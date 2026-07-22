@@ -904,21 +904,15 @@ function render(){
   pintarBadges(yo);
 
   /* 4 · REUNIONES */
+  const misReu = REUNIONES.filter(r => r && (r.convocante===yo.nombre || r.tipo==="general" || (r.invitados||[]).includes(yo.nombre)));
   $("s-reuniones").innerHTML = `
     <h1>Reuniones</h1>
     <p class="sub">Tus reuniones y encuestas de disponibilidad.</p>
     <div class="crear-btn" style="margin:0 0 6px"><button class="ebtn" onclick="crearEncuesta()">Convocar reunión</button></div>
-    ${REUNIONES.map(r=>reuCard(r,yo)).join("")}
-    <h2>Cómo funciona</h2>
-    <div class="tarjeta">
-      <div class="fila"><div class="tit">General<small>todo el equipo · mín. 2 por cuatrimestre</small></div><div class="der">Art. 27a</div></div>
-      <div class="fila"><div class="tit">Junta Directiva<small>mín. 1 al mes · coordinadores + dirección</small></div><div class="der">Art. 27b</div></div>
-      <div class="fila"><div class="tit">Consejo<small>por configurar</small></div><div class="der">—</div></div>
-      <div class="fila"><div class="tit">Subsistema<small>mín. 1 al mes</small></div><div class="der">Art. 27c</div></div>
-      <div class="fila"><div class="tit">Mixta<small>varios subsistemas a la vez</small></div><div class="der">Art. 27d</div></div>
-      <div class="fila"><div class="tit">Reunión de trabajo<small>informal · la convoca cualquiera</small></div><div class="der">—</div></div>
-    </div>
-    <p class="pie">Las de trabajo las convoca cualquier miembro invitando a quien necesite; general, junta, subsistema y mixta las convoca coordinación.</p>`;
+    <h2>Mis reuniones</h2>
+    ${misReu.length
+      ? misReu.map(r=>reuCard(r,yo)).join("")
+      : `<div class="tarjeta"><div class="sindatos">Actualmente no estás convocado a ninguna reunión.<span>Cuando te convoquen a una —o la convoques tú— aparecerá aquí.</span></div></div>`}`;
 
   /* 5 · CONTRIBUCIÓN */
   const d = yo.desglose, techo = d.techo_mensual;
