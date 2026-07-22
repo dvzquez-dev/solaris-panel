@@ -1190,7 +1190,7 @@ async function verReunion(id, _bg){
     <h2 style="margin:16px 2px 0">Cuándo puede el equipo</h2>
     ${resumen()}
     ${puedeFijar?`<div id="fijar-box" class="crear-btn" style="margin-top:12px"><button class="ebtn" onclick="fijarUI(${r.id})">📌 Fijar fecha de la reunión</button>${plazoVenc?``:`<div class="cprev" style="margin:4px 2px 0">El plazo aún no ha vencido, pero ya puedes fijarla si lo tienes claro.</div>`}</div>`:``}
-    ${(fijada && puedeGestionar && _fijadaFuturo(r.fijada))?`<div id="desfijar-box" class="crear-btn" style="margin-top:12px"><button class="ebtn sec" onclick="desfijarUI(${r.id})">Cambiar fecha / cancelar el fijado</button></div>`:``}
+    ${(fijada && puedeGestionar)?`<div id="desfijar-box" class="crear-btn" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="ebtn sec" onclick="fijarUI(${r.id})">Cambiar fecha/hora</button><button class="ebtn sec" style="color:var(--warn);border-color:var(--warn)" onclick="desfijarUI(${r.id})">Cancelar fijado</button></div>`:``}
     ${(fijada||(esPD&&organiza))?``:`<h2 style="margin:16px 2px 0">Mi disponibilidad</h2>${rejilla(yo.nombre, esPD)}`}
     ${puedeGestionar ? `<div id="ce-delbox" style="margin-top:22px;text-align:center;border-top:1px solid var(--line);padding-top:14px"><button class="ebtn sec" style="color:var(--red2);border-color:var(--red)" onclick="borrarReunionUI(${r.id})">Eliminar reunión</button></div>` : ``}`;
   $("modal").classList.add("on");
@@ -1202,42 +1202,57 @@ function _fijadaLabel(f){ if(!f) return ""; if(typeof f==="string") return fLim(
 function _fijadaBloques(f){ return (f && typeof f==="object" && Array.isArray(f.bloques)) ? f.bloques : []; }
 function _fijadaFuturo(f){ if(!f) return false; const iso=(typeof f==="object"?(f.iso||f.fecha):f); if(!iso) return true; const s=String(iso); const d=new Date(/[ T]/.test(s)?s.replace(" ","T"):s+"T23:59:59"); return d.getTime()>Date.now(); }
 function fijarUI(id){
-  const box=document.getElementById("fijar-box"); if(!box) return;
+  const box=document.getElementById("fijar-box")||document.getElementById("desfijar-box"); if(!box) return;
   const r=REUNIONES.find(x=>x.id===id)||(ENC28&&ENC28.id===id?ENC28:null); if(!r) return;
-  const F=r.franjas||[], hoy=(DATA&&DATA.generado)||"";
+  const F=r.franjas||[], dias=r.dias||[], bloques=r.bloques||[];
+  const fj=r.fijada; let selDi=0, preFr=[];
+  if(fj&&typeof fj==="object"){ if(Array.isArray(fj.bloques)&&fj.bloques.length){ selDi=fj.bloques[0][0]; preFr=fj.bloques.map(b=>b[1]); } else if(Array.isArray(fj.franjas)) preFr=fj.franjas.slice(); }
   box.innerHTML=`<div class="tarjeta" style="text-align:left">
-    <div style="font-weight:700;margin-bottom:6px">Fijar la reunión</div>
-    <div class="cprev" style="margin:0 0 9px">Elige la <b>fecha</b> y toca el/los <b>horario(s)</b> (varios si solapan). Al confirmar se cierra la disponibilidad y los huecos elegidos salen <b style="color:var(--ok)">en verde</b> en el mapa para todos.</div>
-    <label style="display:block;margin-bottom:9px">Fecha<input id="fj-fecha" type="date" value="${hoy}"></label>
-    <div style="font-size:12.5px;color:var(--ink2);margin-bottom:5px">Horario — toca uno o varios</div>
-    <div class="fjstrip" id="fj-slots">${F.map((f,i)=>`<button type="button" class="fjslot" data-fi="${i}">${f.ini}</button>`).join("")||`<span style="color:var(--ink3)">esta reunión no tiene franjas</span>`}</div>
-    <div id="fj-msg" class="er" style="color:var(--warn);font-size:12.5px;margin-top:9px;display:none"></div>
-    <div style="margin-top:11px;display:flex;gap:8px">
+    <div style="font-weight:700;margin-bottom:6px">${fj?"Cambiar la fecha fijada":"Fijar la reunión"}</div>
+    <div class="cprev" style="margin:0 0 9px">Elige el <b>día</b> y toca la <b>primera</b> y la <b>última</b> franja (seguidas). El resultado sale <b style="color:var(--ok)">en verde</b> en el mapa.</div>
+    <label style="display:block;margin-bottom:9px">Día<select id="fj-dia">${dias.map((d,di)=>`<option value="${di}"${di===selDi?" selected":""}>${d}</option>`).join("")||`<option value="0">—</option>`}</select></label>
+    <div style="font-size:12.5px;color:var(--ink2);margin-bottom:5px">Franjas de ese día</div>
+    <div class="fjstrip" id="fj-slots"></div>
+    <div id="fj-sel" style="font-size:13px;color:var(--ok);font-weight:700;margin-top:8px;min-height:17px"></div>
+    <div id="fj-msg" class="er" style="color:var(--warn);font-size:12.5px;margin-top:3px;display:none"></div>
+    <div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="ebtn" onclick="fijarOK(${id})">Confirmar</button>
       <button class="ebtn sec" onclick="verReunion(${id})">Cancelar</button>
     </div></div>`;
-  const strip=document.getElementById("fj-slots");
-  if(strip) strip.querySelectorAll(".fjslot").forEach(b=>b.addEventListener("click",()=>b.classList.toggle("on")));
+  const iniM=f=>{const p=String(f&&f.ini||"0:0").split(":");return (+p[0]||0)*60+(+p[1]||0);};
+  const st={di:selDi, ord:[], anchor:-1, last:-1}; window._fjState=st;
+  const paint=()=>{
+    const strip=$("fj-slots"); if(!strip) return;
+    const lo=st.anchor<0?-1:Math.min(st.anchor,st.last), hi=st.anchor<0?-1:Math.max(st.anchor,st.last);
+    strip.innerHTML=st.ord.length?st.ord.map((oi,k)=>`<button type="button" class="fjslot${(k>=lo&&k<=hi)?" on":""}" data-k="${k}">${F[oi].ini}–${finFranja(F[oi])}</button>`).join(""):`<span style="color:var(--ink3)">este día no tiene franjas</span>`;
+    strip.querySelectorAll(".fjslot").forEach(b=>b.addEventListener("click",()=>{ const k=+b.dataset.k; if(st.anchor<0){st.anchor=k;st.last=k;} else if(st.anchor!==st.last){st.anchor=k;st.last=k;} else {st.last=k;} paint(); }));
+    const sel=$("fj-sel"); if(sel){ if(lo<0){sel.textContent="";} else { sel.textContent=`Elegido: ${F[st.ord[lo]].ini}–${finFranja(F[st.ord[hi]])}`; } }
+  };
+  const loadDay=di=>{ const avail=[...new Set(bloques.filter(b=>b[0]===di).map(b=>b[1]))].filter(i=>i>=0&&i<F.length); avail.sort((x,y)=>iniM(F[x])-iniM(F[y]));
+    st.di=di; st.ord=avail; st.anchor=-1; st.last=-1;
+    if(preFr&&preFr.length){ const ks=preFr.map(fi=>avail.indexOf(fi)).filter(k=>k>=0).sort((a,b)=>a-b); if(ks.length){ st.anchor=ks[0]; st.last=ks[ks.length-1]; } preFr=[]; }
+    paint(); };
+  $("fj-dia").addEventListener("change",e=>loadDay(+e.target.value));
+  loadDay(selDi);
 }
 async function fijarOK(id){
   if(window._fijando) return;
   const r=REUNIONES.find(x=>x.id===id)||(ENC28&&ENC28.id===id?ENC28:null); if(!r) return;
   const msg=document.getElementById("fj-msg"), err=t=>{ if(msg){msg.textContent=t;msg.style.display="";} };
-  const fecha=($("fj-fecha")&&$("fj-fecha").value)||"";
-  const sel=[...document.querySelectorAll("#fj-slots .fjslot.on")].map(b=>+b.dataset.fi).sort((a,b)=>a-b);
-  if(!fecha) return err("Elige la fecha.");
-  if(!sel.length) return err("Toca al menos un horario.");
+  const st=window._fjState;
+  if(!st || st.anchor<0) return err("Toca la primera y la última franja.");
+  const lo=Math.min(st.anchor,st.last), hi=Math.max(st.anchor,st.last), ordSel=st.ord.slice(lo,hi+1), di=st.di;
+  if(!ordSel.length) return err("Selección vacía.");
   window._fijando=true;
-  const btn=document.querySelector(`#fijar-box button[onclick="fijarOK(${id})"]`); if(btn){btn.disabled=true;btn.textContent="Fijando…";}
-  const F=r.franjas||[], p=fecha.split("-"), ddmm=(p.length===3?p[2]+"/"+p[1]:"");
-  let di=-1; (r.dias||[]).forEach((d,ix)=>{ if(ddmm&&String(d).indexOf(ddmm)>=0) di=ix; });
-  const bloques = di>=0 ? sel.map(fi=>[di,fi]) : [];
-  const inis=sel.map(fi=>F[fi]&&F[fi].ini).filter(Boolean).sort();
-  const fins=sel.map(fi=>F[fi]?finFranja(F[fi]):"").filter(Boolean).sort();
-  const ini0=inis[0]||"", finMax=fins.length?fins[fins.length-1]:"";
-  const fechaTxt=(p.length===3?p[2]+"/"+p[1]+"/"+p[0]:fecha);
-  const label=`${fechaTxt} · ${ini0}${(finMax&&finMax!==ini0)?"–"+finMax:""}`;
-  const fijada={fecha,franjas:sel,bloques,label,iso:fecha+(ini0?" "+ini0:"")};
+  const btn=document.querySelector(`button[onclick="fijarOK(${id})"]`); if(btn){btn.disabled=true;btn.textContent="Fijando…";}
+  const F=r.franjas||[], dias=r.dias||[], dia=dias[di]||"";
+  const anio=(((DATA&&DATA.generado)||"2026")+"").slice(0,4);
+  const dm=String(dia).match(/(\d{1,2})\/(\d{1,2})/);
+  const fecha=dm?`${anio}-${dm[2].padStart(2,"0")}-${dm[1].padStart(2,"0")}`:"";
+  const bloques=ordSel.map(fi=>[di,fi]);
+  const ini0=F[ordSel[0]]?F[ordSel[0]].ini:"", finMax=F[ordSel[ordSel.length-1]]?finFranja(F[ordSel[ordSel.length-1]]):"";
+  const label=`${dia} · ${ini0}${(finMax&&finMax!==ini0)?"–"+finMax:""}`;
+  const fijada={fecha,franjas:ordSel,bloques,label,iso:fecha+(ini0?" "+ini0:"")};
   try{
     if(backendOK && SESION){ await api.fijar(id, fijada); }
     if(r) r.fijada=fijada; if(ENC28&&ENC28.id===id) ENC28.fijada=fijada;
