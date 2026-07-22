@@ -306,6 +306,19 @@
   .rejilla .celc{height:16px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
   .rejilla .celc.best{outline:2px solid #fff;outline-offset:-1px}
   .rejilla .celc.no{background:transparent}
+  .rejilla .celc.tap{cursor:pointer}
+  .rejilla .celc.sel{outline:2px solid var(--ink);outline-offset:-1px;box-shadow:0 0 0 2px rgba(0,0,0,.25)}
+  .cseg{display:flex;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:0 2px}
+  .cseg button{flex:1;background:var(--sur2);border:0;border-right:1px solid var(--line);padding:9px 4px;font-size:12.5px;color:var(--ink2);cursor:pointer;font-family:inherit}
+  .cseg button:last-child{border-right:0}
+  .cseg button.on{background:rgba(228,30,37,.16);color:var(--red2);font-weight:700}
+  .fdbox{margin:11px 2px 2px;padding:10px 12px;background:var(--sur2);border:1px solid var(--line);border-radius:10px}
+  .fdcab{font-size:12.5px;color:var(--ink2);margin-bottom:8px}
+  .fdcab b{color:var(--ink)}
+  .fdchips{display:flex;flex-wrap:wrap;gap:6px}
+  .fchip{background:var(--sur);border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12px;color:var(--ink)}
+  .fchip.pres{border-color:var(--red);color:var(--red2);font-weight:600}
+  .odbox{margin:9px 2px 2px}
   .disp-sec.res.on{max-height:1100px}
   .densbar{display:inline-block;width:52px;height:9px;border-radius:3px;background:linear-gradient(90deg,rgba(228,30,37,.14),var(--red));margin:0 6px;vertical-align:middle}
   .densrow{display:flex;flex-direction:column;gap:7px;margin:13px 2px 2px}
@@ -437,7 +450,21 @@ const api = {
   getEntregables: () => api._post({action:"getEntregables"}),
   decidir: (id, accion, motivo, extra) => api._post({action:"decidir", id, accion, motivo, extra}),
 };
-function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null}; }
+function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"anonima"}; }
+// Convierte un enlace de Drive/Docs a su URL de vista previa embebible; si es otro
+// (p.ej. un PDF directo) lo deja tal cual para meterlo en el iframe.
+function _embedUrl(u){
+  u=String(u||"").trim();
+  let m=u.match(/drive\.google\.com\/file\/d\/([^/?#]+)/); if(m) return "https://drive.google.com/file/d/"+m[1]+"/preview";
+  m=u.match(/[?&]id=([^&#]+)/); if(m && /drive\.google\.com/.test(u)) return "https://drive.google.com/file/d/"+m[1]+"/preview";
+  m=u.match(/(docs\.google\.com\/(?:document|presentation|spreadsheets)\/d\/[^/?#]+)/); if(m) return "https://"+m[1]+"/preview";
+  return u;
+}
+function _ordenDiaBox(u){
+  const src=_embedUrl(u);
+  return `<div class="odbox"><iframe src="${src}" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:430px;border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>
+    <div style="margin-top:6px;text-align:right"><a href="${u}" target="_blank" rel="noopener" style="color:var(--red2);font-size:12.5px">Abrir en una pestaña ›</a></div></div>`;
+}
 const TAREAS = [];
 // Espejo del canal de turnos de Discord (datos/turnos.json). Cada turno trae
 // sus roles ya asignados (miembro resuelto del handle). Vacío en verano.
@@ -542,11 +569,17 @@ function resumen(){
   const e=ENC28, F0=Array.isArray(e.franjas)?e.franjas:[], nD=(e.dias||[]).length, nF=F0.length;
   const resp=e.resp||{}, nombres=Object.keys(resp).filter(n=>Array.isArray(resp[n])), nR=nombres.length;
   if(!nD||!nF) return `<div class="sindatos">Esta encuesta no tiene franjas.</div>`;
+  const _yoNom=(DATA.miembros[iyo]&&DATA.miembros[iyo].nombre)||"";
+  const soyOrg=(e.convocante===_yoNom)||(typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL);
+  const vision=e.vision||"anonima";
+  // oculta: el mapa no se muestra a quien no organiza (anti-gaming). El organizador/admin sí lo ve para decidir.
+  if(vision==="oculta" && !soyOrg) return `<div class="sindatos">Se ha ocultado la visibilidad de disponibilidad para esta reunión.<span>Cubre la tuya igualmente; quien la convoca elegirá el mejor momento.</span></div>`;
   if(!nR) return `<div class="sindatos">Nadie ha respondido todavía.<span>Cuando el equipo cubra su disponibilidad, verás aquí cuántos pueden en cada franja.</span></div>`;
+  const conNombres=(vision==="publica");   // pública: tocar un hueco revela quién puede
   const orden=F0.map((_,i)=>i).sort((a,b)=> iniMin(F0[a])-iniMin(F0[b]) || (+F0[a].dur||0)-(+F0[b].dur||0));
   const F=orden.map(i=>F0[i]), pos=[]; orden.forEach((oi,k)=>pos[oi]=k);
   const cel=Array.from({length:nD},()=>Array(nF).fill(null));
-  (e.bloques||[]).forEach((b,i)=>{ if(Array.isArray(b)&&b[1]>=0&&b[1]<nF&&cel[b[0]]){ let disp=0,pres=0; nombres.forEach(n=>{const v=+resp[n][i]||0; if(v>=1)disp++; if(v>=2)pres++;}); cel[b[0]][pos[b[1]]]={disp,pres}; } });
+  (e.bloques||[]).forEach((b,i)=>{ if(Array.isArray(b)&&b[1]>=0&&b[1]<nF&&cel[b[0]]){ let disp=0,pres=0,quienes=[]; nombres.forEach(n=>{const v=+resp[n][i]||0; if(v>=1){disp++;quienes.push({n:n,pres:v>=2});} if(v>=2)pres++;}); cel[b[0]][pos[b[1]]]={disp,pres,quienes}; } });
   const slots=[]; cel.forEach((row,di)=>row.forEach((c,f)=>{ if(c) slots.push({di,f,disp:c.disp,pres:c.pres}); }));
   const maxDisp=slots.reduce((m,x)=>Math.max(m,x.disp),0);
   const porMejor=(a,b)=> b.disp-a.disp || b.pres-a.pres || a.di-b.di || iniMin(F[a.f])-iniMin(F[b.f]);
@@ -555,22 +588,39 @@ function resumen(){
   const contiguo=F.every((f,i)=> i===0 || iniMin(f)===finMin(F[i-1]));
   const enHora=F.filter(f=>iniMin(f)%60===0).length, largo=F.some(f=>String(f.ini).slice(3)!=="00"), verLbl=ix=> enHora>=2 ? iniMin(F[ix])%60===0 : (!largo || ix%2===0);
   const verNum = nF<=15;
+  if(conNombres) window._franjaInfo={};
   let g=`<div class="rejwrap"><div class="rejilla" style="grid-template-columns:auto repeat(${nF},minmax(16px,1fr))"><div class="rc"></div>`;
   F.forEach((f,ix)=>{const et=String(f.ini).replace(":00",""),L=verLbl(ix); g+= contiguo?`<div class="rc rh">${L?`<span>${et}</span>`:``}${ix===nF-1?`<span class="fin">${finFranja(f).replace(":00","")}</span>`:``}</div>`:`<div class="rc rh cen">${L?`<span>${et}</span>`:``}</div>`;});
   e.dias.forEach((d,di)=>{ g+=`<div class="rc rd">${d}</div>`;
     for(let f=0;f<nF;f++){const c=cel[di][f];
       if(!c){g+=`<div class="celc no"></div>`;continue;}
       const a=maxDisp?(0.12+0.88*c.disp/maxDisp):0, es=(best&&best.di===di&&best.f===f);
-      g+=`<div class="celc${es?" best":""}" title="${F[f].ini}–${finFranja(F[f])} · ${d}: ${c.disp}/${nR} pueden${hayPres?`, ${c.pres} en persona`:``}" style="background:rgba(228,30,37,${a.toFixed(3)})">${verNum&&c.disp?c.disp:""}</div>`;
+      if(conNombres) window._franjaInfo[di+"_"+f]={dia:d,ini:F[f].ini,fin:finFranja(F[f]),disp:c.disp,pres:c.pres,quienes:c.quienes};
+      g+=`<div class="celc${es?" best":""}${conNombres?" tap":""}" ${conNombres?`onclick="_mostrarFranja('${di}_${f}')" data-fk="${di}_${f}"`:``} title="${F[f].ini}–${finFranja(F[f])} · ${d}: ${c.disp}/${nR} pueden${hayPres?`, ${c.pres} en persona`:``}" style="background:rgba(228,30,37,${a.toFixed(3)})">${verNum&&c.disp?c.disp:""}</div>`;
     }
   });
   g+=`</div></div>`;
+  const detalle = conNombres ? `<div id="franja-detalle" class="fdbox" style="display:none"></div>` : ``;
   const top=[...slots].sort(porMejor).slice(0,3);
   const lista=top.map(x=>`<div class="densf"><span class="dd">${e.dias[x.di]} ${F[x.f].ini}</span><span class="db"><i style="width:${maxDisp?Math.round(100*x.disp/maxDisp):0}%"></i></span><span class="dn">${x.disp}/${nR}${(hayPres&&x.pres)?` · ${x.pres} en persona`:""}</span></div>`).join("");
-  return `<div class="dispcab"><b>${nR}</b> respondieron · mejor franja <b style="color:var(--red2)">${best?`${e.dias[best.di]} ${F[best.f].ini}`:"—"}</b>${best?` — ${best.disp}/${nR} pueden${(hayPres&&best.pres)?`, ${best.pres} en persona`:""}`:""}</div>${g}
+  const notaLeg = conNombres ? "toca un hueco para ver quién puede en esa franja" : (verNum?"el número es cuánta gente puede":"mantén el dedo en una celda para el detalle");
+  return `<div class="dispcab"><b>${nR}</b> respondieron · mejor franja <b style="color:var(--red2)">${best?`${e.dias[best.di]} ${F[best.f].ini}`:"—"}</b>${best?` — ${best.disp}/${nR} pueden${(hayPres&&best.pres)?`, ${best.pres} en persona`:""}`:""}</div>${g}${detalle}
     <div class="densrow">${lista}</div>
-    <div class="displeg" style="margin-top:8px">menos<span class="densbar"></span>más · el número es cuánta gente puede${verNum?"":" (mantén pulsada una celda para el detalle)"}</div>`;
+    <div class="displeg" style="margin-top:8px">menos<span class="densbar"></span>más · ${notaLeg}</div>`;
 }
+// pública: pinta debajo del mapa quién puede en la franja tocada
+function _mostrarFranja(key){
+  const info=(window._franjaInfo||{})[key], box=document.getElementById("franja-detalle");
+  if(!info||!box) return;
+  const pilaDe=n=>{const m=DATA.miembros.find(x=>x.nombre===n); return m?(m.pila||n.split(" ")[0]):n.split(" ")[0];};
+  const q=info.quienes||[];
+  const chips=q.length?q.map(x=>`<span class="fchip${x.pres?" pres":""}">${pilaDe(x.n)}</span>`).join(""):`<span style="color:var(--ink3)">nadie por ahora</span>`;
+  box.innerHTML=`<div class="fdcab"><b>${info.dia} ${info.ini}–${info.fin}</b> · ${info.disp} pueden${(hayPresDe(info))?`, ${info.pres} en persona`:""}</div><div class="fdchips">${chips}</div>`;
+  box.style.display="";
+  document.querySelectorAll("#modal-body .celc.sel").forEach(c=>c.classList.remove("sel"));
+  const cell=document.querySelector('#modal-body .celc[data-fk="'+key+'"]'); if(cell)cell.classList.add("sel");
+}
+function hayPresDe(info){ return (ENC28&&(ENC28.modalidad||"hibrida")!=="telematica") && info.pres>0; }
 function finFranja(f){const t=finMin(f);return `${String(((Math.floor(t/60))%24+24)%24).padStart(2,"0")}:${String((t%60+60)%60).padStart(2,"0")}`;}
 function toggleDisp(){
   const s=$("disp28"), t=$("reutog");
@@ -1108,6 +1158,7 @@ async function verReunion(id, _bg){
   const yo=DATA.miembros[iyo], esPD=yo.unidad==="Project Director", organiza=r.convocante===yo.nombre;
   const yaCubri=Array.isArray((r.resp||{})[yo.nombre]);
   $("modal-body").innerHTML=`${encMeta()}
+    ${r.ordenDia?`<h2 style="margin:16px 2px 0">Orden del día</h2>${_ordenDiaBox(r.ordenDia)}`:``}
     ${(esPD&&organiza)?`<p class="pie" style="margin:10px 2px 0">La organizas tú; estás exento de cubrir la disponibilidad.</p>`
       :`<div class="crear-btn" style="margin-top:11px"><button class="ebtn" onclick="cubrir()">${yaCubri?"Editar mi disponibilidad":"Cubrir mi disponibilidad"}</button></div>`}
     <h2 style="margin:16px 2px 0">Cuándo puede el equipo</h2>
@@ -1172,6 +1223,14 @@ function crearEncuesta(){
       <label>Duración de franja<select id="ce-dur"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option><option value="90">1 h 30 min</option><option value="120">2 h</option></select></label>
       <label>Cadencia<select id="ce-paso"><option value="0">Contiguas</option><option value="15">Solapadas cada 15 min</option><option value="30">Solapadas cada 30 min</option><option value="60">Solapadas cada 60 min</option></select></label>
       <div style="display:flex;gap:8px"><label style="flex:1;min-width:0">Límite para responder<input id="ce-lim" type="date"></label><label style="flex:1;min-width:0">Hora (opcional)<input id="ce-limh" type="time"></label></div>
+      <label>Orden del día <span style="color:var(--ink3);font-weight:400">(enlace a PDF/Drive, opcional)</span><input id="ce-orden" placeholder="pega el enlace del documento…" autocomplete="off"></label>
+      <label style="margin-bottom:3px">Visión de disponibilidad</label>
+      <div class="cseg" id="ce-vision">
+        <button type="button" data-v="publica">Pública</button>
+        <button type="button" data-v="anonima" class="on">Anónima</button>
+        <button type="button" data-v="oculta">Oculta</button>
+      </div>
+      <div class="cprev" id="ce-vhint" style="margin:-4px 2px 2px">El equipo ve el mapa de calor con los totales, sin nombres.</div>
     </div>
     <div id="ce-prev" class="cprev"></div>
     <button class="ebtn" onclick="hacerEncuesta()">Crear encuesta</button>`;
@@ -1205,6 +1264,9 @@ function crearEncuesta(){
   if($("ce-tipo")){$("ce-tipo").addEventListener("change",tipoUpd);tipoUpd();}
   if($("ce-mix")){$("ce-mix").querySelectorAll(".cmixb").forEach(btn=>btn.addEventListener("click",()=>{btn.classList.toggle("on");const u=btn.dataset.u,on=btn.classList.contains("on");DATA.miembros.forEach((m,ix)=>{if(m.unidad===u&&ix!==iyo){if(on)window._invitados.add(ix);else window._invitados.delete(ix);}});invRender();}));}
   if($("ce-inv")){$("ce-inv").addEventListener("input",e=>sugRender(e.target.value));$("ce-inv").addEventListener("blur",()=>setTimeout(()=>{if($("ce-sug"))$("ce-sug").style.display="none";},180));}
+  window._vision="anonima";
+  const _vhints={publica:"Cualquiera puede tocar un hueco del mapa y ver quién puede en esa franja.",anonima:"El equipo ve el mapa de calor con los totales, sin nombres.",oculta:"El equipo no ve el mapa; solo tú (quien convoca) lo verás para decidir."};
+  if($("ce-vision")){$("ce-vision").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{$("ce-vision").querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");window._vision=b.dataset.v;if($("ce-vhint"))$("ce-vhint").textContent=_vhints[window._vision]||"";}));}
   $("ce-d0").value=hoy; $("ce-d1").value=mas(hoy,6); $("ce-fecha").value=hoy; $("ce-lim").value=mas(hoy,5);
   upd(); $("modal").classList.add("on");
 }
@@ -1225,7 +1287,7 @@ async function hacerEncuesta(){
   if(!F.length||!bloques.length) return;
   const tipo=V("ce-tipo")||"general", inv=[...(window._invitados||[])].map(ix=>DATA.miembros[ix].nombre);
   const _nid=REUNIONES.reduce((m,r)=>Math.max(m,r.id||0),0)+1;
-  ENC28={id:_nid,titulo:V("ce-tit").trim()||"Reunión sin título",fecha:null,dias,franjas:F,bloques,resp:{},total:bloques.length,limite:V("ce-lim")?(V("ce-lim")+(V("ce-limh")?" "+V("ce-limh"):"")):null,tipo,modalidad:V("ce-modalidad")||"hibrida",invitados:inv,convocante:DATA.miembros[iyo].nombre};
+  ENC28={id:_nid,titulo:V("ce-tit").trim()||"Reunión sin título",fecha:null,dias,franjas:F,bloques,resp:{},total:bloques.length,limite:V("ce-lim")?(V("ce-lim")+(V("ce-limh")?" "+V("ce-limh"):"")):null,tipo,modalidad:V("ce-modalidad")||"hibrida",invitados:inv,convocante:DATA.miembros[iyo].nombre,ordenDia:(V("ce-orden")||"").trim(),vision:(window._vision||"anonima")};
   if(backendOK){ try{ const d=await api.crear(ENC28); if(d&&d.id) ENC28.id=d.id; }catch(_){} }
   REUNIONES.unshift(ENC28);
   const rawRangos=$("ce-perdia").checked?(()=>{const rows=[...$("ce-dias").querySelectorAll(".drow")];return rows.map(r=>r.classList.contains("off")?[0,0]:[+r.querySelector(".dr0").value,+r.querySelector(".dr1").value]);})():null;
