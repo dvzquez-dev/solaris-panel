@@ -49,7 +49,7 @@
 
   /* ── cabecera ──────────────────────────────────────────────────────── */
   header{
-    position:sticky; top:0; z-index:20; padding:15px 18px 14px;
+    position:sticky; top:0; z-index:20; padding:calc(15px + env(safe-area-inset-top)) 18px 14px;
     background:linear-gradient(180deg, var(--bg) 76%, transparent);
     display:flex; align-items:center; justify-content:space-between; gap:12px;
   }
@@ -525,6 +525,21 @@ function _pintarPersona_(){ const sel=$("persona"); if(!sel) return;
 }
 _pintarPersona_();
 $("persona").onchange = e => { iyo = +e.target.value; render(); };
+function cerrarSesion(){
+  SESION=null;
+  try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
+  location.reload();
+}
+function _pintarSalir_(){
+  const hdr=document.querySelector("header"); if(!hdr || document.getElementById("hdr-right")) return;
+  const sel=document.getElementById("persona"), lab=sel?sel.closest("label"):null;
+  const wrap=document.createElement("div"); wrap.id="hdr-right"; wrap.style.cssText="display:flex;align-items:center;gap:9px;flex:none";
+  if(lab){ hdr.insertBefore(wrap,lab); wrap.appendChild(lab); } else hdr.appendChild(wrap);
+  const b=document.createElement("button"); b.id="btnSalir"; b.type="button"; b.textContent="Salir"; b.title="Cerrar sesión";
+  b.style.cssText="background:none;border:1px solid var(--line);color:var(--ink2);border-radius:9px;padding:6px 11px;font-size:12px;cursor:pointer;font-family:inherit;flex:none;white-space:nowrap";
+  b.addEventListener("click",cerrarSesion);
+  wrap.appendChild(b);
+}
 
 /* ── nav ───────────────────────────────────────────────────────────── */
 let activa = "estado";
@@ -1474,7 +1489,8 @@ function cubrir(){
   const instr=modo==="presencial"?"toca o arrastra · marca tu disponibilidad presencial":modo==="telematica"?"toca o arrastra · marca tu disponibilidad telemática":"toca o arrastra · 1× telemático · 2× presencial + telemático · 3× quitar";
   const leyenda=modo==="presencial"?`<span class="pt p"></span>disponibilidad presencial`:modo==="telematica"?`<span class="pt t"></span>disponibilidad telemática`:`<span class="pt p"></span>presencial + telemático<span class="pt t"></span>solo telemático`;
   const enHora=F.filter(f=>iniMin(f)%60===0).length, largo=F.some(f=>String(f.ini).slice(3)!=="00"), verLbl=ix=> enHora>=2 ? iniMin(F[ix])%60===0 : (!largo || ix%2===0);
-  let hd=`<div class="rc"></div>`+F.map((f,ix)=>`<div class="rc rh cen">${verLbl(ix)?`<span>${String(f.ini).replace(":00","")}</span>`:``}</div>`).join("");
+  const contiguo=F.every((f,i)=> i===0 || iniMin(f)===finMin(F[i-1]));
+  let hd=`<div class="rc"></div>`+F.map((f,ix)=>{const et=String(f.ini).replace(":00",""),L=verLbl(ix); return contiguo?`<div class="rc rh">${L?`<span>${et}</span>`:``}${ix===nF-1?`<span class="fin">${finFranja(f).replace(":00","")}</span>`:``}</div>`:`<div class="rc rh cen">${L?`<span>${et}</span>`:``}</div>`;}).join("");
   let rows=""; e.dias.forEach((d,di)=>{ rows+=`<div class="rc rd">${d}</div>`; for(let f=0;f<nF;f++){const k=di+"_"+f; rows+=`<div class="ecel ${oferta.has(k)?cls(sel.get(k)):"off"}" data-k="${k}"></div>`;} });
   $("modal-body").innerHTML=`<div class="mtit">Marca tu disponibilidad</div><div class="msub">${DATA.miembros[iyo].pila} · ${instr}</div>${_avisoPlazo}
     <div class="rejwrap" style="margin-top:10px"><div class="egrid" style="grid-template-columns:auto repeat(${nF},minmax(30px,1fr))">${hd}${rows}</div></div>
@@ -1586,6 +1602,7 @@ async function _onCredencial_(resp){
     var idx=DATA.miembros.findIndex(function(m){return m.nombre===SESION.nombre;});
     iyo = idx>=0 ? idx : (DATA.miembros.length ? 0 : -1);   // admin/no-miembro: primer perfil; el selector #persona deja cambiar
     _pintarPersona_();   // repoblar el selector con los miembros ya cargados tras el login
+    _pintarSalir_();     // botón "Salir" (cerrar sesión) en la cabecera, para todos
     var g=document.getElementById("loginGate"); if(g) g.remove();
     render();
     // solo la cuenta admin ve otros perfiles; el resto queda fijado al suyo.
