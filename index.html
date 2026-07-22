@@ -527,6 +527,7 @@ _pintarPersona_();
 $("persona").onchange = e => { iyo = +e.target.value; render(); };
 function cerrarSesion(){
   SESION=null;
+  try{ localStorage.removeItem("sol_last_email"); }catch(_){}   // olvidar la cuenta → siguiente vez podrás elegir otra
   try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
   location.reload();
 }
@@ -1599,6 +1600,7 @@ async function _onCredencial_(resp){
       SESION={token:resp.credential, email:yo.email, nombre:yo.nombre};
       await _cargarBackend_();
     }
+    try{ if(SESION&&SESION.email) localStorage.setItem("sol_last_email", SESION.email); }catch(_){}   // recordar para el auto-inicio
     var idx=DATA.miembros.findIndex(function(m){return m.nombre===SESION.nombre;});
     iyo = idx>=0 ? idx : (DATA.miembros.length ? 0 : -1);   // admin/no-miembro: primer perfil; el selector #persona deja cambiar
     _pintarPersona_();   // repoblar el selector con los miembros ya cargados tras el login
@@ -1615,7 +1617,10 @@ async function _onCredencial_(resp){
 function _pintarLogin_(){
   _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(260px,64vw);height:auto;margin-bottom:6px"><div style="opacity:.8;max-width:340px">Entra con tu cuenta de UVigo Aerotech<br>para ver tu panel.</div><div id="gbtn"></div>');
   try{
-    google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID, callback:_onCredencial_, auto_select:true, itp_support:true});
+    var _hint=""; try{ _hint=localStorage.getItem("sol_last_email")||""; }catch(_){}
+    var _gcfg={client_id:GOOGLE_CLIENT_ID, callback:_onCredencial_, auto_select:true, itp_support:true};
+    if(_hint) _gcfg.login_hint=_hint;   // pista de la última cuenta → la escoge sola, sin popup de selección
+    google.accounts.id.initialize(_gcfg);
     google.accounts.id.renderButton(document.getElementById("gbtn"), {theme:"filled_black", size:"large", text:"signin_with", shape:"pill"});
     try{ google.accounts.id.prompt(); }catch(_){}   // auto-inicia sesión (silencioso) para quien ya entró; si no puede, queda el botón. "Salir" lo desactiva (disableAutoSelect).
     api.ping();   // pre-calienta el backend mientras el usuario mira la pantalla de login
