@@ -656,7 +656,7 @@ function verDoc(id){
       <div class="er"><span class="amb ${AMB[e.ambito][1]}">${AMB[e.ambito][0]}</span> · ${e.tipo} · enviado ${fechaCorta(e.fecha)} · <span class="stpill ${EST_D[e.estado][1]}">${EST_D[e.estado][0]}</span></div>
       <p>${e.resumen||"Sin descripción."}</p>
       ${(e.etiquetas&&e.etiquetas.length)?`<div class="er">Etiquetas: ${e.etiquetas.join(", ")}</div>`:``}
-      ${e.severidad?`<div class="er" style="margin-top:6px">Calidad: <span class="sev sev-${e.severidad}">${e.severidad}</span>${(e.issues&&e.issues.length)?` · ${e.issues.length} aviso${e.issues.length===1?"":"s"}`:" · sin avisos"}</div>`:``}
+      ${e.severidad?`<div class="er" style="margin-top:6px">Calidad: <span class="sev sev-${e.severidad}">${({baja:"alta",media:"media",alta:"baja"}[e.severidad])||e.severidad}</span>${(e.issues&&e.issues.length)?` · ${e.issues.length} aviso${e.issues.length===1?"":"s"}`:" · sin avisos"}</div>`:``}
       ${(e.issues&&e.issues.length)?`<ul class="docissues">${e.issues.map(x=>`<li>${x}</li>`).join("")}</ul>`:``}
       <div class="er">Revisa: <b>${revs}</b>${enlaces?` · ${enlaces}`:``}</div>
       ${e.bloqueo?`<div class="docbloq">⚠ ${e.bloqueo}</div>`:``}
@@ -689,6 +689,9 @@ function verDoc(id){
 }
 function zoomDoc(d){const p=document.querySelector("#pdfbox .pdfpage"); if(!p)return; let z=+p.dataset.z||1; z = d===0?1 : Math.min(3, Math.max(0.6, +(z + d*0.25).toFixed(2))); p.dataset.z=z; p.style.width=(320*z)+"px"; const l=$("zlbl"); if(l)l.textContent=Math.round(z*100)+"%";}
 async function decidirDoc(id, accion){
+  if(window._decidiendo) return;                       // no enviar varias revisiones si pulsas rápido o el backend tarda
+  window._decidiendo = true;
+  try {
   const e=ENTREGABLES.find(x=>x.id===id); if(!e) return;
   const yo=DATA.miembros[iyo]; if(!puedeDecidir(e, yo)) return;
   const motivo=(($("doc-motivo")&&$("doc-motivo").value)||"").trim();
@@ -706,6 +709,7 @@ async function decidirDoc(id, accion){
     e.revisor=yo.pila;
   }
   $("modal").classList.remove("on"); render(); document.querySelector('[data-k="documentos"]').click();
+  } finally { window._decidiendo = false; }
 }
 function _docErr_(msg){ var b=document.getElementById("doc-err"); if(!b){ b=document.createElement("div"); b.id="doc-err"; b.style.cssText="color:var(--red2);font-size:12px;margin-top:8px"; var host=document.getElementById("modal-body")||document.body; host.appendChild(b); } b.textContent=msg; }
 async function deshacerDoc(id){const e=ENTREGABLES.find(x=>x.id===id); if(!e||!puedeDecidir(e,DATA.miembros[iyo]))return; if(backendOK&&SESION){ try{ const upd=await api.decidir(id,"deshacer"); if(upd){ const ix=ENTREGABLES.findIndex(x=>x.id===id); if(ix>=0)ENTREGABLES[ix]=upd; } }catch(err){ _docErr_("No se pudo deshacer: "+((err&&err.message)||err)); return; } } else { e.estado="revision"; e.revisor=null; e.nota=null; } $("modal").classList.remove("on"); render(); document.querySelector('[data-k="documentos"]').click();}
