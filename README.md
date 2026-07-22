@@ -1,4 +1,4 @@
-# Panel Solaris — app de miembros
+# App Solaris — app de miembros
 
 App instalable (PWA) del equipo **UVigo Aerotech · Solaris**. Turnos, tareas,
 reuniones, documentos y tu ficha, desde el móvil.
@@ -8,7 +8,7 @@ reuniones, documentos y tu ficha, desde el móvil.
   `@uvigoaerotech.com`, y filtrados por rol (cada miembro ve lo suyo).
 - **Instalar**: abre la URL en el móvil → *Añadir a pantalla de inicio*
   (Android: Chrome · iPhone: Safari).
-- Generado desde `navegador/app.html` del proyecto Panel Solaris.
+- Generado desde `navegador/app.html` del proyecto App Solaris.
 
 Alojamiento provisional en la cuenta personal; se migrará a la organización de
 UVigo Aerotech.
