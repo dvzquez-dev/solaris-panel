@@ -322,6 +322,13 @@
   .fijada-bnr{margin:12px 2px 2px;padding:11px 13px;border:1px solid var(--ok);border-radius:11px;background:rgba(46,160,90,.10);color:var(--ink);font-size:14px}
   .fijada-bnr b{color:var(--ok)}
   .fijada-bnr span{display:block;color:var(--ink2);font-size:12.5px;margin-top:3px}
+  .rejilla .celc.fij{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.92)}
+  .displeg.escala{display:flex;align-items:center;justify-content:center;gap:10px;font-size:12.5px;color:var(--ink2)}
+  .displeg.escala .densbar{width:130px;height:12px;margin:0}
+  .fijkey{display:inline-block;width:11px;height:11px;border-radius:2px;background:rgba(46,160,90,.95);vertical-align:-1px;margin-right:5px}
+  .fjstrip{display:flex;flex-wrap:wrap;gap:6px}
+  .fjslot{background:var(--sur2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px;color:var(--ink2);cursor:pointer;font-family:inherit}
+  .fjslot.on{background:rgba(46,160,90,.16);border-color:var(--ok);color:var(--ok);font-weight:700}
   .disp-sec.res.on{max-height:1100px}
   .densbar{display:inline-block;width:52px;height:9px;border-radius:3px;background:linear-gradient(90deg,rgba(228,30,37,.14),var(--red));margin:0 6px;vertical-align:middle}
   .densrow{display:flex;flex-direction:column;gap:7px;margin:13px 2px 2px}
@@ -454,7 +461,7 @@ const api = {
   getEntregables: () => api._post({action:"getEntregables"}),
   decidir: (id, accion, motivo, extra) => api._post({action:"decidir", id, accion, motivo, extra}),
 };
-function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:r.fijada||""}; }
+function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"publica", fijada:r.fijada||""}; }
 // Convierte un enlace de Drive/Docs a su URL de vista previa embebible; si es otro
 // (p.ej. un PDF directo) lo deja tal cual para meterlo en el iframe.
 function _embedUrl(u){
@@ -575,7 +582,7 @@ function resumen(){
   if(!nD||!nF) return `<div class="sindatos">Esta encuesta no tiene franjas.</div>`;
   const _yoNom=(DATA.miembros[iyo]&&DATA.miembros[iyo].nombre)||"";
   const soyOrg=(e.convocante===_yoNom)||(typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL);
-  const vision=e.vision||"anonima";
+  const vision=e.vision||"publica";
   // oculta: el mapa no se muestra a quien no organiza (anti-gaming). El organizador/admin sí lo ve para decidir.
   if(vision==="oculta" && !soyOrg) return `<div class="sindatos">Se ha ocultado la visibilidad de disponibilidad para esta reunión.<span>Cubre la tuya igualmente; quien la convoca elegirá el mejor momento.</span></div>`;
   if(!nR) return `<div class="sindatos">Nadie ha respondido todavía.<span>Cuando el equipo cubra su disponibilidad, verás aquí cuántos pueden en cada franja.</span></div>`;
@@ -584,6 +591,7 @@ function resumen(){
   const F=orden.map(i=>F0[i]), pos=[]; orden.forEach((oi,k)=>pos[oi]=k);
   const cel=Array.from({length:nD},()=>Array(nF).fill(null));
   (e.bloques||[]).forEach((b,i)=>{ if(Array.isArray(b)&&b[1]>=0&&b[1]<nF&&cel[b[0]]){ let disp=0,pres=0,quienes=[]; nombres.forEach(n=>{const v=+resp[n][i]||0; if(v>=1){disp++;quienes.push({n:n,pres:v>=2});} if(v>=2)pres++;}); cel[b[0]][pos[b[1]]]={disp,pres,quienes}; } });
+  const _fijB=_fijadaBloques(e.fijada), fijSet=new Set(); _fijB.forEach(bb=>{ if(Array.isArray(bb)&&pos[bb[1]]!=null) fijSet.add(bb[0]+"_"+pos[bb[1]]); });
   const slots=[]; cel.forEach((row,di)=>row.forEach((c,f)=>{ if(c) slots.push({di,f,disp:c.disp,pres:c.pres}); }));
   const maxDisp=slots.reduce((m,x)=>Math.max(m,x.disp),0);
   const porMejor=(a,b)=> b.disp-a.disp || b.pres-a.pres || a.di-b.di || iniMin(F[a.f])-iniMin(F[b.f]);
@@ -600,7 +608,8 @@ function resumen(){
       if(!c){g+=`<div class="celc no"></div>`;continue;}
       const a=maxDisp?(0.12+0.88*c.disp/maxDisp):0, es=(best&&best.di===di&&best.f===f);
       if(conNombres) window._franjaInfo[di+"_"+f]={dia:d,ini:F[f].ini,fin:finFranja(F[f]),disp:c.disp,pres:c.pres,quienes:c.quienes};
-      g+=`<div class="celc${es?" best":""}${conNombres?" tap":""}" ${conNombres?`onclick="_mostrarFranja('${di}_${f}')" data-fk="${di}_${f}"`:``} title="${F[f].ini}–${finFranja(F[f])} · ${d}: ${c.disp}/${nR} pueden${hayPres?`, ${c.pres} en persona`:``}" style="background:rgba(228,30,37,${a.toFixed(3)})">${verNum&&c.disp?c.disp:""}</div>`;
+      const esFij=fijSet.has(di+"_"+f);
+      g+=`<div class="celc${es?" best":""}${esFij?" fij":""}${conNombres?" tap":""}" ${conNombres?`onclick="_mostrarFranja('${di}_${f}')" data-fk="${di}_${f}"`:``} title="${F[f].ini}–${finFranja(F[f])} · ${d}: ${c.disp}/${nR} pueden${hayPres?`, ${c.pres} en persona`:``}${esFij?" · ELEGIDO":""}" style="background:${esFij?'rgba(46,160,90,.95)':'rgba(228,30,37,'+a.toFixed(3)+')'}">${verNum&&c.disp?c.disp:""}</div>`;
     }
   });
   g+=`</div></div>`;
@@ -610,7 +619,8 @@ function resumen(){
   const notaLeg = conNombres ? "toca un hueco para ver quién puede en esa franja" : (verNum?"el número es cuánta gente puede":"mantén el dedo en una celda para el detalle");
   return `<div class="dispcab"><b>${nR}</b> respondieron · mejor franja <b style="color:var(--red2)">${best?`${e.dias[best.di]} ${F[best.f].ini}`:"—"}</b>${best?` — ${best.disp}/${nR} pueden${(hayPres&&best.pres)?`, ${best.pres} en persona`:""}`:""}</div>${g}${detalle}
     <div class="densrow">${lista}</div>
-    <div class="displeg" style="margin-top:8px">menos<span class="densbar"></span>más · ${notaLeg}</div>`;
+    <div class="displeg escala" style="margin-top:13px"><span>menos</span><span class="densbar"></span><span>más</span></div>
+    <div class="displeg" style="margin-top:7px">${fijSet.size?`<span class="fijkey"></span>hueco elegido · `:``}${notaLeg}</div>`;
 }
 // pública: pinta debajo del mapa quién puede en la franja tocada
 function _mostrarFranja(key){
@@ -1110,7 +1120,7 @@ function reuCard(r, yo){
   else est=`<span style="color:var(--red2)">te falta cubrir</span>`;
   if(r._eliminando) return `<div class="tarjeta" style="opacity:.4;pointer-events:none"><div class="fila"><div class="tit">${r.titulo}</div><div class="der"><span style="color:var(--red2);font-weight:800;letter-spacing:1.5px">ELIMINANDO…</span></div></div></div>`;
   return `<div class="tarjeta clicable" onclick="verReunion(${r.id})"><div class="fila"><div class="tit">${r.titulo} <span class="cbadge ${t[1]}">${t[0]}</span> <span class="cbadge modo ${r.modalidad||'hibrida'}">${MOD[r.modalidad||'hibrida']}</span>
-    <small>Convoca ${r.convocante.split(" ")[0]}${r.fijada?` · 📌 ${fLim(r.fijada)}`:(lim?` · cierra ${lim}`:"")} · ${nR} respondieron</small></div>
+    <small>Convoca ${r.convocante.split(" ")[0]}${r.fijada?` · 📌 ${_fijadaLabel(r.fijada)}`:(lim?` · cierra ${lim}`:"")} · ${nR} respondieron</small></div>
     <div class="der">${est} <span class="chev">›</span></div></div></div>`;
 }
 /* -- Live: mientras una reunion esta abierta, refresca sus respuestas cada 9s.
@@ -1167,53 +1177,86 @@ async function verReunion(id, _bg){
   const nR=(r.resp&&Object.keys(r.resp).filter(n=>Array.isArray(r.resp[n])).length)||r.nResp||0;
   const puedeFijar=puedeGestionar && !fijada && (plazoVenc || nR>0);
   $("modal-body").innerHTML=`${encMeta()}
-    ${fijada?`<div class="fijada-bnr">📌 Reunión fijada · <b>${fLim(r.fijada)}</b><span>La disponibilidad está cerrada para todos.</span></div>`:``}
+    ${fijada?`<div class="fijada-bnr">📌 Reunión fijada · <b>${_fijadaLabel(r.fijada)}</b><span>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</span></div>`:``}
     ${r.ordenDia?`<h2 style="margin:16px 2px 0">Orden del día</h2>${_ordenDiaBox(r.ordenDia)}`:``}
     ${fijada
       ? ``
       : (esPD&&organiza)
         ? `<p class="pie" style="margin:10px 2px 0">La organizas tú; estás exento de cubrir la disponibilidad.</p>`
         : `<div class="crear-btn" style="margin-top:11px"><button class="ebtn" onclick="cubrir()">${yaCubri?"Editar mi disponibilidad":"Cubrir mi disponibilidad"}</button></div>`}
-    ${(!fijada || nR>0)?`<h2 style="margin:16px 2px 0">Cuándo puede el equipo</h2>${resumen()}`:``}
+    <h2 style="margin:16px 2px 0">Cuándo puede el equipo</h2>
+    ${resumen()}
     ${puedeFijar?`<div id="fijar-box" class="crear-btn" style="margin-top:12px"><button class="ebtn" onclick="fijarUI(${r.id})">📌 Fijar fecha de la reunión</button>${plazoVenc?``:`<div class="cprev" style="margin:4px 2px 0">El plazo aún no ha vencido, pero ya puedes fijarla si lo tienes claro.</div>`}</div>`:``}
+    ${(fijada && puedeGestionar && _fijadaFuturo(r.fijada))?`<div id="desfijar-box" class="crear-btn" style="margin-top:12px"><button class="ebtn sec" onclick="desfijarUI(${r.id})">Cambiar fecha / cancelar el fijado</button></div>`:``}
     ${(fijada||(esPD&&organiza))?``:`<h2 style="margin:16px 2px 0">Mi disponibilidad</h2>${rejilla(yo.nombre, esPD)}`}
     ${puedeGestionar ? `<div id="ce-delbox" style="margin-top:22px;text-align:center;border-top:1px solid var(--line);padding-top:14px"><button class="ebtn sec" style="color:var(--red2);border-color:var(--red)" onclick="borrarReunionUI(${r.id})">Eliminar reunión</button></div>` : ``}`;
   $("modal").classList.add("on");
   if(!_bg && backendOK){ (async()=>{ try{ const d=await api.get(id); if(d&&d.reunion){ const nueva=normReu(d.reunion); nueva.resp=d.respuestas||{}; const ix=REUNIONES.findIndex(x=>x.id===id); if(ix>=0)REUNIONES[ix]=nueva; const m=document.getElementById("modal"); if(m&&m.classList.contains("on")&&ENC28&&ENC28.id===id&&!document.querySelector("#modal-body .egrid")) verReunion(id, true); } }catch(_){} })(); }
 }
 function _plazoVencido(r){ if(!r||!r.limite) return false; const s=String(r.limite); const dl=new Date(/[ T]/.test(s)?s.replace(" ","T"):s+"T23:59:59"); return new Date()>dl; }
+// fijada puede ser objeto {fecha,franjas,bloques,label,iso} (nuevo) o string (antiguo).
+function _fijadaLabel(f){ if(!f) return ""; if(typeof f==="string") return fLim(f); return f.label || fLim(f.iso||f.fecha||""); }
+function _fijadaBloques(f){ return (f && typeof f==="object" && Array.isArray(f.bloques)) ? f.bloques : []; }
+function _fijadaFuturo(f){ if(!f) return false; const iso=(typeof f==="object"?(f.iso||f.fecha):f); if(!iso) return true; const s=String(iso); const d=new Date(/[ T]/.test(s)?s.replace(" ","T"):s+"T23:59:59"); return d.getTime()>Date.now(); }
 function fijarUI(id){
   const box=document.getElementById("fijar-box"); if(!box) return;
-  const hoy=(DATA&&DATA.generado)||"";
+  const r=REUNIONES.find(x=>x.id===id)||(ENC28&&ENC28.id===id?ENC28:null); if(!r) return;
+  const F=r.franjas||[], hoy=(DATA&&DATA.generado)||"";
   box.innerHTML=`<div class="tarjeta" style="text-align:left">
-    <div style="font-weight:700;margin-bottom:6px">Fijar fecha y hora</div>
-    <div class="cprev" style="margin:0 0 9px">Al confirmarla se <b>cierra la disponibilidad</b> para todos y la reunión queda marcada como fijada. Mira el mapa de arriba para elegir el mejor momento.</div>
-    <div style="display:flex;gap:8px">
-      <label style="flex:1;min-width:0">Fecha<input id="fj-fecha" type="date" value="${hoy}"></label>
-      <label style="flex:1;min-width:0">Hora<input id="fj-hora" type="time"></label>
-    </div>
-    <div id="fj-msg" class="er" style="color:var(--warn);font-size:12.5px;margin-top:8px;display:none"></div>
+    <div style="font-weight:700;margin-bottom:6px">Fijar la reunión</div>
+    <div class="cprev" style="margin:0 0 9px">Elige la <b>fecha</b> y toca el/los <b>horario(s)</b> (varios si solapan). Al confirmar se cierra la disponibilidad y los huecos elegidos salen <b style="color:var(--ok)">en verde</b> en el mapa para todos.</div>
+    <label style="display:block;margin-bottom:9px">Fecha<input id="fj-fecha" type="date" value="${hoy}"></label>
+    <div style="font-size:12.5px;color:var(--ink2);margin-bottom:5px">Horario — toca uno o varios</div>
+    <div class="fjstrip" id="fj-slots">${F.map((f,i)=>`<button type="button" class="fjslot" data-fi="${i}">${f.ini}</button>`).join("")||`<span style="color:var(--ink3)">esta reunión no tiene franjas</span>`}</div>
+    <div id="fj-msg" class="er" style="color:var(--warn);font-size:12.5px;margin-top:9px;display:none"></div>
     <div style="margin-top:11px;display:flex;gap:8px">
-      <button class="ebtn" onclick="fijarOK(${id})">Confirmar fecha</button>
+      <button class="ebtn" onclick="fijarOK(${id})">Confirmar</button>
       <button class="ebtn sec" onclick="verReunion(${id})">Cancelar</button>
     </div></div>`;
+  const strip=document.getElementById("fj-slots");
+  if(strip) strip.querySelectorAll(".fjslot").forEach(b=>b.addEventListener("click",()=>b.classList.toggle("on")));
 }
 async function fijarOK(id){
   if(window._fijando) return;
-  const gv=x=>($(x)&&$(x).value)||"";
-  const fecha=gv("fj-fecha"), hora=gv("fj-hora"), msg=document.getElementById("fj-msg");
-  if(!fecha){ if(msg){msg.textContent="Pon al menos la fecha.";msg.style.display="";} return; }
+  const r=REUNIONES.find(x=>x.id===id)||(ENC28&&ENC28.id===id?ENC28:null); if(!r) return;
+  const msg=document.getElementById("fj-msg"), err=t=>{ if(msg){msg.textContent=t;msg.style.display="";} };
+  const fecha=($("fj-fecha")&&$("fj-fecha").value)||"";
+  const sel=[...document.querySelectorAll("#fj-slots .fjslot.on")].map(b=>+b.dataset.fi).sort((a,b)=>a-b);
+  if(!fecha) return err("Elige la fecha.");
+  if(!sel.length) return err("Toca al menos un horario.");
   window._fijando=true;
   const btn=document.querySelector(`#fijar-box button[onclick="fijarOK(${id})"]`); if(btn){btn.disabled=true;btn.textContent="Fijando…";}
-  const fijada=fecha+(hora?" "+hora:"");
+  const F=r.franjas||[], p=fecha.split("-"), ddmm=(p.length===3?p[2]+"/"+p[1]:"");
+  let di=-1; (r.dias||[]).forEach((d,ix)=>{ if(ddmm&&String(d).indexOf(ddmm)>=0) di=ix; });
+  const bloques = di>=0 ? sel.map(fi=>[di,fi]) : [];
+  const inis=sel.map(fi=>F[fi]&&F[fi].ini).filter(Boolean).sort();
+  const fins=sel.map(fi=>F[fi]?finFranja(F[fi]):"").filter(Boolean).sort();
+  const ini0=inis[0]||"", finMax=fins.length?fins[fins.length-1]:"";
+  const fechaTxt=(p.length===3?p[2]+"/"+p[1]+"/"+p[0]:fecha);
+  const label=`${fechaTxt} · ${ini0}${(finMax&&finMax!==ini0)?"–"+finMax:""}`;
+  const fijada={fecha,franjas:sel,bloques,label,iso:fecha+(ini0?" "+ini0:"")};
   try{
     if(backendOK && SESION){ await api.fijar(id, fijada); }
-    const r=REUNIONES.find(x=>x.id===id); if(r) r.fijada=fijada; if(ENC28&&ENC28.id===id) ENC28.fijada=fijada;
+    if(r) r.fijada=fijada; if(ENC28&&ENC28.id===id) ENC28.fijada=fijada;
     render(); verReunion(id);
-  }catch(err){
-    if(msg){msg.textContent="No se pudo fijar: "+((err&&err.message)||err);msg.style.display="";}
-    if(btn){btn.disabled=false;btn.textContent="Confirmar fecha";}
-  } finally{ window._fijando=false; }
+  }catch(e){ err("No se pudo fijar: "+((e&&e.message)||e)); if(btn){btn.disabled=false;btn.textContent="Confirmar";} }
+  finally{ window._fijando=false; }
+}
+function desfijarUI(id){
+  const box=document.getElementById("desfijar-box"); if(!box) return;
+  box.innerHTML=`<div class="er" style="color:var(--warn);margin-bottom:8px">¿Cancelar el fijado? Se reabre la disponibilidad y el equipo podrá volver a cubrir.</div>
+    <button class="ebtn" style="background:var(--warn);border-color:var(--warn)" onclick="desfijarOK(${id})">Sí, cancelar y reabrir</button>
+    <button class="ebtn sec" style="margin-left:8px" onclick="verReunion(${id})">No</button>`;
+}
+async function desfijarOK(id){
+  if(window._fijando) return; window._fijando=true;
+  const r=REUNIONES.find(x=>x.id===id);
+  try{
+    if(backendOK && SESION){ await api.fijar(id, ""); }
+    if(r) r.fijada=""; if(ENC28&&ENC28.id===id) ENC28.fijada="";
+    render(); verReunion(id);
+  }catch(e){}
+  finally{ window._fijando=false; }
 }
 function borrarReunionUI(id){
   const box=document.getElementById("ce-delbox"); if(!box) return;
@@ -1273,11 +1316,11 @@ function crearEncuesta(){
       <label>Orden del día <span style="color:var(--ink3);font-weight:400">(enlace a PDF/Drive, opcional)</span><input id="ce-orden" placeholder="pega el enlace del documento…" autocomplete="off"></label>
       <label style="margin-bottom:3px">Visión de disponibilidad</label>
       <div class="cseg" id="ce-vision">
-        <button type="button" data-v="publica">Pública</button>
-        <button type="button" data-v="anonima" class="on">Anónima</button>
+        <button type="button" data-v="publica" class="on">Pública</button>
+        <button type="button" data-v="anonima">Anónima</button>
         <button type="button" data-v="oculta">Oculta</button>
       </div>
-      <div class="cprev" id="ce-vhint" style="margin:-4px 2px 2px">El equipo ve el mapa de calor con los totales, sin nombres.</div>
+      <div class="cprev" id="ce-vhint" style="margin:-4px 2px 2px">Cualquiera puede tocar un hueco del mapa y ver quién puede en esa franja.</div>
     </div>
     <div id="ce-prev" class="cprev"></div>
     <button class="ebtn" onclick="hacerEncuesta()">Crear encuesta</button>`;
@@ -1311,7 +1354,7 @@ function crearEncuesta(){
   if($("ce-tipo")){$("ce-tipo").addEventListener("change",tipoUpd);tipoUpd();}
   if($("ce-mix")){$("ce-mix").querySelectorAll(".cmixb").forEach(btn=>btn.addEventListener("click",()=>{btn.classList.toggle("on");const u=btn.dataset.u,on=btn.classList.contains("on");DATA.miembros.forEach((m,ix)=>{if(m.unidad===u&&ix!==iyo){if(on)window._invitados.add(ix);else window._invitados.delete(ix);}});invRender();}));}
   if($("ce-inv")){$("ce-inv").addEventListener("input",e=>sugRender(e.target.value));$("ce-inv").addEventListener("blur",()=>setTimeout(()=>{if($("ce-sug"))$("ce-sug").style.display="none";},180));}
-  window._vision="anonima";
+  window._vision="publica";
   const _vhints={publica:"Cualquiera puede tocar un hueco del mapa y ver quién puede en esa franja.",anonima:"El equipo ve el mapa de calor con los totales, sin nombres.",oculta:"El equipo no ve el mapa; solo tú (quien convoca) lo verás para decidir."};
   if($("ce-vision")){$("ce-vision").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{$("ce-vision").querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");window._vision=b.dataset.v;if($("ce-vhint"))$("ce-vhint").textContent=_vhints[window._vision]||"";}));}
   $("ce-d0").value=hoy; $("ce-d1").value=mas(hoy,6); $("ce-fecha").value=hoy; $("ce-lim").value=mas(hoy,5);
