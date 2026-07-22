@@ -1174,10 +1174,9 @@ async function verReunion(id, _bg){
       : (esPD&&organiza)
         ? `<p class="pie" style="margin:10px 2px 0">La organizas tú; estás exento de cubrir la disponibilidad.</p>`
         : `<div class="crear-btn" style="margin-top:11px"><button class="ebtn" onclick="cubrir()">${yaCubri?"Editar mi disponibilidad":"Cubrir mi disponibilidad"}</button></div>`}
-    <h2 style="margin:16px 2px 0">Cuándo puede el equipo</h2>
-    ${resumen()}
+    ${(!fijada || nR>0)?`<h2 style="margin:16px 2px 0">Cuándo puede el equipo</h2>${resumen()}`:``}
     ${puedeFijar?`<div id="fijar-box" class="crear-btn" style="margin-top:12px"><button class="ebtn" onclick="fijarUI(${r.id})">📌 Fijar fecha de la reunión</button>${plazoVenc?``:`<div class="cprev" style="margin:4px 2px 0">El plazo aún no ha vencido, pero ya puedes fijarla si lo tienes claro.</div>`}</div>`:``}
-    ${(esPD&&organiza)?``:`<h2 style="margin:16px 2px 0">Mi disponibilidad</h2>${rejilla(yo.nombre, esPD)}`}
+    ${(fijada||(esPD&&organiza))?``:`<h2 style="margin:16px 2px 0">Mi disponibilidad</h2>${rejilla(yo.nombre, esPD)}`}
     ${puedeGestionar ? `<div id="ce-delbox" style="margin-top:22px;text-align:center;border-top:1px solid var(--line);padding-top:14px"><button class="ebtn sec" style="color:var(--red2);border-color:var(--red)" onclick="borrarReunionUI(${r.id})">Eliminar reunión</button></div>` : ``}`;
   $("modal").classList.add("on");
   if(!_bg && backendOK){ (async()=>{ try{ const d=await api.get(id); if(d&&d.reunion){ const nueva=normReu(d.reunion); nueva.resp=d.respuestas||{}; const ix=REUNIONES.findIndex(x=>x.id===id); if(ix>=0)REUNIONES[ix]=nueva; const m=document.getElementById("modal"); if(m&&m.classList.contains("on")&&ENC28&&ENC28.id===id&&!document.querySelector("#modal-body .egrid")) verReunion(id, true); } }catch(_){} })(); }
