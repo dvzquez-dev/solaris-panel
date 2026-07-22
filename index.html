@@ -1103,9 +1103,8 @@ function _iniciarPollDocs_(){
     }catch(_){}
   }, 9000);
 }
-async function verReunion(id){
-  let r=REUNIONES.find(x=>x.id===id);
-  if(backendOK){ try{ const d=await api.get(id); if(d&&d.reunion){ r=normReu(d.reunion); r.resp=d.respuestas||{}; const _ix=REUNIONES.findIndex(x=>x.id===id); if(_ix>=0)REUNIONES[_ix]=r; else REUNIONES.unshift(r); } }catch(_){} }
+async function verReunion(id, _bg){
+  let r=REUNIONES.find(x=>x.id===id) || (ENC28&&ENC28.id===id?ENC28:null);
   if(!r) return;
   ENC28=r;
   _iniciarPoll_(id);
@@ -1119,6 +1118,7 @@ async function verReunion(id){
     ${(esPD&&organiza)?``:`<h2 style="margin:16px 2px 0">Mi disponibilidad</h2>${rejilla(yo.nombre, esPD)}`}
     ${(organiza || (typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL)) ? `<div id="ce-delbox" style="margin-top:22px;text-align:center;border-top:1px solid var(--line);padding-top:14px"><button class="ebtn sec" style="color:var(--red2);border-color:var(--red)" onclick="borrarReunionUI(${r.id})">Eliminar reunión</button></div>` : ``}`;
   $("modal").classList.add("on");
+  if(!_bg && backendOK){ (async()=>{ try{ const d=await api.get(id); if(d&&d.reunion){ const nueva=normReu(d.reunion); nueva.resp=d.respuestas||{}; const ix=REUNIONES.findIndex(x=>x.id===id); if(ix>=0)REUNIONES[ix]=nueva; const m=document.getElementById("modal"); if(m&&m.classList.contains("on")&&ENC28&&ENC28.id===id&&!document.querySelector("#modal-body .egrid")) verReunion(id, true); } }catch(_){} })(); }
 }
 function borrarReunionUI(id){
   const box=document.getElementById("ce-delbox"); if(!box) return;
@@ -1128,6 +1128,7 @@ function borrarReunionUI(id){
 }
 async function borrarReunionOK(id){
   if(window._borrandoReu) return; window._borrandoReu=true;
+  const _bx=document.getElementById("ce-delbox"); if(_bx) _bx.innerHTML='<div class="er" style="color:var(--warn)">Eliminando…</div>';
   try{
     if(backendOK && SESION){ try{ await api.borrar(id); }catch(err){ const b=document.getElementById("ce-delbox"); if(b) b.innerHTML=`<div class="er" style="color:var(--red2)">No se pudo borrar: ${((err&&err.message)||err)}</div>`; return; } }
     const ix=REUNIONES.findIndex(x=>x.id===id); if(ix>=0) REUNIONES.splice(ix,1);
