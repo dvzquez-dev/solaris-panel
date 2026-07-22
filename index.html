@@ -556,14 +556,38 @@ const PICO = {elegible:STAR,
   evaluacion:'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5m0 3.5h.01M10.3 3.5l-8 14A2 2 0 004 20h16a2 2 0 001.7-3l-8-14a2 2 0 00-3.4 0z"/></svg>'};
 
 let iyo = DATA.miembros.findIndex(m=>m.pila==="Daniel");
+let VER_ADMIN = false;   // admin: true = con poderes de admin ("Vista admin"); false = "viendo como" un miembro (sin poderes). Solo la cuenta admin real lo alterna.
+function _puedeImpersonar_(){ return typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL; }   // quién puede cambiar de perfil (la cuenta admin real)
+function _esAdmin_(){ return VER_ADMIN===true && _puedeImpersonar_(); }   // poderes de admin ACTIVOS (solo la cuenta admin y solo en modo "Vista admin")
 
 /* ── selector de persona ───────────────────────────────────────────── */
 function _pintarPersona_(){ const sel=$("persona"); if(!sel) return;
-  sel.innerHTML = DATA.miembros.map((m,i)=>`<option value="${i}">${m.nombre}${m.cargo?" · "+m.cargo:""}</option>`).join("");
-  if(iyo>=0 && iyo<DATA.miembros.length) sel.value=iyo;
+  const adminOpt = _puedeImpersonar_() ? `<option value="admin">🛡 Vista admin (todos los permisos)</option>` : ``;
+  sel.innerHTML = adminOpt + DATA.miembros.map((m,i)=>`<option value="${i}">${m.nombre}${m.cargo?" · "+m.cargo:""}</option>`).join("");
+  if(_puedeImpersonar_() && VER_ADMIN) sel.value="admin";
+  else if(iyo>=0 && iyo<DATA.miembros.length) sel.value=iyo;
 }
 _pintarPersona_();
-$("persona").onchange = e => { iyo = +e.target.value; render(); };
+$("persona").onchange = e => {
+  const v=e.target.value;
+  if(v==="admin"){ VER_ADMIN=true; }              // volver a la Vista admin (con poderes)
+  else { VER_ADMIN=false; iyo=+v; }               // "ver como" ese miembro: sus datos y SUS permisos, sin los de admin
+  render();
+};
+// Banda superior "Viendo como…": solo cuando la cuenta admin está impersonando a un miembro. Botón para volver a la vista admin.
+function _volverAdmin_(){ VER_ADMIN=true; _pintarPersona_(); render(); }
+function _pintarBannerVerComo_(){
+  let b=document.getElementById("banner-vercomo");
+  const activo = _puedeImpersonar_() && !VER_ADMIN && DATA.miembros[iyo];
+  if(!activo){ if(b) b.remove(); return; }
+  if(!b){
+    b=document.createElement("div"); b.id="banner-vercomo";
+    b.style.cssText="position:sticky;top:0;z-index:60;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:#3f2d00;color:#ffd873;border-bottom:1px solid #6b4e00;padding:7px 12px;font-size:13px;line-height:1.4;text-align:center";
+    document.body.insertBefore(b, document.body.firstChild);
+  }
+  b.innerHTML = `<span>👁 Viendo la app <b>como ${DATA.miembros[iyo].nombre}</b> — con SUS permisos, sin los de admin.</span>`
+    + `<button type="button" onclick="_volverAdmin_()" style="background:#ffd873;color:#3a2a00;border:none;border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">Volver a vista admin</button>`;
+}
 function cerrarSesion(){
   SESION=null;
   try{ localStorage.removeItem("sol_last_email"); localStorage.removeItem("sol_sess"); }catch(_){}   // olvidar cuenta + sesión guardada → siguiente vez eliges de nuevo
@@ -623,7 +647,7 @@ function _notisEquipoHTML(){
   return `<button class="ebtn" onclick="activarNotis(this)">Activar notificaciones</button><div id="notis-msg" class="er" style="color:var(--ink3);margin-top:4px"></div>`;
 }
 function _pintarNotisEquipo(){ const h=document.getElementById("notis-box"); if(h) h.innerHTML=_notisEquipoHTML(); }
-function _esAdminPush_(){ return SESION && (SESION.email===ADMIN_EMAIL || (DATA.miembros[iyo] && DATA.miembros[iyo].nombre===PD_NOM)); }
+function _esAdminPush_(){ return SESION && (_esAdmin_() || (DATA.miembros[iyo] && DATA.miembros[iyo].nombre===PD_NOM)); }
 async function _enviarPrueba_(btn){
   if(btn){ btn.disabled=true; btn.textContent="Enviando…"; }
   try{
@@ -703,7 +727,7 @@ function resumen(){
   const resp=e.resp||{}, nombres=Object.keys(resp).filter(n=>Array.isArray(resp[n])), nR=nombres.length;
   if(!nD||!nF) return `<div class="sindatos">Esta encuesta no tiene franjas.</div>`;
   const _yoNom=(DATA.miembros[iyo]&&DATA.miembros[iyo].nombre)||"";
-  const soyOrg=(e.convocante===_yoNom)||(typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL);
+  const soyOrg=(e.convocante===_yoNom)||_esAdmin_();
   const vision=e.vision||"anonima";
   // oculta: el mapa no se muestra a quien no organiza (anti-gaming). El organizador/admin sí lo ve para decidir.
   if(vision==="oculta" && !soyOrg) return `<div class="sindatos">Se ha ocultado la visibilidad de disponibilidad para esta reunión.<span>Cubre la tuya igualmente; quien la convoca elegirá el mejor momento.</span></div>`;
@@ -980,6 +1004,7 @@ function gauge(p, col){
 function irA(k){const b=document.querySelector(`[data-k="${k}"]`);if(b)b.click();}
 function render(){
   if(!DATA.miembros || !DATA.miembros.length || iyo<0 || !DATA.miembros[iyo]){ return; }  // sin datos aún (pre-login): el gate cubre la pantalla; se rellena tras el login
+  _pintarBannerVerComo_();   // banda "Viendo como…" cuando el admin está impersonando a un miembro
   const yo = DATA.miembros[iyo];
   const col = COLOR[yo.estado];
   $("avat").textContent = yo.pila[0];
@@ -1353,7 +1378,7 @@ async function verReunion(id, _bg){
   _iniciarPoll_(id);
   const yo=DATA.miembros[iyo], esPD=yo.unidad==="Project Director", organiza=r.convocante===yo.nombre;
   const yaCubri=Array.isArray((r.resp||{})[yo.nombre]);
-  const esAdmin=(typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL);
+  const esAdmin=_esAdmin_();
   const puedeGestionar=organiza||esAdmin, fijada=!!r.fijada, plazoVenc=_plazoVencido(r);
   const nR=(r.resp&&Object.keys(r.resp).filter(n=>Array.isArray(r.resp[n])).length)||r.nResp||0;
   const puedeFijar=puedeGestionar && !fijada;   // el convocante puede fijar cuando quiera, aunque nadie haya respondido
@@ -1758,6 +1783,7 @@ async function _onCredencial_(resp, _silent){
     try{ if(SESION&&SESION.email){ localStorage.setItem("sol_last_email", SESION.email); localStorage.setItem("sol_sess", JSON.stringify({token:SESION.token, email:SESION.email, ts:Date.now()})); } }catch(_){}   // recordar cuenta + sesión (login instantáneo al reabrir)
     var idx=DATA.miembros.findIndex(function(m){return m.nombre===SESION.nombre;});
     iyo = idx>=0 ? idx : (DATA.miembros.length ? 0 : -1);   // admin/no-miembro: primer perfil; el selector #persona deja cambiar
+    VER_ADMIN = (SESION.email===ADMIN_EMAIL);   // la cuenta admin arranca en "Vista admin" (con poderes); desde el selector puede pasar a "ver como" un miembro
     _pintarPersona_();   // repoblar el selector con los miembros ya cargados tras el login
     _pintarSalir_();     // botón "Salir" (cerrar sesión) en la cabecera, para todos
     _pushInit_();        // registra el service worker + re-guarda la suscripción push si ya la había
