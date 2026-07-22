@@ -426,6 +426,7 @@ const api = {
   listar: () => api._get({action:"listarReuniones"}),
   get: (id) => api._get({action:"getReunion", id}),
   crear: (reunion) => api._post({action:"crearReunion", reunion}),
+  borrar: (id) => api._post({action:"borrarReunion", id}),
   responder: (id,nombre,valores) => api._post({action:"responder", id, nombre, valores}),
   quienSoy: (token) => api._post({action:"quienSoy", token}),
   getPanel: () => api._post({action:"getPanel"}),
@@ -1114,8 +1115,23 @@ async function verReunion(id){
       :`<div class="crear-btn" style="margin-top:11px"><button class="ebtn" onclick="cubrir()">${yaCubri?"Editar mi disponibilidad":"Cubrir mi disponibilidad"}</button></div>`}
     <h2 style="margin:16px 2px 0">Cuándo puede el equipo</h2>
     ${resumen()}
-    ${(esPD&&organiza)?``:`<h2 style="margin:16px 2px 0">Mi disponibilidad</h2>${rejilla(yo.nombre, esPD)}`}`;
+    ${(esPD&&organiza)?``:`<h2 style="margin:16px 2px 0">Mi disponibilidad</h2>${rejilla(yo.nombre, esPD)}`}
+    ${(organiza || (typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL)) ? `<div id="ce-delbox" style="margin-top:22px;text-align:center;border-top:1px solid var(--line);padding-top:14px"><button class="ebtn sec" style="color:var(--red2);border-color:var(--red)" onclick="borrarReunionUI(${r.id})">Eliminar reunión</button></div>` : ``}`;
   $("modal").classList.add("on");
+}
+function borrarReunionUI(id){
+  const box=document.getElementById("ce-delbox"); if(!box) return;
+  box.innerHTML=`<div class="er" style="color:var(--warn);margin-bottom:8px">¿Eliminar esta reunión y todas sus respuestas? No se puede deshacer.</div>
+    <button class="ebtn" style="background:var(--red);border-color:var(--red)" onclick="borrarReunionOK(${id})">Sí, eliminar</button>
+    <button class="ebtn sec" style="margin-left:8px" onclick="verReunion(${id})">Cancelar</button>`;
+}
+async function borrarReunionOK(id){
+  if(window._borrandoReu) return; window._borrandoReu=true;
+  try{
+    if(backendOK && SESION){ try{ await api.borrar(id); }catch(err){ const b=document.getElementById("ce-delbox"); if(b) b.innerHTML=`<div class="er" style="color:var(--red2)">No se pudo borrar: ${((err&&err.message)||err)}</div>`; return; } }
+    const ix=REUNIONES.findIndex(x=>x.id===id); if(ix>=0) REUNIONES.splice(ix,1);
+    _pararPoll_(); $("modal").classList.remove("on"); render(); document.querySelector('[data-k="reuniones"]').click();
+  } finally { window._borrandoReu=false; }
 }
 window.PLANTILLAS = window.PLANTILLAS || [
   {titulo:"Tardes (18–23, 1 h)", modo:"rango", nd:"7", h0:"18", h1:"23", dur:"60", paso:"0", perdia:false, rangos:null},
