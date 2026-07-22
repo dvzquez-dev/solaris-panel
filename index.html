@@ -1335,7 +1335,7 @@ async function _cargarBackend_(){
   _iniciarPollDocs_();
 }
 async function _onCredencial_(resp){
-  _gate_('<img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="opacity:.8">Verificando…</div>');
+  _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="opacity:.8">Verificando…</div>');
   try{
     var yo=await api.quienSoy(resp.credential);
     SESION={token:resp.credential, email:yo.email, nombre:yo.nombre};
@@ -1347,24 +1347,24 @@ async function _onCredencial_(resp){
     // solo la cuenta admin ve otros perfiles; el resto queda fijado al suyo.
     if(SESION.email!==ADMIN_EMAIL){ var _sel=document.getElementById("persona"); if(_sel){ _sel.disabled=true; _sel.style.display="none"; var _lab=_sel.closest("label"); if(_lab){ _lab.style.pointerEvents="none"; var _sv=_lab.querySelector("svg"); if(_sv)_sv.style.display="none"; } } }
   }catch(e){
-    _gate_('<img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+((e&&e.message)||e)+'</div><button id="reGis" style="border:1px solid #444;background:transparent;color:#eaeaea;border-radius:10px;padding:10px 16px;cursor:pointer">Reintentar</button>');
+    _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+((e&&e.message)||e)+'</div><button id="reGis" style="border:1px solid #444;background:transparent;color:#eaeaea;border-radius:10px;padding:10px 16px;cursor:pointer">Reintentar</button>');
     var b=document.getElementById("reGis"); if(b) b.onclick=_pintarLogin_;
   }
 }
 function _pintarLogin_(){
-  _gate_('<img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(260px,64vw);height:auto;margin-bottom:6px"><div style="opacity:.8;max-width:340px">Entra con tu cuenta de UVigo Aerotech<br>para ver tu panel.</div><div id="gbtn"></div>');
+  _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(260px,64vw);height:auto;margin-bottom:6px"><div style="opacity:.8;max-width:340px">Entra con tu cuenta de UVigo Aerotech<br>para ver tu panel.</div><div id="gbtn"></div>');
   try{
     google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID, callback:_onCredencial_});
     google.accounts.id.renderButton(document.getElementById("gbtn"), {theme:"filled_black", size:"large", text:"signin_with", shape:"pill"});
   }catch(e){ _gate_('<div style="color:#ffb3b0">Error iniciando Google Sign-In: '+((e&&e.message)||e)+'</div>'); }
 }
 if(GOOGLE_CLIENT_ID){
-  _gate_('<img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="opacity:.7">Cargando…</div>');
+  _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="opacity:.7">Cargando…</div>');
   (function _esperarGis_(n){
     if(window.google && window.google.accounts && window.google.accounts.id){ _pintarLogin_(); return; }
     if(n<=0){
       if(DATA.miembros && DATA.miembros.length){ var g=document.getElementById("loginGate"); if(g) g.remove(); }   // artefacto con datos-semilla: cae al selector manual
-      else { _gate_('<img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="color:#ffb3b0;max-width:320px">No se pudo cargar el inicio de sesión. Revisa tu conexión y vuelve a intentarlo.</div><button onclick="location.reload()" style="border:1px solid #444;background:transparent;color:#eaeaea;border-radius:10px;padding:10px 16px;cursor:pointer">Recargar</button>'); }   // build sin datos: sin login no hay nada que enseñar, mantener el gate
+      else { _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="color:#ffb3b0;max-width:320px">No se pudo cargar el inicio de sesión. Revisa tu conexión y vuelve a intentarlo.</div><button onclick="location.reload()" style="border:1px solid #444;background:transparent;color:#eaeaea;border-radius:10px;padding:10px 16px;cursor:pointer">Recargar</button>'); }   // build sin datos: sin login no hay nada que enseñar, mantener el gate
       return;
     }
     setTimeout(function(){_esperarGis_(n-1);}, 150);
