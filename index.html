@@ -429,6 +429,8 @@ const api = {
   borrar: (id) => api._post({action:"borrarReunion", id}),
   responder: (id,nombre,valores) => api._post({action:"responder", id, nombre, valores}),
   quienSoy: (token) => api._post({action:"quienSoy", token}),
+  bootstrap: (token) => api._post(token?{action:"bootstrap", token}:{action:"bootstrap"}),
+  ping: () => { try{ fetch(BACKEND_URL+"?action=ping",{cache:"no-store"}).catch(function(){}); }catch(_){} },
   getPanel: () => api._post({action:"getPanel"}),
   getTareas: () => api._post({action:"getTareas"}),
   getTurnos: () => api._post({action:"getTurnos"}),
@@ -1057,7 +1059,7 @@ function reuCard(r, yo){
   else if(!abierta) est=`<span style="color:var(--ink3)">cerrada</span>`;
   else if(yaCubri) est=`<span style="color:var(--ok)">✓ cubierta</span>`;
   else est=`<span style="color:var(--red2)">te falta cubrir</span>`;
-  if(r._eliminando) return `<div class="tarjeta" style="opacity:.4;pointer-events:none"><div class="fila"><div class="tit">${r.titulo}</div><div class="der"><span style="color:var(--red2);font-weight:800;letter-spacing:1.5px">ELIMINADO</span></div></div></div>`;
+  if(r._eliminando) return `<div class="tarjeta" style="opacity:.4;pointer-events:none"><div class="fila"><div class="tit">${r.titulo}</div><div class="der"><span style="color:var(--red2);font-weight:800;letter-spacing:1.5px">ELIMINANDO…</span></div></div></div>`;
   return `<div class="tarjeta clicable" onclick="verReunion(${r.id})"><div class="fila"><div class="tit">${r.titulo} <span class="cbadge ${t[1]}">${t[0]}</span> <span class="cbadge modo ${r.modalidad||'hibrida'}">${MOD[r.modalidad||'hibrida']}</span>
     <small>Convoca ${r.convocante.split(" ")[0]}${lim?` · cierra ${lim}`:""} · ${nR} respondieron</small></div>
     <div class="der">${est} <span class="chev">›</span></div></div></div>`;
@@ -1166,7 +1168,7 @@ function crearEncuesta(){
         <div id="ce-chips" class="cchips"></div>
       </div>
       ${(window.PLANTILLAS&&window.PLANTILLAS.length)?`<label>Copiar distribución de<select id="ce-copiar"><option value="">— empezar en blanco —</option>${window.PLANTILLAS.map((p,i)=>`<option value="${i}">${p.titulo}</option>`).join("")}</select></label>`:``}
-      <label>Título<input id="ce-tit" value="Reunión de disponibilidad"></label>
+      <label>Título<input id="ce-tit" placeholder="Reunión sin título" autocomplete="off"></label>
       <label>Fechas por<select id="ce-modo"><option value="rango" selected>Desde / hasta</option><option value="dur">Desde + nº de días</option></select></label>
       <div class="row2" id="ce-rango"><label>Desde<input id="ce-d0" type="date"></label><label>Hasta<input id="ce-d1" type="date"></label></div>
       <div class="row2" id="ce-durw" style="display:none"><label>Desde<input id="ce-fecha" type="date"></label><label>Días<input id="ce-nd" type="number" value="7" min="1" max="60"></label></div>
@@ -1229,7 +1231,7 @@ async function hacerEncuesta(){
   if(!F.length||!bloques.length) return;
   const tipo=V("ce-tipo")||"general", inv=[...(window._invitados||[])].map(ix=>DATA.miembros[ix].nombre);
   const _nid=REUNIONES.reduce((m,r)=>Math.max(m,r.id||0),0)+1;
-  ENC28={id:_nid,titulo:V("ce-tit")||"Reunión",fecha:null,dias,franjas:F,bloques,resp:{},total:bloques.length,limite:V("ce-lim")?(V("ce-lim")+(V("ce-limh")?" "+V("ce-limh"):"")):null,tipo,modalidad:V("ce-modalidad")||"hibrida",invitados:inv,convocante:DATA.miembros[iyo].nombre};
+  ENC28={id:_nid,titulo:V("ce-tit").trim()||"Reunión sin título",fecha:null,dias,franjas:F,bloques,resp:{},total:bloques.length,limite:V("ce-lim")?(V("ce-lim")+(V("ce-limh")?" "+V("ce-limh"):"")):null,tipo,modalidad:V("ce-modalidad")||"hibrida",invitados:inv,convocante:DATA.miembros[iyo].nombre};
   if(backendOK){ try{ const d=await api.crear(ENC28); if(d&&d.id) ENC28.id=d.id; }catch(_){} }
   REUNIONES.unshift(ENC28);
   const rawRangos=$("ce-perdia").checked?(()=>{const rows=[...$("ce-dias").querySelectorAll(".drow")];return rows.map(r=>r.classList.contains("off")?[0,0]:[+r.querySelector(".dr0").value,+r.querySelector(".dr1").value]);})():null;
@@ -1311,43 +1313,62 @@ function _gate_(html){
     document.body.appendChild(g); }
   g.innerHTML=html; return g;
 }
-async function _cargarBackend_(){
-  // Datos reales por rol. admin: panel completo. miembro: identidades publicas
-  // + mi ficha completa + ranking anonimo. Si algo falla, se queda el horneado.
-  var pnl=null, trs=null, tus=null;
-  try{ pnl=await api.getPanel(); }catch(_){}
-  try{ trs=await api.getTareas(); }catch(_){}
-  try{ tus=await api.getTurnos(); }catch(_){}
-  var ent=null; try{ ent=await api.getEntregables(); }catch(_){}
-  if(pnl){
-    if(pnl.generado) DATA.generado=pnl.generado;
-    if(pnl.temporada) DATA.temporada=pnl.temporada;
-    if(pnl.reunion) DATA.reunion=pnl.reunion;
-    if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length) DATA.subsistemas=pnl.subsistemas;
-    if(pnl.yo){                                     // forma MIEMBRO
-      var pub=(pnl.miembros||[]).slice();
-      var ix=pub.findIndex(function(m){return m.nombre===pnl.yo.nombre;});
-      if(ix>=0) pub[ix]=pnl.yo; else pub.push(pnl.yo);
-      DATA.miembros=pub;
-      DATA._ranking=pnl.ranking||null;
-      DATA._rol="miembro";
-    } else if(Array.isArray(pnl.miembros)&&pnl.miembros.length){   // forma ADMIN
-      DATA.miembros=pnl.miembros;
-      DATA._ranking=null; DATA._rol="admin";
-    }
+function _aplicarPanel_(pnl){
+  if(!pnl) return;
+  if(pnl.generado) DATA.generado=pnl.generado;
+  if(pnl.temporada) DATA.temporada=pnl.temporada;
+  if(pnl.reunion) DATA.reunion=pnl.reunion;
+  if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length) DATA.subsistemas=pnl.subsistemas;
+  if(pnl.yo){                                     // forma MIEMBRO
+    var pub=(pnl.miembros||[]).slice();
+    var ix=pub.findIndex(function(m){return m.nombre===pnl.yo.nombre;});
+    if(ix>=0) pub[ix]=pnl.yo; else pub.push(pnl.yo);
+    DATA.miembros=pub;
+    DATA._ranking=pnl.ranking||null;
+    DATA._rol="miembro";
+  } else if(Array.isArray(pnl.miembros)&&pnl.miembros.length){   // forma ADMIN
+    DATA.miembros=pnl.miembros;
+    DATA._ranking=null; DATA._rol="admin";
   }
+}
+function _aplicarDatos_(trs,tus,ent){
   if(Array.isArray(trs)){ TAREAS.length=0; trs.forEach(function(t){TAREAS.push(t);}); }
   if(Array.isArray(tus)){ TURNOS.length=0; tus.forEach(function(t){TURNOS.push(t);}); }
   if(Array.isArray(ent)){ ENTREGABLES.length=0; ent.forEach(function(x){ENTREGABLES.push(x);}); }
+}
+// Aplica la respuesta de UNA sola petición `bootstrap` (identidad ya asignada).
+function _aplicarBootstrap_(boot){
+  _aplicarPanel_(boot.panel);
+  _aplicarDatos_(boot.tareas, boot.turnos, boot.entregables);
+  if(Array.isArray(boot.reuniones)){ REUNIONES = boot.reuniones.map(normReu); ENC28 = REUNIONES.length ? REUNIONES[0] : ENC28; backendOK=true; }
+  _iniciarPollDocs_();
+}
+// FALLBACK (solo si el backend aún no tiene `bootstrap`): 4 peticiones sueltas.
+async function _cargarBackend_(){
+  var pnl=null, trs=null, tus=null, ent=null;
+  try{ pnl=await api.getPanel(); }catch(_){}
+  try{ trs=await api.getTareas(); }catch(_){}
+  try{ tus=await api.getTurnos(); }catch(_){}
+  try{ ent=await api.getEntregables(); }catch(_){}
+  _aplicarPanel_(pnl);
+  _aplicarDatos_(trs,tus,ent);
   _iniciarPollDocs_();
 }
 async function _onCredencial_(resp){
   _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="opacity:.8">Verificando…</div>');
   try{
-    var yo=await api.quienSoy(resp.credential);
-    SESION={token:resp.credential, email:yo.email, nombre:yo.nombre};
-    await _cargarBackend_();
-    var idx=DATA.miembros.findIndex(function(m){return m.nombre===yo.nombre;});
+    // 1 sola petición: verifica el token una vez y trae TODO (identidad + panel +
+    // tareas + turnos + entregables + reuniones). Antes eran 6 secuenciales.
+    var boot=null; try{ boot=await api.bootstrap(resp.credential); }catch(_){ boot=null; }
+    if(boot && boot.identidad){
+      SESION={token:resp.credential, email:boot.identidad.email, nombre:boot.identidad.nombre};
+      _aplicarBootstrap_(boot);
+    } else {                                          // backend sin `bootstrap` aún: ruta antigua
+      var yo=await api.quienSoy(resp.credential);
+      SESION={token:resp.credential, email:yo.email, nombre:yo.nombre};
+      await _cargarBackend_();
+    }
+    var idx=DATA.miembros.findIndex(function(m){return m.nombre===SESION.nombre;});
     iyo = idx>=0 ? idx : (DATA.miembros.length ? 0 : -1);   // admin/no-miembro: primer perfil; el selector #persona deja cambiar
     var g=document.getElementById("loginGate"); if(g) g.remove();
     render();
@@ -1363,6 +1384,8 @@ function _pintarLogin_(){
   try{
     google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID, callback:_onCredencial_});
     google.accounts.id.renderButton(document.getElementById("gbtn"), {theme:"filled_black", size:"large", text:"signin_with", shape:"pill"});
+    api.ping();   // pre-calienta el backend mientras el usuario mira la pantalla de login
+    setTimeout(function(){ api.ping(); }, 4000);   // 2º toque por si el 1º pilló el arranque en frío
   }catch(e){ _gate_('<div style="color:#ffb3b0">Error iniciando Google Sign-In: '+((e&&e.message)||e)+'</div>'); }
 }
 if(GOOGLE_CLIENT_ID){
