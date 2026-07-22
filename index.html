@@ -25,7 +25,7 @@
     --warn:#E8912E;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0}
+  html,body{margin:0;overscroll-behavior:none}   /* evita el "tirar para refrescar" accidental */
   body{
     background:
       radial-gradient(1100px 660px at 50% -10%, #2C1012 0%, transparent 62%),
@@ -40,12 +40,12 @@
 
   /* ── marco de teléfono ─────────────────────────────────────────────── */
   .fono{
-    width:100%; max-width:400px; min-height:812px; position:relative;
+    width:100%; max-width:400px; height:812px; max-height:calc(100vh - 62px); position:relative;
     background:var(--bg); border:1px solid var(--line); border-radius:34px;
     box-shadow:0 30px 80px -20px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.02);
     overflow:hidden; display:flex; flex-direction:column;
   }
-  @media(max-width:430px){ body{padding:0} .fono{border:0;border-radius:0;min-height:100vh} }
+  @media(max-width:430px){ body{padding:0} .fono{border:0;border-radius:0;height:100vh;height:100dvh;max-height:none} }
 
   /* ── cabecera ──────────────────────────────────────────────────────── */
   header{
@@ -70,7 +70,7 @@
   select#persona{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:16px}
 
   /* ── contenido con scroll ──────────────────────────────────────────── */
-  main{flex:1; overflow-y:auto; padding:4px 16px 96px; -webkit-overflow-scrolling:touch;
+  main{flex:1; min-height:0; overscroll-behavior:contain; overflow-y:auto; padding:4px 16px 96px; -webkit-overflow-scrolling:touch;
     position:relative; z-index:1}
   /* estrellas de 4 puntas de fondo — el motivo de la insignia, muy tenue */
   .deco{position:absolute; top:0; left:0; right:0; height:340px; z-index:0;
@@ -996,7 +996,7 @@ function render(){
         <small>${m.cargo==="Project Director"?"Project Director":"coordina "+m.unidad}</small></div>
         <div class="der">${m.cargo==="Project Director"?"dirección":m.unidad.split(" ")[0]}</div></div>`).join("")}
     </div>
-    <p class="pie">SOLARIS · prototipo · datos reales del panel a ${DATA.generado.split("-").reverse().join("/")}</p>`;
+    <p class="pie">SOLARIS · datos a ${DATA.generado.split("-").reverse().join("/")}</p>`;
 }
 
 function abrirTurno(i){
@@ -1189,6 +1189,11 @@ function crearEncuesta(){
   upd(); $("modal").classList.add("on");
 }
 async function hacerEncuesta(){
+  if(window._creandoReu) return;                       // no crear varias reuniones si pulsas rápido o el backend tarda
+  window._creandoReu = true;
+  const _bcrear = document.querySelector('button[onclick="hacerEncuesta()"]');
+  if(_bcrear){ _bcrear.disabled = true; _bcrear.dataset._txt = _bcrear.textContent; _bcrear.textContent = "Creando…"; }
+  try {
   const V=id=>$(id).value;
   const dias = V("ce-modo")==="rango" ? diasEntre(V("ce-d0"),V("ce-d1")) : diasDesde(V("ce-fecha")||DATA.generado, Math.max(1,+V("ce-nd")||1));
   if(!dias.length) return;
@@ -1207,6 +1212,10 @@ async function hacerEncuesta(){
   window.PLANTILLAS.unshift({titulo:V("ce-tit")||"Encuesta",modo:V("ce-modo"),nd:V("ce-nd"),h0:V("ce-h0"),h1:V("ce-h1"),dur:V("ce-dur"),paso:V("ce-paso"),modalidad:V("ce-modalidad"),perdia:$("ce-perdia").checked,rangos:rawRangos});
   if(window.PLANTILLAS.length>8)window.PLANTILLAS.length=8;
   render(); document.querySelector('[data-k="reuniones"]').click(); verReunion(ENC28.id);
+  } finally {
+    window._creandoReu = false;
+    if(_bcrear){ _bcrear.disabled = false; if(_bcrear.dataset._txt) _bcrear.textContent = _bcrear.dataset._txt; }
+  }
 }
 function cubrir(){
   const e=ENC28, F=e.franjas||[], nD=(e.dias||[]).length, nF=F.length;
@@ -1312,7 +1321,7 @@ async function _onCredencial_(resp){
     SESION={token:resp.credential, email:yo.email, nombre:yo.nombre};
     await _cargarBackend_();
     var idx=DATA.miembros.findIndex(function(m){return m.nombre===yo.nombre;});
-    if(idx>=0) iyo=idx;
+    iyo = idx>=0 ? idx : (DATA.miembros.length ? 0 : -1);   // admin/no-miembro: primer perfil; el selector #persona deja cambiar
     var g=document.getElementById("loginGate"); if(g) g.remove();
     render();
     // solo la cuenta admin ve otros perfiles; el resto queda fijado al suyo.
