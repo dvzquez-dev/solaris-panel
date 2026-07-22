@@ -1,0 +1,9 @@
+{
+  "name": "solaris-emisor-push",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Emisor de notificaciones Web Push del app Solaris (lee la cola del backend y envia con web-push).",
+  "main": "enviar_push.js",
+  "scripts": { "start": "node enviar_push.js" },
+  "dependencies": { "web-push": "^3.6.7" }
+}
