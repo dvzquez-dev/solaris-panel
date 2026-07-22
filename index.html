@@ -518,8 +518,11 @@ const PICO = {elegible:STAR,
 let iyo = DATA.miembros.findIndex(m=>m.pila==="Daniel");
 
 /* ── selector de persona ───────────────────────────────────────────── */
-$("persona").innerHTML = DATA.miembros.map((m,i)=>
-  `<option value="${i}">${m.nombre}${m.cargo?" · "+m.cargo:""}</option>`).join("");
+function _pintarPersona_(){ const sel=$("persona"); if(!sel) return;
+  sel.innerHTML = DATA.miembros.map((m,i)=>`<option value="${i}">${m.nombre}${m.cargo?" · "+m.cargo:""}</option>`).join("");
+  if(iyo>=0 && iyo<DATA.miembros.length) sel.value=iyo;
+}
+_pintarPersona_();
 $("persona").onchange = e => { iyo = +e.target.value; render(); };
 
 /* ── nav ───────────────────────────────────────────────────────────── */
@@ -1578,6 +1581,7 @@ async function _onCredencial_(resp){
     }
     var idx=DATA.miembros.findIndex(function(m){return m.nombre===SESION.nombre;});
     iyo = idx>=0 ? idx : (DATA.miembros.length ? 0 : -1);   // admin/no-miembro: primer perfil; el selector #persona deja cambiar
+    _pintarPersona_();   // repoblar el selector con los miembros ya cargados tras el login
     var g=document.getElementById("loginGate"); if(g) g.remove();
     render();
     // solo la cuenta admin ve otros perfiles; el resto queda fijado al suyo.
