@@ -465,6 +465,7 @@ const _MF=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","di
 const fFecha=iso=>{const d=new Date(iso+"T00:00:00"),w=_DF[d.getDay()];return `${w[0].toUpperCase()+w.slice(1)} ${d.getDate()} ${_MF[d.getMonth()]}`;};
 const eu = n => Math.round(n) + " €";
 const h = n => (Number.isInteger(n)?n:n.toFixed(1).replace(".",",")) + " h";
+const fLim = l => { if(!l) return ""; const p=String(l).split(" "); return p[0].split("-").reverse().join("/")+(p[1]?" · "+p[1]:""); };  // "yyyy-mm-dd[ hh:mm]" -> "dd/mm/yyyy[ · hh:mm]"
 const COLOR = {evaluacion:"var(--bad)",normal:"var(--info)",elegible:"var(--ok)"};
 const ETQ = {evaluacion:"en evaluación",normal:"normal",elegible:"elegible"};
 const CLS = {evaluacion:"ev",normal:"no",elegible:"el"};
@@ -784,7 +785,7 @@ function render(){
   });
   if(nReu) alertas += `<div class="alerta avi clic" onclick="irA('reuniones')">
     <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-    <span><b>Tienes ${nReu} reunión${nReu===1?"":"es"} sin cubrir tu disponibilidad.</b>${nReu===1?` «${reuFalta.titulo}»${reuFalta.limite?` — cierra el ${reuFalta.limite.split("-").reverse().join("/")}`:""}.`:" Cúbrelas antes de que cierren."}</span><span class="chev">›</span></div>`;
+    <span><b>Tienes ${nReu} reunión${nReu===1?"":"es"} sin cubrir tu disponibilidad.</b>${nReu===1?` «${reuFalta.titulo}»${reuFalta.limite?` — cierra el ${fLim(reuFalta.limite)}`:""}.`:" Cúbrelas antes de que cierren."}</span><span class="chev">›</span></div>`;
   // aviso: documentos esperando tu aprobación
   const nDoc=(typeof ENTREGABLES!=="undefined"?ENTREGABLES:[]).filter(e=>e.estado==="revision"&&revisoresDe(e).includes(yo.nombre)).length;
   if(nDoc) alertas += `<div class="alerta avi clic" onclick="irA('documentos')">
@@ -1034,7 +1035,7 @@ function presetInvitados(tipo, ci){
 function encMeta(){
   const e=ENC28, T={general:["General","general"],junta:["Junta Directiva",""],consejo:["Consejo",""],subsistema:["Subsistema",""],mixta:["Mixta",""],trabajo:["Reunión de trabajo","trabajo"]};
   const MOD={presencial:"presencial",telematica:"telemática",hibrida:"híbrida"};
-  const t=T[e.tipo||"general"]||["General","general"], lim=e.limite?e.limite.split("-").reverse().join("/"):null, inv=e.invitados||[], modo=e.modalidad||"hibrida";
+  const t=T[e.tipo||"general"]||["General","general"], lim=e.limite?fLim(e.limite):null, inv=e.invitados||[], modo=e.modalidad||"hibrida";
   const invLinea = e.tipo==="general" ? `<div class="erow">Convocados: <b>todo el equipo</b></div>`
     : inv.length ? `<div class="erow">Invitados (<b>${inv.length}</b>)${inv.length<=6?`: ${inv.map(n=>n.split(" ")[0]).join(", ")}`:""}</div>` : ``;
   return `<div class="emeta"><div class="etit">${e.titulo} <span class="cbadge ${t[1]}">${t[0]}</span> <span class="cbadge modo ${modo}">${MOD[modo]}</span></div>`+
@@ -1046,7 +1047,7 @@ function encMeta(){
 function reuCard(r, yo){
   const T={general:["General","general"],junta:["Junta Directiva",""],consejo:["Consejo",""],subsistema:["Subsistema",""],mixta:["Mixta",""],trabajo:["Reunión de trabajo","trabajo"]};
   const MOD={presencial:"presencial",telematica:"telemática",hibrida:"híbrida"};
-  const t=T[r.tipo||"general"]||["General","general"], lim=r.limite?r.limite.split("-").reverse().join("/"):null;
+  const t=T[r.tipo||"general"]||["General","general"], lim=r.limite?fLim(r.limite):null;
   const nR=(r.resp&&Object.keys(r.resp).filter(n=>Array.isArray(r.resp[n])).length)||r.nResp||0;
   const organiza=r.convocante===yo.nombre, invitado=(r.tipo==="general")||(r.invitados||[]).includes(yo.nombre);
   const abierta=!r.limite||DATA.generado<=r.limite, yaCubri=Array.isArray((r.resp||{})[yo.nombre]);
@@ -1172,6 +1173,7 @@ function crearEncuesta(){
       <label>Duración de franja<select id="ce-dur"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option><option value="90">1 h 30 min</option><option value="120">2 h</option></select></label>
       <label>Cadencia<select id="ce-paso"><option value="0">Contiguas</option><option value="15">Solapadas cada 15 min</option><option value="30">Solapadas cada 30 min</option><option value="60">Solapadas cada 60 min</option></select></label>
       <label>Límite para responder<input id="ce-lim" type="date"></label>
+      <label>Hora límite (opcional)<input id="ce-limh" type="time"></label>
     </div>
     <div id="ce-prev" class="cprev"></div>
     <button class="ebtn" onclick="hacerEncuesta()">Crear encuesta</button>`;
@@ -1196,7 +1198,7 @@ function crearEncuesta(){
     const {F,perDia:pd}=genUnion(rangos(),+V("ce-dur"),+V("ce-paso")), nb=pd.reduce((a,x)=>a+x.length,0), nd=dias().length;
     $("ce-prev").innerHTML=(F.length&&nb)?`<b>${F.length} franja${F.length===1?"":"s"}</b> distintas · <b>${nb} bloques</b> en ${nd} día${nd===1?"":"s"}${per()?" (horario por día)":""}. Cierra: <b>${V("ce-lim")?V("ce-lim").split("-").reverse().join("/"):"sin límite"}</b>.`:`Revisa fechas u horario: no sale ninguna franja.`;};
   const aplicarCfg=c=>{ $("ce-tit").value=c.titulo||$("ce-tit").value; $("ce-modo").value=c.modo||"rango"; if(c.nd)$("ce-nd").value=c.nd; $("ce-h0").value=c.h0; $("ce-h1").value=c.h1; $("ce-dur").value=c.dur; $("ce-paso").value=c.paso; if(c.modalidad&&$("ce-modalidad"))$("ce-modalidad").value=c.modalidad; $("ce-perdia").checked=!!c.perdia; if(c.perdia){renderDias();const rows=[...$("ce-dias").querySelectorAll(".drow")];(c.rangos||[]).forEach((rg,i)=>{const r=rows[i];if(!r)return;if(rg[0]>0){r.classList.remove("off");r.querySelector(".dr0").value=rg[0];r.querySelector(".dr1").value=rg[1];}else{r.classList.add("off");}aplicaDrow(r);});} upd(); };
-  ["ce-modo","ce-h0","ce-h1","ce-dur","ce-paso","ce-nd","ce-d0","ce-d1","ce-lim"].forEach(id=>$(id).addEventListener("change",()=>{if(per())renderDias();upd();}));
+  ["ce-modo","ce-h0","ce-h1","ce-dur","ce-paso","ce-nd","ce-d0","ce-d1","ce-lim","ce-limh"].forEach(id=>$(id).addEventListener("change",()=>{if(per())renderDias();upd();}));
   $("ce-perdia").addEventListener("change",()=>{if(per())renderDias();upd();});
   if($("ce-copiar")) $("ce-copiar").addEventListener("change",()=>{const v=V("ce-copiar");if(v!=="")aplicarCfg(window.PLANTILLAS[+v]);});
   const invRender=()=>{const c=$("ce-chips");c.innerHTML=[...window._invitados].map(ix=>`<span class="cchip"><b>${DATA.miembros[ix].pila}</b><button data-ix="${ix}">×</button></span>`).join("");c.querySelectorAll("button").forEach(b=>b.onclick=()=>{window._invitados.delete(+b.dataset.ix);invRender();});};
@@ -1225,7 +1227,7 @@ async function hacerEncuesta(){
   if(!F.length||!bloques.length) return;
   const tipo=V("ce-tipo")||"general", inv=[...(window._invitados||[])].map(ix=>DATA.miembros[ix].nombre);
   const _nid=REUNIONES.reduce((m,r)=>Math.max(m,r.id||0),0)+1;
-  ENC28={id:_nid,titulo:V("ce-tit")||"Reunión",fecha:null,dias,franjas:F,bloques,resp:{},total:bloques.length,limite:V("ce-lim")||null,tipo,modalidad:V("ce-modalidad")||"hibrida",invitados:inv,convocante:DATA.miembros[iyo].nombre};
+  ENC28={id:_nid,titulo:V("ce-tit")||"Reunión",fecha:null,dias,franjas:F,bloques,resp:{},total:bloques.length,limite:V("ce-lim")?(V("ce-lim")+(V("ce-limh")?" "+V("ce-limh"):"")):null,tipo,modalidad:V("ce-modalidad")||"hibrida",invitados:inv,convocante:DATA.miembros[iyo].nombre};
   if(backendOK){ try{ const d=await api.crear(ENC28); if(d&&d.id) ENC28.id=d.id; }catch(_){} }
   REUNIONES.unshift(ENC28);
   const rawRangos=$("ce-perdia").checked?(()=>{const rows=[...$("ce-dias").querySelectorAll(".drow")];return rows.map(r=>r.classList.contains("off")?[0,0]:[+r.querySelector(".dr0").value,+r.querySelector(".dr1").value]);})():null;
@@ -1240,7 +1242,10 @@ async function hacerEncuesta(){
 function cubrir(){
   const e=ENC28, F=e.franjas||[], nD=(e.dias||[]).length, nF=F.length;
   if(!nF||!nD) return;
-  if(e.limite && DATA.generado > e.limite){ $("modal-body").innerHTML=`<div class="mtit">Encuesta cerrada</div><div class="msub">El plazo para responder terminó el ${e.limite.split("-").reverse().join("/")}. Ya no se puede editar.</div>`; $("modal").classList.add("on"); return; }
+  const _dl = e.limite ? new Date((/[ T]/.test(e.limite) ? e.limite.replace(" ","T") : e.limite+"T23:59:59")) : null;
+  const fueraDePlazo = !!(_dl && new Date() > _dl);
+  const _sancionable = ["general","junta","consejo"].indexOf(e.tipo)>=0;
+  const _avisoPlazo = fueraDePlazo ? `<div class="er" style="margin:2px 0 10px;padding:9px 11px;border:1px solid var(--warn);border-radius:9px;background:rgba(232,145,46,.10);color:var(--warn);font-size:12.5px;line-height:1.4">⚠ El plazo terminó (${fLim(e.limite)}). ${_sancionable?"Si la cubres o editas ahora, constará como <b>fuera de plazo</b> → sanción teórica (salvo tu primera vez, y solo en generales). Aun así, cúbrela: se agradece — a quien no la cubrió no se le quita la sanción.":"Aquí no hay sanción automática, pero cúbrela cuando puedas."}</div>` : ``;
   const nombre=DATA.miembros[iyo].nombre, sel=new Map();
   (e.resp[nombre]||[]).forEach((v,i)=>{ if(v&&e.bloques[i]) sel.set(e.bloques[i][0]+"_"+e.bloques[i][1], +v||1); });
   const oferta=new Set((e.bloques||[]).map(b=>b[0]+"_"+b[1]));
@@ -1252,7 +1257,7 @@ function cubrir(){
   const enHora=F.filter(f=>iniMin(f)%60===0).length, largo=F.some(f=>String(f.ini).slice(3)!=="00"), verLbl=ix=> enHora>=2 ? iniMin(F[ix])%60===0 : (!largo || ix%2===0);
   let hd=`<div class="rc"></div>`+F.map((f,ix)=>`<div class="rc rh cen">${verLbl(ix)?`<span>${String(f.ini).replace(":00","")}</span>`:``}</div>`).join("");
   let rows=""; e.dias.forEach((d,di)=>{ rows+=`<div class="rc rd">${d}</div>`; for(let f=0;f<nF;f++){const k=di+"_"+f; rows+=`<div class="ecel ${oferta.has(k)?cls(sel.get(k)):"off"}" data-k="${k}"></div>`;} });
-  $("modal-body").innerHTML=`<div class="mtit">Marca tu disponibilidad</div><div class="msub">${DATA.miembros[iyo].pila} · ${instr}</div>
+  $("modal-body").innerHTML=`<div class="mtit">Marca tu disponibilidad</div><div class="msub">${DATA.miembros[iyo].pila} · ${instr}</div>${_avisoPlazo}
     <div class="rejwrap" style="margin-top:10px"><div class="egrid" style="grid-template-columns:auto repeat(${nF},minmax(16px,1fr))">${hd}${rows}</div></div>
     <div class="displeg" style="margin-top:9px">${leyenda}</div>
     <div class="ecount" id="ecount"></div><button class="ebtn" onclick="guardarDisp()">Guardar disponibilidad</button>`;
