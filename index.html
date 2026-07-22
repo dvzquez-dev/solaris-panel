@@ -451,6 +451,7 @@ const api = {
   crear: (reunion) => api._post({action:"crearReunion", reunion}),
   borrar: (id) => api._post({action:"borrarReunion", id}),
   fijar: (id, fijada) => api._post({action:"fijarReunion", id, fijada}),
+  setOrdenDia: (id, ordenDia) => api._post({action:"actualizarReunion", id, campos:{ordenDia}}),
   responder: (id,nombre,valores) => api._post({action:"responder", id, nombre, valores}),
   quienSoy: (token) => api._post({action:"quienSoy", token}),
   bootstrap: (token) => api._post(token?{action:"bootstrap", token}:{action:"bootstrap"}),
@@ -1178,7 +1179,9 @@ async function verReunion(id, _bg){
   const puedeFijar=puedeGestionar && !fijada && (plazoVenc || nR>0);
   $("modal-body").innerHTML=`${encMeta()}
     ${fijada?`<div class="fijada-bnr">📌 Reunión fijada · <b>${_fijadaLabel(r.fijada)}</b><span>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</span></div>`:``}
-    ${r.ordenDia?`<h2 style="margin:16px 2px 0">Orden del día</h2>${_ordenDiaBox(r.ordenDia)}`:``}
+    ${r.ordenDia
+      ? `<h2 style="margin:16px 2px 0">Orden del día</h2>${_ordenDiaBox(r.ordenDia)}${puedeGestionar?`<div id="od-box" style="margin-top:4px;text-align:right"><button class="ebtn sec" style="font-size:12.5px;padding:5px 11px" onclick="ordenDiaUI(${r.id})">Cambiar / quitar orden del día</button></div>`:``}`
+      : (puedeGestionar?`<div id="od-box" style="margin-top:14px"><button class="ebtn sec" onclick="ordenDiaUI(${r.id})">➕ Añadir orden del día (PDF/Drive)</button></div>`:``)}
     ${fijada
       ? ``
       : (esPD&&organiza)
@@ -1258,6 +1261,44 @@ async function desfijarOK(id){
   }catch(e){}
   finally{ window._fijando=false; }
 }
+function ordenDiaUI(id){
+  const box=document.getElementById("od-box"); if(!box) return;
+  const r=REUNIONES.find(x=>x.id===id)||(ENC28&&ENC28.id===id?ENC28:null);
+  const cur=(r&&r.ordenDia)||"";
+  box.innerHTML=`<div class="tarjeta" style="text-align:left">
+    <div style="font-weight:700;margin-bottom:6px">Orden del día</div>
+    <div class="cprev" style="margin:0 0 8px">Pega el enlace del PDF o del documento de Drive. Basta con compartirlo con el equipo/dominio <b>uvigoaerotech.com</b> — no hace falta que sea público.</div>
+    <input id="od-in" placeholder="https://drive.google.com/…" autocomplete="off" value="${cur.replace(/"/g,"&quot;")}">
+    <div id="od-msg" class="er" style="color:var(--warn);font-size:12.5px;margin-top:7px;display:none"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="ebtn" onclick="ordenDiaOK(${id})">Guardar</button>
+      ${cur?`<button class="ebtn sec" onclick="ordenDiaQuitar(${id})">Quitar</button>`:``}
+      <button class="ebtn sec" onclick="verReunion(${id})">Cancelar</button>
+    </div></div>`;
+}
+async function ordenDiaOK(id){
+  if(window._odGuardando) return;
+  const link=(($("od-in")&&$("od-in").value)||"").trim(), msg=document.getElementById("od-msg");
+  if(!link){ if(msg){msg.textContent="Pega un enlace.";msg.style.display="";} return; }
+  window._odGuardando=true;
+  const btn=document.querySelector(`#od-box button[onclick="ordenDiaOK(${id})"]`); if(btn){btn.disabled=true;btn.textContent="Guardando…";}
+  try{
+    if(backendOK && SESION){ await api.setOrdenDia(id, link); }
+    const r=REUNIONES.find(x=>x.id===id); if(r) r.ordenDia=link; if(ENC28&&ENC28.id===id) ENC28.ordenDia=link;
+    render(); verReunion(id);
+  }catch(e){ if(msg){msg.textContent="No se pudo guardar: "+((e&&e.message)||e);msg.style.display="";} if(btn){btn.disabled=false;btn.textContent="Guardar";} }
+  finally{ window._odGuardando=false; }
+}
+async function ordenDiaQuitar(id){
+  if(window._odGuardando) return; window._odGuardando=true;
+  const r=REUNIONES.find(x=>x.id===id);
+  try{
+    if(backendOK && SESION){ await api.setOrdenDia(id, ""); }
+    if(r) r.ordenDia=""; if(ENC28&&ENC28.id===id) ENC28.ordenDia="";
+    render(); verReunion(id);
+  }catch(e){}
+  finally{ window._odGuardando=false; }
+}
 function borrarReunionUI(id){
   const box=document.getElementById("ce-delbox"); if(!box) return;
   box.innerHTML=`<div class="er" style="color:var(--warn);margin-bottom:8px">¿Eliminar esta reunión y todas sus respuestas? No se puede deshacer.</div>
@@ -1279,7 +1320,8 @@ window.PLANTILLAS = window.PLANTILLAS || [
   {titulo:"Día completo solapado (10–22, 1 h 30 c/30)", modo:"rango", nd:"3", h0:"10", h1:"22", dur:"90", paso:"30", perdia:false, rangos:null}
 ];
 function crearEncuesta(){
-  const oh=(a,b,sel)=>{let s="";for(let h=a;h<=b;h++)s+=`<option value="${h}"${h===sel?" selected":""}>${String(h).padStart(2,"0")}:00</option>`;return s;};
+  const HM=v=>`${String(Math.floor(v)).padStart(2,"0")}:${(v%1)?"30":"00"}`;
+  const oh=(a,b,sel)=>{let s="";for(let v=a;v<=b+1e-9;v+=0.5)s+=`<option value="${v}"${Math.abs(v-sel)<1e-9?" selected":""}>${HM(v)}</option>`;return s;};
   const hoy=DATA.generado, mas=(iso,n)=>{const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
   const esCoord=!!DATA.miembros[iyo].cargo, TIPOS=[
     {v:"general",n:"General",d:"todo el equipo",coord:true},
@@ -1307,7 +1349,7 @@ function crearEncuesta(){
       <label>Fechas por<select id="ce-modo"><option value="rango" selected>Desde / hasta</option><option value="dur">Desde + nº de días</option></select></label>
       <div class="row2" id="ce-rango"><label>Desde<input id="ce-d0" type="date"></label><label>Hasta<input id="ce-d1" type="date"></label></div>
       <div class="row2" id="ce-durw" style="display:none"><label>Desde<input id="ce-fecha" type="date"></label><label>Días<input id="ce-nd" type="number" value="7" min="1" max="60"></label></div>
-      <div class="row2"><label>De<select id="ce-h0">${oh(8,22,10)}</select></label><label>a<select id="ce-h1">${oh(9,23,22)}</select></label></div>
+      <div class="row2"><label>De<select id="ce-h0">${oh(8,22,10)}</select></label><label>a<select id="ce-h1">${oh(11,23,22)}</select></label></div>
       <label class="chk"><input type="checkbox" id="ce-perdia"> Horario distinto por día</label>
       <div id="ce-dias" class="cdias" style="display:none"></div>
       <label>Duración de franja<select id="ce-dur"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option><option value="90">1 h 30 min</option><option value="120">2 h</option></select></label>
@@ -1327,19 +1369,23 @@ function crearEncuesta(){
   const V=id=>$(id).value, per=()=>$("ce-perdia").checked;
   const dias=()=> V("ce-modo")==="rango" ? diasEntre(V("ce-d0"),V("ce-d1")) : diasDesde(V("ce-fecha")||DATA.generado, Math.max(1,+V("ce-nd")||1));
   const aplicaDrow=r=>{const off=r.classList.contains("off");r.querySelectorAll("select").forEach(sel=>sel.disabled=off);const b=r.querySelector(".dtog");if(b)b.classList.toggle("on",!off);};
-  const renderDias=()=>{const ds=dias(),h0=+V("ce-h0"),h1=+V("ce-h1");
+  const renderDias=()=>{const ds=dias(),h0=+V("ce-h0"),h1=+V("ce-h1"),min0=Math.min(23,h0+durH());
     const prev=[...$("ce-dias").querySelectorAll(".drow")].map(r=>({off:r.classList.contains("off"),a:r.querySelector(".dr0").value,b:r.querySelector(".dr1").value}));
-    $("ce-dias").innerHTML=ds.map((d,i)=>`<div class="drow" data-d="${i}"><button type="button" class="dtog on" data-d="${i}" aria-label="activar o desactivar el día"></button><span>${d}</span><select class="dr0" data-d="${i}">${oh(8,22,h0)}</select><select class="dr1" data-d="${i}">${oh(9,23,h1)}</select></div>`).join("");
+    $("ce-dias").innerHTML=ds.map((d,i)=>`<div class="drow" data-d="${i}"><button type="button" class="dtog on" data-d="${i}" aria-label="activar o desactivar el día"></button><span>${d}</span><select class="dr0" data-d="${i}">${oh(8,22,h0)}</select><select class="dr1" data-d="${i}">${oh(min0,23,h1<min0?min0:h1)}</select></div>`).join("");
+    const fixDr1=r=>{const a=r.querySelector(".dr0"),b=r.querySelector(".dr1"),mn=Math.min(23,(+a.value||8)+durH());let cur=+b.value;if(!(cur>=mn))cur=mn;b.innerHTML=oh(mn,23,cur);};
     [...$("ce-dias").querySelectorAll(".drow")].forEach((r,i)=>{const p=prev[i];
       if(p){if(p.off)r.classList.add("off");r.querySelector(".dr0").value=p.a;r.querySelector(".dr1").value=p.b;}
-      aplicaDrow(r);
+      fixDr1(r); aplicaDrow(r);
       r.querySelector(".dtog").addEventListener("click",()=>{r.classList.toggle("off");aplicaDrow(r);upd();});
-      r.querySelector(".dr0").addEventListener("change",upd);r.querySelector(".dr1").addEventListener("change",upd);});};
+      r.querySelector(".dr0").addEventListener("change",()=>{fixDr1(r);upd();});r.querySelector(".dr1").addEventListener("change",upd);});};
   const rangos=()=>{const ds=dias();
     if(!per()) return ds.map(()=>[+V("ce-h0"),+V("ce-h1")]);
     const rows=[...$("ce-dias").querySelectorAll(".drow")];
     return ds.map((_,i)=>{const r=rows[i];if(!r||r.classList.contains("off"))return[0,0];return[+r.querySelector(".dr0").value,+r.querySelector(".dr1").value];});};
+  const durH=()=>((+V("ce-dur"))||60)/60;
+  const updateFin=()=>{ if(!$("ce-h1"))return; const min=Math.min(23,(+V("ce-h0")||8)+durH()); let cur=+V("ce-h1"); if(!(cur>=min))cur=min; $("ce-h1").innerHTML=oh(min,23,cur); };
   const upd=()=>{
+    updateFin();
     const rg=V("ce-modo")==="rango"; $("ce-rango").style.display=rg?"":"none"; $("ce-durw").style.display=rg?"none":"";
     $("ce-dias").style.display=per()?"":"none";
     const {F,perDia:pd}=genUnion(rangos(),+V("ce-dur"),+V("ce-paso")), nb=pd.reduce((a,x)=>a+x.length,0), nd=dias().length;
