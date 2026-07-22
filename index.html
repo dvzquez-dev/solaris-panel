@@ -590,7 +590,6 @@ function resumen(){
   const vision=e.vision||"anonima";
   // oculta: el mapa no se muestra a quien no organiza (anti-gaming). El organizador/admin sí lo ve para decidir.
   if(vision==="oculta" && !soyOrg) return `<div class="sindatos">Se ha ocultado la visibilidad de disponibilidad para esta reunión.<span>Cubre la tuya igualmente; quien la convoca elegirá el mejor momento.</span></div>`;
-  if(!nR) return `<div class="sindatos">Nadie ha respondido todavía.<span>Cuando el equipo cubra su disponibilidad, verás aquí cuántos pueden en cada franja.</span></div>`;
   const conNombres=(vision==="publica");   // pública: tocar un hueco revela quién puede
   const orden=F0.map((_,i)=>i).sort((a,b)=> iniMin(F0[a])-iniMin(F0[b]) || (+F0[a].dur||0)-(+F0[b].dur||0));
   const F=orden.map(i=>F0[i]), pos=[]; orden.forEach((oi,k)=>pos[oi]=k);
@@ -611,7 +610,7 @@ function resumen(){
   e.dias.forEach((d,di)=>{ g+=`<div class="rc rd">${d}</div>`;
     for(let f=0;f<nF;f++){const c=cel[di][f];
       if(!c){g+=`<div class="celc no"></div>`;continue;}
-      const a=maxDisp?(0.12+0.88*c.disp/maxDisp):0, es=(best&&best.di===di&&best.f===f);
+      const a=maxDisp?(0.12+0.88*c.disp/maxDisp):0.07, es=(maxDisp>0 && best&&best.di===di&&best.f===f);
       if(conNombres) window._franjaInfo[di+"_"+f]={dia:d,ini:F[f].ini,fin:finFranja(F[f]),disp:c.disp,pres:c.pres,quienes:c.quienes};
       const esFij=fijSet.has(di+"_"+f);
       g+=`<div class="celc${es?" best":""}${esFij?" fij":""}${conNombres?" tap":""}" ${conNombres?`onclick="_mostrarFranja('${di}_${f}')" data-fk="${di}_${f}"`:``} title="${F[f].ini}–${finFranja(F[f])} · ${d}: ${c.disp}/${nR} pueden${hayPres?`, ${c.pres} en persona`:``}${esFij?" · ELEGIDO":""}" style="background:${esFij?'rgba(46,160,90,.95)':'rgba(228,30,37,'+a.toFixed(3)+')'}">${verNum&&c.disp?c.disp:""}</div>`;
@@ -622,10 +621,14 @@ function resumen(){
   const top=[...slots].sort(porMejor).slice(0,3);
   const lista=top.map(x=>`<div class="densf"><span class="dd">${e.dias[x.di]} ${F[x.f].ini}</span><span class="db"><i style="width:${maxDisp?Math.round(100*x.disp/maxDisp):0}%"></i></span><span class="dn">${x.disp}/${nR}${(hayPres&&x.pres)?` · ${x.pres} en persona`:""}</span></div>`).join("");
   const notaLeg = conNombres ? "toca un hueco para ver quién puede en esa franja" : (verNum?"el número es cuánta gente puede":"mantén el dedo en una celda para el detalle");
-  return `<div class="dispcab"><b>${nR}</b> respondieron · mejor franja <b style="color:var(--red2)">${best?`${e.dias[best.di]} ${F[best.f].ini}`:"—"}</b>${best?` — ${best.disp}/${nR} pueden${(hayPres&&best.pres)?`, ${best.pres} en persona`:""}`:""}</div>${g}${detalle}
-    <div class="densrow">${lista}</div>
+  const cabHead = nR
+    ? `<b>${nR}</b> respondieron · mejor franja <b style="color:var(--red2)">${best?`${e.dias[best.di]} ${F[best.f].ini}`:"—"}</b>${best?` — ${best.disp}/${nR} pueden${(hayPres&&best.pres)?`, ${best.pres} en persona`:""}`:""}`
+    : `<b>Nadie ha respondido todavía.</b> <span style="color:var(--ink3)">Aún puedes fijar la fecha si ya la tienes decidida.</span>`;
+  return `<div class="dispcab">${cabHead}</div>${g}${detalle}
+    ${nR?`<div class="densrow">${lista}</div>
     <div class="displeg escala" style="margin-top:13px"><span>menos</span><span class="densbar"></span><span>más</span></div>
-    <div class="displeg" style="margin-top:7px">${fijSet.size?`<span class="fijkey"></span>hueco elegido · `:``}${notaLeg}</div>`;
+    <div class="displeg" style="margin-top:7px">${fijSet.size?`<span class="fijkey"></span>hueco elegido · `:``}${notaLeg}</div>`
+    :(fijSet.size?`<div class="displeg" style="margin-top:9px"><span class="fijkey"></span>hueco elegido</div>`:``)}`;
 }
 // pública: pinta debajo del mapa quién puede en la franja tocada
 function _mostrarFranja(key){
@@ -1180,7 +1183,7 @@ async function verReunion(id, _bg){
   const esAdmin=(typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL);
   const puedeGestionar=organiza||esAdmin, fijada=!!r.fijada, plazoVenc=_plazoVencido(r);
   const nR=(r.resp&&Object.keys(r.resp).filter(n=>Array.isArray(r.resp[n])).length)||r.nResp||0;
-  const puedeFijar=puedeGestionar && !fijada && (plazoVenc || nR>0);
+  const puedeFijar=puedeGestionar && !fijada;   // el convocante puede fijar cuando quiera, aunque nadie haya respondido
   $("modal-body").innerHTML=`${encMeta()}
     ${fijada?`<div class="fijada-bnr">📌 Reunión fijada · <b>${_fijadaLabel(r.fijada)}</b><span>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</span></div>`:``}
     ${r.ordenDia
