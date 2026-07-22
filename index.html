@@ -478,6 +478,9 @@ const api = {
   getTareas: () => api._post({action:"getTareas"}),
   getTurnos: () => api._post({action:"getTurnos"}),
   getEntregables: () => api._post({action:"getEntregables"}),
+  guardarPush: (sub) => api._post({action:"guardarPush", sub}),
+  borrarPush: (endpoint) => api._post({action:"borrarPush", endpoint}),
+  enviarPush: (destinatario, titulo, cuerpo, opts) => api._post({action:"enviarPush", destinatario, titulo, cuerpo, opts}),
   decidir: (id, accion, motivo, extra) => api._post({action:"decidir", id, accion, motivo, extra}),
 };
 function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:r.fijada||""}; }
@@ -567,6 +570,59 @@ function cerrarSesion(){
   try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
   location.reload();
 }
+/* ---- Notificaciones push (Web Push). Ver docs/notificaciones-push-plan.md.
+   En iPhone SOLO funciona si la app está instalada en la pantalla de inicio (standalone);
+   si no, se muestra la instrucción en vez del botón. ---- */
+const VAPID_PUBLIC = "BOcYdKPWxq5NAKS6AbZIW9UV7MOb7gmy1nP_KhdxZpvPa3O5jsZ-_jravOhHivQqQuJoJvLTcrc2xvZESc2g0Ag";
+function _urlB64_(b64){
+  const pad = "=".repeat((4 - b64.length % 4) % 4);
+  const s = (b64 + pad).replace(/-/g,"+").replace(/_/g,"/");
+  const raw = atob(s), arr = new Uint8Array(raw.length);
+  for (let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+function _pushSoportado_(){ return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
+function _esIOS_(){ return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1); }
+function _esStandalone_(){ return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true; }
+let _swReg = null;
+async function _registrarSW_(){
+  if (!("serviceWorker" in navigator)) return null;
+  try { _swReg = await navigator.serviceWorker.register("sw.js"); return _swReg; } catch(e){ console.log("SW no registrado:", e); return null; }
+}
+async function activarNotis(btn){
+  if (!_pushSoportado_()){ _notisMsg("Este navegador no soporta notificaciones."); return; }
+  if (_esIOS_() && !_esStandalone_()){ _notisMsg("En iPhone: instala la app en la pantalla de inicio (Compartir → Añadir a inicio) y ábrela desde el icono."); _pintarNotisEquipo(); return; }
+  if (btn){ btn.disabled=true; btn.textContent="Activando…"; }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted"){ _notisMsg("Permiso denegado. Puedes activarlo en los Ajustes del móvil."); return; }
+    const reg = _swReg || await _registrarSW_();
+    if (!reg){ _notisMsg("No se pudo preparar el service worker."); return; }
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub){ sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC) }); }
+    if (SESION){ await api.guardarPush(sub.toJSON()); }
+    _notisMsg("¡Notificaciones activadas! ✓");
+  } catch(e){ _notisMsg("No se pudo activar: "+((e&&e.message)||e)); }
+  finally { _pintarNotisEquipo(); }
+}
+function _notisMsg(t){ const b=document.getElementById("notis-msg"); if(b) b.textContent=t; }
+// Al abrir: registra el SW y, si ya había permiso + suscripción + sesión, la re-guarda por si rotó.
+async function _pushInit_(){
+  if (!_pushSoportado_()) return;
+  const reg = await _registrarSW_();
+  try { if (reg && Notification.permission==="granted"){ await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub && SESION) api.guardarPush(sub.toJSON()); } } catch(_){}
+}
+// Botón/cartel de notificaciones para la pantalla Equipo (se re-pinta según estado del permiso).
+function _notisEquipoHTML(){
+  if (!_pushSoportado_()) return `<div class="er" style="color:var(--ink3)">Tu navegador no soporta notificaciones.</div>`;
+  if (_esIOS_() && !_esStandalone_()) return `<div class="er" style="color:var(--ink2);line-height:1.55">📲 Para recibir avisos en <b>iPhone</b>: pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>, y abre la app desde el icono nuevo. Luego vuelve aquí y actívalas.</div>`;
+  const perm = Notification.permission;
+  if (perm === "granted") return `<div class="er" style="color:var(--ok)">🔔 Notificaciones activadas.</div><div id="notis-msg" class="er" style="color:var(--ink3);margin-top:2px"></div>`;
+  if (perm === "denied") return `<div class="er" style="color:var(--ink2)">🔕 Permiso bloqueado. Actívalo en los Ajustes del móvil para este sitio.</div>`;
+  return `<button class="ebtn" onclick="activarNotis(this)">Activar notificaciones</button><div id="notis-msg" class="er" style="color:var(--ink3);margin-top:4px"></div>`;
+}
+function _pintarNotisEquipo(){ const h=document.getElementById("notis-box"); if(h) h.innerHTML=_notisEquipoHTML(); }
 function _pintarSalir_(){
   const hdr=document.querySelector("header"); if(!hdr || document.getElementById("hdr-right")) return;
   const sel=document.getElementById("persona"), lab=sel?sel.closest("label"):null;
@@ -1156,6 +1212,9 @@ function render(){
         <small>${m.cargo==="Project Director"?"Project Director":"coordina "+m.unidad}</small></div>
         <div class="der">${m.cargo==="Project Director"?"dirección":m.unidad.split(" ")[0]}</div></div>`).join("")}
     </div>
+    <h2>Notificaciones</h2>
+    <div class="tarjeta"><div id="notis-box">${_notisEquipoHTML()}</div>
+      <p class="pie">Avisos de reuniones, documentos y anuncios. Los importantes llegan siempre; podrás silenciar solo las noticias.</p></div>
     <p class="pie">SOLARIS · datos a ${DATA.generado.split("-").reverse().join("/")}</p>`;
 }
 
@@ -1691,6 +1750,7 @@ async function _onCredencial_(resp, _silent){
     iyo = idx>=0 ? idx : (DATA.miembros.length ? 0 : -1);   // admin/no-miembro: primer perfil; el selector #persona deja cambiar
     _pintarPersona_();   // repoblar el selector con los miembros ya cargados tras el login
     _pintarSalir_();     // botón "Salir" (cerrar sesión) en la cabecera, para todos
+    _pushInit_();        // registra el service worker + re-guarda la suscripción push si ya la había
     var g=document.getElementById("loginGate"); if(g) g.remove();
     render();
     // solo la cuenta admin ve otros perfiles; el resto queda fijado al suyo.
