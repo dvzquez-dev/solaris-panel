@@ -461,7 +461,7 @@ const api = {
   getEntregables: () => api._post({action:"getEntregables"}),
   decidir: (id, accion, motivo, extra) => api._post({action:"decidir", id, accion, motivo, extra}),
 };
-function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"publica", fijada:r.fijada||""}; }
+function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:r.fijada||""}; }
 // Convierte un enlace de Drive/Docs a su URL de vista previa embebible; si es otro
 // (p.ej. un PDF directo) lo deja tal cual para meterlo en el iframe.
 function _embedUrl(u){
@@ -582,7 +582,7 @@ function resumen(){
   if(!nD||!nF) return `<div class="sindatos">Esta encuesta no tiene franjas.</div>`;
   const _yoNom=(DATA.miembros[iyo]&&DATA.miembros[iyo].nombre)||"";
   const soyOrg=(e.convocante===_yoNom)||(typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL);
-  const vision=e.vision||"publica";
+  const vision=e.vision||"anonima";
   // oculta: el mapa no se muestra a quien no organiza (anti-gaming). El organizador/admin sí lo ve para decidir.
   if(vision==="oculta" && !soyOrg) return `<div class="sindatos">Se ha ocultado la visibilidad de disponibilidad para esta reunión.<span>Cubre la tuya igualmente; quien la convoca elegirá el mejor momento.</span></div>`;
   if(!nR) return `<div class="sindatos">Nadie ha respondido todavía.<span>Cuando el equipo cubra su disponibilidad, verás aquí cuántos pueden en cada franja.</span></div>`;
@@ -1316,11 +1316,11 @@ function crearEncuesta(){
       <label>Orden del día <span style="color:var(--ink3);font-weight:400">(enlace a PDF/Drive, opcional)</span><input id="ce-orden" placeholder="pega el enlace del documento…" autocomplete="off"></label>
       <label style="margin-bottom:3px">Visión de disponibilidad</label>
       <div class="cseg" id="ce-vision">
-        <button type="button" data-v="publica" class="on">Pública</button>
-        <button type="button" data-v="anonima">Anónima</button>
+        <button type="button" data-v="publica">Pública</button>
+        <button type="button" data-v="anonima" class="on">Anónima</button>
         <button type="button" data-v="oculta">Oculta</button>
       </div>
-      <div class="cprev" id="ce-vhint" style="margin:-4px 2px 2px">Cualquiera puede tocar un hueco del mapa y ver quién puede en esa franja.</div>
+      <div class="cprev" id="ce-vhint" style="margin:-4px 2px 2px">El equipo ve el mapa de calor con los totales, sin nombres.</div>
     </div>
     <div id="ce-prev" class="cprev"></div>
     <button class="ebtn" onclick="hacerEncuesta()">Crear encuesta</button>`;
@@ -1354,7 +1354,7 @@ function crearEncuesta(){
   if($("ce-tipo")){$("ce-tipo").addEventListener("change",tipoUpd);tipoUpd();}
   if($("ce-mix")){$("ce-mix").querySelectorAll(".cmixb").forEach(btn=>btn.addEventListener("click",()=>{btn.classList.toggle("on");const u=btn.dataset.u,on=btn.classList.contains("on");DATA.miembros.forEach((m,ix)=>{if(m.unidad===u&&ix!==iyo){if(on)window._invitados.add(ix);else window._invitados.delete(ix);}});invRender();}));}
   if($("ce-inv")){$("ce-inv").addEventListener("input",e=>sugRender(e.target.value));$("ce-inv").addEventListener("blur",()=>setTimeout(()=>{if($("ce-sug"))$("ce-sug").style.display="none";},180));}
-  window._vision="publica";
+  window._vision="anonima";
   const _vhints={publica:"Cualquiera puede tocar un hueco del mapa y ver quién puede en esa franja.",anonima:"El equipo ve el mapa de calor con los totales, sin nombres.",oculta:"El equipo no ve el mapa; solo tú (quien convoca) lo verás para decidir."};
   if($("ce-vision")){$("ce-vision").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{$("ce-vision").querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");window._vision=b.dataset.v;if($("ce-vhint"))$("ce-vhint").textContent=_vhints[window._vision]||"";}));}
   $("ce-d0").value=hoy; $("ce-d1").value=mas(hoy,6); $("ce-fecha").value=hoy; $("ce-lim").value=mas(hoy,5);
