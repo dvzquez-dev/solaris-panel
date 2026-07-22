@@ -373,6 +373,15 @@
   .sev-alta{background:rgba(228,30,37,.14);border:1px solid var(--red);color:var(--red2)}
   .docissues{margin:6px 0 0;padding-left:17px;font-size:11.5px;color:var(--ink2);line-height:1.5}
   .docissues li{margin:2px 0}
+  /* Tarjeta de revisión enriquecida (analysis_json de Cowork) */
+  .docsec{margin:10px 0 0}
+  .docsec h5{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);margin:0 0 3px;font-weight:700}
+  .docsec .docp{margin:0;font-size:12.5px;color:var(--ink2);line-height:1.5}
+  .doclist{margin:0;padding-left:16px;font-size:12.5px;color:var(--ink2);line-height:1.5}
+  .doclist li{margin:2.5px 0}
+  .docsec.dec h5{color:var(--red2)}
+  .docsec.rie h5{color:var(--warn)}
+  .docconteos{margin-top:8px;color:var(--ink3);font-size:11.5px}
   .pdftool{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:11.5px;color:var(--ink2);gap:8px}
   .pdfz{display:flex;align-items:center;gap:7px;flex-shrink:0}
   .pdfz b{font-size:11px;color:var(--ink3);min-width:40px;text-align:center;font-variant-numeric:tabular-nums}
@@ -389,6 +398,14 @@
   .pp-line{height:6px;border-radius:3px;background:#e6e6e6}
   .pp-fig{margin:14px 0;border:1px dashed #bbb;border-radius:6px;background:#f4f4f4;color:#999;font-size:9.5px;text-align:center;padding:22px 10px;display:flex;flex-direction:column;gap:4px}
   .pp-fig span{font-size:8.5px;color:#aaa}
+  .odfull{background:none;border:0;color:var(--red2);font-size:12.5px;font-weight:600;cursor:pointer;padding:0}
+  /* Visor a pantalla completa (overlay CSS: la Fullscreen API nativa no va con iframes en iPhone). */
+  .docfull{position:fixed;inset:0;z-index:1000;background:#111;display:flex;flex-direction:column}
+  .docfull-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(9px + env(safe-area-inset-top)) 14px 9px;background:#000;color:#fff;font-size:13.5px;flex:0 0 auto}
+  .docfull-bar .dft{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85}
+  .docfull-x{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:9px;padding:9px 16px;font-size:14px;font-weight:700;cursor:pointer;flex:0 0 auto}
+  .docfull-x:active{background:rgba(255,255,255,.3)}
+  .docfull iframe{flex:1 1 auto;width:100%;border:0;background:#fff;padding-bottom:env(safe-area-inset-bottom)}
 </style>
 
 <div class="fono">
@@ -475,8 +492,27 @@ function _embedUrl(u){
 }
 function _ordenDiaBox(u){
   const src=_embedUrl(u);
+  const s=String(src).replace(/'/g,"%27");
   return `<div class="odbox"><iframe src="${src}" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:430px;border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>
-    <div style="margin-top:6px;text-align:right"><a href="${u}" target="_blank" rel="noopener" style="color:var(--red2);font-size:12.5px">Abrir en una pestaña ›</a></div></div>`;
+    <div style="margin-top:6px;display:flex;justify-content:flex-end;align-items:center;gap:16px">
+      <button class="odfull" onclick="abrirDocFull('${s}')">Pantalla completa ⤢</button>
+      <a href="${u}" target="_blank" rel="noopener" style="color:var(--red2);font-size:12.5px">Abrir en una pestaña ›</a></div></div>`;
+}
+// Visor a pantalla completa: overlay fijo con el documento y un botón grande de salir
+// (fácil de cerrar, requisito de Daniel). Escape también cierra en escritorio.
+function abrirDocFull(src){
+  cerrarDocFull();
+  const o=document.createElement("div"); o.className="docfull"; o.id="docfull";
+  o.innerHTML=`<div class="docfull-bar"><span class="dft">Documento · pantalla completa</span><button class="docfull-x" onclick="cerrarDocFull()" aria-label="Salir de pantalla completa">Salir ✕</button></div>`+
+    `<iframe src="${src}" referrerpolicy="no-referrer" allow="fullscreen"></iframe>`;
+  document.body.appendChild(o); document.body.style.overflow="hidden";
+  window._docFullEsc=e=>{ if(e.key==="Escape") cerrarDocFull(); };
+  document.addEventListener("keydown", window._docFullEsc);
+}
+function cerrarDocFull(){
+  const o=document.getElementById("docfull"); if(o) o.remove();
+  document.body.style.overflow="";
+  if(window._docFullEsc){ document.removeEventListener("keydown", window._docFullEsc); window._docFullEsc=null; }
 }
 const TAREAS = [];
 // Espejo del canal de turnos de Discord (datos/turnos.json). Cada turno trae
@@ -725,21 +761,54 @@ function docsPantalla(yo){
     : `<div class="tarjeta"><div class="sindatos">No has subido nada a revisión.<span>Lo que subas por el formulario aparecerá aquí con su estado.</span></div></div>`;
   return h;
 }
+// Tarjeta de revisión enriquecida: pinta el analysis_json de Cowork de forma DEFENSIVA
+// (cada sección solo si viene y no está vacía; analysis_json NO es uniforme entre tipos de
+// documento — un Informe puede traer solo propósito/alcance). Ver contrato-integracion-cowork.md §4.
+function _escDoc(s){ return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function _listaDoc(label, arr, cls){
+  if(!Array.isArray(arr)||!arr.length) return "";
+  return `<div class="docsec${cls?" "+cls:""}"><h5>${label}</h5><ul class="doclist">${arr.map(x=>`<li>${_escDoc(x)}</li>`).join("")}</ul></div>`;
+}
+function _analisisHTML(e){
+  const a=e&&e.analisis; if(!a||typeof a!=="object") return "";
+  let h="";
+  if(a.proposito) h+=`<div class="docsec"><h5>Propósito</h5><p class="docp">${_escDoc(a.proposito)}</p></div>`;
+  h+=_listaDoc("Alcance", a.alcance);
+  h+=_listaDoc("Decisiones"+((a.decisiones&&a.decisiones.length)?` · ${a.decisiones.length}`:""), a.decisiones, "dec");
+  h+=_listaDoc("Acciones", a.acciones);
+  h+=_listaDoc("Pendientes", a.pendientes);
+  h+=_listaDoc("Riesgos", a.riesgos, "rie");
+  h+=_listaDoc("Fechas clave", a.fechasClave, "fch");
+  const c=a.conteos;
+  if(c && typeof c==="object"){
+    const items=Object.keys(c).filter(k=>Number(c[k])>0).map(k=>`${c[k]} ${k}`);
+    if(items.length) h+=`<div class="er docconteos">${_escDoc(items.join(" · "))}</div>`;
+  }
+  return h;
+}
 function verDoc(id){
   const e=ENTREGABLES.find(x=>x.id===id); if(!e) return;
   const yo=DATA.miembros[iyo], puede = puedeDecidir(e, yo);
   const bloqueado = !puede && e.estado!=="revision" && revisoresDe(e).includes(yo.nombre);
   const revs = revisoresDe(e).map(n=>n.split(" ")[0]).join(" o ");
-  const enlaces = (e.enlaceDrive?`<a href="${e.enlaceDrive}" onclick="return false" style="color:var(--red2)">ver en Drive</a>`:``)+(e.paginaNotion?`${e.enlaceDrive?" · ":""}<a href="${e.paginaNotion}" onclick="return false" style="color:var(--red2)">página Notion</a>`:``);
+  const _realUrl = u => /^https?:\/\//.test(u||"");
+  const _lnk = (u,txt) => _realUrl(u) ? `<a href="${u}" target="_blank" rel="noopener" style="color:var(--red2)">${txt}</a>` : `<a href="#" onclick="return false" style="color:var(--ink3)">${txt}</a>`;
+  const enlaces = (e.enlaceDrive?_lnk(e.enlaceDrive,"ver en Drive"):``)+(e.paginaNotion?`${e.enlaceDrive?" · ":""}${_lnk(e.paginaNotion,"página Notion")}`:``);
   const lineas=[92,84,88,72,90,64,86].map(w=>`<div class="pp-line" style="width:${w}%"></div>`).join("");
-  const visor = `<div class="pdftool"><span>Documento · léelo antes de decidir</span><span class="pdfz"><button onclick="zoomDoc(-1)" aria-label="alejar">−</button><b id="zlbl">100%</b><button onclick="zoomDoc(1)" aria-label="acercar">+</button><button onclick="zoomDoc(0)" title="Ajustar">⤢</button></span></div>
+  // Si el expediente trae un enlace REAL de Drive, se embebe de verdad (mismo mecanismo que
+  // la orden del día). El preview de Drive carga si el que mira está logueado en una cuenta
+  // con acceso (dominio uvigoaerotech.com basta; no hace falta que sea público). Notion NO se
+  // embebe (bloquea el iframe) => queda como enlace que abre en pestaña. Sin enlace real: maqueta.
+  const visor = _realUrl(e.enlaceDrive)
+    ? `<div class="pdftool"><span>Documento · léelo antes de decidir</span><span style="color:var(--ink3);font-size:12px">Drive · UVigo Aerotech</span></div>${_ordenDiaBox(e.enlaceDrive)}`
+    : `<div class="pdftool"><span>Documento · léelo antes de decidir</span><span class="pdfz"><button onclick="zoomDoc(-1)" aria-label="alejar">−</button><b id="zlbl">100%</b><button onclick="zoomDoc(1)" aria-label="acercar">+</button><button onclick="zoomDoc(0)" title="Ajustar">⤢</button></span></div>
     <div class="pdfbox" id="pdfbox"><div class="pdfpage" data-z="1" style="width:320px">
       <div class="pp-h"><span class="pp-org">UVIGO AEROTECH · SOLARIS</span><span class="pp-ref">${e.ref}</span></div>
       <div class="pp-tit">${e.titulo}</div>
       <div class="pp-meta">${e.autor} · ${e.subsistema} · ${e.tipo} · ${fechaCorta(e.fecha)}</div>
       <p class="pp-p">${e.resumen||""}</p>
       <div class="pp-lines">${lineas}</div>
-      <div class="pp-fig">— vista previa —<span>el archivo real (${e.ref}) se incrusta aquí desde Drive/Notion</span></div>
+      <div class="pp-fig">— vista previa —<span>el archivo real (${e.ref}) se incrusta aquí cuando el expediente traiga enlace de Drive</span></div>
       <div class="pp-lines">${lineas}</div>
     </div></div>`;
   $("modal-body").innerHTML=`<div class="mtit">${e.titulo}</div>
@@ -747,6 +816,7 @@ function verDoc(id){
     <div class="entdet">
       <div class="er"><span class="amb ${AMB[e.ambito][1]}">${AMB[e.ambito][0]}</span> · ${e.tipo} · enviado ${fechaCorta(e.fecha)} · <span class="stpill ${EST_D[e.estado][1]}">${EST_D[e.estado][0]}</span></div>
       <p>${e.resumen||"Sin descripción."}</p>
+      ${_analisisHTML(e)}
       ${(e.etiquetas&&e.etiquetas.length)?`<div class="er">Etiquetas: ${e.etiquetas.join(", ")}</div>`:``}
       ${e.severidad?`<div class="er" style="margin-top:6px">Calidad: <span class="sev sev-${e.severidad}">${({baja:"alta",media:"media",alta:"baja"}[e.severidad])||e.severidad}</span>${(e.issues&&e.issues.length)?` · ${e.issues.length} aviso${e.issues.length===1?"":"s"}`:" · sin avisos"}</div>`:``}
       ${(e.issues&&e.issues.length)?`<ul class="docissues">${e.issues.map(x=>`<li>${x}</li>`).join("")}</ul>`:``}
@@ -1107,6 +1177,24 @@ function fmtHM(m){return `${String(m/60|0).padStart(2,"0")}:${String(m%60).padSt
 function genFranjas(h0,h1,dur,paso){const F=[],end=h1*60;paso=paso||dur;for(let t=h0*60;t+dur<=end;t+=paso)F.push({ini:fmtHM(t),dur});return F;}
 function diasDesde(iso,n){const D=["D","L","M","X","J","V","S"],out=[],b=new Date(iso+"T00:00:00");for(let i=0;i<n;i++){const d=new Date(b);d.setDate(b.getDate()+i);out.push(`${D[d.getDay()]} ${d.getDate()}`);}return out;}
 function diasEntre(iso0,iso1){const D=["D","L","M","X","J","V","S"],out=[];if(!iso0||!iso1)return out;const a=new Date(iso0+"T00:00:00"),b=new Date(iso1+"T00:00:00");if(b<a)return out;for(let i=0;i<62&&a<=b;i++){out.push(`${D[a.getDay()]} ${a.getDate()}`);a.setDate(a.getDate()+1);}return out;}
+// Reconstruye la fecha ISO real del día `di` de una reunión. Las etiquetas de día son
+// "L 20" (letra de día de semana + día del mes), sin mes ni año. Se ancla el día 0 a una
+// fecha de referencia cercana (límite de respuesta / creado / generado) exigiendo que
+// coincidan DÍA-DEL-MES y DÍA-DE-SEMANA: ese par es único dentro de ±45 días, mucho más
+// que la distancia real entre el plazo y la reunión. Devuelve "" si no puede anclar.
+function _fechaDeDia(r, di){
+  const dias=(r&&r.dias)||[]; if(!dias.length||di==null||di<0||!dias[di]) return "";
+  const D=["D","L","M","X","J","V","S"];
+  const p0=String(dias[0]).trim().split(/\s+/), wd0=p0[0], dom0=parseInt(p0[1],10);
+  if(!dom0) return "";
+  const refIso=(r.limite&&String(r.limite).slice(0,10))||(r.creado&&String(r.creado).slice(0,10))||((DATA&&DATA.generado)?String(DATA.generado).slice(0,10):"")||"";
+  const ref=refIso?new Date(refIso+"T00:00:00"):new Date();
+  let day0=null,best=1e9;
+  for(let k=-45;k<=45;k++){ const d=new Date(ref); d.setDate(ref.getDate()+k); if(d.getDate()===dom0 && D[d.getDay()]===wd0 && Math.abs(k)<best){ best=Math.abs(k); day0=d; } }
+  if(!day0) return "";
+  const d=new Date(day0); d.setDate(day0.getDate()+di);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
 function genUnion(rangos,dur,paso){const map=new Map(),F=[],perDia=[];rangos.forEach(([h0,h1])=>{const idxs=[];if(h1>h0){genFranjas(h0,h1,dur,paso).forEach(f=>{const k=f.ini+"|"+f.dur;if(!map.has(k)){map.set(k,F.length);F.push(f);}idxs.push(map.get(k));});}perDia.push(idxs);});const ord=F.map((_,i)=>i).sort((a,b)=>iniMin(F[a])-iniMin(F[b])||(+F[a].dur||0)-(+F[b].dur||0)),pos=[];ord.forEach((oi,k)=>pos[oi]=k);return{F:ord.map(i=>F[i]),perDia:perDia.map(x=>x.map(i=>pos[i]))};}
 function presetInvitados(tipo, ci){
   const M=DATA.miembros, yo=M[ci], otros=f=>M.map((m,i)=>i).filter(i=>i!==ci && f(M[i]));
@@ -1269,9 +1357,7 @@ async function fijarOK(id){
   window._fijando=true;
   const btn=document.querySelector(`button[onclick="fijarOK(${id})"]`); if(btn){btn.disabled=true;btn.textContent="Fijando…";}
   const F=r.franjas||[], dias=r.dias||[], dia=dias[di]||"";
-  const anio=(((DATA&&DATA.generado)||"2026")+"").slice(0,4);
-  const dm=String(dia).match(/(\d{1,2})\/(\d{1,2})/);
-  const fecha=dm?`${anio}-${dm[2].padStart(2,"0")}-${dm[1].padStart(2,"0")}`:"";
+  const fecha=_fechaDeDia(r, di);
   const bloques=ordSel.map(fi=>[di,fi]);
   const ini0=F[ordSel[0]]?F[ordSel[0]].ini:"", finMax=F[ordSel[ordSel.length-1]]?finFranja(F[ordSel[ordSel.length-1]]):"";
   const label=`${dia} · ${ini0}${(finMax&&finMax!==ini0)?"–"+finMax:""}`;
