@@ -1175,8 +1175,7 @@ function crearEncuesta(){
       <div id="ce-dias" class="cdias" style="display:none"></div>
       <label>Duración de franja<select id="ce-dur"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option><option value="90">1 h 30 min</option><option value="120">2 h</option></select></label>
       <label>Cadencia<select id="ce-paso"><option value="0">Contiguas</option><option value="15">Solapadas cada 15 min</option><option value="30">Solapadas cada 30 min</option><option value="60">Solapadas cada 60 min</option></select></label>
-      <label>Límite para responder<input id="ce-lim" type="date"></label>
-      <label>Hora límite (opcional)<input id="ce-limh" type="time"></label>
+      <div style="display:flex;gap:8px"><label style="flex:1;min-width:0">Límite para responder<input id="ce-lim" type="date"></label><label style="flex:1;min-width:0">Hora (opcional)<input id="ce-limh" type="time"></label></div>
     </div>
     <div id="ce-prev" class="cprev"></div>
     <button class="ebtn" onclick="hacerEncuesta()">Crear encuesta</button>`;
