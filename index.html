@@ -319,6 +319,9 @@
   .fchip{background:var(--sur);border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12px;color:var(--ink)}
   .fchip.pres{border-color:var(--red);color:var(--red2);font-weight:600}
   .odbox{margin:9px 2px 2px}
+  .fijada-bnr{margin:12px 2px 2px;padding:11px 13px;border:1px solid var(--ok);border-radius:11px;background:rgba(46,160,90,.10);color:var(--ink);font-size:14px}
+  .fijada-bnr b{color:var(--ok)}
+  .fijada-bnr span{display:block;color:var(--ink2);font-size:12.5px;margin-top:3px}
   .disp-sec.res.on{max-height:1100px}
   .densbar{display:inline-block;width:52px;height:9px;border-radius:3px;background:linear-gradient(90deg,rgba(228,30,37,.14),var(--red));margin:0 6px;vertical-align:middle}
   .densrow{display:flex;flex-direction:column;gap:7px;margin:13px 2px 2px}
@@ -440,6 +443,7 @@ const api = {
   get: (id) => api._get({action:"getReunion", id}),
   crear: (reunion) => api._post({action:"crearReunion", reunion}),
   borrar: (id) => api._post({action:"borrarReunion", id}),
+  fijar: (id, fijada) => api._post({action:"fijarReunion", id, fijada}),
   responder: (id,nombre,valores) => api._post({action:"responder", id, nombre, valores}),
   quienSoy: (token) => api._post({action:"quienSoy", token}),
   bootstrap: (token) => api._post(token?{action:"bootstrap", token}:{action:"bootstrap"}),
@@ -450,7 +454,7 @@ const api = {
   getEntregables: () => api._post({action:"getEntregables"}),
   decidir: (id, accion, motivo, extra) => api._post({action:"decidir", id, accion, motivo, extra}),
 };
-function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"anonima"}; }
+function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:r.fijada||""}; }
 // Convierte un enlace de Drive/Docs a su URL de vista previa embebible; si es otro
 // (p.ej. un PDF directo) lo deja tal cual para meterlo en el iframe.
 function _embedUrl(u){
@@ -1098,14 +1102,15 @@ function reuCard(r, yo){
   const organiza=r.convocante===yo.nombre, invitado=(r.tipo==="general")||(r.invitados||[]).includes(yo.nombre);
   const abierta=!r.limite||DATA.generado<=r.limite, yaCubri=Array.isArray((r.resp||{})[yo.nombre]);
   let est;
-  if(organiza) est=`<span style="color:var(--ink3)">la organizas</span>`;
+  if(r.fijada) est=`<span style="color:var(--ok)">📌 fijada</span>`;
+  else if(organiza) est=`<span style="color:var(--ink3)">la organizas</span>`;
   else if(!invitado) est=`<span style="color:var(--ink3)">no invitado</span>`;
   else if(!abierta) est=`<span style="color:var(--ink3)">cerrada</span>`;
   else if(yaCubri) est=`<span style="color:var(--ok)">✓ cubierta</span>`;
   else est=`<span style="color:var(--red2)">te falta cubrir</span>`;
   if(r._eliminando) return `<div class="tarjeta" style="opacity:.4;pointer-events:none"><div class="fila"><div class="tit">${r.titulo}</div><div class="der"><span style="color:var(--red2);font-weight:800;letter-spacing:1.5px">ELIMINANDO…</span></div></div></div>`;
   return `<div class="tarjeta clicable" onclick="verReunion(${r.id})"><div class="fila"><div class="tit">${r.titulo} <span class="cbadge ${t[1]}">${t[0]}</span> <span class="cbadge modo ${r.modalidad||'hibrida'}">${MOD[r.modalidad||'hibrida']}</span>
-    <small>Convoca ${r.convocante.split(" ")[0]}${lim?` · cierra ${lim}`:""} · ${nR} respondieron</small></div>
+    <small>Convoca ${r.convocante.split(" ")[0]}${r.fijada?` · 📌 ${fLim(r.fijada)}`:(lim?` · cierra ${lim}`:"")} · ${nR} respondieron</small></div>
     <div class="der">${est} <span class="chev">›</span></div></div></div>`;
 }
 /* -- Live: mientras una reunion esta abierta, refresca sus respuestas cada 9s.
@@ -1157,16 +1162,59 @@ async function verReunion(id, _bg){
   _iniciarPoll_(id);
   const yo=DATA.miembros[iyo], esPD=yo.unidad==="Project Director", organiza=r.convocante===yo.nombre;
   const yaCubri=Array.isArray((r.resp||{})[yo.nombre]);
+  const esAdmin=(typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL);
+  const puedeGestionar=organiza||esAdmin, fijada=!!r.fijada, plazoVenc=_plazoVencido(r);
+  const nR=(r.resp&&Object.keys(r.resp).filter(n=>Array.isArray(r.resp[n])).length)||r.nResp||0;
+  const puedeFijar=puedeGestionar && !fijada && (plazoVenc || nR>0);
   $("modal-body").innerHTML=`${encMeta()}
+    ${fijada?`<div class="fijada-bnr">📌 Reunión fijada · <b>${fLim(r.fijada)}</b><span>La disponibilidad está cerrada para todos.</span></div>`:``}
     ${r.ordenDia?`<h2 style="margin:16px 2px 0">Orden del día</h2>${_ordenDiaBox(r.ordenDia)}`:``}
-    ${(esPD&&organiza)?`<p class="pie" style="margin:10px 2px 0">La organizas tú; estás exento de cubrir la disponibilidad.</p>`
-      :`<div class="crear-btn" style="margin-top:11px"><button class="ebtn" onclick="cubrir()">${yaCubri?"Editar mi disponibilidad":"Cubrir mi disponibilidad"}</button></div>`}
+    ${fijada
+      ? ``
+      : (esPD&&organiza)
+        ? `<p class="pie" style="margin:10px 2px 0">La organizas tú; estás exento de cubrir la disponibilidad.</p>`
+        : `<div class="crear-btn" style="margin-top:11px"><button class="ebtn" onclick="cubrir()">${yaCubri?"Editar mi disponibilidad":"Cubrir mi disponibilidad"}</button></div>`}
     <h2 style="margin:16px 2px 0">Cuándo puede el equipo</h2>
     ${resumen()}
+    ${puedeFijar?`<div id="fijar-box" class="crear-btn" style="margin-top:12px"><button class="ebtn" onclick="fijarUI(${r.id})">📌 Fijar fecha de la reunión</button>${plazoVenc?``:`<div class="cprev" style="margin:4px 2px 0">El plazo aún no ha vencido, pero ya puedes fijarla si lo tienes claro.</div>`}</div>`:``}
     ${(esPD&&organiza)?``:`<h2 style="margin:16px 2px 0">Mi disponibilidad</h2>${rejilla(yo.nombre, esPD)}`}
-    ${(organiza || (typeof SESION!=="undefined" && SESION && SESION.email===ADMIN_EMAIL)) ? `<div id="ce-delbox" style="margin-top:22px;text-align:center;border-top:1px solid var(--line);padding-top:14px"><button class="ebtn sec" style="color:var(--red2);border-color:var(--red)" onclick="borrarReunionUI(${r.id})">Eliminar reunión</button></div>` : ``}`;
+    ${puedeGestionar ? `<div id="ce-delbox" style="margin-top:22px;text-align:center;border-top:1px solid var(--line);padding-top:14px"><button class="ebtn sec" style="color:var(--red2);border-color:var(--red)" onclick="borrarReunionUI(${r.id})">Eliminar reunión</button></div>` : ``}`;
   $("modal").classList.add("on");
   if(!_bg && backendOK){ (async()=>{ try{ const d=await api.get(id); if(d&&d.reunion){ const nueva=normReu(d.reunion); nueva.resp=d.respuestas||{}; const ix=REUNIONES.findIndex(x=>x.id===id); if(ix>=0)REUNIONES[ix]=nueva; const m=document.getElementById("modal"); if(m&&m.classList.contains("on")&&ENC28&&ENC28.id===id&&!document.querySelector("#modal-body .egrid")) verReunion(id, true); } }catch(_){} })(); }
+}
+function _plazoVencido(r){ if(!r||!r.limite) return false; const s=String(r.limite); const dl=new Date(/[ T]/.test(s)?s.replace(" ","T"):s+"T23:59:59"); return new Date()>dl; }
+function fijarUI(id){
+  const box=document.getElementById("fijar-box"); if(!box) return;
+  const hoy=(DATA&&DATA.generado)||"";
+  box.innerHTML=`<div class="tarjeta" style="text-align:left">
+    <div style="font-weight:700;margin-bottom:6px">Fijar fecha y hora</div>
+    <div class="cprev" style="margin:0 0 9px">Al confirmarla se <b>cierra la disponibilidad</b> para todos y la reunión queda marcada como fijada. Mira el mapa de arriba para elegir el mejor momento.</div>
+    <div style="display:flex;gap:8px">
+      <label style="flex:1;min-width:0">Fecha<input id="fj-fecha" type="date" value="${hoy}"></label>
+      <label style="flex:1;min-width:0">Hora<input id="fj-hora" type="time"></label>
+    </div>
+    <div id="fj-msg" class="er" style="color:var(--warn);font-size:12.5px;margin-top:8px;display:none"></div>
+    <div style="margin-top:11px;display:flex;gap:8px">
+      <button class="ebtn" onclick="fijarOK(${id})">Confirmar fecha</button>
+      <button class="ebtn sec" onclick="verReunion(${id})">Cancelar</button>
+    </div></div>`;
+}
+async function fijarOK(id){
+  if(window._fijando) return;
+  const gv=x=>($(x)&&$(x).value)||"";
+  const fecha=gv("fj-fecha"), hora=gv("fj-hora"), msg=document.getElementById("fj-msg");
+  if(!fecha){ if(msg){msg.textContent="Pon al menos la fecha.";msg.style.display="";} return; }
+  window._fijando=true;
+  const btn=document.querySelector(`#fijar-box button[onclick="fijarOK(${id})"]`); if(btn){btn.disabled=true;btn.textContent="Fijando…";}
+  const fijada=fecha+(hora?" "+hora:"");
+  try{
+    if(backendOK && SESION){ await api.fijar(id, fijada); }
+    const r=REUNIONES.find(x=>x.id===id); if(r) r.fijada=fijada; if(ENC28&&ENC28.id===id) ENC28.fijada=fijada;
+    render(); verReunion(id);
+  }catch(err){
+    if(msg){msg.textContent="No se pudo fijar: "+((err&&err.message)||err);msg.style.display="";}
+    if(btn){btn.disabled=false;btn.textContent="Confirmar fecha";}
+  } finally{ window._fijando=false; }
 }
 function borrarReunionUI(id){
   const box=document.getElementById("ce-delbox"); if(!box) return;
@@ -1302,6 +1350,7 @@ async function hacerEncuesta(){
 function cubrir(){
   const e=ENC28, F=e.franjas||[], nD=(e.dias||[]).length, nF=F.length;
   if(!nF||!nD) return;
+  if(e.fijada) return;   // reunión ya fijada: disponibilidad cerrada
   const _dl = e.limite ? new Date((/[ T]/.test(e.limite) ? e.limite.replace(" ","T") : e.limite+"T23:59:59")) : null;
   const fueraDePlazo = !!(_dl && new Date() > _dl);
   const _sancionable = ["general","junta","consejo"].indexOf(e.tipo)>=0;
