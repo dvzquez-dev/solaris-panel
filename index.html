@@ -1057,6 +1057,7 @@ function reuCard(r, yo){
   else if(!abierta) est=`<span style="color:var(--ink3)">cerrada</span>`;
   else if(yaCubri) est=`<span style="color:var(--ok)">✓ cubierta</span>`;
   else est=`<span style="color:var(--red2)">te falta cubrir</span>`;
+  if(r._eliminando) return `<div class="tarjeta" style="opacity:.4;pointer-events:none"><div class="fila"><div class="tit">${r.titulo}</div><div class="der"><span style="color:var(--red2);font-weight:800;letter-spacing:1.5px">ELIMINADO</span></div></div></div>`;
   return `<div class="tarjeta clicable" onclick="verReunion(${r.id})"><div class="fila"><div class="tit">${r.titulo} <span class="cbadge ${t[1]}">${t[0]}</span> <span class="cbadge modo ${r.modalidad||'hibrida'}">${MOD[r.modalidad||'hibrida']}</span>
     <small>Convoca ${r.convocante.split(" ")[0]}${lim?` · cierra ${lim}`:""} · ${nR} respondieron</small></div>
     <div class="der">${est} <span class="chev">›</span></div></div></div>`;
@@ -1128,11 +1129,12 @@ function borrarReunionUI(id){
 }
 async function borrarReunionOK(id){
   if(window._borrandoReu) return; window._borrandoReu=true;
-  const _bx=document.getElementById("ce-delbox"); if(_bx) _bx.innerHTML='<div class="er" style="color:var(--warn)">Eliminando…</div>';
   try{
-    if(backendOK && SESION){ try{ await api.borrar(id); }catch(err){ const b=document.getElementById("ce-delbox"); if(b) b.innerHTML=`<div class="er" style="color:var(--red2)">No se pudo borrar: ${((err&&err.message)||err)}</div>`; return; } }
-    const ix=REUNIONES.findIndex(x=>x.id===id); if(ix>=0) REUNIONES.splice(ix,1);
+    const r=REUNIONES.find(x=>x.id===id); if(r) r._eliminando=true;
     _pararPoll_(); $("modal").classList.remove("on"); render(); document.querySelector('[data-k="reuniones"]').click();
+    if(backendOK && SESION){ try{ await api.borrar(id); }catch(err){ if(r) delete r._eliminando; render(); return; } }
+    const ix=REUNIONES.findIndex(x=>x.id===id); if(ix>=0) REUNIONES.splice(ix,1);
+    render();
   } finally { window._borrandoReu=false; }
 }
 window.PLANTILLAS = window.PLANTILLAS || [
