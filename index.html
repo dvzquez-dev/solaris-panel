@@ -527,7 +527,7 @@ _pintarPersona_();
 $("persona").onchange = e => { iyo = +e.target.value; render(); };
 function cerrarSesion(){
   SESION=null;
-  try{ localStorage.removeItem("sol_last_email"); }catch(_){}   // olvidar la cuenta → siguiente vez podrás elegir otra
+  try{ localStorage.removeItem("sol_last_email"); localStorage.removeItem("sol_sess"); }catch(_){}   // olvidar cuenta + sesión guardada → siguiente vez eliges de nuevo
   try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
   location.reload();
 }
@@ -1586,7 +1586,7 @@ async function _cargarBackend_(){
   _aplicarDatos_(trs,tus,ent);
   _iniciarPollDocs_();
 }
-async function _onCredencial_(resp){
+async function _onCredencial_(resp, _silent){
   _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="opacity:.8">Verificando…</div>');
   try{
     // 1 sola petición: verifica el token una vez y trae TODO (identidad + panel +
@@ -1600,7 +1600,7 @@ async function _onCredencial_(resp){
       SESION={token:resp.credential, email:yo.email, nombre:yo.nombre};
       await _cargarBackend_();
     }
-    try{ if(SESION&&SESION.email) localStorage.setItem("sol_last_email", SESION.email); }catch(_){}   // recordar para el auto-inicio
+    try{ if(SESION&&SESION.email){ localStorage.setItem("sol_last_email", SESION.email); localStorage.setItem("sol_sess", JSON.stringify({token:SESION.token, email:SESION.email, ts:Date.now()})); } }catch(_){}   // recordar cuenta + sesión (login instantáneo al reabrir)
     var idx=DATA.miembros.findIndex(function(m){return m.nombre===SESION.nombre;});
     iyo = idx>=0 ? idx : (DATA.miembros.length ? 0 : -1);   // admin/no-miembro: primer perfil; el selector #persona deja cambiar
     _pintarPersona_();   // repoblar el selector con los miembros ya cargados tras el login
@@ -1610,6 +1610,7 @@ async function _onCredencial_(resp){
     // solo la cuenta admin ve otros perfiles; el resto queda fijado al suyo.
     if(SESION.email!==ADMIN_EMAIL){ var _sel=document.getElementById("persona"); if(_sel){ _sel.disabled=true; _sel.style.display="none"; var _lab=_sel.closest("label"); if(_lab){ _lab.style.pointerEvents="none"; var _sv=_lab.querySelector("svg"); if(_sv)_sv.style.display="none"; } } }
   }catch(e){
+    if(_silent){ try{ localStorage.removeItem("sol_sess"); }catch(_){} _arrancarGis_(); return; }   // sesión guardada caducada → login normal, sin error feo
     _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+((e&&e.message)||e)+'</div><button id="reGis" style="border:1px solid #444;background:transparent;color:#eaeaea;border-radius:10px;padding:10px 16px;cursor:pointer">Reintentar</button>');
     var b=document.getElementById("reGis"); if(b) b.onclick=_pintarLogin_;
   }
@@ -1618,7 +1619,7 @@ function _pintarLogin_(){
   _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(260px,64vw);height:auto;margin-bottom:6px"><div style="opacity:.8;max-width:340px">Entra con tu cuenta de UVigo Aerotech<br>para ver tu panel.</div><div id="gbtn"></div>');
   try{
     var _hint=""; try{ _hint=localStorage.getItem("sol_last_email")||""; }catch(_){}
-    var _gcfg={client_id:GOOGLE_CLIENT_ID, callback:_onCredencial_, auto_select:true, itp_support:true};
+    var _gcfg={client_id:GOOGLE_CLIENT_ID, callback:_onCredencial_, auto_select:true, itp_support:true, use_fedcm_for_prompt:true};
     if(_hint) _gcfg.login_hint=_hint;   // pista de la última cuenta → la escoge sola, sin popup de selección
     google.accounts.id.initialize(_gcfg);
     google.accounts.id.renderButton(document.getElementById("gbtn"), {theme:"filled_black", size:"large", text:"signin_with", shape:"pill"});
@@ -1627,9 +1628,9 @@ function _pintarLogin_(){
     setTimeout(function(){ api.ping(); }, 4000);   // 2º toque por si el 1º pilló el arranque en frío
   }catch(e){ _gate_('<div style="color:#ffb3b0">Error iniciando Google Sign-In: '+((e&&e.message)||e)+'</div>'); }
 }
-if(GOOGLE_CLIENT_ID){
-  _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="opacity:.7">Cargando…</div>');
+function _arrancarGis_(){
   (function _esperarGis_(n){
+    if(SESION) return;   // ya dentro (por sesión guardada) → no montar Google
     if(window.google && window.google.accounts && window.google.accounts.id){ _pintarLogin_(); return; }
     if(n<=0){
       if(DATA.miembros && DATA.miembros.length){ var g=document.getElementById("loginGate"); if(g) g.remove(); }   // artefacto con datos-semilla: cae al selector manual
@@ -1638,5 +1639,12 @@ if(GOOGLE_CLIENT_ID){
     }
     setTimeout(function(){_esperarGis_(n-1);}, 150);
   })(40);
+}
+if(GOOGLE_CLIENT_ID){
+  _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="opacity:.7">Cargando…</div>');
+  var _sg=null; try{ _sg=JSON.parse(localStorage.getItem("sol_sess")||"null"); }catch(_){}
+  var _tokGuardado=(_sg && _sg.token && (Date.now()-(_sg.ts||0) < 50*60*1000)) ? _sg.token : null;   // token < 50 min → probablemente vivo
+  if(_tokGuardado){ _onCredencial_({credential:_tokGuardado}, true); }   // login instantáneo; si caducó, cae a Google sin ruido
+  else { _arrancarGis_(); }
 }
 </script>
