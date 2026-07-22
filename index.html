@@ -623,6 +623,15 @@ function _notisEquipoHTML(){
   return `<button class="ebtn" onclick="activarNotis(this)">Activar notificaciones</button><div id="notis-msg" class="er" style="color:var(--ink3);margin-top:4px"></div>`;
 }
 function _pintarNotisEquipo(){ const h=document.getElementById("notis-box"); if(h) h.innerHTML=_notisEquipoHTML(); }
+function _esAdminPush_(){ return SESION && (SESION.email===ADMIN_EMAIL || (DATA.miembros[iyo] && DATA.miembros[iyo].nombre===PD_NOM)); }
+async function _enviarPrueba_(btn){
+  if(btn){ btn.disabled=true; btn.textContent="Enviando…"; }
+  try{
+    const r = await api.enviarPush({tipo:"individual", miembro:SESION.email}, "Prueba Solaris", "¡Las notificaciones funcionan! 🚀", {url:"/solaris-panel/", categoria:"anuncio"});
+    _notisMsg("Encolada ("+((r&&r.encolados)||0)+" destinatario/s). El emisor la manda en el siguiente ciclo.");
+  }catch(e){ _notisMsg("Error encolando: "+((e&&e.message)||e)); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent="Enviar notificación de prueba (a mí)"; } }
+}
 function _pintarSalir_(){
   const hdr=document.querySelector("header"); if(!hdr || document.getElementById("hdr-right")) return;
   const sel=document.getElementById("persona"), lab=sel?sel.closest("label"):null;
@@ -1214,6 +1223,7 @@ function render(){
     </div>
     <h2>Notificaciones</h2>
     <div class="tarjeta"><div id="notis-box">${_notisEquipoHTML()}</div>
+      ${_esAdminPush_() ? `<button class="ebtn sec" style="margin-top:8px" onclick="_enviarPrueba_(this)">Enviar notificación de prueba (a mí)</button>` : ``}
       <p class="pie">Avisos de reuniones, documentos y anuncios. Los importantes llegan siempre; podrás silenciar solo las noticias.</p></div>
     <p class="pie">SOLARIS · datos a ${DATA.generado.split("-").reverse().join("/")}</p>`;
 }
