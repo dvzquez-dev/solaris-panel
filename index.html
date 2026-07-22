@@ -222,12 +222,13 @@
   .rejwrap{overflow-x:auto;margin:0 2px;padding-bottom:2px}
   .rejilla{display:grid;gap:2px}
   .rc{font-size:8px;color:var(--ink3);display:flex;align-items:center;justify-content:center}
-  .rc.rd{justify-content:flex-end;padding-right:5px;white-space:nowrap;font-size:9px}
+  .rc.rd{justify-content:flex-end;padding-right:6px;white-space:nowrap;font-size:10px;position:sticky;left:0;background:var(--sur);z-index:2}
+  .rejilla>.rc:first-child,.egrid>.rc:first-child{position:sticky;left:0;background:var(--sur);z-index:2}
   .rc.rh{overflow:visible;position:relative;min-height:17px;align-items:flex-start}
   .rc.rh span{position:absolute;left:0;top:3px;transform:translateX(-50%);white-space:nowrap;font-size:9px;color:var(--ink2)}
   .rc.rh span.fin{left:auto;right:0;transform:none}
   .rc.rh.cen span{left:50%}
-  .cel{height:12px;border-radius:2px}
+  .cel{height:20px;border-radius:2px}
   .cel.si{background:var(--red)}
   .cel.na{background:#2c2223}
   .cel.no{background:transparent}
@@ -264,7 +265,7 @@
   .ebtn{width:100%;background:var(--red);color:#fff;border:0;border-radius:11px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
   .ebtn.sec{background:var(--sur2);color:var(--ink);border:1px solid var(--line)}
   .egrid{display:grid;gap:2px;touch-action:none;user-select:none}
-  .egrid .ecel{height:16px;border-radius:3px;background:var(--sur2);cursor:pointer}
+  .egrid .ecel{height:26px;border-radius:3px;background:var(--sur2);cursor:pointer}
   .egrid .ecel.on1{background:#3f9ed6}
   .egrid .ecel.on2{background:var(--red)}
   .egrid .ecel.prev{outline:2px solid var(--red2);outline-offset:-1px}
@@ -303,7 +304,7 @@
   .emeta{background:var(--sur);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin:11px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.5}
   .emeta .etit{font-size:14px;color:var(--ink);font-weight:600;margin-bottom:3px}
   .emeta .erow{margin-top:4px}.emeta b{color:var(--ink)}
-  .rejilla .celc{height:16px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff}
+  .rejilla .celc{height:24px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
   .rejilla .celc.best{outline:2px solid #fff;outline-offset:-1px}
   .rejilla .celc.no{background:transparent}
   .rejilla .celc.tap{cursor:pointer}
@@ -557,7 +558,7 @@ function rejilla(nombre, esPD){
   (e.bloques||[]).forEach((b,i)=>{ if(Array.isArray(b) && cel[b[0]] && b[1]>=0 && b[1]<nF) cel[b[0]][pos[b[1]]]=marc[i]; });
   const contiguo=F.every((f,i)=> i===0 || iniMin(f)===finMin(F[i-1]));
   const solapado=F.some((f,i)=> i>0 && iniMin(f)<finMin(F[i-1]));
-  let g=`<div class="rejwrap"><div class="rejilla" style="grid-template-columns:auto repeat(${nF},minmax(14px,1fr))">`;
+  let g=`<div class="rejwrap"><div class="rejilla" style="grid-template-columns:auto repeat(${nF},minmax(26px,1fr))">`;
   g+=`<div class="rc"></div>`;
   const enHora=F.filter(f=>iniMin(f)%60===0).length, largo=F.some(f=>String(f.ini).slice(3)!=="00");
   const verLbl=ix=> enHora>=2 ? iniMin(F[ix])%60===0 : (!largo || ix%2===0);
@@ -605,7 +606,7 @@ function resumen(){
   const enHora=F.filter(f=>iniMin(f)%60===0).length, largo=F.some(f=>String(f.ini).slice(3)!=="00"), verLbl=ix=> enHora>=2 ? iniMin(F[ix])%60===0 : (!largo || ix%2===0);
   const verNum = nF<=15;
   if(conNombres) window._franjaInfo={};
-  let g=`<div class="rejwrap"><div class="rejilla" style="grid-template-columns:auto repeat(${nF},minmax(16px,1fr))"><div class="rc"></div>`;
+  let g=`<div class="rejwrap"><div class="rejilla" style="grid-template-columns:auto repeat(${nF},minmax(26px,1fr))"><div class="rc"></div>`;
   F.forEach((f,ix)=>{const et=String(f.ini).replace(":00",""),L=verLbl(ix); g+= contiguo?`<div class="rc rh">${L?`<span>${et}</span>`:``}${ix===nF-1?`<span class="fin">${finFranja(f).replace(":00","")}</span>`:``}</div>`:`<div class="rc rh cen">${L?`<span>${et}</span>`:``}</div>`;});
   e.dias.forEach((d,di)=>{ g+=`<div class="rc rd">${d}</div>`;
     for(let f=0;f<nF;f++){const c=cel[di][f];
@@ -1473,7 +1474,7 @@ function cubrir(){
   let hd=`<div class="rc"></div>`+F.map((f,ix)=>`<div class="rc rh cen">${verLbl(ix)?`<span>${String(f.ini).replace(":00","")}</span>`:``}</div>`).join("");
   let rows=""; e.dias.forEach((d,di)=>{ rows+=`<div class="rc rd">${d}</div>`; for(let f=0;f<nF;f++){const k=di+"_"+f; rows+=`<div class="ecel ${oferta.has(k)?cls(sel.get(k)):"off"}" data-k="${k}"></div>`;} });
   $("modal-body").innerHTML=`<div class="mtit">Marca tu disponibilidad</div><div class="msub">${DATA.miembros[iyo].pila} · ${instr}</div>${_avisoPlazo}
-    <div class="rejwrap" style="margin-top:10px"><div class="egrid" style="grid-template-columns:auto repeat(${nF},minmax(16px,1fr))">${hd}${rows}</div></div>
+    <div class="rejwrap" style="margin-top:10px"><div class="egrid" style="grid-template-columns:auto repeat(${nF},minmax(30px,1fr))">${hd}${rows}</div></div>
     <div class="displeg" style="margin-top:9px">${leyenda}</div>
     <div class="ecount" id="ecount"></div><button class="ebtn" onclick="guardarDisp()">Guardar disponibilidad</button>`;
   window._sel=sel;
