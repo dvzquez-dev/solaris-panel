@@ -354,6 +354,11 @@
   .cmixb.on{background:rgba(228,30,37,.15);border-color:var(--red);color:var(--red2);font-weight:600}
   .cchip{display:inline-flex;align-items:center;gap:6px;background:var(--sur2);border:1px solid var(--line);border-radius:20px;padding:4px 8px 4px 11px;font-size:12px;color:var(--ink)}
   .cchip b{font-weight:600}.cchip button{background:var(--line);border:0;color:var(--ink2);width:16px;height:16px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;padding:0}
+  /* Fichas que se marcan tocándolas (elegir a quién se le revoca dentro de un paquete) */
+  .cchip[onclick]{cursor:pointer;padding:6px 12px;opacity:.5;user-select:none}
+  .cchip[onclick] small{color:var(--ink3);font-size:11px}
+  .cchip.on{opacity:1;border-color:var(--ok);background:var(--okbg)}
+  .cchip.on b{color:var(--ok)}
   .cbadge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 7px;border-radius:20px;background:var(--sur2);border:1px solid var(--line);color:var(--ink2);vertical-align:middle}
   .cbadge.general{background:rgba(228,30,37,.15);border-color:var(--red);color:var(--red2)}
   .cbadge.trabajo{background:rgba(63,158,214,.15);border-color:#3f9ed6;color:#7cc3ec}
@@ -1823,9 +1828,13 @@ function _colaSancHTML_(arr){
     const et=p=>`${p>0?"+":"−"}${Math.abs(p)} ${Math.abs(p)===1?"punto":"puntos"}`;
     const cuanto = vals.length===1 ? `${et(vals[0])}${n>1?" c/u":""}` : `de ${et(vals[0])} a ${et(vals[vals.length-1])}`;
     const col = vals[vals.length-1]<0 ? 'var(--red2)' : 'var(--ok)';
+    // Aplicadas: se pueden anular varias del paquete de una vez, eligiendo a quién.
+    const nRev=items.filter(s=>s.estado==="aplicada" && !esRevoc(s) && !yaRevocada(s)).length;
     const bulk=conBulk?`<div class="scitem-a" style="margin-top:10px">
         <button class="scok" onclick="_decLote_('${lsafe}','aprobar',this)">Aprobar las ${n}</button>
-        <button class="scno" onclick="_decLote_('${lsafe}','rechazar',this)">Rechazar las ${n}</button></div>`:"";
+        <button class="scno" onclick="_decLote_('${lsafe}','rechazar',this)">Rechazar las ${n}</button></div>`
+      : (nRev?`<div class="scitem-a" style="margin-top:10px">
+        <button class="scmod" onclick="abrirRevocarLote('${lsafe}')">Revocar…${nRev<n?` (${nRev} revocables)`:""}</button></div>`:"");
     // La lista de personas nace PLEGADA: el lote se lee de un vistazo y se abre solo si
     // quieres tocar a alguien en concreto.
     return `<div class="sclote">
@@ -1905,6 +1914,74 @@ async function _decLote_(lote, accion, btn){
 // No se "borra" nada: se encola un movimiento INVERSO que pasa por la misma cola y que
 // tú apruebas igual que una sanción. Así queda rastro de la sanción y de su marcha atrás.
 function _sancPorId(id){ return (_colaSancCache||[]).find(s=>String(s.id)===String(id))||null; }
+// Sanciones de un lote que todavía se pueden revocar (aplicadas y sin revocación en marcha)
+function _revocables(lote){
+  const c=_colaSancCache||[];
+  return c.filter(s=>s.lote===lote && s.estado==="aplicada" && s.origen!=="revocacion"
+    && !c.some(x=>x.origen==="revocacion" && x.extra && String(x.extra.revoca)===String(s.id) && x.estado!=="rechazada"));
+}
+// Revocar VARIAS de un lote a la vez: se eligen tocando las fichas y se anulan juntas,
+// con un mismo motivo y un mismo lote de revocación (una tarjeta, un comunicado).
+function abrirRevocarLote(lote){
+  const items=_revocables(lote); if(!items.length) return;
+  const s0=items[0]||{}, art=(s0.articulo&&s0.articulo!=="libre")?` · Art. ${_escDoc(s0.articulo)}`:"";
+  window._rvLote=lote; window._rvSel=new Set(items.map(s=>String(s.id)));
+  $("modal-body").innerHTML=`
+    <div class="mtit">↩️ Revocar sanciones del paquete</div>
+    <div class="msub">Elige a quién se le retira. Las que marques se anulan <b>juntas</b>: una sola tarjeta en la cola y <b>un único comunicado</b>. Entran como <b>pendientes</b> y las confirmas tú.</div>
+    <div class="tarjeta" style="margin-bottom:12px">
+      <div class="sclote-m">${_escDoc(s0.motivo||"(sin motivo)")}${art}</div>
+    </div>
+    <div class="cform">
+      <label>A quién se le retira <span style="color:var(--ink3)">(toca para marcar)</span></label>
+      <div class="cchips" id="rv-chips"></div>
+      <div class="scmsbar"><button type="button" onclick="_rvTodos(true)">Todos</button><button type="button" onclick="_rvTodos(false)">Ninguno</button><span id="rv-cuenta"></span></div>
+      <label>Motivo de la revocación<select id="rv-tipo" onchange="_rvPrev()">
+        <option value="Apelación aceptada: presentó una justificación válida">Apelación aceptada · presentó justificación</option>
+        <option value="Error en la sanción: no procedía">Error · la sanción no procedía</option>
+        <option value="__libre">Otro (lo escribo yo)</option>
+      </select></label>
+      <div id="rv-librewrap"></div>
+    </div>
+    <div id="rv-prev" class="tarjeta" style="margin-top:12px"></div>
+    <div id="rv-err" class="er" style="margin-top:6px"></div>
+    <button class="ebtn" style="margin-top:12px" onclick="_enviarRevocLote(this)">Añadir las revocaciones a la cola</button>`;
+  $("modal").classList.add("on"); $("modal").classList.add("full");
+  _rvChips(); _rvPrev();
+}
+function _rvChips(){
+  const c=$("rv-chips"); if(!c) return;
+  const items=_revocables(window._rvLote);
+  c.innerHTML=items.map(s=>{
+    const on=window._rvSel.has(String(s.id));
+    return `<span class="cchip${on?" on":""}" data-id="${s.id}" onclick="_rvTog('${s.id}')"><b>${_escDoc(s.nombre)}</b><small>${s.puntos>0?"+":""}${s.puntos}</small></span>`;
+  }).join("");
+  const n=window._rvSel.size, cu=$("rv-cuenta");
+  if(cu) cu.textContent=`${n} de ${items.length}`;
+}
+function _rvTog(id){ id=String(id); const S=window._rvSel; S.has(id)?S.delete(id):S.add(id); _rvChips(); _rvPrev(); }
+function _rvTodos(v){ window._rvSel = v ? new Set(_revocables(window._rvLote).map(s=>String(s.id))) : new Set(); _rvChips(); _rvPrev(); }
+async function _enviarRevocLote(btn){
+  const err=$("rv-err"); err.textContent=""; err.style.color="var(--red2)";
+  const ids=[...(window._rvSel||[])], texto=_rvTexto();
+  if(!ids.length){ err.textContent="Marca al menos a una persona."; return; }
+  if(!texto){ err.textContent="Elige o escribe el motivo de la revocación."; return; }
+  if(typeof backendOK!=="undefined" && !backendOK){ err.textContent="Sin conexión con el backend."; return; }
+  const prev=btn?btn.textContent:""; if(btn){ btn.disabled=true; btn.textContent="Enviando…"; }
+  try{
+    await api.pushSancion(ids.map(id=>{
+      const s=_sancPorId(id);
+      return { origen:"revocacion", lote:"revoca-"+window._rvLote, nombre:s.nombre,
+        motivo:"Revocación de «"+(s.motivo||"sanción")+"» — "+texto,
+        articulo:s.articulo||"libre", puntos:-Number(s.puntos||0),
+        extra:{ revoca:s.id, loteOriginal:s.lote||null, motivoOriginal:s.motivo||null, razon:texto } };
+    }));
+    err.style.color="var(--ok)"; err.textContent=`${ids.length} ${ids.length===1?"revocación añadida":"revocaciones añadidas"} a la cola (pendientes de confirmar).`;
+    if(btn) btn.style.display="none";
+    _cargarColaSanc_(true);
+  }catch(e){ err.style.color="var(--red2)"; err.textContent="No se pudo: "+e.message; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=prev||"Añadir las revocaciones a la cola"; } }
+}
 function abrirRevocar(id){
   const s=_sancPorId(id); if(!s) return;
   const m=_scMiembro(s.nombre), pts=m&&m.puntos!=null?m.puntos:null, dev=-Number(s.puntos||0);
@@ -1928,7 +2005,7 @@ function abrirRevocar(id){
     <div id="rv-err" class="er" style="margin-top:6px"></div>
     <button class="ebtn" style="margin-top:12px" onclick="_enviarRevoc(${s.id}, this)">Añadir la revocación a la cola</button>`;
   $("modal").classList.add("on"); $("modal").classList.add("full");
-  window._rvSanc=s; window._rvDev=dev; window._rvPts=pts;
+  window._rvSanc=s; window._rvDev=dev; window._rvPts=pts; window._rvLote=null;   // modo "una"
   _rvPrev();
 }
 function _rvTexto(){
@@ -1940,11 +2017,22 @@ function _rvPrev(){
   if(w && libre && !$("rv-libre")) w.innerHTML=`<label>Explica el motivo<input id="rv-libre" placeholder="por qué se retira la sanción…" autocomplete="off" oninput="_rvPrev()"></label>`;
   if(w && !libre) w.innerHTML="";
   const p=$("rv-prev"); if(!p) return;
+  const nota=`<div class="er" style="color:var(--ink3);margin-top:6px">La casilla «Infracción este mes» se desmarcará <b>solo si no la tenía ya antes de esa sanción</b> — si venía marcada de otra, se queda. Lo comprueba la rutina contra el registro, porque la app no ve las sanciones aplicadas fuera de ella.</div>`;
+  const fila=(nombre,dev,pts)=>{
+    const fin = pts==null ? null : Math.max(0, Math.min(10, pts+dev));
+    return `<div class="fila"><div class="tit">${_escDoc(nombre)}<small>le devuelve ${dev>0?"+":""}${dev} ${Math.abs(dev)===1?"punto":"puntos"}</small></div>
+      ${pts==null?"":`<div class="der mono">${pts} → <b style="color:var(--ok)">${fin}</b></div>`}</div>`;
+  };
+  if(window._rvLote){                                   // varias del mismo paquete
+    const ids=[...(window._rvSel||[])];
+    if(!ids.length){ p.innerHTML=`<div class="sindatos">No has marcado a nadie.</div>`; return; }
+    p.innerHTML=`<div class="fila"><div class="tit"><b>Se retira a ${ids.length} ${ids.length===1?"persona":"personas"}</b><small>${_escDoc(_rvTexto()||"(falta el motivo)")}</small></div></div>`
+      + ids.map(id=>{ const s=_sancPorId(id); if(!s) return ""; const m=_scMiembro(s.nombre);
+          return fila(s.nombre, -Number(s.puntos||0), m&&m.puntos!=null?m.puntos:null); }).join("") + nota;
+    return;
+  }
   const dev=window._rvDev||0, pts=window._rvPts, s=window._rvSanc||{};
-  const fin = pts==null ? null : Math.max(0, Math.min(10, pts+dev));
-  p.innerHTML=`<div class="fila"><div class="tit">Le devuelve ${dev>0?"+":""}${dev} ${Math.abs(dev)===1?"punto":"puntos"}<small>${_escDoc(_rvTexto()||"(falta el motivo)")}</small></div>
-      ${pts==null?"":`<div class="der mono">${pts} → <b style="color:var(--ok)">${fin}</b></div>`}</div>
-    <div class="er" style="color:var(--ink3);margin-top:6px">La casilla «Infracción este mes» se desmarcará <b>solo si no la tenía ya antes de esta sanción</b> — si venía marcada de otra, se queda. Lo comprueba la rutina contra el registro, porque la app no ve las sanciones aplicadas fuera de ella.</div>`;
+  p.innerHTML=fila(s.nombre||"", dev, pts).replace("<small>le devuelve", `<small>${_escDoc(_rvTexto()||"(falta el motivo)")} · le devuelve`) + nota;
 }
 async function _enviarRevoc(id, btn){
   const err=$("rv-err"); err.textContent=""; err.style.color="var(--red2)";
