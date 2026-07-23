@@ -1058,8 +1058,7 @@ function _adminHomeHTML_(){
       <div class="tarjeta mini"><div class="k">Miembros · subsistemas</div><div class="v mono">${M.length}<small> · ${nSub}</small></div></div>
     </div>
     <div class="tarjeta"><div class="fila"><div class="tit">Reparto por estado</div></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${chips}</div></div>
-    <button class="ebtn" style="margin-top:12px" onclick="abrirSancionar()">🔨 Sancionar a un miembro</button>`;
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${chips}</div></div>`;
 }
 // Aporte en Vista admin: ranking COMPLETO del equipo (sin censurar), en vez de la ficha personal del miembro[0].
 function _aporteAdminHTML_(){
@@ -1072,10 +1071,10 @@ function _aporteAdminHTML_(){
 // Lista completa de miembros para la pantalla Equipo en Vista admin (solo el admin la recibe del backend).
 function _rosterAdminHTML_(){
   const M=[...DATA.miembros].sort((a,b)=>(b.hMes||0)-(a.hMes||0));
-  const filas=M.map(m=>`<div class="fila"><div class="tit">${m.nombre}${m.infraccion?' <span style="color:var(--red2)">⚠</span>':''}
+  const filas=M.map((m,i)=>`<div class="fila"><div class="tit"><span class="mono" style="color:var(--ink3)">${i+1}.</span> ${m.nombre}${m.infraccion?' <span style="color:var(--red2)">⚠</span>':''}
       <small>${m.unidad}${m.cargo?' · '+m.cargo:''}</small></div>
     <div class="der mono">${h(m.hMes)}${m.cuota!=null?' · '+Math.round(m.cuota)+'€':''}</div></div>`).join("");
-  return `<h2>Todos los miembros <span style="color:var(--ink3);font-weight:600">· ${M.length} · solo admin</span></h2>
+  return `<h2>Ranking · todos los miembros <span style="color:var(--ink3);font-weight:600">· ${M.length} · por horas · solo admin</span></h2>
     <div class="tarjeta">${filas}</div>`;
 }
 // Turnos en Vista admin: TODOS los turnos del equipo (convocados + pasados), no los del miembro[0].
@@ -1109,6 +1108,23 @@ function _docsAdminHTML_(){
   const sec=(tit,arr)=>`<h2>${tit} · ${arr.length}</h2>`+(arr.length?`<div class="tarjeta">${arr.map(fila).join("")}</div>`:`<div class="tarjeta"><div class="sindatos">Nada aquí.</div></div>`);
   return `<h1>Documentos</h1><p class="sub">Todos los expedientes del equipo · vista admin.</p>`
     + sec("Esperando decisión", rev) + sec("En curso", curso) + sec("Resueltos", resu);
+}
+// Panel del PD (Vista admin): acciones de dirección — sancionar + notificaciones. Ocupa el hueco de "Aporte"
+// (la pantalla Equipo ya contiene el ranking). El nav relabelea "Aporte"→"Panel PD" para el admin.
+function _panelPDHTML_(){
+  return `<h1>Panel del PD</h1>
+    <p class="sub">Acciones de dirección. Vista admin.</p>
+    <h2>Disciplina</h2>
+    <div class="tarjeta"><div class="fila"><div class="tit">Sancionar a un miembro<small>Puntos del RRI (Título VII) o motivo libre</small></div><div class="der"><button class="ebtn sec" onclick="abrirSancionar()">Abrir</button></div></div></div>
+    <h2>Notificaciones</h2>
+    <div class="tarjeta">
+      ${_esAdminPush_()?`<button class="ebtn" onclick="_enviarPrueba_(this)">Enviar notificación de prueba (a mí)</button><div id="notis-msg" class="er" style="color:var(--ink3);margin-top:4px"></div>`:`<div class="er" style="color:var(--ink3)">Sin permiso de envío.</div>`}
+      <p class="pie">El envío dirigido (individual / grupo / global) llega con la UI de destinatario — en cola.</p></div>`;
+}
+function _ajustarNavAdmin_(){
+  const b=document.querySelector('nav button[data-k="contrib"]'); if(!b) return;
+  const lbl=_esAdmin_()?"Panel PD":"Aporte";
+  for(const n of b.childNodes){ if(n.nodeType===3 && n.textContent.trim()){ if(n.textContent!==lbl) n.textContent=lbl; break; } }
 }
 function render(){
   if(!DATA.miembros || !DATA.miembros.length || iyo<0 || !DATA.miembros[iyo]){ return; }  // sin datos aún (pre-login): el gate cubre la pantalla; se rellena tras el login
@@ -1259,6 +1275,7 @@ function render(){
     ${cuerpo}`;
   $("s-documentos").innerHTML = _esAdmin_() ? _docsAdminHTML_() : docsPantalla(yo);
   pintarBadges(yo);
+  _ajustarNavAdmin_();
 
   /* 4 · REUNIONES */
   const misReu = _esAdmin_() ? REUNIONES.filter(r=>r) : REUNIONES.filter(r => r && (r.convocante===yo.nombre || r.tipo==="general" || (r.invitados||[]).includes(yo.nombre)));
@@ -1290,7 +1307,7 @@ function render(){
       : `<div class="r"><span class="p mono">${i+1}</span><span class="cens"></span></div>`;
   }).join("");
 
-  $("s-contrib").innerHTML = _esAdmin_() ? _aporteAdminHTML_() : `
+  $("s-contrib").innerHTML = _esAdmin_() ? _panelPDHTML_() : `
     <h1>Mi contribución</h1>
     <p class="sub">Horas, carga y en qué punto estás.</p>
     <div class="duo">
