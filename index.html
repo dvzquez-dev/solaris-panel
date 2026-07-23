@@ -1777,7 +1777,9 @@ async function _cargarColaSanc_(force){
 function _colaSancHTML_(arr){
   if(!arr.length) return `<div class="tarjeta"><div class="sindatos">No hay sanciones en la cola.</div></div>`;
   const pend=arr.filter(s=>s.estado==="pendiente"), apr=arr.filter(s=>s.estado==="aprobada"),
-        otras=arr.filter(s=>s.estado==="rechazada"||s.estado==="aplicada");
+        // OJO: "revocada" tiene que estar aquí. Si falta, las sanciones retiradas no caen en
+        // ninguna sección y se esfuman de la cola — justo lo contrario de dejar rastro.
+        otras=arr.filter(s=>["rechazada","aplicada","revocada"].includes(s.estado));
   // Botonera de una fila, común a sueltas y a las de dentro de un lote.
   const esRevoc=s=>s.origen==="revocacion";
   const yaRevocada=s=>(arr||[]).some(x=>esRevoc(x) && x.extra && String(x.extra.revoca)===String(s.id) && x.estado!=="rechazada");
