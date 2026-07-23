@@ -269,6 +269,7 @@
   .scpill{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:5px 11px;border-radius:20px}
   .scpill.ok{background:var(--okbg);color:var(--ok)}
   .scpill.no{background:#2a1a1b;color:var(--red2)}
+  .scpill{background:var(--sur2);color:var(--ink2)}   /* neutra: revocada / revocación en curso */
   .pasnota{font-size:11.5px;color:var(--ink3);margin:10px 4px 0;line-height:1.45}
   .dispcab{font-size:12.5px;color:var(--ink2);margin:14px 2px 11px}
   .dispcab b{color:var(--ink)}
@@ -1771,35 +1772,39 @@ function _colaSancHTML_(arr){
   if(!arr.length) return `<div class="tarjeta"><div class="sindatos">No hay sanciones en la cola.</div></div>`;
   const pend=arr.filter(s=>s.estado==="pendiente"), apr=arr.filter(s=>s.estado==="aprobada"),
         otras=arr.filter(s=>s.estado==="rechazada"||s.estado==="aplicada");
+  // Botonera de una fila, común a sueltas y a las de dentro de un lote.
+  const esRevoc=s=>s.origen==="revocacion";
+  const yaRevocada=s=>(arr||[]).some(x=>esRevoc(x) && x.extra && String(x.extra.revoca)===String(s.id) && x.estado!=="rechazada");
+  const acciones=s=>{
+    if(s.estado==="pendiente") return `<div class="scitem-a"><button class="scok" onclick="_decSanc(${s.id},'aprobar',null,this)">Aprobar</button><button class="scmod" onclick="_modSanc(${s.id})">Modificar</button><button class="scno" onclick="_decSanc(${s.id},'rechazar',null,this)">Rechazar</button></div>`;
+    if(s.estado==="aprobada") return `<div class="scitem-a"><span class="scpill ok">aprobada · a aplicar</span></div>`;
+    if(s.estado==="revocada") return `<div class="scitem-a"><span class="scpill">revocada</span></div>`;
+    if(s.estado==="aplicada"){
+      // Una sanción aplicada ya no se puede tocar, pero SÍ revocar: se encola el movimiento inverso.
+      if(esRevoc(s)) return `<div class="scitem-a"><span class="scpill ok">devuelta</span></div>`;
+      if(yaRevocada(s)) return `<div class="scitem-a"><span class="scpill">revocación en curso</span></div>`;
+      return `<div class="scitem-a"><span class="scpill ok">aplicada</span><button class="scmod" onclick="abrirRevocar(${s.id})">Revocar</button></div>`;
+    }
+    return `<div class="scitem-a"><span class="scpill no">rechazada</span></div>`;
+  };
   const linea=s=>{
     const col=s.puntos<0?'var(--red2)':'var(--ok)';
-    const pila=(s.nombre||"").split(" ")[0];
+    const pila=(esRevoc(s)?"↩️ ":"")+(s.nombre||"").split(" ")[0];
     const art=(s.articulo&&s.articulo!=="libre")?` · Art. ${_escDoc(s.articulo)}`:"";
     const org=s.origen==="reunion"?" · reunión":"";
     const jus=s.justificacion?` · ${_escDoc(s.justificacion)}`:"";
     const meta=`${_escDoc(s.motivo||"(sin motivo)")}${art}${org}${jus}`;
-    let acc;
-    if(s.estado==="pendiente") acc=`<div class="scitem-a"><button class="scok" onclick="_decSanc(${s.id},'aprobar',null,this)">Aprobar</button><button class="scmod" onclick="_modSanc(${s.id})">Modificar</button><button class="scno" onclick="_decSanc(${s.id},'rechazar',null,this)">Rechazar</button></div>`;
-    else if(s.estado==="aprobada") acc=`<div class="scitem-a"><span class="scpill ok">aprobada · a aplicar</span></div>`;
-    else if(s.estado==="aplicada") acc=`<div class="scitem-a"><span class="scpill ok">aplicada</span></div>`;
-    else acc=`<div class="scitem-a"><span class="scpill no">rechazada</span></div>`;
     return `<div class="scitem">
       <div class="scitem-h"><span class="scitem-n">${_escDoc(pila)}</span><span class="scitem-p" style="color:${col}">${s.puntos>0?"+":""}${s.puntos}</span></div>
-      <div class="scitem-m">${meta}</div>${acc}</div>`;
+      <div class="scitem-m">${meta}</div>${acciones(s)}</div>`;
   };
   // Fila compacta para miembros de un LOTE: el motivo/artículo va una sola vez en la cabecera del lote
   const lineaLote=s=>{
     const col=s.puntos<0?'var(--red2)':'var(--ok)';
-    const pila=(s.nombre||"").split(" ")[0];
-    let acc;
-    if(s.estado==="pendiente") acc=`<div class="scitem-a"><button class="scok" onclick="_decSanc(${s.id},'aprobar',null,this)">Aprobar</button><button class="scmod" onclick="_modSanc(${s.id})">Modificar</button><button class="scno" onclick="_decSanc(${s.id},'rechazar',null,this)">Rechazar</button></div>`;
-    else if(s.estado==="aprobada") acc=`<div class="scitem-a"><span class="scpill ok">aprobada · a aplicar</span></div>`;
-    else if(s.estado==="aplicada") acc=`<div class="scitem-a"><span class="scpill ok">aplicada</span></div>`;
-    else acc=`<div class="scitem-a"><span class="scpill no">rechazada</span></div>`;
     const jus=s.justificacion?`<div class="scitem-m" style="margin:2px 0 8px">${_escDoc(s.justificacion)}</div>`:``;
     return `<div class="scitem">
-      <div class="scitem-h"><span class="scitem-n">${_escDoc(s.nombre||"")}</span><span class="scitem-p" style="color:${col}">${s.puntos>0?"+":""}${s.puntos}</span></div>
-      ${jus}${acc}</div>`;
+      <div class="scitem-h"><span class="scitem-n">${esRevoc(s)?"↩️ ":""}${_escDoc(s.nombre||"")}</span><span class="scitem-p" style="color:${col}">${s.puntos>0?"+":""}${s.puntos}</span></div>
+      ${jus}${acciones(s)}</div>`;
   };
   // Agrupa por lote (las sueltas van aparte)
   const agrupar=a=>{
@@ -1895,6 +1900,76 @@ async function _decLote_(lote, accion, btn){
     const box=$("pd-cola");
     if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">${hechas}/${ids.length} ${accion==='rechazar'?'rechazadas':'aprobadas'}. Falló: ${_escDoc(fallos.join(" · "))}</div>`);
   }
+}
+// ── Revocar una sanción ya aplicada (apelación aceptada / error) ──────────────────
+// No se "borra" nada: se encola un movimiento INVERSO que pasa por la misma cola y que
+// tú apruebas igual que una sanción. Así queda rastro de la sanción y de su marcha atrás.
+function _sancPorId(id){ return (_colaSancCache||[]).find(s=>String(s.id)===String(id))||null; }
+function abrirRevocar(id){
+  const s=_sancPorId(id); if(!s) return;
+  const m=_scMiembro(s.nombre), pts=m&&m.puntos!=null?m.puntos:null, dev=-Number(s.puntos||0);
+  const art=(s.articulo&&s.articulo!=="libre")?` · Art. ${_escDoc(s.articulo)}`:"";
+  $("modal-body").innerHTML=`
+    <div class="mtit">↩️ Revocar sanción</div>
+    <div class="msub">Entra en la cola como <b>pendiente</b>, igual que una sanción: la confirmas tú y la aplica la rutina. La sanción original no se borra — queda registrada y marcada como revocada.</div>
+    <div class="tarjeta" style="margin-bottom:12px">
+      <div class="fila"><div class="tit">${_escDoc(s.nombre)}<small>${_escDoc(s.motivo||"(sin motivo)")}${art}</small></div>
+        <div class="der mono" style="color:var(--red2)">${s.puntos>0?"+":""}${s.puntos}</div></div>
+    </div>
+    <div class="cform">
+      <label>Motivo de la revocación<select id="rv-tipo" onchange="_rvPrev()">
+        <option value="Apelación aceptada: presentó una justificación válida">Apelación aceptada · presentó justificación</option>
+        <option value="Error en la sanción: no procedía">Error · la sanción no procedía</option>
+        <option value="__libre">Otro (lo escribo yo)</option>
+      </select></label>
+      <div id="rv-librewrap"></div>
+    </div>
+    <div id="rv-prev" class="tarjeta" style="margin-top:12px"></div>
+    <div id="rv-err" class="er" style="margin-top:6px"></div>
+    <button class="ebtn" style="margin-top:12px" onclick="_enviarRevoc(${s.id}, this)">Añadir la revocación a la cola</button>`;
+  $("modal").classList.add("on"); $("modal").classList.add("full");
+  window._rvSanc=s; window._rvDev=dev; window._rvPts=pts;
+  _rvPrev();
+}
+function _rvTexto(){
+  const t=($("rv-tipo")||{}).value||"";
+  return t==="__libre" ? ((($("rv-libre")||{}).value)||"").trim() : t;
+}
+function _rvPrev(){
+  const w=$("rv-librewrap"), libre=(($("rv-tipo")||{}).value)==="__libre";
+  if(w && libre && !$("rv-libre")) w.innerHTML=`<label>Explica el motivo<input id="rv-libre" placeholder="por qué se retira la sanción…" autocomplete="off" oninput="_rvPrev()"></label>`;
+  if(w && !libre) w.innerHTML="";
+  const p=$("rv-prev"); if(!p) return;
+  const dev=window._rvDev||0, pts=window._rvPts, s=window._rvSanc||{};
+  const fin = pts==null ? null : Math.max(0, Math.min(10, pts+dev));
+  p.innerHTML=`<div class="fila"><div class="tit">Le devuelve ${dev>0?"+":""}${dev} ${Math.abs(dev)===1?"punto":"puntos"}<small>${_escDoc(_rvTexto()||"(falta el motivo)")}</small></div>
+      ${pts==null?"":`<div class="der mono">${pts} → <b style="color:var(--ok)">${fin}</b></div>`}</div>
+    <div class="er" style="color:var(--ink3);margin-top:6px">La casilla «Infracción este mes» se desmarcará <b>solo si no le queda ninguna otra infracción</b> este mes. Lo comprueba la rutina contra Notion y el registro, porque la app no ve las sanciones aplicadas fuera de ella.</div>`;
+}
+async function _enviarRevoc(id, btn){
+  const err=$("rv-err"); err.textContent=""; err.style.color="var(--red2)";
+  const s=_sancPorId(id); if(!s){ err.textContent="No encuentro la sanción."; return; }
+  const texto=_rvTexto();
+  if(!texto){ err.textContent="Elige o escribe el motivo de la revocación."; return; }
+  if(typeof backendOK!=="undefined" && !backendOK){ err.textContent="Sin conexión con el backend."; return; }
+  const prev=btn?btn.textContent:""; if(btn){ btn.disabled=true; btn.textContent="Enviando…"; }
+  try{
+    // Lote propio "revoca-…": agrupa las revocaciones de un mismo lote en una tarjeta y,
+    // de paso, el dedup por (lote,nombre) del backend impide revocar dos veces a la misma persona.
+    await api.pushSancion([{
+      origen:"revocacion",
+      lote: s.lote ? ("revoca-"+s.lote) : null,
+      nombre: s.nombre,
+      motivo: "Revocación de «"+(s.motivo||"sanción")+"» — "+texto,
+      articulo: s.articulo || "libre",
+      puntos: -Number(s.puntos||0),
+      extra: { revoca: s.id, loteOriginal: s.lote||null, motivoOriginal: s.motivo||null, razon: texto }
+    }]);
+    err.style.color="var(--ok)"; err.textContent="Revocación añadida a la cola (pendiente de confirmar).";
+    if(btn){ btn.style.display="none"; }
+    _cargarColaSanc_(true);
+  }catch(e){ err.style.color="var(--red2)"; err.textContent="No se pudo: "+e.message; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=prev||"Añadir la revocación a la cola"; } }
 }
 function _modSanc(id){
   const p=prompt("Nuevos puntos (negativo resta, positivo suma). Vacío = no cambiarlos:");
