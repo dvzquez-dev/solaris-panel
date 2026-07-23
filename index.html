@@ -1394,9 +1394,11 @@ function abrirSancionar(){
   $("modal-body").innerHTML = `
     <div class="mtit">🔨 Sancionar a un miembro</div>
     <div class="msub">Puntos del RRI (Título VII) o motivo libre. Se prepara aquí; la aplica la rutina tras confirmar.</div>
-    <label style="display:block;margin-top:12px">Miembro<select id="sc-miembro" onchange="_scPrev()">${ops}</select></label>
-    <label class="cinv" style="display:block;margin-top:10px">Motivo<input id="sc-mot" placeholder="escribe o elige del RRI…" autocomplete="off"><div id="sc-sug" class="csug" style="display:none"></div></label>
-    <div id="sc-ptswrap" style="margin-top:10px"></div>
+    <div class="cform">
+      <label>Miembro<select id="sc-miembro" onchange="_scPrev()">${ops}</select></label>
+      <label class="cinv">Motivo<input id="sc-mot" placeholder="elige del RRI o escribe uno libre…" autocomplete="off"><div id="sc-sug" class="csug" style="display:none"></div></label>
+      <div id="sc-ptswrap"></div>
+    </div>
     <div id="sc-prev" class="tarjeta" style="margin-top:12px;display:none"></div>
     <div id="sc-err" class="er" style="color:var(--red2);margin-top:6px"></div>
     <button class="ebtn" style="margin-top:12px" onclick="_prepararSanc()">Preparar sanción</button>
@@ -1408,42 +1410,49 @@ function abrirSancionar(){
 }
 function _scWire(){
   const inp=$("sc-mot"), sug=$("sc-sug"); if(!inp) return;
+  const otro=_todosMotivos().find(m=>m.libre);
   const render=()=>{
     const q=(inp.value||"").toLowerCase().trim();
-    const hits=_todosMotivos().filter(m=>m.texto.toLowerCase().includes(q) || ("art. "+m.art).toLowerCase().includes(q));
-    if(!q || !hits.length){ sug.style.display="none"; return; }
-    sug.innerHTML=hits.map(m=>`<div data-id="${m.id}">${m.texto} <small>· Art. ${m.art} · ${m.opciones?m.opciones.join("/")+" pts":(m.puntos!=null?(m.puntos>0?"+":"")+m.puntos+" pts":"libre")}</small></div>`).join("");
+    let hits = q ? _todosMotivos().filter(m=>m.texto.toLowerCase().includes(q) || ("art. "+m.art).toLowerCase().includes(q)) : _todosMotivos();
+    if(!hits.length && otro) hits=[otro];   // sin coincidencias → ofrece "Otra" (texto libre)
+    if(!hits.length){ sug.style.display="none"; return; }
+    sug.innerHTML=hits.map(m=>`<div data-id="${m.id}">${m.libre?"Otra (motivo libre)":m.texto} <small>· ${m.libre?"lo escribes tú":"Art. "+m.art+" · "+(m.opciones?m.opciones.join("/")+" pts":(m.puntos>0?"+":"")+m.puntos+" pts")}</small></div>`).join("");
     sug.style.display="";
-    sug.querySelectorAll("div").forEach(d=>d.onclick=()=>{ _sancionSel=_todosMotivos().find(x=>x.id===d.dataset.id); inp.value=_sancionSel.texto; sug.style.display="none"; _scPintarPts(); });
+    sug.querySelectorAll("div").forEach(d=>d.onclick=()=>{ _sancionSel=_todosMotivos().find(x=>x.id===d.dataset.id); inp.value=_sancionSel.libre?"Otra":_sancionSel.texto; sug.style.display="none"; _scPintarPts(); });
   };
-  inp.oninput=()=>{ _sancionSel=null; render(); _scPintarPts(); };
+  inp.oninput=render;
+  inp.onfocus=render;   // ← al poner el cursor, se abre el desplegable sin escribir nada
   inp.onblur=()=>setTimeout(()=>{ if(sug) sug.style.display="none"; },160);
 }
 function _scPintarPts(){
   const w=$("sc-ptswrap"); if(!w) return; const m=_sancionSel;
-  if(m && m.opciones){ w.innerHTML=`<label style="display:block">Puntos<select id="sc-pts" onchange="_scPrev()">${m.opciones.map(o=>`<option value="${o}">${o>0?"+":""}${o}</option>`).join("")}</select></label>`; }
-  else if(m && m.puntos!=null){ w.innerHTML=`<label style="display:block">Puntos<input id="sc-pts" value="${m.puntos}" readonly style="opacity:.75"></label>`; }
-  else { w.innerHTML=`<label style="display:block">Puntos <span style="color:var(--ink3)">(motivo libre)</span><input id="sc-pts" type="number" step="1" placeholder="ej. -1" oninput="_scPrev()"></label>`; }
+  if(!m){ w.innerHTML=""; _scPrev(); return; }
+  if(m.libre){ w.innerHTML=`<label>Motivo libre<input id="sc-motlibre" placeholder="describe la infracción…" autocomplete="off" oninput="_scPrev()"></label>`
+      + `<label>Puntos <span style="color:var(--ink3)">(a mano)</span><input id="sc-pts" type="number" step="1" placeholder="ej. -1" oninput="_scPrev()"></label>`; }
+  else if(m.opciones){ w.innerHTML=`<label>Puntos<select id="sc-pts" onchange="_scPrev()">${m.opciones.map(o=>`<option value="${o}">${o>0?"+":""}${o}</option>`).join("")}</select></label>`; }
+  else { w.innerHTML=`<label>Puntos<input id="sc-pts" value="${m.puntos}" readonly style="opacity:.75"></label>`; }
   _scPrev();
 }
 function _scPts(){ const e=$("sc-pts"); return e ? parseInt(e.value,10) : NaN; }
 function _scPrev(){
   const prev=$("sc-prev"); if(!prev) return;
   const sel=$("sc-miembro"); const m=sel ? DATA.miembros[+sel.value] : null; const d=_scPts();
-  if(!m || isNaN(d) || d===0){ prev.style.display="none"; return; }
+  if(!m || !_sancionSel || isNaN(d) || d===0){ prev.style.display="none"; return; }
+  const texto=_sancionSel.libre ? (($("sc-motlibre")||{}).value||"(motivo libre)") : _sancionSel.texto;
   const antes=(m.puntos!=null?m.puntos:5), despues=Math.max(0,Math.min(10,antes+d));
   prev.style.display="";
-  prev.innerHTML=`<div class="fila"><div class="tit">${m.pila}<small>${_sancionSel?_sancionSel.texto:(($("sc-mot")||{}).value||"motivo libre")}</small></div>
+  prev.innerHTML=`<div class="fila"><div class="tit">${m.pila}<small>${texto}</small></div>
     <div class="der mono">${antes} → <b style="color:${d<0?'var(--red2)':'var(--ok)'}">${despues}</b> <small>· ${_estadoPts(despues)}</small></div></div>
     ${(despues===antes&&d<0)?`<div class="er" style="color:var(--warn);margin-top:4px">Ya está en el suelo (0): no baja más.</div>`:``}`;
 }
 function _prepararSanc(){
   const err=$("sc-err"); err.textContent="";
-  const sel=$("sc-miembro"); const m=sel?DATA.miembros[+sel.value]:null; const d=_scPts();
-  const texto=_sancionSel?_sancionSel.texto:(($("sc-mot")||{}).value||"").trim();
-  const art=_sancionSel?_sancionSel.art:"libre";
+  const sel=$("sc-miembro"); const m=sel?DATA.miembros[+sel.value]:null; const d=_scPts(); const mot=_sancionSel;
   if(!m){ err.textContent="Elige un miembro."; return; }
-  if(!texto){ err.textContent="Elige o escribe un motivo."; return; }
+  if(!mot){ err.textContent="Elige un motivo de la lista (o «Otra»)."; return; }
+  const texto = mot.libre ? (($("sc-motlibre")||{}).value||"").trim() : mot.texto;
+  const art = mot.libre ? "libre" : mot.art;
+  if(mot.libre && !texto){ err.textContent="Escribe el motivo libre."; return; }
   if(isNaN(d)||d===0){ err.textContent="Indica los puntos (distintos de 0)."; return; }
   window._sancPend.push({ miembro:m.nombre, pila:m.pila, texto, art, puntos:d, at:new Date().toISOString() });
   abrirSancionar();
