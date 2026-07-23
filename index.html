@@ -293,7 +293,8 @@
   .mmemo{margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink2)}
   .cform{display:flex;flex-direction:column;gap:11px;margin:14px 0}
   .cform label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--ink2)}
-  .cform input,.cform select{background:var(--sur2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;color:var(--ink);font-size:14px;font-family:inherit}
+  .cform input,.cform select,.cform textarea{background:var(--sur2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;color:var(--ink);font-size:14px;font-family:inherit}
+  .cform textarea{resize:vertical;min-height:64px;line-height:1.45}
   .cform .row2{display:flex;gap:10px}.cform .row2 label{flex:1}
   .cprev{font-size:12px;color:var(--ink3);margin:2px 2px 14px;line-height:1.5}.cprev b{color:var(--ink2)}
   .ebtn{width:100%;background:var(--red);color:#fff;border:0;border-radius:11px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
@@ -687,12 +688,90 @@ function _notisEquipoHTML(){
 function _pintarNotisEquipo(){ const h=document.getElementById("notis-box"); if(h) h.innerHTML=_notisEquipoHTML(); }
 function _esAdminPush_(){ return SESION && (_esAdmin_() || (DATA.miembros[iyo] && DATA.miembros[iyo].nombre===PD_NOM)); }
 async function _enviarPrueba_(btn){
+  const _prev = btn ? btn.textContent : "";
   if(btn){ btn.disabled=true; btn.textContent="Enviando…"; }
   try{
     const r = await api.enviarPush({tipo:"individual", miembro:SESION.email}, "Prueba Solaris", "¡Las notificaciones funcionan! 🚀", {url:"/solaris-panel/", categoria:"anuncio"});
     _notisMsg("Encolada ("+((r&&r.encolados)||0)+" destinatario/s). El emisor la manda en el siguiente ciclo.");
   }catch(e){ _notisMsg("Error encolando: "+((e&&e.message)||e)); }
-  finally{ if(btn){ btn.disabled=false; btn.textContent="Enviar notificación de prueba (a mí)"; } }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=_prev||"Prueba (solo a mí)"; } }
+}
+
+/* ── Notificaciones del Panel PD: selector de destinatario ──────────────────────────────
+   Espejo del `_resolverDestinatario_` del backend: global · grupo(subsistema|rol|reunión) ·
+   individual. El backend ya lo soportaba entero; esto es solo la UI. */
+function _ntPintar(){
+  const w=$("nt-destwrap"); if(!w) return;
+  const t=(($("nt-tipo")||{}).value)||"global";
+  if(t==="subsistema"){
+    w.innerHTML=`<label>Subsistema<select id="nt-valor" onchange="_ntPrev()">${(DATA.subsistemas||[]).map(s=>`<option value="${_escDoc(s.u)}">${_escDoc(s.u)}</option>`).join("")}</select></label>`;
+  } else if(t==="rol"){
+    w.innerHTML=`<label>Rol<select id="nt-valor" onchange="_ntPrev()">
+      <option value="coordinadores">Coordinadores</option>
+      <option value="consejo">Consejo</option>
+      <option value="revisores">Revisores (PD y José)</option>
+      <option value="pd">Solo el Project Director</option></select></label>`;
+  } else if(t==="reunion"){
+    const rs=(typeof REUNIONES!=="undefined"?REUNIONES:[]).filter(r=>r&&r.id);
+    w.innerHTML = rs.length
+      ? `<label>Reunión<select id="nt-valor" onchange="_ntPrev()">${rs.map(r=>`<option value="${r.id}">${_escDoc(r.titulo||("Reunión "+r.id))}</option>`).join("")}</select></label>`
+      : `<div class="er" style="color:var(--ink3)">No hay reuniones para elegir.</div>`;
+  } else if(t==="individual"){
+    const ms=[...(DATA.miembros||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    w.innerHTML=`<label>Persona<select id="nt-valor" onchange="_ntPrev()">${ms.map(m=>`<option value="${_escDoc(m.nombre)}">${_escDoc(m.nombre)}</option>`).join("")}</select></label>`;
+  } else { w.innerHTML=""; }   // global: sin selector extra
+  _ntPrev();
+}
+// Objeto destinatario tal y como lo espera el backend
+function _ntDest(){
+  const t=(($("nt-tipo")||{}).value)||"global", v=($("nt-valor")||{}).value;
+  if(t==="individual") return {tipo:"individual", miembro:v};
+  if(t==="subsistema") return {tipo:"grupo", grupo:"subsistema", valor:v};
+  if(t==="rol")        return {tipo:"grupo", grupo:"rol", valor:v};
+  if(t==="reunion")    return {tipo:"grupo", grupo:"reunion", valor:v};
+  return {tipo:"global"};
+}
+// Cuenta orientativa en cliente (el backend manda; esto es solo para no enviar a ciegas)
+function _ntCuantos(){
+  const d=_ntDest(), ms=DATA.miembros||[];
+  if(d.tipo==="global") return ms.length;
+  if(d.tipo==="individual") return d.miembro?1:0;
+  if(d.grupo==="subsistema") return ms.filter(m=>m.unidad===d.valor).length;
+  if(d.grupo==="rol"){
+    if(d.valor==="coordinadores") return ms.filter(m=>m.cargo==="Coordinador").length;
+    if(d.valor==="consejo") return (typeof CONSEJO!=="undefined"?CONSEJO.length:0);
+    if(d.valor==="revisores") return 2;
+    if(d.valor==="pd") return 1;
+  }
+  if(d.grupo==="reunion"){
+    const r=(typeof REUNIONES!=="undefined"?REUNIONES:[]).find(x=>String(x.id)===String(d.valor));
+    if(!r) return 0;
+    return r.tipo==="general" ? ms.length : ((r.invitados||[]).length);
+  }
+  return 0;
+}
+function _ntPrev(){
+  const p=$("nt-prev"); if(!p) return;
+  const n=_ntCuantos();
+  p.textContent=`Llegaría a ${n} ${n===1?"persona":"personas"} · solo a quienes tengan las notificaciones activadas.`;
+}
+async function _enviarNoti_(btn){
+  const err=$("nt-err"); if(err){ err.textContent=""; err.style.color="var(--red2)"; }
+  const tit=((($("nt-tit")||{}).value)||"").trim(), cuerpo=((($("nt-cuerpo")||{}).value)||"").trim();
+  if(!tit){ if(err) err.textContent="Ponle un título."; return; }
+  if(!cuerpo){ if(err) err.textContent="Escribe el mensaje."; return; }
+  if(typeof backendOK!=="undefined" && !backendOK){ if(err) err.textContent="Sin conexión con el backend."; return; }
+  const dest=_ntDest();
+  if((dest.tipo==="individual" && !dest.miembro) || (dest.grupo && !dest.valor)){ if(err) err.textContent="Elige el destinatario."; return; }
+  const prev=btn?btn.textContent:"";
+  if(btn){ btn.disabled=true; btn.textContent="Enviando…"; }
+  try{
+    const res=await api.enviarPush(dest, tit, cuerpo, {url:"/solaris-panel/", categoria:"anuncio"});
+    const n=(res && res.encolados!=null) ? res.encolados : _ntCuantos();
+    if(err){ err.style.color="var(--ok)"; err.textContent=`Encolada para ${n} ${n===1?"persona":"personas"}. La entrega el emisor.`; }
+    if($("nt-tit")) $("nt-tit").value=""; if($("nt-cuerpo")) $("nt-cuerpo").value="";
+  }catch(e){ if(err){ err.style.color="var(--red2)"; err.textContent="No se pudo enviar: "+((e&&e.message)||e); } }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=prev||"Enviar notificación"; } }
 }
 function _pintarSalir_(){
   const hdr=document.querySelector("header"); if(!hdr || document.getElementById("hdr-right")) return;
@@ -1225,8 +1304,29 @@ function _panelPDHTML_(){
     <div id="pd-cola">${_colaSancCache?_colaSancHTML_(_colaSancCache):'<div class="tarjeta"><div class="sindatos">Cargando…</div></div>'}</div>
     <h2>Notificaciones</h2>
     <div class="tarjeta">
-      ${_esAdminPush_()?`<button class="ebtn" onclick="_enviarPrueba_(this)">Enviar notificación de prueba (a mí)</button><div id="notis-msg" class="er" style="color:var(--ink3);margin-top:4px"></div>`:`<div class="er" style="color:var(--ink3)">Sin permiso de envío.</div>`}
-      <p class="pie">El envío dirigido (individual / grupo / global) llega con la UI de destinatario — en cola.</p></div>`;
+      ${_esAdminPush_()?`
+      <div class="cform">
+        <label>Para<select id="nt-tipo" onchange="_ntPintar()">
+          <option value="global">Todo el equipo</option>
+          <option value="subsistema">Un subsistema</option>
+          <option value="rol">Un rol</option>
+          <option value="reunion">Invitados de una reunión</option>
+          <option value="individual">Una persona</option>
+        </select></label>
+        <div id="nt-destwrap"></div>
+        <label>Título<input id="nt-tit" placeholder="p. ej. Reunión de consejo el jueves" autocomplete="off"></label>
+        <label>Mensaje<textarea id="nt-cuerpo" rows="3" placeholder="lo que les llegará en la notificación…"></textarea></label>
+      </div>
+      <div id="nt-prev" class="er" style="color:var(--ink3);margin-top:2px"></div>
+      <div id="nt-err" class="er" style="margin-top:6px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="ebtn" style="flex:1;min-width:170px" onclick="_enviarNoti_(this)">Enviar notificación</button>
+        <button class="ebtn sec" style="flex:1;min-width:140px" onclick="_enviarPrueba_(this)">Prueba (solo a mí)</button>
+      </div>
+      <div id="notis-msg" class="er" style="color:var(--ink3);margin-top:6px"></div>
+      <p class="pie">Queda <b>encolada</b> y la entrega el emisor de push. Solo la reciben quienes hayan activado las notificaciones <b>en ese dispositivo</b>.</p>
+      `:`<div class="er" style="color:var(--ink3)">Sin permiso de envío.</div>`}
+    </div>`;
 }
 function _ajustarNavAdmin_(){
   const b=document.querySelector('nav button[data-k="contrib"]'); if(!b) return;
@@ -1447,7 +1547,7 @@ function render(){
     <div class="tarjeta rank">${rankHTML}
       <p class="pie" style="padding:10px 0 0">Media de horas/mes de la temporada. Ves tu puesto; el resto va sin nombre.</p>
     </div>`;
-  if(_esAdmin_()) _cargarColaSanc_();   // Panel PD: carga la cola de sanciones (debounced, no molesta en polls)
+  if(_esAdmin_()){ _cargarColaSanc_(); _ntPintar(); }   // Panel PD: cola de sanciones (debounced) + selector de destinatario
 
   /* 6 · EQUIPO */
   const coords = DATA.miembros.filter(m=>m.cargo).sort((a,b)=>
