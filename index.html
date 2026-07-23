@@ -45,7 +45,10 @@
     box-shadow:0 30px 80px -20px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.02);
     overflow:hidden; display:flex; flex-direction:column;
   }
-  @media(max-width:430px){ body{padding:0} .fono{border:0;border-radius:0;height:100vh;height:100dvh;max-height:none} }
+  @media(max-width:430px){ body{padding:0} .fono{border:0;border-radius:0;height:100vh;height:100dvh;max-height:none}
+    /* En móvil la barra va FIJA al viewport visual (no absolute dentro de .fono): en Android así queda siempre
+       sobre la barra de gestos del sistema aunque cambie la altura tras recargar/relogin. Centrada al ancho de .fono. */
+    nav{position:fixed;left:50%;right:auto;transform:translateX(-50%);width:100%;max-width:400px} }
 
   /* ── cabecera ──────────────────────────────────────────────────────── */
   header{
@@ -70,7 +73,7 @@
   select#persona{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:16px}
 
   /* ── contenido con scroll ──────────────────────────────────────────── */
-  main{flex:1; min-height:0; overscroll-behavior:contain; overflow-y:auto; padding:4px 16px 96px; -webkit-overflow-scrolling:touch;
+  main{flex:1; min-height:0; overscroll-behavior:contain; overflow-y:auto; padding:4px 16px calc(96px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling:touch;
     position:relative; z-index:1}
   /* estrellas de 4 puntas de fondo — el motivo de la insignia, muy tenue */
   .deco{position:absolute; top:0; left:0; right:0; height:340px; z-index:0;
@@ -967,6 +970,11 @@ async function deshacerDoc(id){const e=ENTREGABLES.find(x=>x.id===id); if(!e||!p
 async function reenviarDoc(id){const e=ENTREGABLES.find(x=>x.id===id); if(!e||e.autor!==DATA.miembros[iyo].nombre||e.estado!=="cambios")return; if(backendOK&&SESION){ try{ const upd=await api.decidir(id,"reenviar"); if(upd){ const ix=ENTREGABLES.findIndex(x=>x.id===id); if(ix>=0)ENTREGABLES[ix]=upd; } }catch(err){ _docErr_("No se pudo reenviar: "+((err&&err.message)||err)); return; } } else { e.estado="revision"; e.revisor=null; e.nota=null; } $("modal").classList.remove("on"); render(); document.querySelector('[data-k="documentos"]').click();}
 function pintarBadges(yo){
   const set=(k,n)=>{const b=$("badge-"+k); if(b){ b.textContent = n>9?"9+":n; b.style.display = n>0?"":"none"; }};
+  if(_esAdmin_()){   // en Vista admin, los badges muestran cuentas GLOBALES, no las del miembro[0]
+    set("documentos", (typeof ENTREGABLES!=="undefined"?ENTREGABLES:[]).filter(e=>e.estado==="revision").length);
+    let _nAb=0; (typeof REUNIONES!=="undefined"?REUNIONES:[]).forEach(e=>{ if(e&&Array.isArray(e.dias)&&e.dias.length && !e.fijada && (!e.limite||DATA.generado<=e.limite)) _nAb++; });
+    set("reuniones", _nAb); set("turnos", 0); return;
+  }
   // documentos: expedientes pendientes de TU revisión
   set("documentos", ENTREGABLES.filter(e=>e.estado==="revision" && revisoresDe(e).includes(yo.nombre)).length);
   // reuniones: te falta cubrir tu disponibilidad (invitado, abierta, sin cubrir, y no la organizas tú)
@@ -1002,13 +1010,43 @@ function gauge(p, col){
 }
 
 function irA(k){const b=document.querySelector(`[data-k="${k}"]`);if(b)b.click();}
+// Home de la Vista admin: panel de control (resumen del equipo + lo que requiere atención). Sustituye la ficha
+// personal, que para el perfil Admin (no es un miembro) no tiene sentido. Cuentas GLOBALES.
+function _adminHomeHTML_(){
+  const M=DATA.miembros||[], E=(typeof ENTREGABLES!=="undefined"?ENTREGABLES:[]), R=(typeof REUNIONES!=="undefined"?REUNIONES:[]);
+  const hoy=DATA.generado;
+  const nRev=E.filter(e=>e.estado==="revision").length;
+  let nAb=0; R.forEach(r=>{ if(r&&Array.isArray(r.dias)&&r.dias.length && !r.fijada && (!r.limite||hoy<=r.limite)) nAb++; });
+  const nInfra=M.filter(m=>m.infraccion).length;
+  const nSub=(DATA.subsistemas||[]).length;
+  const porEstado={}; M.forEach(m=>{ porEstado[m.estado]=(porEstado[m.estado]||0)+1; });
+  const chips=Object.keys(porEstado).map(k=>`<span class="pill ${CLS[k]||''}">${PICO[k]||''} ${porEstado[k]} ${ETQ[k]||k}</span>`).join(" ");
+  const tile=(k,label,n,color)=>`<div class="tarjeta mini clic" onclick="irA('${k}')" style="cursor:pointer"><div class="k">${label}</div><div class="v mono" style="color:${n?color:'var(--ink)'}">${n}</div></div>`;
+  return `
+    <div class="cabhome">
+      <div style="width:52px;height:52px;border-radius:50%;background:#b58900;display:flex;align-items:center;justify-content:center;font-size:26px;flex:none">🛡</div>
+      <div><div class="hola">Vista <b>Admin</b></div>
+        <span class="pill" style="background:#3f2d00;color:#ffd873;border-color:#6b4e00">vista completa · todos los permisos</span></div>
+    </div>
+    <p class="sub" style="margin-top:2px">Resumen del equipo y lo que requiere atención. Para ver la ficha de alguien, elígelo en el selector de arriba (“Ver como”).</p>
+    <div class="duo">
+      ${tile('documentos','Docs esperando decisión',nRev,'var(--warn)')}
+      ${tile('reuniones','Reuniones abiertas',nAb,'var(--ink)')}
+    </div>
+    <div class="duo">
+      ${tile('equipo','En infracción (mes)',nInfra,'var(--red2)')}
+      <div class="tarjeta mini"><div class="k">Miembros · subsistemas</div><div class="v mono">${M.length}<small> · ${nSub}</small></div></div>
+    </div>
+    <div class="tarjeta"><div class="fila"><div class="tit">Reparto por estado</div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${chips}</div></div>`;
+}
 function render(){
   if(!DATA.miembros || !DATA.miembros.length || iyo<0 || !DATA.miembros[iyo]){ return; }  // sin datos aún (pre-login): el gate cubre la pantalla; se rellena tras el login
   _pintarBannerVerComo_();   // banda "Viendo como…" cuando el admin está impersonando a un miembro
   const yo = DATA.miembros[iyo];
   const col = COLOR[yo.estado];
-  $("avat").textContent = yo.pila[0];
-  $("avat").style.background = col;
+  if(_esAdmin_()){ $("avat").textContent="🛡"; $("avat").style.background="#b58900"; }
+  else { $("avat").textContent = yo.pila[0]; $("avat").style.background = col; }
   const esPD = yo.unidad==="Project Director";
 
   /* 1 · ESTADO */
@@ -1047,7 +1085,7 @@ function render(){
     <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4 4 0 01-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 015.4-5.4z"/></svg>
     <span><b>Tienes ${nTur} turno${nTur===1?"":"s"} próximo${nTur===1?"":"s"}.</b> Mira los detalles en Turnos.</span><span class="chev">›</span></div>`;
 
-  $("s-estado").innerHTML = `
+  $("s-estado").innerHTML = _esAdmin_() ? _adminHomeHTML_() : `
     <div class="cabhome">
       ${gauge(yo.puntos, col)}
       <div><div class="hola">Hola,<b>${yo.pila}</b></div>
