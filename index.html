@@ -229,6 +229,16 @@
   .tkn.z{opacity:.45}
   .tkbox{display:none;padding:0 2px 2px}
   .tkbox.on{display:block}
+  /* Cola de sanciones (Panel PD) */
+  .scsec{font-size:13px;color:var(--ink2);font-weight:700;margin:16px 2px 6px}
+  .scrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+  .scrow:first-child{border-top:0}
+  .scrow .tit{font-weight:600}
+  .scacc{display:flex;gap:6px;flex:none}
+  .scacc button{border:1px solid var(--line);background:var(--sur);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer}
+  .scok{color:var(--ok);border-color:var(--ok)}
+  .scno{color:var(--red2);border-color:var(--red2)}
+  .scmod{color:var(--ink2)}
   .pasnota{font-size:11.5px;color:var(--ink3);margin:10px 4px 0;line-height:1.45}
   .dispcab{font-size:12.5px;color:var(--ink2);margin:14px 2px 11px}
   .dispcab b{color:var(--ink)}
@@ -495,6 +505,9 @@ const api = {
   borrarPush: (endpoint) => api._post({action:"borrarPush", endpoint}),
   enviarPush: (destinatario, titulo, cuerpo, opts) => api._post({action:"enviarPush", destinatario, titulo, cuerpo, opts}),
   decidir: (id, accion, motivo, extra) => api._post({action:"decidir", id, accion, motivo, extra}),
+  pushSancion: (sanciones) => api._post({action:"pushSancion", sanciones}),
+  getSanciones: (filtro) => api._post({action:"getSanciones", filtro: filtro||{}}),
+  decidirSancion: (id, accion, opts) => api._post(Object.assign({action:"decidirSancion", id, accion}, opts||{})),
 };
 function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:r.fijada||""}; }
 // Convierte un enlace de Drive/Docs a su URL de vista previa embebible; si es otro
@@ -1196,6 +1209,8 @@ function _panelPDHTML_(){
     <p class="sub">Acciones de dirección. Vista admin.</p>
     <h2>Disciplina</h2>
     <div class="tarjeta"><div class="fila"><div class="tit">Sancionar a un miembro<small>Puntos del RRI (Título VII) o motivo libre</small></div><div class="der"><button class="ebtn sec" onclick="abrirSancionar()">Abrir</button></div></div></div>
+    <h2 style="display:flex;align-items:center;justify-content:space-between">Cola de sanciones <button class="ebtn sec" style="font-size:12px;padding:4px 10px" onclick="_cargarColaSanc_(true)">Actualizar</button></h2>
+    <div id="pd-cola"><div class="tarjeta"><div class="sindatos">Cargando…</div></div></div>
     <h2>Notificaciones</h2>
     <div class="tarjeta">
       ${_esAdminPush_()?`<button class="ebtn" onclick="_enviarPrueba_(this)">Enviar notificación de prueba (a mí)</button><div id="notis-msg" class="er" style="color:var(--ink3);margin-top:4px"></div>`:`<div class="er" style="color:var(--ink3)">Sin permiso de envío.</div>`}
@@ -1420,6 +1435,7 @@ function render(){
     <div class="tarjeta rank">${rankHTML}
       <p class="pie" style="padding:10px 0 0">Media de horas/mes de la temporada. Ves tu puesto; el resto va sin nombre.</p>
     </div>`;
+  if(_esAdmin_()) _cargarColaSanc_();   // Panel PD: carga la cola de sanciones (debounced, no molesta en polls)
 
   /* 6 · EQUIPO */
   const coords = DATA.miembros.filter(m=>m.cargo).sort((a,b)=>
@@ -1462,23 +1478,17 @@ function _estadoPts(p){ return p<=2 ? "evaluación" : (p>=9 ? "elegible" : "norm
 function _todosMotivos(){ return RRI_MOTIVOS.restas.concat(RRI_MOTIVOS.sumas); }
 function abrirSancionar(){
   const ops = DATA.miembros.map((m,i)=>`<option value="${i}">${m.nombre}${m.cargo?" · "+m.cargo:""}</option>`).join("");
-  const pend = window._sancPend.length
-    ? `<h4 style="margin:14px 0 6px">Preparadas · ${window._sancPend.length}</h4><div class="tarjeta">`
-      + window._sancPend.map((s,i)=>`<div class="fila"><div class="tit">${s.pila}<small>${s.texto} · Art. ${s.art} · <b style="color:${s.puntos<0?'var(--red2)':'var(--ok)'}">${s.puntos>0?"+":""}${s.puntos}</b></small></div><div class="der"><button type="button" onclick="_quitarSanc(${i})" style="background:none;border:0;color:var(--ink3);font-size:18px;cursor:pointer">×</button></div></div>`).join("")
-      + `</div><p class="er" style="color:var(--ink3);margin-top:6px">Se enviarán a la cola de sanciones (la aplica la rutina) — pendiente del backend.</p>`
-    : "";
   $("modal-body").innerHTML = `
     <div class="mtit">🔨 Sancionar a un miembro</div>
-    <div class="msub">Puntos del RRI (Título VII) o motivo libre. Se prepara aquí; la aplica la rutina tras confirmar.</div>
+    <div class="msub">Puntos del RRI (Título VII) o motivo libre. Entra en la cola como <b>pendiente</b>; la confirmas en el Panel PD y la aplica la rutina.</div>
     <div class="cform">
       <label>Miembro<select id="sc-miembro" onchange="_scPrev()">${ops}</select></label>
       <label class="cinv">Motivo<input id="sc-mot" placeholder="elige del RRI o escribe uno libre…" autocomplete="off"><div id="sc-sug" class="csug" style="display:none"></div></label>
       <div id="sc-ptswrap"></div>
     </div>
     <div id="sc-prev" class="tarjeta" style="margin-top:12px;display:none"></div>
-    <div id="sc-err" class="er" style="color:var(--red2);margin-top:6px"></div>
-    <button class="ebtn" style="margin-top:12px" onclick="_prepararSanc()">Preparar sanción</button>
-    ${pend}`;
+    <div id="sc-err" class="er" style="margin-top:6px"></div>
+    <button class="ebtn" style="margin-top:12px" onclick="_enviarSanc(this)">Añadir a la cola</button>`;
   $("modal").classList.add("on");
   _sancionSel = null;
   _scWire();
@@ -1521,8 +1531,8 @@ function _scPrev(){
     <div class="der mono">${antes} → <b style="color:${d<0?'var(--red2)':'var(--ok)'}">${despues}</b> <small>· ${_estadoPts(despues)}</small></div></div>
     ${(despues===antes&&d<0)?`<div class="er" style="color:var(--warn);margin-top:4px">Ya está en el suelo (0): no baja más.</div>`:``}`;
 }
-function _prepararSanc(){
-  const err=$("sc-err"); err.textContent="";
+async function _enviarSanc(btn){
+  const err=$("sc-err"); err.textContent=""; err.style.color="var(--red2)";
   const sel=$("sc-miembro"); const m=sel?DATA.miembros[+sel.value]:null; const d=_scPts(); const mot=_sancionSel;
   if(!m){ err.textContent="Elige un miembro."; return; }
   if(!mot){ err.textContent="Elige un motivo de la lista (o «Otra»)."; return; }
@@ -1530,10 +1540,61 @@ function _prepararSanc(){
   const art = mot.libre ? "libre" : mot.art;
   if(mot.libre && !texto){ err.textContent="Escribe el motivo libre."; return; }
   if(isNaN(d)||d===0){ err.textContent="Indica los puntos (distintos de 0)."; return; }
-  window._sancPend.push({ miembro:m.nombre, pila:m.pila, texto, art, puntos:d, at:new Date().toISOString() });
-  abrirSancionar();
+  if(typeof backendOK!=="undefined" && !backendOK){ err.textContent="Sin conexión con el backend; no se puede encolar."; return; }
+  const prev=btn?btn.textContent:""; if(btn){ btn.disabled=true; btn.textContent="Enviando…"; }
+  try{
+    const r = await api.pushSancion([{ origen:"manual", nombre:m.nombre, motivo:texto, articulo:art, puntos:d }]);
+    if(!r || !r.ok) throw new Error((r&&r.error)||"error");
+    err.style.color="var(--ok)"; err.textContent=`Añadida a la cola: ${m.pila} · ${d>0?"+":""}${d} (pendiente de confirmar).`;
+    _sancionSel=null; const inp=$("sc-mot"); if(inp) inp.value=""; _scPintarPts();   // reset para encolar otra
+    _cargarColaSanc_(true);                                                          // refresca la cola del Panel PD
+  }catch(e){ err.style.color="var(--red2)"; err.textContent="No se pudo añadir: "+e.message; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=prev||"Añadir a la cola"; } }
 }
-function _quitarSanc(i){ window._sancPend.splice(i,1); abrirSancionar(); }
+// ── Cola de sanciones en el Panel PD (getSanciones -> aprobar / modificar / rechazar) ──
+let _colaSancTs = 0;
+async function _cargarColaSanc_(force){
+  const box=$("pd-cola"); if(!box) return;
+  const now=+new Date(); if(!force && now-_colaSancTs<4000) return;   // debounce (no spamear en polls)
+  _colaSancTs=now;
+  if(typeof backendOK!=="undefined" && !backendOK){ box.innerHTML=`<div class="tarjeta"><div class="sindatos">Sin conexión con el backend.</div></div>`; return; }
+  try{
+    const r=await api.getSanciones({});
+    box.innerHTML=_colaSancHTML_((r&&r.ok&&Array.isArray(r.data))?r.data:[]);
+  }catch(e){ box.innerHTML=`<div class="tarjeta"><div class="sindatos">No se pudo cargar la cola: ${e.message}</div></div>`; }
+}
+function _colaSancHTML_(arr){
+  if(!arr.length) return `<div class="tarjeta"><div class="sindatos">No hay sanciones en la cola.</div></div>`;
+  const pend=arr.filter(s=>s.estado==="pendiente"), apr=arr.filter(s=>s.estado==="aprobada"),
+        otras=arr.filter(s=>s.estado==="rechazada"||s.estado==="aplicada");
+  const linea=s=>{
+    const col=s.puntos<0?'var(--red2)':'var(--ok)';
+    const pts=`<b style="color:${col}">${s.puntos>0?"+":""}${s.puntos}</b>`;
+    const pila=(s.nombre||"").split(" ")[0];
+    const meta=`${_escDoc?_escDoc(s.motivo||""):(s.motivo||"")}${s.articulo&&s.articulo!=="libre"?" · Art. "+s.articulo:""}${s.origen==="reunion"?" · reunión":""}${s.justificacion?" · "+(_escDoc?_escDoc(s.justificacion):s.justificacion):""}`;
+    let acc;
+    if(s.estado==="pendiente") acc=`<div class="scacc"><button class="scok" onclick="_decSanc(${s.id},'aprobar')">Aprobar</button><button class="scmod" onclick="_modSanc(${s.id})">Modificar</button><button class="scno" onclick="_decSanc(${s.id},'rechazar')">Rechazar</button></div>`;
+    else if(s.estado==="aprobada") acc=`<span class="stpill est-aprobado">aprobada · a aplicar</span>`;
+    else if(s.estado==="aplicada") acc=`<span class="stpill est-aprobado">aplicada</span>`;
+    else acc=`<span class="stpill est-rechazado">rechazada</span>`;
+    return `<div class="scrow"><div class="tit">${pila} ${pts}<small>${meta}</small></div>${acc}</div>`;
+  };
+  const sec=(t,a)=> a.length?`<h3 class="scsec">${t} · ${a.length}</h3><div class="tarjeta">${a.map(linea).join("")}</div>`:"";
+  return sec("Pendientes de confirmar", pend)+sec("Aprobadas · esperando rutina", apr)+sec("Resueltas", otras);
+}
+async function _decSanc(id, accion, opts){
+  if(typeof backendOK!=="undefined" && !backendOK) return;
+  try{ const r=await api.decidirSancion(id, accion, opts||{}); if(!r||!r.ok) throw new Error((r&&r.error)||"error"); _cargarColaSanc_(true); }
+  catch(e){ const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo: ${e.message}</div>`); }
+}
+function _modSanc(id){
+  const p=prompt("Nuevos puntos (negativo resta, positivo suma). Vacío = no cambiarlos:");
+  if(p===null) return;                                   // cancelado
+  const j=prompt("Justificación (opcional):")||"";
+  const opts={ justificacion:j };
+  if(String(p).trim()!=="" && !isNaN(parseInt(p,10))) opts.puntos=parseInt(p,10);
+  _decSanc(id, "aprobar", opts);                          // modificar = aprobar con puntos/justificación ajustados
+}
 function abrirTurno(i){
   const t=TURNOS[i]; if(!t) return;
   const badges=[t.cancelable?'cancelable':'', t.crucial?'crucial':'', (t.nota||'')].filter(Boolean).map(b=>`<span class="tag">${b}</span>`).join(' ');
