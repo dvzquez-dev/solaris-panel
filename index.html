@@ -248,7 +248,9 @@
   .sclote{background:var(--sur);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:10px}
   .sclote-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:13.5px}
   .sclote-m{font-size:12.5px;color:var(--ink2);margin-top:4px;line-height:1.45}
-  .sclote-items{margin-top:12px;border-top:1px solid var(--line);padding-top:2px}
+  .sclote-items{margin-top:2px;border-top:1px solid var(--line);padding-top:2px}
+  .sclote .pastog{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+  .sclote .pas-sec.on{max-height:6000px}   /* un lote puede llevar los 32 del equipo */
   /* Selección múltiple de miembros (paquete de sanciones) */
   .scms{max-height:38vh;overflow-y:auto;border:1px solid var(--line);border-radius:9px;background:var(--sur2)}
   .scms label{display:flex;align-items:center;gap:9px;padding:8px 11px;font-size:13.5px;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--line)}
@@ -1790,18 +1792,27 @@ function _colaSancHTML_(arr){
     return { grupos:[...g.entries()], sueltas };
   };
   const grupoHTML=(lote,items,conBulk)=>{
-    const n=items.length, tot=items.reduce((x,s)=>x+(Number(s.puntos)||0),0), s0=items[0]||{};
+    const n=items.length, s0=items[0]||{};
     const art=(s0.articulo&&s0.articulo!=="libre")?` · Art. ${_escDoc(s0.articulo)}`:"";
     const org=s0.origen==="reunion"?" · reunión":"";
     const lsafe=String(lote).replace(/['"\\]/g,"");
+    // Se enseña lo que le cae A CADA UNO, no la suma del lote: un "−5" hace pensar que
+    // alguien pierde 5 puntos, cuando son 5 personas a −1.
+    const vals=[...new Set(items.map(s=>Number(s.puntos)||0))].sort((a,b)=>Math.abs(a)-Math.abs(b));
+    const et=p=>`${p>0?"+":"−"}${Math.abs(p)} ${Math.abs(p)===1?"punto":"puntos"}`;
+    const cuanto = vals.length===1 ? `${et(vals[0])}${n>1?" c/u":""}` : `de ${et(vals[0])} a ${et(vals[vals.length-1])}`;
+    const col = vals[vals.length-1]<0 ? 'var(--red2)' : 'var(--ok)';
     const bulk=conBulk?`<div class="scitem-a" style="margin-top:10px">
         <button class="scok" onclick="_decLote_('${lsafe}','aprobar',this)">Aprobar las ${n}</button>
         <button class="scno" onclick="_decLote_('${lsafe}','rechazar',this)">Rechazar las ${n}</button></div>`:"";
+    // La lista de personas nace PLEGADA: el lote se lee de un vistazo y se abre solo si
+    // quieres tocar a alguien en concreto.
     return `<div class="sclote">
-      <div class="sclote-h"><b>${n} ${n===1?"sanción":"sanciones"} · mismo lote</b><span class="mono" style="color:${tot<0?'var(--red2)':'var(--ok)'}">${tot>0?"+":""}${tot}</span></div>
+      <div class="sclote-h"><b>${n} ${n===1?"persona":"personas"}</b><span class="mono" style="color:${col}">${cuanto}</span></div>
       <div class="sclote-m">${_escDoc(s0.motivo||"(sin motivo)")}${art}${org}</div>
       ${bulk}
-      <div class="sclote-items">${items.map(lineaLote).join("")}</div>
+      <div class="pastog" onclick="_togDrawer(this)"><b>Ver ${n===1?"a la persona":`las ${n} personas`}</b>${_TK_CHEV}</div>
+      <div class="pas-sec"><div class="sclote-items">${items.map(lineaLote).join("")}</div></div>
     </div>`;
   };
   const sec=(t,a,conBulk)=>{
