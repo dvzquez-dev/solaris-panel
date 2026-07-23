@@ -1944,7 +1944,7 @@ function _rvPrev(){
   const fin = pts==null ? null : Math.max(0, Math.min(10, pts+dev));
   p.innerHTML=`<div class="fila"><div class="tit">Le devuelve ${dev>0?"+":""}${dev} ${Math.abs(dev)===1?"punto":"puntos"}<small>${_escDoc(_rvTexto()||"(falta el motivo)")}</small></div>
       ${pts==null?"":`<div class="der mono">${pts} → <b style="color:var(--ok)">${fin}</b></div>`}</div>
-    <div class="er" style="color:var(--ink3);margin-top:6px">La casilla «Infracción este mes» se desmarcará <b>solo si no le queda ninguna otra infracción</b> este mes. Lo comprueba la rutina contra Notion y el registro, porque la app no ve las sanciones aplicadas fuera de ella.</div>`;
+    <div class="er" style="color:var(--ink3);margin-top:6px">La casilla «Infracción este mes» se desmarcará <b>solo si no la tenía ya antes de esta sanción</b> — si venía marcada de otra, se queda. Lo comprueba la rutina contra el registro, porque la app no ve las sanciones aplicadas fuera de ella.</div>`;
 }
 async function _enviarRevoc(id, btn){
   const err=$("rv-err"); err.textContent=""; err.style.color="var(--red2)";
