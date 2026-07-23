@@ -244,6 +244,19 @@
   .scno{color:var(--red2);border-color:var(--red2)!important}
   .scmod{color:var(--ink2)}
   .scitem-wait{font-size:12.5px;color:var(--ink3);font-weight:600}
+  /* Lote: varias sanciones que comparten motivo → una tarjeta y un solo comunicado */
+  .sclote{background:var(--sur);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:10px}
+  .sclote-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:13.5px}
+  .sclote-m{font-size:12.5px;color:var(--ink2);margin-top:4px;line-height:1.45}
+  .sclote-items{margin-top:12px;border-top:1px solid var(--line);padding-top:2px}
+  /* Selección múltiple de miembros (paquete de sanciones) */
+  .scms{max-height:38vh;overflow-y:auto;border:1px solid var(--line);border-radius:9px;background:var(--sur2)}
+  .scms label{display:flex;align-items:center;gap:9px;padding:8px 11px;font-size:13.5px;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--line)}
+  .scms label:last-child{border-bottom:0}
+  .scms input{width:16px;height:16px;flex:none;accent-color:var(--red)}
+  .scms small{color:var(--ink3);font-size:11px}
+  .scmsbar{display:flex;gap:8px;align-items:center;margin-top:6px;font-size:12px;color:var(--ink3)}
+  .scmsbar button{background:none;border:0;color:var(--red2);font-size:12px;font-weight:600;cursor:pointer;padding:0}
   .scpill{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:5px 11px;border-radius:20px}
   .scpill.ok{background:var(--okbg);color:var(--ok)}
   .scpill.no{background:#2a1a1b;color:var(--red2)}
@@ -1589,12 +1602,15 @@ window._sancPend = window._sancPend || [];
 function _estadoPts(p){ return p<=2 ? "evaluación" : (p>=9 ? "elegible" : "normal"); }
 function _todosMotivos(){ return RRI_MOTIVOS.restas.concat(RRI_MOTIVOS.sumas); }
 function abrirSancionar(){
-  const ops = DATA.miembros.map((m,i)=>`<option value="${i}">${m.nombre}${m.cargo?" · "+m.cargo:""}</option>`).join("");
   $("modal-body").innerHTML = `
-    <div class="mtit">🔨 Sancionar a un miembro</div>
-    <div class="msub">Puntos del RRI (Título VII) o motivo libre. Entra en la cola como <b>pendiente</b>; la confirmas en el Panel PD y la aplica la rutina.</div>
+    <div class="mtit">🔨 Sancionar</div>
+    <div class="msub">Puntos del RRI (Título VII) o motivo libre. Entra en la cola como <b>pendiente</b>; la confirmas en el Panel PD y la aplica la rutina. Si marcas <b>varias personas</b>, van como un <b>paquete</b>: una sola tarjeta en la cola y <b>un único comunicado</b> de Discord.</div>
     <div class="cform">
-      <label>Miembro<select id="sc-miembro" onchange="_scPrev()">${ops}</select></label>
+      <label>Sancionar a<select id="sc-modo" onchange="_scPintarMiembros()">
+        <option value="una">Una persona</option>
+        <option value="varias">Varias personas (paquete)</option>
+      </select></label>
+      <div id="sc-miembrowrap"></div>
       <label class="cinv">Motivo<input id="sc-mot" placeholder="elige del RRI o escribe uno libre…" autocomplete="off"><div id="sc-sug" class="csug" style="display:none"></div></label>
       <div id="sc-ptswrap"></div>
     </div>
@@ -1604,8 +1620,39 @@ function abrirSancionar(){
   $("modal").classList.add("on");
   $("modal").classList.add("full");   // el panel de sanción va a (casi) pantalla completa
   _sancionSel = null;
+  _scPintarMiembros();
   _scWire();
   _scPintarPts();
+}
+// Selector de destinatarios de la sanción: una persona (select) o varias (lista con casillas + buscador)
+function _scPintarMiembros(){
+  const w=$("sc-miembrowrap"); if(!w) return;
+  const modo=(($("sc-modo")||{}).value)||"una";
+  const ms=[...(DATA.miembros||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  if(modo==="una"){
+    w.innerHTML=`<label>Miembro<select id="sc-miembro" onchange="_scPrev()">${ms.map(m=>`<option value="${_escDoc(m.nombre)}">${_escDoc(m.nombre)}${m.cargo?" · "+_escDoc(m.cargo):""}</option>`).join("")}</select></label>`;
+  } else {
+    w.innerHTML=`<label>Miembros <span style="color:var(--ink3)">(marca a quién sancionar)</span>
+        <input id="sc-buscar" placeholder="buscar…" autocomplete="off" oninput="_scFiltrarMiembros()"></label>
+      <div class="scms" id="sc-lista">${ms.map(m=>`<label data-n="${_escDoc(m.nombre.toLowerCase())}"><input type="checkbox" value="${_escDoc(m.nombre)}" onchange="_scPrev()"><span>${_escDoc(m.nombre)}${m.cargo?` <small>· ${_escDoc(m.cargo)}</small>`:""}</span></label>`).join("")}</div>
+      <div class="scmsbar"><button type="button" onclick="_scTodos(true)">Todos</button><button type="button" onclick="_scTodos(false)">Ninguno</button><span id="sc-cuenta">0 seleccionados</span></div>`;
+  }
+  _scPrev();
+}
+function _scFiltrarMiembros(){
+  const q=((($("sc-buscar")||{}).value)||"").toLowerCase().trim(), l=$("sc-lista"); if(!l) return;
+  l.querySelectorAll("label").forEach(x=>{ x.style.display=(!q || (x.dataset.n||"").includes(q))?"":"none"; });
+}
+function _scTodos(v){
+  const l=$("sc-lista"); if(!l) return;
+  l.querySelectorAll('input[type=checkbox]').forEach(c=>{ if(c.closest("label").style.display!=="none") c.checked=v; });
+  _scPrev();
+}
+// Nombres elegidos: 1 en modo "una", N en modo "varias"
+function _scSel(){
+  if(((($("sc-modo")||{}).value)||"una")==="una"){ const v=($("sc-miembro")||{}).value; return v?[v]:[]; }
+  const l=$("sc-lista"); if(!l) return [];
+  return [...l.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
 }
 function _scWire(){
   const inp=$("sc-mot"), sug=$("sc-sug"); if(!inp) return;
@@ -1633,32 +1680,56 @@ function _scPintarPts(){
   _scPrev();
 }
 function _scPts(){ const e=$("sc-pts"); return e ? parseInt(e.value,10) : NaN; }
+// El select/lista guardan el NOMBRE (no el índice): buscar por nombre, nunca por DATA.miembros[i]
+function _scMiembro(n){ return (DATA.miembros||[]).find(m=>m.nombre===n)||null; }
 function _scPrev(){
+  const nombres=_scSel(), d=_scPts();
+  const cnt=$("sc-cuenta"); if(cnt) cnt.textContent=`${nombres.length} seleccionado${nombres.length===1?"":"s"}`;
   const prev=$("sc-prev"); if(!prev) return;
-  const sel=$("sc-miembro"); const m=sel ? DATA.miembros[+sel.value] : null; const d=_scPts();
-  if(!m || !_sancionSel || isNaN(d) || d===0){ prev.style.display="none"; return; }
+  if(!nombres.length || !_sancionSel || isNaN(d) || d===0){ prev.style.display="none"; return; }
   const texto=_sancionSel.libre ? (($("sc-motlibre")||{}).value||"(motivo libre)") : _sancionSel.texto;
-  const antes=(m.puntos!=null?m.puntos:5), despues=Math.max(0,Math.min(10,antes+d));
   prev.style.display="";
-  prev.innerHTML=`<div class="fila"><div class="tit">${m.pila}<small>${texto}</small></div>
-    <div class="der mono">${antes} → <b style="color:${d<0?'var(--red2)':'var(--ok)'}">${despues}</b> <small>· ${_estadoPts(despues)}</small></div></div>
-    ${(despues===antes&&d<0)?`<div class="er" style="color:var(--warn);margin-top:4px">Ya está en el suelo (0): no baja más.</div>`:``}`;
+  // Con varios, la cabecera dice que van como paquete y cada fila enseña su propio antes→después
+  const cab = nombres.length>1
+    ? `<div class="fila"><div class="tit"><b>Paquete de ${nombres.length} sanciones</b><small>${_escDoc(texto)}</small></div>
+        <div class="der mono">${d>0?"+":""}${d} <small>c/u</small></div></div>` : "";
+  prev.innerHTML = cab + nombres.map(n=>{
+    const m=_scMiembro(n); if(!m) return "";
+    const antes=(m.puntos!=null?m.puntos:5), despues=Math.max(0,Math.min(10,antes+d));
+    const quien=_escDoc(m.pila||m.nombre);
+    return `<div class="fila"><div class="tit">${quien}${nombres.length>1?"":`<small>${_escDoc(texto)}</small>`}</div>
+      <div class="der mono">${antes} → <b style="color:${d<0?'var(--red2)':'var(--ok)'}">${despues}</b> <small>· ${_estadoPts(despues)}</small></div></div>
+      ${(despues===antes&&d<0)?`<div class="er" style="color:var(--warn);margin-top:4px">${quien} ya está en el suelo (0): no baja más.</div>`:``}`;
+  }).join("");
 }
 async function _enviarSanc(btn){
   const err=$("sc-err"); err.textContent=""; err.style.color="var(--red2)";
-  const sel=$("sc-miembro"); const m=sel?DATA.miembros[+sel.value]:null; const d=_scPts(); const mot=_sancionSel;
-  if(!m){ err.textContent="Elige un miembro."; return; }
+  const nombres=_scSel(); const d=_scPts(); const mot=_sancionSel;
+  if(!nombres.length){ err.textContent="Elige a quién sancionar."; return; }
   if(!mot){ err.textContent="Elige un motivo de la lista (o «Otra»)."; return; }
   const texto = mot.libre ? (($("sc-motlibre")||{}).value||"").trim() : mot.texto;
   const art = mot.libre ? "libre" : mot.art;
   if(mot.libre && !texto){ err.textContent="Escribe el motivo libre."; return; }
   if(isNaN(d)||d===0){ err.textContent="Indica los puntos (distintos de 0)."; return; }
   if(typeof backendOK!=="undefined" && !backendOK){ err.textContent="Sin conexión con el backend; no se puede encolar."; return; }
+  // Varias personas = un PAQUETE: comparten `lote`, así la cola las agrupa y se deciden juntas
+  // (y el comunicado de Discord sale como un solo bloque). Una sola va suelta, sin lote.
+  const lote = nombres.length>1 ? `manual-${new Date().toISOString().slice(0,10)}-${Math.random().toString(36).slice(2,7)}` : "";
+  const items = nombres.map(n=>{
+    const it={ origen:"manual", nombre:n, motivo:texto, articulo:art, puntos:d };
+    if(lote) it.lote=lote;
+    return it;
+  });
   const prev=btn?btn.textContent:""; if(btn){ btn.disabled=true; btn.textContent="Enviando…"; }
   try{
-    await api.pushSancion([{ origen:"manual", nombre:m.nombre, motivo:texto, articulo:art, puntos:d }]);  // _apiParse lanza si falla
-    err.style.color="var(--ok)"; err.textContent=`Añadida a la cola: ${m.pila} · ${d>0?"+":""}${d} (pendiente de confirmar).`;
+    await api.pushSancion(items);  // _apiParse lanza si falla
+    const uno=_scMiembro(nombres[0]);
+    err.style.color="var(--ok)";
+    err.textContent = items.length===1
+      ? `Añadida a la cola: ${(uno&&(uno.pila||uno.nombre))||nombres[0]} · ${d>0?"+":""}${d} (pendiente de confirmar).`
+      : `Añadidas a la cola: ${items.length} sanciones de ${d>0?"+":""}${d}, como un paquete (pendientes de confirmar).`;
     _sancionSel=null; const inp=$("sc-mot"); if(inp) inp.value=""; _scPintarPts();   // reset para encolar otra
+    _scTodos(false);                                                                 // y limpia la selección: no reenviar sin querer
     _cargarColaSanc_(true);                                                          // refresca la cola del Panel PD
   }catch(e){ err.style.color="var(--red2)"; err.textContent="No se pudo añadir: "+e.message; }
   finally{ if(btn){ btn.disabled=false; btn.textContent=prev||"Añadir a la cola"; } }
@@ -1698,8 +1769,50 @@ function _colaSancHTML_(arr){
       <div class="scitem-h"><span class="scitem-n">${_escDoc(pila)}</span><span class="scitem-p" style="color:${col}">${s.puntos>0?"+":""}${s.puntos}</span></div>
       <div class="scitem-m">${meta}</div>${acc}</div>`;
   };
-  const sec=(t,a)=> a.length?`<h3 class="scsec">${t} · ${a.length}</h3><div class="tarjeta">${a.map(linea).join("")}</div>`:"";
-  return sec("Pendientes de confirmar", pend)+sec("Aprobadas · esperando rutina", apr)+sec("Resueltas", otras);
+  // Fila compacta para miembros de un LOTE: el motivo/artículo va una sola vez en la cabecera del lote
+  const lineaLote=s=>{
+    const col=s.puntos<0?'var(--red2)':'var(--ok)';
+    const pila=(s.nombre||"").split(" ")[0];
+    let acc;
+    if(s.estado==="pendiente") acc=`<div class="scitem-a"><button class="scok" onclick="_decSanc(${s.id},'aprobar',null,this)">Aprobar</button><button class="scmod" onclick="_modSanc(${s.id})">Modificar</button><button class="scno" onclick="_decSanc(${s.id},'rechazar',null,this)">Rechazar</button></div>`;
+    else if(s.estado==="aprobada") acc=`<div class="scitem-a"><span class="scpill ok">aprobada · a aplicar</span></div>`;
+    else if(s.estado==="aplicada") acc=`<div class="scitem-a"><span class="scpill ok">aplicada</span></div>`;
+    else acc=`<div class="scitem-a"><span class="scpill no">rechazada</span></div>`;
+    const jus=s.justificacion?`<div class="scitem-m" style="margin:2px 0 8px">${_escDoc(s.justificacion)}</div>`:``;
+    return `<div class="scitem">
+      <div class="scitem-h"><span class="scitem-n">${_escDoc(s.nombre||"")}</span><span class="scitem-p" style="color:${col}">${s.puntos>0?"+":""}${s.puntos}</span></div>
+      ${jus}${acc}</div>`;
+  };
+  // Agrupa por lote (las sueltas van aparte)
+  const agrupar=a=>{
+    const g=new Map(), sueltas=[];
+    a.forEach(s=>{ if(s.lote){ if(!g.has(s.lote)) g.set(s.lote,[]); g.get(s.lote).push(s); } else sueltas.push(s); });
+    return { grupos:[...g.entries()], sueltas };
+  };
+  const grupoHTML=(lote,items,conBulk)=>{
+    const n=items.length, tot=items.reduce((x,s)=>x+(Number(s.puntos)||0),0), s0=items[0]||{};
+    const art=(s0.articulo&&s0.articulo!=="libre")?` · Art. ${_escDoc(s0.articulo)}`:"";
+    const org=s0.origen==="reunion"?" · reunión":"";
+    const lsafe=String(lote).replace(/['"\\]/g,"");
+    const bulk=conBulk?`<div class="scitem-a" style="margin-top:10px">
+        <button class="scok" onclick="_decLote_('${lsafe}','aprobar',this)">Aprobar las ${n}</button>
+        <button class="scno" onclick="_decLote_('${lsafe}','rechazar',this)">Rechazar las ${n}</button></div>`:"";
+    return `<div class="sclote">
+      <div class="sclote-h"><b>${n} ${n===1?"sanción":"sanciones"} · mismo lote</b><span class="mono" style="color:${tot<0?'var(--red2)':'var(--ok)'}">${tot>0?"+":""}${tot}</span></div>
+      <div class="sclote-m">${_escDoc(s0.motivo||"(sin motivo)")}${art}${org}</div>
+      ${bulk}
+      <div class="sclote-items">${items.map(lineaLote).join("")}</div>
+    </div>`;
+  };
+  const sec=(t,a,conBulk)=>{
+    if(!a.length) return "";
+    const {grupos,sueltas}=agrupar(a);
+    let h=`<h3 class="scsec">${t} · ${a.length}</h3>`;
+    grupos.forEach(([lote,items])=>{ h+=grupoHTML(lote,items,conBulk); });
+    if(sueltas.length) h+=`<div class="tarjeta">${sueltas.map(linea).join("")}</div>`;
+    return h;
+  };
+  return sec("Pendientes de confirmar", pend, true)+sec("Aprobadas · esperando rutina", apr, false)+sec("Resueltas", otras, false);
 }
 async function _decSanc(id, accion, opts, btn){
   if(typeof backendOK!=="undefined" && !backendOK) return;
@@ -1710,6 +1823,28 @@ async function _decSanc(id, accion, opts, btn){
   if(acc) acc.innerHTML = `<span class="scitem-wait">${accion==='rechazar'?'Rechazando':'Aprobando'}…</span>`;
   try{ await api.decidirSancion(id, accion, opts||{}); await _cargarColaSanc_(true); }   // _apiParse lanza si falla
   catch(e){ if(acc) acc.innerHTML=prev; const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo: ${e.message}</div>`); }
+}
+// Decide de golpe todas las PENDIENTES de un lote. Secuencial a propósito: el backend guarda la
+// cola entera de una vez (read-modify-write), así que en paralelo las decisiones se pisarían.
+async function _decLote_(lote, accion, btn){
+  if(typeof backendOK!=="undefined" && !backendOK) return;
+  const ids=(_colaSancCache||[]).filter(s=>s.lote===lote && s.estado==="pendiente").map(s=>s.id);
+  if(!ids.length){ _cargarColaSanc_(true); return; }
+  const acc = (btn && btn.closest) ? btn.closest('.scitem-a') : null;
+  const previo = acc ? acc.innerHTML : null;
+  const verbo = accion==='rechazar' ? 'Rechazando' : 'Aprobando';
+  const fallos=[]; let hechas=0;
+  for(let i=0;i<ids.length;i++){
+    if(acc) acc.innerHTML=`<span class="scitem-wait">${verbo} ${i+1}/${ids.length}…</span>`;
+    try{ await api.decidirSancion(ids[i], accion, {}); hechas++; }   // _apiParse lanza si falla
+    catch(e){ fallos.push(e.message); }
+  }
+  try{ await _cargarColaSanc_(true); }catch(e){}
+  if(fallos.length){
+    if(acc && !hechas) acc.innerHTML=previo;                          // no cambió nada: deja los botones
+    const box=$("pd-cola");
+    if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">${hechas}/${ids.length} ${accion==='rechazar'?'rechazadas':'aprobadas'}. Falló: ${_escDoc(fallos.join(" · "))}</div>`);
+  }
 }
 function _modSanc(id){
   const p=prompt("Nuevos puntos (negativo resta, positivo suma). Vacío = no cambiarlos:");
