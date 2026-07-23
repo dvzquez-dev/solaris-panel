@@ -271,8 +271,8 @@
   .modal-card{background:var(--sur);border:1px solid var(--line);border-radius:16px 16px 0 0;width:100%;max-width:440px;max-height:86vh;overflow-y:auto;padding:22px 18px 30px;position:relative}
   .mclose{position:absolute;top:12px;right:12px;background:var(--sur2);border:1px solid var(--line);color:var(--ink2);width:30px;height:30px;border-radius:50%;font-size:13px;cursor:pointer;z-index:2}
   /* Modal GRANDE (casi pantalla completa) — para el panel de sanción, más cómodo de rellenar */
-  .modal.full{align-items:center}
-  .modal.full .modal-card{max-width:660px;width:96%;max-height:94vh;border-radius:16px}
+  .modal.full{align-items:center;padding:2vh 0}
+  .modal.full .modal-card{width:96vw;max-width:1400px;height:96vh;max-height:96vh;border-radius:16px}
   .mhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 30px 4px 0}
   .mtit{font-size:19px;font-weight:800}
   .msub{font-size:12.5px;color:var(--ink2);margin-top:3px}
@@ -1560,9 +1560,9 @@ let _colaSancTs = 0, _colaSancCache = null;
 async function _cargarColaSanc_(force){
   const box=$("pd-cola"); if(!box) return;
   if(_colaSancCache) box.innerHTML=_colaSancHTML_(_colaSancCache);    // pinta lo último conocido YA (no "Cargando…")
+  if(typeof backendOK!=="undefined" && !backendOK){ if(!_colaSancCache) box.innerHTML=`<div class="tarjeta"><div class="sindatos">Conectando…</div></div>`; return; }  // sin marcar ts: reintenta al siguiente render
   const now=+new Date(); if(!force && now-_colaSancTs<4000) return;   // debounce (no spamear en polls)
   _colaSancTs=now;
-  if(typeof backendOK!=="undefined" && !backendOK){ if(!_colaSancCache) box.innerHTML=`<div class="tarjeta"><div class="sindatos">Sin conexión con el backend.</div></div>`; return; }
   try{
     const r=await api.getSanciones({});
     _colaSancCache=(r&&r.ok&&Array.isArray(r.data))?r.data:[];
