@@ -229,16 +229,24 @@
   .tkn.z{opacity:.45}
   .tkbox{display:none;padding:0 2px 2px}
   .tkbox.on{display:block}
-  /* Cola de sanciones (Panel PD) */
-  .scsec{font-size:13px;color:var(--ink2);font-weight:700;margin:16px 2px 6px}
-  .scrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
-  .scrow:first-child{border-top:0}
-  .scrow .tit{font-weight:600}
-  .scacc{display:flex;gap:6px;flex:none}
-  .scacc button{border:1px solid var(--line);background:var(--sur);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer}
-  .scok{color:var(--ok);border-color:var(--ok)}
-  .scno{color:var(--red2);border-color:var(--red2)}
+  /* Cola de sanciones (Panel PD) — tarjeta apilada: nombre+puntos arriba, motivo debajo, acciones al pie */
+  .scsec{font-size:12.5px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:18px 2px 8px}
+  .scitem{padding:13px 2px;border-top:1px solid var(--line)}
+  .scitem:first-child{border-top:0}
+  .scitem-h{display:flex;align-items:baseline;gap:8px}
+  .scitem-n{font-weight:700;font-size:15px}
+  .scitem-p{font-weight:800;font-size:15px;margin-left:auto;font-variant-numeric:tabular-nums}
+  .scitem-m{font-size:12.5px;color:var(--ink2);margin:4px 0 11px;line-height:1.45}
+  .scitem-a{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .scitem-a button{border:1px solid var(--line);background:var(--sur);border-radius:9px;padding:7px 15px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .scitem-a button:disabled{opacity:.5;cursor:default}
+  .scok{color:var(--ok);border-color:var(--ok)!important}
+  .scno{color:var(--red2);border-color:var(--red2)!important}
   .scmod{color:var(--ink2)}
+  .scitem-wait{font-size:12.5px;color:var(--ink3);font-weight:600}
+  .scpill{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:5px 11px;border-radius:20px}
+  .scpill.ok{background:var(--okbg);color:var(--ok)}
+  .scpill.no{background:#2a1a1b;color:var(--red2)}
   .pasnota{font-size:11.5px;color:var(--ink3);margin:10px 4px 0;line-height:1.45}
   .dispcab{font-size:12.5px;color:var(--ink2);margin:14px 2px 11px}
   .dispcab b{color:var(--ink)}
@@ -1559,13 +1567,14 @@ async function _enviarSanc(btn){
 let _colaSancTs = 0, _colaSancCache = null;
 async function _cargarColaSanc_(force){
   const box=$("pd-cola"); if(!box) return;
-  if(_colaSancCache) box.innerHTML=_colaSancHTML_(_colaSancCache);    // pinta lo último conocido YA (no "Cargando…")
   if(typeof backendOK!=="undefined" && !backendOK){ if(!_colaSancCache) box.innerHTML=`<div class="tarjeta"><div class="sindatos">Conectando…</div></div>`; return; }  // sin marcar ts: reintenta al siguiente render
   const now=+new Date(); if(!force && now-_colaSancTs<4000) return;   // debounce (no spamear en polls)
   _colaSancTs=now;
   try{
     const arr=await api.getSanciones({});      // _apiParse ya devuelve el DATA (el array); lanza si el backend da error
-    _colaSancCache=Array.isArray(arr)?arr:[];
+    const next=Array.isArray(arr)?arr:[];
+    if(_colaSancCache && JSON.stringify(next)===JSON.stringify(_colaSancCache)) return;   // sin cambios: no repintar (evita parpadeo del poll y respeta el "Aprobando…")
+    _colaSancCache=next;
     box.innerHTML=_colaSancHTML_(_colaSancCache);
   }catch(e){ if(!_colaSancCache) box.innerHTML=`<div class="tarjeta"><div class="sindatos">No se pudo cargar la cola: ${e.message}</div></div>`; }
 }
@@ -1575,23 +1584,32 @@ function _colaSancHTML_(arr){
         otras=arr.filter(s=>s.estado==="rechazada"||s.estado==="aplicada");
   const linea=s=>{
     const col=s.puntos<0?'var(--red2)':'var(--ok)';
-    const pts=`<b style="color:${col}">${s.puntos>0?"+":""}${s.puntos}</b>`;
     const pila=(s.nombre||"").split(" ")[0];
-    const meta=`${_escDoc?_escDoc(s.motivo||""):(s.motivo||"")}${s.articulo&&s.articulo!=="libre"?" · Art. "+s.articulo:""}${s.origen==="reunion"?" · reunión":""}${s.justificacion?" · "+(_escDoc?_escDoc(s.justificacion):s.justificacion):""}`;
+    const art=(s.articulo&&s.articulo!=="libre")?` · Art. ${_escDoc(s.articulo)}`:"";
+    const org=s.origen==="reunion"?" · reunión":"";
+    const jus=s.justificacion?` · ${_escDoc(s.justificacion)}`:"";
+    const meta=`${_escDoc(s.motivo||"(sin motivo)")}${art}${org}${jus}`;
     let acc;
-    if(s.estado==="pendiente") acc=`<div class="scacc"><button class="scok" onclick="_decSanc(${s.id},'aprobar')">Aprobar</button><button class="scmod" onclick="_modSanc(${s.id})">Modificar</button><button class="scno" onclick="_decSanc(${s.id},'rechazar')">Rechazar</button></div>`;
-    else if(s.estado==="aprobada") acc=`<span class="stpill est-aprobado">aprobada · a aplicar</span>`;
-    else if(s.estado==="aplicada") acc=`<span class="stpill est-aprobado">aplicada</span>`;
-    else acc=`<span class="stpill est-rechazado">rechazada</span>`;
-    return `<div class="scrow"><div class="tit">${pila} ${pts}<small>${meta}</small></div>${acc}</div>`;
+    if(s.estado==="pendiente") acc=`<div class="scitem-a"><button class="scok" onclick="_decSanc(${s.id},'aprobar',null,this)">Aprobar</button><button class="scmod" onclick="_modSanc(${s.id})">Modificar</button><button class="scno" onclick="_decSanc(${s.id},'rechazar',null,this)">Rechazar</button></div>`;
+    else if(s.estado==="aprobada") acc=`<div class="scitem-a"><span class="scpill ok">aprobada · a aplicar</span></div>`;
+    else if(s.estado==="aplicada") acc=`<div class="scitem-a"><span class="scpill ok">aplicada</span></div>`;
+    else acc=`<div class="scitem-a"><span class="scpill no">rechazada</span></div>`;
+    return `<div class="scitem">
+      <div class="scitem-h"><span class="scitem-n">${_escDoc(pila)}</span><span class="scitem-p" style="color:${col}">${s.puntos>0?"+":""}${s.puntos}</span></div>
+      <div class="scitem-m">${meta}</div>${acc}</div>`;
   };
   const sec=(t,a)=> a.length?`<h3 class="scsec">${t} · ${a.length}</h3><div class="tarjeta">${a.map(linea).join("")}</div>`:"";
   return sec("Pendientes de confirmar", pend)+sec("Aprobadas · esperando rutina", apr)+sec("Resueltas", otras);
 }
-async function _decSanc(id, accion, opts){
+async function _decSanc(id, accion, opts, btn){
   if(typeof backendOK!=="undefined" && !backendOK) return;
-  try{ await api.decidirSancion(id, accion, opts||{}); _cargarColaSanc_(true); }   // _apiParse lanza si falla
-  catch(e){ const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo: ${e.message}</div>`); }
+  // feedback inmediato (Apps Script puede tardar en frío): la fila muestra "Aprobando…/Rechazando…"
+  const item = (btn && btn.closest) ? btn.closest('.scitem') : null;
+  const acc = item ? item.querySelector('.scitem-a') : null;
+  const prev = acc ? acc.innerHTML : null;
+  if(acc) acc.innerHTML = `<span class="scitem-wait">${accion==='rechazar'?'Rechazando':'Aprobando'}…</span>`;
+  try{ await api.decidirSancion(id, accion, opts||{}); await _cargarColaSanc_(true); }   // _apiParse lanza si falla
+  catch(e){ if(acc) acc.innerHTML=prev; const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo: ${e.message}</div>`); }
 }
 function _modSanc(id){
   const p=prompt("Nuevos puntos (negativo resta, positivo suma). Vacío = no cambiarlos:");
@@ -1717,6 +1735,18 @@ function _iniciarPollDocs_(){
         ENTREGABLES.length=0; ent.forEach(function(x){ENTREGABLES.push(x);}); render();
       }
     }catch(_){}
+  }, 9000);
+}
+// Auto-refresco de la Cola de sanciones mientras el PD está en el Panel PD (activa==="contrib").
+let _pollSancT = null;
+function _iniciarPollSanc_(){
+  if(_pollSancT) return;
+  _pollSancT = setInterval(function(){
+    if(!(backendOK && SESION)) return;
+    if(activa !== "contrib" || !_esAdmin_()) return;          // solo en el Panel PD, en Vista admin
+    var modal = document.getElementById("modal");
+    if(modal && modal.classList.contains("on")) return;       // no molestar con el modal de sanción abierto
+    _cargarColaSanc_(true);                                    // compara y solo repinta si cambió
   }, 9000);
 }
 async function verReunion(id, _bg){
@@ -2101,7 +2131,7 @@ function _aplicarBootstrap_(boot){
   _aplicarPanel_(boot.panel);
   _aplicarDatos_(boot.tareas, boot.turnos, boot.entregables);
   if(Array.isArray(boot.reuniones)){ REUNIONES = boot.reuniones.map(normReu); ENC28 = REUNIONES.length ? REUNIONES[0] : ENC28; backendOK=true; }
-  _iniciarPollDocs_();
+  _iniciarPollDocs_(); _iniciarPollSanc_();
 }
 // FALLBACK (solo si el backend aún no tiene `bootstrap`): 4 peticiones sueltas.
 async function _cargarBackend_(){
@@ -2112,7 +2142,7 @@ async function _cargarBackend_(){
   try{ ent=await api.getEntregables(); }catch(_){}
   _aplicarPanel_(pnl);
   _aplicarDatos_(trs,tus,ent);
-  _iniciarPollDocs_();
+  _iniciarPollDocs_(); _iniciarPollSanc_();
 }
 async function _onCredencial_(resp, _silent){
   _gate_('<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px"><img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(200px,52vw);height:auto"><div style="opacity:.8">Verificando…</div>');
