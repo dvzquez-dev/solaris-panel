@@ -197,6 +197,7 @@
   .est.se{background:#241b1c;color:var(--ink3)}
   .est.ed{background:#2a2011;color:var(--warn)}
   .est.rv{background:var(--okbg);color:var(--ok)}
+  .est.fin{background:#1e2a20;color:#7ea88c}
   .tk .tit small .venc{color:var(--red2);font-weight:600}
   /* disponibilidad marcada (mapa de calor) */
   .reu{cursor:pointer}
@@ -216,6 +217,18 @@
   .pas-sec{max-height:0;overflow:hidden;transition:max-height .45s ease}
   .pas-sec.on{max-height:2400px}
   .pas-sec .tarjeta{margin-top:8px}
+  /* Tareas del equipo (Vista admin): fila de miembro plegable + cajón de tareas */
+  .tkm{display:flex;align-items:center;justify-content:space-between;cursor:pointer;
+    padding:12px 14px;margin-top:8px;border:1px solid var(--line);border-radius:12px;background:var(--sur)}
+  .tkm .tit{font-weight:600}
+  .tkm .der{display:flex;align-items:center;gap:8px;color:var(--ink3)}
+  .tkm svg{transition:transform .3s}
+  .tkm.ab svg{transform:rotate(180deg)}
+  .tkn{font-size:12px;font-weight:700;background:var(--sur2);border:1px solid var(--line);
+    border-radius:20px;padding:2px 9px;color:var(--ink2);min-width:22px;text-align:center}
+  .tkn.z{opacity:.45}
+  .tkbox{display:none;padding:0 2px 2px}
+  .tkbox.on{display:block}
   .pasnota{font-size:11.5px;color:var(--ink3);margin:10px 4px 0;line-height:1.45}
   .dispcab{font-size:12.5px;color:var(--ink2);margin:14px 2px 11px}
   .dispcab b{color:var(--ink)}
@@ -1026,6 +1039,77 @@ function gauge(p, col){
 }
 
 function irA(k){const b=document.querySelector(`[data-k="${k}"]`);if(b)b.click();}
+
+// ── Helpers de Tareas (compartidos por la vista de miembro y la Vista admin) ──
+const _TK_EST = {"Sin empezar":["se","sin empezar"],"En desarrollo":["ed","en curso"],"Revisando":["rv","revisando"]};
+const _TK_ORDU = {"alta":0,"media":1,"baja":2};
+// ¿tarea finalizada? Defensivo: el Kanban de Notion marca "Hecha"/"Finalizada"/… — cualquier variante conocida.
+// Si no casa, la tarea se trata como ACTIVA (nunca escondemos trabajo vivo en el cajón de finalizadas).
+const _TK_FIN_RE = /hech|finaliz|complet|termin|cerrad|acabad|resuelt|done|✔|✅/i;
+function _tkFin(t){ return _TK_FIN_RE.test((t&&t.e)||""); }
+function _tkVence(l, hoy){
+  if(!l) return "sin fecha";
+  const d = Math.round((new Date(l)-hoy)/86400000);
+  if(d<0) return `venció hace ${-d} día${-d===1?'':'s'}`;
+  if(d===0) return "vence hoy";
+  return `vence en ${d} día${d===1?'':'s'}`;
+}
+function _tkOrdAct(a,b){ return (_TK_ORDU[a.u]-_TK_ORDU[b.u]) || ((a.l?+new Date(a.l):9e15)-(b.l?+new Date(b.l):9e15)); }
+function _tkFilaAct(t, hoy){
+  const [ec,el] = _TK_EST[t.e] || ["se", t.e];
+  const rojo = t.u==="alta" || (t.l && new Date(t.l)<hoy);
+  return `<div class="fila tk"><div class="tit">${t.n}
+    <small>${t.s} · ${t.pr||"—"} · <span class="${rojo?'venc':''}">${_tkVence(t.l,hoy)}</span></small></div>
+    <div class="der"><span class="est ${ec}">${el}</span></div></div>`;
+}
+function _tkFilaFin(t){
+  return `<div class="fila tk"><div class="tit">${t.n}
+    <small>${t.s} · ${t.pr||"—"}</small></div>
+    <div class="der"><span class="est fin">${t.e}</span></div></div>`;
+}
+// Cajón plegable genérico: alterna la clase .on del hermano siguiente (.tkbox / .pas-sec) y gira el chevron.
+// No usa ids fijos (evita la colisión de "pas"/"pastog" que sí tiene togglePas entre secciones).
+function _togDrawer(btn){ const s=btn.nextElementSibling; if(!s) return; const ab=s.classList.toggle("on"); btn.classList.toggle("ab",ab); }
+const _TK_CHEV = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>`;
+
+// Tareas en la Vista admin: TODO el equipo agrupado por subsistema (unidad), miembros ordenados por carga
+// activa; al tocar un miembro se despliegan sus tareas activas + un cajón con las finalizadas.
+function _tareasAdminHTML_(){
+  const hoy = new Date(DATA.generado);
+  const M = DATA.miembros || [];
+  const act={}, fin={};
+  M.forEach(m=>{ act[m.nombre]=[]; fin[m.nombre]=[]; });
+  (typeof TAREAS!=="undefined"?TAREAS:[]).forEach(t=>{ (t.r||[]).forEach(nom=>{
+    if(!(nom in act)) return;                 // responsable fuera del roster: se ignora (defensivo)
+    if(_tkFin(t)) fin[nom].push(t); else act[nom].push(t);
+  }); });
+  const grupos={};
+  M.forEach(m=>{ (grupos[m.unidad]=grupos[m.unidad]||[]).push(m); });
+  const totAct = u => grupos[u].reduce((s,m)=>s+act[m.nombre].length,0);
+  const unidades = Object.keys(grupos).sort((a,b)=> totAct(b)-totAct(a) || a.localeCompare(b));
+  let out = `<h1>Tareas del equipo</h1><p class="sub">Miembros por subsistema, ordenados por carga activa. Toca a alguien para ver sus tareas.</p>`;
+  unidades.forEach(u=>{
+    const ms = grupos[u].slice().sort((a,b)=> act[b.nombre].length-act[a.nombre].length || a.pila.localeCompare(b.pila));
+    const tot = totAct(u);
+    out += `<h2>${u} <span style="color:var(--ink3);font-weight:600">· ${tot} activa${tot===1?'':'s'}</span></h2>`;
+    ms.forEach(m=>{
+      const a = act[m.nombre].slice().sort(_tkOrdAct), f = fin[m.nombre];
+      const apel = m.nombre.split(' ').slice(1).join(' ');
+      out += `<div class="tkm" onclick="_togDrawer(this)">
+        <div class="tit">${m.pila} <small>${apel}${m.cargo?' · '+m.cargo:''}</small></div>
+        <div class="der"><span class="tkn mono ${a.length?'':'z'}">${a.length}</span>${_TK_CHEV}</div></div>
+        <div class="tkbox">`;
+      out += a.length ? `<div class="tarjeta">${a.map(t=>_tkFilaAct(t,hoy)).join("")}</div>`
+                      : `<div class="tarjeta"><div class="sindatos">Sin tareas activas.</div></div>`;
+      if(f.length){
+        out += `<div class="pastog" onclick="_togDrawer(this)"><span>Finalizadas <b>· ${f.length}</b></span>${_TK_CHEV}</div>
+          <div class="pas-sec"><div class="tarjeta">${f.map(_tkFilaFin).join("")}</div></div>`;
+      }
+      out += `</div>`;
+    });
+  });
+  return out;
+}
 // Home de la Vista admin: panel de control (resumen del equipo + lo que requiere atención). Sustituye la ficha
 // personal, que para el perfil Admin (no es un miembro) no tiene sentido. Cuentas GLOBALES.
 function _adminHomeHTML_(){
@@ -1241,34 +1325,26 @@ function render(){
     $("s-turnos").innerHTML=`<h1>Turnos de fabricación</h1><p class="sub">En cuáles estás, quién más va y lo que ya hiciste.</p>${arriba}${hist}`;
   })();
 
-  /* 3 · TAREAS (ejemplo) */
-  const HOY = new Date(DATA.generado);
-  const EST = {"Sin empezar":["se","sin empezar"],"En desarrollo":["ed","en curso"],"Revisando":["rv","revisando"]};
-  const ordUrg = {"alta":0,"media":1,"baja":2};
-  function venceTxt(l){
-    if(!l) return "sin fecha";
-    const d = Math.round((new Date(l)-HOY)/86400000);
-    if(d<0) return `venció hace ${-d} día${-d===1?'':'s'}`;
-    if(d===0) return "vence hoy";
-    return `vence en ${d} día${d===1?'':'s'}`;
+  /* 3 · TAREAS */
+  if(_esAdmin_()){
+    $("s-tareas").innerHTML = _tareasAdminHTML_();     // vista global: equipo por subsistema + carga activa
+  } else {
+    const HOY = new Date(DATA.generado);
+    const misTodas = TAREAS.filter(t => t.r.includes(yo.nombre));
+    const mias = misTodas.filter(t=>!_tkFin(t)).sort(_tkOrdAct);                       // activas
+    const misFin = misTodas.filter(_tkFin).sort((a,b)=> (b.l||"").localeCompare(a.l||"")); // finalizadas → cajón
+    const cuerpo = mias.length ? `<div class="tarjeta">${mias.map(t=>_tkFilaAct(t,HOY)).join("")}</div>
+      <p class="pie">Vienen del Kanban de tu subsistema en Notion. Las «importante» y «urgente» se pueden apelar (Art. 34).</p>`
+      : `<div class="tarjeta"><div class="sindatos">No tienes tareas activas ahora mismo.<span>Cuando tu coordinador te asigne una en el Kanban, aparecerá aquí.</span></div></div>`;
+    const finDr = misFin.length
+      ? `<div class="pastog" onclick="_togDrawer(this)"><span>Finalizadas <b>· ${misFin.length}</b></span>${_TK_CHEV}</div>`
+        + `<div class="pas-sec"><div class="tarjeta">${misFin.map(_tkFilaFin).join("")}</div></div>`
+      : "";
+    $("s-tareas").innerHTML = `
+      <h1>Mis tareas</h1>
+      <p class="sub">${mias.length?`${mias.length} activa${mias.length===1?'':'s'} · de los Kanban de Notion`:'Lo que tienes asignado.'}</p>
+      ${cuerpo}${finDr}`;
   }
-  const mias = TAREAS.filter(t => t.r.includes(yo.nombre))
-    .sort((a,b)=> (ordUrg[a.u]-ordUrg[b.u]) ||
-      ((a.l?+new Date(a.l):9e15)-(b.l?+new Date(b.l):9e15)));
-  const cuerpo = mias.length ? `<div class="tarjeta">${mias.map(t=>{
-      const [ec,el]=EST[t.e]||["se",t.e];
-      const venc = venceTxt(t.l);
-      const rojo = t.u==="alta" || (t.l && new Date(t.l)<HOY);
-      return `<div class="fila tk"><div class="tit">${t.n}
-        <small>${t.s} · ${t.pr||"—"} · <span class="${rojo?'venc':''}">${venc}</span></small></div>
-        <div class="der"><span class="est ${ec}">${el}</span></div></div>`;
-    }).join("")}</div>
-    <p class="pie">Vienen del Kanban de tu subsistema en Notion. Las «importante» y «urgente» se pueden apelar (Art. 34).</p>`
-    : `<div class="tarjeta"><div class="sindatos">No tienes tareas asignadas ahora mismo.<span>Cuando tu coordinador te asigne una en el Kanban, aparecerá aquí.</span></div></div>`;
-  $("s-tareas").innerHTML = `
-    <h1>Mis tareas</h1>
-    <p class="sub">${mias.length?`${mias.length} activa${mias.length===1?'':'s'} · de los Kanban de Notion`:'Lo que tienes asignado.'}</p>
-    ${cuerpo}`;
   $("s-documentos").innerHTML = _esAdmin_() ? _docsAdminHTML_() : docsPantalla(yo);
   pintarBadges(yo);
   _ajustarNavAdmin_();
