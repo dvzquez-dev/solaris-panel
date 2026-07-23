@@ -1058,6 +1058,38 @@ function _rosterAdminHTML_(){
   return `<h2>Todos los miembros <span style="color:var(--ink3);font-weight:600">· ${M.length} · solo admin</span></h2>
     <div class="tarjeta">${filas}</div>`;
 }
+// Turnos en Vista admin: TODOS los turnos del equipo (convocados + pasados), no los del miembro[0].
+function _turnosAdminHTML_(){
+  const MES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const DIA=["dom","lun","mar","mié","jue","vie","sáb"];
+  const hoyT=new Date(DATA.generado+"T00:00:00");
+  const fF=iso=>{const d=new Date(iso+"T00:00:00");const w=DIA[d.getDay()];return `${w[0].toUpperCase()+w.slice(1)} ${d.getDate()} ${MES[d.getMonth()]}`;};
+  const esFut=t=>new Date(t.fecha+"T00:00:00")>=hoyT;
+  const card=t=>{
+    const roles=(t.roles||[]).map(r=>`<div class="fila"><div class="tit">${r.miembro||"— libre"}<small>${r.rol}</small></div></div>`).join("");
+    const sub=[t.momento,t.hora,t.punto].filter(Boolean).join(" · ");
+    const cancel=t.cancelable?`<span class="tag">cancelable</span>`:"";
+    return `<div class="tarjeta clicable" onclick="abrirTurno(${TURNOS.indexOf(t)})"><div class="fila"><div class="tit">${fF(t.fecha)}<small>${sub}</small></div><div class="der">${cancel} <span class="chev">›</span></div></div>${roles}</div>`;
+  };
+  const prox=TURNOS.filter(esFut).sort((a,b)=>a.fecha.localeCompare(b.fecha)||(a.hora||"").localeCompare(b.hora||""));
+  const pas=TURNOS.filter(t=>!esFut(t)).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const chev=`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>`;
+  const arriba=prox.length?`<h2>Turnos convocados · ${prox.length}</h2>${prox.map(card).join("")}`:`<div class="tarjeta"><div class="sindatos">No hay turnos convocados ahora.</div></div>`;
+  const hist=pas.length?`<div class="pastog" id="pastog" onclick="togglePas()"><span>Turnos pasados <b>· ${pas.length}</b></span>${chev}</div><div class="pas-sec" id="pas"><div>${pas.map(card).join("")}</div></div>`:"";
+  return `<h1>Turnos de fabricación</h1><p class="sub">Todos los turnos del equipo · vista admin.</p>${arriba}${hist}`;
+}
+// Documentos en Vista admin: TODOS los expedientes agrupados por estado. (Ver = sí; potestad de decidir
+// cualquiera requiere aún que el backend conceda override al admin — pendiente, ver plan-vista-admin.md.)
+function _docsAdminHTML_(){
+  const E=(typeof ENTREGABLES!=="undefined"?ENTREGABLES:[]);
+  const rev=E.filter(e=>e.estado==="revision");
+  const curso=E.filter(e=>["recibido","analizado","cambios"].includes(e.estado));
+  const resu=E.filter(e=>["aprobado","publicado","cerrado","rechazado"].includes(e.estado));
+  const fila=e=>`<div class="fila clicable ent" onclick="verDoc(${e.id})"><div class="tit">${e.titulo}<small><span class="dref">${e.ref}</span> · ${(e.autor||'').split(" ")[0]} · <span class="amb ${AMB[e.ambito][1]}">${AMB[e.ambito][0]}</span></small></div><div class="der"><span class="stpill ${EST_D[e.estado][1]}">${EST_D[e.estado][0]}</span></div></div>`;
+  const sec=(tit,arr)=>`<h2>${tit} · ${arr.length}</h2>`+(arr.length?`<div class="tarjeta">${arr.map(fila).join("")}</div>`:`<div class="tarjeta"><div class="sindatos">Nada aquí.</div></div>`);
+  return `<h1>Documentos</h1><p class="sub">Todos los expedientes del equipo · vista admin.</p>`
+    + sec("Esperando decisión", rev) + sec("En curso", curso) + sec("Resueltos", resu);
+}
 function render(){
   if(!DATA.miembros || !DATA.miembros.length || iyo<0 || !DATA.miembros[iyo]){ return; }  // sin datos aún (pre-login): el gate cubre la pantalla; se rellena tras el login
   _pintarBannerVerComo_();   // banda "Viendo como…" cuando el admin está impersonando a un miembro
@@ -1136,6 +1168,7 @@ function render(){
     const hoyT=new Date(DATA.generado+"T00:00:00");
     const fF=iso=>{const d=new Date(iso+"T00:00:00");const w=DIA[d.getDay()];return `${w[0].toUpperCase()+w.slice(1)} ${d.getDate()} ${MES[d.getMonth()]}`;};
     const esFut=t=>new Date(t.fecha+"T00:00:00")>=hoyT;
+    if(_esAdmin_()){ $("s-turnos").innerHTML=_turnosAdminHTML_(); return; }
     const prox=TURNOS.filter(esFut)
       .sort((a,b)=>a.fecha.localeCompare(b.fecha)||(a.hora||"").localeCompare(b.hora||""));
     const mmPas=TURNOS.filter(t=>!esFut(t) && t.roles.some(r=>r.miembro===yo.nombre))
@@ -1204,19 +1237,19 @@ function render(){
     <h1>Mis tareas</h1>
     <p class="sub">${mias.length?`${mias.length} activa${mias.length===1?'':'s'} · de los Kanban de Notion`:'Lo que tienes asignado.'}</p>
     ${cuerpo}`;
-  $("s-documentos").innerHTML = docsPantalla(yo);
+  $("s-documentos").innerHTML = _esAdmin_() ? _docsAdminHTML_() : docsPantalla(yo);
   pintarBadges(yo);
 
   /* 4 · REUNIONES */
-  const misReu = REUNIONES.filter(r => r && (r.convocante===yo.nombre || r.tipo==="general" || (r.invitados||[]).includes(yo.nombre)));
+  const misReu = _esAdmin_() ? REUNIONES.filter(r=>r) : REUNIONES.filter(r => r && (r.convocante===yo.nombre || r.tipo==="general" || (r.invitados||[]).includes(yo.nombre)));
   $("s-reuniones").innerHTML = `
     <h1>Reuniones</h1>
-    <p class="sub">Tus reuniones y encuestas de disponibilidad.</p>
-    <div class="crear-btn" style="margin:0 0 6px"><button class="ebtn" onclick="crearEncuesta()">Convocar reunión</button></div>
-    <h2>Mis reuniones</h2>
+    <p class="sub">${_esAdmin_()?"Todas las reuniones del equipo · administración (no convocas: no eres una persona real).":"Tus reuniones y encuestas de disponibilidad."}</p>
+    ${_esAdmin_()?``:`<div class="crear-btn" style="margin:0 0 6px"><button class="ebtn" onclick="crearEncuesta()">Convocar reunión</button></div>`}
+    <h2>${_esAdmin_()?"Todas las reuniones":"Mis reuniones"}</h2>
     ${misReu.length
       ? misReu.map(r=>reuCard(r,yo)).join("")
-      : `<div class="tarjeta"><div class="sindatos">Actualmente no estás convocado a ninguna reunión.<span>Cuando te convoquen a una —o la convoques tú— aparecerá aquí.</span></div></div>`}`;
+      : (_esAdmin_()?`<div class="tarjeta"><div class="sindatos">No hay reuniones convocadas.</div></div>`:`<div class="tarjeta"><div class="sindatos">Actualmente no estás convocado a ninguna reunión.<span>Cuando te convoquen a una —o la convoques tú— aparecerá aquí.</span></div></div>`)}`;
 
   /* 5 · CONTRIBUCIÓN */
   const d = yo.desglose, techo = d.techo_mensual;
