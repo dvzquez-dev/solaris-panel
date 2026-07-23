@@ -315,6 +315,7 @@
   .csug div{padding:8px 11px;font-size:13px;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--line)}
   .csug div:last-child{border-bottom:0}.csug div:hover,.csug div.hi{background:var(--sur3,rgba(255,255,255,.05))}
   .csug small{color:var(--ink3);font-size:11px}
+  #sc-sug{max-height:52vh}   /* el modal de sanción es alto: el desplegable de motivos se alarga más hacia abajo */
   .cchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
   .cmix{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
   .cmixb{background:var(--sur2);border:1px solid var(--line);border-radius:20px;padding:6px 11px;font-size:12px;color:var(--ink2);cursor:pointer;font-family:inherit}
@@ -1547,8 +1548,7 @@ async function _enviarSanc(btn){
   if(typeof backendOK!=="undefined" && !backendOK){ err.textContent="Sin conexión con el backend; no se puede encolar."; return; }
   const prev=btn?btn.textContent:""; if(btn){ btn.disabled=true; btn.textContent="Enviando…"; }
   try{
-    const r = await api.pushSancion([{ origen:"manual", nombre:m.nombre, motivo:texto, articulo:art, puntos:d }]);
-    if(!r || !r.ok) throw new Error((r&&r.error)||"error");
+    await api.pushSancion([{ origen:"manual", nombre:m.nombre, motivo:texto, articulo:art, puntos:d }]);  // _apiParse lanza si falla
     err.style.color="var(--ok)"; err.textContent=`Añadida a la cola: ${m.pila} · ${d>0?"+":""}${d} (pendiente de confirmar).`;
     _sancionSel=null; const inp=$("sc-mot"); if(inp) inp.value=""; _scPintarPts();   // reset para encolar otra
     _cargarColaSanc_(true);                                                          // refresca la cola del Panel PD
@@ -1564,8 +1564,8 @@ async function _cargarColaSanc_(force){
   const now=+new Date(); if(!force && now-_colaSancTs<4000) return;   // debounce (no spamear en polls)
   _colaSancTs=now;
   try{
-    const r=await api.getSanciones({});
-    _colaSancCache=(r&&r.ok&&Array.isArray(r.data))?r.data:[];
+    const arr=await api.getSanciones({});      // _apiParse ya devuelve el DATA (el array); lanza si el backend da error
+    _colaSancCache=Array.isArray(arr)?arr:[];
     box.innerHTML=_colaSancHTML_(_colaSancCache);
   }catch(e){ if(!_colaSancCache) box.innerHTML=`<div class="tarjeta"><div class="sindatos">No se pudo cargar la cola: ${e.message}</div></div>`; }
 }
@@ -1590,7 +1590,7 @@ function _colaSancHTML_(arr){
 }
 async function _decSanc(id, accion, opts){
   if(typeof backendOK!=="undefined" && !backendOK) return;
-  try{ const r=await api.decidirSancion(id, accion, opts||{}); if(!r||!r.ok) throw new Error((r&&r.error)||"error"); _cargarColaSanc_(true); }
+  try{ await api.decidirSancion(id, accion, opts||{}); _cargarColaSanc_(true); }   // _apiParse lanza si falla
   catch(e){ const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo: ${e.message}</div>`); }
 }
 function _modSanc(id){
