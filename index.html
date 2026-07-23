@@ -269,7 +269,10 @@
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;z-index:60;align-items:flex-end;justify-content:center}
   .modal.on{display:flex}
   .modal-card{background:var(--sur);border:1px solid var(--line);border-radius:16px 16px 0 0;width:100%;max-width:440px;max-height:86vh;overflow-y:auto;padding:22px 18px 30px;position:relative}
-  .mclose{position:absolute;top:12px;right:12px;background:var(--sur2);border:1px solid var(--line);color:var(--ink2);width:30px;height:30px;border-radius:50%;font-size:13px;cursor:pointer}
+  .mclose{position:absolute;top:12px;right:12px;background:var(--sur2);border:1px solid var(--line);color:var(--ink2);width:30px;height:30px;border-radius:50%;font-size:13px;cursor:pointer;z-index:2}
+  /* Modal GRANDE (casi pantalla completa) — para el panel de sanción, más cómodo de rellenar */
+  .modal.full{align-items:center}
+  .modal.full .modal-card{max-width:660px;width:96%;max-height:94vh;border-radius:16px}
   .mhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 30px 4px 0}
   .mtit{font-size:19px;font-weight:800}
   .msub{font-size:12.5px;color:var(--ink2);margin-top:3px}
@@ -1210,7 +1213,7 @@ function _panelPDHTML_(){
     <h2>Disciplina</h2>
     <div class="tarjeta"><div class="fila"><div class="tit">Sancionar a un miembro<small>Puntos del RRI (Título VII) o motivo libre</small></div><div class="der"><button class="ebtn sec" onclick="abrirSancionar()">Abrir</button></div></div></div>
     <h2 style="display:flex;align-items:center;justify-content:space-between">Cola de sanciones <button class="ebtn sec" style="font-size:12px;padding:4px 10px" onclick="_cargarColaSanc_(true)">Actualizar</button></h2>
-    <div id="pd-cola"><div class="tarjeta"><div class="sindatos">Cargando…</div></div></div>
+    <div id="pd-cola">${_colaSancCache?_colaSancHTML_(_colaSancCache):'<div class="tarjeta"><div class="sindatos">Cargando…</div></div>'}</div>
     <h2>Notificaciones</h2>
     <div class="tarjeta">
       ${_esAdminPush_()?`<button class="ebtn" onclick="_enviarPrueba_(this)">Enviar notificación de prueba (a mí)</button><div id="notis-msg" class="er" style="color:var(--ink3);margin-top:4px"></div>`:`<div class="er" style="color:var(--ink3)">Sin permiso de envío.</div>`}
@@ -1490,6 +1493,7 @@ function abrirSancionar(){
     <div id="sc-err" class="er" style="margin-top:6px"></div>
     <button class="ebtn" style="margin-top:12px" onclick="_enviarSanc(this)">Añadir a la cola</button>`;
   $("modal").classList.add("on");
+  $("modal").classList.add("full");   // el panel de sanción va a (casi) pantalla completa
   _sancionSel = null;
   _scWire();
   _scPintarPts();
@@ -1552,16 +1556,18 @@ async function _enviarSanc(btn){
   finally{ if(btn){ btn.disabled=false; btn.textContent=prev||"Añadir a la cola"; } }
 }
 // ── Cola de sanciones en el Panel PD (getSanciones -> aprobar / modificar / rechazar) ──
-let _colaSancTs = 0;
+let _colaSancTs = 0, _colaSancCache = null;
 async function _cargarColaSanc_(force){
   const box=$("pd-cola"); if(!box) return;
+  if(_colaSancCache) box.innerHTML=_colaSancHTML_(_colaSancCache);    // pinta lo último conocido YA (no "Cargando…")
   const now=+new Date(); if(!force && now-_colaSancTs<4000) return;   // debounce (no spamear en polls)
   _colaSancTs=now;
-  if(typeof backendOK!=="undefined" && !backendOK){ box.innerHTML=`<div class="tarjeta"><div class="sindatos">Sin conexión con el backend.</div></div>`; return; }
+  if(typeof backendOK!=="undefined" && !backendOK){ if(!_colaSancCache) box.innerHTML=`<div class="tarjeta"><div class="sindatos">Sin conexión con el backend.</div></div>`; return; }
   try{
     const r=await api.getSanciones({});
-    box.innerHTML=_colaSancHTML_((r&&r.ok&&Array.isArray(r.data))?r.data:[]);
-  }catch(e){ box.innerHTML=`<div class="tarjeta"><div class="sindatos">No se pudo cargar la cola: ${e.message}</div></div>`; }
+    _colaSancCache=(r&&r.ok&&Array.isArray(r.data))?r.data:[];
+    box.innerHTML=_colaSancHTML_(_colaSancCache);
+  }catch(e){ if(!_colaSancCache) box.innerHTML=`<div class="tarjeta"><div class="sindatos">No se pudo cargar la cola: ${e.message}</div></div>`; }
 }
 function _colaSancHTML_(arr){
   if(!arr.length) return `<div class="tarjeta"><div class="sindatos">No hay sanciones en la cola.</div></div>`;
@@ -1608,7 +1614,7 @@ function abrirTurno(i){
     + `<div class="mmemo">Memoria del turno · <span style="color:var(--ink3)">enlace pendiente</span></div>`;
   $("modal").classList.add("on");
 }
-function cerrarModal(e){ if(!e || e.target.id==="modal" || (e.target.closest && e.target.closest("[data-cerrar]"))){ $("modal").classList.remove("on"); _pararPoll_(); } }
+function cerrarModal(e){ if(!e || e.target.id==="modal" || (e.target.closest && e.target.closest("[data-cerrar]"))){ $("modal").classList.remove("on"); $("modal").classList.remove("full"); _pararPoll_(); } }
 function fmtHM(m){return `${String(m/60|0).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;}
 function genFranjas(h0,h1,dur,paso){const F=[],end=h1*60;paso=paso||dur;for(let t=h0*60;t+dur<=end;t+=paso)F.push({ini:fmtHM(t),dur});return F;}
 function diasDesde(iso,n){const D=["D","L","M","X","J","V","S"],out=[],b=new Date(iso+"T00:00:00");for(let i=0;i<n;i++){const d=new Date(b);d.setDate(b.getDate()+i);out.push(`${D[d.getDay()]} ${d.getDate()}`);}return out;}
