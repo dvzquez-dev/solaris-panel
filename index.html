@@ -251,6 +251,13 @@
   .sclote-items{margin-top:2px;border-top:1px solid var(--line);padding-top:2px}
   .sclote .pastog{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
   .sclote .pas-sec.on{max-height:6000px}   /* un lote puede llevar los 32 del equipo */
+  /* Progreso de una tanda de decisiones: fijo al viewport, para que siga viéndose
+     aunque la tarjeta se repinte o la cierres. */
+  .scprog{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom));
+    z-index:60;background:var(--sur2);border:1px solid var(--line);border-radius:12px;
+    padding:9px 15px;box-shadow:0 10px 26px rgba(0,0,0,.45);display:flex;flex-direction:column;
+    align-items:center;gap:2px;font-size:13px;color:var(--ink);max-width:88vw;text-align:center}
+  .scprog small{color:var(--ink3);font-size:11px}
   /* Selección múltiple de miembros (paquete de sanciones) */
   .scms{max-height:38vh;overflow-y:auto;border:1px solid var(--line);border-radius:9px;background:var(--sur2)}
   .scms label{display:flex;align-items:center;gap:9px;padding:8px 11px;font-size:13.5px;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--line)}
@@ -1737,9 +1744,18 @@ async function _enviarSanc(btn){
   finally{ if(btn){ btn.disabled=false; btn.textContent=prev||"Añadir a la cola"; } }
 }
 // ── Cola de sanciones en el Panel PD (getSanciones -> aprobar / modificar / rechazar) ──
-let _colaSancTs = 0, _colaSancCache = null;
+let _colaSancTs = 0, _colaSancCache = null, _sancBusy = false;
+// Aviso flotante de progreso: vive FUERA de la cola, así sobrevive a que la tarjeta se
+// repinte o la cierres. Antes el "3/5…" se pintaba dentro del botón y desaparecía con él.
+function _sancProg(txt){
+  let t=$("sc-prog");
+  if(txt==null){ if(t) t.remove(); return; }
+  if(!t){ t=document.createElement("div"); t.id="sc-prog"; t.className="scprog"; document.body.appendChild(t); }
+  t.innerHTML=txt;
+}
 async function _cargarColaSanc_(force){
   const box=$("pd-cola"); if(!box) return;
+  if(_sancBusy) return;   // hay decisiones en vuelo: no repintar hasta que acaben
   if(typeof backendOK!=="undefined" && !backendOK){ if(!_colaSancCache) box.innerHTML=`<div class="tarjeta"><div class="sindatos">Conectando…</div></div>`; return; }  // sin marcar ts: reintenta al siguiente render
   const now=+new Date(); if(!force && now-_colaSancTs<4000) return;   // debounce (no spamear en polls)
   _colaSancTs=now;
@@ -1818,12 +1834,24 @@ function _colaSancHTML_(arr){
   const sec=(t,a,conBulk)=>{
     if(!a.length) return "";
     const {grupos,sueltas}=agrupar(a);
-    let h=`<h3 class="scsec">${t} · ${a.length}</h3>`;
+    let h=t?`<h3 class="scsec">${t} · ${a.length}</h3>`:"";
     grupos.forEach(([lote,items])=>{ h+=grupoHTML(lote,items,conBulk); });
     if(sueltas.length) h+=`<div class="tarjeta">${sueltas.map(linea).join("")}</div>`;
     return h;
   };
-  return sec("Pendientes de confirmar", pend, true)+sec("Aprobadas · esperando rutina", apr, false)+sec("Resueltas", otras, false);
+  let out = sec("Pendientes de confirmar", pend, true) + sec("Aprobadas · esperando rutina", apr, false);
+  // Las resueltas no paran de crecer (son el historial). Van plegadas y recortadas a las
+  // últimas, para que la cola siga siendo una bandeja de trabajo y no un archivo.
+  if(otras.length){
+    const TOPE=15;
+    const ord=[...otras].sort((a,b)=>String(b.decidido_at||b.creado_at||"").localeCompare(String(a.decidido_at||a.creado_at||"")));
+    const vis=ord.slice(0,TOPE), resto=ord.length-vis.length;
+    out += `<h3 class="scsec">Resueltas · ${otras.length}</h3>
+      <div class="pastog" onclick="_togDrawer(this)"><b>Ver el historial</b>${_TK_CHEV}</div>
+      <div class="pas-sec">${sec("", vis, false)}
+        ${resto>0?`<div class="sindatos" style="padding:10px 2px">y ${resto} más antiguas</div>`:""}</div>`;
+  }
+  return out;
 }
 async function _decSanc(id, accion, opts, btn){
   if(typeof backendOK!=="undefined" && !backendOK) return;
@@ -1831,9 +1859,13 @@ async function _decSanc(id, accion, opts, btn){
   const item = (btn && btn.closest) ? btn.closest('.scitem') : null;
   const acc = item ? item.querySelector('.scitem-a') : null;
   const prev = acc ? acc.innerHTML : null;
-  if(acc) acc.innerHTML = `<span class="scitem-wait">${accion==='rechazar'?'Rechazando':'Aprobando'}…</span>`;
-  try{ await api.decidirSancion(id, accion, opts||{}); await _cargarColaSanc_(true); }   // _apiParse lanza si falla
-  catch(e){ if(acc) acc.innerHTML=prev; const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo: ${e.message}</div>`); }
+  const verbo = accion==='rechazar'?'Rechazando':'Aprobando';
+  if(acc) acc.innerHTML = `<span class="scitem-wait">${verbo}…</span>`;
+  _sancProg(`<b>${verbo}…</b>`);
+  _sancBusy=true;   // el auto-refresco no puede repintar mientras esto está en vuelo
+  try{ await api.decidirSancion(id, accion, opts||{}); _sancBusy=false; await _cargarColaSanc_(true); }   // _apiParse lanza si falla
+  catch(e){ _sancBusy=false; if(acc) acc.innerHTML=prev; const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo: ${e.message}</div>`); }
+  finally{ _sancBusy=false; setTimeout(()=>_sancProg(null), 1200); }
 }
 // Decide de golpe todas las PENDIENTES de un lote. Secuencial a propósito: el backend guarda la
 // cola entera de una vez (read-modify-write), así que en paralelo las decisiones se pisarían.
@@ -1845,12 +1877,19 @@ async function _decLote_(lote, accion, btn){
   const previo = acc ? acc.innerHTML : null;
   const verbo = accion==='rechazar' ? 'Rechazando' : 'Aprobando';
   const fallos=[]; let hechas=0;
-  for(let i=0;i<ids.length;i++){
-    if(acc) acc.innerHTML=`<span class="scitem-wait">${verbo} ${i+1}/${ids.length}…</span>`;
-    try{ await api.decidirSancion(ids[i], accion, {}); hechas++; }   // _apiParse lanza si falla
-    catch(e){ fallos.push(e.message); }
-  }
+  _sancBusy=true;                      // congela el auto-refresco: si repinta a media tanda, te borra el progreso
+  try{
+    for(let i=0;i<ids.length;i++){
+      const paso=`${verbo} ${i+1}/${ids.length}…`;
+      if(acc) acc.innerHTML=`<span class="scitem-wait">${paso}</span>`;
+      _sancProg(`<b>${paso}</b><small>no cierres la app hasta que acabe</small>`);
+      try{ await api.decidirSancion(ids[i], accion, {}); hechas++; }   // _apiParse lanza si falla
+      catch(e){ fallos.push(e.message); }
+    }
+  } finally { _sancBusy=false; }
+  _sancProg(`<b>${hechas}/${ids.length} ${accion==='rechazar'?'rechazadas':'aprobadas'}</b><small>actualizando la cola…</small>`);
   try{ await _cargarColaSanc_(true); }catch(e){}
+  setTimeout(()=>_sancProg(null), 2500);
   if(fallos.length){
     if(acc && !hechas) acc.innerHTML=previo;                          // no cambió nada: deja los botones
     const box=$("pd-cola");
