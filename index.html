@@ -550,6 +550,7 @@ const api = {
   pushSancion: (sanciones) => api._post({action:"pushSancion", sanciones}),
   getSanciones: (filtro) => api._post({action:"getSanciones", filtro: filtro||{}}),
   decidirSancion: (id, accion, opts) => api._post(Object.assign({action:"decidirSancion", id, accion}, opts||{})),
+  agruparSanciones: (ids, lote) => api._post({action:"agruparSanciones", ids, lote}),
 };
 function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:r.fijada||""}; }
 // Convierte un enlace de Drive/Docs a su URL de vista previa embebible; si es otro
@@ -1912,7 +1913,13 @@ function _colaSancHTML_(arr){
     const {grupos,sueltas}=agrupar(a);
     let h=t?`<h3 class="scsec">${t} · ${a.length}</h3>`:"";
     grupos.forEach(([lote,items])=>{ h+=grupoHTML(lote,items,conBulk); });
-    if(sueltas.length) h+=`<div class="tarjeta">${sueltas.map(linea).join("")}</div>`;
+    if(sueltas.length){
+      // Sanciones que entraron una a una y que ahora se pueden juntar en un paquete, para
+      // decidirlas y anunciarlas de una vez en lugar de soltar N mensajes.
+      const agr=(conBulk && sueltas.filter(s=>!esRevoc(s)).length>1)
+        ? `<div class="scitem-a" style="margin:0 0 8px"><button class="scmod" onclick="abrirAgrupar()">Agrupar en un paquete…</button></div>` : "";
+      h+=agr+`<div class="tarjeta">${sueltas.map(linea).join("")}</div>`;
+    }
     return h;
   };
   let out = sec("Pendientes de confirmar", pend, true) + sec("Aprobadas · esperando rutina", apr, false);
@@ -1972,6 +1979,79 @@ async function _decLote_(lote, accion, btn){
     if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">${hechas}/${ids.length} ${accion==='rechazar'?'rechazadas':'aprobadas'}. Falló: ${_escDoc(fallos.join(" · "))}</div>`);
   }
 }
+// ── Juntar sanciones sueltas en un paquete ────────────────────────────────────────
+// Solo pendientes: una vez decidida, mover una sanción de paquete falsearía el historial.
+function _sueltasPend(){
+  return (_colaSancCache||[]).filter(s=>!s.lote && s.estado==="pendiente" && s.origen!=="revocacion");
+}
+function abrirAgrupar(){
+  const items=_sueltasPend(); if(items.length<2) return;
+  window._agSel=new Set(items.map(s=>String(s.id)));
+  $("modal-body").innerHTML=`
+    <div class="mtit">📦 Agrupar en un paquete</div>
+    <div class="msub">Junta sanciones que entraron sueltas para <b>decidirlas y anunciarlas de una vez</b>. Solo se pueden agrupar las <b>pendientes</b>: mover una ya decidida falsearía el historial.</div>
+    <div class="cform">
+      <label>Cuáles <span style="color:var(--ink3)">(toca para marcar)</span></label>
+      <div class="cchips" id="ag-chips"></div>
+      <div class="scmsbar"><button type="button" onclick="_agTodos(true)">Todas</button><button type="button" onclick="_agTodos(false)">Ninguna</button><span id="ag-cuenta"></span></div>
+      <label>Paquete<select id="ag-paq" onchange="_agPaqUpd()">${_scPaqOpciones().replace(/^<option value="">[^<]*<\/option>/,'')}</select></label>
+      <div id="ag-paqwrap"></div>
+    </div>
+    <div id="ag-prev" class="tarjeta" style="margin-top:12px"></div>
+    <div id="ag-err" class="er" style="margin-top:6px"></div>
+    <button class="ebtn" style="margin-top:12px" onclick="_enviarAgrupar(this)">Agrupar</button>`;
+  $("modal").classList.add("on"); $("modal").classList.add("full");
+  _agChips(); _agPaqUpd();
+}
+function _agChips(){
+  const c=$("ag-chips"); if(!c) return;
+  const items=_sueltasPend();
+  c.innerHTML=items.map(s=>{
+    const on=window._agSel.has(String(s.id));
+    return `<span class="cchip${on?" on":""}" onclick="_agTog('${s.id}')"><b>${_escDoc((s.nombre||"").split(" ")[0])}</b><small>${s.puntos>0?"+":""}${s.puntos}</small></span>`;
+  }).join("");
+  const cu=$("ag-cuenta"); if(cu) cu.textContent=`${window._agSel.size} de ${items.length}`;
+  _agPrev();
+}
+function _agTog(id){ id=String(id); const S=window._agSel; S.has(id)?S.delete(id):S.add(id); _agChips(); }
+function _agTodos(v){ window._agSel = v ? new Set(_sueltasPend().map(s=>String(s.id))) : new Set(); _agChips(); }
+function _agPaqUpd(){
+  const v=($("ag-paq")||{}).value||"", w=$("ag-paqwrap"); if(!w) return;
+  w.innerHTML = (v==="__nuevo")
+    ? `<label>Nombre del paquete<input id="ag-paqnom" placeholder="p. ej. Formulario O&M 25/07" autocomplete="off" oninput="_agPrev()"></label>` : "";
+  _agPrev();
+}
+function _agLote(){
+  const v=($("ag-paq")||{}).value||"";
+  if(v!=="__nuevo") return v;
+  return ((($("ag-paqnom")||{}).value)||"").trim().replace(/["'\\<>&]/g,"").slice(0,60);
+}
+function _agPrev(){
+  const p=$("ag-prev"); if(!p) return;
+  const ids=[...(window._agSel||[])], lote=_agLote();
+  if(!ids.length){ p.innerHTML=`<div class="sindatos">No has marcado ninguna.</div>`; return; }
+  const items=_sueltasPend().filter(s=>ids.includes(String(s.id)));
+  const motivos=new Set(items.map(s=>s.motivo||""));
+  p.innerHTML=`<div class="fila"><div class="tit"><b>${ids.length} sanciones a un paquete</b><small>${lote?`«${_escDoc(lote)}»`:"falta elegir o nombrar el paquete"}</small></div></div>`
+    + items.map(s=>`<div class="fila"><div class="tit">${_escDoc(s.nombre)}<small>${_escDoc(s.motivo||"(sin motivo)")}</small></div><div class="der mono">${s.puntos>0?"+":""}${s.puntos}</div></div>`).join("")
+    + (motivos.size>1?`<div class="er" style="color:var(--warn);margin-top:6px">Ojo: tienen <b>motivos distintos</b>. El comunicado del paquete usa el motivo de la primera, así que quedará raro. Agrupa solo lo que comparta motivo.</div>`:"");
+}
+async function _enviarAgrupar(btn){
+  const err=$("ag-err"); err.textContent=""; err.style.color="var(--red2)";
+  const ids=[...(window._agSel||[])].map(Number), lote=_agLote();
+  if(ids.length<2){ err.textContent="Marca al menos dos."; return; }
+  if(!lote){ err.textContent="Elige un paquete o ponle nombre a uno nuevo."; return; }
+  if(typeof backendOK!=="undefined" && !backendOK){ err.textContent="Sin conexión con el backend."; return; }
+  const prev=btn?btn.textContent:""; if(btn){ btn.disabled=true; btn.textContent="Agrupando…"; }
+  try{
+    const r=await api.agruparSanciones(ids, lote);
+    err.style.color="var(--ok)"; err.textContent=`${(r&&r.agrupadas)||ids.length} sanciones agrupadas en «${lote}».`;
+    if(btn) btn.style.display="none";
+    _cargarColaSanc_(true);
+  }catch(e){ err.style.color="var(--red2)"; err.textContent="No se pudo: "+e.message; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=prev||"Agrupar"; } }
+}
+
 // ── Revocar una sanción ya aplicada (apelación aceptada / error) ──────────────────
 // No se "borra" nada: se encola un movimiento INVERSO que pasa por la misma cola y que
 // tú apruebas igual que una sanción. Así queda rastro de la sanción y de su marcha atrás.
