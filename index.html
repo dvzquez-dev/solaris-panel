@@ -1041,6 +1041,23 @@ function _adminHomeHTML_(){
     <div class="tarjeta"><div class="fila"><div class="tit">Reparto por estado</div></div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${chips}</div></div>`;
 }
+// Aporte en Vista admin: ranking COMPLETO del equipo (sin censurar), en vez de la ficha personal del miembro[0].
+function _aporteAdminHTML_(){
+  const rk=[...DATA.miembros].sort((a,b)=>(b.hMes||0)-(a.hMes||0));
+  const filas=rk.map((m,i)=>`<div class="r"><span class="p mono">${i+1}</span><span class="nom">${m.nombre}${m.infraccion?' <span style="color:var(--red2)">⚠</span>':''}</span><span class="hrs mono">${h(m.hMes)}</span></div>`).join("");
+  return `<h1>Aporte del equipo</h1>
+    <p class="sub">Ranking completo de horas · temporada ${DATA.temporada} · vista admin, sin censurar.</p>
+    <div class="tarjeta rank">${filas}</div>`;
+}
+// Lista completa de miembros para la pantalla Equipo en Vista admin (solo el admin la recibe del backend).
+function _rosterAdminHTML_(){
+  const M=[...DATA.miembros].sort((a,b)=>(b.hMes||0)-(a.hMes||0));
+  const filas=M.map(m=>`<div class="fila"><div class="tit">${m.nombre}${m.infraccion?' <span style="color:var(--red2)">⚠</span>':''}
+      <small>${m.unidad}${m.cargo?' · '+m.cargo:''}</small></div>
+    <div class="der mono">${h(m.hMes)}${m.cuota!=null?' · '+Math.round(m.cuota)+'€':''}</div></div>`).join("");
+  return `<h2>Todos los miembros <span style="color:var(--ink3);font-weight:600">· ${M.length} · solo admin</span></h2>
+    <div class="tarjeta">${filas}</div>`;
+}
 function render(){
   if(!DATA.miembros || !DATA.miembros.length || iyo<0 || !DATA.miembros[iyo]){ return; }  // sin datos aún (pre-login): el gate cubre la pantalla; se rellena tras el login
   _pintarBannerVerComo_();   // banda "Viendo como…" cuando el admin está impersonando a un miembro
@@ -1220,7 +1237,7 @@ function render(){
       : `<div class="r"><span class="p mono">${i+1}</span><span class="cens"></span></div>`;
   }).join("");
 
-  $("s-contrib").innerHTML = `
+  $("s-contrib").innerHTML = _esAdmin_() ? _aporteAdminHTML_() : `
     <h1>Mi contribución</h1>
     <p class="sub">Horas, carga y en qué punto estás.</p>
     <div class="duo">
@@ -1267,7 +1284,7 @@ function render(){
     (a.cargo==="Project Director"?0:1)-(b.cargo==="Project Director"?0:1));
   const maxSub = DATA.subsistemas[0].media;
   const subHTML = DATA.subsistemas.map((s,i)=>{
-    const mine = s.u===yo.unidad;
+    const mine = !_esAdmin_() && s.u===yo.unidad;
     return `<div class="fila" style="${mine?'background:linear-gradient(90deg,rgba(245,166,35,.07),transparent);margin:0 -8px;padding:11px 8px;border-radius:9px':''}">
       <div class="tit" style="${mine?'color:var(--red2)':''}">${i+1}. ${s.u}${mine?' (tú)':''}
         <small>${s.n} ${s.n===1?'persona':'personas'}</small>
@@ -1277,6 +1294,7 @@ function render(){
   $("s-equipo").innerHTML = `
     <h1>El equipo</h1>
     <p class="sub">Quién coordina qué y cómo va cada unidad.</p>
+    ${_esAdmin_()?_rosterAdminHTML_():''}
     <h2>Ranking de subsistemas <span style="color:var(--ink3);font-weight:600">· media/persona</span></h2>
     <div class="tarjeta">${subHTML}</div>
     <h2>Coordinación</h2>
