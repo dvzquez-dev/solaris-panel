@@ -1618,15 +1618,16 @@ window._sancPend = window._sancPend || [];
 function _estadoPts(p){ return p<=2 ? "evaluación" : (p>=9 ? "elegible" : "normal"); }
 function _todosMotivos(){ return RRI_MOTIVOS.restas.concat(RRI_MOTIVOS.sumas); }
 function abrirSancionar(){
+  window._scPersonas = new Set();
   $("modal-body").innerHTML = `
     <div class="mtit">🔨 Sancionar</div>
-    <div class="msub">Puntos del RRI (Título VII) o motivo libre. Entra en la cola como <b>pendiente</b>; la confirmas en el Panel PD y la aplica la rutina. Si marcas <b>varias personas</b>, van como un <b>paquete</b>: una sola tarjeta en la cola y <b>un único comunicado</b> de Discord.</div>
+    <div class="msub">Puntos del RRI (Título VII) o motivo libre. Entra en la cola como <b>pendiente</b>; la confirmas en el Panel PD y la aplica la rutina. Varias personas en un <b>paquete</b> = una sola tarjeta en la cola y <b>un único comunicado</b> de Discord.</div>
     <div class="cform">
-      <label>Sancionar a<select id="sc-modo" onchange="_scPintarMiembros()">
-        <option value="una">Una persona</option>
-        <option value="varias">Varias personas (paquete)</option>
-      </select></label>
-      <div id="sc-miembrowrap"></div>
+      <label>Paquete<select id="sc-paq" onchange="_scPaqUpd()">${_scPaqOpciones()}</select></label>
+      <div id="sc-paqwrap"></div>
+      <label class="cinv">A quién<input id="sc-per" placeholder="escribe un nombre…" autocomplete="off"><div id="sc-persug" class="csug" style="display:none"></div></label>
+      <div id="sc-chips" class="cchips"></div>
+      <div class="scmsbar"><button type="button" onclick="_scTodos(true)">Todo el equipo</button><button type="button" onclick="_scTodos(false)">Ninguno</button><span id="sc-cuenta">0 seleccionados</span></div>
       <label class="cinv">Motivo<input id="sc-mot" placeholder="elige del RRI o escribe uno libre…" autocomplete="off"><div id="sc-sug" class="csug" style="display:none"></div></label>
       <div id="sc-ptswrap"></div>
     </div>
@@ -1636,39 +1637,80 @@ function abrirSancionar(){
   $("modal").classList.add("on");
   $("modal").classList.add("full");   // el panel de sanción va a (casi) pantalla completa
   _sancionSel = null;
-  _scPintarMiembros();
+  _scPerWire();
+  _scPaqUpd();
   _scWire();
   _scPintarPts();
 }
-// Selector de destinatarios de la sanción: una persona (select) o varias (lista con casillas + buscador)
-function _scPintarMiembros(){
-  const w=$("sc-miembrowrap"); if(!w) return;
-  const modo=(($("sc-modo")||{}).value)||"una";
-  const ms=[...(DATA.miembros||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  if(modo==="una"){
-    w.innerHTML=`<label>Miembro<select id="sc-miembro" onchange="_scPrev()">${ms.map(m=>`<option value="${_escDoc(m.nombre)}">${_escDoc(m.nombre)}${m.cargo?" · "+_escDoc(m.cargo):""}</option>`).join("")}</select></label>`;
-  } else {
-    w.innerHTML=`<label>Miembros <span style="color:var(--ink3)">(marca a quién sancionar)</span>
-        <input id="sc-buscar" placeholder="buscar…" autocomplete="off" oninput="_scFiltrarMiembros()"></label>
-      <div class="scms" id="sc-lista">${ms.map(m=>`<label data-n="${_escDoc(m.nombre.toLowerCase())}"><input type="checkbox" value="${_escDoc(m.nombre)}" onchange="_scPrev()"><span>${_escDoc(m.nombre)}${m.cargo?` <small>· ${_escDoc(m.cargo)}</small>`:""}</span></label>`).join("")}</div>
-      <div class="scmsbar"><button type="button" onclick="_scTodos(true)">Todos</button><button type="button" onclick="_scTodos(false)">Ninguno</button><span id="sc-cuenta">0 seleccionados</span></div>`;
-  }
+// ── A quién: fichas con autocompletado, como los invitados de una reunión ──────────
+// (antes era una lista de 32 casillas; se escribe el nombre y se añade la ficha)
+function _scChips(){
+  const c=$("sc-chips"); if(!c) return;
+  c.innerHTML=[...window._scPersonas].map(n=>{
+    const m=_scMiembro(n);
+    return `<span class="cchip"><b>${_escDoc(m?(m.pila||n):n)}</b><button data-n="${_escDoc(n)}">×</button></span>`;
+  }).join("");
+  c.querySelectorAll("button").forEach(b=>b.onclick=()=>{ window._scPersonas.delete(b.dataset.n); _scChips(); _scPrev(); });
   _scPrev();
 }
-function _scFiltrarMiembros(){
-  const q=((($("sc-buscar")||{}).value)||"").toLowerCase().trim(), l=$("sc-lista"); if(!l) return;
-  l.querySelectorAll("label").forEach(x=>{ x.style.display=(!q || (x.dataset.n||"").includes(q))?"":"none"; });
+function _scPerWire(){
+  const inp=$("sc-per"), sug=$("sc-persug"); if(!inp) return;
+  const render=()=>{
+    const q=(inp.value||"").trim().toLowerCase();
+    const hits=(DATA.miembros||[]).filter(m=>!window._scPersonas.has(m.nombre) &&
+        (!q || m.nombre.toLowerCase().includes(q) || (m.unidad||"").toLowerCase().includes(q))).slice(0,8);
+    if(!hits.length){ sug.style.display="none"; return; }
+    sug.innerHTML=hits.map(m=>`<div data-n="${_escDoc(m.nombre)}">${_escDoc(m.nombre)} <small>${_escDoc(m.cargo||m.unidad||"")}</small></div>`).join("");
+    sug.style.display="";
+    sug.querySelectorAll("div").forEach(d=>d.onclick=()=>{ window._scPersonas.add(d.dataset.n); inp.value=""; sug.style.display="none"; _scChips(); });
+  };
+  inp.oninput=render;
+  inp.onfocus=render;                                  // al enfocar se abre la lista sin escribir
+  inp.onblur=()=>setTimeout(()=>{ if(sug) sug.style.display="none"; },180);
 }
 function _scTodos(v){
-  const l=$("sc-lista"); if(!l) return;
-  l.querySelectorAll('input[type=checkbox]').forEach(c=>{ if(c.closest("label").style.display!=="none") c.checked=v; });
+  window._scPersonas = v ? new Set((DATA.miembros||[]).map(m=>m.nombre)) : new Set();
+  _scChips();
+}
+function _scSel(){ return [...(window._scPersonas||[])]; }
+
+// ── Paquete: suelto, uno nuevo con nombre, o añadir a uno que ya está en la cola ──
+function _scLotesAbiertos(){
+  const g=new Map();
+  (_colaSancCache||[]).forEach(s=>{
+    if(!s.lote || s.origen==="revocacion") return;
+    if(s.estado!=="pendiente" && s.estado!=="aprobada") return;   // cerrado: no se le añade nadie
+    if(!g.has(s.lote)) g.set(s.lote,{lote:s.lote,n:0,motivo:s.motivo,articulo:s.articulo,puntos:s.puntos});
+    g.get(s.lote).n++;
+  });
+  return [...g.values()];
+}
+function _scPaqOpciones(){
+  const ab=_scLotesAbiertos();
+  return `<option value="">Automático · suelta si es una, paquete si son varias</option>
+    <option value="__nuevo">➕ Paquete nuevo (le pongo nombre)</option>`
+    + (ab.length?`<optgroup label="Añadir a un paquete abierto">${ab.map(l=>
+        `<option value="${_escDoc(l.lote)}">${_escDoc(l.lote)} · ${l.n} ${l.n===1?"persona":"personas"}</option>`).join("")}</optgroup>`:"");
+}
+function _scPaqUpd(){
+  const v=($("sc-paq")||{}).value||"", w=$("sc-paqwrap"); if(!w) return;
+  if(v==="__nuevo"){
+    w.innerHTML=`<label>Nombre del paquete<input id="sc-paqnom" placeholder="p. ej. Formulario O&M 25/07" autocomplete="off" oninput="_scPrev()"></label>`;
+  } else if(v){
+    const l=_scLotesAbiertos().find(x=>x.lote===v);
+    w.innerHTML=l?`<div class="cprev" style="margin:-4px 2px 0">Se suman a <b>${_escDoc(l.lote)}</b> (${l.n} ya dentro). Se decidirán y se anunciarán con ese paquete.<br><small style="color:var(--ink3)">Motivo del paquete: ${_escDoc(l.motivo||"(sin motivo)")}</small></div>`:"";
+  } else { w.innerHTML=""; }
   _scPrev();
 }
-// Nombres elegidos: 1 en modo "una", N en modo "varias"
-function _scSel(){
-  if(((($("sc-modo")||{}).value)||"una")==="una"){ const v=($("sc-miembro")||{}).value; return v?[v]:[]; }
-  const l=$("sc-lista"); if(!l) return [];
-  return [...l.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
+// Nombre de lote final: el que escribas, saneado (va dentro de atributos HTML y es clave de dedup)
+function _scLoteFinal(n){
+  const v=($("sc-paq")||{}).value||"";
+  if(v==="__nuevo"){
+    const nom=((($("sc-paqnom")||{}).value)||"").trim().replace(/["'\\<>&]/g,"").slice(0,60);
+    return nom || ("paquete-"+new Date().toISOString().slice(0,10)+"-"+Math.random().toString(36).slice(2,6));
+  }
+  if(v) return v;                                        // añadir a uno existente
+  return n>1 ? ("manual-"+new Date().toISOString().slice(0,10)+"-"+Math.random().toString(36).slice(2,7)) : "";
 }
 function _scWire(){
   const inp=$("sc-mot"), sug=$("sc-sug"); if(!inp) return;
@@ -1706,9 +1748,10 @@ function _scPrev(){
   const texto=_sancionSel.libre ? (($("sc-motlibre")||{}).value||"(motivo libre)") : _sancionSel.texto;
   prev.style.display="";
   // Con varios, la cabecera dice que van como paquete y cada fila enseña su propio antes→después
-  const cab = nombres.length>1
-    ? `<div class="fila"><div class="tit"><b>Paquete de ${nombres.length} sanciones</b><small>${_escDoc(texto)}</small></div>
-        <div class="der mono">${d>0?"+":""}${d} <small>c/u</small></div></div>` : "";
+  const _lote = (typeof _scLoteFinal==="function" && $("sc-paq")) ? _scLoteFinal(nombres.length) : "";
+  const cab = (nombres.length>1 || _lote)
+    ? `<div class="fila"><div class="tit"><b>${nombres.length===1?"1 sanción":`Paquete de ${nombres.length} sanciones`}</b><small>${_lote?`paquete «${_escDoc(_lote)}» · `:""}${_escDoc(texto)}</small></div>
+        <div class="der mono">${d>0?"+":""}${d}${nombres.length>1?" <small>c/u</small>":""}</div></div>` : "";
   prev.innerHTML = cab + nombres.map(n=>{
     const m=_scMiembro(n); if(!m) return "";
     const antes=(m.puntos!=null?m.puntos:5), despues=Math.max(0,Math.min(10,antes+d));
@@ -1728,9 +1771,10 @@ async function _enviarSanc(btn){
   if(mot.libre && !texto){ err.textContent="Escribe el motivo libre."; return; }
   if(isNaN(d)||d===0){ err.textContent="Indica los puntos (distintos de 0)."; return; }
   if(typeof backendOK!=="undefined" && !backendOK){ err.textContent="Sin conexión con el backend; no se puede encolar."; return; }
-  // Varias personas = un PAQUETE: comparten `lote`, así la cola las agrupa y se deciden juntas
-  // (y el comunicado de Discord sale como un solo bloque). Una sola va suelta, sin lote.
-  const lote = nombres.length>1 ? `manual-${new Date().toISOString().slice(0,10)}-${Math.random().toString(36).slice(2,7)}` : "";
+  // El paquete lo decide el selector: suelta, uno nuevo con el nombre que pusiste, o sumarse
+  // a uno que ya está en la cola. Compartir `lote` es lo que hace que se decidan juntas y
+  // salgan en un único comunicado.
+  const lote = _scLoteFinal(nombres.length);
   const items = nombres.map(n=>{
     const it={ origen:"manual", nombre:n, motivo:texto, articulo:art, puntos:d };
     if(lote) it.lote=lote;
