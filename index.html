@@ -1812,15 +1812,25 @@ async function _cargarColaSanc_(force){
   const box=$("pd-cola"); if(!box) return;
   if(_sancBusy) return;   // hay decisiones en vuelo: no repintar hasta que acaben
   if(typeof backendOK!=="undefined" && !backendOK){ if(!_colaSancCache) box.innerHTML=`<div class="tarjeta"><div class="sindatos">Conectando…</div></div>`; return; }  // sin marcar ts: reintenta al siguiente render
-  const now=+new Date(); if(!force && now-_colaSancTs<4000) return;   // debounce (no spamear en polls)
+  // Debounce SOLO cuando YA hay datos (evita spamear en polls). La PRIMERA carga (caché vacío)
+  // no se debe frenar nunca: si no, al entrar al Panel PD con el ts reciente (p.ej. una carga
+  // previa quedó a medias al cambiar de perfil) se quedaba en "Cargando…" para siempre.
+  const now=+new Date(); if(!force && _colaSancCache && now-_colaSancTs<4000) return;
   _colaSancTs=now;
   try{
     const arr=await api.getSanciones({});      // _apiParse ya devuelve el DATA (el array); lanza si el backend da error
     const next=Array.isArray(arr)?arr:[];
-    if(_colaSancCache && JSON.stringify(next)===JSON.stringify(_colaSancCache)) return;   // sin cambios: no repintar (evita parpadeo del poll y respeta el "Aprobando…")
+    // Re-buscar el cuadro: entre el await y ahora, la sección pudo re-renderizarse (cambiar de
+    // perfil y volver) y el `box` de arriba quedar detached — pintaríamos en un nodo invisible.
+    const b=$("pd-cola"); if(!b) return;
+    // El "no repintar si no cambió" evita el parpadeo del poll, PERO si el cuadro visible está en
+    // el placeholder ("Cargando…"/"Conectando…") hay que pintar aunque el caché coincida (dos
+    // cargas solapadas: la 1ª llenó el caché contra un nodo viejo, la 2ª veía igual y no pintaba).
+    const placeholder=/Cargando…|Conectando…/.test(b.textContent||"");
+    if(_colaSancCache && !placeholder && JSON.stringify(next)===JSON.stringify(_colaSancCache)) return;
     _colaSancCache=next;
-    box.innerHTML=_colaSancHTML_(_colaSancCache);
-  }catch(e){ if(!_colaSancCache) box.innerHTML=`<div class="tarjeta"><div class="sindatos">No se pudo cargar la cola: ${e.message}</div></div>`; }
+    b.innerHTML=_colaSancHTML_(_colaSancCache);
+  }catch(e){ const b=$("pd-cola"); if(b && !_colaSancCache) b.innerHTML=`<div class="tarjeta"><div class="sindatos">No se pudo cargar la cola: ${e.message}</div></div>`; }
 }
 function _colaSancHTML_(arr){
   if(!arr.length) return `<div class="tarjeta"><div class="sindatos">No hay sanciones en la cola.</div></div>`;
