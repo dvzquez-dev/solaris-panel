@@ -1654,12 +1654,15 @@ function _scChips(){
   c.querySelectorAll("button").forEach(b=>b.onclick=()=>{ window._scPersonas.delete(b.dataset.n); _scChips(); _scPrev(); });
   _scPrev();
 }
+// Búsqueda sin acentos: "oscar" encuentra a "Óscar", "alvaro" a Álvaro. Sin esto, un nombre
+// con tilde solo aparece si tecleas la tilde exacta — inservible en el móvil.
+function _sinTildes(t){ return (t||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
 function _scPerWire(){
   const inp=$("sc-per"), sug=$("sc-persug"); if(!inp) return;
   const render=()=>{
-    const q=(inp.value||"").trim().toLowerCase();
+    const q=_sinTildes((inp.value||"").trim());
     const hits=(DATA.miembros||[]).filter(m=>!window._scPersonas.has(m.nombre) &&
-        (!q || m.nombre.toLowerCase().includes(q) || (m.unidad||"").toLowerCase().includes(q))).slice(0,8);
+        (!q || _sinTildes(m.nombre).includes(q) || _sinTildes(m.unidad).includes(q))).slice(0,8);
     if(!hits.length){ sug.style.display="none"; return; }
     sug.innerHTML=hits.map(m=>`<div data-n="${_escDoc(m.nombre)}">${_escDoc(m.nombre)} <small>${_escDoc(m.cargo||m.unidad||"")}</small></div>`).join("");
     sug.style.display="";
@@ -2594,7 +2597,7 @@ function crearEncuesta(){
   $("ce-perdia").addEventListener("change",()=>{if(per())renderDias();upd();});
   if($("ce-copiar")) $("ce-copiar").addEventListener("change",()=>{const v=V("ce-copiar");if(v!=="")aplicarCfg(window.PLANTILLAS[+v]);});
   const invRender=()=>{const c=$("ce-chips");c.innerHTML=[...window._invitados].map(ix=>`<span class="cchip"><b>${DATA.miembros[ix].pila}</b><button data-ix="${ix}">×</button></span>`).join("");c.querySelectorAll("button").forEach(b=>b.onclick=()=>{window._invitados.delete(+b.dataset.ix);invRender();});};
-  const sugRender=q=>{const sg=$("ce-sug");q=(q||"").trim().toLowerCase();if(!q){sg.style.display="none";return;}const hits=DATA.miembros.map((m,ix)=>({m,ix})).filter(o=>o.ix!==iyo&&!window._invitados.has(o.ix)&&o.m.nombre.toLowerCase().includes(q)).slice(0,6);if(!hits.length){sg.style.display="none";return;}sg.innerHTML=hits.map(o=>`<div data-ix="${o.ix}">${o.m.nombre} <small>${o.m.cargo||o.m.unidad}</small></div>`).join("");sg.style.display="";sg.querySelectorAll("div").forEach(d=>d.onclick=()=>{window._invitados.add(+d.dataset.ix);$("ce-inv").value="";sg.style.display="none";invRender();});};
+  const sugRender=q=>{const sg=$("ce-sug");q=_sinTildes((q||"").trim());if(!q){sg.style.display="none";return;}const hits=DATA.miembros.map((m,ix)=>({m,ix})).filter(o=>o.ix!==iyo&&!window._invitados.has(o.ix)&&_sinTildes(o.m.nombre).includes(q)).slice(0,6);if(!hits.length){sg.style.display="none";return;}sg.innerHTML=hits.map(o=>`<div data-ix="${o.ix}">${o.m.nombre} <small>${o.m.cargo||o.m.unidad}</small></div>`).join("");sg.style.display="";sg.querySelectorAll("div").forEach(d=>d.onclick=()=>{window._invitados.add(+d.dataset.ix);$("ce-inv").value="";sg.style.display="none";invRender();});};
   const tipoUpd=()=>{const t=V("ce-tipo");$("ce-invwrap").style.display=(t==="general")?"none":"";if($("ce-mixwrap"))$("ce-mixwrap").style.display=(t==="mixta")?"":"none";if($("ce-mix"))$("ce-mix").querySelectorAll(".cmixb").forEach(b=>b.classList.remove("on"));window._invitados=new Set(presetInvitados(t,iyo));if($("ce-chips"))invRender();};
   if($("ce-tipo")){$("ce-tipo").addEventListener("change",tipoUpd);tipoUpd();}
   if($("ce-mix")){$("ce-mix").querySelectorAll(".cmixb").forEach(btn=>btn.addEventListener("click",()=>{btn.classList.toggle("on");const u=btn.dataset.u,on=btn.classList.contains("on");DATA.miembros.forEach((m,ix)=>{if(m.unidad===u&&ix!==iyo){if(on)window._invitados.add(ix);else window._invitados.delete(ix);}});invRender();}));}
