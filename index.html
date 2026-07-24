@@ -1922,7 +1922,7 @@ function _colaSancHTML_(arr){
       const loteOrig=(s0.extra||{}).loteOriginal;
       const nOrig=loteOrig ? (arr||[]).filter(x=>x.lote===loteOrig && !esRevoc(x)).length : 0;
       cab=`<b>${n} ${n===1?"apelación aceptada":"apelaciones aceptadas"}</b>`+(nOrig?`<small style="color:var(--ink3)"> · de ${nOrig} sancionados</small>`:"");
-      sub=`Se retira: ${_escDoc((s0.extra||{}).motivoOriginal || s0.motivo || "(sin motivo)")}${art}`;
+      sub=`Se retira: ${_escDoc((s0.extra||{}).motivoOriginal || s0.motivo || "(sin motivo)")}${artLabel(s0)}`;
     } else {
       // Cabecera del bloque: N sancionados + (si los hay) los premios, aparte y en verde.
       const ns=sanc.length, np=prem.length;
@@ -1944,7 +1944,9 @@ function _colaSancHTML_(arr){
     if(!a.length) return "";
     const {grupos,sueltas}=agrupar(a);
     let h=t?`<h3 class="scsec">${t} · ${a.length}</h3>`:"";
-    grupos.forEach(([lote,items])=>{ h+=grupoHTML(lote,items,conBulk); });
+    // Un lote con datos raros NO puede tumbar toda la cola (dejándola en "Cargando…" para
+    // siempre): si grupoHTML peta, se muestra un aviso de ese lote y el resto sigue.
+    grupos.forEach(([lote,items])=>{ try{ h+=grupoHTML(lote,items,conBulk); }catch(_){ h+=`<div class="tarjeta"><div class="sindatos">Lote «${_escDoc(String(lote))}» con datos incompletos.</div></div>`; } });
     if(sueltas.length){
       // Sanciones que entraron una a una y que ahora se pueden juntar en un paquete, para
       // decidirlas y anunciarlas de una vez en lugar de soltar N mensajes.
