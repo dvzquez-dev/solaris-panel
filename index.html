@@ -567,6 +567,7 @@ const api = {
   decidirSancion: (id, accion, opts) => api._post(Object.assign({action:"decidirSancion", id, accion}, opts||{})),
   agruparSanciones: (ids, lote) => api._post({action:"agruparSanciones", ids, lote}),
   confirmarLote: (lote) => api._post({action:"confirmarLote", lote}),
+  marcarLote: (lote, decision) => api._post({action:"marcarLote", lote, decision}),
 };
 function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:r.fijada||""}; }
 // Convierte un enlace de Drive/Docs a su URL de vista previa embebible; si es otro
@@ -972,7 +973,7 @@ const RRI_MOTIVOS = { restas:[
   {id:"art30h",art:"30h",texto:"No responder reiteradamente a un Doodle de subsistema (≥2)",puntos:-1},
   {id:"art30i",art:"30i",texto:"Faltar a un turno de trabajo sin justificar",puntos:-1},
   {id:"min",art:"30·P3",texto:"No alcanzar el mínimo de disponibilidad",puntos:-1},
-  {id:"mentir",art:"30",texto:"Mentir sobre asuntos del equipo (incl. falsear disponibilidad)",opciones:[-2,-3,-4,-5],grave:true},
+  {id:"mentir",art:"30·párr.final",texto:"Mentir sobre asuntos del equipo (incl. falsear disponibilidad)",opciones:[-2,-3,-4,-5],grave:true},
   {id:"otro",art:"29i",texto:"Otra — norma no recogida (potestad del PD)",libre:true}
 ], sumas:[
   {id:"art31b",art:"31b",texto:"Tarea voluntaria o urgente en plazo",opciones:[1,2]},
@@ -2064,22 +2065,37 @@ async function _marcarDec(id, decision, btn){
     const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo marcar: ${e.message}</div>`);
   } finally { _sancBusy=false; }
 }
-// Marca de golpe todas las pendientes del bloque (sigue sin aplicar nada).
+// Marca de golpe todas las pendientes del bloque (sigue sin aplicar nada). UNA sola llamada:
+// antes iba una por persona y un bloque de reunión general (~30) tardaba decenas de segundos y
+// podía quedarse a medias. El backend las escribe todas bajo el mismo lock.
 async function _marcarTodo(lote, decision, btn){
   if(typeof backendOK!=="undefined" && !backendOK) return;
-  // incluye revocaciones y premios: todo lo pendiente del bloque se marca igual
-  const míos=(_colaSancCache||[]).filter(s=>s.lote===lote && s.estado==="pendiente"
-    && (s.decision||"aceptar")!==decision);
-  if(!míos.length) return;
+  const hay=(_colaSancCache||[]).some(s=>s.lote===lote && s.estado==="pendiente" && (s.decision||"aceptar")!==decision);
+  if(!hay) return;
   const prev=btn?btn.textContent:null; if(btn){ btn.disabled=true; btn.textContent="Marcando…"; }
   _sancBusy=true;
   try{
-    for(const s of míos){ await api.decidirSancion(s.id,"marcar",{decision}); s.decision=decision; }
+    try{
+      await api.marcarLote(lote, decision);                 // rápido: una escritura en el backend
+    }catch(e){
+      // El backend desplegado puede no tener aún `marcarLote`. En vez de romper, se cae al
+      // método antiguo (una llamada por persona): más lento, pero funciona con cualquier versión.
+      const míos=(_colaSancCache||[]).filter(s=>s.lote===lote && s.estado==="pendiente"
+        && (s.decision||"aceptar")!==decision
+        && !(decision==="justificar" && (s.origen==="revocacion" || s.origen==="premio" || (s.extra&&s.extra.compensacion))));
+      let i=0;
+      for(const s of míos){
+        i++; if(btn) btn.textContent=`Marcando ${i}/${míos.length}…`;
+        await api.decidirSancion(s.id,"marcar",{decision});
+      }
+    }
+    _sancBusy=false;
+    await _cargarColaSanc_(true);          // el backend manda: puede haber saltado alguna
   }catch(e){
     const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo: ${e.message}</div>`);
+    try{ _repintarCola_(); }catch(_){}
   } finally {
     _sancBusy=false; if(btn){ btn.disabled=false; btn.textContent=prev; }
-    try{ _repintarCola_(); }catch(_){}
   }
 }
 // Confirma el BLOQUE ENTERO: una sola llamada, atómica en el backend. Es el único
