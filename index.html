@@ -1664,8 +1664,11 @@ function _scPerWire(){
   const inp=$("sc-per"), sug=$("sc-persug"); if(!inp) return;
   const render=()=>{
     const q=_sinTildes((inp.value||"").trim());
+    // TODOS los que casan (no solo 8): al enfocar sin escribir se ve el equipo entero, ordenado
+    // alfabéticamente y con scroll. Antes cortaba a 8 y parecía que "faltaba medio equipo".
     const hits=(DATA.miembros||[]).filter(m=>!window._scPersonas.has(m.nombre) &&
-        (!q || _sinTildes(m.nombre).includes(q) || _sinTildes(m.unidad).includes(q))).slice(0,8);
+        (!q || _sinTildes(m.nombre).includes(q) || _sinTildes(m.unidad).includes(q)))
+      .sort((a,b)=>_sinTildes(a.nombre).localeCompare(_sinTildes(b.nombre)));
     if(!hits.length){ sug.style.display="none"; return; }
     sug.innerHTML=hits.map(m=>`<div data-n="${_escDoc(m.nombre)}">${_escDoc(m.nombre)} <small>${_escDoc(m.cargo||m.unidad||"")}</small></div>`).join("");
     sug.style.display="";
