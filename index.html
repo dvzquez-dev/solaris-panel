@@ -123,7 +123,7 @@
      direccion) pero POR FUERA, con aire — el arco llega a r~45,5 y la estrella queda a
      r~54 (borde interior ~48), asi que ya no se mete en el trazo. 12px para que sea fina. */
   .gauge .tip i{position:absolute;left:50%;top:-5px;margin-left:-6px;width:12px;height:12px;
-    display:block;color:var(--red2);filter:drop-shadow(0 0 6px rgba(255,74,79,.7))}
+    display:block;color:var(--red2);filter:drop-shadow(0 0 6px rgba(255,74,79,.7));transform:rotate(90deg);transform-origin:100% 50%}
   .gauge .tip i svg{position:static;width:12px;height:12px;fill:currentColor;inset:auto}
   @media(prefers-reduced-motion:reduce){
     .gauge .seg.on,.gauge .tip{transition:none} .gauge .tk.chispa{animation:none}}
