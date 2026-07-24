@@ -2,7 +2,7 @@
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0D0A0B">
+<meta name="theme-color" content="#0C0B0B">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,9 +17,15 @@
      equipo aeroespacial, estética «control de misión de noche». No es una
      omisión del modo claro, es el mundo visual elegido. */
   :root{
-    --bg:#0D0A0B; --sur:#161112; --sur2:#1F1819; --line:#33292A;
-    --ink:#F4EEEE; --ink2:#B0A2A1; --ink3:#7A6B6A;
-    --red:#E41E25; --red2:#FF4A4F;          /* rojo Solaris, de la insignia */
+    /* RAMPA DE NEUTROS medida en Insignia_Solaris.png (docs/identidad-visual.md §4-ter).
+       El gris de la insignia es #231F20 (52,3% de los pixeles): H=345 · S=6,1%. Toda la
+       rampa deriva de ahi conservando ese tono y saturacion y moviendo solo la luminosidad,
+       para que TODO el gris de la interfaz sea el gris de Solaris a distintas alturas. Antes
+       los tokens iban al doble de saturacion y con el tono a la deriva (340->4 segun la altura),
+       o sea que cambiaban de color a lo largo de la escala; --ink era un blanco rosado. */
+    --bg:#0C0B0B; --sur:#181616; --sur2:#221E1F; --gris:#231F20; --line:#322C2E; --line2:#463E40;
+    --ink:#F4F3F3; --ink2:#B2A8AB; --ink3:#7C6E72;
+    --red:#E41E25; --red2:#FF4A4F;          /* rojo Solaris, de la insignia (99,2%) — NO se toca */
     --ok:#3EB489; --okbg:#10241C;
     --info:#C8BEBB; --bad:#E4342B; --badbg:#2A1414;
     --warn:#E8912E;
@@ -97,10 +103,33 @@
 
   /* ── home: anillo de puntos ────────────────────────────────────────── */
   .cabhome{display:flex;align-items:center;gap:18px;margin:12px 0 8px}
-  .gauge{position:relative;width:104px;height:104px;flex:none}
+  .gauge{position:relative;width:112px;height:112px;flex:none;cursor:pointer;
+    -webkit-tap-highlight-color:transparent}
+  .gauge svg{position:absolute;inset:0;width:112px;height:112px;overflow:visible}
+  .gauge .seg{fill:none;stroke-width:7;stroke-linecap:round}
+  .gauge .seg.on{transition:stroke-dashoffset .42s cubic-bezier(.16,.84,.44,1),
+    stroke-width .42s cubic-bezier(.16,.84,.44,1)}
+  .gauge.arma .seg.on.fog{stroke-width:10}
+  .gauge .tk{stroke:var(--line2);stroke-width:1.6;stroke-linecap:round;transition:stroke .25s linear}
+  .gauge .tk.f{stroke:var(--red2)} .gauge .tk.zc.f{stroke:var(--warn)}
+  .gauge .tk.chispa{animation:chispazo .5s cubic-bezier(.16,.84,.44,1)}
+  @keyframes chispazo{
+    0%{stroke:#fff;stroke-width:3.2;filter:drop-shadow(0 0 8px #fff) drop-shadow(0 0 12px var(--red2))}
+    55%{stroke:var(--red2);stroke-width:2;filter:drop-shadow(0 0 6px var(--red2))}
+    100%{stroke:var(--red2);stroke-width:1.6;filter:none}}
+  .gauge .tip{position:absolute;inset:0;transform:rotate(0deg);pointer-events:none;
+    transition:transform .7s cubic-bezier(.34,1.42,.5,1)}
+  /* Estrella montada en la PUNTA del arco: alineada con el final del trazo (misma
+     direccion) pero POR FUERA, con aire — el arco llega a r~45,5 y la estrella queda a
+     r~54 (borde interior ~48), asi que ya no se mete en el trazo. 12px para que sea fina. */
+  .gauge .tip i{position:absolute;left:50%;top:-6px;margin-left:-6px;width:12px;height:12px;
+    display:block;color:var(--red2);filter:drop-shadow(0 0 6px rgba(255,74,79,.7))}
+  .gauge .tip i svg{position:static;width:12px;height:12px;fill:currentColor;inset:auto}
+  @media(prefers-reduced-motion:reduce){
+    .gauge .seg.on,.gauge .tip{transition:none} .gauge .tk.chispa{animation:none}}
   .gval{position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;font-weight:800;font-size:36px;
-    letter-spacing:-.03em;line-height:.8}
+    letter-spacing:-.03em;line-height:.8;pointer-events:none}
   .gval span{font-size:11px;font-weight:600;color:var(--ink3);letter-spacing:.03em;
     margin-top:4px}
   .hola{font-size:13px;color:var(--ink2)}
@@ -315,6 +344,13 @@
   .sindatos{padding:18px 6px;text-align:center;color:var(--ink2);font-size:13px}
   .sindatos span{display:block;color:var(--ink3);font-size:11.5px;margin-top:5px}
   .clicable{cursor:pointer}
+  /* ACUSE DE CLIC (decision cerrada ronda 3): pulsar es un acuse barato (<120 ms) en la
+     propia pieza — NUNCA un circulo que se expande bajo el dedo, y no se mueve un blanco de
+     clic (nada de transform/padding). Se enciende un canto rojo con box-shadow inset (no un
+     pseudo-elemento, para no pisar los ::after que ya usan las tarjetas). Lo pone un handler
+     global sobre botones y filas clicables. */
+  .pulsa{box-shadow:inset 2px 0 0 var(--red2), 0 0 10px -4px var(--red2) !important}
+  @media(prefers-reduced-motion:reduce){ .pulsa{box-shadow:inset 2px 0 0 var(--red2) !important} }
   .chev{color:var(--ink3);font-weight:700;margin-left:2px}
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;z-index:60;align-items:flex-end;justify-content:center}
   .modal.on{display:flex}
@@ -1182,18 +1218,51 @@ function togglePas(){
   const s=$("pas"), t=$("pastog");
   const ab=s.classList.toggle("on"); if(t) t.classList.toggle("ab",ab);
 }
-// medidor segmentado: 10 tramos, tipo instrumento; llenos = puntos
+// medidor segmentado: 10 tramos, tipo instrumento; llenos = puntos.
+// Piel ronda 3: zona critica ambar (3 primeros), marca por tramo que chispea, estrella
+// en la punta. Geometria intacta (10 arcos de 36 con 8 de hueco). `col` se conserva por
+// compatibilidad pero el color de los tramos llenos sale del estado (rojo, o ambar si p<=3).
 function gauge(p, col){
-  const cx=52,cy=52,r=42,n=10,gap=8,step=360/n; let s="";
+  const cx=56,cy=56,r=42,n=10,gap=8,step=360/n; let seg="",tk="";
   for(let i=0;i<n;i++){
     const a0=(-90+i*step+gap/2)*Math.PI/180, a1=(-90+(i+1)*step-gap/2)*Math.PI/180;
     const x0=(cx+r*Math.cos(a0)).toFixed(2), y0=(cy+r*Math.sin(a0)).toFixed(2);
     const x1=(cx+r*Math.cos(a1)).toFixed(2), y1=(cy+r*Math.sin(a1)).toFixed(2);
-    s+=`<path d="M${x0} ${y0} A${r} ${r} 0 0 1 ${x1} ${y1}" fill="none"
-      stroke="${i<p?col:'var(--sur2)'}" stroke-width="6.5" stroke-linecap="round"/>`;
+    const lleno=i<p, crit=i<3, stroke=lleno?((crit&&p<=3)?'var(--warn)':'var(--red)'):'var(--sur2)';
+    seg+=`<path class="seg${lleno?' on':''}" data-i="${i}" pathLength="100" style="stroke-dasharray:100"
+      d="M${x0} ${y0} A${r} ${r} 0 0 1 ${x1} ${y1}" fill="none" stroke="${stroke}" stroke-width="7" stroke-linecap="round"/>`;
+    const a=(-90+i*step)*Math.PI/180;
+    tk+=`<line class="tk${crit?' zc':''}${lleno?' f':''}" data-i="${i}"
+      x1="${(cx+48*Math.cos(a)).toFixed(1)}" y1="${(cy+48*Math.sin(a)).toFixed(1)}"
+      x2="${(cx+53*Math.cos(a)).toFixed(1)}" y2="${(cy+53*Math.sin(a)).toFixed(1)}"/>`;
   }
-  return `<div class="gauge"><svg width="104" height="104" viewBox="0 0 104 104">${s}</svg>
+  const giro=p*step-gap/2;
+  return `<div class="gauge" id="gauge" onclick="armarGauge()" role="button" tabindex="0" aria-label="Puntos de conducta: ${p} de 10">
+    <svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true"><g>${tk}</g>${seg}</svg>
+    <div class="tip" id="gtip" style="transform:rotate(${giro}deg)"><i>${STAR}</i></div>
     <div class="gval">${p}<span>/ 10</span></div></div>`;
+}
+// dispara la secuencia de encendido + chispas (al tocar el medidor). Idempotente.
+let _gaugeTimers=[];
+function armarGauge(){
+  const g=document.getElementById("gauge"); if(!g) return;
+  _gaugeTimers.forEach(clearTimeout); _gaugeTimers=[];
+  const segs=[...g.querySelectorAll(".seg.on")];
+  if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches){
+    segs.forEach(s=>s.style.strokeDashoffset="0"); return;
+  }
+  g.classList.add("arma");
+  segs.forEach(s=>{ s.style.transition="none"; s.style.strokeDashoffset="100"; s.classList.remove("fog"); });
+  g.querySelectorAll(".tk").forEach(t=>t.classList.remove("chispa"));
+  void g.offsetWidth;                                  // reflow: que el rebobinado no se anime
+  segs.forEach(s=>{ s.style.transition=""; });
+  segs.forEach((s,k)=>{
+    _gaugeTimers.push(setTimeout(()=>{
+      s.style.strokeDashoffset="0"; s.classList.add("fog"); setTimeout(()=>s.classList.remove("fog"),240);
+      const i=s.getAttribute("data-i"), t=g.querySelector(`.tk[data-i="${i}"]`);
+      if(t){ t.classList.remove("chispa"); void t.getBoundingClientRect(); t.classList.add("chispa"); }
+    }, 120+k*78));
+  });
 }
 
 function irA(k){const b=document.querySelector(`[data-k="${k}"]`);if(b)b.click();}
@@ -2922,6 +2991,16 @@ async function guardarDisp(){
   if(backendOK){ try{ await api.responder(e.id, nombre, vals); }catch(_){} }
   render(); verReunion(e.id);
 }
+/* Acuse de clic (decision cerrada): <120 ms, en la propia pieza. Un handler global
+   —el DOM se regenera en cada render, asi que un listener delegado es lo unico que
+   sobrevive— marca .pulsa sobre botones y filas clicables. No mueve nada. */
+document.addEventListener("pointerdown", function(e){
+  if(!e.target || !e.target.closest) return;
+  var el = e.target.closest(".ebtn, nav button, .clicable, .alerta.clic, .fila.clicable, .scitem-a button, .scdec, .entok, .entno, .quien");
+  if(!el) return;
+  el.classList.add("pulsa");
+  setTimeout(function(){ el.classList.remove("pulsa"); }, 120);
+}, {passive:true});
 render();
 /* Carga inicial de reuniones desde el backend. Si responde, es la fuente de
    verdad; si no (CSP del artefacto, sin red…), se queda en los datos locales. */
