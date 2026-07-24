@@ -1843,13 +1843,14 @@ function _colaSancHTML_(arr){
   const pend=arr.filter(s=>s.estado==="pendiente"), apr=arr.filter(s=>s.estado==="aprobada"),
         // OJO: "revocada" tiene que estar aquí. Si falta, las sanciones retiradas no caen en
         // ninguna sección y se esfuman de la cola — justo lo contrario de dejar rastro.
-        otras=arr.filter(s=>["rechazada","aplicada","revocada"].includes(s.estado));
+        otras=arr.filter(s=>["rechazada","aplicada","revocada","justificada"].includes(s.estado));
   // Botonera de una fila, común a sueltas y a las de dentro de un lote.
   const esRevoc=s=>s.origen==="revocacion";
   const esPremio=s=>s.origen==="premio" || (s.extra&&s.extra.compensacion);
   const yaRevocada=s=>(arr||[]).some(x=>esRevoc(x) && x.extra && String(x.extra.revoca)===String(s.id) && x.estado!=="rechazada");
   // Lo que se pinta a la derecha de cada persona: premio (+Xh ⭐), aviso (0 pts, 1ª falta) o puntos.
   const valorSanc=s=>{
+    if(s.estado==="justificada") return {t:'sin sanción', c:'var(--ok)'};   // justificación aceptada: no se sanciona
     if(esPremio(s)){ const h=(s.extra&&s.extra.compensacion)||0.5; return {t:`+${String(h).replace(".",",")} h ⭐`, c:'var(--ok)'}; }
     if(esRevoc(s)) return {t:`${s.puntos>0?"+":""}${s.puntos}`, c:'var(--ok)'};
     if(!Number(s.puntos)) return {t:'aviso', c:'var(--ink3)'};   // 0 puntos = aviso registrado (marca infracción, no resta)
@@ -1858,8 +1859,14 @@ function _colaSancHTML_(arr){
   // " · Art. 30g" sin duplicar el "Art." aunque el dato ya lo traiga.
   const artLabel=s=>{ if(!s.articulo||s.articulo==="libre") return ""; return ` · Art. ${_escDoc(String(s.articulo).replace(/^Art\.?\s*/i,""))}`; };
   const acciones=s=>{
-    if(s.estado==="pendiente") return `<div class="scitem-a"><button class="scok" onclick="_decSanc(${s.id},'aprobar',null,this)">Aprobar</button><button class="scmod" onclick="_modSanc(${s.id})">Modificar</button><button class="scno" onclick="_decSanc(${s.id},'rechazar',null,this)">Rechazar</button></div>`;
+    if(s.estado==="pendiente"){
+      // "Justificar" solo tiene sentido en una sanción de verdad: ni un premio ni una revocación
+      // se "justifican". Marca a la persona como justificada → sin sanción, y sale en el grupo verde.
+      const just=(!esRevoc(s)&&!esPremio(s))?`<button class="scmod" onclick="_justSanc(${s.id})">Justificar</button>`:"";
+      return `<div class="scitem-a"><button class="scok" onclick="_decSanc(${s.id},'aprobar',null,this)">Aprobar</button><button class="scmod" onclick="_modSanc(${s.id})">Modificar</button>${just}<button class="scno" onclick="_decSanc(${s.id},'rechazar',null,this)">Rechazar</button></div>`;
+    }
     if(s.estado==="aprobada") return `<div class="scitem-a"><span class="scpill ok">aprobada · a aplicar</span></div>`;
+    if(s.estado==="justificada") return `<div class="scitem-a"><span class="scpill">justificada · sin sanción</span></div>`;
     if(s.estado==="revocada") return `<div class="scitem-a"><span class="scpill">revocada</span></div>`;
     if(s.estado==="aplicada"){
       // Una sanción aplicada ya no se puede tocar, pero SÍ revocar: se encola el movimiento inverso.
@@ -1976,7 +1983,7 @@ async function _decSanc(id, accion, opts, btn){
   const item = (btn && btn.closest) ? btn.closest('.scitem') : null;
   const acc = item ? item.querySelector('.scitem-a') : null;
   const prev = acc ? acc.innerHTML : null;
-  const verbo = accion==='rechazar'?'Rechazando':'Aprobando';
+  const verbo = accion==='rechazar'?'Rechazando':(accion==='justificar'?'Justificando':'Aprobando');
   if(acc) acc.innerHTML = `<span class="scitem-wait">${verbo}…</span>`;
   _sancProg(`<b>${verbo}…</b>`);
   _sancBusy=true;   // el auto-refresco no puede repintar mientras esto está en vuelo
@@ -2238,10 +2245,19 @@ async function _enviarRevoc(id, btn){
 function _modSanc(id){
   const p=prompt("Nuevos puntos (negativo resta, positivo suma). Vacío = no cambiarlos:");
   if(p===null) return;                                   // cancelado
-  const j=prompt("Justificación (opcional):")||"";
+  const j=prompt("Nota (opcional):")||"";
   const opts={ justificacion:j };
   if(String(p).trim()!=="" && !isNaN(parseInt(p,10))) opts.puntos=parseInt(p,10);
-  _decSanc(id, "aprobar", opts);                          // modificar = aprobar con puntos/justificación ajustados
+  _decSanc(id, "aprobar", opts);                          // modificar = aprobar con puntos/nota ajustados
+}
+// Justificar = la persona tenía una razón aceptada: NO se la sanciona (ni puntos ni infracción en
+// Notion) y sale en el grupo verde «Con justificación aceptada» del comunicado, como Martín y Fer.
+function _justSanc(id){
+  const s=(_colaSancCache||[]).find(x=>String(x.id)===String(id));
+  const quien=s?(s.nombre||"").split(" ")[0]:"esta persona";
+  const j=prompt(`Justificación aceptada de ${quien} (motivo, opcional).\n\nNO se le aplicará sanción; aparecerá en «Con justificación aceptada» del comunicado.`);
+  if(j===null) return;                                   // cancelado
+  _decSanc(id, "justificar", { justificacion: j||"" });
 }
 function abrirTurno(i){
   const t=TURNOS[i]; if(!t) return;
