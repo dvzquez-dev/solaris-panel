@@ -252,6 +252,21 @@
   .sclote-items{margin-top:2px;border-top:1px solid var(--line);padding-top:2px}
   .sclote .pastog{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
   .sclote .pas-sec.on{max-height:6000px}   /* un lote puede llevar los 32 del equipo */
+  /* Decisiones en borrador dentro de un bloque: segmentado de 3 estados por persona. */
+  .scdecs{gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;display:inline-flex}
+  button.scdec{flex:1;border:0;background:transparent;color:var(--ink3);font:600 12px/1 inherit;
+    padding:7px 10px;cursor:pointer;border-right:1px solid var(--line);white-space:nowrap}
+  button.scdec:last-child{border-right:0}
+  button.scdec.on{color:#fff}
+  button.scdec.on.ok{background:var(--ok)} button.scdec.on.no{background:var(--red2)}
+  button.scdec.on.ju{background:var(--ink2)}
+  /* Barra de cierre del bloque */
+  .scblq{margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(127,127,127,.06)}
+  .scblq-r{font-size:13px;color:var(--ink2)}
+  .scblq-n{font-size:11.5px;color:var(--ink3);margin-top:7px;line-height:1.4}
+  button.scenviar{display:block;width:100%;margin-top:9px;padding:11px;border:0;border-radius:9px;
+    background:var(--ink);color:#fff;font:600 14px/1 inherit;cursor:pointer}
+  button.scenviar:disabled{opacity:.55;cursor:default}
   /* Progreso de una tanda de decisiones: fijo al viewport, para que siga viéndose
      aunque la tarjeta se repinte o la cierres. */
   .scprog{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom));
@@ -551,6 +566,7 @@ const api = {
   getSanciones: (filtro) => api._post({action:"getSanciones", filtro: filtro||{}}),
   decidirSancion: (id, accion, opts) => api._post(Object.assign({action:"decidirSancion", id, accion}, opts||{})),
   agruparSanciones: (ids, lote) => api._post({action:"agruparSanciones", ids, lote}),
+  confirmarLote: (lote) => api._post({action:"confirmarLote", lote}),
 };
 function normReu(r){ r=r||{}; return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida", convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[], limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[], franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[], total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null, ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:r.fijada||""}; }
 // Convierte un enlace de Drive/Docs a su URL de vista previa embebible; si es otro
@@ -1858,7 +1874,16 @@ function _colaSancHTML_(arr){
   };
   // " · Art. 30g" sin duplicar el "Art." aunque el dato ya lo traiga.
   const artLabel=s=>{ if(!s.articulo||s.articulo==="libre") return ""; return ` · Art. ${_escDoc(String(s.articulo).replace(/^Art\.?\s*/i,""))}`; };
-  const acciones=s=>{
+  // `enLote`: dentro de un bloque NO se decide una a una (eso levantaba el flag al vuelo y la
+  // rutina podía aplicar medio bloque). Se MARCA la decisión —por defecto «acepta»— y el bloque
+  // entero se confirma con un solo botón. Cambiar motivo/puntos solo se ofrece en las sueltas.
+  const acciones=(s,enLote)=>{
+    if(s.estado==="pendiente" && enLote){
+      if(esRevoc(s)||esPremio(s)) return `<div class="scitem-a"><span class="scpill">${esPremio(s)?"premio · entra con el bloque":"apelación · entra con el bloque"}</span></div>`;
+      const d=s.decision||"aceptar";
+      const b=(k,txt,cls)=>`<button class="scdec${d===k?" on "+cls:""}" onclick="_marcarDec(${s.id},'${k}',this)">${txt}</button>`;
+      return `<div class="scitem-a scdecs">${b("aceptar","Acepta","ok")}${b("justificar","Justifica","ju")}${b("rechazar","Rechaza","no")}</div>`;
+    }
     if(s.estado==="pendiente"){
       // "Justificar" solo tiene sentido en una sanción de verdad: ni un premio ni una revocación
       // se "justifican". Marca a la persona como justificada → sin sanción, y sale en el grupo verde.
@@ -1884,15 +1909,18 @@ function _colaSancHTML_(arr){
     const meta=`${_escDoc(s.motivo||"(sin motivo)")}${artLabel(s)}${org}${jus}`;
     return `<div class="scitem">
       <div class="scitem-h"><span class="scitem-n">${_escDoc(pila)}</span><span class="scitem-p" style="color:${v.c}">${v.t}</span></div>
-      <div class="scitem-m">${meta}</div>${acciones(s)}</div>`;
+      <div class="scitem-m">${meta}</div>${acciones(s,false)}</div>`;
   };
   // Fila compacta para miembros de un LOTE: el motivo/artículo va una sola vez en la cabecera del lote
   const lineaLote=s=>{
     const v=valorSanc(s);
     const jus=s.justificacion?`<div class="scitem-m" style="margin:2px 0 8px">${_escDoc(s.justificacion)}</div>`:``;
-    return `<div class="scitem">
-      <div class="scitem-h"><span class="scitem-n">${esRevoc(s)?"↩️ ":(esPremio(s)?"⭐ ":"")}${_escDoc(s.nombre||"")}</span><span class="scitem-p" style="color:${v.c}">${v.t}</span></div>
-      ${jus}${acciones(s)}</div>`;
+    // en un bloque pendiente, el valor se tacha si la decisión marcada es no sancionar
+    const d=s.estado==="pendiente"?(s.decision||"aceptar"):null;
+    const tach=(d==="rechazar"||d==="justificar")?"opacity:.4;text-decoration:line-through":"";
+    return `<div class="scitem" id="sc-it-${s.id}">
+      <div class="scitem-h"><span class="scitem-n">${esRevoc(s)?"↩️ ":(esPremio(s)?"⭐ ":"")}${_escDoc(s.nombre||"")}</span><span class="scitem-p" style="color:${v.c};${tach}">${v.t}</span></div>
+      ${jus}${acciones(s,true)}</div>`;
   };
   // Agrupa por lote (las sueltas van aparte)
   const agrupar=a=>{
@@ -1913,11 +1941,31 @@ function _colaSancHTML_(arr){
     const col = (vals[vals.length-1]||0)<0 ? 'var(--red2)' : 'var(--ink3)';
     // Aplicadas: se pueden anular varias del paquete de una vez, eligiendo a quién.
     const nRev=items.filter(s=>s.estado==="aplicada" && !esRevoc(s) && !yaRevocada(s)).length;
-    const bulk=conBulk?`<div class="scitem-a" style="margin-top:10px">
-        <button class="scok" onclick="_decLote_('${lsafe}','aprobar',this)">Aprobar las ${n}</button>
-        <button class="scno" onclick="_decLote_('${lsafe}','rechazar',this)">Rechazar las ${n}</button></div>`
-      : (nRev?`<div class="scitem-a" style="margin-top:10px">
-        <button class="scmod" onclick="abrirRevocarLote('${lsafe}')">Revocar…${nRev<n?` (${nRev} revocables)`:""}</button></div>`:"");
+    // BLOQUE PENDIENTE: se marcan las decisiones (por defecto «acepta») y se manda ENTERO.
+    // Nada se aplica hasta que se pulsa «Aprobar el bloque»: así no se dispara a medias.
+    let bulk="";
+    if(conBulk){
+      const pnd=items.filter(s=>s.estado==="pendiente" && !esRevoc(s) && !esPremio(s));
+      const cnt={aceptar:0,justificar:0,rechazar:0};
+      pnd.forEach(s=>{ cnt[s.decision||"aceptar"]++; });
+      const partes=[];
+      if(cnt.aceptar) partes.push(`<b style="color:var(--ok)">${cnt.aceptar}</b> acepta${cnt.aceptar===1?"":"n"}`);
+      if(cnt.justificar) partes.push(`<b>${cnt.justificar}</b> justificada${cnt.justificar===1?"":"s"}`);
+      if(cnt.rechazar) partes.push(`<b style="color:var(--red2)">${cnt.rechazar}</b> rechazada${cnt.rechazar===1?"":"s"}`);
+      const nAp=cnt.aceptar, nOtros=items.length-pnd.length;
+      bulk=`<div class="scblq">
+        <div class="scblq-r">${partes.join(" · ")||"sin sanciones pendientes"}${nOtros?`<small style="color:var(--ink3)"> · ${nOtros} más entran con el bloque</small>`:""}</div>
+        <div class="scitem-a" style="margin-top:8px">
+          <button class="scmod" onclick="_marcarTodo('${lsafe}','aceptar',this)">Aceptar todas</button>
+          <button class="scmod" onclick="_marcarTodo('${lsafe}','rechazar',this)">Rechazar todas</button>
+        </div>
+        <button class="scenviar" onclick="_confirmarLote('${lsafe}',this)">Aprobar el bloque${nAp?` · ${nAp} sanci${nAp===1?"ón":"ones"}`:""}</button>
+        <div class="scblq-n">Nada se aplica hasta que pulses aquí. Entonces entra el bloque entero de una vez.</div>
+      </div>`;
+    } else if(nRev){
+      bulk=`<div class="scitem-a" style="margin-top:10px">
+        <button class="scmod" onclick="abrirRevocarLote('${lsafe}')">Revocar…${nRev<n?` (${nRev} revocables)`:""}</button></div>`;
+    }
     // La lista de personas nace PLEGADA: el lote se lee de un vistazo y se abre solo si
     // quieres tocar a alguien en concreto.
     // Un paquete de apelaciones se lee al revés: importa de QUÉ sanción se sale, no el
@@ -1976,6 +2024,78 @@ function _colaSancHTML_(arr){
         ${resto>0?`<div class="sindatos" style="padding:10px 2px">y ${resto} más antiguas</div>`:""}</div>`;
   }
   return out;
+}
+// Repinta la cola desde la caché, SIN ir al backend, conservando qué desplegables
+// estaban abiertos: marcar una decisión no puede plegarte el bloque que estás revisando.
+function _repintarCola_(){
+  const box=$("pd-cola"); if(!box || !_colaSancCache) return;
+  const abiertos=[...box.querySelectorAll(".pas-sec")].map(e=>e.classList.contains("on"));
+  box.innerHTML=_colaSancHTML_(_colaSancCache);
+  const secs=[...box.querySelectorAll(".pas-sec")];
+  secs.forEach((e,i)=>{ if(abiertos[i]){ e.classList.add("on"); const t=e.previousElementSibling; if(t&&t.classList.contains("pastog")) t.classList.add("ab"); } });
+}
+// ── Decisiones EN BORRADOR dentro de un bloque ────────────────────────────────
+// Marcar NO aplica nada: solo deja escrita tu decisión. El bloque se manda entero
+// con _confirmarLote(). Se pinta al momento (optimista) y se persiste detrás; si
+// el backend falla, se revierte y se avisa, para no enseñar algo que no se guardó.
+async function _marcarDec(id, decision, btn){
+  if(typeof backendOK!=="undefined" && !backendOK) return;
+  const s=(_colaSancCache||[]).find(x=>String(x.id)===String(id)); if(!s) return;
+  const antes=s.decision||"aceptar";
+  if(antes===decision) return;
+  s.decision=decision;
+  _sancBusy=true;
+  try{ _repintarCola_(); }catch(_){}
+  try{
+    await api.decidirSancion(id,"marcar",{decision});
+  }catch(e){
+    s.decision=antes;
+    try{ _repintarCola_(); }catch(_){}
+    const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo marcar: ${e.message}</div>`);
+  } finally { _sancBusy=false; }
+}
+// Marca de golpe todas las pendientes del bloque (sigue sin aplicar nada).
+async function _marcarTodo(lote, decision, btn){
+  if(typeof backendOK!=="undefined" && !backendOK) return;
+  const míos=(_colaSancCache||[]).filter(s=>s.lote===lote && s.estado==="pendiente"
+    && s.origen!=="revocacion" && !(s.origen==="premio"||(s.extra&&s.extra.compensacion))
+    && (s.decision||"aceptar")!==decision);
+  if(!míos.length) return;
+  const prev=btn?btn.textContent:null; if(btn){ btn.disabled=true; btn.textContent="Marcando…"; }
+  _sancBusy=true;
+  try{
+    for(const s of míos){ await api.decidirSancion(s.id,"marcar",{decision}); s.decision=decision; }
+  }catch(e){
+    const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo: ${e.message}</div>`);
+  } finally {
+    _sancBusy=false; if(btn){ btn.disabled=false; btn.textContent=prev; }
+    try{ _repintarCola_(); }catch(_){}
+  }
+}
+// Confirma el BLOQUE ENTERO: una sola llamada, atómica en el backend. Es el único
+// punto en el que algo pasa a aplicarse.
+async function _confirmarLote(lote, btn){
+  if(typeof backendOK!=="undefined" && !backendOK) return;
+  const pnd=(_colaSancCache||[]).filter(s=>s.lote===lote && s.estado==="pendiente");
+  const sanc=pnd.filter(s=>s.origen!=="revocacion" && !(s.origen==="premio"||(s.extra&&s.extra.compensacion)));
+  const c={aceptar:0,justificar:0,rechazar:0}; sanc.forEach(s=>{ c[s.decision||"aceptar"]++; });
+  const resumen=[`${c.aceptar} se aplican`, c.justificar?`${c.justificar} justificadas`:null,
+                 c.rechazar?`${c.rechazar} rechazadas`:null].filter(Boolean).join(", ");
+  if(!confirm(`Vas a cerrar el bloque «${lote}».\n\n${resumen}.\n\nEsto aplica las sanciones aceptadas en Notion y manda el comunicado. ¿Seguimos?`)) return;
+  const prev=btn?btn.textContent:null; if(btn){ btn.disabled=true; btn.textContent="Cerrando el bloque…"; }
+  _sancProg(`<b>Cerrando el bloque…</b><small>no cierres la app</small>`);
+  _sancBusy=true;
+  try{
+    const r=await api.confirmarLote(lote);
+    _sancBusy=false;
+    _sancProg(`<b>Bloque cerrado</b><small>${r.aprobadas} a aplicar · ${r.justificadas} justificadas · ${r.rechazadas} rechazadas</small>`);
+    await _cargarColaSanc_(true);
+    setTimeout(()=>_sancProg(null), 3000);
+  }catch(e){
+    _sancBusy=false; if(btn){ btn.disabled=false; btn.textContent=prev; }
+    _sancProg(null);
+    const box=$("pd-cola"); if(box) box.insertAdjacentHTML("afterbegin",`<div class="er" style="color:var(--red2);margin-bottom:6px">No se pudo cerrar el bloque: ${e.message}</div>`);
+  }
 }
 async function _decSanc(id, accion, opts, btn){
   if(typeof backendOK!=="undefined" && !backendOK) return;
@@ -2242,13 +2362,60 @@ async function _enviarRevoc(id, btn){
   }catch(e){ err.style.color="var(--red2)"; err.textContent="No se pudo: "+e.message; }
   finally{ if(btn){ btn.disabled=false; btn.textContent=prev||"Añadir la revocación a la cola"; } }
 }
+// Editor de una sanción SUELTA: cambia motivo (del catálogo del RRI), artículo y puntos, y
+// la aprueba. Solo en las sueltas: dentro de un bloque no se cambia el tipo de sanción, solo
+// se marca la decisión. Reusa el mismo catálogo que el creador de sanciones.
 function _modSanc(id){
-  const p=prompt("Nuevos puntos (negativo resta, positivo suma). Vacío = no cambiarlos:");
-  if(p===null) return;                                   // cancelado
-  const j=prompt("Nota (opcional):")||"";
-  const opts={ justificacion:j };
-  if(String(p).trim()!=="" && !isNaN(parseInt(p,10))) opts.puntos=parseInt(p,10);
-  _decSanc(id, "aprobar", opts);                          // modificar = aprobar con puntos/nota ajustados
+  const s=(_colaSancCache||[]).find(x=>String(x.id)===String(id)); if(!s) return;
+  window._msId=id;
+  const ms=_todosMotivos();
+  const actual=String(s.articulo||"").replace(/^Art\.?\s*/i,"");
+  const opts=ms.map(m=>`<option value="${m.id}"${m.articulo===actual?" selected":""}>Art. ${m.articulo} — ${_escDoc(m.texto).slice(0,70)}</option>`).join("");
+  $("modal-body").innerHTML=`
+    <div class="mhead"><div><div class="mtit">Modificar sanción</div>
+      <div class="msub">${_escDoc(s.nombre||"")} · ahora: ${_escDoc(s.motivo||"(sin motivo)")}</div></div></div>
+    <label class="cinv">Motivo del RRI
+      <select id="ms-mot" onchange="_msPts()">
+        <option value="">— mantener el actual —</option>
+        <option value="libre">Motivo libre (a mano)</option>
+        ${opts}
+      </select></label>
+    <div id="ms-wrap"></div>
+    <label class="cinv">Nota interna <span style="color:var(--ink3)">(opcional)</span>
+      <input id="ms-nota" placeholder="por qué se modifica…" autocomplete="off"></label>
+    <div class="er" id="ms-err" style="color:var(--red2);min-height:16px;margin-top:6px"></div>
+    <button class="ebtn" style="margin-top:6px" onclick="_msGuardar(this)">Guardar y aprobar</button>`;
+  $("modal").classList.add("on");
+  _msPts();
+}
+function _msSel(){ const v=($("ms-mot")||{}).value||""; if(!v) return null; if(v==="libre") return {libre:true};
+  return _todosMotivos().find(m=>m.id===v)||null; }
+function _msPts(){
+  const w=$("ms-wrap"); if(!w) return; const m=_msSel();
+  const s=(_colaSancCache||[]).find(x=>String(x.id)===String(window._msId))||{};
+  if(!m){ w.innerHTML=`<label class="cinv">Puntos<input id="ms-p" type="number" step="1" value="${Number(s.puntos)||0}"></label>`; return; }
+  if(m.libre){ w.innerHTML=`<label class="cinv">Motivo libre<input id="ms-libre" placeholder="describe la infracción…" autocomplete="off"></label>`
+    + `<label class="cinv">Puntos <span style="color:var(--ink3)">(a mano)</span><input id="ms-p" type="number" step="1" value="${Number(s.puntos)||-1}"></label>`; }
+  else if(m.opciones){ w.innerHTML=`<label class="cinv">Puntos<select id="ms-p">${m.opciones.map(o=>`<option value="${o}">${o>0?"+":""}${o}</option>`).join("")}</select></label>`; }
+  else { w.innerHTML=`<label class="cinv">Puntos <span style="color:var(--ink3)">(los fija el RRI)</span><input id="ms-p" value="${m.puntos}" readonly style="opacity:.75"></label>`; }
+}
+async function _msGuardar(btn){
+  const id=window._msId, m=_msSel(), err=$("ms-err");
+  const p=parseInt((($("ms-p")||{}).value||""),10);
+  if(isNaN(p)){ err.textContent="Pon unos puntos válidos."; return; }
+  const o={ puntos:p };
+  if(m && m.libre){
+    const t=(($("ms-libre")||{}).value||"").trim();
+    if(!t){ err.textContent="Describe el motivo libre."; return; }
+    o.motivo=t; o.articulo="libre";
+  } else if(m){ o.motivo=m.texto; o.articulo=m.articulo; }
+  const nota=(($("ms-nota")||{}).value||"").trim(); if(nota) o.justificacion=nota;
+  const prev=btn.textContent; btn.disabled=true; btn.textContent="Guardando…";
+  try{
+    await api.decidirSancion(id,"aprobar",o);
+    cerrarModal();
+    await _cargarColaSanc_(true);
+  }catch(e){ err.textContent="No se pudo: "+e.message; btn.disabled=false; btn.textContent=prev; }
 }
 // Justificar = la persona tenía una razón aceptada: NO se la sanciona (ni puntos ni infracción en
 // Notion) y sale en el grupo verde «Con justificación aceptada» del comunicado, como Martín y Fer.
