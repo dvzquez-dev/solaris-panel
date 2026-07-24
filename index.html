@@ -547,8 +547,12 @@ function _apiParse(txt){ let j=null; try{ j=JSON.parse(txt); }catch(_){} if(!j |
 const api = {
   _get: async (params) => { const qs=Object.entries(params).map(([k,v])=>k+"="+encodeURIComponent(typeof v==="string"?v:JSON.stringify(v))).join("&"); const r=await fetch(BACKEND_URL+"?"+qs,{cache:"no-store"}); return _apiParse(await r.text()); },
   _post: async (body) => { if(SESION&&SESION.token&&!body.token) body=Object.assign({},body,{token:SESION.token}); const r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)}); return _apiParse(await r.text()); },
-  listar: () => api._get({action:"listarReuniones"}),
-  get: (id) => api._get({action:"getReunion", id}),
+  // POST, no GET: `_post` adjunta el token de la sesion y el backend exige identidad
+  // en estas dos desde v20 (antes eran publicas). El token NUNCA va en la query string.
+  // Con esto TODO el trafico va por POST; `_get` queda sin usar (se deja: quitarlo
+  // es riesgo sin ganancia, y `api.ping` sigue usando fetch directo).
+  listar: () => api._post({action:"listarReuniones"}),
+  get: (id) => api._post({action:"getReunion", id}),
   crear: (reunion) => api._post({action:"crearReunion", reunion}),
   borrar: (id) => api._post({action:"borrarReunion", id}),
   fijar: (id, fijada) => api._post({action:"fijarReunion", id, fijada}),
