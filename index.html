@@ -1236,7 +1236,7 @@ function gauge(p, col){
       x1="${(cx+48*Math.cos(a)).toFixed(1)}" y1="${(cy+48*Math.sin(a)).toFixed(1)}"
       x2="${(cx+53*Math.cos(a)).toFixed(1)}" y2="${(cy+53*Math.sin(a)).toFixed(1)}"/>`;
   }
-  const giro=p*step-gap/2-10;
+  const giro=p*step-gap/2-5;
   return `<div class="gauge" id="gauge" onclick="armarGauge()" role="button" tabindex="0" aria-label="Puntos de conducta: ${p} de 10">
     <svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true"><g>${tk}</g>${seg}</svg>
     <div class="tip" id="gtip" style="transform:rotate(${giro}deg)"><i>${STAR}</i></div>
