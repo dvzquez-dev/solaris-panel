@@ -1514,7 +1514,10 @@ function render(){
     ${_esAdmin_()?``:`<div class="crear-btn" style="margin:0 0 6px"><button class="ebtn" onclick="crearEncuesta()">Convocar reunión</button></div>`}
     <h2>${_esAdmin_()?"Todas las reuniones":"Mis reuniones"}</h2>
     ${misReu.length
-      ? misReu.map(r=>reuCard(r,yo)).join("")
+      // Una reunión con datos incompletos NO puede tumbar el render entero: si reuCard peta,
+      // se pinta una tarjeta de aviso y las demás siguen. (Antes, una sola reunión mal formada
+      // abortaba render y dejaba el Panel PD mostrando la pantalla del miembro: label sí, contenido no.)
+      ? misReu.map(r=>{ try{ return reuCard(r,yo); }catch(_){ return `<div class="tarjeta"><div class="sindatos">Reunión con datos incompletos${r&&r.id?` (id ${r.id})`:""}.<span>No se pudo mostrar; el resto no se ve afectado.</span></div></div>`; } }).join("")
       : (_esAdmin_()?`<div class="tarjeta"><div class="sindatos">No hay reuniones convocadas.</div></div>`:`<div class="tarjeta"><div class="sindatos">Actualmente no estás convocado a ninguna reunión.<span>Cuando te convoquen a una —o la convoques tú— aparecerá aquí.</span></div></div>`)}`;
 
   /* 5 · CONTRIBUCIÓN */
