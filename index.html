@@ -1346,7 +1346,10 @@ function _panelPDHTML_(){
     <p class="sub">Acciones de dirección. Vista admin.</p>
     <h2>Disciplina</h2>
     <div class="tarjeta"><div class="fila"><div class="tit">Sancionar a un miembro<small>Puntos del RRI (Título VII) o motivo libre</small></div><div class="der"><button class="ebtn sec" onclick="abrirSancionar()">Abrir</button></div></div></div>
-    <h2 style="display:flex;align-items:center;justify-content:space-between">Cola de sanciones <button class="ebtn sec" style="font-size:12px;padding:4px 10px" onclick="_cargarColaSanc_(true)">Actualizar</button></h2>
+    <!-- Sin botón "Actualizar": la cola se refresca sola cada 9 s (_iniciarPollSanc_) y también
+         tras cada decisión. El botón llamaba a la MISMA función, así que solo ahorraba esos 9 s
+         y encima sugería que lo que veías podía estar viejo. Ver docs/decisiones-app.md. -->
+    <h2>Cola de sanciones</h2>
     <div id="pd-cola">${_colaSancCache?_colaSancHTML_(_colaSancCache):'<div class="tarjeta"><div class="sindatos">Cargando…</div></div>'}</div>
     <h2>Notificaciones</h2>
     <div class="tarjeta">
