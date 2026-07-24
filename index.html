@@ -1882,9 +1882,12 @@ function _colaSancHTML_(arr){
   // entero se confirma con un solo botón. Cambiar motivo/puntos solo se ofrece en las sueltas.
   const acciones=(s,enLote)=>{
     if(s.estado==="pendiente" && enLote){
-      if(esRevoc(s)||esPremio(s)) return `<div class="scitem-a"><span class="scpill">${esPremio(s)?"premio · entra con el bloque":"apelación · entra con el bloque"}</span></div>`;
       const d=s.decision||"aceptar";
       const b=(k,txt,cls)=>`<button class="scdec${d===k?" on "+cls:""}" onclick="_marcarDec(${s.id},'${k}',this)">${txt}</button>`;
+      // Una revocación o un premio NO se "justifican": o entran o no entran. Dos estados, pero
+      // marcables igual — un bloque de apelaciones se decide como cualquier otro bloque.
+      if(esRevoc(s)||esPremio(s))
+        return `<div class="scitem-a scdecs">${b("aceptar","Acepta","ok")}${b("rechazar","Rechaza","no")}</div>`;
       return `<div class="scitem-a scdecs">${b("aceptar","Acepta","ok")}${b("justificar","Justifica","ju")}${b("rechazar","Rechaza","no")}</div>`;
     }
     if(s.estado==="pendiente"){
@@ -1948,22 +1951,26 @@ function _colaSancHTML_(arr){
     // Nada se aplica hasta que se pulsa «Aprobar el bloque»: así no se dispara a medias.
     let bulk="";
     if(conBulk){
-      const pnd=items.filter(s=>s.estado==="pendiente" && !esRevoc(s) && !esPremio(s));
+      // TODAS las pendientes del lote cuentan, también revocaciones y premios: un bloque de
+      // apelaciones se decide igual que uno de sanciones.
+      const pnd=items.filter(s=>s.estado==="pendiente");
       const cnt={aceptar:0,justificar:0,rechazar:0};
       pnd.forEach(s=>{ cnt[s.decision||"aceptar"]++; });
+      const esRev=esRevoc(s0);
       const partes=[];
-      if(cnt.aceptar) partes.push(`<b style="color:var(--ok)">${cnt.aceptar}</b> acepta${cnt.aceptar===1?"":"n"}`);
+      if(cnt.aceptar) partes.push(`<b style="color:var(--ok)">${cnt.aceptar}</b> ${esRev?`se devuelve${cnt.aceptar===1?"":"n"}`:`acepta${cnt.aceptar===1?"":"n"}`}`);
       if(cnt.justificar) partes.push(`<b>${cnt.justificar}</b> justificada${cnt.justificar===1?"":"s"}`);
       if(cnt.rechazar) partes.push(`<b style="color:var(--red2)">${cnt.rechazar}</b> rechazada${cnt.rechazar===1?"":"s"}`);
-      const nAp=cnt.aceptar, nOtros=items.length-pnd.length;
+      const nAp=cnt.aceptar;
+      const etiq=esRev?`${nAp} devolución${nAp===1?"":"es"}`:`${nAp} sanci${nAp===1?"ón":"ones"}`;
       bulk=`<div class="scblq">
-        <div class="scblq-r">${partes.join(" · ")||"sin sanciones pendientes"}${nOtros?`<small style="color:var(--ink3)"> · ${nOtros} más entran con el bloque</small>`:""}</div>
+        <div class="scblq-r">${partes.join(" · ")||"nada pendiente en este bloque"}</div>
         <div class="scitem-a" style="margin-top:8px">
           <button class="scmod" onclick="_marcarTodo('${lsafe}','aceptar',this)">Aceptar todas</button>
           <button class="scmod" onclick="_marcarTodo('${lsafe}','rechazar',this)">Rechazar todas</button>
         </div>
-        <button class="scenviar" onclick="_confirmarLote('${lsafe}',this)">Aprobar el bloque${nAp?` · ${nAp} sanci${nAp===1?"ón":"ones"}`:""}</button>
-        <div class="scblq-n">Nada se aplica hasta que pulses aquí. Entonces entra el bloque entero de una vez.</div>
+        <button class="scenviar" onclick="_confirmarLote('${lsafe}',this)">${esRev?"Confirmar las apelaciones":"Aprobar el bloque"}${nAp?` · ${etiq}`:""}</button>
+        <div class="scblq-n">${esRev?"No se devuelve nada hasta que pulses aquí.":"Nada se aplica hasta que pulses aquí."} Entonces entra el bloque entero de una vez.</div>
       </div>`;
     } else if(nRev){
       bulk=`<div class="scitem-a" style="margin-top:10px">
@@ -2060,8 +2067,8 @@ async function _marcarDec(id, decision, btn){
 // Marca de golpe todas las pendientes del bloque (sigue sin aplicar nada).
 async function _marcarTodo(lote, decision, btn){
   if(typeof backendOK!=="undefined" && !backendOK) return;
+  // incluye revocaciones y premios: todo lo pendiente del bloque se marca igual
   const míos=(_colaSancCache||[]).filter(s=>s.lote===lote && s.estado==="pendiente"
-    && s.origen!=="revocacion" && !(s.origen==="premio"||(s.extra&&s.extra.compensacion))
     && (s.decision||"aceptar")!==decision);
   if(!míos.length) return;
   const prev=btn?btn.textContent:null; if(btn){ btn.disabled=true; btn.textContent="Marcando…"; }
@@ -2080,11 +2087,15 @@ async function _marcarTodo(lote, decision, btn){
 async function _confirmarLote(lote, btn){
   if(typeof backendOK!=="undefined" && !backendOK) return;
   const pnd=(_colaSancCache||[]).filter(s=>s.lote===lote && s.estado==="pendiente");
-  const sanc=pnd.filter(s=>s.origen!=="revocacion" && !(s.origen==="premio"||(s.extra&&s.extra.compensacion)));
-  const c={aceptar:0,justificar:0,rechazar:0}; sanc.forEach(s=>{ c[s.decision||"aceptar"]++; });
-  const resumen=[`${c.aceptar} se aplican`, c.justificar?`${c.justificar} justificadas`:null,
+  if(!pnd.length){ await _cargarColaSanc_(true); return; }
+  const esRev=pnd[0] && pnd[0].origen==="revocacion";
+  const c={aceptar:0,justificar:0,rechazar:0}; pnd.forEach(s=>{ c[s.decision||"aceptar"]++; });
+  const resumen=[`${c.aceptar} ${esRev?"se devuelven":"se aplican"}`,
+                 c.justificar?`${c.justificar} justificadas`:null,
                  c.rechazar?`${c.rechazar} rechazadas`:null].filter(Boolean).join(", ");
-  if(!confirm(`Vas a cerrar el bloque «${lote}».\n\n${resumen}.\n\nEsto aplica las sanciones aceptadas en Notion y manda el comunicado. ¿Seguimos?`)) return;
+  const efecto=esRev ? "Esto devuelve los puntos en Notion y anuncia las apelaciones."
+                     : "Esto aplica las sanciones aceptadas en Notion y manda el comunicado.";
+  if(!confirm(`Vas a cerrar el bloque «${lote}».\n\n${resumen}.\n\n${efecto} ¿Seguimos?`)) return;
   const prev=btn?btn.textContent:null; if(btn){ btn.disabled=true; btn.textContent="Cerrando el bloque…"; }
   _sancProg(`<b>Cerrando el bloque…</b><small>no cierres la app</small>`);
   _sancBusy=true;
