@@ -1827,7 +1827,17 @@ function _colaSancHTML_(arr){
         otras=arr.filter(s=>["rechazada","aplicada","revocada"].includes(s.estado));
   // Botonera de una fila, común a sueltas y a las de dentro de un lote.
   const esRevoc=s=>s.origen==="revocacion";
+  const esPremio=s=>s.origen==="premio" || (s.extra&&s.extra.compensacion);
   const yaRevocada=s=>(arr||[]).some(x=>esRevoc(x) && x.extra && String(x.extra.revoca)===String(s.id) && x.estado!=="rechazada");
+  // Lo que se pinta a la derecha de cada persona: premio (+Xh ⭐), aviso (0 pts, 1ª falta) o puntos.
+  const valorSanc=s=>{
+    if(esPremio(s)){ const h=(s.extra&&s.extra.compensacion)||0.5; return {t:`+${String(h).replace(".",",")} h ⭐`, c:'var(--ok)'}; }
+    if(esRevoc(s)) return {t:`${s.puntos>0?"+":""}${s.puntos}`, c:'var(--ok)'};
+    if(!Number(s.puntos)) return {t:'aviso', c:'var(--ink3)'};   // 0 puntos = aviso registrado (marca infracción, no resta)
+    return {t:`${s.puntos}`, c:s.puntos<0?'var(--red2)':'var(--ok)'};
+  };
+  // " · Art. 30g" sin duplicar el "Art." aunque el dato ya lo traiga.
+  const artLabel=s=>{ if(!s.articulo||s.articulo==="libre") return ""; return ` · Art. ${_escDoc(String(s.articulo).replace(/^Art\.?\s*/i,""))}`; };
   const acciones=s=>{
     if(s.estado==="pendiente") return `<div class="scitem-a"><button class="scok" onclick="_decSanc(${s.id},'aprobar',null,this)">Aprobar</button><button class="scmod" onclick="_modSanc(${s.id})">Modificar</button><button class="scno" onclick="_decSanc(${s.id},'rechazar',null,this)">Rechazar</button></div>`;
     if(s.estado==="aprobada") return `<div class="scitem-a"><span class="scpill ok">aprobada · a aplicar</span></div>`;
@@ -1841,22 +1851,21 @@ function _colaSancHTML_(arr){
     return `<div class="scitem-a"><span class="scpill no">rechazada</span></div>`;
   };
   const linea=s=>{
-    const col=s.puntos<0?'var(--red2)':'var(--ok)';
-    const pila=(esRevoc(s)?"↩️ ":"")+(s.nombre||"").split(" ")[0];
-    const art=(s.articulo&&s.articulo!=="libre")?` · Art. ${_escDoc(s.articulo)}`:"";
+    const v=valorSanc(s);
+    const pila=(esRevoc(s)?"↩️ ":(esPremio(s)?"⭐ ":""))+(s.nombre||"").split(" ")[0];
     const org=s.origen==="reunion"?" · reunión":"";
     const jus=s.justificacion?` · ${_escDoc(s.justificacion)}`:"";
-    const meta=`${_escDoc(s.motivo||"(sin motivo)")}${art}${org}${jus}`;
+    const meta=`${_escDoc(s.motivo||"(sin motivo)")}${artLabel(s)}${org}${jus}`;
     return `<div class="scitem">
-      <div class="scitem-h"><span class="scitem-n">${_escDoc(pila)}</span><span class="scitem-p" style="color:${col}">${s.puntos>0?"+":""}${s.puntos}</span></div>
+      <div class="scitem-h"><span class="scitem-n">${_escDoc(pila)}</span><span class="scitem-p" style="color:${v.c}">${v.t}</span></div>
       <div class="scitem-m">${meta}</div>${acciones(s)}</div>`;
   };
   // Fila compacta para miembros de un LOTE: el motivo/artículo va una sola vez en la cabecera del lote
   const lineaLote=s=>{
-    const col=s.puntos<0?'var(--red2)':'var(--ok)';
+    const v=valorSanc(s);
     const jus=s.justificacion?`<div class="scitem-m" style="margin:2px 0 8px">${_escDoc(s.justificacion)}</div>`:``;
     return `<div class="scitem">
-      <div class="scitem-h"><span class="scitem-n">${esRevoc(s)?"↩️ ":""}${_escDoc(s.nombre||"")}</span><span class="scitem-p" style="color:${col}">${s.puntos>0?"+":""}${s.puntos}</span></div>
+      <div class="scitem-h"><span class="scitem-n">${esRevoc(s)?"↩️ ":(esPremio(s)?"⭐ ":"")}${_escDoc(s.nombre||"")}</span><span class="scitem-p" style="color:${v.c}">${v.t}</span></div>
       ${jus}${acciones(s)}</div>`;
   };
   // Agrupa por lote (las sueltas van aparte)
@@ -1867,15 +1876,15 @@ function _colaSancHTML_(arr){
   };
   const grupoHTML=(lote,items,conBulk)=>{
     const n=items.length, s0=items[0]||{};
-    const art=(s0.articulo&&s0.articulo!=="libre")?` · Art. ${_escDoc(s0.articulo)}`:"";
     const org=s0.origen==="reunion"?" · reunión":"";
     const lsafe=String(lote).replace(/['"\\]/g,"");
-    // Se enseña lo que le cae A CADA UNO, no la suma del lote: un "−5" hace pensar que
-    // alguien pierde 5 puntos, cuando son 5 personas a −1.
-    const vals=[...new Set(items.map(s=>Number(s.puntos)||0))].sort((a,b)=>Math.abs(a)-Math.abs(b));
-    const et=p=>`${p>0?"+":"−"}${Math.abs(p)} ${Math.abs(p)===1?"punto":"puntos"}`;
-    const cuanto = vals.length===1 ? `${et(vals[0])}${n>1?" c/u":""}` : `de ${et(vals[0])} a ${et(vals[vals.length-1])}`;
-    const col = vals[vals.length-1]<0 ? 'var(--red2)' : 'var(--ok)';
+    // Un bloque de reunión mezcla SANCIONES y PREMIOS: se cuentan aparte (un premio no es sanción).
+    const sanc=items.filter(s=>!esPremio(s)), prem=items.filter(esPremio);
+    // El rango se calcula solo sobre las sanciones, y el 0 se lee "aviso", no "−0".
+    const vals=[...new Set(sanc.map(s=>Number(s.puntos)||0))].sort((a,b)=>Math.abs(a)-Math.abs(b));
+    const et=p=>p===0?"aviso":`${p>0?"+":"−"}${Math.abs(p)} ${Math.abs(p)===1?"punto":"puntos"}`;
+    const cuanto = !sanc.length ? "" : (vals.length===1 ? `${et(vals[0])}${sanc.length>1?" c/u":""}` : `de ${et(vals[0])} a ${et(vals[vals.length-1])}`);
+    const col = (vals[vals.length-1]||0)<0 ? 'var(--red2)' : 'var(--ink3)';
     // Aplicadas: se pueden anular varias del paquete de una vez, eligiendo a quién.
     const nRev=items.filter(s=>s.estado==="aplicada" && !esRevoc(s) && !yaRevocada(s)).length;
     const bulk=conBulk?`<div class="scitem-a" style="margin-top:10px">
@@ -1896,8 +1905,12 @@ function _colaSancHTML_(arr){
       cab=`<b>${n} ${n===1?"apelación aceptada":"apelaciones aceptadas"}</b>`+(nOrig?`<small style="color:var(--ink3)"> · de ${nOrig} sancionados</small>`:"");
       sub=`Se retira: ${_escDoc((s0.extra||{}).motivoOriginal || s0.motivo || "(sin motivo)")}${art}`;
     } else {
-      cab=`<b>${n} ${n===1?"persona":"personas"}</b>`;
-      sub=`${_escDoc(s0.motivo||"(sin motivo)")}${art}${org}`;
+      // Cabecera del bloque: N sancionados + (si los hay) los premios, aparte y en verde.
+      const ns=sanc.length, np=prem.length;
+      cab=`<b>${ns} ${ns===1?"persona":"personas"}</b>`
+        + (np?`<small style="color:var(--ok)"> · ⭐ ${np} premio${np===1?"":"s"}</small>`:"");
+      const sm=sanc[0]||s0;
+      sub=`${_escDoc(sm.motivo||"(sin motivo)")}${artLabel(sm)}${org}`;
     }
     return `<div class="sclote${rev?" rev":""}">
       <div class="sclote-h">${cab}<span class="mono" style="color:${col}">${cuanto}</span></div>
