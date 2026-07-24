@@ -76,8 +76,11 @@
   .deco{position:absolute; top:0; left:0; right:0; height:340px; z-index:0;
     pointer-events:none; overflow:hidden}
   .deco svg{position:absolute}
-  .marcagua{position:absolute; bottom:66px; right:-40px; width:210px; height:auto;
-    opacity:.045; z-index:0; pointer-events:none}
+  /* Marca de agua de la insignia. En % (no px) para que ocupe lo mismo en el móvil y dentro
+     del marco de 400px del escritorio. Grande a propósito: a 210px parecía un elemento
+     suelto; a este tamaño se lee como fondo intencionado. */
+  .marcagua{position:absolute; bottom:78px; right:-10%; width:92%; height:auto;
+    opacity:.06; z-index:0; pointer-events:none}
   .pantalla{display:none; animation:sube .32s ease}
   .pantalla.on{display:block}
   @keyframes sube{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
