@@ -1473,7 +1473,8 @@ function filaParte(p){
 }
 function vHoras(){
   var c=sumaE('conf'), o=sumaE('otor'), p=sumaE('pend');
-  var cuentan=c+o;
+  var notion=(typeof YO.horasMes==='number');   // la nube trae las horas REALES del mes desde el Panel de Rendimientos
+  var cuentan=notion?YO.horasMes:(c+o);          // base = total real del mes (Notion) si lo hay; si no, los partes
   var mias=PARTES.filter(function(x){return x.e!=='conf';});
   var confs=PARTES.filter(function(x){return x.e==='conf';});
 
@@ -1494,12 +1495,14 @@ function vHoras(){
     : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta 4 € por turno.</p>';
 
   return '<div class="h1">Horas</div><p class="h1s">Julio 2026 · lo que cuenta, lo que está en el aire y lo que te han otorgado.</p>'+
-    '<div class="tarj">'+cab('Recuento del mes','confirmadas · otorgadas · pendientes')+
-      '<div class="cifh"><span class="g mono" id="gHoras">'+nf(cuentan,1)+'</span><span class="sc">h que cuentan</span></div>'+
+    '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'confirmadas · otorgadas · pendientes')+
+      '<div class="cifh"><span class="g mono" id="gHoras">'+nf(cuentan,1)+'</span><span class="sc">h '+(notion?'empleadas este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
-        '<span class="pil conf">'+nf(c,1)+' h confirmadas</span>'+
-        (o?'<span class="pil otor">'+nf(o,1)+' h otorgadas</span>':'')+
-        (p?'<span class="pil pend">+'+nf(p,1)+' h pendientes</span>':'')+
+        (notion
+          ? (p?'<span class="pil pend">+'+nf(p,1)+' h fichadas · pendientes de firma</span>':'')
+          : ('<span class="pil conf">'+nf(c,1)+' h confirmadas</span>'+
+             (o?'<span class="pil otor">'+nf(o,1)+' h otorgadas</span>':'')+
+             (p?'<span class="pil pend">+'+nf(p,1)+' h pendientes</span>':'')))+
       '</div>'+
       barraHorasHTML('barHoras')+
     '</div>'+
