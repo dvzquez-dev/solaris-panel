@@ -176,7 +176,7 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .med .tk.zc.f{stroke:var(--warn)}
 .med .tip{position:absolute;inset:0;transform:rotate(0deg);pointer-events:none;
   transition:transform .8s var(--arco)}
-.med .tip i{position:absolute;left:50%;top:5px;margin-left:-8px;width:16px;height:16px;display:block;
+.med .tip i{position:absolute;left:50%;top:2px;margin-left:-8px;width:16px;height:16px;display:block;
   color:var(--red2);filter:drop-shadow(0 0 8px rgba(255,74,79,.75))}
 .med .tip i svg{width:16px;height:16px;fill:currentColor}
 .med .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
@@ -723,7 +723,7 @@ function _aplicarPanel_(pnl){
 var _E_MOVIL_={pendiente:'pend',aprobada:'conf',aplicada:'conf',otorgada:'otor',rechazada:'dev',detalle:'dev'};
 function normPMovil(p){
   return { id:p.id, f:_isoADMY_(p.fecha), t:p.tarea||'', q:Number(p.horas)||0,
-    e:_E_MOVIL_[p.estado]||'pend', ini:p.ini||'', fin:p.fin||'',
+    e:_E_MOVIL_[p.estado]||'pend', ini:p.ini||'', fin:p.fin||'', cat:p.categoria||null,
     just:p.justificacion||'', nota:p.motivo||p.justificacion||'', sinFichaje:!!p.sinFichaje }; }
 async function _cargarMisPartes_(){
   try{ var arr=await api.getPartes({mias:true}); if(Array.isArray(arr)) PARTES=arr.map(normPMovil); }
@@ -847,13 +847,13 @@ var MOVS=[
    conf = aprobadas · pend = esperando firma · otor = OTORGADAS por el coordinador
    (te las pone él directamente desde su panel; no las pides tú). */
 var PARTES=[
-  {id:1,f:'22/07/2026',t:'Laminado de fuselaje · tramo 2',q:4.0,e:'conf',ini:'16:30',fin:'20:30'},
-  {id:2,f:'19/07/2026',t:'Ensayo estático · apoyo de instrumentación',q:3.5,e:'conf',ini:'09:00',fin:'12:30'},
-  {id:3,f:'15/07/2026',t:'Reunión de integración motor / estructura',q:1.5,e:'conf',ini:'18:00',fin:'19:30'},
-  {id:4,f:'12/07/2026',t:'Mecanizado de anillos de refuerzo',q:5.5,e:'conf',ini:'10:00',fin:'15:30'},
-  {id:5,f:'18/07/2026',t:'Feria de divulgación · montaje del estand',q:3.0,e:'otor',
+  {id:1,f:'22/07/2026',t:'Laminado de fuselaje · tramo 2',q:4.0,e:'conf',cat:'tareas',ini:'16:30',fin:'20:30'},
+  {id:2,f:'19/07/2026',t:'Ensayo estático · apoyo de instrumentación',q:3.5,e:'conf',cat:'tareas',ini:'09:00',fin:'12:30'},
+  {id:3,f:'15/07/2026',t:'Reunión de integración motor / estructura',q:1.5,e:'conf',cat:'reunion',ini:'18:00',fin:'19:30'},
+  {id:4,f:'12/07/2026',t:'Mecanizado de anillos de refuerzo',q:5.5,e:'conf',cat:'tareas',ini:'10:00',fin:'15:30'},
+  {id:5,f:'18/07/2026',t:'Feria de divulgación · montaje del estand',q:3.0,e:'otor',cat:'compensacion',
    nota:'Otorgadas por Xoán (coordinador) — no hacía falta que las declarases.'},
-  {id:6,f:'20/07/2026',t:'Revisión de planos con Propulsión',q:2.0,e:'pend',ini:'17:00',fin:'19:00',
+  {id:6,f:'20/07/2026',t:'Revisión de planos con Propulsión',q:2.0,e:'pend',cat:'reunion',ini:'17:00',fin:'19:00',
    just:'Revisión conjunta de las interfaces del mamparo con el equipo de Propulsión.'}
 ];
 function sumaE(e){return PARTES.filter(function(p){return p.e===e;}).reduce(function(a,p){return a+p.q;},0);}
@@ -1004,6 +1004,10 @@ function tost(m){
    EL MEDIDOR DE PUNTOS — geometría de gauge(): 10 arcos de 36°, hueco de 8°
    ═══════════════════════════════════════════════════════════════════════════ */
 var MC=86, MR=62, MGAP=8, MSTEP=36;
+/* Nudge de la estrella de la punta (pedido por Daniel 25/07): +3,5° en sentido horario
+   —la aleja del final del arco y la inclina a la vez, porque va dentro del .tip que gira—
+   y un poco más de radio en el CSS (.tip i top). */
+var MTIP=3.5;
 function arcoSeg(i,r){
   var a0=(-90+i*MSTEP+MGAP/2)*Math.PI/180, a1=(-90+(i+1)*MSTEP-MGAP/2)*Math.PI/180;
   return 'M'+(MC+r*Math.cos(a0)).toFixed(2)+' '+(MC+r*Math.sin(a0)).toFixed(2)+
@@ -1024,7 +1028,7 @@ function medidorHTML(){
       'x1="'+(MC+72*Math.cos(a)).toFixed(1)+'" y1="'+(MC+72*Math.sin(a)).toFixed(1)+'" '+
       'x2="'+(MC+79*Math.cos(a)).toFixed(1)+'" y2="'+(MC+79*Math.sin(a)).toFixed(1)+'"/>';
   }
-  var giro=p*MSTEP-MGAP/2;
+  var giro=p*MSTEP-MGAP/2+MTIP;
   var est=estadoPts(p);
   return '<div class="medcaja">'+
     '<div class="med late" id="med" data-p role="button" tabindex="0" aria-label="Puntos de conducta: '+p+' de 10">'+
@@ -1064,7 +1068,7 @@ var medTimers=[];
 function armarMedidor(){
   var med=$('#med'); if(!med) return;
   medTimers.forEach(clearTimeout); medTimers=[];
-  var p=YO.puntos, giro=p*MSTEP-MGAP/2;
+  var p=YO.puntos, giro=p*MSTEP-MGAP/2+MTIP;
   var tip=$('#medTip'), num=$('#medN');
   /* rebobinado instantáneo, para que solo el ARMADO vaya escalonado */
   med.classList.remove('arm');
@@ -1479,6 +1483,22 @@ async function enviarFichaje(){
 /* ═══════════════════════════════════════════════════════════════════════════
    PANTALLA 3 · HORAS
    ═══════════════════════════════════════════════════════════════════════════ */
+/* Etiqueta de la CATEGORÍA de Notion a la que suma cada imputación (fichaje u otorgamiento).
+   El miembro la ve para reconciliar: 'esta hora cayó en Reuniones', 'esta en Carga tareas'.
+   null = cajón por defecto (Compensaciones), igual que hace el motor (aplicar_horas.py). */
+var CAT_ETI={tareas:'Carga tareas',reunion:'Reuniones',turno:'Turnos fabric.',compensacion:'Compensaciones'};
+function catEti(c){ return CAT_ETI[c]||CAT_ETI.compensacion; }
+/* Desglose de lo que TUS imputaciones sumaron a cada categoría (no el total de la categoría en
+   Notion, que además lleva reuniones auto, cursos, etc.): es la parte que puedes verificar tú. */
+function desgloseCat(ps){
+  if(!ps.length) return '';
+  var g={}, orden=['reunion','tareas','turno','compensacion'];
+  ps.forEach(function(p){ var k=(p.cat in CAT_ETI)?p.cat:'compensacion'; g[k]=(g[k]||0)+p.q; });
+  var chips=orden.filter(function(k){return g[k];}).map(function(k){
+    return '<span class="pil neu" style="margin:0 6px 6px 0">'+esc(CAT_ETI[k])+' <b class="mono">'+nf(g[k],1)+' h</b></span>';
+  }).join('');
+  return '<div style="display:flex;flex-wrap:wrap;margin:2px 0 4px">'+chips+'</div>';
+}
 function filaParte(p){
   var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':p.e==='dev'?'borde-no':'borde-pe';
   var pil = p.e==='conf'?'<span class="pil conf">aprobada</span>'
@@ -1488,7 +1508,9 @@ function filaParte(p){
   var sub = p.e==='otor' ? esc(p.nota||'')
           : p.e==='pend' ? ('en la cola de '+esc(aprobadorDe(YO.nombre,YO.unidad).nom.split(' ')[0]))
           : (p.f+(p.ini?' · '+p.ini+'–'+p.fin:''));
-  return '<div class="fila '+cls+'"><div class="a"><b>'+esc(p.t)+'</b><small>'+sub+
+  var catTxt = (p.e==='conf'||p.e==='otor') ? ' · sumó a '+catEti(p.cat)
+             : p.e==='pend' ? ' · irá a '+catEti(p.cat) : '';
+  return '<div class="fila '+cls+'"><div class="a"><b>'+esc(p.t)+'</b><small>'+sub+catTxt+
     (p.sinFichaje?' · <span style="color:var(--warn)">sin fichaje</span>':'')+'</small></div>'+
     '<div class="d">'+pil+' <b class="mono">'+nf(p.q,1)+' h</b></div></div>';
 }
@@ -1540,8 +1562,15 @@ function vHoras(){
             'con su estado hasta que tu coordinador los firme.','pulsa «fichar» en la barra', false))+
     '</div>'+
 
-    '<h2 class="sec">Ya confirmadas<span class="ln"></span>'+nf(c,1)+' h</h2>'+
-    '<div class="tarj">'+confs.map(filaParte).join('')+'</div>'+
+    '<h2 class="sec">Historial · qué se contó<span class="ln"></span>'+nf(c+o,1)+' h</h2>'+
+    '<div class="tarj">'+
+      desgloseCat(confs.concat(PARTES.filter(function(x){return x.e==='otor';})))+
+      '<p class="rnota" style="margin:0 0 10px">Lo que <b>tus</b> fichajes y otorgamientos sumaron a cada '+
+      'categoría del Panel de Rendimientos este mes. Cada categoría en Notion lleva además reuniones '+
+      'automáticas, cursos y demás; esto es solo tu parte, para que cuadres lo que declaraste.</p>'+
+      (confs.length?confs.map(filaParte).join('')
+        :vacio('Nada aplicado todavía','Cuando tu coordinador firme un fichaje, aparecerá aquí con la '+
+            'categoría a la que sumó.','',false))+'</div>'+
 
     '<h2 class="sec">Mi carga del mes<span class="ln"></span>banda sana 60–90</h2>'+
     '<div class="tarj">'+
