@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Solaris · Instrumento — la app del miembro (ronda 3)</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <style>
@@ -52,7 +52,7 @@
   --arco:cubic-bezier(.34,1.42,.5,1);
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;touch-action:manipulation}
 body{
   background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px;
   line-height:1.45; -webkit-font-smoothing:antialiased;
@@ -787,6 +787,16 @@ function _gate_(html){
     document.body.appendChild(g); }
   g.innerHTML=html; return g;
 }
+/* En el móvil el zoom del navegador (pinch) DESCUADRA el layout: la portada de carga se iba a una
+   esquina porque el viewport visual dejaba de coincidir con el de layout. Se bloquea el zoom nativo
+   salvo dentro de un contenedor [data-zoomable] (un visor de documento con su propio zoom). El
+   viewport ya lleva user-scalable=no (Android/iOS viejo); esto cubre iOS moderno, que lo ignora. */
+(function _antiZoom_(){
+  function fuera(e){ return !(e.target && e.target.closest && e.target.closest('[data-zoomable]')); }
+  ['gesturestart','gesturechange','gestureend'].forEach(function(ev){
+    document.addEventListener(ev, function(e){ if(fuera(e)) e.preventDefault(); }, {passive:false});
+  });
+})();
 async function _onCredencial_(resp,_silente){
   _gate_(SPLASH+'<div style="opacity:.8">Verificando…</div>');
   try{
