@@ -209,7 +209,7 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
   border:1px solid var(--line);overflow:hidden}
 .barh i{position:absolute;top:0;bottom:0;left:0;width:0;transition:width 1s var(--sal),left 1s var(--sal)}
 .barh i.conf{background:linear-gradient(90deg,#2C8F6C,var(--ok))}
-.barh i.otor{background:linear-gradient(90deg,#2b6e8f,var(--tel))}
+.barh i.otor{background:linear-gradient(90deg,#2C8F6C,var(--ok))}
 .barh i.pend{background:repeating-linear-gradient(45deg,rgba(232,145,46,.9) 0 3px,transparent 3px 6px);
   border-left:1px solid rgba(232,145,46,.55)}
 .barh .mk{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--ink);opacity:.85;
@@ -230,7 +230,7 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .pil{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
   padding:3px 8px;border-radius:20px;border:1px solid;white-space:nowrap}
 .pil.pend{color:var(--warn);border-color:rgba(232,145,46,.45);background:rgba(232,145,46,.09)}
-.pil.otor{color:var(--tel);border-color:rgba(63,158,214,.45);background:rgba(63,158,214,.09)}
+.pil.otor{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
 .pil.conf{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
 .pil.no{color:var(--red2);border-color:rgba(255,74,79,.42);background:rgba(228,30,37,.09)}
 .pil.neu{color:var(--ink2);border-color:var(--line);background:var(--sur2)}
@@ -628,6 +628,7 @@ var $$=function(s,c){return Array.prototype.slice.call((c||document).querySelect
 var RM=window.matchMedia('(prefers-reduced-motion: reduce)');
 function redu(){return RM.matches;}
 function nf(v,d){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}).format(v);}
+function nf2(v){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,maximumFractionDigits:2}).format(v);}  // horas: hasta 2 decimales (centésima)
 function h1(v){return nf(v,1)+' h';}
 function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -720,7 +721,7 @@ function _aplicarPanel_(pnl){
   if(yo) YO=yo;
 }
 /* Mapea un parte del backend al modelo del móvil (e: conf|otor|dev|pend). */
-var _E_MOVIL_={pendiente:'pend',aprobada:'conf',aplicada:'conf',otorgada:'otor',rechazada:'dev',detalle:'dev'};
+var _E_MOVIL_={pendiente:'pend',aprobada:'otor',aplicada:'otor',otorgada:'otor',rechazada:'dev',detalle:'dev'};
 function normPMovil(p){
   return { id:p.id, f:_isoADMY_(p.fecha), t:p.tarea||'', q:Number(p.horas)||0,
     e:_E_MOVIL_[p.estado]||'pend', ini:p.ini||'', fin:p.fin||'', cat:p.categoria||null,
@@ -1045,8 +1046,7 @@ function medidorHTML(){
         halo+'<g class="tks">'+ticks+'</g>'+segs+
       '</svg>'+
       '<div class="tip" id="medTip" style="transform:rotate('+giro+'deg)"><i><svg viewBox="0 0 24 24"><use href="#es"/></svg></i></div>'+
-      '<div class="mid"><div class="n mono"><span id="medN">0</span><small>/10</small></div>'+
-        '<div class="u">puntos · '+DATA.temporada+'</div></div>'+
+      '<div class="mid"><div class="n mono"><span id="medN">0</span><small>/10</small></div></div>'+
     '</div>'+
     '<div class="pips" id="pips">'+new Array(11).join('<i></i>')+'</div>'+
     '<div class="medley">'+
@@ -1111,12 +1111,12 @@ function armarMedidor(){
 var K_BAR=13.6;
 function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 function barraHorasHTML(id){
-  var c=sumaE('conf'), o=sumaE('otor'), p=sumaE('pend');
-  var wc=wBar(c), wco=wBar(c+o), wcop=wBar(c+o+p);
+  var notion=(typeof YO.horasMes==='number');
+  var cont=notion?YO.horasMes:sumaE('otor'), p=sumaE('pend');   /* otorgadas = todo lo que cuenta (Notion) */
+  var wco=wBar(cont), wcop=wBar(cont+p);
   var wu=wBar(UMBRAL), wm=wBar(MEDIA_EQ);
   return '<div class="barh" id="'+id+'">'+
-      '<i class="conf" data-w="'+wc.toFixed(2)+'"></i>'+
-      '<i class="otor" data-l="'+wc.toFixed(2)+'" data-w="'+(wco-wc).toFixed(2)+'"></i>'+
+      '<i class="otor" data-w="'+wco.toFixed(2)+'"></i>'+
       '<i class="pend" data-l="'+wco.toFixed(2)+'" data-w="'+(wcop-wco).toFixed(2)+'"></i>'+
       '<span class="mk med" data-l="'+wm.toFixed(2)+'"></span>'+
       '<span class="mk" data-l="'+wu.toFixed(2)+'"></span>'+
@@ -1124,8 +1124,7 @@ function barraHorasHTML(id){
     '<div class="barhet"><span data-l="'+wm.toFixed(2)+'">media '+nf(MEDIA_EQ,1)+'</span>'+
       '<span data-l="'+wu.toFixed(2)+'">objetivo '+nf(UMBRAL,1)+'</span></div>'+
     '<div class="leyh">'+
-      '<span><i style="background:var(--ok)"></i>confirmadas</span>'+
-      '<span><i style="background:var(--tel)"></i>otorgadas</span>'+
+      '<span><i style="background:var(--ok)"></i>otorgadas</span>'+
       '<span><i style="background:repeating-linear-gradient(45deg,rgba(232,145,46,.9) 0 3px,transparent 3px 6px)"></i>pendientes · no cuentan</span>'+
     '</div>'+
     '<p class="rnota" style="margin-top:9px">La escala es <b>asintótica</b>: cuantas más horas, más a la '+
@@ -1220,10 +1219,10 @@ function vEstado(){
 
   return '<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>'+
     av+
-    '<div class="tarj">'+cab('Horas de julio','objetivo '+nf(UMBRAL,1)+' h')+
-      '<div class="cifh"><span class="g" id="gEstado">'+nf(sumaE('conf')+sumaE('otor'),1)+'</span>'+
-      '<span class="sc">h que cuentan</span>'+
-      (sumaE('pend')?'<span class="pil pend" style="margin-left:auto">+'+nf(sumaE('pend'),1)+' h pend.</span>':'')+'</div>'+
+    '<div class="tarj">'+cab('Horas de julio', (typeof YO.horasMes==='number')?'Panel de Rendimientos':'objetivo '+nf(UMBRAL,1)+' h')+
+      '<div class="cifh"><span class="g" id="gEstado">'+nf2((typeof YO.horasMes==='number')?YO.horasMes:sumaE('otor'))+'</span>'+
+      '<span class="sc">h '+((typeof YO.horasMes==='number')?'empleadas este mes':'que cuentan')+'</span>'+
+      (sumaE('pend')?'<span class="pil pend" style="margin-left:auto">+'+nf2(sumaE('pend'))+' h pend.</span>':'')+'</div>'+
       barraHorasHTML('barEstado')+
     '</div>'+
     '<h2 class="sec">Tus tareas activas<span class="ln"></span>'+TAREAS.length+'</h2>'+
@@ -1370,7 +1369,7 @@ function vFichar(){
         '<div class="nodo" id="n2" style="left:50%"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
           '<span>Imputación<em id="e2">sin asignar</em></span></div>'+
         '<div class="nodo" id="n3" style="left:83.4%"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
-          '<span>Justificación<em id="e3">0 / 25</em></span></div>'+
+          '<span>Justificación<em id="e3">—</em></span></div>'+
       '</div>'+
       '<div class="figcierra" id="figMsg"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
         '<span>Faltan nodos por encender: todavía no se puede enviar.</span></div>'+
@@ -1400,7 +1399,7 @@ function validarFichaje(){
   var e1=$('#e1'), e2=$('#e2'), e3=$('#e3');
   if(e1) e1.textContent = dur<=0 ? '—' : (dur>12 ? 'excede 12 h' : nf(dur,2)+' h');
   if(e2) e2.textContent = n2 ? (imput.length>16?imput.slice(0,15)+'…':imput) : 'sin asignar';
-  if(e3) e3.textContent = Math.min(25,f.just.trim().length)+' / 25';
+  if(e3) e3.textContent = n3 ? 'lista' : '—';
 
   [['n1',n1],['n2',n2],['n3',n3]].forEach(function(x){
     var el=$('#'+x[0]); if(el) el.classList.toggle('on',x[1]);
@@ -1505,7 +1504,7 @@ function filaParte(p){
           : p.e==='otor'?'<span class="pil otor">otorgada</span>'
           : p.e==='dev' ?'<span class="pil no">devuelta</span>'
           : '<span class="pil pend">en cola</span>';
-  var sub = p.e==='otor' ? esc(p.nota||'')
+  var sub = p.e==='otor' ? (p.nota?esc(p.nota):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
           : p.e==='pend' ? ('en la cola de '+esc(aprobadorDe(YO.nombre,YO.unidad).nom.split(' ')[0]))
           : (p.f+(p.ini?' · '+p.ini+'–'+p.fin:''));
   var catTxt = (p.e==='conf'||p.e==='otor') ? ' · sumó a '+catEti(p.cat)
@@ -1515,11 +1514,11 @@ function filaParte(p){
     '<div class="d">'+pil+' <b class="mono">'+nf(p.q,1)+' h</b></div></div>';
 }
 function vHoras(){
-  var c=sumaE('conf'), o=sumaE('otor'), p=sumaE('pend');
+  var o=sumaE('otor'), p=sumaE('pend');
   var notion=(typeof YO.horasMes==='number');   // la nube trae las horas REALES del mes desde el Panel de Rendimientos
-  var cuentan=notion?YO.horasMes:(c+o);          // base = total real del mes (Notion) si lo hay; si no, los partes
-  var mias=PARTES.filter(function(x){return x.e!=='conf';});
-  var confs=PARTES.filter(function(x){return x.e==='conf';});
+  var cuentan=notion?YO.horasMes:o;              // base = total real del mes (Notion); si no, lo que ya cuenta
+  var mias=PARTES.filter(function(x){return x.e==='pend'||x.e==='dev';});   // en cola / devueltos
+  var confs=PARTES.filter(function(x){return x.e==='otor';});               // lo que ya cuenta
 
   /* ranking CENSURADO: tu puesto y tus vecinos, sin nombres ajenos */
   var puesto=YO.puesto, total=32, filas='';
@@ -1538,20 +1537,19 @@ function vHoras(){
     : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta 4 € por turno.</p>';
 
   return '<div class="h1">Horas</div><p class="h1s">Julio 2026 · lo que cuenta, lo que está en el aire y lo que te han otorgado.</p>'+
-    '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'confirmadas · otorgadas · pendientes')+
-      '<div class="cifh"><span class="g mono" id="gHoras">'+nf(cuentan,1)+'</span><span class="sc">h '+(notion?'empleadas este mes':'que cuentan')+'</span></div>'+
+    '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'otorgadas · pendientes')+
+      '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'empleadas este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
         (notion
-          ? (p?'<span class="pil pend">+'+nf(p,1)+' h fichadas · pendientes de firma</span>':'')
-          : ('<span class="pil conf">'+nf(c,1)+' h confirmadas</span>'+
-             (o?'<span class="pil otor">'+nf(o,1)+' h otorgadas</span>':'')+
-             (p?'<span class="pil pend">+'+nf(p,1)+' h pendientes</span>':'')))+
+          ? (p?'<span class="pil pend">+'+nf2(p)+' h fichadas · pendientes de firma</span>':'')
+          : ('<span class="pil otor">'+nf2(o)+' h otorgadas</span>'+
+             (p?'<span class="pil pend">+'+nf2(p)+' h pendientes</span>':'')))+
       '</div>'+
       barraHorasHTML('barHoras')+
     '</div>'+
 
     '<div class="tarj">'+cab('Comparación','incrementos')+bloqueDeltas()+
-      '<p class="rnota">Los porcentajes se calculan sobre las horas que <b>cuentan</b> (confirmadas + otorgadas). '+
+      '<p class="rnota">Los porcentajes se calculan sobre las horas que <b>cuentan</b>. '+
       'Lo pendiente no mueve tu posición hasta que alguien lo firma.</p></div>'+
 
     '<h2 class="sec">Tus partes<span class="ln"></span>'+mias.length+'</h2>'+
@@ -1562,9 +1560,9 @@ function vHoras(){
             'con su estado hasta que tu coordinador los firme.','pulsa «fichar» en la barra', false))+
     '</div>'+
 
-    '<h2 class="sec">Historial · qué se contó<span class="ln"></span>'+nf(c+o,1)+' h</h2>'+
+    '<h2 class="sec">Historial · qué se contó<span class="ln"></span>'+nf2(o)+' h</h2>'+
     '<div class="tarj">'+
-      desgloseCat(confs.concat(PARTES.filter(function(x){return x.e==='otor';})))+
+      desgloseCat(confs)+
       '<p class="rnota" style="margin:0 0 10px">Lo que <b>tus</b> fichajes y otorgamientos sumaron a cada '+
       'categoría del Panel de Rendimientos este mes. Cada categoría en Notion lleva además reuniones '+
       'automáticas, cursos y demás; esto es solo tu parte, para que cuadres lo que declaraste.</p>'+
