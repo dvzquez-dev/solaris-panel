@@ -679,6 +679,8 @@ var YO=DATA.miembros[0];
 var BACKEND_URL="https://script.google.com/macros/s/AKfycbzIew9FuvCZAnPks77_LkwmmeMJyJ64xd4zk6ryD1uIQSb4W09H7dQn8Z-xG64ANWsXfg/exec";
 var GOOGLE_CLIENT_ID="920160966999-sjgj2rbk9i74fde54uanpa9tp34ih741.apps.googleusercontent.com";
 var backendOK=false, SESION=null;
+var ADMIN_EMAIL='solaris@uvigoaerotech.com';   // la cuenta que ve a TODOS y puede «ver como» cualquiera
+function esAdmin(){ return !!(SESION && SESION.email && String(SESION.email).toLowerCase()===ADMIN_EMAIL); }
 function _apiParse(txt){ var j=null; try{ j=JSON.parse(txt); }catch(_){}
   if(!j || j.ok!==true) throw new Error((j&&j.error)||"respuesta no válida del backend");
   return j.data; }
@@ -717,8 +719,40 @@ function _aplicarPanel_(pnl){
   } else if(Array.isArray(pnl.miembros)&&pnl.miembros.length){   // forma ADMIN
     DATA.miembros=pnl.miembros;
     yo=SESION?pnl.miembros.filter(function(m){return m.nombre===SESION.nombre;})[0]:null;
+    if(!yo) yo=pnl.miembros.filter(function(m){return m.cargo==='Project Director';})[0]||pnl.miembros[0];   // admin no está en el roster: ve como el PD
   }
   if(yo) YO=yo;
+}
+/* «Ver como» — SOLO la cuenta admin (solaris@): se pone en la vista de cualquier miembro. El
+   backend ya le sirve el roster completo con datos por persona, así que ve sus horas/puntos/cuota. */
+function _pintarCabecera_(){
+  if(typeof YO==='undefined' || !YO) return;
+  var hn=$('#hNom'), hr=$('#hRol');
+  if(hn) hn.textContent=(YO.pila||(YO.nombre||'').split(' ')[0]||YO.nombre||'');
+  if(hr) hr.textContent=((YO.unidad||'')+' · '+(YO.cargo||'Miembro')).toUpperCase();
+}
+function _pintarVerComo_(){
+  var rs=$('#rolsel'); if(!rs) return;
+  if(!esAdmin()){ rs.style.display='none'; return; }
+  var ms=(DATA.miembros||[]).slice().sort(function(a,b){return (a.nombre||'').localeCompare(b.nombre||'');});
+  rs.style.display='';
+  rs.innerHTML='<span class="sc" style="margin-right:6px;align-self:center">Ver como</span>'+
+    '<select id="verComo" style="background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:6px 9px;color:var(--ink);font:inherit;font-size:12px;max-width:170px">'+
+    ms.map(function(m){ return '<option value="'+esc(m.nombre)+'"'+((YO&&m.nombre===YO.nombre)?' selected':'')+'>'+esc(m.pila||m.nombre)+(m.cargo?' · '+m.cargo:'')+'</option>'; }).join('')+
+    '</select>';
+  var sel=$('#verComo'); if(sel) sel.onchange=function(){ _verComo_(sel.value); };
+}
+var _partesAdmin=null;   // caché de TODOS los partes (admin) para filtrar por miembro al «ver como»
+async function _partesDe_(nombre){
+  if(!_partesAdmin){ try{ _partesAdmin=await api.getPartes({})||[]; }catch(_){ _partesAdmin=[]; } }
+  return _partesAdmin.filter(function(p){return p.autor===nombre;}).map(normPMovil);
+}
+async function _verComo_(nombre){
+  var m=(DATA.miembros||[]).filter(function(x){return x.nombre===nombre;})[0]; if(!m) return;
+  YO=m; _pintarCabecera_();
+  try{ PARTES=await _partesDe_(nombre); }catch(_){ PARTES=[]; }
+  if(typeof MOVS!=='undefined') MOVS.length=0;
+  pintar();
 }
 /* Mapea un parte del backend al modelo del móvil (e: conf|otor|dev|pend). */
 var _E_MOVIL_={pendiente:'pend',aprobada:'otor',aplicada:'otor',otorgada:'otor',rechazada:'dev',detalle:'dev'};
@@ -771,16 +805,13 @@ async function _onCredencial_(resp,_silente){
     await _cargarMisPartes_();
     await _cargarFichajeAbierto_();
     var g=document.getElementById('loginGate'); if(g) g.remove();
-    var rs=$('#rolsel'); if(rs) rs.style.display='none';   // con cuenta real no hay conmutador de rol
     var bs=$('#btnSalir'); if(bs) bs.style.display='';     // sí hay salir/cambiar de cuenta
+    _pintarVerComo_();                                     // admin (solaris@): selector «ver como»; resto: sin conmutador
+    if(esAdmin() && YO){ _partesAdmin=null; try{ PARTES=await _partesDe_(YO.nombre); }catch(_){} }   // admin: partes del miembro elegido
     // el backend NO sirve el detalle de movimientos de puntos: vaciamos la semilla (era ficticia,
     // enseñaba los de otra persona). Se muestra vacío hasta que haya fuente real.
     if(typeof MOVS!=='undefined') MOVS.length=0;
-    if(typeof YO!=='undefined' && YO){                     // la cabecera muestra al miembro real
-      var hn=$('#hNom'), hr=$('#hRol');
-      if(hn) hn.textContent=(YO.pila||(YO.nombre||'').split(' ')[0]||YO.nombre||'');
-      if(hr) hr.textContent=((YO.unidad||'')+' · '+(YO.cargo||'Miembro')).toUpperCase();
-    }
+    _pintarCabecera_();                                    // la cabecera muestra al miembro (real o «visto como»)
     pintar();
   }catch(e){
     if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
