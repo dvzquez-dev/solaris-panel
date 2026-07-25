@@ -1,0 +1,1860 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<title>Solaris · Puente de mando — el escritorio de consejo y junta (ronda 3)</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   SOLARIS · PUENTE DE MANDO — dirección definitiva, ESCRITORIO
+   ───────────────────────────────────────────────────────────────────────────
+   Público: consejo, junta y Project Director. NO es la app del miembro
+   estirada — es otro producto. Aquí se GOBIERNA: firmar horas, decidir
+   expedientes, cerrar bloques de sanciones, cerrar el mes, mirar al equipo
+   entero. El móvil (`movil.html`) es la herramienta del miembro.
+
+   Paleta medida en Insignia_Solaris.png (docs/identidad-visual.md §4 y §4-ter):
+   #231F20 (52,3 %) · #FFFFFF (24,9 %) · #E41E25 (21,9 %). La rampa de grises
+   se deriva del neutro conservando H=345° y S=6,1 %.
+
+   Fuera, por orden de Daniel: el apartado de ECONOMÍA (cuotas/gastos/tesorería)
+   no va en el panel. Las cuotas se leen en el Ranking, junto a las horas.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0C0B0B; --sur:#181616; --sur2:#221E1F; --gris:#231F20;
+  --line:#322C2E; --line2:#463E40; --ink3:#7C6E72; --ink2:#B2A8AB; --ink:#F4F3F3;
+  --red:#E41E25; --red2:#FF4A4F; --red3:#8E1418;
+  --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --r:10px; --r2:8px;
+  --sal:cubic-bezier(.16,.84,.44,1);
+  --arco:cubic-bezier(.34,1.42,.5,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;min-height:100vh;padding:18px;display:flex;flex-direction:column;gap:13px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.sc{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);line-height:1}
+.up{color:var(--ok)} .dn{color:var(--red2)} .wa{color:var(--warn)}
+
+/* cartel */
+.cartel{border:1px solid var(--line);border-radius:var(--r);
+  background:linear-gradient(180deg,var(--sur2),var(--sur));padding:15px 18px}
+.cartel h1{margin:0;font-size:19px;letter-spacing:-.01em}
+.cartel h1 span{color:var(--red2)}
+.cartel p{margin:7px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.6;max-width:1100px}
+.cartel p b{color:var(--ink)}
+
+/* ═══ MARCO ══════════════════════════════════════════════════════════════ */
+.marco{position:relative;display:grid;grid-template-columns:238px 1fr;grid-template-rows:56px 1fr;
+  height:calc(100vh - 150px);min-height:660px;border:1px solid var(--line);border-radius:var(--r);
+  overflow:hidden;background:var(--bg);box-shadow:0 26px 60px rgba(0,0,0,.45)}
+
+/* lateral */
+aside{grid-row:1/3;border-right:1px solid var(--line);background:var(--sur);
+  display:flex;flex-direction:column;min-height:0;position:relative}
+.marca{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--line)}
+.marca .ins{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;
+  background:linear-gradient(155deg,#3d2427,#20161a);color:var(--red2);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+.marca .ins svg{width:16px;height:16px;fill:currentColor}
+.marca .ins img{width:24px;height:24px;object-fit:contain;display:block}
+/* marca de agua del lienzo: fija al marco, nunca sobre el contenido */
+.marcagua{position:absolute;right:-5%;bottom:-6%;width:40%;height:auto;opacity:.04;
+  z-index:0;pointer-events:none}
+main{z-index:1}
+.marca .nm{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase}
+.marca .nm span{display:block;font-size:8px;letter-spacing:.12em;color:var(--ink3);margin-top:3px}
+.nav{flex:1;min-height:0;overflow-y:auto;padding:6px 0 12px;position:relative;scrollbar-width:thin}
+.nav::-webkit-scrollbar{width:5px}
+.nav::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.grupo{padding:12px 13px 5px;display:flex;align-items:center;gap:8px}
+.grupo .ln{flex:1;height:1px;background:var(--line)}
+.item{width:100%;text-align:left;padding:7px 12px 7px 18px;display:flex;align-items:center;gap:8px;
+  color:var(--ink2);font-size:12.5px;position:relative;
+  transition:color .15s linear,background .15s linear}
+/* NO se desplaza al pasar el ratón: es un blanco de clic (decisión cerrada) */
+.item:hover{color:var(--ink);background:rgba(255,255,255,.025)}
+.item .rail{position:absolute;left:0;top:3px;bottom:3px;width:2px;background:var(--red);border-radius:2px;
+  transform:scaleY(0);transform-origin:50% 50%;transition:transform .26s var(--sal)}
+.item:hover .rail{transform:scaleY(.38)}
+.item.on{color:var(--ink);background:rgba(228,30,37,.08)}
+.item.on .rail{transform:scaleY(1)}
+.item .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .cnt{font-family:var(--mono);font-size:9.5px;color:var(--ink3);background:var(--sur2);
+  border:1px solid var(--line);border-radius:9px;padding:0 6px;line-height:15px;min-width:20px;
+  text-align:center;flex:none}
+.item .cnt.hot{color:#fff;background:var(--red);border-color:var(--red)}
+.item .cnt.wa{color:#241a08;background:var(--warn);border-color:var(--warn)}
+/* la estrella que viaja, en vertical, con la comba proporcional a la distancia */
+.viajev{position:absolute;left:3px;top:0;width:15px;height:15px;pointer-events:none;z-index:4;
+  color:var(--red2);transition:transform .38s var(--arco)}
+.viajev svg{width:15px;height:15px;fill:currentColor;display:block;
+  filter:drop-shadow(0 0 7px rgba(255,74,79,.75))}
+.viajev.vuela svg{animation:arcoX .38s var(--arco)}
+@keyframes arcoX{50%{transform:translateX(var(--comba,16px)) scale(1.5) rotate(120deg)}}
+.pielat{flex:none;border-top:1px solid var(--line);padding:9px 13px;display:flex;gap:9px;align-items:center}
+
+/* barra superior */
+.top{grid-column:2;border-bottom:1px solid var(--line);background:var(--sur);
+  display:flex;align-items:center;gap:13px;padding:0 15px}
+.miga{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);white-space:nowrap}
+.miga b{color:var(--ink);font-weight:500}
+.buscar{flex:1;max-width:330px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);
+  background:var(--bg);border-radius:var(--r2);padding:6px 10px}
+.buscar:focus-within{border-color:var(--line2);box-shadow:0 0 0 3px rgba(228,30,37,.1)}
+.buscar input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--ink);font:inherit;font-size:12px}
+.buscar input::placeholder{color:var(--ink3)}
+.topd{margin-left:auto;display:flex;align-items:center;gap:11px}
+
+/* ── «ACTÚAS COMO» — el conmutador de versión ────────────────────────────
+   De la 04b, con los dos ajustes que pidió Daniel: la estrella un pelín más a
+   la IZQUIERDA y la comba AL REVÉS (se hunde en vez de arquearse hacia arriba).
+   No es un adorno: hace demostrable el enrutado por rango. ───────────────── */
+.actua{position:relative;display:flex;align-items:center;gap:2px;border:1px solid var(--line);
+  border-radius:22px;background:var(--sur2);padding:3px 3px 3px 22px}
+.actua .est{position:absolute;left:5px;top:50%;width:13px;height:13px;margin-top:-6.5px;
+  color:var(--red2);pointer-events:none;transition:transform .34s var(--arco)}
+.actua .est svg{width:13px;height:13px;fill:currentColor;display:block;
+  filter:drop-shadow(0 0 6px rgba(255,74,79,.7))}
+.actua .est.vuela svg{animation:combaAbajo .34s var(--arco)}
+/* comba invertida: baja y vuelve, en vez de subir */
+@keyframes combaAbajo{50%{transform:translateY(9px) scale(1.45) rotate(-120deg)}}
+.actua button{padding:5px 11px;border-radius:18px;font-family:var(--mono);font-size:9px;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);white-space:nowrap;
+  transition:color .16s linear,background .16s linear}
+.actua button.on{background:var(--red);color:#fff}
+
+.yo{display:flex;align-items:center;gap:8px;padding:4px 9px 4px 4px;border:1px solid var(--line);
+  border-radius:var(--r2);background:var(--sur2)}
+.yo .av{width:23px;height:23px;border-radius:6px;display:grid;place-items:center;flex:none;
+  font-family:var(--mono);font-size:9px;color:#efe3e3;background:linear-gradient(155deg,#5c2226,#2a1214)}
+.yo .n{font-size:11.5px;line-height:1.2}
+.yo .rl{font-family:var(--mono);font-size:8px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase}
+
+/* lienzo */
+main{grid-column:2;min-height:0;overflow-y:auto;padding:15px;scrollbar-width:thin;position:relative}
+main::-webkit-scrollbar{width:8px}
+main::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+main.fundiendo{opacity:.25;transition:opacity .14s linear}
+main.entrando>*{animation:entra .38s var(--sal) both}
+main.entrando>*:nth-child(2){animation-delay:.05s}
+main.entrando>*:nth-child(3){animation-delay:.1s}
+main.entrando>*:nth-child(4){animation-delay:.15s}
+@keyframes entra{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+.cabp{display:flex;align-items:flex-end;gap:13px;margin-bottom:14px;flex-wrap:wrap}
+.cabp h2{margin:0;font-size:18px;font-weight:600;letter-spacing:-.015em}
+.cabp .meta{font-family:var(--mono);font-size:9.5px;color:var(--ink3);letter-spacing:.08em}
+.cabp .acts{margin-left:auto;display:flex;gap:7px}
+
+/* paneles */
+.pan{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);margin-bottom:13px;
+  position:relative}
+.pan>.ph{display:flex;align-items:center;gap:9px;padding:10px 13px;border-bottom:1px solid var(--line)}
+.pan>.ph .ln{flex:1;height:1px;background:var(--line)}
+.pan>.pb{padding:13px}
+.pan.destaca{border-color:rgba(228,30,37,.42);box-shadow:0 0 0 1px rgba(228,30,37,.12)}
+.pan.destaca>.ph{background:rgba(228,30,37,.06)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);
+  background:var(--sur2);border-radius:var(--r2);padding:7px 13px;font-size:12px;font-weight:600;
+  position:relative;overflow:hidden;transition:background .16s linear,border-color .16s linear}
+.btn::after{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--red2);
+  transform:scaleY(0);transform-origin:50% 50%;transition:transform .16s var(--sal)}
+.btn.pulsa::after{transform:scaleY(1);box-shadow:0 0 9px var(--red2)}
+.btn:hover{border-color:var(--line2);background:#221D1E}
+.btn.pri{background:var(--red);border-color:var(--red);color:#fff}
+.btn.pri:hover{background:var(--red2);border-color:var(--red2)}
+.btn.ok{color:var(--ok);border-color:rgba(62,180,137,.45)}
+.btn.no{color:var(--red2);border-color:rgba(255,74,79,.45)}
+.btn.sm{padding:5px 10px;font-size:11px;font-weight:500}
+.btn[disabled]{opacity:.45;cursor:not-allowed;pointer-events:none}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:13px}
+@media(max-width:1150px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px 11px;
+  position:relative;overflow:hidden;transition:border-color .2s linear}
+.kpi:hover{border-color:var(--line2)}
+.kpi .val{font-family:var(--mono);font-size:29px;font-weight:600;letter-spacing:-.035em;line-height:1.1;margin:9px 0 3px}
+.kpi .val small{font-size:13px;color:var(--ink3);font-weight:400;letter-spacing:0}
+.kpi .d{font-size:11px;color:var(--ink3)}
+.kpi .bar{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(255,255,255,.05)}
+.kpi .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--red3),var(--red2));
+  transition:width 1s var(--sal)}
+
+/* tablas densas */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:560px}
+thead th{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);font-family:var(--mono);
+  font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);font-weight:400;white-space:nowrap}
+thead th.r,td.r{text-align:right}
+tbody td{padding:8px 12px;border-bottom:1px solid rgba(50,44,46,.6);font-size:12.5px}
+tbody tr{transition:background .14s linear}
+tbody tr:hover{background:rgba(255,255,255,.028)}
+td .mem{display:flex;align-items:center;gap:8px}
+td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1px solid var(--line);
+  display:grid;place-items:center;font-family:var(--mono);font-size:9px;color:var(--ink2);flex:none}
+
+/* chips y pastillas */
+.chip{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--ink3);background:var(--sur2);white-space:nowrap}
+.chip.ok{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
+.chip.wa{color:var(--warn);border-color:rgba(232,145,46,.45);background:rgba(232,145,46,.09)}
+.chip.no{color:var(--red2);border-color:rgba(255,74,79,.45);background:rgba(228,30,37,.09)}
+.chip.tel{color:var(--tel);border-color:rgba(63,158,214,.45);background:rgba(63,158,214,.09)}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+
+/* ── ZONA FIJA «REQUIERE TU DECISIÓN» ────────────────────────────────────
+   De la 02b, con lo que Daniel pidió encima: cada fila LLEVA al sitio exacto
+   (al expediente, al parte, al bloque), no a la sección genérica. ──────── */
+.dec{display:flex;align-items:center;gap:12px;padding:11px 13px;border-top:1px solid var(--line);
+  cursor:pointer;transition:background .14s linear}
+.dec:first-child{border-top:0}
+.dec:hover{background:rgba(255,255,255,.03)}
+.dec .ic{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;flex:none;
+  background:var(--sur2);border:1px solid var(--line);color:var(--red2)}
+.dec .ic svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
+.dec .tx{flex:1;min-width:0}
+.dec .tx b{display:block;font-size:13px}
+.dec .tx small{display:block;font-size:11px;color:var(--ink3);margin-top:2px}
+.dec .der{display:flex;align-items:center;gap:9px;flex:none}
+.dec .chev{color:var(--ink3);font-family:var(--mono)}
+
+/* tarjeta de parte de horas */
+.parte{border-top:1px solid var(--line);padding:13px}
+.parte:first-child{border-top:0}
+.parte .h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.parte .h b{font-size:13.5px}
+.parte .h .u{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+.parte .h .q{margin-left:auto;font-family:var(--mono);font-size:18px;font-weight:600;color:var(--warn);letter-spacing:-.02em}
+.parte .just{margin-top:9px;padding:9px 11px;border:1px solid var(--line);border-left:2px solid var(--tel);
+  background:#0A0909;border-radius:var(--r2);font-size:12px;color:var(--ink2);line-height:1.55}
+.parte .just .sc{display:block;margin-bottom:4px}
+.parte .fl{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.parte .ruta{margin-top:9px;font-size:11.5px;color:var(--ink3);line-height:1.5}
+.parte .ruta b{color:var(--ink2)}
+.parte .acts{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.parte textarea{width:100%;background:#0A0909;border:1px solid var(--line);border-radius:var(--r2);
+  color:var(--ink);font-family:var(--sans);font-size:12.5px;padding:8px 10px;outline:0;resize:vertical;
+  min-height:52px;margin-top:8px}
+.parte.asienta{opacity:.25;transition:opacity .4s linear}
+
+/* bloque de sanciones */
+.lote{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--sur)}
+.lote-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:14px}
+.lote-m{font-size:12px;color:var(--ink2);margin-top:5px;line-height:1.5}
+.lrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(50,44,46,.8);flex-wrap:wrap}
+.lrow .nm{flex:1;min-width:130px;font-size:12.5px;font-weight:600}
+.lrow .vl{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--red2);width:52px;text-align:right}
+.lrow .vl.tach{opacity:.38;text-decoration:line-through}
+.decs{display:inline-flex;border:1px solid var(--line);border-radius:var(--r2);overflow:hidden}
+.decs button{border-right:1px solid var(--line);padding:5px 10px;font-size:11px;font-weight:600;color:var(--ink3);white-space:nowrap}
+.decs button:last-child{border-right:0}
+.decs button.on.a{background:var(--ok);color:#fff}
+.decs button.on.j{background:var(--ink2);color:#1a1616}
+.decs button.on.r{background:var(--red2);color:#fff}
+.cierrel{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:var(--r2);
+  background:rgba(127,127,127,.05);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.cierrel .tx{flex:1;min-width:200px;font-size:12.5px;color:var(--ink2)}
+.cierrel em{display:block;font-style:normal;font-size:11px;color:var(--ink3);margin-top:5px;line-height:1.45}
+
+/* instrumento de puntos (media del equipo — admite decimales) */
+.anillo{position:relative;width:150px;height:150px;flex:none}
+.anillo svg{position:absolute;inset:0;width:150px;height:150px;overflow:visible}
+.anillo .pista{fill:none;stroke:var(--line);stroke-width:1;stroke-dasharray:2 5}
+.anillo .seg{fill:none;stroke-width:7.5;stroke-linecap:round}
+.anillo .seg.vac{stroke:var(--sur2)}
+.anillo .seg.zc{stroke:rgba(232,145,46,.16)}
+.anillo .tk{stroke:var(--line2);stroke-width:1.6;stroke-linecap:round}
+.anillo .tk.f{stroke:var(--red2)}
+.anillo .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;pointer-events:none}
+.anillo .mid .n{font-family:var(--mono);font-size:34px;font-weight:600;letter-spacing:-.04em;line-height:1}
+.anillo .mid .n small{font-size:14px;color:var(--ink3)}
+.anillo .mid .u{font-family:var(--mono);font-size:8px;letter-spacing:.15em;color:var(--ink3);margin-top:5px}
+
+/* desplegable por reunión (disponibilidad y riesgo) */
+.acord{border:1px solid var(--line);border-radius:var(--r2);margin-bottom:9px;overflow:hidden;background:var(--sur)}
+.acord>.hh{display:flex;align-items:center;gap:11px;padding:11px 13px;cursor:pointer}
+.acord>.hh:hover{background:rgba(255,255,255,.025)}
+.acord>.hh .tx{flex:1;min-width:0}
+.acord>.hh .tx b{display:block;font-size:13px}
+.acord>.hh .tx small{display:block;font-size:11px;color:var(--ink3);margin-top:2px}
+.acord>.hh svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;color:var(--ink3);
+  transition:transform .3s var(--sal);flex:none}
+.acord.ab>.hh svg{transform:rotate(180deg)}
+.acord>.bb{max-height:0;overflow:hidden;transition:max-height .42s var(--sal)}
+.acord.ab>.bb{max-height:1200px}
+
+/* mapa de calor */
+.heat{overflow-x:auto;padding-bottom:4px}
+.hg{display:grid;gap:2px;min-width:430px}
+.hc{font-family:var(--mono);font-size:8.5px;color:var(--ink3);display:flex;align-items:center;justify-content:center;min-height:18px}
+.hc.rd{justify-content:flex-end;padding-right:7px;white-space:nowrap;font-size:9.5px;color:var(--ink2)}
+.hc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
+/* etiqueta al LÍMITE izquierdo = hora de inicio (decisión cerrada) */
+.hc.rh span{position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}
+.cel{height:19px;border-radius:2px;display:grid;place-items:center;font-family:var(--mono);
+  font-size:8.5px;color:rgba(244,243,243,.9)}
+.cel.best{outline:1px solid var(--ink);outline-offset:-1px}
+
+/* fichajes en curso */
+.curso{display:flex;align-items:center;gap:12px;padding:11px 13px;border-top:1px solid var(--line)}
+.curso:first-child{border-top:0}
+.curso .pt{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none;
+  animation:latido 1.9s ease-in-out infinite}
+.curso.wa .pt{background:var(--warn)}
+.curso .tx{flex:1;min-width:0}
+.curso .tx b{display:block;font-size:13px}
+.curso .tx small{display:block;font-size:11px;color:var(--ink3);margin-top:2px}
+.curso .q{font-family:var(--mono);font-size:15px;font-weight:600}
+.curso.wa .q{color:var(--warn)}
+
+/* checklist de cierre */
+.paso{display:flex;align-items:center;gap:12px;padding:11px 13px;border-top:1px solid var(--line)}
+.paso:first-child{border-top:0}
+.paso .bx{width:17px;height:17px;border-radius:5px;border:1px solid var(--ink3);flex:none;position:relative}
+.paso.ok .bx{background:var(--ok);border-color:var(--ok)}
+.paso.ok .bx::after{content:"";position:absolute;left:5px;top:2px;width:4px;height:8px;
+  border:solid #0A0909;border-width:0 1.6px 1.6px 0;transform:rotate(42deg)}
+.paso.bloq .bx{border-color:var(--red2)}
+.paso .tx{flex:1;min-width:0}
+.paso .tx b{display:block;font-size:12.5px}
+.paso .tx small{display:block;font-size:11px;color:var(--ink3);margin-top:2px}
+
+.nota{font-size:11.5px;color:var(--ink3);line-height:1.6;padding:11px 13px;border-top:1px solid var(--line)}
+.nota b{color:var(--ink2)}
+.vac{padding:26px 14px;text-align:center;color:var(--ink3);font-size:12.5px;line-height:1.6}
+.vac b{display:block;color:var(--ink2);font-family:var(--mono);font-size:11px;letter-spacing:.12em;
+  text-transform:uppercase;margin-bottom:6px}
+.tost{position:fixed;left:50%;bottom:26px;transform:translate(-50%,12px);z-index:80;background:var(--sur2);
+  border:1px solid var(--line);border-left:2px solid var(--red);border-radius:var(--r2);padding:9px 15px;
+  font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .2s linear,transform .28s var(--sal);
+  box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.tost.on{opacity:1;transform:translate(-50%,0)}
+@keyframes latido{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:1;transform:scale(1)}}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;
+    transition-duration:.001ms !important}
+  .viajev,.actua .est{display:none}
+  main.entrando>*{animation:none}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="es" viewBox="0 0 24 24"><path d="M12 1Q13.4 10.6 23 12 13.4 13.4 12 23 10.6 13.4 1 12 10.6 10.6 12 1Z"/></symbol>
+  <symbol id="i-reloj" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/></symbol>
+  <symbol id="i-gavel" viewBox="0 0 24 24"><path d="M3 21h10M6 17l7-7M9 4l7 7M7.5 5.5 12 10M13 6.5 17.5 11"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
+</svg>
+
+<div class="cartel">
+  <h1>Solaris · <span>Puente de mando</span></h1>
+  <div class="sc" style="margin-top:6px">Ronda 3 · dirección definitiva · <b>escritorio = consejo, junta y PD</b></div>
+  <p><b>No es la app del miembro estirada.</b> El móvil sirve para <i>hacer</i>: fichar, cubrir, subir. Esto sirve
+  para <i>gobernar</i>: firmar horas, decidir expedientes, cerrar bloques de sanciones, cerrar el mes y mirar al
+  equipo entero. Arriba del todo, siempre, lo que <b>requiere tu decisión</b>, y cada fila lleva al sitio exacto.
+  Fuera el apartado de economía, por orden tuya; las cuotas se leen en el Ranking, al lado de las horas.</p>
+</div>
+
+<div class="marco">
+  <aside>
+    <div class="marca">
+      <span class="ins"><img src="data:image/png;base64,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" alt="Solaris"></span>
+      <span class="nm">Solaris<span>Puente de mando</span></span>
+    </div>
+    <div class="nav" id="nav">
+      <span class="viajev" id="viajev"><svg><use href="#es"/></svg></span>
+    </div>
+    <div class="pielat">
+      <span class="sc">Temporada 25/26</span>
+      <span class="sc" style="margin-left:auto;color:var(--ok)">● EN LÍNEA</span>
+    </div>
+  </aside>
+
+  <header class="top">
+    <div class="miga"><span>Solaris</span><span style="color:var(--line2)">/</span>
+      <span id="migaA">Operación</span><span style="color:var(--line2)">/</span><b id="migaB">Panel de mando</b></div>
+    <div class="buscar">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7C6E72" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="text" placeholder="Buscar miembro, expediente, parte…">
+    </div>
+    <div class="topd">
+      <div class="actua" id="actua">
+        <span class="est" id="actuaEst"><svg><use href="#es"/></svg></span>
+        <button data-rol="pd" class="on">Project Director</button>
+        <button data-rol="rev">Revisor fijo</button>
+        <button data-rol="coord">Coordinador</button>
+      </div>
+      <div class="yo"><span class="av" id="yoAv">LC</span>
+        <span><span class="n" id="yoN">Lois Carballo</span><br><span class="rl" id="yoR">Project Director</span></span></div>
+    </div>
+  </header>
+
+  <main id="main"></main>
+  <img class="marcagua" aria-hidden="true" src="data:image/png;base64,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" alt="">
+</div>
+
+<div class="tost" id="tost"></div>
+
+<script>
+/* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
+   permite portarlas en los dos sentidos y probarlas desde la consola. */
+"use strict";
+var $=function(s,c){return (c||document).querySelector(s);};
+var $$=function(s,c){return Array.prototype.slice.call((c||document).querySelectorAll(s));};
+var RM=window.matchMedia('(prefers-reduced-motion: reduce)');
+function redu(){return RM.matches;}
+function nf(v,d){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}).format(v);}
+function h1(v){return nf(v,1)+' h';}
+function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function ini(n){var p=n.split(' ');return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase();}
+function tost(m){var t=$('#tost');t.textContent=m;t.classList.add('on');
+  clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('on');},2600);}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FRONTERA DE API · idéntica a la de app.html (docs/backend-plan.md).
+   GET para lecturas, POST text/plain para escrituras (evita el preflight CORS
+   y el límite de longitud de URL). `_apiParse` YA devuelve el `data` desenvuelto:
+   nada de mirar r.ok ni r.data río abajo — ese fue un bug real del 23/07.
+   Sin backend alcanzable (sin red, sin login) backendOK queda a false y la
+   pantalla sigue funcionando con la semilla ficticia.
+   ═══════════════════════════════════════════════════════════════════════════ */
+var BACKEND_URL="https://script.google.com/macros/s/AKfycbzIew9FuvCZAnPks77_LkwmmeMJyJ64xd4zk6ryD1uIQSb4W09H7dQn8Z-xG64ANWsXfg/exec";
+var GOOGLE_CLIENT_ID="920160966999-sjgj2rbk9i74fde54uanpa9tp34ih741.apps.googleusercontent.com";
+var ADMIN_EMAIL="solaris@uvigoaerotech.com";
+var backendOK=false, SESION=null;
+
+function _apiParse(txt){ var j=null; try{ j=JSON.parse(txt); }catch(_){}
+  if(!j || j.ok!==true) throw new Error((j&&j.error)||"respuesta no válida del backend");
+  return j.data; }
+var api={
+  _get: async function(params){
+    var qs=Object.keys(params).map(function(k){ var v=params[k];
+      return k+"="+encodeURIComponent(typeof v==="string"?v:JSON.stringify(v)); }).join("&");
+    var r=await fetch(BACKEND_URL+"?"+qs,{cache:"no-store"});
+    return _apiParse(await r.text()); },
+  _post: async function(body){
+    if(SESION&&SESION.token&&!body.token) body=Object.assign({},body,{token:SESION.token});
+    var r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify(body)});
+    return _apiParse(await r.text()); },
+  ping:        function(){ try{ fetch(BACKEND_URL+"?action=ping",{cache:"no-store"}).catch(function(){}); }catch(_){} },
+  bootstrap:   function(t,nombre){ var b={action:"bootstrap"}; if(t)b.token=t; if(nombre)b.nombre=nombre; return api._post(b); },
+  quienSoy:    function(t){ return api._post({action:"quienSoy",token:t}); },
+  getPanel:    function(){ return api._post({action:"getPanel"}); },
+  getTareas:   function(){ return api._post({action:"getTareas"}); },
+  getTurnos:   function(){ return api._post({action:"getTurnos"}); },
+  getEntregables: function(){ return api._post({action:"getEntregables"}); },
+  listar:      function(){ return api._get({action:"listarReuniones"}); },
+  get:         function(id){ return api._get({action:"getReunion",id:id}); },
+  crear:       function(r){ return api._post({action:"crearReunion",reunion:r}); },
+  borrar:      function(id){ return api._post({action:"borrarReunion",id:id}); },
+  fijar:       function(id,f){ return api._post({action:"fijarReunion",id:id,fijada:f}); },
+  setOrdenDia: function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); },
+  responder:   function(id,n,v){ return api._post({action:"responder",id:id,nombre:n,valores:v}); },
+  decidir:     function(id,a,m,x){ return api._post({action:"decidir",id:id,accion:a,motivo:m,extra:x}); },
+  getSanciones:function(f){ return api._post({action:"getSanciones",filtro:f||{}}); },
+  pushSancion: function(ss){ return api._post({action:"pushSancion",sanciones:ss}); },
+  decidirSancion: function(id,a,o){ return api._post(Object.assign({action:"decidirSancion",id:id,accion:a},o||{})); },
+  agruparSanciones: function(ids,l){ return api._post({action:"agruparSanciones",ids:ids,lote:l}); },
+  confirmarLote: function(l){ return api._post({action:"confirmarLote",lote:l}); },
+  marcarLote:  function(l,d){ return api._post({action:"marcarLote",lote:l,decision:d}); },
+  getPartes:   function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
+  decidirParte:function(id,a,m){ return api._post({action:"decidirParte",id:id,accion:a,motivo:m}); },
+  otorgarHoras:function(p){ return api._post({action:"otorgarHoras",parte:p}); },
+  enviarPush:  function(d,t,c,o){ return api._post({action:"enviarPush",destinatario:d,titulo:t,cuerpo:c,opts:o}); },
+  getControl:  function(){ return api._post({action:"getControl"}); },
+  setControl:  function(clave,valor,nota){ return api._post({action:"setControl",clave:clave,valor:valor,nota:nota}); }
+};
+
+/* normaliza una reunión del backend a la forma que pintan las vistas */
+function normReu(r){ r=r||{};
+  return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida",
+    convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[],
+    limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[],
+    franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[],
+    total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null,
+    ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:r.fijada||""}; }
+
+var HOY='24/07/2026', UMBRAL=11.8, MEDIA_EQ=10.9;
+/* fecha comparable cronologicamente venga en ISO (AAAA-MM-DD) o DD/MM/AAAA */
+function _fechaISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? (m[3]+'-'+m[2]+'-'+m[1]) : f; }
+/* los valores internos van sin tildes (convencion del proyecto: lo estructural en
+   ingles/ASCII); lo que se PINTA lleva su nombre en castellano correcto. */
+var MOD_ET={presencial:'presencial',telematica:'telemática',hibrida:'híbrida'};
+/* Nombres canonicos: los de verdad (app.html los tiene igual). Ademas se
+   REDERIVAN del roster al aplicar el panel, para no depender de un literal:
+   si manana cambia el PD, el panel no se queda hablando del anterior. */
+var PD_NOM='Daniel V\u00e1zquez Pi\u00f1eiro', REV2_NOM='Jos\u00e9 Manuel Torres Rodr\u00edguez';
+function _rederivarCargos_(){
+  var pd=DATA.miembros.filter(function(m){ return m.cargo==='Project Director'; })[0];
+  if(pd) PD_NOM=pd.nombre;
+  if(!miembro(REV2_NOM)){
+    /* sin segundo revisor en el roster, el escalado cae en el PD y hay que decirlo */
+    var c=DATA.miembros.filter(function(m){ return m.cargo==='Coordinador' && m.nombre!==PD_NOM; })[0];
+    REV2_NOM = c ? c.nombre : PD_NOM;
+  }
+}
+
+/* ═══ DATOS ficticios con el esquema real de app.html ═══════════════════ */
+var DATA={generado:'2026-07-24',temporada:'25/26',subsistemas:[],miembros:[]};
+/* semilla ficticia: lo que se ve SIN backend. Tras el login la sustituye
+   entera la respuesta de `bootstrap`, con el filtrado por rol del servidor. */
+DATA.miembros=[
+ {nombre:'Nerea Ferreiro Lamas',pila:'Nerea',unidad:'Estructuras y Aerodinámica',cargo:null,puntos:7,hMes:14.5,hAnt:11.9,horasTemp:132.4,meses:11,cuota:24.18,coche:2,infraccion:false},
+ {nombre:'Xoán Bermúdez Rial',pila:'Xoán',unidad:'Estructuras y Aerodinámica',cargo:'Coordinador',puntos:10,hMes:31.2,hAnt:28.4,horasTemp:341.6,meses:11,cuota:0,coche:5,infraccion:false},
+ {nombre:'Lois Carballo Sendón',pila:'Lois',unidad:'Dirección',cargo:'Project Director',puntos:10,hMes:44.8,hAnt:41.0,horasTemp:498.2,meses:11,cuota:0,coche:0,infraccion:false},
+ {nombre:'Antía Ruibal Cortegoso',pila:'Antía',unidad:'Electrónica',cargo:null,puntos:10,hMes:26.6,hAnt:24.1,horasTemp:286.9,meses:11,cuota:8.44,coche:0,infraccion:false},
+ {nombre:'Roi Miramontes Paz',pila:'Roi',unidad:'Electrónica',cargo:'Coordinador',puntos:9,hMes:22.4,hAnt:25.8,horasTemp:246.8,meses:11,cuota:16.47,coche:1,infraccion:false},
+ {nombre:'Olalla Vilanova Seixas',pila:'Olalla',unidad:'Dinámica y Control',cargo:'Coordinador',puntos:10,hMes:38.5,hAnt:33.2,horasTemp:423.8,meses:11,cuota:0,coche:14,infraccion:false},
+ {nombre:'Breogán Cives Doural',pila:'Breogán',unidad:'Propulsión',cargo:'Coordinador',puntos:10,hMes:19.8,hAnt:20.6,horasTemp:214.5,meses:11,cuota:19.05,coche:0,infraccion:false},
+ {nombre:'Ledicia Amoedo Cambeses',pila:'Ledicia',unidad:'Org&Mark',cargo:'Coordinador',puntos:8,hMes:7.7,hAnt:9.4,horasTemp:84.1,meses:11,cuota:38.90,coche:0,infraccion:true},
+ {nombre:'Uxía Berdiales Randín',pila:'Uxía',unidad:'Propulsión',cargo:null,puntos:5,hMes:9.5,hAnt:12.8,horasTemp:104.5,meses:11,cuota:31.72,coche:0,infraccion:true},
+ {nombre:'Iago Randán Fuciños',pila:'Iago',unidad:'Estructuras y Aerodinámica',cargo:null,puntos:10,hMes:22.0,hAnt:17.3,horasTemp:198.0,meses:9,cuota:14.30,coche:3,infraccion:false},
+ {nombre:'Sabela Ordóñez Pacio',pila:'Sabela',unidad:'Electrónica',cargo:null,puntos:10,hMes:6.0,hAnt:8.1,horasTemp:41.0,meses:3,cuota:15.00,coche:0,infraccion:false},
+ {nombre:'Anxo Ferradás Vilaboa',pila:'Anxo',unidad:'Dinámica y Control',cargo:null,puntos:9,hMes:16.4,hAnt:14.9,horasTemp:172.2,meses:11,cuota:21.60,coche:0,infraccion:false},
+ {nombre:'Noa Pardiñas Quintás',pila:'Noa',unidad:'Estructuras y Aerodinámica',cargo:null,puntos:10,hMes:12.9,hAnt:13.6,horasTemp:129.0,meses:10,cuota:25.40,coche:0,infraccion:false},
+ {nombre:'Xurxo Ameixeiras Codesal',pila:'Xurxo',unidad:'Propulsión',cargo:null,puntos:6,hMes:4.2,hAnt:7.8,horasTemp:52.6,meses:11,cuota:56.12,coche:0,infraccion:true},
+ {nombre:'Mariña Cotelo Xesteira',pila:'Mariña',unidad:'Electrónica',cargo:null,puntos:10,hMes:18.1,hAnt:15.2,horasTemp:181.0,meses:10,cuota:20.05,coche:0,infraccion:false},
+ {nombre:'Tomé Vilariño Estévez',pila:'Tomé',unidad:'Dinámica y Control',cargo:null,puntos:8,hMes:10.4,hAnt:11.7,horasTemp:114.4,meses:11,cuota:29.88,coche:0,infraccion:true},
+ {nombre:'Comba Sarmiento Nogueira',pila:'Comba',unidad:'Org&Mark',cargo:null,puntos:10,hMes:8.8,hAnt:6.2,horasTemp:70.4,meses:8,cuota:36.10,coche:0,infraccion:false},
+ {nombre:'Xela Rendo Trigueiro',pila:'Xela',unidad:'Estructuras y Aerodinámica',cargo:null,puntos:9,hMes:11.2,hAnt:12.4,horasTemp:123.2,meses:11,cuota:27.66,coche:1,infraccion:false}
+];
+DATA.subsistemas=[{u:'Electrónica',n:4},{u:'Dinámica y Control',n:3},{u:'Estructuras y Aerodinámica',n:5},
+          {u:'Propulsión',n:3},{u:'Org&Mark',n:2},{u:'Dirección',n:1}];
+/* miembro() puede devolver null y eso es correcto (sirve para preguntar «existe?»).
+   Lo que NO puede es usarse directo en el render: el dato real trae nombres que no
+   casan con el roster (un turno del Discord firmado con otro apellido, un parte de
+   alguien que ya se fue). _m() SIEMPRE devuelve algo pintable y marca al desconocido. */
+function miembro(n){for(var i=0;i<DATA.miembros.length;i++) if(DATA.miembros[i].nombre===n) return DATA.miembros[i]; return null;}
+function _m(n){
+  var x=miembro(n); if(x) return x;
+  var nom=String(n||'').trim();
+  return {nombre:nom||'\u2014', pila:(nom.split(' ')[0]||'\u2014'), unidad:'\u2014',
+          cargo:null, puntos:null, hMes:0, hAnt:null, horasTemp:0, meses:1, cuota:null,
+          coche:0, infraccion:false, _fuera:true};
+}
+function coordinadorDe(u){for(var i=0;i<DATA.miembros.length;i++) if(DATA.miembros[i].cargo==='Coordinador'&&DATA.miembros[i].unidad===u) return DATA.miembros[i].nombre; return PD_NOM;}
+function rangoNom(n){ if(n===PD_NOM) return 3; if(n===REV2_NOM) return 2; var m=miembro(n); return (m&&m.cargo==='Coordinador')?1:0; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   IDENTIDAD · ACTOR sale del login verificado, no de un conmutador.
+   El conmutador «Actúas como» solo lo ve la cuenta admin (mismo modelo que el
+   selector de persona de app.html: _puedeImpersonar_ / VER_ADMIN). Para todos
+   los demás es su propia identidad y no se puede cambiar. NO es una frontera de
+   seguridad: el backend gatea por token; esto es QA.
+   ═══════════════════════════════════════════════════════════════════════════ */
+var ACTOR=PD_NOM;
+function _puedeImpersonar_(){ return !!(SESION && SESION.email===ADMIN_EMAIL); }
+function _rolDe_(nombre){
+  if(nombre===PD_NOM) return 'Project Director';
+  if(nombre===REV2_NOM) return 'Revisor fijo · rango 2';
+  var m=miembro(nombre);
+  return (m&&m.cargo==='Coordinador') ? ('Coordinador de '+m.unidad) : 'Miembro';
+}
+
+/* ── PARTES DE HORAS ───────────────────────────────────────────────────── */
+var SEQ=20;
+var PARTES=[
+ {id:1,autor:'Iago Randán Fuciños',unidad:'Estructuras y Aerodinámica',fecha:'23/07/2026',ini:'16:30',fin:'20:00',
+  horas:3.5,tarea:'Laminado del fuselaje · tramo 2',origen:'turno',
+  just:'Laminado de las dos últimas capas de fibra del tramo 2 y curado con Xela. Quedó en el parte de taller 26-118.',
+  estado:'pend',flags:[['ok','coincide con el turno T-118']]},
+ {id:2,autor:'Uxía Berdiales Randín',unidad:'Propulsión',fecha:'22/07/2026',ini:'09:00',fin:'18:00',
+  horas:9.0,tarea:'Ensayo estático · banco de pruebas',origen:'bloque',
+  just:'Montaje del banco, dos ensayos en frío y desmontaje. Todo el día en el CITI.',
+  estado:'pend',flags:[['wa','bloque de 9 h en un solo día'],['wa','declarado a posteriori, sin fichaje']]},
+ {id:3,autor:'Xoán Bermúdez Rial',unidad:'Estructuras y Aerodinámica',fecha:'21/07/2026',ini:'18:00',fin:'21:00',
+  horas:3.0,tarea:'Revisión de planos de mamparo',origen:'turno',
+  just:'Revisión de los planos del mamparo delantero antes de mandarlos a mecanizado.',
+  estado:'pend',flags:[['wa','lo firma el coordinador de la unidad → escala']]},
+ {id:4,autor:'Noa Pardiñas Quintás',unidad:'Estructuras y Aerodinámica',fecha:'20/07/2026',ini:'17:00',fin:'19:30',
+  horas:2.5,tarea:'Mecanizado de anillos',origen:'turno',just:'Mecanizado y verificación de cotas.',
+  estado:'aprobado',decisor:PD_NOM,dec:'21/07/2026'},
+ {id:5,autor:'Xurxo Ameixeiras Codesal',unidad:'Propulsión',fecha:'19/07/2026',ini:'10:00',fin:'19:00',
+  horas:9.0,tarea:'Inventario de propulsante',origen:'bloque',just:'Recuento.',
+  estado:'detalle',decisor:PD_NOM,dec:'20/07/2026',motivo:'Nueve horas para un recuento: detalla qué se hizo en cada tramo.'}
+];
+/* enrutado de un parte: coordinador de la unidad del autor; si el autor ES el
+   coordinador, ESCALA al revisor de más rango. Nadie firma lo suyo. */
+function revisoresDeParte(p){
+  var c=coordinadorDe(p.unidad);
+  if(c!==p.autor) return [c];
+  return [PD_NOM,REV2_NOM].filter(function(n){return n!==p.autor;});
+}
+function puedeDecidirParte(p,quien){
+  if(quien===p.autor) return false;
+  var rev=revisoresDeParte(p), maxR=Math.max.apply(null,rev.map(rangoNom));
+  return rev.indexOf(quien)>=0 || rangoNom(quien)>maxR;
+}
+function pendientes(){return PARTES.filter(function(p){return p.estado==='pend';});}
+
+/* fichajes abiertos ahora mismo */
+/* «ahora» son las 19:39: los minutos abiertos se DERIVAN de la hora de entrada, no se
+   escriben a mano, o tres sesiones simultaneas darian tres relojes distintos. */
+var AHORA_MIN=19*60+39;
+var CURSO=[
+ {n:'Nerea Ferreiro Lamas',lugar:'Taller de estructuras',desde:'16:05'},
+ {n:'Breogán Cives Doural',lugar:'Sala de cálculo',desde:'18:40'},
+ {n:'Xela Rendo Trigueiro',lugar:'Taller de estructuras',desde:'09:10'}
+];
+CURSO.forEach(function(c){ var q=c.desde.split(':'); c.min=AHORA_MIN-(+q[0]*60 + +q[1]); });
+
+/* ── EXPEDIENTES ───────────────────────────────────────────────────────── */
+var DOCS=[
+ {id:1,ref:'Informe_S-2011_26',tit:'Ensayo estático del motor S-3 — resultados',autor:'Uxía Berdiales Randín',
+  sub:'Propulsión',amb:'subsistema',est:'revision',sev:'alta',iss:2},
+ {id:2,ref:'Acta_S-6301_26',tit:'Acta de la junta del 17/07/2026',autor:'Ledicia Amoedo Cambeses',
+  sub:'Org&Mark',amb:'general',est:'revision',sev:'baja',iss:0},
+ {id:3,ref:'Informe_S-4102_26',tit:'Caracterización del mamparo delantero',autor:'Nerea Ferreiro Lamas',
+  sub:'Estructuras y Aerodinámica',amb:'archivo',est:'revision',sev:'media',iss:1},
+ {id:4,ref:'Tabla_S-5507_26',tit:'Tabla de masas del tramo 2',autor:'Nerea Ferreiro Lamas',
+  sub:'Estructuras y Aerodinámica',amb:'archivo',est:'cambios',sev:'media',iss:3},
+ {id:5,ref:'Informe_S-2044_26',tit:'Curva de empuje corregida por temperatura',autor:'Xurxo Ameixeiras Codesal',
+  sub:'Propulsión',amb:'subsistema',est:'analizado',sev:'baja',iss:0},
+ {id:6,ref:'Informe_S-4110_26',tit:'Ensayo de tracción de uniones encoladas',autor:'Iago Randán Fuciños',
+  sub:'Estructuras y Aerodinámica',amb:'archivo',est:'publicado',sev:'baja',iss:0},
+ {id:7,ref:'Acta_S-6302_26',tit:'Acta del consejo del 10/07/2026',autor:'Lois Carballo Sendón',
+  sub:'Dirección',amb:'general',est:'publicado',sev:'baja',iss:0}
+];
+function revisoresDeDoc(d){
+  var r = d.amb==='general' ? [PD_NOM] : d.amb==='subsistema' ? [PD_NOM,REV2_NOM] : [coordinadorDe(d.sub)];
+  r=r.filter(function(n){return n!==d.autor;});
+  if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n){return n!==d.autor;});
+  if(!r.length) r=[PD_NOM];
+  return r;
+}
+function docsMios(){return DOCS.filter(function(d){return d.est==='revision' && revisoresDeDoc(d).indexOf(ACTOR)>=0;});}
+
+/* ── DISCIPLINA ────────────────────────────────────────────────────────── */
+var SANC_BACK=null;   /* cola real de sanciones del backend; null = semilla ficticia */
+var PART_BACK=null;   /* cola real de partes de horas del backend; null = semilla ficticia */
+var LOTE={nombre:'Formulario de O&M · 25/07',motivo:'No rellenar el formulario de O&M para la publicación del 25/07',
+  art:'30g',cerrado:false,items:[
+  {id:1,n:'Uxía Berdiales Randín',pts:-1,dec:'aceptar'},
+  {id:2,n:'Xurxo Ameixeiras Codesal',pts:-1,dec:'aceptar'},
+  {id:3,n:'Tomé Vilariño Estévez',pts:-1,dec:'aceptar'},
+  {id:4,n:'Comba Sarmiento Nogueira',pts:0,dec:'aceptar'},
+  {id:5,n:'Sabela Ordóñez Pacio',pts:-1,dec:'aceptar'}]};
+var APELA=[
+ {n:'Tomé Vilariño Estévez',motivo:'Ausencia a la reunión general del 14/07',razon:'Aportó justificante médico del mismo día.',pts:1},
+ {n:'Ledicia Amoedo Cambeses',motivo:'Deadline de la memoria de patrocinio',razon:'La tarea se reasignó y no se le comunicó.',pts:1}
+];
+
+/* ── REUNIONES ─────────────────────────────────────────────────────────── */
+var REUS=[
+ {id:1,tit:'Reunión general de fin de temporada',tipo:'general',mod:'telematica',limite:'26/07/2026',
+  conv:18,cubren:14,minimo:4,fijada:null,
+  dias:['L 27','M 28','X 29','J 30','V 31'],
+  franjas:['16:00','17:00','18:00','19:00','20:00','21:00','22:00'],
+  /* ningun valor puede superar a `cubren`: quien no ha cubierto no puede estar disponible */
+  calor:[[2,3,5,7,9,10,8],[1,3,5,6,8,9,7],[3,4,6,9,11,12,10],[2,3,4,5,7,8,6],[3,5,8,10,12,14,11]],
+  sinCubrir:['Xurxo Ameixeiras Codesal','Sabela Ordóñez Pacio','Comba Sarmiento Nogueira'],
+  bajoMin:['Uxía Berdiales Randín','Tomé Vilariño Estévez']},
+ {id:2,tit:'Junta ordinaria de agosto',tipo:'junta',mod:'hibrida',limite:'02/08/2026',
+  conv:6,cubren:5,minimo:2,fijada:null,dias:['L 03','M 04','X 05'],franjas:['18:00','19:00','20:00'],
+  calor:[[2,4,5],[3,5,4],[1,3,3]],sinCubrir:['Ledicia Amoedo Cambeses'],bajoMin:[]},
+ {id:3,tit:'Consejo · cierre de temporada',tipo:'consejo',mod:'presencial',limite:'10/08/2026',
+  conv:10,cubren:10,minimo:3,fijada:'M 11 · 19:00–21:00',dias:['L 10','M 11'],franjas:['18:00','19:00','20:00'],
+  calor:[[5,7,6],[8,10,9]],sinCubrir:[],bajoMin:[]}
+];
+/* escalas de sanción por no cubrir — decisión cerrada del PD (22/07):
+   solo general/junta/consejo sancionan. General 0,1,2,2… · junta y consejo 1 plano. */
+var VECES={'Xurxo Ameixeiras Codesal':2,'Sabela Ordóñez Pacio':0,'Comba Sarmiento Nogueira':1,
+  'Uxía Berdiales Randín':1,'Tomé Vilariño Estévez':3,'Ledicia Amoedo Cambeses':0};
+function sancionPor(tipo,nombre){
+  if(tipo!=='general'&&tipo!=='junta'&&tipo!=='consejo') return {p:0,txt:'sin sanción automática · potestad del coordinador'};
+  if(tipo==='junta'||tipo==='consejo') return {p:1,txt:'1 punto · escala plana'};
+  var v=VECES[nombre]||0;
+  if(v===0) return {p:0,txt:'aviso · 1.ª vez, sin puntos'};
+  if(v===1) return {p:1,txt:'1 punto · 2.ª vez'};
+  return {p:2,txt:'2 puntos · 3.ª o más (tope 2)'};
+}
+
+var TURNOS=[
+ {id:'T-118',f:'23/07/2026',hora:'16:30',punto:'Taller EEI · nave 2',dur:'3 h 30',plazas:'3/3'},
+ {id:'T-119',f:'29/07/2026',hora:'10:00',punto:'CITI · banco de ensayos',dur:'6 h',plazas:'2/3'},
+ {id:'T-120',f:'31/07/2026',hora:'17:00',punto:'Taller EEI · nave 2',dur:'4 h',plazas:'2/3'},
+ {id:'T-121',f:'05/08/2026',hora:'09:30',punto:'CITI · sala limpia',dur:'5 h',plazas:'2/2'}
+];
+var TAREAS=[
+ {n:'Cerrar el plano del mamparo delantero',r:'Nerea Ferreiro',s:'Estructuras y Aerodinámica',u:'alta',e:'En desarrollo',l:'27/07/2026'},
+ {n:'Memoria de fabricación del tramo 2',r:'Iago Randán',s:'Estructuras y Aerodinámica',u:'media',e:'Revisando',l:'31/07/2026'},
+ {n:'Informe del ensayo estático',r:'Uxía Berdiales',s:'Propulsión',u:'alta',e:'En desarrollo',l:'26/07/2026'},
+ {n:'Calibración de la IMU de repuesto',r:'Antía Ruibal',s:'Electrónica',u:'media',e:'Sin empezar',l:'04/08/2026'},
+ {n:'Actualizar la tabla de masas',r:'Anxo Ferradás',s:'Dinámica y Control',u:'baja',e:'Revisando',l:'08/08/2026'},
+ {n:'Dossier de patrocinio 26/27',r:'Ledicia Amoedo',s:'Org&Mark',u:'alta',e:'En desarrollo',l:'25/07/2026'}
+];
+var CANDID=[
+ {n:'Software de vuelo',d:'Estudiante de 3.º con experiencia en control embebido. Entrevista hecha el 21/07.',
+  av:'Avala Mariña Cotelo · pide 10 h/mes',fase:'entrevistada'},
+ {n:'Estructuras · composites',d:'2.º de Aeroespacial. Ha trabajado con fibra en un equipo de Fórmula Student.',
+  av:'Avala Xoán Bermúdez · pide 8 h/mes',fase:'pendiente'},
+ {n:'Comunicación y patrocinio',d:'Perfil de marketing. Interesada en el dossier de patrocinio 26/27.',
+  av:'Sin avalista · pide 6 h/mes',fase:'nueva'}
+];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PIEZAS COMUNES
+   ═══════════════════════════════════════════════════════════════════════════ */
+function pan(cab,der,cuerpo,cls){
+  return '<div class="pan'+(cls?' '+cls:'')+'"><div class="ph"><span class="sc">'+cab+'</span>'+
+    '<span class="ln"></span>'+(der?'<span class="sc">'+der+'</span>':'')+'</div>'+cuerpo+'</div>';
+}
+function kpi(t,v,d,tono,w){
+  return '<div class="kpi"><div class="sc">'+t+'</div><div class="val mono'+(tono?' '+tono:'')+'">'+v+'</div>'+
+    '<div class="d">'+d+'</div><div class="bar"><i data-w="'+w+'"></i></div></div>';
+}
+function tabla(cols,filas){
+  return '<div class="tw"><table><thead><tr>'+cols.map(function(c){
+    return '<th'+(c[1]?' class="r"':'')+'>'+c[0]+'</th>';}).join('')+'</tr></thead><tbody>'+filas+'</tbody></table></div>';
+}
+function vac(t,p){ return '<div class="vac"><b>'+esc(t)+'</b>'+p+'</div>'; }
+
+/* instrumento de puntos — geometría de gauge(): 10 arcos de 36°, hueco de 8°.
+   Aquí admite DECIMALES, porque lo que se mide es la MEDIA del equipo (04b). */
+var ACX=75,ACY=75,AR=52,AGAP=8,ASTEP=36;
+function arco(i,r,frac){
+  var a0=(-90+i*ASTEP+AGAP/2)*Math.PI/180;
+  var a1=(-90+i*ASTEP+AGAP/2+(ASTEP-AGAP)*frac)*Math.PI/180;
+  return 'M'+(ACX+r*Math.cos(a0)).toFixed(2)+' '+(ACY+r*Math.sin(a0)).toFixed(2)+
+    ' A'+r+' '+r+' 0 0 1 '+(ACX+r*Math.cos(a1)).toFixed(2)+' '+(ACY+r*Math.sin(a1)).toFixed(2);
+}
+function anilloHTML(valor,etiqueta){
+  var segs='',ticks='',i;
+  for(i=0;i<10;i++){
+    var f=Math.max(0,Math.min(1,valor-i));
+    segs+='<path class="seg vac'+(i<3?' zc':'')+'" d="'+arco(i,AR,1)+'"/>';
+    if(f>0) segs+='<path class="seg" stroke="'+(i<3?'var(--warn)':'var(--red)')+'" d="'+arco(i,AR,f)+'"/>';
+    var a=(-90+i*ASTEP)*Math.PI/180;
+    ticks+='<line class="tk'+(f>0?' f':'')+'" x1="'+(ACX+60*Math.cos(a)).toFixed(1)+'" y1="'+(ACY+60*Math.sin(a)).toFixed(1)+
+      '" x2="'+(ACX+66*Math.cos(a)).toFixed(1)+'" y2="'+(ACY+66*Math.sin(a)).toFixed(1)+'"/>';
+  }
+  return '<div class="anillo"><svg viewBox="0 0 150 150"><circle class="pista" cx="75" cy="75" r="'+AR+'"/>'+
+    ticks+segs+'</svg><div class="mid"><div class="n mono">'+nf(valor,1)+'<small>/10</small></div>'+
+    '<div class="u">'+esc(etiqueta)+'</div></div></div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VISTAS
+   ═══════════════════════════════════════════════════════════════════════════ */
+var V={};
+
+/* ── PANEL DE MANDO ──────────────────────────────────────────────────────
+   Arriba del todo y SIN scroll previo: lo que requiere tu decisión. Cada fila
+   lleva al sitio exacto, no a la sección genérica (lo pidió Daniel). ─────── */
+function colaDecision(){
+  var out=[];
+  pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).forEach(function(p){
+    out.push({ic:'i-reloj',b:h1(p.horas)+' de '+_m(p.autor).pila,
+      s:esc(p.tarea)+' · '+p.fecha+(p.origen==='bloque'?' · declarado sin fichaje':''),
+      chip:'<span class="chip wa">parte de horas</span>',ir:'partes',foco:'parte-'+p.id});
+  });
+  docsMios().forEach(function(d){
+    out.push({ic:'i-doc',b:esc(d.tit),s:d.ref+' · '+_m(d.autor).pila+' · ámbito '+d.amb+
+      (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):''),
+      chip:'<span class="chip '+(d.sev==='alta'?'no':d.sev==='media'?'wa':'ok')+'">severidad '+d.sev+'</span>',
+      ir:'docdec',foco:'doc-'+d.id});
+  });
+  if(!LOTE.cerrado && rangoNom(ACTOR)>=3)
+    out.push({ic:'i-gavel',b:'Bloque de sanciones · '+LOTE.nombre,
+      s:LOTE.items.length+' personas · Art. '+LOTE.art+' · nada se aplica hasta cerrarlo entero',
+      chip:'<span class="chip no">bloque abierto</span>',ir:'sanciones',foco:'lote'});
+  REUS.forEach(function(r0){
+    if(r0.fijada) return;
+    var cob=_cobertura_(r0);
+    var r=Object.assign({}, r0, {tit:r0.tit||r0.titulo,
+      conv:(r0.conv!=null?r0.conv:cob.conv), cubren:(r0.cubren!=null?r0.cubren:cob.cubren),
+      limite:r0.limite||'sin l\u00edmite'});
+    if(r.cubren>=r.conv) return;
+    out.push({ic:'i-cal',b:'\u00ab'+esc(r.tit)+'\u00bb sin fijar',
+      s:r.cubren+' de '+r.conv+' han cubierto \u00b7 cierra el '+r.limite,
+      chip:'<span class="chip">reunión</span>',ir:'dispo',foco:'reu-'+r.id});
+  });
+  return out;
+}
+V.panel={g:'Operación',t:'Panel de mando',f:function(){
+  var cola=colaDecision();
+  /* Con la forma MIEMBRO el backend solo manda identidad de los demas (nombre,
+     pila, unidad, cargo): no hay puntos ni horas ajenas. Se agrega SOLO sobre
+     quien trae el dato, y si no hay nadie se dice, en vez de pintar NaN. */
+  var conPts=DATA.miembros.filter(function(m){return typeof m.puntos==='number';});
+  var conH  =DATA.miembros.filter(function(m){return typeof m.hMes==='number';});
+  var media=conPts.length?conPts.reduce(function(a,m){return a+m.puntos;},0)/conPts.length:null;
+  var totH =conH.reduce(function(a,m){return a+m.hMes;},0);
+  var bajo =conH.filter(function(m){return m.hMes<UMBRAL;}).length;
+  var infra=DATA.miembros.filter(function(m){return m.infraccion;}).length;
+  var parcial = conH.length < DATA.miembros.length;
+  var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
+
+  var lista = cola.length
+    ? cola.map(function(x){
+        return '<div class="dec" data-ir="'+x.ir+'" data-foco="'+x.foco+'">'+
+          '<span class="ic"><svg><use href="#'+x.ic+'"/></svg></span>'+
+          '<span class="tx"><b>'+x.b+'</b><small>'+x.s+'</small></span>'+
+          '<span class="der">'+x.chip+'<span class="chev">›</span></span></div>';
+      }).join('')
+    : vac('Nada requiere tu decisión','No hay partes, expedientes ni bloques esperándote. Cuando llegue algo de tu jurisdicción, aparece aquí arriba y no hay que ir a buscarlo.');
+
+  return pan('Requiere tu decisión',cola.length+' asuntos',lista,'destaca')+
+    '<div class="kpis">'+
+      kpi('Horas en el aire',nf(enAire,1)+'<small> h</small>','no cuentan hasta que se firmen','wa','58%')+
+      kpi('Expedientes esperándote',docsMios().length,'de tu jurisdicción',docsMios().length?'wa':'up','40%')+
+      kpi('Bajo el umbral',bajo,'de '+conH.length+' con horas visibles · menos de '+nf(UMBRAL,1)+' h/mes','wa',(conH.length?(bajo/conH.length*100).toFixed(0):0)+'%')+
+      kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(infra/DATA.miembros.length*100).toFixed(0)+'%')+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:300px 1fr;gap:13px;align-items:start">'+
+      pan('Conducta del equipo', media==null?'sin datos':('media de '+conPts.length),
+        '<div class="pb" style="display:flex;flex-direction:column;align-items:center;gap:12px">'+
+          (media==null
+            ? vac('No se sirven los puntos del equipo','Con tu rol el backend solo manda la identidad de los demás '+
+                '(nombre, unidad y cargo), no sus puntos ni sus horas. Este panel es de coordinación: para verlo '+
+                'entero hace falta que el servidor abra esos datos a consejo y junta, no solo a la cuenta admin.')
+            : anilloHTML(media,'media del equipo'))+
+          '<p style="margin:0;font-size:11.5px;color:var(--ink3);line-height:1.6;text-align:center">'+
+          'El anillo admite decimales porque mide una <b style="color:var(--ink2)">media</b>. En la ficha de una '+
+          'persona los tramos son enteros: los puntos no son un porcentaje.</p></div>')+
+      pan('Resumen del mes','julio 2026',
+        '<div class="pb">'+
+          '<div class="chips">'+
+            '<span class="chip">TOTAL <b style="color:var(--ink)">'+nf(totH,1)+' h</b>'+(parcial?' <span style="color:var(--warn)">(parcial)</span>':'')+'</span>'+
+            '<span class="chip">MEDIA <b style="color:var(--ink)">'+(conH.length?nf(totH/conH.length,1):'—')+' h</b></span>'+
+            '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+nf(UMBRAL,1)+' h</b></span>'+
+            '<span class="chip">CIERRA <b style="color:var(--ink)">31/07</b></span>'+
+          '</div>'+
+          insightsHTML()+
+        '</div>')+
+    '</div>';
+}};
+/* lecturas automáticas: lo que un humano no ve de un vistazo en una tabla */
+function insightsHTML(){
+  var xs=[];
+  /* se ordena por el MISMO porcentaje que luego se imprime: si no, el rotulo nombra
+     a uno y ensena un numero que no es el mayor. */
+  var conAnt=DATA.miembros.filter(function(m){ return m.hAnt!=null && m.hAnt>0; });
+  if(conAnt.length>=2){
+    var vpc=function(m){ return (m.hMes-m.hAnt)/m.hAnt*100; };
+    var subida=conAnt.slice().sort(function(a,b){return vpc(b)-vpc(a);})[0];
+    var bajada=conAnt.slice().sort(function(a,b){return vpc(a)-vpc(b);})[0];
+    xs.push(['up',esc(subida.pila)+' es quien m\u00e1s sube: '+pc(vpc(subida))+
+      ' respecto al mes pasado ('+h1(subida.hAnt)+' \u2192 '+h1(subida.hMes)+').']);
+    xs.push(['dn',esc(bajada.pila)+' es quien m\u00e1s baja: '+pc(vpc(bajada))+
+      ' ('+h1(bajada.hAnt)+' \u2192 '+h1(bajada.hMes)+').']);
+  } else {
+    /* no se finge una comparativa que no existe: se dice que falta el dato */
+    xs.push(['wa','No hay horas del mes anterior en el panel, as\u00ed que no se puede comparar '+
+      'mes a mes. Har\u00eda falta que el motor empuje `hAnt` o un hist\u00f3rico.']);
+    var top=DATA.miembros.slice().sort(function(a,b){return (b.hMes||0)-(a.hMes||0);})[0];
+    if(top) xs.push(['up',esc(top.pila)+' es quien m\u00e1s horas lleva este mes: '+h1(top.hMes||0)+'.']);
+  }
+  var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
+  if(enAire>0) xs.push(['wa',nf(enAire,1)+' h están sin firmar. Mientras sigan ahí, el umbral del mes y el '+
+    'ranking se calculan con datos incompletos.']);
+  var sinCubrir=REUS.reduce(function(a,r){
+    var sc = r.sinCubrir || _cobertura_(r).sinCubrir;   /* el dato real no lo trae: se deriva */
+    return a+((sc&&sc.length)||0); },0);
+  if(sinCubrir) xs.push(['wa',sinCubrir+' personas no han cubierto alguna disponibilidad abierta. '+
+    'Mira «Disponibilidad y riesgo» para ver qué sanción implicaría a cada una.']);
+  var largos=CURSO.filter(function(c){return c.min>=600;}).length;
+  if(largos) xs.push(['wa',largos+' fichaje'+(largos===1?'':'s')+' lleva'+(largos===1?'':'n')+
+    ' más de 10 h abierto. A las 14 h se cierran solos con la hora de la última actividad.']);
+  return xs.map(function(x){
+    return '<div style="display:flex;gap:9px;padding:8px 0;border-top:1px solid rgba(50,44,46,.7);font-size:12.5px;color:var(--ink2);line-height:1.55">'+
+      '<span class="'+x[0]+'" style="flex:none;font-family:var(--mono)">'+(x[0]==='up'?'▲':x[0]==='dn'?'▼':'!')+'</span>'+
+      '<span>'+x[1]+'</span></div>';
+  }).join('');
+}
+
+/* ── PARTES DE HORAS ─────────────────────────────────────────────────────
+   Organización de la 06a: los que decides tú arriba, los de otros visibles
+   pero no decidibles, y el histórico. La justificación se ve SIN desplegar:
+   es lo que se juzga. Acciones: aprobar · pedir detalle · rechazar, más
+   OTORGAR horas directamente (lo pidió Daniel). ─────────────────────────── */
+function parteCard(p){
+  var m=_m(p.autor), rev=revisoresDeParte(p), puede=puedeDecidirParte(p,ACTOR);
+  var esc2=(coordinadorDe(p.unidad)===p.autor);
+  return '<div class="parte" id="parte-'+p.id+'">'+
+    '<div class="h"><b>'+esc(m.pila)+'</b><span class="u">'+esc(p.unidad)+'</span>'+
+      '<span class="u">'+p.fecha+' · '+p.ini+'–'+p.fin+'</span>'+
+      '<span class="q">'+nf(p.horas,1)+'<small> h</small></span></div>'+
+    '<div class="just"><span class="sc">'+esc(p.tarea)+'</span>'+esc(p.just)+'</div>'+
+    '<div class="fl">'+p.flags.map(function(f){
+      return '<span class="chip '+(f[0]==='ok'?'ok':'wa')+'">'+esc(f[1])+'</span>';}).join('')+
+      (p.origen==='bloque'?'':'<span class="chip ok">con fichaje</span>')+'</div>'+
+    '<div class="ruta">Le corresponde a <b>'+esc(rev.map(function(n){return miembro(n)?miembro(n).pila:n;}).join(' o '))+'</b>'+
+      (esc2?' — <span class="wa">escalado: '+esc(m.pila)+' coordina su propia unidad, así que sube al de más rango</span>':
+       ' · coordinador de '+esc(p.unidad))+'.'+
+      (puede?'':' <b>Tu rango no alcanza para decidirlo.</b>')+'</div>'+
+    (puede?'<textarea data-motivo placeholder="Motivo — obligatorio para rechazar o pedir detalle…"></textarea>'+
+      '<div class="acts">'+
+        '<button class="btn pri" data-parte="'+p.id+'" data-acc="si">Aprobar</button>'+
+        '<button class="btn" data-parte="'+p.id+'" data-acc="det">Pedir detalle</button>'+
+        '<button class="btn no" data-parte="'+p.id+'" data-acc="no">Rechazar</button>'+
+      '</div>':'')+
+  '</div>';
+}
+V.partes={g:'Horas',t:'Partes de horas',f:function(){
+  var cola=pendientes();
+  var mias=cola.filter(function(p){return puedeDecidirParte(p,ACTOR);});
+  var otras=cola.filter(function(p){return !puedeDecidirParte(p,ACTOR);});
+  var hist=PARTES.filter(function(p){return p.estado!=='pend';});
+  var totH=cola.reduce(function(a,p){return a+p.horas;},0);
+  return '<div class="kpis">'+
+      kpi('Esperan tu decisión',mias.length,mias.length?'de tu jurisdicción':'nada tuyo en cola',mias.length?'wa':'up',(mias.length*20)+'%')+
+      kpi('Horas en el aire',nf(totH,1)+'<small> h</small>','no cuentan hasta aprobarse','wa','56%')+
+      kpi('Cola completa',cola.length,'de todo el equipo','','45%')+
+      kpi('Resueltos este mes',hist.length,'con su motivo registrado','up','70%')+
+    '</div>'+
+    pan('Requieren tu decisión',mias.length+' partes',
+      mias.length?mias.map(parteCard).join(''):vac('La cola está limpia',
+        'Cuando alguien de tu unidad declare horas, aparecerá aquí con su justificación a la vista.'),'destaca')+
+    pan('Otorgar horas directamente','sin que nadie las pida',
+      '<div class="pb"><p style="margin:0 0 11px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
+      'A veces las horas las pone el coordinador: una feria, un traslado, un turno que no se fichó. '+
+      'Se registran como <b>otorgadas</b>, cuentan igual y en la app del miembro salen marcadas como tales '+
+      '—no como algo que él declaró—, para que el rastro no mienta.</p>'+
+      '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
+        '<label style="flex:1;min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">A quién</span>'+
+        '<select style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
+        DATA.miembros.map(function(m){return '<option>'+esc(m.nombre)+'</option>';}).join('')+'</select></label>'+
+        '<label style="width:110px"><span class="sc" style="display:block;margin-bottom:5px">Horas</span>'+
+        '<input class="mono" value="3,0" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-family:var(--mono);font-size:12.5px"></label>'+
+        '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Concepto</span>'+
+        '<input placeholder="p. ej. Feria de divulgación · montaje" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
+        '<button class="btn pri" data-otorgar>Otorgar</button>'+
+      '</div></div>')+
+    (otras.length?pan('En la cola de otros',otras.length+' partes · los ves, no los decides',
+      otras.map(parteCard).join('')):'')+
+    pan('Histórico',hist.length+' decisiones',
+      hist.map(function(p){
+        var et=p.estado==='aprobado'?'<span class="chip ok">aprobado</span>'
+              :p.estado==='rechazado'?'<span class="chip no">rechazado</span>'
+              :'<span class="chip wa">devuelto · falta detalle</span>';
+        return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+
+          h1(p.horas)+' · '+esc(p.tarea)+'</b><small>'+p.fecha+' · decidió '+
+          esc(_m(p.decisor||PD_NOM).pila)+' el '+(p.dec||'—')+
+          (p.motivo?' · «'+esc(p.motivo)+'»':'')+'</small></span><span class="der">'+et+'</span></div>';
+      }).join(''))+
+    '<div class="pan"><div class="nota">El enrutado no lo elige nadie a mano: un parte va al <b>coordinador de la '+
+      'unidad de quien lo firma</b>; si el autor es ese coordinador, <b>escala</b> al revisor de más rango. Rango '+
+      '<b>PD (3) &gt; revisor fijo (2) &gt; coordinador (1) &gt; miembro (0)</b>, y <b>nadie decide lo suyo</b>. '+
+      'Es exactamente el modelo que la app ya usa para aprobar documentos, aplicado a las horas.</div></div>';
+}};
+
+/* ── FICHAJES EN CURSO ───────────────────────────────────────────────────── */
+V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
+  return pan('Sesiones abiertas ahora mismo',CURSO.length+' personas',
+    CURSO.map(function(c){
+      var wa=c.min>=600;
+      var hh=Math.floor(c.min/60), mm=c.min%60;
+      return '<div class="curso'+(wa?' wa':'')+'"><span class="pt"></span>'+
+        '<span class="tx"><b>'+esc(_m(c.n).pila)+'</b>'+
+        '<small>'+esc(c.lugar)+' · desde las '+c.desde+'</small></span>'+
+        '<span class="q mono">'+hh+' h '+String(mm).padStart(2,'0')+'</span>'+
+        (wa?'<span class="chip wa">avisado</span>':'<span class="chip ok">en curso</span>')+'</div>';
+    }).join('')+
+    '<div class="nota">Un fichaje que pasa de <b>10 horas abiertas</b> se marca en ámbar y se le avisa al miembro. '+
+    'A las <b>14 h</b> se cierra solo con la hora de su última actividad y le queda pendiente de corregir: '+
+    'así nunca se pierde una sesión olvidada y nunca se regalan horas que no se trabajaron.</div>');
+}};
+
+/* ── REGISTRO DEL MES ────────────────────────────────────────────────────── */
+V.registro={g:'Horas',t:'Registro del mes',f:function(){
+  /* solo entran los que traen horas: con la forma MIEMBRO el backend no sirve
+     las ajenas, y una tabla de 32 filas vacias no es un registro, es ruido. */
+  var VIS=DATA.miembros.filter(function(m){ return typeof m.hMes==='number'; });
+  if(!VIS.length) return pan('Registro del mes','sin datos',
+    vac('El servidor no te sirve las horas del equipo','Con tu rol, `getPanel` solo devuelve tu propia ficha '+
+      'y la identidad de los demás. Para que consejo y junta vean el registro entero hace falta abrirlo '+
+      'en el backend, hoy reservado a la cuenta admin.'));
+  var tot=VIS.reduce(function(a,m){return a+(m.hMes||0);},0);
+  return '<div class="chips"><span class="chip">TOTAL <b style="color:var(--ink)">'+nf(tot,1)+' h</b></span>'+
+    '<span class="chip">MEDIA <b style="color:var(--ink)">'+nf(tot/VIS.length,1)+' h</b></span>'+
+    '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+nf(UMBRAL,1)+' h/mes</b></span>'+
+    (VIS.length<DATA.miembros.length?'<span class="chip wa">solo '+VIS.length+' de '+DATA.miembros.length+' visibles</span>':'')+'</div>'+
+    pan('Horas por miembro · julio 2026','confirmadas',
+      tabla([['Miembro'],['Unidad'],['Julio',1],['Junio',1],['Δ',1],['vs. objetivo',1]],
+        VIS.slice().sort(function(a,b){return (b.hMes||0)-(a.hMes||0);}).map(function(m){
+          /* hAnt (mes anterior) NO existe en el dato real del panel: hoy nadie lo
+             sirve. Antes de inventarlo, se dice que no esta. */
+          var hay=(m.hAnt!=null && m.hAnt>0);
+          var d=hay?((m.hMes-m.hAnt)/m.hAnt*100):null, o=UMBRAL?((m.hMes-UMBRAL)/UMBRAL*100):0;
+          return '<tr><td><span class="mem"><span class="av">'+ini(m.nombre)+'</span>'+esc(m.pila||m.nombre)+'</span></td>'+
+            '<td style="color:var(--ink3)">'+esc(m.unidad)+'</td>'+
+            '<td class="r mono">'+nf(m.hMes||0,1)+'</td>'+
+            '<td class="r mono" style="color:var(--ink3)">'+(hay?nf(m.hAnt,1):'\u2014')+'</td>'+
+            '<td class="r mono '+(d==null?'':(d>=0?'up':'dn'))+'">'+(d==null?'\u2014':pc(d))+'</td>'+
+            '<td class="r mono '+(o>=0?'up':'dn')+'">'+pc(o)+'</td></tr>';
+        }).join('')));
+}};
+
+/* ── CIERRE MENSUAL ──────────────────────────────────────────────────────── */
+V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
+  var sinFirmar=pendientes().length;
+  var pasos=[
+    ['Consolidar las horas del mes', sinFirmar===0, sinFirmar?sinFirmar+' partes sin firmar':'todo firmado', sinFirmar>0],
+    ['Cerrar el bloque de sanciones', LOTE.cerrado, LOTE.cerrado?'cerrado y en cola de aplicación':LOTE.items.length+' personas sin confirmar', !LOTE.cerrado],
+    ['Resolver los expedientes en revisión', docsMios().length===0, docsMios().length?docsMios().length+' esperando tu firma':'ninguno pendiente de ti', false],
+    ['Recalcular umbral y cuota', true, 'lo hace el motor · curva t, truncada al céntimo', false],
+    ['Publicar el ranking del mes', true, 'ponderado horas de temporada / meses en el equipo', false],
+    ['Comunicado al canal', false, 'se manda al cerrar, con los grupos y las menciones', false]
+  ];
+  var hechos=pasos.filter(function(p){return p[1];}).length;
+  var bloqueado=pasos.some(function(p){return p[3];});
+  return '<div class="chips"><span class="chip">CIERRA <b style="color:var(--ink)">31/07/2026</b></span>'+
+    '<span class="chip">QUEDAN <b style="color:var(--ink)">7 días</b></span>'+
+    '<span class="chip '+(bloqueado?'no':'ok')+'">'+(bloqueado?'BLOQUEADO':'LISTO PARA CERRAR')+'</span></div>'+
+    pan('Pasos del cierre',hechos+' de '+pasos.length+' hechos',
+      pasos.map(function(p){
+        return '<div class="paso'+(p[1]?' ok':'')+(p[3]?' bloq':'')+'"><span class="bx"></span>'+
+          '<span class="tx"><b>'+esc(p[0])+'</b><small>'+esc(p[2])+'</small></span>'+
+          (p[3]?'<span class="chip no">bloquea</span>':(p[1]?'<span class="chip ok">listo</span>':'<span class="chip">pendiente</span>'))+
+          '</div>';
+      }).join('')+
+      '<div class="nota">El cierre <b>no arranca</b> mientras queden partes de horas sin decidir o un bloque de '+
+      'sanciones abierto: las horas moverían el umbral a posteriori y el comunicado saldría incompleto. '+
+      'Es la misma razón por la que un bloque se confirma entero y no de una en una.</div>')+
+    pan('Cerrar julio','',
+      '<div class="pb"><button class="btn pri" '+(bloqueado?'disabled':'')+' data-cerrarmes>'+
+      (bloqueado?'Bloqueado · resuelve lo de arriba':'Cerrar el mes y mandar el comunicado')+'</button></div>');
+}};
+
+/* ── DOCUMENTOS ──────────────────────────────────────────────────────────── */
+function filaDoc(d){
+  var rev=revisoresDeDoc(d).map(function(n){return miembro(n)?miembro(n).pila:n;}).join(' o ');
+  var puede=revisoresDeDoc(d).indexOf(ACTOR)>=0 || rangoNom(ACTOR)>Math.max.apply(null,revisoresDeDoc(d).map(rangoNom));
+  return '<div class="dec" id="doc-'+d.id+'" style="cursor:default">'+
+    '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
+    '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+d.ref+'</span> · '+
+      esc(_m(d.autor).pila)+' · ámbito '+d.amb+' · firma '+esc(rev)+
+      (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+'</small></span>'+
+    '<span class="der"><span class="chip '+(d.sev==='alta'?'no':d.sev==='media'?'wa':'ok')+'">sev. '+d.sev+'</span>'+
+      (d.est==='revision'&&puede
+        ?'<button class="btn sm" data-doc="'+d.id+'" data-acc="cambios">Cambios</button>'+
+         '<button class="btn sm pri" data-doc="'+d.id+'" data-acc="aprobar">Aprobar</button>'
+        :'<span class="chip '+(d.est==='publicado'?'ok':d.est==='cambios'?'no':'')+'">'+d.est+'</span>')+
+    '</span></div>';
+}
+V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
+  var m=docsMios();
+  return pan('Expedientes que firmas tú',m.length+' pendientes',
+    m.length?m.map(filaDoc).join(''):vac('Bandeja limpia',
+      'Nada esperando tu firma. El routing va por ámbito: archivo de miembro → su coordinador · informe de '+
+      'subsistema → PD o '+esc(_m(REV2_NOM).pila)+' · informe general → solo el PD. Y nadie firma lo suyo.'),'destaca')+
+    '<div class="pan"><div class="nota">Esto sustituye el correo con palabra clave del pipeline de Cowork: '+
+    'el revisor decide de un toque, la decisión se registra en el backend y Cowork la lee de ahí para disparar '+
+    'Notion, Drive, el Libro de Datos y el aviso a Discord.</div></div>';
+}};
+V.docurso={g:'Documentos',t:'En curso',f:function(){
+  var c=DOCS.filter(function(d){return ['recibido','analizado','revision','cambios'].indexOf(d.est)>=0;});
+  return pan('Pipeline documental',c.length+' expedientes',c.map(filaDoc).join(''));
+}};
+V.docpub={g:'Documentos',t:'Publicados',f:function(){
+  var p=DOCS.filter(function(d){return d.est==='publicado';});
+  return '<div class="chips"><span class="chip">EN NOTION <b style="color:var(--ink)">41</b></span>'+
+    '<span class="chip">LIBRO DE DATOS <b style="color:var(--ink)">28</b></span></div>'+
+    pan('Últimos publicados','fuente de verdad: Notion',p.map(filaDoc).join(''));
+}};
+
+/* ── DISCIPLINA ──────────────────────────────────────────────────────────── */
+/* el rango de puntos del bloque se CALCULA, nunca se escribe a mano: un aviso (0
+   puntos) no es «-1 punto», y un bloque puede mezclar valores. */
+function rangoLote(){
+  var vals=[],avisos=0;
+  LOTE.items.forEach(function(x){ if(!Number(x.pts)) avisos++; else if(vals.indexOf(x.pts)<0) vals.push(x.pts); });
+  vals.sort(function(a,b){return Math.abs(a)-Math.abs(b);});
+  var et=function(pp){ return (pp>0?'+':'−')+Math.abs(pp)+' '+(Math.abs(pp)===1?'punto':'puntos'); };
+  var nS=LOTE.items.length-avisos;
+  var t = !vals.length ? '' : (vals.length===1 ? et(vals[0])+(nS>1?' c/u':'')
+        : 'de '+et(vals[0])+' a '+et(vals[vals.length-1]));
+  if(avisos) t += (t?' · ':'')+avisos+' aviso'+(avisos===1?'':'s');
+  return t;
+}
+V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
+  var c={aceptar:0,justificar:0,rechazar:0};
+  LOTE.items.forEach(function(x){c[x.dec]++;});
+  var cuerpo = LOTE.cerrado
+    ? '<div class="pb">'+vac('Bloque cerrado','Entró entero y de una vez. La rutina lo aplica en Notion '+
+        '(copiar → editar → contrastar) y manda un solo comunicado con sus grupos y menciones.')+'</div>'
+    : '<div class="pb"><div class="lote" id="lote">'+
+      '<div class="lote-h"><b>'+LOTE.items.length+' personas</b><span class="mono" style="color:var(--red2)">'+rangoLote()+'</span></div>'+
+      '<div class="lote-m">'+esc(LOTE.motivo)+' · <b>Art. '+LOTE.art+'</b></div>'+
+      LOTE.items.map(function(x){
+        var m=_m(x.n), t=(x.dec!=='aceptar')?' tach':'';
+        /* si la decision marcada NO es aceptar no se resta nada: la prevision tiene
+           que reflejar lo que va a pasar de verdad al cerrar el bloque. */
+        var antes=m?m.puntos:10;
+        var desp=(x.dec==='aceptar')?Math.max(0,Math.min(10,antes+x.pts)):antes;
+        return '<div class="lrow"><span class="nm">'+esc(x.n)+
+          '<span class="sc" style="display:block;margin-top:3px">'+antes+' → '+desp+'</span></span>'+
+          '<span class="vl'+t+'">'+(x.pts===0?'aviso':x.pts)+'</span>'+
+          '<span class="decs" data-lid="'+x.id+'">'+
+            '<button class="'+(x.dec==='aceptar'?'on a':'')+'" data-dec="aceptar">Acepta</button>'+
+            '<button class="'+(x.dec==='justificar'?'on j':'')+'" data-dec="justificar">Justifica</button>'+
+            '<button class="'+(x.dec==='rechazar'?'on r':'')+'" data-dec="rechazar">Rechaza</button>'+
+          '</span>'+
+          '<button class="btn sm" data-mod="'+x.id+'">Modificar</button></span></div>';
+      }).join('')+
+      '<div class="cierrel"><div class="tx"><b class="up">'+c.aceptar+'</b> se aplican · '+
+        '<b>'+c.justificar+'</b> justificadas · <b class="dn">'+c.rechazar+'</b> rechazadas'+
+        '<em>Marcar no aplica nada. No se sanciona a nadie hasta que cierras el bloque entero: aprobar de una '+
+        'en una podía dejar medio bloque aplicado y el comunicado incompleto.</em></div>'+
+        '<button class="btn pri" data-lote>Aprobar el bloque · '+c.aceptar+' sanciones</button></div>'+
+      '</div></div>';
+  return pan('Bloque abierto · '+esc(LOTE.nombre),'RRI Título VII',cuerpo,'destaca')+
+    '<div class="pan"><div class="nota"><b>Modificar</b> solo existe en las sanciones sueltas y aquí, por fila, '+
+    'para corregir el artículo o los puntos de una persona antes de cerrar. Lo que <b>no</b> se puede es cambiar el '+
+    'motivo del bloque persona a persona: en un lote todas comparten motivo y artículo, y eso es lo que hace que '+
+    'salga un único comunicado.</div></div>';
+}};
+V.apela={g:'Disciplina',t:'Apelaciones',f:function(){
+  return pan('Apelaciones abiertas',APELA.length+'',
+    APELA.map(function(a){
+      return '<div class="dec" style="cursor:default"><span class="ic"><svg><use href="#i-gavel"/></svg></span>'+
+        '<span class="tx"><b>'+esc(a.n)+'</b><small>'+esc(a.motivo)+' · '+esc(a.razon)+'</small></span>'+
+        '<span class="der"><span class="chip ok">+'+a.pts+'</span>'+
+        '<button class="btn sm no">Denegar</button><button class="btn sm pri">Estimar</button></span></div>';
+    }).join('')+
+    '<div class="nota">Estimar una apelación no borra nada: encola el <b>movimiento inverso</b>, que pasa por la '+
+    'misma cola y se confirma igual. Así queda rastro de la sanción y de su marcha atrás.</div>');
+}};
+
+/* ── REUNIONES ───────────────────────────────────────────────────────────── */
+V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
+  return pan('Reuniones abiertas',REUS.length+'',
+    tabla([['Reunión'],['Tipo'],['Modalidad'],['Convocados',1],['Han cubierto',1],['Cierra',1],['Estado',1]],
+      REUS.map(function(r0){
+        var cob=_cobertura_(r0);
+        var r=Object.assign({}, r0, {tit:r0.tit||r0.titulo, mod:r0.mod||r0.modalidad,
+          conv:(r0.conv!=null?r0.conv:cob.conv), cubren:(r0.cubren!=null?r0.cubren:cob.cubren),
+          limite:r0.limite||'\u2014'});
+        return '<tr><td>'+esc(r.tit)+'</td><td class="mono" style="color:var(--ink3)">'+r.tipo+'</td>'+
+          '<td class="mono" style="color:var(--ink3)">'+(MOD_ET[r.mod]||r.mod)+'</td>'+
+          '<td class="r mono">'+r.conv+'</td>'+
+          '<td class="r mono '+(r.cubren===r.conv?'up':'wa')+'">'+r.cubren+'</td>'+
+          '<td class="r mono">'+r.limite+'</td>'+
+          '<td class="r">'+(r.fijada?'<span class="chip ok">📌 '+esc(r.fijada)+'</span>':'<span class="chip wa">sin fijar</span>')+'</td></tr>';
+      }).join(''))+
+    '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>');
+}};
+/* Disponibilidad y riesgo: por reunión, un desplegable con quién no ha cubierto
+   y QUÉ SANCIÓN le caería, según la escala cerrada del PD. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   La rejilla real NO es un rectangulo lleno: la del 28/07 son 14 dias x 13 franjas
+   = 182 celdas, pero solo 102 estan OFERTADAS, y `resp[nombre]` es un vector plano
+   indexado contra `bloques`, no contra [dia][franja]. Leerlo como matriz densa da
+   basura. Esto reproduce lo que ya hace app.html: matriz dispersa con null en lo
+   no ofertado. Si la reunion trae `calor` (semilla ficticia), se respeta.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function _calorDe_(r){
+  if(Array.isArray(r.calor) && r.calor.length) return r.calor;      // semilla
+  var nD=(r.dias||[]).length, nF=(r.franjas||[]).length;
+  var cel=[]; for(var i=0;i<nD;i++){ cel.push(new Array(nF).fill(null)); }
+  var nombres=Object.keys(r.resp||{}).filter(function(n){ return Array.isArray(r.resp[n]); });
+  (r.bloques||[]).forEach(function(b,i){
+    if(!Array.isArray(b)) return;
+    var d=b[0], f=b[1];
+    if(!(cel[d]) || f<0 || f>=nF) return;
+    var n=0; nombres.forEach(function(nm){ if((+r.resp[nm][i]||0)>0) n++; });
+    cel[d][f]=n;
+  });
+  return cel;
+}
+/* etiqueta de franja: el dato real las trae como {ini,dur}; la semilla, como string */
+function _iniF(f){ return (f&&typeof f==='object') ? String(f.ini||'') : String(f||''); }
+/* ═══════════════════════════════════════════════════════════════════════════
+   EL MÍNIMO EXIGIDO · Reforma §P3. No es una heurística: es una regla del PD.
+   25 % de los bloques ofertados en MAYO–AGOSTO y DICIEMBRE–ENERO; 30 % el resto.
+   La AUTORIDAD es `minimo_por_periodo()` en flujos/construir_reunion.py — el motor
+   es quien sanciona; aquí solo se muestra. Si esa función cambia, esto cambia.
+   El periodo se toma de la FECHA DE LA REUNIÓN (o de su límite), no de hoy: una
+   reunión de septiembre convocada en agosto exige el 30 %, no el 25 %.
+   ═══════════════════════════════════════════════════════════════════════════ */
+var MESES_MINIMO_BAJO=[1,5,6,7,8,12];
+function _pctMinimo_(iso){
+  var mes=null;
+  var m=String(iso||'').match(/^(\d{4})-(\d{2})/);
+  if(m) mes=+m[2];
+  if(mes==null) mes=new Date().getMonth()+1;
+  return MESES_MINIMO_BAJO.indexOf(mes)>=0 ? 0.25 : 0.30;
+}
+function _minimoExigido_(r){
+  var tot = r.total || (r.bloques||[]).length || 0;
+  var ref = r.fecha || r.limite || (typeof DATA!=='undefined'?DATA.generado:'');
+  return Math.max(1, Math.round(tot*_pctMinimo_(ref)));
+}
+function _etiquetaMinimo_(r){
+  var pct=Math.round(_pctMinimo_(r.fecha||r.limite||DATA.generado)*100);
+  return _minimoExigido_(r)+' bloques ('+pct+' % de '+(r.total||(r.bloques||[]).length||0)+')';
+}
+/* quien ha cubierto, quien no y cuantos estaban convocados — derivado, no inventado */
+function _cobertura_(r){
+  var resp=r.resp||{};
+  var cubren=Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); });
+  var universo = (r.invitados&&r.invitados.length) ? r.invitados
+               : (r.tipo==='general' ? DATA.miembros.map(function(m){return m.nombre;}) : cubren);
+  /* el convocante organiza: esta exento de cubrir su propia encuesta */
+  universo = universo.filter(function(n){ return n!==r.convocante; });
+  var sin = universo.filter(function(n){ return cubren.indexOf(n)<0; });
+  var minimo = r.minimo!=null ? r.minimo : _minimoExigido_(r);
+  var bajo = cubren.filter(function(n){
+    var v=resp[n]||[]; var c=0; v.forEach(function(x){ if((+x||0)>0) c++; });
+    return c>0 && c<minimo && n!==r.convocante;
+  });
+  return {cubren:cubren.length, conv:universo.length, sinCubrir:sin, bajoMin:bajo, minimo:minimo};
+}
+V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
+  if(!REUS.length) return pan('Disponibilidad y riesgo','',
+    vac('No hay ninguna reuni\u00f3n','Cuando se convoque una, aqui saldra su mapa de calor y a quien le caeria sancion por no cubrir.'));
+  return REUS.map(function(r0){
+    var cob=_cobertura_(r0);
+    var r=Object.assign({}, r0, {calor:_calorDe_(r0), conv:(r0.conv!=null?r0.conv:cob.conv),
+      cubren:(r0.cubren!=null?r0.cubren:cob.cubren), minimo:cob.minimo,
+      sinCubrir:(r0.sinCubrir||cob.sinCubrir), bajoMin:(r0.bajoMin||cob.bajoMin),
+      mod:r0.mod||r0.modalidad, tit:r0.tit||r0.titulo, limite:r0.limite||'sin l\u00edmite'});
+    var max=0; r.calor.forEach(function(f){f.forEach(function(v){if(v!=null&&v>max)max=v;});});
+    var best={d:0,f:0,v:-1};
+    r.calor.forEach(function(f,di){f.forEach(function(v,fi){if(v!=null&&v>best.v)best={d:di,f:fi,v:v};});});
+    var g='<div class="heat"><div class="hg" style="grid-template-columns:auto repeat('+r.franjas.length+',minmax(28px,1fr))">';
+    g+='<div class="hc"></div>';
+    r.franjas.forEach(function(f){ g+='<div class="hc rh"><span>'+_iniF(f).replace(':00','')+'</span></div>'; });
+    r.dias.forEach(function(d,di){
+      g+='<div class="hc rd">'+d+'</div>';
+      r.calor[di].forEach(function(v,fi){
+        if(v==null){ g+='<div class="cel" style="background:transparent"></div>'; return; }  // no ofertada
+        var a=max?(0.12+0.88*v/max).toFixed(3):'0.12';
+        g+='<div class="cel'+((di===best.d&&fi===best.f)?' best':'')+'" style="background:rgba(228,30,37,'+a+')">'+v+'</div>';
+      });
+    });
+    g+='</div></div>';
+    var riesgo=r.sinCubrir.map(function(n){
+      var s=sancionPor(r.tipo,n), m=miembro(n);
+      return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(m?m.nombre:n)+'</b>'+
+        '<small>no ha cubierto · '+(VECES[n]||0)+' antecedente'+((VECES[n]||0)===1?'':'s')+' esta temporada</small></span>'+
+        '<span class="der"><span class="chip '+(s.p===0?'':(s.p>=2?'no':'wa'))+'">'+esc(s.txt)+'</span></span></div>';
+    }).join('');
+    var bajo=r.bajoMin.map(function(n){
+      var m=miembro(n);
+      return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(m?m.nombre:n)+'</b>'+
+        '<small>cubrió por debajo del mínimo exigido · '+_etiquetaMinimo_(r)+'</small></span>'+
+        '<span class="der"><span class="chip wa">−1 punto · Art. 30·P3</span></span></div>';
+    }).join('');
+    return '<div class="acord" id="reu-'+r.id+'"><div class="hh" data-acord>'+
+      '<span class="tx"><b>'+esc(r.tit)+'</b><small>'+r.tipo+' · '+(MOD_ET[r.mod]||r.mod)+' · '+r.cubren+' de '+r.conv+
+      ' han cubierto · cierra el '+r.limite+'</small></span>'+
+      '<span class="chip '+(r.sinCubrir.length||r.bajoMin.length?'no':'ok')+'">'+
+        (r.sinCubrir.length+r.bajoMin.length)+' en riesgo</span>'+
+      '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+      '<div class="bb"><div style="padding:13px">'+
+        '<p style="margin:0 0 11px;font-size:12.5px;color:var(--ink2)">Mejor franja: <b>'+r.dias[best.d]+' '+
+        _iniF(r.franjas[best.f])+'</b> — '+Math.max(0,best.v)+' de '+r.conv+' pueden.</p>'+g+
+        (riesgo?'<h4 class="sc" style="margin:16px 0 2px">Sin cubrir · sanción que implicaría</h4>'+riesgo:'')+
+        (bajo?'<h4 class="sc" style="margin:16px 0 2px">Por debajo del mínimo</h4>'+bajo:'')+
+        (!riesgo&&!bajo?'<div class="vac"><b>Nadie en riesgo</b>Todo el mundo ha cubierto y por encima del mínimo.</div>':'')+
+        '<div class="nota" style="margin-top:12px;border:0;padding:11px 0 0">El <b>mínimo exigido</b> sale de la '+
+        'Reforma §P3: <b>25 %</b> de los bloques en mayo–agosto y diciembre–enero, <b>30 %</b> el resto. Lo calcula '+
+        'el motor (<span class="mono">minimo_por_periodo</span>); aquí solo se muestra.<br>Solo sancionan automáticamente las de '+
+        '<b>jurisdicción del PD</b>: general, junta y consejo. En general la escala es <b>0, 1, 2, 2…</b> '+
+        '(la primera vez es aviso); en junta y consejo, <b>1 punto siempre</b>. Subsistema, mixta y trabajo no '+
+        'generan sanción automática: quedan a potestad del coordinador. Esto solo <b>avisa</b>: quien aplica es el motor.</div>'+
+      '</div></div></div>';
+  }).join('');
+}};
+V.actas={g:'Reuniones',t:'Actas',f:function(){
+  return pan('Actas de la temporada','12',
+    tabla([['Referencia'],['Reunión'],['Fecha'],['Acuerdos',1],['Estado',1]],
+      [['Acta_S-6302_26','Consejo · 10/07/2026','10/07/2026','13','<span class="chip ok">publicada</span>'],
+       ['Acta_S-6301_26','Junta · 17/07/2026','17/07/2026','7','<span class="chip wa">en revisión</span>'],
+       ['Acta_S-6300_26','General · 20/06/2026','20/06/2026','9','<span class="chip ok">publicada</span>']]
+      .map(function(r){
+        return '<tr><td class="mono" style="color:var(--red2)">'+r[0]+'</td><td>'+r[1]+'</td>'+
+          '<td class="mono" style="color:var(--ink3)">'+r[2]+'</td><td class="r mono">'+r[3]+'</td>'+
+          '<td class="r">'+r[4]+'</td></tr>';
+      }).join('')));
+}};
+
+/* ── OPERACIÓN ───────────────────────────────────────────────────────────── */
+V.turnos={g:'Operación',t:'Turnos',f:function(){
+  return pan('Turnos convocados',TURNOS.length+'',
+    tabla([['Turno'],['Fecha'],['Hora',0],['Punto'],['Duración',1],['Van',1]],
+      /* las fechas llegan en ISO (dato real: '2025-11-26') o DD/MM/AAAA (semilla): se
+         normalizan a ISO antes de comparar, o un sort lexicografico las cruza mal de mes. */
+      TURNOS.slice().sort(function(a,b){ return _fechaISO_(b.fecha||b.f).localeCompare(_fechaISO_(a.fecha||a.f)); })
+      .map(function(t){
+        /* el turno real (espejo del Discord) no tiene id, ni plazas, ni duracion
+           numerica: se sintetiza la referencia y se pinta lo que de verdad hay. */
+        var f=t.fecha||t.f||'\u2014';
+        var id=t.id || ('T\u00b7'+String(f).replace(/-/g,'').slice(4)+(t.hora?'\u00b7'+String(t.hora).slice(0,5):''));
+        var quien=(t.roles||[]).length;
+        return '<tr><td class="mono" style="color:var(--red2)">'+esc(id)+'</td><td class="mono">'+esc(f)+'</td>'+
+          '<td class="mono">'+esc(t.hora||'\u2014')+'</td><td style="color:var(--ink2)">'+esc(t.punto||'\u2014')+'</td>'+
+          '<td class="r mono" style="color:var(--ink3)">'+esc(t.duracion||t.dur||'\u2014')+'</td>'+
+          '<td class="r mono">'+quien+'</td></tr>';
+      }).join(''))+
+    '<div class="nota"><b>Convocar turnos desde aquí queda fuera de esta versión</b>, por decisión tuya: hoy se '+
+    'convocan en el canal de fabricación de Discord y el panel los espeja. Cuando toque, este es el sitio, y '+
+    'arrastraría también gastos y listas de compra.</div>');
+}};
+V.tareas={g:'Operación',t:'Tareas',f:function(){
+  var porUni={};
+  TAREAS.forEach(function(t){ (porUni[t.s]=porUni[t.s]||[]).push(t); });
+  return Object.keys(porUni).sort(function(a,b){return porUni[b].length-porUni[a].length;}).map(function(u){
+    return pan(u,porUni[u].length+' activas',
+      tabla([['Tarea'],['Responsable'],['Urgencia'],['Estado'],['Vence',1]],
+        porUni[u].map(function(t){
+          var resp = Array.isArray(t.r) ? t.r.map(function(x){return String(x).split(' ')[0];}).join(', ') : (t.r||'—');
+          return '<tr><td>'+esc(t.n)+'</td><td style="color:var(--ink2)">'+esc(resp)+'</td>'+
+            '<td><span class="chip '+(t.u==='alta'?'no':t.u==='media'?'wa':'')+'">'+t.u+'</span></td>'+
+            '<td style="color:var(--ink3)">'+esc(t.e)+'</td><td class="r mono">'+t.l+'</td></tr>';
+        }).join('')));
+  }).join('');
+}};
+
+/* ── EQUIPO ──────────────────────────────────────────────────────────────── */
+V.miembros={g:'Equipo',t:'Miembros',f:function(){
+  return '<div class="chips">'+DATA.subsistemas.map(function(s){
+      return '<span class="chip">'+esc(s.u)+' <b style="color:var(--ink)">'+s.n+'</b></span>';}).join('')+'</div>'+
+    pan('Todos los miembros',DATA.miembros.length+' · lectura completa',
+      tabla([['Miembro'],['Unidad'],['Cargo'],['Pts',1],['H/mes',1],['Temporada',1]],
+        DATA.miembros.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).map(function(m){
+          return '<tr><td><span class="mem"><span class="av">'+ini(m.nombre)+'</span>'+esc(m.nombre)+
+            (m.infraccion?' <span class="dn">⚠</span>':'')+'</span></td>'+
+            '<td style="color:var(--ink3)">'+esc(m.unidad)+'</td>'+
+            '<td style="color:var(--ink3)">'+(m.cargo||'—')+'</td>'+
+            '<td class="r mono '+(m.puntos==null?'':(m.puntos<=3?'dn':m.puntos>=9?'up':''))+'">'+(m.puntos==null?'—':m.puntos)+'</td>'+
+            '<td class="r mono">'+(typeof m.hMes==='number'?nf(m.hMes,1):'—')+'</td>'+
+            '<td class="r mono" style="color:var(--ink3)">'+(typeof m.horasTemp==='number'?nf(m.horasTemp,1):'—')+'</td></tr>';
+        }).join('')));
+}};
+/* Ranking CON cuotas: al quitar Economía, la cuota se lee aquí, al lado de las
+   horas que la generan — que es donde tiene sentido leerla. */
+V.ranking={g:'Equipo',t:'Ranking',f:function(){
+  /* el ranking pondera horas de temporada / meses en el equipo (decision cerrada).
+     Sin esos dos campos no hay ranking que valga: se dice, no se finge. */
+  var VIS=DATA.miembros.filter(function(m){ return typeof m.horasTemp==='number' && m.meses; });
+  if(!VIS.length) return pan('Ranking','sin datos',
+    vac('El servidor no te sirve las horas del equipo','El ranking se pondera horas de temporada entre meses '+
+      'en el equipo, y con tu rol el backend no manda ninguno de los dos de los demás. Hoy solo la cuenta '+
+      'admin recibe el roster completo.'));
+  var rk=VIS.slice().sort(function(a,b){return (b.horasTemp/b.meses)-(a.horasTemp/a.meses);});
+  var conQ=VIS.filter(function(m){ return typeof m.cuota==='number'; });
+  var cuotaTot=conQ.reduce(function(a,m){return a+m.cuota;},0);
+  return '<div class="chips">'+
+      '<span class="chip">PONDERADO <b style="color:var(--ink)">horas de temporada / meses en el equipo</b></span>'+
+      '<span class="chip">CUOTA MEDIA <b style="color:var(--ink)">'+(conQ.length?nf(cuotaTot/conQ.length,2):'—')+' €</b></span>'+
+      '<span class="chip">A CERO <b style="color:var(--ink)">'+conQ.filter(function(m){return m.cuota===0;}).length+'</b></span>'+
+    '</div>'+
+    pan('Ranking de la temporada','con la cuota al lado',
+      tabla([['#',0],['Miembro'],['Unidad'],['H/mes pond.',1],['Temporada',1],['Coche',1],['Cuota',1]],
+        rk.map(function(m,i){
+          var pond=m.horasTemp/m.meses;
+          return '<tr><td class="mono" style="color:var(--ink3)">'+(i+1)+'</td>'+
+            '<td><span class="mem"><span class="av">'+ini(m.nombre)+'</span>'+esc(m.nombre)+'</span></td>'+
+            '<td style="color:var(--ink3)">'+esc(m.unidad)+'</td>'+
+            '<td class="r mono '+(pond>=UMBRAL?'up':'dn')+'">'+nf(pond,1)+'</td>'+
+            '<td class="r mono" style="color:var(--ink3)">'+nf(m.horasTemp,1)+'</td>'+
+            '<td class="r mono" style="color:var(--ink3)">'+(m.coche||'—')+'</td>'+
+            '<td class="r mono '+(m.cuota===0?'up':'')+'">'+(typeof m.cuota==='number'?nf(m.cuota,2)+' €':'—')+'</td></tr>';
+        }).join(''))+
+      '<div class="nota">La cuota la calcula el motor: curva t con umbral dinámico 8–15 h/mes, base de 2 h, '+
+      '<b>truncada al céntimo</b>, 4 € de descuento por turno con coche fuera de Vigo y suelo de 0 €. '+
+      'Aquí solo se lee. <b>No hay apartado de economía</b> en el panel: la cuota vive junto a las horas que la generan.</div>');
+}};
+V.reclutar={g:'Equipo',t:'Reclutamiento',f:function(){
+  return '<div class="chips"><span class="chip">CANDIDATURAS <b style="color:var(--ink)">'+CANDID.length+'</b></span>'+
+    '<span class="chip">ALTAS DEL CURSO <b style="color:var(--ink)">9</b></span>'+
+    '<span class="chip">RETENCIÓN A 6 MESES <b style="color:var(--ink)">67 %</b></span></div>'+
+    pan('Candidaturas abiertas',CANDID.length+'',
+      CANDID.map(function(c){
+        return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(c.n)+'</b>'+
+          '<small>'+esc(c.d)+'<br>'+esc(c.av)+'</small></span>'+
+          '<span class="der"><span class="chip '+(c.fase==='entrevistada'?'ok':c.fase==='pendiente'?'wa':'')+'">'+c.fase+'</span>'+
+          '<button class="btn sm">Ver</button></span></div>';
+      }).join(''))+
+    '<div class="pan"><div class="nota">Miembros y reclutamiento van <b>separados</b> a propósito: una candidatura '+
+    'no es un miembro, y mezclarlas en la misma tabla obliga a filtrar mentalmente cada vez que miras al equipo.</div></div>';
+}};
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOGIN · mismo gate que app.html: Google Sign-In restringido a
+   @uvigoaerotech.com, sesión guardada en localStorage para volver a entrar sin
+   pasar por Google si el token sigue vivo (<50 min), y re-login silencioso con
+   FedCM + login_hint. Si GIS no carga (sin red), NO hay gate y la pantalla se
+   queda con la semilla ficticia: la maqueta sigue siendo demostrable.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function _gate_(html){
+  var g=document.getElementById('loginGate');
+  if(!g){ g=document.createElement('div'); g.id='loginGate';
+    g.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;'+
+      'align-items:center;justify-content:center;gap:16px;background:#0C0B0B;color:#F4F3F3;'+
+      'font:15px/1.5 system-ui,-apple-system,sans-serif;text-align:center;padding:24px';
+    document.body.appendChild(g); }
+  g.innerHTML=html; return g;
+}
+function _insigniaHTML_(){
+  var i=document.querySelector('.marca .ins img');
+  return i ? '<img src="'+i.src+'" alt="Solaris" style="width:96px;height:96px;object-fit:contain">' : '';
+}
+/* Dos formas del panel, exactamente como las manda el backend:
+   · MIEMBRO  -> {yo:<mi ficha completa>, miembros:[solo identidad], ranking:{puesto,total}}
+   · ADMIN    -> {miembros:[fichas completas]}
+   El escritorio es de coordinación, así que con la forma de miembro habrá vistas
+   que se queden a medias: se dice en pantalla en vez de fingir que hay datos. */
+function _aplicarPanel_(pnl){
+  if(!pnl) return;
+  if(pnl.generado) DATA.generado=pnl.generado;
+  if(pnl.temporada) DATA.temporada=pnl.temporada;
+  if(pnl.reunion) DATA.reunion=pnl.reunion;
+  if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length) DATA.subsistemas=pnl.subsistemas;
+  if(pnl.yo){                                   // forma MIEMBRO
+    var pub=(pnl.miembros||[]).slice();
+    var ix=-1;
+    for(var i=0;i<pub.length;i++) if(pub[i].nombre===pnl.yo.nombre) ix=i;
+    if(ix>=0) pub[ix]=pnl.yo; else pub.push(pnl.yo);
+    DATA.miembros=pub; DATA._rol='miembro'; DATA._ranking=pnl.ranking||null;
+  } else if(Array.isArray(pnl.miembros)&&pnl.miembros.length){   // forma ADMIN
+    DATA.miembros=pnl.miembros; DATA._rol='admin'; DATA._ranking=null;
+  }
+  _rederivarCargos_();
+}
+function _aplicarBootstrap_(boot){
+  _aplicarPanel_(boot.panel);
+  if(Array.isArray(boot.tareas)){ TAREAS.length=0; boot.tareas.forEach(function(t){TAREAS.push(t);}); }
+  if(Array.isArray(boot.turnos)){ TURNOS.length=0; boot.turnos.forEach(function(t){TURNOS.push(t);}); }
+  if(Array.isArray(boot.entregables)){ DOCS.length=0; boot.entregables.forEach(function(d){DOCS.push(d);}); }
+  if(Array.isArray(boot.reuniones)){ REUS.length=0; boot.reuniones.map(normReu).forEach(function(r){REUS.push(r);}); }
+  backendOK=true;
+}
+async function _cargarSanciones_(){
+  try{ var arr=await api.getSanciones({}); if(Array.isArray(arr)) SANC_BACK=arr; }
+  catch(e){ SANC_BACK=null; }
+  _loteReal_();
+}
+/* Mapea un parte del BACKEND (subsistema/justificacion/estado 'pendiente'…) al modelo que
+   pinta el escritorio (unidad/just/estado 'pend'…). Sin datos inventados: los flags de
+   calidad de la maqueta no existen en real, salvo los que el propio dato delata. */
+function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
+var _EST_PARTE_={pendiente:'pend',aprobada:'aprobado',rechazada:'rechazado',detalle:'detalle',otorgada:'aprobado',aplicada:'aprobado'};
+function normParte(p){
+  var fl=[];
+  if(p.autocierre) fl.push(['wa','autocerrado al tope de 14 h']);
+  if(p.sinFichaje) fl.push(['wa','declarado sin fichaje']);
+  if(p.origen==='otorgada') fl.push(['ok','otorgada por '+((p.decidido_por)||'coordinación')]);
+  return { id:p.id, autor:p.autor, unidad:p.subsistema||'—', fecha:_isoADMY_(p.fecha),
+    ini:p.ini||'—', fin:p.fin||'—', horas:Number(p.horas)||0, tarea:p.tarea||'',
+    origen:p.sinFichaje?'bloque':'turno', just:p.justificacion||'', flags:fl,
+    estado:_EST_PARTE_[p.estado]||'pend', decisor:p.decidido_por||null,
+    dec:p.decidido_at?_isoADMY_(String(p.decidido_at).slice(0,10)):null, motivo:p.motivo||null, _real:true };
+}
+/* Vuelca la cola real de partes sobre PARTES (que si no se queda con la semilla). */
+function _partesReal_(){
+  if(!Array.isArray(PART_BACK)) return;                 // sin backend: semilla
+  PARTES=PART_BACK.map(normParte);
+}
+async function _cargarPartes_(){
+  try{ var arr=await api.getPartes({}); if(Array.isArray(arr)) PART_BACK=arr; }
+  catch(e){ PART_BACK=null; }
+  _partesReal_();
+}
+/* Construye el BLOQUE de sanciones desde la cola REAL del backend (SANC_BACK) cuando hay
+   pendientes agrupadas en un lote. Con ids reales, marcar una decisión viaja al backend y
+   «cerrar el bloque» levanta el flag que lee el motor Python. Sin backend o sin lote
+   pendiente, se queda la semilla de demostración (LOTE.real queda sin marcar). */
+function _loteReal_(){
+  if(!Array.isArray(SANC_BACK)) return;                                   // sin backend
+  var pend=SANC_BACK.filter(function(s){ return s.estado==='pendiente' && s.lote; });
+  if(!pend.length) return;                                                // nada agrupado
+  var lote=pend[0].lote;                                                   // primer bloque
+  var its=pend.filter(function(s){ return s.lote===lote; });
+  LOTE={ real:true, lote:lote, nombre:lote, cerrado:false,
+    motivo:its[0].motivo||'—', art:its[0].articulo||'libre',
+    items:its.map(function(s){ return {id:s.id, n:s.nombre, pts:Number(s.puntos)||0,
+      dec:s.decision||'aceptar'}; }) };
+}
+async function _onCredencial_(resp,_silente){
+  _gate_(_insigniaHTML_()+'<div style="opacity:.8">Verificando…</div>');
+  try{
+    var boot=null; try{ boot=await api.bootstrap(resp.credential); }catch(_){ boot=null; }
+    if(boot && boot.identidad){
+      SESION={token:resp.credential,email:boot.identidad.email,nombre:boot.identidad.nombre};
+      _aplicarBootstrap_(boot);
+    } else {
+      var yo=await api.quienSoy(resp.credential);
+      SESION={token:resp.credential,email:yo.email,nombre:yo.nombre};
+      var pnl=null; try{ pnl=await api.getPanel(); }catch(_){}
+      _aplicarPanel_(pnl); backendOK=true;
+    }
+    try{ localStorage.setItem('sol_last_email',SESION.email);
+         localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
+    ACTOR = SESION.nombre || PD_NOM;
+    await _cargarSanciones_();
+    await _cargarPartes_();
+    var g=document.getElementById('loginGate'); if(g) g.remove();
+    _pintarActua_(); pintar();
+  }catch(e){
+    if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
+    _gate_(_insigniaHTML_()+'<div style="color:#ffb3b0;max-width:360px">No se pudo entrar: '+
+      ((e&&e.message)||e)+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
+      'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>');
+    var b=document.getElementById('reGis'); if(b) b.onclick=_pintarLogin_;
+  }
+}
+function _pintarLogin_(){
+  _gate_(_insigniaHTML_()+
+    '<div style="font:600 19px/1.3 system-ui">Solaris · Puente de mando</div>'+
+    '<div style="opacity:.75;max-width:360px">Entra con tu cuenta de UVigo Aerotech.<br>'+
+    'Este panel es para <b>consejo, junta y dirección</b>.</div><div id="gbtn"></div>');
+  try{
+    var hint=''; try{ hint=localStorage.getItem('sol_last_email')||''; }catch(_){}
+    var cfg={client_id:GOOGLE_CLIENT_ID,callback:_onCredencial_,auto_select:true,
+             itp_support:true,use_fedcm_for_prompt:true};
+    if(hint) cfg.login_hint=hint;
+    google.accounts.id.initialize(cfg);
+    google.accounts.id.renderButton(document.getElementById('gbtn'),
+      {theme:'filled_black',size:'large',text:'signin_with',shape:'pill'});
+    try{ google.accounts.id.prompt(); }catch(_){}
+    api.ping(); setTimeout(function(){ api.ping(); },4000);   // pre-calienta el contenedor
+  }catch(e){ _gate_('<div style="color:#ffb3b0">Error iniciando Google Sign-In: '+((e&&e.message)||e)+'</div>'); }
+}
+function _arrancarGis_(){
+  (function esperar(n){
+    if(SESION) return;
+    if(window.google&&window.google.accounts&&window.google.accounts.id){ _pintarLogin_(); return; }
+    if(n<=0){ var g=document.getElementById('loginGate'); if(g) g.remove(); return; }  // sin red: semilla ficticia
+    setTimeout(function(){ esperar(n-1); },150);
+  })(40);
+}
+function cerrarSesion(){
+  SESION=null;
+  try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
+  try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
+  location.reload();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NAVEGACIÓN
+   ═══════════════════════════════════════════════════════════════════════════ */
+var GRUPOS=[
+  ['Operación',['panel','turnos','tareas']],
+  ['Horas',['partes','curso','registro','cierre']],
+  ['Documentos',['docdec','docurso','docpub']],
+  ['Disciplina',['sanciones','apela']],
+  ['Reuniones',['convoc','dispo','actas']],
+  ['Equipo',['miembros','ranking','reclutar']]
+];
+var vista='panel';
+function conteo(k){
+  if(k==='partes') return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).length;
+  if(k==='curso')  return CURSO.length;
+  if(k==='docdec') return docsMios().length;
+  if(k==='docurso')return DOCS.filter(function(d){return ['recibido','analizado','revision','cambios'].indexOf(d.est)>=0;}).length;
+  if(k==='docpub') return DOCS.filter(function(d){return d.est==='publicado';}).length;
+  if(k==='sanciones') return LOTE.cerrado?0:LOTE.items.length;
+  if(k==='apela')  return APELA.length;
+  if(k==='convoc') return REUS.length;
+  if(k==='turnos') return TURNOS.length;
+  if(k==='tareas') return TAREAS.length;
+  if(k==='miembros') return DATA.miembros.length;
+  if(k==='reclutar') return CANDID.length;
+  return 0;
+}
+function pintarNav(){
+  var nav=$('#nav');
+  $$('.grupo,.item',nav).forEach(function(e){e.remove();});
+  GRUPOS.forEach(function(g){
+    var d=document.createElement('div'); d.className='grupo';
+    d.innerHTML='<span class="sc">'+g[0]+'</span><span class="ln"></span>';
+    nav.appendChild(d);
+    g[1].forEach(function(k){
+      var n=conteo(k), b=document.createElement('button');
+      b.className='item'+(k===vista?' on':''); b.dataset.v=k;
+      var cls = (k==='partes'&&n)||(k==='docdec'&&n) ? ' hot' : (k==='sanciones'&&n)||(k==='curso'&&n) ? ' wa' : '';
+      b.innerHTML='<span class="rail"></span><span class="tx">'+V[k].t+'</span>'+
+        (n?'<span class="cnt'+cls+'">'+n+'</span>':'');
+      nav.appendChild(b);
+    });
+  });
+  $$('.item',nav).forEach(function(b){ b.onclick=function(){ ir(b.dataset.v); }; });
+}
+var ultY=null;
+function colocarEstrella(animar){
+  var nav=$('#nav'), v=$('#viajev'), act=$('.item.on',nav);
+  if(!act||!v) return;
+  var y=act.offsetTop+act.offsetHeight/2-7.5;
+  var y0=(ultY==null)?y:ultY, d=Math.abs(y-y0);
+  var comba=Math.min(30,9+d*0.13);
+  v.style.setProperty('--comba',comba.toFixed(0)+'px');
+  v.style.transform='translateY('+y.toFixed(1)+'px)';
+  if(animar&&!redu()&&d>2){
+    v.classList.remove('vuela'); void v.offsetWidth; v.classList.add('vuela');
+    setTimeout(function(){v.classList.remove('vuela');},430);
+  }
+  ultY=y;
+}
+function pintar(){
+  var m=$('#main');
+  m.innerHTML=V[vista].f();
+  $('#migaA').textContent=V[vista].g;
+  $('#migaB').textContent=V[vista].t;
+  pintarNav();
+  colocarEstrella(false);
+  /* barras de los KPI: setTimeout, no rAF (en pestaña de fondo rAF no dispara) */
+  $$('.kpi .bar i',m).forEach(function(i){
+    i.style.width='0';
+    setTimeout(function(){ i.style.width=i.dataset.w; }, redu()?0:70);
+  });
+  enganchar();
+}
+function ir(k,foco){
+  if(k===vista && !foco) return;
+  vista=k;
+  var m=$('#main');
+  if(redu()){ pintar(); m.scrollTop=0; colocarEstrella(true); if(foco) enfocar(foco); return; }
+  m.classList.add('fundiendo');
+  setTimeout(function(){
+    pintar(); m.scrollTop=0;
+    m.classList.remove('fundiendo'); m.classList.add('entrando');
+    setTimeout(function(){ m.classList.remove('entrando'); },820);
+    colocarEstrella(true);
+    if(foco) enfocar(foco);
+  },150);
+}
+/* llevar al sitio EXACTO, no a la sección: la fila que se abre queda marcada */
+function enfocar(id){
+  setTimeout(function(){
+    var el=document.getElementById(id); if(!el) return;
+    if(el.classList.contains('acord')) el.classList.add('ab');
+    el.scrollIntoView({block:'center',behavior:redu()?'auto':'smooth'});
+    el.style.transition='box-shadow .3s linear';
+    el.style.boxShadow='0 0 0 2px var(--red)';
+    setTimeout(function(){ el.style.boxShadow=''; },1600);
+  },80);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ENGANCHES
+   ═══════════════════════════════════════════════════════════════════════════ */
+function enganchar(){
+  $$('[data-ir]').forEach(function(el){
+    el.onclick=function(){ ir(el.dataset.ir, el.dataset.foco); };
+  });
+  $$('[data-acord]').forEach(function(h){
+    h.onclick=function(){ h.parentNode.classList.toggle('ab'); };
+  });
+  /* decidir un parte: PERSISTE (api.decidirParte). Aprobar levanta aplicar_horas=true → el
+     motor Python suma las horas al ledger y recalcula cuota/ranking. La app flaguea, el motor
+     ejecuta. Rechazar/detalle exigen motivo. Con datos reales viaja; con la semilla, memoria. */
+  $$('[data-parte]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var p=PARTES.filter(function(x){return x.id===+b.dataset.parte;})[0]; if(!p) return;
+      var card=b.closest('.parte'), ta=card.querySelector('[data-motivo]');
+      var mot=ta?ta.value.trim():'';
+      var acc=b.dataset.acc==='si'?'aprobar':b.dataset.acc==='no'?'rechazar':'detalle';
+      if(acc!=='aprobar' && mot.length<8){
+        if(ta){ ta.focus(); ta.style.borderColor='rgba(232,145,46,.6)';
+          setTimeout(function(){ta.style.borderColor='';},1600); }
+        tost('Rechazar o pedir detalle exige un motivo. Sin él no se envía.');
+        return;
+      }
+      var okMsg=acc==='aprobar'
+        ? h1(p.horas)+' aprobadas: el motor las suma al panel de '+_m(p.autor).pila+' y recalcula cuota y ranking.'
+        : (acc==='rechazar'?'Parte rechazado, con su motivo.':'Devuelto: le pides detalle al autor.');
+      if(p._real && backendOK && SESION){
+        var acts=card.querySelectorAll('.acts .btn'); acts.forEach(function(x){x.disabled=true;});
+        try{
+          var upd=await api.decidirParte(p.id, acc, mot||null);
+          if(upd){ var i=PART_BACK.findIndex(function(x){return x.id===p.id;}); if(i>=0) PART_BACK[i]=upd; _partesReal_(); }
+          card.classList.add('asienta'); tost(okMsg); setTimeout(pintar,420);
+        }catch(e){ acts.forEach(function(x){x.disabled=false;}); tost('No se pudo: '+((e&&e.message)||e)); }
+        return;
+      }
+      p.estado = acc==='aprobar'?'aprobado':acc==='rechazar'?'rechazado':'detalle';   // semilla local
+      p.decisor=ACTOR; p.dec=HOY; if(mot) p.motivo=mot;
+      card.classList.add('asienta'); tost(okMsg); setTimeout(pintar,420);
+    };
+  });
+  /* otorgar horas directas: lee el mini-formulario y PERSISTE (api.otorgarHoras). */
+  $$('[data-otorgar]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var caja=b.parentNode;
+      var nombre=(caja.querySelector('select')||{}).value||'';
+      var horas=parseFloat(String((caja.querySelector('input.mono')||{}).value||'').replace(',','.'))||0;
+      var concepto=(caja.querySelector('input:not(.mono)')||{}).value||'';
+      if(!nombre || horas<=0){ tost('Elige a quién y unas horas > 0.'); return; }
+      if(PART_BACK!==null && backendOK && SESION){    // hay backend: persiste de verdad
+        b.disabled=true; var prev=b.textContent; b.textContent='Otorgando…';
+        try{
+          var rec=await api.otorgarHoras({nombre:nombre, horas:horas, tarea:concepto});
+          if(rec){ PART_BACK.push(rec); _partesReal_(); }
+          tost(h1(horas)+' otorgadas a '+(_m(nombre).pila||nombre)+': entran ya y el motor las aplica.');
+          pintar();
+        }catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo otorgar: '+((e&&e.message)||e)); }
+        return;
+      }
+      tost(h1(horas)+' otorgadas a '+(_m(nombre).pila||nombre)+' (semilla local): entran marcadas como «otorgadas».');
+    };
+  });
+  /* documentos: decidir PERSISTE en el backend (api.decidir, ya desplegada). La app
+     flaguea, el motor/Cowork ejecuta. El servidor revalida la autoridad por token;
+     esto es solo el disparo. Con backend caído cae al cambio en memoria (semilla). */
+  $$('[data-doc]').forEach(function(b){
+    if(b._wired) return; b._wired=true;   // no duplicar el envío si pintar() re-engancha
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var d=DOCS.filter(function(x){return x.id===+b.dataset.doc;})[0]; if(!d) return;
+      var accion = b.dataset.acc==='aprobar' ? 'aprobado' : 'cambios';
+      var motivo = accion==='cambios' ? (prompt('Motivo para el autor (obligatorio en «cambios»):')||'').trim() : '';
+      if(accion==='cambios' && !motivo){ tost('Sin motivo no se piden cambios.'); return; }
+      b.disabled=true; var prev=b.textContent; b.textContent='Enviando…';
+      try{
+        if(typeof backendOK!=='undefined' && backendOK && SESION){
+          var upd=await api.decidir(d.id, accion, motivo, null);   // el actor sale del token
+          if(upd){ var i=DOCS.findIndex(function(x){return x.id===d.id;}); if(i>=0) DOCS[i]=upd; }
+          tost(accion==='aprobado'
+            ? 'Aprobado en el backend. Cowork lo lee de ahí y dispara Notion, Drive y el Libro de Datos.'
+            : 'Cambios pedidos y guardados. Le llega al autor.');
+        } else {                                                   // sin backend: semilla
+          d.est = accion==='aprobado' ? 'publicado' : 'cambios'; if(motivo) d.nota=motivo;
+          tost('(sin backend) '+(accion==='aprobado'?'aprobado en local.':'cambios en local.'));
+        }
+        pintar();
+      }catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo: '+((e&&e.message)||e)); }
+    };
+  });
+  /* bloque de sanciones: marcar es BORRADOR (no aplica nada). Con bloque real viaja al
+     backend (api.decidirSancion acción «marcar»); con la semilla, solo memoria. */
+  $$('.decs button').forEach(function(b){
+    b.onclick=async function(){
+      var id=+b.parentNode.dataset.lid, dec=b.dataset.dec;
+      var it=LOTE.items.filter(function(x){ return x.id===id; })[0]; if(!it) return;
+      if(LOTE.real && backendOK && SESION){
+        var prev=it.dec; it.dec=dec; pintar();                 // optimista
+        try{ await api.decidirSancion(id,'marcar',{decision:dec}); }
+        catch(e){ it.dec=prev; pintar(); tost('No se pudo marcar: '+((e&&e.message)||e)); }
+        return;
+      }
+      it.dec=dec; pintar();                                    // semilla local
+    };
+  });
+  $$('[data-mod]').forEach(function(b){
+    b.onclick=function(){ tost('Editor de la sanción: artículo del RRI y puntos, solo para esta persona.'); };
+  });
+  /* cerrar el bloque: es el DISPARO. Con bloque real, api.confirmarLote lo cierra entero
+     bajo lock y levanta aplicar_sanciones=true (una vez) para que el motor lo escriba en
+     Notion y mande el comunicado. La app flaguea, el motor ejecuta. */
+  $$('[data-lote]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var c=0; LOTE.items.forEach(function(x){ if(x.dec==='aceptar') c++; });
+      if(!confirm('Vas a cerrar el bloque «'+LOTE.nombre+'».\n\n'+c+' se aplican.\n\n'+
+        'Esto aplica las sanciones aceptadas en Notion y manda el comunicado. ¿Seguimos?')) return;
+      if(LOTE.real && backendOK && SESION){
+        b.disabled=true; var prev=b.textContent; b.textContent='Cerrando…';
+        try{
+          var r=await api.confirmarLote(LOTE.lote);
+          LOTE.cerrado=true;
+          var ap=(r&&r.aprobadas!=null)?r.aprobadas:c;
+          tost('Bloque cerrado: '+ap+' aplicada'+(ap===1?'':'s')+'. El motor las escribe en Notion y manda el comunicado.');
+          pintar();
+        }catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo cerrar: '+((e&&e.message)||e)); }
+        return;
+      }
+      LOTE.cerrado=true;                                       // semilla local
+      tost('Bloque cerrado entero. O entra todo, o no entra nada.');
+      pintar();
+    };
+  });
+  $$('[data-cerrarmes]').forEach(function(b){ b.onclick=function(){ tost('Mes cerrado y comunicado enviado.'); }; });
+  $$('[data-nueva]').forEach(function(b){ b.onclick=function(){ tost('Abre el creador de reuniones (tipo, modalidad, fechas, franjas, visión).'); }; });
+  /* acuse de pulsación: <120 ms, en la propia pieza, nunca bajo el cursor */
+  $$('.btn').forEach(function(b){
+    b.addEventListener('pointerdown',function(){
+      b.classList.add('pulsa'); setTimeout(function(){b.classList.remove('pulsa');},120);
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   «ACTÚAS COMO» · solo la cuenta admin puede cambiar de identidad, igual que el
+   selector de persona de app.html. Para el resto se oculta y ACTOR es quien eres.
+   Se pinta desde el roster REAL: PD, revisor fijo y los coordinadores que haya.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function _pintarActua_(){
+  var caja=$('#actua'); if(!caja) return;
+  var m=miembro(ACTOR);
+  $('#yoN').textContent = m ? m.nombre.split(' ').slice(0,2).join(' ') : (SESION?SESION.nombre:'—');
+  $('#yoR').textContent = _rolDe_(ACTOR);
+  $('#yoAv').textContent = ini(m?m.nombre:(SESION&&SESION.nombre)||'??');
+  if(!_puedeImpersonar_() && SESION){ caja.style.display='none'; return; }
+  caja.style.display='';
+  var opts=[];
+  if(miembro(PD_NOM)) opts.push([PD_NOM,'Project Director']);
+  if(miembro(REV2_NOM)) opts.push([REV2_NOM,'Revisor fijo']);
+  DATA.miembros.filter(function(x){ return x.cargo==='Coordinador' && x.nombre!==PD_NOM && x.nombre!==REV2_NOM; })
+    .slice(0,3).forEach(function(x){ opts.push([x.nombre, x.pila||x.nombre.split(' ')[0]]); });
+  if(!opts.length) opts=[[ACTOR,'Yo']];
+  $$('#actua button',caja).forEach(function(b){ b.remove(); });
+  opts.forEach(function(o){
+    var b=document.createElement('button');
+    b.dataset.nom=o[0]; b.textContent=o[1];
+    b.className=(o[0]===ACTOR?'on':'');
+    caja.appendChild(b);
+  });
+  $$('#actua button').forEach(function(b){
+    b.onclick=function(){
+      $$('#actua button').forEach(function(x){x.classList.toggle('on',x===b);});
+      ACTOR=b.dataset.nom;
+      $('#yoN').textContent=(miembro(ACTOR)||{}).nombre||ACTOR;
+      $('#yoR').textContent=_rolDe_(ACTOR);
+      $('#yoAv').textContent=ini(ACTOR);
+      var est=$('#actuaEst');
+      var dx=Math.abs((b.offsetLeft-5)-(parseFloat(est.style.transform.replace(/[^0-9.-]/g,''))||0));
+      est.style.transform='translateX('+(b.offsetLeft-5)+'px)';
+      if(!redu() && dx>2){ est.classList.remove('vuela'); void est.offsetWidth; est.classList.add('vuela');
+        setTimeout(function(){est.classList.remove('vuela');},380); }
+      pintar();
+    };
+  });
+}
+
+window.addEventListener('resize',function(){ ultY=null; colocarEstrella(false); });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ARRANQUE · se pinta la semilla para que nunca haya pantalla en blanco, y por
+   encima entra el login. Si hay sesión guardada de menos de 50 min, se entra sin
+   pasar por Google (mismo criterio que app.html).
+   ═══════════════════════════════════════════════════════════════════════════ */
+_pintarActua_();
+pintar();
+setTimeout(function(){
+  colocarEstrella(false);
+  var on=$('#actua button.on'); if(on) $('#actuaEst').style.transform='translateX('+(on.offsetLeft-5)+'px)';
+},60);
+
+if(GOOGLE_CLIENT_ID && !window.__SIN_LOGIN__){
+  _gate_(_insigniaHTML_()+'<div style="opacity:.7">Cargando…</div>');
+  var _sg=null; try{ _sg=JSON.parse(localStorage.getItem('sol_sess')||'null'); }catch(_){}
+  var _tok=(_sg && _sg.token && (Date.now()-(_sg.ts||0) < 50*60*1000)) ? _sg.token : null;
+  if(_tok) _onCredencial_({credential:_tok}, true);
+  else _arrancarGis_();
+}
+</script>
+</body>
+</html>
