@@ -694,7 +694,7 @@ var api={
   getPartes: function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
   pushParte: function(p){ return api._post({action:"pushParte",parte:p}); },
   ficharEntrada:    function(){ return api._post({action:"ficharEntrada"}); },
-  ficharSalida:     function(tarea,just){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just}); },
+  ficharSalida:     function(tarea,just,cat){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat}); },
   getFichajeAbierto:function(){ return api._post({action:"getFichajeAbierto"}); }
 };
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
@@ -963,7 +963,7 @@ function aprobadorDe(autor,unidad){
    ═══════════════════════════════════════════════════════════════════════════ */
 var ST={vista:'estado', libro:false, modo:'vivo', rol:'miembro',
   ses:{estado:'parada', ini:null, acum:0, desde:null, ult:'19:42'},
-  form:{fecha:HOY, ini:'17:00', fin:'20:30', tarea:'', just:'', origen:'turno'},
+  form:{fecha:HOY, ini:'17:00', fin:'20:30', cat:'tareas', tarea:'', detalle:'', just:'', origen:'turno'},
   sel:null            /* Map de la rejilla de cubrir */
 };
 var SEQ=6;
@@ -1323,10 +1323,27 @@ function vFichar(){
     (ST.modo==='vivo'?vivo:bloque)+
 
     '<div class="tarj">'+cab('Justificación','obligatoria')+
-      '<label class="campo"><span class="sc">Imputar a <span class="req">*</span></span>'+
-        '<select id="fTarea"><option value="">— elige una de tus tareas —</option>'+opts+
-        '<option value="Trabajo de subsistema"'+(ST.form.tarea==='Trabajo de subsistema'?' selected':'')+'>Trabajo de subsistema · '+esc(YO.unidad)+'</option>'+
+      '<label class="campo"><span class="sc">¿Bajo qué categoría caen tus horas? <span class="req">*</span></span>'+
+        '<select id="fCat">'+
+          '<option value="tareas"'+(ST.form.cat==='tareas'?' selected':'')+'>Tarea</option>'+
+          '<option value="reunion"'+(ST.form.cat==='reunion'?' selected':'')+'>Reunión no convocada</option>'+
+          '<option value="turno"'+(ST.form.cat==='turno'?' selected':'')+'>Turno no convocado</option>'+
+          '<option value="compensacion"'+(ST.form.cat==='compensacion'?' selected':'')+'>Compensación</option>'+
         '</select></label>'+
+      (ST.form.cat==='tareas'
+        ? '<label class="campo"><span class="sc">Imputar a <span class="req">*</span></span>'+
+            '<select id="fTarea"><option value="">— elige una de tus tareas —</option>'+opts+
+            '<option value="Trabajo de subsistema"'+(ST.form.tarea==='Trabajo de subsistema'?' selected':'')+'>Trabajo de subsistema · '+esc(YO.unidad)+'</option>'+
+            '<option value="__otro__"'+(ST.form.tarea==='__otro__'?' selected':'')+'>Otro (lo escribo)</option>'+
+            '</select></label>'+
+            (ST.form.tarea==='__otro__'
+              ? '<label class="campo"><span class="sc">Cuál <span class="req">*</span></span><input id="fDetalle" value="'+esc(ST.form.detalle)+'" placeholder="nombre de la tarea"></label>'
+              : '')
+        : '<label class="campo"><span class="sc">'+
+            (ST.form.cat==='reunion'?'Nombre de la reunión':ST.form.cat==='turno'?'Qué turno':'Concepto')+
+            ' <span class="req">*</span></span><input id="fDetalle" value="'+esc(ST.form.detalle)+'" placeholder="'+
+            (ST.form.cat==='reunion'?'p. ej. Integración motor / estructura del 20/07':ST.form.cat==='turno'?'p. ej. Turno de taller del 19/07':'tiempo real que el sistema no refleja')+
+            '"></label>')+
       '<label class="campo" style="margin-bottom:6px"><span class="sc">Qué estuviste haciendo <span class="req">*</span></span>'+
         '<textarea id="fJust" placeholder="Qué hiciste, con quién y dónde. Mínimo 25 caracteres.">'+esc(ST.form.just)+'</textarea></label>'+
       '<div class="justfila">'+
@@ -1371,12 +1388,14 @@ function validarFichaje(){
   var haySes = ST.modo!=='vivo' || minSes()>0 || !!ST.ses.cloudIni;   /* con fichaje en la nube ya hay sesión */
   var dur = ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durForm();
   var n1 = haySes && dur>0 && dur<=12;
-  var n2 = !!f.tarea;
+  /* la imputación depende de la categoría: tarea del desplegable, o el texto libre */
+  var imput = f.cat==='tareas' ? (f.tarea==='__otro__' ? f.detalle.trim() : f.tarea) : f.detalle.trim();
+  var n2 = !!imput;
   var n3 = f.just.trim().length>=25;
 
   var e1=$('#e1'), e2=$('#e2'), e3=$('#e3');
   if(e1) e1.textContent = dur<=0 ? '—' : (dur>12 ? 'excede 12 h' : nf(dur,2)+' h');
-  if(e2) e2.textContent = n2 ? (f.tarea.length>16?f.tarea.slice(0,15)+'…':f.tarea) : 'sin asignar';
+  if(e2) e2.textContent = n2 ? (imput.length>16?imput.slice(0,15)+'…':imput) : 'sin asignar';
   if(e3) e3.textContent = Math.min(25,f.just.trim().length)+' / 25';
 
   [['n1',n1],['n2',n2],['n3',n3]].forEach(function(x){
@@ -1423,34 +1442,36 @@ function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4}
 /* Envío del fichaje. Con cuenta real y sesión EN VIVO → api.ficharSalida: la NUBE cierra
    la sesión abierta y calcula las horas (de la entrada al momento del envío). Un BLOQUE
    declarado a mano → api.pushParte (sin fichaje). Sin backend: memoria (semilla). */
+function _imputacion_(f){ return f.cat==='tareas' ? (f.tarea==='__otro__' ? f.detalle.trim() : f.tarea) : f.detalle.trim(); }
 async function enviarFichaje(){
   if(!validarFichaje()) return;
+  var f=ST.form, imput=_imputacion_(f);
   if(backendOK && SESION){
     tost('Enviando…');
     try{
       var nuevo=null, h=0;
       if(ST.modo==='vivo' && ST.ses.cloudIni){
-        var r=await api.ficharSalida(ST.form.tarea, ST.form.just.trim());   // la nube cierra y calcula
+        var r=await api.ficharSalida(imput, f.just.trim(), f.cat);   // la nube cierra, calcula y guarda la categoría
         if(r && r.parte){ nuevo=normPMovil(r.parte); h=r.parte.horas; }
       } else {
         var dur=durForm();
-        var rec=await api.pushParte({ fecha:_dmyAISO_(ST.form.fecha), tarea:ST.form.tarea, horas:dur,
-          ini:ST.form.ini, fin:ST.form.fin, justificacion:ST.form.just.trim(), sinFichaje:true });
+        var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, horas:dur,
+          ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true });
         if(rec&&rec.partes&&rec.partes[0]){ nuevo=normPMovil(rec.partes[0]); h=dur; }
       }
       if(nuevo) PARTES.unshift(nuevo);
-      ST.ses={estado:'parada'}; ST.form.just=''; ST.form.tarea='';
+      ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle='';
       tost('Fichaje enviado · '+nf(h,2)+' h a la cola de tu coordinador');
       irA('horas');
     }catch(e){ tost('No se pudo enviar: '+((e&&e.message)||e)); }
     return;
   }
   var durd = ST.modo==='vivo' ? horasSesion() : durForm();   // demo local (sin backend)
-  PARTES.unshift({id:++SEQ, f:ST.form.fecha, t:ST.form.tarea, q:durd, e:'pend',
-    ini:ST.form.ini, fin:ST.form.fin, just:ST.form.just.trim(),
+  PARTES.unshift({id:++SEQ, f:f.fecha, t:imput, cat:f.cat, q:durd, e:'pend',
+    ini:f.ini, fin:f.fin, just:f.just.trim(),
     sinFichaje: ST.modo==='bloque'});
   ST.ses={estado:'parada',ini:null,acum:0,desde:null,ult:ST.ses.ult};
-  ST.form.just=''; ST.form.tarea='';
+  f.just=''; f.tarea=''; f.detalle='';
   tost('Enviado · '+nf(durd,2)+' h pendientes de firma');
   irA('horas');
 }
@@ -2201,8 +2222,12 @@ function enganchar(){
     pintar();
     var t=$('#fJust'); if(t) t.focus();
   };
+  var fc=$('#fCat');
+  if(fc) fc.onchange=function(){ ST.form.cat=fc.value; ST.form.tarea=''; ST.form.detalle=''; pintar(); };
   var ft=$('#fTarea');
-  if(ft) ft.onchange=function(){ ST.form.tarea=ft.value; validarFichaje(); };
+  if(ft) ft.onchange=function(){ ST.form.tarea=ft.value; if(ft.value==='__otro__'){ ST.form.detalle=''; pintar(); } else validarFichaje(); };
+  var fd=$('#fDetalle');
+  if(fd) fd.oninput=function(){ ST.form.detalle=fd.value; validarFichaje(); };
   var fj=$('#fJust');
   if(fj) fj.oninput=function(){ ST.form.just=fj.value; validarFichaje(); };
   var ff=$('#fFecha');
