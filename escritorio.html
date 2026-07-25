@@ -209,6 +209,12 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .chip.no{color:var(--red2);border-color:rgba(255,74,79,.45);background:rgba(228,30,37,.09)}
 .chip.tel{color:var(--tel);border-color:rgba(63,158,214,.45);background:rgba(63,158,214,.09)}
 .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+/* chip seleccionable de miembro (bloque de horas) */
+.pick{cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.03em;padding:5px 11px;border-radius:20px;
+  border:1px solid var(--line);color:var(--ink2);background:var(--sur2);white-space:nowrap;transition:border-color .12s,color .12s,background .12s}
+.pick:hover{border-color:var(--ink3);color:var(--ink)}
+.pick.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
+.pick.on::before{content:'\2713 '}
 
 /* ── ZONA FIJA «REQUIERE TU DECISIÓN» ────────────────────────────────────
    De la 02b, con lo que Daniel pidió encima: cada fila LLEVA al sitio exacto
@@ -475,6 +481,7 @@ var api={
   getPartes:   function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
   decidirParte:function(id,a,m){ return api._post({action:"decidirParte",id:id,accion:a,motivo:m}); },
   otorgarHoras:function(p){ return api._post({action:"otorgarHoras",parte:p}); },
+  otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea}); },
   enviarPush:  function(d,t,c,o){ return api._post({action:"enviarPush",destinatario:d,titulo:t,cuerpo:c,opts:o}); },
   getControl:  function(){ return api._post({action:"getControl"}); },
   setControl:  function(clave,valor,nota){ return api._post({action:"setControl",clave:clave,valor:valor,nota:nota}); }
@@ -907,6 +914,44 @@ function parteCard(p){
       '</div>':'')+
   '</div>';
 }
+/* Bloque de horas: mismo espíritu que un lote de sanciones —atributos compartidos (unas horas y
+   un concepto para todos) y un solo disparo—, pero para OTORGAR. El coordinador marca a los suyos
+   de subsistema (chips) y les pone las mismas horas de golpe; el servidor revalida jurisdicción por
+   persona (api.otorgarBloque -> _otorgarBloque_ -> _otorgarHoras_ por nombre) y reporta fallos sin
+   cortar el resto. Solo se ve con rango de coordinación o superior. */
+function bloquePanel(){
+  if(rangoNom(ACTOR)<1) return '';
+  var actor=_m(ACTOR), esPD=rangoNom(ACTOR)>=2, unidad=(actor&&actor.unidad)||'';
+  var reg=DATA.miembros.filter(function(m){ return !m.cargo; });            // solo miembros de subsistema
+  var pool=esPD?reg:reg.filter(function(m){ return m.unidad===unidad; });
+  if(!pool.length) return pan('Bloque de horas','a varios de tu subsistema de golpe',
+    '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
+    'No tienes miembros de subsistema bajo tu jurisdicción a los que otorgar en bloque.</p></div>');
+  var subs=[]; reg.forEach(function(m){ if(subs.indexOf(m.unidad)<0) subs.push(m.unidad); });
+  var filtro = esPD
+    ? '<label style="display:block;margin-bottom:10px"><span class="sc" style="display:block;margin-bottom:5px">Subsistema</span>'+
+      '<select id="bloSub" style="width:100%;max-width:260px;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
+      '<option value="">Todos</option>'+subs.map(function(u){ return '<option>'+esc(u)+'</option>'; }).join('')+'</select></label>'
+    : '<div class="chips" style="margin-bottom:10px"><span class="chip">'+esc(unidad)+'</span></div>';
+  var chips=pool.map(function(m){
+    return '<button type="button" class="pick" data-nom="'+esc(m.nombre)+'" data-unidad="'+esc(m.unidad)+'">'+esc(m.pila)+'</button>';
+  }).join('');
+  return pan('Bloque de horas','a varios de tu subsistema de golpe',
+    '<div class="pb"><p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
+    'Un traslado, un montaje, una feria a la que fue medio subsistema: en vez de otorgar uno a uno, '+
+    '<b>marca a quienes participaron</b> y ponles las mismas horas de una vez. Como en un bloque de '+
+    'sanciones, todos comparten concepto y cantidad y nada se aplica hasta que lo disparas. Entran como '+
+    '<b>otorgadas</b> —igual que las individuales— y el motor las suma a cada quien.</p>'+
+    filtro+
+    '<div class="chips" id="bloPool" style="margin-bottom:12px">'+chips+'</div>'+
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
+      '<label style="width:120px"><span class="sc" style="display:block;margin-bottom:5px">Horas c/u</span>'+
+      '<input class="mono" id="bloH" value="2,0" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-family:var(--mono);font-size:12.5px"></label>'+
+      '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Concepto</span>'+
+      '<input id="bloC" placeholder="p. ej. Traslado a campo de pruebas" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
+      '<button class="btn pri" data-bloque>Otorgar el bloque</button>'+
+    '</div></div>');
+}
 V.partes={g:'Horas',t:'Partes de horas',f:function(){
   var cola=pendientes();
   var mias=cola.filter(function(p){return puedeDecidirParte(p,ACTOR);});
@@ -937,6 +982,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
         '<input placeholder="p. ej. Feria de divulgación · montaje" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
         '<button class="btn pri" data-otorgar>Otorgar</button>'+
       '</div></div>')+
+    bloquePanel()+
     (otras.length?pan('En la cola de otros',otras.length+' partes · los ves, no los decides',
       otras.map(parteCard).join('')):'')+
     pan('Histórico',hist.length+' decisiones',
@@ -1709,6 +1755,41 @@ function enganchar(){
         return;
       }
       tost(h1(horas)+' otorgadas a '+(_m(nombre).pila||nombre)+' (semilla local): entran marcadas como «otorgadas».');
+    };
+  });
+  /* bloque de horas: marca a varios de tu subsistema y otórgales lo mismo (api.otorgarBloque).
+     Un solo disparo crea todas las partes 'otorgada'; el servidor revalida jurisdicción por token
+     y persona. Con backend real viaja; sin él, semilla local. */
+  var _bs=$('#bloSub');
+  if(_bs) _bs.onchange=function(){
+    var u=_bs.value;
+    $$('#bloPool .pick').forEach(function(c){
+      var vis=!u||c.dataset.unidad===u; c.style.display=vis?'':'none'; if(!vis) c.classList.remove('on');
+    });
+  };
+  $$('#bloPool .pick').forEach(function(c){ c.onclick=function(){ c.classList.toggle('on'); }; });
+  $$('[data-bloque]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var marcados=$$('#bloPool .pick.on').map(function(c){ return c.dataset.nom; });
+      var horas=parseFloat(String(($('#bloH')||{}).value||'').replace(',','.'))||0;
+      var concepto=($('#bloC')||{}).value||'';
+      if(!marcados.length){ tost('Marca al menos a una persona del subsistema.'); return; }
+      if(horas<=0){ tost('Pon unas horas > 0.'); return; }
+      if(PART_BACK!==null && backendOK && SESION){
+        b.disabled=true; var prev=b.textContent; b.textContent='Otorgando\u2026';
+        try{
+          var r=await api.otorgarBloque({nombres:marcados, horas:horas, tarea:concepto});
+          var okN=(r&&r.otorgados)||0, res=(r&&r.resultados)||[];
+          res.forEach(function(x){ if(x&&x.id) PART_BACK.push(x); });         // las partes creadas
+          if(res.length) _partesReal_();
+          var fallos=res.filter(function(x){ return x&&x.error; }).length;
+          tost(h1(horas)+' a '+okN+'/'+marcados.length+' de subsistema'+(fallos?' \u00b7 '+fallos+' sin permiso o error':'')+'. El motor las aplica.');
+          pintar();
+        }catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo otorgar el bloque: '+((e&&e.message)||e)); }
+        return;
+      }
+      tost(h1(horas)+' a '+marcados.length+' de subsistema (semilla local): entran como \u00abotorgadas\u00bb.');
     };
   });
   /* documentos: decidir PERSISTE en el backend (api.decidir, ya desplegada). La app
