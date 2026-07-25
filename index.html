@@ -692,9 +692,14 @@ var api={
   quienSoy:  function(t){ return api._post({action:"quienSoy",token:t}); },
   getPanel:  function(){ return api._post({action:"getPanel"}); },
   getPartes: function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
-  pushParte: function(p){ return api._post({action:"pushParte",parte:p}); }
+  pushParte: function(p){ return api._post({action:"pushParte",parte:p}); },
+  ficharEntrada:    function(){ return api._post({action:"ficharEntrada"}); },
+  ficharSalida:     function(tarea,just){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just}); },
+  getFichajeAbierto:function(){ return api._post({action:"getFichajeAbierto"}); }
 };
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
+/* HH:MM local de una fecha ISO (la hora de apertura que da la nube) */
+function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes()); }
 /* Aplica el panel del backend a DATA y fija YO al miembro que ha entrado. El backend
    sirve al miembro su ficha completa (yo) + solo la identidad de los demás. */
 function _aplicarPanel_(pnl){
@@ -722,6 +727,13 @@ function normPMovil(p){
     just:p.justificacion||'', nota:p.motivo||p.justificacion||'', sinFichaje:!!p.sinFichaje }; }
 async function _cargarMisPartes_(){
   try{ var arr=await api.getPartes({mias:true}); if(Array.isArray(arr)) PARTES=arr.map(normPMovil); }
+  catch(e){}
+}
+/* Al entrar, retoma el fichaje que hubiera abierto en la nube: el reloj sigue desde la
+   hora del servidor, así que cerrar la app (o cambiar de móvil) no pierde la sesión. */
+async function _cargarFichajeAbierto_(){
+  try{ var f=await api.getFichajeAbierto();
+    if(f && f.ini) ST.ses={estado:'corriendo', cloudIni:f.ini, desde:_hhmmDe_(f.ini), ult:_hhmmDe_(f.ini)}; }
   catch(e){}
 }
 /* DEMO = solo para ver la maqueta en local SIN cuenta (?demo en la URL). En la app
@@ -756,6 +768,7 @@ async function _onCredencial_(resp,_silente){
     try{ localStorage.setItem('sol_last_email',SESION.email);
          localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
     await _cargarMisPartes_();
+    await _cargarFichajeAbierto_();
     var g=document.getElementById('loginGate'); if(g) g.remove();
     var rs=$('#rolsel'); if(rs) rs.style.display='none';   // con cuenta real no hay conmutador de rol
     var bs=$('#btnSalir'); if(bs) bs.style.display='';     // sí hay salir/cambiar de cuenta
@@ -1228,6 +1241,7 @@ function vEstado(){
 var DEMO_X=60;
 function minSes(){
   var s=ST.ses;
+  if(s.cloudIni) return Math.min(840, Math.max(0, Math.round((Date.now()-Date.parse(s.cloudIni))/60000)));  // nube: tiempo REAL, tope 14 h
   if(s.estado==='parada') return 0;
   if(s.estado==='pausada') return s.acum;
   return s.acum + Math.round((Date.now()-s.ini)/60000*DEMO_X);
@@ -1251,6 +1265,7 @@ function optHoras(sel){
 }
 function vFichar(){
   var s=ST.ses, min=minSes(), largo=min>=600, corre=s.estado==='corriendo';
+  var nube=(typeof backendOK!=='undefined' && backendOK && SESION);   // sesión respaldada por la nube
   var rt=aprobadorDe(YO.nombre,YO.unidad);
   var opts=TAREAS.map(function(t){
     return '<option value="'+esc(t.n)+'"'+(ST.form.tarea===t.n?' selected':'')+'>'+esc(t.n)+'</option>';
@@ -1264,15 +1279,17 @@ function vFichar(){
           (corre?'CONTANDO DESDE LAS '+s.desde:(s.estado==='pausada'?'EN PAUSA · SE REANUDA CUANDO QUIERAS':'SIN SESIÓN ABIERTA'))+
         '</span></div>'+
       '</div>'+
-      (s.estado!=='parada'
+      (s.estado!=='parada' && !nube
         ? '<div class="pasos" style="justify-content:center;margin-top:12px">'+
           '<button data-p id="btnAdel">&#9193; adelantar 9 h <span style="color:var(--ink3)">(maqueta)</span></button></div>'
         : '')+
       '<div class="sesbtn">'+
         (s.estado==='parada'
           ? '<button class="btn pri full" data-p id="btnIni">Fichar entrada</button>'
-          : '<button class="btn" data-p id="btnPausa">'+(s.estado==='pausada'?'Reanudar':'Pausar')+'</button>'+
-            '<button class="btn no" data-p id="btnFin">Fichar salida</button>')+
+          : (nube
+              ? '<button class="btn no full" data-p id="btnFin">Fichar salida</button>'
+              : '<button class="btn" data-p id="btnPausa">'+(s.estado==='pausada'?'Reanudar':'Pausar')+'</button>'+
+                '<button class="btn no" data-p id="btnFin">Fichar salida</button>'))+
       '</div>'+
       (largo?'<div class="avisolargo"><b>Llevas más de 10 h abiertas.</b> Si te olvidaste de cerrar, ciérrala ahora: '+
         'a las <b>14 h</b> la sesión se cierra sola con la hora de tu última actividad ('+s.ult+') y te llega para que la ajustes. '+
@@ -1351,8 +1368,8 @@ function vFichar(){
 /* validación: los tres nodos y las dos aristas */
 function validarFichaje(){
   var f=ST.form;
-  var haySes = ST.modo!=='vivo' || minSes()>0;      /* sin sesion abierta no hay duracion */
-  var dur = ST.modo==='vivo' ? (minSes()>0?horasSesion():0) : durForm();
+  var haySes = ST.modo!=='vivo' || minSes()>0 || !!ST.ses.cloudIni;   /* con fichaje en la nube ya hay sesión */
+  var dur = ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durForm();
   var n1 = haySes && dur>0 && dur<=12;
   var n2 = !!f.tarea;
   var n3 = f.just.trim().length>=25;
@@ -1403,31 +1420,38 @@ function medirAristas(){
   });
 }
 function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?(m[3]+'-'+m[2]+'-'+m[1]):f; }
-/* Fichar salida: con cuenta real PERSISTE (api.pushParte) → cae en la cola del
-   coordinador (getPartes/decidirParte del escritorio). Sin backend: memoria (semilla). */
+/* Envío del fichaje. Con cuenta real y sesión EN VIVO → api.ficharSalida: la NUBE cierra
+   la sesión abierta y calcula las horas (de la entrada al momento del envío). Un BLOQUE
+   declarado a mano → api.pushParte (sin fichaje). Sin backend: memoria (semilla). */
 async function enviarFichaje(){
   if(!validarFichaje()) return;
-  var dur = ST.modo==='vivo' ? horasSesion() : durForm();
   if(backendOK && SESION){
     tost('Enviando…');
     try{
-      var rec=await api.pushParte({ fecha:_dmyAISO_(ST.form.fecha), tarea:ST.form.tarea, horas:dur,
-        ini:ST.form.ini, fin:ST.form.fin, justificacion:ST.form.just.trim(), sinFichaje: ST.modo==='bloque' });
-      var nuevo=(rec&&rec.partes&&rec.partes[0])?normPMovil(rec.partes[0]):null;
+      var nuevo=null, h=0;
+      if(ST.modo==='vivo' && ST.ses.cloudIni){
+        var r=await api.ficharSalida(ST.form.tarea, ST.form.just.trim());   // la nube cierra y calcula
+        if(r && r.parte){ nuevo=normPMovil(r.parte); h=r.parte.horas; }
+      } else {
+        var dur=durForm();
+        var rec=await api.pushParte({ fecha:_dmyAISO_(ST.form.fecha), tarea:ST.form.tarea, horas:dur,
+          ini:ST.form.ini, fin:ST.form.fin, justificacion:ST.form.just.trim(), sinFichaje:true });
+        if(rec&&rec.partes&&rec.partes[0]){ nuevo=normPMovil(rec.partes[0]); h=dur; }
+      }
       if(nuevo) PARTES.unshift(nuevo);
-      ST.ses={estado:'parada',ini:null,acum:0,desde:null,ult:ST.ses.ult};
-      ST.form.just=''; ST.form.tarea='';
-      tost('Enviado · '+nf(dur,2)+' h a la cola de tu coordinador');
+      ST.ses={estado:'parada'}; ST.form.just=''; ST.form.tarea='';
+      tost('Fichaje enviado · '+nf(h,2)+' h a la cola de tu coordinador');
       irA('horas');
     }catch(e){ tost('No se pudo enviar: '+((e&&e.message)||e)); }
     return;
   }
-  PARTES.unshift({id:++SEQ, f:ST.form.fecha, t:ST.form.tarea, q:dur, e:'pend',
+  var durd = ST.modo==='vivo' ? horasSesion() : durForm();   // demo local (sin backend)
+  PARTES.unshift({id:++SEQ, f:ST.form.fecha, t:ST.form.tarea, q:durd, e:'pend',
     ini:ST.form.ini, fin:ST.form.fin, just:ST.form.just.trim(),
     sinFichaje: ST.modo==='bloque'});
   ST.ses={estado:'parada',ini:null,acum:0,desde:null,ult:ST.ses.ult};
   ST.form.just=''; ST.form.tarea='';
-  tost('Enviado · '+nf(dur,2)+' h pendientes de firma');
+  tost('Enviado · '+nf(durd,2)+' h pendientes de firma');
   irA('horas');
 }
 
@@ -2126,10 +2150,20 @@ function enganchar(){
     b.onclick=function(){ ST.modo=b.dataset.mo; pintar(); };
   });
   var bi=$('#btnIni');
-  if(bi) bi.onclick=function(){
-    var d=new Date();
+  if(bi) bi.onclick=async function(){
+    if(typeof backendOK!=='undefined' && backendOK && SESION){
+      bi.disabled=true;
+      try{
+        var rec=await api.ficharEntrada();
+        ST.ses={estado:'corriendo', cloudIni:rec.ini, desde:_hhmmDe_(rec.ini), ult:_hhmmDe_(rec.ini)};
+        tost('Fichando. Corre en la nube: aunque cierres la app, sigue contando.');
+        pintar();
+      }catch(e){ bi.disabled=false; tost('No se pudo fichar entrada: '+((e&&e.message)||e)); }
+      return;
+    }
+    var d=new Date();   // demo local (sin backend)
     ST.ses={estado:'corriendo',ini:Date.now(),acum:0,desde:pad(d.getHours())+':'+pad(d.getMinutes()),ult:pad(d.getHours())+':'+pad(d.getMinutes())};
-    pintar(); tost('Sesión abierta. Puedes pausarla cuando quieras.');
+    pintar(); tost('Sesión abierta.');
   };
   var bp=$('#btnPausa');
   if(bp) bp.onclick=function(){
@@ -2149,7 +2183,15 @@ function enganchar(){
   };
   var bf=$('#btnFin');
   if(bf) bf.onclick=function(){
-    var min=minSes();
+    if(typeof backendOK!=='undefined' && backendOK && SESION && ST.ses.cloudIni){
+      // en la nube: «fichar salida» = validar y enviar (la nube cierra la sesión y calcula las horas).
+      if(validarFichaje()){ enviarFichaje(); }
+      else { ST.form.origen='turno';
+        tost('Elige la tarea y escribe la justificación abajo para cerrar el fichaje.');
+        var tj=$('#fTarea'); if(tj) tj.scrollIntoView({behavior:'smooth',block:'center'}); }
+      return;
+    }
+    var min=minSes();   // demo local: congela el reloj y abre la justificación
     ST.ses.acum=min; ST.ses.estado='pausada'; ST.ses.ini=null;
     ST.form.origen='turno';
     tost('Sesión de '+nf(horasSesion(),2)+' h cerrada. Falta la justificación.');
@@ -2268,9 +2310,9 @@ document.addEventListener('click',function(ev){
 setInterval(function(){
   var d=new Date();
   var r=$('#reloj'); if(r) r.textContent=pad(d.getHours())+':'+pad(d.getMinutes());
-  if(ST.ses.estado==='corriendo' && minSes()>=840){
-    /* 14 h: la sesión se cierra SOLA con la hora de la última actividad y queda
-       pendiente de que el miembro la corrija. Ni se pierde ni se regala. */
+  if(!ST.ses.cloudIni && ST.ses.estado==='corriendo' && minSes()>=840){
+    /* 14 h (solo en DEMO local): la sesión se cierra sola. En la nube esto lo hace el
+       backend (cerrarFichajesVencidos, barrido del gate), no el navegador. */
     ST.ses.acum=840; ST.ses.estado='pausada'; ST.ses.ini=null;
     tost('Sesión cerrada automáticamente a las 14 h. Ajústala antes de enviarla.');
     if(ST.vista==='fichar') pintar();
