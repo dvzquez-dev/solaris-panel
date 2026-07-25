@@ -592,6 +592,8 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
           <button data-rol="coord" data-p>Coord.</button>
           <button data-rol="pd" data-p>PD</button>
         </div>
+        <button id="btnSalir" onclick="cerrarSesion()" style="display:none;border:1px solid var(--line);
+          border-radius:9px;padding:7px 13px;font-size:12px;color:var(--ink2)">Salir</button>
       </div>
     </header>
 
@@ -727,8 +729,8 @@ async function _cargarMisPartes_(){
 var DEMO = window.__SIN_LOGIN__ === true || /[?&]demo\b/.test(location.search);
 /* Splash de marca REAL, calcado de app.html: la insignia + el banner «UVigo Aerotech
    Solaris». Son ficheros del repo publicado; con onerror degradan a texto en local. */
-var SPLASH = '<img src="insignia.png" alt="Solaris" style="width:104px;height:auto;margin-bottom:10px" onerror="this.style.display=\'none\'">'+
-  '<img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="width:min(240px,60vw);height:auto;margin-bottom:4px" onerror="this.style.display=\'none\'">';
+var SPLASH = '<img src="insignia.png" alt="Solaris" style="display:block;margin:0 auto 10px;width:104px;height:auto" onerror="this.style.display=\'none\'">'+
+  '<img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="display:block;margin:0 auto 4px;width:min(240px,60vw);height:auto" onerror="this.style.display=\'none\'">';
 function _gate_(html){
   var g=document.getElementById('loginGate');
   if(!g){ g=document.createElement('div'); g.id='loginGate';
@@ -756,6 +758,10 @@ async function _onCredencial_(resp,_silente){
     await _cargarMisPartes_();
     var g=document.getElementById('loginGate'); if(g) g.remove();
     var rs=$('#rolsel'); if(rs) rs.style.display='none';   // con cuenta real no hay conmutador de rol
+    var bs=$('#btnSalir'); if(bs) bs.style.display='';     // sí hay salir/cambiar de cuenta
+    // el backend NO sirve el detalle de movimientos de puntos: vaciamos la semilla (era ficticia,
+    // enseñaba los de otra persona). Se muestra vacío hasta que haya fuente real.
+    if(typeof MOVS!=='undefined') MOVS.length=0;
     if(typeof YO!=='undefined' && YO){                     // la cabecera muestra al miembro real
       var hn=$('#hNom'), hr=$('#hRol');
       if(hn) hn.textContent=(YO.pila||(YO.nombre||'').split(' ')[0]||YO.nombre||'');
@@ -1033,11 +1039,12 @@ function medidorHTML(){
     '<button class="btn mini" data-p id="btnLibro" style="margin-top:11px">Desglose de puntos</button>'+
   '</div>'+
   '<div class="libro" id="libro"><div id="libroIn" style="padding-top:6px">'+
-    MOVS.map(function(m){
+    (MOVS.length ? MOVS.map(function(m){
       return '<div class="retf"><span class="pt'+(m.p>0?' mas':'')+'">'+(m.p>0?'+':'−')+Math.abs(m.p)+'</span>'+
         '<span class="mo"><b>'+esc(m.t)+'</b><small>ART. '+m.art+' · '+m.f+'</small></span>'+
         '<span class="vv">'+(m.rep?'vuelve el<br>'+m.rep:'no caduca')+'</span></div>';
-    }).join('')+
+    }).join('') : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos registrados</b>'+
+      '<small>El detalle de cada subida o bajada de puntos aún no llega del backend.</small></span></div>')+
   '</div></div>';
 }
 var medTimers=[];
