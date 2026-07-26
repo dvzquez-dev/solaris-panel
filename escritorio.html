@@ -1359,7 +1359,7 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
 /* ── OPERACIÓN ───────────────────────────────────────────────────────────── */
 V.turnos={g:'Operación',t:'Turnos',f:function(){
   return pan('Turnos convocados',TURNOS.length+'',
-    tabla([['Turno'],['Fecha'],['Hora',0],['Punto'],['Duración',1],['Van',1]],
+    tabla([['Turno'],['Fecha'],['Hora',0],['Punto'],['Duración',1],['Van',1],['Memoria',1]],
       /* las fechas llegan en ISO (dato real: '2025-11-26') o DD/MM/AAAA (semilla): se
          normalizan a ISO antes de comparar, o un sort lexicografico las cruza mal de mes. */
       TURNOS.slice().sort(function(a,b){ return _fechaISO_(b.fecha||b.f).localeCompare(_fechaISO_(a.fecha||a.f)); })
@@ -1372,7 +1372,10 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
         return '<tr><td class="mono" style="color:var(--red2)">'+esc(id)+'</td><td class="mono">'+esc(f)+'</td>'+
           '<td class="mono">'+esc(t.hora||'\u2014')+'</td><td style="color:var(--ink2)">'+esc(t.punto||'\u2014')+'</td>'+
           '<td class="r mono" style="color:var(--ink3)">'+esc(t.duracion||t.dur||'\u2014')+'</td>'+
-          '<td class="r mono">'+quien+'</td></tr>';
+          '<td class="r mono">'+quien+'</td>'+
+          '<td class="r mono">'+(t.memoria
+            ? '<a href="'+esc(t.memoria)+'" target="_blank" rel="noopener" style="color:var(--red2)">ver</a>'
+            : '<span style="color:var(--ink3)">—</span>')+'</td></tr>';
       }).join(''))+
     '<div class="nota"><b>Convocar turnos desde aquí queda fuera de esta versión</b>, por decisión tuya: hoy se '+
     'convocan en el canal de fabricación de Discord y el panel los espeja. Cuando toque, este es el sitio, y '+
