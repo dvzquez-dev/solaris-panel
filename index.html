@@ -661,7 +661,15 @@ var HOY='24/07/2026';
    ═══════════════════════════════════════════════════════════════════════════ */
 var UMBRAL=11.8;          /* umbral dinámico de cuota (8–15 h/mes) */
 var MEDIA_EQ=10.9;
-var PD_NOM='Lois Carballo Sendón';
+var PD_NOM='Lois Carballo Sendón';   // semilla; con datos reales lo rederiva _rederivarPD_()
+/* Con el roster real, el PD es quien tenga el cargo — no el de la semilla. */
+/* límite de una reunión en DD/MM (del dato, no cableado). */
+function _limM_(R){ var l=R&&R.limite; if(!l) return 'sin límite'; l=String(l).slice(0,10); return _isoADMY_(l); }
+function _pilaDeM_(n){ var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0]; return m&&m.pila; }
+function _rederivarPD_(){
+  var pd=(DATA.miembros||[]).filter(function(m){ return m.cargo==='Project Director'; })[0];
+  if(pd) PD_NOM=pd.nombre;
+}
 var REV2_NOM='Antía Ruibal Cortegoso';
 
 var DATA={
@@ -747,6 +755,7 @@ function _aplicarPanel_(pnl){
     if(!yo) yo=pnl.miembros.filter(function(m){return m.cargo==='Project Director';})[0]||pnl.miembros[0];   // admin no está en el roster: ve como el PD
   }
   if(yo) YO=yo;
+  _rederivarPD_();
 }
 /* «Ver como» — SOLO la cuenta admin (solaris@): se pone en la vista de cualquier miembro. El
    backend ya le sirve el roster completo con datos por persona, así que ve sus horas/puntos/cuota. */
@@ -1040,7 +1049,12 @@ var SEQ=6;
    PD/coordinador que entra de verdad ve «Convocar reunión», el Panel PD, etc. */
 function esCoord(){ return ST.rol==='coord' || ST.rol==='pd' || (typeof YO!=='undefined' && YO && (YO.cargo==='Coordinador' || YO.cargo==='Project Director')); }
 function esPD(){ return ST.rol==='pd' || (typeof YO!=='undefined' && YO && YO.cargo==='Project Director'); }
-function yoNombre(){ return esPD()?PD_NOM : (ST.rol==='coord'?'Xoán Bermúdez Rial':YO.nombre); }
+/* Con cuenta real SIEMPRE mandas tú (YO.nombre). Los nombres de la semilla solo valen para la
+   demo local (?demo), donde el conmutador finge ser el PD o un coordinador. */
+function yoNombre(){
+  if(typeof backendOK!=='undefined' && backendOK && SESION) return (YO&&YO.nombre)||'';
+  return esPD()?PD_NOM : (ST.rol==='coord'?'Xoán Bermúdez Rial':YO.nombre);
+}
 
 /* ── MODAL (mismo patrón que app.html) ─────────────────────────────────── */
 function abrirModal(html){
@@ -1276,7 +1290,7 @@ function vEstado(){
   if(!REUNION.cubierta && !REUNION.fijada){
     av+='<div class="aviso" data-ir="reu" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
       '<div style="flex:1"><b>Te falta cubrir una disponibilidad</b>'+
-      '<p>«'+esc(REUNION.titulo)+'» — cierra el 26/07/2026.</p></div>'+
+      '<p>«'+esc(REUNION.titulo)+'» — cierra el '+_limM_(REUNION)+'.</p></div>'+
       '<span class="chev">›</span></div>';
   }
 
@@ -1300,7 +1314,7 @@ function vEstado(){
     '<h2 class="sec">Próxima reunión<span class="ln"></span></h2>'+
     '<div class="tarj clic" data-ir="reu" data-p>'+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(REUNION.titulo)+'</b>'+
-      '<small>MAR 28/07/2026 · 22:00 · TELEMÁTICA</small></div>'+
+      '<small>'+esc(REUNION.fijada||('cierra el '+_limM_(REUNION)))+' · '+esc((REUNION.modalidad||'').toUpperCase())+'</small></div>'+
       '<div class="d"><span class="pil '+((REUNION.fijada||REUNION.cubierta)?'conf':'pend')+'">'+(REUNION.fijada?'fijada':(REUNION.cubierta?'cubierta':'te falta'))+'</span></div></div></div>';
 }
 
@@ -1886,7 +1900,7 @@ function vReu(){
     '<h2 class="sec">Mis reuniones<span class="ln"></span>1</h2>'+
     '<div class="tarj">'+cab('General','telemática')+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
-      '<small>Convoca Lois · '+(R.fijada?'📌 '+esc(R.fijada):'cierra el 26/07/2026')+' · '+R.nInv+' convocados</small></div>'+
+      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(R.fijada):'cierra el '+_limM_(R))+' · '+R.nInv+' convocados</small></div>'+
       '<div class="d"><span class="pil '+(R.fijada?'conf':(R.cubierta?'conf':'no'))+'">'+
         (R.fijada?'fijada':(R.cubierta?'cubierta':'te falta'))+'</span></div></div>'+
       (R.fijada
