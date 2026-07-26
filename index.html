@@ -2739,7 +2739,9 @@ function enganchar(){
         lista(t.principales,'Objetivos principales')+lista(t.secundarios,'Objetivos secundarios')+
         (t.nota?'<p class="rnota" style="margin-top:10px"><b>Nota:</b> '+esc(t.nota)+'</p>':'')+
         '<p class="rnota" style="margin-top:14px;border-top:1px solid var(--line);padding-top:11px">'+
-        'Memoria del turno · <span style="color:var(--ink3)">enlace pendiente</span></p>');
+        'Memoria del turno · '+(t.memoria
+          ? '<a href="'+esc(t.memoria)+'" target="_blank" rel="noopener" style="color:var(--red2)">abrir</a>'
+          : '<span style="color:var(--ink3)">aún no subida</span>')+'</p>');
     };
   });
   $$('[data-doc]').forEach(function(el){ el.onclick=function(){ verDoc(+el.dataset.doc); }; });
