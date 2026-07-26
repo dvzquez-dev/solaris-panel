@@ -1000,6 +1000,28 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
       '<b>PD (3) &gt; revisor fijo (2) &gt; coordinador (1) &gt; miembro (0)</b>, y <b>nadie decide lo suyo</b>. '+
       'Es exactamente el modelo que la app ya usa para aprobar documentos, aplicado a las horas.</div></div>';
 }};
+V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
+  var sd=PARTES.filter(function(p){return p.estado==='sindecl';});
+  var cad=PARTES.filter(function(p){return p.estado==='cad';});
+  return '<div class="kpis">'+
+      kpi('Sin declarar ahora',sd.length,sd.length?'fichajes cerrados que nadie justificó':'todo declarado',sd.length?'wa':'up',(sd.length*15)+'%')+
+      kpi('Caducados',cad.length,'pasaron 7 días sin declarar','',(cad.length*10)+'%')+
+    '</div>'+
+    pan('Fichajes sin declarar', sd.length+' · solo el autor los declara (desde su móvil)',
+      sd.length?sd.map(function(p){
+        return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+h1(p.horas)+'</b>'+
+          '<small>'+esc(p.unidad)+' · '+p.fecha+(p.ini!=='—'?' · '+p.ini+'–'+p.fin:'')+'</small></span>'+
+          '<span class="der"><span class="chip wa">sin declarar</span></span></div>';
+      }).join(''):vac('Nada sin declarar','Cuando alguien fiche salida sin justificar aparece aquí, hasta que lo declare o caduque (7 días).'),'destaca')+
+    (cad.length?pan('Caducados',cad.length+' · se perdieron sin declarar',
+      cad.map(function(p){
+        return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+h1(p.horas)+'</b>'+
+          '<small>'+esc(p.unidad)+' · '+p.fecha+'</small></span><span class="der"><span class="chip no">caducada</span></span></div>';
+      }).join('')):'')+
+    '<div class="pan"><div class="nota">Un fichaje <b>sin declarar</b> es una salida que se cerró sin categoría ni justificación. '+
+      'El coordinador NO lo ve en su cola (no se aprueba en blanco); solo su autor lo declara desde el móvil, y a los '+
+      '<b>7 días</b> caduca (con aviso 24 h antes). Esta vista es solo para el admin.</div></div>';
+}};
 
 /* ── FICHAJES EN CURSO ───────────────────────────────────────────────────── */
 V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
@@ -1495,7 +1517,7 @@ async function _cargarSanciones_(){
    pinta el escritorio (unidad/just/estado 'pend'…). Sin datos inventados: los flags de
    calidad de la maqueta no existen en real, salvo los que el propio dato delata. */
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
-var _EST_PARTE_={pendiente:'pend',aprobada:'aprobado',rechazada:'rechazado',detalle:'detalle',otorgada:'aprobado',aplicada:'aprobado'};
+var _EST_PARTE_={pendiente:'pend',aprobada:'aprobado',rechazada:'rechazado',detalle:'detalle',otorgada:'aprobado',aplicada:'aprobado',sin_declarar:'sindecl',caducada:'cad'};
 function normParte(p){
   var fl=[];
   if(p.autocierre) fl.push(['wa','autocerrado al tope de 14 h']);
@@ -1597,7 +1619,7 @@ function cerrarSesion(){
    ═══════════════════════════════════════════════════════════════════════════ */
 var GRUPOS=[
   ['Operación',['panel','turnos','tareas']],
-  ['Horas',['partes','curso','registro','cierre']],
+  ['Horas',['partes','sindeclarar','curso','registro','cierre']],
   ['Documentos',['docdec','docurso','docpub']],
   ['Disciplina',['sanciones','apela']],
   ['Reuniones',['convoc','dispo','actas']],
@@ -1606,6 +1628,7 @@ var GRUPOS=[
 var vista='panel';
 function conteo(k){
   if(k==='partes') return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).length;
+  if(k==='sindeclarar') return PARTES.filter(function(p){return p.estado==='sindecl';}).length;
   if(k==='curso')  return CURSO.length;
   if(k==='docdec') return docsMios().length;
   if(k==='docurso')return DOCS.filter(function(d){return ['recibido','analizado','revision','cambios'].indexOf(d.est)>=0;}).length;
@@ -1627,6 +1650,7 @@ function pintarNav(){
     d.innerHTML='<span class="sc">'+g[0]+'</span><span class="ln"></span>';
     nav.appendChild(d);
     g[1].forEach(function(k){
+      if(k==='sindeclarar' && !_puedeImpersonar_()) return;   // solo el admin ve los fichajes sin declarar
       var n=conteo(k), b=document.createElement('button');
       b.className='item'+(k===vista?' on':''); b.dataset.v=k;
       var cls = (k==='partes'&&n)||(k==='docdec'&&n) ? ' hot' : (k==='sanciones'&&n)||(k==='curso'&&n) ? ' wa' : '';
