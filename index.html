@@ -1353,7 +1353,7 @@ function bloqueDeltas(){
      (Antes sumaba el estado 'conf', que ya no existe -> siempre 0 y los deltas salían rotos.) */
   var base=(typeof YO.horasMes==='number') ? YO.horasMes : sumaE('otor');
   return '<div>'+
-    deltaHTML('vs. junio',base,YO.hAnt,nf(YO.hAnt,1)+' h en junio')+
+    (typeof YO.hAnt==='number' ? deltaHTML('vs. '+(YO.mesAnt||'mes anterior'),base,YO.hAnt,nf(YO.hAnt,1)+' h en '+(YO.mesAnt||'el mes anterior')) : '')+
     deltaHTML('vs. objetivo',base,UMBRAL,'umbral '+nf(UMBRAL,1)+' h/mes')+
     deltaHTML('vs. equipo',base,MEDIA_EQ,'media '+nf(MEDIA_EQ,1)+' h')+
     deltaHTML('vs. unidad',base,mediaSub(YO.unidad),'Estructuras '+nf(mediaSub(YO.unidad),1)+' h')+
