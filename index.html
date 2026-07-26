@@ -788,6 +788,44 @@ async function _verComo_(nombre){
   if(typeof MOVS!=='undefined') MOVS.length=0;
   pintar();
 }
+/* Vuelca en la app lo que trae el bootstrap y BORRA lo que quede de la semilla (nombres y
+   datos ficticios). Si el backend no sirve una lista, se vacía: mejor un hueco honesto que
+   un dato inventado. */
+function _aplicarBootstrapMovil_(boot){
+  boot=boot||{};
+  if(typeof TAREAS!=='undefined'){ TAREAS.length=0; (boot.tareas||[]).forEach(function(t){ TAREAS.push(t); }); }
+  if(typeof TURNOS!=='undefined'){ TURNOS.length=0; (boot.turnos||[]).forEach(function(t){ TURNOS.push(t); }); }
+  if(typeof ENTREGABLES!=='undefined'){ ENTREGABLES.length=0; (boot.entregables||[]).forEach(function(d){ ENTREGABLES.push(d); }); }
+  if(typeof LOTE!=='undefined' && LOTE && LOTE.items) LOTE.items=[];   // bloque de sanciones: era semilla
+}
+/* ── REUNIONES REALES (recuperado de app.html): el móvil listaba solo una de la semilla.
+   Adapta la reunión del backend al modelo de la pantalla: el mapa de calor sale de 'resp'
+   (quién puede en cada bloque), los convocados de 'invitados'. ── */
+var REUNIONES_M=[];
+function _normReuM_(r){
+  var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};
+  var calor=dias.map(function(){ return F.map(function(){ return 0; }); });
+  Object.keys(resp).forEach(function(nom){
+    var v=resp[nom]||[];
+    for(var i=0;i<bl.length;i++){ if(+v[i]>0){ var d=bl[i][0], f=bl[i][1];
+      if(calor[d]&&calor[d][f]!=null) calor[d][f]++; } }
+  });
+  var fij=r.fijada; if(fij && typeof fij==='object') fij=fij.label||fij.iso||null;
+  return { id:r.id, titulo:r.titulo||'Reunión sin título', tipo:r.tipo||'general',
+    modalidad:r.modalidad||'hibrida', limite:r.limite||null, fijada:fij||null,
+    convocante:r.convocante||'', dias:dias, franjas:F, bloques:bl, resp:resp,
+    calor:calor, nInv:(r.invitados||[]).length,
+    cubierta: !!(YO && resp[YO.nombre] && resp[YO.nombre].some(function(x){ return +x>0; })), _real:true };
+}
+async function _cargarReunionesM_(){
+  try{ var arr=await api.listarReuniones();
+    if(Array.isArray(arr) && arr.length){
+      REUNIONES_M=arr.map(_normReuM_);
+      var mia=REUNIONES_M.filter(function(r){ return !r.fijada; })[0]||REUNIONES_M[0];
+      if(mia) REUNION=mia;
+    }
+  }catch(e){}
+}
 /* Mapea un parte del backend al modelo del móvil (e: conf|otor|dev|pend). */
 var _E_MOVIL_={pendiente:'pend',aprobada:'otor',aplicada:'otor',otorgada:'otor',rechazada:'dev',detalle:'dev',sin_declarar:'sindecl',caducada:'cad'};
 function normPMovil(p){
@@ -849,6 +887,8 @@ async function _onCredencial_(resp,_silente){
          localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
     await _cargarMisPartes_();
     await _cargarFichajeAbierto_();
+    _aplicarBootstrapMovil_(boot);        // tareas/turnos/documentos REALES (fuera la semilla)
+    await _cargarReunionesM_();           // tus reuniones del backend
     var g=document.getElementById('loginGate'); if(g) g.remove();
     var bs=$('#btnSalir'); if(bs) bs.style.display='';     // sí hay salir/cambiar de cuenta
     _pintarVerComo_();                                     // admin (solaris@): selector «ver como»; resto: sin conmutador
@@ -1196,7 +1236,11 @@ function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 function barraHorasHTML(id){
   var notion=(typeof YO.horasMes==='number');
   var cont=notion?YO.horasMes:sumaE('otor'), p=sumaE('pend');   /* otorgadas = todo lo que cuenta (Notion) */
-  var wco=wBar(cont), wcop=wBar(cont+p);
+  /* La barra NUNCA se llena (escala asintótica), pero dentro del ancho que ocupa el total
+     (otorgadas+pendientes) el reparto es LINEAL: si 4 de 20 h están pendientes, el rayado
+     ocupa 1/5 de lo pintado — no un pixel al final como si fueran un extra. */
+  var tot=cont+p, wtot=wBar(tot);
+  var wco = tot>0 ? wtot*(cont/tot) : 0, wcop = wtot;
   var wu=wBar(UMBRAL), wm=wBar(MEDIA_EQ);
   return '<div class="barh" id="'+id+'">'+
       '<i class="otor" data-w="'+wco.toFixed(2)+'"></i>'+
@@ -1248,7 +1292,9 @@ function animarDeltas(root){
   });
 }
 function bloqueDeltas(){
-  var base=sumaE('conf')+sumaE('otor');
+  /* la base es la MISMA cifra que enseña la pantalla: el total real de Notion si lo hay.
+     (Antes sumaba el estado 'conf', que ya no existe -> siempre 0 y los deltas salían rotos.) */
+  var base=(typeof YO.horasMes==='number') ? YO.horasMes : sumaE('otor');
   return '<div>'+
     deltaHTML('vs. junio',base,YO.hAnt,nf(YO.hAnt,1)+' h en junio')+
     deltaHTML('vs. objetivo',base,UMBRAL,'umbral '+nf(UMBRAL,1)+' h/mes')+
@@ -1897,8 +1943,16 @@ function vReu(){
 
   return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
     '<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar '+(esCoord()?'reunión':'reunión de trabajo')+'</button>'+
-    '<h2 class="sec">Mis reuniones<span class="ln"></span>1</h2>'+
-    '<div class="tarj">'+cab('General','telemática')+
+    '<h2 class="sec">Mis reuniones<span class="ln"></span>'+(REUNIONES_M.length||1)+'</h2>'+
+    (REUNIONES_M.length>1
+      ? '<div class="tarj">'+REUNIONES_M.map(function(x,i){
+          var sel=(x.id===R.id);
+          return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
+            '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
+            (x.fijada?'📌 '+esc(x.fijada):'cierra el '+_limM_(x))+' · '+x.nInv+' convocados</small></div>'+
+            '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':'<span class="chev">›</span>')+'</div></div>'; }).join('')+'</div>'
+      : '')+
+    '<div class="tarj">'+cab(R.tipo||'General', R.modalidad||'')+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
       '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(R.fijada):'cierra el '+_limM_(R))+' · '+R.nInv+' convocados</small></div>'+
       '<div class="d"><span class="pil '+(R.fijada?'conf':(R.cubierta?'conf':'no'))+'">'+
@@ -2552,6 +2606,7 @@ function enganchar(){
   /* reuniones */
   var bc=$('#btnCubrir'); if(bc) bc.onclick=cubrirModal;
   var bcr=$('#btnCrear'); if(bcr) bcr.onclick=crearModal;
+  $$('[data-reu]').forEach(function(el){ el.onclick=function(){ var x=REUNIONES_M[+el.dataset.reu]; if(x){ REUNION=x; pintar(); } }; });
   var bfj=$('#btnFijar'); if(bfj) bfj.onclick=fijarModal;
   var bdf=$('#btnDesfijar');
   if(bdf) bdf.onclick=function(){ REUNION.fijada=null; tost('Fijado cancelado: se reabre la disponibilidad.'); pintar(); };
