@@ -473,7 +473,7 @@ var api={
   getPartes:   function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
   decidirParte:function(id,a,m){ return api._post({action:"decidirParte",id:id,accion:a,motivo:m}); },
   otorgarHoras:function(p){ return api._post({action:"otorgarHoras",parte:p}); },
-  otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea}); },
+  otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria}); },
   enviarPush:  function(d,t,c,o){ return api._post({action:"enviarPush",destinatario:d,titulo:t,cuerpo:c,opts:o}); },
   getControl:  function(){ return api._post({action:"getControl"}); },
   setControl:  function(clave,valor,nota){ return api._post({action:"setControl",clave:clave,valor:valor,nota:nota}); }
@@ -934,7 +934,7 @@ function bloquePanel(){
     filtro+
     '<div class="chips" id="bloPool" style="margin-bottom:12px">'+chips+'</div>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
-      '<label style="width:120px"><span class="sc" style="display:block;margin-bottom:5px">Horas c/u</span>'+
+      '<label style="min-width:150px"><span class="sc" style="display:block;margin-bottom:5px">Categoría</span>'+'<select id="bloCat" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+'<option value="reunion">Reunión</option><option value="tareas">Tarea</option>'+'<option value="turno">Turno</option><option value="compensacion" selected>Compensación</option></select></label>'+'<label style="width:120px"><span class="sc" style="display:block;margin-bottom:5px">Horas c/u</span>'+
       '<input class="mono" id="bloH" value="2,0" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-family:var(--mono);font-size:12.5px"></label>'+
       '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Concepto</span>'+
       '<input id="bloC" placeholder="p. ej. Traslado a campo de pruebas" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
@@ -1796,7 +1796,8 @@ function enganchar(){
       if(PART_BACK!==null && backendOK && SESION){
         b.disabled=true; var prev=b.textContent; b.textContent='Otorgando\u2026';
         try{
-          var r=await api.otorgarBloque({nombres:marcados, horas:horas, tarea:concepto});
+          var cat=($('#bloCat')||{}).value||'compensacion';
+          var r=await api.otorgarBloque({nombres:marcados, horas:horas, tarea:concepto, categoria:cat});
           var okN=(r&&r.otorgados)||0, res=(r&&r.resultados)||[];
           res.forEach(function(x){ if(x&&x.id) PART_BACK.push(x); });         // las partes creadas
           if(res.length) _partesReal_();
