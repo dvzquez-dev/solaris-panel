@@ -215,6 +215,17 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .pick:hover{border-color:var(--ink3);color:var(--ink)}
 .pick.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
 .pick.on::before{content:'\2713 '}
+/* reparto del turno: una fila por persona marcada, con su rol y sus distintivos */
+.repf{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--line)}
+.repf:last-child{border-bottom:0}
+.repf b{min-width:96px;font-size:12.5px}
+.repf input{flex:1;min-width:130px;background:#0A0909;border:1px solid var(--line);border-radius:7px;
+  padding:6px 9px;color:var(--ink);font:inherit;font-size:12px}
+.mini{cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.04em;padding:5px 9px;
+  border-radius:20px;border:1px solid var(--line);background:transparent;color:var(--ink3)}
+.mini:hover{border-color:var(--ink3);color:var(--ink)}
+.mini.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
+.mini.x:hover{border-color:var(--red);color:var(--red2)}
 
 /* ── ZONA FIJA «REQUIERE TU DECISIÓN» ────────────────────────────────────
    De la 02b, con lo que Daniel pidió encima: cada fila LLEVA al sitio exacto
@@ -455,6 +466,7 @@ var api={
   getPanel:    function(){ return api._post({action:"getPanel"}); },
   getTareas:   function(){ return api._post({action:"getTareas"}); },
   getTurnos:   function(){ return api._post({action:"getTurnos"}); },
+  crearTurno:  function(t){ return api._post({action:"crearTurno",turno:t}); },
   getEntregables: function(){ return api._post({action:"getEntregables"}); },
   listar:      function(){ return api._get({action:"listarReuniones"}); },
   get:         function(id){ return api._get({action:"getReunion",id:id}); },
@@ -514,26 +526,26 @@ var DATA={generado:'2026-07-24',temporada:'25/26',subsistemas:[],miembros:[]};
 /* semilla ficticia: lo que se ve SIN backend. Tras el login la sustituye
    entera la respuesta de `bootstrap`, con el filtrado por rol del servidor. */
 DATA.miembros=[
- {nombre:'Nerea Ferreiro Lamas',pila:'Nerea',unidad:'Estructuras y Aerodinámica',cargo:null,puntos:7,hMes:14.5,hAnt:11.9,horasTemp:132.4,meses:11,cuota:24.18,coche:2,infraccion:false},
- {nombre:'Xoán Bermúdez Rial',pila:'Xoán',unidad:'Estructuras y Aerodinámica',cargo:'Coordinador',puntos:10,hMes:31.2,hAnt:28.4,horasTemp:341.6,meses:11,cuota:0,coche:5,infraccion:false},
+ {nombre:'Nerea Ferreiro Lamas',pila:'Nerea',unidad:'Aeroestructuras',cargo:null,puntos:7,hMes:14.5,hAnt:11.9,horasTemp:132.4,meses:11,cuota:24.18,coche:2,infraccion:false},
+ {nombre:'Xoán Bermúdez Rial',pila:'Xoán',unidad:'Aeroestructuras',cargo:'Coordinador',puntos:10,hMes:31.2,hAnt:28.4,horasTemp:341.6,meses:11,cuota:0,coche:5,infraccion:false},
  {nombre:'Lois Carballo Sendón',pila:'Lois',unidad:'Dirección',cargo:'Project Director',puntos:10,hMes:44.8,hAnt:41.0,horasTemp:498.2,meses:11,cuota:0,coche:0,infraccion:false},
- {nombre:'Antía Ruibal Cortegoso',pila:'Antía',unidad:'Electrónica',cargo:null,puntos:10,hMes:26.6,hAnt:24.1,horasTemp:286.9,meses:11,cuota:8.44,coche:0,infraccion:false},
- {nombre:'Roi Miramontes Paz',pila:'Roi',unidad:'Electrónica',cargo:'Coordinador',puntos:9,hMes:22.4,hAnt:25.8,horasTemp:246.8,meses:11,cuota:16.47,coche:1,infraccion:false},
- {nombre:'Olalla Vilanova Seixas',pila:'Olalla',unidad:'Dinámica y Control',cargo:'Coordinador',puntos:10,hMes:38.5,hAnt:33.2,horasTemp:423.8,meses:11,cuota:0,coche:14,infraccion:false},
+ {nombre:'Antía Ruibal Cortegoso',pila:'Antía',unidad:'Aviónica',cargo:null,puntos:10,hMes:26.6,hAnt:24.1,horasTemp:286.9,meses:11,cuota:8.44,coche:0,infraccion:false},
+ {nombre:'Roi Miramontes Paz',pila:'Roi',unidad:'Aviónica',cargo:'Coordinador',puntos:9,hMes:22.4,hAnt:25.8,horasTemp:246.8,meses:11,cuota:16.47,coche:1,infraccion:false},
+ {nombre:'Olalla Vilanova Seixas',pila:'Olalla',unidad:'GNC',cargo:'Coordinador',puntos:10,hMes:38.5,hAnt:33.2,horasTemp:423.8,meses:11,cuota:0,coche:14,infraccion:false},
  {nombre:'Breogán Cives Doural',pila:'Breogán',unidad:'Propulsión',cargo:'Coordinador',puntos:10,hMes:19.8,hAnt:20.6,horasTemp:214.5,meses:11,cuota:19.05,coche:0,infraccion:false},
  {nombre:'Ledicia Amoedo Cambeses',pila:'Ledicia',unidad:'Org&Mark',cargo:'Coordinador',puntos:8,hMes:7.7,hAnt:9.4,horasTemp:84.1,meses:11,cuota:38.90,coche:0,infraccion:true},
  {nombre:'Uxía Berdiales Randín',pila:'Uxía',unidad:'Propulsión',cargo:null,puntos:5,hMes:9.5,hAnt:12.8,horasTemp:104.5,meses:11,cuota:31.72,coche:0,infraccion:true},
- {nombre:'Iago Randán Fuciños',pila:'Iago',unidad:'Estructuras y Aerodinámica',cargo:null,puntos:10,hMes:22.0,hAnt:17.3,horasTemp:198.0,meses:9,cuota:14.30,coche:3,infraccion:false},
- {nombre:'Sabela Ordóñez Pacio',pila:'Sabela',unidad:'Electrónica',cargo:null,puntos:10,hMes:6.0,hAnt:8.1,horasTemp:41.0,meses:3,cuota:15.00,coche:0,infraccion:false},
- {nombre:'Anxo Ferradás Vilaboa',pila:'Anxo',unidad:'Dinámica y Control',cargo:null,puntos:9,hMes:16.4,hAnt:14.9,horasTemp:172.2,meses:11,cuota:21.60,coche:0,infraccion:false},
- {nombre:'Noa Pardiñas Quintás',pila:'Noa',unidad:'Estructuras y Aerodinámica',cargo:null,puntos:10,hMes:12.9,hAnt:13.6,horasTemp:129.0,meses:10,cuota:25.40,coche:0,infraccion:false},
+ {nombre:'Iago Randán Fuciños',pila:'Iago',unidad:'Aeroestructuras',cargo:null,puntos:10,hMes:22.0,hAnt:17.3,horasTemp:198.0,meses:9,cuota:14.30,coche:3,infraccion:false},
+ {nombre:'Sabela Ordóñez Pacio',pila:'Sabela',unidad:'Aviónica',cargo:null,puntos:10,hMes:6.0,hAnt:8.1,horasTemp:41.0,meses:3,cuota:15.00,coche:0,infraccion:false},
+ {nombre:'Anxo Ferradás Vilaboa',pila:'Anxo',unidad:'GNC',cargo:null,puntos:9,hMes:16.4,hAnt:14.9,horasTemp:172.2,meses:11,cuota:21.60,coche:0,infraccion:false},
+ {nombre:'Noa Pardiñas Quintás',pila:'Noa',unidad:'Aeroestructuras',cargo:null,puntos:10,hMes:12.9,hAnt:13.6,horasTemp:129.0,meses:10,cuota:25.40,coche:0,infraccion:false},
  {nombre:'Xurxo Ameixeiras Codesal',pila:'Xurxo',unidad:'Propulsión',cargo:null,puntos:6,hMes:4.2,hAnt:7.8,horasTemp:52.6,meses:11,cuota:56.12,coche:0,infraccion:true},
- {nombre:'Mariña Cotelo Xesteira',pila:'Mariña',unidad:'Electrónica',cargo:null,puntos:10,hMes:18.1,hAnt:15.2,horasTemp:181.0,meses:10,cuota:20.05,coche:0,infraccion:false},
- {nombre:'Tomé Vilariño Estévez',pila:'Tomé',unidad:'Dinámica y Control',cargo:null,puntos:8,hMes:10.4,hAnt:11.7,horasTemp:114.4,meses:11,cuota:29.88,coche:0,infraccion:true},
+ {nombre:'Mariña Cotelo Xesteira',pila:'Mariña',unidad:'Aviónica',cargo:null,puntos:10,hMes:18.1,hAnt:15.2,horasTemp:181.0,meses:10,cuota:20.05,coche:0,infraccion:false},
+ {nombre:'Tomé Vilariño Estévez',pila:'Tomé',unidad:'GNC',cargo:null,puntos:8,hMes:10.4,hAnt:11.7,horasTemp:114.4,meses:11,cuota:29.88,coche:0,infraccion:true},
  {nombre:'Comba Sarmiento Nogueira',pila:'Comba',unidad:'Org&Mark',cargo:null,puntos:10,hMes:8.8,hAnt:6.2,horasTemp:70.4,meses:8,cuota:36.10,coche:0,infraccion:false},
- {nombre:'Xela Rendo Trigueiro',pila:'Xela',unidad:'Estructuras y Aerodinámica',cargo:null,puntos:9,hMes:11.2,hAnt:12.4,horasTemp:123.2,meses:11,cuota:27.66,coche:1,infraccion:false}
+ {nombre:'Xela Rendo Trigueiro',pila:'Xela',unidad:'Aeroestructuras',cargo:null,puntos:9,hMes:11.2,hAnt:12.4,horasTemp:123.2,meses:11,cuota:27.66,coche:1,infraccion:false}
 ];
-DATA.subsistemas=[{u:'Electrónica',n:4},{u:'Dinámica y Control',n:3},{u:'Estructuras y Aerodinámica',n:5},
+DATA.subsistemas=[{u:'Aviónica',n:4},{u:'GNC',n:3},{u:'Aeroestructuras',n:5},
           {u:'Propulsión',n:3},{u:'Org&Mark',n:2},{u:'Dirección',n:1}];
 /* miembro() puede devolver null y eso es correcto (sirve para preguntar «existe?»).
    Lo que NO puede es usarse directo en el render: el dato real trae nombres que no
@@ -569,7 +581,7 @@ function _rolDe_(nombre){
 /* ── PARTES DE HORAS ───────────────────────────────────────────────────── */
 var SEQ=20;
 var PARTES=[
- {id:1,autor:'Iago Randán Fuciños',unidad:'Estructuras y Aerodinámica',fecha:'23/07/2026',ini:'16:30',fin:'20:00',
+ {id:1,autor:'Iago Randán Fuciños',unidad:'Aeroestructuras',fecha:'23/07/2026',ini:'16:30',fin:'20:00',
   horas:3.5,tarea:'Laminado del fuselaje · tramo 2',origen:'turno',
   just:'Laminado de las dos últimas capas de fibra del tramo 2 y curado con Xela. Quedó en el parte de taller 26-118.',
   estado:'pend',flags:[['ok','coincide con el turno T-118']]},
@@ -577,11 +589,11 @@ var PARTES=[
   horas:9.0,tarea:'Ensayo estático · banco de pruebas',origen:'bloque',
   just:'Montaje del banco, dos ensayos en frío y desmontaje. Todo el día en el CITI.',
   estado:'pend',flags:[['wa','bloque de 9 h en un solo día'],['wa','declarado a posteriori, sin fichaje']]},
- {id:3,autor:'Xoán Bermúdez Rial',unidad:'Estructuras y Aerodinámica',fecha:'21/07/2026',ini:'18:00',fin:'21:00',
+ {id:3,autor:'Xoán Bermúdez Rial',unidad:'Aeroestructuras',fecha:'21/07/2026',ini:'18:00',fin:'21:00',
   horas:3.0,tarea:'Revisión de planos de mamparo',origen:'turno',
   just:'Revisión de los planos del mamparo delantero antes de mandarlos a mecanizado.',
   estado:'pend',flags:[['wa','lo firma el coordinador de la unidad → escala']]},
- {id:4,autor:'Noa Pardiñas Quintás',unidad:'Estructuras y Aerodinámica',fecha:'20/07/2026',ini:'17:00',fin:'19:30',
+ {id:4,autor:'Noa Pardiñas Quintás',unidad:'Aeroestructuras',fecha:'20/07/2026',ini:'17:00',fin:'19:30',
   horas:2.5,tarea:'Mecanizado de anillos',origen:'turno',just:'Mecanizado y verificación de cotas.',
   estado:'aprobado',decisor:PD_NOM,dec:'21/07/2026'},
  {id:5,autor:'Xurxo Ameixeiras Codesal',unidad:'Propulsión',fecha:'19/07/2026',ini:'10:00',fin:'19:00',
@@ -620,13 +632,13 @@ var DOCS=[
  {id:2,ref:'Acta_S-6301_26',tit:'Acta de la junta del 17/07/2026',autor:'Ledicia Amoedo Cambeses',
   sub:'Org&Mark',amb:'general',est:'revision',sev:'baja',iss:0},
  {id:3,ref:'Informe_S-4102_26',tit:'Caracterización del mamparo delantero',autor:'Nerea Ferreiro Lamas',
-  sub:'Estructuras y Aerodinámica',amb:'archivo',est:'revision',sev:'media',iss:1},
+  sub:'Aeroestructuras',amb:'archivo',est:'revision',sev:'media',iss:1},
  {id:4,ref:'Tabla_S-5507_26',tit:'Tabla de masas del tramo 2',autor:'Nerea Ferreiro Lamas',
-  sub:'Estructuras y Aerodinámica',amb:'archivo',est:'cambios',sev:'media',iss:3},
+  sub:'Aeroestructuras',amb:'archivo',est:'cambios',sev:'media',iss:3},
  {id:5,ref:'Informe_S-2044_26',tit:'Curva de empuje corregida por temperatura',autor:'Xurxo Ameixeiras Codesal',
   sub:'Propulsión',amb:'subsistema',est:'analizado',sev:'baja',iss:0},
  {id:6,ref:'Informe_S-4110_26',tit:'Ensayo de tracción de uniones encoladas',autor:'Iago Randán Fuciños',
-  sub:'Estructuras y Aerodinámica',amb:'archivo',est:'publicado',sev:'baja',iss:0},
+  sub:'Aeroestructuras',amb:'archivo',est:'publicado',sev:'baja',iss:0},
  {id:7,ref:'Acta_S-6302_26',tit:'Acta del consejo del 10/07/2026',autor:'Lois Carballo Sendón',
   sub:'Dirección',amb:'general',est:'publicado',sev:'baja',iss:0}
 ];
@@ -691,11 +703,11 @@ var TURNOS=[
  {id:'T-121',f:'05/08/2026',hora:'09:30',punto:'CITI · sala limpia',dur:'5 h',plazas:'2/2'}
 ];
 var TAREAS=[
- {n:'Cerrar el plano del mamparo delantero',r:'Nerea Ferreiro',s:'Estructuras y Aerodinámica',u:'alta',e:'En desarrollo',l:'27/07/2026'},
- {n:'Memoria de fabricación del tramo 2',r:'Iago Randán',s:'Estructuras y Aerodinámica',u:'media',e:'Revisando',l:'31/07/2026'},
+ {n:'Cerrar el plano del mamparo delantero',r:'Nerea Ferreiro',s:'Aeroestructuras',u:'alta',e:'En desarrollo',l:'27/07/2026'},
+ {n:'Memoria de fabricación del tramo 2',r:'Iago Randán',s:'Aeroestructuras',u:'media',e:'Revisando',l:'31/07/2026'},
  {n:'Informe del ensayo estático',r:'Uxía Berdiales',s:'Propulsión',u:'alta',e:'En desarrollo',l:'26/07/2026'},
- {n:'Calibración de la IMU de repuesto',r:'Antía Ruibal',s:'Electrónica',u:'media',e:'Sin empezar',l:'04/08/2026'},
- {n:'Actualizar la tabla de masas',r:'Anxo Ferradás',s:'Dinámica y Control',u:'baja',e:'Revisando',l:'08/08/2026'},
+ {n:'Calibración de la IMU de repuesto',r:'Antía Ruibal',s:'Aviónica',u:'media',e:'Sin empezar',l:'04/08/2026'},
+ {n:'Actualizar la tabla de masas',r:'Anxo Ferradás',s:'GNC',u:'baja',e:'Revisando',l:'08/08/2026'},
  {n:'Dossier de patrocinio 26/27',r:'Ledicia Amoedo',s:'Org&Mark',u:'alta',e:'En desarrollo',l:'25/07/2026'}
 ];
 var CANDID=[
@@ -908,10 +920,111 @@ function parteCard(p){
    de subsistema (chips) y les pone las mismas horas de golpe; el servidor revalida jurisdicción por
    persona (api.otorgarBloque -> _otorgarBloque_ -> _otorgarHoras_ por nombre) y reporta fallos sin
    cortar el resto. Solo se ve con rango de coordinación o superior. */
+/* ---- Convocar turno -------------------------------------------------------------
+   Escribe DIRECTO en la base de Notion (v31). El campo autoritativo de roles es
+   `Reparto` ("Nombre \u2014 rol"), que es el que lee la app; las columnas People de Notion
+   se rellenan a partir de los mismos nombres para que la ficha se vea bien allí.
+   El estado vive fuera de render() para que un repintado no borre lo que llevas puesto. */
+var TUR_SEL = {};        // nombre -> {rol, coche}
+var TUR_RESP = null;     // nombre del responsable de turno
+
+function pintarReparto(){
+  var c=document.getElementById('tuLista'); if(!c) return;
+  var nn=Object.keys(TUR_SEL);
+  if(!nn.length){
+    c.innerHTML='<p style="margin:0;font-size:12px;color:var(--ink3)">Nadie marcado todav\u00eda. '+
+      'Pulsa arriba a qui\u00e9n convocas y aqu\u00ed le pones su papel.</p>';
+    return;
+  }
+  c.innerHTML=nn.map(function(n){
+    var e=TUR_SEL[n], m=_m(n);
+    return '<div class="repf">'+
+      '<b>'+esc((m&&m.pila)||n)+'</b>'+
+      '<input data-rol="'+esc(n)+'" value="'+esc(e.rol||'')+'" placeholder="su papel (opcional)">'+
+      '<button type="button" class="mini'+(TUR_RESP===n?' on':'')+'" data-resp="'+esc(n)+'">responsable</button>'+
+      '<button type="button" class="mini'+(e.coche?' on':'')+'" data-coche="'+esc(n)+'">coche</button>'+
+      '<button type="button" class="mini x" data-quita="'+esc(n)+'">quitar</button>'+
+    '</div>';
+  }).join('');
+  cablearReparto();
+}
+
+function cablearReparto(){
+  $$('#tuLista [data-rol]').forEach(function(i){
+    i.oninput=function(){ if(TUR_SEL[i.dataset.rol]) TUR_SEL[i.dataset.rol].rol=i.value; };
+  });
+  $$('#tuLista [data-resp]').forEach(function(b){
+    b.onclick=function(){ var n=b.dataset.resp; TUR_RESP=(TUR_RESP===n?null:n); pintarReparto(); };
+  });
+  $$('#tuLista [data-coche]').forEach(function(b){
+    b.onclick=function(){ var n=b.dataset.coche; TUR_SEL[n].coche=!TUR_SEL[n].coche; pintarReparto(); };
+  });
+  $$('#tuLista [data-quita]').forEach(function(b){
+    b.onclick=function(){
+      var n=b.dataset.quita; delete TUR_SEL[n]; if(TUR_RESP===n) TUR_RESP=null;
+      var chip=document.querySelector('#tuPool [data-tu="'+n.replace(/"/g,'&quot;')+'"]');
+      if(chip) chip.classList.remove('on');
+      pintarReparto();
+    };
+  });
+}
+
+function convocarPanel(){
+  if(rangoNom(ACTOR)<1) return '';                       // solo coordinaci\u00f3n o superior
+  var E='width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
+        'padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px';
+  var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
+  /* las bajas no se convocan: siguen en el roster por su historia, no para turnos nuevos */
+  var pool=DATA.miembros.filter(function(m){ return !m.baja; })
+    .slice().sort(function(a,b){ return String(a.pila).localeCompare(String(b.pila)); });
+  var chips=pool.map(function(m){
+    return '<button type="button" class="pick'+(TUR_SEL[m.nombre]?' on':'')+'" data-tu="'+esc(m.nombre)+'">'+
+      esc(m.pila)+'</button>';
+  }).join('');
+  return pan('Convocar turno','queda escrito en Notion',
+    '<div class="pb">'+
+    '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
+      'Lo que rellenes aqu\u00ed <b>crea la fila en la base de fabricaci\u00f3n</b>, que es de donde bebe todo: '+
+      'el m\u00f3vil de cada convocado y la vista de Notion del equipo. Marca qui\u00e9n va, ponle a cada uno su '+
+      'papel y di qu\u00e9 hay que sacar. <b>La fecha es la clave</b>: no deja crear dos turnos el mismo d\u00eda.</p>'+
+
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+      '<label style="width:145px">'+lab('Fecha')+'<input type="date" id="tuFecha" style="'+E+'"></label>'+
+      '<label style="width:110px">'+lab('Hora')+'<input type="time" id="tuHora" style="'+E+'"></label>'+
+      '<label style="width:135px">'+lab('Duraci\u00f3n')+
+        '<input id="tuDur" placeholder="~ 3 horas" style="'+E+'"></label>'+
+      '<label style="width:135px">'+lab('D\u00f3nde se trabaja')+'<select id="tuLugar" style="'+E+'">'+
+        '<option>CITI</option><option>Vigo</option><option>Coasa</option><option>Otro</option></select></label>'+
+      '<label style="flex:1;min-width:190px">'+lab('D\u00f3nde se queda')+
+        '<input id="tuPunto" placeholder="enfrente del polit\u00e9cnico" style="'+E+'"></label>'+
+      '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px;cursor:pointer">'+
+        '<input type="checkbox" id="tuCrucial" style="width:15px;height:15px;accent-color:var(--red)">Crucial</label>'+
+    '</div>'+
+
+    lab('Qui\u00e9n va')+
+    '<div class="chips" id="tuPool" style="margin:0 0 10px">'+chips+'</div>'+
+    '<div id="tuLista" style="margin-bottom:12px"></div>'+
+
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:11px">'+
+      '<label style="flex:1;min-width:230px">'+lab('Objetivos principales \u00b7 uno por l\u00ednea')+
+        '<textarea id="tuObj1" rows="3" placeholder="Lijado del tramo 2&#10;Pegado de aletas" '+
+        'style="'+E+';resize:vertical"></textarea></label>'+
+      '<label style="flex:1;min-width:230px">'+lab('Objetivos secundarios \u00b7 si sobra tiempo')+
+        '<textarea id="tuObj2" rows="3" placeholder="Ordenar el z\u00falo" '+
+        'style="'+E+';resize:vertical"></textarea></label>'+
+    '</div>'+
+
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
+      '<label style="flex:1;min-width:230px">'+lab('Aviso para los convocados')+
+        '<input id="tuNota" placeholder="traed guantes y mascarilla" style="'+E+'"></label>'+
+      '<button class="btn pri" data-convocar>Convocar el turno</button>'+
+    '</div></div>');
+}
+
 function bloquePanel(){
   if(rangoNom(ACTOR)<1) return '';
   var actor=_m(ACTOR), esPD=rangoNom(ACTOR)>=2, unidad=(actor&&actor.unidad)||'';
-  var reg=DATA.miembros.filter(function(m){ return !m.cargo; });            // solo miembros de subsistema
+  var reg=DATA.miembros.filter(function(m){ return !m.cargo && !m.baja; }); // miembros de subsistema, sin bajas
   var pool=esPD?reg:reg.filter(function(m){ return m.unidad===unidad; });
   if(!pool.length) return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
@@ -1377,9 +1490,10 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
             ? '<a href="'+esc(t.memoria)+'" target="_blank" rel="noopener" style="color:var(--red2)">ver</a>'
             : '<span style="color:var(--ink3)">—</span>')+'</td></tr>';
       }).join(''))+
-    '<div class="nota"><b>Convocar turnos desde aquí queda fuera de esta versión</b>, por decisión tuya: hoy se '+
-    'convocan en el canal de fabricación de Discord y el panel los espeja. Cuando toque, este es el sitio, y '+
-    'arrastraría también gastos y listas de compra.</div>');
+    '<div class="nota">Los turnos se leen <b>en vivo de Notion</b> (Base de fabricación · Turnos): lo que '+
+    'convoques aquí abajo aparece allí, y lo que se toque allí aparece aquí en cuanto caduque la '+
+    'caché (5 min).</div>')+
+    convocarPanel();
 }};
 V.tareas={g:'Operación',t:'Tareas',f:function(){
   var porUni={};
@@ -1824,6 +1938,46 @@ function enganchar(){
         return;
       }
       tost(h1(horas)+' a '+marcados.length+' de subsistema (semilla local): entran como \u00abotorgadas\u00bb.');
+    };
+  });
+
+  /* convocar turno: chips -> reparto -> api.crearTurno (escribe en Notion). */
+  $$('#tuPool .pick').forEach(function(c){
+    c.onclick=function(){
+      var n=c.dataset.tu;
+      if(TUR_SEL[n]){ delete TUR_SEL[n]; if(TUR_RESP===n) TUR_RESP=null; c.classList.remove('on'); }
+      else { TUR_SEL[n]={rol:'',coche:false}; c.classList.add('on'); }
+      pintarReparto();
+    };
+  });
+  if(document.getElementById('tuLista')) pintarReparto();   // repinta tras un render()
+  $$('[data-convocar]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var lin=function(id){ return (($('#'+id)||{}).value||'').split('\n')
+        .map(function(x){return x.trim();}).filter(function(x){return x;}); };
+      var nn=Object.keys(TUR_SEL);
+      var t={ fecha:($('#tuFecha')||{}).value||'', hora:($('#tuHora')||{}).value||'',
+        duracion:($('#tuDur')||{}).value||'', lugar:($('#tuLugar')||{}).value||'',
+        punto:($('#tuPunto')||{}).value||'', crucial:!!(($('#tuCrucial')||{}).checked),
+        nota:($('#tuNota')||{}).value||'', principales:lin('tuObj1'), secundarios:lin('tuObj2'),
+        responsable:TUR_RESP,
+        coche:nn.filter(function(n){ return TUR_SEL[n].coche; }),
+        reparto:nn.map(function(n){ return {nombre:n, rol:TUR_SEL[n].rol||''}; }) };
+      if(!t.fecha){ tost('Ponle fecha al turno.'); return; }
+      if(!nn.length){ tost('Marca al menos a una persona.'); return; }
+      if(!backendOK || !SESION){ tost('Sin backend no se puede convocar: esto escribe en Notion.'); return; }
+      b.disabled=true; var prev=b.textContent; b.textContent='Convocando\u2026';
+      try{
+        var r=await api.crearTurno(t);
+        var sin=(r&&r.sinEtiquetar)||[];
+        TUR_SEL={}; TUR_RESP=null;
+        try{ var tt=await api.getTurnos(); if(Array.isArray(tt)){ TURNOS.length=0; tt.forEach(function(x){TURNOS.push(x);}); } }catch(_){}
+        tost('Turno '+(r&&r.id||'')+' convocado en Notion'+
+          (sin.length?' \u00b7 sin etiquetar en Notion: '+sin.join(', '):'')+'.');
+        pintar();
+      }catch(e){ b.disabled=false; b.textContent=prev;
+        tost('No se pudo convocar: '+((e&&e.message)||e)); }
     };
   });
   /* documentos: decidir PERSISTE en el backend (api.decidir, ya desplegada). La app
