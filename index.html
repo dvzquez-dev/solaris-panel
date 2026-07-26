@@ -808,17 +808,24 @@ function _aplicarBootstrapMovil_(boot){
 var REUNIONES_M=[];
 function _normReuM_(r){
   var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};
-  var calor=dias.map(function(){ return F.map(function(){ return 0; }); });
+  /* null = bloque NO OFERTADO (con horario por día no todas las franjas existen todos los
+     días). app.html lo resolvía con un Set `oferta`; aquí la matriz nace a null y solo los
+     bloques realmente ofertados pasan a 0. Así un hueco muerto no se pinta como «nadie puede».
+     `pond` es la vista PONDERADA: suma los valores (presencial+telemático=2, telemático=1);
+     `calor` cuenta PERSONAS (cualquier valor > 0). */
+  var calor=dias.map(function(){ return F.map(function(){ return null; }); });
+  var pond =dias.map(function(){ return F.map(function(){ return null; }); });
+  bl.forEach(function(b){ if(calor[b[0]] && b[1]<F.length){ calor[b[0]][b[1]]=0; pond[b[0]][b[1]]=0; } });
   Object.keys(resp).forEach(function(nom){
     var v=resp[nom]||[];
-    for(var i=0;i<bl.length;i++){ if(+v[i]>0){ var d=bl[i][0], f=bl[i][1];
-      if(calor[d]&&calor[d][f]!=null) calor[d][f]++; } }
+    for(var i=0;i<bl.length;i++){ var val=+v[i]||0; if(val>0){ var d=bl[i][0], f=bl[i][1];
+      if(calor[d]&&calor[d][f]!=null){ calor[d][f]++; pond[d][f]+=val; } } }
   });
   var fij=r.fijada; if(fij && typeof fij==='object') fij=fij.label||fij.iso||null;
   return { id:r.id, titulo:r.titulo||'Reunión sin título', tipo:r.tipo||'general',
     modalidad:r.modalidad||'hibrida', limite:r.limite||null, fijada:fij||null,
     convocante:r.convocante||'', dias:dias, franjas:F, bloques:bl, resp:resp,
-    calor:calor, nInv:(r.invitados||[]).length,
+    calor:calor, pond:pond, nInv:(r.invitados||[]).length,
     cubierta: !!(YO && resp[YO.nombre] && resp[YO.nombre].some(function(x){ return +x>0; })),
     exento: !!(YO && r.convocante && YO.nombre===r.convocante),   // quien convoca ORGANIZA: no cubre su propia encuesta
     _real:true };
@@ -1918,9 +1925,15 @@ function verDoc(id){
 }
 function vReu(){
   var R=REUNION, nF=R.franjas.length;
-  var max=0; R.calor.forEach(function(fila){fila.forEach(function(v){if(v>max)max=v;});});
+  /* Vista PONDERADA (solo tiene sentido en híbridas): presencial+telemático vale 2 y
+     telemático 1, así que la ponderación es literalmente la suma de los valores. En
+     «personas» se cuenta a cada uno una vez. Los null (no ofertado) no entran en nada. */
+  var hib=(R.modalidad==='hibrida') && !!R.pond;
+  var pondOn = hib && !!ST.pond;
+  var M = pondOn ? R.pond : R.calor;
+  var max=0; M.forEach(function(fila){fila.forEach(function(v){ if(v!=null&&v>max)max=v; });});
   var best={d:0,f:0,v:0};
-  R.calor.forEach(function(fila,di){fila.forEach(function(v,fi){if(v>best.v)best={d:di,f:fi,v:v};});});
+  M.forEach(function(fila,di){fila.forEach(function(v,fi){ if(v!=null&&v>best.v)best={d:di,f:fi,v:v}; });});
   var g='<div style="overflow-x:auto;margin:0 2px"><div style="display:grid;gap:2px;grid-template-columns:auto repeat('+nF+',minmax(26px,1fr));min-width:280px">';
   g+='<div></div>';
   R.franjas.forEach(function(f,ix){
@@ -1937,9 +1950,15 @@ function vReu(){
   R.dias.forEach(function(d,di){
     g+='<div style="font-family:var(--mono);font-size:9.5px;color:var(--ink2);display:flex;'+
       'align-items:center;justify-content:flex-end;padding-right:6px">'+d+'</div>';
-    R.calor[di].forEach(function(v,fi){
-      var a=(0.12+0.88*v/max).toFixed(3);
-      var esBest=(di===best.d&&fi===best.f);
+    M[di].forEach(function(v,fi){
+      if(v==null){   // NO OFERTADO: hueco muerto, ni número ni color de calor
+        g+='<div title="no ofertado" style="height:21px;border-radius:2px;display:grid;place-items:center;'+
+          'font-family:var(--mono);font-size:8.5px;color:var(--ink3);background:repeating-linear-gradient('+
+          '45deg,rgba(255,255,255,.045) 0 3px,transparent 3px 6px);border:1px solid var(--line)">·</div>';
+        return;
+      }
+      var a=(0.12+0.88*(max?v/max:0)).toFixed(3);
+      var esBest=(di===best.d&&fi===best.f&&best.v>0);
       g+='<div style="height:21px;border-radius:2px;display:grid;place-items:center;'+
         'font-family:var(--mono);font-size:8.5px;color:#fff;background:rgba(228,30,37,'+a+')'+
         (esBest?';outline:1px solid var(--ink);outline-offset:-1px':'')+'">'+v+'</div>';
@@ -1977,10 +1996,18 @@ function vReu(){
     '</div>'+
     '<h2 class="sec">Cuándo puede el equipo<span class="ln"></span></h2>'+
     '<div class="tarj">'+
+      (hib?'<div class="modos" id="calModo" style="margin-bottom:10px">'+
+        '<button data-pond="0" class="'+(pondOn?'':'on')+'" data-p>Personas</button>'+
+        '<button data-pond="1" class="'+(pondOn?'on':'')+'" data-p>Ponderada</button></div>':'')+
       '<p class="rnota" style="margin:0 0 10px"><b>'+R.nInv+'</b> convocados · mejor franja '+
-      '<b style="color:var(--red2)">'+R.dias[best.d]+' '+R.franjas[best.f].ini+'</b> — '+best.v+' pueden.</p>'+
+      (best.v>0
+        ? '<b style="color:var(--red2)">'+R.dias[best.d]+' '+R.franjas[best.f].ini+'</b> — '+best.v+(pondOn?' puntos.':' pueden.')
+        : '<b>aún nadie</b> ha cubierto esta encuesta.')+'</p>'+
       g+
-      '<div class="leyh" style="margin-top:11px"><span>el número es cuánta gente puede</span></div>'+
+      '<div class="leyh" style="margin-top:11px"><span>'+
+        (pondOn?'el número son PUNTOS: presencial+telemático 2 · solo telemático 1'
+               :'el número es cuánta gente puede')+'</span>'+
+        '<span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>no ofertado</span></div>'+
     '</div>'+
     (esCoord()?'<button class="btn full" data-p id="btnBorrar" style="margin-top:6px;color:var(--red2);border-color:var(--red)">Eliminar reunión</button>':'');
 }
@@ -2625,6 +2652,7 @@ function enganchar(){
   var bc=$('#btnCubrir'); if(bc) bc.onclick=cubrirModal;
   var bcr=$('#btnCrear'); if(bcr) bcr.onclick=crearModal;
   $$('[data-reu]').forEach(function(el){ el.onclick=function(){ var x=REUNIONES_M[+el.dataset.reu]; if(x){ REUNION=x; pintar(); } }; });
+  $$('#calModo button').forEach(function(b){ b.onclick=function(){ ST.pond=(b.dataset.pond==='1'); pintar(); }; });
   var bfj=$('#btnFijar'); if(bfj) bfj.onclick=fijarModal;
   var bdf=$('#btnDesfijar');
   if(bdf) bdf.onclick=function(){ REUNION.fijada=null; tost('Fijado cancelado: se reabre la disponibilidad.'); pintar(); };
