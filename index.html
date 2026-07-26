@@ -796,10 +796,32 @@ async function _verComo_(nombre){
 /* Vuelca en la app lo que trae el bootstrap y BORRA lo que quede de la semilla (nombres y
    datos ficticios). Si el backend no sirve una lista, se vacía: mejor un hueco honesto que
    un dato inventado. */
+/* El backend sirve el turno con SU forma (fecha ISO, roles:[{rol,miembro}], duracion, momento,
+   punto, crucial, nota, principales, secundarios). La pantalla espera {id,f,hora,punto,dur,mio,
+   roles:[[nombre,rol]],pasado}. Sin este adaptador se volcaba el objeto crudo y la pantalla salía
+   vacía. Aquí se traduce y se conserva TODO lo que da el backend (objetivos, nota, memoria). */
+function _normTurnoM_(t, ix){
+  var iso=String(t.fecha||'').slice(0,10);
+  var f=_isoADMY_(iso) || iso;
+  var roles=(t.roles||[]).map(function(r){
+    if(Array.isArray(r)) return r;
+    var nom=r.miembro||r.nombre||'— libre';
+    var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===nom; })[0];
+    return [ (m&&m.pila)||nom, r.rol||'' ];
+  });
+  var yo=(YO&&YO.nombre)||'', mio=null;
+  (t.roles||[]).forEach(function(r){ if(!Array.isArray(r) && (r.miembro===yo)) mio=r.rol||'te toca'; });
+  var hoyISO=_dmyAISO_(HOY);
+  var dur=t.duracion || (t.momento==='tarde'?'tarde':(t.momento==='mañana'?'mañana':'—'));
+  return { id: 'T-'+(iso||ix), f:f, iso:iso, hora:t.hora||'—', punto:t.punto||'—', dur:dur,
+    mio:mio, roles:roles, pasado: !!(iso && iso < hoyISO),
+    principales:t.principales||[], secundarios:t.secundarios||[],
+    nota:t.nota||null, crucial:!!t.crucial, memoria:t.memoria||null, _real:true };
+}
 function _aplicarBootstrapMovil_(boot){
   boot=boot||{};
   if(typeof TAREAS!=='undefined'){ TAREAS.length=0; (boot.tareas||[]).forEach(function(t){ TAREAS.push(t); }); }
-  if(typeof TURNOS!=='undefined'){ TURNOS.length=0; (boot.turnos||[]).forEach(function(t){ TURNOS.push(t); }); }
+  if(typeof TURNOS!=='undefined'){ TURNOS.length=0; (boot.turnos||[]).forEach(function(t,ix){ TURNOS.push(_normTurnoM_(t,ix)); }); }
   if(typeof ENTREGABLES!=='undefined'){ ENTREGABLES.length=0; (boot.entregables||[]).forEach(function(d){ ENTREGABLES.push(d); }); }
   if(typeof LOTE!=='undefined' && LOTE && LOTE.items) LOTE.items=[];   // bloque de sanciones: era semilla
 }
@@ -1816,7 +1838,7 @@ function vTurnos(){
   var prox=TURNOS.filter(function(t){return !t.pasado;});
   var pas=TURNOS.filter(function(t){return t.pasado;});
   function tarjeta(t){
-    return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+cab(t.id+(t.mio?' · te toca':''),t.f)+
+    return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+cab(t.f+(t.mio?' · te toca':'')+(t.crucial?' · crucial':''), t.hora)+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b>'+
       '<small>'+t.hora+' · '+t.dur+'</small></div>'+
       '<div class="d">'+(t.mio?'<span class="pil conf">'+esc(t.mio)+'</span> ':'')+'<span class="chev">›</span></div></div>'+
@@ -1824,10 +1846,15 @@ function vTurnos(){
         return '<div class="fila"><div class="a"><b>'+esc(r[0])+'</b><small>'+esc(r[1])+'</small></div></div>';
       }).join('')+'</div>';
   }
+  /* los pasados van en CAJÓN plegable, como en app.html: no estorban pero están */
+  pas.sort(function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); });
   return '<div class="h1">Turnos</div><p class="h1s">Fabricación · en cuáles estás y quién más va.</p>'+
     (prox.length? '<h2 class="sec">Convocados<span class="ln"></span>'+prox.length+'</h2>'+prox.map(tarjeta).join('')
       : '<div class="tarj">'+vacio('Sin turnos convocados','En verano se paran casi del todo. Cuando se convoque uno en el canal de fabricación aparecerá aquí.','',false)+'</div>')+
-    (pas.length? '<h2 class="sec">Ya hechos<span class="ln"></span>'+pas.length+'</h2>'+pas.map(tarjeta).join('') : '');
+    (pas.length? '<div class="cajon" data-caj data-p><span>Turnos pasados <b>· '+pas.length+'</b>'+
+        (pas[0].f?' <span style="color:var(--ink3)">· el último, '+esc(pas[0].f)+'</span>':'')+'</span>'+
+        '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+        '<div class="cajsec">'+pas.map(tarjeta).join('')+'</div>' : '');
 }
 /* ── DOCUMENTOS — routing por ámbito y rango, igual que app.html ────────── */
 var AMB={archivo:'archivo',subsistema:'subsistema',general:'general'};
@@ -2004,8 +2031,10 @@ function vReu(){
       (R.fijada
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
           '<b style="color:var(--ok)">📌 Reunión fijada · '+esc(R.fijada)+'</b><br>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</div>'
-        : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
-          (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>')+
+        : (R.exento
+            ? ''                                   /* organizas: no se te pide cubrir */
+            : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
+              (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
     (R.exento?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas, no cubres</b>. Tu disponibilidad no se te pide ni cuenta para el mínimo.</p>':'')+
       (esCoord()?'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">'+
         '<button class="btn mini" data-p id="btnFijar" style="flex:1">'+(R.fijada?'Cambiar fecha/hora':'📌 Fijar fecha')+'</button>'+
@@ -2705,6 +2734,7 @@ function enganchar(){
           return '<div class="fila"><div class="a"><b>'+esc(r[0])+'</b><small>'+esc(r[1])+'</small></div></div>';
         }).join('')+'</div>'+
         lista(t.principales,'Objetivos principales')+lista(t.secundarios,'Objetivos secundarios')+
+        (t.nota?'<p class="rnota" style="margin-top:10px"><b>Nota:</b> '+esc(t.nota)+'</p>':'')+
         '<p class="rnota" style="margin-top:14px;border-top:1px solid var(--line);padding-top:11px">'+
         'Memoria del turno · <span style="color:var(--ink3)">enlace pendiente</span></p>');
     };
