@@ -270,11 +270,15 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .csug small{color:var(--ink3);margin-left:6px}
 .cdias{display:flex;flex-direction:column;gap:6px;margin-bottom:11px}
 .drow{display:flex;align-items:center;gap:7px;font-size:12px}
-.drow span{flex:1;font-family:var(--mono);font-size:11px;color:var(--ink2)}
+.drow span{flex:1;font-size:12px;color:var(--ink);text-transform:capitalize}
 .drow select{background:#0A0909;border:1px solid var(--line);border-radius:7px;padding:5px 7px;color:var(--ink);font:inherit;font-size:11.5px}
 .drow.off{opacity:.42}
-.dtog{width:15px;height:15px;flex:none;border-radius:5px;border:1px solid var(--line);background:var(--sur2)}
-.dtog.on{background:var(--red);border-color:var(--red)}
+.dtog{width:26px;height:26px;flex:none;border-radius:8px;border:1px solid var(--line);background:var(--sur2);position:relative}
+.dtog::after{content:'';position:absolute;inset:7px;border-radius:3px;background:var(--ink3)}
+.dtog.on{background:rgba(228,30,37,.16);border-color:var(--red)}
+.dtog.on::after{background:var(--red)}
+.drow{padding:5px 0;border-bottom:1px solid var(--line)}
+.drow:last-child{border-bottom:0}
 .modos button{flex:1;border-right:1px solid var(--line);padding:10px 4px;font-family:var(--mono);
   font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);
   transition:background .16s linear,color .16s linear}
@@ -815,7 +819,9 @@ function _normReuM_(r){
     modalidad:r.modalidad||'hibrida', limite:r.limite||null, fijada:fij||null,
     convocante:r.convocante||'', dias:dias, franjas:F, bloques:bl, resp:resp,
     calor:calor, nInv:(r.invitados||[]).length,
-    cubierta: !!(YO && resp[YO.nombre] && resp[YO.nombre].some(function(x){ return +x>0; })), _real:true };
+    cubierta: !!(YO && resp[YO.nombre] && resp[YO.nombre].some(function(x){ return +x>0; })),
+    exento: !!(YO && r.convocante && YO.nombre===r.convocante),   // quien convoca ORGANIZA: no cubre su propia encuesta
+    _real:true };
 }
 async function _cargarReunionesM_(){
   try{ var arr=await api.listarReuniones();
@@ -1333,7 +1339,7 @@ function vEstado(){
       '<p><span class="mono">'+cambios[0].ref+'</span> · corrígelo y reenvíalo a revisión.</p></div>'+
       '<span class="chev">›</span></div>';
   }
-  if(!REUNION.cubierta && !REUNION.fijada){
+  if(!REUNION.cubierta && !REUNION.exento && !REUNION.fijada){
     av+='<div class="aviso" data-ir="reu" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
       '<div style="flex:1"><b>Te falta cubrir una disponibilidad</b>'+
       '<p>«'+esc(REUNION.titulo)+'» — cierra el '+_limM_(REUNION)+'.</p></div>'+
@@ -1361,7 +1367,7 @@ function vEstado(){
     '<div class="tarj clic" data-ir="reu" data-p>'+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(REUNION.titulo)+'</b>'+
       '<small>'+esc(REUNION.fijada||('cierra el '+_limM_(REUNION)))+' · '+esc((REUNION.modalidad||'').toUpperCase())+'</small></div>'+
-      '<div class="d"><span class="pil '+((REUNION.fijada||REUNION.cubierta)?'conf':'pend')+'">'+(REUNION.fijada?'fijada':(REUNION.cubierta?'cubierta':'te falta'))+'</span></div></div></div>';
+      '<div class="d"><span class="pil '+((REUNION.fijada||REUNION.cubierta||REUNION.exento)?'conf':'pend')+'">'+(REUNION.fijada?'fijada':(REUNION.exento?'organizas':(REUNION.cubierta?'cubierta':'te falta')))+'</span></div></div></div>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1955,13 +1961,14 @@ function vReu(){
     '<div class="tarj">'+cab(R.tipo||'General', R.modalidad||'')+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
       '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(R.fijada):'cierra el '+_limM_(R))+' · '+R.nInv+' convocados</small></div>'+
-      '<div class="d"><span class="pil '+(R.fijada?'conf':(R.cubierta?'conf':'no'))+'">'+
-        (R.fijada?'fijada':(R.cubierta?'cubierta':'te falta'))+'</span></div></div>'+
+      '<div class="d"><span class="pil '+((R.fijada||R.cubierta||R.exento)?'conf':'no')+'">'+
+        (R.fijada?'fijada':(R.exento?'organizas':(R.cubierta?'cubierta':'te falta')))+'</span></div></div>'+
       (R.fijada
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
           '<b style="color:var(--ok)">📌 Reunión fijada · '+esc(R.fijada)+'</b><br>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</div>'
         : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
           (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>')+
+    (R.exento?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas, no cubres</b>. Tu disponibilidad no se te pide ni cuenta para el mínimo.</p>':'')+
       (esCoord()?'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">'+
         '<button class="btn mini" data-p id="btnFijar" style="flex:1">'+(R.fijada?'Cambiar fecha/hora':'📌 Fijar fecha')+'</button>'+
         (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
@@ -2092,6 +2099,15 @@ function _sinTildesM_(t){ return (t||'').toLowerCase().normalize('NFD').replace(
 function _dmyM_(iso){ var m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):iso; }
 function _diasDesdeM_(iso,n){ var D=['D','L','M','X','J','V','S'],out=[],b=new Date(iso+'T00:00:00');
   for(var i=0;i<n;i++){ var d=new Date(b); d.setDate(b.getDate()+i); out.push(D[d.getDay()]+' '+d.getDate()); } return out; }
+var _DL_=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+/* nombres largos para la vista de 'horario distinto por día' (ahí caben y se leen mejor) */
+function _diasLargosM_(modo,d0,d1,fecha,nd){
+  var out=[], a, i;
+  if(modo==='rango'){ if(!d0||!d1) return out; a=new Date(d0+'T00:00:00'); var b=new Date(d1+'T00:00:00');
+    for(i=0;i<62&&a<=b;i++){ out.push(_DL_[a.getDay()]+' '+a.getDate()); a.setDate(a.getDate()+1); } }
+  else { a=new Date((fecha||'')+'T00:00:00'); for(i=0;i<nd;i++){ var d=new Date(a); d.setDate(a.getDate()+i); out.push(_DL_[d.getDay()]+' '+d.getDate()); } }
+  return out;
+}
 function _diasEntreM_(a0,a1){ var D=['D','L','M','X','J','V','S'],out=[]; if(!a0||!a1) return out;
   var a=new Date(a0+'T00:00:00'), b=new Date(a1+'T00:00:00'); if(b<a) return out;
   for(var i=0;i<62&&a<=b;i++){ out.push(D[a.getDay()]+' '+a.getDate()); a.setDate(a.getDate()+1); } return out; }
@@ -2194,7 +2210,9 @@ function crearModal(){
     sg.innerHTML=hits.map(function(m){ return '<div data-n="'+esc(m.nombre)+'" data-p>'+esc(m.nombre)+' <small>'+esc(m.cargo||m.unidad||'')+'</small></div>'; }).join('');
     sg.style.display='';
     $$('#ceSug div').forEach(function(d){ d.onclick=function(){ INV.add(d.dataset.n); $('#ceInv').value=''; sg.style.display='none'; invRender(); upd(); }; }); };
-  var renderDias=function(){ var ds=dias(), prev=$$('#ceDias .drow').map(function(r){
+  var renderDias=function(){ var ds=_diasLargosM_(val('ceModo'), val('ceD0'), val('ceD1'), val('ceFecha')||_dmyAISO_(HOY), Math.max(1,+val('ceND')||1));
+    if(!ds.length) ds=dias();
+    var prev=$$('#ceDias .drow').map(function(r){
       return {off:r.classList.contains('off'), a:r.querySelector('.dr0').value, b:r.querySelector('.dr1').value}; });
     $('#ceDias').innerHTML=ds.map(function(d,i){
       return '<div class="drow" data-d="'+i+'"><button type="button" class="dtog on" data-p aria-label="activar o desactivar el día"></button>'+
