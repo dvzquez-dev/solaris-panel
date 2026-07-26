@@ -1217,8 +1217,10 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
    basura. Esto reproduce lo que ya hace app.html: matriz dispersa con null en lo
    no ofertado. Si la reunion trae `calor` (semilla ficticia), se respeta.
    ═══════════════════════════════════════════════════════════════════════════ */
-function _calorDe_(r){
-  if(Array.isArray(r.calor) && r.calor.length) return r.calor;      // semilla
+/* pond=true -> vista PONDERADA: suma los valores (presencial+telematico 2, telematico 1) en vez
+   de contar personas. Solo tiene sentido en hibridas. Los null (no ofertado) siguen a null. */
+function _calorDe_(r, pond){
+  if(!pond && Array.isArray(r.calor) && r.calor.length) return r.calor;      // semilla
   var nD=(r.dias||[]).length, nF=(r.franjas||[]).length;
   var cel=[]; for(var i=0;i<nD;i++){ cel.push(new Array(nF).fill(null)); }
   var nombres=Object.keys(r.resp||{}).filter(function(n){ return Array.isArray(r.resp[n]); });
@@ -1226,7 +1228,7 @@ function _calorDe_(r){
     if(!Array.isArray(b)) return;
     var d=b[0], f=b[1];
     if(!(cel[d]) || f<0 || f>=nF) return;
-    var n=0; nombres.forEach(function(nm){ if((+r.resp[nm][i]||0)>0) n++; });
+    var n=0; nombres.forEach(function(nm){ var v=+r.resp[nm][i]||0; if(v>0) n+= (pond? v : 1); });
     cel[d][f]=n;
   });
   return cel;
@@ -1274,19 +1276,26 @@ function _cobertura_(r){
   });
   return {cubren:cubren.length, conv:universo.length, sinCubrir:sin, bajoMin:bajo, minimo:minimo};
 }
+var DISPO_POND=false;   // conmutador personas/ponderada del mapa (solo hibridas)
 V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
   if(!REUS.length) return pan('Disponibilidad y riesgo','',
     vac('No hay ninguna reuni\u00f3n','Cuando se convoque una, aqui saldra su mapa de calor y a quien le caeria sancion por no cubrir.'));
   return REUS.map(function(r0){
     var cob=_cobertura_(r0);
-    var r=Object.assign({}, r0, {calor:_calorDe_(r0), conv:(r0.conv!=null?r0.conv:cob.conv),
+    var hib=(r0.modalidad==='hibrida');
+    var pondOn=hib && DISPO_POND;
+    var r=Object.assign({}, r0, {calor:_calorDe_(r0, pondOn), _hib:hib, _pond:pondOn, conv:(r0.conv!=null?r0.conv:cob.conv),
       cubren:(r0.cubren!=null?r0.cubren:cob.cubren), minimo:cob.minimo,
       sinCubrir:(r0.sinCubrir||cob.sinCubrir), bajoMin:(r0.bajoMin||cob.bajoMin),
       mod:r0.mod||r0.modalidad, tit:r0.tit||r0.titulo, limite:r0.limite||'sin l\u00edmite'});
     var max=0; r.calor.forEach(function(f){f.forEach(function(v){if(v!=null&&v>max)max=v;});});
     var best={d:0,f:0,v:-1};
     r.calor.forEach(function(f,di){f.forEach(function(v,fi){if(v!=null&&v>best.v)best={d:di,f:fi,v:v};});});
-    var g='<div class="heat"><div class="hg" style="grid-template-columns:auto repeat('+r.franjas.length+',minmax(28px,1fr))">';
+    var g='';
+    if(hib) g+='<div class="decs" style="margin-bottom:9px">'+
+      '<button data-pond="0" class="'+(pondOn?'':'on')+'">Personas</button>'+
+      '<button data-pond="1" class="'+(pondOn?'on':'')+'">Ponderada</button></div>';
+    g+='<div class="heat"><div class="hg" style="grid-template-columns:auto repeat('+r.franjas.length+',minmax(28px,1fr))">';
     g+='<div class="hc"></div>';
     r.franjas.forEach(function(f){ g+='<div class="hc rh"><span>'+_iniF(f).replace(':00','')+'</span></div>'; });
     r.dias.forEach(function(d,di){
@@ -1298,6 +1307,9 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
       });
     });
     g+='</div></div>';
+    g+='<div class="nota" style="margin-top:7px">'+(pondOn
+      ? 'El número son <b>puntos</b>: presencial+telemático 2 · solo telemático 1. Las celdas vacías son bloques <b>no ofertados</b>.'
+      : 'El número es <b>cuánta gente puede</b>. Las celdas vacías son bloques <b>no ofertados</b>.')+'</div>';
     var riesgo=r.sinCubrir.map(function(n){
       var s=sancionPor(r.tipo,n), m=miembro(n);
       return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(m?m.nombre:n)+'</b>'+
@@ -1716,6 +1728,7 @@ function enganchar(){
   $$('[data-ir]').forEach(function(el){
     el.onclick=function(){ ir(el.dataset.ir, el.dataset.foco); };
   });
+  $$('[data-pond]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); DISPO_POND=(b.dataset.pond==='1'); pintar(); }; });
   $$('[data-acord]').forEach(function(h){
     h.onclick=function(){ h.parentNode.classList.toggle('ab'); };
   });
