@@ -735,7 +735,8 @@ var api={
   reanudarFichaje:  function(){ return api._post({action:"reanudarFichaje"}); },
   declararParte:    function(id,tarea,just,cat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat}); },
   crearReunion:     function(r){ return api._post({action:"crearReunion",reunion:r}); },
-  listarReuniones:  function(){ return api._post({action:"listarReuniones"}); }
+  listarReuniones:  function(){ return api._post({action:"listarReuniones"}); },
+  getReunion:       function(id){ return api._post({action:"getReunion",id:id}); }
 };
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
 /* HH:MM local de una fecha ISO (la hora de apertura que da la nube) */
@@ -830,12 +831,30 @@ function _normReuM_(r){
     exento: !!(YO && r.convocante && YO.nombre===r.convocante),   // quien convoca ORGANIZA: no cubre su propia encuesta
     _real:true };
 }
+/* listarReuniones NO trae las respuestas (viven en su propia hoja y las sirve getReunion),
+   asi que el mapa de calor saldria vacio. Al abrir una reunion se hidrata con sus respuestas
+   reales y se recalculan las matrices (personas y ponderada). */
+async function _hidratarReuM_(r){
+  if(!r || r._hidratada) return r;
+  try{ var d=await api.getReunion(r.id);
+    var resp=(d && (d.respuestas || (d.reunion && d.reunion.resp))) || null;
+    if(resp){ var base=(d && d.reunion) || {};
+      var nuevo=_normReuM_({ id:r.id, titulo:r.titulo, tipo:r.tipo, modalidad:r.modalidad,
+        limite:r.limite, fijada:base.fijada!==undefined?base.fijada:r.fijada, convocante:r.convocante,
+        dias:r.dias, franjas:r.franjas, bloques:r.bloques, invitados:new Array(r.nInv), resp:resp });
+      nuevo._hidratada=true;
+      var i=REUNIONES_M.indexOf(r); if(i>=0) REUNIONES_M[i]=nuevo;
+      if(REUNION===r) REUNION=nuevo;
+      return nuevo; }
+  }catch(e){}
+  r._hidratada=true; return r;
+}
 async function _cargarReunionesM_(){
   try{ var arr=await api.listarReuniones();
     if(Array.isArray(arr) && arr.length){
       REUNIONES_M=arr.map(_normReuM_);
       var mia=REUNIONES_M.filter(function(r){ return !r.fijada; })[0]||REUNIONES_M[0];
-      if(mia) REUNION=mia;
+      if(mia){ REUNION=mia; await _hidratarReuM_(mia); }
     }
   }catch(e){}
 }
@@ -2651,7 +2670,7 @@ function enganchar(){
   /* reuniones */
   var bc=$('#btnCubrir'); if(bc) bc.onclick=cubrirModal;
   var bcr=$('#btnCrear'); if(bcr) bcr.onclick=crearModal;
-  $$('[data-reu]').forEach(function(el){ el.onclick=function(){ var x=REUNIONES_M[+el.dataset.reu]; if(x){ REUNION=x; pintar(); } }; });
+  $$('[data-reu]').forEach(function(el){ el.onclick=async function(){ var x=REUNIONES_M[+el.dataset.reu]; if(x){ REUNION=x; pintar(); await _hidratarReuM_(x); pintar(); } }; });
   $$('#calModo button').forEach(function(b){ b.onclick=function(){ ST.pond=(b.dataset.pond==='1'); pintar(); }; });
   var bfj=$('#btnFijar'); if(bfj) bfj.onclick=fijarModal;
   var bdf=$('#btnDesfijar');
