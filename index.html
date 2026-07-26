@@ -255,6 +255,26 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 
 /* ═══ FICHAR ══════════════════════════════════════════════════════════════ */
 .modos{display:flex;border:1px solid var(--line);border-radius:var(--r2);overflow:hidden;margin-bottom:12px}
+/* convocar: subsistemas, invitados con autocompletado y horario por día */
+.cmix{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:11px}
+.cmixb{font-family:var(--mono);font-size:10.5px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);
+  color:var(--ink2);background:var(--sur2)}
+.cmixb.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
+.cchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.cchip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:4px 6px 4px 10px;border-radius:20px;
+  border:1px solid var(--line);background:var(--sur2);color:var(--ink)}
+.cchip button{color:var(--ink3);font-size:14px;line-height:1;padding:0 2px}
+.csug{position:relative;border:1px solid var(--line);border-radius:9px;background:#0A0909;margin:-6px 0 10px;overflow:hidden}
+.csug div{padding:8px 11px;font-size:12.5px;border-top:1px solid var(--line)}
+.csug div:first-child{border-top:0}
+.csug small{color:var(--ink3);margin-left:6px}
+.cdias{display:flex;flex-direction:column;gap:6px;margin-bottom:11px}
+.drow{display:flex;align-items:center;gap:7px;font-size:12px}
+.drow span{flex:1;font-family:var(--mono);font-size:11px;color:var(--ink2)}
+.drow select{background:#0A0909;border:1px solid var(--line);border-radius:7px;padding:5px 7px;color:var(--ink);font:inherit;font-size:11.5px}
+.drow.off{opacity:.42}
+.dtog{width:15px;height:15px;flex:none;border-radius:5px;border:1px solid var(--line);background:var(--sur2)}
+.dtog.on{background:var(--red);border-color:var(--red)}
 .modos button{flex:1;border-right:1px solid var(--line);padding:10px 4px;font-family:var(--mono);
   font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);
   transition:background .16s linear,color .16s linear}
@@ -701,7 +721,9 @@ var api={
   getFichajeAbierto:function(){ return api._post({action:"getFichajeAbierto"}); },
   pausarFichaje:    function(){ return api._post({action:"pausarFichaje"}); },
   reanudarFichaje:  function(){ return api._post({action:"reanudarFichaje"}); },
-  declararParte:    function(id,tarea,just,cat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat}); }
+  declararParte:    function(id,tarea,just,cat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat}); },
+  crearReunion:     function(r){ return api._post({action:"crearReunion",reunion:r}); },
+  listarReuniones:  function(){ return api._post({action:"listarReuniones"}); }
 };
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
 /* HH:MM local de una fecha ISO (la hora de apertura que da la nube) */
@@ -1860,7 +1882,7 @@ function vReu(){
   g+='</div></div>';
 
   return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
-    (esCoord()?'<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar reunión</button>':'')+
+    '<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar '+(esCoord()?'reunión':'reunión de trabajo')+'</button>'+
     '<h2 class="sec">Mis reuniones<span class="ln"></span>1</h2>'+
     '<div class="tarj">'+cab('General','telemática')+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
@@ -1993,29 +2015,83 @@ function vEquipo(){
     '<p class="rnota" style="text-align:center;margin:16px 0 6px">SOLARIS · datos a 24/07/2026</p>';
 }
 
-/* ── CREAR REUNIÓN — tipo gateado por rol, modalidad, fechas, franjas, visión ── */
+/* ── CREAR REUNIÓN — portado de app.html con todo: tipo gateado por rol, modalidad,
+   convocados por defecto según tipo, selector de subsistemas (mixta), invitados con
+   autocompletado, fechas desde/hasta o desde+nº días, horario distinto por día (con
+   activar/desactivar), cadencia, límite, orden del día, visión y vista previa. Al crear
+   PERSISTE en el backend (api.crearReunion); sin backend queda en memoria. ────────── */
+function _sinTildesM_(t){ return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function _dmyM_(iso){ var m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):iso; }
+function _diasDesdeM_(iso,n){ var D=['D','L','M','X','J','V','S'],out=[],b=new Date(iso+'T00:00:00');
+  for(var i=0;i<n;i++){ var d=new Date(b); d.setDate(b.getDate()+i); out.push(D[d.getDay()]+' '+d.getDate()); } return out; }
+function _diasEntreM_(a0,a1){ var D=['D','L','M','X','J','V','S'],out=[]; if(!a0||!a1) return out;
+  var a=new Date(a0+'T00:00:00'), b=new Date(a1+'T00:00:00'); if(b<a) return out;
+  for(var i=0;i<62&&a<=b;i++){ out.push(D[a.getDay()]+' '+a.getDate()); a.setDate(a.getDate()+1); } return out; }
+function _genFranjasM_(h0,h1,dur,paso){ var out=[], step=(paso&&+paso>0)?+paso:+dur;
+  for(var m=h0*60; m+(+dur)<=h1*60+1e-9; m+=step) out.push({ini:pad(Math.floor(m/60))+':'+pad(m%60), dur:+dur});
+  return out; }
+function _genUnionM_(rangos,dur,paso){ var map={}, F=[], perDia=[];
+  rangos.forEach(function(r){ var idxs=[]; if(r[1]>r[0]){ _genFranjasM_(r[0],r[1],dur,paso).forEach(function(f){
+    var k=f.ini+'|'+f.dur; if(!(k in map)){ map[k]=F.length; F.push(f); } idxs.push(map[k]); }); } perDia.push(idxs); });
+  var ord=F.map(function(_,i){return i;}).sort(function(a,b){ return (parseInt(F[a].ini,10)*60+ +F[a].ini.slice(3)) - (parseInt(F[b].ini,10)*60+ +F[b].ini.slice(3)); });
+  var pos=[]; ord.forEach(function(oi,k){ pos[oi]=k; });
+  return { F: ord.map(function(i){return F[i];}), perDia: perDia.map(function(x){ return x.map(function(i){return pos[i];}); }) }; }
+/* convocados por defecto según el tipo (como app.html): general=todo el equipo, subsistema=tu unidad,
+   junta=coordinadores+PD, consejo=por configurar, mixta/trabajo=a mano. */
+function _presetInvitadosM_(tipo){
+  var yo=(YO&&YO.nombre)||'', ms=DATA.miembros||[], out=[];
+  ms.forEach(function(m){
+    if(m.nombre===yo) return;
+    var meto = tipo==='general' ? true
+             : tipo==='subsistema' ? (m.unidad===(YO&&YO.unidad))
+             : tipo==='junta' ? (m.cargo==='Coordinador'||m.cargo==='Project Director')
+             : false;                              // consejo/mixta/trabajo: a mano
+    if(meto) out.push(m.nombre);
+  });
+  return out;
+}
+var PLANTILLAS_M = [];
 function crearModal(){
+  var coord=esCoord();
   var tipos=[['general','General · todo el equipo',true],['junta','Junta Directiva · coordinación',true],
-    ['consejo','Consejo',true],['subsistema','Subsistema · tu unidad',true],
+    ['consejo','Consejo · por configurar',true],['subsistema','Subsistema · tu unidad',true],
     ['mixta','Mixta · varios subsistemas',true],['trabajo','Reunión de trabajo · invitas tú',false]];
-  var op=tipos.filter(function(t){return esCoord()||!t[2];})
+  var op=tipos.filter(function(t){return coord||!t[2];})
     .map(function(t){return '<option value="'+t[0]+'">'+t[1]+'</option>';}).join('');
-  abrirModal('<div class="mtit">Nueva reunión</div>'+
-    '<div class="msub">La app sustituye a Xoyondo: la disponibilidad se cubre aquí, con sesión iniciada.</div>'+
+  var hoyISO=_dmyAISO_(HOY), mas=function(iso,n){ var d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n);
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
+  var subs=(DATA.subsistemas||[]).map(function(sb){ return '<button type="button" class="cmixb" data-u="'+esc(sb.u||sb)+'" data-p>'+esc(sb.u||sb)+'</button>'; }).join('');
+  var plant=PLANTILLAS_M.length ? '<label class="campo"><span class="sc">Copiar distribución de</span><select id="ceCopiar">'+
+      '<option value="">— empezar en blanco —</option>'+PLANTILLAS_M.map(function(p,i){ return '<option value="'+i+'">'+esc(p.titulo)+'</option>'; }).join('')+'</select></label>' : '';
+  abrirModal('<div class="mtit">Nueva '+(coord?'reunión':'reunión de trabajo')+'</div>'+
     '<label class="campo"><span class="sc">Tipo</span><select id="ceTipo">'+op+'</select></label>'+
+    (coord?'':'<p class="rnota" style="margin:-4px 0 10px">Como miembro convocas <b>reuniones de trabajo</b> e invitas a quien quieras. Las generales, de junta o de subsistema las convoca coordinación.</p>')+
     '<label class="campo"><span class="sc">Modalidad</span><select id="ceMod">'+
       '<option value="hibrida">Híbrida (presencial + telemática)</option>'+
       '<option value="presencial">Presencial</option>'+
       '<option value="telematica">Telemática</option></select></label>'+
+    '<div id="ceMixW" style="display:none"><span class="sc" style="display:block;margin-bottom:5px">Subsistemas que participan</span>'+
+      '<div class="cmix" id="ceMix">'+subs+'</div></div>'+
+    '<div id="ceInvW"><label class="campo"><span class="sc">Invitar</span><input id="ceInv" placeholder="escribe un nombre…" autocomplete="off"></label>'+
+      '<div class="csug" id="ceSug" style="display:none"></div><div class="cchips" id="ceChips"></div></div>'+
+    plant+
     '<label class="campo"><span class="sc">Título</span><input id="ceTit" placeholder="Reunión sin título"></label>'+
-    '<div class="dosc"><label class="campo"><span class="sc">Desde</span><input class="mono" id="ceD0" value="27/07/2026"></label>'+
-    '<label class="campo"><span class="sc">Hasta</span><input class="mono" id="ceD1" value="31/07/2026"></label></div>'+
+    '<label class="campo"><span class="sc">Fechas por</span><select id="ceModo"><option value="rango">Desde / hasta</option><option value="dur">Desde + nº de días</option></select></label>'+
+    '<div class="dosc" id="ceRango"><label class="campo"><span class="sc">Desde</span><input class="mono" id="ceD0" type="date" value="'+hoyISO+'"></label>'+
+      '<label class="campo"><span class="sc">Hasta</span><input class="mono" id="ceD1" type="date" value="'+mas(hoyISO,6)+'"></label></div>'+
+    '<div class="dosc" id="ceDurW" style="display:none"><label class="campo"><span class="sc">Desde</span><input class="mono" id="ceFecha" type="date" value="'+hoyISO+'"></label>'+
+      '<label class="campo"><span class="sc">Días</span><input class="mono" id="ceND" type="number" value="7" min="1" max="60"></label></div>'+
     '<div class="dosc"><label class="campo"><span class="sc">De</span><select id="ceH0">'+optHoras('16:00')+'</select></label>'+
-    '<label class="campo"><span class="sc">A</span><select id="ceH1">'+optHoras('23:00')+'</select></label></div>'+
+      '<label class="campo"><span class="sc">A</span><select id="ceH1">'+optHoras('23:00')+'</select></label></div>'+
+    '<label class="campo" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="cePerdia" style="width:auto"><span class="sc" style="margin:0">Horario distinto por día</span></label>'+
+    '<div class="cdias" id="ceDias" style="display:none"></div>'+
     '<label class="campo"><span class="sc">Duración de franja</span><select id="ceDur">'+
-      '<option value="30">30 min</option><option value="60" selected>1 h</option>'+
+      '<option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option>'+
       '<option value="90">1 h 30 min</option><option value="120">2 h</option></select></label>'+
-    '<label class="campo"><span class="sc">Límite para responder</span><input class="mono" id="ceLim" value="26/07/2026"></label>'+
+    '<label class="campo"><span class="sc">Cadencia</span><select id="cePaso"><option value="0">Contiguas</option>'+
+      '<option value="15">Solapadas cada 15 min</option><option value="30">Solapadas cada 30 min</option><option value="60">Solapadas cada 60 min</option></select></label>'+
+    '<div class="dosc"><label class="campo"><span class="sc">Límite para responder</span><input class="mono" id="ceLim" type="date" value="'+mas(hoyISO,5)+'"></label>'+
+      '<label class="campo"><span class="sc">Hora (opcional)</span><input class="mono" id="ceLimH" type="time"></label></div>'+
     '<label class="campo"><span class="sc">Orden del día (enlace a Drive, opcional)</span>'+
       '<input id="ceOrden" placeholder="https://drive.google.com/…"></label>'+
     '<span class="sc" style="display:block;margin-bottom:6px">Visión de disponibilidad</span>'+
@@ -2024,17 +2100,111 @@ function crearModal(){
       '<button data-v="anonima" class="on" data-p>Anónima</button>'+
       '<button data-v="oculta" data-p>Oculta</button></div>'+
     '<p class="rnota" id="ceHint">El equipo ve el mapa de calor con los totales, sin nombres.</p>'+
+    '<p class="rnota" id="cePrev" style="color:var(--ink2)"></p>'+
     '<button class="btn pri full" style="margin-top:12px" data-p id="btnCrearOK">Crear encuesta</button>');
+
+  var val=function(id){ var e=$('#'+id); return e?e.value:''; };
+  var per=function(){ var e=$('#cePerdia'); return !!(e&&e.checked); };
+  var hNum=function(v){ v=String(v||'0:00'); return parseInt(v,10)+(+v.slice(3)||0)/60; };
+  var dias=function(){ return val('ceModo')==='rango' ? _diasEntreM_(val('ceD0'),val('ceD1'))
+    : _diasDesdeM_(val('ceFecha')||_dmyAISO_(HOY), Math.max(1,+val('ceND')||1)); };
+  var rangos=function(){ var ds=dias();
+    if(!per()) return ds.map(function(){ return [hNum(val('ceH0')), hNum(val('ceH1'))]; });
+    var rows=$$('#ceDias .drow');
+    return ds.map(function(_,i){ var r=rows[i]; if(!r||r.classList.contains('off')) return [0,0];
+      return [hNum(r.querySelector('.dr0').value), hNum(r.querySelector('.dr1').value)]; }); };
+  var INV=new Set();
+  var invRender=function(){ var c=$('#ceChips'); if(!c) return;
+    c.innerHTML=Array.from(INV).map(function(n){
+      var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
+      return '<span class="cchip"><b>'+esc((m&&m.pila)||n)+'</b><button data-n="'+esc(n)+'" data-p>×</button></span>'; }).join('');
+    $$('#ceChips button').forEach(function(b){ b.onclick=function(){ INV.delete(b.dataset.n); invRender(); upd(); }; }); };
+  var sugRender=function(q){ var sg=$('#ceSug'); if(!sg) return; q=_sinTildesM_((q||'').trim());
+    if(!q){ sg.style.display='none'; return; }
+    var hits=(DATA.miembros||[]).filter(function(m){ return m.nombre!==(YO&&YO.nombre) && !INV.has(m.nombre) && _sinTildesM_(m.nombre).indexOf(q)>=0; }).slice(0,6);
+    if(!hits.length){ sg.style.display='none'; return; }
+    sg.innerHTML=hits.map(function(m){ return '<div data-n="'+esc(m.nombre)+'" data-p>'+esc(m.nombre)+' <small>'+esc(m.cargo||m.unidad||'')+'</small></div>'; }).join('');
+    sg.style.display='';
+    $$('#ceSug div').forEach(function(d){ d.onclick=function(){ INV.add(d.dataset.n); $('#ceInv').value=''; sg.style.display='none'; invRender(); upd(); }; }); };
+  var renderDias=function(){ var ds=dias(), prev=$$('#ceDias .drow').map(function(r){
+      return {off:r.classList.contains('off'), a:r.querySelector('.dr0').value, b:r.querySelector('.dr1').value}; });
+    $('#ceDias').innerHTML=ds.map(function(d,i){
+      return '<div class="drow" data-d="'+i+'"><button type="button" class="dtog on" data-p aria-label="activar o desactivar el día"></button>'+
+        '<span>'+esc(d)+'</span><select class="dr0">'+optHoras(val('ceH0'))+'</select><select class="dr1">'+optHoras(val('ceH1'))+'</select></div>'; }).join('');
+    $$('#ceDias .drow').forEach(function(r,i){ var p=prev[i];
+      if(p){ if(p.off) r.classList.add('off'); r.querySelector('.dr0').value=p.a; r.querySelector('.dr1').value=p.b; }
+      var apl=function(){ var off=r.classList.contains('off');
+        r.querySelectorAll('select').forEach(function(sl){ sl.disabled=off; });
+        r.querySelector('.dtog').classList.toggle('on',!off); };
+      apl();
+      r.querySelector('.dtog').onclick=function(){ r.classList.toggle('off'); apl(); upd(); };
+      r.querySelector('.dr0').onchange=upd; r.querySelector('.dr1').onchange=upd; }); };
+  function upd(){
+    var rg=val('ceModo')==='rango';
+    if($('#ceRango')) $('#ceRango').style.display=rg?'':'none';
+    if($('#ceDurW'))  $('#ceDurW').style.display=rg?'none':'';
+    if($('#ceDias'))  $('#ceDias').style.display=per()?'':'none';
+    var u=_genUnionM_(rangos(), +val('ceDur')||60, +val('cePaso')||0);
+    var nb=u.perDia.reduce(function(a,x){ return a+x.length; },0), nd=dias().length;
+    var p=$('#cePrev'); if(p) p.innerHTML=(u.F.length&&nb)
+      ? '<b>'+u.F.length+' franja'+(u.F.length===1?'':'s')+'</b> distintas · <b>'+nb+' bloques</b> en '+nd+' día'+(nd===1?'':'s')+
+        (per()?' (horario por día)':'')+' · <b>'+INV.size+'</b> convocados.'
+      : 'Revisa fechas u horario: no sale ninguna franja.';
+  }
+  var tipoUpd=function(){ var t=val('ceTipo');
+    if($('#ceMixW')) $('#ceMixW').style.display=(t==='mixta')?'':'none';
+    if($('#ceInvW')) $('#ceInvW').style.display=(t==='general')?'none':'';
+    $$('#ceMix .cmixb').forEach(function(b){ b.classList.remove('on'); });
+    INV=new Set(_presetInvitadosM_(t)); invRender(); upd(); };
+  $('#ceTipo').onchange=tipoUpd;
+  $$('#ceMix .cmixb').forEach(function(b){ b.onclick=function(){ b.classList.toggle('on');
+    var u=b.dataset.u, on=b.classList.contains('on');
+    (DATA.miembros||[]).forEach(function(m){ if(m.unidad===u && m.nombre!==(YO&&YO.nombre)){ if(on) INV.add(m.nombre); else INV.delete(m.nombre); } });
+    invRender(); upd(); }; });
+  var inp=$('#ceInv');
+  if(inp){ inp.oninput=function(){ sugRender(inp.value); };
+    inp.onblur=function(){ setTimeout(function(){ if($('#ceSug')) $('#ceSug').style.display='none'; },180); }; }
+  ['ceModo','ceH0','ceH1','ceDur','cePaso','ceND','ceD0','ceD1','ceLim','ceLimH'].forEach(function(id){
+    var e=$('#'+id); if(e) e.onchange=function(){ if(per()) renderDias(); upd(); }; });
+  $('#cePerdia').onchange=function(){ if(per()) renderDias(); upd(); };
+  var cop=$('#ceCopiar');
+  if(cop) cop.onchange=function(){ var v=cop.value; if(v==='') return; var c=PLANTILLAS_M[+v]; if(!c) return;
+    if(c.titulo && $('#ceTit')) $('#ceTit').value=c.titulo;
+    ['ceModo','ceH0','ceH1','ceDur','cePaso','ceND'].forEach(function(id){ if(c[id]!=null && $('#'+id)) $('#'+id).value=c[id]; });
+    if(c.modalidad && $('#ceMod')) $('#ceMod').value=c.modalidad;
+    $('#cePerdia').checked=!!c.perdia; if(per()) renderDias(); upd(); };
   var hints={publica:'Cualquiera puede tocar un hueco y ver quién puede en esa franja.',
     anonima:'El equipo ve el mapa de calor con los totales, sin nombres.',
     oculta:'El equipo no ve el mapa; solo tú, para decidir.'};
+  var vision='anonima';
   $$('#ceVision button').forEach(function(b){
-    b.onclick=function(){
-      $$('#ceVision button').forEach(function(x){x.classList.remove('on');});
-      b.classList.add('on'); $('#ceHint').textContent=hints[b.dataset.v];
-    };
-  });
-  $('#btnCrearOK').onclick=function(){ cerrarModal(); tost('Encuesta creada y convocada.'); };
+    b.onclick=function(){ $$('#ceVision button').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on'); vision=b.dataset.v; $('#ceHint').textContent=hints[vision]; }; });
+  tipoUpd();
+  /* crear: construye la reunión y la PERSISTE (api.crearReunion). Sin backend, queda local. */
+  $('#btnCrearOK').onclick=async function(){
+    var bt=$('#btnCrearOK'); if(bt.disabled) return;
+    var ds=dias(); if(!ds.length){ tost('Revisa las fechas: no hay días.'); return; }
+    var u=_genUnionM_(rangos(), +val('ceDur')||60, +val('cePaso')||0), bloques=[];
+    u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
+    if(!u.F.length || !bloques.length){ tost('Con ese horario no sale ninguna franja.'); return; }
+    var lim=val('ceLim') ? (val('ceLim')+(val('ceLimH')?' '+val('ceLimH'):'')) : null;
+    var reu={ titulo:(val('ceTit')||'').trim()||'Reunión sin título', tipo:val('ceTipo')||'trabajo',
+      modalidad:val('ceMod')||'hibrida', convocante:(YO&&YO.nombre)||'', invitados:Array.from(INV),
+      dias:ds, franjas:u.F, bloques:bloques, total:bloques.length, limite:lim,
+      ordenDia:(val('ceOrden')||'').trim(), vision:vision, resp:{} };
+    PLANTILLAS_M.unshift({ titulo:reu.titulo, ceModo:val('ceModo'), ceH0:val('ceH0'), ceH1:val('ceH1'),
+      ceDur:val('ceDur'), cePaso:val('cePaso'), ceND:val('ceND'), modalidad:reu.modalidad, perdia:per() });
+    if(PLANTILLAS_M.length>8) PLANTILLAS_M.length=8;
+    bt.disabled=true; var prev=bt.textContent; bt.textContent='Creando…';
+    if(typeof backendOK!=='undefined' && backendOK && SESION){
+      try{ var d=await api.crearReunion(reu); if(d&&d.id) reu.id=d.id;
+        cerrarModal(); tost('Reunión convocada · '+reu.invitados.length+' convocados, '+bloques.length+' bloques.'); pintar();
+      }catch(e){ bt.disabled=false; bt.textContent=prev; tost('No se pudo convocar: '+((e&&e.message)||e)); }
+      return;
+    }
+    cerrarModal(); tost('(sin backend) Reunión preparada · '+bloques.length+' bloques.');
+  };
 }
 /* ── FIJAR FECHA — día + rango contiguo de franjas ─────────────────────── */
 function fijarModal(){
