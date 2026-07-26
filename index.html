@@ -525,8 +525,20 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .cajon svg{width:15px;height:15px;transition:transform .3s var(--sal);fill:none;stroke:currentColor;stroke-width:2.4}
 .cajon.ab svg{transform:rotate(180deg)}
 .cajon b{color:var(--ink2);font-weight:600}
+/* tu fila del reparto: un realce sobrio, en vez de repetir tu cargo en una pildora */
+.fila.yo{background:rgba(228,30,37,.09);border-left:2px solid var(--red);padding-left:9px;margin-left:-11px;
+  border-radius:0 6px 6px 0}
+/* memoria del turno incrustada, con hechuras de documento */
+.doc{margin-top:13px;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#0A0909}
+.doc .dh{display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.doc .dh b{font-size:12.5px}
+.doc .dh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px}
+.doc .dp{height:104px;background:linear-gradient(#141212,#0A0909);position:relative;overflow:hidden}
+.doc .dp i{position:absolute;left:14px;right:14px;height:5px;border-radius:3px;background:rgba(255,255,255,.07)}
+.doc .da{display:block;padding:9px 12px;text-align:center;font-family:var(--mono);font-size:11px;
+  color:var(--red2);border-top:1px solid var(--line);text-decoration:none}
 .cajsec{max-height:0;overflow:hidden;transition:max-height .45s var(--sal)}
-.cajsec.on{max-height:3000px}
+.cajsec.on{max-height:20000px}   /* 3000px cortaba la lista con 20+ turnos */
 
 /* ═══ REJILLA DE DISPONIBILIDAD (cubrir · arrastre) ══════════════════════ */
 .rejw{overflow-x:auto;margin:0 2px;padding-bottom:3px}
@@ -679,23 +691,23 @@ var REV2_NOM='Antía Ruibal Cortegoso';
 var DATA={
   generado:'2026-07-24', temporada:'25/26',
   subsistemas:[
-    {u:'Electrónica',media:20.5,n:8},
-    {u:'Dinámica y Control',media:19.2,n:8},
-    {u:'Estructuras y Aerodinámica',media:12.8,n:8},
+    {u:'Aviónica',media:20.5,n:8},
+    {u:'GNC',media:19.2,n:8},
+    {u:'Aeroestructuras',media:12.8,n:8},
     {u:'Propulsión',media:12.0,n:6},
     {u:'Org&Mark',media:7.7,n:2}
   ],
   miembros:[
-    {nombre:'Nerea Ferreiro Lamas',pila:'Nerea',unidad:'Estructuras y Aerodinámica',cargo:null,
+    {nombre:'Nerea Ferreiro Lamas',pila:'Nerea',unidad:'Aeroestructuras',cargo:null,
      puntos:7,estado:'normal',infraccion:false,hMes:14.5,hAnt:11.9,horasTemp:132.4,meses:11,
      cuota:24.18,cuota_base:32.18,coche:2,puesto:9},
-    {nombre:'Xoán Bermúdez Rial',pila:'Xoán',unidad:'Estructuras y Aerodinámica',cargo:'Coordinador',
+    {nombre:'Xoán Bermúdez Rial',pila:'Xoán',unidad:'Aeroestructuras',cargo:'Coordinador',
      puntos:10,estado:'elegible',infraccion:false,hMes:31.2,hAnt:28.4,horasTemp:341.6,meses:11,
      cuota:0,cuota_base:12.4,coche:5,puesto:5},
     {nombre:'Lois Carballo Sendón',pila:'Lois',unidad:'Dirección',cargo:'Project Director',
      puntos:10,estado:'elegible',infraccion:false,hMes:44.8,hAnt:41.0,horasTemp:498.2,meses:11,
      cuota:0,cuota_base:0,coche:0,puesto:1},
-    {nombre:'Antía Ruibal Cortegoso',pila:'Antía',unidad:'Electrónica',cargo:null,
+    {nombre:'Antía Ruibal Cortegoso',pila:'Antía',unidad:'Aviónica',cargo:null,
      puntos:10,estado:'elegible',infraccion:false,hMes:26.6,hAnt:24.1,horasTemp:286.9,meses:11,
      cuota:8.44,cuota_base:8.44,coche:0,puesto:6}
   ]
@@ -768,7 +780,15 @@ function _pintarCabecera_(){
   if(typeof YO==='undefined' || !YO) return;
   var hn=$('#hNom'), hr=$('#hRol');
   if(hn) hn.textContent=(YO.pila||(YO.nombre||'').split(' ')[0]||YO.nombre||'');
-  if(hr) hr.textContent=((YO.unidad||'')+' · '+(YO.cargo||'Miembro')).toUpperCase();
+  /* Nada de 'PROJECT DIRECTOR · PROJECT DIRECTOR': el PD no tiene subsistema, su unidad
+     ES su cargo. Y a un coordinador le dice de QUÉ lo es, que es la información util. */
+  if(hr){
+    var u=YO.unidad||'', c=YO.cargo||'Miembro', txt;
+    if(!u || u===c) txt=c;
+    else if(c==='Coordinador') txt='Coordinador de '+u;
+    else txt=u+' · '+c;
+    hr.textContent=txt.toUpperCase();
+  }
 }
 function _pintarVerComo_(){
   var rs=$('#rolsel'); if(!rs) return;
@@ -803,17 +823,23 @@ async function _verComo_(nombre){
 function _normTurnoM_(t, ix){
   var iso=String(t.fecha||'').slice(0,10);
   var f=_isoADMY_(iso) || iso;
+  var _yo=(YO&&YO.nombre)||'';
+  /* [pila, rol, esYo] — el tercer campo permite RESALTAR tu fila sin repetir el cargo */
   var roles=(t.roles||[]).map(function(r){
-    if(Array.isArray(r)) return r;
+    if(Array.isArray(r)) return [r[0], r[1]||'', false];
     var nom=r.miembro||r.nombre||'— libre';
     var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===nom; })[0];
-    return [ (m&&m.pila)||nom, r.rol||'' ];
+    return [ (m&&m.pila)||nom, r.rol||'', nom===_yo ];
   });
   var yo=(YO&&YO.nombre)||'', mio=null;
   (t.roles||[]).forEach(function(r){ if(!Array.isArray(r) && (r.miembro===yo)) mio=r.rol||'te toca'; });
   var hoyISO=_dmyAISO_(HOY);
   var dur=t.duracion || (t.momento==='tarde'?'tarde':(t.momento==='mañana'?'mañana':'—'));
-  return { id: 'T-'+(iso||ix), f:f, iso:iso, hora:t.hora||'—', punto:t.punto||'—', dur:dur,
+  /* `hecho` manda sobre la fecha: lo que decide si un turno sale suelto o al cajon es
+     su ESTADO en Notion, no que la fecha haya pasado (un turno de ayer sin cerrar sigue vivo). */
+  var est=t.estado||'';
+  return { id: t.id || ('T-'+(iso||ix)), f:f, iso:iso, hora:t.hora||'—', punto:t.punto||'—', dur:dur,
+    lugar:t.lugar||null, estado:est, hecho: est ? (est==='Realizado'||est==='Cancelado') : !!(iso && iso < hoyISO),
     mio:mio, roles:roles, pasado: !!(iso && iso < hoyISO),
     principales:t.principales||[], secundarios:t.secundarios||[],
     nota:t.nota||null, crucial:!!t.crucial, memoria:t.memoria||null, _real:true };
@@ -844,9 +870,14 @@ function _normReuM_(r){
     for(var i=0;i<bl.length;i++){ var val=+v[i]||0; if(val>0){ var d=bl[i][0], f=bl[i][1];
       if(calor[d]&&calor[d][f]!=null){ calor[d][f]++; pond[d][f]+=val; } } }
   });
-  var fij=r.fijada; if(fij && typeof fij==='object') fij=fij.label||fij.iso||null;
+  /* `fijada` viene del backend como OBJETO con los indices ({fecha,franjas,bloques,label}).
+     Antes se colapsaba a la etiqueta y se perdian los indices, asi que el mapa no podia
+     pintar el hueco elegido en verde aunque el aviso lo prometiera. */
+  var fijO=r.fijada, fijBl=[];
+  if(fijO && typeof fijO==='object'){ fijBl=(fijO.bloques||[]).slice(); }
+  var fij=fijO; if(fij && typeof fij==='object') fij=fij.label||fij.iso||null;
   return { id:r.id, titulo:r.titulo||'Reunión sin título', tipo:r.tipo||'general',
-    modalidad:r.modalidad||'hibrida', limite:r.limite||null, fijada:fij||null,
+    modalidad:r.modalidad||'hibrida', limite:r.limite||null, fijada:fij||null, fijadaBl:fijBl,
     convocante:r.convocante||'', dias:dias, franjas:F, bloques:bl, resp:resp,
     calor:calor, pond:pond, nInv:(r.invitados||[]).length,
     cubierta: !!(YO && resp[YO.nombre] && resp[YO.nombre].some(function(x){ return +x>0; })),
@@ -1000,10 +1031,10 @@ function mediaSub(u){for(var i=0;i<DATA.subsistemas.length;i++) if(DATA.subsiste
 
 /* tareas asignadas — la imputación del fichaje va SOBRE ESTAS, no a mano */
 var TAREAS=[
-  {n:'Cerrar el plano del mamparo delantero',s:'Estructuras y Aerodinámica',u:'alta',e:'En desarrollo',l:'27/07/2026',pr:'EuRoC'},
-  {n:'Memoria de fabricación del tramo 2',s:'Estructuras y Aerodinámica',u:'media',e:'Revisando',l:'31/07/2026',pr:'EuRoC'},
-  {n:'Laminado del fuselaje · tramo 2',s:'Estructuras y Aerodinámica',u:'alta',e:'En desarrollo',l:'29/07/2026',pr:'Viradinha MkIII'},
-  {n:'Tabla de masas · configuración B',s:'Estructuras y Aerodinámica',u:'baja',e:'Sin empezar',l:'08/08/2026',pr:'EuRoC'}
+  {n:'Cerrar el plano del mamparo delantero',s:'Aeroestructuras',u:'alta',e:'En desarrollo',l:'27/07/2026',pr:'EuRoC'},
+  {n:'Memoria de fabricación del tramo 2',s:'Aeroestructuras',u:'media',e:'Revisando',l:'31/07/2026',pr:'EuRoC'},
+  {n:'Laminado del fuselaje · tramo 2',s:'Aeroestructuras',u:'alta',e:'En desarrollo',l:'29/07/2026',pr:'Viradinha MkIII'},
+  {n:'Tabla de masas · configuración B',s:'Aeroestructuras',u:'baja',e:'Sin empezar',l:'08/08/2026',pr:'EuRoC'}
 ];
 
 /* movimientos de puntos: qué te los quitó y cuándo vuelven */
@@ -1031,9 +1062,9 @@ function sumaE(e){return PARTES.filter(function(p){return p.e===e;}).reduce(func
 
 var ENTREGABLES=[
   {id:1,ref:'Informe_S-4102_26',titulo:'Caracterización del mamparo delantero',autor:'Nerea Ferreiro Lamas',
-   subsistema:'Estructuras y Aerodinámica',ambito:'archivo',estado:'revision',sev:'media'},
+   subsistema:'Aeroestructuras',ambito:'archivo',estado:'revision',sev:'media'},
   {id:2,ref:'Tabla_S-5507_26',titulo:'Tabla de masas del tramo 2 · configuración de vuelo B',
-   autor:'Nerea Ferreiro Lamas',subsistema:'Estructuras y Aerodinámica',ambito:'archivo',estado:'cambios',
+   autor:'Nerea Ferreiro Lamas',subsistema:'Aeroestructuras',ambito:'archivo',estado:'cambios',
    sev:'media',nota:'Faltan las tolerancias de las cotas críticas. Corrige y reenvía.'}
 ];
 var TURNOS=[
@@ -1075,7 +1106,7 @@ var ENT_REV=[
      riesgos:['La célula de carga no estaba recalibrada desde mayo.'],
      fechasClave:['Repetición prevista para el 29/07/2026']}},
   {id:12,ref:'Tabla_S-5501_26',titulo:'Tabla de masas del tramo 2 · configuración A',
-   autor:'Iago Randán Fuciños',subsistema:'Estructuras y Aerodinámica',tipo:'Tabla',ambito:'archivo',
+   autor:'Iago Randán Fuciños',subsistema:'Aeroestructuras',tipo:'Tabla',ambito:'archivo',
    estado:'revision',fecha:'21/07/2026',sev:'baja',
    resumen:'Masas medidas del tramo 2 en configuración A, con incertidumbre por componente.',issues:[]}
 ];
@@ -1837,23 +1868,31 @@ function vTareas(){
       '<div class="cajsec"><div class="tarj">'+fin.map(fila).join('')+'</div></div>':'');
 }
 
+/* Solo TUS turnos: aqui no pinta ver los de los demas. (Un boton de 'ver todos'
+   queda para mas adelante.) Y el corte no es futuro/pasado sino REALIZADO o no:
+   lo que sigue vivo va suelto y visible; lo cerrado, al cajon. */
+function _mioTurno_(t){ return !!(t.mio || (t.roles||[]).some(function(r){ return r[2]; })); }
 function vTurnos(){
-  var prox=TURNOS.filter(function(t){return !t.pasado;});
-  var pas=TURNOS.filter(function(t){return t.pasado;});
+  var mios=TURNOS.filter(_mioTurno_);
+  var prox=mios.filter(function(t){ return !t.hecho; });
+  var pas=mios.filter(function(t){ return t.hecho; });
   function tarjeta(t){
-    return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+cab(t.f+(t.mio?' · te toca':'')+(t.crucial?' · crucial':''), t.hora)+
+    return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+
+      cab(t.f+(t.crucial?' · crucial':''), t.hora)+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b>'+
-      '<small>'+t.hora+' · '+t.dur+'</small></div>'+
-      '<div class="d">'+(t.mio?'<span class="pil conf">'+esc(t.mio)+'</span> ':'')+'<span class="chev">›</span></div></div>'+
+      '<small>'+esc(t.hora)+' · '+esc(t.dur)+(t.lugar?' · '+esc(t.lugar):'')+'</small></div>'+
+      '<div class="d"><span class="chev">›</span></div></div>'+
       t.roles.map(function(r){
-        return '<div class="fila"><div class="a"><b>'+esc(r[0])+'</b><small>'+esc(r[1])+'</small></div></div>';
+        return '<div class="fila'+(r[2]?' yo':'')+'"><div class="a"><b>'+esc(r[0])+'</b>'+
+          '<small>'+esc(r[1])+'</small></div></div>';
       }).join('')+'</div>';
   }
   /* los pasados van en CAJÓN plegable, como en app.html: no estorban pero están */
   pas.sort(function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); });
+  /* los vivos van SUELTOS: sin cabecera de seccion ni etiquetas, para que canten */
   return '<div class="h1">Turnos</div><p class="h1s">Fabricación · en cuáles estás y quién más va.</p>'+
-    (prox.length? '<h2 class="sec">Convocados<span class="ln"></span>'+prox.length+'</h2>'+prox.map(tarjeta).join('')
-      : '<div class="tarj">'+vacio('Sin turnos convocados','En verano se paran casi del todo. Cuando se convoque uno en el canal de fabricación aparecerá aquí.','',false)+'</div>')+
+    (prox.length? prox.map(tarjeta).join('')
+      : '<div class="tarj">'+vacio('Sin turnos por delante','Cuando te convoquen a uno aparecerá aquí, arriba del todo.','',false)+'</div>')+
     (pas.length? '<div class="cajon" data-caj data-p><span>Turnos pasados <b>· '+pas.length+'</b>'+
         (pas[0].f?' <span style="color:var(--ink3)">· el último, '+esc(pas[0].f)+'</span>':'')+'</span>'+
         '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
@@ -1983,6 +2022,8 @@ function vReu(){
   var max=0; M.forEach(function(fila){fila.forEach(function(v){ if(v!=null&&v>max)max=v; });});
   var best={d:0,f:0,v:0};
   M.forEach(function(fila,di){fila.forEach(function(v,fi){ if(v!=null&&v>best.v)best={d:di,f:fi,v:v}; });});
+  /* indice rapido de los bloques fijados, para pintarlos en verde */
+  var fijSet={}; (R.fijadaBl||[]).forEach(function(b){ fijSet[b[0]+'-'+b[1]]=1; });
   var g='<div style="overflow-x:auto;margin:0 2px"><div style="display:grid;gap:2px;grid-template-columns:auto repeat('+nF+',minmax(26px,1fr));min-width:280px">';
   g+='<div></div>';
   R.franjas.forEach(function(f,ix){
@@ -2008,6 +2049,12 @@ function vReu(){
       }
       var a=(0.12+0.88*(max?v/max:0)).toFixed(3);
       var esBest=(di===best.d&&fi===best.f&&best.v>0);
+      if(fijSet[di+'-'+fi]){   // el hueco ELEGIDO: verde, y manda sobre el resaltado de 'mejor'
+        g+='<div title="franja fijada" style="height:21px;border-radius:2px;display:grid;'+
+          'place-items:center;font-family:var(--mono);font-size:8.5px;color:#fff;'+
+          'background:rgba(53,199,89,.85);outline:1px solid var(--ok);outline-offset:-1px">'+v+'</div>';
+        return;
+      }
       g+='<div style="height:21px;border-radius:2px;display:grid;place-items:center;'+
         'font-family:var(--mono);font-size:8.5px;color:#fff;background:rgba(228,30,37,'+a+')'+
         (esBest?';outline:1px solid var(--ink);outline-offset:-1px':'')+'">'+v+'</div>';
@@ -2038,7 +2085,8 @@ function vReu(){
             ? ''                                   /* organizas: no se te pide cubrir */
             : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
               (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
-    (R.exento?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas, no cubres</b>. Tu disponibilidad no se te pide ni cuenta para el mínimo.</p>':'')+
+    /* si ya está fijada, el aviso de organizador sobra y quedaba colgando debajo del cartel verde */
+    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas, no cubres</b>. Tu disponibilidad no se te pide ni cuenta para el mínimo.</p>':'')+
       (esCoord()?'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">'+
         '<button class="btn mini" data-p id="btnFijar" style="flex:1">'+(R.fijada?'Cambiar fecha/hora':'📌 Fijar fecha')+'</button>'+
         (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
@@ -2175,8 +2223,11 @@ function vEquipo(){
    PERSISTE en el backend (api.crearReunion); sin backend queda en memoria. ────────── */
 function _sinTildesM_(t){ return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
 function _dmyM_(iso){ var m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):iso; }
-function _diasDesdeM_(iso,n){ var D=['D','L','M','X','J','V','S'],out=[],b=new Date(iso+'T00:00:00');
-  for(var i=0;i<n;i++){ var d=new Date(b); d.setDate(b.getDate()+i); out.push(D[d.getDay()]+' '+d.getDate()); } return out; }
+/* Las etiquetas de dia van en DD/MM, igual que la Reunion General: 'V 24' se lee
+   peor y ademas pierde el mes, que importa cuando el rango cruza de mes. */
+function _ddmmM_(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1); }
+function _diasDesdeM_(iso,n){ var out=[],b=new Date(iso+'T00:00:00');
+  for(var i=0;i<n;i++){ var d=new Date(b); d.setDate(b.getDate()+i); out.push(_ddmmM_(d)); } return out; }
 var _DL_=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 /* nombres largos para la vista de 'horario distinto por día' (ahí caben y se leen mejor) */
 function _diasLargosM_(modo,d0,d1,fecha,nd){
@@ -2186,9 +2237,9 @@ function _diasLargosM_(modo,d0,d1,fecha,nd){
   else { a=new Date((fecha||'')+'T00:00:00'); for(i=0;i<nd;i++){ var d=new Date(a); d.setDate(a.getDate()+i); out.push(_DL_[d.getDay()]+' '+d.getDate()); } }
   return out;
 }
-function _diasEntreM_(a0,a1){ var D=['D','L','M','X','J','V','S'],out=[]; if(!a0||!a1) return out;
+function _diasEntreM_(a0,a1){ var out=[]; if(!a0||!a1) return out;
   var a=new Date(a0+'T00:00:00'), b=new Date(a1+'T00:00:00'); if(b<a) return out;
-  for(var i=0;i<62&&a<=b;i++){ out.push(D[a.getDay()]+' '+a.getDate()); a.setDate(a.getDate()+1); } return out; }
+  for(var i=0;i<62&&a<=b;i++){ out.push(_ddmmM_(a)); a.setDate(a.getDate()+1); } return out; }
 function _genFranjasM_(h0,h1,dur,paso){ var out=[], step=(paso&&+paso>0)?+paso:+dur;
   for(var m=h0*60; m+(+dur)<=h1*60+1e-9; m+=step) out.push({ini:pad(Math.floor(m/60))+':'+pad(m%60), dur:+dur});
   return out; }
@@ -2201,7 +2252,7 @@ function _genUnionM_(rangos,dur,paso){ var map={}, F=[], perDia=[];
 /* convocados por defecto según el tipo (como app.html): general=todo el equipo, subsistema=tu unidad,
    junta=coordinadores+PD, consejo=por configurar, mixta/trabajo=a mano. */
 function _presetInvitadosM_(tipo){
-  var yo=(YO&&YO.nombre)||'', ms=DATA.miembros||[], out=[];
+  var yo=(YO&&YO.nombre)||'', ms=(DATA.miembros||[]).filter(function(m){ return !m.baja; }), out=[];
   ms.forEach(function(m){
     if(m.nombre===yo) return;
     var meto = tipo==='general' ? true
@@ -2352,6 +2403,14 @@ function crearModal(){
     var u=_genUnionM_(rangos(), +val('ceDur')||60, +val('cePaso')||0), bloques=[];
     u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
     if(!u.F.length || !bloques.length){ tost('Con ese horario no sale ninguna franja.'); return; }
+    /* Si los dias arrancan en minutos distintos (17:00 vs 17:30), la union de franjas
+       interleava y el mapa sale a huecos alternos. Avisamos ANTES de crearla. */
+    var arranques={}; u.F.forEach(function(f){ arranques[String(f.ini).slice(3)]=1; });
+    if(Object.keys(arranques).length>1 && !window.__avisoRejilla__){
+      window.__avisoRejilla__=1;
+      tost('Ojo: los días no empiezan a la misma hora en punto, el mapa saldrá a huecos. Pulsa otra vez para crearla igual.');
+      bt.disabled=false; return;
+    }
     var lim=val('ceLim') ? (val('ceLim')+(val('ceLimH')?' '+val('ceLimH'):'')) : null;
     var reu={ titulo:(val('ceTit')||'').trim()||'Reunión sin título', tipo:val('ceTipo')||'trabajo',
       modalidad:val('ceMod')||'hibrida', convocante:(YO&&YO.nombre)||'', invitados:Array.from(INV),
@@ -2738,10 +2797,16 @@ function enganchar(){
         }).join('')+'</div>'+
         lista(t.principales,'Objetivos principales')+lista(t.secundarios,'Objetivos secundarios')+
         (t.nota?'<p class="rnota" style="margin-top:10px"><b>Nota:</b> '+esc(t.nota)+'</p>':'')+
-        '<p class="rnota" style="margin-top:14px;border-top:1px solid var(--line);padding-top:11px">'+
-        'Memoria del turno · '+(t.memoria
-          ? '<a href="'+esc(t.memoria)+'" target="_blank" rel="noopener" style="color:var(--red2)">abrir</a>'
-          : '<span style="color:var(--ink3)">aún no subida</span>')+'</p>');
+        /* la memoria se incrusta como DOCUMENTO (igual que un orden del día), no como
+           un enlace suelto: se ve que hay un papel detrás y se abre desde ahí. */
+        (t.memoria
+          ? '<div class="doc"><div class="dh"><b>Memoria de fabricación</b>'+
+              '<small>'+esc(t.f)+'</small></div>'+
+              '<div class="dp">'+[18,34,50,66,82].map(function(y,i){
+                return '<i style="top:'+y+'px;'+(i===4?'right:96px':'')+'"></i>'; }).join('')+'</div>'+
+              '<a class="da" href="'+esc(t.memoria)+'" target="_blank" rel="noopener">abrir la memoria</a></div>'
+          : '<p class="rnota" style="margin-top:14px;border-top:1px solid var(--line);padding-top:11px">'+
+            'Memoria del turno · <span style="color:var(--ink3)">aún no subida</span></p>'));
     };
   });
   $$('[data-doc]').forEach(function(el){ el.onclick=function(){ verDoc(+el.dataset.doc); }; });
