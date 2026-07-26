@@ -1295,21 +1295,24 @@ function barraHorasHTML(id){
      ocupa 1/5 de lo pintado — no un pixel al final como si fueran un extra. */
   var tot=cont+p, wtot=wBar(tot);
   var wco = tot>0 ? wtot*(cont/tot) : 0, wcop = wtot;
-  var wu=wBar(UMBRAL), wm=wBar(MEDIA_EQ);
+  /* La MARCA del objetivo va en la MISMA escala que lo pintado: dentro del ancho reservado
+     el reparto es lineal, así que el objetivo cae en wtot*(UMBRAL/tot). Con la escala asintótica
+     se descolocaba (con 87 h la barra llega casi al borde y el objetivo se quedaba a media barra).
+     Si aún no hay horas, o el objetivo queda más a la derecha que el total, se ancla al final. */
+  var wu = tot>0 ? Math.min(98, wtot*(UMBRAL/tot)) : wBar(UMBRAL);
   return '<div class="barh" id="'+id+'">'+
       '<i class="otor" data-w="'+wco.toFixed(2)+'"></i>'+
       '<i class="pend" data-l="'+wco.toFixed(2)+'" data-w="'+(wcop-wco).toFixed(2)+'"></i>'+
-      '<span class="mk med" data-l="'+wm.toFixed(2)+'"></span>'+
       '<span class="mk" data-l="'+wu.toFixed(2)+'"></span>'+
     '</div>'+
-    '<div class="barhet"><span data-l="'+wm.toFixed(2)+'">media '+nf(MEDIA_EQ,1)+'</span>'+
-      '<span data-l="'+wu.toFixed(2)+'">objetivo '+nf(UMBRAL,1)+'</span></div>'+
+    '<div class="barhet"><span data-l="'+wu.toFixed(2)+'">objetivo '+nf(UMBRAL,1)+' h</span></div>'+
     '<div class="leyh">'+
       '<span><i style="background:var(--ok)"></i>otorgadas</span>'+
       '<span><i style="background:repeating-linear-gradient(45deg,rgba(232,145,46,.9) 0 3px,transparent 3px 6px)"></i>pendientes · no cuentan</span>'+
     '</div>'+
     '<p class="rnota" style="margin-top:9px">La escala es <b>asintótica</b>: cuantas más horas, más a la '+
-    'derecha, pero la barra nunca llega al borde ni se rompe. El objetivo y la media están en esa misma escala.</p>';
+    'derecha, pero la barra nunca llega al borde ni se rompe. Dentro de lo pintado, todo va a escala: '+
+    'las horas pendientes y la marca del objetivo ocupan su parte proporcional.</p>';
 }
 function animarBarras(root){
   $$('.barh',root||document).forEach(function(b){
