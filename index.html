@@ -1569,7 +1569,7 @@ function filaParte(p){
           : p.e==='sindecl'?'<span class="pil pend">sin declarar</span>'
           : '<span class="pil pend">en cola</span>';
   var sub = p.e==='otor' ? (p.nota?esc(p.nota):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
-          : p.e==='pend' ? ('en la cola de '+esc(aprobadorDe(YO.nombre,YO.unidad).nom.split(' ')[0]))
+          : p.e==='pend' ? 'esperando aprobación'
           : p.e==='sindecl' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · caduca '+_isoADMY_((''+p.caduca).slice(0,10)):''))
           : (p.f+(p.ini?' · '+p.ini+'–'+p.fin:''));
   var catTxt = (p.e==='conf'||p.e==='otor') ? ' · sumó a '+catEti(p.cat)
