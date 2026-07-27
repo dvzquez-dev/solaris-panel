@@ -1345,6 +1345,10 @@ function _aplicarBootstrapMovil_(boot){
     (boot.entregables||[]).forEach(function(d){
       if(!d) return;
       if(d.sev==null && d.severidad!=null) d.sev=d.severidad;   // la vista lee `sev`
+      /* El backend manda `enlaceDrive` y aqui se quedaba sin recoger: el visor no tenia que
+         enseñar. Tercera vez hoy que un normalizador tira un dato que si venia (`origen`,
+         `ordenDia`, este). Normalizar es tirar lo que no nombras. */
+      if(!d.drive && d.enlaceDrive) d.drive=d.enlaceDrive;
       (d.autor===_yoDoc ? ENTREGABLES : ENT_REV).push(d);
     });
   }
@@ -2897,7 +2901,8 @@ function _contextoM_(){
   var nav=/Firefox/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome/.test(ua)?'Chrome':
           /Safari/.test(ua)?'Safari':'otro';
   return 'movil · '+nav+' · '+screen.width+'x'+screen.height+
-    ' · datos '+(DATA.generado||'?')+(_esStandalone_()?' · desde la pantalla de inicio':'');
+    ' · build '+BUILD+' · datos '+(DATA.generado||'?')+
+    (_esStandalone_()?' · desde la pantalla de inicio':'');
 }
 function buzonModal(tipo){
   var esBug=(tipo!=='mejora');
@@ -2932,8 +2937,12 @@ function buzonModal(tipo){
     if(!tit){ tost('Escribe al menos en una línea qué pasa.'); $('#bzTit').focus(); return; }
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
       tost('Sin conexión con el servidor no se puede enviar. Vuelve a intentarlo.'); return; }
+    /* LA VERSION ES LA DEL CODIGO, no la de los datos. Antes iba `DATA.generado` -cuando se
+       genero el panel-, que no dice nada de que build estaba viendo quien reporta. Y esa es
+       la pregunta que costo dos rondas el 27/07: Pages cachea el HTML 10 min, asi que un
+       reporte contra una build vieja manda a buscar un fallo que ya no existe. */
     var datos={ titulo:tit, donde:'Móvil', pantalla:pant,
-                version:(DATA.generado||''), contexto:_contextoM_() };
+                version:BUILD, contexto:_contextoM_() };
     if(esBug){ datos.esperaba=det; datos.paso=tit; datos.gravedad=grav; }
     else { datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
     env.disabled=true; var prev=env.textContent; env.textContent='Enviando…';
@@ -2967,7 +2976,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='9a10d6d';
+var BUILD='3e109d0';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -3124,20 +3133,35 @@ function verDoc(id){
     secs+
     ((e.issues&&e.issues.length)?'<h4>Avisos de calidad · '+e.issues.length+'</h4><ul class="obj">'+
       e.issues.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'')+
+    /* EL DOCUMENTO DE VERDAD. Aqui habia una maqueta con rayas grises que decia «sin vista
+       previa»: esta pantalla existe para LEER el archivo antes de decidir, y decidir sin
+       poder abrirlo es aprobar a ciegas — justo lo que venia a evitar. */
     '<h4>Documento</h4>'+
-    '<div style="border:1px solid var(--line);border-radius:9px;background:#fff;color:#1a1a1a;padding:16px;'+
-      'font-size:10.5px;line-height:1.5">'+
-      '<div style="display:flex;justify-content:space-between;border-bottom:1.5px solid #E41E25;padding-bottom:5px;margin-bottom:9px">'+
-      '<b style="font-size:8px;letter-spacing:1px;color:#E41E25">UVIGO AEROTECH · SOLARIS</b>'+
-      '<span style="font-family:monospace;font-size:8.5px;color:#666">'+e.ref+'</span></div>'+
-      '<b style="font-size:13px;color:#111;display:block;margin-bottom:4px">'+esc(e.titulo)+'</b>'+
-      '<div style="font-size:8.5px;color:#777;margin-bottom:9px">'+esc(e.autor)+' · '+esc(e.tipo||'Informe')+' · '+esc(e.fecha||'')+'</div>'+
-      [92,84,88,72,90,64].map(function(w){return '<div style="height:5px;border-radius:3px;background:#e6e6e6;margin:5px 0;width:'+w+'%"></div>';}).join('')+
-      '<div style="border:1px dashed #bbb;border-radius:5px;background:#f4f4f4;color:#999;font-size:9px;'+
-      'text-align:center;padding:18px 8px;margin:10px 0">— sin vista previa —<br><span style="font-size:8px">'+
-      'el documento entero todavía no se puede leer desde el móvil</span></div></div>'+
+    (_idDrive_(e.drive)
+      /* `data-visor`, NO `data-doc`: ese atributo YA lo usan las filas de expediente (llevan
+         el id del documento), asi que `$('[data-doc]')` cogia una fila y le metia el iframe
+         dentro. Cazado ejecutando, no leyendo. */
+      ? '<div class="doc"><div class="memcuerpo" data-visor="'+_idDrive_(e.drive)+'">'+
+          '<div class="dcar">Cargando el documento…</div></div>'+
+        '<a class="da" href="'+esc(e.drive)+'" target="_blank" rel="noopener">abrir en Drive</a></div>'
+      : '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
+        'Pideselo a quien lo subio antes de decidir.</div></div>')+
     '<p class="rnota" style="margin-top:10px">Revisa: <b>'+revs+'</b></p>'+
     acc);
+  /* Se incrusta DESPUES de abrir el modal: un iframe dentro de la cadena de strings no
+     arranca hasta que esta en el DOM, y asi ademas se puede vigilar si carga. */
+  var _c=$('[data-visor]');
+  if(_c){
+    var f=document.createElement('iframe');
+    f.className='dv'; f.setAttribute('loading','lazy');
+    f.src='https://drive.google.com/file/d/'+_c.dataset.visor+'/preview';
+    /* Si no carga -permisos, CSP- se admite y se ofrece Drive. Un hueco blanco eterno es
+       peor que decirlo: quien revisa no sabe si esperar o si esta roto. */
+    var _f=setTimeout(function(){ if(_c.dataset.ok) return;
+      _c.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
+    f.onload=function(){ _c.dataset.ok='1'; clearTimeout(_f); };
+    _c.innerHTML=''; _c.appendChild(f);
+  }
 }
 function vReu(){
   if(_reunionesCargando_())
