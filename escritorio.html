@@ -544,7 +544,7 @@ var HOY=(function(){
   if(location.search.indexOf('demo')>=0) return '24/07/2026';
   var d=new Date(), p=function(x){ return (x<10?'0':'')+x; };
   return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear();
-})(), UMBRAL=11.8, MEDIA_EQ=10.9;
+})(), UMBRAL=11.8, MEDIA_EQ=10.9;   /* UMBRAL: ultimo valor conocido; lo recalcula `_umbral_()` */
 /* fecha comparable cronologicamente venga en ISO (AAAA-MM-DD) o DD/MM/AAAA */
 function _fechaISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   return m ? (m[3]+'-'+m[2]+'-'+m[1]) : f; }
@@ -602,6 +602,25 @@ function miembro(n){for(var i=0;i<DATA.miembros.length;i++) if(DATA.miembros[i].
    invitar, ni sancionar, ni otorgar horas, ni «ver como». Antes cada sitio se lo filtraba
    por su cuenta y donde nadie lo escribio salia la lista entera. */
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
+/* GEMELA (la otra cara: misma funcion, mismo nombre).
+   EL UMBRAL NO ES UNA CONSTANTE. `reglas/cuota.py` lo define asi:
+       umbral = max(8, min(15, (2/3) x media de horas del mes del equipo))
+   Aqui estaba cableado a 11,8 — que es ese mismo calculo hecho UNA VEZ, con la media de
+   las 32 personas, bajas incluidas (2/3 x 17,70 = 11,80). Contando solo a los activos la
+   media sube a 19,70 y el umbral a 13,14. Un numero cableado no se ve venir, y un umbral
+   bajo hace que el panel diga que la gente cumple cuando no cumple. */
+var UMBRAL_LO=8, UMBRAL_HI=15, UMBRAL_FRAC=2/3;
+function _umbral_(){
+  /* Solo activos: es la misma poblacion sobre la que se miden las medias. */
+  var hs=_activos_().map(function(m){ return m.hMes; })
+                    .filter(function(h){ return typeof h==='number'; });
+  /* Un miembro solo ve SUS horas, asi que no puede calcular la media del equipo. Con una
+     sola muestra saldria 2/3 de tus propias horas, que no es el umbral de nadie: se cae al
+     ultimo valor conocido. Lo correcto es que lo mande el backend, que si tiene los 32. */
+  if(hs.length<2) return UMBRAL;
+  var media=hs.reduce(function(a,h){ return a+h; },0)/hs.length;
+  return Math.max(UMBRAL_LO, Math.min(UMBRAL_HI, UMBRAL_FRAC*media));
+}
 function _m(n){
   var x=miembro(n); if(x) return x;
   var nom=String(n||'').trim();
@@ -896,13 +915,18 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
   /* Con la forma MIEMBRO el backend solo manda identidad de los demas (nombre,
      pila, unidad, cargo): no hay puntos ni horas ajenas. Se agrega SOLO sobre
      quien trae el dato, y si no hay nadie se dice, en vez de pintar NaN. */
-  var conPts=DATA.miembros.filter(function(m){return typeof m.puntos==='number';});
-  var conH  =DATA.miembros.filter(function(m){return typeof m.hMes==='number';});
+  /* SOLO LOS ACTIVOS (decision de Daniel, 27/07). El roster son 32 con 9 de baja; contarlas
+     ponia «13 en infraccion, 41 %» cuando de esos 13 habia 7 que ya se habian ido: la cifra
+     real es 6 de 23, un 26 %. Y la media de horas subia de 17,70 a 19,70. Su historia se
+     conserva en su ficha y en el cierre; en la foto del equipo, no. */
+  var EQUIPO=_activos_();
+  var conPts=EQUIPO.filter(function(m){return typeof m.puntos==='number';});
+  var conH  =EQUIPO.filter(function(m){return typeof m.hMes==='number';});
   var media=conPts.length?conPts.reduce(function(a,m){return a+m.puntos;},0)/conPts.length:null;
   var totH =conH.reduce(function(a,m){return a+m.hMes;},0);
   var bajo =conH.filter(function(m){return m.hMes<UMBRAL;}).length;
-  var infra=DATA.miembros.filter(function(m){return m.infraccion;}).length;
-  var parcial = conH.length < DATA.miembros.length;
+  var infra=EQUIPO.filter(function(m){return m.infraccion;}).length;
+  var parcial = conH.length < EQUIPO.length;
   var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
 
   var lista = cola.length
@@ -919,7 +943,7 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
       kpi('Horas en el aire',nf(enAire,1)+'<small> h</small>','no cuentan hasta que se firmen','wa')+
       kpi('Expedientes esperándote',docsMios().length,'los firmas tú',docsMios().length?'wa':'up')+
       kpi('Bajo el umbral',bajo,'de '+conH.length+' · menos de '+nf(UMBRAL,1)+' h/mes','wa',(conH.length?(bajo/conH.length*100).toFixed(0):0)+'%')+
-      kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(infra/DATA.miembros.length*100).toFixed(0)+'%')+
+      kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(EQUIPO.length?(infra/EQUIPO.length*100).toFixed(0):0)+'%')+
     '</div>'+
     '<div style="display:grid;grid-template-columns:300px 1fr;gap:13px;align-items:start">'+
       pan('Conducta del equipo', media==null?'sin datos':('media de '+conPts.length),
@@ -948,7 +972,8 @@ function insightsHTML(){
   var xs=[];
   /* se ordena por el MISMO porcentaje que luego se imprime: si no, el rotulo nombra
      a uno y ensena un numero que no es el mayor. */
-  var conAnt=DATA.miembros.filter(function(m){ return m.hAnt!=null && m.hAnt>0; });
+  /* Tambien solo activos: «quien mas sube este mes» no puede ser alguien que se fue. */
+  var conAnt=_activos_().filter(function(m){ return m.hAnt!=null && m.hAnt>0; });
   if(conAnt.length>=2){
     var vpc=function(m){ return (m.hMes-m.hAnt)/m.hAnt*100; };
     var subida=conAnt.slice().sort(function(a,b){return vpc(b)-vpc(a);})[0];
@@ -960,7 +985,7 @@ function insightsHTML(){
   } else {
     /* no se finge una comparativa que no existe: se dice que falta el dato */
     xs.push(['wa','Todav\u00eda no hay horas del mes anterior, as\u00ed que no se puede comparar la evoluci\u00f3n.']);
-    var top=DATA.miembros.slice().sort(function(a,b){return (b.hMes||0)-(a.hMes||0);})[0];
+    var top=_activos_().slice().sort(function(a,b){return (b.hMes||0)-(a.hMes||0);})[0];
     if(top) xs.push(['up',esc(top.pila)+' es quien m\u00e1s horas lleva este mes: '+h1(top.hMes||0)+'.']);
   }
   var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
@@ -1233,9 +1258,9 @@ V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
 
 /* ── REGISTRO DEL MES ────────────────────────────────────────────────────── */
 V.registro={g:'Horas',t:'Registro del mes',f:function(){
-  /* solo entran los que traen horas: con la forma MIEMBRO el backend no sirve
-     las ajenas, y una tabla de 32 filas vacias no es un registro, es ruido. */
-  var VIS=DATA.miembros.filter(function(m){ return typeof m.hMes==='number'; });
+  /* solo entran los ACTIVOS que traen horas: con la forma MIEMBRO el backend no sirve
+     las ajenas, y una tabla de filas vacias no es un registro, es ruido. */
+  var VIS=_activos_().filter(function(m){ return typeof m.hMes==='number'; });
   if(!VIS.length) return pan('Registro del mes','sin datos',
     vac('Sin horas del equipo','Tu cuenta solo tiene acceso a tus propias horas, no a las del resto. '+
       'Si necesitas el registro completo del mes, pídeselo al Project Director.'));
@@ -1765,7 +1790,7 @@ function _cobertura_(r){
   var resp=r.resp||{};
   var cubren=Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); });
   var universo = (r.invitados&&r.invitados.length) ? r.invitados
-               : (r.tipo==='general' ? DATA.miembros.map(function(m){return m.nombre;}) : cubren);
+               : (r.tipo==='general' ? _activos_().map(function(m){return m.nombre;}) : cubren);
   /* el convocante organiza: esta exento de cubrir su propia encuesta */
   universo = universo.filter(function(n){ return n!==r.convocante; });
   var sin = universo.filter(function(n){ return cubren.indexOf(n)<0; });
@@ -1924,7 +1949,7 @@ V.miembros={g:'Equipo',t:'Miembros',f:function(){
 V.ranking={g:'Equipo',t:'Ranking',f:function(){
   /* el ranking pondera horas de temporada / meses en el equipo (decision cerrada).
      Sin esos dos campos no hay ranking que valga: se dice, no se finge. */
-  var VIS=DATA.miembros.filter(function(m){ return typeof m.horasTemp==='number' && m.meses; });
+  var VIS=_activos_().filter(function(m){ return typeof m.horasTemp==='number' && m.meses; });
   if(!VIS.length) return pan('Ranking','sin datos',
     vac('Sin horas del equipo','El ranking se calcula con las horas de temporada de cada uno y tu cuenta solo '+
       've las tuyas. Si necesitas el ranking completo, pídeselo al Project Director.'));
@@ -2185,6 +2210,7 @@ function _aplicarPanel_(pnl){
     if(m.hMes==null && typeof m.horasMes==='number') m.hMes=m.horasMes;
   });
   _rederivarCargos_();
+  UMBRAL=_umbral_();      // despues de traducir horasMes->hMes, que es de donde sale
 }
 function _aplicarBootstrap_(boot){
   _aplicarPanel_(boot.panel);
