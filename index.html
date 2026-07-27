@@ -945,6 +945,23 @@ function esAdmin(){ return !!(SESION && SESION.email && String(SESION.email).toL
    invitar, ni sancionar, ni otorgar horas, ni «ver como». Antes cada sitio se lo filtraba
    por su cuenta y donde nadie lo escribio salia la lista entera. */
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
+/* GEMELA. LAS HORAS DE ESTE MES, de verdad.
+
+   `horasMes` viene del campo de Notion «Horas empleadas (este mes)» y NO son las de este
+   mes: cuadra con la suma de los componentes del mes en 5 personas de 32, y con
+   `horasTemp/meses` -la media de la temporada- en las 32. Medias del equipo: 17,70 h el
+   campo, 12,56 h julio de verdad. El fallo es de la FORMULA DE NOTION, no de la app; aqui
+   solo se deja de repetirlo.
+
+   `horasMesReal` lo calcula `flujos/umbral.py` (horas de temporada menos la suma de los
+   meses ya cerrados) y coincide con los componentes de Notion en 32 de 32.
+
+   Sin `horasMesReal` (backend viejo) se cae a la media, pero DICIENDOLO. */
+function _hMesReal_(m){
+  m = m || {};
+  return (typeof m.hMesReal==='number') ? m.hMesReal
+       : (typeof m.horasMesReal==='number') ? m.horasMesReal : null;
+}
 /* GEMELA (la otra cara: misma funcion, mismo nombre).
    EL UMBRAL NO ES UNA CONSTANTE. `reglas/cuota.py` lo define asi:
        umbral = max(8, min(15, (2/3) x media de horas del mes del equipo))
@@ -1082,6 +1099,11 @@ function _aplicarPanel_(pnl){
   /* Los ingredientes del umbral: medias mensuales de la temporada y la del mes
      abierto. El peso del dia lo pone `_umbral_()` al calcular, no el backend. */
   if(pnl.umbral) DATA.umbral=pnl.umbral;
+  /* El backend habla largo (`horasMesReal`) y la vista lee corto (`hMesReal`), igual que
+     con horasMes->hMes. Sin esta traduccion el dato llega y no se ve. */
+  (DATA.miembros||[]).forEach(function(m){
+    if(m.hMesReal==null && typeof m.horasMesReal==='number') m.hMesReal=m.horasMesReal;
+  });
   if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length) DATA.subsistemas=pnl.subsistemas;
   var yo=null;
   if(pnl.yo){                                              // forma MIEMBRO
@@ -2114,9 +2136,13 @@ function vEstado(){
 
   return '<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>'+
     av+
-    '<div class="tarj">'+cab('Horas del mes', (typeof YO.horasMes==='number')?'Panel de Rendimientos':'objetivo '+nf(UMBRAL,1)+' h')+
-      '<div class="cifh"><span class="g" id="gEstado">'+nf2((typeof YO.horasMes==='number')?YO.horasMes:sumaE('otor'))+'</span>'+
-      '<span class="sc">h '+((typeof YO.horasMes==='number')?'empleadas este mes':'que cuentan')+'</span>'+
+    /* El numero grande son las horas de ESTE MES cuando se saben; si no, la media de la
+       temporada, y entonces la etiqueta lo dice. Antes ponia «empleadas este mes» sobre la
+       media, que es de lo poco que un miembro puede comprobar a mano. */
+    '<div class="tarj">'+cab(_hMesReal_(YO)!=null?'Horas de este mes':((typeof YO.horasMes==='number')?'Horas por mes':'Horas del mes'),
+        _hMesReal_(YO)!=null?'Panel de Rendimientos':((typeof YO.horasMes==='number')?'media de la temporada':'objetivo '+nf(UMBRAL,1)+' h'))+
+      '<div class="cifh"><span class="g" id="gEstado">'+nf2(_hMesReal_(YO)!=null?_hMesReal_(YO):((typeof YO.horasMes==='number')?YO.horasMes:sumaE('otor')))+'</span>'+
+      '<span class="sc">h '+(_hMesReal_(YO)!=null?'este mes':((typeof YO.horasMes==='number')?'de media al mes':'que cuentan'))+'</span>'+
       (sumaE('pend')?'<span class="pil pend" style="margin-left:auto">+'+nf2(sumaE('pend'))+' h pend.</span>':'')+'</div>'+
       barraHorasHTML('barEstado')+
     '</div>'+
