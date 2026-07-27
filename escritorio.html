@@ -1798,8 +1798,12 @@ function _minHM_(v){
   var p=String(t==null?'':t).split(':');
   return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
 }
-function _hmMin_(m){ m=(+m||0); var p=function(x){ return (x<10?'0':'')+x; };
-  return p(Math.floor(m/60)%24)+':'+p(m%60); }
+/* GEMELA del movil, byte a byte. Tenia un `p` propio en vez de `pad` -que aqui no
+   existia-, asi que las dos copias habian divergido en el cuerpo aunque hicieran lo
+   mismo. Ya no: si tocas una, toca la otra. */
+function _hmMin_(m){                       // minutos -> 'HH:MM'
+  m=(+m||0); return pad(Math.floor(m/60)%24)+':'+pad(m%60);
+}
 function _horasHM_(v){ return _minHM_(v)/60; }
 /* ═══ GEMELA · existe una copia IDENTICA en movil.html. Si tocas una, toca la otra. ═══
    Ordena las franjas por hora y REMAPEA el indice de franja de cada bloque. El ORDEN DE
@@ -1835,6 +1839,13 @@ function _calorDe_(r, pond){
 }
 /* etiqueta de franja: el dato real las trae como {ini,dur}; la semilla, como string */
 function _iniF(f){ return (f&&typeof f==='object') ? String(f.ini||'') : String(f||''); }
+/* GEMELAS del movil (mismo nombre, mismo cuerpo). La CSP no deja compartir codigo entre los
+   dos artefactos, asi que copia identica es lo maximo honesto: si tocas una, toca la otra.
+   OJO: `pad` tambien hacia falta y aqui no estaba — copiar una funcion sin sus dependencias
+   rompio la vista de Disponibilidad entera («pad is not defined»). */
+function pad(n){return String(n).padStart(2,'0');}
+function _duF(f){ return (f&&typeof f==='object') ? (+f.dur||60) : 60; }
+function _mcdM_(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; }
 /* ═══════════════════════════════════════════════════════════════════════════
    EL MÍNIMO EXIGIDO · Reforma §P3. No es una heurística: es una regla del PD.
    25 % de los bloques ofertados en MAYO–AGOSTO y DICIEMBRE–ENERO; 30 % el resto.
@@ -1897,16 +1908,69 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
     if(hib) g+='<div class="decs" style="margin-bottom:9px">'+
       '<button data-pond="0" class="'+(pondOn?'':'on')+'">Personas</button>'+
       '<button data-pond="1" class="'+(pondOn?'on':'')+'">Ponderada</button></div>';
-    g+='<div class="heat"><div class="hg" style="grid-template-columns:auto repeat('+r.franjas.length+',minmax(28px,1fr))">';
+    /* EJE DE TIEMPO, no una columna por franja (portado del movil, 27/07).
+
+       `repeat(nFranjas)` solo es cierto si todas duran lo mismo y van seguidas, y no es el
+       caso: las reuniones de antes del modelo de slot traen franjas de 60 min SOLAPADAS cada
+       30. Con columnas iguales, una franja de 30 min ocupaba lo mismo que una de 2 h y el
+       mapa mentia sobre el tiempo — que es justo lo unico que se le pide.
+
+       El eje se trocea en pasos finos, pero la FRANJA NO SE TROCEA: cada una es una celda
+       con `span k`, ancha lo que dura, con su numero una vez. (Trocearla ponia el numero
+       solo donde arranca y salia «3 · 3 · 3 ·», como si en la mitad no pudiera nadie.) */
+    var _fj={};
+    (r.fijadaBl||[]).forEach(function(b){
+      var f=r.franjas[b[1]]; if(!f) return;
+      var a=_minHM_(f), z=a+_duF(f), q=_fj[b[0]];
+      _fj[b[0]] = q ? [Math.min(q[0],a), Math.max(q[1],z)] : [a,z];
+    });
+    /* La fijada se pinta por RANGO DE MINUTOS y no por indice de franja: con franjas que se
+       solapan, el indice no identifica un rato. Le paso al movil y no se veia. */
+    var _esFij=function(di,t,hasta){ var q=_fj[di]; return !!q && t>=q[0] && hasta<=q[1]; };
+    var _paso=0; r.franjas.forEach(function(f){ _paso=_mcdM_(_paso,_minHM_(f)); _paso=_mcdM_(_paso,_duF(f)); });
+    _paso=Math.max(15, Math.min(60, _paso||60));
+    var _t0=Math.min.apply(null, r.franjas.map(_minHM_));
+    var _t1=Math.max.apply(null, r.franjas.map(function(f){ return _minHM_(f)+_duF(f); }));
+    var _eje=[]; for(var _t=_t0; _t<_t1; _t+=_paso) _eje.push(_t);
+    /* que franja OFERTADA cubre cada instante de cada dia (-1 = ninguna) */
+    var _cubre=r.dias.map(function(_,di){
+      return _eje.map(function(t){
+        for(var fi=0; fi<r.franjas.length; fi++){
+          if(r.calor[di][fi]==null) continue;
+          var a=_minHM_(r.franjas[fi]);
+          if(t>=a && t<a+_duF(r.franjas[fi])) return fi;
+        }
+        return -1;
+      });
+    });
+    g+='<div class="heat"><div class="hg" style="grid-template-columns:auto repeat('+_eje.length+',minmax(20px,1fr))">';
     g+='<div class="hc"></div>';
-    r.franjas.forEach(function(f){ g+='<div class="hc rh"><span>'+_iniF(f).replace(':00','')+'</span></div>'; });
+    /* etiqueta al LIMITE izquierdo (= hora de inicio) y solo en punto: decision cerrada. */
+    _eje.forEach(function(t){
+      g+='<div class="hc rh">'+((t%60===0)?'<span>'+pad(Math.floor(t/60)%24)+'</span>':'')+'</div>';
+    });
     r.dias.forEach(function(d,di){
       g+='<div class="hc rd">'+d+'</div>';
-      r.calor[di].forEach(function(v,fi){
-        if(v==null){ g+='<div class="cel" style="background:transparent"></div>'; return; }  // no ofertada
-        var a=max?(0.12+0.88*v/max).toFixed(3):'0.12';
-        g+='<div class="cel'+((di===best.d&&fi===best.f)?' best':'')+'" style="background:rgba(228,30,37,'+a+')">'+v+'</div>';
-      });
+      var ix=0;
+      while(ix<_eje.length){
+        var fi=_cubre[di][ix], k=1;
+        while(ix+k<_eje.length && _cubre[di][ix+k]===fi) k++;      // hasta donde llega la franja
+        var _ta=_eje[ix], _tz=(ix+k<_eje.length? _eje[ix+k] : _t1);
+        var geo='grid-column:span '+k;
+        if(fi<0){
+          /* Fuera del horario de ese dia... salvo que ahi este la FIJADA, que es una
+             decision y tiene que verse aunque esa franja no se ofertara. */
+          if(_esFij(di,_ta,_tz)) g+='<div class="cel" title="reuni\u00f3n fijada" style="'+geo+';background:rgba(53,199,89,.85)"></div>';
+          else g+='<div class="cel" style="'+geo+';background:transparent"></div>';
+        } else {
+          var v=r.calor[di][fi], a=max?(0.12+0.88*v/max).toFixed(3):'0.12';
+          var fij=_esFij(di,_ta,_tz);
+          g+='<div class="cel'+((di===best.d&&fi===best.f)?' best':'')+'" title="'+
+            _hmMin_(_minHM_(r.franjas[fi]))+'\u2013'+_hmMin_(_minHM_(r.franjas[fi])+_duF(r.franjas[fi]))+' \u00b7 '+v+'" style="'+geo+';'+
+            'background:'+(fij?'rgba(53,199,89,.85)':'rgba(228,30,37,'+a+')')+'">'+v+'</div>';
+        }
+        ix+=k;
+      }
     });
     g+='</div></div>';
     g+='<div class="nota" style="margin-top:7px">'+(pondOn
