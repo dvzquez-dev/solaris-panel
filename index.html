@@ -219,6 +219,20 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
    (#3EB489): las encendidas son #FF4A4F, un rojo MUY brillante, y al lado un verde oscuro
    se ve apagado aunque tenga la misma forma. No es un color nuevo: ya esta en la paleta. */
 .med.aura .tk.cierra{stroke:#7BE3BE}
+/* EL DESTELLO, A JUEGO. `chispazo` acaba en ROJO, asi que con el aura puesta cada barrita
+   destellaba en rojo y saltaba a azul: se veia mal. Cada una destella ahora hacia SU color,
+   asi que al encenderse en orden se ve la cadena entera. Van despues de las de color a
+   proposito: misma especificidad, gana la de abajo. */
+.med.aura .tk.chispa{animation:chispazoAzul .5s var(--sal)}
+.med.aura .tk.chispa.cierra{animation:chispazoVerde .5s var(--sal)}
+@keyframes chispazoAzul{
+  0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 14px var(--tel))}
+  55%{stroke:#9BD4F0;stroke-width:2.2;filter:drop-shadow(0 0 7px var(--tel))}
+  100%{stroke:var(--tel);stroke-width:1.7;filter:none}}
+@keyframes chispazoVerde{
+  0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 10px #fff) drop-shadow(0 0 16px #7BE3BE)}
+  55%{stroke:#BFF5E2;stroke-width:2.2;filter:drop-shadow(0 0 8px #7BE3BE)}
+  100%{stroke:#7BE3BE;stroke-width:1.7;filter:none}}
 .med .tip{position:absolute;inset:0;transform:rotate(0deg);pointer-events:none;
   transition:transform .8s var(--arco)}
 .med .tip i{position:absolute;left:50%;top:2px;margin-left:-8px;width:16px;height:16px;display:block;
@@ -229,10 +243,8 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .med .mid .n{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:-.045em;line-height:1}
 .med .mid .n small{font-size:16px;color:var(--ink3);letter-spacing:-.02em}
 .med .mid .u{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:var(--ink3);margin-top:5px}
-.pips{display:flex;gap:4px;margin-top:13px;width:100%}
-.pips i{flex:1;height:4px;border-radius:2px;background:#2C2527;display:block}
-.pips i.on{background:var(--ok);box-shadow:0 0 7px rgba(62,180,137,.5)}
-.pips i.zc{background:var(--warn);box-shadow:0 0 7px rgba(232,145,46,.5)}
+/* `.pips` (la linea de puntitos bajo el medidor) se retiro el 27/07: repetia lo que ya dice
+   el anillo. Si algun dia vuelve, esta en el historial. */
 .medley{margin-top:11px;font-size:11.5px;color:var(--ink2);text-align:center;line-height:1.5}
 .medley b{color:var(--ink)}
 .libro{overflow:hidden;height:0;transition:height .42s var(--sal)}
@@ -1713,7 +1725,9 @@ function medidorHTML(){
       '<div class="tip" id="medTip" style="transform:rotate('+giro+'deg)"><i><svg viewBox="0 0 24 24"><use href="#es"/></svg></i></div>'+
       '<div class="mid"><div class="n mono"><span id="medN">0</span><small>/10</small></div></div>'+
     '</div>'+
-    '<div class="pips" id="pips">'+new Array(11).join('<i></i>')+'</div>'+
+    /* La linea de puntitos se retiro (Daniel, 27/07): con el medidor circular basta. Decia
+       lo mismo dos veces y encima en horizontal, que es la lectura que el anillo evita. */
+
     '<div class="medley">'+
       (est==='elegible'?'<b>Elegible.</b>':est==='evaluacion'?'<b style="color:var(--red2)">En evaluación.</b>':'<b>Sin expediente.</b>')+
       (p>3
@@ -1731,17 +1745,35 @@ function medidorHTML(){
       '<small>Aquí aparece cada subida o bajada de puntos, con su artículo y su fecha.</small></span></div>')+
   '</div></div>';
 }
-var medTimers=[];
-function armarMedidor(){
+var medTimers=[], _medArmado_=null;
+/* EL MEDIDOR NO SE REARMA SI NO HA CAMBIADO NADA. Cada `pintar()` rebobinaba el anillo a
+   cero y volvia a encenderlo tramo a tramo, asi que CUALQUIER repintado -el de los datos
+   que llegan despues del login, el refresco de fondo- se veia como si la pagina se
+   recargara sola. (Daniel: «se sigue recargando... una segunda vez la pagina principal».)
+   La animacion es para cuando la cifra CAMBIA, que es cuando cuenta algo. */
+function armarMedidor(forzar){
   var med=$('#med'); if(!med) return;
-  medTimers.forEach(clearTimeout); medTimers=[];
   var p=YO.puntos, giro=p*MSTEP-MGAP/2+MTIP;
+  var firma=String(p)+'|'+((YO&&YO.nombre)||'');
+  var tip0=$('#medTip'), num0=$('#medN');
+  /* OJO: `pintar()` reconstruye `#main`, asi que el medidor es un elemento NUEVO en cada
+     repintado y no vale con mirar si ya estaba armado. Lo que se compara es la CIFRA: si
+     no ha cambiado, se pinta ya montado, sin rebobinar ni encender tramo a tramo. */
+  if(!forzar && _medArmado_===firma){
+    medTimers.forEach(clearTimeout); medTimers=[];
+    med.classList.add('arm');
+    if(num0) num0.textContent=p;
+    if(tip0){ tip0.style.transition='none'; tip0.style.transform='rotate('+giro+'deg)';
+      void med.offsetWidth; tip0.style.transition=''; }
+    return;
+  }
+  _medArmado_=firma;
+  medTimers.forEach(clearTimeout); medTimers=[];
   var tip=$('#medTip'), num=$('#medN');
   /* rebobinado instantáneo, para que solo el ARMADO vaya escalonado */
   med.classList.remove('arm');
   $$('.seg.on',med).forEach(function(s){s.style.transition='none';s.classList.remove('fog');});
   $$('.tk',med).forEach(function(t){t.classList.remove('chispa');});
-  $$('#pips i').forEach(function(el){el.classList.remove('on','zc');});
   if(tip){tip.style.transition='none';tip.style.transform='rotate(0deg)';}
   if(num) num.textContent='0';
   void med.offsetWidth;
@@ -1752,7 +1784,6 @@ function armarMedidor(){
     med.classList.add('arm');
     if(num) num.textContent=p;
     if(tip) tip.style.transform='rotate('+giro+'deg)';
-    $$('#pips i').forEach(function(el,i){ if(i<p) el.classList.add(i<3?'zc':'on'); });
     return;
   }
   med.classList.add('arm');
@@ -1765,7 +1796,6 @@ function armarMedidor(){
         var t=$('.tk[data-i="'+k+'"]',med);
         if(t){ t.classList.remove('chispa'); void t.getBoundingClientRect(); t.classList.add('chispa'); }
         if(num) num.textContent=k+1;
-        var pip=$$('#pips i')[k]; if(pip) pip.classList.add(k<3?'zc':'on');
       }, 140+k*78));
     })(k);
   }
