@@ -1745,30 +1745,14 @@ function medidorHTML(){
       '<small>Aquí aparece cada subida o bajada de puntos, con su artículo y su fecha.</small></span></div>')+
   '</div></div>';
 }
-var medTimers=[], _medArmado_=null;
-/* EL MEDIDOR NO SE REARMA SI NO HA CAMBIADO NADA. Cada `pintar()` rebobinaba el anillo a
-   cero y volvia a encenderlo tramo a tramo, asi que CUALQUIER repintado -el de los datos
-   que llegan despues del login, el refresco de fondo- se veia como si la pagina se
-   recargara sola. (Daniel: «se sigue recargando... una segunda vez la pagina principal».)
-   La animacion es para cuando la cifra CAMBIA, que es cuando cuenta algo. */
-function armarMedidor(forzar){
+var medTimers=[];
+/* LA SECUENCIA DE ARMADO SE QUEDA, SIEMPRE. La quite para matar un «parece que se recarga»
+   y me carge lo que a Daniel mas le gustaba del medidor: los tramos encendiendose en orden.
+   Si el repintado molesta, se arregla repintando menos, NO apagando la animacion. */
+function armarMedidor(){
   var med=$('#med'); if(!med) return;
-  var p=YO.puntos, giro=p*MSTEP-MGAP/2+MTIP;
-  var firma=String(p)+'|'+((YO&&YO.nombre)||'');
-  var tip0=$('#medTip'), num0=$('#medN');
-  /* OJO: `pintar()` reconstruye `#main`, asi que el medidor es un elemento NUEVO en cada
-     repintado y no vale con mirar si ya estaba armado. Lo que se compara es la CIFRA: si
-     no ha cambiado, se pinta ya montado, sin rebobinar ni encender tramo a tramo. */
-  if(!forzar && _medArmado_===firma){
-    medTimers.forEach(clearTimeout); medTimers=[];
-    med.classList.add('arm');
-    if(num0) num0.textContent=p;
-    if(tip0){ tip0.style.transition='none'; tip0.style.transform='rotate('+giro+'deg)';
-      void med.offsetWidth; tip0.style.transition=''; }
-    return;
-  }
-  _medArmado_=firma;
   medTimers.forEach(clearTimeout); medTimers=[];
+  var p=YO.puntos, giro=p*MSTEP-MGAP/2+MTIP;
   var tip=$('#medTip'), num=$('#medN');
   /* rebobinado instantáneo, para que solo el ARMADO vaya escalonado */
   med.classList.remove('arm');
