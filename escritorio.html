@@ -405,7 +405,12 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
       <div class="yo"><span class="av" id="yoAv">LC</span>
         <span><span class="n" id="yoN">Lois Carballo</span><br><span class="rl" id="yoR">Project Director</span></span></div>
       <!-- `cerrarSesion()` existia desde el principio y no la invocaba nadie: no habia forma de salir. -->
-      <button id="btnSalir" title="Cerrar sesión" style="background:none;border:1px solid var(--line);border-radius:9px;color:var(--ink3);font:inherit;font-size:11.5px;padding:6px 11px;cursor:pointer;margin-left:10px">Salir</button>
+      <button id="btnMenu" aria-label="Más opciones" style="background:none;border:1px solid var(--line);border-radius:9px;color:var(--ink2);width:32px;height:32px;cursor:pointer;margin-left:10px;font-size:15px">⋮</button>
+      <div id="menuE" hidden style="position:absolute;top:52px;right:18px;min-width:200px;background:#141212;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.55);z-index:900">
+        <button data-mnu="ajustes" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Ajustes</button>
+        <button data-mnu="buzon" disabled style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink3);font:inherit;font-size:13px;padding:12px 14px;text-align:left">Buzón · todavía no montado</button>
+        <button data-mnu="salir" style="display:block;width:100%;background:none;border:0;color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Cerrar sesión</button>
+      </div>
     </div>
   </header>
 
@@ -1945,9 +1950,26 @@ function _arrancarGis_(){
     setTimeout(function(){ esperar(n-1); },150);
   })(40);
 }
+/* Lo que no es tarea diaria (ajustes, buzon, cerrar sesion) va al menu de los tres
+   puntos, no suelto en la cabecera ni en la barra lateral, que ya va cargada. */
 function _cablearSalir_(){
-  var b=document.getElementById('btnSalir');
-  if(b && !b._ok){ b._ok=1; b.onclick=function(){ cerrarSesion(); }; }
+  var b=document.getElementById('btnMenu'), m=document.getElementById('menuE');
+  if(b && m && !b._ok){
+    b._ok=1;
+    b.onclick=function(ev){ ev.stopPropagation(); m.hidden=!m.hidden; };
+    document.addEventListener('click', function(){ if(!m.hidden) m.hidden=true; });
+    m.addEventListener('click', function(ev){ ev.stopPropagation(); });
+    [].slice.call(m.querySelectorAll('[data-mnu]')).forEach(function(x){
+      x.onclick=function(){
+        m.hidden=true;
+        if(x.dataset.mnu==='salir'){ cerrarSesion(); return; }
+        if(x.dataset.mnu==='ajustes'){
+          tost('Sesión de '+((SESION&&SESION.email)||ACTOR||'—')+
+               ' · temporada '+((DATA&&DATA.temporada)||'—'));
+        }
+      };
+    });
+  }
 }
 function cerrarSesion(){
   SESION=null;
