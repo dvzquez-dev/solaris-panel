@@ -695,6 +695,7 @@ function docsMios(){return DOCS.filter(function(d){return d.est==='revision' && 
 
 /* ── DISCIPLINA ────────────────────────────────────────────────────────── */
 var SANC_BACK=null;   /* cola real de sanciones del backend; null = semilla ficticia */
+var LOTES_PEND=[], LOTE_SEL=0;   /* todos los bloques pendientes, y cual se esta mirando */
 var PART_BACK=null;   /* cola real de partes de horas del backend; null = semilla ficticia */
 var LOTE={nombre:'Formulario de O&M · 25/07',motivo:'No rellenar el formulario de O&M para la publicación del 25/07',
   art:'30g',cerrado:false,items:[
@@ -1301,6 +1302,68 @@ function rangoLote(){
   if(avisos) t += (t?' · ':'')+avisos+' aviso'+(avisos===1?'':'s');
   return t;
 }
+/* ── Sanciones sueltas e historial ────────────────────────────────────────────
+   El backend las sirve desde siempre y el panel no las pintaba: se podia dejar a
+   alguien sancionado sin que nadie lo viera. Las sueltas no son un bloque (cada una
+   tiene su motivo y su articulo), asi que van en su propia tabla. */
+function _sancSueltas_(){
+  if(!Array.isArray(SANC_BACK)) return [];
+  return SANC_BACK.filter(function(s){ return s.estado==='pendiente' && !s.lote; });
+}
+function _sancHist_(){
+  if(!Array.isArray(SANC_BACK)) return [];
+  return SANC_BACK.filter(function(s){ return s.estado && s.estado!=='pendiente'; })
+    .sort(function(a,b){ return String(b.creado_at||'').localeCompare(String(a.creado_at||'')); });
+}
+function _selectorLotes_(){
+  if(LOTES_PEND.length<2) return '';
+  return '<div class="pb" style="padding-bottom:0"><label style="display:block">'+
+    '<span class="sc" style="display:block;margin-bottom:5px">Hay '+LOTES_PEND.length+' bloques pendientes</span>'+
+    '<select id="loteSel" style="width:100%;max-width:340px;background:#0A0909;border:1px solid var(--line);'+
+    'border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
+    LOTES_PEND.map(function(l,i){
+      return '<option value="'+i+'"'+(i===LOTE_SEL?' selected':'')+'>'+esc(l)+'</option>'; }).join('')+
+    '</select></label></div>';
+}
+function _panelSueltas_(){
+  var ss=_sancSueltas_();
+  if(!ss.length) return pan('Sanciones sueltas','ninguna',
+    vac('No hay sanciones sueltas','Las que no van en bloque —cada una con su motivo y su artículo— aparecen aquí.'));
+  return pan('Sanciones sueltas', ss.length+'',
+    tabla([['Persona'],['Motivo'],['Art.',0],['Puntos',1],['']],
+      ss.map(function(s){
+        var m=_m(s.nombre);
+        return '<tr><td>'+esc((m&&m.pila)||s.nombre)+'</td>'+
+          '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
+          '<td class="mono" style="color:var(--ink3)">'+esc(s.articulo||'libre')+'</td>'+
+          '<td class="r mono '+((+s.puntos||0)<0?'dn':'')+'">'+(Number(s.puntos)||0)+'</td>'+
+          '<td class="r"><span class="decs" data-sid="'+s.id+'">'+
+            '<button data-sdec="aprobar">Aplica</button>'+
+            '<button data-sdec="justificar">Justifica</button>'+
+            '<button data-sdec="rechazar">Rechaza</button>'+
+          '</span></td></tr>';
+      }).join(''))+
+    '<div class="nota">Cada suelta se decide por su cuenta: no comparten motivo ni comunicado.</div>');
+}
+function _panelHistSanc_(){
+  var hs=_sancHist_();
+  if(!hs.length) return pan('Historial','vacío',
+    vac('Todavía no hay sanciones resueltas','Cada una que apruebes, justifiques o rechaces queda aquí con su decisión.'));
+  return pan('Historial', hs.length+'',
+    tabla([['Persona'],['Motivo'],['Estado',0],['Puntos',1],['Cuándo',1]],
+      hs.slice(0,40).map(function(s){
+        var m=_m(s.nombre);
+        var et={aplicada:'aplicada',aprobada:'aprobada',justificada:'justificada',
+                rechazada:'rechazada',revocada:'revocada'}[s.estado]||s.estado;
+        var tono=(s.estado==='rechazada'||s.estado==='revocada')?'dn':(s.estado==='aplicada'?'up':'');
+        return '<tr><td>'+esc((m&&m.pila)||s.nombre)+'</td>'+
+          '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
+          '<td class="mono '+tono+'">'+esc(et)+'</td>'+
+          '<td class="r mono">'+(Number(s.puntos)||0)+'</td>'+
+          '<td class="r mono" style="color:var(--ink3)">'+esc(String(s.creado_at||'').slice(0,10))+'</td></tr>';
+      }).join(''))+
+    (hs.length>40?'<div class="nota">Se muestran las 40 más recientes de '+hs.length+'.</div>':''));
+}
 V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
   var c={aceptar:0,justificar:0,rechazar:0};
   LOTE.items.forEach(function(x){c[x.dec]++;});
@@ -1331,10 +1394,13 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
         '<em>Marcar no aplica nada: no se sanciona a nadie hasta que cierras el bloque entero.</em></div>'+
         '<button class="btn pri" data-lote>Aprobar el bloque · '+c.aceptar+' sanciones</button></div>'+
       '</div></div>';
-  return pan('Bloque abierto · '+esc(LOTE.nombre),'RRI Título VII',cuerpo,'destaca')+
+  return _selectorLotes_()+
+    pan('Bloque abierto · '+esc(LOTE.nombre),'RRI Título VII',cuerpo,'destaca')+
     '<div class="pan"><div class="nota"><b>Modificar</b> corrige el artículo o los puntos de una persona antes '+
     'de cerrar. El <b>motivo y el artículo son comunes a todo el bloque</b>: no se cambian fila a fila, y por eso '+
-    'sale un único comunicado.</div></div>';
+    'sale un único comunicado.</div></div>'+
+    _panelSueltas_()+
+    _panelHistSanc_();
 }};
 V.apela={g:'Disciplina',t:'Apelaciones',f:function(){
   return pan('Apelaciones abiertas',APELA.length+'',
@@ -1812,7 +1878,10 @@ function _loteReal_(){
   if(!Array.isArray(SANC_BACK)) return;                                   // sin backend
   var pend=SANC_BACK.filter(function(s){ return s.estado==='pendiente' && s.lote; });
   if(!pend.length) return;                                                // nada agrupado
-  var lote=pend[0].lote;                                                   // primer bloque
+  /* Antes se cogia SIEMPRE `pend[0].lote`: con dos bloques, el segundo no existia para
+     el panel. Ahora se listan todos y se puede cambiar de uno a otro. */
+  LOTES_PEND=[]; pend.forEach(function(x){ if(LOTES_PEND.indexOf(x.lote)<0) LOTES_PEND.push(x.lote); });
+  var lote=LOTES_PEND[Math.min(LOTE_SEL, LOTES_PEND.length-1)] || LOTES_PEND[0];
   var its=pend.filter(function(s){ return s.lote===lote; });
   LOTE={ real:true, lote:lote, nombre:lote, cerrado:false,
     motivo:its[0].motivo||'—', art:its[0].articulo||'libre',
@@ -1963,6 +2032,32 @@ function _pintarPie_(){
 function pintar(){
   _pintarPie_();
   _cablearSalir_();
+  /* Decidir una SUELTA. A diferencia del bloque, aqui no hay borrador: se aplica al
+     momento, porque cada una tiene su motivo y su comunicado. Por eso se pide confirmar. */
+  $$('[data-sid] [data-sdec]').forEach(function(b){
+    b.onclick=async function(){
+      var id=+b.parentNode.dataset.sid, acc=b.dataset.sdec;
+      var s=(SANC_BACK||[]).filter(function(x){ return x.id===id; })[0]; if(!s) return;
+      if(!backendOK||!SESION){ tost('Sin conexión no se puede decidir.'); return; }
+      var eti={aprobar:'aplicar',justificar:'justificar',rechazar:'rechazar'}[acc]||acc;
+      var m=_m(s.nombre);
+      var aviso='¿Seguro que quieres '+eti+' la sanción de '+((m&&m.pila)||s.nombre)+'?'
+        + String.fromCharCode(10) + (s.motivo||'')
+        + String.fromCharCode(10,10) + 'Esto se aplica ya, no es un borrador.';
+      if(!confirm(aviso)) return;
+      var just=null;
+      if(acc==='justificar'){ just=prompt('Motivo de la justificación:'); if(!just) return; }
+      b.disabled=true;
+      try{
+        await api.decidirSancion(id, acc, just?{justificacion:just}:{});
+        s.estado = acc==='aprobar'?'aplicada':(acc==='justificar'?'justificada':'rechazada');
+        tost('Sanción '+s.estado+'.'); pintar();
+      }catch(e){ b.disabled=false; tost('No se pudo: '+((e&&e.message)||e)); }
+    };
+  });
+  /* cambiar de bloque pendiente */
+  var _ls=$('#loteSel');
+  if(_ls) _ls.onchange=function(){ LOTE_SEL=+_ls.value||0; _loteReal_(); pintar(); };
   /* fijar fecha / orden del dia: api.fijar y api.setOrdenDia existian y no las llamaba nadie */
   var _rs=$('#reSel');
   if(_rs) _rs.onchange=function(){ RE_SEL=+_rs.value||0; pintar(); };
