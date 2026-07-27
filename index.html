@@ -165,6 +165,18 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .med.arm .seg.on.fog{stroke-width:11.5}
 .med .halo{fill:none;stroke-width:10;opacity:.26;filter:blur(6px)}
 .med.late .halo{animation:latido 2.8s ease-in-out infinite}
+/* AURA de elegible: el anillo respira y suelta un halo alrededor. Solo cuando lo eres;
+   si estuviera siempre, dejaria de significar nada. Se apaga con reduced-motion. */
+.med.aura .halo{opacity:.5;stroke-width:13;animation:auralatido 2.2s ease-in-out infinite}
+.med.aura::after{content:'';position:absolute;inset:-14px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(62,180,137,.22),rgba(63,158,214,.13) 62%,transparent 74%);
+  animation:aurapulso 2.2s ease-in-out infinite}
+.med.aura .tk.f{stroke:var(--tel)}
+@keyframes auralatido{0%,100%{opacity:.42;stroke-width:11}50%{opacity:.72;stroke-width:15}}
+@keyframes aurapulso{0%,100%{opacity:.55;transform:scale(.97)}50%{opacity:1;transform:scale(1.04)}}
+@media (prefers-reduced-motion:reduce){
+  .med.aura .halo,.med.aura::after{animation:none}
+}
 /* las marcas: una por tramo, FUERA del anillo. Al prender su tramo, chispean. */
 .med .tk{stroke:var(--line2);stroke-width:1.7;stroke-linecap:round;transition:stroke .25s linear}
 .med .tk.f{stroke:var(--red2)}
@@ -981,14 +993,16 @@ function _normTurnoM_(t, ix){
    que ya habia: nunca una pantalla vacia por un refresco lento. */
 async function _refrescarEnSegundoPlano_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
-  try{
-    var t=await api.getTurnos();
-    if(Array.isArray(t) && t.length){ TURNOS.length=0; t.forEach(function(x,i){ TURNOS.push(_normTurnoM_(x,i)); }); pintar(); }
-  }catch(_){}
-  try{
-    var q=await api.getTareas();
-    if(Array.isArray(q) && q.length){ TAREAS.length=0; q.forEach(function(x){ TAREAS.push(x); }); pintar(); }
-  }catch(_){}
+  /* Las dos a la vez y UN solo repintado. Antes iban en serie y cada respuesta repintaba
+     por su cuenta: dos reconstrucciones de `#main` mas, encima de las del login. */
+  var _t=api.getTurnos().then(function(t){
+    if(Array.isArray(t) && t.length){ TURNOS.length=0; t.forEach(function(x,i){ TURNOS.push(_normTurnoM_(x,i)); }); }
+  }).catch(function(){});
+  var _q=api.getTareas().then(function(q){
+    if(Array.isArray(q) && q.length){ TAREAS.length=0; q.forEach(function(x){ TAREAS.push(x); }); }
+  }).catch(function(){});
+  await Promise.all([_t,_q]);
+  _repintarSuave_();
 }
 function _aplicarBootstrapMovil_(boot){
   boot=boot||{};
@@ -1192,11 +1206,14 @@ async function _onCredencial_(resp,_silente){
     if(typeof MOVS!=='undefined') MOVS.length=0;
     _pintarCabecera_();                                    // la cabecera muestra al miembro (real o «visto como»)
     pintar();
-    /* Las cuatro que faltan, a la vez y sin bloquear. Cada una repinta al llegar; si una
-       falla, las otras siguen -antes una sola caida dejaba el login colgado-. */
-    _cargarMisPartes_().then(pintar);
-    _cargarFichajeAbierto_().then(pintar);
-    _cargarReunionesM_().then(pintar);
+    /* Las que faltan van a la vez y sin bloquear, pero se repinta UNA SOLA VEZ al final.
+       Con un `pintar()` por carga, la pantalla se rehacia tres veces seguidas nada mas
+       entrar: como `pintar()` reconstruye `#main`, cada repintado pierde el scroll y lo que
+       tuvieras abierto, y se ve como si la app se recargara sola. (Daniel: «te hace refresh
+       y se buguea la vista».) Ninguna espera a las otras para cargar; solo se junta el
+       repintado. Y si una falla, `Promise.all` no se cae: cada una ya traga su error. */
+    Promise.all([_cargarMisPartes_(), _cargarFichajeAbierto_(), _cargarReunionesM_()])
+      .then(function(){ _repintarSuave_(); });
   }catch(e){
     if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
     _gate_(SPLASH+'<div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+
@@ -1437,11 +1454,23 @@ function arcoSeg(i,r){
          ' A'+r+' '+r+' 0 0 1 '+(MC+r*Math.cos(a1)).toFixed(2)+' '+(MC+r*Math.sin(a1)).toFixed(2);
 }
 function estadoPts(p){return p<=2?'evaluacion':(p>=9?'elegible':'normal');}
+/* COLOR DE CADA TRAMO DEL MEDIDOR (decisión de Daniel, 27/07).
+   Al ser ELEGIBLE el anillo deja de ser rojo: los tramos del medio pasan a AZUL y los dos
+   últimos —9/10 y 10/10— a VERDE, que es lo que se está celebrando.
+   El tramo de las 12 en punto (i=0) es la dirección de los 0 puntos, o sea de dónde vienes:
+   se queda NARANJA y solo cambia si tienes los 10. Mientras te falte un punto, el anillo
+   sigue recordando por dónde se cae. */
+function _colorSeg_(i, p){
+  var eleg = p>=9;
+  if(!eleg) return (i<3 && p<=3) ? 'url(#gWa)' : 'url(#gRed)';
+  if(i===0) return (p>=10) ? 'url(#gVer)' : 'url(#gWa)';   // el origen: solo cede con los 10
+  return (i>=8) ? 'url(#gVer)' : 'url(#gAzu)';
+}
 function medidorHTML(){
   var p=YO.puntos, segs='', ticks='', halo='', i;
   for(i=0;i<10;i++){
     var lleno=i<p, crit=i<3;
-    var col = lleno ? ((crit&&p<=3)?'url(#gWa)':'url(#gRed)') : '';
+    var col = lleno ? _colorSeg_(i,p) : '';
     segs+='<path class="seg '+(lleno?'on':'vac'+(crit?' zc':''))+'" '+
       (lleno?'stroke="'+col+'" ':'')+'d="'+arcoSeg(i,MR)+'"/>';
     if(lleno) halo+='<path class="halo" stroke="'+col+'" d="'+arcoSeg(i,MR)+'"/>';
@@ -1454,13 +1483,18 @@ function medidorHTML(){
   var giro=p*MSTEP-MGAP/2+MTIP;
   var est=estadoPts(p);
   return '<div class="medcaja">'+
-    '<div class="med late" id="med" data-p role="button" tabindex="0" aria-label="Puntos de conducta: '+p+' de 10">'+
+    '<div class="med late'+(est==='elegible'?' aura':'')+'" id="med" data-p role="button" tabindex="0" aria-label="Puntos de conducta: '+p+' de 10'+(est==='elegible'?', elegible':'')+'">'+
       '<svg class="dial" viewBox="0 0 172 172" aria-hidden="true">'+
         '<defs>'+
           '<linearGradient id="gRed" x1="0" y1="0" x2="1" y2="1">'+
             '<stop offset="0" stop-color="#FF6B6F"/><stop offset=".55" stop-color="#E41E25"/><stop offset="1" stop-color="#8E1418"/></linearGradient>'+
           '<linearGradient id="gWa" x1="0" y1="0" x2="1" y2="1">'+
             '<stop offset="0" stop-color="#F5B25E"/><stop offset="1" stop-color="#E8912E"/></linearGradient>'+
+          /* Azul telemático y verde de la paleta: NO se inventan colores nuevos. */
+          '<linearGradient id="gAzu" x1="0" y1="0" x2="1" y2="1">'+
+            '<stop offset="0" stop-color="#7FC4EA"/><stop offset=".55" stop-color="#3f9ed6"/><stop offset="1" stop-color="#1E6A96"/></linearGradient>'+
+          '<linearGradient id="gVer" x1="0" y1="0" x2="1" y2="1">'+
+            '<stop offset="0" stop-color="#7BE3BE"/><stop offset=".55" stop-color="#3EB489"/><stop offset="1" stop-color="#1E7A5A"/></linearGradient>'+
         '</defs>'+
         '<g class="fili"><path transform="translate(86 86) scale(5) translate(-12 -12)" '+
           'd="M12 1Q13.4 10.6 23 12 13.4 13.4 12 23 10.6 13.4 1 12 10.6 10.6 12 1Z"/></g>'+
@@ -1556,7 +1590,10 @@ function barraHorasHTML(id){
     (tot>0
       ? '<div class="leyh">'+
           '<span><i style="background:var(--ok)"></i>cuentan</span>'+
-          (p>0?'<span><i style="background:repeating-linear-gradient(45deg,rgba(232,145,46,.9) 0 3px,transparent 3px 6px)"></i>pendientes · no cuentan</span>':'')+
+          /* La leyenda va SIEMPRE, tengas o no horas pendientes: es la clave de colores de
+             la barra, no un aviso. Que aparezca y desaparezca segun el dato hace que la
+             barra cambie de significado sin avisar. (Daniel, 27/07.) */
+          '<span'+(p>0?'':' style="opacity:.5"')+'><i style="background:repeating-linear-gradient(45deg,rgba(232,145,46,.9) 0 3px,transparent 3px 6px)"></i>pendientes · no cuentan</span>'+
         '</div>'
       : '')+
     (tot>0
@@ -3281,6 +3318,15 @@ function pintarNav(){
       '<svg><use href="#'+d[2]+'"/></svg>'+d[1];
     nav.appendChild(bt);
   });
+}
+/* Repintar SIN que se note: `pintar()` reconstruye `#main`, asi que el navegador manda el
+   scroll a cero y parece que la app se ha recargado. Cuando el repintado no lo ha pedido el
+   usuario -llega un dato de fondo- hay que devolverlo a donde estaba. */
+function _repintarSuave_(){
+  var m=document.getElementById('main');
+  var y=m?m.scrollTop:0;
+  pintar();
+  if(m && y) m.scrollTop=y;
 }
 function pintar(){
   var f=VISTAS[ST.vista];
