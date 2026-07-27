@@ -2961,13 +2961,27 @@ function _abrirMenu_(v){
   m.classList.toggle('on', !!v);
   m.setAttribute('aria-hidden', v?'false':'true');
 }
+/* GEMELA. La versión de ESTE fichero: la huella de su contenido, que reescribe
+   `flujos/publicar_web.py` al subir. No hay que acordarse de nada: si esta publicado,
+   lleva su huella; en local dice «sin publicar», que tambien es la verdad.
+   Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
+   `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
+   de saber si dos personas miraban el mismo codigo. */
+var BUILD='9a10d6d';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
   return '<div class="mtit">Ajustes</div><div class="ajus">'+
     '<h4>Notificaciones</h4>'+_notisHTML_()+
     '<h4>Sesión</h4><div class="tarj"><div class="fila"><div class="a"><b>'+quien+'</b>'+
-      '<small>'+v+'</small></div></div></div></div>';
+      '<small>'+v+'</small></div></div></div>'+
+    /* QUE VERSION ES. Lo primero que hay que poder responder cuando alguien dice «sigue
+       fallando»: Pages cachea el HTML 10 min, asi que dos personas pueden estar mirando
+       codigo distinto sin saberlo. Pasó el 27/07, dos veces. */
+    '<h4>Versión</h4><div class="tarj"><div class="fila"><div class="a">'+
+      '<b class="mono">'+esc(BUILD)+'</b>'+
+      '<small>Si esto no coincide con lo que te digan, recarga forzando (mantén pulsado '+
+      'recargar, o cierra la pestaña y ábrela de nuevo).</small></div></div></div></div>';
 }
 function vTurnos(){
   var mios=TURNOS.filter(_mioTurno_);
