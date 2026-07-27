@@ -494,6 +494,9 @@ var api={
   crear:       function(r){ return api._post({action:"crearReunion",reunion:r}); },
   /* Buzones. `quien` lo pone el servidor desde el token: si lo mandara el cliente,
      cualquiera podria firmar un reporte como cualquier otro. */
+  /* El cierre ENCOLA el calculo; no aplica nada. Ver `_cerrarMes_` en el backend. */
+  getCierre:      function(){ return api._post({action:"getCierre"}); },
+  cerrarMes:      function(f){ return api._post({action:"cerrarMes",forzar:!!f}); },
   reportarBug:    function(d){ return api._post({action:"reportarBug",datos:d}); },
   reportarMejora: function(d){ return api._post({action:"reportarMejora",datos:d}); },
   getBuzon:       function(){ return api._post({action:"getBuzon"}); },
@@ -1252,34 +1255,86 @@ V.registro={g:'Horas',t:'Registro del mes',f:function(){
 }};
 
 /* ── CIERRE MENSUAL ──────────────────────────────────────────────────────── */
+/* Estado del cierre traido del backend. `null` = todavia no se ha preguntado; distinguirlo
+   de «no hay nada» importa, o la pantalla diria que todo esta listo sin haber mirado. */
+var CIERRE=null, CIERRE_ERR=null;
+async function _cargarCierre_(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION){ CIERRE_ERR='sin conexión'; return; }
+  try{ CIERRE=await api.getCierre(); CIERRE_ERR=null; }
+  catch(e){ CIERRE=null; CIERRE_ERR=(e&&e.message)||String(e); }
+  pintar();
+}
+/* El ultimo dia del mes y los que faltan, CALCULADOS. Estaban escritos a mano en el HTML
+   («31/07/2026», «7 días»): en octubre habrian seguido diciendo lo mismo. */
+function _finDeMes_(){
+  var h=new Date(), fin=new Date(h.getFullYear(), h.getMonth()+1, 0);
+  var dias=Math.max(0, Math.ceil((fin-new Date(h.getFullYear(),h.getMonth(),h.getDate()))/86400000));
+  var p=function(x){ return (x<10?'0':'')+x; };
+  return { txt:p(fin.getDate())+'/'+p(fin.getMonth()+1)+'/'+fin.getFullYear(), dias:dias,
+           mes:['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+                'septiembre','octubre','noviembre','diciembre'][h.getMonth()] };
+}
 V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
-  var sinFirmar=pendientes().length;
+  var fin=_finDeMes_();
+  if(CIERRE===null && !CIERRE_ERR)
+    return pan('Cierre de '+fin.mes,'comprobando…',
+      '<div class="nota" style="border-top:0">Preguntando al servidor en qué punto está el cierre…</div>');
+  if(CIERRE_ERR)
+    return pan('Cierre de '+fin.mes,'no se pudo comprobar',
+      vac('No se pudo leer el estado del cierre', esc(CIERRE_ERR)+'. No es que esté todo listo: '+
+        'es que no se ha podido comprobar, y cerrar a ciegas mueve la cuota de 32 personas.'));
+  var bloq=(CIERRE.bloqueos)||[], enc=CIERRE.encolado||null, plan=CIERRE.plan||null;
+  /* Los bloqueos los da el SERVIDOR mirando el dato. La vista ya no los deduce por su
+     cuenta: si la cuenta local y la del backend no coinciden, gana la del backend, que es
+     la que va a decidir si deja cerrar. */
+  var listo=!bloq.length;
+  var estado = plan ? ['PLAN CALCULADO','ok'] : enc ? ['CALCULÁNDOSE','wa']
+             : listo ? ['LISTO PARA CALCULAR','ok'] : ['BLOQUEADO','no'];
   var pasos=[
-    ['Consolidar las horas del mes', sinFirmar===0, sinFirmar?sinFirmar+' partes sin firmar':'todo firmado', sinFirmar>0],
-    ['Cerrar el bloque de sanciones', LOTE.cerrado, LOTE.cerrado?'cerrado y en cola de aplicación':LOTE.items.length+' personas sin confirmar', !LOTE.cerrado],
-    ['Resolver los expedientes en revisión', docsMios().length===0, docsMios().length?docsMios().length+' esperando tu firma':'ninguno pendiente de ti', false],
-    ['Recalcular umbral y cuota', true, 'automático al cerrar el mes', false],
-    ['Publicar el ranking del mes', true, 'ponderado horas de temporada / meses en el equipo', false],
-    ['Comunicado al canal', false, 'se manda al cerrar, con los grupos y las menciones', false]
+    ['Decidir los partes de horas', !bloq.filter(function(b){return b.que==='partes';}).length,
+     (bloq.filter(function(b){return b.que==='partes';})[0]||{}).texto || 'todo decidido'],
+    ['Confirmar las sanciones pendientes', !bloq.filter(function(b){return b.que==='sanciones';}).length,
+     (bloq.filter(function(b){return b.que==='sanciones';})[0]||{}).texto || 'ninguna sin confirmar']
   ];
-  var hechos=pasos.filter(function(p){return p[1];}).length;
-  var bloqueado=pasos.some(function(p){return p[3];});
-  return '<div class="chips"><span class="chip">CIERRA <b style="color:var(--ink)">31/07/2026</b></span>'+
-    '<span class="chip">QUEDAN <b style="color:var(--ink)">7 días</b></span>'+
-    '<span class="chip '+(bloqueado?'no':'ok')+'">'+(bloqueado?'BLOQUEADO':'LISTO PARA CERRAR')+'</span></div>'+
-    pan('Pasos del cierre',hechos+' de '+pasos.length+' hechos',
+  return '<div class="chips">'+
+      '<span class="chip">CIERRA <b style="color:var(--ink)">'+fin.txt+'</b></span>'+
+      '<span class="chip">QUEDAN <b style="color:var(--ink)">'+fin.dias+' día'+(fin.dias===1?'':'s')+'</b></span>'+
+      '<span class="chip '+estado[1]+'">'+estado[0]+'</span></div>'+
+    pan('Antes de cerrar', bloq.length? (bloq.length+' sin resolver') : 'nada pendiente',
       pasos.map(function(p){
-        return '<div class="paso'+(p[1]?' ok':'')+(p[3]?' bloq':'')+'"><span class="bx"></span>'+
+        return '<div class="paso'+(p[1]?' ok':' bloq')+'"><span class="bx"></span>'+
           '<span class="tx"><b>'+esc(p[0])+'</b><small>'+esc(p[2])+'</small></span>'+
-          (p[3]?'<span class="chip no">bloquea</span>':(p[1]?'<span class="chip ok">listo</span>':'<span class="chip">pendiente</span>'))+
-          '</div>';
+          (p[1]?'<span class="chip ok">listo</span>':'<span class="chip no">bloquea</span>')+'</div>';
       }).join('')+
-      '<div class="nota">El cierre <b>no arranca</b> mientras queden partes de horas sin decidir o un bloque de '+
-      'sanciones abierto: esas horas moverían el umbral después de cerrar y el comunicado saldría '+
-      'incompleto.</div>')+
-    pan('Cerrar julio','',
-      '<div class="pb"><button class="btn pri" '+(bloqueado?'disabled':'')+' data-cerrarmes>'+
-      (bloqueado?'Bloqueado · resuelve lo de arriba':'Cerrar el mes y mandar el comunicado')+'</button></div>');
+      '<div class="nota">Estas dos <b>bloquean</b> porque entran en la cuenta: unas horas que se '+
+      'aprueban después del cierre moverían el umbral y la cuota de alguien saldría mal, y una '+
+      'sanción sin confirmar dejaría el comunicado incompleto.</div>')+
+    (plan
+      ? pan('El plan está calculado', plan.personas+' personas',
+          tabla([['Dato'],['Valor']],
+            '<tr><td>Periodo</td><td class="mono">'+esc(plan.periodo||'—')+'</td></tr>'+
+            '<tr><td>Calculado</td><td>'+esc(plan.calculado||'—')+'</td></tr>'+
+            '<tr><td>Personas</td><td>'+esc(String(plan.personas||'—'))+'</td></tr>'+
+            '<tr><td>Avisos</td><td>'+((plan.avisos&&plan.avisos.length)?esc(String(plan.avisos.length)):'ninguno')+'</td></tr>'+
+            '<tr><td>Fichero</td><td class="mono">'+esc(plan.fichero||'—')+'</td></tr>')+
+          ((plan.avisos&&plan.avisos.length)
+            ? '<div class="nota"><b>Avisos del cálculo:</b><ul class="obj">'+
+              plan.avisos.slice(0,8).map(function(a){ return '<li>'+esc(String(a))+'</li>'; }).join('')+'</ul></div>'
+            : '')+
+          '<div class="nota"><b>No se ha aplicado nada.</b> El plan dice qué valor nuevo le toca a '+
+          'cada campo de cada persona. Revísalo en el fichero y aplícalo tú: de aquí salen la cuota '+
+          'y la renovación, y eso no lo dispara un botón.</div>')
+      : '')+
+    pan('Cerrar '+fin.mes,'',
+      (enc && !plan
+        ? '<div class="nota" style="border-top:0">Encolado por <b>'+esc(_m(enc.por).pila)+'</b>. '+
+          'La rutina lo recoge en la siguiente pasada (va cada 2 minutos) y deja el plan aquí.</div>'
+        : '')+
+      '<div class="pb"><button class="btn pri" '+(listo?'':'disabled')+' data-cerrarmes>'+
+      (listo?'Calcular el cierre de '+fin.mes:'Bloqueado · resuelve lo de arriba')+'</button></div>'+
+      '<div class="nota">Esto <b>no cierra el mes</b>: encola el cálculo. La rutina saca el plan '+
+      '—ceros de carga, puntos que ruedan al mes anterior, compensaciones al defecto— y tú '+
+      'decides si se aplica.</div>');
 }};
 
 /* ── DOCUMENTOS ──────────────────────────────────────────────────────────── */
@@ -2501,6 +2556,25 @@ function pintar(){
   m.innerHTML=V[vista].f();
   var _bn=m.querySelector('#btnNotis'); if(_bn) _bn.onclick=function(){ activarNotis(_bn); };
   var _bs=m.querySelector('[data-salir]'); if(_bs) _bs.onclick=function(){ cerrarSesion(); };
+  /* CERRAR EL MES: encola el calculo. Era un `tost`. Se confirma porque, aunque no aplique
+     nada, dispara un proceso sobre la ficha de todo el equipo y conviene mirarlo antes. */
+  var _cm=m.querySelector('[data-cerrarmes]');
+  if(_cm) _cm.onclick=async function(){
+    if(_cm.disabled) return;
+    if(typeof backendOK==='undefined' || !backendOK || !SESION){
+      tost('Sin conexión no se puede encolar el cierre.'); return; }
+    if(!confirm('Calcular el cierre del mes.'+String.fromCharCode(10,10)+
+      'NO se aplica nada: la rutina saca el plan (qué valor nuevo le toca a cada campo de '+
+      'cada persona) y lo dejará aquí para que lo revises.'+String.fromCharCode(10,10)+
+      '¿Sigo?')) return;
+    _cm.disabled=true; var prev=_cm.textContent; _cm.textContent='Encolando…';
+    try{
+      await api.cerrarMes(false);
+      tost('Cierre encolado. La rutina lo recoge en la siguiente pasada.');
+      await _cargarCierre_();
+    }catch(e){ _cm.disabled=false; _cm.textContent=prev;
+      tost('No se pudo encolar: '+((e&&e.message)||e)); }
+  };
   /* buzon: abrir/cerrar un reporte y las tres decisiones. Ninguna aplica nada: mueven
      el estado. Construir y publicar siguen siendo pasos aparte. */
   $$('[data-bzsel]',m).forEach(function(el){
@@ -2532,6 +2606,9 @@ function pintar(){
   enganchar();
 }
 function ir(k,foco){
+  /* Al abrir el cierre se pregunta al servidor en que punto esta: los bloqueos y el plan
+     los tiene el, no se deducen aqui. */
+  if(k==='cierre' && CIERRE===null && !CIERRE_ERR) setTimeout(_cargarCierre_,60);
   if(k===vista && !foco) return;
   vista=k;
   var m=$('#main');
