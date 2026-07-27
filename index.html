@@ -182,10 +182,12 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .med.aura .tip i{color:var(--ok);
   filter:drop-shadow(0 0 10px rgba(62,180,137,.9)) drop-shadow(0 0 20px rgba(62,180,137,.5));
   animation:estrellaviva 1.8s ease-in-out infinite}
-@keyframes estrellaviva{0%,100%{transform:scale(1) rotate(0deg);
-    filter:drop-shadow(0 0 8px rgba(62,180,137,.75)) drop-shadow(0 0 16px rgba(62,180,137,.35))}
-  50%{transform:scale(1.28) rotate(45deg);
-    filter:drop-shadow(0 0 14px rgba(62,180,137,1)) drop-shadow(0 0 28px rgba(62,180,137,.7))}}
+/* NI GIRA NI SE ENCOGE: la estrella tapa la barrita vertical que tiene detras, y al girar
+   45 grados la destapaba. Late SOLO el resplandor, que es lo que da vida sin mover nada
+   de sitio. (Mismo criterio que las barritas: cambia el brillo, no la forma.) */
+@keyframes estrellaviva{
+  0%,100%{filter:drop-shadow(0 0 7px rgba(62,180,137,.7))}
+  50%{filter:drop-shadow(0 0 15px rgba(62,180,137,1)) drop-shadow(0 0 26px rgba(62,180,137,.55))}}
 @media (prefers-reduced-motion:reduce){
   .med.aura .halo,.med.aura::after,.med.aura .tip i{animation:none}
 }
