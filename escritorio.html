@@ -2638,9 +2638,18 @@ function colocarEstrella(animar){
 }
 /* El pie del lateral decia 'EN LINEA' y 'Temporada 25/26' a fuego: afirmaba dos cosas que
    no sabia. Ahora sale de `backendOK` y de la temporada que manda el backend. */
+/* GEMELA. La versión de ESTE fichero: la huella de su contenido, que reescribe
+   `flujos/publicar_web.py` al subir. No hay que acordarse de nada: si esta publicado,
+   lleva su huella; en local dice «sin publicar», que tambien es la verdad.
+   Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
+   `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
+   de saber si dos personas miraban el mismo codigo. */
+var BUILD='ad38521';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
-  if(t) t.textContent='Temporada '+((DATA&&DATA.temporada)||'—');
+  /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
+     el 27/07 se perdieron dos rondas depurando builds distintos sin saberlo. */
+  if(t) t.textContent='Temporada '+((DATA&&DATA.temporada)||'—')+' · '+BUILD;
   if(c){
     var ok=(typeof backendOK!=='undefined') && backendOK && SESION;
     c.textContent=ok?'● EN LÍNEA':'● SIN CONEXIÓN';
