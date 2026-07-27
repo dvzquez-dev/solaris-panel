@@ -1123,7 +1123,14 @@ function _aplicarPanel_(pnl){
   if(yo) YO=yo;
   _rederivarPD_();
   UMBRAL=_umbral_();      // con el roster ya puesto: la regla, no el numero cableado
+  /* La SEMILLA no deja rastro. Al arrancar se pinta una vez con datos de maqueta (debajo
+     del gate), y esos anchos quedaban en `_anchoPrev_`: al entrar tus datos reales, la
+     barra 'interpolaba' desde un numero inventado. Se limpia la primera vez que llega un
+     panel de verdad, asi que tu primera barra crece de cero -que es lo que se quiere ver
+     una vez- y a partir de ahi ya interpola entre valores tuyos. */
+  if(!_panelReal_){ _panelReal_=true; _anchoPrev_={}; }
 }
+var _panelReal_=false;
 /* «Ver como» — SOLO la cuenta admin (solaris@): se pone en la vista de cualquier miembro. El
    backend ya le sirve el roster completo con datos por persona, así que ve sus horas/puntos/cuota. */
 function _pintarCabecera_(){
@@ -1477,7 +1484,13 @@ async function _cargarReunionesM_(yaPedidas){
       var _resto=REUNIONES_M.filter(function(x){ return x!==mia && !x._hidratada; });
       if(_resto.length){
         Promise.all(_resto.map(function(x){ return _hidratarReuM_(x).catch(function(){}); }))
-          .then(function(){ if(typeof _repintarSuave_==='function') _repintarSuave_(); });
+          .then(function(){
+            /* SOLO si estas mirando reuniones. Esto hidrata los mapas de calor del resto de
+               la lista; si estas en Estado no cambia nada de lo que ves, y sin embargo era
+               una SEGUNDA pintada del arranque —medida— que volvia a animar las barras.
+               Daniel: «la barra sigue arrancando desde 0 2 o 3 veces al iniciar sesion». */
+            if(ST.vista==='reu' && typeof _repintarSuave_==='function') _repintarSuave_();
+          });
       }
     }
   }catch(e){}
