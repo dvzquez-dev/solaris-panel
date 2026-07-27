@@ -613,8 +613,11 @@ function miembro(n){for(var i=0;i<DATA.miembros.length;i++) if(DATA.miembros[i].
    entra aqui y no en cinco sitios. */
 function _hMesReal_(m){
   m = m || {};
-  return (typeof m.hMes==='number') ? m.hMes
-       : (typeof m.horasMes==='number') ? m.horasMes : null;
+  /* `horasMes` PRIMERO: es el campo que llega del backend con el overlay de Notion en
+     vivo. `hMes` es una COPIA que hace `_aplicarPanel_` para las vistas que leen corto,
+     y una copia puede quedarse atras. Ante la duda, el original. */
+  return (typeof m.horasMes==='number') ? m.horasMes
+       : (typeof m.hMes==='number') ? m.hMes : null;
 }
 /* GEMELA (escritorio: misma funcion, mismo nombre). Quien SIGUE en el equipo.
    El roster conserva a las bajas por su historia -sus partes, sus sanciones, sus horas
