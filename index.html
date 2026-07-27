@@ -952,7 +952,21 @@ function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.b
    sobre los 32 de la temporada). Se calcula igualmente, porque un numero a mano deja de
    ser correcto en cuanto cambian las horas y nadie se entera: no se ve venir. */
 var UMBRAL_LO=8, UMBRAL_HI=15, UMBRAL_FRAC=2/3;
-/* OJO: la poblacion del umbral NO es la de las estadisticas, y es a proposito.
+/* EL UMBRAL, EN DIRECTO. Regla de Daniel (27/07):
+
+     «cada mes tiene un peso de 1 y dentro de ese mes se reparte equitativamente entre los
+      miembros activos; luego se normaliza a los meses que hay. Un mes con menos gente
+      cuenta lo mismo que uno con mas: solo importa la media local de ese mes.»
+
+   Y el mes EN CURSO entra con el peso de lo que lleva transcurrido (dia/dias del mes).
+   Sin eso, cada dia 1 el umbral pegaria un salto al aparecer un mes entero de golpe; con
+   eso se mueve poco a poco. Por eso se calcula AQUI y no viene ya hecho del backend: el
+   peso cambia cada dia, y un numero subido ayer ya no seria el de hoy.
+
+   Los ingredientes -las medias mensuales ya cerradas y la del mes abierto- SI vienen del
+   panel (`flujos/umbral.py`), porque salen del historico mensual y eso la app no lo tiene.
+
+   OJO: la poblacion del umbral NO es la de las estadisticas, y es a proposito.
 
    Las estadisticas del panel (medias, «en infraccion») miden al equipo que hay HOY, asi que
    van sobre `_activos_()`. El umbral es otra cosa: sale del RRI y mide la TEMPORADA, asi que
@@ -966,13 +980,31 @@ var UMBRAL_LO=8, UMBRAL_HI=15, UMBRAL_FRAC=2/3;
 
    No las 'armonices' en una sola: son dos preguntas distintas con dos respuestas distintas.
    (Lo hice y salio 13,13 donde tocaba 11,80.) */
+function _fraccionDelMes_(d){
+  d=d||new Date();
+  var dias=new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();   // dia 0 del siguiente
+  return Math.max(0, Math.min(1, d.getDate()/dias));
+}
 function _umbral_(){
+  var ing=DATA.umbral;
+  if(ing && ing.medias && ing.medias.length){
+    var num=0, den=0;
+    ing.medias.forEach(function(x){ num+=x; den+=1; });        // cada mes cerrado pesa 1
+    var ma=ing.mesAbierto;
+    if(ma && typeof ma.media==='number'){
+      var w=_fraccionDelMes_();                                 // el abierto, a prorrata
+      num+=ma.media*w; den+=w;
+    }
+    if(den>0) return Math.max(ing.lo||UMBRAL_LO, Math.min(ing.hi||UMBRAL_HI, (ing.frac||UMBRAL_FRAC)*(num/den)));
+  }
+  /* Sin ingredientes (backend viejo, o una cuenta a la que no se los sirven) se cae a la
+     aproximacion por persona: media de `horasTemp/meses` de TODOS los de la temporada. No
+     es la misma cuenta -pondera por persona, no por mes- pero es del mismo orden y honesta.
+     Y si ni eso, al ultimo valor conocido: nunca a 2/3 de tus propias horas, que no es el
+     umbral de nadie. */
   var hs=(DATA.miembros||[]).map(function(m){
       return (typeof m.horasTemp==='number' && m.meses) ? (m.horasTemp/m.meses) : null;
     }).filter(function(h){ return typeof h==='number'; });
-  /* Un miembro solo ve SUS horas, asi que no puede calcular la media del equipo. Con una
-     sola muestra saldria 2/3 de tus propias horas, que no es el umbral de nadie: se cae al
-     ultimo valor conocido. Lo correcto es que lo mande el backend, que si tiene los 32. */
   if(hs.length<2) return UMBRAL;
   var media=hs.reduce(function(a,h){ return a+h; },0)/hs.length;
   return Math.max(UMBRAL_LO, Math.min(UMBRAL_HI, UMBRAL_FRAC*media));
@@ -1047,6 +1079,9 @@ function _aplicarPanel_(pnl){
      de ahi que cada cara dijera una fecha distinta. */
   if(pnl.generado) DATA.generado=pnl.generado;
   if(pnl.temporada) DATA.temporada=pnl.temporada;
+  /* Los ingredientes del umbral: medias mensuales de la temporada y la del mes
+     abierto. El peso del dia lo pone `_umbral_()` al calcular, no el backend. */
+  if(pnl.umbral) DATA.umbral=pnl.umbral;
   if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length) DATA.subsistemas=pnl.subsistemas;
   var yo=null;
   if(pnl.yo){                                              // forma MIEMBRO
