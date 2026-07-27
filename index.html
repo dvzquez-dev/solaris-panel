@@ -178,16 +178,18 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
    del medidor; Daniel se referia a la estrella del INDICADOR (la punta que gira), no a
    esta. Se queda como siempre: fondo al 5 %, gris, girando despacio. */
 /* El aura va en la ESTRELLA DEL INDICADOR: la punta de cuatro picos que marca tu posicion.
-   Es la que celebra, porque es la que ha llegado hasta ahi. */
-.med.aura .tip i{color:var(--ok);
-  filter:drop-shadow(0 0 10px rgba(62,180,137,.9)) drop-shadow(0 0 20px rgba(62,180,137,.5));
+   Es la que celebra, porque es la que ha llegado hasta ahi. DORADA, no verde: el verde ya
+   significa «tramo conseguido» en el anillo y en las barritas, y repetirlo aqui le quitaria
+   significado. El dorado no compite con nada y se lee como premio. */
+.med.aura .tip i{color:#F2C94C;
+  filter:drop-shadow(0 0 10px rgba(242,201,76,.9)) drop-shadow(0 0 20px rgba(242,201,76,.5));
   animation:estrellaviva 1.8s ease-in-out infinite}
 /* NI GIRA NI SE ENCOGE: la estrella tapa la barrita vertical que tiene detras, y al girar
    45 grados la destapaba. Late SOLO el resplandor, que es lo que da vida sin mover nada
    de sitio. (Mismo criterio que las barritas: cambia el brillo, no la forma.) */
 @keyframes estrellaviva{
-  0%,100%{filter:drop-shadow(0 0 7px rgba(62,180,137,.7))}
-  50%{filter:drop-shadow(0 0 15px rgba(62,180,137,1)) drop-shadow(0 0 26px rgba(62,180,137,.55))}}
+  0%,100%{filter:drop-shadow(0 0 7px rgba(242,201,76,.7))}
+  50%{filter:drop-shadow(0 0 15px rgba(242,201,76,1)) drop-shadow(0 0 26px rgba(242,201,76,.55))}}
 @media (prefers-reduced-motion:reduce){
   .med.aura .halo,.med.aura::after,.med.aura .tip i{animation:none}
 }
@@ -1634,7 +1636,10 @@ var MC=86, MR=62, MGAP=8, MSTEP=36;
 /* Nudge de la estrella de la punta (pedido por Daniel 25/07): +3,5° en sentido horario
    —la aleja del final del arco y la inclina a la vez, porque va dentro del .tip que gira—
    y un poco más de radio en el CSS (.tip i top). */
-var MTIP=3.5;
+/* 3,5 dejaba el puntero medio grado corto: 71,5 / 179,5 / 359,5 en vez de 72 / 180 / 360.
+   Con 4 el angulo sale EXACTAMENTE p*36, que es donde acaba el tramo. Ese medio grado no
+   se ve suelto, pero al lado de la barrita del tope si canta. */
+var MTIP=4;
 function arcoSeg(i,r){
   var a0=(-90+i*MSTEP+MGAP/2)*Math.PI/180, a1=(-90+(i+1)*MSTEP-MGAP/2)*Math.PI/180;
   return 'M'+(MC+r*Math.cos(a0)).toFixed(2)+' '+(MC+r*Math.sin(a0)).toFixed(2)+
