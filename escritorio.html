@@ -1350,6 +1350,42 @@ V.apela={g:'Disciplina',t:'Apelaciones',f:function(){
 }};
 
 /* ── REUNIONES ───────────────────────────────────────────────────────────── */
+/* ── Fijar fecha y orden del dia ──────────────────────────────────────────────
+   Se elige DIA + FRANJA de la propia reunion (no texto libre): asi la etiqueta que se
+   guarda casa con lo que pinta el mapa y se puede resaltar en verde el hueco elegido.
+   Quien puede lo decide el backend; aqui solo se ofrece. */
+function _fijarPanel_(){
+  if(!REUS.length) return '';
+  var opts=REUS.map(function(r,i){
+    return '<option value="'+i+'">'+esc(r.tit||r.titulo||('Reunión '+r.id))+'</option>'; }).join('');
+  var r=REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0];
+  var E='width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
+        'padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px';
+  var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
+  var dias=(r.dias||[]).map(function(d,i){ return '<option value="'+i+'">'+esc(d)+'</option>'; }).join('');
+  var fr=(r.franjas||[]).map(function(f,i){
+    return '<option value="'+i+'">'+esc(_iniF(f))+'</option>'; }).join('');
+  return pan('Fijar fecha y orden del día', r.fijada?('fijada · '+esc(r.fijada)):'sin fijar',
+    '<div class="pb">'+
+    '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
+      'Elige el hueco con el mapa de calor delante. Al fijarla, la disponibilidad se cierra '+
+      'y el hueco elegido sale <b>en verde</b> en el mapa de todo el mundo.</p>'+
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
+      '<label style="flex:2;min-width:190px">'+lab('Reunión')+
+        '<select id="reSel" style="'+E+'">'+opts+'</select></label>'+
+      '<label style="width:130px">'+lab('Día')+'<select id="reDia" style="'+E+'">'+dias+'</select></label>'+
+      '<label style="width:120px">'+lab('Desde')+'<select id="reF0" style="'+E+'">'+fr+'</select></label>'+
+      '<label style="width:120px">'+lab('Hasta')+'<select id="reF1" style="'+E+'">'+fr+'</select></label>'+
+      '<button class="btn pri" data-fijar>Fijar</button>'+
+      (r.fijada?'<button class="btn" data-desfijar style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
+    '</div>'+
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
+      '<label style="flex:1;min-width:240px">'+lab('Orden del día · enlace o texto')+
+        '<input id="reOrden" value="'+esc(r.ordenDia||'')+'" placeholder="https://… o los puntos a tratar" style="'+E+'"></label>'+
+      '<button class="btn" data-orden>Guardar orden del día</button>'+
+    '</div></div>');
+}
+var RE_SEL=0;
 V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
   if(!REUS.length) return pan('Reuniones abiertas','ninguna',
     vac('No hay ninguna reunión abierta','Convoca una para que el equipo cubra su disponibilidad.')+
@@ -1368,7 +1404,8 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
           '<td class="r mono">'+r.limite+'</td>'+
           '<td class="r">'+(r.fijada?'<span class="chip ok">📌 '+esc(r.fijada)+'</span>':'<span class="chip wa">sin fijar</span>')+'</td></tr>';
       }).join(''))+
-    '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>');
+    '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>')+
+    _fijarPanel_();
 }};
 /* Disponibilidad y riesgo: por reunión, un desplegable con quién no ha cubierto
    y QUÉ SANCIÓN le caería, según la escala cerrada del PD. */
@@ -1926,6 +1963,51 @@ function _pintarPie_(){
 function pintar(){
   _pintarPie_();
   _cablearSalir_();
+  /* fijar fecha / orden del dia: api.fijar y api.setOrdenDia existian y no las llamaba nadie */
+  var _rs=$('#reSel');
+  if(_rs) _rs.onchange=function(){ RE_SEL=+_rs.value||0; pintar(); };
+  var _reuSel=function(){ return REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0]; };
+  $$('[data-fijar]').forEach(function(b){
+    b.onclick=async function(){
+      var r=_reuSel(); if(!r) return;
+      var di=+($('#reDia')||{}).value||0, f0=+($('#reF0')||{}).value||0, f1=+($('#reF1')||{}).value||0;
+      if(f1<f0){ var t=f0; f0=f1; f1=t; }
+      var bloques=[]; for(var f=f0;f<=f1;f++) bloques.push([di,f]);
+      var fin=_iniF((r.franjas||[])[f1]);
+      var finM=_minHM_(fin)+((r.franjas||[])[f1]&&+r.franjas[f1].dur||60);
+      var etiqueta=(r.dias||[])[di]+' \u00b7 '+_iniF((r.franjas||[])[f0])+'\u2013'+_hmMin_(finM);
+      if(!backendOK||!SESION){ tost('Sin conexi\u00f3n no se puede fijar la fecha.'); return; }
+      b.disabled=true; var prev=b.textContent; b.textContent='Fijando\u2026';
+      try{
+        await api.fijar(r.id, {label:etiqueta, bloques:bloques, franjas:[f0,f1]});
+        r.fijada=etiqueta; r.fijadaBl=bloques;
+        tost('Reuni\u00f3n fijada: '+etiqueta+'. La disponibilidad queda cerrada.');
+        pintar();
+      }catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo fijar: '+((e&&e.message)||e)); }
+    };
+  });
+  $$('[data-desfijar]').forEach(function(b){
+    b.onclick=async function(){
+      var r=_reuSel(); if(!r) return;
+      if(!backendOK||!SESION){ tost('Sin conexi\u00f3n no se puede cancelar el fijado.'); return; }
+      b.disabled=true;
+      try{ await api.fijar(r.id, null); r.fijada=''; r.fijadaBl=[];
+        tost('Fijado cancelado: se reabre la disponibilidad.'); pintar();
+      }catch(e){ b.disabled=false; tost('No se pudo cancelar: '+((e&&e.message)||e)); }
+    };
+  });
+  $$('[data-orden]').forEach(function(b){
+    b.onclick=async function(){
+      var r=_reuSel(); if(!r) return;
+      var txt=(($('#reOrden')||{}).value||'').trim();
+      if(!backendOK||!SESION){ tost('Sin conexi\u00f3n no se puede guardar el orden del d\u00eda.'); return; }
+      b.disabled=true; var prev=b.textContent; b.textContent='Guardando\u2026';
+      try{ await api.setOrdenDia(r.id, txt); r.ordenDia=txt;
+        tost('Orden del d\u00eda guardado.'); pintar();
+      }catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo guardar: '+((e&&e.message)||e)); }
+    };
+  });
+
   var m=$('#main');
   m.innerHTML=V[vista].f();
   $('#migaA').textContent=V[vista].g;
