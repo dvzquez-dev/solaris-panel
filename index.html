@@ -1220,9 +1220,30 @@ async function _refrescoVivo_(motivo){
     var q=_pide_('getTareas').then(function(x){ if(Array.isArray(x)&&x.length){ TAREAS.length=0;
       x.forEach(function(y){ TAREAS.push(y); }); } }).catch(function(){});
     var r=_cargarReunionesM_().catch(function(){});
-    await Promise.all([t,q,r]);
+    /* EL PANEL TAMBIEN. Aqui vivian solo turnos, tareas y reuniones, asi que tus horas del
+       mes, tus puntos y tu cuota se quedaban con el valor de cuando entraste — y esas son
+       justo las cifras que uno vuelve a mirar para ver si ha entrado lo que acaba de
+       fichar. Va en el mismo `Promise.all`: no cuesta una vuelta mas de reloj. */
+    var pnl=_pide_('getPanel').then(function(x){ if(x) _refrescarPanelM_(x); }).catch(function(){});
+    await Promise.all([t,q,r,pnl]);
     if(!_modalAbierto_()) _repintarSuave_();
   } finally { _REFRESCANDO_=false; }
+}
+/* Aplica un panel recien traido SIN perder a quien estabas viendo.
+
+   `_aplicarPanel_` reescribe `DATA.miembros` y tambien `YO`, y la cuenta admin puede estar
+   viendo la app COMO otra persona. Sin esto, cada 90 s la devolveria a su propia ficha sola,
+   sin que nadie haya tocado nada. Se apunta a quien mirabas y se le vuelve a buscar en el
+   roster NUEVO —no se reutiliza el objeto viejo— porque sus datos son justo lo que se
+   queria refrescar. */
+function _refrescarPanelM_(pnl){
+  var viendo = (YO && YO.nombre) || null;
+  _aplicarPanel_(pnl);
+  if(viendo && YO && YO.nombre!==viendo){
+    var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===viendo; })[0];
+    if(m) YO=m;                     // si ya no esta en el roster, se queda el que toque
+  }
+  _pintarCabecera_();
 }
 /* La reunion ABIERTA, aparte y mas rapido. Es lo unico que cambia mientras lo miras:
    varias personas cubriendo a la vez el dia antes de que cierre el plazo. Es UNA llamada
