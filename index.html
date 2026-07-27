@@ -1051,6 +1051,10 @@ var api={
   getTurnos: function(){ return api._post({action:"getTurnos"}); },
   getTareas: function(){ return api._post({action:"getTareas"}); },
   getPartes: function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
+  /* FALTABA. La cola de sanciones del Panel del PD salia SIEMPRE vacia con cuenta real
+     porque no habia forma de pedirla: el panel enseñaba la semilla y sus botones solo
+     tocaban memoria. Es la misma accion que usa el escritorio. */
+  getSanciones: function(f){ return api._post({action:"getSanciones",filtro:f||{}}); },
   pushParte: function(p){ return api._post({action:"pushParte",parte:p}); },
   ficharEntrada:    function(){ return api._post({action:"ficharEntrada"}); },
   ficharSalida:     function(tarea,just,cat){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat}); },
@@ -1412,6 +1416,9 @@ function _normReuM_(r){
   return { id:r.id, titulo:r.titulo||'Reunión sin título', tipo:r.tipo||'general',
     modalidad:r.modalidad||'hibrida', limite:r.limite||null, fijada:fij||null, fijadaBl:fijBl,
     convocante:r.convocante||'', dias:dias, franjas:F, bloques:bl, resp:resp,
+    /* El backend lo manda (`_ex.ordenDia`) y aqui se tiraba, asi que el dialogo salia
+       siempre vacio y no habia forma de corregir un enlace mal pegado. */
+    ordenDia:r.ordenDia||'',
     /* `slot` es la casilla que se pinta y `duracion` lo que hay que juntar seguido.
        Las reuniones de antes de este modelo no traen `duracion`: entonces el minimo es
        una casilla y todo se comporta como se comportaba. */
@@ -1500,14 +1507,42 @@ async function _cargarReunionesM_(yaPedidas){
    «te piden mas detalle» (puedes arreglarlo) de «te lo han rechazado» (se acabo). El
    escritorio si las distingue; ahora las dos caras cuentan lo mismo. */
 var _E_MOVIL_={pendiente:'pend',aprobada:'otor',aplicada:'otor',otorgada:'otor',rechazada:'rech',detalle:'det',sin_declarar:'sindecl',caducada:'cad'};
+/* La coletilla que explica de donde sale una hora. Tres casos y ni uno mas:
+     fichaje  -> nada, es lo normal y no hay que decirlo;
+     manual   -> «sin fichaje», en ambar: quien firma tiene derecho a saber que no hubo
+                 cronometro;
+     otorgada -> «automatica», en gris: NO es un aviso, es informacion. Marcarla en ambar
+                 seria acusar al miembro de algo que hizo el sistema.
+   Un parte viejo sin `origen` se comporta como antes, con `sinFichaje`: es lo unico que se
+   sabe de el, y no se le inventa una procedencia que no consta. */
+function _origenParte_(p){
+  var o=p&&p.origen;
+  if(o==='fichaje') return '';
+  if(o==='otorgada') return ' · <span style="color:var(--ink3)">automática</span>';
+  if(o==='manual')  return ' · <span style="color:var(--warn)">sin fichaje</span>';
+  return (p&&p.sinFichaje) ? ' · <span style="color:var(--warn)">sin fichaje</span>' : '';
+}
 function normPMovil(p){
   return { id:p.id, f:_isoADMY_(p.fecha), t:p.tarea||'', q:Number(p.horas)||0,
     e:_E_MOVIL_[p.estado]||'pend', ini:p.ini||'', fin:p.fin||'', cat:p.categoria||null,
-    just:p.justificacion||'', nota:p.motivo||p.justificacion||'', sinFichaje:!!p.sinFichaje, caduca:p.caduca_at||null }; }
+    just:p.justificacion||'', nota:p.motivo||p.justificacion||'', sinFichaje:!!p.sinFichaje,
+    /* DE DONDE VIENE la hora: 'fichaje' | 'manual' | 'otorgada'. El backend lo guarda desde
+       siempre y aqui se tiraba, asi que la vista solo tenia el booleano `sinFichaje` —que
+       dice lo que FALTA, no de donde sale— y llamaba «sin fichaje» a lo que otorga el
+       sistema. Ver `_origenParte_`. */
+    origen:p.origen||null, caduca:p.caduca_at||null }; }
 /* QUE HA LLEGADO YA. Se pinta antes de tenerlo todo, asi que hace falta distinguir «esto
    esta vacio» de «esto todavia no ha llegado»: son cosas distintas y confundirlas es la
    forma mas facil de que alguien crea que no tiene reuniones y no cubra. */
 var CARGA={partes:false, fichaje:false, reuniones:false};
+/* La cola de sanciones DE VERDAD, para el Panel del PD. Solo lectura: decidir se hace
+   desde el escritorio, que es donde estan el motivo, el articulo y el comunicado. */
+var SANC_M=null;   // null = todavia no se sabe · [] = se pregunto y no hay
+async function _cargarSancionesM_(){
+  if(!esPD()) return;
+  try{ var a=await api.getSanciones({estado:'pendiente'}); if(Array.isArray(a)) SANC_M=a; }
+  catch(e){}
+}
 async function _cargarMisPartes_(){
   try{ var arr=await api.getPartes({mias:true}); if(Array.isArray(arr)) PARTES=arr.map(normPMovil); }
   catch(e){}
@@ -1558,6 +1593,7 @@ async function _onCredencial_(resp,_silente){
        el nombre llegan enseguida con el bootstrap. */
     SESION={token:resp.credential,email:null,nombre:null};
     var pPartes  = _cargarMisPartes_();
+    var pSanc    = _cargarSancionesM_();
     var pFichaje = _cargarFichajeAbierto_();
     var pReuniones = Promise.resolve().then(function(){ return api.listarReuniones(); })
                        .catch(function(){ return null; });   // se normaliza abajo, con YO ya puesto
@@ -1585,7 +1621,7 @@ async function _onCredencial_(resp,_silente){
        necesitan saber quien eres), asi que a estas alturas o han vuelto ya o les queda poco.
        El ancho total sigue siendo una ida y vuelta, no dos. */
     _gate_(SPLASH+'<div style="opacity:.8">Cargando tus datos…</div>');
-    await Promise.all([pPartes, pFichaje, _cargarReunionesM_(pReuniones)]);
+    await Promise.all([pPartes, pFichaje, pSanc, _cargarReunionesM_(pReuniones)]);
     /* El admin, DESPUES de esperar. Si va antes lo pisa `_cargarMisPartes_`, que pide
        `{mias:true}` = los partes de la cuenta `solaris@`, no los del miembro que estas
        viendo. Estaba pasando: se cargaban los buenos y luego los otros encima. */
@@ -2582,7 +2618,7 @@ function filaParte(p){
              : p.e==='pend' ? ' · irá a '+catEti(p.cat) : '';
   var accion = p.e==='sindecl' ? '<button class="btn mini" data-declarar="'+p.id+'" data-p style="margin-right:7px">Declarar</button>' : '';
   return '<div class="fila '+cls+'"><div class="a"><b>'+esc(p.t||'Fichaje sin declarar')+'</b><small>'+sub+catTxt+
-    (p.sinFichaje?' · <span style="color:var(--warn)">sin fichaje</span>':'')+'</small></div>'+
+    _origenParte_(p)+'</small></div>'+
     '<div class="d">'+accion+pil+' <b class="mono">'+nf(p.q,1)+' h</b></div></div>';
 }
 function vHoras(){
@@ -3860,6 +3896,35 @@ function fijarModal(){
    porque aprobar de una en una podía aplicar medio bloque.
    ═══════════════════════════════════════════════════════════════════════════ */
 function panelPD(){
+  /* LA COLA REAL. Antes se pintaba `LOTE`, la semilla de maqueta, y sus botones solo
+     tocaban memoria: con cuenta real salia vacia y aun asi se podia «cerrar el bloque».
+     Ahora sale de `SANC_M` (`getSanciones`), y si todavia no ha llegado se DICE, en vez de
+     enseñar un cero que parece una respuesta. Decidir sigue siendo del escritorio. */
+  if(SANC_M===null) return '<h2 class="sec">Panel del PD<span class="ln"></span>disciplina</h2>'+
+    '<div class="tarj">'+vacio('Cargando la cola…','Buscando qué sanciones esperan decisión.','',true)+'</div>';
+  if(!SANC_M.length) return '<h2 class="sec">Panel del PD<span class="ln"></span>disciplina</h2>'+
+    '<div class="tarj">'+vacio('Nada pendiente','Ninguna sanción espera decisión ahora mismo.','',false)+'</div>';
+  var porLote={};
+  SANC_M.forEach(function(x){ var k=x.lote||'(sueltas)'; (porLote[k]=porLote[k]||[]).push(x); });
+  return '<h2 class="sec">Panel del PD<span class="ln"></span>disciplina</h2>'+
+    Object.keys(porLote).map(function(k){
+      var it=porLote[k];
+      return '<div class="tarj"><div class="lote"><div class="lote-h">'+
+        '<b>'+it.length+' '+(it.length===1?'sanción':'sanciones')+'</b>'+
+        '<span class="mono" style="color:var(--red2)">'+esc(k)+'</span></div>'+
+        it.slice(0,8).map(function(x){
+          return '<div class="lote-i"><span class="n">'+esc(_pilaDeM_(x.nombre)||x.nombre||'')+'</span>'+
+            '<span class="mono" style="color:var(--ink3);font-size:10.5px">'+esc(x.motivo||'')+'</span></div>';
+        }).join('')+
+        (it.length>8?'<div class="lote-m">y '+(it.length-8)+' más</div>':'')+
+        '<p class="rnota">Se deciden desde el <b>escritorio</b>, que es donde están el motivo, el '+
+        'artículo y el comunicado. Aquí solo se consultan.</p></div></div>';
+    }).join('');
+}
+/* La maqueta de antes se conserva SIN USAR: describe la interaccion que habra que portar el
+   dia que se decida sancionar desde el movil. Borrarla seria perder el diseño; dejarla viva
+   era mentir. */
+function _panelPDmaqueta_(){
   var c={aceptar:0,justificar:0,rechazar:0};
   LOTE.items.forEach(function(x){c[x.dec]++;});
   var lote = !LOTE.items.length
@@ -4202,13 +4267,38 @@ function enganchar(){
       tost('Fijado cancelado: se reabre la disponibilidad.'); pintar();
     }catch(e){ bdf.disabled=false; tost('No se pudo cancelar: '+((e&&e.message)||e)); }
   };
+  /* GUARDA DE VERDAD. El boton llevaba `data-cerrar` y nada mas: pegabas el enlace, dabas a
+     Guardar y no pasaba nada. `api.setOrdenDia` llevaba declarada desde la v12 SIN QUE NADIE
+     LA LLAMARA -el mismo patron que `api.getTurnos`, que estuvo meses sin existir-. */
   var bod=$('#btnOrden');
   if(bod) bod.onclick=function(){
+    var R2=REUNION; if(!R2) return;
     abrirModal('<div class="mtit">Orden del día</div>'+
       '<div class="msub">Pega el enlace del PDF o del documento de Drive. Basta con compartirlo con el dominio '+
       '<b>uvigoaerotech.com</b>: no hace falta que sea público.</div>'+
-      '<label class="campo"><span class="sc">Enlace</span><input id="odIn" placeholder="https://drive.google.com/…"></label>'+
-      '<button class="btn pri full" data-p data-cerrar>Guardar</button>');
+      '<label class="campo"><span class="sc">Enlace</span><input id="odIn" placeholder="https://drive.google.com/…" value="'+esc(R2.ordenDia||'')+'"></label>'+
+      '<button class="btn pri full" data-p id="btnODok">Guardar</button>'+
+      (R2.ordenDia?'<button class="btn mini full" data-p id="btnODquita" style="margin-top:8px">Quitar el enlace</button>':''));
+    var guardar=async function(u){
+      if(typeof backendOK==='undefined' || !backendOK || !SESION){
+        tost('Sin conexión no se puede guardar: no llegaría a nadie más.'); return; }
+      var b=$('#btnODok'); if(b){ b.disabled=true; b.textContent='Guardando…'; }
+      try{
+        await api.setOrdenDia(R2.id, u);
+        R2.ordenDia=u;
+        var m=(REUNIONES_M||[]).filter(function(x){ return x.id===R2.id; })[0]; if(m) m.ordenDia=u;
+        cerrarModal(); tost(u?'Orden del día guardado.':'Enlace quitado.'); pintar();
+      }catch(e){ if(b){ b.disabled=false; b.textContent='Guardar'; }
+        tost('No se pudo guardar: '+((e&&e.message)||e)); }
+    };
+    $('#btnODok').onclick=function(){
+      var u=(($('#odIn')||{}).value||'').trim();
+      /* Se comprueba que parezca un enlace: esto acaba en un boton que la gente pulsa, y un
+         boton que lleva a ninguna parte es peor que no tenerlo. */
+      if(u && !/^https?:\/\/\S+$/i.test(u)){ tost('Eso no parece un enlace. Debe empezar por https://'); return; }
+      guardar(u);
+    };
+    var bq=$('#btnODquita'); if(bq) bq.onclick=function(){ guardar(''); };
   };
   /* BORRAR DE VERDAD (era el agujero H12: el boton solo se disculpaba). Se lleva por
      delante la disponibilidad que haya cubierto la gente, y eso no se deshace: se dice
@@ -4294,10 +4384,10 @@ function enganchar(){
       pintar();
     };
   });
+  /* El «cerrar bloque» se retiro: solo cambiaba memoria local y hacia creer que la sancion
+     quedaba aplicada. Se decide en el escritorio. */
   var blt=$('#btnLote');
-  if(blt) blt.onclick=function(){
-    LOTE.cerrado=true; tost('Bloque cerrado. Entra entero.'); pintar();
-  };
+  if(blt) blt.onclick=function(){ tost('Las sanciones se deciden desde el escritorio.'); };
   var bsn=$('#btnSancionar'); if(bsn) bsn.onclick=sancionarModal;
 }
 /* decisiones sobre un documento (dentro del modal) */
