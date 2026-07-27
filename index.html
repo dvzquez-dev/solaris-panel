@@ -535,6 +535,9 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .doc .dh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px}
 .doc .dp{height:104px;background:linear-gradient(#141212,#0A0909);position:relative;overflow:hidden}
 .doc .dp i{position:absolute;left:14px;right:14px;height:5px;border-radius:3px;background:rgba(255,255,255,.07)}
+/* visor incrustado: alto contenido, el zoom lo pone el propio visor de Drive */
+.doc .dv{width:100%;height:52vh;min-height:280px;border:0;display:block;background:#2a2526}
+.doc .dcar{padding:26px 12px;text-align:center;color:var(--ink3);font-size:12px;line-height:1.6}
 .doc .da{display:block;padding:9px 12px;text-align:center;font-family:var(--mono);font-size:11px;
   color:var(--red2);border-top:1px solid var(--line);text-decoration:none}
 .cajsec{max-height:0;overflow:hidden;transition:max-height .45s var(--sal)}
@@ -1465,12 +1468,8 @@ function vEstado(){
       '<span class="chev">›</span></div>';
   }
 
-  var actT=TAREAS.filter(function(t){ return !/hech|finaliz|complet|termin|cerrad/i.test(t.e); });
-  var act=actT.slice(0,3).map(function(t){
-    return '<div class="fila"><div class="a"><b>'+esc(t.n)+'</b>'+
-      '<small>'+esc(t.pr)+' · vence '+t.l+'</small></div>'+
-      '<div class="d"><span class="pil '+(t.u==='alta'?'no':t.u==='media'?'pend':'neu')+'">'+t.u+'</span></div></div>';
-  }).join('');
+  /* Las tareas salieron de aqui: tienen pestana propia y en la portada solo alargaban
+     la primera pantalla repitiendo lo mismo. */
 
   return '<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>'+
     av+
@@ -1479,14 +1478,6 @@ function vEstado(){
       '<span class="sc">h '+((typeof YO.horasMes==='number')?'empleadas este mes':'que cuentan')+'</span>'+
       (sumaE('pend')?'<span class="pil pend" style="margin-left:auto">+'+nf2(sumaE('pend'))+' h pend.</span>':'')+'</div>'+
       barraHorasHTML('barEstado')+
-    '</div>'+
-    '<h2 class="sec">Tus tareas activas<span class="ln"></span>'+actT.length+'</h2>'+
-    '<div class="tarj">'+
-      (actT.length
-        ? act+'<p class="rnota">'+(actT.length>3?'Y '+(actT.length-3)+' más en Tareas. ':'')+
-          'Al fichar, tus horas se imputan a una de ellas.</p>'
-        : vacio('Sin tareas asignadas','No tienes ninguna tarea asignada ahora mismo. Cuando tu '+
-            'coordinador te asigne una, aparecerá aquí.','',false))+
     '</div>'+
     '<h2 class="sec">Próxima reunión<span class="ln"></span></h2>'+
     (_sinReuniones_()
@@ -1633,11 +1624,11 @@ function vFichar(){
           '<path id="ar2" d="M150 22 Q200 4 250 22"></path>'+
         '</svg>'+
         '<div class="nodo" id="n1" style="left:16.6%"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
-          '<span>Duración<em id="e1">—</em></span></div>'+
+          '<span>Duración<em id="e1"></em></span></div>'+
         '<div class="nodo" id="n2" style="left:50%"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
-          '<span>Imputación<em id="e2">sin asignar</em></span></div>'+
+          '<span>Imputación<em id="e2"></em></span></div>'+
         '<div class="nodo" id="n3" style="left:83.4%"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
-          '<span>Justificación<em id="e3">—</em></span></div>'+
+          '<span>Justificación<em id="e3"></em></span></div>'+
       '</div>'+
       '<div class="figcierra" id="figMsg"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
         '<span>Faltan datos: todavía no se puede enviar.</span></div>'+
@@ -1666,9 +1657,12 @@ function validarFichaje(){
   var n3 = f.just.trim().length>=25;
 
   var e1=$('#e1'), e2=$('#e2'), e3=$('#e3');
-  if(e1) e1.textContent = dur<=0 ? '—' : (dur>12 ? 'excede 12 h' : nf(dur,2)+' h');
-  if(e2) e2.textContent = n2 ? (imput.length>16?imput.slice(0,15)+'…':imput) : 'sin asignar';
-  if(e3) e3.textContent = n3 ? 'lista' : '—';
+  /* Debajo de cada estrella NO va el valor: que se encienda ya dice que ese requisito
+     esta cubierto, y repetirlo recargaba el dibujo. La unica excepcion es pasarse de
+     12 h, que no es adorno sino un tope que bloquea el envio. */
+  if(e1) e1.textContent = (dur>12) ? 'excede 12 h' : '';
+  if(e2) e2.textContent = '';
+  if(e3) e3.textContent = '';
 
   [['n1',n1],['n2',n2],['n3',n3]].forEach(function(x){
     var el=$('#'+x[0]); if(el) el.classList.toggle('on',x[1]);
@@ -1895,7 +1889,9 @@ function vHoras(){
 var TK_ORD={alta:0,media:1,baja:2};
 function vTareas(){
   var hoy=new Date(_dmyAISO_(HOY)+'T00:00:00');   // mismo origen que HOY, no una fecha aparte
-  var fin=TAREAS.filter(function(t){return /hech|finaliz|complet|termin|cerrad/i.test(t.e);});
+  var fin=TAREAS.filter(function(t){return /hech|finaliz|complet|termin|cerrad/i.test(t.e);})
+    /* por FECHA real: comparar 'DD/MM/AAAA' como texto pone 12/06 por delante de 03/07 */
+    .sort(function(a,b){ return String(_dmyAISO_(b.l)||'').localeCompare(String(_dmyAISO_(a.l)||'')); });
   var act=TAREAS.filter(function(t){return !/hech|finaliz|complet|termin|cerrad/i.test(t.e);})
     .sort(function(a,b){return (TK_ORD[a.u]-TK_ORD[b.u]) || a.l.localeCompare(b.l);});
   function vence(l){
@@ -1918,7 +1914,9 @@ function vTareas(){
     (act.length?'<div class="tarj" style="background:rgba(63,158,214,.05);border-color:rgba(63,158,214,.3)">'+
       '<p class="rnota" style="margin:0">Al fichar puedes imputar tus horas a cualquiera de estas tareas. '+
       'Si crees que una no te corresponde, puedes apelarla (Art. 34).</p></div>':'')+
-    (fin.length?'<div class="cajon" data-caj data-p><span>Finalizadas <b>· '+fin.length+'</b></span>'+
+    /* mismo cajon que en Turnos: cuenta y la ultima, para que las dos pantallas se lean igual */
+    (fin.length?'<div class="cajon" data-caj data-p><span>Tareas pasadas <b>· '+fin.length+'</b>'+
+        (fin[0]&&fin[0].l?' <span style="color:var(--ink3)">· la última, '+esc(fin[0].l)+'</span>':'')+'</span>'+
       '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
       '<div class="cajsec"><div class="tarj">'+fin.map(fila).join('')+'</div></div>':'');
 }
@@ -1927,6 +1925,47 @@ function vTareas(){
    queda para mas adelante.) Y el corte no es futuro/pasado sino REALIZADO o no:
    lo que sigue vivo va suelto y visible; lo cerrado, al cajon. */
 function _mioTurno_(t){ return !!(t.mio || (t.roles||[]).some(function(r){ return r[2]; })); }
+/* De una URL de Drive saca el id del fichero, para poder pedir su visor incrustable. */
+function _idDrive_(u){ var m=String(u||'').match(/\/d\/([A-Za-z0-9_-]{20,})/); return m?m[1]:null; }
+
+/* La memoria va PLEGADA: la mayoria de las veces se abre la ficha para ver quien va y a
+   que hora, no para leer el informe. El iframe se crea al desplegar, no antes. */
+function _memoriaHTML_(t){
+  var id=_idDrive_(t.memoria);
+  return '<div class="doc" style="margin-top:14px">'+
+    '<div class="dh clic" data-mem="'+(id||'')+'" data-p style="cursor:pointer">'+
+      '<b>Memoria de fabricación</b><small>'+esc(t.f)+' · pulsa para leerla</small>'+
+      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
+        'stroke:currentColor;stroke-width:2.4;transition:transform .3s var(--sal)">'+
+        '<path d="M6 9l6 6 6-6"/></svg></div>'+
+    '<div class="memcuerpo" hidden></div>'+
+    '<a class="da" href="'+esc(t.memoria)+'" target="_blank" rel="noopener">abrir en Drive</a></div>';
+}
+function _cablearMemoria_(){
+  $$('[data-mem]').forEach(function(h){
+    h.onclick=function(){
+      var cuerpo=h.parentNode.querySelector('.memcuerpo'), sv=h.querySelector('svg');
+      var abierto=!cuerpo.hasAttribute('hidden');
+      if(abierto){ cuerpo.setAttribute('hidden',''); sv.style.transform=''; return; }
+      cuerpo.removeAttribute('hidden'); sv.style.transform='rotate(180deg)';
+      if(cuerpo.dataset.cargado) return;
+      cuerpo.dataset.cargado='1';
+      var id=h.dataset.mem;
+      if(!id){ cuerpo.innerHTML='<div class="dcar">No se puede mostrar aquí. Ábrela en Drive.</div>'; return; }
+      cuerpo.innerHTML='<div class="dcar">Cargando la memoria…</div>';
+      var f=document.createElement('iframe');
+      f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
+      f.src='https://drive.google.com/file/d/'+id+'/preview';
+      /* Si el visor no carga (CSP del artefacto, o sin permiso), se dice y se ofrece Drive. */
+      var fallo=setTimeout(function(){
+        if(cuerpo.dataset.ok) return;
+        cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrela en Drive con el enlace de abajo.</div>';
+      }, 6000);
+      f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
+      cuerpo.innerHTML=''; cuerpo.appendChild(f);
+    };
+  });
+}
 function vTurnos(){
   var mios=TURNOS.filter(_mioTurno_);
   var prox=mios.filter(function(t){ return !t.hecho; });
@@ -2094,42 +2133,64 @@ function vReu(){
   M.forEach(function(fila,di){fila.forEach(function(v,fi){ if(v!=null&&v>best.v)best={d:di,f:fi,v:v}; });});
   /* indice rapido de los bloques fijados, para pintarlos en verde */
   var fijSet={}; (R.fijadaBl||[]).forEach(function(b){ fijSet[b[0]+'-'+b[1]]=1; });
-  var g='<div style="overflow-x:auto;margin:0 2px"><div style="display:grid;gap:2px;grid-template-columns:auto repeat('+nF+',minmax(26px,1fr));min-width:280px">';
+  /* EJE DE TIEMPO, no de franjas. Con horarios distintos por dia la union mezcla :00 y
+     :30; una columna por franja hacia que cada dia llenara una de cada dos casillas y el
+     mapa pareciera un tablero. Ahora la columna es un instante y cada franja ocupa lo que
+     dura, asi que la fila de cada dia sale de una pieza. */
+  var _mm=function(f){ var p=String(f.ini).split(':'); return (+p[0])*60+(+p[1]||0); };
+  var _du=function(f){ return +f.dur||60; };
+  var _mcd=function(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; };
+  var paso=0; R.franjas.forEach(function(f){ paso=_mcd(paso,_mm(f)); paso=_mcd(paso,_du(f)); });
+  paso=Math.max(15, Math.min(60, paso||60));
+  var t0=Math.min.apply(null, R.franjas.map(_mm));
+  var t1=Math.max.apply(null, R.franjas.map(function(f){ return _mm(f)+_du(f); }));
+  var eje=[]; for(var _t=t0; _t<t1; _t+=paso) eje.push(_t);
+  var _hhmm=function(m){ return pad(Math.floor(m/60)%24)+':'+pad(m%60); };
+  /* para cada dia y cada instante, que franja OFERTADA lo cubre (-1 = ninguna) */
+  var cubre=R.dias.map(function(_,di){
+    return eje.map(function(t){
+      for(var fi=0; fi<R.franjas.length; fi++){
+        if(M[di][fi]==null) continue;
+        var a=_mm(R.franjas[fi]);
+        if(t>=a && t<a+_du(R.franjas[fi])) return fi;
+      }
+      return -1;
+    });
+  });
+  var g='<div style="overflow-x:auto;margin:0 2px"><div style="display:grid;gap:2px;grid-template-columns:auto repeat('+eje.length+',minmax(20px,1fr));min-width:280px">';
   g+='<div></div>';
-  R.franjas.forEach(function(f,ix){
-    /* decisión cerrada: la etiqueta va al LÍMITE izquierdo = hora de inicio */
-    /* etiqueta al LIMITE izquierdo = hora de inicio (decision cerrada). La ultima
-       lleva ademas la de CIERRE a la derecha, o el ultimo bloque no tendria limite. */
-    /* el cierre sale de la DURACION real de la franja; asumir 1 h mentia con pasos de 30 min */
-    var _m0=(parseInt(f.ini,10)||0)*60+(+String(f.ini).slice(3)||0)+(+f.dur||60);
-    var finF=pad(Math.floor(_m0/60)%24)+((_m0%60)?':'+pad(_m0%60):'');
-    g+='<div style="position:relative;min-height:15px"><span style="position:absolute;left:0;top:2px;'+
-      'transform:translateX(-50%);font-family:var(--mono);font-size:8.5px;color:var(--ink3)">'+
-      f.ini.replace(':00','')+'</span>'+
-      (ix===nF-1?'<span style="position:absolute;right:0;top:2px;font-family:var(--mono);font-size:8.5px;color:var(--ink3)">'+finF+'</span>':'')+
+  eje.forEach(function(t,ix){
+    /* decision cerrada: la etiqueta va al LIMITE izquierdo = hora de inicio. Con paso fino
+       solo se rotula la hora en punto, o no se leeria nada. */
+    var enPunto=(t%60===0);
+    g+='<div style="position:relative;min-height:15px">'+
+      (enPunto?'<span style="position:absolute;left:0;top:2px;transform:translateX(-50%);'+
+        'font-family:var(--mono);font-size:8.5px;color:var(--ink3)">'+pad(Math.floor(t/60)%24)+'</span>':'')+
+      (ix===eje.length-1?'<span style="position:absolute;right:0;top:2px;font-family:var(--mono);'+
+        'font-size:8.5px;color:var(--ink3)">'+_hhmm(t1).replace(':00','')+'</span>':'')+
       '</div>';
   });
   R.dias.forEach(function(d,di){
     g+='<div style="font-family:var(--mono);font-size:9.5px;color:var(--ink2);display:flex;'+
       'align-items:center;justify-content:flex-end;padding-right:6px">'+d+'</div>';
-    M[di].forEach(function(v,fi){
-      if(v==null){   // NO OFERTADO: hueco muerto, ni número ni color de calor
-        g+='<div title="fuera del horario de ese día" style="height:21px;border-radius:2px;display:grid;place-items:center;'+
-          'font-family:var(--mono);font-size:8.5px;color:var(--ink3);background:repeating-linear-gradient('+
-          '45deg,rgba(255,255,255,.045) 0 3px,transparent 3px 6px);border:1px solid var(--line)">·</div>';
+    eje.forEach(function(t,ix){
+      var fi=cubre[di][ix];
+      if(fi<0){   // fuera del horario de ese dia
+        g+='<div title="fuera del horario de ese d\u00eda" style="height:21px;border-radius:2px;'+
+          'background:repeating-linear-gradient(45deg,rgba(255,255,255,.045) 0 3px,transparent 3px 6px);'+
+          'border:1px solid var(--line)"></div>';
         return;
       }
+      var v=M[di][fi];
+      var arranca=(t===_mm(R.franjas[fi]));      // el numero solo en la casilla donde empieza
       var a=(0.12+0.88*(max?v/max:0)).toFixed(3);
       var esBest=(di===best.d&&fi===best.f&&best.v>0);
-      if(fijSet[di+'-'+fi]){   // el hueco ELEGIDO: verde, y manda sobre el resaltado de 'mejor'
-        g+='<div title="franja fijada" style="height:21px;border-radius:2px;display:grid;'+
-          'place-items:center;font-family:var(--mono);font-size:8.5px;color:#fff;'+
-          'background:rgba(53,199,89,.85);outline:1px solid var(--ok);outline-offset:-1px">'+v+'</div>';
-        return;
-      }
-      g+='<div style="height:21px;border-radius:2px;display:grid;place-items:center;'+
-        'font-family:var(--mono);font-size:8.5px;color:#fff;background:rgba(228,30,37,'+a+')'+
-        (esBest?';outline:1px solid var(--ink);outline-offset:-1px':'')+'">'+v+'</div>';
+      var fondo = fijSet[di+'-'+fi] ? 'rgba(53,199,89,.85)' : 'rgba(228,30,37,'+a+')';
+      var borde = fijSet[di+'-'+fi] ? ';outline:1px solid var(--ok);outline-offset:-1px'
+                 : (esBest?';outline:1px solid var(--ink);outline-offset:-1px':'');
+      g+='<div title="'+_hhmm(_mm(R.franjas[fi]))+'" style="height:21px;border-radius:2px;'+
+        'display:grid;place-items:center;font-family:var(--mono);font-size:8.5px;color:#fff;'+
+        'background:'+fondo+borde+'">'+(arranca?v:'')+'</div>';
     });
   });
   g+='</div></div>';
@@ -2872,20 +2933,17 @@ function enganchar(){
       abrirModal('<div class="mtit">'+t.f+'</div>'+
         '<div class="msub">'+esc(t.punto)+' · '+t.hora+' · '+t.dur+'</div>'+
         '<h4>Quién va</h4><div class="tarj" style="margin:0">'+t.roles.map(function(r){
-          return '<div class="fila"><div class="a"><b>'+esc(r[0])+'</b><small>'+esc(r[1])+'</small></div></div>';
+          return '<div class="fila'+(r[2]?' yo':'')+'"><div class="a"><b>'+esc(r[0])+'</b>'+
+            '<small>'+esc(r[1])+'</small></div></div>';
         }).join('')+'</div>'+
         lista(t.principales,'Objetivos principales')+lista(t.secundarios,'Objetivos secundarios')+
         (t.nota?'<p class="rnota" style="margin-top:10px"><b>Nota:</b> '+esc(t.nota)+'</p>':'')+
         /* la memoria se incrusta como DOCUMENTO (igual que un orden del día), no como
            un enlace suelto: se ve que hay un papel detrás y se abre desde ahí. */
-        (t.memoria
-          ? '<div class="doc"><div class="dh"><b>Memoria de fabricación</b>'+
-              '<small>'+esc(t.f)+'</small></div>'+
-              '<div class="dp">'+[18,34,50,66,82].map(function(y,i){
-                return '<i style="top:'+y+'px;'+(i===4?'right:96px':'')+'"></i>'; }).join('')+'</div>'+
-              '<a class="da" href="'+esc(t.memoria)+'" target="_blank" rel="noopener">abrir la memoria</a></div>'
+        (t.memoria ? _memoriaHTML_(t)
           : '<p class="rnota" style="margin-top:14px;border-top:1px solid var(--line);padding-top:11px">'+
             'Memoria del turno · <span style="color:var(--ink3)">aún no subida</span></p>'));
+      _cablearMemoria_();
     };
   });
   $$('[data-doc]').forEach(function(el){ el.onclick=function(){ verDoc(+el.dataset.doc); }; });
