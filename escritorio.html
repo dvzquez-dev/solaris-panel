@@ -596,6 +596,23 @@ DATA.subsistemas=[{u:'Aviónica',n:4},{u:'GNC',n:3},{u:'Aeroestructuras',n:5},
    casan con el roster (un turno del Discord firmado con otro apellido, un parte de
    alguien que ya se fue). _m() SIEMPRE devuelve algo pintable y marca al desconocido. */
 function miembro(n){for(var i=0;i<DATA.miembros.length;i++) if(DATA.miembros[i].nombre===n) return DATA.miembros[i]; return null;}
+/* GEMELA. LAS HORAS DE ESTE MES, de verdad.
+
+   `horasMes` viene del campo de Notion «Horas empleadas (este mes)» y NO son las de este
+   mes: cuadra con la suma de los componentes del mes en 5 personas de 32, y con
+   `horasTemp/meses` -la media de la temporada- en las 32. Medias del equipo: 17,70 h el
+   campo, 12,56 h julio de verdad. El fallo es de la FORMULA DE NOTION, no de la app; aqui
+   solo se deja de repetirlo.
+
+   `horasMesReal` lo calcula `flujos/umbral.py` (horas de temporada menos la suma de los
+   meses ya cerrados) y coincide con los componentes de Notion en 32 de 32.
+
+   Sin `horasMesReal` (backend viejo) se cae a la media, pero DICIENDOLO. */
+function _hMesReal_(m){
+  m = m || {};
+  return (typeof m.hMesReal==='number') ? m.hMesReal
+       : (typeof m.horasMesReal==='number') ? m.horasMesReal : null;
+}
 /* GEMELA (escritorio: misma funcion, mismo nombre). Quien SIGUE en el equipo.
    El roster conserva a las bajas por su historia -sus partes, sus sanciones, sus horas
    pasadas siguen siendo verdad-, pero no se les vuelve a elegir para nada: ni convocar, ni
@@ -972,6 +989,12 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
   var bajo =conH.filter(function(m){return m.hMes<UMBRAL;}).length;
   var infra=EQUIPO.filter(function(m){return m.infraccion;}).length;
   var parcial = conH.length < EQUIPO.length;
+  /* ESTE MES es este mes. `hMes` es la media de la temporada -el campo de Notion miente en
+     su nombre-, asi que el resumen usa `hMesReal` y solo cae a la media si no la hay,
+     cambiando el rotulo. Julio de 2026: 401,9 h reales contra 566,3 h de la media. */
+  var conR=EQUIPO.filter(function(m){ return typeof m.hMesReal==='number'; });
+  var mesReal=conR.length>0, baseMes=mesReal?conR:conH;
+  var totMes=baseMes.reduce(function(a,m){ return a+(mesReal?m.hMesReal:m.hMes); },0);
   var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
 
   var lista = cola.length
@@ -987,7 +1010,10 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
     '<div class="kpis">'+
       kpi('Horas en el aire',nf(enAire,1)+'<small> h</small>','no cuentan hasta que se firmen','wa')+
       kpi('Expedientes esperándote',docsMios().length,'los firmas tú',docsMios().length?'wa':'up')+
-      kpi('Bajo el umbral',bajo,'de '+conH.length+' · menos de '+nf(UMBRAL,1)+' h/mes','wa',(conH.length?(bajo/conH.length*100).toFixed(0):0)+'%')+
+      /* Se compara la MEDIA de la temporada, no lo que lleve este mes: el umbral tambien
+         es una media por mes, y contrastar un mes a medias contra un listón de mes
+         entero marcaría a todo el equipo cada día 2. La etiqueta lo dice. */
+      kpi('Bajo el umbral',bajo,'de '+conH.length+' · media de temporada bajo '+nf(UMBRAL,1)+' h/mes','wa',(conH.length?(bajo/conH.length*100).toFixed(0):0)+'%')+
       kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(EQUIPO.length?(infra/EQUIPO.length*100).toFixed(0):0)+'%')+
     '</div>'+
     '<div style="display:grid;grid-template-columns:300px 1fr;gap:13px;align-items:start">'+
@@ -1000,11 +1026,11 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
           '<p style="margin:0;font-size:11.5px;color:var(--ink3);line-height:1.6;text-align:center">'+
           'Media de puntos de todo el equipo, sobre 10. Los tres primeros tramos, en '+
           '<b style="color:var(--ink2)">ámbar</b>, son la zona de riesgo disciplinario.</p></div>')+
-      pan('Resumen del mes','julio 2026',
+      pan(mesReal?'Este mes':'Media de la temporada', mesReal?'julio 2026':'sobre '+baseMes.length+' personas',
         '<div class="pb">'+
           '<div class="chips">'+
-            '<span class="chip">TOTAL <b style="color:var(--ink)">'+nf(totH,1)+' h</b>'+(parcial?' <span style="color:var(--warn)">(parcial)</span>':'')+'</span>'+
-            '<span class="chip">MEDIA <b style="color:var(--ink)">'+(conH.length?nf(totH/conH.length,1):'—')+' h</b></span>'+
+            '<span class="chip">TOTAL <b style="color:var(--ink)">'+nf(totMes,1)+' h</b>'+(parcial?' <span style="color:var(--warn)">(parcial)</span>':'')+'</span>'+
+            '<span class="chip">MEDIA <b style="color:var(--ink)">'+(baseMes.length?nf(totMes/baseMes.length,1):'—')+' h</b></span>'+
             '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+nf(UMBRAL,1)+' h</b></span>'+
             '<span class="chip">CIERRA <b style="color:var(--ink)">31/07</b></span>'+
           '</div>'+
@@ -2240,6 +2266,11 @@ function _aplicarPanel_(pnl){
   /* Los ingredientes del umbral: medias mensuales de la temporada y la del mes
      abierto. El peso del dia lo pone `_umbral_()` al calcular, no el backend. */
   if(pnl.umbral) DATA.umbral=pnl.umbral;
+  /* El backend habla largo (`horasMesReal`) y la vista lee corto (`hMesReal`), igual que
+     con horasMes->hMes. Sin esta traduccion el dato llega y no se ve. */
+  (DATA.miembros||[]).forEach(function(m){
+    if(m.hMesReal==null && typeof m.horasMesReal==='number') m.hMesReal=m.horasMesReal;
+  });
   if(pnl.reunion) DATA.reunion=pnl.reunion;
   if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length) DATA.subsistemas=pnl.subsistemas;
   if(pnl.yo){                                   // forma MIEMBRO
