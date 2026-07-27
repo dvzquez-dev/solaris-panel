@@ -939,6 +939,12 @@ var GOOGLE_CLIENT_ID="920160966999-sjgj2rbk9i74fde54uanpa9tp34ih741.apps.googleu
 var backendOK=false, SESION=null;
 var ADMIN_EMAIL='solaris@uvigoaerotech.com';   // la cuenta que ve a TODOS y puede «ver como» cualquiera
 function esAdmin(){ return !!(SESION && SESION.email && String(SESION.email).toLowerCase()===ADMIN_EMAIL); }
+/* GEMELA (escritorio: misma funcion, mismo nombre). Quien SIGUE en el equipo.
+   El roster conserva a las bajas por su historia -sus partes, sus sanciones, sus horas
+   pasadas siguen siendo verdad-, pero no se les vuelve a elegir para nada: ni convocar, ni
+   invitar, ni sancionar, ni otorgar horas, ni «ver como». Antes cada sitio se lo filtraba
+   por su cuenta y donde nadie lo escribio salia la lista entera. */
+function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
 function _apiParse(txt){ var j=null; try{ j=JSON.parse(txt); }catch(_){}
   if(!j || j.ok!==true) throw new Error((j&&j.error)||"respuesta no válida del backend");
   return j.data; }
@@ -1044,7 +1050,7 @@ function _pintarCabecera_(){
 function _pintarVerComo_(){
   var rs=$('#rolsel'); if(!rs) return;
   if(!esAdmin()){ rs.style.display='none'; return; }
-  var ms=(DATA.miembros||[]).slice().sort(function(a,b){return (a.nombre||'').localeCompare(b.nombre||'');});
+  var ms=_activos_().slice().sort(function(a,b){return (a.nombre||'').localeCompare(b.nombre||'');});
   rs.style.display='';
   rs.innerHTML='<span class="sc" style="margin-right:6px;align-self:center">Ver como</span>'+
     '<select id="verComo" style="background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:6px 9px;color:var(--ink);font:inherit;font-size:12px;max-width:170px">'+
@@ -1316,8 +1322,13 @@ async function _hidratarReuM_(r){
   }catch(e){}
   r._hidratada=true; return r;
 }
-async function _cargarReunionesM_(){
-  try{ var arr=await api.listarReuniones();
+/* `yaPedidas`: una promesa de `listarReuniones` lanzada antes. La PETICION no necesita saber
+   quien eres -el backend te identifica por el token-, pero NORMALIZARLA si (`_normReuM_`
+   mira `YO.nombre` para saber que has contestado tu). Separarlas deja que la peticion vuele
+   en paralelo con el `bootstrap` y solo el normalizado espere. Sin argumento, pide ella
+   misma: asi la sigue usando el refresco en vivo sin enterarse. */
+async function _cargarReunionesM_(yaPedidas){
+  try{ var arr=await (yaPedidas || api.listarReuniones());
     CARGA.reuniones=true;
     if(Array.isArray(arr) && arr.length){
       /* SE CONSERVA LA QUE ESTABAS MIRANDO. Esta funcion tambien la llama el refresco en
@@ -1398,6 +1409,16 @@ function _gate_(html){
 async function _onCredencial_(resp,_silente){
   _gate_(SPLASH+'<div style="opacity:.8">Verificando…</div>');
   try{
+    /* TODO A LA VEZ. `getPartes`, `getFichajeAbierto` y `listarReuniones` se identifican por
+       el TOKEN, que ya lo tenemos: no hay que esperar al `bootstrap` para pedirlas. Salen
+       aqui y se recogen abajo, asi que el arranque cuesta UNA ida y vuelta y no dos.
+       `SESION` se rellena provisional con el token para que `api` pueda firmarlas; el email y
+       el nombre llegan enseguida con el bootstrap. */
+    SESION={token:resp.credential,email:null,nombre:null};
+    var pPartes  = _cargarMisPartes_();
+    var pFichaje = _cargarFichajeAbierto_();
+    var pReuniones = Promise.resolve().then(function(){ return api.listarReuniones(); })
+                       .catch(function(){ return null; });   // se normaliza abajo, con YO ya puesto
     var boot=null; try{ boot=await api.bootstrap(resp.credential); }catch(_){ boot=null; }
     if(boot && boot.identidad){
       SESION={token:resp.credential,email:boot.identidad.email,nombre:boot.identidad.nombre};
@@ -1411,29 +1432,32 @@ async function _onCredencial_(resp,_silente){
     try{ localStorage.setItem('sol_last_email',SESION.email);
          localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
     _aplicarBootstrapMovil_(boot);        // tareas/turnos/documentos REALES (fuera la semilla)
-    /* SE PINTA YA. Antes se encadenaban getPartes -> getFichajeAbierto -> listarReuniones
-       -> getReunion ANTES de quitar el gate: cinco idas y vueltas a Apps Script en serie,
-       a 1,67 s de media = mas de 8 s mirando «Verificando…». El bootstrap ya trae
-       identidad, panel, tareas, turnos y documentos: con eso hay pantalla. Lo demas cae
-       despues, en PARALELO, y se repinta segun llega. */
-    var g=document.getElementById('loginGate'); if(g) g.remove();
-    var bs=$('#btnSalir'); if(bs) bs.style.display='';     // sí hay salir/cambiar de cuenta
-    _pintarVerComo_();                                     // admin (solaris@): selector «ver como»; resto: sin conmutador
-    if(esAdmin() && YO){ _partesAdmin=null; try{ PARTES=await _partesDe_(YO.nombre); }catch(_){} }   // admin: partes del miembro elegido
+
+    /* NO SE ENSEÑA NADA HASTA QUE ESTA TODO. Antes se quitaba el gate con lo del bootstrap y
+       el resto caia despues repintando: tres pintadas seguidas y, como `pintar()` reconstruye
+       `#main`, la vista se reseteaba entera cada vez. (Daniel: «van apareciendo mas cosas en
+       la pantalla principal y resetea toda la vista».)
+
+       Y NO tarda mas por esperar, que era el motivo de hacerlo al reves: las tres peticiones
+       que faltan salieron ARRIBA, a la vez que el `bootstrap` (se identifican por el token, no
+       necesitan saber quien eres), asi que a estas alturas o han vuelto ya o les queda poco.
+       El ancho total sigue siendo una ida y vuelta, no dos. */
+    _gate_(SPLASH+'<div style="opacity:.8">Cargando tus datos…</div>');
+    await Promise.all([pPartes, pFichaje, _cargarReunionesM_(pReuniones)]);
+    /* El admin, DESPUES de esperar. Si va antes lo pisa `_cargarMisPartes_`, que pide
+       `{mias:true}` = los partes de la cuenta `solaris@`, no los del miembro que estas
+       viendo. Estaba pasando: se cargaban los buenos y luego los otros encima. */
+    if(esAdmin() && YO){ _partesAdmin=null; try{ PARTES=await _partesDe_(YO.nombre); }catch(_){} }
     // el backend NO sirve el detalle de movimientos de puntos: vaciamos la semilla (era ficticia,
     // enseñaba los de otra persona). Se muestra vacío hasta que haya fuente real.
     if(typeof MOVS!=='undefined') MOVS.length=0;
+
+    _pintarVerComo_();                                     // admin (solaris@): selector «ver como»; resto: sin conmutador
     _pintarCabecera_();                                    // la cabecera muestra al miembro (real o «visto como»)
-    pintar();
+    pintar();                                              // LA UNICA pintada del arranque
+    var g=document.getElementById('loginGate'); if(g) g.remove();   // y ahora se enseña
+    var bs=$('#btnSalir'); if(bs) bs.style.display='';     // sí hay salir/cambiar de cuenta
     _arrancarRefrescoVivo_();                              // a partir de aqui se alimenta sola
-    /* Las que faltan van a la vez y sin bloquear, pero se repinta UNA SOLA VEZ al final.
-       Con un `pintar()` por carga, la pantalla se rehacia tres veces seguidas nada mas
-       entrar: como `pintar()` reconstruye `#main`, cada repintado pierde el scroll y lo que
-       tuvieras abierto, y se ve como si la app se recargara sola. (Daniel: «te hace refresh
-       y se buguea la vista».) Ninguna espera a las otras para cargar; solo se junta el
-       repintado. Y si una falla, `Promise.all` no se cae: cada una ya traga su error. */
-    Promise.all([_cargarMisPartes_(), _cargarFichajeAbierto_(), _cargarReunionesM_()])
-      .then(function(){ _repintarSuave_(); });
   }catch(e){
     if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
     _gate_(SPLASH+'<div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+
@@ -3248,7 +3272,7 @@ function _rankSubsHTML_(){
 }
 /* Quién coordina qué: consulta, no tarea diaria. Se abre desde el menú ⋮. */
 function _coordinacionHTML_(){
-  var coords=(DATA.miembros||[]).filter(function(m){ return m.cargo; });
+  var coords=_activos_().filter(function(m){ return m.cargo; });
   return '<div class="mtit">El equipo</div>'+
     '<div class="msub">Quién coordina cada unidad</div>'+
     '<div class="tarj" style="margin:0">'+(coords.length?coords.map(function(m){
@@ -3330,7 +3354,7 @@ function _durTxtM_(min){
 /* convocados por defecto según el tipo (como app.html): general=todo el equipo, subsistema=tu unidad,
    junta=coordinadores+PD, consejo=por configurar, mixta/trabajo=a mano. */
 function _presetInvitadosM_(tipo){
-  var yo=(YO&&YO.nombre)||'', ms=(DATA.miembros||[]).filter(function(m){ return !m.baja; }), out=[];
+  var yo=(YO&&YO.nombre)||'', ms=_activos_(), out=[];
   ms.forEach(function(m){
     if(m.nombre===yo) return;
     var meto = tipo==='general' ? true
@@ -3419,7 +3443,7 @@ function crearModal(){
     $$('#ceChips button').forEach(function(b){ b.onclick=function(){ INV.delete(b.dataset.n); invRender(); upd(); }; }); };
   var sugRender=function(q){ var sg=$('#ceSug'); if(!sg) return; q=_sinTildesM_((q||'').trim());
     if(!q){ sg.style.display='none'; return; }
-    var hits=(DATA.miembros||[]).filter(function(m){ return m.nombre!==(YO&&YO.nombre) && !INV.has(m.nombre) && _sinTildesM_(m.nombre).indexOf(q)>=0; }).slice(0,6);
+    var hits=_activos_().filter(function(m){ return m.nombre!==(YO&&YO.nombre) && !INV.has(m.nombre) && _sinTildesM_(m.nombre).indexOf(q)>=0; }).slice(0,6);
     if(!hits.length){ sg.style.display='none'; return; }
     sg.innerHTML=hits.map(function(m){ return '<div data-n="'+esc(m.nombre)+'" data-p>'+esc(m.nombre)+' <small>'+esc(m.cargo||m.unidad||'')+'</small></div>'; }).join('');
     sg.style.display='';
@@ -3465,7 +3489,7 @@ function crearModal(){
   $('#ceTipo').onchange=tipoUpd;
   $$('#ceMix .cmixb').forEach(function(b){ b.onclick=function(){ b.classList.toggle('on');
     var u=b.dataset.u, on=b.classList.contains('on');
-    (DATA.miembros||[]).forEach(function(m){ if(m.unidad===u && m.nombre!==(YO&&YO.nombre)){ if(on) INV.add(m.nombre); else INV.delete(m.nombre); } });
+    _activos_().forEach(function(m){ if(m.unidad===u && m.nombre!==(YO&&YO.nombre)){ if(on) INV.add(m.nombre); else INV.delete(m.nombre); } });
     invRender(); upd(); }; });
   var inp=$('#ceInv');
   if(inp){ inp.oninput=function(){ sugRender(inp.value); };
@@ -3652,7 +3676,7 @@ function sancionarModal(){
     '<div class="msub">Entra en la cola como <b>pendiente</b>: la confirmas aquí y se aplica después. '+
     'Varias personas a la vez van en un mismo bloque, con <b>un único comunicado</b>.</div>'+
     '<label class="campo"><span class="sc">A quién</span><select id="scPer">'+
-      DATA.miembros.map(function(m){return '<option>'+esc(m.nombre)+'</option>';}).join('')+'</select></label>'+
+      _activos_().map(function(m){return '<option>'+esc(m.nombre)+'</option>';}).join('')+'</select></label>'+
     '<label class="campo"><span class="sc">Motivo del RRI</span><select id="scMot">'+
       motivos.map(function(m){return '<option value="'+m.id+'">Art. '+m.art+' — '+esc(m.texto)+'</option>';}).join('')+
       '</select></label>'+
