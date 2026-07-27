@@ -948,15 +948,28 @@ function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.b
 /* GEMELA (la otra cara: misma funcion, mismo nombre).
    EL UMBRAL NO ES UNA CONSTANTE. `reglas/cuota.py` lo define asi:
        umbral = max(8, min(15, (2/3) x media de horas del mes del equipo))
-   Aqui estaba cableado a 11,8 — que es ese mismo calculo hecho UNA VEZ, con la media de
-   las 32 personas, bajas incluidas (2/3 x 17,70 = 11,80). Contando solo a los activos la
-   media sube a 19,70 y el umbral a 13,14. Un numero cableado no se ve venir, y un umbral
-   bajo hace que el panel diga que la gente cumple cuando no cumple. */
+   Aqui estaba cableado a 11,8 — que resulta ser el valor CORRECTO (2/3 x 17,70 = 11,80
+   sobre los 32 de la temporada). Se calcula igualmente, porque un numero a mano deja de
+   ser correcto en cuanto cambian las horas y nadie se entera: no se ve venir. */
 var UMBRAL_LO=8, UMBRAL_HI=15, UMBRAL_FRAC=2/3;
+/* OJO: la poblacion del umbral NO es la de las estadisticas, y es a proposito.
+
+   Las estadisticas del panel (medias, «en infraccion») miden al equipo que hay HOY, asi que
+   van sobre `_activos_()`. El umbral es otra cosa: sale del RRI y mide la TEMPORADA, asi que
+   entran TODOS los que estuvieron en ella —tambien quien luego se fue—, cada uno por los
+   meses que estuvo. Si alguien curro medio año, ese medio año cuenta.
+
+   Y la magnitud tampoco es `hMes` (lo que llevas ESTE mes) sino **horas de temporada
+   divididas por meses de estancia**, que es lo que dice la primera linea de
+   `reglas/cuota.py`. Asi quien lleva 3 meses no sale hundido frente a quien lleva 11: la
+   ponderacion por meses ya esta dentro del propio ratio.
+
+   No las 'armonices' en una sola: son dos preguntas distintas con dos respuestas distintas.
+   (Lo hice y salio 13,13 donde tocaba 11,80.) */
 function _umbral_(){
-  /* Solo activos: es la misma poblacion sobre la que se miden las medias. */
-  var hs=_activos_().map(function(m){ return m.hMes; })
-                    .filter(function(h){ return typeof h==='number'; });
+  var hs=(DATA.miembros||[]).map(function(m){
+      return (typeof m.horasTemp==='number' && m.meses) ? (m.horasTemp/m.meses) : null;
+    }).filter(function(h){ return typeof h==='number'; });
   /* Un miembro solo ve SUS horas, asi que no puede calcular la media del equipo. Con una
      sola muestra saldria 2/3 de tus propias horas, que no es el umbral de nadie: se cae al
      ultimo valor conocido. Lo correcto es que lo mande el backend, que si tiene los 32. */
