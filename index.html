@@ -187,7 +187,7 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
   50%{transform:scale(1.28) rotate(45deg);
     filter:drop-shadow(0 0 14px rgba(62,180,137,1)) drop-shadow(0 0 28px rgba(62,180,137,.7))}}
 @media (prefers-reduced-motion:reduce){
-  .med.aura .halo,.med.aura::after,.med.aura .tip i,.med.aura .tk.cierra{animation:none}
+  .med.aura .halo,.med.aura::after,.med.aura .tip i{animation:none}
 }
 /* las marcas: una por tramo, FUERA del anillo. Al prender su tramo, chispean. */
 .med .tk{stroke:var(--line2);stroke-width:1.7;stroke-linecap:round;transition:stroke .25s linear}
@@ -207,14 +207,14 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 /* La barrita de las 12 es la primera y la ultima a la vez, como en un reloj: marca donde
    empieza y donde acaba la vuelta. VERDE si y solo si tienes los 10. */
 /* Sin `.f` a proposito: la barrita del 9 marca los 9 puntos aunque su tramo siga vacio. */
-/* La barrita SIEMPRE a plena opacidad: latia bajando al 80 % y eso no se lee como «vivo»,
-   se lee como APAGADO. (Daniel: «se ve opaco».) Lo que late es el resplandor, no la barra.
-   Y se engorda un poco menos: 2,4 en vez de 2,8, que a 1,7 de las demas cantaba. */
-.med.aura .tk.cierra{stroke:var(--ok);stroke-width:2.4;opacity:1;
-  animation:barrita12 2.2s ease-in-out infinite}
-@keyframes barrita12{
-  0%,100%{filter:drop-shadow(0 0 3px rgba(62,180,137,.7))}
-  50%{filter:drop-shadow(0 0 9px rgba(62,180,137,1)) drop-shadow(0 0 16px rgba(62,180,137,.45))}}
+/* SOLO EL COLOR. Nada de grosor, ni filtro, ni animacion: una barrita verde tiene que ser
+   una barrita como las demas pero verde, no otra cosa. Le habia puesto 2,4 px (contra los
+   1,7 del resto), un drop-shadow y un latido, y se veia de otra pasta. Daniel: «en vez de
+   cambiar solo el color, las has cambiado bastante la estructura».
+   El tono es el claro del degradado verde que ya usa el anillo (#7BE3BE), no `--ok`
+   (#3EB489): las encendidas son #FF4A4F, un rojo MUY brillante, y al lado un verde oscuro
+   se ve apagado aunque tenga la misma forma. No es un color nuevo: ya esta en la paleta. */
+.med.aura .tk.cierra{stroke:#7BE3BE}
 .med .tip{position:absolute;inset:0;transform:rotate(0deg);pointer-events:none;
   transition:transform .8s var(--arco)}
 .med .tip i{position:absolute;left:50%;top:2px;margin-left:-8px;width:16px;height:16px;display:block;
