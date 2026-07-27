@@ -1017,7 +1017,10 @@ function _aplicarBootstrapMovil_(boot){
 var REUNIONES_M=[];
 /* Con sesión real y sin reuniones servidas NO se pinta la reunión de la semilla:
    se dice en pantalla que no hay ninguna. Un dato falso es peor que un hueco. */
-function _sinReuniones_(){ return !!(typeof backendOK!=='undefined' && backendOK && SESION && !REUNIONES_M.length); }
+/* OJO: solo es «no tienes reuniones» si YA llegaron. Mientras se cargan hay que decir que
+   se estan cargando, o alguien puede creer que no le toca cubrir nada y no cubrir. */
+function _sinReuniones_(){ return !!(typeof backendOK!=='undefined' && backendOK && SESION && CARGA.reuniones && !REUNIONES_M.length); }
+function _reunionesCargando_(){ return !!(typeof backendOK!=='undefined' && backendOK && SESION && !CARGA.reuniones); }
 /* Las franjas NO vienen ordenadas por hora: la Reunion General llego de Xoyondo como
    18,19,20,21,22,10,11..17, asi que el mapa saltaba de 23:00 a 10:00. Se ordenan aqui y se
    REMAPEA el indice de franja dentro de cada bloque. Ojo: el ORDEN DE LOS BLOQUES no se
@@ -1096,6 +1099,7 @@ async function _hidratarReuM_(r){
 }
 async function _cargarReunionesM_(){
   try{ var arr=await api.listarReuniones();
+    CARGA.reuniones=true;
     if(Array.isArray(arr) && arr.length){
       REUNIONES_M=arr.map(_normReuM_);
       /* Antes: la primera SIN FIJAR en orden de creacion. Ni miraba fechas, ni tenia
@@ -1114,9 +1118,14 @@ function normPMovil(p){
   return { id:p.id, f:_isoADMY_(p.fecha), t:p.tarea||'', q:Number(p.horas)||0,
     e:_E_MOVIL_[p.estado]||'pend', ini:p.ini||'', fin:p.fin||'', cat:p.categoria||null,
     just:p.justificacion||'', nota:p.motivo||p.justificacion||'', sinFichaje:!!p.sinFichaje, caduca:p.caduca_at||null }; }
+/* QUE HA LLEGADO YA. Se pinta antes de tenerlo todo, asi que hace falta distinguir «esto
+   esta vacio» de «esto todavia no ha llegado»: son cosas distintas y confundirlas es la
+   forma mas facil de que alguien crea que no tiene reuniones y no cubra. */
+var CARGA={partes:false, fichaje:false, reuniones:false};
 async function _cargarMisPartes_(){
   try{ var arr=await api.getPartes({mias:true}); if(Array.isArray(arr)) PARTES=arr.map(normPMovil); }
   catch(e){}
+  finally{ CARGA.partes=true; }
 }
 /* Al entrar, retoma el fichaje que hubiera abierto en la nube: el reloj sigue desde la
    hora del servidor, así que cerrar la app (o cambiar de móvil) no pierde la sesión. */
@@ -1125,6 +1134,7 @@ async function _cargarFichajeAbierto_(){
     if(f && f.ini){ var ps=f.pausas||[], ult=ps[ps.length-1];
       ST.ses={estado:(ult&&!ult.fin)?'pausada':'corriendo', cloudIni:f.ini, pausas:ps, desde:_hhmmDe_(f.ini), ult:_hhmmDe_(f.ini)}; } }
   catch(e){}
+  finally{ CARGA.fichaje=true; }
 }
 /* DEMO = solo para ver la maqueta en local SIN cuenta (?demo en la URL). En la app
    publicada NUNCA se activa: el login es OBLIGATORIO, no se cae a datos falsos. */
@@ -1167,10 +1177,12 @@ async function _onCredencial_(resp,_silente){
     }
     try{ localStorage.setItem('sol_last_email',SESION.email);
          localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
-    await _cargarMisPartes_();
-    await _cargarFichajeAbierto_();
     _aplicarBootstrapMovil_(boot);        // tareas/turnos/documentos REALES (fuera la semilla)
-    await _cargarReunionesM_();           // tus reuniones del backend
+    /* SE PINTA YA. Antes se encadenaban getPartes -> getFichajeAbierto -> listarReuniones
+       -> getReunion ANTES de quitar el gate: cinco idas y vueltas a Apps Script en serie,
+       a 1,67 s de media = mas de 8 s mirando «Verificando…». El bootstrap ya trae
+       identidad, panel, tareas, turnos y documentos: con eso hay pantalla. Lo demas cae
+       despues, en PARALELO, y se repinta segun llega. */
     var g=document.getElementById('loginGate'); if(g) g.remove();
     var bs=$('#btnSalir'); if(bs) bs.style.display='';     // sí hay salir/cambiar de cuenta
     _pintarVerComo_();                                     // admin (solaris@): selector «ver como»; resto: sin conmutador
@@ -1180,6 +1192,11 @@ async function _onCredencial_(resp,_silente){
     if(typeof MOVS!=='undefined') MOVS.length=0;
     _pintarCabecera_();                                    // la cabecera muestra al miembro (real o «visto como»)
     pintar();
+    /* Las cuatro que faltan, a la vez y sin bloquear. Cada una repinta al llegar; si una
+       falla, las otras siguen -antes una sola caida dejaba el login colgado-. */
+    _cargarMisPartes_().then(pintar);
+    _cargarFichajeAbierto_().then(pintar);
+    _cargarReunionesM_().then(pintar);
   }catch(e){
     if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
     _gate_(SPLASH+'<div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+
@@ -1655,6 +1672,9 @@ function vEstado(){
 }
 function _proxReuHTML_(){
   var R=_proximaReuM_();
+  if(_reunionesCargando_())
+    return '<h2 class="sec">Próxima reunión<span class="ln"></span></h2>'+
+      '<div class="tarj"><p class="rnota" style="margin:0;padding:6px 0">Cargando tus reuniones…</p></div>';
   if(_sinReuniones_() || !R)
     return '<h2 class="sec">Próxima reunión<span class="ln"></span></h2>'+
       '<div class="tarj">'+vacio('Ninguna reunión convocada',
@@ -1729,7 +1749,11 @@ function vFichar(){
         : '')+
       '<div class="sesbtn">'+
         (s.estado==='parada'
-          ? '<button class="btn pri full" data-p id="btnIni">Fichar entrada</button>'
+          ? (CARGA.fichaje
+              /* Sin saber si YA tienes un fichaje abierto no se puede ofrecer «fichar
+                 entrada»: dirias «parado» a alguien que esta fichando y ficharia dos veces. */
+              ? '<button class="btn pri full" data-p id="btnIni">Fichar entrada</button>'
+              : '<button class="btn full" disabled>Comprobando si ya tienes un fichaje abierto…</button>')
           : (nube
               ? '<button class="btn" data-p id="btnPausa">'+(s.estado==='pausada'?'Reanudar':'Pausar')+'</button>'+'<button class="btn no" data-p id="btnFin">Fichar salida</button>'
               : '<button class="btn" data-p id="btnPausa">'+(s.estado==='pausada'?'Reanudar':'Pausar')+'</button>'+
@@ -2468,6 +2492,9 @@ function verDoc(id){
     acc);
 }
 function vReu(){
+  if(_reunionesCargando_())
+    return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
+      '<div class="tarj"><p class="rnota" style="margin:0;padding:6px 0">Cargando tus reuniones…</p></div>';
   if(_sinReuniones_())
     return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
       '<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar '+(esCoord()?'reunión':'reunión de trabajo')+'</button>'+
@@ -3236,7 +3263,9 @@ function badges(){
   var b={};
   b.horas = PARTES.filter(function(p){return p.e==='pend';}).length;
   b.docs  = ENTREGABLES.filter(function(e){return e.estado==='cambios';}).length;
-  b.reu   = (_sinReuniones_()||REUNION.cubierta||REUNION.fijada)?0:1;   /* fijada = disponibilidad cerrada */
+  /* Nada de avisar de lo que todavia no se sabe: mientras cargan las reuniones el globo
+     se queda apagado, y aparece cuando hay dato de verdad. */
+  b.reu   = (_reunionesCargando_()||_sinReuniones_()||REUNION.cubierta||REUNION.fijada)?0:1;
   return b;
 }
 function pintarNav(){
