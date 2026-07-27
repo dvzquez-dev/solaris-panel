@@ -663,7 +663,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
       <div class="caja">
         <button data-mnu="equipo" data-p>El equipo<small>Quién coordina cada unidad</small></button>
         <button data-mnu="ajustes" data-p>Ajustes<small>Notificaciones y sesión</small></button>
-        <button data-mnu="buzon" disabled>Buzón<small>Todavía no está montado</small></button>
+        <button data-mnu="buzon" data-p>Reportar<small>Un fallo o una mejora</small></button>
         <button data-mnu="salir" data-p>Cerrar sesión</button>
       </div>
     </div>
@@ -852,6 +852,10 @@ var api={
   reanudarFichaje:  function(){ return api._post({action:"reanudarFichaje"}); },
   declararParte:    function(id,tarea,just,cat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat}); },
   crearReunion:     function(r){ return api._post({action:"crearReunion",reunion:r}); },
+  /* Buzones. `quien` NO se manda: lo pone el servidor desde el token, porque si lo
+     mandara el navegador cualquiera podria firmar un reporte como cualquier otro. */
+  reportarBug:      function(d){ return api._post({action:"reportarBug",datos:d}); },
+  reportarMejora:   function(d){ return api._post({action:"reportarMejora",datos:d}); },
   listarReuniones:  function(){ return api._post({action:"listarReuniones"}); },
   getReunion:       function(id){ return api._post({action:"getReunion",id:id}); },
   /* Estaban en app.html y se perdieron al partir el artefacto: sin ellas, cubrir y
@@ -881,6 +885,10 @@ function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.
    sirve al miembro su ficha completa (yo) + solo la identidad de los demás. */
 function _aplicarPanel_(pnl){
   if(!pnl) return;
+  /* Faltaba copiar `generado`, asi que esta cara enseñaba SIEMPRE la fecha de su semilla
+     -escrita a mano- por mucho que el backend mandara otra. El escritorio si la copiaba:
+     de ahi que cada cara dijera una fecha distinta. */
+  if(pnl.generado) DATA.generado=pnl.generado;
   if(pnl.temporada) DATA.temporada=pnl.temporada;
   if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length) DATA.subsistemas=pnl.subsistemas;
   var yo=null;
@@ -2227,6 +2235,66 @@ function _notisHTML_(){
     '<button class="btn full" data-p id="btnNotis">Activar notificaciones</button>'+
     '<p class="rnota" id="notisMsg" style="margin:8px 0 0"></p></div>';
 }
+/* ── BUZON: reportar un fallo o proponer una mejora ───────────────────────────
+   Dos campos a mano y punto (decision de Daniel): si se piden mas, no lo usa nadie.
+   El resto -pantalla, navegador, version de los datos- lo rellena la app, y `quien` lo
+   pone el SERVIDOR desde el token. Lo que se escribe aqui NO se aplica ni se publica:
+   va a una cola que revisa Daniel. ─────────────────────────────────────────────── */
+var _NOMBRE_PANTALLA_={estado:'Estado',fichar:'Fichar',horas:'Horas',tareas:'Tareas',
+  turnos:'Turnos',docs:'Documentos',reu:'Reuniones'};
+function _contextoM_(){
+  var ua=navigator.userAgent||'';
+  var nav=/Firefox/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome/.test(ua)?'Chrome':
+          /Safari/.test(ua)?'Safari':'otro';
+  return 'movil · '+nav+' · '+screen.width+'x'+screen.height+
+    ' · datos '+(DATA.generado||'?')+(_esStandalone_()?' · desde la pantalla de inicio':'');
+}
+function buzonModal(tipo){
+  var esBug=(tipo!=='mejora');
+  var pant=_NOMBRE_PANTALLA_[ST.vista]||ST.vista;
+  abrirModal('<div class="mtit">'+(esBug?'Reportar un fallo':'Proponer una mejora')+'</div>'+
+    '<div class="msub">Estás en <b>'+esc(pant)+'</b> · se envía con tu nombre</div>'+
+    '<div class="modos" id="bzTipo" style="margin-bottom:12px">'+
+      '<button data-bt="bug" class="'+(esBug?'on':'')+'" data-p>Un fallo</button>'+
+      '<button data-bt="mejora" class="'+(esBug?'':'on')+'" data-p>Una mejora</button></div>'+
+    '<label class="campo"><span class="sc">'+(esBug?'¿Qué ha pasado?':'¿Qué mejorarías?')+
+      ' <span class="req">*</span></span>'+
+      '<input id="bzTit" placeholder="'+(esBug?'en una línea…':'en una línea…')+'" autocomplete="off"></label>'+
+    '<label class="campo"><span class="sc">'+(esBug?'¿Qué esperabas que pasara?':'¿Por qué? ¿Qué te cuesta hoy?')+'</span>'+
+      '<textarea id="bzDet" placeholder="'+(esBug?'y qué hiciste justo antes, si lo recuerdas…':'el problema de fondo, no la solución…')+'"></textarea></label>'+
+    (esBug?'<span class="sc" style="display:block;margin-bottom:6px">¿Cuánto molesta?</span>'+
+      '<div class="modos" id="bzGrav" style="margin-bottom:12px">'+
+      '<button data-g="Bloquea" data-p>Me bloquea</button>'+
+      '<button data-g="Molesta" class="on" data-p>Molesta</button>'+
+      '<button data-g="Cosmético" data-p>Es cosmético</button></div>':'')+
+    '<p class="rnota">Esto <b>no cambia nada por sí solo</b>: va a una cola que revisa el '+
+    'Project Director. Si sale adelante, se prepara y se te avisa.</p>'+
+    '<button class="btn pri full" data-p id="bzEnviar" style="margin-top:10px">Enviar</button>');
+  var grav='Molesta';
+  $$('#bzGrav button').forEach(function(b){ b.onclick=function(){
+    $$('#bzGrav button').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on'); grav=b.dataset.g; }; });
+  $$('#bzTipo button').forEach(function(b){ b.onclick=function(){ buzonModal(b.dataset.bt); }; });
+  var env=$('#bzEnviar');
+  env.onclick=async function(){
+    if(env.disabled) return;
+    var tit=($('#bzTit').value||'').trim(), det=($('#bzDet').value||'').trim();
+    if(!tit){ tost('Escribe al menos en una línea qué pasa.'); $('#bzTit').focus(); return; }
+    if(typeof backendOK==='undefined' || !backendOK || !SESION){
+      tost('Sin conexión con el servidor no se puede enviar. Vuelve a intentarlo.'); return; }
+    var datos={ titulo:tit, donde:'Móvil', pantalla:pant,
+                version:(DATA.generado||''), contexto:_contextoM_() };
+    if(esBug){ datos.esperaba=det; datos.paso=tit; datos.gravedad=grav; }
+    else { datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
+    env.disabled=true; var prev=env.textContent; env.textContent='Enviando…';
+    try{
+      var r=await (esBug?api.reportarBug(datos):api.reportarMejora(datos));
+      cerrarModal();
+      tost((esBug?'Fallo reportado':'Mejora enviada')+' · '+((r&&r.id)||'')+'. Gracias.');
+    }catch(e){ env.disabled=false; env.textContent=prev;
+      tost('No se pudo enviar: '+((e&&e.message)||e)); }
+  };
+}
 /* ── Menu de los tres puntos ──────────────────────────────────────────────────
    Aqui va lo que NO es tarea diaria. La barra de abajo ya tiene ocho pestanas y
    meter ahi ajustes o el buzon la haria inservible en un movil. */
@@ -3444,6 +3512,7 @@ function enganchar(){
       var q=b.dataset.mnu;
       _abrirMenu_(false);
       if(q==='salir'){ cerrarSesion(); return; }
+      if(q==='buzon'){ buzonModal('bug'); return; }
       if(q==='equipo'){ abrirModal(_coordinacionHTML_()); return; }
       if(q==='ajustes'){ abrirModal(_ajustesHTML_());
         var b2=$('#btnNotis'); if(b2) b2.onclick=function(){ activarNotis(b2); }; }
