@@ -596,22 +596,25 @@ DATA.subsistemas=[{u:'Aviónica',n:4},{u:'GNC',n:3},{u:'Aeroestructuras',n:5},
    casan con el roster (un turno del Discord firmado con otro apellido, un parte de
    alguien que ya se fue). _m() SIEMPRE devuelve algo pintable y marca al desconocido. */
 function miembro(n){for(var i=0;i<DATA.miembros.length;i++) if(DATA.miembros[i].nombre===n) return DATA.miembros[i]; return null;}
-/* GEMELA. LAS HORAS DE ESTE MES, de verdad.
+/* GEMELA. LAS HORAS DE ESTE MES.
 
-   `horasMes` viene del campo de Notion «Horas empleadas (este mes)» y NO son las de este
-   mes: cuadra con la suma de los componentes del mes en 5 personas de 32, y con
-   `horasTemp/meses` -la media de la temporada- en las 32. Medias del equipo: 17,70 h el
-   campo, 12,56 h julio de verdad. El fallo es de la FORMULA DE NOTION, no de la app; aqui
-   solo se deja de repetirlo.
+   `horasMes` viene del campo de Notion «Horas empleadas (este mes)» y SI son las de este
+   mes. Lo di por falso el 27/07 porque coincidia con `horasTemp/meses` en 32 de 32... pero
+   estaba leyendo la CACHE del backend (`_notionDisciplina_` guarda su lectura). Con Notion
+   fresco coinciden en 1 de 32, y las diferencias son grandes y crecientes, que es justo lo
+   que hace un mes en curso. Daniel lo vio en la pantalla: «me aparecen menos horas de las
+   que tengo».
 
-   `horasMesReal` lo calcula `flujos/umbral.py` (horas de temporada menos la suma de los
-   meses ya cerrados) y coincide con los componentes de Notion en 32 de 32.
+   Lo que SI esta viejo es `datos/horas_temporada.json`: un snapshot. Cualquier cifra
+   derivada de el -lo era `horasMesReal`- enseña el mes congelado el dia del snapshot y le
+   gana al dato vivo, que es exactamente lo que no puede pasar.
 
-   Sin `horasMesReal` (backend viejo) se cae a la media, pero DICIENDOLO. */
+   Se deja la funcion como puerta unica: si algun dia hay una fuente mejor que `horasMes`,
+   entra aqui y no en cinco sitios. */
 function _hMesReal_(m){
   m = m || {};
-  return (typeof m.hMesReal==='number') ? m.hMesReal
-       : (typeof m.horasMesReal==='number') ? m.horasMesReal : null;
+  return (typeof m.hMes==='number') ? m.hMes
+       : (typeof m.horasMes==='number') ? m.horasMes : null;
 }
 /* GEMELA (escritorio: misma funcion, mismo nombre). Quien SIGUE en el equipo.
    El roster conserva a las bajas por su historia -sus partes, sus sanciones, sus horas
@@ -989,12 +992,10 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
   var bajo =conH.filter(function(m){return m.hMes<UMBRAL;}).length;
   var infra=EQUIPO.filter(function(m){return m.infraccion;}).length;
   var parcial = conH.length < EQUIPO.length;
-  /* ESTE MES es este mes. `hMes` es la media de la temporada -el campo de Notion miente en
-     su nombre-, asi que el resumen usa `hMesReal` y solo cae a la media si no la hay,
-     cambiando el rotulo. Julio de 2026: 401,9 h reales contra 566,3 h de la media. */
-  var conR=EQUIPO.filter(function(m){ return typeof m.hMesReal==='number'; });
-  var mesReal=conR.length>0, baseMes=mesReal?conR:conH;
-  var totMes=baseMes.reduce(function(a,m){ return a+(mesReal?m.hMesReal:m.hMes); },0);
+  /* ESTE MES: `hMes` es el campo vivo de Notion «Horas empleadas (este mes)» y SI son las
+     de este mes. Lo di por falso comparandolo contra un snapshot viejo; ver `_hMesReal_`. */
+  var baseMes=conH, mesReal=conH.length>0;
+  var totMes=baseMes.reduce(function(a,m){ return a+m.hMes; },0);
   var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
 
   var lista = cola.length
@@ -2266,11 +2267,8 @@ function _aplicarPanel_(pnl){
   /* Los ingredientes del umbral: medias mensuales de la temporada y la del mes
      abierto. El peso del dia lo pone `_umbral_()` al calcular, no el backend. */
   if(pnl.umbral) DATA.umbral=pnl.umbral;
-  /* El backend habla largo (`horasMesReal`) y la vista lee corto (`hMesReal`), igual que
-     con horasMes->hMes. Sin esta traduccion el dato llega y no se ve. */
-  (DATA.miembros||[]).forEach(function(m){
-    if(m.hMesReal==null && typeof m.horasMesReal==='number') m.hMesReal=m.horasMesReal;
-  });
+  /* `horasMesReal` se dejo de usar: derivaba de un snapshot y le ganaba al dato vivo.
+     Si el backend lo sigue mandando, se ignora. */
   if(pnl.reunion) DATA.reunion=pnl.reunion;
   if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length) DATA.subsistemas=pnl.subsistemas;
   if(pnl.yo){                                   // forma MIEMBRO
