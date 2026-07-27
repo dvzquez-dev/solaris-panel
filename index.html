@@ -207,9 +207,14 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 /* La barrita de las 12 es la primera y la ultima a la vez, como en un reloj: marca donde
    empieza y donde acaba la vuelta. VERDE si y solo si tienes los 10. */
 /* Sin `.f` a proposito: la barrita del 9 marca los 9 puntos aunque su tramo siga vacio. */
-.med.aura .tk.cierra{stroke:var(--ok);stroke-width:2.8;
-  filter:drop-shadow(0 0 5px rgba(62,180,137,.85));animation:barrita12 2.2s ease-in-out infinite}
-@keyframes barrita12{0%,100%{opacity:.8}50%{opacity:1}}
+/* La barrita SIEMPRE a plena opacidad: latia bajando al 80 % y eso no se lee como «vivo»,
+   se lee como APAGADO. (Daniel: «se ve opaco».) Lo que late es el resplandor, no la barra.
+   Y se engorda un poco menos: 2,4 en vez de 2,8, que a 1,7 de las demas cantaba. */
+.med.aura .tk.cierra{stroke:var(--ok);stroke-width:2.4;opacity:1;
+  animation:barrita12 2.2s ease-in-out infinite}
+@keyframes barrita12{
+  0%,100%{filter:drop-shadow(0 0 3px rgba(62,180,137,.7))}
+  50%{filter:drop-shadow(0 0 9px rgba(62,180,137,1)) drop-shadow(0 0 16px rgba(62,180,137,.45))}}
 .med .tip{position:absolute;inset:0;transform:rotate(0deg);pointer-events:none;
   transition:transform .8s var(--arco)}
 .med .tip i{position:absolute;left:50%;top:2px;margin-left:-8px;width:16px;height:16px;display:block;
