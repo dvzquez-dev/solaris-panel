@@ -2084,8 +2084,11 @@ function _insigniaHTML_(){
    despues sin bloquear. */
 async function _refrescarEnSegundoPlano_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
-  try{ var t=await api.getTurnos(); if(Array.isArray(t)&&t.length){ TURNOS.length=0; t.forEach(function(x){TURNOS.push(x);}); pintar(); } }catch(_){}
-  try{ var q=await api.getTareas(); if(Array.isArray(q)&&q.length){ TAREAS.length=0; q.forEach(function(x){TAREAS.push(x);}); pintar(); } }catch(_){}
+  /* Las dos a la vez y UN solo repintado (ver la gemela del movil). */
+  var _t=api.getTurnos().then(function(t){ if(Array.isArray(t)&&t.length){ TURNOS.length=0; t.forEach(function(x){TURNOS.push(x);}); } }).catch(function(){});
+  var _q=api.getTareas().then(function(q){ if(Array.isArray(q)&&q.length){ TAREAS.length=0; q.forEach(function(x){TAREAS.push(x);}); } }).catch(function(){});
+  await Promise.all([_t,_q]);
+  _repintarSuave_();
 }
 async function _hidratarReus_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
@@ -2209,8 +2212,10 @@ async function _onCredencial_(resp,_silente){
        la primera pantalla no las usa. Ahora caen en paralelo y repintan al llegar. */
     var g=document.getElementById('loginGate'); if(g) g.remove();
     _pintarActua_(); pintar();
-    _cargarSanciones_().then(pintar);
-    _cargarPartes_().then(pintar);
+    /* UN solo repintado al final, no uno por carga: `pintar()` reconstruye `#main` y cada
+       repintado pierde el scroll, asi que tres seguidos se ven como una recarga sola. */
+    Promise.all([_cargarSanciones_(), _cargarPartes_()])
+      .then(function(){ _repintarSuave_(); });
   }catch(e){
     if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
     _gate_(_insigniaHTML_()+'<div style="color:#ffb3b0;max-width:360px">No se pudo entrar: '+
@@ -2410,6 +2415,13 @@ function _pintarPie_(){
     c.textContent=ok?'● EN LÍNEA':'● SIN CONEXIÓN';
     c.style.color=ok?'var(--ok)':'var(--ink3)';
   }
+}
+/* Repintar sin que se note: ver la gemela en movil.html. */
+function _repintarSuave_(){
+  var m=document.getElementById('main');
+  var y=m?m.scrollTop:0;
+  pintar();
+  if(m && y) m.scrollTop=y;
 }
 function pintar(){
   _pintarPie_();
