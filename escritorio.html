@@ -261,6 +261,21 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
   color:var(--ink);font-family:var(--sans);font-size:12.5px;padding:8px 10px;outline:0;resize:vertical;
   min-height:52px;margin-top:8px}
 .parte.asienta{opacity:.25;transition:opacity .4s linear}
+/* GEMELA de movil.html: visor de documento plegado. El iframe se crea al desplegar,
+   no antes; un expediente se abre casi siempre para ver de que va, no para leerlo. */
+.doc{margin-top:11px;border:1px solid var(--line);border-radius:var(--r2);overflow:hidden;background:#0A0909}
+.doc .dh{display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid var(--line);cursor:pointer}
+.doc .dh:hover{background:rgba(255,255,255,.03)}
+.doc .dh b{font-size:12.5px}
+.doc .dh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px;margin-top:2px}
+.doc .dv{width:100%;height:64vh;min-height:340px;border:0;display:block;background:#2a2526}
+.doc .dcar{padding:26px 12px;text-align:center;color:var(--ink3);font-size:12px;line-height:1.6}
+.doc .da{display:block;padding:9px 12px;text-align:center;font-family:var(--mono);font-size:11px;
+  color:var(--red2);border-top:1px solid var(--line);text-decoration:none}
+/* ficha de expediente: reaprovecha .parte (misma gramatica que un parte de horas) */
+.parte .pils{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.parte .obj{margin:5px 0 0;padding-left:17px;font-size:12px;color:var(--ink2);line-height:1.6}
+.parte .sub{margin-top:11px}
 
 /* bloque de sanciones */
 .lote{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--sur)}
@@ -690,6 +705,15 @@ function _normDocE_(d, i){
     avisos:  Array.isArray(d.issues) ? d.issues : [],        // la lista, para leerlos
     resumen: d.resumen || '',
     fecha:   d.fecha || '',
+    /* Lo que el backend mandaba y esta cara tiraba a la basura: sin `analisis` no hay
+       proposito ni riesgos que leer, sin `nota` no se ve por que se pidieron cambios, y
+       sin `revisor` no se puede saber si ya decidio alguien ni si puedes pisarlo. */
+    analisis:  d.analisis || null,
+    nota:      d.nota || '',
+    revisor:   d.revisor || null,
+    decision:  d.decision || null,
+    etiquetas: d.etiquetas || [],
+    sustituye: d.sustituyeA || null,
     bloqueo: d.bloqueo || null,
     drive:   d.enlaceDrive || null,
     notion:  d.paginaNotion || null,
@@ -770,6 +794,9 @@ var CANDID=[
 /* ═══════════════════════════════════════════════════════════════════════════
    PIEZAS COMUNES
    ═══════════════════════════════════════════════════════════════════════════ */
+/* Un solo estilo de campo para toda la cara: estaba copiado en dos sitios como `var E`. */
+var CAMPO_CSS='width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
+  'padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px';
 function pan(cab,der,cuerpo,cls){
   return '<div class="pan'+(cls?' '+cls:'')+'"><div class="ph"><span class="sc">'+cab+'</span>'+
     '<span class="ln"></span>'+(der?'<span class="sc">'+der+'</span>':'')+'</div>'+cuerpo+'</div>';
@@ -1019,8 +1046,7 @@ function cablearReparto(){
 
 function convocarPanel(){
   if(rangoNom(ACTOR)<1) return '';                       // solo coordinaci\u00f3n o superior
-  var E='width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
-        'padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px';
+  var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   /* las bajas no se convocan: siguen en el roster por su historia, no para turnos nuevos */
   var pool=DATA.miembros.filter(function(m){ return !m.baja; })
@@ -1250,29 +1276,135 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
 }};
 
 /* ── DOCUMENTOS ──────────────────────────────────────────────────────────── */
+/* Estados y ambitos EN CASTELLANO. El chip pintaba el enum tal cual -«revision»,
+   «analizado», «ambito archivo»-, que es vocabulario del pipeline, no de quien firma. */
+var EST_DOC={recibido:['recibido',''],analizado:['analizado',''],revision:['en revisión','wa'],
+  aprobado:['aprobado','ok'],anot:['aprobado con anotaciones','ok'],publicado:['publicado','ok'],
+  cambios:['cambios pedidos','no'],rechazado:['rechazado','no'],publicando:['publicando','']};
+var AMB_DOC={archivo:'archivo de miembro',subsistema:'informe de subsistema',general:'informe general'};
+function estDoc(e){ return EST_DOC[e]||[String(e||'—'),'']; }
+/* `severidad` mide LO MALO: severidad alta = calidad baja. Pintar «calidad alta» en el
+   expediente con mas avisos decia justo lo contrario. GEMELA del `sevTxt` del movil. */
+var CAL_DOC={baja:'alta',media:'media',alta:'baja'};
+function calDoc(sev){ return 'calidad '+(CAL_DOC[sev]||'sin medir'); }
+function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
+/* GEMELA de `puedeDecidirDoc` del movil y de `_puedeDecidir_` del backend: nadie firma
+   lo suyo, el primero que decide bloquea a sus iguales, y solo alguien de MAS rango
+   puede pisar esa decision. La fila solo miraba `est==='revision'`, asi que una vez
+   decidido no habia forma de corregir un error desde aqui. */
+function rangoPila(pila){ for(var i=0;i<DATA.miembros.length;i++)
+  if(DATA.miembros[i].pila===pila) return rangoNom(DATA.miembros[i].nombre); return 0; }
+function puedeDecidirDoc(d){
+  if(!d || d.autor===ACTOR) return false;
+  var rev=revisoresDeDoc(d), maxR=Math.max.apply(null,rev.map(rangoNom));
+  if(rev.indexOf(ACTOR)<0 && rangoNom(ACTOR)<=maxR) return false;
+  if(['revision','recibido','analizado'].indexOf(d.est)>=0) return true;
+  return d.revisor===_m(ACTOR).pila || rangoNom(ACTOR)>rangoPila(d.revisor);
+}
+function _idDrive_(u){ var m=String(u||'').match(/\/d\/([A-Za-z0-9_-]{20,})/); return m?m[1]:null; }
+/* La fila YA NO DECIDE. Tenia «Aprobar» y «Cambios» ahi mismo, con el titulo por toda
+   informacion: eso es firmar a ciegas, justo lo que la pantalla venia a evitar. Ahora
+   se pulsa y se abre el expediente entero (`docCard`), que es donde estan los botones. */
+var DOC_SEL=null;                 // expediente desplegado en las listas compactas
 function filaDoc(d){
-  var rev=revisoresDeDoc(d).map(function(n){return miembro(n)?miembro(n).pila:n;}).join(' o ');
-  /* NADIE FIRMA LO SUYO: faltaba excluir al autor, asi que el PD podia aprobar su propio
-     informe general. El backend ya lo impide; esta cara no lo reflejaba. */
-  var _rev=revisoresDeDoc(d);
-  var puede=(d.autor!==ACTOR) &&
-    (_rev.indexOf(ACTOR)>=0 || rangoNom(ACTOR)>Math.max.apply(null,_rev.map(rangoNom)));
-  return '<div class="dec" id="doc-'+d.id+'" style="cursor:default">'+
+  if(DOC_SEL===d.id) return docCard(d);
+  var rev=revisoresDeDoc(d).map(function(n){return _m(n).pila;}).join(' o ');
+  var st=estDoc(d.est), mio=puedeDecidirDoc(d) && d.est==='revision';
+  return '<div class="dec" id="doc-'+d.id+'" data-docsel="'+d.id+'">'+
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
-    '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+d.ref+'</span> · '+
-      esc(_m(d.autor).pila)+' · ámbito '+d.amb+' · firma '+esc(rev)+
+    '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+esc(d.ref)+'</span> · '+
+      esc(_m(d.autor).pila)+' · '+ambDoc(d.amb)+' · firma '+esc(rev)+
       (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+'</small></span>'+
-    '<span class="der"><span class="chip '+(d.sev==='alta'?'no':d.sev==='media'?'wa':'ok')+'">sev. '+d.sev+'</span>'+
-      (d.est==='revision'&&puede
-        ?'<button class="btn sm" data-doc="'+d.id+'" data-acc="cambios">Cambios</button>'+
-         '<button class="btn sm pri" data-doc="'+d.id+'" data-acc="aprobar">Aprobar</button>'
-        :'<span class="chip '+(d.est==='publicado'?'ok':d.est==='cambios'?'no':'')+'">'+d.est+'</span>')+
+    '<span class="der">'+
+      (mio?'<span class="chip wa">te toca</span>':'')+
+      '<span class="chip '+(d.sev==='alta'?'no':d.sev==='media'?'wa':'ok')+'">'+calDoc(d.sev)+'</span>'+
+      '<span class="chip '+st[1]+'">'+st[0]+'</span><span class="chev">›</span>'+
     '</span></div>';
+}
+/* EL EXPEDIENTE ENTERO, que es lo que hay que leer antes de firmar: resumen ejecutivo,
+   analisis, avisos de calidad, la ultima decision con su motivo, el documento de Drive
+   incrustado, y las cuatro palabras clave del correo real -aprobar, aprobar con
+   anotaciones, solicitar cambios, rechazar- mas deshacer y reenviar. */
+function docCard(d){
+  var revs=revisoresDeDoc(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
+  var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';
+  var lista=function(t,xs){ return (xs&&xs.length)
+    ? '<div class="sub"><span class="sc">'+t+'</span><ul class="obj">'+
+      xs.map(function(v){return '<li>'+esc(v)+'</li>';}).join('')+'</ul></div>' : ''; };
+  if(an){
+    if(an.proposito) secs+='<div class="sub"><span class="sc">Propósito</span>'+
+      '<p style="margin:4px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+esc(an.proposito)+'</p></div>';
+    secs+=lista('Alcance',an.alcance)+lista('Decisiones',an.decisiones)+
+          lista('Riesgos',an.riesgos)+lista('Fechas clave',an.fechasClave);
+  }
+  var avisos = (d.avisos&&d.avisos.length) ? lista('Avisos de calidad · '+d.avisos.length, d.avisos)
+    : (d.iss ? '<div class="sub"><span class="sc">Calidad</span><p style="margin:4px 0 0;font-size:12px;'+
+        'color:var(--ink3);line-height:1.55">'+d.iss+' aviso'+(d.iss===1?'':'s')+' de calidad, sin detalle. '+
+        'Los manda Cowork con el expediente.</p></div>' : '');
+  /* La decision anterior se ve SIN desplegar: es lo que hay que juzgar para deshacerla. */
+  var previa = (d.est==='cambios'||d.est==='rechazado'||d.revisor)
+    ? '<div class="just" style="border-left-color:var(--warn)"><span class="sc">'+
+      (d.revisor?('decidió '+esc(d.revisor)):'última decisión')+' · '+st[0]+'</span>'+
+      esc(d.nota||'Sin motivo escrito.')+'</div>' : '';
+  var idD=_idDrive_(d.drive);
+  var visor = d.drive
+    ? '<div class="doc"><div class="dh" data-vdoc="'+esc(idD||'')+'">'+
+      '<b>El documento</b><small>'+esc(d.ref)+' · pulsa para leerlo</small>'+
+      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
+      'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
+      '<div class="vcuerpo" hidden></div>'+
+      '<a class="da" href="'+esc(d.drive)+'" target="_blank" rel="noopener">abrir en Drive</a></div>'
+    : '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
+      'Cowork lo manda en <span class="mono">enlaceDrive</span>; sin él no hay nada que leer aquí.</div></div>';
+  var acc;
+  if(puede){
+    acc='<label style="display:block;margin-top:11px">'+
+      '<span class="sc" style="display:block;margin-bottom:5px">Título · puedes corregirlo al aprobar con anotaciones</span>'+
+      '<input id="dtit-'+d.id+'" value="'+esc(d.tit)+'" style="'+CAMPO_CSS+'"></label>'+
+      '<textarea data-motivo placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
+      '<div class="acts">'+
+        '<button class="btn pri" data-doc="'+d.id+'" data-acc="aprobado">Aprobar</button>'+
+        '<button class="btn" data-doc="'+d.id+'" data-acc="anot">Aprobar con anotaciones</button>'+
+        '<button class="btn" data-doc="'+d.id+'" data-acc="cambios">Solicitar cambios</button>'+
+        '<button class="btn no" data-doc="'+d.id+'" data-acc="rechazado">Rechazar</button>'+
+        (d.est!=='revision'&&d.revisor?'<button class="btn" data-doc="'+d.id+'" data-acc="deshacer">Deshacer y devolver a revisión</button>':'')+
+      '</div>';
+  } else if(d.autor===ACTOR && d.est==='cambios'){
+    acc='<div class="acts"><button class="btn pri" data-doc="'+d.id+'" data-acc="reenviar">Reenviar corregido</button></div>';
+  } else if(d.autor===ACTOR){
+    acc='<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>';
+  } else if(d.revisor){
+    acc='<div class="ruta">Ya lo decidió <b>'+esc(d.revisor)+'</b>. Puedes consultarlo; para cambiar la '+
+      'decisión hace falta más rango que quién la tomó.</div>';
+  } else {
+    acc='<div class="ruta">Lo firma <b>'+esc(rev)+'</b>, no tú.</div>';
+  }
+  return '<div class="parte" id="doc-'+d.id+'">'+
+    '<div class="h"><b>'+esc(d.tit)+'</b>'+
+      '<span class="u">'+esc(d.ref)+'</span>'+
+      '<span class="u">'+esc(d.tipo||'documento')+'</span>'+
+      '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button></div>'+
+    '<div class="pils">'+
+      '<span class="chip">'+esc(_m(d.autor).pila)+' · '+esc(d.sub||'—')+'</span>'+
+      '<span class="chip">'+ambDoc(d.amb)+'</span>'+
+      '<span class="chip '+st[1]+'">'+st[0]+'</span>'+
+      '<span class="chip '+(d.sev==='alta'?'no':d.sev==='media'?'wa':'ok')+'">'+calDoc(d.sev)+'</span>'+
+      (d.fecha?'<span class="chip">'+esc(d.fecha)+'</span>':'')+
+    '</div>'+
+    '<div class="just"><span class="sc">Resumen ejecutivo</span>'+
+      esc(d.resumen||'El expediente llegó sin resumen. Léelo abajo antes de firmar.')+'</div>'+
+    previa+secs+avisos+visor+
+    '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':'Firma: <b>'+esc(rev)+'</b>')+
+      ' · Decidir aquí sustituye a contestar el correo de aprobación.</div>'+
+    acc+
+  '</div>';
 }
 V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
   var m=docsMios();
+  /* Aqui van SIEMPRE desplegados: son los que tienes que decidir, y decidir exige leer.
+     En «En curso» y «Publicados» se pliegan, porque ahi se consulta, no se firma. */
   return pan('Expedientes que firmas tú',m.length+' pendientes',
-    m.length?m.map(filaDoc).join(''):vac('Bandeja limpia',
+    m.length?m.map(docCard).join(''):vac('Bandeja limpia',
       'Nada esperando tu firma. El archivo de un miembro lo firma su coordinador; el informe de subsistema, '+
       'el Project Director o '+esc(_m(REV2_NOM).pila)+'; el informe general, solo el Project Director. '+
       'Nadie firma lo suyo.'),'destaca')+
@@ -1430,8 +1562,7 @@ function _fijarPanel_(){
   var opts=REUS.map(function(r,i){
     return '<option value="'+i+'">'+esc(r.tit||r.titulo||('Reunión '+r.id))+'</option>'; }).join('');
   var r=REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0];
-  var E='width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
-        'padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px';
+  var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   var dias=(r.dias||[]).map(function(d,i){ return '<option value="'+i+'">'+esc(d)+'</option>'; }).join('');
   var fr=(r.franjas||[]).map(function(f,i){
@@ -2317,26 +2448,77 @@ function enganchar(){
   /* documentos: decidir PERSISTE en el backend (api.decidir, ya desplegada). La app
      flaguea, el motor/Cowork ejecuta. El servidor revalida la autoridad por token;
      esto es solo el disparo. Con backend caído cae al cambio en memoria (semilla). */
-  $$('[data-doc]').forEach(function(b){
-    if(b._wired) return; b._wired=true;   // no duplicar el envío si pintar() re-engancha
+  /* abrir y cerrar el expediente en las listas compactas */
+  $$('[data-docsel]').forEach(function(el){
+    el.onclick=function(ev){ ev.stopPropagation();
+      var v=el.dataset.docsel; DOC_SEL = v ? +v : null; pintar();
+      if(DOC_SEL){ var c=document.getElementById('doc-'+DOC_SEL);
+        if(c) c.scrollIntoView({block:'nearest',behavior:redu()?'auto':'smooth'}); }
+    };
+  });
+  /* visor del documento: el iframe se crea al desplegar. Si Drive no deja incrustarlo
+     (permisos, o una CSP en el hosting) se dice y se ofrece el enlace, no se deja en blanco. */
+  $$('[data-vdoc]').forEach(function(h){
+    h.onclick=function(){
+      var cuerpo=h.parentNode.querySelector('.vcuerpo'), sv=h.querySelector('svg');
+      if(!cuerpo.hasAttribute('hidden')){ cuerpo.setAttribute('hidden',''); sv.style.transform=''; return; }
+      cuerpo.removeAttribute('hidden'); sv.style.transform='rotate(180deg)';
+      if(cuerpo.dataset.cargado) return; cuerpo.dataset.cargado='1';
+      var id=h.dataset.vdoc;
+      if(!id){ cuerpo.innerHTML='<div class="dcar">El enlace no es un archivo de Drive reconocible.<br>' +
+        'Ábrelo con el enlace de abajo.</div>'; return; }
+      cuerpo.innerHTML='<div class="dcar">Cargando el documento…</div>';
+      var f=document.createElement('iframe');
+      f.className='dv'; f.setAttribute('loading','lazy');
+      f.src='https://drive.google.com/file/d/'+id+'/preview';
+      var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
+        cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
+      f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
+      cuerpo.innerHTML=''; cuerpo.appendChild(f);
+    };
+  });
+  /* LAS CUATRO ACCIONES del correo real, mas deshacer y reenviar. Todas viajan a
+     `api.decidir`, que ya estaba desplegada aceptandolas desde v28 y de la que esta cara
+     solo usaba dos. El servidor revalida la autoridad por token; esto es el disparo.
+     El motivo y el titulo salen de la propia ficha: un prompt() no deja releer el
+     expediente mientras escribes por que lo rechazas. */
+  var ETI_DOC={aprobado:'Aprobado. Se publica en Notion, Drive y el Libro de Datos.',
+    anot:'Aprobado con anotaciones. Se publica con el título corregido.',
+    cambios:'Cambios pedidos. Le llega al autor, que podrá reenviarlo corregido.',
+    rechazado:'Rechazado. El autor recibe el motivo.',
+    deshacer:'Decisión deshecha: vuelve a revisión.',
+    reenviar:'Reenviado a revisión.'};
+  $$('.acts [data-doc]').forEach(function(b){
     b.onclick=async function(){
       if(b.disabled) return;
       var d=DOCS.filter(function(x){return x.id===+b.dataset.doc;})[0]; if(!d) return;
-      var accion = b.dataset.acc==='aprobar' ? 'aprobado' : 'cambios';
-      var motivo = accion==='cambios' ? (prompt('Motivo para el autor (obligatorio en «cambios»):')||'').trim() : '';
-      if(accion==='cambios' && !motivo){ tost('Sin motivo no se piden cambios.'); return; }
+      var accion=b.dataset.acc, ficha=document.getElementById('doc-'+d.id);
+      var ta=ficha&&ficha.querySelector('[data-motivo]');
+      var motivo=(ta&&ta.value||'').trim();
+      var ti=document.getElementById('dtit-'+d.id);
+      var titulo=(ti&&ti.value||'').trim();
+      if((accion==='cambios'||accion==='rechazado') && !motivo){
+        tost(accion==='cambios'?'Sin motivo no se piden cambios: el autor no sabría qué corregir.'
+          :'Sin motivo no se rechaza.'); if(ta) ta.focus(); return; }
+      if(accion==='anot' && !titulo){ tost('Con anotaciones hace falta un título.'); return; }
+      if(accion==='rechazado' && !confirm('Rechazar «'+d.tit+'». El expediente queda cerrado y el autor'+
+        ' tendrá que enviar uno nuevo. ¿Seguro?')) return;
+      if(accion==='deshacer' && !confirm('Devolver «'+d.tit+'» a revisión y borrar la decisión de '+
+        (d.revisor||'quien la tomó')+'. ¿Seguro?')) return;
+      var extra = accion==='anot' ? {titulo:titulo} : null;
       b.disabled=true; var prev=b.textContent; b.textContent='Enviando…';
       try{
         if(typeof backendOK!=='undefined' && backendOK && SESION){
-          var upd=await api.decidir(d.id, accion, motivo, null);   // el actor sale del token
-          if(upd){ var i=DOCS.findIndex(function(x){return x.id===d.id;}); if(i>=0) DOCS[i]=upd; }
-          tost(accion==='aprobado'
-            ? 'Aprobado. Se publica en Notion, Drive y el Libro de Datos.'
-            : 'Cambios pedidos. Le llega al autor.');
-        } else {                                                   // sin backend: semilla
-          d.est = accion==='aprobado' ? 'publicado' : 'cambios'; if(motivo) d.nota=motivo;
-          tost('Sin conexión: '+(accion==='aprobado'?'la aprobación no se ha guardado.':'los cambios no se han guardado.'));
+          var upd=await api.decidir(d.id, accion, motivo, extra);   // el actor sale del token
+          /* `upd` viene con las claves LARGAS del backend. Metiendolo crudo en DOCS la fila
+             se quedaba sin titulo y con el estado en blanco hasta recargar. */
+          if(upd){ var i=DOCS.findIndex(function(x){return x.id===d.id;}); if(i>=0) DOCS[i]=_normDocE_(upd,i); }
+          tost(ETI_DOC[accion]||'Hecho.');
+        } else {
+          tost('Sin conexión con el backend: la decisión NO se ha guardado.');
+          b.disabled=false; b.textContent=prev; return;
         }
+        if(accion!=='deshacer') DOC_SEL=null;
         pintar();
       }catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo: '+((e&&e.message)||e)); }
     };
