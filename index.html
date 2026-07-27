@@ -229,25 +229,17 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
   0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 14px var(--tel))}
   55%{stroke:#9BD4F0;stroke-width:2.2;filter:drop-shadow(0 0 7px var(--tel))}
   100%{stroke:var(--tel);stroke-width:1.7;filter:none}}
-/* ── LAS PASADAS DE LA CASCADA ─────────────────────────────────────────────────────
-   Tres estados que solo existen mientras el medidor se arma; no son estados del dato,
-   son momentos. Van al final del bloque a proposito, como las tres de arriba: tienen que
-   ganarle al color que el markup le pone a cada tramo con el atributo `stroke`.
-   (Cualquier regla CSS gana a un atributo de presentacion, por eso funciona.) */
-/* 1 · ROJA: el anillo arranca en rojo aunque el dato ya sea de elegible. */
-.med.paso-rojo .seg.on{stroke:url(#gRed)}
-.med.paso-rojo .halo{stroke:url(#gRed)}
-/* 2 · DORADA: el barrido que anuncia. Cada barrita se queda dorada al pasar por ella. */
-.med.paso-oro .seg.on{stroke:#F2C94C}
-.med.paso-oro .halo{stroke:#F2C94C}
-.med .tk.chOro{stroke:#F2C94C}
+/* ── LAS CUATRO OLAS ───────────────────────────────────────────────────────────────
+   El color de cada tramo lo pone la ola AL PASAR, en linea (`style.stroke`), no una clase
+   global. Es lo que permite que las olas se solapen: con una clase en `.med` se repintaba
+   el anillo entero de golpe y la ola de detras se comia lo que la de delante no habia
+   tocado todavia. Aqui solo quedan los DESTELLOS, uno por ola, con su clase propia:
+   `.chRoj` `.chOro` `.chAzu` `.chVer`. Nombrarlos evita la guerra de especificidad que ya
+   rompio esto una vez (ver README: «una regla CSS puede estar escrita y muerta»). */
+.med .tk.chRoj.chispa{animation:chispazo .5s var(--sal)}
 .med .tk.chOro.chispa{animation:chispazoOro .5s var(--sal)}
-/* 3 · AZUL: fuerza a azul TAMBIEN a las dos ultimas, que por dato ya son verdes. Sin
-   esto el verde llegaria a la vez que el azul y no habria cuarta pasada que ver. */
-.med.aura.paso-azul .seg.on{stroke:url(#gAzu)}
-.med.aura.paso-azul .halo{stroke:url(#gAzu)}
-.med.aura.paso-azul .tk.cierra{stroke:var(--tel)}
-.med.aura.paso-azul .tk.chispa.cierra{animation:chispazoAzul .5s var(--sal)}
+.med .tk.chAzu.chispa{animation:chispazoAzul .5s var(--sal)}
+.med .tk.chVer.chispa{animation:chispazoVerde .5s var(--sal)}
 @keyframes chispazoOro{
   0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 15px #F2C94C)}
   55%{stroke:#FFE9A8;stroke-width:2.2;filter:drop-shadow(0 0 8px #F2C94C)}
@@ -1778,7 +1770,7 @@ var medTimers=[];
 /* LA SECUENCIA DE ARMADO SE QUEDA, SIEMPRE. La quite para matar un «parece que se recarga»
    y me carge lo que a Daniel mas le gustaba del medidor: los tramos encendiendose en orden.
    Si el repintado molesta, se arregla repintando menos, NO apagando la animacion. */
-function armarMedidor(){
+function armarMedidor(silencioso){
   var med=$('#med'); if(!med) return;
   medTimers.forEach(clearTimeout); medTimers=[];
   var p=YO.puntos, giro=p*MSTEP-MGAP/2+MTIP;
@@ -1786,15 +1778,21 @@ function armarMedidor(){
   /* rebobinado instantáneo, para que solo el ARMADO vaya escalonado */
   med.classList.remove('arm');
   $$('.seg.on',med).forEach(function(s){s.style.transition='none';s.classList.remove('fog');});
-  $$('.tk',med).forEach(function(t){t.classList.remove('chispa','chOro');});
-  med.classList.remove('paso-rojo','paso-oro','paso-azul');
+  $$('.tk',med).forEach(function(t){
+    t.classList.remove('chispa','chRoj','chOro','chAzu','chVer');
+    t.style.stroke='';                     // vuelve al color que le toca por CSS
+  });
   if(tip){tip.style.transition='none';tip.style.transform='rotate(0deg)';}
   if(num) num.textContent='0';
   void med.offsetWidth;
   $$('.seg.on',med).forEach(function(s){s.style.transition='';});
   if(tip) tip.style.transition='';
 
-  if(redu()){
+  /* Armado instantaneo: el estado FINAL, sin recorrerlo. Vale para quien pidio menos
+     movimiento y para el repintado de fondo, que son el mismo caso -nadie ha pedido ver
+     esto- aunque por motivos distintos. El color final ya lo pone el markup
+     (`_colorSeg_`/`_colorTick_`), asi que aqui solo falta encenderlo. */
+  if(redu() || silencioso){
     med.classList.add('arm');
     if(num) num.textContent=p;
     if(tip) tip.style.transform='rotate('+giro+'deg)';
@@ -1803,71 +1801,81 @@ function armarMedidor(){
   med.classList.add('arm');
   if(tip) tip.style.transform='rotate('+giro+'deg)';
 
-  /* Un BARRIDO recorre el anillo tramo a tramo llamando a `paso(k)`. Empieza en `t0` y
-     devuelve cuando acaba, que es como se encadenan las pasadas sin contar milisegundos
-     a mano. */
-  function barrido(t0, ms, paso){
-    for(var k=0;k<p;k++){
-      (function(k){ medTimers.push(setTimeout(function(){ paso(k); }, t0+k*ms)); })(k);
-    }
-    return t0 + p*ms;
-  }
-  /* Prende el tramo k: fogonazo en la curva y destello en su barrita recta. `tono` dice
-     hacia que color destella la barrita; sin tono, el que le toque por CSS. */
+  var segs=$$('.seg.on',med);
+  var PASO=78;          // ms entre barra y barra DENTRO de una ola
+  var DESFASE=3;        // barras que va cada ola por detras de la anterior
+
   function fogonazo(sg){
     if(!sg) return;
     sg.classList.add('fog');
     medTimers.push(setTimeout(function(){ sg.classList.remove('fog'); },240));
   }
-  function prende(k, tono, cuenta){
-    fogonazo($$('.seg.on',med)[k]);
-    var t=$('.tk[data-i="'+k+'"]',med);
-    if(t){
-      t.classList.remove('chispa','chOro');
-      if(tono) t.classList.add(tono);
-      void t.getBoundingClientRect();      // reinicia la animacion; sin esto no repite
-      t.classList.add('chispa');
+  /* Cada ola da un paso de mas al final, sin tramo: es para la barrita que marca TUS
+     puntos. Con 10 es la de las 12, que es la misma que la del 0 —el medidor es un circulo
+     y ahi la vuelta se cierra—; con 9, la del 9, cuyo tramo esta vacio y por eso ninguna
+     ola normal la tocaria. */
+
+  /* UNA OLA: recorre el anillo pintando cada tramo al pasar por el. Todas van al MISMO
+     paso, asi que ninguna adelanta a la de delante: la distancia entre olas es constante y
+     eso es lo que se lee como continuidad. `pinta(k)` devuelve el color del tramo k, o null
+     si esta ola no tiene nada que decir ahi (la verde, en los ocho primeros).
+     `p+1` pasos: el ultimo es solo la barrita de cierre. */
+  function ola(t0, pinta, tinta, chispa, cuenta){
+    for(var k=0;k<=p;k++){
+      (function(k){
+        medTimers.push(setTimeout(function(){
+          var cierre = (k===p);
+          var col = cierre ? null : pinta(k);
+          if(col){ var sg=segs[k]; if(sg){ sg.style.stroke=col; fogonazo(sg); } }
+          var iTk = cierre ? (p>=10?0:p) : k;   // el cierre con 10 es la del 0: es un circulo
+          var tk = $('.tk[data-i="'+iTk+'"]',med);
+          var tn = tinta(iTk);
+          if(tk && tn){
+            tk.style.stroke=tn;
+            tk.classList.remove('chispa','chRoj','chOro','chAzu','chVer');
+            tk.classList.add(chispa);
+            void tk.getBoundingClientRect();   // reinicia la animacion; sin esto no repite
+            tk.classList.add('chispa');
+          }
+          if(cuenta && num && !cierre) num.textContent=k+1;
+        }, t0+k*PASO));
+      })(k);
     }
-    if(cuenta && num) num.textContent=k+1;
   }
 
-  /* PASADA 1 - ROJA. Es el armado de siempre y es donde acaba un mes normal. */
   var eleg = estadoPts(p)==='elegible';
-  if(eleg){ med.classList.remove('aura'); med.classList.add('paso-rojo'); }
-  var t=barrido(140, 78, function(k){ prende(k, null, true); });
-  if(!eleg) return;
+  /* Sin elegibilidad, UNA ola y la de siempre. La cascada tiene que estar reservada o deja
+     de significar nada. Aqui no se toca el color: el del markup ya es el bueno. */
+  if(!eleg){
+    ola(140, function(){ return null; }, function(){ return null; }, 'chRoj', true);
+    return;
+  }
 
-  /* PASADA 2 - DORADA. No significa nada por si misma: significa que viene algo. */
-  medTimers.push(setTimeout(function(){
-    med.classList.remove('paso-rojo'); med.classList.add('paso-oro');
-  }, t+110));
-  t=barrido(t+110, 62, function(k){ prende(k, 'chOro', false); });
+  /* ELEGIBLE. Cuatro olas a 3 barras de distancia. El anillo arranca en ROJO aunque el dato
+     ya sea de elegible: si no, la ola roja iria pintando de rojo lo que ya esta azul, que es
+     la pelicula al reves. */
+  med.classList.remove('aura');
+  segs.forEach(function(sg){ sg.style.stroke='url(#gRed)'; });
+  var ROJO='var(--red2)', ORO='#F2C94C', AZUL='var(--tel)', VERDE='#7BE3BE';
+  /* QUIEN es verde lo deciden `_colorSeg_`/`_colorTick_`, que son las que pintan el estado
+     final. Aqui habia dos reglas nuevas escritas a mano: con 10 puntos coincidian y con 9
+     NO —ponia verdes tramos y barritas que no lo son—. Una regla, un sitio. */
+  function verdeSeg(k){ return _colorSeg_(k,p)==='url(#gVer)'; }
+  function verdeTk(i){ return _colorTick_(i,p)==='cierra'; }
 
-  /* PASADA 3 - AZUL. `paso-azul` tapa el verde de las dos ultimas para que la cuarta
-     pasada tenga algo que revelar (ver la cabecera del parche). */
-  medTimers.push(setTimeout(function(){
-    med.classList.remove('paso-oro'); med.classList.add('aura','paso-azul');
-  }, t+110));
-  t=barrido(t+110, 62, function(k){ prende(k, null, false); });
-
-  /* PASADA 4 - VERDE, y solo las que lo son. Se destapan en el orden en que se ganan:
-     primero la del 9 y luego la de las 12, que es la que cierra la vuelta. Cada barrita
-     verde va con la curva que remata, no con la que arranca en ella. */
-  medTimers.push(setTimeout(function(){
-    med.classList.remove('paso-azul');
-    var verdes=$$('.tk.cierra',med).map(function(tk){
-      var i=+tk.getAttribute('data-i');
-      return {tk:tk, seg:(i===0 ? p-1 : i-1)};      // la de las 12 remata la ultima curva
-    }).sort(function(a,b){ return a.seg-b.seg; });
-    verdes.forEach(function(v,i){
-      medTimers.push(setTimeout(function(){
-        fogonazo($$('.seg.on',med)[v.seg]);
-        v.tk.classList.remove('chispa');
-        void v.tk.getBoundingClientRect();
-        v.tk.classList.add('chispa');
-      }, i*170));
-    });
-  }, t+140));
+  ola(140, function(){ return 'url(#gRed)'; }, function(){ return ROJO; }, 'chRoj', true);
+  ola(140 + DESFASE*PASO, function(){ return ORO; }, function(){ return ORO; }, 'chOro', false);
+  /* El aura -halo que respira y estrella dorada- entra con la ola AZUL, que es el color de
+     elegible. Antes seria celebrar algo que todavia no se ve. */
+  medTimers.push(setTimeout(function(){ med.classList.add('aura'); }, 140 + 2*DESFASE*PASO));
+  ola(140 + 2*DESFASE*PASO, function(){ return 'url(#gAzu)'; }, function(){ return AZUL; }, 'chAzu', false);
+  /* La VERDE arranca en 0 como las demas y da los mismos pasos; simplemente no tiene nada
+     que pintar hasta llegar a los dos ultimos. No es un caso especial: es la misma ola.
+     (Daniel: «como si empezase en 0 pero no se nota hasta donde es visible».) */
+  ola(140 + 3*DESFASE*PASO,
+      function(k){ return verdeSeg(k) ? 'url(#gVer)' : null; },
+      function(i){ return verdeTk(i)  ? VERDE : null; },
+      'chVer', false);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1908,13 +1916,17 @@ function barraHorasHTML(id){
       ? (p>0?'<p class="rnota" style="margin-top:9px">Lo rayado son '+nf2(p)+' h esperando firma: todavía no cuentan.</p>':'')
       : '<p class="rnota" style="margin-top:9px">Aún no tienes horas registradas este mes. El objetivo son '+nf(UMBRAL,1)+' h.</p>');
 }
-function animarBarras(root){
+function animarBarras(root, silencioso){
   $$('.barh',root||document).forEach(function(b){
     $$('i',b).forEach(function(i){
       var l=i.dataset.l, w=i.dataset.w;
-      i.style.left=(l||0)+'%'; i.style.width='0';
+      i.style.left=(l||0)+'%';
+      /* En un repintado de fondo la barra aparece con su ancho: no vuelve a crecer desde
+         cero cada 90 s con el mismo dato. */
+      if(redu() || silencioso){ i.style.width=w+'%'; return; }
+      i.style.width='0';
       /* setTimeout, no rAF: en pestaña de fondo rAF no dispara y quedaría a cero */
-      setTimeout(function(){ i.style.width=w+'%'; }, redu()?0:70);
+      setTimeout(function(){ i.style.width=w+'%'; }, 70);
     });
     $$('.mk',b).forEach(function(m){ m.style.left=m.dataset.l+'%'; });
   });
@@ -3687,18 +3699,31 @@ function pintarNav(){
 function _repintarSuave_(){
   var m=document.getElementById('main');
   var y=m?m.scrollTop:0;
-  pintar();
+  pintar(true);                  // CALLADO: lo ha pedido un dato, no el usuario
   if(m && y) m.scrollTop=y;
 }
-function pintar(){
+/* `silencioso`: repinta sin representar la funcion otra vez.
+
+   La regla es la de siempre —si el repintado molesta se repinta MENOS, no se apaga la
+   animacion—, pero `pintar()` no puede saber solo si viene de un dedo o de una respuesta
+   del servidor: se lo dice quien llama. Con dedo, todo se anima. Con dato de fondo, cada
+   animacion se salta pintando su estado FINAL (no el inicial), asi que nada queda a cero.
+
+   Sin esto, el login pintaba dos veces y el refresco en vivo una cada 90 s, y en cada una
+   se repetian la entrada de la vista, la cascada del medidor y el crecimiento de las
+   barras. Con el mismo dato. Daniel: «se recarga solo por la cara». */
+function pintar(silencioso){
   var f=VISTAS[ST.vista];
   var el=$('#v-'+ST.vista);
-  if(f&&el){ el.innerHTML=f(); el.classList.add('entra'); setTimeout(function(){el.classList.remove('entra');},360); }
+  if(f&&el){
+    el.innerHTML=f();
+    if(!silencioso){ el.classList.add('entra'); setTimeout(function(){el.classList.remove('entra');},360); }
+  }
   $$('.vis').forEach(function(s){s.classList.toggle('on', s.id==='v-'+ST.vista);});
   pintarNav();
   colocarViaje(false);
-  if(ST.vista==='estado'){ armarMedidor(); animarBarras(el); }
-  if(ST.vista==='horas'){ animarBarras(el); animarDeltas(el); }
+  if(ST.vista==='estado'){ armarMedidor(silencioso); animarBarras(el, silencioso); }
+  if(ST.vista==='horas'){ animarBarras(el, silencioso); animarDeltas(el); }
   if(ST.vista==='fichar'){ medirAristas(); validarFichaje(); }
   enganchar();
 }
