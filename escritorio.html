@@ -2203,10 +2203,14 @@ async function _onCredencial_(resp,_silente){
     try{ localStorage.setItem('sol_last_email',SESION.email);
          localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
     ACTOR = SESION.nombre || PD_NOM;
-    await _cargarSanciones_();
-    await _cargarPartes_();
+    /* SE PINTA YA con el bootstrap, que trae identidad, panel, tareas, turnos y
+       documentos. Antes se esperaba ademas a sanciones y a partes EN SERIE: dos idas y
+       vueltas mas a Apps Script (~1,7 s cada una) mirando «Verificando…» para nada, porque
+       la primera pantalla no las usa. Ahora caen en paralelo y repintan al llegar. */
     var g=document.getElementById('loginGate'); if(g) g.remove();
     _pintarActua_(); pintar();
+    _cargarSanciones_().then(pintar);
+    _cargarPartes_().then(pintar);
   }catch(e){
     if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
     _gate_(_insigniaHTML_()+'<div style="color:#ffb3b0;max-width:360px">No se pudo entrar: '+
