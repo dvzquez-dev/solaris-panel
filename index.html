@@ -3109,7 +3109,6 @@ function vReu(){
   var best={d:0,f:0,v:0};
   M.forEach(function(fila,di){fila.forEach(function(v,fi){ if(v!=null&&v>best.v)best={d:di,f:fi,v:v}; });});
   /* indice rapido de los bloques fijados, para pintarlos en verde */
-  var fijSet={}; (R.fijadaBl||[]).forEach(function(b){ fijSet[b[0]+'-'+b[1]]=1; });
   /* ── LA MEJOR HORA ES UNA VENTANA, NO UNA CASILLA ──────────────────────────
      Con slots de 30 min y una reunion de 1 h, la casilla con mas gente no responde a
      nada: si a las 18:00 pueden 12 y a las 18:30 solo 2, a las 18:00 NO cabe la reunion.
@@ -3150,6 +3149,29 @@ function vReu(){
      dura, asi que la fila de cada dia sale de una pieza. */
   var _mm=_minHM_;                          // antes: parser propio, identico a este
   var _du=function(f){ return +f.dur||60; };
+  /* EL VERDE, POR HORA REAL Y NO POR INDICE DE FRANJA.
+     (Va AQUI y no arriba: necesita `_mm`/`_du`, que se declaran justo encima. Puesto antes,
+      `vReu` reventaba entera con «_mm is not a function» y la pantalla de Reuniones no
+      pintaba nada.)
+
+     Se buscaba `fijSet[dia+'-'+franja]` contra la franja que cubre cada instante — pero esa
+     rejilla solo guarda UNA franja por instante, y las reuniones de antes del modelo de slot
+     traen franjas de 60 min SOLAPADAS cada 30. Resultado: la general tenia su fijada en una
+     franja que nunca ganaba ningun instante y no se pintaba NADA; y la de trabajo, fijada en
+     dos franjas que se pisan, salia como un solo bloque en vez del rango entero.
+
+     Con el rango en minutos da igual cuantas franjas sean ni si se solapan: una celda va en
+     verde si su tramo cae dentro. */
+  var fijRango={};
+  (R.fijadaBl||[]).forEach(function(b){
+    var di=b[0], fi=b[1], f=R.franjas[fi]; if(!f) return;
+    var a=_mm(f), z=a+_du(f), r=fijRango[di];
+    fijRango[di] = r ? [Math.min(r[0],a), Math.max(r[1],z)] : [a,z];
+  });
+  /* Una celda esta fijada si su tramo [t, t+paso) cae dentro del rango de su dia. */
+  function _esFijada_(di, t, hasta){
+    var r=fijRango[di]; return !!r && t>=r[0] && hasta<=r[1];
+  }
   var _mcd=function(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; };
   var paso=0; R.franjas.forEach(function(f){ paso=_mcd(paso,_mm(f)); paso=_mcd(paso,_du(f)); });
   paso=Math.max(15, Math.min(60, paso||60));
@@ -3194,13 +3216,24 @@ function vReu(){
       while(ix+k<eje.length && cubre[di][ix+k]===fi) k++;      // hasta donde llega esta franja
       var geo='grid-column:span '+k+';height:21px;border-radius:2px';
       if(fi<0){                                                // fuera del horario de ese dia
+        /* ...salvo que ahi este la reunion FIJADA. La fijada es una DECISION, no un dato de
+           disponibilidad: tiene que verse aunque esa franja no estuviera ofertada ese dia.
+           Pasa con las reuniones viejas, cuyas franjas de 60 min se solapan cada 30 y no
+           cuadran con la rejilla. Si la decision no se ve, el mapa no sirve para lo unico
+           que de verdad importa mirar. */
+        if(_esFijada_(di, eje[ix], (ix+k<eje.length? eje[ix+k] : eje[ix]+paso))){
+          g+='<div title="reunión fijada" style="'+geo+';background:rgba(53,199,89,.85);'+
+            'outline:1px solid var(--ok);outline-offset:-1px"></div>';
+          ix+=k; continue;
+        }
         g+='<div title="fuera del horario de ese d\u00eda" style="'+geo+';'+
           'background:repeating-linear-gradient(45deg,rgba(255,255,255,.045) 0 3px,transparent 3px 6px);'+
           'border:1px solid var(--line)"></div>';
       } else {
         var v=M[di][fi], ini=_mm(R.franjas[fi]);
         var a=(0.12+0.88*(max?v/max:0)).toFixed(3);
-        var esBest=(di===vent.d && fi>=vent.f0 && fi<=vent.f1 && vent.v>0), fij=fijSet[di+'-'+fi];
+        var _t0=eje[ix], _t1=(ix+k<eje.length? eje[ix+k] : ini+_du(R.franjas[fi]));
+        var esBest=(di===vent.d && fi>=vent.f0 && fi<=vent.f1 && vent.v>0), fij=_esFijada_(di,_t0,_t1);
         var fondo = fij ? 'rgba(53,199,89,.85)' : 'rgba(228,30,37,'+a+')';
         var borde = fij ? ';outline:1px solid var(--ok);outline-offset:-1px'
                    : (esBest?';outline:1px solid var(--ink);outline-offset:-1px':'');
