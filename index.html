@@ -229,6 +229,29 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
   0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 14px var(--tel))}
   55%{stroke:#9BD4F0;stroke-width:2.2;filter:drop-shadow(0 0 7px var(--tel))}
   100%{stroke:var(--tel);stroke-width:1.7;filter:none}}
+/* ── LAS PASADAS DE LA CASCADA ─────────────────────────────────────────────────────
+   Tres estados que solo existen mientras el medidor se arma; no son estados del dato,
+   son momentos. Van al final del bloque a proposito, como las tres de arriba: tienen que
+   ganarle al color que el markup le pone a cada tramo con el atributo `stroke`.
+   (Cualquier regla CSS gana a un atributo de presentacion, por eso funciona.) */
+/* 1 · ROJA: el anillo arranca en rojo aunque el dato ya sea de elegible. */
+.med.paso-rojo .seg.on{stroke:url(#gRed)}
+.med.paso-rojo .halo{stroke:url(#gRed)}
+/* 2 · DORADA: el barrido que anuncia. Cada barrita se queda dorada al pasar por ella. */
+.med.paso-oro .seg.on{stroke:#F2C94C}
+.med.paso-oro .halo{stroke:#F2C94C}
+.med .tk.chOro{stroke:#F2C94C}
+.med .tk.chOro.chispa{animation:chispazoOro .5s var(--sal)}
+/* 3 · AZUL: fuerza a azul TAMBIEN a las dos ultimas, que por dato ya son verdes. Sin
+   esto el verde llegaria a la vez que el azul y no habria cuarta pasada que ver. */
+.med.aura.paso-azul .seg.on{stroke:url(#gAzu)}
+.med.aura.paso-azul .halo{stroke:url(#gAzu)}
+.med.aura.paso-azul .tk.cierra{stroke:var(--tel)}
+.med.aura.paso-azul .tk.chispa.cierra{animation:chispazoAzul .5s var(--sal)}
+@keyframes chispazoOro{
+  0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 15px #F2C94C)}
+  55%{stroke:#FFE9A8;stroke-width:2.2;filter:drop-shadow(0 0 8px #F2C94C)}
+  100%{stroke:#F2C94C;stroke-width:1.7;filter:none}}
 @keyframes chispazoVerde{
   0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 10px #fff) drop-shadow(0 0 16px #7BE3BE)}
   55%{stroke:#BFF5E2;stroke-width:2.2;filter:drop-shadow(0 0 8px #7BE3BE)}
@@ -406,17 +429,23 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 
 /* ── LA CONSTELACIÓN DE REQUISITOS ───────────────────────────────────────
    Lo mejor de la 03a: la regla de negocio DIBUJADA. Tres nodos —duración,
-   imputación, justificación— que se encienden, y dos aristas que solo cierran
+   imputación, justificación— que se encienden, y TRES aristas que solo se trazan
    cuando sus dos extremos están encendidos. Hasta que la figura no cierra, el
    botón no es un botón. Aquí las aristas van con la estrella de marca.
    ─────────────────────────────────────────────────────────────────────── */
-.const{position:relative;height:76px;margin:16px 0 2px}
-.const svg.ar{position:absolute;inset:0;width:100%;height:76px;overflow:visible}
+/* TRIANGULO, no fila. Tres nodos alineados con dos aristas no cierran nunca, y la idea que
+   sostiene esta figura es justamente que el boton no se enciende hasta que CIERRA. Con
+   tres requisitos, la figura que cierra es el triangulo. */
+.const{position:relative;height:150px;margin:16px 0 2px}
+.const svg.ar{position:absolute;inset:0;width:100%;height:150px;overflow:visible}
 .const svg.ar path{fill:none;stroke:var(--red2);stroke-width:1.2;stroke-linecap:round;opacity:.55;
   stroke-dasharray:var(--L,80);stroke-dashoffset:var(--L,80);
   transition:stroke-dashoffset .55s var(--sal),opacity .3s linear}
 .const svg.ar path.on{stroke-dashoffset:0;opacity:.9}
-.const .nodo{position:absolute;top:8px;transform:translateX(-50%);display:flex;flex-direction:column;
+/* La BASE es la que cierra el triangulo: cuando aparece, la figura esta completa. Se le da
+   un pelo mas de presencia para que se note que ha cerrado. */
+.const svg.ar path#ar3.on{opacity:1;stroke-width:1.5;filter:drop-shadow(0 0 5px rgba(255,74,79,.5))}
+.const .nodo{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;
   align-items:center;gap:7px;width:104px;text-align:center}
 .const .nodo .es{width:19px;height:19px;color:#3A3032;
   transition:color .4s var(--sal),transform .55s var(--arco),filter .4s linear}
@@ -1757,7 +1786,8 @@ function armarMedidor(){
   /* rebobinado instantáneo, para que solo el ARMADO vaya escalonado */
   med.classList.remove('arm');
   $$('.seg.on',med).forEach(function(s){s.style.transition='none';s.classList.remove('fog');});
-  $$('.tk',med).forEach(function(t){t.classList.remove('chispa');});
+  $$('.tk',med).forEach(function(t){t.classList.remove('chispa','chOro');});
+  med.classList.remove('paso-rojo','paso-oro','paso-azul');
   if(tip){tip.style.transition='none';tip.style.transform='rotate(0deg)';}
   if(num) num.textContent='0';
   void med.offsetWidth;
@@ -1772,17 +1802,72 @@ function armarMedidor(){
   }
   med.classList.add('arm');
   if(tip) tip.style.transform='rotate('+giro+'deg)';
-  /* secuencia de encendido: cada tramo prende con su fogonazo y su CHISPA en la marca */
-  for(var k=0;k<p;k++){
-    (function(k){
-      medTimers.push(setTimeout(function(){
-        var s=$$('.seg.on',med)[k]; if(s){ s.classList.add('fog'); setTimeout(function(){s.classList.remove('fog');},240); }
-        var t=$('.tk[data-i="'+k+'"]',med);
-        if(t){ t.classList.remove('chispa'); void t.getBoundingClientRect(); t.classList.add('chispa'); }
-        if(num) num.textContent=k+1;
-      }, 140+k*78));
-    })(k);
+
+  /* Un BARRIDO recorre el anillo tramo a tramo llamando a `paso(k)`. Empieza en `t0` y
+     devuelve cuando acaba, que es como se encadenan las pasadas sin contar milisegundos
+     a mano. */
+  function barrido(t0, ms, paso){
+    for(var k=0;k<p;k++){
+      (function(k){ medTimers.push(setTimeout(function(){ paso(k); }, t0+k*ms)); })(k);
+    }
+    return t0 + p*ms;
   }
+  /* Prende el tramo k: fogonazo en la curva y destello en su barrita recta. `tono` dice
+     hacia que color destella la barrita; sin tono, el que le toque por CSS. */
+  function fogonazo(sg){
+    if(!sg) return;
+    sg.classList.add('fog');
+    medTimers.push(setTimeout(function(){ sg.classList.remove('fog'); },240));
+  }
+  function prende(k, tono, cuenta){
+    fogonazo($$('.seg.on',med)[k]);
+    var t=$('.tk[data-i="'+k+'"]',med);
+    if(t){
+      t.classList.remove('chispa','chOro');
+      if(tono) t.classList.add(tono);
+      void t.getBoundingClientRect();      // reinicia la animacion; sin esto no repite
+      t.classList.add('chispa');
+    }
+    if(cuenta && num) num.textContent=k+1;
+  }
+
+  /* PASADA 1 - ROJA. Es el armado de siempre y es donde acaba un mes normal. */
+  var eleg = estadoPts(p)==='elegible';
+  if(eleg){ med.classList.remove('aura'); med.classList.add('paso-rojo'); }
+  var t=barrido(140, 78, function(k){ prende(k, null, true); });
+  if(!eleg) return;
+
+  /* PASADA 2 - DORADA. No significa nada por si misma: significa que viene algo. */
+  medTimers.push(setTimeout(function(){
+    med.classList.remove('paso-rojo'); med.classList.add('paso-oro');
+  }, t+110));
+  t=barrido(t+110, 62, function(k){ prende(k, 'chOro', false); });
+
+  /* PASADA 3 - AZUL. `paso-azul` tapa el verde de las dos ultimas para que la cuarta
+     pasada tenga algo que revelar (ver la cabecera del parche). */
+  medTimers.push(setTimeout(function(){
+    med.classList.remove('paso-oro'); med.classList.add('aura','paso-azul');
+  }, t+110));
+  t=barrido(t+110, 62, function(k){ prende(k, null, false); });
+
+  /* PASADA 4 - VERDE, y solo las que lo son. Se destapan en el orden en que se ganan:
+     primero la del 9 y luego la de las 12, que es la que cierra la vuelta. Cada barrita
+     verde va con la curva que remata, no con la que arranca en ella. */
+  medTimers.push(setTimeout(function(){
+    med.classList.remove('paso-azul');
+    var verdes=$$('.tk.cierra',med).map(function(tk){
+      var i=+tk.getAttribute('data-i');
+      return {tk:tk, seg:(i===0 ? p-1 : i-1)};      // la de las 12 remata la ultima curva
+    }).sort(function(a,b){ return a.seg-b.seg; });
+    verdes.forEach(function(v,i){
+      medTimers.push(setTimeout(function(){
+        fogonazo($$('.seg.on',med)[v.seg]);
+        v.tk.classList.remove('chispa');
+        void v.tk.getBoundingClientRect();
+        v.tk.classList.add('chispa');
+      }, i*170));
+    });
+  }, t+140));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2094,15 +2179,18 @@ function vFichar(){
     '<h2 class="sec">Antes de enviar<span class="ln"></span></h2>'+
     '<div class="tarj">'+
       '<div class="const" id="const">'+
-        '<svg class="ar" viewBox="0 0 300 76" preserveAspectRatio="none">'+
-          '<path id="ar1" d="M50 22 Q100 4 150 22"></path>'+
-          '<path id="ar2" d="M150 22 Q200 4 250 22"></path>'+
+        /* Vertices: duracion arriba en el centro, los otros dos abajo. Las aristas van de
+           estrella a estrella, no de caja a caja, por eso arrancan a la altura del icono. */
+        '<svg class="ar" viewBox="0 0 300 150" preserveAspectRatio="none">'+
+          '<path id="ar1" d="M150 26 Q96 52 62 96"></path>'+
+          '<path id="ar2" d="M150 26 Q204 52 238 96"></path>'+
+          '<path id="ar3" d="M62 96 Q150 118 238 96"></path>'+
         '</svg>'+
-        '<div class="nodo" id="n1" style="left:16.6%"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
+        '<div class="nodo" id="n1" style="left:50%;top:6px"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
           '<span>Duración<em id="e1"></em></span></div>'+
-        '<div class="nodo" id="n2" style="left:50%"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
+        '<div class="nodo" id="n2" style="left:21%;top:80px"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
           '<span>Imputación<em id="e2"></em></span></div>'+
-        '<div class="nodo" id="n3" style="left:83.4%"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
+        '<div class="nodo" id="n3" style="left:79%;top:80px"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
           '<span>Justificación<em id="e3"></em></span></div>'+
       '</div>'+
       '<div class="figcierra" id="figMsg"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
@@ -2142,9 +2230,12 @@ function validarFichaje(){
   [['n1',n1],['n2',n2],['n3',n3]].forEach(function(x){
     var el=$('#'+x[0]); if(el) el.classList.toggle('on',x[1]);
   });
-  var a1=$('#ar1'), a2=$('#ar2');
+  /* Cada arista une DOS vertices y se dibuja cuando los dos estan encendidos. La base
+     (ar3) es la que CIERRA el triangulo, y por eso solo aparece con los tres. */
+  var a1=$('#ar1'), a2=$('#ar2'), a3=$('#ar3');
   if(a1) a1.classList.toggle('on', n1&&n2);
-  if(a2) a2.classList.toggle('on', n2&&n3);
+  if(a2) a2.classList.toggle('on', n1&&n3);
+  if(a3) a3.classList.toggle('on', n2&&n3);
 
   /* el aro de la justificación */
   var pct=Math.min(1,f.just.trim().length/25);
@@ -2172,12 +2263,22 @@ function validarFichaje(){
   }
   return todo;
 }
+/* La longitud REAL de cada arista, que es de donde salen el trazo y su desplazamiento.
+   Si se queda en el fallback, la linea se dibuja a trazos en vez de entera: un dasharray
+   de 80 sobre una arista de 113 es «trazo, hueco, trozo». Pasaba de verdad, porque
+   `getTotalLength()` devuelve 0 mientras la pantalla no esta renderizada y `pintar()` mide
+   en el mismo tick en que la enseña. Por eso se fuerza el calculo de estilo antes, y se
+   reintenta en el siguiente frame si alguna sigue sin medir. */
 function medirAristas(){
-  ['ar1','ar2'].forEach(function(id){
+  var svg=$('.const svg.ar'); if(!svg) return;
+  void svg.getBoundingClientRect();           // fuerza el layout: sin esto mide 0
+  var faltan=false;
+  ['ar1','ar2','ar3'].forEach(function(id){
     var p=$('#'+id); if(!p) return;
-    var L=80; try{ L=p.getTotalLength()||80; }catch(e){}
-    p.style.setProperty('--L',L);
+    var L=0; try{ L=p.getTotalLength(); }catch(e){}
+    if(L>0) p.style.setProperty('--L',L); else faltan=true;
   });
+  if(faltan) requestAnimationFrame(medirAristas);
 }
 function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?(m[3]+'-'+m[2]+'-'+m[1]):f; }
 /* Envío del fichaje. Con cuenta real y sesión EN VIVO → api.ficharSalida: la NUBE cierra
