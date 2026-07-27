@@ -692,9 +692,17 @@ var PD_NOM='Lois Carballo Sendón';   // semilla; con datos reales lo rederiva _
 /* límite de una reunión en DD/MM (del dato, no cableado). */
 function _limM_(R){ var l=R&&R.limite; if(!l) return 'sin límite'; l=String(l).slice(0,10); return _isoADMY_(l); }
 function _pilaDeM_(n){ var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0]; return m&&m.pila; }
+/* Se rederivaban SOLO el PD, asi que REV2_NOM se quedaba en el nombre de la semilla y el
+   rango 2 no existia con datos reales: Jose podia decidir un expediente en el escritorio y
+   no en el movil. El segundo revisor es Jose Manuel Torres (DOC_JOSE en el backend); si no
+   estuviera en el roster, se cae al coordinador de la UCT antes que a un nombre inventado. */
 function _rederivarPD_(){
-  var pd=(DATA.miembros||[]).filter(function(m){ return m.cargo==='Project Director'; })[0];
+  var ms=DATA.miembros||[];
+  var pd=ms.filter(function(m){ return m.cargo==='Project Director'; })[0];
   if(pd) PD_NOM=pd.nombre;
+  var rev=ms.filter(function(m){ return /^José Manuel Torres/.test(m.nombre||''); })[0]
+        || ms.filter(function(m){ return m.cargo==='Coordinador' && /Coordinación Técnica/.test(m.unidad||''); })[0];
+  if(rev) REV2_NOM=rev.nombre;
 }
 var REV2_NOM='Antía Ruibal Cortegoso';
 
@@ -758,7 +766,13 @@ var api={
   declararParte:    function(id,tarea,just,cat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat}); },
   crearReunion:     function(r){ return api._post({action:"crearReunion",reunion:r}); },
   listarReuniones:  function(){ return api._post({action:"listarReuniones"}); },
-  getReunion:       function(id){ return api._post({action:"getReunion",id:id}); }
+  getReunion:       function(id){ return api._post({action:"getReunion",id:id}); },
+  /* Estaban en app.html y se perdieron al partir el artefacto: sin ellas, cubrir y
+     decidir se quedaban en la memoria del movil y no llegaban nunca al servidor. */
+  responder:        function(id,n,v){ return api._post({action:"responder",id:id,nombre:n,valores:v}); },
+  decidir:          function(id,a,m,x){ return api._post({action:"decidir",id:id,accion:a,motivo:m,extra:x}); },
+  fijar:            function(id,f){ return api._post({action:"fijarReunion",id:id,fijada:f}); },
+  setOrdenDia:      function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); }
 };
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
 /* HH:MM local de una fecha ISO (la hora de apertura que da la nube) */
@@ -1893,9 +1907,20 @@ function vTareas(){
     /* por FECHA real: comparar 'DD/MM/AAAA' como texto pone 12/06 por delante de 03/07 */
     .sort(function(a,b){ return String(_dmyAISO_(b.l)||'').localeCompare(String(_dmyAISO_(a.l)||'')); });
   var act=TAREAS.filter(function(t){return !/hech|finaliz|complet|termin|cerrad/i.test(t.e);})
-    .sort(function(a,b){return (TK_ORD[a.u]-TK_ORD[b.u]) || a.l.localeCompare(b.l);});
+    /* sin fecha limite van al final; `a.l.localeCompare` sobre null tumbaba la pantalla */
+    .sort(function(a,b){
+      var d=(TK_ORD[a.u]-TK_ORD[b.u]); if(d) return d;
+      if(!a.l) return 1; if(!b.l) return -1;
+      return String(_dmyAISO_(a.l)).localeCompare(String(_dmyAISO_(b.l)));
+    });
+  /* Una tarea puede no tener fecha limite: el backend manda `l:null` y es legitimo.
+     Antes `l.split` reventaba y la pantalla entera se quedaba en blanco. */
   function vence(l){
-    var p=l.split('/'), d=Math.round((new Date(p[2]+'-'+p[1]+'-'+p[0])-hoy)/86400000);
+    if(!l) return ['sin fecha límite',false];
+    var p=String(l).split('/');
+    if(p.length<3) return ['sin fecha límite',false];
+    var d=Math.round((new Date(p[2]+'-'+p[1]+'-'+p[0])-hoy)/86400000);
+    if(isNaN(d)) return ['sin fecha límite',false];
     if(d<0) return ['venció hace '+(-d)+' día'+(-d===1?'':'s'),true];
     if(d===0) return ['vence hoy',true];
     return ['vence en '+d+' día'+(d===1?'':'s'),d<=3];
@@ -2255,7 +2280,16 @@ function cubrirModal(){
   var ley = modo==='presencial' ? '<span><i style="background:var(--red)"></i>presencial</span>'
           : modo==='telematica' ? '<span><i style="background:var(--tel)"></i>telemática</span>'
           : '<span><i style="background:var(--red)"></i>presencial + telemático</span><span><i style="background:var(--tel)"></i>solo telemático</span>';
-  if(!ST.sel) ST.sel=new Map();
+  /* Precarga de lo ya enviado: sin esto, «Editar mi disponibilidad» abria la rejilla
+     en blanco y guardar equivalia a borrar lo que tenias puesto.
+     `resp[nombre]` esta alineado a la POSICION del bloque, no al indice de franja. */
+  if(!ST.sel || ST._selDe!==R.id){
+    ST.sel=new Map(); ST._selDe=R.id;
+    var _mio=(R.resp||{})[(YO&&YO.nombre)||'']||[];
+    (R.bloques||[]).forEach(function(b,i){
+      var v=+_mio[i]||0; if(v>0) ST.sel.set(b[0]+'_'+b[1], v);
+    });
+  }
   var hd='<div class="rc"></div>';
   R.franjas.forEach(function(f,ix){
     hd+='<div class="rc rh"><span>'+f.ini.replace(':00','')+'</span>'+
@@ -2322,7 +2356,32 @@ function engancharRejilla(){
   });
   grid.addEventListener('pointerup',function(){ if(startK){ commit(lastK||startK); startK=null; } });
   var g=$('#btnGuardarDisp');
-  if(g) g.onclick=function(){ REUNION.cubierta=ST.sel.size>0; cerrarModal(); tost('Disponibilidad guardada.'); pintar(); };
+  /* GUARDA EN EL SERVIDOR. Antes solo ponia una marca local y decia «guardada»: en el
+     servidor no quedaba nada, y de ahi come el pipeline de sanciones. `valores` va
+     alineado a la POSICION de cada bloque, que es como lo espera `responder`. */
+  if(g) g.onclick=async function(){
+    if(g.disabled) return;
+    var R2=REUNION;
+    var vals=(R2.bloques||[]).map(function(b){ return ST.sel.get(b[0]+'_'+b[1])||0; });
+    if(typeof backendOK!=='undefined' && backendOK && SESION){
+      g.disabled=true; var prev=g.textContent; g.textContent='Guardando…';
+      try{
+        await api.responder(R2.id, (YO&&YO.nombre)||'', vals);
+        if(!R2.resp) R2.resp={};
+        R2.resp[(YO&&YO.nombre)||'']=vals;
+        var re=_normReuM_(R2); REUNION=re;                    // recalcula el mapa con lo tuyo dentro
+        var ix=REUNIONES_M.findIndex(function(x){ return x.id===re.id; });
+        if(ix>=0) REUNIONES_M[ix]=re;
+        ST._selDe=null;
+        cerrarModal(); tost('Disponibilidad guardada.'); pintar();
+      }catch(e){
+        g.disabled=false; g.textContent=prev;
+        tost('No se pudo guardar: '+((e&&e.message)||e)+'. Vuelve a intentarlo.');
+      }
+      return;
+    }
+    tost('Sin conexión no se puede guardar la disponibilidad.');
+  };
 }
 function vEquipo(){
   var subs=DATA.subsistemas||[], maxS=subs.length?subs[0].media:1;
