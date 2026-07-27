@@ -404,6 +404,8 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
       </div>
       <div class="yo"><span class="av" id="yoAv">LC</span>
         <span><span class="n" id="yoN">Lois Carballo</span><br><span class="rl" id="yoR">Project Director</span></span></div>
+      <!-- `cerrarSesion()` existia desde el principio y no la invocaba nadie: no habia forma de salir. -->
+      <button id="btnSalir" title="Cerrar sesión" style="background:none;border:1px solid var(--line);border-radius:9px;color:var(--ink3);font:inherit;font-size:11.5px;padding:6px 11px;cursor:pointer;margin-left:10px">Salir</button>
     </div>
   </header>
 
@@ -465,8 +467,9 @@ var api={
   getTurnos:   function(){ return api._post({action:"getTurnos"}); },
   crearTurno:  function(t){ return api._post({action:"crearTurno",turno:t}); },
   getEntregables: function(){ return api._post({action:"getEntregables"}); },
-  listar:      function(){ return api._get({action:"listarReuniones"}); },
-  get:         function(id){ return api._get({action:"getReunion",id:id}); },
+  /* por POST, para que lleven el token como el resto: por GET iban sin identidad */
+  listar:      function(){ return api._post({action:"listarReuniones"}); },
+  get:         function(id){ return api._post({action:"getReunion",id:id}); },
   crear:       function(r){ return api._post({action:"crearReunion",reunion:r}); },
   borrar:      function(id){ return api._post({action:"borrarReunion",id:id}); },
   fijar:       function(id,f){ return api._post({action:"fijarReunion",id:id,fijada:f}); },
@@ -495,9 +498,23 @@ function normReu(r){ r=r||{};
     limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[],
     franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[],
     total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null,
-    ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:r.fijada||""}; }
+    ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:_labelFijada_(r.fijada)}; }
+/* El backend manda `fijada` como objeto {fecha,franjas,bloques,label,iso}; pintarlo tal
+   cual daba «[object Object]» en la tabla de convocatorias. */
+function _labelFijada_(f){
+  if(!f) return '';
+  if(typeof f==='string') return f;
+  return f.label || f.iso || '';
+}
 
-var HOY='24/07/2026', UMBRAL=11.8, MEDIA_EQ=10.9;
+
+/* La fecha estaba fija: el panel decia siempre 24/07/2026 y de ahi salen los vencimientos
+   y el periodo del minimo exigido. Solo se congela con ?demo, para que la maqueta sea estable. */
+var HOY=(function(){
+  if(location.search.indexOf('demo')>=0) return '24/07/2026';
+  var d=new Date(), p=function(x){ return (x<10?'0':'')+x; };
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear();
+})(), UMBRAL=11.8, MEDIA_EQ=10.9;
 /* fecha comparable cronologicamente venga en ISO (AAAA-MM-DD) o DD/MM/AAAA */
 function _fechaISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   return m ? (m[3]+'-'+m[2]+'-'+m[1]) : f; }
@@ -645,6 +662,34 @@ function revisoresDeDoc(d){
   if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n){return n!==d.autor;});
   if(!r.length) r=[PD_NOM];
   return r;
+}
+/* El backend sirve el entregable con SU forma (titulo, ambito, estado, severidad,
+   issues[], subsistema) y estas vistas leen la corta (tit, amb, est, sev, iss, sub).
+   Sin este adaptador la bandeja salia vacia y las filas sin titulo. Ojo: `iss` es una
+   CUENTA, no la lista, porque la vista escribe «N avisos». */
+function _normDocE_(d, i){
+  if(!d) return d;
+  if(d.tit!==undefined && d.est!==undefined) return d;      // ya viene corta (semilla)
+  var iss = Array.isArray(d.issues) ? d.issues.length : (+d.issues||0);
+  return {
+    id:      (d.id!==undefined ? d.id : i),
+    ref:     d.ref || '',
+    tit:     d.titulo || d.tit || d.ref || '',
+    autor:   d.autor || '',
+    sub:     d.subsistema || d.sub || '',
+    tipo:    d.tipo || '',
+    amb:     d.ambito || d.amb || '',
+    est:     d.estado || d.est || '',
+    sev:     d.severidad || d.sev || 'baja',
+    iss:     iss,
+    avisos:  Array.isArray(d.issues) ? d.issues : [],        // la lista, para leerlos
+    resumen: d.resumen || '',
+    fecha:   d.fecha || '',
+    bloqueo: d.bloqueo || null,
+    drive:   d.enlaceDrive || null,
+    notion:  d.paginaNotion || null,
+    _crudo:  d
+  };
 }
 function docsMios(){return DOCS.filter(function(d){return d.est==='revision' && revisoresDeDoc(d).indexOf(ACTOR)>=0;});}
 
@@ -1201,7 +1246,11 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
 /* ── DOCUMENTOS ──────────────────────────────────────────────────────────── */
 function filaDoc(d){
   var rev=revisoresDeDoc(d).map(function(n){return miembro(n)?miembro(n).pila:n;}).join(' o ');
-  var puede=revisoresDeDoc(d).indexOf(ACTOR)>=0 || rangoNom(ACTOR)>Math.max.apply(null,revisoresDeDoc(d).map(rangoNom));
+  /* NADIE FIRMA LO SUYO: faltaba excluir al autor, asi que el PD podia aprobar su propio
+     informe general. El backend ya lo impide; esta cara no lo reflejaba. */
+  var _rev=revisoresDeDoc(d);
+  var puede=(d.autor!==ACTOR) &&
+    (_rev.indexOf(ACTOR)>=0 || rangoNom(ACTOR)>Math.max.apply(null,_rev.map(rangoNom)));
   return '<div class="dec" id="doc-'+d.id+'" style="cursor:default">'+
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
     '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+d.ref+'</span> · '+
@@ -1621,6 +1670,23 @@ function _insigniaHTML_(){
    · ADMIN    -> {miembros:[fichas completas]}
    El escritorio es de coordinación, así que con la forma de miembro habrá vistas
    que se queden a medias: se dice en pantalla en vez de fingir que hay datos. */
+/* `listarReuniones` no devuelve las respuestas (viven en su propia hoja y las sirve
+   `getReunion`). Sin pedirlas, el mapa de calor salia ENTERO A CERO, el panel decia "0 de N
+   han cubierto" y metia a TODOS los convocados en la lista de riesgo con su sancion
+   propuesta al lado: se proponia castigar a quien si habia cubierto. Es el mismo hidratado
+   que ya hacia el movil en `_hidratarReuM_`. */
+async function _hidratarReus_(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
+  for(var i=0;i<REUS.length;i++){
+    var r=REUS[i];
+    if(r.resp && Object.keys(r.resp).length) continue;
+    try{
+      var d=await api.get(r.id);
+      if(d && d.resp){ r.resp=d.resp; r.calor=null; }   // calor null: se recalcula con las respuestas
+    }catch(_){ /* una reunion que no se puede leer no debe tumbar el resto */ }
+  }
+  try{ pintar(); }catch(_){}
+}
 function _aplicarPanel_(pnl){
   if(!pnl) return;
   if(pnl.generado) DATA.generado=pnl.generado;
@@ -1636,14 +1702,23 @@ function _aplicarPanel_(pnl){
   } else if(Array.isArray(pnl.miembros)&&pnl.miembros.length){   // forma ADMIN
     DATA.miembros=pnl.miembros; DATA._rol='admin'; DATA._ranking=null;
   }
+  /* El backend manda `horasMes`; TODA esta cara lee `hMes`. Sin esta traduccion el PD veia
+     "H/mes —" y "TOTAL 0,0 h" con las horas ahi mismo. Mismo fallo de forma que ya se cazo
+     en turnos, tareas y documentos: el backend habla largo y la vista lee corto. */
+  (DATA.miembros||[]).forEach(function(m){
+    if(m.hMes==null && typeof m.horasMes==='number') m.hMes=m.horasMes;
+  });
   _rederivarCargos_();
 }
 function _aplicarBootstrap_(boot){
   _aplicarPanel_(boot.panel);
   if(Array.isArray(boot.tareas)){ TAREAS.length=0; boot.tareas.forEach(function(t){TAREAS.push(t);}); }
   if(Array.isArray(boot.turnos)){ TURNOS.length=0; boot.turnos.forEach(function(t){TURNOS.push(t);}); }
-  if(Array.isArray(boot.entregables)){ DOCS.length=0; boot.entregables.forEach(function(d){DOCS.push(d);}); }
-  if(Array.isArray(boot.reuniones)){ REUS.length=0; boot.reuniones.map(normReu).forEach(function(r){REUS.push(r);}); }
+  if(Array.isArray(boot.entregables)){ DOCS.length=0; boot.entregables.forEach(function(d,i){DOCS.push(_normDocE_(d,i));}); }
+  if(Array.isArray(boot.reuniones)){
+    REUS.length=0; boot.reuniones.map(normReu).forEach(function(r){REUS.push(r);});
+    _hidratarReus_();          // el bootstrap NO trae `resp`: sin esto el mapa sale a cero
+  }
   backendOK=true;
 }
 async function _cargarSanciones_(){
@@ -1749,6 +1824,10 @@ function _arrancarGis_(){
     setTimeout(function(){ esperar(n-1); },150);
   })(40);
 }
+function _cablearSalir_(){
+  var b=document.getElementById('btnSalir');
+  if(b && !b._ok){ b._ok=1; b.onclick=function(){ cerrarSesion(); }; }
+}
 function cerrarSesion(){
   SESION=null;
   try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
@@ -1831,6 +1910,7 @@ function _pintarPie_(){
 }
 function pintar(){
   _pintarPie_();
+  _cablearSalir_();
   var m=$('#main');
   m.innerHTML=V[vista].f();
   $('#migaA').textContent=V[vista].g;
