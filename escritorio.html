@@ -2152,8 +2152,10 @@ async function reportarModal(){
   var ua=navigator.userAgent||'';
   var nav=/Firefox/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome/.test(ua)?'Chrome':/Safari/.test(ua)?'Safari':'otro';
   var datos={ titulo:tit, donde:'Escritorio', pantalla:((V[vista]&&V[vista].t)||vista),
-    version:(DATA.generado||''),
-    contexto:'escritorio · '+nav+' · '+screen.width+'x'+screen.height+' · datos '+(DATA.generado||'?') };
+    /* La version del CODIGO, no la de los datos: ver la gemela del movil. */
+    version:BUILD,
+    contexto:'escritorio · '+nav+' · '+screen.width+'x'+screen.height+
+      ' · build '+BUILD+' · datos '+(DATA.generado||'?') };
   if(esMejora){ datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
   else { datos.esperaba=det; datos.paso=tit; datos.gravedad='Molesta'; }
   try{
@@ -2695,7 +2697,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='0331def';
+var BUILD='d21459e';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
