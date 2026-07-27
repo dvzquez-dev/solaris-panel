@@ -962,8 +962,11 @@ function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.b
    entra aqui y no en cinco sitios. */
 function _hMesReal_(m){
   m = m || {};
-  return (typeof m.hMes==='number') ? m.hMes
-       : (typeof m.horasMes==='number') ? m.horasMes : null;
+  /* `horasMes` PRIMERO: es el campo que llega del backend con el overlay de Notion en
+     vivo. `hMes` es una COPIA que hace `_aplicarPanel_` para las vistas que leen corto,
+     y una copia puede quedarse atras. Ante la duda, el original. */
+  return (typeof m.horasMes==='number') ? m.horasMes
+       : (typeof m.hMes==='number') ? m.hMes : null;
 }
 /* GEMELA (la otra cara: misma funcion, mismo nombre).
    EL UMBRAL NO ES UNA CONSTANTE. `reglas/cuota.py` lo define asi:
@@ -1925,6 +1928,30 @@ function armarMedidor(silencioso){
   medTimers.forEach(clearTimeout); medTimers=[];
   var p=YO.puntos, giro=p*MSTEP-MGAP/2+MTIP;
   var tip=$('#medTip'), num=$('#medN');
+
+  /* CALLADO = APARECER LLENO, sin pasar por vacio.
+
+     Esto sale ARRIBA del todo a proposito. Debajo hay un rebobinado que quita `arm`
+     (vacia el anillo), pone el puntero a 0 grados, el numero a 0 y fuerza un reflow — y ese
+     reflow hace que el vacio SE PINTE. Aunque justo despues se volviera a armar de golpe,
+     el ojo ya ha visto el cero: es el «se resetea por la cara» que se ve cada vez que
+     llega un dato de fondo. No basta con no animar: hay que NO REBOBINAR.
+
+     Se apaga la transicion mientras se coloca, para que el anillo no se dibuje ni el
+     puntero gire; y se devuelve despues, para que el siguiente cambio de verdad si
+     transicione en vez de saltar. */
+  if(redu() || silencioso){
+    var segs=$$('.seg.on',med);
+    segs.forEach(function(x){ x.style.transition='none'; });
+    if(tip) tip.style.transition='none';
+    med.classList.add('arm');
+    if(num) num.textContent=p;
+    if(tip) tip.style.transform='rotate('+giro+'deg)';
+    void med.offsetWidth;
+    segs.forEach(function(x){ x.style.transition=''; });
+    if(tip) tip.style.transition='';
+    return;
+  }
   /* rebobinado instantáneo, para que solo el ARMADO vaya escalonado */
   med.classList.remove('arm');
   $$('.seg.on',med).forEach(function(s){s.style.transition='none';s.classList.remove('fog');});
@@ -1942,12 +1969,7 @@ function armarMedidor(silencioso){
      movimiento y para el repintado de fondo, que son el mismo caso -nadie ha pedido ver
      esto- aunque por motivos distintos. El color final ya lo pone el markup
      (`_colorSeg_`/`_colorTick_`), asi que aqui solo falta encenderlo. */
-  if(redu() || silencioso){
-    med.classList.add('arm');
-    if(num) num.textContent=p;
-    if(tip) tip.style.transform='rotate('+giro+'deg)';
-    return;
-  }
+  /* (el caso callado/reduced ya salio arriba, antes de rebobinar) */
   med.classList.add('arm');
   if(tip) tip.style.transform='rotate('+giro+'deg)';
 
@@ -2035,8 +2057,10 @@ function armarMedidor(silencioso){
 var K_BAR=13.6;
 function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 function barraHorasHTML(id){
-  var notion=(typeof YO.horasMes==='number');
-  var cont=notion?YO.horasMes:sumaE('otor'), p=sumaE('pend');   /* otorgadas = todo lo que cuenta (Notion) */
+  /* La MISMA puerta que las dos tarjetas (`_hMesReal_`): esta era la TERCERA copia de
+     «de donde salen las horas del mes». */
+  var _hm=_hMesReal_(YO), notion=(_hm!=null);
+  var cont=notion?_hm:sumaE('otor'), p=sumaE('pend');   /* otorgadas = todo lo que cuenta */
   /* La barra NUNCA se llena (escala asintótica), pero dentro del ancho que ocupa el total
      (otorgadas+pendientes) el reparto es LINEAL: si 4 de 20 h están pendientes, el rayado
      ocupa 1/5 de lo pintado — no un pixel al final como si fueran un extra. */
@@ -2066,15 +2090,29 @@ function barraHorasHTML(id){
       ? (p>0?'<p class="rnota" style="margin-top:9px">Lo rayado son '+nf2(p)+' h esperando firma: todavía no cuentan.</p>':'')
       : '<p class="rnota" style="margin-top:9px">Aún no tienes horas registradas este mes. El objetivo son '+nf(UMBRAL,1)+' h.</p>');
 }
+/* Cuanto medía cada barra la ultima vez, para poder IR de ahi al valor nuevo.
+
+   `pintar()` reconstruye el DOM, asi que cada barra nace SIN PASADO y crecia desde cero:
+   al refrescar los datos, en vez de deslizarse de 87 a 91, se vaciaba y volvia a llenarse
+   entera. (Daniel: «en lugar de transicionar interpoladamente entre un estado y otro
+   resetea y la barra va de 0 a 91».) Se guarda el ancho fuera del DOM —que es lo unico que
+   sobrevive al repintado— y se arranca de ahi: la transicion CSS hace el resto.
+
+   La clave es el id de la barra + la posicion del tramo dentro de ella; las dos son
+   estables entre repintados. */
+var _anchoPrev_={};
 function animarBarras(root, silencioso){
   $$('.barh',root||document).forEach(function(b){
-    $$('i',b).forEach(function(i){
+    $$('i',b).forEach(function(i,ix){
       var l=i.dataset.l, w=i.dataset.w;
       i.style.left=(l||0)+'%';
-      /* En un repintado de fondo la barra aparece con su ancho: no vuelve a crecer desde
-         cero cada 90 s con el mismo dato. */
-      if(redu() || silencioso){ i.style.width=w+'%'; return; }
-      i.style.width='0';
+      var k=(b.id||b.className)+':'+ix, prev=_anchoPrev_[k];
+      _anchoPrev_[k]=w;
+      if(redu()){ i.style.width=w+'%'; return; }
+      /* De donde parte: de lo que media antes si ya estaba pintada, y de cero solo la
+         primera vez —que ahi si se quiere ver crecer—. */
+      i.style.width=(prev!=null?prev:0)+'%';
+      if(prev===w) return;                    // mismo dato: ni se toca
       /* setTimeout, no rAF: en pestaña de fondo rAF no dispara y quedaría a cero */
       setTimeout(function(){ i.style.width=w+'%'; }, 70);
     });
@@ -2536,8 +2574,14 @@ function filaParte(p){
 }
 function vHoras(){
   var o=sumaE('otor'), p=sumaE('pend');
-  var notion=(typeof YO.horasMes==='number');   // la nube trae las horas REALES del mes desde el Panel de Rendimientos
-  var cuentan=notion?YO.horasMes:o;              // base = total real del mes (Notion); si no, lo que ya cuenta
+  /* MISMA PUERTA que la tarjeta de Estado (`_hMesReal_`). Habia dos tarjetas de «horas del
+     mes» -una aqui y otra en `vEstado`- leyendo campos DISTINTOS, y en cuanto se toco una
+     se pusieron a decir numeros distintos en la misma app: 91 h en Horas y otra cosa en
+     Estado. Daniel: «no te dije que no duplicases funciones». Si mañana cambia de donde
+     salen las horas, se cambia en `_hMesReal_` y las dos se enteran. */
+  var _hm=_hMesReal_(YO);
+  var notion=(_hm!=null);
+  var cuentan=notion?_hm:o;
   var mias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad';});   // en cola / con detalle pedido / rechazados / sin declarar / caducados
   var confs=PARTES.filter(function(x){return x.e==='otor';});               // lo que ya cuenta
 
@@ -2559,7 +2603,7 @@ function vHoras(){
 
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'otorgadas · pendientes')+
-      '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'empleadas este mes':'que cuentan')+'</span></div>'+
+      '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
         (notion
           ? (p?'<span class="pil pend">+'+nf2(p)+' h fichadas · pendientes de firma</span>':'')
