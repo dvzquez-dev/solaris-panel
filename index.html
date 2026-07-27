@@ -3750,8 +3750,9 @@ function crearModal(){
 function fijarModal(){
   var R=REUNION;
   abrirModal('<div class="mtit">Fijar la reunión</div>'+
-    '<div class="msub">Elige el <b>día</b> y toca la <b>primera</b> y la <b>última</b> franja seguidas. '+
-    'El resultado sale en verde en el mapa.</div>'+
+    '<div class="msub">Elige el <b>día</b> y toca donde <b>empieza</b>: se marcan solas las '+
+    ('<b>'+_slotsMin_(R.duracion,R.slot)+'</b> franjas que dura'+(R.duracion?' ('+_durTxtM_(R.duracion)+')':'')+'. ')+
+    'Puedes estirar hacia la derecha, pero no dejarlo en menos. El resultado sale en verde en el mapa.</div>'+
     '<label class="campo"><span class="sc">Día</span><select id="fjDia">'+
       R.dias.map(function(d,i){return '<option value="'+i+'">'+esc(_diaTxtM_(d))+'</option>';}).join('')+'</select></label>'+
     '<span class="sc" style="display:block;margin-bottom:7px">Franjas de ese día</span>'+
@@ -3763,6 +3764,11 @@ function fijarModal(){
     '<div class="sc" id="fjSel" style="margin:11px 0 0;color:var(--ok);font-size:12px"></div>'+
     '<button class="btn pri full" style="margin-top:13px" data-p id="btnFijarOK">Confirmar</button>');
   var anchor=-1,last=-1;
+  /* EL MINIMO ES EL MISMO QUE AL CUBRIR. Una reunion de 1 h 30 con slots de 30 min ocupa
+     TRES franjas, se este cubriendo o fijando: aqui se dejo el «toca la primera y la ultima»
+     a pelo y se podia fijar en menos tiempo del que dura la reunion. (Daniel: «puse de 18:30
+     a 20:00 y se marca como si fuera de 19:00 a 20:00».) */
+  var MIN=_slotsMin_(R.duracion, R.slot), NF=R.franjas.length;
   var pintaSlots=function(){
     var lo=anchor<0?-1:Math.min(anchor,last), hi=anchor<0?-1:Math.max(anchor,last);
     $$('#fjSlots button').forEach(function(b,k){
@@ -3774,14 +3780,26 @@ function fijarModal(){
     if(s) s.textContent = lo<0 ? '' : ('Elegido: '+_hFranja_(REUNION,lo)+'–'+_hFinFranja_(REUNION,hi));
   };
   $$('#fjSlots button').forEach(function(b,k){
+    /* Si desde aqui no caben las franjas que dura, no se puede empezar aqui. Se apaga en vez
+       de dejar tocar y corregir despues: lo mismo que hace la rejilla de cubrir. */
+    if(k+MIN>NF){ b.disabled=true; b.style.opacity='.35'; b.title='No caben '+MIN+' franjas seguidas desde aquí'; }
     b.onclick=function(){
-      if(anchor<0||anchor!==last){ anchor=k; last=k; } else { last=k; }
+      if(b.disabled) return;
+      if(anchor<0 || anchor!==last){
+        anchor=k; last=Math.min(NF-1, k+MIN-1);      // un toque = el minimo, hacia la derecha
+      } else {
+        /* estirar es libre, pero nunca por debajo del minimo */
+        last = (k>=anchor) ? Math.max(k, anchor+MIN-1) : k;
+        if(k<anchor){ anchor=k; last=Math.max(last, k+MIN-1); }
+        if(last>NF-1) last=NF-1;
+      }
       pintaSlots();
     };
   });
   $('#btnFijarOK').onclick=async function(){
     var b=$('#btnFijarOK'); if(b.disabled) return;
-    if(anchor<0){ tost('Toca la primera y la última franja.'); return; }
+    if(anchor<0){ tost('Toca dónde empieza la reunión.'); return; }
+    if(Math.abs(last-anchor)+1 < MIN){ tost('La reunión dura '+MIN+' franjas: no se puede fijar en menos.'); return; }
     var R2=REUNION, di=+$('#fjDia').value;
     var lo=Math.min(anchor,last), hi=Math.max(anchor,last);
     var etiqueta=_diaTxtM_(R2.dias[di])+' · '+_hFranja_(R2,lo)+'–'+_hFinFranja_(R2,hi);
