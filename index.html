@@ -1007,6 +1007,10 @@ function _normReuM_(r){
   return { id:r.id, titulo:r.titulo||'Reunión sin título', tipo:r.tipo||'general',
     modalidad:r.modalidad||'hibrida', limite:r.limite||null, fijada:fij||null, fijadaBl:fijBl,
     convocante:r.convocante||'', dias:dias, franjas:F, bloques:bl, resp:resp,
+    /* `slot` es la casilla que se pinta y `duracion` lo que hay que juntar seguido.
+       Las reuniones de antes de este modelo no traen `duracion`: entonces el minimo es
+       una casilla y todo se comporta como se comportaba. */
+    slot: +r.slot || (F[0] && +F[0].dur) || 60, duracion: +r.duracion || 0,
     calor:calor, pond:pond, nInv:(r.invitados||[]).length,
     cubierta: !!(YO && resp[YO.nombre] && resp[YO.nombre].some(function(x){ return +x>0; })),
     exento: !!(YO && r.convocante && YO.nombre===r.convocante),   // quien convoca ORGANIZA: no cubre su propia encuesta
@@ -2336,6 +2340,40 @@ function vReu(){
   M.forEach(function(fila,di){fila.forEach(function(v,fi){ if(v!=null&&v>best.v)best={d:di,f:fi,v:v}; });});
   /* indice rapido de los bloques fijados, para pintarlos en verde */
   var fijSet={}; (R.fijadaBl||[]).forEach(function(b){ fijSet[b[0]+'-'+b[1]]=1; });
+  /* ── LA MEJOR HORA ES UNA VENTANA, NO UNA CASILLA ──────────────────────────
+     Con slots de 30 min y una reunion de 1 h, la casilla con mas gente no responde a
+     nada: si a las 18:00 pueden 12 y a las 18:30 solo 2, a las 18:00 NO cabe la reunion.
+     Se busca la mejor ventana de lo que dura, y se cuenta a quien puede en TODA ella:
+     es una INTERSECCION de personas, no el minimo casilla a casilla. Sin respuestas
+     cargadas (la lista no las trae hasta abrir la reunion) se cae a la casilla suelta,
+     que es lo que habia. ───────────────────────────────────────────────────────── */
+  var _slotR=+R.slot || (R.franjas[0] && +R.franjas[0].dur) || 60;
+  var _minR=_slotsMin_(R.duracion, _slotR);
+  var _ofR={}; (R.bloques||[]).forEach(function(b){ _ofR[b[0]+'_'+b[1]]=1; });
+  var _quien=[];                                  // un Set de 'd_f' por persona
+  Object.keys(R.resp||{}).forEach(function(n){
+    var v=R.resp[n]||[], set={}, hay=false;
+    (R.bloques||[]).forEach(function(b,i){ if(+v[i]>0){ set[b[0]+'_'+b[1]]=1; hay=true; } });
+    if(hay) _quien.push(set);
+  });
+  var vent={d:best.d, f0:best.f, f1:best.f, v:best.v, exacta:false};
+  if(_quien.length){
+    var mejor={d:0,f0:0,f1:0,v:-1};
+    R.dias.forEach(function(_,di){
+      for(var f=0; f+_minR<=R.franjas.length; f++){
+        var ok=true;
+        for(var i=0;i<_minR;i++) if(!_ofR[di+'_'+(f+i)]){ ok=false; break; }
+        if(!ok) continue;
+        var n=0;
+        _quien.forEach(function(set){
+          for(var i=0;i<_minR;i++) if(!set[di+'_'+(f+i)]) return;
+          n++;
+        });
+        if(n>mejor.v) mejor={d:di, f0:f, f1:f+_minR-1, v:n};
+      }
+    });
+    if(mejor.v>=0) vent={d:mejor.d, f0:mejor.f0, f1:mejor.f1, v:mejor.v, exacta:true};
+  }
   /* EJE DE TIEMPO, no de franjas. Con horarios distintos por dia la union mezcla :00 y
      :30; una columna por franja hacia que cada dia llenara una de cada dos casillas y el
      mapa pareciera un tablero. Ahora la columna es un instante y cada franja ocupa lo que
@@ -2376,25 +2414,32 @@ function vReu(){
   R.dias.forEach(function(d,di){
     g+='<div style="font-family:var(--mono);font-size:9.5px;color:var(--ink2);display:flex;'+
       'align-items:center;justify-content:flex-end;padding-right:6px">'+d+'</div>';
-    eje.forEach(function(t,ix){
-      var fi=cubre[di][ix];
-      if(fi<0){   // fuera del horario de ese dia
-        g+='<div title="fuera del horario de ese d\u00eda" style="height:21px;border-radius:2px;'+
+    /* UNA CELDA POR FRANJA, ancha lo que la franja dura. Antes se pintaba una celda por
+       INSTANTE del eje y el numero solo en la que arrancaba: con paso de 30 min y franjas
+       de una hora salia «3 · 3 · 3 ·», y parecia que en la mitad de los huecos no podia
+       nadie. El eje de tiempo se queda; lo que cambia es que la franja no se trocea. */
+    var ix=0;
+    while(ix<eje.length){
+      var fi=cubre[di][ix], k=1;
+      while(ix+k<eje.length && cubre[di][ix+k]===fi) k++;      // hasta donde llega esta franja
+      var geo='grid-column:span '+k+';height:21px;border-radius:2px';
+      if(fi<0){                                                // fuera del horario de ese dia
+        g+='<div title="fuera del horario de ese d\u00eda" style="'+geo+';'+
           'background:repeating-linear-gradient(45deg,rgba(255,255,255,.045) 0 3px,transparent 3px 6px);'+
           'border:1px solid var(--line)"></div>';
-        return;
+      } else {
+        var v=M[di][fi], ini=_mm(R.franjas[fi]);
+        var a=(0.12+0.88*(max?v/max:0)).toFixed(3);
+        var esBest=(di===vent.d && fi>=vent.f0 && fi<=vent.f1 && vent.v>0), fij=fijSet[di+'-'+fi];
+        var fondo = fij ? 'rgba(53,199,89,.85)' : 'rgba(228,30,37,'+a+')';
+        var borde = fij ? ';outline:1px solid var(--ok);outline-offset:-1px'
+                   : (esBest?';outline:1px solid var(--ink);outline-offset:-1px':'');
+        g+='<div title="'+_hhmm(ini)+'\u2013'+_hhmm(ini+_du(R.franjas[fi]))+' \u00b7 '+v+'" style="'+geo+';'+
+          'display:grid;place-items:center;font-family:var(--mono);font-size:8.5px;color:#fff;'+
+          'background:'+fondo+borde+'">'+v+'</div>';
       }
-      var v=M[di][fi];
-      var arranca=(t===_mm(R.franjas[fi]));      // el numero solo en la casilla donde empieza
-      var a=(0.12+0.88*(max?v/max:0)).toFixed(3);
-      var esBest=(di===best.d&&fi===best.f&&best.v>0);
-      var fondo = fijSet[di+'-'+fi] ? 'rgba(53,199,89,.85)' : 'rgba(228,30,37,'+a+')';
-      var borde = fijSet[di+'-'+fi] ? ';outline:1px solid var(--ok);outline-offset:-1px'
-                 : (esBest?';outline:1px solid var(--ink);outline-offset:-1px':'');
-      g+='<div title="'+_hhmm(_mm(R.franjas[fi]))+'" style="height:21px;border-radius:2px;'+
-        'display:grid;place-items:center;font-family:var(--mono);font-size:8.5px;color:#fff;'+
-        'background:'+fondo+borde+'">'+(arranca?v:'')+'</div>';
-    });
+      ix+=k;
+    }
   });
   g+='</div></div>';
 
@@ -2434,9 +2479,12 @@ function vReu(){
       (hib?'<div class="modos" id="calModo" style="margin-bottom:10px">'+
         '<button data-pond="0" class="'+(pondOn?'':'on')+'" data-p>Personas</button>'+
         '<button data-pond="1" class="'+(pondOn?'on':'')+'" data-p>Ponderada</button></div>':'')+
-      '<p class="rnota" style="margin:0 0 10px"><b>'+R.nInv+'</b> convocados · mejor franja '+
-      (best.v>0
-        ? '<b style="color:var(--red2)">'+R.dias[best.d]+' '+R.franjas[best.f].ini+'</b> — '+best.v+(pondOn?' puntos.':' pueden.')
+      '<p class="rnota" style="margin:0 0 10px"><b>'+R.nInv+'</b> convocados · mejor hueco '+
+      (vent.v>0
+        ? '<b style="color:var(--red2)">'+R.dias[vent.d]+' '+_hFranja_(R,vent.f0)+
+          (vent.f1>vent.f0?('–'+_hFinFranja_(R,vent.f1)):'')+'</b> — '+vent.v+
+          (vent.exacta ? (vent.v===1?' puede la reunión entera.':' pueden la reunión entera.')
+                       : (pondOn?' puntos.':' pueden.'))
         : '<b>todavía no ha respondido nadie</b>.')+'</p>'+
       g+
       '<div class="leyh" style="margin-top:11px"><span>'+
@@ -2452,6 +2500,8 @@ function vReu(){
 function cubrirModal(){
   var R=REUNION, nF=R.franjas.length, nD=R.dias.length;
   var modo=R.modalidad;
+  var _slot=+R.slot || (R.franjas[0] && +R.franjas[0].dur) || 60;
+  var _minS=_slotsMin_(R.duracion, _slot);
   var instr = modo==='presencial' ? 'toca o arrastra · marca tu disponibilidad presencial'
             : modo==='telematica' ? 'toca o arrastra · marca tu disponibilidad telemática'
             : 'toca o arrastra · 1× telemático · 2× presencial + telemático · 3× quitar';
@@ -2473,16 +2523,25 @@ function cubrirModal(){
     hd+='<div class="rc rh"><span>'+f.ini.replace(':00','')+'</span>'+
       (ix===nF-1?'<span class="fin">23</span>':'')+'</div>';
   });
+  /* Las casillas NO OFERTADAS ya no se pueden pintar. Antes se pintaban igual, se veian
+     marcadas, y al guardar se caian sin decir nada: `vals` se arma recorriendo `bloques`,
+     asi que lo que no era bloque no existia. */
+  var _ofer={}; (R.bloques||[]).forEach(function(b){ _ofer[b[0]+'_'+b[1]]=1; });
   var rows='';
   R.dias.forEach(function(d,di){
     rows+='<div class="rc rd">'+d+'</div>';
     for(var f=0;f<nF;f++){
-      var k=di+'_'+f, v=ST.sel.get(k)||0;
+      var k=di+'_'+f;
+      if(!_ofer[k]){ rows+='<div class="ecel off" title="fuera del horario de ese día"></div>'; continue; }
+      var v=ST.sel.get(k)||0;
       rows+='<div class="ecel '+(v===2?'on2':v===1?'on1':'')+'" data-k="'+k+'"></div>';
     }
   });
   abrirModal('<div class="mtit">Marca tu disponibilidad</div>'+
     '<div class="msub">'+esc(YO.pila)+' · '+instr+'</div>'+
+    (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">La reunión dura <b>'+_durTxtM_(_minS*_slot)+
+      '</b>, así que cada toque marca <b>'+_minS+' casillas seguidas</b> a partir de ahí. '+
+      'Puedes estirar más arrastrando; lo que quede más corto se quita solo.</p>':'')+
     '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nF+',minmax(30px,1fr))">'+hd+rows+'</div></div>'+
     '<div class="leyh" style="margin-top:10px">'+ley+'</div>'+
     '<div class="sc" id="ecount" style="margin:12px 0 10px"></div>'+
@@ -2491,48 +2550,99 @@ function cubrirModal(){
 }
 function engancharRejilla(){
   var grid=$('#rejC'); if(!grid) return;
-  var modo=REUNION.modalidad;
+  var R=REUNION, modo=R.modalidad, nF=(R.franjas||[]).length;
+  var slot=+R.slot || (R.franjas[0] && +R.franjas[0].dur) || 60;
+  var minS=_slotsMin_(R.duracion, slot);          // casillas seguidas que exige la reunión
+  var ofer={}; (R.bloques||[]).forEach(function(b){ ofer[b[0]+'_'+b[1]]=1; });
+  var hay=function(di,f){ return f>=0 && f<nF && !!ofer[di+'_'+f]; };
   var sig=function(cur){ return modo==='presencial'?(cur===2?0:2) : modo==='telematica'?(cur===1?0:1) : ((cur||0)+1)%3; };
+  /* La unidad es el HUECO, no la casilla: una racha mas corta que la reunion no sirve
+     para nada -no puedes ir- y ademas el pipeline de sanciones te daria por «cubierto». */
+  var rachas=function(di){
+    var out=[], f=0;
+    while(f<nF){
+      if(!ST.sel.get(di+'_'+f)){ f++; continue; }
+      var a=f; while(f<nF && ST.sel.get(di+'_'+f)) f++;
+      out.push([a,f-1]);
+    }
+    return out;
+  };
+  /* Lo que queda corto se QUITA, nunca se completa: completarlo seria inventarle
+     disponibilidad a una persona, y de aqui salen sanciones reales. */
+  var sanear=function(){
+    var n=0;
+    R.dias.forEach(function(_,di){
+      rachas(di).forEach(function(r){
+        if(r[1]-r[0]+1>=minS) return;
+        for(var i=r[0];i<=r[1];i++) ST.sel.delete(di+'_'+i);
+        n++;
+      });
+    });
+    return n;
+  };
   var cont=function(){
-    var t=0,p=0; ST.sel.forEach(function(v){ v===2?p++:t++; });
     var e=$('#ecount'); if(!e) return;
-    e.textContent = modo==='presencial' ? (p+t)+' franjas presenciales'
-      : modo==='telematica' ? (p+t)+' franjas telemáticas'
-      : p+' presenciales · '+t+' telemáticas';
+    var hue=0, cas=0, p=0, t=0;
+    R.dias.forEach(function(_,di){ rachas(di).forEach(function(r){ hue++; cas+=r[1]-r[0]+1; }); });
+    ST.sel.forEach(function(v){ v===2?p++:t++; });
+    e.innerHTML = !hue
+      ? 'Sin marcar todavía'+(minS>1?(' · cada toque marca '+_durTxtM_(minS*slot)):'')
+      : '<b>'+hue+'</b> hueco'+(hue===1?'':'s')+' · '+_durTxtM_(cas*slot)+' en total'+
+        (modo==='hibrida' ? (' · '+p+' presencial'+(p===1?'':'es')+' · '+t+' telemática'+(t===1?'':'s')) : '');
   };
   cont();
-  var startK=null,lastK=null,target=1;
-  var kk=function(k){return k.split('_').map(Number);};
-  var rect=function(a,b,fn){
-    var A=kk(a),B=kk(b);
-    for(var r=Math.min(A[0],B[0]);r<=Math.max(A[0],B[0]);r++)
-      for(var f=Math.min(A[1],B[1]);f<=Math.max(A[1],B[1]);f++) fn(r+'_'+f);
+  var ancla=null, ultimo=null, target=1, borra=false;
+  var kk=function(k){ return k.split('_').map(Number); };
+  var cabe=function(di,f){ for(var i=0;i<minS;i++) if(!hay(di,f+i)) return false; return true; };
+  /* EL MINIMO VA A LA DERECHA DEL TOQUE (decision de Daniel): el hueco nace donde pones
+     el dedo y se lleva lo que dura la reunion. Estirar a partir de ahi es libre. */
+  var rango=function(){
+    var A=kk(ancla), B=kk(ultimo||ancla);
+    var f0=Math.min(A[1],B[1]);
+    var f1=borra ? Math.max(A[1],B[1]) : Math.max(A[1]+minS-1, B[1]);
+    return { d0:Math.min(A[0],B[0]), d1:Math.max(A[0],B[0]), f0:f0, f1:Math.min(nF-1,f1) };
   };
-  var limpia=function(){ $$('.ecel.prev',grid).forEach(function(c){c.classList.remove('prev');}); };
-  var prev=function(cur){ limpia(); rect(startK,cur,function(k){
+  var barrer=function(fn){
+    var r=rango();
+    for(var d=r.d0; d<=r.d1; d++) for(var f=r.f0; f<=r.f1; f++) if(hay(d,f)) fn(d+'_'+f);
+  };
+  var limpia=function(){ $$('.ecel.prev',grid).forEach(function(c){ c.classList.remove('prev'); }); };
+  var prev=function(){ limpia(); barrer(function(k){
     var c=grid.querySelector('[data-k="'+k+'"]'); if(c) c.classList.add('prev'); }); };
-  var commit=function(cur){
-    rect(startK,cur,function(k){
-      var c=grid.querySelector('[data-k="'+k+'"]'); if(!c) return;
-      if(target===0) ST.sel.delete(k); else ST.sel.set(k,target);
+  /* Se repinta la rejilla ENTERA porque `sanear` puede tocar casillas fuera del arrastre. */
+  var repinta=function(){
+    $$('.ecel[data-k]',grid).forEach(function(c){
+      var v=ST.sel.get(c.dataset.k)||0;
       c.classList.remove('on1','on2');
-      if(target===1) c.classList.add('on1'); else if(target===2) c.classList.add('on2');
+      if(v===1) c.classList.add('on1'); else if(v===2) c.classList.add('on2');
     });
-    limpia(); cont();
+  };
+  var commit=function(){
+    barrer(function(k){ if(target===0) ST.sel.delete(k); else ST.sel.set(k,target); });
+    var q=sanear();
+    limpia(); repinta(); cont();
+    if(q) tost(q===1 ? ('Un hueco se quedó por debajo de '+_durTxtM_(minS*slot)+' y se ha quitado.')
+                    : ('Se han quitado '+q+' huecos que quedaban por debajo de '+_durTxtM_(minS*slot)+'.'));
   };
   grid.addEventListener('pointerdown',function(ev){
-    var el=ev.target.closest('.ecel'); if(!el) return;
+    var el=ev.target.closest('.ecel'); if(!el || !el.dataset.k) return;   // no ofertada: no se toca
     ev.preventDefault();
-    startK=el.dataset.k; lastK=startK; target=sig(ST.sel.get(startK)||0);
-    try{grid.setPointerCapture(ev.pointerId);}catch(e){}
-    prev(startK);
+    var A=kk(el.dataset.k);
+    target=sig(ST.sel.get(el.dataset.k)||0); borra=(target===0);
+    if(!borra && !cabe(A[0],A[1])){
+      tost('Ahí no entra la reunión entera ('+_durTxtM_(minS*slot)+'): el horario de ese día acaba antes.');
+      return;
+    }
+    ancla=el.dataset.k; ultimo=ancla;
+    try{ grid.setPointerCapture(ev.pointerId); }catch(e){}
+    prev();
   });
   grid.addEventListener('pointermove',function(ev){
-    if(!startK) return;
+    if(!ancla) return;
     var el=document.elementFromPoint(ev.clientX,ev.clientY);
-    if(el&&el.classList.contains('ecel')){ lastK=el.dataset.k; prev(lastK); }
+    if(el && el.classList.contains('ecel') && el.dataset.k){ ultimo=el.dataset.k; prev(); }
   });
-  grid.addEventListener('pointerup',function(){ if(startK){ commit(lastK||startK); startK=null; } });
+  grid.addEventListener('pointerup',function(){ if(ancla){ commit(); ancla=null; ultimo=null; } });
   var g=$('#btnGuardarDisp');
   /* GUARDA EN EL SERVIDOR. Antes solo ponia una marca local y decia «guardada»: en el
      servidor no quedaba nada, y de ahi come el pipeline de sanciones. `valores` va
@@ -2616,15 +2726,48 @@ function _diasLargosM_(modo,d0,d1,fecha,nd){
 function _diasEntreM_(a0,a1){ var out=[]; if(!a0||!a1) return out;
   var a=new Date(a0+'T00:00:00'), b=new Date(a1+'T00:00:00'); if(b<a) return out;
   for(var i=0;i<62&&a<=b;i++){ out.push(_ddmmM_(a)); a.setDate(a.getDate()+1); } return out; }
-function _genFranjasM_(h0,h1,dur,paso){ var out=[], step=(paso&&+paso>0)?+paso:+dur;
-  for(var m=h0*60; m+(+dur)<=h1*60+1e-9; m+=step) out.push({ini:pad(Math.floor(m/60))+':'+pad(m%60), dur:+dur});
-  return out; }
-function _genUnionM_(rangos,dur,paso){ var map={}, F=[], perDia=[];
-  rangos.forEach(function(r){ var idxs=[]; if(r[1]>r[0]){ _genFranjasM_(r[0],r[1],dur,paso).forEach(function(f){
-    var k=f.ini+'|'+f.dur; if(!(k in map)){ map[k]=F.length; F.push(f); } idxs.push(map[k]); }); } perDia.push(idxs); });
-  var ord=F.map(function(_,i){return i;}).sort(function(a,b){ return (parseInt(F[a].ini,10)*60+ +F[a].ini.slice(3)) - (parseInt(F[b].ini,10)*60+ +F[b].ini.slice(3)); });
-  var pos=[]; ord.forEach(function(oi,k){ pos[oi]=k; });
-  return { F: ord.map(function(i){return F[i];}), perDia: perDia.map(function(x){ return x.map(function(i){return pos[i];}); }) }; }
+/* UNA SOLA REJILLA para todos los dias, contigua y anclada al tamano de slot.
+   Antes cada dia generaba SUS franjas desde SU hora de inicio y con una «cadencia» que
+   podia solaparlas: un dia a las 17:00 y otro a las 17:30 daban franjas alternas, y con
+   cadencia de 15 min y franja de 1 h salian cuatro franjas por hora pisandose entre si.
+   Ahora el origen es comun (el inicio mas temprano, bajado al multiplo del slot) y cada
+   dia solo OFERTA los slots que le caben enteros. Asi no hay solapes que dibujar.
+   `rangos` son horas decimales [inicio, fin] por dia; [0,0] = dia apagado. */
+function _genUnionM_(rangos, slot){
+  slot=Math.max(5, Math.min(240, +slot||60));
+  var act=rangos.filter(function(r){ return r && r[1]>r[0]; });
+  if(!act.length) return { F:[], perDia:rangos.map(function(){ return []; }) };
+  var m0=Math.min.apply(null, act.map(function(r){ return Math.round(r[0]*60); }));
+  var m1=Math.max.apply(null, act.map(function(r){ return Math.round(r[1]*60); }));
+  m0=Math.floor(m0/slot)*slot;                       // el origen cae en la rejilla
+  var F=[];
+  for(var t=m0; t+slot<=m1+1e-9 && F.length<400; t+=slot)
+    F.push({ini:pad(Math.floor(t/60))+':'+pad(t%60), dur:slot});
+  var perDia=rangos.map(function(r){
+    var out=[]; if(!(r && r[1]>r[0])) return out;
+    var a=Math.round(r[0]*60), b=Math.round(r[1]*60);
+    F.forEach(function(_,i){ var ti=m0+i*slot; if(ti>=a && ti+slot<=b) out.push(i); });
+    return out;                                      // solo los slots que caben ENTEROS
+  });
+  return { F:F, perDia:perDia };
+}
+/* Hora de inicio y de fin de una franja, para escribir un hueco como «18:00–19:00». */
+function _hFranja_(R,fi){ var f=(R.franjas||[])[fi]; return f ? _hmMin_(_minHM_(f)) : '—'; }
+function _hFinFranja_(R,fi){ var f=(R.franjas||[])[fi];
+  return f ? _hmMin_(_minHM_(f) + (+f.dur>0 ? +f.dur : 60)) : '—'; }
+/* Cuantas casillas seguidas hacen falta para cubrir la reunión. Se redondea HACIA ARRIBA:
+   media casilla no existe, y quedarse corto es no poder ir. Sin `duracion` (reuniones de
+   antes de este modelo) da 1, que es como se comportaba la app hasta ahora. */
+function _slotsMin_(duracion, slot){
+  var d=+duracion||0, s=Math.max(5, +slot||60);
+  return Math.max(1, Math.ceil(d/s) || 1);
+}
+function _durTxtM_(min){
+  min=Math.max(0, Math.round(+min||0));
+  var h=Math.floor(min/60), m=min%60;
+  if(!h) return m+' min';
+  return h+' h'+(m?' '+m+' min':'');
+}
 /* convocados por defecto según el tipo (como app.html): general=todo el equipo, subsistema=tu unidad,
    junta=coordinadores+PD, consejo=por configurar, mixta/trabajo=a mano. */
 function _presetInvitadosM_(tipo){
@@ -2674,11 +2817,18 @@ function crearModal(){
       '<label class="campo"><span class="sc">A</span><select id="ceH1">'+optHoras('23:00')+'</select></label></div>'+
     '<label class="campo" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="cePerdia" style="width:auto"><span class="sc" style="margin:0">Horario distinto por día</span></label>'+
     '<div class="cdias" id="ceDias" style="display:none"></div>'+
-    '<label class="campo"><span class="sc">Duración de franja</span><select id="ceDur">'+
-      '<option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option>'+
-      '<option value="90">1 h 30 min</option><option value="120">2 h</option></select></label>'+
-    '<label class="campo"><span class="sc">Cadencia</span><select id="cePaso"><option value="0">Contiguas</option>'+
-      '<option value="15">Solapadas cada 15 min</option><option value="30">Solapadas cada 30 min</option><option value="60">Solapadas cada 60 min</option></select></label>'+
+    /* Dos preguntas, no dos rarezas: la casilla que se pinta, y lo que dura la reunión.
+       La «cadencia solapada» se retiró: era una forma retorcida de decir «slots de 15
+       min» y dejaba el mapa ilegible. */
+    '<div class="dosc">'+
+      '<label class="campo"><span class="sc">Tamaño de slot</span><select id="ceSlot">'+
+        '<option value="15">15 min</option><option value="30" selected>30 min</option>'+
+        '<option value="60">1 h</option></select></label>'+
+      '<label class="campo"><span class="sc">Dura la reunión</span><select id="ceDura">'+
+        '<option value="30">30 min</option><option value="60" selected>1 h</option>'+
+        '<option value="90">1 h 30 min</option><option value="120">2 h</option>'+
+        '<option value="180">3 h</option></select></label></div>'+
+    '<p class="rnota" id="ceSlotHint"></p>'+
     '<div class="dosc"><label class="campo"><span class="sc">Límite para responder</span><input class="mono" id="ceLim" type="date" value="'+mas(hoyISO,5)+'"></label>'+
       '<label class="campo"><span class="sc">Hora (opcional)</span><input class="mono" id="ceLimH" type="time"></label></div>'+
     '<label class="campo"><span class="sc">Orden del día (enlace a Drive, opcional)</span>'+
@@ -2735,12 +2885,18 @@ function crearModal(){
     if($('#ceRango')) $('#ceRango').style.display=rg?'':'none';
     if($('#ceDurW'))  $('#ceDurW').style.display=rg?'none':'';
     if($('#ceDias'))  $('#ceDias').style.display=per()?'':'none';
-    var u=_genUnionM_(rangos(), +val('ceDur')||60, +val('cePaso')||0);
+    var sl=+val('ceSlot')||30, du=+val('ceDura')||60;
+    var u=_genUnionM_(rangos(), sl);
     var nb=u.perDia.reduce(function(a,x){ return a+x.length; },0), nd=dias().length;
+    /* Que hay que juntar para que valga, dicho antes de convocar y con la cuenta hecha. */
+    var nS=_slotsMin_(du,sl), h=$('#ceSlotHint');
+    if(h) h.innerHTML='Se pintan casillas de <b>'+_durTxtM_(sl)+'</b> y hay que juntar '+
+      '<b>'+nS+' seguida'+(nS===1?'':'s')+'</b> ('+_durTxtM_(nS*sl)+') para que cuente.'+
+      (du%sl ? ' La duración no es múltiplo del slot, así que se redondea hacia arriba.' : '');
     var p=$('#cePrev'); if(p) p.innerHTML=(u.F.length&&nb)
-      ? '<b>'+u.F.length+' franja'+(u.F.length===1?'':'s')+'</b> distintas · <b>'+nb+' bloques</b> en '+nd+' día'+(nd===1?'':'s')+
+      ? '<b>'+u.F.length+' casilla'+(u.F.length===1?'':'s')+'</b> de '+_durTxtM_(sl)+' · <b>'+nb+' bloques</b> en '+nd+' día'+(nd===1?'':'s')+
         (per()?' (horario por día)':'')+' · <b>'+INV.size+'</b> convocados.'
-      : 'Revisa fechas u horario: no sale ninguna franja.';
+      : 'Revisa fechas u horario: no sale ninguna casilla.';
   }
   var tipoUpd=function(){ var t=val('ceTipo');
     if($('#ceMixW')) $('#ceMixW').style.display=(t==='mixta')?'':'none';
@@ -2755,13 +2911,13 @@ function crearModal(){
   var inp=$('#ceInv');
   if(inp){ inp.oninput=function(){ sugRender(inp.value); };
     inp.onblur=function(){ setTimeout(function(){ if($('#ceSug')) $('#ceSug').style.display='none'; },180); }; }
-  ['ceModo','ceH0','ceH1','ceDur','cePaso','ceND','ceD0','ceD1','ceLim','ceLimH'].forEach(function(id){
+  ['ceModo','ceH0','ceH1','ceSlot','ceDura','ceND','ceD0','ceD1','ceLim','ceLimH'].forEach(function(id){
     var e=$('#'+id); if(e) e.onchange=function(){ if(per()) renderDias(); upd(); }; });
   $('#cePerdia').onchange=function(){ if(per()) renderDias(); upd(); };
   var cop=$('#ceCopiar');
   if(cop) cop.onchange=function(){ var v=cop.value; if(v==='') return; var c=PLANTILLAS_M[+v]; if(!c) return;
     if(c.titulo && $('#ceTit')) $('#ceTit').value=c.titulo;
-    ['ceModo','ceH0','ceH1','ceDur','cePaso','ceND'].forEach(function(id){ if(c[id]!=null && $('#'+id)) $('#'+id).value=c[id]; });
+    ['ceModo','ceH0','ceH1','ceSlot','ceDura','ceND'].forEach(function(id){ if(c[id]!=null && $('#'+id)) $('#'+id).value=c[id]; });
     if(c.modalidad && $('#ceMod')) $('#ceMod').value=c.modalidad;
     $('#cePerdia').checked=!!c.perdia; if(per()) renderDias(); upd(); };
   var hints={publica:'Cualquiera puede tocar un hueco y ver quién puede en esa franja.',
@@ -2776,24 +2932,29 @@ function crearModal(){
   $('#btnCrearOK').onclick=async function(){
     var bt=$('#btnCrearOK'); if(bt.disabled) return;
     var ds=dias(); if(!ds.length){ tost('Revisa las fechas: no hay días.'); return; }
-    var u=_genUnionM_(rangos(), +val('ceDur')||60, +val('cePaso')||0), bloques=[];
+    var _sl=+val('ceSlot')||30, _du=+val('ceDura')||60;
+    var u=_genUnionM_(rangos(), _sl), bloques=[];
     u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
-    if(!u.F.length || !bloques.length){ tost('Con ese horario no sale ninguna franja.'); return; }
-    /* Si los dias arrancan en minutos distintos (17:00 vs 17:30), la union de franjas
-       interleava y el mapa sale a huecos alternos. Avisamos ANTES de crearla. */
-    var arranques={}; u.F.forEach(function(f){ arranques[String(f.ini).slice(3)]=1; });
-    if(Object.keys(arranques).length>1 && !window.__avisoRejilla__){
-      window.__avisoRejilla__=1;
-      tost('Ojo: los días no empiezan a la misma hora en punto, el mapa saldrá a huecos. Pulsa otra vez para crearla igual.');
+    if(!u.F.length || !bloques.length){ tost('Con ese horario no sale ninguna casilla.'); return; }
+    /* El aviso de «los días no empiezan a la misma hora, el mapa saldrá a huecos» se
+       retiró: con la rejilla única ya no puede pasar. Lo que sí hay que decir es si
+       algún día se queda demasiado corto para que quepa la reunión entera. */
+    var _nS=_slotsMin_(_du,_sl);
+    var _cortos=u.perDia.filter(function(idxs,i){ return (rangos()[i]||[0,0])[1]>(rangos()[i]||[0,0])[0] && idxs.length<_nS; }).length;
+    if(_cortos && !window.__avisoCorto__){
+      window.__avisoCorto__=1;
+      tost('Ojo: '+_cortos+' día'+(_cortos===1?'':'s')+' no da'+(_cortos===1?'':'n')+' para '+_durTxtM_(_nS*_sl)+
+        ' seguidos, así que ahí nadie podrá marcar. Pulsa otra vez para crearla igual.');
       bt.disabled=false; return;
     }
     var lim=val('ceLim') ? (val('ceLim')+(val('ceLimH')?' '+val('ceLimH'):'')) : null;
     var reu={ titulo:(val('ceTit')||'').trim()||'Reunión sin título', tipo:val('ceTipo')||'trabajo',
       modalidad:val('ceMod')||'hibrida', convocante:(YO&&YO.nombre)||'', invitados:Array.from(INV),
       dias:ds, franjas:u.F, bloques:bloques, total:bloques.length, limite:lim,
+      slot:_sl, duracion:_nS*_sl,          // lo que hay que juntar seguido para que valga
       ordenDia:(val('ceOrden')||'').trim(), vision:vision, resp:{} };
     PLANTILLAS_M.unshift({ titulo:reu.titulo, ceModo:val('ceModo'), ceH0:val('ceH0'), ceH1:val('ceH1'),
-      ceDur:val('ceDur'), cePaso:val('cePaso'), ceND:val('ceND'), modalidad:reu.modalidad, perdia:per() });
+      ceSlot:val('ceSlot'), ceDura:val('ceDura'), ceND:val('ceND'), modalidad:reu.modalidad, perdia:per() });
     if(PLANTILLAS_M.length>8) PLANTILLAS_M.length=8;
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Creando…';
     if(typeof backendOK!=='undefined' && backendOK && SESION){
