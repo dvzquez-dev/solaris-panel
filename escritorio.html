@@ -2307,13 +2307,63 @@ function _insigniaHTML_(){
    que ya hacia el movil en `_hidratarReuM_`. */
 /* Igual que en el movil: el bootstrap sirve cache para entrar rapido y lo fresco se pide
    despues sin bloquear. */
-async function _refrescarEnSegundoPlano_(){
+/* ¿ESTA ESCRIBIENDO? El movil se protege con «¿hay un modal abierto?»; aqui no hay modales
+   -se usa `confirm`/`prompt`, que bloquean el hilo- pero SI hay formularios: el buzon, el
+   motivo de una sancion, el enlace del orden del dia. Repintar mientras alguien escribe le
+   borra lo escrito, y eso es peor que un dato con 90 segundos de retraso. */
+function _escribiendoE_(){
+  var a=document.activeElement;
+  return !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName||''));
+}
+/* Pide una accion sin que un fallo se lleve por delante a las demas. Nace del mismo fallo
+   real que su gemela del movil: `api.getTurnos` no existia y el TypeError, dentro de un
+   `Promise.all`, mataba tambien lo que iba al lado. */
+function _pideE_(accion, arg){
+  try{
+    if(typeof api[accion]!=='function'){
+      try{ console.warn('api.'+accion+' no existe: ese dato no se refresca'); }catch(_){}
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(api[accion](arg)).catch(function(){ return null; });
+  }catch(_){ return Promise.resolve(null); }
+}
+var _REFRESCANDO_E_=false, _ULT_REFRESCO_E_=0;
+/* EL ESCRITORIO SE ALIMENTA SOLO. Es la cara que mas rato se deja abierta -es un panel de
+   mando, vive en una pestaña toda la tarde- y se quedaba con lo que trajo al entrar: quien
+   coordina veia una cola de decisiones congelada a la hora del login, sin saberlo.
+   Antes esto solo traia turnos y tareas, y una sola vez. */
+async function _refrescarEnSegundoPlano_(motivo){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
-  /* Las dos a la vez y UN solo repintado (ver la gemela del movil). */
-  var _t=api.getTurnos().then(function(t){ if(Array.isArray(t)&&t.length){ TURNOS.length=0; t.forEach(function(x){TURNOS.push(x);}); } }).catch(function(){});
-  var _q=api.getTareas().then(function(q){ if(Array.isArray(q)&&q.length){ TAREAS.length=0; q.forEach(function(x){TAREAS.push(x);}); } }).catch(function(){});
-  await Promise.all([_t,_q]);
-  _repintarSuave_();
+  if(_REFRESCANDO_E_ || document.hidden) return;      // nadie mira: no se gasta cuota
+  if(_escribiendoE_()) return;
+  var ahora=Date.now();
+  if(motivo==='vuelta' && (ahora-_ULT_REFRESCO_E_) < 30000) return;
+  _REFRESCANDO_E_=true; _ULT_REFRESCO_E_=ahora;
+  try{
+    var _t=_pideE_('getTurnos').then(function(t){ if(Array.isArray(t)&&t.length){ TURNOS.length=0; t.forEach(function(x){TURNOS.push(x);}); } });
+    var _q=_pideE_('getTareas').then(function(q){ if(Array.isArray(q)&&q.length){ TAREAS.length=0; q.forEach(function(x){TAREAS.push(x);}); } });
+    var _p=_pideE_('getPanel').then(function(p){ if(p) _aplicarPanel_(p); });
+    var _s=_pideE_('getSanciones',{}).then(function(a){ if(Array.isArray(a)) SANC_BACK=a; });
+    var _r=_pideE_('getPartes',{}).then(function(a){ if(Array.isArray(a)) PART_BACK=a; });
+    var _d=_pideE_('getEntregables').then(function(a){ if(Array.isArray(a)){ DOCS.length=0; a.forEach(function(x,i){ DOCS.push(_normDocE_(x,i)); }); } });
+    /* Las reuniones, con cuidado: la lista NO trae las respuestas (viven en su propia hoja),
+       asi que refrescarla a lo bruto deja los mapas de calor a cero. Se conservan las que ya
+       estaban hidratadas, emparejando por id. */
+    var _u=_pideE_('listar').then(function(a){
+      if(!Array.isArray(a) || !a.length) return;
+      var prev={}; REUS.forEach(function(x){ if(x && x.resp && Object.keys(x.resp).length) prev[x.id]=x.resp; });
+      REUS.length=0;
+      a.map(normReu).forEach(function(r){ if(prev[r.id]){ r.resp=prev[r.id]; r.calor=null; } REUS.push(r); });
+    });
+    await Promise.all([_t,_q,_p,_s,_r,_d,_u]);
+    if(!_escribiendoE_()) _repintarSuave_();          // pudo empezar a escribir mientras cargaba
+  } finally { _REFRESCANDO_E_=false; }
+}
+function _arrancarRefrescoVivoE_(){
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden) _refrescarEnSegundoPlano_('vuelta');
+  });
+  setInterval(function(){ _refrescarEnSegundoPlano_('reloj'); }, 90000);
 }
 async function _hidratarReus_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
@@ -2447,6 +2497,7 @@ async function _onCredencial_(resp,_silente){
        repintado pierde el scroll, asi que tres seguidos se ven como una recarga sola. */
     Promise.all([_cargarSanciones_(), _cargarPartes_()])
       .then(function(){ _repintarSuave_(); });
+    _arrancarRefrescoVivoE_();                       // a partir de aqui se alimenta sola
   }catch(e){
     if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
     _gate_(_insigniaHTML_()+'<div style="color:#ffb3b0;max-width:360px">No se pudo entrar: '+
@@ -2644,7 +2695,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='ad38521';
+var BUILD='0331def';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
