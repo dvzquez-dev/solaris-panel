@@ -886,6 +886,11 @@ var api={
   bootstrap: function(t){ var b={action:"bootstrap"}; if(t)b.token=t; return api._post(b); },
   quienSoy:  function(t){ return api._post({action:"quienSoy",token:t}); },
   getPanel:  function(){ return api._post({action:"getPanel"}); },
+  /* FALTABAN. Se llamaban desde los dos refrescos y no estaban declaradas: el TypeError
+     se lo tragaba un `catch` vacio, asi que turnos y tareas no se refrescaban NUNCA y
+     nadie se enteraba. El escritorio si las tenia. */
+  getTurnos: function(){ return api._post({action:"getTurnos"}); },
+  getTareas: function(){ return api._post({action:"getTareas"}); },
   getPartes: function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
   pushParte: function(p){ return api._post({action:"pushParte",parte:p}); },
   ficharEntrada:    function(){ return api._post({action:"ficharEntrada"}); },
@@ -905,7 +910,6 @@ var api={
   borrarReunion:    function(id){ return api._post({action:"borrarReunion",id:id}); },
   /* `fijada` viaja como OBJETO {label,bloques,franjas}: con solo la etiqueta, el mapa no
      sabe que casillas pintar en verde. Es el formato que el backend ya guarda. */
-  fijar:            function(id,f){ return api._post({action:"fijarReunion",id:id,fijada:f}); },
   getReunion:       function(id){ return api._post({action:"getReunion",id:id}); },
   /* Estaban en app.html y se perdieron al partir el artefacto: sin ellas, cubrir y
      decidir se quedaban en la memoria del movil y no llegaban nunca al servidor. */
@@ -1049,9 +1053,9 @@ async function _refrescoVivo_(motivo){
   if(motivo==='vuelta' && (ahora-_ULT_REFRESCO_) < 30000) return;
   _REFRESCANDO_=true; _ULT_REFRESCO_=ahora;
   try{
-    var t=api.getTurnos().then(function(x){ if(Array.isArray(x)&&x.length){ TURNOS.length=0;
+    var t=_pide_('getTurnos').then(function(x){ if(Array.isArray(x)&&x.length){ TURNOS.length=0;
       x.forEach(function(y,i){ TURNOS.push(_normTurnoM_(y,i)); }); } }).catch(function(){});
-    var q=api.getTareas().then(function(x){ if(Array.isArray(x)&&x.length){ TAREAS.length=0;
+    var q=_pide_('getTareas').then(function(x){ if(Array.isArray(x)&&x.length){ TAREAS.length=0;
       x.forEach(function(y){ TAREAS.push(y); }); } }).catch(function(){});
     var r=_cargarReunionesM_().catch(function(){});
     await Promise.all([t,q,r]);
@@ -1101,14 +1105,30 @@ function _arrancarRefrescoVivo_(){
   setInterval(function(){ _refrescoVivo_('reloj'); }, 90000);
   setInterval(_refrescarReuAbierta_, 20000);
 }
+/* Pide una accion del api SIN que un fallo se lleve por delante a las demas. Nace de un
+   fallo real: `api.getTurnos` no estaba declarada, y como la llamada iba en un
+   `Promise.all`, el TypeError mataba tambien el refresco de reuniones que iba al lado.
+   Devuelve `null` en vez de reventar, y deja rastro en la consola para que no vuelva a
+   pasar en silencio. */
+function _pide_(accion, arg){
+  try{
+    if(typeof api[accion]!=='function'){
+      try{ console.warn('api.'+accion+' no existe: ese dato no se refresca'); }catch(_){}
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(api[accion](arg));
+  }catch(e){ return Promise.resolve(null); }
+}
 async function _refrescarEnSegundoPlano_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
   /* Las dos a la vez y UN solo repintado. Antes iban en serie y cada respuesta repintaba
-     por su cuenta: dos reconstrucciones de `#main` mas, encima de las del login. */
-  var _t=api.getTurnos().then(function(t){
+     por su cuenta: dos reconstrucciones de `#main` mas, encima de las del login.
+     `_pide_` envuelve la llamada: si una accion no existe -paso: `getTurnos` se llamaba sin
+     estar declarada- se pierde ESE dato y no se lleva por delante a los otros dos. */
+  var _t=_pide_('getTurnos').then(function(t){
     if(Array.isArray(t) && t.length){ TURNOS.length=0; t.forEach(function(x,i){ TURNOS.push(_normTurnoM_(x,i)); }); }
   }).catch(function(){});
-  var _q=api.getTareas().then(function(q){
+  var _q=_pide_('getTareas').then(function(q){
     if(Array.isArray(q) && q.length){ TAREAS.length=0; q.forEach(function(x){ TAREAS.push(x); }); }
   }).catch(function(){});
   await Promise.all([_t,_q]);
