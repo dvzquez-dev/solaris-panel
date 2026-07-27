@@ -526,12 +526,14 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .cajon.ab svg{transform:rotate(180deg)}
 .cajon b{color:var(--ink2);font-weight:600}
 /* menu de los tres puntos: lo que no es tarea diaria no ocupa sitio en la barra */
-.kebab{background:none;border:1px solid var(--line);border-radius:9px;color:var(--ink2);
+.kebab{position:relative;z-index:901;background:#141212;border:1px solid var(--line);border-radius:9px;color:var(--ink2);
   width:34px;height:34px;display:grid;place-items:center;cursor:pointer;font-size:16px;line-height:1}
 .kebab:active{background:rgba(255,255,255,.06)}
-.menu{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.5);display:none}
+.menu{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.35);display:none}
 .menu.on{display:block}
-.menu .caja{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;min-width:210px;
+/* Cuelga por DEBAJO del boton (la posicion se calcula al abrir): antes se pintaba encima
+   y tapaba los propios tres puntos, que es justo lo que no debe pasar. */
+.menu .caja{position:absolute;min-width:216px;
   background:#141212;border:1px solid var(--line);border-radius:13px;overflow:hidden;
   box-shadow:0 14px 40px rgba(0,0,0,.55)}
 .menu button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;
@@ -540,7 +542,12 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .menu button:last-child{border-bottom:0}
 .menu button:active{background:rgba(255,255,255,.05)}
 .menu button[disabled]{color:var(--ink3);cursor:default}
-.menu button small{display:block;color:var(--ink3);font-size:10.5px;margin-top:2px}
+.menu button small{display:block;color:var(--ink3);font-size:11.5px;margin-top:3px}
+/* Ajustes se lee de cerca y con una mano: texto mayor que el del resto de la app */
+.ajus{font-size:14px;line-height:1.65;color:var(--ink2)}
+.ajus h4{font-size:13px;margin:16px 0 8px}
+.ajus .tarj p,.ajus .rnota{font-size:13.5px;line-height:1.6}
+.ajus .btn{font-size:14px;padding:13px}
 /* tu fila del reparto: un realce sobrio, en vez de repetir tu cargo en una pildora */
 .fila.yo{background:rgba(228,30,37,.09);border-left:2px solid var(--red);padding-left:9px;margin-left:-11px;
   border-radius:0 6px 6px 0}
@@ -909,6 +916,20 @@ function _normTurnoM_(t, ix){
     principales:t.principales||[], secundarios:t.secundarios||[],
     nota:t.nota||null, crucial:!!t.crucial, memoria:t.memoria||null, _real:true };
 }
+/* El bootstrap sirve lo CACHEADO para que entrar sea instantaneo. Los datos frescos se
+   piden justo despues, sin bloquear, y se repinta cuando llegan. Si fallan, se queda lo
+   que ya habia: nunca una pantalla vacia por un refresco lento. */
+async function _refrescarEnSegundoPlano_(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
+  try{
+    var t=await api.getTurnos();
+    if(Array.isArray(t) && t.length){ TURNOS.length=0; t.forEach(function(x,i){ TURNOS.push(_normTurnoM_(x,i)); }); pintar(); }
+  }catch(_){}
+  try{
+    var q=await api.getTareas();
+    if(Array.isArray(q) && q.length){ TAREAS.length=0; q.forEach(function(x){ TAREAS.push(x); }); pintar(); }
+  }catch(_){}
+}
 function _aplicarBootstrapMovil_(boot){
   boot=boot||{};
   if(typeof TAREAS!=='undefined'){ TAREAS.length=0; (boot.tareas||[]).forEach(function(t){ TAREAS.push(t); }); }
@@ -928,6 +949,7 @@ function _aplicarBootstrapMovil_(boot){
   }
   if(typeof LOTE!=='undefined' && LOTE && LOTE.items) LOTE.items=[];   // bloque de sanciones: era semilla
   if(typeof SUELTAS!=='undefined') SUELTAS.length=0;                   // sanciones sueltas: eran semilla
+  setTimeout(_refrescarEnSegundoPlano_, 300);
 }
 /* ── REUNIONES REALES (recuperado de app.html): el móvil listaba solo una de la semilla.
    Adapta la reunión del backend al modelo de la pantalla: el mapa de calor sale de 'resp'
@@ -2129,16 +2151,24 @@ function _notisHTML_(){
    meter ahi ajustes o el buzon la haria inservible en un movil. */
 function _abrirMenu_(v){
   var m=$('#menu'); if(!m) return;
+  if(v){
+    var b=$('#btnMenu'), c=m.querySelector('.caja');
+    if(b && c){
+      var r=b.getBoundingClientRect();
+      c.style.top=(r.bottom+8)+'px';                       // POR DEBAJO del boton
+      c.style.right=Math.max(8, window.innerWidth-r.right)+'px';
+    }
+  }
   m.classList.toggle('on', !!v);
   m.setAttribute('aria-hidden', v?'false':'true');
 }
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
-  return '<div class="mtit">Ajustes</div>'+
+  return '<div class="mtit">Ajustes</div><div class="ajus">'+
     '<h4>Notificaciones</h4>'+_notisHTML_()+
     '<h4>Sesión</h4><div class="tarj"><div class="fila"><div class="a"><b>'+quien+'</b>'+
-      '<small>'+v+'</small></div></div></div>';
+      '<small>'+v+'</small></div></div></div></div>';
 }
 function vTurnos(){
   var mios=TURNOS.filter(_mioTurno_);
