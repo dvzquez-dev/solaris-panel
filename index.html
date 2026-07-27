@@ -180,7 +180,7 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 @keyframes estrellaviva{0%,100%{opacity:.13;filter:drop-shadow(0 0 2px rgba(62,180,137,.35))}
   50%{opacity:.30;filter:drop-shadow(0 0 10px rgba(62,180,137,.8))}}
 @media (prefers-reduced-motion:reduce){
-  .med.aura .halo,.med.aura::after,.med.aura .fili,.med.aura .tk.f.cierra{animation:none}
+  .med.aura .halo,.med.aura::after,.med.aura .fili,.med.aura .tk.cierra{animation:none}
 }
 /* las marcas: una por tramo, FUERA del anillo. Al prender su tramo, chispean. */
 .med .tk{stroke:var(--line2);stroke-width:1.7;stroke-linecap:round;transition:stroke .25s linear}
@@ -199,7 +199,8 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .med.aura .tk.f{stroke:var(--tel)}
 /* La barrita de las 12 es la primera y la ultima a la vez, como en un reloj: marca donde
    empieza y donde acaba la vuelta. VERDE si y solo si tienes los 10. */
-.med.aura .tk.f.cierra{stroke:var(--ok);stroke-width:2.8;
+/* Sin `.f` a proposito: la barrita del 9 marca los 9 puntos aunque su tramo siga vacio. */
+.med.aura .tk.cierra{stroke:var(--ok);stroke-width:2.8;
   filter:drop-shadow(0 0 5px rgba(62,180,137,.85));animation:barrita12 2.2s ease-in-out infinite}
 @keyframes barrita12{0%,100%{opacity:.8}50%{opacity:1}}
 .med .tip{position:absolute;inset:0;transform:rotate(0deg);pointer-events:none;
@@ -1645,9 +1646,15 @@ function _colorSeg_(i, p){
    azul, porque la vuelta no está cerrada. */
 function _colorTick_(i, p){
   if(p<9) return '';                       // sin elegibilidad manda el CSS de siempre
-  /* Con los 10 se encienden DOS: la del 9 y la de las 12 -que es a la vez la 0 y la 10-.
-     Son las dos que cierran la vuelta; con 9 puntos ninguna, porque no esta cerrada. */
-  return (p>=10 && (i===0 || i===9)) ? 'cierra' : 'eleg';
+  /* Cada barrita marca UNA cifra, y se enciende cuando esa cifra se alcanza:
+       · la del 9  -> con 9 puntos (y sigue con 10);
+       · la de las 12, que es a la vez la 0 y la 10 -> solo con los 10, la vuelta cerrada.
+     OJO: la del 9 NO tiene la clase `f` con 9 puntos, porque `f` marca el tramo que
+     ARRANCA en ella y ese tramo aun no esta lleno. Por eso el CSS del verde no puede
+     colgar de `.f`. */
+  if(i===9) return 'cierra';                              // 9 y 10
+  if(i===0 && p>=10) return 'cierra';                     // solo 10
+  return 'eleg';
 }
 function medidorHTML(){
   var p=YO.puntos, segs='', ticks='', halo='', i;
@@ -1659,8 +1666,9 @@ function medidorHTML(){
     if(lleno) halo+='<path class="halo" stroke="'+col+'" d="'+arcoSeg(i,MR)+'"/>';
     /* la marca de cada tramo, fuera del anillo: es la que CHISPEA al prender */
     var a=(-90+i*MSTEP)*Math.PI/180;
-    ticks+='<line class="tk'+(crit?' zc':'')+(lleno?' f':'')+
-      (lleno?(' '+_colorTick_(i,p)):'')+'" data-i="'+i+'" '+
+    /* El color NO depende de que el tramo este lleno: la barrita del 9 se pone verde con 9
+       puntos aunque su tramo (el decimo) siga vacio. */
+    ticks+='<line class="tk'+(crit?' zc':'')+(lleno?' f':'')+' '+_colorTick_(i,p)+'" data-i="'+i+'" '+
       'x1="'+(MC+72*Math.cos(a)).toFixed(1)+'" y1="'+(MC+72*Math.sin(a)).toFixed(1)+'" '+
       'x2="'+(MC+79*Math.cos(a)).toFixed(1)+'" y2="'+(MC+79*Math.sin(a)).toFixed(1)+'"/>';
   }
