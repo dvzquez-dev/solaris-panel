@@ -1058,11 +1058,48 @@ async function _refrescoVivo_(motivo){
     if(!_modalAbierto_()) _repintarSuave_();
   } finally { _REFRESCANDO_=false; }
 }
+/* La reunion ABIERTA, aparte y mas rapido. Es lo unico que cambia mientras lo miras:
+   varias personas cubriendo a la vez el dia antes de que cierre el plazo. Es UNA llamada
+   (`getReunion`), no las tres del refresco general, asi que puede ir a 20 s sin castigar
+   al backend. */
+var _REFREU_=false;
+function _firmaResp_(r){
+  var q=(r&&r.resp)||{}, k=Object.keys(q).sort(), out=[];
+  for(var i=0;i<k.length;i++) out.push(k[i]+':'+(q[k[i]]||[]).join(''));
+  return out.join('|');
+}
+async function _refrescarReuAbierta_(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
+  if(_REFREU_ || document.hidden) return;
+  if(ST.vista!=='reu') return;                 // solo lo que tienes delante
+  if(_modalAbierto_()) return;                 // no se cambia la rejilla mientras pintas
+  var R=REUNION; if(!R || R.id==null) return;
+  _REFREU_=true;
+  try{
+    var d=await api.getReunion(R.id);
+    var resp=(d && (d.respuestas || (d.reunion && d.reunion.resp))) || null;
+    if(!resp) return;
+    var base=(d && d.reunion) || {};
+    var _fj=(base.fijada!==undefined && base.fijada!=='') ? base.fijada : R.fijada;
+    var nuevo=_normReuM_({ id:R.id, titulo:R.titulo, tipo:R.tipo, modalidad:R.modalidad,
+      limite:R.limite, fijada:_fj, fijadaBl:R.fijadaBl, convocante:R.convocante,
+      dias:R.dias, franjas:R.franjas, bloques:R.bloques, invitados:new Array(R.nInv),
+      slot:R.slot, duracion:R.duracion, resp:resp });
+    nuevo._hidratada=true;
+    /* Si nadie ha contestado nada nuevo, NO se repinta: reconstruir la pantalla cada 20 s
+       para dejarla igual se nota, y molesta. */
+    if(_firmaResp_(nuevo)===_firmaResp_(R)) return;
+    var i=REUNIONES_M.indexOf(R); if(i>=0) REUNIONES_M[i]=nuevo;
+    REUNION=nuevo;
+    if(ST.vista==='reu' && !_modalAbierto_()) _repintarSuave_();
+  }catch(_){ } finally { _REFREU_=false; }
+}
 function _arrancarRefrescoVivo_(){
   document.addEventListener('visibilitychange', function(){
     if(!document.hidden) _refrescoVivo_('vuelta');
   });
   setInterval(function(){ _refrescoVivo_('reloj'); }, 90000);
+  setInterval(_refrescarReuAbierta_, 20000);
 }
 async function _refrescarEnSegundoPlano_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
@@ -3478,6 +3515,9 @@ function pintar(){
   enganchar();
 }
 function irA(k){
+  /* Al abrir Reuniones se pide ya, sin esperar al reloj: entras justo para ver quien ha
+     contestado, y esperar 20 s para eso es raro. */
+  if(k==='reu') setTimeout(_refrescarReuAbierta_, 60);
   if(k===ST.vista) return;
   /* pintar() recoloca el indicador y deja ultimoX en la posicion NUEVA. Hay que
      guardarla antes y restituirla, o la distancia sale 0 y no vuela nada: ni el
