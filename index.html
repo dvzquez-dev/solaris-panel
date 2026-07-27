@@ -721,6 +721,58 @@ var PD_NOM='Lois Carballo Sendón';   // semilla; con datos reales lo rederiva _
 /* Con el roster real, el PD es quien tenga el cargo — no el de la semilla. */
 /* límite de una reunión en DD/MM (del dato, no cableado). */
 function _limM_(R){ var l=R&&R.limite; if(!l) return 'sin límite'; l=String(l).slice(0,10); return _isoADMY_(l); }
+/* ── CUAL ES LA PROXIMA REUNION ───────────────────────────────────────────────
+   Los dias de una reunion vienen como 'DD/MM', SIN año. Se resuelve contra hoy: si la
+   fecha cae mas de medio año atras, es del año que viene (una reunion en enero vista
+   desde diciembre). Sin esto, «31/12» parecia pasado siempre. */
+var _MSDIA_=86400000;
+function _hoyDateM_(){ var d=new Date(_dmyAISO_(HOY)+'T00:00:00'); return isNaN(d)?new Date():d; }
+function _msDeDDMM_(dd, base){
+  var m=/^\s*(\d{1,2})\/(\d{1,2})/.exec(String(dd||''));
+  if(!m) return null;
+  var t=new Date(base.getFullYear(), (+m[2])-1, +m[1]).getTime();
+  if(t < base.getTime()-182*_MSDIA_) t=new Date(base.getFullYear()+1, (+m[2])-1, +m[1]).getTime();
+  return t;
+}
+/* Cuando OCURRE: la fijada, su dia fijado; la que no, su primer dia ofertado que no
+   haya pasado. No es el limite para responder -eso es otra cosa y se dice aparte-. */
+function _cuandoReuM_(r){
+  var base=_hoyDateM_(), dias=(r&&r.dias)||[];
+  if(r && r.fijada && (r.fijadaBl||[]).length){
+    var t=_msDeDDMM_(dias[r.fijadaBl[0][0]], base);
+    if(t!=null) return { ms:t, fijada:true };
+  }
+  var ts=dias.map(function(d){ return _msDeDDMM_(d, base); })
+             .filter(function(x){ return x!=null; });
+  if(!ts.length) return { ms:Infinity, fijada:!!(r&&r.fijada) };   // sin fechas legibles: al final
+  var fut=ts.filter(function(t){ return t>=base.getTime(); });
+  return { ms: fut.length ? Math.min.apply(null,fut) : Math.max.apply(null,ts),
+           fijada: !!(r&&r.fijada) };
+}
+/* Lo que te falta cubrir, ordenado por lo que CADUCA ANTES. El plazo es lo que mira el
+   motor de sanciones, asi que es lo que manda en el aviso -no la fecha de la reunion-. */
+function _limMsM_(r){
+  var l=r&&r.limite; if(!l) return Infinity;
+  var t=Date.parse(String(l).slice(0,10)); return isNaN(t)?Infinity:t;
+}
+function _pendientesCubrirM_(){
+  return (REUNIONES_M||[]).filter(function(r){
+    return r && !r.cubierta && !r.exento && !r.fijada;   // fijada = el plazo ya se cerro
+  }).sort(function(a,b){ return _limMsM_(a)-_limMsM_(b); });
+}
+function _proximaReuM_(){
+  var L=REUNIONES_M||[]; if(!L.length) return null;
+  var hoy=_hoyDateM_().getTime();
+  var con=L.map(function(r){ var c=_cuandoReuM_(r);
+    return { r:r, ms:c.ms, fij:c.fijada, pasada:(c.ms<hoy) }; });
+  con.sort(function(a,b){
+    if(a.pasada!==b.pasada) return a.pasada?1:-1;   // lo que ya ocurrió, al final
+    if(a.ms!==b.ms) return a.ms-b.ms;               // antes en el tiempo, antes en la lista
+    if(a.fij!==b.fij) return a.fij?-1:1;            // a igualdad, manda la que tiene fecha
+    return 0;
+  });
+  return con[0].r;
+}
 /* Habia dos en este mismo fichero (`_pilaDeM_` y `pilaDe`) con distinto fallback. Queda
    esta, con el bueno: si el nombre no esta en el roster, el nombre de pila. */
 function _pilaDeM_(n){
@@ -1038,7 +1090,9 @@ async function _cargarReunionesM_(){
   try{ var arr=await api.listarReuniones();
     if(Array.isArray(arr) && arr.length){
       REUNIONES_M=arr.map(_normReuM_);
-      var mia=REUNIONES_M.filter(function(r){ return !r.fijada; })[0]||REUNIONES_M[0];
+      /* Antes: la primera SIN FIJAR en orden de creacion. Ni miraba fechas, ni tenia
+         sentido descartar las fijadas -son las que mas seguro ocurren-. */
+      var mia=_proximaReuM_()||REUNIONES_M[0];
       if(mia){ REUNION=mia; await _hidratarReuM_(mia); }
     }
   }catch(e){}
@@ -1561,10 +1615,17 @@ function vEstado(){
       '<p><span class="mono">'+cambios[0].ref+'</span> · corrígelo y reenvíalo a revisión.</p></div>'+
       '<span class="chev">›</span></div>';
   }
-  if(!_sinReuniones_() && !REUNION.cubierta && !REUNION.exento && !REUNION.fijada){
-    av+='<div class="aviso" data-ir="reu" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
-      '<div style="flex:1"><b>Te falta cubrir una disponibilidad</b>'+
-      '<p>«'+esc(REUNION.titulo)+'» — cierra el '+_limM_(REUNION)+'.</p></div>'+
+  /* NO uses `REUNION` aqui: es el puntero de la pantalla de Reuniones y cambia al
+     navegar, asi que este aviso te mandaba a cubrir la que estabas mirando mientras la
+     que cierra manana no salia por ningun lado. Y de no cubrir a tiempo salen sanciones. */
+  var _pend=_pendientesCubrirM_();
+  if(_pend.length){
+    var _p0=_pend[0], _resto=_pend.length-1;
+    av+='<div class="aviso" data-ir="reu" data-reuid="'+esc(String(_p0.id))+'" data-p>'+
+      '<span class="ic"><svg><use href="#i-warn"/></svg></span>'+
+      '<div style="flex:1"><b>Te falta cubrir '+(_pend.length>1?(_pend.length+' disponibilidades'):'una disponibilidad')+'</b>'+
+      '<p>«'+esc(_p0.titulo)+'» — cierra el '+_limM_(_p0)+
+        (_resto>0 ? (', y '+_resto+' más después') : '')+'.</p></div>'+
       '<span class="chev">›</span></div>';
   }
 
@@ -1579,14 +1640,30 @@ function vEstado(){
       (sumaE('pend')?'<span class="pil pend" style="margin-left:auto">+'+nf2(sumaE('pend'))+' h pend.</span>':'')+'</div>'+
       barraHorasHTML('barEstado')+
     '</div>'+
-    '<h2 class="sec">Próxima reunión<span class="ln"></span></h2>'+
-    (_sinReuniones_()
-      ? '<div class="tarj">'+vacio('Ninguna reunión convocada',
-          'Ahora mismo no estás convocado a ninguna reunión.','',false)+'</div>'
-      : '<div class="tarj clic" data-ir="reu" data-p>'+
-        '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(REUNION.titulo)+'</b>'+
-        '<small>'+esc(REUNION.fijada||('cierra el '+_limM_(REUNION)))+' · '+esc((REUNION.modalidad||'').toUpperCase())+'</small></div>'+
-        '<div class="d"><span class="pil '+((REUNION.fijada||REUNION.cubierta||REUNION.exento)?'conf':'pend')+'">'+(REUNION.fijada?'fijada':(REUNION.exento?'organizas':(REUNION.cubierta?'cubierta':'te falta')))+'</span></div></div></div>');
+    /* OJO: aquí NO va `REUNION`. Ese es el puntero de la pantalla de Reuniones y cambia
+       al navegar por la lista, así que esta tarjeta acababa mostrando «la última que
+       abriste» con el rótulo de «la próxima». */
+    _proxReuHTML_();
+}
+function _proxReuHTML_(){
+  var R=_proximaReuM_();
+  if(_sinReuniones_() || !R)
+    return '<h2 class="sec">Próxima reunión<span class="ln"></span></h2>'+
+      '<div class="tarj">'+vacio('Ninguna reunión convocada',
+        'Ahora mismo no estás convocado a ninguna reunión.','',false)+'</div>';
+  var c=_cuandoReuM_(R), pasada=(c.ms<_hoyDateM_().getTime());
+  /* Si lo único que queda ya ocurrió, se dice: llamar «próxima» a algo de la semana
+     pasada es exactamente el tipo de mentira pequeña que hace desconfiar del resto. */
+  var rotulo = pasada ? 'Última reunión' : 'Próxima reunión';
+  var cuando = R.fijada ? esc(R.fijada)
+    : ((R.dias&&R.dias.length) ? ('sin fecha fija · cierra el '+esc(_limM_(R)))
+                               : ('cierra el '+esc(_limM_(R))));
+  return '<h2 class="sec">'+rotulo+'<span class="ln"></span></h2>'+
+    '<div class="tarj clic" data-ir="reu" data-reuid="'+esc(String(R.id))+'" data-p>'+
+    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
+    '<small>'+cuando+' · '+esc((R.modalidad||'').toUpperCase())+'</small></div>'+
+    '<div class="d"><span class="pil '+((R.fijada||R.cubierta||R.exento)?'conf':'pend')+'">'+
+      (R.fijada?'fijada':(R.exento?'organizas':(R.cubierta?'cubierta':'te falta')))+'</span></div></div></div>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3184,7 +3261,18 @@ function enganchar(){
   /* nav */
   $$('.tab').forEach(function(t){ t.onclick=function(){ irA(t.dataset.d); }; });
   /* avisos y tarjetas clicables */
-  $$('[data-ir]').forEach(function(el){ el.onclick=function(){ irA(el.dataset.ir); }; });
+  /* Una tarjeta que nombra una reunion concreta debe ABRIR ESA, no dejarte en la que
+     estuvieras viendo: si no, pulsas el aviso y aterrizas en otra distinta. */
+  $$('[data-ir]').forEach(function(el){ el.onclick=function(){
+    /* Si la tarjeta nombra una reunión concreta, abre ESA. Antes te llevaba a Reuniones y
+       te dejaba en la que estuvieras viendo, que podía ser otra distinta de la del aviso. */
+    var rid=el.dataset.reuid;
+    if(rid){
+      var r=(REUNIONES_M||[]).filter(function(x){ return String(x.id)===String(rid); })[0];
+      if(r){ REUNION=r; _hidratarReuM_(r).then(function(){ pintar(); }); }
+    }
+    irA(el.dataset.ir);
+  }; });
 
   /* medidor */
   var med=$('#med');
