@@ -423,7 +423,8 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
       <button id="btnMenu" aria-label="Más opciones" style="background:none;border:1px solid var(--line);border-radius:9px;color:var(--ink2);width:32px;height:32px;cursor:pointer;margin-left:10px;font-size:15px">⋮</button>
       <div id="menuE" hidden style="position:absolute;top:52px;right:18px;min-width:200px;background:#141212;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.55);z-index:900">
         <button data-mnu="ajustes" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Ajustes</button>
-        <button data-mnu="buzon" disabled style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink3);font:inherit;font-size:13px;padding:12px 14px;text-align:left">Buzón · todavía no montado</button>
+        <button data-mnu="reportar" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Reportar un fallo o una mejora</button>
+        <button data-mnu="buzon" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Buzón · la cola de reportes</button>
         <button data-mnu="salir" style="display:block;width:100%;background:none;border:0;color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Cerrar sesión</button>
       </div>
     </div>
@@ -491,6 +492,12 @@ var api={
   listar:      function(){ return api._post({action:"listarReuniones"}); },
   get:         function(id){ return api._post({action:"getReunion",id:id}); },
   crear:       function(r){ return api._post({action:"crearReunion",reunion:r}); },
+  /* Buzones. `quien` lo pone el servidor desde el token: si lo mandara el cliente,
+     cualquiera podria firmar un reporte como cualquier otro. */
+  reportarBug:    function(d){ return api._post({action:"reportarBug",datos:d}); },
+  reportarMejora: function(d){ return api._post({action:"reportarMejora",datos:d}); },
+  getBuzon:       function(){ return api._post({action:"getBuzon"}); },
+  decidirReporte: function(tipo,id,campos){ return api._post({action:"decidirReporte",tipo:tipo,id:id,campos:campos}); },
   borrar:      function(id){ return api._post({action:"borrarReunion",id:id}); },
   fijar:       function(id,f){ return api._post({action:"fijarReunion",id:id,fijada:f}); },
   setOrdenDia: function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); },
@@ -1899,11 +1906,137 @@ V.reclutar={g:'Equipo',t:'Reclutamiento',f:function(){
 }};
 
 
+/* ── BUZON: la cola de reportes ───────────────────────────────────────────────
+   Solo el PD. El backend lo revalida por token; esto es la puerta, no la cerradura.
+   Esta pantalla NO aplica nada: mueve el estado del reporte y ya. Construir y publicar
+   siguen siendo pasos aparte, y la vista previa es un Artifact, nunca produccion.
+   ─────────────────────────────────────────────────────────────────────────── */
+var BUZON=null, BUZON_ERR=null, BUZON_SEL=null;
+/* Reportar desde el escritorio. Mismo criterio que en el movil: dos campos a mano y el
+   resto lo rellena la app. Se hace con un `prompt` encadenado a proposito -esta cara no
+   tiene modales y montar uno solo para esto seria mas superficie de la que vale-. */
+async function reportarModal(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION){
+    tost('Sin conexión con el servidor no se puede reportar.'); return; }
+  var esMejora=confirm('¿Es una MEJORA?'+String.fromCharCode(10,10)+
+    'Aceptar = proponer una mejora.'+String.fromCharCode(10)+'Cancelar = reportar un fallo.');
+  var tit=(prompt(esMejora?'¿Qué mejorarías? (en una línea)':'¿Qué ha pasado? (en una línea)')||'').trim();
+  if(!tit) return;
+  var det=(prompt(esMejora?'¿Por qué? ¿Qué te cuesta hoy? (el problema de fondo, no la solución)'
+                         :'¿Qué esperabas que pasara?')||'').trim();
+  var ua=navigator.userAgent||'';
+  var nav=/Firefox/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome/.test(ua)?'Chrome':/Safari/.test(ua)?'Safari':'otro';
+  var datos={ titulo:tit, donde:'Escritorio', pantalla:((V[vista]&&V[vista].t)||vista),
+    version:(DATA.generado||''),
+    contexto:'escritorio · '+nav+' · '+screen.width+'x'+screen.height+' · datos '+(DATA.generado||'?') };
+  if(esMejora){ datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
+  else { datos.esperaba=det; datos.paso=tit; datos.gravedad='Molesta'; }
+  try{
+    var r=await (esMejora?api.reportarMejora(datos):api.reportarBug(datos));
+    tost((esMejora?'Mejora enviada':'Fallo reportado')+' · '+((r&&r.id)||'')+'.');
+    if(vista==='buzon') _cargarBuzon_();
+  }catch(e){ tost('No se pudo enviar: '+((e&&e.message)||e)); }
+}
+var EST_BUZON={
+  'Nuevo':['sin mirar','wa'], 'Analizado':['analizado',''], 'Esperando visto bueno':['te toca decidir','wa'],
+  'Adelante':['adelante','ok'], 'Listo para revisar':['listo para que lo veas','wa'],
+  'Publicado':['publicado','ok'], 'Descartado':['descartado','']};
+function _estBuzon_(e){ return EST_BUZON[e]||[String(e||'—'),'']; }
+async function _cargarBuzon_(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION){ BUZON=[]; BUZON_ERR='sin conexión'; return; }
+  try{ BUZON=await api.getBuzon(); BUZON_ERR=null; }
+  catch(e){ BUZON=[]; BUZON_ERR=(e&&e.message)||String(e); }
+  pintar();
+}
+function _fichaBuzon_(r){
+  var st=_estBuzon_(r.estado), esBug=(r.tipo!=='mejora');
+  var campo=function(t,v){ return v? ('<div class="sub"><span class="sc">'+t+'</span>'+
+    '<p style="margin:4px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+esc(v)+'</p></div>') : ''; };
+  return '<div class="parte" id="bz-'+esc(r.id)+'">'+
+    '<div class="h"><b>'+esc(r.titulo)+'</b>'+
+      '<span class="u">'+esc(r.id)+'</span>'+
+      '<button class="btn sm" style="margin-left:auto" data-bzsel="">Cerrar</button></div>'+
+    '<div class="pils">'+
+      '<span class="chip">'+(esBug?'fallo':'mejora')+'</span>'+
+      '<span class="chip">'+esc(_m(r.quien).pila)+'</span>'+
+      '<span class="chip">'+esc(r.donde||'—')+(r.pantalla?' · '+esc(r.pantalla):'')+'</span>'+
+      (esBug&&r.gravedad?'<span class="chip '+(r.gravedad==='Bloquea'?'no':r.gravedad==='Molesta'?'wa':'')+'">'+esc(r.gravedad)+'</span>':'')+
+      '<span class="chip '+st[1]+'">'+st[0]+'</span>'+
+    '</div>'+
+    campo(esBug?'Qué esperaba':'Por qué', esBug?r.esperaba:r.porque)+
+    campo('Contexto', r.contexto)+
+    campo('Diagnóstico', r.diagnostico)+
+    campo('Recomendación', r.recomendacion)+
+    (r.vista_previa? '<div class="sub"><span class="sc">Vista previa</span>'+
+       '<p style="margin:4px 0 0"><a href="'+esc(r.vista_previa)+'" target="_blank" rel="noopener" '+
+       'style="color:var(--red2);font-size:12.5px">abrir el artefacto con los cambios puestos</a></p></div>' : '')+
+    (r.recomendacion
+      ? '<div class="acts">'+
+        '<button class="btn pri" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Adelante">Adelante, hazlo</button>'+
+        (r.vista_previa?'<button class="btn ok" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Publicado">Visto bueno · publicar</button>':'')+
+        '<button class="btn no" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Descartado">Descartar</button>'+
+        '</div>'
+      : '<div class="ruta">Todavía sin analizar. Cuando esté reproducido y valorado, aparecen '+
+        'aquí el diagnóstico y la recomendación, y con ellos los botones.</div>')+
+  '</div>';
+}
+function _filaBuzon_(r){
+  if(BUZON_SEL===r.id) return _fichaBuzon_(r);
+  var st=_estBuzon_(r.estado);
+  return '<div class="dec" data-bzsel="'+esc(r.id)+'">'+
+    '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
+    '<span class="tx"><b>'+esc(r.titulo)+'</b><small><span class="mono">'+esc(r.id)+'</span> · '+
+      esc(_m(r.quien).pila)+' · '+esc(r.donde||'—')+(r.pantalla?' · '+esc(r.pantalla):'')+'</small></span>'+
+    '<span class="der">'+
+      ((r.tipo!=='mejora'&&r.gravedad==='Bloquea')?'<span class="chip no">bloquea</span>':'')+
+      '<span class="chip '+st[1]+'">'+st[0]+'</span><span class="chev">›</span></span></div>';
+}
+V.buzon={g:'Buzón',t:'Reportes',f:function(){
+  if(rangoNom(ACTOR)<3 && !(SESION&&SESION.email===ADMIN_EMAIL))
+    return pan('Buzón','', vac('Esta cola es del Project Director',
+      'Los reportes llevan lo que la gente escribe cuando algo le molesta, así que no son '+
+      'material de consulta general. Para reportar algo, usa el menú de arriba a la derecha.'));
+  if(BUZON===null) return pan('Buzón','cargando…',
+    '<div class="nota" style="border-top:0">Pidiendo la cola al servidor…</div>');
+  if(BUZON_ERR) return pan('Buzón','no se pudo leer',
+    vac('No se pudo cargar la cola', esc(BUZON_ERR)+'. No es que no haya reportes: es que no se han podido leer.'));
+  var abiertos=BUZON.filter(function(r){ return ['Publicado','Descartado'].indexOf(r.estado)<0; });
+  var cerrados=BUZON.filter(function(r){ return ['Publicado','Descartado'].indexOf(r.estado)>=0; });
+  var tuyos=abiertos.filter(function(r){ return !!r.recomendacion; });
+  /* El recuento por CARA a la vista: movil y escritorio son artefactos distintos y el
+     mismo fallo puede estar en uno y no en el otro. Saber donde se acumulan es la mitad
+     del triaje. */
+  var enCara=function(c){ return abiertos.filter(function(r){ return (r.cara||'')===c; }).length; };
+  return '<div class="chips">'+
+      '<span class="chip">ABIERTOS <b style="color:var(--ink)">'+abiertos.length+'</b></span>'+
+      '<span class="chip">MÓVIL <b style="color:var(--ink)">'+enCara('movil')+'</b></span>'+
+      '<span class="chip">ESCRITORIO <b style="color:var(--ink)">'+enCara('escritorio')+'</b></span>'+
+      '<span class="chip '+(tuyos.length?'wa':'')+'">ESPERANDO TU DECISIÓN <b style="color:var(--ink)">'+tuyos.length+'</b></span>'+
+    '</div>'+
+    pan('Esperando tu decisión', tuyos.length+'',
+      tuyos.length? tuyos.map(_fichaBuzon_).join('')
+        : vac('Nada que decidir ahora mismo','Cuando un reporte esté reproducido y valorado, '+
+          'aparece aquí con la recomendación y los botones.'),'destaca')+
+    pan('Resto de abiertos', (abiertos.length-tuyos.length)+'',
+      (abiertos.length-tuyos.length)? abiertos.filter(function(r){ return !r.recomendacion; }).map(_filaBuzon_).join('')
+        : vac('Ninguno más abierto','Todo lo reportado está o decidido o esperando tu visto bueno.'))+
+    pan('Cerrados', cerrados.length+'',
+      cerrados.length? cerrados.map(_filaBuzon_).join('')
+        : vac('Todavía no hay ninguno cerrado','Aquí van los publicados y los descartados.'))+
+    '<div class="pan"><div class="nota"><b>Nada se aplica desde aquí.</b> Estos botones solo '+
+    'mueven el reporte: «adelante» autoriza a construirlo, y el visto bueno se da <b>después</b> '+
+    'de mirar el artefacto de vista previa. Publicar sigue siendo un paso aparte.</div></div>';
+}};
+
 /* AJUSTES ERA UN `tost`. Pulsar Ajustes soltaba un mensajito flotante con la sesion y
    se acababa ahi: ni pantalla, ni notificaciones, ni de donde salen los datos. */
 V.ajustes={g:'Ajustes',t:'Ajustes',f:function(){
   var quien=(SESION&&SESION.email)||ACTOR||'—';
-  var gen=DATA.generado? _isoADMY_(DATA.generado) : '—';
+  /* Sin backend lo que hay es la semilla, y su fecha es de mentira: se dice, en vez de
+     presentarla como si fuera el dato real. */
+  var hayBack=(typeof backendOK!=='undefined' && backendOK && SESION);
+  var gen=!DATA.generado ? '—' : (hayBack ? _isoADMY_(DATA.generado)
+         : (_isoADMY_(DATA.generado)+' · de la semilla, no del servidor'));
   return pan('Notificaciones', (typeof Notification==='undefined')?'no disponibles':Notification.permission,
       _notisHTML_())+
     pan('Sesión','', tabla([['Dato'],['Valor']],
@@ -2120,7 +2253,9 @@ function _cablearSalir_(){
       x.onclick=function(){
         m.hidden=true;
         if(x.dataset.mnu==='salir'){ cerrarSesion(); return; }
-        if(x.dataset.mnu==='ajustes'){ ir('ajustes'); }
+        if(x.dataset.mnu==='ajustes'){ ir('ajustes'); return; }
+        if(x.dataset.mnu==='reportar'){ reportarModal(); return; }
+        if(x.dataset.mnu==='buzon'){ BUZON=null; ir('buzon'); _cargarBuzon_(); return; }
       };
     });
   }
@@ -2350,6 +2485,25 @@ function pintar(){
   m.innerHTML=V[vista].f();
   var _bn=m.querySelector('#btnNotis'); if(_bn) _bn.onclick=function(){ activarNotis(_bn); };
   var _bs=m.querySelector('[data-salir]'); if(_bs) _bs.onclick=function(){ cerrarSesion(); };
+  /* buzon: abrir/cerrar un reporte y las tres decisiones. Ninguna aplica nada: mueven
+     el estado. Construir y publicar siguen siendo pasos aparte. */
+  $$('[data-bzsel]',m).forEach(function(el){
+    el.onclick=function(ev){ ev.stopPropagation(); var v=el.dataset.bzsel; BUZON_SEL=v||null; pintar(); };
+  });
+  $$('[data-bzacc]',m).forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var id=b.dataset.bz, tipo=b.dataset.bzt, acc=b.dataset.bzacc;
+      var aviso={Adelante:'Autorizas que se construya. Todavía NO se publica nada.',
+        Publicado:'Das el visto bueno: esto es lo que autoriza a publicarlo.',
+        Descartado:'Se descarta. Queda en el histórico, no se borra.'}[acc]||'';
+      if(!confirm(acc+' — '+id+String.fromCharCode(10,10)+aviso)) return;
+      var campos={estado:acc};
+      b.disabled=true; var prev=b.textContent; b.textContent='Guardando…';
+      try{ await api.decidirReporte(tipo, id, campos); tost(id+': '+acc+'.'); _cargarBuzon_(); }
+      catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo: '+((e&&e.message)||e)); }
+    };
+  });
   $('#migaA').textContent=V[vista].g;
   $('#migaB').textContent=V[vista].t;
   pintarNav();
