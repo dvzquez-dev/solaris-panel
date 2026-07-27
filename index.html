@@ -691,7 +691,12 @@ var PD_NOM='Lois Carballo Sendón';   // semilla; con datos reales lo rederiva _
 /* Con el roster real, el PD es quien tenga el cargo — no el de la semilla. */
 /* límite de una reunión en DD/MM (del dato, no cableado). */
 function _limM_(R){ var l=R&&R.limite; if(!l) return 'sin límite'; l=String(l).slice(0,10); return _isoADMY_(l); }
-function _pilaDeM_(n){ var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0]; return m&&m.pila; }
+/* Habia dos en este mismo fichero (`_pilaDeM_` y `pilaDe`) con distinto fallback. Queda
+   esta, con el bueno: si el nombre no esta en el roster, el nombre de pila. */
+function _pilaDeM_(n){
+  var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
+  return (m && m.pila) || String(n||'').split(' ')[0];
+}
 /* Se rederivaban SOLO el PD, asi que REV2_NOM se quedaba en el nombre de la semilla y el
    rango 2 no existia con datos reales: Jose podia decidir un expediente en el escritorio y
    no en el movil. El segundo revisor es Jose Manuel Torres (DOC_JOSE en el backend); si no
@@ -775,6 +780,18 @@ var api={
   setOrdenDia:      function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); }
 };
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
+/* ---- HORAS: una sola familia. Habia CINCO parsers de 'HH:MM' repartidos por el
+   fichero, con tres unidades de salida distintas y dos que reventaban si les llegaba
+   un string en vez de un {ini}. Estas aguantan las dos formas. ---- */
+function _minHM_(v){                       // 'HH:MM' o {ini:'HH:MM'} -> minutos
+  var t=(v && typeof v==='object') ? v.ini : v;
+  var p=String(t==null?'':t).split(':');
+  return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
+}
+function _hmMin_(m){                       // minutos -> 'HH:MM'
+  m=(+m||0); return pad(Math.floor(m/60)%24)+':'+pad(m%60);
+}
+function _horasHM_(v){ return _minHM_(v)/60; }   // 'HH:MM' -> horas decimales
 /* HH:MM local de una fecha ISO (la hora de apertura que da la nube) */
 function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes()); }
 /* Aplica el panel del backend a DATA y fija YO al miembro que ha entrado. El backend
@@ -889,17 +906,22 @@ function _sinReuniones_(){ return !!(typeof backendOK!=='undefined' && backendOK
    REMAPEA el indice de franja dentro de cada bloque. Ojo: el ORDEN DE LOS BLOQUES no se
    toca, porque `resp[nombre]` es un array alineado a esa posicion; si se reordenara, cada
    disponibilidad se pegaria a la franja equivocada. */
-function _ordenarFranjasM_(F, bl, fij){
-  var min=function(f){ var p=String(f&&f.ini||'0:0').split(':'); return (+p[0])*60+(+p[1]||0); };
+/* ═══ GEMELA · existe una copia IDENTICA en escritorio.html. Si tocas una, toca la otra. ═══
+   Ordena las franjas por hora y REMAPEA el indice de franja de cada bloque. El ORDEN DE
+   LOS BLOQUES no se toca: `resp[nombre]` esta alineado a esa posicion y reordenarlo pegaria
+   cada disponibilidad a la franja equivocada. */
+function _ordenarFranjas_(r){
+  var F=(r&&r.franjas)||[], bl=(r&&r.bloques)||[], fij=(r&&r.fijadaBl)||[];
   var idx=F.map(function(_,i){ return i; });
-  var ya=idx.every(function(i){ return i===0 || min(F[i-1])<=min(F[i]); });
-  if(ya) return {F:F, bl:bl, fij:fij};
-  idx.sort(function(a,b){ return min(F[a])-min(F[b]); });
+  if(idx.every(function(i){ return i===0 || _minHM_(F[i-1])<=_minHM_(F[i]); }))
+    return {franjas:F, bloques:bl, fijadaBl:fij, cambio:false};
+  idx.sort(function(a,b){ return _minHM_(F[a])-_minHM_(F[b]); });
   var pos=[]; idx.forEach(function(vi,k){ pos[vi]=k; });
   return {
-    F:   idx.map(function(i){ return F[i]; }),
-    bl:  bl.map(function(b){ return [b[0], pos[b[1]]]; }),
-    fij: (fij||[]).map(function(b){ return [b[0], pos[b[1]]]; })
+    franjas:  idx.map(function(i){ return F[i]; }),
+    bloques:  bl.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
+    fijadaBl: fij.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
+    cambio:   true
   };
 }
 function _normReuM_(r){
@@ -910,8 +932,8 @@ function _normReuM_(r){
      `pond` es la vista PONDERADA: suma los valores (presencial+telemático=2, telemático=1);
      `calor` cuenta PERSONAS (cualquier valor > 0). */
   var _fijPrev=(r.fijada && typeof r.fijada==='object') ? (r.fijada.bloques||[]) : [];
-  var _ord=_ordenarFranjasM_(F, bl, _fijPrev);
-  F=_ord.F; bl=_ord.bl; _fijPrev=_ord.fij;
+  var _ord=_ordenarFranjas_({franjas:F, bloques:bl, fijadaBl:_fijPrev});
+  F=_ord.franjas; bl=_ord.bloques; _fijPrev=_ord.fijadaBl;
   var calor=dias.map(function(){ return F.map(function(){ return null; }); });
   var pond =dias.map(function(){ return F.map(function(){ return null; }); });
   bl.forEach(function(b){ if(calor[b[0]] && b[1]<F.length){ calor[b[0]][b[1]]=0; pond[b[0]][b[1]]=0; } });
@@ -961,7 +983,10 @@ async function _cargarReunionesM_(){
   }catch(e){}
 }
 /* Mapea un parte del backend al modelo del móvil (e: conf|otor|dev|pend). */
-var _E_MOVIL_={pendiente:'pend',aprobada:'otor',aplicada:'otor',otorgada:'otor',rechazada:'dev',detalle:'dev',sin_declarar:'sindecl',caducada:'cad'};
+/* `rechazada` y `detalle` colapsaban las dos en 'dev', asi que el miembro NO distinguia
+   «te piden mas detalle» (puedes arreglarlo) de «te lo han rechazado» (se acabo). El
+   escritorio si las distingue; ahora las dos caras cuentan lo mismo. */
+var _E_MOVIL_={pendiente:'pend',aprobada:'otor',aplicada:'otor',otorgada:'otor',rechazada:'rech',detalle:'det',sin_declarar:'sindecl',caducada:'cad'};
 function normPMovil(p){
   return { id:p.id, f:_isoADMY_(p.fecha), t:p.tarea||'', q:Number(p.horas)||0,
     e:_E_MOVIL_[p.estado]||'pend', ini:p.ini||'', fin:p.fin||'', cat:p.categoria||null,
@@ -1785,15 +1810,18 @@ function desgloseCat(ps){
   return '<div style="display:flex;flex-wrap:wrap;margin:2px 0 4px">'+chips+'</div>';
 }
 function filaParte(p){
-  var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='dev'||p.e==='cad')?'borde-no':'borde-pe';
+  var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='rech'||p.e==='cad')?'borde-no':'borde-pe';
   var pil = p.e==='conf'?'<span class="pil conf">aprobada</span>'
           : p.e==='otor'?'<span class="pil otor">otorgada</span>'
-          : p.e==='dev' ?'<span class="pil no">devuelta</span>'
+          : p.e==='rech'?'<span class="pil no">rechazada</span>'
+          : p.e==='det' ?'<span class="pil pend">falta detalle</span>'
           : p.e==='cad' ?'<span class="pil no">caducada</span>'
           : p.e==='sindecl'?'<span class="pil pend">sin declarar</span>'
           : '<span class="pil pend">en cola</span>';
   var sub = p.e==='otor' ? (p.nota?esc(p.nota):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
           : p.e==='pend' ? 'esperando aprobación'
+          : p.e==='det'  ? 'te piden más detalle · edítala y vuelve a enviarla'
+          : p.e==='rech' ? 'rechazada'+(p.nota?' · '+esc(p.nota):'')
           : p.e==='sindecl' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · caduca '+_isoADMY_((''+p.caduca).slice(0,10)):''))
           : (p.f+(p.ini?' · '+p.ini+'–'+p.fin:''));
   var catTxt = (p.e==='conf'||p.e==='otor') ? ' · sumó a '+catEti(p.cat)
@@ -1807,7 +1835,7 @@ function vHoras(){
   var o=sumaE('otor'), p=sumaE('pend');
   var notion=(typeof YO.horasMes==='number');   // la nube trae las horas REALES del mes desde el Panel de Rendimientos
   var cuentan=notion?YO.horasMes:o;              // base = total real del mes (Notion); si no, lo que ya cuenta
-  var mias=PARTES.filter(function(x){return x.e==='pend'||x.e==='dev'||x.e==='sindecl'||x.e==='cad';});   // en cola / devueltos / sin declarar / caducados
+  var mias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad';});   // en cola / con detalle pedido / rechazados / sin declarar / caducados
   var confs=PARTES.filter(function(x){return x.e==='otor';});               // lo que ya cuenta
 
   /* ranking CENSURADO: tu puesto y tus vecinos, sin nombres ajenos */
@@ -2029,8 +2057,7 @@ function revisoresDe(e){
   if(!r.length) r=[PD_NOM];
   return r;
 }
-function pilaDe(n){ for(var i=0;i<DATA.miembros.length;i++) if(DATA.miembros[i].nombre===n) return DATA.miembros[i].pila;
-  return String(n).split(' ')[0]; }
+function pilaDe(n){ return _pilaDeM_(n); }        // alias historico: la logica vive en _pilaDeM_
 function rangoPila(pila){ for(var i=0;i<DATA.miembros.length;i++) if(DATA.miembros[i].pila===pila)
   return rangoNom(DATA.miembros[i].nombre); return 0; }
 function puedeDecidirDoc(e){
@@ -2162,7 +2189,7 @@ function vReu(){
      :30; una columna por franja hacia que cada dia llenara una de cada dos casillas y el
      mapa pareciera un tablero. Ahora la columna es un instante y cada franja ocupa lo que
      dura, asi que la fila de cada dia sale de una pieza. */
-  var _mm=function(f){ var p=String(f.ini).split(':'); return (+p[0])*60+(+p[1]||0); };
+  var _mm=_minHM_;                          // antes: parser propio, identico a este
   var _du=function(f){ return +f.dur||60; };
   var _mcd=function(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; };
   var paso=0; R.franjas.forEach(function(f){ paso=_mcd(paso,_mm(f)); paso=_mcd(paso,_du(f)); });
@@ -2170,7 +2197,7 @@ function vReu(){
   var t0=Math.min.apply(null, R.franjas.map(_mm));
   var t1=Math.max.apply(null, R.franjas.map(function(f){ return _mm(f)+_du(f); }));
   var eje=[]; for(var _t=t0; _t<t1; _t+=paso) eje.push(_t);
-  var _hhmm=function(m){ return pad(Math.floor(m/60)%24)+':'+pad(m%60); };
+  var _hhmm=_hmMin_;                        // antes: formateador propio, identico a este
   /* para cada dia y cada instante, que franja OFERTADA lo cubre (-1 = ninguna) */
   var cubre=R.dias.map(function(_,di){
     return eje.map(function(t){
@@ -2418,7 +2445,7 @@ function vEquipo(){
    activar/desactivar), cadencia, límite, orden del día, visión y vista previa. Al crear
    PERSISTE en el backend (api.crearReunion); sin backend queda en memoria. ────────── */
 function _sinTildesM_(t){ return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
-function _dmyM_(iso){ var m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):iso; }
+/* `_dmyM_` se borro: era byte a byte `_isoADMY_` y ademas no la llamaba nadie. */
 /* Las etiquetas de dia van en DD/MM, igual que la Reunion General: 'V 24' se lee
    peor y ademas pierde el mes, que importa cuando el rango cruza de mes. */
 function _ddmmM_(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1); }
@@ -2514,7 +2541,7 @@ function crearModal(){
 
   var val=function(id){ var e=$('#'+id); return e?e.value:''; };
   var per=function(){ var e=$('#cePerdia'); return !!(e&&e.checked); };
-  var hNum=function(v){ v=String(v||'0:00'); return parseInt(v,10)+(+v.slice(3)||0)/60; };
+  var hNum=_horasHM_;                       // antes: parser propio; ademas fallaba con 'H:MM'
   var dias=function(){ return val('ceModo')==='rango' ? _diasEntreM_(val('ceD0'),val('ceD1'))
     : _diasDesdeM_(val('ceFecha')||_dmyAISO_(HOY), Math.max(1,+val('ceND')||1)); };
   var rangos=function(){ var ds=dias();
