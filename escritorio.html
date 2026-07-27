@@ -596,6 +596,12 @@ DATA.subsistemas=[{u:'Aviónica',n:4},{u:'GNC',n:3},{u:'Aeroestructuras',n:5},
    casan con el roster (un turno del Discord firmado con otro apellido, un parte de
    alguien que ya se fue). _m() SIEMPRE devuelve algo pintable y marca al desconocido. */
 function miembro(n){for(var i=0;i<DATA.miembros.length;i++) if(DATA.miembros[i].nombre===n) return DATA.miembros[i]; return null;}
+/* GEMELA (escritorio: misma funcion, mismo nombre). Quien SIGUE en el equipo.
+   El roster conserva a las bajas por su historia -sus partes, sus sanciones, sus horas
+   pasadas siguen siendo verdad-, pero no se les vuelve a elegir para nada: ni convocar, ni
+   invitar, ni sancionar, ni otorgar horas, ni «ver como». Antes cada sitio se lo filtraba
+   por su cuenta y donde nadie lo escribio salia la lista entera. */
+function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
 function _m(n){
   var x=miembro(n); if(x) return x;
   var nom=String(n||'').trim();
@@ -1059,7 +1065,7 @@ function convocarPanel(){
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   /* las bajas no se convocan: siguen en el roster por su historia, no para turnos nuevos */
-  var pool=DATA.miembros.filter(function(m){ return !m.baja; })
+  var pool=_activos_()
     .slice().sort(function(a,b){ return String(a.pila).localeCompare(String(b.pila)); });
   var chips=pool.map(function(m){
     return '<button type="button" class="pick'+(TUR_SEL[m.nombre]?' on':'')+'" data-tu="'+esc(m.nombre)+'">'+
@@ -1107,7 +1113,7 @@ function convocarPanel(){
 function bloquePanel(){
   if(rangoNom(ACTOR)<1) return '';
   var actor=_m(ACTOR), esPD=rangoNom(ACTOR)>=2, unidad=(actor&&actor.unidad)||'';
-  var reg=DATA.miembros.filter(function(m){ return !m.cargo && !m.baja; }); // miembros de subsistema, sin bajas
+  var reg=_activos_().filter(function(m){ return !m.cargo; }); // miembros de subsistema, sin bajas
   var pool=esPD?reg:reg.filter(function(m){ return m.unidad===unidad; });
   if(!pool.length) return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
@@ -1159,7 +1165,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
       '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
         '<label style="flex:1;min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">A quién</span>'+
         '<select style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
-        DATA.miembros.map(function(m){return '<option>'+esc(m.nombre)+'</option>';}).join('')+'</select></label>'+
+        _activos_().map(function(m){return '<option>'+esc(m.nombre)+'</option>';}).join('')+'</select></label>'+
         '<label style="width:110px"><span class="sc" style="display:block;margin-bottom:5px">Horas</span>'+
         '<input class="mono" value="3,0" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-family:var(--mono);font-size:12.5px"></label>'+
         '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Concepto</span>'+
