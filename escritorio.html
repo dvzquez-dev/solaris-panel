@@ -1384,19 +1384,33 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
 /* Las franjas pueden venir SIN ORDENAR (la General llego de Xoyondo como 18..22,10..17)
    y el mapa saltaba de 23:00 a 10:00. Se ordenan y se remapea el indice de franja de cada
    bloque; el ORDEN DE LOS BLOQUES no se toca, porque `resp[n]` esta alineado a esa posicion. */
-function _ordenarFranjasE_(r){
-  var F=r.franjas||[], bl=r.bloques||[];
-  var min=function(f){ var t=(f&&typeof f==='object')?String(f.ini||''):String(f||'');
-    var p=t.split(':'); return (+p[0]||0)*60+(+p[1]||0); };
+/* ═══ GEMELAS de movil.html: misma familia de horas, mismos nombres. ═══
+   Aguantan 'HH:MM' y {ini:'HH:MM'}: antes cada sitio tenia su propio parser. */
+function _minHM_(v){
+  var t=(v && typeof v==='object') ? v.ini : v;
+  var p=String(t==null?'':t).split(':');
+  return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
+}
+function _hmMin_(m){ m=(+m||0); var p=function(x){ return (x<10?'0':'')+x; };
+  return p(Math.floor(m/60)%24)+':'+p(m%60); }
+function _horasHM_(v){ return _minHM_(v)/60; }
+/* ═══ GEMELA · existe una copia IDENTICA en movil.html. Si tocas una, toca la otra. ═══
+   Ordena las franjas por hora y REMAPEA el indice de franja de cada bloque. El ORDEN DE
+   LOS BLOQUES no se toca: `resp[nombre]` esta alineado a esa posicion y reordenarlo pegaria
+   cada disponibilidad a la franja equivocada. */
+function _ordenarFranjas_(r){
+  var F=(r&&r.franjas)||[], bl=(r&&r.bloques)||[], fij=(r&&r.fijadaBl)||[];
   var idx=F.map(function(_,i){ return i; });
-  if(idx.every(function(i){ return i===0 || min(F[i-1])<=min(F[i]); })) return r;
-  idx.sort(function(a,b){ return min(F[a])-min(F[b]); });
+  if(idx.every(function(i){ return i===0 || _minHM_(F[i-1])<=_minHM_(F[i]); }))
+    return {franjas:F, bloques:bl, fijadaBl:fij, cambio:false};
+  idx.sort(function(a,b){ return _minHM_(F[a])-_minHM_(F[b]); });
   var pos=[]; idx.forEach(function(vi,k){ pos[vi]=k; });
-  return Object.assign({}, r, {
-    franjas: idx.map(function(i){ return F[i]; }),
-    bloques: bl.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
-    calor: null                                   // se recalcula con el orden nuevo
-  });
+  return {
+    franjas:  idx.map(function(i){ return F[i]; }),
+    bloques:  bl.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
+    fijadaBl: fij.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
+    cambio:   true
+  };
 }
 function _calorDe_(r, pond){
   if(!pond && Array.isArray(r.calor) && r.calor.length) return r.calor;      // semilla
@@ -1463,7 +1477,8 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
     var cob=_cobertura_(r0);
     var hib=(r0.modalidad==='hibrida');
     var pondOn=hib && DISPO_POND;
-    r0=_ordenarFranjasE_(r0);
+    var _o=_ordenarFranjas_(r0);
+    if(_o.cambio) r0=Object.assign({}, r0, {franjas:_o.franjas, bloques:_o.bloques, calor:null});
     var r=Object.assign({}, r0, {calor:_calorDe_(r0, pondOn), _hib:hib, _pond:pondOn, conv:(r0.conv!=null?r0.conv:cob.conv),
       cubren:(r0.cubren!=null?r0.cubren:cob.cubren), minimo:cob.minimo,
       sinCubrir:(r0.sinCubrir||cob.sinCubrir), bajoMin:(r0.bajoMin||cob.bajoMin),
