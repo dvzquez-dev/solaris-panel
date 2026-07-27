@@ -3061,16 +3061,40 @@ document.addEventListener('click',function(ev){
     tost('Cambios y rechazo exigen motivo.');
     return;
   }
-  if(acc==='reenviar'){ e.estado='revision'; e.nota=null; tost('Reenviado a revisión.'); }
-  else if(acc==='aprobado'||acc==='anot'){
-    if(acc==='anot'){ var nt=(($('#dTit')&&$('#dTit').value)||'').trim(); if(nt) e.titulo=nt; }
-    e.estado='publicado';
-    tost(acc==='anot'?'Aprobado con anotaciones · título ajustado.':'Aprobado · publicado en Notion y en el Libro de Datos.');
+  /* Aplica la decision al objeto local. Se usa DESPUES de que el servidor la acepte, o
+     directamente cuando no hay backend (maqueta). */
+  var _aplicar=function(){
+    if(acc==='reenviar'){ e.estado='revision'; e.nota=null; }
+    else if(acc==='aprobado'||acc==='anot'){
+      if(acc==='anot'){ var nt=(($('#dTit')&&$('#dTit').value)||'').trim(); if(nt) e.titulo=nt; }
+      e.estado='publicado';
+    }
+    else if(acc==='cambios'){ e.estado='cambios'; e.nota=mot; }
+    else { e.estado='rechazado'; e.nota=mot; }
+    if(acc!=='reenviar') e.revisor=_pilaDeM_(yoNombre());   /* constancia de quien decidio */
+  };
+  var _aviso={reenviar:'Reenviado a revisión.',
+    aprobado:'Aprobado · publicado en Notion y en el Libro de Datos.',
+    anot:'Aprobado con anotaciones · título ajustado.',
+    cambios:'Cambios pedidos: le llega al autor.',
+    rechazado:'Rechazado.'}[acc]||'Hecho.';
+
+  /* PERSISTE. Antes esto solo mutaba memoria: el revisor creia que habia firmado y no
+     habia firmado nada. Si el servidor dice que no, no se toca el estado ni se miente. */
+  if(typeof backendOK!=='undefined' && backendOK && SESION){
+    if(b.disabled) return;
+    b.disabled=true;
+    var extra=null;
+    if(acc==='anot'){ var t2=(($('#dTit')&&$('#dTit').value)||'').trim(); if(t2) extra={titulo:t2}; }
+    api.decidir(id, acc, mot||null, extra).then(function(){
+      _aplicar(); cerrarModal(); tost(_aviso); pintar();
+    }).catch(function(err){
+      b.disabled=false;
+      tost('No se pudo registrar la decisión: '+((err&&err.message)||err));
+    });
+    return;
   }
-  else if(acc==='cambios'){ e.estado='cambios'; e.nota=mot; tost('Cambios pedidos: le llega al autor.'); }
-  else { e.estado='rechazado'; e.nota=mot; tost('Rechazado.'); }
-  if(acc!=='reenviar') e.revisor=pilaDe(yoNombre());      /* deja constancia de quien decidio */
-  cerrarModal(); pintar();
+  _aplicar(); cerrarModal(); tost(_aviso+' (sin conexión: solo en este teléfono)'); pintar();
 });
 
 /* reloj de la barra de estado + cronómetro de la sesión */
