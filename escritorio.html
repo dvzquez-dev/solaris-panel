@@ -1798,6 +1798,13 @@ function _insigniaHTML_(){
    han cubierto" y metia a TODOS los convocados en la lista de riesgo con su sancion
    propuesta al lado: se proponia castigar a quien si habia cubierto. Es el mismo hidratado
    que ya hacia el movil en `_hidratarReuM_`. */
+/* Igual que en el movil: el bootstrap sirve cache para entrar rapido y lo fresco se pide
+   despues sin bloquear. */
+async function _refrescarEnSegundoPlano_(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
+  try{ var t=await api.getTurnos(); if(Array.isArray(t)&&t.length){ TURNOS.length=0; t.forEach(function(x){TURNOS.push(x);}); pintar(); } }catch(_){}
+  try{ var q=await api.getTareas(); if(Array.isArray(q)&&q.length){ TAREAS.length=0; q.forEach(function(x){TAREAS.push(x);}); pintar(); } }catch(_){}
+}
 async function _hidratarReus_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
   for(var i=0;i<REUS.length;i++){
@@ -1841,6 +1848,7 @@ function _aplicarBootstrap_(boot){
   if(Array.isArray(boot.reuniones)){
     REUS.length=0; boot.reuniones.map(normReu).forEach(function(r){REUS.push(r);});
     _hidratarReus_();          // el bootstrap NO trae `resp`: sin esto el mapa sale a cero
+    setTimeout(_refrescarEnSegundoPlano_, 300);   // datos frescos sin bloquear la entrada
   }
   backendOK=true;
 }
