@@ -1386,6 +1386,17 @@ function _normReuM_(r){
        una casilla y todo se comporta como se comportaba. */
     slot: +r.slot || (F[0] && +F[0].dur) || 60, duracion: +r.duracion || 0,
     calor:calor, pond:pond, nInv:(r.invitados||[]).length,
+    /* ¿ES TUYA? Antes solo se guardaba CUANTOS invitados hay, y sin los nombres nadie podia
+       preguntarse «¿estoy yo?»: se le reclamaba cubrir a todo el equipo una reunion de un
+       invitado. Y de no cubrir salen sanciones, asi que no es un aviso cosmetico.
+       Sin lista de invitados (reuniones de antes de este modelo) se mantiene el
+       comportamiento de siempre —todos—: hacerlas desaparecer de golpe seria peor. */
+    invitado: (function(){
+      var inv=Array.isArray(r.invitados)?r.invitados:null;
+      if(!inv || !inv.length) return true;                       // sin lista: como antes
+      if(!YO || !YO.nombre) return true;
+      return inv.indexOf(YO.nombre)>=0 || YO.nombre===r.convocante;   // convocas = es tuya
+    })(),
     cubierta: !!(YO && resp[YO.nombre] && resp[YO.nombre].some(function(x){ return +x>0; })),
     exento: !!(YO && r.convocante && YO.nombre===r.convocante),   // quien convoca ORGANIZA: no cubre su propia encuesta
     _real:true };
@@ -1425,7 +1436,11 @@ async function _cargarReunionesM_(yaPedidas){
          vivo cada 90 s: sin esto, estarias viendo una reunion y de pronto te saltaria a otra
          sola. Solo se elige la «proxima» cuando no habia ninguna abierta o ya no existe. */
       var _antes=(REUNION && REUNION.id)||null;
-      REUNIONES_M=arr.map(_normReuM_);
+      /* Se filtra AQUI y no en cada pantalla: la lista, el globo del nav, «lo que caduca
+         antes» y «tu proxima reunion» leen todos de `REUNIONES_M`, asi que repetir la
+         condicion en cuatro sitios es garantizar que un dia se desincronicen.
+         En el ESCRITORIO no se filtra: alli se ven todas a proposito. */
+      REUNIONES_M=arr.map(_normReuM_).filter(function(r){ return r.invitado; });
       var mia=null;
       if(_antes!=null) mia=REUNIONES_M.filter(function(x){ return x.id===_antes; })[0]||null;
       /* Antes: la primera SIN FIJAR en orden de creacion. Ni miraba fechas, ni tenia
