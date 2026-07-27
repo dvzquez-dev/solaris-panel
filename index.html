@@ -1138,7 +1138,12 @@ function _normReuM_(r){
      bloques realmente ofertados pasan a 0. Así un hueco muerto no se pinta como «nadie puede».
      `pond` es la vista PONDERADA: suma los valores (presencial+telemático=2, telemático=1);
      `calor` cuenta PERSONAS (cualquier valor > 0). */
-  var _fijPrev=(r.fijada && typeof r.fijada==='object') ? (r.fijada.bloques||[]) : [];
+  /* Los bloques de la franja fijada pueden venir de DOS sitios: dentro de `fijada` cuando
+     el backend manda el objeto {label,bloques,franjas}, o sueltos en `fijadaBl` cuando lo
+     que se re-normaliza es una reunion que YA paso por aqui (al salir, `fijada` se aplana
+     a la etiqueta). Mirar solo el objeto hacia que hidratar borrase el verde del mapa. */
+  var _fijPrev=(r.fijada && typeof r.fijada==='object') ? (r.fijada.bloques||[])
+             : (Array.isArray(r.fijadaBl) ? r.fijadaBl : []);
   var _ord=_ordenarFranjas_({franjas:F, bloques:bl, fijadaBl:_fijPrev});
   F=_ord.franjas; bl=_ord.bloques; _fijPrev=_ord.fijadaBl;
   var calor=dias.map(function(){ return F.map(function(){ return null; }); });
@@ -1174,9 +1179,13 @@ async function _hidratarReuM_(r){
   try{ var d=await api.getReunion(r.id);
     var resp=(d && (d.respuestas || (d.reunion && d.reunion.resp))) || null;
     if(resp){ var base=(d && d.reunion) || {};
+      /* `base.fijada` es el objeto del backend cuando lo hay; `r.fijada` ya es la etiqueta
+         aplanada, asi que hay que arrastrar `fijadaBl` aparte o se pierde el verde. */
+      var _fj=(base.fijada!==undefined && base.fijada!=='') ? base.fijada : r.fijada;
       var nuevo=_normReuM_({ id:r.id, titulo:r.titulo, tipo:r.tipo, modalidad:r.modalidad,
-        limite:r.limite, fijada:base.fijada!==undefined?base.fijada:r.fijada, convocante:r.convocante,
-        dias:r.dias, franjas:r.franjas, bloques:r.bloques, invitados:new Array(r.nInv), resp:resp });
+        limite:r.limite, fijada:_fj, fijadaBl:r.fijadaBl, convocante:r.convocante,
+        dias:r.dias, franjas:r.franjas, bloques:r.bloques, invitados:new Array(r.nInv),
+        slot:r.slot, duracion:r.duracion, resp:resp });
       nuevo._hidratada=true;
       var i=REUNIONES_M.indexOf(r); if(i>=0) REUNIONES_M[i]=nuevo;
       if(REUNION===r) REUNION=nuevo;
@@ -1188,11 +1197,25 @@ async function _cargarReunionesM_(){
   try{ var arr=await api.listarReuniones();
     CARGA.reuniones=true;
     if(Array.isArray(arr) && arr.length){
+      /* SE CONSERVA LA QUE ESTABAS MIRANDO. Esta funcion tambien la llama el refresco en
+         vivo cada 90 s: sin esto, estarias viendo una reunion y de pronto te saltaria a otra
+         sola. Solo se elige la «proxima» cuando no habia ninguna abierta o ya no existe. */
+      var _antes=(REUNION && REUNION.id)||null;
       REUNIONES_M=arr.map(_normReuM_);
+      var mia=null;
+      if(_antes!=null) mia=REUNIONES_M.filter(function(x){ return x.id===_antes; })[0]||null;
       /* Antes: la primera SIN FIJAR en orden de creacion. Ni miraba fechas, ni tenia
          sentido descartar las fijadas -son las que mas seguro ocurren-. */
-      var mia=_proximaReuM_()||REUNIONES_M[0];
+      if(!mia) mia=_proximaReuM_()||REUNIONES_M[0];
       if(mia){ REUNION=mia; await _hidratarReuM_(mia); }
+      /* Y LAS DEMAS TAMBIEN, en paralelo y sin bloquear: antes solo se hidrataba la
+         «proxima» y el resto al abrirlas, de ahi el «aun me la tiene que cargar». Suelen
+         ser una o dos. Si alguna falla, las demas siguen. */
+      var _resto=REUNIONES_M.filter(function(x){ return x!==mia && !x._hidratada; });
+      if(_resto.length){
+        Promise.all(_resto.map(function(x){ return _hidratarReuM_(x).catch(function(){}); }))
+          .then(function(){ if(typeof _repintarSuave_==='function') _repintarSuave_(); });
+      }
     }
   }catch(e){}
 }
