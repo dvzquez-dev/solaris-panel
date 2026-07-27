@@ -1899,6 +1899,24 @@ V.reclutar={g:'Equipo',t:'Reclutamiento',f:function(){
 }};
 
 
+/* AJUSTES ERA UN `tost`. Pulsar Ajustes soltaba un mensajito flotante con la sesion y
+   se acababa ahi: ni pantalla, ni notificaciones, ni de donde salen los datos. */
+V.ajustes={g:'Ajustes',t:'Ajustes',f:function(){
+  var quien=(SESION&&SESION.email)||ACTOR||'—';
+  var gen=DATA.generado? _isoADMY_(DATA.generado) : '—';
+  return pan('Notificaciones', (typeof Notification==='undefined')?'no disponibles':Notification.permission,
+      _notisHTML_())+
+    pan('Sesión','', tabla([['Dato'],['Valor']],
+      '<tr><td>Cuenta</td><td class="mono">'+esc(quien)+'</td></tr>'+
+      '<tr><td>Actúas como</td><td>'+esc(ACTOR)+' · '+esc(_rolDe_(ACTOR))+'</td></tr>'+
+      '<tr><td>Temporada</td><td>'+esc((DATA&&DATA.temporada)||'—')+'</td></tr>'+
+      '<tr><td>Datos del panel</td><td>'+esc(gen)+'</td></tr>'+
+      '<tr><td>Backend</td><td>'+((typeof backendOK!=='undefined'&&backendOK)?'conectado':'sin conexión · lo que ves es la semilla')+'</td></tr>')+
+    '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn no" data-salir>Cerrar sesión</button></div>')+
+    '<div class="pan"><div class="nota">Los avisos van al <b>navegador</b>, no al correo. Si cierras '+
+    'sesión o cambias de equipo hay que volver a activarlos aquí.</div></div>';
+}};
+
 /* ═══════════════════════════════════════════════════════════════════════════
    LOGIN · mismo gate que app.html: Google Sign-In restringido a
    @uvigoaerotech.com, sesión guardada en localStorage para volver a entrar sin
@@ -2102,14 +2120,78 @@ function _cablearSalir_(){
       x.onclick=function(){
         m.hidden=true;
         if(x.dataset.mnu==='salir'){ cerrarSesion(); return; }
-        if(x.dataset.mnu==='ajustes'){
-          tost('Sesión de '+((SESION&&SESION.email)||ACTOR||'—')+
-               ' · temporada '+((DATA&&DATA.temporada)||'—'));
-        }
+        if(x.dataset.mnu==='ajustes'){ ir('ajustes'); }
       };
     });
   }
 }
+/* ═══ NOTIFICACIONES PUSH ═══════════════════════════════════════════════════
+   GEMELAS de movil.html: mismos nombres y mismo comportamiento. La CSP impide compartir
+   codigo entre las dos caras, asi que la unica forma honesta es que la copia sea
+   IDENTICA y se llame igual. Si tocas una, toca la otra.
+   El escritorio no tenia NADA de esto: quien coordina desde el ordenador no podia
+   activar las notificaciones, aunque la cadena de envio lleva desplegada desde v22.
+   La VAPID publica NO es un secreto: va en el cliente por diseno. ═══════════════ */
+var VAPID_PUBLIC='BOcYdKPWxq5NAKS6AbZIW9UV7MOb7gmy1nP_KhdxZpvPa3O5jsZ-_jravOhHivQqQuJoJvLTcrc2xvZESc2g0Ag';
+function _urlB64_(b64){
+  var pad='='.repeat((4-b64.length%4)%4);
+  var t=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');
+  var raw=atob(t), arr=new Uint8Array(raw.length);
+  for(var i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+function _pushSoportado_(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+var _swReg=null;
+async function _registrarSW_(){
+  if(!('serviceWorker' in navigator)) return null;
+  try{ _swReg=await navigator.serviceWorker.register('sw.js'); return _swReg; }catch(e){ return null; }
+}
+function _notisMsg(t){ var b=document.getElementById('notisMsg'); if(b) b.textContent=t; }
+async function activarNotis(btn){
+  if(!_pushSoportado_()){ _notisMsg('Este navegador no admite notificaciones.'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='Activando…'; }
+  try{
+    var perm=await Notification.requestPermission();
+    if(perm!=='granted'){ _notisMsg('Permiso denegado. Puedes darlo en los ajustes del navegador.'); return; }
+    var reg=_swReg || await _registrarSW_();
+    if(!reg){ _notisMsg('No se pudo preparar el service worker.'); return; }
+    await navigator.serviceWorker.ready;
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
+    if(typeof SESION!=='undefined' && SESION) await api.guardarPush(sub.toJSON());
+    else { _notisMsg('Permiso dado, pero sin sesión no se puede registrar el aviso en el servidor.'); return; }
+    _notisMsg('Notificaciones activadas.');
+  }catch(e){ _notisMsg('No se pudo activar: '+((e&&e.message)||e)); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Activar notificaciones'; } pintar(); }
+}
+/* Al abrir: registra el SW y, si ya habia permiso y sesion, re-guarda la suscripcion por
+   si el navegador la roto -pasa, y si no se re-guarda dejan de llegar avisos EN SILENCIO. */
+async function _pushInit_(){
+  if(!_pushSoportado_()) return;
+  var reg=await _registrarSW_();
+  try{
+    if(reg && Notification.permission==='granted'){
+      await navigator.serviceWorker.ready;
+      var sub=await reg.pushManager.getSubscription();
+      if(sub && typeof SESION!=='undefined' && SESION) api.guardarPush(sub.toJSON());
+    }
+  }catch(_){}
+}
+function _notisHTML_(){
+  if(!_pushSoportado_())
+    return '<div class="nota" style="border-top:0">Este navegador no admite notificaciones.</div>';
+  if(Notification.permission==='denied')
+    return '<div class="nota" style="border-top:0">Las tienes <b>bloqueadas</b> en este navegador. '+
+      'Hay que desbloquearlas en el candado de la barra de direcciones; desde aquí no se puede.</div>';
+  if(Notification.permission==='granted')
+    return '<div class="pb"><span class="chip ok">activadas</span>'+
+      '<span class="sc" id="notisMsg" style="margin-left:10px"></span></div>';
+  return '<div class="nota" style="border-top:0">Avisos de turnos, reuniones, partes de horas '+
+    'y decisiones sobre documentos.</div>'+
+    '<div class="pb"><button class="btn pri" id="btnNotis">Activar notificaciones</button>'+
+    '<span class="sc" id="notisMsg" style="margin-left:10px"></span></div>';
+}
+
 function cerrarSesion(){
   SESION=null;
   try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
@@ -2266,6 +2348,8 @@ function pintar(){
 
   var m=$('#main');
   m.innerHTML=V[vista].f();
+  var _bn=m.querySelector('#btnNotis'); if(_bn) _bn.onclick=function(){ activarNotis(_bn); };
+  var _bs=m.querySelector('[data-salir]'); if(_bs) _bs.onclick=function(){ cerrarSesion(); };
   $('#migaA').textContent=V[vista].g;
   $('#migaB').textContent=V[vista].t;
   pintarNav();
@@ -2640,6 +2724,11 @@ if(GOOGLE_CLIENT_ID && !window.__SIN_LOGIN__){
   if(_tok) _onCredencial_({credential:_tok}, true);
   else _arrancarGis_();
 }
+/* GEMELA de movil.html: se registra el service worker al arrancar y, si YA habia permiso,
+   se re-guarda la suscripcion -los navegadores la rotan y, si no se vuelve a guardar, los
+   avisos dejan de llegar sin que nadie se entere-. No pide permiso por su cuenta: eso solo
+   pasa si pulsas el boton de Ajustes. */
+setTimeout(function(){ try{ _pushInit_(); }catch(_){} }, 800);
 </script>
 </body>
 </html>
