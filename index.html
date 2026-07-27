@@ -772,6 +772,37 @@ function _pendientesCubrirM_(){
     return r && !r.cubierta && !r.exento && !r.fijada;   // fijada = el plazo ya se cerro
   }).sort(function(a,b){ return _limMsM_(a)-_limMsM_(b); });
 }
+/* ── UN SOLO FORMATO DE DIA EN TODA LA APP ────────────────────────────────────
+   `dias` llega COMO VENGA de quien creo la reunion: '27/07' si se creo aqui, 'L 27' en la
+   semilla, y lo que trajera el import de Xoyondo. Y se pintaba TAL CUAL, asi que la reunion
+   general y la de trabajo salian con formatos distintos EN LA MISMA LISTA. Peor: al fijar,
+   la etiqueta se construia como `dias[di] + ' · ' + hora`, o sea que heredaba el formato.
+   (Daniel lo reporto dos veces: «en que momento, porque sigue asi».)
+   Se unifica AL PINTAR, no en el dato: `dias` esta alineado por indice con `bloques` y no se
+   toca nada de lo guardado. Y lo que no se puede deducir NO SE INVENTA: si el dia no trae
+   mes, se deja como esta en vez de fabricarle uno. */
+var _DIAS3_=['dom','lun','mar','mié','jue','vie','sáb'];
+function _diaTxtM_(d){
+  var t=String(d==null?'':d).trim();
+  var m=/(\d{1,2})\s*\/\s*(\d{1,2})/.exec(t);
+  if(!m) return t;                                   // sin mes: no se le inventa uno
+  var ms=_msDeDDMM_(m[1]+'/'+m[2], _hoyDateM_());
+  return (ms!=null ? _DIAS3_[new Date(ms).getDay()]+' ' : '')+pad(+m[1])+'/'+pad(+m[2]);
+}
+/* La etiqueta de una reunion ya fijada se guardo con el formato de entonces. Se reescribe
+   solo su parte de DIA y se deja la hora intacta. */
+function _fijadaTxtM_(f){
+  var t=String(f||''); if(!t) return t;
+  var i=t.indexOf(' · ');
+  return i<0 ? _diaTxtM_(t) : (_diaTxtM_(t.slice(0,i))+t.slice(i));
+}
+/* Borrar una reunion la puede borrar QUIEN LA CONVOCO (o el admin), no cualquier
+   coordinador: es lo que exige el backend, y el boton tiene que decir la verdad. */
+function _puedeBorrarReuM_(r){
+  if(!r) return false;
+  if(typeof esAdmin==='function' && esAdmin()) return true;
+  return !!(YO && r.convocante && YO.nombre===r.convocante);
+}
 function _proximaReuM_(){
   var L=REUNIONES_M||[]; if(!L.length) return null;
   var hoy=_hoyDateM_().getTime();
@@ -869,6 +900,12 @@ var api={
   reportarBug:      function(d){ return api._post({action:"reportarBug",datos:d}); },
   reportarMejora:   function(d){ return api._post({action:"reportarMejora",datos:d}); },
   listarReuniones:  function(){ return api._post({action:"listarReuniones"}); },
+  /* El backend gatea: solo el convocante o el admin. Aqui se replica el gate para no
+     ofrecer un boton que va a fallar, pero la frontera de verdad esta alli. */
+  borrarReunion:    function(id){ return api._post({action:"borrarReunion",id:id}); },
+  /* `fijada` viaja como OBJETO {label,bloques,franjas}: con solo la etiqueta, el mapa no
+     sabe que casillas pintar en verde. Es el formato que el backend ya guarda. */
+  fijar:            function(id,f){ return api._post({action:"fijarReunion",id:id,fijada:f}); },
   getReunion:       function(id){ return api._post({action:"getReunion",id:id}); },
   /* Estaban en app.html y se perdieron al partir el artefacto: sin ellas, cubrir y
      decidir se quedaban en la memoria del movil y no llegaban nunca al servidor. */
@@ -991,6 +1028,42 @@ function _normTurnoM_(t, ix){
 /* El bootstrap sirve lo CACHEADO para que entrar sea instantaneo. Los datos frescos se
    piden justo despues, sin bloquear, y se repinta cuando llegan. Si fallan, se queda lo
    que ya habia: nunca una pantalla vacia por un refresco lento. */
+/* ── QUE SE ALIMENTE DE LA NUBE, NO SOLO AL ENTRAR ────────────────────────────
+   Hasta ahora los datos se pedian UNA vez al arrancar y ahi se quedaban: si alguien
+   convocaba una reunion o cerraba un turno, no te enterabas hasta recargar la app.
+   Se refresca al VOLVER a la app (que es cuando la gente espera ver lo nuevo) y cada
+   90 s con la app delante. 90 y no 9 como hacia `app.html`: cada llamada a Apps Script
+   cuesta ~1,7 s y son tres; a 9 s estaria pidiendo datos casi todo el rato. */
+var _ULT_REFRESCO_=0, _REFRESCANDO_=false;
+function _modalAbierto_(){
+  var m=document.getElementById('modal');
+  return !!(m && m.classList.contains('on'));
+}
+async function _refrescoVivo_(motivo){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
+  if(_REFRESCANDO_ || document.hidden) return;
+  /* Con un modal abierto NO se toca la pantalla: alguien puede estar cubriendo su
+     disponibilidad o escribiendo un reporte, y repintar le mueve el suelo. */
+  if(_modalAbierto_()) return;
+  var ahora=Date.now();
+  if(motivo==='vuelta' && (ahora-_ULT_REFRESCO_) < 30000) return;
+  _REFRESCANDO_=true; _ULT_REFRESCO_=ahora;
+  try{
+    var t=api.getTurnos().then(function(x){ if(Array.isArray(x)&&x.length){ TURNOS.length=0;
+      x.forEach(function(y,i){ TURNOS.push(_normTurnoM_(y,i)); }); } }).catch(function(){});
+    var q=api.getTareas().then(function(x){ if(Array.isArray(x)&&x.length){ TAREAS.length=0;
+      x.forEach(function(y){ TAREAS.push(y); }); } }).catch(function(){});
+    var r=_cargarReunionesM_().catch(function(){});
+    await Promise.all([t,q,r]);
+    if(!_modalAbierto_()) _repintarSuave_();
+  } finally { _REFRESCANDO_=false; }
+}
+function _arrancarRefrescoVivo_(){
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden) _refrescoVivo_('vuelta');
+  });
+  setInterval(function(){ _refrescoVivo_('reloj'); }, 90000);
+}
 async function _refrescarEnSegundoPlano_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
   /* Las dos a la vez y UN solo repintado. Antes iban en serie y cada respuesta repintaba
@@ -1206,6 +1279,7 @@ async function _onCredencial_(resp,_silente){
     if(typeof MOVS!=='undefined') MOVS.length=0;
     _pintarCabecera_();                                    // la cabecera muestra al miembro (real o «visto como»)
     pintar();
+    _arrancarRefrescoVivo_();                              // a partir de aqui se alimenta sola
     /* Las que faltan van a la vez y sin bloquear, pero se repinta UNA SOLA VEZ al final.
        Con un `pintar()` por carga, la pantalla se rehacia tres veces seguidas nada mas
        entrar: como `pintar()` reconstruye `#main`, cada repintado pierde el scroll y lo que
@@ -1308,7 +1382,9 @@ var TURNOS=[
 ];
 var REUNION={titulo:'Reunión general de fin de temporada',tipo:'general',modalidad:'telematica',
   limite:'2026-07-26',fijada:null,cubierta:false,
-  dias:['L 27','M 28','X 29','J 30','V 31'],
+  /* La semilla usa el MISMO formato que produce el creador de encuestas: si no, en demo
+     se ve una divergencia que en produccion no existe (o al reves). */
+  dias:['27/07','28/07','29/07','30/07','31/07'],
   franjas:[{ini:'16:00',dur:60},{ini:'17:00',dur:60},{ini:'18:00',dur:60},{ini:'19:00',dur:60},
            {ini:'20:00',dur:60},{ini:'21:00',dur:60},{ini:'22:00',dur:60}],
   calor:[[3,5,8,11,14,15,12],[2,4,7,9,12,13,11],[4,6,9,13,17,19,16],[3,4,6,8,11,12,9],[5,8,12,15,18,21,17]],
@@ -1650,6 +1726,12 @@ function bloqueDeltas(){
 function vacio(tit,txt,pie,buscando){
   return '<div class="vacio'+(buscando?'':' quieto')+'"><div class="rad"><i></i><u></u></div>'+
     '<h4>'+esc(tit)+'</h4><p>'+txt+'</p>'+(pie?'<span class="sc">'+esc(pie)+'</span>':'')+'</div>';
+}
+/* Vacio COMPACTO: una linea. El decorado (circulo + titulo + parrafo) mide ~190 px y esta
+   para EXPLICAR por que no hay nada; repetirlo en cada seccion de la misma pantalla no
+   explica mas, solo obliga a hacer scroll para descubrir que no hay nada. */
+function vacioMini(txt){
+  return '<p class="rnota" style="margin:0;padding:9px 2px;text-align:center">'+txt+'</p>';
 }
 function cab(t,d){
   return '<div class="tt"><span class="sc">'+esc(t)+'</span><span class="ln"></span>'+
@@ -2445,28 +2527,36 @@ function vDocs(){
   var pend=ENT_REV.filter(function(e){return e.estado==='revision' && revisoresDe(e).indexOf(yoNombre())>=0;});
   var enCurso=ENT_REV.concat([]);
   var h='<div class="h1">Documentos</div><p class="h1s">Tus documentos y los que tienes que revisar.</p>';
+  /* NADA DE NADA: una sola caja explicada, en vez de tres estados vacios decorados que
+     juntos miden media pantalla. La explicacion hace falta UNA vez, no tres. */
+  if(!pend.length && !mios.length && !(esPD() && enCurso.length)){
+    return h+'<div class="tarj">'+vacio('Nada por aquí',
+      (esCoord()
+        ? 'No hay ningún documento esperando tu firma, y tú no has enviado ninguno. Cuando '+
+          'alguien de tu unidad envíe un archivo, te llegará aquí.'
+        : 'No has enviado ningún documento y no tienes ninguno que revisar: los tuyos los '+
+          'firma tu coordinador.'),
+      '',false)+'</div>';
+  }
   h+='<h2 class="sec">Pendiente de tu revisión<span class="ln"></span>'+pend.length+'</h2>';
   h+= pend.length
     ? '<div class="tarj">'+pend.map(function(e){return filaDoc(e,false);}).join('')+'</div>'
-    : '<div class="tarj">'+vacio('Nada que revisar',
-        esCoord()?'Ningún documento espera tu firma ahora mismo. Aquí te llegan los archivos de la gente de tu unidad.'
-        :'No tienes documentos que revisar: los tuyos los firma tu coordinador.',
-        '',false)+'</div>';
+    : '<div class="tarj">'+vacioMini(esCoord()?'Ningún documento espera tu firma.'
+        :'Nada que revisar: tus documentos los firma tu coordinador.')+'</div>';
   if(esPD()){
     h+='<h2 class="sec">En curso<span class="ln"></span>'+enCurso.length+'</h2>'+
        '<div class="tarj">'+
        (enCurso.length
          ? enCurso.map(function(e){return filaDoc(e,false);}).join('')+
            '<p class="rnota">Todos los expedientes abiertos ahora mismo. El detalle por subsistema está en el escritorio.</p>'
-         : vacio('Nada en curso','Ningún expediente del equipo está abierto ahora mismo.','',false))+
+         : vacioMini('Ningún expediente del equipo está abierto.'))+
        '</div>';
   }
   h+='<h2 class="sec">Mis documentos<span class="ln"></span>'+mios.length+'</h2>'+
      '<div class="tarj">'+
      (mios.length
        ? mios.map(function(e){return filaDoc(e,true);}).join('')
-       : vacio('Sin documentos','Todavía no has enviado ningún documento. Los que envíes aparecerán aquí '+
-           'con su estado.','',false))+
+       : vacioMini('Todavía no has enviado ninguno. Los que envíes aparecerán aquí con su estado.'))+
      '</div>';
   return h;
 }
@@ -2660,12 +2750,12 @@ function vReu(){
           var sel=(x.id===R.id);
           return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
             '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
-            (x.fijada?'📌 '+esc(x.fijada):'cierra el '+_limM_(x))+' · '+x.nInv+' convocados</small></div>'+
+            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):'cierra el '+_limM_(x))+' · '+x.nInv+' convocados</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':'<span class="chev">›</span>')+'</div></div>'; }).join('')+'</div>'
       : '')+
     '<div class="tarj">'+cab(R.tipo||'General', R.modalidad||'')+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
-      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(R.fijada):'cierra el '+_limM_(R))+' · '+R.nInv+' convocados</small></div>'+
+      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):'cierra el '+_limM_(R))+' · '+R.nInv+' convocados</small></div>'+
       '<div class="d"><span class="pil '+((R.fijada||R.cubierta||R.exento)?'conf':'no')+'">'+
         (R.fijada?'fijada':(R.exento?'organizas':(R.cubierta?'cubierta':'te falta')))+'</span></div></div>'+
       (R.fijada
@@ -2690,7 +2780,7 @@ function vReu(){
         '<button data-pond="1" class="'+(pondOn?'on':'')+'" data-p>Ponderada</button></div>':'')+
       '<p class="rnota" style="margin:0 0 10px"><b>'+R.nInv+'</b> convocados · mejor hueco '+
       (vent.v>0
-        ? '<b style="color:var(--red2)">'+R.dias[vent.d]+' '+_hFranja_(R,vent.f0)+
+        ? '<b style="color:var(--red2)">'+esc(_diaTxtM_(R.dias[vent.d]))+' '+_hFranja_(R,vent.f0)+
           (vent.f1>vent.f0?('–'+_hFinFranja_(R,vent.f1)):'')+'</b> — '+vent.v+
           (vent.exacta ? (vent.v===1?' puede la reunión entera.':' pueden la reunión entera.')
                        : (pondOn?' puntos.':' pueden.'))
@@ -2701,7 +2791,7 @@ function vReu(){
                :'el número es cuánta gente puede')+'</span>'+
         '<span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>fuera del horario de ese día</span></div>'+
     '</div>'+
-    (esCoord()?'<button class="btn full" data-p id="btnBorrar" style="margin-top:6px;color:var(--red2);border-color:var(--red)">Eliminar reunión</button>':'');
+    (_puedeBorrarReuM_(R)?'<button class="btn full" data-p id="btnBorrar" style="margin-top:6px;color:var(--red2);border-color:var(--red)">Eliminar reunión</button>':'');
 }
 
 /* ── CUBRIR DISPONIBILIDAD — pintar a dedo/arrastre, ciclo según modalidad ─
@@ -3168,7 +3258,17 @@ function crearModal(){
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Creando…';
     if(typeof backendOK!=='undefined' && backendOK && SESION){
       try{ var d=await api.crearReunion(reu); if(d&&d.id) reu.id=d.id;
-        cerrarModal(); tost('Reunión convocada · '+reu.invitados.length+' convocados, '+bloques.length+' bloques.'); pintar();
+        cerrarModal();
+        tost('Reunión convocada · '+reu.invitados.length+' convocados, '+bloques.length+' bloques.');
+        /* Se RECARGA la lista del servidor. Antes se llamaba a `pintar()` sin haber metido
+           la reunion nueva en `REUNIONES_M`: se repintaba lo mismo de antes y parecia que
+           no se habia creado. Y se recarga en vez de fabricar una copia local, que es como
+           se acaba enseñando algo que en la nube no esta. */
+        CARGA.reuniones=false; pintar();            // «cargando», no «no tienes»
+        await _cargarReunionesM_();
+        var _nueva=(REUNIONES_M||[]).filter(function(x){ return x.id===reu.id; })[0];
+        if(_nueva){ REUNION=_nueva; await _hidratarReuM_(_nueva); }
+        ST.vista='reu'; pintar();
       }catch(e){ bt.disabled=false; bt.textContent=prev; tost('No se pudo convocar: '+((e&&e.message)||e)); }
       return;
     }
@@ -3182,11 +3282,12 @@ function fijarModal(){
     '<div class="msub">Elige el <b>día</b> y toca la <b>primera</b> y la <b>última</b> franja seguidas. '+
     'El resultado sale en verde en el mapa.</div>'+
     '<label class="campo"><span class="sc">Día</span><select id="fjDia">'+
-      R.dias.map(function(d,i){return '<option value="'+i+'">'+d+'</option>';}).join('')+'</select></label>'+
+      R.dias.map(function(d,i){return '<option value="'+i+'">'+esc(_diaTxtM_(d))+'</option>';}).join('')+'</select></label>'+
     '<span class="sc" style="display:block;margin-bottom:7px">Franjas de ese día</span>'+
+    /* La hora de fin sale de la FRANJA, no de «la hora siguiente»: con slots de 15 o 30
+       min, dar por hecho que cada franja dura una hora es sencillamente falso. */
     '<div class="pasos" id="fjSlots">'+R.franjas.map(function(f,i){
-      var fin=String(parseInt(f.ini,10)+1).padStart(2,'0')+':00';
-      return '<button data-k="'+i+'" data-p>'+f.ini+'–'+fin+'</button>';
+      return '<button data-k="'+i+'" data-p>'+_hFranja_(R,i)+'–'+_hFinFranja_(R,i)+'</button>';
     }).join('')+'</div>'+
     '<div class="sc" id="fjSel" style="margin:11px 0 0;color:var(--ok);font-size:12px"></div>'+
     '<button class="btn pri full" style="margin-top:13px" data-p id="btnFijarOK">Confirmar</button>');
@@ -3199,8 +3300,7 @@ function fijarModal(){
       b.style.color=on?'var(--ok)':''; b.style.fontWeight=on?'700':'';
     });
     var s=$('#fjSel');
-    if(s) s.textContent = lo<0 ? '' : ('Elegido: '+REUNION.franjas[lo].ini+'–'+
-      String(parseInt(REUNION.franjas[hi].ini,10)+1).padStart(2,'0')+':00');
+    if(s) s.textContent = lo<0 ? '' : ('Elegido: '+_hFranja_(REUNION,lo)+'–'+_hFinFranja_(REUNION,hi));
   };
   $$('#fjSlots button').forEach(function(b,k){
     b.onclick=function(){
@@ -3208,12 +3308,26 @@ function fijarModal(){
       pintaSlots();
     };
   });
-  $('#btnFijarOK').onclick=function(){
+  $('#btnFijarOK').onclick=async function(){
+    var b=$('#btnFijarOK'); if(b.disabled) return;
     if(anchor<0){ tost('Toca la primera y la última franja.'); return; }
-    var di=+$('#fjDia').value, lo=Math.min(anchor,last), hi=Math.max(anchor,last);
-    REUNION.fijada=REUNION.dias[di]+' · '+REUNION.franjas[lo].ini+'–'+
-      String(parseInt(REUNION.franjas[hi].ini,10)+1).padStart(2,'0')+':00';
-    cerrarModal(); tost('Reunión fijada. Disponibilidad cerrada.'); pintar();
+    var R2=REUNION, di=+$('#fjDia').value;
+    var lo=Math.min(anchor,last), hi=Math.max(anchor,last);
+    var etiqueta=_diaTxtM_(R2.dias[di])+' · '+_hFranja_(R2,lo)+'–'+_hFinFranja_(R2,hi);
+    /* Los BLOQUES son lo que el mapa pinta en verde. Sin ellos solo quedaba el borde de
+       «mejor franja», que significa otra cosa. */
+    var bloques=[]; for(var f=lo; f<=hi; f++) bloques.push([di,f]);
+    if(typeof backendOK==='undefined' || !backendOK || !SESION){
+      tost('Sin conexión no se puede fijar: no llegaría a nadie más.'); return; }
+    b.disabled=true; var prev=b.textContent; b.textContent='Fijando…';
+    try{
+      await api.fijar(R2.id, {label:etiqueta, bloques:bloques, franjas:[lo,hi]});
+      R2.fijada=etiqueta; R2.fijadaBl=bloques;
+      cerrarModal();
+      tost('Reunión fijada: '+etiqueta+'. La disponibilidad queda cerrada.');
+      pintar();
+    }catch(e){ b.disabled=false; b.textContent=prev;
+      tost('No se pudo fijar: '+((e&&e.message)||e)); }
   };
 }
 
@@ -3535,8 +3649,21 @@ function enganchar(){
   $$('[data-reu]').forEach(function(el){ el.onclick=async function(){ var x=REUNIONES_M[+el.dataset.reu]; if(x){ REUNION=x; pintar(); await _hidratarReuM_(x); pintar(); } }; });
   $$('#calModo button').forEach(function(b){ b.onclick=function(){ ST.pond=(b.dataset.pond==='1'); pintar(); }; });
   var bfj=$('#btnFijar'); if(bfj) bfj.onclick=fijarModal;
+  /* Desfijar tampoco viajaba (agujero H14): se borraba en memoria y al recargar volvia.
+     Y reabre la disponibilidad de TODO el equipo, asi que se confirma. */
   var bdf=$('#btnDesfijar');
-  if(bdf) bdf.onclick=function(){ REUNION.fijada=null; tost('Fijado cancelado: se reabre la disponibilidad.'); pintar(); };
+  if(bdf) bdf.onclick=async function(){
+    if(bdf.disabled) return;
+    var R2=REUNION; if(!R2) return;
+    if(typeof backendOK==='undefined' || !backendOK || !SESION){
+      tost('Sin conexión no se puede cancelar el fijado.'); return; }
+    if(!confirm('Cancelar la fecha fijada de «'+R2.titulo+'».'+String.fromCharCode(10,10)+
+      'Se reabre la disponibilidad para todo el equipo. ¿Seguro?')) return;
+    bdf.disabled=true;
+    try{ await api.fijar(R2.id, null); R2.fijada=null; R2.fijadaBl=[];
+      tost('Fijado cancelado: se reabre la disponibilidad.'); pintar();
+    }catch(e){ bdf.disabled=false; tost('No se pudo cancelar: '+((e&&e.message)||e)); }
+  };
   var bod=$('#btnOrden');
   if(bod) bod.onclick=function(){
     abrirModal('<div class="mtit">Orden del día</div>'+
@@ -3545,8 +3672,35 @@ function enganchar(){
       '<label class="campo"><span class="sc">Enlace</span><input id="odIn" placeholder="https://drive.google.com/…"></label>'+
       '<button class="btn pri full" data-p data-cerrar>Guardar</button>');
   };
+  /* BORRAR DE VERDAD (era el agujero H12: el boton solo se disculpaba). Se lleva por
+     delante la disponibilidad que haya cubierto la gente, y eso no se deshace: se dice
+     cuanta gente respondio ANTES de preguntar. */
   var bb=$('#btnBorrar');
-  if(bb) bb.onclick=function(){ tost('Eliminar una reunión todavía se hace desde el escritorio.'); };
+  if(bb) bb.onclick=async function(){
+    if(bb.disabled) return;
+    var R=REUNION; if(!R) return;
+    if(!_puedeBorrarReuM_(R)){ tost('Solo puede eliminarla quien la convocó.'); return; }
+    if(typeof backendOK==='undefined' || !backendOK || !SESION){
+      tost('Sin conexión no se puede eliminar una reunión.'); return; }
+    var nResp=Object.keys(R.resp||{}).filter(function(n){
+      return (R.resp[n]||[]).some(function(v){ return +v>0; }); }).length;
+    var aviso='Eliminar «'+R.titulo+'».'+String.fromCharCode(10,10)+
+      (nResp? ('Se borra también la disponibilidad que ya cubrieron '+nResp+' persona'+(nResp===1?'':'s')+'.')
+            : 'Todavía no la ha cubierto nadie.')+
+      String.fromCharCode(10)+'Esto no se puede deshacer. ¿Seguro?';
+    if(!confirm(aviso)) return;
+    bb.disabled=true; var prev=bb.textContent; bb.textContent='Eliminando…';
+    try{
+      await api.borrarReunion(R.id);
+      var ix=REUNIONES_M.findIndex(function(x){ return x.id===R.id; });
+      if(ix>=0) REUNIONES_M.splice(ix,1);
+      REUNION=_proximaReuM_()||REUNIONES_M[0]||REUNION;
+      ST.sel=null; ST._selDe=null;              // la seleccion era de la que ya no existe
+      tost('Reunión eliminada.');
+      pintar();
+    }catch(e){ bb.disabled=false; bb.textContent=prev;
+      tost('No se pudo eliminar: '+((e&&e.message)||e)); }
+  };
 
   /* cajones plegables */
   $$('[data-caj]').forEach(function(b){
