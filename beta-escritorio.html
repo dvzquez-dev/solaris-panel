@@ -2394,7 +2394,12 @@ var RRI_MOTIVOS=[
   ['30i','Faltar a un turno de trabajo sin justificar', -1],
   ['30g','No rellenar un formulario obligatorio', -1],
   ['30h','No cubrir la disponibilidad de una reunión', -1],
-  ['plazo','Incumplir el plazo de una tarea', -1],
+  /* El RRI distingue DOS articulos para esto, y la diferencia no es menor: 30b es para
+     una tarea «importante» o «urgente» y 30c para cualquier otra. Lo sabe quien sanciona,
+     asi que se pregunta en vez de mandar la clave interna `plazo` al comunicado -que es
+     lo que hizo salir «Art. plazo» en el de Jose-. */
+  ['plazo','Incumplir el plazo de una tarea (30c)', -1],
+  ['plazoUrg','Incumplir el plazo de una tarea urgente o importante (30b)', -1],
   ['libre','Otro · lo escribo yo', -1]
 ];
 /* EL ORDEN DE LOS SUBSISTEMAS, deducido y no escrito a mano: es el orden en que vienen los
@@ -2560,7 +2565,7 @@ function _ponerSancCuerpo_(){
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   var E=CAMPO_CSS;
   var grupos=_gruposSanc_(_actorSanc_(), SANC_FORM.filtro);
-  var esPlazo=(SANC_FORM.motivo==='plazo');
+  var esPlazo=(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg');
   /* LAS TAREAS DEL SANCIONADO, no las mias -antes se ofrecian las propias y por eso no se podia
      sancionar a nadie por un plazo-. `null` = todavia se estan pidiendo. Y solo las VIVAS con
      enlace a Notion: sin `url` no se puede mover la fecha. */
@@ -2637,7 +2642,7 @@ function _cablearPonerSanc_(){
     $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
     /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS: hay que repintar.
        Con los demas motivos no se toca nada, que seria tirar lo escrito por nada. */
-    if(SANC_FORM.motivo==='plazo'){ SANC_FORM.tarea=''; repintar(); }
+    if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; repintar(); }
   }
   /* Elegir persona NO repinta: solo se marca. */
   $$('[data-sanq]').forEach(function(b){ b.onclick=function(){ marcar(b);
@@ -2657,6 +2662,8 @@ function _cablearPonerSanc_(){
   var bt=$('#btnSanc');
   if(bt) bt.onclick=async function(){
     var quien=SANC_FORM.quien, mot=val('snMotivo'), pts=parseInt(val('snPts'),10);
+    /* Propia del ENVIO: `esPlazo` es de la funcion que pinta y aqui no existe. */
+    var esDePlazo=(mot==='plazo'||mot==='plazoUrg');
     if(!quien){ msg('Elige a qui\u00e9n: pulsa un nombre de la lista.', true); return; }
     if(!mot){ msg('Elige el motivo.', true); return; }
     if(!(pts<=0)){ msg('Los puntos de una sanci\u00f3n son 0 o negativos.', true); return; }
@@ -2667,13 +2674,17 @@ function _cablearPonerSanc_(){
       if(!texto){ msg('Escribe qu\u00e9 ha pasado.', true); return; }
     }
     var urlTarea='', plazo='';
-    if(mot==='plazo'){
+    if(mot==='plazo'||mot==='plazoUrg'){
       urlTarea=val('snTarea'); plazo=val('snPlazo');
       if(!urlTarea){ msg('Elige la tarea cuyo plazo se incumpli\u00f3.', true); return; }
       if(!plazo){ msg('Pon el plazo nuevo: sancionar por un plazo y no darle otro no arregla nada.', true); return; }
-      var t=(TAREAS||[]).filter(function(x){ return x.url===urlTarea; })[0];
+      /* De la lista DEL SANCIONADO -`SANC_TAREAS`-, no de `TAREAS`, que son las mias. Si se
+         busca aqui, el titulo no aparece y el motivo queda en «una tarea»: es lo que le paso a
+         la sancion de Jose del 28/07. Lo que se pinta y lo que se guarda tienen que salir del
+         MISMO sitio. */
+      var t=((SANC_TAREAS&&SANC_TAREAS.lista)||[]).filter(function(x){ return x.url===urlTarea; })[0];
       texto='Incumplir el plazo de \u00ab'+((t&&(t.n||t.nombre))||'una tarea')+'\u00bb';
-      art='plazo';
+      art=(mot==='plazoUrg') ? '30b' : '30c';   // el articulo REAL del RRI
     }
     if(!backendOK || !SESION){ msg('Sin conexi\u00f3n no se puede: esto escribe en la cola de verdad.', true); return; }
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando\u2026';
@@ -2681,10 +2692,10 @@ function _cablearPonerSanc_(){
       /* EL ORDEN IMPORTA: primero Notion, luego la sancion. Al reves quedaria la sancion puesta
          y la tarea con la fecha vieja, que es la unica de las dos combinaciones malas que NO se
          ve mirando la cola. */
-      if(mot==='plazo'){ msg('Moviendo el plazo en Notion\u2026'); await api.moverLimiteTarea(urlTarea, plazo); }
+      if(esDePlazo){ msg('Moviendo el plazo en Notion\u2026'); await api.moverLimiteTarea(urlTarea, plazo); }
       await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual'}]);
       SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
-      tost('Sanci\u00f3n puesta a '+(_pilaDeM_(quien)||quien)+'.'+(mot==='plazo'?' Plazo movido en Notion.':''));
+      tost('Sanci\u00f3n puesta a '+(_pilaDeM_(quien)||quien)+'.'+(esDePlazo?' Plazo movido en Notion.':''));
       await _cargarSanciones_();     // la cola de abajo tiene que enterarse
       pintar();
     }catch(e){
@@ -4177,7 +4188,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='054a448';
+var BUILD='1090077';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

@@ -2288,7 +2288,12 @@ var RRI_MOTIVOS=[
   ['30i','Faltar a un turno de trabajo sin justificar', -1],
   ['30g','No rellenar un formulario obligatorio', -1],
   ['30h','No cubrir la disponibilidad de una reunión', -1],
-  ['plazo','Incumplir el plazo de una tarea', -1],
+  /* El RRI distingue DOS articulos para esto, y la diferencia no es menor: 30b es para
+     una tarea «importante» o «urgente» y 30c para cualquier otra. Lo sabe quien sanciona,
+     asi que se pregunta en vez de mandar la clave interna `plazo` al comunicado -que es
+     lo que hizo salir «Art. plazo» en el de Jose-. */
+  ['plazo','Incumplir el plazo de una tarea (30c)', -1],
+  ['plazoUrg','Incumplir el plazo de una tarea urgente o importante (30b)', -1],
   ['libre','Otro · lo escribo yo', -1]
 ];
 /* EL ORDEN DE LOS SUBSISTEMAS, deducido y no escrito a mano: es el orden en que vienen los
@@ -2357,7 +2362,7 @@ function _sancionesHTML_(){
      en los tres rangos, que es parte del modelo. */
   var grupos=_gruposSanc_(_actorSanc_(), SANC_FORM.filtro);
   var nTotal=sancionablesPor(_actorSanc_()).length;
-  var esPlazo=(SANC_FORM.motivo==='plazo');
+  var esPlazo=(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg');
   /* LAS TAREAS DEL SANCIONADO, no las mias -antes se ofrecian las propias y por eso no se
      podia sancionar a nadie por un plazo-. `null` = todavia se estan pidiendo. Y solo las
      VIVAS con enlace a Notion: sin `url` no se puede mover la fecha, y ofrecerla seria
@@ -2488,7 +2493,7 @@ function _cablearSanciones_(){
       var m=$('#snMsg'); if(m){ m.textContent='A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'; m.style.color='var(--ink3)'; }
       /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS, asi que hay que
          repintar. En los demas motivos no se repinta: seria tirar lo escrito por nada. */
-      if(SANC_FORM.motivo==='plazo'){ SANC_FORM.tarea=''; repintar(); }
+      if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; repintar(); }
     };
   });
   /* Teclear rehace SOLO la lista, no el formulario. Y no pierde el foco ni el cursor. */
@@ -2501,7 +2506,7 @@ function _cablearSanciones_(){
       b.onclick=function(){
         SANC_FORM.quien=b.dataset.sanq;
         $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
-        if(SANC_FORM.motivo==='plazo'){ SANC_FORM.tarea=''; repintar(); }
+        if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; repintar(); }
       };
     });
   };
@@ -2515,6 +2520,8 @@ function _cablearSanciones_(){
   var bt=$('#btnSanc');
   if(bt) bt.onclick=async function(){
     var quien=SANC_FORM.quien, mot=val('snMotivo'), pts=parseInt(val('snPts'),10);
+    /* Propia del ENVIO: `esPlazo` es de la funcion que pinta y aqui no existe. */
+    var esDePlazo=(mot==='plazo'||mot==='plazoUrg');
     if(!quien){ msg('Elige a quién: pulsa un nombre de la lista.', true); return; }
     if(!mot){ msg('Elige el motivo.', true); return; }
     if(!(pts<=0)){ msg('Los puntos de una sanción son 0 o negativos.', true); return; }
@@ -2525,13 +2532,17 @@ function _cablearSanciones_(){
       if(!texto){ msg('Escribe qué ha pasado.', true); return; }
     }
     var urlTarea='', plazo='';
-    if(mot==='plazo'){
+    if(mot==='plazo'||mot==='plazoUrg'){
       urlTarea=val('snTarea'); plazo=val('snPlazo');
       if(!urlTarea){ msg('Elige la tarea cuyo plazo se incumplió.', true); return; }
       if(!plazo){ msg('Pon el plazo nuevo: sancionar por un plazo y no darle otro no arregla nada.', true); return; }
-      var t=(TAREAS||[]).filter(function(x){ return x.url===urlTarea; })[0];
+      /* De la lista DEL SANCIONADO -`SANC_TAREAS`-, no de `TAREAS`, que son las mias. Si se
+         busca aqui, el titulo no aparece y el motivo queda en «una tarea»: es lo que le paso a
+         la sancion de Jose del 28/07. Lo que se pinta y lo que se guarda tienen que salir del
+         MISMO sitio. */
+      var t=((SANC_TAREAS&&SANC_TAREAS.lista)||[]).filter(function(x){ return x.url===urlTarea; })[0];
       texto='Incumplir el plazo de «'+((t&&(t.n||t.nombre))||'una tarea')+'»';
-      art='plazo';
+      art=(mot==='plazoUrg') ? '30b' : '30c';   // el articulo REAL del RRI
     }
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
       msg('Sin conexión no se puede: esto escribe en la cola de verdad.', true); return; }
@@ -2540,13 +2551,13 @@ function _cablearSanciones_(){
       /* EL ORDEN IMPORTA: primero Notion, luego la sancion. Si Notion falla no se sanciona;
          al reves quedaria la sancion puesta y la tarea con la fecha vieja, que es la unica de
          las dos combinaciones que no se ve mirando la cola. */
-      if(mot==='plazo'){
+      if(mot==='plazo'||mot==='plazoUrg'){
         msg('Moviendo el plazo en Notion…');
         await api.moverLimiteTarea(urlTarea, plazo);
       }
       await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual'}]);
       SANC_M=null; SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
-      tost('Sanción puesta a '+(_pilaDeM_(quien)||quien)+'.'+(mot==='plazo'?' Plazo movido en Notion.':''));
+      tost('Sanción puesta a '+(_pilaDeM_(quien)||quien)+'.'+(esDePlazo?' Plazo movido en Notion.':''));
       _abrirSanciones_();
     }catch(e){
       bt.disabled=false; bt.textContent=prev;
@@ -4288,7 +4299,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d17c957';
+var BUILD='6663c52';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
