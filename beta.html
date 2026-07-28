@@ -170,18 +170,13 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
    · centrado (de la 06a), no arrinconado
    NO lleva la cota gris al pasar el dedo: molestaba y se ha quitado.
    ═════════════════════════════════════════════════════════════════════════ */
-/* EL MEDIDOR, EN FILA Y MAS PEQUEÑO (MEJ-M-2026-07-27-1, Adrian: «ocupa demasiado»).
-   Antes: anillo de 172 px con la leyenda y el boton DEBAJO, en columna. Con la
-   cabecera de la tarjeta eso son ~300 px de los 844 de un iPhone, y empujaba las horas
-   del mes -lo que uno viene a mirar- por debajo del pliegue.
-   `--medW` es la unica medida: TODO lo de dentro se expresa como fraccion suya
-   (estrella .093, su offset .01163, el numero .2558), asi que la figura es identica
-   a escala. Cambiar ese numero es lo unico que hace falta para volver a 172. */
-.medcaja{display:flex;flex-direction:row;align-items:center;gap:15px;padding:4px 0 2px}
-.med{--medW:126px;position:relative;width:var(--medW);height:var(--medW);flex:none}
-.med svg.dial{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-/* la columna de la derecha: leyenda arriba, boton debajo, las dos alineadas a la izq. */
-.medlado{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+/* REVERTIDO el 28/07 por orden de Daniel: el medidor vuelve a 172 px, en columna y
+   centrado, con la leyenda y el boton debajo. Se habia encogido a 126 px y puesto en
+   fila (MEJ-M-2026-07-27-1, de Adrian). Daniel: «estaba muchisimo mas guapo antes».
+   NO se vuelve a tocar sin que el lo apruebe primero en el buzon. */
+.medcaja{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px}
+.med{position:relative;width:172px;height:172px;flex:none}
+.med svg.dial{position:absolute;inset:0;width:172px;height:172px;overflow:visible}
 .med .fili{transform-box:view-box;transform-origin:86px 86px;opacity:.05;fill:var(--ink);
   animation:giroLento 30s linear infinite}
 .med .pista{fill:none;stroke:var(--line);stroke-width:1;stroke-dasharray:2 5;opacity:.8}
@@ -279,24 +274,21 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
   100%{stroke:#7BE3BE;stroke-width:1.7;filter:none}}
 .med .tip{position:absolute;inset:0;transform:rotate(0deg);pointer-events:none;
   transition:transform .8s var(--arco)}
-/* En fraccion de `--medW`: con 172 px sale exactamente lo de antes (16 px de estrella
-   a 2 px del borde), y con cualquier otro tamaño la estrella cae sobre la misma marca.
-   Con medidas fijas se despegaba del anillo al encogerlo. */
-.med .tip i{position:absolute;left:50%;display:block;
-  top:calc(var(--medW,172px) * .01163); margin-left:calc(var(--medW,172px) * -.0465);
-  width:calc(var(--medW,172px) * .093); height:calc(var(--medW,172px) * .093);
+.med .tip i{position:absolute;left:50%;top:2px;margin-left:-8px;width:16px;height:16px;display:block;
   color:var(--red2);filter:drop-shadow(0 0 8px rgba(255,74,79,.75))}
-.med .tip i svg{width:100%;height:100%;fill:currentColor;display:block}
+.med .tip i svg{width:16px;height:16px;fill:currentColor}
 .med .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
   justify-content:center;pointer-events:none}
-.med .mid .n{font-family:var(--mono);font-size:calc(var(--medW,172px) * .2558);
-  font-weight:600;letter-spacing:-.045em;line-height:1}
-.med .mid .n small{font-size:calc(var(--medW,172px) * .093);color:var(--ink3);letter-spacing:-.02em}
+.med .mid .n{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:-.045em;line-height:1}
+.med .mid .n small{font-size:16px;color:var(--ink3);letter-spacing:-.02em}
 .med .mid .u{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:var(--ink3);margin-top:5px}
 /* `.pips` (la linea de puntitos bajo el medidor) se retiro el 27/07: repetia lo que ya dice
    el anillo. Si algun dia vuelve, esta en el historial. */
-.medley{margin:0;font-size:11.5px;color:var(--ink2);text-align:left;line-height:1.5}
+.medley{margin-top:11px;font-size:11.5px;color:var(--ink2);text-align:center;line-height:1.5}
 .medley b{color:var(--ink)}
+/* La comparativa cuelga de la barra: se separa con una linea, no con una tarjeta.
+   La tarjeta aparte era lo que hacia que pareciera una seccion propia y sobrara. */
+.comph{margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}
 .libro{overflow:hidden;height:0;transition:height .42s var(--sal)}
 .retf{display:flex;align-items:center;gap:11px;padding:9px 2px;border-top:1px solid var(--line);font-size:12px}
 .retf .pt{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--red2);flex:none;width:26px}
@@ -598,9 +590,13 @@ nav{flex:none;position:relative;height:calc(70px + env(safe-area-inset-bottom,0p
 .chispas.on b:nth-child(4){--dx:7px;--dy:-16px;animation-delay:.02s}
 @keyframes chispita{0%{opacity:1;transform:translate(0,0) scale(1)}
   100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3)}}
+/* `--tabN` lo pone `pintarNav` con cuantas pestañas hay. Con siete el ancho da para 7,5 px
+   de rotulo; con menos sobra sitio y crecen. Daniel: «que se autoajuste el espacio de
+   abajo»; Adrian, en el reporte: «poder ver las letras de las demas a mayor tamaño». */
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
-  padding:12px 0 9px;font-family:var(--mono);font-size:7.5px;letter-spacing:.05em;text-transform:uppercase;
-  color:var(--ink3);position:relative;transition:color .18s linear}
+  padding:12px 0 9px;font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase;
+  font-size:clamp(7.5px, calc(7.5px + (7 - var(--tabN,7)) * .5px), 9.5px);
+  color:var(--ink3);position:relative;transition:color .18s linear,font-size .18s linear}
 .tab svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;
   stroke-linecap:round;stroke-linejoin:round}
 .tab.on{color:var(--ink)} .tab.on svg{stroke:var(--red2)}
@@ -903,6 +899,8 @@ var HOY=(function(){
    DATOS — esquema REAL de app.html, contenido ficticio.
    ═══════════════════════════════════════════════════════════════════════════ */
 var UMBRAL=11.8;          /* ultimo valor conocido; lo recalcula `_umbral_()` con el panel */
+/* Red de seguridad para la maqueta. La cifra buena la calcula `_mediaEquipo_()` desde
+   `DATA.subsistemas`; esta constante solo se usa si esa lista viene vacia. */
 var MEDIA_EQ=10.9;
 var PD_NOM='Lois Carballo Sendón';   // semilla; con datos reales lo rederiva _rederivarPD_()
 /* Con el roster real, el PD es quien tenga el cargo — no el de la semilla. */
@@ -1700,7 +1698,7 @@ var CARGA={partes:false, fichaje:false, reuniones:false};
    pantalla, no de la persona (el mismo miembro puede querer una cosa en el movil y
    otra en el escritorio). Se lee con `_pref_` para que un localStorage bloqueado
    -Safari privado lo hace- no reviente el arranque entero. */
-var PREF={docsSiempre:false, escala:''};        // '' | 'tx-l' | 'tx-xl'
+var PREF={docsOcultar:false, escala:''};        // '' | 'tx-l' | 'tx-xl'
 try{ var _pr=JSON.parse(localStorage.getItem('sol_pref')||'null');
      if(_pr && typeof _pr==='object') for(var _k in PREF) if(_k in _pr)
        PREF[_k]=(typeof PREF[_k]==='boolean') ? !!_pr[_k] : String(_pr[_k]||'');
@@ -1821,13 +1819,23 @@ async function _onCredencial_(resp,_silente){
         'border-radius:9px;padding:10px 16px;text-decoration:none">Ir al panel</a>');
       return;
     }
-    _pintarVerComo_();                                     // admin (solaris@): selector «ver como»; resto: sin conmutador
-    _pintarCabecera_();                                    // la cabecera muestra al miembro (real o «visto como»)
-    pintar();                                              // LA UNICA pintada del arranque
-    var g=document.getElementById('loginGate'); if(g) g.remove();   // y ahora se enseña
-    var bs=$('#btnSalir'); if(bs) bs.style.display='';     // sí hay salir/cambiar de cuenta
-    _arrancarRefrescoVivo_();                              // a partir de aqui se alimenta sola
+    /* SIN NOTIFICACIONES NO SE ENTRA (Daniel, 28/07). Va aqui, con la identidad ya
+       resuelta y con el gate todavia puesto: si falta el permiso, la app no llega a
+       pintarse. `_seguir_` es lo que habria pasado despues, para poder continuar sin
+       recargar en cuanto lo concedan. */
+    var _seguir_=function(){
+      _pintarVerComo_();                                   // admin (solaris@): selector «ver como»; resto: sin conmutador
+      _pintarCabecera_();                                  // la cabecera muestra al miembro (real o «visto como»)
+      pintar();                                            // LA UNICA pintada del arranque
+      var g=document.getElementById('loginGate'); if(g) g.remove();   // y ahora se enseña
+      var bs=$('#btnSalir'); if(bs) bs.style.display='';   // sí hay salir/cambiar de cuenta
+      _arrancarRefrescoVivo_();                            // a partir de aqui se alimenta sola
+    };
+    var _falta=DEMO ? null : _faltanNotis_();
+    if(_falta){ _gateNotis_(_falta, _seguir_); return; }
+    _seguir_();
   }catch(e){
+
     if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
     _gate_(SPLASH+'<div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+
       ((e&&e.message)||e)+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
@@ -1871,7 +1879,16 @@ function cerrarSesion(){
   location.reload();
 }
 
-function mediaSub(u){for(var i=0;i<DATA.subsistemas.length;i++) if(DATA.subsistemas[i].u===u) return DATA.subsistemas[i].media; return MEDIA_EQ;}
+function mediaSub(u){for(var i=0;i<DATA.subsistemas.length;i++) if(DATA.subsistemas[i].u===u) return DATA.subsistemas[i].media; return _mediaEquipo_();}
+/* La media de horas por persona del equipo entero, PONDERADA por cuanta gente tiene cada
+   subsistema: la media de las medias daria el mismo peso a Org&Mark (1 persona) que a
+   Avionica (8). `DATA.subsistemas` lo manda el backend a todo el mundo -son agregados
+   sin nombres-, asi que esto vale igual para un miembro raso que para el PD. */
+function _mediaEquipo_(){
+  var ss=DATA.subsistemas||[], h=0, n=0;
+  for(var i=0;i<ss.length;i++){ var c=Number(ss[i].n)||0; h+=(Number(ss[i].media)||0)*c; n+=c; }
+  return n ? h/n : MEDIA_EQ;
+}
 
 /* tareas asignadas — la imputación del fichaje va SOBRE ESTAS, no a mano */
 var TAREAS=[
@@ -2142,15 +2159,13 @@ function medidorHTML(){
     /* La linea de puntitos se retiro (Daniel, 27/07): con el medidor circular basta. Decia
        lo mismo dos veces y encima en horizontal, que es la lectura que el anillo evita. */
 
-    '<div class="medlado">'+
-      '<div class="medley">'+
-        (est==='elegible'?'<b>Elegible.</b>':est==='evaluacion'?'<b style="color:var(--red2)">En evaluación.</b>':'<b>Sin expediente.</b>')+
-        (p>3
-          ? ' Te quedan <b>'+(p-3)+'</b> punto'+((p-3)===1?'':'s')+' antes de la zona crítica.'
-          : ' Estás en <b>zona crítica</b>: por debajo de 2 puntos se abre expediente.')+
-      '</div>'+
-      '<button class="btn mini" data-p id="btnLibro">Desglose de puntos</button>'+
+    '<div class="medley">'+
+      (est==='elegible'?'<b>Elegible.</b>':est==='evaluacion'?'<b style="color:var(--red2)">En evaluación.</b>':'<b>Sin expediente.</b>')+
+      (p>3
+        ? ' Te quedan <b>'+(p-3)+'</b> punto'+((p-3)===1?'':'s')+' antes de la zona crítica.'
+        : ' Estás en <b>zona crítica</b>: por debajo de 2 puntos se abre expediente.')+
     '</div>'+
+    '<button class="btn mini" data-p id="btnLibro" style="margin-top:11px">Desglose de puntos</button>'+
   '</div>'+
   '<div class="libro" id="libro"><div id="libroIn" style="padding-top:6px">'+
     (MOVS.length ? MOVS.map(function(m){
@@ -2298,6 +2313,25 @@ function armarMedidor(silencioso){
    ═══════════════════════════════════════════════════════════════════════════ */
 var K_BAR=13.6;
 function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
+/* LA COMPARATIVA, pegada a la barra (Daniel, 28/07: «un espacio abajo en el mismo div»).
+
+   Dos filas y no cuatro:
+   · **vs mes anterior** — lo unico que dice si vas mejor o peor que tu, y no lo dice nada mas
+     en toda la app. Necesita `YO.hAnt`; mientras el backend no lo mande, la fila no se pinta
+     (en vez de inventarse un 0, que saldria como «+100 %»).
+   · **vs equipo** — la media por persona del equipo. Es INDIVIDUAL: el ranking dice en que
+     puesto estas, no cuanto te separa de la media, que es otra pregunta.
+
+   Se cayeron a proposito «vs objetivo» (el objetivo ya es la marca de la propia barra, tres
+   pixeles mas arriba) y «vs unidad» (Daniel: «el de vs unidad tambien [lo borraria]»). */
+function _compHorasHTML_(base){
+  var f='';
+  if(typeof YO.hAnt==='number' && YO.hAnt>0)
+    f+=deltaHTML('vs. '+(YO.mesAnt||'mes anterior'), base, YO.hAnt, nf(YO.hAnt,1)+' h en '+(YO.mesAnt||'el mes anterior'));
+  var me=_mediaEquipo_();
+  if(me>0) f+=deltaHTML('vs. equipo', base, me, 'media '+nf(me,1)+' h/persona');
+  return f ? '<div class="comph">'+f+'</div>' : '';
+}
 function barraHorasHTML(id){
   /* La MISMA puerta que las dos tarjetas (`_hMesReal_`): esta era la TERCERA copia de
      «de donde salen las horas del mes». */
@@ -2335,7 +2369,11 @@ function barraHorasHTML(id){
       : '')+
     (tot>0
       ? (p>0?'<p class="rnota" style="margin-top:9px">Lo rayado son '+nf2(p)+' h esperando firma: todavía no cuentan.</p>':'')
-      : '<p class="rnota" style="margin-top:9px">Aún no tienes horas registradas este mes. El objetivo son '+nf(UMBRAL,1)+' h.</p>');
+      : '<p class="rnota" style="margin-top:9px">Aún no tienes horas registradas este mes. El objetivo son '+nf(UMBRAL,1)+' h.</p>')+
+    /* La comparativa se compara contra lo que YA CUENTA, no contra el total con lo
+       pendiente: lo pendiente puede caerse en la firma y entonces la comparacion
+       habria dicho lo contrario de lo que acaba pasando. */
+    _compHorasHTML_(cont);
 }
 /* Cuanto medía cada barra la ultima vez, para poder IR de ahi al valor nuevo.
 
@@ -2491,11 +2529,10 @@ function vEstado(){
   /* Las tareas salieron de aqui: tienen pestana propia y en la portada solo alargaban
      la primera pantalla repitiendo lo mismo. */
 
-  /* EL ORDEN. Antes Conducta abria la pantalla. Los puntos cambian dos o tres veces al
-     año; las horas del mes cambian cada vez que fichas, y son lo que uno viene a mirar.
-     Asi que primero lo que urge (avisos), luego las horas, luego la reunion, y Conducta
-     al final. Adrian: «daria mas importancia a otras cosas de la pagina principal». */
-  return av+
+  /* EL ORDEN: Conducta ABRE la pantalla. Se probo a mandarla al final (MEJ-1) y Daniel
+     lo revirtio el 28/07: «estaba muchisimo mas guapo antes que estuviese arriba». */
+  return '<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>'+
+    av+
     /* El numero grande son las horas de ESTE MES cuando se saben; si no, la media de la
        temporada, y entonces la etiqueta lo dice. Antes ponia «empleadas este mes» sobre la
        media, que es de lo poco que un miembro puede comprobar a mano. */
@@ -2509,8 +2546,7 @@ function vEstado(){
     /* OJO: aquí NO va `REUNION`. Ese es el puntero de la pantalla de Reuniones y cambia
        al navegar por la lista, así que esta tarjeta acababa mostrando «la última que
        abriste» con el rótulo de «la próxima». */
-    _proxReuHTML_()+
-    '<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>';
+    _proxReuHTML_();
 }
 function _proxReuHTML_(){
   var R=_proximaReuM_();
@@ -3101,9 +3137,74 @@ async function _pushInit_(){
     }
   }catch(_){}
 }
+/* ¿PUEDE ESTA APP FUNCIONAR SIN NOTIFICACIONES? No (Daniel, 28/07): «las notificaciones han
+   de ser obligatorias de tener activadas, es decir, que si no estan activadas directamente que
+   no te permita usar la aplicacion».
+
+   Devuelve el motivo por el que NO se puede pasar, o `null` si se pasa:
+     · `'imposible'` — el navegador no admite push. **Se deja pasar**: exigir algo que el
+       aparato no puede dar no consigue notificaciones, solo un panel inservible.
+     · `'ios'`       — iPhone fuera de la pantalla de inicio. SI se bloquea: aqui si se puede
+       cumplir, instalandola, y es justo lo que hay que empujar.
+     · `'pedir'`     — el permiso no esta dado y todavia se puede pedir.
+     · `'denegado'`  — se denego. El navegador no vuelve a preguntar solo: hay que ir a los
+       ajustes del sistema, y la pantalla dice donde. */
+function _faltanNotis_(){
+  if(!_pushSoportado_()) return null;                       // no puede: se pasa
+  if(_esIOS_() && !_esStandalone_()) return 'ios';
+  if(Notification.permission==='granted') return null;
+  return (Notification.permission==='denied') ? 'denegado' : 'pedir';
+}
+/* La pantalla del gate. No es un aviso que se pueda cerrar: es la unica pantalla que hay
+   hasta que el permiso este dado. El boton reintenta y, si cuela, arranca la app de verdad. */
+function _gateNotis_(motivo, seguir){
+  var cuerpo, boton='';
+  if(motivo==='ios'){
+    cuerpo='Para recibir los avisos en <b>iPhone</b> hay que abrir el panel desde la pantalla '+
+      'de inicio.<br><br>Pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>, y entra '+
+      'desde ese icono.';
+  } else if(motivo==='denegado'){
+    cuerpo='Has denegado las notificaciones y el navegador ya no vuelve a preguntar.<br><br>'+
+      'Actívalas en los ajustes del móvil (<b>Ajustes → la app o el navegador → '+
+      'Notificaciones</b>) y vuelve a entrar.';
+    boton='Ya las he activado';
+  } else {
+    cuerpo='El panel avisa de tus turnos, de las reuniones y de las decisiones sobre tus '+
+      'documentos y tus horas. <b>Sin notificaciones no se puede usar</b>: los avisos llegan '+
+      'tarde y de eso salen faltas.';
+    boton='Activar notificaciones';
+  }
+  var g=_gate_(SPLASH+'<div style="max-width:330px;line-height:1.6">'+cuerpo+'</div>'+
+    (boton?'<button id="btnGateNotis" style="border:1px solid #463E40;background:none;'+
+      'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">'+boton+'</button>':'')+
+    '<div id="gateNotisMsg" style="opacity:.75;font-size:13px;max-width:330px"></div>');
+  var b=g.querySelector('#btnGateNotis');
+  if(b) b.onclick=async function(){
+    b.disabled=true; b.textContent='Un momento…';
+    var msg=g.querySelector('#gateNotisMsg');
+    try{
+      if(Notification.permission!=='granted') await Notification.requestPermission();
+      if(Notification.permission==='granted'){
+        /* Y se suscribe de verdad, no solo el permiso: un permiso sin suscripcion no
+           entrega ni un aviso, y el gate habria dejado pasar a alguien que no recibe nada. */
+        var reg=_swReg || await _registrarSW_();
+        if(reg){ await navigator.serviceWorker.ready;
+          var sub=await reg.pushManager.getSubscription();
+          if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
+          if(typeof SESION!=='undefined' && SESION) try{ await api.guardarPush(sub.toJSON()); }catch(_){}
+        }
+        seguir(); return;
+      }
+      if(msg) msg.textContent='Sigue sin permiso. Hay que darlo en los ajustes del móvil.';
+    }catch(e){ if(msg) msg.textContent='No se pudo: '+((e&&e.message)||e); }
+    b.disabled=false; b.textContent=boton;
+  };
+}
 function _notisHTML_(){
   if(!_pushSoportado_())
-    return '<div class="tarj"><p class="rnota" style="margin:0">Este navegador no admite notificaciones.</p></div>';
+    return '<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador '+
+      'no admite notificaciones. El panel las da por <b>obligatorias</b>, así que aquí te '+
+      'estás perdiendo los avisos de turnos, reuniones y decisiones. Ábrelo en el móvil.</p></div>';
   if(_esIOS_() && !_esStandalone_())
     return '<div class="tarj"><p class="rnota" style="margin:0;line-height:1.6">Para recibir avisos en <b>iPhone</b>: '+
       'pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> y abre la app desde ese icono. '+
@@ -3504,7 +3605,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f3c204e';
+var BUILD='f9b7b06';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -3515,10 +3616,11 @@ function _ajustesHTML_(){
       '</div><p class="rnota" style="margin:9px 0 0">Agranda lo que se lee: la pantalla '+
       'y las fichas. La barra de abajo no cambia, sus rótulos ya hacen de icono.</p></div>'+
     '<h4>Pestañas</h4><div class="tarj"><div class="fila"><div class="a">'+
-      '<b>Mostrar siempre Documentos</b><small>Sin esto, la pestaña solo aparece cuando '+
-      'tienes algo que revisar o algo tuyo en vuelo. Con una menos, las demás se leen mejor.'+
+      '<b>Esconder Documentos cuando no tengas nada</b><small>La pestaña desaparece de la '+
+      'barra mientras no haya nada que revisar ni nada tuyo en vuelo, y vuelve sola en '+
+      'cuanto lo haya. Con una pestaña menos, los rótulos de las demás crecen.'+
       '</small></div><div class="d"><button class="btn" id="btnDocsSiempre" data-p>'+
-      (PREF.docsSiempre?'Sí':'No')+'</button></div></div></div>'+
+      (PREF.docsOcultar?'Sí':'No')+'</button></div></div></div>'+
     '<h4>Notificaciones</h4>'+_notisHTML_()+
     '<h4>Sesión</h4><div class="tarj"><div class="fila"><div class="a"><b>'+quien+'</b>'+
       '<small>'+v+'</small></div></div></div>'+
@@ -4603,12 +4705,18 @@ function _destVisibles_(){
   return DEST.filter(function(d){
     /* Se queda si la has fijado en Ajustes, si estas dentro (no se puede tirar el suelo
        que pisas) o si de verdad tienes algo que hacer ahi. */
-    if(d[0]==='docs') return PREF.docsSiempre || ST.vista==='docs' || _docsRelevantes_();
+    /* Por DEFECTO se ve. Solo se esconde si tu lo has pedido en Ajustes, y aun asi
+       reaparece cuando hay algo que hacer o cuando estas dentro: no se puede tirar el
+       suelo que pisas. */
+    if(d[0]==='docs') return !PREF.docsOcultar || ST.vista==='docs' || _docsRelevantes_();
     return true;
   });
 }
 function pintarNav(){
   var nav=$('#nav'), b=badges();
+  /* Cuantas hay, para que el CSS ajuste el rotulo. Va en el propio nav y no en :root
+     porque es una propiedad de esta barra, no del documento. */
+  nav.style.setProperty('--tabN', String(_destVisibles_().length));
   var previos=$$('.tab',nav);
   previos.forEach(function(t){t.remove();});
   _destVisibles_().forEach(function(d){
@@ -4657,7 +4765,10 @@ function pintar(silencioso){
   /* `el` acotado a proposito: sin el, `root||document` recorreria TAMBIEN la barra de la
      otra vista -que sigue en el DOM, oculta- y le machacaria su memoria con un ancho que
      no le toca. Si `el` no existe no se anima nada, que es lo correcto. */
-  if(el && ST.vista==='estado'){ armarMedidor(silencioso); animarBarras(el, silencioso); }
+  /* `animarDeltas` va en las DOS: la comparativa cuelga de la barra de horas y esa barra
+     la pintan Estado y Horas. Estaba solo en Horas y en Estado las filas se quedaban a
+     cero -pintadas, pero sin llegar a moverse de la marca central. */
+  if(el && ST.vista==='estado'){ armarMedidor(silencioso); animarBarras(el, silencioso); animarDeltas(el); }
   if(el && ST.vista==='horas'){ animarBarras(el, silencioso); animarDeltas(el); }
   if(ST.vista==='fichar'){ medirAristas(); validarFichaje(); }
   enganchar();
@@ -4989,8 +5100,8 @@ function enganchar(){
         });
         var b3=$('#btnDocsSiempre');
         if(b3) b3.onclick=function(){
-          PREF.docsSiempre=!PREF.docsSiempre; _guardarPref_();
-          b3.textContent=PREF.docsSiempre?'Sí':'No';
+          PREF.docsOcultar=!PREF.docsOcultar; _guardarPref_();
+          b3.textContent=PREF.docsOcultar?'Sí':'No';
           /* La barra se repinta sola, pero la estrella viajera se coloca por el
              rectangulo del boton activo: con una pestaña mas o menos, ese rectangulo
              cambia de sitio y hay que recolocarla o se queda sobre la posicion vieja. */

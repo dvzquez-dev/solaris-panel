@@ -2550,6 +2550,14 @@ V.reclutar={g:'Equipo',t:'Reclutamiento',f:function(){
    siguen siendo pasos aparte, y la vista previa es un Artifact, nunca produccion.
    ─────────────────────────────────────────────────────────────────────────── */
 var BUZON=null, BUZON_ERR=null, BUZON_SEL=null;
+/* Lo que Daniel va escribiendo en la caja de anotaciones, por reporte. Vive FUERA del
+   DOM a proposito: `pintar()` reconstruye la vista entera y se llevaria por delante el
+   texto a medio escribir. Con esto, un repintado -o volver de otra pestaña- lo devuelve.
+   Es el mismo motivo por el que ya no hay `prompt()`: un dialogo se cierra solo. */
+var BZ_NOTAS={};
+/* La decision pulsada y aun sin confirmar: {id, acc, notas:bool}. La confirmacion se pide
+   EN LA FICHA y no con `confirm()`, que tapa justo lo que estabas leyendo para decidir. */
+var BZ_CONF=null;
 /* Reportar desde el escritorio. Mismo criterio que en el movil: dos campos a mano y el
    resto lo rellena la app. Se hace con un `prompt` encadenado a proposito -esta cara no
    tiene modales y montar uno solo para esto seria mas superficie de la que vale-. */
@@ -2882,20 +2890,59 @@ function _fichaBuzon_(r){
     (r.vista_previa? '<div class="sub"><span class="sc">Vista previa</span>'+
        '<p style="margin:4px 0 0"><a href="'+esc(r.vista_previa)+'" target="_blank" rel="noopener" '+
        'style="color:var(--red2);font-size:12.5px">abrir el artefacto con los cambios puestos</a></p></div>' : '')+
-    (r.recomendacion
-      ? '<div class="acts">'+
-        '<button class="btn pri" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Adelante">Adelante, hazlo</button>'+
-        /* ADELANTE CON ANOTACIONES (Daniel, 28/07). Mismo estado que «Adelante» —autoriza
-           igual— pero pidiendo sus matices: qué parte sí, qué parte no, cómo lo quiere.
-           Es un estado con instrucciones, no un estado nuevo: quien construye tiene que
-           leerlas ANTES de ponerse, y para eso van pegadas al reporte y no en un chat. */
-        '<button class="btn" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Adelante+">Adelante, con anotaciones</button>'+
-        (r.vista_previa?'<button class="btn ok" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Publicado">Visto bueno · publicar</button>':'')+
-        '<button class="btn no" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Descartado">Descartar</button>'+
-        '</div>'
+    (r.recomendacion ? _accBuzon_(r, esBug)
       : '<div class="ruta">Todavía sin analizar. Cuando esté reproducido y valorado, aparecen '+
         'aquí el diagnóstico y la recomendación, y con ellos los botones.</div>')+
   '</div>';
+}
+/* LAS CUATRO SALIDAS DEL BUZON, con la caja de anotaciones a la vista.
+
+   Daniel (28/07): «dejame por favor una caja de texto normal y no tener q rellenarlo en un
+   popup q si no como cambie de pestaña se me cierra». Asi que el `prompt()` se fue y esto es
+   un `<textarea>` de la propia ficha, igual que el motivo de los documentos.
+
+   Las salidas son cuatro y no dos: `Adelante` · `Adelante con anotaciones` ·
+   `Descartar con anotaciones` · `Descartar`. Las dos «con anotaciones» guardan el MISMO estado
+   que su version seca -autorizan o descartan igual- y lo que añaden son las instrucciones.
+   Un estado nuevo habria que pintarlo en todos los sitios que pintan estados y no diria nada
+   que no diga el texto.
+
+   La confirmacion tambien se pide aqui dentro, no con `confirm()`: el dialogo tapa justo el
+   diagnostico que estabas leyendo para decidir. */
+var BZ_AVISO={
+  'Adelante':'Autorizas que se construya. Todavía NO se publica nada.',
+  'Publicado':'Das el visto bueno: esto es lo que autoriza a publicarlo.',
+  'Descartado':'Se descarta. Queda en el histórico, no se borra.'};
+function _accBuzon_(r, esBug){
+  var t=esBug?'bug':'mejora', ID=esc(r.id);
+  var notas=(BZ_NOTAS[r.id]!=null?BZ_NOTAS[r.id]:(r.anotaciones||''));
+  function bot(acc, txt, cls){
+    return '<button class="btn '+(cls||'')+'" data-bz="'+ID+'" data-bzt="'+t+'" data-bzacc="'+acc+'">'+txt+'</button>';
+  }
+  /* Confirmacion en linea: se sustituyen los botones por el aviso y un si/no. Se ve el aviso
+     Y el reporte a la vez, que es lo que un `confirm()` no deja hacer. */
+  if(BZ_CONF && BZ_CONF.id===r.id){
+    var seca=BZ_CONF.acc, conN=BZ_CONF.notas;
+    return '<div class="sub" style="border-color:var(--red2)">'+
+      '<span class="sc">'+(conN?seca.toUpperCase()+' CON ANOTACIONES':seca.toUpperCase())+'</span>'+
+      '<p style="margin:4px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.55">'+
+        esc(BZ_AVISO[seca]||'')+'</p>'+
+      (conN?'<p style="margin:6px 0 0;font-size:12.5px;color:#f0cf9e;line-height:1.55">'+
+        esc((BZ_NOTAS[r.id]||'').trim())+'</p>':'')+
+      '<div class="acts">'+
+        '<button class="btn pri" data-bzok="'+ID+'" data-bzt="'+t+'">Confirmar</button>'+
+        '<button class="btn" data-bzno="">Volver</button>'+
+      '</div></div>';
+  }
+  return '<textarea data-bznotas="'+ID+'" placeholder="Anotaciones — qué parte sí, qué parte no, cómo lo quieres. Las lee quien lo construya antes de empezar…">'+
+      esc(notas)+'</textarea>'+
+    '<div class="acts">'+
+      bot('Adelante','Adelante, hazlo','pri')+
+      bot('Adelante+','Adelante, con anotaciones')+
+      (r.vista_previa?bot('Publicado','Visto bueno · publicar','ok'):'')+
+      bot('Descartado+','Descartar con anotaciones','no')+
+      bot('Descartado','Descartar','no')+
+    '</div>';
 }
 function _filaBuzon_(r){
   if(BUZON_SEL===r.id) return _fichaBuzon_(r);
@@ -3400,7 +3447,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='97d2aaf';
+var BUILD='45abbce';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3575,38 +3622,51 @@ function pintar(){
   /* buzon: abrir/cerrar un reporte y las tres decisiones. Ninguna aplica nada: mueven
      el estado. Construir y publicar siguen siendo pasos aparte. */
   $$('[data-bzsel]',m).forEach(function(el){
-    el.onclick=function(ev){ ev.stopPropagation(); var v=el.dataset.bzsel; BUZON_SEL=v||null; pintar(); };
+    el.onclick=function(ev){ ev.stopPropagation(); var v=el.dataset.bzsel;
+      /* Cambiar de reporte cancela la confirmacion a medias, pero NO el borrador de
+         anotaciones: ese es trabajo escrito y se conserva por si vuelve. */
+      if(BZ_CONF && BZ_CONF.id!==v) BZ_CONF=null;
+      BUZON_SEL=v||null; pintar(); };
+  });
+  /* La caja de anotaciones. Se apunta a CADA TECLA en `BZ_NOTAS` para que un repintado
+     -o volver de otra pestaña- no se lleve por delante lo escrito. */
+  $$('[data-bznotas]',m).forEach(function(ta){
+    ta.oninput=function(){ BZ_NOTAS[ta.dataset.bznotas]=ta.value; };
   });
   $$('[data-bzacc]',m).forEach(function(b){
-    b.onclick=async function(){
+    b.onclick=function(){
       if(b.disabled) return;
-      var id=b.dataset.bz, tipo=b.dataset.bzt, acc=b.dataset.bzacc;
-      /* `Adelante+` NO es un estado: es «Adelante» con instrucciones. El estado que se
-         guarda es el mismo -autoriza igual- y lo que cambia es que van pegadas al reporte
-         unas anotaciones que quien construye tiene que leer antes de ponerse. Un estado
-         nuevo obligaria a enseñarlo en todos los sitios que pintan estados y no diria
-         nada que no diga el texto. */
-      var conNotas=(acc==='Adelante+');
-      if(conNotas) acc='Adelante';
-      var aviso={Adelante:'Autorizas que se construya. Todavía NO se publica nada.',
-        Publicado:'Das el visto bueno: esto es lo que autoriza a publicarlo.',
-        Descartado:'Se descarta. Queda en el histórico, no se borra.'}[acc]||'';
-      var notas=null;
-      if(conNotas){
-        var previas=((BUZON||[]).filter(function(x){ return x.id===id; })[0]||{}).anotaciones||'';
-        notas=prompt('Tus anotaciones: qué parte sí, qué parte no, cómo lo quieres.'+
-          String.fromCharCode(10)+'Las lee quien lo construya antes de empezar.', previas);
-        /* Cancelar aborta; dejarlo vacío también, porque «adelante con anotaciones» sin
-           anotaciones es «adelante» y para eso está el otro botón. */
-        if(notas===null) return;
-        if(!notas.trim()){ tost('Sin anotaciones, usa «Adelante, hazlo».'); return; }
+      var id=b.dataset.bz, acc=b.dataset.bzacc;
+      /* `Adelante+` y `Descartado+` NO son estados: son el mismo estado con instrucciones.
+         Se guarda `Adelante`/`Descartado` y las anotaciones van en su columna. Un estado
+         nuevo habria que pintarlo en todos los sitios que pintan estados y no diria nada
+         que no diga el texto. */
+      var conNotas=/\+$/.test(acc);
+      if(conNotas) acc=acc.slice(0,-1);
+      var ta=$('[data-bznotas="'+id+'"]',m);
+      if(ta) BZ_NOTAS[id]=ta.value;
+      /* Sin anotaciones, «con anotaciones» es la version seca y para eso esta el otro boton. */
+      if(conNotas && !String(BZ_NOTAS[id]||'').trim()){
+        tost('Escribe las anotaciones en la caja de arriba.');
+        if(ta) ta.focus();
+        return;
       }
-      if(!confirm((conNotas?'Adelante CON ANOTACIONES':acc)+' — '+id+String.fromCharCode(10,10)+aviso)) return;
+      BZ_CONF={id:id, acc:acc, notas:conNotas};
+      pintar();
+    };
+  });
+  $$('[data-bzno]',m).forEach(function(b){ b.onclick=function(){ BZ_CONF=null; pintar(); }; });
+  $$('[data-bzok]',m).forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled || !BZ_CONF) return;
+      var id=b.dataset.bzok, tipo=b.dataset.bzt, acc=BZ_CONF.acc, conNotas=BZ_CONF.notas;
       var campos={estado:acc};
-      if(conNotas) campos.anotaciones=notas.trim();
+      if(conNotas) campos.anotaciones=String(BZ_NOTAS[id]||'').trim();
       b.disabled=true; var prev=b.textContent; b.textContent='Guardando…';
       try{ await api.decidirReporte(tipo, id, campos);
-        tost(id+': '+acc+(conNotas?' con anotaciones.':'.')); _cargarBuzon_(); }
+        tost(id+': '+acc+(conNotas?' con anotaciones.':'.'));
+        /* El borrador se tira SOLO cuando el servidor ya lo tiene. Si falla, sigue ahi. */
+        delete BZ_NOTAS[id]; BZ_CONF=null; _cargarBuzon_(); }
       catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo: '+((e&&e.message)||e)); }
     };
   });
