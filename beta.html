@@ -2239,6 +2239,15 @@ function puedeSancionarA(actor, objetivo){
 }
 /* A quien puede sancionar, ya filtrado. Lo usan los dos formularios: que la lista salga de
    la MISMA regla que el permiso es lo que impide ofrecer a alguien y que el envio falle. */
+/* QUIEN MANDA A EFECTOS DE SANCIONES · GEMELA (movil/escritorio).
+   No es `yoNombre()`: ese sale de `YO`, y **`YO` se reescribe con «ver como»**, asi que el PD
+   mirando la ficha de otro heredaba la jurisdiccion de ese otro. El backend (v49) compara
+   contra `ident.nombre` -el de la SESION-, de modo que la cara y el servidor estaban
+   respondiendo a preguntas distintas. La autoridad no se hereda mirando. */
+function _actorSanc_(){
+  if (typeof backendOK !== 'undefined' && backendOK && SESION && SESION.nombre) return SESION.nombre;
+  return yoNombre();               // demo local (?demo), donde no hay sesion
+}
 function sancionablesPor(actor){
   return (DATA.miembros || []).filter(function(m){
     return m && !m.baja && puedeSancionarA(actor, m.nombre);
@@ -2315,13 +2324,13 @@ function _gruposSanc_(actor, filtro){
 function _sancionesHTML_(){
   /* El gate es el RANGO DE SANCIONES, no el cargo: Bruno tiene rango 2 sin ser nada en los
      documentos, y un consejero sin gente debajo es rango 0 aunque este en el consejo. */
-  if(rangoSanc(yoNombre())<1) return '<div class="mtit">Sanciones</div>'+
+  if(rangoSanc(_actorSanc_())<1) return '<div class="mtit">Sanciones</div>'+
     '<div class="msub">Esto no es para ti.</div>';
   /* La lista sale de la MISMA regla que el permiso. Ofrecer a alguien y que luego el envio
      falle es peor que no ofrecerlo: parece un fallo cuando es la norma. Y uno mismo SI esta,
      en los tres rangos, que es parte del modelo. */
-  var grupos=_gruposSanc_(yoNombre(), SANC_FORM.filtro);
-  var nTotal=sancionablesPor(yoNombre()).length;
+  var grupos=_gruposSanc_(_actorSanc_(), SANC_FORM.filtro);
+  var nTotal=sancionablesPor(_actorSanc_()).length;
   var esPlazo=(SANC_FORM.motivo==='plazo');
   /* Solo las tareas VIVAS y con enlace a Notion: sin `url` no se puede mover la fecha, y
      ofrecerla seria prometer algo que va a fallar al guardar. */
@@ -2445,7 +2454,7 @@ function _cablearSanciones_(){
   if(fi) fi.oninput=function(){
     SANC_FORM.filtro=fi.value;
     var c=$('#snLista'); if(!c) return;
-    c.innerHTML=_listaSancHTML_(_gruposSanc_(yoNombre(), SANC_FORM.filtro));
+    c.innerHTML=_listaSancHTML_(_gruposSanc_(_actorSanc_(), SANC_FORM.filtro));
     $$('[data-sanq]',c).forEach(function(b){
       b.onclick=function(){
         SANC_FORM.quien=b.dataset.sanq;
@@ -4236,7 +4245,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7835ebd';
+var BUILD='998b9b1';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -5796,7 +5805,7 @@ function enganchar(){
      esta opcion». No es que la vean y les falle: no aparece — enseñar una puerta cerrada
      invita a empujarla y, sobre todo, dice quien manda sobre quien a quien no le toca. */
   var _ms=$('#menu [data-mnu="sanciones"]');
-  if(_ms) _ms.style.display = (rangoSanc(yoNombre())>=1) ? '' : 'none';
+  if(_ms) _ms.style.display = (rangoSanc(_actorSanc_())>=1) ? '' : 'none';
   var _bm=$('#btnMenu'); if(_bm) _bm.onclick=function(){ _abrirMenu_(true); };
   var _mn=$('#menu');
   if(_mn) _mn.onclick=function(ev){ if(ev.target===_mn) _abrirMenu_(false); };
