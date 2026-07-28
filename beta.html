@@ -2196,10 +2196,12 @@ var RANGO_SANC = {
    Se declara como ESTRUCTURA y no como una excepcion con nombre y apellidos, porque no lo es:
    la siguiente subcoordinacion que se cree es UNA LINEA aqui y no un caso especial repartido
    por el codigo. La gente va nombrada una a una porque «Hardware» no es un campo del roster:
-   es un reparto de trabajo, y deducirlo de algo seria inventarse una relacion que no existe. */
+   es un reparto de trabajo, y deducirlo de algo seria inventarse una relacion que no existe.
+   Los nombres son los del ROSTER, completos: puestos por nombre de pila no casaban con nadie
+   y Breixo se quedaba sin equipo, en silencio. */
 var SUBCOORD = [
   { unidad:'Aviónica', equipo:'Hardware', quien:'Breixo Pombar Fernández',
-    gente:['Breixo Pombar Fernández', 'Aarón', 'Yoel'] }
+    gente:['Breixo Pombar Fernández', 'Aaron Parada Valiño', 'Yoel Clemente González'] }
 ];
 /* La subcoordinacion de alguien, o `null`. */
 function _subcoordDe_(n){
@@ -4234,7 +4236,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='034d305';
+var BUILD='7835ebd';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
