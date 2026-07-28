@@ -289,6 +289,12 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 /* La comparativa cuelga de la barra: se separa con una linea, no con una tarjeta.
    La tarjeta aparte era lo que hacia que pareciera una seccion propia y sobrara. */
 .comph{margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}
+/* Plegado generico (`data-plg`). Existe uno para el visor de documentos, pero ese trae
+   iframe y carga diferida; esto es solo enseñar/esconder lo que ya esta pintado. */
+.plgh{display:flex;align-items:center;gap:9px;cursor:pointer;padding:3px 0}
+.plgh b{font-size:12.5px}
+.plgh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px;margin-top:2px}
+.plgc{padding-top:10px}
 .libro{overflow:hidden;height:0;transition:height .42s var(--sal)}
 .retf{display:flex;align-items:center;gap:11px;padding:9px 2px;border-top:1px solid var(--line);font-size:12px}
 .retf .pt{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--red2);flex:none;width:26px}
@@ -722,6 +728,21 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 /* visor incrustado: alto contenido, el zoom lo pone el propio visor de Drive */
 .doc .dv{width:100%;height:52vh;min-height:280px;border:0;display:block;background:#2a2526}
 .doc .dcar{padding:26px 12px;text-align:center;color:var(--ink3);font-size:12px;line-height:1.6}
+/* Pantalla completa del visor. Es CSS y no la Fullscreen API a proposito:
+   `requestFullscreen` sobre un elemento NO existe en iOS Safari, que es justo donde se lee un
+   documento con el movil en la mano. Una funcion que en la mitad de los aparatos no hace nada
+   es peor que no tenerla. */
+.doc.full{position:fixed;inset:0;z-index:9000;margin:0;border-radius:0;display:flex;
+  flex-direction:column;background:#0A0909}
+.doc.full .vcuerpo{flex:1;min-height:0;display:flex}
+.doc.full .dv{height:auto;min-height:0;flex:1}
+.vfull{margin-left:auto;background:none;border:1px solid var(--line);border-radius:7px;
+  width:26px;height:26px;padding:0;display:flex;align-items:center;justify-content:center;
+  color:var(--ink2);cursor:pointer;flex:none}
+.vfull:hover{color:var(--ink);border-color:var(--ink3)}
+.vfull svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round}
+.doc .dh .vchev{flex:none;margin-left:7px}
 .doc .da{display:block;padding:9px 12px;text-align:center;font-family:var(--mono);font-size:11px;
   color:var(--red2);border-top:1px solid var(--line);text-decoration:none}
 .cajsec{max-height:0;overflow:hidden;transition:max-height .45s var(--sal)}
@@ -823,6 +844,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
     <img class="marcagua" aria-hidden="true" src="data:image/png;base64,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" alt="">
     <div class="menu" id="menu" aria-hidden="true">
       <div class="caja">
+        <button data-mnu="cuota" data-p>Tu cuota<small>Lo que te toca pagar esta temporada</small></button>
         <button data-mnu="equipo" data-p>El equipo<small>Quién coordina cada unidad</small></button>
         <button data-mnu="ajustes" data-p>Ajustes<small>Notificaciones y sesión</small></button>
         <button data-mnu="buzon" data-p>Reportar<small>Un fallo o una mejora</small></button>
@@ -1159,15 +1181,43 @@ function _umbral_(){
   var media=hs.reduce(function(a,h){ return a+h; },0)/hs.length;
   return Math.max(UMBRAL_LO, Math.min(UMBRAL_HI, UMBRAL_FRAC*media));
 }
-function _apiParse(txt){ var j=null; try{ j=JSON.parse(txt); }catch(_){}
-  if(!j || j.ok!==true) throw new Error((j&&j.error)||"respuesta no válida del backend");
-  return j.data; }
+/* `_ApiTransito` marca los fallos que SI se reintentan: la peticion no llego entera. Se
+   distingue de un «no» del backend, que no se reintenta porque tiene criterio. */
+function _ApiTransito(m){ this.message=m; this.transito=true; }
+_ApiTransito.prototype=Object.create(Error.prototype);
+function _apiParse(txt, accion){
+  var j=null; try{ j=JSON.parse(txt); }catch(_){}
+  /* Lo que vuelve no es JSON: es la pagina HTML de Google del 404 transitorio. */
+  if(!j) throw new _ApiTransito("respuesta no válida del backend");
+  if(j.ok===true) return j.data;
+  var err=String(j.error||"");
+  /* «acción desconocida: » con la accion VACIA = el cuerpo del POST se perdio por el camino
+     y el backend no vio ninguna accion. Nunca llego a ejecutarse nada, asi que se repite. */
+  if(accion && /^acci[oó]n desconocida/.test(err) && err.indexOf(accion)<0)
+    throw new _ApiTransito("el cuerpo del POST no llegó ("+err+")");
+  throw new Error(err||"respuesta no válida del backend");
+}
 var api={
+  /* TRES INTENTOS. Apps Script pierde el cuerpo del POST de vez en cuando (302->404) y
+     hasta ahora eso era un fallo a la cara del usuario: «no fui capaz de fichar». Se nota en
+     el fichaje y no en el resto porque las demas pantallas se refrescan solas y la siguiente
+     pasada tapaba el hueco. Misma regla que `rutinas/llamar.py`. */
   _post: async function(body){
     if(SESION&&SESION.token&&!body.token) body=Object.assign({},body,{token:SESION.token});
-    var r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify(body)});
-    return _apiParse(await r.text()); },
+    var accion=String(body.action||""), ultimo=null;
+    for(var i=0;i<3;i++){
+      if(i) await new Promise(function(ok){ setTimeout(ok, 600+i*800); });
+      try{
+        var r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+          body:JSON.stringify(body)});
+        return _apiParse(await r.text(), accion);
+      }catch(e){
+        /* Un «no» del backend no se reintenta; un fallo de red o de transito, si. */
+        if(e && !e.transito && !(e instanceof TypeError)) throw e;
+        ultimo=e;
+      }
+    }
+    throw ultimo || new Error("no se pudo hablar con el servidor"); },
   ping:      function(){ try{ fetch(BACKEND_URL+"?action=ping",{cache:"no-store"}).catch(function(){}); }catch(_){} },
   bootstrap: function(t){ var b={action:"bootstrap"}; if(t)b.token=t; return api._post(b); },
   quienSoy:  function(t){ return api._post({action:"quienSoy",token:t}); },
@@ -1698,10 +1748,15 @@ var CARGA={partes:false, fichaje:false, reuniones:false};
    pantalla, no de la persona (el mismo miembro puede querer una cosa en el movil y
    otra en el escritorio). Se lee con `_pref_` para que un localStorage bloqueado
    -Safari privado lo hace- no reviente el arranque entero. */
-var PREF={docsOcultar:false, escala:''};        // '' | 'tx-l' | 'tx-xl'
+/* `ocultar` es un mapa por pestaña, no una bandera por cada una: ver `OCULTABLES`. */
+var PREF={ocultar:{}, escala:''};               // '' | 'tx-l' | 'tx-xl'
 try{ var _pr=JSON.parse(localStorage.getItem('sol_pref')||'null');
-     if(_pr && typeof _pr==='object') for(var _k in PREF) if(_k in _pr)
-       PREF[_k]=(typeof PREF[_k]==='boolean') ? !!_pr[_k] : String(_pr[_k]||'');
+     if(_pr && typeof _pr==='object') for(var _k in PREF) if(_k in _pr){
+       /* `ocultar` es un objeto y hay que copiarlo como tal: pasandolo por `String()`
+          -como el resto- se guardaba «[object Object]» y la preferencia se perdia. */
+       if(_k==='ocultar') PREF.ocultar=(_pr.ocultar && typeof _pr.ocultar==='object') ? _pr.ocultar : {};
+       else PREF[_k]=(typeof PREF[_k]==='boolean') ? !!_pr[_k] : String(_pr[_k]||'');
+     }
 }catch(_){}
 function _guardarPref_(){ try{ localStorage.setItem('sol_pref',JSON.stringify(PREF)); }catch(_){} }
 /* Se aplica sobre el `body` como clase y no como estilo en linea porque el modal se crea
@@ -2535,16 +2590,10 @@ function vEstado(){
      lo revirtio el 28/07: «estaba muchisimo mas guapo antes que estuviese arriba». */
   return '<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>'+
     av+
-    /* El numero grande son las horas de ESTE MES cuando se saben; si no, la media de la
-       temporada, y entonces la etiqueta lo dice. Antes ponia «empleadas este mes» sobre la
-       media, que es de lo poco que un miembro puede comprobar a mano. */
-    '<div class="tarj">'+cab(_hMesReal_(YO)!=null?'Horas de este mes':'Horas del mes',
-        _hMesReal_(YO)!=null?'Panel de Rendimientos':'objetivo '+nf(UMBRAL,1)+' h')+
-      '<div class="cifh"><span class="g" id="gEstado">'+nf2(_hMesReal_(YO)!=null?_hMesReal_(YO):sumaE('otor'))+'</span>'+
-      '<span class="sc">h '+(_hMesReal_(YO)!=null?'este mes':'que cuentan')+'</span>'+
-      (sumaE('pend')?'<span class="pil pend" style="margin-left:auto">+'+nf2(sumaE('pend'))+' h pend.</span>':'')+'</div>'+
-      barraHorasHTML('barEstado')+
-    '</div>'+
+    /* LAS HORAS SALIERON DE AQUI (Daniel, 28/07: «quitaria las horas de estado y las
+       dejaria solo en horas»). Estaban en dos pantallas con la misma cifra y la misma barra.
+       Lo que se queda es el AVISO de horas esperando firma, arriba: eso no es una cifra que
+       consultar, es algo que hacer. */
     /* OJO: aquí NO va `REUNION`. Ese es el puntero de la pantalla de Reuniones y cambia
        al navegar por la lista, así que esta tarjeta acababa mostrando «la última que
        abriste» con el rótulo de «la próxima». */
@@ -2875,6 +2924,17 @@ function desgloseCat(ps){
   }).join('');
   return '<div style="display:flex;flex-wrap:wrap;margin:2px 0 4px">'+chips+'</div>';
 }
+/* EL HISTORIAL, SOLO DEL MES EN CURSO (Daniel, 28/07). No se borra nada: los partes
+   siguen enteros y el cierre mensual los conserva; lo que se filtra es lo que SE PINTA. Su
+   razon es la buena: un historial que solo crece es basura infinita en una pantalla de movil,
+   y lo de meses cerrados ya no se puede tocar ni discutir.
+   La fecha viene como `DD/MM/AAAA`, que es como la escribe el resto de la app. */
+function _delMesEnCurso_(p){
+  var f=String(p&&p.f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(!m) return true;                       // sin fecha legible no se esconde: se ve y se nota
+  var h=new Date();
+  return (+m[2])===(h.getMonth()+1) && (+m[3])===h.getFullYear();
+}
 function filaParte(p){
   var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='rech'||p.e==='cad')?'borde-no':'borde-pe';
   var pil = p.e==='conf'?'<span class="pil conf">aprobada</span>'
@@ -2896,6 +2956,45 @@ function filaParte(p){
   return '<div class="fila '+cls+'"><div class="a"><b>'+esc(p.t||'Fichaje sin declarar')+'</b><small>'+sub+catTxt+
     _origenParte_(p)+'</small></div>'+
     '<div class="d">'+accion+pil+' <b class="mono">'+nf(p.q,1)+' h</b></div></div>';
+}
+/* El historial plegado, al fondo de Horas. Usa el mismo visor de plegado que el resto
+   (`data-vabrir`/`.vcuerpo`) para no estrenar un tercer mecanismo de desplegar cosas. */
+function _historialHTML_(confs){
+  var delMes=(confs||[]).filter(_delMesEnCurso_);
+  var h=delMes.reduce(function(a,p){ return a+(+p.q||0); },0);
+  return '<h2 class="sec">Historial de este mes<span class="ln"></span>'+nf2(h)+' h</h2>'+
+    '<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
+      '<b>Qué se te contó este mes</b><small>'+delMes.length+' apunte'+(delMes.length===1?'':'s')+
+        ' · pulsa para verlos</small>'+
+      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
+        'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
+      '<div class="plgc" hidden>'+
+        (delMes.length
+          ? desgloseCat(delMes)+
+            '<p class="rnota" style="margin:0 0 10px">A qué categoría del Panel de Rendimientos sumó cada '+
+            'una de tus horas. La categoría también recoge reuniones automáticas y cursos: aquí solo '+
+            'está tu parte. Los meses cerrados no se borran, pero ya no se muestran.</p>'+
+            delMes.map(filaParte).join('')
+          : vacio('Este mes todavía nada','Cuando te firmen un fichaje aparecerá aquí, con la categoría '+
+              'a la que sumó.','',false))+
+      '</div></div></div>';
+}
+/* LA CUOTA, en el menu ⋮ (Daniel, 28/07: «moveria la parte entera de cuota al menu de los 3
+   puntos»). Es una cifra que se consulta dos veces al año: en Horas solo alargaba la pantalla. */
+function _cuotaHTML_(){
+  var eur=function(n){return nf(n,2)+' €';};
+  var recibo = YO.coche
+    ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(YO.cuota_base)+'</span></div>'+
+      '<div class="rl desc"><span>Por poner el coche · '+YO.coche+' turno'+(YO.coche===1?'':'s')+'</span>'+
+      '<span class="ra">−'+eur(YO.cuota_base-YO.cuota)+'</span></div>'
+    : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta 4 € por turno.</p>';
+  return '<div class="mtit">Tu cuota</div>'+
+    '<div class="msub">Se cierra en agosto, al acabar la temporada. Es requisito para renovar.</div>'+
+    '<div class="tarj acc">'+
+      '<div class="cifh"><span class="g mono" style="color:var(--ok)">'+nf(YO.cuota,2)+'</span><span class="sc">€ al año</span></div>'+
+      '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+recibo+'</div>'+
+      '<p class="rnota">Sale de tus horas de la temporada: el objetivo se mueve entre 8 y 15 h/mes, con '+
+      '2 h de base. Se descuentan 4 € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>';
 }
 function vHoras(){
   var o=sumaE('otor'), p=sumaE('pend');
@@ -2919,13 +3018,6 @@ function vHoras(){
       : '<div class="r"><span class="p mono">'+i+'</span><span class="cens"></span></div>';
   }
 
-  var eur=function(n){return nf(n,2)+' €';};
-  var recibo = YO.coche
-    ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(YO.cuota_base)+'</span></div>'+
-      '<div class="rl desc"><span>Por poner el coche · '+YO.coche+' turno'+(YO.coche===1?'':'s')+'</span>'+
-      '<span class="ra">−'+eur(YO.cuota_base-YO.cuota)+'</span></div>'
-    : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta 4 € por turno.</p>';
-
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
@@ -2946,15 +3038,9 @@ function vHoras(){
             'hasta que tu coordinador las apruebe.','ficha desde la pestaña Fichar', false))+
     '</div>'+
 
-    '<h2 class="sec">Historial · qué se contó<span class="ln"></span>'+nf2(o)+' h</h2>'+
-    '<div class="tarj">'+
-      desgloseCat(confs)+
-      (confs.length
-        ? '<p class="rnota" style="margin:0 0 10px">A qué categoría del Panel de Rendimientos sumó cada una '+
-          'de tus horas. La categoría también recoge reuniones automáticas y cursos: aquí solo está tu parte.</p>'+
-          confs.map(filaParte).join('')
-        : vacio('Todavía nada contabilizado','Cuando te firmen un fichaje aparecerá aquí, con la categoría '+
-            'a la que sumó.','',false))+'</div>'+
+    /* Las horas por subsistema van JUSTO detras de tus partes (Daniel, 28/07): lo tuyo
+       primero, y al lado con que se compara. El historial se fue al fondo. */
+    _rankSubsHTML_()+
 
     '<h2 class="sec">Mi carga del mes<span class="ln"></span>banda sana 60–90</h2>'+
     '<div class="tarj">'+
@@ -2972,7 +3058,6 @@ function vHoras(){
           '</div><div class="d">banda sana 60–90</div></div>'
         : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+
     '</div>'+
-    _rankSubsHTML_()+
     '<h2 class="sec">Ranking de horas<span class="ln"></span>temporada '+DATA.temporada+'</h2>'+
     '<div class="tarj rank">'+
       (filas
@@ -2981,12 +3066,11 @@ function vHoras(){
         : vacio('Sin puesto todavía','Tu posición se calcula con las horas de la temporada al cerrar el mes.','',false))+
     '</div>'+
 
-    '<h2 class="sec">Tu cuota<span class="ln"></span>se cierra en agosto</h2>'+
-    '<div class="tarj acc">'+
-      '<div class="cifh"><span class="g mono" style="color:var(--ok)">'+nf(YO.cuota,2)+'</span><span class="sc">€ al año</span></div>'+
-      '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+recibo+'</div>'+
-      '<p class="rnota">Sale de tus horas de la temporada: el objetivo se mueve entre 8 y 15 h/mes, con '+
-      '2 h de base. Se descuentan 4 € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>'+
+    /* EL HISTORIAL, AL FONDO Y PLEGADO (Daniel, 28/07). Y solo el mes en curso: lo de
+       meses cerrados sigue guardado, pero ya no se puede tocar ni discutir, asi que en el
+       movil solo es scroll. */
+    _historialHTML_(confs)+
+    /* La cuota se fue al menu ⋮: es una cifra que se consulta dos veces al año. */
     (esPD()?panelPD():'');
 }
 
@@ -3047,44 +3131,103 @@ function _mioTurno_(t){ return !!(t.mio || (t.roles||[]).some(function(r){ retur
 /* De una URL de Drive saca el id del fichero, para poder pedir su visor incrustable. */
 function _idDrive_(u){ var m=String(u||'').match(/\/d\/([A-Za-z0-9_-]{20,})/); return m?m[1]:null; }
 
-/* La memoria va PLEGADA: la mayoria de las veces se abre la ficha para ver quien va y a
-   que hora, no para leer el informe. El iframe se crea al desplegar, no antes. */
-function _memoriaHTML_(t){
-  var id=_idDrive_(t.memoria);
-  return '<div class="doc" style="margin-top:14px">'+
-    '<div class="dh clic" data-mem="'+(id||'')+'" data-p style="cursor:pointer">'+
-      '<b>Memoria de fabricación</b><small>'+esc(t.f)+' · pulsa para leerla</small>'+
-      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
-        'stroke:currentColor;stroke-width:2.4;transition:transform .3s var(--sal)">'+
+/* ═══ EL VISOR DE DOCUMENTOS · GEMELA (movil/escritorio) ═══════════════════════
+   Habia TRES copias de esto -la memoria de un turno, la revision documental del movil y la
+   del escritorio-, identicas salvo en el texto de «cargando» y en si nacian plegadas. Daniel
+   lo cazo por el sintoma: «no esta la pantalla completa en las revisiones documentales como
+   si lo estaba en ordenes del dia... las separaste por pereza». Tenia razon: una mejora
+   puesta en una copia no le llegaba a las otras.
+
+   Ahora es una sola, y las dos diferencias son parametros:
+     · `plegado` — nace cerrada (la memoria de un turno se abre para ver quien va, no para
+       leer el informe) o abierta (una revision documental existe PARA leerlo).
+     · `queEs`   — «la memoria» / «el documento», que es lo unico que cambiaba del texto.
+
+   El iframe se crea **al desplegar**, nunca antes: tres visores de Drive cargando a la vez en
+   una ficha es medio megabyte que casi nadie va a mirar. */
+function _visorHTML_(o){
+  var abierto = !o.plegado;
+  return '<div class="doc" data-visor>'+
+    '<div class="dh" data-vabrir="'+esc(o.id||'')+'" data-p style="cursor:pointer">'+
+      '<b>'+esc(o.titulo)+'</b><small>'+esc(o.sub||'')+(o.plegado?' · pulsa para leerlo':'')+'</small>'+
+      /* La pantalla completa va en la cabecera y NO despliega: `stopPropagation` en su
+         manejador. Sin eso, pulsarla plegaba el visor a la vez que lo maximizaba. */
+      '<button class="vfull" data-vfull data-p title="Pantalla completa" aria-label="Pantalla completa">'+
+        '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>'+
+      '<svg class="vchev" viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;'+
+        'stroke:currentColor;stroke-width:2.4;transition:transform .3s'+(abierto?';transform:rotate(180deg)':'')+'">'+
         '<path d="M6 9l6 6 6-6"/></svg></div>'+
-    '<div class="memcuerpo" hidden></div>'+
-    '<a class="da" href="'+esc(t.memoria)+'" target="_blank" rel="noopener">abrir en Drive</a></div>';
+    '<div class="vcuerpo"'+(abierto?'':' hidden')+' data-quees="'+esc(o.queEs||'el documento')+'">'+
+      (abierto?'<div class="dcar">Cargando '+esc(o.queEs||'el documento')+'…</div>':'')+'</div>'+
+    (o.url?'<a class="da" href="'+esc(o.url)+'" target="_blank" rel="noopener">abrir en Drive</a>':'')+
+  '</div>';
 }
-function _cablearMemoria_(){
-  $$('[data-mem]').forEach(function(h){
+/* Mete el iframe de Drive en un cuerpo ya visible. Si no carga -permisos, CSP del hosting- se
+   DICE y se ofrece el enlace: un hueco blanco eterno es peor, porque quien revisa no sabe si
+   esperar o si esta roto. */
+function _cargarVisor_(cuerpo, id){
+  if(cuerpo.dataset.cargado) return; cuerpo.dataset.cargado='1';
+  var que=cuerpo.dataset.quees||'el documento';
+  if(!id){ cuerpo.innerHTML='<div class="dcar">El enlace no es un archivo de Drive reconocible.<br>'+
+    'Ábrelo con el enlace de abajo.</div>'; return; }
+  cuerpo.innerHTML='<div class="dcar">Cargando '+que+'…</div>';
+  var f=document.createElement('iframe');
+  f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
+  f.src='https://drive.google.com/file/d/'+id+'/preview';
+  var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
+    cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
+  f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
+  cuerpo.innerHTML=''; cuerpo.appendChild(f);
+}
+function _cablearVisor_(raiz){
+  var R=raiz||document;
+  $$('[data-visor] .vcuerpo',R).forEach(function(c){          // los que nacen abiertos
+    if(!c.hasAttribute('hidden')){
+      var h=c.parentNode.querySelector('[data-vabrir]');
+      _cargarVisor_(c, h && h.dataset.vabrir);
+    }
+  });
+  $$('[data-vabrir]',R).forEach(function(h){
     h.onclick=function(){
-      var cuerpo=h.parentNode.querySelector('.memcuerpo'), sv=h.querySelector('svg');
-      var abierto=!cuerpo.hasAttribute('hidden');
-      if(abierto){ cuerpo.setAttribute('hidden',''); sv.style.transform=''; return; }
-      cuerpo.removeAttribute('hidden'); sv.style.transform='rotate(180deg)';
-      if(cuerpo.dataset.cargado) return;
-      cuerpo.dataset.cargado='1';
-      var id=h.dataset.mem;
-      if(!id){ cuerpo.innerHTML='<div class="dcar">No se puede mostrar aquí. Ábrela en Drive.</div>'; return; }
-      cuerpo.innerHTML='<div class="dcar">Cargando la memoria…</div>';
-      var f=document.createElement('iframe');
-      f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
-      f.src='https://drive.google.com/file/d/'+id+'/preview';
-      /* Si el visor no carga (CSP del artefacto, o sin permiso), se dice y se ofrece Drive. */
-      var fallo=setTimeout(function(){
-        if(cuerpo.dataset.ok) return;
-        cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrela en Drive con el enlace de abajo.</div>';
-      }, 6000);
-      f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
-      cuerpo.innerHTML=''; cuerpo.appendChild(f);
+      var caja=h.parentNode, cuerpo=caja.querySelector('.vcuerpo'), sv=caja.querySelector('.vchev');
+      if(!cuerpo.hasAttribute('hidden')){ cuerpo.setAttribute('hidden',''); if(sv) sv.style.transform=''; return; }
+      cuerpo.removeAttribute('hidden'); if(sv) sv.style.transform='rotate(180deg)';
+      _cargarVisor_(cuerpo, h.dataset.vabrir);
     };
   });
+  $$('[data-vfull]',R).forEach(function(b){
+    b.onclick=function(ev){
+      ev.stopPropagation();                                    // no despliega: solo maximiza
+      var caja=b.closest('.doc'), cuerpo=caja.querySelector('.vcuerpo');
+      var yaEsta=caja.classList.toggle('full');
+      document.body.style.overflow = yaEsta ? 'hidden' : '';
+      /* Maximizar con el visor plegado no enseñaria nada: se abre y se carga. */
+      if(yaEsta && cuerpo.hasAttribute('hidden')){
+        cuerpo.removeAttribute('hidden');
+        var sv=caja.querySelector('.vchev'); if(sv) sv.style.transform='rotate(180deg)';
+        _cargarVisor_(cuerpo, (caja.querySelector('[data-vabrir]')||{dataset:{}}).dataset.vabrir);
+      }
+    };
+  });
+  if(!_cablearVisor_._esc){
+    _cablearVisor_._esc=true;
+    document.addEventListener('keydown', function(e){
+      if(e.key!=='Escape') return;
+      var f=document.querySelector('.doc.full');
+      if(f){ f.classList.remove('full'); document.body.style.overflow=''; }
+    });
+  }
 }
+
+/* La memoria va PLEGADA: la mayoria de las veces se abre la ficha para ver quien va y a
+   que hora, no para leer el informe. */
+function _memoriaHTML_(t){
+  return _visorHTML_({id:_idDrive_(t.memoria), url:t.memoria, titulo:'Memoria de fabricación',
+    sub:t.f, queEs:'la memoria', plegado:true});
+}
+/* Se conserva el nombre porque lo llaman las fichas de turno; por dentro ya es el visor
+   unico. Un alias es mas honesto que dejar la copia viva «por si acaso». */
+function _cablearMemoria_(){ _cablearVisor_(); }
 /* ═══ NOTIFICACIONES PUSH (recuperado de app.html) ═══════════════════════════
    La cadena de emision ya estaba desplegada y sin nadie escuchando: el movil solo
    tenia un boton apagado. Clave VAPID publica (no es un secreto: va en el cliente).
@@ -3619,7 +3762,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='1ee0cf8';
+var BUILD='209a892';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -3629,12 +3772,15 @@ function _ajustesHTML_(){
         ((PREF.escala||'')===e[0]?'on':'')+'" data-p>'+e[1]+'</button>'; }).join('')+
       '</div><p class="rnota" style="margin:9px 0 0">Agranda lo que se lee: la pantalla '+
       'y las fichas. La barra de abajo no cambia, sus rótulos ya hacen de icono.</p></div>'+
-    '<h4>Pestañas</h4><div class="tarj"><div class="fila"><div class="a">'+
-      '<b>Esconder Documentos cuando no tengas nada</b><small>La pestaña desaparece de la '+
-      'barra mientras no haya nada que revisar ni nada tuyo en vuelo, y vuelve sola en '+
-      'cuanto lo haya. Con una pestaña menos, los rótulos de las demás crecen.'+
-      '</small></div><div class="d"><button class="btn" id="btnDocsSiempre" data-p>'+
-      (PREF.docsOcultar?'Sí':'No')+'</button></div></div></div>'+
+    '<h4>Pestañas</h4><div class="tarj">'+
+      OCULTABLES.map(function(o){
+        return '<div class="fila"><div class="a">'+
+          '<b>Esconder '+o[1]+' cuando no tengas nada</b><small>Desaparece de la barra '+o[2]+
+          ', y vuelve sola en cuanto lo haya. Con una pestaña menos, los rótulos de las '+
+          'demás crecen.</small></div><div class="d">'+
+          '<button class="btn" data-ocultar="'+o[0]+'" data-p>'+(_seOculta_(o[0])?'Sí':'No')+
+          '</button></div></div>';
+      }).join('')+'</div>'+
     '<h4>Notificaciones</h4>'+_notisHTML_()+
     '<h4>Sesión</h4><div class="tarj"><div class="fila"><div class="a"><b>'+quien+'</b>'+
       '<small>'+v+'</small></div></div></div>'+
@@ -3720,6 +3866,21 @@ function _docsPend_(){
 function _docsRelevantes_(){
   return !!(_docsPend_().length || ENTREGABLES.length || (esPD() && ENT_REV.length));
 }
+/* ¿Tienes tareas vivas? Mismo criterio que usa la pantalla para separar «en curso» de
+   «hechas»: si divergieran habria una pestaña que al pulsarla no tiene nada, que es justo
+   el fallo que reporto Adrian con Documentos. */
+function _tareasRelevantes_(){
+  return TAREAS.some(function(t){ return !/hech|finaliz|complet|termin|cerrad/i.test(t.e); });
+}
+/* LAS PESTAÑAS QUE SE PUEDEN ESCONDER, en una tabla y no repartidas por el fichero.
+   Daniel pidio esto para Documentos y luego para Tareas; a la tercera vez, copiar la
+   condicion, la preferencia y la fila de Ajustes serian nueve sitios que mantener.
+   Añadir una pestaña aqui es UNA linea, y Ajustes se entera solo. */
+var OCULTABLES=[
+  ['docs','Documentos','mientras no haya nada que revisar ni nada tuyo en vuelo', _docsRelevantes_],
+  ['tareas','Tareas','mientras no tengas ninguna tarea en curso', _tareasRelevantes_]
+];
+function _seOculta_(k){ return !!(PREF.ocultar && PREF.ocultar[k]); }
 function vDocs(){
   var mios=ENTREGABLES;
   var pend=_docsPend_();
@@ -3806,30 +3967,17 @@ function verDoc(id){
        poder abrirlo es aprobar a ciegas — justo lo que venia a evitar. */
     '<h4>Documento</h4>'+
     (_idDrive_(e.drive)
-      /* `data-visor`, NO `data-doc`: ese atributo YA lo usan las filas de expediente (llevan
-         el id del documento), asi que `$('[data-doc]')` cogia una fila y le metia el iframe
-         dentro. Cazado ejecutando, no leyendo. */
-      ? '<div class="doc"><div class="memcuerpo" data-visor="'+_idDrive_(e.drive)+'">'+
-          '<div class="dcar">Cargando el documento…</div></div>'+
-        '<a class="da" href="'+esc(e.drive)+'" target="_blank" rel="noopener">abrir en Drive</a></div>'
+      /* Nace ABIERTO: esta pantalla existe para leer el archivo antes de decidir, y decidir
+         sin abrirlo es aprobar a ciegas. Y ahora con pantalla completa, como el resto. */
+      ? _visorHTML_({id:_idDrive_(e.drive), url:e.drive, titulo:'El documento', sub:e.ref,
+                     queEs:'el documento', plegado:false})
       : '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
         'Pideselo a quien lo subio antes de decidir.</div></div>')+
     '<p class="rnota" style="margin-top:10px">Revisa: <b>'+revs+'</b></p>'+
     acc);
-  /* Se incrusta DESPUES de abrir el modal: un iframe dentro de la cadena de strings no
-     arranca hasta que esta en el DOM, y asi ademas se puede vigilar si carga. */
-  var _c=$('[data-visor]');
-  if(_c){
-    var f=document.createElement('iframe');
-    f.className='dv'; f.setAttribute('loading','lazy');
-    f.src='https://drive.google.com/file/d/'+_c.dataset.visor+'/preview';
-    /* Si no carga -permisos, CSP- se admite y se ofrece Drive. Un hueco blanco eterno es
-       peor que decirlo: quien revisa no sabe si esperar o si esta roto. */
-    var _f=setTimeout(function(){ if(_c.dataset.ok) return;
-      _c.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
-    f.onload=function(){ _c.dataset.ok='1'; clearTimeout(_f); };
-    _c.innerHTML=''; _c.appendChild(f);
-  }
+  /* Se cablea DESPUES de abrir el modal: un iframe dentro de la cadena de strings no
+     arranca hasta que esta en el DOM. */
+  _cablearVisor_();
 }
 function vReu(){
   if(_reunionesCargando_())
@@ -4722,7 +4870,10 @@ function _destVisibles_(){
     /* Por DEFECTO se ve. Solo se esconde si tu lo has pedido en Ajustes, y aun asi
        reaparece cuando hay algo que hacer o cuando estas dentro: no se puede tirar el
        suelo que pisas. */
-    if(d[0]==='docs') return !PREF.docsOcultar || ST.vista==='docs' || _docsRelevantes_();
+    for(var i=0;i<OCULTABLES.length;i++){
+      var o=OCULTABLES[i];
+      if(d[0]===o[0]) return !_seOculta_(o[0]) || ST.vista===o[0] || o[3]();
+    }
     return true;
   });
 }
@@ -4779,10 +4930,9 @@ function pintar(silencioso){
   /* `el` acotado a proposito: sin el, `root||document` recorreria TAMBIEN la barra de la
      otra vista -que sigue en el DOM, oculta- y le machacaria su memoria con un ancho que
      no le toca. Si `el` no existe no se anima nada, que es lo correcto. */
-  /* `animarDeltas` va en las DOS: la comparativa cuelga de la barra de horas y esa barra
-     la pintan Estado y Horas. Estaba solo en Horas y en Estado las filas se quedaban a
-     cero -pintadas, pero sin llegar a moverse de la marca central. */
-  if(el && ST.vista==='estado'){ armarMedidor(silencioso); animarBarras(el, silencioso); animarDeltas(el); }
+  /* En Estado ya no hay barra de horas (se fue a Horas y solo a Horas), pero si el
+     medidor. `animarBarras` se queda porque la pantalla tiene otras barras. */
+  if(el && ST.vista==='estado'){ armarMedidor(silencioso); animarBarras(el, silencioso); }
   if(el && ST.vista==='horas'){ animarBarras(el, silencioso); animarDeltas(el); }
   if(ST.vista==='fichar'){ medirAristas(); validarFichaje(); }
   enganchar();
@@ -5094,6 +5244,15 @@ function enganchar(){
   });
   $$('[data-doc]').forEach(function(el){ el.onclick=function(){ verDoc(+el.dataset.doc); }; });
   var _bn=$('#btnNotis'); if(_bn) _bn.onclick=function(){ activarNotis(_bn); };
+  /* Plegados sencillos (`data-plg`): el historial de Horas, y lo que venga. */
+  $$('[data-plg]').forEach(function(h){
+    h.onclick=function(){
+      var c=h.parentNode.querySelector('.plgc'), sv=h.querySelector('svg');
+      var abierto=!c.hasAttribute('hidden');
+      if(abierto){ c.setAttribute('hidden',''); sv.style.transform=''; }
+      else { c.removeAttribute('hidden'); sv.style.transform='rotate(180deg)'; }
+    };
+  });
   var _bm=$('#btnMenu'); if(_bm) _bm.onclick=function(){ _abrirMenu_(true); };
   var _mn=$('#menu');
   if(_mn) _mn.onclick=function(ev){ if(ev.target===_mn) _abrirMenu_(false); };
@@ -5103,6 +5262,7 @@ function enganchar(){
       _abrirMenu_(false);
       if(q==='salir'){ cerrarSesion(); return; }
       if(q==='buzon'){ buzonModal('bug'); return; }
+      if(q==='cuota'){ abrirModal(_cuotaHTML_()); return; }
       if(q==='equipo'){ abrirModal(_coordinacionHTML_()); return; }
       if(q==='ajustes'){ abrirModal(_ajustesHTML_());
         var b2=$('#btnNotis'); if(b2) b2.onclick=function(){ activarNotis(b2); };
@@ -5112,15 +5272,18 @@ function enganchar(){
             $$('#ajEscala [data-esc]').forEach(function(x){ x.classList.toggle('on', x===be); });
           };
         });
-        var b3=$('#btnDocsSiempre');
-        if(b3) b3.onclick=function(){
-          PREF.docsOcultar=!PREF.docsOcultar; _guardarPref_();
-          b3.textContent=PREF.docsOcultar?'Sí':'No';
-          /* La barra se repinta sola, pero la estrella viajera se coloca por el
-             rectangulo del boton activo: con una pestaña mas o menos, ese rectangulo
-             cambia de sitio y hay que recolocarla o se queda sobre la posicion vieja. */
-          pintarNav(); colocarViaje(false);
-        };
+        $$('[data-ocultar]').forEach(function(b3){
+          b3.onclick=function(){
+            var k=b3.dataset.ocultar;
+            PREF.ocultar=PREF.ocultar||{};
+            PREF.ocultar[k]=!PREF.ocultar[k]; _guardarPref_();
+            b3.textContent=_seOculta_(k)?'Sí':'No';
+            /* La barra se repinta sola, pero la estrella viajera se coloca por el
+               rectangulo del boton activo: con una pestaña mas o menos, ese rectangulo
+               cambia de sitio y hay que recolocarla o se queda sobre la posicion vieja. */
+            pintarNav(); colocarViaje(false);
+          };
+        });
       }
     };
   });

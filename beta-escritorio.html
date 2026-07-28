@@ -270,6 +270,21 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .doc .dh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px;margin-top:2px}
 .doc .dv{width:100%;height:64vh;min-height:340px;border:0;display:block;background:#2a2526}
 .doc .dcar{padding:26px 12px;text-align:center;color:var(--ink3);font-size:12px;line-height:1.6}
+/* Pantalla completa del visor. Es CSS y no la Fullscreen API a proposito:
+   `requestFullscreen` sobre un elemento NO existe en iOS Safari, que es justo donde se lee un
+   documento con el movil en la mano. Una funcion que en la mitad de los aparatos no hace nada
+   es peor que no tenerla. */
+.doc.full{position:fixed;inset:0;z-index:9000;margin:0;border-radius:0;display:flex;
+  flex-direction:column;background:#0A0909}
+.doc.full .vcuerpo{flex:1;min-height:0;display:flex}
+.doc.full .dv{height:auto;min-height:0;flex:1}
+.vfull{margin-left:auto;background:none;border:1px solid var(--line);border-radius:7px;
+  width:26px;height:26px;padding:0;display:flex;align-items:center;justify-content:center;
+  color:var(--ink2);cursor:pointer;flex:none}
+.vfull:hover{color:var(--ink);border-color:var(--ink3)}
+.vfull svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round}
+.doc .dh .vchev{flex:none;margin-left:7px}
 .doc .da{display:block;padding:9px 12px;text-align:center;font-family:var(--mono);font-size:11px;
   color:var(--red2);border-top:1px solid var(--line);text-decoration:none}
 /* ficha de expediente: reaprovecha .parte (misma gramatica que un parte de horas) */
@@ -566,20 +581,48 @@ function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; 
 function esAdmin(){ return _puedeImpersonar_(); }
 function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre) : 0; }
 
-function _apiParse(txt){ var j=null; try{ j=JSON.parse(txt); }catch(_){}
-  if(!j || j.ok!==true) throw new Error((j&&j.error)||"respuesta no válida del backend");
-  return j.data; }
+/* `_ApiTransito` marca los fallos que SI se reintentan: la peticion no llego entera. Se
+   distingue de un «no» del backend, que no se reintenta porque tiene criterio. */
+function _ApiTransito(m){ this.message=m; this.transito=true; }
+_ApiTransito.prototype=Object.create(Error.prototype);
+function _apiParse(txt, accion){
+  var j=null; try{ j=JSON.parse(txt); }catch(_){}
+  /* Lo que vuelve no es JSON: es la pagina HTML de Google del 404 transitorio. */
+  if(!j) throw new _ApiTransito("respuesta no válida del backend");
+  if(j.ok===true) return j.data;
+  var err=String(j.error||"");
+  /* «acción desconocida: » con la accion VACIA = el cuerpo del POST se perdio por el camino
+     y el backend no vio ninguna accion. Nunca llego a ejecutarse nada, asi que se repite. */
+  if(accion && /^acci[oó]n desconocida/.test(err) && err.indexOf(accion)<0)
+    throw new _ApiTransito("el cuerpo del POST no llegó ("+err+")");
+  throw new Error(err||"respuesta no válida del backend");
+}
 var api={
   _get: async function(params){
     var qs=Object.keys(params).map(function(k){ var v=params[k];
       return k+"="+encodeURIComponent(typeof v==="string"?v:JSON.stringify(v)); }).join("&");
     var r=await fetch(BACKEND_URL+"?"+qs,{cache:"no-store"});
     return _apiParse(await r.text()); },
+  /* TRES INTENTOS. Apps Script pierde el cuerpo del POST de vez en cuando (302->404) y
+     hasta ahora eso era un fallo a la cara del usuario: «no fui capaz de fichar». Se nota en
+     el fichaje y no en el resto porque las demas pantallas se refrescan solas y la siguiente
+     pasada tapaba el hueco. Misma regla que `rutinas/llamar.py`. */
   _post: async function(body){
     if(SESION&&SESION.token&&!body.token) body=Object.assign({},body,{token:SESION.token});
-    var r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify(body)});
-    return _apiParse(await r.text()); },
+    var accion=String(body.action||""), ultimo=null;
+    for(var i=0;i<3;i++){
+      if(i) await new Promise(function(ok){ setTimeout(ok, 600+i*800); });
+      try{
+        var r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+          body:JSON.stringify(body)});
+        return _apiParse(await r.text(), accion);
+      }catch(e){
+        /* Un «no» del backend no se reintenta; un fallo de red o de transito, si. */
+        if(e && !e.transito && !(e instanceof TypeError)) throw e;
+        ultimo=e;
+      }
+    }
+    throw ultimo || new Error("no se pudo hablar con el servidor"); },
   ping:        function(){ try{ fetch(BACKEND_URL+"?action=ping",{cache:"no-store"}).catch(function(){}); }catch(_){} },
   bootstrap:   function(t,nombre){ var b={action:"bootstrap"}; if(t)b.token=t; if(nombre)b.nombre=nombre; return api._post(b); },
   quienSoy:    function(t){ return api._post({action:"quienSoy",token:t}); },
@@ -1848,6 +1891,93 @@ function puedeDecidirDoc(d){
   return d.revisor===_m(ACTOR).pila || rangoNom(ACTOR)>rangoPila(d.revisor);
 }
 function _idDrive_(u){ var m=String(u||'').match(/\/d\/([A-Za-z0-9_-]{20,})/); return m?m[1]:null; }
+/* ═══ EL VISOR DE DOCUMENTOS · GEMELA (movil/escritorio) ═══════════════════════
+   Habia TRES copias de esto -la memoria de un turno, la revision documental del movil y la
+   del escritorio-, identicas salvo en el texto de «cargando» y en si nacian plegadas. Daniel
+   lo cazo por el sintoma: «no esta la pantalla completa en las revisiones documentales como
+   si lo estaba en ordenes del dia... las separaste por pereza». Tenia razon: una mejora
+   puesta en una copia no le llegaba a las otras.
+
+   Ahora es una sola, y las dos diferencias son parametros:
+     · `plegado` — nace cerrada (la memoria de un turno se abre para ver quien va, no para
+       leer el informe) o abierta (una revision documental existe PARA leerlo).
+     · `queEs`   — «la memoria» / «el documento», que es lo unico que cambiaba del texto.
+
+   El iframe se crea **al desplegar**, nunca antes: tres visores de Drive cargando a la vez en
+   una ficha es medio megabyte que casi nadie va a mirar. */
+function _visorHTML_(o){
+  var abierto = !o.plegado;
+  return '<div class="doc" data-visor>'+
+    '<div class="dh" data-vabrir="'+esc(o.id||'')+'" data-p style="cursor:pointer">'+
+      '<b>'+esc(o.titulo)+'</b><small>'+esc(o.sub||'')+(o.plegado?' · pulsa para leerlo':'')+'</small>'+
+      /* La pantalla completa va en la cabecera y NO despliega: `stopPropagation` en su
+         manejador. Sin eso, pulsarla plegaba el visor a la vez que lo maximizaba. */
+      '<button class="vfull" data-vfull data-p title="Pantalla completa" aria-label="Pantalla completa">'+
+        '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>'+
+      '<svg class="vchev" viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;'+
+        'stroke:currentColor;stroke-width:2.4;transition:transform .3s'+(abierto?';transform:rotate(180deg)':'')+'">'+
+        '<path d="M6 9l6 6 6-6"/></svg></div>'+
+    '<div class="vcuerpo"'+(abierto?'':' hidden')+' data-quees="'+esc(o.queEs||'el documento')+'">'+
+      (abierto?'<div class="dcar">Cargando '+esc(o.queEs||'el documento')+'…</div>':'')+'</div>'+
+    (o.url?'<a class="da" href="'+esc(o.url)+'" target="_blank" rel="noopener">abrir en Drive</a>':'')+
+  '</div>';
+}
+/* Mete el iframe de Drive en un cuerpo ya visible. Si no carga -permisos, CSP del hosting- se
+   DICE y se ofrece el enlace: un hueco blanco eterno es peor, porque quien revisa no sabe si
+   esperar o si esta roto. */
+function _cargarVisor_(cuerpo, id){
+  if(cuerpo.dataset.cargado) return; cuerpo.dataset.cargado='1';
+  var que=cuerpo.dataset.quees||'el documento';
+  if(!id){ cuerpo.innerHTML='<div class="dcar">El enlace no es un archivo de Drive reconocible.<br>'+
+    'Ábrelo con el enlace de abajo.</div>'; return; }
+  cuerpo.innerHTML='<div class="dcar">Cargando '+que+'…</div>';
+  var f=document.createElement('iframe');
+  f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
+  f.src='https://drive.google.com/file/d/'+id+'/preview';
+  var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
+    cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
+  f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
+  cuerpo.innerHTML=''; cuerpo.appendChild(f);
+}
+function _cablearVisor_(raiz){
+  var R=raiz||document;
+  $$('[data-visor] .vcuerpo',R).forEach(function(c){          // los que nacen abiertos
+    if(!c.hasAttribute('hidden')){
+      var h=c.parentNode.querySelector('[data-vabrir]');
+      _cargarVisor_(c, h && h.dataset.vabrir);
+    }
+  });
+  $$('[data-vabrir]',R).forEach(function(h){
+    h.onclick=function(){
+      var caja=h.parentNode, cuerpo=caja.querySelector('.vcuerpo'), sv=caja.querySelector('.vchev');
+      if(!cuerpo.hasAttribute('hidden')){ cuerpo.setAttribute('hidden',''); if(sv) sv.style.transform=''; return; }
+      cuerpo.removeAttribute('hidden'); if(sv) sv.style.transform='rotate(180deg)';
+      _cargarVisor_(cuerpo, h.dataset.vabrir);
+    };
+  });
+  $$('[data-vfull]',R).forEach(function(b){
+    b.onclick=function(ev){
+      ev.stopPropagation();                                    // no despliega: solo maximiza
+      var caja=b.closest('.doc'), cuerpo=caja.querySelector('.vcuerpo');
+      var yaEsta=caja.classList.toggle('full');
+      document.body.style.overflow = yaEsta ? 'hidden' : '';
+      /* Maximizar con el visor plegado no enseñaria nada: se abre y se carga. */
+      if(yaEsta && cuerpo.hasAttribute('hidden')){
+        cuerpo.removeAttribute('hidden');
+        var sv=caja.querySelector('.vchev'); if(sv) sv.style.transform='rotate(180deg)';
+        _cargarVisor_(cuerpo, (caja.querySelector('[data-vabrir]')||{dataset:{}}).dataset.vabrir);
+      }
+    };
+  });
+  if(!_cablearVisor_._esc){
+    _cablearVisor_._esc=true;
+    document.addEventListener('keydown', function(e){
+      if(e.key!=='Escape') return;
+      var f=document.querySelector('.doc.full');
+      if(f){ f.classList.remove('full'); document.body.style.overflow=''; }
+    });
+  }
+}
 /* La fila YA NO DECIDE. Tenia «Aprobar» y «Cambios» ahi mismo, con el titulo por toda
    informacion: eso es firmar a ciegas, justo lo que la pantalla venia a evitar. Ahora
    se pulsa y se abre el expediente entero (`docCard`), que es donde estan los botones. */
@@ -1894,12 +2024,10 @@ function docCard(d){
       esc(d.nota||'Sin motivo escrito.')+'</div>' : '';
   var idD=_idDrive_(d.drive);
   var visor = d.drive
-    ? '<div class="doc"><div class="dh" data-vdoc="'+esc(idD||'')+'">'+
-      '<b>El documento</b><small>'+esc(d.ref)+' · pulsa para leerlo</small>'+
-      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
-      'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
-      '<div class="vcuerpo" hidden></div>'+
-      '<a class="da" href="'+esc(d.drive)+'" target="_blank" rel="noopener">abrir en Drive</a></div>'
+    /* Nace ABIERTO, igual que en el movil: esta ficha existe para leer el archivo antes de
+       decidir. Y con pantalla completa, que era lo que faltaba aqui y estaba en otro sitio. */
+    ? _visorHTML_({id:idD, url:d.drive, titulo:'El documento', sub:d.ref,
+                   queEs:'el documento', plegado:false})
     : '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
       'Cowork lo manda en <span class="mono">enlaceDrive</span>; sin él no hay nada que leer aquí.</div></div>';
   var acc;
@@ -3447,7 +3575,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='45abbce';
+var BUILD='c61252f';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3865,27 +3993,7 @@ function enganchar(){
         if(c) c.scrollIntoView({block:'nearest',behavior:redu()?'auto':'smooth'}); }
     };
   });
-  /* visor del documento: el iframe se crea al desplegar. Si Drive no deja incrustarlo
-     (permisos, o una CSP en el hosting) se dice y se ofrece el enlace, no se deja en blanco. */
-  $$('[data-vdoc]').forEach(function(h){
-    h.onclick=function(){
-      var cuerpo=h.parentNode.querySelector('.vcuerpo'), sv=h.querySelector('svg');
-      if(!cuerpo.hasAttribute('hidden')){ cuerpo.setAttribute('hidden',''); sv.style.transform=''; return; }
-      cuerpo.removeAttribute('hidden'); sv.style.transform='rotate(180deg)';
-      if(cuerpo.dataset.cargado) return; cuerpo.dataset.cargado='1';
-      var id=h.dataset.vdoc;
-      if(!id){ cuerpo.innerHTML='<div class="dcar">El enlace no es un archivo de Drive reconocible.<br>' +
-        'Ábrelo con el enlace de abajo.</div>'; return; }
-      cuerpo.innerHTML='<div class="dcar">Cargando el documento…</div>';
-      var f=document.createElement('iframe');
-      f.className='dv'; f.setAttribute('loading','lazy');
-      f.src='https://drive.google.com/file/d/'+id+'/preview';
-      var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
-        cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
-      f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
-      cuerpo.innerHTML=''; cuerpo.appendChild(f);
-    };
-  });
+  _cablearVisor_(m);
   /* LAS CUATRO ACCIONES del correo real, mas deshacer y reenviar. Todas viajan a
      `api.decidir`, que ya estaba desplegada aceptandolas desde v28 y de la que esta cara
      solo usaba dos. El servidor revalida la autoridad por token; esto es el disparo.
