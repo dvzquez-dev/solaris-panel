@@ -1054,6 +1054,14 @@ var backendOK=false, SESION=null;
    verificado—, asi que abrirla sin cuenta del dominio no enseña nada. Lo que esto evita
    es que el EQUIPO acabe usando sin querer una version a medias. */
 var CANAL='beta';
+/* LA VERSION DEL RELEASE. La sella `publicar_web.py` al publicar a produccion con
+   `--release X.Y`; en beta y en local se queda vacia, que es la verdad: la beta no es
+   ninguna version, es lo que va camino de serlo.
+   Va SEPARADA de `BUILD` a proposito: `VERSION` dice QUE RELEASE es y `BUILD` dice QUE
+   CODIGO exacto. Entre dos releases la beta cambia de build sin cambiar de version, y
+   eso es justo lo que hay que poder distinguir al leer un reporte. */
+var VERSION='';
+
 /* Quien puede usar la beta. Se deja en una funcion sola porque ensancharla es una linea:
    `|| _rangoBeta_()>=1` mete a los coordinadores. */
 function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; }
@@ -3121,7 +3129,7 @@ function _contextoM_(){
           /Safari/.test(ua)?'Safari':'otro';
   /* El canal va DENTRO del contexto: dos ficheros con el mismo aspecto y distinto código
      son la forma más fácil de perseguir un fallo en el sitio equivocado. */
-  return 'movil'+(CANAL==='beta'?' · BETA':'')+' · '+nav+' · '+screen.width+'x'+screen.height+
+  return 'movil'+(CANAL==='beta'?' · BETA':(VERSION?' · v'+VERSION:''))+' · '+nav+' · '+screen.width+'x'+screen.height+
     ' · build '+BUILD+' · datos '+(DATA.generado||'?')+
     (_esStandalone_()?' · desde la pantalla de inicio':'');
 }
@@ -3496,7 +3504,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='53dd36b';
+var BUILD='f3c204e';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -3517,8 +3525,12 @@ function _ajustesHTML_(){
     /* QUE VERSION ES. Lo primero que hay que poder responder cuando alguien dice «sigue
        fallando»: Pages cachea el HTML 10 min, asi que dos personas pueden estar mirando
        codigo distinto sin saberlo. Pasó el 27/07, dos veces. */
+    /* Se enseñan las DOS: la versión es la que le dices a alguien («voy por la 0.1») y el
+       build es el que sirve para saber si estáis mirando el mismo código. En beta no hay
+       versión todavía, y decirlo es más honesto que inventarle una. */
     '<h4>Versión</h4><div class="tarj"><div class="fila"><div class="a">'+
-      '<b class="mono">'+esc(BUILD)+'</b>'+
+      '<b class="mono">'+esc(VERSION?('v'+VERSION):(CANAL==='beta'?'beta':'sin publicar'))+
+        ' · '+esc(BUILD)+'</b>'+
       '<small>Si esto no coincide con lo que te digan, recarga forzando (mantén pulsado '+
       'recargar, o cierra la pestaña y ábrela de nuevo).</small></div></div></div></div>';
 }

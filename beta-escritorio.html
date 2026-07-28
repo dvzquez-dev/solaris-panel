@@ -550,6 +550,14 @@ var backendOK=false, SESION=null;
    verificado—, asi que abrirla sin cuenta del dominio no enseña nada. Lo que esto evita
    es que el EQUIPO acabe usando sin querer una version a medias. */
 var CANAL='beta';
+/* LA VERSION DEL RELEASE. La sella `publicar_web.py` al publicar a produccion con
+   `--release X.Y`; en beta y en local se queda vacia, que es la verdad: la beta no es
+   ninguna version, es lo que va camino de serlo.
+   Va SEPARADA de `BUILD` a proposito: `VERSION` dice QUE RELEASE es y `BUILD` dice QUE
+   CODIGO exacto. Entre dos releases la beta cambia de build sin cambiar de version, y
+   eso es justo lo que hay que poder distinguir al leer un reporte. */
+var VERSION='';
+
 /* Quien puede usar la beta. Se deja en una funcion sola porque ensancharla es una linea:
    `|| rangoNom(...)>=1` mete a los coordinadores. */
 function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; }
@@ -2807,7 +2815,7 @@ async function reportarModal(){
   var datos={ titulo:tit, donde:'Escritorio', pantalla:((V[vista]&&V[vista].t)||vista),
     /* La version del CODIGO, no la de los datos: ver la gemela del movil. */
     version:BUILD,
-    contexto:'escritorio'+(CANAL==='beta'?' · BETA':'')+' · '+nav+' · '+screen.width+'x'+screen.height+
+    contexto:'escritorio'+(CANAL==='beta'?' · BETA':(VERSION?' · v'+VERSION:''))+' · '+nav+' · '+screen.width+'x'+screen.height+
       ' · build '+BUILD+' · datos '+(DATA.generado||'?') };
   if(esMejora){ datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
   else { datos.esperaba=det; datos.paso=tit; datos.gravedad='Molesta'; }
@@ -2859,12 +2867,29 @@ function _fichaBuzon_(r){
     campo('Contexto', r.contexto)+
     campo('Diagnóstico', r.diagnostico)+
     campo('Recomendación', r.recomendacion)+
+    /* TUS anotaciones, si diste el adelante con matices. Van DESPUÉS de la recomendación
+       a propósito: la recomendación es lo que propone quien lo analizó, esto es lo que
+       decides tú encima. Quien construya lee las dos, en ese orden. */
+    (r.anotaciones? '<div class="sub"><span class="sc">Tus anotaciones</span>'+
+       '<p style="margin:4px 0 0;font-size:12.5px;color:#f0cf9e;line-height:1.55">'+
+       esc(r.anotaciones)+'</p></div>' : '')+
+    /* La captura que adjuntó quien reporta. Para lo visual vale por tres párrafos. */
+    (r.captura && /^https?:/.test(String(r.captura))
+      ? '<div class="sub"><span class="sc">Captura</span>'+
+        '<p style="margin:4px 0 0"><a href="'+esc(r.captura)+'" target="_blank" rel="noopener" '+
+        'style="color:var(--red2);font-size:12.5px">ver la captura que adjuntó</a></p></div>'
+      : (r.captura ? campo('Captura', r.captura) : ''))+
     (r.vista_previa? '<div class="sub"><span class="sc">Vista previa</span>'+
        '<p style="margin:4px 0 0"><a href="'+esc(r.vista_previa)+'" target="_blank" rel="noopener" '+
        'style="color:var(--red2);font-size:12.5px">abrir el artefacto con los cambios puestos</a></p></div>' : '')+
     (r.recomendacion
       ? '<div class="acts">'+
         '<button class="btn pri" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Adelante">Adelante, hazlo</button>'+
+        /* ADELANTE CON ANOTACIONES (Daniel, 28/07). Mismo estado que «Adelante» —autoriza
+           igual— pero pidiendo sus matices: qué parte sí, qué parte no, cómo lo quiere.
+           Es un estado con instrucciones, no un estado nuevo: quien construye tiene que
+           leerlas ANTES de ponerse, y para eso van pegadas al reporte y no en un chat. */
+        '<button class="btn" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Adelante+">Adelante, con anotaciones</button>'+
         (r.vista_previa?'<button class="btn ok" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Publicado">Visto bueno · publicar</button>':'')+
         '<button class="btn no" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Descartado">Descartar</button>'+
         '</div>'
@@ -3375,12 +3400,15 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='3a4affb';
+var BUILD='97d2aaf';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
      el 27/07 se perdieron dos rondas depurando builds distintos sin saberlo. */
-  if(t) t.textContent='Temporada '+((DATA&&DATA.temporada)||'—')+' · '+BUILD;
+  /* Version Y build: la version es la que le dices a alguien, el build es el que sirve
+     para saber si estais mirando el mismo codigo. En beta no hay version y se dice. */
+  if(t) t.textContent='Temporada '+((DATA&&DATA.temporada)||'—')+' · '+
+    (VERSION?('v'+VERSION):(CANAL==='beta'?'beta':'sin publicar'))+' · '+BUILD;
   if(c){
     var ok=(typeof backendOK!=='undefined') && backendOK && SESION;
     c.textContent=ok?'● EN LÍNEA':'● SIN CONEXIÓN';
@@ -3553,13 +3581,32 @@ function pintar(){
     b.onclick=async function(){
       if(b.disabled) return;
       var id=b.dataset.bz, tipo=b.dataset.bzt, acc=b.dataset.bzacc;
+      /* `Adelante+` NO es un estado: es «Adelante» con instrucciones. El estado que se
+         guarda es el mismo -autoriza igual- y lo que cambia es que van pegadas al reporte
+         unas anotaciones que quien construye tiene que leer antes de ponerse. Un estado
+         nuevo obligaria a enseñarlo en todos los sitios que pintan estados y no diria
+         nada que no diga el texto. */
+      var conNotas=(acc==='Adelante+');
+      if(conNotas) acc='Adelante';
       var aviso={Adelante:'Autorizas que se construya. Todavía NO se publica nada.',
         Publicado:'Das el visto bueno: esto es lo que autoriza a publicarlo.',
         Descartado:'Se descarta. Queda en el histórico, no se borra.'}[acc]||'';
-      if(!confirm(acc+' — '+id+String.fromCharCode(10,10)+aviso)) return;
+      var notas=null;
+      if(conNotas){
+        var previas=((BUZON||[]).filter(function(x){ return x.id===id; })[0]||{}).anotaciones||'';
+        notas=prompt('Tus anotaciones: qué parte sí, qué parte no, cómo lo quieres.'+
+          String.fromCharCode(10)+'Las lee quien lo construya antes de empezar.', previas);
+        /* Cancelar aborta; dejarlo vacío también, porque «adelante con anotaciones» sin
+           anotaciones es «adelante» y para eso está el otro botón. */
+        if(notas===null) return;
+        if(!notas.trim()){ tost('Sin anotaciones, usa «Adelante, hazlo».'); return; }
+      }
+      if(!confirm((conNotas?'Adelante CON ANOTACIONES':acc)+' — '+id+String.fromCharCode(10,10)+aviso)) return;
       var campos={estado:acc};
+      if(conNotas) campos.anotaciones=notas.trim();
       b.disabled=true; var prev=b.textContent; b.textContent='Guardando…';
-      try{ await api.decidirReporte(tipo, id, campos); tost(id+': '+acc+'.'); _cargarBuzon_(); }
+      try{ await api.decidirReporte(tipo, id, campos);
+        tost(id+': '+acc+(conNotas?' con anotaciones.':'.')); _cargarBuzon_(); }
       catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo: '+((e&&e.message)||e)); }
     };
   });
