@@ -3039,8 +3039,10 @@ function _fichaBuzon_(r){
    diagnostico que estabas leyendo para decidir. */
 var BZ_AVISO={
   'Adelante':'Autorizas que se construya. Todavía NO se publica nada.',
-  'Publicado':'Das el visto bueno: esto es lo que autoriza a publicarlo.',
-  'Descartado':'Se descarta. Queda en el histórico, no se borra.'};
+  /* `Publicado` no se pone desde aquí: lo pone el propio release, en bloque
+     (`flujos/publicar_web.py --release` → `triaje.py --publicar`). Así el buzón no puede
+     decir «publicado» de algo que no salió, ni al revés. */
+  'Descartado':'Sale del lote. Queda en el histórico, no se borra.'};
 function _accBuzon_(r, esBug){
   var t=esBug?'bug':'mejora', ID=esc(r.id);
   var notas=(BZ_NOTAS[r.id]!=null?BZ_NOTAS[r.id]:(r.anotaciones||''));
@@ -3062,12 +3064,27 @@ function _accBuzon_(r, esBug){
         '<button class="btn" data-bzno="">Volver</button>'+
       '</div></div>';
   }
+  /* YA CONSTRUIDO Y EN LA BETA. Aquí NO va un botón de «publicar» por reporte: un release
+     sube el fichero ENTERO, así que todo lo que esté en la beta sale a la vez o no sale.
+     Un botón por reporte describiría algo que no ocurre. Daniel (28/07): «tengo que poder
+     publicar en bloque, no tiene sentido publicar las cosas una a una», y «lo de publicar
+     los cambios sí que es a mi orden por este chat».
+     Lo que sí hace falta aquí es poder SACAR uno del lote antes de que salga. */
+  if(r.estado==='Listo para revisar'){
+    return '<div class="ruta">Hecho y <b>en la beta</b>, sin publicar. Sale a producción con el '+
+      'próximo release, junto con todo lo demás que haya en la beta — y el release lo pides tú.'+
+      '<br>Si este no debe salir, sácalo del lote descartándolo con tus anotaciones.</div>'+
+      '<textarea data-bznotas="'+ID+'" placeholder="Por qué lo sacas del lote…">'+esc(notas)+'</textarea>'+
+      '<div class="acts">'+
+        bot('Adelante+','Devolver: rehacer con anotaciones')+
+        bot('Descartado+','Sacar del lote, con anotaciones','no')+
+      '</div>';
+  }
   return '<textarea data-bznotas="'+ID+'" placeholder="Anotaciones — qué parte sí, qué parte no, cómo lo quieres. Las lee quien lo construya antes de empezar…">'+
       esc(notas)+'</textarea>'+
     '<div class="acts">'+
       bot('Adelante','Adelante, hazlo','pri')+
       bot('Adelante+','Adelante, con anotaciones')+
-      (r.vista_previa?bot('Publicado','Visto bueno · publicar','ok'):'')+
       bot('Descartado+','Descartar con anotaciones','no')+
       bot('Descartado','Descartar','no')+
     '</div>';
@@ -3575,7 +3592,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='c61252f';
+var BUILD='496edef';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3993,7 +4010,10 @@ function enganchar(){
         if(c) c.scrollIntoView({block:'nearest',behavior:redu()?'auto':'smooth'}); }
     };
   });
-  _cablearVisor_(m);
+  /* Sin raiz: `enganchar()` no tiene el contenedor a mano (lo tenia el bloque que esto
+     sustituyo, que usaba `$$` global). Pasarle una `m` que aqui no existe reventaba la
+     pantalla entera con «m is not defined» — cazado ejecutando, no leyendo. */
+  _cablearVisor_();
   /* LAS CUATRO ACCIONES del correo real, mas deshacer y reenviar. Todas viajan a
      `api.decidir`, que ya estaba desplegada aceptandolas desde v28 y de la que esta cara
      solo usaba dos. El servidor revalida la autoridad por token; esto es el disparo.
