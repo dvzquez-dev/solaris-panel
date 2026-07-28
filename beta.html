@@ -306,6 +306,18 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .plgh b{font-size:12.5px}
 .plgh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px;margin-top:2px}
 .plgc{padding-top:10px}
+/* La lista de personas: alta y con scroll propio, para que el formulario no se vaya a
+   tres pantallas cuando el equipo tiene cuarenta. */
+.sanlista{max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r2);
+  margin:0 0 11px;-webkit-overflow-scrolling:touch}
+.sangrupo{position:sticky;top:0;background:var(--sur2);padding:5px 10px;font-family:var(--mono);
+  font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+.sanper{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;
+  border:0;border-bottom:1px solid var(--line);padding:9px 10px;color:var(--ink);font:inherit;
+  font-size:12.5px;cursor:pointer}
+.sanper i{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--ink3);margin-left:auto}
+.sanper.on{background:rgba(228,30,37,.14);box-shadow:inset 3px 0 0 var(--red)}
+.sanper.on b{color:var(--red2)}
 .libro{overflow:hidden;height:0;transition:height .42s var(--sal)}
 .retf{display:flex;align-items:center;gap:11px;padding:9px 2px;border-top:1px solid var(--line);font-size:12px}
 .retf .pt{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--red2);flex:none;width:26px}
@@ -2255,7 +2267,11 @@ function yoNombre(){
 
    `RRI_MOTIVOS` son los del catalogo real (ver `datos/rri_motivos.json`); el de plazo es el
    unico que arrastra tarea y fecha. */
-var SANC_FORM={motivo:'', tarea:'', plazo:''};
+/* El formulario ENTERO, para que sobreviva a los repintados. Antes solo guardaba el
+   motivo y la fecha: al cambiar el motivo se repinta el modal y la persona elegida volvia
+   al primero de la lista -«me cambia a Aarón por la puta cara»-. Un formulario que se
+   borra solo no es un fallo de pintado: es que el estado estaba en el DOM. */
+var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
 var RRI_MOTIVOS=[
   ['30i','Faltar a un turno de trabajo sin justificar', -1],
   ['30g','No rellenar un formulario obligatorio', -1],
@@ -2263,6 +2279,37 @@ var RRI_MOTIVOS=[
   ['plazo','Incumplir el plazo de una tarea', -1],
   ['libre','Otro · lo escribo yo', -1]
 ];
+/* EL ORDEN DE LOS SUBSISTEMAS, deducido y no escrito a mano: es el orden en que vienen los
+   miembros del panel, que es el que trae Notion. Una constante aqui se quedaria vieja el dia
+   que se reordene alla, y nadie se enteraria hasta que alguien mirase. */
+function _ordenSubs_(){
+  var vis=[];
+  (DATA.miembros||[]).forEach(function(m){
+    var u=m&&m.unidad; if(u && vis.indexOf(u)<0) vis.push(u);
+  });
+  return vis;
+}
+/* Agrupa a quien puedas sancionar: por subsistema en el orden de Notion, y dentro de cada uno
+   EL COORDINADOR PRIMERO y el resto alfabetico. Daniel: «y con el coordinador de primero». */
+function _gruposSanc_(actor, filtro){
+  var f=_sinTildes_(String(filtro||'').trim().toLowerCase());
+  var gente=sancionablesPor(actor).filter(function(m){
+    if(!f) return true;
+    return _sinTildes_((m.nombre||'').toLowerCase()).indexOf(f)>=0 ||
+           _sinTildes_((m.pila||'').toLowerCase()).indexOf(f)>=0 ||
+           _sinTildes_((m.unidad||'').toLowerCase()).indexOf(f)>=0;
+  });
+  var orden=_ordenSubs_(), por={};
+  gente.forEach(function(m){ var u=m.unidad||'—'; (por[u]=por[u]||[]).push(m); });
+  return orden.filter(function(u){ return por[u]; }).map(function(u){
+    var l=por[u].slice().sort(function(a,b){
+      var ca=(a.cargo==='Coordinador')?0:1, cb=(b.cargo==='Coordinador')?0:1;
+      if(ca!==cb) return ca-cb;                       // el coordinador, primero
+      return String(a.nombre||'').localeCompare(String(b.nombre||''), 'es');
+    });
+    return {unidad:u, gente:l};
+  });
+}
 function _sancionesHTML_(){
   /* El gate es el RANGO DE SANCIONES, no el cargo: Bruno tiene rango 2 sin ser nada en los
      documentos, y un consejero sin gente debajo es rango 0 aunque este en el consejo. */
@@ -2271,7 +2318,8 @@ function _sancionesHTML_(){
   /* La lista sale de la MISMA regla que el permiso. Ofrecer a alguien y que luego el envio
      falle es peor que no ofrecerlo: parece un fallo cuando es la norma. Y uno mismo SI esta,
      en los tres rangos, que es parte del modelo. */
-  var acts=sancionablesPor(yoNombre());
+  var grupos=_gruposSanc_(yoNombre(), SANC_FORM.filtro);
+  var nTotal=sancionablesPor(yoNombre()).length;
   var esPlazo=(SANC_FORM.motivo==='plazo');
   /* Solo las tareas VIVAS y con enlace a Notion: sin `url` no se puede mover la fecha, y
      ofrecerla seria prometer algo que va a fallar al guardar. */
@@ -2280,22 +2328,26 @@ function _sancionesHTML_(){
   return '<div class="mtit">Sanciones</div>'+
     '<div class="msub">Ponerlas y decidirlas. El comunicado sigue saliendo del escritorio.</div>'+
     '<h4>Poner una sanción</h4><div class="tarj">'+
-      '<label class="campo"><span class="sc">A quién</span><select id="snQuien">'+
-        acts.map(function(m){ return '<option value="'+esc(m.nombre)+'">'+esc(m.nombre)+' · '+esc(m.unidad||'')+'</option>'; }).join('')+
-      '</select></label>'+
+      /* BUSCADOR, no desplegable. Con 40 personas un `<select>` es una lista que hay que
+         recorrer con el pulgar; aquí se escriben tres letras. Filtra por nombre, pila o
+         subsistema, y SIN TILDES: «aaron» encuentra a «Aarón». */
+      '<label class="campo"><span class="sc">A quién</span>'+
+        '<input id="snFiltro" placeholder="Escribe para filtrar · nombre o subsistema" '+
+        'value="'+esc(SANC_FORM.filtro||'')+'" autocomplete="off"></label>'+
+      '<div class="sanlista" id="snLista">'+_listaSancHTML_(grupos)+'</div>'+
       '<label class="campo"><span class="sc">Motivo</span><select id="snMotivo">'+
         '<option value="">— elige —</option>'+
         RRI_MOTIVOS.map(function(r){ return '<option value="'+r[0]+'"'+(SANC_FORM.motivo===r[0]?' selected':'')+'>'+esc(r[1])+'</option>'; }).join('')+
       '</select></label>'+
       (SANC_FORM.motivo==='libre'
-        ? '<label class="campo"><span class="sc">Cuál</span><input id="snLibre" placeholder="Qué ha pasado"></label>'+
-          '<label class="campo"><span class="sc">Artículo del RRI</span><input id="snArt" value="libre"></label>'
+        ? '<label class="campo"><span class="sc">Cuál</span><input id="snLibre" placeholder="Qué ha pasado" value="'+esc(SANC_FORM.libre||'')+'"></label>'+
+          '<label class="campo"><span class="sc">Artículo del RRI</span><input id="snArt" value="'+esc(SANC_FORM.art||'libre')+'"></label>'
         : '')+
       (esPlazo
         ? (tareas.length
             ? '<label class="campo"><span class="sc">Qué tarea</span><select id="snTarea">'+
                 '<option value="">— elige la tarea —</option>'+
-                tareas.map(function(t){ return '<option value="'+esc(t.url)+'">'+esc(t.n||t.nombre||'(sin título)')+
+                tareas.map(function(t){ return '<option value="'+esc(t.url)+'"'+(SANC_FORM.tarea===t.url?' selected':'')+'>'+esc(t.n||t.nombre||'(sin título)')+
                   (t.l?' · vencía '+esc(_isoADMY_(t.l)):'')+'</option>'; }).join('')+
               '</select></label>'+
               '<label class="campo"><span class="sc">Plazo nuevo</span><input type="date" id="snPlazo" value="'+esc(SANC_FORM.plazo||'')+'"></label>'+
@@ -2305,11 +2357,23 @@ function _sancionesHTML_(){
             : '<p class="rnota" style="margin:0 0 10px;color:var(--warn)">No hay ninguna tarea viva con '+
               'enlace a Notion, así que no se puede mover ningún plazo. Elige otro motivo.</p>')
         : '')+
-      '<label class="campo"><span class="sc">Puntos</span><input type="number" id="snPts" value="-1" step="1" min="-5" max="0"></label>'+
+      '<label class="campo"><span class="sc">Puntos</span><input type="number" id="snPts" value="'+esc(SANC_FORM.pts||'-1')+'" step="1" min="-5" max="0"></label>'+
       '<button class="btn pri full" data-p id="btnSanc">Poner la sanción</button>'+
       '<p class="rnota" id="snMsg" style="margin:8px 0 0"></p>'+
     '</div>'+
     '<h4>Pendientes de decidir</h4>'+_sancColaHTML_();
+}
+/* La lista de personas. Se pinta aparte para poder rehacerla al teclear SIN tocar el resto
+   del formulario: repintar el modal entero es lo que borraba lo ya elegido. */
+function _listaSancHTML_(grupos){
+  if(!grupos.length) return '<p class="rnota" style="margin:0;padding:8px 2px">Nadie con ese filtro.</p>';
+  return grupos.map(function(g){
+    return '<div class="sangrupo">'+esc(g.unidad)+'</div>'+
+      g.gente.map(function(m){
+        return '<button class="sanper'+(SANC_FORM.quien===m.nombre?' on':'')+'" data-sanq="'+esc(m.nombre)+'" data-p>'+
+          '<b>'+esc(m.nombre)+'</b>'+(m.cargo==='Coordinador'?'<i>coord.</i>':'')+'</button>';
+      }).join('');
+  }).join('');
 }
 function _sancColaHTML_(){
   if(SANC_M===null) return '<div class="tarj">'+vacio('Cargando…','Buscando qué espera decisión.','',true)+'</div>';
@@ -2353,20 +2417,51 @@ function _cablearSanciones_(){
   var val=function(id){ var e=$('#'+id); return e?e.value:''; };
   var msg=function(t,mal){ var b=$('#snMsg'); if(b){ b.textContent=t; b.style.color=mal?'var(--warn)':'var(--ink3)'; } };
 
-  /* El motivo decide QUE MAS se pide, asi que al cambiarlo hay que repintar. Se guarda en
-     `SANC_FORM` para no perder lo elegido en ese repintado. */
-  var mo=$('#snMotivo');
-  if(mo) mo.onchange=function(){
-    SANC_FORM.motivo=mo.value;
-    SANC_FORM.plazo=val('snPlazo')||SANC_FORM.plazo;
-    abrirModal(_sancionesHTML_()); _cablearSanciones_();
+  /* LO PRIMERO: guardar TODO lo escrito antes de cualquier repintado. Esto es exactamente lo
+     que faltaba: al cambiar el motivo se repintaba el modal y la persona elegida volvia al
+     primero de la lista. El estado vivia en el DOM, y el DOM se rehace. */
+  function recoger(){
+    ['snMotivo','snLibre','snArt','snTarea','snPlazo','snPts','snFiltro'].forEach(function(id){
+      var e=$('#'+id); if(!e) return;
+      SANC_FORM[{snMotivo:'motivo',snLibre:'libre',snArt:'art',snTarea:'tarea',
+                 snPlazo:'plazo',snPts:'pts',snFiltro:'filtro'}[id]]=e.value;
+    });
+  }
+  function repintar(){ recoger(); abrirModal(_sancionesHTML_()); _cablearSanciones_(); }
+
+  /* Elegir persona NO repinta el formulario: solo se marca en la lista. Repintar por esto
+     seria volver a tirar lo escrito, que es el fallo que se acaba de arreglar. */
+  $$('[data-sanq]').forEach(function(b){
+    b.onclick=function(){
+      SANC_FORM.quien=b.dataset.sanq;
+      $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
+      var m=$('#snMsg'); if(m){ m.textContent='A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'; m.style.color='var(--ink3)'; }
+    };
+  });
+  /* Teclear rehace SOLO la lista, no el formulario. Y no pierde el foco ni el cursor. */
+  var fi=$('#snFiltro');
+  if(fi) fi.oninput=function(){
+    SANC_FORM.filtro=fi.value;
+    var c=$('#snLista'); if(!c) return;
+    c.innerHTML=_listaSancHTML_(_gruposSanc_(yoNombre(), SANC_FORM.filtro));
+    $$('[data-sanq]',c).forEach(function(b){
+      b.onclick=function(){
+        SANC_FORM.quien=b.dataset.sanq;
+        $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
+      };
+    });
   };
+
+  /* El motivo decide QUE MAS se pide, asi que al cambiarlo hay que repintar. Pero se recoge
+     todo antes, y `_sancionesHTML_` vuelve a pintar lo elegido. */
+  var mo=$('#snMotivo');
+  if(mo) mo.onchange=function(){ repintar(); };
   var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
 
   var bt=$('#btnSanc');
   if(bt) bt.onclick=async function(){
-    var quien=val('snQuien'), mot=val('snMotivo'), pts=parseInt(val('snPts'),10);
-    if(!quien){ msg('Elige a quién.', true); return; }
+    var quien=SANC_FORM.quien, mot=val('snMotivo'), pts=parseInt(val('snPts'),10);
+    if(!quien){ msg('Elige a quién: pulsa un nombre de la lista.', true); return; }
     if(!mot){ msg('Elige el motivo.', true); return; }
     if(!(pts<=0)){ msg('Los puntos de una sanción son 0 o negativos.', true); return; }
     var art=mot, texto='';
@@ -2396,7 +2491,7 @@ function _cablearSanciones_(){
         await api.moverLimiteTarea(urlTarea, plazo);
       }
       await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual'}]);
-      SANC_M=null; SANC_FORM={motivo:'', tarea:'', plazo:''};
+      SANC_M=null; SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
       tost('Sanción puesta a '+(_pilaDeM_(quien)||quien)+'.'+(mot==='plazo'?' Plazo movido en Notion.':''));
       _abrirSanciones_();
     }catch(e){
@@ -4139,7 +4234,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='ed870ff';
+var BUILD='a9a3bba';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
