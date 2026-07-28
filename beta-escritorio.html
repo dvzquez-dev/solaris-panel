@@ -589,6 +589,73 @@ var VERSION='';
 function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; }
 /* El escritorio no tiene `esAdmin`: su equivalente es `_puedeImpersonar_`, que mira el
    mismo correo. Se envuelve para que `_puedeBeta_` sea GEMELA de la del movil. */
+/* La misma busqueda con distinto nombre en cada cara; se envuelve para que el bloque de
+   autoridad de abajo sea IDENTICO en las dos y un diff lo confirme de un vistazo. */
+function _mSanc_(n){ return _m(n); }
+/* ═══ AUTORIDAD DE SANCIONES · GEMELA (movil/escritorio) ═══════════════════════════
+   Modelo dicho por Daniel el 28/07. Ver `docs/decisiones-app.md`.
+
+     rango 3 (PD) -> cualquiera, incluido el mismo
+     rango 2      -> cualquiera, incluido ellos mismos, SALVO al PD
+     rango 1      -> a si mismo y a los de su jurisdiccion
+     rango 0      -> nada, y NO VE la opcion
+
+   ⚠️ ESTO NO ES `rangoNom`. El rango de admin y la autoridad DOCUMENTAL son dos cosas
+   distintas desde hoy, y lo que obliga a separarlas es Bruno: rango 2 de admin y **cero**
+   autoridad documental. Con un solo rango no se puede decir eso sin darle tambien los papeles.
+
+   ⚠️ Y ESTO ES DE CARA, NO SEGURIDAD. El backend solo exige rango>=1 en `pushSancion`: la
+   frontera de verdad esta ahi y todavia no comprueba a QUIEN se sanciona. Mientras tanto, esto
+   evita el error honesto, no al que quiera saltarselo. */
+var PD_SANC = 'Daniel V\u00e1zquez Pi\u00f1eiro';
+/* La tabla es EXPLICITA a proposito: el modelo dice que el cargo no basta -«no necesariamente
+   por pertenecer al consejo se tendra rango 1 sino rango 0»- y que lo que da el rango 1 es
+   tener gente debajo. Deducirlo del cargo daria autoridad a quien no manda sobre nadie. */
+var RANGO_SANC = {
+  'Daniel V\u00e1zquez Pi\u00f1eiro': 3,
+  'Jos\u00e9 Manuel Torres Rodr\u00edguez': 2,
+  /* Bruno es la EXCEPCION del modelo: coordinador de Logistica con rango 2 de admin y ninguna
+     autoridad documental. Daniel: «es un poco como el Reaper de ir persiguiendo que se cumplan
+     los objetivos logisticos». */
+  'Bruno Ara\u00fajo Gonz\u00e1lez': 2
+};
+/* Jurisdicciones EXTRA, encima del propio subsistema. Breixo lleva ademas la gente de
+   Hardware. Se nombran una a una porque «Hardware» no es un subsistema del roster: es un
+   reparto de trabajo, y deducirlo de algun campo seria inventarse una relacion que no existe. */
+var JURIS_EXTRA = {
+  'Breixo Pombar Fern\u00e1ndez': ['Breixo Pombar Fern\u00e1ndez', 'Aar\u00f3n', 'Yoel']
+};
+function rangoSanc(nombre){
+  var n = String(nombre || '');
+  if (RANGO_SANC[n] != null) return RANGO_SANC[n];
+  /* Rango 1 = tiene gente bajo su jurisdiccion. Hoy eso son los coordinadores (mandan sobre su
+     unidad) y quien tenga jurisdiccion extra declarada. */
+  if (JURIS_EXTRA[n]) return 1;
+  var m = _mSanc_(n);
+  if (m && m.cargo === 'Coordinador') return 1;
+  return 0;
+}
+/* ¿Puede `actor` sancionar a `objetivo`? Una sola puerta: si alguna pantalla decide esto por su
+   cuenta, en dos semanas dira otra cosa que esta. */
+function puedeSancionarA(actor, objetivo){
+  var r = rangoSanc(actor);
+  if (r <= 0) return false;
+  if (r >= 3) return true;                                   // el PD, a cualquiera
+  if (r === 2) return String(objetivo) !== PD_SANC;          // rango 2, a todos menos al PD
+  /* Rango 1: a si mismo y a los suyos. */
+  if (String(objetivo) === String(actor)) return true;
+  var extra = JURIS_EXTRA[String(actor)];
+  if (extra && extra.indexOf(String(objetivo)) >= 0) return true;
+  var a = _mSanc_(actor), o = _mSanc_(objetivo);
+  return !!(a && o && a.unidad && a.unidad === o.unidad);
+}
+/* A quien puede sancionar, ya filtrado. Lo usan los dos formularios: que la lista salga de la
+   MISMA regla que el permiso es lo que impide ofrecer a alguien y que luego el envio falle. */
+function sancionablesPor(actor){
+  return (DATA.miembros || []).filter(function(m){
+    return m && !m.baja && puedeSancionarA(actor, m.nombre);
+  });
+}
 function esAdmin(){ return _puedeImpersonar_(); }
 /* ⚠️ AUTORIDAD TRIPLICADA a proposito (mapa §5, D9): `rangoNom`, `coordinadorDe`,
    `revisoresDe` y `puedeDecidir*` existen aqui, en `movil.html` y en el backend
@@ -3806,7 +3873,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='532bd67';
+var BUILD='a70ec67';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
