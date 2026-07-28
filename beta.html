@@ -2173,18 +2173,33 @@ var RANGO_SANC = {
      los objetivos logisticos». */
   'Bruno Ara\u00fajo Gonz\u00e1lez': 2
 };
-/* Jurisdicciones EXTRA, encima del propio subsistema. Breixo lleva ademas la gente de
-   Hardware. Se nombran una a una porque «Hardware» no es un subsistema del roster: es un
-   reparto de trabajo, y deducirlo de algun campo seria inventarse una relacion que no existe. */
-var JURIS_EXTRA = {
-  'Breixo Pombar Fern\u00e1ndez': ['Breixo Pombar Fern\u00e1ndez', 'Aar\u00f3n', 'Yoel']
-};
+/* LAS SUBCOORDINACIONES. Un subsistema puede partirse en equipos con su propio
+   subcoordinador, y **un subcoordinador manda sobre SU equipo, no sobre la unidad**.
+   Estructura de hoy (Daniel, 28/07):
+     Avionica -> coordinador Oscar - subcoordinacion Software (Oscar) - Hardware (Breixo)
+
+   El coordinador de la unidad sigue mandando sobre la unidad ENTERA, subequipos incluidos:
+   Oscar llega a todo Avionica sea por coordinador o por subcoordinador de Software.
+
+   Se declara como ESTRUCTURA y no como una excepcion con nombre y apellidos, porque no lo es:
+   la siguiente subcoordinacion que se cree es UNA LINEA aqui y no un caso especial repartido
+   por el codigo. La gente va nombrada una a una porque «Hardware» no es un campo del roster:
+   es un reparto de trabajo, y deducirlo de algo seria inventarse una relacion que no existe. */
+var SUBCOORD = [
+  { unidad:'Aviónica', equipo:'Hardware', quien:'Breixo Pombar Fernández',
+    gente:['Breixo Pombar Fernández', 'Aarón', 'Yoel'] }
+];
+/* La subcoordinacion de alguien, o `null`. */
+function _subcoordDe_(n){
+  for (var i=0;i<SUBCOORD.length;i++) if (SUBCOORD[i].quien === String(n)) return SUBCOORD[i];
+  return null;
+}
 function rangoSanc(nombre){
   var n = String(nombre || '');
   if (RANGO_SANC[n] != null) return RANGO_SANC[n];
-  /* Rango 1 = tiene gente bajo su jurisdiccion. Hoy eso son los coordinadores (mandan sobre su
-     unidad) y quien tenga jurisdiccion extra declarada. */
-  if (JURIS_EXTRA[n]) return 1;
+  /* Rango 1 = tiene gente bajo su jurisdiccion: los coordinadores (su unidad) y quien tenga
+     jurisdiccion propia declarada (un subcoordinador). */
+  if (_subcoordDe_(n)) return 1;
   var m = _mSanc_(n);
   if (m && m.cargo === 'Coordinador') return 1;
   return 0;
@@ -2198,13 +2213,18 @@ function puedeSancionarA(actor, objetivo){
   if (r === 2) return String(objetivo) !== PD_SANC;          // rango 2, a todos menos al PD
   /* Rango 1: a si mismo y a los suyos. */
   if (String(objetivo) === String(actor)) return true;
-  var extra = JURIS_EXTRA[String(actor)];
-  if (extra && extra.indexOf(String(objetivo)) >= 0) return true;
   var a = _mSanc_(actor), o = _mSanc_(objetivo);
-  return !!(a && o && a.unidad && a.unidad === o.unidad);
+  /* Coordinador de la unidad: la unidad ENTERA, subequipos incluidos. Se mira ANTES que la
+     subcoordinacion porque Oscar es las dos cosas y lo que manda es lo mas amplio. */
+  if (a && a.cargo === 'Coordinador' && o && a.unidad && a.unidad === o.unidad) return true;
+  /* Subcoordinador: SU equipo y nada mas. No se le suma el subsistema — eso es justo lo
+     que lo distingue del coordinador. */
+  var sc = _subcoordDe_(String(actor));
+  if (sc) return sc.gente.indexOf(String(objetivo)) >= 0;
+  return false;
 }
-/* A quien puede sancionar, ya filtrado. Lo usan los dos formularios: que la lista salga de la
-   MISMA regla que el permiso es lo que impide ofrecer a alguien y que luego el envio falle. */
+/* A quien puede sancionar, ya filtrado. Lo usan los dos formularios: que la lista salga de
+   la MISMA regla que el permiso es lo que impide ofrecer a alguien y que el envio falle. */
 function sancionablesPor(actor){
   return (DATA.miembros || []).filter(function(m){
     return m && !m.baja && puedeSancionarA(actor, m.nombre);
@@ -4119,7 +4139,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='9591757';
+var BUILD='ed870ff';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
