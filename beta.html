@@ -2305,7 +2305,12 @@ function barraHorasHTML(id){
      se descolocaba (con 87 h la barra llega casi al borde y el objetivo se quedaba a media barra).
      Si aún no hay horas, o el objetivo queda más a la derecha que el total, se ancla al final. */
   var wu = tot>0 ? Math.min(98, wtot*(UMBRAL/tot)) : wBar(UMBRAL);
-  return '<div class="barh" id="'+id+'">'+
+  /* `data-k` es la clave de la MEMORIA de anchos, y a proposito NO es el id.
+     Estado y Horas pintan LA MISMA barra con el mismo dato y distinto id
+     (`barEstado` / `barHoras`), asi que indexando por id cada pantalla tenia su propia
+     memoria: mirabas tus horas en Estado, pulsabas Horas... y la misma barra volvia a
+     crecer desde cero. Con una clave por DATO, las dos comparten pasado. */
+  return '<div class="barh" id="'+id+'" data-k="horasMes">'+
       '<i class="otor" data-w="'+wco.toFixed(2)+'"></i>'+
       '<i class="pend" data-l="'+wco.toFixed(2)+'" data-w="'+(wcop-wco).toFixed(2)+'"></i>'+
       '<span class="mk" data-l="'+wu.toFixed(2)+'"></span>'+
@@ -2349,7 +2354,12 @@ function animarBarras(root, silencioso){
     $$('i',b).forEach(function(i,ix){
       var l=i.dataset.l, w=i.dataset.w;
       i.style.left=(l||0)+'%';
-      var k=(b.id||b.className)+':'+ix, prev=_anchoPrev_[k];
+      var k=(b.dataset.k||b.id||b.className)+':'+ix, prev=_anchoPrev_[k];
+      /* Un ancho no numerico (`NaN`, vacio) escrito como `width:NaN%` es CSS invalido:
+         el navegador lo descarta y el tramo se queda en el `width:0` de la hoja, o sea
+         creciendo desde cero sin que nadie lo haya pedido. Si no es un numero, no se
+         guarda ni se anima. */
+      if(!isFinite(parseFloat(w))){ i.style.width='0%'; return; }
       _anchoPrev_[k]=w;
       /* 🔴 `silencioso` LLEGABA Y NO SE MIRABA. El parametro estaba declarado, todas las
          llamadas lo pasaban... y el cuerpo no lo leia nunca. Lo unico que evitaba que un
@@ -2362,7 +2372,21 @@ function animarBarras(root, silencioso){
       if(silencioso || redu()){ i.style.width=w+'%'; return; }
       /* De donde parte: de lo que media antes si ya estaba pintada, y de cero solo la
          primera vez —que ahi si se quiere ver crecer—. */
+      /* 🔴 EL SALTO A `prev` TIENE QUE SER UN SALTO, NO UNA TRANSICION.
+         `.barh i` nace con `width:0` por CSS (regla de arriba) y `pintar()` fuerza DOS
+         reflows sincronos entre el `innerHTML` y esta linea: `colocarViaje()` lee
+         `getBoundingClientRect()` y `armarMedidor()` hace `void med.offsetWidth`. Un
+         reflow CONFIRMA el 0 como estilo anterior, asi que asignar `prev%` deja de ser
+         una colocacion instantanea y dispara `transition:width 1s`: la barra barre de
+         CERO a `prev`, y 70 ms despues se redirige a `w`. Con el dato IDENTICO.
+         Eso es el «se resetea y arranca de 0» que Daniel llevaba viendo: no dependia de
+         los datos ni de la memoria, sino del reflow que hace otra funcion por el medio.
+         Mismo remedio que ya usa `armarMedidor`: apagar la transicion, colocar, forzar
+         el reflow y devolverla. */
+      i.style.transition='none';
       i.style.width=(prev!=null?prev:0)+'%';
+      void i.offsetWidth;
+      i.style.transition='';
       if(prev===w) return;                    // mismo dato: ni se toca
       /* setTimeout, no rAF: en pestaña de fondo rAF no dispara y quedaría a cero */
       setTimeout(function(){ i.style.width=w+'%'; }, 70);
@@ -3472,7 +3496,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='87bbed7';
+var BUILD='53dd36b';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -4618,8 +4642,11 @@ function pintar(silencioso){
   $$('.vis').forEach(function(s){s.classList.toggle('on', s.id==='v-'+ST.vista);});
   pintarNav();
   colocarViaje(false);
-  if(ST.vista==='estado'){ armarMedidor(silencioso); animarBarras(el, silencioso); }
-  if(ST.vista==='horas'){ animarBarras(el, silencioso); animarDeltas(el); }
+  /* `el` acotado a proposito: sin el, `root||document` recorreria TAMBIEN la barra de la
+     otra vista -que sigue en el DOM, oculta- y le machacaria su memoria con un ancho que
+     no le toca. Si `el` no existe no se anima nada, que es lo correcto. */
+  if(el && ST.vista==='estado'){ armarMedidor(silencioso); animarBarras(el, silencioso); }
+  if(el && ST.vista==='horas'){ animarBarras(el, silencioso); animarDeltas(el); }
   if(ST.vista==='fichar'){ medirAristas(); validarFichaje(); }
   enganchar();
 }
