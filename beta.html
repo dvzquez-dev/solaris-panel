@@ -4234,7 +4234,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='a9a3bba';
+var BUILD='034d305';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -4376,9 +4376,6 @@ var OCULTABLES=[
   ['tareas','Tareas','mientras no tengas ninguna tarea en curso', _tareasRelevantes_]
 ];
 function _seOculta_(k){ return !!(PREF.ocultar && PREF.ocultar[k]); }
-/* Con un modal delante -Ajustes, por ejemplo- la barra de abajo no se toca: si no, apagar
-   una pestaña desde Ajustes hace desaparecer justo la pantalla que tienes debajo. */
-function _hayModal_(){ var m=$('#modal'); return !!(m && m.classList.contains('on')); }
 function vDocs(){
   var mios=ENTREGABLES;
   var pend=_docsPend_();
@@ -5382,8 +5379,11 @@ function _destVisibles_(){
       if(d[0]!==o[0]) continue;
       try{
         if(!_seOculta_(o[0])) return true;
+        /* Estar DENTRO la protege, y eso ya cubre el caso que me preocupaba: si la apagas
+           desde Ajustes estando en ella, `ST.vista` es la suya y no se va. El guardian de
+           «hay un modal abierto» sobraba y ademas rompia lo obvio — apagarla desde Ajustes no
+           hacia NADA visible, porque el modal esta abierto por definicion mientras la apagas. */
         if(ST.vista===o[0]) return true;
-        if(_hayModal_()) return true;
         return !!o[3]();
       }catch(_){ return true; }
     }
@@ -5830,10 +5830,14 @@ function enganchar(){
             PREF.ocultar=PREF.ocultar||{};
             PREF.ocultar[k]=!PREF.ocultar[k]; _guardarPref_();
             b3.textContent=_seOculta_(k)?'Sí':'No';
-            /* La barra se repinta sola, pero la estrella viajera se coloca por el
-               rectangulo del boton activo: con una pestaña mas o menos, ese rectangulo
-               cambia de sitio y hay que recolocarla o se queda sobre la posicion vieja. */
-            pintarNav(); colocarViaje(false);
+            /* `pintar()` ENTERO, no `pintarNav()` suelto. Y esta es la razon, que costo dos
+               intentos: `pintarNav()` BORRA las pestañas y las vuelve a crear, pero **no les
+               pone el manejador de clic** — eso lo hace `enganchar()`, al final de `pintar()`.
+               Llamando solo a `pintarNav()` la barra se redibujaba MUERTA: todo se veia, los
+               medidores seguian animando y no se podia navegar. Daniel: «peta la app y se queda
+               congelada, o sea los gauges se mueven pero no puedes navegar».
+               Silencioso para no re-animar la pantalla de debajo por un ajuste. */
+            pintar(true);
           };
         });
       }
