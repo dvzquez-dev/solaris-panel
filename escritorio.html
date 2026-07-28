@@ -620,13 +620,28 @@ function normReu(r){ r=r||{};
     limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[],
     franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[],
     total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null,
-    ordenDia:r.ordenDia||"", vision:r.vision||"anonima", fijada:_labelFijada_(r.fijada)}; }
+    ordenDia:r.ordenDia||"", vision:r.vision||"anonima",
+    fijada:_labelFijada_(r.fijada), fijadaBl:_bloquesFijada_(r)}; }
 /* El backend manda `fijada` como objeto {fecha,franjas,bloques,label,iso}; pintarlo tal
    cual daba «[object Object]» en la tabla de convocatorias. */
 function _labelFijada_(f){
   if(!f) return '';
   if(typeof f==='string') return f;
   return f.label || f.iso || '';
+}
+/* 🔴 LOS BLOQUES DE LA FIJADA, que este normalizador TIRABA.
+   El mapa de calor sabía pintar la fijada en verde —está ahí, por rango de minutos— pero
+   leía `r.fijadaBl`, y `normReu` solo se quedaba con la etiqueta. Así que el verde solo se
+   veía en la sesión en la que fijabas la fecha (ahí se asigna a mano) y **se perdía en
+   cuanto recargabas**: la fecha fijada volvía a salir roja. Daniel, unas cuantas veces.
+   Es la CUARTA vez que un normalizador tira un dato que sí venía (`origen`, `ordenDia`,
+   `enlaceDrive`, y este). Por eso el mapa funcional tiene ya su tabla de procedencia.
+   Se aceptan las dos formas, igual que en el móvil: el objeto del backend, o `fijadaBl`
+   suelto cuando lo que se re-normaliza es una reunión que ya pasó por aquí. */
+function _bloquesFijada_(r){
+  var f=r&&r.fijada;
+  if(f && typeof f==='object' && Array.isArray(f.bloques)) return f.bloques;
+  return Array.isArray(r&&r.fijadaBl) ? r.fijadaBl : [];
 }
 
 
@@ -2264,7 +2279,15 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
     var hib=(r0.modalidad==='hibrida');
     var pondOn=hib && DISPO_POND;
     var _o=_ordenarFranjas_(r0);
-    if(_o.cambio) r0=Object.assign({}, r0, {franjas:_o.franjas, bloques:_o.bloques, calor:null});
+    /* 🔴 Y AQUÍ HAY QUE COGER TAMBIÉN `fijadaBl`. `_ordenarFranjas_` REMAPEA los índices de
+       franja al reordenarlas —los calcula bien, línea a línea— y este `Object.assign` se
+       quedaba solo con `franjas` y `bloques`, así que sobrevivía el índice VIEJO.
+       Efecto: la Reunión General llegó de Xoyondo con las franjas 18,19,20,21,22,10,11…17;
+       ordenadas, el índice 4 pasa de ser las 22:00 a ser las 14:00. El verde se pintaba —
+       ocho horas antes de la reunión. Dos fallos encadenados: primero el dato no llegaba
+       (`normReu` lo tiraba) y, en cuanto llegó, se pintaba en la hora equivocada. */
+    if(_o.cambio) r0=Object.assign({}, r0, {franjas:_o.franjas, bloques:_o.bloques,
+                                            fijadaBl:_o.fijadaBl, calor:null});
     var r=Object.assign({}, r0, {calor:_calorDe_(r0, pondOn), _hib:hib, _pond:pondOn, conv:(r0.conv!=null?r0.conv:cob.conv),
       cubren:(r0.cubren!=null?r0.cubren:cob.cubren), minimo:cob.minimo,
       sinCubrir:(r0.sinCubrir||cob.sinCubrir), bajoMin:(r0.bajoMin||cob.bajoMin),
@@ -3128,6 +3151,19 @@ async function _onCredencial_(resp,_silente){
       _gate_(_insigniaHTML_()+'<div style="max-width:380px;line-height:1.55;text-align:center"><b>No tienes permiso para entrar al escritorio.</b><br><span style="opacity:.75">Este panel es para consejo, junta y direcci\u00f3n. Tu sitio es la app del m\u00f3vil.</span></div>');
       return;
     }
+    /* LA BETA NO ES PARA TODO EL MUNDO — GEMELA de la del móvil. Va aquí, después de que la
+       identidad esté resuelta y antes de quitar el gate: si no pasa, la app no arranca.
+       ⚠️ Faltaba: esta cara tenía `_puedeBeta_` y no la llamaba nadie, así que su beta estaba
+       abierta a cualquier coordinador que diera con la URL. Escribir la comprobación no es
+       ponerla. */
+    if(!_puedeBeta_()){
+      _gate_(_insigniaHTML_()+'<div style="max-width:380px;line-height:1.55;text-align:center">'+
+        '<b>Esto es la versión de pruebas.</b><br><span style="opacity:.75">Todavía no es para '+
+        'uso general.</span><br><br><a href="./escritorio.html" style="border:1px solid #463E40;'+
+        'background:none;color:#F4F3F3;border-radius:9px;padding:9px 15px;text-decoration:none;'+
+        'display:inline-block">Ir al panel</a></div>');
+      return;
+    }
     try{ localStorage.setItem('sol_last_email',SESION.email);
          localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
     ACTOR = SESION.nombre || PD_NOM;
@@ -3339,7 +3375,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b56d342';
+var BUILD='3a4affb';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
