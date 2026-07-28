@@ -1234,6 +1234,11 @@ var api={
   getSanciones: function(f){ return api._post({action:"getSanciones",filtro:f||{}}); },
   pushParte: function(p){ return api._post({action:"pushParte",parte:p}); },
   ficharEntrada:    function(){ return api._post({action:"ficharEntrada"}); },
+  /* Preferencias de aviso (backend v45). Viven en el SERVIDOR y no en el movil porque el
+     filtro se aplica antes de enviar el push: callar en el navegador acaba con la
+     suscripcion revocada (`userVisibleOnly` obliga a mostrar algo por cada push). */
+  getNotis:         function(){ return api._post({action:"getNotis"}); },
+  guardarNotis:     function(t){ return api._post({action:"guardarNotis",tipos:t}); },
   ficharSalida:     function(tarea,just,cat){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat}); },
   getFichajeAbierto:function(){ return api._post({action:"getFichajeAbierto"}); },
   pausarFichaje:    function(){ return api._post({action:"pausarFichaje"}); },
@@ -3249,26 +3254,9 @@ async function _registrarSW_(){
   try{ _swReg=await navigator.serviceWorker.register('sw.js'); return _swReg; }catch(e){ return null; }
 }
 function _notisMsg(t){ var b=$('#notisMsg'); if(b) b.textContent=t; }
-async function activarNotis(btn){
-  if(!_pushSoportado_()){ _notisMsg('Este navegador no admite notificaciones.'); return; }
-  if(_esIOS_() && !_esStandalone_()){
-    _notisMsg('En iPhone: Compartir → Añadir a pantalla de inicio, y abre la app desde ese icono.');
-    return;
-  }
-  if(btn){ btn.disabled=true; btn.textContent='Activando…'; }
-  try{
-    var perm=await Notification.requestPermission();
-    if(perm!=='granted'){ _notisMsg('Permiso denegado. Puedes darlo en los ajustes del móvil.'); return; }
-    var reg=_swReg || await _registrarSW_();
-    if(!reg){ _notisMsg('No se pudo preparar el service worker.'); return; }
-    await navigator.serviceWorker.ready;
-    var sub=await reg.pushManager.getSubscription();
-    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
-    if(typeof SESION!=='undefined' && SESION) await api.guardarPush(sub.toJSON());
-    _notisMsg('Notificaciones activadas.');
-  }catch(e){ _notisMsg('No se pudo activar: '+((e&&e.message)||e)); }
-  finally{ if(btn){ btn.disabled=false; btn.textContent='Activar notificaciones'; } pintar(); }
-}
+/* `activarNotis` se retiro el 28/07: con las notificaciones obligatorias, el permiso se
+   pide UNA vez y en el gate del arranque (`_gateNotis_`). Tener las dos era la misma
+   funcion escrita dos veces, que es como empiezan las divergencias. */
 /* Al abrir: registra el SW y, si ya habia permiso y sesion, re-guarda la suscripcion por si
    el navegador la roto (pasa, y si no se re-guarda dejan de llegar avisos en silencio). */
 async function _pushInit_(){
@@ -3357,6 +3345,17 @@ function _gateNotis_(motivo, seguir){
     b.disabled=false; b.textContent=boton;
   };
 }
+/* Los cinco tipos que se pueden apagar. Es la MISMA lista que `NOTIS_TIPOS` del backend;
+   si divergieran, aqui saldria un interruptor que el servidor no mira. Los textos son de
+   aqui porque son de cara al miembro; las claves las manda el servidor. */
+var NOTIS_ETI={
+  turnos:['Turnos','Convocatorias y cambios de turno de fabricación'],
+  reuniones:['Reuniones','Recordatorios 24 h, 1 h y 10 min antes'],
+  documentos:['Documentos','Cuando te toca revisar algo o deciden sobre lo tuyo'],
+  horas:['Horas y partes','Cuando te firman, rechazan o piden detalle de un parte'],
+  avisos:['Avisos y sanciones','Lo disciplinario y lo que tiene plazo']
+};
+var NOTIS_PREF=null;                    // lo que dijo el servidor la ultima vez
 function _notisHTML_(){
   if(!_pushSoportado_())
     return '<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador '+
@@ -3364,15 +3363,53 @@ function _notisHTML_(){
       'estás perdiendo los avisos de turnos, reuniones y decisiones. Ábrelo en el móvil.</p></div>';
   if(_esIOS_() && !_esStandalone_())
     return '<div class="tarj"><p class="rnota" style="margin:0;line-height:1.6">Para recibir avisos en <b>iPhone</b>: '+
-      'pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> y abre la app desde ese icono. '+
-      'Luego vuelve aquí y actívalas.</p></div>';
-  if(Notification.permission==='granted')
-    return '<div class="tarj"><p class="rnota" style="margin:0;color:var(--ok)">Notificaciones activadas.</p>'+
-      '<p class="rnota" id="notisMsg" style="margin:4px 0 0"></p></div>';
-  return '<div class="tarj"><p class="rnota" style="margin:0 0 10px">Avisos de turnos, reuniones y '+
-    'decisiones sobre tus documentos y tus horas.</p>'+
-    '<button class="btn full" data-p id="btnNotis">Activar notificaciones</button>'+
+      'pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> y abre la app desde ese icono.</p></div>';
+  /* El botón de «activar» se fue: para llegar hasta aquí ya has pasado el gate del arranque.
+     Lo que queda es elegir QUÉ te llega. */
+  return '<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
+      '<b>Qué avisos quieres recibir</b><small>Se aplica en el servidor, antes de enviarlos</small>'+
+      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
+        'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
+    '<div class="plgc" hidden id="notisLista">'+
+      '<p class="rnota" style="margin:0 0 10px">Cargando tus preferencias…</p>'+
+    '</div></div>'+
     '<p class="rnota" id="notisMsg" style="margin:8px 0 0"></p></div>';
+}
+/* Pinta la lista con lo que diga el SERVIDOR. Si no se puede leer se dice y no se enseñan
+   interruptores: unos interruptores con un valor inventado son peores que no tenerlos, porque
+   se tocan creyendo que hacen algo. */
+function _pintarNotisLista_(){
+  var c=$('#notisLista'); if(!c) return;
+  if(!NOTIS_PREF){ c.innerHTML='<p class="rnota" style="margin:0;color:var(--warn)">No se pudieron '+
+    'leer tus preferencias. Vuelve a abrir Ajustes.</p>'; return; }
+  var filas='';
+  for(var k in NOTIS_ETI){
+    if(!(k in NOTIS_PREF)) continue;        // el servidor manda: si no lo lista, no existe
+    var e=NOTIS_ETI[k], on=NOTIS_PREF[k]!==false;
+    filas+='<div class="fila"><div class="a"><b>'+e[0]+'</b><small>'+e[1]+'</small></div>'+
+      '<div class="d"><button class="btn" data-noti="'+k+'" data-p>'+(on?'Sí':'No')+'</button></div></div>';
+  }
+  c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0">Lo urgente llega igual: un aviso '+
+    'marcado como <b>forzoso</b> se salta estos interruptores.</p>';
+  $$('[data-noti]',c).forEach(function(b){
+    b.onclick=async function(){
+      var k=b.dataset.noti, antes=NOTIS_PREF[k]!==false;
+      /* Se pinta el cambio YA y se revierte solo si el servidor dice que no: dejar el dedo
+         esperando una ida y vuelta a Apps Script se siente roto. */
+      NOTIS_PREF[k]=!antes; b.textContent=(!antes)?'Sí':'No'; b.disabled=true;
+      try{ var r=await api.guardarNotis(NOTIS_PREF); if(r && r.tipos) NOTIS_PREF=r.tipos; _notisMsg(''); }
+      catch(e){ NOTIS_PREF[k]=antes; b.textContent=antes?'Sí':'No';
+        _notisMsg('No se pudo guardar: '+((e&&e.message)||e)); }
+      b.disabled=false;
+    };
+  });
+}
+async function _cargarNotis_(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION){
+    NOTIS_PREF=null; _pintarNotisLista_(); return; }
+  try{ var r=await api.getNotis(); NOTIS_PREF=(r&&r.tipos)||null; }
+  catch(_){ NOTIS_PREF=null; }
+  _pintarNotisLista_();
 }
 /* ── BUZON: reportar un fallo o proponer una mejora ───────────────────────────
    Dos campos a mano y punto (decision de Daniel): si se piden mas, no lo usa nadie.
@@ -3762,7 +3799,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='209a892';
+var BUILD='7c10508';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -5243,7 +5280,6 @@ function enganchar(){
     };
   });
   $$('[data-doc]').forEach(function(el){ el.onclick=function(){ verDoc(+el.dataset.doc); }; });
-  var _bn=$('#btnNotis'); if(_bn) _bn.onclick=function(){ activarNotis(_bn); };
   /* Plegados sencillos (`data-plg`): el historial de Horas, y lo que venga. */
   $$('[data-plg]').forEach(function(h){
     h.onclick=function(){
@@ -5265,7 +5301,16 @@ function enganchar(){
       if(q==='cuota'){ abrirModal(_cuotaHTML_()); return; }
       if(q==='equipo'){ abrirModal(_coordinacionHTML_()); return; }
       if(q==='ajustes'){ abrirModal(_ajustesHTML_());
-        var b2=$('#btnNotis'); if(b2) b2.onclick=function(){ activarNotis(b2); };
+        /* Se piden al abrir y no al arrancar: es una llamada mas al backend y esta
+           pantalla la abre casi nadie casi nunca. */
+        _cargarNotis_();
+        $$('[data-plg]').forEach(function(h){
+          h.onclick=function(){
+            var c=h.parentNode.querySelector('.plgc'), sv=h.querySelector('svg');
+            if(c.hasAttribute('hidden')){ c.removeAttribute('hidden'); sv.style.transform='rotate(180deg)'; }
+            else { c.setAttribute('hidden',''); sv.style.transform=''; }
+          };
+        });
         $$('#ajEscala [data-esc]').forEach(function(be){
           be.onclick=function(){
             PREF.escala=be.dataset.esc; _guardarPref_(); _aplicarEscala_();
