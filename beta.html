@@ -1253,7 +1253,18 @@ function _aplicarPanel_(pnl){
      barra 'interpolaba' desde un numero inventado. Se limpia la primera vez que llega un
      panel de verdad, asi que tu primera barra crece de cero -que es lo que se quiere ver
      una vez- y a partir de ahi ya interpola entre valores tuyos. */
-  if(!_panelReal_){ _panelReal_=true; _anchoPrev_={}; }
+  /* Se limpia la semilla SOLO si no habia memoria de verdad guardada. Antes se limpiaba
+     siempre que llegaba el primer panel real, y como el pintado del login NO es callado,
+     la barra crecia desde cero EN CADA INICIO DE SESION. Es lo que Daniel describio como
+     «arranca desde 0 dos o tres veces al iniciar sesion»: se arreglo que se pintara una
+     sola vez, pero no que esa vez empezara en cero.
+     Con memoria guardada de una sesion anterior, interpolar desde ahi es lo correcto: son
+     TUS horas de la ultima vez, no un numero de maqueta. */
+  if(!_panelReal_){
+    _panelReal_=true;
+    var _habia=false; try{ _habia=!!localStorage.getItem('sol_anchos'); }catch(_){}
+    if(!_habia) _anchoPrev_={};
+  }
 }
 var _panelReal_=false;
 /* «Ver como» — SOLO la cuenta admin (solaris@): se pone en la vista de cualquier miembro. El
@@ -2323,7 +2334,16 @@ function barraHorasHTML(id){
 
    La clave es el id de la barra + la posicion del tramo dentro de ella; las dos son
    estables entre repintados. */
+/* LA MEMORIA DE ANCHOS SOBREVIVE A LA RECARGA. Vivia solo en memoria, asi que CUALQUIER
+   recarga la vaciaba y la barra volvia a crecer desde cero. Y en un iPhone con la app en
+   la pantalla de inicio eso no es raro: iOS descarta las paginas de fondo y las recarga al
+   volver. Desde fuera se ve como «se resetea cuando le sale de los huevos», que es
+   exactamente lo que reporto Daniel — y por eso no habia forma de reproducirlo navegando.
+   Con `localStorage` la barra crece de cero UNA vez en la vida del dispositivo. */
 var _anchoPrev_={};
+try{ var _ap=JSON.parse(localStorage.getItem('sol_anchos')||'null');
+     if(_ap && typeof _ap==='object') _anchoPrev_=_ap; }catch(_){}
+function _guardarAnchos_(){ try{ localStorage.setItem('sol_anchos',JSON.stringify(_anchoPrev_)); }catch(_){} }
 function animarBarras(root, silencioso){
   $$('.barh',root||document).forEach(function(b){
     $$('i',b).forEach(function(i,ix){
@@ -2331,7 +2351,15 @@ function animarBarras(root, silencioso){
       i.style.left=(l||0)+'%';
       var k=(b.id||b.className)+':'+ix, prev=_anchoPrev_[k];
       _anchoPrev_[k]=w;
-      if(redu()){ i.style.width=w+'%'; return; }
+      /* 🔴 `silencioso` LLEGABA Y NO SE MIRABA. El parametro estaba declarado, todas las
+         llamadas lo pasaban... y el cuerpo no lo leia nunca. Lo unico que evitaba que un
+         repintado de fondo reanimara la barra era el atajo `prev===w`, o sea: funcionaba
+         de casualidad mientras el dato no cambiase, y en cuanto cambiaba -o la memoria
+         estaba vacia- la barra se reiniciaba sin que nadie hubiera tocado nada.
+         Callado = ancho final y punto. La regla del proyecto es «repintar menos, no
+         apagar la animacion»: esto no apaga nada, solo deja de animar lo que no ha
+         pedido el usuario. */
+      if(silencioso || redu()){ i.style.width=w+'%'; return; }
       /* De donde parte: de lo que media antes si ya estaba pintada, y de cero solo la
          primera vez —que ahi si se quiere ver crecer—. */
       i.style.width=(prev!=null?prev:0)+'%';
@@ -2341,6 +2369,7 @@ function animarBarras(root, silencioso){
     });
     $$('.mk',b).forEach(function(m){ m.style.left=m.dataset.l+'%'; });
   });
+  _guardarAnchos_();
   $$('.barhet span',root||document).forEach(function(s){ s.style.left=s.dataset.l+'%'; });
 }
 
@@ -3443,7 +3472,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='335689b';
+var BUILD='87bbed7';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
