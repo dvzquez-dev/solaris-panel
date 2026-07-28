@@ -3018,6 +3018,9 @@ function _fichaBuzon_(r){
     (r.vista_previa? '<div class="sub"><span class="sc">Vista previa</span>'+
        '<p style="margin:4px 0 0"><a href="'+esc(r.vista_previa)+'" target="_blank" rel="noopener" '+
        'style="color:var(--red2);font-size:12.5px">abrir el artefacto con los cambios puestos</a></p></div>' : '')+
+    /* La compensación va JUNTO a la decisión, no en otra pantalla: el número solo se puede
+       juzgar leyendo lo que costó el reporte, y eso está aquí arriba. */
+    ((r.estado==='Publicado') ? _compHTML_(r) : '')+
     (r.recomendacion ? _accBuzon_(r, esBug)
       : '<div class="ruta">Todavía sin analizar. Cuando esté reproducido y valorado, aparecen '+
         'aquí el diagnóstico y la recomendación, y con ellos los botones.</div>')+
@@ -3043,6 +3046,72 @@ var BZ_AVISO={
      (`flujos/publicar_web.py --release` → `triaje.py --publicar`). Así el buzón no puede
      decir «publicado» de algo que no salió, ni al revés. */
   'Descartado':'Sale del lote. Queda en el histórico, no se borra.'};
+/* ═══ COMPENSAR UN REPORTE CON HORAS ═══════════════════════════════════════════
+   Daniel (27/07, al decidirlo): «seria basicamente puesto como una propuesta de otorgar esas
+   horas en mi panel del escritorio, modificables tambien». Y el 28/07: «debe ser editable y al
+   lado de cada modificacion aprobada, con la propuesta por la matriz».
+
+   LA MATRIZ VIVE AQUI Y SOLO AQUI. Cambiar la escala tiene que ser tocar estos numeros, no
+   perseguir multiplicaciones por el fichero.
+
+   ⚠️ ESTOS VALORES SON UNA PROPUESTA MIA, NO LA ESCALA DE DANIEL. La suya lleva pendiente
+   desde el 27/07 (ver `docs/plan-compensar-reportes.md`). La pantalla lo dice: presentar un
+   numero inventado como si fuera suyo es pedirle que firme a ciegas. */
+var MATRIZ_COMP={
+  base:0.5,                                    // por haberse molestado en reportarlo bien
+  gravedad:{ 'Bloquea':1.5, 'Molesta':0.75, 'Cosmético':0.25, 'Cosmetico':0.25 },
+  /* Un fallo que bloquea a 30 no vale lo que uno que molesta a 1. */
+  alcance:{ 'equipo':1.5, 'subsistema':1.0, 'persona':0.5 },
+  /* El eje que mas conviene premiar: enseña a reportar bien. */
+  calidad:{ 'reproducible':1.5, 'con_preguntas':1.0, 'no_reproducible':0 },
+  tope:3.0                                     // por reporte, para que nada se dispare
+};
+/* Devuelve `{horas, porque[], faltan[]}`. `faltan` es la lista de ejes que el triaje no
+   escribio: se asume lo conservador y SE DICE, en vez de disimular el hueco. */
+function _compPropuesta_(r){
+  var M=MATRIZ_COMP, porque=[], faltan=[];
+  var h=M.base; porque.push('base '+M.base+' h');
+  var g=M.gravedad[String(r.gravedad||'')];
+  if(g==null){ g=M.gravedad['Molesta']; faltan.push('gravedad'); }
+  h+=g; porque.push('gravedad '+(r.gravedad||'—')+' +'+g);
+  var a=M.alcance[String(r.alcance||'')];
+  if(a==null){ a=M.alcance['persona']; faltan.push('alcance'); }
+  h+=a; porque.push('alcance '+(r.alcance||'—')+' +'+a);
+  var c=M.calidad[String(r.calidad||'')];
+  if(c==null){ c=M.calidad['con_preguntas']; faltan.push('calidad del reporte'); }
+  h+=c; porque.push('calidad '+(r.calidad||'—')+' +'+c);
+  h=Math.min(M.tope, Math.round(h*4)/4);       // en cuartos de hora, como los partes
+  return {horas:h, porque:porque, faltan:faltan};
+}
+/* Nadie se compensa a si mismo: misma regla que en documentos. Y solo cuenta lo que llego a
+   produccion, que es cuando se sabe que valia. */
+function _compPuede_(r){
+  if((r.estado||'')!=='Publicado') return 'solo cuando esté publicado';
+  if(_m(r.quien).pila===_m(ACTOR).pila || r.quien===ACTOR) return 'es tuyo: nadie se compensa a sí mismo';
+  if(r.horas_otorgadas) return 'ya compensado con '+r.horas_otorgadas+' h';
+  return null;
+}
+function _compHTML_(r){
+  var p=_compPropuesta_(r), no=_compPuede_(r);
+  var ID=esc(r.id);
+  return '<div class="sub"><span class="sc">Compensación en horas</span>'+
+    '<p style="margin:4px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.55">'+
+      'La matriz propone <b>'+p.horas+' h</b> — '+esc(p.porque.join(' · '))+'.'+
+      (p.faltan.length? '<br><span style="color:var(--warn)">El triaje no escribió '+
+        esc(p.faltan.join(' ni '))+': se ha supuesto lo más conservador.</span>' : '')+
+      '<br><span style="color:var(--ink3)">La escala todavía no la has fijado tú; estos '+
+      'valores son una propuesta y están en <span class="mono">MATRIZ_COMP</span>.</span></p>'+
+    (no
+      ? '<div class="ruta">No se puede otorgar: '+esc(no)+'.</div>'
+      : '<div class="acts">'+
+          '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px">Horas'+
+          '<input type="number" step="0.25" min="0" max="8" value="'+p.horas+'" data-comph="'+ID+'" '+
+          'style="width:78px;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
+          'padding:7px 9px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
+          '<button class="btn pri" data-comp="'+ID+'">Otorgar a '+esc(_m(r.quien).pila)+'</button>'+
+        '</div>')+
+  '</div>';
+}
 function _accBuzon_(r, esBug){
   var t=esBug?'bug':'mejora', ID=esc(r.id);
   var notas=(BZ_NOTAS[r.id]!=null?BZ_NOTAS[r.id]:(r.anotaciones||''));
@@ -3592,7 +3661,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='496edef';
+var BUILD='cc52908';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3798,6 +3867,37 @@ function pintar(){
       }
       BZ_CONF={id:id, acc:acc, notas:conNotas};
       pintar();
+    };
+  });
+  $$('[data-comp]',m).forEach(function(b){
+    b.onclick=async function(){
+      var id=b.dataset.comp, r=((BUZON||[]).filter(function(x){ return x.id===id; })[0]||null);
+      if(!r) return;
+      var caja=$('[data-comph="'+id+'"]',m);
+      /* Se otorga LO QUE HAY EN LA CAJA, no lo que propuso la matriz: si él lo cambió, su
+         número es el bueno. Esa es toda la gracia de que sea editable. */
+      var horas=Math.round((parseFloat(caja&&caja.value)||0)*4)/4;
+      if(!(horas>0)){ tost('Pon las horas antes de otorgar.'); if(caja) caja.focus(); return; }
+      b.disabled=true; var prev=b.textContent; b.textContent='Otorgando…';
+      try{
+        /* EL ORDEN IMPORTA, y es al revés de lo natural: PRIMERO se anota en el reporte y
+           solo si eso queda escrito se otorgan las horas.
+
+           Si se otorgara antes, y el backend no supiera guardar `horas_otorgadas` -pasa: la
+           columna es de v46 y hasta entonces el campo se ignora EN SILENCIO-, las horas
+           estarían dadas y el reporte no lo sabría. Volverías a verlo sin marca y podrías
+           pagarlo otra vez. Así, si el backend no lo admite, no se paga nada y se dice. */
+        var t = r.tipo==='bug'?'bug':'mejora';
+        await api.decidirReporte(t, id, {horas_otorgadas:horas});
+        var vuelta=(await api.getBuzon()||[]).filter(function(x){ return x.id===id; })[0];
+        if(!vuelta || String(vuelta.horas_otorgadas||'')===''){
+          tost('El backend no guarda todavía la compensación (falta desplegar v46). NO se ha otorgado nada.');
+          b.disabled=false; b.textContent=prev; return;
+        }
+        await api.otorgarHoras({nombre:r.quien, horas:horas,
+          tarea:'Compensación por el reporte '+id, categoria:'compensacion'});
+        tost(id+': '+horas+' h a '+_m(r.quien).pila+'.'); _cargarBuzon_();
+      }catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo: '+((e&&e.message)||e)); }
     };
   });
   $$('[data-bzno]',m).forEach(function(b){ b.onclick=function(){ BZ_CONF=null; pintar(); }; });
