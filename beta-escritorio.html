@@ -506,7 +506,9 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
   <header class="top">
     <div class="miga"><span>Solaris</span><span style="color:var(--line2)">/</span>
       <span id="migaA">Operación</span><span style="color:var(--line2)">/</span><b id="migaB">Panel de mando</b>
-      <span class="beta" id="hBeta" style="display:none;margin-left:8px">beta</span></div>
+      <!-- El distintivo es tambien LA VUELTA a produccion: ver el movil. -->
+      <a class="beta" id="hBeta" href="./escritorio.html" style="display:none;margin-left:8px;text-decoration:none"
+         title="Estas en la version de pruebas · pulsa para volver al panel de verdad">beta</a></div>
     <!-- El buscador se retira hasta que busque de verdad: prometía una función que no existía. -->
     <div class="topd">
       <div class="actua" id="actua">
@@ -4188,7 +4190,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='1090077';
+var BUILD='4dde06b';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
