@@ -365,6 +365,11 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .vac{padding:26px 14px;text-align:center;color:var(--ink3);font-size:12.5px;line-height:1.6}
 .vac b{display:block;color:var(--ink2);font-family:var(--mono);font-size:11px;letter-spacing:.12em;
   text-transform:uppercase;margin-bottom:6px}
+/* El distintivo de BETA. Va en la cabecera y no en Ajustes: tiene que verse SIN buscarlo,
+   o acabas reportando contra la versión equivocada. Ámbar, que es el color de «ojo» en
+   esta paleta, y no rojo: rojo aquí significa Solaris, no aviso. */
+.beta{font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:#241a08;background:var(--warn);border-radius:5px;padding:2px 5px;flex:none}
 .tost{position:fixed;left:50%;bottom:26px;transform:translate(-50%,12px);z-index:80;background:var(--sur2);
   border:1px solid var(--line);border-left:2px solid var(--red);border-radius:var(--r2);padding:9px 15px;
   font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .2s linear,transform .28s var(--sal);
@@ -450,7 +455,8 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 
   <header class="top">
     <div class="miga"><span>Solaris</span><span style="color:var(--line2)">/</span>
-      <span id="migaA">Operación</span><span style="color:var(--line2)">/</span><b id="migaB">Panel de mando</b></div>
+      <span id="migaA">Operación</span><span style="color:var(--line2)">/</span><b id="migaB">Panel de mando</b>
+      <span class="beta" id="hBeta" style="display:none;margin-left:8px">beta</span></div>
     <!-- El buscador se retira hasta que busque de verdad: prometía una función que no existía. -->
     <div class="topd">
       <div class="actua" id="actua">
@@ -536,6 +542,21 @@ var BACKEND_URL="https://script.google.com/macros/s/AKfycbzIew9FuvCZAnPks77_Lkwm
 var GOOGLE_CLIENT_ID="920160966999-sjgj2rbk9i74fde54uanpa9tp34ih741.apps.googleusercontent.com";
 var ADMIN_EMAIL="solaris@uvigoaerotech.com";
 var backendOK=false, SESION=null;
+/* EN QUE CANAL ESTAMOS. Lo sella `flujos/publicar_web.py` al publicar, igual que `BUILD`:
+   el fichero local es UNO y sale con dos sellos segun a donde suba. En local se queda en
+   'produccion', que para trabajar es lo que menos estorba.
+   ⚠️ La URL de la beta es PUBLICA y no se puede esconder: Pages sirve estatico sobre un
+   repo publico. Pero el HTML no lleva datos —todo lo sirve el backend contra un token
+   verificado—, asi que abrirla sin cuenta del dominio no enseña nada. Lo que esto evita
+   es que el EQUIPO acabe usando sin querer una version a medias. */
+var CANAL='beta';
+/* Quien puede usar la beta. Se deja en una funcion sola porque ensancharla es una linea:
+   `|| rangoNom(...)>=1` mete a los coordinadores. */
+function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; }
+/* El escritorio no tiene `esAdmin`: su equivalente es `_puedeImpersonar_`, que mira el
+   mismo correo. Se envuelve para que `_puedeBeta_` sea GEMELA de la del movil. */
+function esAdmin(){ return _puedeImpersonar_(); }
+function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre) : 0; }
 
 function _apiParse(txt){ var j=null; try{ j=JSON.parse(txt); }catch(_){}
   if(!j || j.ok!==true) throw new Error((j&&j.error)||"respuesta no válida del backend");
@@ -2763,7 +2784,7 @@ async function reportarModal(){
   var datos={ titulo:tit, donde:'Escritorio', pantalla:((V[vista]&&V[vista].t)||vista),
     /* La version del CODIGO, no la de los datos: ver la gemela del movil. */
     version:BUILD,
-    contexto:'escritorio · '+nav+' · '+screen.width+'x'+screen.height+
+    contexto:'escritorio'+(CANAL==='beta'?' · BETA':'')+' · '+nav+' · '+screen.width+'x'+screen.height+
       ' · build '+BUILD+' · datos '+(DATA.generado||'?') };
   if(esMejora){ datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
   else { datos.esperaba=det; datos.paso=tit; datos.gravedad='Molesta'; }
@@ -3318,7 +3339,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d5014d1';
+var BUILD='b56d342';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3506,6 +3527,8 @@ function pintar(){
       catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo: '+((e&&e.message)||e)); }
     };
   });
+  var _b=document.getElementById('hBeta');
+  if(_b) _b.style.display = (CANAL==='beta') ? '' : 'none';
   $('#migaA').textContent=V[vista].g;
   $('#migaB').textContent=V[vista].t;
   pintarNav();
