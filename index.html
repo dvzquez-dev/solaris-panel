@@ -3397,7 +3397,20 @@ function buzonModal(tipo){
       env.classList.remove('pri'); env.classList.add('ok');
       env.disabled=true;
       if(sinFoto){
-        tost('Enviado · '+((r&&r.id)||'')+'. ⚠️ La foto NO se ha guardado: al servidor le falta ese paso.');
+        /* EL AVISO SE QUEDA EN PANTALLA, no en un `tost`. Lo puse en un aviso flotante y
+           Daniel no vio nada: dura 2,4 s, sale abajo del todo y justo cuando el modal
+           cambia. Perder una foto que alguien se ha parado a marcar y contarlo en un
+           mensaje que se va es no contarlo. Ahora es un bloque ámbar dentro del
+           formulario, con el id del reporte, y solo se va cuando cierras tú. */
+        var _av=document.createElement('div');
+        _av.className='avisolargo';
+        _av.style.cssText='margin-top:10px;border-color:rgba(232,145,46,.45);'+
+          'background:rgba(232,145,46,.10);color:#f0cf9e';
+        _av.innerHTML='<b style="color:var(--warn)">El texto se ha guardado · '+esc((r&&r.id)||'')+'</b><br>'+
+          'Pero <b>la foto no</b>: al servidor todavía le falta el paso que la sube. '+
+          'Cuéntaselo a Daniel — es un despliegue de dos líneas.';
+        env.parentNode.insertBefore(_av, env.nextSibling);
+        _av.scrollIntoView({block:'nearest'});
         return;
       }
       setTimeout(function(){
@@ -3430,7 +3443,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='e973b3b';
+var BUILD='335689b';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
