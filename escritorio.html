@@ -378,6 +378,48 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
   .viajev,.actua .est{display:none}
   main.entrando>*{animation:none}
 }
+/* ═══ FOTO EN EL BUZÓN + PINTOR ═══════════════════════════════════════════
+   Diseño de Daniel (28/07): subes una foto, un lapicito abre un lienzo a pantalla
+   completa, pintas encima con zoom para precisar, y al salir se fusionan las dos capas.
+   ═════════════════════════════════════════════════════════════════════════ */
+.bzfoto{display:flex;align-items:center;gap:10px;margin:2px 0 12px}
+.bzfoto .mini{width:54px;height:54px;border-radius:8px;object-fit:cover;flex:none;
+  border:1px solid var(--line);background:#000}
+.bzfoto .tx{flex:1;min-width:0;font-size:11.5px;color:var(--ink3);line-height:1.45}
+.bzfoto .tx b{display:block;color:var(--ink2);font-size:12.5px}
+.bzfoto button{flex:none}
+/* A PANTALLA COMPLETA de verdad: `position:fixed;inset:0` sale del modal y tapa la app
+   entera. Se pinta mejor cuanto más grande, que es justo lo que se pidió. */
+.pintor{position:fixed;inset:0;z-index:90;background:#0A0909;display:none;
+  flex-direction:column;touch-action:none;overscroll-behavior:none}
+.pintor.on{display:flex}
+/* El lienzo se ancla ARRIBA A LA IZQUIERDA del area y se coloca solo con `transform`.
+   Estaba centrado por el grid, asi que `vista.x` era un desplazamiento sobre una
+   posicion ya centrada mientras el pellizco calculaba con coordenadas de PANTALLA: al
+   ampliar, la imagen se iba del dedo casi dos mil pixeles. Con el origen en 0,0 las dos
+   cuentas hablan del mismo sitio. */
+.pzona{flex:1;min-height:0;position:relative;overflow:hidden}
+.plienzo{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;line-height:0}
+.plienzo img{display:block;max-width:none;user-select:none;-webkit-user-drag:none}
+.plienzo canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+/* La barra respeta el indicador de inicio: si no, «Listo» queda medio tapado y hay que
+   pulsar dos veces (mismo fallo que se arregló en la barra de abajo). */
+.pbarra{flex:none;background:rgba(24,22,22,.98);border-top:1px solid var(--line);
+  padding:9px 12px calc(9px + env(safe-area-inset-bottom,0px));display:flex;
+  flex-direction:column;gap:9px}
+.pfila{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pcol{width:26px;height:26px;border-radius:50%;flex:none;border:2px solid transparent;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.5)}
+.pcol.on{border-color:var(--ink)}
+.pintor input[type=color]{width:30px;height:30px;padding:0;border:1px solid var(--line);
+  border-radius:8px;background:none;flex:none}
+.pgr{display:flex;gap:6px;align-items:center;flex:none}
+.pgr button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);
+  display:grid;place-items:center;background:var(--sur2)}
+.pgr button.on{border-color:var(--red2)}
+.pgr button i{display:block;border-radius:50%;background:var(--ink)}
+.pintor .modos{flex:none}
+.pintor .crece{flex:1}
 </style>
 </head>
 <body>
@@ -435,6 +477,35 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 </div>
 
 <div class="tost" id="tost"></div>
+
+    <!-- El pintor vive FUERA del modal a propósito: `position:fixed` dentro de un
+         contenedor con transform se ancla a ese contenedor, no a la pantalla. -->
+    <div class="pintor" id="pintor" aria-hidden="true">
+      <div class="pzona" id="pzona">
+        <div class="plienzo" id="plienzo"><img id="pfondo" alt=""><canvas id="ptrazos"></canvas></div>
+      </div>
+      <div class="pbarra">
+        <div class="pfila" id="pcolores"></div>
+        <div class="pfila">
+          <div class="pgr" id="pgrosor"></div>
+          <div class="modos" id="pmodo">
+            <button data-pm="pintar" class="on" data-p>Pintar</button>
+            <button data-pm="mover" data-p>Mover</button>
+          </div>
+          <button class="btn mini" id="pdeshacer" data-p>Deshacer</button>
+          <span class="crece"></span>
+          <button class="btn mini" id="pcancelar" data-p>Cancelar</button>
+          <button class="btn pri mini" id="plisto" data-p>Listo</button>
+        </div>
+      </div>
+    </div>
+
+    <nav id="nav">
+      <svg class="estela" id="estela" preserveAspectRatio="none"><path id="estelaP"></path></svg>
+      <span class="sombra" id="sombra"><i></i></span>
+      <span class="viaje" id="viaje"><i><svg viewBox="0 0 24 24"><use href="#es"/></svg></i></span>
+      <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
+    </nav>
 
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -545,9 +616,11 @@ var HOY=(function(){
   var d=new Date(), p=function(x){ return (x<10?'0':'')+x; };
   return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear();
 })(), UMBRAL=11.8, MEDIA_EQ=10.9;   /* UMBRAL: ultimo valor conocido; lo recalcula `_umbral_()` */
-/* fecha comparable cronologicamente venga en ISO (AAAA-MM-DD) o DD/MM/AAAA */
-function _fechaISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  return m ? (m[3]+'-'+m[2]+'-'+m[1]) : f; }
+/* GEMELA · movil.html. Fecha comparable cronologicamente venga en ISO (AAAA-MM-DD) o
+   DD/MM/AAAA. Se llamaba `_fechaISO_` aqui y `_dmyAISO_` en el movil: misma funcion con dos
+   nombres, que es la deuda D3 del mapa funcional. Ahora se llama igual en las dos caras y
+   los cuerpos son identicos byte a byte. */
+function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?(m[3]+'-'+m[2]+'-'+m[1]):f; }
 /* los valores internos van sin tildes (convencion del proyecto: lo estructural en
    ingles/ASCII); lo que se PINTA lleva su nombre en castellano correcto. */
 var MOD_ET={presencial:'presencial',telematica:'telemática',hibrida:'híbrida'};
@@ -1210,6 +1283,253 @@ function convocarPanel(){
     '</div></div>');
 }
 
+/* ═══ CONVOCAR REUNIÓN ═══════════════════════════════════════════════════════
+   Hasta el 28/07 el botón sacaba un `tost`. Los ayudantes de aquí abajo son GEMELOS
+   byte a byte de los del móvil (antes tenían sufijo `M` allí; se renombraron para que
+   coincidan). La CSP impide compartir código entre los dos artefactos, así que lo único
+   honesto es que la copia sea idéntica y se llame igual. Si tocas una, toca la otra.
+   ═════════════════════════════════════════════════════════════════════════════ */
+/* GEMELA · movil.html */
+function _sinTildes_(t){ return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+/* GEMELA · movil.html — las etiquetas de día van en DD/MM: 'V 24' se lee peor y pierde
+   el mes, que importa cuando el rango cruza de mes. */
+function _ddmm_(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1); }
+/* GEMELA · movil.html */
+function _diasDesde_(iso,n){ var out=[],b=new Date(iso+'T00:00:00');
+  for(var i=0;i<n;i++){ var d=new Date(b); d.setDate(b.getDate()+i); out.push(_ddmm_(d)); } return out; }
+/* GEMELA · movil.html */
+function _diasEntre_(a0,a1){ var out=[]; if(!a0||!a1) return out;
+  var a=new Date(a0+'T00:00:00'), b=new Date(a1+'T00:00:00'); if(b<a) return out;
+  for(var i=0;i<62&&a<=b;i++){ out.push(_ddmm_(a)); a.setDate(a.getDate()+1); } return out; }
+/* GEMELA · movil.html — UNA SOLA REJILLA para todos los días, contigua y anclada al
+   tamaño de slot. Antes cada día generaba SUS franjas desde SU hora de inicio, y un día a
+   las 17:00 y otro a las 17:30 daban franjas alternas que se pisaban. Ahora el origen es
+   común (el inicio más temprano, bajado al múltiplo del slot) y cada día solo OFERTA los
+   slots que le caben enteros. `rangos` son horas decimales [ini,fin]; [0,0] = día off. */
+function _genUnion_(rangos, slot){
+  slot=Math.max(5, Math.min(240, +slot||60));
+  var act=rangos.filter(function(r){ return r && r[1]>r[0]; });
+  if(!act.length) return { F:[], perDia:rangos.map(function(){ return []; }) };
+  var m0=Math.min.apply(null, act.map(function(r){ return Math.round(r[0]*60); }));
+  var m1=Math.max.apply(null, act.map(function(r){ return Math.round(r[1]*60); }));
+  m0=Math.floor(m0/slot)*slot;
+  var F=[];
+  for(var t=m0; t+slot<=m1+1e-9 && F.length<400; t+=slot)
+    F.push({ini:pad(Math.floor(t/60))+':'+pad(t%60), dur:slot});
+  var perDia=rangos.map(function(r){
+    var out=[]; if(!(r && r[1]>r[0])) return out;
+    var a=Math.round(r[0]*60), b=Math.round(r[1]*60);
+    F.forEach(function(_,i){ var ti=m0+i*slot; if(ti>=a && ti+slot<=b) out.push(i); });
+    return out;
+  });
+  return { F:F, perDia:perDia };
+}
+/* GEMELA · movil.html — cuántas casillas seguidas hacen falta. Se redondea HACIA ARRIBA:
+   media casilla no existe, y quedarse corto es no poder ir. */
+function _slotsMin_(duracion, slot){
+  var d=+duracion||0, s=Math.max(5, +slot||60);
+  return Math.max(1, Math.ceil(d/s) || 1);
+}
+/* GEMELA · movil.html */
+function _durTxt_(min){
+  min=Math.max(0, Math.round(+min||0));
+  var h=Math.floor(min/60), m=min%60;
+  if(!h) return m+' min';
+  return h+' h'+(m?' '+m+' min':'');
+}
+/* GEMELA · movil.html — convocados por defecto según el tipo. Aquí «yo» es ACTOR (la
+   identidad con la que se está actuando), no `YO`: es la única diferencia y va marcada. */
+function _presetInvitados_(tipo){
+  var yo=ACTOR||'', out=[];
+  _activos_().forEach(function(m){
+    if(m.nombre===yo) return;
+    var meto = tipo==='general' ? true
+             : tipo==='subsistema' ? (m.unidad===((_m(yo)||{}).unidad))
+             : tipo==='junta' ? (m.cargo==='Coordinador'||m.cargo==='Project Director')
+             : false;
+    if(meto) out.push(m.nombre);
+  });
+  return out;
+}
+/* GEMELA · movil.html — las horas en pasos de 15 min. */
+function optHoras(sel){
+  var s='';
+  for(var m=0;m<24*60;m+=15){
+    var v=pad(Math.floor(m/60))+':'+pad(m%60);
+    s+='<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>';
+  }
+  return s;
+}
+/* Horas decimales desde 'HH:MM'. Reusa el parser que ya existe en esta cara. */
+function _horasHM_(t){ return _minHM_(t)/60; }
+
+var CONV_INV=null;                 // quién está convocado ahora mismo (Set, se conserva al repintar)
+function convocarReunionPanel(){
+  if(rangoNom(ACTOR)<1) return '';                    // solo coordinación o superior
+  var E=CAMPO_CSS;
+  var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
+  if(CONV_INV===null) CONV_INV=new Set(_presetInvitados_('general'));
+  var hoy=new Date(), iso=function(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
+  var mas=function(d,n){ var x=new Date(d); x.setDate(x.getDate()+n); return iso(x); };
+  var subs={}; _activos_().forEach(function(m){ if(m.unidad) subs[m.unidad]=1; });
+  var chipsSub=Object.keys(subs).sort().map(function(u){
+    return '<button type="button" class="pick" data-csub="'+esc(u)+'">'+esc(u)+'</button>'; }).join('');
+  var pool=_activos_().slice().sort(function(a,b){ return String(a.pila).localeCompare(String(b.pila)); });
+  var chips=pool.map(function(m){
+    return '<button type="button" class="pick'+(CONV_INV.has(m.nombre)?' on':'')+'" data-cinv="'+esc(m.nombre)+'">'+
+      esc(m.pila)+'</button>'; }).join('');
+  return pan('Convocar reunión','sale el mapa de disponibilidad',
+    '<div class="pb">'+
+    '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
+      'A los convocados les toca <b>cubrir su disponibilidad</b>, y de no cubrirla salen '+
+      'sanciones. Elige bien a quién metes.</p>'+
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+      '<label style="width:210px">'+lab('Tipo')+'<select id="cvTipo" style="'+E+'">'+
+        '<option value="general">General · todo el equipo</option>'+
+        '<option value="junta">Junta Directiva · coordinación</option>'+
+        '<option value="consejo">Consejo</option>'+
+        '<option value="subsistema">Subsistema · tu unidad</option>'+
+        '<option value="mixta">Mixta · varios subsistemas</option>'+
+        '<option value="trabajo">Reunión de trabajo</option></select></label>'+
+      '<label style="width:210px">'+lab('Modalidad')+'<select id="cvMod" style="'+E+'">'+
+        '<option value="hibrida">Híbrida</option><option value="presencial">Presencial</option>'+
+        '<option value="telematica">Telemática</option></select></label>'+
+      '<label style="flex:1;min-width:220px">'+lab('Título')+
+        '<input id="cvTit" placeholder="Reunión sin título" style="'+E+'"></label>'+
+    '</div>'+
+    lab('Subsistemas · marca uno y entra su gente')+
+    '<div class="chips" style="margin:0 0 8px">'+chipsSub+'</div>'+
+    lab('Convocados <b id="cvN">'+CONV_INV.size+'</b>')+
+    '<div class="chips" id="cvPool" style="margin:0 0 12px">'+chips+'</div>'+
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+      '<label style="width:150px">'+lab('Desde')+'<input type="date" id="cvD0" value="'+iso(hoy)+'" style="'+E+'"></label>'+
+      '<label style="width:150px">'+lab('Hasta')+'<input type="date" id="cvD1" value="'+mas(hoy,6)+'" style="'+E+'"></label>'+
+      '<label style="width:120px">'+lab('De')+'<select id="cvH0" style="'+E+'">'+optHoras('16:00')+'</select></label>'+
+      '<label style="width:120px">'+lab('A')+'<select id="cvH1" style="'+E+'">'+optHoras('23:00')+'</select></label>'+
+    '</div>'+
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+      '<label style="width:150px">'+lab('Tamaño de casilla')+'<select id="cvSlot" style="'+E+'">'+
+        '<option value="15">15 min</option><option value="30" selected>30 min</option>'+
+        '<option value="60">1 h</option></select></label>'+
+      '<label style="width:150px">'+lab('Dura la reunión')+'<select id="cvDura" style="'+E+'">'+
+        '<option value="30">30 min</option><option value="60" selected>1 h</option>'+
+        '<option value="90">1 h 30 min</option><option value="120">2 h</option></select></label>'+
+      '<label style="width:150px">'+lab('Fecha límite')+'<input type="date" id="cvLim" value="'+mas(hoy,5)+'" style="'+E+'"></label>'+
+      '<label style="flex:1;min-width:220px">'+lab('Orden del día · enlace')+
+        '<input id="cvOrden" placeholder="https://drive.google.com/…" style="'+E+'"></label>'+
+    '</div>'+
+    '<div class="nota" id="cvPrev" style="border-top:0;margin-bottom:11px">—</div>'+
+    '<button class="btn pri" data-convreu>Convocar la reunión</button>'+
+    '<div class="nota">Lo que <b>no</b> hay aquí y sí en el móvil: <b>horario distinto por '+
+    'día</b> y <b>copiar la distribución</b> de otra reunión. Si necesitas una de las dos, '+
+    'convócala desde el móvil.</div>'+
+    '</div>');
+}
+/* CABLEADO DE LA CONVOCATORIA. Va aparte de `enganchar()` porque `pintar()` lo llama
+   justo después de meter el HTML, y porque tiene su propio estado (`CONV_INV`) que hay
+   que conservar entre repintados: si se reconstruyera, marcar a alguien y que el refresco
+   en vivo lo borrase sería exactamente el fallo que se arregló en el móvil. */
+function _cablearConvocar_(){
+  var t=$('#cvTipo'); if(!t) return;                  // no está la vista o no hay potestad
+  var val=function(id){ var e=$('#'+id); return e?e.value:''; };
+  var dias=function(){ return _diasEntre_(val('cvD0'), val('cvD1')); };
+  var rangos=function(){ var h0=_horasHM_(val('cvH0')), h1=_horasHM_(val('cvH1'));
+    return dias().map(function(){ return [h0,h1]; }); };
+  function pintaChips(){
+    $$('#cvPool [data-cinv]').forEach(function(b){
+      b.classList.toggle('on', CONV_INV.has(b.dataset.cinv)); });
+    var n=$('#cvN'); if(n) n.textContent=CONV_INV.size;
+  }
+  function upd(){
+    var sl=+val('cvSlot')||30, du=+val('cvDura')||60;
+    var u=_genUnion_(rangos(), sl);
+    var nb=u.perDia.reduce(function(a,x){ return a+x.length; },0), nd=dias().length;
+    var nS=_slotsMin_(du,sl);
+    var p=$('#cvPrev'); if(!p) return;
+    /* La cuenta se dice ANTES de convocar: cuántas casillas salen, cuántas hay que juntar
+       y a cuánta gente se le va a reclamar. Es lo que decide si el mapa sirve. */
+    p.innerHTML = (!nd) ? 'Revisa las fechas: el rango está vacío o al revés.'
+      : (!u.F.length || !nb) ? 'Con ese horario no sale ninguna casilla.'
+      : '<b>'+u.F.length+'</b> casilla'+(u.F.length===1?'':'s')+' de <b>'+_durTxt_(sl)+'</b> · '+
+        '<b>'+nb+'</b> bloques en <b>'+nd+'</b> día'+(nd===1?'':'s')+' · '+
+        'hay que juntar <b>'+nS+'</b> seguida'+(nS===1?'':'s')+' ('+_durTxt_(nS*sl)+') para que cuente · '+
+        '<b>'+CONV_INV.size+'</b> convocados'+
+        (du%sl ? ' · la duración no es múltiplo de la casilla, se redondea hacia arriba' : '');
+  }
+  t.onchange=function(){
+    /* Al cambiar el tipo se rehace la lista de convocados: es lo que espera cualquiera
+       que elige «General» después de haber trasteado. Los tipos sin preset (consejo,
+       mixta, trabajo) la dejan VACÍA a propósito, para que se elija a mano. */
+    CONV_INV=new Set(_presetInvitados_(t.value)); pintaChips(); upd();
+  };
+  $$('[data-csub]').forEach(function(b){
+    b.onclick=function(){
+      b.classList.toggle('on');
+      var u=b.dataset.csub, on=b.classList.contains('on');
+      _activos_().forEach(function(m){ if(m.unidad===u && m.nombre!==ACTOR){
+        if(on) CONV_INV.add(m.nombre); else CONV_INV.delete(m.nombre); } });
+      pintaChips(); upd();
+    };
+  });
+  $$('#cvPool [data-cinv]').forEach(function(b){
+    b.onclick=function(){ var n=b.dataset.cinv;
+      if(CONV_INV.has(n)) CONV_INV.delete(n); else CONV_INV.add(n);
+      pintaChips(); upd(); };
+  });
+  ['cvD0','cvD1','cvH0','cvH1','cvSlot','cvDura'].forEach(function(id){
+    var e=$('#'+id); if(e) e.onchange=upd; });
+  upd();
+  var bt=$('[data-convreu]');
+  if(bt) bt.onclick=async function(){
+    if(bt.disabled) return;
+    var ds=dias(); if(!ds.length){ tost('Revisa las fechas: no hay días.'); return; }
+    if(!CONV_INV.size){ tost('No has convocado a nadie.'); return; }
+    var sl=+val('cvSlot')||30, du=+val('cvDura')||60;
+    var u=_genUnion_(rangos(), sl), bloques=[];
+    u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
+    if(!u.F.length || !bloques.length){ tost('Con ese horario no sale ninguna casilla.'); return; }
+    var nS=_slotsMin_(du,sl);
+    /* Si el horario no da para la reunión entera, NADIE podrá marcar y la reunión nace
+       muerta. Se avisa una vez y se deja convocar igual: puede ser a propósito. */
+    if(u.F.length<nS && !bt.dataset.avisado){
+      bt.dataset.avisado='1';
+      tost('Ojo: el horario no da para '+_durTxt_(nS*sl)+' seguidos, así que nadie podrá '+
+        'marcar. Pulsa otra vez para convocarla igual.');
+      return;
+    }
+    var reu={ titulo:(val('cvTit')||'').trim()||'Reunión sin título',
+      tipo:val('cvTipo')||'trabajo', modalidad:val('cvMod')||'hibrida',
+      convocante:ACTOR||'', invitados:Array.from(CONV_INV),
+      dias:ds, franjas:u.F, bloques:bloques, total:bloques.length,
+      limite:val('cvLim')||null,
+      /* `duracion` va REDONDEADA al múltiplo de casilla, igual que en el móvil: es lo que
+         hay que juntar seguido para que valga, no la duración cruda. Si aquí se mandara
+         la cruda, el mínimo al cubrir saldría distinto en cada cara. */
+      slot:sl, duracion:nS*sl,
+      ordenDia:(val('cvOrden')||'').trim(), vision:'anonima', resp:{} };
+    if(!backendOK || !SESION){ tost('Sin conexión no se puede convocar.'); return; }
+    if(!confirm('Convocar «'+reu.titulo+'» a '+reu.invitados.length+' personas.'+
+      String.fromCharCode(10,10)+'Les tocará cubrir su disponibilidad, y de no cubrirla '+
+      'salen sanciones.')) return;
+    bt.disabled=true; var prev=bt.textContent; bt.textContent='Convocando…';
+    try{
+      await api.crear(reu);
+      CONV_INV=null;                                  // la siguiente empieza limpia
+      tost('Reunión convocada · '+reu.invitados.length+' convocados, '+bloques.length+' bloques.');
+      /* Se RECARGA del servidor en vez de fabricar una copia local: así no se enseña algo
+         que en la nube no está. Se conservan las respuestas ya hidratadas —la lista NO las
+         trae, viven en su propia hoja— o los mapas de calor se quedarían a cero. */
+      var lista=await api.listar();
+      if(Array.isArray(lista) && lista.length){
+        var prevResp={}; REUS.forEach(function(x){ if(x && x.resp && Object.keys(x.resp).length) prevResp[x.id]=x.resp; });
+        REUS.length=0;
+        lista.map(normReu).forEach(function(r){ if(prevResp[r.id]){ r.resp=prevResp[r.id]; r.calor=null; } REUS.push(r); });
+      }
+      pintar();
+    }catch(e){ bt.disabled=false; bt.textContent=prev;
+      tost('No se pudo convocar: '+((e&&e.message)||e)); }
+  };
+}
 function bloquePanel(){
   if(rangoNom(ACTOR)<1) return '';
   var actor=_m(ACTOR), esPD=rangoNom(ACTOR)>=2, unidad=(actor&&actor.unidad)||'';
@@ -1314,7 +1634,21 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
 }};
 
 /* ── FICHAJES EN CURSO ───────────────────────────────────────────────────── */
+/* ⛔ NO CONECTADO. El dato EXISTE en el backend -los fichajes abiertos viven en su hoja y
+   el barrido de las 14 h los recorre- pero **no hay accion que los lea en global**:
+   `getFichajeAbierto` devuelve el TUYO. Falta un `getFichajesAbiertos` para el PD.
+   Hasta entonces esto NO inventa tres sesiones: dice que no esta conectado. Antes
+   pintaba a tres personas que no existen con su hora de entrada y su reloj corriendo. */
+var CURSO_CONECTADO=false;
 V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
+  if(!CURSO_CONECTADO) return pan('Sesiones abiertas ahora mismo','sin conectar',
+    vac('Todavía no se pueden ver los fichajes de los demás','El backend guarda las sesiones '+
+      'abiertas —de hecho las cierra solas a las 14 h— pero no hay ninguna acción que las '+
+      'sirva todas juntas: la que existe devuelve <b>la tuya</b>. Falta '+
+      '<span class="mono">getFichajesAbiertos</span> en el backend.')+
+    '<div class="nota">Cuando esté: un fichaje que pasa de <b>10 horas abiertas</b> se marca en '+
+    'ámbar y se avisa a quien lo tiene abierto. A las <b>14 h</b> se cierra solo con la hora de '+
+    'su última actividad y le queda pendiente de corregir.</div>');
   return pan('Sesiones abiertas ahora mismo',CURSO.length+(CURSO.length===1?' persona':' personas'),
     (CURSO.length?CURSO.map(function(c){
       var wa=c.min>=600;
@@ -1646,9 +1980,14 @@ function _panelSueltas_(){
             '<button data-sdec="aprobar">Aplica</button>'+
             '<button data-sdec="justificar">Justifica</button>'+
             '<button data-sdec="rechazar">Rechaza</button>'+
-          '</span></td></tr>';
+          '</span> <button class="btn sm" data-seditar="'+s.id+'">Editar</button></td></tr>';
       }).join(''))+
-    '<div class="nota">Cada suelta se decide por su cuenta: no comparten motivo ni comunicado.</div>');
+    '<div class="pb" style="padding-top:0"><button class="btn sm" data-agrupar>Agrupar en un paquete</button>'+
+      '<span class="sc" style="margin-left:9px">un solo comunicado para todas</span></div>'+
+    '<div class="nota">Cada suelta se decide por su cuenta: no comparten motivo ni comunicado. '+
+    '<b>Editar</b> corrige puntos, motivo y artículo <b>al aplicarla</b> —es lo único que deja el '+
+    'backend—. <b>Revocar una ya aplicada no se hace desde aquí</b>: el servidor no deja tocar '+
+    'lo aplicado, y la revocación va por <span class="mono">flujos/enviar_revocacion.py</span>.</div>');
 }
 function _panelHistSanc_(){
   var hs=_sancHist_();
@@ -1691,9 +2030,11 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
             '<button class="'+(x.dec==='aceptar'?'on a':'')+'" data-dec="aceptar">Acepta</button>'+
             '<button class="'+(x.dec==='justificar'?'on j':'')+'" data-dec="justificar">Justifica</button>'+
             '<button class="'+(x.dec==='rechazar'?'on r':'')+'" data-dec="rechazar">Rechaza</button>'+
-          '</span>'+
-          '<button class="btn sm" data-mod="'+x.id+'">Modificar</button></span></div>';
+          '</span></div>';
       }).join('')+
+      '<div class="pb" style="padding-top:0"><button class="btn sm" data-todas="aceptar">Aceptan todas</button> '+
+        '<button class="btn sm" data-todas="rechazar">Rechazan todas</button>'+
+        '<span class="sc" style="margin-left:9px">marcar sigue siendo borrador</span></div>'+
       '<div class="cierrel"><div class="tx"><b class="up">'+c.aceptar+'</b> se aplican · '+
         '<b>'+c.justificar+'</b> justificadas · <b class="dn">'+c.rechazar+'</b> rechazadas'+
         '<em>Marcar no aplica nada: no se sanciona a nadie hasta que cierras el bloque entero.</em></div>'+
@@ -1701,21 +2042,25 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
       '</div></div>';
   return _selectorLotes_()+
     pan('Bloque abierto · '+esc(LOTE.nombre),'RRI Título VII',cuerpo,'destaca')+
-    '<div class="pan"><div class="nota"><b>Modificar</b> corrige el artículo o los puntos de una persona antes '+
-    'de cerrar. El <b>motivo y el artículo son comunes a todo el bloque</b>: no se cambian fila a fila, y por eso '+
-    'sale un único comunicado.</div></div>'+
+    '<div class="pan"><div class="nota">El <b>motivo y el artículo son comunes a todo el bloque</b>: '+
+    'no se cambian fila a fila, y por eso sale un único comunicado. <b>Los puntos de una persona '+
+    'concreta todavía no se pueden corregir desde aquí</b>: el backend solo los cambia al aprobar, '+
+    'y eso la sacaría del bloque. Si hay que corregir una, sácala del paquete y aplícala suelta.'+
+    '</div></div>'+
     _panelSueltas_()+
     _panelHistSanc_();
 }};
+/* ⛔ NO CONECTADO, y lo peor no eran los datos: eran los BOTONES. «Denegar» y «Estimar»
+   no estaban cableados a nada -ni a una accion, ni a un tost- asi que pulsarlos no hacia
+   absolutamente nada y no lo decia. En una pantalla de disciplina, sobre puntos de
+   personas, eso es lo mas parecido a mentir que puede hacer una interfaz.
+   No hay accion de apelaciones en el backend: ni cola, ni estado, ni devolucion. */
 V.apela={g:'Disciplina',t:'Apelaciones',f:function(){
-  return pan('Apelaciones abiertas',APELA.length+'',
-    (APELA.length?APELA.map(function(a){
-      return '<div class="dec" style="cursor:default"><span class="ic"><svg><use href="#i-gavel"/></svg></span>'+
-        '<span class="tx"><b>'+esc(a.n)+'</b><small>'+esc(a.motivo)+' · '+esc(a.razon)+'</small></span>'+
-        '<span class="der"><span class="chip ok">+'+a.pts+'</span>'+
-        '<button class="btn sm no">Denegar</button><button class="btn sm pri">Estimar</button></span></div>';
-    }).join(''):vac('Sin apelaciones abiertas','Cuando alguien recurra una sanción aparece aquí, con su '+
-      'razón y los puntos que pide de vuelta.'))+
+  return pan('Apelaciones abiertas','sin conectar',
+    vac('Las apelaciones todavía no se tramitan aquí','No hay cola de apelaciones en el '+
+      'backend: ni acción para recurrir, ni estado, ni devolución de puntos. Mientras tanto '+
+      'una apelación se resuelve hablando, y si procede se otorga la devolución a mano desde '+
+      '<b>Sanciones</b>.')+
     '<div class="nota">Estimar una apelación no borra la sanción: crea la <b>devolución de puntos</b>, que '+
     'pasa por la misma cola y se confirma igual. Queda el rastro de las dos.</div>');
 }};
@@ -1759,7 +2104,8 @@ var RE_SEL=0;
 V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
   if(!REUS.length) return pan('Reuniones abiertas','ninguna',
     vac('No hay ninguna reunión abierta','Convoca una para que el equipo cubra su disponibilidad.')+
-    '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>');
+    '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>')+
+    convocarReunionPanel();
   return pan('Reuniones abiertas',REUS.length+'',
     tabla([['Reunión'],['Tipo'],['Modalidad'],['Convocados',1],['Han cubierto',1],['Cierra',1],['Estado',1]],
       REUS.map(function(r0){
@@ -1775,7 +2121,8 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
           '<td class="r">'+(r.fijada?'<span class="chip ok">📌 '+esc(r.fijada)+'</span>':'<span class="chip wa">sin fijar</span>')+'</td></tr>';
       }).join(''))+
     '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>')+
-    _fijarPanel_();
+    _fijarPanel_()+
+    convocarReunionPanel();
 }};
 /* Disponibilidad y riesgo: por reunión, un desplegable con quién no ha cubierto
    y QUÉ SANCIÓN le caería, según la escala cerrada del PD. */
@@ -2009,17 +2356,33 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
       '</div></div></div>';
   }).join('');
 }};
+/* LAS ACTAS SON EXPEDIENTES, no una tabla aparte. Aqui habia tres filas escritas a mano
+   con referencias inventadas. Y el dato ya estaba en casa: el Form del pipeline tiene
+   `Acta` como Tipo de documento y la referencia es `Acta_S-6301_26`, asi que la lista de
+   actas es un FILTRO sobre los expedientes que esta cara ya carga. */
+function _esActa_(d){
+  /* Por el tipo si viene; si no, por el prefijo de la referencia, que lo lleva siempre.
+     Los expedientes viejos pueden no traer `tipo` y la referencia nunca falta. */
+  return /^acta$/i.test(String(d.tipo||'')) || /^Acta_/i.test(String(d.ref||''));
+}
 V.actas={g:'Reuniones',t:'Actas',f:function(){
-  return pan('Actas de la temporada','3 registradas',
-    tabla([['Referencia'],['Reunión'],['Fecha'],['Acuerdos',1],['Estado',1]],
-      [['Acta_S-6302_26','Consejo · 10/07/2026','10/07/2026','13','<span class="chip ok">publicada</span>'],
-       ['Acta_S-6301_26','Junta · 17/07/2026','17/07/2026','7','<span class="chip wa">en revisión</span>'],
-       ['Acta_S-6300_26','General · 20/06/2026','20/06/2026','9','<span class="chip ok">publicada</span>']]
-      .map(function(r){
-        return '<tr><td class="mono" style="color:var(--red2)">'+r[0]+'</td><td>'+r[1]+'</td>'+
-          '<td class="mono" style="color:var(--ink3)">'+r[2]+'</td><td class="r mono">'+r[3]+'</td>'+
-          '<td class="r">'+r[4]+'</td></tr>';
-      }).join('')));
+  var actas=(DOCS||[]).filter(_esActa_).sort(function(a,b){
+    return String(b.fecha||'').localeCompare(String(a.fecha||'')); });
+  if(!actas.length) return pan('Actas de la temporada','ninguna',
+    vac('Todavía no hay ningún acta','Un acta es un expediente más: se sube por el formulario '+
+      'con <b>Tipo de documento = Acta</b> y aparece aquí en cuanto entra. Su referencia '+
+      'empieza por <span class="mono">Acta_S-</span>.'));
+  return pan('Actas de la temporada',actas.length+(actas.length===1?' registrada':' registradas'),
+    tabla([['Referencia'],['Título'],['Autor'],['Fecha'],['Estado',1]],
+      actas.map(function(d){
+        return '<tr><td class="mono" style="color:var(--red2)">'+esc(d.ref)+'</td>'+
+          '<td>'+esc(d.tit)+'</td><td>'+esc(_m(d.autor).pila||d.autor)+'</td>'+
+          '<td class="mono" style="color:var(--ink3)">'+esc(d.fecha||'—')+'</td>'+
+          '<td class="r"><span class="chip '+estDoc(d.est)[1]+'">'+esc(estDoc(d.est)[0])+'</span></td></tr>';
+      }).join(''))+
+    '<div class="nota">Las actas no se llevan aparte: son <b>expedientes</b> del pipeline '+
+    'documental y pasan por la misma revisión que lo demás. Para decidir sobre una, ve a '+
+    '<b>Documentos</b>.</div>');
 }};
 
 /* ── OPERACIÓN ───────────────────────────────────────────────────────────── */
@@ -2031,7 +2394,7 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
     tabla([['Turno'],['Fecha'],['Hora',0],['Punto'],['Duración',1],['Van',1],['Memoria',1]],
       /* las fechas llegan en ISO (dato real: '2025-11-26') o DD/MM/AAAA (semilla): se
          normalizan a ISO antes de comparar, o un sort lexicografico las cruza mal de mes. */
-      TURNOS.slice().sort(function(a,b){ return _fechaISO_(b.fecha||b.f).localeCompare(_fechaISO_(a.fecha||a.f)); })
+      TURNOS.slice().sort(function(a,b){ return _dmyAISO_(b.fecha||b.f).localeCompare(_dmyAISO_(a.fecha||a.f)); })
       .map(function(t){
         /* el turno real (espejo del Discord) no tiene id, ni plazas, ni duracion
            numerica: se sintetiza la referencia y se pinta lo que de verdad hay. */
@@ -2116,18 +2479,16 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
       'descuenta <b>4 €</b> por cada turno con coche fuera de Vigo y nunca baja de <b>0 €</b>. '+
       'Aquí solo se consulta.</div>');
 }};
+/* ⛔ NO CONECTADO. Tres candidaturas inventadas con su avalista y su fase, y un boton
+   «Ver» que no llevaba a ningun sitio. No hay solicitudes de ingreso en ningun sistema:
+   hoy se reciben hablando. El contador del chip tambien mentia: contaba la maqueta. */
 V.reclutar={g:'Equipo',t:'Reclutamiento',f:function(){
-  return '<div class="chips"><span class="chip">CANDIDATURAS <b style="color:var(--ink)">'+CANDID.length+'</b></span></div>'+
-    pan('Candidaturas abiertas',CANDID.length+'',
-      CANDID.length?CANDID.map(function(c){
-        return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(c.n)+'</b>'+
-          '<small>'+esc(c.d)+'<br>'+esc(c.av)+'</small></span>'+
-          '<span class="der"><span class="chip '+(c.fase==='entrevistada'?'ok':c.fase==='pendiente'?'wa':'')+'">'+c.fase+'</span>'+
-          '<button class="btn sm">Ver</button></span></div>';
-      }).join(''):vac('No hay candidaturas abiertas','Las solicitudes de ingreso salen aquí, con su avalista '+
-        'y las horas que ofrecen.'))+
-    '<div class="pan"><div class="nota">Una candidatura no es un miembro: no tiene puntos, ni horas, ni cuota '+
-    'hasta que se le da de alta en el equipo.</div></div>';
+  return pan('Candidaturas abiertas','sin conectar',
+      vac('Las candidaturas todavía no llegan a la app','No hay ningún sitio donde se '+
+        'recojan las solicitudes de ingreso: hoy llegan hablando o por Instagram. El día que '+
+        'haya un formulario, aparecerán aquí con su avalista y las horas que ofrecen.')+
+    '<div class="nota">Una candidatura no es un miembro: no tiene puntos, ni horas, ni cuota '+
+    'hasta que se le da de alta en el equipo.</div>');
 }};
 
 
@@ -2140,6 +2501,254 @@ var BUZON=null, BUZON_ERR=null, BUZON_SEL=null;
 /* Reportar desde el escritorio. Mismo criterio que en el movil: dos campos a mano y el
    resto lo rellena la app. Se hace con un `prompt` encadenado a proposito -esta cara no
    tiene modales y montar uno solo para esto seria mas superficie de la que vale-. */
+var BZ_FOTO=null;                 // {url, w, h} — lo que se enviará, ya fusionado
+var PINT_MAX=1600;                // lado mayor. Una captura de iPhone son 1179x2556 y 4 MB
+var PINT_COLORES=['#E41E25','#F2C94C','#3EB489','#3f9ed6','#FFFFFF','#111111'];
+var PINT_GROSORES=[0.004,0.008,0.016];   // fracción del lado mayor: el trazo escala con la foto
+
+/* Reduce ANTES de nada. No es solo por el peso del envío: pintar sobre un lienzo de 12 Mpx
+   en un móvil va a tirones, y la captura se sigue leyendo a 1600. */
+function _leerImagen_(file){
+  return new Promise(function(ok,mal){
+    if(!file){ mal(new Error('sin fichero')); return; }
+    if(!/^image\//.test(file.type||'')){ mal(new Error('eso no es una imagen')); return; }
+    var fr=new FileReader();
+    fr.onerror=function(){ mal(new Error('no se pudo leer el fichero')); };
+    fr.onload=function(){
+      var im=new Image();
+      im.onerror=function(){ mal(new Error('no se pudo abrir la imagen')); };
+      im.onload=function(){
+        var k=Math.min(1, PINT_MAX/Math.max(im.naturalWidth, im.naturalHeight));
+        var w=Math.max(1,Math.round(im.naturalWidth*k)), h=Math.max(1,Math.round(im.naturalHeight*k));
+        var c=document.createElement('canvas'); c.width=w; c.height=h;
+        c.getContext('2d').drawImage(im,0,0,w,h);
+        ok({ url:c.toDataURL('image/jpeg',0.85), w:w, h:h });
+      };
+      im.src=fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+function _pesoKB_(dataUrl){
+  var i=(dataUrl||'').indexOf(',');
+  return i<0 ? 0 : Math.round((dataUrl.length-i-1)*0.75/1024);   // base64 → bytes
+}
+
+/* EL PINTOR. `alTerminar(dataUrl)` recibe las dos capas YA fusionadas, o no se llama si
+   se cancela. Todo el estado vive aquí dentro: al cerrarse no queda nada. */
+function _abrirPintor_(fondoUrl, alTerminar){
+  var caja=$('#pintor'), zona=$('#pzona'), lienzo=$('#plienzo');
+  var img=$('#pfondo'), cv=$('#ptrazos');
+  if(!caja||!img||!cv) return;
+  var ctx=cv.getContext('2d');
+  /* TRAZOS, no píxeles: cada uno es {color, grosor, pts:[[x,y],…]} en coordenadas de
+     IMAGEN. Deshacer es quitar el último y repintar. Con capturas de pantalla a resolución
+     completa, guardar un snapshot por trazo se come la memoria de un móvil. */
+  var trazos=[], activo=null;
+  var color=PINT_COLORES[0], grosor=PINT_GROSORES[1], modo='pintar';
+  var vista={e:1, x:0, y:0}, punteros={}, pellizco=null;
+
+  function aplicarVista(){
+    lienzo.style.transform='translate('+vista.x.toFixed(1)+'px,'+vista.y.toFixed(1)+'px) scale('+vista.e.toFixed(4)+')';
+  }
+  function repintar(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    trazos.concat(activo?[activo]:[]).forEach(function(t){
+      if(!t.pts.length) return;
+      ctx.strokeStyle=t.color; ctx.lineWidth=t.grosor;
+      ctx.beginPath(); ctx.moveTo(t.pts[0][0], t.pts[0][1]);
+      /* Un toque sin arrastre es un punto: sin esto, marcar algo pequeño no pinta nada. */
+      if(t.pts.length===1) ctx.lineTo(t.pts[0][0]+0.01, t.pts[0][1]);
+      else for(var i=1;i<t.pts.length;i++) ctx.lineTo(t.pts[i][0], t.pts[i][1]);
+      ctx.stroke();
+    });
+  }
+  /* LA CONVERSIÓN QUE IMPORTA. El lienzo va dentro de un contenedor con `transform`, así
+     que su `getBoundingClientRect()` YA incluye zoom y desplazamiento: dividir por el ancho
+     del rectángulo da la coordenada en píxeles de imagen sin tocar la matriz a mano. Con
+     cuentas propias, el trazo se desplaza en cuanto haces zoom. */
+  function aImagen(ev){
+    var r=cv.getBoundingClientRect();
+    return [ (ev.clientX-r.left)/r.width*cv.width, (ev.clientY-r.top)/r.height*cv.height ];
+  }
+  function encajar(){
+    var rz=zona.getBoundingClientRect();
+    var k=Math.min(rz.width/cv.width, rz.height/cv.height);
+    vista.e=k; vista.x=(rz.width-cv.width*k)/2; vista.y=(rz.height-cv.height*k)/2;
+    aplicarVista();
+  }
+  function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+  zona.onpointerdown=function(ev){
+    /* La captura va en `try` y ANTES de nada: `setPointerCapture` LANZA si el navegador no
+       reconoce ese puntero, y sin el try la excepción se lleva por delante el resto del
+       manejador — el dedo no se registra, `punteros` se queda con uno solo y el pellizco no
+       llega a existir. Que la captura falle no puede impedir seguir el gesto. */
+    try{ zona.setPointerCapture(ev.pointerId); }catch(_){}
+    punteros[ev.pointerId]={x:ev.clientX,y:ev.clientY};
+    var ids=Object.keys(punteros);
+    if(ids.length===2){
+      /* DOS DEDOS SIEMPRE HACEN ZOOM, aunque estés en modo pintar: es el gesto que todo el
+         mundo prueba primero. Si había un trazo empezado se descarta, porque era el primer
+         dedo del pellizco y no un trazo de verdad. */
+      activo=null; repintar();
+      var a=punteros[ids[0]], b=punteros[ids[1]], rz=zona.getBoundingClientRect();
+      /* El punto medio se guarda RELATIVO al area, que es el sistema en el que vive
+         `vista.x`. Con coordenadas de pantalla se mezclan dos origenes distintos. */
+      pellizco={ d:dist(a,b), cx:(a.x+b.x)/2-rz.left, cy:(a.y+b.y)/2-rz.top,
+                 e:vista.e, x:vista.x, y:vista.y };
+      return;
+    }
+    if(ids.length>2) return;
+    if(modo==='pintar'){
+      var p=aImagen(ev);
+      activo={ color:color, grosor:Math.max(1, grosor*Math.max(cv.width,cv.height)), pts:[p] };
+      repintar();
+    } else {
+      /* Arrastrar es un DELTA, asi que aqui el origen da igual; se guarda en pantalla.
+         `d:0` es lo que distingue arrastre de pellizco. */
+      pellizco={ d:0, cx:ev.clientX, cy:ev.clientY, e:vista.e, x:vista.x, y:vista.y };
+    }
+  };
+  zona.onpointermove=function(ev){
+    if(!punteros[ev.pointerId]) return;
+    punteros[ev.pointerId]={x:ev.clientX,y:ev.clientY};
+    var ids=Object.keys(punteros);
+    if(ids.length>=2 && pellizco && pellizco.d){
+      var a=punteros[ids[0]], b=punteros[ids[1]];
+      var k=Math.max(0.2, Math.min(8, dist(a,b)/pellizco.d));
+      var e2=Math.max(0.1, Math.min(12, pellizco.e*k));
+      var kk=e2/pellizco.e;
+      /* El punto medio de los dedos se queda quieto: es lo que hace que el pellizco se
+         sienta bien. Sin esto la imagen se va del dedo al ampliar. */
+      var rz=zona.getBoundingClientRect();
+      var cx=(a.x+b.x)/2-rz.left, cy=(a.y+b.y)/2-rz.top;
+      vista.e=e2;
+      vista.x=cx-(pellizco.cx-pellizco.x)*kk;
+      vista.y=cy-(pellizco.cy-pellizco.y)*kk;
+      aplicarVista(); return;
+    }
+    if(activo && modo==='pintar'){
+      var p=aImagen(ev);
+      var u=activo.pts[activo.pts.length-1];
+      /* Se descartan los puntos que no aportan: con el dedo llegan decenas por segundo y
+         guardarlos todos engorda el repintado sin cambiar el trazo. */
+      if(Math.hypot(p[0]-u[0], p[1]-u[1]) > 0.7){ activo.pts.push(p); repintar(); }
+      return;
+    }
+    if(pellizco && !pellizco.d && modo==='mover'){
+      vista.x=pellizco.x+(ev.clientX-pellizco.cx);
+      vista.y=pellizco.y+(ev.clientY-pellizco.cy);
+      aplicarVista();
+    }
+  };
+  function soltar(ev){
+    delete punteros[ev.pointerId];
+    if(!Object.keys(punteros).length){
+      pellizco=null;
+      if(activo){ trazos.push(activo); activo=null; repintar(); }
+    }
+  }
+  zona.onpointerup=soltar; zona.onpointercancel=soltar; zona.onpointerleave=soltar;
+  /* ÚNICA DIFERENCIA CON EL MÓVIL, y va marcada: con ratón no hay dos dedos, así que la
+     rueda hace zoom. Misma cuenta que el pellizco —el punto bajo el cursor se queda
+     quieto—, con el cursor haciendo de punto medio. */
+  zona.onwheel=function(ev){
+    ev.preventDefault();
+    var rz=zona.getBoundingClientRect();
+    var px=ev.clientX-rz.left, py=ev.clientY-rz.top;
+    var k=Math.exp(-ev.deltaY*0.0015);
+    var e2=Math.max(0.1, Math.min(12, vista.e*k)), kk=e2/vista.e;
+    vista.x=px-(px-vista.x)*kk;
+    vista.y=py-(py-vista.y)*kk;
+    vista.e=e2; aplicarVista();
+  };
+
+  /* la paleta: los presets más el selector de color del sistema, que es el «típico» */
+  var pc=$('#pcolores');
+  pc.innerHTML=PINT_COLORES.map(function(c,i){
+    return '<button class="pcol'+(i===0?' on':'')+'" data-pc="'+c+'" style="background:'+c+'" data-p aria-label="color"></button>';
+  }).join('')+'<input type="color" id="pcolorlibre" value="'+PINT_COLORES[0]+'" aria-label="otro color">';
+  function marcarColor(c){
+    color=c;
+    $$('#pcolores .pcol').forEach(function(b){ b.classList.toggle('on', b.dataset.pc===c); });
+  }
+  $$('#pcolores .pcol').forEach(function(b){ b.onclick=function(){ marcarColor(b.dataset.pc); }; });
+  var cl=$('#pcolorlibre'); if(cl) cl.oninput=function(){ marcarColor(cl.value); };
+
+  var pg=$('#pgrosor');
+  pg.innerHTML=PINT_GROSORES.map(function(g,i){
+    var d=Math.round(4+i*4);
+    return '<button data-pg="'+g+'"'+(i===1?' class="on"':'')+' data-p aria-label="grosor">'+
+      '<i style="width:'+d+'px;height:'+d+'px"></i></button>';
+  }).join('');
+  $$('#pgrosor button').forEach(function(b){ b.onclick=function(){
+    grosor=+b.dataset.pg;
+    $$('#pgrosor button').forEach(function(x){ x.classList.toggle('on', x===b); }); }; });
+
+  $$('#pmodo button').forEach(function(b){ b.onclick=function(){
+    modo=b.dataset.pm;
+    $$('#pmodo button').forEach(function(x){ x.classList.toggle('on', x===b); }); }; });
+  $('#pdeshacer').onclick=function(){
+    if(!trazos.length){ tost('No hay nada que deshacer.'); return; }
+    trazos.pop(); repintar();
+  };
+
+  function cerrar(){ caja.classList.remove('on'); caja.setAttribute('aria-hidden','true'); }
+  $('#pcancelar').onclick=function(){
+    if(trazos.length && !confirm('Vas a salir sin guardar lo que has pintado. ¿Seguro?')) return;
+    cerrar();
+  };
+  $('#plisto').onclick=function(){
+    /* LA FUSIÓN POR CAPAS: la de abajo es la foto tal cual, la de arriba lo pintado. Sale
+       un solo fichero, que es lo que se puede abrir en cualquier parte. */
+    var out=document.createElement('canvas');
+    out.width=cv.width; out.height=cv.height;
+    var o=out.getContext('2d');
+    o.drawImage(img, 0, 0, out.width, out.height);
+    o.drawImage(cv, 0, 0);
+    cerrar();
+    alTerminar(out.toDataURL('image/jpeg', 0.82), trazos.length);
+  };
+
+  img.onload=function(){
+    cv.width=img.naturalWidth; cv.height=img.naturalHeight;
+    img.style.width=cv.width+'px'; img.style.height=cv.height+'px';
+    repintar(); encajar();
+  };
+  img.src=fondoUrl;
+  caja.classList.add('on'); caja.setAttribute('aria-hidden','false');
+  if(img.complete && img.naturalWidth) img.onload();
+}
+
+/* ADJUNTAR EN EL ESCRITORIO. Aqui no hay modal —reportar es una cadena de `prompt()`—,
+   asi que se pregunta y se abre el selector. **Despues** de los `prompt`, nunca durante:
+   un `prompt` bloquea el hilo y el selector de fichero no llegaria a abrirse. */
+function _pedirCaptura_(){
+  return new Promise(function(ok){
+    var f=document.createElement('input');
+    f.type='file'; f.accept='image/*'; f.style.display='none';
+    document.body.appendChild(f);
+    /* Si se cierra el selector sin elegir nada no salta ningun evento, asi que la
+       promesa se resolveria nunca. Se resuelve al volver el foco a la ventana. */
+    var cerrado=false;
+    function fin(v){ if(cerrado) return; cerrado=true; f.remove(); ok(v); }
+    f.onchange=async function(){
+      var file=f.files&&f.files[0];
+      if(!file){ fin(null); return; }
+      try{
+        var im=await _leerImagen_(file);
+        _abrirPintor_(im.url, function(url){ fin(url); });
+      }catch(err){ tost('No se pudo usar esa imagen: '+((err&&err.message)||err)); fin(null); }
+    };
+    window.addEventListener('focus', function ret(){
+      window.removeEventListener('focus', ret);
+      setTimeout(function(){ if(!(f.files&&f.files.length)) fin(null); }, 400);
+    });
+    f.click();
+  });
+}
 async function reportarModal(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION){
     tost('Sin conexión con el servidor no se puede reportar.'); return; }
@@ -2158,9 +2767,21 @@ async function reportarModal(){
       ' · build '+BUILD+' · datos '+(DATA.generado||'?') };
   if(esMejora){ datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
   else { datos.esperaba=det; datos.paso=tit; datos.gravedad='Molesta'; }
+  /* La captura se ofrece AL FINAL, cuando ya no hay `prompt` abierto. Y se ofrece, no se
+     exige: hay reportes que no son de sitio y pedir una foto los frenaria. */
+  if(confirm('¿Quieres adjuntar una captura?'+String.fromCharCode(10,10)+
+    'Se abre para marcarla con el lápiz antes de enviarla.'+String.fromCharCode(10)+
+    'Cancelar = enviar sin foto.')){
+    var cap=await _pedirCaptura_();
+    if(cap) datos.captura=cap;
+  }
   try{
     var r=await (esMejora?api.reportarMejora(datos):api.reportarBug(datos));
-    tost((esMejora?'Mejora enviada':'Fallo reportado')+' · '+((r&&r.id)||'')+'.');
+    /* Si la foto no se guardo, se dice: el backend solo devuelve `captura` cuando la ha
+       subido a Drive. Callarse seria dejar creer que la marcaste para nada. */
+    var sinFoto = datos.captura && !(r && r.captura);
+    tost((esMejora?'Mejora enviada':'Fallo reportado')+' · '+((r&&r.id)||'')+'.'+
+      (sinFoto?' ⚠️ La foto NO se ha guardado: al servidor le falta ese paso.':''));
     if(vista==='buzon') _cargarBuzon_();
   }catch(e){ tost('No se pudo enviar: '+((e&&e.message)||e)); }
 }
@@ -2642,17 +3263,17 @@ var vista='panel';
 function conteo(k){
   if(k==='partes') return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).length;
   if(k==='sindeclarar') return PARTES.filter(function(p){return p.estado==='sindecl';}).length;
-  if(k==='curso')  return CURSO.length;
+  if(k==='curso')  return CURSO_CONECTADO ? CURSO.length : 0;   // sin conectar no hay nada que contar
   if(k==='docdec') return docsMios().length;
   if(k==='docurso')return DOCS.filter(function(d){return ['recibido','analizado','revision','cambios'].indexOf(d.est)>=0;}).length;
   if(k==='docpub') return DOCS.filter(function(d){return d.est==='publicado';}).length;
   if(k==='sanciones') return LOTE.cerrado?0:LOTE.items.length;
-  if(k==='apela')  return APELA.length;
+  if(k==='apela')  return 0;        // no hay cola de apelaciones: contar la maqueta era mentir
   if(k==='convoc') return REUS.length;
   if(k==='turnos') return TURNOS.length;
   if(k==='tareas') return TAREAS.length;
   if(k==='miembros') return DATA.miembros.length;
-  if(k==='reclutar') return CANDID.length;
+  if(k==='reclutar') return 0;      // idem: no hay candidaturas en ningun sistema
   return 0;
 }
 function pintarNav(){
@@ -2697,7 +3318,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d21459e';
+var BUILD='d5014d1';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -2719,6 +3340,13 @@ function _repintarSuave_(){
 function pintar(){
   _pintarPie_();
   _cablearSalir_();
+  /* ⛔ EL HTML VA PRIMERO. Estaba al final, DESPUES de cablear medio panel, asi que
+     cada pintada enganchaba manejadores a los nodos de la pintada anterior y acto
+     seguido los tiraba. Lo que rompia: las sanciones SUELTAS no se podian decidir —sus
+     botones acababan en el manejador del BLOQUE, que busca un `data-lid` que ellas no
+     tienen y se va sin hacer nada ni decirlo—. Se cazo ejecutando, no leyendo. */
+  var m=$('#main');
+  m.innerHTML=V[vista].f();
   /* Decidir una SUELTA. A diferencia del bloque, aqui no hay borrador: se aplica al
      momento, porque cada una tiene su motivo y su comunicado. Por eso se pide confirmar. */
   $$('[data-sid] [data-sdec]').forEach(function(b){
@@ -2740,6 +3368,54 @@ function pintar(){
         s.estado = acc==='aprobar'?'aplicada':(acc==='justificar'?'justificada':'rechazada');
         tost('Sanción '+s.estado+'.'); pintar();
       }catch(e){ b.disabled=false; tost('No se pudo: '+((e&&e.message)||e)); }
+    };
+  });
+  /* EDITAR UNA SUELTA. El backend deja cambiar `puntos`, `motivo` y `articulo` **solo en la
+     acción `aprobar`**, así que editar y aplicar son el mismo gesto: no hay forma de guardar
+     una corrección y decidir después. Se dice en el diálogo, para que nadie crea que está
+     guardando un borrador. */
+  $$('[data-seditar]').forEach(function(b){
+    b.onclick=async function(){
+      var id=+b.dataset.seditar;
+      var s=(SANC_BACK||[]).filter(function(x){ return x.id===id; })[0]; if(!s) return;
+      if(!backendOK||!SESION){ tost('Sin conexión no se puede editar.'); return; }
+      var m=_m(s.nombre), quien=(m&&m.pila)||s.nombre;
+      var pts=prompt('Puntos para '+quien+' (0 = aviso, negativo = resta):', String(Number(s.puntos)||0));
+      if(pts===null) return;
+      if(isNaN(Number(pts))){ tost('Los puntos tienen que ser un número.'); return; }
+      var mot=prompt('Motivo:', s.motivo||''); if(mot===null) return;
+      var art=prompt('Artículo del RRI:', s.articulo||'libre'); if(art===null) return;
+      if(!confirm('Aplicar la sanción de '+quien+' con '+Number(pts)+' punto(s), art. '+art+'.'+
+        String.fromCharCode(10,10)+'Editar y aplicar son lo mismo: el backend solo guarda los '+
+        'cambios al aprobar. Esto NO es un borrador.')) return;
+      b.disabled=true;
+      try{
+        await api.decidirSancion(id,'aprobar',{puntos:Number(pts), motivo:mot, articulo:art});
+        s.puntos=Number(pts); s.motivo=mot; s.articulo=art; s.estado='aprobada';
+        tost('Sanción aplicada con los cambios.'); pintar();
+      }catch(e){ b.disabled=false; tost('No se pudo: '+((e&&e.message)||e)); }
+    };
+  });
+  /* AGRUPAR SUELTAS. Un paquete es lo que hace que salga UN comunicado en vez de N, así que
+     agrupar no es cosmético. El backend se niega a meter dos veces a la misma persona en el
+     mismo paquete: ese error se enseña tal cual, porque dice exactamente qué pasa. */
+  $$('[data-agrupar]').forEach(function(b){
+    b.onclick=async function(){
+      var ss=_sancSueltas_();
+      if(ss.length<2){ tost('Hacen falta al menos dos sueltas para agrupar.'); return; }
+      if(!backendOK||!SESION){ tost('Sin conexión no se puede agrupar.'); return; }
+      var lote=prompt('Nombre del paquete (lo verá el comunicado):',
+        'Sanciones ' + new Date().toISOString().slice(0,10));
+      if(!lote || !lote.trim()) return;
+      if(!confirm('Agrupar '+ss.length+' sanciones sueltas en «'+lote.trim()+'».'+
+        String.fromCharCode(10,10)+'No se aplica nada: pasan a decidirse juntas y con un solo '+
+        'comunicado.')) return;
+      b.disabled=true; var prev=b.textContent; b.textContent='Agrupando…';
+      try{
+        await api.agruparSanciones(ss.map(function(x){ return x.id; }), lote.trim());
+        await _cargarSanciones_();
+        tost('Agrupadas en «'+lote.trim()+'».'); pintar();
+      }catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo agrupar: '+((e&&e.message)||e)); }
     };
   });
   /* cambiar de bloque pendiente */
@@ -2790,8 +3466,6 @@ function pintar(){
     };
   });
 
-  var m=$('#main');
-  m.innerHTML=V[vista].f();
   var _bn=m.querySelector('#btnNotis'); if(_bn) _bn.onclick=function(){ activarNotis(_bn); };
   var _bs=m.querySelector('[data-salir]'); if(_bs) _bs.onclick=function(){ cerrarSesion(); };
   /* CERRAR EL MES: encola el calculo. Era un `tost`. Se confirma porque, aunque no aplique
@@ -3094,7 +3768,10 @@ function enganchar(){
   });
   /* bloque de sanciones: marcar es BORRADOR (no aplica nada). Con bloque real viaja al
      backend (api.decidirSancion acción «marcar»); con la semilla, solo memoria. */
-  $$('.decs button').forEach(function(b){
+  /* ACOTADO AL BLOQUE (`[data-lid]`). Las sueltas usan la misma clase `decs`, asi que
+     este selector se tragaba tambien sus botones: les ponia ESTE manejador encima del
+     suyo, y como no tienen `data-lid` no encontraba la sancion y salia en silencio. */
+  $$('.decs[data-lid] button').forEach(function(b){
     b.onclick=async function(){
       var id=+b.parentNode.dataset.lid, dec=b.dataset.dec;
       var it=LOTE.items.filter(function(x){ return x.id===id; })[0]; if(!it) return;
@@ -3107,8 +3784,34 @@ function enganchar(){
       it.dec=dec; pintar();                                    // semilla local
     };
   });
-  $$('[data-mod]').forEach(function(b){
-    b.onclick=function(){ tost('Editor de la sanción: artículo del RRI y puntos, solo para esta persona.'); };
+  /* MARCAR TODAS DE GOLPE. Sigue siendo borrador -no aplica nada-, solo evita veinte
+     clics. EN SERIE a proposito: cada `decidirSancion` coge un `LockService` en el
+     backend y veinte llamadas a la vez se pisan entre ellas (pasó esta misma noche
+     escribiendo el buzón, con «otro proceso ha retenido el bloqueo»). */
+  $$('[data-todas]').forEach(function(b){
+    b.onclick=async function(){
+      var dec=b.dataset.todas;
+      var faltan=LOTE.items.filter(function(x){ return x.dec!==dec; });
+      if(!faltan.length){ tost('Ya estaban todas así.'); return; }
+      if(!confirm('Marcar '+faltan.length+' como «'+dec+'».'+String.fromCharCode(10,10)+
+        'Esto NO aplica nada: el bloque se cierra aparte.')) return;
+      if(!(LOTE.real && backendOK && SESION)){
+        faltan.forEach(function(x){ x.dec=dec; }); pintar(); return;   // semilla local
+      }
+      b.disabled=true; var prev=b.textContent;
+      var mal=0;
+      for(var i=0;i<faltan.length;i++){
+        b.textContent=(i+1)+'/'+faltan.length+'…';
+        try{ await api.decidirSancion(faltan[i].id,'marcar',{decision:dec}); faltan[i].dec=dec; }
+        catch(e){ mal++; }
+      }
+      b.disabled=false; b.textContent=prev;
+      /* Si alguna falla se dice CUANTAS: dar por buenas veinte cuando entraron
+         dieciocho es exactamente como se cierra un bloque a medias sin enterarse. */
+      tost(mal ? ('Marcadas '+(faltan.length-mal)+' de '+faltan.length+'; '+mal+' fallaron.')
+               : ('Marcadas '+faltan.length+'. Sigue sin aplicarse nada.'));
+      pintar();
+    };
   });
   /* cerrar el bloque: es el DISPARO. Con bloque real, api.confirmarLote lo cierra entero
      bajo lock y levanta aplicar_sanciones=true (una vez) para que el motor lo escriba en
@@ -3135,8 +3838,19 @@ function enganchar(){
       pintar();
     };
   });
-  $$('[data-cerrarmes]').forEach(function(b){ b.onclick=function(){ tost('Mes cerrado y comunicado enviado.'); }; });
-  $$('[data-nueva]').forEach(function(b){ b.onclick=function(){ tost('Abre el creador de reuniones: tipo, modalidad, fechas y franjas.'); }; });
+  /* 🔴 AQUI HABIA UN BOTON QUE MENTIA. `$$('[data-cerrarmes]')` pisaba el manejador de
+     verdad que `pintar()` acababa de poner —confirmar, `api.cerrarMes`, recargar el
+     plan— con un `tost('Mes cerrado y comunicado enviado.')`. El ultimo que escribe gana,
+     y ganaba el falso: pulsar «Calcular el cierre» no encolaba nada y contestaba que el
+     mes estaba cerrado y el comunicado enviado. Resto de cuando la pantalla era maqueta.
+     No se sustituye por nada: el manejador bueno ya existe, solo estaba tapado. */
+  /* El botón «Convocar reunión» era un `tost` descriptivo. Ahora lleva al panel de verdad,
+     que vive en esta misma vista, y le da el foco. */
+  $$('[data-nueva]').forEach(function(b){ b.onclick=function(){
+    var p=$('#cvTipo'); if(p){ p.scrollIntoView({block:'center'}); p.focus(); }
+    else tost('La convocatoria es solo para coordinación.');
+  }; });
+  _cablearConvocar_();
   /* acuse de pulsación: <120 ms, en la propia pieza, nunca bajo el cursor */
   $$('.btn').forEach(function(b){
     b.addEventListener('pointerdown',function(){
