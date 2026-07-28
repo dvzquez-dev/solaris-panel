@@ -767,7 +767,8 @@ var api={
   bootstrap:   function(t,nombre){ var b={action:"bootstrap"}; if(t)b.token=t; if(nombre)b.nombre=nombre; return api._post(b); },
   quienSoy:    function(t){ return api._post({action:"quienSoy",token:t}); },
   getPanel:    function(){ return api._post({action:"getPanel"}); },
-  getTareas:   function(){ return api._post({action:"getTareas"}); },
+  /* `nombre` = las de OTRA persona (backend v52), para sancionar por un plazo. */
+  getTareas:   function(nombre){ return api._post(nombre ? {action:"getTareas",nombre:nombre} : {action:"getTareas"}); },
   getTurnos:   function(){ return api._post({action:"getTurnos"}); },
   crearTurno:  function(t){ return api._post({action:"crearTurno",turno:t}); },
   getEntregables: function(){ return api._post({action:"getEntregables"}); },
@@ -2408,6 +2409,31 @@ function _ordenSubs_(){
 }
 /* Agrupa a quien puedas sancionar: por subsistema en el orden de Notion, y dentro de cada uno
    EL COORDINADOR PRIMERO y el resto alfabetico. Daniel: «y con el coordinador de primero». */
+/* LAS TAREAS DEL SANCIONADO · GEMELA (movil/escritorio).
+   Para sancionar a alguien por incumplir un plazo hay que elegir una tarea SUYA. Antes se
+   ofrecian las de uno mismo, y como el PD no tiene tareas asignadas la lista salia vacia: la
+   sancion por plazo no se podia poner contra nadie. El backend (v52) las sirve si puedes
+   sancionar a esa persona -misma regla que la sancion, ningun camino nuevo-. */
+var SANC_TAREAS = { quien: '', lista: null, cargando: false };   // lista null = aun sin pedir
+function _tareasDe_(nombre, alLlegar){
+  var n = String(nombre || '');
+  if (!n) return [];
+  if (SANC_TAREAS.quien === n && SANC_TAREAS.lista) return SANC_TAREAS.lista;
+  if (SANC_TAREAS.quien === n && SANC_TAREAS.cargando) return null;   // ya se esta pidiendo
+  SANC_TAREAS = { quien: n, lista: null, cargando: true };
+  api.getTareas(n).then(function(l){
+    /* Solo se acepta la respuesta si sigue siendo la persona que se pidio: si mientras llegaba
+       se eligio a otra, pintar esto seria ofrecer las tareas de quien no es. */
+    if (SANC_TAREAS.quien !== n) return;
+    SANC_TAREAS = { quien: n, lista: l || [], cargando: false };
+    if (alLlegar) alLlegar();
+  }).catch(function(e){
+    if (SANC_TAREAS.quien !== n) return;
+    SANC_TAREAS = { quien: n, lista: [], cargando: false, error: (e && e.message) || String(e) };
+    if (alLlegar) alLlegar();
+  });
+  return null;                                   // null = «cargando», distinto de [] = «no tiene»
+}
 function _gruposSanc_(actor, filtro){
   var f=_sinTildes_(String(filtro||'').trim().toLowerCase());
   var gente=sancionablesPor(actor).filter(function(m){
@@ -2535,9 +2561,14 @@ function _ponerSancCuerpo_(){
   var E=CAMPO_CSS;
   var grupos=_gruposSanc_(_actorSanc_(), SANC_FORM.filtro);
   var esPlazo=(SANC_FORM.motivo==='plazo');
-  /* Solo tareas VIVAS y con enlace a Notion: sin `url` no se puede mover la fecha, y ofrecerla
-     seria prometer algo que va a fallar al guardar. */
-  var tareas=(TAREAS||[]).filter(function(t){
+  /* LAS TAREAS DEL SANCIONADO, no las mias -antes se ofrecian las propias y por eso no se podia
+     sancionar a nadie por un plazo-. `null` = todavia se estan pidiendo. Y solo las VIVAS con
+     enlace a Notion: sin `url` no se puede mover la fecha. */
+  var _tt=esPlazo ? _tareasDe_(SANC_FORM.quien, function(){
+    var c=$('#ponerSanc'); if(c){ c.innerHTML=_ponerSancCuerpo_(); _cablearPonerSanc_(); }
+  }) : [];
+  var cargandoT=(_tt===null);
+  var tareas=(_tt||[]).filter(function(t){
     return t && t.url && !/hech|finaliz|complet|termin|cerrad/i.test(t.e||''); });
   return '<div class="sanwrap">'+
     '<div>'+
@@ -2558,7 +2589,13 @@ function _ponerSancCuerpo_(){
             '<input id="snArt" value="'+esc(SANC_FORM.art||'libre')+'" style="'+E+'"></label>'
         : '')+
       (esPlazo
-        ? (tareas.length
+        ? (!SANC_FORM.quien
+            ? '<div class="nota" style="margin:0 0 9px">Elige primero a quién sancionas: las tareas '+
+              'que se ofrecen son <b>las suyas</b>.</div>'
+          : cargandoT
+            ? '<div class="nota" style="margin:0 0 9px">Buscando las tareas de '+
+              esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'…</div>'
+          : tareas.length
             ? '<label style="display:block;margin-bottom:9px">'+lab('Qu\u00e9 tarea')+
                 '<select id="snTarea" style="'+E+'"><option value="">\u2014 elige la tarea \u2014</option>'+
                 tareas.map(function(t){ return '<option value="'+esc(t.url)+'"'+(SANC_FORM.tarea===t.url?' selected':'')+'>'+esc(t.n||t.nombre||'(sin t\u00edtulo)')+
@@ -2569,7 +2606,7 @@ function _ponerSancCuerpo_(){
               '<div class="nota" style="margin:0 0 9px">El plazo nuevo se escribe <b>en Notion</b>. Si eso '+
               'falla, la sanci\u00f3n <b>no</b> se pone: no tiene sentido sancionar por un plazo y dejar la '+
               'tarea con la fecha vencida.</div>'
-            : '<div class="nota" style="margin:0 0 9px;color:var(--warn)">No hay ninguna tarea viva con enlace '+
+            : '<div class="nota" style="margin:0 0 9px;color:var(--warn)">'+esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+' no tiene ninguna tarea viva con enlace '+
               'a Notion, as\u00ed que no se puede mover ning\u00fan plazo. Elige otro motivo.</div>')
         : '')+
       '<label style="display:block;margin-bottom:11px;max-width:130px">'+lab('Puntos')+
@@ -2598,6 +2635,9 @@ function _cablearPonerSanc_(){
   function marcar(b){
     SANC_FORM.quien=b.dataset.sanq;
     $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
+    /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS: hay que repintar.
+       Con los demas motivos no se toca nada, que seria tirar lo escrito por nada. */
+    if(SANC_FORM.motivo==='plazo'){ SANC_FORM.tarea=''; repintar(); }
   }
   /* Elegir persona NO repinta: solo se marca. */
   $$('[data-sanq]').forEach(function(b){ b.onclick=function(){ marcar(b);
@@ -4137,7 +4177,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='525d944';
+var BUILD='054a448';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
