@@ -1185,6 +1185,15 @@ function _umbral_(){
    distingue de un «no» del backend, que no se reintenta porque tiene criterio. */
 function _ApiTransito(m){ this.message=m; this.transito=true; }
 _ApiTransito.prototype=Object.create(Error.prototype);
+/* ═══ LOGIN Y SESION · GEMELO EN LA OTRA CARA ═══════════════════════════════════
+   Todo este bloque -`_gate_`, `_onCredencial_`, `_pintarLogin_`, `_arrancarGis_`,
+   `cerrarSesion`, `_apiParse` y el objeto `api`- esta **calcado** en el otro fichero. Es
+   deliberado: son dos artefactos autocontenidos y la CSP impide compartir codigo.
+
+   ⚠️ **CAMBIAR UNO SIN CAMBIAR EL OTRO ES COMO EMPIEZAN LAS DIVERGENCIAS.** Paso hoy con el
+   visor de documentos: tres copias, una mejora en una, y las otras dos sin enterarse.
+   Si tocas algo de aqui, abre el otro fichero antes de dar el cambio por hecho. (Mapa §5, D11.)
+   ═══════════════════════════════════════════════════════════════════════════════ */
 function _apiParse(txt, accion){
   var j=null; try{ j=JSON.parse(txt); }catch(_){}
   /* Lo que vuelve no es JSON: es la pagina HTML de Google del 404 transitorio. */
@@ -1580,6 +1589,35 @@ function _ordenarFranjas_(r){
     cambio:   true
   };
 }
+/* EL MAPA DE CALOR · GEMELA de `_calorDe_(r, pond)` en `escritorio.html`.
+   Estaba INLINE aquí dentro de `_normReuM_` y aislada allí (mapa §5, D6): la misma cuenta
+   escrita dos veces y con dos formas, que es como acaban divergiendo. Ahora comparten nombre
+   y firma, así que un solo grep las encuentra juntas.
+
+   `pond=false` cuenta PERSONAS (cualquier valor > 0); `pond=true` suma los VALORES
+   (presencial+telemático=2, telemático=1). El móvil las necesita las dos y la llama dos veces.
+
+   ⚠️ `null` no es cero: es **bloque NO OFERTADO**. Con horario por día no todas las franjas
+   existen todos los días, y pintar un hueco muerto como «no puede nadie» es mentir. Por eso la
+   matriz nace a `null` y solo los bloques realmente ofertados pasan a 0.
+
+   ⚠️ Y el índice de `resp[nombre][i]` es la posición en `bloques`, **no** la franja: si
+   `bloques` se reordena (lo hace `_ordenarFranjas_`), hay que pasar aquí el reordenado y sus
+   respuestas alineadas. Mezclar los dos órdenes es lo que apuntaba a otra hora. */
+function _calorDe_(r, pond){
+  var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};
+  var cel=dias.map(function(){ return F.map(function(){ return null; }); });
+  bl.forEach(function(b){ if(cel[b[0]] && b[1]<F.length) cel[b[0]][b[1]]=0; });
+  Object.keys(resp).forEach(function(nom){
+    var v=resp[nom]||[];
+    for(var i=0;i<bl.length;i++){
+      var val=+v[i]||0; if(!(val>0)) continue;
+      var d=bl[i][0], f=bl[i][1];
+      if(cel[d] && cel[d][f]!=null) cel[d][f] += (pond ? val : 1);
+    }
+  });
+  return cel;
+}
 function _normReuM_(r){
   var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};
   /* null = bloque NO OFERTADO (con horario por día no todas las franjas existen todos los
@@ -1595,14 +1633,8 @@ function _normReuM_(r){
              : (Array.isArray(r.fijadaBl) ? r.fijadaBl : []);
   var _ord=_ordenarFranjas_({franjas:F, bloques:bl, fijadaBl:_fijPrev});
   F=_ord.franjas; bl=_ord.bloques; _fijPrev=_ord.fijadaBl;
-  var calor=dias.map(function(){ return F.map(function(){ return null; }); });
-  var pond =dias.map(function(){ return F.map(function(){ return null; }); });
-  bl.forEach(function(b){ if(calor[b[0]] && b[1]<F.length){ calor[b[0]][b[1]]=0; pond[b[0]][b[1]]=0; } });
-  Object.keys(resp).forEach(function(nom){
-    var v=resp[nom]||[];
-    for(var i=0;i<bl.length;i++){ var val=+v[i]||0; if(val>0){ var d=bl[i][0], f=bl[i][1];
-      if(calor[d]&&calor[d][f]!=null){ calor[d][f]++; pond[d][f]+=val; } } }
-  });
+  var calor=_calorDe_({dias:dias, franjas:F, bloques:bl, resp:resp}, false);
+  var pond =_calorDe_({dias:dias, franjas:F, bloques:bl, resp:resp}, true);
   /* `fijada` viene del backend como OBJETO con los indices ({fecha,franjas,bloques,label}).
      Antes se colapsaba a la etiqueta y se perdian los indices, asi que el mapa no podia
      pintar el hueco elegido en verde aunque el aviso lo prometiera. */
@@ -2094,7 +2126,13 @@ var ST={vista:'estado', libro:false, modo:'vivo', rol:'miembro',
   sel:null            /* Map de la rejilla de cubrir */
 };
 var SEQ=6;
-/* rol: gatea exactamente lo mismo que app.html — quién revisa, quién sanciona */
+/* rol: gatea exactamente lo mismo que app.html — quién revisa, quién sanciona.
+   ⚠️ AUTORIDAD TRIPLICADA a proposito (mapa §5, D9): `rangoNom`, `coordinadorDe`,
+   `revisoresDe` y `puedeDecidir*` existen aqui, en `escritorio.html` y en el backend
+   (`_rangoNom_`, `_coordinadorDe_`, `_revisoresDe_`, `_puedeDecidir_`). **El backend es
+   la unica frontera de seguridad**; las dos caras llevan su copia solo para PINTAR. Se
+   llaman igual en los tres sitios para que un grep las encuentre juntas: si cambias una
+   regla de autoridad, son TRES ficheros. */
 /* Rol efectivo: en login REAL manda YO.cargo (el conmutador ST.rol es solo de la demo). Así el
    PD/coordinador que entra de verdad ve «Convocar reunión», el Panel PD, etc. */
 function esCoord(){ return ST.rol==='coord' || ST.rol==='pd' || (typeof YO!=='undefined' && YO && (YO.cargo==='Coordinador' || YO.cargo==='Project Director')); }
@@ -2636,6 +2674,10 @@ function _proxReuHTML_(){
    día. En la app real DEMO_X vale 1. */
 var DEMO_X=60;
 /* v27: minutos de pausa de la sesión en la nube (tramos cerrados; el abierto cuenta hasta ahora). */
+/* GEMELA EN OTRO RUNTIME: `_pausaMs_` del backend hace esta MISMA cuenta en
+   milisegundos (suma de tramos `{ini,fin}`; el tramo abierto cuenta hasta ahora). No se
+   pueden fundir -son runtimes distintos- pero **si cambia la semantica de `pausas`, hay
+   que tocar las dos**. Mapa §5, D7. */
 function _pausaMinMovil_(pausas){ var now=Date.now(), t=0; (pausas||[]).forEach(function(p){ var pi=Date.parse(p.ini), pf=p.fin?Date.parse(p.fin):now; if(pf>pi) t+=(pf-pi); }); return Math.round(t/60000); }
 function minSes(){
   var s=ST.ses;
@@ -3799,7 +3841,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='8a594e0';
+var BUILD='d759fa9';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -3833,10 +3875,18 @@ function _ajustesHTML_(){
       '<small>Si esto no coincide con lo que te digan, recarga forzando (mantén pulsado '+
       'recargar, o cierra la pestaña y ábrela de nuevo).</small></div></div></div></div>';
 }
+/* «Ver todos» vive aqui y no en `ST` porque es una forma de MIRAR, no un estado de la app:
+   no debe sobrevivir a cambiar de pantalla ni ensuciar el resto. */
+var TURNOS_TODOS=false;
 function vTurnos(){
-  var mios=TURNOS.filter(_mioTurno_);
+  /* Por defecto SOLO LOS TUYOS -decision de Daniel-, con un conmutador para ver los del
+     equipo. Los de otros se pintan igual pero sin poder tocarlos: ver quien va a que sirve
+     para organizarse; apuntarse en el turno de otro, no. */
+  var base=TURNOS_TODOS ? TURNOS.slice() : TURNOS.filter(_mioTurno_);
+  var mios=base;
   var prox=mios.filter(function(t){ return !t.hecho; });
   var pas=mios.filter(function(t){ return t.hecho; });
+  var nTodos=TURNOS.length, nMios=TURNOS.filter(_mioTurno_).length;
   function tarjeta(t){
     return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+
       cab(t.f+(t.crucial?' · crucial':''), t.hora)+
@@ -3852,9 +3902,20 @@ function vTurnos(){
   pas.sort(function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); });
   /* los vivos van SUELTOS: sin cabecera de seccion ni etiquetas, para que canten */
   return '<div class="h1">Turnos</div><p class="h1s">Fabricación · en cuáles estás y quién más va.</p>'+
+    /* El conmutador solo aparece si hay algo mas que ver: con todos los turnos siendo tuyos,
+       un boton que no cambia nada es ruido que hay que leer igual. */
+    (nTodos>nMios
+      ? '<div class="modos" id="turnoModo" style="margin-bottom:11px">'+
+          '<button data-tt="0" class="'+(TURNOS_TODOS?'':'on')+'" data-p>Los míos · '+nMios+'</button>'+
+          '<button data-tt="1" class="'+(TURNOS_TODOS?'on':'')+'" data-p>Todos · '+nTodos+'</button>'+
+        '</div>'
+      : '')+
     (prox.length? prox.map(tarjeta).join('')
-      : '<div class="tarj">'+vacio('Sin turnos por delante','No tienes ningún turno de fabricación asignado. '+
-          'Cuando te convoquen a uno, aparecerá aquí.','',false)+'</div>')+
+      : '<div class="tarj">'+vacio(TURNOS_TODOS?'Sin turnos por delante':'Sin turnos por delante',
+          TURNOS_TODOS
+            ? 'No hay ningún turno de fabricación convocado. Cuando alguien convoque uno, aparecerá aquí.'
+            : 'No tienes ningún turno de fabricación asignado. Cuando te convoquen a uno, aparecerá aquí.'+
+              (nTodos>nMios?' Hay '+nTodos+' del equipo: míralos con «Todos».':''),'',false)+'</div>')+
     (pas.length? '<div class="cajon" data-caj data-p><span>Turnos pasados <b>· '+pas.length+'</b>'+
         (pas[0].f?' <span style="color:var(--ink3)">· el último, '+esc(pas[0].f)+'</span>':'')+'</span>'+
         '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
@@ -5108,6 +5169,10 @@ function enganchar(){
     bl.textContent = ST.libro ? 'Ocultar desglose' : 'Desglose de puntos';
   };
 
+  /* turnos: los mios / todos. Solo cambia lo que se mira, no toca datos. */
+  $$('#turnoModo [data-tt]').forEach(function(b){
+    b.onclick=function(){ TURNOS_TODOS=(b.dataset.tt==='1'); pintar(); };
+  });
   /* fichar */
   $$('#modos button').forEach(function(b){
     b.onclick=function(){ ST.modo=b.dataset.mo; pintar(); };
