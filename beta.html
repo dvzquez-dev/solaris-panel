@@ -3799,7 +3799,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7c10508';
+var BUILD='8a594e0';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -3901,13 +3901,17 @@ function _docsPend_(){
   return ENT_REV.filter(function(e){return e.estado==='revision' && revisoresDe(e).indexOf(yoNombre())>=0;});
 }
 function _docsRelevantes_(){
-  return !!(_docsPend_().length || ENTREGABLES.length || (esPD() && ENT_REV.length));
+  /* Con `||[]` porque estas listas las llena el backend y pueden no haber llegado. Antes
+     asumían que sí, y al usarse desde `_destVisibles_` -que corre en CADA pintado- un dato
+     que falta dejaba de romper una pantalla para romper la app entera. */
+  return !!((_docsPend_()||[]).length || (ENTREGABLES||[]).length ||
+            (esPD() && (ENT_REV||[]).length));
 }
 /* ¿Tienes tareas vivas? Mismo criterio que usa la pantalla para separar «en curso» de
    «hechas»: si divergieran habria una pestaña que al pulsarla no tiene nada, que es justo
    el fallo que reporto Adrian con Documentos. */
 function _tareasRelevantes_(){
-  return TAREAS.some(function(t){ return !/hech|finaliz|complet|termin|cerrad/i.test(t.e); });
+  return (TAREAS||[]).some(function(t){ return !/hech|finaliz|complet|termin|cerrad/i.test(t&&t.e); });
 }
 /* LAS PESTAÑAS QUE SE PUEDEN ESCONDER, en una tabla y no repartidas por el fichero.
    Daniel pidio esto para Documentos y luego para Tareas; a la tercera vez, copiar la
@@ -3918,6 +3922,9 @@ var OCULTABLES=[
   ['tareas','Tareas','mientras no tengas ninguna tarea en curso', _tareasRelevantes_]
 ];
 function _seOculta_(k){ return !!(PREF.ocultar && PREF.ocultar[k]); }
+/* Con un modal delante -Ajustes, por ejemplo- la barra de abajo no se toca: si no, apagar
+   una pestaña desde Ajustes hace desaparecer justo la pantalla que tienes debajo. */
+function _hayModal_(){ var m=$('#modal'); return !!(m && m.classList.contains('on')); }
 function vDocs(){
   var mios=ENTREGABLES;
   var pend=_docsPend_();
@@ -4904,12 +4911,27 @@ function _destVisibles_(){
   return DEST.filter(function(d){
     /* Se queda si la has fijado en Ajustes, si estas dentro (no se puede tirar el suelo
        que pisas) o si de verdad tienes algo que hacer ahi. */
-    /* Por DEFECTO se ve. Solo se esconde si tu lo has pedido en Ajustes, y aun asi
-       reaparece cuando hay algo que hacer o cuando estas dentro: no se puede tirar el
-       suelo que pisas. */
+    /* Por DEFECTO se ve. Solo se esconde si TÚ lo has pedido en Ajustes, y aun así:
+         · **no mientras estés dentro** — no se puede tirar el suelo que se pisa. Daniel:
+           «haz que hasta que la abandones no desaparezca»; se va cuando navegas fuera.
+         · **ni con un modal abierto encima**: apagarla desde Ajustes no puede evaporar lo
+           que estás mirando por debajo.
+         · ni cuando de verdad tienes algo que hacer ahí.
+
+       Y TODO ESTO NO PUEDE LANZAR NUNCA. Esta función corre en `pintarNav()`, o sea en cada
+       pintado de cada pantalla: una excepción aquí no rompe una pestaña, deja la app entera
+       sin pintar. Y como la preferencia vive en `localStorage`, ni recargando se arregla —
+       queda ladrillo. Pasó el 28/07 en la beta, con `TAREAS` sin llegar del backend.
+       Ante la duda **se ve**: mostrar de más es recuperable, esconder de más no. */
     for(var i=0;i<OCULTABLES.length;i++){
       var o=OCULTABLES[i];
-      if(d[0]===o[0]) return !_seOculta_(o[0]) || ST.vista===o[0] || o[3]();
+      if(d[0]!==o[0]) continue;
+      try{
+        if(!_seOculta_(o[0])) return true;
+        if(ST.vista===o[0]) return true;
+        if(_hayModal_()) return true;
+        return !!o[3]();
+      }catch(_){ return true; }
     }
     return true;
   });
@@ -4950,7 +4972,28 @@ function _repintarSuave_(){
    Sin esto, el login pintaba dos veces y el refresco en vivo una cada 90 s, y en cada una
    se repetian la entrada de la vista, la cascada del medidor y el crecimiento de las
    barras. Con el mismo dato. Daniel: «se recarga solo por la cara». */
+/* RED DE SEGURIDAD. Una preferencia guardada que rompe el pintado no es un fallo: es un
+   LADRILLO. Vive en `localStorage`, asi que recargar no la quita y la app no vuelve a
+   arrancar nunca — hasta que alguien sepa borrar el almacenamiento del navegador, que no es
+   algo que se le pueda pedir a nadie. Paso el 28/07 en la beta.
+
+   Asi que si pintar revienta, se tira LA PREFERENCIA -no los datos, que son de verdad- y se
+   reintenta una vez. Si vuelve a reventar, se propaga: a partir de ahi el problema no es la
+   preferencia y taparlo seria peor. */
 function pintar(silencioso){
+  try{ return _pintar_(silencioso); }
+  catch(e){
+    if(pintar._rescatando) throw e;
+    pintar._rescatando=true;
+    try{
+      PREF.ocultar={}; PREF.escala=''; _guardarPref_(); _aplicarEscala_();
+      var r=_pintar_(silencioso);
+      try{ tost('Se han restablecido las preferencias de pantallas: una de ellas impedía dibujar la app.'); }catch(_){}
+      return r;
+    } finally { pintar._rescatando=false; }
+  }
+}
+function _pintar_(silencioso){
   /* Si la vista en la que estas ha dejado de mostrarse -decidiste el ultimo documento y
      Docs se retira- hay que sacarte: si no, te quedas en una pantalla sin boton
      encendido y el indicador viajero no tiene a donde apuntar. */
