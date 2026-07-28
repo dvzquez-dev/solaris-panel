@@ -3128,6 +3128,19 @@ async function _onCredencial_(resp,_silente){
       _gate_(_insigniaHTML_()+'<div style="max-width:380px;line-height:1.55;text-align:center"><b>No tienes permiso para entrar al escritorio.</b><br><span style="opacity:.75">Este panel es para consejo, junta y direcci\u00f3n. Tu sitio es la app del m\u00f3vil.</span></div>');
       return;
     }
+    /* LA BETA NO ES PARA TODO EL MUNDO — GEMELA de la del móvil. Va aquí, después de que la
+       identidad esté resuelta y antes de quitar el gate: si no pasa, la app no arranca.
+       ⚠️ Faltaba: esta cara tenía `_puedeBeta_` y no la llamaba nadie, así que su beta estaba
+       abierta a cualquier coordinador que diera con la URL. Escribir la comprobación no es
+       ponerla. */
+    if(!_puedeBeta_()){
+      _gate_(_insigniaHTML_()+'<div style="max-width:380px;line-height:1.55;text-align:center">'+
+        '<b>Esto es la versión de pruebas.</b><br><span style="opacity:.75">Todavía no es para '+
+        'uso general.</span><br><br><a href="./escritorio.html" style="border:1px solid #463E40;'+
+        'background:none;color:#F4F3F3;border-radius:9px;padding:9px 15px;text-decoration:none;'+
+        'display:inline-block">Ir al panel</a></div>');
+      return;
+    }
     try{ localStorage.setItem('sol_last_email',SESION.email);
          localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
     ACTOR = SESION.nombre || PD_NOM;
@@ -3339,7 +3352,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b56d342';
+var BUILD='1ae5c3a';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
