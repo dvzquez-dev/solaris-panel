@@ -4,6 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Solaris · Instrumento — la app del miembro (ronda 3)</title>
+<!-- ICONO Y MANIFEST · lo pone el publicador segun el canal (ver `flujos/publicar_web.py`).
+     Se declaran AQUI y no se dejan a la convencion de la raiz del sitio: produccion y beta
+     viven en el mismo dominio, asi que heredando `/apple-touch-icon.png` las dos salian con
+     el MISMO icono. Con las dos instaladas en el movil, eso es abrir la que no era. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+<meta name="apple-mobile-web-app-title" content="Solaris">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -170,18 +181,13 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
    · centrado (de la 06a), no arrinconado
    NO lleva la cota gris al pasar el dedo: molestaba y se ha quitado.
    ═════════════════════════════════════════════════════════════════════════ */
-/* EL MEDIDOR, EN FILA Y MAS PEQUEÑO (MEJ-M-2026-07-27-1, Adrian: «ocupa demasiado»).
-   Antes: anillo de 172 px con la leyenda y el boton DEBAJO, en columna. Con la
-   cabecera de la tarjeta eso son ~300 px de los 844 de un iPhone, y empujaba las horas
-   del mes -lo que uno viene a mirar- por debajo del pliegue.
-   `--medW` es la unica medida: TODO lo de dentro se expresa como fraccion suya
-   (estrella .093, su offset .01163, el numero .2558), asi que la figura es identica
-   a escala. Cambiar ese numero es lo unico que hace falta para volver a 172. */
-.medcaja{display:flex;flex-direction:row;align-items:center;gap:15px;padding:4px 0 2px}
-.med{--medW:126px;position:relative;width:var(--medW);height:var(--medW);flex:none}
-.med svg.dial{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-/* la columna de la derecha: leyenda arriba, boton debajo, las dos alineadas a la izq. */
-.medlado{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+/* REVERTIDO el 28/07 por orden de Daniel: el medidor vuelve a 172 px, en columna y
+   centrado, con la leyenda y el boton debajo. Se habia encogido a 126 px y puesto en
+   fila (MEJ-M-2026-07-27-1, de Adrian). Daniel: «estaba muchisimo mas guapo antes».
+   NO se vuelve a tocar sin que el lo apruebe primero en el buzon. */
+.medcaja{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px}
+.med{position:relative;width:172px;height:172px;flex:none}
+.med svg.dial{position:absolute;inset:0;width:172px;height:172px;overflow:visible}
 .med .fili{transform-box:view-box;transform-origin:86px 86px;opacity:.05;fill:var(--ink);
   animation:giroLento 30s linear infinite}
 .med .pista{fill:none;stroke:var(--line);stroke-width:1;stroke-dasharray:2 5;opacity:.8}
@@ -279,24 +285,39 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
   100%{stroke:#7BE3BE;stroke-width:1.7;filter:none}}
 .med .tip{position:absolute;inset:0;transform:rotate(0deg);pointer-events:none;
   transition:transform .8s var(--arco)}
-/* En fraccion de `--medW`: con 172 px sale exactamente lo de antes (16 px de estrella
-   a 2 px del borde), y con cualquier otro tamaño la estrella cae sobre la misma marca.
-   Con medidas fijas se despegaba del anillo al encogerlo. */
-.med .tip i{position:absolute;left:50%;display:block;
-  top:calc(var(--medW,172px) * .01163); margin-left:calc(var(--medW,172px) * -.0465);
-  width:calc(var(--medW,172px) * .093); height:calc(var(--medW,172px) * .093);
+.med .tip i{position:absolute;left:50%;top:2px;margin-left:-8px;width:16px;height:16px;display:block;
   color:var(--red2);filter:drop-shadow(0 0 8px rgba(255,74,79,.75))}
-.med .tip i svg{width:100%;height:100%;fill:currentColor;display:block}
+.med .tip i svg{width:16px;height:16px;fill:currentColor}
 .med .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
   justify-content:center;pointer-events:none}
-.med .mid .n{font-family:var(--mono);font-size:calc(var(--medW,172px) * .2558);
-  font-weight:600;letter-spacing:-.045em;line-height:1}
-.med .mid .n small{font-size:calc(var(--medW,172px) * .093);color:var(--ink3);letter-spacing:-.02em}
+.med .mid .n{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:-.045em;line-height:1}
+.med .mid .n small{font-size:16px;color:var(--ink3);letter-spacing:-.02em}
 .med .mid .u{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:var(--ink3);margin-top:5px}
 /* `.pips` (la linea de puntitos bajo el medidor) se retiro el 27/07: repetia lo que ya dice
    el anillo. Si algun dia vuelve, esta en el historial. */
-.medley{margin:0;font-size:11.5px;color:var(--ink2);text-align:left;line-height:1.5}
+.medley{margin-top:11px;font-size:11.5px;color:var(--ink2);text-align:center;line-height:1.5}
 .medley b{color:var(--ink)}
+/* La comparativa cuelga de la barra: se separa con una linea, no con una tarjeta.
+   La tarjeta aparte era lo que hacia que pareciera una seccion propia y sobrara. */
+.comph{margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}
+/* Plegado generico (`data-plg`). Existe uno para el visor de documentos, pero ese trae
+   iframe y carga diferida; esto es solo enseñar/esconder lo que ya esta pintado. */
+.plgh{display:flex;align-items:center;gap:9px;cursor:pointer;padding:3px 0}
+.plgh b{font-size:12.5px}
+.plgh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px;margin-top:2px}
+.plgc{padding-top:10px}
+/* La lista de personas: alta y con scroll propio, para que el formulario no se vaya a
+   tres pantallas cuando el equipo tiene cuarenta. */
+.sanlista{max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r2);
+  margin:0 0 11px;-webkit-overflow-scrolling:touch}
+.sangrupo{position:sticky;top:0;background:var(--sur2);padding:5px 10px;font-family:var(--mono);
+  font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+.sanper{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;
+  border:0;border-bottom:1px solid var(--line);padding:9px 10px;color:var(--ink);font:inherit;
+  font-size:12.5px;cursor:pointer}
+.sanper i{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--ink3);margin-left:auto}
+.sanper.on{background:rgba(228,30,37,.14);box-shadow:inset 3px 0 0 var(--red)}
+.sanper.on b{color:var(--red2)}
 .libro{overflow:hidden;height:0;transition:height .42s var(--sal)}
 .retf{display:flex;align-items:center;gap:11px;padding:9px 2px;border-top:1px solid var(--line);font-size:12px}
 .retf .pt{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--red2);flex:none;width:26px}
@@ -598,9 +619,13 @@ nav{flex:none;position:relative;height:calc(70px + env(safe-area-inset-bottom,0p
 .chispas.on b:nth-child(4){--dx:7px;--dy:-16px;animation-delay:.02s}
 @keyframes chispita{0%{opacity:1;transform:translate(0,0) scale(1)}
   100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3)}}
+/* `--tabN` lo pone `pintarNav` con cuantas pestañas hay. Con siete el ancho da para 7,5 px
+   de rotulo; con menos sobra sitio y crecen. Daniel: «que se autoajuste el espacio de
+   abajo»; Adrian, en el reporte: «poder ver las letras de las demas a mayor tamaño». */
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
-  padding:12px 0 9px;font-family:var(--mono);font-size:7.5px;letter-spacing:.05em;text-transform:uppercase;
-  color:var(--ink3);position:relative;transition:color .18s linear}
+  padding:12px 0 9px;font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase;
+  font-size:clamp(7.5px, calc(7.5px + (7 - var(--tabN,7)) * .5px), 9.5px);
+  color:var(--ink3);position:relative;transition:color .18s linear,font-size .18s linear}
 .tab svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;
   stroke-linecap:round;stroke-linejoin:round}
 .tab.on{color:var(--ink)} .tab.on svg{stroke:var(--red2)}
@@ -726,6 +751,21 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 /* visor incrustado: alto contenido, el zoom lo pone el propio visor de Drive */
 .doc .dv{width:100%;height:52vh;min-height:280px;border:0;display:block;background:#2a2526}
 .doc .dcar{padding:26px 12px;text-align:center;color:var(--ink3);font-size:12px;line-height:1.6}
+/* Pantalla completa del visor. Es CSS y no la Fullscreen API a proposito:
+   `requestFullscreen` sobre un elemento NO existe en iOS Safari, que es justo donde se lee un
+   documento con el movil en la mano. Una funcion que en la mitad de los aparatos no hace nada
+   es peor que no tenerla. */
+.doc.full{position:fixed;inset:0;z-index:9000;margin:0;border-radius:0;display:flex;
+  flex-direction:column;background:#0A0909}
+.doc.full .vcuerpo{flex:1;min-height:0;display:flex}
+.doc.full .dv{height:auto;min-height:0;flex:1}
+.vfull{margin-left:auto;background:none;border:1px solid var(--line);border-radius:7px;
+  width:26px;height:26px;padding:0;display:flex;align-items:center;justify-content:center;
+  color:var(--ink2);cursor:pointer;flex:none}
+.vfull:hover{color:var(--ink);border-color:var(--ink3)}
+.vfull svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round}
+.doc .dh .vchev{flex:none;margin-left:7px}
 .doc .da{display:block;padding:9px 12px;text-align:center;font-family:var(--mono);font-size:11px;
   color:var(--red2);border-top:1px solid var(--line);text-decoration:none}
 .cajsec{max-height:0;overflow:hidden;transition:max-height .45s var(--sal)}
@@ -827,6 +867,8 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
     <img class="marcagua" aria-hidden="true" src="data:image/png;base64,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" alt="">
     <div class="menu" id="menu" aria-hidden="true">
       <div class="caja">
+        <button data-mnu="sanciones" data-p>Sanciones<small>Ponerlas y decidir las pendientes</small></button>
+        <button data-mnu="cuota" data-p>Tu cuota<small>Lo que te toca pagar esta temporada</small></button>
         <button data-mnu="equipo" data-p>El equipo<small>Quién coordina cada unidad</small></button>
         <button data-mnu="ajustes" data-p>Ajustes<small>Notificaciones y sesión</small></button>
         <button data-mnu="buzon" data-p>Reportar<small>Un fallo o una mejora</small></button>
@@ -903,6 +945,8 @@ var HOY=(function(){
    DATOS — esquema REAL de app.html, contenido ficticio.
    ═══════════════════════════════════════════════════════════════════════════ */
 var UMBRAL=11.8;          /* ultimo valor conocido; lo recalcula `_umbral_()` con el panel */
+/* Red de seguridad para la maqueta. La cifra buena la calcula `_mediaEquipo_()` desde
+   `DATA.subsistemas`; esta constante solo se usa si esa lista viene vacia. */
 var MEDIA_EQ=10.9;
 var PD_NOM='Lois Carballo Sendón';   // semilla; con datos reales lo rederiva _rederivarPD_()
 /* Con el roster real, el PD es quien tenga el cargo — no el de la semilla. */
@@ -1054,6 +1098,14 @@ var backendOK=false, SESION=null;
    verificado—, asi que abrirla sin cuenta del dominio no enseña nada. Lo que esto evita
    es que el EQUIPO acabe usando sin querer una version a medias. */
 var CANAL='produccion';
+/* LA VERSION DEL RELEASE. La sella `publicar_web.py` al publicar a produccion con
+   `--release X.Y`; en beta y en local se queda vacia, que es la verdad: la beta no es
+   ninguna version, es lo que va camino de serlo.
+   Va SEPARADA de `BUILD` a proposito: `VERSION` dice QUE RELEASE es y `BUILD` dice QUE
+   CODIGO exacto. Entre dos releases la beta cambia de build sin cambiar de version, y
+   eso es justo lo que hay que poder distinguir al leer un reporte. */
+var VERSION='0.1';
+
 /* Quien puede usar la beta. Se deja en una funcion sola porque ensancharla es una linea:
    `|| _rangoBeta_()>=1` mete a los coordinadores. */
 function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; }
@@ -1153,15 +1205,52 @@ function _umbral_(){
   var media=hs.reduce(function(a,h){ return a+h; },0)/hs.length;
   return Math.max(UMBRAL_LO, Math.min(UMBRAL_HI, UMBRAL_FRAC*media));
 }
-function _apiParse(txt){ var j=null; try{ j=JSON.parse(txt); }catch(_){}
-  if(!j || j.ok!==true) throw new Error((j&&j.error)||"respuesta no válida del backend");
-  return j.data; }
+/* `_ApiTransito` marca los fallos que SI se reintentan: la peticion no llego entera. Se
+   distingue de un «no» del backend, que no se reintenta porque tiene criterio. */
+function _ApiTransito(m){ this.message=m; this.transito=true; }
+_ApiTransito.prototype=Object.create(Error.prototype);
+/* ═══ LOGIN Y SESION · GEMELO EN LA OTRA CARA ═══════════════════════════════════
+   Todo este bloque -`_gate_`, `_onCredencial_`, `_pintarLogin_`, `_arrancarGis_`,
+   `cerrarSesion`, `_apiParse` y el objeto `api`- esta **calcado** en el otro fichero. Es
+   deliberado: son dos artefactos autocontenidos y la CSP impide compartir codigo.
+
+   ⚠️ **CAMBIAR UNO SIN CAMBIAR EL OTRO ES COMO EMPIEZAN LAS DIVERGENCIAS.** Paso hoy con el
+   visor de documentos: tres copias, una mejora en una, y las otras dos sin enterarse.
+   Si tocas algo de aqui, abre el otro fichero antes de dar el cambio por hecho. (Mapa §5, D11.)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+function _apiParse(txt, accion){
+  var j=null; try{ j=JSON.parse(txt); }catch(_){}
+  /* Lo que vuelve no es JSON: es la pagina HTML de Google del 404 transitorio. */
+  if(!j) throw new _ApiTransito("respuesta no válida del backend");
+  if(j.ok===true) return j.data;
+  var err=String(j.error||"");
+  /* «acción desconocida: » con la accion VACIA = el cuerpo del POST se perdio por el camino
+     y el backend no vio ninguna accion. Nunca llego a ejecutarse nada, asi que se repite. */
+  if(accion && /^acci[oó]n desconocida/.test(err) && err.indexOf(accion)<0)
+    throw new _ApiTransito("el cuerpo del POST no llegó ("+err+")");
+  throw new Error(err||"respuesta no válida del backend");
+}
 var api={
+  /* TRES INTENTOS. Apps Script pierde el cuerpo del POST de vez en cuando (302->404) y
+     hasta ahora eso era un fallo a la cara del usuario: «no fui capaz de fichar». Se nota en
+     el fichaje y no en el resto porque las demas pantallas se refrescan solas y la siguiente
+     pasada tapaba el hueco. Misma regla que `rutinas/llamar.py`. */
   _post: async function(body){
     if(SESION&&SESION.token&&!body.token) body=Object.assign({},body,{token:SESION.token});
-    var r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify(body)});
-    return _apiParse(await r.text()); },
+    var accion=String(body.action||""), ultimo=null;
+    for(var i=0;i<3;i++){
+      if(i) await new Promise(function(ok){ setTimeout(ok, 600+i*800); });
+      try{
+        var r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+          body:JSON.stringify(body)});
+        return _apiParse(await r.text(), accion);
+      }catch(e){
+        /* Un «no» del backend no se reintenta; un fallo de red o de transito, si. */
+        if(e && !e.transito && !(e instanceof TypeError)) throw e;
+        ultimo=e;
+      }
+    }
+    throw ultimo || new Error("no se pudo hablar con el servidor"); },
   ping:      function(){ try{ fetch(BACKEND_URL+"?action=ping",{cache:"no-store"}).catch(function(){}); }catch(_){} },
   bootstrap: function(t){ var b={action:"bootstrap"}; if(t)b.token=t; return api._post(b); },
   quienSoy:  function(t){ return api._post({action:"quienSoy",token:t}); },
@@ -1176,8 +1265,18 @@ var api={
      porque no habia forma de pedirla: el panel enseñaba la semilla y sus botones solo
      tocaban memoria. Es la misma accion que usa el escritorio. */
   getSanciones: function(f){ return api._post({action:"getSanciones",filtro:f||{}}); },
+  /* Poner y decidir sanciones desde el movil (28/07). El backend ya las tenia: lo que
+     faltaba era que esta cara las ofreciera. */
+  pushSancion:  function(ss){ return api._post({action:"pushSancion",sanciones:ss}); },
+  decidirSancion: function(id,a,o){ return api._post(Object.assign({action:"decidirSancion",id:id,accion:a},o||{})); },
+  moverLimiteTarea: function(u,f){ return api._post({action:"moverLimiteTarea",url:u,fecha:f}); },
   pushParte: function(p){ return api._post({action:"pushParte",parte:p}); },
   ficharEntrada:    function(){ return api._post({action:"ficharEntrada"}); },
+  /* Preferencias de aviso (backend v45). Viven en el SERVIDOR y no en el movil porque el
+     filtro se aplica antes de enviar el push: callar en el navegador acaba con la
+     suscripcion revocada (`userVisibleOnly` obliga a mostrar algo por cada push). */
+  getNotis:         function(){ return api._post({action:"getNotis"}); },
+  guardarNotis:     function(t){ return api._post({action:"guardarNotis",tipos:t}); },
   ficharSalida:     function(tarea,just,cat){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat}); },
   getFichajeAbierto:function(){ return api._post({action:"getFichajeAbierto"}); },
   pausarFichaje:    function(){ return api._post({action:"pausarFichaje"}); },
@@ -1519,6 +1618,35 @@ function _ordenarFranjas_(r){
     cambio:   true
   };
 }
+/* EL MAPA DE CALOR · GEMELA de `_calorDe_(r, pond)` en `escritorio.html`.
+   Estaba INLINE aquí dentro de `_normReuM_` y aislada allí (mapa §5, D6): la misma cuenta
+   escrita dos veces y con dos formas, que es como acaban divergiendo. Ahora comparten nombre
+   y firma, así que un solo grep las encuentra juntas.
+
+   `pond=false` cuenta PERSONAS (cualquier valor > 0); `pond=true` suma los VALORES
+   (presencial+telemático=2, telemático=1). El móvil las necesita las dos y la llama dos veces.
+
+   ⚠️ `null` no es cero: es **bloque NO OFERTADO**. Con horario por día no todas las franjas
+   existen todos los días, y pintar un hueco muerto como «no puede nadie» es mentir. Por eso la
+   matriz nace a `null` y solo los bloques realmente ofertados pasan a 0.
+
+   ⚠️ Y el índice de `resp[nombre][i]` es la posición en `bloques`, **no** la franja: si
+   `bloques` se reordena (lo hace `_ordenarFranjas_`), hay que pasar aquí el reordenado y sus
+   respuestas alineadas. Mezclar los dos órdenes es lo que apuntaba a otra hora. */
+function _calorDe_(r, pond){
+  var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};
+  var cel=dias.map(function(){ return F.map(function(){ return null; }); });
+  bl.forEach(function(b){ if(cel[b[0]] && b[1]<F.length) cel[b[0]][b[1]]=0; });
+  Object.keys(resp).forEach(function(nom){
+    var v=resp[nom]||[];
+    for(var i=0;i<bl.length;i++){
+      var val=+v[i]||0; if(!(val>0)) continue;
+      var d=bl[i][0], f=bl[i][1];
+      if(cel[d] && cel[d][f]!=null) cel[d][f] += (pond ? val : 1);
+    }
+  });
+  return cel;
+}
 function _normReuM_(r){
   var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};
   /* null = bloque NO OFERTADO (con horario por día no todas las franjas existen todos los
@@ -1534,14 +1662,8 @@ function _normReuM_(r){
              : (Array.isArray(r.fijadaBl) ? r.fijadaBl : []);
   var _ord=_ordenarFranjas_({franjas:F, bloques:bl, fijadaBl:_fijPrev});
   F=_ord.franjas; bl=_ord.bloques; _fijPrev=_ord.fijadaBl;
-  var calor=dias.map(function(){ return F.map(function(){ return null; }); });
-  var pond =dias.map(function(){ return F.map(function(){ return null; }); });
-  bl.forEach(function(b){ if(calor[b[0]] && b[1]<F.length){ calor[b[0]][b[1]]=0; pond[b[0]][b[1]]=0; } });
-  Object.keys(resp).forEach(function(nom){
-    var v=resp[nom]||[];
-    for(var i=0;i<bl.length;i++){ var val=+v[i]||0; if(val>0){ var d=bl[i][0], f=bl[i][1];
-      if(calor[d]&&calor[d][f]!=null){ calor[d][f]++; pond[d][f]+=val; } } }
-  });
+  var calor=_calorDe_({dias:dias, franjas:F, bloques:bl, resp:resp}, false);
+  var pond =_calorDe_({dias:dias, franjas:F, bloques:bl, resp:resp}, true);
   /* `fijada` viene del backend como OBJETO con los indices ({fecha,franjas,bloques,label}).
      Antes se colapsaba a la etiqueta y se perdian los indices, asi que el mapa no podia
      pintar el hueco elegido en verde aunque el aviso lo prometiera. */
@@ -1692,10 +1814,15 @@ var CARGA={partes:false, fichaje:false, reuniones:false};
    pantalla, no de la persona (el mismo miembro puede querer una cosa en el movil y
    otra en el escritorio). Se lee con `_pref_` para que un localStorage bloqueado
    -Safari privado lo hace- no reviente el arranque entero. */
-var PREF={docsSiempre:false, escala:''};        // '' | 'tx-l' | 'tx-xl'
+/* `ocultar` es un mapa por pestaña, no una bandera por cada una: ver `OCULTABLES`. */
+var PREF={ocultar:{}, escala:''};               // '' | 'tx-l' | 'tx-xl'
 try{ var _pr=JSON.parse(localStorage.getItem('sol_pref')||'null');
-     if(_pr && typeof _pr==='object') for(var _k in PREF) if(_k in _pr)
-       PREF[_k]=(typeof PREF[_k]==='boolean') ? !!_pr[_k] : String(_pr[_k]||'');
+     if(_pr && typeof _pr==='object') for(var _k in PREF) if(_k in _pr){
+       /* `ocultar` es un objeto y hay que copiarlo como tal: pasandolo por `String()`
+          -como el resto- se guardaba «[object Object]» y la preferencia se perdia. */
+       if(_k==='ocultar') PREF.ocultar=(_pr.ocultar && typeof _pr.ocultar==='object') ? _pr.ocultar : {};
+       else PREF[_k]=(typeof PREF[_k]==='boolean') ? !!_pr[_k] : String(_pr[_k]||'');
+     }
 }catch(_){}
 function _guardarPref_(){ try{ localStorage.setItem('sol_pref',JSON.stringify(PREF)); }catch(_){} }
 /* Se aplica sobre el `body` como clase y no como estilo en linea porque el modal se crea
@@ -1813,13 +1940,25 @@ async function _onCredencial_(resp,_silente){
         'border-radius:9px;padding:10px 16px;text-decoration:none">Ir al panel</a>');
       return;
     }
-    _pintarVerComo_();                                     // admin (solaris@): selector «ver como»; resto: sin conmutador
-    _pintarCabecera_();                                    // la cabecera muestra al miembro (real o «visto como»)
-    pintar();                                              // LA UNICA pintada del arranque
-    var g=document.getElementById('loginGate'); if(g) g.remove();   // y ahora se enseña
-    var bs=$('#btnSalir'); if(bs) bs.style.display='';     // sí hay salir/cambiar de cuenta
-    _arrancarRefrescoVivo_();                              // a partir de aqui se alimenta sola
+    /* SIN NOTIFICACIONES NO SE ENTRA (Daniel, 28/07). Va aqui, con la identidad ya
+       resuelta y con el gate todavia puesto: si falta el permiso, la app no llega a
+       pintarse. `_seguir_` es lo que habria pasado despues, para poder continuar sin
+       recargar en cuanto lo concedan. */
+    var _seguir_=function(){
+      _pintarVerComo_();                                   // admin (solaris@): selector «ver como»; resto: sin conmutador
+      _pintarCabecera_();                                  // la cabecera muestra al miembro (real o «visto como»)
+      pintar();                                            // LA UNICA pintada del arranque
+      var g=document.getElementById('loginGate'); if(g) g.remove();   // y ahora se enseña
+      var bs=$('#btnSalir'); if(bs) bs.style.display='';   // sí hay salir/cambiar de cuenta
+      _arrancarRefrescoVivo_();                            // a partir de aqui se alimenta sola
+    };
+    /* El gate de notificaciones ya no esta aqui: corre ANTES del login (ver el arranque,
+       al final del fichero). Aqui solo queda guardar la suscripcion, que necesita sesion.
+       Daniel: «que te ponga antes de siquiera poder hacer login». */
+    try{ _pushInit_(); }catch(_){}
+    _seguir_();
   }catch(e){
+
     if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
     _gate_(SPLASH+'<div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+
       ((e&&e.message)||e)+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
@@ -1863,7 +2002,16 @@ function cerrarSesion(){
   location.reload();
 }
 
-function mediaSub(u){for(var i=0;i<DATA.subsistemas.length;i++) if(DATA.subsistemas[i].u===u) return DATA.subsistemas[i].media; return MEDIA_EQ;}
+function mediaSub(u){for(var i=0;i<DATA.subsistemas.length;i++) if(DATA.subsistemas[i].u===u) return DATA.subsistemas[i].media; return _mediaEquipo_();}
+/* La media de horas por persona del equipo entero, PONDERADA por cuanta gente tiene cada
+   subsistema: la media de las medias daria el mismo peso a Org&Mark (1 persona) que a
+   Avionica (8). `DATA.subsistemas` lo manda el backend a todo el mundo -son agregados
+   sin nombres-, asi que esto vale igual para un miembro raso que para el PD. */
+function _mediaEquipo_(){
+  var ss=DATA.subsistemas||[], h=0, n=0;
+  for(var i=0;i<ss.length;i++){ var c=Number(ss[i].n)||0; h+=(Number(ss[i].media)||0)*c; n+=c; }
+  return n ? h/n : MEDIA_EQ;
+}
 
 /* tareas asignadas — la imputación del fichaje va SOBRE ESTAS, no a mano */
 var TAREAS=[
@@ -2007,7 +2155,111 @@ var ST={vista:'estado', libro:false, modo:'vivo', rol:'miembro',
   sel:null            /* Map de la rejilla de cubrir */
 };
 var SEQ=6;
-/* rol: gatea exactamente lo mismo que app.html — quién revisa, quién sanciona */
+/* La misma busqueda con distinto nombre en cada cara; se envuelve para que el bloque de
+   autoridad de abajo sea IDENTICO en las dos y un diff lo confirme de un vistazo. */
+function _mSanc_(n){ return (DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0]||null; }
+/* ═══ AUTORIDAD DE SANCIONES · GEMELA (movil/escritorio) ═══════════════════════════
+   Modelo dicho por Daniel el 28/07. Ver `docs/decisiones-app.md`.
+
+     rango 3 (PD) -> cualquiera, incluido el mismo
+     rango 2      -> cualquiera, incluido ellos mismos, SALVO al PD
+     rango 1      -> a si mismo y a los de su jurisdiccion
+     rango 0      -> nada, y NO VE la opcion
+
+   ⚠️ ESTO NO ES `rangoNom`. El rango de admin y la autoridad DOCUMENTAL son dos cosas
+   distintas desde hoy, y lo que obliga a separarlas es Bruno: rango 2 de admin y **cero**
+   autoridad documental. Con un solo rango no se puede decir eso sin darle tambien los papeles.
+
+   ⚠️ Y ESTO ES DE CARA, NO SEGURIDAD. El backend solo exige rango>=1 en `pushSancion`: la
+   frontera de verdad esta ahi y todavia no comprueba a QUIEN se sanciona. Mientras tanto, esto
+   evita el error honesto, no al que quiera saltarselo. */
+var PD_SANC = 'Daniel V\u00e1zquez Pi\u00f1eiro';
+/* La tabla es EXPLICITA a proposito: el modelo dice que el cargo no basta -«no necesariamente
+   por pertenecer al consejo se tendra rango 1 sino rango 0»- y que lo que da el rango 1 es
+   tener gente debajo. Deducirlo del cargo daria autoridad a quien no manda sobre nadie. */
+var RANGO_SANC = {
+  'Daniel V\u00e1zquez Pi\u00f1eiro': 3,
+  'Jos\u00e9 Manuel Torres Rodr\u00edguez': 2,
+  /* Bruno es la EXCEPCION del modelo: coordinador de Logistica con rango 2 de admin y ninguna
+     autoridad documental. Daniel: «es un poco como el Reaper de ir persiguiendo que se cumplan
+     los objetivos logisticos». */
+  'Bruno Ara\u00fajo Gonz\u00e1lez': 2
+};
+/* LAS SUBCOORDINACIONES. Un subsistema puede partirse en equipos con su propio
+   subcoordinador, y **un subcoordinador manda sobre SU equipo, no sobre la unidad**.
+   Estructura de hoy (Daniel, 28/07):
+     Avionica -> coordinador Oscar - subcoordinacion Software (Oscar) - Hardware (Breixo)
+
+   El coordinador de la unidad sigue mandando sobre la unidad ENTERA, subequipos incluidos:
+   Oscar llega a todo Avionica sea por coordinador o por subcoordinador de Software.
+
+   Se declara como ESTRUCTURA y no como una excepcion con nombre y apellidos, porque no lo es:
+   la siguiente subcoordinacion que se cree es UNA LINEA aqui y no un caso especial repartido
+   por el codigo. La gente va nombrada una a una porque «Hardware» no es un campo del roster:
+   es un reparto de trabajo, y deducirlo de algo seria inventarse una relacion que no existe.
+   Los nombres son los del ROSTER, completos: puestos por nombre de pila no casaban con nadie
+   y Breixo se quedaba sin equipo, en silencio. */
+var SUBCOORD = [
+  { unidad:'Aviónica', equipo:'Hardware', quien:'Breixo Pombar Fernández',
+    gente:['Breixo Pombar Fernández', 'Aaron Parada Valiño', 'Yoel Clemente González'] }
+];
+/* La subcoordinacion de alguien, o `null`. */
+function _subcoordDe_(n){
+  for (var i=0;i<SUBCOORD.length;i++) if (SUBCOORD[i].quien === String(n)) return SUBCOORD[i];
+  return null;
+}
+function rangoSanc(nombre){
+  var n = String(nombre || '');
+  if (RANGO_SANC[n] != null) return RANGO_SANC[n];
+  /* Rango 1 = tiene gente bajo su jurisdiccion: los coordinadores (su unidad) y quien tenga
+     jurisdiccion propia declarada (un subcoordinador). */
+  if (_subcoordDe_(n)) return 1;
+  var m = _mSanc_(n);
+  if (m && m.cargo === 'Coordinador') return 1;
+  return 0;
+}
+/* ¿Puede `actor` sancionar a `objetivo`? Una sola puerta: si alguna pantalla decide esto por su
+   cuenta, en dos semanas dira otra cosa que esta. */
+function puedeSancionarA(actor, objetivo){
+  var r = rangoSanc(actor);
+  if (r <= 0) return false;
+  if (r >= 3) return true;                                   // el PD, a cualquiera
+  if (r === 2) return String(objetivo) !== PD_SANC;          // rango 2, a todos menos al PD
+  /* Rango 1: a si mismo y a los suyos. */
+  if (String(objetivo) === String(actor)) return true;
+  var a = _mSanc_(actor), o = _mSanc_(objetivo);
+  /* Coordinador de la unidad: la unidad ENTERA, subequipos incluidos. Se mira ANTES que la
+     subcoordinacion porque Oscar es las dos cosas y lo que manda es lo mas amplio. */
+  if (a && a.cargo === 'Coordinador' && o && a.unidad && a.unidad === o.unidad) return true;
+  /* Subcoordinador: SU equipo y nada mas. No se le suma el subsistema — eso es justo lo
+     que lo distingue del coordinador. */
+  var sc = _subcoordDe_(String(actor));
+  if (sc) return sc.gente.indexOf(String(objetivo)) >= 0;
+  return false;
+}
+/* A quien puede sancionar, ya filtrado. Lo usan los dos formularios: que la lista salga de
+   la MISMA regla que el permiso es lo que impide ofrecer a alguien y que el envio falle. */
+/* QUIEN MANDA A EFECTOS DE SANCIONES · GEMELA (movil/escritorio).
+   No es `yoNombre()`: ese sale de `YO`, y **`YO` se reescribe con «ver como»**, asi que el PD
+   mirando la ficha de otro heredaba la jurisdiccion de ese otro. El backend (v49) compara
+   contra `ident.nombre` -el de la SESION-, de modo que la cara y el servidor estaban
+   respondiendo a preguntas distintas. La autoridad no se hereda mirando. */
+function _actorSanc_(){
+  if (typeof backendOK !== 'undefined' && backendOK && SESION && SESION.nombre) return SESION.nombre;
+  return yoNombre();               // demo local (?demo), donde no hay sesion
+}
+function sancionablesPor(actor){
+  return (DATA.miembros || []).filter(function(m){
+    return m && !m.baja && puedeSancionarA(actor, m.nombre);
+  });
+}
+/* rol: gatea exactamente lo mismo que app.html — quién revisa, quién sanciona.
+   ⚠️ AUTORIDAD TRIPLICADA a proposito (mapa §5, D9): `rangoNom`, `coordinadorDe`,
+   `revisoresDe` y `puedeDecidir*` existen aqui, en `escritorio.html` y en el backend
+   (`_rangoNom_`, `_coordinadorDe_`, `_revisoresDe_`, `_puedeDecidir_`). **El backend es
+   la unica frontera de seguridad**; las dos caras llevan su copia solo para PINTAR. Se
+   llaman igual en los tres sitios para que un grep las encuentre juntas: si cambias una
+   regla de autoridad, son TRES ficheros. */
 /* Rol efectivo: en login REAL manda YO.cargo (el conmutador ST.rol es solo de la demo). Así el
    PD/coordinador que entra de verdad ve «Convocar reunión», el Panel PD, etc. */
 function esCoord(){ return ST.rol==='coord' || ST.rol==='pd' || (typeof YO!=='undefined' && YO && (YO.cargo==='Coordinador' || YO.cargo==='Project Director')); }
@@ -2019,6 +2271,283 @@ function yoNombre(){
   return esPD()?PD_NOM : (ST.rol==='coord'?'Xoán Bermúdez Rial':YO.nombre);
 }
 
+/* ═══ SANCIONES DESDE EL MOVIL ═══════════════════════════════════════════════════
+   Daniel (28/07): «que lo haya en movil para poner sanciones y aprobar sanciones, tal vez en
+   los 3 puntos de arriba». Vive en el menu ⋮ y no en una pestaña porque es cosa del PD y de
+   los coordinadores: en la barra le quitaria sitio a todo el mundo para servir a cuatro.
+
+   `RRI_MOTIVOS` son los del catalogo real (ver `datos/rri_motivos.json`); el de plazo es el
+   unico que arrastra tarea y fecha. */
+/* El formulario ENTERO, para que sobreviva a los repintados. Antes solo guardaba el
+   motivo y la fecha: al cambiar el motivo se repinta el modal y la persona elegida volvia
+   al primero de la lista -«me cambia a Aarón por la puta cara»-. Un formulario que se
+   borra solo no es un fallo de pintado: es que el estado estaba en el DOM. */
+var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
+var RRI_MOTIVOS=[
+  ['30i','Faltar a un turno de trabajo sin justificar', -1],
+  ['30g','No rellenar un formulario obligatorio', -1],
+  ['30h','No cubrir la disponibilidad de una reunión', -1],
+  ['plazo','Incumplir el plazo de una tarea', -1],
+  ['libre','Otro · lo escribo yo', -1]
+];
+/* EL ORDEN DE LOS SUBSISTEMAS, deducido y no escrito a mano: es el orden en que vienen los
+   miembros del panel, que es el que trae Notion. Una constante aqui se quedaria vieja el dia
+   que se reordene alla, y nadie se enteraria hasta que alguien mirase. */
+function _ordenSubs_(){
+  var vis=[];
+  (DATA.miembros||[]).forEach(function(m){
+    var u=m&&m.unidad; if(u && vis.indexOf(u)<0) vis.push(u);
+  });
+  return vis;
+}
+/* Agrupa a quien puedas sancionar: por subsistema en el orden de Notion, y dentro de cada uno
+   EL COORDINADOR PRIMERO y el resto alfabetico. Daniel: «y con el coordinador de primero». */
+function _gruposSanc_(actor, filtro){
+  var f=_sinTildes_(String(filtro||'').trim().toLowerCase());
+  var gente=sancionablesPor(actor).filter(function(m){
+    if(!f) return true;
+    return _sinTildes_((m.nombre||'').toLowerCase()).indexOf(f)>=0 ||
+           _sinTildes_((m.pila||'').toLowerCase()).indexOf(f)>=0 ||
+           _sinTildes_((m.unidad||'').toLowerCase()).indexOf(f)>=0;
+  });
+  var orden=_ordenSubs_(), por={};
+  gente.forEach(function(m){ var u=m.unidad||'—'; (por[u]=por[u]||[]).push(m); });
+  return orden.filter(function(u){ return por[u]; }).map(function(u){
+    var l=por[u].slice().sort(function(a,b){
+      var ca=(a.cargo==='Coordinador')?0:1, cb=(b.cargo==='Coordinador')?0:1;
+      if(ca!==cb) return ca-cb;                       // el coordinador, primero
+      return String(a.nombre||'').localeCompare(String(b.nombre||''), 'es');
+    });
+    return {unidad:u, gente:l};
+  });
+}
+function _sancionesHTML_(){
+  /* El gate es el RANGO DE SANCIONES, no el cargo: Bruno tiene rango 2 sin ser nada en los
+     documentos, y un consejero sin gente debajo es rango 0 aunque este en el consejo. */
+  if(rangoSanc(_actorSanc_())<1) return '<div class="mtit">Sanciones</div>'+
+    '<div class="msub">Esto no es para ti.</div>';
+  /* La lista sale de la MISMA regla que el permiso. Ofrecer a alguien y que luego el envio
+     falle es peor que no ofrecerlo: parece un fallo cuando es la norma. Y uno mismo SI esta,
+     en los tres rangos, que es parte del modelo. */
+  var grupos=_gruposSanc_(_actorSanc_(), SANC_FORM.filtro);
+  var nTotal=sancionablesPor(_actorSanc_()).length;
+  var esPlazo=(SANC_FORM.motivo==='plazo');
+  /* Solo las tareas VIVAS y con enlace a Notion: sin `url` no se puede mover la fecha, y
+     ofrecerla seria prometer algo que va a fallar al guardar. */
+  var tareas=(TAREAS||[]).filter(function(t){
+    return t && t.url && !/hech|finaliz|complet|termin|cerrad/i.test(t.e||''); });
+  return '<div class="mtit">Sanciones</div>'+
+    '<div class="msub">Ponerlas y decidirlas. El comunicado sigue saliendo del escritorio.</div>'+
+    '<h4>Poner una sanción</h4><div class="tarj">'+
+      /* BUSCADOR, no desplegable. Con 40 personas un `<select>` es una lista que hay que
+         recorrer con el pulgar; aquí se escriben tres letras. Filtra por nombre, pila o
+         subsistema, y SIN TILDES: «aaron» encuentra a «Aarón». */
+      '<label class="campo"><span class="sc">A quién</span>'+
+        '<input id="snFiltro" placeholder="Escribe para filtrar · nombre o subsistema" '+
+        'value="'+esc(SANC_FORM.filtro||'')+'" autocomplete="off"></label>'+
+      '<div class="sanlista" id="snLista">'+_listaSancHTML_(grupos)+'</div>'+
+      '<label class="campo"><span class="sc">Motivo</span><select id="snMotivo">'+
+        '<option value="">— elige —</option>'+
+        RRI_MOTIVOS.map(function(r){ return '<option value="'+r[0]+'"'+(SANC_FORM.motivo===r[0]?' selected':'')+'>'+esc(r[1])+'</option>'; }).join('')+
+      '</select></label>'+
+      (SANC_FORM.motivo==='libre'
+        ? '<label class="campo"><span class="sc">Cuál</span><input id="snLibre" placeholder="Qué ha pasado" value="'+esc(SANC_FORM.libre||'')+'"></label>'+
+          '<label class="campo"><span class="sc">Artículo del RRI</span><input id="snArt" value="'+esc(SANC_FORM.art||'libre')+'"></label>'
+        : '')+
+      (esPlazo
+        ? (tareas.length
+            ? '<label class="campo"><span class="sc">Qué tarea</span><select id="snTarea">'+
+                '<option value="">— elige la tarea —</option>'+
+                tareas.map(function(t){ return '<option value="'+esc(t.url)+'"'+(SANC_FORM.tarea===t.url?' selected':'')+'>'+esc(t.n||t.nombre||'(sin título)')+
+                  (t.l?' · vencía '+esc(_isoADMY_(t.l)):'')+'</option>'; }).join('')+
+              '</select></label>'+
+              '<label class="campo"><span class="sc">Plazo nuevo</span><input type="date" id="snPlazo" value="'+esc(SANC_FORM.plazo||'')+'"></label>'+
+              '<p class="rnota" style="margin:0 0 10px">El plazo nuevo se escribe <b>en Notion</b>. '+
+              'Si eso falla, la sanción <b>no</b> se pone: no tiene sentido sancionar por un plazo y '+
+              'dejar la tarea con la fecha vencida.</p>'
+            : '<p class="rnota" style="margin:0 0 10px;color:var(--warn)">No hay ninguna tarea viva con '+
+              'enlace a Notion, así que no se puede mover ningún plazo. Elige otro motivo.</p>')
+        : '')+
+      '<label class="campo"><span class="sc">Puntos</span><input type="number" id="snPts" value="'+esc(SANC_FORM.pts||'-1')+'" step="1" min="-5" max="0"></label>'+
+      '<button class="btn pri full" data-p id="btnSanc">Poner la sanción</button>'+
+      '<p class="rnota" id="snMsg" style="margin:8px 0 0"></p>'+
+    '</div>'+
+    '<h4>Pendientes de decidir</h4>'+_sancColaHTML_();
+}
+/* La lista de personas. Se pinta aparte para poder rehacerla al teclear SIN tocar el resto
+   del formulario: repintar el modal entero es lo que borraba lo ya elegido. */
+function _listaSancHTML_(grupos){
+  if(!grupos.length) return '<p class="rnota" style="margin:0;padding:8px 2px">Nadie con ese filtro.</p>';
+  return grupos.map(function(g){
+    return '<div class="sangrupo">'+esc(g.unidad)+'</div>'+
+      g.gente.map(function(m){
+        return '<button class="sanper'+(SANC_FORM.quien===m.nombre?' on':'')+'" data-sanq="'+esc(m.nombre)+'" data-p>'+
+          '<b>'+esc(m.nombre)+'</b>'+(m.cargo==='Coordinador'?'<i>coord.</i>':'')+'</button>';
+      }).join('');
+  }).join('');
+}
+function _sancColaHTML_(){
+  if(SANC_M===null) return '<div class="tarj">'+vacio('Cargando…','Buscando qué espera decisión.','',true)+'</div>';
+  if(!SANC_M.length) return '<div class="tarj">'+vacio('Nada pendiente','Ninguna sanción espera decisión.','',false)+'</div>';
+  var porLote={};
+  SANC_M.forEach(function(x){ var k=x.lote||'(sueltas)'; (porLote[k]=porLote[k]||[]).push(x); });
+  return Object.keys(porLote).map(function(k){
+    var it=porLote[k], suelta=(k==='(sueltas)');
+    return '<div class="tarj"><div class="lote"><div class="lote-h">'+
+      '<b>'+it.length+' '+(it.length===1?'sanción':'sanciones')+'</b>'+
+      '<span class="mono" style="color:var(--red2)">'+esc(k)+'</span></div>'+
+      it.map(function(x){
+        return '<div class="lote-i" style="flex-wrap:wrap;gap:6px">'+
+          '<span class="n">'+esc(_pilaDeM_(x.nombre)||x.nombre||'')+'</span>'+
+          '<span class="mono" style="color:var(--ink3);font-size:10.5px;flex:1">'+esc(x.motivo||'')+
+            ' · '+(+x.puntos||0)+'</span>'+
+          (suelta
+            ? '<button class="btn mini" data-sok="'+esc(x.id)+'" data-p>Aprobar</button>'+
+              '<button class="btn mini" data-sno="'+esc(x.id)+'" data-p style="color:var(--warn);border-color:var(--warn)">Rechazar</button>'
+            : '<button class="btn mini" data-smarc="'+esc(x.id)+'" data-dec="aceptar" data-p'+
+                (x.dec==='aceptar'?' class="btn mini on"':'')+'>Sí</button>'+
+              '<button class="btn mini" data-smarc="'+esc(x.id)+'" data-dec="rechazar" data-p>No</button>')+
+        '</div>';
+      }).join('')+
+      (suelta ? ''
+        : '<p class="rnota">Dentro de un lote no se decide una a una: se marca cada una y el '+
+          'bloque se cierra entero, porque aprobar de una en una podía aplicar medio bloque.</p>'+
+          '<button class="btn full" data-scerrar="'+esc(k)+'" data-p>Cerrar el bloque entero</button>')+
+    '</div></div>';
+  }).join('');
+}
+/* Abre la pantalla y la deja cableada. Se vuelve a llamar despues de cada accion en vez de
+   repintar a mano: asi la cola y el formulario no pueden quedar diciendo cosas distintas. */
+async function _abrirSanciones_(){
+  abrirModal(_sancionesHTML_());
+  _cablearSanciones_();
+  if(SANC_M===null){ await _cargarSancionesM_(); if($('#modal').classList.contains('on')){
+    abrirModal(_sancionesHTML_()); _cablearSanciones_(); } }
+}
+function _cablearSanciones_(){
+  var val=function(id){ var e=$('#'+id); return e?e.value:''; };
+  var msg=function(t,mal){ var b=$('#snMsg'); if(b){ b.textContent=t; b.style.color=mal?'var(--warn)':'var(--ink3)'; } };
+
+  /* LO PRIMERO: guardar TODO lo escrito antes de cualquier repintado. Esto es exactamente lo
+     que faltaba: al cambiar el motivo se repintaba el modal y la persona elegida volvia al
+     primero de la lista. El estado vivia en el DOM, y el DOM se rehace. */
+  function recoger(){
+    ['snMotivo','snLibre','snArt','snTarea','snPlazo','snPts','snFiltro'].forEach(function(id){
+      var e=$('#'+id); if(!e) return;
+      SANC_FORM[{snMotivo:'motivo',snLibre:'libre',snArt:'art',snTarea:'tarea',
+                 snPlazo:'plazo',snPts:'pts',snFiltro:'filtro'}[id]]=e.value;
+    });
+  }
+  function repintar(){ recoger(); abrirModal(_sancionesHTML_()); _cablearSanciones_(); }
+
+  /* Elegir persona NO repinta el formulario: solo se marca en la lista. Repintar por esto
+     seria volver a tirar lo escrito, que es el fallo que se acaba de arreglar. */
+  $$('[data-sanq]').forEach(function(b){
+    b.onclick=function(){
+      SANC_FORM.quien=b.dataset.sanq;
+      $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
+      var m=$('#snMsg'); if(m){ m.textContent='A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'; m.style.color='var(--ink3)'; }
+    };
+  });
+  /* Teclear rehace SOLO la lista, no el formulario. Y no pierde el foco ni el cursor. */
+  var fi=$('#snFiltro');
+  if(fi) fi.oninput=function(){
+    SANC_FORM.filtro=fi.value;
+    var c=$('#snLista'); if(!c) return;
+    c.innerHTML=_listaSancHTML_(_gruposSanc_(_actorSanc_(), SANC_FORM.filtro));
+    $$('[data-sanq]',c).forEach(function(b){
+      b.onclick=function(){
+        SANC_FORM.quien=b.dataset.sanq;
+        $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
+      };
+    });
+  };
+
+  /* El motivo decide QUE MAS se pide, asi que al cambiarlo hay que repintar. Pero se recoge
+     todo antes, y `_sancionesHTML_` vuelve a pintar lo elegido. */
+  var mo=$('#snMotivo');
+  if(mo) mo.onchange=function(){ repintar(); };
+  var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
+
+  var bt=$('#btnSanc');
+  if(bt) bt.onclick=async function(){
+    var quien=SANC_FORM.quien, mot=val('snMotivo'), pts=parseInt(val('snPts'),10);
+    if(!quien){ msg('Elige a quién: pulsa un nombre de la lista.', true); return; }
+    if(!mot){ msg('Elige el motivo.', true); return; }
+    if(!(pts<=0)){ msg('Los puntos de una sanción son 0 o negativos.', true); return; }
+    var art=mot, texto='';
+    RRI_MOTIVOS.forEach(function(r){ if(r[0]===mot) texto=r[1]; });
+    if(mot==='libre'){
+      texto=(val('snLibre')||'').trim(); art=(val('snArt')||'libre').trim();
+      if(!texto){ msg('Escribe qué ha pasado.', true); return; }
+    }
+    var urlTarea='', plazo='';
+    if(mot==='plazo'){
+      urlTarea=val('snTarea'); plazo=val('snPlazo');
+      if(!urlTarea){ msg('Elige la tarea cuyo plazo se incumplió.', true); return; }
+      if(!plazo){ msg('Pon el plazo nuevo: sancionar por un plazo y no darle otro no arregla nada.', true); return; }
+      var t=(TAREAS||[]).filter(function(x){ return x.url===urlTarea; })[0];
+      texto='Incumplir el plazo de «'+((t&&(t.n||t.nombre))||'una tarea')+'»';
+      art='plazo';
+    }
+    if(typeof backendOK==='undefined' || !backendOK || !SESION){
+      msg('Sin conexión no se puede: esto escribe en la cola de verdad.', true); return; }
+    bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando…';
+    try{
+      /* EL ORDEN IMPORTA: primero Notion, luego la sancion. Si Notion falla no se sanciona;
+         al reves quedaria la sancion puesta y la tarea con la fecha vieja, que es la unica de
+         las dos combinaciones que no se ve mirando la cola. */
+      if(mot==='plazo'){
+        msg('Moviendo el plazo en Notion…');
+        await api.moverLimiteTarea(urlTarea, plazo);
+      }
+      await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual'}]);
+      SANC_M=null; SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
+      tost('Sanción puesta a '+(_pilaDeM_(quien)||quien)+'.'+(mot==='plazo'?' Plazo movido en Notion.':''));
+      _abrirSanciones_();
+    }catch(e){
+      bt.disabled=false; bt.textContent=prev;
+      msg('No se pudo: '+((e&&e.message)||e), true);
+    }
+  };
+
+  /* Sueltas: se deciden una a una. */
+  $$('[data-sok]').forEach(function(b){ b.onclick=function(){ _decidirSancM_(b.dataset.sok,'aprobar',b); }; });
+  $$('[data-sno]').forEach(function(b){ b.onclick=function(){ _decidirSancM_(b.dataset.sno,'rechazar',b); }; });
+  /* De lote: se MARCA, y el bloque se cierra entero. */
+  $$('[data-smarc]').forEach(function(b){
+    b.onclick=async function(){
+      b.disabled=true;
+      try{ await api.decidirSancion(b.dataset.smarc,'marcar',{decision:b.dataset.dec});
+        (SANC_M||[]).forEach(function(x){ if(String(x.id)===b.dataset.smarc) x.dec=b.dataset.dec; });
+        abrirModal(_sancionesHTML_()); _cablearSanciones_();
+      }catch(e){ b.disabled=false; tost('No se pudo marcar: '+((e&&e.message)||e)); }
+    };
+  });
+  $$('[data-scerrar]').forEach(function(b){
+    b.onclick=async function(){
+      var lote=b.dataset.scerrar;
+      var it=(SANC_M||[]).filter(function(x){ return (x.lote||'(sueltas)')===lote; });
+      var sinMarcar=it.filter(function(x){ return !x.dec; });
+      if(sinMarcar.length){ tost('Faltan '+sinMarcar.length+' por marcar: el bloque se cierra entero.'); return; }
+      b.disabled=true; b.textContent='Cerrando…';
+      /* EN SERIE: cada `decidirSancion` coge el LockService del backend, y en paralelo se
+         pisan entre ellas. Es lento y es lo correcto. */
+      try{
+        for(var i=0;i<it.length;i++)
+          await api.decidirSancion(it[i].id, it[i].dec==='rechazar'?'rechazar':'aprobar', {});
+        SANC_M=null; tost('Bloque cerrado · '+it.length+' sanciones.'); _abrirSanciones_();
+      }catch(e){ b.disabled=false; b.textContent='Cerrar el bloque entero';
+        tost('Se quedó a medias: '+((e&&e.message)||e)); }
+    };
+  });
+}
+async function _decidirSancM_(id, accion, b){
+  b.disabled=true;
+  try{ await api.decidirSancion(id, accion, {});
+    SANC_M=null; tost(accion==='aprobar'?'Sanción aprobada.':'Sanción rechazada.'); _abrirSanciones_();
+  }catch(e){ b.disabled=false; tost('No se pudo: '+((e&&e.message)||e)); }
+}
 /* ── MODAL (mismo patrón que app.html) ─────────────────────────────────── */
 function abrirModal(html){
   $('#modal-body').innerHTML=html;
@@ -2134,15 +2663,13 @@ function medidorHTML(){
     /* La linea de puntitos se retiro (Daniel, 27/07): con el medidor circular basta. Decia
        lo mismo dos veces y encima en horizontal, que es la lectura que el anillo evita. */
 
-    '<div class="medlado">'+
-      '<div class="medley">'+
-        (est==='elegible'?'<b>Elegible.</b>':est==='evaluacion'?'<b style="color:var(--red2)">En evaluación.</b>':'<b>Sin expediente.</b>')+
-        (p>3
-          ? ' Te quedan <b>'+(p-3)+'</b> punto'+((p-3)===1?'':'s')+' antes de la zona crítica.'
-          : ' Estás en <b>zona crítica</b>: por debajo de 2 puntos se abre expediente.')+
-      '</div>'+
-      '<button class="btn mini" data-p id="btnLibro">Desglose de puntos</button>'+
+    '<div class="medley">'+
+      (est==='elegible'?'<b>Elegible.</b>':est==='evaluacion'?'<b style="color:var(--red2)">En evaluación.</b>':'<b>Sin expediente.</b>')+
+      (p>3
+        ? ' Te quedan <b>'+(p-3)+'</b> punto'+((p-3)===1?'':'s')+' antes de la zona crítica.'
+        : ' Estás en <b>zona crítica</b>: por debajo de 2 puntos se abre expediente.')+
     '</div>'+
+    '<button class="btn mini" data-p id="btnLibro" style="margin-top:11px">Desglose de puntos</button>'+
   '</div>'+
   '<div class="libro" id="libro"><div id="libroIn" style="padding-top:6px">'+
     (MOVS.length ? MOVS.map(function(m){
@@ -2290,6 +2817,25 @@ function armarMedidor(silencioso){
    ═══════════════════════════════════════════════════════════════════════════ */
 var K_BAR=13.6;
 function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
+/* LA COMPARATIVA, pegada a la barra (Daniel, 28/07: «un espacio abajo en el mismo div»).
+
+   Dos filas y no cuatro:
+   · **vs mes anterior** — lo unico que dice si vas mejor o peor que tu, y no lo dice nada mas
+     en toda la app. Necesita `YO.hAnt`; mientras el backend no lo mande, la fila no se pinta
+     (en vez de inventarse un 0, que saldria como «+100 %»).
+   · **vs equipo** — la media por persona del equipo. Es INDIVIDUAL: el ranking dice en que
+     puesto estas, no cuanto te separa de la media, que es otra pregunta.
+
+   Se cayeron a proposito «vs objetivo» (el objetivo ya es la marca de la propia barra, tres
+   pixeles mas arriba) y «vs unidad» (Daniel: «el de vs unidad tambien [lo borraria]»). */
+function _compHorasHTML_(base){
+  var f='';
+  if(typeof YO.hAnt==='number' && YO.hAnt>0)
+    f+=deltaHTML('vs. '+(YO.mesAnt||'mes anterior'), base, YO.hAnt, nf(YO.hAnt,1)+' h en '+(YO.mesAnt||'el mes anterior'));
+  var me=_mediaEquipo_();
+  if(me>0) f+=deltaHTML('vs. equipo', base, me, 'media '+nf(me,1)+' h/persona');
+  return f ? '<div class="comph">'+f+'</div>' : '';
+}
 function barraHorasHTML(id){
   /* La MISMA puerta que las dos tarjetas (`_hMesReal_`): esta era la TERCERA copia de
      «de donde salen las horas del mes». */
@@ -2327,7 +2873,11 @@ function barraHorasHTML(id){
       : '')+
     (tot>0
       ? (p>0?'<p class="rnota" style="margin-top:9px">Lo rayado son '+nf2(p)+' h esperando firma: todavía no cuentan.</p>':'')
-      : '<p class="rnota" style="margin-top:9px">Aún no tienes horas registradas este mes. El objetivo son '+nf(UMBRAL,1)+' h.</p>');
+      : '<p class="rnota" style="margin-top:9px">Aún no tienes horas registradas este mes. El objetivo son '+nf(UMBRAL,1)+' h.</p>')+
+    /* La comparativa se compara contra lo que YA CUENTA, no contra el total con lo
+       pendiente: lo pendiente puede caerse en la firma y entonces la comparacion
+       habria dicho lo contrario de lo que acaba pasando. */
+    _compHorasHTML_(cont);
 }
 /* Cuanto medía cada barra la ultima vez, para poder IR de ahi al valor nuevo.
 
@@ -2483,26 +3033,18 @@ function vEstado(){
   /* Las tareas salieron de aqui: tienen pestana propia y en la portada solo alargaban
      la primera pantalla repitiendo lo mismo. */
 
-  /* EL ORDEN. Antes Conducta abria la pantalla. Los puntos cambian dos o tres veces al
-     año; las horas del mes cambian cada vez que fichas, y son lo que uno viene a mirar.
-     Asi que primero lo que urge (avisos), luego las horas, luego la reunion, y Conducta
-     al final. Adrian: «daria mas importancia a otras cosas de la pagina principal». */
-  return av+
-    /* El numero grande son las horas de ESTE MES cuando se saben; si no, la media de la
-       temporada, y entonces la etiqueta lo dice. Antes ponia «empleadas este mes» sobre la
-       media, que es de lo poco que un miembro puede comprobar a mano. */
-    '<div class="tarj">'+cab(_hMesReal_(YO)!=null?'Horas de este mes':'Horas del mes',
-        _hMesReal_(YO)!=null?'Panel de Rendimientos':'objetivo '+nf(UMBRAL,1)+' h')+
-      '<div class="cifh"><span class="g" id="gEstado">'+nf2(_hMesReal_(YO)!=null?_hMesReal_(YO):sumaE('otor'))+'</span>'+
-      '<span class="sc">h '+(_hMesReal_(YO)!=null?'este mes':'que cuentan')+'</span>'+
-      (sumaE('pend')?'<span class="pil pend" style="margin-left:auto">+'+nf2(sumaE('pend'))+' h pend.</span>':'')+'</div>'+
-      barraHorasHTML('barEstado')+
-    '</div>'+
+  /* EL ORDEN: Conducta ABRE la pantalla. Se probo a mandarla al final (MEJ-1) y Daniel
+     lo revirtio el 28/07: «estaba muchisimo mas guapo antes que estuviese arriba». */
+  return '<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>'+
+    av+
+    /* LAS HORAS SALIERON DE AQUI (Daniel, 28/07: «quitaria las horas de estado y las
+       dejaria solo en horas»). Estaban en dos pantallas con la misma cifra y la misma barra.
+       Lo que se queda es el AVISO de horas esperando firma, arriba: eso no es una cifra que
+       consultar, es algo que hacer. */
     /* OJO: aquí NO va `REUNION`. Ese es el puntero de la pantalla de Reuniones y cambia
        al navegar por la lista, así que esta tarjeta acababa mostrando «la última que
        abriste» con el rótulo de «la próxima». */
-    _proxReuHTML_()+
-    '<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>';
+    _proxReuHTML_();
 }
 function _proxReuHTML_(){
   var R=_proximaReuM_();
@@ -2536,6 +3078,10 @@ function _proxReuHTML_(){
    día. En la app real DEMO_X vale 1. */
 var DEMO_X=60;
 /* v27: minutos de pausa de la sesión en la nube (tramos cerrados; el abierto cuenta hasta ahora). */
+/* GEMELA EN OTRO RUNTIME: `_pausaMs_` del backend hace esta MISMA cuenta en
+   milisegundos (suma de tramos `{ini,fin}`; el tramo abierto cuenta hasta ahora). No se
+   pueden fundir -son runtimes distintos- pero **si cambia la semantica de `pausas`, hay
+   que tocar las dos**. Mapa §5, D7. */
 function _pausaMinMovil_(pausas){ var now=Date.now(), t=0; (pausas||[]).forEach(function(p){ var pi=Date.parse(p.ini), pf=p.fin?Date.parse(p.fin):now; if(pf>pi) t+=(pf-pi); }); return Math.round(t/60000); }
 function minSes(){
   var s=ST.ses;
@@ -2829,6 +3375,17 @@ function desgloseCat(ps){
   }).join('');
   return '<div style="display:flex;flex-wrap:wrap;margin:2px 0 4px">'+chips+'</div>';
 }
+/* EL HISTORIAL, SOLO DEL MES EN CURSO (Daniel, 28/07). No se borra nada: los partes
+   siguen enteros y el cierre mensual los conserva; lo que se filtra es lo que SE PINTA. Su
+   razon es la buena: un historial que solo crece es basura infinita en una pantalla de movil,
+   y lo de meses cerrados ya no se puede tocar ni discutir.
+   La fecha viene como `DD/MM/AAAA`, que es como la escribe el resto de la app. */
+function _delMesEnCurso_(p){
+  var f=String(p&&p.f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(!m) return true;                       // sin fecha legible no se esconde: se ve y se nota
+  var h=new Date();
+  return (+m[2])===(h.getMonth()+1) && (+m[3])===h.getFullYear();
+}
 function filaParte(p){
   var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='rech'||p.e==='cad')?'borde-no':'borde-pe';
   var pil = p.e==='conf'?'<span class="pil conf">aprobada</span>'
@@ -2850,6 +3407,45 @@ function filaParte(p){
   return '<div class="fila '+cls+'"><div class="a"><b>'+esc(p.t||'Fichaje sin declarar')+'</b><small>'+sub+catTxt+
     _origenParte_(p)+'</small></div>'+
     '<div class="d">'+accion+pil+' <b class="mono">'+nf(p.q,1)+' h</b></div></div>';
+}
+/* El historial plegado, al fondo de Horas. Usa el mismo visor de plegado que el resto
+   (`data-vabrir`/`.vcuerpo`) para no estrenar un tercer mecanismo de desplegar cosas. */
+function _historialHTML_(confs){
+  var delMes=(confs||[]).filter(_delMesEnCurso_);
+  var h=delMes.reduce(function(a,p){ return a+(+p.q||0); },0);
+  return '<h2 class="sec">Historial de este mes<span class="ln"></span>'+nf2(h)+' h</h2>'+
+    '<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
+      '<b>Qué se te contó este mes</b><small>'+delMes.length+' apunte'+(delMes.length===1?'':'s')+
+        ' · pulsa para verlos</small>'+
+      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
+        'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
+      '<div class="plgc" hidden>'+
+        (delMes.length
+          ? desgloseCat(delMes)+
+            '<p class="rnota" style="margin:0 0 10px">A qué categoría del Panel de Rendimientos sumó cada '+
+            'una de tus horas. La categoría también recoge reuniones automáticas y cursos: aquí solo '+
+            'está tu parte. Los meses cerrados no se borran, pero ya no se muestran.</p>'+
+            delMes.map(filaParte).join('')
+          : vacio('Este mes todavía nada','Cuando te firmen un fichaje aparecerá aquí, con la categoría '+
+              'a la que sumó.','',false))+
+      '</div></div></div>';
+}
+/* LA CUOTA, en el menu ⋮ (Daniel, 28/07: «moveria la parte entera de cuota al menu de los 3
+   puntos»). Es una cifra que se consulta dos veces al año: en Horas solo alargaba la pantalla. */
+function _cuotaHTML_(){
+  var eur=function(n){return nf(n,2)+' €';};
+  var recibo = YO.coche
+    ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(YO.cuota_base)+'</span></div>'+
+      '<div class="rl desc"><span>Por poner el coche · '+YO.coche+' turno'+(YO.coche===1?'':'s')+'</span>'+
+      '<span class="ra">−'+eur(YO.cuota_base-YO.cuota)+'</span></div>'
+    : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta 4 € por turno.</p>';
+  return '<div class="mtit">Tu cuota</div>'+
+    '<div class="msub">Se cierra en agosto, al acabar la temporada. Es requisito para renovar.</div>'+
+    '<div class="tarj acc">'+
+      '<div class="cifh"><span class="g mono" style="color:var(--ok)">'+nf(YO.cuota,2)+'</span><span class="sc">€ al año</span></div>'+
+      '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+recibo+'</div>'+
+      '<p class="rnota">Sale de tus horas de la temporada: el objetivo se mueve entre 8 y 15 h/mes, con '+
+      '2 h de base. Se descuentan 4 € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>';
 }
 function vHoras(){
   var o=sumaE('otor'), p=sumaE('pend');
@@ -2873,13 +3469,6 @@ function vHoras(){
       : '<div class="r"><span class="p mono">'+i+'</span><span class="cens"></span></div>';
   }
 
-  var eur=function(n){return nf(n,2)+' €';};
-  var recibo = YO.coche
-    ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(YO.cuota_base)+'</span></div>'+
-      '<div class="rl desc"><span>Por poner el coche · '+YO.coche+' turno'+(YO.coche===1?'':'s')+'</span>'+
-      '<span class="ra">−'+eur(YO.cuota_base-YO.cuota)+'</span></div>'
-    : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta 4 € por turno.</p>';
-
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
@@ -2900,15 +3489,9 @@ function vHoras(){
             'hasta que tu coordinador las apruebe.','ficha desde la pestaña Fichar', false))+
     '</div>'+
 
-    '<h2 class="sec">Historial · qué se contó<span class="ln"></span>'+nf2(o)+' h</h2>'+
-    '<div class="tarj">'+
-      desgloseCat(confs)+
-      (confs.length
-        ? '<p class="rnota" style="margin:0 0 10px">A qué categoría del Panel de Rendimientos sumó cada una '+
-          'de tus horas. La categoría también recoge reuniones automáticas y cursos: aquí solo está tu parte.</p>'+
-          confs.map(filaParte).join('')
-        : vacio('Todavía nada contabilizado','Cuando te firmen un fichaje aparecerá aquí, con la categoría '+
-            'a la que sumó.','',false))+'</div>'+
+    /* Las horas por subsistema van JUSTO detras de tus partes (Daniel, 28/07): lo tuyo
+       primero, y al lado con que se compara. El historial se fue al fondo. */
+    _rankSubsHTML_()+
 
     '<h2 class="sec">Mi carga del mes<span class="ln"></span>banda sana 60–90</h2>'+
     '<div class="tarj">'+
@@ -2926,7 +3509,6 @@ function vHoras(){
           '</div><div class="d">banda sana 60–90</div></div>'
         : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+
     '</div>'+
-    _rankSubsHTML_()+
     '<h2 class="sec">Ranking de horas<span class="ln"></span>temporada '+DATA.temporada+'</h2>'+
     '<div class="tarj rank">'+
       (filas
@@ -2935,12 +3517,11 @@ function vHoras(){
         : vacio('Sin puesto todavía','Tu posición se calcula con las horas de la temporada al cerrar el mes.','',false))+
     '</div>'+
 
-    '<h2 class="sec">Tu cuota<span class="ln"></span>se cierra en agosto</h2>'+
-    '<div class="tarj acc">'+
-      '<div class="cifh"><span class="g mono" style="color:var(--ok)">'+nf(YO.cuota,2)+'</span><span class="sc">€ al año</span></div>'+
-      '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+recibo+'</div>'+
-      '<p class="rnota">Sale de tus horas de la temporada: el objetivo se mueve entre 8 y 15 h/mes, con '+
-      '2 h de base. Se descuentan 4 € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>'+
+    /* EL HISTORIAL, AL FONDO Y PLEGADO (Daniel, 28/07). Y solo el mes en curso: lo de
+       meses cerrados sigue guardado, pero ya no se puede tocar ni discutir, asi que en el
+       movil solo es scroll. */
+    _historialHTML_(confs)+
+    /* La cuota se fue al menu ⋮: es una cifra que se consulta dos veces al año. */
     (esPD()?panelPD():'');
 }
 
@@ -3001,44 +3582,103 @@ function _mioTurno_(t){ return !!(t.mio || (t.roles||[]).some(function(r){ retur
 /* De una URL de Drive saca el id del fichero, para poder pedir su visor incrustable. */
 function _idDrive_(u){ var m=String(u||'').match(/\/d\/([A-Za-z0-9_-]{20,})/); return m?m[1]:null; }
 
-/* La memoria va PLEGADA: la mayoria de las veces se abre la ficha para ver quien va y a
-   que hora, no para leer el informe. El iframe se crea al desplegar, no antes. */
-function _memoriaHTML_(t){
-  var id=_idDrive_(t.memoria);
-  return '<div class="doc" style="margin-top:14px">'+
-    '<div class="dh clic" data-mem="'+(id||'')+'" data-p style="cursor:pointer">'+
-      '<b>Memoria de fabricación</b><small>'+esc(t.f)+' · pulsa para leerla</small>'+
-      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
-        'stroke:currentColor;stroke-width:2.4;transition:transform .3s var(--sal)">'+
+/* ═══ EL VISOR DE DOCUMENTOS · GEMELA (movil/escritorio) ═══════════════════════
+   Habia TRES copias de esto -la memoria de un turno, la revision documental del movil y la
+   del escritorio-, identicas salvo en el texto de «cargando» y en si nacian plegadas. Daniel
+   lo cazo por el sintoma: «no esta la pantalla completa en las revisiones documentales como
+   si lo estaba en ordenes del dia... las separaste por pereza». Tenia razon: una mejora
+   puesta en una copia no le llegaba a las otras.
+
+   Ahora es una sola, y las dos diferencias son parametros:
+     · `plegado` — nace cerrada (la memoria de un turno se abre para ver quien va, no para
+       leer el informe) o abierta (una revision documental existe PARA leerlo).
+     · `queEs`   — «la memoria» / «el documento», que es lo unico que cambiaba del texto.
+
+   El iframe se crea **al desplegar**, nunca antes: tres visores de Drive cargando a la vez en
+   una ficha es medio megabyte que casi nadie va a mirar. */
+function _visorHTML_(o){
+  var abierto = !o.plegado;
+  return '<div class="doc" data-visor>'+
+    '<div class="dh" data-vabrir="'+esc(o.id||'')+'" data-p style="cursor:pointer">'+
+      '<b>'+esc(o.titulo)+'</b><small>'+esc(o.sub||'')+(o.plegado?' · pulsa para leerlo':'')+'</small>'+
+      /* La pantalla completa va en la cabecera y NO despliega: `stopPropagation` en su
+         manejador. Sin eso, pulsarla plegaba el visor a la vez que lo maximizaba. */
+      '<button class="vfull" data-vfull data-p title="Pantalla completa" aria-label="Pantalla completa">'+
+        '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>'+
+      '<svg class="vchev" viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;'+
+        'stroke:currentColor;stroke-width:2.4;transition:transform .3s'+(abierto?';transform:rotate(180deg)':'')+'">'+
         '<path d="M6 9l6 6 6-6"/></svg></div>'+
-    '<div class="memcuerpo" hidden></div>'+
-    '<a class="da" href="'+esc(t.memoria)+'" target="_blank" rel="noopener">abrir en Drive</a></div>';
+    '<div class="vcuerpo"'+(abierto?'':' hidden')+' data-quees="'+esc(o.queEs||'el documento')+'">'+
+      (abierto?'<div class="dcar">Cargando '+esc(o.queEs||'el documento')+'…</div>':'')+'</div>'+
+    (o.url?'<a class="da" href="'+esc(o.url)+'" target="_blank" rel="noopener">abrir en Drive</a>':'')+
+  '</div>';
 }
-function _cablearMemoria_(){
-  $$('[data-mem]').forEach(function(h){
+/* Mete el iframe de Drive en un cuerpo ya visible. Si no carga -permisos, CSP del hosting- se
+   DICE y se ofrece el enlace: un hueco blanco eterno es peor, porque quien revisa no sabe si
+   esperar o si esta roto. */
+function _cargarVisor_(cuerpo, id){
+  if(cuerpo.dataset.cargado) return; cuerpo.dataset.cargado='1';
+  var que=cuerpo.dataset.quees||'el documento';
+  if(!id){ cuerpo.innerHTML='<div class="dcar">El enlace no es un archivo de Drive reconocible.<br>'+
+    'Ábrelo con el enlace de abajo.</div>'; return; }
+  cuerpo.innerHTML='<div class="dcar">Cargando '+que+'…</div>';
+  var f=document.createElement('iframe');
+  f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
+  f.src='https://drive.google.com/file/d/'+id+'/preview';
+  var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
+    cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
+  f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
+  cuerpo.innerHTML=''; cuerpo.appendChild(f);
+}
+function _cablearVisor_(raiz){
+  var R=raiz||document;
+  $$('[data-visor] .vcuerpo',R).forEach(function(c){          // los que nacen abiertos
+    if(!c.hasAttribute('hidden')){
+      var h=c.parentNode.querySelector('[data-vabrir]');
+      _cargarVisor_(c, h && h.dataset.vabrir);
+    }
+  });
+  $$('[data-vabrir]',R).forEach(function(h){
     h.onclick=function(){
-      var cuerpo=h.parentNode.querySelector('.memcuerpo'), sv=h.querySelector('svg');
-      var abierto=!cuerpo.hasAttribute('hidden');
-      if(abierto){ cuerpo.setAttribute('hidden',''); sv.style.transform=''; return; }
-      cuerpo.removeAttribute('hidden'); sv.style.transform='rotate(180deg)';
-      if(cuerpo.dataset.cargado) return;
-      cuerpo.dataset.cargado='1';
-      var id=h.dataset.mem;
-      if(!id){ cuerpo.innerHTML='<div class="dcar">No se puede mostrar aquí. Ábrela en Drive.</div>'; return; }
-      cuerpo.innerHTML='<div class="dcar">Cargando la memoria…</div>';
-      var f=document.createElement('iframe');
-      f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
-      f.src='https://drive.google.com/file/d/'+id+'/preview';
-      /* Si el visor no carga (CSP del artefacto, o sin permiso), se dice y se ofrece Drive. */
-      var fallo=setTimeout(function(){
-        if(cuerpo.dataset.ok) return;
-        cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrela en Drive con el enlace de abajo.</div>';
-      }, 6000);
-      f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
-      cuerpo.innerHTML=''; cuerpo.appendChild(f);
+      var caja=h.parentNode, cuerpo=caja.querySelector('.vcuerpo'), sv=caja.querySelector('.vchev');
+      if(!cuerpo.hasAttribute('hidden')){ cuerpo.setAttribute('hidden',''); if(sv) sv.style.transform=''; return; }
+      cuerpo.removeAttribute('hidden'); if(sv) sv.style.transform='rotate(180deg)';
+      _cargarVisor_(cuerpo, h.dataset.vabrir);
     };
   });
+  $$('[data-vfull]',R).forEach(function(b){
+    b.onclick=function(ev){
+      ev.stopPropagation();                                    // no despliega: solo maximiza
+      var caja=b.closest('.doc'), cuerpo=caja.querySelector('.vcuerpo');
+      var yaEsta=caja.classList.toggle('full');
+      document.body.style.overflow = yaEsta ? 'hidden' : '';
+      /* Maximizar con el visor plegado no enseñaria nada: se abre y se carga. */
+      if(yaEsta && cuerpo.hasAttribute('hidden')){
+        cuerpo.removeAttribute('hidden');
+        var sv=caja.querySelector('.vchev'); if(sv) sv.style.transform='rotate(180deg)';
+        _cargarVisor_(cuerpo, (caja.querySelector('[data-vabrir]')||{dataset:{}}).dataset.vabrir);
+      }
+    };
+  });
+  if(!_cablearVisor_._esc){
+    _cablearVisor_._esc=true;
+    document.addEventListener('keydown', function(e){
+      if(e.key!=='Escape') return;
+      var f=document.querySelector('.doc.full');
+      if(f){ f.classList.remove('full'); document.body.style.overflow=''; }
+    });
+  }
 }
+
+/* La memoria va PLEGADA: la mayoria de las veces se abre la ficha para ver quien va y a
+   que hora, no para leer el informe. */
+function _memoriaHTML_(t){
+  return _visorHTML_({id:_idDrive_(t.memoria), url:t.memoria, titulo:'Memoria de fabricación',
+    sub:t.f, queEs:'la memoria', plegado:true});
+}
+/* Se conserva el nombre porque lo llaman las fichas de turno; por dentro ya es el visor
+   unico. Un alias es mas honesto que dejar la copia viva «por si acaso». */
+function _cablearMemoria_(){ _cablearVisor_(); }
 /* ═══ NOTIFICACIONES PUSH (recuperado de app.html) ═══════════════════════════
    La cadena de emision ya estaba desplegada y sin nadie escuchando: el movil solo
    tenia un boton apagado. Clave VAPID publica (no es un secreto: va en el cliente).
@@ -3060,26 +3700,9 @@ async function _registrarSW_(){
   try{ _swReg=await navigator.serviceWorker.register('sw.js'); return _swReg; }catch(e){ return null; }
 }
 function _notisMsg(t){ var b=$('#notisMsg'); if(b) b.textContent=t; }
-async function activarNotis(btn){
-  if(!_pushSoportado_()){ _notisMsg('Este navegador no admite notificaciones.'); return; }
-  if(_esIOS_() && !_esStandalone_()){
-    _notisMsg('En iPhone: Compartir → Añadir a pantalla de inicio, y abre la app desde ese icono.');
-    return;
-  }
-  if(btn){ btn.disabled=true; btn.textContent='Activando…'; }
-  try{
-    var perm=await Notification.requestPermission();
-    if(perm!=='granted'){ _notisMsg('Permiso denegado. Puedes darlo en los ajustes del móvil.'); return; }
-    var reg=_swReg || await _registrarSW_();
-    if(!reg){ _notisMsg('No se pudo preparar el service worker.'); return; }
-    await navigator.serviceWorker.ready;
-    var sub=await reg.pushManager.getSubscription();
-    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
-    if(typeof SESION!=='undefined' && SESION) await api.guardarPush(sub.toJSON());
-    _notisMsg('Notificaciones activadas.');
-  }catch(e){ _notisMsg('No se pudo activar: '+((e&&e.message)||e)); }
-  finally{ if(btn){ btn.disabled=false; btn.textContent='Activar notificaciones'; } pintar(); }
-}
+/* `activarNotis` se retiro el 28/07: con las notificaciones obligatorias, el permiso se
+   pide UNA vez y en el gate del arranque (`_gateNotis_`). Tener las dos era la misma
+   funcion escrita dos veces, que es como empiezan las divergencias. */
 /* Al abrir: registra el SW y, si ya habia permiso y sesion, re-guarda la suscripcion por si
    el navegador la roto (pasa, y si no se re-guarda dejan de llegar avisos en silencio). */
 async function _pushInit_(){
@@ -3093,20 +3716,146 @@ async function _pushInit_(){
     }
   }catch(_){}
 }
+/* ¿PUEDE ESTA APP FUNCIONAR SIN NOTIFICACIONES? No (Daniel, 28/07): «las notificaciones han
+   de ser obligatorias de tener activadas, es decir, que si no estan activadas directamente que
+   no te permita usar la aplicacion».
+
+   Devuelve el motivo por el que NO se puede pasar, o `null` si se pasa:
+     · `'imposible'` — el navegador no admite push. **Se deja pasar**: exigir algo que el
+       aparato no puede dar no consigue notificaciones, solo un panel inservible.
+     · `'ios'`       — iPhone fuera de la pantalla de inicio. SI se bloquea: aqui si se puede
+       cumplir, instalandola, y es justo lo que hay que empujar.
+     · `'pedir'`     — el permiso no esta dado y todavia se puede pedir.
+     · `'denegado'`  — se denego. El navegador no vuelve a preguntar solo: hay que ir a los
+       ajustes del sistema, y la pantalla dice donde. */
+function _faltanNotis_(){
+  if(!_pushSoportado_()) return null;                       // no puede: se pasa
+  if(_esIOS_() && !_esStandalone_()) return 'ios';
+  if(Notification.permission==='granted') return null;
+  return (Notification.permission==='denied') ? 'denegado' : 'pedir';
+}
+/* La pantalla del gate. No es un aviso que se pueda cerrar: es la unica pantalla que hay
+   hasta que el permiso este dado. El boton reintenta y, si cuela, arranca la app de verdad. */
+function _gateNotis_(motivo, seguir){
+  /* Al volver de los ajustes del telefono la pagina no se recarga: sigue viva y con el
+     gate puesto. Sin esto habria que recargar a mano justo despues de hacer lo que se te
+     acaba de pedir, que es la peor manera de terminar. */
+  if(!_gateNotis_._mirando){
+    _gateNotis_._mirando=true;
+    document.addEventListener('visibilitychange', function(){
+      if(document.hidden || !document.getElementById('loginGate')) return;
+      if(!_faltanNotis_() && _gateNotis_._seguir){ var f=_gateNotis_._seguir; _gateNotis_._seguir=null; f(); }
+    });
+  }
+  _gateNotis_._seguir=seguir;
+  var cuerpo, boton='';
+  if(motivo==='ios'){
+    cuerpo='Para recibir los avisos en <b>iPhone</b> hay que abrir el panel desde la pantalla '+
+      'de inicio.<br><br>Pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>, y entra '+
+      'desde ese icono.';
+  } else if(motivo==='denegado'){
+    cuerpo='Has denegado las notificaciones y <b>el navegador ya no vuelve a preguntar</b>: '+
+      'hay que activarlas a mano en el teléfono.<br><br>'+
+      '<b>Ajustes → Solaris</b> (o tu navegador) <b>→ Notificaciones → Permitir</b>.<br>'+
+      'Vuelve aquí después: se comprueba solo.';
+    boton='Ya las he activado';
+  } else {
+    cuerpo='<b>Antes de entrar</b>, activa las notificaciones.<br><br>El panel avisa de tus '+
+      'turnos, de las reuniones y de las decisiones sobre tus documentos y tus horas. '+
+      '<b>Sin ellas no se puede usar</b>: los avisos llegan tarde y de eso salen faltas.';
+    boton='Activar notificaciones';
+  }
+  var g=_gate_(SPLASH+'<div style="max-width:330px;line-height:1.6">'+cuerpo+'</div>'+
+    (boton?'<button id="btnGateNotis" style="border:1px solid #463E40;background:none;'+
+      'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">'+boton+'</button>':'')+
+    '<div id="gateNotisMsg" style="opacity:.75;font-size:13px;max-width:330px"></div>');
+  var b=g.querySelector('#btnGateNotis');
+  if(b) b.onclick=async function(){
+    b.disabled=true; b.textContent='Un momento…';
+    var msg=g.querySelector('#gateNotisMsg');
+    try{
+      if(Notification.permission!=='granted') await Notification.requestPermission();
+      if(Notification.permission==='granted'){
+        /* Y se suscribe de verdad, no solo el permiso: un permiso sin suscripcion no
+           entrega ni un aviso, y el gate habria dejado pasar a alguien que no recibe nada. */
+        var reg=_swReg || await _registrarSW_();
+        if(reg){ await navigator.serviceWorker.ready;
+          var sub=await reg.pushManager.getSubscription();
+          if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
+          if(typeof SESION!=='undefined' && SESION) try{ await api.guardarPush(sub.toJSON()); }catch(_){}
+        }
+        seguir(); return;
+      }
+      if(msg) msg.textContent='Sigue sin permiso. Hay que darlo en los ajustes del móvil.';
+    }catch(e){ if(msg) msg.textContent='No se pudo: '+((e&&e.message)||e); }
+    b.disabled=false; b.textContent=boton;
+  };
+}
+/* Los cinco tipos que se pueden apagar. Es la MISMA lista que `NOTIS_TIPOS` del backend;
+   si divergieran, aqui saldria un interruptor que el servidor no mira. Los textos son de
+   aqui porque son de cara al miembro; las claves las manda el servidor. */
+var NOTIS_ETI={
+  turnos:['Turnos','Convocatorias y cambios de turno de fabricación'],
+  reuniones:['Reuniones','Recordatorios 24 h, 1 h y 10 min antes'],
+  documentos:['Documentos','Cuando te toca revisar algo o deciden sobre lo tuyo'],
+  horas:['Horas y partes','Cuando te firman, rechazan o piden detalle de un parte'],
+  avisos:['Avisos y sanciones','Lo disciplinario y lo que tiene plazo']
+};
+var NOTIS_PREF=null;                    // lo que dijo el servidor la ultima vez
 function _notisHTML_(){
   if(!_pushSoportado_())
-    return '<div class="tarj"><p class="rnota" style="margin:0">Este navegador no admite notificaciones.</p></div>';
+    return '<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador '+
+      'no admite notificaciones. El panel las da por <b>obligatorias</b>, así que aquí te '+
+      'estás perdiendo los avisos de turnos, reuniones y decisiones. Ábrelo en el móvil.</p></div>';
   if(_esIOS_() && !_esStandalone_())
     return '<div class="tarj"><p class="rnota" style="margin:0;line-height:1.6">Para recibir avisos en <b>iPhone</b>: '+
-      'pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> y abre la app desde ese icono. '+
-      'Luego vuelve aquí y actívalas.</p></div>';
-  if(Notification.permission==='granted')
-    return '<div class="tarj"><p class="rnota" style="margin:0;color:var(--ok)">Notificaciones activadas.</p>'+
-      '<p class="rnota" id="notisMsg" style="margin:4px 0 0"></p></div>';
-  return '<div class="tarj"><p class="rnota" style="margin:0 0 10px">Avisos de turnos, reuniones y '+
-    'decisiones sobre tus documentos y tus horas.</p>'+
-    '<button class="btn full" data-p id="btnNotis">Activar notificaciones</button>'+
+      'pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> y abre la app desde ese icono.</p></div>';
+  /* El botón de «activar» se fue: para llegar hasta aquí ya has pasado el gate del arranque.
+     Lo que queda es elegir QUÉ te llega. */
+  return '<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
+      '<b>Qué avisos quieres recibir</b><small>Se aplica en el servidor, antes de enviarlos</small>'+
+      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
+        'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
+    '<div class="plgc" hidden id="notisLista">'+
+      '<p class="rnota" style="margin:0 0 10px">Cargando tus preferencias…</p>'+
+    '</div></div>'+
     '<p class="rnota" id="notisMsg" style="margin:8px 0 0"></p></div>';
+}
+/* Pinta la lista con lo que diga el SERVIDOR. Si no se puede leer se dice y no se enseñan
+   interruptores: unos interruptores con un valor inventado son peores que no tenerlos, porque
+   se tocan creyendo que hacen algo. */
+function _pintarNotisLista_(){
+  var c=$('#notisLista'); if(!c) return;
+  if(!NOTIS_PREF){ c.innerHTML='<p class="rnota" style="margin:0;color:var(--warn)">No se pudieron '+
+    'leer tus preferencias. Vuelve a abrir Ajustes.</p>'; return; }
+  var filas='';
+  for(var k in NOTIS_ETI){
+    if(!(k in NOTIS_PREF)) continue;        // el servidor manda: si no lo lista, no existe
+    var e=NOTIS_ETI[k], on=NOTIS_PREF[k]!==false;
+    filas+='<div class="fila"><div class="a"><b>'+e[0]+'</b><small>'+e[1]+'</small></div>'+
+      '<div class="d"><button class="btn" data-noti="'+k+'" data-p>'+(on?'Sí':'No')+'</button></div></div>';
+  }
+  c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0">Lo urgente llega igual: un aviso '+
+    'marcado como <b>forzoso</b> se salta estos interruptores.</p>';
+  $$('[data-noti]',c).forEach(function(b){
+    b.onclick=async function(){
+      var k=b.dataset.noti, antes=NOTIS_PREF[k]!==false;
+      /* Se pinta el cambio YA y se revierte solo si el servidor dice que no: dejar el dedo
+         esperando una ida y vuelta a Apps Script se siente roto. */
+      NOTIS_PREF[k]=!antes; b.textContent=(!antes)?'Sí':'No'; b.disabled=true;
+      try{ var r=await api.guardarNotis(NOTIS_PREF); if(r && r.tipos) NOTIS_PREF=r.tipos; _notisMsg(''); }
+      catch(e){ NOTIS_PREF[k]=antes; b.textContent=antes?'Sí':'No';
+        _notisMsg('No se pudo guardar: '+((e&&e.message)||e)); }
+      b.disabled=false;
+    };
+  });
+}
+async function _cargarNotis_(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION){
+    NOTIS_PREF=null; _pintarNotisLista_(); return; }
+  try{ var r=await api.getNotis(); NOTIS_PREF=(r&&r.tipos)||null; }
+  catch(_){ NOTIS_PREF=null; }
+  _pintarNotisLista_();
 }
 /* ── BUZON: reportar un fallo o proponer una mejora ───────────────────────────
    Dos campos a mano y punto (decision de Daniel): si se piden mas, no lo usa nadie.
@@ -3121,7 +3870,7 @@ function _contextoM_(){
           /Safari/.test(ua)?'Safari':'otro';
   /* El canal va DENTRO del contexto: dos ficheros con el mismo aspecto y distinto código
      son la forma más fácil de perseguir un fallo en el sitio equivocado. */
-  return 'movil'+(CANAL==='beta'?' · BETA':'')+' · '+nav+' · '+screen.width+'x'+screen.height+
+  return 'movil'+(CANAL==='beta'?' · BETA':(VERSION?' · v'+VERSION:''))+' · '+nav+' · '+screen.width+'x'+screen.height+
     ' · build '+BUILD+' · datos '+(DATA.generado||'?')+
     (_esStandalone_()?' · desde la pantalla de inicio':'');
 }
@@ -3496,7 +4245,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='53dd36b';
+var BUILD='998b9b1';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -3506,26 +4255,42 @@ function _ajustesHTML_(){
         ((PREF.escala||'')===e[0]?'on':'')+'" data-p>'+e[1]+'</button>'; }).join('')+
       '</div><p class="rnota" style="margin:9px 0 0">Agranda lo que se lee: la pantalla '+
       'y las fichas. La barra de abajo no cambia, sus rótulos ya hacen de icono.</p></div>'+
-    '<h4>Pestañas</h4><div class="tarj"><div class="fila"><div class="a">'+
-      '<b>Mostrar siempre Documentos</b><small>Sin esto, la pestaña solo aparece cuando '+
-      'tienes algo que revisar o algo tuyo en vuelo. Con una menos, las demás se leen mejor.'+
-      '</small></div><div class="d"><button class="btn" id="btnDocsSiempre" data-p>'+
-      (PREF.docsSiempre?'Sí':'No')+'</button></div></div></div>'+
+    '<h4>Pestañas</h4><div class="tarj">'+
+      OCULTABLES.map(function(o){
+        return '<div class="fila"><div class="a">'+
+          '<b>Esconder '+o[1]+' cuando no tengas nada</b><small>Desaparece de la barra '+o[2]+
+          ', y vuelve sola en cuanto lo haya. Con una pestaña menos, los rótulos de las '+
+          'demás crecen.</small></div><div class="d">'+
+          '<button class="btn" data-ocultar="'+o[0]+'" data-p>'+(_seOculta_(o[0])?'Sí':'No')+
+          '</button></div></div>';
+      }).join('')+'</div>'+
     '<h4>Notificaciones</h4>'+_notisHTML_()+
     '<h4>Sesión</h4><div class="tarj"><div class="fila"><div class="a"><b>'+quien+'</b>'+
       '<small>'+v+'</small></div></div></div>'+
     /* QUE VERSION ES. Lo primero que hay que poder responder cuando alguien dice «sigue
        fallando»: Pages cachea el HTML 10 min, asi que dos personas pueden estar mirando
        codigo distinto sin saberlo. Pasó el 27/07, dos veces. */
+    /* Se enseñan las DOS: la versión es la que le dices a alguien («voy por la 0.1») y el
+       build es el que sirve para saber si estáis mirando el mismo código. En beta no hay
+       versión todavía, y decirlo es más honesto que inventarle una. */
     '<h4>Versión</h4><div class="tarj"><div class="fila"><div class="a">'+
-      '<b class="mono">'+esc(BUILD)+'</b>'+
+      '<b class="mono">'+esc(VERSION?('v'+VERSION):(CANAL==='beta'?'beta':'sin publicar'))+
+        ' · '+esc(BUILD)+'</b>'+
       '<small>Si esto no coincide con lo que te digan, recarga forzando (mantén pulsado '+
       'recargar, o cierra la pestaña y ábrela de nuevo).</small></div></div></div></div>';
 }
+/* «Ver todos» vive aqui y no en `ST` porque es una forma de MIRAR, no un estado de la app:
+   no debe sobrevivir a cambiar de pantalla ni ensuciar el resto. */
+var TURNOS_TODOS=false;
 function vTurnos(){
-  var mios=TURNOS.filter(_mioTurno_);
+  /* Por defecto SOLO LOS TUYOS -decision de Daniel-, con un conmutador para ver los del
+     equipo. Los de otros se pintan igual pero sin poder tocarlos: ver quien va a que sirve
+     para organizarse; apuntarse en el turno de otro, no. */
+  var base=TURNOS_TODOS ? TURNOS.slice() : TURNOS.filter(_mioTurno_);
+  var mios=base;
   var prox=mios.filter(function(t){ return !t.hecho; });
   var pas=mios.filter(function(t){ return t.hecho; });
+  var nTodos=TURNOS.length, nMios=TURNOS.filter(_mioTurno_).length;
   function tarjeta(t){
     return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+
       cab(t.f+(t.crucial?' · crucial':''), t.hora)+
@@ -3541,9 +4306,20 @@ function vTurnos(){
   pas.sort(function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); });
   /* los vivos van SUELTOS: sin cabecera de seccion ni etiquetas, para que canten */
   return '<div class="h1">Turnos</div><p class="h1s">Fabricación · en cuáles estás y quién más va.</p>'+
+    /* El conmutador solo aparece si hay algo mas que ver: con todos los turnos siendo tuyos,
+       un boton que no cambia nada es ruido que hay que leer igual. */
+    (nTodos>nMios
+      ? '<div class="modos" id="turnoModo" style="margin-bottom:11px">'+
+          '<button data-tt="0" class="'+(TURNOS_TODOS?'':'on')+'" data-p>Los míos · '+nMios+'</button>'+
+          '<button data-tt="1" class="'+(TURNOS_TODOS?'on':'')+'" data-p>Todos · '+nTodos+'</button>'+
+        '</div>'
+      : '')+
     (prox.length? prox.map(tarjeta).join('')
-      : '<div class="tarj">'+vacio('Sin turnos por delante','No tienes ningún turno de fabricación asignado. '+
-          'Cuando te convoquen a uno, aparecerá aquí.','',false)+'</div>')+
+      : '<div class="tarj">'+vacio(TURNOS_TODOS?'Sin turnos por delante':'Sin turnos por delante',
+          TURNOS_TODOS
+            ? 'No hay ningún turno de fabricación convocado. Cuando alguien convoque uno, aparecerá aquí.'
+            : 'No tienes ningún turno de fabricación asignado. Cuando te convoquen a uno, aparecerá aquí.'+
+              (nTodos>nMios?' Hay '+nTodos+' del equipo: míralos con «Todos».':''),'',false)+'</div>')+
     (pas.length? '<div class="cajon" data-caj data-p><span>Turnos pasados <b>· '+pas.length+'</b>'+
         (pas[0].f?' <span style="color:var(--ink3)">· el último, '+esc(pas[0].f)+'</span>':'')+'</span>'+
         '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
@@ -3590,8 +4366,27 @@ function _docsPend_(){
   return ENT_REV.filter(function(e){return e.estado==='revision' && revisoresDe(e).indexOf(yoNombre())>=0;});
 }
 function _docsRelevantes_(){
-  return !!(_docsPend_().length || ENTREGABLES.length || (esPD() && ENT_REV.length));
+  /* Con `||[]` porque estas listas las llena el backend y pueden no haber llegado. Antes
+     asumían que sí, y al usarse desde `_destVisibles_` -que corre en CADA pintado- un dato
+     que falta dejaba de romper una pantalla para romper la app entera. */
+  return !!((_docsPend_()||[]).length || (ENTREGABLES||[]).length ||
+            (esPD() && (ENT_REV||[]).length));
 }
+/* ¿Tienes tareas vivas? Mismo criterio que usa la pantalla para separar «en curso» de
+   «hechas»: si divergieran habria una pestaña que al pulsarla no tiene nada, que es justo
+   el fallo que reporto Adrian con Documentos. */
+function _tareasRelevantes_(){
+  return (TAREAS||[]).some(function(t){ return !/hech|finaliz|complet|termin|cerrad/i.test(t&&t.e); });
+}
+/* LAS PESTAÑAS QUE SE PUEDEN ESCONDER, en una tabla y no repartidas por el fichero.
+   Daniel pidio esto para Documentos y luego para Tareas; a la tercera vez, copiar la
+   condicion, la preferencia y la fila de Ajustes serian nueve sitios que mantener.
+   Añadir una pestaña aqui es UNA linea, y Ajustes se entera solo. */
+var OCULTABLES=[
+  ['docs','Documentos','mientras no haya nada que revisar ni nada tuyo en vuelo', _docsRelevantes_],
+  ['tareas','Tareas','mientras no tengas ninguna tarea en curso', _tareasRelevantes_]
+];
+function _seOculta_(k){ return !!(PREF.ocultar && PREF.ocultar[k]); }
 function vDocs(){
   var mios=ENTREGABLES;
   var pend=_docsPend_();
@@ -3678,30 +4473,17 @@ function verDoc(id){
        poder abrirlo es aprobar a ciegas — justo lo que venia a evitar. */
     '<h4>Documento</h4>'+
     (_idDrive_(e.drive)
-      /* `data-visor`, NO `data-doc`: ese atributo YA lo usan las filas de expediente (llevan
-         el id del documento), asi que `$('[data-doc]')` cogia una fila y le metia el iframe
-         dentro. Cazado ejecutando, no leyendo. */
-      ? '<div class="doc"><div class="memcuerpo" data-visor="'+_idDrive_(e.drive)+'">'+
-          '<div class="dcar">Cargando el documento…</div></div>'+
-        '<a class="da" href="'+esc(e.drive)+'" target="_blank" rel="noopener">abrir en Drive</a></div>'
+      /* Nace ABIERTO: esta pantalla existe para leer el archivo antes de decidir, y decidir
+         sin abrirlo es aprobar a ciegas. Y ahora con pantalla completa, como el resto. */
+      ? _visorHTML_({id:_idDrive_(e.drive), url:e.drive, titulo:'El documento', sub:e.ref,
+                     queEs:'el documento', plegado:false})
       : '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
         'Pideselo a quien lo subio antes de decidir.</div></div>')+
     '<p class="rnota" style="margin-top:10px">Revisa: <b>'+revs+'</b></p>'+
     acc);
-  /* Se incrusta DESPUES de abrir el modal: un iframe dentro de la cadena de strings no
-     arranca hasta que esta en el DOM, y asi ademas se puede vigilar si carga. */
-  var _c=$('[data-visor]');
-  if(_c){
-    var f=document.createElement('iframe');
-    f.className='dv'; f.setAttribute('loading','lazy');
-    f.src='https://drive.google.com/file/d/'+_c.dataset.visor+'/preview';
-    /* Si no carga -permisos, CSP- se admite y se ofrece Drive. Un hueco blanco eterno es
-       peor que decirlo: quien revisa no sabe si esperar o si esta roto. */
-    var _f=setTimeout(function(){ if(_c.dataset.ok) return;
-      _c.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
-    f.onload=function(){ _c.dataset.ok='1'; clearTimeout(_f); };
-    _c.innerHTML=''; _c.appendChild(f);
-  }
+  /* Se cablea DESPUES de abrir el modal: un iframe dentro de la cadena de strings no
+     arranca hasta que esta en el DOM. */
+  _cablearVisor_();
 }
 function vReu(){
   if(_reunionesCargando_())
@@ -4591,12 +5373,39 @@ function _destVisibles_(){
   return DEST.filter(function(d){
     /* Se queda si la has fijado en Ajustes, si estas dentro (no se puede tirar el suelo
        que pisas) o si de verdad tienes algo que hacer ahi. */
-    if(d[0]==='docs') return PREF.docsSiempre || ST.vista==='docs' || _docsRelevantes_();
+    /* Por DEFECTO se ve. Solo se esconde si TÚ lo has pedido en Ajustes, y aun así:
+         · **no mientras estés dentro** — no se puede tirar el suelo que se pisa. Daniel:
+           «haz que hasta que la abandones no desaparezca»; se va cuando navegas fuera.
+         · **ni con un modal abierto encima**: apagarla desde Ajustes no puede evaporar lo
+           que estás mirando por debajo.
+         · ni cuando de verdad tienes algo que hacer ahí.
+
+       Y TODO ESTO NO PUEDE LANZAR NUNCA. Esta función corre en `pintarNav()`, o sea en cada
+       pintado de cada pantalla: una excepción aquí no rompe una pestaña, deja la app entera
+       sin pintar. Y como la preferencia vive en `localStorage`, ni recargando se arregla —
+       queda ladrillo. Pasó el 28/07 en la beta, con `TAREAS` sin llegar del backend.
+       Ante la duda **se ve**: mostrar de más es recuperable, esconder de más no. */
+    for(var i=0;i<OCULTABLES.length;i++){
+      var o=OCULTABLES[i];
+      if(d[0]!==o[0]) continue;
+      try{
+        if(!_seOculta_(o[0])) return true;
+        /* Estar DENTRO la protege, y eso ya cubre el caso que me preocupaba: si la apagas
+           desde Ajustes estando en ella, `ST.vista` es la suya y no se va. El guardian de
+           «hay un modal abierto» sobraba y ademas rompia lo obvio — apagarla desde Ajustes no
+           hacia NADA visible, porque el modal esta abierto por definicion mientras la apagas. */
+        if(ST.vista===o[0]) return true;
+        return !!o[3]();
+      }catch(_){ return true; }
+    }
     return true;
   });
 }
 function pintarNav(){
   var nav=$('#nav'), b=badges();
+  /* Cuantas hay, para que el CSS ajuste el rotulo. Va en el propio nav y no en :root
+     porque es una propiedad de esta barra, no del documento. */
+  nav.style.setProperty('--tabN', String(_destVisibles_().length));
   var previos=$$('.tab',nav);
   previos.forEach(function(t){t.remove();});
   _destVisibles_().forEach(function(d){
@@ -4628,7 +5437,28 @@ function _repintarSuave_(){
    Sin esto, el login pintaba dos veces y el refresco en vivo una cada 90 s, y en cada una
    se repetian la entrada de la vista, la cascada del medidor y el crecimiento de las
    barras. Con el mismo dato. Daniel: «se recarga solo por la cara». */
+/* RED DE SEGURIDAD. Una preferencia guardada que rompe el pintado no es un fallo: es un
+   LADRILLO. Vive en `localStorage`, asi que recargar no la quita y la app no vuelve a
+   arrancar nunca — hasta que alguien sepa borrar el almacenamiento del navegador, que no es
+   algo que se le pueda pedir a nadie. Paso el 28/07 en la beta.
+
+   Asi que si pintar revienta, se tira LA PREFERENCIA -no los datos, que son de verdad- y se
+   reintenta una vez. Si vuelve a reventar, se propaga: a partir de ahi el problema no es la
+   preferencia y taparlo seria peor. */
 function pintar(silencioso){
+  try{ return _pintar_(silencioso); }
+  catch(e){
+    if(pintar._rescatando) throw e;
+    pintar._rescatando=true;
+    try{
+      PREF.ocultar={}; PREF.escala=''; _guardarPref_(); _aplicarEscala_();
+      var r=_pintar_(silencioso);
+      try{ tost('Se han restablecido las preferencias de pantallas: una de ellas impedía dibujar la app.'); }catch(_){}
+      return r;
+    } finally { pintar._rescatando=false; }
+  }
+}
+function _pintar_(silencioso){
   /* Si la vista en la que estas ha dejado de mostrarse -decidiste el ultimo documento y
      Docs se retira- hay que sacarte: si no, te quedas en una pantalla sin boton
      encendido y el indicador viajero no tiene a donde apuntar. */
@@ -4645,6 +5475,8 @@ function pintar(silencioso){
   /* `el` acotado a proposito: sin el, `root||document` recorreria TAMBIEN la barra de la
      otra vista -que sigue en el DOM, oculta- y le machacaria su memoria con un ancho que
      no le toca. Si `el` no existe no se anima nada, que es lo correcto. */
+  /* En Estado ya no hay barra de horas (se fue a Horas y solo a Horas), pero si el
+     medidor. `animarBarras` se queda porque la pantalla tiene otras barras. */
   if(el && ST.vista==='estado'){ armarMedidor(silencioso); animarBarras(el, silencioso); }
   if(el && ST.vista==='horas'){ animarBarras(el, silencioso); animarDeltas(el); }
   if(ST.vista==='fichar'){ medirAristas(); validarFichaje(); }
@@ -4741,6 +5573,10 @@ function enganchar(){
     bl.textContent = ST.libro ? 'Ocultar desglose' : 'Desglose de puntos';
   };
 
+  /* turnos: los mios / todos. Solo cambia lo que se mira, no toca datos. */
+  $$('#turnoModo [data-tt]').forEach(function(b){
+    b.onclick=function(){ TURNOS_TODOS=(b.dataset.tt==='1'); pintar(); };
+  });
   /* fichar */
   $$('#modos button').forEach(function(b){
     b.onclick=function(){ ST.modo=b.dataset.mo; pintar(); };
@@ -4956,7 +5792,20 @@ function enganchar(){
     };
   });
   $$('[data-doc]').forEach(function(el){ el.onclick=function(){ verDoc(+el.dataset.doc); }; });
-  var _bn=$('#btnNotis'); if(_bn) _bn.onclick=function(){ activarNotis(_bn); };
+  /* Plegados sencillos (`data-plg`): el historial de Horas, y lo que venga. */
+  $$('[data-plg]').forEach(function(h){
+    h.onclick=function(){
+      var c=h.parentNode.querySelector('.plgc'), sv=h.querySelector('svg');
+      var abierto=!c.hasAttribute('hidden');
+      if(abierto){ c.setAttribute('hidden',''); sv.style.transform=''; }
+      else { c.removeAttribute('hidden'); sv.style.transform='rotate(180deg)'; }
+    };
+  });
+  /* El item de Sanciones NO SE ENSEÑA a un rango 0. Daniel: «los miembros jamas podran ver
+     esta opcion». No es que la vean y les falle: no aparece — enseñar una puerta cerrada
+     invita a empujarla y, sobre todo, dice quien manda sobre quien a quien no le toca. */
+  var _ms=$('#menu [data-mnu="sanciones"]');
+  if(_ms) _ms.style.display = (rangoSanc(_actorSanc_())>=1) ? '' : 'none';
   var _bm=$('#btnMenu'); if(_bm) _bm.onclick=function(){ _abrirMenu_(true); };
   var _mn=$('#menu');
   if(_mn) _mn.onclick=function(ev){ if(ev.target===_mn) _abrirMenu_(false); };
@@ -4966,24 +5815,42 @@ function enganchar(){
       _abrirMenu_(false);
       if(q==='salir'){ cerrarSesion(); return; }
       if(q==='buzon'){ buzonModal('bug'); return; }
+      if(q==='sanciones'){ _abrirSanciones_(); return; }
+      if(q==='cuota'){ abrirModal(_cuotaHTML_()); return; }
       if(q==='equipo'){ abrirModal(_coordinacionHTML_()); return; }
       if(q==='ajustes'){ abrirModal(_ajustesHTML_());
-        var b2=$('#btnNotis'); if(b2) b2.onclick=function(){ activarNotis(b2); };
+        /* Se piden al abrir y no al arrancar: es una llamada mas al backend y esta
+           pantalla la abre casi nadie casi nunca. */
+        _cargarNotis_();
+        $$('[data-plg]').forEach(function(h){
+          h.onclick=function(){
+            var c=h.parentNode.querySelector('.plgc'), sv=h.querySelector('svg');
+            if(c.hasAttribute('hidden')){ c.removeAttribute('hidden'); sv.style.transform='rotate(180deg)'; }
+            else { c.setAttribute('hidden',''); sv.style.transform=''; }
+          };
+        });
         $$('#ajEscala [data-esc]').forEach(function(be){
           be.onclick=function(){
             PREF.escala=be.dataset.esc; _guardarPref_(); _aplicarEscala_();
             $$('#ajEscala [data-esc]').forEach(function(x){ x.classList.toggle('on', x===be); });
           };
         });
-        var b3=$('#btnDocsSiempre');
-        if(b3) b3.onclick=function(){
-          PREF.docsSiempre=!PREF.docsSiempre; _guardarPref_();
-          b3.textContent=PREF.docsSiempre?'Sí':'No';
-          /* La barra se repinta sola, pero la estrella viajera se coloca por el
-             rectangulo del boton activo: con una pestaña mas o menos, ese rectangulo
-             cambia de sitio y hay que recolocarla o se queda sobre la posicion vieja. */
-          pintarNav(); colocarViaje(false);
-        };
+        $$('[data-ocultar]').forEach(function(b3){
+          b3.onclick=function(){
+            var k=b3.dataset.ocultar;
+            PREF.ocultar=PREF.ocultar||{};
+            PREF.ocultar[k]=!PREF.ocultar[k]; _guardarPref_();
+            b3.textContent=_seOculta_(k)?'Sí':'No';
+            /* `pintar()` ENTERO, no `pintarNav()` suelto. Y esta es la razon, que costo dos
+               intentos: `pintarNav()` BORRA las pestañas y las vuelve a crear, pero **no les
+               pone el manejador de clic** — eso lo hace `enganchar()`, al final de `pintar()`.
+               Llamando solo a `pintarNav()` la barra se redibujaba MUERTA: todo se veia, los
+               medidores seguian animando y no se podia navegar. Daniel: «peta la app y se queda
+               congelada, o sea los gauges se mueven pero no puedes navegar».
+               Silencioso para no re-animar la pantalla de debajo por un ajuste. */
+            pintar(true);
+          };
+        });
       }
     };
   });
@@ -5096,10 +5963,17 @@ setTimeout(function(){ try{ _pushInit_(); }catch(_){} }, 800);
    NUNCA entra a datos falsos. */
 if(GOOGLE_CLIENT_ID && !DEMO){
   _gate_(SPLASH+'<div style="opacity:.7">Cargando…</div>');
-  var _sg=null; try{ _sg=JSON.parse(localStorage.getItem('sol_sess')||'null'); }catch(_){}
-  var _tok=(_sg && _sg.token && (Date.now()-(_sg.ts||0) < 50*60*1000)) ? _sg.token : null;
-  if(_tok) _onCredencial_({credential:_tok}, true);
-  else _arrancarGis_();
+  /* PRIMERO LAS NOTIFICACIONES, ANTES DE PODER SIQUIERA INICIAR SESION (Daniel, 28/07).
+     Estaba despues de resolver la identidad y eso es tarde: te dejaba escribir el correo,
+     elegir cuenta y esperar a que cargue todo para luego decirte que no pasas. */
+  var _entrar=function(){
+    var _sg=null; try{ _sg=JSON.parse(localStorage.getItem('sol_sess')||'null'); }catch(_){}
+    var _tok=(_sg && _sg.token && (Date.now()-(_sg.ts||0) < 50*60*1000)) ? _sg.token : null;
+    if(_tok) _onCredencial_({credential:_tok}, true);
+    else _arrancarGis_();
+  };
+  var _faltaN=_faltanNotis_();
+  if(_faltaN) _gateNotis_(_faltaN, _entrar); else _entrar();
 }
 </script>
 </body>

@@ -3,6 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- ICONO Y MANIFEST · lo pone el publicador segun el canal (ver `flujos/publicar_web.py`).
+     Se declaran AQUI y no se dejan a la convencion de la raiz del sitio: produccion y beta
+     viven en el mismo dominio, asi que heredando `/apple-touch-icon.png` las dos salian con
+     el MISMO icono. Con las dos instaladas en el movil, eso es abrir la que no era. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+<meta name="apple-mobile-web-app-title" content="Solaris">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
 <style>
@@ -270,6 +281,21 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .doc .dh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px;margin-top:2px}
 .doc .dv{width:100%;height:64vh;min-height:340px;border:0;display:block;background:#2a2526}
 .doc .dcar{padding:26px 12px;text-align:center;color:var(--ink3);font-size:12px;line-height:1.6}
+/* Pantalla completa del visor. Es CSS y no la Fullscreen API a proposito:
+   `requestFullscreen` sobre un elemento NO existe en iOS Safari, que es justo donde se lee un
+   documento con el movil en la mano. Una funcion que en la mitad de los aparatos no hace nada
+   es peor que no tenerla. */
+.doc.full{position:fixed;inset:0;z-index:9000;margin:0;border-radius:0;display:flex;
+  flex-direction:column;background:#0A0909}
+.doc.full .vcuerpo{flex:1;min-height:0;display:flex}
+.doc.full .dv{height:auto;min-height:0;flex:1}
+.vfull{margin-left:auto;background:none;border:1px solid var(--line);border-radius:7px;
+  width:26px;height:26px;padding:0;display:flex;align-items:center;justify-content:center;
+  color:var(--ink2);cursor:pointer;flex:none}
+.vfull:hover{color:var(--ink);border-color:var(--ink3)}
+.vfull svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round}
+.doc .dh .vchev{flex:none;margin-left:7px}
 .doc .da{display:block;padding:9px 12px;text-align:center;font-family:var(--mono);font-size:11px;
   color:var(--red2);border-top:1px solid var(--line);text-decoration:none}
 /* ficha de expediente: reaprovecha .parte (misma gramatica que un parte de horas) */
@@ -425,6 +451,30 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .pgr button i{display:block;border-radius:50%;background:var(--ink)}
 .pintor .modos{flex:none}
 .pintor .crece{flex:1}
+
+/* ── Lista de personas para sancionar · GEMELA del movil ───────────────────────
+   Un `<select>` de 40 nombres es una lista que hay que recorrer a ojo; aqui se escriben
+   tres letras. En el escritorio, ademas, cabe al lado de los campos en vez de encima. */
+/* La lista de personas: alta y con scroll propio, para que el formulario no se vaya a
+   tres pantallas cuando el equipo tiene cuarenta. */
+.sanlista{max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r2);
+  margin:0 0 11px;-webkit-overflow-scrolling:touch}
+.sangrupo{position:sticky;top:0;background:var(--sur2);padding:5px 10px;font-family:var(--mono);
+  font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+.sanper{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;
+  border:0;border-bottom:1px solid var(--line);padding:9px 10px;color:var(--ink);font:inherit;
+  font-size:12.5px;cursor:pointer}
+.sanper i{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--ink3);margin-left:auto}
+.sanper.on{background:rgba(228,30,37,.14);box-shadow:inset 3px 0 0 var(--red)}
+.sanper.on b{color:var(--red2)}
+/* Dos columnas: la lista a la izquierda, los campos a la derecha. Por debajo de 780 px
+   se apila -el panel se usa tambien en portatiles con la ventana a medias-. */
+.sanwrap{display:grid;grid-template-columns:minmax(230px,300px) 1fr;gap:16px;align-items:start}
+/* Los campos NO se estiran a todo el ancho: un desplegable de 1000 px para un texto de 40
+   caracteres deja los tres campos desperdigados. Un formulario mejora cuando el ojo va de
+   uno al siguiente sin viajar, no por ser mas ancho. */
+.sanwrap>div:last-child{max-width:520px}
+@media (max-width:780px){ .sanwrap{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -550,28 +600,169 @@ var backendOK=false, SESION=null;
    verificado—, asi que abrirla sin cuenta del dominio no enseña nada. Lo que esto evita
    es que el EQUIPO acabe usando sin querer una version a medias. */
 var CANAL='produccion';
+/* LA VERSION DEL RELEASE. La sella `publicar_web.py` al publicar a produccion con
+   `--release X.Y`; en beta y en local se queda vacia, que es la verdad: la beta no es
+   ninguna version, es lo que va camino de serlo.
+   Va SEPARADA de `BUILD` a proposito: `VERSION` dice QUE RELEASE es y `BUILD` dice QUE
+   CODIGO exacto. Entre dos releases la beta cambia de build sin cambiar de version, y
+   eso es justo lo que hay que poder distinguir al leer un reporte. */
+var VERSION='0.1';
+
 /* Quien puede usar la beta. Se deja en una funcion sola porque ensancharla es una linea:
    `|| rangoNom(...)>=1` mete a los coordinadores. */
 function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; }
 /* El escritorio no tiene `esAdmin`: su equivalente es `_puedeImpersonar_`, que mira el
    mismo correo. Se envuelve para que `_puedeBeta_` sea GEMELA de la del movil. */
+/* La misma busqueda con distinto nombre en cada cara; se envuelve para que el bloque de
+   autoridad de abajo sea IDENTICO en las dos y un diff lo confirme de un vistazo. */
+function _mSanc_(n){ return _m(n); }
+/* ═══ AUTORIDAD DE SANCIONES · GEMELA (movil/escritorio) ═══════════════════════════
+   Modelo dicho por Daniel el 28/07. Ver `docs/decisiones-app.md`.
+
+     rango 3 (PD) -> cualquiera, incluido el mismo
+     rango 2      -> cualquiera, incluido ellos mismos, SALVO al PD
+     rango 1      -> a si mismo y a los de su jurisdiccion
+     rango 0      -> nada, y NO VE la opcion
+
+   ⚠️ ESTO NO ES `rangoNom`. El rango de admin y la autoridad DOCUMENTAL son dos cosas
+   distintas desde hoy, y lo que obliga a separarlas es Bruno: rango 2 de admin y **cero**
+   autoridad documental. Con un solo rango no se puede decir eso sin darle tambien los papeles.
+
+   ⚠️ Y ESTO ES DE CARA, NO SEGURIDAD. El backend solo exige rango>=1 en `pushSancion`: la
+   frontera de verdad esta ahi y todavia no comprueba a QUIEN se sanciona. Mientras tanto, esto
+   evita el error honesto, no al que quiera saltarselo. */
+var PD_SANC = 'Daniel V\u00e1zquez Pi\u00f1eiro';
+/* La tabla es EXPLICITA a proposito: el modelo dice que el cargo no basta -«no necesariamente
+   por pertenecer al consejo se tendra rango 1 sino rango 0»- y que lo que da el rango 1 es
+   tener gente debajo. Deducirlo del cargo daria autoridad a quien no manda sobre nadie. */
+var RANGO_SANC = {
+  'Daniel V\u00e1zquez Pi\u00f1eiro': 3,
+  'Jos\u00e9 Manuel Torres Rodr\u00edguez': 2,
+  /* Bruno es la EXCEPCION del modelo: coordinador de Logistica con rango 2 de admin y ninguna
+     autoridad documental. Daniel: «es un poco como el Reaper de ir persiguiendo que se cumplan
+     los objetivos logisticos». */
+  'Bruno Ara\u00fajo Gonz\u00e1lez': 2
+};
+/* LAS SUBCOORDINACIONES. Un subsistema puede partirse en equipos con su propio
+   subcoordinador, y **un subcoordinador manda sobre SU equipo, no sobre la unidad**.
+   Estructura de hoy (Daniel, 28/07):
+     Avionica -> coordinador Oscar - subcoordinacion Software (Oscar) - Hardware (Breixo)
+
+   El coordinador de la unidad sigue mandando sobre la unidad ENTERA, subequipos incluidos:
+   Oscar llega a todo Avionica sea por coordinador o por subcoordinador de Software.
+
+   Se declara como ESTRUCTURA y no como una excepcion con nombre y apellidos, porque no lo es:
+   la siguiente subcoordinacion que se cree es UNA LINEA aqui y no un caso especial repartido
+   por el codigo. La gente va nombrada una a una porque «Hardware» no es un campo del roster:
+   es un reparto de trabajo, y deducirlo de algo seria inventarse una relacion que no existe.
+   Los nombres son los del ROSTER, completos: puestos por nombre de pila no casaban con nadie
+   y Breixo se quedaba sin equipo, en silencio. */
+var SUBCOORD = [
+  { unidad:'Aviónica', equipo:'Hardware', quien:'Breixo Pombar Fernández',
+    gente:['Breixo Pombar Fernández', 'Aaron Parada Valiño', 'Yoel Clemente González'] }
+];
+/* La subcoordinacion de alguien, o `null`. */
+function _subcoordDe_(n){
+  for (var i=0;i<SUBCOORD.length;i++) if (SUBCOORD[i].quien === String(n)) return SUBCOORD[i];
+  return null;
+}
+function rangoSanc(nombre){
+  var n = String(nombre || '');
+  if (RANGO_SANC[n] != null) return RANGO_SANC[n];
+  /* Rango 1 = tiene gente bajo su jurisdiccion: los coordinadores (su unidad) y quien tenga
+     jurisdiccion propia declarada (un subcoordinador). */
+  if (_subcoordDe_(n)) return 1;
+  var m = _mSanc_(n);
+  if (m && m.cargo === 'Coordinador') return 1;
+  return 0;
+}
+/* ¿Puede `actor` sancionar a `objetivo`? Una sola puerta: si alguna pantalla decide esto por su
+   cuenta, en dos semanas dira otra cosa que esta. */
+function puedeSancionarA(actor, objetivo){
+  var r = rangoSanc(actor);
+  if (r <= 0) return false;
+  if (r >= 3) return true;                                   // el PD, a cualquiera
+  if (r === 2) return String(objetivo) !== PD_SANC;          // rango 2, a todos menos al PD
+  /* Rango 1: a si mismo y a los suyos. */
+  if (String(objetivo) === String(actor)) return true;
+  var a = _mSanc_(actor), o = _mSanc_(objetivo);
+  /* Coordinador de la unidad: la unidad ENTERA, subequipos incluidos. Se mira ANTES que la
+     subcoordinacion porque Oscar es las dos cosas y lo que manda es lo mas amplio. */
+  if (a && a.cargo === 'Coordinador' && o && a.unidad && a.unidad === o.unidad) return true;
+  /* Subcoordinador: SU equipo y nada mas. No se le suma el subsistema — eso es justo lo
+     que lo distingue del coordinador. */
+  var sc = _subcoordDe_(String(actor));
+  if (sc) return sc.gente.indexOf(String(objetivo)) >= 0;
+  return false;
+}
+/* A quien puede sancionar, ya filtrado. Lo usan los dos formularios: que la lista salga de
+   la MISMA regla que el permiso es lo que impide ofrecer a alguien y que el envio falle. */
+function sancionablesPor(actor){
+  return (DATA.miembros || []).filter(function(m){
+    return m && !m.baja && puedeSancionarA(actor, m.nombre);
+  });
+}
 function esAdmin(){ return _puedeImpersonar_(); }
+/* ⚠️ AUTORIDAD TRIPLICADA a proposito (mapa §5, D9): `rangoNom`, `coordinadorDe`,
+   `revisoresDe` y `puedeDecidir*` existen aqui, en `movil.html` y en el backend
+   (`_rangoNom_`, `_coordinadorDe_`, `_revisoresDe_`, `_puedeDecidir_`). **El backend es
+   la unica frontera de seguridad**; las dos caras llevan su copia solo para PINTAR.
+   Si cambias una regla de autoridad, son TRES ficheros.
+   `puedeDecidirParte` y `puedeDecidirDoc` NO se funden: son dos autoridades distintas
+   -horas y documentos- y darles el mismo nombre las haria parecer la misma. */
 function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre) : 0; }
 
-function _apiParse(txt){ var j=null; try{ j=JSON.parse(txt); }catch(_){}
-  if(!j || j.ok!==true) throw new Error((j&&j.error)||"respuesta no válida del backend");
-  return j.data; }
+/* `_ApiTransito` marca los fallos que SI se reintentan: la peticion no llego entera. Se
+   distingue de un «no» del backend, que no se reintenta porque tiene criterio. */
+function _ApiTransito(m){ this.message=m; this.transito=true; }
+_ApiTransito.prototype=Object.create(Error.prototype);
+/* ═══ LOGIN Y SESION · GEMELO EN LA OTRA CARA ═══════════════════════════════════
+   Todo este bloque -`_gate_`, `_onCredencial_`, `_pintarLogin_`, `_arrancarGis_`,
+   `cerrarSesion`, `_apiParse` y el objeto `api`- esta **calcado** en el otro fichero. Es
+   deliberado: son dos artefactos autocontenidos y la CSP impide compartir codigo.
+
+   ⚠️ **CAMBIAR UNO SIN CAMBIAR EL OTRO ES COMO EMPIEZAN LAS DIVERGENCIAS.** Paso hoy con el
+   visor de documentos: tres copias, una mejora en una, y las otras dos sin enterarse.
+   Si tocas algo de aqui, abre el otro fichero antes de dar el cambio por hecho. (Mapa §5, D11.)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+function _apiParse(txt, accion){
+  var j=null; try{ j=JSON.parse(txt); }catch(_){}
+  /* Lo que vuelve no es JSON: es la pagina HTML de Google del 404 transitorio. */
+  if(!j) throw new _ApiTransito("respuesta no válida del backend");
+  if(j.ok===true) return j.data;
+  var err=String(j.error||"");
+  /* «acción desconocida: » con la accion VACIA = el cuerpo del POST se perdio por el camino
+     y el backend no vio ninguna accion. Nunca llego a ejecutarse nada, asi que se repite. */
+  if(accion && /^acci[oó]n desconocida/.test(err) && err.indexOf(accion)<0)
+    throw new _ApiTransito("el cuerpo del POST no llegó ("+err+")");
+  throw new Error(err||"respuesta no válida del backend");
+}
 var api={
   _get: async function(params){
     var qs=Object.keys(params).map(function(k){ var v=params[k];
       return k+"="+encodeURIComponent(typeof v==="string"?v:JSON.stringify(v)); }).join("&");
     var r=await fetch(BACKEND_URL+"?"+qs,{cache:"no-store"});
     return _apiParse(await r.text()); },
+  /* TRES INTENTOS. Apps Script pierde el cuerpo del POST de vez en cuando (302->404) y
+     hasta ahora eso era un fallo a la cara del usuario: «no fui capaz de fichar». Se nota en
+     el fichaje y no en el resto porque las demas pantallas se refrescan solas y la siguiente
+     pasada tapaba el hueco. Misma regla que `rutinas/llamar.py`. */
   _post: async function(body){
     if(SESION&&SESION.token&&!body.token) body=Object.assign({},body,{token:SESION.token});
-    var r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify(body)});
-    return _apiParse(await r.text()); },
+    var accion=String(body.action||""), ultimo=null;
+    for(var i=0;i<3;i++){
+      if(i) await new Promise(function(ok){ setTimeout(ok, 600+i*800); });
+      try{
+        var r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+          body:JSON.stringify(body)});
+        return _apiParse(await r.text(), accion);
+      }catch(e){
+        /* Un «no» del backend no se reintenta; un fallo de red o de transito, si. */
+        if(e && !e.transito && !(e instanceof TypeError)) throw e;
+        ultimo=e;
+      }
+    }
+    throw ultimo || new Error("no se pudo hablar con el servidor"); },
   ping:        function(){ try{ fetch(BACKEND_URL+"?action=ping",{cache:"no-store"}).catch(function(){}); }catch(_){} },
   bootstrap:   function(t,nombre){ var b={action:"bootstrap"}; if(t)b.token=t; if(nombre)b.nombre=nombre; return api._post(b); },
   quienSoy:    function(t){ return api._post({action:"quienSoy",token:t}); },
@@ -600,6 +791,9 @@ var api={
   decidir:     function(id,a,m,x){ return api._post({action:"decidir",id:id,accion:a,motivo:m,extra:x}); },
   getSanciones:function(f){ return api._post({action:"getSanciones",filtro:f||{}}); },
   pushSancion: function(ss){ return api._post({action:"pushSancion",sanciones:ss}); },
+  /* GEMELA del movil. La necesita la sancion por incumplir un plazo: mueve la fecha en
+     Notion (backend v48) ANTES de sancionar. */
+  moverLimiteTarea: function(u,f){ return api._post({action:"moverLimiteTarea",url:u,fecha:f}); },
   decidirSancion: function(id,a,o){ return api._post(Object.assign({action:"decidirSancion",id:id,accion:a},o||{})); },
   agruparSanciones: function(ids,l){ return api._post({action:"agruparSanciones",ids:ids,lote:l}); },
   confirmarLote: function(l){ return api._post({action:"confirmarLote",lote:l}); },
@@ -888,7 +1082,7 @@ var DOCS=[
  {id:7,ref:'Acta_S-6302_26',tit:'Acta del consejo del 10/07/2026',autor:'Lois Carballo Sendón',
   sub:'Dirección',amb:'general',est:'publicado',sev:'baja',iss:0}
 ];
-function revisoresDeDoc(d){
+function revisoresDe(d){
   var r = d.amb==='general' ? [PD_NOM] : d.amb==='subsistema' ? [PD_NOM,REV2_NOM] : [coordinadorDe(d.sub)];
   r=r.filter(function(n){return n!==d.autor;});
   if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n){return n!==d.autor;});
@@ -932,7 +1126,7 @@ function _normDocE_(d, i){
     _crudo:  d
   };
 }
-function docsMios(){return DOCS.filter(function(d){return d.est==='revision' && revisoresDeDoc(d).indexOf(ACTOR)>=0;});}
+function docsMios(){return DOCS.filter(function(d){return d.est==='revision' && revisoresDe(d).indexOf(ACTOR)>=0;});}
 
 /* ── DISCIPLINA ────────────────────────────────────────────────────────── */
 var SANC_BACK=null;   /* cola real de sanciones del backend; null = semilla ficticia */
@@ -1007,6 +1201,7 @@ var CANDID=[
    PIEZAS COMUNES
    ═══════════════════════════════════════════════════════════════════════════ */
 /* Un solo estilo de campo para toda la cara: estaba copiado en dos sitios como `var E`. */
+/* (el CSS de la lista de personas se inyecta abajo, junto al resto de estilos) */
 var CAMPO_CSS='width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
   'padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px';
 function pan(cab,der,cuerpo,cls){
@@ -1023,7 +1218,10 @@ function tabla(cols,filas){
   return '<div class="tw"><table><thead><tr>'+cols.map(function(c){
     return '<th'+(c[1]?' class="r"':'')+'>'+c[0]+'</th>';}).join('')+'</tr></thead><tbody>'+filas+'</tbody></table></div>';
 }
-function vac(t,p){ return '<div class="vac"><b>'+esc(t)+'</b>'+p+'</div>'; }
+/* `vacioSimple` y no `vac`: en el movil hay un `vacio` que es OTRA cosa -lleva el
+   radar y su parrafo- y dos nombres casi iguales para dos cosas distintas es peor
+   que dos nombres distintos. Mapa §5, D10. */
+function vacioSimple(t,p){ return '<div class="vac"><b>'+esc(t)+'</b>'+p+'</div>'; }
 
 /* instrumento de puntos — geometría de gauge(): 10 arcos de 36°, hueco de 8°.
    Aquí admite DECIMALES, porque lo que se mide es la MEDIA del equipo (04b). */
@@ -1117,7 +1315,7 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
           '<span class="tx"><b>'+x.b+'</b><small>'+x.s+'</small></span>'+
           '<span class="der">'+x.chip+'<span class="chev">›</span></span></div>';
       }).join('')
-    : vac('Nada requiere tu decisión','No hay partes de horas, expedientes ni sanciones esperando tu firma. Lo que te toque decidir aparecerá aquí.');
+    : vacioSimple('Nada requiere tu decisión','No hay partes de horas, expedientes ni sanciones esperando tu firma. Lo que te toque decidir aparecerá aquí.');
 
   return pan('Requiere tu decisión',cola.length+' asuntos',lista,'destaca')+
     '<div class="kpis">'+
@@ -1133,7 +1331,7 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
       pan('Conducta del equipo', media==null?'sin datos':('media de '+conPts.length),
         '<div class="pb" style="display:flex;flex-direction:column;align-items:center;gap:12px">'+
           (media==null
-            ? vac('Sin puntos del equipo','Tu cuenta solo ve el nombre, la unidad y el cargo del resto del '+
+            ? vacioSimple('Sin puntos del equipo','Tu cuenta solo ve el nombre, la unidad y el cargo del resto del '+
                 'equipo, no sus puntos. Si necesitas la conducta del equipo, pídesela al Project Director.')
             : anilloHTML(media,'media del equipo'))+
           '<p style="margin:0;font-size:11.5px;color:var(--ink3);line-height:1.6;text-align:center">'+
@@ -1454,23 +1652,47 @@ function convocarReunionPanel(){
       '<label style="flex:1;min-width:220px">'+lab('Orden del día · enlace')+
         '<input id="cvOrden" placeholder="https://drive.google.com/…" style="'+E+'"></label>'+
     '</div>'+
+    /* HORARIO POR DÍA. Se pinta al vuelo (`#cvDias`) porque depende de las fechas, que
+       cambian mientras rellenas. Un día apagado NO es un día con horario vacío: es un día
+       que no se ofrece, y eso se ve. */
+    '<div style="display:flex;gap:9px;align-items:flex-end;margin-bottom:9px;flex-wrap:wrap">'+
+      '<label style="flex:1;min-width:240px">'+lab('Copiar la distribución de otra reunión')+
+        '<select id="cvCopia" style="'+E+'"><option value="">— sin copiar —</option>'+
+        (REUS||[]).filter(function(r){ return (r.franjas||[]).length; }).map(function(r){
+          return '<option value="'+esc(r.id)+'">'+esc(r.titulo||('Reunión '+r.id))+
+                 ' · '+((r.dias||[]).length)+' días</option>'; }).join('')+
+        '</select></label>'+
+      '<button class="btn" id="cvHorAbrir" type="button">Horario por día</button>'+
+    '</div>'+
+    '<div id="cvDias" hidden style="margin-bottom:11px"></div>'+
     '<div class="nota" id="cvPrev" style="border-top:0;margin-bottom:11px">—</div>'+
     '<button class="btn pri" data-convreu>Convocar la reunión</button>'+
-    '<div class="nota">Lo que <b>no</b> hay aquí y sí en el móvil: <b>horario distinto por '+
-    'día</b> y <b>copiar la distribución</b> de otra reunión. Si necesitas una de las dos, '+
-    'convócala desde el móvil.</div>'+
     '</div>');
 }
 /* CABLEADO DE LA CONVOCATORIA. Va aparte de `enganchar()` porque `pintar()` lo llama
    justo después de meter el HTML, y porque tiene su propio estado (`CONV_INV`) que hay
    que conservar entre repintados: si se reconstruyera, marcar a alguien y que el refresco
    en vivo lo borrase sería exactamente el fallo que se arregló en el móvil. */
+/* Horario POR DIA de la convocatoria en curso: `{ '27/07': {h0:'16:00', h1:'23:00', off:false} }`.
+   Vive fuera del HTML por lo mismo que `CONV_INV`: `pintar()` reconstruye la vista y un
+   refresco en vivo te borraria lo que estabas configurando. Se vacia al convocar. */
+var CONV_HOR={};
 function _cablearConvocar_(){
   var t=$('#cvTipo'); if(!t) return;                  // no está la vista o no hay potestad
   var val=function(id){ var e=$('#'+id); return e?e.value:''; };
   var dias=function(){ return _diasEntre_(val('cvD0'), val('cvD1')); };
-  var rangos=function(){ var h0=_horasHM_(val('cvH0')), h1=_horasHM_(val('cvH1'));
-    return dias().map(function(){ return [h0,h1]; }); };
+  /* El rango de CADA dia: el suyo si lo tiene, el general si no, y `null` si esta apagado.
+     `_genUnion_` ya sabe tratar los tres casos -filtra `r && r[1]>r[0]`-, asi que aqui no hay
+     que decidir nada mas: solo dejar de tirar la informacion. */
+  var rangos=function(){
+    var h0=_horasHM_(val('cvH0')), h1=_horasHM_(val('cvH1'));
+    return dias().map(function(d){
+      var c=CONV_HOR[d];
+      if(!c) return [h0,h1];
+      if(c.off) return null;
+      return [_horasHM_(c.h0||val('cvH0')), _horasHM_(c.h1||val('cvH1'))];
+    });
+  };
   function pintaChips(){
     $$('#cvPool [data-cinv]').forEach(function(b){
       b.classList.toggle('on', CONV_INV.has(b.dataset.cinv)); });
@@ -1492,6 +1714,97 @@ function _cablearConvocar_(){
         '<b>'+CONV_INV.size+'</b> convocados'+
         (du%sl ? ' · la duración no es múltiplo de la casilla, se redondea hacia arriba' : '');
   }
+  /* La tabla de días se repinta cada vez que cambian las fechas: es la única forma de que
+     no se quede hablando de días que ya no existen. Lo configurado se conserva por FECHA, no
+     por posición, así que mover el rango un día no descoloca lo que ya habías puesto. */
+  function pintaDias(){
+    var c=$('#cvDias'); if(!c) return;
+    /* `CAMPO_CSS` y no `E`: `E` es una variable LOCAL de `convocarReunionPanel` y aqui no
+       existe. Usarla hacia que esta funcion lanzara justo despues de quitar el `hidden`, o
+       sea que el bloque se abria VACIO y sin un solo error a la vista. Cazado ejecutando. */
+    var E=CAMPO_CSS;
+    var ds=dias();
+    if(!ds.length){ c.innerHTML='<div class="nota" style="border-top:0">Revisa las fechas.</div>'; return; }
+    c.innerHTML='<div class="nota" style="border-top:0;margin-bottom:7px">Sin tocar nada, todos '+
+      'los días usan el horario de arriba. Apaga un día para no ofrecerlo.</div>'+
+      ds.map(function(d){
+        var cf=CONV_HOR[d]||{}, off=!!cf.off;
+        return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;'+
+          (off?'opacity:.45':'')+'">'+
+          '<b style="width:82px;font-size:12.5px">'+esc(d)+'</b>'+
+          '<select data-chd="'+esc(d)+'" data-q="h0" '+(off?'disabled':'')+' style="'+E+';width:118px">'+
+            optHoras(cf.h0||val('cvH0'))+'</select>'+
+          '<select data-chd="'+esc(d)+'" data-q="h1" '+(off?'disabled':'')+' style="'+E+';width:118px">'+
+            optHoras(cf.h1||val('cvH1'))+'</select>'+
+          '<button class="btn sm" type="button" data-choff="'+esc(d)+'">'+(off?'Apagado':'Activo')+'</button>'+
+        '</div>';
+      }).join('');
+    $$('[data-chd]',c).forEach(function(sel){
+      sel.onchange=function(){
+        var d=sel.dataset.chd; CONV_HOR[d]=CONV_HOR[d]||{};
+        CONV_HOR[d][sel.dataset.q]=sel.value; upd();
+      };
+    });
+    $$('[data-choff]',c).forEach(function(b){
+      b.onclick=function(){
+        var d=b.dataset.choff; CONV_HOR[d]=CONV_HOR[d]||{};
+        CONV_HOR[d].off=!CONV_HOR[d].off; pintaDias(); upd();
+      };
+    });
+  }
+  var ha=$('#cvHorAbrir');
+  if(ha) ha.onclick=function(){
+    var c=$('#cvDias'); if(!c) return;
+    if(c.hasAttribute('hidden')){ c.removeAttribute('hidden'); pintaDias(); ha.classList.add('on'); }
+    else { c.setAttribute('hidden',''); ha.classList.remove('on'); }
+  };
+  /* COPIAR LA DISTRIBUCIÓN. Se copia el horario de cada día POR POSICIÓN. Si la vieja tenía
+     menos días, los que sobran se quedan con el horario general: lo normal es alargar una
+     tanda, y apagarlos sería decidir por quien convoca. */
+  var cp=$('#cvCopia');
+  if(cp) cp.onchange=function(){
+    var r=(REUS||[]).filter(function(x){ return String(x.id)===cp.value; })[0];
+    if(!r){ CONV_HOR={}; pintaDias(); upd(); return; }
+    var ds=dias(), F=r.franjas||[], bl=r.bloques||[];
+    /* Solo se copia si las franjas de origen traen HORA. Las hay que no -formatos viejos, o
+       una reunión que nunca llegó a tener rejilla-, y sin `ini` la cuenta sale de un cero y
+       escribe un horario inventado (salían días de 00:00 a 01:00). Antes que eso, se dice. */
+    var conHora=F.filter(function(f){ return f && f.ini; }).length;
+    if(!conHora){
+      cp.value='';
+      tost('Esa reunión no tiene horario que copiar: sus franjas no traen hora.');
+      return;
+    }
+    /* De los bloques se saca, por día, la primera y la última franja ofertada: eso ES su
+       horario. Reconstruirlo así -y no guardarlo aparte- evita que las dos cosas discrepen. */
+    var porDia={};
+    bl.forEach(function(b){ if(!Array.isArray(b)) return;
+      var d=b[0], f=b[1]; if(!F[f]) return;
+      if(!porDia[d]) porDia[d]={a:f,b:f}; else { if(f<porDia[d].a) porDia[d].a=f; if(f>porDia[d].b) porDia[d].b=f; }
+    });
+    /* Una reunión SIN `bloques` no es una reunión sin horario: es una rectangular, donde
+       todas las franjas se ofrecen todos los días. Sin este respaldo, copiar de una de esas
+       no hacía nada y parecía que el botón estaba roto. */
+    if(!Object.keys(porDia).length && F.length){
+      var todo={a:0, b:F.length-1};
+      (r.dias||ds).forEach(function(_,i){ porDia[i]=todo; });
+    }
+    CONV_HOR={};
+    ds.forEach(function(d,i){
+      var p=porDia[i]; if(!p) return;
+      var ini=F[p.a].ini, finM=_horasHM_(F[p.b].ini)*60 + (+F[p.b].dur||60);
+      CONV_HOR[d]={ h0:ini, h1:pad(Math.floor(finM/60))+':'+pad(Math.round(finM%60)) };
+    });
+    var c=$('#cvDias'); if(c && c.hasAttribute('hidden')){ c.removeAttribute('hidden'); if(ha) ha.classList.add('on'); }
+    pintaDias(); upd();
+    tost('Copiado el horario de «'+(r.titulo||r.id)+'» a '+Object.keys(CONV_HOR).length+' día(s).');
+  };
+  /* Cambiar las fechas rehace la tabla: si no, habla de días que ya no existen. */
+  ['cvD0','cvD1','cvH0','cvH1'].forEach(function(id){
+    var e=$('#'+id); if(!e) return;
+    var antes=e.onchange;
+    e.onchange=function(){ if(antes) antes.call(e); if(!$('#cvDias').hasAttribute('hidden')) pintaDias(); upd(); };
+  });
   t.onchange=function(){
     /* Al cambiar el tipo se rehace la lista de convocados: es lo que espera cualquiera
        que elige «General» después de haber trasteado. Los tipos sin preset (consejo,
@@ -1550,7 +1863,7 @@ function _cablearConvocar_(){
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Convocando…';
     try{
       await api.crear(reu);
-      CONV_INV=null;                                  // la siguiente empieza limpia
+      CONV_INV=null; CONV_HOR={};                     // la siguiente empieza limpia
       tost('Reunión convocada · '+reu.invitados.length+' convocados, '+bloques.length+' bloques.');
       /* Se RECARGA del servidor en vez de fabricar una copia local: así no se enseña algo
          que en la nube no está. Se conservan las respuestas ya hidratadas —la lista NO las
@@ -1612,7 +1925,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
       kpi('Resueltos este mes',hist.length,'con su motivo registrado','up')+
     '</div>'+
     pan('Requieren tu decisión',mias.length+' partes',
-      mias.length?mias.map(parteCard).join(''):vac('La cola está limpia',
+      mias.length?mias.map(parteCard).join(''):vacioSimple('La cola está limpia',
         'Cuando alguien de tu unidad declare horas, aparecerá aquí con su justificación a la vista.'),'destaca')+
     pan('Otorgar horas directamente','sin que nadie las pida',
       '<div class="pb"><p style="margin:0 0 11px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
@@ -1640,7 +1953,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
           h1(p.horas)+' · '+esc(p.tarea)+'</b><small>'+p.fecha+' · decidió '+
           esc(_m(p.decisor||PD_NOM).pila)+' el '+(p.dec||'—')+
           (p.motivo?' · «'+esc(p.motivo)+'»':'')+'</small></span><span class="der">'+et+'</span></div>';
-      }).join(''):vac('Todavía no hay decisiones','Cada parte que apruebes, devuelvas o rechaces queda aquí '+
+      }).join(''):vacioSimple('Todavía no hay decisiones','Cada parte que apruebes, devuelvas o rechaces queda aquí '+
         'con su motivo y con quién lo firmó.'))+
     '<div class="pan"><div class="nota">Un parte lo firma el <b>coordinador de la unidad de quien lo declara</b>. '+
       'Si el autor es ese coordinador, pasa al revisor de más rango: primero el Project Director, luego el '+
@@ -1658,7 +1971,7 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
         return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+h1(p.horas)+'</b>'+
           '<small>'+esc(p.unidad)+' · '+p.fecha+(p.ini!=='—'?' · '+p.ini+'–'+p.fin:'')+'</small></span>'+
           '<span class="der"><span class="chip wa">sin declarar</span></span></div>';
-      }).join(''):vac('Nada sin declarar','Cuando alguien fiche salida sin justificar aparece aquí, hasta que lo declare o caduque (7 días).'),'destaca')+
+      }).join(''):vacioSimple('Nada sin declarar','Cuando alguien fiche salida sin justificar aparece aquí, hasta que lo declare o caduque (7 días).'),'destaca')+
     (cad.length?pan('Caducados',cad.length+' · se perdieron sin declarar',
       cad.map(function(p){
         return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+h1(p.horas)+'</b>'+
@@ -1678,7 +1991,7 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
 var CURSO_CONECTADO=false;
 V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
   if(!CURSO_CONECTADO) return pan('Sesiones abiertas ahora mismo','sin conectar',
-    vac('Todavía no se pueden ver los fichajes de los demás','El backend guarda las sesiones '+
+    vacioSimple('Todavía no se pueden ver los fichajes de los demás','El backend guarda las sesiones '+
       'abiertas —de hecho las cierra solas a las 14 h— pero no hay ninguna acción que las '+
       'sirva todas juntas: la que existe devuelve <b>la tuya</b>. Falta '+
       '<span class="mono">getFichajesAbiertos</span> en el backend.')+
@@ -1694,7 +2007,7 @@ V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
         '<small>'+esc(c.lugar)+' · desde las '+c.desde+'</small></span>'+
         '<span class="q mono">'+hh+' h '+String(mm).padStart(2,'0')+'</span>'+
         (wa?'<span class="chip wa">avisado</span>':'<span class="chip ok">en curso</span>')+'</div>';
-    }).join(''):vac('Nadie fichado ahora mismo','Cuando alguien fiche entrada aparece aquí, con dónde '+
+    }).join(''):vacioSimple('Nadie fichado ahora mismo','Cuando alguien fiche entrada aparece aquí, con dónde '+
       'está y cuánto lleva abierto.'))+
     '<div class="nota">Un fichaje que pasa de <b>10 horas abiertas</b> se marca en ámbar y se avisa a quien lo '+
     'tiene abierto. A las <b>14 h</b> se cierra solo con la hora de su última actividad y le queda pendiente '+
@@ -1707,7 +2020,7 @@ V.registro={g:'Horas',t:'Registro del mes',f:function(){
      las ajenas, y una tabla de filas vacias no es un registro, es ruido. */
   var VIS=_activos_().filter(function(m){ return typeof m.hMes==='number'; });
   if(!VIS.length) return pan('Registro del mes','sin datos',
-    vac('Sin horas del equipo','Tu cuenta solo tiene acceso a tus propias horas, no a las del resto. '+
+    vacioSimple('Sin horas del equipo','Tu cuenta solo tiene acceso a tus propias horas, no a las del resto. '+
       'Si necesitas el registro completo del mes, pídeselo al Project Director.'));
   var tot=VIS.reduce(function(a,m){return a+(m.hMes||0);},0);
   return '<div class="chips"><span class="chip">TOTAL <b style="color:var(--ink)">'+nf(tot,1)+' h</b></span>'+
@@ -1757,7 +2070,7 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
       '<div class="nota" style="border-top:0">Preguntando al servidor en qué punto está el cierre…</div>');
   if(CIERRE_ERR)
     return pan('Cierre de '+fin.mes,'no se pudo comprobar',
-      vac('No se pudo leer el estado del cierre', esc(CIERRE_ERR)+'. No es que esté todo listo: '+
+      vacioSimple('No se pudo leer el estado del cierre', esc(CIERRE_ERR)+'. No es que esté todo listo: '+
         'es que no se ha podido comprobar, y cerrar a ciegas mueve la cuota de 32 personas.'));
   var bloq=(CIERRE.bloqueos)||[], enc=CIERRE.encolado||null, plan=CIERRE.plan||null;
   /* Los bloqueos los da el SERVIDOR mirando el dato. La vista ya no los deduce por su
@@ -1834,19 +2147,106 @@ function rangoPila(pila){ for(var i=0;i<DATA.miembros.length;i++)
   if(DATA.miembros[i].pila===pila) return rangoNom(DATA.miembros[i].nombre); return 0; }
 function puedeDecidirDoc(d){
   if(!d || d.autor===ACTOR) return false;
-  var rev=revisoresDeDoc(d), maxR=Math.max.apply(null,rev.map(rangoNom));
+  var rev=revisoresDe(d), maxR=Math.max.apply(null,rev.map(rangoNom));
   if(rev.indexOf(ACTOR)<0 && rangoNom(ACTOR)<=maxR) return false;
   if(['revision','recibido','analizado'].indexOf(d.est)>=0) return true;
   return d.revisor===_m(ACTOR).pila || rangoNom(ACTOR)>rangoPila(d.revisor);
 }
 function _idDrive_(u){ var m=String(u||'').match(/\/d\/([A-Za-z0-9_-]{20,})/); return m?m[1]:null; }
+/* ═══ EL VISOR DE DOCUMENTOS · GEMELA (movil/escritorio) ═══════════════════════
+   Habia TRES copias de esto -la memoria de un turno, la revision documental del movil y la
+   del escritorio-, identicas salvo en el texto de «cargando» y en si nacian plegadas. Daniel
+   lo cazo por el sintoma: «no esta la pantalla completa en las revisiones documentales como
+   si lo estaba en ordenes del dia... las separaste por pereza». Tenia razon: una mejora
+   puesta en una copia no le llegaba a las otras.
+
+   Ahora es una sola, y las dos diferencias son parametros:
+     · `plegado` — nace cerrada (la memoria de un turno se abre para ver quien va, no para
+       leer el informe) o abierta (una revision documental existe PARA leerlo).
+     · `queEs`   — «la memoria» / «el documento», que es lo unico que cambiaba del texto.
+
+   El iframe se crea **al desplegar**, nunca antes: tres visores de Drive cargando a la vez en
+   una ficha es medio megabyte que casi nadie va a mirar. */
+function _visorHTML_(o){
+  var abierto = !o.plegado;
+  return '<div class="doc" data-visor>'+
+    '<div class="dh" data-vabrir="'+esc(o.id||'')+'" data-p style="cursor:pointer">'+
+      '<b>'+esc(o.titulo)+'</b><small>'+esc(o.sub||'')+(o.plegado?' · pulsa para leerlo':'')+'</small>'+
+      /* La pantalla completa va en la cabecera y NO despliega: `stopPropagation` en su
+         manejador. Sin eso, pulsarla plegaba el visor a la vez que lo maximizaba. */
+      '<button class="vfull" data-vfull data-p title="Pantalla completa" aria-label="Pantalla completa">'+
+        '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>'+
+      '<svg class="vchev" viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;'+
+        'stroke:currentColor;stroke-width:2.4;transition:transform .3s'+(abierto?';transform:rotate(180deg)':'')+'">'+
+        '<path d="M6 9l6 6 6-6"/></svg></div>'+
+    '<div class="vcuerpo"'+(abierto?'':' hidden')+' data-quees="'+esc(o.queEs||'el documento')+'">'+
+      (abierto?'<div class="dcar">Cargando '+esc(o.queEs||'el documento')+'…</div>':'')+'</div>'+
+    (o.url?'<a class="da" href="'+esc(o.url)+'" target="_blank" rel="noopener">abrir en Drive</a>':'')+
+  '</div>';
+}
+/* Mete el iframe de Drive en un cuerpo ya visible. Si no carga -permisos, CSP del hosting- se
+   DICE y se ofrece el enlace: un hueco blanco eterno es peor, porque quien revisa no sabe si
+   esperar o si esta roto. */
+function _cargarVisor_(cuerpo, id){
+  if(cuerpo.dataset.cargado) return; cuerpo.dataset.cargado='1';
+  var que=cuerpo.dataset.quees||'el documento';
+  if(!id){ cuerpo.innerHTML='<div class="dcar">El enlace no es un archivo de Drive reconocible.<br>'+
+    'Ábrelo con el enlace de abajo.</div>'; return; }
+  cuerpo.innerHTML='<div class="dcar">Cargando '+que+'…</div>';
+  var f=document.createElement('iframe');
+  f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
+  f.src='https://drive.google.com/file/d/'+id+'/preview';
+  var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
+    cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
+  f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
+  cuerpo.innerHTML=''; cuerpo.appendChild(f);
+}
+function _cablearVisor_(raiz){
+  var R=raiz||document;
+  $$('[data-visor] .vcuerpo',R).forEach(function(c){          // los que nacen abiertos
+    if(!c.hasAttribute('hidden')){
+      var h=c.parentNode.querySelector('[data-vabrir]');
+      _cargarVisor_(c, h && h.dataset.vabrir);
+    }
+  });
+  $$('[data-vabrir]',R).forEach(function(h){
+    h.onclick=function(){
+      var caja=h.parentNode, cuerpo=caja.querySelector('.vcuerpo'), sv=caja.querySelector('.vchev');
+      if(!cuerpo.hasAttribute('hidden')){ cuerpo.setAttribute('hidden',''); if(sv) sv.style.transform=''; return; }
+      cuerpo.removeAttribute('hidden'); if(sv) sv.style.transform='rotate(180deg)';
+      _cargarVisor_(cuerpo, h.dataset.vabrir);
+    };
+  });
+  $$('[data-vfull]',R).forEach(function(b){
+    b.onclick=function(ev){
+      ev.stopPropagation();                                    // no despliega: solo maximiza
+      var caja=b.closest('.doc'), cuerpo=caja.querySelector('.vcuerpo');
+      var yaEsta=caja.classList.toggle('full');
+      document.body.style.overflow = yaEsta ? 'hidden' : '';
+      /* Maximizar con el visor plegado no enseñaria nada: se abre y se carga. */
+      if(yaEsta && cuerpo.hasAttribute('hidden')){
+        cuerpo.removeAttribute('hidden');
+        var sv=caja.querySelector('.vchev'); if(sv) sv.style.transform='rotate(180deg)';
+        _cargarVisor_(cuerpo, (caja.querySelector('[data-vabrir]')||{dataset:{}}).dataset.vabrir);
+      }
+    };
+  });
+  if(!_cablearVisor_._esc){
+    _cablearVisor_._esc=true;
+    document.addEventListener('keydown', function(e){
+      if(e.key!=='Escape') return;
+      var f=document.querySelector('.doc.full');
+      if(f){ f.classList.remove('full'); document.body.style.overflow=''; }
+    });
+  }
+}
 /* La fila YA NO DECIDE. Tenia «Aprobar» y «Cambios» ahi mismo, con el titulo por toda
    informacion: eso es firmar a ciegas, justo lo que la pantalla venia a evitar. Ahora
    se pulsa y se abre el expediente entero (`docCard`), que es donde estan los botones. */
 var DOC_SEL=null;                 // expediente desplegado en las listas compactas
 function filaDoc(d){
   if(DOC_SEL===d.id) return docCard(d);
-  var rev=revisoresDeDoc(d).map(function(n){return _m(n).pila;}).join(' o ');
+  var rev=revisoresDe(d).map(function(n){return _m(n).pila;}).join(' o ');
   var st=estDoc(d.est), mio=puedeDecidirDoc(d) && d.est==='revision';
   return '<div class="dec" id="doc-'+d.id+'" data-docsel="'+d.id+'">'+
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
@@ -1864,7 +2264,7 @@ function filaDoc(d){
    incrustado, y las cuatro palabras clave del correo real -aprobar, aprobar con
    anotaciones, solicitar cambios, rechazar- mas deshacer y reenviar. */
 function docCard(d){
-  var revs=revisoresDeDoc(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
+  var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
   var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';
   var lista=function(t,xs){ return (xs&&xs.length)
     ? '<div class="sub"><span class="sc">'+t+'</span><ul class="obj">'+
@@ -1886,12 +2286,10 @@ function docCard(d){
       esc(d.nota||'Sin motivo escrito.')+'</div>' : '';
   var idD=_idDrive_(d.drive);
   var visor = d.drive
-    ? '<div class="doc"><div class="dh" data-vdoc="'+esc(idD||'')+'">'+
-      '<b>El documento</b><small>'+esc(d.ref)+' · pulsa para leerlo</small>'+
-      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
-      'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
-      '<div class="vcuerpo" hidden></div>'+
-      '<a class="da" href="'+esc(d.drive)+'" target="_blank" rel="noopener">abrir en Drive</a></div>'
+    /* Nace ABIERTO, igual que en el movil: esta ficha existe para leer el archivo antes de
+       decidir. Y con pantalla completa, que era lo que faltaba aqui y estaba en otro sitio. */
+    ? _visorHTML_({id:idD, url:d.drive, titulo:'El documento', sub:d.ref,
+                   queEs:'el documento', plegado:false})
     : '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
       'Cowork lo manda en <span class="mono">enlaceDrive</span>; sin él no hay nada que leer aquí.</div></div>';
   var acc;
@@ -1942,7 +2340,7 @@ V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
   /* Aqui van SIEMPRE desplegados: son los que tienes que decidir, y decidir exige leer.
      En «En curso» y «Publicados» se pliegan, porque ahi se consulta, no se firma. */
   return pan('Expedientes que firmas tú',m.length+' pendientes',
-    m.length?m.map(docCard).join(''):vac('Bandeja limpia',
+    m.length?m.map(docCard).join(''):vacioSimple('Bandeja limpia',
       'Nada esperando tu firma. El archivo de un miembro lo firma su coordinador; el informe de subsistema, '+
       'el Project Director o '+esc(_m(REV2_NOM).pila)+'; el informe general, solo el Project Director. '+
       'Nadie firma lo suyo.'),'destaca')+
@@ -1952,14 +2350,14 @@ V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
 V.docurso={g:'Documentos',t:'En curso',f:function(){
   var c=DOCS.filter(function(d){return ['recibido','analizado','revision','cambios'].indexOf(d.est)>=0;});
   return pan('Expedientes en curso',c.length+(c.length===1?' expediente':' expedientes'),
-    c.length?c.map(filaDoc).join(''):vac('Nada en curso','Ningún documento espera revisión ni corrección. '+
+    c.length?c.map(filaDoc).join(''):vacioSimple('Nada en curso','Ningún documento espera revisión ni corrección. '+
       'Los que ya se aprobaron están en Publicados.'));
 }};
 V.docpub={g:'Documentos',t:'Publicados',f:function(){
   var p=DOCS.filter(function(d){return d.est==='publicado';});
   return '<div class="chips"><span class="chip">PUBLICADOS <b style="color:var(--ink)">'+p.length+'</b></span></div>'+
     pan('Últimos publicados','ya están en Notion',
-      p.length?p.map(filaDoc).join(''):vac('Todavía no hay nada publicado','Un expediente aparece aquí en '+
+      p.length?p.map(filaDoc).join(''):vacioSimple('Todavía no hay nada publicado','Un expediente aparece aquí en '+
         'cuanto se aprueba y se publica en Notion.'));
 }};
 
@@ -1977,10 +2375,87 @@ function rangoLote(){
   if(avisos) t += (t?' · ':'')+avisos+' aviso'+(avisos===1?'':'s');
   return t;
 }
+/* ═══ PONER UNA SANCION DESDE EL ESCRITORIO ═══════════════════════════════════════
+   Daniel (28/07): «y en ordenador que se puedan poner y aprobar tambien», «en ordenador es
+   una cosa en un apartado normal». Aprobar ya se podia; poner, no.
+
+   ⚠️ Todo lo que va de aqui a `_listaSancHTML_` esta COPIADO DEL MOVIL BYTE A BYTE y se
+   llama igual: son GEMELAS. La CSP impide compartir codigo entre los dos artefactos, asi
+   que lo unico honesto es que la copia sea identica y un diff lo confirme. Si tocas una,
+   toca la otra. Lo que NO es gemelo es la presentacion (`_ponerSancionHTML_`): alli es una
+   columna estrecha dentro de un modal y aqui hay ancho de sobra. */
+/* El formulario ENTERO, para que sobreviva a los repintados. Antes solo guardaba el
+   motivo y la fecha: al cambiar el motivo se repinta el modal y la persona elegida volvia
+   al primero de la lista -«me cambia a Aarón por la puta cara»-. Un formulario que se
+   borra solo no es un fallo de pintado: es que el estado estaba en el DOM. */
+var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
+var RRI_MOTIVOS=[
+  ['30i','Faltar a un turno de trabajo sin justificar', -1],
+  ['30g','No rellenar un formulario obligatorio', -1],
+  ['30h','No cubrir la disponibilidad de una reunión', -1],
+  ['plazo','Incumplir el plazo de una tarea', -1],
+  ['libre','Otro · lo escribo yo', -1]
+];
+/* EL ORDEN DE LOS SUBSISTEMAS, deducido y no escrito a mano: es el orden en que vienen los
+   miembros del panel, que es el que trae Notion. Una constante aqui se quedaria vieja el dia
+   que se reordene alla, y nadie se enteraria hasta que alguien mirase. */
+function _ordenSubs_(){
+  var vis=[];
+  (DATA.miembros||[]).forEach(function(m){
+    var u=m&&m.unidad; if(u && vis.indexOf(u)<0) vis.push(u);
+  });
+  return vis;
+}
+/* Agrupa a quien puedas sancionar: por subsistema en el orden de Notion, y dentro de cada uno
+   EL COORDINADOR PRIMERO y el resto alfabetico. Daniel: «y con el coordinador de primero». */
+function _gruposSanc_(actor, filtro){
+  var f=_sinTildes_(String(filtro||'').trim().toLowerCase());
+  var gente=sancionablesPor(actor).filter(function(m){
+    if(!f) return true;
+    return _sinTildes_((m.nombre||'').toLowerCase()).indexOf(f)>=0 ||
+           _sinTildes_((m.pila||'').toLowerCase()).indexOf(f)>=0 ||
+           _sinTildes_((m.unidad||'').toLowerCase()).indexOf(f)>=0;
+  });
+  var orden=_ordenSubs_(), por={};
+  gente.forEach(function(m){ var u=m.unidad||'—'; (por[u]=por[u]||[]).push(m); });
+  return orden.filter(function(u){ return por[u]; }).map(function(u){
+    var l=por[u].slice().sort(function(a,b){
+      var ca=(a.cargo==='Coordinador')?0:1, cb=(b.cargo==='Coordinador')?0:1;
+      if(ca!==cb) return ca-cb;                       // el coordinador, primero
+      return String(a.nombre||'').localeCompare(String(b.nombre||''), 'es');
+    });
+    return {unidad:u, gente:l};
+  });
+}
+/* La lista de personas. Se pinta aparte para poder rehacerla al teclear SIN tocar el resto
+   del formulario: repintar el modal entero es lo que borraba lo ya elegido. */
+function _listaSancHTML_(grupos){
+  if(!grupos.length) return '<p class="rnota" style="margin:0;padding:8px 2px">Nadie con ese filtro.</p>';
+  return grupos.map(function(g){
+    return '<div class="sangrupo">'+esc(g.unidad)+'</div>'+
+      g.gente.map(function(m){
+        return '<button class="sanper'+(SANC_FORM.quien===m.nombre?' on':'')+'" data-sanq="'+esc(m.nombre)+'" data-p>'+
+          '<b>'+esc(m.nombre)+'</b>'+(m.cargo==='Coordinador'?'<i>coord.</i>':'')+'</button>';
+      }).join('');
+  }).join('');
+}
+
 /* ── Sanciones sueltas e historial ────────────────────────────────────────────
    El backend las sirve desde siempre y el panel no las pintaba: se podia dejar a
    alguien sancionado sin que nadie lo viera. Las sueltas no son un bloque (cada una
    tiene su motivo y su articulo), asi que van en su propia tabla. */
+/* Los dos envoltorios que hacen que el bloque de arriba pueda ser IDENTICO al del movil:
+   alli `_pilaDeM_` busca en el roster y `yoNombre()` sale de `YO`. Aqui ya existen `_m` y
+   `ACTOR`, asi que se envuelven en vez de duplicar la busqueda. */
+function _pilaDeM_(n){ var m=_m(n); return (m&&m.pila)||''; }
+/* QUIEN MANDA A EFECTOS DE SANCIONES · GEMELA (movil/escritorio).
+   No es `ACTOR`: ACTOR cambia con «ver como», y el backend (v49) comprueba contra
+   `ident.nombre` -el de la SESION-. Si la cara ofreciera la jurisdiccion de la persona que
+   estas mirando, el envio lo rechazaria el servidor: la autoridad no se hereda mirando. */
+function _actorSanc_(){
+  if (typeof backendOK !== 'undefined' && backendOK && SESION && SESION.nombre) return SESION.nombre;
+  return ACTOR;                    // demo local, donde no hay sesion
+}
 function _sancSueltas_(){
   if(!Array.isArray(SANC_BACK)) return [];
   return SANC_BACK.filter(function(s){ return s.estado==='pendiente' && !s.lote; });
@@ -2003,7 +2478,7 @@ function _selectorLotes_(){
 function _panelSueltas_(){
   var ss=_sancSueltas_();
   if(!ss.length) return pan('Sanciones sueltas','ninguna',
-    vac('No hay sanciones sueltas','Las que no van en bloque —cada una con su motivo y su artículo— aparecen aquí.'));
+    vacioSimple('No hay sanciones sueltas','Las que no van en bloque —cada una con su motivo y su artículo— aparecen aquí.'));
   return pan('Sanciones sueltas', ss.length+'',
     tabla([['Persona'],['Motivo'],['Art.',0],['Puntos',1],['']],
       ss.map(function(s){
@@ -2028,7 +2503,7 @@ function _panelSueltas_(){
 function _panelHistSanc_(){
   var hs=_sancHist_();
   if(!hs.length) return pan('Historial','vacío',
-    vac('Todavía no hay sanciones resueltas','Cada una que apruebes, justifiques o rechaces queda aquí con su decisión.'));
+    vacioSimple('Todavía no hay sanciones resueltas','Cada una que apruebes, justifiques o rechaces queda aquí con su decisión.'));
   return pan('Historial', hs.length+'',
     tabla([['Persona'],['Motivo'],['Estado',0],['Puntos',1],['Cuándo',1]],
       hs.slice(0,40).map(function(s){
@@ -2044,11 +2519,145 @@ function _panelHistSanc_(){
       }).join(''))+
     (hs.length>40?'<div class="nota">Se muestran las 40 más recientes de '+hs.length+'.</div>':''));
 }
+/* El panel. `_ponerSancCuerpo_` va aparte para poder repintar SOLO esto al cambiar el motivo:
+   `pintar()` reconstruye `#main` entero y pierde el scroll, y esta pantalla lleva debajo la cola
+   y el historial -saltar al principio cada vez que tocas un desplegable es inaceptable-. */
+function _ponerSancionHTML_(){
+  /* Rango 0 NO VE la opcion. El gate es el RANGO DE SANCIONES y no el cargo: Bruno es rango 2
+     sin tocar un documento, y estar en el consejo no da rango por si solo. */
+  if(rangoSanc(_actorSanc_())<1) return '';
+  var n=sancionablesPor(_actorSanc_()).length;
+  return pan('Poner una sanci\u00f3n', n+(n===1?' persona':' personas')+' bajo tu jurisdicci\u00f3n',
+    '<div class="pb" id="ponerSanc">'+_ponerSancCuerpo_()+'</div>');
+}
+function _ponerSancCuerpo_(){
+  var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
+  var E=CAMPO_CSS;
+  var grupos=_gruposSanc_(_actorSanc_(), SANC_FORM.filtro);
+  var esPlazo=(SANC_FORM.motivo==='plazo');
+  /* Solo tareas VIVAS y con enlace a Notion: sin `url` no se puede mover la fecha, y ofrecerla
+     seria prometer algo que va a fallar al guardar. */
+  var tareas=(TAREAS||[]).filter(function(t){
+    return t && t.url && !/hech|finaliz|complet|termin|cerrad/i.test(t.e||''); });
+  return '<div class="sanwrap">'+
+    '<div>'+
+      '<label style="display:block;margin-bottom:9px">'+lab('A qui\u00e9n')+
+        '<input id="snFiltro" placeholder="Escribe para filtrar \u00b7 nombre o subsistema" '+
+        'value="'+esc(SANC_FORM.filtro||'')+'" autocomplete="off" style="'+E+'"></label>'+
+      '<div class="sanlista" id="snLista">'+_listaSancHTML_(grupos)+'</div>'+
+    '</div>'+
+    '<div>'+
+      '<label style="display:block;margin-bottom:9px">'+lab('Motivo')+
+        '<select id="snMotivo" style="'+E+'"><option value="">\u2014 elige \u2014</option>'+
+        RRI_MOTIVOS.map(function(r){ return '<option value="'+r[0]+'"'+(SANC_FORM.motivo===r[0]?' selected':'')+'>'+esc(r[1])+'</option>'; }).join('')+
+      '</select></label>'+
+      (SANC_FORM.motivo==='libre'
+        ? '<label style="display:block;margin-bottom:9px">'+lab('Cu\u00e1l')+
+            '<input id="snLibre" placeholder="Qu\u00e9 ha pasado" value="'+esc(SANC_FORM.libre||'')+'" style="'+E+'"></label>'+
+          '<label style="display:block;margin-bottom:9px">'+lab('Art\u00edculo del RRI')+
+            '<input id="snArt" value="'+esc(SANC_FORM.art||'libre')+'" style="'+E+'"></label>'
+        : '')+
+      (esPlazo
+        ? (tareas.length
+            ? '<label style="display:block;margin-bottom:9px">'+lab('Qu\u00e9 tarea')+
+                '<select id="snTarea" style="'+E+'"><option value="">\u2014 elige la tarea \u2014</option>'+
+                tareas.map(function(t){ return '<option value="'+esc(t.url)+'"'+(SANC_FORM.tarea===t.url?' selected':'')+'>'+esc(t.n||t.nombre||'(sin t\u00edtulo)')+
+                  (t.l?' \u00b7 venc\u00eda '+esc(_isoADMY_(t.l)):'')+'</option>'; }).join('')+
+              '</select></label>'+
+              '<label style="display:block;margin-bottom:9px">'+lab('Plazo nuevo')+
+                '<input type="date" id="snPlazo" value="'+esc(SANC_FORM.plazo||'')+'" style="'+E+'"></label>'+
+              '<div class="nota" style="margin:0 0 9px">El plazo nuevo se escribe <b>en Notion</b>. Si eso '+
+              'falla, la sanci\u00f3n <b>no</b> se pone: no tiene sentido sancionar por un plazo y dejar la '+
+              'tarea con la fecha vencida.</div>'
+            : '<div class="nota" style="margin:0 0 9px;color:var(--warn)">No hay ninguna tarea viva con enlace '+
+              'a Notion, as\u00ed que no se puede mover ning\u00fan plazo. Elige otro motivo.</div>')
+        : '')+
+      '<label style="display:block;margin-bottom:11px;max-width:130px">'+lab('Puntos')+
+        '<input type="number" id="snPts" value="'+esc(SANC_FORM.pts||'-1')+'" step="1" min="-5" max="0" style="'+E+'"></label>'+
+      '<button class="btn pri" id="btnSanc">Poner la sanci\u00f3n</button>'+
+      '<div class="nota" id="snMsg" style="margin:9px 0 0">La sanci\u00f3n entra <b>pendiente</b>: se decide '+
+      'abajo, y el comunicado sale despu\u00e9s.</div>'+
+    '</div>'+
+  '</div>';
+}
+function _cablearPonerSanc_(){
+  var val=function(id){ var e=$('#'+id); return e?e.value:''; };
+  var msg=function(t,mal){ var b=$('#snMsg'); if(b){ b.textContent=t; b.style.color=mal?'var(--warn)':''; } };
+  /* LO PRIMERO: guardar TODO lo escrito antes de cualquier repintado. El estado no puede vivir
+     en el DOM, porque el DOM se rehace. */
+  function recoger(){
+    ['snMotivo','snLibre','snArt','snTarea','snPlazo','snPts','snFiltro'].forEach(function(id){
+      var e=$('#'+id); if(!e) return;
+      SANC_FORM[{snMotivo:'motivo',snLibre:'libre',snArt:'art',snTarea:'tarea',
+                 snPlazo:'plazo',snPts:'pts',snFiltro:'filtro'}[id]]=e.value;
+    });
+  }
+  /* Repinta SOLO el panel, no la pantalla. */
+  function repintar(){ recoger(); var c=$('#ponerSanc'); if(!c) return;
+    c.innerHTML=_ponerSancCuerpo_(); _cablearPonerSanc_(); }
+  function marcar(b){
+    SANC_FORM.quien=b.dataset.sanq;
+    $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
+  }
+  /* Elegir persona NO repinta: solo se marca. */
+  $$('[data-sanq]').forEach(function(b){ b.onclick=function(){ marcar(b);
+    msg('A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'); }; });
+  /* Teclear rehace SOLO la lista: ni pierde el foco ni borra lo ya elegido. */
+  var fi=$('#snFiltro');
+  if(fi) fi.oninput=function(){
+    SANC_FORM.filtro=fi.value;
+    var c=$('#snLista'); if(!c) return;
+    c.innerHTML=_listaSancHTML_(_gruposSanc_(_actorSanc_(), SANC_FORM.filtro));
+    $$('[data-sanq]',c).forEach(function(b){ b.onclick=function(){ marcar(b); }; });
+  };
+  /* El motivo decide QUE MAS se pide, asi que ese si repinta. */
+  var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ repintar(); };
+  var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
+
+  var bt=$('#btnSanc');
+  if(bt) bt.onclick=async function(){
+    var quien=SANC_FORM.quien, mot=val('snMotivo'), pts=parseInt(val('snPts'),10);
+    if(!quien){ msg('Elige a qui\u00e9n: pulsa un nombre de la lista.', true); return; }
+    if(!mot){ msg('Elige el motivo.', true); return; }
+    if(!(pts<=0)){ msg('Los puntos de una sanci\u00f3n son 0 o negativos.', true); return; }
+    var art=mot, texto='';
+    RRI_MOTIVOS.forEach(function(r){ if(r[0]===mot) texto=r[1]; });
+    if(mot==='libre'){
+      texto=(val('snLibre')||'').trim(); art=(val('snArt')||'libre').trim();
+      if(!texto){ msg('Escribe qu\u00e9 ha pasado.', true); return; }
+    }
+    var urlTarea='', plazo='';
+    if(mot==='plazo'){
+      urlTarea=val('snTarea'); plazo=val('snPlazo');
+      if(!urlTarea){ msg('Elige la tarea cuyo plazo se incumpli\u00f3.', true); return; }
+      if(!plazo){ msg('Pon el plazo nuevo: sancionar por un plazo y no darle otro no arregla nada.', true); return; }
+      var t=(TAREAS||[]).filter(function(x){ return x.url===urlTarea; })[0];
+      texto='Incumplir el plazo de \u00ab'+((t&&(t.n||t.nombre))||'una tarea')+'\u00bb';
+      art='plazo';
+    }
+    if(!backendOK || !SESION){ msg('Sin conexi\u00f3n no se puede: esto escribe en la cola de verdad.', true); return; }
+    bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando\u2026';
+    try{
+      /* EL ORDEN IMPORTA: primero Notion, luego la sancion. Al reves quedaria la sancion puesta
+         y la tarea con la fecha vieja, que es la unica de las dos combinaciones malas que NO se
+         ve mirando la cola. */
+      if(mot==='plazo'){ msg('Moviendo el plazo en Notion\u2026'); await api.moverLimiteTarea(urlTarea, plazo); }
+      await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual'}]);
+      SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
+      tost('Sanci\u00f3n puesta a '+(_pilaDeM_(quien)||quien)+'.'+(mot==='plazo'?' Plazo movido en Notion.':''));
+      await _cargarSanciones_();     // la cola de abajo tiene que enterarse
+      pintar();
+    }catch(e){
+      bt.disabled=false; bt.textContent=prev;
+      msg('No se pudo: '+((e&&e.message)||e), true);
+    }
+  };
+}
 V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
   var c={aceptar:0,justificar:0,rechazar:0};
   LOTE.items.forEach(function(x){c[x.dec]++;});
   var cuerpo = LOTE.cerrado
-    ? '<div class="pb">'+vac('Bloque cerrado','Entró entero y de una vez. Las sanciones se aplican en '+
+    ? '<div class="pb">'+vacioSimple('Bloque cerrado','Entró entero y de una vez. Las sanciones se aplican en '+
         'Notion y sale un único comunicado con sus menciones.')+'</div>'
     : '<div class="pb"><div class="lote" id="lote">'+
       '<div class="lote-h"><b>'+LOTE.items.length+' personas</b><span class="mono" style="color:var(--red2)">'+rangoLote()+'</span></div>'+
@@ -2076,7 +2685,10 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
         '<em>Marcar no aplica nada: no se sanciona a nadie hasta que cierras el bloque entero.</em></div>'+
         '<button class="btn pri" data-lote>Aprobar el bloque · '+c.aceptar+' sanciones</button></div>'+
       '</div></div>';
-  return _selectorLotes_()+
+  /* Poner va ARRIBA: es lo primero que se hace aqui, y ademas lo que se pone cae en la
+     cola que viene justo debajo. */
+  return _ponerSancionHTML_()+
+    _selectorLotes_()+
     pan('Bloque abierto · '+esc(LOTE.nombre),'RRI Título VII',cuerpo,'destaca')+
     '<div class="pan"><div class="nota">El <b>motivo y el artículo son comunes a todo el bloque</b>: '+
     'no se cambian fila a fila, y por eso sale un único comunicado. <b>Los puntos de una persona '+
@@ -2093,7 +2705,7 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
    No hay accion de apelaciones en el backend: ni cola, ni estado, ni devolucion. */
 V.apela={g:'Disciplina',t:'Apelaciones',f:function(){
   return pan('Apelaciones abiertas','sin conectar',
-    vac('Las apelaciones todavía no se tramitan aquí','No hay cola de apelaciones en el '+
+    vacioSimple('Las apelaciones todavía no se tramitan aquí','No hay cola de apelaciones en el '+
       'backend: ni acción para recurrir, ni estado, ni devolución de puntos. Mientras tanto '+
       'una apelación se resuelve hablando, y si procede se otorga la devolución a mano desde '+
       '<b>Sanciones</b>.')+
@@ -2139,7 +2751,7 @@ function _fijarPanel_(){
 var RE_SEL=0;
 V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
   if(!REUS.length) return pan('Reuniones abiertas','ninguna',
-    vac('No hay ninguna reunión abierta','Convoca una para que el equipo cubra su disponibilidad.')+
+    vacioSimple('No hay ninguna reunión abierta','Convoca una para que el equipo cubra su disponibilidad.')+
     '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>')+
     convocarReunionPanel();
   return pan('Reuniones abiertas',REUS.length+'',
@@ -2273,7 +2885,7 @@ function _cobertura_(r){
 var DISPO_POND=false;   // conmutador personas/ponderada del mapa (solo hibridas)
 V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
   if(!REUS.length) return pan('Disponibilidad y riesgo','',
-    vac('No hay ninguna reuni\u00f3n','Cuando se convoque una, aqu\u00ed sale su mapa de calor y a qui\u00e9n le caer\u00eda sanci\u00f3n por no cubrirla.'));
+    vacioSimple('No hay ninguna reuni\u00f3n','Cuando se convoque una, aqu\u00ed sale su mapa de calor y a qui\u00e9n le caer\u00eda sanci\u00f3n por no cubrirla.'));
   return REUS.map(function(r0){
     var cob=_cobertura_(r0);
     var hib=(r0.modalidad==='hibrida');
@@ -2413,7 +3025,7 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
   var actas=(DOCS||[]).filter(_esActa_).sort(function(a,b){
     return String(b.fecha||'').localeCompare(String(a.fecha||'')); });
   if(!actas.length) return pan('Actas de la temporada','ninguna',
-    vac('Todavía no hay ningún acta','Un acta es un expediente más: se sube por el formulario '+
+    vacioSimple('Todavía no hay ningún acta','Un acta es un expediente más: se sube por el formulario '+
       'con <b>Tipo de documento = Acta</b> y aparece aquí en cuanto entra. Su referencia '+
       'empieza por <span class="mono">Acta_S-</span>.'));
   return pan('Actas de la temporada',actas.length+(actas.length===1?' registrada':' registradas'),
@@ -2432,7 +3044,7 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
 /* ── OPERACIÓN ───────────────────────────────────────────────────────────── */
 V.turnos={g:'Operación',t:'Turnos',f:function(){
   if(!TURNOS.length) return pan('Turnos convocados','ninguno',
-    vac('No hay turnos convocados','Convoca el primero aquí abajo: queda publicado en Notion y les llega a los '+
+    vacioSimple('No hay turnos convocados','Convoca el primero aquí abajo: queda publicado en Notion y les llega a los '+
       'convocados.'))+convocarPanel();
   return pan('Turnos convocados',TURNOS.length+'',
     tabla([['Turno'],['Fecha'],['Hora',0],['Punto'],['Duración',1],['Van',1],['Memoria',1]],
@@ -2461,7 +3073,7 @@ V.tareas={g:'Operación',t:'Tareas',f:function(){
   var porUni={};
   TAREAS.forEach(function(t){ (porUni[t.s]=porUni[t.s]||[]).push(t); });
   if(!Object.keys(porUni).length) return pan('Tareas','ninguna activa',
-    vac('No hay tareas activas','En cuanto se asigne una tarea aparece aquí, agrupada por subsistema.'));
+    vacioSimple('No hay tareas activas','En cuanto se asigne una tarea aparece aquí, agrupada por subsistema.'));
   return Object.keys(porUni).sort(function(a,b){return porUni[b].length-porUni[a].length;}).map(function(u){
     return pan(u,porUni[u].length+' activas',
       tabla([['Tarea'],['Responsable'],['Urgencia'],['Estado'],['Vence',1]],
@@ -2497,7 +3109,7 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
      Sin esos dos campos no hay ranking que valga: se dice, no se finge. */
   var VIS=_activos_().filter(function(m){ return typeof m.horasTemp==='number' && m.meses; });
   if(!VIS.length) return pan('Ranking','sin datos',
-    vac('Sin horas del equipo','El ranking se calcula con las horas de temporada de cada uno y tu cuenta solo '+
+    vacioSimple('Sin horas del equipo','El ranking se calcula con las horas de temporada de cada uno y tu cuenta solo '+
       've las tuyas. Si necesitas el ranking completo, pídeselo al Project Director.'));
   var rk=VIS.slice().sort(function(a,b){return (b.horasTemp/b.meses)-(a.horasTemp/a.meses);});
   var conQ=VIS.filter(function(m){ return typeof m.cuota==='number'; });
@@ -2528,7 +3140,7 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
    hoy se reciben hablando. El contador del chip tambien mentia: contaba la maqueta. */
 V.reclutar={g:'Equipo',t:'Reclutamiento',f:function(){
   return pan('Candidaturas abiertas','sin conectar',
-      vac('Las candidaturas todavía no llegan a la app','No hay ningún sitio donde se '+
+      vacioSimple('Las candidaturas todavía no llegan a la app','No hay ningún sitio donde se '+
         'recojan las solicitudes de ingreso: hoy llegan hablando o por Instagram. El día que '+
         'haya un formulario, aparecerán aquí con su avalista y las horas que ofrecen.')+
     '<div class="nota">Una candidatura no es un miembro: no tiene puntos, ni horas, ni cuota '+
@@ -2542,6 +3154,14 @@ V.reclutar={g:'Equipo',t:'Reclutamiento',f:function(){
    siguen siendo pasos aparte, y la vista previa es un Artifact, nunca produccion.
    ─────────────────────────────────────────────────────────────────────────── */
 var BUZON=null, BUZON_ERR=null, BUZON_SEL=null;
+/* Lo que Daniel va escribiendo en la caja de anotaciones, por reporte. Vive FUERA del
+   DOM a proposito: `pintar()` reconstruye la vista entera y se llevaria por delante el
+   texto a medio escribir. Con esto, un repintado -o volver de otra pestaña- lo devuelve.
+   Es el mismo motivo por el que ya no hay `prompt()`: un dialogo se cierra solo. */
+var BZ_NOTAS={};
+/* La decision pulsada y aun sin confirmar: {id, acc, notas:bool}. La confirmacion se pide
+   EN LA FICHA y no con `confirm()`, que tapa justo lo que estabas leyendo para decidir. */
+var BZ_CONF=null;
 /* Reportar desde el escritorio. Mismo criterio que en el movil: dos campos a mano y el
    resto lo rellena la app. Se hace con un `prompt` encadenado a proposito -esta cara no
    tiene modales y montar uno solo para esto seria mas superficie de la que vale-. */
@@ -2807,7 +3427,7 @@ async function reportarModal(){
   var datos={ titulo:tit, donde:'Escritorio', pantalla:((V[vista]&&V[vista].t)||vista),
     /* La version del CODIGO, no la de los datos: ver la gemela del movil. */
     version:BUILD,
-    contexto:'escritorio'+(CANAL==='beta'?' · BETA':'')+' · '+nav+' · '+screen.width+'x'+screen.height+
+    contexto:'escritorio'+(CANAL==='beta'?' · BETA':(VERSION?' · v'+VERSION:''))+' · '+nav+' · '+screen.width+'x'+screen.height+
       ' · build '+BUILD+' · datos '+(DATA.generado||'?') };
   if(esMejora){ datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
   else { datos.esperaba=det; datos.paso=tit; datos.gravedad='Molesta'; }
@@ -2859,18 +3479,160 @@ function _fichaBuzon_(r){
     campo('Contexto', r.contexto)+
     campo('Diagnóstico', r.diagnostico)+
     campo('Recomendación', r.recomendacion)+
+    /* TUS anotaciones, si diste el adelante con matices. Van DESPUÉS de la recomendación
+       a propósito: la recomendación es lo que propone quien lo analizó, esto es lo que
+       decides tú encima. Quien construya lee las dos, en ese orden. */
+    (r.anotaciones? '<div class="sub"><span class="sc">Tus anotaciones</span>'+
+       '<p style="margin:4px 0 0;font-size:12.5px;color:#f0cf9e;line-height:1.55">'+
+       esc(r.anotaciones)+'</p></div>' : '')+
+    /* La captura que adjuntó quien reporta. Para lo visual vale por tres párrafos. */
+    (r.captura && /^https?:/.test(String(r.captura))
+      ? '<div class="sub"><span class="sc">Captura</span>'+
+        '<p style="margin:4px 0 0"><a href="'+esc(r.captura)+'" target="_blank" rel="noopener" '+
+        'style="color:var(--red2);font-size:12.5px">ver la captura que adjuntó</a></p></div>'
+      : (r.captura ? campo('Captura', r.captura) : ''))+
     (r.vista_previa? '<div class="sub"><span class="sc">Vista previa</span>'+
        '<p style="margin:4px 0 0"><a href="'+esc(r.vista_previa)+'" target="_blank" rel="noopener" '+
        'style="color:var(--red2);font-size:12.5px">abrir el artefacto con los cambios puestos</a></p></div>' : '')+
-    (r.recomendacion
-      ? '<div class="acts">'+
-        '<button class="btn pri" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Adelante">Adelante, hazlo</button>'+
-        (r.vista_previa?'<button class="btn ok" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Publicado">Visto bueno · publicar</button>':'')+
-        '<button class="btn no" data-bz="'+esc(r.id)+'" data-bzt="'+(esBug?'bug':'mejora')+'" data-bzacc="Descartado">Descartar</button>'+
-        '</div>'
+    /* La compensación va JUNTO a la decisión, no en otra pantalla: el número solo se puede
+       juzgar leyendo lo que costó el reporte, y eso está aquí arriba. */
+    ((r.estado==='Publicado') ? _compHTML_(r) : '')+
+    (r.recomendacion ? _accBuzon_(r, esBug)
       : '<div class="ruta">Todavía sin analizar. Cuando esté reproducido y valorado, aparecen '+
         'aquí el diagnóstico y la recomendación, y con ellos los botones.</div>')+
   '</div>';
+}
+/* LAS CUATRO SALIDAS DEL BUZON, con la caja de anotaciones a la vista.
+
+   Daniel (28/07): «dejame por favor una caja de texto normal y no tener q rellenarlo en un
+   popup q si no como cambie de pestaña se me cierra». Asi que el `prompt()` se fue y esto es
+   un `<textarea>` de la propia ficha, igual que el motivo de los documentos.
+
+   Las salidas son cuatro y no dos: `Adelante` · `Adelante con anotaciones` ·
+   `Descartar con anotaciones` · `Descartar`. Las dos «con anotaciones» guardan el MISMO estado
+   que su version seca -autorizan o descartan igual- y lo que añaden son las instrucciones.
+   Un estado nuevo habria que pintarlo en todos los sitios que pintan estados y no diria nada
+   que no diga el texto.
+
+   La confirmacion tambien se pide aqui dentro, no con `confirm()`: el dialogo tapa justo el
+   diagnostico que estabas leyendo para decidir. */
+var BZ_AVISO={
+  'Adelante':'Autorizas que se construya. Todavía NO se publica nada.',
+  /* `Publicado` no se pone desde aquí: lo pone el propio release, en bloque
+     (`flujos/publicar_web.py --release` → `triaje.py --publicar`). Así el buzón no puede
+     decir «publicado» de algo que no salió, ni al revés. */
+  'Descartado':'Sale del lote. Queda en el histórico, no se borra.'};
+/* ═══ COMPENSAR UN REPORTE CON HORAS ═══════════════════════════════════════════
+   Daniel (27/07, al decidirlo): «seria basicamente puesto como una propuesta de otorgar esas
+   horas en mi panel del escritorio, modificables tambien». Y el 28/07: «debe ser editable y al
+   lado de cada modificacion aprobada, con la propuesta por la matriz».
+
+   LA MATRIZ VIVE AQUI Y SOLO AQUI. Cambiar la escala tiene que ser tocar estos numeros, no
+   perseguir multiplicaciones por el fichero.
+
+   ⚠️ ESTOS VALORES SON UNA PROPUESTA MIA, NO LA ESCALA DE DANIEL. La suya lleva pendiente
+   desde el 27/07 (ver `docs/plan-compensar-reportes.md`). La pantalla lo dice: presentar un
+   numero inventado como si fuera suyo es pedirle que firme a ciegas. */
+var MATRIZ_COMP={
+  base:0.5,                                    // por haberse molestado en reportarlo bien
+  gravedad:{ 'Bloquea':1.5, 'Molesta':0.75, 'Cosmético':0.25, 'Cosmetico':0.25 },
+  /* Un fallo que bloquea a 30 no vale lo que uno que molesta a 1. */
+  alcance:{ 'equipo':1.5, 'subsistema':1.0, 'persona':0.5 },
+  /* El eje que mas conviene premiar: enseña a reportar bien. */
+  calidad:{ 'reproducible':1.5, 'con_preguntas':1.0, 'no_reproducible':0 },
+  tope:3.0                                     // por reporte, para que nada se dispare
+};
+/* Devuelve `{horas, porque[], faltan[]}`. `faltan` es la lista de ejes que el triaje no
+   escribio: se asume lo conservador y SE DICE, en vez de disimular el hueco. */
+function _compPropuesta_(r){
+  var M=MATRIZ_COMP, porque=[], faltan=[];
+  var h=M.base; porque.push('base '+M.base+' h');
+  var g=M.gravedad[String(r.gravedad||'')];
+  if(g==null){ g=M.gravedad['Molesta']; faltan.push('gravedad'); }
+  h+=g; porque.push('gravedad '+(r.gravedad||'—')+' +'+g);
+  var a=M.alcance[String(r.alcance||'')];
+  if(a==null){ a=M.alcance['persona']; faltan.push('alcance'); }
+  h+=a; porque.push('alcance '+(r.alcance||'—')+' +'+a);
+  var c=M.calidad[String(r.calidad||'')];
+  if(c==null){ c=M.calidad['con_preguntas']; faltan.push('calidad del reporte'); }
+  h+=c; porque.push('calidad '+(r.calidad||'—')+' +'+c);
+  h=Math.min(M.tope, Math.round(h*4)/4);       // en cuartos de hora, como los partes
+  return {horas:h, porque:porque, faltan:faltan};
+}
+/* Nadie se compensa a si mismo: misma regla que en documentos. Y solo cuenta lo que llego a
+   produccion, que es cuando se sabe que valia. */
+function _compPuede_(r){
+  if((r.estado||'')!=='Publicado') return 'solo cuando esté publicado';
+  if(_m(r.quien).pila===_m(ACTOR).pila || r.quien===ACTOR) return 'es tuyo: nadie se compensa a sí mismo';
+  if(r.horas_otorgadas) return 'ya compensado con '+r.horas_otorgadas+' h';
+  return null;
+}
+function _compHTML_(r){
+  var p=_compPropuesta_(r), no=_compPuede_(r);
+  var ID=esc(r.id);
+  return '<div class="sub"><span class="sc">Compensación en horas</span>'+
+    '<p style="margin:4px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.55">'+
+      'La matriz propone <b>'+p.horas+' h</b> — '+esc(p.porque.join(' · '))+'.'+
+      (p.faltan.length? '<br><span style="color:var(--warn)">El triaje no escribió '+
+        esc(p.faltan.join(' ni '))+': se ha supuesto lo más conservador.</span>' : '')+
+      '<br><span style="color:var(--ink3)">La escala todavía no la has fijado tú; estos '+
+      'valores son una propuesta y están en <span class="mono">MATRIZ_COMP</span>.</span></p>'+
+    (no
+      ? '<div class="ruta">No se puede otorgar: '+esc(no)+'.</div>'
+      : '<div class="acts">'+
+          '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px">Horas'+
+          '<input type="number" step="0.25" min="0" max="8" value="'+p.horas+'" data-comph="'+ID+'" '+
+          'style="width:78px;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
+          'padding:7px 9px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
+          '<button class="btn pri" data-comp="'+ID+'">Otorgar a '+esc(_m(r.quien).pila)+'</button>'+
+        '</div>')+
+  '</div>';
+}
+function _accBuzon_(r, esBug){
+  var t=esBug?'bug':'mejora', ID=esc(r.id);
+  var notas=(BZ_NOTAS[r.id]!=null?BZ_NOTAS[r.id]:(r.anotaciones||''));
+  function bot(acc, txt, cls){
+    return '<button class="btn '+(cls||'')+'" data-bz="'+ID+'" data-bzt="'+t+'" data-bzacc="'+acc+'">'+txt+'</button>';
+  }
+  /* Confirmacion en linea: se sustituyen los botones por el aviso y un si/no. Se ve el aviso
+     Y el reporte a la vez, que es lo que un `confirm()` no deja hacer. */
+  if(BZ_CONF && BZ_CONF.id===r.id){
+    var seca=BZ_CONF.acc, conN=BZ_CONF.notas;
+    return '<div class="sub" style="border-color:var(--red2)">'+
+      '<span class="sc">'+(conN?seca.toUpperCase()+' CON ANOTACIONES':seca.toUpperCase())+'</span>'+
+      '<p style="margin:4px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.55">'+
+        esc(BZ_AVISO[seca]||'')+'</p>'+
+      (conN?'<p style="margin:6px 0 0;font-size:12.5px;color:#f0cf9e;line-height:1.55">'+
+        esc((BZ_NOTAS[r.id]||'').trim())+'</p>':'')+
+      '<div class="acts">'+
+        '<button class="btn pri" data-bzok="'+ID+'" data-bzt="'+t+'">Confirmar</button>'+
+        '<button class="btn" data-bzno="">Volver</button>'+
+      '</div></div>';
+  }
+  /* YA CONSTRUIDO Y EN LA BETA. Aquí NO va un botón de «publicar» por reporte: un release
+     sube el fichero ENTERO, así que todo lo que esté en la beta sale a la vez o no sale.
+     Un botón por reporte describiría algo que no ocurre. Daniel (28/07): «tengo que poder
+     publicar en bloque, no tiene sentido publicar las cosas una a una», y «lo de publicar
+     los cambios sí que es a mi orden por este chat».
+     Lo que sí hace falta aquí es poder SACAR uno del lote antes de que salga. */
+  if(r.estado==='Listo para revisar'){
+    return '<div class="ruta">Hecho y <b>en la beta</b>, sin publicar. Sale a producción con el '+
+      'próximo release, junto con todo lo demás que haya en la beta — y el release lo pides tú.'+
+      '<br>Si este no debe salir, sácalo del lote descartándolo con tus anotaciones.</div>'+
+      '<textarea data-bznotas="'+ID+'" placeholder="Por qué lo sacas del lote…">'+esc(notas)+'</textarea>'+
+      '<div class="acts">'+
+        bot('Adelante+','Devolver: rehacer con anotaciones')+
+        bot('Descartado+','Sacar del lote, con anotaciones','no')+
+      '</div>';
+  }
+  return '<textarea data-bznotas="'+ID+'" placeholder="Anotaciones — qué parte sí, qué parte no, cómo lo quieres. Las lee quien lo construya antes de empezar…">'+
+      esc(notas)+'</textarea>'+
+    '<div class="acts">'+
+      bot('Adelante','Adelante, hazlo','pri')+
+      bot('Adelante+','Adelante, con anotaciones')+
+      bot('Descartado+','Descartar con anotaciones','no')+
+      bot('Descartado','Descartar','no')+
+    '</div>';
 }
 function _filaBuzon_(r){
   if(BUZON_SEL===r.id) return _fichaBuzon_(r);
@@ -2885,13 +3647,13 @@ function _filaBuzon_(r){
 }
 V.buzon={g:'Buzón',t:'Reportes',f:function(){
   if(rangoNom(ACTOR)<3 && !(SESION&&SESION.email===ADMIN_EMAIL))
-    return pan('Buzón','', vac('Esta cola es del Project Director',
+    return pan('Buzón','', vacioSimple('Esta cola es del Project Director',
       'Los reportes llevan lo que la gente escribe cuando algo le molesta, así que no son '+
       'material de consulta general. Para reportar algo, usa el menú de arriba a la derecha.'));
   if(BUZON===null) return pan('Buzón','cargando…',
     '<div class="nota" style="border-top:0">Pidiendo la cola al servidor…</div>');
   if(BUZON_ERR) return pan('Buzón','no se pudo leer',
-    vac('No se pudo cargar la cola', esc(BUZON_ERR)+'. No es que no haya reportes: es que no se han podido leer.'));
+    vacioSimple('No se pudo cargar la cola', esc(BUZON_ERR)+'. No es que no haya reportes: es que no se han podido leer.'));
   var abiertos=BUZON.filter(function(r){ return ['Publicado','Descartado'].indexOf(r.estado)<0; });
   var cerrados=BUZON.filter(function(r){ return ['Publicado','Descartado'].indexOf(r.estado)>=0; });
   var tuyos=abiertos.filter(function(r){ return !!r.recomendacion; });
@@ -2907,14 +3669,14 @@ V.buzon={g:'Buzón',t:'Reportes',f:function(){
     '</div>'+
     pan('Esperando tu decisión', tuyos.length+'',
       tuyos.length? tuyos.map(_fichaBuzon_).join('')
-        : vac('Nada que decidir ahora mismo','Cuando un reporte esté reproducido y valorado, '+
+        : vacioSimple('Nada que decidir ahora mismo','Cuando un reporte esté reproducido y valorado, '+
           'aparece aquí con la recomendación y los botones.'),'destaca')+
     pan('Resto de abiertos', (abiertos.length-tuyos.length)+'',
       (abiertos.length-tuyos.length)? abiertos.filter(function(r){ return !r.recomendacion; }).map(_filaBuzon_).join('')
-        : vac('Ninguno más abierto','Todo lo reportado está o decidido o esperando tu visto bueno.'))+
+        : vacioSimple('Ninguno más abierto','Todo lo reportado está o decidido o esperando tu visto bueno.'))+
     pan('Cerrados', cerrados.length+'',
       cerrados.length? cerrados.map(_filaBuzon_).join('')
-        : vac('Todavía no hay ninguno cerrado','Aquí van los publicados y los descartados.'))+
+        : vacioSimple('Todavía no hay ninguno cerrado','Aquí van los publicados y los descartados.'))+
     '<div class="pan"><div class="nota"><b>Nada se aplica desde aquí.</b> Estos botones solo '+
     'mueven el reporte: «adelante» autoriza a construirlo, y el visto bueno se da <b>después</b> '+
     'de mirar el artefacto de vista previa. Publicar sigue siendo un paso aparte.</div></div>';
@@ -3375,12 +4137,15 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='3a4affb';
+var BUILD='525d944';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
      el 27/07 se perdieron dos rondas depurando builds distintos sin saberlo. */
-  if(t) t.textContent='Temporada '+((DATA&&DATA.temporada)||'—')+' · '+BUILD;
+  /* Version Y build: la version es la que le dices a alguien, el build es el que sirve
+     para saber si estais mirando el mismo codigo. En beta no hay version y se dice. */
+  if(t) t.textContent='Temporada '+((DATA&&DATA.temporada)||'—')+' · '+
+    (VERSION?('v'+VERSION):(CANAL==='beta'?'beta':'sin publicar'))+' · '+BUILD;
   if(c){
     var ok=(typeof backendOK!=='undefined') && backendOK && SESION;
     c.textContent=ok?'● EN LÍNEA':'● SIN CONEXIÓN';
@@ -3404,6 +4169,7 @@ function pintar(){
      tienen y se va sin hacer nada ni decirlo—. Se cazo ejecutando, no leyendo. */
   var m=$('#main');
   m.innerHTML=V[vista].f();
+  _cablearPonerSanc_();   // no hace nada si la vista no lo pinta
   /* Decidir una SUELTA. A diferencia del bloque, aqui no hay borrador: se aplica al
      momento, porque cada una tiene su motivo y su comunicado. Por eso se pide confirmar. */
   $$('[data-sid] [data-sdec]').forEach(function(b){
@@ -3547,19 +4313,82 @@ function pintar(){
   /* buzon: abrir/cerrar un reporte y las tres decisiones. Ninguna aplica nada: mueven
      el estado. Construir y publicar siguen siendo pasos aparte. */
   $$('[data-bzsel]',m).forEach(function(el){
-    el.onclick=function(ev){ ev.stopPropagation(); var v=el.dataset.bzsel; BUZON_SEL=v||null; pintar(); };
+    el.onclick=function(ev){ ev.stopPropagation(); var v=el.dataset.bzsel;
+      /* Cambiar de reporte cancela la confirmacion a medias, pero NO el borrador de
+         anotaciones: ese es trabajo escrito y se conserva por si vuelve. */
+      if(BZ_CONF && BZ_CONF.id!==v) BZ_CONF=null;
+      BUZON_SEL=v||null; pintar(); };
+  });
+  /* La caja de anotaciones. Se apunta a CADA TECLA en `BZ_NOTAS` para que un repintado
+     -o volver de otra pestaña- no se lleve por delante lo escrito. */
+  $$('[data-bznotas]',m).forEach(function(ta){
+    ta.oninput=function(){ BZ_NOTAS[ta.dataset.bznotas]=ta.value; };
   });
   $$('[data-bzacc]',m).forEach(function(b){
-    b.onclick=async function(){
+    b.onclick=function(){
       if(b.disabled) return;
-      var id=b.dataset.bz, tipo=b.dataset.bzt, acc=b.dataset.bzacc;
-      var aviso={Adelante:'Autorizas que se construya. Todavía NO se publica nada.',
-        Publicado:'Das el visto bueno: esto es lo que autoriza a publicarlo.',
-        Descartado:'Se descarta. Queda en el histórico, no se borra.'}[acc]||'';
-      if(!confirm(acc+' — '+id+String.fromCharCode(10,10)+aviso)) return;
+      var id=b.dataset.bz, acc=b.dataset.bzacc;
+      /* `Adelante+` y `Descartado+` NO son estados: son el mismo estado con instrucciones.
+         Se guarda `Adelante`/`Descartado` y las anotaciones van en su columna. Un estado
+         nuevo habria que pintarlo en todos los sitios que pintan estados y no diria nada
+         que no diga el texto. */
+      var conNotas=/\+$/.test(acc);
+      if(conNotas) acc=acc.slice(0,-1);
+      var ta=$('[data-bznotas="'+id+'"]',m);
+      if(ta) BZ_NOTAS[id]=ta.value;
+      /* Sin anotaciones, «con anotaciones» es la version seca y para eso esta el otro boton. */
+      if(conNotas && !String(BZ_NOTAS[id]||'').trim()){
+        tost('Escribe las anotaciones en la caja de arriba.');
+        if(ta) ta.focus();
+        return;
+      }
+      BZ_CONF={id:id, acc:acc, notas:conNotas};
+      pintar();
+    };
+  });
+  $$('[data-comp]',m).forEach(function(b){
+    b.onclick=async function(){
+      var id=b.dataset.comp, r=((BUZON||[]).filter(function(x){ return x.id===id; })[0]||null);
+      if(!r) return;
+      var caja=$('[data-comph="'+id+'"]',m);
+      /* Se otorga LO QUE HAY EN LA CAJA, no lo que propuso la matriz: si él lo cambió, su
+         número es el bueno. Esa es toda la gracia de que sea editable. */
+      var horas=Math.round((parseFloat(caja&&caja.value)||0)*4)/4;
+      if(!(horas>0)){ tost('Pon las horas antes de otorgar.'); if(caja) caja.focus(); return; }
+      b.disabled=true; var prev=b.textContent; b.textContent='Otorgando…';
+      try{
+        /* EL ORDEN IMPORTA, y es al revés de lo natural: PRIMERO se anota en el reporte y
+           solo si eso queda escrito se otorgan las horas.
+
+           Si se otorgara antes, y el backend no supiera guardar `horas_otorgadas` -pasa: la
+           columna es de v46 y hasta entonces el campo se ignora EN SILENCIO-, las horas
+           estarían dadas y el reporte no lo sabría. Volverías a verlo sin marca y podrías
+           pagarlo otra vez. Así, si el backend no lo admite, no se paga nada y se dice. */
+        var t = r.tipo==='bug'?'bug':'mejora';
+        await api.decidirReporte(t, id, {horas_otorgadas:horas});
+        var vuelta=(await api.getBuzon()||[]).filter(function(x){ return x.id===id; })[0];
+        if(!vuelta || String(vuelta.horas_otorgadas||'')===''){
+          tost('El backend no guarda todavía la compensación (falta desplegar v46). NO se ha otorgado nada.');
+          b.disabled=false; b.textContent=prev; return;
+        }
+        await api.otorgarHoras({nombre:r.quien, horas:horas,
+          tarea:'Compensación por el reporte '+id, categoria:'compensacion'});
+        tost(id+': '+horas+' h a '+_m(r.quien).pila+'.'); _cargarBuzon_();
+      }catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo: '+((e&&e.message)||e)); }
+    };
+  });
+  $$('[data-bzno]',m).forEach(function(b){ b.onclick=function(){ BZ_CONF=null; pintar(); }; });
+  $$('[data-bzok]',m).forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled || !BZ_CONF) return;
+      var id=b.dataset.bzok, tipo=b.dataset.bzt, acc=BZ_CONF.acc, conNotas=BZ_CONF.notas;
       var campos={estado:acc};
+      if(conNotas) campos.anotaciones=String(BZ_NOTAS[id]||'').trim();
       b.disabled=true; var prev=b.textContent; b.textContent='Guardando…';
-      try{ await api.decidirReporte(tipo, id, campos); tost(id+': '+acc+'.'); _cargarBuzon_(); }
+      try{ await api.decidirReporte(tipo, id, campos);
+        tost(id+': '+acc+(conNotas?' con anotaciones.':'.'));
+        /* El borrador se tira SOLO cuando el servidor ya lo tiene. Si falla, sigue ahi. */
+        delete BZ_NOTAS[id]; BZ_CONF=null; _cargarBuzon_(); }
       catch(e){ b.disabled=false; b.textContent=prev; tost('No se pudo: '+((e&&e.message)||e)); }
     };
   });
@@ -3758,27 +4587,10 @@ function enganchar(){
         if(c) c.scrollIntoView({block:'nearest',behavior:redu()?'auto':'smooth'}); }
     };
   });
-  /* visor del documento: el iframe se crea al desplegar. Si Drive no deja incrustarlo
-     (permisos, o una CSP en el hosting) se dice y se ofrece el enlace, no se deja en blanco. */
-  $$('[data-vdoc]').forEach(function(h){
-    h.onclick=function(){
-      var cuerpo=h.parentNode.querySelector('.vcuerpo'), sv=h.querySelector('svg');
-      if(!cuerpo.hasAttribute('hidden')){ cuerpo.setAttribute('hidden',''); sv.style.transform=''; return; }
-      cuerpo.removeAttribute('hidden'); sv.style.transform='rotate(180deg)';
-      if(cuerpo.dataset.cargado) return; cuerpo.dataset.cargado='1';
-      var id=h.dataset.vdoc;
-      if(!id){ cuerpo.innerHTML='<div class="dcar">El enlace no es un archivo de Drive reconocible.<br>' +
-        'Ábrelo con el enlace de abajo.</div>'; return; }
-      cuerpo.innerHTML='<div class="dcar">Cargando el documento…</div>';
-      var f=document.createElement('iframe');
-      f.className='dv'; f.setAttribute('loading','lazy');
-      f.src='https://drive.google.com/file/d/'+id+'/preview';
-      var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
-        cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
-      f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
-      cuerpo.innerHTML=''; cuerpo.appendChild(f);
-    };
-  });
+  /* Sin raiz: `enganchar()` no tiene el contenedor a mano (lo tenia el bloque que esto
+     sustituyo, que usaba `$$` global). Pasarle una `m` que aqui no existe reventaba la
+     pantalla entera con «m is not defined» — cazado ejecutando, no leyendo. */
+  _cablearVisor_();
   /* LAS CUATRO ACCIONES del correo real, mas deshacer y reenviar. Todas viajan a
      `api.decidir`, que ya estaba desplegada aceptandolas desde v28 y de la que esta cara
      solo usaba dos. El servidor revalida la autoridad por token; esto es el disparo.
