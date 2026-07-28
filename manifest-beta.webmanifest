@@ -1,0 +1,12 @@
+{
+  "name": "UVigo Aerotech · Solaris β",
+  "short_name": "Solaris β",
+  "description": "Versión de PRUEBAS del panel Solaris. Escribe en los datos de verdad; no es la app del equipo.",
+  "start_url": "./beta.html", "scope": "./", "display": "standalone", "orientation": "portrait",
+  "background_color": "#0D0A0B", "theme_color": "#0D0A0B",
+  "icons": [
+    {"src": "icon-beta-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-beta-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icon-beta-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

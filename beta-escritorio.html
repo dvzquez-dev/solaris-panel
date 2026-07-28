@@ -3,6 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- ICONO Y MANIFEST · lo pone el publicador segun el canal (ver `flujos/publicar_web.py`).
+     Se declaran AQUI y no se dejan a la convencion de la raiz del sitio: produccion y beta
+     viven en el mismo dominio, asi que heredando `/apple-touch-icon.png` las dos salian con
+     el MISMO icono. Con las dos instaladas en el movil, eso es abrir la que no era. -->
+<link rel="manifest" href="manifest-beta.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon-beta.png">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+<meta name="apple-mobile-web-app-title" content="Solaris β">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
 <style>
@@ -3795,7 +3806,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f882cfb';
+var BUILD='532bd67';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
