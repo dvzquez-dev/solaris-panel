@@ -1831,8 +1831,10 @@ async function _onCredencial_(resp,_silente){
       var bs=$('#btnSalir'); if(bs) bs.style.display='';   // sí hay salir/cambiar de cuenta
       _arrancarRefrescoVivo_();                            // a partir de aqui se alimenta sola
     };
-    var _falta=DEMO ? null : _faltanNotis_();
-    if(_falta){ _gateNotis_(_falta, _seguir_); return; }
+    /* El gate de notificaciones ya no esta aqui: corre ANTES del login (ver el arranque,
+       al final del fichero). Aqui solo queda guardar la suscripcion, que necesita sesion.
+       Daniel: «que te ponga antes de siquiera poder hacer login». */
+    try{ _pushInit_(); }catch(_){}
     _seguir_();
   }catch(e){
 
@@ -3158,20 +3160,32 @@ function _faltanNotis_(){
 /* La pantalla del gate. No es un aviso que se pueda cerrar: es la unica pantalla que hay
    hasta que el permiso este dado. El boton reintenta y, si cuela, arranca la app de verdad. */
 function _gateNotis_(motivo, seguir){
+  /* Al volver de los ajustes del telefono la pagina no se recarga: sigue viva y con el
+     gate puesto. Sin esto habria que recargar a mano justo despues de hacer lo que se te
+     acaba de pedir, que es la peor manera de terminar. */
+  if(!_gateNotis_._mirando){
+    _gateNotis_._mirando=true;
+    document.addEventListener('visibilitychange', function(){
+      if(document.hidden || !document.getElementById('loginGate')) return;
+      if(!_faltanNotis_() && _gateNotis_._seguir){ var f=_gateNotis_._seguir; _gateNotis_._seguir=null; f(); }
+    });
+  }
+  _gateNotis_._seguir=seguir;
   var cuerpo, boton='';
   if(motivo==='ios'){
     cuerpo='Para recibir los avisos en <b>iPhone</b> hay que abrir el panel desde la pantalla '+
       'de inicio.<br><br>Pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>, y entra '+
       'desde ese icono.';
   } else if(motivo==='denegado'){
-    cuerpo='Has denegado las notificaciones y el navegador ya no vuelve a preguntar.<br><br>'+
-      'Actívalas en los ajustes del móvil (<b>Ajustes → la app o el navegador → '+
-      'Notificaciones</b>) y vuelve a entrar.';
+    cuerpo='Has denegado las notificaciones y <b>el navegador ya no vuelve a preguntar</b>: '+
+      'hay que activarlas a mano en el teléfono.<br><br>'+
+      '<b>Ajustes → Solaris</b> (o tu navegador) <b>→ Notificaciones → Permitir</b>.<br>'+
+      'Vuelve aquí después: se comprueba solo.';
     boton='Ya las he activado';
   } else {
-    cuerpo='El panel avisa de tus turnos, de las reuniones y de las decisiones sobre tus '+
-      'documentos y tus horas. <b>Sin notificaciones no se puede usar</b>: los avisos llegan '+
-      'tarde y de eso salen faltas.';
+    cuerpo='<b>Antes de entrar</b>, activa las notificaciones.<br><br>El panel avisa de tus '+
+      'turnos, de las reuniones y de las decisiones sobre tus documentos y tus horas. '+
+      '<b>Sin ellas no se puede usar</b>: los avisos llegan tarde y de eso salen faltas.';
     boton='Activar notificaciones';
   }
   var g=_gate_(SPLASH+'<div style="max-width:330px;line-height:1.6">'+cuerpo+'</div>'+
@@ -3605,7 +3619,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f9b7b06';
+var BUILD='1ee0cf8';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -5219,10 +5233,17 @@ setTimeout(function(){ try{ _pushInit_(); }catch(_){} }, 800);
    NUNCA entra a datos falsos. */
 if(GOOGLE_CLIENT_ID && !DEMO){
   _gate_(SPLASH+'<div style="opacity:.7">Cargando…</div>');
-  var _sg=null; try{ _sg=JSON.parse(localStorage.getItem('sol_sess')||'null'); }catch(_){}
-  var _tok=(_sg && _sg.token && (Date.now()-(_sg.ts||0) < 50*60*1000)) ? _sg.token : null;
-  if(_tok) _onCredencial_({credential:_tok}, true);
-  else _arrancarGis_();
+  /* PRIMERO LAS NOTIFICACIONES, ANTES DE PODER SIQUIERA INICIAR SESION (Daniel, 28/07).
+     Estaba despues de resolver la identidad y eso es tarde: te dejaba escribir el correo,
+     elegir cuenta y esperar a que cargue todo para luego decirte que no pasas. */
+  var _entrar=function(){
+    var _sg=null; try{ _sg=JSON.parse(localStorage.getItem('sol_sess')||'null'); }catch(_){}
+    var _tok=(_sg && _sg.token && (Date.now()-(_sg.ts||0) < 50*60*1000)) ? _sg.token : null;
+    if(_tok) _onCredencial_({credential:_tok}, true);
+    else _arrancarGis_();
+  };
+  var _faltaN=_faltanNotis_();
+  if(_faltaN) _gateNotis_(_faltaN, _entrar); else _entrar();
 }
 </script>
 </body>
