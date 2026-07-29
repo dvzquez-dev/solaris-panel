@@ -3586,15 +3586,34 @@ var BZ_AVISO={
    ⚠️ ESTOS VALORES SON UNA PROPUESTA MIA, NO LA ESCALA DE DANIEL. La suya lleva pendiente
    desde el 27/07 (ver `docs/plan-compensar-reportes.md`). La pantalla lo dice: presentar un
    numero inventado como si fuera suyo es pedirle que firme a ciegas. */
+/* ESTRICTA Y CON RENDIMIENTOS DECRECIENTES (Daniel, 29/07: «que sea diminishing returns... tienes
+   que ser mas estricto»). La version anterior daba 3,00 h a los SIETE reportes publicados -todos
+   tocaban el tope- y sumaba 21 h, mas de lo que una persona trabaja en un mes. No medía: recortaba
+   a todos por el mismo sitio. */
 var MATRIZ_COMP={
-  base:0.5,                                    // por haberse molestado en reportarlo bien
-  gravedad:{ 'Bloquea':1.5, 'Molesta':0.75, 'Cosmético':0.25, 'Cosmetico':0.25 },
+  base:0,                                      // NADA por reportar: se cobra por lo que aporta
+  gravedad:{ 'Bloquea':1.0, 'Molesta':0.35, 'Cosmético':0.15, 'Cosmetico':0.15 },
   /* Un fallo que bloquea a 30 no vale lo que uno que molesta a 1. */
-  alcance:{ 'equipo':1.5, 'subsistema':1.0, 'persona':0.5 },
+  alcance:{ 'equipo':0.6, 'subsistema':0.4, 'persona':0.2 },
   /* El eje que mas conviene premiar: enseña a reportar bien. */
-  calidad:{ 'reproducible':1.5, 'con_preguntas':1.0, 'no_reproducible':0 },
-  tope:3.0                                     // por reporte, para que nada se dispare
+  calidad:{ 'reproducible':0.6, 'con_preguntas':0.25, 'no_reproducible':0 },
+  tope:2.0,                                    // por reporte, para que nada se dispare
+  /* DIMINISHING RETURNS, POR PERSONA Y TEMPORADA. El primero entero, el segundo al 60%, y asi.
+     Sin esto, quien reporta veinte cosas menores cobra veinte veces el precio completo, que es
+     justo el incentivo que no se quiere: premia el volumen, no el hallazgo. */
+  decrec:[1.0, 0.6, 0.4, 0.3, 0.25]            // el 5º y siguientes, al 25%
 };
+/* Cuantos reportes PAGADOS lleva ya esa persona: el orden decide su factor. Solo cuentan los que
+   llegaron a `Publicado` -lo descartado no compensa- y se ordena por fecha de creacion, para que
+   el factor no dependa de en que orden los mire el PD. */
+function _ordenComp_(r){
+  var q = String((r && r.quien) || ''), id = String((r && r.id) || '');
+  var previos = (BUZON || []).filter(function(x){
+    return x && String(x.quien||'') === q && x.estado === 'Publicado' &&
+           String(x.creado||'') < String(r.creado||'');
+  });
+  return previos.length + 1;
+}
 /* Devuelve `{horas, porque[], faltan[]}`. `faltan` es la lista de ejes que el triaje no
    escribio: se asume lo conservador y SE DICE, en vez de disimular el hueco. */
 function _compPropuesta_(r){
@@ -3609,7 +3628,12 @@ function _compPropuesta_(r){
   var c=M.calidad[String(r.calidad||'')];
   if(c==null){ c=M.calidad['con_preguntas']; faltan.push('calidad del reporte'); }
   h+=c; porque.push('calidad '+(r.calidad||'—')+' +'+c);
-  h=Math.min(M.tope, Math.round(h*4)/4);       // en cuartos de hora, como los partes
+  h=Math.min(M.tope, h);
+  /* Y AQUI el decrecimiento, sobre el bruto ya topado. Se dice en el desglose: quien lo lea tiene
+     que ver por que su quinto reporte vale menos que el primero, o parecera arbitrario. */
+  var nOrden=_ordenComp_(r), f=M.decrec[Math.min(nOrden, M.decrec.length)-1];
+  if(f<1) porque.push(nOrden+'º reporte suyo · x'+f);
+  h=Math.round(h*f*4)/4;                       // en cuartos de hora, como los partes
   return {horas:h, porque:porque, faltan:faltan};
 }
 /* Nadie se compensa a si mismo: misma regla que en documentos. Y solo cuenta lo que llego a
@@ -4190,7 +4214,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='4dde06b';
+var BUILD='052b86d';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
