@@ -4303,7 +4303,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7717c5e';
+var BUILD='108621e';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -4385,6 +4385,15 @@ function vTurnos(){
 }
 /* ── DOCUMENTOS — routing por ámbito y rango, igual que app.html ────────── */
 var AMB={archivo:'archivo',subsistema:'subsistema',general:'general'};
+/* Los ESTADOS, en legible. El movil pintaba `e.estado` en crudo y el miembro leia
+   «revision» o «anot»: los valores internos del backend. GEMELA del escritorio -copiada,
+   no reescrita- para que las dos caras llamen igual a lo mismo. */
+var EST_DOC={recibido:['recibido',''],analizado:['analizado',''],revision:['en revisión','wa'],
+  aprobado:['aprobado','ok'],anot:['aprobado con anotaciones','ok'],publicado:['publicado','ok'],
+  cambios:['cambios pedidos','no'],rechazado:['rechazado','no'],publicando:['publicando','']};
+var AMB_DOC={archivo:'archivo de miembro',subsistema:'informe de subsistema',general:'informe general'};
+function estDoc(e){ return EST_DOC[e]||[String(e||'—'),'']; }
+
 function revisoresDe(e){
   var r = e.ambito==='general' ? [PD_NOM]
         : e.ambito==='subsistema' ? [PD_NOM,REV2_NOM]
@@ -4519,7 +4528,7 @@ function verDoc(id){
     '<div class="msub"><span class="mono">'+e.ref+'</span> · '+esc(e.autor)+' · '+esc(e.subsistema)+'</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+
       '<span class="pil neu">'+AMB[e.ambito]+'</span>'+
-      '<span class="pil '+(e.estado==='revision'?'pend':e.estado==='cambios'?'no':'conf')+'">'+esc(e.estado)+'</span>'+
+      '<span class="pil '+(e.estado==='revision'?'pend':e.estado==='cambios'?'no':'conf')+'">'+esc(estDoc(e.estado)[0])+'</span>'+
       (e.sev?'<span class="pil '+(e.sev==='alta'?'no':e.sev==='media'?'pend':'conf')+'">calidad '+sevTxt[e.sev]+'</span>':'')+
     '</div>'+
     '<p style="font-size:12.5px;color:var(--ink2);line-height:1.55;margin:0">'+esc(e.resumen||'Sin descripción.')+'</p>'+
