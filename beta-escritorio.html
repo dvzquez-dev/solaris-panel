@@ -574,7 +574,11 @@ var $$=function(s,c){return Array.prototype.slice.call((c||document).querySelect
 var RM=window.matchMedia('(prefers-reduced-motion: reduce)');
 function redu(){return RM.matches;}
 function nf(v,d){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}).format(v);}
-function h1(v){return nf(v,1)+' h';}
+/* Las horas van con los decimales que TENGAN, no con uno fijo. Con `nf(v,1)` un cuarto de
+   hora -0,25- se pintaba «0,3 h», que ademas no es ningun escalon de la escala de
+   compensacion. Se muestran dos decimales solo si el numero los usa: 2 h se lee mejor que
+   2,00 h, y 0,25 h tiene que leerse 0,25 h. GEMELA en las dos caras. */
+function h1(v){ var n=Number(v)||0; return nf(n, (Math.round(n*100)%100===0) ? 0 : 2)+' h'; }
 function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function ini(n){var p=n.split(' ');return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase();}
@@ -3586,64 +3590,69 @@ var BZ_AVISO={
    ⚠️ ESTOS VALORES SON UNA PROPUESTA MIA, NO LA ESCALA DE DANIEL. La suya lleva pendiente
    desde el 27/07 (ver `docs/plan-compensar-reportes.md`). La pantalla lo dice: presentar un
    numero inventado como si fuera suyo es pedirle que firme a ciegas. */
-/* ESTRICTA Y CON RENDIMIENTOS DECRECIENTES (Daniel, 29/07: «que sea diminishing returns... tienes
-   que ser mas estricto»). La version anterior daba 3,00 h a los SIETE reportes publicados -todos
-   tocaban el tope- y sumaba 21 h, mas de lo que una persona trabaja en un mes. No medía: recortaba
-   a todos por el mismo sitio. */
-var MATRIZ_COMP={
-  base:0,                                      // NADA por reportar: se cobra por lo que aporta
-  gravedad:{ 'Bloquea':1.0, 'Molesta':0.35, 'Cosmético':0.15, 'Cosmetico':0.15 },
-  /* Un fallo que bloquea a 30 no vale lo que uno que molesta a 1. */
-  alcance:{ 'equipo':0.6, 'subsistema':0.4, 'persona':0.2 },
-  /* El eje que mas conviene premiar: enseña a reportar bien. */
-  calidad:{ 'reproducible':0.6, 'con_preguntas':0.25, 'no_reproducible':0 },
-  tope:2.0,                                    // por reporte, para que nada se dispare
-  /* DIMINISHING RETURNS, POR PERSONA Y TEMPORADA. El primero entero, el segundo al 60%, y asi.
-     Sin esto, quien reporta veinte cosas menores cobra veinte veces el precio completo, que es
-     justo el incentivo que no se quiere: premia el volumen, no el hallazgo. */
-  decrec:[1.0, 0.6, 0.4, 0.3, 0.25]            // el 5º y siguientes, al 25%
+/* ═══ LA ESCALA DE COMPENSACION (Daniel, 29/07) ═══════════════════════════════════
+   Dictada por el, literal, y sustituye a la suma de ejes que habia antes -que daba lo MISMO a
+   los siete reportes publicados porque todos tocaban el tope-.
+
+   No es una formula: es un JUICIO, en ocho escalones de cuarto de hora. Los ejes del triaje
+   (`gravedad`, `alcance`, `calidad`) dejan de sumar horas y pasan a ser lo que siempre debieron
+   ser: PISTAS para elegir escalon.
+
+   ⛔ POR ENCIMA DE 2 h NO PROPONE NADIE: eso lo da Daniel a mano. */
+var ESCALA_COMP=[
+  [0.25, 'algo normal'],
+  [0.50, 'algo decente'],
+  [0.75, 'algo bueno'],
+  [1.00, 'algo excelente'],
+  [1.25, 'algo impresionante'],
+  [1.50, 'algo espectacularmente útil'],
+  [1.75, 'algo importante en el funcionamiento y muy útil'],
+  [2.00, 'un bug crítico que casi tumba la app y la ponía en riesgo']
+];
+/* LOS PESOS. Sesgados a la baja a proposito (Daniel: «ser poco generoso a no ser que sea algo
+   super critico»): la gravedad es la unica que puede empujar al techo, y los otros dos ejes
+   describen el REPORTE, no el hallazgo, asi que suman poco. */
+var PESOS_COMP={
+  gravedad:{ 'Bloquea':1.75, 'Molesta':0.35, 'Cosmético':0.10, 'Cosmetico':0.10 },
+  gravedadSinMedir:0.05,                      // una mejora no trae gravedad: casi no puntua
+  /* Alcance y calidad suman POCO a proposito: si suman mas, tapan a la gravedad y todo lo
+     cosmetico bien reportado se planta en 0,50. Con esto, «letra un poco mas grande» -cosmetico,
+     de equipo, impecablemente reportado- cae donde debe: 0,25. */
+  alcance:{ 'equipo':0.15, 'subsistema':0.10, 'persona':0.05 },
+  calidad:{ 'reproducible':0.10, 'con_preguntas':0.05, 'no_reproducible':0 },
+  minimo:0.25,                                 // si algo se paga, se paga el escalon mas bajo
+  tope:2.00                                    // por encima, SOLO Daniel a mano
 };
-/* Cuantos reportes PAGADOS lleva ya esa persona: el orden decide su factor. Solo cuentan los que
-   llegaron a `Publicado` -lo descartado no compensa- y se ordena por fecha de creacion, para que
-   el factor no dependa de en que orden los mire el PD. */
-function _ordenComp_(r){
-  var q = String((r && r.quien) || ''), id = String((r && r.id) || '');
-  var previos = (BUZON || []).filter(function(x){
-    return x && String(x.quien||'') === q && x.estado === 'Publicado' &&
-           String(x.creado||'') < String(r.creado||'');
-  });
-  return previos.length + 1;
+/* Suma ponderada -> cuartos de hora -> el escalon de `ESCALA_COMP` que le toca. */
+function _ponderaComp_(r){
+  var P=PESOS_COMP, h=0, porque=[];
+  var g=String(r.gravedad||'');
+  if(P.gravedad[g]!=null){ h+=P.gravedad[g]; porque.push(g.toLowerCase()+' +'+P.gravedad[g].toFixed(2)); }
+  else { h+=P.gravedadSinMedir; porque.push('sin gravedad medida +'+P.gravedadSinMedir.toFixed(2)); }
+  var a=String(r.alcance||''), c=String(r.calidad||'');
+  if(P.alcance[a]!=null){ h+=P.alcance[a]; porque.push('alcance '+a+' +'+P.alcance[a].toFixed(2)); }
+  if(P.calidad[c]!=null){ h+=P.calidad[c]; porque.push('calidad '+c+' +'+P.calidad[c].toFixed(2)); }
+  var horas=Math.round(h*4)/4;                 // EL REDONDEO A CUARTOS que pidio Daniel
+  if(horas<P.minimo) horas=P.minimo;
+  if(horas>P.tope) horas=P.tope;
+  porque.push('suma '+h.toFixed(2)+' → '+horas.toFixed(2)+' h');
+  return {horas:horas, porque:porque};
 }
-/* Devuelve `{horas, porque[], faltan[]}`. `faltan` es la lista de ejes que el triaje no
+/* La etiqueta que le corresponde a esas horas, para que el numero venga con su significado. */
+function _etiquetaComp_(horas){
+  for(var i=ESCALA_COMP.length-1;i>=0;i--) if(horas>=ESCALA_COMP[i][0]) return ESCALA_COMP[i][1];
+  return ESCALA_COMP[0][1];
+}
+/* Devuelve `{horas, etiqueta, porque[], faltan[]}`. `faltan` son los ejes que el triaje no
    escribio: se asume lo conservador y SE DICE, en vez de disimular el hueco. */
 function _compPropuesta_(r){
-  var M=MATRIZ_COMP, porque=[], faltan=[];
-  var h=M.base; porque.push('base '+M.base+' h');
-  var g=M.gravedad[String(r.gravedad||'')];
-  if(g==null){ g=M.gravedad['Molesta']; faltan.push('gravedad'); }
-  h+=g; porque.push('gravedad '+(r.gravedad||'—')+' +'+g);
-  var a=M.alcance[String(r.alcance||'')];
-  if(a==null){ a=M.alcance['persona']; faltan.push('alcance'); }
-  h+=a; porque.push('alcance '+(r.alcance||'—')+' +'+a);
-  var c=M.calidad[String(r.calidad||'')];
-  if(c==null){ c=M.calidad['con_preguntas']; faltan.push('calidad del reporte'); }
-  h+=c; porque.push('calidad '+(r.calidad||'—')+' +'+c);
-  h=Math.min(M.tope, h);
-  /* Y AQUI el decrecimiento, sobre el bruto ya topado. Se dice en el desglose: quien lo lea tiene
-     que ver por que su quinto reporte vale menos que el primero, o parecera arbitrario. */
-  var nOrden=_ordenComp_(r), f=M.decrec[Math.min(nOrden, M.decrec.length)-1];
-  if(f<1) porque.push(nOrden+'º reporte suyo · x'+f);
-  h=Math.round(h*f*4)/4;                       // en cuartos de hora, como los partes
-  return {horas:h, porque:porque, faltan:faltan};
+  var p=_ponderaComp_(r), faltan=[];
+  if(!r.gravedad) faltan.push('gravedad');
+  if(!r.alcance) faltan.push('alcance');
+  if(!r.calidad) faltan.push('calidad del reporte');
+  return {horas:p.horas, etiqueta:_etiquetaComp_(p.horas), porque:p.porque, faltan:faltan};
 }
-/* Nadie se compensa a si mismo: misma regla que en documentos. Y solo cuenta lo que llego a
-   produccion, que es cuando se sabe que valia. */
-function _compPuede_(r){
-  if((r.estado||'')!=='Publicado') return 'solo cuando esté publicado';
-  if(_m(r.quien).pila===_m(ACTOR).pila || r.quien===ACTOR) return 'es tuyo: nadie se compensa a sí mismo';
-  if(r.horas_otorgadas) return 'ya compensado con '+r.horas_otorgadas+' h';
-  return null;
-}
+
 function _compHTML_(r){
   var p=_compPropuesta_(r), no=_compPuede_(r);
   var ID=esc(r.id);
@@ -4214,7 +4223,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='052b86d';
+var BUILD='8473d34';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4430,7 +4439,10 @@ function pintar(){
       var caja=$('[data-comph="'+id+'"]',m);
       /* Se otorga LO QUE HAY EN LA CAJA, no lo que propuso la matriz: si él lo cambió, su
          número es el bueno. Esa es toda la gracia de que sea editable. */
-      var horas=Math.round((parseFloat(caja&&caja.value)||0)*4)/4;
+      /* SIN REDONDEAR: si escribe 0,3 se otorgan 0,3. Redondear a cuartos aqui convertia su
+         0,3 en 0,25 y contradecia el comentario de arriba — la caja es editable para que su
+         numero mande. El redondeo vale para lo que PROPONE la app, no para lo que teclea el. */
+      var horas=parseFloat(caja&&caja.value)||0;
       if(!(horas>0)){ tost('Pon las horas antes de otorgar.'); if(caja) caja.focus(); return; }
       b.disabled=true; var prev=b.textContent; b.textContent='Otorgando…';
       try{

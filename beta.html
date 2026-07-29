@@ -931,7 +931,11 @@ var RM=window.matchMedia('(prefers-reduced-motion: reduce)');
 function redu(){return RM.matches;}
 function nf(v,d){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}).format(v);}
 function nf2(v){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,maximumFractionDigits:2}).format(v);}  // horas: hasta 2 decimales (centésima)
-function h1(v){return nf(v,1)+' h';}
+/* Las horas van con los decimales que TENGAN, no con uno fijo. Con `nf(v,1)` un cuarto de
+   hora -0,25- se pintaba «0,3 h», que ademas no es ningun escalon de la escala de
+   compensacion. Se muestran dos decimales solo si el numero los usa: 2 h se lee mejor que
+   2,00 h, y 0,25 h tiene que leerse 0,25 h. GEMELA en las dos caras. */
+function h1(v){ var n=Number(v)||0; return nf(n, (Math.round(n*100)%100===0) ? 0 : 2)+' h'; }
 function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function pad(n){return String(n).padStart(2,'0');}
@@ -4303,7 +4307,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='108621e';
+var BUILD='7c01941';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
