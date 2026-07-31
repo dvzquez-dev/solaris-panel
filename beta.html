@@ -832,6 +832,20 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
   .med .fili,.vacio .rad::after,.estela,.chispas,.sombra{display:none}
   .sesion .rel .c{animation:none}
 }
+.mdoc{font-size:13px;line-height:1.6;color:var(--ink2)}
+.mdoc h1{font-size:16px;color:var(--ink);margin:0 0 10px}
+.mdoc h2{font-size:14.5px;color:var(--ink);margin:18px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
+.mdoc h3{font-size:13px;color:var(--ink);margin:13px 0 6px}
+.mdoc p{margin:0 0 9px}
+.mdoc ul{margin:0 0 11px;padding-left:17px}
+.mdoc li{margin:0 0 6px}
+.mdoc code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#0A0909;
+  border:1px solid var(--line);border-radius:5px;padding:1px 4px}
+.mdoc blockquote{margin:0 0 10px;padding:8px 11px;border-left:2px solid var(--line);
+  background:#0A0909;border-radius:0 8px 8px 0;color:var(--ink3)}
+.mdoc hr{border:0;border-top:1px solid var(--line);margin:15px 0}
+.mdoc a{color:var(--red2)}
+.mdoc b{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -874,6 +888,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
         <button data-mnu="sanciones" data-p>Sanciones<small>Ponerlas y decidir las pendientes</small></button>
         <button data-mnu="cuota" data-p>Tu cuota<small>Lo que te toca pagar esta temporada</small></button>
         <button data-mnu="equipo" data-p>El equipo<small>Quién coordina cada unidad</small></button>
+        <button data-mnu="novedades" data-p>Novedades<small>Qué ha cambiado en cada versión</small></button>
         <button data-mnu="ajustes" data-p>Ajustes<small>Notificaciones y sesión</small></button>
         <button data-mnu="buzon" data-p>Reportar<small>Un fallo o una mejora</small></button>
         <button data-mnu="salir" data-p>Cerrar sesión</button>
@@ -2646,6 +2661,65 @@ async function _decidirSancM_(id, accion, b){
   }catch(e){ b.disabled=false; tost('No se pudo: '+((e&&e.message)||e)); }
 }
 /* ── MODAL (mismo patrón que app.html) ─────────────────────────────────── */
+/*CHANGELOG_INI*/var CHANGELOG_MD="# Changelog — Panel Solaris\n\nQué cambió en cada versión de la app, en corto. Escrito **para el equipo**, no para el que la\nprograma: si algo no se nota usándola, no está aquí.\n\n> **No confundir con `versiones.md`.** Ese es el registro para **revertir**: qué versión de la app\n> iba con qué versión del backend, y en qué orden se deshace. Este dice **qué cambió**. Si los dos\n> se contradicen sobre fechas o números, manda `versiones.md`.\n\n**Cómo leerlo**: 📱 móvil · 🖥️ escritorio · ⚙️ backend. Lo que sale en las dos caras va en «las dos».\nLa app dice qué versión lleva: móvil en **Ajustes**, escritorio en **el pie**.\n\n---\n\n## v0.2 — *en beta desde el 31/07/2026*\n\n**Dónde mirarla**: [`beta.html`](https://dvzquez-dev.github.io/solaris-panel/beta.html) ·\n[`beta-escritorio.html`](https://dvzquez-dev.github.io/solaris-panel/beta-escritorio.html).\n**Producción sigue en la v0.1** y no se toca hasta que Daniel lo valide.\n\n**Las dos caras**\n\n- Ya se puede sancionar por **incumplir un plazo**. El formulario ofrecía **tus** tareas en vez de\n  las de la persona sancionada, así que con el PD —que no tiene tareas— la lista salía vacía y la\n  sanción por plazo era imposible de poner **contra nadie**.\n- Los motivos de sanción llevan **su artículo real del RRI** (30b tarea importante o urgente, 30c\n  cualquier otra), en vez de una clave interna.\n- Las horas se escriben con los decimales que tienen: **0,25 h** ya no sale como «0,3 h».\n- El distintivo **«beta»** de la cabecera es ahora el **enlace de vuelta a producción**.\n\n**📱 Móvil**\n\n- Los expedientes dicen **«en revisión»**, no `revision`: fuera los estados internos del servidor.\n- **El «Desglose de puntos» ya enseña algo.** Cada subida o bajada, con su motivo, su artículo del\n  RRI y su fecha. Antes existía la pantalla y salía siempre vacía. *(Necesita el backend v53.)*\n- **Horas y puntos enseñan tus últimos 10 movimientos**: las horas **del mes** (se reinician con\n  el cierre, igual que el Panel de Rendimientos) y los puntos **de la temporada**. **No se borra\n  nada**: el registro completo se conserva, lo que cambia es cuánto se pinta — y la pantalla lo\n  dice.\n- **El desglose de tus horas cuelga de la propia cifra**, como desplegable opcional: ya no hay\n  que bajar al fondo de la pantalla para saber de qué se componen.\n- **«Ver el desglose completo de este mes»**: una ventana con **todas** tus contribuciones del\n  mes, sin recortar, empezando por la **compensación mensual que te toca por cargo** — esas horas\n  que se asignan solas y que antes no aparecían por ningún lado.\n\n**🖥️ Escritorio**\n\n- La **compensación en horas** de un reporte sale de una **matriz ponderada redondeada a cuartos**,\n  con la escala de **0,25 «algo normal»** a **2,00 «un bug crítico»**. El techo son 2 h; por encima\n  las da Daniel a mano.\n- **Manda el número que teclees**: se quitó el redondeo que pisaba el valor escrito. Redondear vale\n  para lo que **propone** la app, no para lo que decide una persona.\n- **Las mejoras ya se valoran**. Antes todas caían en el escalón mínimo dieran lo que dieran: el\n  eje que decide se estaba guardando en una columna que el buzón de mejoras no tiene, y se perdía\n  sin avisar. Ahora una mejora se valora por **`valor`** (Alto · Medio · Bajo) y se ve en su\n  tarjeta. **Una mejora topa en 1,50 h**; las 2 h se quedan para un bug crítico.\n\n- **Se arregló que no se pudieran otorgar horas.** La ficha de un reporte ya publicado no\n  llegaba a pintarse, que es justo donde se compensa.\n\n**⚙️ Backend v52**\n\n- `getTareas` admite `nombre`: devuelve las tareas de **a quien puedes sancionar**, con la misma\n  regla que la sanción.\n\n---\n\n## v0.1 — 28/07/2026 · backend v51\n\nEl **primer release numerado**. Recoge todo lo que producción no tenía desde las 07:37 de ese día.\n\n**Las dos caras**\n\n- **Buzón de bugs y mejoras**, cuatro buzones separados (bug/mejora × móvil/escritorio). Se reporta\n  desde el menú ⋮ y **la cara va dentro del identificador**, para que se sepa de qué se habla.\n- **Fotos en el reporte, con pintor encima**: adjuntas una imagen, se abre a pantalla completa y la\n  marcas —paleta, tres grosores, deshacer, zoom con dos dedos—; al enviar se fusionan las capas.\n- **Poner y decidir sanciones**, con su **modelo de autoridad**: cada uno solo alcanza a quien le\n  corresponde, y **lo comprueba el servidor**, no solo la pantalla.\n- **Un solo visor de documentos**, con pantalla completa. Antes había tres copias distintas.\n- El **fichaje reintenta** cuando el envío se pierde por el camino. Antes fallaba a la primera y\n  decía «respuesta no válida».\n\n**📱 Móvil**\n\n- **Notificaciones obligatorias**: sin activarlas la app no arranca, y el aviso va **antes** del\n  login. Con **preferencias por tipo** en Ajustes.\n- Vuelve la **comparativa de horas**: contra tu **mes anterior** y contra el **equipo**.\n- **Documentos** se ve por defecto; **Tareas** y **Documentos** se pueden ocultar desde Ajustes.\n- **Horas** reordenada: partes arriba, historial al fondo, plegado y solo del mes en curso.\n- La **cuota** pasa al menú ⋮.\n- Botón **«ver todos los turnos»**.\n- El móvil **deja de estirarse** en pantalla de ordenador.\n\n**🖥️ Escritorio**\n\n- **Convocar reunión** con horario **distinto por día** (con días apagables) y **copiar la\n  distribución** de otra reunión.\n- La **propuesta de compensación en horas**, editable y junto al reporte.\n- **Cola de sanciones**: aceptar o rechazar todas, editar una suelta y agrupar en un paquete.\n\n**⚙️ Backend v43 → v51**\n\n- Buzón: estados, anotaciones y capturas a Drive.\n- Preferencias de notificación, con el filtro **en el servidor**.\n- `getFichajesAbiertos` y `getDatos`.\n- `moverLimiteTarea`: mueve la fecha límite de una tarea **en Notion**.\n- La **autoridad de sanciones**, comprobada por persona.\n- **Último acceso** de cada persona, el dato que pide la regla semanal del RRI.\n- El **id de Notion** se lee bien aunque el título lleve guiones.\n\n---\n\n## Antes de los números — hasta el 28/07/2026, 07:37\n\nLo que había en producción **sin versión**: la app se publicaba directamente y el backend iba por su\ncuenta. No hay historial versión a versión porque no se numeraba; esto es el resumen de lo que ya\nfuncionaba cuando empezaron los números.\n\n**Las dos caras**\n\n- **Reuniones y disponibilidad** propias, en sustitución de Xoyondo y when2meet: convocar con tipos\n  gateados por cargo, pintar tu disponibilidad a dedo, **mapa de calor** agregado con la mejor\n  franja, y **slot + duración** en vez de franjas solapadas.\n- **Documentos**: revisar y aprobar expedientes con las cuatro decisiones reales, enrutado por\n  ámbito, bloqueo mutuo y desempate por rango.\n- **Turnos** leídos en vivo de Notion y **tareas** de los cuatro Kanban.\n- **Fichaje** y partes de horas.\n- **Refresco en vivo**: lo que miras se actualiza solo, sin borrarte lo que estés escribiendo.\n- La app **dice qué versión es** (`BUILD`), para no depurar dos builds distintos sin saberlo.\n\n**📱 Móvil**\n\n- Seis pestañas, medidor de conducta y **cascada** al ser elegible.\n- **Estado**, **Turnos**, **Tareas**, **Reuniones**, **Horas** y **Equipo**.\n\n**🖥️ Escritorio**\n\n- Vista de coordinación: cola de sanciones, partes, documentos, cierre mensual encolable y\n  convocatorias.\n- **Ajustes** propios, con notificaciones y sesión.\n\n---\n\n> **Cómo se actualiza este fichero**: al hacer un release se añade su bloque **en ese momento**, con\n> bullets cortos y separados por cara. Un changelog que se escribe «cuando haya tiempo» se escribe\n> de memoria, y de memoria se escribe mal. La lista de qué se toca al publicar está en\n> `ARRANQUE.md` §5.\n";/*CHANGELOG_FIN*/
+/* ═══ EL CHANGELOG, DENTRO DE LA APP · GEMELA (movil/escritorio) ═══════════════════
+   `CHANGELOG_MD` lo rellena `rutinas/sellar_changelog.py` desde `docs/changelog.md`, antes de
+   publicar. **No se escribe a mano aqui**: la CSP obliga a que cada cara sea autocontenida, asi
+   que el texto esta duplicado por fuerza — lo que no puede ser es que lo dupliquen unos dedos.
+
+   `_mdHTML_` es un renderizador MINIMO: solo lo que el changelog usa (titulos, negrita, cursiva,
+   codigo, vinetas, cita, regla y enlaces). No es un parser de markdown y no pretende serlo; si
+   algun dia el changelog usa tablas, se añaden aqui y se dice. */
+function _mdHTML_(md){
+  function linea(s){
+    return esc(s)
+      .replace(/`([^`]+)`/g,'<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+      .replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<i>$2</i>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  }
+  /* ⛔ SE JUNTA PRIMERO Y SE FORMATEA DESPUES. Al reves -formateando linea a linea- una
+     negrita que cruza dos lineas del markdown no se cierra nunca y sale `**` crudo en
+     pantalla. El changelog esta lleno de ellas, porque las lineas van a 100 columnas. */
+  var out=[], li=[], par=[], cita=[];
+  function cierraLi(){
+    if(!li.length) return;
+    out.push('<ul>'+li.map(function(t){ return '<li>'+linea(t)+'</li>'; }).join('')+'</ul>');
+    li=[];
+  }
+  /* Los parrafos se acumulan y se cierran de golpe: en el changelog una frase ocupa tres
+     lineas y pintarlas como tres parrafos parte el texto donde no toca. */
+  function cierraPar(){ if(par.length){ out.push('<p>'+linea(par.join(' '))+'</p>'); par=[]; } }
+  function cierraCita(){ if(cita.length){ out.push('<blockquote>'+linea(cita.join(' '))+'</blockquote>'); cita=[]; } }
+  function cierra(){ cierraLi(); cierraPar(); cierraCita(); }
+  String(md||'').split(/\r?\n/).forEach(function(l){
+    var t=l.replace(/\s+$/,''), m;
+    if(/^---+$/.test(t)){ cierra(); out.push('<hr>'); return; }
+    if((m=t.match(/^(#{1,4})\s+(.*)$/))){ cierra(); var n=m[1].length;
+      out.push('<h'+n+'>'+linea(m[2])+'</h'+n+'>'); return; }
+    if((m=t.match(/^>\s?(.*)$/))){ cierraLi(); cierraPar(); cita.push(m[1]); return; }
+    if((m=t.match(/^[-*]\s+(.*)$/))){ cierraPar(); cierraCita(); li.push(m[1]); return; }
+    if(!t){ cierra(); return; }
+    /* Linea sangrada dentro de una vineta: es continuacion suya, no un parrafo nuevo. */
+    if(li.length && /^\s+/.test(l)){ li[li.length-1]+=' '+t.replace(/^\s+/,''); return; }
+    cierraLi(); cierraCita(); par.push(t);
+  });
+  cierra();
+  return out.join('');
+}
+/* La pantalla de novedades. Si el sellado no se hizo, se DICE en vez de enseñar un hueco:
+   un changelog vacio parece que no ha cambiado nada, que es lo contrario de la verdad. */
+function _novedadesHTML_(){
+  var cuerpo = String(CHANGELOG_MD||'').trim()
+    ? '<div class="mdoc">'+_mdHTML_(CHANGELOG_MD)+'</div>'
+    : '<p class="rnota">El changelog no se selló en esta build. Está en '+
+      '<span class="mono">docs/changelog.md</span> del repositorio.</p>';
+  return '<div class="mtit">Novedades</div>'+
+    '<div class="msub">Qué ha cambiado en cada versión. Estás en '+
+      esc(VERSION?('v'+VERSION):(CANAL==='beta'?'la beta':'una build sin publicar'))+
+      ' · <span class="mono">'+esc(BUILD)+'</span></div>'+
+    cuerpo;
+}
 function abrirModal(html){
   $('#modal-body').innerHTML=html;
   $('#modal').classList.add('on');
@@ -3505,9 +3579,19 @@ function _temporadaDe_(d){
   var ini = (d.getMonth()+1) >= 9 ? d.getFullYear() : d.getFullYear()-1;
   return String(ini).slice(2)+'/'+String(ini+1).slice(2);
 }
+/* `DD/MM/AAAA` -> `Date`. Pasa por `_dmyAISO_`, que YA EXISTE y es GEMELA en las dos caras
+   (mapa funcional §4.2). La primera version de esto traia su propio `match` de la fecha: un
+   TERCER parser de la misma familia, que es justo lo que el mapa prohibe en su punto 2. */
 function _fechaDMY_(s){
-  var m=String(s||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  return m ? new Date(+m[3], (+m[2])-1, +m[1]) : null;
+  var iso=_dmyAISO_(s);
+  /* `_dmyAISO_` CONVIERTE, no valida: lo que no reconoce lo devuelve tal cual (probado:
+     'no' sale 'no'). Reutilizar la puerta buena no exime de comprobar lo que sale, o la
+     basura entra como `Invalid Date` y se cuela en los filtros. */
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso||''))) return null;
+  var p=iso.split('-'), d=new Date(+p[0], (+p[1])-1, +p[2]);
+  /* Y `new Date(2026,12,32)` NO falla: rueda al mes siguiente. Se contrasta que lo que sale
+     es lo que entro, o una fecha imposible pasaria por buena. */
+  return (d.getFullYear()===+p[0] && d.getMonth()===(+p[1])-1 && d.getDate()===+p[2]) ? d : null;
 }
 function _deEstaTemporada_(d){ return !!d && _temporadaDe_(d)===_temporadaDe_(_hoyDateM_()); }
 /* ⛔ CADA MAGNITUD SE REINICIA CON LO SUYO, y confundirlo hace que la app diga otra cosa que el
@@ -3579,55 +3663,37 @@ function filaParte(p){
     _origenParte_(p)+'</small></div>'+
     '<div class="d">'+accion+pil+' <b class="mono">'+nf(p.q,1)+' h</b></div></div>';
 }
-/* El historial plegado, al fondo de Horas. Usa el mismo visor de plegado que el resto
-   (`data-vabrir`/`.vcuerpo`) para no estrenar un tercer mecanismo de desplegar cosas. */
-function _historialHTML_(confs){
-  /* ÁMBITO MES: las horas se reinician con el cierre mensual, no con la temporada. */
-  var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
-  var delMes=r.ultimos;
-  var h=r.suma+_compMensual_(YO);            /* la SUMA es la del MES entero, no la de los 10
-                                                pintados, y lleva la compensación por cargo:
-                                                si no, el total no cuadra con el panel. */
-  return '<h2 class="sec">Últimos movimientos<span class="ln"></span>'+nf2(h)+' h</h2>'+
-    '<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
-      '<b>Qué se te ha contado este mes</b><small>'+r.total+' apunte'+(r.total===1?'':'s')+
-        ' · pulsa para ver los '+Math.min(r.total,MOVS_N)+' últimos</small>'+
-      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
-        'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
-      '<div class="plgc" hidden>'+
-        /* AQUI SOLO LOS APUNTES. El desglose por categorias se fue arriba, con la cifra
-           (31/07): tenerlo en los dos sitios seria decir lo mismo dos veces y, en cuanto se
-           tocara uno, decirlo distinto. */
-        (delMes.length
-          ? '<p class="rnota" style="margin:0 0 10px">'+_notaRegistro_(r.total)+'</p>'+
-            delMes.map(filaParte).join('')
-          : vacio('Este mes todavía nada','Cuando te firmen un fichaje aparecerá aquí, con la '+
-              'categoría a la que sumó.','',false))+
-      '</div></div></div>';
-}
-/* EL DESGLOSE, BAJO LA CIFRA. Plegado por defecto: es una respuesta a una pregunta que no
-   todo el mundo se hace cada vez que abre la app, pero cuando se la hace la quiere AHI, no al
-   final de la pantalla. Usa el mismo mecanismo de plegado que el resto (`data-plg`/`.plgc`),
-   que ya es el tercer sitio que lo usa y sigue siendo uno solo. */
-function _desgloseHorasHTML_(confs){
+/* ═══ LAS HORAS DEL MES: UN SOLO DESPLEGABLE, BAJO LA CIFRA ═══════════════════════
+   Daniel pidio UNO y yo le deje DOS —«Ver desglose» aqui y «Que se te ha contado este mes» al
+   fondo—, que es lo que canto el 31/07: «ahora esta duplicado lo de las horas». Lo que dijo,
+   las dos veces y en este orden:
+     · «pondria ULTIMOS MOVIMIENTOS y DENTRO de ese desplegable una opcion de ver el desglose
+        completo de este mes»
+     · «el desglose deberia aparecer como desplegable opcional DONDE ESTAN LAS HORAS, no aparte»
+   O sea: un desplegable, pegado a la cifra, y la ventana colgando de el. Sustituye a
+   `_desgloseHorasHTML_` y a `_historialHTML_`, que eran esas dos mitades. */
+function _movHorasHTML_(confs){
   var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
   var comp=_compMensual_(YO);
   return '<div class="plg" style="margin-top:11px"><div class="plgh" data-plg data-p>'+
-      '<b>Ver desglose</b><small>de qué se componen estas horas</small>'+
+      '<b>Últimos movimientos</b><small>'+r.total+' apunte'+(r.total===1?'':'s')+' este mes · '+
+        'de qué se componen estas horas</small>'+
       '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
         'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
     '<div class="plgc" hidden>'+
-      /* LA COMPENSACION POR CARGO VA LA PRIMERA. Es la contribucion que nadie ve venir -no la
+      /* LA COMPENSACION POR CARGO VA LA PRIMERA: es la contribucion que nadie ve venir -no la
          fichas, te la dan- y la que hace que la cuenta cuadre con el Panel de Rendimientos. */
       '<div class="fila borde-ot"><div class="a"><b>Compensación mensual por cargo</b>'+
         '<small>se te asigna cada mes · no se ficha</small></div>'+
         '<div class="d"><b class="mono">'+nf(comp,1)+' h</b></div></div>'+
       (r.total ? desgloseCat(r.todos) : '')+
-      '<p class="rnota" style="margin:8px 0 0">'+
+      '<p class="rnota" style="margin:8px 0 10px">'+
         (r.total
-          ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes.'
-          : 'Este mes todavía no se te ha contado ningún fichaje.')+
-        ' Al cerrar el mes esto vuelve a empezar; el registro <b>no se borra</b>.</p>'+
+          ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes. '+
+            _notaRegistro_(r.total)
+          : 'Este mes todavía no se te ha contado ningún fichaje. Al cerrar el mes esto vuelve a '+
+            'empezar; el registro <b>no se borra</b>.')+'</p>'+
+      r.ultimos.map(filaParte).join('')+
       '<button class="btn mini" data-desgmes data-p style="margin-top:9px">'+
         'Ver el desglose completo de este mes</button>'+
     '</div></div>';
@@ -3714,7 +3780,7 @@ function vHoras(){
       /* EL DESGLOSE, PEGADO A LA CIFRA (Daniel, 31/07: «como desplegable opcional donde estan
          las horas, no aparte»). Antes vivia al fondo, dentro del historial: para saber de que
          se componia tu numero habia que bajar la pantalla entera y abrir otra cosa. */
-      _desgloseHorasHTML_(confs)+
+      _movHorasHTML_(confs)+
     '</div>'+
 
     '<h2 class="sec">Tus partes<span class="ln"></span>'+mias.length+'</h2>'+
@@ -3753,10 +3819,6 @@ function vHoras(){
         : vacio('Sin puesto todavía','Tu posición se calcula con las horas de la temporada al cerrar el mes.','',false))+
     '</div>'+
 
-    /* EL HISTORIAL, AL FONDO Y PLEGADO (Daniel, 28/07). Y solo los ULTIMOS de la temporada
-       (30/07): lo demas sigue guardado -el registro es permanente- pero en el movil solo era
-       scroll. Ver `_ultimosMov_`. */
-    _historialHTML_(confs)+
     /* La cuota se fue al menu ⋮: es una cifra que se consulta dos veces al año. */
     (esPD()?panelPD():'');
 }
@@ -4481,7 +4543,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='809f35d';
+var BUILD='f85646d';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -6068,6 +6130,7 @@ function enganchar(){
       if(q==='buzon'){ buzonModal('bug'); return; }
       if(q==='sanciones'){ _abrirSanciones_(); return; }
       if(q==='cuota'){ abrirModal(_cuotaHTML_()); return; }
+      if(q==='novedades'){ abrirModal(_novedadesHTML_()); return; }
       if(q==='equipo'){ abrirModal(_coordinacionHTML_()); return; }
       if(q==='ajustes'){ abrirModal(_ajustesHTML_());
         /* Se piden al abrir y no al arrancar: es una llamada mas al backend y esta
