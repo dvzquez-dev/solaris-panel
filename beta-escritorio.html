@@ -3518,7 +3518,7 @@ async function _cargarBuzon_(){
   pintar();
 }
 function _fichaBuzon_(r){
-  var st=_estBuzon_(r.estado), esBug=(r.tipo!=='mejora');
+  var st=_estBuzon_(r.estado), esBug=!_esMejora_(r);
   var campo=function(t,v){ return v? ('<div class="sub"><span class="sc">'+t+'</span>'+
     '<p style="margin:4px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+esc(v)+'</p></div>') : ''; };
   return '<div class="parte" id="bz-'+esc(r.id)+'">'+
@@ -3529,7 +3529,10 @@ function _fichaBuzon_(r){
       '<span class="chip">'+(esBug?'fallo':'mejora')+'</span>'+
       '<span class="chip">'+esc(_m(r.quien).pila)+'</span>'+
       '<span class="chip">'+esc(r.donde||'—')+(r.pantalla?' · '+esc(r.pantalla):'')+'</span>'+
+      /* El eje que decide las horas, A LA VISTA en la tarjeta: antes solo se pintaba en los
+         bugs, asi que en una mejora no habia forma de ver por que proponia lo que proponia. */
       (esBug&&r.gravedad?'<span class="chip '+(r.gravedad==='Bloquea'?'no':r.gravedad==='Molesta'?'wa':'')+'">'+esc(r.gravedad)+'</span>':'')+
+      (!esBug&&r.valor?'<span class="chip '+(r.valor==='Alto'?'no':r.valor==='Medio'?'wa':'')+'">valor '+esc(r.valor)+'</span>':'')+
       '<span class="chip '+st[1]+'">'+st[0]+'</span>'+
     '</div>'+
     campo(esBug?'Qué esperaba':'Por qué', esBug?r.esperaba:r.porque)+
@@ -3612,29 +3615,60 @@ var ESCALA_COMP=[
 /* LOS PESOS. Sesgados a la baja a proposito (Daniel: «ser poco generoso a no ser que sea algo
    super critico»): la gravedad es la unica que puede empujar al techo, y los otros dos ejes
    describen el REPORTE, no el hallazgo, asi que suman poco. */
+/* ¿ES UNA MEJORA? **Manda el ID**, igual que en el backend (`_decidirReporte_`): lleva dentro
+   el tipo y la cara, asi que no se puede acabar mirando el eje equivocado por un `tipo` mal
+   puesto o ausente. `tipo` queda de respaldo para lo que venga sin id. */
+function _esMejora_(r){
+  var id=String((r&&r.id)||'');
+  if(id.indexOf('MEJ-')===0) return true;
+  if(id.indexOf('BUG-')===0) return false;
+  return (r&&r.tipo)==='mejora';
+}
+/* Como se llama el eje que mas pesa, en ESTE reporte. Una sola puerta: si esto se decide
+   suelto en cada sitio, vuelve a pasar lo del 29/07. */
+function _ejeComp_(r){ return _esMejora_(r) ? 'valor' : 'gravedad'; }
 var PESOS_COMP={
+  /* ⛔ CADA TIPO TIENE SU EJE, Y NO ES COSMETICA: en el esquema del buzon las mejoras **no
+     tienen columna `gravedad`** (`COLS_MEJ` trae `valor`), asi que escribir ahi se perdia SIN
+     DAR ERROR — paso el 29/07 con los 7 reportes de Adrian.
+
+     LA CALIBRACION, con los otros dos ejes en su valor normal (equipo + reproducible):
+
+        BUG    Cosmetico 0,25 · Molesta 0,50 · Bloquea 2,00   <- la que valido Daniel el 29/07
+        MEJORA Bajo      0,25 · Medio   0,50 · Alto    1,50   <- topa en 1,50 (ver `topeMejora`)
+
+     Los dos escalones de abajo son el mismo numero en los dos ejes a proposito; el de arriba NO,
+     porque el peldano de 2,00 de la escala es «un bug critico que casi tumba la app». */
   gravedad:{ 'Bloquea':1.75, 'Molesta':0.35, 'Cosmético':0.10, 'Cosmetico':0.10 },
-  gravedadSinMedir:0.05,                      // una mejora no trae gravedad: casi no puntua
+  /* `Alto` vale MENOS que `Bloquea` (1,25 vs 1,75) por decision de Daniel (30/07): el peldano
+     de 2,00 de su escala dice «un bug critico que casi tumba la app», y eso en una mejora no se
+     sostiene. Una mejora impecable llega a 1,50, «algo espectacularmente util». */
+  valor:{ 'Alto':1.25, 'Medio':0.35, 'Bajo':0.10 },
+  ejeSinMedir:0.05,                           // sin el eje medido: casi no puntua
   /* Alcance y calidad suman POCO a proposito: si suman mas, tapan a la gravedad y todo lo
      cosmetico bien reportado se planta en 0,50. Con esto, «letra un poco mas grande» -cosmetico,
      de equipo, impecablemente reportado- cae donde debe: 0,25. */
   alcance:{ 'equipo':0.15, 'subsistema':0.10, 'persona':0.05 },
   calidad:{ 'reproducible':0.10, 'con_preguntas':0.05, 'no_reproducible':0 },
   minimo:0.25,                                 // si algo se paga, se paga el escalon mas bajo
-  tope:2.00                                    // por encima, SOLO Daniel a mano
+  tope:2.00,                                   // por encima, SOLO Daniel a mano
+  /* El techo de una MEJORA. Va EXPLICITO y no confiado a que 1,25+0,15+0,10 salga justo 1,50:
+     el dia que alguien recalibre `alcance` o `calidad`, el techo tiene que seguir en pie. */
+  topeMejora:1.50
 };
 /* Suma ponderada -> cuartos de hora -> el escalon de `ESCALA_COMP` que le toca. */
 function _ponderaComp_(r){
   var P=PESOS_COMP, h=0, porque=[];
-  var g=String(r.gravedad||'');
-  if(P.gravedad[g]!=null){ h+=P.gravedad[g]; porque.push(g.toLowerCase()+' +'+P.gravedad[g].toFixed(2)); }
-  else { h+=P.gravedadSinMedir; porque.push('sin gravedad medida +'+P.gravedadSinMedir.toFixed(2)); }
+  var eje=_ejeComp_(r), v=String(r[eje]||'');
+  if(P[eje][v]!=null){ h+=P[eje][v]; porque.push(v.toLowerCase()+' +'+P[eje][v].toFixed(2)); }
+  else { h+=P.ejeSinMedir; porque.push('sin '+eje+' medido +'+P.ejeSinMedir.toFixed(2)); }
   var a=String(r.alcance||''), c=String(r.calidad||'');
   if(P.alcance[a]!=null){ h+=P.alcance[a]; porque.push('alcance '+a+' +'+P.alcance[a].toFixed(2)); }
   if(P.calidad[c]!=null){ h+=P.calidad[c]; porque.push('calidad '+c+' +'+P.calidad[c].toFixed(2)); }
   var horas=Math.round(h*4)/4;                 // EL REDONDEO A CUARTOS que pidio Daniel
+  var techo=_esMejora_(r) ? P.topeMejora : P.tope;
   if(horas<P.minimo) horas=P.minimo;
-  if(horas>P.tope) horas=P.tope;
+  if(horas>techo){ horas=techo; porque.push('techo de '+(_esMejora_(r)?'mejora':'bug')+' '+techo.toFixed(2)); }
   porque.push('suma '+h.toFixed(2)+' → '+horas.toFixed(2)+' h');
   return {horas:horas, porque:porque};
 }
@@ -3647,12 +3681,31 @@ function _etiquetaComp_(horas){
    escribio: se asume lo conservador y SE DICE, en vez de disimular el hueco. */
 function _compPropuesta_(r){
   var p=_ponderaComp_(r), faltan=[];
-  if(!r.gravedad) faltan.push('gravedad');
+  if(!r[_ejeComp_(r)]) faltan.push(_ejeComp_(r));
   if(!r.alcance) faltan.push('alcance');
   if(!r.calidad) faltan.push('calidad del reporte');
   return {horas:p.horas, etiqueta:_etiquetaComp_(p.horas), porque:p.porque, faltan:faltan};
 }
 
+/* NADIE SE COMPENSA A SI MISMO, y solo cuenta lo que llego a produccion -que es cuando se sabe
+   lo que valia-. Devuelve el motivo por el que NO se puede, o null si se puede.
+
+   ⚠️ SE BORRO POR ACCIDENTE el 29/07 (commit 2b09b32, al reescribir el bloque de la escala) y
+   `_compHTML_` la seguia llamando: la ficha de **cualquier reporte `Publicado`** moria con
+   `ReferenceError: _compPuede_ is not defined`. O sea que la pantalla con la que se paga llevaba
+   un dia muerta, publicada en beta, y no se vio porque nadie abrio una ficha ya publicada.
+
+   Restaurada el 30/07 con UN cambio sobre el original: la identidad sale de `_actorSanc_()` y no
+   de `ACTOR`. `ACTOR` lo reescribe «ver como» (:4886), asi que el PD mirando la ficha de Adrian
+   se veria a si mismo como autor y se quedaria **sin poder compensarle**. Es literalmente el
+   fallo que se corrigio en sanciones el 28/07: la autoridad no se hereda mirando. */
+function _compPuede_(r){
+  if((r.estado||'')!=='Publicado') return 'solo cuando esté publicado';
+  var yo=_actorSanc_();
+  if(r.quien===yo || _m(r.quien).pila===_m(yo).pila) return 'es tuyo: nadie se compensa a sí mismo';
+  if(r.horas_otorgadas) return 'ya compensado con '+r.horas_otorgadas+' h';
+  return null;
+}
 function _compHTML_(r){
   var p=_compPropuesta_(r), no=_compPuede_(r);
   var ID=esc(r.id);
@@ -3728,7 +3781,8 @@ function _filaBuzon_(r){
     '<span class="tx"><b>'+esc(r.titulo)+'</b><small><span class="mono">'+esc(r.id)+'</span> · '+
       esc(_m(r.quien).pila)+' · '+esc(r.donde||'—')+(r.pantalla?' · '+esc(r.pantalla):'')+'</small></span>'+
     '<span class="der">'+
-      ((r.tipo!=='mejora'&&r.gravedad==='Bloquea')?'<span class="chip no">bloquea</span>':'')+
+      ((!_esMejora_(r)&&r.gravedad==='Bloquea')?'<span class="chip no">bloquea</span>':'')+
+      ((_esMejora_(r)&&r.valor==='Alto')?'<span class="chip no">valor alto</span>':'')+
       '<span class="chip '+st[1]+'">'+st[0]+'</span><span class="chev">›</span></span></div>';
 }
 V.buzon={g:'Buzón',t:'Reportes',f:function(){
@@ -4223,7 +4277,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='8473d34';
+var BUILD='4837955';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

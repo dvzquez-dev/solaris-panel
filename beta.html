@@ -1274,6 +1274,9 @@ var api={
      porque no habia forma de pedirla: el panel enseñaba la semilla y sus botones solo
      tocaban memoria. Es la misma accion que usa el escritorio. */
   getSanciones: function(f){ return api._post({action:"getSanciones",filtro:f||{}}); },
+  /* TU libro de puntos. Va por su propia accion y no por `getSanciones` porque la pregunta es
+     otra: aquella es la COLA del que decide, esta es TU historial. Ver Codigo.gs. */
+  getMisMovimientos: function(){ return api._post({action:"getMisMovimientos"}); },
   /* Poner y decidir sanciones desde el movil (28/07). El backend ya las tenia: lo que
      faltaba era que esta cara las ofreciera. */
   pushSancion:  function(ss){ return api._post({action:"pushSancion",sanciones:ss}); },
@@ -1413,6 +1416,8 @@ async function _verComo_(nombre){
   var m=(DATA.miembros||[]).filter(function(x){return x.nombre===nombre;})[0]; if(!m) return;
   YO=m; _pintarCabecera_();
   try{ PARTES=await _partesDe_(nombre); }catch(_){ PARTES=[]; }
+  /* «Ver como»: los movimientos son los TUYOS y el backend solo sirve los del que pregunta,
+     así que mirando a otro se vacía. Enseñar los propios bajo la ficha de otro sería mentir. */
   if(typeof MOVS!=='undefined') MOVS.length=0;
   pintar();
 }
@@ -1851,6 +1856,34 @@ async function _cargarSancionesM_(){
   try{ var a=await api.getSanciones({estado:'pendiente'}); if(Array.isArray(a)) SANC_M=a; }
   catch(e){}
 }
+/* De sanción a movimiento del libro. La forma que espera `medidorHTML` es `{f,art,t,p,vv}`.
+   `vv` es la tercera columna —lo que pasa con esos puntos— y se resuelve AQUI y no al pintar,
+   porque depende del estado y el pintado no tiene por qué saber de estados de sanción. */
+function _movDeSancion_(s){
+  var just=(s.estado==='justificada');
+  var iso=String(s.fecha||'').slice(0,10);
+  return {
+    f: (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? _isoADMY_(iso) : (s.fecha||'')),
+    art: String(s.articulo||'—'),
+    t: String(s.motivo||'(sin motivo)'),
+    /* La insignia y la etiqueta salen del MISMO dato. El backend ya manda 0 en una
+       justificada, pero si algun dia mandara el valor crudo se veria «−1» al lado de «no
+       restó», que es lo peor que puede pasar aqui: dos cosas ciertas por separado que juntas
+       se contradicen, y la persona sin saber si le quitaron el punto o no. */
+    p: just ? 0 : (Number(s.puntos)||0),
+    /* Los puntos SE REINICIAN CADA TEMPORADA (RRI Art. 29), no caducan sanción a sanción. Se
+       dice así, con palabras, en vez de inventarse una fecha exacta que el RRI no fija. */
+    vv: just ? 'justificada<br>no restó' : 'hasta el fin<br>de temporada'
+  };
+}
+async function _cargarMovimientosM_(){
+  if(typeof MOVS==='undefined') return;
+  MOVS.length=0;                                  // fuera la semilla, pase lo que pase
+  try{
+    var a=await api.getMisMovimientos();
+    if(Array.isArray(a)) a.forEach(function(s){ MOVS.push(_movDeSancion_(s)); });
+  }catch(e){ /* backend viejo o sin red: se queda vacío, que es lo que hacía antes */ }
+}
 async function _cargarMisPartes_(){
   try{ var arr=await api.getPartes({mias:true}); if(Array.isArray(arr)) PARTES=arr.map(normPMovil); }
   catch(e){}
@@ -1934,9 +1967,11 @@ async function _onCredencial_(resp,_silente){
        `{mias:true}` = los partes de la cuenta `solaris@`, no los del miembro que estas
        viendo. Estaba pasando: se cargaban los buenos y luego los otros encima. */
     if(esAdmin() && YO){ _partesAdmin=null; try{ PARTES=await _partesDe_(YO.nombre); }catch(_){} }
-    // el backend NO sirve el detalle de movimientos de puntos: vaciamos la semilla (era ficticia,
-    // enseñaba los de otra persona). Se muestra vacío hasta que haya fuente real.
-    if(typeof MOVS!=='undefined') MOVS.length=0;
+    /* EL LIBRO DE PUNTOS, YA CON DATOS REALES (backend v53). Hasta hoy aquí se vaciaba la
+       semilla y punto: la pantalla existía y no enseñaba nada, porque el backend no servía los
+       movimientos a la persona de la que hablan. Si la llamada falla o el backend es viejo
+       (acción desconocida), se queda vacío como antes — un hueco honesto, no un error. */
+    await _cargarMovimientosM_();
 
     /* LA BETA NO ES PARA TODO EL MUNDO. Se comprueba con la identidad YA resuelta y ANTES
        de quitar el gate: si no pasa, la app no llega a arrancar. Se le manda a la de
@@ -2733,13 +2768,24 @@ function medidorHTML(){
     '</div>'+
     '<button class="btn mini" data-p id="btnLibro" style="margin-top:11px">Desglose de puntos</button>'+
   '</div>'+
-  '<div class="libro" id="libro"><div id="libroIn" style="padding-top:6px">'+
-    (MOVS.length ? MOVS.map(function(m){
-      return '<div class="retf"><span class="pt'+(m.p>0?' mas':'')+'">'+(m.p>0?'+':'−')+Math.abs(m.p)+'</span>'+
-        '<span class="mo"><b>'+esc(m.t)+'</b><small>ART. '+m.art+' · '+m.f+'</small></span>'+
-        '<span class="vv">'+(m.rep?'vuelve el<br>'+m.rep:'no caduca')+'</span></div>';
-    }).join('') : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos este ciclo</b>'+
+  _libroPuntosHTML_();
+}
+/* EL LIBRO DE PUNTOS. Mismo trato que el de horas y por la misma puerta (`_ultimosMov_`):
+   los ultimos de la temporada, y el registro entero se conserva. */
+function _libroPuntosHTML_(){
+  /* ÁMBITO TEMPORADA: los puntos se reinician con ella (RRI Art. 29), no con el mes. */
+  var r=_ultimosMov_(MOVS, function(m){ return m.f; }, null, 'temporada');
+  return '<div class="libro" id="libro"><div id="libroIn" style="padding-top:6px">'+
+    (r.ultimos.length ? r.ultimos.map(function(m){
+      /* El 0 no lleva signo: «−0» obliga a leerlo dos veces para acabar sabiendo que no te
+         quitaron nada. Es el caso de una justificada. */
+      var sg = m.p>0 ? '+'+m.p : (m.p<0 ? '−'+Math.abs(m.p) : '0');
+      return '<div class="retf"><span class="pt'+(m.p>0?' mas':'')+'">'+sg+'</span>'+
+        '<span class="mo"><b>'+esc(m.t)+'</b><small>ART. '+esc(m.art)+' · '+esc(m.f)+'</small></span>'+
+        '<span class="vv">'+(m.vv || (m.rep?'vuelve el<br>'+m.rep:'no caduca'))+'</span></div>';
+    }).join('') : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b>'+
       '<small>Aquí aparece cada subida o bajada de puntos, con su artículo y su fecha.</small></span></div>')+
+    (r.ultimos.length ? '<p class="rnota" style="margin:8px 0 0">'+_notaRegistro_(r.total)+'</p>' : '')+
   '</div></div>';
 }
 var medTimers=[];
@@ -3437,16 +3483,79 @@ function desgloseCat(ps){
   }).join('');
   return '<div style="display:flex;flex-wrap:wrap;margin:2px 0 4px">'+chips+'</div>';
 }
-/* EL HISTORIAL, SOLO DEL MES EN CURSO (Daniel, 28/07). No se borra nada: los partes
-   siguen enteros y el cierre mensual los conserva; lo que se filtra es lo que SE PINTA. Su
-   razon es la buena: un historial que solo crece es basura infinita en una pantalla de movil,
-   y lo de meses cerrados ya no se puede tocar ni discutir.
-   La fecha viene como `DD/MM/AAAA`, que es como la escribe el resto de la app. */
-function _delMesEnCurso_(p){
-  var f=String(p&&p.f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if(!m) return true;                       // sin fecha legible no se esconde: se ve y se nota
-  var h=new Date();
-  return (+m[2])===(h.getMonth()+1) && (+m[3])===h.getFullYear();
+/* ═══ LOS ULTIMOS MOVIMIENTOS · UNA SOLA PUERTA PARA HORAS Y PARA PUNTOS ═══════════
+   Daniel (30/07): «deberia mostrar las ultimas 5 acciones de suma o resta... y al inicio de
+   temporada resetearse. Igual que muestre los ultimos 10. **aun asi el registro debe ser
+   permanente**».
+
+   Esa ultima frase es la que manda, y separa dos cosas que es facil confundir:
+     · **LA VISTA** se corta por temporada y se queda en los ultimos `MOVS_N`. Un historial que
+       solo crece es basura infinita en una pantalla de movil.
+     · **EL REGISTRO** no se toca NUNCA. Los partes siguen enteros, el cierre mensual los
+       conserva y las sanciones viven en el KV. Aqui no se borra nada: se PINTA menos.
+   Se dice en pantalla, ademas, para que nadie crea que su historial se ha perdido.
+
+   Sustituye a `_delMesEnCurso_`, que cortaba por MES: el corte bueno es la temporada, que es
+   la unidad en la que se reinician los puntos (RRI Art. 29) y en la que se miden las horas. */
+var MOVS_N=10;                              /* cuantos se pintan. Daniel dudo entre 5 y 10: es
+                                               este numero y nada mas, cambiarlo no toca nada. */
+/* La temporada va de septiembre a agosto · GEMELA de `reglas/disciplina.py:temporada_de`.
+   Si esto y el Python discrepan, el que manda es el Python: ahi se calculan los puntos. */
+function _temporadaDe_(d){
+  var ini = (d.getMonth()+1) >= 9 ? d.getFullYear() : d.getFullYear()-1;
+  return String(ini).slice(2)+'/'+String(ini+1).slice(2);
+}
+function _fechaDMY_(s){
+  var m=String(s||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? new Date(+m[3], (+m[2])-1, +m[1]) : null;
+}
+function _deEstaTemporada_(d){ return !!d && _temporadaDe_(d)===_temporadaDe_(_hoyDateM_()); }
+/* ⛔ CADA MAGNITUD SE REINICIA CON LO SUYO, y confundirlo hace que la app diga otra cosa que el
+   Panel de Rendimientos (Daniel, 30/07):
+     · PUNTOS -> por TEMPORADA (RRI Art. 29).
+     · HORAS  -> por MES. El cierre mensual pone a cero Carga tareas, Reuniones, Cursos y
+       Turnos (`flujos/cierre.py`), asi que enseñar la temporada en Horas seria enseñar horas
+       que el panel ya no cuenta. */
+function _deEsteMes_(d){
+  var h=_hoyDateM_();
+  return !!d && d.getMonth()===h.getMonth() && d.getFullYear()===h.getFullYear();
+}
+/* Los nombres de mes. El escritorio lleva la misma lista suelta dentro de su formateador de
+   fechas; candidata a unificar si algun dia se tocan las dos. */
+var MESES_L=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+             'septiembre','octubre','noviembre','diciembre'];
+function _mesLargo_(d){ return MESES_L[d.getMonth()]+' '+d.getFullYear(); }
+/* LA COMPENSACION MENSUAL POR CARGO · GEMELA de `flujos/cierre.py:COMPENSACION`.
+   Son horas que se reciben TODOS los meses por el cargo, sin fichar nada, y el cierre las
+   restaura cada mes. Sin ellas el desglose no cuadra con el panel y parece que faltan horas.
+   ⚠️ Es el DEFECTO por cargo. El cierre admite «extras oficiales» encima, y esos hoy la app
+   **no los conoce** — el panel no manda el valor real de Notion. Por eso se rotula como base
+   por cargo y no como «tus compensaciones». */
+var COMP_CARGO={'Project Director':7.0,'Coordinador':3.5};
+function _compMensual_(m){ var c=(m&&m.cargo)||null; return COMP_CARGO[c]!=null?COMP_CARGO[c]:2.0; }
+/* Devuelve `{total, ultimos, suma}` de ESTA temporada. `fecha` saca el `DD/MM/AAAA` de cada
+   elemento, que es como los escribe el resto de la app.
+   ⚠️ Lo que NO tiene fecha legible **no se esconde**: se ve y se nota. Esconder un apunte roto
+   es la forma mas rapida de que nadie se entere de que esta roto. */
+function _ultimosMov_(lista, fecha, cuanto, ambito){
+  var dentro = (ambito==='mes') ? _deEsteMes_ : _deEstaTemporada_;
+  var conD=[], sinD=[], suma=0;
+  (lista||[]).forEach(function(x){
+    var d=_fechaDMY_(fecha(x));
+    if(!d){ sinD.push(x); suma+=(cuanto?(+cuanto(x)||0):0); return; }
+    if(!dentro(d)) return;
+    conD.push({x:x,d:d}); suma+=(cuanto?(+cuanto(x)||0):0);
+  });
+  conD.sort(function(a,b){ return b.d-a.d; });
+  var todos=sinD.concat(conD.map(function(o){ return o.x; }));
+  return { total: todos.length, ultimos: todos.slice(0,MOVS_N), todos: todos, suma: suma };
+}
+/* La coletilla que aparece en los dos libros. Una sola frase, en un sitio. */
+function _notaRegistro_(total){
+  return total>MOVS_N
+    ? 'Se enseñan los <b>'+MOVS_N+'</b> más recientes de la temporada, de '+total+'. '+
+      'El registro completo <b>se conserva</b>: aquí solo se pinta menos.'
+    : 'Todo lo de esta temporada. El registro completo <b>se conserva</b> entre temporadas.';
 }
 function filaParte(p){
   var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='rech'||p.e==='cad')?'borde-no':'borde-pe';
@@ -3473,24 +3582,85 @@ function filaParte(p){
 /* El historial plegado, al fondo de Horas. Usa el mismo visor de plegado que el resto
    (`data-vabrir`/`.vcuerpo`) para no estrenar un tercer mecanismo de desplegar cosas. */
 function _historialHTML_(confs){
-  var delMes=(confs||[]).filter(_delMesEnCurso_);
-  var h=delMes.reduce(function(a,p){ return a+(+p.q||0); },0);
-  return '<h2 class="sec">Historial de este mes<span class="ln"></span>'+nf2(h)+' h</h2>'+
+  /* ÁMBITO MES: las horas se reinician con el cierre mensual, no con la temporada. */
+  var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
+  var delMes=r.ultimos;
+  var h=r.suma+_compMensual_(YO);            /* la SUMA es la del MES entero, no la de los 10
+                                                pintados, y lleva la compensación por cargo:
+                                                si no, el total no cuadra con el panel. */
+  return '<h2 class="sec">Últimos movimientos<span class="ln"></span>'+nf2(h)+' h</h2>'+
     '<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
-      '<b>Qué se te contó este mes</b><small>'+delMes.length+' apunte'+(delMes.length===1?'':'s')+
-        ' · pulsa para verlos</small>'+
+      '<b>Qué se te ha contado este mes</b><small>'+r.total+' apunte'+(r.total===1?'':'s')+
+        ' · pulsa para ver los '+Math.min(r.total,MOVS_N)+' últimos</small>'+
       '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
         'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
       '<div class="plgc" hidden>'+
+        /* AQUI SOLO LOS APUNTES. El desglose por categorias se fue arriba, con la cifra
+           (31/07): tenerlo en los dos sitios seria decir lo mismo dos veces y, en cuanto se
+           tocara uno, decirlo distinto. */
         (delMes.length
-          ? desgloseCat(delMes)+
-            '<p class="rnota" style="margin:0 0 10px">A qué categoría del Panel de Rendimientos sumó cada '+
-            'una de tus horas. La categoría también recoge reuniones automáticas y cursos: aquí solo '+
-            'está tu parte. Los meses cerrados no se borran, pero ya no se muestran.</p>'+
+          ? '<p class="rnota" style="margin:0 0 10px">'+_notaRegistro_(r.total)+'</p>'+
             delMes.map(filaParte).join('')
-          : vacio('Este mes todavía nada','Cuando te firmen un fichaje aparecerá aquí, con la categoría '+
-              'a la que sumó.','',false))+
+          : vacio('Este mes todavía nada','Cuando te firmen un fichaje aparecerá aquí, con la '+
+              'categoría a la que sumó.','',false))+
       '</div></div></div>';
+}
+/* EL DESGLOSE, BAJO LA CIFRA. Plegado por defecto: es una respuesta a una pregunta que no
+   todo el mundo se hace cada vez que abre la app, pero cuando se la hace la quiere AHI, no al
+   final de la pantalla. Usa el mismo mecanismo de plegado que el resto (`data-plg`/`.plgc`),
+   que ya es el tercer sitio que lo usa y sigue siendo uno solo. */
+function _desgloseHorasHTML_(confs){
+  var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
+  var comp=_compMensual_(YO);
+  return '<div class="plg" style="margin-top:11px"><div class="plgh" data-plg data-p>'+
+      '<b>Ver desglose</b><small>de qué se componen estas horas</small>'+
+      '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
+        'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
+    '<div class="plgc" hidden>'+
+      /* LA COMPENSACION POR CARGO VA LA PRIMERA. Es la contribucion que nadie ve venir -no la
+         fichas, te la dan- y la que hace que la cuenta cuadre con el Panel de Rendimientos. */
+      '<div class="fila borde-ot"><div class="a"><b>Compensación mensual por cargo</b>'+
+        '<small>se te asigna cada mes · no se ficha</small></div>'+
+        '<div class="d"><b class="mono">'+nf(comp,1)+' h</b></div></div>'+
+      (r.total ? desgloseCat(r.todos) : '')+
+      '<p class="rnota" style="margin:8px 0 0">'+
+        (r.total
+          ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes.'
+          : 'Este mes todavía no se te ha contado ningún fichaje.')+
+        ' Al cerrar el mes esto vuelve a empezar; el registro <b>no se borra</b>.</p>'+
+      '<button class="btn mini" data-desgmes data-p style="margin-top:9px">'+
+        'Ver el desglose completo de este mes</button>'+
+    '</div></div>';
+}
+/* ═══ EL DESGLOSE COMPLETO DEL MES, EN UNA VENTANA ════════════════════════════════
+   Daniel (30/07): «algo de ver desglose completo y que te abra una ventana con todo pq en
+   algunos casos sera inmenso, y ha de aparecer CADA CONTRIBUCION, incluida la compensacion
+   mensual pasiva inicial».
+
+   Por eso va en modal y no en la tarjeta: sin tope de filas. Y empieza por la compensacion
+   por cargo, que es la contribucion que nadie ve venir —no la fichas, te la dan— y sin la
+   cual el total no cuadra con el Panel de Rendimientos. */
+function _desgloseMesHTML_(confs){
+  var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
+  var comp=_compMensual_(YO), total=r.suma+comp;
+  var cargo=(YO&&YO.cargo)||'miembro';
+  var fila=
+    '<div class="fila borde-ot"><div class="a"><b>Compensación mensual por cargo</b>'+
+      '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha · vuelve a asignarse en el '+
+      'cierre</small></div>'+
+    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf(comp,1)+' h</b></div></div>';
+  return '<div class="mtit">Desglose de '+esc(_mesLargo_(_hoyDateM_()))+'</div>'+
+    '<div class="msub">Todas tus contribuciones de este mes, sin recortar.</div>'+
+    '<div class="tarj">'+
+      '<div class="cifh"><span class="g mono">'+nf2(total)+'</span><span class="sc">h este mes</span></div>'+
+      desgloseCat(r.todos)+
+    '</div>'+
+    '<div class="tarj">'+fila+r.todos.map(filaParte).join('')+'</div>'+
+    '<p class="rnota">La compensación por cargo es la <b>base</b> (Project Director 7 h · '+
+      'Coordinador 3,5 h · miembro 2 h). Si tienes extras oficiales encima, están en Notion y '+
+      'esta pantalla todavía no los conoce.<br>'+
+      'El registro <b>no se borra nunca</b>: al cerrar el mes estas horas pasan al histórico y '+
+      'aquí empieza el mes nuevo.</p>';
 }
 /* LA CUOTA, en el menu ⋮ (Daniel, 28/07: «moveria la parte entera de cuota al menu de los 3
    puntos»). Es una cifra que se consulta dos veces al año: en Horas solo alargaba la pantalla. */
@@ -3541,6 +3711,10 @@ function vHoras(){
              (p?'<span class="pil pend">+'+nf2(p)+' h pendientes</span>':'')))+
       '</div>'+
       barraHorasHTML('barHoras')+
+      /* EL DESGLOSE, PEGADO A LA CIFRA (Daniel, 31/07: «como desplegable opcional donde estan
+         las horas, no aparte»). Antes vivia al fondo, dentro del historial: para saber de que
+         se componia tu numero habia que bajar la pantalla entera y abrir otra cosa. */
+      _desgloseHorasHTML_(confs)+
     '</div>'+
 
     '<h2 class="sec">Tus partes<span class="ln"></span>'+mias.length+'</h2>'+
@@ -3579,9 +3753,9 @@ function vHoras(){
         : vacio('Sin puesto todavía','Tu posición se calcula con las horas de la temporada al cerrar el mes.','',false))+
     '</div>'+
 
-    /* EL HISTORIAL, AL FONDO Y PLEGADO (Daniel, 28/07). Y solo el mes en curso: lo de
-       meses cerrados sigue guardado, pero ya no se puede tocar ni discutir, asi que en el
-       movil solo es scroll. */
+    /* EL HISTORIAL, AL FONDO Y PLEGADO (Daniel, 28/07). Y solo los ULTIMOS de la temporada
+       (30/07): lo demas sigue guardado -el registro es permanente- pero en el movil solo era
+       scroll. Ver `_ultimosMov_`. */
     _historialHTML_(confs)+
     /* La cuota se fue al menu ⋮: es una cifra que se consulta dos veces al año. */
     (esPD()?panelPD():'');
@@ -4307,7 +4481,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7c01941';
+var BUILD='809f35d';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -5863,6 +6037,12 @@ function enganchar(){
     };
   });
   $$('[data-doc]').forEach(function(el){ el.onclick=function(){ verDoc(+el.dataset.doc); }; });
+  /* El desglose completo del mes, en ventana: sin tope de filas (puede ser inmenso). */
+  $$('[data-desgmes]').forEach(function(b){
+    b.onclick=function(){
+      abrirModal(_desgloseMesHTML_(PARTES.filter(function(x){ return x.e==='otor'; })));
+    };
+  });
   /* Plegados sencillos (`data-plg`): el historial de Horas, y lo que venga. */
   $$('[data-plg]').forEach(function(h){
     h.onclick=function(){
