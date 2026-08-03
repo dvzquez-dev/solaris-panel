@@ -1251,7 +1251,7 @@ function vacioSimple(t,p){ return '<div class="vac"><b>'+esc(t)+'</b>'+p+'</div>
    copia sea IDENTICA y se llame igual (mapa §5). Lo comprueba `rutinas/probar_libros_e.py`.
    Lo unico que NO se copia es la pantalla: el escritorio tiene sus propias piezas y no tiene
    modal, asi que el desglose del mes va desplegado en la vista en vez de en una ventana. */
-var MOVS_N=10;
+var MOVS_N=5;
 var COMP_CARGO={'Project Director':7.0,'Coordinador':3.5};
 var MESES_L=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
              'septiembre','octubre','noviembre','diciembre'];
@@ -1291,11 +1291,12 @@ function _ultimosMov_(lista, fecha, cuanto, ambito){
   var todos=sinD.concat(conD.map(function(o){ return o.x; }));
   return { total: todos.length, ultimos: todos.slice(0,MOVS_N), todos: todos, suma: suma };
 }
-function _notaRegistro_(total){
+function _notaRegistro_(total, ambito){
+  var d = (ambito==='mes') ? 'de este mes' : 'de la temporada';
   return total>MOVS_N
-    ? 'Se enseñan los <b>'+MOVS_N+'</b> más recientes de la temporada, de '+total+'. '+
+    ? 'Se enseñan los <b>'+MOVS_N+'</b> más recientes '+d+', de '+total+'. '+
       'El registro completo <b>se conserva</b>: aquí solo se pinta menos.'
-    : 'Todo lo de esta temporada. El registro completo <b>se conserva</b> entre temporadas.';
+    : 'Todo lo '+d+'. El registro completo <b>se conserva</b>.';
 }
 function _compBase_(m){ var c=(m&&m.cargo)||null; return COMP_CARGO[c]!=null?COMP_CARGO[c]:2.0; }
 function _compEsReal_(m){ var v=m&&m.compensaciones; return typeof v==='number' && isFinite(v); }
@@ -4027,7 +4028,7 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
 
   var libroH = r.total||extra
     ? tabla([['Concepto'],['Horas',1]], filas)+
-      '<p class="rnota">'+(r.total? _notaRegistro_(r.total) : 'Este mes todavía no se te ha '+
+      '<p class="rnota">'+(r.total? _notaRegistro_(r.total,'mes') : 'Este mes todavía no se te ha '+
         'contado ningún fichaje.')+'</p>'
     : vacioSimple('Nada este mes','Aún no se te ha contado ningún fichaje. Al cerrar el mes '+
         'esto vuelve a empezar; el registro no se borra.');
@@ -4039,7 +4040,7 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
         return '<tr><td>'+esc(x.t)+'<div class="sc">'+esc(x.f)+
           (x.art?' · '+esc(x.art):'')+' · '+x.vv.replace(/<br>/g,' ')+'</div></td>'+
           '<td class="r mono">'+(x.p>0?'+':'')+x.p+'</td></tr>'; }).join(''))+
-      '<p class="rnota">'+_notaRegistro_(rp.total)+'</p>'
+      '<p class="rnota">'+_notaRegistro_(rp.total,'temporada')+'</p>'
     : vacioSimple('Sin movimientos','No tienes subidas ni bajadas de puntos esta temporada. '+
         'Si el servidor es anterior a la v53 esto sale vacío aunque las haya.');
 
@@ -4515,7 +4516,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='ac4d2ec';
+var BUILD='3ab2816';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

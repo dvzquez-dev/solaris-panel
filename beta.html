@@ -2863,7 +2863,7 @@ function _libroPuntosHTML_(){
         '<span class="vv">'+(m.vv || (m.rep?'vuelve el<br>'+m.rep:'no caduca'))+'</span></div>';
     }).join('') : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b>'+
       '<small>Aquí aparece cada subida o bajada de puntos, con su artículo y su fecha.</small></span></div>')+
-    (r.ultimos.length ? '<p class="rnota" style="margin:8px 0 0">'+_notaRegistro_(r.total)+'</p>' : '')+
+    (r.ultimos.length ? '<p class="rnota" style="margin:8px 0 0">'+_notaRegistro_(r.total,'temporada')+'</p>' : '')+
   '</div></div>';
 }
 var medTimers=[];
@@ -3575,7 +3575,7 @@ function desgloseCat(ps){
 
    Sustituye a `_delMesEnCurso_`, que cortaba por MES: el corte bueno es la temporada, que es
    la unidad en la que se reinician los puntos (RRI Art. 29) y en la que se miden las horas. */
-var MOVS_N=10;                              /* cuantos se pintan. Daniel dudo entre 5 y 10: es
+var MOVS_N=5;                              /* cuantos se pintan. Daniel dudo entre 5 y 10: es
                                                este numero y nada mas, cambiarlo no toca nada. */
 /* La temporada va de septiembre a agosto · GEMELA de `reglas/disciplina.py:temporada_de`.
    Si esto y el Python discrepan, el que manda es el Python: ahi se calculan los puntos. */
@@ -3661,11 +3661,12 @@ function _ultimosMov_(lista, fecha, cuanto, ambito){
   return { total: todos.length, ultimos: todos.slice(0,MOVS_N), todos: todos, suma: suma };
 }
 /* La coletilla que aparece en los dos libros. Una sola frase, en un sitio. */
-function _notaRegistro_(total){
+function _notaRegistro_(total, ambito){
+  var d = (ambito==='mes') ? 'de este mes' : 'de la temporada';
   return total>MOVS_N
-    ? 'Se enseñan los <b>'+MOVS_N+'</b> más recientes de la temporada, de '+total+'. '+
+    ? 'Se enseñan los <b>'+MOVS_N+'</b> más recientes '+d+', de '+total+'. '+
       'El registro completo <b>se conserva</b>: aquí solo se pinta menos.'
-    : 'Todo lo de esta temporada. El registro completo <b>se conserva</b> entre temporadas.';
+    : 'Todo lo '+d+'. El registro completo <b>se conserva</b>.';
 }
 function filaParte(p){
   var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='rech'||p.e==='cad')?'borde-no':'borde-pe';
@@ -3728,10 +3729,14 @@ function _movHorasHTML_(confs){
       '<p class="rnota" style="margin:8px 0 10px">'+
         (r.total
           ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes. '+
-            _notaRegistro_(r.total)
+            _notaRegistro_(r.total,'mes')
           : 'Este mes todavía no se te ha contado ningún fichaje. Al cerrar el mes esto vuelve a '+
             'empezar; el registro <b>no se borra</b>.')+'</p>'+
-      r.ultimos.map(filaParte).join('')+
+      /* LA COMPENSACION CUENTA COMO UNO DE LOS CINCO (Daniel, 03/08: «los ultimos 5 tambien
+         son los ultimos 5 del mes, INCLUYENDO la compensacion inicial»). Antes se pintaba
+         aparte y encima de los 10, asi que la pantalla anunciaba un numero y ensenaba otro.
+         La extra, cuando la hay, va DENTRO de ese mismo apunte: es la misma contribucion. */
+      r.todos.slice(0, Math.max(0, MOVS_N-1)).map(filaParte).join('')+
       '<button class="btn mini" data-desgmes data-p style="margin-top:9px">'+
         'Ver el desglose completo de este mes</button>'+
     '</div></div>';
@@ -4149,6 +4154,9 @@ var NOTIS_ETI={
   horas:['Horas y partes','Cuando te firman, rechazan o piden detalle de un parte'],
   avisos:['Avisos y sanciones','Lo disciplinario y lo que tiene plazo']
 };
+/* Los que NO se pueden apagar. GEMELA de `NOTIS_FIJOS` del backend, que es
+   quien de verdad lo impide: esto solo evita ensenar un interruptor que miente. */
+var NOTIS_FIJOS=['turnos','avisos','reuniones'];
 var NOTIS_PREF=null;                    // lo que dijo el servidor la ultima vez
 function _notisHTML_(){
   if(!_pushSoportado_())
@@ -4179,12 +4187,20 @@ function _pintarNotisLista_(){
   var filas='';
   for(var k in NOTIS_ETI){
     if(!(k in NOTIS_PREF)) continue;        // el servidor manda: si no lo lista, no existe
-    var e=NOTIS_ETI[k], on=NOTIS_PREF[k]!==false;
-    filas+='<div class="fila"><div class="a"><b>'+e[0]+'</b><small>'+e[1]+'</small></div>'+
-      '<div class="d"><button class="btn" data-noti="'+k+'" data-p>'+(on?'Sí':'No')+'</button></div></div>';
+    var e=NOTIS_ETI[k], on=NOTIS_PREF[k]!==false, fijo=NOTIS_FIJOS.indexOf(k)>=0;
+    /* LOS FIJOS NO LLEVAN INTERRUPTOR (Daniel, 03/08). Ensenar uno que no hace nada es peor
+       que no ensenarlo: lo apagas, crees que lo apagaste, te llegan igual — y a partir de ahi
+       no te fias tampoco de los dos que si funcionan. */
+    filas+='<div class="fila"><div class="a"><b>'+e[0]+'</b><small>'+e[1]+
+      (fijo?' · <b>no se puede desactivar</b>':'')+'</small></div>'+
+      '<div class="d">'+(fijo
+        ? '<span class="pil otor">siempre</span>'
+        : '<button class="btn" data-noti="'+k+'" data-p>'+(on?'Sí':'No')+'</button>')+
+      '</div></div>';
   }
-  c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0">Lo urgente llega igual: un aviso '+
-    'marcado como <b>forzoso</b> se salta estos interruptores.</p>';
+  c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0"><b>Turnos</b>, <b>reuniones</b> y '+
+    '<b>avisos y sanciones</b> llegan siempre: llevan plazo y consecuencias, y perdérselos no '+
+    'es una molestia, es una sanción. Lo demás lo eliges tú.</p>';
   $$('[data-noti]',c).forEach(function(b){
     b.onclick=async function(){
       var k=b.dataset.noti, antes=NOTIS_PREF[k]!==false;
@@ -4593,7 +4609,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='04ddb7a';
+var BUILD='8a08168';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
