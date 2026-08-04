@@ -127,7 +127,14 @@ var RM=window.matchMedia('(prefers-reduced-motion: reduce)');
 
 
 function ini(n){var p=n.split(' ');return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCase();}
-function tost(m){var t=$('#tost');t.textContent=m;t.classList.add('on');
+/* El aviso flotante. `if(!t) return;` es la guarda que ya tenía el móvil: sin ella, llamar a
+   tost() sin el nodo en el DOM lanza un TypeError donde el móvil no hace nada.
+   ⚠️ Y una corrección al parte, que decía que esto YA estaba fallando en producción: NO lo
+   estaba. `<div id="tost">` está en la línea 80 y los scripts se cargan a partir de la 111, así
+   que el nodo existe siempre que corre esto. Es una divergencia LATENTE, no un fallo vivo — la
+   guarda entra porque no cuesta nada, no porque hubiera nada roto.
+   La duración NO se iguala (2600 aquí, 2400 en el móvil): son dos diseños distintos. */
+function tost(m){var t=$('#tost');if(!t)return;t.textContent=m;t.classList.add('on');
   clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('on');},2600);}
 
 
@@ -2065,7 +2072,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='094fa0d';
+var BUILD='e09d75e';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
