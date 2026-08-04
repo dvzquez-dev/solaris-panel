@@ -109,6 +109,7 @@
     </nav>
 
 <script src="comun-beta.js?v=774b16e"></script>
+<script src="notis.escritorio-beta.js?v=14e0a0b"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -287,6 +288,16 @@ var api={
   otorgarHoras:function(p){ return api._post({action:"otorgarHoras",parte:p}); },
   otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria}); },
   enviarPush:  function(d,t,c,o){ return api._post({action:"enviarPush",destinatario:d,titulo:t,cuerpo:c,opts:o}); },
+  /* ⛔ ESTA FALTABA, y en la cara del PD llevaba rota desde siempre — sin dar señal. La llaman
+     `activarNotis` (aquí abajo) y `_pushInit_` (comun.js), que corre en LAS DOS caras al
+     arrancar; allí el fallo se lo tragaba un `catch(_){}` vacío. `_pushInit_` existe justo para
+     RE-GUARDAR la suscripción cuando el navegador la rota —«si no se re-guarda dejan de llegar
+     avisos en silencio», dice su propio comentario—, así que aquí esa red no existía: activabas
+     las notificaciones y el servidor no se enteraba nunca. Con los avisos obligatorios, eso es
+     un turno o una reunión que no llega y de la que salen faltas.
+     Lo destapó la ronda de agentes de la fase 3, no una lectura: `api.guardarPush` estaba
+     definida solo en el móvil (`movil.html:399`) y aquí se llamaba igual. */
+  guardarPush: function(sub){ return api._post({action:"guardarPush",sub:sub}); },
   getControl:  function(){ return api._post({action:"getControl"}); },
   setControl:  function(clave,valor,nota){ return api._post({action:"setControl",clave:clave,valor:valor,nota:nota}); },
   getMisMovimientos: function(){ return api._post({action:"getMisMovimientos"}); }
@@ -3521,40 +3532,6 @@ var VAPID_PUBLIC='BOcYdKPWxq5NAKS6AbZIW9UV7MOb7gmy1nP_KhdxZpvPa3O5jsZ-_jravOhHiv
 
 var _swReg=null;
 
-function _notisMsg(t){ var b=document.getElementById('notisMsg'); if(b) b.textContent=t; }
-async function activarNotis(btn){
-  if(!_pushSoportado_()){ _notisMsg('Este navegador no admite notificaciones.'); return; }
-  if(btn){ btn.disabled=true; btn.textContent='Activando…'; }
-  try{
-    var perm=await Notification.requestPermission();
-    if(perm!=='granted'){ _notisMsg('Permiso denegado. Puedes darlo en los ajustes del navegador.'); return; }
-    var reg=_swReg || await _registrarSW_();
-    if(!reg){ _notisMsg('No se pudo preparar el service worker.'); return; }
-    await navigator.serviceWorker.ready;
-    var sub=await reg.pushManager.getSubscription();
-    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
-    if(typeof SESION!=='undefined' && SESION) await api.guardarPush(sub.toJSON());
-    else { _notisMsg('Permiso dado, pero sin sesión no se puede registrar el aviso en el servidor.'); return; }
-    _notisMsg('Notificaciones activadas.');
-  }catch(e){ _notisMsg('No se pudo activar: '+((e&&e.message)||e)); }
-  finally{ if(btn){ btn.disabled=false; btn.textContent='Activar notificaciones'; } pintar(); }
-}
-
-function _notisHTML_(){
-  if(!_pushSoportado_())
-    return '<div class="nota" style="border-top:0">Este navegador no admite notificaciones.</div>';
-  if(Notification.permission==='denied')
-    return '<div class="nota" style="border-top:0">Las tienes <b>bloqueadas</b> en este navegador. '+
-      'Hay que desbloquearlas en el candado de la barra de direcciones; desde aquí no se puede.</div>';
-  if(Notification.permission==='granted')
-    return '<div class="pb"><span class="chip ok">activadas</span>'+
-      '<span class="sc" id="notisMsg" style="margin-left:10px"></span></div>';
-  return '<div class="nota" style="border-top:0">Avisos de turnos, reuniones, partes de horas '+
-    'y decisiones sobre documentos.</div>'+
-    '<div class="pb"><button class="btn pri" id="btnNotis">Activar notificaciones</button>'+
-    '<span class="sc" id="notisMsg" style="margin-left:10px"></span></div>';
-}
-
 
 /* ═══════════════════════════════════════════════════════════════════════════
    NAVEGACIÓN
@@ -3629,7 +3606,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='532cce6';
+var BUILD='7f249ce';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
