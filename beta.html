@@ -3809,6 +3809,58 @@ function _mesACerrar_(){
 /* La PANTALLA no es gemela y no debe serlo: el escritorio tiene `pan`/`tabla` y no tiene modal;
    aqui va en ventana porque en un telefono no cabe de otra forma. Lo que si es gemelo es de
    donde sale la decision (`_puedeCerrarMes_`) y que mes se cierra (`_mesACerrar_`). */
+
+/* ── EL PLAN, LEGIBLE ────────────────────────────────────────────────────────────────────
+   Antes esta pantalla decia «ya hay plan calculado» y punto. Un cierre que hay que aprobar a
+   ciegas -o abriendo un JSON de 48 KB- no se revisa: se acepta. Lo que sube `cerrar_mes.py` es
+   un DERIVADO (por persona, solo los campos que CAMBIAN), no el plan entero.
+   ⚠️ Los campos se pintan con su NOMBRE REAL de Notion, aunque sean largos y ocupen dos lineas
+   en un telefono: lo que se lee aqui tiene que ser lo mismo que hay en la ficha. Abreviarlos
+   ahorraria pixeles y quitaria la unica forma de contrastar. */
+function _numPlan_(v){
+  if(v===true) return 'sí';
+  if(v===false) return 'no';
+  if(v===null||v===undefined||v==='') return '—';
+  return (typeof v==='number') ? nf(v,(v%1?2:0)) : String(v);
+}
+function _fichaPlanHTML_(f){
+  var filas=(f.c||[]).map(function(c){
+    return '<div class="rl"><span>'+esc(c[0])+'</span>'+
+      '<span class="ra">'+esc(_numPlan_(c[1]))+' → <b>'+esc(_numPlan_(c[2]))+'</b></span></div>';
+  }).join('');
+  var extra=[];
+  if(f.mp) extra.push(esc(f.mp));
+  if(f.cp) extra.push('pierde '+esc(_numPlan_(f.cp))+' h de compensación');
+  if(f.est && f.est!=='normal') extra.push('queda <b>'+esc(f.est)+'</b>');
+  return '<details class="plg"><summary><b>'+esc(f.n||'?')+'</b>'+
+    (f.u?' <small>'+esc(f.u)+'</small>':'')+
+    ' <small>· '+((f.c||[]).length)+' cambio'+(((f.c||[]).length)===1?'':'s')+'</small></summary>'+
+    filas+(extra.length?'<p class="rnota">'+extra.join(' · ')+'</p>':'')+'</details>';
+}
+function _planHTML_(plan){
+  var t=plan.totales||{}, fs=plan.fichas||[];
+  var cuando=plan.calculado ? String(plan.calculado).slice(0,16).replace('T',' ') : '';
+  var cab='<div class="rec">'+
+    '<div class="rl"><span>Personas</span><span class="ra"><b>'+(t.personas||fs.length||0)+'</b></span></div>'+
+    '<div class="rl"><span>Horas que se ponen a cero</span><span class="ra"><b>'+
+      esc(_numPlan_(t.horas_a_cero||0))+' h</b></span></div>'+
+    '<div class="rl"><span>Suben puntos</span><span class="ra"><b>'+(t.suben_puntos||0)+'</b></span></div>'+
+    '<div class="rl"><span>Bajan puntos</span><span class="ra"><b>'+(t.bajan_puntos||0)+'</b></span></div>'+
+    '<div class="rl"><span>Con infracción marcada</span><span class="ra"><b>'+(t.con_infraccion||0)+'</b></span></div>'+
+    '</div>';
+  var avisos=(plan.avisos||[]).length
+    ? '<p class="rnota" style="color:var(--warn)"><b>'+plan.avisos.length+' aviso'+
+      (plan.avisos.length===1?'':'s')+'</b>: '+esc(plan.avisos.slice(0,3).join(' · '))+'</p>'
+    : '';
+  return '<p class="rnota" style="margin:0 0 10px">Plan de <b>'+esc(plan.periodo||'')+'</b>'+
+      (cuando?', calculado el '+esc(cuando):'')+'. <b>Todavía no se ha aplicado.</b></p>'+
+    cab+avisos+
+    '<p class="rnota" style="margin:12px 0 4px">Qué le cambia a cada uno · toca para abrir</p>'+
+    fs.map(_fichaPlanHTML_).join('')+
+    '<p class="rnota">Aplicarlo <b>no se hace desde aquí</b>: escribe en las 32 fichas de Notion '+
+    'y de ahí salen la cuota y la renovación.</p>';
+}
+
 function _cierreHTML_(est, err, cargando){
   var cer=_mesACerrar_();
   var cab='<h3 style="margin:0 0 4px">Cierre de '+esc(cer.mes)+'</h3>'+
@@ -3821,8 +3873,7 @@ function _cierreHTML_(est, err, cargando){
   var filas=bloq.map(function(b){
     return '<div class="rl"><span>'+esc(b.texto||b.que)+'</span>'+
       '<span class="ra" style="color:var(--warn)">bloquea</span></div>'; }).join('');
-  if(plan) return cab+'<p class="rnota">Ya hay plan calculado para <b>'+esc(plan.periodo||'')+
-    '</b>. Revisalo antes de aplicarlo; aplicar no se hace desde el movil.</p>';
+  if(plan) return cab+_planHTML_(plan);
   if(enc) return cab+'<p class="rnota">Encolado. La rutina lo recoge en la siguiente pasada '+
     '(va cada 2 minutos) y deja el plan.</p>';
   return cab+(filas ? '<div class="rec">'+filas+'</div>'+
@@ -4679,7 +4730,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='3847a10';
+var BUILD='2de7437';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
