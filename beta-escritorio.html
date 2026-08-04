@@ -2245,6 +2245,16 @@ function _finDeMes_(){
    habría sido el correcto —lo acumulado desde el corte anterior— pero etiquetado como agosto
    siendo casi todo julio, y esa etiqueta es la que acaba en el nombre del plan, en el registro
    de lo aplicado y en el histórico. */
+/* «2026-07» es un identificador, no algo que se le lea a nadie. Daniel, viendo el boton:
+   «pone cierre 2026-07, que dices, sera cierre de julio». Se saca del PROPIO periodo del plan y
+   no de `_mesACerrar_()`: si algun dia se revisa un cierre viejo, tiene que decir SU mes, no el
+   que tocaria hoy. GEMELA en las dos caras. */
+function _nomPeriodo_(p){
+  var m=/^(\d{4})-(\d{2})$/.exec(String(p||''));
+  if(!m) return String(p||'');
+  var i=parseInt(m[2],10)-1;
+  return (MESES_L[i]||m[2])+' de '+m[1];
+}
 function _mesACerrar_(){
   var h=new Date(), a=h.getFullYear(), m=h.getMonth();       /* getMonth() es 0-11 */
   if(m===0){ a-=1; m=11; } else { m-=1; }
@@ -4551,7 +4561,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='e682a73';
+var BUILD='490bfba';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

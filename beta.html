@@ -3799,6 +3799,16 @@ function _puedeImpersonar_(){ return !!(SESION && SESION.email===ADMIN_EMAIL); }
 function _puedeCerrarMes_(){
   try{ return !!(_puedeImpersonar_() || rangoNom(_actorSanc_())>=3); }catch(_){ return false; }
 }
+/* «2026-07» es un identificador, no algo que se le lea a nadie. Daniel, viendo el boton:
+   «pone cierre 2026-07, que dices, sera cierre de julio». Se saca del PROPIO periodo del plan y
+   no de `_mesACerrar_()`: si algun dia se revisa un cierre viejo, tiene que decir SU mes, no el
+   que tocaria hoy. GEMELA en las dos caras. */
+function _nomPeriodo_(p){
+  var m=/^(\d{4})-(\d{2})$/.exec(String(p||''));
+  if(!m) return String(p||'');
+  var i=parseInt(m[2],10)-1;
+  return (MESES_L[i]||m[2])+' de '+m[1];
+}
 function _mesACerrar_(){
   var h=new Date(), a=h.getFullYear(), m=h.getMonth();       /* getMonth() es 0-11 */
   if(m===0){ a-=1; m=11; } else { m-=1; }
@@ -3853,7 +3863,7 @@ function _planHTML_(plan){
     ? '<p class="rnota" style="color:var(--warn)"><b>'+plan.avisos.length+' aviso'+
       (plan.avisos.length===1?'':'s')+'</b>: '+esc(plan.avisos.slice(0,3).join(' · '))+'</p>'
     : '';
-  return '<p class="rnota" style="margin:0 0 10px">Plan de <b>'+esc(plan.periodo||'')+'</b>'+
+  return '<p class="rnota" style="margin:0 0 10px">Plan de <b>'+esc(_nomPeriodo_(plan.periodo))+'</b>'+
       (cuando?', calculado el '+esc(cuando):'')+'. <b>Todavía no se ha aplicado.</b></p>'+
     cab+avisos+
     '<p class="rnota" style="margin:12px 0 4px">Qué le cambia a cada uno · toca para abrir</p>'+
@@ -3885,7 +3895,7 @@ function _decidirCierreHTML_(plan){
         'nuevas y viejas conviviendo. <b>No lo vuelvas a lanzar sin mirarlo.</b></p>':'');
   }
   return '<button class="btn pri" data-aplicarcierre style="width:100%;margin-top:14px">'+
-      'Aplicar el cierre de '+esc(plan.periodo||'')+'</button>'+
+      'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo))+'</button>'+
     '<p class="rnota">Esto <b>sí escribe</b> en Notion, en '+((plan.totales&&plan.totales.personas)||
       plan.personas||'?')+' fichas. Lo hace un script determinista que comprueba el «antes» de '+
       'cada una y se planta si algo no cuadra.</p>';
@@ -3922,7 +3932,7 @@ function _abrirCierre_(){
     var ap=$('[data-aplicarcierre]');
     if(ap) ap.onclick=async function(){
       var pl=(est&&est.plan)||{}, n=((pl.totales&&pl.totales.personas)||pl.personas||'?');
-      if(!confirm('APLICAR el cierre de '+(pl.periodo||'')+'.\n\nEsto ESCRIBE en Notion en '+n+
+      if(!confirm('APLICAR el cierre de '+_nomPeriodo_(pl.periodo)+'.\n\nEsto ESCRIBE en Notion en '+n+
                   ' fichas: pone las cargas a cero, hace rodar los puntos y devuelve las '+
                   'compensaciones al defecto del cargo.\n\nDe aqui salen la cuota y la '+
                   'renovacion.\n\n¿Seguro?')) return;
@@ -4773,7 +4783,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='3fc16a4';
+var BUILD='8b0f811';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
