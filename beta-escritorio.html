@@ -1365,7 +1365,7 @@ function anilloHTML(valor,etiqueta){
 /* ═══════════════════════════════════════════════════════════════════════════
    VISTAS
    ═══════════════════════════════════════════════════════════════════════════ */
-/*CHANGELOG_INI*/var CHANGELOG_MD="# Changelog — Panel Solaris\n\nQué cambió en cada versión de la app, en corto. Escrito **para el equipo**, no para el que la\nprograma: si algo no se nota usándola, no está aquí.\n\nEstás leyendo el de **esta** app: lo que cambió aquí. Lo que además cambió en la otra cara sale\nbajo «Las dos caras». Se abre desde el menú **⋮**, y la versión que llevas está en Ajustes (móvil)\no en el pie (escritorio).\n\n---\n\n## v0.2 — *en beta desde el 31/07/2026*\n\n**Dónde mirarla**: [`beta.html`](https://dvzquez-dev.github.io/solaris-panel/beta.html) ·\n[`beta-escritorio.html`](https://dvzquez-dev.github.io/solaris-panel/beta-escritorio.html).\n**Producción sigue en la v0.1** y no se toca hasta que Daniel lo valide.\n\n**Las dos caras**\n\n- Ya se puede sancionar por **incumplir un plazo**. El formulario ofrecía **tus** tareas en vez de\n  las de la persona sancionada, así que con el PD —que no tiene tareas— la lista salía vacía y la\n  sanción por plazo era imposible de poner **contra nadie**.\n- Los motivos de sanción llevan **su artículo real del RRI** (30b tarea importante o urgente, 30c\n  cualquier otra), en vez de una clave interna.\n- Las horas se escriben con los decimales que tienen: **0,25 h** ya no sale como «0,3 h».\n- El distintivo **«beta»** de la cabecera es ahora el **enlace de vuelta a producción**.\n\n**🖥️ Escritorio**\n\n- **«Lo tuyo»: tus horas y tus puntos, también aquí.** Hasta ahora quien coordina veía la cola de\n  todo el equipo pero **no su propio libro**. Ya está, en el grupo Horas: lo que llevas este mes\n  con su desglose —incluida la compensación por tu cargo y la extra, separadas— y tus movimientos\n  de puntos de la temporada.\n- La **compensación en horas** de un reporte sale de una **matriz ponderada redondeada a cuartos**,\n  con la escala de **0,25 «algo normal»** a **2,00 «un bug crítico»**. El techo son 2 h; por encima\n  las da Daniel a mano.\n- **Manda el número que teclees**: se quitó el redondeo que pisaba el valor escrito. Redondear vale\n  para lo que **propone** la app, no para lo que decide una persona.\n- **Las mejoras ya se valoran**. Antes todas caían en el escalón mínimo dieran lo que dieran: el\n  eje que decide se estaba guardando en una columna que el buzón de mejoras no tiene, y se perdía\n  sin avisar. Ahora una mejora se valora por **`valor`** (Alto · Medio · Bajo) y se ve en su\n  tarjeta. **Una mejora topa en 1,50 h**; las 2 h se quedan para un bug crítico.\n\n- **Se arregló que no se pudieran otorgar horas.** La ficha de un reporte ya publicado no\n  llegaba a pintarse, que es justo donde se compensa.\n\n**⚙️ Backend v56**\n\n- El **cierre mensual** ya se puede **aplicar** desde el panel, no solo calcular. Solo el Project\n  Director, y deja las fichas listas para que él las revise.\n\n**⚙️ Backend v55**\n\n- **Los avisos de turnos, reuniones y sanciones ya no se pueden desactivar.** Llevan plazo y\n  consecuencias: perdérselos no es una molestia, es una sanción. Documentos y horas los sigues\n  eligiendo tú.\n- El servidor entiende las **unidades nuevas** (Recovery, Documentación Técnica, Seguridad y\n  Verificación, Patrocinios y Relaciones Externas, Logística).\n\n**⚙️ Backend v54**\n\n- Tu campo **`Compensaciones`** de Notion llega a la app **en vivo**, con los extras que te hayan\n  asignado. Antes la app lo deducía de tu cargo y los extras no se veían.\n\n**⚙️ Backend v52**\n\n- `getTareas` admite `nombre`: devuelve las tareas de **a quien puedes sancionar**, con la misma\n  regla que la sanción.\n\n---\n\n## v0.1 — 28/07/2026 · backend v51\n\nEl **primer release numerado**. Recoge todo lo que producción no tenía desde las 07:37 de ese día.\n\n**Las dos caras**\n\n- **Buzón de bugs y mejoras**, cuatro buzones separados (bug/mejora × móvil/escritorio). Se reporta\n  desde el menú ⋮ y **la cara va dentro del identificador**, para que se sepa de qué se habla.\n- **Fotos en el reporte, con pintor encima**: adjuntas una imagen, se abre a pantalla completa y la\n  marcas —paleta, tres grosores, deshacer, zoom con dos dedos—; al enviar se fusionan las capas.\n- **Poner y decidir sanciones**, con su **modelo de autoridad**: cada uno solo alcanza a quien le\n  corresponde, y **lo comprueba el servidor**, no solo la pantalla.\n- **Un solo visor de documentos**, con pantalla completa. Antes había tres copias distintas.\n- El **fichaje reintenta** cuando el envío se pierde por el camino. Antes fallaba a la primera y\n  decía «respuesta no válida».\n\n**🖥️ Escritorio**\n\n- **Convocar reunión** con horario **distinto por día** (con días apagables) y **copiar la\n  distribución** de otra reunión.\n- La **propuesta de compensación en horas**, editable y junto al reporte.\n- **Cola de sanciones**: aceptar o rechazar todas, editar una suelta y agrupar en un paquete.\n\n**⚙️ Backend v43 → v51**\n\n- Buzón: estados, anotaciones y capturas a Drive.\n- Preferencias de notificación, con el filtro **en el servidor**.\n- `getFichajesAbiertos` y `getDatos`.\n- `moverLimiteTarea`: mueve la fecha límite de una tarea **en Notion**.\n- La **autoridad de sanciones**, comprobada por persona.\n- **Último acceso** de cada persona, el dato que pide la regla semanal del RRI.\n- El **id de Notion** se lee bien aunque el título lleve guiones.\n\n---\n\n## Antes de los números — hasta el 28/07/2026, 07:37\n\nLo que había en producción **sin versión**: la app se publicaba directamente y el backend iba por su\ncuenta. No hay historial versión a versión porque no se numeraba; esto es el resumen de lo que ya\nfuncionaba cuando empezaron los números.\n\n**Las dos caras**\n\n- **Reuniones y disponibilidad** propias, en sustitución de Xoyondo y when2meet: convocar con tipos\n  gateados por cargo, pintar tu disponibilidad a dedo, **mapa de calor** agregado con la mejor\n  franja, y **slot + duración** en vez de franjas solapadas.\n- **Documentos**: revisar y aprobar expedientes con las cuatro decisiones reales, enrutado por\n  ámbito, bloqueo mutuo y desempate por rango.\n- **Turnos** leídos en vivo de Notion y **tareas** de los cuatro Kanban.\n- **Fichaje** y partes de horas.\n- **Refresco en vivo**: lo que miras se actualiza solo, sin borrarte lo que estés escribiendo.\n- La app **dice qué versión es** (`BUILD`), para no depurar dos builds distintos sin saberlo.\n\n**🖥️ Escritorio**\n\n- Vista de coordinación: cola de sanciones, partes, documentos, cierre mensual encolable y\n  convocatorias.\n- **Ajustes** propios, con notificaciones y sesión.\n\n---\n\n> **Cómo se actualiza este fichero**: al hacer un release se añade su bloque **en ese momento**, con\n> bullets cortos y separados por cara. Un changelog que se escribe «cuando haya tiempo» se escribe\n> de memoria, y de memoria se escribe mal. La lista de qué se toca al publicar está en\n> `ARRANQUE.md` §5.\n>\n> ⛔ **TODA versión nueva tiene su bloque aquí — beta y producción** (Daniel, 02/08/2026). Y no\n> depende de que nadie se acuerde: `flujos/publicar_web.py` **no deja salir un release** cuya\n> versión no aparezca en este fichero, y avisa en beta si la versión en vuelo no tiene bloque.\n>\n> ⛔ **La versión NO sube por iniciativa de un agente.** Se sube cuando el cambio es fuerte y lo\n> dice Daniel —o se le pide—. Entre subida y subida, **todo se acumula en el bloque de la versión\n> en vuelo**: la beta cambia de `BUILD` sin cambiar de `VERSION`, que es justo lo que hay que\n> poder distinguir al leer un reporte.\n";/*CHANGELOG_FIN*/
+/*CHANGELOG_INI*/var CHANGELOG_MD="# Changelog — Panel Solaris\n\nQué cambió en cada versión de la app, en corto. Escrito **para el equipo**, no para el que la\nprograma: si algo no se nota usándola, no está aquí.\n\nEstás leyendo el de **esta** app: lo que cambió aquí. Lo que además cambió en la otra cara sale\nbajo «Las dos caras». Se abre desde el menú **⋮**, y la versión que llevas está en Ajustes (móvil)\no en el pie (escritorio).\n\n---\n\n## v0.2 — *en beta desde el 31/07/2026*\n\n**Dónde mirarla**: [`beta.html`](https://dvzquez-dev.github.io/solaris-panel/beta.html) ·\n[`beta-escritorio.html`](https://dvzquez-dev.github.io/solaris-panel/beta-escritorio.html).\n**Producción sigue en la v0.1** y no se toca hasta que Daniel lo valide.\n\n**Las dos caras**\n\n- Ya se puede sancionar por **incumplir un plazo**. El formulario ofrecía **tus** tareas en vez de\n  las de la persona sancionada, así que con el PD —que no tiene tareas— la lista salía vacía y la\n  sanción por plazo era imposible de poner **contra nadie**.\n- Los motivos de sanción llevan **su artículo real del RRI** (30b tarea importante o urgente, 30c\n  cualquier otra), en vez de una clave interna.\n- Las horas se escriben con los decimales que tienen: **0,25 h** ya no sale como «0,3 h».\n- El distintivo **«beta»** de la cabecera es ahora el **enlace de vuelta a producción**.\n- **El plan del cierre ya no se contradice a sí mismo.** Decía «todavía no se ha aplicado» y\n  «aplicarlo no se hace desde aquí» **siempre** —incluso con el cierre ya hecho y con el botón de\n  aplicar justo debajo—, mientras el bloque de al lado decía «aplicado». Ahora las dos partes\n  leen el mismo dato.\n\n**🖥️ Escritorio**\n\n- **«Lo tuyo»: tus horas y tus puntos, también aquí.** Hasta ahora quien coordina veía la cola de\n  todo el equipo pero **no su propio libro**. Ya está, en el grupo Horas: lo que llevas este mes\n  con su desglose —incluida la compensación por tu cargo y la extra, separadas— y tus movimientos\n  de puntos de la temporada.\n- La **compensación en horas** de un reporte sale de una **matriz ponderada redondeada a cuartos**,\n  con la escala de **0,25 «algo normal»** a **2,00 «un bug crítico»**. El techo son 2 h; por encima\n  las da Daniel a mano.\n- **Manda el número que teclees**: se quitó el redondeo que pisaba el valor escrito. Redondear vale\n  para lo que **propone** la app, no para lo que decide una persona.\n- **Las mejoras ya se valoran**. Antes todas caían en el escalón mínimo dieran lo que dieran: el\n  eje que decide se estaba guardando en una columna que el buzón de mejoras no tiene, y se perdía\n  sin avisar. Ahora una mejora se valora por **`valor`** (Alto · Medio · Bajo) y se ve en su\n  tarjeta. **Una mejora topa en 1,50 h**; las 2 h se quedan para un bug crítico.\n\n- **Se arregló que no se pudieran otorgar horas.** La ficha de un reporte ya publicado no\n  llegaba a pintarse, que es justo donde se compensa.\n\n- **El cierre mensual ya se ve entero aquí, y se puede aplicar.** Antes esta pantalla se quedaba\n  en «plan calculado» pasara lo que pasara: no sabía si el cierre ya estaba aplicado —decía «no se\n  ha aplicado nada» con las 32 fichas ya escritas—, no enseñaba qué le cambiaba a cada persona, y\n  el botón de aplicar solo existía en el móvil. Ahora hay **tabla con el cambio de cada uno**,\n  estado real (**aplicado** · **parado a medias**, con cuántas fichas y cuáles faltaron) y\n  **botón de aplicar**.\n- **Recalcular un cierre ya aplicado avisa antes.** Sobreescribe el plan y deja la pantalla sin\n  saber que el mes se cerró (lo escrito en Notion no se toca). Antes lo hacía en silencio.\n\n**⚙️ Backend v56**\n\n- El **cierre mensual** ya se puede **aplicar** desde el panel, no solo calcular. Solo el Project\n  Director, y deja las fichas listas para que él las revise.\n\n**⚙️ Backend v55**\n\n- **Los avisos de turnos, reuniones y sanciones ya no se pueden desactivar.** Llevan plazo y\n  consecuencias: perdérselos no es una molestia, es una sanción. Documentos y horas los sigues\n  eligiendo tú.\n- El servidor entiende las **unidades nuevas** (Recovery, Documentación Técnica, Seguridad y\n  Verificación, Patrocinios y Relaciones Externas, Logística).\n\n**⚙️ Backend v54**\n\n- Tu campo **`Compensaciones`** de Notion llega a la app **en vivo**, con los extras que te hayan\n  asignado. Antes la app lo deducía de tu cargo y los extras no se veían.\n\n**⚙️ Backend v52**\n\n- `getTareas` admite `nombre`: devuelve las tareas de **a quien puedes sancionar**, con la misma\n  regla que la sanción.\n\n---\n\n## v0.1 — 28/07/2026 · backend v51\n\nEl **primer release numerado**. Recoge todo lo que producción no tenía desde las 07:37 de ese día.\n\n**Las dos caras**\n\n- **Buzón de bugs y mejoras**, cuatro buzones separados (bug/mejora × móvil/escritorio). Se reporta\n  desde el menú ⋮ y **la cara va dentro del identificador**, para que se sepa de qué se habla.\n- **Fotos en el reporte, con pintor encima**: adjuntas una imagen, se abre a pantalla completa y la\n  marcas —paleta, tres grosores, deshacer, zoom con dos dedos—; al enviar se fusionan las capas.\n- **Poner y decidir sanciones**, con su **modelo de autoridad**: cada uno solo alcanza a quien le\n  corresponde, y **lo comprueba el servidor**, no solo la pantalla.\n- **Un solo visor de documentos**, con pantalla completa. Antes había tres copias distintas.\n- El **fichaje reintenta** cuando el envío se pierde por el camino. Antes fallaba a la primera y\n  decía «respuesta no válida».\n\n**🖥️ Escritorio**\n\n- **Convocar reunión** con horario **distinto por día** (con días apagables) y **copiar la\n  distribución** de otra reunión.\n- La **propuesta de compensación en horas**, editable y junto al reporte.\n- **Cola de sanciones**: aceptar o rechazar todas, editar una suelta y agrupar en un paquete.\n\n**⚙️ Backend v43 → v51**\n\n- Buzón: estados, anotaciones y capturas a Drive.\n- Preferencias de notificación, con el filtro **en el servidor**.\n- `getFichajesAbiertos` y `getDatos`.\n- `moverLimiteTarea`: mueve la fecha límite de una tarea **en Notion**.\n- La **autoridad de sanciones**, comprobada por persona.\n- **Último acceso** de cada persona, el dato que pide la regla semanal del RRI.\n- El **id de Notion** se lee bien aunque el título lleve guiones.\n\n---\n\n## Antes de los números — hasta el 28/07/2026, 07:37\n\nLo que había en producción **sin versión**: la app se publicaba directamente y el backend iba por su\ncuenta. No hay historial versión a versión porque no se numeraba; esto es el resumen de lo que ya\nfuncionaba cuando empezaron los números.\n\n**Las dos caras**\n\n- **Reuniones y disponibilidad** propias, en sustitución de Xoyondo y when2meet: convocar con tipos\n  gateados por cargo, pintar tu disponibilidad a dedo, **mapa de calor** agregado con la mejor\n  franja, y **slot + duración** en vez de franjas solapadas.\n- **Documentos**: revisar y aprobar expedientes con las cuatro decisiones reales, enrutado por\n  ámbito, bloqueo mutuo y desempate por rango.\n- **Turnos** leídos en vivo de Notion y **tareas** de los cuatro Kanban.\n- **Fichaje** y partes de horas.\n- **Refresco en vivo**: lo que miras se actualiza solo, sin borrarte lo que estés escribiendo.\n- La app **dice qué versión es** (`BUILD`), para no depurar dos builds distintos sin saberlo.\n\n**🖥️ Escritorio**\n\n- Vista de coordinación: cola de sanciones, partes, documentos, cierre mensual encolable y\n  convocatorias.\n- **Ajustes** propios, con notificaciones y sesión.\n\n---\n\n> **Cómo se actualiza este fichero**: al hacer un release se añade su bloque **en ese momento**, con\n> bullets cortos y separados por cara. Un changelog que se escribe «cuando haya tiempo» se escribe\n> de memoria, y de memoria se escribe mal. La lista de qué se toca al publicar está en\n> `ARRANQUE.md` §5.\n>\n> ⛔ **TODA versión nueva tiene su bloque aquí — beta y producción** (Daniel, 02/08/2026). Y no\n> depende de que nadie se acuerde: `flujos/publicar_web.py` **no deja salir un release** cuya\n> versión no aparezca en este fichero, y avisa en beta si la versión en vuelo no tiene bloque.\n>\n> ⛔ **La versión NO sube por iniciativa de un agente.** Se sube cuando el cambio es fuerte y lo\n> dice Daniel —o se le pide—. Entre subida y subida, **todo se acumula en el bloque de la versión\n> en vuelo**: la beta cambia de `BUILD` sin cambiar de `VERSION`, que es justo lo que hay que\n> poder distinguir al leer un reporte.\n";/*CHANGELOG_FIN*/
 /* ═══ EL CHANGELOG, DENTRO DE LA APP · GEMELA (movil/escritorio) ═══════════════════
    `CHANGELOG_MD` lo rellena `rutinas/sellar_changelog.py` desde `docs/changelog.md`, antes de
    publicar. **No se escribe a mano aqui**: la CSP obliga a que cada cara sea autocontenida, asi
@@ -2255,11 +2255,43 @@ function _nomPeriodo_(p){
   var i=parseInt(m[2],10)-1;
   return (MESES_L[i]||m[2])+' de '+m[1];
 }
+/* GEMELA del movil, byte a byte. Un booleano de Notion se lee «si»/«no», no «true»; y un
+   numero con decimales lleva dos, porque un cuarto de hora pintado con uno dice «0,3». */
+function _numPlan_(v){
+  if(v===true) return 'sí';
+  if(v===false) return 'no';
+  if(v===null||v===undefined||v==='') return '—';
+  return (typeof v==='number') ? nf(v,(v%1?2:0)) : String(v);
+}
 function _mesACerrar_(){
   var h=new Date(), a=h.getFullYear(), m=h.getMonth();       /* getMonth() es 0-11 */
   if(m===0){ a-=1; m=11; } else { m-=1; }
   var mm=m+1;
   return { p:a+'-'+(mm<10?'0':'')+mm, mes:MESES_L[m] };
+}
+/* Lo que el movil pinta en `<details>` uno por persona, aqui es UNA tabla: en 1920 px se
+   compara de un vistazo -que es para lo que se revisa un cierre- y en un telefono no cabe.
+   Los campos van con su NOMBRE REAL de Notion aunque sean largos: lo que se lee aqui tiene
+   que ser lo mismo que hay en la ficha, o no se puede contrastar. */
+function _fichasPlanHTML_(plan){
+  var fs=plan.fichas||[];
+  if(!fs.length) return '';
+  var filas=fs.map(function(f){
+    var cs=(f.c||[]).map(function(c){
+      return '<div><span class="sc">'+esc(c[0])+'</span> '+esc(_numPlan_(c[1]))+
+        ' → <b>'+esc(_numPlan_(c[2]))+'</b></div>';
+    }).join('');
+    var extra=[];
+    if(f.mp) extra.push(esc(f.mp));
+    if(f.cp) extra.push('pierde '+esc(_numPlan_(f.cp))+' h de compensación');
+    if(f.est && f.est!=='normal') extra.push('queda <b>'+esc(f.est)+'</b>');
+    return '<tr><td><b>'+esc(f.n||'?')+'</b></td><td>'+esc(f.u||'—')+'</td>'+
+      '<td>'+(cs||'<span class="sc">sin cambios</span>')+
+      (extra.length?'<div class="sc" style="margin-top:4px">'+extra.join(' · ')+'</div>':'')+'</td></tr>';
+  }).join('');
+  return '<div class="nota" style="padding-bottom:0"><b>Qué le cambia a cada uno</b> — '+
+    fs.length+' persona'+(fs.length===1?'':'s')+'</div>'+
+    tabla([['Persona'],['Unidad'],['Qué cambia']], filas);
 }
 V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
   var fin=_finDeMes_(), cer=_mesACerrar_();
@@ -2275,7 +2307,13 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
      cuenta: si la cuenta local y la del backend no coinciden, gana la del backend, que es
      la que va a decidir si deja cerrar. */
   var listo=!bloq.length;
-  var estado = plan ? ['PLAN CALCULADO','ok'] : enc ? ['CALCULÁNDOSE','wa']
+  /* ⛔ El estado se leia del plan y PARABA en «calculado»: aplicado y parado-a-medias no
+     existian en esta cara, asi que un cierre ya escrito en 32 fichas de Notion se veia
+     igual que uno recien calculado. `aplicado` sale del registro, no de esta pasada. */
+  var res=plan?(plan.resultado||null):null, hecho=!!(plan&&(plan.aplicado||res));
+  var estado = (plan&&plan.parado) ? ['PARADO A MEDIAS','no']
+             : hecho ? ['APLICADO','ok']
+             : plan ? ['PLAN CALCULADO','ok'] : enc ? ['CALCULÁNDOSE','wa']
              : listo ? ['LISTO PARA CALCULAR','ok'] : ['BLOQUEADO','no'];
   var pasos=[
     ['Decidir los partes de horas', !bloq.filter(function(b){return b.que==='partes';}).length,
@@ -2308,9 +2346,35 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
             ? '<div class="nota"><b>Avisos del cálculo:</b><ul class="obj">'+
               plan.avisos.slice(0,8).map(function(a){ return '<li>'+esc(String(a))+'</li>'; }).join('')+'</ul></div>'
             : '')+
-          '<div class="nota"><b>No se ha aplicado nada.</b> El plan dice qué valor nuevo le toca a '+
-          'cada campo de cada persona. Revísalo en el fichero y aplícalo tú: de aquí salen la cuota '+
-          'y la renovación, y eso no lo dispara un botón.</div>')
+          /* ⛔ Aqui habia un «No se ha aplicado nada.» CABLEADO: lo decia con el cierre ya
+             escrito en las 32 fichas. Ahora sale del dato. */
+          (hecho
+            ? '<div class="nota"><b>'+(plan.parado?'Se paró a medias.':'Ya está aplicado.')+'</b> '+
+              ((res&&res.aplicadas)||0)+' ficha'+(((res&&res.aplicadas)||0)===1?'':'s')+' escritas en Notion'+
+              ((res&&res.at)?' · '+esc(String(res.at).slice(0,16).replace('T',' ')):'')+
+              ((res&&res.ausentes)?' · <b>'+res.ausentes+' sin ficha en Notion</b>'+
+                ((res.nombres_ausentes&&res.nombres_ausentes.length)?' ('+esc(res.nombres_ausentes.join(', '))+')':''):'')+
+              ((res&&res.descuadres)?' · <b>'+res.descuadres+' descuadres</b>':'')+
+              ((res&&res.fallos)?' · <b>'+res.fallos+' fallos</b>':'')+
+              (plan.parado?'<br><b>Hay fichas nuevas y viejas conviviendo. No lo relances sin mirarlo.</b>':'')+
+              '</div>'
+            : '<div class="nota"><b>No se ha aplicado nada.</b> El plan dice qué valor nuevo le toca a '+
+              'cada campo de cada persona. Revísalo aquí abajo antes de aplicarlo: de aquí salen la '+
+              'cuota y la renovación.</div>')+
+          /* El desglose por persona SI cabe en un ordenador. En el movil va en desplegables
+             porque no cabe; replicarlos aqui seria portar la limitacion, no la funcion. */
+          _fichasPlanHTML_(plan))
+      : '')+
+    /* APLICAR: el boton mas peligroso de la app. Escribe en las fichas de Notion de las 32
+       personas, y de ahi salen la cuota y la renovacion. Por eso va DEBAJO del plan entero
+       -no se aprueba a ciegas- y solo sale si hay plan SIN aplicar. */
+    (plan && !hecho
+      ? pan('Aplicar el cierre de '+_nomPeriodo_(plan.periodo),'esto sí escribe',
+          '<div class="pb"><button class="btn pri" data-aplicarcierre>'+
+          'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo))+'</button></div>'+
+          '<div class="nota">Escribe en <b>'+((plan.totales&&plan.totales.personas)||plan.personas||0)+
+          ' fichas de Notion</b>. Es idempotente —aplicarlo dos veces no rueda los puntos dos '+
+          'veces— y si sale torcido se deshace con <span class="mono">rutinas/revertir_cierre.py</span>.</div>')
       : '')+
     pan('Cerrar '+cer.mes,'',
       (enc && !plan
@@ -2319,6 +2383,15 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
         : '')+
       '<div class="pb"><button class="btn pri" '+(listo?'':'disabled')+' data-cerrarmes>'+
       (listo?'Calcular el cierre de '+cer.mes:'Bloqueado · resuelve lo de arriba')+'</button></div>'+
+      /* ⛔ Recalcular con el cierre YA APLICADO reescribe `aplicado:False` y borra el rastro
+         de que se hizo. No se deshabilita el boton -puede hacer falta recalcular de verdad-,
+         se AVISA de lo que cuesta. */
+      (hecho
+        ? '<div class="nota" style="color:var(--warn)"><b>Ojo:</b> el cierre de '+
+          esc(_nomPeriodo_(plan.periodo))+' <b>ya está aplicado</b>. Recalcular ahora sobreescribe '+
+          'el plan y <b>borra el rastro de que se aplicó</b> — lo escrito en Notion no se toca, '+
+          'pero esta pantalla dejará de saberlo.</div>'
+        : '')+
       '<div class="nota">Esto <b>no cierra el mes</b>: encola el cálculo. La rutina saca el plan '+
       '—ceros de carga, puntos que ruedan al mes anterior, compensaciones al defecto— y tú '+
       'decides si se aplica.</div>');
@@ -4561,7 +4634,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='490bfba';
+var BUILD='e5ef52e';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4722,10 +4795,17 @@ function pintar(){
     if(_cm.disabled) return;
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
       tost('Sin conexión no se puede encolar el cierre.'); return; }
+    /* Si ya esta aplicado, el confirm lo DICE: recalcular no toca Notion, pero deja esta
+       pantalla sin saber que el mes se cerro. */
+    var _pl=(CIERRE&&CIERRE.plan)||null;
+    var _ya=!!(_pl&&(_pl.aplicado||_pl.resultado));
     if(!confirm('Calcular el cierre del mes.'+String.fromCharCode(10,10)+
       'NO se aplica nada: la rutina saca el plan (qué valor nuevo le toca a cada campo de '+
-      'cada persona) y lo dejará aquí para que lo revises.'+String.fromCharCode(10,10)+
-      '¿Sigo?')) return;
+      'cada persona) y lo dejará aquí para que lo revises.'+
+      (_ya?String.fromCharCode(10,10)+'OJO: el cierre de '+_nomPeriodo_(_pl.periodo)+
+        ' YA ESTA APLICADO. Recalcular sobreescribe el plan y borra el rastro de que se '+
+        'aplico. Lo escrito en Notion no se toca.':'')+
+      String.fromCharCode(10,10)+'¿Sigo?')) return;
     _cm.disabled=true; var prev=_cm.textContent; _cm.textContent='Encolando…';
     try{
       await api.cerrarMes(false, _mesACerrar_().p);
@@ -4733,6 +4813,27 @@ function pintar(){
       await _cargarCierre_();
     }catch(e){ _cm.disabled=false; _cm.textContent=prev;
       tost('No se pudo encolar: '+((e&&e.message)||e)); }
+  };
+  /* APLICAR EL CIERRE: esto SI escribe en Notion. Solo levanta el flag; lo aplica
+     `rutinas/aplicar_cierre.py` desde el gate, que es determinista e idempotente. */
+  var _ac=m.querySelector('[data-aplicarcierre]');
+  if(_ac) _ac.onclick=async function(){
+    if(_ac.disabled) return;
+    var pl=(CIERRE&&CIERRE.plan)||null; if(!pl) return;
+    if(typeof backendOK==='undefined' || !backendOK || !SESION){
+      tost('Sin conexión no se puede aplicar el cierre.'); return; }
+    var n=(pl.totales&&pl.totales.personas)||pl.personas||0;
+    if(!confirm('APLICAR el cierre de '+_nomPeriodo_(pl.periodo)+'.'+String.fromCharCode(10,10)+
+      'Esto SI escribe en '+n+' fichas de Notion: pone la carga a cero, rueda los puntos al mes '+
+      'anterior y marca las infracciones. De ahi salen la cuota y la renovacion.'+
+      String.fromCharCode(10,10)+'¿Lo has revisado persona a persona?')) return;
+    _ac.disabled=true; var prev=_ac.textContent; _ac.textContent='Encolando…';
+    try{
+      await api.aplicarCierre(pl.periodo);
+      tost('Cierre encolado para aplicar. La rutina lo recoge en la siguiente pasada.');
+      await _cargarCierre_(); pintar();
+    }catch(e){ _ac.disabled=false; _ac.textContent=prev;
+      tost('No se pudo aplicar: '+((e&&e.message)||e)); }
   };
   /* buzon: abrir/cerrar un reporte y las tres decisiones. Ninguna aplica nada: mueven
      el estado. Construir y publicar siguen siendo pasos aparte. */
