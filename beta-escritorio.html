@@ -1498,7 +1498,7 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
       /* Se compara la MEDIA de la temporada, no lo que lleve este mes: el umbral tambien
          es una media por mes, y contrastar un mes a medias contra un listón de mes
          entero marcaría a todo el equipo cada día 2. La etiqueta lo dice. */
-      kpi('Bajo el umbral',bajo,'de '+conH.length+' · media de temporada bajo '+nf(UMBRAL,1)+' h/mes','wa',(conH.length?(bajo/conH.length*100).toFixed(0):0)+'%')+
+      kpi('Bajo el umbral',bajo,'de '+conH.length+' · media de temporada bajo '+nf2(UMBRAL)+' h/mes','wa',(conH.length?(bajo/conH.length*100).toFixed(0):0)+'%')+
       kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(EQUIPO.length?(infra/EQUIPO.length*100).toFixed(0):0)+'%')+
     '</div>'+
     '<div style="display:grid;grid-template-columns:300px 1fr;gap:13px;align-items:start">'+
@@ -1514,9 +1514,9 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
       pan(mesReal?'Este mes':'Media de la temporada', mesReal?'julio 2026':'sobre '+baseMes.length+' personas',
         '<div class="pb">'+
           '<div class="chips">'+
-            '<span class="chip">TOTAL <b style="color:var(--ink)">'+nf(totMes,1)+' h</b>'+(parcial?' <span style="color:var(--warn)">(parcial)</span>':'')+'</span>'+
+            '<span class="chip">TOTAL <b style="color:var(--ink)">'+h1(totMes)+'</b>'+(parcial?' <span style="color:var(--warn)">(parcial)</span>':'')+'</span>'+
             '<span class="chip">MEDIA <b style="color:var(--ink)">'+(baseMes.length?nf(totMes/baseMes.length,1):'—')+' h</b></span>'+
-            '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+nf(UMBRAL,1)+' h</b></span>'+
+            '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+h1(UMBRAL)+'</b></span>'+
             '<span class="chip">CIERRA <b style="color:var(--ink)">31/07</b></span>'+
           '</div>'+
           insightsHTML()+
@@ -1545,7 +1545,7 @@ function insightsHTML(){
     if(top) xs.push(['up',esc(top.pila)+' es quien m\u00e1s horas lleva este mes: '+h1(top.hMes||0)+'.']);
   }
   var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
-  if(enAire>0) xs.push(['wa',nf(enAire,1)+' h están sin firmar. Mientras sigan ahí, el umbral del mes y el '+
+  if(enAire>0) xs.push(['wa',h1(enAire)+' están sin firmar. Mientras sigan ahí, el umbral del mes y el '+
     'ranking se calculan con datos incompletos.']);
   var sinCubrir=REUS.reduce(function(a,r){
     var sc = r.sinCubrir || _cobertura_(r).sinCubrir;   /* el dato real no lo trae: se deriva */
@@ -2197,9 +2197,9 @@ V.registro={g:'Horas',t:'Registro del mes',f:function(){
     vacioSimple('Sin horas del equipo','Tu cuenta solo tiene acceso a tus propias horas, no a las del resto. '+
       'Si necesitas el registro completo del mes, pídeselo al Project Director.'));
   var tot=VIS.reduce(function(a,m){return a+(m.hMes||0);},0);
-  return '<div class="chips"><span class="chip">TOTAL <b style="color:var(--ink)">'+nf(tot,1)+' h</b></span>'+
-    '<span class="chip">MEDIA <b style="color:var(--ink)">'+nf(tot/VIS.length,1)+' h</b></span>'+
-    '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+nf(UMBRAL,1)+' h/mes</b></span>'+
+  return '<div class="chips"><span class="chip">TOTAL <b style="color:var(--ink)">'+h1(tot)+'</b></span>'+
+    '<span class="chip">MEDIA <b style="color:var(--ink)">'+h1(tot/VIS.length)+'</b></span>'+
+    '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+h1(UMBRAL)+'/mes</b></span>'+
     (VIS.length<DATA.miembros.length?'<span class="chip wa">solo '+VIS.length+' de '+DATA.miembros.length+' visibles</span>':'')+'</div>'+
     pan('Horas por miembro · julio 2026','confirmadas',
       tabla([['Miembro'],['Unidad'],['Julio',1],['Junio',1],['Δ',1],['vs. objetivo',1]],
@@ -4551,7 +4551,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='6fcceeb';
+var BUILD='e682a73';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

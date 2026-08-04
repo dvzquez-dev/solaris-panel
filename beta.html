@@ -3021,9 +3021,9 @@ function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 function _compHorasHTML_(base){
   var f='';
   if(typeof YO.hAnt==='number' && YO.hAnt>0)
-    f+=deltaHTML('vs. '+(YO.mesAnt||'mes anterior'), base, YO.hAnt, nf(YO.hAnt,1)+' h en '+(YO.mesAnt||'el mes anterior'));
+    f+=deltaHTML('vs. '+(YO.mesAnt||'mes anterior'), base, YO.hAnt, nf2(YO.hAnt)+' h en '+(YO.mesAnt||'el mes anterior'));
   var me=_mediaEquipo_();
-  if(me>0) f+=deltaHTML('vs. equipo', base, me, 'media '+nf(me,1)+' h/persona');
+  if(me>0) f+=deltaHTML('vs. equipo', base, me, 'media '+nf2(me)+' h/persona');
   return f ? '<div class="comph">'+f+'</div>' : '';
 }
 function barraHorasHTML(id){
@@ -3051,7 +3051,7 @@ function barraHorasHTML(id){
       '<i class="pend" data-l="'+wco.toFixed(2)+'" data-w="'+(wcop-wco).toFixed(2)+'"></i>'+
       '<span class="mk" data-l="'+wu.toFixed(2)+'"></span>'+
     '</div>'+
-    '<div class="barhet"><span data-l="'+wu.toFixed(2)+'">objetivo '+nf(UMBRAL,1)+' h</span></div>'+
+    '<div class="barhet"><span data-l="'+wu.toFixed(2)+'">objetivo '+h1(UMBRAL)+'</span></div>'+
     (tot>0
       ? '<div class="leyh">'+
           '<span><i style="background:var(--ok)"></i>cuentan</span>'+
@@ -3063,7 +3063,7 @@ function barraHorasHTML(id){
       : '')+
     (tot>0
       ? (p>0?'<p class="rnota" style="margin-top:9px">Lo rayado son '+nf2(p)+' h esperando firma: todavía no cuentan.</p>':'')
-      : '<p class="rnota" style="margin-top:9px">Aún no tienes horas registradas este mes. El objetivo son '+nf(UMBRAL,1)+' h.</p>')+
+      : '<p class="rnota" style="margin-top:9px">Aún no tienes horas registradas este mes. El objetivo son '+h1(UMBRAL)+'.</p>')+
     /* La comparativa se compara contra lo que YA CUENTA, no contra el total con lo
        pendiente: lo pendiente puede caerse en la firma y entonces la comparacion
        habria dicho lo contrario de lo que acaba pasando. */
@@ -3194,7 +3194,7 @@ function vEstado(){
   if(pend>0){
     var rt=aprobadorDe(YO.nombre,YO.unidad);
     av+='<div class="aviso" data-ir="horas" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
-      '<div style="flex:1"><b>'+nf(pend,1)+' h esperando aprobación</b>'+
+      '<div style="flex:1"><b>'+h1(pend)+' esperando aprobación</b>'+
       '<p>Todavía no cuentan. Las firma '+esc(rt.nom.split(' ')[0])+', '+
       (rt.escalado?'Project Director':'coordinador de tu unidad')+'.</p></div>'+
       '<span class="chev">›</span></div>';
@@ -3563,7 +3563,7 @@ function desgloseCat(ps){
   var g={}, orden=['reunion','tareas','turno','compensacion'];
   ps.forEach(function(p){ var k=(p.cat in CAT_ETI)?p.cat:'compensacion'; g[k]=(g[k]||0)+p.q; });
   var chips=orden.filter(function(k){return g[k];}).map(function(k){
-    return '<span class="pil neu" style="margin:0 6px 6px 0">'+esc(CAT_ETI[k])+' <b class="mono">'+nf(g[k],1)+' h</b></span>';
+    return '<span class="pil neu" style="margin:0 6px 6px 0">'+esc(CAT_ETI[k])+' <b class="mono">'+h1(g[k])+'</b></span>';
   }).join('');
   return '<div style="display:flex;flex-wrap:wrap;margin:2px 0 4px">'+chips+'</div>';
 }
@@ -3694,7 +3694,7 @@ function filaParte(p){
   var accion = p.e==='sindecl' ? '<button class="btn mini" data-declarar="'+p.id+'" data-p style="margin-right:7px">Declarar</button>' : '';
   return '<div class="fila '+cls+'"><div class="a"><b>'+esc(p.t||'Fichaje sin declarar')+'</b><small>'+sub+catTxt+
     _origenParte_(p)+'</small></div>'+
-    '<div class="d">'+accion+pil+' <b class="mono">'+nf(p.q,1)+' h</b></div></div>';
+    '<div class="d">'+accion+pil+' <b class="mono">'+h1(p.q)+'</b></div></div>';
 }
 /* ═══ LAS HORAS DEL MES: UN SOLO DESPLEGABLE, BAJO LA CIFRA ═══════════════════════
    Daniel pidio UNO y yo le deje DOS —«Ver desglose» aqui y «Que se te ha contado este mes» al
@@ -4773,7 +4773,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7a29135';
+var BUILD='3fc16a4';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -5418,7 +5418,7 @@ function _rankSubsHTML_(){
         '<div style="height:7px;border-radius:4px;background:var(--sur2);margin-top:6px;overflow:hidden">'+
         '<i style="display:block;height:100%;width:'+(s.media/maxS*100).toFixed(0)+'%;border-radius:4px;'+
         'background:'+(mio?'var(--red)':'var(--ink3)')+'"></i></div></div>'+
-        '<div class="d">'+nf(s.media,1)+' h</div></div>';
+        '<div class="d">'+h1(s.media)+'</div></div>';
     }).join('')
     : vacio('Sin datos de subsistemas','La media por unidad se calcula al cerrar el mes. Todavía no ha llegado.','',false))+'</div>';
 }
