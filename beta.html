@@ -3429,8 +3429,10 @@ function validarFichaje(){
   var haySes = !!declP || ST.modo!=='vivo' || minSes()>0 || !!ST.ses.cloudIni;   /* declarar: ya hay sesión cerrada */
   var dur = declP ? declP.q : (ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durForm());
   var n1 = declP ? true : (haySes && dur>0 && dur<=12);
-  /* la imputación depende de la categoría: tarea del desplegable, o el texto libre */
-  var imput = f.cat==='tareas' ? (f.tarea==='__otro__' ? f.detalle.trim() : f.tarea) : f.detalle.trim();
+  /* la regla de qué es "la imputación" vive en _imputacion_(): un solo sitio, para que si
+     cambia no haya que acordarse de tocar aquí Y en enviarFichaje (antes no daba error, solo
+     desincronizaba silenciosamente lo que se valida de lo que se envía). */
+  var imput = _imputacion_(f);
   var n2 = !!imput;
   var n3 = f.just.trim().length>=25;
 
@@ -4609,7 +4611,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b684a3d';
+var BUILD='539cefc';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
