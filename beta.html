@@ -937,6 +937,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
+<script src="comun-beta.js"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -944,17 +945,10 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 var $=function(s,c){return (c||document).querySelector(s);};
 var $$=function(s,c){return Array.prototype.slice.call((c||document).querySelectorAll(s));};
 var RM=window.matchMedia('(prefers-reduced-motion: reduce)');
-function redu(){return RM.matches;}
-function nf(v,d){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}).format(v);}
-function nf2(v){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,maximumFractionDigits:2}).format(v);}  // horas: hasta 2 decimales (centésima)
-/* Las horas van con los decimales que TENGAN, no con uno fijo. Con `nf(v,1)` un cuarto de
-   hora -0,25- se pintaba «0,3 h», que ademas no es ningun escalon de la escala de
-   compensacion. Se muestran dos decimales solo si el numero los usa: 2 h se lee mejor que
-   2,00 h, y 0,25 h tiene que leerse 0,25 h. GEMELA en las dos caras. */
-function h1(v){ var n=Number(v)||0; return nf(n, (Math.round(n*100)%100===0) ? 0 : 2)+' h'; }
-function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
-function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function pad(n){return String(n).padStart(2,'0');}
+
+
+  // horas: hasta 2 decimales (centésima)
+
 
 /* La fecha era fija ('24/07/2026'): la app decia siempre ese dia, y de ahi salen los
    turnos pasados, los vencimientos y el saludo. Ahora es la de verdad; la semilla solo
@@ -981,7 +975,7 @@ function _limM_(R){ var l=R&&R.limite; if(!l) return 'sin límite'; l=String(l).
    fecha cae mas de medio año atras, es del año que viene (una reunion en enero vista
    desde diciembre). Sin esto, «31/12» parecia pasado siempre. */
 var _MSDIA_=86400000;
-function _hoyDateM_(){ var d=new Date(_dmyAISO_(HOY)+'T00:00:00'); return isNaN(d)?new Date():d; }
+
 function _msDeDDMM_(dd, base){
   var m=/^\s*(\d{1,2})\/(\d{1,2})/.exec(String(dd||''));
   if(!m) return null;
@@ -1130,41 +1124,11 @@ var CANAL='beta';
    eso es justo lo que hay que poder distinguir al leer un reporte. */
 var VERSION='0.2';
 
-/* Quien puede usar la beta. Se deja en una funcion sola porque ensancharla es una linea:
-   `|| _rangoBeta_()>=1` mete a los coordinadores. */
-function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; }
-function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre) : 0; }
+
 var ADMIN_EMAIL='solaris@uvigoaerotech.com';   // la cuenta que ve a TODOS y puede «ver como» cualquiera
 function esAdmin(){ return !!(SESION && SESION.email && String(SESION.email).toLowerCase()===ADMIN_EMAIL); }
-/* GEMELA (escritorio: misma funcion, mismo nombre). Quien SIGUE en el equipo.
-   El roster conserva a las bajas por su historia -sus partes, sus sanciones, sus horas
-   pasadas siguen siendo verdad-, pero no se les vuelve a elegir para nada: ni convocar, ni
-   invitar, ni sancionar, ni otorgar horas, ni «ver como». Antes cada sitio se lo filtraba
-   por su cuenta y donde nadie lo escribio salia la lista entera. */
-function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
-/* GEMELA. LAS HORAS DE ESTE MES.
 
-   `horasMes` viene del campo de Notion «Horas empleadas (este mes)» y SI son las de este
-   mes. Lo di por falso el 27/07 porque coincidia con `horasTemp/meses` en 32 de 32... pero
-   estaba leyendo la CACHE del backend (`_notionDisciplina_` guarda su lectura). Con Notion
-   fresco coinciden en 1 de 32, y las diferencias son grandes y crecientes, que es justo lo
-   que hace un mes en curso. Daniel lo vio en la pantalla: «me aparecen menos horas de las
-   que tengo».
 
-   Lo que SI esta viejo es `datos/horas_temporada.json`: un snapshot. Cualquier cifra
-   derivada de el -lo era `horasMesReal`- enseña el mes congelado el dia del snapshot y le
-   gana al dato vivo, que es exactamente lo que no puede pasar.
-
-   Se deja la funcion como puerta unica: si algun dia hay una fuente mejor que `horasMes`,
-   entra aqui y no en cinco sitios. */
-function _hMesReal_(m){
-  m = m || {};
-  /* `horasMes` PRIMERO: es el campo que llega del backend con el overlay de Notion en
-     vivo. `hMes` es una COPIA que hace `_aplicarPanel_` para las vistas que leen corto,
-     y una copia puede quedarse atras. Ante la duda, el original. */
-  return (typeof m.horasMes==='number') ? m.horasMes
-       : (typeof m.hMes==='number') ? m.hMes : null;
-}
 /* GEMELA (la otra cara: misma funcion, mismo nombre).
    EL UMBRAL NO ES UNA CONSTANTE. `reglas/cuota.py` lo define asi:
        umbral = max(8, min(15, (2/3) x media de horas del mes del equipo))
@@ -1172,66 +1136,8 @@ function _hMesReal_(m){
    sobre los 32 de la temporada). Se calcula igualmente, porque un numero a mano deja de
    ser correcto en cuanto cambian las horas y nadie se entera: no se ve venir. */
 var UMBRAL_LO=8, UMBRAL_HI=15, UMBRAL_FRAC=2/3;
-/* EL UMBRAL, EN DIRECTO. Regla de Daniel (27/07):
 
-     «cada mes tiene un peso de 1 y dentro de ese mes se reparte equitativamente entre los
-      miembros activos; luego se normaliza a los meses que hay. Un mes con menos gente
-      cuenta lo mismo que uno con mas: solo importa la media local de ese mes.»
 
-   Y el mes EN CURSO entra con el peso de lo que lleva transcurrido (dia/dias del mes).
-   Sin eso, cada dia 1 el umbral pegaria un salto al aparecer un mes entero de golpe; con
-   eso se mueve poco a poco. Por eso se calcula AQUI y no viene ya hecho del backend: el
-   peso cambia cada dia, y un numero subido ayer ya no seria el de hoy.
-
-   Los ingredientes -las medias mensuales ya cerradas y la del mes abierto- SI vienen del
-   panel (`flujos/umbral.py`), porque salen del historico mensual y eso la app no lo tiene.
-
-   OJO: la poblacion del umbral NO es la de las estadisticas, y es a proposito.
-
-   Las estadisticas del panel (medias, «en infraccion») miden al equipo que hay HOY, asi que
-   van sobre `_activos_()`. El umbral es otra cosa: sale del RRI y mide la TEMPORADA, asi que
-   entran TODOS los que estuvieron en ella —tambien quien luego se fue—, cada uno por los
-   meses que estuvo. Si alguien curro medio año, ese medio año cuenta.
-
-   Y la magnitud tampoco es `hMes` (lo que llevas ESTE mes) sino **horas de temporada
-   divididas por meses de estancia**, que es lo que dice la primera linea de
-   `reglas/cuota.py`. Asi quien lleva 3 meses no sale hundido frente a quien lleva 11: la
-   ponderacion por meses ya esta dentro del propio ratio.
-
-   No las 'armonices' en una sola: son dos preguntas distintas con dos respuestas distintas.
-   (Lo hice y salio 13,13 donde tocaba 11,80.) */
-function _fraccionDelMes_(d){
-  d=d||new Date();
-  var dias=new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();   // dia 0 del siguiente
-  return Math.max(0, Math.min(1, d.getDate()/dias));
-}
-function _umbral_(){
-  var ing=DATA.umbral;
-  if(ing && ing.medias && ing.medias.length){
-    var num=0, den=0;
-    ing.medias.forEach(function(x){ num+=x; den+=1; });        // cada mes cerrado pesa 1
-    var ma=ing.mesAbierto;
-    if(ma && typeof ma.media==='number'){
-      var w=_fraccionDelMes_();                                 // el abierto, a prorrata
-      num+=ma.media*w; den+=w;
-    }
-    if(den>0) return Math.max(ing.lo||UMBRAL_LO, Math.min(ing.hi||UMBRAL_HI, (ing.frac||UMBRAL_FRAC)*(num/den)));
-  }
-  /* Sin ingredientes (backend viejo, o una cuenta a la que no se los sirven) se cae a la
-     aproximacion por persona: media de `horasTemp/meses` de TODOS los de la temporada. No
-     es la misma cuenta -pondera por persona, no por mes- pero es del mismo orden y honesta.
-     Y si ni eso, al ultimo valor conocido: nunca a 2/3 de tus propias horas, que no es el
-     umbral de nadie. */
-  var hs=(DATA.miembros||[]).map(function(m){
-      return (typeof m.horasTemp==='number' && m.meses) ? (m.horasTemp/m.meses) : null;
-    }).filter(function(h){ return typeof h==='number'; });
-  if(hs.length<2) return UMBRAL;
-  var media=hs.reduce(function(a,h){ return a+h; },0)/hs.length;
-  return Math.max(UMBRAL_LO, Math.min(UMBRAL_HI, UMBRAL_FRAC*media));
-}
-/* `_ApiTransito` marca los fallos que SI se reintentan: la peticion no llego entera. Se
-   distingue de un «no» del backend, que no se reintenta porque tiene criterio. */
-function _ApiTransito(m){ this.message=m; this.transito=true; }
 _ApiTransito.prototype=Object.create(Error.prototype);
 /* ═══ LOGIN Y SESION · GEMELO EN LA OTRA CARA ═══════════════════════════════════
    Todo este bloque -`_gate_`, `_onCredencial_`, `_pintarLogin_`, `_arrancarGis_`,
@@ -1242,18 +1148,7 @@ _ApiTransito.prototype=Object.create(Error.prototype);
    visor de documentos: tres copias, una mejora en una, y las otras dos sin enterarse.
    Si tocas algo de aqui, abre el otro fichero antes de dar el cambio por hecho. (Mapa §5, D11.)
    ═══════════════════════════════════════════════════════════════════════════════ */
-function _apiParse(txt, accion){
-  var j=null; try{ j=JSON.parse(txt); }catch(_){}
-  /* Lo que vuelve no es JSON: es la pagina HTML de Google del 404 transitorio. */
-  if(!j) throw new _ApiTransito("respuesta no válida del backend");
-  if(j.ok===true) return j.data;
-  var err=String(j.error||"");
-  /* «acción desconocida: » con la accion VACIA = el cuerpo del POST se perdio por el camino
-     y el backend no vio ninguna accion. Nunca llego a ejecutarse nada, asi que se repite. */
-  if(accion && /^acci[oó]n desconocida/.test(err) && err.indexOf(accion)<0)
-    throw new _ApiTransito("el cuerpo del POST no llegó ("+err+")");
-  throw new Error(err||"respuesta no válida del backend");
-}
+
 var api={
   /* TRES INTENTOS. Apps Script pierde el cuerpo del POST de vez en cuando (302->404) y
      hasta ahora eso era un fallo a la cara del usuario: «no fui capaz de fichar». Se nota en
@@ -1333,7 +1228,7 @@ var api={
   setOrdenDia:      function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); },
   guardarPush:      function(sub){ return api._post({action:"guardarPush",sub:sub}); }
 };
-function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
+
 /* ---- HORAS: una sola familia. Habia CINCO parsers de 'HH:MM' repartidos por el
    fichero, con tres unidades de salida distintas y dos que reventaban si les llegaba
    un string en vez de un {ini}. Estas aguantan las dos formas. ---- */
@@ -1342,14 +1237,9 @@ function _minHM_(v){                       // 'HH:MM' o {ini:'HH:MM'} -> minutos
   var p=String(t==null?'':t).split(':');
   return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
 }
-function _hmMin_(m){                       // minutos -> 'HH:MM'
-  m=(+m||0); return pad(Math.floor(m/60)%24)+':'+pad(m%60);
-}
-function _horasHM_(v){ return _minHM_(v)/60; }   // 'HH:MM' -> horas decimales
-/* Maximo comun divisor. Vive AQUI, con la familia de `HH:MM`, y no dentro de `vReu`, porque es
-   GEMELA byte a byte de la del escritorio y una closure no se puede comparar de un vistazo.
-   Se usa para el PASO de la rejilla: el mcd de los inicios y las duraciones de las franjas. */
-function _mcd_(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; }
+
+   // 'HH:MM' -> horas decimales
+
 /* HH:MM local de una fecha ISO (la hora de apertura que da la nube) */
 function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes()); }
 /* Aplica el panel del backend a DATA y fija YO al miembro que ha entrado. El backend
@@ -1568,20 +1458,7 @@ function _arrancarRefrescoVivo_(){
   setInterval(function(){ _refrescoVivo_('reloj'); }, 90000);
   setInterval(_refrescarReuAbierta_, 20000);
 }
-/* Pide una accion del api SIN que un fallo se lleve por delante a las demas. Nace de un
-   fallo real: `api.getTurnos` no estaba declarada, y como la llamada iba en un
-   `Promise.all`, el TypeError mataba tambien el refresco de reuniones que iba al lado.
-   Devuelve `null` en vez de reventar, y deja rastro en la consola para que no vuelva a
-   pasar en silencio. */
-function _pide_(accion, arg){
-  try{
-    if(typeof api[accion]!=='function'){
-      try{ console.warn('api.'+accion+' no existe: ese dato no se refresca'); }catch(_){}
-      return Promise.resolve(null);
-    }
-    return Promise.resolve(api[accion](arg)).catch(function(){ return null; });
-  }catch(_){ return Promise.resolve(null); }
-}
+
 async function _refrescarEnSegundoPlano_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
   /* Las dos a la vez y UN solo repintado. Antes iban en serie y cada respuesta repintaba
@@ -1637,24 +1514,7 @@ function _reunionesCargando_(){ return !!(typeof backendOK!=='undefined' && back
    REMAPEA el indice de franja dentro de cada bloque. Ojo: el ORDEN DE LOS BLOQUES no se
    toca, porque `resp[nombre]` es un array alineado a esa posicion; si se reordenara, cada
    disponibilidad se pegaria a la franja equivocada. */
-/* ═══ GEMELA · existe una copia IDENTICA en escritorio.html. Si tocas una, toca la otra. ═══
-   Ordena las franjas por hora y REMAPEA el indice de franja de cada bloque. El ORDEN DE
-   LOS BLOQUES no se toca: `resp[nombre]` esta alineado a esa posicion y reordenarlo pegaria
-   cada disponibilidad a la franja equivocada. */
-function _ordenarFranjas_(r){
-  var F=(r&&r.franjas)||[], bl=(r&&r.bloques)||[], fij=(r&&r.fijadaBl)||[];
-  var idx=F.map(function(_,i){ return i; });
-  if(idx.every(function(i){ return i===0 || _minHM_(F[i-1])<=_minHM_(F[i]); }))
-    return {franjas:F, bloques:bl, fijadaBl:fij, cambio:false};
-  idx.sort(function(a,b){ return _minHM_(F[a])-_minHM_(F[b]); });
-  var pos=[]; idx.forEach(function(vi,k){ pos[vi]=k; });
-  return {
-    franjas:  idx.map(function(i){ return F[i]; }),
-    bloques:  bl.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
-    fijadaBl: fij.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
-    cambio:   true
-  };
-}
+
 /* EL MAPA DE CALOR · GEMELA de `_calorDe_(r, pond)` en `escritorio.html`.
    Estaba INLINE aquí dentro de `_normReuM_` y aislada allí (mapa §5, D6): la misma cuenta
    escrita dos veces y con dos formas, que es como acaban divergiendo. Ahora comparten nombre
@@ -1879,26 +1739,7 @@ async function _cargarSancionesM_(){
   try{ var a=await api.getSanciones({estado:'pendiente'}); if(Array.isArray(a)) SANC_M=a; }
   catch(e){}
 }
-/* De sanción a movimiento del libro. La forma que espera `medidorHTML` es `{f,art,t,p,vv}`.
-   `vv` es la tercera columna —lo que pasa con esos puntos— y se resuelve AQUI y no al pintar,
-   porque depende del estado y el pintado no tiene por qué saber de estados de sanción. */
-function _movDeSancion_(s){
-  var just=(s.estado==='justificada');
-  var iso=String(s.fecha||'').slice(0,10);
-  return {
-    f: (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? _isoADMY_(iso) : (s.fecha||'')),
-    art: String(s.articulo||'—'),
-    t: String(s.motivo||'(sin motivo)'),
-    /* La insignia y la etiqueta salen del MISMO dato. El backend ya manda 0 en una
-       justificada, pero si algun dia mandara el valor crudo se veria «−1» al lado de «no
-       restó», que es lo peor que puede pasar aqui: dos cosas ciertas por separado que juntas
-       se contradicen, y la persona sin saber si le quitaron el punto o no. */
-    p: just ? 0 : (Number(s.puntos)||0),
-    /* Los puntos SE REINICIAN CADA TEMPORADA (RRI Art. 29), no caducan sanción a sanción. Se
-       dice así, con palabras, en vez de inventarse una fecha exacta que el RRI no fija. */
-    vv: just ? 'justificada<br>no restó' : 'hasta el fin<br>de temporada'
-  };
-}
+
 async function _cargarMovimientosM_(){
   if(typeof MOVS==='undefined') return;
   MOVS.length=0;                                  // fuera la semilla, pase lo que pase
@@ -2062,12 +1903,7 @@ function _arrancarGis_(){
     setTimeout(function(){ esperar(n-1); },150);
   })(40);
 }
-function cerrarSesion(){
-  SESION=null;
-  try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
-  try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
-  location.reload();
-}
+
 
 function mediaSub(u){for(var i=0;i<DATA.subsistemas.length;i++) if(DATA.subsistemas[i].u===u) return DATA.subsistemas[i].media; return _mediaEquipo_();}
 /* La media de horas por persona del equipo entero, PONDERADA por cuanta gente tiene cada
@@ -2270,40 +2106,8 @@ var SUBCOORD = [
   { unidad:'Aviónica', equipo:'Hardware', quien:'Breixo Pombar Fernández',
     gente:['Breixo Pombar Fernández', 'Aaron Parada Valiño', 'Yoel Clemente González'] }
 ];
-/* La subcoordinacion de alguien, o `null`. */
-function _subcoordDe_(n){
-  for (var i=0;i<SUBCOORD.length;i++) if (SUBCOORD[i].quien === String(n)) return SUBCOORD[i];
-  return null;
-}
-function rangoSanc(nombre){
-  var n = String(nombre || '');
-  if (RANGO_SANC[n] != null) return RANGO_SANC[n];
-  /* Rango 1 = tiene gente bajo su jurisdiccion: los coordinadores (su unidad) y quien tenga
-     jurisdiccion propia declarada (un subcoordinador). */
-  if (_subcoordDe_(n)) return 1;
-  var m = _mSanc_(n);
-  if (m && m.cargo === 'Coordinador') return 1;
-  return 0;
-}
-/* ¿Puede `actor` sancionar a `objetivo`? Una sola puerta: si alguna pantalla decide esto por su
-   cuenta, en dos semanas dira otra cosa que esta. */
-function puedeSancionarA(actor, objetivo){
-  var r = rangoSanc(actor);
-  if (r <= 0) return false;
-  if (r >= 3) return true;                                   // el PD, a cualquiera
-  if (r === 2) return String(objetivo) !== PD_SANC;          // rango 2, a todos menos al PD
-  /* Rango 1: a si mismo y a los suyos. */
-  if (String(objetivo) === String(actor)) return true;
-  var a = _mSanc_(actor), o = _mSanc_(objetivo);
-  /* Coordinador de la unidad: la unidad ENTERA, subequipos incluidos. Se mira ANTES que la
-     subcoordinacion porque Oscar es las dos cosas y lo que manda es lo mas amplio. */
-  if (a && a.cargo === 'Coordinador' && o && a.unidad && a.unidad === o.unidad) return true;
-  /* Subcoordinador: SU equipo y nada mas. No se le suma el subsistema — eso es justo lo
-     que lo distingue del coordinador. */
-  var sc = _subcoordDe_(String(actor));
-  if (sc) return sc.gente.indexOf(String(objetivo)) >= 0;
-  return false;
-}
+
+
 /* A quien puede sancionar, ya filtrado. Lo usan los dos formularios: que la lista salga de
    la MISMA regla que el permiso es lo que impide ofrecer a alguien y que el envio falle. */
 /* QUIEN MANDA A EFECTOS DE SANCIONES · GEMELA (movil/escritorio).
@@ -2315,11 +2119,7 @@ function _actorSanc_(){
   if (typeof backendOK !== 'undefined' && backendOK && SESION && SESION.nombre) return SESION.nombre;
   return yoNombre();               // demo local (?demo), donde no hay sesion
 }
-function sancionablesPor(actor){
-  return (DATA.miembros || []).filter(function(m){
-    return m && !m.baja && puedeSancionarA(actor, m.nombre);
-  });
-}
+
 /* rol: gatea exactamente lo mismo que app.html — quién revisa, quién sanciona.
    ⚠️ AUTORIDAD TRIPLICADA a proposito (mapa §5, D9): `rangoNom`, `coordinadorDe`,
    `revisoresDe` y `puedeDecidir*` existen aqui, en `escritorio.html` y en el backend
@@ -2362,16 +2162,7 @@ var RRI_MOTIVOS=[
   ['plazoUrg','Incumplir el plazo de una tarea urgente o importante (30b)', -1],
   ['libre','Otro · lo escribo yo', -1]
 ];
-/* EL ORDEN DE LOS SUBSISTEMAS, deducido y no escrito a mano: es el orden en que vienen los
-   miembros del panel, que es el que trae Notion. Una constante aqui se quedaria vieja el dia
-   que se reordene alla, y nadie se enteraria hasta que alguien mirase. */
-function _ordenSubs_(){
-  var vis=[];
-  (DATA.miembros||[]).forEach(function(m){
-    var u=m&&m.unidad; if(u && vis.indexOf(u)<0) vis.push(u);
-  });
-  return vis;
-}
+
 /* Agrupa a quien puedas sancionar: por subsistema en el orden de Notion, y dentro de cada uno
    EL COORDINADOR PRIMERO y el resto alfabetico. Daniel: «y con el coordinador de primero». */
 /* LAS TAREAS DEL SANCIONADO · GEMELA (movil/escritorio).
@@ -2380,44 +2171,8 @@ function _ordenSubs_(){
    sancion por plazo no se podia poner contra nadie. El backend (v52) las sirve si puedes
    sancionar a esa persona -misma regla que la sancion, ningun camino nuevo-. */
 var SANC_TAREAS = { quien: '', lista: null, cargando: false };   // lista null = aun sin pedir
-function _tareasDe_(nombre, alLlegar){
-  var n = String(nombre || '');
-  if (!n) return [];
-  if (SANC_TAREAS.quien === n && SANC_TAREAS.lista) return SANC_TAREAS.lista;
-  if (SANC_TAREAS.quien === n && SANC_TAREAS.cargando) return null;   // ya se esta pidiendo
-  SANC_TAREAS = { quien: n, lista: null, cargando: true };
-  api.getTareas(n).then(function(l){
-    /* Solo se acepta la respuesta si sigue siendo la persona que se pidio: si mientras llegaba
-       se eligio a otra, pintar esto seria ofrecer las tareas de quien no es. */
-    if (SANC_TAREAS.quien !== n) return;
-    SANC_TAREAS = { quien: n, lista: l || [], cargando: false };
-    if (alLlegar) alLlegar();
-  }).catch(function(e){
-    if (SANC_TAREAS.quien !== n) return;
-    SANC_TAREAS = { quien: n, lista: [], cargando: false, error: (e && e.message) || String(e) };
-    if (alLlegar) alLlegar();
-  });
-  return null;                                   // null = «cargando», distinto de [] = «no tiene»
-}
-function _gruposSanc_(actor, filtro){
-  var f=_sinTildes_(String(filtro||'').trim().toLowerCase());
-  var gente=sancionablesPor(actor).filter(function(m){
-    if(!f) return true;
-    return _sinTildes_((m.nombre||'').toLowerCase()).indexOf(f)>=0 ||
-           _sinTildes_((m.pila||'').toLowerCase()).indexOf(f)>=0 ||
-           _sinTildes_((m.unidad||'').toLowerCase()).indexOf(f)>=0;
-  });
-  var orden=_ordenSubs_(), por={};
-  gente.forEach(function(m){ var u=m.unidad||'—'; (por[u]=por[u]||[]).push(m); });
-  return orden.filter(function(u){ return por[u]; }).map(function(u){
-    var l=por[u].slice().sort(function(a,b){
-      var ca=(a.cargo==='Coordinador')?0:1, cb=(b.cargo==='Coordinador')?0:1;
-      if(ca!==cb) return ca-cb;                       // el coordinador, primero
-      return String(a.nombre||'').localeCompare(String(b.nombre||''), 'es');
-    });
-    return {unidad:u, gente:l};
-  });
-}
+
+
 function _sancionesHTML_(){
   /* El gate es el RANGO DE SANCIONES, no el cargo: Bruno tiene rango 2 sin ser nada en los
      documentos, y un consejero sin gente debajo es rango 0 aunque este en el consejo. */
@@ -2484,18 +2239,7 @@ function _sancionesHTML_(){
     '</div>'+
     '<h4>Pendientes de decidir</h4>'+_sancColaHTML_();
 }
-/* La lista de personas. Se pinta aparte para poder rehacerla al teclear SIN tocar el resto
-   del formulario: repintar el modal entero es lo que borraba lo ya elegido. */
-function _listaSancHTML_(grupos){
-  if(!grupos.length) return '<p class="rnota" style="margin:0;padding:8px 2px">Nadie con ese filtro.</p>';
-  return grupos.map(function(g){
-    return '<div class="sangrupo">'+esc(g.unidad)+'</div>'+
-      g.gente.map(function(m){
-        return '<button class="sanper'+(SANC_FORM.quien===m.nombre?' on':'')+'" data-sanq="'+esc(m.nombre)+'" data-p>'+
-          '<b>'+esc(m.nombre)+'</b>'+(m.cargo==='Coordinador'?'<i>coord.</i>':'')+'</button>';
-      }).join('');
-  }).join('');
-}
+
 function _sancColaHTML_(){
   if(SANC_M===null) return '<div class="tarj">'+vacio('Cargando…','Buscando qué espera decisión.','',true)+'</div>';
   if(!SANC_M.length) return '<div class="tarj">'+vacio('Nada pendiente','Ninguna sanción espera decisión.','',false)+'</div>';
@@ -2669,7 +2413,7 @@ async function _decidirSancM_(id, accion, b){
   }catch(e){ b.disabled=false; tost('No se pudo: '+((e&&e.message)||e)); }
 }
 /* ── MODAL (mismo patrón que app.html) ─────────────────────────────────── */
-/*CHANGELOG_INI*/var CHANGELOG_MD="# Changelog — Panel Solaris\n\nQué cambió en cada versión de la app, en corto. Escrito **para el equipo**, no para el que la\nprograma: si algo no se nota usándola, no está aquí.\n\nEstás leyendo el de **esta** app: lo que cambió aquí. Lo que además cambió en la otra cara sale\nbajo «Las dos caras». Se abre desde el menú **⋮**, y la versión que llevas está en Ajustes (móvil)\no en el pie (escritorio).\n\n---\n\n## v0.2 — *en beta desde el 31/07/2026*\n\n**Dónde mirarla**: [`beta.html`](https://dvzquez-dev.github.io/solaris-panel/beta.html) ·\n[`beta-escritorio.html`](https://dvzquez-dev.github.io/solaris-panel/beta-escritorio.html).\n**Producción sigue en la v0.1** y no se toca hasta que Daniel lo valide.\n\n**Las dos caras**\n\n- Ya se puede sancionar por **incumplir un plazo**. El formulario ofrecía **tus** tareas en vez de\n  las de la persona sancionada, así que con el PD —que no tiene tareas— la lista salía vacía y la\n  sanción por plazo era imposible de poner **contra nadie**.\n- Los motivos de sanción llevan **su artículo real del RRI** (30b tarea importante o urgente, 30c\n  cualquier otra), en vez de una clave interna.\n- Las horas se escriben con los decimales que tienen: **0,25 h** ya no sale como «0,3 h».\n- El distintivo **«beta»** de la cabecera es ahora el **enlace de vuelta a producción**.\n- **El plan del cierre ya no se contradice a sí mismo.** Decía «todavía no se ha aplicado» y\n  «aplicarlo no se hace desde aquí» **siempre** —incluso con el cierre ya hecho y con el botón de\n  aplicar justo debajo—, mientras el bloque de al lado decía «aplicado». Ahora las dos partes\n  leen el mismo dato.\n\n**📱 Móvil**\n\n- Los expedientes dicen **«en revisión»**, no `revision`: fuera los estados internos del servidor.\n- **El «Desglose de puntos» ya enseña algo.** Cada subida o bajada, con su motivo, su artículo del\n  RRI y su fecha. Antes existía la pantalla y salía siempre vacía. *(Necesita el backend v53.)*\n- **Horas y puntos enseñan tus últimos 10 movimientos**: las horas **del mes** (se reinician con\n  el cierre, igual que el Panel de Rendimientos) y los puntos **de la temporada**. **No se borra\n  nada**: el registro completo se conserva, lo que cambia es cuánto se pinta — y la pantalla lo\n  dice.\n- **El desglose de tus horas cuelga de la propia cifra**, como desplegable opcional: ya no hay\n  que bajar al fondo de la pantalla para saber de qué se componen.\n- **«Ver el desglose completo de este mes»**: una ventana con **todas** tus contribuciones del\n  mes, sin recortar, empezando por la **compensación mensual que te toca por cargo** — esas horas\n  que se asignan solas y que antes no aparecían por ningún lado.\n\n- **Tus horas de compensación, y separadas en las dos que son.** La app las deducía de tu cargo\n  (Project Director 7 h · Coordinador 3,5 h · miembro 2 h), así que si te habían asignado horas\n  **por encima de eso** —por cubrir turnos de más, por ejemplo— no las veías por ningún lado: la\n  pantalla te enseñaba menos horas de las que tenías. Ahora aparecen las dos, cada una en su fila:\n  la **compensación por tu cargo**, que llega sola, y la **compensación extra**, que te asigna el\n  Project Director por trabajo de más y **solo cuenta ese mes**.\n  *(Necesita el backend v54; hasta entonces la pantalla avisa de que está usando la base.)*\n\n**⚙️ Backend v56**\n\n- El **cierre mensual** ya se puede **aplicar** desde el panel, no solo calcular. Solo el Project\n  Director, y deja las fichas listas para que él las revise.\n\n**⚙️ Backend v55**\n\n- **Los avisos de turnos, reuniones y sanciones ya no se pueden desactivar.** Llevan plazo y\n  consecuencias: perdérselos no es una molestia, es una sanción. Documentos y horas los sigues\n  eligiendo tú.\n- El servidor entiende las **unidades nuevas** (Recovery, Documentación Técnica, Seguridad y\n  Verificación, Patrocinios y Relaciones Externas, Logística).\n\n**⚙️ Backend v54**\n\n- Tu campo **`Compensaciones`** de Notion llega a la app **en vivo**, con los extras que te hayan\n  asignado. Antes la app lo deducía de tu cargo y los extras no se veían.\n\n**⚙️ Backend v52**\n\n- `getTareas` admite `nombre`: devuelve las tareas de **a quien puedes sancionar**, con la misma\n  regla que la sanción.\n\n---\n\n## v0.1 — 28/07/2026 · backend v51\n\nEl **primer release numerado**. Recoge todo lo que producción no tenía desde las 07:37 de ese día.\n\n**Las dos caras**\n\n- **Buzón de bugs y mejoras**, cuatro buzones separados (bug/mejora × móvil/escritorio). Se reporta\n  desde el menú ⋮ y **la cara va dentro del identificador**, para que se sepa de qué se habla.\n- **Fotos en el reporte, con pintor encima**: adjuntas una imagen, se abre a pantalla completa y la\n  marcas —paleta, tres grosores, deshacer, zoom con dos dedos—; al enviar se fusionan las capas.\n- **Poner y decidir sanciones**, con su **modelo de autoridad**: cada uno solo alcanza a quien le\n  corresponde, y **lo comprueba el servidor**, no solo la pantalla.\n- **Un solo visor de documentos**, con pantalla completa. Antes había tres copias distintas.\n- El **fichaje reintenta** cuando el envío se pierde por el camino. Antes fallaba a la primera y\n  decía «respuesta no válida».\n\n**📱 Móvil**\n\n- **Notificaciones obligatorias**: sin activarlas la app no arranca, y el aviso va **antes** del\n  login. Con **preferencias por tipo** en Ajustes.\n- Vuelve la **comparativa de horas**: contra tu **mes anterior** y contra el **equipo**.\n- **Documentos** se ve por defecto; **Tareas** y **Documentos** se pueden ocultar desde Ajustes.\n- **Horas** reordenada: partes arriba, historial al fondo, plegado y solo del mes en curso.\n- La **cuota** pasa al menú ⋮.\n- Botón **«ver todos los turnos»**.\n- El móvil **deja de estirarse** en pantalla de ordenador.\n\n**⚙️ Backend v43 → v51**\n\n- Buzón: estados, anotaciones y capturas a Drive.\n- Preferencias de notificación, con el filtro **en el servidor**.\n- `getFichajesAbiertos` y `getDatos`.\n- `moverLimiteTarea`: mueve la fecha límite de una tarea **en Notion**.\n- La **autoridad de sanciones**, comprobada por persona.\n- **Último acceso** de cada persona, el dato que pide la regla semanal del RRI.\n- El **id de Notion** se lee bien aunque el título lleve guiones.\n\n---\n\n## Antes de los números — hasta el 28/07/2026, 07:37\n\nLo que había en producción **sin versión**: la app se publicaba directamente y el backend iba por su\ncuenta. No hay historial versión a versión porque no se numeraba; esto es el resumen de lo que ya\nfuncionaba cuando empezaron los números.\n\n**Las dos caras**\n\n- **Reuniones y disponibilidad** propias, en sustitución de Xoyondo y when2meet: convocar con tipos\n  gateados por cargo, pintar tu disponibilidad a dedo, **mapa de calor** agregado con la mejor\n  franja, y **slot + duración** en vez de franjas solapadas.\n- **Documentos**: revisar y aprobar expedientes con las cuatro decisiones reales, enrutado por\n  ámbito, bloqueo mutuo y desempate por rango.\n- **Turnos** leídos en vivo de Notion y **tareas** de los cuatro Kanban.\n- **Fichaje** y partes de horas.\n- **Refresco en vivo**: lo que miras se actualiza solo, sin borrarte lo que estés escribiendo.\n- La app **dice qué versión es** (`BUILD`), para no depurar dos builds distintos sin saberlo.\n\n**📱 Móvil**\n\n- Seis pestañas, medidor de conducta y **cascada** al ser elegible.\n- **Estado**, **Turnos**, **Tareas**, **Reuniones**, **Horas** y **Equipo**.\n\n---\n\n> **Cómo se actualiza este fichero**: al hacer un release se añade su bloque **en ese momento**, con\n> bullets cortos y separados por cara. Un changelog que se escribe «cuando haya tiempo» se escribe\n> de memoria, y de memoria se escribe mal. La lista de qué se toca al publicar está en\n> `ARRANQUE.md` §5.\n>\n> ⛔ **TODA versión nueva tiene su bloque aquí — beta y producción** (Daniel, 02/08/2026). Y no\n> depende de que nadie se acuerde: `flujos/publicar_web.py` **no deja salir un release** cuya\n> versión no aparezca en este fichero, y avisa en beta si la versión en vuelo no tiene bloque.\n>\n> ⛔ **La versión NO sube por iniciativa de un agente.** Se sube cuando el cambio es fuerte y lo\n> dice Daniel —o se le pide—. Entre subida y subida, **todo se acumula en el bloque de la versión\n> en vuelo**: la beta cambia de `BUILD` sin cambiar de `VERSION`, que es justo lo que hay que\n> poder distinguir al leer un reporte.\n";/*CHANGELOG_FIN*/
+/*CHANGELOG_INI*/var CHANGELOG_MD="# Changelog — Panel Solaris\n\nQué cambió en cada versión de la app, en corto. Escrito **para el equipo**, no para el que la\nprograma: si algo no se nota usándola, no está aquí.\n\nEstás leyendo el de **esta** app: lo que cambió aquí. Lo que además cambió en la otra cara sale\nbajo «Las dos caras». Se abre desde el menú **⋮**, y la versión que llevas está en Ajustes (móvil)\no en el pie (escritorio).\n\n---\n\n## v0.2 — *en beta desde el 31/07/2026*\n\n**Dónde mirarla**: [`beta.html`](https://dvzquez-dev.github.io/solaris-panel/beta.html) ·\n[`beta-escritorio.html`](https://dvzquez-dev.github.io/solaris-panel/beta-escritorio.html).\n**Producción sigue en la v0.1** y no se toca hasta que Daniel lo valide.\n\n**Las dos caras**\n\n- Ya se puede sancionar por **incumplir un plazo**. El formulario ofrecía **tus** tareas en vez de\n  las de la persona sancionada, así que con el PD —que no tiene tareas— la lista salía vacía y la\n  sanción por plazo era imposible de poner **contra nadie**.\n- Los motivos de sanción llevan **su artículo real del RRI** (30b tarea importante o urgente, 30c\n  cualquier otra), en vez de una clave interna.\n- Las horas se escriben con los decimales que tienen: **0,25 h** ya no sale como «0,3 h».\n- El distintivo **«beta»** de la cabecera es ahora el **enlace de vuelta a producción**.\n- **El plan del cierre ya no se contradice a sí mismo.** Decía «todavía no se ha aplicado» y\n  «aplicarlo no se hace desde aquí» **siempre** —incluso con el cierre ya hecho y con el botón de\n  aplicar justo debajo—, mientras el bloque de al lado decía «aplicado». Ahora las dos partes\n  leen el mismo dato.\n\n**📱 Móvil**\n\n- Los expedientes dicen **«en revisión»**, no `revision`: fuera los estados internos del servidor.\n- **El «Desglose de puntos» ya enseña algo.** Cada subida o bajada, con su motivo, su artículo del\n  RRI y su fecha. Antes existía la pantalla y salía siempre vacía. *(Necesita el backend v53.)*\n- **Horas y puntos enseñan tus últimos 10 movimientos**: las horas **del mes** (se reinician con\n  el cierre, igual que el Panel de Rendimientos) y los puntos **de la temporada**. **No se borra\n  nada**: el registro completo se conserva, lo que cambia es cuánto se pinta — y la pantalla lo\n  dice.\n- **El desglose de tus horas cuelga de la propia cifra**, como desplegable opcional: ya no hay\n  que bajar al fondo de la pantalla para saber de qué se componen.\n- **«Ver el desglose completo de este mes»**: una ventana con **todas** tus contribuciones del\n  mes, sin recortar, empezando por la **compensación mensual que te toca por cargo** — esas horas\n  que se asignan solas y que antes no aparecían por ningún lado.\n\n- **Tus horas de compensación, y separadas en las dos que son.** La app las deducía de tu cargo\n  (Project Director 7 h · Coordinador 3,5 h · miembro 2 h), así que si te habían asignado horas\n  **por encima de eso** —por cubrir turnos de más, por ejemplo— no las veías por ningún lado: la\n  pantalla te enseñaba menos horas de las que tenías. Ahora aparecen las dos, cada una en su fila:\n  la **compensación por tu cargo**, que llega sola, y la **compensación extra**, que te asigna el\n  Project Director por trabajo de más y **solo cuenta ese mes**.\n  *(Necesita el backend v54; hasta entonces la pantalla avisa de que está usando la base.)*\n\n**⚙️ Backend v57**\n\n- **«Cerrar el mes» pasa a llamarse «calcular el cierre»**, que es lo que hace: fabrica la\n  propuesta, no cierra nada. El que cierra sigue siendo «aplicar el cierre». El nombre viejo hacía\n  creer que ya estaba hecho a quien mirara el registro.\n- **Org&Mark deja de convertirse en «Org y Mark»**, un nombre que no existe en ningún sitio y que\n  dejaba a esa persona con una unidad que nadie reconocía.\n- **La Unidad de Coordinación Técnica es la Unidad de Documentación Técnica**, su nombre de 26/27.\n- **Un reporte del buzón ya publicado o descartado no se puede reescribir.**\n\n**⚙️ Backend v56**\n\n- El **cierre mensual** ya se puede **aplicar** desde el panel, no solo calcular. Solo el Project\n  Director, y deja las fichas listas para que él las revise.\n\n**⚙️ Backend v55**\n\n- **Los avisos de turnos, reuniones y sanciones ya no se pueden desactivar.** Llevan plazo y\n  consecuencias: perdérselos no es una molestia, es una sanción. Documentos y horas los sigues\n  eligiendo tú.\n- El servidor entiende las **unidades nuevas** (Recovery, Documentación Técnica, Seguridad y\n  Verificación, Patrocinios y Relaciones Externas, Logística).\n\n**⚙️ Backend v54**\n\n- Tu campo **`Compensaciones`** de Notion llega a la app **en vivo**, con los extras que te hayan\n  asignado. Antes la app lo deducía de tu cargo y los extras no se veían.\n\n**⚙️ Backend v52**\n\n- `getTareas` admite `nombre`: devuelve las tareas de **a quien puedes sancionar**, con la misma\n  regla que la sanción.\n\n---\n\n## v0.1 — 28/07/2026 · backend v51\n\nEl **primer release numerado**. Recoge todo lo que producción no tenía desde las 07:37 de ese día.\n\n**Las dos caras**\n\n- **Buzón de bugs y mejoras**, cuatro buzones separados (bug/mejora × móvil/escritorio). Se reporta\n  desde el menú ⋮ y **la cara va dentro del identificador**, para que se sepa de qué se habla.\n- **Fotos en el reporte, con pintor encima**: adjuntas una imagen, se abre a pantalla completa y la\n  marcas —paleta, tres grosores, deshacer, zoom con dos dedos—; al enviar se fusionan las capas.\n- **Poner y decidir sanciones**, con su **modelo de autoridad**: cada uno solo alcanza a quien le\n  corresponde, y **lo comprueba el servidor**, no solo la pantalla.\n- **Un solo visor de documentos**, con pantalla completa. Antes había tres copias distintas.\n- El **fichaje reintenta** cuando el envío se pierde por el camino. Antes fallaba a la primera y\n  decía «respuesta no válida».\n\n**📱 Móvil**\n\n- **Notificaciones obligatorias**: sin activarlas la app no arranca, y el aviso va **antes** del\n  login. Con **preferencias por tipo** en Ajustes.\n- Vuelve la **comparativa de horas**: contra tu **mes anterior** y contra el **equipo**.\n- **Documentos** se ve por defecto; **Tareas** y **Documentos** se pueden ocultar desde Ajustes.\n- **Horas** reordenada: partes arriba, historial al fondo, plegado y solo del mes en curso.\n- La **cuota** pasa al menú ⋮.\n- Botón **«ver todos los turnos»**.\n- El móvil **deja de estirarse** en pantalla de ordenador.\n\n**⚙️ Backend v43 → v51**\n\n- Buzón: estados, anotaciones y capturas a Drive.\n- Preferencias de notificación, con el filtro **en el servidor**.\n- `getFichajesAbiertos` y `getDatos`.\n- `moverLimiteTarea`: mueve la fecha límite de una tarea **en Notion**.\n- La **autoridad de sanciones**, comprobada por persona.\n- **Último acceso** de cada persona, el dato que pide la regla semanal del RRI.\n- El **id de Notion** se lee bien aunque el título lleve guiones.\n\n---\n\n## Antes de los números — hasta el 28/07/2026, 07:37\n\nLo que había en producción **sin versión**: la app se publicaba directamente y el backend iba por su\ncuenta. No hay historial versión a versión porque no se numeraba; esto es el resumen de lo que ya\nfuncionaba cuando empezaron los números.\n\n**Las dos caras**\n\n- **Reuniones y disponibilidad** propias, en sustitución de Xoyondo y when2meet: convocar con tipos\n  gateados por cargo, pintar tu disponibilidad a dedo, **mapa de calor** agregado con la mejor\n  franja, y **slot + duración** en vez de franjas solapadas.\n- **Documentos**: revisar y aprobar expedientes con las cuatro decisiones reales, enrutado por\n  ámbito, bloqueo mutuo y desempate por rango.\n- **Turnos** leídos en vivo de Notion y **tareas** de los cuatro Kanban.\n- **Fichaje** y partes de horas.\n- **Refresco en vivo**: lo que miras se actualiza solo, sin borrarte lo que estés escribiendo.\n- La app **dice qué versión es** (`BUILD`), para no depurar dos builds distintos sin saberlo.\n\n**📱 Móvil**\n\n- Seis pestañas, medidor de conducta y **cascada** al ser elegible.\n- **Estado**, **Turnos**, **Tareas**, **Reuniones**, **Horas** y **Equipo**.\n\n---\n\n> **Cómo se actualiza este fichero**: al hacer un release se añade su bloque **en ese momento**, con\n> bullets cortos y separados por cara. Un changelog que se escribe «cuando haya tiempo» se escribe\n> de memoria, y de memoria se escribe mal. La lista de qué se toca al publicar está en\n> `ARRANQUE.md` §5.\n>\n> ⛔ **TODA versión nueva tiene su bloque aquí — beta y producción** (Daniel, 02/08/2026). Y no\n> depende de que nadie se acuerde: `flujos/publicar_web.py` **no deja salir un release** cuya\n> versión no aparezca en este fichero, y avisa en beta si la versión en vuelo no tiene bloque.\n>\n> ⛔ **La versión NO sube por iniciativa de un agente.** Se sube cuando el cambio es fuerte y lo\n> dice Daniel —o se le pide—. Entre subida y subida, **todo se acumula en el bloque de la versión\n> en vuelo**: la beta cambia de `BUILD` sin cambiar de `VERSION`, que es justo lo que hay que\n> poder distinguir al leer un reporte.\n";/*CHANGELOG_FIN*/
 /* ═══ EL CHANGELOG, DENTRO DE LA APP · GEMELA (movil/escritorio) ═══════════════════
    `CHANGELOG_MD` lo rellena `rutinas/sellar_changelog.py` desde `docs/changelog.md`, antes de
    publicar. **No se escribe a mano aqui**: la CSP obliga a que cada cara sea autocontenida, asi
@@ -2678,56 +2422,8 @@ async function _decidirSancM_(id, accion, b){
    `_mdHTML_` es un renderizador MINIMO: solo lo que el changelog usa (titulos, negrita, cursiva,
    codigo, vinetas, cita, regla y enlaces). No es un parser de markdown y no pretende serlo; si
    algun dia el changelog usa tablas, se añaden aqui y se dice. */
-function _mdHTML_(md){
-  function linea(s){
-    return esc(s)
-      .replace(/`([^`]+)`/g,'<code>$1</code>')
-      .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
-      .replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<i>$2</i>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
-  }
-  /* ⛔ SE JUNTA PRIMERO Y SE FORMATEA DESPUES. Al reves -formateando linea a linea- una
-     negrita que cruza dos lineas del markdown no se cierra nunca y sale `**` crudo en
-     pantalla. El changelog esta lleno de ellas, porque las lineas van a 100 columnas. */
-  var out=[], li=[], par=[], cita=[];
-  function cierraLi(){
-    if(!li.length) return;
-    out.push('<ul>'+li.map(function(t){ return '<li>'+linea(t)+'</li>'; }).join('')+'</ul>');
-    li=[];
-  }
-  /* Los parrafos se acumulan y se cierran de golpe: en el changelog una frase ocupa tres
-     lineas y pintarlas como tres parrafos parte el texto donde no toca. */
-  function cierraPar(){ if(par.length){ out.push('<p>'+linea(par.join(' '))+'</p>'); par=[]; } }
-  function cierraCita(){ if(cita.length){ out.push('<blockquote>'+linea(cita.join(' '))+'</blockquote>'); cita=[]; } }
-  function cierra(){ cierraLi(); cierraPar(); cierraCita(); }
-  String(md||'').split(/\r?\n/).forEach(function(l){
-    var t=l.replace(/\s+$/,''), m;
-    if(/^---+$/.test(t)){ cierra(); out.push('<hr>'); return; }
-    if((m=t.match(/^(#{1,4})\s+(.*)$/))){ cierra(); var n=m[1].length;
-      out.push('<h'+n+'>'+linea(m[2])+'</h'+n+'>'); return; }
-    if((m=t.match(/^>\s?(.*)$/))){ cierraLi(); cierraPar(); cita.push(m[1]); return; }
-    if((m=t.match(/^[-*]\s+(.*)$/))){ cierraPar(); cierraCita(); li.push(m[1]); return; }
-    if(!t){ cierra(); return; }
-    /* Linea sangrada dentro de una vineta: es continuacion suya, no un parrafo nuevo. */
-    if(li.length && /^\s+/.test(l)){ li[li.length-1]+=' '+t.replace(/^\s+/,''); return; }
-    cierraLi(); cierraCita(); par.push(t);
-  });
-  cierra();
-  return out.join('');
-}
-/* La pantalla de novedades. Si el sellado no se hizo, se DICE en vez de enseñar un hueco:
-   un changelog vacio parece que no ha cambiado nada, que es lo contrario de la verdad. */
-function _novedadesHTML_(){
-  var cuerpo = String(CHANGELOG_MD||'').trim()
-    ? '<div class="mdoc">'+_mdHTML_(CHANGELOG_MD)+'</div>'
-    : '<p class="rnota">El changelog no se selló en esta build. Está en '+
-      '<span class="mono">docs/changelog.md</span> del repositorio.</p>';
-  return '<div class="mtit">Novedades</div>'+
-    '<div class="msub">Qué ha cambiado en cada versión. Estás en '+
-      esc(VERSION?('v'+VERSION):(CANAL==='beta'?'la beta':'una build sin publicar'))+
-      ' · <span class="mono">'+esc(BUILD)+'</span></div>'+
-    cuerpo;
-}
+
+
 function abrirModal(html){
   $('#modal-body').innerHTML=html;
   $('#modal').classList.add('on');
@@ -3289,14 +2985,7 @@ function durForm(){
   if(d<0) d+=1440;
   return Math.round(d/15)/4;
 }
-function optHoras(sel){
-  var s='';
-  for(var m=0;m<24*60;m+=15){
-    var v=pad(Math.floor(m/60))+':'+pad(m%60);
-    s+='<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>';
-  }
-  return s;
-}
+
 function vFichar(){
   var s=ST.ses, min=minSes(), largo=min>=600, corre=s.estado==='corriendo';
   var nube=(typeof backendOK!=='undefined' && backendOK && SESION);   // sesión respaldada por la nube
@@ -3501,7 +3190,7 @@ function medirAristas(){
   });
   if(faltan) requestAnimationFrame(medirAristas);
 }
-function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?(m[3]+'-'+m[2]+'-'+m[1]):f; }
+
 /* Envío del fichaje. Con cuenta real y sesión EN VIVO → api.ficharSalida: la NUBE cierra
    la sesión abierta y calcula las horas (de la entrada al momento del envío). Un BLOQUE
    declarado a mano → api.pushParte (sin fichaje). Sin backend: memoria (semilla). */
@@ -3583,42 +3272,13 @@ function desgloseCat(ps){
    la unidad en la que se reinician los puntos (RRI Art. 29) y en la que se miden las horas. */
 var MOVS_N=5;                              /* cuantos se pintan. Daniel dudo entre 5 y 10: es
                                                este numero y nada mas, cambiarlo no toca nada. */
-/* La temporada va de septiembre a agosto · GEMELA de `reglas/disciplina.py:temporada_de`.
-   Si esto y el Python discrepan, el que manda es el Python: ahi se calculan los puntos. */
-function _temporadaDe_(d){
-  var ini = (d.getMonth()+1) >= 9 ? d.getFullYear() : d.getFullYear()-1;
-  return String(ini).slice(2)+'/'+String(ini+1).slice(2);
-}
-/* `DD/MM/AAAA` -> `Date`. Pasa por `_dmyAISO_`, que YA EXISTE y es GEMELA en las dos caras
-   (mapa funcional §4.2). La primera version de esto traia su propio `match` de la fecha: un
-   TERCER parser de la misma familia, que es justo lo que el mapa prohibe en su punto 2. */
-function _fechaDMY_(s){
-  var iso=_dmyAISO_(s);
-  /* `_dmyAISO_` CONVIERTE, no valida: lo que no reconoce lo devuelve tal cual (probado:
-     'no' sale 'no'). Reutilizar la puerta buena no exime de comprobar lo que sale, o la
-     basura entra como `Invalid Date` y se cuela en los filtros. */
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(iso||''))) return null;
-  var p=iso.split('-'), d=new Date(+p[0], (+p[1])-1, +p[2]);
-  /* Y `new Date(2026,12,32)` NO falla: rueda al mes siguiente. Se contrasta que lo que sale
-     es lo que entro, o una fecha imposible pasaria por buena. */
-  return (d.getFullYear()===+p[0] && d.getMonth()===(+p[1])-1 && d.getDate()===+p[2]) ? d : null;
-}
-function _deEstaTemporada_(d){ return !!d && _temporadaDe_(d)===_temporadaDe_(_hoyDateM_()); }
-/* ⛔ CADA MAGNITUD SE REINICIA CON LO SUYO, y confundirlo hace que la app diga otra cosa que el
-   Panel de Rendimientos (Daniel, 30/07):
-     · PUNTOS -> por TEMPORADA (RRI Art. 29).
-     · HORAS  -> por MES. El cierre mensual pone a cero Carga tareas, Reuniones, Cursos y
-       Turnos (`flujos/cierre.py`), asi que enseñar la temporada en Horas seria enseñar horas
-       que el panel ya no cuenta. */
-function _deEsteMes_(d){
-  var h=_hoyDateM_();
-  return !!d && d.getMonth()===h.getMonth() && d.getFullYear()===h.getFullYear();
-}
+
+
 /* Los nombres de mes. El escritorio lleva la misma lista suelta dentro de su formateador de
    fechas; candidata a unificar si algun dia se tocan las dos. */
 var MESES_L=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
              'septiembre','octubre','noviembre','diciembre'];
-function _mesLargo_(d){ return MESES_L[d.getMonth()]+' '+d.getFullYear(); }
+
 /* LA COMPENSACION MENSUAL · GEMELA de `flujos/cierre.py:COMPENSACION`.
    Son horas que se reciben TODOS los meses sin fichar nada, y el cierre las restaura al defecto
    del cargo. Sin ellas el desglose no cuadra con el panel y parece que faltan horas.
@@ -3634,46 +3294,8 @@ function _mesLargo_(d){ return MESES_L[d.getMonth()]+' '+d.getFullYear(); }
    siempre: la cara puede publicarse antes que el backend sin romper nada. Pero entonces
    **no se rotula como si fuera tuyo**, porque no se sabe: eso lo decide `_compEsReal_`. */
 var COMP_CARGO={'Project Director':7.0,'Coordinador':3.5};
-function _compBase_(m){ var c=(m&&m.cargo)||null; return COMP_CARGO[c]!=null?COMP_CARGO[c]:2.0; }
-function _compEsReal_(m){ var v=m&&m.compensaciones; return typeof v==='number' && isFinite(v); }
-function _compMensual_(m){ return _compEsReal_(m) ? m.compensaciones : _compBase_(m); }
-/* LO QUE HAY POR ENCIMA DE LA BASE, que es una cosa DISTINTA y se ensena aparte.
-   Daniel (02/08): «cuando se esta extra en turnos etc yo asigno horas de compensacion... no es
-   parte de la compensacion base, es una compensacion extra». La base llega sola por el puesto;
-   el extra se lo ha ganado alguien y se lo asigna el a mano, asi que meterlos en la misma cifra
-   esconde lo unico de los dos que reconoce algo que esa persona hizo.
-   Notion guarda UN solo numero (base + extras), asi que esto se deriva — misma cuenta que
-   `flujos/cierre.py:compensacion_perdida`. Se redondea al centimo porque la resta en coma
-   flotante saca cosas como 2.0999999999999996 y eso no se le ensena a nadie. */
-function _compExtra_(m){
-  if(!_compEsReal_(m)) return 0;                 // sin el dato de Notion no se puede saber
-  return Math.round((m.compensaciones-_compBase_(m))*100)/100;
-}
-/* Devuelve `{total, ultimos, suma}` de ESTA temporada. `fecha` saca el `DD/MM/AAAA` de cada
-   elemento, que es como los escribe el resto de la app.
-   ⚠️ Lo que NO tiene fecha legible **no se esconde**: se ve y se nota. Esconder un apunte roto
-   es la forma mas rapida de que nadie se entere de que esta roto. */
-function _ultimosMov_(lista, fecha, cuanto, ambito){
-  var dentro = (ambito==='mes') ? _deEsteMes_ : _deEstaTemporada_;
-  var conD=[], sinD=[], suma=0;
-  (lista||[]).forEach(function(x){
-    var d=_fechaDMY_(fecha(x));
-    if(!d){ sinD.push(x); suma+=(cuanto?(+cuanto(x)||0):0); return; }
-    if(!dentro(d)) return;
-    conD.push({x:x,d:d}); suma+=(cuanto?(+cuanto(x)||0):0);
-  });
-  conD.sort(function(a,b){ return b.d-a.d; });
-  var todos=sinD.concat(conD.map(function(o){ return o.x; }));
-  return { total: todos.length, ultimos: todos.slice(0,MOVS_N), todos: todos, suma: suma };
-}
-/* La coletilla que aparece en los dos libros. Una sola frase, en un sitio. */
-function _notaRegistro_(total, ambito){
-  var d = (ambito==='mes') ? 'de este mes' : 'de la temporada';
-  return total>MOVS_N
-    ? 'Se enseñan los <b>'+MOVS_N+'</b> más recientes '+d+', de '+total+'. '+
-      'El registro completo <b>se conserva</b>: aquí solo se pinta menos.'
-    : 'Todo lo '+d+'. El registro completo <b>se conserva</b>.';
-}
+
+
 function filaParte(p){
   var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='rech'||p.e==='cad')?'borde-no':'borde-pe';
   var pil = p.e==='conf'?'<span class="pil conf">aprobada</span>'
@@ -3795,26 +3417,6 @@ function _desgloseMesHTML_(confs){
 /* ═══ GEMELAS con el escritorio (copiadas byte a byte) ═══════════════════════════════════
    La CSP impide compartir codigo entre las dos caras, asi que lo unico honesto es que la copia
    sea identica y se llame igual. Si tocas una, toca la otra. */
-function _puedeImpersonar_(){ return !!(SESION && SESION.email===ADMIN_EMAIL); }
-function _puedeCerrarMes_(){
-  try{ return !!(_puedeImpersonar_() || rangoNom(_actorSanc_())>=3); }catch(_){ return false; }
-}
-/* «2026-07» es un identificador, no algo que se le lea a nadie. Daniel, viendo el boton:
-   «pone cierre 2026-07, que dices, sera cierre de julio». Se saca del PROPIO periodo del plan y
-   no de `_mesACerrar_()`: si algun dia se revisa un cierre viejo, tiene que decir SU mes, no el
-   que tocaria hoy. GEMELA en las dos caras. */
-function _nomPeriodo_(p){
-  var m=/^(\d{4})-(\d{2})$/.exec(String(p||''));
-  if(!m) return String(p||'');
-  var i=parseInt(m[2],10)-1;
-  return (MESES_L[i]||m[2])+' de '+m[1];
-}
-function _mesACerrar_(){
-  var h=new Date(), a=h.getFullYear(), m=h.getMonth();       /* getMonth() es 0-11 */
-  if(m===0){ a-=1; m=11; } else { m-=1; }
-  var mm=m+1;
-  return { p:a+'-'+(mm<10?'0':'')+mm, mes:MESES_L[m] };
-}
 
 
 /* La PANTALLA no es gemela y no debe serlo: el escritorio tiene `pan`/`tabla` y no tiene modal;
@@ -3828,12 +3430,7 @@ function _mesACerrar_(){
    ⚠️ Los campos se pintan con su NOMBRE REAL de Notion, aunque sean largos y ocupen dos lineas
    en un telefono: lo que se lee aqui tiene que ser lo mismo que hay en la ficha. Abreviarlos
    ahorraria pixeles y quitaria la unica forma de contrastar. */
-function _numPlan_(v){
-  if(v===true) return 'sí';
-  if(v===false) return 'no';
-  if(v===null||v===undefined||v==='') return '—';
-  return (typeof v==='number') ? nf(v,(v%1?2:0)) : String(v);
-}
+
 function _fichaPlanHTML_(f){
   var filas=(f.c||[]).map(function(c){
     return '<div class="rl"><span>'+esc(c[0])+'</span>'+
@@ -4114,8 +3711,7 @@ function vTareas(){
    queda para mas adelante.) Y el corte no es futuro/pasado sino REALIZADO o no:
    lo que sigue vivo va suelto y visible; lo cerrado, al cajon. */
 function _mioTurno_(t){ return !!(t.mio || (t.roles||[]).some(function(r){ return r[2]; })); }
-/* De una URL de Drive saca el id del fichero, para poder pedir su visor incrustable. */
-function _idDrive_(u){ var m=String(u||'').match(/\/d\/([A-Za-z0-9_-]{20,})/); return m?m[1]:null; }
+
 
 /* ═══ EL VISOR DE DOCUMENTOS · GEMELA (movil/escritorio) ═══════════════════════
    Habia TRES copias de esto -la memoria de un turno, la revision documental del movil y la
@@ -4131,79 +3727,7 @@ function _idDrive_(u){ var m=String(u||'').match(/\/d\/([A-Za-z0-9_-]{20,})/); r
 
    El iframe se crea **al desplegar**, nunca antes: tres visores de Drive cargando a la vez en
    una ficha es medio megabyte que casi nadie va a mirar. */
-function _visorHTML_(o){
-  var abierto = !o.plegado;
-  return '<div class="doc" data-visor>'+
-    '<div class="dh" data-vabrir="'+esc(o.id||'')+'" data-p style="cursor:pointer">'+
-      '<b>'+esc(o.titulo)+'</b><small>'+esc(o.sub||'')+(o.plegado?' · pulsa para leerlo':'')+'</small>'+
-      /* La pantalla completa va en la cabecera y NO despliega: `stopPropagation` en su
-         manejador. Sin eso, pulsarla plegaba el visor a la vez que lo maximizaba. */
-      '<button class="vfull" data-vfull data-p title="Pantalla completa" aria-label="Pantalla completa">'+
-        '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>'+
-      '<svg class="vchev" viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;'+
-        'stroke:currentColor;stroke-width:2.4;transition:transform .3s'+(abierto?';transform:rotate(180deg)':'')+'">'+
-        '<path d="M6 9l6 6 6-6"/></svg></div>'+
-    '<div class="vcuerpo"'+(abierto?'':' hidden')+' data-quees="'+esc(o.queEs||'el documento')+'">'+
-      (abierto?'<div class="dcar">Cargando '+esc(o.queEs||'el documento')+'…</div>':'')+'</div>'+
-    (o.url?'<a class="da" href="'+esc(o.url)+'" target="_blank" rel="noopener">abrir en Drive</a>':'')+
-  '</div>';
-}
-/* Mete el iframe de Drive en un cuerpo ya visible. Si no carga -permisos, CSP del hosting- se
-   DICE y se ofrece el enlace: un hueco blanco eterno es peor, porque quien revisa no sabe si
-   esperar o si esta roto. */
-function _cargarVisor_(cuerpo, id){
-  if(cuerpo.dataset.cargado) return; cuerpo.dataset.cargado='1';
-  var que=cuerpo.dataset.quees||'el documento';
-  if(!id){ cuerpo.innerHTML='<div class="dcar">El enlace no es un archivo de Drive reconocible.<br>'+
-    'Ábrelo con el enlace de abajo.</div>'; return; }
-  cuerpo.innerHTML='<div class="dcar">Cargando '+que+'…</div>';
-  var f=document.createElement('iframe');
-  f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
-  f.src='https://drive.google.com/file/d/'+id+'/preview';
-  var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
-    cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
-  f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
-  cuerpo.innerHTML=''; cuerpo.appendChild(f);
-}
-function _cablearVisor_(raiz){
-  var R=raiz||document;
-  $$('[data-visor] .vcuerpo',R).forEach(function(c){          // los que nacen abiertos
-    if(!c.hasAttribute('hidden')){
-      var h=c.parentNode.querySelector('[data-vabrir]');
-      _cargarVisor_(c, h && h.dataset.vabrir);
-    }
-  });
-  $$('[data-vabrir]',R).forEach(function(h){
-    h.onclick=function(){
-      var caja=h.parentNode, cuerpo=caja.querySelector('.vcuerpo'), sv=caja.querySelector('.vchev');
-      if(!cuerpo.hasAttribute('hidden')){ cuerpo.setAttribute('hidden',''); if(sv) sv.style.transform=''; return; }
-      cuerpo.removeAttribute('hidden'); if(sv) sv.style.transform='rotate(180deg)';
-      _cargarVisor_(cuerpo, h.dataset.vabrir);
-    };
-  });
-  $$('[data-vfull]',R).forEach(function(b){
-    b.onclick=function(ev){
-      ev.stopPropagation();                                    // no despliega: solo maximiza
-      var caja=b.closest('.doc'), cuerpo=caja.querySelector('.vcuerpo');
-      var yaEsta=caja.classList.toggle('full');
-      document.body.style.overflow = yaEsta ? 'hidden' : '';
-      /* Maximizar con el visor plegado no enseñaria nada: se abre y se carga. */
-      if(yaEsta && cuerpo.hasAttribute('hidden')){
-        cuerpo.removeAttribute('hidden');
-        var sv=caja.querySelector('.vchev'); if(sv) sv.style.transform='rotate(180deg)';
-        _cargarVisor_(cuerpo, (caja.querySelector('[data-vabrir]')||{dataset:{}}).dataset.vabrir);
-      }
-    };
-  });
-  if(!_cablearVisor_._esc){
-    _cablearVisor_._esc=true;
-    document.addEventListener('keydown', function(e){
-      if(e.key!=='Escape') return;
-      var f=document.querySelector('.doc.full');
-      if(f){ f.classList.remove('full'); document.body.style.overflow=''; }
-    });
-  }
-}
+
 
 /* La memoria va PLEGADA: la mayoria de las veces se abre la ficha para ver quien va y a
    que hora, no para leer el informe. */
@@ -4219,38 +3743,17 @@ function _cablearMemoria_(){ _cablearVisor_(); }
    tenia un boton apagado. Clave VAPID publica (no es un secreto: va en el cliente).
    iOS: las push SOLO llegan si la app esta anadida a la pantalla de inicio. */
 var VAPID_PUBLIC='BOcYdKPWxq5NAKS6AbZIW9UV7MOb7gmy1nP_KhdxZpvPa3O5jsZ-_jravOhHivQqQuJoJvLTcrc2xvZESc2g0Ag';
-function _urlB64_(b64){
-  var pad='='.repeat((4-b64.length%4)%4);
-  var t=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');
-  var raw=atob(t), arr=new Uint8Array(raw.length);
-  for(var i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
-  return arr;
-}
-function _pushSoportado_(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+
+
 function _esIOS_(){ return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
 function _esStandalone_(){ return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone===true; }
 var _swReg=null;
-async function _registrarSW_(){
-  if(!('serviceWorker' in navigator)) return null;
-  try{ _swReg=await navigator.serviceWorker.register('sw.js'); return _swReg; }catch(e){ return null; }
-}
+
 function _notisMsg(t){ var b=$('#notisMsg'); if(b) b.textContent=t; }
 /* `activarNotis` se retiro el 28/07: con las notificaciones obligatorias, el permiso se
    pide UNA vez y en el gate del arranque (`_gateNotis_`). Tener las dos era la misma
    funcion escrita dos veces, que es como empiezan las divergencias. */
-/* Al abrir: registra el SW y, si ya habia permiso y sesion, re-guarda la suscripcion por si
-   el navegador la roto (pasa, y si no se re-guarda dejan de llegar avisos en silencio). */
-async function _pushInit_(){
-  if(!_pushSoportado_()) return;
-  var reg=await _registrarSW_();
-  try{
-    if(reg && Notification.permission==='granted'){
-      await navigator.serviceWorker.ready;
-      var sub=await reg.pushManager.getSubscription();
-      if(sub && typeof SESION!=='undefined' && SESION) api.guardarPush(sub.toJSON());
-    }
-  }catch(_){}
-}
+
 /* ¿PUEDE ESTA APP FUNCIONAR SIN NOTIFICACIONES? No (Daniel, 28/07): «las notificaciones han
    de ser obligatorias de tener activadas, es decir, que si no estan activadas directamente que
    no te permita usar la aplicacion».
@@ -4428,33 +3931,6 @@ var PINT_MAX=1600;                // lado mayor. Una captura de iPhone son 1179x
 var PINT_COLORES=['#E41E25','#F2C94C','#3EB489','#3f9ed6','#FFFFFF','#111111'];
 var PINT_GROSORES=[0.004,0.008,0.016];   // fracción del lado mayor: el trazo escala con la foto
 
-/* Reduce ANTES de nada. No es solo por el peso del envío: pintar sobre un lienzo de 12 Mpx
-   en un móvil va a tirones, y la captura se sigue leyendo a 1600. */
-function _leerImagen_(file){
-  return new Promise(function(ok,mal){
-    if(!file){ mal(new Error('sin fichero')); return; }
-    if(!/^image\//.test(file.type||'')){ mal(new Error('eso no es una imagen')); return; }
-    var fr=new FileReader();
-    fr.onerror=function(){ mal(new Error('no se pudo leer el fichero')); };
-    fr.onload=function(){
-      var im=new Image();
-      im.onerror=function(){ mal(new Error('no se pudo abrir la imagen')); };
-      im.onload=function(){
-        var k=Math.min(1, PINT_MAX/Math.max(im.naturalWidth, im.naturalHeight));
-        var w=Math.max(1,Math.round(im.naturalWidth*k)), h=Math.max(1,Math.round(im.naturalHeight*k));
-        var c=document.createElement('canvas'); c.width=w; c.height=h;
-        c.getContext('2d').drawImage(im,0,0,w,h);
-        ok({ url:c.toDataURL('image/jpeg',0.85), w:w, h:h });
-      };
-      im.src=fr.result;
-    };
-    fr.readAsDataURL(file);
-  });
-}
-function _pesoKB_(dataUrl){
-  var i=(dataUrl||'').indexOf(',');
-  return i<0 ? 0 : Math.round((dataUrl.length-i-1)*0.75/1024);   // base64 → bytes
-}
 
 /* EL PINTOR. `alTerminar(dataUrl)` recibe las dos capas YA fusionadas, o no se llama si
    se cancela. Todo el estado vive aquí dentro: al cerrarse no queda nada. */
@@ -4791,7 +4267,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='3da2a6e';
+var BUILD='7975d5a';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -4880,7 +4356,7 @@ var EST_DOC={recibido:['recibido',''],analizado:['analizado',''],revision:['en r
   aprobado:['aprobado','ok'],anot:['aprobado con anotaciones','ok'],publicado:['publicado','ok'],
   cambios:['cambios pedidos','no'],rechazado:['rechazado','no'],publicando:['publicando','']};
 var AMB_DOC={archivo:'archivo de miembro',subsistema:'informe de subsistema',general:'informe general'};
-function estDoc(e){ return EST_DOC[e]||[String(e||'—'),'']; }
+
 
 function revisoresDe(e){
   var r = e.ambito==='general' ? [PD_NOM]
@@ -5460,13 +4936,10 @@ function _coordinacionHTML_(){
    autocompletado, fechas desde/hasta o desde+nº días, horario distinto por día (con
    activar/desactivar), cadencia, límite, orden del día, visión y vista previa. Al crear
    PERSISTE en el backend (api.crearReunion); sin backend queda en memoria. ────────── */
-function _sinTildes_(t){ return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+
 /* `_dmyM_` se borro: era byte a byte `_isoADMY_` y ademas no la llamaba nadie. */
-/* Las etiquetas de dia van en DD/MM, igual que la Reunion General: 'V 24' se lee
-   peor y ademas pierde el mes, que importa cuando el rango cruza de mes. */
-function _ddmm_(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1); }
-function _diasDesde_(iso,n){ var out=[],b=new Date(iso+'T00:00:00');
-  for(var i=0;i<n;i++){ var d=new Date(b); d.setDate(b.getDate()+i); out.push(_ddmm_(d)); } return out; }
+
+
 var _DL_=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 /* nombres largos para la vista de 'horario distinto por día' (ahí caben y se leen mejor) */
 function _diasLargos_(modo,d0,d1,fecha,nd){
@@ -5476,9 +4949,7 @@ function _diasLargos_(modo,d0,d1,fecha,nd){
   else { a=new Date((fecha||'')+'T00:00:00'); for(i=0;i<nd;i++){ var d=new Date(a); d.setDate(a.getDate()+i); out.push(_DL_[d.getDay()]+' '+d.getDate()); } }
   return out;
 }
-function _diasEntre_(a0,a1){ var out=[]; if(!a0||!a1) return out;
-  var a=new Date(a0+'T00:00:00'), b=new Date(a1+'T00:00:00'); if(b<a) return out;
-  for(var i=0;i<62&&a<=b;i++){ out.push(_ddmm_(a)); a.setDate(a.getDate()+1); } return out; }
+
 /* UNA SOLA REJILLA para todos los dias, contigua y anclada al tamano de slot.
    Antes cada dia generaba SUS franjas desde SU hora de inicio y con una «cadencia» que
    podia solaparlas: un dia a las 17:00 y otro a las 17:30 daban franjas alternas, y con
@@ -5508,19 +4979,8 @@ function _genUnion_(rangos, slot){
 function _hFranja_(R,fi){ var f=(R.franjas||[])[fi]; return f ? _hmMin_(_minHM_(f)) : '—'; }
 function _hFinFranja_(R,fi){ var f=(R.franjas||[])[fi];
   return f ? _hmMin_(_minHM_(f) + (+f.dur>0 ? +f.dur : 60)) : '—'; }
-/* Cuantas casillas seguidas hacen falta para cubrir la reunión. Se redondea HACIA ARRIBA:
-   media casilla no existe, y quedarse corto es no poder ir. Sin `duracion` (reuniones de
-   antes de este modelo) da 1, que es como se comportaba la app hasta ahora. */
-function _slotsMin_(duracion, slot){
-  var d=+duracion||0, s=Math.max(5, +slot||60);
-  return Math.max(1, Math.ceil(d/s) || 1);
-}
-function _durTxt_(min){
-  min=Math.max(0, Math.round(+min||0));
-  var h=Math.floor(min/60), m=min%60;
-  if(!h) return m+' min';
-  return h+' h'+(m?' '+m+' min':'');
-}
+
+
 /* convocados por defecto según el tipo (como app.html): general=todo el equipo, subsistema=tu unidad,
    junta=coordinadores+PD, consejo=por configurar, mixta/trabajo=a mano. */
 function _presetInvitados_(tipo){
