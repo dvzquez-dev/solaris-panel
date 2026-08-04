@@ -1305,7 +1305,7 @@ var api={
      suscripcion revocada (`userVisibleOnly` obliga a mostrar algo por cada push). */
   getCierre:        function(){ return api._post({action:"getCierre"}); },
   aplicarCierre:    function(p){ return api._post({action:"aplicarCierre",periodo:p||null}); },
-  cerrarMes:        function(f,p){ return api._post({action:"cerrarMes",forzar:!!f,periodo:p||null}); },
+  calcularCierre:        function(f,p){ return api._post({action:"calcularCierre",forzar:!!f,periodo:p||null}); },
   getNotis:         function(){ return api._post({action:"getNotis"}); },
   guardarNotis:     function(t){ return api._post({action:"guardarNotis",tipos:t}); },
   ficharSalida:     function(tarea,just,cat){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat}); },
@@ -3823,7 +3823,7 @@ function _mesACerrar_(){
 
 /* ── EL PLAN, LEGIBLE ────────────────────────────────────────────────────────────────────
    Antes esta pantalla decia «ya hay plan calculado» y punto. Un cierre que hay que aprobar a
-   ciegas -o abriendo un JSON de 48 KB- no se revisa: se acepta. Lo que sube `cerrar_mes.py` es
+   ciegas -o abriendo un JSON de 48 KB- no se revisa: se acepta. Lo que sube `calcular_cierre.py` es
    un DERIVADO (por persona, solo los campos que CAMBIAN), no el plan entero.
    ⚠️ Los campos se pintan con su NOMBRE REAL de Notion, aunque sean largos y ocupen dos lineas
    en un telefono: lo que se lee aqui tiene que ser lo mismo que hay en la ficha. Abreviarlos
@@ -3955,7 +3955,7 @@ function _abrirCierre_(){
       if(!confirm('Calcular el cierre de '+_mesACerrar_().mes+'.\n\nNO se aplica nada: la '+
                   'rutina saca el plan y lo deja para revisarlo.\n\n¿Sigo?')) return;
       b.disabled=true; b.textContent='Encolando…';
-      try{ await api.cerrarMes(false, _mesACerrar_().p);
+      try{ await api.calcularCierre(false, _mesACerrar_().p);
            tost('Cierre encolado. La rutina lo recoge en la siguiente pasada.');
            pinta(await api.getCierre(), null); }
       catch(e){ b.disabled=false; tost('No se pudo encolar: '+((e&&e.message)||e)); }
@@ -4791,7 +4791,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='0b14fe6';
+var BUILD='3da2a6e';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -6368,7 +6368,7 @@ function enganchar(){
   if(_ms) _ms.style.display = (rangoSanc(_actorSanc_())>=1) ? '' : 'none';
   /* El cierre toca la ficha de 32 personas y de ahi salen la cuota y la renovacion: la
      entrada NO existe para nadie mas. Es cortesia, no seguridad -la frontera de verdad es
-     `_cerrarMes_` en el backend, que comprueba el rango-, pero un boton que no esta no se
+     `_calcularCierre_` en el backend, que comprueba el rango-, pero un boton que no esta no se
      pulsa sin querer. */
   var _mc=$('#menu [data-mnu="cierre"]');
   if(_mc) _mc.style.display = _puedeCerrarMes_() ? '' : 'none';

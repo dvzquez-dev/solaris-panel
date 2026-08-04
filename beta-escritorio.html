@@ -800,9 +800,10 @@ var api={
   crear:       function(r){ return api._post({action:"crearReunion",reunion:r}); },
   /* Buzones. `quien` lo pone el servidor desde el token: si lo mandara el cliente,
      cualquiera podria firmar un reporte como cualquier otro. */
-  /* El cierre ENCOLA el calculo; no aplica nada. Ver `_cerrarMes_` en el backend. */
+  /* ENCOLA el CALCULO del cierre; no aplica nada -eso es `aplicarCierre`. Se
+     llamaba `cerrarMes` y hacia creer lo contrario. */
   getCierre:      function(){ return api._post({action:"getCierre"}); },
-  cerrarMes:      function(f,p){ return api._post({action:"cerrarMes",forzar:!!f,periodo:p||null}); },
+  calcularCierre:      function(f,p){ return api._post({action:"calcularCierre",forzar:!!f,periodo:p||null}); },
   aplicarCierre:  function(p){ return api._post({action:"aplicarCierre",periodo:p||null}); },
   reportarBug:    function(d){ return api._post({action:"reportarBug",datos:d}); },
   reportarMejora: function(d){ return api._post({action:"reportarMejora",datos:d}); },
@@ -2757,7 +2758,7 @@ function _pilaDeM_(n){ var m=_m(n); return (m&&m.pila)||''; }
    pantalla: si cada uno lo dedujera por su cuenta, un día uno diría que sí y otro que no.
    El rango sale de `_actorSanc_()` —la SESIÓN— y no de `ACTOR`, que lo reescribe «ver como»:
    el admin mirando la ficha de otro no puede heredar su permiso, ni perder el suyo.
-   ⚠️ Esto es CORTESÍA, no seguridad: la frontera real es `_cerrarMes_` en el backend, que
+   ⚠️ Esto es CORTESÍA, no seguridad: la frontera real es `_calcularCierre_` en el backend, que
    exige rango >= 3. Aquí solo se evita ofrecer un botón que al pulsarlo dice que no. */
 function _puedeCerrarMes_(){
   try{ return !!(_puedeImpersonar_() || rangoNom(_actorSanc_())>=3); }catch(_){ return false; }
@@ -4649,7 +4650,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='4458dc0';
+var BUILD='176b7c5';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4823,7 +4824,7 @@ function pintar(){
       String.fromCharCode(10,10)+'¿Sigo?')) return;
     _cm.disabled=true; var prev=_cm.textContent; _cm.textContent='Encolando…';
     try{
-      await api.cerrarMes(false, _mesACerrar_().p);
+      await api.calcularCierre(false, _mesACerrar_().p);
       tost('Cierre encolado. La rutina lo recoge en la siguiente pasada.');
       await _cargarCierre_();
     }catch(e){ _cm.disabled=false; _cm.textContent=prev;
@@ -5253,7 +5254,7 @@ function enganchar(){
     };
   });
   /* 🔴 AQUI HABIA UN BOTON QUE MENTIA. `$$('[data-cerrarmes]')` pisaba el manejador de
-     verdad que `pintar()` acababa de poner —confirmar, `api.cerrarMes`, recargar el
+     verdad que `pintar()` acababa de poner —confirmar, `api.calcularCierre`, recargar el
      plan— con un `tost('Mes cerrado y comunicado enviado.')`. El ultimo que escribe gana,
      y ganaba el falso: pulsar «Calcular el cierre» no encolaba nada y contestaba que el
      mes estaba cerrado y el comunicado enviado. Resto de cuando la pantalla era maqueta.
