@@ -886,6 +886,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
     <div class="menu" id="menu" aria-hidden="true">
       <div class="caja">
         <button data-mnu="sanciones" data-p>Sanciones<small>Ponerlas y decidir las pendientes</small></button>
+        <button data-mnu="cierre" style="display:none">Cierre mensual<small>Encolar el calculo del corte</small></button>
         <button data-mnu="cuota" data-p>Tu cuota<small>Lo que te toca pagar esta temporada</small></button>
         <button data-mnu="equipo" data-p>El equipo<small>Quién coordina cada unidad</small></button>
         <button data-mnu="novedades" data-p>Novedades<small>Qué ha cambiado en cada versión</small></button>
@@ -1302,6 +1303,8 @@ var api={
   /* Preferencias de aviso (backend v45). Viven en el SERVIDOR y no en el movil porque el
      filtro se aplica antes de enviar el push: callar en el navegador acaba con la
      suscripcion revocada (`userVisibleOnly` obliga a mostrar algo por cada push). */
+  getCierre:        function(){ return api._post({action:"getCierre"}); },
+  cerrarMes:        function(f,p){ return api._post({action:"cerrarMes",forzar:!!f,periodo:p||null}); },
   getNotis:         function(){ return api._post({action:"getNotis"}); },
   guardarNotis:     function(t){ return api._post({action:"guardarNotis",tipos:t}); },
   ficharSalida:     function(tarea,just,cat){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat}); },
@@ -3787,6 +3790,71 @@ function _desgloseMesHTML_(confs){
 }
 /* LA CUOTA, en el menu ⋮ (Daniel, 28/07: «moveria la parte entera de cuota al menu de los 3
    puntos»). Es una cifra que se consulta dos veces al año: en Horas solo alargaba la pantalla. */
+
+/* ═══ GEMELAS con el escritorio (copiadas byte a byte) ═══════════════════════════════════
+   La CSP impide compartir codigo entre las dos caras, asi que lo unico honesto es que la copia
+   sea identica y se llame igual. Si tocas una, toca la otra. */
+function _puedeImpersonar_(){ return !!(SESION && SESION.email===ADMIN_EMAIL); }
+function _puedeCerrarMes_(){
+  try{ return !!(_puedeImpersonar_() || rangoNom(_actorSanc_())>=3); }catch(_){ return false; }
+}
+function _mesACerrar_(){
+  var h=new Date(), a=h.getFullYear(), m=h.getMonth();       /* getMonth() es 0-11 */
+  if(m===0){ a-=1; m=11; } else { m-=1; }
+  var mm=m+1;
+  return { p:a+'-'+(mm<10?'0':'')+mm, mes:MESES_L[m] };
+}
+
+
+/* La PANTALLA no es gemela y no debe serlo: el escritorio tiene `pan`/`tabla` y no tiene modal;
+   aqui va en ventana porque en un telefono no cabe de otra forma. Lo que si es gemelo es de
+   donde sale la decision (`_puedeCerrarMes_`) y que mes se cierra (`_mesACerrar_`). */
+function _cierreHTML_(est, err, cargando){
+  var cer=_mesACerrar_();
+  var cab='<h3 style="margin:0 0 4px">Cierre de '+esc(cer.mes)+'</h3>'+
+    '<p class="rnota" style="margin:0 0 12px">Cierra el corte que va desde el cierre anterior '+
+    'hasta hoy. <b>No aplica nada</b>: encola el calculo y el plan se revisa antes.</p>';
+  if(cargando) return cab+'<p class="rnota">Preguntando al servidor en que punto esta…</p>';
+  if(err) return cab+'<p class="rnota" style="color:var(--warn)">No se pudo comprobar: '+
+    esc(err)+'. <b>No</b> quiere decir que este todo listo.</p>';
+  var bloq=(est&&est.bloqueos)||[], enc=(est&&est.encolado)||null, plan=(est&&est.plan)||null;
+  var filas=bloq.map(function(b){
+    return '<div class="rl"><span>'+esc(b.texto||b.que)+'</span>'+
+      '<span class="ra" style="color:var(--warn)">bloquea</span></div>'; }).join('');
+  if(plan) return cab+'<p class="rnota">Ya hay plan calculado para <b>'+esc(plan.periodo||'')+
+    '</b>. Revisalo antes de aplicarlo; aplicar no se hace desde el movil.</p>';
+  if(enc) return cab+'<p class="rnota">Encolado. La rutina lo recoge en la siguiente pasada '+
+    '(va cada 2 minutos) y deja el plan.</p>';
+  return cab+(filas ? '<div class="rec">'+filas+'</div>'+
+      '<p class="rnota">Estas bloquean porque entran en la cuenta: unas horas que se decidan '+
+      'despues del cierre dejan mal la cuota de alguien.</p>' : '')+
+    '<button class="btn pri" data-cerrarmes'+(bloq.length?' disabled':'')+
+      ' style="width:100%;margin-top:10px">'+
+      (bloq.length?'Bloqueado · '+bloq.length+' sin resolver'
+                  :'Calcular el cierre de '+esc(cer.mes))+'</button>';
+}
+function _abrirCierre_(){
+  abrirModal(_cierreHTML_(null,null,true));
+  var pinta=function(est,err){
+    var c=$('#modal-body'); if(!c) return;
+    c.innerHTML=_cierreHTML_(est,err,false);
+    var b=$('[data-cerrarmes]'); if(!b) return;
+    b.onclick=async function(){
+      if(!confirm('Calcular el cierre de '+_mesACerrar_().mes+'.\n\nNO se aplica nada: la '+
+                  'rutina saca el plan y lo deja para revisarlo.\n\n¿Sigo?')) return;
+      b.disabled=true; b.textContent='Encolando…';
+      try{ await api.cerrarMes(false, _mesACerrar_().p);
+           tost('Cierre encolado. La rutina lo recoge en la siguiente pasada.');
+           pinta(await api.getCierre(), null); }
+      catch(e){ b.disabled=false; tost('No se pudo encolar: '+((e&&e.message)||e)); }
+    };
+  };
+  /* Se pide al ABRIR y no al arrancar: es una llamada mas al backend y esta pantalla la abre
+     una sola persona, casi nunca. Mismo criterio que Ajustes. */
+  api.getCierre().then(function(d){ pinta(d,null); })
+                 .catch(function(e){ pinta(null,(e&&e.message)||String(e)); });
+}
+
 function _cuotaHTML_(){
   var eur=function(n){return nf(n,2)+' €';};
   var recibo = YO.coche
@@ -4611,7 +4679,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='539cefc';
+var BUILD='3847a10';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -6186,6 +6254,12 @@ function enganchar(){
      invita a empujarla y, sobre todo, dice quien manda sobre quien a quien no le toca. */
   var _ms=$('#menu [data-mnu="sanciones"]');
   if(_ms) _ms.style.display = (rangoSanc(_actorSanc_())>=1) ? '' : 'none';
+  /* El cierre toca la ficha de 32 personas y de ahi salen la cuota y la renovacion: la
+     entrada NO existe para nadie mas. Es cortesia, no seguridad -la frontera de verdad es
+     `_cerrarMes_` en el backend, que comprueba el rango-, pero un boton que no esta no se
+     pulsa sin querer. */
+  var _mc=$('#menu [data-mnu="cierre"]');
+  if(_mc) _mc.style.display = _puedeCerrarMes_() ? '' : 'none';
   var _bm=$('#btnMenu'); if(_bm) _bm.onclick=function(){ _abrirMenu_(true); };
   var _mn=$('#menu');
   if(_mn) _mn.onclick=function(ev){ if(ev.target===_mn) _abrirMenu_(false); };
@@ -6197,6 +6271,7 @@ function enganchar(){
       if(q==='buzon'){ buzonModal('bug'); return; }
       if(q==='sanciones'){ _abrirSanciones_(); return; }
       if(q==='cuota'){ abrirModal(_cuotaHTML_()); return; }
+      if(q==='cierre'){ _abrirCierre_(); return; }
       if(q==='novedades'){ abrirModal(_novedadesHTML_()); return; }
       if(q==='equipo'){ abrirModal(_coordinacionHTML_()); return; }
       if(q==='ajustes'){ abrirModal(_ajustesHTML_());
