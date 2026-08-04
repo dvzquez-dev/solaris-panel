@@ -802,7 +802,7 @@ var api={
      cualquiera podria firmar un reporte como cualquier otro. */
   /* El cierre ENCOLA el calculo; no aplica nada. Ver `_cerrarMes_` en el backend. */
   getCierre:      function(){ return api._post({action:"getCierre"}); },
-  cerrarMes:      function(f){ return api._post({action:"cerrarMes",forzar:!!f}); },
+  cerrarMes:      function(f,p){ return api._post({action:"cerrarMes",forzar:!!f,periodo:p||null}); },
   aplicarCierre:  function(p){ return api._post({action:"aplicarCierre",periodo:p||null}); },
   reportarBug:    function(d){ return api._post({action:"reportarBug",datos:d}); },
   reportarMejora: function(d){ return api._post({action:"reportarMejora",datos:d}); },
@@ -2237,13 +2237,27 @@ function _finDeMes_(){
            mes:['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
                 'septiembre','octubre','noviembre','diciembre'][h.getMonth()] };
 }
+/* El mes que se CIERRA no es el que corre. Lo dijo Daniel el 04/08: «el cierre va del anterior
+   cierre al cierre actual», y se lanza cuando el mes ya ha terminado — o sea que el 4 de agosto
+   lo que se cierra es JULIO.
+   ⛔ Antes esta pantalla decía el mes EN CURSO («Cerrar agosto» el día 4) y el botón no mandaba
+   periodo, así que el backend caía a `_periodoActual_()` y encolaba **2026-08**. El contenido
+   habría sido el correcto —lo acumulado desde el corte anterior— pero etiquetado como agosto
+   siendo casi todo julio, y esa etiqueta es la que acaba en el nombre del plan, en el registro
+   de lo aplicado y en el histórico. */
+function _mesACerrar_(){
+  var h=new Date(), a=h.getFullYear(), m=h.getMonth();       /* getMonth() es 0-11 */
+  if(m===0){ a-=1; m=11; } else { m-=1; }
+  var mm=m+1;
+  return { p:a+'-'+(mm<10?'0':'')+mm, mes:MESES_L[m] };
+}
 V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
-  var fin=_finDeMes_();
+  var fin=_finDeMes_(), cer=_mesACerrar_();
   if(CIERRE===null && !CIERRE_ERR)
-    return pan('Cierre de '+fin.mes,'comprobando…',
+    return pan('Cierre de '+cer.mes,'comprobando…',
       '<div class="nota" style="border-top:0">Preguntando al servidor en qué punto está el cierre…</div>');
   if(CIERRE_ERR)
-    return pan('Cierre de '+fin.mes,'no se pudo comprobar',
+    return pan('Cierre de '+cer.mes,'no se pudo comprobar',
       vacioSimple('No se pudo leer el estado del cierre', esc(CIERRE_ERR)+'. No es que esté todo listo: '+
         'es que no se ha podido comprobar, y cerrar a ciegas mueve la cuota de 32 personas.'));
   var bloq=(CIERRE.bloqueos)||[], enc=CIERRE.encolado||null, plan=CIERRE.plan||null;
@@ -2288,13 +2302,13 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
           'cada campo de cada persona. Revísalo en el fichero y aplícalo tú: de aquí salen la cuota '+
           'y la renovación, y eso no lo dispara un botón.</div>')
       : '')+
-    pan('Cerrar '+fin.mes,'',
+    pan('Cerrar '+cer.mes,'',
       (enc && !plan
         ? '<div class="nota" style="border-top:0">Encolado por <b>'+esc(_m(enc.por).pila)+'</b>. '+
           'La rutina lo recoge en la siguiente pasada (va cada 2 minutos) y deja el plan aquí.</div>'
         : '')+
       '<div class="pb"><button class="btn pri" '+(listo?'':'disabled')+' data-cerrarmes>'+
-      (listo?'Calcular el cierre de '+fin.mes:'Bloqueado · resuelve lo de arriba')+'</button></div>'+
+      (listo?'Calcular el cierre de '+cer.mes:'Bloqueado · resuelve lo de arriba')+'</button></div>'+
       '<div class="nota">Esto <b>no cierra el mes</b>: encola el cálculo. La rutina saca el plan '+
       '—ceros de carga, puntos que ruedan al mes anterior, compensaciones al defecto— y tú '+
       'decides si se aplica.</div>');
@@ -4537,7 +4551,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d645286';
+var BUILD='6fcceeb';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4704,7 +4718,7 @@ function pintar(){
       '¿Sigo?')) return;
     _cm.disabled=true; var prev=_cm.textContent; _cm.textContent='Encolando…';
     try{
-      await api.cerrarMes(false);
+      await api.cerrarMes(false, _mesACerrar_().p);
       tost('Cierre encolado. La rutina lo recoge en la siguiente pasada.');
       await _cargarCierre_();
     }catch(e){ _cm.disabled=false; _cm.textContent=prev;
