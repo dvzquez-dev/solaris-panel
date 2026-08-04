@@ -538,6 +538,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
       <div id="menuE" hidden style="position:absolute;top:52px;right:18px;min-width:200px;background:#141212;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.55);z-index:900">
         <button data-mnu="ajustes" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Ajustes</button>
         <button data-mnu="novedades" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Novedades &middot; qu&eacute; ha cambiado</button>
+        <button data-mnu="cierre" hidden style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Cierre mensual</button>
         <button data-mnu="reportar" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Reportar un fallo o una mejora</button>
         <button data-mnu="buzon" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Buzón · la cola de reportes</button>
         <button data-mnu="salir" style="display:block;width:100%;background:none;border:0;color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Cerrar sesión</button>
@@ -802,6 +803,7 @@ var api={
   /* El cierre ENCOLA el calculo; no aplica nada. Ver `_cerrarMes_` en el backend. */
   getCierre:      function(){ return api._post({action:"getCierre"}); },
   cerrarMes:      function(f){ return api._post({action:"cerrarMes",forzar:!!f}); },
+  aplicarCierre:  function(p){ return api._post({action:"aplicarCierre",periodo:p||null}); },
   reportarBug:    function(d){ return api._post({action:"reportarBug",datos:d}); },
   reportarMejora: function(d){ return api._post({action:"reportarMejora",datos:d}); },
   getBuzon:       function(){ return api._post({action:"getBuzon"}); },
@@ -2654,6 +2656,15 @@ function _pilaDeM_(n){ var m=_m(n); return (m&&m.pila)||''; }
    No es `ACTOR`: ACTOR cambia con «ver como», y el backend (v49) comprueba contra
    `ident.nombre` -el de la SESION-. Si la cara ofreciera la jurisdiccion de la persona que
    estas mirando, el envio lo rechazaria el servidor: la autoridad no se hereda mirando. */
+/* ⛔ ¿PUEDE CERRAR EL MES? Una sola puerta, porque lo preguntan el nav, el menú ⋮ y la
+   pantalla: si cada uno lo dedujera por su cuenta, un día uno diría que sí y otro que no.
+   El rango sale de `_actorSanc_()` —la SESIÓN— y no de `ACTOR`, que lo reescribe «ver como»:
+   el admin mirando la ficha de otro no puede heredar su permiso, ni perder el suyo.
+   ⚠️ Esto es CORTESÍA, no seguridad: la frontera real es `_cerrarMes_` en el backend, que
+   exige rango >= 3. Aquí solo se evita ofrecer un botón que al pulsarlo dice que no. */
+function _puedeCerrarMes_(){
+  try{ return !!(_puedeImpersonar_() || rangoNom(_actorSanc_())>=3); }catch(_){ return false; }
+}
 function _actorSanc_(){
   if (typeof backendOK !== 'undefined' && backendOK && SESION && SESION.nombre) return SESION.nombre;
   return ACTOR;                    // demo local, donde no hay sesion
@@ -4354,7 +4365,13 @@ function _cablearSalir_(){
   var b=document.getElementById('btnMenu'), m=document.getElementById('menuE');
   if(b && m && !b._ok){
     b._ok=1;
-    b.onclick=function(ev){ ev.stopPropagation(); m.hidden=!m.hidden; };
+    b.onclick=function(ev){
+      ev.stopPropagation();
+      /* Se decide AL ABRIR, no al pintar: el menu se cablea una vez (`b._ok`) y la sesion
+         puede resolverse despues. Preguntarlo aqui es preguntarlo cuando ya se sabe. */
+      var c=m.querySelector('[data-mnu="cierre"]'); if(c) c.hidden=!_puedeCerrarMes_();
+      m.hidden=!m.hidden;
+    };
     document.addEventListener('click', function(){ if(!m.hidden) m.hidden=true; });
     m.addEventListener('click', function(ev){ ev.stopPropagation(); });
     [].slice.call(m.querySelectorAll('[data-mnu]')).forEach(function(x){
@@ -4366,6 +4383,7 @@ function _cablearSalir_(){
            sella una vez por cara y se pinta desde `_novedadesHTML_`. En el movil esto abre un
            modal porque alli no hay barra lateral; aqui hay pantalla, asi que se navega. */
         if(x.dataset.mnu==='novedades'){ ir('novedades'); return; }
+        if(x.dataset.mnu==='cierre'){ ir('cierre'); return; }
         if(x.dataset.mnu==='reportar'){ reportarModal(); return; }
         if(x.dataset.mnu==='buzon'){ BUZON=null; ir('buzon'); _cargarBuzon_(); return; }
       };
@@ -4483,6 +4501,9 @@ function pintarNav(){
     nav.appendChild(d);
     g[1].forEach(function(k){
       if(k==='sindeclarar' && !_puedeImpersonar_()) return;   // solo el admin ve los fichajes sin declarar
+      /* El cierre lo dispara SOLO el PD (o admin). Antes esta entrada la veia cualquiera que
+         entrara al escritorio: el backend le decia que no, pero despues de haberselo ofrecido. */
+      if(k==='cierre' && !_puedeCerrarMes_()) return;
       var n=conteo(k), b=document.createElement('button');
       b.className='item'+(k===vista?' on':''); b.dataset.v=k;
       var cls = (k==='partes'&&n)||(k==='docdec'&&n) ? ' hot' : (k==='sanciones'&&n)||(k==='curso'&&n) ? ' wa' : '';
@@ -4516,7 +4537,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='75a80d4';
+var BUILD='92f828c';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
