@@ -31,6 +31,7 @@ async function activarNotis(btn){
   finally{ if(btn){ btn.disabled=false; btn.textContent='Activar notificaciones'; } pintar(); }
 }
 
+/* EQUIVALENTE (no GEMELA): el movil pide el permiso en el gate de arranque y tiene el panel de preferencias; el escritorio lo pide con un boton y distingue 'denied'. Divergen por la cara, y esta escrito. */
 function _notisHTML_(){
   if(!_pushSoportado_())
     return '<div class="nota" style="border-top:0">Este navegador no admite notificaciones.</div>';

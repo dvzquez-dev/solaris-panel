@@ -28,9 +28,10 @@ async function _cargarMovimientosM_(){
 
 /* La misma busqueda con distinto nombre en cada cara; se envuelve para que el bloque de
    autoridad de abajo sea IDENTICO en las dos y un diff lo confirme de un vistazo. */
+/* EQUIVALENTE (no GEMELA): misma busqueda con distinto ayudante en cada cara —existe JUSTO para que el bloque de autoridad de debajo si sea identico—. */
 function _mSanc_(n){ return (DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0]||null; }
 
-/* QUIEN MANDA A EFECTOS DE SANCIONES · GEMELA (movil/escritorio).
+/* QUIEN MANDA A EFECTOS DE SANCIONES · EQUIVALENTE (movil/escritorio).
    No es `yoNombre()`: ese sale de `YO`, y **`YO` se reescribe con «ver como»**, asi que el PD
    mirando la ficha de otro heredaba la jurisdiccion de ese otro. El backend (v49) compara
    contra `ident.nombre` -el de la SESION-, de modo que la cara y el servidor estaban

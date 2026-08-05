@@ -68,7 +68,7 @@ function _genUnion_(rangos, slot){
   return { F:F, perDia:perDia };
 }
 
-/* GEMELA · movil.html — convocados por defecto según el tipo. Aquí «yo» es ACTOR (la
+/* EQUIVALENTE · movil.html — convocados por defecto según el tipo. Aquí «yo» es ACTOR (la
    identidad con la que se está actuando), no `YO`: es la única diferencia y va marcada. */
 function _presetInvitados_(tipo){
   var yo=ACTOR||'', out=[];

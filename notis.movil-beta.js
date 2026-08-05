@@ -94,6 +94,7 @@ function _gateNotis_(motivo, seguir){
   };
 }
 
+/* EQUIVALENTE (no GEMELA): el movil pide el permiso en el gate de arranque y tiene el panel de preferencias; el escritorio lo pide con un boton y distingue 'denied'. Divergen por la cara, y esta escrito. */
 function _notisHTML_(){
   if(!_pushSoportado_())
     return '<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador '+

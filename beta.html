@@ -108,13 +108,13 @@
     </nav>
 
 <script src="comun-beta.js?v=68580b1"></script>
-<script src="notis.movil-beta.js?v=81b0f7c"></script>
+<script src="notis.movil-beta.js?v=bd8915e"></script>
 <script src="cierre.movil-beta.js?v=d6511a2"></script>
 <script src="tareas.movil-beta.js?v=9c56fc2"></script>
 <script src="turnos.movil-beta.js?v=627183f"></script>
-<script src="buzon.movil-beta.js?v=e0ed87d"></script>
-<script src="documentos.movil-beta.js?v=280fecb"></script>
-<script src="sanciones.movil-beta.js?v=8639b69"></script>
+<script src="buzon.movil-beta.js?v=50c3e0b"></script>
+<script src="documentos.movil-beta.js?v=aa4be87"></script>
+<script src="sanciones.movil-beta.js?v=af42cd0"></script>
 <script src="reuniones.movil-beta.js?v=d7a34eb"></script>
 <script src="horas.movil-beta.js?v=27a843e"></script>
 <script src="equipo.movil-beta.js?v=9ed447c"></script>
@@ -630,6 +630,13 @@ async function _onCredencial_(resp,_silente){
     var pPartes  = _cargarMisPartes_();
     var pSanc    = _cargarSancionesM_();
     var pFichaje = _cargarFichajeAbierto_();
+    /* ⛔ EL LIBRO DE PUNTOS TAMBIEN SALE AQUI ARRIBA (05/08). Estaba abajo con su propio
+       `await`, DESPUES del `Promise.all`, y eso le costaba al arranque **una ida y vuelta
+       entera de mas** — el ancho total pasaba de una a dos. Medido contra el backend real
+       ese dia: **1,4-1,5 s en caliente**, y con cortes intermitentes de 10 s o timeout.
+       Puede salir aqui porque `getMisMovimientos` se identifica **por el token**, igual que
+       las otras tres, y no necesita saber quien eres: el token ya esta puesto arriba. */
+    var pMovs    = _cargarMovimientosM_();
     var pReuniones = Promise.resolve().then(function(){ return api.listarReuniones(); })
                        .catch(function(){ return null; });   // se normaliza abajo, con YO ya puesto
     var boot=null; try{ boot=await api.bootstrap(resp.credential); }catch(_){ boot=null; }
@@ -656,16 +663,15 @@ async function _onCredencial_(resp,_silente){
        necesitan saber quien eres), asi que a estas alturas o han vuelto ya o les queda poco.
        El ancho total sigue siendo una ida y vuelta, no dos. */
     _gate_(SPLASH+'<div style="opacity:.8">Cargando tus datos…</div>');
-    await Promise.all([pPartes, pFichaje, pSanc, _cargarReunionesM_(pReuniones)]);
+    await Promise.all([pPartes, pFichaje, pSanc, pMovs, _cargarReunionesM_(pReuniones)]);
     /* El admin, DESPUES de esperar. Si va antes lo pisa `_cargarMisPartes_`, que pide
        `{mias:true}` = los partes de la cuenta `solaris@`, no los del miembro que estas
        viendo. Estaba pasando: se cargaban los buenos y luego los otros encima. */
     if(esAdmin() && YO){ _partesAdmin=null; try{ PARTES=await _partesDe_(YO.nombre); }catch(_){} }
-    /* EL LIBRO DE PUNTOS, YA CON DATOS REALES (backend v53). Hasta hoy aquí se vaciaba la
-       semilla y punto: la pantalla existía y no enseñaba nada, porque el backend no servía los
-       movimientos a la persona de la que hablan. Si la llamada falla o el backend es viejo
-       (acción desconocida), se queda vacío como antes — un hueco honesto, no un error. */
-    await _cargarMovimientosM_();
+    /* EL LIBRO DE PUNTOS, YA CON DATOS REALES (backend v53): se lanza ARRIBA (`pMovs`) y se
+       espera en el `Promise.all` de aquí encima, así que ya no añade una ida y vuelta propia.
+       Si la llamada falla o el backend es viejo (acción desconocida), se queda vacío como
+       antes — un hueco honesto, no un error. */
 
     /* LA BETA NO ES PARA TODO EL MUNDO. Se comprueba con la identidad YA resuelta y ANTES
        de quitar el gate: si no pasa, la app no llega a arrancar. Se le manda a la de
@@ -1281,7 +1287,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='9b88e2d';
+var BUILD='839bcc6';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';

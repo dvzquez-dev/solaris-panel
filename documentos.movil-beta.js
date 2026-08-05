@@ -24,6 +24,13 @@ function revisoresDe(e){
 function pilaDe(n){ return _pilaDeM_(n); }
 
 
+/* EQUIVALENTE (no GEMELA) — y la diferencia es REGLA DE PRODUCTO, no un descuido.
+   Daniel (05/08): «en telefono solo se puede checkear los documentos tuyos pendientes de
+   revision o los que tienes tu pendientes de revisar; no aparecen hasta que esten
+   completamente analizados y listos con el link bien embebido».
+   Por eso el MOVIL decide solo en `revision` -es lo unico que llega a ver- y el ESCRITORIO
+   tambien en `recibido` y `analizado`, donde se ve el pipeline entero. Los campos tambien
+   difieren (`e.estado` / `d.est`) porque cada cara consume su propia forma del dato. */
 function puedeDecidirDoc(e){
   var yo=yoNombre();
   if(yo===e.autor) return false;                          /* ni mandando por rango */

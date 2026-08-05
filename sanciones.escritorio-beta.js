@@ -13,6 +13,7 @@
 
 /* La misma busqueda con distinto nombre en cada cara; se envuelve para que el bloque de
    autoridad de abajo sea IDENTICO en las dos y un diff lo confirme de un vistazo. */
+/* EQUIVALENTE (no GEMELA): misma busqueda con distinto ayudante en cada cara —existe JUSTO para que el bloque de autoridad de debajo si sea identico—. */
 function _mSanc_(n){ return _m(n); }
 
 function sancionPor(tipo,nombre){

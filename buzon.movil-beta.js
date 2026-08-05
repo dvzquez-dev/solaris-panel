@@ -24,6 +24,7 @@ function _contextoM_(){
 
 /* EL PINTOR. `alTerminar(dataUrl)` recibe las dos capas YA fusionadas, o no se llama si
    se cancela. Todo el estado vive aquí dentro: al cerrarse no queda nada. */
+/* EQUIVALENTE (no GEMELA): el escritorio anade zoom con la RUEDA del raton —con raton no hay dos dedos—; el movil no. Auditado el 05/08: es la unica diferencia y todo lo demas es identico byte a byte. */
 function _abrirPintor_(fondoUrl, alTerminar){
   var caja=$('#pintor'), zona=$('#pzona'), lienzo=$('#plienzo');
   var img=$('#pfondo'), cv=$('#ptrazos');

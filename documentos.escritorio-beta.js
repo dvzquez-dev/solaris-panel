@@ -68,6 +68,13 @@ function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
    puede pisar esa decision. La fila solo miraba `est==='revision'`, asi que una vez
    decidido no habia forma de corregir un error desde aqui. */
 
+/* EQUIVALENTE (no GEMELA) — y la diferencia es REGLA DE PRODUCTO, no un descuido.
+   Daniel (05/08): «en telefono solo se puede checkear los documentos tuyos pendientes de
+   revision o los que tienes tu pendientes de revisar; no aparecen hasta que esten
+   completamente analizados y listos con el link bien embebido».
+   Por eso el MOVIL decide solo en `revision` -es lo unico que llega a ver- y el ESCRITORIO
+   tambien en `recibido` y `analizado`, donde se ve el pipeline entero. Los campos tambien
+   difieren (`e.estado` / `d.est`) porque cada cara consume su propia forma del dato. */
 function puedeDecidirDoc(d){
   if(!d || d.autor===ACTOR) return false;
   var rev=revisoresDe(d), maxR=Math.max.apply(null,rev.map(rangoNom));
