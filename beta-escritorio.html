@@ -1963,7 +1963,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b5bef84';
+var BUILD='e013328';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -1985,17 +1985,23 @@ function _repintarSuave_(){
   pintar();
   if(m && y) m.scrollTop=y;
 }
-function pintar(){
+function _pinPie_(m){
   _pintarPie_();
   _cablearSalir_();
+}
+
+function _pinHTML_(m){
   /* ⛔ EL HTML VA PRIMERO. Estaba al final, DESPUES de cablear medio panel, asi que
      cada pintada enganchaba manejadores a los nodos de la pintada anterior y acto
      seguido los tiraba. Lo que rompia: las sanciones SUELTAS no se podian decidir —sus
      botones acababan en el manejador del BLOQUE, que busca un `data-lid` que ellas no
      tienen y se va sin hacer nada ni decirlo—. Se cazo ejecutando, no leyendo. */
-  var m=$('#main');
+
   m.innerHTML=V[vista].f();
   _cablearPonerSanc_();   // no hace nada si la vista no lo pinta
+}
+
+function _pinSancSuelta_(m){
   /* Decidir una SUELTA. A diferencia del bloque, aqui no hay borrador: se aplica al
      momento, porque cada una tiene su motivo y su comunicado. Por eso se pide confirmar. */
   $$('[data-sid] [data-sdec]').forEach(function(b){
@@ -2019,6 +2025,9 @@ function pintar(){
       }catch(e){ b.disabled=false; tost('No se pudo: '+((e&&e.message)||e)); }
     };
   });
+}
+
+function _pinSancEditar_(m){
   /* EDITAR UNA SUELTA. El backend deja cambiar `puntos`, `motivo` y `articulo` **solo en la
      acción `aprobar`**, así que editar y aplicar son el mismo gesto: no hay forma de guardar
      una corrección y decidir después. Se dice en el diálogo, para que nadie crea que está
@@ -2045,6 +2054,9 @@ function pintar(){
       }catch(e){ b.disabled=false; tost('No se pudo: '+((e&&e.message)||e)); }
     };
   });
+}
+
+function _pinSancAgrupar_(m){
   /* AGRUPAR SUELTAS. Un paquete es lo que hace que salga UN comunicado en vez de N, así que
      agrupar no es cosmético. El backend se niega a meter dos veces a la misma persona en el
      mismo paquete: ese error se enseña tal cual, porque dice exactamente qué pasa. */
@@ -2070,6 +2082,9 @@ function pintar(){
   /* cambiar de bloque pendiente */
   var _ls=$('#loteSel');
   if(_ls) _ls.onchange=function(){ LOTE_SEL=+_ls.value||0; _loteReal_(); pintar(); };
+}
+
+function _pinReunionFijar_(m){
   /* fijar fecha / orden del dia: api.fijar y api.setOrdenDia existian y no las llamaba nadie */
   var _rs=$('#reSel');
   if(_rs) _rs.onchange=function(){ RE_SEL=+_rs.value||0; pintar(); };
@@ -2117,6 +2132,9 @@ function pintar(){
 
   var _bn=m.querySelector('#btnNotis'); if(_bn) _bn.onclick=function(){ activarNotis(_bn); };
   var _bs=m.querySelector('[data-salir]'); if(_bs) _bs.onclick=function(){ cerrarSesion(); };
+}
+
+function _pinCerrarMes_(m){
   /* CERRAR EL MES: encola el calculo. Era un `tost`. Se confirma porque, aunque no aplique
      nada, dispara un proceso sobre la ficha de todo el equipo y conviene mirarlo antes. */
   var _cm=m.querySelector('[data-cerrarmes]');
@@ -2143,6 +2161,9 @@ function pintar(){
     }catch(e){ _cm.disabled=false; _cm.textContent=prev;
       tost('No se pudo encolar: '+((e&&e.message)||e)); }
   };
+}
+
+function _pinAplicarCierre_(m){
   /* APLICAR EL CIERRE: esto SI escribe en Notion. Solo levanta el flag; lo aplica
      `rutinas/aplicar_cierre.py` desde el gate, que es determinista e idempotente. */
   var _ac=m.querySelector('[data-aplicarcierre]');
@@ -2164,6 +2185,9 @@ function pintar(){
     }catch(e){ _ac.disabled=false; _ac.textContent=prev;
       tost('No se pudo aplicar: '+((e&&e.message)||e)); }
   };
+}
+
+function _pinBuzon_(m){
   /* buzon: abrir/cerrar un reporte y las tres decisiones. Ninguna aplica nada: mueven
      el estado. Construir y publicar siguen siendo pasos aparte. */
   $$('[data-bzsel]',m).forEach(function(el){
@@ -2173,6 +2197,9 @@ function pintar(){
       if(BZ_CONF && BZ_CONF.id!==v) BZ_CONF=null;
       BUZON_SEL=v||null; pintar(); };
   });
+}
+
+function _pinAnotaciones_(m){
   /* La caja de anotaciones. Se apunta a CADA TECLA en `BZ_NOTAS` para que un repintado
      -o volver de otra pestaña- no se lleve por delante lo escrito. */
   $$('[data-bznotas]',m).forEach(function(ta){
@@ -2261,6 +2288,24 @@ function pintar(){
     setTimeout(function(){ i.style.width=i.dataset.w; }, redu()?0:70);
   });
   enganchar();
+}
+
+/* ⛔ ERA UNA SOLA FUNCIÓN DE 275 LÍNEAS. Ahora es la lista de lo que hace, y cada pieza se
+   lee sola. El corte es MECÁNICO: por los comentarios de sección que ya estaban, en el
+   mismo orden y sin mover una línea de dentro. Comprobado que ninguna variable local cruza
+   de tramo — si cruzara, el troceador se planta en vez de cortar. */
+function pintar(){
+  var m=$('#main');
+  _pinPie_(m);
+  _pinHTML_(m);
+  _pinSancSuelta_(m);
+  _pinSancEditar_(m);
+  _pinSancAgrupar_(m);
+  _pinReunionFijar_(m);
+  _pinCerrarMes_(m);
+  _pinAplicarCierre_(m);
+  _pinBuzon_(m);
+  _pinAnotaciones_(m);
 }
 function ir(k,foco){
   /* Al abrir el cierre se pregunta al servidor en que punto esta: los bloqueos y el plan
