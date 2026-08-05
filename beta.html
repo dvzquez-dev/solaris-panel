@@ -1281,7 +1281,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='2a88bee';
+var BUILD='9b88e2d';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -1569,9 +1569,12 @@ window.addEventListener('resize',function(){ ultimoX=null; colocarViaje(false); 
 /* ═══════════════════════════════════════════════════════════════════════════
    ENGANCHES
    ═══════════════════════════════════════════════════════════════════════════ */
-function enganchar(){
+function _engNav_(){
   /* nav */
   $$('.tab').forEach(function(t){ t.onclick=function(){ irA(t.dataset.d); }; });
+}
+
+function _engAvisos_(){
   /* avisos y tarjetas clicables */
   /* Una tarjeta que nombra una reunion concreta debe ABRIR ESA, no dejarte en la que
      estuvieras viendo: si no, pulsas el aviso y aterrizas en otra distinta. */
@@ -1586,6 +1589,9 @@ function enganchar(){
     irA(el.dataset.ir);
   }; });
 
+}
+
+function _engMedidor_(){
   /* medidor */
   var med=$('#med');
   if(med) med.onclick=function(){ armarMedidor(); };
@@ -1601,6 +1607,9 @@ function enganchar(){
   $$('#turnoModo [data-tt]').forEach(function(b){
     b.onclick=function(){ TURNOS_TODOS=(b.dataset.tt==='1'); pintar(); };
   });
+}
+
+function _engFichar_(){
   /* fichar */
   $$('#modos button').forEach(function(b){
     b.onclick=function(){ ST.modo=b.dataset.mo; pintar(); };
@@ -1702,6 +1711,9 @@ function enganchar(){
   $$('[data-declarar]').forEach(function(b){ b.onclick=function(){ ST.form.declararId=+b.dataset.declarar; ST.form.cat='tareas'; ST.form.tarea=''; ST.form.detalle=''; ST.form.just=''; irA('fichar'); }; });
   var bcd=$('[data-canceldecl]'); if(bcd) bcd.onclick=function(){ ST.form.declararId=null; ST.form.just=''; irA('horas'); };
 
+}
+
+function _engReuniones_(){
   /* reuniones */
   var bc=$('#btnCubrir'); if(bc) bc.onclick=cubrirModal;
   var bcr=$('#btnCrear'); if(bcr) bcr.onclick=crearModal;
@@ -1786,6 +1798,9 @@ function enganchar(){
       tost('No se pudo eliminar: '+((e&&e.message)||e)); }
   };
 
+}
+
+function _engPlegables_(){
   /* cajones plegables */
   $$('[data-caj]').forEach(function(b){
     b.onclick=function(){
@@ -1793,6 +1808,9 @@ function enganchar(){
       var ab=s.classList.toggle('on'); b.classList.toggle('ab',ab);
     };
   });
+}
+
+function _engTurnosYDocs_(){
   /* turnos y documentos */
   $$('[data-turno]').forEach(function(el){
     el.onclick=function(){
@@ -1906,6 +1924,22 @@ function enganchar(){
   var blt=$('#btnLote');
   if(blt) blt.onclick=function(){ tost('Las sanciones se deciden desde el escritorio.'); };
   var bsn=$('#btnSancionar'); if(bsn) bsn.onclick=sancionarModal;
+}
+
+/* ⛔ ERA UNA SOLA FUNCIÓN DE 338 LÍNEAS, y es la que engancha TODA la cara. Ahora es la
+   lista de lo que se engancha, y cada pieza se lee sola. El corte es MECÁNICO: se cortó
+   por los comentarios de sección que ya estaban, en el mismo orden, sin mover una línea de
+   dentro. Lo único que podía romperlo era una variable local que cruzara de sección, y se
+   comprobó que ninguna lo hace — las dos que lo parecían (`be`, `x`) eran parámetros de
+   callbacks distintos, no la misma variable. */
+function enganchar(){
+  _engNav_();
+  _engAvisos_();
+  _engMedidor_();
+  _engFichar_();
+  _engReuniones_();
+  _engPlegables_();
+  _engTurnosYDocs_();
 }
 /* decisiones sobre un documento (dentro del modal) */
 document.addEventListener('click',function(ev){
