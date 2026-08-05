@@ -1963,7 +1963,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='41e5d15';
+var BUILD='b5bef84';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -2284,7 +2284,7 @@ function ir(k,foco){
 /* ═══════════════════════════════════════════════════════════════════════════
    ENGANCHES
    ═══════════════════════════════════════════════════════════════════════════ */
-function enganchar(){
+function _engIrYAcordeones_(){
   $$('[data-ir]').forEach(function(el){
     el.onclick=function(){ ir(el.dataset.ir, el.dataset.foco); };
   });
@@ -2292,6 +2292,9 @@ function enganchar(){
   $$('[data-acord]').forEach(function(h){
     h.onclick=function(){ h.parentNode.classList.toggle('ab'); };
   });
+}
+
+function _engPartes_(){
   /* decidir un parte: PERSISTE (api.decidirParte). Aprobar levanta aplicar_horas=true → el
      motor Python suma las horas al ledger y recalcula cuota/ranking. La app flaguea, el motor
      ejecuta. Rechazar/detalle exigen motivo. Con datos reales viaja; con la semilla, memoria. */
@@ -2325,6 +2328,9 @@ function enganchar(){
       card.classList.add('asienta'); tost(okMsg); setTimeout(pintar,420);
     };
   });
+}
+
+function _engOtorgar_(){
   /* otorgar horas directas: lee el mini-formulario y PERSISTE (api.otorgarHoras). */
   $$('[data-otorgar]').forEach(function(b){
     b.onclick=async function(){
@@ -2347,6 +2353,9 @@ function enganchar(){
       tost('Sin conexión no se pueden otorgar horas: no se ha guardado nada.');
     };
   });
+}
+
+function _engBloqueHoras_(){
   /* bloque de horas: marca a varios de tu subsistema y otórgales lo mismo (api.otorgarBloque).
      Un solo disparo crea todas las partes 'otorgada'; el servidor revalida jurisdicción por token
      y persona. Con backend real viaja; sin él, semilla local. */
@@ -2384,6 +2393,9 @@ function enganchar(){
     };
   });
 
+}
+
+function _engConvocarTurno_(){
   /* convocar turno: chips -> reparto -> api.crearTurno (escribe en Notion). */
   $$('#tuPool .pick').forEach(function(c){
     c.onclick=function(){
@@ -2426,6 +2438,9 @@ function enganchar(){
   /* documentos: decidir PERSISTE en el backend (api.decidir, ya desplegada). La app
      flaguea, el motor/Cowork ejecuta. El servidor revalida la autoridad por token;
      esto es solo el disparo. Con backend caído cae al cambio en memoria (semilla). */
+}
+
+function _engDocsAbrir_(){
   /* abrir y cerrar el expediente en las listas compactas */
   $$('[data-docsel]').forEach(function(el){
     el.onclick=function(ev){ ev.stopPropagation();
@@ -2438,6 +2453,9 @@ function enganchar(){
      sustituyo, que usaba `$$` global). Pasarle una `m` que aqui no existe reventaba la
      pantalla entera con «m is not defined» — cazado ejecutando, no leyendo. */
   _cablearVisor_();
+}
+
+function _engDocsDecidir_(){
   /* LAS CUATRO ACCIONES del correo real, mas deshacer y reenviar. Todas viajan a
      `api.decidir`, que ya estaba desplegada aceptandolas desde v28 y de la que esta cara
      solo usaba dos. El servidor revalida la autoridad por token; esto es el disparo.
@@ -2486,6 +2504,9 @@ function enganchar(){
   });
   /* bloque de sanciones: marcar es BORRADOR (no aplica nada). Con bloque real viaja al
      backend (api.decidirSancion acción «marcar»); con la semilla, solo memoria. */
+}
+
+function _engSancMarcar_(){
   /* ACOTADO AL BLOQUE (`[data-lid]`). Las sueltas usan la misma clase `decs`, asi que
      este selector se tragaba tambien sus botones: les ponia ESTE manejador encima del
      suyo, y como no tienen `data-lid` no encontraba la sancion y salia en silencio. */
@@ -2502,6 +2523,9 @@ function enganchar(){
       it.dec=dec; pintar();                                    // semilla local
     };
   });
+}
+
+function _engSancTodas_(){
   /* MARCAR TODAS DE GOLPE. Sigue siendo borrador -no aplica nada-, solo evita veinte
      clics. EN SERIE a proposito: cada `decidirSancion` coge un `LockService` en el
      backend y veinte llamadas a la vez se pisan entre ellas (pasó esta misma noche
@@ -2531,6 +2555,9 @@ function enganchar(){
       pintar();
     };
   });
+}
+
+function _engSancCerrar_(){
   /* cerrar el bloque: es el DISPARO. Con bloque real, api.confirmarLote lo cierra entero
      bajo lock y levanta aplicar_sanciones=true (una vez) para que el motor lo escriba en
      Notion y mande el comunicado. La app flaguea, el motor ejecuta. */
@@ -2575,6 +2602,23 @@ function enganchar(){
       b.classList.add('pulsa'); setTimeout(function(){b.classList.remove('pulsa');},120);
     });
   });
+}
+
+/* ⛔ ERA UNA SOLA FUNCIÓN DE 290 LÍNEAS. Ahora es la lista de lo que hace, y cada pieza se
+   lee sola. El corte es MECÁNICO: por los comentarios de sección que ya estaban, en el
+   mismo orden y sin mover una línea de dentro. Comprobado que ninguna variable local cruza
+   de tramo — si cruzara, el troceador se planta en vez de cortar. */
+function enganchar(){
+  _engIrYAcordeones_();
+  _engPartes_();
+  _engOtorgar_();
+  _engBloqueHoras_();
+  _engConvocarTurno_();
+  _engDocsAbrir_();
+  _engDocsDecidir_();
+  _engSancMarcar_();
+  _engSancTodas_();
+  _engSancCerrar_();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
