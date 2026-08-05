@@ -26,9 +26,11 @@ function _rederivarPD_(){
   var ms=DATA.miembros||[];
   var pd=ms.filter(function(m){ return m.cargo==='Project Director'; })[0];
   if(pd) PD_NOM=pd.nombre;
-  var rev=ms.filter(function(m){ return /^José Manuel Torres/.test(m.nombre||''); })[0]
-        || ms.filter(function(m){ return m.cargo==='Coordinador' && /Coordinación Técnica/.test(m.unidad||''); })[0];
-  if(rev) REV2_NOM=rev.nombre;
+  /* ⛔ AQUÍ HABÍA UN NOMBRE PROPIO DENTRO DE UN REGEX (`/^José Manuel Torres/`), y decidía
+     quién puede aprobar un expediente de subsistema. Daniel: *«es porque José es coordinador
+     de la UCT, no por ser él sino por su cargo»*. La derivación vive ahora en `comun.js`
+     (`_rederivarRev2_`), UNA para las dos caras: el escritorio la calculaba distinto. */
+  _rederivarRev2_();
 }
 
 

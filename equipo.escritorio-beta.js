@@ -14,11 +14,13 @@
 function _rederivarCargos_(){
   var pd=DATA.miembros.filter(function(m){ return m.cargo==='Project Director'; })[0];
   if(pd) PD_NOM=pd.nombre;
-  if(!miembro(REV2_NOM)){
-    /* sin segundo revisor en el roster, el escalado cae en el PD y hay que decirlo */
-    var c=DATA.miembros.filter(function(m){ return m.cargo==='Coordinador' && m.nombre!==PD_NOM; })[0];
-    REV2_NOM = c ? c.nombre : PD_NOM;
-  }
+  /* ⛔ AQUÍ SE COGÍA «EL PRIMER COORDINADOR QUE NO FUERA EL PD», quienquiera que fuese, y eso
+     reparte por orden de lista la autoridad para aprobar un expediente de subsistema. Además
+     el móvil lo calculaba de OTRA forma (con el nombre de José en un regex): dos políticas para
+     la misma pregunta. Ahora es una sola, en `comun.js`, y deriva del CARGO — coordinador de la
+     UCT—; si no hay ninguno cae al PD, que es lo que hace también `_coordinadorDe_` en el
+     backend: sin coordinador la autoridad sube, no se sortea. */
+  _rederivarRev2_();
 }
 
 /* miembro() puede devolver null y eso es correcto (sirve para preguntar «existe?»).

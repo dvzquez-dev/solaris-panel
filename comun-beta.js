@@ -718,6 +718,47 @@ function coordinadorDe(u){
   return c ? c.nombre : PD_NOM;
 }
 
+/* ⛔ ¿ES LA UNIDAD DE DOCUMENTACIÓN TÉCNICA? El nombre llega de tres sitios y no coincide:
+   `UCT` (el viejo, y el que sigue usando Cowork), `Documentación Técnica` (el del roster) y
+   `Unidad de Documentación Técnica` (el canónico que devuelve `umbral.coordinadas`). Se
+   pregunta por la unidad, NO por quién la lleva — que es justo lo que se viene a arreglar. */
+function esUCT(u){
+  return /documentaci[oó]n\s+t[eé]cnica/i.test(String(u || '')) || /^\s*UCT\s*$/i.test(String(u || ''));
+}
+
+/* ⛔ EL SEGUNDO REVISOR DOCUMENTAL SE DERIVA DEL CARGO, NO DE UN NOMBRE (05/08/2026).
+   Daniel: *«es porque José es coordinador de la UCT, no por ser él sino por su cargo»*.
+
+   `REV2_NOM` decide `rangoNom(...)===2`, o sea **quién puede aprobar un expediente de
+   subsistema**. Hasta hoy cada cara lo calculaba a su manera, y las dos mal:
+
+     · el MÓVIL buscaba `/^José Manuel Torres/` — **un nombre propio dentro de un regex**. El día
+       que José deje el cargo, la autoridad documental se va con él y nadie se entera;
+     · el ESCRITORIO, si ese nombre no estaba en el roster, cogía **el primer coordinador que no
+       fuera el PD**, quienquiera que fuese — o sea que repartía autoridad por orden de lista.
+
+   Dos políticas distintas para la misma pregunta es D1 con otro disfraz, y aquí el resultado no
+   es un texto feo: es quién firma documentos. Ahora es UNA función y tres escalones, del dato
+   bueno al conservador:
+
+     1. quien **coordina** la UCT (`coordina`, la lista que trae el panel);
+     2. si el backend aún no manda ese campo, el coordinador cuya **unidad** sea la UCT;
+     3. y si no hay ninguno, **el PD** — nunca «el primero que aparezca». Es lo mismo que hace
+        `_coordinadorDe_` en el backend, que cae a `DOC_PD`: sin coordinador, la autoridad sube,
+        no se reparte al azar. */
+function _rederivarRev2_(){
+  var m = buscaMiembro(function(x){
+    var c = x.coordina;
+    if (!c) return false;
+    if (typeof c === 'string') return esUCT(c);
+    for (var i = 0; i < c.length; i++) if (esUCT(c[i])) return true;
+    return false;
+  });
+  if (!m) m = buscaMiembro(function(x){ return x.cargo === 'Coordinador' && esUCT(x.unidad); });
+  REV2_NOM = m ? m.nombre : PD_NOM;
+  return REV2_NOM;
+}
+
 /* El rango de alguien a quien solo conocemos por el nombre de pila — que es como
    llegan firmados los turnos del Discord y los expedientes.
    Estaba escrita DOS VECES, una por cara, palabra por palabra (`documentos.movil.js`
