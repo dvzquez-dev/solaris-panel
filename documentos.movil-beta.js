@@ -23,8 +23,6 @@ function revisoresDe(e){
 
 function pilaDe(n){ return _pilaDeM_(n); }
 
-function rangoPila(pila){ for(var i=0;i<DATA.miembros.length;i++) if(DATA.miembros[i].pila===pila)
-  return rangoNom(DATA.miembros[i].nombre); return 0; }
 
 function puedeDecidirDoc(e){
   var yo=yoNombre();

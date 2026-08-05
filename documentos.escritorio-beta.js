@@ -67,8 +67,6 @@ function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
    lo suyo, el primero que decide bloquea a sus iguales, y solo alguien de MAS rango
    puede pisar esa decision. La fila solo miraba `est==='revision'`, asi que una vez
    decidido no habia forma de corregir un error desde aqui. */
-function rangoPila(pila){ for(var i=0;i<DATA.miembros.length;i++)
-  if(DATA.miembros[i].pila===pila) return rangoNom(DATA.miembros[i].nombre); return 0; }
 
 function puedeDecidirDoc(d){
   if(!d || d.autor===ACTOR) return false;

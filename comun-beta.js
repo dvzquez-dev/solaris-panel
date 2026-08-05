@@ -671,3 +671,72 @@ function _durTxt_(min){
   return h+' h'+(m?' '+m+' min':'');
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   QUIÉN ES QUIÉN — una sola vez para las dos caras (05/08/2026)
+
+   Estas tres estaban duplicadas, y `rutinas/gemelas.py` las venía señalando
+   desde el 04/08 como §5 D9 («autoridad triplicada»). Lo que las mantenía
+   separadas no era una diferencia de comportamiento: era que el móvil
+   **repetía a mano el bucle de buscar a una persona** donde el escritorio
+   llamaba a `miembro(n)`. Misma transformación, distinto ayudante — el patrón
+   D20 exacto.
+
+   Al dar `miembro()` a las dos caras, las tres se vuelven idénticas y caben
+   aquí. Lo que se gana no son bytes: se gana que «¿quién coordina esto?» y
+   «¿qué rango tiene este?» se contesten en UN sitio, que es lo que hace que
+   cambiar la regla no exija acordarse de dos ficheros.
+
+   ⚠️ Leen `DATA`, `PD_NOM` y `REV2_NOM` **en el momento de la llamada**, no al
+   cargar: las dos caras arrancan con semillas distintas de `REV2_NOM` y las
+   re-derivan del roster (`_rederivarCargos_` / `_rederivarPD_`). Congelarlas
+   aquí las dejaría con el nombre de la semilla, que es un fallo que ya ocurrió.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ⛔ EL ÚNICO RECORRIDO DE `DATA.miembros`. Debajo hay tres preguntas distintas
+   —por nombre, por unidad, por nombre de pila— y las tres se contestaban con su
+   propio `for` escrito a mano, en cuatro ficheros. Un bucle, tres preguntas: eso
+   es lo que hace que «buscar a alguien» se lea de un vistazo y que arreglar la
+   búsqueda no sea acordarse de cuatro sitios.
+   Devuelve la ficha o `null`; quien quiera un valor por defecto lo pone él. */
+function buscaMiembro(cumple){
+  var ms = DATA.miembros || [];
+  for(var i=0;i<ms.length;i++) if(cumple(ms[i])) return ms[i];
+  return null;
+}
+
+/* La ficha de alguien por su nombre, o `null`. La versión tolerante —que devuelve
+   un fantasma en vez de `null`— es `_m()` y vive en el escritorio, que es quien la
+   necesita para pintar filas de gente que ya no está. */
+function miembro(n){
+  return buscaMiembro(function(m){ return m.nombre===n; });
+}
+
+/* Quién coordina esa unidad; si nadie, el PD. */
+function coordinadorDe(u){
+  var c = buscaMiembro(function(m){ return m.cargo==='Coordinador' && m.unidad===u; });
+  return c ? c.nombre : PD_NOM;
+}
+
+/* El rango de alguien a quien solo conocemos por el nombre de pila — que es como
+   llegan firmados los turnos del Discord y los expedientes.
+   Estaba escrita DOS VECES, una por cara, palabra por palabra (`documentos.movil.js`
+   y `documentos.escritorio.js`). Si dos personas comparten pila gana la primera del
+   roster: eso ya era así, y aquí queda dicho en vez de escondido en el bucle. */
+function rangoPila(pila){
+  var m = buscaMiembro(function(x){ return x.pila===pila; });
+  return m ? rangoNom(m.nombre) : 0;
+}
+
+/* La escalera de autoridad de DOCUMENTOS: PD(3) > revisor fijo(2) >
+   coordinador(1) > resto(0).
+   ⛔ NO es la de sanciones. Esa es `rangoSanc`, que sale de una tabla explícita
+   (`RANGO_SANC`) porque ahí hay gente con rango sin tener cargo — deducirlo del
+   `cargo` es justo el fallo que esa tabla existe para impedir. Se confunden
+   solas: si vienes a tocar una, comprueba cuál. */
+function rangoNom(n){
+  if(n===PD_NOM) return 3;
+  if(n===REV2_NOM) return 2;
+  var m=miembro(n);
+  return (m && m.cargo==='Coordinador') ? 1 : 0;
+}
