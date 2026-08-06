@@ -111,7 +111,7 @@
 <script src="comun-beta.js?v=66b1db1"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
-<script src="turnos.escritorio-beta.js?v=2bd5fd6"></script>
+<script src="turnos.escritorio-beta.js?v=df86aad"></script>
 <script src="buzon.escritorio-beta.js?v=aa3b013"></script>
 <script src="documentos.escritorio-beta.js?v=1918b5e"></script>
 <script src="sanciones.escritorio-beta.js?v=1c7fbee"></script>
@@ -1416,7 +1416,7 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
 V.turnos={g:'Operación',t:'Turnos',f:function(){
   if(!TURNOS.length) return pan('Turnos convocados','ninguno',
     vacioSimple('No hay turnos convocados','Convoca el primero aquí abajo: queda publicado en Notion y les llega a los '+
-      'convocados.'))+_dispPanel_()+convocarPanel();
+      'convocados.'))+_convocarDispPanel_()+_dispPanel_()+convocarPanel();
   return pan('Turnos convocados',TURNOS.length+'',
     tabla([['Turno'],['Fecha'],['Hora',0],['Punto'],['Duración',1],['Van',1],['Memoria',1]],
       /* las fechas llegan en ISO (dato real: '2025-11-26') o DD/MM/AAAA (semilla): se
@@ -1438,7 +1438,7 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
       }).join(''))+
     '<div class="nota">Los turnos se leen <b>en vivo de Notion</b>: lo que convoques aquí abajo aparece '+
     'allí, y lo que se cambie allí tarda unos minutos en verse aquí.</div>')+
-    _dispPanel_()+convocarPanel();
+    _convocarDispPanel_()+_dispPanel_()+convocarPanel();
 }};
 V.tareas={g:'Operación',t:'Tareas',f:function(){
   var porUni={};
@@ -2070,7 +2070,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='cdbcca7';
+var BUILD='a1cc9c5';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -2415,6 +2415,7 @@ function pintar(){
   _pinBuzon_(m);
   _pinAnotaciones_(m);
   _pinDisp_();
+  _pinConvDisp_(m);
 }
 function ir(k,foco){
   /* Al abrir el cierre se pregunta al servidor en que punto esta: los bloqueos y el plan

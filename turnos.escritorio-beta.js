@@ -225,6 +225,84 @@ function _pinDisp_(){
   });
 }
 
+/* ═══ CONVOCAR DISPONIBILIDAD ═══════════════════════════════════════════════════════
+   Abre el plazo para una semana. **Solo rango ≥ 3** — Daniel, §3.11 del plan: *«eso solo lo
+   puedo hacer yo, eso sí que no va a cambiar»*.
+
+   ⛔ AQUÍ NO SE CALCULA NINGUNA FECHA. Se encola **qué semana** se quiere y el servidor
+   —`rutinas/calcular_convocatoria.py`, con la regla de `reglas/convocatoria.py`— resuelve la
+   apertura y el límite. Es el patrón de la casa: **el escritorio encola, Python calcula**,
+   igual que el cierre mensual y el de temporada.
+   ⛔ Y por eso esta pantalla **no promete horas**: decir aquí «se abre el jueves a las 22:00»
+   sería escribir la regla por segunda vez, en prosa, donde nadie la va a actualizar. */
+
+function _puedeConvocarDisp_(){ return rangoNom(ACTOR) >= 3; }
+
+function _convocarDispPanel_(){
+  if(!_puedeConvocarDisp_()) return '';
+  var E=CAMPO_CSS;
+  var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
+  return pan('Convocar disponibilidad','abre el plazo · solo dirección',
+    '<div class="pb">'+
+    '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
+      'Elige <b>cualquier día</b> de la semana que quieras preguntar: se pregunta la semana '+
+      'entera, de lunes a domingo. <b>El plazo lo calcula el servidor</b> con la regla del '+
+      'calendario — aquí no se decide. Recoger disponibilidad <b>no sale de la app</b>: no toca '+
+      'Notion ni el excel de Aerotech.</p>'+
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+      '<label style="width:165px">'+lab('Semana (un día cualquiera)')+
+        '<input type="date" id="cdSemana" style="'+E+'"></label>'+
+      '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px">'+
+        '<input type="checkbox" id="cdCuvi" checked> CUVI</label>'+
+      '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px">'+
+        '<input type="checkbox" id="cdCiti" checked> CITI</label>'+
+      '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px">'+
+        '<input type="checkbox" id="cdTarde"> la tarde va partida (16:00 / 18:00)</label>'+
+    '</div>'+
+    '<button class="btn" data-convdisp>Convocar disponibilidad</button>'+
+    '<div class="nota" id="cdNota">Se encola y la rutina lo recoge en la siguiente pasada. '+
+      'Lo que salga —los días, el plazo y a quién se convoca— aparecerá arriba.</div>'+
+    '</div>');
+}
+
+function _pinConvDisp_(m){
+  var b=(m||document).querySelector('[data-convdisp]'); if(!b) return;
+  b.onclick=async function(){
+    if(b.disabled) return;
+    if(typeof backendOK==='undefined' || !backendOK || !SESION){
+      tost('Sin conexión no se puede convocar.'); return; }
+    var sem=(document.getElementById('cdSemana')||{}).value||'';
+    if(!sem){ tost('Elige una semana.'); return; }
+    var sitios=[];
+    if((document.getElementById('cdCuvi')||{}).checked) sitios.push('cuvi');
+    if((document.getElementById('cdCiti')||{}).checked) sitios.push('citi');
+    /* ⛔ Sin sitio no se convoca: una convocatoria sin dónde no se puede contestar, y dejarla
+       salir vacía sería el mismo fallo mudo de siempre. */
+    if(!sitios.length){ tost('Marca al menos un sitio (CUVI o CITI).'); return; }
+    if(!confirm('Abrir la disponibilidad de la semana del '+sem+'.'+String.fromCharCode(10,10)+
+      'NO sale nada fuera de la app: no toca Notion ni el excel de Aerotech. El servidor '+
+      'calcula el plazo y monta la convocatoria.'+String.fromCharCode(10,10)+'¿Sigo?')) return;
+    b.disabled=true; var prev=b.textContent; b.textContent='Encolando…';
+    try{
+      await api.setControl('convocar_disponibilidad', {
+        semana: sem,
+        tarde_partida: !!(document.getElementById('cdTarde')||{}).checked,
+        sitios: sitios,
+        por: ACTOR,
+        at: new Date().toISOString()
+      }, 'convocatoria de disponibilidad para turnos');
+      tost('Encolado. La rutina lo recoge en la siguiente pasada.');
+      var n=document.getElementById('cdNota');
+      if(n) n.innerHTML='<b>Encolado</b> para la semana del '+esc(sem)+'. El plazo lo calcula '+
+        'el servidor; cuando lo procese, la convocatoria aparece arriba.';
+    }catch(e){
+      tost('No se pudo encolar: '+e);
+    }finally{
+      b.disabled=false; b.textContent=prev;
+    }
+  };
+}
+
 function convocarPanel(){
   if(rangoNom(ACTOR)<1) return '';                       // solo coordinaci\u00f3n o superior
   var E=CAMPO_CSS;
