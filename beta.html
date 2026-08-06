@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=bb60ef3"></script>
+<script src="comun-beta.js?v=e803725"></script>
 <script src="notis.movil-beta.js?v=bd8915e"></script>
 <script src="cierre.movil-beta.js?v=d6511a2"></script>
 <script src="tareas.movil-beta.js?v=9c56fc2"></script>
@@ -303,6 +303,8 @@ var api={
   pushSancion:  function(ss){ return api._post({action:"pushSancion",sanciones:ss}); },
   decidirSancion: function(id,a,o){ return api._post(Object.assign({action:"decidirSancion",id:id,accion:a},o||{})); },
   moverLimiteTarea: function(u,f){ return api._post({action:"moverLimiteTarea",url:u,fecha:f}); },
+  getNovedadesVistas: function(){ return api._post({action:"getNovedadesVistas"}); },
+  marcarNovedadVista: function(id,visto){ return api._post({action:"marcarNovedadVista",id:id,visto:!!visto}); },
   pushParte: function(p){ return api._post({action:"pushParte",parte:p}); },
   ficharEntrada:    function(perfil){ return api._post({action:"ficharEntrada",perfil:perfil||null}); },
   /* Preferencias de aviso (backend v45). Viven en el SERVIDOR y no en el movil porque el
@@ -1312,7 +1314,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='10bf9ef';
+var BUILD='f0a39b8';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';

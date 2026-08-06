@@ -899,6 +899,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-registro', fecha:'2026-08-07', titulo:'Lo que marcas como visto ya no se queda en tu móvil',
+      items:[
+        {cara:'movil', vista:'estado', txt:'El «Ya lo he visto» se guarda en el servidor, con la fecha y quién lo marcó — así lo ve también quien programa.'},
+        {cara:'escritorio', vista:'panel', txt:'Mismo registro en las dos caras: marcas en una y aparece marcado en la otra.'},
+        {cara:'movil', vista:'estado', txt:'Si el servidor no contesta, te lo dice en vez de perderlo en silencio.'}
+      ]},
     { id:'2026-08-06-perfil', fecha:'2026-08-06', titulo:'Elegir con qué cargo fichas',
       items:[
         {cara:'movil', vista:'fichar', txt:'Si tienes más de un cargo, arriba de la justificación sale «Fichas como»: eliges con cuál. Con uno solo no aparece nada.'},
@@ -925,7 +931,55 @@ function _novedades_(){
 }
 
 /* Lo que YA se ha visto, en este navegador: `{id: {at}}`. Nunca lanza. */
+/* ═══ EL REGISTRO DE REVISIÓN VIVE EN EL SERVIDOR (v63) ═══════════════════════════
+   Daniel (06/08/2026): «al cerrar una que no se borre sino que se deseleccione y se guarde en
+   un historial, **para tú llevar cuenta** de qué voy aprobando y cuándo».
+
+   ⛔ Ese «para TÚ llevar cuenta» es la razón entera: en `localStorage` el registro vive en SU
+   móvil y quien programa de madrugada no lo ve. Con la capa en el navegador, la frase de Daniel
+   era literalmente imposible de cumplir.
+
+   ⛔ **El servidor MANDA cuando está cargado, y el local pasa a ser su copia.** No se fusionan:
+   fusionar haría que una tanda que él desmarcó en el servidor **resucitara** desde una entrada
+   vieja del móvil — deshacer dejaría de funcionar y no daría ningún error.
+
+   ⚠️ Y solo lo carga y lo escribe **rango ≥ 3**. No es seguridad, es significado: el registro es
+   «lo que el PD ha revisado». Para el resto del equipo la capa sigue siendo un «qué hay de
+   nuevo» local, que es lo que es para ellos. */
+function _novPuedeRegistro_(){
+  if (typeof SESION==='undefined' || !SESION || !SESION.nombre) return false;
+  if (typeof esAdmin==='function' && esAdmin()) return true;
+  return (typeof _rangoBeta_==='function') && _rangoBeta_() >= 3;
+}
+
+/* El estado de la carga, en `window` y no en una variable de módulo: `comun.js` no lleva ni
+   una sentencia ejecutable de nivel superior, y eso es lo que lo hace seguro de cargar antes
+   que nada. Estados: sin pedir · pidiendo · ok · error. */
+function _novSrvEstado_(v){
+  if (v !== undefined) window.__novSrvEstado = v;
+  return window.__novSrvEstado || 'sin pedir';
+}
+function _novSrv_(){ return window.__novSrv || null; }
+
+/* Pide el registro UNA vez y repinta cuando llega. Se llama desde `_engNov_`, que ya corre
+   después de cada pintado en las dos caras — así no hay que tocar dos arranques distintos ni
+   añadir una ida y vuelta al de siempre. */
+function _novCargar_(repintar){
+  if (_novSrvEstado_() !== 'sin pedir') return;
+  if (!_novPuedeRegistro_() || typeof api==='undefined' || !api.getNovedadesVistas) return;
+  _novSrvEstado_('pidiendo');
+  api.getNovedadesVistas().then(function(v){
+    window.__novSrv = v || {};
+    _novSrvEstado_('ok');
+    /* El local pasa a ser copia del servidor: si se queda con lo suyo, la próxima vez que se
+       abra sin conexión enseñaría un estado que ya no es. */
+    try{ localStorage.setItem('solaris_nov_vistas', JSON.stringify(window.__novSrv)); }catch(_){}
+    if (typeof repintar==='function') repintar();
+  }).catch(function(){ _novSrvEstado_('error'); });
+}
+
 function _novVistas_(){
+  var s=_novSrv_(); if(s) return s;          // el registro del servidor manda
   try{ return JSON.parse(localStorage.getItem('solaris_nov_vistas')||'{}')||{}; }
   catch(_){ return {}; }
 }
@@ -935,7 +989,21 @@ function _novMarcar_(id){
   var v=_novVistas_(), at=new Date().toISOString();
   v[id]={at:at};
   try{ localStorage.setItem('solaris_nov_vistas', JSON.stringify(v)); }catch(_){}
+  if(_novSrv_()) window.__novSrv=v;
+  _novAlServidor_(id, true);
   return at;
+}
+
+/* Manda la decisión al servidor sin esperarla. ⛔ Se pinta ANTES de saber si llegó, a
+   propósito: el botón tiene que responder al dedo. Y si falla, se dice — un registro que
+   se pierde en silencio es peor que no tenerlo, porque parece que está. */
+function _novAlServidor_(id, visto){
+  if(!_novPuedeRegistro_() || typeof api==='undefined' || !api.marcarNovedadVista) return;
+  api.marcarNovedadVista(id, visto).then(function(v){
+    if(v){ window.__novSrv=v; _novSrvEstado_('ok'); }
+  }).catch(function(e){
+    if(typeof tost==='function') tost('No se pudo guardar en el servidor: '+((e&&e.message)||e));
+  });
 }
 
 /* Deshacer: si te lo cargas por error, vuelve a la lista. Sin esto, un toque mal dado es
@@ -943,6 +1011,8 @@ function _novMarcar_(id){
 function _novOlvidar_(id){
   var v=_novVistas_(); delete v[id];
   try{ localStorage.setItem('solaris_nov_vistas', JSON.stringify(v)); }catch(_){}
+  if(_novSrv_()) window.__novSrv=v;
+  _novAlServidor_(id, false);
 }
 
 /* Las tandas de ESTA cara que aún no has visto, y las que sí. `cara` es 'movil'|'escritorio'. */
@@ -999,8 +1069,11 @@ function _novHTML_(cara){
       ? '<details class="novhist"><summary>Ya revisadas · '+d.hechas.length+'</summary>'+
         d.hechas.map(function(t){ return tanda(t,true); }).join('')+'</details>'
       : '')+
-    '<p class="novpie">El «visto» se guarda <b>en este navegador</b>. Que llegue también al '+
-      'servidor —y con ello a quien programa— pide una acción nueva en el backend; está apuntado.</p>'+
+    '<p class="novpie">'+(_novSrv_()
+      ? 'El «visto» queda <b>en el servidor</b>, con la fecha y quién lo marcó — así lo ve también quien programa.'
+      : (_novPuedeRegistro_()
+          ? 'El «visto» se guarda <b>en este navegador</b>; el registro del servidor no ha cargado (se reintenta al volver a entrar).'
+          : 'El «visto» se guarda <b>en este navegador</b>. El registro compartido es del director.'))+'</p>'+
   '</div>';
 }
 
@@ -1016,6 +1089,8 @@ function _novCuando_(iso){
    `pintar`, pero se pasa como argumento para no dar por hecho el nombre desde `comun.js`. */
 function _engNov_(repintar){
   var c=document.getElementById('novc'); if(!c) return;
+  _novCargar_(repintar);        // una sola vez; repinta cuando llega
+
   c.querySelectorAll('[data-novok]').forEach(function(b){
     b.onclick=function(){ _novMarcar_(b.dataset.novok); if(repintar) repintar(); };
   });
