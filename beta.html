@@ -16,7 +16,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil-beta.css?v=27e21d6">
+<link rel="stylesheet" href="movil-beta.css?v=95996b8">
 </head>
 <body>
 
@@ -116,7 +116,7 @@
 <script src="documentos.movil-beta.js?v=aa4be87"></script>
 <script src="sanciones.movil-beta.js?v=af42cd0"></script>
 <script src="reuniones.movil-beta.js?v=f177a68"></script>
-<script src="horas.movil-beta.js?v=27a843e"></script>
+<script src="horas.movil-beta.js?v=96bc99d"></script>
 <script src="equipo.movil-beta.js?v=45b56b6"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -278,6 +278,10 @@ var api={
   /* `nombre` = las de OTRA persona (backend v52), para sancionar por un plazo. */
   getTareas: function(nombre){ return api._post(nombre ? {action:"getTareas",nombre:nombre} : {action:"getTareas"}); },
   getPartes: function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
+  /* ⛔ ESTA LÍNEA FALTABA EN EL MÓVIL, y es el mismo agujero que tuvo `api.guardarPush`
+     al revés: el escritorio la tenía desde siempre y aquí no, así que desde el teléfono
+     no se podía decidir un parte aunque tuvieras potestad. */
+  decidirParte: function(id,a,m){ return api._post({action:"decidirParte",id:id,accion:a,motivo:m}); },
   /* FALTABA. La cola de sanciones del Panel del PD salia SIEMPRE vacia con cuenta real
      porque no habia forma de pedirla: el panel enseñaba la semilla y sus botones solo
      tocaban memoria. Es la misma accion que usa el escritorio. */
@@ -628,6 +632,9 @@ async function _onCredencial_(resp,_silente){
        el nombre llegan enseguida con el bootstrap. */
     SESION={token:resp.credential,email:null,nombre:null};
     var pPartes  = _cargarMisPartes_();
+    /* Los que esperan TU firma salen en la MISMA tanda que los tuyos: el arranque ya
+       cuesta una sola ida y vuelta y esto no añade otra. Va al `Promise.all` de abajo. */
+    var pDecidir = _cargarPartesDec_();
     var pSanc    = _cargarSancionesM_();
     var pFichaje = _cargarFichajeAbierto_();
     /* ⛔ EL LIBRO DE PUNTOS TAMBIEN SALE AQUI ARRIBA (05/08). Estaba abajo con su propio
@@ -663,7 +670,7 @@ async function _onCredencial_(resp,_silente){
        necesitan saber quien eres), asi que a estas alturas o han vuelto ya o les queda poco.
        El ancho total sigue siendo una ida y vuelta, no dos. */
     _gate_(SPLASH+'<div style="opacity:.8">Cargando tus datos…</div>');
-    await Promise.all([pPartes, pFichaje, pSanc, pMovs, _cargarReunionesM_(pReuniones)]);
+    await Promise.all([pPartes, pDecidir, pFichaje, pSanc, pMovs, _cargarReunionesM_(pReuniones)]);
     /* El admin, DESPUES de esperar. Si va antes lo pisa `_cargarMisPartes_`, que pide
        `{mias:true}` = los partes de la cuenta `solaris@`, no los del miembro que estas
        viendo. Estaba pasando: se cargaban los buenos y luego los otros encima. */
@@ -760,6 +767,12 @@ var MOVS=[
 /* PARTES DE HORAS — tres categorías, la tercera es nueva:
    conf = aprobadas · pend = esperando firma · otor = OTORGADAS por el coordinador
    (te las pone él directamente desde su panel; no las pides tú). */
+/* Los partes que TÚ tienes que decidir (los de tu gente), aparte de los tuyos.
+   ⛔ Son dos listas distintas a propósito: `PARTES` son los tuyos —que no puedes decidir,
+   nadie decide lo suyo— y estos son los que esperan tu firma. Mezclarlos haría que la
+   pantalla tuviera que preguntar «¿este es mío o de otro?» en cada sitio, que es de donde
+   salen los fallos mudos de esta casa. */
+var PARTES_DEC=[];
 var PARTES=[
   {id:1,f:'22/07/2026',t:'Laminado de fuselaje · tramo 2',q:4.0,e:'conf',cat:'tareas',ini:'16:30',fin:'20:30'},
   {id:2,f:'19/07/2026',t:'Ensayo estático · apoyo de instrumentación',q:3.5,e:'conf',cat:'tareas',ini:'09:00',fin:'12:30'},
@@ -1287,7 +1300,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='a11813a';
+var BUILD='5ec781f';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -1971,6 +1984,7 @@ function enganchar(){
   _engPlegables_();
   _engTurnosYDocs_();
   _engConv_();
+  _engPartesDec_();
 }
 /* decisiones sobre un documento (dentro del modal) */
 document.addEventListener('click',function(ev){

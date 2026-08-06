@@ -783,6 +783,22 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .celc.best{outline:1px solid var(--ink);outline-offset:-1px}
 .celc.fij{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.92)}
 
+/* ═══ DECIDIR PARTES DESDE EL MÓVIL ═════════════════════════════════════ */
+.pdi{border-top:1px solid var(--line);padding:11px 0 4px}
+.pdi:first-of-type{border-top:0}
+.pdt{font-size:12.5px;font-weight:600;margin:2px 0 4px}
+.pdj{font-size:12px;color:var(--ink2);line-height:1.5;margin-bottom:6px}
+.pdw{display:inline-block;font-size:10px;font-weight:600;color:var(--red2);
+  border:1px solid var(--red2);border-radius:5px;padding:1px 6px;margin-bottom:7px}
+.pdm{width:100%;background:var(--sur2);border:1px solid var(--line);border-radius:8px;
+  padding:8px 10px;font-size:12.5px;color:var(--ink);margin-bottom:8px}
+.pdb{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.pdb button{flex:1;min-width:88px;border:1px solid var(--line);border-radius:8px;padding:8px 6px;
+  font-size:12px;font-weight:600;color:var(--ink);background:var(--sur2)}
+.pdb button[data-pdacc="aprobar"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.pdb button.no{color:var(--red2)}
+.pdb button:disabled{opacity:.5}
+
 /* ═══ TURNOS · cubrir disponibilidad ════════════════════════════════════
    ⛔ CLASES PROPIAS, no se reutiliza `.ecel`. En reuniones `on1`=telemático y
    `on2`=presencial: allí el eje es CÓMO asistes. Aquí es DÓNDE (CUVI/CITI/los

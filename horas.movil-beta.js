@@ -623,6 +623,92 @@ function _cuotaHTML_(){
       '2 h de base. Se descuentan 4 € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>';
 }
 
+/* ═══ DECIDIR PARTES DE HORAS DESDE EL MÓVIL ════════════════════════════════════════
+   Daniel (06/08): *«habilitar el teléfono a los coordinadores y subcoordinadores (y a mí) a
+   aceptar y aprobar fichajes; todos los fichajes que no estén routeados deberían recaer en
+   mí»*.
+
+   ⛔ LA AUTORIDAD NO SE DECIDE AQUÍ. El backend ya la comprueba: `_puedeSobreParte_` (rango ≥ 3
+   o coordinador del subsistema del parte) y, en `_decidirParte_`, **nadie decide lo suyo**. De
+   ahí sale la regla que pedía Daniel sin escribir nada nuevo: si fichas *en concepto de*
+   coordinador de tu propia unidad, el que aprobaría serías tú — y como no puedes, **cae en el
+   PD**. Esta pantalla evita el error honesto, no al que quiera saltársela.
+
+   ⛔ Y no se filtra por rango en la cara para decidir QUÉ se ve: se pide al servidor y se pinta
+   lo que devuelva. Filtrar aquí sería tener la regla en dos idiomas — y la de la cara siempre
+   se queda vieja. */
+
+function _cargarPartesDec_(){
+  /* Los que esperan decisión, **sin** los tuyos: el backend ya te sirve solo lo que te toca. */
+  return api.getPartes({}).then(function(arr){
+    if(!Array.isArray(arr)) return;
+    var yo=(YO&&YO.nombre)||'';
+    PARTES_DEC = arr.filter(function(p){
+      return (p.estado==='pendiente' || p.estado==='detalle') && p.autor!==yo;
+    }).map(function(p){
+      return { id:p.id, autor:p.autor, pila:_pilaDeM_(p.autor), unidad:p.subsistema||'—',
+        f:_isoADMY_(p.fecha), ini:p.ini||'—', fin:p.fin||'—', q:Number(p.horas)||0,
+        t:p.tarea||'', just:p.justificacion||'', sinFichaje:!!p.sinFichaje,
+        estado:p.estado, origen:p.origen||null };
+    });
+  }).catch(function(){});
+}
+
+function _partesDecHTML_(){
+  if(!PARTES_DEC.length) return '';
+  var horas=0; PARTES_DEC.forEach(function(p){ horas+=p.q; });
+  return '<div class="tarj" id="pdec">'+
+    cab('Esperan tu decisión', PARTES_DEC.length+' · '+nf2(horas)+' h')+
+    '<p class="rnota" style="margin:0 0 10px">Son horas de tu gente: <b>no cuentan hasta que las '+
+      'firmes</b>. Rechazar o pedir detalle exige un motivo.</p>'+
+    PARTES_DEC.map(function(p){
+      return '<div class="pdi" data-pd="'+p.id+'">'+
+        '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
+          '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(p.ini)+'–'+esc(p.fin)+'</small></div>'+
+          '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
+        '<div class="pdt">'+esc(p.t)+'</div>'+
+        (p.just?'<div class="pdj">'+esc(p.just)+'</div>':'')+
+        (p.sinFichaje?'<span class="pdw">declarado sin fichaje</span>':'')+
+        '<input class="pdm" type="text" placeholder="Motivo — obligatorio para rechazar o pedir detalle">'+
+        '<div class="pdb">'+
+          '<button data-pdacc="aprobar" data-p>Aprobar</button>'+
+          '<button data-pdacc="detalle" data-p>Pedir detalle</button>'+
+          '<button data-pdacc="rechazar" class="no" data-p>Rechazar</button>'+
+        '</div></div>';
+    }).join('')+'</div>';
+}
+
+function _engPartesDec_(){
+  var c=$('#pdec'); if(!c) return;
+  $$('#pdec [data-pdacc]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var caja=b.closest('[data-pd]'); if(!caja) return;
+      var id=+caja.dataset.pd, acc=b.dataset.pdacc;
+      var mot=((caja.querySelector('.pdm')||{}).value||'').trim();
+      /* ⛔ El motivo se exige AQUÍ TAMBIÉN, no solo en el servidor: el backend lo rechaza con
+         un error, y comerse un viaje de red para que te digan lo que ya se sabía es una
+         pantalla que te hace perder el rato. El mínimo es el mismo que el suyo (8). */
+      if(acc!=='aprobar' && mot.length<8){
+        tost('Pon un motivo (al menos 8 caracteres).'); return; }
+      if(acc==='aprobar' && !confirm('Aprobar estas horas.\n\nPasan a contar en el mes de quien '+
+        'las declaró y ya no se pueden deshacer desde aquí.\n\n¿Sigo?')) return;
+      $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=true; });
+      var prev=b.textContent; b.textContent='…';
+      try{
+        await api.decidirParte(id, acc, mot||null);
+        tost(acc==='aprobar'?'Aprobado. Ya cuenta.':(acc==='rechazar'?'Rechazado.':'Detalle pedido.'));
+        await _cargarPartesDec_();
+        pintar();
+      }catch(e){
+        tost('No se pudo: '+e);
+        $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=false; });
+        b.textContent=prev;
+      }
+    };
+  });
+}
+
 function vHoras(){
   var o=sumaE('otor'), p=sumaE('pend');
   /* MISMA PUERTA que la tarjeta de Estado (`_hMesReal_`). Habia dos tarjetas de «horas del
@@ -645,7 +731,9 @@ function vHoras(){
       : '<div class="r"><span class="p mono">'+i+'</span><span class="cens"></span></div>';
   }
 
+  /* Lo que ESPERA TU FIRMA va lo primero: es de otra gente y tiene a alguien esperando. */
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
+    _partesDecHTML_()+
     '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
