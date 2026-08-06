@@ -908,6 +908,13 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-horas', fecha:'2026-08-07', titulo:'Horas: desplegables, y el parte aprobado ya desaparece',
+      items:[
+        {cara:'movil', vista:'horas', txt:'«Esperan tu decisión» es ahora un desplegable que dice cuántos partes y cuántas horas hay que conceder, sin abrirlo. Dentro, uno por miembro.'},
+        {cara:'movil', vista:'horas', txt:'«Tus partes» igual, con un solo nivel.'},
+        {cara:'movil', vista:'horas', txt:'Y al aprobar, el parte YA desaparece de la lista: antes se quedaba hasta que aprobabas el siguiente.'},
+        {cara:'movil', vista:'fichar', txt:'Un envío no puede crear dos partes aunque la red falle y se reintente.'}
+      ]},
     { id:'2026-08-07-registro', fecha:'2026-08-07', titulo:'Lo que marcas como visto ya no se queda en tu móvil',
       items:[
         {cara:'movil', vista:'estado', txt:'El «Ya lo he visto» se guarda en el servidor, con la fecha y quién lo marcó — así lo ve también quien programa.'},

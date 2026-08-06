@@ -700,15 +700,10 @@ function _cargarPartesDec_(){
   }).catch(function(){});
 }
 
-function _partesDecHTML_(){
-  if(!PARTES_DEC.length) return '';
-  var horas=0; PARTES_DEC.forEach(function(p){ horas+=p.q; });
-  return '<div class="tarj" id="pdec">'+
-    cab('Esperan tu decisión', PARTES_DEC.length+' · '+nf2(horas)+' h')+
-    '<p class="rnota" style="margin:0 0 10px">Son horas de tu gente: <b>no cuentan hasta que las '+
-      'firmes</b>. Rechazar o pedir detalle exige un motivo.</p>'+
-    PARTES_DEC.map(function(p){
-      return '<div class="pdi" data-pd="'+p.id+'">'+
+/* Una ficha de parte, dentro de la lista de decisión. Se saca aparte porque ahora vive dentro
+   de DOS desplegables y el HTML de la ficha no tiene por qué enterarse de eso. */
+function _pdFichaHTML_(p){
+  return '<div class="pdi" data-pd="'+p.id+'">'+
         '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
           '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(p.ini)+'–'+esc(p.fin)+'</small></div>'+
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
@@ -721,7 +716,45 @@ function _partesDecHTML_(){
           '<button data-pdacc="detalle" data-p>Pedir detalle</button>'+
           '<button data-pdacc="rechazar" class="no" data-p>Rechazar</button>'+
         '</div></div>';
-    }).join('')+'</div>';
+}
+
+/* ═══ «ESPERAN TU DECISIÓN» · DESPLEGABLE DE DESPLEGABLES ══════════════════════════════
+   Daniel (07/08): *«este tipo de cosas siempre mejor que sean desplegables: ponga ahí esperan
+   tu decisión —desplegable que ponga número de partes y total de horas a conceder— y al abrir
+   me salga un desplegable de desplegables (1 por miembro), y dentro de cada miembro lo que me
+   muestras ahora»*.
+
+   ⛔ **Nace CERRADO.** El valor del cambio es justamente que la cabecera diga el total sin
+   ocupar la pantalla: abrirlo por defecto lo dejaría igual que antes con un clic de más.
+   ⚠️ Salvo cuando hay **un solo miembro**: ahí el segundo desplegable no separa nada de nada,
+   así que se abre solo. Un nivel de pliegue que no agrupa nada es un clic regalado. */
+function _partesDecHTML_(){
+  if(!PARTES_DEC.length) return '';
+  var horas=0; PARTES_DEC.forEach(function(p){ horas+=p.q; });
+  /* Agrupado por autor CONSERVANDO EL ORDEN de llegada: ordenar por nombre pondría a la misma
+     persona arriba siempre, y lo que interesa es lo que lleva más tiempo esperando. */
+  var orden=[], por={};
+  PARTES_DEC.forEach(function(p){
+    if(!por[p.autor]){ por[p.autor]=[]; orden.push(p.autor); }
+    por[p.autor].push(p);
+  });
+  var unico = orden.length===1;
+  return '<div class="tarj" id="pdec">'+
+    '<details class="pdgrupo">'+
+      '<summary><b>Esperan tu decisión</b>'+
+        '<span class="pdnum">'+PARTES_DEC.length+' '+(PARTES_DEC.length===1?'parte':'partes')+
+        ' · '+nf2(horas)+' h</span></summary>'+
+      '<p class="rnota" style="margin:8px 0 10px">Son horas de tu gente: <b>no cuentan hasta que '+
+        'las firmes</b>. Rechazar o pedir detalle exige un motivo.</p>'+
+      orden.map(function(a){
+        var ps=por[a], h=0; ps.forEach(function(x){ h+=x.q; });
+        return '<details class="pdpers"'+(unico?' open':'')+'>'+
+          '<summary><b>'+esc(ps[0].pila)+'</b>'+
+            '<span class="pdnum">'+ps.length+' · '+nf2(h)+' h</span></summary>'+
+          ps.map(_pdFichaHTML_).join('')+
+        '</details>';
+      }).join('')+
+    '</details></div>';
 }
 
 function _engPartesDec_(){
@@ -806,9 +839,16 @@ function vHoras(){
       _movHorasHTML_(confs)+
     '</div>'+
 
+    /* ⛔ UN SOLO NIVEL, no dos. Daniel (07/08): *«la misma lógica del desplegable, pero esta
+       vez, como son tuyos, no hace falta desplegable de desplegables sino solo uno»*. Agrupar
+       tus propios partes por autor sería agruparlos por ti. */
     '<h2 class="sec">Tus partes<span class="ln"></span>'+mias.length+'</h2>'+
     '<div class="tarj">'+
-      (mias.length ? mias.map(filaParte).join('')
+      (mias.length
+        ? '<details class="pdgrupo"><summary><b>Tus partes</b><span class="pdnum">'+
+            mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
+            nf2(mias.reduce(function(t,x){ return t+(Number(x.q)||0); },0))+' h</span></summary>'+
+          mias.map(filaParte).join('')+'</details>'
         : vacio('Ningún parte en cola',
             'No tienes horas esperando firma. Las que envíes aparecerán aquí con su estado '+
             'hasta que tu coordinador las apruebe.','ficha desde la pestaña Fichar', false))+

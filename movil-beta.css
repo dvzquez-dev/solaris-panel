@@ -818,6 +818,17 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .novb button.si{background:var(--ok);border-color:var(--ok);color:#fff}
 .novv{font-size:11.5px;color:var(--ink3)}
 .novnada{font-size:12.5px;color:var(--ink3);margin:0 0 6px}
+/* Los desplegables de horas. Mismo gesto que `.novhist`, pero la cabecera lleva su cuenta
+   a la derecha: el valor de plegarlo es que el número se vea SIN abrirlo. */
+.pdgrupo>summary,.pdpers>summary{display:flex;align-items:center;justify-content:space-between;
+  gap:10px;cursor:pointer;list-style:none;padding:4px 0}
+.pdgrupo>summary::-webkit-details-marker,.pdpers>summary::-webkit-details-marker{display:none}
+.pdgrupo>summary::after,.pdpers>summary::after{content:'›';color:var(--ink3);font-size:15px;
+  transform:rotate(90deg);transition:transform .16s}
+.pdgrupo[open]>summary::after,.pdpers[open]>summary::after{transform:rotate(-90deg)}
+.pdnum{font-family:var(--mono);font-size:11px;color:var(--ink3);white-space:nowrap}
+.pdpers{border-top:1px solid var(--line);margin-top:6px;padding-top:4px}
+.pdpers>summary{font-size:13px}
 .novhist{margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
 .novhist summary{font-size:12px;color:var(--ink3);cursor:pointer}
 .novpie{font-size:11px;color:var(--ink3);line-height:1.5;margin:9px 0 0;
