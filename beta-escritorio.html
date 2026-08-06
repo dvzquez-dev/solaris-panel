@@ -16,7 +16,7 @@
 <meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio-beta.css?v=b83fc66">
+<link rel="stylesheet" href="escritorio-beta.css?v=fdc79b8">
 </head>
 <body>
 
@@ -108,14 +108,14 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=6fe8588"></script>
+<script src="comun-beta.js?v=66b1db1"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
-<script src="cierre.escritorio-beta.js?v=ab76284"></script>
-<script src="turnos.escritorio-beta.js?v=43cb96f"></script>
+<script src="cierre.escritorio-beta.js?v=b534df5"></script>
+<script src="turnos.escritorio-beta.js?v=2bd5fd6"></script>
 <script src="buzon.escritorio-beta.js?v=aa3b013"></script>
 <script src="documentos.escritorio-beta.js?v=1918b5e"></script>
 <script src="sanciones.escritorio-beta.js?v=1c7fbee"></script>
-<script src="reuniones.escritorio-beta.js?v=a6a01c4"></script>
+<script src="reuniones.escritorio-beta.js?v=45226c0"></script>
 <script src="horas.escritorio-beta.js?v=fe4d86d"></script>
 <script src="equipo.escritorio-beta.js?v=8d4dd07"></script>
 <script>
@@ -278,6 +278,15 @@ var api={
   getCierre:      function(){ return api._post({action:"getCierre"}); },
   calcularCierre:      function(f,p){ return api._post({action:"calcularCierre",forzar:!!f,periodo:p||null}); },
   aplicarCierre:  function(p){ return api._post({action:"aplicarCierre",periodo:p||null}); },
+  /* CIERRE DE TEMPORADA (backend v60). Mismo patron que el mensual: ENCOLA, no aplica.
+     ⛔ `prorrogado` viaja con TRES valores -true, false y null=«sin votar»- porque el Art.
+     29l empieza con un «si»: pide 2/3 de la Junta (29k), y «no se ha votado» NO es «se voto
+     que no». Por eso no se normaliza a booleano aqui. */
+  getTemporada:   function(){ return api._post({action:"getTemporada"}); },
+  calcularTemporada: function(o){ o=o||{}; return api._post({action:"calcularTemporada",
+    temporada:o.temporada||null, prorrogado:(o.prorrogado===undefined?null:o.prorrogado),
+    tarifa:o.tarifa||null, bajas:o.bajas||null}); },
+  aplicarTemporada:  function(t){ return api._post({action:"aplicarTemporada",temporada:t||null}); },
   reportarBug:    function(d){ return api._post({action:"reportarBug",datos:d}); },
   reportarMejora: function(d){ return api._post({action:"reportarMejora",datos:d}); },
   getBuzon:       function(){ return api._post({action:"getBuzon"}); },
@@ -559,6 +568,28 @@ var ACX=75,ACY=75,AR=52,AGAP=8,ASTEP=36;
    algun dia el changelog usa tablas, se añaden aqui y se dice. */
 
 
+/* ═══ DISPONIBILIDAD PARA TURNOS ═══════════════════════════════════════════════════
+   ⛔ `abre` y `limite` llegan YA CALCULADOS: la regla —jueves 22:00 → sábado 22:00, ventana de
+   48 h— vive SOLO en `reglas/convocatoria.py`. Esta cara no calcula fechas, las compara.
+   ⛔ Y `consejo` VIAJA CON LA CONVOCATORIA, no se deduce del cargo ni se copia aquí. La lista
+   buena es `CONSEJO_PUSH` del backend, que es explícita: hay gente del consejo que no coordina
+   nada y coordinadores que no son del consejo. Copiarla a la cara sería tener en dos sitios la
+   regla de quién puede liderar un turno. Mientras el backend no la mande, viaja en el dato.
+   ⛔ Y `franjas` también es dato: si la tarde acaba llevando hora de entrada, la convocatoria
+   nace con tres franjas y aquí no se toca nada.
+   ⚠️ DEMO: instantes y respuestas inventados, para poder mirar la pantalla. */
+var CONVOCATORIAS=[{
+  id:'cv-2026-08-10', semana:'2026-08-10',
+  dias:['2026-08-10','2026-08-11','2026-08-12','2026-08-13','2026-08-14','2026-08-15','2026-08-16'],
+  franjas:[{k:'m',txt:'Mañana'},{k:'t',txt:'Tarde/noche'}],
+  sitios:['cuvi','citi'],
+  abre:'2026-08-06T09:00', limite:'2026-08-08T22:00',
+  convocante:'Daniel Vázquez Piñeiro',
+  consejo:['Daniel Vázquez Piñeiro','José Manuel Torres Rodríguez','Bruno Araújo González'],
+  invitados:[], resp:{}
+}];
+var DISP_SITIO='', DISP_SEL='';
+
 var V={};
 
 /* ── PANEL DE MANDO ──────────────────────────────────────────────────────
@@ -812,6 +843,10 @@ V.registro={g:'Horas',t:'Registro del mes',f:function(){
 /* Estado del cierre traido del backend. `null` = todavia no se ha preguntado; distinguirlo
    de «no hay nada» importa, o la pantalla diria que todo esta listo sin haber mirado. */
 var CIERRE=null, CIERRE_ERR=null;
+/* Lo mismo para el cierre de TEMPORADA. `null` = no se ha preguntado todavia, que no es lo
+   mismo que «no hay nada»: sin esa distincion la pantalla diria que esta todo listo sin
+   haber mirado. Van aqui y no en el modulo porque un modulo solo lleva `function`. */
+var TEMP=null, TEMP_ERR=null;
 
 
 /* El mes que se CIERRA no es el que corre. Lo dijo Daniel el 04/08: «el cierre va del anterior
@@ -955,6 +990,76 @@ var CAL_DOC={baja:'alta',media:'media',alta:'baja'};
 
    El iframe se crea **al desplegar**, nunca antes: tres visores de Drive cargando a la vez en
    una ficha es medio megabyte que casi nadie va a mirar. */
+
+
+/* ── CIERRE DE TEMPORADA · una vez al año, el 1 de septiembre ─────────────────────────
+   ⛔ Esta pantalla PINTA el veredicto, no lo deduce. Los bloqueos los calcula
+   `flujos/temporada.validar_temporada` y llegan con su texto: el mensual de agosto tiene que
+   estar aplicado ANTES, porque si no el mensual copiaría a «Puntos mes anterior» el 5 que
+   acaba de poner el ajuste del Art. 29l y borraría los puntos reales de agosto. Repetir esa
+   regla aquí sería tener la misma regla en dos idiomas — que hoy mismo ya costó un fallo. */
+V.temporada={g:'Horas',t:'Cierre de temporada',f:function(){
+  if(TEMP===null && !TEMP_ERR)
+    return pan('Cierre de temporada','comprobando…',
+      '<div class="nota" style="border-top:0">Preguntando al servidor…</div>');
+  if(TEMP_ERR)
+    return pan('Cierre de temporada','no se pudo comprobar',
+      vacioSimple('No se pudo leer el estado', esc(TEMP_ERR)+'. No es que esté todo listo: es '+
+        'que no se ha podido comprobar, y esto mueve la cuota y la renovación de 32 personas.'));
+  var pl=TEMP.plan||null, enc=TEMP.encolado||null, apl=TEMP.aplicando||null;
+  var t=(pl&&pl.totales)||{}, bloq=(pl&&pl.bloqueos)||[];
+  var cab='Temporada '+esc(TEMP.temporada||'—');
+  var cuerpo='';
+
+  if(!pl){
+    cuerpo+=vacioSimple('Todavía no hay plan',
+      'Esto se hace <b>una vez al año</b>, el 1 de septiembre, y <b>después</b> del cierre '+
+      'mensual de agosto. Calcularlo no toca Notion: deja aquí a quién le sube los puntos al '+
+      'suelo de 5 (Art. 29l), la cuota de cada uno y el ranking de la temporada.');
+  } else {
+    cuerpo+='<div class="kpis">'+
+      kpi('Personas', String(pl.personas==null?'—':pl.personas), 'en el plan')+
+      kpi('Suben al suelo', String(t.suben_a_suelo==null?'—':t.suben_a_suelo),
+          'a '+(t.suelo==null?5:t.suelo)+' puntos · Art. 29l')+
+      kpi('Cuota', (t.a_cobrar_total==null?'—':String(t.a_cobrar_total)+' €'),
+          'tarifa '+esc(t.tarifa||'—')+' · '+(t.personas_con_cuota||0)+' personas')+
+      '</div>';
+    /* ⛔ El motivo por el que NO se puede aplicar se enseña ENTERO. Un «no se puede» sin el
+       porqué obliga a abrir un JSON por SSH, y entonces no se revisa: se acepta. */
+    if(bloq.length){
+      cuerpo+='<div class="nota"><b>No es aplicable todavía</b> ('+bloq.length+'):<ul>'+
+        bloq.map(function(b){ return '<li>'+esc(String(b))+'</li>'; }).join('')+'</ul></div>';
+    }
+    if((pl.avisos||[]).length){
+      cuerpo+='<div class="nota">Avisos:<ul>'+
+        pl.avisos.map(function(a){ return '<li>'+esc(String(a))+'</li>'; }).join('')+'</ul></div>';
+    }
+    var pr=pl.prorroga||{};
+    cuerpo+='<div class="nota">Prórroga (Art. 29k, 2/3 de la Junta): <b>'+
+      (pr.decidida ? (pr.prorrogado?'aprobada':'NO aprobada') : 'todavía sin votar')+'</b>. '+
+      'El Art. 29l empieza con un «si»: sin decisión registrada el plan no es aplicable, y eso '+
+      'es lo correcto — no se ajustan puntos que nadie ha aprobado.</div>';
+    if((pl.ranking_top||[]).length){
+      cuerpo+=tabla([['Cabeza del ranking'],['Horas',1],['Meses',1]],
+        pl.ranking_top.map(function(f){
+          return '<tr><td>'+esc(String(f.n||''))+'</td><td class="r mono">'+esc(String(f.h))+
+                 '</td><td class="r mono">'+esc(String(f.m))+'</td></tr>'; }).join(''));
+    }
+  }
+
+  if(enc) cuerpo+='<div class="nota"><b>Encolado</b> para calcular'+
+    (enc.por?' por '+esc(String(enc.por)):'')+'. La rutina lo recoge en la siguiente pasada.</div>';
+  if(apl) cuerpo+='<div class="nota"><b>Encolado para APLICAR</b>'+
+    (apl.por?' por '+esc(String(apl.por)):'')+'.</div>';
+  if(pl&&pl.aplicado) cuerpo+='<div class="nota"><b>APLICADO.</b></div>';
+
+  cuerpo+='<div class="acc">'+
+    '<button class="btn" data-calctemp>Calcular el cierre de temporada</button>'+
+    (pl&&pl.aplicable&&!pl.aplicado
+      ? '<button class="btn pri" data-aplicartemp>Aplicar</button>' : '')+
+    '</div>';
+  return pan(cab, pl?(pl.aplicable?'listo para aplicar':'no aplicable'):'sin plan', cuerpo);
+}};
 
 
 /* La fila YA NO DECIDE. Tenia «Aprobar» y «Cambios» ahi mismo, con el titulo por toda
@@ -1311,7 +1416,7 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
 V.turnos={g:'Operación',t:'Turnos',f:function(){
   if(!TURNOS.length) return pan('Turnos convocados','ninguno',
     vacioSimple('No hay turnos convocados','Convoca el primero aquí abajo: queda publicado en Notion y les llega a los '+
-      'convocados.'))+convocarPanel();
+      'convocados.'))+_dispPanel_()+convocarPanel();
   return pan('Turnos convocados',TURNOS.length+'',
     tabla([['Turno'],['Fecha'],['Hora',0],['Punto'],['Duración',1],['Van',1],['Memoria',1]],
       /* las fechas llegan en ISO (dato real: '2025-11-26') o DD/MM/AAAA (semilla): se
@@ -1333,7 +1438,7 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
       }).join(''))+
     '<div class="nota">Los turnos se leen <b>en vivo de Notion</b>: lo que convoques aquí abajo aparece '+
     'allí, y lo que se cambie allí tarda unos minutos en verse aquí.</div>')+
-    convocarPanel();
+    _dispPanel_()+convocarPanel();
 }};
 V.tareas={g:'Operación',t:'Tareas',f:function(){
   var porUni={};
@@ -1910,7 +2015,7 @@ var _swReg=null;
    ═══════════════════════════════════════════════════════════════════════════ */
 var GRUPOS=[
   ['Operación',['panel','turnos','tareas']],
-  ['Horas',['libros','partes','sindeclarar','curso','registro','cierre']],
+  ['Horas',['libros','partes','sindeclarar','curso','registro','cierre','temporada']],
   ['Documentos',['docdec','docurso','docpub']],
   ['Disciplina',['sanciones','apela']],
   ['Reuniones',['convoc','dispo','actas']],
@@ -1930,6 +2035,8 @@ function pintarNav(){
       /* El cierre lo dispara SOLO el PD (o admin). Antes esta entrada la veia cualquiera que
          entrara al escritorio: el backend le decia que no, pero despues de haberselo ofrecido. */
       if(k==='cierre' && !_puedeCerrarMes_()) return;
+      /* El de temporada, igual: de aqui salen la cuota y la renovacion de TODO el equipo. */
+      if(k==='temporada' && !_puedeCerrarMes_()) return;
       var n=conteo(k), b=document.createElement('button');
       b.className='item'+(k===vista?' on':''); b.dataset.v=k;
       var cls = (k==='partes'&&n)||(k==='docdec'&&n) ? ' hot' : (k==='sanciones'&&n)||(k==='curso'&&n) ? ' wa' : '';
@@ -1963,7 +2070,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='e013328';
+var BUILD='cdbcca7';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -2304,13 +2411,16 @@ function pintar(){
   _pinReunionFijar_(m);
   _pinCerrarMes_(m);
   _pinAplicarCierre_(m);
+  _pinTemporada_(m);
   _pinBuzon_(m);
   _pinAnotaciones_(m);
+  _pinDisp_();
 }
 function ir(k,foco){
   /* Al abrir el cierre se pregunta al servidor en que punto esta: los bloqueos y el plan
      los tiene el, no se deducen aqui. */
   if(k==='cierre' && CIERRE===null && !CIERRE_ERR) setTimeout(_cargarCierre_,60);
+  if(k==='temporada' && TEMP===null && !TEMP_ERR) setTimeout(_cargarTemporada_,60);
   if(k===vista && !foco) return;
   vista=k;
   var m=$('#main');

@@ -401,6 +401,38 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
   .viajev,.actua .est{display:none}
   main.entrando>*{animation:none}
 }
+/* ═══ DISPONIBILIDAD PARA TURNOS · el mapa ══════════════════════════════
+   Clases propias: la escala de reuniones dice CÓMO asistes y esta dice DÓNDE. */
+.dmapa{display:grid;gap:3px;margin:4px 0 0}
+.dmc{font-family:var(--mono);font-size:10px;color:var(--ink3);display:flex;
+  align-items:center;justify-content:center;text-align:center;line-height:1.25}
+.dmc.dml{justify-content:flex-end;padding-right:8px;white-space:nowrap;color:var(--ink2);font-size:11px}
+.dcel{height:36px;border-radius:4px;background:var(--sur2);display:grid;place-items:center;
+  font-family:var(--mono);font-size:13px;font-weight:600;color:#fff;cursor:pointer;
+  position:relative;transition:outline-color .12s}
+.dcel.v0{color:var(--ink3)}
+/* ⛔ `dsel`/`dmejor` y NO `sel`/`top`: `escritorio.css` ya declara `.top{grid-column:2}`
+   —la barra superior del layout— y la celda con esa clase heredaba la columna, con lo que
+   se iba a la fila siguiente y partía el mapa. El HTML era correcto; lo rompía una clase
+   de tres letras escrita 300 líneas más arriba. */
+.dcel.dsel{outline:2px solid var(--ink);outline-offset:-2px}
+.dcel.dmejor{outline:2px solid var(--ok);outline-offset:-2px}
+/* El coche se ve SIN pasar el ratón: sin coche muchos turnos no salen. */
+.dcel .dch{position:absolute;top:1px;right:3px;font-size:11px;line-height:1;
+  filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
+.ddet{margin-top:11px;border-top:1px solid var(--line);padding-top:11px;font-size:12.5px;
+  line-height:1.6;min-height:86px}
+.ddet h5{margin:0 0 6px;font-size:12px;color:var(--ink2);font-weight:600}
+.ddet .cesta{margin-bottom:5px}
+.ddet .cesta b{color:var(--ink);font-weight:600}
+.ddet .cesta span{color:var(--ink2)}
+.ddet .nadie{color:var(--ink3)}
+.dsit{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:9px}
+.dsit button{border-right:1px solid var(--line);padding:5px 11px;font-size:11.5px;font-weight:600;
+  color:var(--ink3);background:transparent}
+.dsit button:last-child{border-right:0}
+.dsit button.on{background:var(--red);color:#fff}
+
 /* ═══ FOTO EN EL BUZÓN + PINTOR ═══════════════════════════════════════════
    Diseño de Daniel (28/07): subes una foto, un lapicito abre un lienzo a pantalla
    completa, pintas encima con zoom para precisar, y al salir se fusionan las dos capas.

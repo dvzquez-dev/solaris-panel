@@ -783,6 +783,36 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .celc.best{outline:1px solid var(--ink);outline-offset:-1px}
 .celc.fij{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.92)}
 
+/* ═══ TURNOS · cubrir disponibilidad ════════════════════════════════════
+   ⛔ CLASES PROPIAS, no se reutiliza `.ecel`. En reuniones `on1`=telemático y
+   `on2`=presencial: allí el eje es CÓMO asistes. Aquí es DÓNDE (CUVI/CITI/los
+   dos) y encima lleva coche. Reutilizar la escala «porque se parece» haría que
+   el mismo valor significara dos cosas según la pantalla, que es de donde salen
+   los fallos mudos de este proyecto. */
+.tpin{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0 8px}
+.tpin button{border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:11.5px;
+  font-weight:600;color:var(--ink3);background:transparent;white-space:nowrap}
+.tpin button.on{color:#fff}
+.tpin button.on[data-pin="cuvi"]{background:var(--red);border-color:var(--red)}
+.tpin button.on[data-pin="citi"]{background:var(--tel);border-color:var(--tel)}
+.tpin button.on[data-pin="ambos"]{background:linear-gradient(135deg,var(--red) 50%,var(--tel) 50%);
+  border-color:var(--ink3)}
+.tpin button.on[data-pin="no"]{background:var(--ink2);color:#1a1616;border-color:var(--ink2)}
+.tpin button.coche.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.tcel{height:30px;border-radius:3px;background:var(--sur2);cursor:pointer;position:relative;
+  display:grid;place-items:center;font-family:var(--mono);font-size:9px;color:#fff}
+.tcel.cuvi{background:var(--red)}
+.tcel.citi{background:var(--tel)}
+.tcel.ambos{background:linear-gradient(135deg,var(--red) 50%,var(--tel) 50%)}
+.tcel.no{background:var(--sur2);border:1px solid var(--ink3);color:var(--ink3)}
+/* El coche se ve SIN abrir nada: sin coche muchos turnos no salen, así que es
+   información de un vistazo, no de un desglose. */
+.tcel .cch{position:absolute;top:0;right:1px;font-size:11px;line-height:1;
+  filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
+.tplazo{font-size:11.5px;color:var(--ink2);margin-top:8px;line-height:1.5}
+.tplazo b{color:var(--ink)}
+.tplazo.urge b{color:var(--red2)}
+
 /* ═══ COLA DE SANCIONES · BLOQUES (Panel PD) ════════════════════════════ */
 .lote{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px}
 .lote.rev{border-left:3px solid var(--ok)}

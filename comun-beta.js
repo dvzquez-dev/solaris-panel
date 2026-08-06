@@ -718,10 +718,69 @@ function coordinadorDe(u){
   return c ? c.nombre : PD_NOM;
 }
 
+
+/* ⛔ EL MAPA DE CALOR · UNA SOLA VEZ (05/08/2026). Estaba escrito en las DOS caras con la
+   etiqueta GEMELA encima, y **ya divergian** — que es exactamente lo que ese comentario
+   avisaba que iba a pasar (mapa §5, D6). Diferencias medidas:
+
+     · el ESCRITORIO tenia un atajo de SEMILLA (`r.calor` precalculado) que el movil no. Es de
+       demo: en cuanto llegan respuestas reales se pone a `null` y se recalcula. Se conserva,
+       porque sin el la pantalla de demo no pinta nada, y va marcado como lo que es.
+     · con BLOQUES DUPLICADOS el movil ACUMULA y el escritorio SOBREESCRIBIA con el ultimo.
+       Gana acumular: un bloque repetido es un dato malo, y perder respuestas en silencio es
+       peor que contarlas de mas — al menos se nota.
+
+   `pond=false` cuenta PERSONAS (cualquier valor > 0); `pond=true` suma los VALORES
+   (presencial+telematico=2, telematico=1). El movil necesita las dos y la llama dos veces.
+
+   ⚠️ `null` NO es cero: es **bloque NO OFERTADO**. Con horario por dia no todas las franjas
+   existen todos los dias, y pintar un hueco muerto como «no puede nadie» es mentir. Por eso la
+   matriz nace a `null` y solo los bloques realmente ofertados pasan a 0.
+
+   ⚠️ Y el indice de `resp[nombre][i]` es la posicion en `bloques`, **no** la franja: si
+   `bloques` se reordena (lo hace `_ordenarFranjas_`), hay que pasar aqui el reordenado y sus
+   respuestas alineadas. Mezclar los dos ordenes es lo que apuntaba a otra hora. */
+function _calorDe_(r, pond){
+  if(!pond && Array.isArray(r.calor) && r.calor.length) return r.calor;   // semilla de demo
+  var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};
+  var cel=dias.map(function(){ return F.map(function(){ return null; }); });
+  bl.forEach(function(b){ if(Array.isArray(b) && cel[b[0]] && b[1]>=0 && b[1]<F.length) cel[b[0]][b[1]]=0; });
+  Object.keys(resp).forEach(function(nom){
+    var v=resp[nom]; if(!Array.isArray(v)) return;
+    for(var i=0;i<bl.length;i++){
+      var val=+v[i]||0; if(!(val>0)) continue;
+      if(!Array.isArray(bl[i])) continue;
+      var d=bl[i][0], f=bl[i][1];
+      if(cel[d] && cel[d][f]!=null) cel[d][f] += (pond ? val : 1);
+    }
+  });
+  return cel;
+}
+
 /* ⛔ ¿ES LA UNIDAD DE DOCUMENTACIÓN TÉCNICA? El nombre llega de tres sitios y no coincide:
    `UCT` (el viejo, y el que sigue usando Cowork), `Documentación Técnica` (el del roster) y
    `Unidad de Documentación Técnica` (el canónico que devuelve `umbral.coordinadas`). Se
    pregunta por la unidad, NO por quién la lleva — que es justo lo que se viene a arreglar. */
+/* `AAAA-MM-DD` → «lun 10», para rotular una rejilla de días.
+
+   ⛔ Esto es FORMATO, no calendario. La regla de cuándo se abre y cuándo vence una
+   convocatoria vive en `reglas/convocatoria.py` y no se reescribe en ninguna cara; aquí
+   solo se pone nombre a un día que ya viene dado.
+
+   ⚠️ Se ancla al MEDIODIA local a propósito: `new Date('2026-08-10')` se parsea como UTC
+   —así lo manda la norma para la forma corta—, con lo que en un huso al oeste devuelve el
+   día ANTERIOR. Con `T12:00` no hay huso que lo mueva.
+
+   El array va DENTRO: `comun.js` no lleva ni una sentencia ejecutable de nivel superior, y
+   esa es la propiedad que hizo que se pudiera sacar del HTML sin arrastrar orden de carga. */
+function _diaCorto_(iso){
+  var s=String(iso==null?'':iso);
+  if(!/^\d{4}-\d{2}-\d{2}/.test(s)) return s;      // lo que no reconozca, se devuelve tal cual
+  var d=new Date(s.slice(0,10)+'T12:00');
+  if(isNaN(+d)) return s;
+  return ['dom','lun','mar','mi\u00e9','jue','vie','s\u00e1b'][d.getDay()]+' '+s.slice(8,10);
+}
+
 function esUCT(u){
   return /documentaci[oó]n\s+t[eé]cnica/i.test(String(u || '')) || /^\s*UCT\s*$/i.test(String(u || ''));
 }

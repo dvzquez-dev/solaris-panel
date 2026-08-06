@@ -56,6 +56,208 @@ function _memoriaHTML_(t){
    unico. Un alias es mas honesto que dejar la copia viva «por si acaso». */
 function _cablearMemoria_(){ _cablearVisor_(); }
 
+/* ═══ CUBRIR DISPONIBILIDAD PARA TURNOS ═════════════════════════════════════════════
+   La mitad de miembro: ver qué semana se pregunta, cuánto queda de plazo y marcar.
+   La mitad de administrador —convocar y ver el mapa con el desglose— es del escritorio.
+
+   ⛔ AQUÍ NO SE CALCULA NINGUNA FECHA DE CALENDARIO. `abre` y `limite` vienen dados; esta
+   cara solo los compara. La regla vive en `reglas/convocatoria.py`, una sola vez.
+   ⛔ Y el modelo de la celda es el de `reglas/turnos.py`: ausente = no ha contestado ·
+   `{s:'no'}` = ha dicho que no puede · `{s:<sitio>|'ambos',c:bool}` = puede, dónde y si
+   lleva coche. Los TRES estados, no dos: es el único acierto de diseño del excel que se
+   viene a sustituir, y la diferencia importa porque solo al mudo se le puede insistir. */
+
+/* GEMELA de `reglas/turnos.py:clave`. El separador se prueba contra el de Python en
+   `rutinas/probar_turnos.py` §12: si alguien cambia uno, el banco lo canta. */
+function _convClave_(dia, franja){ return dia+'|'+franja; }
+
+/* `sin_abrir` | `abierta` | `cerrada`. Sin instantes NO se escribe: la frontera cerrada es
+   lo que hace que una celda vacía signifique una sola cosa. */
+function _convEstado_(cv, ahora){
+  var t=ahora?+ahora:Date.now(), a=Date.parse(cv.abre), l=Date.parse(cv.limite);
+  if(isNaN(a)||isNaN(l)) return 'cerrada';
+  if(t<a) return 'sin_abrir';
+  return t<=l ? 'abierta' : 'cerrada';
+}
+
+/* Las horas que TE quedan a ti para contestar. Ojo: NO es `ventana_real_h` de Python, que
+   contesta a otra pregunta —«si convoco ahora, cuánto le queda a la gente»— y es de quien
+   convoca. Misma aritmética, distinta pregunta: por eso son dos y no una. */
+function _convQuedan_(cv, ahora){
+  var t=ahora?+ahora:Date.now(), l=Date.parse(cv.limite);
+  return isNaN(l)||l<=t ? 0 : (l-t)/3600000;
+}
+
+/* La convocatoria que hay que enseñar: la primera abierta a la que estás convocado. */
+function _convAbierta_(){
+  var yo=(YO&&YO.nombre)||'';
+  var vivas=(typeof CONVOCATORIAS!=='undefined'?CONVOCATORIAS:[]).filter(function(cv){
+    if(_convEstado_(cv)!=='abierta') return false;
+    var inv=cv.invitados||[];
+    return !inv.length || inv.indexOf(yo)>=0;
+  });
+  return vivas[0]||null;
+}
+
+/* Las clases de estado que puede llevar una celda, sacadas de la convocatoria. Cablearlas
+   haría que un sitio nuevo dejara restos de la clase anterior al repintar. */
+function _convClases_(cv){ return (cv.sitios||[]).concat(['ambos','no']); }
+
+function _convMias_(cv){
+  var yo=(YO&&YO.nombre)||'';
+  if(!cv.resp) cv.resp={};
+  if(!cv.resp[yo]) cv.resp[yo]={};
+  return cv.resp[yo];
+}
+
+/* Cuántas celdas has marcado y cuántas has dejado en blanco. El segundo número es el que
+   importa: en blanco no es «no puedo», es «no has contestado». */
+function _convCuenta_(cv){
+  var mias=_convMias_(cv), n=0, no=0, coches=0, total=0;
+  (cv.dias||[]).forEach(function(d){
+    (cv.franjas||[]).forEach(function(fr){
+      total++;
+      var v=mias[_convClave_(d,fr.k)];
+      if(!v||!v.s) return;
+      if(v.s==='no'){ no++; return; }
+      n++; if(v.c) coches++;
+    });
+  });
+  return {puedo:n, no:no, coches:coches, total:total, blanco:total-n-no};
+}
+
+function _convCelHTML_(cv, dia, franja){
+  var v=_convMias_(cv)[_convClave_(dia,franja)]||null;
+  var cls=(v&&v.s)?(' '+v.s):'';
+  var cch=(v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">🚗</span>':'';
+  var txt=(v&&v.s==='no')?'\u2013':'';
+  return '<div class="tcel'+cls+'" data-tk="'+_convClave_(dia,franja)+'" data-p>'+txt+cch+'</div>';
+}
+
+/* La tarjeta entera. Va la PRIMERA de la pantalla de turnos: lo que caduca manda sobre lo
+   que ya está decidido. */
+function _convHTML_(cv){
+  if(!cv) return '';
+  var F=cv.franjas||[], D=cv.dias||[];
+  var urge=_convQuedan_(cv)<12;
+  var lim=_isoADMY_(String(cv.limite).slice(0,10))||String(cv.limite).slice(0,10);
+  var hora=String(cv.limite).slice(11,16);
+  var pin=function(k,txt){
+    return '<button data-pin="'+k+'" class="'+(CONV_PINCEL===k?'on':'')+'" data-p>'+txt+'</button>';
+  };
+  /* `_diaTxtM_` espera DD/MM, no ISO: pasarle la fecha ISO devuelve la propia cadena sin
+     inventarse un día —hace bien—, así que se convierte antes. Sale «lun 10/08»: el primer
+     trozo es el día de la semana y el segundo el número. */
+  var cab='<div class="rc rd"></div>'+D.map(function(d){
+    var p=String(_diaTxtM_(_isoADMY_(d)||d)||'').split(' ');
+    return '<div class="rc">'+esc(p[0]||'')+'<br>'+esc(String(p[1]||'').slice(0,2))+'</div>';
+  }).join('');
+  var filas=F.map(function(fr){
+    return '<div class="rc rd">'+esc(fr.txt)+'</div>'+
+      D.map(function(d){ return _convCelHTML_(cv,d,fr.k); }).join('');
+  }).join('');
+  return '<div class="tarj" id="convC">'+
+    _convCabHTML_(cv)+
+    '<div class="tpin">'+pin('cuvi','CUVI')+pin('citi','CITI')+pin('ambos','Los dos')+
+      pin('no','No puedo')+
+      '<button data-pin-coche class="coche '+(CONV_COCHE?'on':'')+'" data-p>🚗 con coche</button>'+
+    '</div>'+
+    /* 78 px y no 64: «Tarde/noche» no cabe en 64 y, al ser `nowrap` + `flex-end` + `sticky`,
+       se sale por la izquierda y SE CORTA. No lo caza ninguna prueba de DOM —el `textContent`
+       está entero— sino mirar la pantalla. Con 7 días a 34 px mínimos siguen cabiendo 316 px. */
+    '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:78px repeat('+
+      D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
+    '<div class="tplazo'+(urge?' urge':'')+'" id="convPie">'+_convPieHTML_(cv)+'</div>'+
+    '<p class="rnota" style="margin-top:10px">Hasta el <b>'+esc(lim)+'</b> a las '+esc(hora)+
+      '. Fuera de plazo no se puede marcar: por eso una casilla en blanco significa una sola '+
+      'cosa, que no has contestado.</p>'+
+  '</div>';
+}
+
+/* La cabecera de la tarjeta: qué semana se pregunta y quién lo pide. */
+function _convCabHTML_(cv){
+  var ini=_isoADMY_(cv.dias[0])||cv.dias[0], fin=_isoADMY_(cv.dias[cv.dias.length-1])||'';
+  return '<div class="mtit" style="margin:0 0 2px">Disponibilidad para turnos</div>'+
+    '<div class="msub">Semana del '+esc(ini)+' al '+esc(fin)+
+      (cv.convocante?' · lo pide '+esc(cv.convocante.split(' ')[0]):'')+'</div>';
+}
+
+function _convPieHTML_(cv){
+  var q=_convQuedan_(cv), c=_convCuenta_(cv);
+  var t = q<=0 ? 'Plazo cerrado'
+        : q<1  ? 'Quedan <b>'+Math.round(q*60)+' min</b>'
+               : 'Quedan <b>'+Math.round(q)+' h</b>';
+  return t+' · marcadas <b>'+c.puedo+'</b>'+(c.no?' · no puedo en '+c.no:'')+
+    (c.coches?' · con coche '+c.coches:'')+
+    (c.blanco?' · <b>'+c.blanco+'</b> sin contestar':' · todo contestado');
+}
+
+/* Pintar una celda con el pincel activo. Volver a pintar lo mismo la BORRA: sin eso no habría
+   forma de deshacer una marca, y dejar «no puedo» puesto por error es peor que no marcar. */
+function _convPintar_(cv, k){
+  var mias=_convMias_(cv), v=mias[k]||null;
+  var quiere = CONV_PINCEL==='no' ? {s:'no'} : {s:CONV_PINCEL, c:!!CONV_COCHE};
+  var igual = v && v.s===quiere.s && (quiere.s==='no' || !!v.c===!!quiere.c);
+  if(igual) delete mias[k]; else mias[k]=quiere;
+  return !igual;
+}
+
+function _engConv_(){
+  var cv=_convAbierta_(); if(!cv) return;
+  var rej=$('#convRej'); if(!rej) return;
+  var repinta=function(){
+    (cv.dias||[]).forEach(function(d){
+      (cv.franjas||[]).forEach(function(fr){
+        var k=_convClave_(d,fr.k), el=rej.querySelector('[data-tk="'+k+'"]');
+        if(!el) return;
+        var v=_convMias_(cv)[k]||null;
+        /* ⛔ NO se asigna `className` entero: eso borraría las clases que pone OTRO sistema
+           —aquí `pulsa`, la animación que la app aplica a todo `data-p`—. Se vio en el
+           navegador: la celda acababa con una u otra según quién escribiera el último.
+           Y la lista de clases a quitar sale de los DATOS, no cableada: si mañana hay un
+           tercer sitio, esto sigue limpiando bien. */
+        _convClases_(cv).forEach(function(c){ el.classList.remove(c); });
+        if(v&&v.s) el.classList.add(v.s);
+        el.innerHTML=((v&&v.s==='no')?'\u2013':'')+
+          ((v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">🚗</span>':'');
+      });
+    });
+    var pie=$('#convPie'); if(pie) pie.innerHTML=_convPieHTML_(cv);
+  };
+  $$('#convC [data-pin]').forEach(function(b){
+    b.onclick=function(){
+      CONV_PINCEL=b.dataset.pin;
+      $$('#convC [data-pin]').forEach(function(x){ x.classList.toggle('on', x===b); });
+    };
+  });
+  var bc=$('#convC [data-pin-coche]');
+  if(bc) bc.onclick=function(){ CONV_COCHE=!CONV_COCHE; bc.classList.toggle('on', CONV_COCHE); };
+  /* Pintar a dedo y de arrastre, como en reuniones. ⚠️ `setPointerCapture` LANZA si el puntero
+     no es suyo, y al lanzar aborta el resto del manejador: va envuelto (ya pasó en el pintor). */
+  var pintando=false;
+  rej.addEventListener('pointerdown', function(e){
+    var el=e.target.closest('[data-tk]'); if(!el) return;
+    if(_convEstado_(cv)!=='abierta') return;
+    pintando=true;
+    try{ rej.setPointerCapture(e.pointerId); }catch(_){}
+    _convPintar_(cv, el.dataset.tk); repinta();
+  });
+  rej.addEventListener('pointermove', function(e){
+    if(!pintando) return;
+    var el=document.elementFromPoint(e.clientX, e.clientY);
+    el=el&&el.closest?el.closest('[data-tk]'):null;
+    if(!el||el._ult===CONV_PINCEL+CONV_COCHE) return;
+    el._ult=CONV_PINCEL+CONV_COCHE;
+    _convPintar_(cv, el.dataset.tk); repinta();
+  });
+  var fin=function(){
+    pintando=false;
+    $$('#convC [data-tk]').forEach(function(x){ x._ult=null; });
+  };
+  rej.addEventListener('pointerup', fin);
+  rej.addEventListener('pointercancel', fin);
+}
+
 function vTurnos(){
   /* Por defecto SOLO LOS TUYOS -decision de Daniel-, con un conmutador para ver los del
      equipo. Los de otros se pintan igual pero sin poder tocarlos: ver quien va a que sirve
@@ -79,7 +281,9 @@ function vTurnos(){
   /* los pasados van en CAJÓN plegable, como en app.html: no estorban pero están */
   pas.sort(function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); });
   /* los vivos van SUELTOS: sin cabecera de seccion ni etiquetas, para que canten */
+  /* La convocatoria va la PRIMERA: lo que caduca manda sobre lo que ya está decidido. */
   return '<div class="h1">Turnos</div><p class="h1s">Fabricación · en cuáles estás y quién más va.</p>'+
+    _convHTML_(_convAbierta_())+
     /* El conmutador solo aparece si hay algo mas que ver: con todos los turnos siendo tuyos,
        un boton que no cambia nada es ruido que hay que leer igual. */
     (nTodos>nMios

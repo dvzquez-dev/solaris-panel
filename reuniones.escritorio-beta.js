@@ -397,20 +397,6 @@ function _minHM_(v){
   return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
 }
 
-function _calorDe_(r, pond){
-  if(!pond && Array.isArray(r.calor) && r.calor.length) return r.calor;      // semilla
-  var nD=(r.dias||[]).length, nF=(r.franjas||[]).length;
-  var cel=[]; for(var i=0;i<nD;i++){ cel.push(new Array(nF).fill(null)); }
-  var nombres=Object.keys(r.resp||{}).filter(function(n){ return Array.isArray(r.resp[n]); });
-  (r.bloques||[]).forEach(function(b,i){
-    if(!Array.isArray(b)) return;
-    var d=b[0], f=b[1];
-    if(!(cel[d]) || f<0 || f>=nF) return;
-    var n=0; nombres.forEach(function(nm){ var v=+r.resp[nm][i]||0; if(v>0) n+= (pond? v : 1); });
-    cel[d][f]=n;
-  });
-  return cel;
-}
 
 /* etiqueta de franja: el dato real las trae como {ini,dur}; la semilla, como string */
 function _iniF(f){ return (f&&typeof f==='object') ? String(f.ini||'') : String(f||''); }

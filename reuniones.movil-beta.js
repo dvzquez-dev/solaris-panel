@@ -133,35 +133,6 @@ function _sinReuniones_(){ return !!(typeof backendOK!=='undefined' && backendOK
 
 function _reunionesCargando_(){ return !!(typeof backendOK!=='undefined' && backendOK && SESION && !CARGA.reuniones); }
 
-/* EL MAPA DE CALOR · GEMELA de `_calorDe_(r, pond)` en `escritorio.html`.
-   Estaba INLINE aquí dentro de `_normReuM_` y aislada allí (mapa §5, D6): la misma cuenta
-   escrita dos veces y con dos formas, que es como acaban divergiendo. Ahora comparten nombre
-   y firma, así que un solo grep las encuentra juntas.
-
-   `pond=false` cuenta PERSONAS (cualquier valor > 0); `pond=true` suma los VALORES
-   (presencial+telemático=2, telemático=1). El móvil las necesita las dos y la llama dos veces.
-
-   ⚠️ `null` no es cero: es **bloque NO OFERTADO**. Con horario por día no todas las franjas
-   existen todos los días, y pintar un hueco muerto como «no puede nadie» es mentir. Por eso la
-   matriz nace a `null` y solo los bloques realmente ofertados pasan a 0.
-
-   ⚠️ Y el índice de `resp[nombre][i]` es la posición en `bloques`, **no** la franja: si
-   `bloques` se reordena (lo hace `_ordenarFranjas_`), hay que pasar aquí el reordenado y sus
-   respuestas alineadas. Mezclar los dos órdenes es lo que apuntaba a otra hora. */
-function _calorDe_(r, pond){
-  var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};
-  var cel=dias.map(function(){ return F.map(function(){ return null; }); });
-  bl.forEach(function(b){ if(cel[b[0]] && b[1]<F.length) cel[b[0]][b[1]]=0; });
-  Object.keys(resp).forEach(function(nom){
-    var v=resp[nom]||[];
-    for(var i=0;i<bl.length;i++){
-      var val=+v[i]||0; if(!(val>0)) continue;
-      var d=bl[i][0], f=bl[i][1];
-      if(cel[d] && cel[d][f]!=null) cel[d][f] += (pond ? val : 1);
-    }
-  });
-  return cel;
-}
 
 function _normReuM_(r){
   var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};

@@ -16,7 +16,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil-beta.css?v=1aa0b30">
+<link rel="stylesheet" href="movil-beta.css?v=27e21d6">
 </head>
 <body>
 
@@ -107,15 +107,15 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=6fe8588"></script>
+<script src="comun-beta.js?v=66b1db1"></script>
 <script src="notis.movil-beta.js?v=bd8915e"></script>
 <script src="cierre.movil-beta.js?v=d6511a2"></script>
 <script src="tareas.movil-beta.js?v=9c56fc2"></script>
-<script src="turnos.movil-beta.js?v=627183f"></script>
+<script src="turnos.movil-beta.js?v=9a63115"></script>
 <script src="buzon.movil-beta.js?v=50c3e0b"></script>
 <script src="documentos.movil-beta.js?v=aa4be87"></script>
 <script src="sanciones.movil-beta.js?v=af42cd0"></script>
-<script src="reuniones.movil-beta.js?v=d7a34eb"></script>
+<script src="reuniones.movil-beta.js?v=f177a68"></script>
 <script src="horas.movil-beta.js?v=27a843e"></script>
 <script src="equipo.movil-beta.js?v=45b56b6"></script>
 <script>
@@ -1287,7 +1287,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='839bcc6';
+var BUILD='a11813a';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -1384,6 +1384,30 @@ var PLANTILLAS_M = [];
 var DEST=[['estado','Estado','t-estado'],['fichar','Fichar','t-fichar'],['horas','Horas','t-horas'],
           ['tareas','Tareas','t-tareas'],['turnos','Turnos','t-turnos'],['docs','Docs','t-docs'],
           ['reu','Reunión','t-reu']];   // Equipo salio de la barra: su ranking esta en Horas y la coordinacion en el menu ⋮
+/* ═══ DISPONIBILIDAD PARA TURNOS ═══════════════════════════════════════════════════
+   ⛔ `abre` y `limite` llegan YA CALCULADOS. La regla —jueves 22:00 → sábado 22:00, ventana de
+   48 h— vive SOLO en `reglas/convocatoria.py`. Escribirla también aquí sería la misma regla en
+   dos idiomas, que es exactamente como `_temporadaActual_` coincidía once meses al año y
+   discrepaba justo en septiembre. Esta cara solo COMPARA instantes.
+   ⛔ Y `franjas` viaja DENTRO de la convocatoria: no hay ninguna constante de dos. Si la tarde
+   acaba llevando hora de entrada (`Tarde (16:00)` / `Tarde (18:00)`, que es como está en el
+   Libro de Datos), la convocatoria nace con tres franjas y aquí no se toca nada.
+   ⚠️ DEMO: `abre` se ha adelantado a esta mañana para que la pantalla se pueda tocar hoy; el
+   valor real de esta semana sería `2026-08-06T22:00`. `resp` son datos inventados. */
+var CONVOCATORIAS=[{
+  id:'cv-2026-08-10', semana:'2026-08-10',
+  dias:['2026-08-10','2026-08-11','2026-08-12','2026-08-13','2026-08-14','2026-08-15','2026-08-16'],
+  franjas:[{k:'m',txt:'Mañana'},{k:'t',txt:'Tarde/noche'}],
+  sitios:['cuvi','citi'],
+  abre:'2026-08-06T09:00', limite:'2026-08-08T22:00',
+  convocante:'Daniel Vázquez Piñeiro',
+  invitados:(DATA.miembros||[]).map(function(m){ return m.nombre; }),
+  resp:{}
+}];
+/* El pincel: se elige arriba y se pinta abajo. Con cinco estados por celda (vacío, CUVI, CITI,
+   los dos, no puedo) un ciclo por toque obligaría a dar hasta cuatro toques para corregirse. */
+var CONV_PINCEL='cuvi', CONV_COCHE=false;
+
 var VISTAS={estado:vEstado,fichar:vFichar,horas:vHoras,tareas:vTareas,turnos:vTurnos,
             docs:vDocs,reu:vReu};
 
@@ -1946,6 +1970,7 @@ function enganchar(){
   _engReuniones_();
   _engPlegables_();
   _engTurnosYDocs_();
+  _engConv_();
 }
 /* decisiones sobre un documento (dentro del modal) */
 document.addEventListener('click',function(ev){
