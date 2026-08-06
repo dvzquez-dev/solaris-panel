@@ -773,6 +773,148 @@ function _calorDe_(r, pond){
 
    El array va DENTRO: `comun.js` no lleva ni una sentencia ejecutable de nivel superior, y
    esa es la propiedad que hizo que se pudiera sacar del HTML sin arrastrar orden de carga. */
+/* ═══ NOVEDADES · la capa de «esto es nuevo, míralo» ════════════════════════════════
+   Daniel (06/08/2026): *«una capa completamente retirable… unas cosas que me rodeen las cosas
+   nuevas para que las checkee, desde la última vez que las vi»* · *«lo suyo sería que vayan por
+   TANDAS: al cerrar una que no se borre sino que se deseleccione y se guarde en un historial
+   para tú llevar cuenta de que voy aprobando y cuándo»*.
+
+   ⛔ **UNA SOLA LISTA, en `comun.js`, para las dos caras.** Cada entrada dice a qué cara y a qué
+   pantalla pertenece, así que cada cara enseña lo suyo sin que haya dos listas que mantener —
+   que es como acaban diciendo cosas distintas.
+
+   ⛔ **Cerrar una tanda NO la borra.** Se le pone fecha y se va al historial: la lista de arriba
+   es «lo que te falta por mirar» y la de abajo es «lo que ya miraste, y cuándo». Borrarlas
+   dejaría sin respuesta la pregunta de para qué es esto — saber qué has revisado.
+
+   ⚠️ **Hoy el «visto» se guarda en ESTE navegador** (`localStorage`). Es lo que se puede hacer
+   sin tocar el servidor: `setControl` exige ser la cuenta de administración
+   (`ADMIN_EMAIL = solaris@uvigoaerotech.com`), y con la cuenta personal lo rechazaría. Para que
+   el historial llegue **también a quien programa** hace falta una acción nueva en el backend
+   gateada a rango ≥ 3. Está apuntado, y NO se finge: el pie de la capa lo dice. */
+
+function _novedades_(){
+  /* Lo más nuevo primero. Al cerrar una pieza se añade su tanda AQUÍ, en ese momento. */
+  return [
+    { id:'2026-08-06-horas', fecha:'2026-08-06', titulo:'Aprobar horas desde el teléfono',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Bloque «Esperan tu decisión» lo primero de Horas: aprobar, pedir detalle o rechazar las horas de tu gente, con motivo obligatorio.'},
+        {cara:'movil', vista:'horas', txt:'Lo que no está enrutado cae en el PD — sale solo de que nadie decide lo suyo.'}
+      ]},
+    { id:'2026-08-06-turnos-admin', fecha:'2026-08-06', titulo:'Convocar y ver la disponibilidad',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'«Convocar disponibilidad»: abres el plazo de una semana. Solo rango ≥ 3.'},
+        {cara:'escritorio', vista:'turnos', txt:'Mapa de la semana: cuánta gente puede, filtro CUVI/CITI, símbolo de coche y desglose en tres cestas al pasar el ratón.'},
+        {cara:'escritorio', vista:'turnos', txt:'Debajo del mapa: cuánta gente ha contestado y QUIÉN NO.'}
+      ]},
+    { id:'2026-08-06-turnos-movil', fecha:'2026-08-06', titulo:'Cubrir disponibilidad de turnos',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'Pincel arriba (CUVI · CITI · Los dos · No puedo + coche) y rejilla de la semana. Repintar lo mismo lo borra.'},
+        {cara:'movil', vista:'turnos', txt:'El pie dice cuántas horas quedan de plazo y cuántas casillas llevas SIN contestar.'}
+      ]}
+  ];
+}
+
+/* Lo que YA se ha visto, en este navegador: `{id: {at}}`. Nunca lanza. */
+function _novVistas_(){
+  try{ return JSON.parse(localStorage.getItem('solaris_nov_vistas')||'{}')||{}; }
+  catch(_){ return {}; }
+}
+
+/* Marca una tanda como vista. Devuelve el instante, que es lo que se enseña en el historial. */
+function _novMarcar_(id){
+  var v=_novVistas_(), at=new Date().toISOString();
+  v[id]={at:at};
+  try{ localStorage.setItem('solaris_nov_vistas', JSON.stringify(v)); }catch(_){}
+  return at;
+}
+
+/* Deshacer: si te lo cargas por error, vuelve a la lista. Sin esto, un toque mal dado es
+   definitivo — y el historial es justo lo que permite ofrecerlo. */
+function _novOlvidar_(id){
+  var v=_novVistas_(); delete v[id];
+  try{ localStorage.setItem('solaris_nov_vistas', JSON.stringify(v)); }catch(_){}
+}
+
+/* Las tandas de ESTA cara que aún no has visto, y las que sí. `cara` es 'movil'|'escritorio'. */
+function _novDe_(cara, vistas){
+  vistas = vistas || _novVistas_();
+  var out={pendientes:[], hechas:[]};
+  _novedades_().forEach(function(t){
+    var items=(t.items||[]).filter(function(i){ return i.cara===cara; });
+    if(!items.length) return;                      // nada de esta cara: ni se nombra
+    var copia={id:t.id, fecha:t.fecha, titulo:t.titulo, items:items};
+    if(vistas[t.id]){ copia.visto_at=vistas[t.id].at; out.hechas.push(copia); }
+    else out.pendientes.push(copia);
+  });
+  return out;
+}
+
+/* Cuántas novedades sin ver tiene cada pantalla: `{turnos:2, horas:1}`. Es lo que pone el
+   puntito en el nav — «rodear lo nuevo» sin tener que abrir nada. */
+function _novPorVista_(cara){
+  var n={};
+  _novDe_(cara).pendientes.forEach(function(t){
+    t.items.forEach(function(i){ n[i.vista]=(n[i.vista]||0)+1; });
+  });
+  return n;
+}
+
+/* La capa, en HTML. **Un solo constructor para las dos caras**: cada una le pone su CSS a
+   las clases `nov*`, pero el texto y el comportamiento son los mismos. Dos constructores
+   acabarían diciendo cosas distintas, que es la lección que este proyecto lleva escrita
+   desde `_calorDe_`.
+
+   `cara` es 'movil' | 'escritorio'. Si no hay nada de esa cara, devuelve '' — y entonces la
+   capa **no existe**, que es lo que la hace «completamente retirable». */
+function _novHTML_(cara){
+  var d=_novDe_(cara);
+  if(!d.pendientes.length && !d.hechas.length) return '';
+  var item=function(i){ return '<li>'+esc(i.txt)+'</li>'; };
+  var tanda=function(t, hecha){
+    return '<div class="novt'+(hecha?' ok':'')+'" data-nov="'+esc(t.id)+'">'+
+      '<div class="novh"><b>'+esc(t.titulo)+'</b><span class="novf">'+esc(t.fecha)+'</span></div>'+
+      '<ul class="novl">'+t.items.map(item).join('')+'</ul>'+
+      (hecha
+        ? '<div class="novb"><span class="novv">visto el '+esc(_novCuando_(t.visto_at))+'</span>'+
+          '<button data-novolv="'+esc(t.id)+'" data-p>Volver a marcarlo</button></div>'
+        : '<div class="novb"><button class="si" data-novok="'+esc(t.id)+'" data-p>Ya lo he visto</button></div>')+
+    '</div>';
+  };
+  return '<div class="novc" id="novc">'+
+    '<div class="novtit">Novedades'+(d.pendientes.length?' · <b>'+d.pendientes.length+' sin ver</b>':'')+'</div>'+
+    (d.pendientes.length
+      ? d.pendientes.map(function(t){ return tanda(t,false); }).join('')
+      : '<p class="novnada">Nada nuevo sin mirar. Lo que vaya entrando aparecerá aquí.</p>')+
+    (d.hechas.length
+      ? '<details class="novhist"><summary>Ya revisadas · '+d.hechas.length+'</summary>'+
+        d.hechas.map(function(t){ return tanda(t,true); }).join('')+'</details>'
+      : '')+
+    '<p class="novpie">El «visto» se guarda <b>en este navegador</b>. Que llegue también al '+
+      'servidor —y con ello a quien programa— pide una acción nueva en el backend; está apuntado.</p>'+
+  '</div>';
+}
+
+/* `2026-08-06T19:12:00.000Z` → `06/08/2026, 21:12`. Formato, no calendario. */
+function _novCuando_(iso){
+  var s=String(iso||''); if(s.length<10) return s;
+  var d=new Date(s);
+  if(isNaN(+d)) return s.slice(0,10);
+  return _isoADMY_(s.slice(0,10))+', '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+}
+
+/* Cablea los dos botones. `repintar` es la función de pintado de la cara — las dos se llaman
+   `pintar`, pero se pasa como argumento para no dar por hecho el nombre desde `comun.js`. */
+function _engNov_(repintar){
+  var c=document.getElementById('novc'); if(!c) return;
+  c.querySelectorAll('[data-novok]').forEach(function(b){
+    b.onclick=function(){ _novMarcar_(b.dataset.novok); if(repintar) repintar(); };
+  });
+  c.querySelectorAll('[data-novolv]').forEach(function(b){
+    b.onclick=function(){ _novOlvidar_(b.dataset.novolv); if(repintar) repintar(); };
+  });
+}
+
 function _diaCorto_(iso){
   var s=String(iso==null?'':iso);
   if(!/^\d{4}-\d{2}-\d{2}/.test(s)) return s;      // lo que no reconozca, se devuelve tal cual

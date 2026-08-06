@@ -16,7 +16,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil-beta.css?v=95996b8">
+<link rel="stylesheet" href="movil-beta.css?v=f3cbd37">
 </head>
 <body>
 
@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=66b1db1"></script>
+<script src="comun-beta.js?v=4681532"></script>
 <script src="notis.movil-beta.js?v=bd8915e"></script>
 <script src="cierre.movil-beta.js?v=d6511a2"></script>
 <script src="tareas.movil-beta.js?v=9c56fc2"></script>
@@ -117,7 +117,7 @@
 <script src="sanciones.movil-beta.js?v=af42cd0"></script>
 <script src="reuniones.movil-beta.js?v=f177a68"></script>
 <script src="horas.movil-beta.js?v=96bc99d"></script>
-<script src="equipo.movil-beta.js?v=45b56b6"></script>
+<script src="equipo.movil-beta.js?v=ebc5289"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -1300,7 +1300,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='5ec781f';
+var BUILD='9f6edfe';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -1985,6 +1985,7 @@ function enganchar(){
   _engTurnosYDocs_();
   _engConv_();
   _engPartesDec_();
+  _engNov_(pintar);
 }
 /* decisiones sobre un documento (dentro del modal) */
 document.addEventListener('click',function(ev){

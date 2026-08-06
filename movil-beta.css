@@ -799,6 +799,33 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .pdb button.no{color:var(--red2)}
 .pdb button:disabled{opacity:.5}
 
+/* ═══ NOVEDADES · la capa retirable ═════════════════════════════════════ */
+.novc{border:1px solid var(--red2);border-radius:var(--r);padding:13px;margin-bottom:12px;
+  background:var(--sur)}
+.novtit{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);
+  margin-bottom:9px}
+.novtit b{color:var(--red2)}
+.novt{border-top:1px solid var(--line);padding:10px 0 4px}
+.novt:first-of-type{border-top:0;padding-top:0}
+.novt.ok{opacity:.62}
+.novh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:13px}
+.novf{font-family:var(--mono);font-size:10.5px;color:var(--ink3)}
+.novl{margin:5px 0 8px;padding-left:16px;font-size:12.5px;color:var(--ink2);line-height:1.55}
+.novl li{margin-bottom:3px}
+.novb{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px}
+.novb button{border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:12px;
+  font-weight:600;color:var(--ink2);background:transparent}
+.novb button.si{background:var(--ok);border-color:var(--ok);color:#fff}
+.novv{font-size:11.5px;color:var(--ink3)}
+.novnada{font-size:12.5px;color:var(--ink3);margin:0 0 6px}
+.novhist{margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+.novhist summary{font-size:12px;color:var(--ink3);cursor:pointer}
+.novpie{font-size:11px;color:var(--ink3);line-height:1.5;margin:9px 0 0;
+  border-top:1px solid var(--line);padding-top:8px}
+/* El puntito que «rodea» lo nuevo en el nav. */
+.novpt{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--red2);
+  margin-left:4px;vertical-align:middle}
+
 /* ═══ TURNOS · cubrir disponibilidad ════════════════════════════════════
    ⛔ CLASES PROPIAS, no se reutiliza `.ecel`. En reuniones `on1`=telemático y
    `on2`=presencial: allí el eje es CÓMO asistes. Aquí es DÓNDE (CUVI/CITI/los

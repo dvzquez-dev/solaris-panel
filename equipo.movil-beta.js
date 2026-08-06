@@ -48,6 +48,9 @@ function esCoord(){ return ST.rol==='coord' || ST.rol==='pd' || (typeof YO!=='un
 function esPD(){ return ST.rol==='pd' || (typeof YO!=='undefined' && YO && YO.cargo==='Project Director'); }
 
 function vEstado(){
+  /* La capa de NOVEDADES va lo primero de la pantalla de inicio: es lo que hay que
+     mirar antes que nada, y desaparece sola en cuanto se marca todo como visto. */
+  var _nov=(typeof _novHTML_==='function')?_novHTML_('movil'):'';
   var pend=sumaE('pend');
   var av='';
   if(pend>0){
@@ -84,7 +87,7 @@ function vEstado(){
 
   /* EL ORDEN: Conducta ABRE la pantalla. Se probo a mandarla al final (MEJ-1) y Daniel
      lo revirtio el 28/07: «estaba muchisimo mas guapo antes que estuviese arriba». */
-  return '<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>'+
+  return _nov+'<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>'+
     av+
     /* LAS HORAS SALIERON DE AQUI (Daniel, 28/07: «quitaria las horas de estado y las
        dejaria solo en horas»). Estaban en dos pantallas con la misma cifra y la misma barra.

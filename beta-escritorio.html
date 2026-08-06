@@ -16,7 +16,7 @@
 <meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio-beta.css?v=fdc79b8">
+<link rel="stylesheet" href="escritorio-beta.css?v=1419799">
 </head>
 <body>
 
@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=66b1db1"></script>
+<script src="comun-beta.js?v=4681532"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
 <script src="turnos.escritorio-beta.js?v=df86aad"></script>
@@ -628,7 +628,9 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
       }).join('')
     : vacioSimple('Nada requiere tu decisión','No hay partes de horas, expedientes ni sanciones esperando tu firma. Lo que te toque decidir aparecerá aquí.');
 
-  return pan('Requiere tu decisión',cola.length+' asuntos',lista,'destaca')+
+  /* La capa de NOVEDADES, lo primero del Panel de mando. Si no hay nada, no existe. */
+  return ((typeof _novHTML_==='function')?_novHTML_('escritorio'):'')+
+    pan('Requiere tu decisión',cola.length+' asuntos',lista,'destaca')+
     '<div class="kpis">'+
       kpi('Horas en el aire',nf(enAire,1)+'<small> h</small>','no cuentan hasta que se firmen','wa')+
       kpi('Expedientes esperándote',docsMios().length,'los firmas tú',docsMios().length?'wa':'up')+
@@ -2070,7 +2072,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='a1cc9c5';
+var BUILD='dfc9031';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -2416,6 +2418,7 @@ function pintar(){
   _pinAnotaciones_(m);
   _pinDisp_();
   _pinConvDisp_(m);
+  _engNov_(pintar);
 }
 function ir(k,foco){
   /* Al abrir el cierre se pregunta al servidor en que punto esta: los bloqueos y el plan
