@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=e803725"></script>
+<script src="comun-beta.js?v=988e293"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
 <script src="turnos.escritorio-beta.js?v=df86aad"></script>
@@ -307,6 +307,9 @@ var api={
   marcarLote:  function(l,d){ return api._post({action:"marcarLote",lote:l,decision:d}); },
   getPartes:   function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
   decidirParte:function(id,a,m){ return api._post({action:"decidirParte",id:id,accion:a,motivo:m}); },
+  /* La clave de un solo uso la pone el LLAMADOR, no aqui: `_post` reintenta hasta tres
+     veces, y una clave nacida dentro seria distinta en cada intento -- o sea, ninguna
+     proteccion justo cuando hace falta. */
   otorgarHoras:function(p){ return api._post({action:"otorgarHoras",parte:p}); },
   otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria}); },
   enviarPush:  function(d,t,c,o){ return api._post({action:"enviarPush",destinatario:d,titulo:t,cuerpo:c,opts:o}); },
@@ -320,6 +323,10 @@ var api={
      Lo destapó la ronda de agentes de la fase 3, no una lectura: `api.guardarPush` estaba
      definida solo en el móvil (`movil.html:399`) y aquí se llamaba igual. */
   guardarPush: function(sub){ return api._post({action:"guardarPush",sub:sub}); },
+  getConvocatoria: function(semana){ return api._post({action:"getConvocatoria",semana:semana||null}); },
+  guardarDisponibilidad: function(conv,celdas){ return api._post({action:"guardarDisponibilidad",convocatoria:conv,celdas:celdas}); },
+  crearConvocatoria: function(c){ return api._post({action:"crearConvocatoria",convocatoria:c}); },
+  getDisponibilidad: function(conv){ return api._post({action:"getDisponibilidad",convocatoria:conv}); },
   getNovedadesVistas: function(){ return api._post({action:"getNovedadesVistas"}); },
   marcarNovedadVista: function(id,visto){ return api._post({action:"marcarNovedadVista",id:id,visto:!!visto}); },
   getControl:  function(){ return api._post({action:"getControl"}); },
@@ -2074,7 +2081,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='67aba0e';
+var BUILD='073c331';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

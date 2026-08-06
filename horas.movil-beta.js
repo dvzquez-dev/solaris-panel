@@ -242,7 +242,14 @@ function durForm(){
 function vFichar(){
   var s=ST.ses, min=minSes(), largo=min>=600, corre=s.estado==='corriendo';
   var nube=(typeof backendOK!=='undefined' && backendOK && SESION);   // sesión respaldada por la nube
-  var rt=aprobadorDe(YO.nombre,YO.unidad);
+  /* ⛔ EL PERFIL ELEGIDO, no `YO.unidad`. Esta pantalla dice QUIEN FIRMA en DOS sitios —la
+     tarjeta grande de aqui abajo y la linea bajo el selector de perfil— y hasta el 07/08
+     solo una de las dos seguia al perfil: la grande estaba cableada a la unidad propia. En
+     el caso literal que puso Daniel (Bruno, miembro de una unidad y coordinador de OTRA)
+     la pantalla habria enseñado DOS NOMBRES DISTINTOS, y el prominente era el equivocado.
+     Lo destapo un verificador adversarial, no yo: yo solo mire el bloque que acababa de
+     escribir. Las dos frases salen ahora de `_perfilElegido_()`, que es la unica puerta. */
+  var _perf=_perfilElegido_(), rt=aprobadorDe(YO.nombre,_perf);
   var opts=TAREAS.map(function(t){
     return '<option value="'+esc(t.n)+'"'+(ST.form.tarea===t.n?' selected':'')+'>'+esc(t.n)+'</option>';
   }).join('');
@@ -360,8 +367,8 @@ function vFichar(){
     '</div>'+
 
     '<div class="ruta"><div class="cu"><span class="sc">Quién lo firma</span>'+
-      '<p>Va a <b>'+esc(rt.nom)+'</b>, '+(rt.escalado?'Project Director':'coordinador de '+esc(YO.unidad))+'.'+
-      (rt.escalado?'<span class="esc">NADIE FIRMA LO SUYO · COMO COORDINAS TU UNIDAD, PASA AL PROJECT DIRECTOR</span>':'')+'</p></div></div>'+
+      '<p>Va a <b>'+esc(rt.nom)+'</b>, '+(rt.escalado?'Project Director':'coordinador de '+esc(_perf))+'.'+
+      (rt.escalado?'<span class="esc">NADIE FIRMA LO SUYO · COMO COORDINAS '+esc(_perf).toUpperCase()+', PASA AL PROJECT DIRECTOR</span>':'')+'</p></div></div>'+
 
     '<button class="btn pri full" data-p id="btnEnviar" disabled style="margin-top:13px">'+
       '<span id="lblEnviar">Faltan datos para enviar</span></button>'+
@@ -497,9 +504,11 @@ async function enviarFichaje(){
         if(r && r.parte){ nuevo=normPMovil(r.parte); h=r.parte.horas; }
       } else {
         var dur=durForm();
+        /* ⛔ La clave se genera AQUI, fuera de `api.pushParte`, porque `api._post` reintenta
+           hasta tres veces: si naciera dentro, cada reintento seria un envio distinto. */
         var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, horas:dur,
           ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true,
-          subsistema:_perfilElegido_() });
+          subsistema:_perfilElegido_(), clave:_claveUso_() });
         if(rec&&rec.partes&&rec.partes[0]){ nuevo=normPMovil(rec.partes[0]); h=dur; }
       }
       if(nuevo) PARTES.unshift(nuevo);
@@ -670,6 +679,16 @@ function _cuotaHTML_(){
    lo que devuelva. Filtrar aquí sería tener la regla en dos idiomas — y la de la cara siempre
    se queda vieja. */
 
+/* Cómo se ve un parte en la lista de decisión. Estaba metido dentro del cargador, así que
+   la respuesta de `decidirParte` no podía reutilizarlo y había que re-preguntar al
+   servidor solo para volver a formatear lo mismo. */
+function _normPDec_(p){
+  return { id:p.id, autor:p.autor, pila:_pilaDeM_(p.autor), unidad:p.subsistema||'—',
+    f:_isoADMY_(p.fecha), ini:p.ini||'—', fin:p.fin||'—', q:Number(p.horas)||0,
+    t:p.tarea||'', just:p.justificacion||'', sinFichaje:!!p.sinFichaje,
+    estado:p.estado, origen:p.origen||null };
+}
+
 function _cargarPartesDec_(){
   /* Los que esperan decisión, **sin** los tuyos: el backend ya te sirve solo lo que te toca. */
   return api.getPartes({}).then(function(arr){
@@ -677,12 +696,7 @@ function _cargarPartesDec_(){
     var yo=(YO&&YO.nombre)||'';
     PARTES_DEC = arr.filter(function(p){
       return (p.estado==='pendiente' || p.estado==='detalle') && p.autor!==yo;
-    }).map(function(p){
-      return { id:p.id, autor:p.autor, pila:_pilaDeM_(p.autor), unidad:p.subsistema||'—',
-        f:_isoADMY_(p.fecha), ini:p.ini||'—', fin:p.fin||'—', q:Number(p.horas)||0,
-        t:p.tarea||'', just:p.justificacion||'', sinFichaje:!!p.sinFichaje,
-        estado:p.estado, origen:p.origen||null };
-    });
+    }).map(_normPDec_);
   }).catch(function(){});
 }
 
@@ -728,10 +742,21 @@ function _engPartesDec_(){
       $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=true; });
       var prev=b.textContent; b.textContent='…';
       try{
-        await api.decidirParte(id, acc, mot||null);
+        var upd=await api.decidirParte(id, acc, mot||null);
         tost(acc==='aprobar'?'Aprobado. Ya cuenta.':(acc==='rechazar'?'Rechazado.':'Detalle pedido.'));
-        await _cargarPartesDec_();
+        /* ⛔ SE QUITA DE LA LISTA CON LA RESPUESTA QUE YA TENEMOS, sin volver a preguntar.
+           `decidirParte` DEVUELVE el parte decidido: pedirlo otra vez era, además de un
+           viaje de más, una carrera — la lectura salía antes de que el Sheet confirmase la
+           escritura y devolvía el estado de antes, así que la lista iba una decisión por
+           detrás y el último se quedaba «congelado». El servidor ahora vuelca, pero esto
+           es lo que hace que no dependa de eso. Es lo que ya hacía el escritorio. */
+        if(upd && (upd.estado==='pendiente' || upd.estado==='detalle')){
+          PARTES_DEC = PARTES_DEC.map(function(x){ return x.id===id ? _normPDec_(upd) : x; });
+        } else {
+          PARTES_DEC = PARTES_DEC.filter(function(x){ return x.id!==id; });
+        }
         pintar();
+        _cargarPartesDec_().then(pintar);        // y se re-sincroniza por detrás
       }catch(e){
         tost('No se pudo: '+e);
         $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=false; });

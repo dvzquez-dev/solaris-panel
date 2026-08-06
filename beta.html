@@ -107,16 +107,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=e803725"></script>
+<script src="comun-beta.js?v=988e293"></script>
 <script src="notis.movil-beta.js?v=bd8915e"></script>
 <script src="cierre.movil-beta.js?v=d6511a2"></script>
 <script src="tareas.movil-beta.js?v=9c56fc2"></script>
-<script src="turnos.movil-beta.js?v=9a63115"></script>
+<script src="turnos.movil-beta.js?v=13ad7dd"></script>
 <script src="buzon.movil-beta.js?v=50c3e0b"></script>
 <script src="documentos.movil-beta.js?v=aa4be87"></script>
 <script src="sanciones.movil-beta.js?v=af42cd0"></script>
 <script src="reuniones.movil-beta.js?v=f177a68"></script>
-<script src="horas.movil-beta.js?v=7be07a5"></script>
+<script src="horas.movil-beta.js?v=1568b63"></script>
 <script src="equipo.movil-beta.js?v=ebc5289"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -303,6 +303,10 @@ var api={
   pushSancion:  function(ss){ return api._post({action:"pushSancion",sanciones:ss}); },
   decidirSancion: function(id,a,o){ return api._post(Object.assign({action:"decidirSancion",id:id,accion:a},o||{})); },
   moverLimiteTarea: function(u,f){ return api._post({action:"moverLimiteTarea",url:u,fecha:f}); },
+  getConvocatoria: function(semana){ return api._post({action:"getConvocatoria",semana:semana||null}); },
+  guardarDisponibilidad: function(conv,celdas){ return api._post({action:"guardarDisponibilidad",convocatoria:conv,celdas:celdas}); },
+  crearConvocatoria: function(c){ return api._post({action:"crearConvocatoria",convocatoria:c}); },
+  getDisponibilidad: function(conv){ return api._post({action:"getDisponibilidad",convocatoria:conv}); },
   getNovedadesVistas: function(){ return api._post({action:"getNovedadesVistas"}); },
   marcarNovedadVista: function(id,visto){ return api._post({action:"marcarNovedadVista",id:id,visto:!!visto}); },
   pushParte: function(p){ return api._post({action:"pushParte",parte:p}); },
@@ -1314,7 +1318,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f0a39b8';
+var BUILD='5389055';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';

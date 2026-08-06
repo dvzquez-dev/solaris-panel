@@ -712,6 +712,15 @@ function miembro(n){
   return buscaMiembro(function(m){ return m.nombre===n; });
 }
 
+/* Una clave de un solo uso para un envío. ⛔ Se genera UNA VEZ por envío y se reutiliza en
+   los reintentos: si se generara dentro del reintento, cada intento traería una clave distinta
+   y el servidor los vería como envíos distintos — que es justo el fallo que esto evita.
+   No es criptográfica y no hace falta que lo sea: solo tiene que no repetirse entre envíos de
+   la misma persona en el mismo segundo. */
+function _claveUso_(){
+  return 'c' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
 /* Quien FIRMA un parte enrutado a esa unidad, contando que nadie decide lo suyo.
    ⛔ Y de aqui sale sola la regla que pidio Daniel -«todos los fichajes que no esten routeados
    deberian recaer en mi»-: si fichas EN CONCEPTO DE COORDINADOR de tu propia unidad, el que

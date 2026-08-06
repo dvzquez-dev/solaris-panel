@@ -202,7 +202,56 @@ function _convPintar_(cv, k){
   return !igual;
 }
 
+/* ═══ LA CONVOCATORIA VIENE DEL SERVIDOR (v64) ═════════════════════════════════════
+   Hasta ahora `CONVOCATORIAS` era **semilla**: se pintaba, y al recargar no quedaba nada.
+
+   ⛔ **Con sesión, el servidor MANDA — también cuando dice que no hay ninguna.** Si el
+   servidor contesta «ninguna abierta» y la pantalla se quedara con la de demo, estaría
+   enseñando un plazo que no existe y recogiendo respuestas que no van a ninguna parte. Eso es
+   peor que no enseñar nada, porque nadie lo nota.
+
+   ⛔ **Se guarda AL SOLTAR EL DEDO, no por celda.** Un arrastre sobre una fila entera son 14
+   celdas: guardar en cada una serían 14 peticiones para una sola decisión. El trazo es la
+   unidad natural — empieza al tocar y acaba al levantar.
+
+   ⚠️ Y **la rejilla se manda ENTERA**, que es lo que el servidor espera: guardar «solo lo que
+   cambió» haría imposible **quitar** una marca. */
+function _convEstadoSrv_(v){
+  if (v !== undefined) window.__convSrvEstado = v;
+  return window.__convSrvEstado || 'sin pedir';
+}
+
+function _convCargar_(repintar){
+  if (_convEstadoSrv_() !== 'sin pedir') return;
+  if (typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getConvocatoria) return;
+  _convEstadoSrv_('pidiendo');
+  api.getConvocatoria().then(function(r){
+    _convEstadoSrv_('ok');
+    if(!r || !r.convocatoria){
+      /* El servidor manda: sin convocatoria abierta, no se enseña la de demo. */
+      if(typeof CONVOCATORIAS!=='undefined') CONVOCATORIAS.length=0;
+    } else {
+      var cv=r.convocatoria, yo=(YO&&YO.nombre)||'';
+      cv.resp={}; cv.resp[yo]=r.mias||{};
+      if(typeof CONVOCATORIAS!=='undefined'){ CONVOCATORIAS.length=0; CONVOCATORIAS.push(cv); }
+    }
+    if(typeof repintar==='function') repintar();
+  }).catch(function(){ _convEstadoSrv_('error'); });
+}
+
+/* Manda la rejilla al servidor. Sin esperar a que llegue para repintar —el dedo ya la vio
+   cambiar— pero **avisando si falla**: una disponibilidad que se pierde en silencio es la que
+   luego hace que te pongan un turno cuando no puedes. */
+function _convGuardar_(cv){
+  if(!cv || typeof SESION==='undefined' || !SESION) return;
+  if(typeof api==='undefined' || !api.guardarDisponibilidad) return;
+  api.guardarDisponibilidad(cv.id, _convMias_(cv)).catch(function(e){
+    if(typeof tost==='function') tost('No se pudo guardar tu disponibilidad: '+((e&&e.message)||e));
+  });
+}
+
 function _engConv_(){
+  _convCargar_(function(){ if(typeof pintar==='function') pintar(); });
   var cv=_convAbierta_(); if(!cv) return;
   var rej=$('#convRej'); if(!rej) return;
   var repinta=function(){
@@ -251,6 +300,10 @@ function _engConv_(){
     _convPintar_(cv, el.dataset.tk); repinta();
   });
   var fin=function(){
+    /* ⛔ El guardado va AQUI y no en cada celda: el trazo es la unidad de decisión, y una
+       fila entera son 14 celdas. `pintando` lo vigila para no guardar en un `pointerup`
+       que no venía de pintar nada. */
+    if(pintando) _convGuardar_(cv);
     pintando=false;
     $$('#convC [data-tk]').forEach(function(x){ x._ult=null; });
   };
