@@ -306,6 +306,7 @@ function vFichar(){
         (ST.modo==='vivo'?vivo:bloque)))+
 
     '<div class="tarj">'+cab('Justificación','obligatoria')+
+      _perfilSelHTML_()+
       '<label class="campo"><span class="sc">Categoría <span class="req">*</span></span>'+
         '<select id="fCat">'+
           '<option value="tareas"'+(ST.form.cat==='tareas'?' selected':'')+'>Tarea</option>'+
@@ -316,7 +317,7 @@ function vFichar(){
       (ST.form.cat==='tareas'
         ? '<label class="campo"><span class="sc">Imputar a <span class="req">*</span></span>'+
             '<select id="fTarea"><option value="">— elige una de tus tareas —</option>'+opts+
-            '<option value="Trabajo de subsistema"'+(ST.form.tarea==='Trabajo de subsistema'?' selected':'')+'>Trabajo de subsistema · '+esc(YO.unidad)+'</option>'+
+            '<option value="Trabajo de subsistema"'+(ST.form.tarea==='Trabajo de subsistema'?' selected':'')+'>Trabajo de subsistema · '+esc(_perfilElegido_())+'</option>'+
             '<option value="__otro__"'+(ST.form.tarea==='__otro__'?' selected':'')+'>Otro (lo escribo)</option>'+
             '</select></label>'+
             (ST.form.tarea==='__otro__'
@@ -445,6 +446,31 @@ function medirAristas(){
   if(faltan) requestAnimationFrame(medirAristas);
 }
 
+/* ═══ EL PERFIL AL FICHAR ══════════════════════════════════════════════════════════
+   Daniel (06/08/2026): «el enrutado ese debe estar en la pestana fichar tambien implementado
+   para que cuando alguien tenga mas de un cargo pueda escoger que "perfil" usa».
+
+   ⛔ Con un solo perfil NO SE PINTA. Un desplegable de una opcion no decide nada y hay que
+   leerlo igual: la inmensa mayoria del equipo tiene uno solo, y a esos la pantalla no cambia.
+   ⛔ Va ARRIBA DEL TODO de la justificacion, encima de «Categoria», porque no es un campo mas:
+   cambia QUIEN FIRMA, y eso enmarca todo lo que se rellene debajo. */
+function _perfilElegido_(){
+  var p = ST.form.perfil, ps = _perfilesDe_(YO);
+  if (p && _perfilValido_(YO, p)) return p;
+  var d = _perfilDefecto_(YO);
+  return d ? d.unidad : (ps[0] ? ps[0].unidad : '');
+}
+function _perfilSelHTML_(){
+  if (!_hayQuePreguntarPerfil_(YO)) return '';
+  var ps = _perfilesDe_(YO), el = _perfilElegido_();
+  return '<label class="campo"><span class="sc">Fichas como <span class="req">*</span></span>'+
+    '<select id="fPerfil">'+ ps.map(function(p){
+      return '<option value="'+esc(p.unidad)+'"'+(p.unidad===el?' selected':'')+'>'+esc(p.txt)+'</option>';
+    }).join('') +'</select></label>'+
+    '<p class="mini" style="margin:-4px 0 10px">Lo firma <b>'+esc(_firmaDe_(el, YO.nombre))+'</b>'+
+    ' · estas horas cuentan para <b>'+esc(el)+'</b></p>';
+}
+
 /* Envío del fichaje. Con cuenta real y sesión EN VIVO → api.ficharSalida: la NUBE cierra
    la sesión abierta y calcula las horas (de la entrada al momento del envío). Un BLOQUE
    declarado a mano → api.pushParte (sin fichaje). Sin backend: memoria (semilla). */
@@ -457,7 +483,7 @@ async function enviarFichaje(){
     tost('Declarando…');
     try{ var p=await api.declararParte(f.declararId, imput, f.just.trim(), f.cat);
       if(p){ var i=PARTES.findIndex(function(x){return x.id===f.declararId;}); if(i>=0) PARTES[i]=normPMovil(p); }
-      f.declararId=null; f.just=''; f.tarea=''; f.detalle='';
+      f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
       tost('Declarado · a la cola de tu coordinador.'); irA('horas');
     }catch(e){ tost('No se pudo declarar: '+((e&&e.message)||e)); }
     return;
@@ -467,16 +493,22 @@ async function enviarFichaje(){
     try{
       var nuevo=null, h=0;
       if(ST.modo==='vivo' && ST.ses.cloudIni){
-        var r=await api.ficharSalida(imput, f.just.trim(), f.cat);   // la nube cierra, calcula y guarda la categoría
+        var r=await api.ficharSalida(imput, f.just.trim(), f.cat, _perfilElegido_());   // la nube cierra, calcula y guarda la categoría
         if(r && r.parte){ nuevo=normPMovil(r.parte); h=r.parte.horas; }
       } else {
         var dur=durForm();
         var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, horas:dur,
-          ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true });
+          ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true,
+          subsistema:_perfilElegido_() });
         if(rec&&rec.partes&&rec.partes[0]){ nuevo=normPMovil(rec.partes[0]); h=dur; }
       }
       if(nuevo) PARTES.unshift(nuevo);
-      ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle='';
+      /* ⛔ `perfil` TAMBIEN se limpia. Dejarlo pegado del envio anterior haria que una
+         eleccion puntual («esto fue como coordinador de X») enrutara **todo lo siguiente**
+         a ese cargo, en silencio y sin volver a preguntar -- que es exactamente el fallo
+         que la regla del defecto («por defecto va TU UNIDAD, no el cargo») existe para
+         evitar. Se descubrio mirandolo en el navegador: la pantalla no lo delata. */
+      ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
       tost('Fichaje enviado · '+nf(h,2)+' h a la cola de tu coordinador');
       irA('horas');
     }catch(e){ tost('No se pudo enviar: '+((e&&e.message)||e)); }
@@ -487,7 +519,7 @@ async function enviarFichaje(){
     ini:f.ini, fin:f.fin, just:f.just.trim(),
     sinFichaje: ST.modo==='bloque'});
   ST.ses={estado:'parada',ini:null,acum:0,desde:null,ult:ST.ses.ult};
-  f.just=''; f.tarea=''; f.detalle='';
+  f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
   tost('Enviado · '+nf(durd,2)+' h pendientes de firma');
   irA('horas');
 }

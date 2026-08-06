@@ -712,7 +712,18 @@ function miembro(n){
   return buscaMiembro(function(m){ return m.nombre===n; });
 }
 
-/* Quién coordina esa unidad; si nadie, el PD. */
+/* Quien FIRMA un parte enrutado a esa unidad, contando que nadie decide lo suyo.
+   ⛔ Y de aqui sale sola la regla que pidio Daniel -«todos los fichajes que no esten routeados
+   deberian recaer en mi»-: si fichas EN CONCEPTO DE COORDINADOR de tu propia unidad, el que
+   aprobaria serias tu, y como nadie firma lo suyo, sube al PD. No hay que escribir nada mas.
+   Se pinta en la pantalla de fichar para que la consecuencia de elegir perfil **se vea antes
+   de elegirlo**: es la mitad de la decision, y hasta ahora era invisible. */
+function _firmaDe_(unidad, quien){
+  var c = coordinadorDe(unidad);
+  return c === quien ? PD_NOM : c;
+}
+
+/* Quien coordina esa unidad; si nadie, el PD. */
 function coordinadorDe(u){
   var c = buscaMiembro(function(m){ return m.cargo==='Coordinador' && m.unidad===u; });
   return c ? c.nombre : PD_NOM;
@@ -773,6 +784,89 @@ function _calorDe_(r, pond){
 
    El array va DENTRO: `comun.js` no lleva ni una sentencia ejecutable de nivel superior, y
    esa es la propiedad que hizo que se pudiera sacar del HTML sin arrastrar orden de carga. */
+/* ===== PERFILES: con QUE CARGO fichas =========================================
+   Espejo de `reglas/perfiles.py`. Daniel (06/08): *"si Bruno ficha en concepto de
+   coordinador de logistica no es lo mismo que fichando en concepto de miembro de
+   propulsion"*. El perfil fija el SUBSISTEMA del parte, y el subsistema fija QUIEN
+   LO APRUEBA -- asi que elegir perfil es elegir a quien le llega la firma.
+
+   Y de ahi sale sola la regla que pidio Daniel -"todos los fichajes que no esten
+   routeados deberian recaer en mi"-: si fichas en concepto de coordinador de tu
+   propia unidad, el que aprobaria serias tu, y como nadie decide lo suyo, sube al
+   PD. No hay que escribir nada.
+
+   La clave es la UNIDAD, no el rol: dos perfiles de la misma unidad enrutan igual
+   y se FUNDEN en uno (se conserva el rotulo de mas peso). Ofrecer dos opciones que
+   hacen lo mismo es ruido que hay que leer igual.
+
+   Esto es la PANTALLA. La validacion de verdad la hace el SERVIDOR: sin ella
+   cualquiera mandaria sus horas a la cola de cualquier coordinador. */
+/* Cuanto pesa cada rol al fundir dos perfiles de la misma unidad: coordinar manda
+   sobre estar. Es una FUNCION y no un `var` a proposito: `comun.js` no lleva ni una
+   sentencia ejecutable de nivel superior -- es lo unico que lo hace seguro de cargar
+   antes que nada, y el dia que lleve una, dejara de serlo sin que nadie lo note. */
+function _pesoPerfil_(rol){ return rol==='coordinador' ? 2 : 1; }
+
+function _limpio_(v){ return ((v==null?'':v)+'').replace(/^\s+|\s+$/g,''); }
+
+/* `coordina` llega como cadena, lista o nada.
+   Una cadena NO se itera como lista: recorrer "Logistica" daria nueve perfiles de
+   una letra. Es el fallo mudo de un campo que a veces viene suelto y a veces en
+   lista, y aqui acabaria enrutando horas a ninguna parte. */
+function _unidadesCoord_(v){
+  if(!v) return [];
+  if(typeof v==='string') v=[v];
+  if(typeof v.length!=='number') return [];
+  var out=[],i,u;
+  for(i=0;i<v.length;i++){ u=_limpio_(v[i]); if(u) out.push(u); }
+  return out;
+}
+
+/* Los perfiles de `m`, de mas peso a menos y luego por unidad. Lista VACIA si no se
+   sabe nada de esa persona: eso es "no lo se", y quien llame tiene que poder
+   distinguirlo de "tiene un perfil". Nunca se inventa uno. */
+function _perfilesDe_(m){
+  if(!m||typeof m!=='object') return [];
+  var orden=[], por={}, i, u, unidad=_limpio_(m.unidad);
+  if(unidad){ por[unidad]={unidad:unidad,rol:'miembro',txt:'miembro de '+unidad}; orden.push(unidad); }
+  var cs=_unidadesCoord_(m.coordina);
+  for(i=0;i<cs.length;i++){
+    u=cs[i];
+    if(!por[u]) orden.push(u);
+    else if(_pesoPerfil_(por[u].rol)>=_pesoPerfil_('coordinador')) continue;
+    por[u]={unidad:u,rol:'coordinador',txt:'coordinador de '+u};
+  }
+  var out=[];
+  for(i=0;i<orden.length;i++) out.push(por[orden[i]]);
+  out.sort(function(a,b){
+    var d=_pesoPerfil_(b.rol)-_pesoPerfil_(a.rol);
+    return d ? d : (a.unidad<b.unidad?-1:a.unidad>b.unidad?1:0);
+  });
+  return out;
+}
+
+/* Con uno solo NO se pregunta: un desplegable de una opcion es un paso que no
+   decide nada y que hay que tocar igual. */
+function _hayQuePreguntarPerfil_(m){ return _perfilesDe_(m).length>1; }
+
+/* El que sale marcado. Es LA UNIDAD DE LA PERSONA, no el primero de la lista:
+   fichar "como miembro de lo tuyo" es lo que se hace el 99 % de las veces, y poner
+   arriba el cargo haria que quien coordina algo enrutara por error TODAS sus horas
+   a su propio cargo -- que ademas es justo el caso que acaba en el PD por no poder
+   firmarse uno mismo. */
+function _perfilDefecto_(m){
+  var ps=_perfilesDe_(m), i, unidad=_limpio_(m&&m.unidad);
+  if(!ps.length) return null;
+  for(i=0;i<ps.length;i++) if(ps[i].unidad===unidad) return ps[i];
+  return ps[0];
+}
+
+function _perfilValido_(m,unidad){
+  var ps=_perfilesDe_(m), i, u=_limpio_(unidad);
+  for(i=0;i<ps.length;i++) if(ps[i].unidad===u) return true;
+  return false;
+}
+
 /* ═══ NOVEDADES · la capa de «esto es nuevo, míralo» ════════════════════════════════
    Daniel (06/08/2026): *«una capa completamente retirable… unas cosas que me rodeen las cosas
    nuevas para que las checkee, desde la última vez que las vi»* · *«lo suyo sería que vayan por
@@ -794,8 +888,23 @@ function _calorDe_(r, pond){
    gateada a rango ≥ 3. Está apuntado, y NO se finge: el pie de la capa lo dice. */
 
 function _novedades_(){
-  /* Lo más nuevo primero. Al cerrar una pieza se añade su tanda AQUÍ, en ese momento. */
+  /* Lo más nuevo primero. Al cerrar una pieza se añade su tanda AQUÍ, en ese momento.
+
+     ⛔ CRITERIO DE ENTRADA: **solo entra lo que se puede MIRAR en la app**. Esta capa existe
+     para que Daniel revise; una regla de Python sin pantalla no tiene nada que revisar, y
+     meterla aquí le manda a buscar algo que no está. El 06/08 quedaron fuera a propósito
+     `reglas/convocatoria.que_toca` y `reglas/perfiles.py`: son la base de dos pantallas que
+     todavía no existen, y entrarán **cuando entre su pantalla**.
+
+     El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
+     documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-06-perfil', fecha:'2026-08-06', titulo:'Elegir con qué cargo fichas',
+      items:[
+        {cara:'movil', vista:'fichar', txt:'Si tienes más de un cargo, arriba de la justificación sale «Fichas como»: eliges con cuál. Con uno solo no aparece nada.'},
+        {cara:'movil', vista:'fichar', txt:'Debajo te dice QUIÉN LO VA A FIRMAR y a qué subsistema cuentan esas horas, antes de enviarlo.'},
+        {cara:'movil', vista:'fichar', txt:'Si fichas como coordinador de lo tuyo, sube al PD: nadie firma lo suyo.'}
+      ]},
     { id:'2026-08-06-horas', fecha:'2026-08-06', titulo:'Aprobar horas desde el teléfono',
       items:[
         {cara:'movil', vista:'horas', txt:'Bloque «Esperan tu decisión» lo primero de Horas: aprobar, pedir detalle o rechazar las horas de tu gente, con motivo obligatorio.'},

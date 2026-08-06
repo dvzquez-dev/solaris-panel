@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=4681532"></script>
+<script src="comun-beta.js?v=bb60ef3"></script>
 <script src="notis.movil-beta.js?v=bd8915e"></script>
 <script src="cierre.movil-beta.js?v=d6511a2"></script>
 <script src="tareas.movil-beta.js?v=9c56fc2"></script>
@@ -116,7 +116,7 @@
 <script src="documentos.movil-beta.js?v=aa4be87"></script>
 <script src="sanciones.movil-beta.js?v=af42cd0"></script>
 <script src="reuniones.movil-beta.js?v=f177a68"></script>
-<script src="horas.movil-beta.js?v=96bc99d"></script>
+<script src="horas.movil-beta.js?v=7be07a5"></script>
 <script src="equipo.movil-beta.js?v=ebc5289"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -180,7 +180,16 @@ var DATA={
     {u:'Org&Mark',media:7.7,n:2}
   ],
   miembros:[
+    /* ⛔ `coordina` en la MAQUETA, y a proposito: es el caso literal que puso Daniel -«si
+       Bruno ficha en concepto de coordinador de logistica no es lo mismo que fichando en
+       concepto de miembro de propulsion»-. Nerea es MIEMBRO de Aeroestructuras y COORDINA
+       Avionica, asi que sus dos perfiles los firma gente distinta: el suyo lo firma Xoan
+       (coordinador de Aeroestructuras) y el de Avionica sube al PD. Sin alguien asi en la
+       semilla, el selector **no se ve nunca** en demo y la pantalla no se puede mirar.
+       📌 En el equipo REAL hoy solo hay un caso de dos perfiles (Jose: Propulsion +
+       Unidad de Documentacion Tecnica); el de Bruno **no esta en el roster**. */
     {nombre:'Nerea Ferreiro Lamas',pila:'Nerea',unidad:'Aeroestructuras',cargo:null,
+     coordina:['Aviónica'],
      puntos:7,estado:'normal',infraccion:false,hMes:14.5,hAnt:11.9,horasTemp:132.4,meses:11,
      cuota:24.18,cuota_base:32.18,coche:2,puesto:9},
     {nombre:'Xoán Bermúdez Rial',pila:'Xoán',unidad:'Aeroestructuras',cargo:'Coordinador',
@@ -295,7 +304,7 @@ var api={
   decidirSancion: function(id,a,o){ return api._post(Object.assign({action:"decidirSancion",id:id,accion:a},o||{})); },
   moverLimiteTarea: function(u,f){ return api._post({action:"moverLimiteTarea",url:u,fecha:f}); },
   pushParte: function(p){ return api._post({action:"pushParte",parte:p}); },
-  ficharEntrada:    function(){ return api._post({action:"ficharEntrada"}); },
+  ficharEntrada:    function(perfil){ return api._post({action:"ficharEntrada",perfil:perfil||null}); },
   /* Preferencias de aviso (backend v45). Viven en el SERVIDOR y no en el movil porque el
      filtro se aplica antes de enviar el push: callar en el navegador acaba con la
      suscripcion revocada (`userVisibleOnly` obliga a mostrar algo por cada push). */
@@ -304,7 +313,7 @@ var api={
   calcularCierre:        function(f,p){ return api._post({action:"calcularCierre",forzar:!!f,periodo:p||null}); },
   getNotis:         function(){ return api._post({action:"getNotis"}); },
   guardarNotis:     function(t){ return api._post({action:"guardarNotis",tipos:t}); },
-  ficharSalida:     function(tarea,just,cat){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat}); },
+  ficharSalida:     function(tarea,just,cat,perfil){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat,perfil:perfil||null}); },
   getFichajeAbierto:function(){ return api._post({action:"getFichajeAbierto"}); },
   pausarFichaje:    function(){ return api._post({action:"pausarFichaje"}); },
   reanudarFichaje:  function(){ return api._post({action:"reanudarFichaje"}); },
@@ -876,7 +885,10 @@ var RRI={restas:[
    ═══════════════════════════════════════════════════════════════════════════ */
 var ST={vista:'estado', libro:false, modo:'vivo', rol:'miembro',
   ses:{estado:'parada', ini:null, acum:0, desde:null, ult:'19:42'},
-  form:{fecha:HOY, ini:'17:00', fin:'20:30', cat:'tareas', tarea:'', detalle:'', just:'', origen:'turno', declararId:null},
+  /* `perfil` = con QUE CARGO ficha (la unidad que llevara el parte). Arranca a null y lo
+     resuelve `_perfilElegido_()` contra el roster: cablear aqui la unidad de nadie seria
+     fijarla ANTES de saber quien ha entrado. */
+  form:{fecha:HOY, ini:'17:00', fin:'20:30', cat:'tareas', tarea:'', detalle:'', just:'', origen:'turno', declararId:null, perfil:null},
   sel:null            /* Map de la rejilla de cubrir */
 };
 var SEQ=6;
@@ -1300,7 +1312,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='9f6edfe';
+var BUILD='10bf9ef';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -1662,7 +1674,7 @@ function _engFichar_(){
     if(typeof backendOK!=='undefined' && backendOK && SESION){
       bi.disabled=true;
       try{
-        var rec=await api.ficharEntrada();
+        var rec=await api.ficharEntrada(_perfilElegido_());
         ST.ses={estado:'corriendo', cloudIni:rec.ini, desde:_hhmmDe_(rec.ini), ult:_hhmmDe_(rec.ini)};
         tost('Fichando. Corre en la nube: aunque cierres la app, sigue contando.');
         pintar();
@@ -1706,9 +1718,9 @@ function _engFichar_(){
       bf.disabled=true; var declara=validarFichaje(), f=ST.form;
       tost(declara?'Cerrando y declarando…':'Cerrando sin declarar…');
       try{
-        var r=await api.ficharSalida(declara?_imputacion_(f):'', declara?f.just.trim():'', declara?f.cat:null);
+        var r=await api.ficharSalida(declara?_imputacion_(f):'', declara?f.just.trim():'', declara?f.cat:null, _perfilElegido_());
         if(r && r.parte) PARTES.unshift(normPMovil(r.parte));
-        ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle='';
+        ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
         tost(declara?'Fichaje declarado · a la cola de tu coordinador.':'Fichaje cerrado SIN declarar. Decláralo desde «Tus partes».');
         irA('horas');
       }catch(e){ bf.disabled=false; tost('No se pudo cerrar: '+((e&&e.message)||e)); }
@@ -1721,6 +1733,11 @@ function _engFichar_(){
     pintar();
     var t=$('#fJust'); if(t) t.focus();
   };
+  /* ⛔ `pintar()` y no un repintado del propio select: al cambiar de perfil cambian TAMBIEN
+     el rotulo de «Trabajo de subsistema» y la linea de quien firma. Repintar solo lo que se
+     toco dejaria las otras dos diciendo lo de antes, que es peor que no decir nada. */
+  var fp=$('#fPerfil');
+  if(fp) fp.onchange=function(){ ST.form.perfil=fp.value; pintar(); };
   var fc=$('#fCat');
   if(fc) fc.onchange=function(){ ST.form.cat=fc.value; ST.form.tarea=''; ST.form.detalle=''; pintar(); };
   var ft=$('#fTarea');
