@@ -1126,6 +1126,22 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-medidor-memoria', fecha:'2026-08-07',
+      titulo:'El medidor ya no se cae a cero cada vez que abres la app',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Al entrar, el medidor de conducta se vaciaba y volvía a llenarse aunque no hubiera pasado nada. Ahora recuerda tus puntos entre recargas: si no han cambiado, aparece lleno y ya. Si han cambiado, se anima — que es cuando la animación dice algo.'},
+        {cara:'movil', vista:'estado', txt:'Y si lo tocas, se rearma desde cero a propósito: ahí la animación es lo que has pedido.'}
+      ] },
+    { id:'2026-08-07-partes-orden', fecha:'2026-08-07',
+      titulo:'Tus partes de horas salen ordenados por fecha',
+      items:[
+        {cara:'movil', vista:'horas', txt:'No estaban ordenados por nada: salían en el orden en que los mandara el servidor, así que uno de un mes viejo podía aparecer por encima de los de hoy. Ahora lo más reciente va primero y lo antiguo cae al fondo.'}
+      ] },
+    { id:'2026-08-07-turnos-hueco', fecha:'2026-08-07',
+      titulo:'Turnos dice qué falta cuando no hay semana convocada',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'Si no hay ninguna semana abierta, la pantalla no decía absolutamente nada — así que parecía que lo de rellenar disponibilidad no existía. Ahora avisa de que no hay nada que rellenar todavía, y a quien puede convocar le dice dónde se hace.'}
+      ] },
     { id:'2026-08-07-arranque-escritorio', fecha:'2026-08-07',
       titulo:'El escritorio tampoco se recarga solo al entrar',
       items:[
