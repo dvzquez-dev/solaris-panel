@@ -1059,33 +1059,32 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
-    {f:'2026-08-07', t:'El parseo de horas estaba escrito cuatro veces',
-     d:'Convertir «HH:MM» en minutos estaba en cuatro sitios: dos copias idénticas en los '+
-       'módulos de reuniones de cada cara, y una cuarta a mano dentro del cálculo de '+
-       'duración del parte de horas. Y NO hacían lo mismo: la de a mano daba NaN con un '+
-       'dato raro, y ese NaN se propaga a las horas sin dar ningún error, así que el parte '+
-       'saldría en blanco. Ahora hay una sola, en el fichero que cargan las dos caras.'},
-    {f:'2026-08-07', t:'Novedades ya es solo tuya, y la app entra de una pasada',
-     d:'Dos cosas que reportaste. (1) La entrada «Novedades» del menú NO tenía ninguna '+
-       'condición: en beta no se notaba, pero producción sirve el mismo HTML, así que los '+
-       '32 la tenían en su menú con el registro de cambios de desarrollo. Ahora exige beta '+
-       'Y ser PD, y se filtra también por donde se entra, no solo escondiendo el botón. '+
-       '(2) El widget de la entrada se pintaba dos veces de más: había dos funciones '+
-       'pidiendo los mismos datos, y la primera no marcaba la hora del último refresco, '+
-       'que es lo único que frena al siguiente. Se ha quedado una sola.'},
-    {f:'2026-08-07', t:'La comparativa de horas ya no te dice que vas peor cuando vas mejor',
-     d:'Debajo de la barra de horas se comparaba tu mes A MEDIAS contra el mes anterior '+
-       'ENTERO. A día 7, con 9,8 h este mes y 31 h el pasado, salía −68 % — y salía en rojo a '+
-       'principios de todos los meses, arreglándose sola según pasaban los días. Ahora se '+
-       'compara el RITMO (h/día): ese mismo caso sale +40 %, que es la verdad. Y «vs. equipo» '+
-       'compara con la media real de horas que lleva el equipo este mes, no con un 10,9 que '+
-       'estaba escrito a mano en el código y no se movía nunca.'},
-    {f:'2026-08-07', t:'Ya se ve quién está fichado ahora mismo',
-     d:'La vista «Fichajes en curso» del escritorio pintaba tres personas de mentira. Ahora pregunta '+
-       'al servidor: quién tiene la entrada abierta, desde qué hora, en qué unidad y cuánto lleva. '+
-       'Quien pasa de 10 h sale en ámbar, y quien está en pausa se pinta distinto de quien está '+
-       'trabajando. Si el servidor no contesta lo dice, en vez de enseñar una lista vieja donde '+
-       'alguien que cerró hace horas seguiría saliendo como fichado.'},
+    { id:'2026-08-07-horas-cuatro', fecha:'2026-08-07',
+      titulo:'El parseo de horas estaba escrito cuatro veces',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La duración de un parte se calculaba con un parseo de horas propio, distinto del que usan las reuniones. Con un dato raro daba NaN, y eso se propaga a las horas sin dar error: el parte saldría en blanco. Ahora las dos caras usan la misma.'},
+        {cara:'escritorio', vista:'reuniones', txt:'La rejilla de franjas de una convocatoria también estaba duplicada entre las dos caras. Una sola, y probada: dos días que empiezan a horas distintas ya no dan franjas que se pisen.'}
+      ] },
+    { id:'2026-08-07-novedades-tuyas', fecha:'2026-08-07',
+      titulo:'Novedades ya es solo tuya, y la app entra de una pasada',
+      items:[
+        {cara:'movil', vista:'estado', txt:'La entrada «Novedades» del menú NO tenía ninguna condición: en beta no se notaba, pero producción sirve el mismo HTML, así que los 32 la tenían con el registro de cambios de desarrollo. Ahora exige beta Y ser PD.'},
+        {cara:'escritorio', vista:'estado', txt:'Lo mismo aquí, y filtrado también por donde se entra de verdad: esconder el botón no cierra la puerta.'},
+        {cara:'movil', vista:'horas', txt:'El widget de la entrada se pintaba dos veces de más al abrir la app: había dos funciones pidiendo los mismos datos y la primera no marcaba la hora del último refresco, que es lo único que frena a la siguiente.'}
+      ] },
+    { id:'2026-08-07-curso', fecha:'2026-08-07',
+      titulo:'Ya se ve quién está fichado ahora mismo',
+      items:[
+        {cara:'escritorio', vista:'horas', txt:'La vista «Fichajes en curso» pintaba tres personas de mentira. Ahora pregunta al servidor: quién tiene la entrada abierta, desde qué hora, en qué unidad y cuánto lleva.'},
+        {cara:'escritorio', vista:'horas', txt:'Quien pasa de 10 h sale en ámbar, y quien está en pausa se pinta distinto de quien está trabajando.'},
+        {cara:'escritorio', vista:'horas', txt:'Si el servidor no contesta lo dice, en vez de enseñar una lista vieja donde alguien que cerró hace horas seguiría saliendo como fichado.'}
+      ] },
+    { id:'2026-08-07-ritmo', fecha:'2026-08-07',
+      titulo:'La comparativa de horas ya no dice que vas peor cuando vas mejor',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Debajo de la barra se comparaba tu mes A MEDIAS contra el mes anterior ENTERO. A día 7, con 9,8 h este mes y 31 h el pasado, salía −68 % — y salía en rojo a principios de todos los meses, arreglándose sola según pasaban los días. Ahora se compara el RITMO (h/día): ese mismo caso sale +40 %.'},
+        {cara:'movil', vista:'horas', txt:'Y «vs. equipo» compara con la media real de horas que lleva el equipo este mes, no con un 10,9 que estaba escrito a mano en el código y no se movía nunca. Si no hay dato, la fila no se pinta.'}
+      ] },
     { id:'2026-08-07-avisos', fecha:'2026-08-07', titulo:'Los avisos de la convocatoria: los enciendes tú',
       items:[
         {cara:'escritorio', vista:'turnos', txt:'Interruptor nuevo «mandar los avisos al móvil». Nace APAGADO: hasta que lo enciendas no le llega nada a nadie.'},
