@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=8c2c8f0"></script>
+<script src="comun-beta.js?v=7848438"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
 <script src="turnos.escritorio-beta.js?v=f0af960"></script>
@@ -1950,11 +1950,27 @@ function _aplicarBootstrap_(boot){
   if(Array.isArray(boot.reuniones)){
     REUS.length=0; boot.reuniones.map(normReu).forEach(function(r){REUS.push(r);});
     _hidratarReus_();          // el bootstrap NO trae `resp`: sin esto el mapa sale a cero
-    setTimeout(_refrescoVivo_, 300);   // datos frescos sin bloquear la entrada
+    /* ⛔ AQUI HABIA UN `setTimeout(_refrescoVivo_, 300)`, y es el MISMO fallo que Daniel
+       reportó en el móvil («carga el widget una vez extra»), en la otra cara y sin que nadie
+       lo hubiera mirado. Pedía **las siete cosas** -turnos, tareas, panel, sanciones, partes,
+       documentos y reuniones- 300 ms después de tenerlas: el bootstrap trae panel, tareas,
+       turnos, documentos y reuniones, y el arranque carga sanciones y partes en su propio
+       `Promise.all`. Y `_repintarSuave_` reconstruía `#main` encima de la pintada buena,
+       que en esta cara **pierde el scroll**.
+
+       Lo único que aportaba era dejar puesto el SELLO del antirrebote, y un sello se pone
+       -- abajo, fuera de este `if`. El refresco de verdad sigue vivo: cada 90 s y al volver
+       a la pestaña. */
     /* El libro de puntos es una llamada mas y NO bloquea la entrada: si falla o el backend es
        viejo, la vista se queda vacia y lo dice. */
     _cargarMovimientosE_().then(function(){ if(vista==='libros') _repintarSuave_(); });
   }
+  /* ⛔ EL SELLO VA AQUI, FUERA DEL `if`, y no dentro como lo puse primero: lo que se sella es
+     «acabo de recibir datos del servidor», no «había reuniones». Con el sello dentro, un
+     bootstrap que trajera panel, tareas y turnos pero **ninguna reunión** dejaba
+     `_ULT_REFRESCO_` en 0, y al primer toque en la pantalla saltaba un refresco completo con
+     su repintado -- exactamente el fallo que esto viene a quitar, colado por el caso raro. */
+  _ULT_REFRESCO_=Date.now();
   backendOK=true;
 }
 
@@ -1974,6 +1990,11 @@ async function _onCredencial_(resp,_silente){
       SESION={token:resp.credential,email:yo.email,nombre:yo.nombre};
       var pnl=null; try{ pnl=await api.getPanel(); }catch(_){}
       _aplicarPanel_(pnl); backendOK=true;
+      /* ⛔ AQUI SÍ HACE FALTA. Por esta rama se entra cuando el bootstrap **no** contestó, y
+         entonces turnos, tareas, documentos y reuniones **no los pide nadie más**: se
+         quedarían con la semilla hasta el reloj de los 90 s. Es la contraparte de haber
+         quitado el refresco de arriba: se quita donde sobra, no donde sostiene. */
+      setTimeout(function(){ _refrescoVivo_('arranque'); }, 300);
     }
     if(backendOK && SESION.rango!=null && SESION.rango < 0){   // miembro normal: sin acceso al escritorio
       _gate_(_insigniaHTML_()+'<div style="max-width:380px;line-height:1.55;text-align:center"><b>No tienes permiso para entrar al escritorio.</b><br><span style="opacity:.75">Este panel es para consejo, junta y direcci\u00f3n. Tu sitio es la app del m\u00f3vil.</span></div>');
@@ -2148,7 +2169,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='da4088b';
+var BUILD='8d7a8f9';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

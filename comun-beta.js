@@ -138,6 +138,32 @@ function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.b
 
    El panel real trae `carga_mes_anterior` (comprobado en `datos/panel.json`). Se acepta tambien
    `horasMesAnt` por si el backend lo proyecta con ese nombre al miembro. */
+/* Lo que hay del mes anterior PARA COMPARAR, con el mes al que pertenece de verdad.
+
+   ⛔ Daniel (07/08): *«¿y por qué ya no me aparece la comparación con el mes anterior?»*. La
+   quité yo esa misma tarde, y con buen motivo a medias: la fila leía `hAnt`, que en el panel
+   subido al servidor vale **2 h con `mesAnt: 'junio'`** estando en agosto. O sea que decía
+   «vs. julio» enseñando **junio**. Al pasarla al dato bueno (`carga_mes_anterior`) la fila
+   desapareció, porque **ese campo no está en el panel que hay subido** — arreglé la mentira y de
+   paso me llevé la fila.
+
+   ⛔ **El fallo no era comparar con junio: era decir que era julio.** Así que el dato viejo
+   vuelve a valer, pero **viaja con su propia etiqueta**: si sale de ahí, la fila dice
+   «vs. junio». Cuando el panel del servidor traiga `carga_mes_anterior`, se usa ese y el mes
+   se deriva del periodo — sin tocar nada más.
+
+   ⚠️ `_hAntReal_` (aquí abajo) **no cambia**: sigue devolviendo **solo** el dato bueno, porque
+   el escritorio la usa para decir quién sube y quién baja, y ahí un número de otro mes mezclado
+   con los de éste sí sería mentir. Aquí se compara **contigo mismo** y el rótulo dice contra
+   qué; allí se compara **entre personas** y no hay dónde ponerlo. */
+function _antComparable_(m){
+  var h=_hAntReal_(m);
+  if(h!=null) return {h:h, mes:null};             // mes null = se deriva del periodo del servidor
+  var v=(m && typeof m.hAnt==='number') ? m.hAnt : null;
+  if(v!=null && v>0 && m.mesAnt) return {h:v, mes:String(m.mesAnt)};
+  return null;                                    // sin nada que comparar: la fila no se pinta
+}
+
 function _hAntReal_(m){
   m = m || {};
   var v = (typeof m.horasMesAnt==='number') ? m.horasMesAnt
@@ -1100,6 +1126,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-arranque-escritorio', fecha:'2026-08-07',
+      titulo:'El escritorio tampoco se recarga solo al entrar',
+      items:[
+        {cara:'escritorio', vista:'estado', txt:'Igual que en el móvil: al entrar volvía a pedir las siete cosas —turnos, tareas, panel, sanciones, partes, documentos y reuniones— 300 ms después de haberlas recibido, y repintaba encima. Aquí molestaba más, porque repintar pierde el scroll de donde estuvieras.'},
+        {cara:'escritorio', vista:'estado', txt:'Si el servidor no contesta a la primera, esa recarga SIGUE ocurriendo: es lo que salva la pantalla, y sin ella turnos, tareas y documentos se quedarían con datos de ejemplo hasta el minuto y medio.'}
+      ] },
     { id:'2026-08-07-lote-congelado', fecha:'2026-08-07',
       titulo:'El bloque de sanciones del escritorio se quedaba en el lote de cuando entrabas',
       items:[

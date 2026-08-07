@@ -145,8 +145,34 @@ function _convCelHTML_(cv, dia, franja){
 
 /* La tarjeta entera. Va la PRIMERA de la pantalla de turnos: lo que caduca manda sobre lo
    que ya está decidido. */
+/* ⛔ SIN CONVOCATORIA, EL HUECO HABLA. Aqui había `if(!cv) return '';`, o sea que la pantalla
+   de Turnos **no decía nada** cuando no hay ninguna semana abierta. Daniel (07/08):
+   *«¿dónde está para rellenar disponibilidad en turnos? aún no lo hiciste…»* — y estaba hecho
+   entero: la rejilla, el pincel, el guardado en el servidor. Lo que fallaba es que **sin una
+   convocatoria viva no se ve**, y nadie te dice que eso es lo que falta.
+
+   ⚠️ Y el que tiene que convocar es él, así que la app le escondía justo la acción que lo
+   desbloqueaba. Es el mismo patrón del día: **la ausencia de dato es silenciosa**, y un hueco
+   mudo se lee como «esto no existe», no como «esto está vacío».
+
+   Se dice a todo el mundo (para que nadie lo busque en balde) y a quien puede convocar se le
+   añade **dónde** se hace: convocar vive en el escritorio, no aquí.
+
+   ⚠️ Rango ≥ 3 es el MISMO criterio con el que el escritorio deja convocar. No se reutiliza
+   `_novPuedeRegistro_`, que da ese mismo número pero significa otra cosa («esto lo revisa el
+   PD»): atar dos reglas porque hoy coinciden es cómo se separan mal el día que una cambie. */
+function _puedeConvocarT_(){
+  return (typeof _rangoBeta_==='function') && _rangoBeta_() >= 3;
+}
 function _convHTML_(cv){
-  if(!cv) return '';
+  if(!cv) return '<div class="tarj" style="opacity:.85">'+
+    '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
+    '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
+    'Ahora mismo <b>no hay ninguna semana convocada</b>, así que no hay nada que rellenar. '+
+    'Cuando se abra un plazo aparece aquí la rejilla para pintar tus ratos.'+
+    (_puedeConvocarT_() ? '<br><br><span style="opacity:.75">Convocar una semana se hace desde el '+
+      '<b>escritorio</b> → Turnos → «Convocar disponibilidad».</span>' : '')+
+    '</p></div>';
   var F=cv.franjas||[], D=cv.dias||[];
   var urge=_convQuedan_(cv)<12;
   var lim=_isoADMY_(String(cv.limite).slice(0,10))||String(cv.limite).slice(0,10);

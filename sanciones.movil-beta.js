@@ -397,11 +397,35 @@ function _libroPuntosHTML_(){
 /* LA SECUENCIA DE ARMADO SE QUEDA, SIEMPRE. La quite para matar un «parece que se recarga»
    y me carge lo que a Daniel mas le gustaba del medidor: los tramos encendiendose en orden.
    Si el repintado molesta, se arregla repintando menos, NO apagando la animacion. */
+/* Los puntos con los que se pinto el medidor la ultima vez. Igual que `_anchoPrev_` para las
+   barras, y por el mismo motivo: sobrevive a la recarga. */
+function _medPrev_(){
+  try{ var v=localStorage.getItem('sol_med'); return v==null?null:Number(v); }catch(_){ return null; }
+}
+function _medGuardar_(p){ try{ localStorage.setItem('sol_med', String(p)); }catch(_){} }
+
 function armarMedidor(silencioso){
   var med=$('#med'); if(!med) return;
   medTimers.forEach(clearTimeout); medTimers=[];
   var p=YO.puntos, giro=p*MSTEP-MGAP/2+MTIP;
   var tip=$('#medTip'), num=$('#medN');
+  /* ⛔ AL RECARGAR, SI TUS PUNTOS NO HAN CAMBIADO, NO SE REBOBINA. Daniel, y van dos veces:
+     *«la estrellita y la animacion deberian empezar en el punto donde estaba anteriormente al
+     recargar, en lugar de en 0; eso es el fallo principal»*.
+
+     El camino de abajo hace `remove('arm')` -vacia el anillo y manda el puntero a 0- y luego
+     lo arma escalonado. Eso esta bien la primera vez que ves tus puntos; en CADA recarga es
+     ver tu medidor caerse a cero y volver a subir sin que haya pasado nada.
+
+     El dato anterior vive en `localStorage`, que es lo unico que sobrevive a un F5 -- una
+     variable de modulo se reinicia con la pagina, que es justo el caso que hay que cubrir.
+
+     ⚠️ **Y si los puntos SI han cambiado, se anima**: el se guarda esa parte a proposito
+     (*«deberia cambiar si hubiera cambio de puntos en directo»*). Lo que sobra es la
+     animacion que no informa de nada. */
+  var _pv=_medPrev_();
+  _medGuardar_(p);
+  if(_pv===p) silencioso=true;
 
   /* CALLADO = APARECER LLENO, sin pasar por vacio.
 

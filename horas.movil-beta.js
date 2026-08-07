@@ -165,17 +165,21 @@ function _compHorasHTML_(base){
      Descontarla en uno solo de los dos lados seria peor que no descontarla. */
   var _bt=_horasSinBase_(YO, base);
   var ritmo=(_bt==null?base:_bt)/dia;
-  /* ⛔ DEL PANEL REAL, NUNCA de la semilla: `YO.hAnt` solo existe en los datos de demo, asi
-     que esta fila comparaba contra un numero fijo -«congelado en junio»-. Sin dato real NO
-     se pinta, que es lo que este mismo comentario prometia desde el principio. */
-  var _hA=_hAntReal_(YO);
-  if(_hA!=null){
+  /* ⛔ EL MES ANTERIOR, Y EL MES SALE DEL DATO. Aqui ponía que `hAnt` «solo existe en los datos
+     de demo»: **era falso y costó la fila**. `hAnt` está en el panel SUBIDO al servidor, con
+     `mesAnt: 'junio'` estando en agosto. Al cambiarla al dato bueno (`carga_mes_anterior`) la
+     fila **desapareció**, porque ese campo no está en el panel que hay subido. Daniel:
+     *«¿y por qué ya no me aparece la comparación con el mes anterior?»*.
+
+     El fallo nunca fue comparar con junio: fue **llamarlo julio**. Asi que `_antComparable_`
+     devuelve lo que haya **con el mes al que pertenece**, y el rótulo lo dice. Sin nada, la
+     fila sigue sin pintarse. */
+  var _ant=_antComparable_(YO);
+  if(_ant!=null){
+    var _hA=_ant.h;
     var _bA=_horasSinBase_(YO, _hA);
     var dAnt=_diasMesAnterior_(d.periodo), rAnt=(_bA==null?_hA:_bA)/dAnt;
-    /* El NOMBRE del mes se deriva del periodo que manda el servidor. `YO.mesAnt` no lo
-       asignaba nadie -cero asignaciones en las dos caras y en el backend-, asi que decia
-       siempre «mes anterior» o lo que quedara de la semilla. */
-    var _nomAnt=_mesAnteriorDe_(d.periodo);
+    var _nomAnt=_ant.mes || _mesAnteriorDe_(d.periodo);
     f+=deltaHTML('vs. '+_nomAnt, ritmo, rAnt, nf2(rAnt)+' h/día en '+_nomAnt);
   }
   var me=_mediaEquipo_();
