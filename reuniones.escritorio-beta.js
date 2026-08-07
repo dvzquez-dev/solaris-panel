@@ -389,13 +389,10 @@ function _fijarPanel_(){
     '</div></div>');
 }
 
-/* ═══ GEMELAS de movil.html: misma familia de horas, mismos nombres. ═══
-   Aguantan 'HH:MM' y {ini:'HH:MM'}: antes cada sitio tenia su propio parser. */
-function _minHM_(v){
-  var t=(v && typeof v==='object') ? v.ini : v;
-  var p=String(t==null?'':t).split(':');
-  return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
-}
+/* ⛔ `_minHM_` VIVE EN `comun.js` (07/08), que cargan las dos caras. Estaba aqui y en
+   `reuniones.movil.js` con el MISMO cuerpo: `gemelas.py` las contaba pero no las nombraba,
+   asi que nadie iba a por ellas. No se declara aqui: dos globales con el mismo nombre y el
+   navegador se queda con la ultima que cargue. */
 
 
 /* etiqueta de franja: el dato real las trae como {ini,dur}; la semilla, como string */

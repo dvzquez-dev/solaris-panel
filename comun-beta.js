@@ -56,6 +56,25 @@ function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; 
    dejado el agujero igual. */
 function _puedeVerNovedades_(){ return CANAL==='beta' && (esAdmin() || _rangoBeta_()>=3); }
 
+/* 'HH:MM' (o `{ini:'HH:MM'}`) -> minutos. **UNA sola puerta**, aqui, que cargan las dos caras.
+
+   ⛔ Historia corta: en el movil hubo CINCO parsers de horas con tres unidades de salida
+   distintas; se unificaron en este. Pero la unificacion se hizo **por cara**, asi que quedo
+   la MISMA funcion, con el mismo nombre y el mismo cuerpo, en `reuniones.movil.js` y en
+   `reuniones.escritorio.js`. Y `durForm` de `horas.movil.js` seguia parseando a mano.
+
+   ⚠️ Y no eran equivalentes del todo: `durForm` usaba `+p[0]`, que con basura da **NaN**
+   -y `NaN` se propaga a la duracion sin dar error-, mientras que este `parseInt(...,10)||0`
+   se queda con lo que entienda. Dos copias de una regla que nadie compara son dos reglas.
+
+   Aguanta las dos formas porque la rejilla de reuniones pasa `{ini,dur}` y los formularios
+   pasan la cadena pelada. */
+function _minHM_(v){
+  var t=(v && typeof v==='object') ? v.ini : v;
+  var p=String(t==null?'':t).split(':');
+  return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
+}
+
 /* ⚠️ AUTORIDAD TRIPLICADA a proposito (mapa §5, D9): `rangoNom`, `coordinadorDe`,
    `revisoresDe` y `puedeDecidir*` existen aqui, en `movil.html` y en el backend
    (`_rangoNom_`, `_coordinadorDe_`, `_revisoresDe_`, `_puedeDecidir_`). **El backend es
@@ -1003,6 +1022,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    {f:'2026-08-07', t:'El parseo de horas estaba escrito cuatro veces',
+     d:'Convertir «HH:MM» en minutos estaba en cuatro sitios: dos copias idénticas en los '+
+       'módulos de reuniones de cada cara, y una cuarta a mano dentro del cálculo de '+
+       'duración del parte de horas. Y NO hacían lo mismo: la de a mano daba NaN con un '+
+       'dato raro, y ese NaN se propaga a las horas sin dar ningún error, así que el parte '+
+       'saldría en blanco. Ahora hay una sola, en el fichero que cargan las dos caras.'},
     {f:'2026-08-07', t:'Novedades ya es solo tuya, y la app entra de una pasada',
      d:'Dos cosas que reportaste. (1) La entrada «Novedades» del menú NO tenía ninguna '+
        'condición: en beta no se notaba, pero producción sirve el mismo HTML, así que los '+

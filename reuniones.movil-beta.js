@@ -89,14 +89,10 @@ function _proximaReuM_(){
   return con[0].r;
 }
 
-/* ---- HORAS: una sola familia. Habia CINCO parsers de 'HH:MM' repartidos por el
-   fichero, con tres unidades de salida distintas y dos que reventaban si les llegaba
-   un string en vez de un {ini}. Estas aguantan las dos formas. ---- */
-function _minHM_(v){                       // 'HH:MM' o {ini:'HH:MM'} -> minutos
-  var t=(v && typeof v==='object') ? v.ini : v;
-  var p=String(t==null?'':t).split(':');
-  return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
-}
+/* ---- HORAS: una sola familia. Habia CINCO parsers de 'HH:MM' repartidos por este
+   fichero, con tres unidades de salida distintas y dos que reventaban si les llegaba un
+   string en vez de un {ini}. Se unificaron en `_minHM_`... pero POR CARA, asi que quedaron
+   dos copias identicas. Desde el 07/08 vive en `comun.js`, que cargan las dos. ---- */
 
 function _firmaResp_(r){
   var q=(r&&r.resp)||{}, k=Object.keys(q).sort(), out=[];

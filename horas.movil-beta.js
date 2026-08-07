@@ -298,11 +298,14 @@ function horasSesion(){ return Math.max(0.25, Math.round(minSes()/15)/4); }
 
 function fmtHM(m){ return pad(Math.floor(m/60))+'<span class="c">:</span>'+pad(m%60); }
 
+/* ⛔ POR LA PUERTA UNICA (`_minHM_` de `comun.js`), que antes era un parseo A MANO -la 4a
+   copia del mismo calculo-. Y no eran equivalentes: `+p[0]` con basura da **NaN**, que se
+   propaga a la duracion sin dar error, mientras que el `parseInt(...,10)||0` de la puerta
+   se queda con lo que entienda. */
 function durForm(){
-  var a=ST.form.ini.split(':'), b=ST.form.fin.split(':');
-  var d=(+b[0]*60 + +b[1]) - (+a[0]*60 + +a[1]);
-  if(d<0) d+=1440;
-  return Math.round(d/15)/4;
+  var d=_minHM_(ST.form.fin) - _minHM_(ST.form.ini);
+  if(d<0) d+=1440;                       // cruza medianoche
+  return Math.round(d/15)/4;             // a cuartos de hora
 }
 
 function vFichar(){
