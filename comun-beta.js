@@ -1126,6 +1126,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-mes-de-cierre', fecha:'2026-08-07',
+      titulo:'Tus horas se comparan por el mes DE VERDAD, no por el calendario',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Un mes no dura lo que dice el calendario: dura desde que se cierra el anterior hasta que se cierra ese. Julio se cerró el 4 de agosto, así que agosto empezó ese día. La app dividía tus horas entre los días del calendario, y a principios de mes eso hacía que el ritmo saliera a poco más de la mitad del real — a todo el equipo a la vez.'},
+        {cara:'movil', vista:'horas', txt:'Y la comparación con el mes anterior sale ahora del registro del Drive, que es donde está el dato bueno. Eso quiere decir que si se corrige algo a mano en el panel, la app lo respeta en vez de ignorarlo.'}
+      ] },
     { id:'2026-08-07-medidor-memoria', fecha:'2026-08-07',
       titulo:'El medidor ya no se cae a cero cada vez que abres la app',
       items:[
