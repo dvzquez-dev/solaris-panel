@@ -1126,6 +1126,18 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-08-mes-real', fecha:'2026-08-08',
+      titulo:'Lo del mes de cierre a cierre ya funciona DE VERDAD',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Estaba escrito pero no llegaba a funcionar: la parte '
+          + 'que mira cuando se cerro el mes buscaba la fecha en un sitio y quien la guarda la '
+          + 'escribe en otro, asi que no la encontraba nunca y se caia a contar dias de '
+          + 'calendario — siempre, desde el primer dia. Hoy 8 de agosto: el calendario diria 8 '
+          + 'dias y ahora dice 5, que son los que van desde que se cerro julio el dia 4.'},
+        {cara:'movil', vista:'horas', txt:'Lo que esto cambia es tu ritmo: dividir tus horas '
+          + 'entre 8 dias en vez de entre 5 lo dejaba en poco mas de la mitad, y a todo el '
+          + 'equipo a la vez.'}
+      ] },
     { id:'2026-08-07-pd-agregado', fecha:'2026-08-07',
       titulo:'Daniel: tu propia app era la unica que no recibia esto',
       items:[
