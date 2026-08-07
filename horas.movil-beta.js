@@ -72,14 +72,49 @@ async function _cargarFichajeAbierto_(){
 
 function mediaSub(u){for(var i=0;i<DATA.subsistemas.length;i++) if(DATA.subsistemas[i].u===u) return DATA.subsistemas[i].media; return _mediaEquipo_();}
 
-/* La media de horas por persona del equipo entero, PONDERADA por cuanta gente tiene cada
-   subsistema: la media de las medias daria el mismo peso a Org&Mark (1 persona) que a
-   Avionica (8). `DATA.subsistemas` lo manda el backend a todo el mundo -son agregados
-   sin nombres-, asi que esto vale igual para un miembro raso que para el PD. */
+/* LA MEDIA DE HORAS DEL EQUIPO **ESTE MES**, la de verdad.
+
+   ⛔ Esto salia de `DATA.subsistemas`, y el backend lo manda como `panel.subsistemas || []`
+   sobre un panel que **NO TRAE ese campo**: la lista llegaba VACIA y la funcion caia en su
+   reserva, un `MEDIA_EQ=10.9` **cableado**. O sea que «vs. equipo» comparaba contra un numero
+   inventado que no se movia nunca — y en pantalla parecia un dato. (Daniel, 07/08: «el vs equipo
+   deberia comparar con la media real de horas que lleva el equipo ese mes en ese dia».)
+
+   Dos fuentes legitimas, una sola puerta:
+     · `DATA.equipo_mes` — el agregado sin nombres que el backend manda a un miembro raso, que
+       NO recibe las horas de nadie y por tanto no puede calcularla.
+     · `DATA.miembros[].horasMes` — el PD si recibe el roster entero, y ahi se calcula en casa.
+   Y si no hay ninguna devuelve **null**: la fila no se pinta. Es la misma politica que ya tenia
+   «vs. mes anterior» — antes que inventarse un numero, no decir nada. */
 function _mediaEquipo_(){
-  var ss=DATA.subsistemas||[], h=0, n=0;
-  for(var i=0;i<ss.length;i++){ var c=Number(ss[i].n)||0; h+=(Number(ss[i].media)||0)*c; n+=c; }
-  return n ? h/n : MEDIA_EQ;
+  var e=DATA.equipo_mes;
+  if(e && typeof e.media==='number' && (e.n||0)>=3) return e.media;
+  var ms=DATA.miembros||[], h=0, n=0;
+  for(var i=0;i<ms.length;i++){
+    if(ms[i].baja) continue;
+    var x=_hMesReal_(ms[i]);
+    /* ⛔ Quien no tiene el dato NO cuenta como 0: hundiria la media y todo el mundo saldria
+       «por encima del equipo». Fuera del divisor tambien. */
+    if(typeof x==='number'){ h+=x; n++; }
+  }
+  return n>=3 ? h/n : null;
+}
+
+/* En que dia del mes vamos, y cuantos tiene. **Lo manda el servidor** si puede: un movil con la
+   fecha cambiada haria que la misma comparativa dijera cosas distintas a dos personas. */
+function _diasDelMes_(){
+  var e=DATA.equipo_mes;
+  if(e && e.dia>0 && e.dias_mes>0) return {dia:e.dia, total:e.dias_mes, periodo:e.periodo||null};
+  var d=new Date();
+  return {dia:d.getDate(), total:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(), periodo:null};
+}
+
+/* Cuantos dias tuvo el mes ANTERIOR al periodo `AAAA-MM`. Sin periodo, se deduce de hoy. */
+function _diasMesAnterior_(periodo){
+  var y, m;
+  if(/^\d{4}-\d{2}$/.test(String(periodo||''))){ y=+periodo.slice(0,4); m=+periodo.slice(5,7)-1; }
+  else { var d=new Date(); y=d.getFullYear(); m=d.getMonth(); }
+  return new Date(y, m, 0).getDate();          /* dia 0 del mes actual = ultimo del anterior */
 }
 
 function sumaE(e){return PARTES.filter(function(p){return p.e===e;}).reduce(function(a,p){return a+p.q;},0);}
@@ -97,13 +132,35 @@ function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 
    Se cayeron a proposito «vs objetivo» (el objetivo ya es la marca de la propia barra, tres
    pixeles mas arriba) y «vs unidad» (Daniel: «el de vs unidad tambien [lo borraria]»). */
+/* ⛔ SE COMPARA EL RITMO (h/dia), NO LAS HORAS EN BRUTO. (Daniel, 07/08: «deberia de ser una
+   ponderacion de comparativa entre horas/dias que han transcurrido del mes, no de horas en
+   bruto».)
+
+   El mes en curso esta A MEDIAS y el anterior esta ENTERO. Comparar los totales a dia 7 decia
+   «-78 %» a alguien que va **mejor** que el mes pasado, y lo decia todos los meses: la fila
+   empezaba en rojo el dia 1 y se iba arreglando sola segun pasaban los dias. Un indicador que
+   depende de que dia lo mires no informa de nada, y el que lo lee se acostumbra a ignorarlo.
+
+   Con «vs. equipo» el sesgo ya se cancelaba —los dos numeros son del mismo mes al mismo dia—,
+   pero se pasa igual a h/dia: son la misma fila, y dos filas contiguas que miden en unidades
+   distintas es como se lee mal un numero correcto. */
 function _compHorasHTML_(base){
-  var f='';
-  if(typeof YO.hAnt==='number' && YO.hAnt>0)
-    f+=deltaHTML('vs. '+(YO.mesAnt||'mes anterior'), base, YO.hAnt, nf2(YO.hAnt)+' h en '+(YO.mesAnt||'el mes anterior'));
+  var f='', d=_diasDelMes_(), dia=Math.max(1, d.dia);
+  var ritmo=base/dia;
+  if(typeof YO.hAnt==='number' && YO.hAnt>0){
+    var dAnt=_diasMesAnterior_(d.periodo), rAnt=YO.hAnt/dAnt;
+    f+=deltaHTML('vs. '+(YO.mesAnt||'mes anterior'), ritmo, rAnt,
+      nf2(rAnt)+' h/día en '+(YO.mesAnt||'el mes anterior'));
+  }
   var me=_mediaEquipo_();
-  if(me>0) f+=deltaHTML('vs. equipo', base, me, 'media '+nf2(me)+' h/persona');
-  return f ? '<div class="comph">'+f+'</div>' : '';
+  if(me>0) f+=deltaHTML('vs. equipo', ritmo, me/dia, nf2(me/dia)+' h/día de media');
+  if(!f) return '';
+  /* Que se vea CONTRA QUE se compara uno. Sin esto, «+12 %» respecto a un ritmo no se
+     distingue de «+12 %» respecto a un total, y son cosas distintas. */
+  return '<div class="comph">'+f+
+    '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(base)+
+    ' h en '+dia+' de '+d.total+' días). Se compara el <b>ritmo</b>, no el total: el mes '+
+    'en curso va a medias y el anterior está entero.</p></div>';
 }
 
 function barraHorasHTML(id){

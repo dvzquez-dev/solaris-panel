@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=7dfa83b"></script>
+<script src="comun-beta.js?v=5ff67c6"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
 <script src="turnos.escritorio-beta.js?v=f0af960"></script>
@@ -2042,6 +2042,9 @@ function _cablearSalir_(){
       /* Se decide AL ABRIR, no al pintar: el menu se cablea una vez (`b._ok`) y la sesion
          puede resolverse despues. Preguntarlo aqui es preguntarlo cuando ya se sabe. */
       var c=m.querySelector('[data-mnu="cierre"]'); if(c) c.hidden=!_puedeCerrarMes_();
+      /* Novedades: solo Daniel y solo en beta. En produccion la veian los 32, porque es
+         el mismo HTML y alli el gate de beta no filtra a nadie. */
+      var nv=m.querySelector('[data-mnu="novedades"]'); if(nv) nv.hidden=!_puedeVerNovedades_();
       m.hidden=!m.hidden;
     };
     document.addEventListener('click', function(){ if(!m.hidden) m.hidden=true; });
@@ -2054,7 +2057,8 @@ function _cablearSalir_(){
         /* Lleva a la vista que YA existe (`V.novedades`), no a una copia: el changelog se
            sella una vez por cara y se pinta desde `_novedadesHTML_`. En el movil esto abre un
            modal porque alli no hay barra lateral; aqui hay pantalla, asi que se navega. */
-        if(x.dataset.mnu==='novedades'){ ir('novedades'); return; }
+        /* Solo Daniel y solo en beta: ocultar el boton es cortesia, la frontera va aqui. */
+        if(x.dataset.mnu==='novedades'){ if(_puedeVerNovedades_()) ir('novedades'); return; }
         if(x.dataset.mnu==='cierre'){ ir('cierre'); return; }
         if(x.dataset.mnu==='reportar'){ reportarModal(); return; }
         if(x.dataset.mnu==='buzon'){ BUZON=null; ir('buzon'); _cargarBuzon_(); return; }
@@ -2100,6 +2104,7 @@ function pintarNav(){
       /* El cierre lo dispara SOLO el PD (o admin). Antes esta entrada la veia cualquiera que
          entrara al escritorio: el backend le decia que no, pero despues de haberselo ofrecido. */
       if(k==='cierre' && !_puedeCerrarMes_()) return;
+      if(k==='novedades' && !_puedeVerNovedades_()) return;
       /* El de temporada, igual: de aqui salen la cuota y la renovacion de TODO el equipo. */
       if(k==='temporada' && !_puedeCerrarMes_()) return;
       var n=conteo(k), b=document.createElement('button');
@@ -2135,7 +2140,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7dc47f4';
+var BUILD='a08e0a5';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

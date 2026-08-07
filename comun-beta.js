@@ -41,6 +41,21 @@ function _hoyDateM_(){ var d=new Date(_dmyAISO_(HOY)+'T00:00:00'); return isNaN(
    `|| _rangoBeta_()>=1` mete a los coordinadores. */
 function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; }
 
+/* ⛔ LAS NOVEDADES SON DE DANIEL, Y SOLO EN BETA. (Encargo suyo, 07/08: «lo de novedades
+   solo debe aparecerme a mi, Daniel, a una persona distinta jamas y solo aparece en beta».)
+
+   Hasta hoy la entrada del menu NO tenia ninguna condicion, y eso NO se notaba en beta —donde
+   `_puedeBeta_` ya deja fuera a todo el mundo menos al PD—: se notaba en **produccion**, que
+   sirve el MISMO HTML y donde `_puedeBeta_` devuelve `true` para cualquiera porque el canal
+   no es beta. O sea que los 32 miembros tenian en su menu el registro de cambios de
+   desarrollo. El menu ya oculta `sanciones` y `cierre` por rango; esta se habia quedado sin
+   su linea.
+
+   ⚠️ Es una condicion MAS DURA que `_puedeBeta_`, no la misma: aquella deja pasar a todos
+   fuera de beta (es un gate de canal), y esta exige **beta Y rango**. Reutilizarla habria
+   dejado el agujero igual. */
+function _puedeVerNovedades_(){ return CANAL==='beta' && (esAdmin() || _rangoBeta_()>=3); }
+
 /* ⚠️ AUTORIDAD TRIPLICADA a proposito (mapa §5, D9): `rangoNom`, `coordinadorDe`,
    `revisoresDe` y `puedeDecidir*` existen aqui, en `movil.html` y en el backend
    (`_rangoNom_`, `_coordinadorDe_`, `_revisoresDe_`, `_puedeDecidir_`). **El backend es
@@ -988,6 +1003,27 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    {f:'2026-08-07', t:'Novedades ya es solo tuya, y la app entra de una pasada',
+     d:'Dos cosas que reportaste. (1) La entrada «Novedades» del menú NO tenía ninguna '+
+       'condición: en beta no se notaba, pero producción sirve el mismo HTML, así que los '+
+       '32 la tenían en su menú con el registro de cambios de desarrollo. Ahora exige beta '+
+       'Y ser PD, y se filtra también por donde se entra, no solo escondiendo el botón. '+
+       '(2) El widget de la entrada se pintaba dos veces de más: había dos funciones '+
+       'pidiendo los mismos datos, y la primera no marcaba la hora del último refresco, '+
+       'que es lo único que frena al siguiente. Se ha quedado una sola.'},
+    {f:'2026-08-07', t:'La comparativa de horas ya no te dice que vas peor cuando vas mejor',
+     d:'Debajo de la barra de horas se comparaba tu mes A MEDIAS contra el mes anterior '+
+       'ENTERO. A día 7, con 9,8 h este mes y 31 h el pasado, salía −68 % — y salía en rojo a '+
+       'principios de todos los meses, arreglándose sola según pasaban los días. Ahora se '+
+       'compara el RITMO (h/día): ese mismo caso sale +40 %, que es la verdad. Y «vs. equipo» '+
+       'compara con la media real de horas que lleva el equipo este mes, no con un 10,9 que '+
+       'estaba escrito a mano en el código y no se movía nunca.'},
+    {f:'2026-08-07', t:'Ya se ve quién está fichado ahora mismo',
+     d:'La vista «Fichajes en curso» del escritorio pintaba tres personas de mentira. Ahora pregunta '+
+       'al servidor: quién tiene la entrada abierta, desde qué hora, en qué unidad y cuánto lleva. '+
+       'Quien pasa de 10 h sale en ámbar, y quien está en pausa se pinta distinto de quien está '+
+       'trabajando. Si el servidor no contesta lo dice, en vez de enseñar una lista vieja donde '+
+       'alguien que cerró hace horas seguiría saliendo como fichado.'},
     { id:'2026-08-07-avisos', fecha:'2026-08-07', titulo:'Los avisos de la convocatoria: los enciendes tú',
       items:[
         {cara:'escritorio', vista:'turnos', txt:'Interruptor nuevo «mandar los avisos al móvil». Nace APAGADO: hasta que lo enciendas no le llega nada a nadie.'},
