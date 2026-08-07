@@ -291,7 +291,11 @@ var api={
   reportarMejora: function(d){ return api._post({action:"reportarMejora",datos:d}); },
   getBuzon:       function(){ return api._post({action:"getBuzon"}); },
   decidirReporte: function(tipo,id,campos){ return api._post({action:"decidirReporte",tipo:tipo,id:id,campos:campos}); },
-  borrar:      function(id){ return api._post({action:"borrarReunion",id:id}); },
+  /* ⛔ AQUI HABIA `borrar`, Y SE QUITO: era un SEGUNDO NOMBRE para `borrarReunion` —la
+     misma acción del backend— y **no la llamaba nadie**, ni esta cara ni la otra ni
+     Python. Dos nombres para una puerta es como acaban siendo dos puertas distintas, que
+     es justo lo que dice `[[feedback_una_sola_puerta_por_servicio]]`. Lo cazó
+     `rutinas/cabos_sueltos.py` en su primera pasada. */
   fijar:       function(id,f){ return api._post({action:"fijarReunion",id:id,fijada:f}); },
   setOrdenDia: function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); },
   responder:   function(id,n,v){ return api._post({action:"responder",id:id,nombre:n,valores:v}); },
@@ -2094,7 +2098,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='c9e741f';
+var BUILD='77a12ff';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
