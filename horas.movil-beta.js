@@ -37,8 +37,13 @@ function _origenParte_(p){
   return ' · <span style="color:'+col+'">'+esc(e.txt)+'</span>';
 }
 
+/* ⛔ EL ISO SE CONSERVA. `f` sale ya formateado a `DD/MM/AAAA` para pintarlo, y ordenar por
+   ese texto es incorrecto: «01/09» iría ANTES que «31/08». Sin el ISO no hay forma de poner
+   los partes en orden ni de saber de qué mes es cada uno — y eso hace falta para las tres
+   maneras de tratar los de meses cerrados (ocultar, marcar o plegar), decida Daniel la que
+   decida. Normalizar es tirar lo que no nombras, y aquí se estaba tirando la fecha de verdad. */
 function normPMovil(p){
-  return { id:p.id, f:_isoADMY_(p.fecha), t:p.tarea||'', q:Number(p.horas)||0,
+  return { id:p.id, f:_isoADMY_(p.fecha), iso:String(p.fecha||''), t:p.tarea||'', q:Number(p.horas)||0,
     e:_E_MOVIL_[p.estado]||'pend', ini:p.ini||'', fin:p.fin||'', cat:p.categoria||null,
     just:p.justificacion||'', nota:p.motivo||p.justificacion||'', sinFichaje:!!p.sinFichaje,
     /* DE DONDE VIENE la hora: 'fichaje' | 'manual' | 'otorgada'. El backend lo guarda desde
@@ -1056,8 +1061,14 @@ function vHoras(){
   var _hm=_hMesReal_(YO);
   var notion=(_hm!=null);
   var cuentan=notion?_hm:o;
-  var mias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad';});   // en cola / con detalle pedido / rechazados / sin declarar / caducados
-  var confs=PARTES.filter(function(x){return x.e==='otor';});               // lo que ya cuenta
+  /* ⛔ ORDENADOS POR FECHA, lo más nuevo primero. No había **ni un solo `sort`** en toda la
+     pantalla: los partes salían en el orden en que los mandara el servidor, así que los de un
+     mes viejo podían aparecer por delante de los de hoy. Daniel: *«¿por qué siguen
+     apareciéndome los partes del mes anterior?»* — esto no los quita (eso lo decide él), pero
+     los manda al fondo, que es donde estorban menos. */
+  var _porFecha=function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); };
+  var mias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad';}).sort(_porFecha);   // en cola / con detalle pedido / rechazados / sin declarar / caducados
+  var confs=PARTES.filter(function(x){return x.e==='otor';}).sort(_porFecha);   // lo que ya cuenta
 
   /* ranking CENSURADO: tu puesto y tus vecinos, sin nombres ajenos */
   var puesto=+YO.puesto||0, total=32, filas='';
