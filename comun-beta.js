@@ -1100,6 +1100,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-fosil-escritorio', fecha:'2026-08-07',
+      titulo:'El escritorio comparaba las horas contra un mes fosilizado',
+      items:[
+        {cara:'escritorio', vista:'equipo', txt:'Las «lecturas automáticas» de Equipo decían quién sube y quién baja «respecto al mes pasado», y el mes pasado que usaban era JUNIO — un número viejo que se quedó guardado en el servidor y que ya no actualiza nadie. Es el mismo fallo que estaba en el móvil, en la otra cara, y con el rótulo correcto no se notaba.'},
+        {cara:'escritorio', vista:'equipo', txt:'Ahora sale del dato real; y si no lo hay, en vez de inventarse una comparación dice que todavía no se puede comparar la evolución.'}
+      ] },
     { id:'2026-08-07-widget-extra', fecha:'2026-08-07',
       titulo:'La pantalla de entrada ya no se carga una vez de más',
       items:[

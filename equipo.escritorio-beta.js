@@ -83,15 +83,30 @@ function insightsHTML(){
   /* se ordena por el MISMO porcentaje que luego se imprime: si no, el rotulo nombra
      a uno y ensena un numero que no es el mayor. */
   /* Tambien solo activos: «quien mas sube este mes» no puede ser alguien que se fue. */
-  var conAnt=_activos_().filter(function(m){ return m.hAnt!=null && m.hAnt>0; });
+  /* ⛔ DEL PANEL REAL, NO DE `hAnt`. Este era **el mismo fallo que Daniel reportó en el movil**
+     («esta comparando con junio en lugar de con julio, se quedo congelado»), en la otra cara y sin
+     que nadie lo hubiera mirado: `hAnt` **no lo escribe ningun script** -cero apariciones en los
+     `.py`- y **no esta en `Codigo.gs`**; lo que hay es un valor fosil dentro del KV `panel`, de
+     cuando se subio por ultima vez. Medido el 07/08: `hAnt: 2` con `mesAnt: 'junio'`, estando en
+     agosto. O sea que «quien mas sube este mes» se calculaba **contra junio**.
+
+     ⚠️ Y esta rotulado «respecto al mes pasado», asi que el numero no se ve raro: se lee como si
+     fuera de julio. Un dato viejo con la etiqueta correcta no parece un fallo, parece un dato.
+
+     ✅ El `else` de aqui abajo YA hacia lo correcto («no se finge una comparativa que no existe»);
+     lo unico que impedia llegar a el era el fosil. Con `_hAntReal_` -la misma puerta que usa el
+     movil- sin dato se cae a esa rama, que es lo que toca: mejor no decir nada que comparar
+     contra un mes que no es. */
+  var _ant=function(m){ return _hAntReal_(m); };   /* ya devuelve null si falta o es <=0 */
+  var conAnt=_activos_().filter(function(m){ return _ant(m)!=null; });
   if(conAnt.length>=2){
-    var vpc=function(m){ return (m.hMes-m.hAnt)/m.hAnt*100; };
+    var vpc=function(m){ return (m.hMes-_ant(m))/_ant(m)*100; };
     var subida=conAnt.slice().sort(function(a,b){return vpc(b)-vpc(a);})[0];
     var bajada=conAnt.slice().sort(function(a,b){return vpc(a)-vpc(b);})[0];
     xs.push(['up',esc(subida.pila)+' es quien m\u00e1s sube: '+pc(vpc(subida))+
-      ' respecto al mes pasado ('+h1(subida.hAnt)+' \u2192 '+h1(subida.hMes)+').']);
+      ' respecto al mes pasado ('+h1(_ant(subida))+' \u2192 '+h1(subida.hMes)+').']);
     xs.push(['dn',esc(bajada.pila)+' es quien m\u00e1s baja: '+pc(vpc(bajada))+
-      ' ('+h1(bajada.hAnt)+' \u2192 '+h1(bajada.hMes)+').']);
+      ' ('+h1(_ant(bajada))+' \u2192 '+h1(bajada.hMes)+').']);
   } else {
     /* no se finge una comparativa que no existe: se dice que falta el dato */
     xs.push(['wa','Todav\u00eda no hay horas del mes anterior, as\u00ed que no se puede comparar la evoluci\u00f3n.']);
