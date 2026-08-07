@@ -1100,6 +1100,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-widget-extra', fecha:'2026-08-07',
+      titulo:'La pantalla de entrada ya no se carga una vez de más',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Al entrar, la app volvía a pedir turnos, tareas, reuniones y tu panel 300 ms después de haberlos recibido, y repintaba la pantalla encima de la que acababa de dibujar. Esa segunda pasada era el parpadeo que quedaba. Ahora, si el arranque trajo los datos, no se pide nada más.'},
+        {cara:'movil', vista:'estado', txt:'Si el arranque falla, ese refresco SIGUE ocurriendo: es lo que salva la pantalla cuando el servidor no contesta a la primera, y sin él los turnos y las tareas se quedarían vacíos hasta el minuto y medio.'}
+      ] },
     { id:'2026-08-07-sin-base', fecha:'2026-08-07',
       titulo:'La comparativa de horas ya no cuenta la compensación de tu cargo',
       items:[
