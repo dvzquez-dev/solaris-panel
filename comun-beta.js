@@ -75,6 +75,43 @@ function _minHM_(v){
   return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
 }
 
+/* LA REJILLA DE FRANJAS de una convocatoria: **UNA sola**, contigua y anclada al tamaño de
+   slot, para todos los dias a la vez. `rangos` son horas decimales `[ini,fin]` por dia;
+   `[0,0]` = dia apagado. Devuelve `{F, perDia}`: las franjas comunes y, por dia, cuales le
+   caben ENTERAS.
+
+   ⛔ POR QUE EL ORIGEN ES COMUN. Antes cada dia generaba sus franjas desde SU hora de
+   inicio y con una «cadencia» propia: un dia a las 17:00 y otro a las 17:30 daban franjas
+   alternas que se pisaban, y con cadencia de 15 min y franja de 1 h salian cuatro franjas
+   por hora solapandose. Ahora el origen es el inicio mas temprano bajado al multiplo del
+   slot, asi que no hay solapes que dibujar.
+
+   ⛔ **UNA sola puerta, aqui** (07/08). Estaba en `reuniones.escritorio.js` y en
+   `reuniones.movil.js` con el MISMO cuerpo -18 lineas cada una-, y las dos caras cargan
+   este fichero. Era la ultima de las gemelas que de verdad se podian mover: las otras siete
+   son anidadas y usan las variables locales de su contenedora.
+
+   ⚠️ El tope de `F.length<400` no es decoracion: con un slot de 5 min y un rango largo esto
+   generaria miles de franjas y la rejilla dejaria de dibujarse. */
+function _genUnion_(rangos, slot){
+  slot=Math.max(5, Math.min(240, +slot||60));
+  var act=rangos.filter(function(r){ return r && r[1]>r[0]; });
+  if(!act.length) return { F:[], perDia:rangos.map(function(){ return []; }) };
+  var m0=Math.min.apply(null, act.map(function(r){ return Math.round(r[0]*60); }));
+  var m1=Math.max.apply(null, act.map(function(r){ return Math.round(r[1]*60); }));
+  m0=Math.floor(m0/slot)*slot;
+  var F=[];
+  for(var t=m0; t+slot<=m1+1e-9 && F.length<400; t+=slot)
+    F.push({ini:pad(Math.floor(t/60))+':'+pad(t%60), dur:slot});
+  var perDia=rangos.map(function(r){
+    var out=[]; if(!(r && r[1]>r[0])) return out;
+    var a=Math.round(r[0]*60), b=Math.round(r[1]*60);
+    F.forEach(function(_,i){ var ti=m0+i*slot; if(ti>=a && ti+slot<=b) out.push(i); });
+    return out;
+  });
+  return { F:F, perDia:perDia };
+}
+
 /* ⚠️ AUTORIDAD TRIPLICADA a proposito (mapa §5, D9): `rangoNom`, `coordinadorDe`,
    `revisoresDe` y `puedeDecidir*` existen aqui, en `movil.html` y en el backend
    (`_rangoNom_`, `_coordinadorDe_`, `_revisoresDe_`, `_puedeDecidir_`). **El backend es
