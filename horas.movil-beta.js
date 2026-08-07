@@ -28,11 +28,13 @@ async function _partesDe_(nombre){
    Un parte viejo sin `origen` se comporta como antes, con `sinFichaje`: es lo unico que se
    sabe de el, y no se le inventa una procedencia que no consta. */
 function _origenParte_(p){
-  var o=p&&p.origen;
-  if(o==='fichaje') return '';
-  if(o==='otorgada') return ' · <span style="color:var(--ink3)">automática</span>';
-  if(o==='manual')  return ' · <span style="color:var(--warn)">sin fichaje</span>';
-  return (p&&p.sinFichaje) ? ' · <span style="color:var(--warn)">sin fichaje</span>' : '';
+  /* El texto sale de `_etiOrigenParte_` (comun.js): aqui solo se decide COMO se pinta en esta
+     lista -- corto, en linea y detras del resto. Antes esta funcion tenia su propia tabla de
+     casos, que es como el escritorio y ella acabaron diciendo cosas distintas del mismo parte. */
+  var e=_etiOrigenParte_(p);
+  if(!e) return '';
+  var col = e.tono==='ok' ? 'var(--ink3)' : 'var(--warn)';
+  return ' · <span style="color:'+col+'">'+esc(e.txt)+'</span>';
 }
 
 function normPMovil(p){
@@ -43,6 +45,13 @@ function normPMovil(p){
        siempre y aqui se tiraba, asi que la vista solo tenia el booleano `sinFichaje` —que
        dice lo que FALTA, no de donde sale— y llamaba «sin fichaje» a lo que otorga el
        sistema. Ver `_origenParte_`. */
+    /* ⛔ Y CON EL ORIGEN VIAJAN `decidido_por` Y `revierte`, porque `_etiOrigenParte_`
+       los MIRA. Sin ellos el rotulo no da error: da una VERDAD A MEDIAS -- «otorgada
+       por coordinacion» sin decir quien, y «reversion del parte ?»--, que es peor que
+       un hueco porque parece completa. Se vio en el navegador; la ficha de decision
+       ya los llevaba y esta no, o sea que las dos listas de la MISMA pantalla decian
+       cosas distintas del mismo parte. */
+    decidido_por:p.decidido_por||null, revierte:p.revierte||null,
     origen:p.origen||null, caduca:p.caduca_at||null }; }
 
 async function _cargarMisPartes_(){
@@ -686,6 +695,10 @@ function _normPDec_(p){
   return { id:p.id, autor:p.autor, pila:_pilaDeM_(p.autor), unidad:p.subsistema||'—',
     f:_isoADMY_(p.fecha), ini:p.ini||'—', fin:p.fin||'—', q:Number(p.horas)||0,
     t:p.tarea||'', just:p.justificacion||'', sinFichaje:!!p.sinFichaje,
+    /* ⛔ `ini`/`fin`/`decidido_por`/`revierte` viajan porque `_etiOrigenParte_` los MIRA:
+       sin `ini`/`fin` un declarado a mano se rotula «sin fichaje» teniendo su hora al lado,
+       y sin `decidido_por` un otorgado dice «otorgada por coordinación» sin nombre. */
+    decidido_por:p.decidido_por||null, revierte:p.revierte||null,
     estado:p.estado, origen:p.origen||null };
 }
 
@@ -707,6 +720,18 @@ function _cargarPartesDec_(){
   }).catch(function(){});
 }
 
+/* El rótulo de procedencia en la ficha de decisión: mismo texto que en «Tus partes», otro
+   envoltorio (aquí es un bloque propio, no una coletilla). ⛔ `pdw` es ÁMBAR: se reserva para lo
+   que hay que mirar. Lo otorgado por la coordinación va en gris — marcarlo en ámbar sería pedirle
+   a quien firma que desconfíe de algo que hizo el sistema. */
+function _pdOrigenHTML_(p){
+  var e=_etiOrigenParte_(p);
+  if(!e) return '';
+  return e.tono==='ok'
+    ? '<span class="pdw" style="background:none;color:var(--ink3)">'+esc(e.txt)+'</span>'
+    : '<span class="pdw">'+esc(e.txt)+'</span>';
+}
+
 /* Una ficha de parte, dentro de la lista de decisión. Se saca aparte porque ahora vive dentro
    de DOS desplegables y el HTML de la ficha no tiene por qué enterarse de eso. */
 function _pdFichaHTML_(p){
@@ -716,7 +741,12 @@ function _pdFichaHTML_(p){
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
         '<div class="pdt">'+esc(p.t)+'</div>'+
         (p.just?'<div class="pdj">'+esc(p.just)+'</div>':'')+
-        (p.sinFichaje?'<span class="pdw">declarado sin fichaje</span>':'')+
+        /* ⛔ EL ROTULO SALE DE `origen`, NO DEL BOOLEANO. Con `sinFichaje` esta ficha
+           llamaba «declarado sin fichaje» a un parte que ensena su hora de entrada y salida
+           dos lineas mas arriba, y tambien a lo que otorga la coordinacion. Es la ficha que
+           Daniel tiene delante cuando firma horas de alguien: ahi el rotulo tiene que decir
+           de donde salen, no que les falta. */
+        _pdOrigenHTML_(p)+
         '<input class="pdm" type="text" placeholder="Motivo — obligatorio para rechazar o pedir detalle">'+
         '<div class="pdb">'+
           '<button data-pdacc="aprobar" data-p>Aprobar</button>'+

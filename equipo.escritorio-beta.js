@@ -49,7 +49,8 @@ function colaDecision(){
   var out=[];
   pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).forEach(function(p){
     out.push({ic:'i-reloj',b:h1(p.horas)+' de '+_m(p.autor).pila,
-      s:esc(p.tarea)+' · '+p.fecha+(p.origen==='bloque'?' · declarado sin fichaje':''),
+      /* Mismo vocabulario que las otras dos pantallas: `bloque` ya no existe. */
+      s:esc(p.tarea)+' · '+p.fecha+(_etiOrigenParte_(p)?' · '+_etiOrigenParte_(p).txt:''),
       chip:'<span class="chip wa">parte de horas</span>',ir:'partes',foco:'parte-'+p.id});
   });
   docsMios().forEach(function(d){

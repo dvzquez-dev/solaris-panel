@@ -37,7 +37,7 @@ function parteCard(p){
     '<div class="just"><span class="sc">'+esc(p.tarea)+'</span>'+esc(p.just)+'</div>'+
     '<div class="fl">'+p.flags.map(function(f){
       return '<span class="chip '+(f[0]==='ok'?'ok':'wa')+'">'+esc(f[1])+'</span>';}).join('')+
-      (p.origen==='bloque'?'':'<span class="chip ok">con fichaje</span>')+'</div>'+
+      (p.origen==='fichaje'?'<span class="chip ok">con fichaje</span>':'')+'</div>'+
     '<div class="ruta">'+(puede?'Puedes decidirlo.':'Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.')+'</div>'+
     (puede?'<textarea data-motivo placeholder="Motivo — obligatorio para rechazar o pedir detalle…"></textarea>'+
       '<div class="acts">'+
@@ -85,11 +85,17 @@ function bloquePanel(){
 function normParte(p){
   var fl=[];
   if(p.autocierre) fl.push(['wa','autocerrado al tope de 14 h']);
-  if(p.sinFichaje) fl.push(['wa','declarado sin fichaje']);
-  if(p.origen==='otorgada') fl.push(['ok','otorgada por '+((p.decidido_por)||'coordinación')]);
+  /* ⛔ UNA ETIQUETA, NO DOS. Aqui habia un `if` por el booleano y otro por el origen, y un
+     parte OTORGADO cumplia los dos: salia con «declarado sin fichaje» en ambar Y «otorgada por
+     X» al lado. `_etiOrigenParte_` (comun.js) decide una sola vez, y la misma que el movil. */
+  var _eo=_etiOrigenParte_(p);
+  if(_eo) fl.push([_eo.tono==='ok'?'ok':'wa', _eo.txt]);
   return { id:p.id, autor:p.autor, unidad:p.subsistema||'—', fecha:_isoADMY_(p.fecha),
     ini:p.ini||'—', fin:p.fin||'—', horas:Number(p.horas)||0, tarea:p.tarea||'',
-    origen:p.sinFichaje?'bloque':'turno', just:p.justificacion||'', flags:fl,
+    /* ⛔ EL ORIGEN SE PASA TAL CUAL, sin traducirlo a `bloque`/`turno`. Ese par era un
+       TERCER vocabulario para el mismo hecho, y ademas mentia: llamaba «bloque» a lo que
+       alguien declaraba a mano y a lo que otorgaba la coordinacion. */
+    origen:p.origen||(p.sinFichaje?'manual':'fichaje'), just:p.justificacion||'', flags:fl,
     estado:_EST_PARTE_[p.estado]||'pend', decisor:p.decidido_por||null,
     dec:p.decidido_at?_isoADMY_(String(p.decidido_at).slice(0,10)):null, motivo:p.motivo||null, _real:true };
 }

@@ -927,6 +927,37 @@ function _perfilValido_(m,unidad){
    el historial llegue **también a quien programa** hace falta una acción nueva en el backend
    gateada a rango ≥ 3. Está apuntado, y NO se finge: el pie de la capa lo dice. */
 
+/* ⛔ DE DONDE SALE LA HORA DE UN PARTE, EN UN SOLO SITIO Y CON UN SOLO VOCABULARIO.
+   Habia TRES para el mismo hecho y por eso no coincidian: el booleano `sinFichaje`, el `origen`
+   que manda el backend (`fichaje` · `manual` · `otorgada` · `reversion`) y un `bloque`/`turno`
+   que se inventaba el escritorio. Las diferencias eran los fallos:
+
+   · Un parte OTORGADO salia en el escritorio con DOS etiquetas a la vez -- «declarado sin
+     fichaje» en ambar Y «otorgada por X»--, o sea **acusando al miembro de algo que hizo el
+     sistema**. Medido sobre los partes reales del servidor: los cuatro `otorgada`.
+   · Y la ficha de decision del movil pintaba «declarado sin fichaje» sobre un parte que traia
+     **su hora de entrada y de salida escritas al lado**. Daniel (07/08): *«todos ponian
+     declarado sin fichaje, no se hasta que punto eh»*. Tenia razon en dudar.
+
+   ⚠️ **La pregunta es «de donde sale», no «que le falta».** `sinFichaje` contesta lo segundo, y
+   por eso metia en el mismo saco lo que otorga la coordinacion y lo que alguien declara a mano.
+
+   Devuelve `{tono, txt}` o `null`. El tono lo pinta cada cara a su manera; lo que NO se decide
+   dos veces es cual es. */
+function _etiOrigenParte_(p){
+  var o = p && p.origen;
+  if(o === 'fichaje') return null;              // el caso normal no necesita rotulo
+  if(o === 'otorgada') return { tono:'ok', txt:'otorgada por ' + ((p && p.decidido_por) || 'coordinación') };
+  if(o === 'reversion') return { tono:'ok', txt:'reversión del parte ' + ((p && p.revierte) || '?') };
+  if(o === 'manual'){
+    /* Con hora de entrada y salida escritas, «sin fichaje» se lee como «no dijo cuando», que es
+       falso y visible: el rango esta ahi al lado. Lo que le falta es el cronometro, no el dato. */
+    return { tono:'aviso', txt:(p && p.ini && p.fin) ? 'declarado a mano' : 'declarado sin fichaje' };
+  }
+  /* Un parte VIEJO sin `origen`: es lo unico que se sabe de el y no se le inventa procedencia. */
+  return (p && p.sinFichaje) ? { tono:'aviso', txt:'declarado sin fichaje' } : null;
+}
+
 function _novedades_(){
   /* Lo más nuevo primero. Al cerrar una pieza se añade su tanda AQUÍ, en ese momento.
 
@@ -939,6 +970,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-origen', fecha:'2026-08-07', titulo:'Los partes ya dicen DE DÓNDE salen sus horas',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Tenías razón al dudar: «declarado sin fichaje» salía hasta en partes que enseñan su hora de entrada y de salida. Ahora esos dicen «declarado a mano».'},
+        {cara:'movil', vista:'horas', txt:'Y lo que otorga la coordinación dice «otorgada por» con el nombre, en gris — no en ámbar, que era acusar al miembro de algo que hizo el sistema.'},
+        {cara:'escritorio', vista:'horas', txt:'En el escritorio un parte otorgado salía con DOS etiquetas a la vez, contradiciéndose. Ahora sale una, y la misma que en el móvil.'}
+      ]},
     { id:'2026-08-07-revertir', fecha:'2026-08-07', titulo:'Ya puedes deshacer un parte que firmaste',
       items:[
         {cara:'movil', vista:'horas', txt:'Tarjeta nueva «Ya decidiste», debajo de la cola: ahí está lo que ya firmaste, por si te equivocaste.'},
