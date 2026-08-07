@@ -160,13 +160,18 @@ function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
    distintas es como se lee mal un numero correcto. */
 function _compHorasHTML_(base){
   var f='', d=_diasDelMes_(), dia=Math.max(1, d.dia);
-  var ritmo=base/dia;
+  /* ⛔ SIN LA COMPENSACION BASE, Y EN LOS DOS LADOS. La del cargo no se trabaja: se cobra
+     por el puesto, es la MISMA todos los meses y meterla mide el cargo en vez del trabajo.
+     Descontarla en uno solo de los dos lados seria peor que no descontarla. */
+  var _bt=_horasSinBase_(YO, base);
+  var ritmo=(_bt==null?base:_bt)/dia;
   /* ⛔ DEL PANEL REAL, NUNCA de la semilla: `YO.hAnt` solo existe en los datos de demo, asi
      que esta fila comparaba contra un numero fijo -«congelado en junio»-. Sin dato real NO
      se pinta, que es lo que este mismo comentario prometia desde el principio. */
   var _hA=_hAntReal_(YO);
   if(_hA!=null){
-    var dAnt=_diasMesAnterior_(d.periodo), rAnt=_hA/dAnt;
+    var _bA=_horasSinBase_(YO, _hA);
+    var dAnt=_diasMesAnterior_(d.periodo), rAnt=(_bA==null?_hA:_bA)/dAnt;
     /* El NOMBRE del mes se deriva del periodo que manda el servidor. `YO.mesAnt` no lo
        asignaba nadie -cero asignaciones en las dos caras y en el backend-, asi que decia
        siempre «mes anterior» o lo que quedara de la semilla. */

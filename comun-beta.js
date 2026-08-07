@@ -528,6 +528,25 @@ function _compMensual_(m){ return _compEsReal_(m) ? m.compensaciones : _compBase
    Notion guarda UN solo numero (base + extras), asi que esto se deriva — misma cuenta que
    `flujos/cierre.py:compensacion_perdida`. Se redondea al centimo porque la resta en coma
    flotante saca cosas como 2.0999999999999996 y eso no se le ensena a nadie. */
+/* Las horas de un mes SIN la compensacion que llega por el cargo.
+
+   ⛔ Daniel (07/08): «la comparacion de horas con el mes anterior deberia tener en cuenta que las
+   compensaciones deberian ser descontadas (la compensacion base, no las que se apañan a
+   posteriori)». Y tiene razon de fondo: la base **no se trabaja, se cobra por el puesto**, asi que
+   dejarla dentro hace que la comparativa mida el CARGO y no el trabajo — a quien coordina le sale
+   un ritmo alto sin haber fichado una hora, y comparado consigo mismo nunca se mueve, porque esa
+   parte es constante todos los meses.
+
+   ⚠️ **La EXTRA no se descuenta**, y es la mitad del encargo: esa se la ha ganado alguien haciendo
+   algo de mas —cubrir un turno, un reporte— y se la asigna el PD a mano. Quitarla seria borrar
+   justo lo unico de los dos que reconoce trabajo real.
+
+   El suelo es 0: si alguien tiene menos horas que su base, su trabajo del mes es 0, no negativo. */
+function _horasSinBase_(m, h){
+  if(typeof h!=='number' || !isFinite(h)) return null;
+  return Math.max(0, Math.round((h - _compBase_(m))*100)/100);
+}
+
 function _compExtra_(m){
   if(!_compEsReal_(m)) return 0;                 // sin el dato de Notion no se puede saber
   return Math.round((m.compensaciones-_compBase_(m))*100)/100;
@@ -1081,6 +1100,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-sin-base', fecha:'2026-08-07',
+      titulo:'La comparativa de horas ya no cuenta la compensación de tu cargo',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La fila «vs. <mes anterior>» sumaba la compensación que te llega por el cargo (PD 7 h, coordinador 3,5 h, miembro 2 h). Esa no se trabaja: se cobra por el puesto y es la misma todos los meses, así que la comparativa medía tu cargo en vez de tu trabajo — y comparado contigo mismo no se movía nunca. Ahora se descuenta en los DOS lados.'},
+        {cara:'movil', vista:'horas', txt:'La compensación EXTRA (la que asigna el PD a mano por cubrir un turno o un reporte) SÍ sigue contando: es lo único de las dos que reconoce trabajo real. Y con menos horas que tu base la cuenta se queda en 0, no en negativo.'}
+      ] },
     { id:'2026-08-07-horas-cuatro', fecha:'2026-08-07',
       titulo:'El parseo de horas estaba escrito cuatro veces',
       items:[
