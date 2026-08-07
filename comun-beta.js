@@ -988,6 +988,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-detalle', fecha:'2026-08-07', titulo:'«Pedir detalle» ya sirve para algo',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Si te piden detalle, ahora VES LA PREGUNTA en la propia ficha — antes solo ponía «te piden más detalle» y tocaba adivinar.'},
+        {cara:'movil', vista:'horas', txt:'Y hay botón «Responder»: llega al formulario con lo que ya habías escrito, para corregir en vez de rehacerlo.'},
+        {cara:'movil', vista:'horas', txt:'Al responder, el parte vuelve a la cola y la petición deja de colgar — el coordinador ya no relee una queja que está contestada.'}
+      ]},
     { id:'2026-08-07-origen', fecha:'2026-08-07', titulo:'Los partes ya dicen DE DÓNDE salen sus horas',
       items:[
         {cara:'movil', vista:'horas', txt:'Tenías razón al dudar: «declarado sin fichaje» salía hasta en partes que enseñan su hora de entrada y de salida. Ahora esos dicen «declarado a mano».'},

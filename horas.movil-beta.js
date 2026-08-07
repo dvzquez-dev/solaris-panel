@@ -567,13 +567,24 @@ function filaParte(p){
           : '<span class="pil pend">en cola</span>';
   var sub = p.e==='otor' ? (p.nota?esc(p.nota):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
           : p.e==='pend' ? 'esperando aprobación'
-          : p.e==='det'  ? 'te piden más detalle · edítala y vuelve a enviarla'
+          /* ⛔ SE ENSEÑA LA PREGUNTA, NO QUE HAY UNA. «Te piden más detalle» no dice QUÉ
+             falta, así que el miembro tiene que adivinar o preguntar por Discord — y el
+             motivo lo escribió el coordinador precisamente para eso. Es obligatorio en el
+             servidor (mínimo 8 caracteres), así que aquí siempre hay algo que enseñar. */
+          : p.e==='det'  ? (p.nota ? 'te piden: '+esc(p.nota) : 'te piden más detalle')
           : p.e==='rech' ? 'rechazada'+(p.nota?' · '+esc(p.nota):'')
           : p.e==='sindecl' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · caduca '+_isoADMY_((''+p.caduca).slice(0,10)):''))
           : (p.f+(p.ini?' · '+p.ini+'–'+p.fin:''));
   var catTxt = (p.e==='conf'||p.e==='otor') ? ' · sumó a '+catEti(p.cat)
              : p.e==='pend' ? ' · irá a '+catEti(p.cat) : '';
-  var accion = p.e==='sindecl' ? '<button class="btn mini" data-declarar="'+p.id+'" data-p style="margin-right:7px">Declarar</button>' : '';
+  /* ⛔ Y EL BOTON TAMBIEN EN 'det'. Sin el, la linea de arriba prometia «vuelve a enviarla»
+     sobre una ficha sin nada que pulsar: la promesa estaba escrita desde el primer dia y no
+     habia camino. Dice «Responder» y no «Declarar» porque no es lo mismo — ahi ya hay un
+     parte escrito y lo que se hace es contestar a una pregunta concreta. */
+  var accion = (p.e==='sindecl' || p.e==='det')
+    ? '<button class="btn mini" data-declarar="'+p.id+'" data-p style="margin-right:7px">'+
+        (p.e==='det' ? 'Responder' : 'Declarar')+'</button>'
+    : '';
   return '<div class="fila '+cls+'"><div class="a"><b>'+esc(p.t||'Fichaje sin declarar')+'</b><small>'+sub+catTxt+
     _origenParte_(p)+'</small></div>'+
     '<div class="d">'+accion+pil+' <b class="mono">'+h1(p.q)+'</b></div></div>';
