@@ -697,6 +697,13 @@ function _cargarPartesDec_(){
     PARTES_DEC = arr.filter(function(p){
       return (p.estado==='pendiente' || p.estado==='detalle') && p.autor!==yo;
     }).map(_normPDec_);
+    /* ⛔ Y DE LA MISMA RESPUESTA, lo ya decidido. Pedirlo en otra llamada seria un segundo
+       viaje para datos que ya vienen en el primero -- `getPartes` devuelve la cola entera que
+       te toca ver--, y ademas abriria la puerta a que las dos listas se contradigan porque
+       cada una vio una foto distinta. */
+    PARTES_REV = arr.filter(function(p){
+      return _pdRevertible_(p) && p.autor!==yo;
+    }).map(_normPDec_);
   }).catch(function(){});
 }
 
@@ -728,33 +735,128 @@ function _pdFichaHTML_(p){
    ocupar la pantalla: abrirlo por defecto lo dejaría igual que antes con un clic de más.
    ⚠️ Salvo cuando hay **un solo miembro**: ahí el segundo desplegable no separa nada de nada,
    así que se abre solo. Un nivel de pliegue que no agrupa nada es un clic regalado. */
-function _partesDecHTML_(){
-  if(!PARTES_DEC.length) return '';
-  var horas=0; PARTES_DEC.forEach(function(p){ horas+=p.q; });
-  /* Agrupado por autor CONSERVANDO EL ORDEN de llegada: ordenar por nombre pondría a la misma
-     persona arriba siempre, y lo que interesa es lo que lleva más tiempo esperando. */
+/* ⛔ EL ARMAZON DE LOS DOS DESPLEGABLES, ESCRITO UNA SOLA VEZ. «Esperan tu decision» y «Ya
+   decidiste» se pliegan igual: cabecera con cuantos partes y cuantas horas, dentro un
+   desplegable por persona **en orden de llegada**, y las fichas dentro. Lo unico que cambia es
+   el titulo, la nota y como se pinta cada ficha.
+
+   ⚠️ **Nacio duplicado y lo canto el mutador**, no una revision: tres mutaciones que llevaban
+   dias cazando pasaron a decir «ANCLA NO UNICA (2)» en cuanto la segunda copia entro. Es la
+   forma mas barata que tiene esta casa de enterarse de que algo se ha escrito dos veces —
+   arreglar el orden en una copia y dejar la otra alfabetica no habria dado ningun error. */
+function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
+  if(!lista.length) return '';
+  var horas=0; lista.forEach(function(p){ horas+=p.q; });
+  /* Agrupado por autor CONSERVANDO EL ORDEN de llegada: ordenar por nombre pondria a la misma
+     persona arriba siempre, y lo que interesa es lo que lleva mas tiempo esperando. */
   var orden=[], por={};
-  PARTES_DEC.forEach(function(p){
+  lista.forEach(function(p){
     if(!por[p.autor]){ por[p.autor]=[]; orden.push(p.autor); }
     por[p.autor].push(p);
   });
+  /* Con UN solo miembro el segundo nivel no separa nada de nada: se abre solo. Un pliegue que
+     no agrupa es un clic regalado. */
   var unico = orden.length===1;
-  return '<div class="tarj" id="pdec">'+
+  return '<div class="tarj" id="'+id+'">'+
     '<details class="pdgrupo">'+
-      '<summary><b>Esperan tu decisión</b>'+
-        '<span class="pdnum">'+PARTES_DEC.length+' '+(PARTES_DEC.length===1?'parte':'partes')+
+      '<summary><b>'+titulo+'</b>'+
+        '<span class="pdnum">'+lista.length+' '+(lista.length===1?'parte':'partes')+
         ' · '+nf2(horas)+' h</span></summary>'+
-      '<p class="rnota" style="margin:8px 0 10px">Son horas de tu gente: <b>no cuentan hasta que '+
-        'las firmes</b>. Rechazar o pedir detalle exige un motivo.</p>'+
+      '<p class="rnota" style="margin:8px 0 10px">'+nota+'</p>'+
       orden.map(function(a){
         var ps=por[a], h=0; ps.forEach(function(x){ h+=x.q; });
         return '<details class="pdpers"'+(unico?' open':'')+'>'+
           '<summary><b>'+esc(ps[0].pila)+'</b>'+
             '<span class="pdnum">'+ps.length+' · '+nf2(h)+' h</span></summary>'+
-          ps.map(_pdFichaHTML_).join('')+
+          ps.map(ficha).join('')+
         '</details>';
       }).join('')+
     '</details></div>';
+}
+
+function _partesDecHTML_(){
+  return _pdGrupoHTML_('pdec', 'Esperan tu decisión',
+    'Son horas de tu gente: <b>no cuentan hasta que las firmes</b>. Rechazar o pedir detalle '+
+    'exige un motivo.', PARTES_DEC, _pdFichaHTML_);
+}
+
+/* ⛔ QUE SE PUEDE REVERTIR, EN UN SOLO SITIO. La lista de estados vive aqui y no repartida
+   por la pantalla: el dia que el backend admita uno mas, se toca una linea.
+   ⚠️ `pendiente` NO esta y no es un olvido: no hay ninguna decision que deshacer, y ofrecerlo
+   seria un boton que solo sabe dar error. */
+function _pdRevertible_(p){
+  var e = p && p.estado;
+  return e==='aprobada' || e==='rechazada' || e==='otorgada' || e==='aplicada';
+}
+
+/* Como quedo el parte, en las palabras de quien lo mira -- no en las del backend. «aplicada»
+   no le dice nada a nadie; «ya cuenta en su mes» si. */
+var PD_EST = { aprobada:'aprobada', aplicada:'ya cuenta en su mes', otorgada:'otorgada por ti',
+               rechazada:'rechazada', revertida:'revertida', anulada:'anulada' };
+
+function _pdRevFichaHTML_(p){
+  /* ⛔ EL AVISO DEPENDE DE SI YA TOCO NOTION. Revertir una aprobada sin aplicar no deja rastro;
+     revertir una aplicada emite una contraparte que RESTA de su ficha. Decir lo mismo en los
+     dos casos es esconder el unico que importa. */
+  var enFicha = p.estado==='aplicada';
+  return '<div class="pdi" data-pdr="'+p.id+'">'+
+        '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
+          '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(PD_EST[p.estado]||p.estado)+'</small></div>'+
+          '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
+        '<div class="pdt">'+esc(p.t)+'</div>'+
+        '<span class="pdw">'+(enFicha
+          ? 'Ya sumadas: revertir le RESTA '+nf2(p.q)+' h de su ficha'
+          : 'Aun no cuenta: revertir lo devuelve a la cola')+'</span>'+
+        '<input class="pdrm" type="text" placeholder="Motivo — obligatorio (al menos 8 letras)">'+
+        '<div class="pdb"><button data-pdrev="1" class="no" data-p>Revertir</button></div>'+
+      '</div>';
+}
+
+/* ═══ «YA DECIDISTE» ═══════════════════════════════════════════════════════════════════
+   Daniel (07/08): *«un sitio donde revisar/modificar/revertir los partes aprobados, como las
+   sanciones»*. Hasta hoy una firma equivocada se quedaba firmada para siempre.
+
+   ⛔ **Nace cerrado, y va DEBAJO de «Esperan tu decision»**: lo que hay que hacer va antes que
+   lo que ya esta hecho. Arriba competiria por la atencion con la cola de verdad. */
+function _pdRevHTML_(){
+  return _pdGrupoHTML_('prev', 'Ya decidiste',
+    'Repasa lo que ya firmaste. <b>Revertir exige un motivo</b>; si las horas ya contaban, se '+
+    'le restan.', PARTES_REV, _pdRevFichaHTML_);
+}
+
+function _engPartesRev_(){
+  var c=$('#prev'); if(!c) return;
+  $$('#prev [data-pdrev]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var caja=b.closest('[data-pdr]'); if(!caja) return;
+      var id=+caja.dataset.pdr;
+      var mot=((caja.querySelector('.pdrm')||{}).value||'').trim();
+      /* Mismo minimo que el servidor (8): comerse un viaje de red para que te digan lo que ya
+         se sabia es una pantalla que te hace perder el rato. */
+      if(mot.length<8){ tost('Pon un motivo (al menos 8 caracteres).'); return; }
+      var p=null; PARTES_REV.forEach(function(x){ if(x.id===id) p=x; });
+      if(!confirm('Revertir este parte.\n\n'+((p&&p.estado==='aplicada')
+        ? 'Las horas YA cuentan: se emitira un apunte que se las resta de su ficha.'
+        : 'Todavia no contaban: vuelve a la cola de decision.')+'\n\n¿Sigo?')) return;
+      $$('#prev [data-pdrev]').forEach(function(x){ x.disabled=true; });
+      var prev=b.textContent; b.textContent='…';
+      try{
+        var r=await api.revertirParte(id, mot);
+        tost((r && r.reversion) ? 'Revertido. Se le restan las horas.' : 'Revertido.');
+        /* Se quita con lo que ya tenemos, sin volver a preguntar -- por lo mismo que
+           `_engPartesDec_`: la relectura salia antes de que el Sheet confirmase y devolvia el
+           estado de antes, dejando la ficha «congelada» en pantalla. */
+        PARTES_REV = PARTES_REV.filter(function(x){ return x.id!==id; });
+        pintar();
+        _cargarPartesDec_().then(pintar);
+      }catch(e){
+        tost('No se pudo: '+e);
+        $$('#prev [data-pdrev]').forEach(function(x){ x.disabled=false; });
+        b.textContent=prev;
+      }
+    };
+  });
 }
 
 function _engPartesDec_(){
@@ -770,8 +872,11 @@ function _engPartesDec_(){
          pantalla que te hace perder el rato. El mínimo es el mismo que el suyo (8). */
       if(acc!=='aprobar' && mot.length<8){
         tost('Pon un motivo (al menos 8 caracteres).'); return; }
+      /* ⛔ ESTE AVISO DECIA «ya no se pueden deshacer desde aquí» Y HOY ES FALSO: desde que
+         existe «Ya decidiste», sí se puede. Un aviso que exagera se aprende a ignorar, y el día
+         que diga algo de verdad grave nadie lo leerá. */
       if(acc==='aprobar' && !confirm('Aprobar estas horas.\n\nPasan a contar en el mes de quien '+
-        'las declaró y ya no se pueden deshacer desde aquí.\n\n¿Sigo?')) return;
+        'las declaró. Si te equivocas, lo deshaces en «Ya decidiste».\n\n¿Sigo?')) return;
       $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=true; });
       var prev=b.textContent; b.textContent='…';
       try{
@@ -824,6 +929,7 @@ function vHoras(){
   /* Lo que ESPERA TU FIRMA va lo primero: es de otra gente y tiene a alguien esperando. */
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     _partesDecHTML_()+
+    _pdRevHTML_()+
     '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+

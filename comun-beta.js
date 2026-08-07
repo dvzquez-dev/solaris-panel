@@ -939,6 +939,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-revertir', fecha:'2026-08-07', titulo:'Ya puedes deshacer un parte que firmaste',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Tarjeta nueva «Ya decidiste», debajo de la cola: ahí está lo que ya firmaste, por si te equivocaste.'},
+        {cara:'movil', vista:'horas', txt:'Revertir exige un motivo. Si las horas ya contaban en su mes, se le RESTAN — y la ficha te lo avisa antes, con la cifra.'},
+        {cara:'movil', vista:'horas', txt:'Y el aviso de aprobar ya no dice «no se puede deshacer»: desde hoy sería mentira.'}
+      ]},
     { id:'2026-08-07-horas', fecha:'2026-08-07', titulo:'Horas: desplegables, y el parte aprobado ya desaparece',
       items:[
         {cara:'movil', vista:'horas', txt:'«Esperan tu decisión» es ahora un desplegable que dice cuántos partes y cuántas horas hay que conceder, sin abrirlo. Dentro, uno por miembro.'},
