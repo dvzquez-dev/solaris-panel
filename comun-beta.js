@@ -1126,6 +1126,26 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-pd-agregado', fecha:'2026-08-07',
+      titulo:'Daniel: tu propia app era la unica que no recibia esto',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Todo lo del mes de cierre a cierre estaba llegando a '
+          + 'todo el equipo menos a ti. El servidor manda un resumen del mes (los dias que lleva, '
+          + 'la media del equipo) y a quien tiene rango de Project Director se le devolvia el '
+          + 'panel completo por otro camino, sin ese resumen. Tu app entonces se lo calculaba '
+          + 'sola: contaba los dias del calendario en vez de los que van desde el cierre, y '
+          + 'sacaba una media del equipo sin descontar la compensacion de cada cargo — o sea '
+          + 'comparaba tus horas ya descontadas contra una media sin descontar.'},
+        {cara:'movil', vista:'horas', txt:'No daba ningun error porque cada una de esas lecturas '
+          + 'tiene un plan B, y el plan B es justo el numero equivocado. Ahora el resumen viaja '
+          + 'por la misma puerta para todo el mundo.'}
+      ] },
+    { id:'2026-08-07-mes-anterior-cierre', fecha:'2026-08-07',
+      titulo:'Y el mes ANTERIOR tambien se mide de cierre a cierre',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La comparativa «vs. el mes pasado» ya no divide entre los días del calendario, sino entre los que ese mes duró de verdad: del cierre del mes anterior al suyo. Tu ejemplo: si junio se cerró el 29 y julio el 4 de agosto, julio duró 37 días, no 31 — y dividir por 31 inflaba el ritmo de julio, del equipo entero a la vez y sin dar ningún error.'},
+        {cara:'movil', vista:'horas', txt:'Hacen falta DOS cierres guardados para saber cuándo empezó un mes, y ahora mismo solo está el de julio. Hasta el próximo cierre mensual se sigue usando el calendario: aproximado, pero no inventado. En cuanto cierres agosto, el número pasa a ser el real y no hay que tocar nada.'}
+      ] },
     { id:'2026-08-07-mes-de-cierre', fecha:'2026-08-07',
       titulo:'Tus horas se comparan por el mes DE VERDAD, no por el calendario',
       items:[

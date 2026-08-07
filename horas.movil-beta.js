@@ -128,8 +128,19 @@ function _mesAnteriorDe_(periodo){
   return _MESES_[a.getMonth()];
 }
 
-/* Cuantos dias tuvo el mes ANTERIOR al periodo `AAAA-MM`. Sin periodo, se deduce de hoy. */
-function _diasMesAnterior_(periodo){
+/* Cuantos dias DURO el mes anterior al periodo `AAAA-MM`. Sin periodo, se deduce de hoy.
+
+   ⛔ UN MES NO DURA LO QUE DICE EL CALENDARIO: dura del cierre del anterior al cierre de este
+   (Daniel, 07/08: *«Bueno y si junio se cerro el 29, imaginate»*). Si junio cerro el 29/06 y
+   julio el 04/08, julio duro **37 dias**, no 31 — y dividir por 31 infla el ritmo de julio de
+   las 32 personas a la vez, sin dar ningun error.
+
+   `servidor` es el `equipo_mes.dias_ant` que calcula el backend con el historico de cierres. Si
+   no hay dos cierres guardados llega `null` y se cae al calendario: aproximado, pero no
+   inventado. */
+function _diasMesAnterior_(periodo, servidor){
+  var sv = Number(servidor);
+  if(isFinite(sv) && sv > 0) return sv;
   var y, m;
   if(/^\d{4}-\d{2}$/.test(String(periodo||''))){ y=+periodo.slice(0,4); m=+periodo.slice(5,7)-1; }
   else { var d=new Date(); y=d.getFullYear(); m=d.getMonth(); }
@@ -183,7 +194,14 @@ function _compHorasHTML_(base){
   if(_ant!=null){
     var _hA=_ant.h;
     var _bA=_horasSinBase_(YO, _hA);
-    var dAnt=_diasMesAnterior_(d.periodo), rAnt=(_bA==null?_hA:_bA)/dAnt;
+    /* ⛔ EL DATO DEL SERVIDOR MIDE **EL MES ANTERIOR AL PERIODO**, y solo eso. Si lo que
+       estamos comparando es el RESPALDO viejo —que trae su propio mes (`_ant.mes`) y puede ser
+       otro distinto—, esos dias no son los suyos: dividir horas de junio entre los dias que
+       duro julio da un ritmo que no es de nadie. Con respaldo se sigue con el calendario, que
+       es lo que habia. */
+    var _dsv = (_ant.mes==null && DATA.equipo_mes) ? DATA.equipo_mes.dias_ant : null;
+    var dAnt=_diasMesAnterior_(d.periodo, _dsv);
+    var rAnt=(_bA==null?_hA:_bA)/dAnt;
     var _nomAnt=_ant.mes || _mesAnteriorDe_(d.periodo);
     f+=deltaHTML('vs. '+_nomAnt, ritmo, rAnt, nf2(rAnt)+' h/día en '+_nomAnt);
   }
