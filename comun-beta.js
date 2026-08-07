@@ -988,6 +988,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-avisos', fecha:'2026-08-07', titulo:'Los avisos de la convocatoria: los enciendes tú',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Interruptor nuevo «mandar los avisos al móvil». Nace APAGADO: hasta que lo enciendas no le llega nada a nadie.'},
+        {cara:'escritorio', vista:'turnos', txt:'Apagado la rutina sigue calculando y deja escrito lo que mandaría, así que cuando lo enciendas ya habrás leído el texto exacto.'},
+        {cara:'escritorio', vista:'turnos', txt:'Encendido avisa al abrir, a las 24 h, a las 3 h y a los 10 min — y el recordatorio solo a quien no ha contestado.'}
+      ]},
     { id:'2026-08-07-mapa', fecha:'2026-08-07', titulo:'El mapa de disponibilidad ya es de verdad',
       items:[
         {cara:'escritorio', vista:'turnos', txt:'Pintaba los datos de ejemplo: se veía un mapa de calor con nombres y horas que no eran de nadie. Ahora sale de lo que ha contestado la gente.'},

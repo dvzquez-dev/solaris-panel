@@ -221,6 +221,23 @@ function _dispCargar_(repintar){
   if(_dispEstadoSrv_() !== 'sin pedir') return;
   if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getDisponibilidad) return;
   _dispEstadoSrv_('pidiendo');
+  /* El interruptor se lee EN PARALELO con el mapa, no encadenado: son dos preguntas
+     independientes y encadenarlas sumaria las dos esperas para pintar la misma pantalla.
+     ⚠️ Y su fallo NO tumba el mapa (`catch` propio): que no se sepa si los avisos estan
+     encendidos no es motivo para dejar sin disponibilidad a quien reparte turnos. */
+  if(api.getControl){
+    /* Se pide el CONTROL ENTERO porque es lo único que sabe hacer `api.getControl`, y
+       la clave se saca aquí. ⛔ Cada entrada es `{valor, actualizado_at, por, nota}`,
+       **no el valor a secas**: leer la entrada directamente daría un OBJETO —que es
+       cierto— y el interruptor saldría encendido siempre, incluido el día que esté
+       apagado. Es el mismo fallo que tuvo el gate meses con `calcular_cierre`. */
+    api.getControl().then(function(c){
+      var e = c && c[INTERRUPTOR_AVISOS];
+      var val = (e && typeof e==='object' && 'valor' in e) ? e.valor : e;
+      AVISOS_ON = (val===true || val==='true' || val===1 || val==='1');
+      if(typeof repintar==='function') repintar();
+    }).catch(function(){});
+  }
   api.getDisponibilidad().then(function(r){
     _dispEstadoSrv_('ok');
     if(typeof CONVOCATORIAS==='undefined') return;
@@ -312,10 +329,49 @@ function _convocarDispPanel_(){
     '<button class="btn" data-convdisp>Convocar disponibilidad</button>'+
     '<div class="nota" id="cdNota">Se encola y la rutina lo recoge en la siguiente pasada. '+
       'Lo que salga —los días, el plazo y a quién se convoca— aparecerá arriba.</div>'+
+    /* ⛔ EL INTERRUPTOR DE LOS AVISOS, aquí y no en un fichero de Python. Estos avisos
+       llegan al MÓVIL de 23 personas: encenderlos no es decisión de quien programa —
+       pero tampoco tiene por qué ser un mensaje pidiéndolo, que convierte una decisión
+       suya en una espera. Nace APAGADO.
+       ⚠️ Y la nota dice qué pasa mientras está apagado: la rutina **sigue calculando**
+       y dejando en la bitácora el texto exacto que mandaría. Encenderlo no es un salto
+       a ciegas. */
+    '<div class="sep"></div>'+
+    '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px">'+
+      '<input type="checkbox" id="cdAvisos"'+(AVISOS_ON?' checked':'')+'> '+
+      '<b>mandar los avisos al móvil</b></label>'+
+    '<div class="nota" id="cdAvNota">Apagado, la rutina sigue calculando y deja escrito '+
+      'lo que mandaría, pero <b>no sale nada</b>. Encendido, avisa al abrir, a las 24 h, '+
+      'a las 3 h y a los 10 min — y el recordatorio <b>solo a quien no ha contestado</b>.</div>'+
     '</div>');
 }
 
+function _engAvisosConv_(m){
+  var c=(m||document).querySelector('#cdAvisos'); if(!c) return;
+  c.onchange=async function(){
+    var on=!!c.checked;
+    /* ⛔ SE CONFIRMA AL ENCENDER, no al apagar. Encender manda notificaciones al movil de 23
+       personas; apagar no le llega a nadie. Preguntar en los dos casos entrena a decir que si
+       sin leer, que es como se acaba mandando algo sin querer. */
+    if(on && !confirm('Vas a ENCENDER los avisos de la convocatoria.'+String.fromCharCode(10,10)+
+      'A partir de ahora salen notificaciones al movil del equipo: al abrir la disponibilidad, '+
+      'a las 24 h, a las 3 h y a los 10 minutos del cierre.'+String.fromCharCode(10,10)+
+      'El recordatorio solo le llega a quien no ha contestado. Sigo?')){ c.checked=false; return; }
+    c.disabled=true;
+    try{
+      await api.setControl(INTERRUPTOR_AVISOS, on, on?'avisos ENCENDIDOS':'avisos apagados');
+      AVISOS_ON=on;
+      tost(on?'Avisos encendidos.':'Avisos apagados. La rutina sigue calculando sin mandar.');
+    }catch(e){
+      /* ⛔ Si no se pudo guardar, la casilla VUELVE a donde estaba: dejarla marcada diria que
+         los avisos estan encendidos cuando el servidor no se ha enterado. */
+      c.checked=!on; tost('No se pudo: '+e);
+    }finally{ c.disabled=false; }
+  };
+}
+
 function _pinConvDisp_(m){
+  _engAvisosConv_(m);
   var b=(m||document).querySelector('[data-convdisp]'); if(!b) return;
   b.onclick=async function(){
     if(b.disabled) return;

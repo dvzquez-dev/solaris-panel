@@ -108,10 +108,10 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=60d1d5c"></script>
+<script src="comun-beta.js?v=7dfa83b"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
-<script src="turnos.escritorio-beta.js?v=e442f71"></script>
+<script src="turnos.escritorio-beta.js?v=f0af960"></script>
 <script src="buzon.escritorio-beta.js?v=aa3b013"></script>
 <script src="documentos.escritorio-beta.js?v=1918b5e"></script>
 <script src="sanciones.escritorio-beta.js?v=1c7fbee"></script>
@@ -603,6 +603,14 @@ var DISP_SITIO='', DISP_SEL='';
    lleva declaraciones `function`**. Y existe porque sin él `pintar()` —que corre en
    cada ratón que pasa por el mapa— dispararía una petición por repintado. */
 var DISP_SRV='sin pedir';
+/* Si los avisos de convocatoria están encendidos. ⛔ Arranca en `false` A PROPÓSITO: hasta
+   que el servidor conteste, la casilla tiene que enseñar lo MENOS alarmante — decir
+   «encendido» y que resulte que no lo estaba es peor que al revés. */
+var AVISOS_ON=false;
+/* La clave del CONTROL, en UN sitio: la usan el que la lee al pintar y el que la escribe al
+   pulsar. Escrita dos veces, una falta de ortografia en una de ellas deja el interruptor
+   encendiendo una clave que nadie mira -- y no da ningun error. */
+var INTERRUPTOR_AVISOS='avisos_convocatoria';
 
 var V={};
 
@@ -2086,7 +2094,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='15fa155';
+var BUILD='c9e741f';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
