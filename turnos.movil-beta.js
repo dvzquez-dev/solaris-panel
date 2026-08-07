@@ -71,6 +71,15 @@ function _cablearMemoria_(){ _cablearVisor_(); }
    `rutinas/probar_turnos.py` §12: si alguien cambia uno, el banco lo canta. */
 function _convClave_(dia, franja){ return dia+'|'+franja; }
 
+/* La otra mitad de la puerta: DESCOMPONER la clave. Vive pegada a `_convClave_` y el separador
+   lo saca de ELLA — escribirlo aquí otra vez sería tener el formato en dos sitios, que es justo
+   lo que `_convClave_` existe para impedir: el día que uno cambie, el otro deja de casar y la
+   respuesta DESAPARECE sin dar error. */
+function _convDeClave_(k){
+  var sep=_convClave_('',''), s=String(k), i=s.indexOf(sep);
+  return i<0 ? [s, ''] : [s.slice(0,i), s.slice(i+sep.length)];
+}
+
 /* `sin_abrir` | `abierta` | `cerrada`. Sin instantes NO se escribe: la frontera cerrada es
    lo que hace que una celda vacía signifique una sola cosa. */
 function _convEstado_(cv, ahora){
@@ -198,7 +207,17 @@ function _convPintar_(cv, k){
   var mias=_convMias_(cv), v=mias[k]||null;
   var quiere = CONV_PINCEL==='no' ? {s:'no'} : {s:CONV_PINCEL, c:!!CONV_COCHE};
   var igual = v && v.s===quiere.s && (quiere.s==='no' || !!v.c===!!quiere.c);
-  if(igual) delete mias[k]; else mias[k]=quiere;
+  /* ⛔ SE PINTA EL TURNO ENTERO, no la casilla. Con franjas de una hora, marcar a mano las
+     cuatro de un turno son cuatro toques y tres ocasiones de dejarse una — y una hora suelta
+     marcada no es disponibilidad para nada. El día que la convocatoria venga con dos franjas
+     (`min_h` a 1) esto marca UNA, que es lo correcto ahí. */
+  var par = _convDeClave_(k), dia = par[0];
+  var bloque = _bloqueDesde_(cv.franjas, par[1], _minTurno_(cv));
+  if(!bloque.length) bloque = [par[1]];
+  bloque.forEach(function(fk){
+    var kk = _convClave_(dia, fk);
+    if(igual) delete mias[kk]; else mias[kk]=quiere;
+  });
   return !igual;
 }
 

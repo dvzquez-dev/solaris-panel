@@ -721,6 +721,37 @@ function _claveUso_(){
   return 'c' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
+/* ═══ EL BLOQUE MÍNIMO DE UN TURNO ═════════════════════════════════════════════════
+   Espejo de `reglas/turnos.py:bloque_desde`. Daniel (07/08/2026): franjas por horas, *«que te
+   obligue a mínimo 4 horas… prácticamente como se comportaría una reunión de 4 horas»*.
+
+   ⛔ **El bloque SIEMPRE mide `minimo`, y por eso se ANCLA HACIA ATRÁS si no cabe.** Tocar las
+   21:00 en un día que acaba a las 22:00 no puede dar un turno de una hora: da el de 19 a 22.
+   Recortarlo dejaría decir «puedo un turno» a quien no llega, y no daría ningún error — saldría
+   un turno corto en el reparto y nadie sabría por qué.
+
+   ⛔ **Con MENOS franjas que el mínimo se marca SOLO la tocada.** Es el caso de las
+   convocatorias de dos franjas (mañana/tarde), donde cada franja YA es un turno entero: marcar
+   las dos diría que puedes por la tarde cuando dijiste que por la mañana. */
+function _minTurno_(cv){
+  var m = cv && cv.min_h;
+  return (typeof m==='number' && m>0) ? m : 1;
+}
+
+function _bloqueDesde_(franjas, k, minimo){
+  var claves=[], i;
+  for(i=0;i<(franjas||[]).length;i++){
+    var f=franjas[i];
+    claves.push(f && typeof f==='object' ? f.k : f);
+  }
+  var pos=-1;
+  for(i=0;i<claves.length;i++) if(claves[i]===k) pos=i;
+  if(pos<0) return [];
+  if(!(minimo>1) || claves.length<minimo) return [k];
+  var ini=Math.min(pos, claves.length-minimo);
+  return claves.slice(ini, ini+minimo);
+}
+
 /* Quien FIRMA un parte enrutado a esa unidad, contando que nadie decide lo suyo.
    ⛔ Y de aqui sale sola la regla que pidio Daniel -«todos los fichajes que no esten routeados
    deberian recaer en mi»-: si fichas EN CONCEPTO DE COORDINADOR de tu propia unidad, el que
