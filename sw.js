@@ -1,7 +1,15 @@
 /* Service worker del app Solaris — Web Push. Ver docs/notificaciones-push-plan.md.
-   Se sirve desde la raíz del sitio publicado (web/sw.js -> /solaris-panel/sw.js).
-   Maneja 'push' (muestra la notificación) y 'notificationclick' (abre/enfoca la app). */
-const APP_URL = '/solaris-panel/';
+   Maneja 'push' (muestra la notificación) y 'notificationclick' (abre/enfoca la app).
+
+   ⛔ EL ÁMBITO SE PREGUNTA, NO SE ESCRIBE. Aquí había `const APP_URL = '/solaris-panel/'`, o
+   sea la ruta de PRODUCCIÓN clavada a mano — y este mismo fichero lo registra también la beta,
+   porque `comun.js` hace `register('sw.js')` y las dos caras viven en el mismo sitio. Efecto:
+   **tocar una notificación de beta abría la app del equipo**, y el bucle de enfoque de abajo
+   se traía a la ventana de producción si estaba abierta. No daba ningún error: abría *una* app.
+
+   `self.registration.scope` es la carpeta desde la que se registró ESTE worker, así que cada
+   canal abre el suyo. Y el día que beta viva en `beta/` funciona solo, sin tocar nada. */
+const APP_URL = self.registration.scope;
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
@@ -30,7 +38,9 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const c of wins) {
-      if (c.url.includes('/solaris-panel/') && 'focus' in c) {
+      // ⛔ MISMO MOTIVO que arriba: con la ruta a mano, la beta enfocaba una ventana de
+      // producción y le NAVEGABA encima. Se compara contra el ámbito propio.
+      if (c.url.indexOf(APP_URL) === 0 && 'focus' in c) {
         await c.focus();
         if ('navigate' in c && url && !c.url.endsWith(url)) { try { await c.navigate(url); } catch (_) {} }
         return;

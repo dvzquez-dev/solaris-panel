@@ -988,6 +988,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-sw', fecha:'2026-08-07', titulo:'Una notificación de la beta abría la app del equipo',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Las notificaciones llevaban la dirección de producción escrita a mano, así que tocar una de la beta te abría la app de verdad — y si la tenías abierta, se la traía encima.'},
+        {cara:'movil', vista:'estado', txt:'Ahora cada canal abre el suyo. No hacía falta que se notase para estar mal: siempre abría *una* app.'}
+      ]},
     { id:'2026-08-07-detalle', fecha:'2026-08-07', titulo:'«Pedir detalle» ya sirve para algo',
       items:[
         {cara:'movil', vista:'horas', txt:'Si te piden detalle, ahora VES LA PREGUNTA en la propia ficha — antes solo ponía «te piden más detalle» y tocaba adivinar.'},
