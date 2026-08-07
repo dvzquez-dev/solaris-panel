@@ -114,7 +114,7 @@
 <script src="turnos.movil-beta.js?v=bfea496"></script>
 <script src="buzon.movil-beta.js?v=50c3e0b"></script>
 <script src="documentos.movil-beta.js?v=aa4be87"></script>
-<script src="sanciones.movil-beta.js?v=0be7d41"></script>
+<script src="sanciones.movil-beta.js?v=f036da3"></script>
 <script src="reuniones.movil-beta.js?v=c7c5489"></script>
 <script src="horas.movil-beta.js?v=bacd059"></script>
 <script src="equipo.movil-beta.js?v=ebc5289"></script>
@@ -1352,7 +1352,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='bae875a';
+var BUILD='3d7a621';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -1689,7 +1689,10 @@ function _engAvisos_(){
 function _engMedidor_(){
   /* medidor */
   var med=$('#med');
-  if(med) med.onclick=function(){ armarMedidor(); };
+  /* ⛔ EL CLIC FUERZA. Llamaba `armarMedidor()` a secas, y desde que el medidor se calla
+     cuando tus puntos no han cambiado, tocarlo tampoco hacía nada: la animación que SÍ se
+     ha pedido quedaba silenciada con la que no. */
+  if(med) med.onclick=function(){ armarMedidor(false, true); };
   var bl=$('#btnLibro');
   if(bl) bl.onclick=function(){
     ST.libro=!ST.libro;

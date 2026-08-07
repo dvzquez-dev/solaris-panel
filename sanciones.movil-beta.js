@@ -404,7 +404,14 @@ function _medPrev_(){
 }
 function _medGuardar_(p){ try{ localStorage.setItem('sol_med', String(p)); }catch(_){} }
 
-function armarMedidor(silencioso){
+/* `forzar` = lo ha pedido una persona tocando el medidor. Daniel (07/08), aclarando el encargo
+   de antes: *«pero si le doy click sí se debería reiniciar desde 0, eso sí»*.
+
+   ⛔ La regla completa son DOS reglas, y sin la segunda el arreglo se pasa de frenada:
+     · **solo** → no se rearma (recargar o repintar no es un evento que contar);
+     · **tocado** → se rearma aunque los puntos no hayan cambiado, porque ahí la animación **es
+       lo que se ha pedido**: es el gesto de «enséñamela otra vez», no un efecto secundario. */
+function armarMedidor(silencioso, forzar){
   var med=$('#med'); if(!med) return;
   medTimers.forEach(clearTimeout); medTimers=[];
   var p=YO.puntos, giro=p*MSTEP-MGAP/2+MTIP;
@@ -425,7 +432,7 @@ function armarMedidor(silencioso){
      animacion que no informa de nada. */
   var _pv=_medPrev_();
   _medGuardar_(p);
-  if(_pv===p) silencioso=true;
+  if(!forzar && _pv===p) silencioso=true;
 
   /* CALLADO = APARECER LLENO, sin pasar por vacio.
 
