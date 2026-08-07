@@ -988,6 +988,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-convocar', fecha:'2026-08-07', titulo:'El botón de convocar ya hace algo',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Encolaba la convocatoria y NADIE la recogía: decía «Encolado» y no pasaba nada, nunca. Ya la monta la rutina.'},
+        {cara:'escritorio', vista:'turnos', txt:'Y hay una casilla nueva: «preguntar POR HORAS» — un toque marca el turno de 4 h. Antes era una constante del código y decidías tú por mensaje.'}
+      ]},
     { id:'2026-08-07-sw', fecha:'2026-08-07', titulo:'Una notificación de la beta abría la app del equipo',
       items:[
         {cara:'movil', vista:'estado', txt:'Las notificaciones llevaban la dirección de producción escrita a mano, así que tocar una de la beta te abría la app de verdad — y si la tenías abierta, se la traía encima.'},

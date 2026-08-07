@@ -258,6 +258,13 @@ function _convocarDispPanel_(){
         '<input type="checkbox" id="cdCiti" checked> CITI</label>'+
       '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px">'+
         '<input type="checkbox" id="cdTarde"> la tarde va partida (16:00 / 18:00)</label>'+
+      /* ⛔ EL MODO LO ELIGE QUIEN CONVOCA, no quien programa. Era `horaria=False` en la
+         firma de `montar`: una constante en Python, o sea que preguntar por horas
+         dependia de que alguien tocara el codigo. La etiqueta dice lo que CAMBIA
+         -«un toque marca 4 h»- y no el nombre del modo, que no le dice nada a nadie. */
+      '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px">'+
+        '<input type="checkbox" id="cdHoraria"> preguntar POR HORAS (09:00–22:00); un '+
+        'toque marca el turno de 4 h</label>'+
     '</div>'+
     '<button class="btn" data-convdisp>Convocar disponibilidad</button>'+
     '<div class="nota" id="cdNota">Se encola y la rutina lo recoge en la siguiente pasada. '+
@@ -287,6 +294,11 @@ function _pinConvDisp_(m){
       await api.setControl('convocar_disponibilidad', {
         semana: sem,
         tarde_partida: !!(document.getElementById('cdTarde')||{}).checked,
+        /* ⛔ EL MODO LO ELIGE QUIEN CONVOCA. Era `horaria=False` en la firma de `montar`,
+           o sea una constante que solo se podia cambiar tocando el codigo — y si la próxima
+           semana se pregunta por horas o por medias tardes no es una decisión de quien
+           programa. Aquí es una casilla y viaja en el encargo. */
+        horaria: !!(document.getElementById('cdHoraria')||{}).checked,
         sitios: sitios,
         por: ACTOR,
         at: new Date().toISOString()
