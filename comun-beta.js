@@ -123,6 +123,28 @@ function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre)
 
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
 
+/* Las horas del mes ANTERIOR, **del panel de verdad**. `null` si no llegan.
+
+   ⛔ ESTO EXISTE PORQUE LA COMPARATIVA TIRABA DE LA SEMILLA. `_compHorasHTML_` leia `YO.hAnt`,
+   y ese campo **solo esta en los datos de demo** de `movil.html` -medido el 07/08: cero
+   apariciones en `comun.js` y cero en el backend-. Asi que la fila «vs. mes anterior» comparaba
+   contra un numero fijo escrito a mano, que ni cambia de mes ni es de nadie. Daniel: «esta
+   comparando con junio en lugar de con julio, se quedo congelado». Estaba congelado porque era
+   una constante.
+
+   ⛔ Y el codigo PROMETIA lo contrario -«mientras el backend no lo mande, la fila no se pinta,
+   en vez de inventarse un 0»-: la semilla hacia que esa promesa no se cumpliera nunca, porque
+   siempre habia un dato. **Un valor de demo no es la ausencia de dato: la disfraza.**
+
+   El panel real trae `carga_mes_anterior` (comprobado en `datos/panel.json`). Se acepta tambien
+   `horasMesAnt` por si el backend lo proyecta con ese nombre al miembro. */
+function _hAntReal_(m){
+  m = m || {};
+  var v = (typeof m.horasMesAnt==='number') ? m.horasMesAnt
+        : (typeof m.carga_mes_anterior==='number') ? m.carga_mes_anterior : null;
+  return (typeof v==='number' && v>0) ? v : null;
+}
+
 function _hMesReal_(m){
   m = m || {};
   /* `horasMes` PRIMERO: es el campo que llega del backend con el overlay de Notion en

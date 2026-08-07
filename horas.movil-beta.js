@@ -109,6 +109,20 @@ function _diasDelMes_(){
   return {dia:d.getDate(), total:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(), periodo:null};
 }
 
+/* El NOMBRE del mes anterior a `AAAA-MM`. Sin periodo, se deduce de hoy. */
+function _mesAnteriorDe_(periodo){
+  /* La tabla va DENTRO a proposito: una funcion que depende de una constante de modulo no se
+     puede extraer sola para probarla -el banco la saca con `jsfuente.funcion` y reventaba con
+     «_MESES_ no esta definido»-. Doce cadenas no justifican esa atadura. */
+  var _MESES_=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre',
+               'octubre','noviembre','diciembre'];
+  var y, m;
+  if(/^\d{4}-\d{2}$/.test(String(periodo||''))){ y=+periodo.slice(0,4); m=+periodo.slice(5,7)-1; }
+  else { var d=new Date(); y=d.getFullYear(); m=d.getMonth(); }
+  var a=new Date(y, m-1, 1);
+  return _MESES_[a.getMonth()];
+}
+
 /* Cuantos dias tuvo el mes ANTERIOR al periodo `AAAA-MM`. Sin periodo, se deduce de hoy. */
 function _diasMesAnterior_(periodo){
   var y, m;
@@ -125,7 +139,7 @@ function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 
    Dos filas y no cuatro:
    · **vs mes anterior** — lo unico que dice si vas mejor o peor que tu, y no lo dice nada mas
-     en toda la app. Necesita `YO.hAnt`; mientras el backend no lo mande, la fila no se pinta
+     en toda la app. Sale de `_hAntReal_` (el panel REAL); si no llega, la fila no se pinta
      (en vez de inventarse un 0, que saldria como «+100 %»).
    · **vs equipo** — la media por persona del equipo. Es INDIVIDUAL: el ranking dice en que
      puesto estas, no cuanto te separa de la media, que es otra pregunta.
@@ -147,10 +161,17 @@ function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 function _compHorasHTML_(base){
   var f='', d=_diasDelMes_(), dia=Math.max(1, d.dia);
   var ritmo=base/dia;
-  if(typeof YO.hAnt==='number' && YO.hAnt>0){
-    var dAnt=_diasMesAnterior_(d.periodo), rAnt=YO.hAnt/dAnt;
-    f+=deltaHTML('vs. '+(YO.mesAnt||'mes anterior'), ritmo, rAnt,
-      nf2(rAnt)+' h/día en '+(YO.mesAnt||'el mes anterior'));
+  /* ⛔ DEL PANEL REAL, NUNCA de la semilla: `YO.hAnt` solo existe en los datos de demo, asi
+     que esta fila comparaba contra un numero fijo -«congelado en junio»-. Sin dato real NO
+     se pinta, que es lo que este mismo comentario prometia desde el principio. */
+  var _hA=_hAntReal_(YO);
+  if(_hA!=null){
+    var dAnt=_diasMesAnterior_(d.periodo), rAnt=_hA/dAnt;
+    /* El NOMBRE del mes se deriva del periodo que manda el servidor. `YO.mesAnt` no lo
+       asignaba nadie -cero asignaciones en las dos caras y en el backend-, asi que decia
+       siempre «mes anterior» o lo que quedara de la semilla. */
+    var _nomAnt=_mesAnteriorDe_(d.periodo);
+    f+=deltaHTML('vs. '+_nomAnt, ritmo, rAnt, nf2(rAnt)+' h/día en '+_nomAnt);
   }
   var me=_mediaEquipo_();
   if(me>0) f+=deltaHTML('vs. equipo', ritmo, me/dia, nf2(me/dia)+' h/día de media');

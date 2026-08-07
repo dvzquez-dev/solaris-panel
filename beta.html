@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=7c693e6"></script>
+<script src="comun-beta.js?v=724d1c1"></script>
 <script src="notis.movil-beta.js?v=bd8915e"></script>
 <script src="cierre.movil-beta.js?v=d6511a2"></script>
 <script src="tareas.movil-beta.js?v=9c56fc2"></script>
@@ -116,7 +116,7 @@
 <script src="documentos.movil-beta.js?v=aa4be87"></script>
 <script src="sanciones.movil-beta.js?v=af42cd0"></script>
 <script src="reuniones.movil-beta.js?v=c7c5489"></script>
-<script src="horas.movil-beta.js?v=7d2dce2"></script>
+<script src="horas.movil-beta.js?v=998582e"></script>
 <script src="equipo.movil-beta.js?v=ebc5289"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -190,16 +190,16 @@ var DATA={
        Unidad de Documentacion Tecnica); el de Bruno **no esta en el roster**. */
     {nombre:'Nerea Ferreiro Lamas',pila:'Nerea',unidad:'Aeroestructuras',cargo:null,
      coordina:['Aviónica'],
-     puntos:7,estado:'normal',infraccion:false,hMes:14.5,hAnt:11.9,horasTemp:132.4,meses:11,
+     puntos:7,estado:'normal',infraccion:false,hMes:14.5,horasTemp:132.4,meses:11,
      cuota:24.18,cuota_base:32.18,coche:2,puesto:9},
     {nombre:'Xoán Bermúdez Rial',pila:'Xoán',unidad:'Aeroestructuras',cargo:'Coordinador',
-     puntos:10,estado:'elegible',infraccion:false,hMes:31.2,hAnt:28.4,horasTemp:341.6,meses:11,
+     puntos:10,estado:'elegible',infraccion:false,hMes:31.2,horasTemp:341.6,meses:11,
      cuota:0,cuota_base:12.4,coche:5,puesto:5},
     {nombre:'Lois Carballo Sendón',pila:'Lois',unidad:'Dirección',cargo:'Project Director',
-     puntos:10,estado:'elegible',infraccion:false,hMes:44.8,hAnt:41.0,horasTemp:498.2,meses:11,
+     puntos:10,estado:'elegible',infraccion:false,hMes:44.8,horasTemp:498.2,meses:11,
      cuota:0,cuota_base:0,coche:0,puesto:1},
     {nombre:'Antía Ruibal Cortegoso',pila:'Antía',unidad:'Aviónica',cargo:null,
-     puntos:10,estado:'elegible',infraccion:false,hMes:26.6,hAnt:24.1,horasTemp:286.9,meses:11,
+     puntos:10,estado:'elegible',infraccion:false,hMes:26.6,horasTemp:286.9,meses:11,
      cuota:8.44,cuota_base:8.44,coche:0,puesto:6}
   ]
 };
@@ -1328,7 +1328,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b4b022c';
+var BUILD='942456b';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
