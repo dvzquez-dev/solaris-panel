@@ -334,6 +334,7 @@ var api={
   getNovedadesVistas: function(){ return api._post({action:"getNovedadesVistas"}); },
   marcarNovedadVista: function(id,visto){ return api._post({action:"marcarNovedadVista",id:id,visto:!!visto}); },
   getControl:  function(){ return api._post({action:"getControl"}); },
+  getFichajesAbiertos: function(){ return api._post({action:"getFichajesAbiertos"}); },
   setControl:  function(clave,valor,nota){ return api._post({action:"setControl",clave:clave,valor:valor,nota:nota}); },
   getMisMovimientos: function(){ return api._post({action:"getMisMovimientos"}); }
 };
@@ -807,7 +808,7 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
 }};
 
 /* ── FICHAJES EN CURSO ───────────────────────────────────────────────────── */
-/* ⛔ NO CONECTADO — pero **NO por lo que decia aqui**. Este comentario afirmaba que «no hay
+/* ✅ YA CONECTADO (07/08) — aqui abajo. Lo que decia este comentario antes: afirmaba que «no hay
    accion que los lea en global», y es FALSO desde la v47: `_getFichajesAbiertos_` existe, tiene
    su `case` en el router y devuelve `[{id, autor, subsistema, ini, horas, pausado}]` ordenado por
    hora de entrada, con las horas en cuartos y las pausas ya descontadas. Esta **gateada a rango
@@ -821,30 +822,57 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
 
    Hasta entonces esto NO inventa tres sesiones: dice que no esta conectado. Antes pintaba a tres
    personas que no existen con su hora de entrada y su reloj corriendo. */
-var CURSO_CONECTADO=false;
+/* ✅ CONECTADO (07/08). El comentario de arriba decía que faltaba la acción en el backend y era
+   FALSO desde la v47: `getFichajesAbiertos` existe, está gateada a rango ≥ 3 y devuelve
+   `[{id, autor, subsistema, ini, horas, pausado}]` ordenado por hora de entrada, con las horas ya
+   en cuartos y las pausas descontadas. Solo faltaba esta cara. */
+var CURSO_SRV='sin pedir';
+
+/* ⛔ SE PIDE UNA VEZ, no en cada repintado: `pintar()` corre en cada interacción de la pantalla.
+   Y si el servidor no contesta se marca el estado — un panel de sesiones abiertas que se queda
+   con la lista vieja diría que hay gente fichada que ya cerró. */
+function _cursoCargar_(repintar){
+  if(CURSO_SRV!=='sin pedir') return;
+  if(typeof api==='undefined' || !api.getFichajesAbiertos) return;
+  CURSO_SRV='pidiendo';
+  api.getFichajesAbiertos().then(function(a){
+    CURSO_SRV='ok';
+    CURSO.length=0;
+    if(Array.isArray(a)) a.forEach(function(x){ CURSO.push(x); });
+    if(typeof repintar==='function') repintar();
+  }).catch(function(){
+    CURSO_SRV='error'; CURSO.length=0;
+    if(typeof repintar==='function') repintar();
+  });
+}
+
 V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
-  if(!CURSO_CONECTADO) return pan('Sesiones abiertas ahora mismo','sin conectar',
-    vacioSimple('Todavía no se pueden ver los fichajes de los demás','El backend guarda las sesiones '+
-      'abiertas —de hecho las cierra solas a las 14 h— pero no hay ninguna acción que las '+
-      'sirva todas juntas: la que existe devuelve <b>la tuya</b>. Falta '+
-      '<span class="mono">getFichajesAbiertos</span> en el backend.')+
-    '<div class="nota">Cuando esté: un fichaje que pasa de <b>10 horas abiertas</b> se marca en '+
-    'ámbar y se avisa a quien lo tiene abierto. A las <b>14 h</b> se cierra solo con la hora de '+
-    'su última actividad y le queda pendiente de corregir.</div>');
+  _cursoCargar_(typeof pintar==='function'?pintar:null);
+  if(CURSO_SRV==='error') return pan('Sesiones abiertas ahora mismo','sin datos',
+    vacioSimple('No se pudo preguntar al servidor','Se dice en vez de enseñar una lista vieja: '+
+      'alguien que cerró hace horas seguiría saliendo como fichado.'));
+  if(CURSO_SRV!=='ok') return pan('Sesiones abiertas ahora mismo','…',
+    vacioSimple('Preguntando al servidor','Un momento.'));
   return pan('Sesiones abiertas ahora mismo',CURSO.length+(CURSO.length===1?' persona':' personas'),
     (CURSO.length?CURSO.map(function(c){
-      var wa=c.min>=600;
-      var hh=Math.floor(c.min/60), mm=c.min%60;
+      /* ⛔ EL TOPE EN HORAS, no en minutos: la acción ya devuelve `horas` en cuartos y con las
+         pausas descontadas. Recalcularlo aquí desde `ini` sería escribir por segunda vez la regla
+         de las pausas — y la segunda copia siempre acaba diciendo otra cosa. */
+      var wa=c.horas>=10;
+      /* ⛔ PAUSADO NO ES LO MISMO QUE TRABAJANDO, y el dato viene. Pintarlos igual sería decir
+         que hay alguien en el taller cuando su reloj está parado. */
+      var pau=!!c.pausado;
       return '<div class="curso'+(wa?' wa':'')+'"><span class="pt"></span>'+
-        '<span class="tx"><b>'+esc(_m(c.n).pila)+'</b>'+
-        '<small>'+esc(c.lugar)+' · desde las '+c.desde+'</small></span>'+
-        '<span class="q mono">'+hh+' h '+String(mm).padStart(2,'0')+'</span>'+
-        (wa?'<span class="chip wa">avisado</span>':'<span class="chip ok">en curso</span>')+'</div>';
-    }).join(''):vacioSimple('Nadie fichado ahora mismo','Cuando alguien fiche entrada aparece aquí, con dónde '+
-      'está y cuánto lleva abierto.'))+
-    '<div class="nota">Un fichaje que pasa de <b>10 horas abiertas</b> se marca en ámbar y se avisa a quien lo '+
-    'tiene abierto. A las <b>14 h</b> se cierra solo con la hora de su última actividad y le queda pendiente '+
-    'de corregir.</div>');
+        '<span class="tx"><b>'+esc(_m(c.autor)?_m(c.autor).pila:c.autor)+'</b>'+
+        '<small>'+esc(c.subsistema||'—')+' · desde las '+esc(String(c.ini||'').slice(11,16))+'</small></span>'+
+        '<span class="q mono">'+nf2(c.horas)+' h</span>'+
+        (pau?'<span class="chip">en pausa</span>'
+            :(wa?'<span class="chip wa">pasa de 10 h</span>':'<span class="chip ok">en curso</span>'))+'</div>';
+    }).join(''):vacioSimple('Nadie fichado ahora mismo','Cuando alguien fiche entrada aparece aquí, con su '+
+      'unidad y cuánto lleva abierto.'))+
+    '<div class="nota">Un fichaje que pasa de <b>10 horas abiertas</b> se marca en ámbar. A las '+
+    '<b>14 h</b> se cierra solo con la hora de su última actividad y le queda pendiente de '+
+    'corregir. Las <b>pausas ya están descontadas</b>.</div>');
 }};
 
 /* ── REGISTRO DEL MES ────────────────────────────────────────────────────── */
@@ -2107,7 +2135,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='9825697';
+var BUILD='7dc47f4';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
