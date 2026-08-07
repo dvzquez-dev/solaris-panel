@@ -108,15 +108,15 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=64ad584"></script>
+<script src="comun-beta.js?v=8c2c8f0"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
 <script src="turnos.escritorio-beta.js?v=f0af960"></script>
 <script src="buzon.escritorio-beta.js?v=aa3b013"></script>
 <script src="documentos.escritorio-beta.js?v=1918b5e"></script>
-<script src="sanciones.escritorio-beta.js?v=1c7fbee"></script>
+<script src="sanciones.escritorio-beta.js?v=b179a34"></script>
 <script src="reuniones.escritorio-beta.js?v=1bbd04a"></script>
-<script src="horas.escritorio-beta.js?v=676406f"></script>
+<script src="horas.escritorio-beta.js?v=fc35dac"></script>
 <script src="equipo.escritorio-beta.js?v=a2d5448"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -1882,8 +1882,16 @@ async function _refrescoVivo_(motivo){
     var _t=_pide_('getTurnos').then(function(t){ if(Array.isArray(t)&&t.length){ TURNOS.length=0; t.forEach(function(x){TURNOS.push(x);}); } });
     var _q=_pide_('getTareas').then(function(q){ if(Array.isArray(q)&&q.length){ TAREAS.length=0; q.forEach(function(x){TAREAS.push(x);}); } });
     var _p=_pide_('getPanel').then(function(p){ if(p) _aplicarPanel_(p); });
-    var _s=_pide_('getSanciones',{}).then(function(a){ if(Array.isArray(a)) SANC_BACK=a; });
-    var _r=_pide_('getPartes',{}).then(function(a){ if(Array.isArray(a)) PART_BACK=a; });
+    /* ⛔ LAS MISMAS PUERTAS QUE EL ARRANQUE, y no una segunda copia. Aqui se pedía
+       `getSanciones`/`getPartes` a mano y se asignaba `SANC_BACK`/`PART_BACK` **sin llamar a
+       `_loteReal_()` ni a `_partesReal_()`**, que son las que derivan `LOTE`, `LOTES_PEND` y la
+       cola de partes de esos arrays. Resultado: cada 90 s llegaban sanciones nuevas y el
+       bloque del panel seguía enseñando **el lote de cuando entraste** -- y al repintar, se
+       repintó lo viejo. Un dato congelado encima de uno fresco, sin ningún error.
+       ⚠️ Dos puertas para el mismo dato acaban siendo dos funciones distintas, y la
+       diferencia es el bug: [[feedback_una_sola_puerta_por_servicio]]. */
+    var _s=_cargarSanciones_();
+    var _r=_cargarPartes_();
     var _d=_pide_('getEntregables').then(function(a){ if(Array.isArray(a)){ DOCS.length=0; a.forEach(function(x,i){ DOCS.push(_normDocE_(x,i)); }); } });
     /* Las reuniones, con cuidado: la lista NO trae las respuestas (viven en su propia hoja),
        asi que refrescarla a lo bruto deja los mapas de calor a cero. Se conservan las que ya
@@ -2140,7 +2148,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f18c976';
+var BUILD='da4088b';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

@@ -304,9 +304,13 @@ function _cablearPonerSanc_(){
   };
 }
 
+/* ⛔ UN FALLO DE RED NO BORRA LO QUE YA VALE. El `catch` ponía `SANC_BACK=null`, y `null`
+   significa **semilla ficticia**: en el arranque daba igual -ya era null-, pero desde que esta
+   funcion es tambien la del refresco vivo, un corte de red a los 90 s cambiaba la cola REAL de
+   sanciones por la de ejemplo, sin decir nada. Se conserva lo que hubiera. */
 async function _cargarSanciones_(){
   try{ var arr=await api.getSanciones({}); if(Array.isArray(arr)) SANC_BACK=arr; }
-  catch(e){ SANC_BACK=null; }
+  catch(e){ if(!Array.isArray(SANC_BACK)) SANC_BACK=null; }
   _loteReal_();
 }
 

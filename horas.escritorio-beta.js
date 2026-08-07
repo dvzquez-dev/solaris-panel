@@ -106,9 +106,12 @@ function _partesReal_(){
   PARTES=PART_BACK.map(normParte);
 }
 
+/* ⛔ GEMELA de `_cargarSanciones_`, y por el mismo motivo: `null` es **semilla ficticia**, asi
+   que borrarlo en el `catch` cambia la cola real de partes por la de ejemplo cuando falla un
+   refresco. Se conserva lo que hubiera. */
 async function _cargarPartes_(){
   try{ var arr=await api.getPartes({}); if(Array.isArray(arr)) PART_BACK=arr; }
-  catch(e){ PART_BACK=null; }
+  catch(e){ if(!Array.isArray(PART_BACK)) PART_BACK=null; }
   _partesReal_();
 }
 

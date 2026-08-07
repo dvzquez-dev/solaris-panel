@@ -1100,6 +1100,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-07-lote-congelado', fecha:'2026-08-07',
+      titulo:'El bloque de sanciones del escritorio se quedaba en el lote de cuando entrabas',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'El panel se refresca solo cada 90 segundos, pero al traer las sanciones nuevas no volvía a montar el bloque: seguías viendo el lote que había al entrar, con una pantalla recién repintada que lo hacía parecer al día. Si se cerraba un bloque nuevo mientras tenías la pestaña abierta, no aparecía hasta recargar.'},
+        {cara:'escritorio', vista:'horas', txt:'Lo mismo con la cola de partes de horas. Y de paso: si se cae la red durante un refresco, ya no se pierde la cola real —antes volvía a salir la de ejemplo, sin avisar—.'}
+      ] },
     { id:'2026-08-07-fosil-escritorio', fecha:'2026-08-07',
       titulo:'El escritorio comparaba las horas contra un mes fosilizado',
       items:[
