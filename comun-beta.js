@@ -944,6 +944,24 @@ function _perfilValido_(m,unidad){
 
    Devuelve `{tono, txt}` o `null`. El tono lo pinta cada cara a su manera; lo que NO se decide
    dos veces es cual es. */
+/* CUANTOS APUNTES ANUNCIA «Ultimos movimientos». La compensacion del cargo **es uno** — Daniel
+   (07/08): *«dice 0 apuntes este mes cuando si los hay: la compensacion inicial es un apunte»*—,
+   y tenia razon dos veces: el cuerpo ya la pinta como una fila mas, y la lista de abajo ya le
+   reservaba su hueco (`MOVS_N-1`). El unico sitio que no la contaba era **el numero que la
+   anuncia**, o sea la pantalla contradiciendose sola.
+
+   ⚠️ Se cuenta cuando **lleva horas**: con el dato real de Notion, o si alguien pone un cargo a 0
+   en `COMP_CARGO`, la fila valdria cero y anunciar un apunte de cero horas seria el mismo fallo
+   del reves. Hoy no pasa (`_compBase_` da 2 h por defecto), pero depende de una constante que se
+   edita.
+   ⚠️ Y la EXTRA no suma otro: va **dentro** del mismo apunte — por eso comparten hueco.
+
+   Vive aparte porque es lo unico de esa tarjeta que se puede EJECUTAR en un banco: el resto es
+   HTML con medio modulo detras. */
+function _apuntesMes_(fichajes, horasComp, horasExtra){
+  return (fichajes||0) + (((horasComp||0)!==0 || (horasExtra||0)!==0) ? 1 : 0);
+}
+
 function _etiOrigenParte_(p){
   var o = p && p.origen;
   if(o === 'fichaje') return null;              // el caso normal no necesita rotulo
@@ -974,7 +992,8 @@ function _novedades_(){
       items:[
         {cara:'movil', vista:'horas', txt:'Tenías razón al dudar: «declarado sin fichaje» salía hasta en partes que enseñan su hora de entrada y de salida. Ahora esos dicen «declarado a mano».'},
         {cara:'movil', vista:'horas', txt:'Y lo que otorga la coordinación dice «otorgada por» con el nombre, en gris — no en ámbar, que era acusar al miembro de algo que hizo el sistema.'},
-        {cara:'escritorio', vista:'horas', txt:'En el escritorio un parte otorgado salía con DOS etiquetas a la vez, contradiciéndose. Ahora sale una, y la misma que en el móvil.'}
+        {cara:'escritorio', vista:'horas', txt:'En el escritorio un parte otorgado salía con DOS etiquetas a la vez, contradiciéndose. Ahora sale una, y la misma que en el móvil.'},
+        {cara:'movil', vista:'horas', txt:'Y «Últimos movimientos» ya no dice «0 apuntes este mes» teniendo tu compensación ahí: la cuenta, que es un apunte.'}
       ]},
     { id:'2026-08-07-revertir', fecha:'2026-08-07', titulo:'Ya puedes deshacer un parte que firmaste',
       items:[

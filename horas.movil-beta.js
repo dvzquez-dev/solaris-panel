@@ -594,8 +594,19 @@ function _movHorasHTML_(confs){
       '<small>'+(_cx>0?'te la ha asignado el Project Director por trabajo de más':
                        'ajuste sobre la base de tu cargo')+' · solo de este mes</small></div>'+
       '<div class="d"><b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
+  /* ⛔ LA COMPENSACION ES UN APUNTE, Y LA CABECERA NO LA CONTABA. Daniel (07/08):
+     *«dice 0 apuntes este mes cuando si los hay: la compensacion inicial es un
+     apunte»*. Y tenia razon dos veces: el cuerpo la pinta como una fila mas, y la
+     lista de abajo YA le reserva un hueco (`MOVS_N-1`) porque ocupa uno de los cinco.
+     O sea que el unico sitio que no la contaba era el numero que la anuncia.
+     ⚠️ Se cuenta cuando LLEVA HORAS, no siempre: con el dato real de Notion una
+     compensacion puede valer 0, y anunciar un apunte de cero horas seria el mismo
+     fallo del reves. Con el defecto del cargo nunca es 0 (`_compBase_` da 2 h).
+     ⚠️ Y la EXTRA no suma otro: va dentro del mismo apunte -- lo dice el comentario
+     de abajo y por eso comparten hueco. */
+  var _ap = _apuntesMes_(r.total, _cr?_cb:comp, _cx);
   return '<div class="plg" style="margin-top:11px"><div class="plgh" data-plg data-p>'+
-      '<b>Últimos movimientos</b><small>'+r.total+' apunte'+(r.total===1?'':'s')+' este mes · '+
+      '<b>Últimos movimientos</b><small>'+_ap+' apunte'+(_ap===1?'':'s')+' este mes · '+
         'de qué se componen estas horas</small>'+
       '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
         'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
