@@ -196,7 +196,16 @@ function _convPieHTML_(cv){
   var t = q<=0 ? 'Plazo cerrado'
         : q<1  ? 'Quedan <b>'+Math.round(q*60)+' min</b>'
                : 'Quedan <b>'+Math.round(q)+' h</b>';
-  return t+' · marcadas <b>'+c.puedo+'</b>'+(c.no?' · no puedo en '+c.no:'')+
+  /* ⛔ CON FRANJAS DE UNA HORA, EL NÚMERO SON HORAS, NO RESPUESTAS. Desde que un toque marca
+     el turno entero, «marcadas 4» después de UN gesto se lee como si hubieras contestado cuatro
+     veces — cuando has dicho una sola cosa. Se dice en horas, y se añaden los turnos, que es la
+     unidad en la que piensa quien reparte. Con dos franjas (`min_h` a 1) se deja como estaba:
+     ahí cada casilla sí es una respuesta. */
+  var min=_minTurno_(cv);
+  var marcadas = min>1
+    ? c.puedo+' h'+(c.puedo>=min ? ' ('+Math.floor(c.puedo/min)+(Math.floor(c.puedo/min)===1?' turno':' turnos')+')' : '')
+    : ''+c.puedo;
+  return t+' · marcadas <b>'+marcadas+'</b>'+(c.no?' · no puedo en '+c.no:'')+
     (c.coches?' · con coche '+c.coches:'')+
     (c.blanco?' · <b>'+c.blanco+'</b> sin contestar':' · todo contestado');
 }
