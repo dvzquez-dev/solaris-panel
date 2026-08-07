@@ -807,11 +807,20 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
 }};
 
 /* ── FICHAJES EN CURSO ───────────────────────────────────────────────────── */
-/* ⛔ NO CONECTADO. El dato EXISTE en el backend -los fichajes abiertos viven en su hoja y
-   el barrido de las 14 h los recorre- pero **no hay accion que los lea en global**:
-   `getFichajeAbierto` devuelve el TUYO. Falta un `getFichajesAbiertos` para el PD.
-   Hasta entonces esto NO inventa tres sesiones: dice que no esta conectado. Antes
-   pintaba a tres personas que no existen con su hora de entrada y su reloj corriendo. */
+/* ⛔ NO CONECTADO — pero **NO por lo que decia aqui**. Este comentario afirmaba que «no hay
+   accion que los lea en global», y es FALSO desde la v47: `_getFichajesAbiertos_` existe, tiene
+   su `case` en el router y devuelve `[{id, autor, subsistema, ini, horas, pausado}]` ordenado por
+   hora de entrada, con las horas en cuartos y las pausas ya descontadas. Esta **gateada a rango
+   >= 3** (solo el PD). Lo unico que falta es ESTA cara: `api.getFichajesAbiertos` y el panel.
+
+   ⚠️ Un comentario que dice «falta en el backend» cuando el backend lo tiene manda al siguiente a
+   escribir algo que ya esta — y a desplegarlo, que es lo caro. **NO HACE FALTA DESPLEGAR NADA.**
+   La ficha entera, ya medida, esta en `docs/pendientes.md`; incluye lo que hay que DECIDIR al
+   pintarlo: que se enseña de quien esta pausado, porque el dato viene y tratarlo igual que a
+   quien esta trabajando seria decir algo falso.
+
+   Hasta entonces esto NO inventa tres sesiones: dice que no esta conectado. Antes pintaba a tres
+   personas que no existen con su hora de entrada y su reloj corriendo. */
 var CURSO_CONECTADO=false;
 V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
   if(!CURSO_CONECTADO) return pan('Sesiones abiertas ahora mismo','sin conectar',
@@ -2098,7 +2107,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='77a12ff';
+var BUILD='9825697';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
