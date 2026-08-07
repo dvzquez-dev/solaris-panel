@@ -108,10 +108,10 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=9573640"></script>
+<script src="comun-beta.js?v=60d1d5c"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
-<script src="turnos.escritorio-beta.js?v=53f3f9b"></script>
+<script src="turnos.escritorio-beta.js?v=e442f71"></script>
 <script src="buzon.escritorio-beta.js?v=aa3b013"></script>
 <script src="documentos.escritorio-beta.js?v=1918b5e"></script>
 <script src="sanciones.escritorio-beta.js?v=1c7fbee"></script>
@@ -598,6 +598,11 @@ var CONVOCATORIAS=[{
   invitados:[], resp:{}
 }];
 var DISP_SITIO='', DISP_SEL='';
+/* En qué punto va la petición de la disponibilidad al servidor: 'sin pedir' |
+   'pidiendo' | 'ok' | 'error'. Vive aquí y no en el módulo porque **un módulo solo
+   lleva declaraciones `function`**. Y existe porque sin él `pintar()` —que corre en
+   cada ratón que pasa por el mapa— dispararía una petición por repintado. */
+var DISP_SRV='sin pedir';
 
 var V={};
 
@@ -2081,7 +2086,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='073c331';
+var BUILD='15fa155';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

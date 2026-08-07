@@ -202,7 +202,50 @@ function _dispPanel_(){
     '</div>');
 }
 
+/* ═══ EL MAPA PINTA LO QUE HA CONTESTADO LA GENTE ═══════════════════════════════════════
+   Hasta hoy `_dispViva_()` leia `CONVOCATORIAS` **de memoria**, o sea los datos de demostracion:
+   se abria el escritorio, se veia un mapa de calor con nombres y horas... y no era de nadie.
+   `api.getDisponibilidad` estaba declarada en las dos caras y **no la llamaba nadie**.
+
+   ⛔ Una ida y vuelta, no dos: la accion devuelve la convocatoria Y las respuestas, y desde hoy
+   sin `id` sirve la vigente. Pedir primero cual es y luego sus respuestas serian dos viajes para
+   una pantalla que se abre en el movil de alguien.
+   ⚠️ Y el estado se guarda para no repreguntar en cada repintado: `pintar()` corre muchas veces
+   por interaccion, y sin esto el mapa dispararia una peticion por cada raton que pasa. */
+function _dispEstadoSrv_(v){
+  if(v!==undefined) DISP_SRV=v;
+  return (typeof DISP_SRV==='undefined') ? 'sin pedir' : DISP_SRV;
+}
+
+function _dispCargar_(repintar){
+  if(_dispEstadoSrv_() !== 'sin pedir') return;
+  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getDisponibilidad) return;
+  _dispEstadoSrv_('pidiendo');
+  api.getDisponibilidad().then(function(r){
+    _dispEstadoSrv_('ok');
+    if(typeof CONVOCATORIAS==='undefined') return;
+    /* ⛔ EL SERVIDOR MANDA. Sin convocatoria no se deja la de demostracion puesta: un mapa de
+       mentira es peor que un hueco, porque se reparte gente con el. */
+    CONVOCATORIAS.length=0;
+    if(r && r.convocatoria){
+      var cv=r.convocatoria;
+      cv.resp = r.cv || {};
+      cv.abierta = !!r.abierta;
+      CONVOCATORIAS.push(cv);
+    }
+    if(typeof repintar==='function') repintar();
+  }).catch(function(){
+    /* ⛔ Un fallo NO deja el mapa de demostracion pintado: se marca el estado y se repinta, que
+       es como la pantalla puede decir que no lo sabe en vez de enseñar algo inventado. */
+    _dispEstadoSrv_('error');
+    if(typeof repintar==='function') repintar();
+  });
+}
+
 function _pinDisp_(){
+  /* Se pide AQUI y no en el arranque: el mapa vive en una pestaña que puede no abrirse en
+     toda la sesion, y cargarlo siempre seria una peticion de mas para todo el mundo. */
+  _dispCargar_(typeof pintar==='function' ? pintar : null);
   var cv=_dispViva_(); if(!cv) return;
   var mapa=document.getElementById('dMapa'); if(!mapa) return;
   var calor=_calorTurnos_(cv, DISP_SITIO);
