@@ -1110,7 +1110,8 @@ function _novedades_(){
       titulo:'La comparativa de horas ya no cuenta la compensación de tu cargo',
       items:[
         {cara:'movil', vista:'horas', txt:'La fila «vs. <mes anterior>» sumaba la compensación que te llega por el cargo (PD 7 h, coordinador 3,5 h, miembro 2 h). Esa no se trabaja: se cobra por el puesto y es la misma todos los meses, así que la comparativa medía tu cargo en vez de tu trabajo — y comparado contigo mismo no se movía nunca. Ahora se descuenta en los DOS lados.'},
-        {cara:'movil', vista:'horas', txt:'La compensación EXTRA (la que asigna el PD a mano por cubrir un turno o un reporte) SÍ sigue contando: es lo único de las dos que reconoce trabajo real. Y con menos horas que tu base la cuenta se queda en 0, no en negativo.'}
+        {cara:'movil', vista:'horas', txt:'La compensación EXTRA (la que asigna el PD a mano por cubrir un turno o un reporte) SÍ sigue contando: es lo único de las dos que reconoce trabajo real. Y con menos horas que tu base la cuenta se queda en 0, no en negativo.'},
+        {cara:'movil', vista:'horas', txt:'Y la fila «vs. equipo» también, que esa hubo que arreglarla en el servidor (backend v69): la base depende del cargo de cada uno, y tu móvil no conoce ni las horas ni el cargo de los demás. Si se hubiera descontado solo en tu lado, la comparación sería con descuento contra sin descuento — peor que no tocarla.'}
       ] },
     { id:'2026-08-07-horas-cuatro', fecha:'2026-08-07',
       titulo:'El parseo de horas estaba escrito cuatro veces',
