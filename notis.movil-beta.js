@@ -81,10 +81,29 @@ function _gateNotis_(motivo, seguir){
         /* Y se suscribe de verdad, no solo el permiso: un permiso sin suscripcion no
            entrega ni un aviso, y el gate habria dejado pasar a alguien que no recibe nada. */
         var reg=_swReg || await _registrarSW_();
-        if(reg){ await navigator.serviceWorker.ready;
-          var sub=await reg.pushManager.getSubscription();
-          if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
-          if(typeof SESION!=='undefined' && SESION) try{ await api.guardarPush(sub.toJSON()); }catch(_){}
+        /* ⛔ SIN SERVICE WORKER NO SE PASA. Antes se llamaba a `seguir()` igual, o sea que
+           quien no pudiera registrarlo entraba **sin ninguna suscripcion** -- justo lo que
+           este gate existe para impedir. */
+        if(!reg){
+          if(msg) msg.textContent='No se pudo preparar el aviso en este navegador. '+
+            'Prueba a abrir el panel desde el icono de la pantalla de inicio.';
+          b.disabled=false; b.textContent=boton; return;
+        }
+        await navigator.serviceWorker.ready;
+        var sub=await reg.pushManager.getSubscription();
+        if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
+        /* ⛔ Y EL ERROR DE `guardarPush` NO SE TRAGA. Es la llamada que le dice al SERVIDOR
+           donde mandar: una suscripcion que el servidor no conoce **no entrega nada**. Con
+           `catch(_){}` se pasaba el gate creyendo estar cubierto, que es el agujero que el
+           comentario de arriba dice cerrar. Ya mordio en el escritorio: faltaba esta misma
+           llamada y el fallo se lo tragaba un catch vacio, roto desde siempre y sin señal. */
+        if(typeof SESION!=='undefined' && SESION){
+          try{ await api.guardarPush(sub.toJSON()); }
+          catch(err){
+            if(msg) msg.textContent='El permiso esta dado, pero no se pudo registrar el aviso '+
+              'en el servidor, asi que NO te llegaria nada: '+((err&&err.message)||err);
+            b.disabled=false; b.textContent=boton; return;
+          }
         }
         seguir(); return;
       }
@@ -96,16 +115,25 @@ function _gateNotis_(motivo, seguir){
 
 /* EQUIVALENTE (no GEMELA): el movil pide el permiso en el gate de arranque y tiene el panel de preferencias; el escritorio lo pide con un boton y distingue 'denied'. Divergen por la cara, y esta escrito. */
 function _notisHTML_(){
+  /* ⛔ SI EL ULTIMO REGISTRO FALLO, SE DICE AQUI. La suscripcion se re-guarda en cada
+     apertura porque el navegador la rota; si eso falla y nadie lo cuenta, los avisos dejan
+     de llegar **en silencio** y quien se pierde un turno cree que no le avisaron por otra
+     cosa. Va arriba del todo: debajo de los interruptores no lo lee nadie. */
+  var _fp=(typeof _pushFallo_==='function') ? _pushFallo_() : null;
+  var _avisoFallo = _fp ? '<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">'+
+    '<b>No se pudo confirmar tu registro de avisos</b> la ultima vez que abriste el panel, '+
+    'asi que puede que no te lleguen: '+esc(String(_fp))+'.<br>Cierra y vuelve a abrir; si '+
+    'sigue, avisa.</p></div>' : '';
   if(!_pushSoportado_())
-    return '<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador '+
+    return _avisoFallo+'<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador '+
       'no admite notificaciones. El panel las da por <b>obligatorias</b>, así que aquí te '+
       'estás perdiendo los avisos de turnos, reuniones y decisiones. Ábrelo en el móvil.</p></div>';
   if(_esIOS_() && !_esStandalone_())
-    return '<div class="tarj"><p class="rnota" style="margin:0;line-height:1.6">Para recibir avisos en <b>iPhone</b>: '+
+    return _avisoFallo+'<div class="tarj"><p class="rnota" style="margin:0;line-height:1.6">Para recibir avisos en <b>iPhone</b>: '+
       'pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> y abre la app desde ese icono.</p></div>';
   /* El botón de «activar» se fue: para llegar hasta aquí ya has pasado el gate del arranque.
      Lo que queda es elegir QUÉ te llega. */
-  return '<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
+  return _avisoFallo+'<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
       '<b>Qué avisos quieres recibir</b><small>Se aplica en el servidor, antes de enviarlos</small>'+
       '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
         'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+

@@ -801,9 +801,32 @@ async function _pushInit_(){
     if(reg && Notification.permission==='granted'){
       await navigator.serviceWorker.ready;
       var sub=await reg.pushManager.getSubscription();
-      if(sub && typeof SESION!=='undefined' && SESION) api.guardarPush(sub.toJSON());
+      /* ⛔ CON `await`. Sin el, el `catch` de abajo **no coge nada**: la promesa se
+         rechaza sola y sale por la ventana como «unhandled rejection». Aqui el silencio
+         SI es aceptable -esto corre en cada apertura y se reintenta solo-, pero tiene
+         que ser un silencio elegido, no un error que se escapa por un hueco. */
+      if(sub && typeof SESION!=='undefined' && SESION){
+        await api.guardarPush(sub.toJSON());
+        _pushFallo_(null);   /* ⛔ y el exito lo BORRA: un aviso que no se retira miente */
+      }
     }
-  }catch(_){}
+  }catch(e){
+    /* ⛔ NO SE TRAGA. Este re-guardado existe porque los navegadores ROTAN la
+       suscripcion, y arriba esta escrito lo que pasa si no se re-guarda: **dejan de
+       llegar avisos en silencio**. Tragarse su error es provocar justo eso.
+       ⚠️ No bloquea ni avisa por su cuenta: corre al abrir, y una caida puntual se
+       arregla sola en la siguiente apertura. Lo que hace es dejar CONSTANCIA, y la
+       pantalla de avisos la enseña — ahi si esta mirando quien puede actuar. */
+    _pushFallo_((e && e.message) || String(e));
+  }
+}
+
+/* Lo ultimo que fallo al registrar los avisos, o `null`. En `window` y no en una variable
+   de modulo: `comun.js` no lleva ni una sentencia ejecutable de nivel superior, y eso es
+   lo que lo hace seguro de cargar antes que nada. */
+function _pushFallo_(v){
+  if (v !== undefined) window.__PUSH_FALLO = v || null;
+  return window.__PUSH_FALLO || null;
 }
 
 /* Reduce ANTES de nada. No es solo por el peso del envío: pintar sobre un lienzo de 12 Mpx
@@ -1295,6 +1318,12 @@ function _novedades_(){
         {cara:'movil', vista:'horas', txt:'La fila «vs. <mes anterior>» sumaba la compensación que te llega por el cargo (PD 7 h, coordinador 3,5 h, miembro 2 h). Esa no se trabaja: se cobra por el puesto y es la misma todos los meses, así que la comparativa medía tu cargo en vez de tu trabajo — y comparado contigo mismo no se movía nunca. Ahora se descuenta en los DOS lados.'},
         {cara:'movil', vista:'horas', txt:'La compensación EXTRA (la que asigna el PD a mano por cubrir un turno o un reporte) SÍ sigue contando: es lo único de las dos que reconoce trabajo real. Y con menos horas que tu base la cuenta se queda en 0, no en negativo.'},
         {cara:'movil', vista:'horas', txt:'Y la fila «vs. equipo» también, que esa hubo que arreglarla en el servidor (backend v69): la base depende del cargo de cada uno, y tu móvil no conoce ni las horas ni el cargo de los demás. Si se hubiera descontado solo en tu lado, la comparación sería con descuento contra sin descuento — peor que no tocarla.'}
+      ] },
+    { id:'2026-08-08-avisos-de-verdad', fecha:'2026-08-08',
+      titulo:'Activar los avisos ya no se da por hecho',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Al activar las notificaciones, si el registro en el servidor fallaba **no se dec\u00eda nada** y entrabas igual: el tel\u00e9fono ten\u00eda el permiso, pero el servidor no sab\u00eda a d\u00f3nde mandarte los avisos, as\u00ed que no te llegaba ninguno. Ahora lo dice y puedes reintentar.'},
+        {cara:'movil', vista:'estado', txt:'Y si al abrir el panel no se puede confirmar tu registro, sale un aviso en la pantalla de notificaciones. Los navegadores rotan esa suscripci\u00f3n de vez en cuando, y si no se vuelve a guardar los avisos dejan de llegar sin que nadie se entere.'}
       ] },
     { id:'2026-08-08-sesion-caducada', fecha:'2026-08-08',
       titulo:'\u00abToken inv\u00e1lido\u00bb al cerrar el fichaje: ahora dice qu\u00e9 hacer',
