@@ -2067,7 +2067,31 @@ function _arrancarGis_(){
   (function esperar(n){
     if(SESION) return;
     if(window.google&&window.google.accounts&&window.google.accounts.id){ _pintarLogin_(); return; }
-    if(n<=0){ var g=document.getElementById('loginGate'); if(g) g.remove(); return; }  // sin red: semilla ficticia
+    if(n<=0){
+      /* ⛔ AQUI SE QUITABA EL GATE Y SE ENTRABA EN DEMO, EN SILENCIO. Lo reportó Daniel
+         el 08/08: «me salta la demo directamente y no me dice de iniciar sesión». Lo que
+         queda delante es la app con la **semilla de demostración**, con pinta de
+         funcionar — y cualquier decisión que tomes ahí es sobre datos inventados.
+         ⚠️ El caso legítimo (sin red, mirar la app en local) se conserva: se puede
+         seguir. Lo que cambia es que **se dice**, en vez de dejarte creer que entraste. */
+      _gate_(_insigniaHTML_()+
+        '<div style="max-width:360px;line-height:1.55;text-align:center">'+
+        '<b>No se pudo cargar el inicio de sesi\u00f3n de Google.</b><br>'+
+        '<span style="opacity:.75">Sin \u00e9l no se puede entrar con tu cuenta. '+
+        'Suele ser la conexi\u00f3n o una versi\u00f3n antigua guardada en el navegador: '+
+        'prueba a recargar del todo (Ctrl+May\u00fas+R).</span></div>'+
+        '<button id="reGis2" style="border:1px solid #463E40;background:none;'+
+        'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar'+
+        '</button>'+
+        '<button id="verDemo" style="border:none;background:none;color:#8b8285;'+
+        'font-size:12px;text-decoration:underline;cursor:pointer">Ver la app de '+
+        'demostraci\u00f3n (datos inventados)</button>');
+      var _rg=document.getElementById('reGis2');
+      if(_rg) _rg.onclick=function(){ _arrancarGis_(); };
+      var _vd=document.getElementById('verDemo');
+      if(_vd) _vd.onclick=function(){ var g=document.getElementById('loginGate'); if(g) g.remove(); };
+      return;
+    }
     setTimeout(function(){ esperar(n-1); },150);
   })(40);
 }
@@ -2180,7 +2204,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='5adf4d4';
+var BUILD='26a1cfd';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
