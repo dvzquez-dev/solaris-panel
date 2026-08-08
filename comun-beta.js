@@ -1126,6 +1126,14 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-08-anio-hoja', fecha:'2026-08-08',
+      titulo:'La comparacion con el mes pasado, un paso mas cerca',
+      items:[
+        {cara:'movil', vista:'horas', txt:'El registro del Drive escribe el año una sola vez y '
+          + 'luego encadena los meses, asi que al buscar «julio de 2026» no se encontraba nada: '
+          + 'para el programa ese mes no existia. Ahora el año se deduce del orden de los meses. '
+          + 'Todavia falta un detalle para que la fila del mes pasado aparezca, y esta localizado.'}
+      ] },
     { id:'2026-08-08-mes-real', fecha:'2026-08-08',
       titulo:'Lo del mes de cierre a cierre ya funciona DE VERDAD',
       items:[
