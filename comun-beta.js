@@ -243,6 +243,29 @@ function _umbral_(){
    distingue de un «no» del backend, que no se reintenta porque tiene criterio. */
 function _ApiTransito(m){ this.message=m; this.transito=true; }
 
+/* `_ApiSesion` marca lo que NO se arregla reintentando: tu identidad ha dejado de valer.
+   ⛔ POR QUE EXISTE. Bug de Jose Manuel del 07/08, gravedad **Bloquea**: *«desde la
+   aplicación web de pc no es posible finalizar una sesión de trabajo… aparece un error que es
+   algo así como "token invalido"»*. El token de Google **caduca a la hora**; `SESION.token` se
+   fija en el login y no se renueva mientras la pestaña siga abierta, y el escritorio vive
+   abierto toda la tarde. El backend contesta `token no válido` — correcto para una máquina y
+   **inútil para una persona**: no dice que haya que volver a entrar. Lo intentó dos veces y lo
+   dio por roto.
+   ⚠️ Y NO se reintenta (`transito` es falso a propósito): repetir con el mismo token caducado
+   da el mismo error tres veces y tarda el triple en decir lo mismo. */
+function _ApiSesion(m){ this.message=m; this.sesion=true; }
+
+/* ¿Es este error del backend uno de identidad? Los tres los lanza `_verificarIdentidad_`.
+   ⛔ Se mira con una lista CERRADA, no con un `/token/`: hay errores que llevan la palabra
+   «token» y no son de sesión — mandar a alguien a volver a entrar cuando el problema es otro
+   le hace perder el trabajo que tenga a medias. */
+function _esErrorDeSesion_(err){
+  var e=String(err||'');
+  return /token no v\u00e1lido|token no valido/i.test(e) ||
+         /^sin token$/i.test(e) ||
+         /token de otra aplicaci/i.test(e);
+}
+
 function _apiParse(txt, accion){
   var j=null; try{ j=JSON.parse(txt); }catch(_){}
   /* Lo que vuelve no es JSON: es la pagina HTML de Google del 404 transitorio. */
@@ -253,6 +276,12 @@ function _apiParse(txt, accion){
      y el backend no vio ninguna accion. Nunca llego a ejecutarse nada, asi que se repite. */
   if(accion && /^acci[oó]n desconocida/.test(err) && err.indexOf(accion)<0)
     throw new _ApiTransito("el cuerpo del POST no llegó ("+err+")");
+  /* ⛔ LA SESION CADUCADA SE DICE EN CRISTIANO. Ver `_ApiSesion`: el backend contesta
+     `token no válido`, que es exacto y no le sirve de nada a quien está intentando cerrar su
+     fichaje. Aquí se traduce a lo único accionable: vuelve a entrar. */
+  if(_esErrorDeSesion_(err))
+    throw new _ApiSesion("Tu sesi\u00f3n con Google ha caducado (dura una hora). Vuelve a entrar "+
+                         "con tu cuenta y repite la acci\u00f3n \u2014 no se ha guardado nada.");
   throw new Error(err||"respuesta no válida del backend");
 }
 
@@ -1239,6 +1268,12 @@ function _novedades_(){
         {cara:'movil', vista:'horas', txt:'La fila «vs. <mes anterior>» sumaba la compensación que te llega por el cargo (PD 7 h, coordinador 3,5 h, miembro 2 h). Esa no se trabaja: se cobra por el puesto y es la misma todos los meses, así que la comparativa medía tu cargo en vez de tu trabajo — y comparado contigo mismo no se movía nunca. Ahora se descuenta en los DOS lados.'},
         {cara:'movil', vista:'horas', txt:'La compensación EXTRA (la que asigna el PD a mano por cubrir un turno o un reporte) SÍ sigue contando: es lo único de las dos que reconoce trabajo real. Y con menos horas que tu base la cuenta se queda en 0, no en negativo.'},
         {cara:'movil', vista:'horas', txt:'Y la fila «vs. equipo» también, que esa hubo que arreglarla en el servidor (backend v69): la base depende del cargo de cada uno, y tu móvil no conoce ni las horas ni el cargo de los demás. Si se hubiera descontado solo en tu lado, la comparación sería con descuento contra sin descuento — peor que no tocarla.'}
+      ] },
+    { id:'2026-08-08-sesion-caducada', fecha:'2026-08-08',
+      titulo:'\u00abToken inv\u00e1lido\u00bb al cerrar el fichaje: ahora dice qu\u00e9 hacer',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Si dejas la app abierta m\u00e1s de una hora, tu identidad de Google caduca y el servidor rechaza lo que env\u00edes. Sal\u00eda un \u00abtoken no v\u00e1lido\u00bb que no dec\u00eda nada. Ahora dice que la sesi\u00f3n ha caducado, que vuelvas a entrar, y que NO se ha guardado nada \u2014 as\u00ed sabes que puedes repetir sin miedo a fichar dos veces.'},
+        {cara:'escritorio', vista:'horas', txt:'Igual aqu\u00ed, y es donde m\u00e1s pasa: este panel se deja abierto toda la tarde.'}
       ] },
     { id:'2026-08-08-reu-en-vivo', fecha:'2026-08-08',
       titulo:'El mapa de calor del escritorio ya se llena solo',
