@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=e08b45e"></script>
+<script src="comun-beta.js?v=e4bfe53"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
 <script src="turnos.escritorio-beta.js?v=f0af960"></script>
@@ -2177,7 +2177,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d9b2452';
+var BUILD='176c203';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -2908,8 +2908,7 @@ setTimeout(function(){
 
 if(GOOGLE_CLIENT_ID && !window.__SIN_LOGIN__){
   _gate_(_insigniaHTML_()+'<div style="opacity:.7">Cargando…</div>');
-  var _sg=null; try{ _sg=JSON.parse(localStorage.getItem('sol_sess')||'null'); }catch(_){}
-  var _tok=(_sg && _sg.token && (Date.now()-(_sg.ts||0) < 50*60*1000)) ? _sg.token : null;
+  var _tok=_tokenGuardadoUtil_(_sesionGuardada_());
   if(_tok) _onCredencial_({credential:_tok}, true);
   else _arrancarGis_();
 }

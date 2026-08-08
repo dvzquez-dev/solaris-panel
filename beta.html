@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=e08b45e"></script>
+<script src="comun-beta.js?v=e4bfe53"></script>
 <script src="notis.movil-beta.js?v=bd8915e"></script>
 <script src="cierre.movil-beta.js?v=d6511a2"></script>
 <script src="tareas.movil-beta.js?v=9c56fc2"></script>
@@ -1352,7 +1352,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7a5d25f';
+var BUILD='2b78a63';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -2162,8 +2162,7 @@ if(GOOGLE_CLIENT_ID && !DEMO){
      Estaba despues de resolver la identidad y eso es tarde: te dejaba escribir el correo,
      elegir cuenta y esperar a que cargue todo para luego decirte que no pasas. */
   var _entrar=function(){
-    var _sg=null; try{ _sg=JSON.parse(localStorage.getItem('sol_sess')||'null'); }catch(_){}
-    var _tok=(_sg && _sg.token && (Date.now()-(_sg.ts||0) < 50*60*1000)) ? _sg.token : null;
+    var _tok=_tokenGuardadoUtil_(_sesionGuardada_());
     if(_tok) _onCredencial_({credential:_tok}, true);
     else _arrancarGis_();
   };

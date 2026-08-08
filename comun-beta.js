@@ -266,6 +266,33 @@ function _esErrorDeSesion_(err){
          /token de otra aplicaci/i.test(e);
 }
 
+
+/* ¿Sirve todavia la identidad guardada en este navegador? Devuelve el token o `null`.
+
+   ⛔ POR QUE VIVE AQUI. El umbral estaba escrito **dos veces** — una en cada cara — junto con
+   su lectura de `localStorage`. Es la regla que decide **quien entra sin volver a
+   autenticarse**: dos copias de eso acaban siendo dos reglas distintas.
+
+   ⛔ Y EL NUMERO NO ES CAPRICHO: un token de Google **vive una hora**. Se le dan 50 minutos
+   para no reutilizar uno que va a caducar en mitad de la primera peticion — que es justo el
+   fallo que reporto Jose Manuel el 07/08 («token invalido» al cerrar un fichaje).
+
+   ⚠️ Esto NO es seguridad: quien manda es el servidor, que revalida el token en cada
+   llamada (`_verificarIdentidad_`). Esto solo evita una ida y vuelta que ya se sabe perdida.
+   Sin `ts` la edad sale enorme y devuelve `null`, que es el lado seguro: pedir login de mas
+   molesta; darlo por bueno de menos, no. */
+function _tokenGuardadoUtil_(sg, ahora){
+  if(!sg || !sg.token) return null;
+  return ((ahora || Date.now()) - (sg.ts || 0) < 50*60*1000) ? sg.token : null;
+}
+
+/* Lo que hay guardado de la sesion, o `null`. Nunca lanza: un `localStorage` con basura no
+   puede impedir entrar. */
+function _sesionGuardada_(){
+  try{ return JSON.parse(localStorage.getItem('sol_sess') || 'null'); }
+  catch(_){ return null; }
+}
+
 function _apiParse(txt, accion){
   var j=null; try{ j=JSON.parse(txt); }catch(_){}
   /* Lo que vuelve no es JSON: es la pagina HTML de Google del 404 transitorio. */
