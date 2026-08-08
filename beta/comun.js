@@ -1285,6 +1285,19 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-08-arreglos-web', fecha:'2026-08-08',
+      titulo:'Tres arreglos que solo se ven cuando algo va mal',
+      items:[
+        {cara:'escritorio', vista:'panel', txt:'Si el inicio de sesión de Google no carga, ahora '
+          + 'lo DICE, con un botón de reintentar. Antes entrabas directo a la app con la semilla '
+          + 'de demostración y con pinta de funcionar: cualquier decisión tomada ahí era sobre '
+          + 'datos inventados. Ver la demo sigue estando, pero como elección tuya.'},
+        {cara:'movil', vista:'estado', txt:'La app instalada de beta vuelve a abrir: al mudar la '
+          + 'web a carpetas, el acceso directo arrancaba en una página que ya no existía. Si la '
+          + 'tienes en la pantalla de inicio, mejor bórrala y vuelve a añadirla.'},
+        {cara:'movil', vista:'estado', txt:'Las notificaciones vuelven a llevar su icono: pedían '
+          + 'una imagen que se había movido de sitio, así que llegaban peladas.'}
+      ] },
     { id:'2026-08-08-partes-viejos', fecha:'2026-08-08',
       titulo:'Tus partes de meses anteriores ya no estorban',
       items:[
