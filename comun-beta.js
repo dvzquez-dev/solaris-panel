@@ -1126,6 +1126,16 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-08-partes-viejos', fecha:'2026-08-08',
+      titulo:'Tus partes de meses anteriores ya no estorban',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Los partes de meses pasados se han ido a su propio '
+          + 'bloque plegado, «De meses anteriores», que nace cerrado. Los de este mes se ven '
+          + 'solos y el contador de arriba cuenta solo esos, para que cuadre con lo que ves.'},
+        {cara:'movil', vista:'horas', txt:'No se han ocultado ni borrado: son horas tuyas y '
+          + 'siguen a un toque. Si prefieres que desaparezcan del todo o que solo se marquen, '
+          + 'dilo y se cambia — esto es reversible.'}
+      ] },
     { id:'2026-08-08-mes-anterior-vivo', fecha:'2026-08-08',
       titulo:'Ya puedes compararte con el mes pasado',
       items:[

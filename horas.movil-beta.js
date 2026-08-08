@@ -107,6 +107,26 @@ function _mediaEquipo_(){
 
 /* En que dia del mes vamos, y cuantos tiene. **Lo manda el servidor** si puede: un movil con la
    fecha cambiada haria que la misma comparativa dijera cosas distintas a dos personas. */
+/* ¿Ese parte es de un mes YA PASADO? Se compara `AAAA-MM` contra el periodo que manda el
+   servidor.
+
+   ⛔ EL PERIODO LO PONE EL SERVIDOR (`equipo_mes.periodo`), no el reloj del móvil: con la
+   fecha del teléfono, a dos personas les plegaría cosas distintas el mismo día.
+
+   ⚠️ Sin periodo o sin fecha devuelve **false** — o sea NO se pliega. Ante la duda, el parte
+   se ve: esconder algo por no saber de cuándo es, es peor que enseñarlo de más.
+
+   ⚠️ «Mes pasado» no es exactamente «mes cerrado»: un mes anterior podría seguir sin cerrarse.
+   Se usa el mes porque es lo que la cara puede saber sola, y para lo que esto hace —quitar
+   ruido de lo viejo— basta. Lo que **nunca** se pliega es el mes en curso. */
+function _esDeMesPasado_(p, periodo){
+  var per = String(periodo||'');
+  if(!/^\d{4}-\d{2}$/.test(per)) return false;
+  var iso = String((p&&p.iso)||'');
+  if(!/^\d{4}-\d{2}/.test(iso)) return false;
+  return iso.slice(0,7) < per;
+}
+
 function _diasDelMes_(){
   var e=DATA.equipo_mes;
   if(e && e.dia>0 && e.dias_mes>0) return {dia:e.dia, total:e.dias_mes, periodo:e.periodo||null};
@@ -1085,8 +1105,17 @@ function vHoras(){
      apareciéndome los partes del mes anterior?»* — esto no los quita (eso lo decide él), pero
      los manda al fondo, que es donde estorban menos. */
   var _porFecha=function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); };
-  var mias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad';}).sort(_porFecha);   // en cola / con detalle pedido / rechazados / sin declarar / caducados
+  var _todasMias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad';}).sort(_porFecha);   // en cola / con detalle pedido / rechazados / sin declarar / caducados
   var confs=PARTES.filter(function(x){return x.e==='otor';}).sort(_porFecha);   // lo que ya cuenta
+  /* ⛔ LOS DE MESES PASADOS, APARTE. Ordenarlos los mandaba al fondo, pero seguían **en la
+     misma lista** — y la queja de Daniel era que **aparecen**, no que aparezcan arriba. */
+  /* ⚠️ El periodo se pide AQUI. La primera version usaba `d.periodo` copiado de
+     `_compHorasHTML_` —donde `var d=_diasDelMes_()` si existe— y en esta funcion no: la
+     pantalla de Horas reventaba entera con `ReferenceError`. El banco no lo vio porque miraba
+     el texto; lo cazó pintar la pantalla en el navegador. */
+  var _perAhora=_diasDelMes_().periodo;
+  var mias=_todasMias.filter(function(x){ return !_esDeMesPasado_(x, _perAhora); });
+  var viejas=_todasMias.filter(function(x){ return _esDeMesPasado_(x, _perAhora); });
 
   /* ranking CENSURADO: tu puesto y tus vecinos, sin nombres ajenos */
   var puesto=+YO.puesto||0, total=32, filas='';
@@ -1119,6 +1148,8 @@ function vHoras(){
     /* ⛔ UN SOLO NIVEL, no dos. Daniel (07/08): *«la misma lógica del desplegable, pero esta
        vez, como son tuyos, no hace falta desplegable de desplegables sino solo uno»*. Agrupar
        tus propios partes por autor sería agruparlos por ti. */
+    /* El contador del titulo cuenta SOLO los de este mes: si sumara los plegados, el
+       numero no cuadraria con lo que se ve al abrir. */
     '<h2 class="sec">Tus partes<span class="ln"></span>'+mias.length+'</h2>'+
     '<div class="tarj">'+
       (mias.length
@@ -1126,9 +1157,22 @@ function vHoras(){
             mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
             nf2(mias.reduce(function(t,x){ return t+(Number(x.q)||0); },0))+' h</span></summary>'+
           mias.map(filaParte).join('')+'</details>'
-        : vacio('Ningún parte en cola',
-            'No tienes horas esperando firma. Las que envíes aparecerán aquí con su estado '+
-            'hasta que tu coordinador las apruebe.','ficha desde la pestaña Fichar', false))+
+        : (viejas.length
+            ? vacio('Ningún parte de este mes',
+                'Lo que tienes en cola es de meses anteriores: está justo debajo, plegado.',
+                'ficha desde la pestaña Fichar', false)
+            : vacio('Ningún parte en cola',
+                'No tienes horas esperando firma. Las que envíes aparecerán aquí con su estado '+
+                'hasta que tu coordinador las apruebe.','ficha desde la pestaña Fichar', false)))+
+      /* ⛔ CERRADO POR DEFECTO (sin `open`): es justo lo que estorbaba. Pero **sigue estando**,
+         porque son horas suyas y esconderlas del todo es perder información — plegar se puede
+         deshacer con un dedo, borrar el bloque no. */
+      (viejas.length
+        ? '<details class="pdgrupo"><summary><b>De meses anteriores</b><span class="pdnum">'+
+            viejas.length+' '+(viejas.length===1?'parte':'partes')+' · '+
+            nf2(viejas.reduce(function(t,x){ return t+(Number(x.q)||0); },0))+' h</span></summary>'+
+          viejas.map(filaParte).join('')+'</details>'
+        : '')+
     '</div>'+
 
     /* Las horas por subsistema van JUSTO detras de tus partes (Daniel, 28/07): lo tuyo
