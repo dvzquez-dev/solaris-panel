@@ -1,0 +1,927 @@
+/* ═══ ESTILOS DE LA CARA MOVIL ═══════════════════════════════════════════════════════
+   Vivían dentro de un <style> de 830 líneas en el <head> de `movil.html`. Se sacan para
+   que el HTML se pueda leer y para que un cambio de estética no ensucie el diff del código.
+
+   ⛔ NO se comparte CSS entre las dos caras, a propósito: solo **66 reglas** son idénticas
+   (~6,3 KB de 84), y juntarlas obligaría a pelearse con el orden de la cascada para ahorrar
+   muy poco. Las dos caras son dos diseños, no uno responsive.
+
+   ⚠️ Se publica con nombre por canal (`movil.css` / `movil-beta.css`): beta y producción comparten
+   directorio, así que un nombre único haría que subir a beta cambiase producción.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   SOLARIS · INSTRUMENTO — dirección definitiva, MÓVIL (el miembro)
+   ───────────────────────────────────────────────────────────────────────────
+   Público: el miembro. Su estado, sus horas, sus turnos, sus documentos, su
+   disponibilidad. El escritorio (consejo/junta/PD) es OTRO producto y vive en
+   `escritorio.html`: no es esta pantalla estirada.
+
+   Tesis: el panel es un INSTRUMENTO. Mide, dice qué falta, y no deja disparar
+   hasta que la figura cierra. Nada estalla bajo el dedo.
+
+   PALETA — medida, no elegida (docs/identidad-visual.md §4 y §4-ter):
+   · rojo    #E41E25  → 664.483 px de Insignia_Solaris.png (21,9 % de los opacos)
+   · neutro  #231F20  → 1.587.031 px (52,3 %). H=345° S=6,1% L=12,9%
+   · blanco  #FFFFFF  → 755.286 px (24,9 %)
+   La insignia es LITERALMENTE esos tres colores. La rampa de grises se deriva
+   del neutro conservando su tono y saturación: solo cambia la luminosidad.
+   Semánticos (ok/warn/telemático) son derivados nuestros ya cerrados en la app.
+
+   DATOS: ficticios con el ESQUEMA REAL de app.html (nombre·pila·unidad·cargo·
+   puntos·estado·infraccion·hMes·horasTemp·meses·cuota·cuota_base·coche·puesto).
+   Ni un nombre real: esto se publica.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root{
+  /* rampa derivada de #231F20 — H 345° · S 6,1 % · solo cambia L */
+  --bg:#0C0B0B;        /* L 4,5 % */
+  --sur:#181616;       /* L 9,0 % */
+  --sur2:#221E1F;      /* L 12,5 % */
+  --gris:#231F20;      /* L 12,9 % — EL gris de la insignia */
+  --line:#322C2E;      /* L 18,5 % */
+  --line2:#463E40;     /* L 26,0 % */
+  --ink3:#7C6E72;      /* L 46,0 % */
+  --ink2:#B2A8AB;      /* L 68,0 % */
+  --ink:#F4F3F3;       /* L 95,5 % */
+
+  --red:#E41E25; --red2:#FF4A4F; --red3:#8E1418;
+  --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6;
+
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+
+  --r:12px; --r2:9px;
+  --sal:cubic-bezier(.16,.84,.44,1);
+  --arco:cubic-bezier(.34,1.42,.5,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;touch-action:manipulation}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px;
+  line-height:1.45; -webkit-font-smoothing:antialiased;
+  height:100vh; height:100dvh; display:flex; flex-direction:column;
+  overflow:hidden; position:relative;
+  /* Arriba SI: la muesca tapa la cabecera. Abajo NO: reservarlo aqui y otra vez en la
+     `nav` contaba el inset dos veces y dejaba la barra flotando sobre 68 px de fondo
+     (MEJ-M-2026-07-27-4, Adrian). En iOS la barra inferior TOCA el borde y su fondo
+     pasa por debajo del indicador de inicio. */
+  padding-top:env(safe-area-inset-top,0px);
+}
+/* EN UNA PANTALLA ANCHA, LA APP NO SE ESTIRA. Esta cara esta pensada para 390-430 px:
+   estirada a 1920 las tarjetas quedan larguisimas, el mapa de calor se deforma y los
+   textos se leen peor que en el movil, que es justo al reves de lo que deberia. Se le
+   pone tope y se centra, con una linea a los lados para que se lea como la columna de la
+   app y no como una pagina rota. Debajo de 560 px -o sea, en un movil de verdad- esto no
+   existe. (Daniel, 28/07: «me gustaria que en ordenador no se vea asi ensanchada».) */
+@media (min-width:560px){
+  body{max-width:480px;margin:0 auto;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.sc{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);line-height:1}
+
+/* ── cartel de la maqueta ─────────────────────────────────────────────────── */
+.cartel{max-width:760px;width:100%;border:1px solid var(--line);border-radius:var(--r);
+  background:linear-gradient(180deg,var(--sur2),var(--sur));padding:16px 18px}
+.cartel h1{margin:0 0 3px;font-size:19px;letter-spacing:-.01em}
+.cartel h1 span{color:var(--red2)}
+.cartel p{margin:7px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.6}
+.cartel p b{color:var(--ink)}
+.cartel .tres{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+.mues{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:20px;
+  padding:4px 10px 4px 5px;font-family:var(--mono);font-size:10px;color:var(--ink2)}
+.mues i{width:14px;height:14px;border-radius:50%;display:block}
+
+/* ── chasis del teléfono ──────────────────────────────────────────────────── */
+.fono{width:390px;height:844px;border-radius:38px;padding:9px;position:relative;flex:none;
+  background:linear-gradient(160deg,#2a2325,#100e0e);border:1px solid #3a3234;
+  box-shadow:0 0 0 1px rgba(0,0,0,.6),0 30px 70px rgba(0,0,0,.6)}
+.pant{position:relative;width:100%;height:100%;border-radius:30px;overflow:hidden;
+  background:var(--bg);display:flex;flex-direction:column}
+.isla{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:104px;height:24px;
+  border-radius:14px;background:#080707;z-index:30}
+.stbar{flex:none;height:44px;display:flex;align-items:flex-end;justify-content:space-between;
+  padding:0 18px 6px;font-family:var(--mono);font-size:11px;color:var(--ink2);z-index:20}
+.stbar .sig{display:flex;gap:3px;align-items:flex-end}
+.stbar .sig i{display:block;width:3px;background:var(--ink2);border-radius:1px}
+
+/* ── cabecera ─────────────────────────────────────────────────────────────── */
+header{flex:none;display:flex;align-items:center;gap:10px;padding:4px 16px 12px;position:relative;z-index:12}
+header::after{content:"";position:absolute;left:16px;right:16px;bottom:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--line) 20%,var(--line) 80%,transparent)}
+.avat{width:38px;height:38px;border-radius:11px;flex:none;display:grid;place-items:center;
+  background:linear-gradient(155deg,#3d2427,#20161a);color:var(--red2);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+.avat svg{width:17px;height:17px;fill:currentColor}
+.avat img{width:30px;height:30px;object-fit:contain;display:block}
+/* marca de agua: la insignia real, en % para que ocupe igual en cualquier ancho */
+.marcagua{position:absolute;bottom:88px;right:-12%;width:88%;height:auto;opacity:.05;
+  z-index:0;pointer-events:none}
+.hquien b{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.hquien span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--ink3)}
+.hlado{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+/* ── cuerpo con scroll ────────────────────────────────────────────────────── */
+main{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:10px 15px 18px;scrollbar-width:thin}
+/* TAMAÑO DE LETRA (MEJ-M-2026-07-27-9). Se escala el CONTENEDOR, no cien reglas: toda
+   la cara mide en px absolutos y el viewport prohibe pellizcar, asi que sin esto quien
+   lo ve pequeño no tiene salida. Va en `#main` y en la tarjeta del modal -las dos
+   superficies donde se lee-, NUNCA en el `body`: alli el `height:100dvh` se escala
+   tambien y la app se sale de la pantalla (medido: 844 -> 928 px). */
+body.tx-l  #main, body.tx-l  .modal .card{zoom:1.10}
+body.tx-xl #main, body.tx-xl .modal .card{zoom:1.20}
+main::-webkit-scrollbar{width:5px}
+main::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.vis{display:none} .vis.on{display:block}
+.h1{font-size:20px;font-weight:600;letter-spacing:-.02em;margin:2px 0 2px}
+.h1s{font-size:12px;color:var(--ink3);margin:0 0 14px}
+h2.sec{font-size:9.5px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);font-weight:500;margin:20px 2px 9px;display:flex;align-items:center;gap:8px}
+h2.sec .ln{flex:1;height:1px;background:var(--line)}
+
+.tarj{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);padding:14px;
+  margin-bottom:10px;position:relative}
+.tarj.acc{background:linear-gradient(160deg,#241416,#171112);border-color:#3d2224}
+.tarj .tt{display:flex;align-items:center;gap:8px;margin:-2px 0 10px}
+.tarj .tt .sc{flex:none} .tarj .tt .ln{flex:1;height:1px;background:var(--line)}
+
+/* ── PULSAR: acuse barato, <120 ms, en el propio elemento ─────────────────── */
+/* Decisión cerrada: NADA de círculo que se expande bajo el dedo, y no se mueve
+   un blanco de clic. La pieza se hunde un pelo y se le enciende el canto. */
+[data-p]{position:relative;transition:transform .11s var(--sal),border-color .16s linear}
+[data-p].pulsa{transform:scale(.985)}   /* acuse: solo un leve hundido; nada de barra roja */
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  border:1px solid var(--line);background:var(--sur2);border-radius:var(--r2);
+  padding:10px 15px;font-size:13px;font-weight:600;overflow:hidden;
+  transition:background .16s linear,border-color .16s linear,opacity .2s linear}
+.btn.pri{background:var(--red);border-color:var(--red);color:#fff}
+.btn.pri[disabled]{background:var(--sur2);border-color:var(--line);color:var(--ink3)}
+.btn.full{width:100%}
+.btn[disabled]{opacity:.55;cursor:not-allowed;pointer-events:none}
+.btn.mini{padding:6px 11px;font-size:11.5px;font-weight:500}
+.btn.ok{color:var(--ok);border-color:rgba(62,180,137,.45)}
+.btn.no{color:var(--red2);border-color:rgba(255,74,79,.45)}
+
+/* ═══ EL MEDIDOR DE PUNTOS ════════════════════════════════════════════════
+   Geometría EXACTA de gauge() en app.html: 10 arcos de 36° con 8° de hueco.
+   Decisión cerrada: los puntos son enteros, jamás un anillo continuo.
+   · secuencia de ENCENDIDO por tramos, con fogonazo de grosor (de la 02a)
+   · CHISPA en la marca de cada tramo al prender — lo que más gustó de la 02a
+   · los 3 primeros tramos son ZONA CRÍTICA, en ámbar (de la 02b)
+   · estrella de marca montada en la punta del arco
+   · centrado (de la 06a), no arrinconado
+   NO lleva la cota gris al pasar el dedo: molestaba y se ha quitado.
+   ═════════════════════════════════════════════════════════════════════════ */
+/* REVERTIDO el 28/07 por orden de Daniel: el medidor vuelve a 172 px, en columna y
+   centrado, con la leyenda y el boton debajo. Se habia encogido a 126 px y puesto en
+   fila (MEJ-M-2026-07-27-1, de Adrian). Daniel: «estaba muchisimo mas guapo antes».
+   NO se vuelve a tocar sin que el lo apruebe primero en el buzon. */
+.medcaja{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px}
+.med{position:relative;width:172px;height:172px;flex:none}
+.med svg.dial{position:absolute;inset:0;width:172px;height:172px;overflow:visible}
+.med .fili{transform-box:view-box;transform-origin:86px 86px;opacity:.05;fill:var(--ink);
+  animation:giroLento 30s linear infinite}
+.med .pista{fill:none;stroke:var(--line);stroke-width:1;stroke-dasharray:2 5;opacity:.8}
+.med .seg{fill:none;stroke-width:8.5;stroke-linecap:round;pathLength:100}
+.med .seg.vac{stroke:var(--sur2)}
+.med .seg.zc{stroke:rgba(232,145,46,.16)}
+.med .seg.on{stroke-dasharray:100;stroke-dashoffset:100;
+  transition:stroke-dashoffset .42s var(--sal),stroke-width .42s var(--sal)}
+.med.arm .seg.on{stroke-dashoffset:0}
+.med.arm .seg.on.fog{stroke-width:11.5}
+.med .halo{fill:none;stroke-width:10;opacity:.26;filter:blur(6px)}
+.med.late .halo{animation:latido 2.8s ease-in-out infinite}
+/* AURA de elegible: el anillo respira y suelta un halo alrededor. Solo cuando lo eres;
+   si estuviera siempre, dejaria de significar nada. Se apaga con reduced-motion. */
+.med.aura .halo{opacity:.5;stroke-width:13;animation:auralatido 2.2s ease-in-out infinite}
+.med.aura::after{content:'';position:absolute;inset:-14px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(62,180,137,.22),rgba(63,158,214,.13) 62%,transparent 74%);
+  animation:aurapulso 2.2s ease-in-out infinite}
+
+@keyframes auralatido{0%,100%{opacity:.42;stroke-width:11}50%{opacity:.72;stroke-width:15}}
+@keyframes aurapulso{0%,100%{opacity:.55;transform:scale(.97)}50%{opacity:1;transform:scale(1.04)}}
+/* LA FILIGRANA DEL CENTRO NO SE TOCA. La tine de verde y volvia verduzco todo el centro
+   del medidor; Daniel se referia a la estrella del INDICADOR (la punta que gira), no a
+   esta. Se queda como siempre: fondo al 5 %, gris, girando despacio. */
+/* El aura va en la ESTRELLA DEL INDICADOR: la punta de cuatro picos que marca tu posicion.
+   Es la que celebra, porque es la que ha llegado hasta ahi. DORADA, no verde: el verde ya
+   significa «tramo conseguido» en el anillo y en las barritas, y repetirlo aqui le quitaria
+   significado. El dorado no compite con nada y se lee como premio. */
+.med.aura .tip i{color:#F2C94C;
+  filter:drop-shadow(0 0 10px rgba(242,201,76,.9)) drop-shadow(0 0 20px rgba(242,201,76,.5));
+  animation:estrellaviva 1.8s ease-in-out infinite}
+/* NI GIRA NI SE ENCOGE: la estrella tapa la barrita vertical que tiene detras, y al girar
+   45 grados la destapaba. Late SOLO el resplandor, que es lo que da vida sin mover nada
+   de sitio. (Mismo criterio que las barritas: cambia el brillo, no la forma.) */
+@keyframes estrellaviva{
+  0%,100%{filter:drop-shadow(0 0 7px rgba(242,201,76,.7))}
+  50%{filter:drop-shadow(0 0 15px rgba(242,201,76,1)) drop-shadow(0 0 26px rgba(242,201,76,.55))}}
+@media (prefers-reduced-motion:reduce){
+  .med.aura .halo,.med.aura::after,.med.aura .tip i{animation:none}
+}
+/* las marcas: una por tramo, FUERA del anillo. Al prender su tramo, chispean. */
+.med .tk{stroke:var(--line2);stroke-width:1.7;stroke-linecap:round;transition:stroke .25s linear}
+.med .tk.f{stroke:var(--red2)}
+.med .tk.chispa{animation:chispazo .5s var(--sal)}
+@keyframes chispazo{
+  0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 14px var(--red2))}
+  55%{stroke:var(--red2);stroke-width:2.2;filter:drop-shadow(0 0 7px var(--red2))}
+  100%{stroke:var(--red2);stroke-width:1.7;filter:none}}
+.med .tk.zc.f{stroke:var(--warn)}
+/* ⚠️ ESTAS TRES VAN AL FINAL A PROPOSITO. Estaban mas arriba y NO hacian nada: tienen la
+   misma especificidad que `.med .tk.zc.f` (cuatro clases), asi que ganaba la de mas abajo
+   y la barrita de las 12 seguia naranja con el aura encendida. Si mueves esto hacia arriba,
+   vuelve a romperse. */
+.med.aura .tk{stroke:rgba(63,158,214,.45)}
+.med.aura .tk.f{stroke:var(--tel)}
+/* La barrita de las 12 es la primera y la ultima a la vez, como en un reloj: marca donde
+   empieza y donde acaba la vuelta. VERDE si y solo si tienes los 10. */
+/* Sin `.f` a proposito: la barrita del 9 marca los 9 puntos aunque su tramo siga vacio. */
+/* SOLO EL COLOR. Nada de grosor, ni filtro, ni animacion: una barrita verde tiene que ser
+   una barrita como las demas pero verde, no otra cosa. Le habia puesto 2,4 px (contra los
+   1,7 del resto), un drop-shadow y un latido, y se veia de otra pasta. Daniel: «en vez de
+   cambiar solo el color, las has cambiado bastante la estructura».
+   El tono es el claro del degradado verde que ya usa el anillo (#7BE3BE), no `--ok`
+   (#3EB489): las encendidas son #FF4A4F, un rojo MUY brillante, y al lado un verde oscuro
+   se ve apagado aunque tenga la misma forma. No es un color nuevo: ya esta en la paleta. */
+.med.aura .tk.cierra{stroke:#7BE3BE}
+/* EL DESTELLO, A JUEGO. `chispazo` acaba en ROJO, asi que con el aura puesta cada barrita
+   destellaba en rojo y saltaba a azul: se veia mal. Cada una destella ahora hacia SU color,
+   asi que al encenderse en orden se ve la cadena entera. Van despues de las de color a
+   proposito: misma especificidad, gana la de abajo. */
+.med.aura .tk.chispa{animation:chispazoAzul .5s var(--sal)}
+.med.aura .tk.chispa.cierra{animation:chispazoVerde .5s var(--sal)}
+@keyframes chispazoAzul{
+  0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 14px var(--tel))}
+  55%{stroke:#9BD4F0;stroke-width:2.2;filter:drop-shadow(0 0 7px var(--tel))}
+  100%{stroke:var(--tel);stroke-width:1.7;filter:none}}
+/* ── LAS CUATRO OLAS ───────────────────────────────────────────────────────────────
+   El color de cada tramo lo pone la ola AL PASAR, en linea (`style.stroke`), no una clase
+   global. Es lo que permite que las olas se solapen: con una clase en `.med` se repintaba
+   el anillo entero de golpe y la ola de detras se comia lo que la de delante no habia
+   tocado todavia. Aqui solo quedan los DESTELLOS, uno por ola, con su clase propia:
+   `.chRoj` `.chOro` `.chAzu` `.chVer`. Nombrarlos evita la guerra de especificidad que ya
+   rompio esto una vez (ver README: «una regla CSS puede estar escrita y muerta»). */
+.med .tk.chRoj.chispa{animation:chispazo .5s var(--sal)}
+.med .tk.chOro.chispa{animation:chispazoOro .5s var(--sal)}
+.med .tk.chAzu.chispa{animation:chispazoAzul .5s var(--sal)}
+.med .tk.chVer.chispa{animation:chispazoVerde .5s var(--sal)}
+@keyframes chispazoOro{
+  0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 15px #F2C94C)}
+  55%{stroke:#FFE9A8;stroke-width:2.2;filter:drop-shadow(0 0 8px #F2C94C)}
+  100%{stroke:#F2C94C;stroke-width:1.7;filter:none}}
+@keyframes chispazoVerde{
+  0%{stroke:#fff;stroke-width:3.4;filter:drop-shadow(0 0 10px #fff) drop-shadow(0 0 16px #7BE3BE)}
+  55%{stroke:#BFF5E2;stroke-width:2.2;filter:drop-shadow(0 0 8px #7BE3BE)}
+  100%{stroke:#7BE3BE;stroke-width:1.7;filter:none}}
+.med .tip{position:absolute;inset:0;transform:rotate(0deg);pointer-events:none;
+  transition:transform .8s var(--arco)}
+.med .tip i{position:absolute;left:50%;top:2px;margin-left:-8px;width:16px;height:16px;display:block;
+  color:var(--red2);filter:drop-shadow(0 0 8px rgba(255,74,79,.75))}
+.med .tip i svg{width:16px;height:16px;fill:currentColor}
+.med .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;pointer-events:none}
+.med .mid .n{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:-.045em;line-height:1}
+.med .mid .n small{font-size:16px;color:var(--ink3);letter-spacing:-.02em}
+.med .mid .u{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:var(--ink3);margin-top:5px}
+/* `.pips` (la linea de puntitos bajo el medidor) se retiro el 27/07: repetia lo que ya dice
+   el anillo. Si algun dia vuelve, esta en el historial. */
+.medley{margin-top:11px;font-size:11.5px;color:var(--ink2);text-align:center;line-height:1.5}
+.medley b{color:var(--ink)}
+/* La comparativa cuelga de la barra: se separa con una linea, no con una tarjeta.
+   La tarjeta aparte era lo que hacia que pareciera una seccion propia y sobrara. */
+.comph{margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}
+/* Plegado generico (`data-plg`). Existe uno para el visor de documentos, pero ese trae
+   iframe y carga diferida; esto es solo enseñar/esconder lo que ya esta pintado. */
+.plgh{display:flex;align-items:center;gap:9px;cursor:pointer;padding:3px 0}
+.plgh b{font-size:12.5px}
+.plgh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px;margin-top:2px}
+.plgc{padding-top:10px}
+/* La lista de personas: alta y con scroll propio, para que el formulario no se vaya a
+   tres pantallas cuando el equipo tiene cuarenta. */
+.sanlista{max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r2);
+  margin:0 0 11px;-webkit-overflow-scrolling:touch}
+.sangrupo{position:sticky;top:0;background:var(--sur2);padding:5px 10px;font-family:var(--mono);
+  font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+.sanper{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;
+  border:0;border-bottom:1px solid var(--line);padding:9px 10px;color:var(--ink);font:inherit;
+  font-size:12.5px;cursor:pointer}
+.sanper i{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--ink3);margin-left:auto}
+.sanper.on{background:rgba(228,30,37,.14);box-shadow:inset 3px 0 0 var(--red)}
+.sanper.on b{color:var(--red2)}
+.libro{overflow:hidden;height:0;transition:height .42s var(--sal)}
+.retf{display:flex;align-items:center;gap:11px;padding:9px 2px;border-top:1px solid var(--line);font-size:12px}
+.retf .pt{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--red2);flex:none;width:26px}
+.retf .pt.mas{color:var(--ok)}
+.retf .mo{flex:1;min-width:0} .retf .mo b{display:block;font-size:12.5px;font-weight:600}
+.retf .mo small{color:var(--ink3);font-size:10.5px;font-family:var(--mono);letter-spacing:.05em}
+.retf .vv{font-size:10px;color:var(--ink3);text-align:right;line-height:1.35;flex:none}
+
+/* ═══ BARRA DE HORAS ASINTÓTICA ═══════════════════════════════════════════
+   Lo que pidió Daniel: cuantas más horas, más a la derecha — pero NUNCA se
+   sale ni se rompe. Mapeo saturante w(h)=100·(1−e^(−h/K)); el objetivo y la
+   media pasan por el MISMO mapeo, así siguen significando lo mismo.
+   Tres capas: confirmadas (sólido) · otorgadas (sólido claro) · pendientes
+   (rayado ámbar — lo pendiente NO suma, y se ve que no suma).
+   ═════════════════════════════════════════════════════════════════════════ */
+.barh{position:relative;height:22px;margin:13px 0 8px;border-radius:6px;background:#0A0909;
+  border:1px solid var(--line);overflow:hidden}
+.barh i{position:absolute;top:0;bottom:0;left:0;width:0;transition:width 1s var(--sal),left 1s var(--sal)}
+.barh i.conf{background:linear-gradient(90deg,#2C8F6C,var(--ok))}
+.barh i.otor{background:linear-gradient(90deg,#2C8F6C,var(--ok))}
+.barh i.pend{background:repeating-linear-gradient(45deg,rgba(232,145,46,.9) 0 3px,transparent 3px 6px);
+  border-left:1px solid rgba(232,145,46,.55)}
+.barh .mk{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--ink);opacity:.85;
+  transition:left 1s var(--sal);border-radius:1px}
+.barh .mk.med{background:var(--ink3);width:1px}
+.barhet{position:relative;height:15px;font-family:var(--mono);font-size:8.5px;color:var(--ink3);
+  letter-spacing:.05em}
+.barhet span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;transition:left 1s var(--sal)}
+.leyh{display:flex;flex-wrap:wrap;gap:5px 13px;font-size:10px;font-family:var(--mono);
+  letter-spacing:.05em;color:var(--ink3);margin-top:9px}
+.leyh i{width:10px;height:7px;border-radius:2px;display:inline-block;vertical-align:-1px;margin-right:5px}
+
+/* cifras grandes de horas */
+.cifh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.cifh .g{font-family:var(--mono);font-size:38px;font-weight:600;letter-spacing:-.04em;line-height:1}
+.cifh .g.late{animation:muelle .55s var(--arco)}
+@keyframes muelle{0%{transform:scale(1)}38%{transform:scale(1.09)}100%{transform:scale(1)}}
+.pil{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 8px;border-radius:20px;border:1px solid;white-space:nowrap}
+.pil.pend{color:var(--warn);border-color:rgba(232,145,46,.45);background:rgba(232,145,46,.09)}
+.pil.otor{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
+.pil.conf{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
+.pil.no{color:var(--red2);border-color:rgba(255,74,79,.42);background:rgba(228,30,37,.09)}
+.pil.neu{color:var(--ink2);border-color:var(--line);background:var(--sur2)}
+
+/* ═══ DELTAS — vs mes anterior · objetivo · equipo · subsistema ═══════════ */
+.dlt{display:grid;grid-template-columns:76px 1fr 82px;gap:9px;align-items:center;padding:7px 0}
+.dlt+.dlt{border-top:1px dashed rgba(50,44,46,.85)}
+.dlt .k{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+.dlt .tr{position:relative;height:16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  background:repeating-linear-gradient(90deg,transparent 0 11px,rgba(50,44,46,.7) 11px 12px)}
+.dlt .tr .z{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--ink3)}
+.dlt .tr .f{position:absolute;top:4px;height:8px;width:0;left:50%;border-radius:2px;
+  transition:width .9s var(--sal),left .9s var(--sal)}
+.dlt.pos .tr .f{background:linear-gradient(90deg,rgba(62,180,137,.25),var(--ok))}
+.dlt.neg .tr .f{background:linear-gradient(270deg,rgba(255,74,79,.25),var(--red2))}
+.dlt .tr .m{position:absolute;top:50%;left:50%;width:9px;height:9px;border-radius:2px;background:var(--ink);
+  transform:translate(-50%,-50%) rotate(45deg);box-shadow:0 0 8px rgba(255,255,255,.35);
+  transition:left .9s var(--sal)}
+.dlt .vv{text-align:right;font-family:var(--mono);font-size:12.5px;line-height:1.2}
+.dlt .rr{display:block;font-size:8px;color:var(--ink3);letter-spacing:.04em;line-height:1.4}
+.up{color:var(--ok)} .dn{color:var(--red2)}
+
+/* ═══ FICHAR ══════════════════════════════════════════════════════════════ */
+.modos{display:flex;border:1px solid var(--line);border-radius:var(--r2);overflow:hidden;margin-bottom:12px}
+/* convocar: subsistemas, invitados con autocompletado y horario por día */
+.cmix{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:11px}
+.cmixb{font-family:var(--mono);font-size:10.5px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);
+  color:var(--ink2);background:var(--sur2)}
+.cmixb.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
+.cchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.cchip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:4px 6px 4px 10px;border-radius:20px;
+  border:1px solid var(--line);background:var(--sur2);color:var(--ink)}
+.cchip button{color:var(--ink3);font-size:14px;line-height:1;padding:0 2px}
+.csug{position:relative;border:1px solid var(--line);border-radius:9px;background:#0A0909;margin:-6px 0 10px;overflow:hidden}
+.csug div{padding:8px 11px;font-size:12.5px;border-top:1px solid var(--line)}
+.csug div:first-child{border-top:0}
+.csug small{color:var(--ink3);margin-left:6px}
+.cdias{display:flex;flex-direction:column;gap:6px;margin-bottom:11px}
+.drow{display:flex;align-items:center;gap:7px;font-size:12px}
+.drow span{flex:1;font-size:12px;color:var(--ink);text-transform:capitalize}
+.drow select{background:#0A0909;border:1px solid var(--line);border-radius:7px;padding:5px 7px;color:var(--ink);font:inherit;font-size:11.5px}
+.drow.off{opacity:.42}
+.dtog{width:26px;height:26px;flex:none;border-radius:8px;border:1px solid var(--line);background:var(--sur2);position:relative}
+.dtog::after{content:'';position:absolute;inset:7px;border-radius:3px;background:var(--ink3)}
+.dtog.on{background:rgba(228,30,37,.16);border-color:var(--red)}
+.dtog.on::after{background:var(--red)}
+.drow{padding:5px 0;border-bottom:1px solid var(--line)}
+.drow:last-child{border-bottom:0}
+.modos button{flex:1;border-right:1px solid var(--line);padding:10px 4px;font-family:var(--mono);
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);
+  transition:background .16s linear,color .16s linear}
+.modos button:last-child{border-right:0}
+.modos button.on{background:rgba(228,30,37,.12);color:var(--ink);box-shadow:inset 0 -2px 0 var(--red)}
+
+/* sesión en vivo */
+.sesion{display:flex;flex-direction:column;align-items:center;padding:14px 0 4px}
+.sesion .rel{font-family:var(--mono);font-size:48px;font-weight:600;letter-spacing:-.05em;line-height:1}
+.sesion .rel .c{animation:parpadeo 1s steps(2,start) infinite}
+.sesion.pausada .rel{color:var(--ink3)}
+.sesion.larga .rel{color:var(--warn)}
+.sesion .est{margin-top:9px;display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink3)}
+.sesion .est .d{width:7px;height:7px;border-radius:50%;background:var(--ink3);flex:none}
+.sesion.corre .est .d{background:var(--red);animation:latido 1.9s ease-in-out infinite}
+.sesion.corre .est{color:var(--red2)}
+.sesion.pausada .est .d{background:var(--warn);animation:none}
+.sesion.larga .est{color:var(--warn)}
+.sesbtn{display:flex;gap:8px;margin-top:14px}
+.sesbtn .btn{flex:1}
+.avisolargo{margin-top:11px;padding:10px 12px;border-radius:var(--r2);font-size:11.5px;line-height:1.5;
+  border:1px solid rgba(232,145,46,.4);background:rgba(232,145,46,.08);color:#f0d3a4}
+.avisolargo b{color:var(--warn)}
+
+/* campos */
+.campo{display:flex;flex-direction:column;gap:6px;margin-bottom:11px}
+.campo>.sc{display:flex;align-items:center;gap:6px}
+.campo .req{color:var(--red2)}
+.campo input,.campo select,.campo textarea{background:#0A0909;border:1px solid var(--line);
+  border-radius:var(--r2);color:var(--ink);font-family:var(--sans);font-size:13.5px;padding:10px 11px;
+  width:100%;outline:0;transition:border-color .18s linear,box-shadow .18s linear}
+.campo input.mono,.campo select{font-family:var(--mono);font-size:13px}
+.campo textarea{resize:vertical;min-height:74px;line-height:1.5}
+.campo input:focus,.campo select:focus,.campo textarea:focus{border-color:var(--line2);
+  box-shadow:0 0 0 3px rgba(228,30,37,.11)}
+.campo input::placeholder,.campo textarea::placeholder{color:var(--ink3)}
+.dosc{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* selector de horas: de/a en pasos de 15 min + duración calculada */
+.selh{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end}
+.selh .flecha{padding-bottom:12px;color:var(--ink3);font-family:var(--mono)}
+.durb{margin-top:10px;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r2);
+  border:1px solid var(--line);background:var(--sur2)}
+.durb .q{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.03em}
+.durb .t{font-size:11.5px;color:var(--ink2);line-height:1.4}
+.pasos{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.pasos button{border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-family:var(--mono);
+  font-size:11px;color:var(--ink2);transition:border-color .15s linear,color .15s linear}
+.pasos button:hover{border-color:var(--line2);color:var(--ink)}
+
+/* ── EL ANILLO DE LA JUSTIFICACIÓN ───────────────────────────────────────
+   El contador de texto es un instrumento, no un número gris: el aro se
+   rellena mientras escribes (0/25) y cierra al llegar. De la 04a el aro; de
+   la 03b la lectura «cuánto te queda» en vez de «cuánto llevas».
+   ─────────────────────────────────────────────────────────────────────── */
+.justfila{display:flex;align-items:center;gap:11px;margin-top:-3px}
+.aroJ{position:relative;width:38px;height:38px;flex:none}
+.aroJ svg{width:38px;height:38px;transform:rotate(-90deg)}
+.aroJ .f{fill:none;stroke:var(--sur2);stroke-width:3.4}
+.aroJ .p{fill:none;stroke:var(--warn);stroke-width:3.4;stroke-linecap:round;
+  stroke-dasharray:100;stroke-dashoffset:100;transition:stroke-dashoffset .34s var(--sal),stroke .3s linear}
+.aroJ.ok .p{stroke:var(--ok)}
+.aroJ .n{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);
+  font-size:9.5px;color:var(--ink3)}
+.aroJ.ok .n{color:var(--ok)}
+.justfila .tx{font-size:11.5px;color:var(--ink3);line-height:1.45}
+.justfila .tx b{color:var(--ink2)}
+
+/* ── LA CONSTELACIÓN DE REQUISITOS ───────────────────────────────────────
+   Lo mejor de la 03a: la regla de negocio DIBUJADA. Tres nodos —duración,
+   imputación, justificación— que se encienden, y TRES aristas que solo se trazan
+   cuando sus dos extremos están encendidos. Hasta que la figura no cierra, el
+   botón no es un botón. Aquí las aristas van con la estrella de marca.
+   ─────────────────────────────────────────────────────────────────────── */
+/* TRIANGULO, no fila. Tres nodos alineados con dos aristas no cierran nunca, y la idea que
+   sostiene esta figura es justamente que el boton no se enciende hasta que CIERRA. Con
+   tres requisitos, la figura que cierra es el triangulo. */
+.const{position:relative;height:150px;margin:16px 0 2px}
+.const svg.ar{position:absolute;inset:0;width:100%;height:150px;overflow:visible}
+.const svg.ar path{fill:none;stroke:var(--red2);stroke-width:1.2;stroke-linecap:round;opacity:.55;
+  stroke-dasharray:var(--L,80);stroke-dashoffset:var(--L,80);
+  transition:stroke-dashoffset .55s var(--sal),opacity .3s linear}
+.const svg.ar path.on{stroke-dashoffset:0;opacity:.9}
+/* La BASE es la que cierra el triangulo: cuando aparece, la figura esta completa. Se le da
+   un pelo mas de presencia para que se note que ha cerrado. */
+.const svg.ar path#ar3.on{opacity:1;stroke-width:1.5;filter:drop-shadow(0 0 5px rgba(255,74,79,.5))}
+.const .nodo{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:7px;width:104px;text-align:center}
+.const .nodo .es{width:19px;height:19px;color:#3A3032;
+  transition:color .4s var(--sal),transform .55s var(--arco),filter .4s linear}
+.const .nodo .es svg{width:19px;height:19px;fill:currentColor;display:block}
+.const .nodo.on .es{color:var(--red2);transform:rotate(90deg);filter:drop-shadow(0 0 9px rgba(255,74,79,.85))}
+.const .nodo span{font-family:var(--mono);font-size:8.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink3);line-height:1.4}
+.const .nodo.on span{color:var(--ink2)}
+.const .nodo em{font-style:normal;font-size:9px;color:var(--ink3);opacity:.75}
+.figcierra{font-size:11.5px;margin:9px 2px 0;display:flex;align-items:center;gap:7px;color:var(--warn)}
+.figcierra.ok{color:var(--ok)}
+.figcierra .es{width:11px;height:11px;flex:none}
+.figcierra .es svg{width:11px;height:11px;fill:currentColor;display:block}
+
+/* ruta de aprobación */
+.ruta{display:flex;gap:10px;padding:11px 12px;border-radius:var(--r2);margin:12px 0 0;
+  border:1px solid var(--line);border-left:2px solid var(--tel);background:rgba(63,158,214,.055)}
+.ruta .cu{flex:1;min-width:0}
+.ruta b{font-size:12.5px}
+.ruta p{margin:3px 0 0;font-size:11.5px;color:var(--ink2);line-height:1.5}
+.ruta .esc{display:block;margin-top:5px;font-family:var(--mono);font-size:9px;letter-spacing:.06em;color:var(--warn)}
+
+/* ── FILAS DE DATO ───────────────────────────────────────────────────────── */
+.fila{display:flex;align-items:center;gap:11px;padding:10px 0}
+.fila+.fila{border-top:1px solid rgba(50,44,46,.75)}
+.fila .a{flex:1;min-width:0}
+.fila .a b{display:block;font-size:13px;font-weight:600}
+.fila .a small{display:block;font-size:11px;color:var(--ink3);margin-top:2px;line-height:1.45}
+.fila .d{text-align:right;white-space:nowrap;font-family:var(--mono);font-size:12.5px}
+.fila.clic{cursor:pointer}
+.fila .chev{color:var(--ink3);flex:none}
+.borde-ok{border-left:2px solid var(--ok);padding-left:10px;margin-left:-12px}
+.borde-pe{border-left:2px solid var(--warn);padding-left:10px;margin-left:-12px}
+.borde-ot{border-left:2px solid var(--tel);padding-left:10px;margin-left:-12px}
+.borde-no{border-left:2px solid var(--red2);padding-left:10px;margin-left:-12px}
+
+/* avisos del home: dinámicos y clicables (decisión cerrada de la app) */
+.aviso{display:flex;gap:10px;padding:11px 12px;border-radius:var(--r2);margin-bottom:9px;
+  align-items:flex-start;border:1px solid rgba(232,145,46,.34);background:rgba(232,145,46,.07);
+  cursor:pointer}
+.aviso.mal{border-color:rgba(255,74,79,.34);background:rgba(228,30,37,.075)}
+.aviso .ic{flex:none;margin-top:1px;color:var(--warn)} .aviso.mal .ic{color:var(--red2)}
+.aviso .ic svg{width:15px;height:15px;display:block}
+.aviso b{display:block;font-size:12.5px;margin-bottom:2px}
+.aviso p{margin:0;font-size:11.5px;color:var(--ink2);line-height:1.5}
+.aviso .chev{margin-left:auto;align-self:center;color:var(--ink3);font-family:var(--mono)}
+
+/* ── ESTADO VACÍO / CARGANDO — el radar ──────────────────────────────────
+   Gustó el radar mientras carga. Regla nueva: el radar es LA ESPERA. Cuando
+   se confirma que no hay nada, el radar PARA y el texto dice exactamente qué
+   no se encontró. Un radar girando para siempre miente.
+   ─────────────────────────────────────────────────────────────────────── */
+.vacio{padding:26px 14px 22px;text-align:center}
+.vacio .rad{width:78px;height:78px;margin:0 auto 15px;border:1px solid var(--line);border-radius:50%;
+  position:relative;overflow:hidden;background:radial-gradient(circle,rgba(228,30,37,.05),transparent 70%)}
+.vacio .rad::after{content:"";position:absolute;inset:0;
+  background:conic-gradient(from 0deg,rgba(228,30,37,.45),transparent 30%);
+  animation:giroLento 2.2s linear infinite}
+.vacio .rad i{position:absolute;inset:27%;border:1px solid var(--line);border-radius:50%}
+.vacio .rad u{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line)}
+.vacio.quieto .rad::after{animation:none;background:none}
+.vacio.quieto .rad{border-style:dashed;opacity:.6}
+.vacio h4{margin:0 0 7px;font-family:var(--mono);font-size:11px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink2);font-weight:500}
+.vacio p{margin:0 auto;max-width:275px;font-size:12px;color:var(--ink3);line-height:1.6}
+.vacio .sc{display:block;margin-top:13px}
+
+/* ── ranking CENSURADO: ves tu puesto y a tus vecinos, nunca los nombres ─── */
+.rank .r{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:12.5px}
+.rank .r+.r{border-top:1px solid rgba(50,44,46,.65)}
+.rank .p{width:26px;font-family:var(--mono);font-size:11px;color:var(--ink3)}
+.rank .cens{flex:1;height:9px;border-radius:5px;
+  background:repeating-linear-gradient(90deg,#2C2527 0 7px,#211B1D 7px 12px)}
+.rank .r.yo{background:linear-gradient(90deg,rgba(228,30,37,.11),transparent);margin:0 -8px;
+  padding:8px;border-radius:var(--r2)}
+.rank .r.yo .n{flex:1;font-weight:600;color:var(--red2)}
+.rank .r.yo .p{color:var(--red2)}
+.rank .h{font-family:var(--mono);font-size:11.5px;color:var(--ink2)}
+
+/* recibo de cuota */
+.rl{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink2);padding:4px 0}
+.rl .ra{font-family:var(--mono);color:var(--ink);font-weight:600;white-space:nowrap}
+.rl.desc .ra{color:var(--ok)}
+.rnota{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5}
+
+/* ═══ BARRA DE 7 · LA ESTRELLA QUE VIAJA ══════════════════════════════════
+   Decisión cerrada: el indicador viaja en ARCO con la comba PROPORCIONAL a la
+   distancia. Dos planos (06b): la estrella vuela y su sombra se queda abajo,
+   se ensancha y se difumina. Añadido pedido: un brillito extra al aterrizar.
+   ═════════════════════════════════════════════════════════════════════════ */
+/* `box-sizing:border-box` hace que el padding NO se sume: se come la altura. Con
+   `height:70px` y 34 px de inset a los iconos les quedaban 35 px. Se pide la suma. */
+nav{flex:none;position:relative;height:calc(70px + env(safe-area-inset-bottom,0px));
+  display:flex;align-items:stretch;z-index:20;
+  background:rgba(24,22,22,.97);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+.estela{position:absolute;left:0;top:0;width:100%;height:40px;pointer-events:none;overflow:visible;z-index:3}
+.estela path{fill:none;stroke:var(--red2);stroke-width:1.3;stroke-linecap:round;opacity:0}
+@keyframes estelaAnim{0%{stroke-dashoffset:var(--L);opacity:.85}55%{stroke-dashoffset:0;opacity:.4}
+  100%{stroke-dashoffset:0;opacity:0}}
+.viaje,.sombra{position:absolute;left:0;top:0;pointer-events:none;transform:translateX(0);
+  transition:transform .4s var(--arco)}
+.viaje{z-index:5}
+.sombra{top:9px;z-index:2}
+.viaje i,.sombra i{display:block;position:absolute;top:0}
+.viaje i{width:17px;height:17px;left:-8.5px;color:var(--red2)}
+.viaje i svg{width:17px;height:17px;fill:currentColor;display:block;
+  filter:drop-shadow(0 0 7px rgba(255,74,79,.8))}
+.sombra i{width:18px;height:4px;left:-9px;border-radius:50%;background:rgba(0,0,0,.55);filter:blur(3px)}
+.viaje.vuela i{animation:arcoY .4s var(--arco)}
+.sombra.vuela i{animation:arcoS .4s var(--arco)}
+@keyframes arcoY{50%{transform:translateY(var(--comba,-26px)) scale(1.5) rotate(120deg);
+  filter:drop-shadow(0 15px 10px rgba(0,0,0,.5)) drop-shadow(0 0 12px rgba(228,30,37,.85))}}
+@keyframes arcoS{50%{transform:scale(2.2,.5);opacity:.28;filter:blur(6px)}}
+/* el brillito de aterrizaje: 4 chispas que salen y se apagan */
+.chispas{position:absolute;top:0;left:0;width:0;height:0;pointer-events:none;z-index:6}
+.chispas b{position:absolute;left:0;top:8px;width:3px;height:3px;border-radius:50%;
+  background:var(--red2);box-shadow:0 0 6px var(--red2);opacity:0}
+.chispas.on b{animation:chispita .46s var(--sal) forwards}
+.chispas.on b:nth-child(1){--dx:-13px;--dy:-9px;animation-delay:0s}
+.chispas.on b:nth-child(2){--dx:12px;--dy:-11px;animation-delay:.03s}
+.chispas.on b:nth-child(3){--dx:-8px;--dy:-15px;animation-delay:.05s}
+.chispas.on b:nth-child(4){--dx:7px;--dy:-16px;animation-delay:.02s}
+@keyframes chispita{0%{opacity:1;transform:translate(0,0) scale(1)}
+  100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3)}}
+/* `--tabN` lo pone `pintarNav` con cuantas pestañas hay. Con siete el ancho da para 7,5 px
+   de rotulo; con menos sobra sitio y crecen. Daniel: «que se autoajuste el espacio de
+   abajo»; Adrian, en el reporte: «poder ver las letras de las demas a mayor tamaño». */
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  padding:12px 0 9px;font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase;
+  font-size:clamp(7.5px, calc(7.5px + (7 - var(--tabN,7)) * .5px), 9.5px);
+  color:var(--ink3);position:relative;transition:color .18s linear,font-size .18s linear}
+.tab svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round}
+.tab.on{color:var(--ink)} .tab.on svg{stroke:var(--red2)}
+.tab .nb{position:absolute;top:7px;right:calc(50% - 18px);min-width:15px;height:15px;padding:0 4px;
+  border-radius:8px;background:var(--red);color:#fff;font-size:8.5px;font-weight:700;line-height:15px;
+  text-align:center;box-shadow:0 0 0 1.5px rgba(24,22,22,.95)}
+.tab .nb.wa{background:var(--warn);color:#241a08}
+
+/* ═══ FOTO EN EL BUZÓN + PINTOR ═══════════════════════════════════════════
+   Diseño de Daniel (28/07): subes una foto, un lapicito abre un lienzo a pantalla
+   completa, pintas encima con zoom para precisar, y al salir se fusionan las dos capas.
+   ═════════════════════════════════════════════════════════════════════════ */
+.bzfoto{display:flex;align-items:center;gap:10px;margin:2px 0 12px}
+.bzfoto .mini{width:54px;height:54px;border-radius:8px;object-fit:cover;flex:none;
+  border:1px solid var(--line);background:#000}
+.bzfoto .tx{flex:1;min-width:0;font-size:11.5px;color:var(--ink3);line-height:1.45}
+.bzfoto .tx b{display:block;color:var(--ink2);font-size:12.5px}
+.bzfoto button{flex:none}
+/* A PANTALLA COMPLETA de verdad: `position:fixed;inset:0` sale del modal y tapa la app
+   entera. Se pinta mejor cuanto más grande, que es justo lo que se pidió. */
+.pintor{position:fixed;inset:0;z-index:90;background:#0A0909;display:none;
+  flex-direction:column;touch-action:none;overscroll-behavior:none}
+.pintor.on{display:flex}
+/* El lienzo se ancla ARRIBA A LA IZQUIERDA del area y se coloca solo con `transform`.
+   Estaba centrado por el grid, asi que `vista.x` era un desplazamiento sobre una
+   posicion ya centrada mientras el pellizco calculaba con coordenadas de PANTALLA: al
+   ampliar, la imagen se iba del dedo casi dos mil pixeles. Con el origen en 0,0 las dos
+   cuentas hablan del mismo sitio. */
+.pzona{flex:1;min-height:0;position:relative;overflow:hidden}
+.plienzo{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;line-height:0}
+.plienzo img{display:block;max-width:none;user-select:none;-webkit-user-drag:none}
+.plienzo canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+/* La barra respeta el indicador de inicio: si no, «Listo» queda medio tapado y hay que
+   pulsar dos veces (mismo fallo que se arregló en la barra de abajo). */
+.pbarra{flex:none;background:rgba(24,22,22,.98);border-top:1px solid var(--line);
+  padding:9px 12px calc(9px + env(safe-area-inset-bottom,0px));display:flex;
+  flex-direction:column;gap:9px}
+.pfila{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pcol{width:26px;height:26px;border-radius:50%;flex:none;border:2px solid transparent;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.5)}
+.pcol.on{border-color:var(--ink)}
+.pintor input[type=color]{width:30px;height:30px;padding:0;border:1px solid var(--line);
+  border-radius:8px;background:none;flex:none}
+.pgr{display:flex;gap:6px;align-items:center;flex:none}
+.pgr button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);
+  display:grid;place-items:center;background:var(--sur2)}
+.pgr button.on{border-color:var(--red2)}
+.pgr button i{display:block;border-radius:50%;background:var(--ink)}
+.pintor .modos{flex:none}
+.pintor .crece{flex:1}
+/* El distintivo de BETA. Va en la cabecera y no en Ajustes: tiene que verse SIN buscarlo,
+   o acabas reportando contra la versión equivocada. Ámbar, que es el color de «ojo» en
+   esta paleta, y no rojo: rojo aquí significa Solaris, no aviso. */
+.beta{font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:#241a08;background:var(--warn);border-radius:5px;padding:2px 5px;flex:none}
+/* aviso flotante */
+.tost{position:absolute;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));
+  transform:translate(-50%,10px);z-index:40;
+  background:var(--sur2);border:1px solid var(--line);border-left:2px solid var(--red);
+  border-radius:var(--r2);padding:9px 14px;font-size:12px;opacity:0;pointer-events:none;
+  transition:opacity .2s linear,transform .28s var(--sal);max-width:86%;text-align:center;
+  box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.tost.on{opacity:1;transform:translate(-50%,0)}
+/* ⛔ El aviso FIJO se queda hasta que lo tocas, así que tiene que poder recibir el toque:
+   en reposo `.tost` lleva `pointer-events:none`. Sin esto no habría forma de cerrarlo. */
+.tost.fijo{pointer-events:auto;cursor:pointer}
+
+/* ═══ MODAL — mismo patrón que app.html (#modal + #modal-body) ═══════════ */
+.modal{position:absolute;inset:0;background:rgba(0,0,0,.66);display:none;z-index:50;
+  align-items:flex-end;justify-content:center}
+.modal.on{display:flex}
+.modal .card{background:var(--sur);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;
+  max-height:92%;overflow-y:auto;position:relative;
+  padding:20px 16px calc(26px + env(safe-area-inset-bottom,0px));
+  animation:sube .3s var(--sal)}
+@keyframes sube{from{transform:translateY(26px);opacity:.4}to{transform:none;opacity:1}}
+.modal .x{position:absolute;top:11px;right:11px;width:30px;height:30px;border-radius:50%;
+  background:var(--sur2);border:1px solid var(--line);color:var(--ink2);font-size:13px;z-index:3}
+.mtit{font-size:18px;font-weight:700;letter-spacing:-.015em;margin:0 34px 3px 0}
+.msub{font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5}
+.modal .card h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink3);margin:16px 0 7px;font-weight:500}
+ul.obj{margin:0;padding-left:17px}
+ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
+
+/* ═══ CAJÓN PLEGABLE (tareas finalizadas, turnos pasados, lote) ══════════ */
+.cajon{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;margin-top:9px;
+  border:1px solid var(--line);border-radius:var(--r2);background:var(--sur);font-size:12.5px;
+  font-weight:600;color:var(--red2)}
+.cajon svg{width:15px;height:15px;transition:transform .3s var(--sal);fill:none;stroke:currentColor;stroke-width:2.4}
+.cajon.ab svg{transform:rotate(180deg)}
+.cajon b{color:var(--ink2);font-weight:600}
+/* menu de los tres puntos: lo que no es tarea diaria no ocupa sitio en la barra */
+.kebab{position:relative;z-index:901;background:#141212;border:1px solid var(--line);border-radius:9px;color:var(--ink2);
+  width:34px;height:34px;display:grid;place-items:center;cursor:pointer;font-size:16px;line-height:1}
+.kebab:active{background:rgba(255,255,255,.06)}
+.menu{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.35);display:none}
+.menu.on{display:block}
+/* Cuelga por DEBAJO del boton (la posicion se calcula al abrir): antes se pintaba encima
+   y tapaba los propios tres puntos, que es justo lo que no debe pasar. */
+.menu .caja{position:absolute;min-width:216px;
+  background:#141212;border:1px solid var(--line);border-radius:13px;overflow:hidden;
+  box-shadow:0 14px 40px rgba(0,0,0,.55)}
+.menu button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;
+  border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13.5px;
+  padding:13px 15px;text-align:left;cursor:pointer}
+.menu button:last-child{border-bottom:0}
+.menu button:active{background:rgba(255,255,255,.05)}
+.menu button[disabled]{color:var(--ink3);cursor:default}
+.menu button small{display:block;color:var(--ink3);font-size:11.5px;margin-top:3px}
+/* Ajustes se lee de cerca y con una mano: texto mayor que el del resto de la app */
+.ajus{font-size:14px;line-height:1.65;color:var(--ink2)}
+.ajus h4{font-size:13px;margin:16px 0 8px}
+.ajus .tarj p,.ajus .rnota{font-size:13.5px;line-height:1.6}
+.ajus .btn{font-size:14px;padding:13px}
+/* tu fila del reparto: un realce sobrio, en vez de repetir tu cargo en una pildora */
+.fila.yo{background:rgba(228,30,37,.09);border-left:2px solid var(--red);padding-left:9px;margin-left:-11px;
+  border-radius:0 6px 6px 0}
+/* memoria del turno incrustada, con hechuras de documento */
+.doc{margin-top:13px;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#0A0909}
+.doc .dh{display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.doc .dh b{font-size:12.5px}
+.doc .dh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px}
+.doc .dp{height:104px;background:linear-gradient(#141212,#0A0909);position:relative;overflow:hidden}
+.doc .dp i{position:absolute;left:14px;right:14px;height:5px;border-radius:3px;background:rgba(255,255,255,.07)}
+/* visor incrustado: alto contenido, el zoom lo pone el propio visor de Drive */
+.doc .dv{width:100%;height:52vh;min-height:280px;border:0;display:block;background:#2a2526}
+.doc .dcar{padding:26px 12px;text-align:center;color:var(--ink3);font-size:12px;line-height:1.6}
+/* Pantalla completa del visor. Es CSS y no la Fullscreen API a proposito:
+   `requestFullscreen` sobre un elemento NO existe en iOS Safari, que es justo donde se lee un
+   documento con el movil en la mano. Una funcion que en la mitad de los aparatos no hace nada
+   es peor que no tenerla. */
+.doc.full{position:fixed;inset:0;z-index:9000;margin:0;border-radius:0;display:flex;
+  flex-direction:column;background:#0A0909}
+.doc.full .vcuerpo{flex:1;min-height:0;display:flex}
+.doc.full .dv{height:auto;min-height:0;flex:1}
+.vfull{margin-left:auto;background:none;border:1px solid var(--line);border-radius:7px;
+  width:26px;height:26px;padding:0;display:flex;align-items:center;justify-content:center;
+  color:var(--ink2);cursor:pointer;flex:none}
+.vfull:hover{color:var(--ink);border-color:var(--ink3)}
+.vfull svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round}
+.doc .dh .vchev{flex:none;margin-left:7px}
+.doc .da{display:block;padding:9px 12px;text-align:center;font-family:var(--mono);font-size:11px;
+  color:var(--red2);border-top:1px solid var(--line);text-decoration:none}
+.cajsec{max-height:0;overflow:hidden;transition:max-height .45s var(--sal)}
+.cajsec.on{max-height:20000px}   /* 3000px cortaba la lista con 20+ turnos */
+
+/* ═══ REJILLA DE DISPONIBILIDAD (cubrir · arrastre) ══════════════════════ */
+.rejw{overflow-x:auto;margin:0 2px;padding-bottom:3px}
+.rej{display:grid;gap:2px;touch-action:none;user-select:none}
+.rc{font-family:var(--mono);font-size:8.5px;color:var(--ink3);display:flex;align-items:center;justify-content:center}
+.rc.rd{justify-content:flex-end;padding-right:6px;white-space:nowrap;font-size:9.5px;color:var(--ink2);
+  position:sticky;left:0;background:var(--sur);z-index:2}
+.rc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
+/* decisión cerrada: la etiqueta va al LÍMITE izquierdo de la celda = hora de inicio */
+.rc.rh span{position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}
+.rc.rh span.fin{left:auto;right:0;transform:none}
+.ecel{height:27px;border-radius:3px;background:var(--sur2);cursor:pointer}
+.ecel.on1{background:var(--tel)}          /* telemático */
+.ecel.on2{background:var(--red)}          /* presencial + telemático */
+.ecel.prev{outline:2px solid var(--red2);outline-offset:-1px}
+.ecel.off{background:transparent;border:1px solid var(--line);opacity:.4;cursor:default}
+.celc{height:23px;border-radius:2px;display:grid;place-items:center;font-family:var(--mono);
+  font-size:8.5px;font-weight:600;color:#fff}
+.celc.best{outline:1px solid var(--ink);outline-offset:-1px}
+.celc.fij{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.92)}
+
+/* ═══ DECIDIR PARTES DESDE EL MÓVIL ═════════════════════════════════════ */
+.pdi{border-top:1px solid var(--line);padding:11px 0 4px}
+.pdi:first-of-type{border-top:0}
+.pdt{font-size:12.5px;font-weight:600;margin:2px 0 4px}
+.pdj{font-size:12px;color:var(--ink2);line-height:1.5;margin-bottom:6px}
+.pdw{display:inline-block;font-size:10px;font-weight:600;color:var(--red2);
+  border:1px solid var(--red2);border-radius:5px;padding:1px 6px;margin-bottom:7px}
+.pdm{width:100%;background:var(--sur2);border:1px solid var(--line);border-radius:8px;
+  padding:8px 10px;font-size:12.5px;color:var(--ink);margin-bottom:8px}
+.pdb{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.pdb button{flex:1;min-width:88px;border:1px solid var(--line);border-radius:8px;padding:8px 6px;
+  font-size:12px;font-weight:600;color:var(--ink);background:var(--sur2)}
+.pdb button[data-pdacc="aprobar"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.pdb button.no{color:var(--red2)}
+.pdb button:disabled{opacity:.5}
+
+/* ═══ NOVEDADES · la capa retirable ═════════════════════════════════════ */
+.novc{border:1px solid var(--red2);border-radius:var(--r);padding:13px;margin-bottom:12px;
+  background:var(--sur)}
+.novtit{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);
+  margin-bottom:9px}
+.novtit b{color:var(--red2)}
+.novt{border-top:1px solid var(--line);padding:10px 0 4px}
+.novt:first-of-type{border-top:0;padding-top:0}
+.novt.ok{opacity:.62}
+.novh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:13px}
+.novf{font-family:var(--mono);font-size:10.5px;color:var(--ink3)}
+.novl{margin:5px 0 8px;padding-left:16px;font-size:12.5px;color:var(--ink2);line-height:1.55}
+.novl li{margin-bottom:3px}
+.novb{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px}
+.novb button{border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:12px;
+  font-weight:600;color:var(--ink2);background:transparent}
+.novb button.si{background:var(--ok);border-color:var(--ok);color:#fff}
+.novv{font-size:11.5px;color:var(--ink3)}
+.novnada{font-size:12.5px;color:var(--ink3);margin:0 0 6px}
+/* Los desplegables de horas. Mismo gesto que `.novhist`, pero la cabecera lleva su cuenta
+   a la derecha: el valor de plegarlo es que el número se vea SIN abrirlo. */
+.pdgrupo>summary,.pdpers>summary{display:flex;align-items:center;justify-content:space-between;
+  gap:10px;cursor:pointer;list-style:none;padding:4px 0}
+.pdgrupo>summary::-webkit-details-marker,.pdpers>summary::-webkit-details-marker{display:none}
+.pdgrupo>summary::after,.pdpers>summary::after{content:'›';color:var(--ink3);font-size:15px;
+  transform:rotate(90deg);transition:transform .16s}
+.pdgrupo[open]>summary::after,.pdpers[open]>summary::after{transform:rotate(-90deg)}
+.pdnum{font-family:var(--mono);font-size:11px;color:var(--ink3);white-space:nowrap}
+.pdpers{border-top:1px solid var(--line);margin-top:6px;padding-top:4px}
+.pdpers>summary{font-size:13px}
+.novhist{margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+.novhist summary{font-size:12px;color:var(--ink3);cursor:pointer}
+.novpie{font-size:11px;color:var(--ink3);line-height:1.5;margin:9px 0 0;
+  border-top:1px solid var(--line);padding-top:8px}
+/* El puntito que «rodea» lo nuevo en el nav. */
+.novpt{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--red2);
+  margin-left:4px;vertical-align:middle}
+
+/* ═══ TURNOS · cubrir disponibilidad ════════════════════════════════════
+   ⛔ CLASES PROPIAS, no se reutiliza `.ecel`. En reuniones `on1`=telemático y
+   `on2`=presencial: allí el eje es CÓMO asistes. Aquí es DÓNDE (CUVI/CITI/los
+   dos) y encima lleva coche. Reutilizar la escala «porque se parece» haría que
+   el mismo valor significara dos cosas según la pantalla, que es de donde salen
+   los fallos mudos de este proyecto. */
+.tpin{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0 8px}
+.tpin button{border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:11.5px;
+  font-weight:600;color:var(--ink3);background:transparent;white-space:nowrap}
+.tpin button.on{color:#fff}
+.tpin button.on[data-pin="cuvi"]{background:var(--red);border-color:var(--red)}
+.tpin button.on[data-pin="citi"]{background:var(--tel);border-color:var(--tel)}
+.tpin button.on[data-pin="ambos"]{background:linear-gradient(135deg,var(--red) 50%,var(--tel) 50%);
+  border-color:var(--ink3)}
+.tpin button.on[data-pin="no"]{background:var(--ink2);color:#1a1616;border-color:var(--ink2)}
+.tpin button.coche.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.tcel{height:30px;border-radius:3px;background:var(--sur2);cursor:pointer;position:relative;
+  display:grid;place-items:center;font-family:var(--mono);font-size:9px;color:#fff}
+.tcel.cuvi{background:var(--red)}
+.tcel.citi{background:var(--tel)}
+.tcel.ambos{background:linear-gradient(135deg,var(--red) 50%,var(--tel) 50%)}
+.tcel.no{background:var(--sur2);border:1px solid var(--ink3);color:var(--ink3)}
+/* El coche se ve SIN abrir nada: sin coche muchos turnos no salen, así que es
+   información de un vistazo, no de un desglose. */
+.tcel .cch{position:absolute;top:0;right:1px;font-size:11px;line-height:1;
+  filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
+.tplazo{font-size:11.5px;color:var(--ink2);margin-top:8px;line-height:1.5}
+.tplazo b{color:var(--ink)}
+.tplazo.urge b{color:var(--red2)}
+
+/* ═══ COLA DE SANCIONES · BLOQUES (Panel PD) ════════════════════════════ */
+.lote{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.lote.rev{border-left:3px solid var(--ok)}
+.lote-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:13.5px}
+.lote-m{font-size:12px;color:var(--ink2);margin-top:4px;line-height:1.45}
+.lrow{display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid rgba(50,44,46,.8);flex-wrap:wrap}
+.lrow .nm{flex:1;min-width:90px;font-size:13px;font-weight:600}
+.lrow .vl{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--red2)}
+.lrow .vl.tach{opacity:.4;text-decoration:line-through}
+.decs{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.decs button{border-right:1px solid var(--line);padding:6px 10px;font-size:11.5px;font-weight:600;
+  color:var(--ink3);white-space:nowrap}
+.decs button:last-child{border-right:0}
+.decs button.on.a{background:var(--ok);color:#fff}
+.decs button.on.j{background:var(--ink2);color:#1a1616}
+.decs button.on.r{background:var(--red2);color:#fff}
+.cierre{margin-top:11px;padding:11px 12px;border:1px solid var(--line);border-radius:var(--r2);
+  background:rgba(127,127,127,.05)}
+.cierre .tx{font-size:12.5px;color:var(--ink2)}
+.cierre em{display:block;font-style:normal;font-size:11px;color:var(--ink3);margin-top:6px;line-height:1.45}
+
+/* conmutador de rol (solo de la maqueta) */
+.rolsel{display:flex;gap:5px;border:1px solid var(--line);border-radius:20px;padding:3px;background:var(--sur2)}
+.rolsel button{padding:4px 10px;border-radius:16px;font-family:var(--mono);font-size:9px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+.rolsel button.on{background:var(--red);color:#fff}
+
+@keyframes giroLento{to{transform:rotate(360deg)}}
+@keyframes latido{0%,100%{opacity:.5;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}
+@keyframes parpadeo{50%{opacity:.25}}
+.entra{animation:entra .34s var(--sal) both}
+@keyframes entra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ═══ MOVIMIENTO REDUCIDO — se apaga lo decorativo, se conserva lo que
+   TRANSMITE ESTADO (colores, encendidos, posición del indicador). ════════ */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;
+    transition-duration:.001ms !important}
+  .med .fili,.vacio .rad::after,.estela,.chispas,.sombra{display:none}
+  .sesion .rel .c{animation:none}
+}
+.mdoc{font-size:13px;line-height:1.6;color:var(--ink2)}
+.mdoc h1{font-size:16px;color:var(--ink);margin:0 0 10px}
+.mdoc h2{font-size:14.5px;color:var(--ink);margin:18px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
+.mdoc h3{font-size:13px;color:var(--ink);margin:13px 0 6px}
+.mdoc p{margin:0 0 9px}
+.mdoc ul{margin:0 0 11px;padding-left:17px}
+.mdoc li{margin:0 0 6px}
+.mdoc code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#0A0909;
+  border:1px solid var(--line);border-radius:5px;padding:1px 4px}
+.mdoc blockquote{margin:0 0 10px;padding:8px 11px;border-left:2px solid var(--line);
+  background:#0A0909;border-radius:0 8px 8px 0;color:var(--ink3)}
+.mdoc hr{border:0;border-top:1px solid var(--line);margin:15px 0}
+.mdoc a{color:var(--red2)}
+.mdoc b{color:var(--ink)}
