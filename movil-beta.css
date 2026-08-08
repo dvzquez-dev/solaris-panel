@@ -681,6 +681,9 @@ nav{flex:none;position:relative;height:calc(70px + env(safe-area-inset-bottom,0p
   transition:opacity .2s linear,transform .28s var(--sal);max-width:86%;text-align:center;
   box-shadow:0 12px 30px rgba(0,0,0,.5)}
 .tost.on{opacity:1;transform:translate(-50%,0)}
+/* ⛔ El aviso FIJO se queda hasta que lo tocas, así que tiene que poder recibir el toque:
+   en reposo `.tost` lleva `pointer-events:none`. Sin esto no habría forma de cerrarlo. */
+.tost.fijo{pointer-events:auto;cursor:pointer}
 
 /* ═══ MODAL — mismo patrón que app.html (#modal + #modal-body) ═══════════ */
 .modal{position:absolute;inset:0;background:rgba(0,0,0,.66);display:none;z-index:50;

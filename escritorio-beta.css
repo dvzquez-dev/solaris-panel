@@ -393,6 +393,9 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
   font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .2s linear,transform .28s var(--sal);
   box-shadow:0 12px 30px rgba(0,0,0,.5)}
 .tost.on{opacity:1;transform:translate(-50%,0)}
+/* ⛔ El aviso FIJO se queda hasta que lo tocas, así que tiene que poder recibir el toque:
+   en reposo `.tost` lleva `pointer-events:none`. Sin esto no habría forma de cerrarlo. */
+.tost.fijo{pointer-events:auto;cursor:pointer}
 @keyframes latido{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:1;transform:scale(1)}}
 
 @media (prefers-reduced-motion: reduce){

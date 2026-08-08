@@ -662,7 +662,14 @@ async function enviarFichaje(){
       ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
       tost('Fichaje enviado · '+nf(h,2)+' h a la cola de tu coordinador');
       irA('horas');
-    }catch(e){ tost('No se pudo enviar: '+((e&&e.message)||e)); }
+    }catch(e){
+      /* ⛔ SI LA CULPA ES LA SESION, EL AVISO NO CADUCA. Es el caso que reportó José
+         Manuel: el mensaje explica que hay que volver a entrar y que no se guardó nada,
+         y son ~110 caracteres — en 2,4 segundos **no da tiempo a leerlo**. La regla ya
+         estaba decidida (`decisiones-app.md`, 28/07): *un aviso que caduca solo sirve
+         para lo que no importa*. Perder un fichaje importa. */
+      tost('No se pudo enviar: '+((e&&e.message)||e), (e && e.sesion) ? {fijo:true} : null);
+    }
     return;
   }
   var durd = ST.modo==='vivo' ? horasSesion() : durForm();   // demo local (sin backend)

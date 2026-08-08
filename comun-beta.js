@@ -293,6 +293,38 @@ function _sesionGuardada_(){
   catch(_){ return null; }
 }
 
+
+/* El aviso de abajo. `tost(m)` caduca solo; `tost(m, {fijo:true})` **se queda hasta que lo
+   tocas**.
+
+   ⛔ EL MODO FIJO NO ES UN CAPRICHO: lo pide una decisión ya tomada (`decisiones-app.md`,
+   28/07). Se probó un aviso importante con un toast de 2,4 s y **Daniel no lo vio** — *«no me
+   salió el aviso de nada, así que mal»*. De ahí la regla: **un aviso que caduca solo sirve para
+   lo que no importa**.
+
+   ⛔ Y hacía falta ya: el mensaje de «sesión caducada» son ~110 caracteres, que en 2,4 segundos
+   **no da tiempo a leer**. Un arreglo que explica bien lo que pasa y lo enseña dos segundos
+   deja a la persona igual que antes.
+
+   ⚠️ Vivía DUPLICADO en las dos caras y ya había divergido: 2600 ms en el escritorio y 2400 en
+   el móvil. Misma lógica, dos números — la señal de siempre de que hay dos copias. */
+function tost(m, o){
+  var t=$('#tost'); if(!t) return;
+  t.textContent=m;
+  clearTimeout(t._h);
+  var cerrar=function(){ t.classList.remove('on','fijo'); t.onclick=null; };
+  t.classList.add('on');
+  if(o && o.fijo){
+    /* `.fijo` es lo que le devuelve el `pointer-events`: en reposo el toast no captura
+       clics, y sin esto no habría forma de cerrarlo. */
+    t.classList.add('fijo');
+    t.onclick=cerrar;
+    return;
+  }
+  t.classList.remove('fijo'); t.onclick=null;
+  t._h=setTimeout(cerrar, 2600);
+}
+
 function _apiParse(txt, accion){
   var j=null; try{ j=JSON.parse(txt); }catch(_){}
   /* Lo que vuelve no es JSON: es la pagina HTML de Google del 404 transitorio. */
@@ -1318,6 +1350,11 @@ function _novedades_(){
         {cara:'movil', vista:'horas', txt:'La fila «vs. <mes anterior>» sumaba la compensación que te llega por el cargo (PD 7 h, coordinador 3,5 h, miembro 2 h). Esa no se trabaja: se cobra por el puesto y es la misma todos los meses, así que la comparativa medía tu cargo en vez de tu trabajo — y comparado contigo mismo no se movía nunca. Ahora se descuenta en los DOS lados.'},
         {cara:'movil', vista:'horas', txt:'La compensación EXTRA (la que asigna el PD a mano por cubrir un turno o un reporte) SÍ sigue contando: es lo único de las dos que reconoce trabajo real. Y con menos horas que tu base la cuenta se queda en 0, no en negativo.'},
         {cara:'movil', vista:'horas', txt:'Y la fila «vs. equipo» también, que esa hubo que arreglarla en el servidor (backend v69): la base depende del cargo de cada uno, y tu móvil no conoce ni las horas ni el cargo de los demás. Si se hubiera descontado solo en tu lado, la comparación sería con descuento contra sin descuento — peor que no tocarla.'}
+      ] },
+    { id:'2026-08-08-aviso-que-se-lee', fecha:'2026-08-08',
+      titulo:'Los avisos importantes ya no se van solos',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Si no se puede enviar un fichaje porque tu sesi\u00f3n ha caducado, el aviso **se queda hasta que lo tocas**. Antes desaparec\u00eda en dos segundos y medio, que no da tiempo a leer lo que hay que hacer.'}
       ] },
     { id:'2026-08-08-avisos-de-verdad', fecha:'2026-08-08',
       titulo:'Activar los avisos ya no se da por hecho',

@@ -16,7 +16,7 @@
 <meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio-beta.css?v=1419799">
+<link rel="stylesheet" href="escritorio-beta.css?v=8068e9d">
 </head>
 <body>
 
@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=a8dad93"></script>
+<script src="comun-beta.js?v=826d94e"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
 <script src="turnos.escritorio-beta.js?v=f0af960"></script>
@@ -135,8 +135,8 @@ function ini(n){var p=n.split(' ');return (p[0][0]+(p[1]?p[1][0]:'')).toUpperCas
    que el nodo existe siempre que corre esto. Es una divergencia LATENTE, no un fallo vivo — la
    guarda entra porque no cuesta nada, no porque hubiera nada roto.
    La duración NO se iguala (2600 aquí, 2400 en el móvil): son dos diseños distintos. */
-function tost(m){var t=$('#tost');if(!t)return;t.textContent=m;t.classList.add('on');
-  clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('on');},2600);}
+/* ⛔ `tost` VIVE EN `comun.js` (08/08), que cargan las dos caras. Ver allí por qué hay
+   un modo `{fijo:true}`: un aviso que caduca solo sirve para lo que no importa. */
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2177,7 +2177,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='176c203';
+var BUILD='9d82981';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
