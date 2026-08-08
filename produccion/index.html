@@ -10,7 +10,7 @@
      el MISMO icono. Con las dos instaladas en el movil, eso es abrir la que no era. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" href="favicon-32.png" sizes="32x32">
+<link rel="icon" href="../recursos/favicon-32.png" sizes="32x32">
 <meta name="apple-mobile-web-app-title" content="Solaris">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1861,8 +1861,8 @@ async function _cargarFichajeAbierto_(){
 var DEMO = window.__SIN_LOGIN__ === true || /[?&]demo\b/.test(location.search);
 /* Splash de marca REAL, calcado de app.html: la insignia + el banner «UVigo Aerotech
    Solaris». Son ficheros del repo publicado; con onerror degradan a texto en local. */
-var SPLASH = '<img src="insignia.png" alt="Solaris" style="display:block;margin:0 auto 10px;width:104px;height:auto" onerror="this.style.display=\'none\'">'+
-  '<img src="banner-solaris.png" alt="UVigo Aerotech Solaris" style="display:block;margin:0 auto 4px;width:min(240px,60vw);height:auto" onerror="this.style.display=\'none\'">';
+var SPLASH = '<img src="../recursos/insignia.png" alt="Solaris" style="display:block;margin:0 auto 10px;width:104px;height:auto" onerror="this.style.display=\'none\'">'+
+  '<img src="../recursos/banner-solaris.png" alt="UVigo Aerotech Solaris" style="display:block;margin:0 auto 4px;width:min(240px,60vw);height:auto" onerror="this.style.display=\'none\'">';
 function _gate_(html){
   var g=document.getElementById('loginGate');
   if(!g){ g=document.createElement('div'); g.id='loginGate';
