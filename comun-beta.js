@@ -1240,6 +1240,13 @@ function _novedades_(){
         {cara:'movil', vista:'horas', txt:'La compensación EXTRA (la que asigna el PD a mano por cubrir un turno o un reporte) SÍ sigue contando: es lo único de las dos que reconoce trabajo real. Y con menos horas que tu base la cuenta se queda en 0, no en negativo.'},
         {cara:'movil', vista:'horas', txt:'Y la fila «vs. equipo» también, que esa hubo que arreglarla en el servidor (backend v69): la base depende del cargo de cada uno, y tu móvil no conoce ni las horas ni el cargo de los demás. Si se hubiera descontado solo en tu lado, la comparación sería con descuento contra sin descuento — peor que no tocarla.'}
       ] },
+    { id:'2026-08-08-reu-en-vivo', fecha:'2026-08-08',
+      titulo:'El mapa de calor del escritorio ya se llena solo',
+      items:[
+        {cara:'escritorio', vista:'reuniones', txt:'La reuni\u00f3n que tengas abierta se actualiza sola cada 20 segundos: ves llegar las respuestas de la gente sin recargar. Antes esta pantalla se quedaba con lo que trajo al entrar \u2014 y no lo dec\u00eda, as\u00ed que pod\u00edas estar decidiendo la fecha mirando un mapa de hace una hora.'},
+        {cara:'escritorio', vista:'reuniones', txt:'Solo se refresca si est\u00e1s en Reuniones, y no repinta si nadie ha contestado nada nuevo: una pantalla que se reconstruye sola cada 20 segundos para dejarse igual, molesta.'},
+        {cara:'movil', vista:'reu', txt:'En el m\u00f3vil esto ya funcionaba. Lo que cambia es que ahora las dos caras usan la misma pieza para saber si algo ha cambiado, en vez de una copia cada una.'}
+      ] },
     { id:'2026-08-07-horas-cuatro', fecha:'2026-08-07',
       titulo:'El parseo de horas estaba escrito cuatro veces',
       items:[
@@ -1579,4 +1586,17 @@ function rangoNom(n){
   if(n===REV2_NOM) return 2;
   var m=miembro(n);
   return (m && m.cargo==='Coordinador') ? 1 : 0;
+}
+
+/* La huella de las respuestas de una reunion: `{nombre:[bloques]}` -> una cadena estable.
+   Sirve para una sola cosa, y es la que hace usable el refresco en vivo: **saber si algo ha
+   cambiado antes de repintar**. Reconstruir la rejilla cada 20 s para dejarla igual se nota
+   y molesta, sobre todo mientras alguien esta pintando su disponibilidad.
+   ⛔ Vive aqui desde el 08/08 porque la usan LAS DOS CARAS. Nació en `reuniones.movil.js`
+   cuando solo el movil refrescaba; al darle el refresco al escritorio, dejarla duplicada
+   habria sido crear la gemela numero 19. */
+function _firmaResp_(r){
+  var q=(r&&r.resp)||{}, k=Object.keys(q).sort(), out=[];
+  for(var i=0;i<k.length;i++) out.push(k[i]+':'+(q[k[i]]||[]).join(''));
+  return out.join('|');
 }

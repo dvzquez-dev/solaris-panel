@@ -108,14 +108,14 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun-beta.js?v=15665c7"></script>
+<script src="comun-beta.js?v=03c536a"></script>
 <script src="notis.escritorio-beta.js?v=5f0a77e"></script>
 <script src="cierre.escritorio-beta.js?v=b534df5"></script>
 <script src="turnos.escritorio-beta.js?v=f0af960"></script>
 <script src="buzon.escritorio-beta.js?v=aa3b013"></script>
 <script src="documentos.escritorio-beta.js?v=1918b5e"></script>
 <script src="sanciones.escritorio-beta.js?v=b179a34"></script>
-<script src="reuniones.escritorio-beta.js?v=1bbd04a"></script>
+<script src="reuniones.escritorio-beta.js?v=0dfa3dc"></script>
 <script src="horas.escritorio-beta.js?v=fc35dac"></script>
 <script src="equipo.escritorio-beta.js?v=a2d5448"></script>
 <script>
@@ -1867,6 +1867,9 @@ function _escribiendoE_(){
 }
 
 var _REFRESCANDO_=false, _ULT_REFRESCO_=0;
+/* El cerrojo del refresco de la reunion abierta. Va AQUI y no en el modulo porque un
+   modulo solo lleva declaraciones `function` (ARRANQUE.md §5b). */
+var _REFREU_E_=false;
 /* EL ESCRITORIO SE ALIMENTA SOLO. Es la cara que mas rato se deja abierta -es un panel de
    mando, vive en una pestaña toda la tarde- y se quedaba con lo que trajo al entrar: quien
    coordina veia una cola de decisiones congelada a la hora del login, sin saberlo.
@@ -1911,6 +1914,11 @@ function _arrancarRefrescoVivo_(){
     if(!document.hidden) _refrescoVivo_('vuelta');
   });
   setInterval(function(){ _refrescoVivo_('reloj'); }, 90000);
+  /* ⛔ Y LA REUNION ABIERTA, MAS A MENUDO. Es colaborativa en tiempo real: varios
+     marcando su disponibilidad a la vez. Los 90 s del reloj general se quedan cortos
+     para ver el mapa de calor llenarse. Mismo periodo que el movil, para que las dos
+     caras no digan cosas distintas sobre el mismo dato. */
+  setInterval(_refrescarReuAbiertaE_, 20000);
 }
 
 function _aplicarPanel_(pnl){
@@ -2169,7 +2177,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='bbc2404';
+var BUILD='d9b2452';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

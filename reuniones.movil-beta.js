@@ -94,11 +94,9 @@ function _proximaReuM_(){
    string en vez de un {ini}. Se unificaron en `_minHM_`... pero POR CARA, asi que quedaron
    dos copias identicas. Desde el 07/08 vive en `comun.js`, que cargan las dos. ---- */
 
-function _firmaResp_(r){
-  var q=(r&&r.resp)||{}, k=Object.keys(q).sort(), out=[];
-  for(var i=0;i<k.length;i++) out.push(k[i]+':'+(q[k[i]]||[]).join(''));
-  return out.join('|');
-}
+/* ⛔ `_firmaResp_` VIVE EN `comun.js` (08/08), que cargan las dos caras. Estaba aqui
+   cuando solo el movil refrescaba la reunion abierta; al darle ese refresco tambien al
+   escritorio, copiarla habria sido crear otra gemela. */
 
 async function _refrescarReuAbierta_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;

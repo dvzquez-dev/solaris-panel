@@ -417,6 +417,45 @@ function _cobertura_(r){
   return {cubren:cubren.length, conv:universo.length, sinCubrir:sin, bajoMin:bajo, minimo:minimo};
 }
 
+/* REFRESCO EN VIVO DE LA REUNION QUE TIENES DELANTE (08/08).
+
+   ⛔ POR QUE. `decisiones-app.md` [22/07]: *«Reuniones y revisiones de documentos -> refresco
+   rapido (~9 s, polling de lo que tengas abierto)... esas dos son colaborativas en tiempo real
+   (varios marcando a la vez)»*. El movil lo cumplia desde siempre; **el escritorio no**, y es
+   justo la cara donde se mira el mapa de calor llenarse mientras la gente contesta.
+
+   ⛔ Y no era «solo» que faltara el reloj: `_hidratarReus_` hace `continue` cuando la reunion
+   YA trae respuestas, asi que una vez cargada **no se volvia a mirar nunca**. La rejilla se
+   quedaba en el estado que tuviera al entrar, sin dar ninguna señal.
+
+   Lo destapó `gemelas.py`: `_arrancarRefrescoVivo_` sale al 98 % entre las dos caras — mismo
+   nombre, casi el mismo cuerpo. Ese 2 % era esta linea. */
+async function _refrescarReuAbiertaE_(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
+  if(_REFREU_E_ || document.hidden) return;
+  /* solo lo que tienes delante: pedir la reunion mientras miras el cierre es cuota tirada */
+  if(typeof vista==='undefined' || vista!=='reuniones') return;
+  /* ⛔ NO SE REPINTA MIENTRAS ALGUIEN ESCRIBE: aqui no hay modales, pero si formularios, y
+     repintar le borra lo tecleado. Es la misma guardia que usa `_refrescoVivo_`. */
+  if(typeof _escribiendoE_==='function' && _escribiendoE_()) return;
+  var r = REUS[Math.min(RE_SEL, REUS.length-1)] || REUS[0];
+  if(!r || r.id==null) return;
+  _REFREU_E_=true;
+  try{
+    var d=await api.get(r.id);
+    var resp=(d && d.resp) || null;
+    if(!resp) return;
+    var antes=_firmaResp_(r);
+    var copia={resp:resp};
+    /* Si nadie ha contestado nada nuevo NO se repinta: reconstruir la pantalla cada 20 s para
+       dejarla igual se nota, y en un panel que vive abierto toda la tarde, molesta. */
+    if(_firmaResp_(copia)===antes) return;
+    r.resp=resp; r.calor=null;              // calor null: se recalcula con las respuestas
+    if(vista==='reuniones' && !(typeof _escribiendoE_==='function' && _escribiendoE_())) pintar();
+  }catch(_){ /* una lectura que falla no puede tumbar el panel */ }
+  finally{ _REFREU_E_=false; }
+}
+
 async function _hidratarReus_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
   for(var i=0;i<REUS.length;i++){
