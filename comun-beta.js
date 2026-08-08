@@ -1126,6 +1126,17 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-08-mes-anterior-vivo', fecha:'2026-08-08',
+      titulo:'Ya puedes compararte con el mes pasado',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La fila «vs. el mes pasado» llevaba sin funcionar '
+          + 'desde que se escribio, y no daba ningun error: una parte del programa se rompia por '
+          + 'dentro al leer el registro del Drive y devolvia una lista vacia sin quejarse. Ya '
+          + 'esta: el servidor devuelve la media real del equipo en julio.'},
+        {cara:'movil', vista:'horas', txt:'Falta un detalle para afinarlo del todo: para saber '
+          + 'cuantos dias duro julio hacen falta DOS cierres guardados y de momento solo esta el '
+          + 'suyo. En cuanto cierres agosto se ajusta solo, sin tocar nada.'}
+      ] },
     { id:'2026-08-08-anio-hoja', fecha:'2026-08-08',
       titulo:'La comparacion con el mes pasado, un paso mas cerca',
       items:[
