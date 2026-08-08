@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=ac2abc2"></script>
+<script src="comun.js?v=3c6b606"></script>
 <script src="notis.escritorio.js?v=5f0a77e"></script>
 <script src="cierre.escritorio.js?v=61476db"></script>
 <script src="turnos.escritorio.js?v=f0af960"></script>
@@ -1906,6 +1906,9 @@ async function _refrescoVivo_(motivo){
       a.map(normReu).forEach(function(r){ if(prev[r.id]){ r.resp=prev[r.id]; r.calor=null; } REUS.push(r); });
     });
     await Promise.all([_t,_q,_p,_s,_r,_d,_u]);
+    /* ⛔ SI LA SESION MURIO, ESTE REFRESCO NO HA TRAÍDO NADA — y sin esto no se nota:
+       `_pide_` devuelve `null` por diseño y el repintado deja la pantalla igual. */
+    _avisarSesionMuerta_();
     if(!_escribiendoE_()) _repintarSuave_();          // pudo empezar a escribir mientras cargaba
   } finally { _REFRESCANDO_=false; }
 }
@@ -2177,7 +2180,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='31462c1';
+var BUILD='5adf4d4';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

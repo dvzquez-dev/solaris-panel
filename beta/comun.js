@@ -389,8 +389,38 @@ function _pide_(accion, arg){
       try{ console.warn('api.'+accion+' no existe: ese dato no se refresca'); }catch(_){}
       return Promise.resolve(null);
     }
-    return Promise.resolve(api[accion](arg)).catch(function(){ return null; });
+    return Promise.resolve(api[accion](arg)).catch(function(e){
+      /* ⛔ SIGUE TRAGANDO, pero NO todo es lo mismo. Que falte un dato es normal y no
+         puede tumbar a los demás — para eso nació esto. Que la **sesión** haya caducado
+         es otra cosa: no va a venir ninguno, **nunca más**, y el panel se queda
+         repintando lo de hace horas sin un solo error. En el escritorio, que vive
+         abierto toda la tarde, eso es decidir sanciones sobre una cola vieja. */
+      if (e && e.sesion) _sesionMuerta_(true);
+      return null;
+    });
   }catch(_){ return Promise.resolve(null); }
+}
+
+/* ¿Se ha muerto la sesión mientras la pestaña seguía abierta? En `window` y no en una
+   variable de módulo: `comun.js` no lleva ni una sentencia ejecutable de nivel superior. */
+function _sesionMuerta_(v){
+  if (v !== undefined) window.__SESION_MUERTA = !!v;
+  return !!window.__SESION_MUERTA;
+}
+
+/* Lo dice UNA vez, y con el aviso que no caduca.
+
+   ⛔ UNA VEZ, no una cada 90 s: un aviso que reaparece solo cada minuto y medio se cierra
+   sin leer a la tercera, y entonces ya da igual lo que ponga.
+
+   ⛔ Y FIJO, por la decisión del 28/07: *un aviso que caduca solo sirve para lo que no
+   importa*. Aquí lo que se dice es que **lo que estás mirando ya no es de fiar**. */
+function _avisarSesionMuerta_(){
+  if (!_sesionMuerta_() || window.__SESION_MUERTA_DICHA) return false;
+  window.__SESION_MUERTA_DICHA = true;
+  tost('Tu sesi\u00f3n ha caducado: esta pantalla ya NO se est\u00e1 actualizando y lo que ves '+
+       'puede ser de hace horas. Recarga y vuelve a entrar.', {fijo:true});
+  return true;
 }
 
 function _ordenarFranjas_(r){
@@ -1368,6 +1398,12 @@ function _novedades_(){
         {cara:'movil', vista:'horas', txt:'La fila «vs. <mes anterior>» sumaba la compensación que te llega por el cargo (PD 7 h, coordinador 3,5 h, miembro 2 h). Esa no se trabaja: se cobra por el puesto y es la misma todos los meses, así que la comparativa medía tu cargo en vez de tu trabajo — y comparado contigo mismo no se movía nunca. Ahora se descuenta en los DOS lados.'},
         {cara:'movil', vista:'horas', txt:'La compensación EXTRA (la que asigna el PD a mano por cubrir un turno o un reporte) SÍ sigue contando: es lo único de las dos que reconoce trabajo real. Y con menos horas que tu base la cuenta se queda en 0, no en negativo.'},
         {cara:'movil', vista:'horas', txt:'Y la fila «vs. equipo» también, que esa hubo que arreglarla en el servidor (backend v69): la base depende del cargo de cada uno, y tu móvil no conoce ni las horas ni el cargo de los demás. Si se hubiera descontado solo en tu lado, la comparación sería con descuento contra sin descuento — peor que no tocarla.'}
+      ] },
+    { id:'2026-08-08-panel-congelado', fecha:'2026-08-08',
+      titulo:'El panel ya avisa cuando deja de actualizarse',
+      items:[
+        {cara:'escritorio', vista:'estado', txt:'Si tu sesi\u00f3n caduca con el panel abierto, **dejaba de actualizarse sin decir nada**: segu\u00eda repintando lo de hace horas y no aparec\u00eda ning\u00fan error. Se pod\u00eda estar decidiendo sobre una cola vieja creyendo que estaba al d\u00eda. Ahora lo dice, una vez y sin que se vaya solo.'},
+        {cara:'movil', vista:'estado', txt:'Igual en el m\u00f3vil, aunque ah\u00ed pasa menos porque se recarga m\u00e1s.'}
       ] },
     { id:'2026-08-08-aviso-que-se-lee', fecha:'2026-08-08',
       titulo:'Los avisos importantes ya no se van solos',

@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=ac2abc2"></script>
+<script src="comun.js?v=3c6b606"></script>
 <script src="notis.movil.js?v=2f74e23"></script>
 <script src="cierre.movil.js?v=72a5e2f"></script>
 <script src="tareas.movil.js?v=9c56fc2"></script>
@@ -478,6 +478,10 @@ async function _refrescoVivo_(motivo){
        fichar. Va en el mismo `Promise.all`: no cuesta una vuelta mas de reloj. */
     var pnl=_pide_('getPanel').then(function(x){ if(x) _refrescarPanelM_(x); }).catch(function(){});
     await Promise.all([t,q,r,pnl]);
+    /* ⛔ SI LA SESION MURIO, ESTE REFRESCO NO HA TRAÍDO NADA. `_pide_` devuelve `null`
+       por diseño —para que un dato que falta no tumbe a los demás— y el repintado deja
+       la pantalla igual: se sigue viendo lo de hace horas, sin un solo error. */
+    _avisarSesionMuerta_();
     if(!_modalAbierto_()) _repintarSuave_();
   } finally { _REFRESCANDO_=false; }
 }
@@ -1350,7 +1354,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='78f4e07';
+var BUILD='9b6857d';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
