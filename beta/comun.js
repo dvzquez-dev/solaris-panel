@@ -1383,6 +1383,34 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-09-recarga-sin-cero', fecha:'2026-08-09',
+      titulo:'Al recargar, la pantalla ya no se queda en blanco',
+      items:[
+        {cara:'escritorio', vista:'buzon', txt:'Entrar al buz\u00f3n borraba la cola y '
+          + 'la dejaba en \u00abcargando\u2026\u00bb cada vez, aunque no hubiera cambiado nada. '
+          + 'Ahora se queda lo que ya hab\u00eda y arriba pone \u00abACTUALIZANDO\u2026\u00bb, para que '
+          + 'sepas que lo que est\u00e1s leyendo es lo \u00faltimo que se pudo traer y no algo '
+          + 'reci\u00e9n llegado. Y si no hay conexi\u00f3n ya no se ve la cola vac\u00eda: eso se '
+          + 'le\u00eda como \u00abno hay reportes\u00bb cuando en realidad no se hab\u00edan podido leer.'}
+      ] },
+    { id:'2026-08-09-login-vuelve', fecha:'2026-08-09',
+      titulo:'Si la sesi\u00f3n caduca, vuelve a salir el bot\u00f3n de entrar',
+      items:[
+        {cara:'escritorio', vista:'panel', txt:'Cuando la sesi\u00f3n se ca\u00eda estando dentro, la '
+          + 'app avisaba y ah\u00ed se quedaba: pantalla muerta, datos de ejemplo con pinta de '
+          + 'reales y nada que pulsar. Ahora vuelve a ofrecerte la entrada con tu cuenta.'},
+        {cara:'movil', vista:'estado', txt:'Lo mismo en el m\u00f3vil: si la sesi\u00f3n caduca mientras '
+          + 'lo usas, vuelve a salir el bot\u00f3n de entrar en vez de dejarte mirando datos que ya '
+          + 'no se actualizan.'}
+      ] },
+    { id:'2026-08-09-banda-carga', fecha:'2026-08-09',
+      titulo:'La banda sana de carga pasa a 70\u2013120',
+      items:[
+        {cara:'movil', vista:'horas', txt:'En \u00abMi carga del mes\u00bb la franja verde iba de '
+          + '60 a 90 y ahora va de 70 a 120, por decisi\u00f3n del Project Director. Se ha '
+          + 'movido tambi\u00e9n la barra y sus n\u00fameros, no solo el r\u00f3tulo: si no, dir\u00eda una '
+          + 'cosa y pintar\u00eda otra.'}
+      ] },
     { id:'2026-08-09-plazo-escritorio', fecha:'2026-08-09',
       titulo:'El escritorio tambi\u00e9n dice el plazo en palabras',
       items:[
