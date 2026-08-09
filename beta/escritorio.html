@@ -108,11 +108,11 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=4598a26"></script>
+<script src="comun.js?v=9db88eb"></script>
 <script src="notis.escritorio.js?v=5f0a77e"></script>
 <script src="cierre.escritorio.js?v=61476db"></script>
 <script src="turnos.escritorio.js?v=f0af960"></script>
-<script src="buzon.escritorio.js?v=9547be6"></script>
+<script src="buzon.escritorio.js?v=517ccb7"></script>
 <script src="documentos.escritorio.js?v=1918b5e"></script>
 <script src="sanciones.escritorio.js?v=b179a34"></script>
 <script src="reuniones.escritorio.js?v=d49562f"></script>
@@ -1591,6 +1591,13 @@ V.reclutar={g:'Equipo',t:'Reclutamiento',f:function(){
    siguen siendo pasos aparte, y la vista previa es un Artifact, nunca produccion.
    ─────────────────────────────────────────────────────────────────────────── */
 var BUZON=null, BUZON_ERR=null, BUZON_SEL=null;
+/* ⛔ «SE ESTÁ ACTUALIZANDO» ES UN ESTADO APARTE DEL DATO, y por eso existe esta variable
+   en vez de volver a poner `BUZON=null`. Daniel (09/08): *«que cuando se recarguen los
+   datos … no empiece de 0»*. Poner el dato a `null` **borra lo que ya tenías** cada vez
+   que vuelves a entrar, aunque no haya cambiado nada.
+   ⚠️ Y la versión equivocada del arreglo es dejar lo viejo **callado**: entonces se lee
+   como fresco, que es peor que el hueco — es el fallo del lote de sanciones congelado. */
+var BUZON_CARGANDO=false;
 /* Lo que Daniel va escribiendo en la caja de anotaciones, por reporte. Vive FUERA del
    DOM a proposito: `pintar()` reconstruye la vista entera y se llevaria por delante el
    texto a medio escribir. Con esto, un repintado -o volver de otra pestaña- lo devuelve.
@@ -1705,6 +1712,8 @@ V.buzon={g:'Buzón',t:'Reportes',f:function(){
     return pan('Buzón','', vacioSimple('Esta cola es del Project Director',
       'Los reportes llevan lo que la gente escribe cuando algo le molesta, así que no son '+
       'material de consulta general. Para reportar algo, usa el menú de arriba a la derecha.'));
+  /* ⛔ `null` = **nunca se ha cargado**: ahí no hay nada que conservar y el hueco es honesto.
+     Con dato ya cargado NO se vacía: se enseña y se marca abajo que se está actualizando. */
   if(BUZON===null) return pan('Buzón','cargando…',
     '<div class="nota" style="border-top:0">Pidiendo la cola al servidor…</div>');
   if(BUZON_ERR) return pan('Buzón','no se pudo leer',
@@ -1716,7 +1725,14 @@ V.buzon={g:'Buzón',t:'Reportes',f:function(){
      mismo fallo puede estar en uno y no en el otro. Saber donde se acumulan es la mitad
      del triaje. */
   var enCara=function(c){ return abiertos.filter(function(r){ return (r.cara||'')===c; }).length; };
-  return '<div class="chips">'+
+  /* ⛔ Y SE DICE QUE SE ESTÁ ACTUALIZANDO. Conservar el dato viejo **callando** sería peor que
+     vaciar la pantalla: se leería como fresco, que es el fallo del lote de sanciones
+     congelado. La chapa va la PRIMERA porque es la que cambia cómo se lee todo lo de al lado. */
+  return (BUZON_CARGANDO
+      ? '<div class="chips"><span class="chip wa">ACTUALIZANDO… <b style="color:var(--ink)">'+
+        'lo de abajo es lo último que se pudo leer</b></span></div>'
+      : '')+
+    '<div class="chips">'+
       '<span class="chip">ABIERTOS <b style="color:var(--ink)">'+abiertos.length+'</b></span>'+
       '<span class="chip">MÓVIL <b style="color:var(--ink)">'+enCara('movil')+'</b></span>'+
       '<span class="chip">ESCRITORIO <b style="color:var(--ink)">'+enCara('escritorio')+'</b></span>'+
@@ -2126,7 +2142,9 @@ function _cablearSalir_(){
         if(x.dataset.mnu==='novedades'){ if(_puedeVerNovedades_()) ir('novedades'); return; }
         if(x.dataset.mnu==='cierre'){ ir('cierre'); return; }
         if(x.dataset.mnu==='reportar'){ reportarModal(); return; }
-        if(x.dataset.mnu==='buzon'){ BUZON=null; ir('buzon'); _cargarBuzon_(); return; }
+        /* ⛔ NO se pone `BUZON=null`: eso vaciaba la pantalla en cada visita. Se conserva
+           lo que hay y `_cargarBuzon_` marca que está actualizando. */
+        if(x.dataset.mnu==='buzon'){ ir('buzon'); _cargarBuzon_(); return; }
       };
     });
   }
@@ -2205,7 +2223,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='20444d8';
+var BUILD='b68801f';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

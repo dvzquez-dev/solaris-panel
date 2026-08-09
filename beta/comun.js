@@ -510,7 +510,10 @@ function _avisarSesionMuerta_(){
      sola (`if(SESION) return;`). Fallar hacia \xabte ofrezco entrar\xbb cuesta un gate de m\u00e1s;
      fallar hacia \xabte lo digo y ya\xbb deja a alguien decidiendo sobre datos inventados.
      \u26a0\ufe0f Va por el nombre y con guarda porque **cada cara tiene su puerta**: en el escritorio
-     es `_arrancarGis_`; el m\u00f3vil a\u00fan no la tiene, y ah\u00ed esto no hace nada en vez de reventar. */
+     es `_arrancarGis_` \u2014 y **el m\u00f3vil TAMBIEN la tiene** (`movil.html`), as\u00ed que esto
+     arregla LAS DOS. \u26d4 Aqu\u00ed escrib\u00ed primero que el m\u00f3vil no la ten\u00eda: **era falso**, y se
+     vio ejecutando. La guarda se queda igual, pero por su raz\u00f3n de verdad: cuesta nada, y
+     el d\u00eda que una cara la pierda esto no puede reventar **justo al caducar la sesi\u00f3n**. */
   try{ if (typeof _arrancarGis_ === 'function') _arrancarGis_(); }catch(_){}
   return true;
 }

@@ -268,9 +268,22 @@ async function reportarModal(){
 function _estBuzon_(e){ return EST_BUZON[e]||[String(e||'—'),'']; }
 
 async function _cargarBuzon_(){
-  if(typeof backendOK==='undefined' || !backendOK || !SESION){ BUZON=[]; BUZON_ERR='sin conexión'; return; }
+  /* ⛔ SE MARCA QUE SE ESTÁ ACTUALIZANDO, y NO se vacía el dato. Daniel (09/08): *«que
+     cuando se recarguen los datos … no empiece de 0»*. Antes, entrar al buzón ponía
+     `BUZON=null` y la pantalla volvía a «cargando…» aunque la cola fuera la misma.
+     ⚠️ Y conservar **callando** sería peor: lo viejo se leería como fresco. Por eso hay
+     un estado propio (`BUZON_CARGANDO`) que la vista enseña. */
+  BUZON_CARGANDO=true; try{ pintar(); }catch(_){}
+  if(typeof backendOK==='undefined' || !backendOK || !SESION){
+    BUZON_CARGANDO=false;
+    /* ⛔ Sin conexión NO se borra lo que ya había: se dice el motivo y se deja mirar. Con
+       `BUZON=[]` la cola parecía **vacía**, que no es lo mismo que **no leída**. */
+    if(BUZON===null) BUZON=[];
+    BUZON_ERR='sin conexión'; try{ pintar(); }catch(_){} return;
+  }
   try{ BUZON=await api.getBuzon(); BUZON_ERR=null; }
-  catch(e){ BUZON=[]; BUZON_ERR=(e&&e.message)||String(e); }
+  catch(e){ if(BUZON===null) BUZON=[]; BUZON_ERR=(e&&e.message)||String(e); }
+  BUZON_CARGANDO=false;
   pintar();
 }
 

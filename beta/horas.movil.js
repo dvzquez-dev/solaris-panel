@@ -1218,20 +1218,20 @@ function vHoras(){
        primero, y al lado con que se compara. El historial se fue al fondo. */
     _rankSubsHTML_()+
 
-    '<h2 class="sec">Mi carga del mes<span class="ln"></span>banda sana 60–90</h2>'+
+    '<h2 class="sec">Mi carga del mes<span class="ln"></span>banda sana 70–120</h2>'+
     '<div class="tarj">'+
       (typeof YO.carga==='number'
         ? '<div style="position:relative;height:30px;margin:4px 0 8px">'+
             '<div style="position:absolute;top:11px;left:0;right:0;height:8px;border-radius:5px;background:var(--sur2)"></div>'+
-            '<div style="position:absolute;top:11px;left:33.3%;width:16.7%;height:8px;background:#1d3a2b"></div>'+
+            '<div style="position:absolute;top:11px;left:38.9%;width:27.8%;height:8px;background:#1d3a2b"></div>'+
             '<div style="position:absolute;top:6px;left:calc('+Math.min(100,YO.carga/1.8).toFixed(1)+'% - 1.5px);width:3px;height:18px;'+
               'background:var(--red);border-radius:2px;box-shadow:0 0 8px rgba(228,30,37,.55)"></div>'+
-            '<span style="position:absolute;top:-2px;left:33.3%;font-family:var(--mono);font-size:9px;color:var(--ink3)">60</span>'+
-            '<span style="position:absolute;top:-2px;left:50%;font-family:var(--mono);font-size:9px;color:var(--ink3)">90</span>'+
+            '<span style="position:absolute;top:-2px;left:38.9%;font-family:var(--mono);font-size:9px;color:var(--ink3)">70</span>'+
+            '<span style="position:absolute;top:-2px;left:66.7%;font-family:var(--mono);font-size:9px;color:var(--ink3)">120</span>'+
           '</div>'+
           '<div class="fila" style="padding-bottom:0;border:0"><div class="a"><b>Carga '+nf(YO.carga,0)+'</b>'+
           (YO.desglose?'<small>de este mes '+nf(YO.desglose.aporta_mes_actual||0,0)+' · arrastre '+nf(YO.desglose.arrastre||0,0)+'</small>':'')+
-          '</div><div class="d">banda sana 60–90</div></div>'
+          '</div><div class="d">banda sana 70–120</div></div>'
         : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+
     '</div>'+
     '<h2 class="sec">Ranking de horas<span class="ln"></span>temporada '+DATA.temporada+'</h2>'+
