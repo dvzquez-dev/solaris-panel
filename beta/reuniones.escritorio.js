@@ -19,6 +19,12 @@ function normReu(r){ r=r||{};
     franjas:Array.isArray(r.franjas)?r.franjas:[], bloques:Array.isArray(r.bloques)?r.bloques:[],
     total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null,
     ordenDia:r.ordenDia||"", vision:r.vision||"anonima",
+    /* `slot` (la casilla que se pinta) y `duracion` (lo que hay que juntar seguido), con
+       EL MISMO respaldo que el movil (`_normReuM_`). Aqui se TIRABAN los dos, asi que el
+       panel de fijar no tenia con que exigir el minimo: se podia fijar una reunion de 1 h 30
+       en media hora **sin un aviso**. Y esta es la cara donde se fija. */
+    slot:+r.slot || ((Array.isArray(r.franjas)?r.franjas:[])[0] && +r.franjas[0].dur) || 60,
+    duracion:+r.duracion || 0,
     fijada:_labelFijada_(r.fijada), fijadaBl:_bloquesFijada_(r)}; }
 
 /* El backend manda `fijada` como objeto {fecha,franjas,bloques,label,iso}; pintarlo tal
@@ -353,7 +359,13 @@ function _fijarPanel_(){
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
       'Elige el hueco con el mapa de calor delante. Al fijarla, la disponibilidad se cierra '+
-      'y el hueco elegido sale <b>en verde</b> en el mapa de todo el mundo.</p>'+
+      'y el hueco elegido sale <b>en verde</b> en el mapa de todo el mundo.'+
+      /* Se DICE el minimo antes de intentarlo: un aviso al pulsar llega tarde y se lee
+         como un fallo de la app. Con reuniones de antes del modelo (`duracion` 0) el
+         minimo es 1 y no se dice nada, que es como se comportaba siempre. */
+      (_slotsMin_(r.duracion, r.slot)>1
+        ? (' Dura <b>'+_slotsMin_(r.duracion, r.slot)+' franjas</b> ('+_durTxt_(r.duracion)+
+           '), asi que no se puede fijar en menos.') : '')+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
       '<label style="flex:2;min-width:190px">'+lab('Reunión')+
         '<select id="reSel" style="'+E+'">'+opts+'</select></label>'+

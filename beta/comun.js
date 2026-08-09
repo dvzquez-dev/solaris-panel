@@ -1288,6 +1288,15 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-09-fijar-minimo', fecha:'2026-08-09',
+      titulo:'Fijar una reunión ya no la deja en menos de lo que dura',
+      items:[
+        {cara:'escritorio', vista:'reuniones', txt:'Al fijar la fecha, «Desde» y «Hasta» '
+          + 'admitían cualquier cosa: una reunión de 1 h 30 se podía fijar en media hora y '
+          + 'nadie avisaba. Ahora el panel dice cuántas franjas dura, se estira sola al '
+          + 'mínimo si te quedas corto —y te lo dice— y no deja fijarla si desde esa hora no '
+          + 'cabe entera. El móvil ya lo hacía; esta es la pantalla donde de verdad se fija.'}
+      ] },
     { id:'2026-08-08-arreglos-web', fecha:'2026-08-08',
       titulo:'Tres arreglos que solo se ven cuando algo va mal',
       items:[
