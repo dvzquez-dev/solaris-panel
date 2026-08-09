@@ -71,7 +71,9 @@ function colaDecision(){
       limite:r0.limite||'sin l\u00edmite'});
     if(r.cubren>=r.conv) return;
     out.push({ic:'i-cal',b:'\u00ab'+esc(r.tit)+'\u00bb sin fijar',
-      s:r.cubren+' de '+r.conv+' han cubierto \u00b7 cierra el '+r.limite,
+      /* ⛔ EL PLAZO EN PALABRAS, igual que en el móvil: aquí salía la fecha cruda, así que
+         quien coordina veía dos textos distintos para el mismo dato según la pantalla. */
+      s:r.cubren+' de '+r.conv+' han cubierto \u00b7 '+_plazoTxt_(r.limite),
       chip:'<span class="chip">reunión</span>',ir:'dispo',foco:'reu-'+r.id});
   });
   return out;

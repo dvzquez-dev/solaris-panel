@@ -388,6 +388,28 @@ function _diasHasta_(ms){
    rojo siempre y el aviso deja de significar nada. */
 var _DIAS_PRISA_ = 3;
 
+/* ⛔ EL PLAZO EN PALABRAS — PARA LAS DOS CARAS.
+   Nació en el móvil el 09/08 y el escritorio seguía enseñando la fecha cruda: **el mismo plazo
+   dicho de dos formas se lee como dos cosas**, y el que coordina mira las dos pantallas.
+
+   ⛔ **Acepta los DOS formatos de fecha**, y esto no es cosmético: el backend manda `AAAA-MM-DD`
+   y las semillas y Notion, `DD/MM/AAAA`. Con solo ISO, una fecha del otro formato daba
+   **«sin límite»** — o sea, la pantalla diciéndote que no hay plazo cuando sí lo hay, que es
+   justo el fallo que no da error y te cuesta puntos.
+
+   ⚠️ Las **palabras** son las de una reunión (*cierra*). Una tarea *vence*, y esa pantalla tiene
+   las suyas: lo que comparten es la **cuenta** (`_diasHasta_`), no el verbo. */
+function _plazoTxt_(limite){
+  var iso = _dmyAISO_(String(limite == null ? '' : limite)).slice(0, 10);
+  var dias = _diasHasta_(Date.parse(iso));
+  if (dias === null) return 'sin l\u00edmite';
+  if (dias < 0)  return 'el plazo cerr\u00f3 el ' + _isoADMY_(iso);
+  if (dias === 0) return 'cierra HOY';
+  if (dias === 1) return 'cierra ma\u00f1ana';
+  if (dias <= _DIAS_PRISA_) return 'cierra en ' + dias + ' d\u00edas';
+  return 'cierra el ' + _isoADMY_(iso);
+}
+
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
 
 function _hmMin_(m){                       // minutos -> 'HH:MM'
@@ -1311,6 +1333,15 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-09-plazo-escritorio', fecha:'2026-08-09',
+      titulo:'El escritorio tambi\u00e9n dice el plazo en palabras',
+      items:[
+        {cara:'escritorio', vista:'equipo', txt:'En el panel de convocatorias, cada reuni\u00f3n '
+          + 'dec\u00eda «cierra el 20/08/2026» mientras el m\u00f3vil ya dec\u00eda «cierra HOY». Ahora las dos '
+          + 'caras usan el mismo texto. Y de paso entiende las fechas en los dos formatos: con '
+          + 'una en formato DD/MM/AAAA antes sal\u00eda «sin l\u00edmite», o sea la pantalla diciendo que '
+          + 'no hay plazo cuando s\u00ed lo hay.'}
+      ] },
     { id:'2026-08-09-aviso-portada', fecha:'2026-08-09',
       titulo:'El aviso de la portada dice si el plazo es HOY',
       items:[

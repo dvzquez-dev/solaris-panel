@@ -24,15 +24,10 @@ function _limM_(R){ var l=R&&R.limite; if(!l) return 'sin límite'; l=String(l).
    ⚠️ Y el corte de «pronto» son 3 dias a proposito: con una semana, media lista saldria en
    rojo siempre y el aviso dejaria de significar nada. */
 function _plazoTxtM_(r){
-  /* ⛔ LA CUENTA NO SE HACE AQUÍ: `_diasHasta_` en `comun.js`. Tareas hace la misma y
-     escribirla dos veces son dos reglas — empezando por el corte de «corre prisa». */
-  var dias=_diasHasta_(_limMsM_(r));
-  if(dias===null) return 'sin l\u00edmite';
-  if(dias<0)   return 'el plazo cerr\u00f3 el '+_limM_(r);
-  if(dias===0) return 'cierra HOY';
-  if(dias===1) return 'cierra ma\u00f1ana';
-  if(dias<=_DIAS_PRISA_) return 'cierra en '+dias+' d\u00edas';
-  return 'cierra el '+_limM_(r);
+  /* ⛔ UN ADAPTADOR, NO UNA COPIA. El texto lo decide `_plazoTxt_` en `comun.js`, que usan las
+     dos caras; aquí solo se saca el campo de la reunión. Cuando esto era una función entera, el
+     escritorio enseñaba la fecha cruda porque su cara no la tenía. */
+  return _plazoTxt_(r && r.limite);
 }
 
 function _msDeDDMM_(dd, base){
