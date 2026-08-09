@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=ddb5505"></script>
+<script src="comun.js?v=4a714ff"></script>
 <script src="notis.movil.js?v=2f74e23"></script>
 <script src="cierre.movil.js?v=72a5e2f"></script>
 <script src="tareas.movil.js?v=9c56fc2"></script>
@@ -952,7 +952,8 @@ var SEQ=6;
    ⚠️ Y ESTO ES DE CARA, NO SEGURIDAD. El backend solo exige rango>=1 en `pushSancion`: la
    frontera de verdad esta ahi y todavia no comprueba a QUIEN se sanciona. Mientras tanto, esto
    evita el error honesto, no al que quiera saltarselo. */
-var PD_SANC = 'Daniel V\u00e1zquez Pi\u00f1eiro';
+/* PD_SANC se retir\u00f3 el 09/08: la regla de sanciones mira el RANGO (3 = PD) y no
+   el nombre. Una proteccion escrita con el nombre de una persona sobrevive al cargo. */
 /* La tabla es EXPLICITA a proposito: el modelo dice que el cargo no basta -«no necesariamente
    por pertenecer al consejo se tendra rango 1 sino rango 0»- y que lo que da el rango 1 es
    tener gente debajo. Deducirlo del cargo daria autoridad a quien no manda sobre nadie. */
@@ -1354,7 +1355,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='6e7e810';
+var BUILD='63cd24e';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';

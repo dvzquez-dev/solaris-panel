@@ -489,7 +489,10 @@ function puedeSancionarA(actor, objetivo){
   var r = rangoSanc(actor);
   if (r <= 0) return false;
   if (r >= 3) return true;                                   // el PD, a cualquiera
-  if (r === 2) return String(objetivo) !== PD_SANC;          // rango 2, a todos menos al PD
+  /* Rango 2: a todos menos a quien tenga MAS rango que el. Se mira el RANGO y no el
+     nombre: escrito con el nombre dentro, el dia que cambie el PD el nuevo queda
+     DESPROTEGIDO y el anterior sigue blindado. Lo comprueba `probar_sancionar.py`. */
+  if (r === 2) return rangoSanc(objetivo) < 3;
   /* Rango 1: a si mismo y a los suyos. */
   if (String(objetivo) === String(actor)) return true;
   var a = _mSanc_(actor), o = _mSanc_(objetivo);
