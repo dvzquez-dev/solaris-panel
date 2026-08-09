@@ -498,7 +498,20 @@ function _avisarSesionMuerta_(){
   if (!_sesionMuerta_() || window.__SESION_MUERTA_DICHA) return false;
   window.__SESION_MUERTA_DICHA = true;
   tost('Tu sesi\u00f3n ha caducado: esta pantalla ya NO se est\u00e1 actualizando y lo que ves '+
-       'puede ser de hace horas. Recarga y vuelve a entrar.', {fijo:true});
+       'puede ser de hace horas. Vuelve a entrar.', {fijo:true});
+  /* \u26d4 Y NO BASTA CON DECIRLO: SE VUELVE A OFRECER LA ENTRADA.
+     Daniel (09/08): *\xabno me inicia sesi\u00f3n en escritorio\xbb*. Medido en la beta publicada:
+     `SESION` a `null`, **ning\u00fan gate en el DOM** y la app pintada con la semilla de demo y
+     una identidad que **no es la suya**. La funci\u00f3n que pinta el login estaba **bien** \u2014
+     llamada a mano aparece entera\u2014: lo que faltaba es que **alguien la llamara** cuando la
+     sesi\u00f3n se muere en marcha. El aviso dec\u00eda \xabrecarga y vuelve a entrar\xbb y dejaba la
+     pantalla sin **nada que pulsar**.
+     \u26a0\ufe0f La direcci\u00f3n no puede hacer da\u00f1o: si a\u00fan hubiera sesi\u00f3n, `_arrancarGis_` se planta
+     sola (`if(SESION) return;`). Fallar hacia \xabte ofrezco entrar\xbb cuesta un gate de m\u00e1s;
+     fallar hacia \xabte lo digo y ya\xbb deja a alguien decidiendo sobre datos inventados.
+     \u26a0\ufe0f Va por el nombre y con guarda porque **cada cara tiene su puerta**: en el escritorio
+     es `_arrancarGis_`; el m\u00f3vil a\u00fan no la tiene, y ah\u00ed esto no hace nada en vez de reventar. */
+  try{ if (typeof _arrancarGis_ === 'function') _arrancarGis_(); }catch(_){}
   return true;
 }
 
