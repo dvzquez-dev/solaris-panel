@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=93b9f99"></script>
+<script src="comun.js?v=0a521f3"></script>
 <script src="notis.escritorio.js?v=5f0a77e"></script>
 <script src="cierre.escritorio.js?v=61476db"></script>
 <script src="turnos.escritorio.js?v=f0af960"></script>
@@ -678,13 +678,19 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
           '<p style="margin:0;font-size:11.5px;color:var(--ink3);line-height:1.6;text-align:center">'+
           'Media de puntos de todo el equipo, sobre 10. Los tres primeros tramos, en '+
           '<b style="color:var(--ink2)">ámbar</b>, son la zona de riesgo disciplinario.</p></div>')+
-      pan(mesReal?'Este mes':'Media de la temporada', mesReal?'julio 2026':'sobre '+baseMes.length+' personas',
+      /* ⛔ DECÍA 'julio 2026' A MANO, y seguía diciéndolo en agosto. El mes se DERIVA de la
+         fecha con `_mesLargo_`, que es la misma puerta que usa el resto de la app. */
+      pan(mesReal?'Este mes':'Media de la temporada', mesReal?_mesLargo_(new Date()):'sobre '+baseMes.length+' personas',
         '<div class="pb">'+
           '<div class="chips">'+
             '<span class="chip">TOTAL <b style="color:var(--ink)">'+h1(totMes)+'</b>'+(parcial?' <span style="color:var(--warn)">(parcial)</span>':'')+'</span>'+
             '<span class="chip">MEDIA <b style="color:var(--ink)">'+(baseMes.length?nf(totMes/baseMes.length,1):'—')+' h</b></span>'+
             '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+h1(UMBRAL)+'</b></span>'+
-            '<span class="chip">CIERRA <b style="color:var(--ink)">31/07</b></span>'+
+            /* ⛔ AQUÍ HABÍA 'CIERRA 31/07', escrito a mano. Y no es solo que estuviera
+               viejo: **un mes NO cierra el último día del calendario** — cierra cuando se
+               aplica el cierre (julio cerró el 4 de agosto, `ARRANQUE.md` §2b). Esta vista
+               no carga el plan de cierre, así que **no sabe la fecha**: se quita la chapa en
+               vez de poner otra inventada. Volverá cuando el panel traiga `cierre_plan`. */
           '</div>'+
           insightsHTML()+
         '</div>')+
@@ -889,8 +895,16 @@ V.registro={g:'Horas',t:'Registro del mes',f:function(){
     '<span class="chip">MEDIA <b style="color:var(--ink)">'+h1(tot/VIS.length)+'</b></span>'+
     '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+h1(UMBRAL)+'/mes</b></span>'+
     (VIS.length<DATA.miembros.length?'<span class="chip wa">solo '+VIS.length+' de '+DATA.miembros.length+' visibles</span>':'')+'</div>'+
-    pan('Horas por miembro · julio 2026','confirmadas',
-      tabla([['Miembro'],['Unidad'],['Julio',1],['Junio',1],['Δ',1],['vs. objetivo',1]],
+    /* ⛔ EL TÍTULO Y LAS DOS COLUMNAS IBAN A MANO ('julio 2026', 'Julio', 'Junio') y
+       seguían diciéndolo en agosto: la tabla presentaba las horas de ESTE mes como si
+       fueran las de julio. Es el mismo fallo que Daniel reportó en el móvil — «está
+       comparando con junio en lugar de con julio» — vivo en la otra cara.
+       ⚠️ La columna anterior se rotula **«Mes anterior»** y no con un nombre: `hAnt`
+       viaja con su propio `mesAnt` por persona, así que una cabecera única no puede
+       decir de qué mes es sin mentirle a alguien. El fallo no era comparar con junio:
+       era **decir que era julio**. */
+    pan('Horas por miembro · '+_mesLargo_(new Date()),'confirmadas',
+      tabla([['Miembro'],['Unidad'],[MESES_L[new Date().getMonth()],1],['Mes anterior',1],['Δ',1],['vs. objetivo',1]],
         VIS.slice().sort(function(a,b){return (b.hMes||0)-(a.hMes||0);}).map(function(m){
           /* hAnt (mes anterior) NO existe en el dato real del panel: hoy nadie lo
              sirve. Antes de inventarlo, se dice que no esta. */
@@ -2229,7 +2243,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='072a2ae';
+var BUILD='72f852c';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

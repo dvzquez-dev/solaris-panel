@@ -1403,6 +1403,15 @@ function _novedades_(){
           + 'lo usas, vuelve a salir el bot\u00f3n de entrar en vez de dejarte mirando datos que ya '
           + 'no se actualizan.'}
       ] },
+    { id:'2026-08-10-mes-rotulado', fecha:'2026-08-10',
+      titulo:'El panel dec\u00eda \u00abjulio\u00bb en agosto',
+      items:[
+        {cara:'escritorio', vista:'panel', txt:'El mes iba escrito a mano en cuatro '
+          + 'sitios, as\u00ed que en agosto tus horas de este mes se presentaban como las '
+          + 'de julio. Ahora el mes sale de la fecha. Y la chapa \u00abCIERRA 31/07\u00bb se ha '
+          + 'quitado: un mes no cierra el \u00faltimo d\u00eda del calendario, y esa pantalla no '
+          + 'sabe la fecha real \u2014 mejor no decirla que inventarla.'}
+      ] },
     { id:'2026-08-09-carga-viva', fecha:'2026-08-09',
       titulo:'La carga que ve\u00edas era de julio',
       items:[
