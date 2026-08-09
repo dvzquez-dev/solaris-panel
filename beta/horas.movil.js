@@ -864,9 +864,21 @@ function _normPDec_(p){
     estado:p.estado, origen:p.origen||null };
 }
 
+/* ⛔ EL PERIODO CERRADO, para no ofrecer un botón que el servidor va a negar. `getCierre`
+   es del PD, que es justo quien ve este panel; si falla se queda en `null` y **todo sigue
+   como antes** — la cara es cortesía, el que se planta es el backend. */
+var CIERRE_PLAN = null;
+
+function _cargarCierrePlan_(){
+  if (!(api && api.getCierre)) return Promise.resolve(null);
+  return api.getCierre().then(function(c){
+    CIERRE_PLAN = (c && c.plan) || null; return CIERRE_PLAN;
+  }).catch(function(){ return null; });   /* ⛔ un fallo NO se lee como «mes abierto» */
+}
+
 function _cargarPartesDec_(){
   /* Los que esperan decisión, **sin** los tuyos: el backend ya te sirve solo lo que te toca. */
-  return api.getPartes({}).then(function(arr){
+  return _cargarCierrePlan_().then(function(){ return api.getPartes({}); }).then(function(arr){
     if(!Array.isArray(arr)) return;
     var yo=(YO&&YO.nombre)||'';
     PARTES_DEC = arr.filter(function(p){
@@ -876,9 +888,15 @@ function _cargarPartesDec_(){
        viaje para datos que ya vienen en el primero -- `getPartes` devuelve la cola entera que
        te toca ver--, y ademas abriria la puerta a que las dos listas se contradigan porque
        cada una vio una foto distinta. */
+    /* ⛔ Se quedan en la lista y se MARCAN, no se esconden: esconderlos deja la misma
+       pregunta sin respuesta («¿dónde está el parte que firmé?») y encima calla el motivo. */
     PARTES_REV = arr.filter(function(p){
       return _pdRevertible_(p) && p.autor!==yo;
-    }).map(_normPDec_);
+    }).map(function(p){
+      var n = _normPDec_(p);
+      n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN);
+      return n;
+    });
   }).catch(function(){});
 }
 
@@ -991,11 +1009,25 @@ function _pdRevFichaHTML_(p){
      revertir una aplicada emite una contraparte que RESTA de su ficha. Decir lo mismo en los
      dos casos es esconder el unico que importa. */
   var enFicha = p.estado==='aplicada';
-  return '<div class="pdi" data-pdr="'+p.id+'">'+
+  /* ⛔ LA CABECERA SE MONTA UNA SOLA VEZ. La tuve duplicada un rato -una copia para el mes
+     cerrado y otra para el normal- y eso, además de invitar a que las dos diverjan, dejó
+     **un ancla de mutación apuntando a dos sitios**: la protección queda afirmada y sin
+     verificar, porque una mutación que no sabe dónde ir NO SE HACE. */
+  var cab = '<div class="pdi" data-pdr="'+p.id+'">'+
         '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
           '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(PD_EST[p.estado]||p.estado)+'</small></div>'+
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
-        '<div class="pdt">'+esc(p.t)+'</div>'+
+        '<div class="pdt">'+esc(p.t)+'</div>';
+  /* ⛔ MES CERRADO: ni botón ni caja de motivo, y **se dice por qué**. Sus horas ya están
+     en Notion y de ahí salió la cuota; la contraparte negativa se restaría del mes EN
+     CURSO — horas de otro mes, a alguien que no ha hecho nada, y sin dar error. */
+  if (p.cerrado){
+    return cab+
+        '<span class="pdw">Mes cerrado ('+esc(p.cerrado)+'): ya no se revierte. '+
+          'Esas horas ya cuentan y de ahí salió la cuota.</span>'+
+      '</div>';
+  }
+  return cab+
         '<span class="pdw">'+(enFicha
           ? 'Ya sumadas: revertir le RESTA '+nf2(p.q)+' h de su ficha'
           : 'Aun no cuenta: revertir lo devuelve a la cola')+'</span>'+

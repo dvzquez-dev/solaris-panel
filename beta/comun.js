@@ -376,6 +376,40 @@ function _apiParse(txt, accion){
    que aquí significaría «vence HOY» y mandaría a correr por nada (§3c-24 de ARRANQUE).
    ⚠️ Y **hacia abajo**: `Math.floor`, así que cualquier negativo es «ya pasó». Redondear al alza
    daría «mañana» el día que vence. */
+/* ══ ¿DE QUÉ MES ES ESTE PARTE, Y ESTÁ CERRADO? ═════════════════════════════
+   Daniel (09/08): *«me salen para revocar aún cosas del mes anterior, eso no se debería poder
+   revocar si es del mes anterior uno ya cerrado (hablamos de mes contable, o sea que el de
+   julio acabó el 4 de agosto)»*.
+
+   ⛔ LA FECHA DE UN PARTE NO ES `fin`. En los que salen de un FICHAJE, `ini` y `fin` son
+   HORAS SUELTAS (`'22:45'`) y la fecha vive en `creado_at`. Coger «el primero que exista» se
+   queda con la hora y devuelve mes vacío — o sea **NO bloquea**, que es lo contrario de lo
+   que se pide. Al backend se lo destaparon los DATOS REALES: de 11 partes en vivo, **7**
+   tenían `fin` en `HH:MM`, y uno era de julio con julio ya cerrado.
+   ⚠️ La regla se ESPEJA a propósito (`_fechaDeParte_` en el `.gs`): son dos runtimes, y lo
+   que las ata es una comprobación de **simetría**, no de corrección (§3c-9). */
+function _periodoParte_(p){
+  var c = [p && p.fin, p && p.ini, p && p.creado_at], i, s;
+  for (i = 0; i < c.length; i++){
+    s = String(c[i] == null ? '' : c[i]);
+    if (/^\d{4}-\d{2}/.test(s)) return s.slice(0, 7);
+  }
+  return null;                    /* ⛔ `null` = «no lo sé», nunca '' (§3c-24) */
+}
+
+/* El periodo cerrado si el parte cae dentro de él; `false` si está abierto; **`null` cuando
+   no se sabe** — y quien recibe el `null` **NO bloquea**.
+   ⛔ La dirección importa y es al revés de lo habitual: el servidor YA se planta (v68), así
+   que esto es **cortesía**. Fallar hacia «ofrecer» deja que el servidor explique; fallar
+   hacia «esconder» quita una acción legítima **sin decir por qué**, y eso no se puede
+   depurar desde el móvil. */
+function _mesCerradoParte_(p, plan){
+  if (!plan || !plan.aplicado || !plan.periodo) return null;
+  var per = _periodoParte_(p);
+  if (!per) return null;
+  return per <= String(plan.periodo) ? String(plan.periodo) : false;
+}
+
 function _diasHasta_(ms){
   var t = +ms;
   if (ms == null || !isFinite(t)) return null;
