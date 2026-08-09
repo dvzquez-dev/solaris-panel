@@ -1288,6 +1288,15 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-09-dura-reunion', fecha:'2026-08-09',
+      titulo:'Ahora se ve cuánto dura cada reunión, antes de abrirla',
+      items:[
+        {cara:'movil', vista:'reu', txt:'En Reuniones, cada una dice lo que dura junto a '
+          + 'cuándo cierra y a cuánta gente hay convocada — «cierra el 20/08 · 12 convocados · '
+          + 'dura 1 h 30 min». Antes ese dato solo aparecía al abrir «Cubrir mi disponibilidad», '
+          + 'así que no sabías si te cuadraba hasta estar dentro. Las reuniones creadas antes de '
+          + 'este modelo no lo traen y no dicen nada, en vez de inventarse una hora.'}
+      ] },
     { id:'2026-08-09-fijar-minimo', fecha:'2026-08-09',
       titulo:'Fijar una reunión ya no la deja en menos de lo que dura',
       items:[

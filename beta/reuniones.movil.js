@@ -283,6 +283,18 @@ function _proxReuHTML_(){
       (R.fijada?'fijada':(R.exento?'organizas':(R.cubierta?'cubierta':'te falta')))+'</span></div></div></div>';
 }
 
+/* ⛔ CUANTO DURA LA REUNION, EN UNA SOLA FORMA. Hasta el 09/08 el dato existia (`duracion`)
+   y **no se enseñaba en ninguna parte** hasta abrir el modal de marcar: un miembro veia
+   «cierra el 12 · 18 convocados» sin saber si eran 30 min o dos horas, que es justo lo que
+   decide si le cuadra. Es la misma leccion que el fallo del escritorio de esta noche: **el
+   minimo tiene que VERSE, no solo cumplirse**.
+   ⚠️ Devuelve **cadena vacia** si la reunion no trae `duracion` — las de antes de este modelo
+   no la tienen, y ahí inventar «1 h» seria peor que callar. */
+function _duraTxtM_(r){
+  var d = +(r && r.duracion) || 0;
+  return d > 0 ? ' \u00b7 dura ' + _durTxt_(d) : '';
+}
+
 function vReu(){
   if(_reunionesCargando_())
     return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
@@ -447,12 +459,14 @@ function vReu(){
           var sel=(x.id===R.id);
           return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
             '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
-            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):'cierra el '+_limM_(x))+' · '+x.nInv+' convocados</small></div>'+
+            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):'cierra el '+_limM_(x))+' · '+x.nInv+' convocados'+
+            _duraTxtM_(x)+'</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':'<span class="chev">›</span>')+'</div></div>'; }).join('')+'</div>'
       : '')+
     '<div class="tarj">'+cab(R.tipo||'General', R.modalidad||'')+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
-      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):'cierra el '+_limM_(R))+' · '+R.nInv+' convocados</small></div>'+
+      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):'cierra el '+_limM_(R))+' · '+R.nInv+' convocados'+
+      _duraTxtM_(R)+'</small></div>'+
       '<div class="d"><span class="pil '+((R.fijada||R.cubierta||R.exento)?'conf':'no')+'">'+
         (R.fijada?'fijada':(R.exento?'organizas':(R.cubierta?'cubierta':'te falta')))+'</span></div></div>'+
       (R.fijada
