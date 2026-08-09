@@ -1218,7 +1218,12 @@ function vHoras(){
        primero, y al lado con que se compara. El historial se fue al fondo. */
     _rankSubsHTML_()+
 
-    '<h2 class="sec">Mi carga del mes<span class="ln"></span>banda sana 70–120</h2>'+
+    /* ⛔ SE LLAMABA «Mi carga del mes» Y NO ES LA CARGA DEL MES. `carga` es el indice de
+       Notion: arrastra un 12 % del mes anterior del anterior y un 18 % del anterior, o sea
+       que un 30 % del numero es historia (`reglas/carga.py`). Y ademas viene del PANEL, que
+       hoy es una foto — el overlay en vivo trae puntos, horas y compensaciones, `carga` no.
+       Daniel: «y la carga del mes que aparece no se si esta bien». Tenia razon. */
+    '<h2 class="sec">Mi índice de carga<span class="ln"></span>banda sana 70–120</h2>'+
     '<div class="tarj">'+
       (typeof YO.carga==='number'
         ? '<div style="position:relative;height:30px;margin:4px 0 8px">'+
@@ -1230,7 +1235,11 @@ function vHoras(){
             '<span style="position:absolute;top:-2px;left:66.7%;font-family:var(--mono);font-size:9px;color:var(--ink3)">120</span>'+
           '</div>'+
           '<div class="fila" style="padding-bottom:0;border:0"><div class="a"><b>Carga '+nf(YO.carga,0)+'</b>'+
-          (YO.desglose?'<small>de este mes '+nf(YO.desglose.aporta_mes_actual||0,0)+' · arrastre '+nf(YO.desglose.arrastre||0,0)+'</small>':'')+
+          /* ⛔ «de este mes» era FALSO: ese reparto se calculo cuando se genero el panel,
+             no hoy. Ahora dice de cuando es, y debajo van las horas VIVAS — que es lo que
+             se puede afirmar del mes en curso sin inventar nada. */
+          (YO.desglose?'<small>índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes '+nf(YO.desglose.aporta_mes_actual||0,0)+' · arrastre '+nf(YO.desglose.arrastre||0,0)+'</small>':'')+
+          (_hMesReal_(YO)!=null?'<small>este mes llevas '+h1(_hMesReal_(YO))+', en vivo</small>':'')+
           '</div><div class="d">banda sana 70–120</div></div>'
         : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+
     '</div>'+

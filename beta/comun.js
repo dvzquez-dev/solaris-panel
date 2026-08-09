@@ -1403,10 +1403,21 @@ function _novedades_(){
           + 'lo usas, vuelve a salir el bot\u00f3n de entrar en vez de dejarte mirando datos que ya '
           + 'no se actualizan.'}
       ] },
+    { id:'2026-08-09-carga-viva', fecha:'2026-08-09',
+      titulo:'La carga que ve\u00edas era de julio',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La tarjeta de carga daba un n\u00famero '
+          + 'calculado el d\u00eda que se gener\u00f3 el panel, no hoy \u2014 y encima se '
+          + 'titulaba \u00abMi carga del mes\u00bb. Ahora dice que es un \u00edndice, de qu\u00e9 '
+          + 'fecha es, y a su lado las horas que llevas este mes en vivo.'},
+        {cara:'escritorio', vista:'panel', txt:'Y en el escritorio las horas del mes '
+          + 'sal\u00edan de esa misma foto aunque el dato al d\u00eda ya hubiera llegado: '
+          + 'ahora manda el dato al d\u00eda.'}
+      ] },
     { id:'2026-08-09-banda-carga', fecha:'2026-08-09',
       titulo:'La banda sana de carga pasa a 70\u2013120',
       items:[
-        {cara:'movil', vista:'horas', txt:'En \u00abMi carga del mes\u00bb la franja verde iba de '
+        {cara:'movil', vista:'horas', txt:'En tu tarjeta de carga la franja verde iba de '
           + '60 a 90 y ahora va de 70 a 120, por decisi\u00f3n del Project Director. Se ha '
           + 'movido tambi\u00e9n la barra y sus n\u00fameros, no solo el r\u00f3tulo: si no, dir\u00eda una '
           + 'cosa y pintar\u00eda otra.'}
