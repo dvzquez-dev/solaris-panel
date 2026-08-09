@@ -1288,6 +1288,15 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-09-aviso-portada', fecha:'2026-08-09',
+      titulo:'El aviso de la portada dice si el plazo es HOY',
+      items:[
+        {cara:'movil', vista:'estado', txt:'El aviso «Te falta cubrir una disponibilidad» '
+          + 'terminaba en «cierra el 20/08/2026»: dentro de una alerta, y aun as\u00ed hab\u00eda que '
+          + 'mirar el calendario. Ahora acaba en «cierra HOY», «cierra ma\u00f1ana» o «el plazo '
+          + 'cerr\u00f3 el 07/08». Es el mismo texto que ver\u00e1s en Reuniones: cuatro sitios diciendo '
+          + 'lo mismo con las mismas palabras.'}
+      ] },
     { id:'2026-08-09-plazo-palabras', fecha:'2026-08-09',
       titulo:'El plazo para cubrir ya se dice en palabras',
       items:[

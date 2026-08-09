@@ -77,7 +77,12 @@ function vEstado(){
     av+='<div class="aviso" data-ir="reu" data-reuid="'+esc(String(_p0.id))+'" data-p>'+
       '<span class="ic"><svg><use href="#i-warn"/></svg></span>'+
       '<div style="flex:1"><b>Te falta cubrir '+(_pend.length>1?(_pend.length+' disponibilidades'):'una disponibilidad')+'</b>'+
-      '<p>«'+esc(_p0.titulo)+'» — cierra el '+_limM_(_p0)+
+      /* ⛔ EL PLAZO EN PALABRAS, no la fecha cruda — y aqui es donde mas se nota: **este
+         aviso existe justo para que no te caigan sanciones** (lo dice el comentario de
+         arriba). «Cierra el 20/08/2026» obliga a mirar el calendario **dentro de una
+         alerta**; «cierra HOY» es la alerta. Misma puerta que la lista, la ficha y la
+         tarjeta del Estado: cuatro sitios diciendo lo mismo con las mismas palabras. */
+      '<p>«'+esc(_p0.titulo)+'» — '+esc(_plazoTxtM_(_p0))+
         (_resto>0 ? (', y '+_resto+' más después') : '')+'.</p></div>'+
       '<span class="chev">›</span></div>';
   }
