@@ -365,6 +365,29 @@ function _apiParse(txt, accion){
 /* Mapea un parte del BACKEND (subsistema/justificacion/estado 'pendiente'…) al modelo que
    pinta el escritorio (unidad/just/estado 'pend'…). Sin datos inventados: los flags de
    calidad de la maqueta no existen en real, salvo los que el propio dato delata. */
+/* ⛔ CUÁNTOS DÍAS QUEDAN, Y SI CORRE PRISA — EN UN SOLO SITIO.
+   Dos pantallas hacen esta cuenta: **Tareas** («vence hoy», desde el 27/07) y **Reuniones**
+   («cierra HOY», desde el 09/08). La segunda copia la escribí yo esa noche, y el proyecto tiene
+   fichado a dónde lleva eso: *dos copias de una regla que nadie compara son dos reglas*. Aquí
+   vive la **cuenta**; las **palabras** se quedan en cada pantalla, porque una tarea «vence» y una
+   reunión «cierra», y eso no es un detalle técnico sino cómo se habla de cada cosa.
+
+   ⛔ Devuelve **`null`** si no hay fecha o no se entiende: «no lo sé» no se contesta con un `0`,
+   que aquí significaría «vence HOY» y mandaría a correr por nada (§3c-24 de ARRANQUE).
+   ⚠️ Y **hacia abajo**: `Math.floor`, así que cualquier negativo es «ya pasó». Redondear al alza
+   daría «mañana» el día que vence. */
+function _diasHasta_(ms){
+  var t = +ms;
+  if (ms == null || !isFinite(t)) return null;
+  /* 86400000 y no `_MSDIA_`: esa constante vive en el HTML de cada cara, y declararla aquí
+     sería un global repetido en la misma cara — gana el último que cargue, sin error. */
+  return Math.floor((t - _hoyDateM_().getTime()) / 86400000);
+}
+
+/* El corte de «corre prisa», uno solo para toda la app. Con una semana, media lista sale en
+   rojo siempre y el aviso deja de significar nada. */
+var _DIAS_PRISA_ = 3;
+
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
 
 function _hmMin_(m){                       // minutos -> 'HH:MM'

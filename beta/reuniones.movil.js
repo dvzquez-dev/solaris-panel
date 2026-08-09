@@ -24,13 +24,14 @@ function _limM_(R){ var l=R&&R.limite; if(!l) return 'sin límite'; l=String(l).
    ⚠️ Y el corte de «pronto» son 3 dias a proposito: con una semana, media lista saldria en
    rojo siempre y el aviso dejaria de significar nada. */
 function _plazoTxtM_(r){
-  var ms=_limMsM_(r);
-  if(!isFinite(ms)) return 'sin l\u00edmite';
-  var dias=Math.floor((ms-_hoyDateM_().getTime())/_MSDIA_);
+  /* ⛔ LA CUENTA NO SE HACE AQUÍ: `_diasHasta_` en `comun.js`. Tareas hace la misma y
+     escribirla dos veces son dos reglas — empezando por el corte de «corre prisa». */
+  var dias=_diasHasta_(_limMsM_(r));
+  if(dias===null) return 'sin l\u00edmite';
   if(dias<0)   return 'el plazo cerr\u00f3 el '+_limM_(r);
   if(dias===0) return 'cierra HOY';
   if(dias===1) return 'cierra ma\u00f1ana';
-  if(dias<=3)  return 'cierra en '+dias+' d\u00edas';
+  if(dias<=_DIAS_PRISA_) return 'cierra en '+dias+' d\u00edas';
   return 'cierra el '+_limM_(r);
 }
 

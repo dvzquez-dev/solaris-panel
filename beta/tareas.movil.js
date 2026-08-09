@@ -29,11 +29,14 @@ function vTareas(){
     if(!l) return ['sin fecha límite',false];
     var p=String(l).split('/');
     if(p.length<3) return ['sin fecha límite',false];
-    var d=Math.round((new Date(p[2]+'-'+p[1]+'-'+p[0])-hoy)/86400000);
-    if(isNaN(d)) return ['sin fecha límite',false];
+    /* ⛔ LA CUENTA SALE DE `_diasHasta_` (`comun.js`), la misma que usa Reuniones: el
+       corte de «corre prisa» y el redondeo tienen que ser UNO. Aquí solo se traduce la
+       fecha `DD/MM/AAAA` que manda Notion a milisegundos. */
+    var d=_diasHasta_(Date.parse(p[2]+'-'+p[1]+'-'+p[0]));
+    if(d===null) return ['sin fecha límite',false];
     if(d<0) return ['venció hace '+(-d)+' día'+(-d===1?'':'s'),true];
     if(d===0) return ['vence hoy',true];
-    return ['vence en '+d+' día'+(d===1?'':'s'),d<=3];
+    return ['vence en '+d+' día'+(d===1?'':'s'),d<=_DIAS_PRISA_];
   }
   function fila(t){
     var v=vence(t.l);
