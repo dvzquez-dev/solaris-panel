@@ -1288,6 +1288,15 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-09-plazo-palabras', fecha:'2026-08-09',
+      titulo:'El plazo para cubrir ya se dice en palabras',
+      items:[
+        {cara:'movil', vista:'reu', txt:'Antes ponía «cierra el 20/08/2026» y tenías que '
+          + 'mirar el calendario. Ahora dice «cierra HOY», «cierra mañana» o «cierra en 2 días» '
+          + 'cuando corre prisa, y «el plazo cerró el 08/08» si ya venció — en la lista, en la '
+          + 'ficha y en la tarjeta de Próxima reunión. Ese plazo es el que mira el motor de '
+          + 'sanciones, así que no es un adorno.'}
+      ] },
     { id:'2026-08-09-dura-reunion', fecha:'2026-08-09',
       titulo:'Ahora se ve cuánto dura cada reunión, antes de abrirla',
       items:[

@@ -14,6 +14,26 @@
 /* límite de una reunión en DD/MM (del dato, no cableado). */
 function _limM_(R){ var l=R&&R.limite; if(!l) return 'sin límite'; l=String(l).slice(0,10); return _isoADMY_(l); }
 
+/* ⛔ EL PLAZO EN PALABRAS, Y CON SU URGENCIA. `_limM_` da la fecha pelada
+   («cierra el 20/08/2026») y deja la cuenta a quien mira: si es hoy, si es mañana o si ya
+   pasó, lo tiene que deducir la persona restando en la cabeza. Y ese plazo **es justo lo que
+   mira el motor de sanciones** — lo dice `_pendientesCubrirM_` tres lineas mas abajo. Un dato
+   que decide **puntos** no se enseña como un numero que hay que restar.
+   ⚠️ NO dice que se puede o no hacer despues («ya no puedes cubrir»): eso lo decide el gate,
+   no la pantalla. Dice **cuando cerro**, que es lo que consta.
+   ⚠️ Y el corte de «pronto» son 3 dias a proposito: con una semana, media lista saldria en
+   rojo siempre y el aviso dejaria de significar nada. */
+function _plazoTxtM_(r){
+  var ms=_limMsM_(r);
+  if(!isFinite(ms)) return 'sin l\u00edmite';
+  var dias=Math.floor((ms-_hoyDateM_().getTime())/_MSDIA_);
+  if(dias<0)   return 'el plazo cerr\u00f3 el '+_limM_(r);
+  if(dias===0) return 'cierra HOY';
+  if(dias===1) return 'cierra ma\u00f1ana';
+  if(dias<=3)  return 'cierra en '+dias+' d\u00edas';
+  return 'cierra el '+_limM_(r);
+}
+
 function _msDeDDMM_(dd, base){
   var m=/^\s*(\d{1,2})\/(\d{1,2})/.exec(String(dd||''));
   if(!m) return null;
@@ -272,9 +292,11 @@ function _proxReuHTML_(){
   /* Si lo único que queda ya ocurrió, se dice: llamar «próxima» a algo de la semana
      pasada es exactamente el tipo de mentira pequeña que hace desconfiar del resto. */
   var rotulo = pasada ? 'Última reunión' : 'Próxima reunión';
+  /* ⛔ EL MISMO PLAZO Y CON LAS MISMAS PALABRAS que en Reuniones: dos sitios que dicen lo
+     mismo de dos formas distintas se leen como dos cosas distintas. */
   var cuando = R.fijada ? esc(R.fijada)
-    : ((R.dias&&R.dias.length) ? ('sin fecha fija · cierra el '+esc(_limM_(R)))
-                               : ('cierra el '+esc(_limM_(R))));
+    : ((R.dias&&R.dias.length) ? ('sin fecha fija · '+esc(_plazoTxtM_(R)))
+                               : esc(_plazoTxtM_(R)));
   return '<h2 class="sec">'+rotulo+'<span class="ln"></span></h2>'+
     '<div class="tarj clic" data-ir="reu" data-reuid="'+esc(String(R.id))+'" data-p>'+
     '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
@@ -459,13 +481,13 @@ function vReu(){
           var sel=(x.id===R.id);
           return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
             '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
-            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):'cierra el '+_limM_(x))+' · '+x.nInv+' convocados'+
+            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+x.nInv+' convocados'+
             _duraTxtM_(x)+'</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':'<span class="chev">›</span>')+'</div></div>'; }).join('')+'</div>'
       : '')+
     '<div class="tarj">'+cab(R.tipo||'General', R.modalidad||'')+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
-      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):'cierra el '+_limM_(R))+' · '+R.nInv+' convocados'+
+      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+R.nInv+' convocados'+
       _duraTxtM_(R)+'</small></div>'+
       '<div class="d"><span class="pil '+((R.fijada||R.cubierta||R.exento)?'conf':'no')+'">'+
         (R.fijada?'fijada':(R.exento?'organizas':(R.cubierta?'cubierta':'te falta')))+'</span></div></div>'+
