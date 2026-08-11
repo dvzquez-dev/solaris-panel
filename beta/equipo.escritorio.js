@@ -136,7 +136,12 @@ function insightsHTML(){
 function conteo(k){
   if(k==='partes') return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).length;
   if(k==='sindeclarar') return PARTES.filter(function(p){return p.estado==='sindecl';}).length;
-  if(k==='curso')  return CURSO_CONECTADO ? CURSO.length : 0;   // sin conectar no hay nada que contar
+  /* ⛔ AQUI PONIA `CURSO_CONECTADO`, QUE NO EXISTE EN NINGUN SITIO, y esa sola
+     palabra dejaba entrar al panel sin login: el `ReferenceError` reventaba
+     `pintar()` en el arranque, abortaba el bloque `<script>` entero y la linea que
+     pone el gate de Google -que va DESPUES- no llegaba a ejecutarse. La bandera de
+     verdad es `CURSO_SRV`, y solo 'ok' significa que el servidor contesto. */
+  if(k==='curso')  return CURSO_SRV==='ok' ? CURSO.length : 0;   // sin conectar no hay nada que contar
   if(k==='docdec') return docsMios().length;
   if(k==='docurso')return DOCS.filter(function(d){return ['recibido','analizado','revision','cambios'].indexOf(d.est)>=0;}).length;
   if(k==='docpub') return DOCS.filter(function(d){return d.est==='publicado';}).length;

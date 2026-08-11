@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=b7ca50f"></script>
+<script src="comun.js?v=87ec986"></script>
 <script src="notis.escritorio.js?v=5f0a77e"></script>
 <script src="cierre.escritorio.js?v=61476db"></script>
 <script src="turnos.escritorio.js?v=f0af960"></script>
@@ -117,7 +117,7 @@
 <script src="sanciones.escritorio.js?v=b179a34"></script>
 <script src="reuniones.escritorio.js?v=d49562f"></script>
 <script src="horas.escritorio.js?v=fc35dac"></script>
-<script src="equipo.escritorio.js?v=c8065aa"></script>
+<script src="equipo.escritorio.js?v=2e3c3fa"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -227,6 +227,13 @@ _ApiTransito.prototype=Object.create(Error.prototype);
    Todo este bloque -`_gate_`, `_onCredencial_`, `_pintarLogin_`, `_arrancarGis_`,
    `cerrarSesion`, `_apiParse` y el objeto `api`- esta **calcado** en el otro fichero. Es
    deliberado: son dos artefactos autocontenidos y la CSP impide compartir codigo.
+   ⛔ ESA PREMISA ES FALSA DESDE EL 04/08: GitHub Pages **no manda CSP** y las caras
+      no la declaran. La estricta es la de los Artifacts de claude.ai. El porqué
+      completo, en la cabecera de `comun.js` — aquí solo la marca, para no tener seis
+      copias de la corrección como hay seis del código. ✅ Lo idéntico **sí** puede ir
+      a `comun.js`: esta copia sigue aquí porque **nadie la ha movido**, no porque no
+      se pueda. ⚠️ Y antes de moverla: lo que **diverge** entre caras (`esAdmin`,
+      `revisoresDe`) diverge **a propósito**.
 
    ⚠️ **CAMBIAR UNO SIN CAMBIAR EL OTRO ES COMO EMPIEZAN LAS DIVERGENCIAS.** Paso hoy con el
    visor de documentos: tres copias, una mejora en una, y las otras dos sin enterarse.
@@ -316,7 +323,7 @@ var api={
      veces, y una clave nacida dentro seria distinta en cada intento -- o sea, ninguna
      proteccion justo cuando hace falta. */
   otorgarHoras:function(p){ return api._post({action:"otorgarHoras",parte:p}); },
-  otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria}); },
+  otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria,clave:b.clave}); },
   enviarPush:  function(d,t,c,o){ return api._post({action:"enviarPush",destinatario:d,titulo:t,cuerpo:c,opts:o}); },
   /* ⛔ ESTA FALTABA, y en la cara del PD llevaba rota desde siempre — sin dar señal. La llaman
      `activarNotis` (aquí abajo) y `_pushInit_` (comun.js), que corre en LAS DOS caras al
@@ -722,6 +729,13 @@ var TUR_RESP = null;     // nombre del responsable de turno
    Hasta el 28/07 el botón sacaba un `tost`. Los ayudantes de aquí abajo son GEMELOS
    byte a byte de los del móvil (antes tenían sufijo `M` allí; se renombraron para que
    coincidan). La CSP impide compartir código entre los dos artefactos, así que lo único
+   ⛔ ESA PREMISA ES FALSA DESDE EL 04/08: GitHub Pages **no manda CSP** y las caras
+      no la declaran. La estricta es la de los Artifacts de claude.ai. El porqué
+      completo, en la cabecera de `comun.js` — aquí solo la marca, para no tener seis
+      copias de la corrección como hay seis del código. ✅ Lo idéntico **sí** puede ir
+      a `comun.js`: esta copia sigue aquí porque **nadie la ha movido**, no porque no
+      se pueda. ⚠️ Y antes de moverla: lo que **diverge** entre caras (`esAdmin`,
+      `revisoresDe`) diverge **a propósito**.
    honesto es que la copia sea idéntica y se llame igual. Si tocas una, toca la otra.
    ═════════════════════════════════════════════════════════════════════════════ */
 
@@ -1182,6 +1196,13 @@ V.docpub={g:'Documentos',t:'Publicados',f:function(){
 
    ⚠️ Todo lo que va de aqui a `_listaSancHTML_` esta COPIADO DEL MOVIL BYTE A BYTE y se
    llama igual: son GEMELAS. La CSP impide compartir codigo entre los dos artefactos, asi
+   ⛔ ESA PREMISA ES FALSA DESDE EL 04/08: GitHub Pages **no manda CSP** y las caras
+      no la declaran. La estricta es la de los Artifacts de claude.ai. El porqué
+      completo, en la cabecera de `comun.js` — aquí solo la marca, para no tener seis
+      copias de la corrección como hay seis del código. ✅ Lo idéntico **sí** puede ir
+      a `comun.js`: esta copia sigue aquí porque **nadie la ha movido**, no porque no
+      se pueda. ⚠️ Y antes de moverla: lo que **diverge** entre caras (`esAdmin`,
+      `revisoresDe`) diverge **a propósito**.
    que lo unico honesto es que la copia sea identica y un diff lo confirme. Si tocas una,
    toca la otra. Lo que NO es gemelo es la presentacion (`_ponerSancionHTML_`): alli es una
    columna estrecha dentro de un modal y aqui hay ancho de sobra. */
@@ -1713,6 +1734,17 @@ var PESOS_COMP={
      de equipo, impecablemente reportado- cae donde debe: 0,25. */
   alcance:{ 'equipo':0.15, 'subsistema':0.10, 'persona':0.05 },
   calidad:{ 'reproducible':0.10, 'con_preguntas':0.05, 'no_reproducible':0 },
+  /* ⛔ CUANTO COSTO ENCONTRARLO, que NO es lo mismo que si esta bien reportado. Daniel lo
+     pidio el 27/07 —«se debe valorar cuanto esfuerzo ha costado encontrar ese bug
+     especifico»— y la regla viva no lo implementaba: `calidad` mide **reproducibilidad**.
+     Valores aprobados por el el 11/08: «me parece bien esa decision de directo buscado
+     dificil con esos valores».
+     ✅ Con `directo` a 0 la calibracion que valido el 29/07 NO se mueve, y el techo
+     tampoco: `Bloquea` topa en 2,00 con esfuerzo y sin el. Lo que sube es el medio — un
+     `Molesta` dificil de encontrar pasa de 0,50 a 1,00 h.
+     ⚠️ Y tiene COLUMNA detras (`esfuerzo` en COLS_BUG y COLS_MEJ): un eje sin columna se
+     lee `undefined`, cae al `ejeSinMedir` y el reporte se paga de menos sin dar error. */
+  esfuerzo:{ 'directo':0, 'buscado':0.15, 'dificil':0.35 },
   minimo:0.25,                                 // si algo se paga, se paga el escalon mas bajo
   tope:2.00,                                   // por encima, SOLO Daniel a mano
   /* El techo de una MEJORA. Va EXPLICITO y no confiado a que 1,25+0,15+0,10 salga justo 1,50:
@@ -2177,6 +2209,13 @@ function _cablearSalir_(){
 }
 /* ═══ NOTIFICACIONES PUSH ═══════════════════════════════════════════════════
    GEMELAS de movil.html: mismos nombres y mismo comportamiento. La CSP impide compartir
+   ⛔ ESA PREMISA ES FALSA DESDE EL 04/08: GitHub Pages **no manda CSP** y las caras
+      no la declaran. La estricta es la de los Artifacts de claude.ai. El porqué
+      completo, en la cabecera de `comun.js` — aquí solo la marca, para no tener seis
+      copias de la corrección como hay seis del código. ✅ Lo idéntico **sí** puede ir
+      a `comun.js`: esta copia sigue aquí porque **nadie la ha movido**, no porque no
+      se pueda. ⚠️ Y antes de moverla: lo que **diverge** entre caras (`esAdmin`,
+      `revisoresDe`) diverge **a propósito**.
    codigo entre las dos caras, asi que la unica forma honesta es que la copia sea
    IDENTICA y se llame igual. Si tocas una, toca la otra.
    El escritorio no tenia NADA de esto: quien coordina desde el ordenador no podia
@@ -2249,7 +2288,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b8a9f75';
+var BUILD='dfc73aa';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -2555,7 +2594,11 @@ function _pinAnotaciones_(m){
           tost('El backend no guarda todavía la compensación (falta desplegar v46). NO se ha otorgado nada.');
           b.disabled=false; b.textContent=prev; return;
         }
-        await api.otorgarHoras({nombre:r.quien, horas:horas,
+        /* ⛔ LA CLAVE DE UN SOLO USO. Sin ella `api._post` reintenta tres veces y
+           paga tres compensaciones por el mismo reporte: `_parteConClave_` hace
+           `if (!c) return null`, o sea que sin clave la guarda del backend no
+           protege nada. Daniel, 11/08: «no puede pagar 2 veces la misma cosa». */
+        await api.otorgarHoras({nombre:r.quien, horas:horas, clave:_claveUso_(),
           tarea:'Compensación por el reporte '+id, categoria:'compensacion'});
         tost(id+': '+horas+' h a '+_m(r.quien).pila+'.'); _cargarBuzon_();
       }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo: ', e); }
@@ -2693,7 +2736,7 @@ function _engOtorgar_(){
       if(PART_BACK!==null && backendOK && SESION){    // hay backend: persiste de verdad
         b.disabled=true; var prev=b.textContent; b.textContent='Otorgando…';
         try{
-          var rec=await api.otorgarHoras({nombre:nombre, horas:horas, tarea:concepto});
+          var rec=await api.otorgarHoras({nombre:nombre, horas:horas, tarea:concepto, clave:_claveUso_()});
           if(rec){ PART_BACK.push(rec); _partesReal_(); }
           tost(h1(horas)+' otorgadas a '+(_m(nombre).pila||nombre)+': ya cuentan en sus horas del mes.');
           pintar();
@@ -2729,7 +2772,7 @@ function _engBloqueHoras_(){
         b.disabled=true; var prev=b.textContent; b.textContent='Otorgando\u2026';
         try{
           var cat=($('#bloCat')||{}).value||'compensacion';
-          var r=await api.otorgarBloque({nombres:marcados, horas:horas, tarea:concepto, categoria:cat});
+          var r=await api.otorgarBloque({nombres:marcados, horas:horas, tarea:concepto, categoria:cat, clave:_claveUso_()});
           var okN=(r&&r.otorgados)||0, res=(r&&r.resultados)||[];
           res.forEach(function(x){ if(x&&x.id) PART_BACK.push(x); });         // las partes creadas
           if(res.length) _partesReal_();
@@ -2985,15 +3028,31 @@ window.addEventListener('resize',function(){ ultY=null; colocarEstrella(false); 
    encima entra el login. Si hay sesión guardada de menos de 50 min, se entra sin
    pasar por Google (mismo criterio que app.html).
    ═══════════════════════════════════════════════════════════════════════════ */
-_pintarActua_();
-pintar();
+/* ⛔ EL GATE VA PRIMERO, Y ESTO NO ES ESTILO: ES LO QUE LO SOSTIENE.
+   Hasta el 11/08 iba DESPUES del pintado de la semilla, y un `ReferenceError` en
+   `pintar()` -uno de verdad: `CURSO_CONECTADO`, un simbolo que no existia- abortaba
+   el bloque `<script>` entero, con lo que **el gate no se llegaba a pintar** y el
+   panel de consejo, junta y direccion quedaba abierto a cualquiera que abriera la
+   URL. Daniel: «yo quiero login q no puedo ver nada».
+   ✅ Poniendolo antes, el gate es lo primero que existe y ya no depende de que TODO
+   el pintado salga bien. Se ve igual -es una capa por encima-, y ahora un fallo de
+   pintado deja la pantalla de login puesta en vez de quitarla. */
+if(GOOGLE_CLIENT_ID && !window.__SIN_LOGIN__){
+  _gate_(_insigniaHTML_()+'<div style="opacity:.7">Cargando…</div>');
+}
+
+/* ⚠️ Y EL PINTADO DE LA SEMILLA VA PROTEGIDO. No para tapar fallos -se siguen viendo
+   en la consola- sino para que un fallo de PINTURA no se lleve por delante la
+   AUTENTICACION, que es lo que paso. Son dos cosas de gravedad muy distinta. */
+try{ _pintarActua_(); pintar(); }catch(_ePint){}
 setTimeout(function(){
-  colocarEstrella(false);
-  var on=$('#actua button.on'); if(on) $('#actuaEst').style.transform='translateX('+(on.offsetLeft-5)+'px)';
+  try{
+    colocarEstrella(false);
+    var on=$('#actua button.on'); if(on) $('#actuaEst').style.transform='translateX('+(on.offsetLeft-5)+'px)';
+  }catch(_eEst){}
 },60);
 
 if(GOOGLE_CLIENT_ID && !window.__SIN_LOGIN__){
-  _gate_(_insigniaHTML_()+'<div style="opacity:.7">Cargando…</div>');
   var _tok=_tokenGuardadoUtil_(_sesionGuardada_());
   if(_tok) _onCredencial_({credential:_tok}, true);
   else _arrancarGis_();

@@ -343,6 +343,115 @@ function tostErr(prefijo, e){
   tost(String(prefijo || '') + ((e && e.message) || e), (e && e.sesion) ? {fijo:true} : null);
 }
 
+/* ⛔ REINTENTO PASIVO — LA REGLA DE DANIEL (11/08/2026), Y ES PARA TODA LA APP.
+   Literal: «vale que siga diciendo cargando pero que lo reintente por detras sin decirtelo
+   constantemente, en caso de ser incapaz si quieres (y esto aplica para cualquiera) se podria
+   poner boton de reintentar, pero yo prefiero que en toda la app sea de reintentos pasivos».
+
+   ⛔ NO ES EL REINTENTO DE `api._post`, Y CONFUNDIRLOS ES NO ARREGLAR NADA. Aquel hace TRES
+   intentos en dos segundos contra un fallo de TRANSPORTE (Apps Script pierde el cuerpo del POST
+   de vez en cuando). Cuando esos tres se agotan, la carga se rinde PARA SIEMPRE: el `catch(e){}`
+   deja el global como estaba y la pantalla se queda en «Cargando…» hasta que alguien recargue
+   a mano. Esta puerta es la de DESPUES de aquella.
+
+   ✅ Y POR ESO «CARGANDO…» DEJA DE SER MENTIRA. Yo propuse cambiarlo por «no se pudo
+   consultar» con un boton de reintentar, razonando que decir «Cargando» cuando ya no carga
+   nada es mentir. Daniel eligio lo contrario y con mejor argumento: lo que lo convertia en
+   mentira no era el TEXTO, era que **no se reintentaba**. Si de verdad se reintenta, es cierto.
+
+   ⛔ SOLO PARA LECTURAS. Reintentar una ESCRITURA la duplica —dos partes, dos sanciones, dos
+   fichajes— y ahi el silencio del reintento pasivo es justo lo peor: nadie se entera de que ha
+   pasado dos veces. Las escrituras tienen su propia proteccion (la clave de un solo uso del
+   parte), que es otra cosa y vive en otro sitio. */
+var RP_BASE = 3000;     /* la primera espera */
+var RP_TOPE = 60000;    /* y el techo, que no se pasa */
+
+/* Cuanto se espera ANTES del intento `n` (n=1 es el primer reintento). Duplica y topa.
+   ⛔ EL TECHO NO ES COSMETICO: sin el, duplicar llega a horas en una tarde, y un reintento que
+   vuelve dentro de tres horas no es un reintento — una pestaña abierta toda la tarde no se
+   recuperaria nunca, que es exactamente el caso de Jose Manuel con el escritorio.
+   ⛔ Y NO EMPIEZA EN CERO: `api._post` acaba de gastar ~2 s en sus tres intentos. Volver de
+   inmediato seria un CUARTO intento contra lo mismo, no un reintento pasivo. */
+function _esperaReintento_(n){
+  var i = Math.max(1, Math.floor(n || 1));
+  return Math.min(RP_TOPE, RP_BASE * Math.pow(2, i - 1));
+}
+
+/* Los reintentos VIVOS, por clave.
+   ⛔ EXISTE PARA QUE NO SE APILEN, y esa es la averia clasica de esto: `render()` puede pedir
+   la misma carga cinco veces en un segundo, y cinco cadenas de reintentos son cinco veces el
+   trafico contra un backend que ya esta caido, ademas de cinco `render()` seguidos. */
+var _RP_VIVOS = {};
+
+/* `intentar()` devuelve **exactamente `true`** (o una promesa que resuelve a `true`) cuando la
+   carga fue bien. Al lograrlo se llama a `alLograr` UNA vez: ahi es donde el «Cargando…» se
+   convierte solo en la pantalla de verdad, sin que nadie toque nada.
+
+   ⛔ POR QUE `=== true` Y NO `!== false`. Las quince cargas de la app hoy no devuelven nada
+   (`_cargarSancionesM_` acaba en `catch(e){}`). Con `!== false`, una carga sin adaptar
+   devolveria `undefined`, esto lo leeria como EXITO, la cadena se cortaria al primer intento
+   y `alLograr` se dispararia una vez: **un no-op silencioso con toda la pinta de funcionar**
+   — que es exactamente la averia que Daniel quiere arreglar, disfrazada de arreglo.
+   ✅ Con `=== true`, una carga sin adaptar reintenta para siempre (una peticion por minuto al
+   llegar al techo): molesto y VISIBLE. Entre fallar callando y fallar de cara, de cara.
+   ⛔ Y NO HAY NINGUN `tost` AQUI DENTRO, a proposito: «sin decirtelo constantemente».
+   ⚠️ `temporizar` se inyecta para poder probar esto sin esperar minutos de reloj — el banco le
+   pasa un temporizador falso. Sin esa costura, esta funcion solo se podria mirar. */
+function _reintentoPasivo_(clave, intentar, alLograr, temporizar){
+  if(_RP_VIVOS[clave]) return false;
+  var tmp = temporizar || function(f, ms){ return setTimeout(f, ms); };
+  var n = 1, paso, tras, poner;
+
+  /* ⚠️ Se guarda un OBJETO, no lo que devuelva el temporizador: un doble de prueba puede
+     devolver `undefined` o `0`, y entonces el guardia de arriba dejaria apilar.
+     ⛔ Y LA RANURA SE PONE **ANTES** DE CREAR EL TEMPORIZADOR. Escribirla despues deja el
+     registro sucio en cuanto el temporizador ejecute ya —el `delete` del exito corre primero
+     y la asignacion de despues lo resucita—, y entonces esa clave queda bloqueada para
+     siempre: la pantalla no volveria a reintentar en toda la sesion. Lo cazo el banco con su
+     temporizador falso; leyendo no se ve, porque `setTimeout` de verdad nunca es sincrono. */
+  poner = function(ms){
+    var ranura = { h: null };
+    _RP_VIVOS[clave] = ranura;
+    ranura.h = tmp(paso, ms);
+  };
+
+  tras = function(ok){
+    if(ok){ delete _RP_VIVOS[clave]; if(alLograr) alLograr(); return; }
+    n++;
+    poner(_esperaReintento_(n));
+  };
+
+  /* ⛔ UNA SESION CADUCADA NO SE REINTENTA, Y ESTO NO ES OPINION MIA: lo dice `_ApiSesion`
+     desde el 07/08 —«repetir con el mismo token caducado da el mismo error tres veces y tarda
+     el triple en decir lo mismo»—. Sin esta salida, dejar el escritorio abierto una hora
+     metia CADA carga en un bucle de 60 s para siempre contra un backend que va a decir que no
+     eternamente, y ademas en silencio: es el bug de Jose Manuel con un bucle infinito encima.
+     ✅ Se para y se deja hablar a quien ya sabe decirlo (`_sesionMuerta_`), que ademas lo dice
+     UNA vez y vuelve a ofrecer el login. */
+  var rendirse = function(err){
+    delete _RP_VIVOS[clave];
+    if(typeof _sesionMuerta_ === 'function') _sesionMuerta_(true);
+  };
+  var esDeSesion = function(e){
+    if(!e) return false;
+    if(e.sesion) return true;
+    return typeof _esErrorDeSesion_ === 'function' && _esErrorDeSesion_(e.message || e);
+  };
+
+  paso = function(){
+    var p;
+    try{ p = intentar(); }
+    catch(e){ if(esDeSesion(e)) return rendirse(e); tras(false); return; }
+    if(p && typeof p.then === 'function')
+      p.then(function(r){ tras(r === true); },
+             function(e){ if(esDeSesion(e)) return rendirse(e); tras(false); });
+    else tras(p === true);
+  };
+
+  poner(_esperaReintento_(n));
+  return true;
+}
+
 function _apiParse(txt, accion){
   var j=null; try{ j=JSON.parse(txt); }catch(_){}
   /* Lo que vuelve no es JSON: es la pagina HTML de Google del 404 transitorio. */

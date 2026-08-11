@@ -59,20 +59,62 @@ function normPMovil(p){
     decidido_por:p.decidido_por||null, revierte:p.revierte||null,
     origen:p.origen||null, caduca:p.caduca_at||null }; }
 
+/* ⚠️ MISMO DEFECTO QUE EL DE ABAJO, y se arregla igual aunque HOY no haga daño:
+   `CARGA.partes` no lo lee nadie todavia (medido: una sola aparicion, la escritura).
+   Es una trampa CARGADA para el dia que alguien pinte «Cargando tus partes…» — y
+   ese dia el fallo no seria suyo, seria de esta linea.
+   ⛔ Y al fallar, `PARTES` se queda con la SEMILLA de fabrica: seis partes
+   inventados que se ven como tus horas, en el desglose y en el globo del nav. */
 async function _cargarMisPartes_(){
-  try{ var arr=await api.getPartes({mias:true}); if(Array.isArray(arr)) PARTES=arr.map(normPMovil); }
-  catch(e){}
-  finally{ CARGA.partes=true; }
+  try{ var arr=await api.getPartes({mias:true});
+    if(!Array.isArray(arr)) return false;
+    PARTES=arr.map(normPMovil); CARGA.partes=true; return true; }
+  catch(e){ return false; }
 }
 
 /* Al entrar, retoma el fichaje que hubiera abierto en la nube: el reloj sigue desde la
    hora del servidor, así que cerrar la app (o cambiar de móvil) no pierde la sesión. */
+/* ⛔ EL `finally` DESARMABA LA GUARDA DE TRES LINEAS MAS ABAJO, y el comentario de
+   aquella describe el daño exacto que causaba: «sin saber si YA tienes un fichaje
+   abierto no se puede ofrecer «fichar entrada»: dirias «parado» a alguien que esta
+   fichando y ficharia dos veces». Con `finally`, el camino de ERROR afirmaba que si
+   lo sabia. En la practica: red inestable al entrar -> «SIN SESION ABIERTA» con una
+   sesion corriendo en la nube; si esa persona declara un bloque con `sinFichaje`, a
+   las 14 h el autocierre emite un SEGUNDO parte por las mismas horas.
+   ✅ La bandera se pone donde significa algo: cuando la respuesta LLEGO. Que `f` sea
+   nulo es una respuesta valida -no tienes ninguno abierto-; que reviente, no. */
 async function _cargarFichajeAbierto_(){
   try{ var f=await api.getFichajeAbierto();
     if(f && f.ini){ var ps=f.pausas||[], ult=ps[ps.length-1];
-      ST.ses={estado:(ult&&!ult.fin)?'pausada':'corriendo', cloudIni:f.ini, pausas:ps, desde:_hhmmDe_(f.ini), ult:_hhmmDe_(f.ini)}; } }
-  catch(e){}
-  finally{ CARGA.fichaje=true; }
+      ST.ses={estado:(ult&&!ult.fin)?'pausada':'corriendo', cloudIni:f.ini, pausas:ps, desde:_hhmmDe_(f.ini), ult:_hhmmDe_(f.ini)}; }
+    CARGA.fichaje=true; return true; }
+  catch(e){ return false; }
+}
+
+/* ⛔ REARMA LAS CARGAS QUE NO LLEGARON — la regla de Daniel del 11/08 puesta a trabajar:
+   «que lo reintente por detras sin decirtelo constantemente».
+
+   ⛔ UN SOLO SITIO, Y A PROPOSITO. La tentacion es meter el reintento DENTRO de cada carga,
+   y sale mal por dos motivos: (1) las cargas se llaman tambien desde el refresco de 90 s y
+   desde despues de decidir, asi que cada llamada armaria su cadena; (2) el arranque las lanza
+   en paralelo y las espera juntas — el momento en que se sabe QUE FALTA es justo despues de
+   ese `Promise.all`, no dentro de ninguna.
+
+   ✅ Y por eso se pregunta por la BANDERA y no por el resultado: la bandera es lo que la
+   pantalla mira para decidir si dice «Cargando…». Si esta puesta, no hay nada que reintentar
+   aunque la lista este vacia — vacia es una respuesta.
+
+   ⚠️ Las tres son LECTURAS puras, comprobado contra el backend: `_getPartes_`,
+   `_getFichajeAbierto_` y `_listar_` no escriben nada. Reintentar una ESCRITURA la duplicaria,
+   y eso no se hace desde aqui. */
+function _rearmarCargas_(){
+  if(typeof _reintentoPasivo_ !== 'function') return 0;
+  var n = 0;
+  var repintar = function(){ if(typeof pintar === 'function') pintar(); };
+  if(!CARGA.fichaje   && _reintentoPasivo_('fichaje',   _cargarFichajeAbierto_, repintar)) n++;
+  if(!CARGA.partes    && _reintentoPasivo_('partes',    _cargarMisPartes_,      repintar)) n++;
+  if(!CARGA.reuniones && _reintentoPasivo_('reuniones', _cargarReunionesM_,     repintar)) n++;
+  return n;
 }
 
 function mediaSub(u){for(var i=0;i<DATA.subsistemas.length;i++) if(DATA.subsistemas[i].u===u) return DATA.subsistemas[i].media; return _mediaEquipo_();}

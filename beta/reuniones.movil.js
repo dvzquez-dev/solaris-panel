@@ -240,8 +240,20 @@ async function _hidratarReuM_(r){
    misma: asi la sigue usando el refresco en vivo sin enterarse. */
 async function _cargarReunionesM_(yaPedidas){
   try{ var arr=await (yaPedidas || api.listarReuniones());
+    /* ⛔ LA BANDERA, SOLO SI DE VERDAD LLEGO LA LISTA. Estaba justo detras del
+       `await` y DELANTE de comprobar el array, asi que un fallo la ponia igual. Y
+       en el arranque el fallo ni siquiera lanza: `movil.html` pasa la promesa ya
+       blindada con `.catch(function(){ return null; })`, o sea que llega `null`,
+       `Array.isArray(null)` es falso y te quedabas con la bandera puesta y la lista
+       vacia. Resultado en pantalla: «Ninguna reunion convocada · Ahora mismo no
+       estas convocado a ninguna reunion» — justo lo que el comentario de
+       `_sinReuniones_` prohibe, porque de no cubrir salen SANCIONES.
+       ⚠️ Y la condicion de la bandera NO lleva `.length`: una lista VACIA es una
+       respuesta buena -de verdad no tienes ninguna- y tiene que apagar el
+       «Cargando…». Lo que no vale es que no haya lista. */
+    if(!Array.isArray(arr)) return false;
     CARGA.reuniones=true;
-    if(Array.isArray(arr) && arr.length){
+    if(arr.length){
       /* SE CONSERVA LA QUE ESTABAS MIRANDO. Esta funcion tambien la llama el refresco en
          vivo cada 90 s: sin esto, estarias viendo una reunion y de pronto te saltaria a otra
          sola. Solo se elige la «proxima» cuando no habia ninguna abierta o ya no existe. */
@@ -272,7 +284,9 @@ async function _cargarReunionesM_(yaPedidas){
           });
       }
     }
+    return true;
   }catch(e){}
+  return false;
 }
 
 function _proxReuHTML_(){

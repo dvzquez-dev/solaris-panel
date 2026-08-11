@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=b7ca50f"></script>
+<script src="comun.js?v=87ec986"></script>
 <script src="notis.movil.js?v=2f74e23"></script>
 <script src="cierre.movil.js?v=72a5e2f"></script>
 <script src="tareas.movil.js?v=439790c"></script>
@@ -115,8 +115,8 @@
 <script src="buzon.movil.js?v=7572023"></script>
 <script src="documentos.movil.js?v=aa4be87"></script>
 <script src="sanciones.movil.js?v=f7acd13"></script>
-<script src="reuniones.movil.js?v=856ca5d"></script>
-<script src="horas.movil.js?v=916f44c"></script>
+<script src="reuniones.movil.js?v=6d014cc"></script>
+<script src="horas.movil.js?v=8c6266d"></script>
 <script src="equipo.movil.js?v=5ea3ff8"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -249,6 +249,13 @@ _ApiTransito.prototype=Object.create(Error.prototype);
    Todo este bloque -`_gate_`, `_onCredencial_`, `_pintarLogin_`, `_arrancarGis_`,
    `cerrarSesion`, `_apiParse` y el objeto `api`- esta **calcado** en el otro fichero. Es
    deliberado: son dos artefactos autocontenidos y la CSP impide compartir codigo.
+   ⛔ ESA PREMISA ES FALSA DESDE EL 04/08: GitHub Pages **no manda CSP** y las caras
+      no la declaran. La estricta es la de los Artifacts de claude.ai. El porqué
+      completo, en la cabecera de `comun.js` — aquí solo la marca, para no tener seis
+      copias de la corrección como hay seis del código. ✅ Lo idéntico **sí** puede ir
+      a `comun.js`: esta copia sigue aquí porque **nadie la ha movido**, no porque no
+      se pueda. ⚠️ Y antes de moverla: lo que **diverge** entre caras (`esAdmin`,
+      `revisoresDe`) diverge **a propósito**.
 
    ⚠️ **CAMBIAR UNO SIN CAMBIAR EL OTRO ES COMO EMPIEZAN LAS DIVERGENCIAS.** Paso hoy con el
    visor de documentos: tres copias, una mejora en una, y las otras dos sin enterarse.
@@ -730,6 +737,12 @@ async function _onCredencial_(resp,_silente){
        El ancho total sigue siendo una ida y vuelta, no dos. */
     _gate_(SPLASH+'<div style="opacity:.8">Cargando tus datos…</div>');
     await Promise.all([pPartes, pDecidir, pFichaje, pSanc, pMovs, _cargarReunionesM_(pReuniones)]);
+    /* ⛔ Y LO QUE NO LLEGO SE SIGUE INTENTANDO POR DETRAS (Daniel, 11/08). Aqui es
+       donde se sabe QUE FALTA: las cinco salieron en paralelo y se acaban de
+       esperar juntas. Sin esto, una carga que fallara se quedaba rendida para
+       siempre y la pantalla decia «Cargando…» hasta que alguien recargara a mano.
+       No avisa de nada: es pasivo, que es lo que pidio. */
+    _rearmarCargas_();
     /* El admin, DESPUES de esperar. Si va antes lo pisa `_cargarMisPartes_`, que pide
        `{mias:true}` = los partes de la cuenta `solaris@`, no los del miembro que estas
        viendo. Estaba pasando: se cargaban los buenos y luego los otros encima. */
@@ -1249,6 +1262,13 @@ var COMP_CARGO={'Project Director':7.0,'Coordinador':3.5};
 
 /* ═══ GEMELAS con el escritorio (copiadas byte a byte) ═══════════════════════════════════
    La CSP impide compartir codigo entre las dos caras, asi que lo unico honesto es que la copia
+   ⛔ ESA PREMISA ES FALSA DESDE EL 04/08: GitHub Pages **no manda CSP** y las caras
+      no la declaran. La estricta es la de los Artifacts de claude.ai. El porqué
+      completo, en la cabecera de `comun.js` — aquí solo la marca, para no tener seis
+      copias de la corrección como hay seis del código. ✅ Lo idéntico **sí** puede ir
+      a `comun.js`: esta copia sigue aquí porque **nadie la ha movido**, no porque no
+      se pueda. ⚠️ Y antes de moverla: lo que **diverge** entre caras (`esAdmin`,
+      `revisoresDe`) diverge **a propósito**.
    sea identica y se llame igual. Si tocas una, toca la otra. */
 
 
@@ -1365,7 +1385,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='fa880ba';
+var BUILD='5a430b8';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
