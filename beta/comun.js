@@ -1383,6 +1383,19 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-11-cola-sanciones-movil', fecha:'2026-08-11',
+      titulo:'La cola de sanciones del m\u00f3vil ya se carga (y respeta lo que marcaste en el ordenador)',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La tarjeta \u00abPanel del PD \u00b7 disciplina\u00bb se quedaba en \u00abCargando la cola\u2026\u00bb **para siempre**. La cola se ped\u00eda antes de que la app supiera qui\u00e9n eres, as\u00ed que la pregunta \u00ab\u00bferes el PD?\u00bb se contestaba sobre un usuario de relleno y sal\u00eda siempre que no. Ahora la pide siempre y **decide el servidor** qui\u00e9n ve qu\u00e9.'},
+        {cara:'movil', vista:'horas', txt:'Y los **coordinadores** ya ven su cola: el men\u00fa os ofrec\u00eda Sanciones y el servidor ya os la serv\u00eda, pero la pantalla solo la ped\u00eda si eras el PD, as\u00ed que \u00abPendientes de decidir\u00bb se quedaba cargando sin fin.'},
+        {cara:'movil', vista:'horas', txt:'Y lo que marques en el **ordenador** ya llega al m\u00f3vil: marcabas 30 y al abrir el m\u00f3vil para cerrar el bloque te dec\u00eda \u00abFaltan 30 por marcar\u00bb. El servidor lo guardaba bien; era el m\u00f3vil, que lo buscaba con otro nombre.'}
+      ] },
+    { id:'2026-08-11-mes-de-cierre-a-cierre', fecha:'2026-08-11',
+      titulo:'Tu ritmo del mes vuelve a contarse de cierre a cierre',
+      items:[
+        {cara:'movil', vista:'horas', txt:'El servidor ya calculaba bien los d\u00edas del mes \u2014desde el \u00faltimo cierre, no desde el 1 del calendario\u2014 pero la app **no llegaba a recogerlo** y volv\u00eda a dividir por el calendario. Con julio cerrado el 4 de agosto, el 7 contaba 7 d\u00edas donde llevabas 4: tu ritmo sal\u00eda a poco m\u00e1s de la mitad del real, y le pasaba a todo el equipo a la vez sin dar ning\u00fan aviso. Tambi\u00e9n afecta a \u00abvs. equipo\u00bb y a la comparaci\u00f3n con el mes pasado.'},
+        {cara:'escritorio', vista:'horas', txt:'Lo mismo en el ordenador: la misma cifra la calculaba el servidor y la cara la tiraba.'}
+      ] },
     { id:'2026-08-09-recarga-sin-cero', fecha:'2026-08-09',
       titulo:'Al recargar, la pantalla ya no se queda en blanco',
       items:[

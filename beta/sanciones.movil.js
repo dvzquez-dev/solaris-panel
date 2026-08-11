@@ -11,9 +11,27 @@
    fusionarlas es otro cambio, con otro riesgo y su propia verificación.
    ═══════════════════════════════════════════════════════════════════════════════════════ */
 
+/* ⛔ SIN GATE DE ROL, Y ES A PROPOSITO (11/08). Hasta hoy empezaba con
+   `if(!esPD()) return;` — y esta funcion se llama en `movil.html:693`, **catorce lineas
+   ANTES** de que `_aplicarPanel_` (`:707`) resuelva la identidad. O sea que `esPD()`
+   contestaba sobre la SEMILLA (`ST.rol` de fabrica, `YO = DATA.miembros[0]`) y salia
+   siempre `false`: **la cola no se cargaba NUNCA**, y la tarjeta del PD se quedaba en
+   «Cargando la cola…» para siempre. A los coordinadores no les llegaba ni con la
+   identidad resuelta, aunque el servidor SI se la sirve.
+   ⛔ Y MOVER LA LLAMADA NO VALE: las cinco promesas de ahi arriba salen en paralelo a
+   proposito para que el arranque cueste **UNA ida y vuelta, no dos**.
+   ✅ Quien decide es el SERVIDOR, igual que con `getMisMovimientos`: `_getSanciones_`
+   sirve a rango >= 3 o al `_coordinadorDe_(subsistema)`, y a los demas les devuelve [].
+   El precio es una peticion mas EN PARALELO para quien no ve nada; no una ida y vuelta.
+   ⛔ Y SE TRADUCE `decision` -> `dec` EN LA FRONTERA, como hace el escritorio: el
+   backend guarda el borrador en `s.decision` (`Codigo.gs:2062`) y esta cara lo lee en
+   `x.dec`. Sin traducir, marcar 30 en el escritorio y abrir el movil decia «Faltan 30
+   por marcar». ⚠️ Aqui NO se pone `||'aceptar'` como el escritorio: esta cara usa
+   `!x.dec` para saber lo que falta por marcar, y un defecto lo dejaria todo «marcado». */
 async function _cargarSancionesM_(){
-  if(!esPD()) return;
-  try{ var a=await api.getSanciones({estado:'pendiente'}); if(Array.isArray(a)) SANC_M=a; }
+  try{ var a=await api.getSanciones({estado:'pendiente'});
+       if(Array.isArray(a)){ a.forEach(function(s){ if(!s.dec && s.decision) s.dec=s.decision; });
+                             SANC_M=a; } }
   catch(e){}
 }
 
@@ -265,14 +283,24 @@ function _cablearSanciones_(){
       var sinMarcar=it.filter(function(x){ return !x.dec; });
       if(sinMarcar.length){ tost('Faltan '+sinMarcar.length+' por marcar: el bloque se cierra entero.'); return; }
       b.disabled=true; b.textContent='Cerrando…';
-      /* EN SERIE: cada `decidirSancion` coge el LockService del backend, y en paralelo se
-         pisan entre ellas. Es lento y es lo correcto. */
+      /* ⛔ UNA SOLA LLAMADA, Y NO ES POR VELOCIDAD. Aqui habia un bucle de
+         `decidirSancion(…,'aprobar')`, uno por sancion — y **cada `aprobar` levanta el
+         flag `aplicar_sanciones`** en el backend (`Codigo.gs:2084`). La rutina de Python
+         corre **cada 2 minutos** y puede entrar a mitad del bucle: aplica **medio bloque**
+         en Notion y manda un comunicado incompleto. `_confirmarLote_` existe exactamente
+         para eso —lo dice su comentario— y levanta el flag **una vez y al final**
+         (`Codigo.gs:2144`). El escritorio ya lo hacia asi; esta cara no.
+         ⚠️ Y la guarda de «faltan por marcar» de arriba es IMPRESCINDIBLE: `_confirmarLote_`
+         da por **aceptada** toda pendiente sin `decision` (`Codigo.gs:2135`), asi que
+         quitarla convertiria «sin marcar» en «sancionada». */
       try{
-        for(var i=0;i<it.length;i++)
-          await api.decidirSancion(it[i].id, it[i].dec==='rechazar'?'rechazar':'aprobar', {});
-        SANC_M=null; tost('Bloque cerrado · '+it.length+' sanciones.'); _abrirSanciones_();
+        var r=await api.confirmarLote(lote);
+        var ap=(r&&r.aprobadas!=null)?r.aprobadas:it.length, re=(r&&r.rechazadas)||0;
+        SANC_M=null;
+        tost('Bloque cerrado · '+ap+' aprobadas'+(re?' · '+re+' rechazadas':''));
+        _abrirSanciones_();
       }catch(e){ b.disabled=false; b.textContent='Cerrar el bloque entero';
-        tostErr('Se quedó a medias: ', e); }
+        tostErr('No se pudo cerrar el bloque: ', e); }
     };
   });
 }

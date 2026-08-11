@@ -107,14 +107,14 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=0a521f3"></script>
+<script src="comun.js?v=fb18e27"></script>
 <script src="notis.movil.js?v=2f74e23"></script>
 <script src="cierre.movil.js?v=72a5e2f"></script>
 <script src="tareas.movil.js?v=439790c"></script>
 <script src="turnos.movil.js?v=30616ef"></script>
 <script src="buzon.movil.js?v=7572023"></script>
 <script src="documentos.movil.js?v=aa4be87"></script>
-<script src="sanciones.movil.js?v=05176c8"></script>
+<script src="sanciones.movil.js?v=a420ea3"></script>
 <script src="reuniones.movil.js?v=856ca5d"></script>
 <script src="horas.movil.js?v=916f44c"></script>
 <script src="equipo.movil.js?v=5ea3ff8"></script>
@@ -303,6 +303,10 @@ var api={
      faltaba era que esta cara las ofreciera. */
   pushSancion:  function(ss){ return api._post({action:"pushSancion",sanciones:ss}); },
   decidirSancion: function(id,a,o){ return api._post(Object.assign({action:"decidirSancion",id:id,accion:a},o||{})); },
+  /* ⛔ CERRAR EL BLOQUE ENTERO, EN UNA SOLA LLAMADA (11/08). Sin esto la cara cerraba
+     con un bucle de `decidirSancion`, y cada `aprobar` levanta el flag `aplicar_sanciones`:
+     la rutina entra cada 2 min y puede aplicar MEDIO BLOQUE. El escritorio ya la usaba. */
+  confirmarLote: function(l){ return api._post({action:"confirmarLote",lote:l}); },
   moverLimiteTarea: function(u,f){ return api._post({action:"moverLimiteTarea",url:u,fecha:f}); },
   getConvocatoria: function(semana){ return api._post({action:"getConvocatoria",semana:semana||null}); },
   guardarDisponibilidad: function(conv,celdas){ return api._post({action:"guardarDisponibilidad",convocatoria:conv,celdas:celdas}); },
@@ -362,6 +366,12 @@ function _aplicarPanel_(pnl){
   /* Los ingredientes del umbral: medias mensuales de la temporada y la del mes
      abierto. El peso del dia lo pone `_umbral_()` al calcular, no el backend. */
   if(pnl.umbral) DATA.umbral=pnl.umbral;
+  /* ⛔ EL AGREGADO DEL MES, QUE LLEGABA Y SE CAIA AL SUELO. El backend lo calcula en sus
+     dos ramas y `horas.movil.js` lo lee en cuatro sitios, pero NADIE lo copiaba aqui:
+     `DATA.equipo_mes` era `undefined` SIEMPRE, asi que `_diasDelMes_` caia siempre a su
+     respaldo del calendario. O sea que el mes se volvia a medir del 1 al 31 EN LA CARA,
+     con el backend midiendolo bien desde el cierre — y sin dar ningun error. */
+  if(pnl.equipo_mes) DATA.equipo_mes=pnl.equipo_mes;
   /* `horasMesReal` se dejo de usar: derivaba de un snapshot y le ganaba al dato vivo.
      Si el backend lo sigue mandando, se ignora. */
   if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length) DATA.subsistemas=pnl.subsistemas;
@@ -1355,7 +1365,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='16179ab';
+var BUILD='fa880ba';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
