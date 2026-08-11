@@ -144,9 +144,16 @@ function _sancColaHTML_(){
           (suelta
             ? '<button class="btn mini" data-sok="'+esc(x.id)+'" data-p>Aprobar</button>'+
               '<button class="btn mini" data-sno="'+esc(x.id)+'" data-p style="color:var(--warn);border-color:var(--warn)">Rechazar</button>'
-            : '<button class="btn mini" data-smarc="'+esc(x.id)+'" data-dec="aceptar" data-p'+
-                (x.dec==='aceptar'?' class="btn mini on"':'')+'>Sí</button>'+
-              '<button class="btn mini" data-smarc="'+esc(x.id)+'" data-dec="rechazar" data-p>No</button>')+
+            /* ⛔ UN SOLO ATRIBUTO `class`, CON EL TERNARIO DENTRO. Hasta el 11/08 el boton
+               abria con `class="btn mini"` y el ternario anadia un SEGUNDO `class`: el parser
+               de HTML **descarta el duplicado y se queda con el primero**, asi que `on` no
+               llegaba nunca. Se marcaba sancion por sancion y la pantalla quedaba IGUAL.
+               ✅ Es la forma que `escritorio.html` ya usaba bien. Y el «No» no tenia ternario
+               siquiera: no podia verse marcado ni arreglando lo otro. */
+            : '<button class="btn mini'+(x.dec==='aceptar'?' on a':'')+'" data-smarc="'+esc(x.id)+
+                '" data-dec="aceptar" data-p>Sí</button>'+
+              '<button class="btn mini'+(x.dec==='rechazar'?' on r':'')+'" data-smarc="'+esc(x.id)+
+                '" data-dec="rechazar" data-p>No</button>')+
         '</div>';
       }).join('')+
       (suelta ? ''

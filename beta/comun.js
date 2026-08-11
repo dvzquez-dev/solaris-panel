@@ -1390,6 +1390,12 @@ function _novedades_(){
         {cara:'movil', vista:'horas', txt:'Y los **coordinadores** ya ven su cola: el men\u00fa os ofrec\u00eda Sanciones y el servidor ya os la serv\u00eda, pero la pantalla solo la ped\u00eda si eras el PD, as\u00ed que \u00abPendientes de decidir\u00bb se quedaba cargando sin fin.'},
         {cara:'movil', vista:'horas', txt:'Y lo que marques en el **ordenador** ya llega al m\u00f3vil: marcabas 30 y al abrir el m\u00f3vil para cerrar el bloque te dec\u00eda \u00abFaltan 30 por marcar\u00bb. El servidor lo guardaba bien; era el m\u00f3vil, que lo buscaba con otro nombre.'}
       ] },
+    { id:'2026-08-11-boton-lote-marcado', fecha:'2026-08-11',
+      titulo:'Al marcar una sanci\u00f3n del bloque, ahora SE VE',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Marcabas **S\u00ed** o **No** en una sanci\u00f3n del bloque y la pantalla quedaba **exactamente igual**: no hab\u00eda forma de saber cu\u00e1les llevabas. Ahora el bot\u00f3n marcado se queda en **verde** (o en rojo si rechazas). El ordenador ya lo hac\u00eda bien; era el m\u00f3vil el que se lo com\u00eda.'},
+        {cara:'movil', vista:'estado', txt:'Y el bot\u00f3n **No** tampoco pod\u00eda verse marcado nunca: le faltaba directamente. Importa porque al cerrar el bloque, **lo que no marcas se da por aceptado**.'}
+      ] },
     { id:'2026-08-11-mes-de-cierre-a-cierre', fecha:'2026-08-11',
       titulo:'Tu ritmo del mes vuelve a contarse de cierre a cierre',
       items:[

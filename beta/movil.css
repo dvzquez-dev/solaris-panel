@@ -886,6 +886,11 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .decs button.on.a{background:var(--ok);color:#fff}
 .decs button.on.j{background:var(--ink2);color:#1a1616}
 .decs button.on.r{background:var(--red2);color:#fff}
+/* ⛔ EL LOTE TAMBIEN MARCA, y hasta el 11/08 no lo hacia. Faltaba la regla — y aunque no
+   hubiera faltado, el boton emitia DOS atributos `class` y el segundo se descartaba. Mismo
+   vocabulario que `.decs`, para no inventar paleta: `a` acepta (verde), `r` rechaza (rojo). */
+.lote-i button.on.a{background:var(--ok);color:#fff;border-color:var(--ok)}
+.lote-i button.on.r{background:var(--red2);color:#fff;border-color:var(--red2)}
 .cierre{margin-top:11px;padding:11px 12px;border:1px solid var(--line);border-radius:var(--r2);
   background:rgba(127,127,127,.05)}
 .cierre .tx{font-size:12.5px;color:var(--ink2)}
