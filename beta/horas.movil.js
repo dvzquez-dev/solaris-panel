@@ -169,12 +169,9 @@ function _esDeMesPasado_(p, periodo){
   return iso.slice(0,7) < per;
 }
 
-function _diasDelMes_(){
-  var e=DATA.equipo_mes;
-  if(e && e.dia>0 && e.dias_mes>0) return {dia:e.dia, total:e.dias_mes, periodo:e.periodo||null};
-  var d=new Date();
-  return {dia:d.getDate(), total:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(), periodo:null};
-}
+/* ⛔ `_diasDelMes_` SE MUDO A `comun.js` el 12/08, y no por orden: `_umbral_` vive alli y
+   se llama desde LAS DOS CARAS, asi que aqui no la alcanzaba y pesaba el mes abierto con
+   el calendario. Dejar una copia aqui serian dos puertas para la misma pregunta. */
 
 /* El NOMBRE del mes anterior a `AAAA-MM`. Sin periodo, se deduce de hoy. */
 function _mesAnteriorDe_(periodo){

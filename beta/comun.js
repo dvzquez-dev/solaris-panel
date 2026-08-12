@@ -208,7 +208,33 @@ function _hMesReal_(m){
 
    No las 'armonices' en una sola: son dos preguntas distintas con dos respuestas distintas.
    (Lo hice y salio 13,13 donde tocaba 11,80.) */
+/* ⛔ EL DIA DEL MES SALE DEL SERVIDOR, Y VIVE AQUI PORQUE LO USAN LAS DOS CARAS.
+   Estaba solo en `horas.movil.js`, asi que `_umbral_` -que se llama desde el movil Y desde
+   el escritorio- no podia usarlo y pesaba el mes abierto con el CALENDARIO. Regla de
+   negocio de Daniel: «un mes dura desde el anterior cierre del mes anterior al cierre de
+   ese mes». `equipo_mes.dia` lo calcula `_diasDesdeCierre_` en el backend. */
+function _diasDelMes_(){
+  var e=DATA.equipo_mes;
+  if(e && e.dia>0 && e.dias_mes>0) return {dia:e.dia, total:e.dias_mes, periodo:e.periodo||null};
+  var d=new Date();
+  return {dia:d.getDate(), total:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(), periodo:null};
+}
+
 function _fraccionDelMes_(d){
+  /* ⛔ SIN ARGUMENTO, EL PESO SALE DEL DIA DESDE EL CIERRE, no del dia del calendario.
+     Hasta el 12/08 esto dividia `d.getDate()` por los dias del mes natural, teniendo
+     `equipo_mes.dia` al lado sin tocar — o sea que la regla estaba ENUNCIADA en
+     `_diasDesdeCierre_` y CITADA en el comentario de aqui al lado («el abierto, a
+     prorrata»), y aplicada en ninguno de los dos (§3c-19).
+     ⚠️ MEDIDO: en un dia normal son ~0,2 h de objetivo, pero en la ventana 1-4 de cada
+     mes —cuando el mes de TRABAJO en curso sigue siendo el anterior y el calendario ya
+     dice «dia 1»— son **1,9 h** de diferencia, para las 33 personas a la vez.
+     ✅ Y con esta vara el `Math.min(1, ...)` deja de ser inalcanzable: el dia desde el
+     cierre SI puede pasarse de los dias del mes (32 de 31), que es justo el caso malo. */
+  if(!d){
+    var e=_diasDelMes_();
+    if(e && e.total>0) return Math.max(0, Math.min(1, e.dia/e.total));
+  }
   d=d||new Date();
   var dias=new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();   // dia 0 del siguiente
   return Math.max(0, Math.min(1, d.getDate()/dias));
