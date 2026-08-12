@@ -1711,9 +1711,10 @@ function _novedades_(){
     { id:'2026-08-12-otorgar-confirma-lo-guardado', fecha:'2026-08-12',
       titulo:'Al otorgar horas, el aviso dice lo que se ha GUARDADO, no lo que tecleaste',
       items:[
-        'El tope por parte son 14 h. Si escrib\u00edas 20, se guardaban 14 y el aviso verde dec\u00eda \u00ab20 otorgadas\u00bb: seis horas perdidas sin un solo error.',
-        'Ahora el aviso sale con las horas de verdad y avisa de que se recortaron. El registro tambi\u00e9n guarda que hubo recorte.',
-        'Y por debajo, sin pantalla: el servidor ya no acepta que quien otorga elija contra qu\u00e9 subsistema se mide su potestad.' ] },
+        {cara:'escritorio', vista:'horas', txt:'El tope por parte son **14 h**. Si escrib\u00edas 20, se guardaban 14 y el aviso verde dec\u00eda \u00ab20 otorgadas\u00bb: **seis horas perdidas** sin un solo error.'},
+        {cara:'escritorio', vista:'horas', txt:'Ahora el aviso sale con **las horas que se han guardado** y dice que se recortaron. El registro tambi\u00e9n guarda que hubo recorte, para que se note despu\u00e9s.'},
+        {cara:'escritorio', vista:'horas', txt:'Y por debajo: el servidor ya **no acepta que quien otorga elija contra qu\u00e9 subsistema se mide su potestad** \u2014 antes bastaba con decir \u00abel m\u00edo\u00bb para otorgarle horas a cualquiera.'}
+      ] },
     { id:'2026-08-11-cola-sanciones-movil', fecha:'2026-08-11',
       titulo:'La cola de sanciones del m\u00f3vil ya se carga (y respeta lo que marcaste en el ordenador)',
       items:[
