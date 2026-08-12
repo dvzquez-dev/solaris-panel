@@ -1734,8 +1734,8 @@ function _novedades_(){
     { id:'2026-08-12-libro-horas-dice-lo-que-ensena', fecha:'2026-08-12',
       titulo:'El libro de horas anunciaba un n\u00famero y ense\u00f1aba otro',
       items:[
-        {cara:'m\u00f3vil', vista:'horas', txt:'La lista de \u00abÚltimos movimientos\u00bb reserva un hueco para la compensaci\u00f3n, as\u00ed que pinta **4 fichajes**. La nota de abajo compraba contra 5: con **exactamente 5 fichajes** dec\u00eda \u00abTodo lo de este mes\u00bb **escondiendo uno**, y con 6 dec\u00eda \u00abse ense\u00f1an los 5\u00bb ense\u00f1ando 4.'},
-        {cara:'m\u00f3vil', vista:'horas', txt:'Duele porque esa es la pantalla a la que entras **justo a comprobar si te contaron un parte**: uno que de verdad FALTE era indistinguible del que la vista escond\u00eda, y la nota te firmaba que estaban todos. Ahora dice **lo que pinta**.'},
+        {cara:'movil', vista:'horas', txt:'La lista de \u00abÚltimos movimientos\u00bb reserva un hueco para la compensaci\u00f3n, as\u00ed que pinta **4 fichajes**. La nota de abajo compraba contra 5: con **exactamente 5 fichajes** dec\u00eda \u00abTodo lo de este mes\u00bb **escondiendo uno**, y con 6 dec\u00eda \u00abse ense\u00f1an los 5\u00bb ense\u00f1ando 4.'},
+        {cara:'movil', vista:'horas', txt:'Duele porque esa es la pantalla a la que entras **justo a comprobar si te contaron un parte**: uno que de verdad FALTE era indistinguible del que la vista escond\u00eda, y la nota te firmaba que estaban todos. Ahora dice **lo que pinta**.'},
         {cara:'escritorio', vista:'horas', txt:'Y al rev\u00e9s: el escritorio los pinta **todos** sin recortar, y anunciaba que escond\u00eda cosas que no escond\u00eda. Ahora dice que est\u00e1n todos.'}
       ] },
     { id:'2026-08-12-otorgar-confirma-lo-guardado', fecha:'2026-08-12',
