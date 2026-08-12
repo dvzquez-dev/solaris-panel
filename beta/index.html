@@ -107,16 +107,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=8555e9e"></script>
+<script src="comun.js?v=a82f3e3"></script>
 <script src="notis.movil.js?v=2f74e23"></script>
 <script src="cierre.movil.js?v=72a5e2f"></script>
 <script src="tareas.movil.js?v=2ab8a6a"></script>
 <script src="turnos.movil.js?v=30616ef"></script>
-<script src="buzon.movil.js?v=7572023"></script>
+<script src="buzon.movil.js?v=a180f5a"></script>
 <script src="documentos.movil.js?v=aa4be87"></script>
 <script src="sanciones.movil.js?v=ae5b909"></script>
 <script src="reuniones.movil.js?v=5cd5ccc"></script>
-<script src="horas.movil.js?v=0c6f8e7"></script>
+<script src="horas.movil.js?v=f176371"></script>
 <script src="equipo.movil.js?v=5ea3ff8"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -381,7 +381,19 @@ function _aplicarPanel_(pnl){
   if(pnl.equipo_mes) DATA.equipo_mes=pnl.equipo_mes;
   /* `horasMesReal` se dejo de usar: derivaba de un snapshot y le ganaba al dato vivo.
      Si el backend lo sigue mandando, se ignora. */
-  if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length) DATA.subsistemas=pnl.subsistemas;
+  /* ⛔ Y SE APUNTA QUE LLEGÓ, que es lo que la semilla hacía indistinguible. La lista
+     de `DATA` es de la MAQUETA —cinco unidades inventadas con medias inventadas— y solo
+     se pisa si el panel trae una no vacía; el panel real **no trae ese campo** (lo
+     escribe `flujos/umbral.py --subir`, que está pendiente). Así que en producción la
+     tarjeta pintaba **la semilla**, numerada 1..5 como si fuera un ranking, y las
+     unidades nuevas (Recovery, Documentación Técnica, Seguridad y Verificación,
+     Logística, Patrocinios) **no salían en su propia pantalla**.
+     ⚠️ Es la MISMA lista cuyo vaciado destapó el `MEDIA_EQ` cableado, y aquel arreglo
+     se aplicó solo en `_mediaEquipo_` (§3c-19, dentro del mismo fichero). La regla está
+     escrita en `comun.js`: *un valor de demo no es la ausencia de dato: la disfraza*. */
+  if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length){
+    DATA.subsistemas=pnl.subsistemas; _llego_('subs', true);
+  }
   var yo=null;
   if(pnl.yo){                                              // forma MIEMBRO
     var pub=(pnl.miembros||[]).slice(), ix=-1;
@@ -1391,7 +1403,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='078b7d4';
+var BUILD='736bf34';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';

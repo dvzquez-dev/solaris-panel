@@ -298,6 +298,9 @@ function buzonModal(tipo){
     else { datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
     env.disabled=true; var prev=env.textContent; env.textContent='Enviando…';
     try{
+      /* La clave va FUERA del reintento: se calcula aquí, una vez, y viaja
+         igual en los tres intentos de `api._post`. */
+      datos.clave = _claveReporte_(SESION && SESION.nombre, datos.titulo);
       var r=await (esBug?api.reportarBug(datos):api.reportarMejora(datos));
       /* SI LA FOTO NO SE GUARDÓ, SE DICE. El backend solo devuelve `captura` cuando la ha
          subido a Drive; mientras esa parte no esté desplegada, callarse sería dejar creer

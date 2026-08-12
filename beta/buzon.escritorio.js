@@ -255,6 +255,9 @@ async function reportarModal(){
     if(cap) datos.captura=cap;
   }
   try{
+    /* La clave va FUERA del reintento: se calcula aquí, una vez, y viaja
+       igual en los tres intentos de `api._post`. */
+    datos.clave = _claveReporte_(SESION && SESION.nombre, datos.titulo);
     var r=await (esMejora?api.reportarMejora(datos):api.reportarBug(datos));
     /* Si la foto no se guardo, se dice: el backend solo devuelve `captura` cuando la ha
        subido a Drive. Callarse seria dejar creer que la marcaste para nada. */

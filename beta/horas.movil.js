@@ -161,13 +161,11 @@ function _mediaEquipo_(){
    ⚠️ «Mes pasado» no es exactamente «mes cerrado»: un mes anterior podría seguir sin cerrarse.
    Se usa el mes porque es lo que la cara puede saber sola, y para lo que esto hace —quitar
    ruido de lo viejo— basta. Lo que **nunca** se pliega es el mes en curso. */
-function _esDeMesPasado_(p, periodo){
-  var per = String(periodo||'');
-  if(!/^\d{4}-\d{2}$/.test(per)) return false;
-  var iso = String((p&&p.iso)||'');
-  if(!/^\d{4}-\d{2}/.test(iso)) return false;
-  return iso.slice(0,7) < per;
-}
+/* ⛔ `_esDeMesPasado_` SE MUDÓ A `comun.js` el 13/08, igual que `_diasDelMes_` el
+   12/08 y por lo mismo: la necesita `_deEsteMes_`, que vive allí. Teníamos **dos
+   definiciones de «este mes» en la misma tarjeta** — la cifra grande de cierre a
+   cierre y el desglose por el calendario del teléfono. Dejar una copia aquí serían
+   dos puertas para la misma pregunta. */
 
 /* ⛔ `_diasDelMes_` SE MUDO A `comun.js` el 12/08, y no por orden: `_umbral_` vive alli y
    se llama desde LAS DOS CARAS, asi que aqui no la alcanzaba y pesaba el mes abierto con
@@ -1348,7 +1346,19 @@ function vHoras(){
 /* Ranking de subsistemas: vive en HORAS, al lado del ranking personal, porque las dos
    cosas responden a lo mismo -«¿cómo voy?»- y antes obligaban a cambiar de pestaña. */
 function _rankSubsHTML_(){
-  var subs=DATA.subsistemas||[], maxS=subs.length?subs[0].media:1;
+  /* ⛔ LO QUE NO HA LLEGADO NO SE PINTA — y menos con datos de la maqueta. `DATA` trae
+     cinco unidades de mentira como red de seguridad, y `movil.html` solo las pisa si el
+     panel trae la lista. El panel real **no la trae**, así que esto pintaba la semilla
+     numerada 1..5 como si fuera un ranking — y las unidades nuevas ni aparecían.
+     `_llego_('subs')` lo dice, y es la misma puerta que ya usan los movimientos. */
+  var subs=_llego_('subs') ? (DATA.subsistemas||[]) : [];
+  /* ⛔ Y EL DIVISOR NO PUEDE SER 0. Con el subsistema de cabeza a `media:0` —un mes
+     recién cerrado— el ancho sale `NaN%`, que es CSS INVÁLIDO: el navegador lo descarta,
+     y como este `<i>` no tiene regla propia cae a `width:auto` y **todas las barras
+     salen LLENAS**. La guarda existe doce líneas más arriba, en `animarBarras`
+     (`isFinite(parseFloat(w))`), y aquí falla hacia «lleno», que es peor que hacia
+     «vacío». `|| 1` es el divisor neutro: con todas a 0, todas salen a 0. */
+  var maxS=(subs.length && subs[0].media) ? subs[0].media : 1;
   return '<h2 class="sec">Horas por subsistema<span class="ln"></span>media/persona</h2>'+
     '<div class="tarj">'+(subs.length?subs.map(function(s,i){
       var mio=s.u===YO.unidad;
@@ -1359,6 +1369,6 @@ function _rankSubsHTML_(){
         'background:'+(mio?'var(--red)':'var(--ink3)')+'"></i></div></div>'+
         '<div class="d">'+h1(s.media)+'</div></div>';
     }).join('')
-    : vacio('Sin datos de subsistemas','La media por unidad se calcula al cerrar el mes. Todavía no ha llegado.','',false))+'</div>';
+    : vacio('Sin datos de subsistemas','La media por unidad la calcula el motor al cerrar el mes, y el servidor todavía no la ha mandado.','',false))+'</div>';
 }
 

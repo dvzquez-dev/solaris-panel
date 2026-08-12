@@ -384,6 +384,22 @@ function tostErr(prefijo, e){
   tost(String(prefijo || '') + ((e && e.message) || e), (e && e.sesion) ? {fijo:true} : null);
 }
 
+/* ⛔ LA CLAVE DE UN ENVIO, PARA QUE UN REINTENTO NO LO DUPLIQUE. `api._post` hace TRES
+   intentos en dos segundos contra un fallo de TRANSPORTE —Apps Script pierde el cuerpo
+   del POST de vez en cuando—, y si lo que se pierde es la RESPUESTA el servidor ya
+   escribió: el reintento añade una SEGUNDA fila. Con la compensación en marcha, eso es
+   cobrar dos veces el mismo reporte.
+   ⛔ Y ES ESTABLE PARA UN ENVÍO, no para un intento: se calcula **una vez**, antes de
+   llamar, y se manda igual en los tres. Generarla dentro del reintento —que es la forma
+   que parece correcta— daría una clave distinta cada vez y el servidor no deduplicaría
+   nada. Es la misma idea que `_parteConClave_`, que el backend ya usa para las horas.
+   ⚠️ Nada de aleatorio: lleva **quién** dentro, así que dos personas distintas no pueden
+   colisionar aunque pulsen en el mismo milisegundo. */
+function _claveReporte_(quien, titulo){
+  var t = String(titulo || '').replace(/\s+/g,' ').slice(0, 40);
+  return String(quien || '?') + '|' + new Date().getTime() + '|' + t;
+}
+
 /* ⛔ REINTENTO PASIVO — LA REGLA DE DANIEL (11/08/2026), Y ES PARA TODA LA APP.
    Literal: «vale que siga diciendo cargando pero que lo reintente por detras sin decirtelo
    constantemente, en caso de ser incapaz si quieres (y esto aplica para cualquiera) se podria
@@ -1118,9 +1134,55 @@ function _deEstaTemporada_(d){ return !!d && _temporadaDe_(d)===_temporadaDe_(_h
      · HORAS  -> por MES. El cierre mensual pone a cero Carga tareas, Reuniones, Cursos y
        Turnos (`flujos/cierre.py`), asi que enseñar la temporada en Horas seria enseñar horas
        que el panel ya no cuenta. */
+/* ⛔ SE MUDÓ DESDE `horas.movil.js` el 13/08, y por la misma razón exacta que
+   `_diasDelMes_` el 12/08: la usa `_deEsteMes_`, que vive AQUÍ. Con la función en
+   el módulo, `comun.js` no la alcanzaba y teníamos **dos definiciones de «este
+   mes» en la misma tarjeta**: la cifra grande medía de CIERRE A CIERRE y el
+   desglose de abajo, por el CALENDARIO del teléfono. Dejar una copia aquí serían
+   dos puertas para la misma pregunta.
+
+   ⛔ EL PERIODO LO PONE EL SERVIDOR (`equipo_mes.periodo`), no el reloj del móvil:
+   con la fecha del teléfono, a dos personas les plegaría cosas distintas el mismo
+   día.
+   ⚠️ Sin periodo o sin fecha devuelve **false** — o sea NO se pliega. Ante la duda,
+   el parte se ve: esconder algo por no saber de cuándo es, es peor que enseñarlo
+   de más.
+   ⚠️ «Mes pasado» no es exactamente «mes cerrado»: un mes anterior podría seguir
+   sin cerrarse. Se usa el mes porque es lo que la cara puede saber sola, y para lo
+   que esto hace —quitar ruido de lo viejo— basta. Lo que **nunca** se pliega es el
+   mes en curso. */
+function _esDeMesPasado_(p, periodo){
+  var per = String(periodo||'');
+  if(!/^\d{4}-\d{2}$/.test(per)) return false;
+  var iso = String((p&&p.iso)||'');
+  if(!/^\d{4}-\d{2}/.test(iso)) return false;
+  return iso.slice(0,7) < per;
+}
+
+/* ⛔ «ESTE MES» ES «LO QUE NO ES DE UN MES PASADO», Y POR LA MISMA PUERTA QUE LA CIFRA
+   GRANDE. Hasta el 13/08 esto comó el mes del **reloj del teléfono** mientras `vHoras`
+   —seis líneas más arriba en la misma tarjeta— usaba `equipo_mes.periodo`, o sea el mes
+   de trabajo **de cierre a cierre**. Del día 1 al día del cierre las dos vistas
+   discrepaban: arriba «37 h este mes» y abajo «todavía no se te ha contado ningún
+   fichaje». A las 32 personas, **todos los meses** — julio se aplicó el 04/08.
+   ⚠️ Y el daño es el que describe `_notaRegistro_` aquí al lado: *un parte que de verdad
+   FALTE es indistinguible del que la vista esconde*. Aquí la vista los escondía TODOS,
+   y el número de arriba juraba que estaban.
+   ✅ Se define como el **complemento** de `_esDeMesPasado_` en vez de reimplementar la
+   regla: así las dos mitades de la tarjeta no pueden volver a separarse.
+   ⚠️ **Sin periodo se sigue cayendo al calendario**, y hace falta: `_esDeMesPasado_`
+   contesta `false` a todo cuando no lo hay —su «ante la duda, se ve»—, y tomar eso por
+   «todo es de este mes» metería en la lista partes de hace medio año. */
 function _deEsteMes_(d){
+  if(!d) return false;
+  var per = (typeof _diasDelMes_==='function') ? (_diasDelMes_()||{}).periodo : null;
+  if(/^\d{4}-\d{2}$/.test(String(per||''))){
+    var m = d.getMonth()+1;
+    var iso = d.getFullYear() + '-' + (m<10?'0':'') + m + '-01';
+    return !_esDeMesPasado_({iso:iso}, per);
+  }
   var h=_hoyDateM_();
-  return !!d && d.getMonth()===h.getMonth() && d.getFullYear()===h.getFullYear();
+  return d.getMonth()===h.getMonth() && d.getFullYear()===h.getFullYear();
 }
 
 function _mesLargo_(d){ return MESES_L[d.getMonth()]+' '+d.getFullYear(); }
@@ -1757,6 +1819,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-13-horas-lo-que-no-se-sabe', fecha:'2026-08-13',
+      titulo:'Horas dejaba de ense\u00f1ar datos que no eran tuyos',
+      items:[
+        {cara:'movil', vista:'horas', txt:'\u00abHoras por subsistema\u00bb ense\u00f1aba **cinco unidades de la maqueta** \u2014Avi\u00f3nica, GNC, Aeroestructuras, Propulsi\u00f3n, Org&Mark\u2014 con medias inventadas y numeradas como un ranking, porque el servidor todav\u00eda no manda esa lista. Ahora dice que falta el dato. Y las unidades nuevas (Recovery, Documentaci\u00f3n T\u00e9cnica, Seguridad y Verificaci\u00f3n, Log\u00edstica, Patrocinios) ya no quedan fuera de su propia pantalla.'},
+        {cara:'movil', vista:'horas', txt:'Y en esa misma pantalla, \u00abeste mes\u00bb quer\u00eda decir **dos cosas distintas**: la cifra grande contaba el mes de trabajo (de cierre a cierre) y el desglose de abajo, el mes del calendario de tu m\u00f3vil. Del d\u00eda 1 al d\u00eda del cierre arriba pon\u00eda \u00ab37 h este mes\u00bb y abajo \u00abtodav\u00eda no se te ha contado ning\u00fan fichaje\u00bb. Ahora las dos mitades cuentan lo mismo.'}
+      ] },
     { id:'2026-08-13-horas-numeros-que-no-cuadraban', fecha:'2026-08-13',
       titulo:'Tres n\u00fameros de Horas que no cuadraban con lo que dec\u00edan',
       items:[
