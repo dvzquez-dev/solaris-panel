@@ -296,7 +296,16 @@ function _dispCargar_(repintar){
     if(typeof repintar==='function') repintar();
   }).catch(function(){
     /* ⛔ Un fallo NO deja el mapa de demostracion pintado: se marca el estado y se repinta, que
-       es como la pantalla puede decir que no lo sabe en vez de enseñar algo inventado. */
+       es como la pantalla puede decir que no lo sabe en vez de enseñar algo inventado.
+       ⛔ Y ESO LO DECIA EL COMENTARIO Y NO LO HACIA EL CODIGO. `CONVOCATORIAS.length=0` solo
+       estaba en la rama de EXITO, asi que con el backend caido quedaba puesta la semilla de
+       demostracion — una convocatoria entera, **con los nombres reales del consejo** y su
+       plazo— y quien reparte turnos veia un mapa de calor perfecto y **repartia un turno
+       real con el**. Un mapa de mentira es peor que un hueco, que es justo lo que dice la
+       rama de arriba: la leccion estaba escrita a seis lineas de aqui.
+       ⚠️ Y `DISP_SRV` no lo lee nadie mas: `_dispPanel_` no consulta el estado en ningun
+       punto, asi que marcarlo no basta — hay que VACIAR. */
+    if(typeof CONVOCATORIAS!=='undefined') CONVOCATORIAS.length=0;
     _dispEstadoSrv_('error');
     if(typeof repintar==='function') repintar();
   });
