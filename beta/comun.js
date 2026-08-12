@@ -1757,6 +1757,18 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-13-horas-numeros-que-no-cuadraban', fecha:'2026-08-13',
+      titulo:'Tres n\u00fameros de Horas que no cuadraban con lo que dec\u00edan',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La nota que explica tu ritmo ense\u00f1aba una divisi\u00f3n que **no daba ese ritmo**: dec\u00eda \u00ab1,65 h/d\u00eda (20 h en 10 d\u00edas)\u00bb, y 20 \u00f7 10 = 2. El ritmo va **sin la compensaci\u00f3n base** de tu cargo y el par\u00e9ntesis ense\u00f1aba las horas en bruto. Ahora ense\u00f1a el n\u00famero de verdad y dice por qu\u00e9 no son tus horas del mes.'},
+        {cara:'movil', vista:'horas', txt:'En el ranking, tu fila **no se pintaba** si eras la \u00faltima persona del equipo: el total estaba escrito a mano en 32 y ahora sale del dato del servidor. Ve\u00edas dos rayas an\u00f3nimas y ninguna pista de que faltaba la tuya.'},
+        {cara:'movil', vista:'horas', txt:'Y en esa misma fila, quien todav\u00eda no tiene ning\u00fan mes cerrado ve\u00eda **\u00ab\u221e h\u00bb**. Ahora sale una raya: no se sabe, y se dice.'}
+      ] },
+    { id:'2026-08-13-medidor-se-contradecia', fecha:'2026-08-13',
+      titulo:'El medidor de conducta se contradec\u00eda a s\u00ed mismo',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Con **2 puntos exactos** pon\u00eda \u00abEn evaluaci\u00f3n.\u00bb arriba y, justo debajo, \u00abpor debajo de 2 puntos se abre expediente\u00bb \u2014 o sea que a\u00fan te quedaba margen. El expediente se abre **con 2** (RRI Art. 32). Ahora el n\u00famero de la frase sale de la propia regla, as\u00ed que no pueden volver a separarse.'}
+      ] },
     { id:'2026-08-12-plazos-que-se-escondian', fecha:'2026-08-12',
       titulo:'Dos pantallas escond\u00edan un dato que s\u00ed ten\u00edan',
       items:[

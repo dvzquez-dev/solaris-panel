@@ -239,7 +239,19 @@ function _compHorasHTML_(base){
      por el puesto, es la MISMA todos los meses y meterla mide el cargo en vez del trabajo.
      Descontarla en uno solo de los dos lados seria peor que no descontarla. */
   var _bt=_horasSinBase_(YO, base);
-  var ritmo=(_bt==null?base:_bt)/dia;
+  /* ⛔ EL NUMERADOR SE GUARDA PORQUE LA NOTA DE ABAJO LO ENSEÑA. Hasta el 13/08 el
+     ritmo se calculaba con las horas SIN la base y el paréntesis que dice de dónde
+     sale enseñaba `base`, o sea las horas EN BRUTO: la división impresa no daba
+     nunca el número impreso. Un coordinador con 20 h el día 10 leía «Tu ritmo:
+     1,65 h/día (20 h en 10 de 31 días)», y 20 ÷ 10 = 2. El desfase es exactamente la
+     base de cada uno — **7 h para el PD**, así que la fila más incoherente era la
+     suya. A las 32, todos los días del mes.
+     ⚠️ Y el banco no podía verlo: `probar_ritmo.py` pasa TODAS sus aserciones de
+     ritmo por un `limpio()` que recorta en el primer `<p ...>`, que es justo donde
+     vive esta nota. No era una comprobación que pasara con el fallo: era un recorte
+     del instrumento que hacía imposible plantear la pregunta. */
+  var _num=(_bt==null?base:_bt);
+  var ritmo=_num/dia;
   /* ⛔ EL MES ANTERIOR, Y EL MES SALE DEL DATO. Aqui ponía que `hAnt` «solo existe en los datos
      de demo»: **era falso y costó la fila**. `hAnt` está en el panel SUBIDO al servidor, con
      `mesAnt: 'junio'` estando en agosto. Al cambiarla al dato bueno (`carga_mes_anterior`) la
@@ -270,8 +282,9 @@ function _compHorasHTML_(base){
   /* Que se vea CONTRA QUE se compara uno. Sin esto, «+12 %» respecto a un ritmo no se
      distingue de «+12 %» respecto a un total, y son cosas distintas. */
   return '<div class="comph">'+f+
-    '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(base)+
-    ' h en '+dia+' de '+d.total+' días). Se compara el <b>ritmo</b>, no el total: el mes '+
+    '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(_num)+
+    ' h en '+dia+' de '+d.total+' días'+(_bt==null?'':', sin la compensación base')+
+    '). Se compara el <b>ritmo</b>, no el total: el mes '+
     'en curso va a medias y el anterior está entero.</p></div>';
 }
 
@@ -1215,11 +1228,30 @@ function vHoras(){
   var viejas=_todasMias.filter(function(x){ return _esDeMesPasado_(x, _perAhora); });
 
   /* ranking CENSURADO: tu puesto y tus vecinos, sin nombres ajenos */
-  var puesto=+YO.puesto||0, total=32, filas='';
+  /* ⛔ EL TOTAL SALE DEL DATO, NO DE UN 32 ESCRITO A MANO. El backend manda
+     `ranking.total = ms.length` y el móvil lo tiraba. Con la persona nº 33 el bucle
+     iba de 31 a min(32, 35) = 32 y **nunca llegaba a su propia fila**: veía dos rayas
+     anónimas sin la suya, y como `filas` no salía vacía tampoco saltaba el «Sin puesto
+     todavía». Hoy el roster son 32: estaba a UN ALTA de morder. El escritorio sí lo
+     guarda (`DATA._ranking`), o sea que era una asimetría entre caras (§3c-9). */
+  var _rk=(typeof DATA!=='undefined' && DATA && DATA._ranking) || null;
+  var puesto=+YO.puesto||0;
+  var total=Math.max(+((_rk&&_rk.total))||0, (DATA&&DATA.miembros&&DATA.miembros.length)||0, puesto);
+  var filas='';
+  /* ⛔ Y «NO SÉ CUÁNTAS HORAS POR MES» NO SE PINTA COMO UN NÚMERO. `YO.horasTemp/YO.meses`
+     sin guarda da **Infinity** con `meses:0` —y `h1` lo formatea como **«∞ h»**—, y **NaN**
+     con los dos campos ausentes, que `h1` convierte en **«0 h»**: la app diciéndole a
+     alguien que su ponderado es cero. La guarda existe **enunciada dos veces** y en las
+     dos devolviendo `null`: `comun.js` (`_umbral_`) y el escritorio, esta con el
+     comentario *«se dice, no se finge»*. Aquí el móvil se protegía con `puesto>0`, que
+     es OTRO campo — y `flujos/temporada.py` asigna puesto también a los de `meses = 0`.
+     ⚠️ Esto NO decide dónde va en el ranking (eso lo decide Daniel): decide que, sea
+     donde sea, no se le enseña un número inventado. */
+  var _hm=(typeof YO.horasTemp==='number' && YO.meses) ? (YO.horasTemp/YO.meses) : null;
   for(var i=Math.max(1,puesto-2); puesto>0 && i<=Math.min(total,puesto+2); i++){
     filas += (i===puesto)
       ? '<div class="r yo"><span class="p mono">'+i+'</span><span class="n">'+esc(YO.pila)+' (tú)</span>'+
-        '<span class="h mono">'+h1(YO.horasTemp/YO.meses)+'</span></div>'
+        '<span class="h mono">'+(_hm==null?'—':h1(_hm))+'</span></div>'
       : '<div class="r"><span class="p mono">'+i+'</span><span class="cens"></span></div>';
   }
 

@@ -346,6 +346,20 @@ function arcoSeg(i,r){
 
 function estadoPts(p){return p<=2?'evaluacion':(p>=9?'elegible':'normal');}
 
+/* ⛔ EL NUMERO DE LA FRASE SALE DE LA REGLA, NO SE TECLEA. Hasta el 13/08 el medidor
+   decia «por debajo de 2 puntos se abre expediente» y el expediente se abre **CON 2**
+   (RRI Art. 32, y `reglas/disciplina.py`: de 0 a 2 -> estado de evaluacion). O sea que a
+   quien tiene exactamente 2 la MISMA caja le ponia «En evaluacion.» arriba y debajo que
+   se abre por debajo de 2: las dos frases se contradicen, y la de abajo se lee como que
+   todavia queda un punto de margen. Falla en la direccion que NO avisa.
+   ⚠️ Y ya habia una tercera version del mismo numero en el repo (`navegador/app.html`
+   decia «por debajo de 3», que si es lo mismo que «con 2 o menos»): tres redacciones,
+   dos significados. Por eso ahora se PREGUNTA a `estadoPts` en vez de teclearlo: el
+   dia que cambie el articulo, la frase cambia sola.
+   ⚠️ «Zona critica» NO es lo mismo que «expediente»: el ambar del anillo empieza en 3
+   (`_colorSeg_`) y el expediente, en 2. La frase tiene que distinguirlos. */
+function _topeEval_(){ var k=0,i; for(i=0;i<=10;i++){ if(estadoPts(i)==='evaluacion') k=i; } return k; }
+
 /* COLOR DE CADA TRAMO DEL MEDIDOR (decisión de Daniel, 27/07).
    Al ser ELEGIBLE el anillo deja de ser rojo: los tramos del medio pasan a AZUL y los dos
    últimos —9/10 y 10/10— a VERDE, que es lo que se está celebrando.
@@ -422,7 +436,7 @@ function medidorHTML(){
       (est==='elegible'?'<b>Elegible.</b>':est==='evaluacion'?'<b style="color:var(--red2)">En evaluación.</b>':'<b>Sin expediente.</b>')+
       (p>3
         ? ' Te quedan <b>'+(p-3)+'</b> punto'+((p-3)===1?'':'s')+' antes de la zona crítica.'
-        : ' Estás en <b>zona crítica</b>: por debajo de 2 puntos se abre expediente.')+
+        : ' Estás en <b>zona crítica</b>: con <b>'+_topeEval_()+'</b> puntos o menos se abre expediente.')+
     '</div>'+
     '<button class="btn mini" data-p id="btnLibro" style="margin-top:11px">Desglose de puntos</button>'+
   '</div>'+

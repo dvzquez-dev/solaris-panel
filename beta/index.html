@@ -107,16 +107,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=fb228fb"></script>
+<script src="comun.js?v=8555e9e"></script>
 <script src="notis.movil.js?v=2f74e23"></script>
 <script src="cierre.movil.js?v=72a5e2f"></script>
 <script src="tareas.movil.js?v=2ab8a6a"></script>
 <script src="turnos.movil.js?v=30616ef"></script>
 <script src="buzon.movil.js?v=7572023"></script>
 <script src="documentos.movil.js?v=aa4be87"></script>
-<script src="sanciones.movil.js?v=136a4f6"></script>
+<script src="sanciones.movil.js?v=ae5b909"></script>
 <script src="reuniones.movil.js?v=5cd5ccc"></script>
-<script src="horas.movil.js?v=7eefeff"></script>
+<script src="horas.movil.js?v=0c6f8e7"></script>
 <script src="equipo.movil.js?v=5ea3ff8"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -389,6 +389,12 @@ function _aplicarPanel_(pnl){
     if(ix>=0) pub[ix]=pnl.yo; else pub.push(pnl.yo);
     DATA.miembros=pub; yo=pnl.yo;
     if(pnl.ranking&&pnl.ranking.puesto) yo.puesto=pnl.ranking.puesto;
+    /* ⛔ Y EL TOTAL TAMBIEN, que se tiraba aqui mismo. `horas.movil.js` lo tenia
+       cableado a 32, asi que con la persona nº 33 el bucle del ranking iba de 31 a
+       min(32, 35) y **nunca llegaba a su propia fila**: veía dos rayas anónimas sin
+       la suya, y como la lista no salía vacía tampoco saltaba el «Sin puesto
+       todavía». El escritorio SÍ lo guarda: era una asimetría entre caras. */
+    DATA._ranking=pnl.ranking||null;
   } else if(Array.isArray(pnl.miembros)&&pnl.miembros.length){   // forma ADMIN
     DATA.miembros=pnl.miembros;
     yo=SESION?pnl.miembros.filter(function(m){return m.nombre===SESION.nombre;})[0]:null;
@@ -1385,7 +1391,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='87527dc';
+var BUILD='078b7d4';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
