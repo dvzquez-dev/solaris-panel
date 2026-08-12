@@ -214,6 +214,16 @@ function _fraccionDelMes_(d){
   return Math.max(0, Math.min(1, d.getDate()/dias));
 }
 
+/* El numero si es un numero, y si no el respaldo. ⛔ EXISTE PORQUE `||` NO SIRVE:
+   `0` es falsy, asi que `x||respaldo` tapa un cero que alguien mando a proposito.
+   ⚠️ Y se descarta `NaN` explicitamente: `typeof NaN` es `'number'`, o sea que un
+   `NaN` colado pasaria el filtro y envenenaria el `Math.max`/`Math.min` entero
+   -toda comparacion con NaN es falsa- dejando el umbral en NaN y la pantalla con
+   un objetivo vacio. */
+function _oNum_(v, respaldo){
+  return (typeof v==='number' && !isNaN(v)) ? v : respaldo;
+}
+
 function _umbral_(){
   var ing=DATA.umbral;
   if(ing && ing.medias && ing.medias.length){
@@ -224,7 +234,12 @@ function _umbral_(){
       var w=_fraccionDelMes_();                                 // el abierto, a prorrata
       num+=ma.media*w; den+=w;
     }
-    if(den>0) return Math.max(ing.lo||UMBRAL_LO, Math.min(ing.hi||UMBRAL_HI, (ing.frac||UMBRAL_FRAC)*(num/den)));
+    /* ⛔ `||` NO VALE AQUI: un `lo:0` legitimo -«sin suelo»- es falsy y saldria 8,
+       y un `frac:0` saldria 2/3. Son tres numeros que el backend PUEDE mandar a cero
+       a proposito, asi que el respaldo tiene que dispararse cuando NO VIENE el dato,
+       no cuando el dato vale cero. Hasta hoy era teorico porque nadie producia
+       `panel.umbral`; con el productor restaurado (12/08) muerde de verdad. */
+    if(den>0) return Math.max(_oNum_(ing.lo, UMBRAL_LO), Math.min(_oNum_(ing.hi, UMBRAL_HI), _oNum_(ing.frac, UMBRAL_FRAC)*(num/den)));
   }
   /* Sin ingredientes (backend viejo, o una cuenta a la que no se los sirven) se cae a la
      aproximacion por persona: media de `horasTemp/meses` de TODOS los de la temporada. No
@@ -363,6 +378,21 @@ function tostErr(prefijo, e){
    fichajes— y ahi el silencio del reintento pasivo es justo lo peor: nadie se entera de que ha
    pasado dos veces. Las escrituras tienen su propia proteccion (la clave de un solo uso del
    parte), que es otra cosa y vive en otro sitio. */
+/* ¿LLEGO ESTA CARGA? Una sola puerta para todas, y no una variable suelta por cara.
+   ⛔ EXISTE PORQUE UNA LISTA VACIA NO DICE POR QUE ESTA VACIA. `MOVS` y `MOVS_E` son
+   arrays, nunca `null`, asi que «no hay» y «no llego» se pintaban IGUAL — y lo que se
+   pintaba era lo primero: «Sin movimientos esta temporada». Decirle a alguien que no
+   tiene sanciones cuando el servidor no contesto se lee como «estoy limpio», y ahi ya
+   no se vuelve a mirar.
+   ⚠️ Se consulta SIN argumento y se fija CON el, para que no haya dos funciones que
+   puedan divergir. Y arranca en falso: antes de la primera carga, «no ha llegado» es
+   la verdad. */
+var _LLEGO = {};
+function _llego_(clave, v){
+  if(v !== undefined) _LLEGO[clave] = (v === true);
+  return _LLEGO[clave] === true;
+}
+
 var RP_BASE = 3000;     /* la primera espera */
 var RP_TOPE = 60000;    /* y el techo, que no se pasa */
 
@@ -497,6 +527,173 @@ function _apiParse(txt, accion){
    tenían `fin` en `HH:MM`, y uno era de julio con julio ya cerrado.
    ⚠️ La regla se ESPEJA a propósito (`_fechaDeParte_` en el `.gs`): son dos runtimes, y lo
    que las ata es una comprobación de **simetría**, no de corrección (§3c-9). */
+/* ⛔ A QUE MES CUENTA UN BLOQUE ATRASADO — y por que la pantalla tiene que decirlo.
+   Daniel (11/08): *«Tu puedes declarar un bloque horario atrasado de julio en agosto, si. Eso
+   se puede pero eso tendra que entrar al nuevo mes… nunca al anterior. Siempre al actual.
+   Aunq sea atrasado debe ser asi porque si no peta»*.
+
+   ✅ Y ASI FUNCIONA YA, pero por accidente y sin que nadie lo diga: `_periodoParte_` mira
+   `[fin, ini, creado_at]` y **`fecha` no esta en esa lista**; para un bloque a mano `ini`/`fin`
+   son `HH:MM`, asi que cae a `creado_at` — el mes en que se creo. Coincide con la regla.
+
+   ⛔ LO QUE NO COINCIDE ES LO QUE SE VE. La tarjeta que firma el coordinador pone la fecha
+   que escribio la persona, y esa fecha puede ser de otro mes. Se pinta de una forma y se
+   contabiliza de otra, que es como se firma una cosa creyendo otra.
+   ✅ Devuelve el aviso cuando la fecha escrita cae en un mes distinto del actual, y '' cuando
+   no hay nada que avisar. */
+function _avisoMesDelBloque_(fechaDMY, hoyDMY){
+  var f = _dmyAISO_(String(fechaDMY || ''));
+  var h = _dmyAISO_(String(hoyDMY || ''));
+  if(!/^\d{4}-\d{2}/.test(f) || !/^\d{4}-\d{2}/.test(h)) return '';
+  return f.slice(0,7) === h.slice(0,7) ? '' : h.slice(0,7);
+}
+
+/* ⛔ LOS PUNTOS DE SALIDA, COMO LISTA CERRADA Y CON SU CIUDAD APARTE.
+   Daniel (11/08): «Lista casi mejor. y no es un turno que sale de vigo, es un turno que
+   contemple el trayecto ourense - vigo. La lista es: Enfrente del Politécnico (parada de
+   autobús), Ourense; CUVI, Vigo; CITI, Ourense».
+
+   ⛔ Y LA `ciudad` VA EN SU PROPIO CAMPO, que es el punto entero. Lo que decide si un turno
+   lleva trayecto NO es de dónde sale: es que el trayecto **cruce entre ciudades**. Con la
+   ciudad separada eso es una comparación de un renglón; metida dentro del nombre serían
+   casos especiales, uno por sitio, y el cuarto punto que se añada rompe la regla.
+
+   ⚠️ Y por eso es lista y no texto libre: con texto libre «CUVI», «cuvi» y «CUVI, Vigo» son
+   tres sitios distintos y la comparación no se puede hacer nunca. El «casi» de Daniel es
+   honesto —una lista deja fuera un punto nuevo hasta que alguien lo añada—, y la respuesta a
+   eso no es texto libre: es que añadir una fila aquí sea trivial. Lo es. */
+var PUNTOS_TURNO = [
+  { id:'poli-ou', nombre:'Enfrente del Politécnico (parada de autobús)', ciudad:'Ourense' },
+  { id:'cuvi-vi', nombre:'CUVI',                                          ciudad:'Vigo'    },
+  { id:'citi-ou', nombre:'CITI',                                          ciudad:'Ourense' }
+];
+
+function _puntoTurno_(id){
+  for (var i=0;i<PUNTOS_TURNO.length;i++) if (PUNTOS_TURNO[i].id === id) return PUNTOS_TURNO[i];
+  return null;                    /* ⛔ `null` = «no lo sé», nunca un punto inventado */
+}
+
+/* ¿El trayecto cruza de ciudad? `true` / `false` / **`null` cuando no se sabe**.
+   ⛔ EL `null` NO ES DECORACIÓN: quien recibe un «no lo sé» NO puede tratarlo como «no cruza»,
+   porque eso es exactamente perder un descuento de 4 € sin que nadie se entere. Es la regla
+   del proyecto sobre los valores que significan «no lo sé», y aquí hay dinero detrás. */
+function _trayectoCruzaCiudad_(origenId, destinoId){
+  var o = _puntoTurno_(origenId), d = _puntoTurno_(destinoId);
+  if (!o || !d) return null;
+  return o.ciudad !== d.ciudad;
+}
+
+/* ⛔ LOS TRES CARGOS QUE NO SE PUEDEN DEJAR EN BLANCO.
+   Daniel: «para convocar un turno es obligatorio q se cubran los cargos importantes,
+   responsable de turno, responsable audiovisual, responsable de memoria y coche (opcional)».
+
+   ⚠️ El de TURNO tiene un segundo papel decidido el mismo día: es quien confirma **quién fue
+   de verdad** al acabar, y de esa confirmación depende el descuento del coche. Sin él no hay
+   ni turno ni forma de cerrarlo. */
+/* ⚠️ `corto` existe porque los tres botones van uno al lado del otro en la fila de cada
+   persona, y «Responsable audiovisual» no cabe ahí. El nombre largo (`et`) va en el `title` y
+   en los mensajes: lo que se lee al equivocarse tiene que ser el nombre entero, no la
+   abreviatura — un «falta AV» no le dice nada a quien convoca por primera vez. */
+var CARGOS_TURNO = [
+  { k:'turno',       corto:'turno', et:'Responsable de turno',
+    nota:'confirma quién fue de verdad al acabar' },
+  { k:'audiovisual', corto:'AV',    et:'Responsable audiovisual',  nota:'' },
+  { k:'memoria',     corto:'memoria', et:'Responsable de memoria', nota:'' }
+];
+
+/* Devuelve las CLAVES de los cargos que faltan, en el orden de `CARGOS_TURNO`. Vacío = se
+   puede convocar.
+   ⛔ DEVUELVE CUÁLES FALTAN, no un booleano: un `false` obliga a la pantalla a recalcular el
+   motivo por su cuenta, y ahí es donde las dos versiones se separan y acaban diciendo cosas
+   distintas. Con la lista, el botón y el mensaje leen lo MISMO. */
+function _cargosQueFaltan_(cargos){
+  var c = cargos || {}, faltan = [];
+  for (var i=0;i<CARGOS_TURNO.length;i++){
+    var k = CARGOS_TURNO[i].k;
+    if (!(c[k] && String(c[k]).replace(/^\s+|\s+$/g,''))) faltan.push(k);
+  }
+  return faltan;
+}
+
+/* ⛔ Y EL COCHE ES OPCIONAL, PERO SI SE PONE TIENE QUE ESTAR ENTERO.
+   Daniel: «el coche tiene q tener un campo pa poner de donde sale y a donde va» y «que haya
+   una casilla para cuando el trayecto de ida no sea el mismo que el de vuelta y que
+   normalmente no este activada».
+
+   Devuelve las pegas de UN coche (lista de claves), vacío si está bien. Un coche a medias es
+   peor que ninguno: se convoca creyendo que hay transporte resuelto y no lo hay.
+   ⚠️ `vueltaDistinta` apagada por defecto NO se comprueba aquí —eso es del formulario—, pero
+   si está encendida, la vuelta tiene que estar completa igual que la ida. */
+function _pegasDelCoche_(coche){
+  var c = coche || {}, pegas = [];
+  if (!_puntoTurno_(c.origen))  pegas.push('origen');
+  if (!_puntoTurno_(c.destino)) pegas.push('destino');
+  if (c.vueltaDistinta){
+    if (!_puntoTurno_(c.vueltaOrigen))  pegas.push('vueltaOrigen');
+    if (!_puntoTurno_(c.vueltaDestino)) pegas.push('vueltaDestino');
+  }
+  return pegas;
+}
+
+/* La etiqueta de un coche por su posición: «Coche 1», «Coche 2»…
+   Daniel: «ya apareceria lo clasico despues de disposicion de personas: Coche 1, Coche ...
+   Coche ... sabes osea si hay varios y eso».
+   ⚠️ Base 1 a propósito: nadie dice «Coche 0». */
+function _etiquetaCoche_(i){ return 'Coche ' + (Number(i) + 1); }
+
+/* ⛔ EL MOTIVO POR EL QUE NO SE PUEDE CONVOCAR, en UNA sola frase y en un solo sitio.
+   Lo necesitan DOS: el boton (que sale `disabled` con esto encima) y la comprobacion del
+   envio. Dos textos distintos para la misma regla es como se acaba diciendo «falta el
+   audiovisual» arriba y «marca a alguien» abajo.
+   ✅ Devuelve '' cuando se puede convocar, para que quien lo llame no tenga que negar nada. */
+function _porQueNoSeConvoca_(cargos, cuantos){
+  if(!cuantos) return 'Marca al menos a una persona.';
+  var faltan = _cargosQueFaltan_(cargos), nombres = [], i, j;
+  for(i=0;i<faltan.length;i++){
+    for(j=0;j<CARGOS_TURNO.length;j++){
+      if(CARGOS_TURNO[j].k === faltan[i]) nombres.push(CARGOS_TURNO[j].et);
+    }
+  }
+  if(!nombres.length) return '';
+  /* ⚠️ El nombre LARGO, no la abreviatura de los botones: un «falta AV» no le dice nada a
+     quien convoca por primera vez. */
+  /* Y EL VERBO CONCUERDA. Con dos cargos, «Falta los ...» esta mal escrito, y esto lo lee el
+     equipo entero: un mensaje de error con una falta de concordancia se recuerda mas que lo
+     que decia. Con tres, comas y la ultima con «y». */
+  var lista = nombres.length <= 2 ? nombres.join(' y ')
+            : nombres.slice(0, nombres.length-1).join(', ') + ' y ' + nombres[nombres.length-1];
+  return (nombres.length === 1 ? 'Falta el ' : 'Faltan los ') + lista + '.';
+}
+
+/* ⛔ EL `rol` QUE DE VERDAD SE LEE — y por que esto no es cosmetica.
+   La cara recoge quien lleva coche (boton 🚗) y quien es responsable de turno (radio), y
+   los manda al backend, que los escribe en columnas People de Notion. **Y nadie las vuelve a
+   leer**: `_turnoDeNotion_` saca los roles SOLO del texto `Reparto`, compuesto con `r.rol`, que
+   es lo que alguien teclea a mano en «su papel (opcional)». Y `reglas/cuota.py` cobra el
+   descuento buscando la palabra «coche» DENTRO de ese texto.
+   → Marcar el boton no producia ningun descuento. La pantalla prometia algo que no entregaba.
+
+   ✅ El formato no se inventa: los datos reales ya son asi — «Responsable de turno, Coche»,
+   «Responsable de turno, Coche, Responsable de memoria».
+   ⚠️ Y lo que la persona escribio a mano se CONSERVA y va primero: es lo que ella quiso decir;
+   lo de los botones se añade detras, sin pisarlo ni duplicarlo. */
+function _rolDeTurno_(escrito, marcas){
+  var m = marcas || {}, partes = [], i;
+  var puesto = String(escrito == null ? '' : escrito).replace(/^\s+|\s+$/g,'');
+  if(puesto) partes.push(puesto);
+  var auto = [];
+  if(m.responsable) auto.push('Responsable de turno');
+  if(m.coche)       auto.push('Coche');
+  var bajo = puesto.toLowerCase();
+  for(i=0;i<auto.length;i++){
+    /* ⛔ NO SE DUPLICA lo que ya escribio a mano: `cuota.py` cuenta por SUBCADENA, asi que un
+       «Coche, Coche» no cobra doble hoy — pero la ficha se leeria como una chapuza, y el dia
+       que alguien cuente ocurrencias en vez de buscar la palabra, cobraria dos veces. */
+    if(bajo.indexOf(auto[i].toLowerCase()) < 0) partes.push(auto[i]);
+  }
+  return partes.join(', ');
+}
+
 function _periodoParte_(p){
   var c = [p && p.fin, p && p.ini, p && p.creado_at], i, s;
   for (i = 0; i < c.length; i++){
@@ -729,11 +926,27 @@ function _ordenSubs_(){
   return vis;
 }
 
+/* ¿Esto es una LISTA de verdad? ⛔ EXISTE PORQUE `[]` ES TRUTHY: la comprobacion de
+   cache decia `if (SANC_TAREAS.lista)`, y con eso el `[]` que dejaba el camino de
+   FALLO pasaba por dato bueno. `Array.isArray` no existe en ES3 —el arnes de los
+   bancos—, asi que se mira por `length`, que es lo que de verdad se usa despues. */
+function _esLista_(x){ return !!x && typeof x.length === 'number'; }
+
 function _tareasDe_(nombre, alLlegar){
   var n = String(nombre || '');
   if (!n) return [];
-  if (SANC_TAREAS.quien === n && SANC_TAREAS.lista) return SANC_TAREAS.lista;
+  /* ⛔ LA CACHE SOLO SIRVE ARRAYS. Antes bastaba con que `lista` fuera truthy, y el
+     camino de FALLO guardaba `[]` — que es truthy —, asi que un corte de red quedaba
+     cacheado como «no tiene ninguna» PARA TODA LA SESION: esa persona no se volvia a
+     pedir nunca. Y lo que se pinta con eso empuja a sancionar por otro articulo. */
+  if (SANC_TAREAS.quien === n && _esLista_(SANC_TAREAS.lista)) return SANC_TAREAS.lista;
   if (SANC_TAREAS.quien === n && SANC_TAREAS.cargando) return null;   // ya se esta pidiendo
+  /* ⛔ Y CON UN FALLO YA APUNTADO NO SE REINTENTA EN BUCLE. `render()` pasa por aqui
+     muchas veces, asi que reintentar en cada pintado seria una peticion por fotograma
+     contra un backend que ya ha dicho que no. Se devuelve `null` —«no se sabe»— y
+     quien pinta lee `SANC_TAREAS.error` para decirlo.
+     ⚠️ El reintento SI ocurre al cambiar de persona: `quien` distinto vuelve a pedir. */
+  if (SANC_TAREAS.quien === n && SANC_TAREAS.error) return null;
   SANC_TAREAS = { quien: n, lista: null, cargando: true };
   api.getTareas(n).then(function(l){
     /* Solo se acepta la respuesta si sigue siendo la persona que se pidio: si mientras llegaba
@@ -743,7 +956,10 @@ function _tareasDe_(nombre, alLlegar){
     if (alLlegar) alLlegar();
   }).catch(function(e){
     if (SANC_TAREAS.quien !== n) return;
-    SANC_TAREAS = { quien: n, lista: [], cargando: false, error: (e && e.message) || String(e) };
+    /* ⛔ `null`, NO `[]`. Un fallo de red no es «no tiene ninguna tarea»: es «no se
+       sabe», y guardarlo como lista vacia es la fila de §3c-24 — un valor que
+       significa «no lo se» leido como un dato. */
+    SANC_TAREAS = { quien: n, lista: null, cargando: false, error: (e && e.message) || String(e) };
     if (alLlegar) alLlegar();
   });
   return null;                                   // null = «cargando», distinto de [] = «no tiene»
@@ -1492,6 +1708,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-12-otorgar-confirma-lo-guardado', fecha:'2026-08-12',
+      titulo:'Al otorgar horas, el aviso dice lo que se ha GUARDADO, no lo que tecleaste',
+      items:[
+        'El tope por parte son 14 h. Si escrib\u00edas 20, se guardaban 14 y el aviso verde dec\u00eda \u00ab20 otorgadas\u00bb: seis horas perdidas sin un solo error.',
+        'Ahora el aviso sale con las horas de verdad y avisa de que se recortaron. El registro tambi\u00e9n guarda que hubo recorte.',
+        'Y por debajo, sin pantalla: el servidor ya no acepta que quien otorga elija contra qu\u00e9 subsistema se mide su potestad.' ] },
     { id:'2026-08-11-cola-sanciones-movil', fecha:'2026-08-11',
       titulo:'La cola de sanciones del m\u00f3vil ya se carga (y respeta lo que marcaste en el ordenador)',
       items:[

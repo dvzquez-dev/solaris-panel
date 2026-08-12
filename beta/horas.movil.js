@@ -470,6 +470,15 @@ function vFichar(){
   var bloque=
     '<div class="tarj">'+cab('Bloque declarado','a posteriori')+
       '<label class="campo"><span class="sc">Fecha</span><input class="mono" id="fFecha" value="'+ST.form.fecha+'"></label>'+
+      /* ⛔ Y SE DICE A QUE MES VA A CONTAR si no es el de la fecha escrita. Sin esto,
+         la tarjeta pone 30/07 y las horas caen en agosto: el coordinador firma una
+         cosa creyendo otra. Es la regla de Daniel puesta donde se ve, no solo
+         cumplida por dentro. */
+      (function(){ var m=(typeof _avisoMesDelBloque_==='function')
+          ? _avisoMesDelBloque_(ST.form.fecha, HOY) : '';
+        return m ? '<p class="rnota" style="margin:2px 0 0">Es de otro mes: estas '+
+          'horas contarán en <b>'+esc(m)+'</b>, el mes en curso. Las de un mes ya '+
+          'cerrado no se pueden mover.</p>' : ''; })()+
       '<div class="selh">'+
         '<label class="campo" style="margin:0"><span class="sc">Entrada</span><select id="fIni">'+optHoras(ST.form.ini)+'</select></label>'+
         '<span class="flecha">→</span>'+
@@ -701,7 +710,13 @@ async function enviarFichaje(){
          a ese cargo, en silencio y sin volver a preguntar -- que es exactamente el fallo
          que la regla del defecto («por defecto va TU UNIDAD, no el cargo») existe para
          evitar. Se descubrio mirandolo en el navegador: la pantalla no lo delata. */
+      /* ⛔ Y LA FECHA TAMBIEN, por el MISMO motivo que el perfil de aqui arriba — el
+         comentario de al lado razona este fallo exacto para el otro campo y a este no
+         se le aplico. Declaras un bloque atrasado del 30/07 y TODOS los siguientes de
+         esa sesion salen con el 30/07, en silencio y sin volver a preguntar. Vuelve a
+         HOY, que es el caso normal. */
       ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
+      f.fecha=HOY;
       tost('Fichaje enviado · '+nf(h,2)+' h a la cola de tu coordinador');
       irA('horas');
     }catch(e){

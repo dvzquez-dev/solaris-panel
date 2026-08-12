@@ -108,13 +108,13 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=87ec986"></script>
+<script src="comun.js?v=4e3a987"></script>
 <script src="notis.escritorio.js?v=5f0a77e"></script>
 <script src="cierre.escritorio.js?v=61476db"></script>
-<script src="turnos.escritorio.js?v=f0af960"></script>
+<script src="turnos.escritorio.js?v=385143c"></script>
 <script src="buzon.escritorio.js?v=517ccb7"></script>
 <script src="documentos.escritorio.js?v=1918b5e"></script>
-<script src="sanciones.escritorio.js?v=b179a34"></script>
+<script src="sanciones.escritorio.js?v=8ff43ab"></script>
 <script src="reuniones.escritorio.js?v=d49562f"></script>
 <script src="horas.escritorio.js?v=fc35dac"></script>
 <script src="equipo.escritorio.js?v=2e3c3fa"></script>
@@ -722,7 +722,18 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
    se rellenan a partir de los mismos nombres para que la ficha se vea bien allí.
    El estado vive fuera de render() para que un repintado no borre lo que llevas puesto. */
 var TUR_SEL = {};        // nombre -> {rol, coche}
-var TUR_RESP = null;     // nombre del responsable de turno
+/* ⛔ LOS TRES CARGOS, no uno. Daniel (11/08): «es obligatorio q se cubran los cargos
+   importantes, responsable de turno, responsable audiovisual, responsable de memoria».
+   Hasta hoy solo existia el de turno; los otros dos se tecleaban dentro del texto
+   libre de «su papel», asi que no habia forma de exigirlos ni de leerlos.
+   ⚠️ `TUR_CARGOS.turno` sigue siendo lo que antes era `TUR_RESP`: el envio lo manda en
+   el mismo campo `responsable`, para no romper lo que ya escribe el backend. */
+var TUR_CARGOS = { turno:null, audiovisual:null, memoria:null };
+/* ⛔ LOS COCHES, y son el TRAYECTO — no quien conduce. El boton 🚗 de cada persona
+   sigue significando «lleva coche», que es de lo que sale el descuento de 4 EUR;
+   esto es «de donde sale y a donde va». Mezclarlos daria descuento a los pasajeros.
+   ⚠️ Vacio es el caso NORMAL: un turno en Vigo no necesita ninguno. */
+var TUR_COCHES = [];
 
 
 /* ═══ CONVOCAR REUNIÓN ═══════════════════════════════════════════════════════
@@ -1853,8 +1864,13 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
           (x.art?' · '+esc(x.art):'')+' · '+x.vv.replace(/<br>/g,' ')+'</div></td>'+
           '<td class="r mono">'+(x.p>0?'+':'')+x.p+'</td></tr>'; }).join(''))+
       '<p class="rnota">'+_notaRegistro_(rp.total,'temporada')+'</p>'
-    : vacioSimple('Sin movimientos','No tienes subidas ni bajadas de puntos esta temporada. '+
-        'Si el servidor es anterior a la v53 esto sale vacío aunque las haya.');
+    /* ⛔ Y AQUI SE DECIDIA POR LA LISTA VACIA, que no dice POR QUE esta vacia. La
+       frase de abajo culpaba a la version del servidor de lo que muchas veces era la
+       RED, y en los dos casos afirmaba «no tienes» sin saberlo. */
+    : (!_llego_('movsE')
+      ? vacioSimple('Cargando tus movimientos…','El servidor todavía no ha contestado. Esto NO dice que no tengas movimientos: dice que aún no se sabe.')
+      : vacioSimple('Sin movimientos','No tienes subidas ni bajadas de puntos esta temporada. '+
+        'Si el servidor es anterior a la v53 esto sale vacío aunque las haya.'));
 
   return '<div class="kpis">'+
       kpi('Horas este mes', hMes==null?'—':nf2(hMes), _mesLargo_(_hoyDateM_()), '', null)+
@@ -2026,7 +2042,13 @@ function _aplicarPanel_(pnl){
     var _h=_hMesReal_(m); if(_h!=null) m.hMes=_h;
   });
   _rederivarCargos_();
-  UMBRAL=_umbral_();      // despues de traducir horasMes->hMes, que es de donde sale
+  /* ⛔ EL COMENTARIO QUE HABIA AQUI ERA FALSO, y justificaba una restriccion de orden
+     que no existe. Decia «despues de traducir horasMes->hMes, QUE ES DE DONDE SALE».
+     `_umbral_` **no lee `hMes` en ninguna de sus dos ramas** (comprobado: 0 apariciones
+     en la funcion): lee `DATA.umbral` y, en el respaldo, `horasTemp`/`meses`.
+     ⚠️ Lo que SI hace falta es que el ROSTER este puesto -el respaldo recorre
+     `DATA.miembros`-, que es lo que dice, con razon, el comentario del movil. */
+  UMBRAL=_umbral_();      // con el roster ya puesto: el respaldo recorre `DATA.miembros`
 }
 function _aplicarBootstrap_(boot){
   _aplicarPanel_(boot.panel);
@@ -2288,7 +2310,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='dfc73aa';
+var BUILD='f530e3d';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -2707,6 +2729,26 @@ function _engPartes_(){
       var okMsg=acc==='aprobar'
         ? h1(p.horas)+' aprobadas: se suman a las horas de '+_m(p.autor).pila+' y actualizan su cuota y su puesto.'
         : (acc==='rechazar'?'Parte rechazado, con su motivo.':'Devuelto: le pides detalle al autor.');
+      /* ⛔ LA SEMILLA NO SE DECIDE, Y ESTE ES EL FALLO QUE MAS DANO HACIA DE LOS
+         TRES DE HOY: no hace falta ningun corte de red. `_partesReal_` deja `PARTES`
+         con la semilla de fabrica -5 partes inventados CON NOMBRES REALES, 3 en
+         `pend`- mientras no llegue `PART_BACK`, y la pantalla se pinta ANTES del
+         `Promise.all` que la trae. Sin esto, pulsar Aprobar en esa ventana soltaba el
+         `okMsg` del camino REAL -- el que afirma que las horas quedan sumadas y la cuota
+         actualizada-- **sin haber guardado nada**.
+         ⚠️ Y ese texto NO se repite aqui a proposito: `probar_semilla_no_miente.py`
+         CUENTA sus apariciones, y una cita en un comentario inflaria el recuento.
+         ✅ El guardia ya existia, escrito DOS VECES: `_engOtorgar_` y `_engBloqueHoras_`
+         preguntan por la cola real antes de escribir. Esta era la unica de las tres que
+         no lo miraba. (Su condicion no se copia aqui: el banco la cuenta.)
+         ⚠️ Va por `!p._real` y no por `PART_BACK===null` -aunque hoy coincidan- porque
+         es POR PARTE: si alguna vez se mezclaran, el global dejaria pasar el falso.
+         ⚠️ Y con `backendOK && SESION` delante a proposito: en la DEMO la semilla ES
+         el producto, y ahi decidir en local es lo correcto. */
+      if(!p._real && backendOK && SESION){
+        tost('Todavía no ha llegado la cola real de partes: no se ha guardado nada.');
+        return;
+      }
       if(p._real && backendOK && SESION){
         var acts=card.querySelectorAll('.acts .btn'); acts.forEach(function(x){x.disabled=true;});
         try{
@@ -2738,7 +2780,11 @@ function _engOtorgar_(){
         try{
           var rec=await api.otorgarHoras({nombre:nombre, horas:horas, tarea:concepto, clave:_claveUso_()});
           if(rec){ PART_BACK.push(rec); _partesReal_(); }
-          tost(h1(horas)+' otorgadas a '+(_m(nombre).pila||nombre)+': ya cuentan en sus horas del mes.');
+          // ⛔ SE CONFIRMA LO GUARDADO, NO LO TECLEADO. El backend recorta a 14 h, asi
+          //    que teclear 20 guardaba 14 y esto cantaba «20 otorgadas»: seis horas
+          //    perdidas con un mensaje en verde. `rec.horas` es lo que hay en el store.
+          var _hOk=(rec && rec.horas!=null) ? rec.horas : horas;
+          tost(h1(_hOk)+' otorgadas a '+(_m(nombre).pila||nombre)+': ya cuentan en sus horas del mes.'+(_hOk<horas?' (recortadas al tope de '+h1(_hOk)+')':''));
           pintar();
         }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo otorgar: ', e); }
         return;
@@ -2793,7 +2839,7 @@ function _engConvocarTurno_(){
   $$('#tuPool .pick').forEach(function(c){
     c.onclick=function(){
       var n=c.dataset.tu;
-      if(TUR_SEL[n]){ delete TUR_SEL[n]; if(TUR_RESP===n) TUR_RESP=null; c.classList.remove('on'); }
+      if(TUR_SEL[n]){ delete TUR_SEL[n]; _quitarDeCargos_(n); c.classList.remove('on'); }
       else { TUR_SEL[n]={rol:'',coche:false}; c.classList.add('on'); }
       pintarReparto();
     };
@@ -2809,17 +2855,35 @@ function _engConvocarTurno_(){
         duracion:($('#tuDur')||{}).value||'', lugar:($('#tuLugar')||{}).value||'',
         punto:($('#tuPunto')||{}).value||'', crucial:!!(($('#tuCrucial')||{}).checked),
         nota:($('#tuNota')||{}).value||'', principales:lin('tuObj1'), secundarios:lin('tuObj2'),
-        responsable:TUR_RESP,
+        /* ⚠️ `responsable` se mantiene con el mismo nombre y el mismo significado que
+           antes -el de TURNO-, porque el backend ya escribe esa columna. Los otros dos
+           viajan aparte y, sobre todo, dentro del `rol`, que es lo unico que se lee. */
+        responsable:TUR_CARGOS.turno, cargos:TUR_CARGOS,
         coche:nn.filter(function(n){ return TUR_SEL[n].coche; }),
-        reparto:nn.map(function(n){ return {nombre:n, rol:TUR_SEL[n].rol||''}; }) };
+        /* ⛔ EL `rol` LLEVA LO DE LOS BOTONES, no solo lo tecleado. `responsable` y
+           `coche` se mandan tambien aparte (columnas People de Notion), pero NADIE
+           las vuelve a leer: `_turnoDeNotion_` saca los roles solo del texto
+           `Reparto`. Sin esto, marcar el boton del coche no llegaba a ningun sitio
+           — y es el campo del que `reglas/cuota.py` saca el descuento de 4 EUR. */
+        reparto:nn.map(function(n){ return {nombre:n,
+          rol:(typeof _rolDeTurno_==='function'
+                ? _rolDeTurno_(TUR_SEL[n].rol, {responsable:(n===TUR_CARGOS.turno),
+                                                coche:!!TUR_SEL[n].coche})
+                : (TUR_SEL[n].rol||''))}; }) };
       if(!t.fecha){ tost('Ponle fecha al turno.'); return; }
-      if(!nn.length){ tost('Marca al menos a una persona.'); return; }
+      /* ⛔ LA MISMA FRASE QUE EL BOTON, y la comprobacion se QUEDA aunque el boton ya
+         salga `disabled`: una pantalla puede repintarse mal, y el envio es la ultima
+         linea. Lo que no puede pasar es que digan cosas distintas, y por eso el texto
+         sale de la misma funcion. */
+      var _mot=(typeof _porQueNoSeConvoca_==='function')
+        ? _porQueNoSeConvoca_(TUR_CARGOS, nn.length) : (nn.length?'':'Marca al menos a una persona.');
+      if(_mot){ tost(_mot); return; }
       if(!backendOK || !SESION){ tost('Sin conexión no se puede convocar: el turno se escribe en Notion.'); return; }
       b.disabled=true; var prev=b.textContent; b.textContent='Convocando\u2026';
       try{
         var r=await api.crearTurno(t);
         var sin=(r&&r.sinEtiquetar)||[];
-        TUR_SEL={}; TUR_RESP=null;
+        TUR_SEL={}; TUR_CARGOS={ turno:null, audiovisual:null, memoria:null };
         try{ var tt=await api.getTurnos(); if(Array.isArray(tt)){ TURNOS.length=0; tt.forEach(function(x){TURNOS.push(x);}); } }catch(_){}
         tost('Turno '+(r&&r.id||'')+' convocado en Notion'+
           (sin.length?' \u00b7 no se pudo etiquetar a: '+sin.join(', '):'')+'.');

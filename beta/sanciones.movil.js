@@ -35,13 +35,25 @@ async function _cargarSancionesM_(){
   catch(e){}
 }
 
+/* ⛔ EL VACIADO SE QUEDA Y LA BANDERA ES LO QUE FALTABA. `MOVS.length=0` borra la
+   semilla de demostracion —ensenar cuatro sanciones inventadas seria peor—, pero sin
+   bandera el libro no podia distinguir «no te han sancionado» de «el servidor no
+   contesto», y pintaba lo primero. Es el mismo fallo que ya mordio en reuniones, pero
+   sobre DISCIPLINA, que es peor: se lee como «estoy limpio».
+   ⚠️ Y la bandera CAE con la lista, en la misma linea: dejarla puesta de una carga
+   anterior haria que un refresco fallido vaciara `MOVS` y el libro dijera «Sin
+   movimientos» sobre unos puntos que SI existen. */
 async function _cargarMovimientosM_(){
-  if(typeof MOVS==='undefined') return;
+  if(typeof MOVS==='undefined') return true;     // esta cara no tiene libro: nada que reintentar
   MOVS.length=0;                                  // fuera la semilla, pase lo que pase
+  _llego_('movs', false);
   try{
     var a=await api.getMisMovimientos();
-    if(Array.isArray(a)) a.forEach(function(s){ MOVS.push(_movDeSancion_(s)); });
-  }catch(e){ /* backend viejo o sin red: se queda vacío, que es lo que hacía antes */ }
+    if(!Array.isArray(a)) return false;
+    a.forEach(function(s){ MOVS.push(_movDeSancion_(s)); });
+    _llego_('movs', true);
+    return true;
+  }catch(e){ return false; }
 }
 
 /* La misma busqueda con distinto nombre en cada cara; se envuelve para que el bloque de
@@ -115,6 +127,13 @@ function _sancionesHTML_(){
               '<p class="rnota" style="margin:0 0 10px">El plazo nuevo se escribe <b>en Notion</b>. '+
               'Si eso falla, la sanción <b>no</b> se pone: no tiene sentido sancionar por un plazo y '+
               'dejar la tarea con la fecha vencida.</p>'
+          /* ⛔ «NO SE PUDO LEER» NO ES «NO TIENE». `SANC_TAREAS.error` lo guardaba la
+             puerta desde siempre y NO LO LEIA NADIE, asi que un corte de red se pintaba
+             como «elige otro motivo» y el expediente salia con el articulo equivocado. */
+          : (SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien && SANC_TAREAS.error)
+            ? '<p class="rnota" style="margin:0 0 10px;color:var(--warn)">No se pudieron leer las tareas de '+
+              esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+': '+esc(String(SANC_TAREAS.error))+'.<br>'+
+              'Sin esa lista <b>no se sabe</b> si tiene plazos que mover, así que esto <b>no</b> dice que no los tenga. Vuelve a elegirle para reintentar.</p>'
             : '<p class="rnota" style="margin:0 0 10px;color:var(--warn)">'+
               esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+' no tiene ninguna tarea viva con enlace '+
               'a Notion, así que no se puede mover ningún plazo. Elige otro motivo.</p>')
@@ -423,8 +442,13 @@ function _libroPuntosHTML_(){
       return '<div class="retf"><span class="pt'+(m.p>0?' mas':'')+'">'+sg+'</span>'+
         '<span class="mo"><b>'+esc(m.t)+'</b><small>ART. '+esc(m.art)+' · '+esc(m.f)+'</small></span>'+
         '<span class="vv">'+(m.vv || (m.rep?'vuelve el<br>'+m.rep:'no caduca'))+'</span></div>';
-    }).join('') : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b>'+
-      '<small>Aquí aparece cada subida o bajada de puntos, con su artículo y su fecha.</small></span></div>')+
+    }).join('') : (!_llego_('movs')
+      /* ⛔ VACIO Y «TODAVIA NO SE SABE» NO SE PINTAN IGUAL. Es la mitad que faltaba:
+         arreglar el dato sin arreglar lo que se PINTA deja el bug intacto. */
+      ? '<div class="retf" style="opacity:.7"><span class="mo"><b>Cargando tus movimientos…</b>'+
+        '<small>El servidor todavía no ha contestado. Se sigue intentando solo.</small></span></div>'
+      : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b>'+
+        '<small>Aquí aparece cada subida o bajada de puntos, con su artículo y su fecha.</small></span></div>'))+
     (r.ultimos.length ? '<p class="rnota" style="margin:8px 0 0">'+_notaRegistro_(r.total,'temporada')+'</p>' : '')+
   '</div></div>';
 }

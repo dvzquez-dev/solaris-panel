@@ -25,12 +25,23 @@ function sancionPor(tipo,nombre){
   return {p:2,txt:'2 puntos · 3.ª o más (tope 2)'};
 }
 
+/* ⛔ LA GEMELA DEL MOVIL, Y CON EL MISMO FALLO: vaciaba la lista antes de saber si
+   llegaba y se tragaba el error, asi que un corte de red se pintaba como «No tienes
+   subidas ni bajadas de puntos esta temporada» — y encima seguido de «Si el servidor
+   es anterior a la v53 esto sale vacio aunque las haya», que CULPA A LA VERSION del
+   servidor de lo que puede ser la red.
+   ⚠️ Y aqui es PEOR que en el movil: `_refrescoVivo_` no llama a esta carga, asi que
+   la mentira no se corrige sola — dura toda la sesion. */
 async function _cargarMovimientosE_(){
   MOVS_E.length=0;
+  _llego_('movsE', false);
   try{
     var a=await api.getMisMovimientos();
-    if(Array.isArray(a)) a.forEach(function(s){ MOVS_E.push(_movDeSancion_(s)); });
-  }catch(_){ }
+    if(!Array.isArray(a)) return false;
+    a.forEach(function(s){ MOVS_E.push(_movDeSancion_(s)); });
+    _llego_('movsE', true);
+    return true;
+  }catch(_){ return false; }
 }
 
 function arco(i,r,frac){
@@ -209,6 +220,15 @@ function _ponerSancCuerpo_(){
               '<div class="nota" style="margin:0 0 9px">El plazo nuevo se escribe <b>en Notion</b>. Si eso '+
               'falla, la sanci\u00f3n <b>no</b> se pone: no tiene sentido sancionar por un plazo y dejar la '+
               'tarea con la fecha vencida.</div>'
+          /* ⛔ «NO SE PUDO LEER» NO ES «NO TIENE», y esta es la cara donde se pone la
+             sancion de verdad. `SANC_TAREAS.error` lo guardaba la puerta desde siempre
+             y NO LO LEIA NADIE, asi que un corte de red se pintaba como «elige otro
+             motivo» y el expediente salia con el articulo del RRI equivocado. */
+          : (SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien && SANC_TAREAS.error)
+            ? '<div class="nota" style="margin:0 0 9px;color:var(--warn)">No se pudieron leer las tareas de '+
+              esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+': '+esc(String(SANC_TAREAS.error))+'.<br>'+
+              'Sin esa lista <b>no se sabe</b> si tiene plazos que mover, as\u00ed que esto <b>no</b> dice que no los tenga. '+
+              'Vuelve a elegirle para reintentar.</div>'
             : '<div class="nota" style="margin:0 0 9px;color:var(--warn)">'+esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+' no tiene ninguna tarea viva con enlace '+
               'a Notion, as\u00ed que no se puede mover ning\u00fan plazo. Elige otro motivo.</div>')
         : '')+

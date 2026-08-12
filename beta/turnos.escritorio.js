@@ -11,6 +11,31 @@
    fusionarlas es otro cambio, con otro riesgo y su propia verificación.
    ═══════════════════════════════════════════════════════════════════════════════════════ */
 
+/* ⛔ UNA SOLA PUERTA para desasignar. Se necesita en DOS sitios — al desmarcar el chip
+   de una persona y al pulsar su «quita»— y con tres cargos son tres lineas cada vez.
+   Dos copias de esto acaban siendo dos reglas distintas en cuanto alguien añada un
+   cuarto cargo: una lo limpiaria y la otra no, y quedaria un cargo asignado a alguien
+   que ya no esta en el turno. */
+function _quitarDeCargos_(n){
+  var k; for(k in TUR_CARGOS){ if(TUR_CARGOS[k] === n) TUR_CARGOS[k] = null; }
+}
+
+/* ⛔ EL BOTON SE ACTUALIZA AL PINTAR, no al pulsar. Daniel: «el boton de convocar no
+   vale». Vive fuera del contenedor del reparto -lo pinta `convocarPanel()` una sola
+   vez-, asi que se busca en el documento en vez de reconstruirlo.
+   ⚠️ Si no esta en pantalla no pasa nada: esta funcion tambien corre en pantallas donde
+   no hay formulario de convocar. */
+function _pintarBotonConvocar_(){
+  var b = document.querySelector('[data-convocar]');
+  if(!b) return '';
+  var motivo = (typeof _porQueNoSeConvoca_==='function')
+    ? _porQueNoSeConvoca_(TUR_CARGOS, Object.keys(TUR_SEL).length) : '';
+  b.disabled = !!motivo;
+  b.textContent = motivo ? motivo : 'Convocar el turno';
+  b.title = motivo || '';
+  return motivo;
+}
+
 function pintarReparto(){
   var c=document.getElementById('tuLista'); if(!c) return;
   var nn=Object.keys(TUR_SEL);
@@ -24,7 +49,15 @@ function pintarReparto(){
     return '<div class="repf">'+
       '<b>'+esc((m&&m.pila)||n)+'</b>'+
       '<input data-rol="'+esc(n)+'" value="'+esc(e.rol||'')+'" placeholder="su papel (opcional)">'+
-      '<button type="button" class="mini'+(TUR_RESP===n?' on':'')+'" data-resp="'+esc(n)+'">responsable</button>'+
+      /* ⛔ UN BOTON POR CARGO. Antes habia uno solo -«responsable»- y los otros dos se
+         escribian a mano en el texto libre, donde nadie los podia exigir ni leer.
+         ✅ Y una misma persona PUEDE llevar dos: si se prohibiera, un turno de tres
+         personas no se podria convocar -hay tres cargos- y la pantalla se plantaria.
+         Se avisa, no se impide. */
+      CARGOS_TURNO.map(function(cg){
+        return '<button type="button" class="mini'+(TUR_CARGOS[cg.k]===n?' on':'')+
+          '" data-cargo="'+cg.k+'" data-quien="'+esc(n)+'" title="'+esc(cg.et)+
+          '">'+esc(cg.corto)+'</button>'; }).join('')+
       '<button type="button" class="mini'+(e.coche?' on':'')+'" data-coche="'+esc(n)+'">coche</button>'+
       '<button type="button" class="mini x" data-quita="'+esc(n)+'">quitar</button>'+
     '</div>';
@@ -32,19 +65,29 @@ function pintarReparto(){
   cablearReparto();
 }
 
+/* ⚠️ Se llama DESPUES de cablear, no antes: `cablearReparto()` corre justo detras de
+   `pintarReparto()` en cada cambio, y asi el estado del boton se recalcula con el
+   reparto ya puesto. */
 function cablearReparto(){
+  _pintarBotonConvocar_();
   $$('#tuLista [data-rol]').forEach(function(i){
     i.oninput=function(){ if(TUR_SEL[i.dataset.rol]) TUR_SEL[i.dataset.rol].rol=i.value; };
   });
-  $$('#tuLista [data-resp]').forEach(function(b){
-    b.onclick=function(){ var n=b.dataset.resp; TUR_RESP=(TUR_RESP===n?null:n); pintarReparto(); };
+  $$('#tuLista [data-cargo]').forEach(function(b){
+    b.onclick=function(){
+      var k=b.dataset.cargo, n=b.dataset.quien;
+      /* ⚠️ Un cargo lo lleva UNA persona: asignarlo a otra se lo quita a la anterior
+         sola. Volver a pulsar sobre quien ya lo tiene lo deja vacante. */
+      TUR_CARGOS[k] = (TUR_CARGOS[k]===n ? null : n);
+      pintarReparto();
+    };
   });
   $$('#tuLista [data-coche]').forEach(function(b){
     b.onclick=function(){ var n=b.dataset.coche; TUR_SEL[n].coche=!TUR_SEL[n].coche; pintarReparto(); };
   });
   $$('#tuLista [data-quita]').forEach(function(b){
     b.onclick=function(){
-      var n=b.dataset.quita; delete TUR_SEL[n]; if(TUR_RESP===n) TUR_RESP=null;
+      var n=b.dataset.quita; delete TUR_SEL[n]; _quitarDeCargos_(n);
       var chip=document.querySelector('#tuPool [data-tu="'+n.replace(/"/g,'&quot;')+'"]');
       if(chip) chip.classList.remove('on');
       pintarReparto();
@@ -414,6 +457,82 @@ function _pinConvDisp_(m){
   };
 }
 
+/* ⛔ UN COCHE ES UN TRAYECTO. Se pinta «Coche 1», «Coche 2»... con `_etiquetaCoche_`, que va
+   en base 1 porque nadie dice «Coche 0».
+   ⚠️ La casilla de la vuelta sale APAGADA por defecto y eso no es un detalle: un interruptor
+   encendido de fabrica se acaba dejando puesto, y entonces la mitad de los turnos tendrian una
+   vuelta inventada. Solo cuando se enciende aparecen sus dos campos. */
+function _opcionesPunto_(sel){
+  return '<option value="">— elige —</option>' + PUNTOS_TURNO.map(function(p){
+    return '<option value="'+esc(p.id)+'"'+(sel===p.id?' selected':'')+'>'+
+      esc(p.nombre)+' · '+esc(p.ciudad)+'</option>'; }).join('');
+}
+
+function pintarCoches(){
+  var c = document.getElementById('tuCoches');
+  if(!c) return;
+  if(!TUR_COCHES.length){
+    c.innerHTML = '<p style="margin:0;font-size:12px;color:var(--ink3)">Sin coches. '+
+      'Un turno en Vigo no suele necesitar ninguno.</p>';
+    return;
+  }
+  c.innerHTML = TUR_COCHES.map(function(co, i){
+    /* ⚠️ Se avisa si el trayecto NO cruza de ciudad: no se impide -puede haber un coche
+       dentro de la misma ciudad- pero conviene verlo, porque es lo que decide si el turno
+       «contempla el trayecto Ourense-Vigo». */
+    var cruza = _trayectoCruzaCiudad_(co.origen, co.destino);
+    var nota = (cruza === false)
+      ? '<span class="chip" style="margin-left:6px">mismo municipio</span>' : '';
+    return '<div class="dec" data-coche-i="'+i+'" style="display:block;padding:8px 0">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+        '<b>'+esc(_etiquetaCoche_(i))+'</b>'+nota+
+        '<button type="button" class="mini" data-quitacoche="'+i+'" '+
+          'style="margin-left:auto">quitar</button>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<label style="flex:1;min-width:190px"><span class="sc">Sale de</span>'+
+          '<select data-co-org="'+i+'">'+_opcionesPunto_(co.origen)+'</select></label>'+
+        '<label style="flex:1;min-width:190px"><span class="sc">Va a</span>'+
+          '<select data-co-dst="'+i+'">'+_opcionesPunto_(co.destino)+'</select></label>'+
+      '</div>'+
+      '<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px">'+
+        '<input type="checkbox" data-co-vd="'+i+'"'+(co.vueltaDistinta?' checked':'')+'>'+
+        'La vuelta no es la misma que la ida</label>'+
+      (co.vueltaDistinta
+        ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">'+
+            '<label style="flex:1;min-width:190px"><span class="sc">Vuelve desde</span>'+
+              '<select data-co-vorg="'+i+'">'+_opcionesPunto_(co.vueltaOrigen)+'</select></label>'+
+            '<label style="flex:1;min-width:190px"><span class="sc">Vuelve a</span>'+
+              '<select data-co-vdst="'+i+'">'+_opcionesPunto_(co.vueltaDestino)+'</select></label>'+
+          '</div>'
+        : '')+
+    '</div>';
+  }).join('');
+  cablearCoches();
+}
+
+function cablearCoches(){
+  $$('#tuCoches [data-co-org]').forEach(function(el){
+    el.onchange = function(){ TUR_COCHES[+el.dataset.coOrg].origen = el.value; pintarCoches(); }; });
+  $$('#tuCoches [data-co-dst]').forEach(function(el){
+    el.onchange = function(){ TUR_COCHES[+el.dataset.coDst].destino = el.value; pintarCoches(); }; });
+  $$('#tuCoches [data-co-vorg]').forEach(function(el){
+    el.onchange = function(){ TUR_COCHES[+el.dataset.coVorg].vueltaOrigen = el.value; }; });
+  $$('#tuCoches [data-co-vdst]').forEach(function(el){
+    el.onchange = function(){ TUR_COCHES[+el.dataset.coVdst].vueltaDestino = el.value; }; });
+  $$('#tuCoches [data-co-vd]').forEach(function(el){
+    el.onchange = function(){
+      var co = TUR_COCHES[+el.dataset.coVd];
+      co.vueltaDistinta = !!el.checked;
+      /* ⚠️ Al APAGARLA se borran sus campos: dejarlos puestos manda una vuelta que la
+         casilla dice que no existe, y el backend no sabria cual de las dos creer. */
+      if(!co.vueltaDistinta){ co.vueltaOrigen = null; co.vueltaDestino = null; }
+      pintarCoches();
+    }; });
+  $$('#tuCoches [data-quitacoche]').forEach(function(b){
+    b.onclick = function(){ TUR_COCHES.splice(+b.dataset.quitacoche, 1); pintarCoches(); }; });
+}
+
 function convocarPanel(){
   if(rangoNom(ACTOR)<1) return '';                       // solo coordinaci\u00f3n o superior
   var E=CAMPO_CSS;
@@ -447,6 +566,15 @@ function convocarPanel(){
     lab('Qui\u00e9n va')+
     '<div class="chips" id="tuPool" style="margin:0 0 10px">'+chips+'</div>'+
     '<div id="tuLista" style="margin-bottom:12px"></div>'+
+
+    /* ⛔ LOS COCHES VAN AQUI, DETRAS DE LA GENTE, y el orden lo pidio Daniel:
+       «lo clasico despues de disposicion de personas: Coche 1, Coche ...». Tiene
+       sentido: no puedes repartir a gente que aun no has convocado. */
+    lab('Coches · opcional')+
+    '<div id="tuCoches" style="margin-bottom:6px"></div>'+
+    '<div style="margin-bottom:12px">'+
+      '<button type="button" class="btn mini" data-addcoche>+ añadir coche</button>'+
+    '</div>'+
 
     '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:11px">'+
       '<label style="flex:1;min-width:230px">'+lab('Objetivos principales \u00b7 uno por l\u00ednea')+
