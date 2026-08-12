@@ -1731,6 +1731,13 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-12-plazos-que-se-escondian', fecha:'2026-08-12',
+      titulo:'Dos pantallas escond\u00edan un dato que s\u00ed ten\u00edan',
+      items:[
+        {cara:'movil', vista:'tareas', txt:'**Todas** tus tareas dec\u00edan \u00absin fecha l\u00edmite\u00bb, tuvieran plazo o no \u2014 y por eso ninguna sal\u00eda en rojo. La pantalla que existe para que no se te pase un plazo era la que te lo tapaba. Ahora dice el plazo y avisa cuando corre prisa.'},
+        {cara:'movil', vista:'reu', txt:'El **orden del d\u00eda** de una reuni\u00f3n sal\u00eda siempre vac\u00edo aunque el servidor lo tuviera, y el bot\u00f3n de quitarlo no se pintaba. Peor: guardar con el campo vac\u00edo **borraba el enlace para todo el equipo**. Ya no.'},
+        {cara:'movil', vista:'reu', txt:'Y la disponibilidad de los dem\u00e1s te llega **sin sus nombres** salvo que repartas turnos o hayas convocado t\u00fa. El mapa de calor y el \u00abya has cubierto\u00bb se ven igual: lo \u00fanico que cambia es que qui\u00e9n dijo que no pod\u00eda deja de ser p\u00fablico.'}
+      ] },
     { id:'2026-08-12-libro-horas-dice-lo-que-ensena', fecha:'2026-08-12',
       titulo:'El libro de horas anunciaba un n\u00famero y ense\u00f1aba otro',
       items:[

@@ -27,12 +27,23 @@ function vTareas(){
      Antes `l.split` reventaba y la pantalla entera se quedaba en blanco. */
   function vence(l){
     if(!l) return ['sin fecha límite',false];
-    var p=String(l).split('/');
-    if(p.length<3) return ['sin fecha límite',false];
-    /* ⛔ LA CUENTA SALE DE `_diasHasta_` (`comun.js`), la misma que usa Reuniones: el
-       corte de «corre prisa» y el redondeo tienen que ser UNO. Aquí solo se traduce la
-       fecha `DD/MM/AAAA` que manda Notion a milisegundos. */
-    var d=_diasHasta_(Date.parse(p[2]+'-'+p[1]+'-'+p[0]));
+    /* ⛔ LOS DOS FORMATOS, Y LA PREMISA DE AQUI DEBAJO ERA FALSA. Ponia «la fecha
+       `DD/MM/AAAA` que manda Notion» y Notion **no manda eso**: `Codigo.gs` emite
+       `l: date.start`, que es **ISO `AAAA-MM-DD`**. Con `split('/')`, `'2026-07-27'`
+       daba un array de UNO, caia por `length<3` y la tarea salia como
+       **«sin fecha limite»** — y nunca en rojo, porque el segundo elemento es `false`.
+       ⛔ O sea: en cuanto entra el token, TODAS las tareas con plazo lo escondian. La
+       pantalla que existe para que no se te pase un plazo era la que te lo tapaba, y de
+       ahi sale el **Art. 30c** en un expediente de una persona real.
+       ⚠️ Solo funcionaba con la semilla de demostracion, que si es `DD/MM/AAAA`.
+       ✅ `_dmyAISO_` es la puerta que ya acepta los dos — la misma que usa `_plazoTxt_`,
+       donde esta leccion ya estaba escrita. Se aplico donde se enuncio y no aqui, que es
+       donde se citaba (§3c-19).
+       ⚠️ Y la CUENTA sigue saliendo de `_diasHasta_` (`comun.js`), la misma que usa
+       Reuniones: el corte de «corre prisa» y el redondeo tienen que ser UNO. */
+    var iso=_dmyAISO_(String(l));
+    if(!/^\d{4}-\d{2}-\d{2}/.test(iso)) return ['sin fecha límite',false];
+    var d=_diasHasta_(Date.parse(iso));
     if(d===null) return ['sin fecha límite',false];
     if(d<0) return ['venció hace '+(-d)+' día'+(-d===1?'':'s'),true];
     if(d===0) return ['vence hoy',true];

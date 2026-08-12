@@ -210,6 +210,19 @@ function _fuenteReuM_(R, base, resp){
   return { id:R.id, titulo:R.titulo, tipo:R.tipo, modalidad:R.modalidad,
     limite:R.limite, convocante:R.convocante, slot:R.slot, duracion:R.duracion,
     invitados:new Array(R.nInv), resp:resp,
+    /* ⛔ `ordenDia` VA AQUI, Y ES LA CUARTA VEZ QUE UN NORMALIZADOR TIRA UN DATO QUE SI
+       VENIA. `_normReuM_` lo rescata (lo dice su comentario), pero quien lo alimenta es
+       ESTA funcion, que arma un objeto explicito de 15 campos y no lo nombraba: no habia
+       ni un instante en que `ordenDia` sobreviviera en el movil.
+       ⛔ El dano no era solo que el dialogo saliera vacio: `movil.html` pinta el campo con
+       `R2.ordenDia||''` y esconde el boton de quitar, asi que al pulsar **Guardar** con el
+       campo vacio se llamaba `setOrdenDia(id, '')` y **se borraba el enlace real para todo
+       el equipo**. Una pantalla que afirma que no hay orden del dia y te deja confirmarlo.
+       ⚠️ La leccion ya estaba escrita en `movil.html` («normalizar es tirar lo que no
+       nombras», con `origen` y este mismo `ordenDia` en la lista). Se aplico donde se
+       enuncio y no donde se citaba (§3c-19). Por eso la comprobacion de su banco es
+       ESTRUCTURAL: compara lo que `_normReuM_` LEE con lo que esta ENTREGA. */
+    ordenDia:R.ordenDia,
     dias:s.dias||R.dias, franjas:s.franjas||R.franjas, bloques:s.bloques||R.bloques,
     /* Del servidor viene el objeto `fijada` con sus indices; de lo nuestro, la etiqueta ya
        aplanada mas `fijadaBl` YA remapeado. Cada camino, entero. */
