@@ -575,7 +575,11 @@ function validarFichaje(){
   var declP = f.declararId!=null ? PARTES.filter(function(x){return x.id===f.declararId;})[0] : null;
   var haySes = !!declP || ST.modo!=='vivo' || minSes()>0 || !!ST.ses.cloudIni;   /* declarar: ya hay sesión cerrada */
   var dur = declP ? declP.q : (ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durForm());
-  var n1 = declP ? true : (haySes && dur>0 && dur<=12);
+  /* ⛔ EL TOPE SALE DE `_maxHorasParte_()`, no de un 12 escrito aqui: el servidor topa
+     en 14 y con el 12 de aqui un parte de 13 h quedaba bloqueado POR PANTALLA aunque
+     fuera legal. Los dos numeros nacieron con un dia de diferencia y este se quedo. */
+  var _topeH = _maxHorasParte_();
+  var n1 = declP ? true : (haySes && dur>0 && dur<=_topeH);
   /* la regla de qué es "la imputación" vive en _imputacion_(): un solo sitio, para que si
      cambia no haya que acordarse de tocar aquí Y en enviarFichaje (antes no daba error, solo
      desincronizaba silenciosamente lo que se valida de lo que se envía). */
@@ -587,7 +591,7 @@ function validarFichaje(){
   /* Debajo de cada estrella NO va el valor: que se encienda ya dice que ese requisito
      esta cubierto, y repetirlo recargaba el dibujo. La unica excepcion es pasarse de
      12 h, que no es adorno sino un tope que bloquea el envio. */
-  if(e1) e1.textContent = (dur>12) ? 'excede 12 h' : '';
+  if(e1) e1.textContent = (dur>_topeH) ? ('excede '+_topeH+' h') : '';
   if(e2) e2.textContent = '';
   if(e3) e3.textContent = '';
 
@@ -828,7 +832,7 @@ function _movHorasHTML_(confs){
       '<p class="rnota" style="margin:8px 0 10px">'+
         (r.total
           ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes. '+
-            _notaRegistro_(r.total,'mes')
+            _notaRegistro_(r.total,'mes', Math.max(0, MOVS_N-1))
           : 'Este mes todavía no se te ha contado ningún fichaje. Al cerrar el mes esto vuelve a '+
             'empezar; el registro <b>no se borra</b>.')+'</p>'+
       /* LA COMPENSACION CUENTA COMO UNO DE LOS CINCO (Daniel, 03/08: «los ultimos 5 tambien

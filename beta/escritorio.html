@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=8a45fbd"></script>
+<script src="comun.js?v=408a8fc"></script>
 <script src="notis.escritorio.js?v=5f0a77e"></script>
 <script src="cierre.escritorio.js?v=61476db"></script>
 <script src="turnos.escritorio.js?v=385143c"></script>
@@ -1851,7 +1851,10 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
 
   var libroH = r.total||extra
     ? tabla([['Concepto'],['Horas',1]], filas)+
-      '<p class="rnota">'+(r.total? _notaRegistro_(r.total,'mes') : 'Este mes todavía no se te ha '+
+      /* ⛔ EL ESCRITORIO PINTA TODOS (`r.todos.map`), no un recorte: pasarle `r.total` es
+         decir «se ensenan todos», que es la verdad. Antes comparaba contra `MOVS_N` y con
+         6 fichajes anunciaba que escondia uno que si estaba en la tabla, debajo. */
+      '<p class="rnota">'+(r.total? _notaRegistro_(r.total,'mes', r.total) : 'Este mes todavía no se te ha '+
         'contado ningún fichaje.')+'</p>'
     : vacioSimple('Nada este mes','Aún no se te ha contado ningún fichaje. Al cerrar el mes '+
         'esto vuelve a empezar; el registro no se borra.');
@@ -2310,7 +2313,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f530e3d';
+var BUILD='e295972';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

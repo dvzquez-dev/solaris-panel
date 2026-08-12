@@ -1156,10 +1156,23 @@ function _ultimosMov_(lista, fecha, cuanto, ambito){
 }
 
 /* La coletilla que aparece en los dos libros. Una sola frase, en un sitio. */
-function _notaRegistro_(total, ambito){
+function _notaRegistro_(total, ambito, cuantos){
+  /* ⛔ `cuantos` = CUANTOS SE PINTAN DE VERDAD, y NO siempre es `MOVS_N`. El libro de
+     horas del movil reserva uno de los cinco huecos para la compensacion (Daniel, 03/08:
+     «los ultimos 5 tambien son los ultimos 5 del mes, INCLUYENDO la compensacion»), asi
+     que pinta `MOVS_N-1` fichajes. Esta nota comparaba contra 5 igualmente:
+       · con 6 fichajes decia «se ensenan los 5 mas recientes, de 6» y ensenaba 4;
+       · con exactamente 5 decia «Todo lo de este mes» **escondiendo uno**.
+     ⚠️ Y el escritorio pinta TODOS, asi que decia que escondia cosas que no escondia.
+     ⛔ El dano no es el numero: es que esta es la pantalla a la que alguien entra JUSTO a
+     comprobar si le contaron un parte. Un parte que de verdad FALTE es indistinguible del
+     que la vista esconde -- y la nota le firma que estan todos.
+     ⚠️ Sin el argumento se mantiene `MOVS_N`, que es lo que hacen los dos libros de
+     PUNTOS: esos si pintan `r.ultimos`, o sea `slice(0, MOVS_N)`. */
+  var n = (typeof cuantos === 'number') ? cuantos : MOVS_N;
   var d = (ambito==='mes') ? 'de este mes' : 'de la temporada';
-  return total>MOVS_N
-    ? 'Se enseñan los <b>'+MOVS_N+'</b> más recientes '+d+', de '+total+'. '+
+  return total>n
+    ? 'Se enseñan los <b>'+n+'</b> más recientes '+d+', de '+total+'. '+
       'El registro completo <b>se conserva</b>: aquí solo se pinta menos.'
     : 'Todo lo '+d+'. El registro completo <b>se conserva</b>.';
 }
@@ -1696,6 +1709,16 @@ function _etiOrigenParte_(p){
   return (p && p.sinFichaje) ? { tono:'aviso', txt:'declarado sin fichaje' } : null;
 }
 
+/* ⛔ EL TOPE DE HORAS DE UN PARTE, EN UN SOLO SITIO PARA LAS DOS CARAS. Vivia en dos:
+   el backend topa en 14 (`MAX_HORAS_PARTE`, y el autocierre a 14 esta documentado) y
+   el movil bloqueaba el envio por encima de 12, asi que quien hubiera trabajado 13 h
+   NO PODIA DECLARARLAS por la app aunque el servidor las aceptara.
+   ✅ Y no era una regla mas estricta a proposito, esta MEDIDO: el 12 del movil es del
+   24/07 y el 14 del backend del 25/07 -- el movil se quedo con el valor de la vispera.
+   ⚠️ Va como FUNCION y no como `var` porque un modulo solo lleva declaraciones
+   `function`: las capacidades no se llevan sus globales. */
+function _maxHorasParte_(){ return 14; }
+
 function _novedades_(){
   /* Lo más nuevo primero. Al cerrar una pieza se añade su tanda AQUÍ, en ese momento.
 
@@ -1708,6 +1731,13 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-12-libro-horas-dice-lo-que-ensena', fecha:'2026-08-12',
+      titulo:'El libro de horas anunciaba un n\u00famero y ense\u00f1aba otro',
+      items:[
+        {cara:'m\u00f3vil', vista:'horas', txt:'La lista de \u00abÚltimos movimientos\u00bb reserva un hueco para la compensaci\u00f3n, as\u00ed que pinta **4 fichajes**. La nota de abajo compraba contra 5: con **exactamente 5 fichajes** dec\u00eda \u00abTodo lo de este mes\u00bb **escondiendo uno**, y con 6 dec\u00eda \u00abse ense\u00f1an los 5\u00bb ense\u00f1ando 4.'},
+        {cara:'m\u00f3vil', vista:'horas', txt:'Duele porque esa es la pantalla a la que entras **justo a comprobar si te contaron un parte**: uno que de verdad FALTE era indistinguible del que la vista escond\u00eda, y la nota te firmaba que estaban todos. Ahora dice **lo que pinta**.'},
+        {cara:'escritorio', vista:'horas', txt:'Y al rev\u00e9s: el escritorio los pinta **todos** sin recortar, y anunciaba que escond\u00eda cosas que no escond\u00eda. Ahora dice que est\u00e1n todos.'}
+      ] },
     { id:'2026-08-12-otorgar-confirma-lo-guardado', fecha:'2026-08-12',
       titulo:'Al otorgar horas, el aviso dice lo que se ha GUARDADO, no lo que tecleaste',
       items:[
