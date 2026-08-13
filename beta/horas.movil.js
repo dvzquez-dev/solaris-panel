@@ -142,25 +142,25 @@ function _mediaEquipo_(){
     var x=_hMesReal_(ms[i]);
     /* ⛔ Quien no tiene el dato NO cuenta como 0: hundiria la media y todo el mundo saldria
        «por encima del equipo». Fuera del divisor tambien. */
-    if(typeof x==='number'){ h+=x; n++; }
+    /* ⛔ Y SIN LA COMPENSACIÓN BASE, IGUAL QUE EL OTRO LADO DE LA FILA. El backend ya lo
+       hace en `_equipoMesDe_` y lo razona ahí: *si la media del equipo llegara en bruto
+       se estaría comparando **con descuento contra sin descuento**, que no es ni una
+       cosa ni la otra*. Este respaldo local sumaba **en bruto**, así que cuando se
+       alcanza —backend viejo, o `equipo_mes.n < 3` porque el overlay de Notion vino
+       flaco— **todo el mundo salía por debajo del equipo**: ~2 h/mes de sesgo, y **7
+       para el PD**.
+       ⚠️ Y aquí SÍ se puede, que es lo que confunde: el comentario del backend dice que
+       *«esto no se puede hacer en el móvil»* porque a un miembro raso no le llegan las
+       horas ni el cargo de los demás — y es cierto. Pero esta rama **solo corre cuando
+       ya tienes el roster entero delante**, que es justo cuando el cargo está ahí.
+       Por la misma puerta que el ritmo (`_horasSinBase_`), no por una copia. */
+    if(typeof x==='number'){ h+=_horasSinBase_(ms[i], x); n++; }
   }
   return n>=3 ? h/n : null;
 }
 
 /* En que dia del mes vamos, y cuantos tiene. **Lo manda el servidor** si puede: un movil con la
    fecha cambiada haria que la misma comparativa dijera cosas distintas a dos personas. */
-/* ¿Ese parte es de un mes YA PASADO? Se compara `AAAA-MM` contra el periodo que manda el
-   servidor.
-
-   ⛔ EL PERIODO LO PONE EL SERVIDOR (`equipo_mes.periodo`), no el reloj del móvil: con la
-   fecha del teléfono, a dos personas les plegaría cosas distintas el mismo día.
-
-   ⚠️ Sin periodo o sin fecha devuelve **false** — o sea NO se pliega. Ante la duda, el parte
-   se ve: esconder algo por no saber de cuándo es, es peor que enseñarlo de más.
-
-   ⚠️ «Mes pasado» no es exactamente «mes cerrado»: un mes anterior podría seguir sin cerrarse.
-   Se usa el mes porque es lo que la cara puede saber sola, y para lo que esto hace —quitar
-   ruido de lo viejo— basta. Lo que **nunca** se pliega es el mes en curso. */
 /* ⛔ `_esDeMesPasado_` SE MUDÓ A `comun.js` el 13/08, igual que `_diasDelMes_` el
    12/08 y por lo mismo: la necesita `_deEsteMes_`, que vive allí. Teníamos **dos
    definiciones de «este mes» en la misma tarjeta** — la cifra grande de cierre a
@@ -205,6 +205,33 @@ function _diasMesAnterior_(periodo, servidor){
 }
 
 function sumaE(e){return PARTES.filter(function(p){return p.e===e;}).reduce(function(a,p){return a+p.q;},0);}
+
+/* ⛔ DOS PUERTAS A PROPOSITO, Y LA DIFERENCIA ES QUIEN PREGUNTA.
+   `sumaE` suma **toda** tu cola: es lo que quiere el aviso de Estado («2,5 h esperando
+   aprobacion»), porque un parte de julio sin firmar **sigue esperando firma** y esconderlo
+   seria perder la unica señal de que esta ahi.
+   `sumaEMes` suma **lo de este mes**: es lo que quieren la barra y la pildora de Horas, que
+   dicen literalmente «lo que ya cuenta este mes».
+   ⚠️ Hasta el 13/08 las tres usaban `sumaE`, que filtra **solo por estado**, mientras las
+   otorgadas salian de `_hMesReal_` -estrictamente del mes en curso-. Con 4 h sin firmar de
+   julio y cero horas en agosto, la barra dejaba de decir «aun no tienes horas registradas
+   este mes» y anunciaba «lo rayado son 4 h esperando firma: **todavia** no cuentan» -- un
+   «todavia» falso, porque julio ya esta cerrado. Y con horas en agosto, el tramo de lo que SI
+   cuenta **encogia** y la marca del objetivo se acercaba: la barra decia que vas mejor de lo
+   que vas.
+   ⚠️ La regla ya estaba enunciada seis lineas mas arriba -`vHoras` parte la lista en
+   `mias`/`viejas` con `_esDeMesPasado_` desde el 13/08- y no aplicada aqui, que es la barra
+   que va **entre las dos** en la misma tarjeta (§3c-19).
+   ✅ Y el periodo es el de TRABAJO (`_diasDelMes_().periodo`, de cierre a cierre), no el del
+   reloj del telefono: la misma puerta que la cifra grande. Sin periodo se suma todo, que es
+   la cortesia de `_esDeMesPasado_`: ante la duda, se ve -- esconder horas por no saber el mes
+   hace que un parte que de verdad FALTE sea indistinguible del que la vista tapa. */
+function sumaEMes(e){
+  var per = (typeof _diasDelMes_==='function') ? (_diasDelMes_()||{}).periodo : null;
+  return PARTES.filter(function(p){
+    return p.e===e && !(typeof _esDeMesPasado_==='function' && _esDeMesPasado_(p, per));
+  }).reduce(function(a,p){return a+p.q;},0);
+}
 
 function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 
@@ -290,7 +317,8 @@ function barraHorasHTML(id){
   /* La MISMA puerta que las dos tarjetas (`_hMesReal_`): esta era la TERCERA copia de
      «de donde salen las horas del mes». */
   var _hm=_hMesReal_(YO), notion=(_hm!=null);
-  var cont=notion?_hm:sumaE('otor'), p=sumaE('pend');   /* otorgadas = todo lo que cuenta */
+  /* `sumaEMes`, no `sumaE`: esta barra es la del MES, y `_hm` ya lo es. */
+  var cont=notion?_hm:sumaEMes('otor'), p=sumaEMes('pend');   /* otorgadas = todo lo que cuenta */
   /* La barra NUNCA se llena (escala asintótica), pero dentro del ancho que ocupa el total
      (otorgadas+pendientes) el reparto es LINEAL: si 4 de 20 h están pendientes, el rayado
      ocupa 1/5 de lo pintado — no un pixel al final como si fueran un extra. */
@@ -380,8 +408,22 @@ function animarBarras(root, silencioso){
   $$('.barhet span',root||document).forEach(function(s){ s.style.left=s.dataset.l+'%'; });
 }
 
+/* ⛔ SIN REFERENCIA NO HAY PORCENTAJE, Y SE DICE CALLANDO LA FILA — no pintándola a
+   cero. Aquí ponía `ref ? … : 0`, y ese 0 salía por la puerta de arriba como **«+0,0 %»
+   en verde**: «vas igual que el mes pasado» dicho a quien pasó de 1,5 h a 30.
+   ⚠️ Y llega solo, sin nada raro: `rAnt` es el ritmo del mes anterior **sin la
+   compensación base**, con suelo 0. Si el mes pasado hiciste ≤ tu base —≤2 h un
+   miembro raso, ≤3,5 un coordinador, **≤7 el PD**— sale exactamente 0. Agosto, con el
+   equipo de vacaciones, es el mes en que más gente cae ahí.
+   ⛔ LA GUARDA VA EN LA PUERTA, NO EN CADA LLAMADOR. La simétrica ya existía doce
+   líneas más abajo (`if(me>0)`) y a esta fila no se le había puesto — que es como se
+   olvida la siguiente. Puesta aquí, ningún llamador nuevo puede saltarse la regla, y
+   el `if(me>0)` de abajo se queda como cinturón y tirantes.
+   ⚠️ Se exige `> 0`, no `!= null`: un `ref` de 0 es justo el caso, y `NaN` —que sale
+   de dividir por 0 días— tampoco pasa un `> 0`. */
 function deltaHTML(k,v,ref,txt){
-  var d=ref?(v-ref)/ref*100:0, cls=d>=0?'pos':'neg';
+  if(!(typeof ref==='number' && isFinite(ref) && ref>0)) return '';
+  var d=(v-ref)/ref*100, cls=d>=0?'pos':'neg';
   var w=Math.min(Math.abs(d),80)/80*50, left=d>=0?50:(50-w);
   return '<div class="dlt '+cls+'" data-w="'+w.toFixed(2)+'" data-l="'+left.toFixed(2)+'">'+
     '<span class="k">'+k+'</span>'+
@@ -465,10 +507,17 @@ function vFichar(){
                  entrada»: dirias «parado» a alguien que esta fichando y ficharia dos veces. */
               ? '<button class="btn pri full" data-p id="btnIni">Fichar entrada</button>'
               : '<button class="btn full" disabled>Comprobando si ya tienes un fichaje abierto…</button>')
-          : (nube
-              ? '<button class="btn" data-p id="btnPausa">'+(s.estado==='pausada'?'Reanudar':'Pausar')+'</button>'+'<button class="btn no" data-p id="btnFin">Fichar salida</button>'
-              : '<button class="btn" data-p id="btnPausa">'+(s.estado==='pausada'?'Reanudar':'Pausar')+'</button>'+
-                '<button class="btn no" data-p id="btnFin">Fichar salida</button>'))+
+          /* ⛔ AQUÍ HABÍA UN TERNARIO CON LAS DOS RAMAS IDÉNTICAS — byte a byte. Se
+             ramificaba por `nube` y las dos producían el mismo HTML: dos copias
+             literales de la misma cadena **esperando a divergir**, que es como se
+             escriben los fallos que solo se ven en una de las dos ramas.
+             ⚠️ Y era **basura que se cobra**: cualquier mutación sobre esa condición
+             es **equivalente por construcción** —no puede cazarla nadie—, así que
+             habría salido CIEGA y se habría leído como un agujero del banco.
+             ✅ Los botones son los mismos con nube y sin ella: lo que cambia con `nube`
+             es el botón de maqueta de más arriba, y eso sí está ramificado. */
+          : '<button class="btn" data-p id="btnPausa">'+(s.estado==='pausada'?'Reanudar':'Pausar')+'</button>'+
+            '<button class="btn no" data-p id="btnFin">Fichar salida</button>')+
       '</div>'+
       (largo?'<div class="avisolargo"><b>Llevas más de 10 h abiertas.</b> Si olvidaste cerrarla, ciérrala ahora. '+
         'A las <b>14 h</b> se cierra sola con la hora de tu última actividad ('+s.ult+') y podrás ajustarla antes de enviarla.</div>':
@@ -695,7 +744,13 @@ async function enviarFichaje(){
     tost('Declarando…');
     try{ var p=await api.declararParte(f.declararId, imput, f.just.trim(), f.cat);
       if(p){ var i=PARTES.findIndex(function(x){return x.id===f.declararId;}); if(i>=0) PARTES[i]=normPMovil(p); }
-      f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
+      /* ⛔ Y LA FECHA, IGUAL QUE EN LA OTRA RAMA. El comentario de doce líneas más
+         abajo razona **este fallo exacto** para esta misma rama —*declaras un bloque
+         atrasado del 30/07 y TODOS los siguientes de esa sesión salen con el 30/07, en
+         silencio y sin volver a preguntar*— y aquí no se había aplicado: §3c-19 dentro
+         de la misma función. Se llega escribiendo una fecha vieja, respondiendo a un
+         «sin declarar» y volviendo a declarar. */
+      f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY;
       tost('Declarado · a la cola de tu coordinador.'); irA('horas');
     }catch(e){ tostErr('No se pudo declarar: ', e); }
     return;
@@ -703,7 +758,13 @@ async function enviarFichaje(){
   if(backendOK && SESION){
     tost('Enviando…');
     try{
-      var nuevo=null, h=0;
+      /* ⛔ `h = null` ES «NO LO SÉ», Y CERO ES UN DATO. Aquí ponía `h = 0`: si la
+         llamada **no lanza** pero vuelve sin `.parte` —la nube cerró la sesión y no nos
+         devolvió el parte—, `h` se quedaba en ese 0 y el aviso anunciaba **«Fichaje
+         enviado · 0 h» de una sesión de seis horas**. Y en el peor momento: el formulario
+         ya está limpio y la sesión en `parada`, así que quien lo lee **no sabe si tiene
+         que volver a declarar**. §3c-24. */
+      var nuevo=null, h=null;
       if(ST.modo==='vivo' && ST.ses.cloudIni){
         var r=await api.ficharSalida(imput, f.just.trim(), f.cat, _perfilElegido_());   // la nube cierra, calcula y guarda la categoría
         if(r && r.parte){ nuevo=normPMovil(r.parte); h=r.parte.horas; }
@@ -729,7 +790,11 @@ async function enviarFichaje(){
          HOY, que es el caso normal. */
       ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
       f.fecha=HOY;
-      tost('Fichaje enviado · '+nf(h,2)+' h a la cola de tu coordinador');
+      /* ⚠️ Y el aviso lo DICE en vez de inventarse un número: sin las horas de vuelta,
+         se confirma el envío y se manda a mirar la lista, que es donde estarán. */
+      tost(h==null
+        ? 'Fichaje enviado a la cola de tu coordinador (las horas te las confirma él)'
+        : 'Fichaje enviado · '+nf(h,2)+' h a la cola de tu coordinador');
       irA('horas');
     }catch(e){
       /* ⛔ SI LA CULPA ES LA SESION, EL AVISO NO CADUCA. Es el caso que reportó José
@@ -900,8 +965,16 @@ function _cuotaHTML_(){
     '<div class="tarj acc">'+
       '<div class="cifh"><span class="g mono" style="color:var(--ok)">'+nf(YO.cuota,2)+'</span><span class="sc">€ al año</span></div>'+
       '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+recibo+'</div>'+
+      /* ⛔ LA BASE SALE DE LA REGLA, NO SE TECLEA. Aquí ponía **«2 h de base» para todo
+         el mundo**, y la base es la del **cargo**: `COMP_CARGO` da **7 h al PD** y **3,5 a
+         un coordinador**; 2 es solo el defecto del miembro raso. Y esta nota existe para
+         explicar **de dónde sale tu cuota**, así que a quien intentara cuadrarla a mano le
+         salían otras cuentas — y era el PD, con 7, quien más se desviaba.
+         ✅ Por la misma puerta que el resto (`_compBase_`), no por una copia: el día que
+         cambie la tabla, la frase cambia sola. Es lo mismo que se hizo con la frase del
+         expediente en el medidor de conducta. */
       '<p class="rnota">Sale de tus horas de la temporada: el objetivo se mueve entre 8 y 15 h/mes, con '+
-      '2 h de base. Se descuentan 4 € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>';
+      nf2(_compBase_(YO))+' h de base. Se descuentan 4 € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>';
 }
 
 /* ═══ DECIDIR PARTES DE HORAS DESDE EL MÓVIL ════════════════════════════════════════
@@ -1198,7 +1271,10 @@ function _engPartesDec_(){
 }
 
 function vHoras(){
-  var o=sumaE('otor'), p=sumaE('pend');
+  /* DEL MES, como la barra de abajo: el titular de esta pantalla dice «lo que ya
+     cuenta **este mes**». Con `sumaE` la pildora y la barra podian decir numeros
+     distintos en la misma tarjeta en cuanto una de las dos se arreglara. */
+  var o=sumaEMes('otor'), p=sumaEMes('pend');
   /* MISMA PUERTA que la tarjeta de Estado (`_hMesReal_`). Habia dos tarjetas de «horas del
      mes» -una aqui y otra en `vEstado`- leyendo campos DISTINTOS, y en cuanto se toco una
      se pusieron a decir numeros distintos en la misma app: 91 h en Horas y otra cosa en
