@@ -19,14 +19,21 @@ async function _partesDe_(nombre){
   return _partesAdmin.filter(function(p){return p.autor===nombre;}).map(normPMovil);
 }
 
-/* La coletilla que explica de donde sale una hora. Tres casos y ni uno mas:
-     fichaje  -> nada, es lo normal y no hay que decirlo;
-     manual   -> «sin fichaje», en ambar: quien firma tiene derecho a saber que no hubo
-                 cronometro;
-     otorgada -> «automatica», en gris: NO es un aviso, es informacion. Marcarla en ambar
-                 seria acusar al miembro de algo que hizo el sistema.
-   Un parte viejo sin `origen` se comporta como antes, con `sinFichaje`: es lo unico que se
-   sabe de el, y no se le inventa una procedencia que no consta. */
+/* La coletilla que explica de donde sale una hora. ⛔ LOS CASOS LOS DECIDE
+   `_etiOrigenParte_` (comun.js) DESDE EL 04/08, y hoy son CINCO, no tres:
+     fichaje   -> nada, es lo normal y no hay que decirlo;
+     otorgada  -> «automatica», en gris: NO es un aviso, es informacion;
+     reversion -> tambien en gris, por lo mismo;
+     manual    -> «sin fichaje», en ambar: quien firma tiene derecho a saber que no hubo
+                  cronometro;
+     y un parte viejo sin `origen` cae al respaldo, con `sinFichaje` o nada: es lo unico que
+     se sabe de el, y no se le inventa una procedencia que no consta.
+   ⚠️ AQUI PONIA «tres casos y ni uno mas», y llevaba desactualizado desde el 04/08. No
+   es cosmetico: la regla que subraya la linea de abajo -*marcarla en ambar seria acusar al
+   miembro de algo que hizo el sistema*- esta implementada como **«todo lo que no sea
+   exactamente `ok` va en ambar»**. O sea que un tono nuevo en `comun.js` sale ACUSANDO sin
+   que nadie toque este fichero. El color esta bien hoy; lo que estaba mal es el comentario
+   que te dice cuantos casos tienes que revisar (§3c-19: la premisa vive donde se CITA). */
 function _origenParte_(p){
   /* El texto sale de `_etiOrigenParte_` (comun.js): aqui solo se decide COMO se pinta en esta
      lista -- corto, en linea y detras del resto. Antes esta funcion tenia su propia tabla de
@@ -117,7 +124,14 @@ function _rearmarCargas_(){
   return n;
 }
 
-function mediaSub(u){for(var i=0;i<DATA.subsistemas.length;i++) if(DATA.subsistemas[i].u===u) return DATA.subsistemas[i].media; return _mediaEquipo_();}
+/* ⛔ AQUI VIVIA `mediaSub`, Y SE BORRO EL 13/08 EN VEZ DE VIGILARLA. Cero llamadas en
+   ronda3 -- las copias que salen en un `grep` son de `variantes/ronda2/`, maquetas viejas--,
+   y no era codigo muerto inofensivo: leia `DATA.subsistemas`, que el panel real **no manda**,
+   asi que devolvia la media de la MAQUETA (19,2 h para GNC) con toda la cara de dato. Es el
+   mismo `MEDIA_EQ` cableado que se arreglo en `_mediaEquipo_` el 07/08 y en `_rankSubsHTML_`
+   el 13/08: la tercera copia del mismo fallo, esperando a que alguien la llamara.
+   ⚠️ Y su respaldo podia devolver `null`, que nadie espera de algo llamado «media».
+   Si vuelve a hacer falta la media de un subsistema, sale del backend, no de `DATA`. */
 
 /* LA MEDIA DE HORAS DEL EQUIPO **ESTE MES**, la de verdad.
 
@@ -330,10 +344,15 @@ function barraHorasHTML(id){
      Si aún no hay horas, o el objetivo queda más a la derecha que el total, se ancla al final. */
   var wu = tot>0 ? Math.min(98, wtot*(UMBRAL/tot)) : wBar(UMBRAL);
   /* `data-k` es la clave de la MEMORIA de anchos, y a proposito NO es el id.
-     Estado y Horas pintan LA MISMA barra con el mismo dato y distinto id
-     (`barEstado` / `barHoras`), asi que indexando por id cada pantalla tenia su propia
-     memoria: mirabas tus horas en Estado, pulsabas Horas... y la misma barra volvia a
-     crecer desde cero. Con una clave por DATO, las dos comparten pasado. */
+     El id lo pone QUIEN LLAMA, asi que la misma barra puede salir con nombres distintos
+     segun la pantalla; indexando por id, cada una tendria su propia memoria y la barra
+     volveria a crecer desde cero al cambiar de pantalla. Con una clave por DATO, las dos
+     comparten pasado.
+     ⚠️ Aqui ponia que Estado y Horas la pintaban las dos con ids `barEstado`/`barHoras`.
+     **Eso ya no es cierto**: `barEstado` sale una sola vez en todo el repo -- en este
+     comentario-- y hoy no queda ni un `.barh` fuera de esta funcion. Se corrige donde se
+     CITA y no solo donde se enuncio (§3c-19): el siguiente que lea esto y toque el `data-k`
+     se creeria una simetria que no existe. */
   return '<div class="barh" id="'+id+'" data-k="horasMes">'+
       '<i class="otor" data-w="'+wco.toFixed(2)+'"></i>'+
       '<i class="pend" data-l="'+wco.toFixed(2)+'" data-w="'+(wcop-wco).toFixed(2)+'"></i>'+
@@ -402,10 +421,17 @@ function animarBarras(root, silencioso){
       /* setTimeout, no rAF: en pestaña de fondo rAF no dispara y quedaría a cero */
       setTimeout(function(){ i.style.width=w+'%'; }, 70);
     });
-    $$('.mk',b).forEach(function(m){ m.style.left=m.dataset.l+'%'; });
+    /* La MISMA guarda que los tramos, y aqui hace mas falta: `.barh .mk` no
+       declara `left` en el CSS, asi que un `NaN%` no cae a 0 -- cae a `auto`, o
+       sea la marca del objetivo pegada al borde izquierdo, diciendo «objetivo:
+       0 h» con la barra entera por delante. */
+    $$('.mk',b).forEach(function(m){ var l=parseFloat(m.dataset.l);
+      m.style.left=(isFinite(l)?l:0)+'%'; });
   });
   _guardarAnchos_();
-  $$('.barhet span',root||document).forEach(function(s){ s.style.left=s.dataset.l+'%'; });
+  /* Y el rotulo, que lleva `translateX(-50%)`: sin guarda se va medio fuera. */
+  $$('.barhet span',root||document).forEach(function(s){ var l=parseFloat(s.dataset.l);
+    s.style.left=(isFinite(l)?l:0)+'%'; });
 }
 
 /* ⛔ SIN REFERENCIA NO HAY PORCENTAJE, Y SE DICE CALLANDO LA FILA — no pintándola a

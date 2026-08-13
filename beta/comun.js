@@ -1584,9 +1584,26 @@ function _firmaDe_(unidad, quien){
   return c === quien ? PD_NOM : c;
 }
 
-/* Quien coordina esa unidad; si nadie, el PD. */
+/* Quien coordina esa unidad; si nadie, el PD.
+   ⛔ `coordina` MANDA TAMBIEN, Y AQUI NO SE MIRABA. El backend cerro este mismo agujero el
+   12/08 -- Daniel: «es porque Jose es coordinador de la UCT, no por ser el sino por su
+   cargo»-- y la cara se quedo con la primera pasada sola. Y **nadie tiene una Unidad como
+   `unidad`**: el roster guarda una sola por persona y es su subsistema, asi que la unica via
+   por la que la UCT tiene coordinador es este segundo bucle.
+   ⛔ Lo que se veia: un expediente de la UCT **no le salia a Jose** en «Pendiente de tu
+   revision», `puedeDecidirDoc` daba `false` y la ficha rotulaba «Revisa: Daniel» -- y si era
+   lo unico que tenia pendiente, **no veia ni la pestana**.
+   ✅ El recorrido de `coordina` es `_unidadesCoord_`, que ya existe: llega como cadena, lista
+   o nada, y **una cadena no se itera** (daria doce unidades de una letra). */
 function coordinadorDe(u){
   var c = buscaMiembro(function(m){ return m.cargo==='Coordinador' && m.unidad===u; });
+  if (c) return c.nombre;
+  c = buscaMiembro(function(m){
+    if (m.cargo!=='Coordinador') return false;
+    var v = (typeof _unidadesCoord_==='function') ? _unidadesCoord_(m.coordina) : [], i;
+    for (i=0;i<v.length;i++) if (v[i]===u) return true;
+    return false;
+  });
   return c ? c.nombre : PD_NOM;
 }
 
