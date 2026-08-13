@@ -240,8 +240,18 @@ function _cablearFotoBuzon_(repinta){
   if(qui) qui.onclick=function(){ BZ_FOTO=null; repinta(); };
 }
 
-function buzonModal(tipo){
+/* ⛔ `prev` NO ES UN ADORNO: SIN EL, CAMBIAR DE «FALLO» A «MEJORA» BORRABA LO ESCRITO.
+   El boton de tipo llama a esta misma funcion, que **reconstruye el modal entero** -- y los
+   campos nacian sin `value`, asi que tres parrafos de descripcion desaparecian de golpe.
+   ⛔ Y la premisa estaba escrita TRES LINEAS mas arriba, para la fila de la foto: *«se
+   repinta SOLO la fila de la foto, no el modal entero: reconstruirlo borraria lo que ya
+   hubieras escrito, que es la peor forma de perder un reporte»*. Enunciada en un sitio y no
+   aplicada donde se cita (§3c-19).
+   ⚠️ La foto sobrevivia porque `BZ_FOTO` es global; el texto, que es lo que cuesta escribir,
+   no. */
+function buzonModal(tipo, prev){
   var esBug=(tipo!=='mejora');
+  var _pv=prev||{};
   var pant=_NOMBRE_PANTALLA_[ST.vista]||ST.vista;
   abrirModal('<div class="mtit">'+(esBug?'Reportar un fallo':'Proponer una mejora')+'</div>'+
     '<div class="msub">Estás en <b>'+esc(pant)+'</b> · se envía con tu nombre</div>'+
@@ -250,9 +260,9 @@ function buzonModal(tipo){
       '<button data-bt="mejora" class="'+(esBug?'':'on')+'" data-p>Una mejora</button></div>'+
     '<label class="campo"><span class="sc">'+(esBug?'¿Qué ha pasado?':'¿Qué mejorarías?')+
       ' <span class="req">*</span></span>'+
-      '<input id="bzTit" placeholder="'+(esBug?'en una línea…':'en una línea…')+'" autocomplete="off"></label>'+
+      '<input id="bzTit" value="'+esc(_pv.tit||'')+'" placeholder="'+(esBug?'en una línea…':'en una línea…')+'" autocomplete="off"></label>'+
     '<label class="campo"><span class="sc">'+(esBug?'¿Qué esperabas que pasara?':'¿Por qué? ¿Qué te cuesta hoy?')+'</span>'+
-      '<textarea id="bzDet" placeholder="'+(esBug?'y qué hiciste justo antes, si lo recuerdas…':'el problema de fondo, no la solución…')+'"></textarea></label>'+
+      '<textarea id="bzDet" placeholder="'+(esBug?'y qué hiciste justo antes, si lo recuerdas…':'el problema de fondo, no la solución…')+'">'+esc(_pv.det||'')+'</textarea></label>'+
     (esBug?'<span class="sc" style="display:block;margin-bottom:6px">¿Cuánto molesta?</span>'+
       '<div class="modos" id="bzGrav" style="margin-bottom:12px">'+
       '<button data-g="Bloquea" data-p>Me bloquea</button>'+
@@ -279,7 +289,12 @@ function buzonModal(tipo){
   $$('#bzGrav button').forEach(function(b){ b.onclick=function(){
     $$('#bzGrav button').forEach(function(x){x.classList.remove('on');});
     b.classList.add('on'); grav=b.dataset.g; }; });
-  $$('#bzTipo button').forEach(function(b){ b.onclick=function(){ buzonModal(b.dataset.bt); }; });
+  /* ⛔ SE LEE LO ESCRITO ANTES DE RECONSTRUIR. Es el gesto normal: escribes describiendo
+     un fallo, te das cuenta de que es mas bien una mejora, y pulsas el otro boton. */
+  $$('#bzTipo button').forEach(function(b){ b.onclick=function(){
+    var _t=$('#bzTit'), _d=$('#bzDet');
+    buzonModal(b.dataset.bt, {tit:(_t&&_t.value)||'', det:(_d&&_d.value)||''});
+  }; });
   var env=$('#bzEnviar');
   env.onclick=async function(){
     if(env.disabled) return;
@@ -306,7 +321,13 @@ function buzonModal(tipo){
          subido a Drive; mientras esa parte no esté desplegada, callarse sería dejar creer
          que la marcaste para nada. */
       var sinFoto = datos.captura && !(r && r.captura);
+      /* ⛔ Y LA FILA SE REPINTA AL VACIAR LA FOTO. Antes solo se ponia `BZ_FOTO=null` y la
+         fila se quedaba con el lapiz en pantalla **y cableado**: pulsarlo entraba en el
+         pintor con `BZ_FOTO.url` sobre `null` -> `TypeError` y **no pasaba nada**, sin
+         consola en un movil. Y es justo el gesto de quien acaba de leer «la foto no se
+         guardo». */
       BZ_FOTO=null;
+      _repintaFoto_();
       /* ACUSE ANTES DE CERRAR (Daniel, 28/07). Cerrar de golpe deja la duda de si llegó:
          el botón se pone en verde diciendo «Enviado», se ve un segundo y ENTONCES se
          cierra. Va aquí, después del `await`, así que solo se enseña cuando el servidor

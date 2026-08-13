@@ -359,6 +359,20 @@ function _ponderaComp_(r){
   var a=String(r.alcance||''), c=String(r.calidad||'');
   if(P.alcance[a]!=null){ h+=P.alcance[a]; porque.push('alcance '+a+' +'+P.alcance[a].toFixed(2)); }
   if(P.calidad[c]!=null){ h+=P.calidad[c]; porque.push('calidad '+c+' +'+P.calidad[c].toFixed(2)); }
+  /* \u26d4 EL ESFUERZO, QUE TENIA PESOS, COLUMNA Y VISTO BUENO Y NO LO LEIA NADIE.
+     Daniel lo pidio el 27/07 -«se debe valorar cuanto esfuerzo ha costado encontrar ese bug
+     especifico»- y aprobo los valores el 11/08. La tabla estaba puesta, la columna existia y
+     la nota de arriba explicaba que «un `Molesta` dificil de encontrar pasa de 0,50 a 1,00 h»
+     -- pero esta funcion, que es la que suma, **no lo miraba**.
+     \u26d4 Medido el 13/08: con `dificil`, con `directo` o con basura, la propuesta salia
+     IDENTICA (0,50 h), y `faltan` decia **«nada»** -- o sea que la pantalla le afirmaba al PD
+     que no quedaba ningun eje por medir. Quien reporta un bug que costo encontrar cobraba
+     **0,50 h en vez de 1,00**, y esas horas van a la cuota.
+     \u26a0\ufe0f Va SIN respaldo a proposito, al reves que el eje de gravedad: `directo` vale 0, asi
+     que «no consta» y «lo encontre de frente» pagarian igual y un `ejeSinMedir` aqui
+     inventaria horas. Lo que se hace es DECIRLO, y de eso se encarga `faltan`. */
+  var ef=String(r.esfuerzo||'');
+  if(P.esfuerzo[ef]!=null){ h+=P.esfuerzo[ef]; porque.push('esfuerzo '+ef+' +'+P.esfuerzo[ef].toFixed(2)); }
   var horas=Math.round(h*4)/4;                 // EL REDONDEO A CUARTOS que pidio Daniel
   var techo=_esMejora_(r) ? P.topeMejora : P.tope;
   if(horas<P.minimo) horas=P.minimo;
@@ -380,6 +394,10 @@ function _compPropuesta_(r){
   if(!r[_ejeComp_(r)]) faltan.push(_ejeComp_(r));
   if(!r.alcance) faltan.push('alcance');
   if(!r.calidad) faltan.push('calidad del reporte');
+  /* \u26d4 Y EL ESFUERZO SE DICE CUANDO FALTA. Sin esta linea, `faltan` contestaba «nada»
+     mientras el eje no se estaba midiendo: la pantalla afirmandole al PD que ya lo ha mirado
+     todo. Es el mismo «no lo se» disfrazado de dato que este fichero evita en los otros tres. */
+  if(!r.esfuerzo) faltan.push('esfuerzo de encontrarlo');
   return {horas:p.horas, etiqueta:_etiquetaComp_(p.horas), porque:p.porque, faltan:faltan};
 }
 

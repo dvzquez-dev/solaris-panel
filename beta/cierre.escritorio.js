@@ -20,9 +20,24 @@ async function _cargarCierre_(){
 
 /* El ultimo dia del mes y los que faltan, CALCULADOS. Estaban escritos a mano en el HTML
    («31/07/2026», «7 días»): en octubre habrian seguido diciendo lo mismo. */
-function _finDeMes_(){
-  var h=new Date(), fin=new Date(h.getFullYear(), h.getMonth()+1, 0);
-  var dias=Math.max(0, Math.ceil((fin-new Date(h.getFullYear(),h.getMonth(),h.getDate()))/86400000));
+/* ⛔ `hoy` ES OPCIONAL Y EXISTE PARA PODER PREGUNTARLE. El desvio del cambio de hora solo
+   aparece **25 dias al año**, asi que un banco que la ejecute con el reloj de la maquina sale
+   CIEGO 340 dias y ROJO los otros 25 -- las dos formas de no vigilar nada. Con la fecha
+   inyectable, el caso pregunta por el 1 de octubre cualquier dia del año.
+   ⚠️ Produccion la sigue llamando sin argumento: no cambia nada de lo que se ve. */
+function _finDeMes_(hoy){
+  var h=hoy||new Date(), fin=new Date(h.getFullYear(), h.getMonth()+1, 0);
+  /* ⛔ POR UTC, NO POR HORA LOCAL. Restar dos `Date` locales cuenta las HORAS reales, y
+     en Europe/Madrid el intervalo hasta el 31/10 cruza el cambio de hora del **25/10**: son
+     N dias **+1 h**, y `Math.ceil` lo sube a **N+1**.
+     ⛔ Medido barriendo los 730 dias de 2026 y 2027: **desvio de un dia del 1 al 25 de
+     octubre de 2026** y ninguno en 2027 -- en 2027 el cambio cae el 31, fuera del intervalo.
+     El 1 de octubre la pantalla diria «QUEDAN **31 dias**» de un mes que tiene 31.
+     ⚠️ Y su banco se habria puesto **rojo solo**, esos 25 dias, sin que nadie tocara nada:
+     un rojo con fecha de caducidad puesta, que es de los que acaban apagando un guardia.
+     ✅ `Date.UTC` cuenta dias de calendario y no horas, asi que el huso no entra. */
+  var _u=function(d){ return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); };
+  var dias=Math.max(0, Math.round((_u(fin)-_u(h))/86400000));
   var p=function(x){ return (x<10?'0':'')+x; };
   return { txt:p(fin.getDate())+'/'+p(fin.getMonth()+1)+'/'+fin.getFullYear(), dias:dias,
            mes:['enero','febrero','marzo','abril','mayo','junio','julio','agosto',

@@ -110,9 +110,9 @@
 
 <script src="comun.js?v=f12a772"></script>
 <script src="notis.escritorio.js?v=5f0a77e"></script>
-<script src="cierre.escritorio.js?v=61476db"></script>
+<script src="cierre.escritorio.js?v=3a5c29c"></script>
 <script src="turnos.escritorio.js?v=da008dc"></script>
-<script src="buzon.escritorio.js?v=e58ef20"></script>
+<script src="buzon.escritorio.js?v=3fb7c82"></script>
 <script src="documentos.escritorio.js?v=1918b5e"></script>
 <script src="sanciones.escritorio.js?v=8ff43ab"></script>
 <script src="reuniones.escritorio.js?v=d49562f"></script>
@@ -1849,7 +1849,15 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
       '<td class="r mono">'+nf2(p.horas)+' h</td></tr>';
   }).join('');
 
-  var libroH = r.total||extra
+  /* ⛔ LA COMPENSACION DEL CARGO SE PINTA SIEMPRE, COMO EN EL MOVIL. Esto era
+     `r.total||extra`, asi que con 0 fichajes y sin extra **desaparecia la tabla
+     entera** -- incluida la fila de la compensacion base-- y se pintaba «Nada este
+     mes · Aun no se te ha contado ningun fichaje» **encima de 2 h que SI cuentan**.
+     El movil la pinta fuera del condicional. Otra asimetria de las que cada cara,
+     leida por separado, parece correcta (§3c-9).
+     ⚠️ `base` puede ser 0 si alguien pone un cargo a 0 en la tabla: entonces no hay
+     nada que enseñar y el «nada este mes» vuelve a ser cierto. */
+  var libroH = r.total||extra||base
     ? tabla([['Concepto'],['Horas',1]], filas)+
       /* ⛔ EL ESCRITORIO PINTA TODOS (`r.todos.map`), no un recorte: pasarle `r.total` es
          decir «se ensenan todos», que es la verdad. Antes comparaba contra `MOVS_N` y con
@@ -1879,7 +1887,18 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
       kpi('Horas este mes', hMes==null?'—':nf2(hMes), _mesLargo_(_hoyDateM_()), '', null)+
       kpi('Compensación', nf2(_compMensual_(mi)), real?(extra?'base '+nf2(base)+' + extra '+nf2(extra):'la de tu cargo'):'base del cargo · falta el backend v54','', null)+
       kpi('Puntos', mi.puntos==null?'—':String(mi.puntos), 'hasta el fin de temporada','', null)+
-      kpi('Apuntes del mes', String(r.total), 'partes que ya cuentan','', null)+
+      /* ⛔ POR `_apuntesMes_`, LA MISMA PUERTA QUE EL MOVIL. Esto contaba solo los
+         FICHAJES (`r.total`), y la tabla de abajo abre **siempre** con la fila de la
+         compensacion del cargo -- asi que con 0 fichajes y una extra asignada por el
+         PD, el numero decia **0** con **dos apuntes pintados justo debajo**.
+         ⛔ Es la queja literal de Daniel del 07/08: *«dice 0 apuntes este mes cuando
+         si los hay: la compensacion inicial es un apunte»*. Se arreglo en el movil con
+         `_apuntesMes_` -cuyo comentario dice *«el unico sitio que no la contaba era el
+         numero que la anuncia»*- y **no se llevo aqui**: misma persona, mismo mes,
+         movil «1 apunte» y escritorio «0» (§3c-9).
+         ⚠️ La extra va DENTRO del mismo apunte, no suma otro: por eso comparten fila. */
+      kpi('Apuntes del mes', String(_apuntesMes_(r.total, base, extra)),
+          'partes que ya cuentan','', null)+
     '</div>'+
     pan('Tus horas de este mes', _mesLargo_(_hoyDateM_()), libroH)+
     pan('Tus puntos de la temporada','', libroP);
@@ -2313,7 +2332,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='92f8f6d';
+var BUILD='db42b63';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
