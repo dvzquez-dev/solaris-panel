@@ -1126,7 +1126,25 @@ function _fechaDMY_(s){
   return (d.getFullYear()===+p[0] && d.getMonth()===(+p[1])-1 && d.getDate()===+p[2]) ? d : null;
 }
 
-function _deEstaTemporada_(d){ return !!d && _temporadaDe_(d)===_temporadaDe_(_hoyDateM_()); }
+/* ⛔ LA TEMPORADA SALE DEL PERIODO DEL SERVIDOR, NO DEL RELOJ DEL TELEFONO. Su hermana
+   `_deEsteMes_` -que vive doce lineas mas abajo y a la que llama el MISMO `_ultimosMov_`- se
+   paso al periodo el 13/08 con la razon escrita, y esta se quedo con `_hoyDateM_()`. Filtra
+   el LIBRO DE PUNTOS (RRI Art. 29), o sea la disciplina de 32 personas.
+   ⚠️ Y el corte de temporada es el **1 de septiembre**: en el filo del 31/08-01/09, o con
+   el reloj del telefono desviado, el libro esconderia apuntes de la temporada en curso o
+   enseñaria los de la anterior -- y un apunte que de verdad FALTE es indistinguible del que
+   la vista tapa (es lo que dice `_notaRegistro_` aqui al lado).
+   ✅ El dia 1 del periodo basta para decidir la temporada: `_temporadaDe_` solo mira el mes.
+   ⚠️ Sin periodo se sigue cayendo al reloj, y hace falta: es lo unico que hay antes de que
+   llegue el panel, y callar el libro entero seria peor que enseñarlo con un mes de margen. */
+function _deEstaTemporada_(d){
+  if(!d) return false;
+  var per = (typeof _diasDelMes_==='function') ? (_diasDelMes_()||{}).periodo : null;
+  if(/^\d{4}-\d{2}$/.test(String(per||''))){
+    return _temporadaDe_(d) === _temporadaDe_(new Date(+per.slice(0,4), (+per.slice(5,7))-1, 1));
+  }
+  return _temporadaDe_(d) === _temporadaDe_(_hoyDateM_());
+}
 
 /* ⛔ CADA MAGNITUD SE REINICIA CON LO SUYO, y confundirlo hace que la app diga otra cosa que el
    Panel de Rendimientos (Daniel, 30/07):

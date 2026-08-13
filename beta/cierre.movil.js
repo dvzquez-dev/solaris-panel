@@ -41,18 +41,36 @@ function _planHTML_(plan){
     ? '<p class="rnota" style="color:var(--warn)"><b>'+plan.avisos.length+' aviso'+
       (plan.avisos.length===1?'':'s')+'</b>: '+esc(plan.avisos.slice(0,3).join(' · '))+'</p>'
     : '';
-  /* ⛔ Esto decia «Todavia no se ha aplicado» SIEMPRE, y dos parrafos mas abajo
-     `_decidirCierreHTML_` -que si lee el estado- decia «aplicado». La misma pantalla
-     afirmando las dos cosas: quien la lea creera la que peor le venga. */
+  /* ⛔ EL MISMO TRI-ESTADO QUE LA MITAD DE ABAJO, Y POR LA MISMA PUERTA.
+     Esto decidia con `plan.aplicado` **a secas** mientras `_decidirCierreHTML_` decide con
+     `plan.aplicado || plan.resultado`: **dos criterios sobre el mismo plan**. Y el aplicador
+     produce de verdad los estados donde discrepan -- `aplicado` sale del REGISTRO, no de la
+     pasada, y `resultado` se escribe SIEMPRE.
+     ⛔ Medido el 13/08: con el aplicador parado a medias y las 32 descuadrando, arriba decia
+     «**Todavia no se ha aplicado**… el boton esta abajo» y abajo «**PARADO A MEDIAS · 32
+     descuadres**» — **y ningun boton**. Y en el caso parcial (20 escritas, 12 mal), arriba
+     afirmaba «**Ya esta aplicado**» sobre un cierre que se paro.
+     ✅ Tres estados y no dos, porque hay tres: **parado** manda sobre **aplicado**, y este
+     sobre «todavia no». El escritorio ya lo hacia asi (§3c-9: lo que solo esta en una cara
+     es el fallo que nadie ve). */
+  var _hecho = !!(plan.aplicado || plan.resultado), _parado = !!plan.parado;
+  var _estado = _parado ? '<b>Se paró a medias.</b> Hay fichas nuevas y viejas conviviendo.'
+              : _hecho  ? '<b>Ya está aplicado.</b>'
+                        : '<b>Todavía no se ha aplicado.</b>';
   return '<p class="rnota" style="margin:0 0 10px">Plan de <b>'+esc(_nomPeriodo_(plan.periodo))+'</b>'+
-      (cuando?', calculado el '+esc(cuando):'')+'. '+
-      (plan.aplicado?'<b>Ya está aplicado.</b>':'<b>Todavía no se ha aplicado.</b>')+'</p>'+
+      (cuando?', calculado el '+esc(cuando):'')+'. '+_estado+'</p>'+
     cab+avisos+
     '<p class="rnota" style="margin:12px 0 4px">Qué le cambia a cada uno · toca para abrir</p>'+
     fs.map(_fichaPlanHTML_).join('')+
-    /* ⛔ Y esto decia «Aplicarlo no se hace desde aqui» cuando el boton de aplicar esta
-       JUSTO DEBAJO, en esta misma pantalla. Se escribio antes de que existiera y se quedo. */
-    '<p class="rnota">'+(plan.aplicado
+    /* ⛔ Y ESTE PIE MANDABA AL BOTON SIN MIRAR SI HAY BOTON. Decia «el boton esta
+       abajo» tambien cuando el cierre esta **parado a medias**, que es justo el caso en que
+       `_decidirCierreHTML_` **no pinta ninguno**: se lee como «te falta pulsar algo» cuando
+       lo que hace falta es mirar por que se paro. Antes decia «no se hace desde aqui», con
+       el boton justo debajo -- el mismo fallo, del reves. */
+    '<p class="rnota">'+(_parado
+      ? 'No lo vuelvas a lanzar sin mirar por qué se paró: hay fichas escritas y sin escribir '+
+        'a la vez, y repetirlo encima no lo arregla.'
+      : _hecho
       ? 'Ya está escrito en las fichas de Notion: de ahí salen la cuota y la renovación.'
       : 'Aplicarlo escribe en las fichas de Notion, y de ahí salen la cuota y la '+
         'renovación. Revísalo antes: el botón está abajo.')+'</p>';
@@ -93,7 +111,19 @@ function _cierreHTML_(est, err, cargando){
   var filas=bloq.map(function(b){
     return '<div class="rl"><span>'+esc(b.texto||b.que)+'</span>'+
       '<span class="ra" style="color:var(--warn)">bloquea</span></div>'; }).join('');
-  if(plan) return cab+_planHTML_(plan)+_decidirCierreHTML_(plan);
+  /* ⛔ LOS BLOQUEOS SE PINTAN TAMBIEN CON PLAN, Y ESA ERA LA HUELLA: `filas` se
+     calculaba aqui arriba y **se tiraba**, porque este `return` salia antes de usarla.
+     ⛔ Lo que pasaba, medido: se calcula el plan el dia 1 sin bloqueos; el dia 2 entran dos
+     partes de julio sin decidir; se abre el movil, se ve el plan y el boton «Aplicar el
+     cierre» **sin una palabra de que hay dos partes pendientes**, y se aplica. Esas horas no
+     entran en el corte y la cuota de esas personas sale mal — que es literalmente lo que
+     avisa el texto de esta misma pantalla. El escritorio pinta los chips rojos encima del
+     boton; el movil los escondia.
+     ⚠️ Van ARRIBA del plan, no al final: leidos despues de decidir no sirven de nada. */
+  if(plan) return cab+(filas ? '<div class="rec">'+filas+'</div>'+
+      '<p class="rnota" style="color:var(--warn)"><b>Esto entra en la cuenta y sigue sin '+
+      'resolver.</b> Si aplicas el cierre ahora, lo que se decida despues deja mal la cuota '+
+      'de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan);
   if(enc) return cab+'<p class="rnota">Encolado. La rutina lo recoge en la siguiente pasada '+
     '(va cada 2 minutos) y deja el plan.</p>';
   return cab+(filas ? '<div class="rec">'+filas+'</div>'+
