@@ -554,9 +554,18 @@ function tabla(cols,filas){
    que dos nombres distintos. Mapa §5, D10. */
 function vacioSimple(t,p){ return '<div class="vac"><b>'+esc(t)+'</b>'+p+'</div>'; }
 /* ═══ LIBROS DE HORAS Y PUNTOS · GEMELO DE movil.html ══════════════════════════════════
-   Copiado del movil POR SCRIPT, byte a byte, no reescrito. Si tocas una, toca la otra: la CSP
-   impide compartir codigo entre las dos caras, asi que «no duplicar» aqui significa que la
-   copia sea IDENTICA y se llame igual (mapa §5). Lo comprueba `rutinas/probar_libros_e.py`.
+   Copiado del movil POR SCRIPT, byte a byte, no reescrito. Si tocas una, toca la otra:
+   «no duplicar» aqui significa que la copia sea IDENTICA y se llame igual (mapa §5).
+   ⚠️ AQUI PONIA DOS COSAS QUE YA NO SON CIERTAS, y las dos invitaban a no mirar:
+   · que «la CSP impide compartir codigo entre las dos caras». ESA PREMISA ES FALSA desde
+     el 04/08 -es falsa para GitHub Pages-: las catorce funciones de debajo viven hoy en
+     `comun.js`, compartidas de verdad. Y no describe, JUSTIFICA: le decia al siguiente
+     que no factorizara.
+   · y que `probar_libros_e.py` comprobaba que estas TRES CONSTANTES fueran identicas.
+     Medido el 13/08 divergiendo cada una en `movil.html`: **no cazaba ninguna**, y de
+     `MESES_L` **no se enteraba nadie** (once bancos probados). Ese banco solo compara
+     los CUERPOS DE LAS FUNCIONES; las constantes no las miraba. Ahora si las compara
+     -- y quien lo hace es `probar_gemelas_const.py`.
    Lo unico que NO se copia es la pantalla: el escritorio tiene sus propias piezas y no tiene
    modal, asi que el desglose del mes va desplegado en la vista en vez de en una ventana. */
 var MOVS_N=5;
@@ -2332,7 +2341,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='db42b63';
+var BUILD='58c6882';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
