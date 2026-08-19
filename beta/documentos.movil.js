@@ -248,9 +248,7 @@ function _pasosCorregirM_(e){
         (p.url ? ' — <a href="'+esc(p.url)+'" target="_blank" rel="noopener">abrir el formulario</a>'
                : '')+
         '<br><span class="sc">'+esc(p.d)+'</span>'+
-        (!p.url && p.n===1
-          ? '<br><span class="sc">Si no tienes a mano el enlace del formulario, pídeselo al '+
-            'Project Director.</span>' : '')+'</li>';
+        (p.sinUrl ? '<br><span class="sc">'+esc(p.sinUrl)+'</span>' : '')+'</li>';
     }).join('')+'</ol>';
 }
 

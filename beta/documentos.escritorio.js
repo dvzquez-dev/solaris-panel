@@ -188,7 +188,8 @@ function _pasosCorregirE_(d){
       return '<li style="margin-bottom:5px"><b>'+esc(p.t)+'</b>'+
         (p.url ? ' — <a href="'+esc(p.url)+'" target="_blank" rel="noopener">abrir el formulario</a>'
                : '')+
-        '<br><span class="sc">'+esc(p.d)+'</span></li>';
+        '<br><span class="sc">'+esc(p.d)+'</span>'+
+        (p.sinUrl ? '<br><span class="sc">'+esc(p.sinUrl)+'</span>' : '')+'</li>';
     }).join('')+'</ol></div>';
 }
 

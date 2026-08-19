@@ -3945,7 +3945,14 @@ function _pasosCorregirDoc_(e){
       d:'Con la MISMA referencia: ' + ref + '. Así se actualiza el archivo de este mismo '+
         'expediente. NO lo mandes como «sustituye a…»: eso crea un expediente nuevo y deja '+
         'éste con la versión sin corregir.',
-      url: (url && url.indexOf('http')===0) ? url : '' },
+      url: (url && url.indexOf('http')===0) ? url : '',
+      // ⛔ EL RESPALDO VIVE EN LA PUERTA, NO EN UNA CARA. Estaba escrito dentro del
+      //    renderizador del móvil, así que el escritorio pintaba «reenvíalo por el
+      //    formulario» y NINGÚN sitio al que ir ni a quién preguntar. Una instrucción a
+      //    medias es peor que no darla: manda a hacer algo y esconde cómo. Lo destapó
+      //    refutar el changelog del 19/08 antes de publicarlo, no un banco.
+      sinUrl: (url && url.indexOf('http')===0) ? ''
+            : 'Si no tienes a mano el enlace del formulario, pídeselo al Project Director.' },
     { n:2, t:'Vuelve aquí y pulsa el botón de abajo',
       d:'Es lo único que devuelve el expediente a la cola de revisión. Hazlo DESPUÉS: al '+
         'pulsarlo se borra el motivo que te escribieron, y es donde pone qué hay que corregir.',
