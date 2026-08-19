@@ -80,22 +80,11 @@ function _convDeClave_(k){
   return i<0 ? [s, ''] : [s.slice(0,i), s.slice(i+sep.length)];
 }
 
-/* `sin_abrir` | `abierta` | `cerrada`. Sin instantes NO se escribe: la frontera cerrada es
-   lo que hace que una celda vacía signifique una sola cosa. */
-function _convEstado_(cv, ahora){
-  var t=ahora?+ahora:Date.now(), a=Date.parse(cv.abre), l=Date.parse(cv.limite);
-  if(isNaN(a)||isNaN(l)) return 'cerrada';
-  if(t<a) return 'sin_abrir';
-  return t<=l ? 'abierta' : 'cerrada';
-}
-
-/* Las horas que TE quedan a ti para contestar. Ojo: NO es `ventana_real_h` de Python, que
-   contesta a otra pregunta —«si convoco ahora, cuánto le queda a la gente»— y es de quien
-   convoca. Misma aritmética, distinta pregunta: por eso son dos y no una. */
-function _convQuedan_(cv, ahora){
-  var t=ahora?+ahora:Date.now(), l=Date.parse(cv.limite);
-  return isNaN(l)||l<=t ? 0 : (l-t)/3600000;
-}
+/* ⚠️ `_convEstado_`, `_convQuedan_` y `_convClases_` SE MUDARON A `comun.js` el 14/08,
+   cuando el escritorio necesito contestar la convocatoria: esta cara no carga
+   `turnos.movil.js`, asi que la alternativa era una segunda copia -- y cinco copias de
+   la misma funcion acaban siendo cinco funciones distintas, con las diferencias
+   haciendo de bugs. `_convAbierta_` se queda AQUI: usa `YO`, que es global del movil. */
 
 /* La convocatoria que hay que enseñar: la primera abierta a la que estás convocado. */
 function _convAbierta_(){
@@ -108,12 +97,15 @@ function _convAbierta_(){
   return vivas[0]||null;
 }
 
-/* Las clases de estado que puede llevar una celda, sacadas de la convocatoria. Cablearlas
-   haría que un sitio nuevo dejara restos de la clase anterior al repintar. */
-function _convClases_(cv){ return (cv.sitios||[]).concat(['ambos','no']); }
+/* (`_convClases_` tambien vive ahora en `comun.js` — ver la nota de arriba.) */
 
 function _convMias_(cv){
-  var yo=(YO&&YO.nombre)||'';
+  /* ⛔ LA FILA QUE SE LEE ES LA QUE SE VA A ESCRIBIR. Aquí ponía `YO.nombre`, y con
+     «Ver como» eso pintaba la rejilla del suplantado -- que no está cargada, o sea **en
+     blanco** -- mientras el servidor, que identifica por TOKEN, escribía la tuya. Y la
+     rejilla viaja entera: tu disponibilidad real quedaba sustituida por esa rejilla
+     vacía, bajo el nombre de otra persona y sin forma de verlo. */
+  var yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
   if(!cv.resp) cv.resp={};
   if(!cv.resp[yo]) cv.resp[yo]={};
   return cv.resp[yo];
@@ -298,6 +290,12 @@ function _convCargar_(repintar){
    luego hace que te pongan un turno cuando no puedes. */
 function _convGuardar_(cv){
   if(!cv || typeof SESION==='undefined' || !SESION) return;
+  /* ⛔ Y NO SE CONTESTA POR NADIE: el arrastre dispara esto solo, en `pointerup` y sin
+     confirmación, así que mirando como otra persona bastaba rozar la rejilla. */
+  if(typeof _identidadPrestada_==='function' && _identidadPrestada_(yoNombre())){
+    if(typeof tost==='function') tost('Est\u00e1s viendo la app como otra persona: tus turnos no se tocan desde aqu\u00ed.');
+    return;
+  }
   if(typeof api==='undefined' || !api.guardarDisponibilidad) return;
   api.guardarDisponibilidad(cv.id, _convMias_(cv)).catch(function(e){
     if(typeof tost==='function') tostErr('No se pudo guardar tu disponibilidad: ', e);

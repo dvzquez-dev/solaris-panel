@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<!-- ⛔ ESTE VIEWPORT ES EL DE LA APP, LETRA POR LETRA, Y ESO ES EL PUNTO DE LA PAGINA.
+     Si el diagnostico se sirviera sin `viewport-fit=cover`, `env(safe-area-inset-bottom)`
+     saldria 0 SIEMPRE y la medicion diria «no hay inset» en un movil que si lo tiene:
+     mediria esta pagina en vez de medir el problema. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- ⛔ ESTA PAGINA NO DECLARA MANIFEST, Y ES A PROPOSITO — POR DOS RAZONES.
+     1) Un instrumento no altera lo que mide: declarar un manifest propio puede cambiar
+        el modo de presentacion de la ventana, que es justo la variable en disputa.
+     2) Y una tecnica: en el canal beta, `publicar_web.py` reescribe la referencia al
+        manifiesto por la variante con sufijo -beta, que en la RAIZ no existe (la de beta
+        se publica dentro de `beta/`). Lo cazo `probar_rutas_publicadas.py` al darse de
+        alta la pagina.
+     ⛔ Y OJO AL ESCRIBIR ESTA NOTA: esa reescritura trabaja sobre los BYTES del fichero y
+        no distingue un comentario del codigo. La primera version de este aviso citaba el
+        literal, asi que el publicador lo reescribio DENTRO del comentario y el banco
+        volvio a cantar -- la denuncia creando el hecho que denuncia. Por eso aqui se
+        describe con palabras y no se cita. -->
+<title>Solaris · diagnostico de la barra de abajo</title>
+<style>
+  *{box-sizing:border-box}
+  :root{--bg:#151113;--ink:#F4F3F3;--line:#332d2f;--red:#E41E25;--ok:#49b675;--warn:#e0a33a}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  body{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;
+       padding-top:env(safe-area-inset-top,0px)}
+  header{flex:none;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+  h1{margin:0 0 3px;font-size:15px;color:var(--red);font-weight:700}
+  header p{margin:0;font-size:12px;opacity:.7;line-height:1.4}
+  main{flex:1 1 auto;overflow:auto;padding:12px 16px 18px}
+  .v{display:flex;justify-content:space-between;gap:12px;padding:7px 0;
+     border-bottom:1px solid var(--line)}
+  .v b{font-weight:400;opacity:.72;flex:0 1 auto}
+  .v span{text-align:right;word-break:break-all}
+  h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;opacity:.55;
+     margin:20px 0 4px;font-weight:600}
+  h2:first-child{margin-top:0}
+  .ok{color:var(--ok)} .mal{color:var(--red);font-weight:700} .warn{color:var(--warn)}
+  #ver{margin:16px 0 0;padding:12px 13px;border-radius:9px;border:1px solid var(--line);
+       background:#1d191b;font-size:13px;line-height:1.5}
+  #ver b{display:block;margin-bottom:5px;font-size:13px}
+  /* LA REGLA DE LA APP, COPIADA TAL CUAL. Esta barra se comporta EXACTAMENTE como la de
+     verdad: si aqui se mete debajo de los botones de Android, es que el inset vale 0. */
+  nav{flex:none;position:relative;height:calc(70px + env(safe-area-inset-bottom,0px));
+      display:flex;align-items:stretch;z-index:20;background:rgba(24,22,22,.97);
+      border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  nav div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+          gap:3px;font-size:10.5px;opacity:.8}
+  nav i{display:block;width:19px;height:19px;border-radius:6px;background:var(--red);
+        font-style:normal}
+  /* Franja testigo: ocupa EXACTAMENTE el inset inferior. Si se ve, el inset existe.
+     Si no se ve nada de rojo bajo la barra, el inset vale 0 -- que es el fallo. */
+  .testigo{position:fixed;left:0;right:0;bottom:0;height:env(safe-area-inset-bottom,0px);
+           background:repeating-linear-gradient(45deg,var(--red) 0 7px,#7d1013 7px 14px);
+           z-index:40;pointer-events:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Diagnostico de la barra de abajo</h1>
+  <p>Abre esta pagina <b>por los dos caminos</b> (el enlace viejo y el nuevo) y compara.
+     Lo que decide es <b>modo de presentacion</b> y <b>safe-area-inset-bottom</b>.</p>
+</header>
+
+<main>
+  <div id="ver"></div>
+  <h2>Lo que decide</h2><div id="clave"></div>
+  <h2>Alturas</h2><div id="alt"></div>
+  <h2>Como se ha llegado</h2><div id="nav2"></div>
+  <h2>Entorno</h2><div id="ent"></div>
+</main>
+
+<nav>
+  <div><i></i>estado</div><div><i></i>turnos</div><div><i></i>tareas</div>
+  <div><i></i>docs</div><div><i></i>equipo</div>
+</nav>
+<div class="testigo"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  function fila(dest, etiqueta, valor, clase){
+    var d = document.createElement("div");
+    d.className = "v";
+    var b = document.createElement("b"); b.textContent = etiqueta;
+    var s = document.createElement("span");
+    if (clase) s.className = clase;
+    s.textContent = valor;
+    d.appendChild(b); d.appendChild(s);
+    document.getElementById(dest).appendChild(d);
+  }
+
+  /* ⛔ El inset NO se lee de `getComputedStyle(body).paddingBottom`: el body no lo lleva
+     (la app lo reserva en la `nav`, para no contarlo dos veces). Se mide con un elemento
+     de usar y tirar cuya altura ES el inset -- asi se lee el valor de verdad que el
+     navegador esta dando, no lo que nuestro CSS haya decidido hacer con el. */
+  function inset(lado){
+    var e = document.createElement("div");
+    e.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:env(safe-area-inset-"
+                    + lado + ",0px)";
+    document.body.appendChild(e);
+    var v = e.getBoundingClientRect().height;
+    e.parentNode.removeChild(e);
+    return v;
+  }
+
+  function modo(){
+    var m = ["standalone","minimal-ui","fullscreen","browser"];
+    for (var i=0;i<m.length;i++){
+      try { if (window.matchMedia("(display-mode:" + m[i] + ")").matches) return m[i]; }
+      catch(_){}
+    }
+    if (window.navigator.standalone) return "standalone (iOS)";
+    return "no se sabe";
+  }
+
+  var ib = inset("bottom"), it = inset("top");
+  var dm = modo();
+
+  // --- lo que decide -------------------------------------------------------
+  fila("clave", "modo de presentacion", dm, dm === "standalone" ? "ok" : "warn");
+  fila("clave", "safe-area-inset-bottom", ib.toFixed(1) + " px", ib > 0 ? "ok" : "mal");
+  fila("clave", "safe-area-inset-top", it.toFixed(1) + " px", it > 0 ? "ok" : "warn");
+  /* ⛔ Se informa, pero NO se juzga: esta pagina no declara manifest a proposito (ver la
+     nota del `head`), asi que pintarlo en rojo seria un guardia que canta sobre lo correcto.
+     Lo que decide es `display-mode`, que sale de la instalacion y no de esta etiqueta. */
+  var mf = document.querySelector('link[rel="manifest"]');
+  fila("clave", "manifest de esta pagina", mf ? mf.getAttribute("href") : "ninguno (a proposito)");
+
+  // --- alturas -------------------------------------------------------------
+  function medida(u){
+    var e = document.createElement("div");
+    e.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:100" + u;
+    document.body.appendChild(e);
+    var v = e.getBoundingClientRect().height;
+    e.parentNode.removeChild(e);
+    return v;
+  }
+  fila("alt", "window.innerHeight", window.innerHeight + " px");
+  fila("alt", "100dvh", medida("dvh").toFixed(1) + " px");
+  fila("alt", "100svh", medida("svh").toFixed(1) + " px");
+  fila("alt", "100lvh", medida("lvh").toFixed(1) + " px");
+  fila("alt", "100vh", medida("vh").toFixed(1) + " px");
+  if (window.visualViewport){
+    fila("alt", "visualViewport.height", window.visualViewport.height.toFixed(1) + " px");
+  }
+  fila("alt", "screen.height", (window.screen && window.screen.height) + " px");
+  fila("alt", "devicePixelRatio", String(window.devicePixelRatio || "?"));
+
+  // --- como se ha llegado --------------------------------------------------
+  fila("nav2", "URL de ahora", String(location.href));
+  fila("nav2", "de donde vienes", document.referrer || "(directo / sin referente)");
+  var tipo = "no se sabe";
+  try {
+    var e0 = (performance.getEntriesByType && performance.getEntriesByType("navigation")[0]);
+    if (e0 && e0.type) tipo = e0.type;
+    else if (performance.navigation) tipo = "legacy:" + performance.navigation.type;
+  } catch(_){}
+  fila("nav2", "tipo de navegacion", tipo);
+  // Si se ha llegado por `meta refresh` desde la raiz, el referente es el redirector.
+  var porRedir = /\/(index|beta|escritorio|beta-escritorio)\.html?$|\/$/.test(document.referrer);
+  fila("nav2", "parece venir de un redirector", document.referrer ? (porRedir ? "SI" : "no")
+       : "no hay referente", porRedir ? "warn" : "");
+
+  // --- entorno -------------------------------------------------------------
+  fila("ent", "userAgent", navigator.userAgent);
+  fila("ent", "orientacion", (screen.orientation && screen.orientation.type) || "?");
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
+      navigator.serviceWorker.getRegistrations().then(function(rs){
+        fila("ent", "service workers registrados", rs.length
+             ? rs.map(function(r){ return r.scope; }).join(" · ") : "ninguno");
+      });
+    }
+  } catch(_){}
+
+  // --- veredicto -----------------------------------------------------------
+  var v = document.getElementById("ver"), t, cl;
+  if (ib > 0 && dm === "standalone"){
+    t = "Aqui NO se reproduce. El inset vale " + ib.toFixed(0) + " px y la ventana va en "
+      + "standalone: la barra de abajo deberia quedar POR ENCIMA de los botones. Si aun asi "
+      + "la ves metida debajo, el fallo no es el inset y hay que mirar el CSS de la nav.";
+    cl = "ok";
+  } else if (ib === 0 && it === 0){
+    t = "El navegador NO esta dando insets (arriba y abajo valen 0). O el movil no tiene "
+      + "barra de gestos por software, o esta ventana no esta en modo edge-to-edge. "
+      + "Compara con el otro camino: si por un camino salen 0 y por el otro no, la causa "
+      + "es COMO se llega, no el CSS.";
+    cl = "warn";
+  } else if (ib === 0){
+    t = "REPRODUCIDO: arriba hay inset (" + it.toFixed(0) + " px) pero ABAJO vale 0. "
+      + "La barra se dibuja pegada al borde fisico, o sea debajo de los botones de Android. "
+      + "Esta es la averia.";
+    cl = "mal";
+  } else {
+    t = "Inset abajo = " + ib.toFixed(0) + " px, modo «" + dm + "». Hay inset pero la "
+      + "ventana no va en standalone: apunta a que la PWA perdio su manifest al pasar por "
+      + "el redirector.";
+    cl = "warn";
+  }
+  v.innerHTML = "<b>Veredicto</b>";
+  var p = document.createElement("span");
+  p.className = cl; p.textContent = t;
+  v.appendChild(p);
+})();
+</script>
+</body>
+</html>

@@ -59,13 +59,20 @@ function colaDecision(){
       chip:'<span class="chip '+(d.sev==='alta'?'no':d.sev==='media'?'wa':'ok')+'">severidad '+d.sev+'</span>',
       ir:'docdec',foco:'doc-'+d.id});
   });
-  if(!LOTE.cerrado && rangoNom(ACTOR)>=3)
+  /* ⛔ …y con `LOTE.items.length`: sin eso, la tarjeta seguía saliendo diciendo
+     «0 personas · Art. libre · nada se aplica hasta cerrarlo entero», que manda al PD
+     a una pantalla donde no hay nada que hacer. */
+  if(!LOTE.cerrado && LOTE.items.length && rangoNom(ACTOR)>=3)
     out.push({ic:'i-gavel',b:'Bloque de sanciones · '+LOTE.nombre,
       s:LOTE.items.length+' personas · Art. '+LOTE.art+' · nada se aplica hasta cerrarlo entero',
       chip:'<span class="chip no">bloque abierto</span>',ir:'sanciones',foco:'lote'});
   REUS.forEach(function(r0){
     if(r0.fijada) return;
     var cob=_cobertura_(r0);
+    /* ⛔ REUNION OCULTA: no se sabe cuantos han cubierto, asi que no hay tarjeta. Sin
+       esto salia por accidente —`null>=null` es `0>=0`, cierto, y caia en el `return`
+       de abajo—, que es un acierto que no sobrevive al siguiente refactor. */
+    if(cob.oculto) return;
     var r=Object.assign({}, r0, {tit:r0.tit||r0.titulo,
       conv:(r0.conv!=null?r0.conv:cob.conv), cubren:(r0.cubren!=null?r0.cubren:cob.cubren),
       limite:r0.limite||'sin l\u00edmite'});
@@ -119,6 +126,10 @@ function insightsHTML(){
   if(enAire>0) xs.push(['wa',h1(enAire)+' están sin firmar. Mientras sigan ahí, el umbral del mes y el '+
     'ranking se calculan con datos incompletos.']);
   var sinCubrir=REUS.reduce(function(a,r){
+    /* ⛔ Y una reunion OCULTA no suma: `_cobertura_` devuelve `null` y aqui se cuenta 0.
+       No es «nadie sin cubrir», es «no lo se» — pero el aviso solo se imprime `if
+       (sinCubrir)`, asi que un 0 calla en vez de afirmar. Lo que NO puede pasar es que
+       cuente los 29 que el servidor no mando. */
     var sc = r.sinCubrir || _cobertura_(r).sinCubrir;   /* el dato real no lo trae: se deriva */
     return a+((sc&&sc.length)||0); },0);
   if(sinCubrir) xs.push(['wa',sinCubrir+' personas no han cubierto alguna disponibilidad abierta. '+

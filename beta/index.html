@@ -16,7 +16,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=c648196">
+<link rel="stylesheet" href="movil.css?v=8998bc5">
 </head>
 <body>
 
@@ -57,7 +57,7 @@
       <div class="caja">
         <button data-mnu="sanciones" data-p>Sanciones<small>Ponerlas y decidir las pendientes</small></button>
         <button data-mnu="cierre" style="display:none">Cierre mensual<small>Encolar el calculo del corte</small></button>
-        <button data-mnu="cuota" data-p>Tu cuota<small>Lo que te toca pagar esta temporada</small></button>
+        <button data-mnu="cuota" data-p>Tu cuota<small>Estimación de la cuota de esta temporada</small></button>
         <button data-mnu="equipo" data-p>El equipo<small>Quién coordina cada unidad</small></button>
         <button data-mnu="novedades" data-p>Novedades<small>Qué ha cambiado en cada versión</small></button>
         <button data-mnu="ajustes" data-p>Ajustes<small>Notificaciones y sesión</small></button>
@@ -107,17 +107,17 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=f12a772"></script>
-<script src="notis.movil.js?v=2f74e23"></script>
-<script src="cierre.movil.js?v=fa74f0f"></script>
+<script src="comun.js?v=898c439"></script>
+<script src="notis.movil.js?v=9167a0c"></script>
+<script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=2ab8a6a"></script>
-<script src="turnos.movil.js?v=30616ef"></script>
-<script src="buzon.movil.js?v=a5f1fb9"></script>
-<script src="documentos.movil.js?v=aa4be87"></script>
-<script src="sanciones.movil.js?v=ae5b909"></script>
-<script src="reuniones.movil.js?v=5cd5ccc"></script>
-<script src="horas.movil.js?v=68ae5c1"></script>
-<script src="equipo.movil.js?v=5ea3ff8"></script>
+<script src="turnos.movil.js?v=d76ddc3"></script>
+<script src="buzon.movil.js?v=fb9866e"></script>
+<script src="documentos.movil.js?v=73ce3b6"></script>
+<script src="sanciones.movil.js?v=c784be6"></script>
+<script src="reuniones.movil.js?v=4431652"></script>
+<script src="horas.movil.js?v=2ac7e85"></script>
+<script src="equipo.movil.js?v=d031754"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -354,7 +354,11 @@ var api={
   decidir:          function(id,a,m,x){ return api._post({action:"decidir",id:id,accion:a,motivo:m,extra:x}); },
   fijar:            function(id,f){ return api._post({action:"fijarReunion",id:id,fijada:f}); },
   setOrdenDia:      function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); },
-  guardarPush:      function(sub){ return api._post({action:"guardarPush",sub:sub}); }
+  guardarPush:      function(sub){ return api._post({action:"guardarPush",sub:sub}); },
+  /* ⛔ FALTABA, y `_pide_` lo avisaba por consola —«api.getEntregables no existe: ese dato
+     no se refresca»— donde no lo lee nadie: en este dominio la consola esta denegada. Sin
+     ella el movil solo veia los documentos del bootstrap, o sea los de cuando entro. */
+  getEntregables:   function(){ return api._post({action:"getEntregables"}); }
 };
 
 
@@ -410,9 +414,32 @@ function _aplicarPanel_(pnl){
   } else if(Array.isArray(pnl.miembros)&&pnl.miembros.length){   // forma ADMIN
     DATA.miembros=pnl.miembros;
     yo=SESION?pnl.miembros.filter(function(m){return m.nombre===SESION.nombre;})[0]:null;
-    if(!yo) yo=pnl.miembros.filter(function(m){return m.cargo==='Project Director';})[0]||pnl.miembros[0];   // admin no está en el roster: ve como el PD
+    /* ⛔ ESTE RESPALDO CONVERTIA A UN DESCONOCIDO EN EL PROJECT DIRECTOR, Y NO ES TEORICO.
+       El backend sirve la forma ADMIN (`miembros` sin `yo`) al admin Y a rango>=3, y
+       `_getPanelRol_` devuelve `yo: mio` con `mio` sacado de buscar TU NOMBRE en el roster: si
+       no estas, viene `null`. Y quien no esta en el roster es, literalmente, **el alta nueva**:
+       `_verificarIdentidad_` te da de nombre tu CORREO cuando no estas en la tabla `CORREOS`,
+       que solo cambia REDESPLEGANDO el backend mientras el roster cambia con cada `push`.
+       Divergen por construccion, y en septiembre entra gente por esa puerta.
+       Lo que pasaba entonces: `filter(cargo==='Project Director')[0]` -> **YO = Daniel**. Su
+       nombre y su cargo en TU cabecera, `esPD()` a `true`, el panel del PD abierto y
+       `yoNombre()` devolviendo el nombre de otra persona.
+       ⚠️ No es un agujero de seguridad —el backend identifica por TOKEN y `responder`/`decidir`
+       ignoran el nombre que mande la cara—: es ofrecerle a alguien un panel que le va a rebotar,
+       con la identidad de otro puesta. Que rebote no lo hace inofensivo: lo hace confuso.
+       ✅ El respaldo se queda SOLO para quien de verdad no puede estar en el roster: la cuenta
+       `solaris@` (`esAdmin()`), que ademas tiene su propio selector «ver como». Y se cae el
+       `|| pnl.miembros[0]`, que era la misma trampa un escalon mas abajo: sin PD en el roster,
+       «tu» pasabas a ser el primero de la lista, quienquiera que fuese.
+       ⚠️ GEMELA — ESTO NO CIERRA LA PUERTA A NADIE LEGITIMO: un miembro raso recibe la forma
+       MIEMBRO con su `yo` dentro (la rama de arriba), y el PD y los coordinadores estan en el
+       roster y se encuentran por nombre. El unico que sobrevive por respaldo es el admin, que
+       es exactamente para quien se escribio. */
+    if(!yo && esAdmin()) yo=pnl.miembros.filter(function(m){return m.cargo==='Project Director';})[0]||null;
   }
-  if(yo) YO=yo;
+  /* El testigo se pone AQUI y no al recibir el panel: lo que importa no es que llegara un
+     panel, es que dentro viniera TU ficha. */
+  if(yo){ YO=yo; _YO_REAL_=true; }
   _rederivarPD_();
   UMBRAL=_umbral_();      // con el roster ya puesto: la regla, no el numero cableado
   /* La SEMILLA no deja rastro. Al arrancar se pinta una vez con datos de maqueta (debajo
@@ -434,6 +461,14 @@ function _aplicarPanel_(pnl){
   }
 }
 var _panelReal_=false;
+/* ⛔ ¿ES `YO` DE VERDAD QUIEN HA ENTRADO? Arranca en `false` y solo lo pone `_aplicarPanel_`
+   cuando el servidor ha devuelto una ficha PARA ESTA SESION. Existe porque `YO` nace valiendo
+   `DATA.miembros[0]` —Nerea Ferreiro Lamas, una persona INVENTADA de la semilla— y sin panel se
+   quedaba ahi con `backendOK=true` y el gate retirado: la cabecera con otro nombre, las horas de
+   otro y la cuota de otro, presentadas como tuyas y sin un solo error.
+   ⚠️ `_panelReal_` NO sirve para esto, y por eso son dos: aquel dice «llego algun panel» —lo usa
+   la barra para no interpolar desde un ancho de maqueta— y este dice «llego EL MIO». */
+var _YO_REAL_=false;
 /* «Ver como» — SOLO la cuenta admin (solaris@): se pone en la vista de cualquier miembro. El
    backend ya le sirve el roster completo con datos por persona, así que ve sus horas/puntos/cuota. */
 function _pintarCabecera_(){
@@ -502,17 +537,36 @@ async function _refrescoVivo_(motivo){
   if(motivo==='vuelta' && (ahora-_ULT_REFRESCO_) < 30000) return;
   _REFRESCANDO_=true; _ULT_REFRESCO_=ahora;
   try{
+    /* ⛔⛔ EL `&& x.length` SE QUEDA, Y ESTO ES UNA REVERSION DEL MISMO DIA.
+       Lo quite el 18/08 argumentando que «el escritorio nunca lo llevo
+       (`escritorio.html:2307`)». **La 2307 es `getEntregables`.** Las gemelas de verdad son
+       `escritorio.html:2294-2295` y **SI lo llevan**: compare una funcion contra otra
+       distinta, asi que no elimine una divergencia — la CREE.
+       ⛔ Y la premisa tambien era falsa: `[]` que NO es la verdad **existe y lo sirve el
+       backend con `ok:true`**. `getTareas` filtra por `_idt.nombre`, y
+       `_verificarIdentidad_` devuelve el EMAIL para quien no este en `CORREOS` — su propio
+       comentario dice que «es lo que le pasa a TODO ALTA NUEVA». Ese nombre no casa con
+       ningun responsable, asi que llega `data:[]` con tareas vivas detras, y sin esta
+       guarda a un alta nueva se le VACIA la lista en vez de conservar lo que tenia.
+       ⚠️ Lo unico limpio es `getTurnos`: `_notionTurnos_` devuelve `null` a proposito
+       cuando no pudo preguntar. Pero la guarda es compartida y se acota por la UNION de
+       sus clientes, no por el mejor de ellos. */
     var t=_pide_('getTurnos').then(function(x){ if(Array.isArray(x)&&x.length){ TURNOS.length=0;
       x.forEach(function(y,i){ TURNOS.push(_normTurnoM_(y,i)); }); } }).catch(function(){});
     var q=_pide_('getTareas').then(function(x){ if(Array.isArray(x)&&x.length){ TAREAS.length=0;
       x.forEach(function(y){ TAREAS.push(y); }); } }).catch(function(){});
+    /* ⛔ LOS DOCUMENTOS TAMBIEN, y faltaban desde que existe la pantalla. Cowork empuja un
+       expediente y quien tiene el telefono abierto NO LO VEIA NUNCA — y el telefono es la
+       cara con la que se revisa. El escritorio lo trae desde el principio. */
+    var dcs=_pide_('getEntregables').then(function(x){
+      if(Array.isArray(x)) _repartirEntregablesM_(x); }).catch(function(){});
     var r=_cargarReunionesM_().catch(function(){});
     /* EL PANEL TAMBIEN. Aqui vivian solo turnos, tareas y reuniones, asi que tus horas del
        mes, tus puntos y tu cuota se quedaban con el valor de cuando entraste — y esas son
        justo las cifras que uno vuelve a mirar para ver si ha entrado lo que acaba de
        fichar. Va en el mismo `Promise.all`: no cuesta una vuelta mas de reloj. */
     var pnl=_pide_('getPanel').then(function(x){ if(x) _refrescarPanelM_(x); }).catch(function(){});
-    await Promise.all([t,q,r,pnl]);
+    await Promise.all([t,q,r,pnl,dcs]);
     /* ⛔ SI LA SESION MURIO, ESTE REFRESCO NO HA TRAÍDO NADA. `_pide_` devuelve `null`
        por diseño —para que un dato que falta no tumbe a los demás— y el repintado deja
        la pantalla igual: se sigue viendo lo de hace horas, sin un solo error. */
@@ -563,23 +617,12 @@ function _aplicarBootstrapMovil_(boot){
   boot=boot||{};
   if(typeof TAREAS!=='undefined'){ TAREAS.length=0; (boot.tareas||[]).forEach(function(t){ TAREAS.push(t); }); }
   if(typeof TURNOS!=='undefined'){ TURNOS.length=0; (boot.turnos||[]).forEach(function(t,ix){ TURNOS.push(_normTurnoM_(t,ix)); }); }
-  /* El backend YA manda solo lo que te incumbe: los tuyos, los que revisas y —si eres PD o
-     Jose— los que estan en vuelo. Aqui solo hay que REPARTIRLOS: los que firmas tu van a
-     "Mis documentos"; el resto, a la cola de revision. Antes se volcaba todo en ENTREGABLES
-     (por eso los documentos ajenos salian como tuyos) y ENT_REV se vaciaba a mano. */
-  if(typeof ENTREGABLES!=='undefined' && typeof ENT_REV!=='undefined'){
-    var _yoDoc=(YO&&YO.nombre)||'';
-    ENTREGABLES.length=0; ENT_REV.length=0;
-    (boot.entregables||[]).forEach(function(d){
-      if(!d) return;
-      if(d.sev==null && d.severidad!=null) d.sev=d.severidad;   // la vista lee `sev`
-      /* El backend manda `enlaceDrive` y aqui se quedaba sin recoger: el visor no tenia que
-         enseñar. Tercera vez hoy que un normalizador tira un dato que si venia (`origen`,
-         `ordenDia`, este). Normalizar es tirar lo que no nombras. */
-      if(!d.drive && d.enlaceDrive) d.drive=d.enlaceDrive;
-      (d.autor===_yoDoc ? ENTREGABLES : ENT_REV).push(d);
-    });
-  }
+  /* ⛔ EL REPARTO VIVE EN `_repartirEntregablesM_` (`documentos.movil.js`) DESDE EL 18/08.
+     Estaba escrito AQUI DENTRO, y esa es la razon exacta de que el movil no refrescara
+     documentos: el refresco en vivo no tenia con que repartirlos, y copiarlo habria sido la
+     segunda version del mismo reparto. Ahora las dos entradas —arranque y refresco— pasan
+     por la misma. */
+  _repartirEntregablesM_(boot.entregables||[]);
   if(typeof LOTE!=='undefined' && LOTE && LOTE.items) LOTE.items=[];   // bloque de sanciones: era semilla
   if(typeof SUELTAS!=='undefined') SUELTAS.length=0;                   // sanciones sueltas: eran semilla
   /* ⛔ UNA SOLA PUERTA PARA REFRESCAR. Aqui se llamaba a `_refrescarEnSegundoPlano_`, que
@@ -644,7 +687,17 @@ var REUNIONES_M=[];
 /* `rechazada` y `detalle` colapsaban las dos en 'dev', asi que el miembro NO distinguia
    «te piden mas detalle» (puedes arreglarlo) de «te lo han rechazado» (se acabo). El
    escritorio si las distingue; ahora las dos caras cuentan lo mismo. */
-var _E_MOVIL_={pendiente:'pend',aprobada:'otor',aplicada:'otor',otorgada:'otor',rechazada:'rech',detalle:'det',sin_declarar:'sindecl',caducada:'cad'};
+/* ⛔ `revertida` y `anulada` FALTABAN, y el `||'pend'` de `horas.movil.js` las convertia
+   en PENDIENTE -- para siempre, porque nada las vuelve a mover. A esa persona le decia
+   «en cola, esperando aprobacion» sobre un parte que ya se deshizo, le sumaba esas horas
+   a la pildora de pendientes y al globo del nav, y `_bloqueosCierre_` del backend NO las
+   cuenta: la misma app daba DOS NUMEROS del mismo dato. */
+/* ⛔⛔ `aprobada` y `aplicada` iban a `'otor'`, que `filaParte` pinta como **«otorgada»** —
+   la palabra que esta misma app reserva para las horas que te REGALA la coordinación. O
+   sea que trabajabas, declarabas, te lo firmaban, y la pantalla te decía que te lo habían
+   otorgado. El escritorio sí las distingue. `'conf'` ya existía —etiqueta «aprobada»,
+   borde verde, su CSS— y **no lo producía nadie**: tres ramas de código inalcanzable. */
+var _E_MOVIL_={pendiente:'pend',aprobada:'conf',aplicada:'conf',otorgada:'otor',rechazada:'rech',detalle:'det',sin_declarar:'sindecl',caducada:'cad',revertida:'rev',anulada:'rev'};
 
 
 /* QUE HA LLEGADO YA. Se pinta antes de tenerlo todo, asi que hace falta distinguir «esto
@@ -742,6 +795,36 @@ async function _onCredencial_(resp,_silente){
     }
     try{ localStorage.setItem('sol_last_email',SESION.email);
          localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
+    /* ⛔ SIN TU FICHA NO SE ENTRA — Y DESDE LUEGO NO CON LA DE OTRO.
+       Hasta aqui `_aplicarPanel_` podia no aplicar NADA (`if(!pnl) return;`) y la linea de al
+       lado ponia `backendOK=true` igual. Y `pnl` llega a `null` **sin que falle ninguna red**:
+       `_getPanelRol_` empieza con `var panel=_getDato_('panel'); if(!panel) return null;`, o sea
+       que basta con que la clave `panel` del KV no este —regenerandose, o un `push` a medias—
+       para que el backend conteste identidad SI y panel NO.
+       Lo que quedaba en pantalla: `YO` = `DATA.miembros[0]`, que es **Nerea Ferreiro Lamas**,
+       una persona inventada. Tu cabecera con su nombre, sus 14,5 h y su cuota de 24,18 EUR, sin
+       un solo error y con el gate quitado. **Un dato de maqueta no es la ausencia de dato: la
+       disfraza.**
+       ✅ Ahora se dice, y se ofrece reintentar —lo unico accionable—: si fue un fallo de paso,
+       un toque y entras.
+       ⚠️ GEMELA — ESTO NO PUEDE DEJAR AL EQUIPO FUERA. La condicion es sobre el DATO, no sobre
+       el permiso de nadie: solo se cierra cuando el servidor NO ha mandado tu ficha. Con
+       identidad buena y panel bueno —los 32 y el admin— `_YO_REAL_` es `true` y esto no se
+       llega a notar. Cerrar por «me falta algo» en vez de por «me falta ESTO» habria dejado a
+       todo el equipo fuera de la app, que es mucho peor que el fallo que veniamos a arreglar. */
+    if(!_YO_REAL_){
+      _gate_(SPLASH+'<div style="max-width:330px;line-height:1.6">'+
+        '<b>Entraste, pero no llegaron tus datos.</b><br><br>'+
+        '<span style="opacity:.75">El servidor acept\u00f3 tu cuenta ('+esc(SESION.email||'\u2014')+
+        ') y no devolvi\u00f3 tu ficha, as\u00ed que no hay nada tuyo que ense\u00f1arte \u2014 y no se '+
+        'va a ense\u00f1ar la de otra persona. Si acabas de entrar en el equipo puede que a\u00fan '+
+        'no est\u00e9s en el listado: d\u00edselo al Project Director.</span></div>'+
+        '<button id="reYo" style="border:1px solid #463E40;background:none;color:#F4F3F3;'+
+        'border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>');
+      var _byo=document.getElementById('reYo');
+      if(_byo) _byo.onclick=function(){ _onCredencial_(resp); };
+      return;
+    }
     _aplicarBootstrapMovil_(boot);        // tareas/turnos/documentos REALES (fuera la semilla)
 
     /* NO SE ENSEÑA NADA HASTA QUE ESTA TODO. Antes se quitaba el gate con lo del bootstrap y
@@ -1057,7 +1140,7 @@ function yoNombre(){
    motivo y la fecha: al cambiar el motivo se repinta el modal y la persona elegida volvia
    al primero de la lista -«me cambia a Aarón por la puta cara»-. Un formulario que se
    borra solo no es un fallo de pintado: es que el estado estaba en el DOM. */
-var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
+var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
 var RRI_MOTIVOS=[
   ['30i','Faltar a un turno de trabajo sin justificar', -1],
   ['30g','No rellenar un formulario obligatorio', -1],
@@ -1403,7 +1486,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='736bf34';
+var BUILD='4cb8792';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -1530,7 +1613,11 @@ var VISTAS={estado:vEstado,fichar:vFichar,horas:vHoras,tareas:vTareas,turnos:vTu
 function badges(){
   var b={};
   b.horas = PARTES.filter(function(p){return p.e==='pend';}).length;
-  b.docs  = ENTREGABLES.filter(function(e){return e.estado==='cambios';}).length;
+  /* ⛔ POR LA PUERTA (`_docsAvisoM_`), no con un filtro propio. Esto contaba SOLO tus
+     documentos con cambios pedidos, asi que lo que espera TU FIRMA —que vive en `ENT_REV`
+     y lo calcula `_docsPend_()`— no salia: un coordinador con tres expedientes esperandole
+     veia la pestaña sin un solo numero. Y este globo es HOY el unico aviso que existe. */
+  b.docs  = (typeof _docsAvisoM_==='function') ? _docsAvisoM_() : 0;
   /* Nada de avisar de lo que todavia no se sabe: mientras cargan las reuniones el globo
      se queda apagado, y aparece cuando hay dato de verdad. */
   b.reu   = (_reunionesCargando_()||_sinReuniones_()||REUNION.cubierta||REUNION.fijada)?0:1;
@@ -2003,7 +2090,10 @@ function _engTurnosYDocs_(){
   /* El desglose completo del mes, en ventana: sin tope de filas (puede ser inmenso). */
   $$('[data-desgmes]').forEach(function(b){
     b.onclick=function(){
-      abrirModal(_desgloseMesHTML_(PARTES.filter(function(x){ return x.e==='otor'; })));
+      /* ⛔ Y AQUI TAMBIEN: el desglose es la cuarta copia del criterio «lo que ya cuenta».
+         Con la cadena a pelo, separar «aprobada» de «otorgada» habria vaciado esta ventana
+         de todo lo que te firma tu coordinador. */
+      abrirModal(_desgloseMesHTML_(PARTES.filter(function(x){ return _cuentaYa_(x.e); })));
     };
   });
   /* Plegados sencillos (`data-plg`): el historial de Horas, y lo que venga. */
@@ -2128,22 +2218,29 @@ document.addEventListener('click',function(ev){
     tost('Cambios y rechazo exigen motivo.');
     return;
   }
+  /* DESHACER BORRA LA DECISION DE OTRA PERSONA: se pregunta, como en el escritorio. */
+  if(acc==='deshacer' && !confirm('Devolver «'+e.titulo+'» a revisión y borrar la decisión de '+
+    (e.revisor||'quien la tomó')+'. ¿Seguro?')) return;
+
   /* Aplica la decision al objeto local. Se usa DESPUES de que el servidor la acepte, o
-     directamente cuando no hay backend (maqueta). */
+     directamente cuando no hay backend (maqueta).
+     ⛔ EL CUERPO VIVE EN `documentos.movil.js` (`_aplicarDecDoc_`) Y NO AQUI: suelto dentro
+        de este listener no lo podia ejecutar ningun banco, y escondia un `else` que convertia
+        cualquier accion desconocida en **rechazado**. */
   var _aplicar=function(){
-    if(acc==='reenviar'){ e.estado='revision'; e.nota=null; }
-    else if(acc==='aprobado'||acc==='anot'){
-      if(acc==='anot'){ var nt=(($('#dTit')&&$('#dTit').value)||'').trim(); if(nt) e.titulo=nt; }
-      e.estado='publicado';
-    }
-    else if(acc==='cambios'){ e.estado='cambios'; e.nota=mot; }
-    else { e.estado='rechazado'; e.nota=mot; }
-    if(acc!=='reenviar') e.revisor=_pilaDeM_(yoNombre());   /* constancia de quien decidio */
+    var nt=(($('#dTit')&&$('#dTit').value)||'').trim();
+    var ne=_etiquetasDeTexto_(($('#dEtq')&&$('#dEtq').value)||'');
+    if(!_aplicarDecDoc_(e, acc, mot, nt, ne)) tost('Acción desconocida: no se ha tocado nada.');
   };
-  var _aviso={reenviar:'Reenviado a revisión.',
+  /* ⛔ EL AVISO CONFIRMABA ALGO QUE NO HA PASADO. Quien pulsa sin haber subido el
+     archivo recibia «Reenviado a revision.» --una confirmacion ACTIVA-- y ademas su
+     globo se apagaba, asi que se iba convencido. `Codigo.gs:967` no toca `enlaceDrive`:
+     el revisor abriria la version vieja. */
+  var _aviso={reenviar:'Devuelto a revisión. Si todavía no has subido el archivo corregido por el formulario, el revisor abrirá la versión anterior.',
     aprobado:'Aprobado · publicado en Notion y en el Libro de Datos.',
-    anot:'Aprobado con anotaciones · título ajustado.',
+    anot:'Aprobado con anotaciones · título y etiquetas ajustados.',
     cambios:'Cambios pedidos: le llega al autor.',
+    deshacer:'Decisión deshecha: vuelve a revisión.',
     rechazado:'Rechazado.'}[acc]||'Hecho.';
 
   /* PERSISTE. Antes esto solo mutaba memoria: el revisor creia que habia firmado y no
@@ -2152,7 +2249,16 @@ document.addEventListener('click',function(ev){
     if(b.disabled) return;
     b.disabled=true;
     var extra=null;
-    if(acc==='anot'){ var t2=(($('#dTit')&&$('#dTit').value)||'').trim(); if(t2) extra={titulo:t2}; }
+    /* ⛔ LAS DOS MITADES DE LA ACCION. `extra.etiquetas` lo aplica `Codigo.gs:992` y la app
+       publicada ya lo mandaba (`app.html:1213`); se perdio al partir la pantalla en dos
+       caras. Y va aunque la lista quede VACIA -a diferencia del titulo-: borrar todas las
+       etiquetas es una decision del revisor, y tratarla como «no ha tocado nada» hace que
+       la unica forma de quitarlas sea no tenerlas nunca. */
+    if(acc==='anot'){
+      var t2=(($('#dTit')&&$('#dTit').value)||'').trim();
+      var e2=_etiquetasDeTexto_(($('#dEtq')&&$('#dEtq').value)||'');
+      if(t2) extra={titulo:t2, etiquetas:e2};
+    }
     api.decidir(id, acc, mot||null, extra).then(function(){
       _aplicar(); cerrarModal(); tost(_aviso); pintar();
     }).catch(function(err){

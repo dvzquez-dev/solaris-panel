@@ -88,7 +88,13 @@ function _fijadaTxtM_(f){
 function _puedeBorrarReuM_(r){
   if(!r) return false;
   if(typeof esAdmin==='function' && esAdmin()) return true;
-  return !!(YO && r.convocante && YO.nombre===r.convocante);
+  /* ⛔ `_actorSanc_()`, NO `YO.nombre`: con sesion real la identidad que manda
+     es la de la SESION, y `YO` es el selector de demo. Con `YO.nombre` aqui,
+     cualquiera con sesion podia borrar la reunion de otro cambiando de persona
+     en la pantalla. Es la misma familia que `_convMias_` y `_misCeldas_`, y la
+     funcion de «quien soy de verdad» ya existia. */
+  var _yo = (typeof _actorSanc_==='function') ? _actorSanc_() : (YO && YO.nombre);
+  return !!(_yo && r.convocante && String(_yo)===String(r.convocante));
 }
 
 function _proximaReuM_(){
@@ -126,7 +132,7 @@ async function _refrescarReuAbierta_(){
     var resp=(d && (d.respuestas || (d.reunion && d.reunion.resp))) || null;
     if(!resp) return;
     var base=(d && d.reunion) || {};
-    var nuevo=_normReuM_(_fuenteReuM_(R, base, resp));
+    var nuevo=_normReuM_(_fuenteReuM_(R, base, resp, d && d.agregado));
     nuevo._hidratada=true;
     /* Si nadie ha contestado nada nuevo, NO se repinta: reconstruir la pantalla cada 20 s
        para dejarla igual se nota, y molesta. */
@@ -167,8 +173,17 @@ function _normReuM_(r){
   var fijO=r.fijada, fijBl=_fijPrev.slice();
   var fij=fijO; if(fij && typeof fij==='object') fij=fij.label||fij.iso||null;
   return { id:r.id, titulo:r.titulo||'Reunión sin título', tipo:r.tipo||'general',
+    /* ⛔ `creado` y `fecha` son el 1.º y el 3.º eslabón de la cadena con la que se elige el
+       porcentaje del periodo (`_refMinimo_`, `comun.js`). Esta lista es BLANCA: lo que no
+       esté aquí se pierde en la puerta, y eso dejaba el mínimo del teléfono decidido por
+       una cadena distinta a la del motor. */
     modalidad:r.modalidad||'hibrida', limite:r.limite||null, fijada:fij||null, fijadaBl:fijBl,
+    fecha:r.fecha||null, creado:r.creado||null,
     convocante:r.convocante||'', dias:dias, franjas:F, bloques:bl, resp:resp,
+    /* ⛔ Se LEE y se conserva: el cable entre las dos funciones lo vigila `probar_reunion_movil.py`
+       comparando lo que esta lee con lo que `_fuenteReuM_` entrega. Un campo que una lee y la
+       otra no entrega es el fallo que ya paso CUATRO veces en este mismo objeto. */
+    agregado: r.agregado !== false,
     /* El backend lo manda (`_ex.ordenDia`) y aqui se tiraba, asi que el dialogo salia
        siempre vacio y no habia forma de corregir un enlace mal pegado. */
     ordenDia:r.ordenDia||'',
@@ -204,12 +219,22 @@ function _normReuM_(r){
    solo se ve verde si el tramo entero cae dentro del rango fijado.
 
    La regla: o todo del servidor, o todo de lo que ya teniamos. Nunca la mitad de cada. */
-function _fuenteReuM_(R, base, resp){
+function _fuenteReuM_(R, base, resp, ag){
   var delServidor = base && Array.isArray(base.franjas) && base.franjas.length && Array.isArray(base.bloques);
   var s = delServidor ? base : R;
   return { id:R.id, titulo:R.titulo, tipo:R.tipo, modalidad:R.modalidad,
+    /* ⚠️ Y AQUI TAMBIEN, que es la gemela: un campo que `_normReuM_` lee y esta no entrega
+       es el fallo que ya paso CUATRO veces en este mismo objeto. */
+    fecha:R.fecha, creado:R.creado,
     limite:R.limite, convocante:R.convocante, slot:R.slot, duracion:R.duracion,
     invitados:new Array(R.nInv), resp:resp,
+    /* ⛔ `agregado` LO DECIDE EL SERVIDOR Y AQUI SOLO SE ARRASTRA. Volver a aplicar la regla
+       («¿es oculta? ¿convoco yo?») serian DOS criterios para la misma pregunta, y acaban
+       siendo dos preguntas distintas. Y deducirlo de «no me han llegado filas» tampoco vale:
+       eso no distingue `oculta` de «todavia no ha contestado nadie».
+       ⚠️ `ag == null` es un backend VIEJO que no manda el campo -- no es un «no»: se mantiene
+       el comportamiento de siempre en vez de esconderle el mapa a todo el equipo de golpe. */
+    agregado: (ag == null ? (R.agregado !== false) : ag !== false),
     /* ⛔ `ordenDia` VA AQUI, Y ES LA CUARTA VEZ QUE UN NORMALIZADOR TIRA UN DATO QUE SI
        VENIA. `_normReuM_` lo rescata (lo dice su comentario), pero quien lo alimenta es
        ESTA funcion, que arma un objeto explicito de 15 campos y no lo nombraba: no habia
@@ -237,7 +262,7 @@ async function _hidratarReuM_(r){
     if(resp){ var base=(d && d.reunion) || {};
       /* `base.fijada` es el objeto del backend cuando lo hay; `r.fijada` ya es la etiqueta
          aplanada, asi que hay que arrastrar `fijadaBl` aparte o se pierde el verde. */
-      var nuevo=_normReuM_(_fuenteReuM_(r, base, resp));
+      var nuevo=_normReuM_(_fuenteReuM_(r, base, resp, d && d.agregado));
       nuevo._hidratada=true;
       var i=REUNIONES_M.indexOf(r); if(i>=0) REUNIONES_M[i]=nuevo;
       if(REUNION===r) REUNION=nuevo;
@@ -335,9 +360,40 @@ function _proxReuHTML_(){
    minimo tiene que VERSE, no solo cumplirse**.
    ⚠️ Devuelve **cadena vacia** si la reunion no trae `duracion` — las de antes de este modelo
    no la tienen, y ahí inventar «1 h» seria peor que callar. */
+/* ¿Hay que ESCONDER el agregado de esta reunión? Lo decide el servidor y esto solo lo lee.
+   ⛔ VIVE FUERA DE `vReu` A PROPÓSITO: dentro son doscientas líneas de HTML que no ejecuta
+   ningún banco, así que una mutación sobre la condición habría salido CIEGA por no haber nada
+   que llamar — no por falta de caso. Mismo patrón que `_avisoMesDelBloque_`: decide y
+   devuelve; la pantalla redacta.
+   ⛔ Y `=== false` Y NO `!R.agregado`: una reunión de un backend viejo llega SIN el campo, y
+   `undefined` ahí significa «no lo sé», no «no» (§3c-24). Con `!R.agregado` el mapa se le
+   apagaría a las 33 personas el día que el backend vaya por detrás del `.html`. */
+function _sinAgregadoM_(R){ return !!R && R.agregado === false; }
+
 function _duraTxtM_(r){
   var d = +(r && r.duracion) || 0;
   return d > 0 ? ' \u00b7 dura ' + _durTxt_(d) : '';
+}
+
+/* ⛔⛔ EL TITULAR DEL MAPA: qué hueco recomendar, o POR QUÉ no hay ninguno. PURA, y
+   sacada aquí a propósito — estaba dentro de una concatenación de veinte líneas en
+   `vReu`, y por eso **no la ejecutaba ningún banco**.
+   ⛔ Lo que decía mal: se caía a «todavía no ha respondido nadie» siempre que `vent.v`
+   era 0, y eso pasa en DOS casos que no son silencio — han contestado y **ninguno puede
+   la reunión entera**, o han contestado que **no pueden ningún día**. Quien convoca leía
+   «nadie ha respondido» con tres respuestas en la hoja: o persigue a quien ya contestó, o
+   fija fecha a ciegas. Es §3c-24 otra vez: **ausente ≠ votó que no**, y la cara de
+   escritorio ya lo había aprendido (mete al que contestó todo a cero en `bajoMin`).
+   ⚠️ `nresp` cuenta CLAVES de `resp`, que sólo se escriben al contestar: son respuestas
+   de verdad, no gente convocada. */
+function _titularHueco_(R, vent, nresp, pondOn){
+  if(vent.v>0)
+    return '<b style="color:var(--red2)">'+esc(_diaTxtM_(R.dias[vent.d]))+' '+_hFranja_(R,vent.f0)+
+      (vent.f1>vent.f0?('–'+_hFinFranja_(R,vent.f1)):'')+'</b> — '+vent.v+
+      (vent.exacta ? (vent.v===1?' puede la reunión entera.':' pueden la reunión entera.')
+                   : (pondOn?' puntos.':' pueden.'));
+  return nresp ? '<b>han contestado '+nresp+'</b>, y ninguno puede la reunión entera.'
+               : '<b>todavía no ha respondido nadie</b>.';
 }
 
 function vReu(){
@@ -369,31 +425,14 @@ function vReu(){
      que es lo que habia. ───────────────────────────────────────────────────────── */
   var _slotR=+R.slot || (R.franjas[0] && +R.franjas[0].dur) || 60;
   var _minR=_slotsMin_(R.duracion, _slotR);
-  var _ofR={}; (R.bloques||[]).forEach(function(b){ _ofR[b[0]+'_'+b[1]]=1; });
-  var _quien=[];                                  // un Set de 'd_f' por persona
-  Object.keys(R.resp||{}).forEach(function(n){
-    var v=R.resp[n]||[], set={}, hay=false;
-    (R.bloques||[]).forEach(function(b,i){ if(+v[i]>0){ set[b[0]+'_'+b[1]]=1; hay=true; } });
-    if(hay) _quien.push(set);
-  });
-  var vent={d:best.d, f0:best.f, f1:best.f, v:best.v, exacta:false};
-  if(_quien.length){
-    var mejor={d:0,f0:0,f1:0,v:-1};
-    R.dias.forEach(function(_,di){
-      for(var f=0; f+_minR<=R.franjas.length; f++){
-        var ok=true;
-        for(var i=0;i<_minR;i++) if(!_ofR[di+'_'+(f+i)]){ ok=false; break; }
-        if(!ok) continue;
-        var n=0;
-        _quien.forEach(function(set){
-          for(var i=0;i<_minR;i++) if(!set[di+'_'+(f+i)]) return;
-          n++;
-        });
-        if(n>mejor.v) mejor={d:di, f0:f, f1:f+_minR-1, v:n};
-      }
-    });
-    if(mejor.v>=0) vent={d:mejor.d, f0:mejor.f0, f1:mejor.f1, v:mejor.v, exacta:true};
-  }
+  /* ⛔⛔ CUANTAS PERSONAS HAN CONTESTADO, que NO es lo mismo que cuántas pueden. La clave
+     de `resp` sólo se escribe al contestar (`R2.resp[_quien]=vals`), así que esto cuenta
+     respuestas de verdad — incluidas las de quien contestó que **no puede ningún día**,
+     que es justo la que se estaba leyendo como silencio. §3c-24: ausente ≠ votó que no. */
+  var _nresp=Object.keys(R.resp||{}).length;
+  /* ⚠️ El cálculo se mudó a `_mejorVentana_` (`comun.js`) el 18/08: el escritorio
+     recomendaba **la casilla suelta** con más gente y hacía falta lo mismo allí. */
+  var vent=_mejorVentana_(R, _minR, best);
   /* EJE DE TIEMPO, no de franjas. Con horarios distintos por dia la union mezcla :00 y
      :30; una columna por franja hacia que cada dia llenara una de cada dos casillas y el
      mapa pareciera un tablero. Ahora la columna es un instante y cada franja ocupa lo que
@@ -519,8 +558,19 @@ function vReu(){
           '<b style="color:var(--ok)">📌 Reunión fijada · '+esc(R.fijada)+'</b><br>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</div>'
         : (R.exento
             ? ''                                   /* organizas: no se te pide cubrir */
-            : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
-              (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
+            /* ⛔ CON EL PLAZO CERRADO NO SE OFRECE CUBRIR. El servidor lo RECHAZA
+               (`Codigo.gs:4582`) y hasta hoy la pantalla no preguntaba nada: se pintaba la
+               rejilla entera, se marcaba, y sólo al pulsar «Guardar» salía un error crudo.
+               Quien se rinde ahí sale como «no cubrió» y se lleva el Art. 30g — o sea que la
+               promesa de la pantalla le costaba el punto. Se dice ANTES y con la fecha. */
+            : !_plazoAbierto_(R.limite)
+              ? '<div class="avisolargo" style="border-color:rgba(230,168,58,.4);background:rgba(230,168,58,.08);color:#e8cfa0">'+
+                '<b style="color:var(--warn)">El plazo cerró · '+esc(_limM_(R))+'</b><br>'+
+                (R.cubierta
+                  ? 'Lo que dejaste marcado sigue contando; ya no se puede cambiar.'
+                  : 'Ya no se puede cubrir: el servidor no acepta respuestas fuera de plazo.')+'</div>'
+              : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
+                (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
     /* si ya está fijada, el aviso de organizador sobra y quedaba colgando debajo del cartel verde */
     ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas, no cubres</b>. No se te pide disponibilidad.</p>':'')+
       (esCoord()?'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">'+
@@ -530,23 +580,28 @@ function vReu(){
       '</div>':'')+
     '</div>'+
     '<h2 class="sec">Cuándo puede el equipo<span class="ln"></span></h2>'+
-    '<div class="tarj">'+
+    /* ⛔ EN `oculta` NO SE PINTA EL AGREGADO, y no basta con que el servidor deje de mandarlo:
+       con solo TU fila, `_calorDe_` dibuja un mapa que te cuenta a ti y el titular diría
+       «mejor hueco … 1 puede». No es una fuga, pero es una MENTIRA — y de este mapa salen las
+       propuestas de sanción por no cubrir. Daniel (15/08): «el resto solo puede cubrir su
+       disponibilidad y ya esta». */
+    (_sinAgregadoM_(R)
+      ? '<div class="tarj"><p class="rnota" style="margin:0;padding:6px 0">Esta reunión es '+
+        '<b>oculta</b>: el mapa de calor lo ve <b>solo quien la convoca</b>'+
+        (R.convocante?' ('+esc(R.convocante)+')':'')+'. Tú cubres tu disponibilidad y ya está.'+
+        '</p></div>'
+      : '<div class="tarj">'+
       (hib?'<div class="modos" id="calModo" style="margin-bottom:10px">'+
         '<button data-pond="0" class="'+(pondOn?'':'on')+'" data-p>Personas</button>'+
         '<button data-pond="1" class="'+(pondOn?'on':'')+'" data-p>Ponderada</button></div>':'')+
       '<p class="rnota" style="margin:0 0 10px"><b>'+R.nInv+'</b> convocados · mejor hueco '+
-      (vent.v>0
-        ? '<b style="color:var(--red2)">'+esc(_diaTxtM_(R.dias[vent.d]))+' '+_hFranja_(R,vent.f0)+
-          (vent.f1>vent.f0?('–'+_hFinFranja_(R,vent.f1)):'')+'</b> — '+vent.v+
-          (vent.exacta ? (vent.v===1?' puede la reunión entera.':' pueden la reunión entera.')
-                       : (pondOn?' puntos.':' pueden.'))
-        : '<b>todavía no ha respondido nadie</b>.')+'</p>'+
+      _titularHueco_(R, vent, _nresp, pondOn)+'</p>'+
       g+
       '<div class="leyh" style="margin-top:11px"><span>'+
         (pondOn?'el número son PUNTOS: presencial+telemático 2 · solo telemático 1'
                :'el número es cuánta gente puede')+'</span>'+
         '<span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>fuera del horario de ese día</span></div>'+
-    '</div>'+
+    '</div>')+
     (_puedeBorrarReuM_(R)?'<button class="btn full" data-p id="btnBorrar" style="margin-top:6px;color:var(--red2);border-color:var(--red)">Eliminar reunión</button>':'');
 }
 
@@ -624,27 +679,47 @@ function engancharRejilla(){
     return out;
   };
   /* Lo que queda corto se QUITA, nunca se completa: completarlo seria inventarle
-     disponibilidad a una persona, y de aqui salen sanciones reales. */
+     disponibilidad a una persona, y de aqui salen sanciones reales.
+     ⛔ EL CALCULO VIVE EN `comun.js` desde el 18/08 y **no cambia de comportamiento**: lo que
+     cambia es que el ORDENADOR tambien lo tiene. Estaba solo aqui, y las dos caras escriben
+     en la MISMA fila del servidor -- asi que lo que el escritorio dejaba guardar, este
+     `sanear` se lo borraba a la persona en cuanto tocaba la rejilla en el telefono. */
   var sanear=function(){
-    var n=0;
-    R.dias.forEach(function(_,di){
-      rachas(di).forEach(function(r){
-        if(r[1]-r[0]+1>=minS) return;
-        for(var i=r[0];i<=r[1];i++) ST.sel.delete(di+'_'+i);
-        n++;
-      });
+    var cortas=_rachasCortas_(R.dias.length, nF, minS, function(d,f){
+      return !!ST.sel.get(d+'_'+f);
     });
-    return n;
+    cortas.forEach(function(r){
+      for(var i=r[1];i<=r[2];i++) ST.sel.delete(r[0]+'_'+i);
+    });
+    return cortas.length;
   };
   var cont=function(){
     var e=$('#ecount'); if(!e) return;
     var hue=0, cas=0, p=0, t=0;
     R.dias.forEach(function(_,di){ rachas(di).forEach(function(r){ hue++; cas+=r[1]-r[0]+1; }); });
     ST.sel.forEach(function(v){ v===2?p++:t++; });
+    /* ⛔ CUÁNTAS FRANJAS TE PIDEN, que el teléfono no decía en ningún sitio: la constante
+       del periodo vivía sólo en `escritorio.html`. Es el número contra el que se decide si te
+       cae el Art. 29i, así que quien cubre tiene derecho a verlo MIENTRAS marca, no a
+       enterarse cuando le llega la propuesta de puntos. */
+    /* ⛔ LA CONDICIÓN VA SOBRE EL DATO, NO SOBRE SI EL CÓDIGO EXISTE. Con `typeof …` y un
+       `0` de respaldo, un `_minimoExigido_` ausente **borraba la frase entera** en vez de
+       cantar: la comprobación fallaba hacia el silencio, que es justo lo que esta línea
+       vino a arreglar. Si hay casillas ofertadas el mínimo es ≥ 1 siempre (25 % de 1 ya
+       redondea hacia arriba), así que la única razón legítima de no decir nada es que no
+       haya ninguna. */
+    var _tot = (R.bloques||[]).length;
+    /* ⛔ EL NÚMERO DICE QUÉ ES. «Te piden 26 de 102» es un dato suelto; lo que hace falta saber
+       es que 26 es **el mínimo sin sanción**, y cuántas te faltan para llegar. Daniel (18/08):
+       *«puedes entregar un numero inferior, eso si te tiene que advertir de que cual es el
+       minimo sin sancion»*. Se avisa; no se impide. */
+    var _av = _tot ? _avisoMinimo_(cas, _minimoExigido_(R)) : {falta:0, txt:''};
+    var _pide = _av.txt ? (' · <b'+(_av.falta?' style="color:var(--warn)"':'')+'>'+_av.txt+'</b>') : '';
     e.innerHTML = !hue
-      ? 'Sin marcar todavía'+(minS>1?(' · cada toque marca '+_durTxt_(minS*slot)):'')
+      ? 'Sin marcar todavía'+(minS>1?(' · cada toque marca '+_durTxt_(minS*slot)):'')+_pide
       : '<b>'+hue+'</b> hueco'+(hue===1?'':'s')+' · '+_durTxt_(cas*slot)+' en total'+
-        (modo==='hibrida' ? (' · '+p+' presencial'+(p===1?'':'es')+' · '+t+' telemática'+(t===1?'':'s')) : '');
+        (modo==='hibrida' ? (' · '+p+' presencial'+(p===1?'':'es')+' · '+t+' telemática'+(t===1?'':'s')) : '')+
+        _pide;
   };
   cont();
   var ancla=null, ultimo=null, target=1, borra=false;
@@ -677,8 +752,9 @@ function engancharRejilla(){
     barrer(function(k){ if(target===0) ST.sel.delete(k); else ST.sel.set(k,target); });
     var q=sanear();
     limpia(); repinta(); cont();
-    if(q) tost(q===1 ? ('Un hueco se quedó por debajo de '+_durTxt_(minS*slot)+' y se ha quitado.')
-                    : ('Se han quitado '+q+' huecos que quedaban por debajo de '+_durTxt_(minS*slot)+'.'));
+    /* El texto tambien es compartido: si una cara avisa y la otra calla, la que calla
+       parece que lo guardo. */
+    var _av=_avisoCorto_(q, minS, slot); if(_av) tost(_av);
   };
   grid.addEventListener('pointerdown',function(ev){
     var el=ev.target.closest('.ecel'); if(!el || !el.dataset.k) return;   // no ofertada: no se toca
@@ -705,14 +781,39 @@ function engancharRejilla(){
      alineado a la POSICION de cada bloque, que es como lo espera `responder`. */
   if(g) g.onclick=async function(){
     if(g.disabled) return;
+    /* ⛔ NO SE CONTESTA POR NADIE. Con «Ver como», `YO` era la identidad que viajaba
+       y el backend la honra para el admin: esto guardaba encima de la disponibilidad de
+       otra persona, que luego se come el «te falta cubrir» y su sanción. */
+    if(typeof _identidadPrestada_==='function' && _identidadPrestada_(yoNombre())){
+      tost('Est\u00e1s viendo la app como otra persona: no se contesta por nadie. Vuelve a tu vista para guardar la tuya.');
+      return;
+    }
     var R2=REUNION;
+    /* ⛔ SE PREGUNTA AL PULSAR, no solo al pintar: entre una cosa y otra puede haber entrado un
+       refresco, y el plazo vence SOLO. Una guarda que unicamente vive en el pintado es un
+       rotulo, y el servidor rechaza igual. */
+    if(!_plazoAbierto_(R2.limite)){
+      tost('El plazo cerr\u00f3 el '+_limM_(R2)+': el servidor ya no acepta respuestas.');
+      return;
+    }
     var vals=(R2.bloques||[]).map(function(b){ return ST.sel.get(b[0]+'_'+b[1])||0; });
     if(typeof backendOK!=='undefined' && backendOK && SESION){
       g.disabled=true; var prev=g.textContent; g.textContent='Guardando…';
       try{
-        await api.responder(R2.id, (YO&&YO.nombre)||'', vals);
+        /* ⚠ La identidad que VIAJA es con la que se escribe (`_actorSanc_`: la de la
+           sesión), no `YO` -- que «Ver como» reasigna. Defensa en profundidad: aunque
+           el bloqueo de arriba fallara, esto escribiría en TU fila y no en la de otro. */
+        var _quien=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
+        await api.responder(R2.id, _quien, vals);
         if(!R2.resp) R2.resp={};
-        R2.resp[(YO&&YO.nombre)||'']=vals;
+        R2.resp[_quien]=vals;
+        /* ⛔ SE GUARDA IGUAL Y SE AVISA. Daniel (18/08): entregar menos del mínimo es una
+           OPCIÓN, no un error — lo que no puede pasar es que nadie te diga que ahí hay una
+           propuesta de puntos esperando. Va DESPUÉS del `await`, con lo que de verdad se
+           guardó, no con lo que había en pantalla. */
+        var _gm=0; for(var _i=0;_i<vals.length;_i++) if((+vals[_i]||0)>0) _gm++;
+        var _ga=_avisoMinimo_(_gm, _minimoExigido_(R2));
+        if(_ga.falta) tost('Guardado: '+_gm+' franja'+(_gm===1?'':'s')+'. Ojo, '+_ga.txt+' \u2014 por debajo se propone Art. 29i.');
         var re=_normReuM_(R2); REUNION=re;                    // recalcula el mapa con lo tuyo dentro
         var ix=REUNIONES_M.findIndex(function(x){ return x.id===re.id; });
         if(ix>=0) REUNIONES_M[ix]=re;
@@ -743,21 +844,41 @@ function _diasLargos_(modo,d0,d1,fecha,nd){
 
 
 /* Hora de inicio y de fin de una franja, para escribir un hueco como «18:00–19:00». */
-function _hFranja_(R,fi){ var f=(R.franjas||[])[fi]; return f ? _hmMin_(_minHM_(f)) : '—'; }
+/* ⚠️ `_hFranja_` y `_hFinFranja_` se mudaron a `comun.js` el 18/08: la cara de escritorio
+   necesita lo mismo —a qué hora empieza y acaba la franja `i`— para decir la ventana, y
+   tenerlo sólo aquí obligaba a escribirlo otra vez allí. */
 
-function _hFinFranja_(R,fi){ var f=(R.franjas||[])[fi];
-  return f ? _hmMin_(_minHM_(f) + (+f.dur>0 ? +f.dur : 60)) : '—'; }
+/* convocados por defecto según el tipo: general=todo el equipo, subsistema=tu unidad,
+   junta=coordinadores+PD, **consejo=los 10 del Consejo**, mixta/trabajo=a mano.
 
-/* convocados por defecto según el tipo (como app.html): general=todo el equipo, subsistema=tu unidad,
-   junta=coordinadores+PD, consejo=por configurar, mixta/trabajo=a mano. */
+   ⛔ EL CONSEJO NO ESTABA «POR CONFIGURAR»: LO ESTABA DESDE EL 22/07. Daniel dio los diez
+   nombres ese día y viven en `CONSEJO_PUSH` del backend, que ya los usa para enrutar avisos.
+   Aquí caían en el `false` de abajo, así que convocar una reunión de consejo **no invitaba a
+   nadie** — y la etiqueta del desplegable decía «por configurar», que es de donde salió la nota
+   falsa de que faltaba una decisión suya. La pantalla describía el estado de la pantalla, no el
+   del sistema.
+   ⚠️ La lista **llega en el panel** (`DATA.consejo`) y no se copia aquí: dos copias de la misma
+   verdad acaban siendo dos verdades. Si el panel no la trae —backend viejo—, se devuelve vacío
+   como antes y el convocante los pone a mano: se degrada, no se inventa. */
 function _presetInvitados_(tipo){
   var yo=(YO&&YO.nombre)||'', ms=_activos_(), out=[];
+  if(tipo==='consejo'){
+    var cons=(typeof DATA!=='undefined' && DATA && DATA.consejo) || [];
+    /* ⛔ Se cruza con los ACTIVOS: un miembro del consejo dado de baja no se convoca, igual
+       que en los demás tipos —que salen de `_activos_()`—. Sin esto, el consejo sería el único
+       tipo que invita a gente que ya no está. */
+    ms.forEach(function(m){
+      if(m.nombre===yo) return;
+      for(var i=0;i<cons.length;i++) if(String(cons[i])===String(m.nombre)){ out.push(m.nombre); return; }
+    });
+    return out;
+  }
   ms.forEach(function(m){
     if(m.nombre===yo) return;
     var meto = tipo==='general' ? true
              : tipo==='subsistema' ? (m.unidad===(YO&&YO.unidad))
              : tipo==='junta' ? (m.cargo==='Coordinador'||m.cargo==='Project Director')
-             : false;                              // consejo/mixta/trabajo: a mano
+             : false;                              // mixta/trabajo: a mano
     if(meto) out.push(m.nombre);
   });
   return out;
@@ -766,7 +887,7 @@ function _presetInvitados_(tipo){
 function crearModal(){
   var coord=esCoord();
   var tipos=[['general','General · todo el equipo',true],['junta','Junta Directiva · coordinación',true],
-    ['consejo','Consejo · por configurar',true],['subsistema','Subsistema · tu unidad',true],
+    ['consejo','Consejo · sus miembros',true],['subsistema','Subsistema · tu unidad',true],
     ['mixta','Mixta · varios subsistemas',true],['trabajo','Reunión de trabajo · invitas tú',false]];
   var op=tipos.filter(function(t){return coord||!t[2];})
     .map(function(t){return '<option value="'+t[0]+'">'+t[1]+'</option>';}).join('');
@@ -911,6 +1032,13 @@ function crearModal(){
   /* crear: construye la reunión y la PERSISTE (api.crearReunion). Sin backend, queda local. */
   $('#btnCrearOK').onclick=async function(){
     var bt=$('#btnCrearOK'); if(bt.disabled) return;
+    /* ⛔⛔ SIN ESTO SE CREABA UNA REUNION CON CERO INVITADOS, y una reunión sin lista la
+       app se la enseña **a todo el equipo** con «te falta cubrir» — que es literalmente el
+       daño que motivó el campo `invitado`: «se le reclamaba cubrir a todo el equipo una
+       reunión de un invitado. Y de no cubrir salen sanciones». Se llega solo: «reunión de
+       trabajo» tiene el preset vacío a propósito. El escritorio lo impide desde siempre;
+       esta cara no, y el servidor tampoco lo mira. */
+    if(!INV.size){ tost('No has convocado a nadie.'); return; }
     var ds=dias(); if(!ds.length){ tost('Revisa las fechas: no hay días.'); return; }
     var _sl=+val('ceSlot')||30, _du=+val('ceDura')||60;
     var u=_genUnion_(rangos(), _sl), bloques=[];

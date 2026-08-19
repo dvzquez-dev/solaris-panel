@@ -54,7 +54,13 @@ function _planHTML_(plan){
      sobre «todavia no». El escritorio ya lo hacia asi (§3c-9: lo que solo esta en una cara
      es el fallo que nadie ve). */
   var _hecho = !!(plan.aplicado || plan.resultado), _parado = !!plan.parado;
+  /* ⛔ CUARTO ESTADO, y no es cosmetico: un cierre que acaba 25 de 32 decía «Ya está
+     aplicado» porque `parado` solo mira descuadres y fallos -- un `ausente` no para al
+     aplicador. Las 7 que faltan se quedan con la carga del mes sin poner a cero. */
+  var _inc = _cierreIncompleto_(plan);
   var _estado = _parado ? '<b>Se paró a medias.</b> Hay fichas nuevas y viejas conviviendo.'
+              : _inc   ? '<b>Aplicado a medias:</b> se escribieron '+_inc.hechas+
+                         (_inc.de?' de '+_inc.de:'')+'. <b>Faltan '+_inc.faltan+'.</b>'
               : _hecho  ? '<b>Ya está aplicado.</b>'
                         : '<b>Todavía no se ha aplicado.</b>';
   return '<p class="rnota" style="margin:0 0 10px">Plan de <b>'+esc(_nomPeriodo_(plan.periodo))+'</b>'+
@@ -70,6 +76,10 @@ function _planHTML_(plan){
     '<p class="rnota">'+(_parado
       ? 'No lo vuelvas a lanzar sin mirar por qué se paró: hay fichas escritas y sin escribir '+
         'a la vez, y repetirlo encima no lo arregla.'
+      : _inc
+      ? 'A '+_inc.faltan+' persona'+(_inc.faltan===1?'':'s')+' no se le escribió nada: su carga '+
+        'del mes cerrado sigue puesta, y el mes que viene esas horas se cuentan dos veces. '+
+        'El botón de abajo termina lo que falta.'
       : _hecho
       ? 'Ya está escrito en las fichas de Notion: de ahí salen la cuota y la renovación.'
       : 'Aplicarlo escribe en las fichas de Notion, y de ahí salen la cuota y la '+
@@ -78,6 +88,11 @@ function _planHTML_(plan){
 
 function _decidirCierreHTML_(plan){
   var r=plan.resultado||null;
+  /* ⛔ El botón vuelve SOLO si faltan fichas, y con el número dentro. La regla «aplicado =
+     sin botón» sigue en pie para el camino normal; lo que no puede seguir es que 25 de 32
+     cuente como aplicado. Relanzar es seguro: el aplicador sigue por donde iba y devuelve
+     `ya` para lo que ya tiene el estado final. */
+  var inc=_cierreIncompleto_(plan);
   if(plan.aplicado || r){
     var lin=['<b>'+((r&&r.aplicadas)||0)+'</b> aplicadas'];
     if(r&&r.ya_estaban) lin.push((r.ya_estaban)+' ya estaban');
@@ -86,11 +101,19 @@ function _decidirCierreHTML_(plan){
     if(r&&r.descuadres) lin.push('<b style="color:var(--warn)">'+r.descuadres+' descuadres</b>');
     if(r&&r.fallos) lin.push('<b style="color:var(--warn)">'+r.fallos+' fallos</b>');
     return '<div class="rec" style="margin-top:12px"><div class="rl"><span>Estado</span>'+
-      '<span class="ra"><b>'+(plan.parado?'PARADO A MEDIAS':'aplicado')+'</b></span></div></div>'+
+      '<span class="ra"><b>'+(plan.parado?'PARADO A MEDIAS':inc?'APLICADO A MEDIAS':'aplicado')+
+      '</b></span></div></div>'+
       '<p class="rnota">'+lin.join(' · ')+
       (r&&r.at?' · '+esc(String(r.at).slice(0,16).replace('T',' ')):'')+'</p>'+
       (plan.parado?'<p class="rnota" style="color:var(--warn)">Se paró a medias: hay fichas '+
-        'nuevas y viejas conviviendo. <b>No lo vuelvas a lanzar sin mirarlo.</b></p>':'');
+        'nuevas y viejas conviviendo. <b>No lo vuelvas a lanzar sin mirarlo.</b></p>'
+       :inc?'<p class="rnota" style="color:var(--warn)"><b>Faltan '+inc.faltan+'</b>'+
+        (inc.de?' de '+inc.de:'')+': su carga del mes cerrado sigue puesta y el mes que viene '+
+        'esas horas se cuentan dos veces.</p>'+
+        '<button class="btn pri" data-aplicarcierre style="width:100%;margin-top:10px">'+
+        'Terminar el cierre · faltan '+inc.faltan+'</button>'+
+        '<p class="rnota">Relanzarlo es seguro: sigue por donde iba y no reescribe a quien ya '+
+        'está. Si alguna sigue sin ficha en Notion, volverá a salir aquí.</p>':'');
   }
   return '<button class="btn pri" data-aplicarcierre style="width:100%;margin-top:14px">'+
       'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo))+'</button>'+

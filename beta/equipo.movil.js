@@ -54,18 +54,46 @@ function vEstado(){
   var pend=sumaE('pend');
   var av='';
   if(pend>0){
-    var rt=aprobadorDe(YO.nombre,YO.unidad);
+    /* ⛔ QUIEN FIRMA LO DECIDE EL SUBSISTEMA DEL PARTE, NO LA UNIDAD DE LA PERSONA, y aquí se
+       nombraba a `coordinadorDe(YO.unidad)` sobre una cola que `sumaE` suma ENTERA. Daniel
+       (06/08): *«si Bruno ficha en concepto de coordinador de logística no es lo mismo que
+       fichando en concepto de miembro de propulsión»* — el perfil fija el subsistema, y el
+       subsistema fija quién firma (`_firmaDe_`). La pantalla de fichar ya lo hace bien
+       (`aprobadorDe(YO.nombre,_perfilElegido_())`); ésta se quedó en `YO.unidad` y nombraba a
+       alguien que no firma la mitad de esas horas, en el aviso que existe justo para saber a
+       quién reclamar.
+       ⛔ Y AQUÍ NO SE ARREGLA NOMBRANDO AL BUENO: `normPMovil` no conserva el subsistema del
+       parte, así que desde este aviso no hay con qué partir la cola por perfil. Lo que se
+       quita es la AFIRMACIÓN, no el aviso — y sólo donde no se puede sostener: con un perfil
+       único no hay ambigüedad y se sigue diciendo quién firma.
+       📌 PENDIENTE (`docs/pendientes.md`): llevar el subsistema en `normPMovil` y partir el
+       aviso por perfil es el arreglo entero, y toca un fichero que no es éste. */
+    var _unPerfil=!_hayQuePreguntarPerfil_(YO);
+    var rt=_unPerfil?aprobadorDe(YO.nombre,YO.unidad):null;
     av+='<div class="aviso" data-ir="horas" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
       '<div style="flex:1"><b>'+h1(pend)+' esperando aprobación</b>'+
-      '<p>Todavía no cuentan. Las firma '+esc(rt.nom.split(' ')[0])+', '+
-      (rt.escalado?'Project Director':'coordinador de tu unidad')+'.</p></div>'+
+      '<p>Todavía no cuentan. '+(rt
+        ? ('Las firma '+esc(rt.nom.split(' ')[0])+', '+
+           (rt.escalado?'Project Director':'coordinador de tu unidad')+'.')
+        : 'Las firma quien coordine el subsistema de cada parte.')+'</p></div>'+
       '<span class="chev">›</span></div>';
   }
   var cambios=ENTREGABLES.filter(function(e){return e.estado==='cambios';});
   if(cambios.length){
+    /* ⛔ CON DOS DECÍA «Un documento» Y NOMBRABA SÓLO EL PRIMERO, mientras el globo del nav
+       —`badges()`, con EL MISMO filtro— decía «2». Dos criterios para la misma pregunta en dos
+       sitios que se leen a la vez: se va a Docs, se corrige el que se nombra, y el otro no
+       existe para nadie. La forma se copia del aviso de reuniones, que está diez líneas más
+       abajo en este mismo fichero y ya contaba; no se inventa otra manera de decirlo.
+       ⚠️ Sin el «después» del hermano a propósito: aquella lista va ordenada por lo que caduca
+       antes, y ésta llega en el orden que traiga el servidor. */
+    var _c0=cambios[0], _cresto=cambios.length-1;
     av+='<div class="aviso mal" data-ir="docs" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
-      '<div style="flex:1"><b>Un documento tuyo tiene cambios pedidos</b>'+
-      '<p><span class="mono">'+cambios[0].ref+'</span> · corrígelo y reenvíalo a revisión.</p></div>'+
+      '<div style="flex:1"><b>'+(_cresto>0
+        ? (cambios.length+' documentos tuyos tienen cambios pedidos')
+        : 'Un documento tuyo tiene cambios pedidos')+'</b>'+
+      '<p><span class="mono">'+_c0.ref+'</span>'+(_cresto>0?(', y '+_cresto+' más'):'')+
+        ' · '+(_cresto>0?'corrígelos y reenvíalos':'corrígelo y reenvíalo')+' a revisión.</p></div>'+
       '<span class="chev">›</span></div>';
   }
   /* NO uses `REUNION` aqui: es el puntero de la pantalla de Reuniones y cambia al
@@ -105,13 +133,35 @@ function vEstado(){
 }
 
 /* Quién coordina qué: consulta, no tarea diaria. Se abre desde el menú ⋮. */
+/* ⛔ ESTO ENSEÑABA EL SUBSISTEMA DE CADA UNO, NO LO QUE COORDINA (`'coordina '+esc(m.unidad)`),
+   y filtraba por `m.cargo`. Son las dos mitades del mismo agujero que `coordinadorDe` cerró en
+   `comun.js` el 14/08 — Daniel: *«es porque José es coordinador de la UCT, no por ser él sino
+   por su cargo»* —, y ahí quedó escrito lo que aquí faltaba: **nadie tiene una Unidad como
+   `unidad`**, el roster guarda una sola por persona y es su subsistema. Consecuencias, las dos
+   en la única pantalla que existe para contestar «¿a quién le llega esto?»:
+     · la **Unidad de Documentación Técnica no podía salir NUNCA** (ni ninguna otra Unidad);
+     · **quien coordina algo SIN cargo no aparecía en la lista** — la semilla de `movil.html`
+       tiene ese caso puesto a propósito, y en el equipo real hay uno de dos perfiles.
+   ✅ `coordina` se recorre por su puerta, `_unidadesCoord_`, la misma que usa `coordinadorDe`:
+   llega como cadena, lista o nada, y **una cadena no se itera** (recorrer «Aviónica» daría
+   ocho unidades de una letra). La unidad propia entra sólo si lo dice el CARGO, que es una
+   condición distinta de «es su subsistema».
+   ⚠️ Y a quien conste como `Coordinador` sin nada que coordinar se le pinta **el cargo**, no
+   una unidad deducida: dejarlo fuera de la lista sería tan falso como inventarle una. */
 function _coordinacionHTML_(){
-  var coords=_activos_().filter(function(m){ return m.cargo; });
+  var filas=[];
+  _activos_().forEach(function(m){
+    if(m.cargo==='Project Director'){ filas.push({nom:m.nombre,txt:'Project Director'}); return; }
+    var us=_unidadesCoord_(m.coordina);
+    if(m.cargo==='Coordinador' && m.unidad && us.indexOf(m.unidad)<0) us.unshift(m.unidad);
+    if(us.length) filas.push({nom:m.nombre,txt:'coordina '+us.join(' · ')});
+    else if(m.cargo) filas.push({nom:m.nombre,txt:m.cargo});
+  });
   return '<div class="mtit">El equipo</div>'+
     '<div class="msub">Quién coordina cada unidad</div>'+
-    '<div class="tarj" style="margin:0">'+(coords.length?coords.map(function(m){
-      return '<div class="fila"><div class="a"><b>'+esc(m.nombre)+'</b>'+
-        '<small>'+(m.cargo==='Project Director'?'Project Director':'coordina '+esc(m.unidad))+'</small></div></div>';
+    '<div class="tarj" style="margin:0">'+(filas.length?filas.map(function(f){
+      return '<div class="fila"><div class="a"><b>'+esc(f.nom)+'</b>'+
+        '<small>'+esc(f.txt)+'</small></div></div>';
     }).join('')
     : vacio('Sin datos de coordinación','Todavía no ha llegado quién coordina cada subsistema.','',false))+'</div>'+
     '<p class="rnota" style="text-align:center;margin:14px 0 0">SOLARIS · datos a '+esc(_isoADMY_(DATA.generado||''))+'</p>';

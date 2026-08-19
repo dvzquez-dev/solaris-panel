@@ -16,7 +16,7 @@
 <meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=8068e9d">
+<link rel="stylesheet" href="escritorio.css?v=a5348d2">
 </head>
 <body>
 
@@ -108,16 +108,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=f12a772"></script>
-<script src="notis.escritorio.js?v=5f0a77e"></script>
-<script src="cierre.escritorio.js?v=3a5c29c"></script>
-<script src="turnos.escritorio.js?v=da008dc"></script>
-<script src="buzon.escritorio.js?v=3fb7c82"></script>
-<script src="documentos.escritorio.js?v=1918b5e"></script>
-<script src="sanciones.escritorio.js?v=8ff43ab"></script>
-<script src="reuniones.escritorio.js?v=d49562f"></script>
-<script src="horas.escritorio.js?v=fc35dac"></script>
-<script src="equipo.escritorio.js?v=2e3c3fa"></script>
+<script src="comun.js?v=898c439"></script>
+<script src="notis.escritorio.js?v=e86a1b9"></script>
+<script src="cierre.escritorio.js?v=ddcd168"></script>
+<script src="turnos.escritorio.js?v=623a819"></script>
+<script src="buzon.escritorio.js?v=745846b"></script>
+<script src="documentos.escritorio.js?v=542e6c2"></script>
+<script src="sanciones.escritorio.js?v=07871f6"></script>
+<script src="reuniones.escritorio.js?v=9f71642"></script>
+<script src="horas.escritorio.js?v=e6eef1a"></script>
+<script src="equipo.escritorio.js?v=26424eb"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -304,6 +304,14 @@ var api={
      Python. Dos nombres para una puerta es como acaban siendo dos puertas distintas, que
      es justo lo que dice `[[feedback_una_sola_puerta_por_servicio]]`. Lo cazó
      `rutinas/cabos_sueltos.py` en su primera pasada. */
+  /* ⛔ …Y AL QUITAR EL ALIAS ESTA CARA SE QUEDÓ SIN NINGUNA PUERTA (14/08). El alias sobraba
+     —dos nombres en la MISMA cara acaban siendo dos funciones distintas—, pero la acción del
+     backend sí hacía falta: `_borrarReunion_` exige **convocante o admin**, y quien convoca
+     convoca DESDE AQUÍ (`convocarReunionPanel` pide rango >= 1). O sea que el que se equivoca
+     al convocar no podía deshacerlo en la misma pantalla, y lo único que el escritorio le
+     ofrecía era **fijar** la reunión — cerrar la disponibilidad y afirmar una fecha que no
+     existe. Se llama IGUAL que en el móvil (`movil.html`): eso es una puerta, no un alias. */
+  borrarReunion: function(id){ return api._post({action:"borrarReunion",id:id}); },
   fijar:       function(id,f){ return api._post({action:"fijarReunion",id:id,fijada:f}); },
   setOrdenDia: function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); },
   responder:   function(id,n,v){ return api._post({action:"responder",id:id,nombre:n,valores:v}); },
@@ -319,6 +327,11 @@ var api={
   marcarLote:  function(l,d){ return api._post({action:"marcarLote",lote:l,decision:d}); },
   getPartes:   function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
   decidirParte:function(id,a,m){ return api._post({action:"decidirParte",id:id,accion:a,motivo:m}); },
+  /* GEMELA del móvil. ⛔ `id` y `motivo` van AL PRIMER NIVEL, al revés que `otorgarHoras`
+     —que los envuelve en `parte`—: el router lee `body.id || params.id`. Envolverlos aquí
+     daría «parte no encontrado: undefined», que se lee como un dato malo y no como una
+     llamada mal formada. */
+  revertirParte:function(id,m){ return api._post({action:"revertirParte",id:id,motivo:m}); },
   /* La clave de un solo uso la pone el LLAMADOR, no aqui: `_post` reintenta hasta tres
      veces, y una clave nacida dentro seria distinta en cada intento -- o sea, ninguna
      proteccion justo cuando hace falta. */
@@ -335,6 +348,12 @@ var api={
      Lo destapó la ronda de agentes de la fase 3, no una lectura: `api.guardarPush` estaba
      definida solo en el móvil (`movil.html:399`) y aquí se llamaba igual. */
   guardarPush: function(sub){ return api._post({action:"guardarPush",sub:sub}); },
+  /* ⛔ GEMELAS del móvil, y faltaban LAS DOS en esta cara: `notis.escritorio.js` sólo sabía
+     encender el permiso del navegador, no elegir QUÉ te llega. La preferencia se guarda por
+     PERSONA (correo) en el servidor, así que la que pongas aquí es la misma que ves en el
+     móvil — no son dos ajustes distintos. */
+  getNotis:     function(){ return api._post({action:"getNotis"}); },
+  guardarNotis: function(t){ return api._post({action:"guardarNotis",tipos:t}); },
   getConvocatoria: function(semana){ return api._post({action:"getConvocatoria",semana:semana||null}); },
   guardarDisponibilidad: function(conv,celdas){ return api._post({action:"guardarDisponibilidad",convocatoria:conv,celdas:celdas}); },
   crearConvocatoria: function(c){ return api._post({action:"crearConvocatoria",convocatoria:c}); },
@@ -342,7 +361,25 @@ var api={
   getNovedadesVistas: function(){ return api._post({action:"getNovedadesVistas"}); },
   marcarNovedadVista: function(id,visto){ return api._post({action:"marcarNovedadVista",id:id,visto:!!visto}); },
   getControl:  function(){ return api._post({action:"getControl"}); },
+  /* ⛔ LAS CINCO DEL FICHAJE, QUE ESTA CARA NO TENIA. `getFichajesAbiertos` (la de
+     abajo) sirve las sesiones de LOS DEMAS y esta gateada a rango >= 3; estas cinco son
+     las TUYAS y no llevan gate de rol: el que gobierna tambien es miembro. GEMELAS byte
+     a byte de las de `movil.html` — si tocas una, toca la otra. */
+  ficharEntrada:    function(perfil){ return api._post({action:"ficharEntrada",perfil:perfil||null}); },
+  ficharSalida:     function(tarea,just,cat,perfil){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat,perfil:perfil||null}); },
+  getFichajeAbierto:function(){ return api._post({action:"getFichajeAbierto"}); },
+  pausarFichaje:    function(){ return api._post({action:"pausarFichaje"}); },
+  reanudarFichaje:  function(){ return api._post({action:"reanudarFichaje"}); },
   getFichajesAbiertos: function(){ return api._post({action:"getFichajesAbiertos"}); },
+  /* ⛔ LAS DOS DE DECLARAR, QUE TAMPOCO ESTABAN. Con las cinco de arriba esta cara ya
+     ficha; sin estas no puede RECUPERAR unas horas que se te olvido fichar, que es el
+     unico camino que hay para eso. `otorgarHoras`/`otorgarBloque` son lo contrario:
+     dar horas a OTROS. Ninguna de las dos lleva gate de rol en el backend -- ficha y
+     declara cualquiera con token, y solo lo suyo.
+     ⛔ `clave` NO se pone aqui: la pone el llamador, porque `_post` reintenta tres
+     veces y una clave nacida dentro seria distinta en cada intento. */
+  pushParte:    function(p){ return api._post({action:"pushParte",parte:p}); },
+  declararParte:function(id,tarea,just,cat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat}); },
   setControl:  function(clave,valor,nota){ return api._post({action:"setControl",clave:clave,valor:valor,nota:nota}); },
   getMisMovimientos: function(){ return api._post({action:"getMisMovimientos"}); }
 };
@@ -634,6 +671,78 @@ var AVISOS_ON=false;
    encendiendo una clave que nadie mira -- y no da ningun error. */
 var INTERRUPTOR_AVISOS='avisos_convocatoria';
 
+/* ═══ PREFERENCIAS DE AVISO POR TIPO ═══════════════════════════════════════════════════
+   ⛔ GEMELAS de `movil.html`: mismas claves, mismos textos. La preferencia es UNA —del
+      servidor, por correo—, así que dos listas distintas serían dos caras ofreciendo mandos
+      distintos sobre el MISMO ajuste. Las vigila `probar_gemelas_const.py`.
+   ⛔ Los textos son de aquí porque son de cara a la persona; las CLAVES las manda el
+      servidor: `_getNotis_` devuelve siempre las cinco con su valor. */
+var NOTIS_ETI={
+  turnos:['Turnos','Convocatorias y cambios de turno de fabricación'],
+  reuniones:['Reuniones','Recordatorios 24 h, 1 h y 10 min antes'],
+  documentos:['Documentos','Cuando te toca revisar algo o deciden sobre lo tuyo'],
+  horas:['Horas y partes','Cuando te firman, rechazan o piden detalle de un parte'],
+  avisos:['Avisos y sanciones','Lo disciplinario y lo que tiene plazo']
+};
+/* Los que NO se pueden apagar. GEMELA de `NOTIS_FIJOS` del backend, que es quien de verdad
+   lo impide —`_quiereAviso_` los deja pasar ANTES de mirar la preferencia—: esto sólo evita
+   enseñar un interruptor que miente. */
+var NOTIS_FIJOS=['turnos','avisos','reuniones'];
+/* ⛔ LOS TIPOS QUE HOY PRODUCE ALGÚN EMISOR DE VERDAD, y no es un adorno: es la diferencia
+   entre una pantalla honesta y cinco interruptores decorativos. Medido el 14/08 recorriendo
+   TODAS las llamadas a `enviarPush`/`_encolarPush_` del repositorio:
+     · `avisar_convocatoria.py`        -> 'turno'   -> turnos
+     · `avisar_reunion.py`             -> 'reunion' -> reuniones
+     · `actividad.py`                  -> 'sancion' -> avisos
+     · `Codigo.gs` (parte que caduca)  -> 'aviso'   -> avisos
+   `documentos` y `horas` —las DOS ÚNICAS que se pueden apagar— **no las emite nadie
+   todavía**. Se dice en la pantalla, en vez de ofrecer un mando sobre algo que no pasa.
+   ⚠️ Y no es una frase que envejezca sola: `probar_notis_escritorio.py` recorre los emisores
+   y se pone ROJO el día que alguien escriba uno nuevo sin tocar esta lista. */
+/* ⛔ LA LISTA VIVE EN `comun.js` desde el 14/08: la necesitan las dos caras, y dos copias
+   acaban siendo dos listas distintas -- una diciendo que un tipo se manda y la otra que
+   no, sobre el mismo aviso. */
+var NOTIS_VIVOS=_notisVivos_();
+/* Lo que dijo el servidor la última vez, y en qué punto va la pregunta: 'sin pedir' |
+   'pidiendo' | 'ok' | 'error'. ⛔ Vive aquí y no en el módulo porque un módulo sólo lleva
+   declaraciones `function` (ARRANQUE §5b), y ⛔ arranca en 'sin pedir' —no en 'ok' con un
+   objeto vacío— porque unos interruptores con un valor inventado son peores que no tenerlos:
+   se tocan creyendo que hacen algo. */
+var NOTIS_PREF=null, NOTIS_SRV='sin pedir', NOTIS_ERR=null;
+
+/* ── TU PROPIA SESION DE FICHAJE ───────────────────────────────────────────────────
+   El estado vive AQUI y no en `horas.escritorio.js` porque un modulo solo lleva
+   declaraciones `function`: uno que se lleve estado se lleva el orden de carga, y ahi es
+   donde se rompe sin dar error (ARRANQUE.md §5b).
+
+   `FICHA_SRV.sabido` es lo que decide si la pantalla puede hablar: mientras sea `false`
+   no se ofrece «fichar entrada», porque decir «SIN SESION ABIERTA» a quien tiene el reloj
+   corriendo en el servidor es decirle que no cuenta nada mientras cuenta. Y una vez que
+   es `true`, un refresco fallido NO lo borra: lo que se ensena es lo ultimo que dijo el
+   servidor, y el reloj corre desde SU hora, no desde esta pestana.
+   ⛔ `FICHA` arranca en `null` y eso NO significa «no tienes ninguna»: significa «todavia
+   no se sabe». Quien lo mira pregunta antes por `sabido`. */
+var FICHA_SRV={estado:'sin pedir', at:0, sabido:false};
+var FICHA=null;
+var FICHA_FORM={cat:'tareas', tarea:'', detalle:'', just:'', perfil:null};
+/* El reloj de 1 s: UNO para toda la pagina. Ver `_engFicharE_`. */
+var FICHA_TIC=null;
+
+/* ── DECLARAR UN BLOQUE ATRASADO ─────────────────────────────────────
+   Vive aqui y no en `horas.escritorio.js` por lo mismo que `FICHA_FORM`: un modulo solo
+   lleva declaraciones `function` (ARRANQUE.md §5b).
+   ⛔ ES SU PROPIO FORMULARIO, NO `FICHA_FORM`. Compartirlo haria que elegir «como
+   coordinador de X» para un bloque atrasado enrutara ademas tu SIGUIENTE fichaje en vivo
+   a ese cargo, en silencio: son dos actos distintos y cada uno guarda su eleccion.
+   ⛔ `clave` NACE EN EL PRIMER ENVIO Y SOBREVIVE AL FALLO. Es la clave de un solo uso
+   (`_parteConClave_` en el backend) y es lo unico que cubre el doble envio que NO es un
+   doble clic: reintentar A MANO tras un corte -- el caso en que el servidor SI guardo y
+   la respuesta se perdio -- llega con la misma clave y devuelve el parte que ya hay.
+   ⛔ Y `declararId` es «estoy declarando ESE fichaje ya cerrado», no un bloque nuevo:
+   ahi la duracion la fijo el servidor y aqui no se toca. */
+var BLOQ_FORM={fecha:HOY, ini:'09:00', fin:'11:00', cat:'tareas', tarea:'', detalle:'',
+               just:'', perfil:null, declararId:null, clave:null};
+
 var V={};
 
 /* ── PANEL DE MANDO ──────────────────────────────────────────────────────
@@ -810,6 +919,9 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
     bloquePanel()+
     (otras.length?pan('En la cola de otros',otras.length+' partes · los ves, no los decides',
       otras.map(parteCard).join('')):'')+
+    /* ⛔ DEBAJO de la cola y ENCIMA del histórico: lo que hay que hacer va antes que lo ya
+       hecho, y lo que todavía se puede deshacer, antes que lo que ya no. */
+    _escRevPanel_()+
     pan('Histórico',hist.length+' decisiones',
       hist.length?hist.map(function(p){
         var et=p.estado==='aprobado'?'<span class="chip ok">aprobado</span>'
@@ -832,7 +944,7 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
       kpi('Sin declarar ahora',sd.length,sd.length?'fichajes cerrados que nadie justificó':'todo declarado',sd.length?'wa':'up',(sd.length*15)+'%')+
       kpi('Caducados',cad.length,'pasaron 7 días sin declarar','',(cad.length*10)+'%')+
     '</div>'+
-    pan('Fichajes sin declarar', sd.length+' · solo el autor los declara (desde su móvil)',
+    pan('Fichajes sin declarar', sd.length+' · solo su autor los declara, y en «Lo tuyo»',
       sd.length?sd.map(function(p){
         return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+h1(p.horas)+'</b>'+
           '<small>'+esc(p.unidad)+' · '+p.fecha+(p.ini!=='—'?' · '+p.ini+'–'+p.fin:'')+'</small></span>'+
@@ -844,8 +956,10 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
           '<small>'+esc(p.unidad)+' · '+p.fecha+'</small></span><span class="der"><span class="chip no">caducada</span></span></div>';
       }).join('')):'')+
     '<div class="pan"><div class="nota">Un fichaje <b>sin declarar</b> es una salida que se cerró sin categoría ni justificación. '+
-      'No entra en la cola de nadie: solo su autor puede declararlo desde el móvil, y a los <b>7 días</b> '+
-      'caduca, con un aviso 24 h antes.</div></div>';
+      'No entra en la cola de nadie: solo su autor puede declararlo —en <b>«Lo tuyo»</b> o desde el móvil—, '+
+      'y a los <b>7 días</b> '+
+      'caduca, con un aviso 24 h antes. '+
+      '<b>Y aquí solo salen los TUYOS</b>: el servidor no sirve los fichajes sin declarar de otras personas, ni siquiera al Project Director. Lo que ves no es la lista del equipo.</div></div>';
 }};
 
 /* ── FICHAJES EN CURSO ───────────────────────────────────────────────────── */
@@ -905,7 +1019,7 @@ V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
       var pau=!!c.pausado;
       return '<div class="curso'+(wa?' wa':'')+'"><span class="pt"></span>'+
         '<span class="tx"><b>'+esc(_m(c.autor)?_m(c.autor).pila:c.autor)+'</b>'+
-        '<small>'+esc(c.subsistema||'—')+' · desde las '+esc(String(c.ini||'').slice(11,16))+'</small></span>'+
+        '<small>'+esc(c.subsistema||'—')+' · desde las '+esc(_hhmmDe_(c.ini))+'</small></span>'+
         '<span class="q mono">'+nf2(c.horas)+' h</span>'+
         (pau?'<span class="chip">en pausa</span>'
             :(wa?'<span class="chip wa">pasa de 10 h</span>':'<span class="chip ok">en curso</span>'))+'</div>';
@@ -974,7 +1088,10 @@ var TEMP=null, TEMP_ERR=null;
 
 
 V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
-  var fin=_finDeMes_(), cer=_mesACerrar_();
+  /* ⛔ `_plazoCierre_()` Y NO `_finDeMes_()`: el chip habla del mes QUE SE CIERRA, que es el
+     ANTERIOR al que corre -- la regla de veinte lineas mas arriba. Con `_finDeMes_()` esto
+     decia «CIERRA 31/08 · QUEDAN 13 dias» encima de «Cierre de julio». */
+  var fin=_plazoCierre_(), cer=_mesACerrar_();
   if(CIERRE===null && !CIERRE_ERR)
     return pan('Cierre de '+cer.mes,'comprobando…',
       '<div class="nota" style="border-top:0">Preguntando al servidor en qué punto está el cierre…</div>');
@@ -991,7 +1108,12 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
      existian en esta cara, asi que un cierre ya escrito en 32 fichas de Notion se veia
      igual que uno recien calculado. `aplicado` sale del registro, no de esta pasada. */
   var res=plan?(plan.resultado||null):null, hecho=!!(plan&&(plan.aplicado||res));
+  /* ⛔ `parado` solo mira descuadres y fallos: un `ausente` NO para al aplicador, así que
+     un cierre 25/32 llegaba aquí con `parado:false` y se pintaba **APLICADO en verde**,
+     con el botón desaparecido. Mismo fallo que tenía el móvil, misma puerta. */
+  var inc=_cierreIncompleto_(plan);
   var estado = (plan&&plan.parado) ? ['PARADO A MEDIAS','no']
+             : inc ? ['APLICADO A MEDIAS','no']
              : hecho ? ['APLICADO','ok']
              : plan ? ['PLAN CALCULADO','ok'] : enc ? ['CALCULÁNDOSE','wa']
              : listo ? ['LISTO PARA CALCULAR','ok'] : ['BLOQUEADO','no'];
@@ -1002,8 +1124,8 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
      (bloq.filter(function(b){return b.que==='sanciones';})[0]||{}).texto || 'ninguna sin confirmar']
   ];
   return '<div class="chips">'+
-      '<span class="chip">CIERRA <b style="color:var(--ink)">'+fin.txt+'</b></span>'+
-      '<span class="chip">QUEDAN <b style="color:var(--ink)">'+fin.dias+' día'+(fin.dias===1?'':'s')+'</b></span>'+
+      '<span class="chip">TERMINÓ <b style="color:var(--ink)">'+fin.txt+'</b></span>'+
+      '<span class="chip">LLEVA <b style="color:var(--ink)">'+fin.dias+' día'+(fin.dias===1?'':'s')+'</b></span>'+
       '<span class="chip '+estado[1]+'">'+estado[0]+'</span></div>'+
     pan('Antes de cerrar', bloq.length? (bloq.length+' sin resolver') : 'nada pendiente',
       pasos.map(function(p){
@@ -1029,7 +1151,8 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
           /* ⛔ Aqui habia un «No se ha aplicado nada.» CABLEADO: lo decia con el cierre ya
              escrito en las 32 fichas. Ahora sale del dato. */
           (hecho
-            ? '<div class="nota"><b>'+(plan.parado?'Se paró a medias.':'Ya está aplicado.')+'</b> '+
+            ? '<div class="nota"><b>'+(plan.parado?'Se paró a medias.'
+                :inc?'Aplicado a medias: faltan '+inc.faltan+'.':'Ya está aplicado.')+'</b> '+
               ((res&&res.aplicadas)||0)+' ficha'+(((res&&res.aplicadas)||0)===1?'':'s')+' escritas en Notion'+
               ((res&&res.at)?' · '+esc(String(res.at).slice(0,16).replace('T',' ')):'')+
               ((res&&res.ausentes)?' · <b>'+res.ausentes+' sin ficha en Notion</b>'+
@@ -1048,10 +1171,19 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
     /* APLICAR: el boton mas peligroso de la app. Escribe en las fichas de Notion de las 32
        personas, y de ahi salen la cuota y la renovacion. Por eso va DEBAJO del plan entero
        -no se aprueba a ciegas- y solo sale si hay plan SIN aplicar. */
-    (plan && !hecho
-      ? pan('Aplicar el cierre de '+_nomPeriodo_(plan.periodo),'esto sí escribe',
+    /* ⛔ `!hecho` dejaba fuera el caso que más lo necesita: aplicado A MEDIAS. Con 25 de 32
+       escritas no había ningún botón en ninguna de las dos caras, y las 7 que faltan se
+       quedaban con la carga del mes puesta. Relanzar es seguro y resume por donde iba. */
+    /* ⚠️ `!plan.parado` NO SOBRA, y lo cazó el banco sobre este mismo arreglo: un cierre
+       PARADO con 20 de 32 también está «incompleto», así que sin esto el botón volvía a
+       salir justo sobre el estado en el que este panel dice «no lo relances sin mirarlo».
+       La puerta hace bien en contarlo —parado e incompleto son dos hechos distintos—; a
+       quién se le ofrece el botón lo decide la pantalla. */
+    (plan && (!hecho || (inc && !plan.parado))
+      ? pan((inc?'Terminar':'Aplicar')+' el cierre de '+_nomPeriodo_(plan.periodo),'esto sí escribe',
           '<div class="pb"><button class="btn pri" data-aplicarcierre>'+
-          'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo))+'</button></div>'+
+          (inc?'Terminar el cierre · faltan '+inc.faltan
+              :'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo)))+'</button></div>'+
           '<div class="nota">Escribe en <b>'+((plan.totales&&plan.totales.personas)||plan.personas||0)+
           ' fichas de Notion</b>. Es idempotente —aplicarlo dos veces no rueda los puntos dos '+
           'veces— y si sale torcido se deshace con <span class="mono">rutinas/revertir_cierre.py</span>.</div>')
@@ -1230,7 +1362,7 @@ V.docpub={g:'Documentos',t:'Publicados',f:function(){
    motivo y la fecha: al cambiar el motivo se repinta el modal y la persona elegida volvia
    al primero de la lista -«me cambia a Aarón por la puta cara»-. Un formulario que se
    borra solo no es un fallo de pintado: es que el estado estaba en el DOM. */
-var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
+var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
 var RRI_MOTIVOS=[
   ['30i','Faltar a un turno de trabajo sin justificar', -1],
   ['30g','No rellenar un formulario obligatorio', -1],
@@ -1268,14 +1400,22 @@ var SANC_TAREAS = { quien: '', lista: null, cargando: false };   // lista null =
 V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
   var c={aceptar:0,justificar:0,rechazar:0};
   LOTE.items.forEach(function(x){c[x.dec]++;});
+  /* ⛔ «CERO PERSONAS» NO ES UN BLOQUE: sin esta rama, un lote vacio pintaba la caja
+     entera -- «0 personas», su motivo, su articulo y el boton de aprobar-- como si
+     hubiera algo que decidir. Y el titulo decia «Bloque abierto · null». */
   var cuerpo = LOTE.cerrado
     ? '<div class="pb">'+vacioSimple('Bloque cerrado','Entró entero y de una vez. Las sanciones se aplican en '+
         'Notion y sale un único comunicado con sus menciones.')+'</div>'
+    : !LOTE.items.length
+    ? '<div class="pb">'+vacioSimple('No hay ningún bloque abierto',
+        'Cuando el motor agrupe sanciones pendientes en un bloque, sale aquí para decidirlo entero.')+'</div>'
     : '<div class="pb"><div class="lote" id="lote">'+
       '<div class="lote-h"><b>'+LOTE.items.length+' personas</b><span class="mono" style="color:var(--red2)">'+rangoLote()+'</span></div>'+
       '<div class="lote-m">'+esc(LOTE.motivo)+' · <b>Art. '+LOTE.art+'</b></div>'+
       LOTE.items.map(function(x){
-        var m=_m(x.n), t=(x.dec!=='aceptar')?' tach':'';
+        /* ⛔ TACHADO SOLO SI SE HA DECIDIDO QUE NO. Sin marcar no es «rechazada»: con
+           `x.dec` a `null` el `!=='aceptar'` tachaba los 30, que es la mentira opuesta. */
+        var m=_m(x.n), t=(x.dec && x.dec!=='aceptar')?' tach':'';
         /* si la decision marcada NO es aceptar no se resta nada: la prevision tiene
            que reflejar lo que va a pasar de verdad al cerrar el bloque. */
         var antes=m?m.puntos:10;
@@ -1292,8 +1432,12 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
       '<div class="pb" style="padding-top:0"><button class="btn sm" data-todas="aceptar">Aceptan todas</button> '+
         '<button class="btn sm" data-todas="rechazar">Rechazan todas</button>'+
         '<span class="sc" style="margin-left:9px">marcar sigue siendo borrador</span></div>'+
+      /* ⛔ Y SE DICE CUANTAS FALTAN. Sin esto, «0 se aplican» sobre un bloque de 30 se lee
+         como «no hay nada que aplicar» y no como «no has mirado ninguna». */
       '<div class="cierrel"><div class="tx"><b class="up">'+c.aceptar+'</b> se aplican · '+
         '<b>'+c.justificar+'</b> justificadas · <b class="dn">'+c.rechazar+'</b> rechazadas'+
+        (_faltanPorMarcar_(LOTE.items) ? ' · <b class="dn">'+_faltanPorMarcar_(LOTE.items)+
+          '</b> sin marcar' : '')+
         '<em>Marcar no aplica nada: no se sanciona a nadie hasta que cierras el bloque entero.</em></div>'+
         '<button class="btn pri" data-lote>Aprobar el bloque · '+c.aceptar+' sanciones</button></div>'+
       '</div></div>';
@@ -1301,7 +1445,8 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
      cola que viene justo debajo. */
   return _ponerSancionHTML_()+
     _selectorLotes_()+
-    pan('Bloque abierto · '+esc(LOTE.nombre),'RRI Título VII',cuerpo,'destaca')+
+    pan(LOTE.items.length ? 'Bloque abierto · '+esc(LOTE.nombre) : 'Bloque de sanciones',
+        'RRI Título VII',cuerpo,'destaca')+
     '<div class="pan"><div class="nota">El <b>motivo y el artículo son comunes a todo el bloque</b>: '+
     'no se cambian fila a fila, y por eso sale un único comunicado. <b>Los puntos de una persona '+
     'concreta todavía no se pueden corregir desde aquí</b>: el backend solo los cambia al aprobar, '+
@@ -1346,8 +1491,12 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
           limite:r0.limite||'\u2014'});
         return '<tr><td>'+esc(r.tit)+'</td><td class="mono" style="color:var(--ink3)">'+r.tipo+'</td>'+
           '<td class="mono" style="color:var(--ink3)">'+(MOD_ET[r.mod]||r.mod)+'</td>'+
-          '<td class="r mono">'+r.conv+'</td>'+
-          '<td class="r mono '+(r.cubren===r.conv?'up':'wa')+'">'+r.cubren+'</td>'+
+          /* ⛔ Con la reunion OCULTA el servidor no manda las demas filas, asi que estos
+             dos numeros NO SE SABEN: se pinta «—», no un «1 de 30» fabricado, y NO en
+             verde. Las dos reglas viven en `reuniones.escritorio.js` para poder
+             EJECUTARLAS: aqui dentro no las alcanza ningun arnes. */
+          '<td class="r mono">'+_cifraCob_(r.conv)+'</td>'+
+          '<td class="r mono '+_claseCob_(r.cubren, r.conv)+'">'+_cifraCob_(r.cubren)+'</td>'+
           '<td class="r mono">'+r.limite+'</td>'+
           '<td class="r">'+(r.fijada?'<span class="chip ok">📌 '+esc(r.fijada)+'</span>':'<span class="chip wa">sin fijar</span>')+'</td></tr>';
       }).join(''))+
@@ -1379,7 +1528,9 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
    El periodo se toma de la FECHA DE LA REUNIÓN (o de su límite), no de hoy: una
    reunión de septiembre convocada en agosto exige el 30 %, no el 25 %.
    ═══════════════════════════════════════════════════════════════════════════ */
-var MESES_MINIMO_BAJO=[1,5,6,7,8,12];
+/* ⛔ `MESES_MINIMO_BAJO` VIVE EN `comun.js` (18/08). Estaba aqui, o sea SOLO en la cara del
+   escritorio, y el movil se quedaba sin poder decirle a nadie cuantas franjas se le exigen.
+   Declararla otra vez aqui la pisaria: este `<script>` corre DESPUES de cargar `comun.js`. */
 
 
 var DISPO_POND=false;   // conmutador personas/ponderada del mapa (solo hibridas)
@@ -1388,6 +1539,28 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
     vacioSimple('No hay ninguna reuni\u00f3n','Cuando se convoque una, aqu\u00ed sale su mapa de calor y a qui\u00e9n le caer\u00eda sanci\u00f3n por no cubrirla.'));
   return REUS.map(function(r0){
     var cob=_cobertura_(r0);
+    /* ⛔⛔ AQUI SE FABRICABA LA LISTA. Con la reunion `oculta` y sin ser el convocante,
+       `sinCubrir` salia de restar «los invitados» menos «los que tienen fila» — y filas
+       solo llega la tuya. O sea: los otros 29, **con nombre y apellidos**, cada uno con
+       su chip de sancion, sobre datos que el servidor decidio no mandar.
+       Daniel (15/08): *«Oculta: solo quien convoca ve cualquier cosa. O sea, el resto
+       solo puede cubrir su disponibilidad y ya esta.»*
+       ⛔ La segunda mitad de esa frase es por lo que `_miDispoPanel_` SE QUEDA. */
+    if(cob.oculto)
+      return '<div class="acord" id="reu-'+r0.id+'"><div class="hh" data-acord>'+
+        '<span class="tx"><b>'+esc(r0.tit||r0.titulo)+'</b><small>'+r0.tipo+' \u00b7 '+
+          (MOD_ET[r0.mod||r0.modalidad]||r0.mod||r0.modalidad)+' \u00b7 cierra el '+
+          (r0.limite||'sin l\u00edmite')+'</small></span>'+
+        '<span class="chip">oculta</span>'+
+        '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+        '<div class="bb"><div style="padding:13px">'+
+          _miDispoPanel_(r0)+
+          '<p class="nota" style="margin:12px 0 0;border:0;padding:11px 0 0">Esta '+
+          'reuni\u00f3n es <b>oculta</b>: el mapa de calor y qui\u00e9n ha cubierto los '+
+          've <b>solo quien la convoca</b>'+
+          (r0.convocante?' ('+esc(r0.convocante)+')':'')+'. T\u00fa cubres tu '+
+          'disponibilidad y ya est\u00e1.</p>'+
+        '</div></div></div>';
     var hib=(r0.modalidad==='hibrida');
     var pondOn=hib && DISPO_POND;
     var _o=_ordenarFranjas_(r0);
@@ -1407,6 +1580,12 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
     var max=0; r.calor.forEach(function(f){f.forEach(function(v){if(v!=null&&v>max)max=v;});});
     var best={d:0,f:0,v:-1};
     r.calor.forEach(function(f,di){f.forEach(function(v,fi){if(v!=null&&v>best.v)best={d:di,f:fi,v:v};});});
+    /* ⛔⛔ LA MEJOR HORA ES UNA VENTANA, NO UNA CASILLA. `best` es la casilla suelta con más
+       gente, y con casillas de 30 min y una reunión de 1 h eso **no responde a nada**: si a
+       las 18:00 pueden 12 y a las 18:30 sólo 2, a las 18:00 la reunión NO CABE. Y ésta es
+       la cara donde se **fija la fecha**. El móvil lo hacía bien desde el 17/08; aquí se
+       seguía recomendando la casilla. Misma puerta para los dos. */
+    var vent=_mejorVentana_(r, _slotsMin_(r.duracion, r.slot), best);
     var g='';
     if(hib) g+='<div class="decs" style="margin-bottom:9px">'+
       '<button data-pond="0" class="'+(pondOn?'':'on')+'">Personas</button>'+
@@ -1498,8 +1677,19 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
         (r.sinCubrir.length+r.bajoMin.length)+' en riesgo</span>'+
       '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
       '<div class="bb"><div style="padding:13px">'+
-        '<p style="margin:0 0 11px;font-size:12.5px;color:var(--ink2)">Mejor franja: <b>'+r.dias[best.d]+' '+
-        _iniF(r.franjas[best.f])+'</b> — '+Math.max(0,best.v)+' de '+r.conv+' pueden.</p>'+g+
+        /* ⛔ TU disponibilidad va ARRIBA, antes del agregado: primero contestas, despues
+           miras como va. Y se construye con `r0` -- la reunion SIN reordenar --, porque
+           `responder` espera `valores` alineado a los `bloques` originales; con el
+           objeto reordenado se guardaria en otra hora. */
+        _miDispoPanel_(r0)+
+        /* ⛔ Y EL ROTULO DICE LA VENTANA ENTERA, y distingue PERSONAS de PUNTOS: con la
+           vista Ponderada, `best.v` son puntos y esto decía «N de M **pueden**» — el móvil
+           sí lo distinguía. Y cuando no hay respuestas cargadas, `exacta` es `false` y no
+           se promete «la reunión entera». */
+        '<p style="margin:0 0 11px;font-size:12.5px;color:var(--ink2)">Mejor hueco: <b>'+r.dias[vent.d]+' '+
+        _hFranja_(r,vent.f0)+(vent.f1>vent.f0?('–'+_hFinFranja_(r,vent.f1)):'')+'</b> — '+
+        Math.max(0,vent.v)+' de '+r.conv+
+        (vent.exacta ? ' pueden la reunión entera.' : (pondOn?' puntos.':' pueden.'))+'</p>'+g+
         (riesgo?'<h4 class="sc" style="margin:16px 0 2px">Sin cubrir · sanción que implicaría</h4>'+riesgo:'')+
         (bajo?'<h4 class="sc" style="margin:16px 0 2px">Por debajo del mínimo</h4>'+bajo:'')+
         (!riesgo&&!bajo?'<div class="vac"><b>Nadie en riesgo</b>Todo el mundo ha cubierto y por encima del mínimo.</div>':'')+
@@ -1534,10 +1724,17 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
 }};
 
 /* ── OPERACIÓN ───────────────────────────────────────────────────────────── */
+/* ⛔ EL ESTADO DEL CIERRE DE TURNO VIVE AQUI Y NO EN `turnos.escritorio.js`: un modulo
+   solo lleva declaraciones `function` (ARRANQUE §5b), las capacidades no se llevan sus
+   globales. `quien` es {nombre:bool} —quien fue DE VERDAD— y `extra` {nombre:horas}. */
+var CIERRE_TUR = { i:null, dur:'', quien:{}, extra:{}, hecho:null };
+
 V.turnos={g:'Operación',t:'Turnos',f:function(){
   if(!TURNOS.length) return pan('Turnos convocados','ninguno',
     vacioSimple('No hay turnos convocados','Convoca el primero aquí abajo: queda publicado en Notion y les llega a los '+
-      'convocados.'))+_convocarDispPanel_()+_dispPanel_()+convocarPanel();
+      /* ⛔ LO TUYO VA ANTES DEL AGREGADO: primero contestas, despues miras como va la
+         semana. Si no te toca contestar, `_miTurnoPanel_` devuelve '' y no ocupa nada. */
+      'convocados.'))+_convocarDispPanel_()+_miTurnoPanel_()+_cierreTurnoPanel_()+_dispPanel_()+convocarPanel();
   return pan('Turnos convocados',TURNOS.length+'',
     tabla([['Turno'],['Fecha'],['Hora',0],['Punto'],['Duración',1],['Van',1],['Memoria',1]],
       /* las fechas llegan en ISO (dato real: '2025-11-26') o DD/MM/AAAA (semilla): se
@@ -1559,7 +1756,7 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
       }).join(''))+
     '<div class="nota">Los turnos se leen <b>en vivo de Notion</b>: lo que convoques aquí abajo aparece '+
     'allí, y lo que se cambie allí tarda unos minutos en verse aquí.</div>')+
-    _convocarDispPanel_()+_dispPanel_()+convocarPanel();
+    _convocarDispPanel_()+_miTurnoPanel_()+_cierreTurnoPanel_()+_dispPanel_()+convocarPanel();
 }};
 V.tareas={g:'Operación',t:'Tareas',f:function(){
   var porUni={};
@@ -1599,29 +1796,53 @@ V.miembros={g:'Equipo',t:'Miembros',f:function(){
 V.ranking={g:'Equipo',t:'Ranking',f:function(){
   /* el ranking pondera horas de temporada / meses en el equipo (decision cerrada).
      Sin esos dos campos no hay ranking que valga: se dice, no se finge. */
-  var VIS=_activos_().filter(function(m){ return typeof m.horasTemp==='number' && m.meses; });
-  if(!VIS.length) return pan('Ranking','sin datos',
+  /* ⛔⛔ EL `&& m.meses` ECHABA DEL RANKING A QUIEN NO TIENE NINGUN MES CERRADO, y no
+     con una cifra rara: **desaparecia la persona**. No salia en el ranking, ni en CUOTA
+     MEDIA, ni en A CERO, y ni el vacio ni la nota al pie lo decian.
+     ⛔ Y TIENE FECHA: el **1 de septiembre**, cuando la temporada nueva deja a las 32 con
+     `meses = 0` a la vez, `VIS` se queda VACIO y esta pantalla -la del PD, que es el
+     unico que ve a todo el mundo- dice «Sin horas del equipo». Justo el dia de la v1.0.
+     ✅ Daniel (14/08), literal: *«Se usan las horas reales sin dividir por meses. Mas
+     justo si trabajo, pero el numero no es comparable con el del resto.»* La regla ya
+     estaba escrita DOS veces -`reglas/cuota.py:horas_mes` y su gemela `_hMesDe_`- y aqui
+     no se aplicaba: se rehacia la division a mano, en tres sitios. */
+  var VIS=_activos_().filter(function(m){ return _hMesDe_(m) !== null; });
+  /* ⛔ `< 2`, NO `!VIS.length`. A rango < 3 el backend sirve la forma MIEMBRO —tu ficha entera
+     y las demas solo con identidad—, asi que este filtro se queda con UNA persona: tu. Y con 1
+     el vacio de aqui abajo NO SALTABA, de modo que un coordinador veia un «Ranking de la
+     temporada» de una sola fila, «CUOTA MEDIA» igual a SU PROPIA CUOTA y «A CERO 0» — cifras
+     de equipo calculadas sobre si mismo, sin nada que dijera que faltan 31 personas.
+     ⚠️ El mensaje correcto YA estaba escrito para este caso: lo que fallaba era la PREGUNTA.
+     `!length` pregunta «¿no hay nadie?»; lo que decide es «¿hay ranking?», y con una sola
+     persona no hay nada que ordenar contra nada. */
+  if(VIS.length < 2) return pan('Ranking','sin datos',
     vacioSimple('Sin horas del equipo','El ranking se calcula con las horas de temporada de cada uno y tu cuenta solo '+
       've las tuyas. Si necesitas el ranking completo, pídeselo al Project Director.'));
-  var rk=VIS.slice().sort(function(a,b){return (b.horasTemp/b.meses)-(a.horasTemp/a.meses);});
-  var conQ=VIS.filter(function(m){ return typeof m.cuota==='number'; });
-  var cuotaTot=conQ.reduce(function(a,m){return a+m.cuota;},0);
+  /* Por la MISMA puerta que el filtro y que la cuota: tres formas de dividir lo mismo
+     acaban dividiendo distinto, y aqui la diferencia es el orden del ranking. */
+  var rk=VIS.slice().sort(function(a,b){return _hMesDe_(b)-_hMesDe_(a);});
+  /* ⛔ LA MISMA CUENTA QUE «Tu cuota», o la pantalla da DOS numeros. Desde hoy la cuota
+     personal se calcula en directo; si esta tabla siguiera con la foto del ultimo `push`,
+     el PD leeria un importe arriba y otro abajo para la misma persona. */
+  var _q=function(m){ var q=_cuotaDe_(m); return q.final; };
+  var conQ=VIS.filter(function(m){ return typeof _q(m)==='number'; });
+  var cuotaTot=conQ.reduce(function(a,m){return a+_q(m);},0);
   return '<div class="chips">'+
       '<span class="chip">PONDERADO <b style="color:var(--ink)">horas de temporada / meses en el equipo</b></span>'+
       '<span class="chip">CUOTA MEDIA <b style="color:var(--ink)">'+(conQ.length?nf(cuotaTot/conQ.length,2):'—')+' €</b></span>'+
-      '<span class="chip">A CERO <b style="color:var(--ink)">'+conQ.filter(function(m){return m.cuota===0;}).length+'</b></span>'+
+      '<span class="chip">A CERO <b style="color:var(--ink)">'+conQ.filter(function(m){return _q(m)===0;}).length+'</b></span>'+
     '</div>'+
     pan('Ranking de la temporada','con la cuota al lado',
       tabla([['#',0],['Miembro'],['Unidad'],['H/mes pond.',1],['Temporada',1],['Coche',1],['Cuota',1]],
         rk.map(function(m,i){
-          var pond=m.horasTemp/m.meses;
+          var pond=_hMesDe_(m);
           return '<tr><td class="mono" style="color:var(--ink3)">'+(i+1)+'</td>'+
             '<td><span class="mem"><span class="av">'+ini(m.nombre)+'</span>'+esc(m.nombre)+'</span></td>'+
             '<td style="color:var(--ink3)">'+esc(m.unidad)+'</td>'+
             '<td class="r mono '+(pond>=UMBRAL?'up':'dn')+'">'+nf(pond,1)+'</td>'+
             '<td class="r mono" style="color:var(--ink3)">'+nf(m.horasTemp,1)+'</td>'+
             '<td class="r mono" style="color:var(--ink3)">'+(m.coche||'—')+'</td>'+
-            '<td class="r mono '+(m.cuota===0?'up':'')+'">'+(typeof m.cuota==='number'?nf(m.cuota,2)+' €':'—')+'</td></tr>';
+            '<td class="r mono '+(_q(m)===0?'up':'')+'">'+(typeof _q(m)==='number'?nf(_q(m),2)+' €':'—')+'</td></tr>';
         }).join(''))+
       '<div class="nota">La cuota baja cuantas más horas se hacen: se calcula sobre el objetivo del mes, '+
       'descuenta <b>4 €</b> por cada turno con coche fuera de Vigo y nunca baja de <b>0 €</b>. '+
@@ -1892,7 +2113,16 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
       : vacioSimple('Sin movimientos','No tienes subidas ni bajadas de puntos esta temporada. '+
         'Si el servidor es anterior a la v53 esto sale vacío aunque las haya.'));
 
-  return '<div class="kpis">'+
+  /* ⛔ EL RELOJ VA LO PRIMERO, ENCIMA DE LOS KPI. Es la ACCION; los KPI y las tablas de
+     debajo son la lectura de lo que esa accion produce. Y va en «Lo tuyo» y no en una
+     vista nueva por el motivo por el que esta vista existe: *un coordinador ve la cola de
+     todos, pero no su propio libro*. Fichar es esa misma frase. */
+  /* ⛔ EL ORDEN ES EL DE LOS ACTOS: primero el reloj (lo normal), despues declarar lo que
+     no se fichó (la recuperación) y por último la lectura de lo que producen. Poner el
+     bloque a posteriori encima del cronómetro invitaría a escribir a mano lo que el reloj
+     habría contado solo, que es justo lo que el coordinador no puede verificar. */
+  return _fichaPanel_()+_bloqPanel_()+
+    '<div class="kpis">'+
       kpi('Horas este mes', hMes==null?'—':nf2(hMes), _mesLargo_(_hoyDateM_()), '', null)+
       kpi('Compensación', nf2(_compMensual_(mi)), real?(extra?'base '+nf2(base)+' + extra '+nf2(extra):'la de tu cargo'):'base del cargo · falta el backend v54','', null)+
       kpi('Puntos', mi.puntos==null?'—':String(mi.puntos), 'hasta el fin de temporada','', null)+
@@ -1910,8 +2140,73 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
           'partes que ya cuentan','', null)+
     '</div>'+
     pan('Tus horas de este mes', _mesLargo_(_hoyDateM_()), libroH)+
-    pan('Tus puntos de la temporada','', libroP);
+    pan('Tus puntos de la temporada','', libroP)+
+    /* ⛔ LA CUOTA VA LA ÚLTIMA, y es la misma decisión que en el móvil («se fue al menú ⋮: es
+       una cifra que se consulta dos veces al año»). Arriba va lo que se hace —fichar— y en
+       medio lo que se mira a diario; la cuota es la consecuencia, y se lee dos veces al año. */
+    _cuotaPanelE_(mi);
 }};
+/* ═══ TU CUOTA, EN EL ESCRITORIO ═══════════════════════════════════════════════════════
+   ⛔ EL HUECO. En el móvil, `_cuotaHTML_` (`horas.movil.js`) explica **por qué pagas lo que
+   pagas**. Aquí la cuota solo existía como **columna del Ranking** — y eso solo funciona para
+   el PD: a un coordinador el backend le sirve la forma MIEMBRO (`{yo, miembros: [identidad]}`),
+   así que el filtro de `V.ranking` (`horasTemp` numérico **y** `meses`) se queda con **una**
+   persona, él, y la pantalla pinta un «Ranking de la temporada» de UNA FILA con «CUOTA MEDIA»
+   = su propia cuota. El estado vacío que esa vista escribió para este caso **no salta nunca**:
+   su guarda es `!VIS.length` y `VIS.length` vale 1.
+
+   ⛔ LA CUOTA NO SE CALCULA AQUÍ, NI UN TROZO DE LA CURVA. `cuota`, `cuota_base` y `coche` los
+   produce `reglas/cuota.py` (vía `flujos/cuotas.py`), viajan en el roster que sube
+   `flujos/push.py` y los sirve el backend en `panel.yo`. Aquí solo se PINTAN.
+   ⛔ Lo único que se deriva es `cuota_base − cuota`, que es **el descuento que de verdad se
+   aplicó** — y no `coche × 4`, que con el suelo en 0 € es un número que nadie descontó. Es el
+   mismo invariante que `probar_cuotas.py` vigila en Python: `base − descuento == final`.
+   ⛔ Y SI NO HAY DATO SE DICE, no se pinta un 0: **0 € es el mejor resultado posible** —te lo
+   cubren los turnos con coche— y «no ha llegado» es lo contrario. Pintarlos igual convierte
+   «no se sabe» en «no debes nada».
+
+   ⚠️ `docs/direcciones-visuales-ronda3.md` §3 «Fuera Economía» prohíbe un **apartado** de
+   cuotas/gastos/tesorería y dice que la cuota se lee **en el Ranking**. Esto no es un apartado
+   —no hay entrada de nav, ni gastos, ni tesorería, y solo sale TU número— y **la columna del
+   Ranking no se toca**. Si aun así se lee como «solo en el Ranking», esto se cae quitando la
+   llamada de abajo. */
+function _cuotaPanelE_(mi){
+  if(!mi) return '';
+  /* ⛔ EN DIRECTO (Daniel, 15/08: *«se recalcula en cada fichaje»*). Esto pintaba
+     `mi.cuota` tal cual venia del roster, o sea la foto del ultimo `push`. Por la MISMA
+     puerta que el movil, que para eso esta en `comun.js`: dos caras leyendo `mi.cuota`
+     por su cuenta es como se llega a que digan importes distintos. */
+  var _q=_cuotaDe_(mi);
+  var hay=(typeof _q.final==='number') && isFinite(_q.final);
+  if(!hay) return pan('Tu cuota','sin dato',
+    vacioSimple('Tu cuota todavía no ha llegado','Sale de tus horas de la temporada y se cierra '+
+      'en agosto. Esto NO dice que no tengas cuota: dice que el servidor aún no la ha servido.'));
+  var eur=function(v){ return nf(v,2)+' €'; };
+  var base=_q.base;
+  var desc=(base==null) ? 0 : Math.round((base-_q.final)*100)/100;
+  var filas='<tr><td><b>Cuota por tus horas</b><div class="sc">la que sale de la curva</div></td>'+
+      '<td class="r mono">'+(base==null?'—':eur(base))+'</td></tr>';
+  if(desc>0) filas+='<tr><td><b>Por poner el coche</b><div class="sc">'+(mi.coche||0)+' turno'+
+      ((mi.coche===1)?'':'s')+' fuera de Vigo · 4 € cada uno</div></td>'+
+      '<td class="r mono up">−'+eur(desc)+'</td></tr>';
+  filas+='<tr><td><b>Estimación de lo que pagarás</b><div class="sc">al año · '+
+      (_q.viva ? 'con tus horas de ahora mismo' : 'última cifra servida, no la de ahora')+
+      ' · se cierra en agosto, al acabar la temporada</div></td>'+
+      '<td class="r mono'+((_q.final===0)?' up':'')+'">'+eur(_q.final)+'</td></tr>';
+  return pan('Tu cuota', eur(_q.final)+' al año',
+    tabla([['Concepto'],['Importe',1]], filas)+
+    /* ⛔ LOS DOS INGREDIENTES A LA VISTA, y no es adorno. La curva divide `horasTemp / meses`, y
+       quien no tiene NINGÚN mes cerrado paga **la más cara del equipo** —67,89 € medidos el
+       13/08— por no saberse. El 1 de septiembre `horas_temporada.json` se regenera y las 32
+       pasan por ese estado a la vez. Con las dos cifras delante, un «0 meses» canta; sin
+       ellas es un número plausible que nadie discute. */
+    '<div class="nota">Sale de tus <b>'+((typeof mi.horasTemp==='number')?nf(mi.horasTemp,1):'—')+
+    ' h</b> de la temporada en <b>'+(mi.meses||0)+'</b> '+((mi.meses===1)?'mes':'meses')+
+    ' dentro del equipo. El objetivo del mes se mueve entre <b>8 y 15 h</b>, con '+
+    nf2(_compBase_(mi))+' h de base por tu cargo. Poner el coche fuera de Vigo descuenta '+
+    '<b>4 €</b> por turno y nunca baja de <b>0 €</b>. Se cierra en <b>agosto</b> y es requisito '+
+    'para renovar; aquí solo se consulta.</div>');
+}
 V.novedades={g:'Ajustes',t:'Novedades',f:function(){
   return '<div class="tarj">'+_novedadesHTML_()+'</div>';
 }};
@@ -1922,6 +2217,10 @@ V.ajustes={g:'Ajustes',t:'Ajustes',f:function(){
   var hayBack=(typeof backendOK!=='undefined' && backendOK && SESION);
   var gen=!DATA.generado ? '—' : (hayBack ? _isoADMY_(DATA.generado)
          : (_isoADMY_(DATA.generado)+' · de la semilla, no del servidor'));
+  /* ⛔ SE PIDE AL ABRIR AJUSTES, no al arrancar: es una pantalla de la que casi nadie tira, y
+     cargarla siempre serían 32 llamadas de más a Apps Script al día. El cerrojo está dentro
+     (`NOTIS_SRV`), así que repintar no vuelve a preguntar. */
+  _notisCargar_(pintar);
   return pan('Notificaciones', (typeof Notification==='undefined')?'no disponibles':Notification.permission,
       _notisHTML_())+
     pan('Sesión','', tabla([['Dato'],['Valor']],
@@ -2114,7 +2413,9 @@ function _aplicarBootstrap_(boot){
 }
 
 
-var _EST_PARTE_={pendiente:'pend',aprobada:'aprobado',rechazada:'rechazado',detalle:'detalle',otorgada:'aprobado',aplicada:'aprobado',sin_declarar:'sindecl',caducada:'cad'};
+/* ⛔ `revertida` y `anulada` FALTABAN: el `||'pend'` las devolvia a la cola del
+   coordinador, con botones que el servidor niega. Ver la nota gemela en `movil.html`. */
+var _EST_PARTE_={pendiente:'pend',aprobada:'aprobado',rechazada:'rechazado',detalle:'detalle',otorgada:'aprobado',aplicada:'aprobado',sin_declarar:'sindecl',caducada:'cad',revertida:'rev',anulada:'rev'};
 
 
 async function _onCredencial_(resp,_silente){
@@ -2154,13 +2455,70 @@ async function _onCredencial_(resp,_silente){
     }
     try{ localStorage.setItem('sol_last_email',SESION.email);
          localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
-    ACTOR = SESION.nombre || PD_NOM;
+    /* ⛔ LA IDENTIDAD DE RESPALDO ERA EL PROJECT DIRECTOR, Y ESO ES FALLAR ABIERTO.
+       Aqui, si la identidad llegaba sin nombre, ACTOR pasaba a ser el director del proyecto y
+       `rangoNom(ACTOR)` devolvia **3**: el bloque de sanciones, el cierre de mes, el cierre de
+       temporada, el buzon y la decision de cualquier expediente, todo ofrecido a quien no es.
+       El contraste estaba a un fichero de distancia: `_rangoBeta_()` (comun.js) contesta **0**
+       cuando no hay nombre. La misma pregunta con dos respuestas opuestas es como se abre una
+       puerta por descuido.
+       ⚠️ Y SE MIDE, que no es lo mismo cuanta deuda hay que cuanto dano hace: contra el
+       backend de hoy esa rama **no se dispara**. `_verificarIdentidad_` devuelve
+       `nombre: nombre || email` —y antes `nombre || info.name || email`— con `!info.email`
+       lanzando antes, asi que ese campo es SIEMPRE una cadena con algo. Es deuda **latente**,
+       no dano en curso. Se cierra igual porque esta cara se publica en Pages y el backend en
+       Apps Script, **por separado**: basta con que un dia el servidor conteste otra forma para
+       que la puerta se abra sola, y entonces no habra ningun error que lo delate.
+
+       ⛔ Y LA SEGUNDA MITAD, ESTA SI EN CURSO. `_aplicarPanel_` empieza con `if(!pnl) return;`
+       y quien la llama pone `backendOK=true` igual. `pnl` llega a `null` **sin que falle ninguna
+       red**: `_getPanelRol_` empieza con `var panel=_getDato_('panel'); if(!panel) return null;`.
+       Cuando pasa, esta cara se queda con su semilla —**18 personas inventadas** con horas,
+       cuotas y sanciones inventadas— pintada como si fuera el equipo, en el panel donde se
+       firman horas y se sancionan personas. Y `_rederivarCargos_` tampoco corre, asi que los
+       nombres canonicos se quedan en sus literales: sobre esa ficcion, el director conserva su
+       rango 3.
+       ✅ `DATA._rol` es el testigo que YA existia: solo lo escriben las dos ramas de
+       `_aplicarPanel_`, y solo cuando el roster ha llegado de verdad.
+
+       ⚠️ GEMELA: ninguna de las dos condiciones mira el PERMISO de nadie —son condiciones sobre
+       el DATO—. Con identidad y panel buenos (direccion, junta, consejo, coordinacion y la
+       cuenta admin) esto no se llega a notar: quien entra hoy sigue entrando igual. */
+    var _nomSes=String(SESION.nombre||'').replace(/^\s+|\s+$/g,'');
+    if(!_nomSes || !DATA._rol){
+      _gate_(_insigniaHTML_()+'<div style="max-width:390px;line-height:1.55;text-align:center">'+
+        '<b>'+(_nomSes?'No llegaron los datos del equipo.':'No se pudo confirmar qui\u00e9n eres.')+
+        '</b><br><span style="opacity:.75">'+(_nomSes
+          ? 'Tu cuenta entr\u00f3 bien, pero el servidor no devolvi\u00f3 el roster. Este panel no se '+
+            'abre con datos de muestra: aqu\u00ed se firman horas y se sancionan personas.'
+          : 'El servidor acept\u00f3 tu cuenta pero no dijo tu nombre, y sin nombre no hay forma de '+
+            'saber qu\u00e9 te toca decidir.')+
+        ' Vuelve a intentarlo; si sigue igual, av\u00edsale al Project Director.</span></div>'+
+        '<button id="reIdE" style="border:1px solid #463E40;background:none;color:#F4F3F3;'+
+        'border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>');
+      var _bIdE=document.getElementById('reIdE');
+      if(_bIdE) _bIdE.onclick=function(){ _onCredencial_(resp); };
+      return;
+    }
+    ACTOR = _nomSes;
     /* SE PINTA YA con el bootstrap, que trae identidad, panel, tareas, turnos y
        documentos. Antes se esperaba ademas a sanciones y a partes EN SERIE: dos idas y
        vueltas mas a Apps Script (~1,7 s cada una) mirando «Verificando…» para nada, porque
        la primera pantalla no las usa. Ahora caen en paralelo y repintan al llegar. */
     var g=document.getElementById('loginGate'); if(g) g.remove();
     _pintarActua_(); pintar();
+    /* ⛔ Y AQUI EL RE-REGISTRO DE LOS AVISOS, que es lo que le faltaba a esta cara.
+       `_pushInit_` re-guarda la suscripcion **solo si hay sesion**, y la unica llamada
+       que habia era un `setTimeout(..., 800)` del final del fichero: a los 800 ms, con
+       `_arrancarGis_` esperando un clic humano en Google, `SESION` es `null` y la
+       funcion se salta el re-guardado **en silencio y sin reintento**.
+       ⛔ Y eso importa porque los navegadores ROTAN la suscripcion: sin re-guardarla,
+       los avisos dejan de llegar sin que nada lo diga, mientras Ajustes sigue enseñando
+       «activadas» en verde. El movil hace esto desde siempre (`movil.html`, dentro de
+       `_onCredencial_`): «aqui solo queda guardar la suscripcion, que necesita sesion».
+       ⚠️ Va DESPUES de resolver la identidad y quitar el gate: antes de eso `SESION`
+       puede existir y la identidad no, que es la mitad del problema que se arregla. */
+    try{ _pushInit_(); }catch(_){}
     /* UN solo repintado al final, no uno por carga: `pintar()` reconstruye `#main` y cada
        repintado pierde el scroll, asi que tres seguidos se ven como una recarga sola. */
     Promise.all([_cargarSanciones_(), _cargarPartes_()])
@@ -2210,14 +2568,23 @@ function _arrancarGis_(){
         'prueba a recargar del todo (Ctrl+May\u00fas+R).</span></div>'+
         '<button id="reGis2" style="border:1px solid #463E40;background:none;'+
         'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar'+
-        '</button>'+
-        '<button id="verDemo" style="border:none;background:none;color:#8b8285;'+
-        'font-size:12px;text-decoration:underline;cursor:pointer">Ver la app de '+
-        'demostraci\u00f3n (datos inventados)</button>');
+        '</button>');
       var _rg=document.getElementById('reGis2');
       if(_rg) _rg.onclick=function(){ _arrancarGis_(); };
-      var _vd=document.getElementById('verDemo');
-      if(_vd) _vd.onclick=function(){ var g=document.getElementById('loginGate'); if(g) g.remove(); };
+      /* \u26d4 AQUI HABIA UN BOTON «Ver la app de demostracion (datos inventados)», Y SE QUITO
+         EL 17/08 POR PETICION EXPLICITA DE DANIEL (11/08): «El escritorio no me pide login, no
+         hay nada q elegir, eso no esta bien, **yo quiero login q no puedo ver nada**».
+         \u26a0\ufe0f El boton era una salida honesta y etiquetada -por eso se puso el 08/08-, pero
+         seguia siendo VER ALGO SIN LOGIN, que es justo lo que el pidio que no pasara. Su frase
+         es POSTERIOR al diseno que lo puso, asi que manda ella.
+         \u2705 Y el caso legitimo -mirar la app en local, sin red- no se pierde: sigue detras de
+         `?demo`, que es la MISMA convencion que este fichero ya usa para congelar la fecha
+         (`location.search.indexOf('demo')`). La diferencia con el boton no es cosmetica: un
+         boton se OFRECE a cualquiera que llegue con la sesion caida; un parametro de URL solo
+         lo escribe quien va a buscarlo sabiendo que los datos son inventados. */
+      if(location.search.indexOf('demo')>=0){
+        var g=document.getElementById('loginGate'); if(g) g.remove();
+      }
       return;
     }
     setTimeout(function(){ esperar(n-1); },150);
@@ -2341,7 +2708,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='58c6882';
+var BUILD='eb57440';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -2522,7 +2889,38 @@ function _pinReunionFijar_(m){
     };
   });
 
+  /* ⛔ ELIMINAR UNA REUNIÓN. Lo que sigue pidiendo confirmación es **lo irreversible para
+     el otro** (decisión cerrada del 27/07), y esto lo es dos veces: se borra la reunión Y la
+     disponibilidad que ya cubrió la gente. Por eso el `confirm` **dice cuántas personas** la
+     habían cubierto: sin ese número es un «¿seguro?» que no informa, y se pulsa igual. */
+  $$('[data-borrarreu]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var r=_reuSel(); if(!r) return;
+      /* Se vuelve a preguntar al PULSAR y no solo al pintar: entre las dos cosas puede haber
+         entrado un refresco que cambie la lista, y `_reuSel()` resuelve por índice. */
+      if(!_puedeBorrarReuE_(r)){ tost('Solo puede eliminarla quien la convocó.'); return; }
+      if(typeof backendOK==='undefined' || !backendOK || !SESION){
+        tost('Sin conexión no se puede eliminar una reunión.'); return; }
+      var n=_nRespReuE_(r), tit=r.titulo||r.tit||('Reunión '+r.id);
+      if(!confirm('Eliminar «'+tit+'».'+String.fromCharCode(10,10)+
+        (n ? ('Se borra también la disponibilidad que ya cubrieron '+n+' persona'+(n===1?'':'s')+'.')
+           : 'Según el servidor todavía no la ha cubierto nadie.')+
+        (r.fijada ? (String.fromCharCode(10)+'OJO: ya tiene fecha fijada ('+r.fijada+
+                     '), o sea que está convocada de verdad.') : '')+
+        String.fromCharCode(10)+'Esto no se puede deshacer. ¿Seguro?')) return;
+      b.disabled=true; var prev=b.textContent; b.textContent='Eliminando…';
+      try{
+        await api.borrarReunion(r.id);
+        for(var i=0;i<REUS.length;i++){ if(REUS[i] && REUS[i].id===r.id){ REUS.splice(i,1); break; } }
+        RE_SEL=0;                       // la selección apuntaba a la que ya no existe
+        tost('Reunión eliminada.');
+        pintar();
+      }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo eliminar: ', e); }
+    };
+  });
   var _bn=m.querySelector('#btnNotis'); if(_bn) _bn.onclick=function(){ activarNotis(_bn); };
+  _engNotisPrefs_(m);
   var _bs=m.querySelector('[data-salir]'); if(_bs) _bs.onclick=function(){ cerrarSesion(); };
 }
 
@@ -2710,7 +3108,11 @@ function pintar(){
 function ir(k,foco){
   /* Al abrir el cierre se pregunta al servidor en que punto esta: los bloqueos y el plan
      los tiene el, no se deducen aqui. */
-  if(k==='cierre' && CIERRE===null && !CIERRE_ERR) setTimeout(_cargarCierre_,60);
+  /* ⛔ Y TAMBIÉN AL ABRIR PARTES, porque «Ya firmaste» necesita saber si el mes está cerrado
+     para no ofrecer un botón que el servidor va a negar. Sin esto `CIERRE` se queda en `null`,
+     `_mesCerradoParte_` contesta «no lo sé» y el guardia de cortesía **no existe** — lo cual
+     no da ningún error: da un botón que falla en la cara de quien lo pulsa. */
+  if((k==='cierre'||k==='partes') && CIERRE===null && !CIERRE_ERR) setTimeout(_cargarCierre_,60);
   if(k==='temporada' && TEMP===null && !TEMP_ERR) setTimeout(_cargarTemporada_,60);
   if(k===vista && !foco) return;
   vista=k;
@@ -2735,6 +3137,16 @@ function _engIrYAcordeones_(){
     el.onclick=function(){ ir(el.dataset.ir, el.dataset.foco); };
   });
   $$('[data-pond]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); DISPO_POND=(b.dataset.pond==='1'); pintar(); }; });
+  _cablearMiDispo_();   // no hace nada si la vista no lo pinta
+  _cablearMiTurno_();   // idem
+  /* ⛔⛔ LA TERCERA HERMANA, QUE FALTABA. `_cierreTurnoPanel_()` se pinta en las dos ramas
+     de la vista de turnos (arriba, `V.turnos`), y `_cablearCierreTurno_` no la llamaba
+     NADIE: salia **1 sola vez en todo `navegador/`**, su propia declaracion. Resultado:
+     el responsable veia el panel entero —selector, duracion, casillas de quien fue,
+     campos de extra y el boton de cerrar— y **ni un control respondia**.
+     ⚠️ Agravante: con el `<select>` muerto, `CIERRE_TUR.i = cerrables[0]` dejaba
+     accesible **un solo turno**, el primero del array; a los demas no se llegaba. */
+  _cablearCierreTurno_();   // idem
   $$('[data-acord]').forEach(function(h){
     h.onclick=function(){ h.parentNode.classList.toggle('ab'); };
   });
@@ -2906,8 +3318,10 @@ function _engConvocarTurno_(){
          salga `disabled`: una pantalla puede repintarse mal, y el envio es la ultima
          linea. Lo que no puede pasar es que digan cosas distintas, y por eso el texto
          sale de la misma funcion. */
+      /* ⛔ LOS COCHES TAMBIEN, y aqui MAS que en el boton: esto es la comprobacion del
+         ENVIO, la ultima antes de escribir el turno de verdad. */
       var _mot=(typeof _porQueNoSeConvoca_==='function')
-        ? _porQueNoSeConvoca_(TUR_CARGOS, nn.length) : (nn.length?'':'Marca al menos a una persona.');
+        ? _porQueNoSeConvoca_(TUR_CARGOS, nn.length, TUR_COCHES) : (nn.length?'':'Marca al menos a una persona.');
       if(_mot){ tost(_mot); return; }
       if(!backendOK || !SESION){ tost('Sin conexión no se puede convocar: el turno se escribe en Notion.'); return; }
       b.disabled=true; var prev=b.textContent; b.textContent='Convocando\u2026';
@@ -2954,7 +3368,8 @@ function _engDocsDecidir_(){
     cambios:'Cambios pedidos. Le llega al autor, que podrá reenviarlo corregido.',
     rechazado:'Rechazado. El autor recibe el motivo.',
     deshacer:'Decisión deshecha: vuelve a revisión.',
-    reenviar:'Reenviado a revisión.'};
+    /* ⛔ Mismo aviso falso que en el movil: pulsar no sube nada. */
+    reenviar:'Devuelto a revisión. Si todavía no has subido el archivo corregido por el formulario, el revisor abrirá la versión anterior.'};
   $$('.acts [data-doc]').forEach(function(b){
     b.onclick=async function(){
       if(b.disabled) return;
@@ -2972,7 +3387,10 @@ function _engDocsDecidir_(){
         ' tendrá que enviar uno nuevo. ¿Seguro?')) return;
       if(accion==='deshacer' && !confirm('Devolver «'+d.tit+'» a revisión y borrar la decisión de '+
         (d.revisor||'quien la tomó')+'. ¿Seguro?')) return;
-      var extra = accion==='anot' ? {titulo:titulo} : null;
+      /* Las DOS mitades: el contrato define la accion como ajustar titulo Y etiquetas, y
+         `Codigo.gs:992` aplica las dos. Aqui iba solo el titulo desde la particion. */
+      var etqs = _etiquetasDeTexto_((document.getElementById('detq-'+d.id)||{}).value||'');
+      var extra = accion==='anot' ? {titulo:titulo, etiquetas:etqs} : null;
       b.disabled=true; var prev=b.textContent; b.textContent='Enviando…';
       try{
         if(typeof backendOK!=='undefined' && backendOK && SESION){
@@ -3028,18 +3446,34 @@ function _engSancTodas_(){
       if(!(LOTE.real && backendOK && SESION)){
         faltan.forEach(function(x){ x.dec=dec; }); pintar(); return;   // semilla local
       }
-      b.disabled=true; var prev=b.textContent;
-      var mal=0;
-      for(var i=0;i<faltan.length;i++){
-        b.textContent=(i+1)+'/'+faltan.length+'…';
-        try{ await api.decidirSancion(faltan[i].id,'marcar',{decision:dec}); faltan[i].dec=dec; }
-        catch(e){ mal++; }
+      b.disabled=true; var prev=b.textContent; b.textContent='Marcando…';
+      var mal=0, hechas=0, saltadas=0;
+      /* ⛔⛔ `api.marcarLote` llevaba DECLARADA Y SIN UN SOLO LLAMADOR en esta cara.
+         Se marcaba de una en una — N llamadas, sin lock—, que es exactamente lo que
+         `_marcarLote_` existe para evitar; y de paso se tiraba su `saltadas`, o sea
+         **cuantas no puedes decidir tu**. El prototipo VIEJO (`app.html`) ya tenia esta
+         via rapida con su respaldo: aqui se habia perdido.
+         ⚠️ El respaldo NO es adorno: una implementacion en vuelo del backend puede ser
+         anterior a la accion `marcarLote`, y entonces la unica salida es el bucle. */
+      try{
+        var rm=await api.marcarLote(LOTE.lote, dec);
+        hechas=(rm&&rm.marcadas!=null)?rm.marcadas:faltan.length;
+        saltadas=(rm&&rm.saltadas)||0;
+      }catch(_e){
+        for(var i=0;i<faltan.length;i++){
+          b.textContent=(i+1)+'/'+faltan.length+'…';
+          try{ await api.decidirSancion(faltan[i].id,'marcar',{decision:dec}); hechas++; }
+          catch(e2){ mal++; }
+        }
       }
       b.disabled=false; b.textContent=prev;
+      /* ⛔ Y NO SE PINTA LO QUE UNO CREE, SINO LO QUE HAY: se relee la cola. Marcar a
+         mano `x.dec=dec` daba por marcadas tambien las que el servidor se salto. */
+      await _cargarSanciones_();
       /* Si alguna falla se dice CUANTAS: dar por buenas veinte cuando entraron
          dieciocho es exactamente como se cierra un bloque a medias sin enterarse. */
-      tost(mal ? ('Marcadas '+(faltan.length-mal)+' de '+faltan.length+'; '+mal+' fallaron.')
-               : ('Marcadas '+faltan.length+'. Sigue sin aplicarse nada.'));
+      tost(mal ? ('Marcadas '+hechas+' de '+faltan.length+'; '+mal+' fallaron.')
+               : ('Marcadas '+hechas+'. Sigue sin aplicarse nada.'+_saltadasTxt_(saltadas)));
       pintar();
     };
   });
@@ -3052,6 +3486,14 @@ function _engSancCerrar_(){
   $$('[data-lote]').forEach(function(b){
     b.onclick=async function(){
       if(b.disabled) return;
+      /* ⛔⛔ EL BLOQUE SE CIERRA ENTERO, Y CERRARLO ES EL DISPARO. Una sancion sin marcar
+         no es una aceptada — pero el servidor la da por aceptada, asi que sin esta guarda
+         un clic aqui escribia en Notion y mandaba el comunicado con los nombres de gente
+         sobre la que nadie habia decidido nada. El movil la tenia; esta cara no.
+         ⚠️ Mismo texto que el movil a proposito: dos avisos distintos para la misma
+         regla es como se acaba dudando de cual de los dos es el bueno. */
+      var _faltan=_faltanPorMarcar_(LOTE.items);
+      if(_faltan){ tost('Faltan '+_faltan+' por marcar: el bloque se cierra entero.'); return; }
       var c=0; LOTE.items.forEach(function(x){ if(x.dec==='aceptar') c++; });
       if(!confirm('Vas a cerrar el bloque «'+LOTE.nombre+'».\n\n'+c+' se aplican.\n\n'+
         'Esto aplica las sanciones aceptadas en Notion y manda el comunicado. ¿Seguimos?')) return;
@@ -3059,9 +3501,19 @@ function _engSancCerrar_(){
         b.disabled=true; var prev=b.textContent; b.textContent='Cerrando…';
         try{
           var r=await api.confirmarLote(LOTE.lote);
-          LOTE.cerrado=true;
+          /* ⛔⛔ EL BLOQUE PUEDE CERRARSE A MEDIAS, Y EL SERVIDOR LO DICE.
+             `_confirmarLote_` salta las que no pasan `_puedeSobreSancion_` y las cuenta
+             en `sinPermiso`; esas **se quedan pendientes**. Sin leerlo, esta pantalla
+             ponia «Bloque cerrado» y marcaba `LOTE.cerrado`, o sea que las que quedaban
+             desaparecian del panel sin que nadie hubiera decidido sobre ellas.
+             ⚠️ `LOTE.cerrado` pasa a depender del dato, no de haber llamado. */
+          var _sp=(r&&r.sinPermiso)||0, _ju=(r&&r.justificadas)||0;
+          LOTE.cerrado = !_sp;
           var ap=(r&&r.aprobadas!=null)?r.aprobadas:c;
-          tost('Bloque cerrado: '+ap+' aplicada'+(ap===1?'':'s')+'. Se escriben en Notion y sale el comunicado.');
+          tost((_sp?'Bloque cerrado A MEDIAS: ':'Bloque cerrado: ')+
+            ap+' aplicada'+(ap===1?'':'s')+
+            (_ju?' \u00b7 '+_ju+' justificada'+(_ju===1?'':'s'):'')+
+            '. Se escriben en Notion y sale el comunicado.'+_saltadasTxt_(_sp));
           pintar();
         }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo cerrar: ', e); }
         return;
@@ -3099,6 +3551,7 @@ function _engSancCerrar_(){
 function enganchar(){
   _engIrYAcordeones_();
   _engPartes_();
+  _engPartesRev_();
   _engOtorgar_();
   _engBloqueHoras_();
   _engConvocarTurno_();
@@ -3107,6 +3560,8 @@ function enganchar(){
   _engSancMarcar_();
   _engSancTodas_();
   _engSancCerrar_();
+  _engFicharE_();
+  _engBloqueE_();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

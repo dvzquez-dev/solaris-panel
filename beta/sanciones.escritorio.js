@@ -178,9 +178,11 @@ function _ponerSancCuerpo_(){
   /* LAS TAREAS DEL SANCIONADO, no las mias -antes se ofrecian las propias y por eso no se podia
      sancionar a nadie por un plazo-. `null` = todavia se estan pidiendo. Y solo las VIVAS con
      enlace a Notion: sin `url` no se puede mover la fecha. */
-  var _tt=esPlazo ? _tareasDe_(SANC_FORM.quien, function(){
-    var c=$('#ponerSanc'); if(c){ c.innerHTML=_ponerSancCuerpo_(); _cablearPonerSanc_(); }
-  }) : [];
+  /* ⛔ ESTE CALLBACK ES ASINCRONO Y REPINTA EL PANEL ENTERO. Llegaba aqui `c.innerHTML=...`
+     a pelo, SIN recoger antes: lo tecleado entre que se pidieron las tareas y que llegaron se
+     perdia -y volvia como `-1`, que es el valor por defecto de `pts`, con pinta de elegido-.
+     Ahora pasa por la MISMA puerta que el resto de repintados. */
+  var _tt=esPlazo ? _tareasDe_(SANC_FORM.quien, _repintarPonerSanc_) : [];
   var cargandoT=(_tt===null);
   var tareas=(_tt||[]).filter(function(t){
     return t && t.url && !/hech|finaliz|complet|termin|cerrad/i.test(t.e||''); });
@@ -233,7 +235,7 @@ function _ponerSancCuerpo_(){
               'a Notion, as\u00ed que no se puede mover ning\u00fan plazo. Elige otro motivo.</div>')
         : '')+
       '<label style="display:block;margin-bottom:11px;max-width:130px">'+lab('Puntos')+
-        '<input type="number" id="snPts" value="'+esc(SANC_FORM.pts||'-1')+'" step="1" min="-5" max="0" style="'+E+'"></label>'+
+        '<input type="number" id="snPts" value="'+esc(SANC_FORM.pts||_puntosDeMotivo_(SANC_FORM.motivo)||'')+'" step="1" min="-5" max="0" style="'+E+'"></label>'+
       '<button class="btn pri" id="btnSanc">Poner la sanci\u00f3n</button>'+
       '<div class="nota" id="snMsg" style="margin:9px 0 0">La sanci\u00f3n entra <b>pendiente</b>: se decide '+
       'abajo, y el comunicado sale despu\u00e9s.</div>'+
@@ -241,27 +243,34 @@ function _ponerSancCuerpo_(){
   '</div>';
 }
 
+/* ⛔ LA UNICA PUERTA PARA REPINTAR EL PANEL. Estas dos lineas estaban copiadas en dos
+   sitios -aqui y en el callback de `_tareasDe_`- y solo una recogia antes. Dos copias de un
+   gesto acaban siendo dos gestos distintos, y la diferencia es el bug: fue exactamente este.
+   ⚠️ Recoge AUNQUE los campos ya se guarden al teclear (`_atarSancForm_`): esto es la red,
+   no el mecanismo. */
+function _repintarPonerSanc_(){
+  _recogerSancForm_();
+  var c=$('#ponerSanc'); if(!c) return;
+  c.innerHTML=_ponerSancCuerpo_(); _cablearPonerSanc_();
+}
+
 function _cablearPonerSanc_(){
   var val=function(id){ var e=$('#'+id); return e?e.value:''; };
   var msg=function(t,mal){ var b=$('#snMsg'); if(b){ b.textContent=t; b.style.color=mal?'var(--warn)':''; } };
-  /* LO PRIMERO: guardar TODO lo escrito antes de cualquier repintado. El estado no puede vivir
-     en el DOM, porque el DOM se rehace. */
-  function recoger(){
-    ['snMotivo','snLibre','snArt','snTarea','snPlazo','snPts','snFiltro'].forEach(function(id){
-      var e=$('#'+id); if(!e) return;
-      SANC_FORM[{snMotivo:'motivo',snLibre:'libre',snArt:'art',snTarea:'tarea',
-                 snPlazo:'plazo',snPts:'pts',snFiltro:'filtro'}[id]]=e.value;
-    });
-  }
-  /* Repinta SOLO el panel, no la pantalla. */
-  function repintar(){ recoger(); var c=$('#ponerSanc'); if(!c) return;
-    c.innerHTML=_ponerSancCuerpo_(); _cablearPonerSanc_(); }
+  /* ⛔ CADA CAMPO SE GUARDA AL TECLEARLO. Esto es lo que hace que ningun repintado -este, el
+     del callback de tareas, o el refresco vivo de 90 s- pueda tirar lo escrito: `SANC_FORM` no
+     llega nunca a estar mas viejo que el DOM. Antes solo se recogia AL repintar, y el repintado
+     asincrono no lo hacia. Va lo PRIMERO del cableado, antes de los manejadores `on*`. */
+  _atarSancForm_();
+  /* ⛔ Y NO HAY `recoger`/`repintar` LOCALES: se llama a `_repintarPonerSanc_` por su nombre
+     en cada sitio, que es lo unico que hace visible que la puerta es UNA. Un alias local con el
+     nombre viejo deja el codigo leyendose igual que antes, y la proxima copia se escribe sola. */
   function marcar(b){
     SANC_FORM.quien=b.dataset.sanq;
     $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
     /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS: hay que repintar.
        Con los demas motivos no se toca nada, que seria tirar lo escrito por nada. */
-    if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; repintar(); }
+    if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarPonerSanc_(); }
   }
   /* Elegir persona NO repinta: solo se marca. */
   $$('[data-sanq]').forEach(function(b){ b.onclick=function(){ marcar(b);
@@ -275,17 +284,21 @@ function _cablearPonerSanc_(){
     $$('[data-sanq]',c).forEach(function(b){ b.onclick=function(){ marcar(b); }; });
   };
   /* El motivo decide QUE MAS se pide, asi que ese si repinta. */
-  var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ repintar(); };
+  var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ _repintarPonerSanc_(); };
   var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
 
   var bt=$('#btnSanc');
   if(bt) bt.onclick=async function(){
-    var quien=SANC_FORM.quien, mot=val('snMotivo'), pts=parseInt(val('snPts'),10);
+    /* ⛔ LOS PUNTOS, POR LA PUERTA: `parseInt` a pelo TRUNCA en vez de rechazar
+       (`-3.7` entraba como -3, en silencio) y `!(pts<=0)` deja pasar un -50, que no
+       para NINGUNA capa hasta Notion. Ver `_validaPuntosSanc_` en `comun.js`. */
+    var quien=SANC_FORM.quien, mot=val('snMotivo'), _vp=_validaPuntosSanc_(val('snPts'));
     /* Propia del ENVIO: `esPlazo` es de la funcion que pinta y aqui no existe. */
     var esDePlazo=(mot==='plazo'||mot==='plazoUrg');
     if(!quien){ msg('Elige a qui\u00e9n: pulsa un nombre de la lista.', true); return; }
     if(!mot){ msg('Elige el motivo.', true); return; }
-    if(!(pts<=0)){ msg('Los puntos de una sanci\u00f3n son 0 o negativos.', true); return; }
+    if(!_vp.ok){ msg(_vp.msg, true); return; }
+    var pts=_vp.pts;
     var art=mot, texto='';
     RRI_MOTIVOS.forEach(function(r){ if(r[0]===mot) texto=r[1]; });
     if(mot==='libre'){
@@ -312,8 +325,21 @@ function _cablearPonerSanc_(){
          y la tarea con la fecha vieja, que es la unica de las dos combinaciones malas que NO se
          ve mirando la cola. */
       if(esDePlazo){ msg('Moviendo el plazo en Notion\u2026'); await api.moverLimiteTarea(urlTarea, plazo); }
-      await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual'}]);
-      SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
+      /* ⛔ GEMELA DE `sanciones.movil.js`: la respuesta se lee. El backend salta a quien no
+         es tuyo y lo devuelve en `rechazadas`; sin mirarlo, el `tost` cantaria una sancion
+         que no existe. Se relanza para caer en el `catch` de siempre. */
+      var r = await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual'}]);
+      if(r && r.rechazadas && r.rechazadas.length)
+        throw new Error('no puedes sancionar a '+r.rechazadas.join(', ')+
+                        ': esta fuera de tu jurisdiccion');
+      /* ⛔ Y LA LISTA DE PUNTOS IMPOSIBLES, APARTE de `rechazadas`: son dos motivos
+         distintos y dan dos mensajes distintos. Desde esta cara no deberia saltar
+         nunca -- `_validaPuntosSanc_` corta antes --, y por eso mismo si salta hay que
+         verlo: significa que la cara y el servidor han dejado de decir lo mismo. */
+      if(r && r.invalidas && r.invalidas.length)
+        throw new Error('el servidor no acepta esos puntos ('+pts+'): el RRI va de -5 '+
+                        'a +2, enteros');
+      SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
       tost('Sanci\u00f3n puesta a '+(_pilaDeM_(quien)||quien)+'.'+(esDePlazo?' Plazo movido en Notion.':''));
       await _cargarSanciones_();     // la cola de abajo tiene que enterarse
       pintar();
@@ -341,7 +367,24 @@ async function _cargarSanciones_(){
 function _loteReal_(){
   if(!Array.isArray(SANC_BACK)) return;                                   // sin backend
   var pend=SANC_BACK.filter(function(s){ return s.estado==='pendiente' && s.lote; });
-  if(!pend.length) return;                                                // nada agrupado
+  if(!pend.length){
+    /* ⛔ AQUI SE SALIA DEJANDO LA SEMILLA, y esto no es «no lo se»: el backend HA
+       CONTESTADO y ha dicho que no hay ningun lote pendiente. Eso es un DATO. Como
+       es ademas el estado NORMAL -- y el que habra el 1 de septiembre, empezando
+       temporada--, el PD veia de forma permanente **cinco personas inventadas con
+       sus puntos**, un globo rojo con un 5 y una tarjeta en su pantalla de inicio; y
+       el boton de cerrar le decia que aplicaba en Notion y mandaba el comunicado
+       cuando no viajaba nada.
+       ⚠️ La leccion ya estaba escrita DOS LINEAS mas abajo del contador de al lado
+       -- «no hay cola de apelaciones: contar la maqueta era mentir»--, aplicada en
+       `apela` y en `curso` y no aqui. Y el movil limpia esta misma semilla.
+       ⚠️ Sin backend (arriba) SI se deja: ahi la semilla es la demostracion local,
+       que es para lo que se hizo. */
+    LOTES_PEND=[];
+    LOTE={ real:true, lote:null, nombre:null, cerrado:false, motivo:'—',
+           art:'libre', items:[] };
+    return;
+  }
   /* Antes se cogia SIEMPRE `pend[0].lote`: con dos bloques, el segundo no existia para
      el panel. Ahora se listan todos y se puede cambiar de uno a otro. */
   LOTES_PEND=[]; pend.forEach(function(x){ if(LOTES_PEND.indexOf(x.lote)<0) LOTES_PEND.push(x.lote); });
@@ -350,6 +393,12 @@ function _loteReal_(){
   LOTE={ real:true, lote:lote, nombre:lote, cerrado:false,
     motivo:its[0].motivo||'—', art:its[0].articulo||'libre',
     items:its.map(function(s){ return {id:s.id, n:s.nombre, pts:Number(s.puntos)||0,
-      dec:s.decision||'aceptar'}; }) };
+      /* ⛔ `null`, NO `'aceptar'`. Aqui se fabricaba la decision de todo lo que nadie
+         habia tocado, y el panel la pintaba como ELEGIDA: los 30 con el boton «Acepta»
+         encendido, la prevision de puntos restando, y el boton de cerrar diciendo
+         «Aprobar el bloque · 30 sanciones». Un clic escribe en Notion y manda el
+         comunicado con los 30 nombres.
+         ⚠️ Y borraba lo marcado desde el movil: `s.decision` viene del servidor. */
+      dec:s.decision||null}; }) };
 }
 

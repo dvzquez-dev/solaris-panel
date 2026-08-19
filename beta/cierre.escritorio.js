@@ -25,6 +25,15 @@ async function _cargarCierre_(){
    CIEGO 340 dias y ROJO los otros 25 -- las dos formas de no vigilar nada. Con la fecha
    inyectable, el caso pregunta por el 1 de octubre cualquier dia del año.
    ⚠️ Produccion la sigue llamando sin argumento: no cambia nada de lo que se ve. */
+/* El DIA de una fecha, sin hora y sin huso. Se cuenta con esto y no restando dos `Date`
+   locales porque en Europe/Madrid un intervalo que cruce el cambio de hora son N dias **+1 h**,
+   y segun el redondeo eso se convierte en un dia entero.
+   ⛔ VIVE AQUI Y NO DENTRO DE CADA FUNCION porque lo usan DOS (`_finDeMes_` y
+   `_plazoCierre_`), y dos copias de la misma linea no son un detalle de estilo: la segunda
+   copia **duplico un ancla de mutacion** y dejo esa mutacion sin probar -- salio «el ancla
+   sale 2 veces», que es como se pierde un guardia sin que nadie lo borre. */
+function _diaUTC_(d){ return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); }
+
 function _finDeMes_(hoy){
   var h=hoy||new Date(), fin=new Date(h.getFullYear(), h.getMonth()+1, 0);
   /* ⛔ POR UTC, NO POR HORA LOCAL. Restar dos `Date` locales cuenta las HORAS reales, y
@@ -36,12 +45,38 @@ function _finDeMes_(hoy){
      ⚠️ Y su banco se habria puesto **rojo solo**, esos 25 dias, sin que nadie tocara nada:
      un rojo con fecha de caducidad puesta, que es de los que acaban apagando un guardia.
      ✅ `Date.UTC` cuenta dias de calendario y no horas, asi que el huso no entra. */
-  var _u=function(d){ return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); };
-  var dias=Math.max(0, Math.round((_u(fin)-_u(h))/86400000));
+  var dias=Math.max(0, Math.round((_diaUTC_(fin)-_diaUTC_(h))/86400000));
   var p=function(x){ return (x<10?'0':'')+x; };
   return { txt:p(fin.getDate())+'/'+p(fin.getMonth()+1)+'/'+fin.getFullYear(), dias:dias,
            mes:['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
                 'septiembre','octubre','noviembre','diciembre'][h.getMonth()] };
+}
+
+/* ⛔ EL PLAZO DEL MES QUE SE CIERRA -- QUE NO ES EL QUE CORRE.
+
+   La cabecera de esta vista pintaba `_finDeMes_()`, o sea el fin del mes EN CURSO, justo al
+   lado del titulo «Cierre de julio». El 18 de agosto decia **«CIERRA 31/08/2026 · QUEDAN 13
+   dias»** sobre una pantalla que cierra JULIO: dos meses distintos en la misma tarjeta. Y la
+   regla que lo prohibe estaba escrita veinte lineas mas arriba en `escritorio.html`, desde el
+   04/08: *«El mes que se CIERRA no es el que corre»*.
+
+   ⛔ Y «QUEDAN» no era solo un numero mal: era la PALABRA equivocada. Un mes que ya termino no
+   tiene dias que queden -- tiene dias que **lleva** esperando, que es exactamente la presion
+   que esta pantalla existe para enseñar. Por eso devuelve `dias` contando al reves.
+
+   ⚠️ `new Date(a, m, 0)` es el dia CERO del mes actual, o sea el ULTIMO del anterior: el salto
+   de año sale solo (`new Date(2026,0,0)` es el 31/12/2025) y no hay ninguna resta de meses a
+   mano que equivocarse. De ahi salen el dia y el nombre, preguntandoselos a `_finDeMes_` --
+   una sola puerta para los nombres de mes.
+
+   ⚠️ Y se cuenta por `Date.UTC`, no restando dos `Date` locales, por lo mismo que aprendio
+   `_finDeMes_`: en Europe/Madrid un intervalo que cruza el cambio de hora son N dias **+1 h**.
+   Aqui el intervalo tipico cruza el 25/10 cada año. */
+function _plazoCierre_(hoy){
+  var h=hoy||new Date();
+  var fin=new Date(h.getFullYear(), h.getMonth(), 0);   /* el ultimo dia del mes anterior */
+  var f=_finDeMes_(fin);
+  return { txt:f.txt, mes:f.mes, dias:Math.max(0, Math.round((_diaUTC_(h)-_diaUTC_(fin))/86400000)) };
 }
 
 /* Lo que el movil pinta en `<details>` uno por persona, aqui es UNA tabla: en 1920 px se

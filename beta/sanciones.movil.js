@@ -86,8 +86,10 @@ function _sancionesHTML_(){
      podia sancionar a nadie por un plazo-. `null` = todavia se estan pidiendo. Y solo las
      VIVAS con enlace a Notion: sin `url` no se puede mover la fecha, y ofrecerla seria
      prometer algo que va a fallar al guardar. */
+  /* ⛔ ASINCRONO Y SIN RECOGER: gemela exacta de la del escritorio. Lo tecleado entre que se
+     piden las tareas y que llegan se perdia, y volvia como `-1` con pinta de elegido. */
   var _tt=esPlazo ? _tareasDe_(SANC_FORM.quien, function(){
-    if($('#modal').classList.contains('on')){ abrirModal(_sancionesHTML_()); _cablearSanciones_(); }
+    if($('#modal').classList.contains('on')) _repintarSancM_();
   }) : [];
   var cargandoT=(_tt===null);
   var tareas=(_tt||[]).filter(function(t){
@@ -138,7 +140,7 @@ function _sancionesHTML_(){
               esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+' no tiene ninguna tarea viva con enlace '+
               'a Notion, así que no se puede mover ningún plazo. Elige otro motivo.</p>')
         : '')+
-      '<label class="campo"><span class="sc">Puntos</span><input type="number" id="snPts" value="'+esc(SANC_FORM.pts||'-1')+'" step="1" min="-5" max="0"></label>'+
+      '<label class="campo"><span class="sc">Puntos</span><input type="number" id="snPts" value="'+esc(SANC_FORM.pts||_puntosDeMotivo_(SANC_FORM.motivo)||'')+'" step="1" min="-5" max="0"></label>'+
       '<button class="btn pri full" data-p id="btnSanc">Poner la sanción</button>'+
       '<p class="rnota" id="snMsg" style="margin:8px 0 0"></p>'+
     '</div>'+
@@ -186,27 +188,32 @@ function _sancColaHTML_(){
 /* Abre la pantalla y la deja cableada. Se vuelve a llamar despues de cada accion en vez de
    repintar a mano: asi la cola y el formulario no pueden quedar diciendo cosas distintas. */
 async function _abrirSanciones_(){
-  abrirModal(_sancionesHTML_());
-  _cablearSanciones_();
+  _repintarSancM_();
+  /* ⛔ Y EL SEGUNDO REPINTADO, EL DE DESPUES DE ESPERAR A LA COLA, TAMBIEN POR LA PUERTA: entre
+     que se abre la pantalla y llega `getSanciones` hay una espera de red, y ahi ya se puede
+     estar escribiendo. Era la misma ventana que la del callback de tareas. */
   if(SANC_M===null){ await _cargarSancionesM_(); if($('#modal').classList.contains('on')){
-    abrirModal(_sancionesHTML_()); _cablearSanciones_(); } }
+    _repintarSancM_(); } }
+}
+
+/* ⛔ LA UNICA PUERTA PARA REPINTAR EL MODAL DE SANCIONES. Gemela de `_repintarPonerSanc_`
+   en el escritorio: estas lineas estaban en dos sitios y solo una recogia antes. */
+function _repintarSancM_(){
+  _recogerSancForm_();
+  abrirModal(_sancionesHTML_()); _cablearSanciones_();
 }
 
 function _cablearSanciones_(){
   var val=function(id){ var e=$('#'+id); return e?e.value:''; };
   var msg=function(t,mal){ var b=$('#snMsg'); if(b){ b.textContent=t; b.style.color=mal?'var(--warn)':'var(--ink3)'; } };
 
-  /* LO PRIMERO: guardar TODO lo escrito antes de cualquier repintado. Esto es exactamente lo
-     que faltaba: al cambiar el motivo se repintaba el modal y la persona elegida volvia al
-     primero de la lista. El estado vivia en el DOM, y el DOM se rehace. */
-  function recoger(){
-    ['snMotivo','snLibre','snArt','snTarea','snPlazo','snPts','snFiltro'].forEach(function(id){
-      var e=$('#'+id); if(!e) return;
-      SANC_FORM[{snMotivo:'motivo',snLibre:'libre',snArt:'art',snTarea:'tarea',
-                 snPlazo:'plazo',snPts:'pts',snFiltro:'filtro'}[id]]=e.value;
-    });
-  }
-  function repintar(){ recoger(); abrirModal(_sancionesHTML_()); _cablearSanciones_(); }
+  /* ⛔ CADA CAMPO SE GUARDA AL TECLEARLO, igual que en el escritorio. El `recoger()` de aqui
+     ya arreglaba el repintado por cambio de motivo -por eso decia «esto es exactamente lo que
+     faltaba»-, pero el repintado ASINCRONO del callback de tareas no pasaba por el. Atando los
+     campos, ningun repintado puede tirar lo escrito, venga de donde venga. */
+  _atarSancForm_();
+  /* ⛔ Y NO HAY `recoger`/`repintar` LOCALES: se llama a `_repintarSancM_` por su nombre en
+     cada sitio, que es lo unico que hace visible que la puerta es UNA. */
 
   /* Elegir persona NO repinta el formulario: solo se marca en la lista. Repintar por esto
      seria volver a tirar lo escrito, que es el fallo que se acaba de arreglar. */
@@ -217,7 +224,7 @@ function _cablearSanciones_(){
       var m=$('#snMsg'); if(m){ m.textContent='A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'; m.style.color='var(--ink3)'; }
       /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS, asi que hay que
          repintar. En los demas motivos no se repinta: seria tirar lo escrito por nada. */
-      if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; repintar(); }
+      if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarSancM_(); }
     };
   });
   /* Teclear rehace SOLO la lista, no el formulario. Y no pierde el foco ni el cursor. */
@@ -230,7 +237,7 @@ function _cablearSanciones_(){
       b.onclick=function(){
         SANC_FORM.quien=b.dataset.sanq;
         $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
-        if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; repintar(); }
+        if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarSancM_(); }
       };
     });
   };
@@ -238,17 +245,21 @@ function _cablearSanciones_(){
   /* El motivo decide QUE MAS se pide, asi que al cambiarlo hay que repintar. Pero se recoge
      todo antes, y `_sancionesHTML_` vuelve a pintar lo elegido. */
   var mo=$('#snMotivo');
-  if(mo) mo.onchange=function(){ repintar(); };
+  if(mo) mo.onchange=function(){ _repintarSancM_(); };
   var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
 
   var bt=$('#btnSanc');
   if(bt) bt.onclick=async function(){
-    var quien=SANC_FORM.quien, mot=val('snMotivo'), pts=parseInt(val('snPts'),10);
+    /* ⛔ LOS PUNTOS, POR LA PUERTA: `parseInt` a pelo TRUNCA en vez de rechazar
+       (`-3.7` entraba como -3, en silencio) y `!(pts<=0)` deja pasar un -50, que no
+       para NINGUNA capa hasta Notion. Ver `_validaPuntosSanc_` en `comun.js`. */
+    var quien=SANC_FORM.quien, mot=val('snMotivo'), _vp=_validaPuntosSanc_(val('snPts'));
     /* Propia del ENVIO: `esPlazo` es de la funcion que pinta y aqui no existe. */
     var esDePlazo=(mot==='plazo'||mot==='plazoUrg');
     if(!quien){ msg('Elige a quién: pulsa un nombre de la lista.', true); return; }
     if(!mot){ msg('Elige el motivo.', true); return; }
-    if(!(pts<=0)){ msg('Los puntos de una sanción son 0 o negativos.', true); return; }
+    if(!_vp.ok){ msg(_vp.msg, true); return; }
+    var pts=_vp.pts;
     var art=mot, texto='';
     RRI_MOTIVOS.forEach(function(r){ if(r[0]===mot) texto=r[1]; });
     if(mot==='libre'){
@@ -279,8 +290,22 @@ function _cablearSanciones_(){
         msg('Moviendo el plazo en Notion…');
         await api.moverLimiteTarea(urlTarea, plazo);
       }
-      await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual'}]);
-      SANC_M=null; SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'-1', filtro:''};
+      /* ⛔ LA RESPUESTA SE LEE. El backend ya no lanza cuando la persona no es tuya: la
+         SALTA y la devuelve en `rechazadas`. Sin mirarlo, el `tost` de abajo diria
+         «Sancion puesta a Fulano» sobre una sancion que no existe. Se relanza para caer
+         en el `catch` de siempre y que el mensaje sea el mismo de antes. */
+      var r = await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual'}]);
+      if(r && r.rechazadas && r.rechazadas.length)
+        throw new Error('no puedes sancionar a '+r.rechazadas.join(', ')+
+                        ': esta fuera de tu jurisdiccion');
+      /* ⛔ Y LA LISTA DE PUNTOS IMPOSIBLES, APARTE de `rechazadas`: son dos motivos
+         distintos y dan dos mensajes distintos. Desde esta cara no deberia saltar
+         nunca -- `_validaPuntosSanc_` corta antes --, y por eso mismo si salta hay que
+         verlo: significa que la cara y el servidor han dejado de decir lo mismo. */
+      if(r && r.invalidas && r.invalidas.length)
+        throw new Error('el servidor no acepta esos puntos ('+pts+'): el RRI va de -5 '+
+                        'a +2, enteros');
+      SANC_M=null; SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
       tost('Sanción puesta a '+(_pilaDeM_(quien)||quien)+'.'+(esDePlazo?' Plazo movido en Notion.':''));
       _abrirSanciones_();
     }catch(e){
@@ -298,7 +323,11 @@ function _cablearSanciones_(){
       b.disabled=true;
       try{ await api.decidirSancion(b.dataset.smarc,'marcar',{decision:b.dataset.dec});
         (SANC_M||[]).forEach(function(x){ if(String(x.id)===b.dataset.smarc) x.dec=b.dataset.dec; });
-        abrirModal(_sancionesHTML_()); _cablearSanciones_();
+        /* ⛔ POR LA PUERTA: marcar una sancion del bloque va al backend y luego repinta el modal
+           ENTERO -cola y formulario-, asi que se llevaba por delante lo escrito arriba. La cola
+           y el formulario comparten pantalla en el movil; en el escritorio no, y por eso esta
+           forma no tiene gemela alli. */
+        _repintarSancM_();
       }catch(e){ b.disabled=false; tostErr('No se pudo marcar: ', e); }
     };
   });
@@ -306,8 +335,11 @@ function _cablearSanciones_(){
     b.onclick=async function(){
       var lote=b.dataset.scerrar;
       var it=(SANC_M||[]).filter(function(x){ return (x.lote||'(sueltas)')===lote; });
-      var sinMarcar=it.filter(function(x){ return !x.dec; });
-      if(sinMarcar.length){ tost('Faltan '+sinMarcar.length+' por marcar: el bloque se cierra entero.'); return; }
+      /* Por la MISMA puerta que el escritorio (`_faltanPorMarcar_`, `comun.js`): la
+         guarda existia solo aqui, y una guarda de una cara sola es la que se queda sin
+         gemela. Ahora las dos cuentan igual y el banco puede ejecutarla. */
+      var sinMarcar=_faltanPorMarcar_(it);
+      if(sinMarcar){ tost('Faltan '+sinMarcar+' por marcar: el bloque se cierra entero.'); return; }
       b.disabled=true; b.textContent='Cerrando…';
       /* ⛔ UNA SOLA LLAMADA, Y NO ES POR VELOCIDAD. Aqui habia un bucle de
          `decidirSancion(…,'aprobar')`, uno por sancion — y **cada `aprobar` levanta el
@@ -321,9 +353,15 @@ function _cablearSanciones_(){
          quitarla convertiria «sin marcar» en «sancionada». */
       try{
         var r=await api.confirmarLote(lote);
+        /* ⛔ Por la MISMA puerta que el escritorio: lo que el servidor dice que se salto
+           (`sinPermiso`) no se tira. Esas se quedan **pendientes**, y sin decirlo el
+           bloque se da por cerrado entero. */
         var ap=(r&&r.aprobadas!=null)?r.aprobadas:it.length, re=(r&&r.rechazadas)||0;
+        var ju=(r&&r.justificadas)||0, sp=(r&&r.sinPermiso)||0;
         SANC_M=null;
-        tost('Bloque cerrado · '+ap+' aprobadas'+(re?' · '+re+' rechazadas':''));
+        tost((sp?'Bloque cerrado A MEDIAS · ':'Bloque cerrado · ')+
+          ap+' aprobadas'+(re?' · '+re+' rechazadas':'')+
+          (ju?' · '+ju+' justificadas':'')+_saltadasTxt_(sp));
         _abrirSanciones_();
       }catch(e){ b.disabled=false; b.textContent='Cerrar el bloque entero';
         tostErr('No se pudo cerrar el bloque: ', e); }
@@ -650,8 +688,16 @@ function panelPD(){
             '<span class="mono" style="color:var(--ink3);font-size:10.5px">'+esc(x.motivo||'')+'</span></div>';
         }).join('')+
         (it.length>8?'<div class="lote-m">y '+(it.length-8)+' más</div>':'')+
-        '<p class="rnota">Se deciden desde el <b>escritorio</b>, que es donde están el motivo, el '+
-        'artículo y el comunicado. Aquí solo se consultan.</p></div></div>';
+        /* ⛔ AQUI PONIA «se deciden desde el escritorio · aqui solo se consultan», Y ERA FALSO
+           DESDE EL 28/07: `_cablearSanciones_` cablea `data-sok`/`data-sno` a `decidirSancion`,
+           `data-smarc` a marcar y `data-scerrar` a cerrar el lote — el telefono decide. El texto
+           mandaba a cambiar de aparato para algo que se hace aqui, que es la forma mas cara de
+           que una funcion viva parezca muerta.
+           ⚠️ Lo que SI sigue siendo cierto es lo otro: el motivo y el articulo se eligen al
+           CREAR el bloque, y eso es del escritorio. Se dice eso, que es la parte verdadera. */
+        '<p class="rnota">Decide aquí mismo: <b>acepta o rechaza</b> cada una y luego cierra el '+
+        'bloque entero. El <b>motivo y el artículo</b> son comunes a todo el bloque y se '+
+        'eligieron al crearlo, desde el escritorio.</p></div></div>';
     }).join('');
 }
 

@@ -17,7 +17,23 @@
 function _abrirPintor_(fondoUrl, alTerminar){
   var caja=$('#pintor'), zona=$('#pzona'), lienzo=$('#plienzo');
   var img=$('#pfondo'), cv=$('#ptrazos');
-  if(!caja||!img||!cv) return;
+  /* ⛔⛔ EL PINTOR SIEMPRE CONTESTA, PASE LO QUE PASE. En el escritorio esta
+     envuelto en una PROMESA (`_pedirCaptura_`), y su `fin()` sólo se llama desde
+     aquí: si una salida se va sin avisar, la promesa **no se asienta nunca**, el
+     `await` de `reportarModal` se queda colgado y `reportarBug` no llega a correr.
+     Lo que se pierde no es la foto —es el título, el detalle y la gravedad recién
+     escritos—, y sin un solo error a la vista. Había DOS salidas mudas: cancelar y
+     este `return` de aquí abajo.
+     ⚠️ Al cancelar se contesta con la foto ORIGINAL sin marcar, no con nada: es lo
+     que dice el propio aviso («salir sin guardar **lo que has pintado**») y lo que
+     el móvil ya hacía de hecho, porque allí `BZ_FOTO` se fija antes de abrir. */
+  var contestado=false;
+  function contestar(url, n){
+    if(contestado) return;
+    contestado=true;
+    if(typeof alTerminar==='function') alTerminar(url, n||0);
+  }
+  if(!caja||!img||!cv){ contestar(fondoUrl, 0); return; }
   var ctx=cv.getContext('2d');
   /* TRAZOS, no píxeles: cada uno es {color, grosor, pts:[[x,y],…]} en coordenadas de
      IMAGEN. Deshacer es quitar el último y repintar. Con capturas de pantalla a resolución
@@ -168,6 +184,14 @@ function _abrirPintor_(fondoUrl, alTerminar){
   $$('#pmodo button').forEach(function(b){ b.onclick=function(){
     modo=b.dataset.pm;
     $$('#pmodo button').forEach(function(x){ x.classList.toggle('on', x===b); }); }; });
+  /* ⛔ Y LA BARRA SE PONE AL DÍA AL ABRIR. `modo` se reinicia a 'pintar' aquí
+     dentro, pero la clase `.on` de `#pmodo` vive en el HTML **estático** y sólo la
+     movía el clic de arriba: abrías, tocabas «Mover», cerrabas, y desde la segunda
+     apertura el botón decía «Mover» mientras el lienzo pintaba.
+     ⚠️ `#pcolores` y `#pgrosor` no lo sufrían porque se rehacen enteros unas líneas
+     más arriba, con el `on` puesto en el índice que toca. `#pmodo` es el único de
+     los tres que no se repinta, y por eso es el único que se desincronizaba. */
+  $$('#pmodo button').forEach(function(x){ x.classList.toggle('on', x.dataset.pm===modo); });
   $('#pdeshacer').onclick=function(){
     if(!trazos.length){ tost('No hay nada que deshacer.'); return; }
     trazos.pop(); repintar();
@@ -177,6 +201,10 @@ function _abrirPintor_(fondoUrl, alTerminar){
   $('#pcancelar').onclick=function(){
     if(trazos.length && !confirm('Vas a salir sin guardar lo que has pintado. ¿Seguro?')) return;
     cerrar();
+    /* ⛔ Y SE CONTESTA: cerrar la caja NO es contestar. Quien abrió el pintor puede
+       estar esperando —en el escritorio lo está, dentro de un `await`—, y dejarlo
+       esperando se lleva por delante el reporte entero. */
+    contestar(fondoUrl, 0);
   };
   $('#plisto').onclick=function(){
     /* LA FUSIÓN POR CAPAS: la de abajo es la foto tal cual, la de arriba lo pintado. Sale
@@ -187,7 +215,9 @@ function _abrirPintor_(fondoUrl, alTerminar){
     o.drawImage(img, 0, 0, out.width, out.height);
     o.drawImage(cv, 0, 0);
     cerrar();
-    alTerminar(out.toDataURL('image/jpeg', 0.82), trazos.length);
+    /* Por la MISMA puerta que cancelar: así un clic tardío en «Cancelar» no puede
+       contestar por segunda vez y pisar la imagen marcada con la foto en crudo. */
+    contestar(out.toDataURL('image/jpeg', 0.82), trazos.length);
   };
 
   img.onload=function(){
@@ -245,7 +275,16 @@ async function reportarModal(){
     contexto:'escritorio'+(CANAL==='beta'?' · BETA':(VERSION?' · v'+VERSION:''))+' · '+nav+' · '+screen.width+'x'+screen.height+
       ' · build '+BUILD+' · datos '+(DATA.generado||'?') };
   if(esMejora){ datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
-  else { datos.esperaba=det; datos.paso=tit; datos.gravedad='Molesta'; }
+  else {
+    datos.esperaba=det; datos.paso=tit;
+    /* ⛔ AQUI HABIA `datos.gravedad='Molesta'` CLAVADO. Se pregunta, y si no se reconoce la
+       respuesta NO SE ESCRIBE EL CAMPO: el eje se queda sin medir y la ficha lo pide. */
+    var _g=_normGravedad_(prompt('\u00bfCu\u00e1nto molesta? Escribe una de las tres:'+
+      String.fromCharCode(10,10)+'Bloquea \u00b7 Molesta \u00b7 Cosm\u00e9tico'+
+      String.fromCharCode(10,10)+
+      '(Cancelar o dejarlo en blanco = sin medir; se ver\u00e1 como que falta)'));
+    if(_g) datos.gravedad=_g;
+  }
   /* La captura se ofrece AL FINAL, cuando ya no hay `prompt` abierto. Y se ofrece, no se
      exige: hay reportes que no son de sitio y pedir una foto los frenaria. */
   if(confirm('¿Quieres adjuntar una captura?'+String.fromCharCode(10,10)+
@@ -349,6 +388,34 @@ function _esMejora_(r){
 /* Como se llama el eje que mas pesa, en ESTE reporte. Una sola puerta: si esto se decide
    suelto en cada sitio, vuelve a pasar lo del 29/07. */
 function _ejeComp_(r){ return _esMejora_(r) ? 'valor' : 'gravedad'; }
+
+/* ⛔ LA GRAVEDAD QUE SE TECLEA, LLEVADA A LAS TRES QUE HAY -- O A NADA.
+
+   El movil la coge de un SELECTOR (`buzon.movil.js`, `data-g`), asi que alli siempre llega
+   buena. El escritorio no tiene modal: reporta con `prompt`, o sea que aqui entra lo que a
+   uno le de por escribir. Se toleran mayusculas, espacios y la falta de tilde -teclear
+   `Cosmético` en un `prompt` es incomodo- y se devuelve SIEMPRE la forma canonica, que es la
+   clave de `PESOS_COMP`.
+
+   ⛔ Y LO QUE NO RECONOCE DEVUELVE CADENA VACIA, nunca una de las tres «por si acaso». Quien
+   llama NO escribe entonces el campo, con lo que el eje se queda **sin medir** —que es
+   exactamente lo que `PESOS_COMP.ejeSinMedir` existe para valer— y `faltan` lo canta en la
+   ficha. Poner aqui un valor por defecto es «no lo se» convertido en dato (§3c-24), y ademas
+   **apaga el aviso** que existe para pedirlo.
+
+   ⚠️ Y esto no es teorico: hasta el 18/08 `reportarModal()` clavaba `gravedad='Molesta'` sin
+   preguntar. Un fallo que BLOQUEA reportado desde el portatil salia sin chip rojo y se
+   proponia a **0,50 h en vez de 2,00** -- y esas horas van a la cuota. */
+function _normGravedad_(txt){
+  var s = String(txt == null ? '' : txt).replace(/^\s+|\s+$/g, '').toLowerCase();
+  s = s.replace(/[\u00e1\u00e0\u00e4]/g, 'a').replace(/[\u00e9\u00e8\u00eb]/g, 'e')
+       .replace(/[\u00ed\u00ec\u00ef]/g, 'i').replace(/[\u00f3\u00f2\u00f6]/g, 'o')
+       .replace(/[\u00fa\u00f9\u00fc]/g, 'u');
+  if (s === 'bloquea') return 'Bloquea';
+  if (s === 'molesta') return 'Molesta';
+  if (s === 'cosmetico') return 'Cosm\u00e9tico';
+  return '';
+}
 
 /* Suma ponderada -> cuartos de hora -> el escalon de `ESCALA_COMP` que le toca. */
 function _ponderaComp_(r){

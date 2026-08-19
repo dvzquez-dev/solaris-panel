@@ -28,8 +28,10 @@ function _quitarDeCargos_(n){
 function _pintarBotonConvocar_(){
   var b = document.querySelector('[data-convocar]');
   if(!b) return '';
+  /* ⛔ Y LOS COCHES TAMBIEN: `_pegasDelCoche_` llevaba desde el 11/08 escrita, con banco y
+     sin llamador, asi que se podia convocar con un «Coche 1» a medias. */
   var motivo = (typeof _porQueNoSeConvoca_==='function')
-    ? _porQueNoSeConvoca_(TUR_CARGOS, Object.keys(TUR_SEL).length) : '';
+    ? _porQueNoSeConvoca_(TUR_CARGOS, Object.keys(TUR_SEL).length, TUR_COCHES) : '';
   b.disabled = !!motivo;
   b.textContent = motivo ? motivo : 'Convocar el turno';
   b.title = motivo || '';
@@ -200,6 +202,161 @@ function _dispDetalle_(cv, k, calor){
         c.no_pueden.map(_dispPila_).map(esc).join(', ')+'</span></div>' : '');
 }
 
+
+/* ── CONTESTAR TU DISPONIBILIDAD DE TURNOS, DESDE EL ESCRITORIO ───────────────────
+   ⛔ EL HUECO QUE CIERRA: `api.guardarDisponibilidad` estaba declarada en `escritorio.html`
+   y **no la llamaba nadie**. Esta cara SI lee la convocatoria y pinta el mapa agregado de
+   arriba; lo unico que no podia era **contestarla**. Y quien abre el escritorio tambien hace
+   turnos: para decir cuando puede tenia que sacar el movil, cada semana.
+   ⚠️ MISMO CONTRATO QUE EL MOVIL, a proposito: clave `dia|franja` (`_convClave_` alli,
+   `_dispClave_` aqui, identicas) y valor `{s:'no'}` o `{s:<sitio>|'ambos', c:<coche>}`. Los
+   sitios NO se cablean: salen de `_convClases_(cv)`, que es la funcion que bajo a `comun.js`
+   justo para que las dos caras no acaben con dos listas distintas.
+   ⚠️ Y AQUI SE GUARDA CON BOTON, no a cada clic como en el movil. No es un descuido: alli
+   el dedo pinta y suelta, aqui se arrastra el raton por veinte celdas -- guardar en cada una
+   son veinte escrituras para una sola decision. A cambio hay que decir claramente que queda
+   algo sin guardar, y por eso el boton lo dice. */
+var MIT_PIN = null;        /* el pincel elegido; null = todavia no ha tocado nada */
+var MIT_COCHE = false;
+var MIT_CELDAS = null;     /* lo marcado sin guardar; null = no ha tocado nada */
+
+/* La convocatoria que TE toca contestar: abierta y con tu nombre dentro. ⚠️ `_dispViva_` no
+   vale aqui -- esa coge la primera y sin filtrar, porque el mapa de arriba es de quien
+   convoca y ve la de todos. */
+function _miTurnoCv_(){
+  /* ⛔ LA SESION, NO `ACTOR`: «Actuas como» reescribe `ACTOR`, y este panel escribe.
+     Con `ACTOR` se te ofrecia la convocatoria a la que esta invitada OTRA persona. */
+  var yo = (typeof _actorSanc_==='function') ? _actorSanc_() : ((typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '');
+  if(!yo) return null;
+  var L = (typeof CONVOCATORIAS!=='undefined'?CONVOCATORIAS:[]);
+  for(var i=0;i<L.length;i++){
+    var cv=L[i];
+    if(_convEstado_(cv)!=='abierta') continue;
+    var inv=cv.invitados||[];
+    if(!inv.length || inv.indexOf(yo)>=0) return cv;
+  }
+  return null;
+}
+
+function _misCeldas_(cv){
+  if(MIT_CELDAS) return MIT_CELDAS;
+  /* ⛔ LA FILA QUE SE LEE ES LA QUE SE VA A ESCRIBIR. Aqui `cv.resp` trae a las 32, asi
+     que con `ACTOR` el panel pintaba la disponibilidad REAL de otra persona rotulada «Tu
+     disponibilidad» -- y al guardar, `guardarDisponibilidad` no manda nombre: el backend
+     resuelve por TOKEN y sustituia la TUYA por la de ese otro. */
+  var yo = (typeof _actorSanc_==='function') ? _actorSanc_() : ((typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '');
+  var r = (cv.resp && cv.resp[yo]) || {};
+  var out = {}; for(var k in r) if(r.hasOwnProperty(k)) out[k]=r[k];
+  return out;
+}
+
+/* Lo que pinta el pincel de ahora. Copiado del movil (`turnos.movil.js`): el «no puedo» va
+   SIN `c`, porque un no-puedo con coche no significa nada y Python lo lee por `s`. */
+function _mitQuiere_(){
+  return MIT_PIN==='no' ? {s:'no'} : {s:MIT_PIN, c:!!MIT_COCHE};
+}
+
+/* Marcar una celda, o DESMARCARLA si ya llevaba justo lo mismo. ⚠️ Va aparte del
+   cableado a proposito: es una DECISION, y metida dentro del `onclick` no habia forma
+   de ejecutarla en el arnes -- su mutacion salia ciega. El movil hace lo mismo y por
+   eso compara tambien el coche: cambiar solo el coche es un cambio, no un deshacer. */
+function _mitToggle_(mias, k, q){
+  var v = mias[k];
+  var igual = v && v.s===q.s && (q.s==='no' || !!v.c===!!q.c);
+  if(igual) delete mias[k]; else mias[k]=q;
+  return mias;
+}
+
+function _miTurnoPanel_(){
+  var cv=_miTurnoCv_(); if(!cv) return '';
+  var mias=_misCeldas_(cv), D=cv.dias||[], F=cv.franjas||[];
+  var ET={cuvi:'CUVI', citi:'CITI', ambos:'Los dos', no:'No puedo'};
+  var clases=_convClases_(cv);
+  if(MIT_PIN===null) MIT_PIN=clases[0]||'no';
+  var pin=clases.map(function(k){
+    return '<button data-mtpin="'+k+'" class="'+(MIT_PIN===k?'on':'')+'">'+esc(ET[k]||k)+'</button>';
+  }).join('');
+  var cab='<div class="dmc dml"></div>'+D.map(function(d){
+    var p=String(_diaCorto_(d)).split(' ');
+    return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
+  }).join('');
+  var COL={cuvi:'rgba(228,30,37,.78)', citi:'rgba(63,158,214,.78)', ambos:'rgba(53,199,89,.78)'};
+  var filas=F.map(function(fr){
+    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+D.map(function(d){
+      var k=_dispClave_(d,fr.k), v=mias[k];
+      var st = (v && v.s && v.s!=='no') ? ('background:'+(COL[v.s]||'rgba(228,30,37,.78)')) : '';
+      return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" '+
+        'style="cursor:pointer;'+st+'">'+
+        ((v&&v.s==='no')?'\u2013':((v&&v.c)?'\uD83D\uDE97':''))+'</div>';
+    }).join('');
+  }).join('');
+  var sucio=!!MIT_CELDAS;
+  var quedan=Math.round(_convQuedan_(cv));
+  return pan('Tu disponibilidad',
+    'te quedan '+quedan+' h para contestar',
+    '<div class="pb">'+
+    '<p style="margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
+      'Elige <b>d\u00f3nde puedes</b> y haz clic en los huecos. Lo que marques aqu\u00ed es lo que '+
+      'cuenta para el reparto \u2014 y no contestar es lo que hace que te pongan un turno '+
+      'cuando no puedes.</p>'+
+    '<div class="dsit">'+pin+'</div>'+
+    '<label class="campo" style="margin:9px 0;display:flex;gap:7px;align-items:center">'+
+      '<input type="checkbox" data-mtcoche'+(MIT_COCHE?' checked':'')+'>'+
+      '<span class="sc" style="margin:0">Puedo llevar coche en lo que marque</span></label>'+
+    '<div class="dmapa" style="grid-template-columns:104px repeat('+D.length+',minmax(44px,1fr))">'+
+      cab+filas+'</div>'+
+    '<div style="margin-top:11px;display:flex;gap:9px;align-items:center">'+
+      '<button class="btn pri" data-mtguardar'+(sucio?'':' disabled')+'>Guardar mi disponibilidad</button>'+
+      '<small style="color:var(--ink2)">'+(sucio?'tienes cambios <b>sin guardar</b>':'sin cambios')+'</small>'+
+    '</div></div>');
+}
+
+function _cablearMiTurno_(){
+  $$('[data-mtpin]').forEach(function(b){
+    b.onclick=function(){ MIT_PIN=b.dataset.mtpin; pintar(); };
+  });
+  $$('[data-mtcoche]').forEach(function(c){
+    c.onchange=function(){ MIT_COCHE=!!c.checked; };
+  });
+  $$('[data-mtk]').forEach(function(c){
+    c.onclick=function(){
+      var cv=_miTurnoCv_(); if(!cv) return;
+      MIT_CELDAS=_mitToggle_(_misCeldas_(cv), c.dataset.mtk, _mitQuiere_());
+      pintar();
+    };
+  });
+  $$('[data-mtguardar]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      /* ⛔ Y NO SE CONTESTA POR NADIE. */
+      if(typeof _identidadPrestada_==='function' && _identidadPrestada_(
+           (typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '')){
+        tost('Est\u00e1s actuando como otra persona: tus turnos no se tocan desde aqu\u00ed.');
+        return;
+      }
+      var cv=_miTurnoCv_(); if(!cv) return;
+      var mias=_misCeldas_(cv);
+      b.disabled=true; var t=b.textContent; b.textContent='Guardando\u2026';
+      try{
+        await api.guardarDisponibilidad(cv.id, mias);
+        /* ⚠ El eco local va a la fila de la SESION, que es la que el servidor acaba de
+           escribir: con `ACTOR` la pantalla enseñaba el cambio bajo el nombre equivocado
+           y nunca se contradecia a si misma. */
+        var yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '');
+        if(!cv.resp) cv.resp={};
+        cv.resp[yo]=mias;
+        MIT_CELDAS=null;                       /* ya no queda nada pendiente */
+        tost('Disponibilidad guardada.'); pintar();
+      }catch(e){
+        /* ⛔ UNA DISPONIBILIDAD QUE SE PIERDE EN SILENCIO es la que luego hace que te pongan
+           un turno cuando no puedes. Se avisa, se deja el boton vivo y `MIT_CELDAS` NO se
+           borra: lo marcado sigue en pantalla para reintentar sin volver a pintarlo. */
+        b.disabled=false; b.textContent=t;
+        tostErr('No se pudo guardar tu disponibilidad: ', e);
+      }
+    };
+  });
+}
 function _dispPanel_(){
   var cv=_dispViva_(); if(!cv) return '';
   var calor=_calorTurnos_(cv, DISP_SITIO);
@@ -540,6 +697,185 @@ function cablearCoches(){
     }; });
   $$('#tuCoches [data-quitacoche]').forEach(function(b){
     b.onclick = function(){ TUR_COCHES.splice(+b.dataset.quitacoche, 1); pintarCoches(); }; });
+}
+
+/* ═══ CERRAR UN TURNO Y DECLARAR EL TIEMPO EXTRA ═════════════════════════════════
+   Daniel (15/08): *«el responsable de turno le da a un boton, se valida, y hay un campo para
+   rellenar si hubo tiempo extra a partir de las cuatro horas»*.
+
+   ⛔ DOS GESTOS EN UNA PANTALLA, y es a proposito: **confirmar quien fue de verdad** (el papel
+   que `CARGOS_TURNO` ya le daba al responsable) y **repartir el extra**. Separarlos obligaria a
+   entrar dos veces al mismo turno para decir cosas sobre las mismas personas.
+   ⛔ Y EL EXTRA SE EDITA FILA A FILA porque el ejemplo de Daniel lo exige: *«a lo mejor es
+   tiempo extra que no le cuenta a alguien que vive cerca, pero si a alguien que vive lejos»*.
+   Un solo campo por turno reparte a partes iguales, que es justo lo que ese ejemplo descarta.
+   ⚠️ NO ESCRIBE EN NOTION. Deja la propuesta a la vista para aplicarla: escribir en Notion
+   exige el visto bueno de Daniel **cada vez**, y son los puntos de personas reales. */
+function _turnosCerrables_(){
+  var out = [];
+  (typeof TURNOS !== 'undefined' ? TURNOS : []).forEach(function(t, i){
+    if(_puedeCerrarTurno_(t, ACTOR)) out.push(i);
+  });
+  return out;
+}
+
+function _cierreTurSel_(){
+  var l = (typeof TURNOS !== 'undefined' ? TURNOS : []);
+  return (CIERRE_TUR.i == null) ? null : (l[CIERRE_TUR.i] || null);
+}
+
+/* El techo de esta pantalla. `dur` es texto libre del campo, asi que puede no ser un numero:
+   `_extraTope_` ya trata el no-numero como 0, que es el lado seguro (sin duracion no se
+   declara ningun extra). */
+function _cierreTurTope_(){
+  var d = parseFloat(String(CIERRE_TUR.dur).replace(',', '.'));
+  return _extraTope_(isFinite(d) ? d : 0);
+}
+
+/* Lo que se mandaria: SOLO los confirmados.
+   ⛔ Quien no fue no lleva fila, en vez de llevar una con 0: son dos afirmaciones distintas
+   —«estuvo y no le toca extra» frente a «no estuvo»— y el turno tambien cuenta un turno en el
+   contador. Colar un 0 por un ausente le sumaria el turno a quien no fue. */
+function _cierreTurMapa_(){
+  var out = {}, t = _cierreTurSel_(), tope = _cierreTurTope_();
+  /* ⛔ CON LOS DUDOSOS DENTRO: si el responsable marca a alguien que figuraba como
+     `Posible` y al final fue, tiene que VIAJAR. Recorrer solo `_asistentesTurno_` hacia
+     que marcarlo en la pantalla no sirviera de nada — el clic entraba y la propuesta
+     salia sin el. */
+  var esDud = {};
+  _dudososTurno_(t).forEach(function(n){ esDud[n] = 1; });
+  _asistentesTurno_(t).concat(_dudososTurno_(t)).forEach(function(n){
+    if(!CIERRE_TUR.quien[n]) return;
+    var v = CIERRE_TUR.extra[n];
+    out[n] = (typeof v === 'number' && isFinite(v)) ? v : (esDud[n] ? 0 : tope);
+  });
+  return out;
+}
+
+function _cierreTurnoPanel_(){
+  var cerrables = _turnosCerrables_();
+  if(!cerrables.length) return '';
+  if(CIERRE_TUR.i == null) CIERRE_TUR.i = cerrables[0];
+
+  var t = _cierreTurSel_(), firmes = _asistentesTurno_(t), tope = _cierreTurTope_();
+  var resp = _responsableTurno_(t);
+  /* ⛔ LOS DUDOSOS TAMBIEN SALEN. `_asistentesTurno_` filtra por `_esFirmeRol_`, asi que
+     quien figuraba como `Posible` o `Reserva` **y al final fue** no tenia fila: el
+     responsable no podia darle ni su hora extra ni su turno. `comun.js` ya lo dice —«no
+     se les quita de la lista: el responsable es quien sabe si al final vinieron»—, y
+     `_dudososTurno_` existe desde el 17/08 **sin que la llamara nadie**.
+     ⚠️ `_cierreTurnoInicial_` NO se usa a proposito: recibe `durH` y congela el tope de
+     ese instante, pero aqui la duracion empieza VACIA y se teclea despues — sembrar con
+     ella daria todo a 0 en la primera pintada. Este panel recalcula el tope en cada
+     render, y eso es lo que hay que conservar. */
+  var dud = _dudososTurno_(t), esDud = {};
+  dud.forEach(function(n){ esDud[n] = 1; });
+  var asis = firmes.concat(dud);
+  /* Primera vez sobre este turno: los firmes se dan por idos; los dudosos NO.
+     ⛔ Y la direccion importa: marcarlos por defecto le sumaria **un turno** a quien quiza
+     no fue —lo dice el comentario de `_cierreTurMapa_` dos funciones mas arriba—, mientras
+     que dejarlos sin marcar solo cuesta un clic a quien sabe la respuesta. */
+  if(!Object.keys(CIERRE_TUR.quien).length){
+    firmes.forEach(function(n){ CIERRE_TUR.quien[n] = true; });
+    dud.forEach(function(n){ CIERRE_TUR.quien[n] = false; });
+  }
+
+  var mapa = _cierreTurMapa_(), falta = _cierreTurnoFalta_(mapa, tope);
+
+  var opciones = cerrables.map(function(i){
+    var x = TURNOS[i], f = x.fecha_txt || x.fecha || x.f || '?';
+    return '<option value="'+i+'"'+(i===CIERRE_TUR.i?' selected':'')+'>'+
+      esc(f + (x.hora ? ' · '+String(x.hora).slice(0,5) : '') +
+          (x.punto ? ' · '+x.punto : '')) + '</option>';
+  }).join('');
+
+  var filas = asis.map(function(n){
+    var on = !!CIERRE_TUR.quien[n];
+    var v = CIERRE_TUR.extra[n];
+    /* ⛔ EL DUDOSO ARRANCA A CERO, NO AL TOPE. De estos **no se sabe si fueron**, asi que
+       el defecto tiene que ser «lo que se sabe»: si el responsable lo marca, decide el
+       extra a mano. Al reves habria que acordarse de bajarlo. Es la regla que
+       `_cierreTurnoInicial_` dejo escrita el 17/08 y que nadie ejecutaba. */
+    var val = (typeof v === 'number' && isFinite(v)) ? v : (esDud[n] ? 0 : tope);
+    return '<tr'+(on?'':' style="opacity:.45"')+'>'+
+      '<td><label style="display:flex;align-items:center;gap:7px;cursor:pointer">'+
+        '<input type="checkbox" data-ct-fue="'+esc(n)+'"'+(on?' checked':'')+'>'+
+        esc((miembro(n)||{}).pila || n)+
+        (n===resp?' <span class="chip">responsable</span>':'')+'</label></td>'+
+      '<td class="r"><input class="mono" type="number" step="0.25" min="0" max="'+tope+'" '+
+        'data-ct-extra="'+esc(n)+'" value="'+val+'" style="width:88px;text-align:right"'+
+        (on?'':' disabled')+'> h</td></tr>';
+  }).join('');
+
+  var aviso = (tope <= 0)
+    ? '<div class="nota">El turno no ha pasado de las <b>'+_horasTurnoBase_()+' h</b> de base, '+
+      'as\u00ed que <b>no hay tiempo extra que repartir</b>. Cerrarlo sigue valiendo: confirma qui\u00e9n fue.</div>'
+    : '<div class="nota">El turno dio <b>'+h1(tope)+'</b> por encima de la base de '+
+      '<b>'+_horasTurnoBase_()+' h</b>. Ese es el <b>m\u00e1ximo por persona</b>, y se baja a quien no le '+
+      'corresponda: no todo el mundo se qued\u00f3 lo mismo.</div>';
+
+  var salida = CIERRE_TUR.hecho
+    ? '<div class="nota" style="margin-top:11px"><b>Propuesta lista.</b> No se ha escrito nada en '+
+      'Notion: eso lo aplica Daniel. Va al campo <b>Compensaciones</b>, y el turno suma '+
+      '<b>1 al contador</b> (el \u00d74 lo pone la f\u00f3rmula).<pre class="mono" style="white-space:pre-wrap;'+
+      'font-size:12px;margin:8px 0 0">'+esc(CIERRE_TUR.hecho)+'</pre></div>'
+    : '';
+
+  return pan('Cerrar un turno', cerrables.length+' tuyo(s)',
+    '<label class="campo"><span class="sc">Qu\u00e9 turno</span>'+
+      '<select id="ctSel">'+opciones+'</select></label>'+
+    '<label class="campo"><span class="sc">Cu\u00e1nto dur\u00f3 de verdad (horas)</span>'+
+      '<input class="mono" id="ctDur" type="number" step="0.25" min="0" '+
+        'value="'+esc(CIERRE_TUR.dur)+'" placeholder="p. ej. 6"></label>'+
+    aviso+
+    (asis.length
+      ? '<table class="tb" style="margin-top:9px"><thead><tr><th>Qui\u00e9n fue de verdad</th>'+
+        '<th class="r">Extra</th></tr></thead><tbody>'+filas+'</tbody></table>'
+      : '<div class="nota">Este turno no tiene a nadie resuelto en el roster.</div>')+
+    '<button class="btn pri" id="ctEnviar"'+(falta?' disabled':'')+' style="margin-top:11px">'+
+      (falta ? esc(falta) : 'Cerrar el turno')+'</button>');
+}
+
+function _cablearCierreTurno_(){
+  var sel = document.getElementById('ctSel');
+  if(sel) sel.onchange = function(){
+    /* ⛔ Al cambiar de turno se BORRA el reparto: si se conservara, las horas escritas para
+       una persona de un turno saldrian sembradas en otro turno distinto, con su nombre y con
+       cara de haber sido tecleadas ahi. */
+    CIERRE_TUR.i = +sel.value; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {};
+    CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; render();
+  };
+  var dur = document.getElementById('ctDur');
+  if(dur) dur.onchange = function(){
+    CIERRE_TUR.dur = dur.value;
+    /* El techo baja: lo que ya estuviera por encima se recorta, o el boton quedaria
+       bloqueado por un numero que la persona no puede ver de donde sale. */
+    var tope = _cierreTurTope_();
+    Object.keys(CIERRE_TUR.extra).forEach(function(n){
+      if(CIERRE_TUR.extra[n] > tope) CIERRE_TUR.extra[n] = tope; });
+    CIERRE_TUR.hecho = null; render();
+  };
+  $$('#s-turnos [data-ct-fue]').forEach(function(el){
+    el.onchange = function(){ CIERRE_TUR.quien[el.dataset.ctFue] = !!el.checked; render(); }; });
+  $$('#s-turnos [data-ct-extra]').forEach(function(el){
+    el.onchange = function(){
+      var v = parseFloat(String(el.value).replace(',', '.'));
+      CIERRE_TUR.extra[el.dataset.ctExtra] = isFinite(v) ? v : 0;
+      CIERRE_TUR.hecho = null; render();
+    }; });
+  var b = document.getElementById('ctEnviar');
+  if(b) b.onclick = function(){
+    var mapa = _cierreTurMapa_(), tope = _cierreTurTope_();
+    var falta = _cierreTurnoFalta_(mapa, tope);
+    if(falta){ b.textContent = falta; return; }
+    var t = _cierreTurSel_();
+    CIERRE_TUR.hecho = 'Turno ' + ((t && (t.fecha_txt || t.fecha || t.f)) || '?') +
+      ' \u00b7 ' + Object.keys(mapa).length + ' persona(s), +1 turno cada una\n' +
+      Object.keys(mapa).map(function(n){
+        return '  ' + n + ' \u2192 ' + (mapa[n] ? ('+' + mapa[n] + ' h a Compensaciones')
+                                                : 'sin extra'); }).join('\n');
+    render();
+  };
 }
 
 function convocarPanel(){

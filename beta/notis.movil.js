@@ -154,11 +154,18 @@ function _pintarNotisLista_(){
   for(var k in NOTIS_ETI){
     if(!(k in NOTIS_PREF)) continue;        // el servidor manda: si no lo lista, no existe
     var e=NOTIS_ETI[k], on=NOTIS_PREF[k]!==false, fijo=NOTIS_FIJOS.indexOf(k)>=0;
+    /* ⛔ Y SI HOY NO LO EMITE NADIE, SE DICE. Es el mismo argumento de tres lineas mas
+       abajo, aplicado al otro lado: encender «documentos» y creer que te avisaran de una
+       revision pendiente es la misma promesa vacia que un interruptor que no apaga.
+       ⚠️ Sin la lista se calla en vez de inventar: `true` = «se manda», que es lo que se
+       venia haciendo, y asi un fallo al cargarla no llena la pantalla de avisos falsos. */
+    var vivo=(typeof _notisVivos_==='function') ? (_notisVivos_().indexOf(k)>=0) : true;
     /* LOS FIJOS NO LLEVAN INTERRUPTOR (Daniel, 03/08). Ensenar uno que no hace nada es peor
        que no ensenarlo: lo apagas, crees que lo apagaste, te llegan igual — y a partir de ahi
        no te fias tampoco de los dos que si funcionan. */
     filas+='<div class="fila"><div class="a"><b>'+e[0]+'</b><small>'+e[1]+
-      (fijo?' · <b>no se puede desactivar</b>':'')+'</small></div>'+
+      (fijo?' · <b>no se puede desactivar</b>':'')+
+      ((!fijo && !vivo)?' · <b>hoy no se manda ninguno de este tipo</b>':'')+'</small></div>'+
       '<div class="d">'+(fijo
         ? '<span class="pil otor">siempre</span>'
         : '<button class="btn" data-noti="'+k+'" data-p>'+(on?'Sí':'No')+'</button>')+

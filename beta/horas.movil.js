@@ -11,11 +11,22 @@
    fusionarlas es otro cambio, con otro riesgo y su propia verificación.
    ═══════════════════════════════════════════════════════════════════════════════════════ */
 
-/* HH:MM local de una fecha ISO (la hora de apertura que da la nube) */
-function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes()); }
+/* ⛔ `_hhmmDe_` SE MUDO A `comun.js` el 14/08: el escritorio tambien ficha y necesita
+   la MISMA hora local. Dejar una copia aqui serian dos puertas para la misma pregunta. */
 
 async function _partesDe_(nombre){
-  if(!_partesAdmin){ try{ _partesAdmin=await api.getPartes({})||[]; }catch(_){ _partesAdmin=[]; } }
+  /* ⛔⛔ UN CORTE DE RED NO SE GUARDA COMO «NO TIENE PARTES». Aquí había un
+     `catch(_){ _partesAdmin=[]; }`, y `[]` es **truthy**: el `if(!_partesAdmin)` no
+     volvía a intentarlo **jamás**. Un solo fallo al entrar en «ver como» y, hasta
+     recargar, la app le decía al PD que **cualquiera** a quien mirase no tenía ni un
+     parte — en la pantalla desde la que se otorgan horas, y donde el remedio natural al
+     ver un cero es volver a otorgarlas.
+     ⛔ Es el «no lo sé» leído como dato, con su peor cara: no es un `0`, es una lista
+     vacía, que se pinta igual de bien que una respuesta de verdad.
+     ✅ Ahora el error SUBE, y los dos llamadores ya lo cazan (`movil.html:502` y `:833`).
+     Lo único que cambia es que `_partesAdmin` sigue en `null` y la siguiente consulta
+     **vuelve a preguntar**. */
+  if(!_partesAdmin) _partesAdmin = await api.getPartes({}) || [];
   return _partesAdmin.filter(function(p){return p.autor===nombre;}).map(normPMovil);
 }
 
@@ -247,6 +258,11 @@ function sumaEMes(e){
   }).reduce(function(a,p){return a+p.q;},0);
 }
 
+/* ⛔ LO QUE YA CUENTA SON DOS ESTADOS, no uno: lo aprobado y lo otorgado. Esto era
+   `sumaEMes('otor')` en dos sitios, y al separar «aprobada» de «otorgada» las horas que te
+   firma tu coordinador habrían salido del contador **sin que nada se enterase**. */
+function sumaCuentanMes(){ return sumaEMes('conf') + sumaEMes('otor'); }
+
 function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 
 /* LA COMPARATIVA, pegada a la barra (Daniel, 28/07: «un espacio abajo en el mismo div»).
@@ -332,7 +348,7 @@ function barraHorasHTML(id){
      «de donde salen las horas del mes». */
   var _hm=_hMesReal_(YO), notion=(_hm!=null);
   /* `sumaEMes`, no `sumaE`: esta barra es la del MES, y `_hm` ya lo es. */
-  var cont=notion?_hm:sumaEMes('otor'), p=sumaEMes('pend');   /* otorgadas = todo lo que cuenta */
+  var cont=notion?_hm:sumaCuentanMes(), p=sumaEMes('pend');   /* aprobadas + otorgadas */
   /* La barra NUNCA se llena (escala asintótica), pero dentro del ancho que ocupa el total
      (otorgadas+pendientes) el reparto es LINEAL: si 4 de 20 h están pendientes, el rayado
      ocupa 1/5 de lo pintado — no un pixel al final como si fueran un extra. */
@@ -470,15 +486,17 @@ function animarDeltas(root){
   });
 }
 
-/* GEMELA EN OTRO RUNTIME: `_pausaMs_` del backend hace esta MISMA cuenta en
-   milisegundos (suma de tramos `{ini,fin}`; el tramo abierto cuenta hasta ahora). No se
-   pueden fundir -son runtimes distintos- pero **si cambia la semantica de `pausas`, hay
-   que tocar las dos**. Mapa §5, D7. */
-function _pausaMinMovil_(pausas){ var now=Date.now(), t=0; (pausas||[]).forEach(function(p){ var pi=Date.parse(p.ini), pf=p.fin?Date.parse(p.fin):now; if(pf>pi) t+=(pf-pi); }); return Math.round(t/60000); }
+/* ⛔ `_pausaMinMovil_` SE MUDO A `comun.js` como `_pausaMin_` el 14/08, y con ella la
+   cuenta entera de la sesion (`_minSesion_`): el escritorio ficha desde hoy y esta era la
+   regla que decide cuantos minutos se le descuentan a una persona por las pausas. Una
+   segunda copia en el MISMO runtime no la compara nadie.
+   ⚠️ Y su etiqueta de parentesco con el backend se fue CON ella: dejarla aqui, sin la
+   declaracion que la sujetaba, se la habria comido `minSes` — una promesa heredada por
+   quien no prometio nada. */
 
 function minSes(){
   var s=ST.ses;
-  if(s.cloudIni) return Math.max(0, Math.min(840, Math.round((Date.now()-Date.parse(s.cloudIni))/60000)) - _pausaMinMovil_(s.pausas));  // nube: REAL menos pausas, tope 14 h (en pausa el reloj se congela)
+  if(s.cloudIni) return _minSesion_(s.cloudIni, s.pausas);   // nube: REAL menos pausas, tope de un parte (en pausa el reloj se congela)
   if(s.estado==='parada') return 0;
   if(s.estado==='pausada') return s.acum;
   return s.acum + Math.round((Date.now()-s.ini)/60000*DEMO_X);
@@ -510,7 +528,11 @@ function vFichar(){
      Lo destapo un verificador adversarial, no yo: yo solo mire el bloque que acababa de
      escribir. Las dos frases salen ahora de `_perfilElegido_()`, que es la unica puerta. */
   var _perf=_perfilElegido_(), rt=aprobadorDe(YO.nombre,_perf);
-  var opts=TAREAS.map(function(t){
+  /* ⛔⛔ SIN FILTRO ESTO LISTABA LAS TAREAS DE TODO EL EQUIPO, en un desplegable que se
+     titula «elige una de TUS tareas». El backend sirve todas a la cuenta admin, así que en
+     el teléfono del PD salían las de las 32 personas y el parte se guardaba imputado a la
+     de otro **sin un aviso**. El escritorio filtraba desde el 14/08 y lo dejó escrito. */
+  var opts=_tareasResp_(TAREAS, (YO&&YO.nombre)||'').map(function(t){
     return '<option value="'+esc(t.n)+'"'+(ST.form.tarea===t.n?' selected':'')+'>'+esc(t.n)+'</option>';
   }).join('');
 
@@ -562,6 +584,22 @@ function vFichar(){
         return m ? '<p class="rnota" style="margin:2px 0 0">Es de otro mes: estas '+
           'horas contarán en <b>'+esc(m)+'</b>, el mes en curso. Las de un mes ya '+
           'cerrado no se pueden mover.</p>' : ''; })()+
+      /* ⛔ Y SE DICE SI EL RANGO CRUZA MEDIANOCHE. `durForm` ya envuelve
+         (`if(d<0) d+=1440`) y no lo dice en ningun sitio: quien se equivoca de casilla
+         ve una duracion PLAUSIBLE y la firma. El umbral sale de `_maxHorasParte_()`,
+         no de aqui - ver `_cruceNoche_` en `comun.js`. */
+      (function(){ var c=(typeof _cruceNoche_==='function')
+          ? _cruceNoche_(ST.form.ini, ST.form.fin) : '';
+        if(!c) return '';
+        var e=nf(durForm(),2), r=nf(24-durForm(),2);
+        if(c==='noche') return '<p class="rnota" style="margin:2px 0 0">Cruza '+
+          'medianoche: cuentan <b>'+e+' h</b>.</p>';
+        if(c==='duda') return '<p class="rnota" style="margin:2px 0 0;color:var(--warn)">'+
+          '<b>¿Seguro?</b> La salida es anterior a la entrada. Si cruzó medianoche son '+
+          '<b>'+e+' h</b>; si te equivocaste de casilla, <b>'+r+' h</b>. Las dos caben.</p>';
+        return '<p class="rnota" style="margin:2px 0 0;color:var(--warn)">'+
+          '<b>Parece del revés.</b> Así son <b>'+e+' h</b>, más de lo que un parte '+
+          'admite. Si querías <b>'+r+' h</b>, cambia entrada por salida.</p>'; })()+
       '<div class="selh">'+
         '<label class="campo" style="margin:0"><span class="sc">Entrada</span><select id="fIni">'+optHoras(ST.form.ini)+'</select></label>'+
         '<span class="flecha">→</span>'+
@@ -761,10 +799,41 @@ function _perfilSelHTML_(){
 /* Envío del fichaje. Con cuenta real y sesión EN VIVO → api.ficharSalida: la NUBE cierra
    la sesión abierta y calcula las horas (de la entrada al momento del envío). Un BLOQUE
    declarado a mano → api.pushParte (sin fichaje). Sin backend: memoria (semilla). */
-function _imputacion_(f){ return f.cat==='tareas' ? (f.tarea==='__otro__' ? f.detalle.trim() : f.tarea) : f.detalle.trim(); }
+/* ⛔ `_imputacion_` SE MUDO A `comun.js` el 14/08: el escritorio manda la misma
+   imputacion al cerrar un fichaje, y esta funcion YA estaba parametrizada (recibe `f`),
+   o sea que no habia nada que la atara a esta cara. */
 
 async function enviarFichaje(){
+  /* ⛔⛔ EL CANDADO VA ANTES DE CUALQUIER `await`, Y SON DOS COSAS DISTINTAS: la primera
+     línea corta el segundo clic que YA VENÍA en camino —el que produce el envío
+     duplicado— y `disabled=true` corta los siguientes. Esta cara no tenía **ninguna de
+     las dos**, y es desde la que ficha el equipo: el botón seguía vivo durante todo el
+     viaje de red, en los TRES caminos con `await` (`declararParte`, `ficharSalida`,
+     `pushParte`). Con `declararParte` el segundo intento llega a un parte que ya pasó a
+     `pendiente`, sale con «este parte no admite declaración» y quien lo lee cree que NO
+     se declaró: lo vuelve a declarar como bloque nuevo y **esas horas se le cuentan dos
+     veces**. El escritorio lo tiene desde el 15/08, con este mismo razonamiento escrito
+     (`horas.escritorio.js:1085`); aquí no se copió.
+     ⚠️ Se suelta en los `catch`, no en el éxito: el éxito navega a otra vista y el botón
+     deja de existir. Un botón que revive con el formulario ya limpio invita al segundo
+     envío que esto viene a impedir. */
+  var _be=$('#btnEnviar');
+  if(_be && _be.disabled) return;
   if(!validarFichaje()) return;
+  /* ⛔⛔ LA FECHA NO SE VALIDABA EN ESTA CARA, y la cadena de daño está medida: `_dmyAISO_`
+     devuelve **tal cual** lo que no entiende, el servidor tampoco la mira, y
+     `_fechaDeParte_` cae entonces a `creado_at` — o sea que **el parte cuenta en el mes en
+     que se envió, no en el que se trabajó**. Y en la propia app, `_ultimosMov_` lo mete en
+     `sinD` y **suma sus horas pase el mes que pase**: cuenta en agosto, en septiembre y en
+     octubre. De ahí salen las h/mes, la cuota y el ranking.
+     ⚠️ Se usa `_fechaDMY_`, que YA EXISTÍA: valida el formato **y** que la fecha exista.
+     Va aquí y no en `validarFichaje` porque aquélla enciende las tres estrellas del
+     dibujo, y esto no es una cuarta estrella: es un corte, como el `_bloqFalta_` de la
+     otra cara.
+     ⚠️ Y va ANTES del candado, no después: aquí el botón todavía está vivo, así que no hay
+     nada que soltar. Soltarlo igual sería un segundo mecanismo para lo mismo. */
+  if(!_fechaDMY_(ST.form.fecha)){ tost('La fecha va como DD/MM/AAAA y tiene que existir.'); return; }
+  if(_be) _be.disabled=true;
   var f=ST.form, imput=_imputacion_(f);
   if(f.declararId!=null && backendOK && SESION){   // declarar un parte 'sin declarar' ya cerrado
     tost('Declarando…');
@@ -778,7 +847,13 @@ async function enviarFichaje(){
          «sin declarar» y volviendo a declarar. */
       f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY;
       tost('Declarado · a la cola de tu coordinador.'); irA('horas');
-    }catch(e){ tostErr('No se pudo declarar: ', e); }
+    }catch(e){
+      /* ⛔ Y EL BOTÓN VUELVE A ESTAR VIVO, con el formulario intacto: una escritura que
+         falla y deja el botón muerto es peor que no tener candado — quien lo lee cree que
+         se declaró y no puede reintentar. */
+      if(_be) _be.disabled=false;
+      tostErr('No se pudo declarar: ', e);
+    }
     return;
   }
   if(backendOK && SESION){
@@ -797,11 +872,20 @@ async function enviarFichaje(){
       } else {
         var dur=durForm();
         /* ⛔ La clave se genera AQUI, fuera de `api.pushParte`, porque `api._post` reintenta
-           hasta tres veces: si naciera dentro, cada reintento seria un envio distinto. */
+           hasta tres veces: si naciera dentro, cada reintento seria un envio distinto.
+           ⛔ Y AHORA SOBREVIVE AL FALLO, que es el otro envío duplicado —el que el candado
+           NO cubre—: el reintento **a mano** tras un corte, o sea el caso en que el
+           servidor SÍ guardó y la respuesta se perdió. Guardada en el formulario, ese
+           reintento llega con la MISMA y `_parteConClave_` devuelve el parte que ya hay en
+           vez de crear un segundo. Se limpia sólo cuando el servidor ha contestado.
+           ⚠️ Los tres reintentos internos de `api._post` ya mandaban la misma clave (`body`
+           se construye FUERA del `for`, `movil.html:272`): eso no era el agujero. */
+        if(!f.clave) f.clave=_claveUso_();
         var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, horas:dur,
           ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true,
-          subsistema:_perfilElegido_(), clave:_claveUso_() });
+          subsistema:_perfilElegido_(), clave:f.clave });
         if(rec&&rec.partes&&rec.partes[0]){ nuevo=normPMovil(rec.partes[0]); h=dur; }
+        f.clave=null;
       }
       if(nuevo) PARTES.unshift(nuevo);
       /* ⛔ `perfil` TAMBIEN se limpia. Dejarlo pegado del envio anterior haria que una
@@ -828,6 +912,9 @@ async function enviarFichaje(){
          y son ~110 caracteres — en 2,4 segundos **no da tiempo a leerlo**. La regla ya
          estaba decidida (`decisiones-app.md`, 28/07): *un aviso que caduca solo sirve
          para lo que no importa*. Perder un fichaje importa. */
+      /* ⛔ Y aquí también se suelta el candado: si no, tras un fallo de red el botón se
+         queda muerto y el fichaje sólo se puede reintentar recargando la app. */
+      if(_be) _be.disabled=false;
       tost('No se pudo enviar: '+((e&&e.message)||e), (e && e.sesion) ? {fijo:true} : null);
     }
     return;
@@ -857,15 +944,22 @@ function desgloseCat(ps){
 }
 
 function filaParte(p){
-  var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='rech'||p.e==='cad')?'borde-no':'borde-pe';
+  /* ⛔ `rev` va con los terminales: un parte revertido NO esta esperando nada. */
+  var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='rech'||p.e==='cad'||p.e==='rev')?'borde-no':'borde-pe';
   var pil = p.e==='conf'?'<span class="pil conf">aprobada</span>'
           : p.e==='otor'?'<span class="pil otor">otorgada</span>'
           : p.e==='rech'?'<span class="pil no">rechazada</span>'
           : p.e==='det' ?'<span class="pil pend">falta detalle</span>'
           : p.e==='cad' ?'<span class="pil no">caducada</span>'
+          : p.e==='rev' ?'<span class="pil no">revertida</span>'
           : p.e==='sindecl'?'<span class="pil pend">sin declarar</span>'
           : '<span class="pil pend">en cola</span>';
-  var sub = p.e==='otor' ? (p.nota?esc(p.nota):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
+  /* ⛔ `conf` LLEVA SU PROPIA RAMA. Cuando `aprobada` caía en `'otor'`, una nota escrita
+     al aprobar se veía **en lugar de** la fecha; al separarlos se habría perdido sin que
+     nada avisara. Aquí se enseña lo que importa de un parte trabajado —cuándo y cuánto— y
+     la nota DETRÁS, como ya hacen `rech` y `rev`. */
+  var sub = p.e==='conf' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.nota?' · '+esc(p.nota):''))
+          : p.e==='otor' ? (p.nota?esc(p.nota):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
           : p.e==='pend' ? 'esperando aprobación'
           /* ⛔ SE ENSEÑA LA PREGUNTA, NO QUE HAY UNA. «Te piden más detalle» no dice QUÉ
              falta, así que el miembro tiene que adivinar o preguntar por Discord — y el
@@ -873,9 +967,12 @@ function filaParte(p){
              servidor (mínimo 8 caracteres), así que aquí siempre hay algo que enseñar. */
           : p.e==='det'  ? (p.nota ? 'te piden: '+esc(p.nota) : 'te piden más detalle')
           : p.e==='rech' ? 'rechazada'+(p.nota?' · '+esc(p.nota):'')
+          /* ⚠️ Se dice que se DESHIZO, no que se rechazo: son cosas distintas y a esa
+             persona le importan de forma distinta. */
+          : p.e==='rev'  ? 'revertida'+(p.nota?' · '+esc(p.nota):'')
           : p.e==='sindecl' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · caduca '+_isoADMY_((''+p.caduca).slice(0,10)):''))
           : (p.f+(p.ini?' · '+p.ini+'–'+p.fin:''));
-  var catTxt = (p.e==='conf'||p.e==='otor') ? ' · sumó a '+catEti(p.cat)
+  var catTxt = _cuentaYa_(p.e) ? ' · sumó a '+catEti(p.cat)
              : p.e==='pend' ? ' · irá a '+catEti(p.cat) : '';
   /* ⛔ Y EL BOTON TAMBIEN EN 'det'. Sin el, la linea de arriba prometia «vuelve a enviarla»
      sobre una ficha sin nada que pulsar: la promesa estaba escrita desde el primer dia y no
@@ -946,7 +1043,19 @@ function _movHorasHTML_(confs){
 
 function _desgloseMesHTML_(confs){
   var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
-  var comp=_compMensual_(YO), total=r.suma+comp;
+  var comp=_compMensual_(YO);
+  /* ⛔ EL TOTAL SALE DE LA PUERTA, NO DE UNA SUMA. Daniel, 02/08: «las horas del mes se
+     leen por `_hMesReal_`, no se suman… habia TRES vistas decidiendo por su cuenta las
+     horas del mes y decian cifras distintas en la misma app». Esta ventana era la CUARTA:
+     `vHoras` pinta la cifra grande por Notion y un toque abria esta, con la MISMA pieza
+     visual y el MISMO rotulo, sumando solo tus partes. Notion cuenta ademas reuniones,
+     cursos y turnos de fabricacion (que van **x4**), asi que tres turnos eran 12 h de
+     diferencia entre la tarjeta y la ventana que abre.
+     ⚠️ El respaldo se conserva —sin dato de Notion se suma— pero el ROTULO lo dice, igual
+     que en `vHoras`: «que cuentan» en vez de «este mes». Un numero distinto con el mismo
+     rotulo es lo que hace dudar del dato en vez de usarlo. */
+  var _hmD=_hMesReal_(YO), _notionD=(_hmD!=null);
+  var total=_notionD ? _hmD : (r.suma+comp);
   var cargo=(YO&&YO.cargo)||'miembro', _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO);
   var fila=
     '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
@@ -961,10 +1070,21 @@ function _desgloseMesHTML_(confs){
                        'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
       'la compensación vuelve a la base</small></div>'+
     '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>');
-  return '<div class="mtit">Desglose de '+esc(_mesLargo_(_hoyDateM_()))+'</div>'+
+  /* ⛔ EL TITULO, DEL PERIODO — NO DEL RELOJ DEL TELEFONO. El contenido de esta ventana va
+     de CIERRE A CIERRE (`_ultimosMov_(…,'mes')` → `_deEsteMes_` → `_diasDelMes_().periodo`)
+     y el titulo salia de `new Date()`. Julio se aplico el 04/08, asi que del 01 al 04 de
+     agosto esto se titulaba «Desglose de agosto 2026» y listaba los partes de JULIO.
+     Es el mismo fallo que `_deEsteMes_` documenta como corregido, y lo dice mejor
+     `_compHorasHTML_`: «el fallo nunca fue comparar con junio: fue LLAMARLO julio».
+     ⚠️ `_nomPeriodo_` es la puerta que ya existe para esto, con su cita dentro; el reloj
+     se queda SOLO de respaldo, para cuando el backend no manda periodo. */
+  var _perD=(_diasDelMes_()||{}).periodo;
+  return '<div class="mtit">Desglose de '+
+      esc(_perD ? _nomPeriodo_(_perD) : _mesLargo_(_hoyDateM_()))+'</div>'+
     '<div class="msub">Todas tus contribuciones de este mes, sin recortar.</div>'+
     '<div class="tarj">'+
-      '<div class="cifh"><span class="g mono">'+nf2(total)+'</span><span class="sc">h este mes</span></div>'+
+      '<div class="cifh"><span class="g mono">'+nf2(total)+'</span><span class="sc">h '+
+        (_notionD?'este mes':'que cuentan')+'</span></div>'+
       desgloseCat(r.todos)+
     '</div>'+
     '<div class="tarj">'+fila+r.todos.map(filaParte).join('')+'</div>'+
@@ -981,15 +1101,21 @@ function _desgloseMesHTML_(confs){
 
 function _cuotaHTML_(){
   var eur=function(n){return nf(n,2)+' €';};
+  /* ⛔ EN DIRECTO, que es lo que pidió Daniel el 15/08: *«se recalcula en cada fichaje»*.
+     Hasta hoy esto pintaba `YO.cuota` tal cual llegaba en el roster — o sea **la foto del
+     último `push`**, y entre `push` y `push` pasan días: fichabas cuatro turnos y el
+     número no se movía. Ahora la cuenta se hace aquí, con el padrón que ya está cargado.
+     ⚠️ Si aún no hay padrón se cae a lo que sirvió el backend **y se dice**. */
+  var _q=_cuotaDe_(YO);
   var recibo = YO.coche
-    ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(YO.cuota_base)+'</span></div>'+
+    ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(_q.base)+'</span></div>'+
       '<div class="rl desc"><span>Por poner el coche · '+YO.coche+' turno'+(YO.coche===1?'':'s')+'</span>'+
-      '<span class="ra">−'+eur(YO.cuota_base-YO.cuota)+'</span></div>'
+      '<span class="ra">−'+eur(_q.base-_q.final)+'</span></div>'
     : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta 4 € por turno.</p>';
   return '<div class="mtit">Tu cuota</div>'+
     '<div class="msub">Se cierra en agosto, al acabar la temporada. Es requisito para renovar.</div>'+
     '<div class="tarj acc">'+
-      '<div class="cifh"><span class="g mono" style="color:var(--ok)">'+nf(YO.cuota,2)+'</span><span class="sc">€ al año</span></div>'+
+      '<div class="cifh"><span class="g mono" style="color:var(--ok)">'+nf(_q.final,2)+'</span><span class="sc">€ al año</span></div>'+
       '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+recibo+'</div>'+
       /* ⛔ LA BASE SALE DE LA REGLA, NO SE TECLEA. Aquí ponía **«2 h de base» para todo
          el mundo**, y la base es la del **cargo**: `COMP_CARGO` da **7 h al PD** y **3,5 a
@@ -999,7 +1125,11 @@ function _cuotaHTML_(){
          ✅ Por la misma puerta que el resto (`_compBase_`), no por una copia: el día que
          cambie la tabla, la frase cambia sola. Es lo mismo que se hizo con la frase del
          expediente en el medidor de conducta. */
-      '<p class="rnota">Sale de tus horas de la temporada: el objetivo se mueve entre 8 y 15 h/mes, con '+
+      '<p class="rnota">'+(_q.viva
+        ? 'Se recalcula <b>con tus horas de ahora mismo</b>, no en el último cierre. '
+        : '<b>Es la última cifra que sirvió el servidor</b>, no la de ahora: aún falta el '+
+          'padrón del equipo para recalcularla aquí. ')+
+      'Sale de tus horas de la temporada: el objetivo se mueve entre 8 y 15 h/mes, con '+
       nf2(_compBase_(YO))+' h de base. Se descuentan 4 € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>';
 }
 
@@ -1029,6 +1159,11 @@ function _normPDec_(p){
        sin `ini`/`fin` un declarado a mano se rotula «sin fichaje» teniendo su hora al lado,
        y sin `decidido_por` un otorgado dice «otorgada por coordinación» sin nombre. */
     decidido_por:p.decidido_por||null, revierte:p.revierte||null,
+    /* ⛔ `aplicado_at` VIAJA, y sin el mi propio arreglo del 14/08 era INERTE: este objeto
+       se construye campo a campo, asi que `_yaCuentaEnSuMes_` recibia `undefined` ahi y el
+       `|| p.aplicado_at` no podia decidir nada -- el movil seguia mirando SOLO el estado.
+       ⚠️ La funcion estaba bien y la llamada tambien: lo que faltaba estaba EN MEDIO. */
+    aplicado_at:p.aplicado_at||null,
     estado:p.estado, origen:p.origen||null };
 }
 
@@ -1036,21 +1171,35 @@ function _normPDec_(p){
    es del PD, que es justo quien ve este panel; si falla se queda en `null` y **todo sigue
    como antes** — la cara es cortesía, el que se planta es el backend. */
 var CIERRE_PLAN = null;
+/* ⛔ EL ULTIMO CIERRE APLICADO, que es el dato DURABLE. Aqui se guardaba solo `c.plan` y
+   se tiraba el resto de la respuesta; la ranura del plan **la pisa un calculo nuevo**, y
+   con ella desaparece el instante del cierre. Sin este campo, entre «Calcular» y
+   «Aplicar» la cara vuelve a ofrecer «Revertir» sobre todo. */
+var CIERRE_UC = null;
 
 function _cargarCierrePlan_(){
   if (!(api && api.getCierre)) return Promise.resolve(null);
   return api.getCierre().then(function(c){
+    CIERRE_UC = (c && c.ultimo_cierre) || null;
     CIERRE_PLAN = (c && c.plan) || null; return CIERRE_PLAN;
   }).catch(function(){ return null; });   /* ⛔ un fallo NO se lee como «mes abierto» */
 }
 
 function _cargarPartesDec_(){
-  /* Los que esperan decisión, **sin** los tuyos: el backend ya te sirve solo lo que te toca. */
+  /* Los que esperan decisión, **sin** los tuyos: el backend ya te sirve solo lo que te toca.
+
+     ⛔ SALVO SI ERES EL PD, que desde el 15/08 SÍ firma lo suyo. Con el filtro a secas, los
+     partes que él es el único que puede aprobar eran justo los que no se le enseñaban: la
+     cola le salía vacía y las horas se quedaban sin aplicar para siempre.
+     ⛔ Y el «yo» sale de `_actorSanc_()`, no de `YO.nombre`: con la identidad prestada del
+     selector, `YO` es la persona real y no a quien estás mirando, así que la cola se filtraba
+     por el de siempre. Es el mismo fallo que ya se cerró en `_puedeBorrarReuM_`. */
   return _cargarCierrePlan_().then(function(){ return api.getPartes({}); }).then(function(arr){
     if(!Array.isArray(arr)) return;
-    var yo=(YO&&YO.nombre)||'';
+    var yo=(typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
+    var _mando = (typeof rangoNom==='function' ? rangoNom(yo) : 0) >= 3;
     PARTES_DEC = arr.filter(function(p){
-      return (p.estado==='pendiente' || p.estado==='detalle') && p.autor!==yo;
+      return (p.estado==='pendiente' || p.estado==='detalle') && (_mando || p.autor!==yo);
     }).map(_normPDec_);
     /* ⛔ Y DE LA MISMA RESPUESTA, lo ya decidido. Pedirlo en otra llamada seria un segundo
        viaje para datos que ya vienen en el primero -- `getPartes` devuelve la cola entera que
@@ -1062,7 +1211,7 @@ function _cargarPartesDec_(){
       return _pdRevertible_(p) && p.autor!==yo;
     }).map(function(p){
       var n = _normPDec_(p);
-      n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN);
+      n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN, CIERRE_UC);
       return n;
     });
   }).catch(function(){});
@@ -1164,6 +1313,20 @@ function _partesDecHTML_(){
    seria un boton que solo sabe dar error. */
 function _pdRevertible_(p){
   var e = p && p.estado;
+  /* ⛔⛔ LA CONTRAPARTE DE UNA REVERSIÓN NO SE REVIERTE, y esto NO es cosmético.
+     Nace `aprobada` con `horas: -(h)` (`Codigo.gs`, `_revertirParte_`), así que
+     revertirla mete un parte de horas **negativas** en la cola de decisión de alguien
+     que no lo pidió — y mientras esté `pendiente` **bloquea el cierre del mes para las
+     32**. Si ya estaba aplicada, encima la tarjeta prometía lo contrario de lo que iba
+     a pasar: «revertir le RESTA −2,5 h» sobre un número que el servidor **suma**.
+     ⛔ Y no es una hipótesis: el propio backend lo tiene escrito como **alcanzable**
+     —*«`_pdRevertible_` acepta `aplicada` y no excluye `origen==='reversion'`; el
+     guardia de clave única no lo para porque busca `'rev-'+p.id` con el id de la
+     REVERSIÓN»*—. El escritorio ya lo cortaba (`_escRevBloqueo_`); esta cara era la
+     gemela que faltaba, y es la cara desde la que se decide sobre la marcha.
+     ✅ La salida es la misma que dice el escritorio: si te pasaste revirtiendo, se
+     vuelven a poner las horas con «Otorgar horas directamente». */
+  if(p && p.origen==='reversion') return false;
   return e==='aprobada' || e==='rechazada' || e==='otorgada' || e==='aplicada';
 }
 
@@ -1176,7 +1339,11 @@ function _pdRevFichaHTML_(p){
   /* ⛔ EL AVISO DEPENDE DE SI YA TOCO NOTION. Revertir una aprobada sin aplicar no deja rastro;
      revertir una aplicada emite una contraparte que RESTA de su ficha. Decir lo mismo en los
      dos casos es esconder el unico que importa. */
-  var enFicha = p.estado==='aplicada';
+  /* ⛔ LOS DOS TERMINOS, no solo el estado: si el motor ya escribio en Notion y el estado
+     no llego a rodar, mirar solo `estado` dice «aun no cuenta» CUANDO REVERTIR SI RESTA de
+     la ficha de esa persona -- el unico caso en que el aviso hace falta. La regla es una y
+     vive en `comun.js`. */
+  var enFicha = _yaCuentaEnSuMes_(p);
   /* ⛔ LA CABECERA SE MONTA UNA SOLA VEZ. La tuve duplicada un rato -una copia para el mes
      cerrado y otra para el normal- y eso, además de invitar a que las dos diverjan, dejó
      **un ancla de mutación apuntando a dos sitios**: la protección queda afirmada y sin
@@ -1228,7 +1395,12 @@ function _engPartesRev_(){
          se sabia es una pantalla que te hace perder el rato. */
       if(mot.length<8){ tost('Pon un motivo (al menos 8 caracteres).'); return; }
       var p=null; PARTES_REV.forEach(function(x){ if(x.id===id) p=x; });
-      if(!confirm('Revertir este parte.\n\n'+((p&&p.estado==='aplicada')
+      /* ⛔ LA MISMA REGLA QUE LA TARJETA, o la pantalla se contradice a sí misma a tres
+         píxeles de distancia. Aquí ponía `p.estado==='aplicada'` mientras la ficha de arriba
+         ya usaba `_yaCuentaEnSuMes_`: en la ventana entre escribir Notion y sellar el estado,
+         la tarjeta decía «revertir le RESTA 2 h» y este diálogo, justo después, «todavía no
+         contaban». Quien lo lea se cree el último — y decide con el número equivocado. */
+      if(!confirm('Revertir este parte.\n\n'+(_yaCuentaEnSuMes_(p)
         ? 'Las horas YA cuentan: se emitira un apunte que se las resta de su ficha.'
         : 'Todavia no contaban: vuelve a la cola de decision.')+'\n\n¿Sigo?')) return;
       $$('#prev [data-pdrev]').forEach(function(x){ x.disabled=true; });
@@ -1300,7 +1472,11 @@ function vHoras(){
   /* DEL MES, como la barra de abajo: el titular de esta pantalla dice «lo que ya
      cuenta **este mes**». Con `sumaE` la pildora y la barra podian decir numeros
      distintos en la misma tarjeta en cuanto una de las dos se arreglara. */
-  var o=sumaEMes('otor'), p=sumaEMes('pend');
+  /* ⛔ LAS DOS POR SEPARADO, no sólo su suma: la píldora las ROTULA, y llamar «otorgadas»
+     a lo que trabajaste y te firmaron es el mismo fallo que esta pieza arregla en la fila,
+     una capa más arriba. */
+  var oAp=sumaEMes('conf'), oOt=sumaEMes('otor');
+  var o=sumaCuentanMes(), p=sumaEMes('pend');
   /* MISMA PUERTA que la tarjeta de Estado (`_hMesReal_`). Habia dos tarjetas de «horas del
      mes» -una aqui y otra en `vEstado`- leyendo campos DISTINTOS, y en cuanto se toco una
      se pusieron a decir numeros distintos en la misma app: 91 h en Horas y otra cosa en
@@ -1315,8 +1491,10 @@ function vHoras(){
      apareciéndome los partes del mes anterior?»* — esto no los quita (eso lo decide él), pero
      los manda al fondo, que es donde estorban menos. */
   var _porFecha=function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); };
-  var _todasMias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad';}).sort(_porFecha);   // en cola / con detalle pedido / rechazados / sin declarar / caducados
-  var confs=PARTES.filter(function(x){return x.e==='otor';}).sort(_porFecha);   // lo que ya cuenta
+  /* ⛔ `rev` entra en ESTA lista -- la del historial -- y NO en la de pendientes: un parte
+     revertido se ve, pero no espera nada de nadie. */
+  var _todasMias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad'||x.e==='rev';}).sort(_porFecha);   // en cola / con detalle pedido / rechazados / sin declarar / caducados
+  var confs=PARTES.filter(function(x){return _cuentaYa_(x.e);}).sort(_porFecha);   // aprobadas + otorgadas
   /* ⛔ LOS DE MESES PASADOS, APARTE. Ordenarlos los mandaba al fondo, pero seguían **en la
      misma lista** — y la queja de Daniel era que **aparecen**, no que aparezcan arriba. */
   /* ⚠️ El periodo se pide AQUI. La primera version usaba `d.periodo` copiado de
@@ -1359,12 +1537,13 @@ function vHoras(){
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     _partesDecHTML_()+
     _pdRevHTML_()+
-    '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'otorgadas · pendientes')+
+    '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'aprobadas · otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
         (notion
           ? (p?'<span class="pil pend">+'+nf2(p)+' h fichadas · pendientes de firma</span>':'')
-          : ((o?'<span class="pil otor">'+nf2(o)+' h otorgadas</span>':'')+
+          : ((oAp?'<span class="pil conf">'+nf2(oAp)+' h aprobadas</span>':'')+
+             (oOt?'<span class="pil otor">'+nf2(oOt)+' h otorgadas</span>':'')+
              (p?'<span class="pil pend">+'+nf2(p)+' h pendientes</span>':'')))+
       '</div>'+
       barraHorasHTML('barHoras')+

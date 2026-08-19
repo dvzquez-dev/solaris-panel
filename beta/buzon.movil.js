@@ -28,7 +28,23 @@ function _contextoM_(){
 function _abrirPintor_(fondoUrl, alTerminar){
   var caja=$('#pintor'), zona=$('#pzona'), lienzo=$('#plienzo');
   var img=$('#pfondo'), cv=$('#ptrazos');
-  if(!caja||!img||!cv) return;
+  /* ⛔⛔ EL PINTOR SIEMPRE CONTESTA, PASE LO QUE PASE. En el escritorio esta
+     envuelto en una PROMESA (`_pedirCaptura_`), y su `fin()` sólo se llama desde
+     aquí: si una salida se va sin avisar, la promesa **no se asienta nunca**, el
+     `await` de `reportarModal` se queda colgado y `reportarBug` no llega a correr.
+     Lo que se pierde no es la foto —es el título, el detalle y la gravedad recién
+     escritos—, y sin un solo error a la vista. Había DOS salidas mudas: cancelar y
+     este `return` de aquí abajo.
+     ⚠️ Al cancelar se contesta con la foto ORIGINAL sin marcar, no con nada: es lo
+     que dice el propio aviso («salir sin guardar **lo que has pintado**») y lo que
+     el móvil ya hacía de hecho, porque allí `BZ_FOTO` se fija antes de abrir. */
+  var contestado=false;
+  function contestar(url, n){
+    if(contestado) return;
+    contestado=true;
+    if(typeof alTerminar==='function') alTerminar(url, n||0);
+  }
+  if(!caja||!img||!cv){ contestar(fondoUrl, 0); return; }
   var ctx=cv.getContext('2d');
   /* TRAZOS, no píxeles: cada uno es {color, grosor, pts:[[x,y],…]} en coordenadas de
      IMAGEN. Deshacer es quitar el último y repintar. Con capturas de pantalla a resolución
@@ -166,6 +182,14 @@ function _abrirPintor_(fondoUrl, alTerminar){
   $$('#pmodo button').forEach(function(b){ b.onclick=function(){
     modo=b.dataset.pm;
     $$('#pmodo button').forEach(function(x){ x.classList.toggle('on', x===b); }); }; });
+  /* ⛔ Y LA BARRA SE PONE AL DÍA AL ABRIR. `modo` se reinicia a 'pintar' aquí
+     dentro, pero la clase `.on` de `#pmodo` vive en el HTML **estático** y sólo la
+     movía el clic de arriba: abrías, tocabas «Mover», cerrabas, y desde la segunda
+     apertura el botón decía «Mover» mientras el lienzo pintaba.
+     ⚠️ `#pcolores` y `#pgrosor` no lo sufrían porque se rehacen enteros unas líneas
+     más arriba, con el `on` puesto en el índice que toca. `#pmodo` es el único de
+     los tres que no se repinta, y por eso es el único que se desincronizaba. */
+  $$('#pmodo button').forEach(function(x){ x.classList.toggle('on', x.dataset.pm===modo); });
   $('#pdeshacer').onclick=function(){
     if(!trazos.length){ tost('No hay nada que deshacer.'); return; }
     trazos.pop(); repintar();
@@ -175,6 +199,10 @@ function _abrirPintor_(fondoUrl, alTerminar){
   $('#pcancelar').onclick=function(){
     if(trazos.length && !confirm('Vas a salir sin guardar lo que has pintado. ¿Seguro?')) return;
     cerrar();
+    /* ⛔ Y SE CONTESTA: cerrar la caja NO es contestar. Quien abrió el pintor puede
+       estar esperando —en el escritorio lo está, dentro de un `await`—, y dejarlo
+       esperando se lleva por delante el reporte entero. */
+    contestar(fondoUrl, 0);
   };
   $('#plisto').onclick=function(){
     /* LA FUSIÓN POR CAPAS: la de abajo es la foto tal cual, la de arriba lo pintado. Sale
@@ -185,7 +213,9 @@ function _abrirPintor_(fondoUrl, alTerminar){
     o.drawImage(img, 0, 0, out.width, out.height);
     o.drawImage(cv, 0, 0);
     cerrar();
-    alTerminar(out.toDataURL('image/jpeg', 0.82), trazos.length);
+    /* Por la MISMA puerta que cancelar: así un clic tardío en «Cancelar» no puede
+       contestar por segunda vez y pisar la imagen marcada con la foto en crudo. */
+    contestar(out.toDataURL('image/jpeg', 0.82), trazos.length);
   };
 
   img.onload=function(){
@@ -252,6 +282,16 @@ function _cablearFotoBuzon_(repinta){
 function buzonModal(tipo, prev){
   var esBug=(tipo!=='mejora');
   var _pv=prev||{};
+  /* ⛔ LA GRAVEDAD TAMBIÉN VIAJA, y por eso se declara AQUÍ: el bloque de chips se
+     pinta unas líneas más abajo, así que si `grav` naciera después de `abrirModal` no
+     habría con qué marcar el elegido. Es el mismo fallo que arriba, tercera cara: se
+     arregló el título, se arregló el detalle, y la gravedad se quedó fuera **de la
+     misma llamada**.
+     ⛔ Y su precio no es cosmético: `PESOS_COMP` paga **2,00 h** por un fallo que
+     bloquea y **0,50 h** por uno que molesta, y esas horas entran en la cuota. Volvía a
+     'Molesta' **repintada con cara de elegida**, así que no había forma de notarlo. */
+  var grav=_pv.grav||'Molesta';
+  function _marcaG_(v){ return grav===v ? ' class="on"' : ''; }
   var pant=_NOMBRE_PANTALLA_[ST.vista]||ST.vista;
   abrirModal('<div class="mtit">'+(esBug?'Reportar un fallo':'Proponer una mejora')+'</div>'+
     '<div class="msub">Estás en <b>'+esc(pant)+'</b> · se envía con tu nombre</div>'+
@@ -265,14 +305,16 @@ function buzonModal(tipo, prev){
       '<textarea id="bzDet" placeholder="'+(esBug?'y qué hiciste justo antes, si lo recuerdas…':'el problema de fondo, no la solución…')+'">'+esc(_pv.det||'')+'</textarea></label>'+
     (esBug?'<span class="sc" style="display:block;margin-bottom:6px">¿Cuánto molesta?</span>'+
       '<div class="modos" id="bzGrav" style="margin-bottom:12px">'+
-      '<button data-g="Bloquea" data-p>Me bloquea</button>'+
-      '<button data-g="Molesta" class="on" data-p>Molesta</button>'+
-      '<button data-g="Cosmético" data-p>Es cosmético</button></div>':'')+
+      '<button data-g="Bloquea"'+_marcaG_('Bloquea')+' data-p>Me bloquea</button>'+
+      '<button data-g="Molesta"'+_marcaG_('Molesta')+' data-p>Molesta</button>'+
+      '<button data-g="Cosmético"'+_marcaG_('Cosmético')+
+        ' data-p>Es cosmético</button></div>':'')+
     _fotoBuzonHTML_()+
     '<p class="rnota">Esto <b>no cambia nada por sí solo</b>: va a una cola que revisa el '+
     'Project Director. Si sale adelante, se prepara y se te avisa.</p>'+
     '<button class="btn pri full" data-p id="bzEnviar" style="margin-top:10px">Enviar</button>');
-  var grav='Molesta';
+  /* (`grav` ya se declaró arriba, con lo que venía en `prev`: aquí se clavaba
+     'Molesta' y eso borraba la elección en cada reconstrucción del modal.) */
   /* Se repinta SOLO la fila de la foto, no el modal entero: reconstruirlo borraría lo que
      ya hubieras escrito, que es la peor forma de perder un reporte. */
   function _repintaFoto_(){
@@ -293,7 +335,7 @@ function buzonModal(tipo, prev){
      un fallo, te das cuenta de que es mas bien una mejora, y pulsas el otro boton. */
   $$('#bzTipo button').forEach(function(b){ b.onclick=function(){
     var _t=$('#bzTit'), _d=$('#bzDet');
-    buzonModal(b.dataset.bt, {tit:(_t&&_t.value)||'', det:(_d&&_d.value)||''});
+    buzonModal(b.dataset.bt, {tit:(_t&&_t.value)||'', det:(_d&&_d.value)||'', grav:grav});
   }; });
   var env=$('#bzEnviar');
   env.onclick=async function(){
