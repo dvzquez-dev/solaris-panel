@@ -3031,6 +3031,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-globo-reuniones', fecha:'2026-08-19',
+      titulo:'El globo rojo de Reuniones ya cuenta lo que te falta a ti',
+      items:[
+        {cara:'movil', vista:'reu', txt:'El número rojo de la pestaña **Reuniones** miraba **la reunión que tuvieras abierta**, no las que te faltan por cubrir. Con dos convocadas, si la más próxima ya la habías cubierto, **la que cerraba mañana no avisaba** — y de no cubrir a tiempo salen puntos (Art. 30g). Encima el globo cambiaba según lo que mirabas: abrir una reunión ya cubierta te apagaba tu propio aviso. Ahora cuenta **cuántas te faltan de verdad**, y dice el número, no un «hay algo».'},
+        {cara:'movil', vista:'reu', txt:'Y si **la convocas tú**, ya no te sale globo: organizas, no cubres. Antes lo llevabas encendido siempre, y al tocarlo la propia pantalla te decía que a ti no se te pide disponibilidad.'}
+      ] },
     { id:'2026-08-19-doc-corregir-dos-pasos', fecha:'2026-08-19',
       titulo:'Corregir un documento: la app ya te dice los dos pasos',
       items:[
