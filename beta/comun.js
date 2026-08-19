@@ -432,7 +432,19 @@ function _truncarCentimo_(x){ return Math.floor(x * 100 + 1e-9) / 100; }
 
 function _umbral_(){
   var ing=DATA.umbral;
-  if(ing && ing.medias && ing.medias.length){
+  /* ⛔ CERO MESES CERRADOS NO ES «SIN INGREDIENTES». Aqui se exigia
+     `ing.medias.length`, y con la lista VACIA se tiraba tambien el `mesAbierto` -que
+     SI es un dato- para caer al respaldo por persona. Eso pasa **todo septiembre**:
+     `flujos/umbral.py` excluye el mes abierto de los cerrados a proposito, asi que en
+     el primer mes de la temporada `medias` es `[]` los 30 dias.
+     🔁 Medido: el 1/09 la cara decia **11,8 h** -el valor CABLEADO de la temporada
+     vieja- y el motor **8,00** (+47,5 %). Y no es que se quede alta: se queda CIEGA.
+     Con el equipo a 30 h/mes el motor dice **15,00** y la cara sigue diciendo 11,8,
+     o sea **-21,3 %**. El objetivo dejaba de seguir las horas reales un mes entero.
+     ⚠️ Y el `if(den>0)` de abajo PASA A ESTAR VIVO con esto: hasta hoy `medias`
+     traia al menos un mes, asi que `den>=1` siempre. Ahora `den` puede ser 0 -sin
+     meses cerrados y sin mes abierto- y sin esa guarda seria `0/0` = NaN en pantalla. */
+  if(ing && ing.medias){
     var num=0, den=0;
     ing.medias.forEach(function(x){ num+=x; den+=1; });        // cada mes cerrado pesa 1
     var ma=ing.mesAbierto;
@@ -3186,6 +3198,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-20-objetivo-primer-mes', fecha:'2026-08-20',
+      titulo:'El objetivo del mes deja de congelarse al empezar temporada',
+      items:[
+        {cara:'movil', vista:'estado', txt:'**El \u00abobjetivo\u00bb de la barra de horas se quedaba clavado en 11,8 h todo septiembre.** Al empezar temporada no hay ning\u00fan mes cerrado, y la pantalla le\u00eda eso como \u00abno hay datos\u00bb \u2014 tirando tambi\u00e9n las horas del mes en curso, que **s\u00ed** son un dato. As\u00ed que ense\u00f1aba el valor de la temporada **vieja**: el 1 de septiembre el motor dice **8,0 h** y la barra dec\u00eda 11,8.'},
+        {cara:'escritorio', vista:'estado', txt:'**Y con ello el chip OBJETIVO, la columna \u00abvs. objetivo\u00bb y qui\u00e9n sale en verde o en rojo.** No es que el n\u00famero fuera alto: es que **no se mov\u00eda**. Con el equipo a 30 h/mes el objetivo real son 15,0 h y la pantalla segu\u00eda diciendo 11,8, o sea corta. Ahora sigue las horas de verdad desde el primer d\u00eda.'}
+      ] },
     { id:'2026-08-20-exencion-primer-mes', fecha:'2026-08-20',
       titulo:'El primer mes ya no lleva cuota tambi\u00e9n en la app',
       items:[
