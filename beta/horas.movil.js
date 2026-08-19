@@ -761,8 +761,17 @@ function validarFichaje(){
   var b=$('#btnEnviar'), l=$('#lblEnviar');
   if(b){
     b.disabled=!todo;
+    /* ⛔ «Falta la duración» salia tambien cuando la duracion ESTA y PASA DEL TOPE, que
+       es lo contrario de faltar: el boton mandaba a rellenar lo que ya estaba puesto.
+       La puerta esta en `comun.js` porque el escritorio hace la misma pregunta. */
+    var _pgM=(typeof _pegaDeDuracion_==='function' && !declP)
+      ? _pegaDeDuracion_(haySes?dur:null, _topeH) : '';
+    var _faltaDur = _pgM==='largo'
+      ? ('Son más de '+nf(_topeH,2)+' h: un parte no puede pasar de ahí')
+      : (_pgM==='sin' ? 'Todavía no hay ninguna sesión que declarar'
+                      : 'Falta la duración');
     if(l) l.textContent = todo ? ('Enviar '+nf(dur,2)+' h a aprobación')
-      : (!n1?'Falta la duración':(!n2?'Falta a qué imputarlas':'Falta la justificación'));
+      : (!n1?_faltaDur:(!n2?'Falta a qué imputarlas':'Falta la justificación'));
   }
   return todo;
 }

@@ -839,8 +839,20 @@ function _bloqFalta_(){
        imposibles, porque `new Date(2026,1,31)` **no falla, rueda al mes siguiente**. */
     if(!_fechaDMY_(f.fecha)) return 'La fecha va como DD/MM/AAAA y tiene que existir';
     var d=_bloqDur_(), tope=_maxHorasParte_();
-    if(!(d>0)) return 'La salida tiene que ser posterior a la entrada';
-    if(d>tope) return 'Un parte no puede pasar de '+tope+' h (van '+h1(d)+')';
+    /* ⛔ TRES CAUSAS, TRES FRASES. Esto decia «La salida tiene que ser posterior a la
+       entrada» y saltaba tambien con un bloque de SIETE MINUTOS -- `_bloqDur_` redondea
+       a cuartos, asi que `Math.round(7/15)/4` es 0 sobre un rango bien ordenado, y quien
+       lo leia se iba a mirar unas horas que estaban bien. El crudo en minutos es lo
+       unico que distingue «demasiado corto» de «la misma hora». */
+    var _cr=_minHM_(BLOQ_FORM.fin)-_minHM_(BLOQ_FORM.ini);
+    if(_cr<0) _cr+=1440;                                  /* cruza medianoche */
+    var _pg=(typeof _pegaDeDuracion_==='function') ? _pegaDeDuracion_(d, tope, _cr)
+                                                   : (d>0?(d>tope?'largo':''):'cero');
+    if(_pg==='largo') return 'Un parte no puede pasar de '+tope+' h (van '+h1(d)+')';
+    if(_pg==='corto') return 'Ese bloque es demasiado corto: las horas se cuentan en '+
+                             'cuartos, y menos de 8 minutos se queda en cero';
+    if(_pg==='cero')  return 'La salida tiene que ser posterior a la entrada';
+    if(_pg==='sin')   return 'Pon la entrada y la salida';
   }
   if(!_imputacion_(f)) return 'Falta a qu\u00e9 imputarlas';
   var n=f.just.trim().length;

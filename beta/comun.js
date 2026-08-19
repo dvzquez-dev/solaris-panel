@@ -3029,6 +3029,36 @@ function _cruceNoche_(iniHM, finHM, topeH){
   return inv>tope ? 'noche' : 'duda';
 }
 
+/* ═══ POR QUE NO VALE ESA DURACION · UNA PUERTA PARA LAS DOS CARAS ══════════════════════
+   Las dos caras hacian la misma pregunta y contestaban con UN solo mensaje que tapaba TRES
+   causas distintas -- y en dos de ellas mentia:
+
+   · El escritorio decia «La salida tiene que ser posterior a la entrada» y eso salta tambien
+     con un bloque de SIETE MINUTOS: `_bloqDur_` redondea a cuartos de hora, asi que
+     `Math.round(7/15)/4` es **0** sobre un rango perfectamente ordenado. Quien lo lee va a
+     mirar las horas, que estan bien.
+   · El movil decia «Falta la duracion» y eso sale tambien cuando la duracion ESTA y **pasa
+     del tope**, que es justo lo contrario de faltar.
+
+   ⛔ DECIDE Y DEVUELVE UN CODIGO; LA FRASE LA REDACTA CADA CARA -- mismo patron que
+   `_avisoMesDelBloque_` y `_cruceNoche_`: las dos caras no dicen las cosas igual.
+   · `''`      — la duracion vale.
+   · `'sin'`   — no hay ninguna sesion ni bloque que medir.
+   · `'largo'` — la hay y **pasa del tope**. Va ANTES que nada: es el unico caso en que el
+     numero existe y se puede enseñar, y decirle «falta» a alguien que ha puesto quince horas
+     le manda a rellenar lo que ya tiene.
+   · `'corto'` — el rango esta bien ordenado pero **redondea a cero**: menos de 7,5 minutos.
+   · `'cero'`  — entrada y salida son la misma hora, o no se sabe cuanto dura.
+   ⚠️ `crudoMin` es OPCIONAL: sin el no se puede distinguir «corto» de «cero», y entonces se
+   contesta `'cero'` en vez de adivinar. Un «no lo se» no se disfraza del caso concreto. */
+function _pegaDeDuracion_(dur, tope, crudoMin){
+  if(typeof dur !== 'number' || !isFinite(dur)) return 'sin';
+  if(typeof tope === 'number' && isFinite(tope) && dur > tope) return 'largo';
+  if(dur > 0) return '';
+  if(typeof crudoMin === 'number' && isFinite(crudoMin) && crudoMin > 0) return 'corto';
+  return 'cero';
+}
+
 /* ═══ EL RELOJ DE UNA SESION DE FICHAJE · UNA PUERTA PARA LAS DOS CARAS ══════════════════
    Vive aqui desde el 14/08 porque **el escritorio tambien ficha**. Hasta hoy esta cuenta
    —minutos de pared desde `ini`, tope de un parte, menos las pausas— estaba solo en
@@ -3090,6 +3120,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-por-que-no-vale-la-duracion', fecha:'2026-08-19',
+      titulo:'Cuando una duración no vale, la app dice POR QUÉ',
+      items:[
+        {cara:'escritorio', vista:'horas', txt:'Un bloque de **siete minutos** te decía «La salida tiene que ser posterior a la entrada» —y estaba perfectamente ordenado—: las horas se cuentan en **cuartos**, así que se quedaba en cero. Ahora lo dice tal cual, y pasarse del tope tiene su propia frase.'},
+        {cara:'movil', vista:'horas', txt:'El botón decía «Falta la duración» también cuando la duración **estaba y pasaba del tope** — o sea que te mandaba a rellenar lo que ya tenías puesto. Ahora te dice que son demasiadas horas.'}
+      ] },
     { id:'2026-08-19-coches-del-turno', fecha:'2026-08-19',
       titulo:'Los coches de un turno ya se rellenan, y el trayecto se guarda',
       items:[
