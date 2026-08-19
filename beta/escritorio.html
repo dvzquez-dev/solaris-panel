@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=58bf31f"></script>
+<script src="comun.js?v=01f230d"></script>
 <script src="notis.escritorio.js?v=e86a1b9"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=623a819"></script>
@@ -2745,7 +2745,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7a46d3b';
+var BUILD='8ccc85d';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3325,6 +3325,23 @@ function _engConvocarTurno_(){
     };
   });
   if(document.getElementById('tuLista')) pintarReparto();   // repinta tras un render()
+  /* ⛔ Y LOS COCHES, que llevaban desde el 11/08 escritos y sin que los alcanzara nadie.
+     `pintarCoches` solo se reinvocaba a si misma desde `cablearCoches`, asi que `#tuCoches`
+     no llegaba ni a pintar su «Sin coches» -- la pantalla no ensenaba que la funcion
+     existiera. Va junto a `pintarReparto()` porque las dos repintan tras un `render()`. */
+  if(document.getElementById('tuCoches') && typeof pintarCoches==='function') pintarCoches();
+  /* ⛔ EL BOTON NO TENIA MANEJADOR: el markup salia y no hacia nada. Un coche nace VACIO
+     y con la vuelta apagada — `_pegasDelCoche_` ya exige origen y destino, y
+     `_porQueNoSeConvoca_` no deja convocar hasta que estan, asi que nacer a medias no
+     cuela nada: solo abre los dos desplegables. */
+  $$('[data-addcoche]').forEach(function(b){
+    b.onclick=function(){
+      TUR_COCHES.push({origen:'', destino:'', vueltaDistinta:false,
+                       vueltaOrigen:null, vueltaDestino:null});
+      pintarCoches();
+      if(typeof pintarReparto==='function') pintarReparto();   // el boton de convocar
+    };
+  });
   $$('[data-convocar]').forEach(function(b){
     b.onclick=async function(){
       if(b.disabled) return;
@@ -3339,6 +3356,16 @@ function _engConvocarTurno_(){
            antes -el de TURNO-, porque el backend ya escribe esa columna. Los otros dos
            viajan aparte y, sobre todo, dentro del `rol`, que es lo unico que se lee. */
         responsable:TUR_CARGOS.turno, cargos:TUR_CARGOS,
+        /* ⛔ EL TRAYECTO VIAJA. Hasta hoy `TUR_COCHES` se rellenaba en pantalla y se
+           quedaba ahi: el unico dato de coche que llegaba a Notion era el BOOLEANO por
+           persona (`t.coche`, via el `rol`), o sea «llevo coche» sin decir de donde a
+           donde. Y eso es justo lo que Daniel pidio que constara.
+           ⚠️ DONDE CAE EN NOTION SIGUE SIENDO DECISION SUYA. Lo que hace esto es que el
+           dato no se pierda: el servidor lo guarda en su almacen y `getTurnos` lo
+           devuelve. Una columna de Notion se puede anadir despues sin tocar la cara. */
+        coches:TUR_COCHES.map(function(co){ return {origen:co.origen||'',
+          destino:co.destino||'', vueltaDistinta:!!co.vueltaDistinta,
+          vueltaOrigen:co.vueltaOrigen||null, vueltaDestino:co.vueltaDestino||null}; }),
         coche:nn.filter(function(n){ return TUR_SEL[n].coche; }),
         /* ⛔ EL `rol` LLEVA LO DE LOS BOTONES, no solo lo tecleado. `responsable` y
            `coche` se mandan tambien aparte (columnas People de Notion), pero NADIE
@@ -3365,7 +3392,13 @@ function _engConvocarTurno_(){
       try{
         var r=await api.crearTurno(t);
         var sin=(r&&r.sinEtiquetar)||[];
+        /* ⛔ `TUR_COCHES` TAMBIEN SE VACIA. Se limpiaban `TUR_SEL` y `TUR_CARGOS` y no
+           este, asi que el siguiente turno que se convocara arrastraba los coches del
+           anterior -- y con el trayecto ya viajando, eso son kilometros de otro dia.
+           ⚠️ `.length=0` y no `= []`: la lista es una global que otros modulos ya
+           capturaron por referencia. */
         TUR_SEL={}; TUR_CARGOS={ turno:null, audiovisual:null, memoria:null };
+        TUR_COCHES.length=0;
         try{ var tt=await api.getTurnos(); if(Array.isArray(tt)){ TURNOS.length=0; tt.forEach(function(x){TURNOS.push(x);}); } }catch(_){}
         tost('Turno '+(r&&r.id||'')+' convocado en Notion'+
           (sin.length?' \u00b7 no se pudo etiquetar a: '+sin.join(', '):'')+'.');

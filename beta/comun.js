@@ -3090,6 +3090,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-coches-del-turno', fecha:'2026-08-19',
+      titulo:'Los coches de un turno ya se rellenan, y el trayecto se guarda',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Al convocar un turno, **«+ añadir coche» ya funciona**: abre sus dos desplegables —de dónde sale y a dónde va— y, si la vuelta no es la misma, los otros dos. Estaba escrito y **el botón no hacía nada**. ⛔ Y el trayecto **viaja con el turno**: hasta ahora lo único que llegaba era «esta persona lleva coche», **sin decir de dónde a dónde** — y es el trayecto el que decide el descuento de **4 € por turno**. ⚠️ No deja convocar un coche a medias, y al convocar se vacía para que el turno siguiente no arrastre los kilómetros del anterior. ⚠️ Falta decidir en qué columna de Notion cae; hoy vive en el servidor y vuelve con cada turno, y necesita **desplegarlo**.'}
+      ] },
     { id:'2026-08-19-ritmo-del-motor', fecha:'2026-08-19',
       titulo:'Tu ritmo h/mes sale del motor, no se lo calcula la pantalla',
       items:[
