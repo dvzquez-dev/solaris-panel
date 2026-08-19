@@ -3074,10 +3074,23 @@ function _pegaDeDuracion_(dur, tope, crudoMin){
    a la ventana del parte (`_pausaMs_(pausas, finMs)` con `finMs` ya topado) y esto no. Una
    sesion de 30 h con una pausa de 1 h en la hora 20: el servidor cierra 14 h y esta cuenta
    pone 13 h en pantalla. Solo se alcanza POR ENCIMA del tope, donde el barrido del gate
-   —cada 2 min— normalmente ya ha cerrado la sesion. Apuntado, no arreglado aqui. */
+   —cada 2 min— normalmente ya ha cerrado la sesion. Apuntado, no arreglado aqui.
+   ⚠️ Y ESE RECORTE TIENE UNA SEGUNDA CARA que aqui no estaba dicha: una pausa ABIERTA
+   cuenta hasta `Date.now()` **sin techo**, mientras el backend la recorta a `finMs`. Es
+   la misma divergencia -- el recorte a la ventana -- vista desde el tramo abierto, y se
+   alcanza por el mismo sitio: por encima del tope. Tambien apuntada, tambien sin tocar.
+   ✅ Lo que SI se arreglo el 19/08 es la tercera diferencia, que no era deliberada: la
+   guarda de TIPO. Ver abajo. */
 function _pausaMin_(pausas){
   var now=Date.now(), t=0;
-  (pausas||[]).forEach(function(p){
+  /* ⛔ LA GUARDA DE TIPO, QUE LA GEMELA YA TENIA. `_pausaMs_` del backend empieza con
+     `Array.isArray(pausas) ? pausas : []` desde siempre; aqui habia `(pausas||[])`, que
+     para el `null` y **no** para una cadena ni un objeto: los dos entran por la izquierda
+     del `||` y despues se les llama un `forEach` que no tienen. Eso no da un numero raro:
+     **lanza**, y se lleva por delante el repintado de la pantalla de quien esta fichando.
+     ⚠️ Y `pausas` viene del backend POR LA RED, que es de donde llegan las formas que uno
+        no escribio. Medido el 19/08: con `'x'` y con `{}` la funcion reventaba. */
+  (Array.isArray(pausas) ? pausas : []).forEach(function(p){
     var pi=Date.parse(p.ini), pf=p.fin?Date.parse(p.fin):now;
     if(pf>pi) t+=(pf-pi);
   });
@@ -3130,15 +3143,15 @@ function _novedades_(){
         {cara:'movil', vista:'estado', txt:'Lo mismo en el móvil (**menú → Sanciones**): el catálogo es una copia literal del del ordenador, así que el fallo estaba en las dos caras — y ésta es desde la que se sanciona sobre la marcha.'}
       ] },
     { id:'2026-08-19-duracion-las-dos-caras', fecha:'2026-08-19',
-      titulo:'…y ahora lo dice también el móvil, y con el formulario vacío',
+      titulo:'Las dos pantallas comparten quién decide por qué no vale una duración',
       items:[
-        {cara:'escritorio', vista:'horas', txt:'Al abrir un bloque nuevo, con la entrada y la salida **todavía en blanco**, te decía «La salida tiene que ser posterior a la entrada» —acusándote de invertir unas horas que **no habías escrito**—. Ahora dice **«Pon la entrada y la salida»**. La frase ya existía; lo que pasaba es que **no se podía llegar a ella**: un campo vacío se leía como las 00:00, o sea como un número.'},
-        {cara:'movil', vista:'horas', txt:'Y el móvil se había quedado a mitad del arreglo de ayer: un bloque de **siete minutos** seguía diciendo «Falta la duración» —mandándote a rellenar lo que ya tenías puesto—, porque se contaba en cuartos y **se quedaba en cero**. Ahora te dice que **es demasiado corto**, y distingue eso de que la salida no sea posterior a la entrada y de que no haya rango escrito.'}
+        {cara:'escritorio', vista:'horas', txt:'**Las dos pantallas ya preguntan lo mismo**: hay una sola función que decide *cuál* de las cuatro causas invalida una duración, y cada pantalla escribe su frase. Antes cada una decidía por su cuenta, y por eso se contradecían. ⚠️ **Corrección**: aquí ponía que además arreglaba el aviso «con la entrada y la salida en blanco». **No se puede llegar a ese estado**: los campos de hora son desplegables sin opción vacía, así que un bloque nuevo siempre trae una hora puesta. El aviso existe, pero no vas a verlo — y decírtelo como si fuera un cambio visible era falso.'},
+        {cara:'movil', vista:'horas', txt:'En el móvil pasa lo mismo, y con la misma corrección: lo que cambia de verdad es que **las dos caras comparten la decisión**, no que vayas a ver frases nuevas. Un bloque de siete minutos **no se puede escribir** —las horas van de cuarto en cuarto—, así que ese caso no existía en la pantalla aunque el código lo supiera contestar.'}
       ] },
     { id:'2026-08-19-por-que-no-vale-la-duracion', fecha:'2026-08-19',
       titulo:'Cuando una duración no vale, la app dice POR QUÉ',
       items:[
-        {cara:'escritorio', vista:'horas', txt:'Un bloque de **siete minutos** te decía «La salida tiene que ser posterior a la entrada» —y estaba perfectamente ordenado—: las horas se cuentan en **cuartos**, así que se quedaba en cero. Ahora lo dice tal cual, y pasarse del tope tiene su propia frase.'},
+        {cara:'escritorio', vista:'horas', txt:'Antes, **cualquier** duración que no valiera —incluida la de pasarse del tope— salía con la misma frase: «La salida tiene que ser posterior a la entrada». Ahora cada causa tiene la suya, así que pasarse de las 14 h te lo dice tal cual en vez de mandarte a mirar unas horas que están bien. ⚠️ **Corregido el 19/08**: aquí ponía que esto arreglaba «un bloque de siete minutos», y **ese bloque no se puede escribir**: los campos de hora son desplegables de **cuarto en cuarto** (96 opciones, sin opción vacía), así que no hay forma de teclear 7 minutos. La frase existía y el caso no.'},
         {cara:'movil', vista:'horas', txt:'El botón decía «Falta la duración» también cuando la duración **estaba y pasaba del tope** — o sea que te mandaba a rellenar lo que ya tenías puesto. Ahora te dice que son demasiadas horas.'}
       ] },
     { id:'2026-08-19-coches-del-turno', fecha:'2026-08-19',

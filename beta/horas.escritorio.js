@@ -839,11 +839,15 @@ function _bloqFalta_(){
        imposibles, porque `new Date(2026,1,31)` **no falla, rueda al mes siguiente**. */
     if(!_fechaDMY_(f.fecha)) return 'La fecha va como DD/MM/AAAA y tiene que existir';
     var d=_bloqDur_(), tope=_maxHorasParte_();
-    /* ⛔ TRES CAUSAS, TRES FRASES. Esto decia «La salida tiene que ser posterior a la
-       entrada» y saltaba tambien con un bloque de SIETE MINUTOS -- `_bloqDur_` redondea
-       a cuartos, asi que `Math.round(7/15)/4` es 0 sobre un rango bien ordenado, y quien
-       lo leia se iba a mirar unas horas que estaban bien. El crudo en minutos es lo
-       unico que distingue «demasiado corto» de «la misma hora». */
+    /* ⛔ CUATRO CAUSAS, CUATRO FRASES. Esto decia «La salida tiene que ser posterior a la
+       entrada» para CUALQUIER duracion invalida, incluida la de pasarse del tope: quien lo
+       leia se iba a mirar unas horas que estaban bien.
+       ⚠️ AQUI PONIA que tambien saltaba con un bloque de SIETE MINUTOS, y ESO NO SE PUEDE
+          ESCRIBIR: `optHoras` da 96 opciones de cuarto en cuarto y **ninguna vacia**
+          (medido el 19/08), asi que toda duracion es multiplo de 15 y `Math.round(d/15)/4`
+          no redondea nunca. `'corto'` y `'sin'` son CONTRATO de una puerta compartida, no
+          casos que el usuario alcance. Lo vigila `probar_pega_duracion.py`, que se pone
+          rojo el dia que el catalogo cambie -- y entonces hay que revisar el changelog. */
     var _cr=_minHM_(BLOQ_FORM.fin)-_minHM_(BLOQ_FORM.ini);
     if(_cr<0) _cr+=1440;                                  /* cruza medianoche */
     /* ⛔ Y EL RANGO VACIO SE DICE APARTE, que es la cuarta causa y estaba MUERTA.

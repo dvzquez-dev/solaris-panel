@@ -765,10 +765,13 @@ function validarFichaje(){
        es lo contrario de faltar: el boton mandaba a rellenar lo que ya estaba puesto.
        La puerta esta en `comun.js` porque el escritorio hace la misma pregunta. */
     /* ⛔ EL CRUDO EN MINUTOS, que es lo UNICO que distingue «demasiado corto» de «la
-       misma hora». Sin el, un bloque de SIETE MINUTOS -- que redondeado a cuartos es 0 --
-       decia «Falta la duración», o sea mandaba a rellenar lo que ya estaba puesto. Es
-       EXACTAMENTE el fallo que se arreglo en el escritorio, con la MISMA puerta escrita al
-       lado y esta cara llamandola a medias.
+       misma hora». Se pasa para que la puerta pueda contestar las CUATRO causas desde las
+       dos caras -- es su contrato --, no porque el usuario alcance esa respuesta.
+       ⚠️ AQUI PONIA que sin esto «un bloque de SIETE MINUTOS decia Falta la duración», y
+          ese bloque NO SE PUEDE ESCRIBIR: los campos son `<select>` de `optHoras`, 96
+          opciones de cuarto en cuarto y ninguna vacia (medido el 19/08). Toda duracion es
+          multiplo de 15, asi que `'corto'` no se alcanza desde aqui. Lo que SI cambia de
+          verdad es que las dos caras compartan la DECISION en vez de cada una la suya.
        ⚠️ Solo en modo FORMULARIO: en vivo la duracion sale de la sesion, no de un rango,
           y ahi `'corto'` no significa nada -- `horasSesion()` tiene suelo de 0,25.
        ⚠️ Y la aritmetica NO se funde con `durForm` a proposito: `probar_minhm.py` la lee
