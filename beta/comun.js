@@ -3061,6 +3061,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-botones-reunion-verdad', fecha:'2026-08-19',
+      titulo:'Los botones de una reunión ya dicen la verdad',
+      items:[
+        {cara:'movil', vista:'reu', txt:'«Fijar fecha», «Cancelar fijado» y «Orden del día» salían para **cualquier coordinador**, y el servidor solo se los acepta a **quien convocó la reunión** (o al admin). Si no era tuya, abrías el modal, elegías el día, arrastrabas las franjas, pulsabas Confirmar… y te decía que no. Ahora sólo salen si de verdad puedes. ⚠️ Si la convocaste tú, **igual que antes**.'}
+      ] },
     { id:'2026-08-19-ranking-primer-cierre', fecha:'2026-08-19',
       titulo:'La clasificación empieza en tu primer cierre de mes',
       items:[

@@ -83,8 +83,15 @@ function _fijadaTxtM_(f){
   return i<0 ? _diaTxtM_(t) : (_diaTxtM_(t.slice(0,i))+t.slice(i));
 }
 
-/* Borrar una reunion la puede borrar QUIEN LA CONVOCO (o el admin), no cualquier
-   coordinador: es lo que exige el backend, y el boton tiene que decir la verdad. */
+/* QUIEN LA CONVOCO (o el admin), no cualquier coordinador: es lo que exige el backend,
+   y el boton tiene que decir la verdad.
+   ⛔ Y VALE PARA LAS TRES ACCIONES DE LA FICHA, no solo para borrar. `Codigo.gs` las
+   gatea con la MISMA linea en las tres: `_borrarReunion_` (:4685), `_editarReunion_`
+   (:4707, que es el orden del dia) y `_fijarReunion_` (:4731). Se llama «Borrar» por
+   donde nacio; lo que decide es «¿puedes ADMINISTRAR esta reunion?».
+   ⚠️ Si algun dia una de las tres deja de compartir la regla, esto pasa a ser DOS
+   preguntas y hay que partirlo -- una sola puerta para dos contratos distintos es peor
+   que dos puertas. */
 function _puedeBorrarReuM_(r){
   if(!r) return false;
   if(typeof esAdmin==='function' && esAdmin()) return true;
@@ -573,7 +580,17 @@ function vReu(){
                 (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
     /* si ya está fijada, el aviso de organizador sobra y quedaba colgando debajo del cartel verde */
     ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas, no cubres</b>. No se te pide disponibilidad.</p>':'')+
-      (esCoord()?'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">'+
+      /* ⛔ LA REGLA ES LA DEL BACKEND, Y NO ES `esCoord()`. Aqui se ofrecian los tres
+         botones a CUALQUIER coordinador, y las tres acciones que llaman las gatea
+         `Codigo.gs` por **convocante o admin** -con la misma linea en las tres:
+         `_borrarReunion_` :4685, `_editarReunion_` :4707, `_fijarReunion_` :4731-.
+         Un coordinador que no convoco abria «Fijar fecha», elegia dia y franjas, pulsaba
+         Confirmar y el servidor le contestaba «solo el convocante o admin». Un boton que
+         ofrece lo que el servidor va a negar es peor que no tenerlo, y este ademas gasta
+         el trabajo de elegir la franja antes de decir que no.
+         ✅ Se pasa por la puerta que YA existia tres lineas mas abajo para el boton de
+         borrar: la misma regla, escrita una vez. */
+      (_puedeBorrarReuM_(R)?'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">'+
         '<button class="btn mini" data-p id="btnFijar" style="flex:1">'+(R.fijada?'Cambiar fecha/hora':'📌 Fijar fecha')+'</button>'+
         (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
         '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
