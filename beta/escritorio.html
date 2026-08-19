@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=1ed3e3d"></script>
+<script src="comun.js?v=0231fef"></script>
 <script src="notis.escritorio.js?v=e86a1b9"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=623a819"></script>
@@ -2248,8 +2248,25 @@ function _cuotaPanelE_(mi){
        pasan por ese estado a la vez. Con las dos cifras delante, un «0 meses» canta; sin
        ellas es un número plausible que nadie discute. */
     '<div class="nota">Sale de tus <b>'+((typeof mi.horasTemp==='number')?nf(mi.horasTemp,1):'—')+
-    ' h</b> de la temporada en <b>'+(mi.meses||0)+'</b> '+((mi.meses===1)?'mes':'meses')+
-    ' dentro del equipo. El objetivo del mes se mueve entre <b>8 y 15 h</b>, con '+
+    ' h</b> de la temporada '+
+    /* ⛔ TRES ESTADOS, NO DOS. `(mi.meses||0)` pintaba «en 0 meses» tanto para quien no ha
+       cerrado ninguno como para quien NO TRAE EL DATO — y `datos/panel.json` lo trae
+       AUSENTE en los 32 (medido el 15/08). Un «no lo sé» pintado como cero es un dato
+       inventado (ARRANQUE §3c-24), y aquí encima explica el importe con una cuenta que
+       nadie ha hecho.
+       ⛔ Y CON 0 MESES LA CUOTA NO SALE DE NINGUNA DIVISIÓN: `_hMesDe_` devuelve las horas
+       CRUDAS, que es lo que decidió Daniel el 14/08 — *«Se usan las horas reales sin
+       dividir por meses»*. «En 0 meses» describe una división que ya no ocurre.
+       ✅ Y se conserva la propiedad por la que se escribió la nota: que ese estado CANTE.
+       Decirlo con palabras —«todavía no has cerrado ningún mes»— canta igual y es cierto. */
+    (typeof mi.meses!=='number'
+       ? 'y todavía <b>no ha llegado</b> cuántos meses llevas en el equipo, así que la cifra '+
+         'es aún más provisional de lo normal. '
+       : (mi.meses>0
+            ? 'en <b>'+mi.meses+'</b> '+((mi.meses===1)?'mes':'meses')+' dentro del equipo. '
+            : 'y, como <b>todavía no has cerrado ningún mes</b>, se usan <b>sin dividir</b> '+
+              '— por eso tampoco sales aún en la clasificación. '))+
+    'El objetivo del mes se mueve entre <b>8 y 15 h</b>, con '+
     nf2(_compBase_(mi))+' h de base por tu cargo. Poner el coche fuera de Vigo descuenta '+
     '<b>4 €</b> por turno y nunca baja de <b>0 €</b>. Se cierra en <b>agosto</b> y es requisito '+
     'para renovar; aquí solo se consulta.</div>');
@@ -2765,7 +2782,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='5a5637d';
+var BUILD='55604ca';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

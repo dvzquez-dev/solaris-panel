@@ -3227,6 +3227,12 @@ function _novedades_(){
       items:[
         {cara:'movil', vista:'reu', txt:'«Fijar fecha», «Cancelar fijado» y «Orden del día» salían para **cualquier coordinador**, y el servidor solo se los acepta a **quien convocó la reunión** (o al admin). Si no era tuya, abrías el modal, elegías el día, arrastrabas las franjas, pulsabas Confirmar… y te decía que no. Ahora sólo salen si de verdad puedes. ⚠️ Si la convocaste tú, **igual que antes**.'}
       ] },
+    { id:'2026-08-19-cuota-en-cero-meses', fecha:'2026-08-19',
+      titulo:'La nota de tu cuota ya no dice \u00ab0 meses\u00bb',
+      items:[
+        {cara:'escritorio', vista:'horas', txt:'Debajo del importe explic\u00e1bamos de d\u00f3nde sale: \u00abde tus 132 h de la temporada en 11 meses dentro del equipo\u00bb. Correcto \u2014 salvo si llevas **cero meses cerrados**, donde pon\u00eda \u00aben 0 meses\u00bb y describ\u00eda una divisi\u00f3n que **no se hace**: sin ning\u00fan mes cerrado tus horas se usan **tal cual, sin dividir**. Ahora lo dice as\u00ed, y de paso te explica por qu\u00e9 tampoco sales todav\u00eda en la clasificaci\u00f3n.'},
+        {cara:'escritorio', vista:'horas', txt:'\u26a0\ufe0f Y hab\u00eda un tercer caso escondido: si el panel **no trae** cu\u00e1ntos meses llevas, se pintaba un **0** igual que a quien de verdad no ha cerrado ninguno. No es lo mismo \u2014 uno es un dato y el otro es \u00abno lo s\u00e9\u00bb \u2014, y ahora se distingue.'}
+      ] },
     { id:'2026-08-19-ranking-numero-fresco', fecha:'2026-08-19',
       titulo:'El filtro del ranking ya mira un n\u00famero de HOY',
       items:[
