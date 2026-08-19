@@ -206,11 +206,25 @@ function _hAntReal_(m){
 
 function _hMesReal_(m){
   m = m || {};
-  /* `horasMes` PRIMERO: es el campo que llega del backend con el overlay de Notion en
-     vivo. `hMes` es una COPIA que hace `_aplicarPanel_` para las vistas que leen corto,
-     y una copia puede quedarse atras. Ante la duda, el original. */
-  return (typeof m.horasMes==='number') ? m.horasMes
-       : (typeof m.hMes==='number') ? m.hMes : null;
+  /* Las horas de ESTE MES, o `null` si no han llegado. `horasMes` es el campo que el
+     backend superpone desde Notion en cada lectura: es el unico que dice las horas del
+     mes en curso.
+     ⛔ AQUI HABIA UN RESPALDO A `hMes`, Y DEVOLVIA OTRA MAGNITUD. El comentario que lo
+     justificaba decia que `hMes` es *«una COPIA que hace `_aplicarPanel_` … y una copia
+     puede quedarse atras»*. **Falso, y medido**: en el panel que sirve el backend,
+     `hMes` es lo que escribe `flujos/ensamblar.py` -- `horas_mes`, o sea **la media
+     ponderada de la TEMPORADA** (32 de 32 cuadran con `horasTemp/meses`, y 0 con
+     `horasMes`). No es una copia atrasada de este mes: es el ritmo del año.
+     ⛔ Y el daño no era cosmetico: quien no tuviera el dato vivo veia su media anual
+     rotulada «este mes llevas X, en vivo», y en el escritorio esa cifra se comparaba
+     contra el UMBRAL DEL MES para decidir quien va por debajo.
+     ✅ Ahora se contesta `null`, que todos los lectores ya saben leer: el movil cae a
+     sumar sus partes aprobados y el escritorio dice que la foto es parcial. «No ha
+     llegado» es una respuesta; un numero de otra magnitud, no.
+     ⚠️ OJO al leer el escritorio: alli `_aplicarPanel_` PISA `m.hMes` con este valor,
+     asi que **despues** de aplicar el panel `hMes` si son las horas del mes. El campo
+     significa dos cosas segun donde se lea, y por eso la unica puerta es esta. */
+  return (typeof m.horasMes==='number') ? m.horasMes : null;
 }
 
 /* EL UMBRAL, EN DIRECTO. Regla de Daniel (27/07):
@@ -472,6 +486,22 @@ function _umbral_(){
 /* Los EUROS que descuenta cada turno conduciendo al CITI. Gemela de
    `reglas/cuota.py:DESCUENTO_COCHE`; el banco compara los dos numeros, que para eso esta. */
 function _descuentoCoche_(){ return 4; }
+
+/* ⛔ «TODAVIA NO PUEDE APARECER». Decision de Daniel (15/08/2026), literal — y es una
+   NEGACION, asi que va copiada entera: *«No aparece, no aparece. En el primer mes aun
+   no puede aparecer una persona. A partir del primer cierre, ya esta, mas facil.»*
+   ⛔ EL CRITERIO ES `cierres`, NO `meses`. `meses` es antiguedad y el motor exige
+   `meses == cierres + 1` cuando el ultimo mes es el abierto, asi que `meses:1` puede
+   ser *un cierre* o *cero cierres y un mes en curso*: indistinguibles. `cierres` lo
+   escribe `flujos/umbral.py` en cada miembro, contando meses CERRADOS del historico.
+   ⛔ Y AUSENTE NO ES CERO. Devuelve `true` **solo si consta** que no tiene ninguno; si
+   el campo no ha llegado -un panel de antes de que esto existiera, o el backend que no
+   contesta- eso es «no lo se» y **no se echa a nadie**. Fallar hacia «sale de mas»
+   ensena un puesto discutible; fallar hacia «no sale» borra a 32 personas de la unica
+   pantalla que las ve. */
+function _sinCierres_(m){
+  return !!m && typeof m.cierres === 'number' && m.cierres <= 0;
+}
 
 /* h/mes de UNA persona. Gemela del respaldo de `reglas/cuota.py:ritmo` -> `horas_mes`.
    ⛔ DEVUELVE `null` CUANDO NO SE SABE, nunca 0: con 0 h/mes la curva clava la cuota **mas
@@ -3031,6 +3061,13 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-ranking-primer-cierre', fecha:'2026-08-19',
+      titulo:'La clasificación empieza en tu primer cierre de mes',
+      items:[
+        {cara:'escritorio', vista:'ranking', txt:'Quien todavía **no ha cerrado ningún mes** ya no sale en la tabla del ranking: hasta el primer cierre no hay con qué compararle. Antes salía, y no discretamente — con cero meses sus horas **no se dividen por nada**, así que un alta con 40 h entraba directa por arriba. Y ahora **se dice al pie** a cuántas personas deja fuera, que es lo que faltaba: un filtro mudo se lee como un fallo.'},
+        {cara:'escritorio', vista:'ranking', txt:'⚠️ Pero **siguen contando en «CUOTA MEDIA» y en «A CERO»**: sus horas mueven la cuota de todo el equipo, así que ahí sí entran. Y si no hay ninguna fila —lo que pasará el **1 de septiembre**, cuando la temporada nueva deja a las 32 sin cierres a la vez— sale «Todavía no hay clasificación» en vez de una tabla vacía.'},
+        {cara:'movil', vista:'horas', txt:'En el móvil ya funcionaba solo: sin puesto sale «Sin puesto todavía» en vez de un número inventado.'}
+      ] },
     { id:'2026-08-19-globo-reuniones', fecha:'2026-08-19',
       titulo:'El globo rojo de Reuniones ya cuenta lo que te falta a ti',
       items:[

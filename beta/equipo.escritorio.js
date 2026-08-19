@@ -107,7 +107,12 @@ function insightsHTML(){
      movil- sin dato se cae a esa rama, que es lo que toca: mejor no decir nada que comparar
      contra un mes que no es. */
   var _ant=function(m){ return _hAntReal_(m); };   /* ya devuelve null si falta o es <=0 */
-  var conAnt=_activos_().filter(function(m){ return _ant(m)!=null; });
+  /* ⛔ Y TAMBIEN HACE FALTA EL DE ESTE MES. `_ant(m)!=null` garantiza el del mes
+     pasado y nada mas: sin `hMes`, `vpc` da **NaN** y el `sort` con NaN no ordena --
+     el titular «quien mas sube» sale de quien caiga primero. Es el mismo criterio del
+     `else` de abajo: no se finge una comparativa que no existe. */
+  var conAnt=_activos_().filter(function(m){
+    return _ant(m)!=null && typeof m.hMes==='number'; });
   if(conAnt.length>=2){
     var vpc=function(m){ return (m.hMes-_ant(m))/_ant(m)*100; };
     var subida=conAnt.slice().sort(function(a,b){return vpc(b)-vpc(a);})[0];
