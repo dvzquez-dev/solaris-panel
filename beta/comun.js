@@ -503,6 +503,29 @@ function _sinCierres_(m){
   return !!m && typeof m.cierres === 'number' && m.cierres <= 0;
 }
 
+/* ⛔ EL PRIMER MES NO LLEVA CUOTA. Daniel (15/08/2026), literal: *«el primer mes
+   como tal si que es cierto en septiembre o el primer mes que alguien no este en el
+   equipo que deberian no ponerle la cuota, porque no tiene mucho sentido»*. Gemela de
+   `reglas/cuota.py:exento_primer_mes`, y existe porque la cara NO la conocia: el
+   motor perdonaba y la pantalla cobraba.
+   🔁 Medido: el 1 de septiembre las 32 pasan a cero cierres a la vez, `_hMesDe_`
+   devuelve 0 h/mes -que es un dato, no un «no lo se»- y la curva clava **67,80 EUR**,
+   la cuota mas cara que existe. El motor, en cambio, archiva **0,00 EUR**. Eran
+   2.169,60 EUR en pantalla contra 0,00 reales, en tres sitios a la vez.
+   ⛔ TRES ESTADOS, como la del motor: `true`, `false` y **`null` = no se sabe**.
+   `cierres === 0` es un HECHO -ningun mes cerrado, o sea que sigue en el primero-;
+   el campo AUSENTE es que no se ha podido mirar el historico, y son cosas distintas:
+   tratar el ausente como exento **perdona dinero que se debe**.
+   ⚠️ El hecho no se reinventa: lo decide `_sinCierres_`, que es quien ya sabe que
+   el criterio es `cierres` y no `meses` (`meses:1` puede ser un cierre o cero cierres
+   con un mes en curso). Aqui solo se anade el brazo del «no lo se», porque las dos
+   preguntas son distintas: para el RANKING, ausente = no se echa a nadie; para el
+   DINERO, ausente = no se perdona nada. */
+function _exentoPrimerMes_(m){
+  if(!m || typeof m.cierres !== 'number') return null;
+  return _sinCierres_(m);
+}
+
 /* h/mes de UNA persona. Gemela del respaldo de `reglas/cuota.py:ritmo` -> `horas_mes`.
    ⛔ DEVUELVE `null` CUANDO NO SE SABE, nunca 0: con 0 h/mes la curva clava la cuota **mas
    cara que existe**. Es el fallo del 15/08 con dinero detras — las 32 a 67,80 EUR el 1 de
@@ -575,11 +598,21 @@ function _cuotaViva_(m){
   return _truncarCentimo_(_curvaCuota_(h, _paramsCuota_().base, u, t));
 }
 
-/* Y con el descuento por conducir. Gemela de `reglas/cuota.py:con_descuento_coche`: suelo
-   0 EUR —se puede llegar a pagar 0, nunca a cobrar—. */
+/* Lo que PAGAS: la base, menos el descuento por conducir, y con la exencion del
+   primer mes por delante. Gemela de `flujos/cuotas.py`, que hace exactamente esto y
+   en este orden. Suelo 0 EUR -se puede llegar a pagar 0, nunca a cobrar-.
+   ⛔ LA EXENCION VA SOBRE `final` Y NO SOBRE `base`, igual que en el motor: la base
+   se conserva CON SU IMPORTE porque es lo que habria pagado, y es lo que hace que la
+   fila cuadre consigo misma cuando alguien la audite. Ponerla a 0 deja un importe que
+   no explica de donde sale el perdon.
+   ⛔ Y SE COMPARA CON `=== true` A PROPOSITO: `_exentoPrimerMes_` devuelve `null`
+   cuando no se sabe, y `null` NO exime -- es lo mismo que hace `flujos/cuotas.py` con
+   su `if ex:`, donde el `None` cae por falsy y se cobra. Perdonar sin saber es
+   regalar dinero del equipo; el que decide con criterio es el motor, no la pantalla. */
 function _cuotaVivaFinal_(m){
   var b = _cuotaViva_(m), n;
   if(b === null) return null;
+  if(_exentoPrimerMes_(m) === true) return 0;
   n = Number(m && m.coche) || 0;
   return _truncarCentimo_(Math.max(0, b - n * _descuentoCoche_()));
 }
@@ -3153,6 +3186,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-20-exencion-primer-mes', fecha:'2026-08-20',
+      titulo:'El primer mes ya no lleva cuota tambi\u00e9n en la app',
+      items:[
+        {cara:'movil', vista:'estado', txt:'**Quien est\u00e1 en su primer mes ve 0,00 \u20ac, y ve POR QU\u00c9.** Lo decidiste el 15/08 \u2014*\u00abel primer mes\u2026 deber\u00edan no ponerle la cuota\u00bb*\u2014 y el motor lo aplicaba desde entonces, pero **la pantalla no se hab\u00eda enterado**: calculaba la cuota en directo sin saber de la exenci\u00f3n. El 1 de septiembre las 32 pas\u00e1is a cero meses cerrados a la vez, y ah\u00ed la curva clava **67,80 \u20ac** \u2014la cuota m\u00e1s cara que existe\u2014 mientras lo archivado son **0,00**.'},
+        {cara:'escritorio', vista:'estado', txt:'**Y el perd\u00f3n ya no se le cuelga al coche.** El recibo calculaba el descuento como *base menos lo que pagas*, as\u00ed que con la exenci\u00f3n el importe entero sal\u00eda como \u00abPor poner el coche \u00b7 0 turnos\u00bb \u2014a quien no ha conducido nunca. Ahora tiene su propia l\u00ednea, **Tu primer mes**: un 0 \u20ac sin motivo al lado no se distingue de un 0 \u20ac por el suelo del descuento del coche.'}
+      ] },
     { id:'2026-08-19-subcoordinacion-en-las-caras', fecha:'2026-08-19',
       titulo:'Una subcoordinaci\u00f3n ya cuenta como coordinaci\u00f3n en las dos caras',
       items:[

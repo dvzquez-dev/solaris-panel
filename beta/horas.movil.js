@@ -1160,7 +1160,20 @@ function _cuotaHTML_(){
      número no se movía. Ahora la cuenta se hace aquí, con el padrón que ya está cargado.
      ⚠️ Si aún no hay padrón se cae a lo que sirvió el backend **y se dice**. */
   var _q=_cuotaDe_(YO);
-  var recibo = YO.coche
+  /* ⛔ EL PRIMER MES NO LLEVA CUOTA, Y SE DICE. Gemela de la del escritorio y por el
+     mismo motivo: aquí el descuento se pinta como `_q.base - _q.final`, así que a un
+     exento CON coche se le atribuía al coche la exención entera. Y a uno SIN coche le
+     salía «Aún sin descuentos» sobre un importe de 0,00 €, que no explica nada.
+     ⚠️ La base puede no estar (el respaldo servido no siempre la trae), y un importe
+     que no se sabe no se pinta: por eso la línea del importe va condicionada. */
+  var _exeM=(_exentoPrimerMes_(YO)===true);
+  var _bM=(typeof _q.base==='number' && isFinite(_q.base));
+  var recibo = _exeM
+    ? (_bM ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(_q.base)+'</span></div>'+
+        '<div class="rl desc"><span>Tu primer mes · aún sin ningún mes cerrado</span>'+
+        '<span class="ra">−'+eur(_q.base)+'</span></div>' : '')+
+      '<p class="rnota">Tu primer mes no lleva cuota: todavía no has cerrado ningún mes.</p>'
+    : YO.coche
     ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(_q.base)+'</span></div>'+
       '<div class="rl desc"><span>Por poner el coche · '+YO.coche+' turno'+(YO.coche===1?'':'s')+'</span>'+
       '<span class="ra">−'+eur(_q.base-_q.final)+'</span></div>'
