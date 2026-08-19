@@ -512,6 +512,23 @@ function _sinCierres_(m){
    cerrado, todas tus horas son del mes en curso. */
 function _hMesDe_(m){
   if(!m) return null;
+  /* \u26d4 EL RITMO SALE DEL MOTOR, NO SE REINVENTA (19/08). `reglas/cuota.py:ritmo` existe
+     literalmente «para que no haya dos», y su docstring avisa: *«el dia que alguien llame a
+     `horas_mes` por su cuenta tendra una persona con dos ritmos segun quien pregunte, y las
+     diferencias entre las dos copias SON los bugs»*. **La cara era ese alguien**: aqui se
+     rehacia `horasTemp / meses` a mano, ignorando el `hMes` que el motor ya calcula --con la
+     ponderacion de julio y agosto a la mitad, que pidio Daniel el 15/08-- y ya envia.
+     \u1f4cf MEDIDO el 19/08 sobre las 32 reales, con el historico del checkout principal: el
+     ritmo difiere en **31 de 32** (hasta 1,43 h/mes) y el importe en **27 de 32**, con un
+     desvio maximo de **9,24 EUR** por persona.
+     \u26a0 Y HOY NO MUEVE NADA, que es lo que lo hace seguro: el panel que hay en el KV se
+     genero SIN el desglose, asi que su `hMes` es la division plana (desvio <= 0,055 h/mes,
+     redondeo). Esto se vuelve correcto el dia que se suba un panel con el historico delante. */
+  var r = m.hMes;
+  if(typeof r === 'number' && isFinite(r)) return r;
+  /* \u26a0 El respaldo sigue siendo el de siempre, y NO sobra: un panel viejo -o uno servido
+     por un backend sin este campo- no puede dejar la pantalla sin cuota. Y con `meses` a 0 van
+     las horas CRUDAS sin dividir, que es la decision de Daniel del 14/08. */
   var h = m.horasTemp;
   if(typeof h !== 'number' || !isFinite(h)) return null;
   return m.meses ? h / m.meses : h;
@@ -3073,6 +3090,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-ritmo-del-motor', fecha:'2026-08-19',
+      titulo:'Tu ritmo h/mes sale del motor, no se lo calcula la pantalla',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La pantalla se calculaba tus **h/mes** por su cuenta dividiendo horas entre meses, en vez de leer el ritmo que ya calcula el motor — que es el que pondera **julio y agosto a la mitad**. Eran dos números para lo mismo. ⚠️ Hoy cambia poco (16 de 32, como mucho **0,37 €**) porque el panel subido se generó sin el histórico; se vuelve correcto cuando se suba uno con él.'},
+        {cara:'escritorio', vista:'ranking', txt:'Lo mismo en la clasificación y en la cuota del escritorio: el ritmo ya no se recalcula aquí.'}
+      ] },
     { id:'2026-08-19-aviso-documentos', fecha:'2026-08-19',
       titulo:'La app ya te avisa al móvil de tus documentos',
       items:[
