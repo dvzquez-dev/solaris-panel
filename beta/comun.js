@@ -3120,6 +3120,15 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-articulo-rri-correcto', fecha:'2026-08-19',
+      titulo:'Dos de los seis motivos de sanción llevaban el artículo cambiado',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'La lista de motivos se ve igual, pero **el artículo que salía era otro**: «no rellenar un formulario» iba como **Art. 30g** —que es el Doodle general— y «no cubrir la disponibilidad» como **30h** —que es el de subsistema **reiterado**, a partir de 2 veces—. ⛔ Y el artículo **no es decoración**: es lo que decide en qué cuenta suma la reincidencia (0 / −1 / −2). 📏 Medido sobre el registro real: si hoy sancionabas por formulario, **10 de 14 personas** habrían recibido puntos distintos de los que les tocan, 9 de ellas **de más** — y su contador de formulario no avanzaba nunca. Ahora salen **29i** y **30g**.'},
+        /* En el móvil las sanciones NO son una pantalla: salen del **menú**
+           (`_abrirSanciones_`, un modal), así que la vista que se señala es la de
+           inicio — igual que el buzón. Lo dice ya la entrada del 18/08 de aquí abajo. */
+        {cara:'movil', vista:'estado', txt:'Lo mismo en el móvil (**menú → Sanciones**): el catálogo es una copia literal del del ordenador, así que el fallo estaba en las dos caras — y ésta es desde la que se sanciona sobre la marcha.'}
+      ] },
     { id:'2026-08-19-duracion-las-dos-caras', fecha:'2026-08-19',
       titulo:'…y ahora lo dice también el móvil, y con el formulario vacío',
       items:[

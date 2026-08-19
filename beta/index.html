@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=0c4b870"></script>
+<script src="comun.js?v=42d98bf"></script>
 <script src="notis.movil.js?v=9167a0c"></script>
 <script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=2ab8a6a"></script>
@@ -1143,8 +1143,20 @@ function yoNombre(){
 var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
 var RRI_MOTIVOS=[
   ['30i','Faltar a un turno de trabajo sin justificar', -1],
-  ['30g','No rellenar un formulario obligatorio', -1],
-  ['30h','No cubrir la disponibilidad de una reunión', -1],
+  /* ⛔ LA CLAVE **ES** EL ARTÍCULO QUE SE ENVÍA (`var art=mot`), y `gradiente.familia_de`
+     clasifica por él: la familia es lo que cuenta la reincidencia (0 / −1 / −2). Estos dos
+     estaban CAMBIADOS y no daba ningún error — daba otros puntos, en otra cuenta.
+     · El RRI dice: g) Doodle **general**; h) Doodle de subsistema **reiterado** (≥2 veces,
+       «según lo determine el responsable de la reunión»). O sea que «no cubrir la
+       disponibilidad de una reunión» es el **30g**, y el 30h es otra conducta con una
+       condición previa que aquí no comprueba nadie.
+     · Y «rellenar un formulario» **no está en la normativa**: su cajón es el **29i**, el
+       mismo que ya usa `flujos/sanciones.py` para «potestad del Project Director». Con
+       `30g` caía en la familia `disponibilidad` y su propio contador no avanzaba nunca.
+     📏 Medido el 19/08 sobre el registro real: **10 de 14 personas** habrían recibido un
+        delta distinto del que les toca, 9 de ellas pagando de más. */
+  ['29i','No rellenar un formulario obligatorio', -1],
+  ['30g','No cubrir la disponibilidad de una reunión', -1],
   /* El RRI distingue DOS articulos para esto, y la diferencia no es menor: 30b es para
      una tarea «importante» o «urgente» y 30c para cualquier otra. Lo sabe quien sanciona,
      asi que se pregunta en vez de mandar la clave interna `plazo` al comunicado -que es
@@ -1486,7 +1498,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f1dd542';
+var BUILD='9aa569f';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
