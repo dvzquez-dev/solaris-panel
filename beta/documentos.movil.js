@@ -173,12 +173,26 @@ function _docsPend_(){
   return ENT_REV.filter(function(e){return e.estado==='revision' && revisoresDe(e).indexOf(yoNombre())>=0;});
 }
 
+/* ⛔⛔ «EN CURSO» LA VE EL PD **Y JOSE**, no solo el PD. El servidor ya se la sirve a los dos
+   -- `getEntregables` filtra por `_nomE===DOC_PD || _nomE===_docJose_()` --, asi que Jose se
+   descargaba el pipeline entero en el telefono y NO VEIA NI UNO: `vDocs` lo pintaba
+   `if(esPD())`, y `esPD()` es `rol==='pd' || cargo==='Project Director'` -- Jose es
+   `Coordinador`. Peor todavia: `_docsRelevantes_` contaba `ENT_REV` con la misma condicion,
+   asi que si no tenia nada propio la pantalla le decia «Nada por aqui» teniendo la lista
+   cargada, y ni siquiera le salia la pestaña.
+   ⛔ Se pregunta por `REV2_NOM`, que es la puerta que YA existe y que `_rederivarRev2_` calcula
+   del panel -- no por un nombre escrito a mano, que es lo que dejaria a Jose fuera el dia que
+   el segundo revisor sea otro. */
+function _veEnCurso_(){
+  return esPD() || (typeof REV2_NOM!=='undefined' && REV2_NOM && yoNombre()===REV2_NOM);
+}
+
 function _docsRelevantes_(){
   /* Con `||[]` porque estas listas las llena el backend y pueden no haber llegado. Antes
      asumían que sí, y al usarse desde `_destVisibles_` -que corre en CADA pintado- un dato
      que falta dejaba de romper una pantalla para romper la app entera. */
   return !!((_docsPend_()||[]).length || (ENTREGABLES||[]).length ||
-            (esPD() && (ENT_REV||[]).length));
+            (_veEnCurso_() && (ENT_REV||[]).length));
 }
 
 function vDocs(){
@@ -202,7 +216,7 @@ function vDocs(){
     ? '<div class="tarj">'+pend.map(function(e){return filaDoc(e,false);}).join('')+'</div>'
     : '<div class="tarj">'+vacioMini(esCoord()?'Ningún documento espera tu firma.'
         :'Nada que revisar: tus documentos los firma tu coordinador.')+'</div>';
-  if(esPD()){
+  if(_veEnCurso_()){
     h+='<h2 class="sec">En curso<span class="ln"></span>'+enCurso.length+'</h2>'+
        '<div class="tarj">'+
        (enCurso.length
@@ -290,7 +304,13 @@ function _docAutorHTML_(e){
   if(est==='rechazado')
     return '<div class="avisolargo" style="margin-top:14px"><b>Te lo rechazaron.</b> '+
       esc(e.nota||'Sin motivo escrito.')+pie+'</div>';
-  if(est==='aprobado'||est==='publicado'||est==='cerrado'){
+  /* ⛔⛔ AQUI ESTABA PINCHADA LA RAMA MUERTA Y FALTABA LA VIVA. `cerrado` no existe
+     -- `_normEstado_` lo traduce a `publicado` --, mientras que `anot` SI llega: el mapa
+     lo produce (`'anot':'anot'`) y un push historico de Cowork lo trae. O sea que el
+     unico estado que de verdad podia caer aqui y no estaba contemplado era el que se
+     quedo fuera, y el autor de un expediente en `anot` no veia NI la accion NI el
+     enlace a Notion -- se caia por debajo de todas las ramas. */
+  if(est==='aprobado'||est==='anot'||est==='publicado'){
     /* ⛔ LA ACCION SALE DE `decision.accion`, NO DEL ESTADO: el backend deja `aprobado` y `anot`
        en el MISMO `publicado`, asi que desde el estado no se puede saber si te lo aprobaron tal
        cual o te lo aprobaron CAMBIANDOTE el titulo y las etiquetas. */
@@ -397,7 +417,17 @@ function verDoc(id){
       /* ⛔ La clase sale de `EST_DOC`, no de un ternario a mano: el `else` era `conf` y
          pintaba **«rechazado» en VERDE** al autor que abre su propio expediente. */
       '<span class="pil '+_pilEstDoc_(e.estado)+'">'+esc(estDoc(e.estado)[0])+'</span>'+
-      (e.sev?'<span class="pil '+(e.sev==='alta'?'no':e.sev==='media'?'pend':'conf')+'">calidad '+sevTxt[e.sev]+'</span>':'')+
+      /* ⛔ EL `else` ERA `conf` -VERDE-: cualquier severidad que no fuera `alta` ni
+         `media` se pintaba con el color de «salio bien», y el texto salia literalmente
+         «calidad undefined», porque `sevTxt` solo tiene baja/media/alta. Un `"high"`
+         de Cowork -- que es el caso esperable, no el raro: el contrato ya mezcla
+         ingles -- se le presentaba al que firma como el documento mas limpio de la
+         bandeja.
+         ⛔ El escritorio YA lo tenia arreglado (chip neutro + «calidad sin medir») y
+         esta cara se quedo fuera del arreglo. Misma leccion que `_pilEstDoc_`: «no lo
+         se» no es «confirmado». Desde el 19/08 `_normSev_` corta esto en el servidor;
+         esto de aqui es el cinturon, porque la maqueta no pasa por el. */
+      (e.sev?'<span class="pil '+(e.sev==='alta'?'no':e.sev==='media'?'pend':e.sev==='baja'?'conf':'neu')+'">calidad '+(sevTxt[e.sev]||'sin medir')+'</span>':'')+
     '</div>'+
     /* ANTES del resumen a propósito: si el expediente está trabado o es una
        revisión de otro, eso cambia lo que hay que mirar en todo lo de abajo. */

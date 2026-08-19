@@ -108,16 +108,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=eac6a90"></script>
+<script src="comun.js?v=10f0eac"></script>
 <script src="notis.escritorio.js?v=e86a1b9"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=623a819"></script>
 <script src="buzon.escritorio.js?v=745846b"></script>
-<script src="documentos.escritorio.js?v=7c5e767"></script>
+<script src="documentos.escritorio.js?v=1063fe8"></script>
 <script src="sanciones.escritorio.js?v=07871f6"></script>
 <script src="reuniones.escritorio.js?v=9f71642"></script>
 <script src="horas.escritorio.js?v=155671f"></script>
-<script src="equipo.escritorio.js?v=beb4ab8"></script>
+<script src="equipo.escritorio.js?v=0fa22f0"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -1327,17 +1327,25 @@ V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
     'Al aprobar, el documento se publica solo en Notion, Drive y el Libro de Datos, y se avisa en Discord.</div></div>';
 }};
 V.docurso={g:'Documentos',t:'En curso',f:function(){
-  var c=DOCS.filter(function(d){return ['recibido','analizado','revision','cambios'].indexOf(d.est)>=0;});
+  var c=DOCS.filter(function(d){return _docEnCurso_(d.est);});
   return pan('Expedientes en curso',c.length+(c.length===1?' expediente':' expedientes'),
     c.length?c.map(filaDoc).join(''):vacioSimple('Nada en curso','Ningún documento espera revisión ni corrección. '+
       'Los que ya se aprobaron están en Publicados.'));
 }};
-V.docpub={g:'Documentos',t:'Publicados',f:function(){
-  var p=DOCS.filter(function(d){return d.est==='publicado';});
-  return '<div class="chips"><span class="chip">PUBLICADOS <b style="color:var(--ink)">'+p.length+'</b></span></div>'+
-    pan('Últimos publicados','ya están en Notion',
-      p.length?p.map(filaDoc).join(''):vacioSimple('Todavía no hay nada publicado','Un expediente aparece aquí en '+
-        'cuanto se aprueba y se publica en Notion.'));
+/* ⛔ ERA «Publicados» Y SOLO LISTABA `publicado`, asi que un RECHAZADO no salia en ninguna
+   de las tres vistas: al rechazarlo desde aqui (`DOC_SEL=null; pintar()`) desaparecia de la
+   pantalla entera, y su autor -- que en el escritorio no tiene ninguna vista propia -- se
+   quedaba sin saber que se lo habian rechazado. Ahora es la lista de lo RESUELTO: publicado o
+   rechazado. La pildora de cada fila ya dice cual de los dos es. */
+V.docpub={g:'Documentos',t:'Resueltos',f:function(){
+  var p=DOCS.filter(function(d){return _docResuelto_(d.est);});
+  var _pub=0, _i;
+  for(_i=0;_i<p.length;_i++) if(p[_i].est==='publicado') _pub++;
+  return '<div class="chips"><span class="chip">PUBLICADOS <b style="color:var(--ink)">'+_pub+'</b></span>'+
+    (p.length-_pub?'<span class="chip">RECHAZADOS <b style="color:var(--ink)">'+(p.length-_pub)+'</b></span>':'')+'</div>'+
+    pan('Expedientes resueltos','publicados en Notion o rechazados',
+      p.length?p.map(filaDoc).join(''):vacioSimple('Todavía no hay nada resuelto','Un expediente aparece aquí en '+
+        'cuanto se aprueba y se publica en Notion, o en cuanto se rechaza.'));
 }};
 
 /* ── DISCIPLINA ──────────────────────────────────────────────────────────── */
@@ -2757,7 +2765,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='611bf12';
+var BUILD='5a5637d';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3404,6 +3412,15 @@ function _engConvocarTurno_(){
       try{
         var r=await api.crearTurno(t);
         var sin=(r&&r.sinEtiquetar)||[];
+        /* ⛔ Y SI EL TRAYECTO NO SE GUARDO, SE DICE. El servidor devuelve
+           `cochesGuardados` y su comentario afirma que «se avisa en el resultado» — pero
+           NADIE lo leia (0 apariciones en `navegador/`), asi que el fallo del almacen, que
+           ya es silencioso por diseño (el `try/catch` no tumba el turno, y hace bien:
+           la fila de Notion YA existe), se perdia del todo: salia «Turno convocado» y los
+           kilometros no estaban en ningun sitio.
+           ⚠️ Solo se avisa si SE DECLARARON coches: sin ellos el servidor devuelve `true`
+           trivialmente, y avisar ahi seria ruido en el 90 % de las convocatorias. */
+        var _coMal = !!(t.coches && t.coches.length) && r && r.cochesGuardados === false;
         /* ⛔ `TUR_COCHES` TAMBIEN SE VACIA. Se limpiaban `TUR_SEL` y `TUR_CARGOS` y no
            este, asi que el siguiente turno que se convocara arrastraba los coches del
            anterior -- y con el trayecto ya viajando, eso son kilometros de otro dia.
@@ -3413,7 +3430,9 @@ function _engConvocarTurno_(){
         TUR_COCHES.length=0;
         try{ var tt=await api.getTurnos(); if(Array.isArray(tt)){ TURNOS.length=0; tt.forEach(function(x){TURNOS.push(x);}); } }catch(_){}
         tost('Turno '+(r&&r.id||'')+' convocado en Notion'+
-          (sin.length?' \u00b7 no se pudo etiquetar a: '+sin.join(', '):'')+'.');
+          (sin.length?' \u00b7 no se pudo etiquetar a: '+sin.join(', '):'')+
+          (_coMal?' \u00b7 \u26a0\ufe0f el TRAYECTO de los coches no se guard\u00f3: '+
+                  'vu\u00e9lvelo a convocar o ap\u00fantalo aparte':'')+'.');
         pintar();
       }catch(e){ b.disabled=false; b.textContent=prev;
         tostErr('No se pudo convocar: ', e); }

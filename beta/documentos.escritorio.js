@@ -273,7 +273,8 @@ function docCard(d){
        traduce antes de preguntar. Pasarle el objeto crudo daria SIEMPRE lista vacia --
        instrucciones escritas, probadas y mudas en una cara entera. */
     acc=_pasosCorregirE_(d)+'<div class="acts"><button class="btn pri" data-doc="'+d.id+'" data-acc="reenviar">Ya está corregido: devolver a revisión</button></div>';
-  } else if(d.autor===ACTOR && (d.est==='publicado' || d.est==='cerrado')){
+  /* ⛔ `cerrado` fuera: no existe -- `_normEstado_` lo traduce a `publicado`. */
+  } else if(d.autor===ACTOR && d.est==='publicado'){
     /* ⛔ AQUI PONIA «Es tuyo: lo firma X», Y YA ESTABA FIRMADO. Sobre un expediente
        publicado eso manda a esperar a alguien que ya decidio, y no dice lo unico que
        queda por hacer: mandar la version nueva como SUSTITUCION. */

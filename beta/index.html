@@ -107,13 +107,13 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=eac6a90"></script>
+<script src="comun.js?v=10f0eac"></script>
 <script src="notis.movil.js?v=9167a0c"></script>
 <script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=2ab8a6a"></script>
 <script src="turnos.movil.js?v=d76ddc3"></script>
 <script src="buzon.movil.js?v=fb9866e"></script>
-<script src="documentos.movil.js?v=c6bb82f"></script>
+<script src="documentos.movil.js?v=5ba2483"></script>
 <script src="sanciones.movil.js?v=c784be6"></script>
 <script src="reuniones.movil.js?v=93bd355"></script>
 <script src="horas.movil.js?v=d272f5b"></script>
@@ -1498,7 +1498,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='9aa569f';
+var BUILD='9fea23f';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -2249,6 +2249,20 @@ document.addEventListener('click',function(ev){
     tost('Cambios y rechazo exigen motivo.');
     return;
   }
+  /* ⛔ LA MISMA GUARDA QUE EL ESCRITORIO, que la tenia desde siempre («Con anotaciones
+     hace falta un titulo.») mientras esta cara no. Sin ella el movil mandaba `anot` con el
+     titulo vacio, el servidor lo aceptaba, no ajustaba nada -- y aun asi dejaba la nota
+     «Aprobado con anotaciones (titulo/etiquetas ajustados)», que el ESCRITORIO pinta. O
+     sea: el expediente contaba un ajuste que no existio, y el autor no podia saber que le
+     habian cambiado porque `decision.ajustes` iba en `null`.
+     ⛔ Una guarda que vive en UNA cara es un rotulo: la otra manda lo prohibido igual. Por
+     eso el 19/08 se puso tambien en `_decidirDoc_`; esta de aqui es para no gastar un
+     viaje y poder señalar el campo. */
+  if(acc==='anot' && !((($('#dTit')&&$('#dTit').value)||'').trim())){
+    if($('#dTit')){ $('#dTit').focus(); $('#dTit').style.borderColor='var(--red)'; }
+    tost('Con anotaciones hace falta un título.');
+    return;
+  }
   /* DESHACER BORRA LA DECISION DE OTRA PERSONA: se pregunta, como en el escritorio. */
   if(acc==='deshacer' && !confirm('Devolver «'+e.titulo+'» a revisión y borrar la decisión de '+
     (e.revisor||'quien la tomó')+'. ¿Seguro?')) return;
@@ -2288,7 +2302,13 @@ document.addEventListener('click',function(ev){
     if(acc==='anot'){
       var t2=(($('#dTit')&&$('#dTit').value)||'').trim();
       var e2=_etiquetasDeTexto_(($('#dEtq')&&$('#dEtq').value)||'');
-      if(t2) extra={titulo:t2, etiquetas:e2};
+      /* ⛔ EL `if(t2)` GOBERNABA EL OBJETO ENTERO, no solo el titulo: con el titulo
+         vacio se perdian TAMBIEN las etiquetas, que es justo lo que el comentario de
+         aqui arriba dice que NO puede pasar. Y no quedaba en nada: `_aplicarDecDoc_`
+         si las aplicaba en local, asi que el telefono las enseñaba cambiadas y volvian
+         solas al siguiente refresco. Ahora `extra` va siempre; quien exige el titulo
+         es la guarda de arriba, y desde el 19/08 tambien el servidor. */
+      extra={titulo:t2, etiquetas:e2};
     }
     api.decidir(id, acc, mot||null, extra).then(function(){
       _aplicar(); cerrarModal(); tost(_aviso); pintar();

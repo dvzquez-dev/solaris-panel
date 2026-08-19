@@ -2350,6 +2350,26 @@ function estDoc(e){ return EST_DOC[e]||[String(e||'—'),'']; }
    `--ok`). Tambien `recibido`, `analizado` y `publicando`.
    ⚠️ Un estado DESCONOCIDO cae a `neu`, no a `conf`: «no se» no es «confirmado»
    (§3c-24). Es justo el caso que producia el fallo. */
+/* ⛔⛔ LAS DOS MITADES DEL PIPELINE, Y ENTRE LAS DOS TIENEN QUE ESTAR TODOS LOS ESTADOS.
+   Antes cada sitio escribia su lista a mano, y las tres que habia eran LA MISMA lista corta:
+   `['recibido','analizado','revision','cambios']`. O sea que `publicando`, `aprobado`, `anot`
+   y `rechazado` no estaban en NINGUNA -- ni en «En curso», ni en «Publicados», ni en lo que el
+   servidor sirve al PD.
+   ⛔ El daño no es teorico y tiene dos formas medidas (19/08):
+     · Cowork re-empuja `notion_page_created` sobre algo YA publicado -> `_normEstado_` lo deja
+       en `publicando` -> se cae de «Publicados» Y de «En curso»: DESAPARECE de la pantalla.
+     · Rechazas un expediente desde el escritorio y `DOC_SEL=null; pintar()` lo deja fuera de
+       las tres vistas -- tambien para su AUTOR, que se queda sin saber que se lo rechazaron.
+   ⛔ Por eso son DOS listas y no una: lo que importa es que su UNION cubra lo que
+   `_normEstado_` puede producir. Eso lo vigila `probar_documentos_caras.py` LEYENDO el mapa
+   del backend, no con una lista escrita a mano aqui -- que es como se quedo corta la anterior.
+   ⚠️ `aprobado` y `anot` son alcanzables aunque `_decidirDoc_` no los deje nunca: llegan de un
+   push historico de Cowork, que si los trae. */
+var DOC_EN_CURSO=['recibido','analizado','revision','cambios','publicando','aprobado','anot'];
+var DOC_RESUELTO=['publicado','rechazado'];
+function _docEnCurso_(est){ return DOC_EN_CURSO.indexOf(String(est==null?'':est))>=0; }
+function _docResuelto_(est){ return DOC_RESUELTO.indexOf(String(est==null?'':est))>=0; }
+
 function _pilEstDoc_(e){
   var c = estDoc(e)[1];
   return c === 'ok' ? 'conf' : c === 'wa' ? 'pend' : c === 'no' ? 'no' : 'neu';
@@ -3133,6 +3153,25 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-docs-ninguna-lista', fecha:'2026-08-19',
+      titulo:'Documentos: ya no se pierde ningún expediente entre las listas',
+      items:[
+        {cara:'escritorio', vista:'docdec', txt:'**«Publicados» ahora es «Resueltos»**, y lista también los **rechazados**. Antes, al rechazar un expediente desaparecía de las tres vistas —también para su autor, que aquí no tiene ninguna lista propia—, así que se lo rechazaban y no se enteraba por esta pantalla.'},
+        {cara:'escritorio', vista:'docurso', txt:'**Y «En curso» ya no se deja fuera lo que se está publicando.** Cuando el pipeline vuelve a publicar un documento, queda un rato en «publicando»: hasta ahora ese estado no salía ni aquí ni en publicados, así que el expediente **desaparecía de la pantalla** mientras duraba. Los números del menú y las listas salen ya del mismo sitio, así que no pueden decir cosas distintas.'},
+        {cara:'movil', vista:'docs', txt:'**El segundo revisor ve «En curso» en el teléfono.** El servidor le mandaba el pipeline entero del equipo y la pantalla sólo se lo enseñaba al Project Director — y si no tenía nada propio, le decía «Nada por aquí» teniendo la lista cargada.'}
+      ] },
+    { id:'2026-08-19-docs-anotaciones-y-calidad', fecha:'2026-08-19',
+      titulo:'Documentos: el título de «con anotaciones», tus etiquetas y el chip de calidad',
+      items:[
+        {cara:'movil', vista:'docs', txt:'**«Aprobar con anotaciones» ahora te pide el título** antes de mandarlo, como ya hacía el ordenador. Antes salía sin él: el documento quedaba diciendo que le habías ajustado el título y las etiquetas **sin haber ajustado nada**, y al autor no se le podía decir qué le habías cambiado.'},
+        {cara:'movil', vista:'docs', txt:'**Y ya no se pierden tus etiquetas.** Si dejabas el título en blanco se caían también las etiquetas que acababas de escribir — y como el teléfono sí te las enseñaba cambiadas, **volvían solas** al refrescar. Vaciarlas del todo sigue valiendo: es una decisión tuya, no un descuido.'},
+        {cara:'movil', vista:'docs', txt:'**El chip de calidad ya no miente.** Una calidad que el pipeline no sepa medir salía en **verde** —el color de «salió bien»— y con el texto «calidad undefined». Ahora sale en gris y dice **«calidad sin medir»**, que es lo que se sabe.'}
+      ] },
+    { id:'2026-08-19-coches-no-se-guardaron', fecha:'2026-08-19',
+      titulo:'Si el trayecto de los coches no se guarda, ahora te lo dice',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Al convocar, el turno se crea en Notion y el **trayecto de los coches** se guarda aparte, en el servidor. Si eso segundo falla, el turno sigue existiendo —y así tiene que ser: reintentar te diría «ya hay turno ese día»—, pero **hasta ahora no te enterabas**: salía «Turno convocado en Notion» y los kilómetros no estaban en ningún sitio. El servidor ya lo contestaba; **nadie lo leía**. Ahora, si habías puesto coches y no se guardaron, el aviso te lo dice y te dice qué hacer.'}
+      ] },
     { id:'2026-08-19-articulo-rri-correcto', fecha:'2026-08-19',
       titulo:'Dos de los seis motivos de sanción llevaban el artículo cambiado',
       items:[
@@ -4121,7 +4160,10 @@ function _urlFormDocs_(){ return ''; }
 function _pasosSustituirDoc_(e, yo){
   if(!e) return [];
   var est = String(e.estado || '');
-  if(est !== 'publicado' && est !== 'cerrado') return [];
+  /* ⛔ `cerrado` NO es un estado que exista: `_normEstado_` lo traduce a `publicado`, asi
+     que este segundo brazo del `and` no se evaluaba nunca -- y su caso en
+     `probar_documentos_autor.py` llevaba meses en VERDE probando una rama inalcanzable. */
+  if(est !== 'publicado') return [];
   if(!yo || !e.autor || String(e.autor) !== String(yo)) return [];
   var ref = e.ref || 'la referencia de este expediente';
   var url = _urlFormDocs_();

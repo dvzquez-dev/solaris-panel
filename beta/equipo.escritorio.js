@@ -159,8 +159,11 @@ function conteo(k){
      verdad es `CURSO_SRV`, y solo 'ok' significa que el servidor contesto. */
   if(k==='curso')  return CURSO_SRV==='ok' ? CURSO.length : 0;   // sin conectar no hay nada que contar
   if(k==='docdec') return docsMios().length;
-  if(k==='docurso')return DOCS.filter(function(d){return ['recibido','analizado','revision','cambios'].indexOf(d.est)>=0;}).length;
-  if(k==='docpub') return DOCS.filter(function(d){return d.est==='publicado';}).length;
+  /* ⛔ POR LA MISMA PUERTA QUE LA VISTA. Estas dos eran una COPIA del filtro, asi que el
+     globo y la lista podian decir cosas distintas -- y de hecho las dos se quedaron cortas
+     a la vez, que es lo que pasa cuando una regla vive en dos sitios. */
+  if(k==='docurso')return DOCS.filter(function(d){return _docEnCurso_(d.est);}).length;
+  if(k==='docpub') return DOCS.filter(function(d){return _docResuelto_(d.est);}).length;
   if(k==='sanciones') return LOTE.cerrado?0:LOTE.items.length;
   if(k==='apela')  return 0;        // no hay cola de apelaciones: contar la maqueta era mentir
   if(k==='convoc') return REUS.length;
