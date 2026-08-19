@@ -3153,6 +3153,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-subcoordinacion-en-las-caras', fecha:'2026-08-19',
+      titulo:'Una subcoordinaci\u00f3n ya cuenta como coordinaci\u00f3n en las dos caras',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'**Quien tiene una subcoordinaci\u00f3n ya ve los paneles de coordinaci\u00f3n.** El servidor le daba rango de coordinaci\u00f3n \u2014por eso le dejaba entrar al ordenador\u2014 y una vez dentro las pantallas no le ense\u00f1aban **ninguno**: ni convocar turno, ni el bloque de horas, ni el desglose de disponibilidad con nombres. La pantalla ten\u00eda el dato bueno y preguntaba a otro sitio.'},
+        {cara:'movil', vista:'reu', txt:'**Y en el tel\u00e9fono ya puede convocar algo que no sea una reuni\u00f3n de trabajo.** El m\u00f3vil decid\u00eda mirando s\u00f3lo el **cargo**, as\u00ed que a quien tiene gente a su cargo sin figurar como coordinador le ofrec\u00eda un solo tipo \u2014mientras el ordenador y el servidor le admit\u00edan los seis.'}
+      ] },
     { id:'2026-08-19-docs-ninguna-lista', fecha:'2026-08-19',
       titulo:'Documentos: ya no se pierde ningún expediente entre las listas',
       items:[
@@ -4457,6 +4463,11 @@ function rangoPila(pila){
 
 /* La escalera de autoridad de DOCUMENTOS: PD(3) > revisor fijo(2) >
    coordinador(1) > resto(0).
+   ⚠️ …PERO NO SOLO DE DOCUMENTOS, y esa frase es la que envejeció: hoy la usan como
+   puerta de «¿es coordinación?» el panel de bloque de horas, el de convocar turno, el
+   desglose de disponibilidad con nombres y los tipos de reunión convocables — todos
+   preguntando `rangoNom(ACTOR) >= 1`. Una capa compartida se acota por la UNIÓN de sus
+   clientes, no por el que la escribió.
    ⛔ NO es la de sanciones. Esa es `rangoSanc`, que sale de una tabla explícita
    (`RANGO_SANC`) porque ahí hay gente con rango sin tener cargo — deducirlo del
    `cargo` es justo el fallo que esa tabla existe para impedir. Se confunden
@@ -4464,6 +4475,17 @@ function rangoPila(pila){
 function rangoNom(n){
   if(n===PD_NOM) return 3;
   if(n===REV2_NOM) return 2;
+  /* Rango 1 = TIENE GENTE BAJO SU JURISDICCION. Va por la MISMA puerta que ya usa
+     `rangoSanc` (`_subcoordDe_`): una segunda tabla aqui seria el tercer criterio para
+     la misma pregunta. El subcoordinador valia 1 en el servidor (`_rangoNom_`,
+     `_rangoEscritorio_`) y 0 aqui, asi que el escritorio le DEJABA ENTRAR -el backend
+     manda rango 1 en el arranque- y una vez dentro no le enseñaba ni un panel de
+     coordinacion. La cara tenia el dato bueno en memoria (`SESION.rango`) y decidia con
+     otro: `SESION.rango` se lee UNA sola vez, para el portazo (`< 0`).
+     ✅ En DOCUMENTOS no cambia nada, y esta medido: 4.032 expedientes cruzados, 0
+     diferencias -- nunca sale de `revisoresDe`, asi que su unico camino es `> maxR`, y
+     `maxR` vale 1 o 3, nunca 0. El control (subcoordinador a rango 2) dio 256. */
+  if(_subcoordDe_(n)) return 1;
   var m=miembro(n);
   return (m && m.cargo==='Coordinador') ? 1 : 0;
 }

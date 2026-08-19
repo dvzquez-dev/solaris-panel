@@ -43,7 +43,15 @@ function aprobadorDe(autor,unidad){
 
 /* Rol efectivo: en login REAL manda YO.cargo (el conmutador ST.rol es solo de la demo). Así el
    PD/coordinador que entra de verdad ve «Convocar reunión», el Panel PD, etc. */
-function esCoord(){ return ST.rol==='coord' || ST.rol==='pd' || (typeof YO!=='undefined' && YO && (YO.cargo==='Coordinador' || YO.cargo==='Project Director')); }
+/* ⛔ Y EL SUBCOORDINADOR TAMBIEN. Esta es la TERCERA forma de preguntar «¿este manda?»
+   (las otras dos son `rangoNom` y `rangoSanc`), y era la unica que decidia solo por
+   `cargo` -- que es justo el fallo que la tabla `RANGO_SANC` existe para impedir: hay
+   gente con jurisdiccion y sin cargo. Sin esto, el movil le ofrecia SOLO «reunion de
+   trabajo» mientras el escritorio y el servidor le admiten los seis tipos.
+   ⚠️ No se delega en `rangoNom` a proposito: `rangoNom` compara contra `PD_NOM`, que
+   `_rederivarPD_` fija desde el roster REAL, y aqui hay funciones que se llaman antes de
+   que la identidad este resuelta. Añadir un brazo no mete esa dependencia; delegar si. */
+function esCoord(){ return ST.rol==='coord' || ST.rol==='pd' || (typeof YO!=='undefined' && YO && (YO.cargo==='Coordinador' || YO.cargo==='Project Director' || !!_subcoordDe_(YO.nombre))); }
 
 function esPD(){ return ST.rol==='pd' || (typeof YO!=='undefined' && YO && YO.cargo==='Project Director'); }
 
