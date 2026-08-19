@@ -176,6 +176,25 @@ function _avisosDocE_(d){
 
 /* Los mismos dos pasos con la marca del escritorio. Daniel (18/08): las instrucciones van en
    las DOS caras —«movil y escrityorio, recuerda q escritorio solo la tiene el consejo»—. */
+/* Gemelo de `_pasosCorregirE_` para SUSTITUIR. ⛔ Y traduce igual que aquel: el
+   escritorio nombra el estado `est`, no `estado`, y el autor `d.autor` contra `ACTOR`.
+   Pasarle el objeto crudo daria SIEMPRE lista vacia -- instrucciones escritas, probadas
+   y mudas en una cara entera, que es exactamente lo que ya paso una vez aqui. */
+function _pasosSustituirE_(d){
+  var ps = (typeof _pasosSustituirDoc_==='function')
+    ? _pasosSustituirDoc_({estado:d && d.est, ref:d && d.ref, autor:d && d.autor},
+                          typeof ACTOR!=='undefined' ? ACTOR : null) : [];
+  if(!ps.length) return '';
+  return '<div class="ruta"><b>¿Hay una versión nueva?</b> No se sube encima: se manda como <b>sustitución</b>, y éste sigue publicado hasta que aprueben la nueva.</div>'+
+    '<ol class="obj" style="margin:8px 0 0;padding-left:20px">'+
+    ps.map(function(p){
+      return '<li style="margin-bottom:6px"><b>'+esc(p.t)+'</b>'+
+        (p.url ? ' — <a href="'+esc(p.url)+'" target="_blank" rel="noopener">abrir el formulario</a>' : '')+
+        '<br><span class="sc">'+esc(p.d)+'</span>'+
+        (p.sinUrl ? '<br><span class="sc">'+esc(p.sinUrl)+'</span>' : '')+'</li>';
+    }).join('')+'</ol>';
+}
+
 function _pasosCorregirE_(d){
   var ps = (typeof _pasosCorregirDoc_==='function')
     ? _pasosCorregirDoc_({estado:d && d.est, ref:d && d.ref}) : [];
@@ -254,6 +273,11 @@ function docCard(d){
        traduce antes de preguntar. Pasarle el objeto crudo daria SIEMPRE lista vacia --
        instrucciones escritas, probadas y mudas en una cara entera. */
     acc=_pasosCorregirE_(d)+'<div class="acts"><button class="btn pri" data-doc="'+d.id+'" data-acc="reenviar">Ya está corregido: devolver a revisión</button></div>';
+  } else if(d.autor===ACTOR && (d.est==='publicado' || d.est==='cerrado')){
+    /* ⛔ AQUI PONIA «Es tuyo: lo firma X», Y YA ESTABA FIRMADO. Sobre un expediente
+       publicado eso manda a esperar a alguien que ya decidio, y no dice lo unico que
+       queda por hacer: mandar la version nueva como SUSTITUCION. */
+    acc=_pasosSustituirE_(d);
   } else if(d.autor===ACTOR){
     acc='<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>';
   } else if(d.revisor){

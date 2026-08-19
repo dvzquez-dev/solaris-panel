@@ -236,6 +236,23 @@ function vDocs(){
       de un rechazo AJENO a cualquiera que abra la ficha. */
 /* Los dos pasos con la marca del móvil. Función aparte para poder ejecutarla: `verDoc` monta
    además el visor y las cuatro acciones, así que ningún banco la corre. */
+/* Los pasos de SUSTITUIR con la marca del movil. Gemelo de `_pasosCorregirM_`, y aparte
+   por lo mismo: `verDoc` monta ademas el visor y las acciones, asi que ningun banco la
+   corre. La lista la decide la puerta comun; aqui solo se envuelve. */
+function _pasosSustituirM_(e){
+  var ps = (typeof _pasosSustituirDoc_==='function')
+    ? _pasosSustituirDoc_(e, yoNombre()) : [];
+  if(!ps.length) return '';
+  return '<div class="avisolargo" style="margin-top:10px"><b>¿Hay una versión nueva de este documento?</b> No se sube encima: se manda como <b>sustitución</b>, y éste sigue publicado hasta que aprueben la nueva.</div>'+
+    '<ol class="obj" style="margin:8px 0 0;padding-left:20px">'+
+    ps.map(function(p){
+      return '<li style="margin-bottom:6px"><b>'+esc(p.t)+'</b>'+
+        (p.url ? ' — <a href="'+esc(p.url)+'" target="_blank" rel="noopener">abrir el formulario</a>' : '')+
+        '<br><span class="sc">'+esc(p.d)+'</span>'+
+        (p.sinUrl ? '<br><span class="sc">'+esc(p.sinUrl)+'</span>' : '')+'</li>';
+    }).join('')+'</ol>';
+}
+
 function _pasosCorregirM_(e){
   var ps = (typeof _pasosCorregirDoc_==='function') ? _pasosCorregirDoc_(e) : [];
   if(!ps.length) return '';
@@ -289,7 +306,15 @@ function _docAutorHTML_(e){
       (url.indexOf('http')===0
         ? '<br><a href="'+esc(url)+'" target="_blank" rel="noopener">Ver la página publicada</a>'
         : '')+
-      '</div>';
+      '</div>'+
+      /* ⛔ Y AQUI LOS PASOS DE SUSTITUIR, PEGADOS -no en una rama propia-. Escribi
+         primero un `if(est==='publicado')` DELANTE de este bloque y se COMIA lo que ya
+         pintaba: la accion real («Aprobado con anotaciones»), que te ajustaron, la firma
+         y el enlace a Notion. CUATRO comprobaciones de este banco se pusieron rojas a la
+         vez y tenian razon. Una rama nueva delante de otra que ya funciona no añade:
+         RESTA -- y el sintoma llega lejos del sitio, en comprobaciones que hablan de
+         acentos y de etiquetas. */
+      _pasosSustituirM_(e);
   }
   return '';
 }

@@ -3061,6 +3061,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-sustituir-documento', fecha:'2026-08-19',
+      titulo:'La app ya explica cómo sustituir un documento publicado',
+      items:[
+        {cara:'movil', vista:'docs', txt:'Si tu documento **ya está publicado** y tienes una versión nueva, la ficha te dice los pasos. ⛔ Y **no son los de corregir**: aquí es un envío **nuevo**, marcado como «sustituye a» con la referencia de éste. Seguir los de corregir —misma referencia— **le pisaría el archivo al documento que el equipo está leyendo**. El original no se borra: sigue publicado hasta que aprueben el nuevo.'},
+        {cara:'escritorio', vista:'docs', txt:'Lo mismo en la tarjeta del escritorio, donde además decía «Es tuyo: lo firma X» sobre algo que **ya estaba firmado**.'}
+      ] },
     { id:'2026-08-19-botones-reunion-verdad', fecha:'2026-08-19',
       titulo:'Los botones de una reunión ya dicen la verdad',
       items:[
@@ -3984,6 +3990,49 @@ function _urlFormDocs_(){ return ''; }
       te escribió el revisor**, o sea la lista de lo que hay que corregir, y sólo se pinta
       mientras el estado es `cambios`. Pulsar el botón antes de corregir **borra las
       instrucciones**. */
+/* ⛔ SUSTITUIR NO ES CORREGIR, Y LAS INSTRUCCIONES SON LAS CONTRARIAS. Por eso esto vive
+   pegado a `_pasosCorregirDoc_` y las dos se nombran la una a la otra: quien tenga delante un
+   expediente PUBLICADO y siga los pasos de corregir -misma referencia- **le pisa el archivo al
+   documento que el equipo ya está leyendo**, sin que nadie lo apruebe.
+
+   · corregir  → te pidieron cambios · MISMA referencia · NO marcar «sustituye a»
+   · sustituir → ya está publicado   · envío NUEVO      · SÍ marcar «sustituye a»
+
+   ⛔ Lo pidió Daniel el 18/08: *«para sobreescribir fichas nuevas capaz mejor que tambien se
+   gestione por ahi. Obvio usando el formulario pero con buenas instrucciones detalladas en la
+   app (movil y escritorio…)»*. Hasta hoy la app no lo explicaba en ninguna cara.
+
+   ⚠️ SOLO al AUTOR y solo sobre lo que YA ESTÁ PUBLICADO (`publicado` o `cerrado`). A un
+   revisor no le toca, y sobre un expediente a medias de revisión el consejo sería falso: ése
+   se corrige, no se sustituye.
+   ⚠️ Y un `rechazado` NO entra aquí a propósito: nadie ha decidido si lo suyo es un envío
+   nuevo ENLAZADO al original o uno libre, y el original ni siquiera está publicado. Inventarlo
+   sería darle una instrucción que el pipeline puede no aceptar. Está fichado como pregunta. */
+function _pasosSustituirDoc_(e, yo){
+  if(!e) return [];
+  var est = String(e.estado || '');
+  if(est !== 'publicado' && est !== 'cerrado') return [];
+  if(!yo || !e.autor || String(e.autor) !== String(yo)) return [];
+  var ref = e.ref || 'la referencia de este expediente';
+  var url = _urlFormDocs_();
+  return [
+    { n:1, t:'Manda la version nueva por el formulario, marcada como «sustituye a»',
+      d:'Ahi pones la referencia de este: ' + ref + '. Es un envio NUEVO: crea su propio '+
+        'expediente y vuelve a pasar por revision. Al reves que corregir: aqui NO se reutiliza '+
+        'la misma referencia, porque este ya esta publicado y no se toca.',
+      url: (url && url.indexOf('http') === 0) ? url : '',
+      /* El respaldo vive en la PUERTA, no en una cara: es la misma leccion del 19/08 que
+         dejo al escritorio mandando al formulario sin decir a quien pedir el enlace. */
+      sinUrl: (url && url.indexOf('http') === 0) ? ''
+            : 'Si no tienes a mano el enlace del formulario, pideselo al Project Director.' },
+    { n:2, t:'Este sigue publicado mientras tanto',
+      d:'No se borra ni se retira. El original queda donde esta, y cuando aprueben el nuevo '+
+        'constara a cual sustituye. Hasta entonces, lo que el equipo lee es este.',
+      url:'', sinUrl:'' }
+  ];
+}
+
+
 function _pasosCorregirDoc_(e){
   if(!e || e.estado!=='cambios') return [];
   var ref = e.ref || 'la misma referencia';
