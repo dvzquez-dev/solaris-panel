@@ -251,17 +251,31 @@ function sumaE(e){return PARTES.filter(function(p){return p.e===e;}).reduce(func
    reloj del telefono: la misma puerta que la cifra grande. Sin periodo se suma todo, que es
    la cortesia de `_esDeMesPasado_`: ante la duda, se ve -- esconder horas por no saber el mes
    hace que un parte que de verdad FALTE sea indistinguible del que la vista tapa. */
-function sumaEMes(e){
+/* ⛔ EL RECORTE DEL MES, EN UN SOLO SITIO. `sumaEMes` y `sumaCuentanMes` preguntan cosas
+   distintas -un estado concreto y «¿esto ya cuenta?»- pero recortan el mes IGUAL, y una
+   copia de ese recorte es como acaban discrepando justo en la frontera del cierre, que
+   es el unico dia en que se nota. */
+function sumaSiMes(pred){
   var per = (typeof _diasDelMes_==='function') ? (_diasDelMes_()||{}).periodo : null;
   return PARTES.filter(function(p){
-    return p.e===e && !(typeof _esDeMesPasado_==='function' && _esDeMesPasado_(p, per));
+    return pred(p) && !(typeof _esDeMesPasado_==='function' && _esDeMesPasado_(p, per));
   }).reduce(function(a,p){return a+p.q;},0);
 }
+
+function sumaEMes(e){ return sumaSiMes(function(p){ return p.e===e; }); }
 
 /* ⛔ LO QUE YA CUENTA SON DOS ESTADOS, no uno: lo aprobado y lo otorgado. Esto era
    `sumaEMes('otor')` en dos sitios, y al separar «aprobada» de «otorgada» las horas que te
    firma tu coordinador habrían salido del contador **sin que nada se enterase**. */
-function sumaCuentanMes(){ return sumaEMes('conf') + sumaEMes('otor'); }
+/* ⛔ Y POR LA PUERTA, no reescribiendo el criterio. Esto era
+   `sumaEMes('conf') + sumaEMes('otor')`, o sea una SEGUNDA definicion de «¿esto ya
+   cuenta?» viviendo a 1.800 lineas de `_cuentaYa_` -- y las dos con un comentario encima
+   explicando que existen para que ese criterio no se duplique.
+   ⛔ Lo que costaba: `_cuentaYa_` decide la lista, el desglose y la categoria, y ESTA
+   decidia el CONTADOR DEL MES y la BARRA, que son los dos numeros que la persona mira
+   primero. Anadir un estado a la puerta los dejaba fuera **sin que nada se enterase** --
+   que es exactamente lo que ya paso una vez al separar `aprobada` de `otorgada`. */
+function sumaCuentanMes(){ return sumaSiMes(function(p){ return _cuentaYa_(p.e); }); }
 
 function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 
