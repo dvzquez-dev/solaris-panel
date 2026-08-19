@@ -2790,7 +2790,19 @@ function _limpio_(v){ return ((v==null?'':v)+'').replace(/^\s+|\s+$/g,''); }
    de las dos le invita a volver a declararlo. */
 function _yaCuentaEnSuMes_(p){ return !!(p && (p.estado==='aplicada' || p.aplicado_at)); }
 
-function _notisVivos_(){ return ['turnos','reuniones','avisos']; }
+/* ⛔ LOS TIPOS DE AVISO QUE ALGUN EMISOR PRODUCE HOY. No es la lista de los que EXISTEN:
+   es la de los que de verdad llegan, y la pantalla de Ajustes marca el resto con «hoy no
+   se manda ninguno de este tipo». Un interruptor que promete algo que nadie emite enseña
+   a ignorar la pantalla entera.
+   ✅ `documentos` entra el 19/08, y no por criterio: hasta ese dia el backend no tenia
+   NINGUN emisor de documentos -- `_encolarPush_` tenia dos llamadores y ninguno lo era.
+   Ahora los tiene: `_avisarDoc_`, desde la decision y desde lo que entra en revision.
+   ⚠️ Lo vigila `probar_notis_escritorio.py` comparando esta lista con los emisores que
+   encuentra EN EL CODIGO, y fue el que canto este cambio antes de que se me ocurriera:
+   su mensaje decia, literal, «si FALTA uno -el caso que viene-, dice hoy no se manda
+   ninguno de algo que si se manda».
+   🔴 `horas` sigue fuera a proposito: nadie lo emite todavia. */
+function _notisVivos_(){ return ['turnos','reuniones','avisos','documentos']; }
 
 function _identidadPrestada_(visto){
   if(typeof SESION==='undefined' || !SESION || !SESION.nombre) return false;
@@ -3061,6 +3073,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-aviso-documentos', fecha:'2026-08-19',
+      titulo:'La app ya te avisa al móvil de tus documentos',
+      items:[
+        {cara:'escritorio', vista:'ajustes', txt:'El interruptor de **Documentos** ya no dice «hoy no se manda ninguno de este tipo»: ahora sí se mandan. Te llega un aviso cuando **deciden sobre lo tuyo** —aprobado, cambios o rechazado— y, si eres revisor, cuando **entra algo que te toca revisar a ti** por tu unidad o tu cargo, no a los dos revisores fijos. ⛔ Y sigue siendo de los que **puedes apagar** desde aquí.'},
+        {cara:'movil', vista:'docs', txt:'Lo mismo en el móvil: la decisión sobre tu documento te llega sin tener que entrar a mirar. ⚠️ Necesita el despliegue del backend para empezar a funcionar.'}
+      ] },
     { id:'2026-08-19-sustituir-documento', fecha:'2026-08-19',
       titulo:'La app ya explica cómo sustituir un documento publicado',
       items:[
