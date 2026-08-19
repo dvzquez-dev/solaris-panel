@@ -3227,6 +3227,12 @@ function _novedades_(){
       items:[
         {cara:'movil', vista:'reu', txt:'«Fijar fecha», «Cancelar fijado» y «Orden del día» salían para **cualquier coordinador**, y el servidor solo se los acepta a **quien convocó la reunión** (o al admin). Si no era tuya, abrías el modal, elegías el día, arrastrabas las franjas, pulsabas Confirmar… y te decía que no. Ahora sólo salen si de verdad puedes. ⚠️ Si la convocaste tú, **igual que antes**.'}
       ] },
+    { id:'2026-08-19-ranking-numero-fresco', fecha:'2026-08-19',
+      titulo:'El filtro del ranking ya mira un n\u00famero de HOY',
+      items:[
+        {cara:'escritorio', vista:'ranking', txt:'Ayer se puso que quien no ha cerrado ning\u00fan mes no sale en la tabla. El filtro estaba bien \u2014 pero le\u00eda un n\u00famero que **s\u00f3lo se refrescaba al recalcular el umbral**, no al subir el panel: pod\u00eda ser de hace d\u00edas. Ahora se reescribe **cada vez que se arma el panel**.'},
+        {cara:'escritorio', vista:'ranking', txt:'\u26a0\ufe0f **Y por qu\u00e9 importa la fecha**: el **1 de septiembre** la temporada nueva empieza con **cero meses cerrados para los 32 a la vez**. Con el n\u00famero viejo, el m\u00f3vil te habr\u00eda dicho \u00abSin puesto todav\u00eda\u00bb y esta tabla habr\u00eda seguido pintando **la clasificaci\u00f3n entera de la temporada pasada**, como si fuera la de esta. Las dos pantallas contestaban a la misma pregunta y una de las dos iba a mentir.'}
+      ] },
     { id:'2026-08-19-ranking-primer-cierre', fecha:'2026-08-19',
       titulo:'La clasificación empieza en tu primer cierre de mes',
       items:[
