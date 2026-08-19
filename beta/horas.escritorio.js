@@ -846,8 +846,16 @@ function _bloqFalta_(){
        unico que distingue «demasiado corto» de «la misma hora». */
     var _cr=_minHM_(BLOQ_FORM.fin)-_minHM_(BLOQ_FORM.ini);
     if(_cr<0) _cr+=1440;                                  /* cruza medianoche */
-    var _pg=(typeof _pegaDeDuracion_==='function') ? _pegaDeDuracion_(d, tope, _cr)
-                                                   : (d>0?(d>tope?'largo':''):'cero');
+    /* ⛔ Y EL RANGO VACIO SE DICE APARTE, que es la cuarta causa y estaba MUERTA.
+       `_bloqDur_` pasa por `_minHM_`, que hace `parseInt(...)||0`: con los dos campos en
+       blanco devuelve **0** -- o sea un numero --, asi que la rama `'sin'` de la puerta
+       estaba escrita y era INALCANZABLE, y un formulario recien abierto acusaba de
+       invertir unas horas que nadie habia escrito todavia. La puerta ya sabia decirlo;
+       lo que faltaba era que esta cara le preguntara. */
+    var _vacio = !String(BLOQ_FORM.ini||'').trim() || !String(BLOQ_FORM.fin||'').trim();
+    var _pg=(typeof _pegaDeDuracion_==='function')
+      ? _pegaDeDuracion_(_vacio ? null : d, tope, _cr)
+      : (d>0?(d>tope?'largo':''):'cero');
     if(_pg==='largo') return 'Un parte no puede pasar de '+tope+' h (van '+h1(d)+')';
     if(_pg==='corto') return 'Ese bloque es demasiado corto: las horas se cuentan en '+
                              'cuartos, y menos de 8 minutos se queda en cero';

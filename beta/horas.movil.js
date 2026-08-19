@@ -764,12 +764,39 @@ function validarFichaje(){
     /* ⛔ «Falta la duración» salia tambien cuando la duracion ESTA y PASA DEL TOPE, que
        es lo contrario de faltar: el boton mandaba a rellenar lo que ya estaba puesto.
        La puerta esta en `comun.js` porque el escritorio hace la misma pregunta. */
+    /* ⛔ EL CRUDO EN MINUTOS, que es lo UNICO que distingue «demasiado corto» de «la
+       misma hora». Sin el, un bloque de SIETE MINUTOS -- que redondeado a cuartos es 0 --
+       decia «Falta la duración», o sea mandaba a rellenar lo que ya estaba puesto. Es
+       EXACTAMENTE el fallo que se arreglo en el escritorio, con la MISMA puerta escrita al
+       lado y esta cara llamandola a medias.
+       ⚠️ Solo en modo FORMULARIO: en vivo la duracion sale de la sesion, no de un rango,
+          y ahi `'corto'` no significa nada -- `horasSesion()` tiene suelo de 0,25.
+       ⚠️ Y la aritmetica NO se funde con `durForm` a proposito: `probar_minhm.py` la lee
+          POR NOMBRE de este fichero y la ejecuta, y `probar_curso.py` §8d ata `durForm` con
+          `_bloqDur_` por simetria. Fundirla pondria rojos dos bancos sanos por un traslado
+          que no es de esta pieza. */
+    var _formu = !declP && ST.modo!=='vivo';
+    var _crM = null, _vacM = false;
+    if(_formu){
+      _crM = _minHM_(ST.form.fin)-_minHM_(ST.form.ini);
+      if(_crM<0) _crM+=1440;                          /* cruza medianoche */
+      _vacM = !String(ST.form.ini||'').trim() || !String(ST.form.fin||'').trim();
+    }
     var _pgM=(typeof _pegaDeDuracion_==='function' && !declP)
-      ? _pegaDeDuracion_(haySes?dur:null, _topeH) : '';
+      ? _pegaDeDuracion_((haySes && !_vacM) ? dur : null, _topeH, _crM) : '';
+    /* ⛔ LA PUERTA CLASIFICA Y LA CARA REDACTA. Y la de `'sin'` son DOS frases, porque
+       son dos cosas distintas: en vivo no hay sesion que declarar; en formulario lo que
+       falta es el rango. Eso solo lo sabe el llamador -- depende del modo de la pantalla,
+       no de la duracion --, asi que no puede vivir dentro de la puerta. */
     var _faltaDur = _pgM==='largo'
       ? ('Son más de '+nf(_topeH,2)+' h: un parte no puede pasar de ahí')
-      : (_pgM==='sin' ? 'Todavía no hay ninguna sesión que declarar'
-                      : 'Falta la duración');
+      : _pgM==='corto'
+        ? 'Ese bloque es demasiado corto: las horas van en cuartos y menos de 8 min es cero'
+        : _pgM==='sin'
+          ? (_formu ? 'Pon la entrada y la salida'
+                    : 'Todavía no hay ninguna sesión que declarar')
+          : (_pgM==='cero' ? 'La salida tiene que ser posterior a la entrada'
+                           : 'Falta la duración');
     if(l) l.textContent = todo ? ('Enviar '+nf(dur,2)+' h a aprobación')
       : (!n1?_faltaDur:(!n2?'Falta a qué imputarlas':'Falta la justificación'));
   }

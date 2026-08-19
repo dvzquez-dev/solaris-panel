@@ -3120,6 +3120,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-19-duracion-las-dos-caras', fecha:'2026-08-19',
+      titulo:'…y ahora lo dice también el móvil, y con el formulario vacío',
+      items:[
+        {cara:'escritorio', vista:'horas', txt:'Al abrir un bloque nuevo, con la entrada y la salida **todavía en blanco**, te decía «La salida tiene que ser posterior a la entrada» —acusándote de invertir unas horas que **no habías escrito**—. Ahora dice **«Pon la entrada y la salida»**. La frase ya existía; lo que pasaba es que **no se podía llegar a ella**: un campo vacío se leía como las 00:00, o sea como un número.'},
+        {cara:'movil', vista:'horas', txt:'Y el móvil se había quedado a mitad del arreglo de ayer: un bloque de **siete minutos** seguía diciendo «Falta la duración» —mandándote a rellenar lo que ya tenías puesto—, porque se contaba en cuartos y **se quedaba en cero**. Ahora te dice que **es demasiado corto**, y distingue eso de que la salida no sea posterior a la entrada y de que no haya rango escrito.'}
+      ] },
     { id:'2026-08-19-por-que-no-vale-la-duracion', fecha:'2026-08-19',
       titulo:'Cuando una duración no vale, la app dice POR QUÉ',
       items:[
