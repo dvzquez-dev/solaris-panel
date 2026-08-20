@@ -1166,7 +1166,16 @@ function _cuotaHTML_(){
      salía «Aún sin descuentos» sobre un importe de 0,00 €, que no explica nada.
      ⚠️ La base puede no estar (el respaldo servido no siempre la trae), y un importe
      que no se sabe no se pinta: por eso la línea del importe va condicionada. */
-  var _exeM=(_exentoPrimerMes_(YO)===true);
+  /* ⛔ SE ENSEÑA CUANDO EL CERO ESTÁ AHÍ, no cuando «tocaría». Con `viva:false` el importe
+     que se enseña lo calculó el
+     motor, que **ya aplicó la exención si tocaba**: volver a restarla aquí deja un recibo que
+     no cuadra consigo mismo.
+     🔁 Medido: con `{cuota_base:30, cuota:22, coche:2, cierres:0}` salía «Cuota por tus horas
+     30,00 · Tu primer mes −30,00 · Estimación 22,00» — 30 − 30 = 0 ≠ 22 — y la línea
+     del coche desaparecía. Y es alcanzable: `flujos/umbral.py --subir` escribe `cierres`
+     **solo**, mientras `cuota`/`cuota_base` los empuja otro comando, así que un panel puede
+     traer el `cierres` nuevo con la cuota vieja. */
+  var _exeM=(_exentoPrimerMes_(YO)===true && _q.final === 0);
   var _bM=(typeof _q.base==='number' && isFinite(_q.base));
   var recibo = _exeM
     ? (_bM ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(_q.base)+'</span></div>'+

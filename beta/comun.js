@@ -590,7 +590,23 @@ function _ritmosEquipo_(){
    ⚠️ Por eso se llama `_umbralCuota_` y no `_umbral2_`: el nombre dice para que sirve. */
 function _umbralCuota_(){
   var L = _ritmosEquipo_(), s = 0, i;
-  if(!L.length) return null;
+  /* ⛔⛔ UNA PERSONA NO ES UN EQUIPO, y con `!L.length` esto se calculaba con UNA sola.
+     A rango < 3 el backend sirve la forma MIEMBRO -tu ficha entera y las demas SOLO con
+     identidad-, asi que `_ritmosEquipo_` se queda con **un** ritmo: el tuyo. Y entonces
+     el umbral es 2/3 de TU ritmo y el techo eres TU, o sea que en la rama `h >= umbral`
+     sale `s = (h-u)/(t-u) = 1` **siempre**: la cuota se clava en el minimo, 20,00 EUR.
+     🔁 Medido contra el padron REAL (u = 11,7976 · t = 67,2545), y el desvio es SIEMPRE
+     a la baja: a 8 h/mes se ensenaban **20,00 EUR donde son 34,95** (-14,95), a 5 h/mes
+     -14,69, a 10 h/mes -4,35. Pica justo en quien menos horas tiene. Y `_cuotaDe_` lo
+     devolvia con `viva:true`, o sea con el rotulo «se recalcula con tus horas de ahora
+     mismo» encima del numero peor. **Son 31 de 32 personas.**
+     ⛔ EL CRITERIO NO SE INVENTA AQUI: `< 2` ya estaba escrito **dos veces** en el
+     proyecto para esta misma pregunta -`_umbral_` diez lineas mas arriba (`hs.length<2`)
+     y el ranking del escritorio (`VIS.length < 2`, con su porque al lado)-. Eran tres
+     sitios contestando a «¿esta poblacion dice algo del equipo?» y dos criterios.
+     ⚠️ Y devolver `null` es lo correcto, no un apano: `_cuotaDe_` cae entonces a la
+     cifra que sirvio el backend -calculada por el motor con las 32- y **lo dice**. */
+  if(L.length < 2) return null;
   for(i = 0; i < L.length; i++) s += L[i];
   return Math.max(UMBRAL_LO, Math.min(UMBRAL_HI, UMBRAL_FRAC * (s / L.length)));
 }
@@ -598,7 +614,9 @@ function _umbralCuota_(){
 /* El techo de la curva: el maximo h/mes del equipo (`reglas/cuota.py:cuotas`). */
 function _techoCuota_(){
   var L = _ritmosEquipo_();
-  if(!L.length) return null;
+  /* ⛔ LA GEMELA, y hace falta: con el techo igual a TU ritmo la curva se clava en su
+     extremo. Un maximo de una muestra de uno eres tu mismo, no el equipo. */
+  if(L.length < 2) return null;
   return Math.max.apply(null, L);
 }
 
@@ -3198,6 +3216,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-20-cuota-poblacion', fecha:'2026-08-20',
+      titulo:'La cuota que ve\u00edas en directo se calculaba con una sola persona: t\u00fa',
+      items:[
+        {cara:'movil', vista:'estado', txt:'**Si no eres el Project Director, tu cuota \u00abse recalcula con tus horas de ahora mismo\u00bb sal\u00eda mal.** El servidor te manda **tu** ficha entera y de los dem\u00e1s s\u00f3lo el nombre \u2014por privacidad\u2014, as\u00ed que la cuenta en directo se hac\u00eda con una poblaci\u00f3n de **una** persona: t\u00fa. Y con eso el resultado se clavaba en **20,00 \u20ac** para casi cualquier ritmo.'},
+        {cara:'escritorio', vista:'estado', txt:'**Siempre por debajo, y m\u00e1s cuanto menos horas.** A 8 h/mes se ense\u00f1aban 20,00 \u20ac donde tocan **34,95**. Ahora, cuando no hay poblaci\u00f3n suficiente para hacer la cuenta, se ense\u00f1a la cifra que calcul\u00f3 el servidor con las 32 \u2014y se dice que es esa\u2014, en vez de inventar una con una muestra de uno.'}
+      ] },
     { id:'2026-08-20-objetivo-primer-mes', fecha:'2026-08-20',
       titulo:'El objetivo del mes deja de congelarse al empezar temporada',
       items:[
