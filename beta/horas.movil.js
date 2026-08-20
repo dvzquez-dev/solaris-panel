@@ -1160,6 +1160,24 @@ function _cuotaHTML_(){
      número no se movía. Ahora la cuenta se hace aquí, con el padrón que ya está cargado.
      ⚠️ Si aún no hay padrón se cae a lo que sirvió el backend **y se dice**. */
   var _q=_cuotaDe_(YO);
+  /* ⛔ SIN CUOTA SERVIDA NO SE TITULA UN CERO. `_cuotaDe_` devuelve `final:null` en cuanto
+     `YO.cuota` no es un numero finito —el respaldo servido no siempre la trae—, y el titular
+     hacia `nf(_q.final,2)` a pelo: `Intl.NumberFormat.format(null)` coacciona a 0, asi que la
+     cifra grande decia «0,00 € al año» **en verde**.
+     ⛔ Y las dos lecturas no son igual de malas: «0,00 €» se lee como **«no pagas»**, que es lo
+     contrario de «todavia no se sabe» — y es la unica de las dos que le da a alguien una razon
+     para **no reservar el dinero**. La cuota es requisito para renovar.
+     ✅ La cura estaba en la cara de al lado, otra vez: `escritorio.html:2227` corta con
+     `typeof _q.final==='number' && isFinite(_q.final)` y su frase dice lo que hay que decir.
+     Se copia ese criterio y esa frase, no se inventa otro. */
+  if(!(typeof _q.final==='number' && isFinite(_q.final)))
+    return '<div class="mtit">Tu cuota</div>'+
+      '<div class="msub">Se cierra en agosto, al acabar la temporada. Es requisito para renovar.</div>'+
+      '<div class="tarj acc">'+
+        '<div class="cifh"><span class="g mono">\u2014</span><span class="sc">\u20ac al a\u00f1o</span></div>'+
+        '<p class="rnota">Tu cuota todav\u00eda no ha llegado. Esto <b>no</b> dice que no tengas '+
+        'cuota: dice que el servidor a\u00fan no la ha servido. Sale de tus horas de la '+
+        'temporada y se cierra en agosto.</p></div>';
   /* ⛔ EL PRIMER MES NO LLEVA CUOTA, Y SE DICE. Gemela de la del escritorio y por el
      mismo motivo: aquí el descuento se pinta como `_q.base - _q.final`, así que a un
      exento CON coche se le atribuía al coche la exención entera. Y a uno SIN coche le
@@ -1183,9 +1201,25 @@ function _cuotaHTML_(){
         '<span class="ra">−'+eur(_q.base)+'</span></div>' : '')+
       '<p class="rnota">Tu primer mes no lleva cuota: todavía no has cerrado ningún mes.</p>'
     : YO.coche
-    ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(_q.base)+'</span></div>'+
-      '<div class="rl desc"><span>Por poner el coche · '+YO.coche+' turno'+(YO.coche===1?'':'s')+'</span>'+
-      '<span class="ra">−'+eur(_q.base-_q.final)+'</span></div>'
+    /* ⛔ Y LA RAMA DEL COCHE VA IGUAL DE PROTEGIDA. `_bM` vivía solo en la de exento, dos líneas
+       arriba, con el comentario que ya explica por qué hace falta: «un importe que no se sabe no
+       se pinta». Sin `cuota_base` —que el respaldo servido no siempre trae, y entonces
+       `_cuotaDe_` devuelve `base:null`— aquí se pintaba un importe **inventado** en la línea de
+       la cuota por horas (`nf(null)` da un cero, no un hueco) y debajo un descuento con **doble
+       menos**, porque `null` menos la cuota es negativo. Un recibo que no cuadra consigo mismo
+       manda a discutir con quien no es.
+       ✅ La cura estaba en la cara de al lado: el escritorio hace `base==null?'—':eur(base)` y
+       `desc=(base==null || _exeE) ? 0 : …`. Se copia ese criterio, no se inventa otro.
+       ⚠️ Y NO se calla: sin base no se puede decir cuánto resta el coche, pero decirlo es justo
+       lo que evita que alguien cuadre su recibo con un número que la app se ha inventado. */
+    ? (_bM
+      ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(_q.base)+'</span></div>'+
+        '<div class="rl desc"><span>Por poner el coche · '+YO.coche+' turno'+(YO.coche===1?'':'s')+'</span>'+
+        '<span class="ra">−'+eur(_q.base-_q.final)+'</span></div>'
+      : '<div class="rl"><span>Cuota por tus horas</span><span class="ra">—</span></div>'+
+        '<p class="rnota">Llevas el coche en '+YO.coche+' turno'+(YO.coche===1?'':'s')+' fuera de '+
+        'Vigo, pero el servidor aún no ha servido tu cuota <b>sin</b> descuentos: no se puede '+
+        'decir cuánto te resta.</p>')
     : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta 4 € por turno.</p>';
   return '<div class="mtit">Tu cuota</div>'+
     '<div class="msub">Se cierra en agosto, al acabar la temporada. Es requisito para renovar.</div>'+

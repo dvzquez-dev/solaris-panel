@@ -3216,6 +3216,23 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-20-turno-entero-escritorio', fecha:'2026-08-20',
+      titulo:'Marcabas el turno en el escritorio y declarabas una hora',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'**Un clic en la rejilla de disponibilidad marcaba UNA franja, no el turno.** Ve\u00edas la casilla pintada, guardabas, y hab\u00edas declarado **una hora** cuando un turno son **cuatro**. No saltaba ning\u00fan aviso: en el reparto sal\u00eda un turno corto y nadie sab\u00eda por qu\u00e9 \u2014 con la misma pantalla dici\u00e9ndote que no contestar es lo que hace que te pongan un turno que no puedes. Ahora un clic marca el turno entero, igual que en el m\u00f3vil, y volver a pulsarlo lo quita entero.'}
+      ] },
+    { id:'2026-08-20-cuota-sin-dato', fecha:'2026-08-20',
+      titulo:'\u00ab0,00 \u20ac al a\u00f1o\u00bb cuando lo que pasa es que tu cuota no ha llegado',
+      items:[
+        {cara:'movil', vista:'estado', txt:'**La cifra grande de \u00abTu cuota\u00bb pod\u00eda decir 0,00 \u20ac al a\u00f1o, en verde, sin que eso fuera verdad.** Pasaba cuando el servidor a\u00fan no hab\u00eda mandado tu cuota: la pantalla pintaba el hueco como si fuera un cero. Y un cero ah\u00ed se lee como \u00abno pagas\u00bb \u2014 que es lo contrario de \u00abtodav\u00eda no se sabe\u00bb, y lo \u00fanico que te dar\u00eda una raz\u00f3n para no reservar el dinero. Ahora pone \u00ab\u2014\u00bb y lo explica. La versi\u00f3n de escritorio ya lo hac\u00eda as\u00ed.'}
+      ] },
+    { id:'2026-08-20-plazo-y-semilla', fecha:'2026-08-20',
+      titulo:'Con el servidor ca\u00eddo ve\u00edas una convocatoria de mentira, y el plazo dec\u00eda 0 h media hora antes',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'**Si el servidor no contestaba, la pantalla se quedaba con la convocatoria de DEMOSTRACI\u00d3N.** Marcaba el error, s\u00ed, pero no borraba lo que hab\u00eda debajo \u2014 as\u00ed que se ve\u00eda una rejilla con d\u00edas y horas que **no exist\u00edan**, y quien contestaba estaba contestando a un plazo inventado. Ahora, si no hay datos, no hay rejilla.'},
+        {cara:'movil', vista:'estado', txt:'**El recibo de la cuota pon\u00eda \u00ab\u2212-24,18 \u20ac\u00bb, con dos signos menos.** Pasaba cuando el servidor a\u00fan no hab\u00eda mandado tu cuota base y ten\u00edas descuento por coche. La l\u00ednea de al lado \u2014la de exento\u2014 ya se proteg\u00eda de eso, y el escritorio tambi\u00e9n; faltaba \u00e9sta. Ahora pone \u00ab\u2014\u00bb y lo dice.'},
+        {cara:'escritorio', vista:'turnos', txt:'**\u00abTe quedan 0 h\u00bb durante la \u00faltima media hora, con la rejilla todav\u00eda abierta.** El r\u00f3tulo redondeaba a horas, as\u00ed que cualquier plazo por debajo de 60 minutos sal\u00eda como cero y parec\u00eda cerrado. Ahora los \u00faltimos minutos se dicen **en minutos**, y \u00abcerrado\u00bb s\u00f3lo cuando lo est\u00e1.'}
+      ] },
     { id:'2026-08-20-cuota-poblacion', fecha:'2026-08-20',
       titulo:'La cuota que ve\u00edas en directo se calculaba con una sola persona: t\u00fa',
       items:[

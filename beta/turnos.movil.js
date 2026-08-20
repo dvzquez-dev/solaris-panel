@@ -282,7 +282,20 @@ function _convCargar_(repintar){
       if(typeof CONVOCATORIAS!=='undefined'){ CONVOCATORIAS.length=0; CONVOCATORIAS.push(cv); }
     }
     if(typeof repintar==='function') repintar();
-  }).catch(function(){ _convEstadoSrv_('error'); });
+  }).catch(function(){
+    /* ⛔ UN FALLO NO DEJA PUESTA LA SEMILLA DE DEMOSTRACIÓN. Marcar el estado no es vaciar:
+       `_convAbierta_` mira la lista y **no consulta `__convSrvEstado` en ningún punto**, así
+       que con el backend caído esta cara seguía pintando una convocatoria entera —con sus días,
+       su rejilla y **su plazo**— y quien contestaba mandaba su disponibilidad a algo que no
+       existe. Un plazo de mentira es peor que un hueco, porque nadie lo nota.
+       ⛔ Y LA LECCIÓN YA ESTABA ESCRITA A SEIS LÍNEAS DE AQUÍ, en la rama del «no hay ninguna»,
+       y otra vez en el gemelo del escritorio (`_dispCargar_`, `turnos.escritorio.js`), cuyo
+       comentario describe **este** fallo. Se cablea la que existe, no se escribe otra.
+       ⚠️ Y se REPINTA: vaciar sin repintar deja en pantalla lo que se dibujó con la semilla. */
+    if(typeof CONVOCATORIAS!=='undefined') CONVOCATORIAS.length=0;
+    _convEstadoSrv_('error');
+    if(typeof repintar==='function') repintar();
+  });
 }
 
 /* Manda la rejilla al servidor. Sin esperar a que llegue para repintar —el dedo ya la vio

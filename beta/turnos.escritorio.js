@@ -260,13 +260,54 @@ function _mitQuiere_(){
    cableado a proposito: es una DECISION, y metida dentro del `onclick` no habia forma
    de ejecutarla en el arnes -- su mutacion salia ciega. El movil hace lo mismo y por
    eso compara tambien el coche: cambiar solo el coche es un cambio, no un deshacer. */
-function _mitToggle_(mias, k, q){
+function _mitToggle_(cv, mias, k, q){
   var v = mias[k];
   var igual = v && v.s===q.s && (q.s==='no' || !!v.c===!!q.c);
-  if(igual) delete mias[k]; else mias[k]=q;
+  /* ⛔ SE MARCA EL TURNO ENTERO, NO LA CASILLA — y esto es lo que la cabecera de arriba ya
+     prometía («MISMO CONTRATO QUE EL MÓVIL, a propósito») sin cumplirlo. El móvil lo hace en
+     `_convPintar_` con `_bloqueDesde_` y `_minTurno_`, que viven en `comun.js` porque las
+     cargan las dos caras; aquí no las referenciaba nadie.
+     ⚠️ La clave se parte y se arma con lo de ESTA cara (`String(k).split('|')` y
+     `_dispClave_`): `_convClave_`/`_convDeClave_` son de `turnos.movil.js` y este bundle **no
+     las tiene** — usarlas aquí sería un `ReferenceError` en la pantalla.
+     ⛔ Y no es un detalle de comodidad: quien contesta desde el escritorio hacía clic, veía la
+     celda pintada, pulsaba «Guardar mi disponibilidad»… y había declarado **una hora**.
+     `reglas/turnos.MIN_HORAS_TURNO` es **4**, y su docstring dice lo que pasa entonces: *«no
+     daría ningún error, saldría un turno corto en el reparto»*. Encima la propia pantalla le
+     dice que *«no contestar es lo que hace que te pongan un turno cuando no puedes»* — marcó,
+     no contó, y le cae el turno igual.
+     ✅ NO-OP EXACTO donde hoy acierta: `_bloqueDesde_` devuelve `[k]` si el mínimo no es >1 o
+     si la convocatoria tiene menos franjas que el mínimo. Con `min_h:1` marca una, que es lo
+     correcto ahí. */
+  var partes = String(k).split('|'), dia = partes[0];
+  var bloque = _bloqueDesde_((cv&&cv.franjas)||[], partes[1], _minTurno_(cv));
+  if(!bloque.length) bloque = [partes[1]];
+  bloque.forEach(function(fk){
+    var kk = _dispClave_(dia, fk);
+    if(igual) delete mias[kk]; else mias[kk]=q;
+  });
   return mias;
 }
 
+/* El rótulo del plazo, en TRES ramas. ⛔ Aquí había `Math.round(_convQuedan_(cv))` a secas, así
+   que durante los últimos ~30 minutos la tarjeta rotulaba «te quedan **0 h** para contestar»
+   con la rejilla VIVA y el botón de guardar activo. Eso se lee como plazo cerrado: se deja de
+   contestar, y el turno lo reparte quien no sabe que podías — que es justo el fallo que toda
+   esta pantalla existe para evitar. Y un plazo ya vencido decía **la misma frase**, o sea la
+   misma frase para dos estados distintos.
+   ✅ El móvil ya tenía las tres (`_convPieHTML_`, `turnos.movil.js`): esto trae ese criterio,
+   no inventa otro.
+   ⚠️ VA FUERA DE `_miTurnoPanel_` A PROPÓSITO, como `_mitToggle_`: metido dentro del panel no
+   hay forma de ejecutarlo en el arnés y su mutación sale **ciega**. El instante entra por
+   argumento para que el caso sea determinista.
+   ⚠️ Y la rama del plazo vencido no es adorno aunque hoy `_miTurnoCv_` no deje llegar a ella:
+   lo que se fija es el CONTRATO de la función, no lo que su único llamador usa hoy. */
+function _mitPlazoTxt_(cv, ahora){
+  var q=_convQuedan_(cv, ahora);
+  return q<=0 ? 'plazo cerrado'
+       : q<1  ? 'te quedan '+Math.round(q*60)+' min para contestar'
+              : 'te quedan '+Math.round(q)+' h para contestar';
+}
 function _miTurnoPanel_(){
   var cv=_miTurnoCv_(); if(!cv) return '';
   var mias=_misCeldas_(cv), D=cv.dias||[], F=cv.franjas||[];
@@ -291,9 +332,8 @@ function _miTurnoPanel_(){
     }).join('');
   }).join('');
   var sucio=!!MIT_CELDAS;
-  var quedan=Math.round(_convQuedan_(cv));
   return pan('Tu disponibilidad',
-    'te quedan '+quedan+' h para contestar',
+    _mitPlazoTxt_(cv),
     '<div class="pb">'+
     '<p style="margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
       'Elige <b>d\u00f3nde puedes</b> y haz clic en los huecos. Lo que marques aqu\u00ed es lo que '+
@@ -321,7 +361,7 @@ function _cablearMiTurno_(){
   $$('[data-mtk]').forEach(function(c){
     c.onclick=function(){
       var cv=_miTurnoCv_(); if(!cv) return;
-      MIT_CELDAS=_mitToggle_(_misCeldas_(cv), c.dataset.mtk, _mitQuiere_());
+      MIT_CELDAS=_mitToggle_(cv, _misCeldas_(cv), c.dataset.mtk, _mitQuiere_());
       pintar();
     };
   });
