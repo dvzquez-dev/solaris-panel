@@ -126,6 +126,31 @@ function _minHM_(v){
 
    ⚠️ El tope de `F.length<400` no es decoracion: con un slot de 5 min y un rango largo esto
    generaria miles de franjas y la rejilla dejaria de dibujarse. */
+/* Cuánta gente pierde su disponibilidad si se borra una reunión. Se dice ANTES de preguntar:
+   un «¿seguro?» que no dice qué se pierde no informa de nada, y lo que se pierde es trabajo de
+   otros.
+
+   ⛔ SE COGE EL MAYOR DE LAS DOS CUENTAS, y no la que haya. Son la misma magnitud —una fila por
+   persona en `Respuestas`— medida en dos momentos: `nResp` la cuenta **el servidor** al listar y
+   llega siempre; `resp` es el detalle que hidrata `_hidratarReus_`, que puede no haber llegado.
+   Quedarse corto aquí es decir «no pierdes nada» justo antes de perderlo; pasarse solo hace
+   mirar dos veces.
+
+   ⚠️ Se cuentan las FILAS, igual que `_cobertura_` («han cubierto»), y no quien marcó algún
+   hueco: contestar «no puedo ningún día» también es haber contestado, y también se borra.
+
+   ⛔ **UNA sola puerta, aquí** (20/08). Vivía en `reuniones.escritorio.js` como `_nRespReuE_`
+   mientras el móvil hacía **su propia cuenta a mano**, y las dos no coincidían: con
+   `{nResp:14, resp:{}}` el escritorio decía 14 y el móvil **0** — o sea «Todavía no la ha
+   cubierto nadie» justo antes de borrar catorce respuestas. Es el mismo movimiento que se hizo
+   con `_genUnion_` aquí abajo, y por el mismo motivo. */
+function _nRespReu_(r){
+  var n=0, resp=(r&&r.resp)||{}, k;
+  for(k in resp){ if(Object.prototype.hasOwnProperty.call(resp,k) && Array.isArray(resp[k])) n++; }
+  var srv=+((r&&r.nResp)||0);
+  return n>srv ? n : srv;
+}
+
 function _genUnion_(rangos, slot){
   slot=Math.max(5, Math.min(240, +slot||60));
   var act=rangos.filter(function(r){ return r && r[1]>r[0]; });
@@ -1787,7 +1812,26 @@ function _gruposSanc_(actor, filtro){
   });
   var orden=_ordenSubs_(), por={};
   gente.forEach(function(m){ var u=m.unidad||'—'; (por[u]=por[u]||[]).push(m); });
-  return orden.filter(function(u){ return por[u]; }).map(function(u){
+  /* ⛔ EL CAJÓN «—» NO SE PINTABA NUNCA, Y LO FABRICA LA LÍNEA DE ARRIBA. `gente.forEach`
+     mete a quien no tiene `unidad` en el cajón `'—'`, y `_ordenSubs_` **sólo devuelve
+     unidades no vacías** (`if(u && vis.indexOf(u)<0)`), así que `orden.filter` lo tiraba
+     SIEMPRE: el respaldo que la línea anterior escribe no podía llegar a pantalla ni una vez.
+     ⛔ Y no es cosmética: `sancionablesPor` **sí** devuelve a esa persona, y con ese número
+     el escritorio rotula «N personas bajo tu jurisdicción» (`_ponerSancionHTML_`,
+     `sanciones.escritorio.js`). O sea: el rótulo la cuenta, la lista no tiene dónde ponerla
+     y **no se le puede sancionar desde ninguna de las dos caras**. Un contador y una lista
+     que suman cosas distintas.
+     ⛔ Un `unidad` vacío no es teórico: `flujos/ensamblar.py` hace
+     `d["unidad"] = v.get("unidad")` con el volcado de Notion delante, así que una ficha con
+     la propiedad sin poner —el alta de septiembre— llega con `null` y **pisa** el valor
+     bueno que hubiera. Medido hoy sobre los datos reales: 0 de 32, o sea que esto **no
+     cambia ningún número ahora mismo**; quita el suelo por el que se cae el día que entre
+     alguien sin unidad.
+     ✅ Se conserva el ORDEN de `_ordenSubs_` —el de Notion— y las que no estén en él van
+     detrás: nadie se cae de la lista por no tener sitio en ese orden. */
+  var vis = orden.filter(function(u){ return por[u]; });
+  Object.keys(por).forEach(function(u){ if(vis.indexOf(u) < 0) vis.push(u); });
+  return vis.map(function(u){
     var l=por[u].slice().sort(function(a,b){
       var ca=(a.cargo==='Coordinador')?0:1, cb=(b.cargo==='Coordinador')?0:1;
       if(ca!==cb) return ca-cb;                       // el coordinador, primero
@@ -1800,7 +1844,16 @@ function _gruposSanc_(actor, filtro){
 /* La lista de personas. Se pinta aparte para poder rehacerla al teclear SIN tocar el resto
    del formulario: repintar el modal entero es lo que borraba lo ya elegido. */
 function _listaSancHTML_(grupos){
-  if(!grupos.length) return '<p class="rnota" style="margin:0;padding:8px 2px">Nadie con ese filtro.</p>';
+  /* ⛔ «NADIE CON ESE FILTRO» CULPABA A UN FILTRO QUE PUEDE NO EXISTIR. Esto se pinta
+     también en el primer dibujado, con la caja de búsqueda vacía: entonces la lista sale
+     vacía por otra cosa —te han dado rango y no tienes a nadie debajo, o el roster aún no
+     ha llegado— y el texto manda a corregir un filtro que no hay. Son dos situaciones
+     distintas y una de ellas no se arregla tocando la caja.
+     ⚠️ Se lee `SANC_FORM.filtro`, que es el MISMO global del que ya sale `SANC_FORM.quien`
+     dos líneas más abajo: no se añade ningún argumento ni se toca a los que llaman. */
+  if(!grupos.length) return '<p class="rnota" style="margin:0;padding:8px 2px">'+
+    ((SANC_FORM && SANC_FORM.filtro) ? 'Nadie con ese filtro.'
+      : 'No hay nadie bajo tu jurisdicción todavía.')+'</p>';
   return grupos.map(function(g){
     return '<div class="sangrupo">'+esc(g.unidad)+'</div>'+
       g.gente.map(function(m){
@@ -3216,6 +3269,17 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-20-sancionables-sin-unidad', fecha:'2026-08-20',
+      titulo:'El r\u00f3tulo contaba a alguien que la lista no pod\u00eda ense\u00f1arte',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'**\u00abN personas bajo tu jurisdicci\u00f3n\u00bb contaba a una persona m\u00e1s de las que sal\u00edan en la lista.** A quien no tuviera subsistema puesto se le hac\u00eda un caj\u00f3n aparte y acto seguido se tiraba, as\u00ed que **no se le pod\u00eda sancionar desde ninguna de las dos caras** \u2014 ni verla, ni marcarla. Hoy no le pasa a nadie del equipo; le pasar\u00eda a la primera alta de septiembre que llegue sin subsistema.'},
+        {cara:'escritorio', vista:'sanciones', txt:'**Y con la caja de b\u00fasqueda vac\u00eda pon\u00eda \u00abNadie con ese filtro\u00bb**, que manda a borrar una b\u00fasqueda que no has escrito. Ahora distingue \u00abno hay nadie\u00bb de \u00abtu filtro no encuentra a nadie\u00bb.'}
+      ] },
+    { id:'2026-08-20-borrar-reunion-cuenta', fecha:'2026-08-20',
+      titulo:'\u00abTodav\u00eda no la ha cubierto nadie\u00bb, y detr\u00e1s se borraban 14 respuestas',
+      items:[
+        {cara:'movil', vista:'reu', txt:'**Al eliminar una reuni\u00f3n, el aviso pod\u00eda decir que no la hab\u00eda cubierto nadie cuando s\u00ed.** Contaba solo a quien hab\u00eda marcado alg\u00fan hueco, y solo si el detalle ya hab\u00eda llegado del servidor \u2014 que nada m\u00e1s abrir la ficha normalmente **no ha llegado**. As\u00ed que una reuni\u00f3n cubierta por catorce personas se anunciaba como vac\u00eda justo antes de borrarla, y eso no se deshace. Ahora cuenta igual que el escritorio: por el n\u00famero que da el servidor, y contando tambi\u00e9n a quien contest\u00f3 \u00abno puedo ning\u00fan d\u00eda\u00bb.'}
+      ] },
     { id:'2026-08-20-turno-entero-escritorio', fecha:'2026-08-20',
       titulo:'Marcabas el turno en el escritorio y declarabas una hora',
       items:[

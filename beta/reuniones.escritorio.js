@@ -687,26 +687,16 @@ function _puedeBorrarReuE_(r){
   return !!(yo && r.convocante && String(yo)===String(r.convocante));
 }
 
-/* Cuánta gente pierde su disponibilidad si se borra. Se dice ANTES de preguntar: un «¿seguro?»
-   que no dice qué se pierde no informa de nada, y lo que se pierde es trabajo de otros.
-   ⛔ SE COGE EL MAYOR DE LAS DOS CUENTAS, y no la que haya. Son la misma magnitud —una fila
-   por persona en `Respuestas`— medida en dos momentos: `nResp` la cuenta **el servidor** al
-   listar y llega siempre; `resp` es el detalle que hidrata `_hidratarReus_`, que puede no
-   haber llegado. Quedarse corto aquí es decir «no pierdes nada» justo antes de perderlo;
-   pasarse solo hace mirar dos veces.
-   ⚠️ Se cuentan las FILAS, igual que `_cobertura_` («han cubierto»), y no quien marcó algún
-   hueco: contestar «no puedo ningún día» también es haber contestado, y también se borra. */
-function _nRespReuE_(r){
-  var n=0, resp=(r&&r.resp)||{}, k;
-  for(k in resp){ if(Object.prototype.hasOwnProperty.call(resp,k) && Array.isArray(resp[k])) n++; }
-  var srv=+((r&&r.nResp)||0);
-  return n>srv ? n : srv;
-}
+/* ⛔ `_nRespReuE_` SE MUDÓ A `comun.js` como `_nRespReu_` (20/08), porque el móvil hacía su
+   propia cuenta a mano y las dos no coincidían: con `{nResp:14, resp:{}}` aquí salía 14 y allí
+   **0**, o sea «todavía no la ha cubierto nadie» justo antes de borrar catorce respuestas. El
+   razonamiento entero (por qué el MAYOR de las dos cuentas, y por qué FILAS y no huecos
+   marcados) vive ahora con la función. */
 
 /* La caja del botón. Devuelve '' si no te toca: el botón no se pinta gris, no se pinta. */
 function _borrarReuBoxE_(r){
   if(!_puedeBorrarReuE_(r)) return '';
-  var n=_nRespReuE_(r);
+  var n=_nRespReu_(r);
   return '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:13px">'+
     '<button class="btn" data-borrarreu="'+esc(r.id)+'" style="color:var(--red2);'+
       'border-color:var(--red)">Eliminar reunión</button>'+

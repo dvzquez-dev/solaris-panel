@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=f15f542"></script>
+<script src="comun.js?v=c352785"></script>
 <script src="notis.movil.js?v=9167a0c"></script>
 <script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=2ab8a6a"></script>
@@ -1498,7 +1498,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='eea5db1';
+var BUILD='b4f4f22';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -2062,8 +2062,15 @@ function _engReuniones_(){
     if(!_puedeBorrarReuM_(R)){ tost('Solo puede eliminarla quien la convocó.'); return; }
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
       tost('Sin conexión no se puede eliminar una reunión.'); return; }
-    var nResp=Object.keys(R.resp||{}).filter(function(n){
-      return (R.resp[n]||[]).some(function(v){ return +v>0; }); }).length;
+    /* ⛔ POR LA MISMA PUERTA QUE EL ESCRITORIO (`_nRespReu_`, en `comun.js`). Aquí se contaba
+       a mano **quien marcó algún hueco > 0** y se IGNORABA `R.nResp`, que es la cuenta que hace
+       el SERVIDOR al listar y que llega siempre. Con el detalle sin hidratar —el caso normal
+       nada más abrir— esto decía **0** sobre una reunión cubierta por 14 personas, y el aviso
+       que se lee justo antes de pulsar decía «Todavía no la ha cubierto nadie». Después
+       `api.borrarReunion` borra la fila de la reunión **y todas sus filas de `Respuestas`**.
+       ⛔ Y de paso dejaba fuera a quien contestó «no puedo ningún día»: eso también es haber
+       contestado, y también se borra. */
+    var nResp=_nRespReu_(R);
     var aviso='Eliminar «'+R.titulo+'».'+String.fromCharCode(10,10)+
       (nResp? ('Se borra también la disponibilidad que ya cubrieron '+nResp+' persona'+(nResp===1?'':'s')+'.')
             : 'Todavía no la ha cubierto nadie.')+
