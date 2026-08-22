@@ -502,7 +502,12 @@ function _compHTML_(r){
       ? '<div class="ruta">No se puede otorgar: '+esc(no)+'.</div>'
       : '<div class="acts">'+
           '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px">Horas'+
-          '<input type="number" step="0.25" min="0" max="8" value="'+p.horas+'" data-comph="'+ID+'" '+
+          /* ⛔ EL TOPE SALE DE `_maxHorasParte_()`, NO CLAVADO. Ponia `max="8"` y el backend
+         recorta a 14 (`Codigo.gs:3457`): un rotulo que contradice al guardia de al lado, y
+         justo la averia del 12-vs-14 de la que nacio ese ayudante. Ademas el `max` de un
+         `<input>` suelto NO valida nada; quien para de verdad es la guarda de
+         `escritorio.html`, que pregunta a la MISMA funcion. */
+      '<input type="number" step="0.25" min="0" max="'+_maxHorasParte_()+'" value="'+p.horas+'" data-comph="'+ID+'" '+
           'style="width:78px;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
           'padding:7px 9px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
           '<button class="btn pri" data-comp="'+ID+'">Otorgar a '+esc(_m(r.quien).pila)+'</button>'+

@@ -178,6 +178,42 @@ main.entrando>*:nth-child(4){animation-delay:.15s}
 .btn.sm{padding:5px 10px;font-size:11px;font-weight:500}
 .btn[disabled]{opacity:.45;cursor:not-allowed;pointer-events:none}
 
+/* ══ LO QUE SE QUEDABA EN LA HOJA DEL MOVIL (224.ª, 22/08) ═════════════════════
+   ⛔ `escritorio.html` carga UNA sola hoja (linea 19), asi que una clase definida solo en
+   `movil.css` **no llega**. Estas cinco las emite la cara escritorio y no las mencionaba
+   nadie aqui: el elemento salia, ocupaba sitio y no se parecia a lo previsto, sin dar un
+   solo error. Portadas TAL CUAL del movil -- no es rediseno, es lo que ya estaba decidido.
+   ⚠️ Lo vigila `rutinas/probar_clases_escritorio.py`, por NOMBRE y no por numero. */
+
+/* El formulario. Sin `.campo`, el <label> vuelve a `display:inline` -rotulo y campo en la
+   misma linea, los dos pegados- y `escritorio.css` no tenia NI UNA regla para `select`.
+   Se ve en el panel «Cerrar un turno». */
+.campo{display:flex;flex-direction:column;gap:6px;margin-bottom:11px}
+.campo>.sc{display:flex;align-items:center;gap:6px}
+.campo .req{color:var(--red2)}
+.campo input,.campo select,.campo textarea{background:#0A0909;border:1px solid var(--line);
+  border-radius:var(--r2);color:var(--ink);font-family:var(--sans);font-size:13.5px;
+  padding:10px 11px;width:100%;outline:0;
+  transition:border-color .18s linear,box-shadow .18s linear}
+.campo input.mono,.campo select{font-family:var(--mono);font-size:13px}
+.campo textarea{resize:vertical;min-height:74px;line-height:1.5}
+.campo input:focus,.campo select:focus,.campo textarea:focus{border-color:var(--line2);
+  box-shadow:0 0 0 3px rgba(228,30,37,.11)}
+.campo input::placeholder,.campo textarea::placeholder{color:var(--ink3)}
+
+/* La tarjeta y sus dos rotulos: es la pantalla Novedades entera, que salia sin tarjeta y
+   con el titulo a tamano de cuerpo. Las emite `comun.js`, o sea las DOS caras. */
+.tarj{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px;margin-bottom:10px;position:relative}
+.tarj .tt{display:flex;align-items:center;gap:8px;margin:-2px 0 10px}
+.tarj .tt .sc{flex:none}
+.mtit{font-size:18px;font-weight:700;letter-spacing:-.015em;margin:0 34px 3px 0}
+.msub{font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5}
+
+/* La nota al pie de una ficha: sin regla salia a tamano y brillo de cuerpo, y con el
+   margen de 1em que le pone el navegador. */
+.rnota{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5}
+
 /* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:13px}
 @media(max-width:1150px){.kpis{grid-template-columns:repeat(2,1fr)}}

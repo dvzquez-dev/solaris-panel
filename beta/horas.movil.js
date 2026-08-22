@@ -541,12 +541,12 @@ function vFichar(){
      la pantalla habria enseñado DOS NOMBRES DISTINTOS, y el prominente era el equivocado.
      Lo destapo un verificador adversarial, no yo: yo solo mire el bloque que acababa de
      escribir. Las dos frases salen ahora de `_perfilElegido_()`, que es la unica puerta. */
-  var _perf=_perfilElegido_(), rt=aprobadorDe(YO.nombre,_perf);
+  var _perf=_perfilElegido_(), rt=aprobadorDe(_fichaYo_(),_perf);
   /* ⛔⛔ SIN FILTRO ESTO LISTABA LAS TAREAS DE TODO EL EQUIPO, en un desplegable que se
      titula «elige una de TUS tareas». El backend sirve todas a la cuenta admin, así que en
      el teléfono del PD salían las de las 32 personas y el parte se guardaba imputado a la
      de otro **sin un aviso**. El escritorio filtraba desde el 14/08 y lo dejó escrito. */
-  var opts=_tareasResp_(TAREAS, (YO&&YO.nombre)||'').map(function(t){
+  var opts=_tareasResp_(TAREAS, _fichaYo_()).map(function(t){
     return '<option value="'+esc(t.n)+'"'+(ST.form.tarea===t.n?' selected':'')+'>'+esc(t.n)+'</option>';
   }).join('');
 
@@ -832,20 +832,42 @@ function medirAristas(){
    leerlo igual: la inmensa mayoria del equipo tiene uno solo, y a esos la pantalla no cambia.
    ⛔ Va ARRIBA DEL TODO de la justificacion, encima de «Categoria», porque no es un campo mas:
    cambia QUIEN FIRMA, y eso enmarca todo lo que se rellene debajo. */
+/* ⛔⛔ QUIEN FICHA ES LA SESIÓN, NO `YO`. `_verComo_` reescribe `YO`, y
+   `_refrescarPanelM_` lo MANTIENE reescrito a través del refresco de 90 s. Con `YO`, esta
+   pantalla ofrecía los perfiles de otra persona y mandaba un `perfil` que no es de quien
+   ficha. Y de las dos ramas, la de DECLARAR **sí escribe**: el servidor deja al admin
+   declarar por otro, así que el parte ajeno pasaba a `pendiente` con TU tarea, TU
+   categoría y TU justificación, y perdía su `caduca_at`.
+   ⚠️ El ESCRITORIO ya estaba curado y lo tenía escrito (`_fichaYo_` en
+   `horas.escritorio.js`), y **este mismo fichero ya aplicaba la regla dos pantallas más
+   abajo** (`_cargarPartesDec_`). Faltaba justo la pantalla que ficha — la guarda correcta
+   estaba puesta sobre la cara equivocada. Mismo nombre que en el escritorio A PROPÓSITO:
+   dos nombres para la misma pregunta acaban siendo dos respuestas. */
+function _fichaYo_(){
+  var n = (typeof _actorSanc_==='function') ? _actorSanc_() : null;
+  return String(n || (YO && YO.nombre) || '');
+}
+function _fichaM_(){ return miembro(_fichaYo_()) || YO; }
+
 function _perfilElegido_(){
-  var p = ST.form.perfil, ps = _perfilesDe_(YO);
-  if (p && _perfilValido_(YO, p)) return p;
-  var d = _perfilDefecto_(YO);
+  var _q = _fichaM_();                 /* ⛔ la SESIÓN, no `YO` — ver `_fichaYo_` */
+  var p = ST.form.perfil, ps = _perfilesDe_(_q);
+  if (p && _perfilValido_(_q, p)) return p;
+  var d = _perfilDefecto_(_q);
   return d ? d.unidad : (ps[0] ? ps[0].unidad : '');
 }
 function _perfilSelHTML_(){
-  if (!_hayQuePreguntarPerfil_(YO)) return '';
-  var ps = _perfilesDe_(YO), el = _perfilElegido_();
+  var _q = _fichaM_();                 /* ⛔ por la misma puerta que `_perfilElegido_`:
+                                          si una mira a la sesión y otra a `YO`, el
+                                          desplegable ofrece opciones que la elegida no
+                                          tiene, y el rótulo firma a nombre de otro */
+  if (!_hayQuePreguntarPerfil_(_q)) return '';
+  var ps = _perfilesDe_(_q), el = _perfilElegido_();
   return '<label class="campo"><span class="sc">Fichas como <span class="req">*</span></span>'+
     '<select id="fPerfil">'+ ps.map(function(p){
       return '<option value="'+esc(p.unidad)+'"'+(p.unidad===el?' selected':'')+'>'+esc(p.txt)+'</option>';
     }).join('') +'</select></label>'+
-    '<p class="mini" style="margin:-4px 0 10px">Lo firma <b>'+esc(_firmaDe_(el, YO.nombre))+'</b>'+
+    '<p class="mini" style="margin:-4px 0 10px">Lo firma <b>'+esc(_firmaDe_(el, _fichaYo_()))+'</b>'+
     ' · estas horas cuentan para <b>'+esc(el)+'</b></p>';
 }
 
@@ -1031,7 +1053,12 @@ function filaParte(p){
      sobre una ficha sin nada que pulsar: la promesa estaba escrita desde el primer dia y no
      habia camino. Dice «Responder» y no «Declarar» porque no es lo mismo — ahi ya hay un
      parte escrito y lo que se hace es contestar a una pregunta concreta. */
-  var accion = (p.e==='sindecl' || p.e==='det')
+  /* ⛔⛔ NADIE DECLARA POR NADIE. Bajo «Ver como», `PARTES` son los de OTRA persona, y el
+     manejador no miraba el autor: el servidor **deja al admin declarar por otro**, así que
+     el parte ajeno pasaba a `pendiente` con TU tarea, TU categoría y TU justificación — y
+     perdía su `caduca_at`. Es la gemela de `_bloqMios_` del escritorio, que ya lo hacía. */
+  var _mio = !p.autor || p.autor === _fichaYo_();
+  var accion = _mio && (p.e==='sindecl' || p.e==='det')
     ? '<button class="btn mini" data-declarar="'+p.id+'" data-p style="margin-right:7px">'+
         (p.e==='det' ? 'Responder' : 'Declarar')+'</button>'
     : '';

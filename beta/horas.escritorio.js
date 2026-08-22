@@ -69,14 +69,24 @@ function parteCard(p){
 
 function bloquePanel(){
   if(rangoNom(ACTOR)<1) return '';
-  var actor=_m(ACTOR), esPD=rangoNom(ACTOR)>=2, unidad=(actor&&actor.unidad)||'';
-  var reg=_activos_().filter(function(m){ return !m.cargo; }); // miembros de subsistema, sin bajas
-  var pool=esPD?reg:reg.filter(function(m){ return m.unidad===unidad; });
+  /* ⛔⛔ `>=3`, NO `>=2`. Esto decia `esPD = rangoNom(ACTOR)>=2`, y con eso el SEGUNDO
+     REVISOR entraba en la rama del Project Director: el pool entero del equipo en los
+     chips y el selector «Subsistema -> Todos». Su rango 2 es DOCUMENTAL -- es el segundo
+     revisor del pipeline--, y aqui no significa nada.
+     MEDIDO contra `_puedeSobreParte_` del servidor sobre el roster real: veia 18 y
+     el servidor le aceptaba 4, o sea 14 rechazos por bloque -- y el aviso final acaba
+     diciendo «Ya cuentan en sus horas del mes» aunque no se otorgara ninguna.
+     ⛔ Y `m.nombre!==ACTOR` no es de mas: el filtro `!m.cargo` saca al PD y a los
+     coordinadores, que tienen cargo, pero un SUBCOORDINADOR tiene rango 1 y `cargo` nulo
+     -- se ofrecia horas a SI MISMO, y el servidor tiene una guarda explicita contra eso. */
+  var actor=_m(ACTOR), mandaEnTodo=rangoNom(ACTOR)>=3, unidad=(actor&&actor.unidad)||'';
+  var reg=_activos_().filter(function(m){ return !m.cargo && m.nombre!==ACTOR; }); // de subsistema, sin bajas, sin uno mismo
+  var pool=mandaEnTodo?reg:reg.filter(function(m){ return m.unidad===unidad; });
   if(!pool.length) return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
     'No hay nadie de tu subsistema a quien otorgar horas en bloque.</p></div>');
   var subs=[]; reg.forEach(function(m){ if(subs.indexOf(m.unidad)<0) subs.push(m.unidad); });
-  var filtro = esPD
+  var filtro = mandaEnTodo
     ? '<label style="display:block;margin-bottom:10px"><span class="sc" style="display:block;margin-bottom:5px">Subsistema</span>'+
       '<select id="bloSub" style="width:100%;max-width:260px;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
       '<option value="">Todos</option>'+subs.map(function(u){ return '<option>'+esc(u)+'</option>'; }).join('')+'</select></label>'
@@ -320,7 +330,12 @@ function _escRevPanel_(){
   var lista=_escRevertibles_(), i, h=0, cuerpo='';
   if(!lista.length) return '';
   for(i=0;i<lista.length;i++){ h+=Number(lista[i].horas)||0; cuerpo+=_escRevCard_(lista[i]); }
-  return pan('Ya firmaste', lista.length+' · '+nf(h,1)+' h',
+  /* ⛔ `nf2`, NO `nf(...,1)` (20/08, 130.ª). Era el ULTIMO redondeo a la decima sobre
+     horas que quedaba, y estaba en el panel que CONTIENE las tarjetas -- que ya usaban
+     `nf2` desde el 18/08. El fichaje redondea a CUARTOS, asi que la mitad de los totales
+     salian falseados: tres partes de 0,75 daban «3 · 2,3 h» encima de tres tarjetas que
+     dicen 0,75. El titular no cuadraba con lo que hay debajo. */
+  return pan('Ya firmaste', lista.length+' · '+nf2(h)+' h',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
     'Lo que ya decidiste y todavía se puede deshacer. <b>Revertir exige un motivo</b>; si las '+
     'horas ya contaban, se emite un apunte que se las resta de su ficha. <b>Nadie revierte lo '+

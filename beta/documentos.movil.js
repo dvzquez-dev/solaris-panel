@@ -99,6 +99,15 @@ function puedeDecidirDoc(e){
   return e.revisor===pilaDe(yo) || rangoNom(yo)>rangoPila(e.revisor);
 }
 
+/* ⛔ EL AMBITO CAE AL TEXTO CRUDO, no a `undefined` (20/08, 125.ª). `AMB` solo
+   tiene las tres claves canonicas, y `revisoresDe` --en este mismo fichero-- lleva
+   una rama escrita para «cuando se cuela un ambito nuevo»: o sea que el codigo ya
+   cuenta con recibir uno que no esta en el enum, y la fila lo pintaba `undefined`.
+   ⚠️ AL TEXTO CRUDO Y NO A UNA CADENA VACIA: enseñar el ambito desconocido tal
+   cual dice QUE paso; un hueco dice que NO HAY ambito, que es falso.
+   ⚠️ Las otras dos caras ya lo hacian asi (`ambDoc` en el escritorio, `_ambD_` en
+   `app.html`). El movil era la unica de las tres que indexaba a pelo. */
+function ambDocM(a){ return AMB[a] || String(a || '—'); }
 function filaDoc(e,mio){
   /* ⛔ ESTA FUNCION NO LLAMABA A `estDoc` NUNCA: reescribia el mapa a mano y caia a
      `[e.estado,'neu']`, o sea al **enum crudo del backend** — la lista decia «publicando»
@@ -108,7 +117,7 @@ function filaDoc(e,mio){
   var st=[estDoc(e.estado)[0], _pilEstDoc_(e.estado)];
   return '<div class="fila clic '+(mio?(e.estado==='cambios'?'borde-no':'borde-pe'):'')+'" data-doc="'+e.id+'" data-p>'+
     '<div class="a"><b>'+esc(e.titulo)+'</b><small><span class="mono">'+e.ref+'</span> · '+
-    esc(e.autor.split(' ')[0])+' · '+AMB[e.ambito]+'</small></div>'+
+    esc(e.autor.split(' ')[0])+' · '+ambDocM(e.ambito)+'</small></div>'+
     '<div class="d"><span class="pil '+st[1]+'">'+st[0]+'</span> <span class="chev">›</span></div></div>';
 }
 
@@ -195,10 +204,32 @@ function _docsRelevantes_(){
             (_veEnCurso_() && (ENT_REV||[]).length));
 }
 
+/* ⛔⛔ «EN CURSO» SE SACA A SU PROPIA FUNCION PARA PODER EJECUTARLA. `vDocs` no la corre
+   ningun banco -- es la pantalla Documentos entera del movil --, asi que lo que se decida
+   aqui dentro no lo vigila nadie. Sacarla es lo mismo que se hizo con `_botonesDecM_`. */
+function _docsEnCursoM_(){
+  /* ⛔⛔ POR `_docEnCurso_`, NO POR UN FILTRO PROPIO. Esto era `ENT_REV.concat([])`, o sea
+     el pipeline ENTERO bajo un titulo que dice «Todos los expedientes abiertos ahora
+     mismo»: `publicado` y `rechazado` salian ahi con su pildora VERDE, y `comun.js` los
+     declara `DOC_RESUELTO` **a proposito** -- su comentario dice «esto es lo que sigue EN
+     VUELO». A fin de temporada la lista era el historico entero.
+     ⛔ Y SIN DUPLICAR LO PENDIENTE: `pend` sale de `_docsPend_()`, que filtra este mismo
+     `ENT_REV`, asi que el 100 % de lo pendiente salia DOS VECES en la misma pantalla, con
+     el mismo contador. En el escritorio las dos listas son disjuntas POR CONSTRUCCION.
+     ⚠️ Se comparan las ENTRADAS, no los `id`: `_docsPend_` devuelve los mismos objetos de
+     `ENT_REV`, y comparar por `id` inventaria una clave que el reparto no promete. */
+  var _p = _docsPend_() || [];
+  return (ENT_REV||[]).filter(function(e){
+    if(!_docEnCurso_(e.estado)) return false;
+    for(var i=0;i<_p.length;i++){ if(_p[i] === e) return false; }
+    return true;
+  });
+}
+
 function vDocs(){
   var mios=ENTREGABLES;
   var pend=_docsPend_();
-  var enCurso=ENT_REV.concat([]);
+  var enCurso=_docsEnCursoM_();
   var h='<div class="h1">Documentos</div><p class="h1s">Tus documentos y los que tienes que revisar.</p>';
   /* NADA DE NADA: una sola caja explicada, en vez de tres estados vacios decorados que
      juntos miden media pantalla. La explicacion hace falta UNA vez, no tres. */
@@ -359,6 +390,22 @@ function _avisosDocM_(e){
   }).join('');
 }
 
+/* ⛔ LOS CUATRO BOTONES, EN SU PROPIA FUNCION. Estaban incrustados en el chorro de HTML de
+   `verDoc`, que necesita media docena de globals para correr: por eso NINGUN banco podia
+   ejecutarlos, y por eso el hueco de `_yaAnalizado_` vivio aqui sin que nadie lo viera.
+   Sacarlo no es estetica: es lo que lo hace medible. */
+function _botonesDecM_(e){
+  /* ✅ PARAR SI, PUBLICAR NO. `cambios` y `rechazado` son legitimos sobre algo que aun no
+     ha pasado el analisis -- son justo la forma de pararlo--; `aprobado` y `anot`
+     publican, y el servidor los rechaza. Quitar los cuatro seria el fallo contrario. */
+  return (_yaAnalizado_(e)
+      ? '<button class="btn pri" style="flex:1 1 46%" data-p data-dec="aprobado" data-id="'+e.id+'">Aprobar</button>'+
+        '<button class="btn" style="flex:1 1 46%" data-p data-dec="anot" data-id="'+e.id+'">Con anotaciones</button>'
+      : '<p class="rnota" style="flex:1 1 100%;margin:0">A\u00fan sin analizar: se puede parar, no publicar.</p>')+
+    '<button class="btn" style="flex:1 1 46%" data-p data-dec="cambios" data-id="'+e.id+'">Solicitar cambios</button>'+
+    '<button class="btn no" style="flex:1 1 46%" data-p data-dec="rechazado" data-id="'+e.id+'">Rechazar</button>';
+}
+
 function verDoc(id){
   var e=ENTREGABLES.concat(ENT_REV).filter(function(x){return x.id===id;})[0];
   if(!e) return;
@@ -385,10 +432,7 @@ function verDoc(id){
       '<label class="campo"><span class="sc">Motivo <span class="req">*</span> si pides cambios o rechazas</span>'+
       '<textarea id="dMot" placeholder="lo leerá el autor…"></textarea></label>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-        '<button class="btn pri" style="flex:1 1 46%" data-p data-dec="aprobado" data-id="'+e.id+'">Aprobar</button>'+
-        '<button class="btn" style="flex:1 1 46%" data-p data-dec="anot" data-id="'+e.id+'">Con anotaciones</button>'+
-        '<button class="btn" style="flex:1 1 46%" data-p data-dec="cambios" data-id="'+e.id+'">Solicitar cambios</button>'+
-        '<button class="btn no" style="flex:1 1 46%" data-p data-dec="rechazado" data-id="'+e.id+'">Rechazar</button>'+
+        _botonesDecM_(e)+
         /* DESHACER. Lo tenia el escritorio y aqui NO, y esta es la cara en la que
            Daniel revisa: quien se equivocaba de boton desde el telefono se quedaba
            mirando un candado que dice «solo alguien de mas rango puede cambiarlo».
@@ -413,7 +457,7 @@ function verDoc(id){
   abrirModal('<div class="mtit">'+esc(e.titulo)+'</div>'+
     '<div class="msub"><span class="mono">'+e.ref+'</span> · '+esc(e.autor)+' · '+esc(e.subsistema)+'</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+
-      '<span class="pil neu">'+AMB[e.ambito]+'</span>'+
+      '<span class="pil neu">'+ambDocM(e.ambito)+'</span>'+
       /* ⛔ La clase sale de `EST_DOC`, no de un ternario a mano: el `else` era `conf` y
          pintaba **«rechazado» en VERDE** al autor que abre su propio expediente. */
       '<span class="pil '+_pilEstDoc_(e.estado)+'">'+esc(estDoc(e.estado)[0])+'</span>'+

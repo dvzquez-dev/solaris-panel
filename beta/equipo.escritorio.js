@@ -56,7 +56,12 @@ function colaDecision(){
   docsMios().forEach(function(d){
     out.push({ic:'i-doc',b:esc(d.tit),s:d.ref+' · '+_m(d.autor).pila+' · ámbito '+d.amb+
       (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):''),
-      chip:'<span class="chip '+(d.sev==='alta'?'no':d.sev==='media'?'wa':'ok')+'">severidad '+d.sev+'</span>',
+      /* ⛔ POR LA PUERTA UNICA. Aqui habia una copia con el `else` en `'ok'` -verde-, asi
+         que `null`, un valor fuera del enum y la cadena vacia salian los TRES con el chip
+         de «salio bien», y el texto decia literalmente «severidad null». Y con vocabulario
+         INVERTIDO respecto a la lista de Documentos: «severidad baja» aqui, «calidad alta»
+         alla, del mismo expediente. */
+      chip:chipSevDoc(d.sev),
       ir:'docdec',foco:'doc-'+d.id});
   });
   /* ⛔ …y con `LOTE.items.length`: sin eso, la tarjeta seguía saliendo diciendo

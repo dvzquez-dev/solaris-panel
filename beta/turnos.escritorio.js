@@ -309,6 +309,9 @@ function _mitPlazoTxt_(cv, ahora){
               : 'te quedan '+Math.round(q)+' h para contestar';
 }
 function _miTurnoPanel_(){
+  /* ⚠️ Misma guarda y por el mismo motivo que en `_dispPanel_`: esta es la mitad que le
+     cuesta la semana a quien iba a contestar. */
+  var av=_dispAviso_('Tu disponibilidad'); if(av) return av;
   var cv=_miTurnoCv_(); if(!cv) return '';
   var mias=_misCeldas_(cv), D=cv.dias||[], F=cv.franjas||[];
   var ET={cuvi:'CUVI', citi:'CITI', ambos:'Los dos', no:'No puedo'};
@@ -397,7 +400,40 @@ function _cablearMiTurno_(){
     };
   });
 }
+/* ═══ UN PANEL QUE NO SABE NO PUEDE QUEDARSE MUDO ════════════════════════
+   ⛔⛔ Vaciar `CONVOCATORIAS` evita el mapa de mentira —y eso hay que conservarlo— pero deja
+   los dos paneles **en blanco y sin una palabra**: `_dispPanel_` y `_miTurnoPanel_` devuelven
+   `''` en cuanto no hay convocatoria, y **`DISP_SRV` no lo leia nadie**; su unico lector era
+   su propio setter. Asi que un fallo de `getDisponibilidad` los hacia desaparecer **para toda
+   la sesion**, porque `_dispCargar_` es de un solo disparo y nada devolvia el estado a
+   'sin pedir' — ni `_refrescoVivo_`, que si refresca turnos, tareas, panel, sanciones, partes,
+   documentos y reuniones.
+   ⛔ El danyo va por los DOS lados: quien iba a contestar su disponibilidad pierde la semana
+   entera —y la tarjeta de al lado dice que *no contestar es lo que hace que te pongan un turno
+   cuando no puedes*—, y quien reparte turnos se queda sin mapa **sin saber por que**.
+   ✅ Y NO SE INVENTA NADA: `V.curso` resuelve esto mismo con el MISMO patron --un disparo y su
+   estado-- y **si** lo consulta; `_notisCargar_` ademas ofrece Reintentar. Eran tres puertas
+   para la misma pregunta y esta era la unica muda. Se copia la que ya estaba bien.
+   ⚠️ Una sola puerta para los dos paneles, no una guarda en cada uno: con dos copias, uno de
+   los dos se queda mudo el dia que alguien toque solo el otro — que es exactamente lo que
+   acaba de pasar aqui.
+   ⚠️ Y devuelve `''` cuando el estado es 'ok': avisar siempre taparia la pantalla entera, que
+   es peor que el fallo que esto cura. */
+function _dispAviso_(titulo){
+  var e = _dispEstadoSrv_();
+  if(e === 'error') return pan(titulo, 'sin datos',
+    vacioSimple('No se pudo preguntar al servidor',
+      'Se dice en vez de ense\u00f1ar un mapa viejo: con uno de mentira se reparte gente de verdad. '+
+      '<button class="btn" data-dreint>Reintentar</button>'));
+  if(e === 'pidiendo') return pan(titulo, '\u2026',
+    vacioSimple('Preguntando al servidor', 'Un momento.'));
+  return '';
+}
+
 function _dispPanel_(){
+  /* ⚠️ ANTES de `_dispViva_()`: si se pone despues, el `return ''` de abajo se lleva el
+     aviso por delante y el panel vuelve a quedarse mudo. */
+  var av=_dispAviso_('Disponibilidad para turnos'); if(av) return av;
   var cv=_dispViva_(); if(!cv) return '';
   var calor=_calorTurnos_(cv, DISP_SITIO);
   var top=_mejorTurno_(calor);
@@ -531,6 +567,14 @@ function _pinDisp_(){
   });
   $$('.dsit [data-dsit]').forEach(function(b){
     b.onclick=function(){ DISP_SITIO=b.dataset.dsit; DISP_SEL=''; pintar(); };
+  });
+  /* ⛔ EL BOTON SIN MANEJADOR ES UN ROTULO. `_dispCargar_` es de un solo disparo, asi que
+     devolver el estado a 'sin pedir' es lo UNICO que vuelve a abrir esa puerta — sin
+     esto, un fallo de red dura hasta que alguien recarga la pagina a mano.
+     ⚠️ Se cablea AQUI, dentro del mismo enganche que los demas botones del panel, porque
+     el aviso se pinta en el sitio del mapa y se vuelve a pintar en cada `pintar()`. */
+  $$('[data-dreint]').forEach(function(b){
+    b.onclick=function(){ _dispEstadoSrv_('sin pedir'); _dispCargar_(pintar); pintar(); };
   });
 }
 

@@ -418,11 +418,41 @@ function _cablearConvocar_(){
    por MINUTOS.
    ⚠️ El ciclo por modalidad es el del movil y es decision cerrada: telematica 0↔1 ·
    presencial 0↔2 · hibrida 0→1→2→0. Aqui no se re-decide. */
-var MIDISP = {};        /* id de reunion -> array alineado a `bloques` (0/1/2), lo que llevas sin guardar */
+var MIDISP = {};        /* id de reunion -> {de:quién, vals:array alineado a `bloques`} */
+
+/* ⛔⛔ QUIÉN ERES A EFECTOS DE DISPONIBILIDAD — UNA SOLA PUERTA, Y ES LA SESIÓN.
+   «Actúas como» reescribe `ACTOR`, y con `ACTOR` este panel —rotulado literalmente
+   «Tu disponibilidad»— pintaba LA FILA REAL DE OTRA PERSONA. Y no se quedaba en mirar:
+   el `onclick` de las celdas NO está bloqueado (el bloqueo vive sólo en el botón
+   Guardar), así que se pintaba encima de la rejilla ajena, eso quedaba en `MIDISP[r.id]`
+   —que no llevaba de quién es— y al volver a tu identidad `_misValores_` te la devolvía
+   como TUYA, ya con Guardar desbloqueado. De esas casillas come el pipeline de sanciones.
+   ⚠️ La regla ya estaba escrita DOS veces en los ficheros de al lado, y lo que faltaba
+   era esta cara: `_misCeldas_` de `turnos.escritorio.js` («LA FILA QUE SE LEE ES LA QUE
+   SE VA A ESCRIBIR») y `_puedeCerrarMes_` de `comun.js` («El rango sale de `_actorSanc_()`
+   —la SESIÓN— y no de `ACTOR`, que lo reescribe «ver como»»).
+   ⚠️ Y lo usan las DOS: la que decide si se te ofrece cubrir y la que pinta lo tuyo. Con
+   una en `ACTOR` y otra en la sesión quedaban dos criterios para la misma pregunta, y se
+   te ofrecía cubrir una reunión a la que la invitada era la otra persona. */
+function _yoDisp_(){
+  var s = (typeof _actorSanc_==='function') ? _actorSanc_() : null;
+  if(s) return String(s);
+  return (typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '';
+}
+
+/* Lo que llevas sin guardar EN ESTA REUNIÓN Y SIENDO TÚ, o `null`. El dueño viaja con el
+   valor — igual que `ST._selDe` en el móvil — en vez de vivir en un `delete` colgado del
+   cambio de identidad: una guarda puesta en el cambiador es una guarda en la cara
+   equivocada, y basta con que mañana alguien añada un segundo sitio que cambie `ACTOR`
+   para que deje de valer. */
+function _midPend_(r){
+  var p = r ? MIDISP[r.id] : null;
+  return (p && p.de === _yoDisp_()) ? p.vals : null;
+}
 
 function _puedoCubrir_(r){
   if(!r || r.fijada) return false;                     /* fijada = ya no se contesta */
-  var yo = (typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '';
+  var yo = _yoDisp_();                                 /* la SESIÓN, no `ACTOR` — ver `_yoDisp_` */
   if(!yo) return false;
   /* ⛔ SIN LISTA DE INVITADOS, LA REUNION ES DE TODOS — y aqui se leia como «de nadie», asi que
      el panel devolvia '' y NADIE podia cubrirla desde el escritorio. Lo peor es que la misma
@@ -440,8 +470,9 @@ function _puedoCubrir_(r){
 }
 
 function _misValores_(r){
-  var yo = (typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '';
-  if(MIDISP[r.id]) return MIDISP[r.id];
+  var yo = _yoDisp_();                 /* ⛔ la SESIÓN, no `ACTOR` — ver `_yoDisp_` */
+  var pend = _midPend_(r);             /* ⛔ y sólo lo pendiente que es TUYO */
+  if(pend) return pend;
   var prev = (r.resp && r.resp[yo]) || [];
   return (r.bloques||[]).map(function(_,i){ return +prev[i] || 0; });
 }
@@ -555,7 +586,8 @@ function _miDispoPanel_(r){
   var ley = modo==='presencial' ? '<span><i style="background:var(--red)"></i>presencial</span>'
           : modo==='telematica' ? '<span><i style="background:var(--tel)"></i>telem\u00e1tica</span>'
           : '<span><i style="background:var(--red)"></i>presencial + telem\u00e1tico</span><span><i style="background:var(--tel)"></i>solo telem\u00e1tico</span>';
-  var sucio = !!MIDISP[r.id];
+  var sucio = !!_midPend_(r);          /* ⛔ por la misma puerta: lo pendiente de OTRO no
+                                          enciende TU botón de guardar */
   return '<div class="micub" style="margin:0 0 15px">'+
     '<h4 class="sc" style="margin:0 0 7px">Tu disponibilidad</h4>'+g+
     '<div class="leg" style="margin-top:6px">'+ley+'</div>'+
@@ -563,7 +595,7 @@ function _miDispoPanel_(r){
       ? '<p class="rnota" style="margin:9px 0 0;color:var(--warn)">El plazo cerró: esto es lo que '+
         'quedó marcado y ya no se puede cambiar — el servidor no acepta respuestas fuera de plazo.</p>'
       : '<div style="margin-top:9px;display:flex;gap:9px;align-items:center">'+
-      '<button class="pri" data-midguardar="'+r.id+'"'+(sucio?'':' disabled')+'>Guardar mi disponibilidad</button>'+
+      '<button class="btn pri" data-midguardar="'+r.id+'"'+(sucio?'':' disabled')+'>Guardar mi disponibilidad</button>'+
       /* ⛔ EL MINIMO SE DICE ANTES DE PULSAR. El movil lo pone en su contador («cada toque
          marca …»); aqui no se decia en ningun sitio, asi que el primer clic marcaba tres
          casillas de golpe sin que nadie lo hubiera anunciado. */
@@ -599,7 +631,7 @@ function _cablearMiDispo_(){
         tost('Ahí no entra la reunión entera ('+_durTxt_(d.nocabe)+'): el horario de ese día acaba antes.');
         return;
       }
-      MIDISP[r.id]=d.vals;
+      MIDISP[r.id]={de:_yoDisp_(), vals:d.vals};   /* ⛔ lo pendiente viaja con su dueño */
       pintar();
       var av=_avisoCorto_(d.cortas, d.minS, d.slot); if(av) tost(av);
     };
@@ -898,7 +930,24 @@ async function _refrescarReuAbiertaE_(){
   _REFREU_E_=true;
   try{
     var d=await api.get(r.id);
-    var resp=(d && d.resp) || null;
+    /* ⛔⛔ EL SERVIDOR MANDA `respuestas` Y AQUI SE LEIA `d.resp`, QUE NO EXISTE.
+       `_get_` devuelve `{reunion, respuestas, agregado}` y `resp` no es columna de
+       `COLS_REU`: 📏 `d.resp` salia 2 veces en esta cara y `d.respuestas` CERO. O sea que
+       este refresco se iba por el `if(!resp) return` de abajo **siempre, desde que existe**,
+       y `_hidratarReus_` no hidrataba nunca. El movil ya leia los DOS nombres, en dos
+       sitios: esto era un TERCER criterio para la misma pregunta, y el unico equivocado.
+       📏 Medido EJECUTANDO con 18 convocados y 14 filas: `cubren` **14 -> 0** y `sinCubrir`
+       **4 -> 17 personas** nombradas con su chip de sancion.
+       ⚠️ El respaldo `d.reunion.resp` NO sobra: es la forma que ya usa el movil
+       (`reuniones.movil.js:139` y `:268`) y cubre un backend que devuelva la reunion con sus
+       respuestas dentro. Una sola forma de leer esto, y es esta. */
+    var resp=(d && (d.respuestas || (d.reunion && d.reunion.resp))) || null;
+    /* ⛔ Y `agregado` SE ARRASTRA AQUI TAMBIEN, no solo al hidratar: este refresco corre
+       cada 20 s y pisa `r.resp`, asi que sin esto la bandera se quedaria con lo que dijo la
+       hidratacion y una reunion que pase a `oculta` seguiria derivando la lista nominal.
+       ⚠️ `== null` y no `!d.agregado`: un backend viejo no manda el campo, y ahi
+       `undefined` significa «no lo se», no «no» (§3c-24). Misma forma que `_normReuM_`. */
+    if(d && d.agregado != null) r.agregado = d.agregado !== false;
     if(!resp) return;
     var antes=_firmaResp_(r);
     var copia={resp:resp};
@@ -922,7 +971,26 @@ async function _hidratarReus_(){
     if(r.resp && Object.keys(r.resp).length) continue;
     try{
       var d=await api.get(r.id);
-      if(d && d.resp){ r.resp=d.resp; r.calor=null; }   // calor null: se recalcula con las respuestas
+      /* ⛔⛔ LA SEGUNDA, Y ES LA QUE DE VERDAD LLENA LA PANTALLA. Mismo fallo que arriba:
+         `d.resp` no existe, el servidor manda `respuestas`. Esta funcion es la unica que
+         rellena `r.resp` para las reuniones de la lista --`_listar_`/`_reuFromRow_` no
+         mandan las filas--, asi que **esta cara no ha recibido la disponibilidad de nadie
+         nunca**. La semilla de `escritorio.html` lo tapaba porque trae `cubren` escrito a
+         mano.
+         ⚠️ SON DOS LINEAS Y HAY QUE ARREGLAR LAS DOS: con solo la de arriba, el refresco
+         leeria el dato nuevo y no habria nada que refrescar, porque la lista sigue vacia. */
+      var _rp = d && (d.respuestas || (d.reunion && d.reunion.resp));
+      if(_rp){ r.resp=_rp; r.calor=null; }   // calor null: se recalcula con las respuestas
+      /* ⛔⛔ Y `agregado`, QUE ES UN DEFECTO SEPARADO: arreglar solo `resp` lo deja en pie.
+         La guarda `if(r.agregado === false)` de `_cobertura_` se escribio el 15/08 para NO
+         fabricar la lista nominal cuando el servidor manda **solo tu fila** -- y no podia
+         dispararse nunca, porque `agregado` solo existe en el payload de `_get_` y esta era
+         la unica puerta por la que entra. 📏 Medido ejecutando, con `agregado:false` y una
+         sola fila: hoy sale `cubren=1 · sinCubrir=16 personas CON NOMBRE`; con la bandera
+         arrastrada sale `oculto` y los cuatro numeros a `null`.
+         ⚠️ `== null` y no `!d.agregado`: un backend viejo no manda el campo, y ahi
+         `undefined` es «no lo se», no «no» (§3c-24). Misma forma que `_normReuM_`. */
+      if(d && d.agregado != null) r.agregado = d.agregado !== false;
     }catch(_){ /* una reunion que no se puede leer no debe tumbar el resto */ }
   }
   try{ pintar(); }catch(_){}

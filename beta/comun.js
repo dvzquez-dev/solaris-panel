@@ -584,7 +584,24 @@ function _hMesDe_(m){
      \u26a0 Y HOY NO MUEVE NADA, que es lo que lo hace seguro: el panel que hay en el KV se
      genero SIN el desglose, asi que su `hMes` es la division plana (desvio <= 0,055 h/mes,
      redondeo). Esto se vuelve correcto el dia que se suba un panel con el historico delante. */
-  var r = m.hMes;
+  /* ⛔⛔ EL RITMO PRIMERO, PORQUE EN EL ESCRITORIO `hMes` YA NO ES EL RITMO. Alli
+     `_aplicarPanel_` lo PISA con `horasMes` — las horas DE ESTE MES — y lo hace a
+     proposito desde el 09/08: esa cara tiene DIECISIETE lecturas de `.hMes` que la tratan
+     como del mes, y sin la traduccion el PD veia «H/mes —» y «TOTAL 0,0 h».
+     ⚠️ O sea que `hMes` significa DOS COSAS segun la cara, y esta funcion —que es
+     COMPARTIDA y de la que sale la CUOTA de las 32— asumia una de las dos. Las dos
+     decisiones eran correctas por separado y se contradecian.
+     📏 Medido ejecutando la cadena entera: el ritmo del motor era 22,42 y lo que llegaba
+     aqui, 10,75. Y el argumento de seguridad del 19/08 —«hoy no mueve nada, desvio
+     <= 0,055 h/mes»— estaba medido CONTRA EL VALOR EQUIVOCADO en esa cara: alli no llega
+     la division plana, llega el overlay del mes.
+     ✅ La cura es guardar el ritmo ANTES de pisarlo (`hRitmo`, en `_aplicarPanel_`) y
+     preferirlo aqui. El movil no pisa nada, asi que alli `hRitmo` no existe y se cae a
+     `hMes`, que es el ritmo: las dos caras vuelven a contestar lo mismo. */
+  var r = m.hRitmo;
+  if(typeof r !== 'number' || !isFinite(r)) r = m.hMes;   /* ⛔ el ritmo primero; si no lo
+                                                             hay, `hMes` — que en el MÓVIL
+                                                             SÍ es el ritmo del motor */
   if(typeof r === 'number' && isFinite(r)) return r;
   /* \u26a0 El respaldo sigue siendo el de siempre, y NO sobra: un panel viejo -o uno servido
      por un backend sin este campo- no puede dejar la pantalla sin cuota. Y con `meses` a 0 van
@@ -2150,7 +2167,16 @@ function _notaRegistro_(total, ambito, cuantos){
     : 'Todo lo '+d+'. El registro completo <b>se conserva</b>.';
 }
 
-function _puedeImpersonar_(){ return !!(SESION && SESION.email===ADMIN_EMAIL); }
+/* ⛔ LA UNICA PUERTA DE ADMIN (20/08, 127.ª). Habia TRES copias y DOS
+   criterios: esta comparaba el correo TAL CUAL, el movil lo bajaba a minusculas y
+   el escritorio lo reescribia a mano teniendo `esAdmin()` catorce lineas mas
+   arriba. Latente -- Google entrega hoy el correo en minusculas --, pero el dia
+   que llegue con una mayuscula una cara diria «eres el admin» y la otra que no.
+   ⚠️ SE NORMALIZA AQUI, y en el sentido en que ya lo hacia la cara que mas se
+   usa: un correo no distingue mayusculas para esto, y `ADMIN_EMAIL` esta escrito
+   en minusculas. Al reves --volver sensible el movil-- se cerraria la sesion de
+   admin a quien hoy entra. */
+function _puedeImpersonar_(){ return !!(SESION && SESION.email && String(SESION.email).toLowerCase() === String(ADMIN_EMAIL).toLowerCase()); }
 
 /* ⛔ ¿PUEDE CERRAR EL MES? Una sola puerta, porque lo preguntan el nav, el menú ⋮ y la
    pantalla: si cada uno lo dedujera por su cuenta, un día uno diría que sí y otro que no.
@@ -2484,6 +2510,16 @@ function estDoc(e){ return EST_DOC[e]||[String(e||'—'),'']; }
 var DOC_EN_CURSO=['recibido','analizado','revision','cambios','publicando','aprobado','anot'];
 var DOC_RESUELTO=['publicado','rechazado'];
 function _docEnCurso_(est){ return DOC_EN_CURSO.indexOf(String(est==null?'':est))>=0; }
+/* ⛔⛔ APROBAR ES PUBLICAR, y no se publica lo que nadie ha analizado: es la regla del
+   servidor (`_puedeDecidir_`, rama `aprobado`/`anot`). Vivia SOLO en
+   `documentos.escritorio.js`, asi que el movil ofrecia «Aprobar» y «Con anotaciones»
+   sobre `recibido` y `analizado` -- medido, 12 de 108 combinaciones-- y el servidor las
+   rechaza SIEMPRE. Aqui la ven las dos caras: una regla de quien puede decidir que
+   depende del APARATO no es una regla. */
+function _yaAnalizado_(d){
+  var e = d && (d.est || d.estado);
+  return e !== 'recibido' && e !== 'analizado';
+}
 function _docResuelto_(est){ return DOC_RESUELTO.indexOf(String(est==null?'':est))>=0; }
 
 function _pilEstDoc_(e){
@@ -2555,6 +2591,17 @@ function _ahoraLocalISO_(d){
 function _normLimite_(limite){
   var s = String(limite || '');
   if (!s || s === 'null' || s === 'undefined') return '';
+  /* ⛔⛔ `DD/MM/AAAA` TAMBIEN MIDE 10, y de aqui salia `'26/07/2026T23:59'` -- que
+     `_plazoAbierto_` compara **como CADENA** contra un ISO. Medido ejecutando: **137 de
+     336** dias contestaban distinto segun el formato, y el patron dia 01..31 salia
+     IDENTICO con MES=01/2020 y con MES=12/2099: el mes y el año **no entraban**. Dias
+     01-20 cerrado SIEMPRE, 21-31 abierto SIEMPRE -- lo decidia la decena del dia.
+     La vecina `_plazoTxt_` ya aceptaba los dos formatos **a proposito** (el backend manda
+     ISO; las semillas y Notion, `DD/MM/AAAA`): eran dos criterios para la misma pregunta,
+     en el mismo fichero, contestando cosas contrarias de la misma fecha.
+     ⚠️ `_dmyAISO_` CONVIERTE, no valida: lo que no reconoce lo devuelve tal cual, asi que
+     esto no puede colar una fecha inventada -- solo endereza la que ya venia. */
+  s = _dmyAISO_(s);
   if (s.length === 10) return s + 'T23:59';
   return s.charAt(10) === ' ' ? (s.slice(0, 10) + 'T' + s.slice(11)) : s;
 }
@@ -3269,6 +3316,35 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-23-escritorio-disponibilidad', fecha:'2026-08-23',
+      titulo:'El escritorio no hab\u00eda recibido nunca la disponibilidad de nadie',
+      items:[
+        {cara:'escritorio', vista:'dispo', txt:'**El panel de escritorio ped\u00eda la reuni\u00f3n al servidor y tiraba la respuesta.** El servidor manda las disponibilidades en un campo llamado `respuestas` y esta cara le\u00eda uno llamado `resp`, que no existe \u2014 as\u00ed que la rejilla, el mapa de calor y el recuento se quedaban con lo que hubiera al entrar. El m\u00f3vil ya lo le\u00eda bien.'},
+        {cara:'escritorio', vista:'dispo', txt:'**Y lo que sal\u00eda en su lugar acusaba a gente que s\u00ed hab\u00eda cubierto.** Con una reuni\u00f3n de 18 convocados y 14 cubiertas, el panel dec\u00eda **0 han cubierto** y listaba a **17 personas** en \u00abquien falta\u00bb, cada una con su chip de la sanci\u00f3n que le tocar\u00eda. Ahora dice 14 y 4.'},
+        {cara:'escritorio', vista:'dispo', txt:'**Y las reuniones OCULTAS volv\u00edan a ense\u00f1ar lo que t\u00fa pediste esconder.** En ese modo el servidor manda **s\u00f3lo tu fila**, y la protecci\u00f3n que hay para no inventar la lista nominal **no pod\u00eda dispararse**, porque la se\u00f1al viajaba en el mismo paquete que se estaba tirando. Medido: 16 nombres donde no deb\u00eda salir ninguno.'},
+        {cara:'escritorio', vista:'convoc', txt:'**Y \u00abEliminar reuni\u00f3n\u00bb no hac\u00eda nada.** Llamaba a una funci\u00f3n que se hab\u00eda mudado de sitio hace tres d\u00edas y cambiado de nombre: el bot\u00f3n fallaba en silencio, **antes incluso de preguntarte si estabas seguro**.'}
+      ] },
+    { id:'2026-08-22-boton-sin-boton', fecha:'2026-08-22',
+      titulo:'El bot\u00f3n de guardar de Reuniones no parec\u00eda un bot\u00f3n, y deshabilitado se ve\u00eda igual',
+      items:[
+        {cara:'escritorio', vista:'reuniones', txt:'**El \u00fanico bot\u00f3n de la pantalla \u2014\u00abGuardar mi disponibilidad\u00bb\u2014 sal\u00eda sin fondo, sin borde y sin relleno**, indistinguible del texto de ayuda que lleva justo al lado. Y **deshabilitado se ve\u00eda exactamente igual que activo**, con la manita del cursor: se pod\u00eda pulsar y no pasaba nada. Le faltaba **una palabra** en la clase \u2014 el fichero de al lado (Turnos) lo hac\u00eda bien, y este mismo lo hac\u00eda bien dos veces de tres.'},
+        {cara:'escritorio', vista:'turnos', txt:'**El formulario de \u00abCerrar un turno\u00bb ten\u00eda el r\u00f3tulo y el campo en la misma l\u00ednea, y los dos desplegables sin estilo ninguno** \u2014 con el aspecto por defecto del navegador, no el de la app. La hoja del escritorio **no ten\u00eda ni una regla para `select`**.'},
+        {cara:'escritorio', vista:'estado', txt:'**La pantalla de Novedades sal\u00eda sin tarjeta**, con el t\u00edtulo a tama\u00f1o de texto normal y el subt\u00edtulo igual de brillante que el cuerpo. Y las notas al pie de las fichas, tambi\u00e9n a tama\u00f1o de cuerpo con el margen que les pone el navegador.'},
+        {cara:'escritorio', vista:'estado', txt:'**Todo esto era la misma causa**: el escritorio carga **una sola hoja de estilos**, y cinco clases que sus pantallas usan viv\u00edan **solo en la del m\u00f3vil**. Una clase que llega y no encuentra su regla **no da ning\u00fan error** \u2014 el elemento sale, ocupa su sitio y no se parece a lo previsto. Ahora lo vigila un banco, **por nombre**.'}
+      ] },
+    { id:'2026-08-21-disponibilidad-muda', fecha:'2026-08-21',
+      titulo:'La disponibilidad de turnos desaparec\u00eda sin decir nada, y no volv\u00eda',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'**Si el servidor no contestaba, los dos paneles de disponibilidad se borraban de la pantalla sin una palabra** \u2014 el mapa de calor y \u00abTu disponibilidad\u00bb\u2014, y **no volv\u00edan en toda la sesi\u00f3n**: se preguntaba una sola vez y nada reabr\u00eda esa puerta. Quien iba a contestar perd\u00eda la semana entera sin enterarse, y quien reparte turnos se quedaba sin mapa sin saber por qu\u00e9. Ahora la pantalla **lo dice** y trae **Reintentar**.'},
+        {cara:'escritorio', vista:'turnos', txt:'**Vaciar el mapa segu\u00eda siendo lo correcto** \u2014 con uno de mentira se reparte gente de verdad, y eso no se ha tocado. Lo que faltaba era la otra mitad: **decir que no se pudo preguntar** en vez de dejar el hueco. Es lo que \u00abSesiones abiertas ahora mismo\u00bb y los avisos del m\u00f3vil ya hac\u00edan en esta misma cara.'}
+      ] },
+    { id:'2026-08-21-en-curso-movil', fecha:'2026-08-21',
+      titulo:'«En curso» en el móvil listaba también lo ya cerrado, y repetía lo tuyo',
+      items:[
+        {cara:'movil', vista:'docs', txt:'**La lista «En curso» traía el pipeline entero, no lo que sigue en vuelo.** Bajo el título «Todos los expedientes abiertos ahora mismo» salían también los **publicados** —con su píldora verde— y los **rechazados**, que están cerrados a propósito; a fin de temporada esa lista era el histórico completo. Ahora pasa por la misma puerta que el escritorio.'},
+        {cara:'movil', vista:'docs', txt:'**Y todo lo de «Pendiente de tu revisión» salía otra vez debajo**, en la misma pantalla y con el mismo contador: eran la misma lista, una filtrada y la otra no. Ahora las dos son disjuntas, como en el escritorio.'},
+        {cara:'escritorio', vista:'docs', txt:'**El chip de calidad del expediente abierto tenía su propia copia de la regla de color.** La lista y la ficha la pintaban por caminos distintos, así que arreglar una dejaba la otra igual — que es como nació la divergencia del «verde para lo que no se ha medido». Ahora las dos llaman a la misma función.'}
+      ] },
     { id:'2026-08-20-sancionables-sin-unidad', fecha:'2026-08-20',
       titulo:'El r\u00f3tulo contaba a alguien que la lista no pod\u00eda ense\u00f1arte',
       items:[
@@ -4621,7 +4697,28 @@ function _rederivarRev2_(){
     return false;
   });
   if (!m) m = buscaMiembro(function(x){ return x.cargo === 'Coordinador' && esUCT(x.unidad); });
-  REV2_NOM = m ? m.nombre : PD_NOM;
+  /* ⛔⛔ NUNCA SE COLAPSA EN EL PD. Aqui ponia `REV2_NOM = m ? m.nombre : PD_NOM`, y con el
+     roster que produce el panel DESPLEGADO los dos escalones de arriba fallan: `coordina`
+     no viaja (0 de 32 medido) y `unidad` guarda el SUBSISTEMA de cada cual, nunca la UCT
+     -- cosa que `coordinadorDe` dice por escrito 1.800 lineas mas arriba, o sea que el
+     escalon 2 NO PUEDE FIRAR NUNCA. Asi que esto pisaba la semilla -- que es el nombre
+     REAL del coordinador de la UCT, o sea CORRECTA -- con el PD, y **el rango 2
+     desaparecia del reparto entero**: `rangoNom` pregunta por el PD antes que por el
+     REV2.
+     ⛔ El dano: un `Informe de Subsistema` firmado por el PD llegaba a `revisoresDe` con
+     los dos revisores siendo el autor, sus dos filtros se vaciaban y el respaldo devolvia
+     `[PD_NOM]` -- el autor. `puedeDecidirDoc` corta al autor por su primera linea y a
+     todos los demas por `rangoNom(ACTOR) <= maxR` con `maxR = 3`: **nadie podia
+     aprobarlo, rechazarlo ni pedirle cambios**, y la ficha rotulaba «Revisa: Daniel».
+     ⚠️ Y ESTO ES LO QUE HACE EL SERVIDOR, que es la autoridad: `_docJose_()` es
+     `if (n && n !== DOC_PD) return n; return DOC_JOSE_FIJO;` -- **nunca colapsa**. O sea
+     que el servidor SI habria aceptado la decision del segundo revisor mientras el
+     cliente le escondia el boton. Curar `revisoresDe` en el cliente en vez de esto lo
+     haria DIVERGIR del servidor: ofreceria el boton a quien el servidor rechaza, que es
+     el mismo fallo por la otra cara.
+     ⚠️ Y la derivacion SIGUE mandando cuando encuentra a alguien: lo que no puede es
+     empeorar el dato que sustituye. */
+  if (m && m.nombre !== PD_NOM) REV2_NOM = m.nombre;
   return REV2_NOM;
 }
 

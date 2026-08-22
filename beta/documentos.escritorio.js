@@ -75,9 +75,38 @@ function _normDocE_(d, i){
   };
 }
 
-function docsMios(){return DOCS.filter(function(d){return d.est==='revision' && revisoresDe(d).indexOf(ACTOR)>=0;});}
+/* ⛔⛔ «¿ME TOCA?» SE PREGUNTA EN UN SOLO SITIO. Habia dos criterios en este fichero: la
+   cola de decision de INICIO --y el globo del nav-- preguntaban por `revisoresDe`, y el
+   chip «te toca» de la lista por `puedeDecidirDoc`. Medido sobre 4 actores x 3 ambitos:
+   **2 divergentes de 12**, las dos del ambito `archivo`, que es el mas numeroso. La lista
+   le pintaba al PD «te toca» sobre expedientes que la cola contaba como NO suyos: abria
+   Documentos y lo veia, iba a Inicio y no habia nada, con el globo diciendo 0.
+   ⚠️ MANDA EL ROUTING: `archivo -> coordinador de la unidad del autor`. Que el PD PUEDA
+   pisar por rango es otra cosa -- el boton de decidir sigue saliendo por
+   `puedeDecidirDoc`, y el servidor se lo aceptaria--: «puedo pisar» no es «me toca». */
+function _meTocaDoc_(d){
+  return d.est==='revision' && revisoresDe(d).indexOf(ACTOR)>=0;
+}
+
+function docsMios(){return DOCS.filter(_meTocaDoc_);}
 
 function calDoc(sev){ return 'calidad '+(CAL_DOC[sev]||'sin medir'); }
+
+/* ⛔⛔ EL CHIP DE SEVERIDAD, EN UNA SOLA PUERTA. Habia dos copias: esta y la de
+   `colaDecision` (la cola de decision de la pantalla de INICIO del PD), y la de alla se
+   quedo con el `else` en `'ok'` -verde- y el texto `'severidad '+d.sev`. Medido con seis
+   valores: TRES salian en verde --`null`, un valor fuera del enum y la cadena vacia--, y
+   el texto salia literalmente «severidad null».
+   ⚠️ Y `null` NO es el caso raro: `_normDocE_` lo pone a proposito y `_normSev_` del
+   servidor devuelve `null` para todo lo que no este en el enum.
+   ⛔ Ademas eran DOS VOCABULARIOS INVERTIDOS para el mismo dato: la cola decia «severidad
+   baja» y la lista «calidad alta» del MISMO expediente.
+   ✅ SIN CLASE = NEUTRO: verde es el color de «salio bien», y quien mira una lista de
+   reojo lee el COLOR, no el texto. */
+function chipSevDoc(sev){
+  return '<span class="chip '+(sev==='alta'?'no':sev==='media'?'wa':sev==='baja'?'ok':'')+
+         '">'+calDoc(sev)+'</span>';
+}
 
 function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
 
@@ -89,10 +118,8 @@ function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
 /* ⛔ «Ha pasado el analisis» en UNA sola puerta: lo miran el boton y -en el servidor- el
    guardia que de verdad publica. Dos formas de preguntar lo mismo acaban contestando
    distinto, y aqui la diferencia es publicar un documento que nadie ha leido. */
-function _yaAnalizado_(d){
-  var e = d && (d.est || d.estado);
-  return e !== 'recibido' && e !== 'analizado';
-}
+/* `_yaAnalizado_` vive en `comun.js` desde la 198.a: la miran LAS DOS caras. Estaba solo
+   aqui, y el movil ofrecia publicar lo que nadie habia analizado. */
 
 /* EQUIVALENTE (no GEMELA) — y la diferencia es REGLA DE PRODUCTO, no un descuido.
    Daniel (05/08): «en telefono solo se puede checkear los documentos tuyos pendientes de
@@ -105,14 +132,25 @@ function puedeDecidirDoc(d){
   if(!d || d.autor===ACTOR) return false;
   var rev=revisoresDe(d), maxR=Math.max.apply(null,rev.map(rangoNom));
   if(rev.indexOf(ACTOR)<0 && rangoNom(ACTOR)<=maxR) return false;
-  if(['revision','recibido','analizado'].indexOf(d.est)>=0) return true;
+  /* ⛔ SOLO `revision` CORTA AQUI, igual que el movil (20/08, 133.a). Con
+     `recibido` y `analizado` en esta lista, un expediente que YA TIENE `revisor`
+     se saltaba de golpe el bloqueo mutuo Y la escalera de rango de la linea de
+     abajo: un coordinador (rango 1) podia RECHAZAR lo que habia firmado el PD, y un
+     igual pisar a otro igual. `_yaAnalizado_` no lo tapaba: cubre *Aprobar* y *Con
+     anotaciones*, y «Solicitar cambios»/«Rechazar» quedan FUERA de ese ternario.
+     No se pierde nada: SIN revisor la linea de abajo ya deja decidir en cualquier
+     estado (`rangoNom(ACTOR) > rangoPila(null)` = `>0`, cierto para todo revisor),
+     que es lo que el caso 38 de `probar_documentos_caras.py` fija. */
+  if(d.est==='revision') return true;      /* sin decidir: cualquiera habilitado */
   return d.revisor===_m(ACTOR).pila || rangoNom(ACTOR)>rangoPila(d.revisor);
 }
 
 function filaDoc(d){
   if(DOC_SEL===d.id) return docCard(d);
   var rev=revisoresDe(d).map(function(n){return _m(n).pila;}).join(' o ');
-  var st=estDoc(d.est), mio=puedeDecidirDoc(d) && d.est==='revision';
+  /* `mio` sale de `_meTocaDoc_`, LA puerta: aqui preguntaba por `puedeDecidirDoc`, que
+     contesta «puedo pisar por rango» y no «me toca» — 2 de 12 combinaciones divergian. */
+  var st=estDoc(d.est), mio=_meTocaDoc_(d);
   return '<div class="dec" id="doc-'+d.id+'" data-docsel="'+d.id+'">'+
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
     '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+esc(d.ref)+'</span> · '+
@@ -120,10 +158,9 @@ function filaDoc(d){
       (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+'</small></span>'+
     '<span class="der">'+
       (mio?'<span class="chip wa">te toca</span>':'')+
-      /* ⛔ SIN CLASE = NEUTRO. El `else` era `'ok'` -verde-, asi que «calidad sin
-         medir» se pintaba con el mismo chip que «calidad alta»: quien mira una lista
-         de expedientes de reojo lee el COLOR, no el texto. */
-      '<span class="chip '+(d.sev==='alta'?'no':d.sev==='media'?'wa':d.sev==='baja'?'ok':'')+'">'+calDoc(d.sev)+'</span>'+
+      /* El chip sale de `chipSevDoc`, que es LA puerta: aqui habia una copia y en
+         `colaDecision` otra, y la de alla se habia quedado con el `else` en verde. */
+      chipSevDoc(d.sev)+
       '<span class="chip '+st[1]+'">'+st[0]+'</span><span class="chev">›</span>'+
     '</span></div>';
 }
@@ -298,8 +335,19 @@ function docCard(d){
       '<span class="chip '+st[1]+'">'+st[0]+'</span>'+
       /* ⛔ SIN CLASE = NEUTRO. El `else` era `'ok'` -verde-, asi que «calidad sin
          medir» se pintaba con el mismo chip que «calidad alta»: quien mira una lista
-         de expedientes de reojo lee el COLOR, no el texto. */
-      '<span class="chip '+(d.sev==='alta'?'no':d.sev==='media'?'wa':d.sev==='baja'?'ok':'')+'">'+calDoc(d.sev)+'</span>'+
+         de expedientes de reojo lee el COLOR, no el texto.
+         ⛔⛔ Y AQUI HABIA UNA SEGUNDA COPIA DEL TERNARIO, con `d.sev===` en vez de `sev===`.
+         La unificacion del 20/08 saco `chipSevDoc` y cambio LA FILA; esta, 230 lineas mas
+         abajo, se quedo -- y el guardia del banco no la veia **por dos caracteres**, con un
+         `ok()` verde encima afirmando que cubria «la fila y la ficha». Ahora las dos LLAMAN. */
+      chipSevDoc(d.sev) +  /* ⛔ EL ESPACIO ANTES DEL `+` NO ES ESTILO. Esta linea era byte
+         a byte la de `filaDoc`, que ya estaba anclada por una mutacion, y entonces esa
+         mutacion salia «2 veces» y **dejaba de aplicarse en silencio**. Un comentario
+         DETRAS no lo arregla: el ancla es una SUBCADENA, no una linea. La MISMA funcion
+         que la fila; el comentario esta
+         aqui para que esta linea no sea byte a byte la de alli -- si lo fuera, el ancla de
+         la mutacion de la fila saldria DOS VECES y esa mutacion dejaria de aplicarse en
+         silencio. Es la regla de «la sangria no desambigua un ancla», por su otra cara. */
       (d.fecha?'<span class="chip">'+esc(d.fecha)+'</span>':'')+
       /* Mismo motivo que en el móvil: verlas no es decidir. */
       (_etiquetasDe_(d).length
