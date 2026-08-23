@@ -303,6 +303,12 @@ function _convCargar_(repintar){
       var cv=r.convocatoria,
           yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
       cv.resp={}; cv.resp[yo]=r.mias||{};
+      /* ⛔⛔ Y EL VEREDICTO DEL PLAZO SE COPIA (308.ª). `getConvocatoria` lo manda en
+         `r.abierta` —`Codigo.gs:2923`— y aquí se **tiraba**: se copiaba `resp` y nada
+         más, así que esta cara —la que usan los 32 para contestar— decidía el plazo con
+         **el reloj del teléfono**. El escritorio ya lo leía desde la 295.ª: es la
+         lección curada en una cara y no en su gemela. Lo consume `_convEstado_`. */
+      cv.abierta = r.abierta;
       if(typeof CONVOCATORIAS!=='undefined'){ CONVOCATORIAS.length=0; CONVOCATORIAS.push(cv); }
     }
     if(typeof repintar==='function') repintar();

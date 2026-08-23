@@ -3010,10 +3010,38 @@ function _identidadPrestada_(visto){
   return !!v && v !== String(SESION.nombre);
 }
 
+/* ⛔⛔ ERA LA **CUARTA** PUERTA DEL PLAZO, NO LA TERCERA (308.ª, 23/08). Aquí seguía
+   `Date.parse(cv.limite)` **a pelo** cuando la 295.ª curó a la vecina —que vive DIEZ
+   LÍNEAS MÁS ABAJO, en este mismo fichero, con un comentario celebrándolo—. Y la que se
+   quedó sin curar es **la que más manda**: `_convQuedan_` pinta un rótulo; ésta decide
+   **si la rejilla existe** (`turnos.movil.js:93` y `:378` la usan de portero), y con
+   'cerrada' el móvil escribe *«no hay ninguna semana convocada»*. Quien no contesta se
+   lleva un Art. 30g.
+   📏 Reproducido ejecutando: con el límite PELADO, a las 10:00 de su propio día, esto
+   decía 'cerrada' y `_convQuedan_` 'quedan 14 h' — `Date.parse` mete la fecha pelada
+   como medianoche **UTC**, o sea el día entero de menos.
+   ⚠️ Hoy es LATENTE por la puerta del productor (`calcular_convocatoria.py:185` da
+   `isoformat(timespec="minutes")`), pero el KV trae formas que nadie controla —
+   `Codigo.gs:2789`: *«hay `limite` con `Z`»*— y para eso existe `_normLimite_`. Se cura
+   porque **dos criterios para el mismo campo son el bug**, no porque hoy sangre.
+   ⚠️ `abre` va por `_dmyAISO_` y NO por `_normLimite_`: aquel endereza `DD/MM/AAAA` sin
+   tocar la hora, y éste añadiría `T23:59` — que para «abre» sería abrir un día tarde.
+   ⛔⛔ Y EL VEREDICTO DEL SERVIDOR MANDA, que es la cara que SÍ mordía. El backend lo
+   envía por las DOS puertas (`Codigo.gs:2923` móvil y `:2968` escritorio, las dos con
+   `abierta: _plazoAbierto_(c.limite)`) y su comentario dice *«deducirlo comparando
+   fechas en la cara sería escribir la regla del plazo por segunda vez»*. El escritorio
+   lo leía; el móvil lo tiraba — o sea que la cara donde contestan los 32 decidía el
+   plazo con **el reloj del teléfono**.
+   ⚠️ Sólo puede CERRAR, nunca abrir, y va DESPUÉS de `sin_abrir`: el campo contesta
+   «¿se acabó el plazo?», no «¿empezó?». Y `=== false`, no `!cv.abierta`: una
+   convocatoria vieja sin el campo es «no lo sé», y cerrarla sería inventar. */
 function _convEstado_(cv, ahora){
-  var t=ahora?+ahora:Date.now(), a=Date.parse(cv.abre), l=Date.parse(cv.limite);
+  var t=ahora?+ahora:Date.now();
+  var a=Date.parse(_dmyAISO_(String((cv&&cv.abre)||''))),
+      l=Date.parse(_normLimite_(cv&&cv.limite));
   if(isNaN(a)||isNaN(l)) return 'cerrada';
   if(t<a) return 'sin_abrir';
+  if(cv && cv.abierta === false) return 'cerrada';
   return t<=l ? 'abierta' : 'cerrada';
 }
 
@@ -3345,6 +3373,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-23-plazo-portero-movil', fecha:'2026-08-23',
+      titulo:'La pantalla de Turnos del m\u00f3vil pod\u00eda decir que no hay ninguna semana convocada habi\u00e9ndola',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'**El portero de la pantalla de Turnos le\u00eda el plazo con otro criterio que el r\u00f3tulo de al lado.** El que decide **si la rejilla existe** se hab\u00eda quedado sin arreglar, as\u00ed que con un plazo escrito como fecha sin hora la pantalla pod\u00eda escribir \u00abahora mismo no hay ninguna semana convocada\u00bb el mismo d\u00eda del plazo, mientras el r\u00f3tulo de arriba dec\u00eda \u00abte quedan 14 h\u00bb. Quien no contesta por eso se lleva un Art. 30g.'},
+        {cara:'movil', vista:'turnos', txt:'**Y el m\u00f3vil tiraba la respuesta del servidor sobre el plazo.** El servidor la manda en cada carga \u2014y es su reloj el que acepta o rechaza lo que env\u00edes\u2014; el escritorio ya la le\u00eda y esta cara, que es donde contest\u00e1is los 32, decid\u00eda con **el reloj del tel\u00e9fono**. Ahora manda el servidor: s\u00f3lo puede cerrar, nunca adelantar una semana que a\u00fan no ha abierto.'}
+      ] },
     { id:'2026-08-23-plazo-un-solo-criterio', fecha:'2026-08-23',
       titulo:'El r\u00f3tulo del plazo dec\u00eda \u00abte quedan N h\u00bb sobre plazos ya cerrados',
       items:[
