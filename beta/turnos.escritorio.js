@@ -303,6 +303,20 @@ function _mitToggle_(cv, mias, k, q){
    ⚠️ Y la rama del plazo vencido no es adorno aunque hoy `_miTurnoCv_` no deje llegar a ella:
    lo que se fija es el CONTRATO de la función, no lo que su único llamador usa hoy. */
 function _mitPlazoTxt_(cv, ahora){
+  /* ⛔⛔ SI EL SERVIDOR YA CONTESTÓ, MANDA ÉL (295.ª, 23/08). `cv.abierta` llegó con
+     **1 escritura y 0 lecturas**: `_dispCargar_` lo guardaba y nadie lo miraba, mientras
+     el rótulo rotulaba lo que le diera el reloj del navegador. El backend lo manda **a
+     propósito** y lo dice en su propio comentario: *«quien mira el mapa necesita saber si
+     lo que ve es definitivo o todavía puede cambiar, y deducirlo comparando fechas en la
+     cara sería escribir la regla del plazo por segunda vez»*. Se estaba escribiendo por
+     segunda vez, y salía distinta.
+     ✅ Y el reloj que decide **es el suyo**: es el que acepta o rechaza lo que mandes.
+     ⚠️ Pero sólo manda para CERRAR. Un `abierta:true` con el reloj local vencido no se
+     convierte en horas inventadas: no sabemos cuántas quedan, sólo que no está cerrado.
+     ⚠️ Y se compara con `=== false`, no `!cv.abierta`: una convocatoria vieja que no trae
+     el campo daría `undefined`, y eso es «no lo sé», no «cerrado» — se quedaría sin
+     rótulo el mapa entero. */
+  if(cv && cv.abierta === false) return 'plazo cerrado';
   var q=_convQuedan_(cv, ahora);
   return q<=0 ? 'plazo cerrado'
        : q<1  ? 'te quedan '+Math.round(q*60)+' min para contestar'
@@ -314,11 +328,14 @@ function _miTurnoPanel_(){
   var av=_dispAviso_('Tu disponibilidad'); if(av) return av;
   var cv=_miTurnoCv_(); if(!cv) return '';
   var mias=_misCeldas_(cv), D=cv.dias||[], F=cv.franjas||[];
-  var ET={cuvi:'CUVI', citi:'CITI', ambos:'Los dos', no:'No puedo'};
+  /* ⛔ LA TABLA DE ROTULOS SE FUE A `comun.js` (290.a, 23/08), por el mismo motivo por el
+     que se fue `_convClases_`: la lista y su etiqueta son LA MISMA decision, y tenerlas
+     separadas es como la cara del movil acabo sacando la lista de los datos y tecleando
+     el rotulo. Esta copia era la buena de las dos, y aun asi sobraba. */
   var clases=_convClases_(cv);
   if(MIT_PIN===null) MIT_PIN=clases[0]||'no';
   var pin=clases.map(function(k){
-    return '<button data-mtpin="'+k+'" class="'+(MIT_PIN===k?'on':'')+'">'+esc(ET[k]||k)+'</button>';
+    return '<button data-mtpin="'+k+'" class="'+(MIT_PIN===k?'on':'')+'">'+esc(_convEtiq_(k))+'</button>';
   }).join('');
   var cab='<div class="dmc dml"></div>'+D.map(function(d){
     var p=String(_diaCorto_(d)).split(' ');
@@ -920,6 +937,26 @@ function _cierreTurnoPanel_(){
       (falta ? esc(falta) : 'Cerrar el turno')+'</button>');
 }
 
+/* ⛔⛔ ESTE PANEL ESTUVO ROTO 5 DE 5, POR DOS CAUSAS DISTINTAS (23/08).
+   (1) Los cinco manejadores repintaban con una funcion que **no existe en esta cara**: era
+       la de `app.html`, otra app que este bundle no carga. Aqui se repinta con `pintar()`
+       (`escritorio.html:3239`), y el HTML declara `"use strict"`. 📏 5 llamadas, 0
+       declaraciones. Cada manejador MUTABA EL ESTADO y lanzaba justo despues, asi que
+       «Cerrar el turno» componia la propuesta entera --el unico producto de esta pantalla,
+       el que va a Compensaciones-- y **no la pintaba nunca**: el boton no hacia nada.
+       ⚠️ Y la consola esta denegada en este dominio: no dejaba rastro ni depurando.
+   (2) Dos de los cinco ni se enganchaban: colgaban de `#s-turnos`, que es el convenio de
+       ids de `app.html`. 📏 `id="s-` sale 7 veces alli y **0 en `escritorio.html`**, asi
+       que `$$` devolvia `[]` SIEMPRE -- las casillas de «quien fue» y los campos de «extra»
+       no recibian manejador, y con ellos el **reparto fila a fila** que Daniel pidio el
+       15/08 (*«a lo mejor es tiempo extra que no le cuenta a alguien que vive cerca, pero
+       si a alguien que vive lejos»*) era **inalcanzable**: a todos les caia el mismo tope.
+       Y un dudoso que si fue **no podia confirmarse nunca**, porque su casilla es una de
+       las dos que no se cableaban.
+   ⛔ Es REINCIDENCIA: `escritorio.html:3290` dice haber curado que «ni un control
+   respondia». Se arreglo el cable, y los controles pasaron a **responder lanzando**.
+   ✅ Lo vigila `rutinas/probar_bundle_caras.py`, que pregunta lo unico preciso: **si un
+   nombre llamado aqui es una funcion del proyecto que vive en OTRO bundle**. */
 function _cablearCierreTurno_(){
   var sel = document.getElementById('ctSel');
   if(sel) sel.onchange = function(){
@@ -927,7 +964,7 @@ function _cablearCierreTurno_(){
        una persona de un turno saldrian sembradas en otro turno distinto, con su nombre y con
        cara de haber sido tecleadas ahi. */
     CIERRE_TUR.i = +sel.value; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {};
-    CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; render();
+    CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
   };
   var dur = document.getElementById('ctDur');
   if(dur) dur.onchange = function(){
@@ -937,15 +974,15 @@ function _cablearCierreTurno_(){
     var tope = _cierreTurTope_();
     Object.keys(CIERRE_TUR.extra).forEach(function(n){
       if(CIERRE_TUR.extra[n] > tope) CIERRE_TUR.extra[n] = tope; });
-    CIERRE_TUR.hecho = null; render();
+    CIERRE_TUR.hecho = null; pintar();
   };
-  $$('#s-turnos [data-ct-fue]').forEach(function(el){
-    el.onchange = function(){ CIERRE_TUR.quien[el.dataset.ctFue] = !!el.checked; render(); }; });
-  $$('#s-turnos [data-ct-extra]').forEach(function(el){
+  $$('[data-ct-fue]').forEach(function(el){
+    el.onchange = function(){ CIERRE_TUR.quien[el.dataset.ctFue] = !!el.checked; pintar(); }; });
+  $$('[data-ct-extra]').forEach(function(el){
     el.onchange = function(){
       var v = parseFloat(String(el.value).replace(',', '.'));
       CIERRE_TUR.extra[el.dataset.ctExtra] = isFinite(v) ? v : 0;
-      CIERRE_TUR.hecho = null; render();
+      CIERRE_TUR.hecho = null; pintar();
     }; });
   var b = document.getElementById('ctEnviar');
   if(b) b.onclick = function(){
@@ -958,7 +995,7 @@ function _cablearCierreTurno_(){
       Object.keys(mapa).map(function(n){
         return '  ' + n + ' \u2192 ' + (mapa[n] ? ('+' + mapa[n] + ' h a Compensaciones')
                                                 : 'sin extra'); }).join('\n');
-    render();
+    pintar();
   };
 }
 

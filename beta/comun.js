@@ -3020,14 +3020,43 @@ function _convEstado_(cv, ahora){
 /* Las horas que TE quedan a ti para contestar. Ojo: NO es `ventana_real_h` de Python, que
    contesta a otra pregunta —«si convoco ahora, cuánto le queda a la gente»— y es de quien
    convoca. Misma aritmética, distinta pregunta: por eso son dos y no una. */
+/* ⛔⛔ POR `_normLimite_`, QUE ES LA MISMA PUERTA QUE USA `_plazoAbierto_` (295.ª, 23/08).
+   Aquí había `Date.parse(cv.limite)` **a pelo**, y el mismo campo tenía por tanto DOS
+   respuestas según quién preguntara. 📏 Medido ejecutando en el arnés: **76 de 264**
+   combinaciones (12 meses × 11 días × las 2 formas en que llega de verdad) contestaban
+   distinto. Y en la peor dirección:
+   · `DD/MM/AAAA` —cómo llega de las semillas y de Notion— lo lee `Date.parse` como
+     **MM/DD**: `'09/01/2026'` sale **1 de septiembre**, así que un plazo muerto en enero
+     rotulaba «te quedan N h para contestar» y la gente contesta un plazo cerrado.
+   · Una fecha **pelada** la toma como medianoche, así que el día entero del plazo salía
+     cerrado — justo lo que `_normLimite_` existe para arreglar («cierra el 20/08» se lee
+     como «tienes el 20», y por eso le pone `T23:59`).
+   ⚠️ No es cosa del escritorio: esta función la usan **3 sitios de las dos caras**
+   (`_mitPlazoTxt_`, y el `urge` y el pie del móvil), así que arreglarla aquí los arregla
+   los tres. La puerta vivía **en este mismo fichero**, 430 líneas más arriba. */
 function _convQuedan_(cv, ahora){
-  var t=ahora?+ahora:Date.now(), l=Date.parse(cv.limite);
+  var t=ahora?+ahora:Date.now(), s=_normLimite_(cv&&cv.limite);
+  var l=s?Date.parse(s):NaN;
   return isNaN(l)||l<=t ? 0 : (l-t)/3600000;
 }
 
 /* Las clases de estado que puede llevar una celda, sacadas de la convocatoria. Cablearlas
    haría que un sitio nuevo dejara restos de la clase anterior al repintar. */
 function _convClases_(cv){ return (cv.sitios||[]).concat(['ambos','no']); }
+
+/* Y el RÓTULO de cada una. Vive aquí, pegado a `_convClases_`, porque son **la misma
+   decisión** —qué se puede contestar esta semana— y tenerlas separadas es exactamente cómo
+   el móvil acabó limpiando las clases con la lista de los datos y **pintando los botones
+   con otra tecleada a mano** (290.ª, 23/08).
+   ⛔ El respaldo es LA PROPIA CLAVE, no la cadena vacía: un sitio nuevo sale con su nombre
+   en crudo —feo, pero pulsable—, mientras que `''` deja un botón **invisible** que ocupa
+   sitio y no dice nada. Y se busca con `hasOwnProperty` y no con `CONV_ETIQ[k]` a secas:
+   una clave llamada `constructor` o `toString` devolvería una función, que es *truthy*. */
+var CONV_ETIQ = {cuvi:'CUVI', citi:'CITI', ambos:'Los dos', no:'No puedo'};
+function _convEtiq_(k){
+  var t = Object.prototype.hasOwnProperty.call(CONV_ETIQ, k) ? CONV_ETIQ[k] : null;
+  return t || String(k == null ? '' : k);
+}
 function _unidadesCoord_(v){
   if(!v) return [];
   if(typeof v==='string') v=[v];
@@ -3316,6 +3345,19 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-23-plazo-un-solo-criterio', fecha:'2026-08-23',
+      titulo:'El r\u00f3tulo del plazo dec\u00eda \u00abte quedan N h\u00bb sobre plazos ya cerrados',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'**Un plazo con la fecha en formato `DD/MM/AAAA` se le\u00eda con el d\u00eda y el mes cambiados.** As\u00ed que un plazo muerto el 9 de enero se tomaba por el 1 de septiembre y la tarjeta rotulaba \u00abte quedan N h para contestar\u00bb: se contestaba un plazo cerrado, y esa respuesta no cuenta. Medido: **76 de 264** combinaciones de fecha contestaban distinto seg\u00fan qui\u00e9n preguntara.'},
+        {cara:'escritorio', vista:'turnos', txt:'**Y al rev\u00e9s: una fecha sin hora cerraba el plazo el d\u00eda entero.** \u00abCierra el 20/08\u00bb significa que tienes el 20 \u2014 y sal\u00eda cerrado desde la medianoche.'},
+        {cara:'escritorio', vista:'turnos', txt:'**Ahora manda el servidor.** \u00c9l ya dec\u00eda en cada respuesta si el plazo sigue abierto \u2014y es su reloj el que acepta o rechaza lo que env\u00edes\u2014, pero la pantalla guardaba ese dato y no lo miraba nunca. Cuando dice que est\u00e1 cerrado, la tarjeta lo dice.'}
+      ] },
+    { id:'2026-08-23-rejilla-turnos-movil', fecha:'2026-08-23',
+      titulo:'Tu rejilla de turnos sal\u00eda en blanco, y los pinceles no eran los de esa semana',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'**Mirando la app como otra persona, tu rejilla de disponibilidad sal\u00eda vac\u00eda.** El servidor manda **tus** celdas \u2014te reconoce por la sesi\u00f3n, no por a qui\u00e9n est\u00e9s mirando\u2014 y la pantalla las guardaba bajo el nombre de la otra persona, as\u00ed que al buscarlas no las encontraba: rejilla en blanco y el pie diciendo \u00abte faltan N por contestar\u00bb a quien ya hab\u00eda contestado. Y **no se arreglaba al volver a tu nombre**: se pide una sola vez por carga.'},
+        {cara:'movil', vista:'turnos', txt:'**Y los botones de pincel eran siempre los mismos cuatro** \u2014CUVI, CITI, Los dos, No puedo\u2014 sin mirar qu\u00e9 sitios se hab\u00edan convocado esa semana. En una semana de un solo sitio se pod\u00eda marcar uno **al que nadie va**, y esa marca se quedaba pegada a la celda al repintar. Ahora los botones son los de **esa** convocatoria, y el que viene marcado tambi\u00e9n.'}
+      ] },
     { id:'2026-08-23-escritorio-disponibilidad', fecha:'2026-08-23',
       titulo:'El escritorio no hab\u00eda recibido nunca la disponibilidad de nadie',
       items:[

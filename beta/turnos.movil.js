@@ -169,6 +169,18 @@ function _convHTML_(cv){
   var urge=_convQuedan_(cv)<12;
   var lim=_isoADMY_(String(cv.limite).slice(0,10))||String(cv.limite).slice(0,10);
   var hora=String(cv.limite).slice(11,16);
+  /* ⛔ LOS SITIOS SALEN DE LA CONVOCATORIA, NO CABLEADOS (290.ª, 23/08). Aquí estaban
+     tecleados los cuatro en la **única cara donde contestan los 32**, mientras el
+     escritorio —escrito después— ya sacaba la lista de `_convClases_(cv)` y lo dejaba
+     escrito: *«los sitios NO se cablean … para que las dos caras no acaben con dos listas
+     distintas»*. Y doce líneas más abajo (`_engConv_`), `_convClases_(cv)` **ya** limpiaba
+     las clases sacándolas de los datos: pintar con una lista y limpiar con otra deja la
+     celda marcada de un sitio que el repintado no conoce.
+     ⛔ Y EL PINCEL ELEGIDO SE NORMALIZA CONTRA ESTA convocatoria: nace en `movil.html`
+     valiendo `'cuvi'` —la tercera copia de la misma lista—, así que una semana sin CUVI
+     venía con un sitio inexistente marcado y el primer trazo escribía `{s:'cuvi'}`. */
+  var clases=_convClases_(cv);
+  if(clases.indexOf(CONV_PINCEL)<0) CONV_PINCEL=clases[0]||'no';
   var pin=function(k,txt){
     return '<button data-pin="'+k+'" class="'+(CONV_PINCEL===k?'on':'')+'" data-p>'+txt+'</button>';
   };
@@ -185,8 +197,7 @@ function _convHTML_(cv){
   }).join('');
   return '<div class="tarj" id="convC">'+
     _convCabHTML_(cv)+
-    '<div class="tpin">'+pin('cuvi','CUVI')+pin('citi','CITI')+pin('ambos','Los dos')+
-      pin('no','No puedo')+
+    '<div class="tpin">'+clases.map(function(k){ return pin(k, esc(_convEtiq_(k))); }).join('')+
       '<button data-pin-coche class="coche '+(CONV_COCHE?'on':'')+'" data-p>🚗 con coche</button>'+
     '</div>'+
     /* 78 px y no 64: «Tarde/noche» no cabe en 64 y, al ser `nowrap` + `flex-end` + `sticky`,
@@ -277,7 +288,20 @@ function _convCargar_(repintar){
       /* El servidor manda: sin convocatoria abierta, no se enseña la de demo. */
       if(typeof CONVOCATORIAS!=='undefined') CONVOCATORIAS.length=0;
     } else {
-      var cv=r.convocatoria, yo=(YO&&YO.nombre)||'';
+      /* ⛔ LA MISMA PUERTA QUE `_convMias_`, QUE ES QUIEN LO LEE. `cv.resp` tiene **un
+         solo escritor** (esta línea) y **un solo lector**, así que la llave ES el contrato
+         entero. El lector se curó el 30/07 —su comentario cuenta el fallo completo— y esta
+         línea se quedó con `YO.nombre`, que **no es la sesión**: «Ver como» reasigna `YO`
+         entero (`movil.html:507`, `YO=m`) y `_actorSanc_()` sigue dando la de la sesión.
+         📏 Alcance **1 de 32**, el PD — y medido, no supuesto: el `YO` de maqueta de
+         `:206` **no llega a usarse aquí**, porque la «UNICA pintada del arranque» (`:876`)
+         va **después** del gate que exige `_YO_REAL_` (`:817`).
+         ⚠️ Y esto se pide **UNA sola vez por carga** (`_convEstadoSrv_() !== 'sin
+         pedir'`), así que no se corrige solo: lo que baja del servidor son TUS celdas
+         —te identifica por TOKEN— y caían bajo el nombre de otra persona, dejando la
+         rejilla **en blanco** y el pie diciendo que no habías contestado nada. */
+      var cv=r.convocatoria,
+          yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
       cv.resp={}; cv.resp[yo]=r.mias||{};
       if(typeof CONVOCATORIAS!=='undefined'){ CONVOCATORIAS.length=0; CONVOCATORIAS.push(cv); }
     }
