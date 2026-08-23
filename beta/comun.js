@@ -3373,6 +3373,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-08-23-pie-turnos-unidad', fecha:'2026-08-23',
+      titulo:'El pie de Turnos mezclaba horas y casillas en la misma frase',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'**De los cuatro contadores del pie, s\u00f3lo uno estaba en horas.** Con turnos de 4 h, un solo \u00abno puedo\u00bb sobre un turno entero pinta cuatro celdas, as\u00ed que el pie dec\u00eda **\u00abno puedo en 4\u00bb** \u2014 que se lee como cuatro negativas cuando has dicho **una** cosa. Es el mismo malentendido que ya se hab\u00eda arreglado para \u00abmarcadas\u00bb, dos operandos m\u00e1s all\u00e1.'},
+        {cara:'movil', vista:'turnos', txt:'**Y \u00absin contestar\u00bb contaba celdas.** Con la convocatoria horaria son **91 celdas**, as\u00ed que quien no hab\u00eda tocado nada le\u00eda \u00ab91 sin contestar\u00bb y ve\u00eda el n\u00famero bajar **de cuatro en cuatro** al marcar un turno. Ahora los cuatro dicen horas y sus turnos: \u00abno puedo en 4 h (1 turno)\u00bb.'}
+      ] },
     { id:'2026-08-23-plazo-portero-movil', fecha:'2026-08-23',
       titulo:'La pantalla de Turnos del m\u00f3vil pod\u00eda decir que no hay ninguna semana convocada habi\u00e9ndola',
       items:[

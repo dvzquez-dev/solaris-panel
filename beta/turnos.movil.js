@@ -220,6 +220,25 @@ function _convCabHTML_(cv){
       (cv.convocante?' · lo pide '+esc(cv.convocante.split(' ')[0]):'')+'</div>';
 }
 
+/* La unidad del pie: horas (y sus turnos) cuando un turno son varias franjas.
+
+   ⛔⛔ EXISTE PORQUE LA CONVERSION SE ESCRIBIO EN LINEA PARA UNO SOLO DE LOS CUATRO
+      CONTADORES (327.ª, 23/08). El comentario de `_convPieHTML_` explica por que se paso a
+      horas -- «"marcadas 4" despues de UN gesto se lee como si hubieras contestado cuatro
+      veces» -- y esa razon vale IGUAL para los otros tres. Con `min_h = 4`, un solo «no
+      puedo» sobre un turno entero pinta 4 celdas y salia «no puedo en 4»: el mismo
+      malentendido, dos operandos mas alla. Y con la convocatoria horaria (09:00-22:00 x 7 =
+      91 celdas) quien no habia tocado nada leia «91 sin contestar», bajando de 4 en 4.
+   ✅ Se saca a funcion, no se copia tres veces: lo que fallo aqui no fue la conversion,
+      fue que vivia PEGADA a uno de los cuatro sitios que la necesitan.
+   ⚠️ Con dos franjas (`min_h` a 1) se cuenta en CASILLAS, que ahi es lo correcto: cada
+      celda es una respuesta y ponerle «h» seria inventarse una unidad. */
+function _convUnid_(n, min){
+  if(!(min>1)) return ''+n;
+  var t=Math.floor(n/min);
+  return n+' h'+(t>=1 ? ' ('+t+(t===1?' turno':' turnos')+')' : '');
+}
+
 function _convPieHTML_(cv){
   var q=_convQuedan_(cv), c=_convCuenta_(cv);
   var t = q<=0 ? 'Plazo cerrado'
@@ -231,12 +250,10 @@ function _convPieHTML_(cv){
      unidad en la que piensa quien reparte. Con dos franjas (`min_h` a 1) se deja como estaba:
      ahí cada casilla sí es una respuesta. */
   var min=_minTurno_(cv);
-  var marcadas = min>1
-    ? c.puedo+' h'+(c.puedo>=min ? ' ('+Math.floor(c.puedo/min)+(Math.floor(c.puedo/min)===1?' turno':' turnos')+')' : '')
-    : ''+c.puedo;
-  return t+' · marcadas <b>'+marcadas+'</b>'+(c.no?' · no puedo en '+c.no:'')+
-    (c.coches?' · con coche '+c.coches:'')+
-    (c.blanco?' · <b>'+c.blanco+'</b> sin contestar':' · todo contestado');
+  return t+' · marcadas <b>'+_convUnid_(c.puedo,min)+'</b>'+
+    (c.no?' · no puedo en '+_convUnid_(c.no,min):'')+
+    (c.coches?' · con coche '+_convUnid_(c.coches,min):'')+
+    (c.blanco?' · <b>'+_convUnid_(c.blanco,min)+'</b> sin contestar':' · todo contestado');
 }
 
 /* Pintar una celda con el pincel activo. Volver a pintar lo mismo la BORRA: sin eso no habría
