@@ -90,7 +90,20 @@ function _convDeClave_(k){
 function _convAbierta_(){
   var yo=(YO&&YO.nombre)||'';
   var vivas=(typeof CONVOCATORIAS!=='undefined'?CONVOCATORIAS:[]).filter(function(cv){
-    if(_convEstado_(cv)!=='abierta') return false;
+    /* ⛔⛔ TRES ESTADOS, NO DOS (456.ª). Esto preguntaba `!=='abierta'` a una función
+       que devuelve `sin_abrir | abierta | cerrada`, así que durante `sin_abrir` —la
+       convocatoria está montada, sus días existen, su plazo abre el jueves a las 22:00—
+       esta cara devolvía `null` y `_convHTML_` escribía *«Ahora mismo no hay ninguna
+       semana convocada»*. Al PD, además, le ofrecía **convocar otra**.
+       ⛔ La ventana no es un borde: `abre = limite - 48 h` (`reglas/convocatoria.py:46`)
+       y el gate monta la convocatoria en cuanto se encola, así que por la vía
+       automática (`cal.proxima()`) dura **hasta 7 días** diciendo que no hay nada.
+       ⚠️ `cerrada` SÍ se queda fuera: ahí no hay nada que enseñar ni que contestar.
+       ⚠️ Esta función devuelve la convocatoria; **quién puede tocarla lo deciden
+       `_convHTML_` (que pinta la rejilla en `off`) y el guardia del `pointerdown`**.
+       Mezclarlo aquí dejaría a `_engConv_` sin nada que enganchar y el pie sin repintar. */
+    var _e=_convEstado_(cv);
+    if(_e!=='abierta' && _e!=='sin_abrir') return false;
     var inv=cv.invitados||[];
     return !inv.length || inv.indexOf(yo)>=0;
   });
@@ -165,6 +178,12 @@ function _convHTML_(cv){
     (_puedeConvocarT_() ? '<br><br><span style="opacity:.75">Convocar una semana se hace desde el '+
       '<b>escritorio</b> → Turnos → «Convocar disponibilidad».</span>' : '')+
     '</p></div>';
+  /* ⛔ EL ESTADO SE PREGUNTA UNA VEZ Y ARRIBA. `_convAbierta_` ya deja pasar `sin_abrir`,
+     así que aquí llega una convocatoria de verdad a la que **todavía no se puede
+     contestar**. Se saca a `_convPreHTML_` en vez de sembrar `if`s por el cuerpo: metida
+     dentro no habría forma de ejecutarla en el arnés y su mutación saldría ciega — es la
+     misma razón por la que `_convPieHTML_` vive fuera de esta función. */
+  if(_convEstado_(cv)==='sin_abrir') return _convPreHTML_(cv);
   var F=cv.franjas||[], D=cv.dias||[];
   var urge=_convQuedan_(cv)<12;
   var lim=_isoADMY_(String(cv.limite).slice(0,10))||String(cv.limite).slice(0,10);
@@ -209,6 +228,45 @@ function _convHTML_(cv){
     '<p class="rnota" style="margin-top:10px">Hasta el <b>'+esc(lim)+'</b> a las '+esc(hora)+
       '. Fuera de plazo no se puede marcar: por eso una casilla en blanco significa una sola '+
       'cosa, que no has contestado.</p>'+
+  '</div>';
+}
+
+/* La tarjeta de una convocatoria que EXISTE y todavía NO ABRE (456.ª).
+
+   ⛔ SE ENSEÑA LA SEMANA, NO UN ANUNCIO. El dato útil aquí no es «puedes contestar» sino
+   **qué te van a preguntar**: qué días, qué franjas y qué sitios. Eso se lee de un vistazo en
+   la rejilla y no se lee en prosa — y una tarjeta sin rejilla vuelve a esconder la forma de
+   la semana, que es la versión suave del hueco mudo del 07/08.
+   ⛔ Y NO SE PUEDE TOCAR: sin `data-tk`, sin `id="convRej"` y sin la fila de pinceles. El
+   pincel y el botón de coche **son la promesa de poder pintar**; dejarlos puestos y confiar
+   en el guardia del `pointerdown` sería un rótulo que miente. Son tres capas y a propósito:
+   (1) sin `data-tk` no hay celda que encontrar, (2) sin `#convRej` `_engConv_` sale solo y no
+   engancha ni un manejador, (3) el guardia del `pointerdown`.
+   ⚠️ `off` no es una clase nueva: es la de `.ecel.off` (`movil.css`), la celda «fuera del
+   horario de ese día» de las encuestas — la misma situación exacta, y la decisión ya tomada.
+   ⚠️ `data-abre` es un asidero **ASCII** para el banco: anclar en la frase la ata a una tilde
+   que `cscript` destroza, y a prosa que el propio comentario puede repetir. */
+function _convPreHTML_(cv){
+  var D=cv.dias||[], F=cv.franjas||[];
+  var ab=_dmyAISO_(String(cv.abre||''));
+  var abD=_isoADMY_(ab.slice(0,10))||ab.slice(0,10), abH=ab.slice(11,16);
+  var lim=_isoADMY_(String(cv.limite).slice(0,10))||String(cv.limite).slice(0,10);
+  var cab='<div class="rc rd"></div>'+D.map(function(d){
+    var p=String(_diaTxtM_(_isoADMY_(d)||d)||'').split(' ');
+    return '<div class="rc">'+esc(p[0]||'')+'<br>'+esc(String(p[1]||'').slice(0,2))+'</div>';
+  }).join('');
+  var filas=F.map(function(fr){
+    return '<div class="rc rd">'+esc(fr.txt)+'</div>'+
+      D.map(function(){ return '<div class="tcel off"></div>'; }).join('');
+  }).join('');
+  return '<div class="tarj" id="convC" data-abre="'+esc(ab)+'">'+
+    _convCabHTML_(cv)+
+    '<div class="rejw"><div class="rej" style="grid-template-columns:78px repeat('+
+      D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
+    '<div class="tplazo">Se abre el <b>'+esc(abD)+'</b> a las '+esc(abH)+
+      '. Entonces podr\u00e1s pintar tus ratos.</div>'+
+    '<p class="rnota" style="margin-top:10px">Hasta que se abra no se puede marcar nada: el '+
+      'plazo empieza cuando el equipo recibe el aviso, y cierra el <b>'+esc(lim)+'</b>.</p>'+
   '</div>';
 }
 
@@ -398,6 +456,33 @@ function _engConv_(){
   var pintando=false;
   rej.addEventListener('pointerdown', function(e){
     var el=e.target.closest('[data-tk]'); if(!el) return;
+    /* ⛔ ESTE GUARDIA ES LA TERCERA CAPA, NO LA PRIMERA (456.ª — corregido MIDIENDO).
+       Escribí aquí que «ahora manda» y era **falso**: `_convPreHTML_` no pinta
+       `id="convRej"`, así que `_engConv_` sale dos líneas antes (`var rej=$('#convRej');
+       if(!rej) return;`) y durante `sin_abrir` este `if` **no lo ejecuta nadie**.
+       📏 Lo destapó su mutación saliendo **CIEGA**, no releerlo. Por eso la línea se
+       queda **sin mutación y con el descarte escrito** en `mutar.py`: dejar una
+       equivalente sería peor que no tener ninguna.
+       ⚠️ Donde SÍ manda es en `cerrada` **con un DOM viejo**: la tarjeta se pintó con el
+       plazo abierto —o sea con `#convRej` y sus manejadores enganchados— y el plazo
+       venció con la pestaña abierta. `fin` sólo llama a `_convGuardar_` si `pintando`, y
+       `pintando` sólo se pone aquí.
+       ⛔⛔ Y LA CARA ES MÁS ESTRICTA QUE EL BACKEND A PROPÓSITO — NO SE ABRE.
+       · La autoridad es `reglas/convocatoria.py:175 admite_respuesta`, que devuelve
+         `estado_en(…) == "abierta"`, y su docstring dice por qué: *«Fuera de la ventana
+         NO se escribe — y por eso una celda vacía pasa a significar una sola cosa: "no
+         ha contestado", que es perseguible»*. `mutar.py` ya trae la mutación que la
+         relaja a `!= "cerrada"` y la clasifica como **defecto**.
+       · Quien diverge es el BACKEND: `Codigo.gs:2938` decide con
+         `_plazoAbierto_(c.limite)`, que sólo conoce el cierre; y `_convVigente_`
+         selecciona igual, así que durante `sin_abrir` te manda `abierta:true`. O sea que
+         el servidor te está diciendo que sí. **Aun así no.**
+       · Motivo, no doctrina: `abre` es el instante en que se le dice al equipo que ya
+         puede (`avisar_convocatoria.texto('abrir')`: *«Ya puedes decir cuándo puedes»*).
+         Escribir antes significa que quien casualmente abrió la app contesta días antes
+         de que a nadie se le pregunte, y **el plazo deja de tener principio**.
+       ⛔ Abrir esto es la «cura» que va a intentar el siguiente. Antes de tocarlo hay que
+       cerrar `Codigo.gs:_guardarDisponibilidad_`, no al revés. Ficha en `pendientes.md`. */
     if(_convEstado_(cv)!=='abierta') return;
     pintando=true;
     try{ rej.setPointerCapture(e.pointerId); }catch(_){}

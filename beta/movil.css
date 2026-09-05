@@ -858,6 +858,11 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .tpin button.coche.on{background:var(--ok);border-color:var(--ok);color:#fff}
 .tcel{height:30px;border-radius:3px;background:var(--sur2);cursor:pointer;position:relative;
   display:grid;place-items:center;font-family:var(--mono);font-size:9px;color:#fff}
+/* ⛔ LA MISMA DECLARACIÓN QUE `.ecel.off`, no una nueva (456.ª): esa es la celda «fuera
+   del horario de ese día» de las encuestas, o sea **una celda que existe, se ve y no se
+   toca** — la misma situación exacta que una convocatoria que aún no abre. Inventar un
+   gris distinto para lo mismo es como acaban dos criterios donde había uno. */
+.tcel.off{background:transparent;border:1px solid var(--line);opacity:.4;cursor:default}
 .tcel.cuvi{background:var(--red)}
 .tcel.citi{background:var(--tel)}
 .tcel.ambos{background:linear-gradient(135deg,var(--red) 50%,var(--tel) 50%)}

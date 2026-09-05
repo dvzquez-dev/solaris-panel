@@ -805,7 +805,21 @@ function _duF(f){ return (f&&typeof f==='object') ? (+f.dur||60) : 60; }
    junto a un chip de «−1 punto». Un recuento imposible al lado de una acusación. */
 function _etiquetaMinimo_(r){
   var tot=r.total||(r.bloques||[]).length||0;
-  if(r.minimo!=null) return r.minimo+' franjas (lo fijó quien convoca)';
+  /* ⛔⛔ SE PREGUNTA SI SE FIJÓ, NO SI EL CAMPO VIENE RELLENO — viene SIEMPRE (451.ª).
+     Esto decía `r.minimo!=null`, y el único llamador (`escritorio.html:1690`) recibe el
+     objeto que se monta en `:1597` con `minimo:cob.minimo` **sin condición**, mientras
+     `_cobertura_` rellena ese campo en sus tres `return` (con el fijado o con el
+     calculado). O sea que la condición era cierta siempre y **la línea de abajo —la del
+     porcentaje y el total— no se ejecutaba jamás**.
+     📏 Y `minimo` **no lo escribe nadie en producción**: 0 productores en `flujos/`,
+     `rutinas/backend.py` y `Codigo.gs`; sus 3 únicas apariciones son filas de la semilla
+     (`escritorio.html:525,533,536`). Así que con datos reales aquí se leía **siempre**
+     *«N franjas (lo fijó quien convoca)»* sobre un número que **no fijó nadie**, al lado
+     del chip de «−1 punto» de esa persona — y lo que se escondía es justo lo que Daniel
+     pidió ver: contra qué porcentaje y sobre cuántas franjas se le exige.
+     ⚠️ `minFijado` lo deriva `_cobertura_` de si el campo **venía**; no se recalcula aquí,
+     que serían dos criterios para la misma pregunta. */
+  if(r.minFijado) return r.minimo+' franjas (lo fijó quien convoca)';
   var pct=Math.round(_pctMinimo_(_refMinimo_(r))*100);
   return _minimoExigido_(r)+' franjas ('+pct+' % de '+tot+')';
 }
@@ -832,9 +846,13 @@ function _cobertura_(r){
      en riesgo», que es afirmar algo que no se sabe (§3c-24). Se conserva la FORMA para
      que los cuatro consumidores no revienten, y `oculto` es lo que miran para decidir
      que enseñar. */
+  /* ⚠️ `minFijado` va también aquí **por la FORMA**, que esta función conserva a
+     propósito —lo dice el comentario de arriba—, no porque hoy lo lea nadie: `cob.minimo`
+     tiene **un** lector (`escritorio.html:1597`) y `escritorio.html:1569` sale antes con
+     `if(cob.oculto) return`. Por eso **no se muta**: nacería ciega. */
   if(r && r.agregado === false)
     return {cubren:null, conv:null, sinCubrir:null, bajoMin:null,
-            minimo:_minimoExigido_(r), oculto:true};
+            minimo:_minimoExigido_(r), minFijado:(r.minimo!=null), oculto:true};
   var cubren=Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); });
   var universo = (r.invitados&&r.invitados.length) ? r.invitados
                : (r.tipo==='general' ? _activos_().map(function(m){return m.nombre;}) : cubren);
@@ -864,7 +882,8 @@ function _cobertura_(r){
   });
   if(_sinNombre.length)
     return {cubren:cubren.length, conv:universo.length, sinCubrir:null, bajoMin:null,
-            minimo:(r.minimo!=null ? r.minimo : _minimoExigido_(r)), oculto:true};
+            minimo:(r.minimo!=null ? r.minimo : _minimoExigido_(r)),
+            minFijado:(r.minimo!=null), oculto:true};
   var sin = universo.filter(function(n){ return cubren.indexOf(n)<0; });
   var minimo = r.minimo!=null ? r.minimo : _minimoExigido_(r);
   /* ⛔⛔ EL `c>0` ESCONDIA JUSTO A QUIEN EL MOTOR VA A SANCIONAR. Quien abre la encuesta,
@@ -880,7 +899,11 @@ function _cobertura_(r){
     var v=resp[n]||[]; var c=0; v.forEach(function(x){ if((+x||0)>0) c++; });
     return c<minimo && n!==r.convocante;
   });
-  return {cubren:cubren.length, conv:universo.length, sinCubrir:sin, bajoMin:bajo, minimo:minimo};
+  /* ⛔ `minFijado` ES EL DATO QUE FALTABA: `minimo` sale relleno de las tres salidas, así
+     que quién lo puso —quien convoca o la regla— **no se podía saber desde fuera**, y el
+     rótulo se lo atribuía a una persona. Va aquí y no en el llamador: es esta función la
+     única que ve el `r` ORIGINAL antes de rellenar el hueco. */
+  return {cubren:cubren.length, conv:universo.length, sinCubrir:sin, bajoMin:bajo, minimo:minimo, minFijado:(r.minimo!=null)};
 }
 
 /* REFRESCO EN VIVO DE LA REUNION QUE TIENES DELANTE (08/08).

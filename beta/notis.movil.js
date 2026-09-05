@@ -36,6 +36,38 @@ function _faltanNotis_(){
   return (Notification.permission==='denied') ? 'denegado' : 'pedir';
 }
 
+/* ⛔⛔ LA UNICA PUERTA A LA SUSCRIPCION, y las DOS salidas del gate pasan por aqui (357.a).
+   Devuelve `true` solo si de verdad hay una suscripcion **que el servidor conoce**.
+   ⛔ Un permiso sin suscripcion no entrega ni un aviso, y el gate habria dejado pasar a
+   alguien que no recibe nada. `subscribe` sin `guardarPush` tampoco vale: es la llamada
+   que le dice al SERVIDOR donde mandar, asi que un fallo ahi **no se traga** -- ya mordio
+   en el escritorio, con un `catch(_){}` roto desde siempre y sin señal.
+   📏 Y lo que cuesta esta escrito en el backend (`Codigo.gs:2470`): el aviso de 24 h de
+   un parte a punto de caducar gasta ahi su UNICO disparo, y a los 7 dias el parte pasa a
+   `caducada` con las horas dentro. */
+async function _asegurarPush_(msg){
+  var reg=_swReg || await _registrarSW_();
+  /* ⛔ SIN SERVICE WORKER NO SE PASA: quien no pudiera registrarlo entraba **sin ninguna
+     suscripcion**, justo lo que este gate existe para impedir. */
+  if(!reg){
+    if(msg) msg.textContent='No se pudo preparar el aviso en este navegador. '+
+      'Prueba a abrir el panel desde el icono de la pantalla de inicio.';
+    return false;
+  }
+  await navigator.serviceWorker.ready;
+  var sub=await reg.pushManager.getSubscription();
+  if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
+  if(typeof SESION!=='undefined' && SESION){
+    try{ await api.guardarPush(sub.toJSON()); }
+    catch(err){
+      if(msg) msg.textContent='El permiso esta dado, pero no se pudo registrar el aviso '+
+        'en el servidor, asi que NO te llegaria nada: '+((err&&err.message)||err);
+      return false;
+    }
+  }
+  return true;
+}
+
 /* La pantalla del gate. No es un aviso que se pueda cerrar: es la unica pantalla que hay
    hasta que el permiso este dado. El boton reintenta y, si cuela, arranca la app de verdad. */
 function _gateNotis_(motivo, seguir){
@@ -44,9 +76,18 @@ function _gateNotis_(motivo, seguir){
      acaba de pedir, que es la peor manera de terminar. */
   if(!_gateNotis_._mirando){
     _gateNotis_._mirando=true;
-    document.addEventListener('visibilitychange', function(){
+    document.addEventListener('visibilitychange', async function(){
       if(document.hidden || !document.getElementById('loginGate')) return;
-      if(!_faltanNotis_() && _gateNotis_._seguir){ var f=_gateNotis_._seguir; _gateNotis_._seguir=null; f(); }
+      if(_faltanNotis_() || !_gateNotis_._seguir) return;
+      /* ⛔⛔ Y POR AQUI TAMBIEN SE SUSCRIBE (357.a). Esta linea era entera
+         `if(!_faltanNotis_() && _seguir){ ... f(); }`: **sin `reg`, sin `subscribe` y sin
+         `guardarPush`**, y `_faltanNotis_` solo mira `Notification.permission`. O sea que
+         activabas el permiso a mano, volvias, entrabas -- y `subscribe()` **no se habia
+         ejecutado nunca**. Y es la salida que la pantalla te manda usar.
+         ✅ Si la suscripcion falla NO se consume `_seguir`: el siguiente `visibilitychange`
+         reintenta, que es lo contrario de dejar pasar. */
+      if(!await _asegurarPush_(null)) return;
+      var f=_gateNotis_._seguir; _gateNotis_._seguir=null; f();
     });
   }
   _gateNotis_._seguir=seguir;
@@ -78,33 +119,14 @@ function _gateNotis_(motivo, seguir){
     try{
       if(Notification.permission!=='granted') await Notification.requestPermission();
       if(Notification.permission==='granted'){
-        /* Y se suscribe de verdad, no solo el permiso: un permiso sin suscripcion no
-           entrega ni un aviso, y el gate habria dejado pasar a alguien que no recibe nada. */
-        var reg=_swReg || await _registrarSW_();
-        /* ⛔ SIN SERVICE WORKER NO SE PASA. Antes se llamaba a `seguir()` igual, o sea que
-           quien no pudiera registrarlo entraba **sin ninguna suscripcion** -- justo lo que
-           este gate existe para impedir. */
-        if(!reg){
-          if(msg) msg.textContent='No se pudo preparar el aviso en este navegador. '+
-            'Prueba a abrir el panel desde el icono de la pantalla de inicio.';
-          b.disabled=false; b.textContent=boton; return;
-        }
-        await navigator.serviceWorker.ready;
-        var sub=await reg.pushManager.getSubscription();
-        if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
-        /* ⛔ Y EL ERROR DE `guardarPush` NO SE TRAGA. Es la llamada que le dice al SERVIDOR
-           donde mandar: una suscripcion que el servidor no conoce **no entrega nada**. Con
-           `catch(_){}` se pasaba el gate creyendo estar cubierto, que es el agujero que el
-           comentario de arriba dice cerrar. Ya mordio en el escritorio: faltaba esta misma
-           llamada y el fallo se lo tragaba un catch vacio, roto desde siempre y sin señal. */
-        if(typeof SESION!=='undefined' && SESION){
-          try{ await api.guardarPush(sub.toJSON()); }
-          catch(err){
-            if(msg) msg.textContent='El permiso esta dado, pero no se pudo registrar el aviso '+
-              'en el servidor, asi que NO te llegaria nada: '+((err&&err.message)||err);
-            b.disabled=false; b.textContent=boton; return;
-          }
-        }
+        /* ⛔⛔ UNA SOLA PUERTA PARA LA SUSCRIPCION (357.a, 24/08). Todo esto vivia SOLO
+           aqui, y el gate tiene **DOS salidas**: este boton y el `visibilitychange` de
+           arriba -- que es justo la que la pantalla te manda usar, porque el gate de
+           `denegado` dice literal *«Vuelve aqui despues: se comprueba solo»*. Por esa otra
+           se llamaba a `seguir()` **sin `reg`, sin `subscribe` y sin `guardarPush`**, o sea
+           con permiso dado y **cero suscripciones**. Es lo mismo que el comentario de
+           `_asegurarPush_` dice impedir, **curado en una salida y no en la de al lado**. */
+        if(!await _asegurarPush_(msg)){ b.disabled=false; b.textContent=boton; return; }
         seguir(); return;
       }
       if(msg) msg.textContent='Sigue sin permiso. Hay que darlo en los ajustes del móvil.';
@@ -171,6 +193,14 @@ function _pintarNotisLista_(){
         : '<button class="btn" data-noti="'+k+'" data-p>'+(on?'Sí':'No')+'</button>')+
       '</div></div>';
   }
+  /* ⛔⛔ EL SERVIDOR PUEDE NO LISTAR NINGUNO, Y ENTONCES SE DICE (356.a, 24/08). Sin
+     esto se pintaba **solo el pie**: la frase «Lo demas lo eliges tu» con CERO
+     interruptores debajo, que promete una eleccion que no existe y es indistinguible de
+     «no tienes nada que elegir». La gemela del escritorio YA la tenia
+     (`notis.escritorio.js:127`), asi que la misma pantalla daba **dos respuestas
+     distintas al mismo estado** segun por donde entrases. */
+  if(!filas){ c.innerHTML='<p class="rnota" style="margin:0">El servidor no ha listado '+
+    'ningún tipo de aviso.</p>'; return; }
   c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0"><b>Turnos</b>, <b>reuniones</b> y '+
     '<b>avisos y sanciones</b> llegan siempre: llevan plazo y consecuencias, y perdérselos no '+
     'es una molestia, es una sanción. Lo demás lo eliges tú.</p>';

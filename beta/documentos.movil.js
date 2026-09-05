@@ -70,7 +70,21 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq){
     /* ⛔ LA OTRA MITAD DE LA ACCION, que faltaba: el contrato define «aprobar con
        anotaciones» como ajustar titulo Y etiquetas, y `Codigo.gs:992` las aplica.
        Sin esto la pantalla prometia en su nombre algo que no podia hacer. */
-    if(acc==='anot' && etq && etq.length) e.etiquetas=etq;
+    /* ⛔⛔ LA MISMA CONDICION QUE EL SERVIDOR (359.a, 24/08). Aqui ponia
+       `&& etq && etq.length` y `Codigo.gs:1224` hace `if (extra.etiquetas)`. **`[]` es
+       TRUTHY en JS**, asi que borrar TODAS las etiquetas y aprobar con anotaciones las
+       quitaba en el servidor y **no aqui**: la pantalla seguia ensenando unas etiquetas
+       que el documento ya no tenia, hasta el siguiente refresco. Dos criterios para la
+       misma pregunta son dos preguntas.
+       📏 Y no hay tercer estado que perder: `movil.html` pasa
+       `ne=_etiquetasDeTexto_((.value)||'')`, que devuelve **siempre un array**. El campo
+       nace relleno con las actuales, asi que «no tocarlo» ya manda las mismas y
+       «vaciarlo» significa **quitalas todas**. No existe el caso «no consta».
+       ⚠️ Y la ASIMETRIA con `tit` de la linea de arriba SE QUEDA a proposito: un titulo
+       vacio NO es «quitalo» --un documento sin titulo no es un estado valido-- y ademas
+       `movil.html` ya se planta antes (*«Con anotaciones hace falta un titulo»*). Son el
+       mismo `if` con dos significados distintos, que es justo lo que los confundio. */
+    if(acc==='anot' && etq) e.etiquetas=etq;
     e.estado='publicado';
   } else if(acc==='cambios'){ e.estado='cambios'; e.nota=mot; }
   else if(acc==='rechazado'){ e.estado='rechazado'; e.nota=mot; }
@@ -490,13 +504,16 @@ function verDoc(id){
        previa»: esta pantalla existe para LEER el archivo antes de decidir, y decidir sin
        poder abrirlo es aprobar a ciegas — justo lo que venia a evitar. */
     '<h4>Documento</h4>'+
-    (_idDrive_(e.drive)
-      /* Nace ABIERTO: esta pantalla existe para leer el archivo antes de decidir, y decidir
-         sin abrirlo es aprobar a ciegas. Y ahora con pantalla completa, como el resto. */
-      ? _visorHTML_({id:_idDrive_(e.drive), url:e.drive, titulo:'El documento', sub:e.ref,
-                     queEs:'el documento', plegado:false})
-      : '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
-        'Pideselo a quien lo subio antes de decidir.</div></div>')+
+    /* ⛔ POR LA PUERTA UNICA (`_visorDocHTML_`), y la pregunta es «¿hay enlace?», no
+       «¿se le saca el id?». Con un enlace que no case con `/d/<ID>/` esto decia «no trae
+       enlace al archivo» sobre uno que SI lo trae, y mandaba a pedirselo al autor --
+       mientras el escritorio, con el mismo dato, pintaba el visor. El caso del enlace no
+       reconocible lo resuelve `_cargarVisor_`, que lo DICE y ofrece el enlace.
+       Nace ABIERTO: esta pantalla existe para leer el archivo antes de decidir, y decidir
+       sin abrirlo es aprobar a ciegas. */
+    _visorDocHTML_(e.drive, e.ref,
+      '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
+      'Pideselo a quien lo subio antes de decidir.</div></div>')+
     '<p class="rnota" style="margin-top:10px">Revisa: <b>'+revs+'</b></p>'+
     acc);
   /* Se cablea DESPUES de abrir el modal: un iframe dentro de la cadena de strings no

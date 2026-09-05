@@ -270,14 +270,13 @@ function docCard(d){
         'color:var(--ink3);line-height:1.55">'+d.iss+' aviso'+(d.iss===1?'':'s')+' de calidad, sin detalle. '+
         'Los manda Cowork con el expediente.</p></div>' : '');
   var previa = _previaDocE_(d, st);
-  var idD=_idDrive_(d.drive);
-  var visor = d.drive
-    /* Nace ABIERTO, igual que en el movil: esta ficha existe para leer el archivo antes de
-       decidir. Y con pantalla completa, que era lo que faltaba aqui y estaba en otro sitio. */
-    ? _visorHTML_({id:idD, url:d.drive, titulo:'El documento', sub:d.ref,
-                   queEs:'el documento', plegado:false})
-    : '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
-      'Cowork lo manda en <span class="mono">enlaceDrive</span>; sin él no hay nada que leer aquí.</div></div>';
+  /* ⛔ POR LA PUERTA UNICA (`_visorDocHTML_`). Esta cara ya acertaba -- preguntaba «¿hay
+     enlace?» --, y va por la puerta igual: dos criterios para la misma pregunta se separan
+     el dia que alguien toca uno, y esto ya habia divergido una vez.
+     Nace ABIERTO: esta ficha existe para leer el archivo antes de decidir. */
+  var visor = _visorDocHTML_(d.drive, d.ref,
+    '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
+    'Cowork lo manda en <span class="mono">enlaceDrive</span>; sin él no hay nada que leer aquí.</div></div>');
   var acc;
   if(puede){
     acc='<label style="display:block;margin-top:11px">'+

@@ -64,7 +64,23 @@ function _justUtil_(tarea, just){
   return pela(j) === pela(tarea || '') ? '' : j;
 }
 
-function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+/* ⛔⛔ LAS COMILLAS TAMBIEN (348.a, 24/08). Esto escapaba `&`, `<` y `>` y **no la
+   comilla**, y de sus llamadas **83 caen dentro de un atributo entrecomillado**; **23 de
+   esas llevan texto que TECLEA UNA PERSONA**: el «Que ha pasado» de una sancion, el nombre
+   de la tarea al declarar horas, el rol de un turno, el titulo del buzon, el orden del dia.
+   Con la comilla cruda el `value="` **se corta ahi** y lo demas se pierde -- no es XSS
+   teorico, es **perdida de lo escrito** en formularios que se repintan solos, y varios de
+   esos campos hacen round-trip (se recogen del DOM y se vuelven a pintar).
+   📏 Y la premisa no era hipotetica: `datos/turnos.json` ya trae **4 textos reales** del
+   equipo con `"` dentro (`Colocar "tapas" de carbono...`). La gente de Solaris escribe
+   comillas. Hoy esos cuatro caen en un `<li>` y no rompen -- pero el mismo campo, el mismo
+   teclado, en un `value=` si.
+   ⚠️ Y habia un guardia VERDE prometiendo justo esto: `probar_buzon_movil.py` exigia `esc(`
+   diciendo *«un titulo con una comilla dentro cerraria el atributo»* -- y `esc(` era
+   exactamente lo que NO paraba una comilla. Un ROTULO, no una guarda.
+   ⚠️ Se escapa tambien la simple: hay atributos con `'...'` y en texto de nodo `&#39;` se
+   pinta como `'`, o sea que no cambia nada de lo que ya se veia bien. */
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 function pad(n){return String(n).padStart(2,'0');}
 
@@ -1131,6 +1147,24 @@ function _dudososTurno_(t){
     out.push(n);
   });
   return out;
+}
+
+/* ⛔ LO QUE IDENTIFICA UN TURNO, Y NO ES SU POSICION EN `TURNOS`.
+   `escritorio.html` RELLENA ese array EN SITIO en sus dos cargas (`TURNOS.length=0;
+   t.forEach(push)`), asi que un indice guardado sobrevive al refresco apuntando a OTRO
+   turno: basta con que aparezca uno nuevo o se caiga uno. La pantalla de cierre guardaba
+   la posicion, y con ella se manda el reparto de horas contra quien no era, sin un solo
+   error a la vista.
+   ⚠️ LOS TURNOS NO TRAEN `id`: vienen del Discord por `datos/turnos.json` y sus campos son
+   `fecha`, `hora`, `punto`, `roles`... Asi que la clave se DERIVA, y de los tres campos que
+   el desplegable ya pinta -- si dos turnos comparten los tres, la persona tampoco puede
+   distinguirlos en la lista, o sea que elegir el primero es lo unico que se puede hacer.
+   📏 Medido sobre los 23 turnos reales: las 23 claves son distintas.
+   ⚠️ Devuelve `null` para «no hay turno», nunca la cadena vacia: una cadena vacia casaria
+   con otro turno igual de vacio. */
+function _claveTurno_(t){
+  if(!t) return null;
+  return String(t.fecha || '') + '|' + String(t.hora || '') + '|' + String(t.punto || '');
 }
 
 /* El nombre del responsable de turno, o `null` si el turno no lo tiene.
@@ -2317,6 +2351,25 @@ function _numPlan_(v){
 /* De una URL de Drive saca el id del fichero, para poder pedir su visor incrustable. */
 function _idDrive_(u){ var m=String(u||'').match(/\/d\/([A-Za-z0-9_-]{20,})/); return m?m[1]:null; }
 
+/* ⛔⛔ LA PUERTA UNICA DEL VISOR DE UN DOCUMENTO, Y LA PREGUNTA ES «¿HAY ENLACE?».
+   Las dos caras contestaban esto con criterios distintos: el escritorio preguntaba
+   `d.drive` y el movil `_idDrive_(e.drive)`. Con un enlace de Drive que no case con
+   `/d/<ID>/` el movil decia «Este expediente no trae enlace al archivo. Pideselo a quien lo
+   subio antes de decidir» -- una frase FALSA sobre un expediente que si lo trae, y que
+   ademas manda a molestar al autor -- mientras el escritorio pintaba el visor con el mismo
+   dato. Las diferencias entre dos criterios para la misma pregunta SON los fallos.
+   ✅ Y el tercer estado ya estaba resuelto aqui debajo: `_cargarVisor_` dice «El enlace no
+   es un archivo de Drive reconocible. Abrelo con el enlace de abajo» y `_visorHTML_` pinta
+   el «abrir en Drive». O sea que no habia que inventar nada: habia que DEJAR LLEGAR.
+   ⚠️ `sinEnlace` lo pone cada cara porque su texto no es el mismo: el escritorio nombra el
+   campo `enlaceDrive` de Cowork y el movil manda a pedirselo al autor. Lo que se unifica es
+   la PUERTA, no la prosa. */
+function _visorDocHTML_(url, sub, sinEnlace){
+  if(!url) return sinEnlace;
+  return _visorHTML_({id:_idDrive_(url), url:url, titulo:'El documento', sub:sub,
+                      queEs:'el documento', plegado:false});
+}
+
 function _visorHTML_(o){
   var abierto = !o.plegado;
   return '<div class="doc" data-visor>'+
@@ -2343,14 +2396,34 @@ function _cargarVisor_(cuerpo, id){
   var que=cuerpo.dataset.quees||'el documento';
   if(!id){ cuerpo.innerHTML='<div class="dcar">El enlace no es un archivo de Drive reconocible.<br>'+
     'Ábrelo con el enlace de abajo.</div>'; return; }
-  cuerpo.innerHTML='<div class="dcar">Cargando '+que+'…</div>';
+  /* ⛔⛔ EL AVISO SE QUEDA HASTA QUE EL VISOR CARGUE (358.a, 24/08). Aqui se escribia
+     «Cargando …» y **cuatro sentencias mas abajo** habia un `cuerpo.innerHTML=''` que lo
+     borraba **en el mismo tick**: entre medias no hay nada que ceda el hilo (`setTimeout`
+     REGISTRA, `f.onload=` ASIGNA), asi que el aviso no llegaba a verse **nunca**.
+     📏 Y lo que quedaba no era un hueco blanco: `.dv` es `#2a2526`, o sea **280-340 px de
+     gris liso sin una palabra**, hasta **6.000 ms** -- el propio temporizador de aqui abajo.
+     Quien revisa no sabe si esperar o si esta roto, que es justo lo que el docstring de
+     esta funcion dice evitar.
+     ✅ Y la cura NO es solo quitar el `innerHTML=''`: `.dcar` no esta posicionado y en
+     `.doc.full .vcuerpo{display:flex}` quedaria **al lado** del PDF para siempre. Se guarda
+     el nodo y se quita en `f.onload`, que es cuando deja de hacer falta. Mientras carga
+     comparten fila --con el visor todavia en gris--, y eso es mejor que un gris mudo.
+     ⚠️ Y se construye con `createElement`+`textContent`, no concatenando `innerHTML`: `que`
+     sale de `dataset.quees`, que el navegador ya **des-escapa** al leerlo, asi que volver a
+     meterlo en `innerHTML` lo re-interpretaba como HTML. */
+  cuerpo.innerHTML='';
+  var car=document.createElement('div');
+  car.className='dcar'; car.textContent='Cargando '+que+'…';
+  cuerpo.appendChild(car);
   var f=document.createElement('iframe');
   f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
   f.src='https://drive.google.com/file/d/'+id+'/preview';
   var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
     cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
-  f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo); };
-  cuerpo.innerHTML=''; cuerpo.appendChild(f);
+  f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo);
+    /* ✅ AQUI, y no antes: es el unico momento en que se sabe que hay algo que mirar. */
+    if(car && car.parentNode) car.parentNode.removeChild(car); };
+  cuerpo.appendChild(f);
 }
 
 function _cablearVisor_(raiz){
@@ -2432,6 +2505,20 @@ async function _pushInit_(){
            Con la constancia puesta, la pantalla de avisos puede decir que tu suscripcion
            no esta registrada en vez de enseñar un «activadas» en verde. */
         _pushFallo_('sin sesi\u00f3n al arrancar: el aviso no se registr\u00f3 en el servidor');
+      } else {
+        /* ⛔⛔ EL TERCER ESTADO, QUE NO DEJABA NINGUN RASTRO (360.a, 24/08). Los otros dos
+           --con sesion y sin sesion-- ya se apuntan aqui arriba; **este no tenia `else`**.
+           Y es el peor de los tres: **permiso dado y CERO suscripciones**, que es
+           literalmente el estado por el que esta funcion existe. El escritorio pintaba
+           «activadas» en verde, `_faltanNotis_()` devolvia `null` --o sea que el gate se
+           franquea-- y no llegaba ni un aviso. **Verde en las dos caras, cero avisos**, en
+           una app que declara las notificaciones obligatorias.
+           ⚠️ Y NO se re-suscribe desde aqui a proposito: esto corre a los 800 ms del
+           arranque, sin gesto de nadie, y `subscribe()` sin gesto no es fiable en todos
+           los navegadores. Quien SI se suscribe es `_asegurarPush_`, la puerta unica del
+           gate (357.a). Lo que faltaba aqui era **decirlo**. */
+        _pushFallo_('el permiso est\u00e1 dado pero no hay suscripci\u00f3n: no te '+
+          'llegar\u00eda ning\u00fan aviso. Vuelve a entrar para reactivarlos.');
       }
     }
   }catch(e){
@@ -3373,6 +3460,38 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-06-semana-sin-abrir', fecha:'2026-09-06',
+      titulo:'El tel\u00e9fono dec\u00eda que no hab\u00eda semana convocada teni\u00e9ndola',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'Desde que se convoca una semana hasta que se abre el plazo pueden pasar **d\u00edas**, y en todo ese rato la pantalla dec\u00eda **\u00abahora mismo no hay ninguna semana convocada\u00bb** \u2014 teni\u00e9ndola. Ahora sale **la semana entera**: qu\u00e9 d\u00edas, qu\u00e9 franjas y **cu\u00e1ndo se abre**. Las casillas se ven en gris y no se pueden marcar hasta que empiece el plazo, que es cuando el equipo recibe el aviso.'}
+      ] },
+    { id:'2026-09-06-minimo-rotulo', fecha:'2026-09-06',
+      titulo:'El panel de riesgo dec\u00eda que el m\u00ednimo lo hab\u00eda fijado alguien, y no',
+      items:[
+        {cara:'escritorio', vista:'dispo', txt:'Debajo de cada nombre en riesgo se le\u00eda **\u00abN franjas (lo fij\u00f3 quien convoca)\u00bb** \u2014 tambi\u00e9n en reuniones donde **nadie fij\u00f3 nada**, que hoy son **todas**: ese campo no lo escribe ning\u00fan sitio en producci\u00f3n. Ahora, cuando el m\u00ednimo lo calcula la app, se dice **contra qu\u00e9 porcentaje y sobre cu\u00e1ntas franjas** \u2014 \u00ab3 franjas (30 % de 8)\u00bb \u2014, que es lo que hace falta para discutir un \u00ab\u22121 punto\u00bb.'}
+      ] },
+    { id:'2026-09-06-just-duplicada-movil', fecha:'2026-09-06',
+      titulo:'El m\u00f3vil repet\u00eda la tarea debajo de s\u00ed misma al firmar horas',
+      items:[
+        {cara:'movil', vista:'horas', txt:'En la ficha con la que se **firman** horas, una justificaci\u00f3n que repet\u00eda la tarea sal\u00eda **otra vez debajo** \u2014 y una de s\u00f3lo espacios dejaba una **caja con borde y nada dentro**. El ordenador ya lo filtraba desde el 18/08; el tel\u00e9fono, que es la cara con la que se firma, no. Ahora las dos usan la misma regla, y lo que S\u00cD aporta se sigue viendo entero.'},
+        {cara:'movil', vista:'horas', txt:'Y en **\u00abTus partes\u00bb** tampoco se repite: esa lista lo le\u00eda por otro campo, as\u00ed que el mismo parte sal\u00eda duplicado en la otra lista de la misma pantalla. \u26a0\ufe0f Lo que **no** cambia es el *\u00abte piden: \u2026\u00bb* de un parte al que se le pide detalle: ah\u00ed se sigue ense\u00f1ando la pregunta entera, aunque coincida con la tarea.'}
+      ] },
+    { id:'2026-08-24-push-sin-suscripcion', fecha:'2026-08-24',
+      titulo:'Las notificaciones pod\u00edan salir en verde sin que llegara ni un aviso',
+      items:[
+        {cara:'movil', vista:'estado', txt:'**Con el permiso dado pero sin suscripci\u00f3n, la app se quedaba callada**: no re-suscrib\u00eda a nadie y no dejaba se\u00f1al, as\u00ed que las dos caras dec\u00edan \u00abactivadas\u00bb y no llegaba **ni un aviso**. Ahora lo dice, y te manda volver a entrar para reactivarlos.'},
+        {cara:'escritorio', vista:'estado', txt:'**Con el permiso dado pero sin suscripci\u00f3n, la app se quedaba callada**: no re-suscrib\u00eda a nadie y no dejaba se\u00f1al, as\u00ed que las dos caras dec\u00edan \u00abactivadas\u00bb y no llegaba **ni un aviso**. Ahora lo dice, y te manda volver a entrar para reactivarlos.'}
+      ] },
+    { id:'2026-08-24-visor-cargando', fecha:'2026-08-24',
+      titulo:'El visor de documentos no dec\u00eda \u00abCargando\u00bb: ense\u00f1aba un rect\u00e1ngulo gris mudo',
+      items:[
+        /* ⛔ UNA ENTRADA POR CARA, no `cara:'ambas'`: `probar_novedades.py` se pone rojo
+           porque una cara desconocida **no casa con el filtro y el punto DESAPARECE**. */
+        {cara:'movil', vista:'docs', txt:'**Al abrir un documento sal\u00eda un bloque gris de 280-340 px sin una palabra**, hasta **6 segundos**. El aviso \u00abCargando el documento\u2026\u00bb s\u00ed se escrib\u00eda \u2014 y se borraba **cuatro sentencias despu\u00e9s, en el mismo instante**, antes de que la pantalla llegara a pintarlo. Quien revisaba no sab\u00eda si esperar o si estaba roto.'},
+        {cara:'escritorio', vista:'docs', txt:'**Al abrir un documento sal\u00eda un bloque gris de 280-340 px sin una palabra**, hasta **6 segundos**. El aviso \u00abCargando el documento\u2026\u00bb s\u00ed se escrib\u00eda \u2014 y se borraba **cuatro sentencias despu\u00e9s, en el mismo instante**, antes de que la pantalla llegara a pintarlo. Quien revisaba no sab\u00eda si esperar o si estaba roto.'},
+        {cara:'movil', vista:'docs', txt:'**Ahora el aviso se queda hasta que el visor carga**, y desaparece justo cuando hay algo que mirar. Si a los 6 s no ha cargado, sigue diciendo por qu\u00e9 y ofreciendo el enlace de Drive.'},
+        {cara:'escritorio', vista:'docs', txt:'**Ahora el aviso se queda hasta que el visor carga**, y desaparece justo cuando hay algo que mirar. Si a los 6 s no ha cargado, sigue diciendo por qu\u00e9 y ofreciendo el enlace de Drive.'}
+      ] },
     { id:'2026-08-23-pie-turnos-unidad', fecha:'2026-08-23',
       titulo:'El pie de Turnos mezclaba horas y casillas en la misma frase',
       items:[

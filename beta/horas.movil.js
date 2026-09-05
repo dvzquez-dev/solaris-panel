@@ -63,7 +63,16 @@ function _origenParte_(p){
 function normPMovil(p){
   return { id:p.id, f:_isoADMY_(p.fecha), iso:String(p.fecha||''), t:p.tarea||'', q:Number(p.horas)||0,
     e:_E_MOVIL_[p.estado]||'pend', ini:p.ini||'', fin:p.fin||'', cat:p.categoria||null,
-    just:p.justificacion||'', nota:p.motivo||p.justificacion||'', sinFichaje:!!p.sinFichaje,
+    /* ⛔ LA PUERTA VA DENTRO DEL `||`, NO ENVOLVIENDOLO, y no es estilo: `nota` mezcla
+       DOS cosas distintas --el motivo de una decision y la justificacion del autor-- y
+       el motivo pasa ENTERO, sin gatear, porque `filaParte` tiene escrito «SE ENSENA LA
+       PREGUNTA, NO QUE HAY UNA». Gatearlo convierte «te piden: Montaje» en «te piden
+       mas detalle» y deshace esa decision.
+       ⚠️ Aqui `p` es el parte CRUDO, asi que el campo si se llama `tarea` --al reves
+       que en `_pdFichaHTML_`, que recibe lo normalizado--. Se cura en el PRODUCTOR
+       porque cierra de golpe las cinco ramas de `filaParte`: la sub-expresion
+       `(p.nota?' · '+esc(p.nota):'')` sale TRES veces y no se puede parchear una a una. */
+    just:p.justificacion||'', nota:p.motivo||_justUtil_(p.tarea, p.justificacion)||'', sinFichaje:!!p.sinFichaje,
     /* DE DONDE VIENE la hora: 'fichaje' | 'manual' | 'otorgada'. El backend lo guarda desde
        siempre y aqui se tiraba, asi que la vista solo tenia el booleano `sinFichaje` —que
        dice lo que FALTA, no de donde sale— y llamaba «sin fichaje» a lo que otorga el
@@ -1373,7 +1382,15 @@ function _pdFichaHTML_(p){
           '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(p.ini)+'–'+esc(p.fin)+'</small></div>'+
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
         '<div class="pdt">'+esc(p.t)+'</div>'+
-        (p.just?'<div class="pdj">'+esc(p.just)+'</div>':'')+
+        /* ⛔⛔ `p.t`, NO `p.tarea`: `_normPDec_` RENOMBRA el campo al normalizar, y una
+           copia literal de la linea del escritorio compara contra `undefined` -- nunca
+           coincide, asi que el duplicado vuelve SIN DAR ERROR. Medido ejecutando las
+           dos formas: con `p.tarea` sale 'Reunion de puesta en marcha de Longship'.
+           ⛔ Y el criterio de aqui era `p.just?`, propio del movil, que solo caza la
+           vacia: de las dos capturas de Daniel del 18/08 seguian vivas la del DUPLICADO
+           y la de la caja de SOLO ESPACIOS (`'   '` es cierto). Esta es la cara con la
+           que se FIRMAN horas; `_justUtil_` estaba en las dos tarjetas de la otra. */
+        (function(_j){ return _j?'<div class="pdj">'+esc(_j)+'</div>':''; })(_justUtil_(p.t, p.just))+
         /* ⛔ EL ROTULO SALE DE `origen`, NO DEL BOOLEANO. Con `sinFichaje` esta ficha
            llamaba «declarado sin fichaje» a un parte que ensena su hora de entrada y salida
            dos lineas mas arriba, y tambien a lo que otorga la coordinacion. Es la ficha que

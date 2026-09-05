@@ -294,7 +294,32 @@ function _cablearSanciones_(){
          SALTA y la devuelve en `rechazadas`. Sin mirarlo, el `tost` de abajo diria
          «Sancion puesta a Fulano» sobre una sancion que no existe. Se relanza para caer
          en el `catch` de siempre y que el mensaje sea el mismo de antes. */
-      var r = await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual'}]);
+      /* ⛔ UNA CLAVE POR ENVÍO, Y NACE EN EL FORMULARIO. `api._post` hace tres
+         intentos contra un fallo de transporte, y si lo que se pierde es la RESPUESTA
+         el servidor ya escribió: sin clave, el reintento pone la sanción otra vez, y
+         cada copia son hasta -5 puntos sobre una persona real — y bloquea el cierre
+         del mes.
+         ⛔⛔ Y NO SE FABRICA EN LA LLAMADA, que es la forma que parece correcta: así
+         cubre los tres intentos automáticos pero NO el reintento A MANO — el usuario
+         ve el error, vuelve a pulsar, y esa segunda pulsación traería una clave nueva
+         sobre una sanción que el servidor SÍ guardó. Es exactamente el fallo que ya
+         se pagó en `horas.movil.js` y cuyo motivo está escrito en
+         `probar_clave_parte.py`: la clave vive en el formulario y se va con él.
+         ⛔⛔ PERO NO PUEDE SOBREVIVIR A UN CAMBIO DE LO QUE SE MANDA, y esto casi se me
+         escapa: `marcar()` cambia `SANC_FORM.quien` sin tocar la clave y el `catch` no
+         vacía el formulario — a propósito. Mando −1 a A, se pierde la RESPUESTA (el
+         servidor SÍ escribió), veo el error, me doy cuenta de que era B, pulso otra
+         vez: misma clave, el servidor la deduplica, y **la sanción a B no existe**.
+         ✅ Por eso la clave se ata a la HUELLA del envío y se renueva si cambia
+         cualquiera de sus cuatro campos. ⚠️ No es deduplicar por contenido —que sería
+         decidir por el usuario, y `probar_clave_parte.py` lo prohibe por escrito—:
+         el éxito vacía `SANC_FORM` entero, así que dos sanciones idénticas seguidas
+         llevan claves distintas. Lo único que comparte clave es el MISMO envío
+         repetido sin éxito en medio, que es la definición de un reintento. */
+      var _huellaSanc = quien+'|'+texto+'|'+art+'|'+pts;
+      if(SANC_FORM.claveDe !== _huellaSanc){
+        SANC_FORM.clave = _claveUso_(); SANC_FORM.claveDe = _huellaSanc; }
+      var r = await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual', clave:SANC_FORM.clave}]);
       if(r && r.rechazadas && r.rechazadas.length)
         throw new Error('no puedes sancionar a '+r.rechazadas.join(', ')+
                         ': esta fuera de tu jurisdiccion');
@@ -305,8 +330,16 @@ function _cablearSanciones_(){
       if(r && r.invalidas && r.invalidas.length)
         throw new Error('el servidor no acepta esos puntos ('+pts+'): el RRI va de -5 '+
                         'a +2, enteros');
+      /* ⛔⛔ Y `duplicadas` TAMBIÉN SE LEE, que es la tercera lista y la que no tenía
+         consumidor. Significa «esto ya estaba puesto»: la fila es del envío anterior,
+         no de éste. Cantar «Sanción puesta a X» sobre ella es el mismo fallo que la
+         gemela del escritorio ya nombra —«SE CUENTA LO QUE ENTRÓ, NO LO QUE SE
+         MANDÓ»—, y aquí además tapa el caso en que la persona cambió el destinatario
+         tras un error. No es un error: se dice, y se sigue. */
+      var _yaEstaba = !!(r && r.duplicadas && r.duplicadas.length);
       SANC_M=null; SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
-      tost('Sanción puesta a '+(_pilaDeM_(quien)||quien)+'.'+(esDePlazo?' Plazo movido en Notion.':''));
+      tost((_yaEstaba ? 'Esa sanción YA estaba puesta (era un reintento): a '
+                      : 'Sanción puesta a ')+(_pilaDeM_(quien)||quien)+'.'+(esDePlazo?' Plazo movido en Notion.':''));
       _abrirSanciones_();
     }catch(e){
       bt.disabled=false; bt.textContent=prev;

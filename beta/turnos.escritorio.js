@@ -540,7 +540,20 @@ function _dispCargar_(repintar){
     if(r && r.convocatoria){
       var cv=r.convocatoria;
       cv.resp = r.cv || {};
-      cv.abierta = !!r.abierta;
+      /* ⛔⛔ SIN `!!` (447.ª, 05/09). El guardia que lo lee tiene escrito su porque:
+         `_convEstado_` usa `cv.abierta === false` y NO `!cv.abierta` porque *«una
+         convocatoria vieja sin el campo es «no lo se», y cerrarla seria inventar»*.
+         Con `!!`, un `undefined` se volvia `false` AQUI, antes de que el guardia lo
+         mirara: el productor decidia por el, y el panel de contestar desaparecia sin
+         una palabra. El movil ya lo copiaba asi (`turnos.movil.js`): dos criterios
+         para el mismo campo son el bug.
+         ⚠️ Hoy es LATENTE -- el backend manda `abierta` por las dos puertas
+         (`Codigo.gs:2922` y `:2968`)--, y se cura por el mismo motivo que la 295.a:
+         porque son dos criterios, no porque sangre.
+         ⚠️ Y no basta un `in` sobre el fuente para vigilarlo: `!!r.abierta` conserva
+         los dos literales que el `ok` de `probar_mi_turno.py` buscaba. Por eso el caso
+         EJECUTA esta expresion. */
+      cv.abierta = r.abierta;
       CONVOCATORIAS.push(cv);
     }
     if(typeof repintar==='function') repintar();
@@ -814,15 +827,42 @@ function cablearCoches(){
    exige el visto bueno de Daniel **cada vez**, y son los puntos de personas reales. */
 function _turnosCerrables_(){
   var out = [];
-  (typeof TURNOS !== 'undefined' ? TURNOS : []).forEach(function(t, i){
-    if(_puedeCerrarTurno_(t, ACTOR)) out.push(i);
+  /* ⛔ CLAVES, NO POSICIONES. `escritorio.html` rellena `TURNOS` EN SITIO en sus dos
+     cargas (`TURNOS.length=0; t.forEach(push)`), asi que un indice guardado sobrevive al
+     refresco apuntando a OTRO turno -- y esto es justo lo que viaja al `value` del
+     `<option>` y vuelve por el `onchange`. */
+  (typeof TURNOS !== 'undefined' ? TURNOS : []).forEach(function(t){
+    if(_puedeCerrarTurno_(t, ACTOR)) out.push(_claveTurno_(t));
   });
   return out;
 }
 
+/* El turno que lleva esa clave, o `null`. Si dos la comparten se devuelve el primero:
+   el desplegable pinta esos mismos tres campos, asi que la persona tampoco puede
+   distinguirlos -- y elegir el primero es lo unico que se puede hacer sin inventar. */
+function _turnoDeClave_(k){
+  var l = (typeof TURNOS !== 'undefined' ? TURNOS : []);
+  if(k == null) return null;
+  for(var i=0;i<l.length;i++) if(_claveTurno_(l[i]) === k) return l[i];
+  return null;
+}
+
+/* ⛔⛔ EL TURNO QUE SE ESTA CERRANDO, BUSCADO POR CLAVE Y VUELTO A AUTORIZAR.
+   Antes esto era `l[CIERRE_TUR.i]`: la POSICION guardada. Con el refresco rellenando
+   `TURNOS` en sitio, esa posicion pasa a apuntar a otro turno mientras `quien`, `extra` y
+   `dur` siguen con lo tecleado para el anterior -- y el reparto de horas se manda contra
+   quien no era, sin un solo error a la vista.
+   ⛔ Y SE VUELVE A PREGUNTAR `_puedeCerrarTurno_`: entre dos refrescos el responsable
+   puede cambiar, y un turno que ya no es tuyo no se cierra. Preguntarlo solo al pintar la
+   lista deja la decision congelada en el momento del primer render. */
 function _cierreTurSel_(){
   var l = (typeof TURNOS !== 'undefined' ? TURNOS : []);
-  return (CIERRE_TUR.i == null) ? null : (l[CIERRE_TUR.i] || null);
+  if(CIERRE_TUR.k == null) return null;
+  for(var i=0;i<l.length;i++){
+    if(_claveTurno_(l[i]) === CIERRE_TUR.k)
+      return _puedeCerrarTurno_(l[i], ACTOR) ? l[i] : null;
+  }
+  return null;
 }
 
 /* El techo de esta pantalla. `dur` es texto libre del campo, asi que puede no ser un numero:
@@ -856,7 +896,7 @@ function _cierreTurMapa_(){
 function _cierreTurnoPanel_(){
   var cerrables = _turnosCerrables_();
   if(!cerrables.length) return '';
-  if(CIERRE_TUR.i == null) CIERRE_TUR.i = cerrables[0];
+  if(CIERRE_TUR.k == null) CIERRE_TUR.k = cerrables[0];
 
   var t = _cierreTurSel_(), firmes = _asistentesTurno_(t), tope = _cierreTurTope_();
   var resp = _responsableTurno_(t);
@@ -883,9 +923,13 @@ function _cierreTurnoPanel_(){
 
   var mapa = _cierreTurMapa_(), falta = _cierreTurnoFalta_(mapa, tope);
 
-  var opciones = cerrables.map(function(i){
-    var x = TURNOS[i], f = x.fecha_txt || x.fecha || x.f || '?';
-    return '<option value="'+i+'"'+(i===CIERRE_TUR.i?' selected':'')+'>'+
+  /* ⚠️ EL `value` VA POR `esc`: la clave lleva el `punto`, que es texto libre del
+     Discord y puede traer comillas -- sin escapar, romperia el atributo y el `<option>`
+     dejaria de tener valor. */
+  var opciones = cerrables.map(function(k){
+    var x = _turnoDeClave_(k), f = (x && (x.fecha_txt || x.fecha || x.f)) || '?';
+    if(!x) return '';
+    return '<option value="'+esc(k)+'"'+(k===CIERRE_TUR.k?' selected':'')+'>'+
       esc(f + (x.hora ? ' · '+String(x.hora).slice(0,5) : '') +
           (x.punto ? ' · '+x.punto : '')) + '</option>';
   }).join('');
@@ -963,7 +1007,9 @@ function _cablearCierreTurno_(){
     /* ⛔ Al cambiar de turno se BORRA el reparto: si se conservara, las horas escritas para
        una persona de un turno saldrian sembradas en otro turno distinto, con su nombre y con
        cara de haber sido tecleadas ahi. */
-    CIERRE_TUR.i = +sel.value; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {};
+    /* ⚠️ SIN `+`: el valor es una CLAVE, no un numero. Con `+` daba `NaN` y el panel
+       se quedaba sin turno elegido. */
+    CIERRE_TUR.k = sel.value; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {};
     CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
   };
   var dur = document.getElementById('ctDur');
