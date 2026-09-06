@@ -231,7 +231,19 @@ function _miTurnoCv_(){
   var L = (typeof CONVOCATORIAS!=='undefined'?CONVOCATORIAS:[]);
   for(var i=0;i<L.length;i++){
     var cv=L[i];
-    if(_convEstado_(cv)!=='abierta') continue;
+    /* ⛔⛔ TRES ESTADOS, NO DOS (459.ª) — la gemela de `_convAbierta_` del móvil, y con
+       un síntoma DISTINTO: aquí `_miTurnoPanel_` devolvía `''`, o sea que el panel
+       **desaparecía sin una palabra** —ni siquiera el aviso de `_dispAviso_`, que sólo
+       habla de fallos de red— mientras `_dispPanel_`, que llega por `_dispViva_` y **no
+       filtra por estado**, pintaba al lado «semana del … · el plazo vence el …». Dos
+       paneles de la misma pantalla contradiciéndose.
+       ⛔⛔ Y CURAR ESTO SOLO ABRE UNA ESCRITURA QUE NO EXISTÍA: `_cablearMiTurno_` cuelga
+       el `onclick` de `[data-mtk]` y el botón llama a `api.guardarDisponibilidad`, que
+       `Codigo.gs:2938` **acepta** en `sin_abrir` porque sólo mira `limite`. Por eso va
+       con `_miTurnoPreHTML_` (que no pinta `data-mtk`) y con el guardia de
+       `[data-mtguardar]`. El móvil ya tenía el suyo escrito; ésta **no**. */
+    var _e=_convEstado_(cv);
+    if(_e!=='abierta' && _e!=='sin_abrir') continue;
     var inv=cv.invitados||[];
     if(!inv.length || inv.indexOf(yo)>=0) return cv;
   }
@@ -322,11 +334,51 @@ function _mitPlazoTxt_(cv, ahora){
        : q<1  ? 'te quedan '+Math.round(q*60)+' min para contestar'
               : 'te quedan '+Math.round(q)+' h para contestar';
 }
+/* «Tu disponibilidad» cuando la convocatoria existe y el plazo TODAVÍA NO ABRE (459.ª).
+
+   ⛔ MISMO CRITERIO QUE EL MÓVIL (`_convPreHTML_`), y no es cosmética: la cabecera de este
+   bloque promete *«MISMO CONTRATO QUE EL MÓVIL, a propósito»*, y dos caras contestando
+   distinto a «¿qué se ve en `sin_abrir`?» es exactamente la divergencia que ese contrato
+   existe para impedir.
+   ⛔ SIN `data-mtk` Y SIN PINCELES: `_cablearMiTurno_` engancha por `[data-mtk]`, así que una
+   celda sin el atributo **no tiene manejador**. El guardia del botón de guardar es la segunda
+   capa, no la primera — y el botón no se pinta.
+   ⚠️ `_mitPlazoTxt_` NO vale de subtítulo: mide contra `limite`, y en `sin_abrir` rotula «te
+   quedan N h para contestar» cuando **no se puede contestar nada**. */
+function _miTurnoPreHTML_(cv){
+  var D=cv.dias||[], F=cv.franjas||[];
+  /* ⛔ POR `_normAbre_` (463.ª): con `_dmyAISO_` a pelo, un `abre` sin hora —o en
+     `DD/MM/AAAA`— dejaba `abH` VACÍO y la tarjeta rotulaba *«Se abre el 09/09/2026 a
+     las **.**»*. La puerta le pone `00:00`, que es lo que significa «se abre ese día». */
+  var ab=_normAbre_(cv.abre);
+  var abD=_isoADMY_(ab.slice(0,10))||ab.slice(0,10), abH=ab.slice(11,16);
+  var cab='<div class="dmc dml"></div>'+D.map(function(d){
+    var p=String(_diaCorto_(d)).split(' ');
+    return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
+  }).join('');
+  var filas=F.map(function(fr){
+    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+
+      D.map(function(){ return '<div class="dcel off"></div>'; }).join('');
+  }).join('');
+  return pan('Tu disponibilidad', 'se abre el '+esc(abD)+' a las '+esc(abH),
+    '<div class="pb" data-abre="'+esc(ab)+'">'+
+    '<p style="margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
+      'Esta es la semana que se va a preguntar. <b>Todav\u00eda no se puede contestar</b>: el '+
+      'plazo se abre el <b>'+esc(abD)+'</b> a las '+esc(abH)+' \u2014 que es cuando el equipo '+
+      'recibe el aviso \u2014 y entonces esta rejilla se vuelve pintable.</p>'+
+    '<div class="dmapa" style="grid-template-columns:104px repeat('+D.length+
+      ',minmax(44px,1fr))">'+cab+filas+'</div>'+
+    '</div>');
+}
+
 function _miTurnoPanel_(){
   /* ⚠️ Misma guarda y por el mismo motivo que en `_dispPanel_`: esta es la mitad que le
      cuesta la semana a quien iba a contestar. */
   var av=_dispAviso_('Tu disponibilidad'); if(av) return av;
   var cv=_miTurnoCv_(); if(!cv) return '';
+  /* ⛔ Fuera del panel a propósito, como `_mitPlazoTxt_`: metida dentro no hay forma de
+     ejecutarla en el arnés y su mutación sale ciega. */
+  if(_convEstado_(cv)==='sin_abrir') return _miTurnoPreHTML_(cv);
   var mias=_misCeldas_(cv), D=cv.dias||[], F=cv.franjas||[];
   /* ⛔ LA TABLA DE ROTULOS SE FUE A `comun.js` (290.a, 23/08), por el mismo motivo por el
      que se fue `_convClases_`: la lista y su etiqueta son LA MISMA decision, y tenerlas
@@ -395,6 +447,20 @@ function _cablearMiTurno_(){
         return;
       }
       var cv=_miTurnoCv_(); if(!cv) return;
+      /* ⛔⛔ EL GUARDIA QUE EL MÓVIL YA TENÍA Y ÉSTA NO (459.ª). Desde que
+         `_miTurnoCv_` deja pasar `sin_abrir`, este manejador es alcanzable con el plazo
+         sin abrir — y `api.guardarDisponibilidad` lo **ACEPTA**: `Codigo.gs:2938` sólo
+         mira `limite`. La primera capa es que `_miTurnoPreHTML_` no pinta `data-mtk` ni
+         el botón; ésta es la segunda, **para un DOM viejo** en una pestaña que lleva
+         días abierta — que es el caso que el propio backend cita.
+         ⛔ La autoridad es `reglas/convocatoria.py:175 admite_respuesta`
+         (`estado_en(…) == "abierta"`), y `mutar.py` ya tiene clasificada como defecto la
+         mutación que la relaja a `!= "cerrada"`. Ver el porqué entero en
+         `turnos.movil.js`, en el guardia del `pointerdown`. */
+      if(_convEstado_(cv)!=='abierta'){
+        tost('El plazo todav\u00eda no est\u00e1 abierto: tu disponibilidad no se guarda.');
+        return;
+      }
       var mias=_misCeldas_(cv);
       b.disabled=true; var t=b.textContent; b.textContent='Guardando\u2026';
       try{
@@ -451,6 +517,16 @@ function _dispPanel_(){
   /* ⚠️ ANTES de `_dispViva_()`: si se pone despues, el `return ''` de abajo se lleva el
      aviso por delante y el panel vuelve a quedarse mudo. */
   var av=_dispAviso_('Disponibilidad para turnos'); if(av) return av;
+  /* ⛔⛔ CON `'solo mio'` NO SE PINTA EL MAPA (466.ª). Por esa puerta llega la
+     convocatoria y **solo las respuestas de quien mira**, asi que el calor saldria de
+     UNA persona y se leeria como el del equipo -- que es exactamente el «mapa de
+     mentira» que la carga ya evita en su rama de error, *porque con uno de mentira se
+     reparte gente de verdad*. Se dice de quien es la pantalla, y «Tu disponibilidad»
+     --que si es suya-- sigue funcionando debajo. */
+  if(_dispEstadoSrv_() === 'solo mio') return pan('Disponibilidad para turnos',
+    'no es tu pantalla',
+    vacioSimple('El mapa de todo el equipo es para quien reparte los turnos',
+      'Tu disponibilidad si la puedes contestar, aqui debajo.'));
   var cv=_dispViva_(); if(!cv) return '';
   var calor=_calorTurnos_(cv, DISP_SITIO);
   var top=_mejorTurno_(calor);
@@ -480,8 +556,11 @@ function _dispPanel_(){
     '<div class="pb">'+
     '<p style="margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
       'Cuánta gente puede en cada hueco. <b>Pasa el ratón</b> por una casilla para ver quién. '+
-      'El plazo vence el <b>'+esc(_isoADMY_(String(cv.limite).slice(0,10))||'')+'</b> a las '+
-      esc(String(cv.limite).slice(11,16))+'.</p>'+
+      /* ⛔ POR `_normLimite_` (465.ª), igual que su gemela del móvil: con un `limite`
+         **pelado** —lo que manda un `<input type="date">`— esto rotulaba *«vence el
+         14/09/2026 a las .»*. Curar una cara y no la otra es el error caro de aquí. */
+      'El plazo vence el <b>'+esc(_isoADMY_(_normLimite_(cv.limite).slice(0,10))||'')+
+      '</b> a las '+esc(_normLimite_(cv.limite).slice(11,16))+'.</p>'+
     '<div class="dsit">'+sit('','Los dos sitios')+sit('cuvi','Solo CUVI')+sit('citi','Solo CITI')+'</div>'+
     '<div class="dmapa" id="dMapa" style="grid-template-columns:104px repeat('+D.length+',minmax(44px,1fr))">'+
       cab+filas+'</div>'+
@@ -568,6 +647,46 @@ function _dispCargar_(repintar){
        rama de arriba: la leccion estaba escrita a seis lineas de aqui.
        ⚠️ Y `DISP_SRV` no lo lee nadie mas: `_dispPanel_` no consulta el estado en ningun
        punto, asi que marcarlo no basta — hay que VACIAR. */
+    /* ⛔⛔ ANTES DE DARLO POR CAIDO, LA OTRA PUERTA (466.ª). `getDisponibilidad` esta
+       gateada a rango >= 1 (`Codigo.gs:2999`), asi que lo que recibe un miembro RASO no
+       es un fallo del servidor: es que **no le dejan ver el mapa de los demas**. Sin
+       esto la pantalla le decia *«No se pudo preguntar al servidor»* --falso-- y se
+       quedaba **sin poder contestar**, cuando `_guardarDisponibilidad_` NO esta gateado
+       y guardar si le dejarian. Medido ejecutando: `pedida=0`, `panel=MIENTE`,
+       `rejilla=notoca`.
+       ⛔ NO SE MIRA EL MENSAJE DEL ERROR para decidir si reintentar: se **intenta la
+       otra puerta**, y si tambien falla se cae al error de verdad. Distinguir por el
+       texto ataria la cara a una cadena del servidor, que es la clase de acuerdo que se
+       rompe en silencio el dia que alguien la reescribe.
+       ⚠️ Y por aqui llega SOLO LO SUYO (`getConvocatoria` devuelve `mias`, no `cv`):
+       el mapa de todos sigue sin estar, asi que el estado lo dice y `_dispPanel_` no
+       pinta un calor de UNA persona -- un mapa de mentira es peor que un hueco, que es
+       lo que ya dice la rama de arriba. */
+    if(typeof api!=='undefined' && api.getConvocatoria){
+      api.getConvocatoria().then(function(r){
+        if(r && r.convocatoria && typeof CONVOCATORIAS!=='undefined'){
+          var cv=r.convocatoria,
+              yo=(typeof _actorSanc_==='function') ? _actorSanc_()
+                 : ((typeof SESION!=='undefined' && SESION && SESION.nombre) || '');
+          /* La misma puerta que usa el movil al cargar: la fila que se LEE es la que se
+             va a ESCRIBIR, y sale del actor de la sesion, no de `YO`. */
+          cv.resp={}; cv.resp[yo]=r.mias||{};
+          cv.abierta = r.abierta;
+          CONVOCATORIAS.length=0; CONVOCATORIAS.push(cv);
+          _dispEstadoSrv_('solo mio');
+        } else {
+          if(typeof CONVOCATORIAS!=='undefined') CONVOCATORIAS.length=0;
+          _dispEstadoSrv_('error');
+        }
+        if(typeof repintar==='function') repintar();
+      })['catch'](function(){
+        /* Las dos puertas caidas si es un fallo de verdad. */
+        if(typeof CONVOCATORIAS!=='undefined') CONVOCATORIAS.length=0;
+        _dispEstadoSrv_('error');
+        if(typeof repintar==='function') repintar();
+      });
+      return;
+    }
     if(typeof CONVOCATORIAS!=='undefined') CONVOCATORIAS.length=0;
     _dispEstadoSrv_('error');
     if(typeof repintar==='function') repintar();

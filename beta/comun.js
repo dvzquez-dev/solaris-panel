@@ -2688,9 +2688,53 @@ function _normLimite_(limite){
      en el mismo fichero, contestando cosas contrarias de la misma fecha.
      ⚠️ `_dmyAISO_` CONVIERTE, no valida: lo que no reconoce lo devuelve tal cual, asi que
      esto no puede colar una fecha inventada -- solo endereza la que ya venia. */
-  s = _dmyAISO_(s);
-  if (s.length === 10) return s + 'T23:59';
-  return s.charAt(10) === ' ' ? (s.slice(0, 10) + 'T' + s.slice(11)) : s;
+  /* ⛔⛔ Y LA CURA NO ALCANZABA A LA FORMA CON HORA (463.ª, 06/09). El regex de
+     `_dmyAISO_` lleva `$`, asi que `'10/09/2026 22:00'` lo devolvia TAL CUAL y de aqui
+     salia `'10/09/2026T22:00'` -- otra vez una fecha en dia/mes comparada como CADENA
+     contra un ISO. 📏 Medido ejecutando: **336 de 336** salian sin normalizar y
+     **139 de 336** dias contestaban distinto segun la forma. Es el MISMO 137/336 de la
+     277.ª, vivo en la forma de al lado: la leccion se curo en un formato y no en su
+     gemelo.
+     ✅ Ahora la parte de FECHA se endereza siempre y la hora se respeta tal cual, asi
+     que las cuatro formas en que llega de verdad (ISO, ISO con espacio, `DD/MM/AAAA` y
+     `DD/MM/AAAA hh:mm`) dan lo mismo. */
+  return _isoFechaHora_(s, '23:59');
+}
+
+/* La fecha, enderezada, con la hora que traiga -- y si no trae, la que se le diga.
+   ⛔ `hora` es un ARGUMENTO y no un valor por defecto porque las dos puertas que la usan
+   contestan a preguntas OPUESTAS: un `limite` sin hora significa *«tienes el dia
+   entero»* (`23:59`) y un `abre` sin hora significa *«ya puedes desde ese dia»*
+   (`00:00`). Con un solo valor por defecto, una de las dos mentiria medio dia. */
+function _isoFechaHora_(v, hora){
+  /* ⛔⛔ EL RECORTE NO ES HIGIENE: SIN ÉL, UN ESPACIO DELANTE ABRE EL PLAZO PARA
+     SIEMPRE (464.ª). `search(/[T ]/)` casaba con ese espacio, la fecha se iba entera al
+     lado de la hora y delante quedaba una `T` sola -- y `'T'`(0x54) > `'2'`(0x32)
+     comparando CADENAS, que es como compara `_plazoAbierto_`. Medido: un plazo de 2020
+     salía `abierto=true`, y el backend ACEPTA esa escritura.
+     ⚠️ La 463.ª lo EMPEORO: antes salía cerrado siempre --malo, pero al otro lado--.
+     ⚠️ En ES3 no hay `trim()`: `cscript` corre ES3 y Apps Script tambien lo acepta. */
+  var s = String(v == null ? '' : v).replace(/^\s+|\s+$/g, '');
+  if (!s || s === 'null' || s === 'undefined') return '';
+  var i = s.search(/[T ]/);
+  var f = _dmyAISO_(i < 0 ? s : s.slice(0, i));
+  /* ⚠️ Y LA HORA SE RECORTA POR DELANTE: con DOS espacios, `r` empezaba por un blanco
+     y `' '`(0x20) < `'0'`(0x30), asi que `...T 09:30` queda por debajo de CUALQUIER hora
+     del dia y el plazo se cerraba su propio dia entero -- el Art. 30g otra vez. */
+  var r = i < 0 ? '' : s.slice(i + 1).replace(/^\s+/, '');
+  if (r) return f + 'T' + r;
+  return f.length === 10 ? (f + 'T' + hora) : f;
+}
+
+/* La puerta de `abre`, que es la hermana de `_normLimite_` y no existia.
+   ⛔⛔ `_convEstado_` hacia `Date.parse(_dmyAISO_(cv.abre))` **a pelo**, o sea el mismo
+   defecto que la 277.ª curo para `limite`, sin curar aqui. 📏 Medido: con
+   `abre='01/10/2026 22:00'` --el 1 de OCTUBRE, futuro-- salia **abierta**, o sea que se
+   podia contestar un plazo que no ha abierto; y con `'12/08/2026 22:00'` --pasado--
+   salia **sin_abrir**, o sea que la semana DESAPARECIA de la app. `Date.parse` lee
+   `DD/MM` como `MM/DD`. */
+function _normAbre_(abre){
+  return _isoFechaHora_(abre, '00:00');
 }
 
 function _plazoAbierto_(limite, ahora){
@@ -3124,7 +3168,11 @@ function _identidadPrestada_(visto){
    convocatoria vieja sin el campo es «no lo sé», y cerrarla sería inventar. */
 function _convEstado_(cv, ahora){
   var t=ahora?+ahora:Date.now();
-  var a=Date.parse(_dmyAISO_(String((cv&&cv.abre)||''))),
+  /* ⛔ POR `_normAbre_`, QUE ES LA HERMANA DE `_normLimite_` (463.ª). Aqui habia un
+     `_dmyAISO_` a pelo, o sea el mismo defecto que la 295.ª curo para `limite` y que
+     aqui seguia vivo: `Date.parse('01/10/2026 22:00')` lee **MM/DD** y devolvia
+     `abierta` sobre un plazo que aun no ha abierto. */
+  var a=Date.parse(_normAbre_(cv&&cv.abre)),
       l=Date.parse(_normLimite_(cv&&cv.limite));
   if(isNaN(a)||isNaN(l)) return 'cerrada';
   if(t<a) return 'sin_abrir';
@@ -3460,9 +3508,22 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-06-raso-ordenador', fecha:'2026-09-06',
+      titulo:'Desde el ordenador, quien no coordina no pod\u00eda contestar su disponibilidad',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'El ordenador ped\u00eda **el mapa de todo el equipo** para poder pintar tu rejilla, y ese mapa **solo lo puede ver quien reparte los turnos**. As\u00ed que a todo el mundo salvo a la coordinaci\u00f3n le sal\u00eda **\u00abNo se pudo preguntar al servidor\u00bb** y se quedaba **sin poder contestar**. Y el aviso era falso: el servidor contestaba perfectamente.'},
+        {cara:'escritorio', vista:'turnos', txt:'Ahora, si no te toca ver el mapa, el ordenador pide **solo lo tuyo** y puedes marcar y guardar igual que en el m\u00f3vil. Donde antes estaba el mapa del equipo sale **\u00abel mapa de todo el equipo es para quien reparte los turnos\u00bb**, en vez de un error. Y si de verdad se cae el servidor, **el aviso vuelve a salir** \u2014 se ha mudado al \u00fanico sitio donde es verdad.'}
+      ] },
+    { id:'2026-09-06-plazo-con-hora', fecha:'2026-09-06',
+      titulo:'El plazo de una semana depend\u00eda de C\u00d3MO se hubiera escrito la fecha',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'Si el l\u00edmite se escribi\u00f3 con hora \u2014**\u00ab14/09/2026 22:00\u00bb**, que es como se teclea\u2014 la app no lo entend\u00eda y el d\u00eda del plazo sal\u00eda **cerrado o abierto seg\u00fan la decena del d\u00eda**, no seg\u00fan la fecha. Medido: **139 de 336** d\u00edas contestaban distinto del mismo d\u00eda escrito en la otra forma. Ahora las dos formas dicen lo mismo.'},
+        {cara:'movil', vista:'turnos', txt:'Y el **desde cu\u00e1ndo** se puede contestar no pasaba por ning\u00fan sitio: una semana que abr\u00eda **el 1 de octubre** se ofrec\u00eda como abierta \u2014contestar un plazo que a\u00fan no ha empezado\u2014 y una que abri\u00f3 **el 12 de agosto** sal\u00eda sin abrir, o sea que **la semana desaparec\u00eda de la pantalla**.'}
+      ] },
     { id:'2026-09-06-semana-sin-abrir', fecha:'2026-09-06',
       titulo:'El tel\u00e9fono dec\u00eda que no hab\u00eda semana convocada teni\u00e9ndola',
       items:[
+        {cara:'escritorio', vista:'turnos', txt:'Y en el ordenador era peor: el panel **\u00abTu disponibilidad\u00bb desaparec\u00eda entero**, sin una palabra, mientras el mapa de al lado pintaba **esa misma semana** con su plazo y la lista de qui\u00e9n no ha contestado. Ahora sale la semana con las casillas en gris y **cu\u00e1ndo se abre**, y el bot\u00f3n de guardar no aparece hasta que empieza el plazo.'},
         {cara:'movil', vista:'turnos', txt:'Desde que se convoca una semana hasta que se abre el plazo pueden pasar **d\u00edas**, y en todo ese rato la pantalla dec\u00eda **\u00abahora mismo no hay ninguna semana convocada\u00bb** \u2014 teni\u00e9ndola. Ahora sale **la semana entera**: qu\u00e9 d\u00edas, qu\u00e9 franjas y **cu\u00e1ndo se abre**. Las casillas se ven en gris y no se pueden marcar hasta que empiece el plazo, que es cuando el equipo recibe el aviso.'}
       ] },
     { id:'2026-09-06-minimo-rotulo', fecha:'2026-09-06',

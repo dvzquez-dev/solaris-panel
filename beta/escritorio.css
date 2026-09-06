@@ -476,6 +476,10 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .dcel{height:36px;border-radius:4px;background:var(--sur2);display:grid;place-items:center;
   font-family:var(--mono);font-size:13px;font-weight:600;color:#fff;cursor:pointer;
   position:relative;transition:outline-color .12s}
+/* ⛔ LA CELDA QUE SE VE Y NO SE TOCA (459.ª): la misma declaración que su gemela del
+   móvil (`.tcel.off`), que a su vez copia la de las encuestas. Un gris distinto para la
+   misma situación es como acaban dos criterios donde había uno. */
+.dcel.off{background:transparent;border:1px solid var(--line);opacity:.4;cursor:default}
 .dcel.v0{color:var(--ink3)}
 /* ⛔ `dsel`/`dmejor` y NO `sel`/`top`: `escritorio.css` ya declara `.top{grid-column:2}`
    —la barra superior del layout— y la celda con esa clase heredaba la columna, con lo que

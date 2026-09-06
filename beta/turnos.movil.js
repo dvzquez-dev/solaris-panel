@@ -186,8 +186,15 @@ function _convHTML_(cv){
   if(_convEstado_(cv)==='sin_abrir') return _convPreHTML_(cv);
   var F=cv.franjas||[], D=cv.dias||[];
   var urge=_convQuedan_(cv)<12;
-  var lim=_isoADMY_(String(cv.limite).slice(0,10))||String(cv.limite).slice(0,10);
-  var hora=String(cv.limite).slice(11,16);
+  /* ⛔ POR `_normLimite_` (465.ª): aquí se cortaba `cv.limite` **en crudo** por las
+     posiciones 10 y 11 —el cableado por posición que la 463.ª quitó de
+     `_isoFechaHora_`, vivo una línea más abajo—. 📏 Medido sobre 5 formas: **2 de 5**
+     dejaban la hora VACÍA —las peladas, que es lo que manda un `<input type="date">`—
+     y la nota decía *«Hasta el 14/09/2026 a las »*. La puerta le pone `23:59`, que es
+     lo que significa «cierra ese día» y lo que ya decide `_plazoAbierto_`. */
+  var _li=_normLimite_(cv.limite);
+  var lim=_isoADMY_(_li.slice(0,10))||_li.slice(0,10);
+  var hora=_li.slice(11,16);
   /* ⛔ LOS SITIOS SALEN DE LA CONVOCATORIA, NO CABLEADOS (290.ª, 23/08). Aquí estaban
      tecleados los cuatro en la **única cara donde contestan los 32**, mientras el
      escritorio —escrito después— ya sacaba la lista de `_convClases_(cv)` y lo dejaba
@@ -248,9 +255,15 @@ function _convHTML_(cv){
    que `cscript` destroza, y a prosa que el propio comentario puede repetir. */
 function _convPreHTML_(cv){
   var D=cv.dias||[], F=cv.franjas||[];
-  var ab=_dmyAISO_(String(cv.abre||''));
+  /* ⛔ POR `_normAbre_` (463.ª): con `_dmyAISO_` a pelo, un `abre` sin hora —o en
+     `DD/MM/AAAA`— dejaba `abH` VACÍO y la tarjeta rotulaba *«Se abre el 09/09/2026 a
+     las **.**»*. La puerta le pone `00:00`, que es lo que significa «se abre ese día». */
+  var ab=_normAbre_(cv.abre);
   var abD=_isoADMY_(ab.slice(0,10))||ab.slice(0,10), abH=ab.slice(11,16);
-  var lim=_isoADMY_(String(cv.limite).slice(0,10))||String(cv.limite).slice(0,10);
+  /* ⚠️ Y aquí también (465.ª), aunque sólo se pinte la fecha: dos criterios para el
+     mismo campo en la misma pantalla es como empiezan las divergencias. */
+  var lim=_isoADMY_(_normLimite_(cv.limite).slice(0,10))
+          ||_normLimite_(cv.limite).slice(0,10);
   var cab='<div class="rc rd"></div>'+D.map(function(d){
     var p=String(_diaTxtM_(_isoADMY_(d)||d)||'').split(' ');
     return '<div class="rc">'+esc(p[0]||'')+'<br>'+esc(String(p[1]||'').slice(0,2))+'</div>';
