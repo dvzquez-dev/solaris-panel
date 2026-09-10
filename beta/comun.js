@@ -3644,6 +3644,14 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-11-cierre-anual-a-medias', fecha:'2026-09-11',
+      titulo:'El cierre de temporada ya no dice \u00abAPLICADO\u00bb con dos fichas escritas',
+      items:[
+        {cara:'escritorio', vista:'temporada', txt:'El panel pon\u00eda **\u00abAPLICADO\u00bb** en cuanto hubiera **una sola ficha escrita** \u2014 y como el bot\u00f3n s\u00f3lo sal\u00eda si NO estaba aplicado, **desaparec\u00eda justo cuando hac\u00eda falta**: un cierre parado en la 2.\u00aa de 32 dec\u00eda \u00abhecho\u00bb y no dejaba terminarlo.'},
+        {cara:'escritorio', vista:'temporada', txt:'\u2705 Ahora son **tres estados**, como en el cierre mensual: **PARADO A MEDIAS** (hubo un descuadre \u2014 sin bot\u00f3n, y te dice que hay fichas nuevas y viejas conviviendo), **APLICADO A MEDIAS: faltan N** (s\u00f3lo falta gente sin ficha \u2014 **con bot\u00f3n**, y lleva el n\u00famero dentro) y **APLICADO**.'},
+        {cara:'escritorio', vista:'temporada', txt:'\u26d4 Con un cierre **parado** el bot\u00f3n NO vuelve, a prop\u00f3sito: un descuadre significa que alguien toc\u00f3 una ficha despu\u00e9s de calcular el plan, y relanzar sin mirarlo escribir\u00eda encima de un cambio que nadie ha visto.'},
+        {cara:'escritorio', vista:'temporada', txt:'Y el panel dice ahora **cu\u00e1ntas fichas se escribieron** y **cu\u00e1ntos descuadres** hubo: \u00abparado\u00bb dice que pasa algo, el n\u00famero dice cu\u00e1nto \u2014 que es lo que separa mirar una ficha de mirar el cierre entero.'}
+      ] },
     { id:'2026-09-10-vs-mes-anterior', fecha:'2026-09-10',
       titulo:'La comparaci\u00f3n de tu ritmo ya no sale contra un mes de hace tres meses',
       items:[
