@@ -2669,12 +2669,34 @@ function _sinTildes_(t){ return (t||'').toLowerCase().normalize('NFD').replace(/
    peor y ademas pierde el mes, que importa cuando el rango cruza de mes. */
 function _ddmm_(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1); }
 
+/* ══ EL TOPE DE DIAS DE UNA CONVOCATORIA, EN UN SOLO SITIO ═════════════════
+
+   ⛔⛔ Estaba escrito CUATRO veces y en DOS de ellas NO ESTABA: `_diasEntre_` cortaba en 62,
+   `_diasLargos_` en 62 en su rama de rango... y `_diasDesde_` y la otra rama de `_diasLargos_`
+   no cortaban nada. Dos criterios para la misma pregunta en el mismo fichero, y el que decidia
+   era el que no existia.
+
+   📏 EL DAÑO, medido: teclear **900** en «nº de dias» da **12.600 bloques ~ 113.000
+   caracteres** contra el limite de **50.000 por celda** que documenta el propio backend
+   (`Codigo.gs:181`, `TOPE_CELDA`); rotura en ~**397 dias**.
+   ⚠️ Y el guardia de los 50.000 EXISTE y no cubre este camino: vive en `_guardarDato_`,
+   mientras `_crear_` escribe `bloques` con `appendRow`.
+
+   ⚠️ `#ceND` lleva `max="60"` en el HTML y **eso no frena nada**: el `max` de un
+   `<input type=number>` solo limita la ruedecita; tecleado o pegado pasa igual. Por eso el
+   tope vive AQUI y no en el formulario.
+
+   ⛔ Y se escribe como FUNCION, no como `var`: el arnes de los bancos extrae funciones
+   (`jsfuente.funcion`), no globals. Un `var` no llegaria al arnes y el caso no podria ni
+   llamarlo -- o sea que el tope quedaria sin poder comprobarse. */
+function _topeDias_(){ return 62; }
+
 function _diasDesde_(iso,n){ var out=[],b=new Date(iso+'T00:00:00');
-  for(var i=0;i<n;i++){ var d=new Date(b); d.setDate(b.getDate()+i); out.push(_ddmm_(d)); } return out; }
+  for(var i=0;i<n&&i<_topeDias_();i++){ var d=new Date(b); d.setDate(b.getDate()+i); out.push(_ddmm_(d)); } return out; }
 
 function _diasEntre_(a0,a1){ var out=[]; if(!a0||!a1) return out;
   var a=new Date(a0+'T00:00:00'), b=new Date(a1+'T00:00:00'); if(b<a) return out;
-  for(var i=0;i<62&&a<=b;i++){ out.push(_ddmm_(a)); a.setDate(a.getDate()+1); } return out; }
+  for(var i=0;i<_topeDias_()&&a<=b;i++){ out.push(_ddmm_(a)); a.setDate(a.getDate()+1); } return out; }
 
 /* Cuantas casillas seguidas hacen falta para cubrir la reunión. Se redondea HACIA ARRIBA:
    media casilla no existe, y quedarse corto es no poder ir. Sin `duracion` (reuniones de

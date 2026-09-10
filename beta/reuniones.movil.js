@@ -850,8 +850,12 @@ function engancharRejilla(){
 function _diasLargos_(modo,d0,d1,fecha,nd){
   var out=[], a, i;
   if(modo==='rango'){ if(!d0||!d1) return out; a=new Date(d0+'T00:00:00'); var b=new Date(d1+'T00:00:00');
-    for(i=0;i<62&&a<=b;i++){ out.push(_DL_[a.getDay()]+' '+a.getDate()); a.setDate(a.getDate()+1); } }
-  else { a=new Date((fecha||'')+'T00:00:00'); for(i=0;i<nd;i++){ var d=new Date(a); d.setDate(a.getDate()+i); out.push(_DL_[d.getDay()]+' '+d.getDate()); } }
+    /* ⛔ EL MISMO TOPE QUE LA REJILLA, y por el mismo sitio (535.ª). Aquí había un `62`
+       tecleado en una rama y NADA en la otra: `dias()` cortaba y esto pintaba 900 filas,
+       o sea 838 huérfanas que `rangos()` no lee. Dos partes de la misma pantalla
+       contestando distinto a «cuántos días hay». */
+    for(i=0;i<_topeDias_()&&a<=b;i++){ out.push(_DL_[a.getDay()]+' '+a.getDate()); a.setDate(a.getDate()+1); } }
+  else { a=new Date((fecha||'')+'T00:00:00'); for(i=0;i<nd&&i<_topeDias_();i++){ var d=new Date(a); d.setDate(a.getDate()+i); out.push(_DL_[d.getDay()]+' '+d.getDate()); } }
   return out;
 }
 
@@ -930,7 +934,7 @@ function crearModal(){
     '<div class="dosc" id="ceRango"><label class="campo"><span class="sc">Desde</span><input class="mono" id="ceD0" type="date" value="'+hoyISO+'"></label>'+
       '<label class="campo"><span class="sc">Hasta</span><input class="mono" id="ceD1" type="date" value="'+mas(hoyISO,6)+'"></label></div>'+
     '<div class="dosc" id="ceDurW" style="display:none"><label class="campo"><span class="sc">Desde</span><input class="mono" id="ceFecha" type="date" value="'+hoyISO+'"></label>'+
-      '<label class="campo"><span class="sc">Días</span><input class="mono" id="ceND" type="number" value="7" min="1" max="60"></label></div>'+
+      '<label class="campo"><span class="sc">Días</span><input class="mono" id="ceND" type="number" value="7" min="1" max="62"></label></div>'+
     '<div class="dosc"><label class="campo"><span class="sc">De</span><select id="ceH0">'+optHoras('16:00')+'</select></label>'+
       '<label class="campo"><span class="sc">A</span><select id="ceH1">'+optHoras('23:00')+'</select></label></div>'+
     '<label class="campo" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="cePerdia" style="width:auto"><span class="sc" style="margin:0">Horario distinto por día</span></label>'+
