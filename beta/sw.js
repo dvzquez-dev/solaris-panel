@@ -69,6 +69,58 @@ function _cacheable_(req, scope){
   return true;
 }
 
+/* ══ ¿LO QUE ACABA DE LLEGAR ES DISTINTO DE LO QUE TENIAMOS? (545.ª, 10/09/2026)
+
+   ⛔⛔ Daniel: *«no me llego nada a la app ni siquiera ninguna novedad»*. Esta cache
+   sirve `guardado || red`, o sea **la cara de ayer** en la primera apertura -- el precio
+   que yo mismo escribi aqui arriba y **no le consulte**. Con el abriendo la app una vez al
+   dia, «la apertura siguiente» es **manana**.
+   ⛔ **Y la cura no es quitar la cache**: entro para arreglar *«tarda mucho en abrir a
+   veces»*, que tambien lo reporto el. Lo que se hace es **avisar**: se sigue sirviendo lo
+   guardado al instante, y cuando la red trae algo distinto, la pagina lo dice.
+
+   📏 MEDIDO CONTRA EL SITIO PUBLICADO antes de escribir esto: GitHub Pages manda
+   **`ETag` en los cuatro ficheros probados** y es **identico en dos peticiones seguidas**
+   al mismo contenido. O sea que es una huella COMPARABLE, que es lo unico que permite
+   afirmar «cambio». Manda tambien `Last-Modified` y `Content-Length`, de respaldo. */
+function _huella_(r){
+  if (!r || !r.headers || typeof r.headers.get !== 'function') return null;
+  var e = r.headers.get('etag');
+  if (e) return 'e:' + e;
+  var m = r.headers.get('last-modified');
+  if (m) return 'm:' + m;
+  var l = r.headers.get('content-length');
+  if (l) return 'l:' + l;
+  /* ⛔ SIN HUELLA SE DEVUELVE `null`, NO UNA CADENA VACIA: dos respuestas sin cabeceras
+     darian `'' === ''` y se leerian como «no cambio», que es afirmar lo que no se sabe. */
+  return null;
+}
+
+/* ¿Hay que avisar de que hay una version nueva? */
+function _hayVersionNueva_(guardado, fresca){
+  /* ⛔ SIN LAS DOS, NO HAY COMPARACION. Y el caso que importa es el PRIMERO: en la
+     primera carga no hay `guardado`, asi que no hay «version nueva» -- hay **la
+     primera**. Avisar ahi seria molestar a todo el que estrena la app. */
+  if (!guardado || !fresca) return false;
+  var a = _huella_(guardado), b = _huella_(fresca);
+  /* ⛔ UN «NO LO SE» NO ES «CAMBIO» NI «NO CAMBIO»: sin huella comparable no se
+     avisa. Fallar hacia «aviso de mas» aqui es un bucle de avisos en cada carga, que es
+     como se aprende a ignorarlos -- y entonces se pierde el que si importa. */
+  if (a === null || b === null) return false;
+  return a !== b;
+}
+
+/* Se lo dice a las pestanas abiertas. ⚠️ NO recarga: alguien puede estar marcando su
+   disponibilidad, y recargar por su cuenta le borra lo que llevaba. La pagina decide. */
+async function _avisarVersion_(){
+  try {
+    var cls = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (var i = 0; i < cls.length; i++) {
+      try { cls[i].postMessage({ tipo: 'version-nueva' }); } catch (_) {}
+    }
+  } catch (_) {}
+}
+
 self.addEventListener('fetch', (e) => {
   if (!_cacheable_(e.request, self.registration.scope)) return;   /* ni se toca: red normal */
   e.respondWith((async () => {
@@ -86,7 +138,12 @@ self.addEventListener('fetch', (e) => {
          fueran la app, y entonces el fallo dura hasta que alguien borre los datos. */
       /* ⚠️ El `put` tambien puede lanzar (cuota): que no se pueda guardar no es motivo
          para no devolver la respuesta que YA ha llegado. */
-      if (r && r.ok) { try { c.put(e.request, r.clone()); } catch (_) {} }
+      if (r && r.ok) {
+        /* ⛔ SE COMPARA ANTES DE PISAR: despues del `put`, `guardado` ya es lo
+           nuevo y la comparacion saldria SIEMPRE igual -- verde para siempre. */
+        if (_hayVersionNueva_(guardado, r)) { _avisarVersion_(); }
+        try { c.put(e.request, r.clone()); } catch (_) {}
+      }
       return r;
       /* ⛔⛔ `|| Response.error()` NO ES ADORNO: sin cache Y sin red, esto devolvia
          `undefined`, y `respondWith(undefined)` **rompe la peticion**. La app se

@@ -219,6 +219,41 @@ function _mesAnteriorDe_(periodo){
   return _MESES_[a.getMonth()];
 }
 
+/* ¿Este dato del «mes anterior» es DE VERDAD el mes anterior?
+
+   ⛔⛔ Daniel, 10/09/2026, con la captura del «VS. JUNIO» estando en septiembre: *«porque
+   vas junio? no deberia comparar con el mes anterior si y solo si este .es existe en tu
+   historial? (si eres nuevo no tienes mes anterior con el que compararte evidentemente)»*.
+
+   ⛔ Aqui la regla era *«ensena lo que haya, pero llamalo por su nombre»* -- y con el panel
+   sin regenerar desde hace 44 dias eso es **junio**, que es de la temporada **25/26**
+   estando ya en la 26/27. Comparar el ritmo de septiembre contra un mes de la temporada
+   cerrada no mide nada, y ese `-100 %` se lee como un juicio.
+
+   ⛔⛔ Y EL CRITERIO ES «EXISTE ESE MES EN SU HISTORIAL», NO «ES SOCIO NUEVO». Daniel
+   lo corrigio el 10/09: *«aunq todos entren como socio nuevo o no ese no tiene nada q
+   ver. cuanta como si estuviesen ya de antes. solo son nuevos pq no habia app antes»*,
+   *«pq no puedes comprarle con un mes q no existe»*, *«pero siya llevasen 1 temporada
+   yoqae entonces si tkeen agosto entonces si»*. **«Socio nuevo» es una regla de CUOTA**
+   y no toca esto: quien lleve una temporada y tenga agosto, se compara con agosto.
+
+   ⛔ **LA GEMELA, que es lo que impide el arreglo perezoso**: el atajo es tirar el respaldo
+   entero, y entonces la fila **no sale nunca** -- que ya paso una vez y el lo cazo (*«¿y por
+   que ya no me aparece la comparacion con el mes anterior?»*). Lo que se descarta no es el
+   respaldo: es el respaldo **de OTRO mes**. Si trae el mes anterior de verdad, sale.
+
+   ⚠️ `mes == null` significa «derivado del periodo», o sea que **es** el anterior por
+   construccion: ese camino no se toca. */
+function _antDelMesAnterior_(ant, periodo){
+  if(ant==null) return null;
+  if(ant.mes==null) return ant;
+  var trae=String(ant.mes||'').toLowerCase();
+  /* ⛔ Y se compara ENTERO con `===`, no con `indexOf`: «junio» esta dentro de nada, pero
+     el dia que un mes sea subcadena de otro -o venga con el ano detras- un `in` casaria de
+     mas y volveria a colarse el mes equivocado (§3c-29 cara E). */
+  return (trae === _mesAnteriorDe_(periodo)) ? ant : null;
+}
+
 /* Cuantos dias DURO el mes anterior al periodo `AAAA-MM`. Sin periodo, se deduce de hoy.
 
    ⛔ UN MES NO DURA LO QUE DICE EL CALENDARIO: dura del cierre del anterior al cierre de este
@@ -339,7 +374,10 @@ function _compHorasHTML_(base){
      El fallo nunca fue comparar con junio: fue **llamarlo julio**. Asi que `_antComparable_`
      devuelve lo que haya **con el mes al que pertenece**, y el rótulo lo dice. Sin nada, la
      fila sigue sin pintarse. */
-  var _ant=_antComparable_(YO);
+  /* ⛔⛔ Y SOLO SI ES EL MES ANTERIOR (546.ª). Ver `_antDelMesAnterior_`: el panel
+     lleva 44 dias sin regenerarse y trae `mesAnt: 'junio'` estando en septiembre --
+     que ademas es de la temporada 25/26. Daniel: *«porque vas junio?»*. */
+  var _ant=_antDelMesAnterior_(_antComparable_(YO), d.periodo);
   if(_ant!=null){
     var _hA=_ant.h;
     var _bA=_horasSinBase_(YO, _hA);

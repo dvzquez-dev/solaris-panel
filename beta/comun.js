@@ -2523,6 +2523,64 @@ function _urlB64_(b64){
   return arr;
 }
 
+/* ══ HAY UNA VERSION NUEVA (545.ª, 10/09/2026) ═══════════════════════
+
+   ⛔⛔ Daniel, 10/09: *«no me llego nada a la app ni siquiera ninguna novedad»*. La cache
+   del worker sirve `guardado || red`, o sea **la cara de ayer** en la primera apertura.
+   Quitarla no vale: entro para arreglar *«tarda mucho en abrir a veces»*, que tambien lo
+   reporto el. Asi que se sigue abriendo al instante **y se avisa** cuando la red trae algo
+   distinto -- lo detecta `_hayVersionNueva_` en `sw.js` comparando la huella (`ETag`).
+
+   ⛔ **NO RECARGA SOLA, Y ESO ES LA DECISION.** El arreglo obvio es `location.reload()` al
+   recibir el mensaje, y borraria lo que alguien lleve marcado -- una disponibilidad a medio
+   pintar, un motivo escrito a medias. Se ofrece; decide quien esta delante. */
+var _avisoVersion = false;
+
+function _pintarVersionNueva_(){
+  /* ⛔ UNA SOLA VEZ. El worker manda un mensaje **por fichero** que cambia, y en una
+     publicacion cambian varios: sin esto salen cinco barras encima de la pantalla. */
+  if (_avisoVersion) return false;
+  if (typeof document === 'undefined' || !document.body) return false;
+  _avisoVersion = true;
+  var d = document.createElement('div');
+  d.id = 'vnueva';
+  d.setAttribute('style', 'position:fixed;left:10px;right:10px;bottom:calc(10px + '
+    + 'env(safe-area-inset-bottom,0px));z-index:9999;display:flex;gap:10px;'
+    + 'align-items:center;padding:11px 12px;border-radius:12px;font-size:12.5px;'
+    + 'background:#1b1a19;border:1px solid rgba(255,255,255,.18);color:#f2f0ee;'
+    + 'box-shadow:0 6px 22px rgba(0,0,0,.45)');
+  var t = document.createElement('span');
+  t.setAttribute('style', 'flex:1;line-height:1.4');
+  t.textContent = 'Hay una versión nueva de la app.';
+  var b = document.createElement('button');
+  b.setAttribute('style', 'flex:none;padding:7px 12px;border-radius:9px;border:0;'
+    + 'background:#E41E25;color:#fff;font:inherit;font-weight:600;cursor:pointer');
+  b.textContent = 'Actualizar';
+  b.onclick = function(){ try { location.reload(); } catch (_) {} };
+  var x = document.createElement('button');
+  x.setAttribute('style', 'flex:none;padding:7px 9px;border-radius:9px;border:0;'
+    + 'background:transparent;color:#9d9894;font:inherit;cursor:pointer');
+  x.textContent = 'Ahora no';
+  /* ⚠️ Cerrar NO vuelve a poner `_avisoVersion` en false: si lo hiciera, el siguiente
+     fichero que refresque lo volveria a sacar y seria imposible quitarselo de encima. */
+  x.onclick = function(){ try { d.parentNode.removeChild(d); } catch (_) {} };
+  d.appendChild(t); d.appendChild(x); d.appendChild(b);
+  document.body.appendChild(d);
+  return true;
+}
+
+/* Engancha el canal del worker. Devuelve si se pudo enganchar, para que quien llame lo
+   sepa: un `catch` vacio aqui dejaria el aviso muerto sin que nadie se entere. */
+function _escucharSW_(){
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false;
+  try {
+    navigator.serviceWorker.addEventListener('message', function(ev){
+      if (ev && ev.data && ev.data.tipo === 'version-nueva') _pintarVersionNueva_();
+    });
+    return true;
+  } catch (_) { return false; }
+}
+
 function _pushSoportado_(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
 
 async function _registrarSW_(){
@@ -2533,8 +2591,15 @@ async function _registrarSW_(){
 /* Al abrir: registra el SW y, si ya habia permiso y sesion, re-guarda la suscripcion por si
    el navegador la roto (pasa, y si no se re-guarda dejan de llegar avisos en silencio). */
 async function _pushInit_(){
-  if(!_pushSoportado_()) return;
+  /* ⛔⛔ EL WORKER SE REGISTRA ANTES DEL GATE DE PUSH (545.ª). Aqui el `return` de
+     `_pushSoportado_()` iba PRIMERO, y ese predicado exige `PushManager` **y**
+     `Notification`: un navegador sin notificaciones se quedaba **sin worker**, o sea
+     **sin cache** -- que existe para otra cosa (*«tarda mucho en abrir a veces»*) y no
+     tiene nada que ver con las notificaciones. Dos capacidades atadas por accidente.
+     ⚠️ Y con ellas se iba el aviso de version nueva, que viaja por el mismo canal. */
   var reg=await _registrarSW_();
+  _escucharSW_();
+  if(!_pushSoportado_()) return;
   try{
     if(reg && Notification.permission==='granted'){
       await navigator.serviceWorker.ready;
@@ -3579,6 +3644,22 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-10-vs-mes-anterior', fecha:'2026-09-10',
+      titulo:'La comparaci\u00f3n de tu ritmo ya no sale contra un mes de hace tres meses',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Sal\u00eda **\u00abvs. junio\u00bb estando en septiembre**, con un \u2212100 %. Lo cazaste t\u00fa: \u00ab\u00bfpor qu\u00e9 vas junio?\u00bb. La fila no compara con el mes anterior: compara con **lo que traiga el panel**, y el panel lleva **44 d\u00edas** sin regenerarse.'},
+        {cara:'movil', vista:'horas', txt:'\u26d4 Y junio es de la temporada **25/26**, con el equipo ya en la **26/27**: comparar tu septiembre contra un mes de la temporada cerrada **no mide nada**, y ese \u2212100 % se lee como un juicio.'},
+        {cara:'movil', vista:'horas', txt:'\u2705 Ahora la fila sale **si y s\u00f3lo si es el mes inmediatamente anterior**. Si el panel trae otro, no se pinta. Y si ese mes **no existe en tu historial**, tampoco: no se puede comparar contra un mes que no hubo.'},
+        {cara:'movil', vista:'horas', txt:'\u26a0\ufe0f Lo que **no** se hizo: quitar la comparaci\u00f3n entera. Eso ya pas\u00f3 una vez y lo cazaste (\u00ab\u00bfy por qu\u00e9 ya no me aparece?\u00bb). Con un mes anterior de verdad, la fila sigue saliendo.'}
+      ] },
+    { id:'2026-09-10-version-nueva', fecha:'2026-09-10',
+      titulo:'La app te avisa cuando hay una versi\u00f3n nueva',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Guardarla en el m\u00f3vil hac\u00eda que abriera al instante, y el precio era que **la primera apertura te ense\u00f1aba la de ayer**. T\u00fa lo viste: \u00abno me lleg\u00f3 nada a la app ni siquiera ninguna novedad\u00bb.'},
+        {cara:'movil', vista:'estado', txt:'Ahora **sigue abriendo al instante** y, cuando por detr\u00e1s llega algo distinto, sale abajo una barra: \u00abHay una versi\u00f3n nueva de la app\u00bb, con **Actualizar** y **Ahora no**.'},
+        {cara:'movil', vista:'estado', txt:'\u26d4 **No se recarga sola, y es a prop\u00f3sito**: si est\u00e1s marcando disponibilidad o escribiendo un motivo, un refresco te lo borrar\u00eda. Decides t\u00fa.'},
+        {cara:'movil', vista:'estado', txt:'Y **no sale la primera vez** que abres la app \u2014ah\u00ed no hay versi\u00f3n nueva, hay **la primera**\u2014 ni cuando no se puede saber si algo cambi\u00f3: avisar sin base ser\u00eda una barra en cada carga.'}
+      ] },
     { id:'2026-09-10-abre-rapido', fecha:'2026-09-10',
       titulo:'La app tardaba en abrir \u00aba veces\u00bb, y ahora se guarda en el m\u00f3vil',
       items:[

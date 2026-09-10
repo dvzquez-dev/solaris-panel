@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=b3b3502"></script>
+<script src="comun.js?v=3d84238"></script>
 <script src="notis.movil.js?v=4218290"></script>
 <script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=2ab8a6a"></script>
@@ -116,7 +116,7 @@
 <script src="documentos.movil.js?v=1302a69"></script>
 <script src="sanciones.movil.js?v=05c14f4"></script>
 <script src="reuniones.movil.js?v=50a8568"></script>
-<script src="horas.movil.js?v=83f9539"></script>
+<script src="horas.movil.js?v=c6345dc"></script>
 <script src="equipo.movil.js?v=8cef805"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -168,7 +168,22 @@ var _MSDIA_=86400000;
 var _DIAS3_=['dom','lun','mar','mié','jue','vie','sáb'];
 
 
-var REV2_NOM='Antía Ruibal Cortegoso';
+/* ⛔⛔ LA SEMILLA DEL SEGUNDO REVISOR, Y AQUI DECIA UN NOMBRE DEL ROSTER DE DEMO
+   (547.ª, 10/09/2026). Daniel, con la ficha de un expediente delante: *«??? porque
+   pone revisa Antia si no hay ninguna en el equipo para a empezar.»*.
+   📏 Era una ASIMETRIA ENTRE CARAS: `escritorio.html` ya decía `'José Manuel
+   Torres Rodríguez'` y esta cara `'Antía Ruibal Cortegoso'` -- un miembro del roster
+   SIMULADO de aqui abajo. Y la autoridad es el servidor: `Codigo.gs:758` declara
+   `DOC_JOSE_FIJO = 'José Manuel Torres Rodríguez'`.
+   ⛔ EL DAÑO NO ES EL ROTULO: `rangoNom` da **rango 2** a `REV2_NOM`, y ese rango
+   decide **quien puede aprobar un expediente de subsistema**. Con esto puesto, en el
+   movil podía decidir alguien que no existe **y José no** -- y el servidor SI le
+   aceptaría la decision a José: el cliente le escondía el boton a quien puede firmar.
+   ⚠️ Y sobrevivía porque `_rederivarRev2_` no puede sustituirla: sus dos escalones
+   piden `coordina` (que **no viaja: 0 de 32**) y `esUCT(unidad)` (y `unidad` guarda el
+   **subsistema**). El comentario que justifica dejar la semilla la llama *«el nombre
+   REAL del coordinador de la UCT, o sea CORRECTA»* — **falso en esta cara**. */
+var REV2_NOM='Jos\u00e9 Manuel Torres Rodr\u00edguez';
 
 var DATA={
   generado:'2026-07-24', temporada:'25/26',
@@ -1500,7 +1515,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='930e0b9';
+var BUILD='d14f0f2';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
