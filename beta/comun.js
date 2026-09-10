@@ -86,6 +86,55 @@ function pad(n){return String(n).padStart(2,'0');}
 
 function _hoyDateM_(){ var d=new Date(_dmyAISO_(HOY)+'T00:00:00'); return isNaN(d)?new Date():d; }
 
+/* ══ EL ALTO DEL ARMAZON — por que la barra de abajo salia TAPADA en Android ════════
+
+   ⛔⛔ Lo reporto Daniel el 10/09/2026: *«esta tapada hasta que minimizo y vuelvo a abrir la
+   app y eso ya esta mal. al menos en android sucede eso»*. Y **que se cure al reabrir es el
+   diagnostico**: la barra no esta mal puesta, es que el alto se calculo antes de tiempo.
+
+   📏 MEDIDO EN SU MOVIL con `navegador/redir/diag.html` (Android 10, Chrome 152,
+   **standalone**, dPR 2.75) — no supuesto:
+
+       window.innerHeight     735 px      100dvh / 100svh    735.3 px
+       100lvh / 100vh         791.3 px    visualViewport.h   791.3 px
+       safe-area-inset-bottom 0.0 px
+
+   La VENTANA mide 791.3 y el LAYOUT 735: **56.3 px** de barra de gestos. Y el inset vale
+   **CERO**, asi que el `env(safe-area-inset-bottom)` de `movil.css:581` **no aporta nada** en
+   ese movil: la nav no puede reservar esos pixeles con CSS.
+
+   ⛔ Y ESTO DESCARTA LA FICHA VIEJA (la del enlace con redirector que perdia la PWA): el
+   diagnostico dice **standalone**, o sea que la PWA esta bien. Mismo sintoma, otro fallo.
+
+   ✅ Se fija el alto desde JS con `innerHeight` —el LAYOUT— y se vuelve a fijar cuando la app
+   vuelve al frente, que es lo que el gesto de minimizar hacia a mano. */
+
+/* El alto que de verdad se puede usar, o `null` si no se sabe.
+
+   ⛔⛔ NO se usa `visualViewport.height`, y es la trampa de la cura facil: parece EL numero
+   bueno y es justo el malo — en su movil vale **791.3**, la ventana ENTERA con los gestos
+   dentro, y usarlo deja la barra 56 px por debajo, que es el fallo que se viene a arreglar.
+   ⛔ Y devuelve `null`, nunca 0: «no lo se» no es «la ventana mide cero», y un 0 aqui deja la
+   app sin armazon — peor que el fallo. Quien lo recibe decide, y decide dejar el CSS. */
+function _altoUtil_(w){
+  w = w || (typeof window !== 'undefined' ? window : null);
+  if (!w) return null;
+  var n = w.innerHeight;
+  return (typeof n === 'number' && n > 0) ? n : null;
+}
+
+/* Escribe ese alto en `--alto` de la raiz, y dice si pudo. El CSS cae a `100dvh` si no esta,
+   asi que **no tocar el estilo cuando no se sabe** es lo unico seguro. */
+function _fijarAlto_(doc, w){
+  doc = doc || (typeof document !== 'undefined' ? document : null);
+  w = w || (typeof window !== 'undefined' ? window : null);
+  if (!doc || !doc.documentElement) return false;
+  var n = _altoUtil_(w);
+  if (n === null) return false;
+  doc.documentElement.style.setProperty('--alto', n + 'px');
+  return true;
+}
+
 /* Quien puede usar la beta. Se deja en una funcion sola porque ensancharla es una linea:
    `|| _rangoBeta_()>=1` mete a los coordinadores. */
 function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; }

@@ -59,7 +59,18 @@ html,body{margin:0;padding:0;touch-action:manipulation}
 body{
   background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px;
   line-height:1.45; -webkit-font-smoothing:antialiased;
-  height:100vh; height:100dvh; display:flex; flex-direction:column;
+  /* ⛔⛔ LAS TRES VAN EN ESTE ORDEN Y NINGUNA SOBRA (530.a, 10/09/2026). En Android la
+     barra de abajo salia TAPADA hasta minimizar y volver a abrir la app — y que se cure
+     al reabrir ES el diagnostico: el alto se calculo antes de tiempo.
+     📏 Medido en su movil con `redir/diag.html`: `innerHeight` **735**, `100dvh`
+     **735.3**, pero `100vh`/`100lvh`/`visualViewport` **791.3** — **56.3 px** de barra de
+     gestos— y `safe-area-inset-bottom` **0.0**, o sea que la nav **no puede reservarlos
+     con CSS** por mucho `env()` que tenga.
+     ✅ `--alto` lo escribe `_fijarAlto_` con `innerHeight`, y se vuelve a escribir cuando
+     la app vuelve al frente. `100dvh` se queda de RESPALDO para cuando no hay JS o el
+     navegador no entiende `var()`: sin el, un fallo del JS dejaria la app sin armazon. */
+  height:100vh; height:100dvh; height:var(--alto, 100dvh);
+  display:flex; flex-direction:column;
   overflow:hidden; position:relative;
   /* Arriba SI: la muesca tapa la cabecera. Abajo NO: reservarlo aqui y otra vez en la
      `nav` contaba el inset dos veces y dejaba la barra flotando sobre 68 px de fondo

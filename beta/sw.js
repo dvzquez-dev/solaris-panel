@@ -26,6 +26,78 @@ const ICONO = 'icon-beta-192.png';
 const BADGE = '../recursos/favicon-32.png';
 
 self.addEventListener('install', () => self.skipWaiting());
+/* ══ LA CACHE — por que la app tardaba en abrir «a veces» ═════════════════════
+
+   Daniel, 10/09/2026: *«el fallo es a tarda mucho en abrir a veces»*.
+
+   📏 MEDIDO contra el sitio publicado, pidiendo compresion como un navegador — y la
+   primera medida fue MIA y estaba mal (`urllib` no pide compresion, asi que dijo «sin
+   comprimir» sobre un servidor que si comprime):
+
+       13 peticiones · 378 KB en la RED · 1.008 KB en claro (gzip al 38 %)
+       cache-control: max-age=600   -> pasados 10 minutos, las 13 se REVALIDAN
+
+   Con red movil eso son segundos, y explica el «a veces»: depende de si hace mas de diez
+   minutos que la abriste.
+
+   ✅ stale-while-revalidate: se sirve lo que hay en cache —la app arranca YA— y la red
+   refresca por detras para la proxima. La version nueva entra a la siguiente apertura.
+   ⚠️ Ese es el precio, y se dice: una apertura con la cara de ayer. El worker hace
+   `skipWaiting` + `clients.claim`, asi que el worker nuevo manda desde el primer momento.
+
+   ⛔⛔ Y LO PELIGROSO NO ES CACHEAR: ES CACHEAR LO QUE NO SE DEBE. Aqui las respuestas son
+   horas, puntos y sanciones de personas reales. Por eso QUE SE TOCA vive en UNA sola funcion
+   -`_cacheable_`- y esa funcion **se ejecuta en el banco** con los casos que hacen dano.
+   ⚠️ El manejador `fetch` en si NO se ejecuta en ningun banco, y hay que decirlo: usa
+   `async`/`await` y `caches`, que el arnes de `cscript` (ES3) no tiene. Se vigila por forma. */
+const CACHE = 'solaris-estaticos-v1';
+
+/* ¿Esta peticion se puede guardar? La puerta unica, y por eso es una funcion aparte.
+
+   ⛔ `GET` y nada mas: cachear un `POST` es creer hecha una escritura que no se mando.
+   ⛔ Del PROPIO ambito y nada mas. Eso deja fuera, de una vez, el backend de Apps Script
+      -cuyas respuestas son el panel del equipo-, el login de Google -de otro origen y con
+      respuesta opaca- y **el otro canal**: beta y produccion viven en el mismo sitio, y una
+      cache que los cruce sirve la app del equipo desde la de pruebas.
+   ⛔ Y NUNCA el propio worker: un `sw.js` cacheado no se puede reemplazar, y eso dejaria la
+      cache puesta para siempre sin forma de apagarla desde fuera. */
+function _cacheable_(req, scope){
+  if (!req || req.method !== 'GET') return false;
+  var u = String(req.url || '');
+  if (u.indexOf(scope) !== 0) return false;
+  if (u.indexOf('sw.js') >= 0) return false;
+  return true;
+}
+
+self.addEventListener('fetch', (e) => {
+  if (!_cacheable_(e.request, self.registration.scope)) return;   /* ni se toca: red normal */
+  e.respondWith((async () => {
+    /* ⛔⛔ SI LA CACHE NO SE PUEDE ABRIR, SE SIGUE COMO SI NO HUBIERA WORKER. En
+       incognito o con la cuota llena, `caches.open` LANZA; sin este `try` la funcion
+       async entera lanza, `respondWith` rechaza y **la peticion falla**. O sea que un
+       fallo de la cache dejaria la app sin cargar — para todas las peticiones del
+       ambito y para las 23 personas. Una cache que rompe es peor que no tener cache. */
+    let c = null;
+    try { c = await caches.open(CACHE); } catch (_) { return fetch(e.request); }
+    let guardado = null;
+    try { guardado = await c.match(e.request); } catch (_) { guardado = null; }
+    const red = fetch(e.request).then((r) => {
+      /* ⛔ Solo se guarda lo que llego BIEN: un 404 o un 500 cacheados se sirven como si
+         fueran la app, y entonces el fallo dura hasta que alguien borre los datos. */
+      /* ⚠️ El `put` tambien puede lanzar (cuota): que no se pueda guardar no es motivo
+         para no devolver la respuesta que YA ha llegado. */
+      if (r && r.ok) { try { c.put(e.request, r.clone()); } catch (_) {} }
+      return r;
+      /* ⛔⛔ `|| Response.error()` NO ES ADORNO: sin cache Y sin red, esto devolvia
+         `undefined`, y `respondWith(undefined)` **rompe la peticion**. La app se
+         quedaria sin cargar, y peor que hoy: sin worker el navegador al menos da su
+         propio error de red. `Response.error()` es exactamente ese error. */
+    }).catch(() => guardado || Response.error());
+    /* ⛔ `guardado || red`: se devuelve lo de la cache SIN esperar a la red -eso es lo que
+       hace que abra ya-, y la promesa de red sigue viva por detras refrescando. */
+    return guardado || red;
+  })());
+});
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
 // Llega una push: el emisor manda un JSON {title, body, url?, tag?, icon?, badge?}.

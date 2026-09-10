@@ -16,7 +16,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0D0A0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=24c5e09">
+<link rel="stylesheet" href="movil.css?v=9231f8f">
 </head>
 <body>
 
@@ -107,7 +107,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=2029309"></script>
+<script src="comun.js?v=4f837e4"></script>
 <script src="notis.movil.js?v=4218290"></script>
 <script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=2ab8a6a"></script>
@@ -1500,7 +1500,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='02ca817';
+var BUILD='7eb1190';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -1831,6 +1831,27 @@ function colocarViaje(animar){
   ultimoX=x;
 }
 window.addEventListener('resize',function(){ ultimoX=null; colocarViaje(false); });
+
+/* ══ EL ALTO DEL ARMAZON, RE-FIJADO EN LOS CUATRO MOMENTOS QUE IMPORTAN ══════════
+   ⛔⛔ Daniel, 10/09: *«esta tapada hasta que minimizo y vuelvo a abrir la app»*. El gesto de
+   minimizar y volver es lo que hacia que el navegador recalculara el alto; aqui se hace solo.
+   ⚠️ Y son CUATRO porque cada uno cubre un camino distinto, no por barrer: `visibilitychange`
+   es literalmente el gesto que lo curaba a mano; `pageshow` cubre volver desde la cache de
+   atras; `resize` cubre que el navegador ajuste su barra; `orientationchange` cubre girar.
+   ⛔ Se llama tambien AL ARRANCAR: sin eso, el primer pintado —que es justo el malo— se
+   quedaria con el `100dvh` de la cascada, que es el valor que dejaba la barra debajo. */
+(function(){
+  function _rearmarAlto_(){
+    if (typeof _fijarAlto_ === 'function') _fijarAlto_(document, window);
+  }
+  _rearmarAlto_();
+  window.addEventListener('resize', _rearmarAlto_);
+  window.addEventListener('orientationchange', _rearmarAlto_);
+  window.addEventListener('pageshow', _rearmarAlto_);
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden) _rearmarAlto_();
+  });
+})();
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ENGANCHES
