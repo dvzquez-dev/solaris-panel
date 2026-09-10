@@ -3557,6 +3557,20 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-10-abre-rapido', fecha:'2026-09-10',
+      titulo:'La app tardaba en abrir \u00aba veces\u00bb, y ahora se guarda en el m\u00f3vil',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Abrir la app se descargaba **entera cada vez**: **13 peticiones y 378 KB** por la red. Y el servidor dice \u00abvale diez minutos\u00bb, as\u00ed que pasados esos diez minutos **las trece se vuelven a pedir** \u2014 de ah\u00ed el \u00aba veces\u00bb, que depend\u00eda de cu\u00e1nto hac\u00eda que la hab\u00edas abierto.'},
+        {cara:'movil', vista:'estado', txt:'Ahora **se queda guardada en el tel\u00e9fono** y arranca con lo que ya tiene, mientras busca lo nuevo por detr\u00e1s. \u26a0\ufe0f El precio: **la primera vez despu\u00e9s de publicar puedes ver la versi\u00f3n de antes**; la siguiente ya es la nueva. Y esta primera apertura a\u00fan no lo notas \u2014 es la que llena el gu\u00e1rdate.'},
+        {cara:'movil', vista:'estado', txt:'\u26d4 Lo que **no** se guarda, a prop\u00f3sito: nada de lo que manda datos (fichajes, sanciones), nada del servidor, y nada del otro canal. Guardar una respuesta del servidor ser\u00eda ense\u00f1arte el panel del equipo **desde el disco del m\u00f3vil y viejo**.'}
+      ] },
+    { id:'2026-09-10-barra-abajo', fecha:'2026-09-10',
+      titulo:'La barra de abajo tapada en Android: era el enlace, no la app',
+      items:[
+        {cara:'movil', vista:'estado', txt:'La barra sal\u00eda **debajo de los botones de Android** hasta minimizar y volver a abrir. Medido en tu m\u00f3vil: la ventana mide **791 px** y el hueco donde cabe la app **735** \u2014 esos **56 px** son la barra de gestos, y el sistema **no nos dice** que est\u00e1n ah\u00ed.'},
+        {cara:'movil', vista:'estado', txt:'\u2705 Lo que lo arregla de verdad es **entrar por el enlace directo** (`\u2026/solaris-panel/beta/`) en vez del atajo viejo, que pasa por un redirector y por el camino pierde el modo aplicaci\u00f3n. \u26a0\ufe0f Hay que **reinstalar el acceso directo**: el que ya tengas apunta al viejo.'},
+        {cara:'movil', vista:'estado', txt:'Y de propina la app se **re-mide sola** al volver al frente, girar el m\u00f3vil o volver de atr\u00e1s, que es lo que antes hac\u00edas t\u00fa a mano minimizando.'}
+      ] },
     { id:'2026-09-06-raso-ordenador', fecha:'2026-09-06',
       titulo:'Desde el ordenador, quien no coordina no pod\u00eda contestar su disponibilidad',
       items:[
