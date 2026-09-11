@@ -190,6 +190,23 @@ function _escEstParte_(e){
    ⚠️ `revertida`, `anulada`, `sin_declarar` y `caducada` tampoco: el backend las niega. */
 function _escRevertible_(p){
   var e = p && p.estado;
+  /* ⛔⛔ LA CONTRAPARTE DE UNA REVERSION NO SE LISTA (563.ª), y esta guarda vive AQUI y
+     no solo en `_escRevBloqueo_`. La contraparte nace `estado:'aprobada'` con
+     `horas: -(h)` (`Codigo.gs`), asi que pasaba este filtro y entraba en
+     `_escRevertibles_` -- y `_escRevPanel_` **suma** las horas de lo que lista:
+     `h+=Number(lista[i].horas)||0`.
+     📏 El resultado, en el titulo del panel: al revertir un parte de 3 h quedaba
+     **«Ya firmaste · 2 · 0 h»** -- dos tarjetas que se anulan --, y si era el unico,
+     **«· 1 · -3 h»**: un total NEGATIVO encima de una tarjeta que ademas no se puede
+     revertir. Es justo lo que prohibe el comentario de `_escRevPanel_`: *un panel que
+     anuncia trabajo que no hay*.
+     ✅ **La cura estaba escrita en la gemela** (`horas.movil.js`, `_pdRevertible_`):
+     `if(p && p.origen==='reversion') return false;`. Aqui se quedo sin aplicar -- una
+     leccion curada en un fichero y no en su gemela.
+     ⚠️ `_escRevBloqueo_` SE QUEDA con su texto: son **dos escalones**. Este decide si
+     la tarjeta existe; aquel explica por que no hay boton si alguna vez vuelve a
+     listarse. Una guarda cubre un escalon, no la escalera. */
+  if(p && p.origen==='reversion') return false;
   return e==='aprobada' || e==='rechazada' || e==='detalle' || e==='otorgada' || e==='aplicada';
 }
 
@@ -1035,6 +1052,20 @@ function _bloqPanel_(){
   /* ⛔ …y desde el 15/08 el PD SI puede, asi que a el no se le avisa: el aviso decia la
      verdad cuando el servidor rechazaba, y repetirlo ahora seria asustar con algo que
      ya funciona -- un guardia que canta sobre lo correcto se acaba ignorando. */
+  /* ⛔⛔ HOY ESTA CONDICION ES INALCANZABLE, Y SE DICE (564.ª). Se midio siguiendo las
+     dos ramas de `_firmaDe_`: devuelve `PD_NOM` cuando el coordinador de esa unidad es
+     `quien`, y el coordinador en los demas casos. Para que salga `yo` hacen falta las
+     dos a la vez, y solo la primera puede darlo -- o sea `yo === PD_NOM`, cuyo
+     `rangoNom` es **3**, asi que el `rangoNom(yo)<3` de al lado lo corta SIEMPRE.
+     ⚠️ No es un fallo: es la 15/08 haciendo su trabajo. El aviso se escribio cuando el
+     servidor rechazaba al PD; al arreglarse, se le anadio `rangoNom(yo)<3` para dejar de
+     asustarle -- y como el PD era el UNICO que cumplia la primera mitad, la rama entera
+     se quedo sin nadie. **La cura correcta mato el caso, no solo el aviso.**
+     ✅ Se conserva -- no se borra -- porque lo que la revive es un cambio en `_firmaDe_`:
+     el dia que escale a **si mismo** en vez de al PD, este texto vuelve a hacer falta y
+     ya esta escrito. Borrarlo obligaria a redescubrir por que hizo falta.
+     ⚠️ Y por eso su mutacion sale **CIEGA a proposito**: no hay entrada que llegue aqui.
+     Lo que NO puede pasar es que eso se lea como cobertura. */
   var soloYo = !!(perf && _firmaDe_(perf, yo)===yo) && rangoNom(yo)<3;
   var avisoFirma = !soloYo ? '' :
     '<div class="nota" style="margin-top:11px"><b>Con este perfil el firmante eres t\u00fa, y '+

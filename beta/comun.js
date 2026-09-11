@@ -3644,6 +3644,13 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-11-ya-firmaste', fecha:'2026-09-11',
+      titulo:'\u00abYa firmaste\u00bb ya no dice \u00ab2 \u00b7 0 h\u00bb despu\u00e9s de revertir',
+      items:[
+        {cara:'escritorio', vista:'partes', txt:'Al **revertir** un parte, el servidor crea una contrapartida con las horas en negativo. Esa contrapartida **se colaba en el panel \u00abYa firmaste\u00bb** \u2014 nace como \u00abaprobada\u00bb, igual que un parte normal \u2014 y el panel **suma las horas de lo que ense\u00f1a**.'},
+        {cara:'escritorio', vista:'partes', txt:'Resultado: revertir un parte de 3 h dejaba el t\u00edtulo en **\u00ab2 \u00b7 0 h\u00bb** \u2014 dos tarjetas que se anulan \u2014, y si era el \u00fanico, **\u00ab1 \u00b7 \u22123 h\u00bb**: un total en negativo encima de una tarjeta que adem\u00e1s no se pod\u00eda revertir.'},
+        {cara:'escritorio', vista:'partes', txt:'\u2705 Ahora la contrapartida **no se lista**, as\u00ed que el t\u00edtulo vuelve a contar lo que de verdad puedes deshacer. En el m\u00f3vil ya era as\u00ed: **al escritorio le faltaba la misma l\u00ednea**.'}
+      ] },
     { id:'2026-09-11-cierre-anual-a-medias', fecha:'2026-09-11',
       titulo:'El cierre de temporada ya no dice \u00abAPLICADO\u00bb con dos fichas escritas',
       items:[
