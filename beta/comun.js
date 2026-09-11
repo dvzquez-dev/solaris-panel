@@ -3644,6 +3644,20 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-11-antecedentes-reales', fecha:'2026-09-11',
+      titulo:'La escala de sanciones ya sale de tus antecedentes DE VERDAD',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'Hasta hoy la escala de puntos por no cubrir una encuesta sal\u00eda de una **tabla de seis nombres de ejemplo** escrita a mano. El equipo son 23 personas, as\u00ed que a casi nadie le casaba: primero dec\u00eda «1.\u00aa vez» a todo el mundo, y desde esta ma\u00f1ana dec\u00eda «no consta». Ahora es **el dato real**: lo cuenta el motor sobre el registro de sanciones aplicadas, **por familia de motivo** \u2014 faltar a la disponibilidad no reincide con no rellenar un formulario.'},
+        {cara:'escritorio', vista:'sanciones', txt:'Y sigue diciendo **no consta** cuando de verdad no consta: si a tu sesi\u00f3n el servidor no le manda ese dato, la pantalla no se lo inventa.'}
+      ] },
+    { id:'2026-09-11-sanciones-no-inventan', fecha:'2026-09-11',
+      titulo:'La pantalla de sanciones deja de inventarse lo que no sabe',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'A quien **no est\u00e1 en la tabla de antecedentes** \u2014 que hoy es casi todo el equipo \u2014 la pantalla le dec\u00eda **\u00abaviso \u00b7 1.\u00aa vez, sin puntos\u00bb** y **\u00ab0 antecedentes esta temporada\u00bb**. Eso no era un dato: era **no saberlo**, escrito como si se supiera. Ahora lo dice: *no consta su historial*.'},
+        {cara:'escritorio', vista:'sanciones', txt:'Con **varios bloques** abiertos, el desplegable pod\u00eda nombrar uno y el panel ense\u00f1ar **otro** \u2014 y debajo est\u00e1 el bot\u00f3n que aplica en Notion. Ahora los dos miran el mismo.'},
+        {cara:'escritorio', vista:'sanciones', txt:'Al sancionar **por plazo**, si fallaba la lectura de tareas la pantalla se quedaba en **\u00abBuscando las tareas de X\u2026\u00bb para siempre**. Ahora dice que no se pudieron leer \u2014 y que eso **no** significa que no las tenga.'},
+        {cara:'escritorio', vista:'libros', txt:'Y **\u00abCargando tus movimientos\u2026\u00bb** ya no dura toda la sesi\u00f3n: se reintenta cada minuto y medio, como el resto.'}
+      ] },
     { id:'2026-09-11-ya-firmaste', fecha:'2026-09-11',
       titulo:'\u00abYa firmaste\u00bb ya no dice \u00ab2 \u00b7 0 h\u00bb despu\u00e9s de revertir',
       items:[
@@ -5107,8 +5121,67 @@ function _diaCorto_(iso){
   return ['dom','lun','mar','mi\u00e9','jue','vie','s\u00e1b'][d.getDay()]+' '+s.slice(8,10);
 }
 
+/* ⛔⛔ EL PATRON VA CON ESCAPES `\uXXXX`, Y NO ES ESTILO (574.ª). Esta funcion decide el
+   primer escalon de `REV2_NOM`, o sea **quien puede aprobar un Informe de Subsistema**, y
+   con la «o» y la «e» acentuadas CRUDAS dentro del regex **no se podia probar**: el unico
+   arnes que hay es `cscript`, que destroza el no-ASCII, asi que el patron llegaba roto y
+   `esUCT('Unidad de Documentacion Tecnica')` -con tildes- contestaba **false**.
+   📏 Medido el 11/09 sobre los mismos datos: en Python casa **1 de 32**; por el arnes,
+   **0 de 32**. O sea que un banco escrito contra ella habria salido VERDE afirmando que no
+   casa con nadie -- y habria medido el arnes, no la funcion.
+   ✅ Con los escapes es el MISMO conjunto de caracteres -no cambia ni un caso- y la funcion
+   pasa a ser ejecutable. Lo demuestra `rutinas/probar_es_uct.py`, cuyo PRIMER caso
+   comprueba que este fuente sigue siendo ASCII puro: si alguien vuelve a teclear la tilde,
+   lo de abajo dejaria de medir la funcion y el banco lo dice antes de ejecutar nada.
+   ⚠️ Es la excepcion razonada a *«en el codigo van los caracteres LITERALES»* (ARRANQUE):
+   aquella regla protege las ANCLAS de las mutaciones, y lo que aqui estaba roto era la
+   capacidad de EJECUTAR. Las mutaciones de esta funcion se anclan en la forma escapada. */
+
+/* ⛔⛔ LOS ANTECEDENTES DE ALGUIEN, POR FAMILIA — Y «NO LO SE» SE DEVUELVE COMO `null` (575.ª).
+   Hasta hoy la pantalla de sanciones decidia la escala de puntos con `VECES`, una tabla de
+   **SEIS NOMBRES DE DEMO** cableada en `escritorio.html`, sobre un roster de **23 personas**.
+   La 565.ª dejo de inventarse el cero; la 572.ª hizo que el dato **viajara** (`ensamblar`
+   escribe `antecedentes` por miembro, contados por `reglas/gradiente.py` sobre el registro
+   append-only); esta es la que lo **lee**.
+
+   ⛔ CUATRO FORMAS DE «NO LO SE», y las cuatro devuelven `null` a proposito (§3c-24):
+     · no esta en el panel;
+     · esta y **no trae el campo** — que es lo que le llega a una cara cuando el backend
+       recorta el miembro (`Codigo.gs:464` reconstruye con seis campos nombrados);
+     · trae el campo pero **no esa familia**;
+     · trae la familia con algo que **no es un numero** (un backend viejo, un `null`).
+   Un `0` en cualquiera de esos sitios diria «1.ª vez, sin puntos» sobre gente de la que no
+   consta nada — que es exactamente el fallo del que viene todo esto.
+   ✅ Y el **0 EXPLICITO si es un dato**: quien consta con cero es su primera vez de verdad.
+
+   ⚠️ LA FAMILIA IMPORTA, no es un detalle: la reincidencia se cuenta **dentro** de una
+   familia. Faltar a la disponibilidad no reincide con no rellenar un formulario, y la reforma
+   del RRI lo dice por escrito. Sumarlas adelantaria un escalon a los dos grupos. */
+function _antecedentesDe_(nombre, familia){
+  var m = (typeof _mSanc_ === 'function') ? _mSanc_(nombre) : null;
+  if (!m) return null;
+  var a = m.antecedentes;
+  if (!a || typeof a !== 'object') return null;
+  /* ⚠️ AQUI HABIA UN `hasOwnProperty`, y se retiro en la MISMA pieza (§3c-27 cara B):
+     estaba **subsumido** por el `typeof` de abajo. Si la familia no esta, `a[familia]`
+     es `undefined` y `typeof undefined` no es `'number'`; y si viniera heredada de
+     `Object.prototype` -- `'constructor'`, pongamos -- seria una funcion, tampoco. O sea
+     que no habia ningun dato capaz de distinguir las dos versiones: su mutacion habria
+     salido CIEGA, y una ciega que se deja enseña a leerlas todas como ruido. */
+  var v = a[familia];
+  return (typeof v === 'number' && isFinite(v)) ? v : null;
+}
+
+/* ⛔ LA PUERTA UNICA DE «CUANTAS VECES HA DEJADO DE CUBRIR». Existe para que el nombre de la
+   familia — que es una cadena acoplada a `reglas/gradiente.FAMILIAS` — se teclee **una sola
+   vez**: sus dos consumidores son la escala de `sancionPor` y el subtitulo de la lista de
+   riesgo, y dos sitios tecleando la misma cadena acaban siendo dos cadenas distintas el dia
+   que alguien la renombre en Python.
+   ⚠️ Y si se renombrara, esto devuelve `null` — «no consta» —, que es el lado seguro: la
+   pantalla deja de decir una escala en vez de decir una equivocada. */
+function _vecesSinCubrir_(nombre){ return _antecedentesDe_(nombre, 'disponibilidad'); }
 function esUCT(u){
-  return /documentaci[oó]n\s+t[eé]cnica/i.test(String(u || '')) || /^\s*UCT\s*$/i.test(String(u || ''));
+  return /documentaci[o\u00f3]n\s+t[e\u00e9]cnica/i.test(String(u || '')) || /^\s*UCT\s*$/i.test(String(u || ''));
 }
 
 /* ⛔ EL SEGUNDO REVISOR DOCUMENTAL SE DERIVA DEL CARGO, NO DE UN NOMBRE (05/08/2026).
@@ -5142,9 +5215,19 @@ function _rederivarRev2_(){
   if (!m) m = buscaMiembro(function(x){ return x.cargo === 'Coordinador' && esUCT(x.unidad); });
   /* ⛔⛔ NUNCA SE COLAPSA EN EL PD. Aqui ponia `REV2_NOM = m ? m.nombre : PD_NOM`, y con el
      roster que produce el panel DESPLEGADO los dos escalones de arriba fallan: `coordina`
-     no viaja (0 de 32 medido) y `unidad` guarda el SUBSISTEMA de cada cual, nunca la UCT
+     no viajaba y `unidad` guarda el SUBSISTEMA de cada cual, nunca la UCT
      -- cosa que `coordinadorDe` dice por escrito 1.800 lineas mas arriba, o sea que el
-     escalon 2 NO PUEDE FIRAR NUNCA. Asi que esto pisaba la semilla -- que es el nombre
+     escalon 2 NO PUEDE FIRAR NUNCA.
+     ⛔⛔ **Y ESE «0 DE 32» YA ES FALSO PARA EL ESCALON 1 — re-medido el 11/09 (574.ª).**
+     `coordina` **SI viaja**: traen valor **4 de 32** en `datos/panel.json` y **6 de 32** en
+     `datos/equipo.json`, y **1 casa con la UCT en los dos** (los valores que casan son
+     «Unidad de Documentacion Tecnica» y «Propulsion y Documentacion Tecnica»). O sea que el
+     escalon 1 **SI dispara** y pisa la semilla.
+     ✅ **Dano hoy: CERO, y esta medido** -- el que elige la derivacion **es la misma persona
+     que la semilla**. El dano era la nota: decia «aqui no hay nada que mirar» sobre el
+     camino que decide quien firma documentos, y una premisa asi no envejece sola.
+     ⚠️ Lo que **sigue siendo verdad** es el escalon 2: `esUCT(unidad)` casa en **0 de 32**,
+     porque `unidad` guarda el subsistema. La nota mezclaba los dos escalones en una frase. Asi que esto pisaba la semilla -- que es el nombre
      REAL del coordinador de la UCT, o sea CORRECTA -- con el PD, y **el rango 2
      desaparecia del reparto entero**: `rangoNom` pregunta por el PD antes que por el
      REV2.

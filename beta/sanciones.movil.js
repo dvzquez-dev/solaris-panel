@@ -91,7 +91,12 @@ function _sancionesHTML_(){
   var _tt=esPlazo ? _tareasDe_(SANC_FORM.quien, function(){
     if($('#modal').classList.contains('on')) _repintarSancM_();
   }) : [];
-  var cargandoT=(_tt===null);
+  /* ⛔⛔ IGUAL QUE EN LA CARA DE ESCRITORIO (567.ª), donde esta el parrafo entero: `null`
+     es «cargando» Y «no se pudo», asi que esta rama se tragaba el error y el aviso de
+     «No se pudieron leer» no se alcanzaba nunca. Se cura en las DOS a la vez porque lo
+     que se cura es la FORMA, no el fichero donde se vio. */
+  var cargandoT=(_tt===null) && !(SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien
+                                  && SANC_TAREAS.error);
   var tareas=(_tt||[]).filter(function(t){
     return t && t.url && !/hech|finaliz|complet|termin|cerrad/i.test(t.e||''); });
   return '<div class="mtit">Sanciones</div>'+

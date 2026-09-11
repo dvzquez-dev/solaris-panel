@@ -19,7 +19,29 @@ function _mSanc_(n){ return _m(n); }
 function sancionPor(tipo,nombre){
   if(tipo!=='general'&&tipo!=='junta'&&tipo!=='consejo') return {p:0,txt:'sin sanción automática · potestad del coordinador'};
   if(tipo==='junta'||tipo==='consejo') return {p:1,txt:'1 punto · escala plana'};
-  var v=VECES[nombre]||0;
+  /* ⛔⛔ «NO CONSTA» NO ES «CERO», Y AQUI DECIDE PUNTOS DE DISCIPLINA (565.ª).
+     `VECES` es una tabla de **SEIS NOMBRES DE DEMO** (`escritorio.html`), y los nombres
+     que llegan aqui son **REALES**: salen de `r.sinCubrir`, que viene de `_cobertura_`.
+     Con el roster de 26/27 -- **23 personas** -- casi nadie esta en esa tabla, asi que el
+     `||0` convertia **«no se su historial»** en **«es su primera vez»**: a un reincidente
+     la pantalla le cantaba *«aviso · 1.ª vez, sin puntos»* y *«0 antecedentes esta
+     temporada»*. Es la misma forma que el «Revisa: Antia» del 10/09: **una semilla de
+     demo leida como dato real**.
+     ✅ Ahora son TRES respuestas y no dos: **p:0** (consta y es la primera), **p>=1**
+     (consta y reincide) y **p:null** (no consta). Un `0` explicito en la tabla sigue
+     dando «1.ª vez» -- eso es un dato --; lo que ya no se inventa es el hueco.
+     ✅ **Y DESDE LA 575.ª EL DATO ES REAL.** Aqui ponia que la reincidencia la cuenta
+     `reglas/gradiente.py` y que **no viajaba al panel**, asi que lo unico honesto que
+     podia hacer esta cara era decir que no lo sabia. Ya no: la 572.ª puso el cable
+     -- `flujos/ensamblar.py` escribe `antecedentes` por miembro, un entero por familia --
+     y esto lo lee por `_vecesSinCubrir_`. `VECES`, la tabla de seis nombres de demo,
+     **se retiro**.
+     ⚠️ Y el `null` sigue existiendo, con MAS motivos que antes: quien no esta en el
+     panel, quien esta y no trae el campo -- el backend recorta el miembro para quien no
+     es admin ni PD --, y quien lo trae con algo que no es un numero. */
+  var v=_vecesSinCubrir_(nombre);
+  if(v===null)
+    return {p:null,txt:'no consta su historial · la escala no se puede decir aquí'};
   if(v===0) return {p:0,txt:'aviso · 1.ª vez, sin puntos'};
   if(v===1) return {p:1,txt:'1 punto · 2.ª vez'};
   return {p:2,txt:'2 puntos · 3.ª o más (tope 2)'};
@@ -90,6 +112,26 @@ function _actorSanc_(){
   return ACTOR;                    // demo local, donde no hay sesion
 }
 
+/* ⛔⛔ EL INDICE DEL BLOQUE QUE SE MIRA, EN UNA SOLA PUERTA (566.ª). Estaba calculado
+   DOS VECES con criterios DISTINTOS: `_loteReal_` clampaba
+   (`Math.min(LOTE_SEL, LOTES_PEND.length-1)`) y `_selectorLotes_` no (`i===LOTE_SEL`).
+   Y nadie resetea `LOTE_SEL`: lo asigna un unico sitio (`escritorio.html`, el `onchange`).
+   📏 Lo que se veia: con 3 bloques eliges el 3.º (`LOTE_SEL=2`), el refresco de 90 s
+   deja 2, y entonces **el panel pinta el bloque B y el desplegable enseña el A** -- porque
+   ninguna `<option>` queda `selected` y el navegador marca la primera. Debajo hay un boton
+   que **aplica en Notion y publica el comunicado**: decidir sobre el bloque equivocado no
+   da ningun error.
+   ⚠️ Es la regla 11 en su forma mas cara: *una constante derivable no se teclea dos
+   veces*. Aqui no era una constante sino un indice, y las dos formas eran razonables por
+   separado -- la diferencia ES el fallo.
+   ✅ Devuelve **0 si no hay bloques**, que es lo que ya hacia el `|| LOTES_PEND[0]` de
+   `_loteReal_`: un `-1` aqui se leeria como «el ultimo» en cualquier `[]`. */
+function _loteIdx_(){
+  var n = (LOTES_PEND && LOTES_PEND.length) || 0;
+  if(!n) return 0;
+  return Math.max(0, Math.min(LOTE_SEL, n - 1));
+}
+
 function _sancSueltas_(){
   if(!Array.isArray(SANC_BACK)) return [];
   return SANC_BACK.filter(function(s){ return s.estado==='pendiente' && !s.lote; });
@@ -108,7 +150,7 @@ function _selectorLotes_(){
     '<select id="loteSel" style="width:100%;max-width:340px;background:#0A0909;border:1px solid var(--line);'+
     'border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
     LOTES_PEND.map(function(l,i){
-      return '<option value="'+i+'"'+(i===LOTE_SEL?' selected':'')+'>'+esc(l)+'</option>'; }).join('')+
+      return '<option value="'+i+'"'+(i===_loteIdx_()?' selected':'')+'>'+esc(l)+'</option>'; }).join('')+
     '</select></label></div>';
 }
 
@@ -146,8 +188,17 @@ function _panelHistSanc_(){
     tabla([['Persona'],['Motivo'],['Estado',0],['Puntos',1],['Cuándo',1]],
       hs.slice(0,40).map(function(s){
         var m=_m(s.nombre);
-        var et={aplicada:'aplicada',aprobada:'aprobada',justificada:'justificada',
-                rechazada:'rechazada',revocada:'revocada'}[s.estado]||s.estado;
+        /* ⚠️ AQUI HABIA UN MAPA IDENTIDAD (568.ª): cada clave se traducia A SI MISMA
+           (`aplicada:'aplicada'`, `aprobada:'aprobada'`…) y el `||s.estado` cubria el
+           resto, asi que `et` era **siempre** `s.estado`. No traducia nada.
+           ⚠️ Y no es inofensivo: un mapa de estados **parece** la puerta donde se decide
+           como se lee cada uno, asi que el siguiente que quiera cambiar un rotulo lo
+           edita ahi… y el `||` de al lado se lo come si se equivoca de clave. Un
+           traductor que no traduce es peor que no tenerlo: invita a confiar en el.
+           ✅ Su gemela del movil tiene el suyo DE VERDAD (`PD_EST`: «aplicada» -> «ya
+           cuenta en su mes»). Si algun dia esta cara quiere rotulos propios, el sitio es
+           ese mapa — con traducciones distintas del original, que es lo que lo hace uno. */
+        var et=s.estado;
         var tono=(s.estado==='rechazada'||s.estado==='revocada')?'dn':(s.estado==='aplicada'?'up':'');
         return '<tr><td>'+esc((m&&m.pila)||s.nombre)+'</td>'+
           '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
@@ -183,7 +234,19 @@ function _ponerSancCuerpo_(){
      perdia -y volvia como `-1`, que es el valor por defecto de `pts`, con pinta de elegido-.
      Ahora pasa por la MISMA puerta que el resto de repintados. */
   var _tt=esPlazo ? _tareasDe_(SANC_FORM.quien, _repintarPonerSanc_) : [];
-  var cargandoT=(_tt===null);
+  /* ⛔⛔ «CARGANDO» Y «NO SE PUDO» LLEGAN LOS DOS COMO `null` (567.ª). `_tareasDe_`
+     devuelve `null` en TRES situaciones -- se esta pidiendo, hubo error, y no se sabe --,
+     asi que `(_tt===null)` metia el error dentro de «cargando». Y como esa rama se
+     pregunta ANTES, la de «No se pudieron leer» **no se alcanzaba nunca**: con la red
+     caida la pantalla decia **«Buscando las tareas de X…» para siempre** — y la puerta
+     **no reintenta a proposito** (`render()` pasa por ahi muchas veces), asi que ese
+     «buscando» no acaba hasta que se elige a otra persona.
+     ⚠️ El texto del error existia, estaba escrito con su matiz -- *«esto NO dice que no
+     los tenga»* -- y no lo vio nadie. Y su unico guardia es un `in` sobre el FUENTE, que
+     sale verde igual: la rama estaba **afirmada y sin ejecutar**.
+     ✅ Cargando es lo que queda cuando NO hay error: el error tiene su propia rama. */
+  var cargandoT=(_tt===null) && !(SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien
+                                  && SANC_TAREAS.error);
   var tareas=(_tt||[]).filter(function(t){
     return t && t.url && !/hech|finaliz|complet|termin|cerrad/i.test(t.e||''); });
   return '<div class="sanwrap">'+
@@ -421,7 +484,11 @@ function _loteReal_(){
   /* Antes se cogia SIEMPRE `pend[0].lote`: con dos bloques, el segundo no existia para
      el panel. Ahora se listan todos y se puede cambiar de uno a otro. */
   LOTES_PEND=[]; pend.forEach(function(x){ if(LOTES_PEND.indexOf(x.lote)<0) LOTES_PEND.push(x.lote); });
-  var lote=LOTES_PEND[Math.min(LOTE_SEL, LOTES_PEND.length-1)] || LOTES_PEND[0];
+  /* ⚠️ Y AQUI SE ACABO EL `|| LOTES_PEND[0]`: era inalcanzable -- `_loteIdx_` ya devuelve
+     un indice dentro de rango, y a esta linea no se llega con la lista vacia (el `if
+     (!pend.length)` de arriba sale antes). Un respaldo que no puede dispararse se lee como
+     una red que no existe. */
+  var lote=LOTES_PEND[_loteIdx_()];
   var its=pend.filter(function(s){ return s.lote===lote; });
   LOTE={ real:true, lote:lote, nombre:lote, cerrado:false,
     motivo:its[0].motivo||'—', art:its[0].articulo||'libre',
