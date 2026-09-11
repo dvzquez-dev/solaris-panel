@@ -905,8 +905,64 @@ function _bloqFalta_(){
 }
 
 /* Quien firma lo que se declare con el perfil elegido, en nombre corto, o '' si no se sabe. */
-function _bloqFirma_(){
+/* ⛔⛔ UN PARTE QUE YA EXISTE NO CAMBIA DE SUBSISTEMA, Y LA PANTALLA LO PROMETIA (581.ª).
+   📏 Los tres caminos que CREAN un parte si mandan el perfil — `ficharEntrada(perfil)`,
+   `ficharSalida(…, perfil)` y `pushParte({subsistema: perf})` —. El unico que no lo manda
+   es `declararParte(decl.id, …)`, y **no puede**: ese parte nacio con su `p.subsistema` y
+   el servidor lo usa para decidir quien lo firma (`_puedeSobreParte_`).
+   ⛔ Asi que el fallo no era «el perfil se tira»: era que **esta cara ofrece cambiar algo
+   que ya esta decidido** y calculaba la promesa con lo elegido. Quien tiene dos perfiles
+   elegia «coordinador de X», leia «se envia a Ana»… y lo firmaba Bea.
+   📏 Medido el 11/09: **1 de 32** en `datos/panel.json` — que es lo que la app lee — y
+   **6 de 32** en `datos/equipo.json` tienen DOS o mas perfiles. Y son coordinadores, que
+   es la poblacion de esta cara.
+   ✅ Cuando hay parte, manda **el suyo**. ⚠️ Y cuando NO lo hay sigue mandando el elegido,
+   que no es un detalle: el bloque atrasado nuevo se crea con `pushParte({subsistema:
+   perf})`, o sea que ahi elegir **si** decide. Las dos mitades tienen su comprobacion. */
+
+/* ⛔⛔ EL CAMPO DE PERFIL, FUERA DE `_bloqPanel_` Y MIRANDO SI HAY PARTE (581.ª).
+   Dos cosas, y la segunda es la que lo hace medible:
+   1º **No se ofrece elegir lo que ya esta decidido.** Un parte que ya existe nacio con su
+      `subsistema` y `declararParte` no puede moverlo, asi que el desplegable «Declaras como»
+      era un **control muerto**: lo mueves, no pasa nada, y hasta la 581.ª encima la pantalla
+      te prometia el firmante de lo elegido. En su sitio va un rotulo que dice **de que
+      subsistema es ese parte**, que es el dato que la persona necesita para decidir si envia.
+   2º **Y vive FUERA del cuerpo de `_bloqPanel_`**, como `_convPreHTML_` y por la misma razon
+      escrita alli: metida dentro no habria forma de ejecutarla en el arnes y su mutacion
+      saldria ciega. Un `if` mas en una funcion de 200 lineas es superficie que nadie mide.
+   📏 El daño medido el 11/09: **1 de 32** en `datos/panel.json` — que es lo que la app lee —
+   y **6 de 32** en `datos/equipo.json` tienen dos o mas perfiles. Son los coordinadores. */
+function _bloqPerfilCampo_(){
+  var d=_bloqDecl_();
+  /* La MISMA pregunta que `_bloqSubsEfectivo_`, y por eso se decide igual: si hay parte,
+     su subsistema manda — y entonces esto no es un desplegable, es un rotulo. */
+  if(d && d.subsistema)
+    return '<div style="min-width:210px"><span class="sc" style="display:block;margin-bottom:5px">'+
+      'Declaras como</span><div class="nota" style="margin:0;padding:7px 9px">Este fichaje se '+
+      'abri\u00f3 en <b>'+esc(d.subsistema)+'</b>, y eso ya no se cambia al declararlo.</div></div>';
+  var ps=_perfilesDe_(miembro(_fichaYo_()));
+  if(ps.length<=1) return '';
   var perf=_bloqPerfil_();
+  return '<label style="min-width:210px"><span class="sc" style="display:block;margin-bottom:5px">'+
+    'Declaras como</span><select id="bqPerfil" style="'+CAMPO_CSS+'">'+ps.map(function(x){
+      return '<option value="'+esc(x.unidad)+'"'+(x.unidad===perf?' selected':'')+'>'+esc(x.txt)+'</option>';
+    }).join('')+'</select></label>';
+}
+/* ⛔⛔ UNA SOLA PUERTA PARA «EL SUBSISTEMA EFECTIVO DE ESTE BLOQUE» (581.ª). La condicion
+   estaba a punto de quedar copiada en TRES sitios de esta misma pantalla — la firma, el
+   rotulo de «Trabajo de subsistema» y la guarda `soloYo` —, y tres copias de un criterio
+   acaban siendo tres criterios: la diferencia se leeria como que un rotulo contradice al
+   de al lado. Es la regla 11 aplicada a una condicion en vez de a una constante.
+   ✅ Y dice lo que significa: si el parte YA existe manda **el suyo**, porque
+   `declararParte` no puede moverlo; si no, manda el **elegido**, porque `pushParte` si lo
+   manda. Las dos mitades tienen su comprobacion. */
+function _bloqSubsEfectivo_(){
+  var d=_bloqDecl_();
+  return (d && d.subsistema) ? d.subsistema : _bloqPerfil_();
+}
+
+function _bloqFirma_(){
+  var perf=_bloqSubsEfectivo_();
   if(!perf) return '';
   var n=_firmaDe_(perf, _fichaYo_());
   return n ? ((miembro(n)||{}).pila||n) : '';
@@ -921,7 +977,10 @@ function _bloqPanel_(){
       'apunta en local: unas horas que el servidor no tiene no son horas de nadie.'));
 
   var f=BLOQ_FORM, decl=_bloqDecl_(), pend=_bloqMios_();
-  var perf=_bloqPerfil_(), yo=_fichaYo_(), firmaP=_bloqFirma_();
+  /* ⛔ `perf` SALE DE LA PUERTA (581.ª), no de `_bloqPerfil_()`: de aqui cuelgan el rotulo
+     «Trabajo de subsistema · X» y la guarda `soloYo`, y los dos decian el subsistema
+     ELEGIDO sobre un parte que ya tiene el suyo — la misma promesa falsa que la firma. */
+  var perf=_bloqSubsEfectivo_(), yo=_fichaYo_(), firmaP=_bloqFirma_();
   var falta=_bloqFalta_();
 
   /* LO QUE CADUCA VA ARRIBA. Un `sin declarar` se pierde a los 7 dias y un bloque nuevo no:
@@ -1016,13 +1075,10 @@ function _bloqPanel_(){
   var opts=_fichaTareas_().map(function(t){
     return '<option value="'+esc(t.n)+'"'+(f.tarea===t.n?' selected':'')+'>'+esc(t.n)+'</option>';
   }).join('');
-  var ps=_perfilesDe_(miembro(yo));
-  var selPerfil = ps.length>1
-    ? '<label style="min-width:210px"><span class="sc" style="display:block;margin-bottom:5px">Declaras como</span>'+
-      '<select id="bqPerfil" style="'+CAMPO_CSS+'">'+ps.map(function(x){
-        return '<option value="'+esc(x.unidad)+'"'+(x.unidad===perf?' selected':'')+'>'+esc(x.txt)+'</option>';
-      }).join('')+'</select></label>'
-    : '';
+  /* ⛔ POR LA PUERTA DE ARRIBA (581.ª): aqui se montaba a pelo con `ps.length>1` y **sin
+     mirar si hay parte**, asi que al declarar uno que ya existe se ofrecia elegir algo que
+     no decide nada. Y dentro de esta funcion no habia forma de ejecutarlo en el arnes. */
+  var selPerfil=_bloqPerfilCampo_();
   var etiDet = f.cat==='reunion' ? 'Nombre de la reuni\u00f3n'
              : f.cat==='turno'   ? 'Qu\u00e9 turno' : 'Concepto';
   var campoImput = f.cat==='tareas'

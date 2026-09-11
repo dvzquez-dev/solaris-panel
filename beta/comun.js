@@ -3644,6 +3644,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-11-declaras-como', fecha:'2026-09-11',
+      titulo:'\u00abDeclaras como\u00bb dejaba elegir algo que ya estaba decidido',
+      items:[
+        {cara:'escritorio', vista:'horas', txt:'Si coordinas alguna unidad tienes **dos perfiles**, y al declarar un fichaje que ya estaba abierto la pantalla te dejaba cambiarlo \u2014 y te promet\u00eda **el coordinador del que eligieras**. Pero ese fichaje naci\u00f3 con su subsistema y eso ya no se mueve: le\u00edas \u00abse env\u00eda a Ana\u00bb y lo firmaba **Bea**. Ahora el desplegable se convierte en un r\u00f3tulo que dice **d\u00f3nde naci\u00f3**, y quien firma sale de ah\u00ed. \u26a0\ufe0f Al declarar un bloque **nuevo** sigues eligiendo, porque ah\u00ed s\u00ed decide.'}
+      ] },
     { id:'2026-09-11-conv-sin-saber', fecha:'2026-09-11',
       titulo:'\u00abNo hay ninguna semana convocada\u00bb ya no se dice cuando no se sabe',
       items:[
