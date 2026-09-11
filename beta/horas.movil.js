@@ -84,6 +84,22 @@ function normPMovil(p){
        ya los llevaba y esta no, o sea que las dos listas de la MISMA pantalla decian
        cosas distintas del mismo parte. */
     decidido_por:p.decidido_por||null, revierte:p.revierte||null,
+    /* ⛔⛔ Y EL AUTOR, que es lo que decide QUIÉN PUEDE DECLARAR ESTE PARTE. `filaParte`
+       tenía ya su guarda —`var _mio = !p.autor || p.autor === _fichaYo_();`— escrita
+       justo para impedir que alguien declare por otro… y **este normalizador no copiaba
+       el campo**, así que `p.autor` llegaba `undefined` y `_mio` salía **`true` SIEMPRE,
+       para todos los partes**. La guarda estaba puesta y no gateaba nada.
+       📏 EL DAÑO: bajo «Ver como», el PD veía «Declarar»/«Responder» sobre los partes de
+       OTRA persona, y el manejador tampoco mira el autor — así que ese parte pasaba a
+       `pendiente` **con la tarea, la categoría y la justificación de quien lo pulsa**, y
+       **perdía su `caduca_at`**. El servidor lo acepta porque quien lo hace es admin.
+       ⚠️ Y su comprobación estaba **VERDE sobre código roto**: medía el USO de la guarda
+       —decía literalmente *«SE MIDE EL USO, NO LA DECLARACIÓN»*— pero no que el campo
+       **llegara**. §3c-39: *un arreglo correcto puede no decidir nada porque el dato no
+       llega*, y el sitio donde se cae es siempre un normalizador que enumera campos.
+       📏 Es la TERCERA vez que este mismo fichero lo sufre: ya pasó con `aplicado_at` y
+       con `decidido_por`/`revierte`, y las dos están escritas aquí arriba. */
+    autor:p.autor||null,
     origen:p.origen||null, caduca:p.caduca_at||null }; }
 
 /* ⚠️ MISMO DEFECTO QUE EL DE ABAJO, y se arregla igual aunque HOY no haga daño:

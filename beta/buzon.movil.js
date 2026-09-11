@@ -281,6 +281,22 @@ function _cablearFotoBuzon_(repinta){
    no. */
 function buzonModal(tipo, prev){
   var esBug=(tipo!=='mejora');
+  /* ⛔⛔ UNA APERTURA FRESCA NO HEREDA LA FOTO DEL REPORTE ANTERIOR. `BZ_FOTO` es global
+     y solo se vaciaba en dos sitios: el boton **Quitar** y el **envio con exito**. Así
+     que bastaba **cerrar el modal sin enviar** —que en un movil es tocar fuera de la
+     tarjeta, sin confirmar (`movil.html`: `e.target.id==='modal'`)— para que la captura
+     marcada siguiera puesta, y la siguiente apertura la pintara como suya y **la
+     enviara**: `datos.captura` de la pantalla VIEJA con `datos.pantalla` diciendo la
+     NUEVA. Es perseguir un fallo en el sitio equivocado, que es justo el motivo por el
+     que se manda la captura.
+     ⚠️ Y la señal que lo distingue YA ESTABA: `prev` solo llega al **reconstruir** el
+     modal al cambiar de tipo —ahi la foto SI debe sobrevivir, igual que el texto— y no
+     llega al abrirlo desde el menu. 📏 Dos llamadores, y cada uno de una clase.
+     ⛔ El comentario de aqui arriba ya había visto la mitad —*«la foto sobrevivia porque
+     `BZ_FOTO` es global; el texto, que es lo que cuesta escribir, no»*— y se curó el
+     texto **sin mirar que la foto sobreviviera de MÁS**: un arreglo vigilado por un solo
+     lado (§3c-31). */
+  if(!prev) BZ_FOTO=null;
   var _pv=prev||{};
   /* ⛔ LA GRAVEDAD TAMBIÉN VIAJA, y por eso se declara AQUÍ: el bloque de chips se
      pinta unas líneas más abajo, así que si `grav` naciera después de `abrirModal` no

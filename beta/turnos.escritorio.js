@@ -720,6 +720,24 @@ function _pinDisp_(){
   /* Se pide AQUI y no en el arranque: el mapa vive en una pestaña que puede no abrirse en
      toda la sesion, y cargarlo siempre seria una peticion de mas para todo el mundo. */
   _dispCargar_(typeof pintar==='function' ? pintar : null);
+  /* ⛔⛔ EL «REINTENTAR» SE CABLEA AQUÍ ARRIBA, ANTES DE LAS DOS GUARDAS. Estaba al final
+     de esta función, y ahí **no llega nunca cuando hace falta**: el botón solo lo pinta
+     `_dispAviso_` en los estados `error` y `sin sesion`, y en los dos se sale antes — en
+     `error` porque `CONVOCATORIAS` se acaba de vaciar y `_dispViva_()` da falsy, y en los
+     dos porque el panel del aviso **no pinta `#dMapa`**.
+     📏 O sea: el manejador se colgaba **exactamente cuando el botón no está en pantalla**,
+     y no se colgaba cuando sí. «No se pudo preguntar al servidor · Reintentar» y el botón
+     no hacía nada, para siempre.
+     ⛔ Y el precio no es el botón: `DISP_SRV` **solo** vuelve a `'sin pedir'` desde ese
+     manejador, así que una caída de red dejaba muertos el mapa Y «Tu disponibilidad»
+     **toda la sesión**. Quien iba a contestar pierde la semana — y la tarjeta de al lado
+     le recuerda que *no contestar es lo que hace que te pongan un turno cuando no puedes*.
+     ⚠️ Su guardia estaba VERDE y no podía cazarlo: `"data-dreint" in _PIN` mira el FUENTE,
+     no si se alcanza — y el propio texto de esa comprobación dice *«un `Reintentar` sin
+     manejador es un rótulo»*. Lo era. */
+  $$('[data-dreint]').forEach(function(b){
+    b.onclick=function(){ _dispEstadoSrv_('sin pedir'); _dispCargar_(pintar); pintar(); };
+  });
   var cv=_dispViva_(); if(!cv) return;
   var mapa=document.getElementById('dMapa'); if(!mapa) return;
   var calor=_calorTurnos_(cv, DISP_SITIO);
@@ -743,11 +761,11 @@ function _pinDisp_(){
   /* ⛔ EL BOTON SIN MANEJADOR ES UN ROTULO. `_dispCargar_` es de un solo disparo, asi que
      devolver el estado a 'sin pedir' es lo UNICO que vuelve a abrir esa puerta — sin
      esto, un fallo de red dura hasta que alguien recarga la pagina a mano.
-     ⚠️ Se cablea AQUI, dentro del mismo enganche que los demas botones del panel, porque
-     el aviso se pinta en el sitio del mapa y se vuelve a pintar en cada `pintar()`. */
-  $$('[data-dreint]').forEach(function(b){
-    b.onclick=function(){ _dispEstadoSrv_('sin pedir'); _dispCargar_(pintar); pintar(); };
-  });
+     ⛔⛔ Y AQUI ESTABA EL CABLE, QUE ES DONDE NO LLEGA. Movido ARRIBA el 11/09 (605.ª):
+     este punto está **debajo** de `if(!cv) return;` y de `if(!mapa) return;`, y los dos
+     disparan justo en los estados donde el botón existe. La premisa de la línea de arriba
+     era correcta —*el aviso se pinta en el sitio del mapa*— y el SITIO elegido, el
+     equivocado. ⚠️ Se deja escrito porque un cable que vuelva aquí se lee igual de bien. */
 }
 
 /* ═══ CONVOCAR DISPONIBILIDAD ═══════════════════════════════════════════════════════

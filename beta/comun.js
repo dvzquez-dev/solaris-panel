@@ -3644,6 +3644,21 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-12-declarar-ajeno', fecha:'2026-09-12',
+      titulo:'Se pod\u00eda declarar el parte de otra persona desde \u00abVer como\u00bb',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La app ya ten\u00eda escrita la regla de que **nadie declara por nadie**\u2026 y no funcionaba: al preparar cada parte para pintarlo **no se copiaba qui\u00e9n lo hab\u00eda escrito**, as\u00ed que la comprobaci\u00f3n dec\u00eda siempre \u00abes tuyo\u00bb. Mirando a otra persona con **Ver como** sal\u00edan sus botones de **Declarar** y **Responder**, y al pulsarlos su parte se enviaba con **tu tarea, tu categor\u00eda y tu justificaci\u00f3n** \u2014 y perd\u00eda su fecha l\u00edmite. Ya no.'}
+      ] },
+    { id:'2026-09-12-reintentar-turnos', fecha:'2026-09-12',
+      titulo:'El \u00abReintentar\u00bb del mapa de turnos no hac\u00eda nada',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Cuando el servidor no contestaba sal\u00eda **\u00abNo se pudo preguntar \u00b7 Reintentar\u00bb**\u2026 y el bot\u00f3n **estaba muerto**: se le enganchaba el manejador en un punto del c\u00f3digo al que no se llega en ese estado. Y como es lo \u00fanico que vuelve a pedir los datos, una ca\u00edda de red dejaba el mapa **y** \u00abTu disponibilidad\u00bb muertos **el resto de la sesi\u00f3n** \u2014 con lo que quien iba a contestar perd\u00eda la semana.'}
+      ] },
+    { id:'2026-09-12-foto-buzon', fecha:'2026-09-12',
+      titulo:'La captura de un reporte se colaba en el siguiente',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Si adjuntabas una captura al buz\u00f3n y cerrabas sin enviar \u2014tocando fuera de la tarjeta\u2014, la foto **se quedaba puesta**: al abrir el buz\u00f3n otra vez para reportar otra cosa, se enviaba **la imagen de la pantalla anterior** con el nombre de la nueva. Ahora una apertura nueva empieza sin foto, y al cambiar entre \u00abfallo\u00bb y \u00abmejora\u00bb se conserva, que es cuando s\u00ed toca.'}
+      ] },
     { id:'2026-09-11-sanc-sin-leer', fecha:'2026-09-11',
       titulo:'Los paneles de sanciones ya no dicen \u00abninguna\u00bb cuando no lo saben',
       items:[
