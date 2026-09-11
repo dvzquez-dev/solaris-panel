@@ -193,6 +193,22 @@ function convocarReunionPanel(){
       '<button class="btn" id="cvHorAbrir" type="button">Horario por día</button>'+
     '</div>'+
     '<div id="cvDias" hidden style="margin-bottom:11px"></div>'+
+    /* ⛔ QUIÉN VE EL MAPA. Daniel, literal: «Oculta y anonima al reves. Anonima: solo ve
+       los nombres el que convoca... Oculta: solo quien convoca ve cualquier cosa». El
+       backend distingue los tres y el MÓVIL los ofrecía; aquí iba `vision:'anonima'` a
+       fuego y sin selector — y por esta pantalla es por donde se convocan **junta y
+       consejo**, que son justo las que pueden querer el modo más restrictivo. §3c-9: lo
+       que solo está en una cara es el fallo que nadie ve.
+       ⚠️ El defecto sigue siendo `anonima`: cambiarlo movería lo que ve el equipo en
+       todas las convocatorias, y eso no lo ha pedido nadie. */
+    '<span class="sc" style="display:block;margin-bottom:5px">Visión de disponibilidad</span>'+
+    '<div id="cvVision" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:7px">'+
+      '<button type="button" class="pick" data-cv="publica">Pública</button>'+
+      '<button type="button" class="pick on" data-cv="anonima">Anónima</button>'+
+      '<button type="button" class="pick" data-cv="oculta">Oculta</button>'+
+    '</div>'+
+    '<p class="nota" id="cvVisHint" style="border-top:0;margin-bottom:11px">'+
+      'El equipo ve el mapa de calor con los totales, sin nombres.</p>'+
     '<div class="nota" id="cvPrev" style="border-top:0;margin-bottom:11px">—</div>'+
     '<button class="btn pri" data-convreu>Convocar la reunión</button>'+
     '</div>');
@@ -348,6 +364,22 @@ function _cablearConvocar_(){
       if(CONV_INV.has(n)) CONV_INV.delete(n); else CONV_INV.add(n);
       pintaChips(); upd(); };
   });
+  /* ⛔ LA VISIÓN ELEGIDA VIVE EN EL DOM, no en un global. `CONV_INV` y `CONV_HOR` son
+     globales porque hay que CONSERVARLOS al repintar el panel; esto no: el botón con
+     `on` ya es el estado, y un global más tendría que declararse en `escritorio.html`
+     — un módulo solo lleva declaraciones `function` (§5b).
+     ⚠️ Y los tres textos son LOS MISMOS del móvil, letra por letra: dos caras que
+     explican distinto la misma opción es la asimetría de siempre un piso más abajo. */
+  var _cvHints={publica:'Cualquiera puede tocar un hueco y ver quién puede en esa franja.',
+    anonima:'El equipo ve el mapa de calor con los totales, sin nombres.',
+    oculta:'El equipo no ve el mapa; solo tú, para decidir.'};
+  $$('#cvVision [data-cv]').forEach(function(b){
+    b.onclick=function(){
+      $$('#cvVision [data-cv]').forEach(function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+      var h=$('#cvVisHint'); if(h) h.textContent=_cvHints[b.dataset.cv]||'';
+    };
+  });
   ['cvD0','cvD1','cvH0','cvH1','cvSlot','cvDura'].forEach(function(id){
     var e=$('#'+id); if(e) e.onchange=upd; });
   upd();
@@ -378,7 +410,12 @@ function _cablearConvocar_(){
          hay que juntar seguido para que valga, no la duración cruda. Si aquí se mandara
          la cruda, el mínimo al cubrir saldría distinto en cada cara. */
       slot:sl, duracion:nS*sl,
-      ordenDia:(val('cvOrden')||'').trim(), vision:'anonima', resp:{} };
+      /* ⛔ SE LEE LO ELEGIDO. El arreglo perezoso es pintar los tres botones y seguir
+         mandando `'anonima'`: la pantalla quedaría perfecta y el servidor recibiría
+         siempre lo mismo. El respaldo es `anonima` porque es el defecto que ya se
+         pintaba, no un valor nuevo. */
+      ordenDia:(val('cvOrden')||'').trim(),
+      vision:(function(){ var v=$('#cvVision [data-cv].on'); return (v&&v.dataset.cv)||'anonima'; })(), resp:{} };
     if(!backendOK || !SESION){ tost('Sin conexión no se puede convocar.'); return; }
     if(!confirm('Convocar «'+reu.titulo+'» a '+reu.invitados.length+' personas.'+
       String.fromCharCode(10,10)+'Les tocará cubrir su disponibilidad, y de no cubrirla '+

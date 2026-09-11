@@ -38,11 +38,27 @@ function _m(n){
 
 
 
+/* ⛔⛔ ES LA CUARTA PUERTA A «¿ESTE MANDA?», Y ERA LA UNICA QUE NO PREGUNTABA POR LA
+   JURISDICCION. Las otras tres -`rangoNom`, `rangoSanc` y `esCoord`- consultan
+   `_subcoordDe_`; esta no la nombraba ni una vez. Y lo que devuelve **no es un adorno**:
+   es la unica linea del escritorio que le dice a alguien **quien es** (`#yoR`, y la fila
+   «Actuas como» del diagnostico).
+   ⛔ EL DAÑO: un **subcoordinador** -a quien el servidor admite con **rango 1**, y que
+   tiene gente bajo su jurisdiccion- se leia a si mismo como **«Miembro»**. Le decimos
+   que no manda a alguien que manda.
+   ⚠️ Y LA SEGUNDA MITAD: `'Coordinador de '+m.unidad` imprime **el subsistema**, no lo
+   que coordina. Lo desmiente por escrito `coordinadorDe` en `comun.js` -- *«nadie tiene
+   una Unidad como `unidad`»*-, y quien coordina una Unidad lo lleva en `coordina`.
+   ⚠️ El orden importa y es por RANGO: PD, revisor fijo, coordinador, subcoordinador. A
+   quien es las dos cosas se le ensena la mayor, que es la que decide. */
 function _rolDe_(nombre){
   if(nombre===PD_NOM) return 'Project Director';
   if(nombre===REV2_NOM) return 'Revisor fijo';
   var m=miembro(nombre);
-  return (m&&m.cargo==='Coordinador') ? ('Coordinador de '+m.unidad) : 'Miembro';
+  if(m&&m.cargo==='Coordinador') return 'Coordinador de '+(m.coordina||m.unidad);
+  var sc=(typeof _subcoordDe_==='function') ? _subcoordDe_(nombre) : null;
+  if(sc) return 'Subcoordina '+sc.equipo+' ('+sc.unidad+')';
+  return 'Miembro';
 }
 
 function colaDecision(){

@@ -3644,6 +3644,26 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-11-sanc-sin-leer', fecha:'2026-09-11',
+      titulo:'Los paneles de sanciones ya no dicen \u00abninguna\u00bb cuando no lo saben',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'Si el servidor no contestaba, **Sanciones sueltas** dec\u00eda \u00abninguna\u00bb y **Historial** dec\u00eda \u00abvac\u00edo\u00bb \u2014 con sanciones pendientes contra gente esperando decisi\u00f3n, invisibles en la pantalla donde se deciden. Y \u00abtodav\u00eda no hay sanciones resueltas\u00bb se lee como que no se ha sancionado a nadie **nunca**. Ahora los dos dicen **\u00absin leer\u00bb** y por qu\u00e9. \u26a0\ufe0f Se reintenta solo cada 90 s.'}
+      ] },
+    { id:'2026-09-11-rol-subcoordina', fecha:'2026-09-11',
+      titulo:'Si subcoordinas un equipo, la app ya no te llama \u00abMiembro\u00bb',
+      items:[
+        {cara:'escritorio', vista:'equipo', txt:'La l\u00ednea que te dice **qui\u00e9n eres** dec\u00eda **\u00abMiembro\u00bb** a quien **subcoordina un equipo** \u2014 aunque el servidor le reconoce **rango 1** y tiene gente a su cargo. Ahora dice **qu\u00e9 subcoordina**. \u26a0\ufe0f Y a quien coordina una **Unidad** se le nombra **la Unidad**, no su subsistema: son cosas distintas y antes sal\u00eda la segunda.'}
+      ] },
+    { id:'2026-09-11-notis-sin-confirmar', fecha:'2026-09-11',
+      titulo:'\u00abActivadas\u00bb en verde cuando el aviso no se hab\u00eda registrado',
+      items:[
+        {cara:'escritorio', vista:'ajustes', txt:'Al pulsar **Activar notificaciones**, si el navegador daba el permiso pero el registro fallaba, el distintivo se pon\u00eda **verde \u00abactivadas\u00bb** \u2014 al lado del mensaje de error. Y no llegaba nada: **ni el aviso de 24 h del parte a punto de caducar**, que gasta ah\u00ed su \u00fanico disparo. Ahora queda como **\u00absin confirmar\u00bb** hasta que el servidor lo tenga de verdad, y al conseguirlo se pone verde solo.'}
+      ] },
+    { id:'2026-09-11-vision-escritorio', fecha:'2026-09-11',
+      titulo:'Desde el ordenador ya se puede convocar una reuni\u00f3n oculta',
+      items:[
+        {cara:'escritorio', vista:'reuniones', txt:'Al convocar, el m\u00f3vil te dejaba elegir **qui\u00e9n ve el mapa de disponibilidad** \u2014 p\u00fablica, an\u00f3nima u oculta \u2014 y el ordenador **no**: mandaba siempre **an\u00f3nima**, sin ense\u00f1ar siquiera la opci\u00f3n. Y por el ordenador es como se convocan **junta y consejo**, que son justo las que pueden querer el modo m\u00e1s restrictivo. Ahora salen los tres botones con su explicaci\u00f3n, y lo que elijas es lo que viaja. \u26a0\ufe0f El defecto sigue siendo **an\u00f3nima**: no cambia nada de lo ya convocado.'}
+      ] },
     { id:'2026-09-11-declaras-como', fecha:'2026-09-11',
       titulo:'\u00abDeclaras como\u00bb dejaba elegir algo que ya estaba decidido',
       items:[

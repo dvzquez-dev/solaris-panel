@@ -24,21 +24,40 @@ var _NOTIS_MSG='';
 function _notisMsg(t){ _NOTIS_MSG = t || '';
   var b=document.getElementById('notisMsg'); if(b) b.textContent=_NOTIS_MSG; }
 
+/* ⛔⛔ EL FALLO SE DEJA ESCRITO, NO SOLO DICHO. `_notisHTML_` pinta el chip mirando
+   `_pushFallo_()` — su propio comentario lo explica: *««ACTIVADAS» ES UN HECHO, NO UN
+   PERMISO»*— y esa constancia la escribía **sólo `_pushInit_`**. `activarNotis` avisaba
+   por texto y **no la escribía**, así que al repintar (`finally{ … pintar(); }`) el permiso
+   ya estaba `granted` y el chip salía **verde «activadas» junto al mensaje de error**.
+   ⚠️ Y quien lo lee se queda creyendo que tiene avisos: no le llega **ni el de 24 h del
+   parte a punto de caducar**, que gasta ahí su único disparo.
+   📏 §3c-19 exacto — *una premisa vive donde se CITA*: se curó la vía de `_pushInit_` y
+   no **la otra escritora del mismo hecho**. Y su gemela del móvil sí devuelve `false`. */
+function _notisFallo_(t){
+  if(typeof _pushFallo_==='function') _pushFallo_(t);
+  _notisMsg(t || '');
+}
+
 async function activarNotis(btn){
   if(!_pushSoportado_()){ _notisMsg('Este navegador no admite notificaciones.'); return; }
   if(btn){ btn.disabled=true; btn.textContent='Activando…'; }
   try{
     var perm=await Notification.requestPermission();
+    /* El permiso denegado NO es un fallo de registro: el chip ya tiene su propia rama
+       (`Notification.permission==='denied'`), y marcarlo aquí pintaría dos avisos. */
     if(perm!=='granted'){ _notisMsg('Permiso denegado. Puedes darlo en los ajustes del navegador.'); return; }
     var reg=_swReg || await _registrarSW_();
-    if(!reg){ _notisMsg('No se pudo preparar el service worker.'); return; }
+    if(!reg){ _notisFallo_('No se pudo preparar el service worker.'); return; }
     await navigator.serviceWorker.ready;
     var sub=await reg.pushManager.getSubscription();
     if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
     if(typeof SESION!=='undefined' && SESION) await api.guardarPush(sub.toJSON());
-    else { _notisMsg('Permiso dado, pero sin sesión no se puede registrar el aviso en el servidor.'); return; }
+    else { _notisFallo_('Permiso dado, pero sin sesión no se puede registrar el aviso en el servidor.'); return; }
+    /* ✅ Y EL ÉXITO LO BORRA: un aviso que no se retira miente igual que uno que no sale.
+       Es lo mismo que hace `_pushInit_` con su `_pushFallo_(null)`. */
+    if(typeof _pushFallo_==='function') _pushFallo_(null);
     _notisMsg('Notificaciones activadas.');
-  }catch(e){ _notisMsg('No se pudo activar: '+((e&&e.message)||e)); }
+  }catch(e){ _notisFallo_('No se pudo activar: '+((e&&e.message)||e)); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Activar notificaciones'; } pintar(); }
 }
 

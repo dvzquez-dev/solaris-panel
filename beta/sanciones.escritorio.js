@@ -52,8 +52,12 @@ function sancionPor(tipo,nombre){
    subidas ni bajadas de puntos esta temporada» — y encima seguido de «Si el servidor
    es anterior a la v53 esto sale vacio aunque las haya», que CULPA A LA VERSION del
    servidor de lo que puede ser la red.
-   ⚠️ Y aqui es PEOR que en el movil: `_refrescoVivo_` no llama a esta carga, asi que
-   la mentira no se corrige sola — dura toda la sesion. */
+   ⚠️ Aqui ponia que era PEOR que en el movil *«porque `_refrescoVivo_` no llama a esta
+   carga, asi que la mentira no se corrige sola — dura toda la sesion»*. **FALSO desde la
+   569.ª**: `escritorio.html` la llama dentro del refresco, y se reintenta cada 90 s.
+   ⛔ Y la correccion se escribio ALLI — citando esta misma frase— y **no aqui, donde se
+   enuncia**: §3c-19 en su forma mas barata de producir. Una premisa corregida en el sitio
+   que la CITA sobrevive entera en el que la AFIRMA, y la siguiente persona lee esta. */
 async function _cargarMovimientosE_(){
   MOVS_E.length=0;
   _llego_('movsE', false);
@@ -156,6 +160,14 @@ function _selectorLotes_(){
 
 function _panelSueltas_(){
   var ss=_sancSueltas_();
+  /* ⛔⛔ «NINGUNA» Y «NO LO SÉ» NO SE PINTAN IGUAL. `SANC_BACK` arranca en `null` y se
+     queda en `null` si `getSanciones` falla, así que la lista salía vacía por las dos
+     razones — y lo que se leía era la primera: **«ninguna»**, con sanciones pendientes
+     contra personas reales **invisibles** en la pantalla donde se deciden. */
+  if(!ss.length && !_llego_('sanc')) return pan('Sanciones sueltas','sin leer',
+    vacioSimple('No se han podido leer las sanciones',
+      'El servidor no ha contestado, as\u00ed que esto NO quiere decir que no haya ninguna. '+
+      'Se reintenta solo cada 90 s; si sigue as\u00ed, recarga la p\u00e1gina.'));
   if(!ss.length) return pan('Sanciones sueltas','ninguna',
     vacioSimple('No hay sanciones sueltas','Las que no van en bloque —cada una con su motivo y su artículo— aparecen aquí.'));
   return pan('Sanciones sueltas', ss.length+'',
@@ -182,6 +194,12 @@ function _panelSueltas_(){
 
 function _panelHistSanc_(){
   var hs=_sancHist_();
+  /* ⛔ Y SU GEMELA (§3c-31): curar sólo el panel de arriba dejaría este afirmando
+     «vacío» por el mismo motivo, y aquí la lectura es peor todavía — «todavía no hay
+     sanciones resueltas» se lee como que **no se ha sancionado a nadie nunca**. */
+  if(!hs.length && !_llego_('sanc')) return pan('Historial','sin leer',
+    vacioSimple('No se ha podido leer el historial',
+      'El servidor no ha contestado. NO quiere decir que no haya sanciones resueltas.'));
   if(!hs.length) return pan('Historial','vacío',
     vacioSimple('Todavía no hay sanciones resueltas','Cada una que apruebes, justifiques o rechaces queda aquí con su decisión.'));
   return pan('Historial', hs.length+'',
@@ -451,7 +469,13 @@ function _cablearPonerSanc_(){
    funcion es tambien la del refresco vivo, un corte de red a los 90 s cambiaba la cola REAL de
    sanciones por la de ejemplo, sin decir nada. Se conserva lo que hubiera. */
 async function _cargarSanciones_(){
-  try{ var arr=await api.getSanciones({}); if(Array.isArray(arr)) SANC_BACK=arr; }
+  /* ⛔⛔ ¿LLEGÓ? Por la MISMA puerta que usa `_cargarMovimientosE_` cien líneas más
+     arriba en este fichero. Su docstring en `comun.js` ya decía exactamente esto:
+     *«decirle a alguien que no tiene sanciones cuando el servidor no contestó se lee
+     como «estoy limpio», y ahí ya no se vuelve a mirar»*. Estaba escrito, resuelto para
+     los movimientos, y **no se había traído aquí** — §3c-19: la premisa vive donde se CITA. */
+  _llego_('sanc', false);
+  try{ var arr=await api.getSanciones({}); if(Array.isArray(arr)){ SANC_BACK=arr; _llego_('sanc', true); } }
   catch(e){ if(!Array.isArray(SANC_BACK)) SANC_BACK=null; }
   _loteReal_();
 }
