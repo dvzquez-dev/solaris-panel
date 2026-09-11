@@ -3644,6 +3644,16 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-11-conv-sin-saber', fecha:'2026-09-11',
+      titulo:'\u00abNo hay ninguna semana convocada\u00bb ya no se dice cuando no se sabe',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'Si el servidor no contesta \u2014 o si no has entrado con tu cuenta \u2014 esta pantalla dec\u00eda **\u00abAhora mismo no hay ninguna semana convocada\u00bb**. Eso es una afirmaci\u00f3n, y la verdad era que **no se sab\u00eda**: pod\u00eda haber un plazo abierto corriendo. Ahora lo dice, y con el bot\u00f3n para reintentar. \u26a0\ufe0f No contestar es justo lo que hace que te pongan un turno cuando no puedes.'}
+      ] },
+    { id:'2026-09-11-mapa-sin-sesion', fecha:'2026-09-11',
+      titulo:'El mapa de turnos ya no ense\u00f1a el de ejemplo como si fuera el de verdad',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Si abres el mapa de disponibilidad **sin haber entrado con tu cuenta**, el servidor no puede contestar qui\u00e9n puede cada franja \u2014 y hasta hoy lo que ve\u00edas era **el mapa de ejemplo**, sin ninguna se\u00f1al de que lo fuera. Con \u00e9l se reparten turnos de verdad. Ahora lo dice, dice **por qu\u00e9** (falta la sesi\u00f3n, no es que el servidor est\u00e9 ca\u00eddo) y trae un bot\u00f3n para reintentar, porque el login puede llegar despu\u00e9s.'}
+      ] },
     { id:'2026-09-11-antecedentes-reales', fecha:'2026-09-11',
       titulo:'La escala de sanciones ya sale de tus antecedentes DE VERDAD',
       items:[

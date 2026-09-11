@@ -510,6 +510,19 @@ function _dispAviso_(titulo){
       '<button class="btn" data-dreint>Reintentar</button>'));
   if(e === 'pidiendo') return pan(titulo, '\u2026',
     vacioSimple('Preguntando al servidor', 'Un momento.'));
+  /* ⛔⛔ Y EL QUE FALTABA (577.ª): sin sesion no es que no se haya preguntado todavia --
+     eso es `'sin pedir'` y sigue mudo a proposito --, es que **no se puede preguntar**.
+     Sin esta rama, lo que se pintaba era el mapa de la SEMILLA sin una palabra.
+     ⚠️ Y NOMBRA EL MOTIVO: «no se pudo preguntar» a secas manda a buscar un fallo del
+     servidor cuando lo que falta es la identidad, que se arregla de otra manera.
+     ⚠️ Ofrece Reintentar igual que el de `'error'`: la sesion puede llegar tarde (el
+     login es asincrono), y entonces ese boton es lo unico que vuelve a abrir la puerta --
+     `_dispCargar_` es de un solo disparo y `_refrescoVivo_` no lo toca. */
+  if(e === 'sin sesion') return pan(titulo, 'sin sesi\u00f3n',
+    vacioSimple('No se pudo preguntar: no hay sesi\u00f3n',
+      'Sin identidad el servidor no contesta qui\u00e9n puede cada franja, y lo que se ve\u00eda aqu\u00ed era el mapa de ejemplo. '+
+      'Entra con tu cuenta y vuelve a esta pesta\u00f1a. '+
+      '<button class="btn" data-dreint>Reintentar</button>'));
   return '';
 }
 
@@ -591,7 +604,17 @@ function _dispEstadoSrv_(v){
 
 function _dispCargar_(repintar){
   if(_dispEstadoSrv_() !== 'sin pedir') return;
-  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getDisponibilidad) return;
+  /* ⛔⛔ SALIR MUDO AQUI DEJABA EL ESTADO EN `'sin pedir'`, Y ESO SIGNIFICA OTRA COSA
+     (577.ª). `'sin pedir'` es *todavia no he preguntado* -- el instante normal antes de
+     la primera carga, porque `_dispPanel_` se pinta ANTES de que `_pinDisp_` dispare la
+     peticion --, asi que `_dispAviso_` lo deja pasar en silencio **con razon**. Esto es
+     *no PUEDO preguntar*, que es un estado distinto y hay que decirlo: lo que se pinta
+     entonces es el mapa de la SEMILLA, y con un mapa de mentira se reparte gente de
+     verdad.
+     ⚠️ Y el arreglo ingenuo -- hacer que `_dispAviso_` cubra `'sin pedir'` -- ROMPE la
+     pantalla normal: sacaria el aviso en cada primer pintado. Por eso la cura va aqui, en
+     quien sabe POR QUE no se pregunto, y no en quien lo pinta (§3c-24). */
+  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getDisponibilidad){ _dispEstadoSrv_('sin sesion'); return; }
   _dispEstadoSrv_('pidiendo');
   /* El interruptor se lee EN PARALELO con el mapa, no encadenado: son dos preguntas
      independientes y encadenarlas sumaria las dos esperas para pintar la misma pantalla.

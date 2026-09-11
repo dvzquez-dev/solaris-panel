@@ -169,7 +169,41 @@ function _convCelHTML_(cv, dia, franja){
 function _puedeConvocarT_(){
   return (typeof _rangoBeta_==='function') && _rangoBeta_() >= 3;
 }
+
+/* ⛔⛔ LA PUERTA DE AVISOS QUE ESTA CARA NO TENIA (578.ª). El escritorio la tiene desde la
+   466.ª (`_dispAviso_`); aqui el estado del servidor se mantenía con cuidado y **no lo leía
+   nadie que dibujara**. 📏 Medido antes de escribir esto: `_convEstadoSrv_` salía **5 veces en
+   todo el repo** — la declaracion y cuatro escrituras — y **ninguna era un pintado**.
+   ⛔ EL DAÑO: con el servidor caido, o sin sesion, `CONVOCATORIAS` se queda como estaba y
+   `_convHTML_(null)` escribe «Ahora mismo **no hay ninguna semana convocada**». Eso es una
+   afirmacion sobre el mundo, y la verdad es *no lo se*. A quien lo lee le dice que no tiene
+   nada que rellenar — y el plazo corre igual: no contestar es exactamente lo que hace que te
+   pongan un turno cuando no puedes. Es §3c-24 en la cara donde contestan los 32.
+   ⚠️ Y `'sin pedir'` SIGUE MUDO A PROPOSITO: es el instante normal antes de la primera
+   carga, porque `_engConv_` corre DESPUES de pintar. Avisar ahi taparia la pantalla en cada
+   pintado, que es el falso positivo que acaba apagando el guardia (§3c-22). */
+function _convAviso_(){
+  var e = (typeof _convEstadoSrv_==='function') ? _convEstadoSrv_() : 'sin pedir';
+  if(e === 'error') return '<div class="tarj" style="opacity:.85">'+
+    '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
+    '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
+    '<b>No se pudo preguntar al servidor</b>, as\u00ed que <b>no se sabe</b> si hay una semana '+
+    'convocada. Esto <b>no</b> quiere decir que no la haya, y el plazo corre igual.'+
+    '<br><br><button class="btn" data-convreint>Reintentar</button></p></div>';
+  if(e === 'sin sesion') return '<div class="tarj" style="opacity:.85">'+
+    '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
+    '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
+    'No se pudo preguntar: <b>no hay sesi\u00f3n</b>. Sin identidad el servidor no dice qu\u00e9 semana '+
+    'est\u00e1 convocada, as\u00ed que <b>no se sabe</b> si tienes algo que rellenar. Entra con tu '+
+    'cuenta y vuelve a esta pantalla.</p></div>';
+  return '';
+}
 function _convHTML_(cv){
+  /* ⛔ EL AVISO VA ANTES DE AFIRMAR QUE NO HAY NADA (578.ª): si se pregunta despues, el
+     `return` de abajo se lo lleva por delante y la pantalla vuelve a decir «no hay
+     ninguna semana convocada» sobre un servidor que no ha contestado. Es la misma nota
+     que tiene `_dispPanel_` en el escritorio, y por la misma razon. */
+  if(!cv){ var _av=_convAviso_(); if(_av) return _av; }
   if(!cv) return '<div class="tarj" style="opacity:.85">'+
     '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
     '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
@@ -368,7 +402,11 @@ function _convEstadoSrv_(v){
 
 function _convCargar_(repintar){
   if (_convEstadoSrv_() !== 'sin pedir') return;
-  if (typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getConvocatoria) return;
+  /* ⛔⛔ NO SE SALE MUDO (578.ª). Dejar el estado en `'sin pedir'` mete *todavia no he
+     preguntado* y *no PUEDO preguntar* en el mismo valor, y el de arriba — que es quien
+     pinta — no puede distinguirlos. Curado en la gemela del escritorio en la 577.ª; esta
+     es la misma FORMA en la otra cara, que es lo que hay que buscar y no el fichero. */
+  if (typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getConvocatoria){ _convEstadoSrv_('sin sesion'); return; }
   _convEstadoSrv_('pidiendo');
   api.getConvocatoria().then(function(r){
     _convEstadoSrv_('ok');
