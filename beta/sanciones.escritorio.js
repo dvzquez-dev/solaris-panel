@@ -485,7 +485,30 @@ async function _cargarSanciones_(){
    «cerrar el bloque» levanta el flag que lee el motor Python. Sin backend o sin lote
    pendiente, se queda la semilla de demostración (LOTE.real queda sin marcar). */
 function _loteReal_(){
-  if(!Array.isArray(SANC_BACK)) return;                                   // sin backend
+  if(!Array.isArray(SANC_BACK)){
+    /* ⛔⛔ `null` SIGNIFICA DOS COSAS Y SOLO UNA AUTORIZA LA SEMILLA (§3c-24). Aqui se
+       salia igual en las dos:
+       · **sin backend** — demostracion local, sin sesion: la semilla ES lo que se ensena,
+         y vaciarla romperia lo unico que se puede mirar sin servidor (esa es la gemela
+         que ya vigila `probar_refresco_escritorio.py` §1b);
+       · **hay backend y sesion, y el servidor NO contesto** — ahi no se sabe nada, y
+         dejar la semilla puesta le ensena al PD **«Bloque abierto · 5 personas» de gente
+         inventada**, con su globo rojo, su tarjeta en la pantalla de inicio y un boton
+         que dice que aplica en Notion y manda el comunicado. En la pantalla desde la que
+         se aprueban sanciones de personas reales.
+       ✅ La puerta para distinguirlo ya existe y es la misma que usa el resto de la cara
+       (`escritorio.html:2368`): `backendOK && SESION`. No es un criterio nuevo.
+       ⚠️ Y se vacia SIN marcar `real`: el bloque desaparece y los paneles de al lado ya
+       dicen «sin leer» por `_llego_('sanc')` (602.ª). Lo que no puede quedar es una cola
+       de mentira con el boton de aplicar encendido. */
+    if(typeof backendOK!=='undefined' && backendOK &&
+       typeof SESION!=='undefined' && SESION){
+      LOTES_PEND=[];
+      LOTE={ real:true, lote:null, nombre:null, cerrado:false, motivo:'—',
+             art:'libre', items:[] };
+    }
+    return;                                                               // sin backend
+  }
   var pend=SANC_BACK.filter(function(s){ return s.estado==='pendiente' && s.lote; });
   if(!pend.length){
     /* ⛔ AQUI SE SALIA DEJANDO LA SEMILLA, y esto no es «no lo se»: el backend HA

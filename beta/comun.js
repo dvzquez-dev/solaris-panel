@@ -3644,6 +3644,16 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-12-lote-sin-leer', fecha:'2026-09-12',
+      titulo:'El panel de sanciones ya no ense\u00f1a un bloque de gente inventada',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'Si el servidor no contestaba, la pantalla de inicio segu\u00eda ense\u00f1ando **\u00abBloque abierto \u00b7 5 personas\u00bb** con nombres de **ejemplo** \u2014 su globo rojo, sus puntos y con **\u00abAcepta\u00bb ya marcado** \u2014, y el bot\u00f3n dec\u00eda que iba a aplicarlo en Notion y mandar el comunicado. Era la semilla de demostraci\u00f3n, que s\u00f3lo deber\u00eda verse sin servidor. Ahora, con sesi\u00f3n abierta y sin respuesta, el bloque **no se pinta**.'}
+      ] },
+    { id:'2026-09-12-clave-buzon-movil', fecha:'2026-09-12',
+      titulo:'Reintentar un reporte que no sali\u00f3 ya no lo manda dos veces',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Si al enviar un reporte fallaba la red, el bot\u00f3n volv\u00eda a habilitarse \u2014bien\u2014 y al pulsarlo otra vez el reporte entraba **dos veces** en la lista, porque cada pulsaci\u00f3n le pon\u00eda una marca distinta y el servidor no pod\u00eda saber que era el mismo. Ahora la marca es una por reporte. \u26a0\ufe0f Y al rev\u00e9s tambi\u00e9n: abrir el buz\u00f3n para reportar otra cosa empieza con marca nueva, as\u00ed que no se te pierde ninguno.'}
+      ] },
     { id:'2026-09-12-consejo-turnos', fecha:'2026-09-12',
       titulo:'El mapa de turnos dec\u00eda que nadie pod\u00eda liderar el turno',
       items:[

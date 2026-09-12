@@ -296,7 +296,11 @@ function buzonModal(tipo, prev){
      `BZ_FOTO` es global; el texto, que es lo que cuesta escribir, no»*— y se curó el
      texto **sin mirar que la foto sobreviviera de MÁS**: un arreglo vigilado por un solo
      lado (§3c-31). */
-  if(!prev) BZ_FOTO=null;
+  /* ⛔ Y LA CLAVE VA POR LA MISMA PUERTA QUE LA FOTO, y por el mismo motivo: una
+     apertura NUEVA es un reporte nuevo y no puede heredar la clave del anterior —el
+     servidor lo descartaría como duplicado, en silencio—; al reconstruir por cambio de
+     tipo (`prev`) es el MISMO reporte y la clave se conserva. */
+  if(!prev){ BZ_FOTO=null; BZ_CLAVE=null; }
   var _pv=prev||{};
   /* ⛔ LA GRAVEDAD TAMBIÉN VIAJA, y por eso se declara AQUÍ: el bloque de chips se
      pinta unas líneas más abajo, así que si `grav` naciera después de `abrirModal` no
@@ -370,10 +374,28 @@ function buzonModal(tipo, prev){
     if(esBug){ datos.esperaba=det; datos.paso=tit; datos.gravedad=grav; }
     else { datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
     env.disabled=true; var prev=env.textContent; env.textContent='Enviando…';
+    /* ⛔⛔ LA CLAVE SE COMPONE UNA VEZ POR REPORTE, NO POR PULSACIÓN. Aquí ya estaba
+       fuera del reintento de `api._post` —sus tres intentos viven dentro de un solo
+       `await`—, pero **dentro del `try`**: si los tres fallan, el `catch` re-habilita el
+       botón y la siguiente pulsación componía una clave NUEVA (`_claveReporte_` lleva
+       `new Date().getTime()`). El servidor no deduplicaba y quedaba una **segunda fila
+       del mismo reporte** — con la compensación en marcha, cobrado dos veces.
+       📏 El escritorio tenía la misma forma y se curó el 12/09 (609.ª) guardándola con el
+       borrador; aquí la puerta es el modal, que sigue abierto. §3c-31: el mismo arreglo
+       por los dos lados.
+       ⛔⛔ Y VA ATADA A UNA HUELLA DEL CONTENIDO, no cacheada a secas — y eso NO es
+       prudencia, es lo que dice el servidor: ante una clave repetida `_reportar_`
+       (`Codigo.gs:2098`) **devuelve la fila que ya hay y no escribe**. Así que si alguien
+       corrige el texto tras el fallo y vuelve a enviar con la clave vieja, su corrección
+       **se pierde en silencio** y encima se le dice que fue bien. Con la huella: mismo
+       contenido → misma clave (no duplica); contenido distinto → clave nueva (entra). */
+    var _huellaBZ = [datos.titulo, datos.esperaba||'', datos.porque||'',
+                     datos.gravedad||'', datos.captura||''].join('\u0001');
+    if(!BZ_CLAVE || BZ_CLAVE.huella !== _huellaBZ){
+      BZ_CLAVE = { huella:_huellaBZ, k:_claveReporte_(SESION && SESION.nombre, datos.titulo) };
+    }
+    datos.clave = BZ_CLAVE.k;
     try{
-      /* La clave va FUERA del reintento: se calcula aquí, una vez, y viaja
-         igual en los tres intentos de `api._post`. */
-      datos.clave = _claveReporte_(SESION && SESION.nombre, datos.titulo);
       var r=await (esBug?api.reportarBug(datos):api.reportarMejora(datos));
       /* SI LA FOTO NO SE GUARDÓ, SE DICE. El backend solo devuelve `captura` cuando la ha
          subido a Drive; mientras esa parte no esté desplegada, callarse sería dejar creer
@@ -385,6 +407,12 @@ function buzonModal(tipo, prev){
          consola en un movil. Y es justo el gesto de quien acaba de leer «la foto no se
          guardo». */
       BZ_FOTO=null;
+      /* ⛔ Y LA CLAVE SE SUELTA AL LLEGAR: si se quedara puesta, el siguiente reporte
+         escrito sin cerrar el modal saldría con la clave del anterior y el servidor lo
+         **descartaría por duplicado**, en silencio. Es la gemela de la de arriba
+         (§3c-31): una guarda contra el duplicado que se come un reporte bueno es peor
+         que el duplicado. */
+      BZ_CLAVE=null;
       _repintaFoto_();
       /* ACUSE ANTES DE CERRAR (Daniel, 28/07). Cerrar de golpe deja la duda de si llegó:
          el botón se pone en verde diciendo «Enviado», se ve un segundo y ENTONCES se
