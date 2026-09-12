@@ -758,8 +758,18 @@ function vFichar(){
     '</div>'+
 
     '<div class="ruta"><div class="cu"><span class="sc">Quién lo firma</span>'+
-      '<p>Va a <b>'+esc(rt.nom)+'</b>, '+(rt.escalado?'Project Director':'coordinador de '+esc(_perf))+'.'+
-      (rt.escalado?'<span class="esc">NADIE FIRMA LO SUYO · COMO COORDINAS '+esc(_perf).toUpperCase()+', PASA AL PROJECT DIRECTOR</span>':'')+'</p></div></div>'+
+      /* ⚠️ Y la frase de arriba tampoco: «Va a Fulano, Project Director» es cierto y se lee
+         raro cuando Fulano eres tú. */
+      '<p>'+(rt.propio
+        ?'Este parte <b>no pasa a nadie</b>: el Project Director eres tú.'
+        :'Va a <b>'+esc(rt.nom)+'</b>, '+(rt.escalado?'Project Director':'coordinador de '+esc(_perf))+'.')+
+      /* ⛔ EL ROTULO SE ELIGE POR `propio`, no por `escalado`: al Project Director le decía
+         «COMO COORDINAS ‹UNIDAD›» — una coordinación que no tiene, porque `coordinadorDe`
+         cae a él cuando la unidad no tiene coordinador — y le anunciaba que su parte pasa
+         a alguien que es él mismo. */
+      (rt.propio
+        ?'<span class="esc">ERES EL PROJECT DIRECTOR · ENCIMA DE TI NO HAY QUIEN FIRME</span>'
+        :(rt.escalado?'<span class="esc">NADIE FIRMA LO SUYO · COMO COORDINAS '+esc(_perf).toUpperCase()+', PASA AL PROJECT DIRECTOR</span>':''))+'</p></div></div>'+
 
     '<button class="btn pri full" data-p id="btnEnviar" disabled style="margin-top:13px">'+
       '<span id="lblEnviar">Faltan datos para enviar</span></button>'+

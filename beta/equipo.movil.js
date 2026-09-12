@@ -35,10 +35,23 @@ function _rederivarPD_(){
 
 
 
+/* ⛔⛔ «ESCALA» Y «SE QUEDA EN TI» NO SON LO MISMO, y hasta el 12/09 salían por la misma
+   puerta. `coordinadorDe` **cae a `PD_NOM`** cuando la unidad no tiene coordinador, así que
+   para el propio Project Director `c===autor` y esto devolvía `escalado:true` — y la
+   pantalla de Fichar le decía, en mayúsculas, **«COMO COORDINAS ‹UNIDAD›, PASA AL PROJECT
+   DIRECTOR»**: le atribuye una coordinación que no tiene y le anuncia que su parte pasa a
+   alguien que **es él mismo**. Es la misma familia que `_rolDe_` diciéndole «Miembro» a
+   quien subcoordina (601.ª): la única línea de la app que le dice a alguien quién es.
+   ✅ `propio` separa los dos casos SIN cambiar `escalado`, que lo leen dos pantallas: sigue
+   valiendo «esto no lo firma tu coordinador», y `propio` añade «…porque el de arriba eres
+   tú». Un flag nuevo al lado del viejo, no un criterio distinto (§3c-31).
+   ⚠️ **Y lo que esto NO decide es quién firma el parte del PD**: hoy se lo devuelve a sí
+   mismo, y eso es una decisión de Daniel, no mía. Queda fichado en `docs/pendientes.md`;
+   aquí lo único que cambia es **dejar de mentirle sobre su propio cargo**. */
 function aprobadorDe(autor,unidad){
   var c=coordinadorDe(unidad);
-  if(c!==autor) return {nom:c,escalado:false};
-  return {nom:PD_NOM,escalado:true};
+  if(c!==autor) return {nom:c,escalado:false,propio:false};
+  return {nom:PD_NOM,escalado:true,propio:(PD_NOM===autor)};
 }
 
 /* Rol efectivo: en login REAL manda YO.cargo (el conmutador ST.rol es solo de la demo). Así el

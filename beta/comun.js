@@ -3644,6 +3644,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-12-ruta-firma-pd', fecha:'2026-09-12',
+      titulo:'Fichar le dec\u00eda al Project Director que coordina una unidad que no coordina',
+      items:[
+        {cara:'movil', vista:'horas', txt:'En **Antes de enviar**, el recuadro de qui\u00e9n firma el parte le sal\u00eda al PD en may\u00fasculas: **\u00abCOMO COORDINAS \u2039SU UNIDAD\u203a, PASA AL PROJECT DIRECTOR\u00bb** \u2014 una coordinaci\u00f3n que no tiene, y anunci\u00e1ndole que su parte pasa a alguien que **es \u00e9l mismo**. Ahora dice lo que de verdad ocurre. \u26a0\ufe0f Para todos los dem\u00e1s no cambia nada.'}
+      ] },
     { id:'2026-09-12-lote-sin-leer', fecha:'2026-09-12',
       titulo:'El panel de sanciones ya no ense\u00f1a un bloque de gente inventada',
       items:[
