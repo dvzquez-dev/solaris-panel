@@ -258,9 +258,68 @@ function _pedirCaptura_(){
   });
 }
 
+/* ⛔⛔ UNA SOLA PUERTA PARA EL BORRADOR, como `_llego_` — y no una variable
+   suelta que cada sitio toque a su manera. Sin argumento CONSULTA, con `null` BORRA y
+   con un objeto GUARDA.
+   ⛔ EL `=== undefined` NO ES UN ADORNO: con `if(!datos)` la llamada que BORRA
+   —`_borradorBuzon_(null)`, la del envio que fue bien— se leeria como una CONSULTA y
+   el borrador sobreviviria a su propio envio. La siguiente vez que alguien pulsara
+   «Reportar» se le ofreceria reenviar algo YA enviado: segunda fila del mismo reporte
+   y la compensacion pagada **dos veces**. Es §3c-24: `null` significa «borra» y
+   `undefined` significa «no te mando nada», y son dos cosas.
+   ⚠️ Y SE GUARDA EL OBJETO ENTERO, no campo a campo: enumerar campos es como se caen
+   por el camino la `captura` —que alguien se ha parado a marcar a lapiz— y la `clave`
+   que impide el duplicado (§3c-39). */
+function _borradorBuzon_(datos, esMejora){
+  if(datos === undefined) return BZ_BORRADOR;
+  BZ_BORRADOR = (datos === null) ? null : { datos: datos, esMejora: esMejora === true };
+  return BZ_BORRADOR;
+}
+
+/* El envio, aparte de las preguntas, para que el REINTENTO no tenga que volver a
+   preguntarlas. Recibe el `datos` ya montado —con su `clave` dentro— y no lo toca.
+   ⛔ LA `clave` NO SE CALCULA AQUI, y ese es el punto: `_claveReporte_` lleva
+   `new Date().getTime()`, asi que recalcularla al reintentar daria una clave NUEVA, el
+   servidor no deduplicaria y quedarian dos filas del mismo reporte — con la
+   compensacion en marcha, eso es cobrar dos veces. */
+async function _enviarReporte_(datos, esMejora){
+  try{
+    var r=await (esMejora?api.reportarMejora(datos):api.reportarBug(datos));
+    /* Llego: el borrador se va. Y se va AQUI, despues del `await`, no antes de
+       llamar: borrarlo por adelantado seria perderlo justo cuando hace falta. */
+    _borradorBuzon_(null);
+    /* Si la foto no se guardo, se dice: el backend solo devuelve `captura` cuando la ha
+       subido a Drive. Callarse seria dejar creer que la marcaste para nada. */
+    var sinFoto = datos.captura && !(r && r.captura);
+    tost((esMejora?'Mejora enviada':'Fallo reportado')+' · '+((r&&r.id)||'')+'.'+
+      (sinFoto?' ⚠️ La foto NO se ha guardado: al servidor le falta ese paso.':''));
+    if(vista==='buzon') _cargarBuzon_();
+  }catch(e){
+    /* ⛔ AQUI SE PERDIA TODO. Ahora se guarda el envio entero y se dice que se ha
+       guardado, que es la mitad que faltaba: un borrador que nadie sabe que existe no
+       lo reintenta nadie. */
+    _borradorBuzon_(datos, esMejora);
+    tostErr('No se pudo enviar · lo escrito se guarda: vuelve a pulsar «Reportar» para reintentarlo sin volver a escribirlo. ', e);
+  }
+}
+
 async function reportarModal(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION){
     tost('Sin conexión con el servidor no se puede reportar.'); return; }
+  /* ⛔ LO PRIMERO: si quedo algo sin enviar, se ofrece REINTENTARLO tal cual — sin
+     volver a teclear el titulo, el detalle, la gravedad ni a marcar la captura. Va
+     delante de las preguntas a proposito: preguntarlo todo otra vez y ofrecer el
+     borrador despues seria el mismo trabajo perdido con un paso mas. */
+  var _b=_borradorBuzon_();
+  if(_b && _b.datos){
+    if(confirm('Tienes un reporte SIN ENVIAR: «'+(_b.datos.titulo||'')+'».'+String.fromCharCode(10,10)+
+      'Aceptar = reintentar enviarlo tal cual (no hay que volver a escribirlo).'+String.fromCharCode(10)+
+      'Cancelar = descartarlo y empezar uno nuevo.')){
+      return _enviarReporte_(_b.datos, _b.esMejora);
+    }
+    /* Descartar es una decision, no un descuido: la frase de arriba lo dice antes. */
+    _borradorBuzon_(null);
+  }
   var esMejora=confirm('¿Es una MEJORA?'+String.fromCharCode(10,10)+
     'Aceptar = proponer una mejora.'+String.fromCharCode(10)+'Cancelar = reportar un fallo.');
   var tit=(prompt(esMejora?'¿Qué mejorarías? (en una línea)':'¿Qué ha pasado? (en una línea)')||'').trim();
@@ -293,18 +352,12 @@ async function reportarModal(){
     var cap=await _pedirCaptura_();
     if(cap) datos.captura=cap;
   }
-  try{
-    /* La clave va FUERA del reintento: se calcula aquí, una vez, y viaja
-       igual en los tres intentos de `api._post`. */
-    datos.clave = _claveReporte_(SESION && SESION.nombre, datos.titulo);
-    var r=await (esMejora?api.reportarMejora(datos):api.reportarBug(datos));
-    /* Si la foto no se guardo, se dice: el backend solo devuelve `captura` cuando la ha
-       subido a Drive. Callarse seria dejar creer que la marcaste para nada. */
-    var sinFoto = datos.captura && !(r && r.captura);
-    tost((esMejora?'Mejora enviada':'Fallo reportado')+' · '+((r&&r.id)||'')+'.'+
-      (sinFoto?' ⚠️ La foto NO se ha guardado: al servidor le falta ese paso.':''));
-    if(vista==='buzon') _cargarBuzon_();
-  }catch(e){ tostErr('No se pudo enviar: ', e); }
+  /* La clave va FUERA del reintento — y fuera de `_enviarReporte_`: se calcula aqui,
+     UNA vez, y viaja igual en los tres intentos de `api._post` **y en el reintento del
+     borrador**. Calcularla dentro del envio daria una clave nueva por reintento y el
+     servidor no deduplicaria: dos filas del mismo reporte, o sea cobrado dos veces. */
+  datos.clave = _claveReporte_(SESION && SESION.nombre, datos.titulo);
+  return _enviarReporte_(datos, esMejora);
 }
 
 function _estBuzon_(e){ return EST_BUZON[e]||[String(e||'—'),'']; }

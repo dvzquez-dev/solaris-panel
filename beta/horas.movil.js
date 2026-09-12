@@ -1311,10 +1311,24 @@ function _cuotaHTML_(){
         'Vigo, pero el servidor aún no ha servido tu cuota <b>sin</b> descuentos: no se puede '+
         'decir cuánto te resta.</p>')
     : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta 4 € por turno.</p>';
+  /* ⛔⛔ ES UNA ESTIMACIÓN, Y LA CIFRA GRANDE TIENE QUE DECIRLO. Daniel, 15/08, literal:
+     *«No se paga mes a mes, animal. **La cuota es anual**, dios. Lo que te aparece en la
+     persona es una **estimacion**. ¿Como no puedes tener eso en cuenta? ¿Te has leido
+     ARRANQUE?»*. Está en `ARRANQUE.md` §2c y es regla de NEGOCIO, no de redacción.
+     📏 Y el escritorio ya lo decía —*«Estimación de lo que pagarás · al año»*— mientras
+     aquí salía **la cifra en verde con «€ al año» y nada más**. Medido: la palabra
+     «estimación» aparecía **1 vez** en este fichero y era **dentro de un comentario**;
+     en el escritorio, en el rótulo que se lee.
+     ⛔ Y esta es **la cara con la que el equipo mira su cuota**: un número en verde, con
+     euros y sin matiz, se lee como una factura — y la cuota no se cobra hasta cerrar la
+     temporada, ni se paga mes a mes. La misma cifra, dos marcos: §3c-9, *lo que solo está
+     en una cara es el fallo que nadie ve*. */
   return '<div class="mtit">Tu cuota</div>'+
     '<div class="msub">Se cierra en agosto, al acabar la temporada. Es requisito para renovar.</div>'+
     '<div class="tarj acc">'+
-      '<div class="cifh"><span class="g mono" style="color:var(--ok)">'+nf(_q.final,2)+'</span><span class="sc">€ al año</span></div>'+
+      '<div class="cifh"><span class="g mono" style="color:var(--ok)">'+nf(_q.final,2)+'</span><span class="sc">€ · estimación al año</span></div>'+
+      '<p class="rnota" style="margin-top:6px">Es una <b>estimación</b>: la cuota es <b>anual</b> '+
+        'y se cierra en agosto con las horas de toda la temporada. No se paga mes a mes.</p>'+
       '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+recibo+'</div>'+
       /* ⛔ LA BASE SALE DE LA REGLA, NO SE TECLEA. Aquí ponía **«2 h de base» para todo
          el mundo**, y la base es la del **cargo**: `COMP_CARGO` da **7 h al PD** y **3,5 a
@@ -1776,9 +1790,19 @@ function vHoras(){
             ? vacio('Ningún parte de este mes',
                 'Lo que tienes en cola es de meses anteriores: está justo debajo, plegado.',
                 'ficha desde la pestaña Fichar', false)
-            : vacio('Ningún parte en cola',
+            /* ⛔⛔ «NINGUNO» NO ES «NO LO SÉ». Al cambiar de persona con «Ver como», si la
+               carga falla se vacía la lista —y hay que vaciarla: son los partes de OTRA
+               persona—, así que esto afirmaba **«No tienes horas esperando firma»** sobre
+               alguien de quien no se sabía nada. Y es la pantalla desde la que se otorgan
+               horas. `_llego_` es la misma puerta que ya usan el libro de puntos y las
+               sanciones del escritorio. */
+            : (typeof _llego_==='function' && !_llego_('partesM')
+              ? vacio('No se han podido leer sus partes',
+                  'El servidor no ha contestado, as\u00ed que esto NO quiere decir que no tenga '+
+                  'ninguno. Vuelve a entrar en su ficha para reintentarlo.', '', false)
+              : vacio('Ningún parte en cola',
                 'No tienes horas esperando firma. Las que envíes aparecerán aquí con su estado '+
-                'hasta que tu coordinador las apruebe.','ficha desde la pestaña Fichar', false)))+
+                'hasta que tu coordinador las apruebe.','ficha desde la pestaña Fichar', false))))+
       /* ⛔ CERRADO POR DEFECTO (sin `open`): es justo lo que estorbaba. Pero **sigue estando**,
          porque son horas suyas y esconderlas del todo es perder información — plegar se puede
          deshacer con un dedo, borrar el bloque no. */

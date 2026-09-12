@@ -108,11 +108,11 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=23e2705"></script>
+<script src="comun.js?v=8355c79"></script>
 <script src="notis.escritorio.js?v=6ac9b14"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=654445b"></script>
-<script src="buzon.escritorio.js?v=38ea20b"></script>
+<script src="buzon.escritorio.js?v=99fbf62"></script>
 <script src="documentos.escritorio.js?v=4edd19b"></script>
 <script src="sanciones.escritorio.js?v=e44d544"></script>
 <script src="reuniones.escritorio.js?v=7e9ab52"></script>
@@ -1985,6 +1985,17 @@ var BZ_CONF=null;
    resto lo rellena la app. Se hace con un `prompt` encadenado a proposito -esta cara no
    tiene modales y montar uno solo para esto seria mas superficie de la que vale-. */
 var BZ_FOTO=null;                 // {url, w, h} — lo que se enviará, ya fusionado
+/* ⛔⛔ LO ESCRITO NO SE PIERDE POR UN FALLO DE RED. El reporte del escritorio se
+   pregunta con `prompt` encadenados, y el `catch` del envio solo sacaba un aviso: se
+   perdian titulo, detalle, gravedad **y la captura ya marcada a lapiz**, sin ninguna
+   forma de reintentar. El movil, en cambio, deja el modal abierto, conserva el texto y
+   re-habilita el boton — asimetria de caras (§3c-9).
+   ⛔ Y NO SE ARREGLA CON EL REINTENTO PASIVO: `comun.js` lo dice con todas las letras,
+   «SOLO PARA LECTURAS. Reintentar una ESCRITURA la duplica». Por eso el reintento lo
+   pide la persona, y lo que se guarda aqui es el envio ENTERO **con su `clave` dentro**.
+   ⚠️ Vive en la cara y no en `buzon.escritorio.js` porque un modulo solo lleva
+   declaraciones `function`: las capacidades no se llevan sus globales. */
+var BZ_BORRADOR=null;            // {datos, esMejora} — lo que no se pudo enviar
 var PINT_MAX=1600;                // lado mayor. Una captura de iPhone son 1179x2556 y 4 MB
 var PINT_COLORES=['#E41E25','#F2C94C','#3EB489','#3f9ed6','#FFFFFF','#111111'];
 var PINT_GROSORES=[0.004,0.008,0.016];   // fracción del lado mayor: el trazo escala con la foto
@@ -2882,7 +2893,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='682acd3';
+var BUILD='af78c40';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

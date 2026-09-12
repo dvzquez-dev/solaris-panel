@@ -3644,6 +3644,21 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-12-borrador-buzon', fecha:'2026-09-12',
+      titulo:'Un fallo de red ya no se lleva el reporte que acabas de escribir',
+      items:[
+        {cara:'escritorio', vista:'buzon', txt:'Al reportar un fallo desde el escritorio se contestan varias preguntas seguidas y, si quieres, se **marca una captura a l\u00e1piz**. Si al enviarlo fallaba la red, sal\u00eda un aviso y **se perd\u00eda todo**: t\u00edtulo, detalle, gravedad y la foto ya marcada, sin nada que pulsar para reintentarlo. Ahora se guarda lo escrito y **la pr\u00f3xima vez que pulses \u00abReportar\u00bb te ofrece enviarlo tal cual**, sin volver a teclear nada. \u26a0\ufe0f Se reenv\u00eda con la misma marca, as\u00ed que no puede acabar dos veces en la lista.'}
+      ] },
+    { id:'2026-09-12-partes-sin-leer', fecha:'2026-09-12',
+      titulo:'\u00abVer como\u00bb ya no dice \u00abning\u00fan parte en cola\u00bb cuando no lo sabe',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Mirando la ficha de otra persona, si el servidor no contestaba la pantalla afirmaba **\u00abNo tienes horas esperando firma\u00bb** sobre alguien de quien no se hab\u00eda podido leer nada \u2014 y es la pantalla desde la que se **otorgan horas**. Ahora dice **\u00abNo se han podido leer sus partes\u00bb** y que eso no quiere decir que no tenga ninguno.'}
+      ] },
+    { id:'2026-09-12-cuota-estimacion-movil', fecha:'2026-09-12',
+      titulo:'Tu cuota en el m\u00f3vil ya dice que es una **estimaci\u00f3n**',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La cifra sal\u00eda en verde con «\u20ac al a\u00f1o» y nada m\u00e1s \u2014 se lee como una factura. **La cuota es anual**: se cierra en agosto con las horas de toda la temporada, y no se paga mes a mes. Ahora lo dice en la propia cifra y debajo. \u26a0\ufe0f El n\u00famero no cambia: cambia lo que significa.'}
+      ] },
     { id:'2026-09-12-declarar-ajeno', fecha:'2026-09-12',
       titulo:'Se pod\u00eda declarar el parte de otra persona desde \u00abVer como\u00bb',
       items:[
