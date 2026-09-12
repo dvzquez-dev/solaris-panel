@@ -124,9 +124,33 @@ function _dispPuede_(v, sitio){
   return v.s===sitio || v.s==='ambos';
 }
 
+/* ⛔⛔ «NADIE DEL CONSEJO PUEDE» NO ES «NO SÉ QUIÉN ES DEL CONSEJO». La cesta de
+   responsables sale de `cv.consejo`, y ese campo **solo lo escribe quien crea la
+   convocatoria**: `crearConvocatoria` guarda `Array.isArray(conv.consejo) ? … : null`
+   (`Codigo.gs:2935`) y en la app **no la llama nadie** — `api.crearConvocatoria` está
+   declarada en las dos caras y tiene CERO llamadas. Con el campo a `null`, el mapa decía
+   «nadie del consejo puede» en **todas** las casillas: es la pantalla desde la que se
+   elige quién lidera el turno, así que se reparten turnos sin responsable creyendo que
+   no hay ninguno disponible.
+   ✅ Y LA LISTA BUENA YA VIAJA: `DATA.consejo` es `CONSEJO_PUSH` (`Codigo.gs:745`), los
+   diez que definió Daniel el 22/07. El backend lo dice en su propio comentario — *«EL
+   CONSEJO VIAJA, NO SE COPIA … va por el panel, que es el canal que la cara ya lee»* —,
+   así que esto **no es una segunda copia de la regla**: es leer la única que hay.
+   ⛔ Y LA CONVOCATORIA MANDA sobre el panel: una junta ampliada puede traer su propia
+   lista, y pisarla con la general cambiaría quién puede liderar ESE turno.
+   ⛔ DEVUELVE `null` CUANDO NO LO SABE, nunca `[]` (§3c-24): un `[]` afirma que el consejo
+   está vacío, y quien lo lee tiene que poder decir «no lo sé» en vez de «nadie». */
+function _consejoDe_(cv){
+  if(cv && cv.consejo && cv.consejo.length) return cv.consejo;
+  var d=(typeof DATA!=='undefined' && DATA && DATA.consejo) || null;
+  return (d && d.length) ? d : null;
+}
+
 /* El agregado con su desglose, celda a celda. */
 function _calorTurnos_(cv, sitio){
-  var consejo={}; (cv.consejo||[]).forEach(function(n){ consejo[n]=1; });
+  /* Por la puerta única: con la convocatoria sin `consejo` esto se quedaba vacío y
+     el mapa decía «nadie del consejo puede» en todas las casillas. */
+  var consejo={}; (_consejoDe_(cv)||[]).forEach(function(n){ consejo[n]=1; });
   var out={};
   (cv.dias||[]).forEach(function(d){
     (cv.franjas||[]).forEach(function(fr){
@@ -195,7 +219,13 @@ function _dispDetalle_(cv, k, calor){
                     : '<span class="nadie">'+vacia+'</span>')+'</span></div>';
   };
   return cab+
-    cesta('Pueden ser responsables', c.responsables, 'nadie del consejo puede') +
+    /* ⛔ El vacío de esta cesta significa DOS cosas y hay que separarlas: o nadie del
+       consejo puede ese rato —un dato—, o no se sabe quién es del consejo —un hueco—.
+       La primera se lee como «busca otro hueco»; la segunda, como «no preguntes
+       todavía». Decir la primera cuando es la segunda reparte turnos sin responsable. */
+    cesta('Pueden ser responsables', c.responsables,
+          _consejoDe_(cv) ? 'nadie del consejo puede'
+                          : 'No se sabe qui\u00e9n es del consejo') +
     cesta('Con coche', c.coches, 'sin coche') +
     cesta('Resto', c.normales, '\u2014') +
     (c.no_pueden.length ? '<div class="cesta"><b>Han dicho que no</b> <span>'+

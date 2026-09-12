@@ -3644,6 +3644,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-12-consejo-turnos', fecha:'2026-09-12',
+      titulo:'El mapa de turnos dec\u00eda que nadie pod\u00eda liderar el turno',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Al pasar el rat\u00f3n por una casilla, la cesta **Pueden ser responsables** sal\u00eda con \u00abnadie del consejo puede\u00bb en **todas** las casillas \u2014 porque la convocatoria que baja del servidor **no trae la lista del consejo** y la pantalla le\u00eda ese hueco como un \u00abno hay nadie\u00bb. Ahora usa la lista que el panel ya manda, y si de verdad no la sabe lo **dice** en vez de afirmar. \u26a0\ufe0f Importa porque es la pantalla desde la que se elige qui\u00e9n lidera el turno.'}
+      ] },
     { id:'2026-09-12-borrador-buzon', fecha:'2026-09-12',
       titulo:'Un fallo de red ya no se lleva el reporte que acabas de escribir',
       items:[
