@@ -1015,10 +1015,22 @@ function crearModal(){
     if(h) h.innerHTML='Se pintan casillas de <b>'+_durTxt_(sl)+'</b> y hay que juntar '+
       '<b>'+nS+' seguida'+(nS===1?'':'s')+'</b> ('+_durTxt_(nS*sl)+') para que cuente.'+
       (du%sl ? ' La duración no es múltiplo del slot, así que se redondea hacia arriba.' : '');
-    var p=$('#cePrev'); if(p) p.innerHTML=(u.F.length&&nb)
+    /* ⛔⛔ EL RECORTE SE DICE. `nd` es `dias().length`, o sea el número **YA topado** por la
+       función del tope: pidiendo 01/01→31/12 esto imprimía «… en **62 días**» y se quedaba
+       tan ancho. Y lo silencioso no es la cuenta, es la **contradicción**: el selector
+       sigue marcando el 31/12 y la rejilla acaba el 03/03, sin una palabra.
+       ⚠️ Y no es «‘no lo sé’ leído como un dato»: 62 **llega al dato** — `_crear_` guarda
+       `bloques` con 62 días y a partir de ahí 62 ES la convocatoria, para el motor y para
+       las sanciones. Por eso se avisa ANTES de convocar, que es cuando se puede cambiar. */
+    var _ped=_diasPedidos_(val('ceModo'), val('ceD0'), val('ceD1'), Math.max(1,+val('ceND')||1));
+    var _rec=_ped-nd;
+    var p=$('#cePrev'); if(p) p.innerHTML=((u.F.length&&nb)
       ? '<b>'+u.F.length+' casilla'+(u.F.length===1?'':'s')+'</b> de '+_durTxt_(sl)+' · <b>'+nb+' bloques</b> en '+nd+' día'+(nd===1?'':'s')+
         (per()?' (horario por día)':'')+' · <b>'+INV.size+'</b> convocados.'
-      : 'Revisa fechas u horario: no sale ninguna casilla.';
+      : 'Revisa fechas u horario: no sale ninguna casilla.')+
+      (_rec>0 ? '<br><b style="color:var(--warn)">Se piden '+_ped+' días y la app reparte '+
+        'como mucho '+_topeDias_()+': se han recortado los '+_rec+' últimos.</b> Lo que se '+
+        'convoque será lo de arriba, no lo que marca la fecha de fin.' : '');
   }
   var tipoUpd=function(){ var t=val('ceTipo');
     if($('#ceMixW')) $('#ceMixW').style.display=(t==='mixta')?'':'none';

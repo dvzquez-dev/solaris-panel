@@ -2763,6 +2763,25 @@ function _diasEntre_(a0,a1){ var out=[]; if(!a0||!a1) return out;
   var a=new Date(a0+'T00:00:00'), b=new Date(a1+'T00:00:00'); if(b<a) return out;
   for(var i=0;i<_topeDias_()&&a<=b;i++){ out.push(_ddmm_(a)); a.setDate(a.getDate()+1); } return out; }
 
+/* ⛔⛔ CUÁNTOS DÍAS SE PIDIERON, sin tope — y existe para poder DECIR el recorte.
+   `_diasEntre_` y `_diasDesde_` devuelven la lista **ya topada** — su tope es el de la
+   función que lo guarda, escrita justo arriba —, así que
+   por ahí no hay forma de saber si sobró algo: **62 se ve igual pidiendo 62 días que
+   pidiendo 365**. Sin esto, la pantalla imprime el número YA recortado y nadie dice que ha
+   recortado — el `<input type=date>` sigue marcando el 31/12 y la rejilla acaba el 03/03.
+   ⚠️ Y NO duplica el recorrido: no construye ninguna lista, **resta fechas**. Duplicarlo
+   sería tener dos criterios de «cuántos días hay», que es de donde vino el lío del tope.
+   ⛔ Y el modo «desde + N» no se calcula: **es** N, que es literalmente lo que se tecleó. */
+function _diasPedidos_(modo,d0,d1,nd){
+  if(modo==='rango'){
+    if(!d0||!d1) return 0;
+    var a=new Date(d0+'T00:00:00'), b=new Date(d1+'T00:00:00');
+    if(b<a) return 0;
+    return Math.round((b-a)/86400000)+1;
+  }
+  return Math.max(0, Math.floor(+nd||0));
+}
+
 /* Cuantas casillas seguidas hacen falta para cubrir la reunión. Se redondea HACIA ARRIBA:
    media casilla no existe, y quedarse corto es no poder ir. Sin `duracion` (reuniones de
    antes de este modelo) da 1, que es como se comportaba la app hasta ahora. */
@@ -3644,6 +3663,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-12-recorte-dias', fecha:'2026-09-12',
+      titulo:'Convocar dec\u00eda \u00ab62 d\u00edas\u00bb sin avisar de que hab\u00eda recortado',
+      items:[
+        {cara:'movil', vista:'reu', txt:'Al crear una encuesta, la app reparte como mucho **62 d\u00edas**. Si ped\u00edas m\u00e1s \u2014por ejemplo de enero a diciembre\u2014 recortaba **en silencio**: el resumen dec\u00eda \u00ab\u2026 en 62 d\u00edas\u00bb, el selector segu\u00eda marcando el 31/12 y la rejilla acababa en marzo, sin una palabra. Ahora lo dice antes de convocar, con cu\u00e1ntos d\u00edas se han quedado fuera. \u26a0\ufe0f Importa porque lo que se convoca es lo recortado: a partir de ah\u00ed **eso ES la convocatoria**, tambi\u00e9n para las sanciones.'}
+      ] },
     { id:'2026-09-12-ruta-firma-pd', fecha:'2026-09-12',
       titulo:'Fichar le dec\u00eda al Project Director que coordina una unidad que no coordina',
       items:[
