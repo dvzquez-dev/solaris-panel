@@ -3825,6 +3825,13 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-14-ambito-legible', fecha:'2026-09-14',
+      titulo:'El \u00e1mbito de un documento, en legible',
+      items:[
+        {cara:'movil', vista:'docs', txt:'En la lista y en la ficha de un documento, el \u00e1mbito dice '
+          +'\u00abinforme de subsistema\u00bb o \u00abarchivo de miembro\u00bb, como en el ordenador, en vez de la '
+          +'palabra interna.'}
+      ] },
     { id:'2026-09-14-convocar-cuenta', fecha:'2026-09-14',
       titulo:'Convocar disponibilidad dice qu\u00e9 cuenta puede',
       items:[

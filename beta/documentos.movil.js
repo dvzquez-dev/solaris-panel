@@ -113,7 +113,7 @@ function puedeDecidirDoc(e){
   return e.revisor===pilaDe(yo) || rangoNom(yo)>rangoPila(e.revisor);
 }
 
-/* ⛔ EL AMBITO CAE AL TEXTO CRUDO, no a `undefined` (20/08, 125.ª). `AMB` solo
+/* ⛔ EL AMBITO CAE AL TEXTO CRUDO, no a `undefined` (20/08, 125.ª). `AMB_DOC` solo
    tiene las tres claves canonicas, y `revisoresDe` --en este mismo fichero-- lleva
    una rama escrita para «cuando se cuela un ambito nuevo»: o sea que el codigo ya
    cuenta con recibir uno que no esta en el enum, y la fila lo pintaba `undefined`.
@@ -121,7 +121,10 @@ function puedeDecidirDoc(e){
    cual dice QUE paso; un hueco dice que NO HAY ambito, que es falso.
    ⚠️ Las otras dos caras ya lo hacian asi (`ambDoc` en el escritorio, `_ambD_` en
    `app.html`). El movil era la unica de las tres que indexaba a pelo. */
-function ambDocM(a){ return AMB[a] || String(a || '—'); }
+/* ⛔⛔ Y LA TABLA ES LA LEGIBLE, LA DEL ESCRITORIO (649.ª, 14/09). Hasta hoy el móvil leía un mapa que
+   devolvía el ámbito tal cual («subsistema») y el escritorio, del mismo expediente, decía «informe de
+   subsistema». Decisión [27/07]: el vocabulario de Cowork no se enseña. */
+function ambDocM(a){ return AMB_DOC[a] || String(a || '—'); }
 function filaDoc(e,mio){
   /* ⛔ ESTA FUNCION NO LLAMABA A `estDoc` NUNCA: reescribia el mapa a mano y caia a
      `[e.estado,'neu']`, o sea al **enum crudo del backend** — la lista decia «publicando»
