@@ -3663,6 +3663,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-14-autor-decidido', fecha:'2026-09-14',
+      titulo:'Tu documento ya decidido te lo cuenta tambi\u00e9n el escritorio',
+      items:[
+        {cara:'escritorio', vista:'docs', txt:'Si abres un expediente **tuyo** que ya est\u00e1 decidido \u2014aprobado, aprobado con anotaciones o rechazado\u2014, el escritorio ya no dice \u00abEs tuyo: lo firma X\u00bb: dice qu\u00e9 decidieron, qui\u00e9n y cu\u00e1ndo, qu\u00e9 te ajustaron, el motivo si te lo rechazaron y, si est\u00e1 publicado, c\u00f3mo mandar una versi\u00f3n nueva. Lo mismo que ya dec\u00eda el m\u00f3vil.'},
+        {cara:'movil', vista:'docs', txt:'Y en las dos caras, un documento tuyo que se est\u00e1 **publicando** ya lo dice, en vez de \u00abEste expediente lo revisa X\u00bb.'}
+      ] },
     { id:'2026-09-12-recorte-dias', fecha:'2026-09-12',
       titulo:'Convocar dec\u00eda \u00ab62 d\u00edas\u00bb sin avisar de que hab\u00eda recortado',
       items:[

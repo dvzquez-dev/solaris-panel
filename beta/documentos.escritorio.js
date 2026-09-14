@@ -232,6 +232,35 @@ function _pasosSustituirE_(d){
     }).join('')+'</ol>';
 }
 
+/* ⛔⛔ LO QUE VE EL AUTOR DE ALGO YA DECIDIDO, EN EL ESCRITORIO (631.ª, 14/09). Gemela de
+   `_docAutorHTML_` del movil, con los MISMOS textos y la misma puerta comun (`_accionDocTxt_`,
+   `_firmaDocTxt_`, `_ajustesDocTxt_`). Hasta hoy esta cara solo curaba `publicado`, y al autor de un
+   `anot`, `aprobado`, `rechazado` o `publicando` le decia «Es tuyo: lo firma X» sobre algo ya firmado.
+   ⚠️ TRADUCE ANTES DE PREGUNTAR, como `_pasosSustituirE_`: esta cara nombra `est` y `notion`.
+   ⚠️ `cambios` NO va aqui (tiene su rama con el boton de reenviar) y `revision` devuelve '' a
+   proposito: ahi «lo firma X» SI es verdad. */
+function _docAutorE_(d){
+  if(!d || typeof ACTOR==='undefined' || d.autor!==ACTOR) return '';
+  var e={estado:d.est, nota:d.nota, decision:d.decision, decidedAt:d.decidedAt, revisor:d.revisor};
+  var firma=(typeof _firmaDocTxt_==='function') ? _firmaDocTxt_(e) : '';
+  var pie=firma ? '<br><span class="sc">'+esc(firma)+'</span>' : '';
+  if(e.estado==='rechazado')
+    return '<div class="ruta"><b>Te lo rechazaron.</b> '+esc(e.nota||'Sin motivo escrito.')+pie+'</div>';
+  if(e.estado==='publicando')
+    return '<div class="ruta"><b>Aprobado: se está publicando.</b> En cuanto termine, aquí tendrás el enlace y, si hace falta, cómo mandar una versión nueva.'+pie+'</div>';
+  if(e.estado==='aprobado'||e.estado==='anot'||e.estado==='publicado'){
+    var acc=(typeof _accionDocTxt_==='function')
+      ? (_accionDocTxt_(e.decision&&e.decision.accion)||'Aprobado') : 'Aprobado';
+    var aj=(typeof _ajustesDocTxt_==='function') ? _ajustesDocTxt_(e) : '';
+    var url=String(d.notion||'');
+    return '<div class="ruta"><b>'+esc(acc)+'.</b> '+(aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+
+      (url.indexOf('http')===0
+        ? '<br><a href="'+esc(url)+'" target="_blank" rel="noopener">Ver la página publicada</a>' : '')+
+      '</div>'+_pasosSustituirE_(d);
+  }
+  return '';
+}
+
 function _pasosCorregirE_(d){
   var ps = (typeof _pasosCorregirDoc_==='function')
     ? _pasosCorregirDoc_({estado:d && d.est, ref:d && d.ref}) : [];
@@ -277,7 +306,7 @@ function docCard(d){
   var visor = _visorDocHTML_(d.drive, d.ref,
     '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
     'Cowork lo manda en <span class="mono">enlaceDrive</span>; sin él no hay nada que leer aquí.</div></div>');
-  var acc;
+  var acc, _aut;
   if(puede){
     acc='<label style="display:block;margin-top:11px">'+
       '<span class="sc" style="display:block;margin-bottom:5px">Título · puedes corregirlo al aprobar con anotaciones</span>'+
@@ -310,11 +339,11 @@ function docCard(d){
        instrucciones escritas, probadas y mudas en una cara entera. */
     acc=_pasosCorregirE_(d)+'<div class="acts"><button class="btn pri" data-doc="'+d.id+'" data-acc="reenviar">Ya está corregido: devolver a revisión</button></div>';
   /* ⛔ `cerrado` fuera: no existe -- `_normEstado_` lo traduce a `publicado`. */
-  } else if(d.autor===ACTOR && d.est==='publicado'){
-    /* ⛔ AQUI PONIA «Es tuyo: lo firma X», Y YA ESTABA FIRMADO. Sobre un expediente
-       publicado eso manda a esperar a alguien que ya decidio, y no dice lo unico que
-       queda por hacer: mandar la version nueva como SUSTITUCION. */
-    acc=_pasosSustituirE_(d);
+  } else if((_aut=_docAutorE_(d))){
+    /* ⛔ AQUI PONIA «Es tuyo: lo firma X», Y YA ESTABA FIRMADO -- y no solo en `publicado`
+       (631.ª, 14/09): tambien en `anot`, `aprobado`, `rechazado` y `publicando`, que ya estan
+       decididos. Lo decide `_docAutorE_`, gemela de `_docAutorHTML_` del movil. */
+    acc=_aut;
   } else if(d.autor===ACTOR){
     acc='<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>';
   } else if(d.revisor){

@@ -355,6 +355,10 @@ function _docAutorHTML_(e){
      unico estado que de verdad podia caer aqui y no estaba contemplado era el que se
      quedo fuera, y el autor de un expediente en `anot` no veia NI la accion NI el
      enlace a Notion -- se caia por debajo de todas las ramas. */
+  /* ⛔ (631.ª) `publicando` TAMBIEN ES DEL AUTOR: caia al `else` de `verDoc` y leia «Este
+     expediente lo revisa X. Tu no decides aqui» sobre SU documento ya aprobado. */
+  if(est==='publicando')
+    return '<div class="avisolargo" style="margin-top:14px"><b>Aprobado: se está publicando.</b> En cuanto termine, aquí tendrás el enlace y, si hace falta, cómo mandar una versión nueva.'+pie+'</div>';
   if(est==='aprobado'||est==='anot'||est==='publicado'){
     /* ⛔ LA ACCION SALE DE `decision.accion`, NO DEL ESTADO: el backend deja `aprobado` y `anot`
        en el MISMO `publicado`, asi que desde el estado no se puede saber si te lo aprobaron tal
