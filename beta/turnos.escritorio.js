@@ -809,10 +809,45 @@ function _pinDisp_(){
    ⛔ Y por eso esta pantalla **no promete horas**: decir aquí «se abre el jueves a las 22:00»
    sería escribir la regla por segunda vez, en prosa, donde nadie la va a actualizar. */
 
-function _puedeConvocarDisp_(){ return rangoNom(ACTOR) >= 3; }
+/* ⛔⛔ DOS PUERTAS QUE NO SE TOCABAN, Y NINGUNA CUENTA PASABA LAS DOS (643.ª, 14/09).
+   La cara pedía rango >= 3 sobre `ACTOR`, y el servidor, para `setControl`, la cuenta ADMIN
+   (`Codigo.gs`, `case 'setControl'`). 📏 Medido, 2 de 2: el correo admin sale UNA vez en
+   `Codigo.gs` —su declaración—, o sea que no está en `CORREOS`, su nombre de sesión ES el
+   correo y `rangoNom` le da 0: sin panel y sin una palabra. La cuenta del PD, al revés: panel
+   entero y al pulsar «No se pudo encolar: solo admin o clave». Lo único que funcionaba era
+   entrar como admin y elegir «Project Director» en «Actúas como», un clic que nada anunciaba
+   y que además escribe con identidad PRESTADA — lo que `probar_identidad_prestada.py` ya
+   cerró para la disponibilidad.
+   ✅ Por eso pregunta a la SESIÓN, como `_puedeCerrarMes_`: la cuenta admin —la que el
+   servidor acepta hoy— o el rango >= 3 de quien ha entrado. Mirar como otro no hereda el
+   permiso ni lo quita. Y quien no puede encolar lo LEE en el panel (abajo), no al pulsar.
+   ⛔ NO se cambió la llamada a `crearConvocatoria`, aunque su gate sea el de esta cara: hace
+   OTRA cosa. Crea el registro ya calculado y exige `dias`, `franjas` y `limite`, que salen de
+   `calcular_convocatoria.py` con `reglas/convocatoria.py`. Llamarla desde aquí sería escribir
+   el calendario en la cara, justo lo que este panel dice no hacer.
+   ⚠️ La mitad que falta es del BACKEND, y hoy no se puede desplegar: que `setControl` acepte
+   rango >= 3 para `convocar_disponibilidad` y `avisos_convocatoria`. */
+function _puedeConvocarDisp_(){
+  var yo = (typeof _actorSanc_==='function') ? _actorSanc_() : ((typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '');
+  return _puedeImpersonar_() || rangoNom(yo) >= 3;
+}
 
 function _convocarDispPanel_(){
   if(!_puedeConvocarDisp_()) return '';
+  /* ⛔ Y EL BOTÓN QUE EL SERVIDOR RECHAZABA SIEMPRE (643.ª). Con la cuenta del PD esto pintaba
+     el formulario y el interruptor, y los dos acaban en `setControl`, que sólo acepta la
+     cuenta admin. Se dice ANTES de pulsar, y se dice QUÉ cuenta: un botón que siempre falla
+     es un rótulo.
+     ⚠️ El interruptor se va con él: su estado lo lee `getControl`, con la misma puerta, así
+     que con esta cuenta `AVISOS_ON` se queda en `false` sin haber preguntado — un «no lo sé»
+     pintado como «apagado» (§3c-24).
+     ⚠️ Sin SESIÓN (demo local) no hay cuenta de la que hablar: sale el formulario, y su clic
+     ya contesta «Sin conexión no se puede convocar». */
+  if(SESION && !_puedeImpersonar_()) return pan('Convocar disponibilidad','solo con la cuenta admin',
+    '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
+      '<b>Desde esta cuenta el servidor lo rechaza.</b> Abrir la disponibilidad y encender los '+
+      'avisos pasan por una acción que hoy solo acepta la cuenta de administración '+
+      '(<b>'+esc(ADMIN_EMAIL)+'</b>): entra con ella y este panel sale aquí entero.</p></div>');
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   return pan('Convocar disponibilidad','abre el plazo · solo dirección',
@@ -912,7 +947,10 @@ function _pinConvDisp_(m){
            programa. Aquí es una casilla y viaja en el encargo. */
         horaria: !!(document.getElementById('cdHoraria')||{}).checked,
         sitios: sitios,
-        por: ACTOR,
+        /* ⛔ LA SESIÓN, NO `ACTOR` (643.ª): la cuenta admin ve este panel aunque «Actúe como»
+           otra persona, y con `ACTOR` la convocatoria saldría pedida por quien está mirando —
+           el «lo pide …» que leen en el móvil las personas convocadas. */
+        por: (typeof _actorSanc_==='function') ? _actorSanc_() : ACTOR,
         at: new Date().toISOString()
       }, 'convocatoria de disponibilidad para turnos');
       tost('Encolado. La rutina lo recoge en la siguiente pasada.');

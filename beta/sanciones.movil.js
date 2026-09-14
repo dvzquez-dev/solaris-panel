@@ -708,7 +708,7 @@ function panelPD(){
   /* LA COLA REAL. Antes se pintaba `LOTE`, la semilla de maqueta, y sus botones solo
      tocaban memoria: con cuenta real salia vacia y aun asi se podia «cerrar el bloque».
      Ahora sale de `SANC_M` (`getSanciones`), y si todavia no ha llegado se DICE, en vez de
-     enseñar un cero que parece una respuesta. Decidir sigue siendo del escritorio. */
+     enseñar un cero que parece una respuesta. Decidir es del modal de Sanciones: ver abajo. */
   if(SANC_M===null) return '<h2 class="sec">Panel del PD<span class="ln"></span>disciplina</h2>'+
     '<div class="tarj">'+vacio('Cargando la cola…','Buscando qué sanciones esperan decisión.','',true)+'</div>';
   if(!SANC_M.length) return '<h2 class="sec">Panel del PD<span class="ln"></span>disciplina</h2>'+
@@ -726,17 +726,26 @@ function panelPD(){
             '<span class="mono" style="color:var(--ink3);font-size:10.5px">'+esc(x.motivo||'')+'</span></div>';
         }).join('')+
         (it.length>8?'<div class="lote-m">y '+(it.length-8)+' más</div>':'')+
-        /* ⛔ AQUI PONIA «se deciden desde el escritorio · aqui solo se consultan», Y ERA FALSO
-           DESDE EL 28/07: `_cablearSanciones_` cablea `data-sok`/`data-sno` a `decidirSancion`,
-           `data-smarc` a marcar y `data-scerrar` a cerrar el lote — el telefono decide. El texto
-           mandaba a cambiar de aparato para algo que se hace aqui, que es la forma mas cara de
-           que una funcion viva parezca muerta.
+        /* ⛔ AQUI PONIA «Decide aqui mismo: acepta o rechaza cada una», Y ESTA TARJETA NO TIENE
+           NI UN BOTON (642.ª). El comentario que lo justificaba era cierto —`_cablearSanciones_`
+           cablea `data-sok`/`data-sno`/`data-smarc`/`data-scerrar`— pero DEL PINTOR DE AL LADO:
+           esos ganchos los emite `_sancColaHTML_`, que es el MODAL de Sanciones (menu ⋮), y aqui
+           no sale ninguno. Medido ejecutando esta funcion con un lote y una suelta en cola:
+           0 `<button` y la promesa impresa dos veces, una por tarjeta.
            ⚠️ Lo que SI sigue siendo cierto es lo otro: el motivo y el articulo se eligen al
-           CREAR el bloque, y eso es del escritorio. Se dice eso, que es la parte verdadera. */
-        '<p class="rnota">Decide aquí mismo: <b>acepta o rechaza</b> cada una y luego cierra el '+
-        'bloque entero. El <b>motivo y el artículo</b> son comunes a todo el bloque y se '+
+           CREAR el bloque, y eso es del escritorio. */
+        '<p class="rnota">El <b>motivo y el artículo</b> son comunes a todo el bloque y se '+
         'eligieron al crearlo, desde el escritorio.</p></div></div>';
-    }).join('');
+    }).join('')+
+    /* ⛔ SE DECIDE A UN TOQUE, NO AQUI: el boton abre la MISMA pantalla que el menu ⋮
+       (`_abrirSanciones_`), que es donde estan los botones de verdad. NO se copian aqui: una
+       segunda cola de decidir sobre sanciones a personas es un segundo criterio que mantener,
+       y sus manejadores reabren el modal de todos modos. Lo cablea `_engTurnosYDocs_`
+       (`movil.html`), donde ya se engancha lo demas de esta tarjeta. Una vez y no por bloque:
+       la pantalla que abre es la cola entera. */
+    '<div class="tarj"><p class="rnota" style="margin:0 0 10px">Se deciden en <b>Sanciones</b>, '+
+    'que también está en el menú ⋮: ahí apruebas o rechazas cada una, y los bloques se cierran '+
+    'enteros.</p><button class="btn full" data-abrirsanc data-p>Abrir Sanciones</button></div>';
 }
 
 /* La maqueta de antes se conserva SIN USAR: describe la interaccion que habra que portar el

@@ -108,14 +108,14 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=621066c"></script>
+<script src="comun.js?v=04cd2d9"></script>
 <script src="notis.movil.js?v=4218290"></script>
 <script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=2ab8a6a"></script>
 <script src="turnos.movil.js?v=d8976c3"></script>
 <script src="buzon.movil.js?v=49f2aa6"></script>
 <script src="documentos.movil.js?v=673a34f"></script>
-<script src="sanciones.movil.js?v=6182b3a"></script>
+<script src="sanciones.movil.js?v=1943120"></script>
 <script src="reuniones.movil.js?v=4dd9f9e"></script>
 <script src="horas.movil.js?v=bb2b4e8"></script>
 <script src="equipo.movil.js?v=fa1ed99"></script>
@@ -1556,7 +1556,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='ca9703d';
+var BUILD='c063f5c';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -2306,6 +2306,10 @@ function _engTurnosYDocs_(){
   var blt=$('#btnLote');
   if(blt) blt.onclick=function(){ tost('Las sanciones se deciden desde el escritorio.'); };
   var bsn=$('#btnSancionar'); if(bsn) bsn.onclick=sancionarModal;
+  /* ⛔ EL UNICO BOTON DEL PANEL DEL PD (642.ª): abre la pantalla donde SI se deciden las
+     sanciones, la misma del menu ⋮. Sin esta linea el boton se pinta y no hace nada, que es
+     peor que la promesa a la que sustituye: aquella al menos no invitaba a pulsar. */
+  $$('[data-abrirsanc]').forEach(function(b){ b.onclick=function(){ _abrirSanciones_(); }; });
 }
 
 /* ⛔ ERA UNA SOLA FUNCIÓN DE 338 LÍNEAS, y es la que engancha TODA la cara. Ahora es la

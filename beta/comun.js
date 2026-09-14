@@ -3825,6 +3825,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-14-convocar-cuenta', fecha:'2026-09-14',
+      titulo:'Convocar disponibilidad dice qu\u00e9 cuenta puede',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Con la cuenta de administraci\u00f3n, el panel de convocar disponibilidad sale entero y convoca. Con tu cuenta personal dice qu\u00e9 cuenta puede, en vez de un bot\u00f3n que el servidor rechaza.'}
+      ] },
     { id:'2026-09-14-automatismos', fecha:'2026-09-14',
       titulo:'Lo que el repo ya hace solo, desde la app',
       items:[
