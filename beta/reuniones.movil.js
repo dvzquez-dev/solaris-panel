@@ -199,6 +199,10 @@ function _normReuM_(r){
        una casilla y todo se comporta como se comportaba. */
     slot: +r.slot || (F[0] && +F[0].dur) || 60, duracion: +r.duracion || 0,
     calor:calor, pond:pond, nInv:(r.invitados||[]).length,
+    /* nResp = la cuenta del SERVIDOR (`_listar_`). `_nRespReu_` la necesita para no decir
+       'nadie' sobre una reunion sin hidratar justo antes de BORRARLA. Lista blanca: lo que
+       no se nombra aqui, se pierde (640.ª). */
+    nResp: +r.nResp || 0,
     /* ¿ES TUYA? Antes solo se guardaba CUANTOS invitados hay, y sin los nombres nadie podia
        preguntarse «¿estoy yo?»: se le reclamaba cubrir a todo el equipo una reunion de un
        invitado. Y de no cubrir salen sanciones, asi que no es un aviso cosmetico.
@@ -234,7 +238,7 @@ function _fuenteReuM_(R, base, resp, ag){
        es el fallo que ya paso CUATRO veces en este mismo objeto. */
     fecha:R.fecha, creado:R.creado,
     limite:R.limite, convocante:R.convocante, slot:R.slot, duracion:R.duracion,
-    invitados:new Array(R.nInv), resp:resp,
+    invitados:new Array(R.nInv), resp:resp, nResp:R.nResp,
     /* ⛔ `agregado` LO DECIDE EL SERVIDOR Y AQUI SOLO SE ARRASTRA. Volver a aplicar la regla
        («¿es oculta? ¿convoco yo?») serian DOS criterios para la misma pregunta, y acaban
        siendo dos preguntas distintas. Y deducirlo de «no me han llegado filas» tampoco vale:

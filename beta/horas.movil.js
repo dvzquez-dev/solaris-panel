@@ -705,11 +705,11 @@ function vFichar(){
   var decl = ST.form.declararId!=null ? PARTES.filter(function(x){return x.id===ST.form.declararId;})[0] : null;
   return '<div class="h1">Fichar</div><p class="h1s">'+HOY+' · tus horas no cuentan hasta que tu coordinador las firma.</p>'+
     (decl
-      ? '<div class="tarj" style="border-color:rgba(232,145,46,.5)"><div class="fila" style="padding-top:0"><div class="a"><b>Fichaje sin declarar</b>'+
+      ? '<div class="tarj" style="border-color:rgba(232,145,46,.5)"><div class="fila" style="padding-top:0"><div class="a"><b>'+(decl.e==='det' ? 'Te piden más detalle' : 'Fichaje sin declarar')+'</b>'+
         /* ⛔ 633.ª LA CADUCIDAD DEL PARTE, NO UN PLAZO CABLEADO: un autocierre caduca a las 24 h,
            y la fila de «Tus partes», a un toque, ya enseña su fecha de verdad (`caduca`).
            Sin ella se queda el texto de siempre. */
-        '<small>'+nf(decl.q,2)+' h · '+esc(decl.f)+' — elige categoría y justifícalo abajo. '+(decl.caduca ? 'Si no, caduca el '+_isoADMY_((''+decl.caduca).slice(0,10))+'.' : 'Si no, caduca a los 7 días.')+'</small></div>'+
+        '<small>'+nf(decl.q,2)+' h · '+esc(decl.f)+(decl.e==='det' ? ' — '+(decl.nota ? 'te piden: '+esc(decl.nota) : 'te piden más detalle')+' · corrige abajo lo que ya mandaste, no empieces de cero.' : ' — elige categoría y justifícalo abajo. '+(decl.caduca ? 'Si no, caduca el '+_isoADMY_((''+decl.caduca).slice(0,10))+'.' : 'Si no, caduca a los 7 días.'))+'</small></div>'+
         '<div class="d"><button class="btn mini" data-canceldecl data-p>Cancelar</button></div></div>'+
         /* ⛔⛔ 633.ª EL AVISO DE DANIEL (09/09): «si fueron 14 h sin querer pero si q trabajaste o
            algo asi q mejor lo declares como bloque dsps en lugar de usar los de 14». Sin él,

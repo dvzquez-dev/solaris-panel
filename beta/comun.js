@@ -3685,6 +3685,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-14-detalle-sin-caducar', fecha:'2026-09-14',
+      titulo:'Contestar un \u00abm\u00e1s detalle\u00bb ya no dice que caduca',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Si un coordinador te pide **m\u00e1s detalle** de un parte y lo abres para contestar, la tarjeta ya no dice \u00abFichaje sin declarar\u2026 caduca a los 7 d\u00edas\u00bb: dice **Te piden m\u00e1s detalle**, ense\u00f1a lo que te preguntaron y te recuerda que corrijas lo que ya mandaste. Un parte as\u00ed no caduca.'}
+      ] },
     { id:'2026-09-14-autor-decidido', fecha:'2026-09-14',
       titulo:'Tu documento ya decidido te lo cuenta tambi\u00e9n el escritorio',
       items:[
