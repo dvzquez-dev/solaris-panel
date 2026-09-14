@@ -3508,6 +3508,28 @@ function _etiOrigenParte_(p){
    `function`: las capacidades no se llevan sus globales. */
 function _maxHorasParte_(){ return 14; }
 
+/* ⛔⛔ UN PARTE DE AUTOCIERRE NO SE DECLARA TAL CUAL, Y SE DICE IGUAL EN LAS DOS CARAS (633.ª).
+   Daniel (09/09): «si fueron 14 h sin querer pero si q trabajaste o algo asi q mejor lo declares
+   como bloque dsps en lugar de usar los de 14». Devuelve el aviso, o '' si no toca.
+   ⚠️ ES UN CONSEJO, NO UNA PROHIBICIÓN: quien llama AVISA y deja el botón. Prohibirlo sólo vale en
+      el servidor; quitarlo de la pantalla no impide nada por la API ni desde una cara vieja.
+   ⚠️ `sinFichaje` FUERA: `pushParte` TAMBIÉN pone `autocierre` al recortar al tope un bloque
+      escrito a mano (`sinFichaje: true, autocierre: recortada`). Ese no «se cerró solo», y
+      mandarle a declarar OTRO bloque son horas dobles.
+   ⚠️ NO mira el estado: lo decide quien llama, que sólo lo pinta donde se declara. Mirarlo aquí
+      obligaría a hablar dos vocabularios — `estado` crudo en el escritorio, `e` en el móvil.
+   ⚠️ NOMBRA EL TOPE, NO LAS HORAS DEL PARTE: las de un autocierre son NETAS de pausas (una sesión
+      de 20 h con 6 de pausa graba 8, `probar_autocierre.py`), y el tope es lo que dijo Daniel.
+   Casos: `probar_origen_parte.py` (la puerta y la fila), `probar_horas_movil.py` (la tarjeta) y
+   `probar_curso.py` §8g (la cabecera, la fila y que las dos caras digan LO MISMO). */
+function _avisoAutocierre_(p){
+  if(!p || !p.autocierre || p.sinFichaje) return '';
+  var t=_maxHorasParte_();
+  return 'Se cerró sola al tope de '+t+' h: esas horas las puso el sistema, no lo que trabajaste. '+
+    'Si fueron '+t+' h sin querer pero sí trabajaste, mejor declara un bloque con lo que trabajaste '+
+    'de verdad, y no declares también este: se contarían dos veces.';
+}
+
 /* ═══ EL AVISO DE CRUCE DE MEDIANOCHE · UNA PUERTA PARA LAS DOS CARAS ════════════
    Un bloque declarado a mano con `fin < ini` admite DOS lecturas, y suman SIEMPRE 24 h:
    · la ENVUELTA — cruza medianoche: `1440 - (ini - fin)`. Es la que calculan hoy `durForm`

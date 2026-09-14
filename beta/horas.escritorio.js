@@ -585,7 +585,9 @@ function _fichaPanel_(){
         '<p style="margin:7px 0 0;font-size:11.5px;color:var(--ink3);line-height:1.6">'+
         (abierta
           ? 'Corre en el <b>servidor</b>: puedes cerrar esta pesta\u00f1a. A las <b>14 h</b> se cierra sola '+
-            'con la hora de tu \u00faltima actividad. Las pausas no cuentan.'
+            /* ⛔ 633.ª el barrido cierra en entrada + 14 h y graba eso menos las pausas: la
+               «última actividad» no la mira nadie. Sin «no cuenta tal cual»: hoy SÍ cuenta. */
+            'con el tope: 14 h desde tu entrada, menos las pausas.'
           : 'Tus horas no cuentan hasta que las firma quien te corresponde.')+'</p>'+
       '</div>'+
       '<div style="display:flex;gap:9px;flex-wrap:wrap">'+botones+'</div>'+
@@ -994,7 +996,8 @@ function _bloqPanel_(){
         h1(p.horas)+' \u00b7 '+esc(_isoADMY_(String(p.fecha||'')))+
         (p.ini&&p.fin?' \u00b7 '+esc(p.ini)+'\u2013'+esc(p.fin):'')+'</b><small>'+
         (det ? 'te piden: '+esc(p.motivo||'m\u00e1s detalle')
-             : 'fichaje cerrado sin justificar'+cad)+'</small></span>'+
+             /* ⛔ 633.ª Y un AUTOCIERRE se dice aquí, ANTES de elegirlo: misma puerta que el móvil. */
+             : (_avisoAutocierre_(p) ? 'autocerrado al tope de '+_maxHorasParte_()+' h' : 'fichaje cerrado sin justificar')+cad)+'</small></span>'+
         '<span class="der"><span class="chip wa">'+(det?'falta detalle':'sin declarar')+'</span>'+
         '<button class="btn sm'+(sel?' pri':'')+'" data-bdecl="'+p.id+'">'+
           (sel?'rellen\u00e1ndolo':(det?'Responder':'Declarar'))+'</button></span></div>';
@@ -1039,6 +1042,12 @@ function _bloqPanel_(){
         (decl.estado==='detalle'
           ? 'Te pidieron m\u00e1s detalle: corrige lo que ya mandaste, no empieces de cero.'
           : 'Solo falta decir a qu\u00e9 imputarlas y justificarlas.')+'</div>'+
+      /* ⛔⛔ 633.ª EL AVISO DE DANIEL (09/09), ENCIMA DEL BOTÓN QUE LO RESUELVE: «si fueron 14 h
+         sin querer pero si q trabajaste o algo asi q mejor lo declares como bloque dsps en
+         lugar de usar los de 14». Sin él, esta cabecera dice «la duración ya la fijó el
+         servidor» —el tope vendido como medida— y nada explica por qué cancelar y declarar un
+         bloque. ⚠️ El texto sale de `_avisoAutocierre_`: el MISMO que la tarjeta del móvil. */
+      (_avisoAutocierre_(decl) ? '<div class="nota" style="margin-top:10px;color:var(--warn)">'+esc(_avisoAutocierre_(decl))+'</div>' : '')+
       '<div style="margin-top:10px"><button class="btn sm" data-bcancel>Cancelar y declarar un bloque</button></div>'+
     '</div>';
   } else if(f.declararId!=null){

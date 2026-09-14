@@ -100,6 +100,11 @@ function normPMovil(p){
        📏 Es la TERCERA vez que este mismo fichero lo sufre: ya pasó con `aplicado_at` y
        con `decidido_por`/`revierte`, y las dos están escritas aquí arriba. */
     autor:p.autor||null,
+    /* ⛔⛔ 633.ª Y `autocierre`, que es lo que distingue «se cerró solo al tope» de un cierre a
+       mano. Sin él, `_avisoAutocierre_` da '' y la fila y la tarjeta de declarar CALLAN: el autor
+       manda a firmar las horas que puso el tope. Es la CUARTA vez que este normalizador tira un
+       campo; el caso de `probar_origen_parte.py` pasa el parte CRUDO por aquí a propósito. */
+    autocierre:!!p.autocierre,
     origen:p.origen||null, caduca:p.caduca_at||null }; }
 
 /* ⚠️ MISMO DEFECTO QUE EL DE ABAJO, y se arregla igual aunque HOY no haga daño:
@@ -645,7 +650,13 @@ function vFichar(){
             '<button class="btn no" data-p id="btnFin">Fichar salida</button>')+
       '</div>'+
       (largo?'<div class="avisolargo"><b>Llevas más de 10 h abiertas.</b> Si olvidaste cerrarla, ciérrala ahora. '+
-        'A las <b>14 h</b> se cierra sola con la hora de tu última actividad ('+s.ult+') y podrás ajustarla antes de enviarla.</div>':
+        /* ⛔ 633.ª LO QUE HACE DE VERDAD EL BARRIDO: cierra en entrada + 14 h y graba eso menos
+           las pausas. Aquí decía «con la hora de tu última actividad», y al retomar la sesión
+           de la nube `s.ult` es la hora de ENTRADA (`_cargarFichajeAbierto_`); y «podrás
+           ajustarla antes de enviarla», que no tiene camino: la tarjeta de declarar no deja
+           tocar las horas (`dur = declP.q`). ⚠️ Sin «no cuenta tal cual»: hoy el autocierre
+           nace `pendiente` y SÍ cuenta si lo firman. */
+        'A las <b>14 h</b> se cierra sola con el tope: 14 h desde tu entrada, menos las pausas.</div>':
         '<p class="rnota">Al fichar salida tendrás que justificar las horas. No cuentan hasta que tu coordinador las firma.</p>')+
     '</div>';
 
@@ -695,8 +706,16 @@ function vFichar(){
   return '<div class="h1">Fichar</div><p class="h1s">'+HOY+' · tus horas no cuentan hasta que tu coordinador las firma.</p>'+
     (decl
       ? '<div class="tarj" style="border-color:rgba(232,145,46,.5)"><div class="fila" style="padding-top:0"><div class="a"><b>Fichaje sin declarar</b>'+
-        '<small>'+nf(decl.q,2)+' h · '+esc(decl.f)+' — elige categoría y justifícalo abajo. Si no, caduca a los 7 días.</small></div>'+
-        '<div class="d"><button class="btn mini" data-canceldecl data-p>Cancelar</button></div></div></div>'
+        /* ⛔ 633.ª LA CADUCIDAD DEL PARTE, NO UN PLAZO CABLEADO: un autocierre caduca a las 24 h,
+           y la fila de «Tus partes», a un toque, ya enseña su fecha de verdad (`caduca`).
+           Sin ella se queda el texto de siempre. */
+        '<small>'+nf(decl.q,2)+' h · '+esc(decl.f)+' — elige categoría y justifícalo abajo. '+(decl.caduca ? 'Si no, caduca el '+_isoADMY_((''+decl.caduca).slice(0,10))+'.' : 'Si no, caduca a los 7 días.')+'</small></div>'+
+        '<div class="d"><button class="btn mini" data-canceldecl data-p>Cancelar</button></div></div>'+
+        /* ⛔⛔ 633.ª EL AVISO DE DANIEL (09/09): «si fueron 14 h sin querer pero si q trabajaste o
+           algo asi q mejor lo declares como bloque dsps en lugar de usar los de 14». Sin él,
+           esta tarjeta invita a «Enviar 14,00 h a aprobación» sobre las horas que puso el tope.
+           ⚠️ AVISA Y NO QUITA EL BOTÓN: «mejor» es un consejo; prohibir sólo vale en el servidor. */
+        (_avisoAutocierre_(decl) ? '<p class="rnota" style="margin:8px 0 0;color:var(--warn)">'+esc(_avisoAutocierre_(decl))+'</p>' : '')+'</div>'
       : ('<div class="modos" id="modos">'+
           '<button data-mo="vivo" class="'+(ST.modo==='vivo'?'on':'')+'" data-p>Sesión en vivo</button>'+
           '<button data-mo="bloque" class="'+(ST.modo==='bloque'?'on':'')+'" data-p>Declarar bloque</button>'+
@@ -1118,7 +1137,10 @@ function filaParte(p){
           /* ⚠️ Se dice que se DESHIZO, no que se rechazo: son cosas distintas y a esa
              persona le importan de forma distinta. */
           : p.e==='rev'  ? 'revertida'+(p.nota?' · '+esc(p.nota):'')
-          : p.e==='sindecl' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · caduca '+_isoADMY_((''+p.caduca).slice(0,10)):''))
+          /* ⛔ 633.ª UN AUTOCIERRE SE DICE EN LA LISTA, ANTES DE PULSAR «Declarar»: la tarjeta
+             con el aviso sólo existe después del toque, y es aquí donde se decide. El
+             criterio NO se copia: sale de `_avisoAutocierre_`, la puerta de las dos caras. */
+          : p.e==='sindecl' ? ((_avisoAutocierre_(p)?'autocerrado al tope · ':'')+p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · caduca '+_isoADMY_((''+p.caduca).slice(0,10)):''))
           : (p.f+(p.ini?' · '+p.ini+'–'+p.fin:''));
   var catTxt = _cuentaYa_(p.e) ? ' · sumó a '+catEti(p.cat)
              : p.e==='pend' ? ' · irá a '+catEti(p.cat) : '';
