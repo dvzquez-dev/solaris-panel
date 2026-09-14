@@ -105,6 +105,11 @@ function normPMovil(p){
        manda a firmar las horas que puso el tope. Es la CUARTA vez que este normalizador tira un
        campo; el caso de `probar_origen_parte.py` pasa el parte CRUDO por aquí a propósito. */
     autocierre:!!p.autocierre,
+    /* ⛔⛔ 635.ª Y `decidido_at` Y `creado_at`: dicen CUÁNDO se aprobó y A QUÉ MES cuenta
+       (`_selloAprobado_`, comun.js). Sin ellos el sello no da error: dice «no consta» sobre un
+       parte que SÍ lo registra. Es la QUINTA vez que este normalizador tira un campo; el caso de
+       `probar_origen_parte.py` pasa el parte CRUDO por aquí a propósito. */
+    decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
     origen:p.origen||null, caduca:p.caduca_at||null }; }
 
 /* ⚠️ MISMO DEFECTO QUE EL DE ABAJO, y se arregla igual aunque HOY no haga daño:
@@ -1142,6 +1147,14 @@ function filaParte(p){
              criterio NO se copia: sale de `_avisoAutocierre_`, la puerta de las dos caras. */
           : p.e==='sindecl' ? ((_avisoAutocierre_(p)?'autocerrado al tope · ':'')+p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · caduca '+_isoADMY_((''+p.caduca).slice(0,10)):''))
           : (p.f+(p.ini?' · '+p.ini+'–'+p.fin:''));
+  /* ⛔⛔ 635.ª LO QUE YA CUENTA DICE CUÁNDO, QUIÉN Y A QUÉ MES (Daniel, 15/08: «que te diga
+     aprobado esta fecha y por quien fue aprobado … una etiqueta de este mes»). El texto NO se
+     decide aquí: sale de `_selloAprobado_`, la puerta de las dos caras. El periodo abierto es el del
+     SERVIDOR y el último cierre solo lo tiene el PD: sin ellos la puerta dice lo que no sabe. */
+  if(_cuentaYa_(p.e)){
+    var _perS=(typeof _diasDelMes_==='function' && typeof DATA!=='undefined' && DATA) ? (_diasDelMes_()||{}).periodo : null;
+    sub += ' · '+esc(_selloAprobado_(p, _perS, (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null));
+  }
   var catTxt = _cuentaYa_(p.e) ? ' · sumó a '+catEti(p.cat)
              : p.e==='pend' ? ' · irá a '+catEti(p.cat) : '';
   /* ⛔ Y EL BOTON TAMBIEN EN 'det'. Sin el, la linea de arriba prometia «vuelve a enviarla»

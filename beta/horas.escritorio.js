@@ -135,8 +135,33 @@ function normParte(p){
        («no se le inventa procedencia»), y la que el MOVIL ya cumplia (`horas.movil.js:78`:
        `origen:p.origen||null`). Esta cara era la unica que la rompia. */
     origen:p.origen||(p.sinFichaje?'manual':null), just:p.justificacion||'', flags:fl,
-    estado:_EST_PARTE_[p.estado]||'pend', decisor:p.decidido_por||null,
-    dec:p.decidido_at?_isoADMY_(String(p.decidido_at).slice(0,10)):null, motivo:p.motivo||null, _real:true };
+    estado:_EST_PARTE_[p.estado]||'pend',
+    /* ⛔⛔ 635.ª LOS CAMPOS CRUDOS, con su nombre del backend, y no `decisor`/`dec`. `dec` salía ya
+       recortado a la fecha UTC y `decisor` era un TERCER nombre para el mismo dato; el «Histórico»
+       los leía con `p.decisor||PD_NOM`, o sea un nombre de relleno donde no consta nadie. Ahora los
+       lee `_selloAprobado_`/`_firmaParte_` (comun.js), la misma puerta que el móvil, y `creado_at`
+       viaja porque de él sale A QUÉ MES cuenta. */
+    decidido_por:p.decidido_por||null, decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
+    motivo:p.motivo||null, _real:true };
+}
+
+/* ⛔⛔ 635.ª UNA FILA DEL «HISTÓRICO» DE PARTES. Vivía dentro de `V.partes` (escritorio.html), donde
+   ningún banco la podía ejecutar, y ahí estaba el invento: «decidió <el PD> el —» con
+   `p.decisor||PD_NOM` sobre un parte SIN decisor, y también sobre un `sin_declarar` o un
+   `caducada`, que nadie decidió (medido en 6872510f).
+   ✅ Lo aprobado lleva el sello de `_selloAprobado_` —el mismo texto que el móvil—; lo rechazado o
+   devuelto, quién y cuándo (`_firmaParte_`); y lo que NO es una decisión no afirma ninguna.
+   ⚠️ La etiqueta de la derecha se deja como estaba: un `sin_declarar`/`caducada` sigue saliendo
+   «devuelto · falta detalle». Está apuntado aparte: esta pieza no decide qué entra en el Histórico. */
+function _escHistFilaHTML_(p, per, uc){
+  var et=p.estado==='aprobado'?'<span class="chip ok">aprobado</span>'
+        :p.estado==='rechazado'?'<span class="chip no">rechazado</span>'
+        :'<span class="chip wa">devuelto · falta detalle</span>';
+  var dec=p.estado==='aprobado' ? _selloAprobado_(p, per, uc)
+        : (p.estado==='rechazado' || p.estado==='detalle') ? 'decidido '+_firmaParte_(p) : '';
+  return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+
+    h1(p.horas)+' · '+esc(p.tarea)+'</b><small>'+p.fecha+(dec?' · '+esc(dec):'')+
+    (p.motivo?' · «'+esc(p.motivo)+'»':'')+'</small></span><span class="der">'+et+'</span></div>';
 }
 
 /* Vuelca la cola real de partes sobre PARTES (que si no se queda con la semilla). */

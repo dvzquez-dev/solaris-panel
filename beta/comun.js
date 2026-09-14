@@ -1519,6 +1519,63 @@ function _mesCerradoParte_(p, plan, uc){
   return p2 <= String(plan.periodo) ? String(plan.periodo) : false;
 }
 
+/* ⛔⛔ 635.ª CUÁNDO Y POR QUIÉN SE DECIDIÓ UN PARTE — lo que CONSTA, nunca un nombre de relleno.
+   Daniel (15/08), literal: «Siempre el parte se aplica al mes en el que esta, tiene que tener una
+   etiqueta de este mes, y luego que te diga aprobado esta fecha y por quien fue aprobado. Eso lo
+   tiene que tener cualquier parte aprobado, siempre registrado.»
+   📏 MEDIDO en 6872510f con partes crudos: el móvil no pintaba ni quién ni cuándo (`normPMovil`
+      tiraba `decidido_at`) y el «Histórico» del escritorio decía «decidió <el PD> el —» sobre un
+      parte SIN decisor, porque `p.decisor||PD_NOM` rellenaba el hueco — y también sobre un
+      `sin_declarar` y un `caducada`, que no decidió nadie.
+   ⛔ SIN EL DATO SE DICE «no consta». El backend los escribe en `_decidirParte_`, `_otorgarHoras_`
+      y la contraparte de `_revertirParte_`; un parte viejo, o uno que nadie decidió, no los trae,
+      y ahí inventar una firma es peor que el hueco.
+   ⛔ LA FECHA ES LA DEL DÍA LOCAL. `decidido_at` viaja en UTC (`toISOString`), y recortar la
+      cadena dice el día ANTERIOR a lo firmado entre las 00:00 y las 02:00 de verano. Se parsea a
+      mano y se pasa por `Date.UTC`: `new Date(cadena)` da NaN en JScript, que es donde corre el banco.
+   ⚠️ La pila la pone cada cara (`_pilaDeM_`); si no está, el nombre ENTERO — nunca otro nombre. */
+function _firmaParte_(p){
+  var at = String((p && p.decidido_at) || ''), por = String((p && p.decidido_por) || '');
+  var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?Z$/.exec(at), el = null;
+  if (m){
+    var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)));
+    el = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+  } else if (/^\d{4}-\d{2}-\d{2}/.test(at)) el = _isoADMY_(at.slice(0, 10));
+  var quien = por ? ((typeof _pilaDeM_ === 'function' && _pilaDeM_(por)) || por) : null;
+  if (!el && !quien) return '(no consta cuándo ni quién)';
+  return (el ? 'el ' + el : '(no consta cuándo)') + ' ' + (quien ? 'por ' + quien : '(no consta quién)');
+}
+
+/* ⛔⛔ 635.ª EL SELLO DE UN PARTE QUE CUENTA: verbo, firma y A QUÉ MES CUENTA. UNA puerta, las dos caras.
+   ⛔ EL MES SALE DEL INSTANTE EN QUE ENTRÓ frente al instante del último cierre: es la regla de
+      Daniel que ya aplican `_mesCerradoParte_` (aquí) y `_parteEnMesCerrado_` (backend), y se
+      REUTILIZA en vez de copiarla. Daniel (15/08): «Si no se ha cerrado el mes, corresponde al mes
+      vigente. Si se ha cerrado el mes, tambien corresponde al mes vigente.»
+   ⛔ Y SÓLO SE NOMBRA EL MES QUE SE PUEDE SABER. Con el último cierre delante (`uc`): lo que entró
+      después es del mes abierto (`perAbierto`, del servidor); lo que entró antes es de un mes
+      cerrado, y CUÁL solo es seguro en la ventana del cierre (creado el 02/08 con julio abierto
+      hasta el 04/08: JULIO, aunque el calendario diga agosto). Más atrás harían falta los dos
+      cierres que lo rodean y la cara solo tiene el último: «de un mes ya cerrado».
+   ⚠️ SIN `uc` —el miembro no lo recibe: `getCierre` es del PD— solo es seguro lo creado en un mes
+      de calendario POSTERIOR al abierto; lo demás sale «sin mes confirmado». Para nombrarlo
+      siempre, el servidor tiene que REGISTRARLO («siempre registrado») o mandar su último cierre.
+   ⚠️ `otorgado` y `revertido` llevan SU verbo: cuentan igual (`_cuentaYa_`), pero llamarlos
+      «aprobado» borra la distinción que esta app hace a propósito. */
+function _selloAprobado_(p, perAbierto, uc){
+  var o = p && p.origen;
+  var verbo = o === 'otorgada' ? 'otorgado' : (o === 'reversion' ? 'revertido' : 'aprobado');
+  var per = /^\d{4}-\d{2}$/.test(String(perAbierto || '')) ? String(perAbierto) : null;
+  var cre = String((p && p.creado_at) || ''), mes = null, cerrado = false;
+  if (/^\d{4}-\d{2}-\d{2}/.test(cre)){
+    var c = (uc && uc.at) ? _mesCerradoParte_(p, null, uc) : null;
+    if (c === false) mes = per;
+    else if (c){ if (cre.slice(0, 7) > c) mes = c; else cerrado = true; }
+    else if (per && cre.slice(0, 7) > per) mes = per;
+  }
+  return verbo + ' ' + _firmaParte_(p) + ' · ' + (mes ? 'cuenta en ' + _nomPeriodo_(mes)
+    : (cerrado ? 'de un mes ya cerrado' : 'sin mes confirmado'));
+}
+
 function _diasHasta_(ms){
   var t = +ms;
   if (ms == null || !isFinite(t)) return null;
@@ -3685,6 +3742,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-14-sello-aprobado', fecha:'2026-09-14',
+      titulo:'Cada parte aprobado dice qui\u00e9n lo aprob\u00f3 y cu\u00e1ndo',
+      items:[
+        {cara:'movil', vista:'horas', txt:'En **Tus partes**, lo aprobado dice *aprobado el DD/MM/AAAA por X* (u *otorgado*) y el mes al que cuenta. Si no se sabe el mes, dice *sin mes confirmado* en vez de adivinarlo.'},
+        {cara:'escritorio', vista:'partes', txt:'En el **Hist\u00f3rico** de partes, lo mismo; y ya no pone un nombre cuando no consta qui\u00e9n decidi\u00f3, ni afirma una decisi\u00f3n sobre un fichaje sin declarar.'}
+      ] },
     { id:'2026-09-14-detalle-sin-caducar', fecha:'2026-09-14',
       titulo:'Contestar un \u00abm\u00e1s detalle\u00bb ya no dice que caduca',
       items:[
