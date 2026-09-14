@@ -94,13 +94,23 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq){
 }
 
 
-/* EQUIVALENTE (no GEMELA) — y la diferencia es REGLA DE PRODUCTO, no un descuido.
-   Daniel (05/08): «en telefono solo se puede checkear los documentos tuyos pendientes de
-   revision o los que tienes tu pendientes de revisar; no aparecen hasta que esten
-   completamente analizados y listos con el link bien embebido».
-   Por eso el MOVIL decide solo en `revision` -es lo unico que llega a ver- y el ESCRITORIO
-   tambien en `recibido` y `analizado`, donde se ve el pipeline entero. Los campos tambien
-   difieren (`e.estado` / `d.est`) porque cada cara consume su propia forma del dato. */
+/* EQUIVALENTE (no GEMELA): la MISMA regla en las dos caras, escrita con el vocabulario de cada
+   una -- el estado es `e.estado` en el movil y `d.est` en el escritorio, y quien decide sale de
+   `yoNombre` en una y de `ACTOR` en la otra --. Difieren los nombres, no la conducta.
+   ⛔ AQUI PONIA que la diferencia era REGLA DE PRODUCTO: que el MOVIL solo decidia en `revision`
+      y el ESCRITORIO tambien en `recibido` y `analizado`. Dejo de ser cierto en la 133.a, cuando
+      el escritorio se alineo con el movil, y el comentario lo siguio diciendo en las dos caras.
+      Medido el 14/09 (651.a), las dos ejecutadas sobre el mismo caso (9 estados, 5 revisores
+      previos, 3 ambitos y 5 actores: 675 combinaciones): 0 divergencias, y las DOS dejan decidir
+      fuera de `revision` en 200 de ellas.
+   La regla de Daniel (05/08) -«en telefono solo se puede checkear los documentos tuyos
+   pendientes de revision o los que tienes tu pendientes de revisar; no aparecen hasta que esten
+   completamente analizados»- NO la impone esta funcion. Lo que PUBLICA solo se ofrece sobre lo
+   ya analizado, y eso lo decide `_yaAnalizado_` (`comun.js`), la misma puerta en las dos caras;
+   pedir cambios y rechazar se ofrecen antes a proposito, porque son la forma de pararlo. Y lo
+   que el movil lista como pendiente (`_docsPend_`, solo `revision`) es una de las TRES listas de
+   su pantalla: «En curso», la que ven el PD y el segundo revisor, ensena tambien `recibido` y
+   `analizado`. */
 function puedeDecidirDoc(e){
   var yo=yoNombre();
   if(yo===e.autor) return false;                          /* ni mandando por rango */
@@ -306,13 +316,7 @@ function _pasosSustituirM_(e){
     ? _pasosSustituirDoc_(e, yoNombre()) : [];
   if(!ps.length) return '';
   return '<div class="avisolargo" style="margin-top:10px"><b>¿Hay una versión nueva de este documento?</b> No se sube encima: se manda como <b>sustitución</b>, y éste sigue publicado hasta que aprueben la nueva.</div>'+
-    '<ol class="obj" style="margin:8px 0 0;padding-left:20px">'+
-    ps.map(function(p){
-      return '<li style="margin-bottom:6px"><b>'+esc(p.t)+'</b>'+
-        (p.url ? ' — <a href="'+esc(p.url)+'" target="_blank" rel="noopener">abrir el formulario</a>' : '')+
-        '<br><span class="sc">'+esc(p.d)+'</span>'+
-        (p.sinUrl ? '<br><span class="sc">'+esc(p.sinUrl)+'</span>' : '')+'</li>';
-    }).join('')+'</ol>';
+    _pasosHTML_(ps, 8, 6);
 }
 
 function _pasosCorregirM_(e){
@@ -321,14 +325,7 @@ function _pasosCorregirM_(e){
   return '<div class="avisolargo" style="margin-top:10px"><b>Para corregirlo son dos pasos, '+
     'en este orden.</b> El botón de abajo <b>no sube nada</b>: sólo devuelve el expediente a '+
     'la cola.</div>'+
-    '<ol class="obj" style="margin:8px 0 0;padding-left:20px">'+
-    ps.map(function(p){
-      return '<li style="margin-bottom:6px"><b>'+esc(p.t)+'</b>'+
-        (p.url ? ' — <a href="'+esc(p.url)+'" target="_blank" rel="noopener">abrir el formulario</a>'
-               : '')+
-        '<br><span class="sc">'+esc(p.d)+'</span>'+
-        (p.sinUrl ? '<br><span class="sc">'+esc(p.sinUrl)+'</span>' : '')+'</li>';
-    }).join('')+'</ol>';
+    _pasosHTML_(ps, 8, 6);
 }
 
 function _docAutorHTML_(e){

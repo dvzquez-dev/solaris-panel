@@ -5233,6 +5233,28 @@ function _pasosCorregirDoc_(e){
   ];
 }
 
+/* LA LISTA DE PASOS de la ficha de un documento, en UNA sola puerta (651.ª, 14/09). Recibe los
+   pasos tal y como los devuelven `_pasosSustituirDoc_` y `_pasosCorregirDoc_` (`t`, `d`, `url`,
+   `sinUrl`) y devuelve el `<ol>` entero.
+   ⛔ ESTABA ESCRITA CUATRO VECES, dos por cara (`_pasosSustituirM_`, `_pasosCorregirM_`,
+      `_pasosSustituirE_`, `_pasosCorregirE_`), igual palabra por palabra salvo dos márgenes. El
+      detector de cuerpos repetidos no la veía: el bloque vivía DENTRO de cuatro funciones con
+      cabeceras distintas. Cuatro copias de lo mismo acaban diciendo cuatro cosas.
+   ⚠️ LOS MÁRGENES VAN COMO PARÁMETRO Y NO UNIFICADOS: el escritorio los lleva más apretados al
+      corregir (6 y 5 px frente a 8 y 6), y cambiarlo es una decisión visual, no un refactor. Sin
+      valor por defecto a propósito: cada llamada dice los suyos.
+   ⚠️ Con la lista vacía devuelve el `<ol>` vacío: si se pinta —y la cabecera con él— lo decide
+      quien llama, que ya lo pregunta antes. */
+function _pasosHTML_(ps, mOl, mLi){
+  return '<ol class="obj" style="margin:'+mOl+'px 0 0;padding-left:20px">'+
+    ps.map(function(p){
+      return '<li style="margin-bottom:'+mLi+'px"><b>'+esc(p.t)+'</b>'+
+        (p.url ? ' — <a href="'+esc(p.url)+'" target="_blank" rel="noopener">abrir el formulario</a>' : '')+
+        '<br><span class="sc">'+esc(p.d)+'</span>'+
+        (p.sinUrl ? '<br><span class="sc">'+esc(p.sinUrl)+'</span>' : '')+'</li>';
+    }).join('')+'</ol>';
+}
+
 /* LAS SECCIONES DEL ANÁLISIS que hay que leer antes de firmar, en su orden y en UN SOLO SITIO:
    `[[rótulo, lista], …]`, saltándose las que no vienen o vienen vacías.
 
