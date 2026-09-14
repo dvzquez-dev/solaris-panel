@@ -74,8 +74,9 @@ function bloquePanel(){
      chips y el selector «Subsistema -> Todos». Su rango 2 es DOCUMENTAL -- es el segundo
      revisor del pipeline--, y aqui no significa nada.
      MEDIDO contra `_puedeSobreParte_` del servidor sobre el roster real: veia 18 y
-     el servidor le aceptaba 4, o sea 14 rechazos por bloque -- y el aviso final acaba
-     diciendo «Ya cuentan en sus horas del mes» aunque no se otorgara ninguna.
+     el servidor le aceptaba 4, o sea 14 rechazos por bloque -- y el aviso final acababa
+     diciendo «Ya cuentan en sus horas del mes» aunque no se otorgara ninguna (hasta la 647.ª:
+     hoy `_engBloqueHoras_` dice cuantas si y a cuantas no, y con 0 no lo canta como hecho).
      ⛔ Y `m.nombre!==ACTOR` no es de mas: el filtro `!m.cargo` saca al PD y a los
      coordinadores, que tienen cargo, pero un SUBCOORDINADOR tiene rango 1 y `cargo` nulo
      -- se ofrecia horas a SI MISMO, y el servidor tiene una guarda explicita contra eso. */

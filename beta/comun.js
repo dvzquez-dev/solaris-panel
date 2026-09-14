@@ -3825,6 +3825,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-14-bloque-horas', fecha:'2026-09-14',
+      titulo:'El bloque de horas dice lo que pas\u00f3',
+      items:[
+        {cara:'escritorio', vista:'horas', txt:'Al otorgar un bloque de horas, el aviso dice cu\u00e1ntas se otorgaron de verdad (y si ninguna, lo dice), y no deja mandar m\u00e1s horas que el tope de un parte.'}
+      ] },
     { id:'2026-09-14-ambito-legible', fecha:'2026-09-14',
       titulo:'El \u00e1mbito de un documento, en legible',
       items:[

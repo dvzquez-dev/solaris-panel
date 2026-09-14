@@ -109,7 +109,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=4138837"></script>
+<script src="comun.js?v=26749a8"></script>
 <script src="notis.escritorio.js?v=6ac9b14"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=5f60f94"></script>
@@ -117,7 +117,7 @@
 <script src="documentos.escritorio.js?v=1f28853"></script>
 <script src="sanciones.escritorio.js?v=1a88580"></script>
 <script src="reuniones.escritorio.js?v=7e9ab52"></script>
-<script src="horas.escritorio.js?v=0829026"></script>
+<script src="horas.escritorio.js?v=7b37df5"></script>
 <script src="equipo.escritorio.js?v=9fb27c7"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -2899,7 +2899,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='13da80b';
+var BUILD='8c392ce';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3488,6 +3488,14 @@ function _engBloqueHoras_(){
       var concepto=($('#bloC')||{}).value||'';
       if(!marcados.length){ tost('Marca al menos a una persona del subsistema.'); return; }
       if(horas<=0){ tost('Pon unas horas > 0.'); return; }
+      /* ⛔⛔ EL TOPE SE COMPRUEBA ANTES DE MANDAR (647.ª). El campo no tenia techo: se tecleaban
+         40, viajaban 40 por persona y `_otorgarHoras_` guardaba 14 a cada uno, con un aviso
+         que cantaba 40. El numero sale de `_maxHorasParte_()` -la puerta unica de las dos
+         caras, que `probar_horas_movil.py` ata a `MAX_HORAS_PARTE` del servidor-, no de un
+         literal aqui: es la deriva del 12 contra el 14 que ya bloqueo por pantalla partes
+         legales. El mismo guardia que la compensacion del buzon, delante de la llamada. */
+      var _topeB=_maxHorasParte_();
+      if(horas>_topeB){ tost('No se ha otorgado nada: el máximo por persona son '+h1(_topeB)+'. Ajusta las horas c/u.'); return; }
       if(PART_BACK!==null && backendOK && SESION){
         b.disabled=true; var prev=b.textContent; b.textContent='Otorgando\u2026';
         try{
@@ -3496,8 +3504,24 @@ function _engBloqueHoras_(){
           var okN=(r&&r.otorgados)||0, res=(r&&r.resultados)||[];
           res.forEach(function(x){ if(x&&x.id) PART_BACK.push(x); });         // las partes creadas
           if(res.length) _partesReal_();
-          var fallos=res.filter(function(x){ return x&&x.error; }).length;
-          tost(h1(horas)+' a '+okN+' de '+marcados.length+(fallos?' \u00b7 '+fallos+' sin permiso o con error':'')+'. Ya cuentan en sus horas del mes.');
+          /* ⛔⛔ EL AVISO DICE LO QUE PASO, NO LO QUE SE PIDIO (647.ª). Acababa SIEMPRE afirmando
+             que ya contaban en sus horas del mes, tambien con 0 otorgadas: `_otorgarBloque_` no
+             lanza ante una persona sin potestad -la apunta con su `error` y sigue-, asi que un
+             bloque rechazado entero vuelve con `ok:true` y la cara lo cantaba como hecho.
+             ✅ Cada salida dice solo lo que consta: 0 -> no se ha otorgado nada; parcial ->
+             cuantas si Y a cuantas no; todas -> ya cuentan.
+             ⚠️ `!r` NO es «0 otorgadas»: es que el servidor no ha confirmado nada (§3c-24), y
+             leerlo como 0 diria «no se ha otorgado nada» sobre un bloque que puede estar hecho.
+             ⚠️ Las horas salen del parte DEVUELTO, como en `_engOtorgar_`, y el recorte se lee
+             de la MARCA que pone `_otorgarHoras_` (`autocierre`), no de guardado < tecleado:
+             el servidor redondea al centesimo, y 1,333 guarda 1,33 sin tocar ningun tope. */
+          var _tot=marcados.length, _okR=res.filter(function(x){ return x&&x.id; });
+          var _hOk=(_okR[0] && _okR[0].horas!=null) ? _okR[0].horas : horas;
+          var _rc=(_okR[0] && _okR[0].autocierre) ? ' (recortadas al tope de '+h1(_hOk)+')' : '';
+          tost(!r ? 'El servidor no ha confirmado el bloque: mira los partes antes de repetirlo, que puede estar otorgado.'
+            : !okN ? '0 de '+_tot+': no se ha otorgado nada (sin permiso o con error).'
+            : okN<_tot ? h1(_hOk)+' a '+okN+' de '+_tot+_rc+'. No se ha otorgado nada a '+(_tot-okN)+' (sin permiso o con error). Lo otorgado ya cuenta en sus horas del mes.'
+            : h1(_hOk)+' a '+okN+' de '+_tot+_rc+'. Ya cuentan en sus horas del mes.');
           pintar();
         }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo otorgar el bloque: ', e); }
         return;
