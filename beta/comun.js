@@ -2116,6 +2116,89 @@ function _novedadesHTML_(){
     cuerpo;
 }
 
+/* ⛔ LO QUE EL REPO YA HACE SOLO, DESDE LA APP (638.ª, 14/09) · UNA PUERTA, LAS DOS CARAS.
+
+   Daniel (10/09), con ESTADO delante: «…darle a un botón y que checkee … q recursos hay ya
+   programados … obviamente todo se debe poder comprobar desde la aplicación». La respuesta ya
+   existía (`rutinas/automatismos.py`), pero sólo por terminal.
+
+   `AUTOMATISMOS` lo sella `rutinas/sellar_automatismos.py` en las dos caras al publicar. Es una
+   FOTO con su fecha: comprobar EN VIVO pediría una clave nueva del KV y desplegar el backend. La
+   cabecera lo dice, y si la fecha falta, dice que no se sabe de cuándo es.
+
+   ⛔ LA COMPROBACIÓN TIENE TRES RESPUESTAS y se pintan TRES: `true` desviado · `false` al día ·
+   `null` «no lo sé». Un `null` pintado como «al día» es un guardia que aprueba sin mirar.
+   ⛔ Y una familia `null` («no se pudo leer») NO es una lista vacía («ninguno»): con la vacía la
+   pantalla diría que el repo no automatiza nada.
+   ⚠️ QUIÉN LA VE: la misma puerta que Novedades (`_puedeVerNovedades_`: beta y director), y se
+   pregunta AQUÍ DENTRO además de en el menú — esconder el botón es cortesía, y en el escritorio
+   a una vista se llega también por `ir()`.
+   Los `data-est`/`data-fam` no pintan nada: son lo que el banco cuenta, en ASCII. */
+function _automatismosHTML_(){
+  var tit='<div class="mtit">Automatismos</div>';
+  if(!_puedeVerNovedades_()){
+    return tit+'<p class="rnota" data-est="nopuede">Esta pantalla es del director, y sólo en la beta.</p>';
+  }
+  var A=(typeof AUTOMATISMOS==='undefined') ? null : AUTOMATISMOS;
+  if(!A || typeof A!=='object'){
+    return tit+'<div class="msub">Lo que el repositorio ya hace solo.</div>'+
+      '<p class="rnota" data-est="sinsellar">El inventario no se selló en esta build. Sale de '+
+      '<span class="mono">rutinas/automatismos.py</span> del repositorio, al publicar.</p>';
+  }
+  var m=String(A.generado||'').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  var h=tit+(m
+    ? '<div class="msub" data-est="foto">Foto del momento de publicar: <b>'+
+      m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>. No es un «comprobar ahora»: lo que haya '+
+      'cambiado después no sale aquí.</div>'
+    : '<div class="msub" data-est="sinfecha"><b>Sin fecha</b>: no se sabe de cuándo es esta foto, '+
+      'así que no la des por actual.</div>');
+  h+='<div class="mdoc"><h3>¿Hay algo desviado?</h3>';
+  var c=A.comprobacion;
+  if(!(c instanceof Array) || !c.length){
+    h+='<p data-est="sincomprobar">Al publicar no se corrió la comprobación: esta foto no dice si '+
+       'hay algo desviado.</p>';
+  } else {
+    h+='<ul>';
+    for(var i=0;i<c.length;i++){
+      var d=c[i].desviado, est=(d===true) ? 'desviado' : ((d===false) ? 'aldia' : 'nolose');
+      h+='<li data-est="'+est+'">'+
+        (est==='desviado' ? '🔴 <b>'+esc(c[i].nombre)+'</b> — desviado'
+          : (est==='aldia' ? '✅ <b>'+esc(c[i].nombre)+'</b> — al día'
+            : '⛔ <b>'+esc(c[i].nombre)+'</b> — <b>no lo sé</b>: no se pudo comprobar, y eso NO es «al día»'))+
+        (c[i].linea ? ' · <code>'+esc(c[i].linea)+'</code>' : '')+'</li>';
+    }
+    h+='</ul>';
+  }
+  var fams=[['gate','Corre solo, cada 2 minutos'],['arreglan','Lo que se arregla con una orden'],
+            ['plantan','Se planta solo (guardias)'],['flujos','Se lanza a mano']];
+  for(var k=0;k<fams.length;k++){
+    var fil=A[fams[k][0]];
+    h+='<h3>'+fams[k][1]+'</h3>';
+    if(!(fil instanceof Array)){
+      h+='<p data-fam="ilegible">⛔ <b>No se pudo leer</b>, y eso NO es «no hay ninguno».</p>';
+      continue;
+    }
+    if(!fil.length){ h+='<p data-fam="vacia">(ninguno)</p>'; continue; }
+    h+='<ul>';
+    for(var j=0;j<fil.length;j++){
+      var x=fil[j], t;
+      if(fams[k][0]==='gate'){
+        t=(x.siempre ? 'siempre' : (x.con_interruptor ? 'si su interruptor está encendido' : 'sin interruptor'))+
+          (x.tipo==='ia' ? ' · ⚠ llama a un modelo ('+esc(x.modelo||'sin decir cuál')+')' : '');
+      } else if(fams[k][0]==='arreglan'){
+        t=esc(x.que)+' · '+(x.con_orden ? 'tiene una orden que lo arregla' : esc(x.arregla||'sin decir cómo'));
+      } else if(fams[k][0]==='plantan'){
+        t='en '+esc(x.evento);
+      } else {
+        t=esc(x.que||'(sin describir)')+(x.escribe_fuera ? ' · ⚠ '+esc(x.escribe_fuera) : '');
+      }
+      h+='<li data-fam="'+fams[k][0]+'"><b>'+esc(x.nombre)+'</b> — '+t+'</li>';
+    }
+    h+='</ul>';
+  }
+  return h+'</div>';
+}
+
 /* las horas en pasos de 15 min. */
 function optHoras(sel){
   var s='';
@@ -3742,6 +3825,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-14-automatismos', fecha:'2026-09-14',
+      titulo:'Lo que el repo ya hace solo, desde la app',
+      items:[
+        {cara:'movil', vista:'estado', txt:'En el men\u00fa \u22ee, al lado de Novedades, **Automatismos**: lo que corre solo, lo que se lanza a mano, los guardias y lo que se arregla solo, con la \u00faltima comprobaci\u00f3n y su fecha.'},
+        {cara:'escritorio', vista:'estado', txt:'Lo mismo en el escritorio. Es la foto de cu\u00e1ndo se public\u00f3, no un comprobar ahora.'}
+      ] },
     { id:'2026-09-14-sello-aprobado', fecha:'2026-09-14',
       titulo:'Cada parte aprobado dice qui\u00e9n lo aprob\u00f3 y cu\u00e1ndo',
       items:[
