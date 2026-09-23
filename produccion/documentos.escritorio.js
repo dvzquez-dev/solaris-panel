@@ -1,0 +1,400 @@
+/* ═══ DOCUMENTOS · cara escritorio ═══════════════════════════════════════════════════════════
+   10 funciones sacadas de `escritorio.html`. Lo carga esa cara con <script src>, ANTES de su bloque
+   grande, así que ya existen cuando aquel se ejecuta.
+
+   ⛔ Aquí SOLO hay declaraciones `function`. El estado (`var`), los registros y las llamadas de
+   arranque se quedan en el HTML: un módulo que se lleve estado se lleva el orden de carga, y ahí
+   es donde se rompe sin dar error. Estas funciones siguen usando los globales de su cara — se
+   llaman en tiempo de ejecución, cuando ya están definidos.
+
+   ⛔ Y es de UNA cara. La otra tiene su propio fichero aunque alguna función se llame igual:
+   fusionarlas es otro cambio, con otro riesgo y su propia verificación.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+
+function revisoresDe(d){
+  /* ⛔ EL `else` ES EL PD, NO EL COORDINADOR, y es lo que dice el SERVIDOR
+     (`Codigo.gs`: `archivo -> coordinador · subsistema -> [PD,JOSE] · ELSE -> PD`).
+     Aqui estaba al reves: un `ambito` no canonico se le ofrecia al COORDINADOR --que
+     pulsa Aprobar y se come «sin permiso para decidir»-- y se escondia del PD, que es
+     el unico que el servidor aceptaria. El expediente se quedaba parado sin que nadie
+     supiera por que.
+     ⚠️ Y `archivo` pasa a ser EXPLICITO: un `else` que reparte autoridad es como se
+     cuela un ambito nuevo en el reparto equivocado sin que nadie lo decida. */
+  var r = d.amb==='archivo' ? [coordinadorDe(d.sub)]
+        : d.amb==='subsistema' ? [PD_NOM,REV2_NOM]
+        : [PD_NOM];
+  r=r.filter(function(n){return n!==d.autor;});
+  if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n){return n!==d.autor;});
+  if(!r.length) r=[PD_NOM];
+  return r;
+}
+
+/* El backend sirve el entregable con SU forma (titulo, ambito, estado, severidad,
+   issues[], subsistema) y estas vistas leen la corta (tit, amb, est, sev, iss, sub).
+   Sin este adaptador la bandeja salia vacia y las filas sin titulo. Ojo: `iss` es una
+   CUENTA, no la lista, porque la vista escribe «N avisos». */
+function _normDocE_(d, i){
+  if(!d) return d;
+  if(d.tit!==undefined && d.est!==undefined) return d;      // ya viene corta (semilla)
+  var iss = Array.isArray(d.issues) ? d.issues.length : (+d.issues||0);
+  return {
+    id:      (d.id!==undefined ? d.id : i),
+    ref:     d.ref || '',
+    tit:     d.titulo || d.tit || d.ref || '',
+    autor:   d.autor || '',
+    sub:     d.subsistema || d.sub || '',
+    tipo:    d.tipo || '',
+    amb:     d.ambito || d.amb || '',
+    est:     d.estado || d.est || '',
+    /* ⛔ `null` = «no lo se». Aqui se fabricaba `'baja'` por SEGUNDA vez -el backend ya
+       lo hacia-, y `CAL_DOC` traduce `baja` a **«alta»**: el `'sin medir'` que `calDoc`
+       ya tenia escrito era **inalcanzable** por el camino del defecto. */
+    sev:     d.severidad || d.sev || null,
+    iss:     iss,
+    avisos:  Array.isArray(d.issues) ? d.issues : [],        // la lista, para leerlos
+    resumen: d.resumen || '',
+    fecha:   d.fecha || '',
+    /* Lo que el backend mandaba y esta cara tiraba a la basura: sin `analisis` no hay
+       proposito ni riesgos que leer, sin `nota` no se ve por que se pidieron cambios, y
+       sin `revisor` no se puede saber si ya decidio alguien ni si puedes pisarlo. */
+    analisis:  d.analisis || null,
+    nota:      d.nota || '',
+    revisor:   d.revisor || null,
+    decision:  d.decision || null,
+    /* ⛔ EL RESPALDO DE LA FIRMA. `_firmaDocTxt_` prefiere `decision.at` y cae a
+       `decidedAt`; sin copiarlo aqui, los expedientes decididos ANTES de que existiera
+       `decision` se quedaban sin CUANDO en esta cara y con el en la otra — la asimetria
+       que cada cara, leida por separado, parece correcta. */
+    decidedAt: d.decidedAt || null,
+    etiquetas: d.etiquetas || [],
+    sustituye: d.sustituyeA || null,
+    bloqueo: d.bloqueo || null,
+    drive:   d.enlaceDrive || null,
+    notion:  d.paginaNotion || null,
+    _crudo:  d
+  };
+}
+
+/* ⛔⛔ «¿ME TOCA?» SE PREGUNTA EN UN SOLO SITIO. Habia dos criterios en este fichero: la
+   cola de decision de INICIO --y el globo del nav-- preguntaban por `revisoresDe`, y el
+   chip «te toca» de la lista por `puedeDecidirDoc`. Medido sobre 4 actores x 3 ambitos:
+   **2 divergentes de 12**, las dos del ambito `archivo`, que es el mas numeroso. La lista
+   le pintaba al PD «te toca» sobre expedientes que la cola contaba como NO suyos: abria
+   Documentos y lo veia, iba a Inicio y no habia nada, con el globo diciendo 0.
+   ⚠️ MANDA EL ROUTING: `archivo -> coordinador de la unidad del autor`. Que el PD PUEDA
+   pisar por rango es otra cosa -- el boton de decidir sigue saliendo por
+   `puedeDecidirDoc`, y el servidor se lo aceptaria--: «puedo pisar» no es «me toca». */
+function _meTocaDoc_(d){
+  return d.est==='revision' && revisoresDe(d).indexOf(ACTOR)>=0;
+}
+
+function docsMios(){return DOCS.filter(_meTocaDoc_);}
+
+function calDoc(sev){ return 'calidad '+(CAL_DOC[sev]||'sin medir'); }
+
+/* ⛔⛔ EL CHIP DE SEVERIDAD, EN UNA SOLA PUERTA. Habia dos copias: esta y la de
+   `colaDecision` (la cola de decision de la pantalla de INICIO del PD), y la de alla se
+   quedo con el `else` en `'ok'` -verde- y el texto `'severidad '+d.sev`. Medido con seis
+   valores: TRES salian en verde --`null`, un valor fuera del enum y la cadena vacia--, y
+   el texto salia literalmente «severidad null».
+   ⚠️ Y `null` NO es el caso raro: `_normDocE_` lo pone a proposito y `_normSev_` del
+   servidor devuelve `null` para todo lo que no este en el enum.
+   ⛔ Ademas eran DOS VOCABULARIOS INVERTIDOS para el mismo dato: la cola decia «severidad
+   baja» y la lista «calidad alta» del MISMO expediente.
+   ✅ SIN CLASE = NEUTRO: verde es el color de «salio bien», y quien mira una lista de
+   reojo lee el COLOR, no el texto. */
+function chipSevDoc(sev){
+  return '<span class="chip '+(sev==='alta'?'no':sev==='media'?'wa':sev==='baja'?'ok':'')+
+         '">'+calDoc(sev)+'</span>';
+}
+
+function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
+
+/* GEMELA de `puedeDecidirDoc` del movil y de `_puedeDecidir_` del backend: nadie firma
+   lo suyo, el primero que decide bloquea a sus iguales, y solo alguien de MAS rango
+   puede pisar esa decision. La fila solo miraba `est==='revision'`, asi que una vez
+   decidido no habia forma de corregir un error desde aqui. */
+
+/* ⛔ «Ha pasado el analisis» en UNA sola puerta: lo miran el boton y -en el servidor- el
+   guardia que de verdad publica. Dos formas de preguntar lo mismo acaban contestando
+   distinto, y aqui la diferencia es publicar un documento que nadie ha leido. */
+/* `_yaAnalizado_` vive en `comun.js` desde la 198.a: la miran LAS DOS caras. Estaba solo
+   aqui, y el movil ofrecia publicar lo que nadie habia analizado. */
+
+/* EQUIVALENTE (no GEMELA): la MISMA regla en las dos caras, escrita con el vocabulario de cada
+   una -- el estado es `e.estado` en el movil y `d.est` en el escritorio, y quien decide sale de
+   `yoNombre` en una y de `ACTOR` en la otra --. Difieren los nombres, no la conducta.
+   ⛔ AQUI PONIA que la diferencia era REGLA DE PRODUCTO: que el MOVIL solo decidia en `revision`
+      y el ESCRITORIO tambien en `recibido` y `analizado`. Dejo de ser cierto en la 133.a, cuando
+      el escritorio se alineo con el movil, y el comentario lo siguio diciendo en las dos caras.
+      Medido el 14/09 (651.a), las dos ejecutadas sobre el mismo caso (9 estados, 5 revisores
+      previos, 3 ambitos y 5 actores: 675 combinaciones): 0 divergencias, y las DOS dejan decidir
+      fuera de `revision` en 200 de ellas.
+   La regla de Daniel (05/08) -«en telefono solo se puede checkear los documentos tuyos
+   pendientes de revision o los que tienes tu pendientes de revisar; no aparecen hasta que esten
+   completamente analizados»- NO la impone esta funcion. Lo que PUBLICA solo se ofrece sobre lo
+   ya analizado, y eso lo decide `_yaAnalizado_` (`comun.js`), la misma puerta en las dos caras;
+   pedir cambios y rechazar se ofrecen antes a proposito, porque son la forma de pararlo. Y lo
+   que el movil lista como pendiente (`_docsPend_`, solo `revision`) es una de las TRES listas de
+   su pantalla: «En curso», la que ven el PD y el segundo revisor, ensena tambien `recibido` y
+   `analizado`. */
+function puedeDecidirDoc(d){
+  if(!d || d.autor===ACTOR) return false;
+  var rev=revisoresDe(d), maxR=Math.max.apply(null,rev.map(rangoNom));
+  if(rev.indexOf(ACTOR)<0 && rangoNom(ACTOR)<=maxR) return false;
+  /* ⛔ SOLO `revision` CORTA AQUI, igual que el movil (20/08, 133.a). Con
+     `recibido` y `analizado` en esta lista, un expediente que YA TIENE `revisor`
+     se saltaba de golpe el bloqueo mutuo Y la escalera de rango de la linea de
+     abajo: un coordinador (rango 1) podia RECHAZAR lo que habia firmado el PD, y un
+     igual pisar a otro igual. `_yaAnalizado_` no lo tapaba: cubre *Aprobar* y *Con
+     anotaciones*, y «Solicitar cambios»/«Rechazar» quedan FUERA de ese ternario.
+     No se pierde nada: SIN revisor la linea de abajo ya deja decidir en cualquier
+     estado (`rangoNom(ACTOR) > rangoPila(null)` = `>0`, cierto para todo revisor),
+     que es lo que el caso 38 de `probar_documentos_caras.py` fija. */
+  if(d.est==='revision') return true;      /* sin decidir: cualquiera habilitado */
+  return d.revisor===_m(ACTOR).pila || rangoNom(ACTOR)>rangoPila(d.revisor);
+}
+
+function filaDoc(d){
+  if(DOC_SEL===d.id) return docCard(d);
+  var rev=revisoresDe(d).map(function(n){return _m(n).pila;}).join(' o ');
+  /* `mio` sale de `_meTocaDoc_`, LA puerta: aqui preguntaba por `puedeDecidirDoc`, que
+     contesta «puedo pisar por rango» y no «me toca» — 2 de 12 combinaciones divergian. */
+  var st=estDoc(d.est), mio=_meTocaDoc_(d);
+  return '<div class="dec" id="doc-'+d.id+'" data-docsel="'+d.id+'">'+
+    '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
+    '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+esc(d.ref)+'</span> · '+
+      esc(_m(d.autor).pila)+' · '+ambDoc(d.amb)+' · firma '+esc(rev)+
+      (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+'</small></span>'+
+    '<span class="der">'+
+      (mio?'<span class="chip wa">te toca</span>':'')+
+      /* El chip sale de `chipSevDoc`, que es LA puerta: aqui habia una copia y en
+         `colaDecision` otra, y la de alla se habia quedado con el `else` en verde. */
+      chipSevDoc(d.sev)+
+      '<span class="chip '+st[1]+'">'+st[0]+'</span><span class="chev">›</span>'+
+    '</span></div>';
+}
+
+/* EL EXPEDIENTE ENTERO, que es lo que hay que leer antes de firmar: resumen ejecutivo,
+   analisis, avisos de calidad, la ultima decision con su motivo, el documento de Drive
+   incrustado, y las cuatro palabras clave del correo real -aprobar, aprobar con
+   anotaciones, solicitar cambios, rechazar- mas deshacer y reenviar. */
+/* La DECISION ANTERIOR de un expediente, tal y como la ve el revisor sin desplegar nada: es
+   lo que hay que juzgar para decidir si se pisa. `''` si todavia no hay ninguna.
+
+   ⛔ SALE DE `d.decision`, NO RECONSTRUIDA DEL ESTADO. Aqui se deducia de `d.est` y `d.revisor`,
+      y asi se perdian las dos cosas que hacen falta para juzgarla: el **cuando** (`decision.at`,
+      que el backend guarda desde siempre) y los **ajustes** de un «con anotaciones» —o sea, QUE
+      titulo y QUE etiquetas cambio el revisor anterior—. Ademas `d.est` **no puede** distinguir
+      `aprobado` de `anot`: `Codigo.gs:993` deja los dos en `publicado`.
+   ⛔ Y decia «Sin motivo escrito.» sobre un APROBADO, que no es una omision: es una afirmacion
+      FALSA. Un aprobado no lleva motivo **por diseño** —`Codigo.gs:993` pone `nota=null`—, asi
+      que eso se lee como que alguien se lo dejo sin escribir y manda a buscar una explicacion
+      que nunca existio.
+   ⛔ Y ES UNA FUNCION APARTE PARA PODER EJECUTARLA: `docCard` monta ademas el visor, el analisis
+      y las cuatro acciones, asi que ningun banco la corre — y una mutacion sobre esto saldria
+      CIEGA. Extraida, el arnes la ejercita en dos lineas.
+   ⚠️ `st` se RECIBE, no se recalcula: `docCard` ya lo tiene, y una segunda copia del mapa de
+      estados es justo el fallo que `estDoc` vino a cerrar. */
+function _previaDocE_(d, st){
+  if(!d) return '';
+  var acc=(typeof _accionDocTxt_==='function')?_accionDocTxt_(d.decision&&d.decision.accion):'';
+  var aju=(typeof _ajustesDocTxt_==='function')?_ajustesDocTxt_(d):'';
+  var fir=(typeof _firmaDocTxt_==='function')?_firmaDocTxt_(d):'';
+  var rot=(st&&st[0])||'';
+  if(!(d.est==='cambios'||d.est==='rechazado'||d.revisor)) return '';
+  return '<div class="just" style="border-left-color:var(--warn)"><span class="sc">'+
+    (fir?('decidió '+esc(fir)):'última decisión')+' · '+esc(acc||rot)+'</span>'+
+    (d.nota ? esc(d.nota) : (acc==='Aprobado' ? 'Aprobado sin anotaciones.' : ''))+
+    (aju?'<br><span class="sc">Ajustó: '+esc(aju)+'</span>':'')+'</div>';
+}
+
+/* Los mismos avisos con la marca del escritorio. Mismo motivo que en el móvil para que
+   sea una función suelta: `docCard` no la ejecuta ningún banco. El CRITERIO no se repite —
+   sale de `_avisosDoc_`—; aquí sólo cambia la envoltura, que es lo único que difiere de
+   verdad entre las dos caras. */
+function _avisosDocE_(d){
+  var xs = (typeof _avisosDoc_==='function') ? _avisosDoc_(d) : [];
+  return xs.map(function(a){
+    return '<div class="just" style="border-left-color:var(--warn)"><span class="sc">'+
+           esc(a.t)+'</span>'+esc(a.d)+'</div>';
+  }).join('');
+}
+
+/* Los mismos dos pasos con la marca del escritorio. Daniel (18/08): las instrucciones van en
+   las DOS caras —«movil y escrityorio, recuerda q escritorio solo la tiene el consejo»—. */
+/* Gemelo de `_pasosCorregirE_` para SUSTITUIR. ⛔ Y traduce igual que aquel: el
+   escritorio nombra el estado `est`, no `estado`, y el autor `d.autor` contra `ACTOR`.
+   Pasarle el objeto crudo daria SIEMPRE lista vacia -- instrucciones escritas, probadas
+   y mudas en una cara entera, que es exactamente lo que ya paso una vez aqui. */
+function _pasosSustituirE_(d){
+  var ps = (typeof _pasosSustituirDoc_==='function')
+    ? _pasosSustituirDoc_({estado:d && d.est, ref:d && d.ref, autor:d && d.autor},
+                          typeof ACTOR!=='undefined' ? ACTOR : null) : [];
+  if(!ps.length) return '';
+  return '<div class="ruta"><b>¿Hay una versión nueva?</b> No se sube encima: se manda como <b>sustitución</b>, y éste sigue publicado hasta que aprueben la nueva.</div>'+
+    _pasosHTML_(ps, 8, 6);
+}
+
+/* ⛔⛔ LO QUE VE EL AUTOR DE ALGO YA DECIDIDO, EN EL ESCRITORIO (631.ª, 14/09). Gemela de
+   `_docAutorHTML_` del movil, con los MISMOS textos y la misma puerta comun (`_accionDocTxt_`,
+   `_firmaDocTxt_`, `_ajustesDocTxt_`). Hasta hoy esta cara solo curaba `publicado`, y al autor de un
+   `anot`, `aprobado`, `rechazado` o `publicando` le decia «Es tuyo: lo firma X» sobre algo ya firmado.
+   ⚠️ TRADUCE ANTES DE PREGUNTAR, como `_pasosSustituirE_`: esta cara nombra `est` y `notion`.
+   ⚠️ `cambios` NO va aqui (tiene su rama con el boton de reenviar) y `revision` devuelve '' a
+   proposito: ahi «lo firma X» SI es verdad. */
+function _docAutorE_(d){
+  if(!d || typeof ACTOR==='undefined' || d.autor!==ACTOR) return '';
+  var e={estado:d.est, nota:d.nota, decision:d.decision, decidedAt:d.decidedAt, revisor:d.revisor};
+  var firma=(typeof _firmaDocTxt_==='function') ? _firmaDocTxt_(e) : '';
+  var pie=firma ? '<br><span class="sc">'+esc(firma)+'</span>' : '';
+  if(e.estado==='rechazado')
+    return '<div class="ruta"><b>Te lo rechazaron.</b> '+esc(e.nota||'Sin motivo escrito.')+pie+'</div>';
+  if(e.estado==='publicando')
+    return '<div class="ruta"><b>Aprobado: se está publicando.</b> En cuanto termine, aquí tendrás el enlace y, si hace falta, cómo mandar una versión nueva.'+pie+'</div>';
+  if(e.estado==='aprobado'||e.estado==='anot'||e.estado==='publicado'){
+    var acc=(typeof _accionDocTxt_==='function')
+      ? (_accionDocTxt_(e.decision&&e.decision.accion)||'Aprobado') : 'Aprobado';
+    var aj=(typeof _ajustesDocTxt_==='function') ? _ajustesDocTxt_(e) : '';
+    var url=String(d.notion||'');
+    return '<div class="ruta"><b>'+esc(acc)+'.</b> '+(aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+
+      (url.indexOf('http')===0
+        ? '<br><a href="'+esc(url)+'" target="_blank" rel="noopener">Ver la página publicada</a>' : '')+
+      '</div>'+_pasosSustituirE_(d);
+  }
+  return '';
+}
+
+function _pasosCorregirE_(d){
+  var ps = (typeof _pasosCorregirDoc_==='function')
+    ? _pasosCorregirDoc_({estado:d && d.est, ref:d && d.ref}) : [];
+  if(!ps.length) return '';
+  return '<div class="just" style="border-left-color:var(--warn)">'+
+    '<span class="sc">Para corregirlo son dos pasos, en este orden</span>'+
+    'El botón de abajo <b>no sube nada</b>: sólo devuelve el expediente a la cola de revisión.'+
+    _pasosHTML_(ps, 6, 5)+'</div>';
+}
+
+function docCard(d){
+  var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
+  var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';
+  var lista=function(t,xs){ return (xs&&xs.length)
+    ? '<div class="sub"><span class="sc">'+t+'</span><ul class="obj">'+
+      xs.map(function(v){return '<li>'+esc(v)+'</li>';}).join('')+'</ul></div>' : ''; };
+  if(an){
+    if(an.proposito) secs+='<div class="sub"><span class="sc">Propósito</span>'+
+      '<p style="margin:4px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+esc(an.proposito)+'</p></div>';
+    /* Mismo motivo que en el móvil: la lista vive en `_seccionesAnalisis_`. Aquí eran
+       cuatro `lista(…)` encadenados a mano, y les faltaban las dos mismas. */
+    _seccionesAnalisis_(an).forEach(function(x){ secs+=lista(x[0], x[1]); });
+    var _cnt=_conteosDoc_(an);
+    if(_cnt) secs+='<div class="sub"><span class="sc">En números</span>'+
+      '<p style="margin:4px 0 0;font-size:12px;color:var(--ink3)">'+esc(_cnt)+'</p></div>';
+  }
+  var avisos = (d.avisos&&d.avisos.length) ? lista('Avisos de calidad · '+d.avisos.length, d.avisos)
+    : (d.iss ? '<div class="sub"><span class="sc">Calidad</span><p style="margin:4px 0 0;font-size:12px;'+
+        'color:var(--ink3);line-height:1.55">'+d.iss+' aviso'+(d.iss===1?'':'s')+' de calidad, sin detalle. '+
+        'Los manda Cowork con el expediente.</p></div>' : '');
+  var previa = _previaDocE_(d, st);
+  /* ⛔ POR LA PUERTA UNICA (`_visorDocHTML_`). Esta cara ya acertaba -- preguntaba «¿hay
+     enlace?» --, y va por la puerta igual: dos criterios para la misma pregunta se separan
+     el dia que alguien toca uno, y esto ya habia divergido una vez.
+     Nace ABIERTO: esta ficha existe para leer el archivo antes de decidir. */
+  var visor = _visorDocHTML_(d.drive, d.ref,
+    '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
+    'Cowork lo manda en <span class="mono">enlaceDrive</span>; sin él no hay nada que leer aquí.</div></div>');
+  var acc, _aut;
+  if(puede){
+    acc='<label style="display:block;margin-top:11px">'+
+      '<span class="sc" style="display:block;margin-bottom:5px">Título · puedes corregirlo al aprobar con anotaciones</span>'+
+      '<input id="dtit-'+d.id+'" value="'+esc(d.tit)+'" style="'+CAMPO_CSS+'"></label>'+
+      '<label style="display:block;margin-top:9px">'+
+      '<span class="sc" style="display:block;margin-bottom:5px">Etiquetas · separadas por comas</span>'+
+      '<input id="detq-'+d.id+'" value="'+esc(_etiquetasDe_(d).join(', '))+'" style="'+CAMPO_CSS+'"></label>'+
+      '<textarea data-motivo placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
+      /* ⛔⛔ APROBAR = PUBLICAR, y no se publica lo que nadie ha analizado. Esta cara ve
+         `recibido` y `analizado` a proposito -Daniel, 05/08: en el movil «no aparecen
+         hasta que esten completamente analizados»; aqui se ve el pipeline entero-, pero
+         VER no es APROBAR: eso ultimo era una deduccion que nadie tomo, y el servidor la
+         aceptaba. Se publicaba un expediente sin analizar y, muchas veces, **sin fichero
+         que leer** -lo dice la propia ficha dos lineas mas arriba-.
+         ⚠️ «Solicitar cambios» y «Rechazar» siguen ahi: son la forma legitima de parar
+         algo que viene mal, y ninguno de los dos publica nada. */
+      '<div class="acts">'+
+        (_yaAnalizado_(d)
+          ? '<button class="btn pri" data-doc="'+d.id+'" data-acc="aprobado">Aprobar</button>'+
+            '<button class="btn" data-doc="'+d.id+'" data-acc="anot">Aprobar con anotaciones</button>'
+          : '<span class="sc" style="align-self:center">A\u00fan sin analizar: se puede parar, no publicar.</span>')+
+        '<button class="btn" data-doc="'+d.id+'" data-acc="cambios">Solicitar cambios</button>'+
+        '<button class="btn no" data-doc="'+d.id+'" data-acc="rechazado">Rechazar</button>'+
+        (d.est!=='revision'&&d.revisor?'<button class="btn" data-doc="'+d.id+'" data-acc="deshacer">Deshacer y devolver a revisión</button>':'')+
+      '</div>';
+  } else if(d.autor===ACTOR && d.est==='cambios'){
+    /* ⛔ Mismo rotulo mentiroso que en el movil: el boton no sube nada.
+       ⚠️ Y el escritorio nombra el estado `est`, no `estado`: por eso `_pasosCorregirE_`
+       traduce antes de preguntar. Pasarle el objeto crudo daria SIEMPRE lista vacia --
+       instrucciones escritas, probadas y mudas en una cara entera. */
+    acc=_pasosCorregirE_(d)+'<div class="acts"><button class="btn pri" data-doc="'+d.id+'" data-acc="reenviar">Ya está corregido: devolver a revisión</button></div>';
+  /* ⛔ `cerrado` fuera: no existe -- `_normEstado_` lo traduce a `publicado`. */
+  } else if((_aut=_docAutorE_(d))){
+    /* ⛔ AQUI PONIA «Es tuyo: lo firma X», Y YA ESTABA FIRMADO -- y no solo en `publicado`
+       (631.ª, 14/09): tambien en `anot`, `aprobado`, `rechazado` y `publicando`, que ya estan
+       decididos. Lo decide `_docAutorE_`, gemela de `_docAutorHTML_` del movil. */
+    acc=_aut;
+  } else if(d.autor===ACTOR){
+    acc='<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>';
+  } else if(d.revisor){
+    acc='<div class="ruta">Ya lo decidió <b>'+esc(d.revisor)+'</b>. Puedes consultarlo; para cambiar la '+
+      'decisión hace falta más rango que quién la tomó.</div>';
+  } else {
+    acc='<div class="ruta">Lo firma <b>'+esc(rev)+'</b>, no tú.</div>';
+  }
+  return '<div class="parte" id="doc-'+d.id+'">'+
+    '<div class="h"><b>'+esc(d.tit)+'</b>'+
+      '<span class="u">'+esc(d.ref)+'</span>'+
+      '<span class="u">'+esc(d.tipo||'documento')+'</span>'+
+      '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button></div>'+
+    '<div class="pils">'+
+      '<span class="chip">'+esc(_m(d.autor).pila)+' · '+esc(d.sub||'—')+'</span>'+
+      '<span class="chip">'+ambDoc(d.amb)+'</span>'+
+      '<span class="chip '+st[1]+'">'+st[0]+'</span>'+
+      /* ⛔ SIN CLASE = NEUTRO. El `else` era `'ok'` -verde-, asi que «calidad sin
+         medir» se pintaba con el mismo chip que «calidad alta»: quien mira una lista
+         de expedientes de reojo lee el COLOR, no el texto.
+         ⛔⛔ Y AQUI HABIA UNA SEGUNDA COPIA DEL TERNARIO, con `d.sev===` en vez de `sev===`.
+         La unificacion del 20/08 saco `chipSevDoc` y cambio LA FILA; esta, 230 lineas mas
+         abajo, se quedo -- y el guardia del banco no la veia **por dos caracteres**, con un
+         `ok()` verde encima afirmando que cubria «la fila y la ficha». Ahora las dos LLAMAN. */
+      chipSevDoc(d.sev) +  /* ⛔ EL ESPACIO ANTES DEL `+` NO ES ESTILO. Esta linea era byte
+         a byte la de `filaDoc`, que ya estaba anclada por una mutacion, y entonces esa
+         mutacion salia «2 veces» y **dejaba de aplicarse en silencio**. Un comentario
+         DETRAS no lo arregla: el ancla es una SUBCADENA, no una linea. La MISMA funcion
+         que la fila; el comentario esta
+         aqui para que esta linea no sea byte a byte la de alli -- si lo fuera, el ancla de
+         la mutacion de la fila saldria DOS VECES y esa mutacion dejaria de aplicarse en
+         silencio. Es la regla de «la sangria no desambigua un ancla», por su otra cara. */
+      (d.fecha?'<span class="chip">'+esc(d.fecha)+'</span>':'')+
+      /* Mismo motivo que en el móvil: verlas no es decidir. */
+      (_etiquetasDe_(d).length
+        ? '<span class="chip">'+esc(_etiquetasDe_(d).join(' · '))+'</span>' : '')+
+    '</div>'+
+    _avisosDocE_(d)+
+    '<div class="just"><span class="sc">Resumen ejecutivo</span>'+
+      esc(d.resumen||'El expediente llegó sin resumen. Léelo abajo antes de firmar.')+'</div>'+
+    previa+secs+avisos+visor+
+    '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':'Firma: <b>'+esc(rev)+'</b>')+
+      ' · Decidir aquí sustituye a contestar el correo de aprobación.</div>'+
+    acc+
+  '</div>';
+}
+
+/* LAS ACTAS SON EXPEDIENTES, no una tabla aparte. Aqui habia tres filas escritas a mano
+   con referencias inventadas. Y el dato ya estaba en casa: el Form del pipeline tiene
+   `Acta` como Tipo de documento y la referencia es `Acta_S-6301_26`, asi que la lista de
+   actas es un FILTRO sobre los expedientes que esta cara ya carga. */
+function _esActa_(d){
+  /* Por el tipo si viene; si no, por el prefijo de la referencia, que lo lleva siempre.
+     Los expedientes viejos pueden no traer `tipo` y la referencia nunca falta. */
+  return /^acta$/i.test(String(d.tipo||'')) || /^Acta_/i.test(String(d.ref||''));
+}
+

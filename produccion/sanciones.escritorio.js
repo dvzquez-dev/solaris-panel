@@ -1,0 +1,551 @@
+/* ═══ SANCIONES · cara escritorio ═══════════════════════════════════════════════════════════
+   18 funciones sacadas de `escritorio.html`. Lo carga esa cara con <script src>, ANTES de su bloque
+   grande, así que ya existen cuando aquel se ejecuta.
+
+   ⛔ Aquí SOLO hay declaraciones `function`. El estado (`var`), los registros y las llamadas de
+   arranque se quedan en el HTML: un módulo que se lleve estado se lleva el orden de carga, y ahí
+   es donde se rompe sin dar error. Estas funciones siguen usando los globales de su cara — se
+   llaman en tiempo de ejecución, cuando ya están definidos.
+
+   ⛔ Y es de UNA cara. La otra tiene su propio fichero aunque alguna función se llame igual:
+   fusionarlas es otro cambio, con otro riesgo y su propia verificación.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+
+/* La misma busqueda con distinto nombre en cada cara; se envuelve para que el bloque de
+   autoridad de abajo sea IDENTICO en las dos y un diff lo confirme de un vistazo. */
+/* EQUIVALENTE (no GEMELA): misma busqueda con distinto ayudante en cada cara —existe JUSTO para que el bloque de autoridad de debajo si sea identico—. */
+function _mSanc_(n){ return _m(n); }
+
+function sancionPor(tipo,nombre){
+  if(tipo!=='general'&&tipo!=='junta'&&tipo!=='consejo') return {p:0,txt:'sin sanción automática · potestad del coordinador'};
+  if(tipo==='junta'||tipo==='consejo') return {p:1,txt:'1 punto · escala plana'};
+  /* ⛔⛔ «NO CONSTA» NO ES «CERO», Y AQUI DECIDE PUNTOS DE DISCIPLINA (565.ª).
+     `VECES` es una tabla de **SEIS NOMBRES DE DEMO** (`escritorio.html`), y los nombres
+     que llegan aqui son **REALES**: salen de `r.sinCubrir`, que viene de `_cobertura_`.
+     Con el roster de 26/27 -- **23 personas** -- casi nadie esta en esa tabla, asi que el
+     `||0` convertia **«no se su historial»** en **«es su primera vez»**: a un reincidente
+     la pantalla le cantaba *«aviso · 1.ª vez, sin puntos»* y *«0 antecedentes esta
+     temporada»*. Es la misma forma que el «Revisa: Antia» del 10/09: **una semilla de
+     demo leida como dato real**.
+     ✅ Ahora son TRES respuestas y no dos: **p:0** (consta y es la primera), **p>=1**
+     (consta y reincide) y **p:null** (no consta). Un `0` explicito en la tabla sigue
+     dando «1.ª vez» -- eso es un dato --; lo que ya no se inventa es el hueco.
+     ✅ **Y DESDE LA 575.ª EL DATO ES REAL.** Aqui ponia que la reincidencia la cuenta
+     `reglas/gradiente.py` y que **no viajaba al panel**, asi que lo unico honesto que
+     podia hacer esta cara era decir que no lo sabia. Ya no: la 572.ª puso el cable
+     -- `flujos/ensamblar.py` escribe `antecedentes` por miembro, un entero por familia --
+     y esto lo lee por `_vecesSinCubrir_`. `VECES`, la tabla de seis nombres de demo,
+     **se retiro**.
+     ⚠️ Y el `null` sigue existiendo, con MAS motivos que antes: quien no esta en el
+     panel, quien esta y no trae el campo -- el backend recorta el miembro para quien no
+     es admin ni PD --, y quien lo trae con algo que no es un numero. */
+  var v=_vecesSinCubrir_(nombre);
+  if(v===null)
+    return {p:null,txt:'no consta su historial · la escala no se puede decir aquí'};
+  if(v===0) return {p:0,txt:'aviso · 1.ª vez, sin puntos'};
+  if(v===1) return {p:1,txt:'1 punto · 2.ª vez'};
+  return {p:2,txt:'2 puntos · 3.ª o más (tope 2)'};
+}
+
+/* ⛔ LA GEMELA DEL MOVIL, Y CON EL MISMO FALLO: vaciaba la lista antes de saber si
+   llegaba y se tragaba el error, asi que un corte de red se pintaba como «No tienes
+   subidas ni bajadas de puntos esta temporada» — y encima seguido de «Si el servidor
+   es anterior a la v53 esto sale vacio aunque las haya», que CULPA A LA VERSION del
+   servidor de lo que puede ser la red.
+   ⚠️ Aqui ponia que era PEOR que en el movil *«porque `_refrescoVivo_` no llama a esta
+   carga, asi que la mentira no se corrige sola — dura toda la sesion»*. **FALSO desde la
+   569.ª**: `escritorio.html` la llama dentro del refresco, y se reintenta cada 90 s.
+   ⛔ Y la correccion se escribio ALLI — citando esta misma frase— y **no aqui, donde se
+   enuncia**: §3c-19 en su forma mas barata de producir. Una premisa corregida en el sitio
+   que la CITA sobrevive entera en el que la AFIRMA, y la siguiente persona lee esta. */
+async function _cargarMovimientosE_(){
+  MOVS_E.length=0;
+  _llego_('movsE', false);
+  try{
+    var a=await api.getMisMovimientos();
+    if(!Array.isArray(a)) return false;
+    a.forEach(function(s){ MOVS_E.push(_movDeSancion_(s)); });
+    _llego_('movsE', true);
+    return true;
+  }catch(_){ return false; }
+}
+
+function arco(i,r,frac){
+  var a0=(-90+i*ASTEP+AGAP/2)*Math.PI/180;
+  var a1=(-90+i*ASTEP+AGAP/2+(ASTEP-AGAP)*frac)*Math.PI/180;
+  return 'M'+(ACX+r*Math.cos(a0)).toFixed(2)+' '+(ACY+r*Math.sin(a0)).toFixed(2)+
+    ' A'+r+' '+r+' 0 0 1 '+(ACX+r*Math.cos(a1)).toFixed(2)+' '+(ACY+r*Math.sin(a1)).toFixed(2);
+}
+
+function anilloHTML(valor,etiqueta){
+  var segs='',ticks='',i;
+  for(i=0;i<10;i++){
+    var f=Math.max(0,Math.min(1,valor-i));
+    segs+='<path class="seg vac'+(i<3?' zc':'')+'" d="'+arco(i,AR,1)+'"/>';
+    if(f>0) segs+='<path class="seg" stroke="'+(i<3?'var(--warn)':'var(--red)')+'" d="'+arco(i,AR,f)+'"/>';
+    var a=(-90+i*ASTEP)*Math.PI/180;
+    ticks+='<line class="tk'+(f>0?' f':'')+'" x1="'+(ACX+60*Math.cos(a)).toFixed(1)+'" y1="'+(ACY+60*Math.sin(a)).toFixed(1)+
+      '" x2="'+(ACX+66*Math.cos(a)).toFixed(1)+'" y2="'+(ACY+66*Math.sin(a)).toFixed(1)+'"/>';
+  }
+  return '<div class="anillo"><svg viewBox="0 0 150 150"><circle class="pista" cx="75" cy="75" r="'+AR+'"/>'+
+    ticks+segs+'</svg><div class="mid"><div class="n mono">'+nf(valor,1)+'<small>/10</small></div>'+
+    '<div class="u">'+esc(etiqueta)+'</div></div></div>';
+}
+
+/* el rango de puntos del bloque se CALCULA, nunca se escribe a mano: un aviso (0
+   puntos) no es «-1 punto», y un bloque puede mezclar valores. */
+function rangoLote(){
+  var vals=[],avisos=0;
+  LOTE.items.forEach(function(x){ if(!Number(x.pts)) avisos++; else if(vals.indexOf(x.pts)<0) vals.push(x.pts); });
+  vals.sort(function(a,b){return Math.abs(a)-Math.abs(b);});
+  var et=function(pp){ return (pp>0?'+':'−')+Math.abs(pp)+' '+(Math.abs(pp)===1?'punto':'puntos'); };
+  var nS=LOTE.items.length-avisos;
+  var t = !vals.length ? '' : (vals.length===1 ? et(vals[0])+(nS>1?' c/u':'')
+        : 'de '+et(vals[0])+' a '+et(vals[vals.length-1]));
+  if(avisos) t += (t?' · ':'')+avisos+' aviso'+(avisos===1?'':'s');
+  return t;
+}
+
+/* Los dos envoltorios que hacen que el bloque de arriba pueda ser IDENTICO al del movil:
+   alli `_pilaDeM_` busca en el roster y `yoNombre()` sale de `YO`. Aqui ya existen `_m` y
+   `ACTOR`, asi que se envuelven en vez de duplicar la busqueda. */
+function _pilaDeM_(n){ var m=_m(n); return (m&&m.pila)||''; }
+
+function _actorSanc_(){
+  if (typeof backendOK !== 'undefined' && backendOK && SESION && SESION.nombre) return SESION.nombre;
+  return ACTOR;                    // demo local, donde no hay sesion
+}
+
+/* ⛔⛔ EL INDICE DEL BLOQUE QUE SE MIRA, EN UNA SOLA PUERTA (566.ª). Estaba calculado
+   DOS VECES con criterios DISTINTOS: `_loteReal_` clampaba
+   (`Math.min(LOTE_SEL, LOTES_PEND.length-1)`) y `_selectorLotes_` no (`i===LOTE_SEL`).
+   Y nadie resetea `LOTE_SEL`: lo asigna un unico sitio (`escritorio.html`, el `onchange`).
+   📏 Lo que se veia: con 3 bloques eliges el 3.º (`LOTE_SEL=2`), el refresco de 90 s
+   deja 2, y entonces **el panel pinta el bloque B y el desplegable enseña el A** -- porque
+   ninguna `<option>` queda `selected` y el navegador marca la primera. Debajo hay un boton
+   que **aplica en Notion y publica el comunicado**: decidir sobre el bloque equivocado no
+   da ningun error.
+   ⚠️ Es la regla 11 en su forma mas cara: *una constante derivable no se teclea dos
+   veces*. Aqui no era una constante sino un indice, y las dos formas eran razonables por
+   separado -- la diferencia ES el fallo.
+   ✅ Devuelve **0 si no hay bloques**, que es lo que ya hacia el `|| LOTES_PEND[0]` de
+   `_loteReal_`: un `-1` aqui se leeria como «el ultimo» en cualquier `[]`. */
+function _loteIdx_(){
+  var n = (LOTES_PEND && LOTES_PEND.length) || 0;
+  if(!n) return 0;
+  return Math.max(0, Math.min(LOTE_SEL, n - 1));
+}
+
+function _sancSueltas_(){
+  if(!Array.isArray(SANC_BACK)) return [];
+  return SANC_BACK.filter(function(s){ return s.estado==='pendiente' && !s.lote; });
+}
+
+function _sancHist_(){
+  if(!Array.isArray(SANC_BACK)) return [];
+  return SANC_BACK.filter(function(s){ return s.estado && s.estado!=='pendiente'; })
+    .sort(function(a,b){ return String(b.creado_at||'').localeCompare(String(a.creado_at||'')); });
+}
+
+function _selectorLotes_(){
+  if(LOTES_PEND.length<2) return '';
+  return '<div class="pb" style="padding-bottom:0"><label style="display:block">'+
+    '<span class="sc" style="display:block;margin-bottom:5px">Hay '+LOTES_PEND.length+' bloques pendientes</span>'+
+    '<select id="loteSel" style="width:100%;max-width:340px;background:#0A0909;border:1px solid var(--line);'+
+    'border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
+    LOTES_PEND.map(function(l,i){
+      return '<option value="'+i+'"'+(i===_loteIdx_()?' selected':'')+'>'+esc(l)+'</option>'; }).join('')+
+    '</select></label></div>';
+}
+
+function _panelSueltas_(){
+  var ss=_sancSueltas_();
+  /* ⛔⛔ «NINGUNA» Y «NO LO SÉ» NO SE PINTAN IGUAL. `SANC_BACK` arranca en `null` y se
+     queda en `null` si `getSanciones` falla, así que la lista salía vacía por las dos
+     razones — y lo que se leía era la primera: **«ninguna»**, con sanciones pendientes
+     contra personas reales **invisibles** en la pantalla donde se deciden. */
+  if(!ss.length && !_llego_('sanc')) return pan('Sanciones sueltas','sin leer',
+    vacioSimple('No se han podido leer las sanciones',
+      'El servidor no ha contestado, as\u00ed que esto NO quiere decir que no haya ninguna. '+
+      'Se reintenta solo cada 90 s; si sigue as\u00ed, recarga la p\u00e1gina.'));
+  if(!ss.length) return pan('Sanciones sueltas','ninguna',
+    vacioSimple('No hay sanciones sueltas','Las que no van en bloque —cada una con su motivo y su artículo— aparecen aquí.'));
+  return pan('Sanciones sueltas', ss.length+'',
+    tabla([['Persona'],['Motivo'],['Art.',0],['Puntos',1],['']],
+      ss.map(function(s){
+        var m=_m(s.nombre);
+        return '<tr><td>'+esc((m&&m.pila)||s.nombre)+'</td>'+
+          '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
+          '<td class="mono" style="color:var(--ink3)">'+esc(s.articulo||'libre')+'</td>'+
+          '<td class="r mono '+((+s.puntos||0)<0?'dn':'')+'">'+(Number(s.puntos)||0)+'</td>'+
+          '<td class="r"><span class="decs" data-sid="'+s.id+'">'+
+            '<button data-sdec="aprobar">Aplica</button>'+
+            '<button data-sdec="justificar">Justifica</button>'+
+            '<button data-sdec="rechazar">Rechaza</button>'+
+          '</span> <button class="btn sm" data-seditar="'+s.id+'">Editar</button></td></tr>';
+      }).join(''))+
+    '<div class="pb" style="padding-top:0"><button class="btn sm" data-agrupar>Agrupar en un paquete</button>'+
+      '<span class="sc" style="margin-left:9px">un solo comunicado para todas</span></div>'+
+    '<div class="nota">Cada suelta se decide por su cuenta: no comparten motivo ni comunicado. '+
+    '<b>Editar</b> corrige puntos, motivo y artículo <b>al aplicarla</b> —es lo único que deja el '+
+    'backend—. <b>Revocar una ya aplicada no se hace desde aquí</b>: el servidor no deja tocar '+
+    'lo aplicado, y la revocación va por <span class="mono">flujos/enviar_revocacion.py</span>.</div>');
+}
+
+function _panelHistSanc_(){
+  var hs=_sancHist_();
+  /* ⛔ Y SU GEMELA (§3c-31): curar sólo el panel de arriba dejaría este afirmando
+     «vacío» por el mismo motivo, y aquí la lectura es peor todavía — «todavía no hay
+     sanciones resueltas» se lee como que **no se ha sancionado a nadie nunca**. */
+  if(!hs.length && !_llego_('sanc')) return pan('Historial','sin leer',
+    vacioSimple('No se ha podido leer el historial',
+      'El servidor no ha contestado. NO quiere decir que no haya sanciones resueltas.'));
+  if(!hs.length) return pan('Historial','vacío',
+    vacioSimple('Todavía no hay sanciones resueltas','Cada una que apruebes, justifiques o rechaces queda aquí con su decisión.'));
+  return pan('Historial', hs.length+'',
+    tabla([['Persona'],['Motivo'],['Estado',0],['Puntos',1],['Cuándo',1]],
+      hs.slice(0,40).map(function(s){
+        var m=_m(s.nombre);
+        /* ⚠️ AQUI HABIA UN MAPA IDENTIDAD (568.ª): cada clave se traducia A SI MISMA
+           (`aplicada:'aplicada'`, `aprobada:'aprobada'`…) y el `||s.estado` cubria el
+           resto, asi que `et` era **siempre** `s.estado`. No traducia nada.
+           ⚠️ Y no es inofensivo: un mapa de estados **parece** la puerta donde se decide
+           como se lee cada uno, asi que el siguiente que quiera cambiar un rotulo lo
+           edita ahi… y el `||` de al lado se lo come si se equivoca de clave. Un
+           traductor que no traduce es peor que no tenerlo: invita a confiar en el.
+           ✅ Su gemela del movil tiene el suyo DE VERDAD (`PD_EST`: «aplicada» -> «ya
+           cuenta en su mes»). Si algun dia esta cara quiere rotulos propios, el sitio es
+           ese mapa — con traducciones distintas del original, que es lo que lo hace uno. */
+        var et=s.estado;
+        var tono=(s.estado==='rechazada'||s.estado==='revocada')?'dn':(s.estado==='aplicada'?'up':'');
+        return '<tr><td>'+esc((m&&m.pila)||s.nombre)+'</td>'+
+          '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
+          '<td class="mono '+tono+'">'+esc(et)+'</td>'+
+          '<td class="r mono">'+(Number(s.puntos)||0)+'</td>'+
+          '<td class="r mono" style="color:var(--ink3)">'+esc(String(s.creado_at||'').slice(0,10))+'</td></tr>';
+      }).join(''))+
+    (hs.length>40?'<div class="nota">Se muestran las 40 más recientes de '+hs.length+'.</div>':''));
+}
+
+/* El panel. `_ponerSancCuerpo_` va aparte para poder repintar SOLO esto al cambiar el motivo:
+   `pintar()` reconstruye `#main` entero y pierde el scroll, y esta pantalla lleva debajo la cola
+   y el historial -saltar al principio cada vez que tocas un desplegable es inaceptable-. */
+function _ponerSancionHTML_(){
+  /* Rango 0 NO VE la opcion. El gate es el RANGO DE SANCIONES y no el cargo: Bruno es rango 2
+     sin tocar un documento, y estar en el consejo no da rango por si solo. */
+  if(rangoSanc(_actorSanc_())<1) return '';
+  var n=sancionablesPor(_actorSanc_()).length;
+  return pan('Poner una sanci\u00f3n', n+(n===1?' persona':' personas')+' bajo tu jurisdicci\u00f3n',
+    '<div class="pb" id="ponerSanc">'+_ponerSancCuerpo_()+'</div>');
+}
+
+function _ponerSancCuerpo_(){
+  var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
+  var E=CAMPO_CSS;
+  var grupos=_gruposSanc_(_actorSanc_(), SANC_FORM.filtro);
+  var esPlazo=(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg');
+  /* LAS TAREAS DEL SANCIONADO, no las mias -antes se ofrecian las propias y por eso no se podia
+     sancionar a nadie por un plazo-. `null` = todavia se estan pidiendo. Y solo las VIVAS con
+     enlace a Notion: sin `url` no se puede mover la fecha. */
+  /* ⛔ ESTE CALLBACK ES ASINCRONO Y REPINTA EL PANEL ENTERO. Llegaba aqui `c.innerHTML=...`
+     a pelo, SIN recoger antes: lo tecleado entre que se pidieron las tareas y que llegaron se
+     perdia -y volvia como `-1`, que es el valor por defecto de `pts`, con pinta de elegido-.
+     Ahora pasa por la MISMA puerta que el resto de repintados. */
+  var _tt=esPlazo ? _tareasDe_(SANC_FORM.quien, _repintarPonerSanc_) : [];
+  /* ⛔⛔ «CARGANDO» Y «NO SE PUDO» LLEGAN LOS DOS COMO `null` (567.ª). `_tareasDe_`
+     devuelve `null` en TRES situaciones -- se esta pidiendo, hubo error, y no se sabe --,
+     asi que `(_tt===null)` metia el error dentro de «cargando». Y como esa rama se
+     pregunta ANTES, la de «No se pudieron leer» **no se alcanzaba nunca**: con la red
+     caida la pantalla decia **«Buscando las tareas de X…» para siempre** — y la puerta
+     **no reintenta a proposito** (`render()` pasa por ahi muchas veces), asi que ese
+     «buscando» no acaba hasta que se elige a otra persona.
+     ⚠️ El texto del error existia, estaba escrito con su matiz -- *«esto NO dice que no
+     los tenga»* -- y no lo vio nadie. Y su unico guardia es un `in` sobre el FUENTE, que
+     sale verde igual: la rama estaba **afirmada y sin ejecutar**.
+     ✅ Cargando es lo que queda cuando NO hay error: el error tiene su propia rama. */
+  var cargandoT=(_tt===null) && !(SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien
+                                  && SANC_TAREAS.error);
+  var tareas=(_tt||[]).filter(function(t){
+    return t && t.url && !/hech|finaliz|complet|termin|cerrad/i.test(t.e||''); });
+  return '<div class="sanwrap">'+
+    '<div>'+
+      '<label style="display:block;margin-bottom:9px">'+lab('A qui\u00e9n')+
+        '<input id="snFiltro" placeholder="Escribe para filtrar \u00b7 nombre o subsistema" '+
+        'value="'+esc(SANC_FORM.filtro||'')+'" autocomplete="off" style="'+E+'"></label>'+
+      '<div class="sanlista" id="snLista">'+_listaSancHTML_(grupos)+'</div>'+
+    '</div>'+
+    '<div>'+
+      '<label style="display:block;margin-bottom:9px">'+lab('Motivo')+
+        '<select id="snMotivo" style="'+E+'"><option value="">\u2014 elige \u2014</option>'+
+        RRI_MOTIVOS.map(function(r){ return '<option value="'+r[0]+'"'+(SANC_FORM.motivo===r[0]?' selected':'')+'>'+esc(r[1])+'</option>'; }).join('')+
+      '</select></label>'+
+      (SANC_FORM.motivo==='libre'
+        ? '<label style="display:block;margin-bottom:9px">'+lab('Cu\u00e1l')+
+            '<input id="snLibre" placeholder="Qu\u00e9 ha pasado" value="'+esc(SANC_FORM.libre||'')+'" style="'+E+'"></label>'+
+          '<label style="display:block;margin-bottom:9px">'+lab('Art\u00edculo del RRI')+
+            '<input id="snArt" value="'+esc(SANC_FORM.art||'libre')+'" style="'+E+'"></label>'
+        : '')+
+      (esPlazo
+        ? (!SANC_FORM.quien
+            ? '<div class="nota" style="margin:0 0 9px">Elige primero a quién sancionas: las tareas '+
+              'que se ofrecen son <b>las suyas</b>.</div>'
+          : cargandoT
+            ? '<div class="nota" style="margin:0 0 9px">Buscando las tareas de '+
+              esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'…</div>'
+          : tareas.length
+            ? '<label style="display:block;margin-bottom:9px">'+lab('Qu\u00e9 tarea')+
+                '<select id="snTarea" style="'+E+'"><option value="">\u2014 elige la tarea \u2014</option>'+
+                tareas.map(function(t){ return '<option value="'+esc(t.url)+'"'+(SANC_FORM.tarea===t.url?' selected':'')+'>'+esc(t.n||t.nombre||'(sin t\u00edtulo)')+
+                  (t.l?' \u00b7 venc\u00eda '+esc(_isoADMY_(t.l)):'')+'</option>'; }).join('')+
+              '</select></label>'+
+              '<label style="display:block;margin-bottom:9px">'+lab('Plazo nuevo')+
+                '<input type="date" id="snPlazo" value="'+esc(SANC_FORM.plazo||'')+'" style="'+E+'"></label>'+
+              '<div class="nota" style="margin:0 0 9px">El plazo nuevo se escribe <b>en Notion</b>. Si eso '+
+              'falla, la sanci\u00f3n <b>no</b> se pone: no tiene sentido sancionar por un plazo y dejar la '+
+              'tarea con la fecha vencida.</div>'
+          /* ⛔ «NO SE PUDO LEER» NO ES «NO TIENE», y esta es la cara donde se pone la
+             sancion de verdad. `SANC_TAREAS.error` lo guardaba la puerta desde siempre
+             y NO LO LEIA NADIE, asi que un corte de red se pintaba como «elige otro
+             motivo» y el expediente salia con el articulo del RRI equivocado. */
+          : (SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien && SANC_TAREAS.error)
+            ? '<div class="nota" style="margin:0 0 9px;color:var(--warn)">No se pudieron leer las tareas de '+
+              esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+': '+esc(String(SANC_TAREAS.error))+'.<br>'+
+              'Sin esa lista <b>no se sabe</b> si tiene plazos que mover, as\u00ed que esto <b>no</b> dice que no los tenga. '+
+              'Vuelve a elegirle para reintentar.</div>'
+            : '<div class="nota" style="margin:0 0 9px;color:var(--warn)">'+esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+' no tiene ninguna tarea viva con enlace '+
+              'a Notion, as\u00ed que no se puede mover ning\u00fan plazo. Elige otro motivo.</div>')
+        : '')+
+      '<label style="display:block;margin-bottom:11px;max-width:130px">'+lab('Puntos')+
+        '<input type="number" id="snPts" value="'+esc(SANC_FORM.pts||_puntosDeMotivo_(SANC_FORM.motivo)||'')+'" step="1" min="-5" max="0" style="'+E+'"></label>'+
+      '<button class="btn pri" id="btnSanc">Poner la sanci\u00f3n</button>'+
+      '<div class="nota" id="snMsg" style="margin:9px 0 0">La sanci\u00f3n entra <b>pendiente</b>: se decide '+
+      'abajo, y el comunicado sale despu\u00e9s.</div>'+
+    '</div>'+
+  '</div>';
+}
+
+/* ⛔ LA UNICA PUERTA PARA REPINTAR EL PANEL. Estas dos lineas estaban copiadas en dos
+   sitios -aqui y en el callback de `_tareasDe_`- y solo una recogia antes. Dos copias de un
+   gesto acaban siendo dos gestos distintos, y la diferencia es el bug: fue exactamente este.
+   ⚠️ Recoge AUNQUE los campos ya se guarden al teclear (`_atarSancForm_`): esto es la red,
+   no el mecanismo. */
+function _repintarPonerSanc_(){
+  _recogerSancForm_();
+  var c=$('#ponerSanc'); if(!c) return;
+  c.innerHTML=_ponerSancCuerpo_(); _cablearPonerSanc_();
+}
+
+function _cablearPonerSanc_(){
+  var val=function(id){ var e=$('#'+id); return e?e.value:''; };
+  var msg=function(t,mal){ var b=$('#snMsg'); if(b){ b.textContent=t; b.style.color=mal?'var(--warn)':''; } };
+  /* ⛔ CADA CAMPO SE GUARDA AL TECLEARLO. Esto es lo que hace que ningun repintado -este, el
+     del callback de tareas, o el refresco vivo de 90 s- pueda tirar lo escrito: `SANC_FORM` no
+     llega nunca a estar mas viejo que el DOM. Antes solo se recogia AL repintar, y el repintado
+     asincrono no lo hacia. Va lo PRIMERO del cableado, antes de los manejadores `on*`. */
+  _atarSancForm_();
+  /* ⛔ Y NO HAY `recoger`/`repintar` LOCALES: se llama a `_repintarPonerSanc_` por su nombre
+     en cada sitio, que es lo unico que hace visible que la puerta es UNA. Un alias local con el
+     nombre viejo deja el codigo leyendose igual que antes, y la proxima copia se escribe sola. */
+  function marcar(b){
+    SANC_FORM.quien=b.dataset.sanq;
+    $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
+    /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS: hay que repintar.
+       Con los demas motivos no se toca nada, que seria tirar lo escrito por nada. */
+    if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarPonerSanc_(); }
+  }
+  /* Elegir persona NO repinta: solo se marca. */
+  $$('[data-sanq]').forEach(function(b){ b.onclick=function(){ marcar(b);
+    msg('A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'); }; });
+  /* Teclear rehace SOLO la lista: ni pierde el foco ni borra lo ya elegido. */
+  var fi=$('#snFiltro');
+  if(fi) fi.oninput=function(){
+    SANC_FORM.filtro=fi.value;
+    var c=$('#snLista'); if(!c) return;
+    c.innerHTML=_listaSancHTML_(_gruposSanc_(_actorSanc_(), SANC_FORM.filtro));
+    $$('[data-sanq]',c).forEach(function(b){ b.onclick=function(){ marcar(b); }; });
+  };
+  /* El motivo decide QUE MAS se pide, asi que ese si repinta. */
+  var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ _repintarPonerSanc_(); };
+  var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
+
+  var bt=$('#btnSanc');
+  if(bt) bt.onclick=async function(){
+    /* ⛔ LOS PUNTOS, POR LA PUERTA: `parseInt` a pelo TRUNCA en vez de rechazar
+       (`-3.7` entraba como -3, en silencio) y `!(pts<=0)` deja pasar un -50, que no
+       para NINGUNA capa hasta Notion. Ver `_validaPuntosSanc_` en `comun.js`. */
+    var quien=SANC_FORM.quien, mot=val('snMotivo'), _vp=_validaPuntosSanc_(val('snPts'));
+    /* Propia del ENVIO: `esPlazo` es de la funcion que pinta y aqui no existe. */
+    var esDePlazo=(mot==='plazo'||mot==='plazoUrg');
+    if(!quien){ msg('Elige a qui\u00e9n: pulsa un nombre de la lista.', true); return; }
+    if(!mot){ msg('Elige el motivo.', true); return; }
+    if(!_vp.ok){ msg(_vp.msg, true); return; }
+    var pts=_vp.pts;
+    var art=mot, texto='';
+    RRI_MOTIVOS.forEach(function(r){ if(r[0]===mot) texto=r[1]; });
+    if(mot==='libre'){
+      texto=(val('snLibre')||'').trim(); art=(val('snArt')||'libre').trim();
+      if(!texto){ msg('Escribe qu\u00e9 ha pasado.', true); return; }
+    }
+    var urlTarea='', plazo='';
+    if(mot==='plazo'||mot==='plazoUrg'){
+      urlTarea=val('snTarea'); plazo=val('snPlazo');
+      if(!urlTarea){ msg('Elige la tarea cuyo plazo se incumpli\u00f3.', true); return; }
+      if(!plazo){ msg('Pon el plazo nuevo: sancionar por un plazo y no darle otro no arregla nada.', true); return; }
+      /* De la lista DEL SANCIONADO -`SANC_TAREAS`-, no de `TAREAS`, que son las mias. Si se
+         busca aqui, el titulo no aparece y el motivo queda en «una tarea»: es lo que le paso a
+         la sancion de Jose del 28/07. Lo que se pinta y lo que se guarda tienen que salir del
+         MISMO sitio. */
+      var t=((SANC_TAREAS&&SANC_TAREAS.lista)||[]).filter(function(x){ return x.url===urlTarea; })[0];
+      texto='Incumplir el plazo de \u00ab'+((t&&(t.n||t.nombre))||'una tarea')+'\u00bb';
+      art=(mot==='plazoUrg') ? '30b' : '30c';   // el articulo REAL del RRI
+    }
+    if(!backendOK || !SESION){ msg('Sin conexi\u00f3n no se puede: esto escribe en la cola de verdad.', true); return; }
+    bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando\u2026';
+    try{
+      /* EL ORDEN IMPORTA: primero Notion, luego la sancion. Al reves quedaria la sancion puesta
+         y la tarea con la fecha vieja, que es la unica de las dos combinaciones malas que NO se
+         ve mirando la cola. */
+      if(esDePlazo){ msg('Moviendo el plazo en Notion\u2026'); await api.moverLimiteTarea(urlTarea, plazo); }
+      /* ⛔ GEMELA DE `sanciones.movil.js`: la respuesta se lee. El backend salta a quien no
+         es tuyo y lo devuelve en `rechazadas`; sin mirarlo, el `tost` cantaria una sancion
+         que no existe. Se relanza para caer en el `catch` de siempre. */
+      /* ⛔ UNA CLAVE POR ENVÍO, Y NACE EN EL FORMULARIO. `api._post` hace tres
+         intentos contra un fallo de transporte, y si lo que se pierde es la RESPUESTA
+         el servidor ya escribió: sin clave, el reintento pone la sanción otra vez, y
+         cada copia son hasta -5 puntos sobre una persona real — y bloquea el cierre
+         del mes.
+         ⛔⛔ Y NO SE FABRICA EN LA LLAMADA, que es la forma que parece correcta: así
+         cubre los tres intentos automáticos pero NO el reintento A MANO — el usuario
+         ve el error, vuelve a pulsar, y esa segunda pulsación traería una clave nueva
+         sobre una sanción que el servidor SÍ guardó. Es exactamente el fallo que ya
+         se pagó en `horas.movil.js` y cuyo motivo está escrito en
+         `probar_clave_parte.py`: la clave vive en el formulario y se va con él.
+         ⛔⛔ PERO NO PUEDE SOBREVIVIR A UN CAMBIO DE LO QUE SE MANDA, y esto casi se me
+         escapa: `marcar()` cambia `SANC_FORM.quien` sin tocar la clave y el `catch` no
+         vacía el formulario — a propósito. Mando −1 a A, se pierde la RESPUESTA (el
+         servidor SÍ escribió), veo el error, me doy cuenta de que era B, pulso otra
+         vez: misma clave, el servidor la deduplica, y **la sanción a B no existe**.
+         ✅ Por eso la clave se ata a la HUELLA del envío y se renueva si cambia
+         cualquiera de sus cuatro campos. ⚠️ No es deduplicar por contenido —que sería
+         decidir por el usuario, y `probar_clave_parte.py` lo prohibe por escrito—:
+         el éxito vacía `SANC_FORM` entero, así que dos sanciones idénticas seguidas
+         llevan claves distintas. Lo único que comparte clave es el MISMO envío
+         repetido sin éxito en medio, que es la definición de un reintento. */
+      var _huellaSanc = quien+'|'+texto+'|'+art+'|'+pts;
+      if(SANC_FORM.claveDe !== _huellaSanc){
+        SANC_FORM.clave = _claveUso_(); SANC_FORM.claveDe = _huellaSanc; }
+      var r = await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual', clave:SANC_FORM.clave}]);
+      if(r && r.rechazadas && r.rechazadas.length)
+        throw new Error('no puedes sancionar a '+r.rechazadas.join(', ')+
+                        ': esta fuera de tu jurisdiccion');
+      /* ⛔ Y LA LISTA DE PUNTOS IMPOSIBLES, APARTE de `rechazadas`: son dos motivos
+         distintos y dan dos mensajes distintos. Desde esta cara no deberia saltar
+         nunca -- `_validaPuntosSanc_` corta antes --, y por eso mismo si salta hay que
+         verlo: significa que la cara y el servidor han dejado de decir lo mismo. */
+      if(r && r.invalidas && r.invalidas.length)
+        throw new Error('el servidor no acepta esos puntos ('+pts+'): el RRI va de -5 '+
+                        'a +2, enteros');
+      /* ⛔⛔ Y `duplicadas` TAMBIÉN SE LEE, que es la tercera lista y la que no tenía
+         consumidor. Significa «esto ya estaba puesto»: la fila es del envío anterior,
+         no de éste. Cantar «Sanción puesta a X» sobre ella es exactamente el fallo que
+         este fichero lleva meses cazando —«SE CUENTA LO QUE ENTRÓ, NO LO QUE SE
+         MANDÓ»—, y aquí además tapa el caso en que la persona cambió el destinatario
+         tras un error. No es un error: se dice, y se sigue. */
+      var _yaEstaba = !!(r && r.duplicadas && r.duplicadas.length);
+      SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
+      tost((_yaEstaba ? 'Esa sanci\u00f3n YA estaba puesta (era un reintento): a '
+                      : 'Sanci\u00f3n puesta a ')+(_pilaDeM_(quien)||quien)+'.'+(esDePlazo?' Plazo movido en Notion.':''));
+      await _cargarSanciones_();     // la cola de abajo tiene que enterarse
+      pintar();
+    }catch(e){
+      bt.disabled=false; bt.textContent=prev;
+      msg('No se pudo: '+((e&&e.message)||e), true);
+    }
+  };
+}
+
+/* ⛔ UN FALLO DE RED NO BORRA LO QUE YA VALE. El `catch` ponía `SANC_BACK=null`, y `null`
+   significa **semilla ficticia**: en el arranque daba igual -ya era null-, pero desde que esta
+   funcion es tambien la del refresco vivo, un corte de red a los 90 s cambiaba la cola REAL de
+   sanciones por la de ejemplo, sin decir nada. Se conserva lo que hubiera. */
+async function _cargarSanciones_(){
+  /* ⛔⛔ ¿LLEGÓ? Por la MISMA puerta que usa `_cargarMovimientosE_` cien líneas más
+     arriba en este fichero. Su docstring en `comun.js` ya decía exactamente esto:
+     *«decirle a alguien que no tiene sanciones cuando el servidor no contestó se lee
+     como «estoy limpio», y ahí ya no se vuelve a mirar»*. Estaba escrito, resuelto para
+     los movimientos, y **no se había traído aquí** — §3c-19: la premisa vive donde se CITA. */
+  _llego_('sanc', false);
+  try{ var arr=await api.getSanciones({}); if(Array.isArray(arr)){ SANC_BACK=arr; _llego_('sanc', true); } }
+  catch(e){ if(!Array.isArray(SANC_BACK)) SANC_BACK=null; }
+  _loteReal_();
+}
+
+/* Construye el BLOQUE de sanciones desde la cola REAL del backend (SANC_BACK) cuando hay
+   pendientes agrupadas en un lote. Con ids reales, marcar una decisión viaja al backend y
+   «cerrar el bloque» levanta el flag que lee el motor Python. Sin backend o sin lote
+   pendiente, se queda la semilla de demostración (LOTE.real queda sin marcar). */
+function _loteReal_(){
+  if(!Array.isArray(SANC_BACK)){
+    /* ⛔⛔ `null` SIGNIFICA DOS COSAS Y SOLO UNA AUTORIZA LA SEMILLA (§3c-24). Aqui se
+       salia igual en las dos:
+       · **sin backend** — demostracion local, sin sesion: la semilla ES lo que se ensena,
+         y vaciarla romperia lo unico que se puede mirar sin servidor (esa es la gemela
+         que ya vigila `probar_refresco_escritorio.py` §1b);
+       · **hay backend y sesion, y el servidor NO contesto** — ahi no se sabe nada, y
+         dejar la semilla puesta le ensena al PD **«Bloque abierto · 5 personas» de gente
+         inventada**, con su globo rojo, su tarjeta en la pantalla de inicio y un boton
+         que dice que aplica en Notion y manda el comunicado. En la pantalla desde la que
+         se aprueban sanciones de personas reales.
+       ✅ La puerta para distinguirlo ya existe y es la misma que usa el resto de la cara
+       (`escritorio.html:2368`): `backendOK && SESION`. No es un criterio nuevo.
+       ⚠️ Y se vacia SIN marcar `real`: el bloque desaparece y los paneles de al lado ya
+       dicen «sin leer» por `_llego_('sanc')` (602.ª). Lo que no puede quedar es una cola
+       de mentira con el boton de aplicar encendido. */
+    if(typeof backendOK!=='undefined' && backendOK &&
+       typeof SESION!=='undefined' && SESION){
+      LOTES_PEND=[];
+      LOTE={ real:true, lote:null, nombre:null, cerrado:false, motivo:'—',
+             art:'libre', items:[] };
+    }
+    return;                                                               // sin backend
+  }
+  var pend=SANC_BACK.filter(function(s){ return s.estado==='pendiente' && s.lote; });
+  if(!pend.length){
+    /* ⛔ AQUI SE SALIA DEJANDO LA SEMILLA, y esto no es «no lo se»: el backend HA
+       CONTESTADO y ha dicho que no hay ningun lote pendiente. Eso es un DATO. Como
+       es ademas el estado NORMAL -- y el que habra el 1 de septiembre, empezando
+       temporada--, el PD veia de forma permanente **cinco personas inventadas con
+       sus puntos**, un globo rojo con un 5 y una tarjeta en su pantalla de inicio; y
+       el boton de cerrar le decia que aplicaba en Notion y mandaba el comunicado
+       cuando no viajaba nada.
+       ⚠️ La leccion ya estaba escrita DOS LINEAS mas abajo del contador de al lado
+       -- «no hay cola de apelaciones: contar la maqueta era mentir»--, aplicada en
+       `apela` y en `curso` y no aqui. Y el movil limpia esta misma semilla.
+       ⚠️ Sin backend (arriba) SI se deja: ahi la semilla es la demostracion local,
+       que es para lo que se hizo. */
+    LOTES_PEND=[];
+    LOTE={ real:true, lote:null, nombre:null, cerrado:false, motivo:'—',
+           art:'libre', items:[] };
+    return;
+  }
+  /* Antes se cogia SIEMPRE `pend[0].lote`: con dos bloques, el segundo no existia para
+     el panel. Ahora se listan todos y se puede cambiar de uno a otro. */
+  LOTES_PEND=[]; pend.forEach(function(x){ if(LOTES_PEND.indexOf(x.lote)<0) LOTES_PEND.push(x.lote); });
+  /* ⚠️ Y AQUI SE ACABO EL `|| LOTES_PEND[0]`: era inalcanzable -- `_loteIdx_` ya devuelve
+     un indice dentro de rango, y a esta linea no se llega con la lista vacia (el `if
+     (!pend.length)` de arriba sale antes). Un respaldo que no puede dispararse se lee como
+     una red que no existe. */
+  var lote=LOTES_PEND[_loteIdx_()];
+  var its=pend.filter(function(s){ return s.lote===lote; });
+  LOTE={ real:true, lote:lote, nombre:lote, cerrado:false,
+    motivo:its[0].motivo||'—', art:its[0].articulo||'libre',
+    items:its.map(function(s){ return {id:s.id, n:s.nombre, pts:Number(s.puntos)||0,
+      /* ⛔ `null`, NO `'aceptar'`. Aqui se fabricaba la decision de todo lo que nadie
+         habia tocado, y el panel la pintaba como ELEGIDA: los 30 con el boton «Acepta»
+         encendido, la prevision de puntos restando, y el boton de cerrar diciendo
+         «Aprobar el bloque · 30 sanciones». Un clic escribe en Notion y manda el
+         comunicado con los 30 nombres.
+         ⚠️ Y borraba lo marcado desde el movil: `s.decision` viene del servidor. */
+      dec:s.decision||null}; }) };
+}
+

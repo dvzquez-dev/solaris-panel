@@ -1,0 +1,451 @@
+/* ═══ BUZON · cara movil ═══════════════════════════════════════════════════════════
+   5 funciones sacadas de `movil.html`. Lo carga esa cara con <script src>, ANTES de su bloque
+   grande, así que ya existen cuando aquel se ejecuta.
+
+   ⛔ Aquí SOLO hay declaraciones `function`. El estado (`var`), los registros y las llamadas de
+   arranque se quedan en el HTML: un módulo que se lleve estado se lleva el orden de carga, y ahí
+   es donde se rompe sin dar error. Estas funciones siguen usando los globales de su cara — se
+   llaman en tiempo de ejecución, cuando ya están definidos.
+
+   ⛔ Y es de UNA cara. La otra tiene su propio fichero aunque alguna función se llame igual:
+   fusionarlas es otro cambio, con otro riesgo y su propia verificación.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+
+function _contextoM_(){
+  var ua=navigator.userAgent||'';
+  var nav=/Firefox/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome/.test(ua)?'Chrome':
+          /Safari/.test(ua)?'Safari':'otro';
+  /* El canal va DENTRO del contexto: dos ficheros con el mismo aspecto y distinto código
+     son la forma más fácil de perseguir un fallo en el sitio equivocado. */
+  return 'movil'+(CANAL==='beta'?' · BETA':(VERSION?' · v'+VERSION:''))+' · '+nav+' · '+screen.width+'x'+screen.height+
+    ' · build '+BUILD+' · datos '+(DATA.generado||'?')+
+    (_esStandalone_()?' · desde la pantalla de inicio':'');
+}
+
+/* EL PINTOR. `alTerminar(dataUrl)` recibe las dos capas YA fusionadas, o no se llama si
+   se cancela. Todo el estado vive aquí dentro: al cerrarse no queda nada. */
+/* EQUIVALENTE (no GEMELA): el escritorio anade zoom con la RUEDA del raton —con raton no hay dos dedos—; el movil no. Auditado el 05/08: es la unica diferencia y todo lo demas es identico byte a byte. */
+function _abrirPintor_(fondoUrl, alTerminar){
+  var caja=$('#pintor'), zona=$('#pzona'), lienzo=$('#plienzo');
+  var img=$('#pfondo'), cv=$('#ptrazos');
+  /* ⛔⛔ EL PINTOR SIEMPRE CONTESTA, PASE LO QUE PASE. En el escritorio esta
+     envuelto en una PROMESA (`_pedirCaptura_`), y su `fin()` sólo se llama desde
+     aquí: si una salida se va sin avisar, la promesa **no se asienta nunca**, el
+     `await` de `reportarModal` se queda colgado y `reportarBug` no llega a correr.
+     Lo que se pierde no es la foto —es el título, el detalle y la gravedad recién
+     escritos—, y sin un solo error a la vista. Había DOS salidas mudas: cancelar y
+     este `return` de aquí abajo.
+     ⚠️ Al cancelar se contesta con la foto ORIGINAL sin marcar, no con nada: es lo
+     que dice el propio aviso («salir sin guardar **lo que has pintado**») y lo que
+     el móvil ya hacía de hecho, porque allí `BZ_FOTO` se fija antes de abrir. */
+  var contestado=false;
+  function contestar(url, n){
+    if(contestado) return;
+    contestado=true;
+    if(typeof alTerminar==='function') alTerminar(url, n||0);
+  }
+  if(!caja||!img||!cv){ contestar(fondoUrl, 0); return; }
+  var ctx=cv.getContext('2d');
+  /* TRAZOS, no píxeles: cada uno es {color, grosor, pts:[[x,y],…]} en coordenadas de
+     IMAGEN. Deshacer es quitar el último y repintar. Con capturas de pantalla a resolución
+     completa, guardar un snapshot por trazo se come la memoria de un móvil. */
+  var trazos=[], activo=null;
+  var color=PINT_COLORES[0], grosor=PINT_GROSORES[1], modo='pintar';
+  var vista={e:1, x:0, y:0}, punteros={}, pellizco=null;
+
+  function aplicarVista(){
+    lienzo.style.transform='translate('+vista.x.toFixed(1)+'px,'+vista.y.toFixed(1)+'px) scale('+vista.e.toFixed(4)+')';
+  }
+  function repintar(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    trazos.concat(activo?[activo]:[]).forEach(function(t){
+      if(!t.pts.length) return;
+      ctx.strokeStyle=t.color; ctx.lineWidth=t.grosor;
+      ctx.beginPath(); ctx.moveTo(t.pts[0][0], t.pts[0][1]);
+      /* Un toque sin arrastre es un punto: sin esto, marcar algo pequeño no pinta nada. */
+      if(t.pts.length===1) ctx.lineTo(t.pts[0][0]+0.01, t.pts[0][1]);
+      else for(var i=1;i<t.pts.length;i++) ctx.lineTo(t.pts[i][0], t.pts[i][1]);
+      ctx.stroke();
+    });
+  }
+  /* LA CONVERSIÓN QUE IMPORTA. El lienzo va dentro de un contenedor con `transform`, así
+     que su `getBoundingClientRect()` YA incluye zoom y desplazamiento: dividir por el ancho
+     del rectángulo da la coordenada en píxeles de imagen sin tocar la matriz a mano. Con
+     cuentas propias, el trazo se desplaza en cuanto haces zoom. */
+  function aImagen(ev){
+    var r=cv.getBoundingClientRect();
+    return [ (ev.clientX-r.left)/r.width*cv.width, (ev.clientY-r.top)/r.height*cv.height ];
+  }
+  function encajar(){
+    var rz=zona.getBoundingClientRect();
+    var k=Math.min(rz.width/cv.width, rz.height/cv.height);
+    vista.e=k; vista.x=(rz.width-cv.width*k)/2; vista.y=(rz.height-cv.height*k)/2;
+    aplicarVista();
+  }
+  function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+
+  zona.onpointerdown=function(ev){
+    /* La captura va en `try` y ANTES de nada: `setPointerCapture` LANZA si el navegador no
+       reconoce ese puntero, y sin el try la excepción se lleva por delante el resto del
+       manejador — el dedo no se registra, `punteros` se queda con uno solo y el pellizco no
+       llega a existir. Que la captura falle no puede impedir seguir el gesto. */
+    try{ zona.setPointerCapture(ev.pointerId); }catch(_){}
+    punteros[ev.pointerId]={x:ev.clientX,y:ev.clientY};
+    var ids=Object.keys(punteros);
+    if(ids.length===2){
+      /* DOS DEDOS SIEMPRE HACEN ZOOM, aunque estés en modo pintar: es el gesto que todo el
+         mundo prueba primero. Si había un trazo empezado se descarta, porque era el primer
+         dedo del pellizco y no un trazo de verdad. */
+      activo=null; repintar();
+      var a=punteros[ids[0]], b=punteros[ids[1]], rz=zona.getBoundingClientRect();
+      /* El punto medio se guarda RELATIVO al area, que es el sistema en el que vive
+         `vista.x`. Con coordenadas de pantalla se mezclan dos origenes distintos. */
+      pellizco={ d:dist(a,b), cx:(a.x+b.x)/2-rz.left, cy:(a.y+b.y)/2-rz.top,
+                 e:vista.e, x:vista.x, y:vista.y };
+      return;
+    }
+    if(ids.length>2) return;
+    if(modo==='pintar'){
+      var p=aImagen(ev);
+      activo={ color:color, grosor:Math.max(1, grosor*Math.max(cv.width,cv.height)), pts:[p] };
+      repintar();
+    } else {
+      /* Arrastrar es un DELTA, asi que aqui el origen da igual; se guarda en pantalla.
+         `d:0` es lo que distingue arrastre de pellizco. */
+      pellizco={ d:0, cx:ev.clientX, cy:ev.clientY, e:vista.e, x:vista.x, y:vista.y };
+    }
+  };
+  zona.onpointermove=function(ev){
+    if(!punteros[ev.pointerId]) return;
+    punteros[ev.pointerId]={x:ev.clientX,y:ev.clientY};
+    var ids=Object.keys(punteros);
+    if(ids.length>=2 && pellizco && pellizco.d){
+      var a=punteros[ids[0]], b=punteros[ids[1]];
+      var k=Math.max(0.2, Math.min(8, dist(a,b)/pellizco.d));
+      var e2=Math.max(0.1, Math.min(12, pellizco.e*k));
+      var kk=e2/pellizco.e;
+      /* El punto medio de los dedos se queda quieto: es lo que hace que el pellizco se
+         sienta bien. Sin esto la imagen se va del dedo al ampliar. */
+      var rz=zona.getBoundingClientRect();
+      var cx=(a.x+b.x)/2-rz.left, cy=(a.y+b.y)/2-rz.top;
+      vista.e=e2;
+      vista.x=cx-(pellizco.cx-pellizco.x)*kk;
+      vista.y=cy-(pellizco.cy-pellizco.y)*kk;
+      aplicarVista(); return;
+    }
+    if(activo && modo==='pintar'){
+      var p=aImagen(ev);
+      var u=activo.pts[activo.pts.length-1];
+      /* Se descartan los puntos que no aportan: con el dedo llegan decenas por segundo y
+         guardarlos todos engorda el repintado sin cambiar el trazo. */
+      if(Math.hypot(p[0]-u[0], p[1]-u[1]) > 0.7){ activo.pts.push(p); repintar(); }
+      return;
+    }
+    if(pellizco && !pellizco.d && modo==='mover'){
+      vista.x=pellizco.x+(ev.clientX-pellizco.cx);
+      vista.y=pellizco.y+(ev.clientY-pellizco.cy);
+      aplicarVista();
+    }
+  };
+  function soltar(ev){
+    delete punteros[ev.pointerId];
+    if(!Object.keys(punteros).length){
+      pellizco=null;
+      if(activo){ trazos.push(activo); activo=null; repintar(); }
+    }
+  }
+  zona.onpointerup=soltar; zona.onpointercancel=soltar; zona.onpointerleave=soltar;
+
+  /* la paleta: los presets más el selector de color del sistema, que es el «típico» */
+  var pc=$('#pcolores');
+  pc.innerHTML=PINT_COLORES.map(function(c,i){
+    return '<button class="pcol'+(i===0?' on':'')+'" data-pc="'+c+'" style="background:'+c+'" data-p aria-label="color"></button>';
+  }).join('')+'<input type="color" id="pcolorlibre" value="'+PINT_COLORES[0]+'" aria-label="otro color">';
+  function marcarColor(c){
+    color=c;
+    $$('#pcolores .pcol').forEach(function(b){ b.classList.toggle('on', b.dataset.pc===c); });
+  }
+  $$('#pcolores .pcol').forEach(function(b){ b.onclick=function(){ marcarColor(b.dataset.pc); }; });
+  var cl=$('#pcolorlibre'); if(cl) cl.oninput=function(){ marcarColor(cl.value); };
+
+  var pg=$('#pgrosor');
+  pg.innerHTML=PINT_GROSORES.map(function(g,i){
+    var d=Math.round(4+i*4);
+    return '<button data-pg="'+g+'"'+(i===1?' class="on"':'')+' data-p aria-label="grosor">'+
+      '<i style="width:'+d+'px;height:'+d+'px"></i></button>';
+  }).join('');
+  $$('#pgrosor button').forEach(function(b){ b.onclick=function(){
+    grosor=+b.dataset.pg;
+    $$('#pgrosor button').forEach(function(x){ x.classList.toggle('on', x===b); }); }; });
+
+  $$('#pmodo button').forEach(function(b){ b.onclick=function(){
+    modo=b.dataset.pm;
+    $$('#pmodo button').forEach(function(x){ x.classList.toggle('on', x===b); }); }; });
+  /* ⛔ Y LA BARRA SE PONE AL DÍA AL ABRIR. `modo` se reinicia a 'pintar' aquí
+     dentro, pero la clase `.on` de `#pmodo` vive en el HTML **estático** y sólo la
+     movía el clic de arriba: abrías, tocabas «Mover», cerrabas, y desde la segunda
+     apertura el botón decía «Mover» mientras el lienzo pintaba.
+     ⚠️ `#pcolores` y `#pgrosor` no lo sufrían porque se rehacen enteros unas líneas
+     más arriba, con el `on` puesto en el índice que toca. `#pmodo` es el único de
+     los tres que no se repinta, y por eso es el único que se desincronizaba. */
+  $$('#pmodo button').forEach(function(x){ x.classList.toggle('on', x.dataset.pm===modo); });
+  $('#pdeshacer').onclick=function(){
+    if(!trazos.length){ tost('No hay nada que deshacer.'); return; }
+    trazos.pop(); repintar();
+  };
+
+  function cerrar(){ caja.classList.remove('on'); caja.setAttribute('aria-hidden','true'); }
+  $('#pcancelar').onclick=function(){
+    if(trazos.length && !confirm('Vas a salir sin guardar lo que has pintado. ¿Seguro?')) return;
+    cerrar();
+    /* ⛔ Y SE CONTESTA: cerrar la caja NO es contestar. Quien abrió el pintor puede
+       estar esperando —en el escritorio lo está, dentro de un `await`—, y dejarlo
+       esperando se lleva por delante el reporte entero. */
+    contestar(fondoUrl, 0);
+  };
+  $('#plisto').onclick=function(){
+    /* LA FUSIÓN POR CAPAS: la de abajo es la foto tal cual, la de arriba lo pintado. Sale
+       un solo fichero, que es lo que se puede abrir en cualquier parte. */
+    var out=document.createElement('canvas');
+    out.width=cv.width; out.height=cv.height;
+    var o=out.getContext('2d');
+    o.drawImage(img, 0, 0, out.width, out.height);
+    o.drawImage(cv, 0, 0);
+    cerrar();
+    /* Por la MISMA puerta que cancelar: así un clic tardío en «Cancelar» no puede
+       contestar por segunda vez y pisar la imagen marcada con la foto en crudo. */
+    contestar(out.toDataURL('image/jpeg', 0.82), trazos.length);
+  };
+
+  img.onload=function(){
+    cv.width=img.naturalWidth; cv.height=img.naturalHeight;
+    img.style.width=cv.width+'px'; img.style.height=cv.height+'px';
+    repintar(); encajar();
+  };
+  img.src=fondoUrl;
+  caja.classList.add('on'); caja.setAttribute('aria-hidden','false');
+  if(img.complete && img.naturalWidth) img.onload();
+}
+
+/* La fila del adjunto dentro del formulario del buzón. */
+function _fotoBuzonHTML_(){
+  if(!BZ_FOTO)
+    return '<div class="bzfoto">'+
+      '<div class="tx"><b>Una foto ayuda mucho</b>Sobre todo si es de sitio: adjunta una '+
+      'captura y márcala con el lápiz.</div>'+
+      '<button class="btn mini" id="bzAdj" data-p>Adjuntar</button></div>'+
+      '<input type="file" id="bzFile" accept="image/*" style="display:none">';
+  return '<div class="bzfoto">'+
+    '<img class="mini" src="'+BZ_FOTO.url+'" alt="">'+
+    '<div class="tx"><b>Foto adjunta</b>'+BZ_FOTO.w+'×'+BZ_FOTO.h+' · '+_pesoKB_(BZ_FOTO.url)+' KB'+
+      (BZ_FOTO.trazos?' · '+BZ_FOTO.trazos+' trazo'+(BZ_FOTO.trazos===1?'':'s'):'')+'</div>'+
+    '<button class="btn mini" id="bzPintar" data-p aria-label="marcar la foto">✏️</button>'+
+    '<button class="btn mini" id="bzQuitar" data-p>Quitar</button></div>'+
+    '<input type="file" id="bzFile" accept="image/*" style="display:none">';
+}
+
+function _cablearFotoBuzon_(repinta){
+  var f=$('#bzFile'), adj=$('#bzAdj'), pin=$('#bzPintar'), qui=$('#bzQuitar');
+  if(adj&&f) adj.onclick=function(){ f.click(); };
+  if(f) f.onchange=async function(){
+    var file=f.files&&f.files[0]; if(!file) return;
+    try{
+      var im=await _leerImagen_(file);
+      BZ_FOTO={url:im.url, w:im.w, h:im.h, trazos:0};
+      repinta();
+      /* Se abre el pintor solo: casi siempre se adjunta PARA marcar algo, y así no hay que
+         descubrir el lápiz. Salir sin pintar deja la foto igual. */
+      _abrirPintor_(BZ_FOTO.url, function(url, n){
+        BZ_FOTO={url:url, w:im.w, h:im.h, trazos:n}; repinta(); });
+    }catch(e){ tostErr('No se pudo usar esa imagen: ', e); }
+  };
+  if(pin) pin.onclick=function(){
+    /* Se vuelve a pintar sobre lo ya fusionado: los trazos anteriores quedan dentro de la
+       foto y no se pueden deshacer, pero se pueden tapar. Guardar la original aparte para
+       poder rehacer sería otra copia en memoria por cada reporte. */
+    _abrirPintor_(BZ_FOTO.url, function(url,n){
+      BZ_FOTO={url:url, w:BZ_FOTO.w, h:BZ_FOTO.h, trazos:(BZ_FOTO.trazos||0)+n}; repinta(); });
+  };
+  if(qui) qui.onclick=function(){ BZ_FOTO=null; repinta(); };
+}
+
+/* ⛔ `prev` NO ES UN ADORNO: SIN EL, CAMBIAR DE «FALLO» A «MEJORA» BORRABA LO ESCRITO.
+   El boton de tipo llama a esta misma funcion, que **reconstruye el modal entero** -- y los
+   campos nacian sin `value`, asi que tres parrafos de descripcion desaparecian de golpe.
+   ⛔ Y la premisa estaba escrita TRES LINEAS mas arriba, para la fila de la foto: *«se
+   repinta SOLO la fila de la foto, no el modal entero: reconstruirlo borraria lo que ya
+   hubieras escrito, que es la peor forma de perder un reporte»*. Enunciada en un sitio y no
+   aplicada donde se cita (§3c-19).
+   ⚠️ La foto sobrevivia porque `BZ_FOTO` es global; el texto, que es lo que cuesta escribir,
+   no. */
+function buzonModal(tipo, prev){
+  var esBug=(tipo!=='mejora');
+  /* ⛔⛔ UNA APERTURA FRESCA NO HEREDA LA FOTO DEL REPORTE ANTERIOR. `BZ_FOTO` es global
+     y solo se vaciaba en dos sitios: el boton **Quitar** y el **envio con exito**. Así
+     que bastaba **cerrar el modal sin enviar** —que en un movil es tocar fuera de la
+     tarjeta, sin confirmar (`movil.html`: `e.target.id==='modal'`)— para que la captura
+     marcada siguiera puesta, y la siguiente apertura la pintara como suya y **la
+     enviara**: `datos.captura` de la pantalla VIEJA con `datos.pantalla` diciendo la
+     NUEVA. Es perseguir un fallo en el sitio equivocado, que es justo el motivo por el
+     que se manda la captura.
+     ⚠️ Y la señal que lo distingue YA ESTABA: `prev` solo llega al **reconstruir** el
+     modal al cambiar de tipo —ahi la foto SI debe sobrevivir, igual que el texto— y no
+     llega al abrirlo desde el menu. 📏 Dos llamadores, y cada uno de una clase.
+     ⛔ El comentario de aqui arriba ya había visto la mitad —*«la foto sobrevivia porque
+     `BZ_FOTO` es global; el texto, que es lo que cuesta escribir, no»*— y se curó el
+     texto **sin mirar que la foto sobreviviera de MÁS**: un arreglo vigilado por un solo
+     lado (§3c-31). */
+  /* ⛔ Y LA CLAVE VA POR LA MISMA PUERTA QUE LA FOTO, y por el mismo motivo: una
+     apertura NUEVA es un reporte nuevo y no puede heredar la clave del anterior —el
+     servidor lo descartaría como duplicado, en silencio—; al reconstruir por cambio de
+     tipo (`prev`) es el MISMO reporte y la clave se conserva. */
+  if(!prev){ BZ_FOTO=null; BZ_CLAVE=null; }
+  var _pv=prev||{};
+  /* ⛔ LA GRAVEDAD TAMBIÉN VIAJA, y por eso se declara AQUÍ: el bloque de chips se
+     pinta unas líneas más abajo, así que si `grav` naciera después de `abrirModal` no
+     habría con qué marcar el elegido. Es el mismo fallo que arriba, tercera cara: se
+     arregló el título, se arregló el detalle, y la gravedad se quedó fuera **de la
+     misma llamada**.
+     ⛔ Y su precio no es cosmético: `PESOS_COMP` paga **2,00 h** por un fallo que
+     bloquea y **0,50 h** por uno que molesta, y esas horas entran en la cuota. Volvía a
+     'Molesta' **repintada con cara de elegida**, así que no había forma de notarlo. */
+  var grav=_pv.grav||'Molesta';
+  function _marcaG_(v){ return grav===v ? ' class="on"' : ''; }
+  var pant=_NOMBRE_PANTALLA_[ST.vista]||ST.vista;
+  abrirModal('<div class="mtit">'+(esBug?'Reportar un fallo':'Proponer una mejora')+'</div>'+
+    '<div class="msub">Estás en <b>'+esc(pant)+'</b> · se envía con tu nombre</div>'+
+    '<div class="modos" id="bzTipo" style="margin-bottom:12px">'+
+      '<button data-bt="bug" class="'+(esBug?'on':'')+'" data-p>Un fallo</button>'+
+      '<button data-bt="mejora" class="'+(esBug?'':'on')+'" data-p>Una mejora</button></div>'+
+    '<label class="campo"><span class="sc">'+(esBug?'¿Qué ha pasado?':'¿Qué mejorarías?')+
+      ' <span class="req">*</span></span>'+
+      '<input id="bzTit" value="'+esc(_pv.tit||'')+'" placeholder="'+(esBug?'en una línea…':'en una línea…')+'" autocomplete="off"></label>'+
+    '<label class="campo"><span class="sc">'+(esBug?'¿Qué esperabas que pasara?':'¿Por qué? ¿Qué te cuesta hoy?')+'</span>'+
+      '<textarea id="bzDet" placeholder="'+(esBug?'y qué hiciste justo antes, si lo recuerdas…':'el problema de fondo, no la solución…')+'">'+esc(_pv.det||'')+'</textarea></label>'+
+    (esBug?'<span class="sc" style="display:block;margin-bottom:6px">¿Cuánto molesta?</span>'+
+      '<div class="modos" id="bzGrav" style="margin-bottom:12px">'+
+      '<button data-g="Bloquea"'+_marcaG_('Bloquea')+' data-p>Me bloquea</button>'+
+      '<button data-g="Molesta"'+_marcaG_('Molesta')+' data-p>Molesta</button>'+
+      '<button data-g="Cosmético"'+_marcaG_('Cosmético')+
+        ' data-p>Es cosmético</button></div>':'')+
+    _fotoBuzonHTML_()+
+    '<p class="rnota">Esto <b>no cambia nada por sí solo</b>: va a una cola que revisa el '+
+    'Project Director. Si sale adelante, se prepara y se te avisa.</p>'+
+    '<button class="btn pri full" data-p id="bzEnviar" style="margin-top:10px">Enviar</button>');
+  /* (`grav` ya se declaró arriba, con lo que venía en `prev`: aquí se clavaba
+     'Molesta' y eso borraba la elección en cada reconstrucción del modal.) */
+  /* Se repinta SOLO la fila de la foto, no el modal entero: reconstruirlo borraría lo que
+     ya hubieras escrito, que es la peor forma de perder un reporte. */
+  function _repintaFoto_(){
+    var vieja=$('.bzfoto'), inp=$('#bzFile');
+    if(!vieja) return;
+    var tmp=document.createElement('div'); tmp.innerHTML=_fotoBuzonHTML_();
+    vieja.replaceWith(tmp.firstChild);
+    if(inp) inp.remove();
+    var nuevoInp=tmp.querySelector('#bzFile');
+    if(nuevoInp) $('.bzfoto').parentNode.insertBefore(nuevoInp, $('.bzfoto').nextSibling);
+    _cablearFotoBuzon_(_repintaFoto_);
+  }
+  _cablearFotoBuzon_(_repintaFoto_);
+  $$('#bzGrav button').forEach(function(b){ b.onclick=function(){
+    $$('#bzGrav button').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on'); grav=b.dataset.g; }; });
+  /* ⛔ SE LEE LO ESCRITO ANTES DE RECONSTRUIR. Es el gesto normal: escribes describiendo
+     un fallo, te das cuenta de que es mas bien una mejora, y pulsas el otro boton. */
+  $$('#bzTipo button').forEach(function(b){ b.onclick=function(){
+    var _t=$('#bzTit'), _d=$('#bzDet');
+    buzonModal(b.dataset.bt, {tit:(_t&&_t.value)||'', det:(_d&&_d.value)||'', grav:grav});
+  }; });
+  var env=$('#bzEnviar');
+  env.onclick=async function(){
+    if(env.disabled) return;
+    var tit=($('#bzTit').value||'').trim(), det=($('#bzDet').value||'').trim();
+    if(!tit){ tost('Escribe al menos en una línea qué pasa.'); $('#bzTit').focus(); return; }
+    if(typeof backendOK==='undefined' || !backendOK || !SESION){
+      tost('Sin conexión con el servidor no se puede enviar. Vuelve a intentarlo.'); return; }
+    /* LA VERSION ES LA DEL CODIGO, no la de los datos. Antes iba `DATA.generado` -cuando se
+       genero el panel-, que no dice nada de que build estaba viendo quien reporta. Y esa es
+       la pregunta que costo dos rondas el 27/07: Pages cachea el HTML 10 min, asi que un
+       reporte contra una build vieja manda a buscar un fallo que ya no existe. */
+    var datos={ titulo:tit, donde:'Móvil', pantalla:pant,
+                version:BUILD, contexto:_contextoM_() };
+    if(BZ_FOTO && BZ_FOTO.url) datos.captura=BZ_FOTO.url;
+    if(esBug){ datos.esperaba=det; datos.paso=tit; datos.gravedad=grav; }
+    else { datos.mejora=tit; datos.porque=det; datos.a_quien=''; }
+    env.disabled=true; var prev=env.textContent; env.textContent='Enviando…';
+    /* ⛔⛔ LA CLAVE SE COMPONE UNA VEZ POR REPORTE, NO POR PULSACIÓN. Aquí ya estaba
+       fuera del reintento de `api._post` —sus tres intentos viven dentro de un solo
+       `await`—, pero **dentro del `try`**: si los tres fallan, el `catch` re-habilita el
+       botón y la siguiente pulsación componía una clave NUEVA (`_claveReporte_` lleva
+       `new Date().getTime()`). El servidor no deduplicaba y quedaba una **segunda fila
+       del mismo reporte** — con la compensación en marcha, cobrado dos veces.
+       📏 El escritorio tenía la misma forma y se curó el 12/09 (609.ª) guardándola con el
+       borrador; aquí la puerta es el modal, que sigue abierto. §3c-31: el mismo arreglo
+       por los dos lados.
+       ⛔⛔ Y VA ATADA A UNA HUELLA DEL CONTENIDO, no cacheada a secas — y eso NO es
+       prudencia, es lo que dice el servidor: ante una clave repetida `_reportar_`
+       (`Codigo.gs:2098`) **devuelve la fila que ya hay y no escribe**. Así que si alguien
+       corrige el texto tras el fallo y vuelve a enviar con la clave vieja, su corrección
+       **se pierde en silencio** y encima se le dice que fue bien. Con la huella: mismo
+       contenido → misma clave (no duplica); contenido distinto → clave nueva (entra). */
+    var _huellaBZ = [datos.titulo, datos.esperaba||'', datos.porque||'',
+                     datos.gravedad||'', datos.captura||''].join('\u0001');
+    if(!BZ_CLAVE || BZ_CLAVE.huella !== _huellaBZ){
+      BZ_CLAVE = { huella:_huellaBZ, k:_claveReporte_(SESION && SESION.nombre, datos.titulo) };
+    }
+    datos.clave = BZ_CLAVE.k;
+    try{
+      var r=await (esBug?api.reportarBug(datos):api.reportarMejora(datos));
+      /* SI LA FOTO NO SE GUARDÓ, SE DICE. El backend solo devuelve `captura` cuando la ha
+         subido a Drive; mientras esa parte no esté desplegada, callarse sería dejar creer
+         que la marcaste para nada. */
+      var sinFoto = datos.captura && !(r && r.captura);
+      /* ⛔ Y LA FILA SE REPINTA AL VACIAR LA FOTO. Antes solo se ponia `BZ_FOTO=null` y la
+         fila se quedaba con el lapiz en pantalla **y cableado**: pulsarlo entraba en el
+         pintor con `BZ_FOTO.url` sobre `null` -> `TypeError` y **no pasaba nada**, sin
+         consola en un movil. Y es justo el gesto de quien acaba de leer «la foto no se
+         guardo». */
+      BZ_FOTO=null;
+      /* ⛔ Y LA CLAVE SE SUELTA AL LLEGAR: si se quedara puesta, el siguiente reporte
+         escrito sin cerrar el modal saldría con la clave del anterior y el servidor lo
+         **descartaría por duplicado**, en silencio. Es la gemela de la de arriba
+         (§3c-31): una guarda contra el duplicado que se come un reporte bueno es peor
+         que el duplicado. */
+      BZ_CLAVE=null;
+      _repintaFoto_();
+      /* ACUSE ANTES DE CERRAR (Daniel, 28/07). Cerrar de golpe deja la duda de si llegó:
+         el botón se pone en verde diciendo «Enviado», se ve un segundo y ENTONCES se
+         cierra. Va aquí, después del `await`, así que solo se enseña cuando el servidor
+         ya ha contestado — anunciar el envío antes de confirmarlo sería mentir bonito.
+         Si la foto no entró, el modal NO se cierra solo: eso hay que leerlo, no verlo de
+         refilón en un aviso que se va. */
+      env.textContent='Enviado ✓';
+      env.classList.remove('pri'); env.classList.add('ok');
+      env.disabled=true;
+      if(sinFoto){
+        /* EL AVISO SE QUEDA EN PANTALLA, no en un `tost`. Lo puse en un aviso flotante y
+           Daniel no vio nada: dura 2,4 s, sale abajo del todo y justo cuando el modal
+           cambia. Perder una foto que alguien se ha parado a marcar y contarlo en un
+           mensaje que se va es no contarlo. Ahora es un bloque ámbar dentro del
+           formulario, con el id del reporte, y solo se va cuando cierras tú. */
+        var _av=document.createElement('div');
+        _av.className='avisolargo';
+        _av.style.cssText='margin-top:10px;border-color:rgba(232,145,46,.45);'+
+          'background:rgba(232,145,46,.10);color:#f0cf9e';
+        _av.innerHTML='<b style="color:var(--warn)">El texto se ha guardado · '+esc((r&&r.id)||'')+'</b><br>'+
+          'Pero <b>la foto no</b>: al servidor todavía le falta el paso que la sube. '+
+          'Cuéntaselo a Daniel — es un despliegue de dos líneas.';
+        env.parentNode.insertBefore(_av, env.nextSibling);
+        _av.scrollIntoView({block:'nearest'});
+        return;
+      }
+      setTimeout(function(){
+        cerrarModal();
+        tost((esBug?'Fallo reportado':'Mejora enviada')+' · '+((r&&r.id)||'')+'. Gracias.');
+      }, 1000);
+    }catch(e){ env.disabled=false; env.textContent=prev;
+      tostErr('No se pudo enviar: ', e); }
+  };
+}
+
