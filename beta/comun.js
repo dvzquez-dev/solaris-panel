@@ -5140,7 +5140,7 @@ function _novHTML_(cara){
       manda a la gente a una página que no existe, que es peor que no ponerla.
    ✅ Con la cadena vacía, las instrucciones **lo dicen** en vez de pintar un enlace muerto, y
       encenderlo es cambiar ESTA línea y nada más. Por eso la pieza entera no está bloqueada. */
-function _urlFormDocs_(){ return ''; }
+function _urlFormDocs_(){ return 'https://docs.google.com/forms/d/e/1FAIpQLScxZPPouMyDop0cxQ82zqLxC4ifzCJVwS46vKZNpAxemlhUGQ/viewform'; }
 
 /* LOS DOS PASOS PARA CORREGIR un expediente al que le han pedido cambios, en ESTE orden.
    `[]` si el expediente no está en `cambios`: es el único estado en que esto aplica.
