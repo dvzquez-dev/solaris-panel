@@ -826,6 +826,25 @@ function _iniF(f){ return (f&&typeof f==='object') ? String(f.ini||'') : String(
 
 function _duF(f){ return (f&&typeof f==='object') ? (+f.dur||60) : 60; }
 
+/* LO OFERTADO DE UNA REUNIÓN DE DEMOSTRACIÓN SE DERIVA DE SU MAPA DE CALOR (741.ª).
+
+   ⛔ `bloques` es **la lista de lo ofertado**, y `_miDispoPanel_` la usa como índice: sin ella
+   `pos` queda vacío, ninguna celda lleva `data-mid` y `_cablearMiDispo_` **no engancha nada**.
+   📏 Medido el 30/09/2026 ejecutando el panel con la semilla tal cual: **1.399 caracteres
+   de HTML y 0 celdas cableadas**; con lo ofertado puesto y el plazo vivo, **6.005 y 35**. O sea
+   que la mitad que se pulsa no se ejecutaba nunca.
+   ⛔ **Se DERIVA de `calor` en vez de escribirse**: `calor` ya es una matriz días × franjas con
+   un número por celda, así que una lista escrita a mano al lado sería la misma verdad dos veces
+   — y se desincronizan en el primer retoque de la semilla, sin dar ningún error. */
+function _bloquesDelCalor_(r){
+  var out = [], d, f, fila;
+  for(d = 0; d < ((r && r.calor) || []).length; d++){
+    fila = r.calor[d] || [];
+    for(f = 0; f < fila.length; f++) out.push([d, f]);
+  }
+  return out;
+}
+
 /* ⛔ `_pctMinimo_` Y `_minimoExigido_` VIVEN EN `comun.js` (18/08), que cargan las dos caras.
    Estaban aqui y su constante en `escritorio.html`, asi que el MOVIL no los tenia y quien
    cubre desde el telefono no veia nunca cuantas franjas se le exigen. Y el redondeo divergia

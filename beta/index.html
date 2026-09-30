@@ -108,7 +108,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=c563cfc"></script>
+<script src="comun.js?v=f0b5a63"></script>
 <script src="notis.movil.js?v=4218290"></script>
 <script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=2ab8a6a"></script>
@@ -1556,7 +1556,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='18b5743';
+var BUILD='beef471';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -1663,18 +1663,18 @@ var DEST=[['estado','Estado','t-estado'],['fichar','Fichar','t-fichar'],['horas'
    ⛔ Y `franjas` viaja DENTRO de la convocatoria: no hay ninguna constante de dos. Si la tarde
    acaba llevando hora de entrada (`Tarde (16:00)` / `Tarde (18:00)`, que es como está en el
    Libro de Datos), la convocatoria nace con tres franjas y aquí no se toca nada.
-   ⚠️ DEMO: `abre` se ha adelantado a esta mañana para que la pantalla se pueda tocar hoy; el
-   valor real de esta semana sería `2026-08-06T22:00`. `resp` son datos inventados. */
-var CONVOCATORIAS=[{
-  id:'cv-2026-08-10', semana:'2026-08-10',
-  dias:['2026-08-10','2026-08-11','2026-08-12','2026-08-13','2026-08-14','2026-08-15','2026-08-16'],
+   ⛔ DEMO, Y SUS FECHAS SE DERIVAN DE HOY (`_semanaDemo_`, 741.ª), que es la MISMA puerta
+   que usa el escritorio. Aquí ponía que `abre` se había adelantado a mano « para que la
+   pantalla se pueda tocar hoy»: eso fue cierto el día que se escribió y dejó de serlo al
+   siguiente — medido el 30/09/2026, `_convEstado_` daba **'cerrada'**. Ahora la apertura se
+   deriva de la ventana de 48 h, como en `reglas/convocatoria.py`. `resp` sí es inventado. */
+var CONVOCATORIAS=[Object.assign(_semanaDemo_(), {
   franjas:[{k:'m',txt:'Mañana'},{k:'t',txt:'Tarde/noche'}],
   sitios:['cuvi','citi'],
-  abre:'2026-08-06T09:00', limite:'2026-08-08T22:00',
   convocante:'Daniel Vázquez Piñeiro',
   invitados:(DATA.miembros||[]).map(function(m){ return m.nombre; }),
   resp:{}
-}];
+})];
 /* El pincel: se elige arriba y se pinta abajo. Con cinco estados por celda (vacío, CUVI, CITI,
    los dos, no puedo) un ciclo por toque obligaría a dar hasta cuatro toques para corregirse. */
 var CONV_PINCEL='cuvi', CONV_COCHE=false;

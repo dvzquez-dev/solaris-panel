@@ -3013,6 +3013,43 @@ function _ahoraLocalISO_(d){
          'T' + p(x.getHours()) + ':' + p(x.getMinutes());
 }
 
+/* EL CALENDARIO DE LA DEMOSTRACIÓN SE DERIVA DE HOY; NO SE ESCRIBE (741.ª).
+
+   ⛔ **Por qué existe.** Las dos caras traían la convocatoria de demostración con las fechas
+   **tecleadas** (`abre:'2026-08-06T09:00'`, `limite:'2026-08-08T22:00'`), así que caducó sola:
+   medido el 30/09/2026, `_convEstado_(CONVOCATORIAS[0])` daba **'cerrada'** en las dos caras
+   —hoy y a noventa días vista—, y con el plazo vencido `_miTurnoPanel_` y `_miDispoPanel_` no
+   llegan a pintar nada tocable. O sea que el pintado de vistas decía **«0 rotas»** sobre dos
+   paneles cuyo cuerpo **no ejecutaba**.
+   ⚠️ Es un [[feedback_guardia_con_fecha_de_caducidad]] al revés: no se pone rojo solo, se
+   queda **mudo** solo — que es peor, porque el verde de al lado sigue saliendo.
+
+   ⛔ **La apertura se DERIVA de la ventana, no se cablea** — la misma regla que
+   `reglas/convocatoria.py` («la apertura se deriva de `limite - VENTANA_H`»): el límite es
+   **mañana a las 22:00** y la apertura **ayer a las 22:00**, que son exactamente las 48 h de
+   siempre. Con eso `abre <= ahora <= limite` se cumple **a cualquier hora de cualquier día**
+   sin fabricar ningún dato: el calendario sigue siendo coherente con la regla real.
+
+   ⛔ **Y se pregunta por la semana que empieza el lunes SIGUIENTE al límite**, que es como
+   funciona de verdad: se contesta antes de que la semana empiece.
+
+   ⚠️ **`ahora` va por argumento** porque si no el caso no puede discriminar: con la fecha
+   tecleada, dos instantes separados dan la misma respuesta ('cerrada' las dos), y con ésta dan
+   'abierta' las dos. Un caso que dependa del reloj de quien corra el banco no distingue nada. */
+function _semanaDemo_(ahora){
+  var hoy = ahora ? new Date(+ahora) : new Date();
+  var mas = function(b, n){ return new Date(b.getFullYear(), b.getMonth(), b.getDate() + n); };
+  var dia = function(d){ return _ahoraLocalISO_(d).slice(0, 10); };
+  var lim = mas(hoy, 1), abre = mas(hoy, -1);
+  /* `getDay()` da 0 el domingo: `(d+6)%7` lo pasa a 0 el lunes, y `7 - eso` es lo que falta
+     hasta el lunes SIGUIENTE — nunca 0, así que la semana siempre cae después del límite. */
+  var lun = mas(lim, 7 - ((lim.getDay() + 6) % 7));
+  var dias = [], i;
+  for(i = 0; i < 7; i++) dias.push(dia(mas(lun, i)));
+  return { id:'cv-' + dias[0], semana:dias[0], dias:dias,
+           abre:dia(abre) + 'T22:00', limite:dia(lim) + 'T22:00' };
+}
+
 /* Una fecha pelada vale TODO su día — «cierra el 20/08» se lee como «tienes el 20». Y un
    separador con espacio se pasa a `T`, porque así es como llega de la hoja. */
 function _normLimite_(limite){

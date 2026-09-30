@@ -109,14 +109,14 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=c563cfc"></script>
+<script src="comun.js?v=f0b5a63"></script>
 <script src="notis.escritorio.js?v=6ac9b14"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=5f60f94"></script>
 <script src="buzon.escritorio.js?v=99fbf62"></script>
 <script src="documentos.escritorio.js?v=e55ad55"></script>
 <script src="sanciones.escritorio.js?v=1a88580"></script>
-<script src="reuniones.escritorio.js?v=7e9ab52"></script>
+<script src="reuniones.escritorio.js?v=289f0d1"></script>
 <script src="horas.escritorio.js?v=7b37df5"></script>
 <script src="equipo.escritorio.js?v=9fb27c7"></script>
 <script>
@@ -537,6 +537,38 @@ var REUS=[
   conv:10,cubren:10,minimo:3,fijada:'M 11 · 19:00–21:00',dias:['L 10','M 11'],franjas:['18:00','19:00','20:00'],
   calor:[[5,7,6],[8,10,9]],sinCubrir:[],bajoMin:[]}
 ];
+/* LO OFERTADO Y LOS PLAZOS DE ESTAS TRES TAMBIÉN SE DERIVAN DE HOY (741.ª).
+
+   ⛔ **Sin `bloques` el panel de «Tu disponibilidad» se pinta y NO SE PUEDE PULSAR.** Esa lista
+   es lo OFERTADO, y `_miDispoPanel_` la usa de índice: sin ella ninguna celda lleva `data-mid`
+   y `_cablearMiDispo_` no engancha nada. 📏 Medido el 30/09/2026 ejecutando el panel: con la
+   semilla tal cual, **1.399 caracteres y 0 celdas cableadas**; con lo ofertado y el plazo vivo,
+   **6.005 y 35**. Y las dos cosas hacen falta: sólo los bloques da 4.814 **y 0 cableadas**
+   (el plazo vencido las deja sin cable), sólo el plazo da 1.463 **y 0**.
+   ⛔ **Las tres quedan en un estado DISTINTO a propósito**, que es lo que hace que el pintado
+   ejercite el panel entero y no una rama: la 1.ª **viva** (se contesta), la 2.ª con el **plazo
+   cerrado** (se ve y no se toca) y la 3.ª **fijada** (devuelve '' y no ocupa nada). */
+(function(){
+  /* ⛔ CON GUARDA, y no por cortesía: esto es la PRIMERA llamada de nivel superior a un
+     módulo, y corre en el arranque. Si `reuniones.escritorio.js` o `comun.js` llegan
+     viejos —una caché del navegador basta, y pasó al probar esta pieza— la excepción se
+     lleva el bloque `<script>` ENTERO: `CONVOCATORIAS` ni se declara y la página queda en
+     blanco. Con la guarda, lo que se pierde es la semilla de demostración, que es lo que
+     menos vale de la página.
+     ⚠️ No la lleva por costumbre: la asignación de `NOTIS_VIVOS` es la otra llamada de
+     nivel superior sin guarda, y está mucho más abajo — o sea que se lleva menos. Ficha
+     aparte.
+     ⛔ Y ese nombre va SIN su línea de código a propósito: `probar_notis.py` cuenta esa
+     línea con un `count(...) == 1` sobre este fichero, y escribirla aquí dentro la pone a
+     **2** — el banco en rojo por la prosa que explica el arreglo (§3c-20). Se nombra, no
+     se copia. */
+  if(typeof _semanaDemo_ !== 'function' || typeof _bloquesDelCalor_ !== 'function') return;
+  var s = _semanaDemo_(), i;
+  for(i = 0; i < REUS.length; i++) REUS[i].bloques = _bloquesDelCalor_(REUS[i]);
+  REUS[0].limite = _isoADMY_(s.limite);   /* mañana: viva */
+  REUS[1].limite = _isoADMY_(s.abre);     /* ayer: cerrada */
+})();
+
 /* escalas de sanción por no cubrir — decisión cerrada del PD (22/07):
    solo general/junta/consejo sancionan. General 0,1,2,2… · junta y consejo 1 plano.
    ⛔⛔ AQUI VIVIA `VECES`, Y SE RETIRO EN LA 575.ª. Era una tabla de **SEIS NOMBRES DE
@@ -658,17 +690,17 @@ var ACX=75,ACY=75,AR=52,AGAP=8,ASTEP=36;
    regla de quién puede liderar un turno. Mientras el backend no la mande, viaja en el dato.
    ⛔ Y `franjas` también es dato: si la tarde acaba llevando hora de entrada, la convocatoria
    nace con tres franjas y aquí no se toca nada.
-   ⚠️ DEMO: instantes y respuestas inventados, para poder mirar la pantalla. */
-var CONVOCATORIAS=[{
-  id:'cv-2026-08-10', semana:'2026-08-10',
-  dias:['2026-08-10','2026-08-11','2026-08-12','2026-08-13','2026-08-14','2026-08-15','2026-08-16'],
+   ⛔ DEMO, Y SUS FECHAS SE DERIVAN DE HOY (`_semanaDemo_`, 741.ª): tecleadas caducaron
+   solas — medido el 30/09/2026, `_convEstado_` daba **'cerrada'** en las dos caras, así que
+   `_miTurnoPanel_` no pintaba rejilla y el pintado de vistas decía «0 rotas» sin haber
+   ejecutado su cuerpo. Las respuestas (`resp`) sí son inventadas. */
+var CONVOCATORIAS=[Object.assign(_semanaDemo_(), {
   franjas:[{k:'m',txt:'Mañana'},{k:'t',txt:'Tarde/noche'}],
   sitios:['cuvi','citi'],
-  abre:'2026-08-06T09:00', limite:'2026-08-08T22:00',
   convocante:'Daniel Vázquez Piñeiro',
   consejo:['Daniel Vázquez Piñeiro','José Manuel Torres Rodríguez','Bruno Araújo González'],
   invitados:[], resp:{}
-}];
+})];
 var DISP_SITIO='', DISP_SEL='';
 /* En qué punto va la petición de la disponibilidad al servidor: 'sin pedir' |
    'pidiendo' | 'ok' | 'error'. Vive aquí y no en el módulo porque **un módulo solo
@@ -2917,7 +2949,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f1a9a9c';
+var BUILD='dcba07c';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
