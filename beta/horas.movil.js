@@ -1288,6 +1288,9 @@ function _desgloseMesHTML_(confs){
 }
 
 function _cuotaHTML_(){
+  /* ⛔ La tercera puerta, y la que de verdad cierra: aunque alguien llame a esta
+     función directamente, sin cuotas no devuelve pantalla. */
+  if(!CUOTAS_ACTIVAS) return '';
   var eur=function(n){return nf(n,2)+' €';};
   /* ⛔ EN DIRECTO, que es lo que pidió Daniel el 15/08: *«se recalcula en cada fichaje»*.
      Hasta hoy esto pintaba `YO.cuota` tal cual llegaba en el roster — o sea **la foto del

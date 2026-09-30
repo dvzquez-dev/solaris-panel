@@ -1,3 +1,16 @@
+/* ⛔⛔ EL INTERRUPTOR DE LA CUOTA. Daniel, 30/09/2026: *«puede que al final no vaya a haber
+   cuotas, entonces no hace falta que aparezca en la aplicación. Y no aparece. Y no hay
+   fallo»*. Con esto en `false`, la cuota **desaparece de las dos caras** y no queda ni un
+   hueco ni un error: cinco puertas la consultan (el botón del menú y la pantalla del móvil,
+   y los chips del ranking y el panel «Tu cuota» del escritorio).
+   ⚠️ **El UMBRAL de horas NO es la cuota y se queda.** Es del RRI: mide la dedicación y
+   sigue valiendo aunque no se cobre nada. Apagar el umbral con esto sería quitar la regla
+   que de verdad mide, y él ya dijo que si no hay cuotas *«meteré otros incentivos»*.
+   ⚠️ Y el CÁLCULO no se toca: `_cuotaDe_` y compañía siguen ahí. Lo que se apaga es lo que
+   se VE — que es exactamente lo que pidió —, no el motor. Así volver a encenderlo es
+   cambiar esta línea, no rehacer nada. */
+var CUOTAS_ACTIVAS = true;
+
 /* ═══ CÓDIGO COMPARTIDO POR LAS DOS CARAS ═══════════════════════════════════════════════
    Lo cargan `movil.html` y `escritorio.html` con <script src>. Aquí vive lo que ANTES estaba
    COPIADO en las dos: 69 funciones idénticas, 468 líneas por cara.
