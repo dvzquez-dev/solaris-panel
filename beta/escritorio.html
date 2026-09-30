@@ -2917,7 +2917,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7b80b1f';
+var BUILD='a726465';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3815,7 +3815,36 @@ function _engSancCerrar_(){
       if(!confirm('Vas a cerrar el bloque «'+LOTE.nombre+'».\n\n'+c+' se aplican.\n\n'+
         'Esto aplica las sanciones aceptadas en Notion y manda el comunicado. ¿Seguimos?')) return;
       if(LOTE.real && backendOK && SESION){
-        b.disabled=true; var prev=b.textContent; b.textContent='Cerrando…';
+        b.disabled=true; var prev=b.textContent; b.textContent='Comprobando…';
+        /* ⛔⛔ LA COLA SE RELEE ANTES DE DISPARAR, Y SI NO SE PUDO RELEER NO SE DISPARA.
+           Gemela de la del móvil (730.ª), y aquí la ventana es más corta — `_refrescoVivo_` sí
+           refresca `SANC_BACK` cada 90 s — pero el daño es el mismo: `_confirmarLote_` da por
+           **ACEPTADA** toda pendiente sin `decision` (`Codigo.gs:2135`), así que una sanción que
+           entrara en esos segundos se aplica en Notion y sale en el comunicado **sin que nadie
+           la haya decidido**. Y esta es *la cara donde de verdad se pulsa el botón*, como dice
+           su propio banco.
+           ⚠️ Va AQUÍ DENTRO, después del `confirm`, a propósito: fuera haría falta una CUARTA
+           copia de la guarda de esta misma línea — la que separa el disparo real de la semilla
+           de demostración — y `probar_semilla_no_miente.py` cuenta que sean **exactamente
+           tres**. Confirmar y abortar es peor UX que abortar antes; disparar sobre una cola
+           vieja es peor que las dos.
+           ⛔ Y ESTE COMENTARIO LA ESCRIBIÓ LITERAL la primera vez, así que el guardia contó
+           **4 de 3** — la prosa que explica el arreglo satisfaciendo su propia medición
+           (§3c-20). Tercera vez en la misma jornada. La guarda se NOMBRA, no se copia.
+           ⚠️ Y el «llegó» no se deduce: lo dice `_llego_('sanc')`, que ya pone
+           `_cargarSanciones_` — su `catch` se traga el error a propósito, así que sin ese dato un
+           corte de red se leería como «la copia vale». */
+        await _cargarSanciones_();
+        var _no=_porQueNoSeCierra_(LOTE.items, _llego_('sanc'));
+        if(_no){
+          tost(_no);
+          /* Con cola fresca se REPINTA, para que lo que falta se vea y no solo se diga; si no
+             llegó nada no hay nada nuevo que pintar y el botón vuelve como estaba. Y tras
+             `pintar()` no se toca `b`: ya lo ha sustituido. */
+          if(_llego_('sanc')) pintar(); else { b.disabled=false; b.textContent=prev; }
+          return;
+        }
+        b.textContent='Cerrando…';
         try{
           var r=await api.confirmarLote(LOTE.lote);
           /* ⛔⛔ EL BLOQUE PUEDE CERRARSE A MEDIAS, Y EL SERVIDOR LO DICE.
