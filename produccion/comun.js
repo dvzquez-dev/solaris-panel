@@ -1,3 +1,20 @@
+/* ⛔⛔ EL INTERRUPTOR DE LA CUOTA. Daniel, 30/09/2026: *«puede que al final no vaya a haber
+   cuotas, entonces no hace falta que aparezca en la aplicación. Y no aparece. Y no hay
+   fallo»*. Con esto en `false`, la cuota **desaparece de las dos caras** y no queda ni un
+   hueco ni un error: cinco puertas la consultan (el botón del menú y la pantalla del móvil,
+   y los chips del ranking y el panel «Tu cuota» del escritorio).
+   ⚠️ **El UMBRAL de horas NO es la cuota y se queda.** Es del RRI: mide la dedicación y
+   sigue valiendo aunque no se cobre nada. Apagar el umbral con esto sería quitar la regla
+   que de verdad mide, y él ya dijo que si no hay cuotas *«meteré otros incentivos»*.
+   ⚠️ Y el CÁLCULO no se toca: `_cuotaDe_` y compañía siguen ahí. Lo que se apaga es lo que
+   se VE — que es exactamente lo que pidió —, no el motor. Así volver a encenderlo es
+   cambiar esta línea, no rehacer nada. */
+var CUOTAS_ACTIVAS = false;   /* ⛔ APAGADA por decision de Daniel (30/09): *«la cuota por ahora apagada pero facil de encender»*. **Encenderla es poner true aqui y publicar**: el CALCULO entero sigue vivo, no hay nada que rehacer.
+   ⛔⛔ Y ESTA LINEA PERDIO DOS PALABRAS AL ESCRIBIRLA (30/09): decia *«cambiar este  por  y publicar»*, con dos huecos donde iban `false` y `true`. Los acentos graves dentro de
+   comillas DOBLES en bash son sustitucion de comandos, asi que se ejecutaron, fallaron
+   por stderr y el texto llego con un agujero -- con el parche saliendo con exito. Y lo
+   que se perdio era justo lo unico que esta linea existe para decir. */
+
 /* ═══ CÓDIGO COMPARTIDO POR LAS DOS CARAS ═══════════════════════════════════════════════
    Lo cargan `movil.html` y `escritorio.html` con <script src>. Aquí vive lo que ANTES estaba
    COPIADO en las dos: 69 funciones idénticas, 468 líneas por cara.
@@ -1373,6 +1390,34 @@ function _faltanPorMarcar_(items){
   return n;
 }
 
+/* ⛔⛔ POR QUE NO SE PUEDE CERRAR EL BLOQUE — o `''` si se puede. Gemela de
+   `_porQueNoSeConvoca_` y por el mismo motivo: la frase la necesitan DOS sitios (el aviso y
+   el corte), y dos textos para la misma regla acaban diciendo cosas distintas.
+   ⛔ LO NUEVO NO ES LA CUENTA, ES EL PRIMER ARGUMENTO. `_faltanPorMarcar_` cuenta bien
+   sobre lo que se le da — y lo que se le daba era una copia LOCAL de la cola que en el
+   movil **no refresca nadie**: `SANC_M` se carga una vez al arrancar (`movil.html:815`) y
+   `_refrescoVivo_` no la toca, aunque si toca turnos, tareas, entregables, reuniones y
+   panel. O sea que la ventana en la que esa copia puede estar vieja no es «un rato con el
+   modal abierto»: es **toda la sesion**.
+   📏 Y el dano son puntos de personas reales: el servidor da por ACEPTADA toda pendiente
+   sin `decision` (`Codigo.gs:2135`), asi que una sancion que entrara despues de tu copia se
+   cerraba **como sancionada sin que nadie la hubiera decidido**, con su nombre en el
+   comunicado.
+   ⛔ `fresca` DECIDE PRIMERO, y es §3c-24: si no se pudo releer la cola no se sabe nada, y
+   «no lo se» no autoriza el disparo. El cargador **se traga su error**, asi que lo que dice
+   si trajo algo es su devolucion, no que la espera haya vuelto.
+   ⚠️ Y el bloque VACIO no es «nada que marcar»: es que ya no esta pendiente — lo cerro
+   otro —, y ahi `_faltanPorMarcar_` devuelve **0**, que autorizaria el cierre. Por eso esta
+   pregunta no se puede contestar con la cuenta a secas. */
+function _porQueNoSeCierra_(items, fresca){
+  if (!fresca) return 'No se pudo releer la cola: el bloque no se cierra a ciegas.';
+  var L = items || [];
+  if (!L.length) return 'Ese bloque ya no est\u00e1 pendiente: lo habr\u00e1 cerrado otro.';
+  var n = _faltanPorMarcar_(L);
+  if (n) return 'Faltan ' + n + ' por marcar: el bloque se cierra entero.';
+  return '';
+}
+
 /* ⛔ EL MOTIVO POR EL QUE NO SE PUEDE CONVOCAR, en UNA sola frase y en un solo sitio.
    Lo necesitan DOS: el boton (que sale `disabled` con esto encima) y la comprobacion del
    envio. Dos textos distintos para la misma regla es como se acaba diciendo «falta el
@@ -1735,6 +1780,18 @@ function _subcoordDe_(n){
 
 function rangoSanc(nombre){
   var n = String(nombre || '');
+  /* ⛔⛔ EL PD SALE DEL CARGO, NO DE LA TABLA (739.ª). `PD_NOM` lo RE-DERIVA la app del
+     roster (`equipo.*.js`: `if(pd) PD_NOM=pd.nombre`), y `rangoNom` —la gemela documental—
+     ya decide por él. Aquí se preguntaba **sólo a la tabla**, que lleva nombres escritos a
+     mano, así que el día del relevo el Project Director de verdad salía con rango **0** y
+     `_sancionesHTML_` le contestaba «Esto no es para ti». 📏 Medido en el arnés antes de
+     arreglarlo: rango **0 en las dos caras y en el backend**, y con dos consecuencias — el
+     PD nuevo **no podía sancionar** y un rango 2 **sí podía sancionarle a él**.
+     ⚠️ La tabla sigue siendo explícita, y eso NO cambia: es para el **rango 1**, que lo da
+     tener gente debajo y no el cargo. Lo que se deriva es sólo el 3.
+     ⚠️ Y va ANTES de la tabla a propósito: si el PD nuevo estuviera en ella con un rango
+     menor —José asciende, pongamos— la tabla le daría 2 y el cargo dice 3. */
+  if (typeof PD_NOM !== 'undefined' && PD_NOM && n === PD_NOM) return 3;
   if (RANGO_SANC[n] != null) return RANGO_SANC[n];
   /* Rango 1 = tiene gente bajo su jurisdiccion: los coordinadores (su unidad) y quien tenga
      jurisdiccion propia declarada (un subcoordinador). */
@@ -2968,6 +3025,43 @@ function _ahoraLocalISO_(d){
          'T' + p(x.getHours()) + ':' + p(x.getMinutes());
 }
 
+/* EL CALENDARIO DE LA DEMOSTRACIÓN SE DERIVA DE HOY; NO SE ESCRIBE (741.ª).
+
+   ⛔ **Por qué existe.** Las dos caras traían la convocatoria de demostración con las fechas
+   **tecleadas** (`abre:'2026-08-06T09:00'`, `limite:'2026-08-08T22:00'`), así que caducó sola:
+   medido el 30/09/2026, `_convEstado_(CONVOCATORIAS[0])` daba **'cerrada'** en las dos caras
+   —hoy y a noventa días vista—, y con el plazo vencido `_miTurnoPanel_` y `_miDispoPanel_` no
+   llegan a pintar nada tocable. O sea que el pintado de vistas decía **«0 rotas»** sobre dos
+   paneles cuyo cuerpo **no ejecutaba**.
+   ⚠️ Es un [[feedback_guardia_con_fecha_de_caducidad]] al revés: no se pone rojo solo, se
+   queda **mudo** solo — que es peor, porque el verde de al lado sigue saliendo.
+
+   ⛔ **La apertura se DERIVA de la ventana, no se cablea** — la misma regla que
+   `reglas/convocatoria.py` («la apertura se deriva de `limite - VENTANA_H`»): el límite es
+   **mañana a las 22:00** y la apertura **ayer a las 22:00**, que son exactamente las 48 h de
+   siempre. Con eso `abre <= ahora <= limite` se cumple **a cualquier hora de cualquier día**
+   sin fabricar ningún dato: el calendario sigue siendo coherente con la regla real.
+
+   ⛔ **Y se pregunta por la semana que empieza el lunes SIGUIENTE al límite**, que es como
+   funciona de verdad: se contesta antes de que la semana empiece.
+
+   ⚠️ **`ahora` va por argumento** porque si no el caso no puede discriminar: con la fecha
+   tecleada, dos instantes separados dan la misma respuesta ('cerrada' las dos), y con ésta dan
+   'abierta' las dos. Un caso que dependa del reloj de quien corra el banco no distingue nada. */
+function _semanaDemo_(ahora){
+  var hoy = ahora ? new Date(+ahora) : new Date();
+  var mas = function(b, n){ return new Date(b.getFullYear(), b.getMonth(), b.getDate() + n); };
+  var dia = function(d){ return _ahoraLocalISO_(d).slice(0, 10); };
+  var lim = mas(hoy, 1), abre = mas(hoy, -1);
+  /* `getDay()` da 0 el domingo: `(d+6)%7` lo pasa a 0 el lunes, y `7 - eso` es lo que falta
+     hasta el lunes SIGUIENTE — nunca 0, así que la semana siempre cae después del límite. */
+  var lun = mas(lim, 7 - ((lim.getDay() + 6) % 7));
+  var dias = [], i;
+  for(i = 0; i < 7; i++) dias.push(dia(mas(lun, i)));
+  return { id:'cv-' + dias[0], semana:dias[0], dias:dias,
+           abre:dia(abre) + 'T22:00', limite:dia(lim) + 'T22:00' };
+}
+
 /* Una fecha pelada vale TODO su día — «cierra el 20/08» se lee como «tienes el 20». Y un
    separador con espacio se pasa a `T`, porque así es como llega de la hoja. */
 function _normLimite_(limite){
@@ -3825,6 +3919,34 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-01-cola-sanciones-fresca', fecha:'2026-10-01',
+      titulo:'La cola de sanciones del m\u00f3vil se pone al d\u00eda sola',
+      items:[
+        {cara:'movil', vista:'estado', txt:'La lista de sanciones que esperan decisi\u00f3n se '
+          +'vuelve a leer cada minuto y medio, como ya hac\u00edan los turnos y las tareas. Antes se '
+          +'cargaba una sola vez al abrir la app, as\u00ed que si dejabas el tel\u00e9fono abierto '
+          +'segu\u00edas viendo las de cuando entraste. Lo que tengas marcado NO se pierde al '
+          +'actualizarse, y si est\u00e1s escribiendo una sanci\u00f3n no se te mueve la pantalla.'}
+      ] },
+    { id:'2026-09-30-justificar-movil', fecha:'2026-09-30',
+      titulo:'Justificar una sanci\u00f3n, desde el m\u00f3vil',
+      items:[
+        {cara:'movil', vista:'estado', txt:'En el bloque de sanciones ya hay TRES botones \u2014 '
+          +'Acepta, Justifica y Rechaza \u2014, como en el ordenador. Antes s\u00f3lo hab\u00eda S\u00ed y No, '
+          +'as\u00ed que desde el tel\u00e9fono no se pod\u00eda dejar una sanci\u00f3n en justificada.'}
+      ] },
+    { id:'2026-09-30-cerrar-bloque-relee', fecha:'2026-09-30',
+      titulo:'Cerrar el bloque comprueba la cola de verdad',
+      items:[
+        /* ⛔ La vista es `estado`, NO `sanciones`. En el móvil las 7 son estado, fichar, horas,
+           tareas, turnos, docs y reu: la cola de sanciones es un MODAL que se abre desde la
+           tarjeta del PD, o sea desde `estado`. Puse `sanciones` contando `vista:'…'` en este
+           fichero — y ese recuento incluye el ESCRITORIO, donde sí es una vista. Lo cazó
+           `probar_novedades.py` en la primera corrida. */
+        {cara:'movil', vista:'estado', txt:'Al pulsar «Cerrar el bloque entero», la cola se vuelve '
+          +'a leer antes de cerrar: si ha entrado una sanción nueva sin decidir, el bloque NO se '
+          +'cierra y la nueva aparece en la lista. Si no se pudo leer la cola, tampoco se cierra.'}
+      ] },
     { id:'2026-09-14-bloque-horas', fecha:'2026-09-14',
       titulo:'El bloque de horas dice lo que pas\u00f3',
       items:[
