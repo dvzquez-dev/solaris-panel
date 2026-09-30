@@ -3919,6 +3919,15 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-01-cola-sanciones-fresca', fecha:'2026-10-01',
+      titulo:'La cola de sanciones del m\u00f3vil se pone al d\u00eda sola',
+      items:[
+        {cara:'movil', vista:'estado', txt:'La lista de sanciones que esperan decisi\u00f3n se '
+          +'vuelve a leer cada minuto y medio, como ya hac\u00edan los turnos y las tareas. Antes se '
+          +'cargaba una sola vez al abrir la app, as\u00ed que si dejabas el tel\u00e9fono abierto '
+          +'segu\u00edas viendo las de cuando entraste. Lo que tengas marcado NO se pierde al '
+          +'actualizarse, y si est\u00e1s escribiendo una sanci\u00f3n no se te mueve la pantalla.'}
+      ] },
     { id:'2026-09-30-justificar-movil', fecha:'2026-09-30',
       titulo:'Justificar una sanci\u00f3n, desde el m\u00f3vil',
       items:[
