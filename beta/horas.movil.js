@@ -1886,7 +1886,18 @@ function vHoras(){
           /* ⛔ «de este mes» era FALSO: ese reparto se calculo cuando se genero el panel,
              no hoy. Ahora dice de cuando es, y debajo van las horas VIVAS — que es lo que
              se puede afirmar del mes en curso sin inventar nada. */
-          (YO.desglose?'<small>índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes '+nf(YO.desglose.aporta_mes_actual||0,0)+' · arrastre '+nf(YO.desglose.arrastre||0,0)+'</small>':'')+
+          /* ⛔ CON UN DECIMAL: el desglose y el total se redondean POR SEPARADO, así que
+             con `nf(…,0)` en los dos sumandos la cuenta **no cuadra con la cifra que la
+             propia tarjeta afirma** — `152,5 + 26,9` se pintaba «153 · 27» junto a un
+             total de **179**, y 153+27 son 180. Un desglose que no suma su total invita
+             a pensar que faltan horas, que es justo lo que esta tarjeta existe para
+             descartar.
+             ⚠️ **LATENTE, no vivo**: medido el 30/09, **0 de 32** miembros tienen
+             `desglose` hoy — ni en la semilla ni en `datos/equipo.json` —, así que nadie
+             lo ha visto. No pude reproducir el «6 de 32» que dio el agente, y queda
+             dicho en vez de repetido. Se arregla igual porque cuesta una línea y el
+             día que el motor vuelva a poblar `desglose` ya no miente. */
+          (YO.desglose?'<small>índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes '+nf(YO.desglose.aporta_mes_actual||0,1)+' · arrastre '+nf(YO.desglose.arrastre||0,1)+'</small>':'')+
           (_hMesReal_(YO)!=null?'<small>este mes llevas '+h1(_hMesReal_(YO))+', en vivo</small>':'')+
           '</div><div class="d">banda sana 70–120</div></div>'
         : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+

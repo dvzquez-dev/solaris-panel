@@ -142,7 +142,16 @@ function filaDoc(e,mio){
      hecho: `EST_DOC` nacio con el comentario «el movil pintaba `e.estado` en crudo y el
      miembro leia «revision» o «anot»». Esta se quedo fuera. */
   var st=[estDoc(e.estado)[0], _pilEstDoc_(e.estado)];
-  return '<div class="fila clic '+(mio?(e.estado==='cambios'?'borde-no':'borde-pe'):'')+'" data-doc="'+e.id+'" data-p>'+
+  /* ⛔ EL BORDE SE DECIDE POR SI SIGUE EN CURSO, no por descarte. Aquí sólo `cambios`
+     escapaba del ámbar de «pendiente», así que **`publicado` y `rechazado` — que
+     `comun.js` declara RESUELTOS en `DOC_RESUELTO` — llevaban borde de atención**: la
+     misma fila con píldora verde «publicado» y borde ámbar, dos estados contradictorios
+     sobre un expediente ya cerrado.
+     ⚠️ Y se pregunta por la **puerta que ya existe** (`_docEnCurso_`), no por una lista
+     nueva: el día que se añada un estado, esto lo hereda en vez de quedarse viejo — que
+     es exactamente cómo nació este fallo. */
+  var _pend = _docEnCurso_(e.estado) && e.estado!=='cambios';
+  return '<div class="fila clic '+(mio?(e.estado==='cambios'?'borde-no':(_pend?'borde-pe':''))+'':'')+'" data-doc="'+e.id+'" data-p>'+
     '<div class="a"><b>'+esc(e.titulo)+'</b><small><span class="mono">'+e.ref+'</span> · '+
     esc(e.autor.split(' ')[0])+' · '+ambDocM(e.ambito)+'</small></div>'+
     '<div class="d"><span class="pil '+st[1]+'">'+st[0]+'</span> <span class="chev">›</span></div></div>';

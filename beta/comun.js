@@ -9,7 +9,11 @@
    ⚠️ Y el CÁLCULO no se toca: `_cuotaDe_` y compañía siguen ahí. Lo que se apaga es lo que
    se VE — que es exactamente lo que pidió —, no el motor. Así volver a encenderlo es
    cambiar esta línea, no rehacer nada. */
-var CUOTAS_ACTIVAS = false;   /* ⛔ APAGADA por decision de Daniel (30/09): *«la cuota por ahora apagada pero facil de encender»*. Encenderla es cambiar este  por  y publicar: el CALCULO entero sigue vivo, no hay nada que rehacer. */
+var CUOTAS_ACTIVAS = false;   /* ⛔ APAGADA por decision de Daniel (30/09): *«la cuota por ahora apagada pero facil de encender»*. **Encenderla es poner true aqui y publicar**: el CALCULO entero sigue vivo, no hay nada que rehacer.
+   ⛔⛔ Y ESTA LINEA PERDIO DOS PALABRAS AL ESCRIBIRLA (30/09): decia *«cambiar este  por  y publicar»*, con dos huecos donde iban `false` y `true`. Los acentos graves dentro de
+   comillas DOBLES en bash son sustitucion de comandos, asi que se ejecutaron, fallaron
+   por stderr y el texto llego con un agujero -- con el parche saliendo con exito. Y lo
+   que se perdio era justo lo unico que esta linea existe para decir. */
 
 /* ═══ CÓDIGO COMPARTIDO POR LAS DOS CARAS ═══════════════════════════════════════════════
    Lo cargan `movil.html` y `escritorio.html` con <script src>. Aquí vive lo que ANTES estaba
@@ -1384,6 +1388,34 @@ function _faltanPorMarcar_(items){
   var n = 0, i, L = items || [];
   for (i = 0; i < L.length; i++) if (!(L[i] && L[i].dec)) n++;
   return n;
+}
+
+/* ⛔⛔ POR QUE NO SE PUEDE CERRAR EL BLOQUE — o `''` si se puede. Gemela de
+   `_porQueNoSeConvoca_` y por el mismo motivo: la frase la necesitan DOS sitios (el aviso y
+   el corte), y dos textos para la misma regla acaban diciendo cosas distintas.
+   ⛔ LO NUEVO NO ES LA CUENTA, ES EL PRIMER ARGUMENTO. `_faltanPorMarcar_` cuenta bien
+   sobre lo que se le da — y lo que se le daba era una copia LOCAL de la cola que en el
+   movil **no refresca nadie**: `SANC_M` se carga una vez al arrancar (`movil.html:815`) y
+   `_refrescoVivo_` no la toca, aunque si toca turnos, tareas, entregables, reuniones y
+   panel. O sea que la ventana en la que esa copia puede estar vieja no es «un rato con el
+   modal abierto»: es **toda la sesion**.
+   📏 Y el dano son puntos de personas reales: el servidor da por ACEPTADA toda pendiente
+   sin `decision` (`Codigo.gs:2135`), asi que una sancion que entrara despues de tu copia se
+   cerraba **como sancionada sin que nadie la hubiera decidido**, con su nombre en el
+   comunicado.
+   ⛔ `fresca` DECIDE PRIMERO, y es §3c-24: si no se pudo releer la cola no se sabe nada, y
+   «no lo se» no autoriza el disparo. El cargador **se traga su error**, asi que lo que dice
+   si trajo algo es su devolucion, no que la espera haya vuelto.
+   ⚠️ Y el bloque VACIO no es «nada que marcar»: es que ya no esta pendiente — lo cerro
+   otro —, y ahi `_faltanPorMarcar_` devuelve **0**, que autorizaria el cierre. Por eso esta
+   pregunta no se puede contestar con la cuenta a secas. */
+function _porQueNoSeCierra_(items, fresca){
+  if (!fresca) return 'No se pudo releer la cola: el bloque no se cierra a ciegas.';
+  var L = items || [];
+  if (!L.length) return 'Ese bloque ya no est\u00e1 pendiente: lo habr\u00e1 cerrado otro.';
+  var n = _faltanPorMarcar_(L);
+  if (n) return 'Faltan ' + n + ' por marcar: el bloque se cierra entero.';
+  return '';
 }
 
 /* ⛔ EL MOTIVO POR EL QUE NO SE PUEDE CONVOCAR, en UNA sola frase y en un solo sitio.
@@ -3838,6 +3870,18 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-30-cerrar-bloque-relee', fecha:'2026-09-30',
+      titulo:'Cerrar el bloque comprueba la cola de verdad',
+      items:[
+        /* ⛔ La vista es `estado`, NO `sanciones`. En el móvil las 7 son estado, fichar, horas,
+           tareas, turnos, docs y reu: la cola de sanciones es un MODAL que se abre desde la
+           tarjeta del PD, o sea desde `estado`. Puse `sanciones` contando `vista:'…'` en este
+           fichero — y ese recuento incluye el ESCRITORIO, donde sí es una vista. Lo cazó
+           `probar_novedades.py` en la primera corrida. */
+        {cara:'movil', vista:'estado', txt:'Al pulsar «Cerrar el bloque entero», la cola se vuelve '
+          +'a leer antes de cerrar: si ha entrado una sanción nueva sin decidir, el bloque NO se '
+          +'cierra y la nueva aparece en la lista. Si no se pudo leer la cola, tampoco se cierra.'}
+      ] },
     { id:'2026-09-14-bloque-horas', fecha:'2026-09-14',
       titulo:'El bloque de horas dice lo que pas\u00f3',
       items:[

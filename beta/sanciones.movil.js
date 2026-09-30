@@ -31,8 +31,15 @@
 async function _cargarSancionesM_(){
   try{ var a=await api.getSanciones({estado:'pendiente'});
        if(Array.isArray(a)){ a.forEach(function(s){ if(!s.dec && s.decision) s.dec=s.decision; });
-                             SANC_M=a; } }
+                             SANC_M=a; return true; } }
   catch(e){}
+  /* ⛔⛔ DEVUELVE SI TRAJO ALGO, y no es adorno: el `catch(e){}` de arriba se traga el error
+     a proposito — un refresco fallido no debe tirar la pantalla —, y eso deja a quien llama
+     sin forma de distinguir «la cola esta al dia» de «no contesto nadie». Quien cierra un
+     bloque necesita justo esa diferencia (§3c-24: «no lo se» no se devuelve como un dato).
+     ⚠️ Falla hacia `false`, o sea hacia NO cerrar: es el lado en el que un fallo cuesta un
+     aviso de mas, no una sancion sobre alguien que nadie ha decidido. */
+  return false;
 }
 
 /* ⛔ EL VACIADO SE QUEDA Y LA BANDERA ES LO QUE FALTABA. `MOVS.length=0` borra la
@@ -372,13 +379,31 @@ function _cablearSanciones_(){
   $$('[data-scerrar]').forEach(function(b){
     b.onclick=async function(){
       var lote=b.dataset.scerrar;
+      /* ⛔⛔ LA COLA SE RELEE ANTES DE CONTAR, Y SI NO SE PUEDE, NO SE CIERRA.
+         Aqui se contaba sobre `SANC_M` tal cual, y en esta cara **esa copia no la refresca
+         nadie**: se carga una vez al arrancar (`movil.html:815`) y el refresco de 90 s no la
+         toca — si toca turnos, tareas, entregables, reuniones y panel. Medido: la ventana no
+         es «un rato con el modal abierto», es **toda la sesion**. Y el servidor da por
+         ACEPTADA toda pendiente sin `decision` (`Codigo.gs:2135`), asi que una sancion que
+         entrara despues de tu copia se cerraba **como sancionada sin que nadie la hubiera
+         decidido**, con su nombre en el comunicado.
+         ⚠️ Y el corte no se puede hacer con la cuenta a secas: con el bloque ya cerrado por
+         otro, la lista sale vacia y contar da **0**, que autoriza el disparo. El motivo se
+         pide a una sola puerta de `comun.js`, gemela de la de convocar.
+         ⚠️ Despues de repintar no se toca `b`: el repintado lo ha sustituido. */
+      b.disabled=true; var _txt=b.textContent; b.textContent='Comprobando…';
+      var _fresca=await _cargarSancionesM_();
       var it=(SANC_M||[]).filter(function(x){ return (x.lote||'(sueltas)')===lote; });
-      /* Por la MISMA puerta que el escritorio (`_faltanPorMarcar_`, `comun.js`): la
-         guarda existia solo aqui, y una guarda de una cara sola es la que se queda sin
-         gemela. Ahora las dos cuentan igual y el banco puede ejecutarla. */
-      var sinMarcar=_faltanPorMarcar_(it);
-      if(sinMarcar){ tost('Faltan '+sinMarcar+' por marcar: el bloque se cierra entero.'); return; }
-      b.disabled=true; b.textContent='Cerrando…';
+      var _no=_porQueNoSeCierra_(it, _fresca);
+      if(_no){
+        tost(_no);
+        /* Con la cola fresca se REPINTA, para que lo que falta se VEA y no solo se diga: un
+           «faltan 1» sin la fila delante es un numero que nadie puede comprobar. Si no se
+           pudo releer no hay nada nuevo que pintar, y el boton vuelve como estaba. */
+        if(_fresca) _repintarSancM_(); else { b.disabled=false; b.textContent=_txt; }
+        return;
+      }
+      b.textContent='Cerrando…';
       /* ⛔ UNA SOLA LLAMADA, Y NO ES POR VELOCIDAD. Aqui habia un bucle de
          `decidirSancion(…,'aprobar')`, uno por sancion — y **cada `aprobar` levanta el
          flag `aplicar_sanciones`** en el backend (`Codigo.gs:2084`). La rutina de Python
