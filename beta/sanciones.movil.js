@@ -183,10 +183,24 @@ function _sancColaHTML_(){
                llegaba nunca. Se marcaba sancion por sancion y la pantalla quedaba IGUAL.
                ✅ Es la forma que `escritorio.html` ya usaba bien. Y el «No» no tenia ternario
                siquiera: no podia verse marcado ni arreglando lo otro. */
+            /* ⛔⛔ TRES DECISIONES, NO DOS. Aqui habia solo Si/No, asi que un PD trabajando
+               desde el telefono **no podia JUSTIFICAR** una sancion de un lote: o la aceptaba
+               o la rechazaba, y son tres cosas distintas -- `justificada` no resta puntos y
+               consta como decidida. El escritorio ofrecia las tres desde siempre
+               (`escritorio.html:1478`) y el backend acepta las tres en `marcar`
+               (`Codigo.gs:3444`), asi que no faltaba servidor: faltaba el boton.
+               ⚠️ Y EL AVISO DE CIERRE YA CONTABA `justificadas`, lo que hacia parecer que el
+               rotulo mentia. No mentia: esa cifra es alcanzable si alguien marco desde el
+               ordenador. Lo que no habia era como producirla desde aqui.
+               ⚠️ LAS PALABRAS SON LAS DEL ESCRITORIO, no Si/No. Con dos opciones un si/no se
+               entiende; con tres deja de ser una pregunta, y dos vocabularios para el mismo
+               dato en la misma app es como se acaba dudando de cual manda. */
             : '<button class="btn mini'+(x.dec==='aceptar'?' on a':'')+'" data-smarc="'+esc(x.id)+
-                '" data-dec="aceptar" data-p>Sí</button>'+
+                '" data-dec="aceptar" data-p>Acepta</button>'+
+              '<button class="btn mini'+(x.dec==='justificar'?' on j':'')+'" data-smarc="'+esc(x.id)+
+                '" data-dec="justificar" data-p>Justifica</button>'+
               '<button class="btn mini'+(x.dec==='rechazar'?' on r':'')+'" data-smarc="'+esc(x.id)+
-                '" data-dec="rechazar" data-p>No</button>')+
+                '" data-dec="rechazar" data-p>Rechaza</button>')+
         '</div>';
       }).join('')+
       (suelta ? ''

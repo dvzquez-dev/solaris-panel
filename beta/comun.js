@@ -3870,6 +3870,13 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-09-30-justificar-movil', fecha:'2026-09-30',
+      titulo:'Justificar una sanci\u00f3n, desde el m\u00f3vil',
+      items:[
+        {cara:'movil', vista:'estado', txt:'En el bloque de sanciones ya hay TRES botones \u2014 '
+          +'Acepta, Justifica y Rechaza \u2014, como en el ordenador. Antes s\u00f3lo hab\u00eda S\u00ed y No, '
+          +'as\u00ed que desde el tel\u00e9fono no se pod\u00eda dejar una sanci\u00f3n en justificada.'}
+      ] },
     { id:'2026-09-30-cerrar-bloque-relee', fecha:'2026-09-30',
       titulo:'Cerrar el bloque comprueba la cola de verdad',
       items:[
