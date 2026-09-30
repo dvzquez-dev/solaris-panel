@@ -694,7 +694,16 @@ var ACX=75,ACY=75,AR=52,AGAP=8,ASTEP=36;
    solas — medido el 30/09/2026, `_convEstado_` daba **'cerrada'** en las dos caras, así que
    `_miTurnoPanel_` no pintaba rejilla y el pintado de vistas decía «0 rotas» sin haber
    ejecutado su cuerpo. Las respuestas (`resp`) sí son inventadas. */
-var CONVOCATORIAS=[Object.assign(_semanaDemo_(), {
+/* ⛔⛔ CON GUARDA, COMO EL DERIVADOR DE ARRIBA — y aquí faltaba (745.ª). Es la misma
+   llamada a la misma puerta doce líneas más abajo, y se quedó sin ella: §3c-31, *un arreglo
+   se vigila por sus DOS lados*. 📏 Medido lo que muere si revienta aquí: **3.298 líneas**
+   del escritorio (128 sentencias de nivel superior, 40 `function`, 54 `var`) y **817** del
+   móvil — el arranque incluido. Y lo introdujo la pieza que derivó la semilla: antes esto
+   era un literal y no podía lanzar.
+   ⚠️ **El respaldo es `[]`, y lo decide lo que YA hace el consumidor**: la app vacía esta
+   lista cuando el servidor falla, y la pantalla sabe decir «no hay ninguna semana
+   convocada». Una lista vacía aquí no afirma nada nuevo. */
+var CONVOCATORIAS = (typeof _semanaDemo_ !== 'function') ? [] : [Object.assign(_semanaDemo_(), {
   franjas:[{k:'m',txt:'Mañana'},{k:'t',txt:'Tarde/noche'}],
   sitios:['cuvi','citi'],
   convocante:'Daniel Vázquez Piñeiro',
@@ -747,7 +756,13 @@ var NOTIS_FIJOS=['turnos','avisos','reuniones'];
 /* ⛔ LA LISTA VIVE EN `comun.js` desde el 14/08: la necesitan las dos caras, y dos copias
    acaban siendo dos listas distintas -- una diciendo que un tipo se manda y la otra que
    no, sobre el mismo aviso. */
-var NOTIS_VIVOS=_notisVivos_();
+/* ⛔ CON GUARDA (745.ª): si `comun.js` llega viejo, esta línea lanza y se lleva el resto
+   del bloque. ⚠️ **Y el respaldo es NO ASIGNAR, no una lista vacía**, al revés que en
+   `CONVOCATORIAS` — lo decide el consumidor: `_notisFila_` lee `typeof NOTIS_VIVOS !==
+   'undefined' ? indexOf(k) >= 0 : true`, así que una lista vacía diría **«hoy no se manda
+   NINGÚN tipo de aviso»** — falso y alarmante— mientras que sin valor cae en el `true` que
+   ya existe: *no consta que no se mande*. §3c-24: un «no lo sé» no se devuelve como `[]`. */
+var NOTIS_VIVOS = (typeof _notisVivos_ === 'function') ? _notisVivos_() : undefined;
 /* Lo que dijo el servidor la última vez, y en qué punto va la pregunta: 'sin pedir' |
    'pidiendo' | 'ok' | 'error'. ⛔ Vive aquí y no en el módulo porque un módulo sólo lleva
    declaraciones `function` (ARRANQUE §5b), y ⛔ arranca en 'sin pedir' —no en 'ok' con un
@@ -2949,7 +2964,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='dcba07c';
+var BUILD='c60e380';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

@@ -1556,7 +1556,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='beef471';
+var BUILD='bb96d19';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
@@ -1668,7 +1668,16 @@ var DEST=[['estado','Estado','t-estado'],['fichar','Fichar','t-fichar'],['horas'
    pantalla se pueda tocar hoy»: eso fue cierto el día que se escribió y dejó de serlo al
    siguiente — medido el 30/09/2026, `_convEstado_` daba **'cerrada'**. Ahora la apertura se
    deriva de la ventana de 48 h, como en `reglas/convocatoria.py`. `resp` sí es inventado. */
-var CONVOCATORIAS=[Object.assign(_semanaDemo_(), {
+/* ⛔⛔ CON GUARDA, COMO EL DERIVADOR DE ARRIBA — y aquí faltaba (745.ª). Es la misma
+   llamada a la misma puerta doce líneas más abajo, y se quedó sin ella: §3c-31, *un arreglo
+   se vigila por sus DOS lados*. 📏 Medido lo que muere si revienta aquí: **3.298 líneas**
+   del escritorio (128 sentencias de nivel superior, 40 `function`, 54 `var`) y **817** del
+   móvil — el arranque incluido. Y lo introdujo la pieza que derivó la semilla: antes esto
+   era un literal y no podía lanzar.
+   ⚠️ **El respaldo es `[]`, y lo decide lo que YA hace el consumidor**: la app vacía esta
+   lista cuando el servidor falla, y la pantalla sabe decir «no hay ninguna semana
+   convocada». Una lista vacía aquí no afirma nada nuevo. */
+var CONVOCATORIAS = (typeof _semanaDemo_ !== 'function') ? [] : [Object.assign(_semanaDemo_(), {
   franjas:[{k:'m',txt:'Mañana'},{k:'t',txt:'Tarde/noche'}],
   sitios:['cuvi','citi'],
   convocante:'Daniel Vázquez Piñeiro',
