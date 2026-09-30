@@ -444,7 +444,15 @@ function verDoc(id){
   var _mioDoc = _docAutorHTML_(e);
   var acc = puede
     ? '<h4>Tu decisión</h4>'+
-      '<label class="campo"><span class="sc">Título · puedes corregirlo al aprobar</span><input id="dTit" value="'+esc(e.titulo)+'"></label>'+
+      /* ⛔ «CON ANOTACIONES» NO ES UN ADORNO: el título corregido SÓLO VIAJA en esa rama
+         (`movil.html` construye `extra` únicamente ahí). Sin esas dos palabras, quien
+         corrige el título y pulsa **Aprobar** lo publica con el VIEJO y sin un solo aviso:
+         cree que lo corrigió. Lo que estaba mal era el RÓTULO, no el comportamiento —
+         `CLAUDE.md` dice que «aprobar con anotaciones» es justo lo que ajusta título y
+         etiquetas, y el escritorio ya lo rotulaba bien.
+         ⚠️ Y el móvil se contradecía A SÍ MISMO dos líneas más abajo: las etiquetas SÍ
+         decían «al aprobar con anotaciones». Asimetría entre caras Y dentro de una cara. */
+      '<label class="campo"><span class="sc">Título · puedes corregirlo al aprobar con anotaciones</span><input id="dTit" value="'+esc(e.titulo)+'"></label>'+
       '<label class="campo"><span class="sc">Etiquetas · separadas por comas, al aprobar con anotaciones</span>'+
       '<input id="dEtq" value="'+esc(_etiquetasDe_(e).join(', '))+'"></label>'+
       '<label class="campo"><span class="sc">Motivo <span class="req">*</span> si pides cambios o rechazas</span>'+

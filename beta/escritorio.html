@@ -109,7 +109,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=8f854c3"></script>
+<script src="comun.js?v=1ab9622"></script>
 <script src="notis.escritorio.js?v=6ac9b14"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=5f60f94"></script>
@@ -1909,6 +1909,10 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
      personal se calcula en directo; si esta tabla siguiera con la foto del ultimo `push`,
      el PD leeria un importe arriba y otro abajo para la misma persona. */
   var _q=function(m){ var q=_cuotaDe_(m); return q.final; };
+  var _conQ = CUOTAS_ACTIVAS;   /* arriba y no abajo: el `pan(...)` de mas adelante es
+     CONTINUACION del `return`, asi que un `var` ahi parte la expresion. Lo rompi asi y lo
+     dijo la consola: `Uncaught SyntaxError: Unexpected token 'var'`, con `V` sin definir
+     y el escritorio entero muerto. Un parche que rompe el fichero SALE CON EXITO. */
   var conQ=VIS.filter(function(m){ return typeof _q(m)==='number'; });
   var cuotaTot=conQ.reduce(function(a,m){return a+_q(m);},0);
   /* ⛔ Los dos chips de dinero se caen con el interruptor; el de PONDERADO se queda,
@@ -1918,10 +1922,17 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
       (CUOTAS_ACTIVAS ? '<span class="chip">CUOTA MEDIA <b style="color:var(--ink)">'+(conQ.length?nf(cuotaTot/conQ.length,2):'—')+' €</b></span>'+
       '<span class="chip">A CERO <b style="color:var(--ink)">'+conQ.filter(function(m){return _q(m)===0;}).length+'</b></span>' : '')+
     '</div>'+
-    pan('Ranking de la temporada', rk.length ? 'con la cuota al lado'
+    /* ⛔ LA SEXTA PUERTA. Con la cuota apagada, la TABLA seguía pintando una columna de
+       importes en euros para todo el equipo — y el subtítulo decía «con la cuota al
+       lado». Gateé los dos chips y di la tabla por hecha; lo tumbó un agente que sólo
+       refutaba. ⚠️ Y mi comprobación en el navegador NO lo cazó porque busqué «CUOTA
+       MEDIA|A CERO», que es justo lo que acababa de arreglar: el caso se escribe mirando
+       lo que NO has tocado. */
+    pan('Ranking de la temporada', rk.length ? (_conQ ? 'con la cuota al lado'
+                                                      : 'por horas ponderadas')
         : 'nadie ha cerrado ningún mes todavía',
       (rk.length ?
-      tabla([['#',0],['Miembro'],['Unidad'],['H/mes pond.',1],['Temporada',1],['Coche',1],['Cuota',1]],
+      tabla([['#',0],['Miembro'],['Unidad'],['H/mes pond.',1],['Temporada',1],['Coche',1]].concat(_conQ ? [['Cuota',1]] : []),
         rk.map(function(m,i){
           var pond=_hMesDe_(m);
           return '<tr><td class="mono" style="color:var(--ink3)">'+(i+1)+'</td>'+
@@ -1930,7 +1941,7 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
             '<td class="r mono '+(pond>=UMBRAL?'up':'dn')+'">'+nf(pond,1)+'</td>'+
             '<td class="r mono" style="color:var(--ink3)">'+nf(m.horasTemp,1)+'</td>'+
             '<td class="r mono" style="color:var(--ink3)">'+(m.coche||'—')+'</td>'+
-            '<td class="r mono '+(_q(m)===0?'up':'')+'">'+(typeof _q(m)==='number'?nf(_q(m),2)+' €':'—')+'</td></tr>';
+            (_conQ ? '<td class="r mono '+(_q(m)===0?'up':'')+'">'+(typeof _q(m)==='number'?nf(_q(m),2)+' €':'—')+'</td>' : '')+'</tr>';
         }).join(''))
       /* ⛔ SIN FILAS NO SE PINTA UNA TABLA VACIA: se dice por que esta vacia. El
          1 de septiembre esto le pasa a las 32 A LA VEZ, y una rejilla con cabeceras
@@ -1939,13 +1950,17 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
         'La clasificación empieza en cuanto se cierra el primer mes de la temporada: '+
         'hasta entonces no hay con qué comparar a nadie. Las horas ya cuentan y se ven '+
         'aquí arriba; lo que falta es el primer cierre.'))+
-      '<div class="nota">La cuota baja cuantas más horas se hacen: se calcula sobre el objetivo del mes, '+
+      /* ⛔ SEPTIMA PUERTA: la NOTA AL PIE. La columna y los chips ya se caían, y esto
+         seguía explicando la fórmula del dinero — «descuenta 4 € por turno con coche», «nunca
+         baja de 0 €» — debajo de una tabla que ya no la enseña. Sin cuotas es peor que
+         ruido: describe una regla que no se aplica. */
+      '<div class="nota">'+(_conQ ? 'La cuota baja cuantas más horas se hacen: se calcula sobre el objetivo del mes, '+
       'descuenta <b>4 €</b> por cada turno con coche fuera de Vigo y nunca baja de <b>0 €</b>. '+
-      'Aquí solo se consulta.'+
+      'Aquí solo se consulta.' : 'La clasificación ordena por horas ponderadas de la temporada. Aquí solo se consulta.')+
       (_aun.length ? ' <b>'+_aun.length+'</b> '+(_aun.length===1?'persona todavía no sale'
         :'personas todavía no salen')+' en la clasificación: aún no han cerrado ningún '+
         'mes, así que no hay con qué compararlas. Entran solas en el primer cierre — sus '+
-        'horas y su cuota sí cuentan en las cifras de arriba.' : '')+
+        'horas'+(_conQ ? ' y su cuota' : '')+' sí cuentan en las cifras de arriba.' : '')+
       '</div>');
 }};
 /* ⛔ NO CONECTADO. Tres candidaturas inventadas con su avalista y su fase, y un boton
@@ -2902,7 +2917,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='aae39e5';
+var BUILD='94628ca';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

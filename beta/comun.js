@@ -9,7 +9,7 @@
    ⚠️ Y el CÁLCULO no se toca: `_cuotaDe_` y compañía siguen ahí. Lo que se apaga es lo que
    se VE — que es exactamente lo que pidió —, no el motor. Así volver a encenderlo es
    cambiar esta línea, no rehacer nada. */
-var CUOTAS_ACTIVAS = true;
+var CUOTAS_ACTIVAS = false;   /* ⛔ APAGADA por decision de Daniel (30/09): *«la cuota por ahora apagada pero facil de encender»*. Encenderla es cambiar este  por  y publicar: el CALCULO entero sigue vivo, no hay nada que rehacer. */
 
 /* ═══ CÓDIGO COMPARTIDO POR LAS DOS CARAS ═══════════════════════════════════════════════
    Lo cargan `movil.html` y `escritorio.html` con <script src>. Aquí vive lo que ANTES estaba
