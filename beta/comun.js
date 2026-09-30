@@ -1780,6 +1780,18 @@ function _subcoordDe_(n){
 
 function rangoSanc(nombre){
   var n = String(nombre || '');
+  /* ⛔⛔ EL PD SALE DEL CARGO, NO DE LA TABLA (739.ª). `PD_NOM` lo RE-DERIVA la app del
+     roster (`equipo.*.js`: `if(pd) PD_NOM=pd.nombre`), y `rangoNom` —la gemela documental—
+     ya decide por él. Aquí se preguntaba **sólo a la tabla**, que lleva nombres escritos a
+     mano, así que el día del relevo el Project Director de verdad salía con rango **0** y
+     `_sancionesHTML_` le contestaba «Esto no es para ti». 📏 Medido en el arnés antes de
+     arreglarlo: rango **0 en las dos caras y en el backend**, y con dos consecuencias — el
+     PD nuevo **no podía sancionar** y un rango 2 **sí podía sancionarle a él**.
+     ⚠️ La tabla sigue siendo explícita, y eso NO cambia: es para el **rango 1**, que lo da
+     tener gente debajo y no el cargo. Lo que se deriva es sólo el 3.
+     ⚠️ Y va ANTES de la tabla a propósito: si el PD nuevo estuviera en ella con un rango
+     menor —José asciende, pongamos— la tabla le daría 2 y el cargo dice 3. */
+  if (typeof PD_NOM !== 'undefined' && PD_NOM && n === PD_NOM) return 3;
   if (RANGO_SANC[n] != null) return RANGO_SANC[n];
   /* Rango 1 = tiene gente bajo su jurisdiccion: los coordinadores (su unidad) y quien tenga
      jurisdiccion propia declarada (un subcoordinador). */
