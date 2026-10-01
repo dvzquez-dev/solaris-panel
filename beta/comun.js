@@ -3625,6 +3625,18 @@ function _perfilesDe_(m){
   if(!m||typeof m!=='object') return [];
   var orden=[], por={}, i, u, unidad=_limpio_(m.unidad);
   if(unidad){ por[unidad]={unidad:unidad,rol:'miembro',txt:'miembro de '+unidad}; orden.push(unidad); }
+  /* ⛔ DONDE ESTA ADEMAS (01/10). Gemela de `reglas/perfiles.py` y de
+     `_perfilesDeNombre_` del backend: tres sitios, una sola regla, y el campo
+     `unidades` no lo leia ninguno aunque `roster_set.py` lo escribe desde el 18/08.
+     ⚠️ Se reutiliza `_unidadesCoord_`, que NO es «las que coordina» pese al nombre:
+     es el normalizador de un campo de lista del roster (cadena -> [cadena], recorte,
+     huecos fuera). Copiarlo habria duplicado tambien la trampa de la cadena.
+     ⚠️ Y va ANTES de `coordina`, que PISA a miembro en la misma unidad. */
+  var us=_unidadesCoord_(m.unidades);
+  for(i=0;i<us.length;i++){
+    u=us[i];
+    if(!por[u]){ por[u]={unidad:u,rol:'miembro',txt:'miembro de '+u}; orden.push(u); }
+  }
   var cs=_unidadesCoord_(m.coordina);
   for(i=0;i<cs.length;i++){
     u=cs[i];

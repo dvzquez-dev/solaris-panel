@@ -109,10 +109,10 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=36727f1"></script>
+<script src="comun.js?v=f041cc6"></script>
 <script src="notis.escritorio.js?v=6ac9b14"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
-<script src="turnos.escritorio.js?v=5f60f94"></script>
+<script src="turnos.escritorio.js?v=c07f7f4"></script>
 <script src="buzon.escritorio.js?v=99fbf62"></script>
 <script src="documentos.escritorio.js?v=e55ad55"></script>
 <script src="sanciones.escritorio.js?v=1a88580"></script>
@@ -2964,7 +2964,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='c2be529';
+var BUILD='dff3b40';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3619,8 +3619,11 @@ function _engConvocarTurno_(){
      cuela nada: solo abre los dos desplegables. */
   $$('[data-addcoche]').forEach(function(b){
     b.onclick=function(){
+      /* ⚠️ Nace con los dos campos puestos: uno que no existe se lee como `undefined`,
+         y repartir gente sobre eso revienta `pintarCoches` entera. */
       TUR_COCHES.push({origen:'', destino:'', vueltaDistinta:false,
-                       vueltaOrigen:null, vueltaDestino:null});
+                       vueltaOrigen:null, vueltaDestino:null,
+                       dueno:null, pasajeros:[]});
       pintarCoches();
       if(typeof pintarReparto==='function') pintarReparto();   // el boton de convocar
     };
@@ -3646,9 +3649,13 @@ function _engConvocarTurno_(){
            ⚠️ DONDE CAE EN NOTION SIGUE SIENDO DECISION SUYA. Lo que hace esto es que el
            dato no se pierda: el servidor lo guarda en su almacen y `getTurnos` lo
            devuelve. Una columna de Notion se puede anadir despues sin tocar la cara. */
+        /* ⛔ Y QUIEN LO LLEVA Y QUIEN VA (754.ª). Sin estas dos lineas el backend
+           validaria `dueno`/`pasajeros` contra el reparto y nunca le llegaria ninguno:
+           un arreglo correcto que no decide nada porque el dato no llega. */
         coches:TUR_COCHES.map(function(co){ return {origen:co.origen||'',
           destino:co.destino||'', vueltaDistinta:!!co.vueltaDistinta,
-          vueltaOrigen:co.vueltaOrigen||null, vueltaDestino:co.vueltaDestino||null}; }),
+          vueltaOrigen:co.vueltaOrigen||null, vueltaDestino:co.vueltaDestino||null,
+          dueno:co.dueno||null, pasajeros:co.pasajeros||[]}; }),
         coche:nn.filter(function(n){ return TUR_SEL[n].coche; }),
         /* ⛔ EL `rol` LLEVA LO DE LOS BOTONES, no solo lo tecleado. `responsable` y
            `coche` se mandan tambien aparte (columnas People de Notion), pero NADIE
