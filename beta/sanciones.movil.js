@@ -173,7 +173,10 @@ function _sancColaHTML_(){
         return '<div class="lote-i" style="flex-wrap:wrap;gap:6px">'+
           '<span class="n">'+esc(_pilaDeM_(x.nombre)||x.nombre||'')+'</span>'+
           '<span class="mono" style="color:var(--ink3);font-size:10.5px;flex:1">'+esc(x.motivo||'')+
-            ' · '+(+x.puntos||0)+'</span>'+
+            /* ⛔ `_etPtsSanc_`, no `(+x.puntos||0)`: esto pintaba **0** para un hueco, y
+               en esta pantalla el 0 se lee «aviso». Y es el MISMO rotulo que el
+               escritorio: dos textos para el mismo dato es la leccion de la gemela. */
+            ' · '+esc(_etSancFila_(x.puntos, x.origen, x.extra))+'</span>'+
           (suelta
             ? '<button class="btn mini" data-sok="'+esc(x.id)+'" data-p>Aprobar</button>'+
               '<button class="btn mini" data-sno="'+esc(x.id)+'" data-p style="color:var(--warn);border-color:var(--warn)">Rechazar</button>'

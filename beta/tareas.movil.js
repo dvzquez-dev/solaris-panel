@@ -62,7 +62,17 @@ function vTareas(){
         'te asigne una, aparecerá aquí.','',false))+'</div>'+
     (act.length?'<div class="tarj" style="background:rgba(63,158,214,.05);border-color:rgba(63,158,214,.3)">'+
       '<p class="rnota" style="margin:0">Al fichar puedes imputar tus horas a cualquiera de estas tareas. '+
-      'Si crees que una no te corresponde, puedes apelarla (Art. 34).</p></div>':'')+
+      /* ⛔ Y DICE DÓNDE SE APELA (762.ª, 02/10). Aquí ponía «puedes apelarla (Art. 34)» a
+         secas, y la app NO tramita apelaciones en ninguna capa — medido: `apelac` sale 0
+         veces en `Codigo.gs`, no hay `api.apelar*` ni `data-apel*` ni pantalla. O sea que
+         la frase mandaba a buscar un botón que no existe, sobre disciplina.
+         ⚠️ El derecho NO se borra: es del RRI y existe. Lo que se añade es el destino, y no
+         me lo invento: es el que ya decía `navegador/app.html:1534` («en privado al Project
+         Director»), que es la app que el equipo venía usando.
+         ⛔ Y NO se inventa el PLAZO: el texto del Art. 34 no está en el repo, y un «tienes
+         N días» escrito a ojo suena oficial — que es peor que no decirlo. */
+      'Si crees que una no te corresponde, el RRI te deja apelarla (Art. 34): '+
+      'de momento es <b>fuera de la app</b>, en privado al Project Director.</p></div>':'')+
     /* mismo cajon que en Turnos: cuenta y la ultima, para que las dos pantallas se lean igual */
     (fin.length?'<div class="cajon" data-caj data-p><span>Tareas pasadas <b>· '+fin.length+'</b>'+
         (fin[0]&&fin[0].l?' <span style="color:var(--ink3)">· la última, '+esc(fin[0].l)+'</span>':'')+'</span>'+

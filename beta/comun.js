@@ -1500,9 +1500,27 @@ function _rolDeTurno_(escrito, marcas){
   var m = marcas || {}, partes = [], i;
   var puesto = String(escrito == null ? '' : escrito).replace(/^\s+|\s+$/g,'');
   if(puesto) partes.push(puesto);
-  var auto = [];
-  if(m.responsable) auto.push('Responsable de turno');
-  if(m.coche)       auto.push('Coche');
+  /* ⛔⛔ LOS TRES CARGOS SALEN DE `CARGOS_TURNO`, NO ESCRITOS AQUI (764.a, 02/10). Aqui
+     habia dos `if` a mano -- el de turno y el coche -- y la pantalla deja marcar TRES
+     cargos desde que existe `TUR_CARGOS`. Los otros dos se marcaban, se mandaban en
+     `cargos:TUR_CARGOS`... y **el backend no lee `cargos` en ningun sitio** (`grep` -> 0).
+     Como `Reparto` --el campo autoritativo, el unico que `_turnoDeNotion_` vuelve a leer--
+     se compone del `rol`, esas dos asignaciones **se perdian en silencio**: se marcaban, se
+     convocaba, y el turno volvia sin ellas. Y son 22 y 21 de los 23 turnos reales.
+     ✅ Recorriendo `CARGOS_TURNO` esto no puede volver a desincronizarse: un cargo nuevo
+     entra solo, con su etiqueta larga, que es la que ya se usa en los mensajes. */
+  var auto = [], _c;
+  for(i=0;i<CARGOS_TURNO.length;i++){
+    _c = CARGOS_TURNO[i];
+    /* ⚠️ `responsable` es el nombre VIEJO de la marca del cargo `turno`, y el envio sigue
+       llamando con el. Valen las dos y se dice: media migracion silenciosa es peor que
+       dos nombres documentados. */
+    if(m[_c.k] || (_c.k === 'turno' && m.responsable)) auto.push(_c.et);
+  }
+  /* ⛔ EL COCHE VA APARTE Y NO ES UN CARGO DE `CARGOS_TURNO`, a proposito: aquellos son de
+     UNA sola persona --medido, nunca pasan de 1 en los 23 turnos reales-- y el coche llega
+     a 2. Quien lo lleva se decide en la pantalla de coches (754.a), con su dueno. */
+  if(m.coche) auto.push('Coche');
   var bajo = puesto.toLowerCase();
   for(i=0;i<auto.length;i++){
     /* ⛔ NO SE DUPLICA lo que ya escribio a mano: `cuota.py` cuenta por SUBCADENA, asi que un
@@ -1962,6 +1980,142 @@ function _tareasDe_(nombre, alLlegar){
    ⚠️ `trim` por regex y no `String.prototype.trim`: en el ES3 de `cscript` -donde corren los
    bancos- ese metodo no existe, y un banco que revienta se lee igual que uno que no encuentra
    nada. */
+/* ══ LOS PUNTOS DE UNA SANCION LEIDOS DEL ALMACEN ══════════════════════════
+
+   ⛔⛔ AQUI EL 0 SIGNIFICA ALGO: es un **aviso** de la 1.a ocurrencia, con su registro y su
+   reincidencia. Asi que `Number(s.puntos) || 0` no es un respaldo -- convierte **«no me ha
+   llegado el dato»** en **«aviso»**, y nadie lo ve: `rangoLote` lo cuenta y lo imprime, y la
+   fila de la persona lo pinta como tal.
+   ⚠️ La frase ya estaba escrita en el backend, encima de `_puntosSancValidos_`: *«de paso
+   muere el `|| 0`, que era un "no lo se" leido como dato»*. La CARA se quedo con el `|| 0`.
+   📏 Y hoy no fabrica ninguno: de las **85 sanciones reales** del ultimo volcado, las 85
+   traen un numero (−1 x24, 0 x59, +1 x2). Lo que mantiene limpio el almacen es la guarda de
+   ESCRITURA, no esta. Esto es una guarda contra el productor que venga.
+
+   ⛔ NO ES `_oNum_(Number(v), null)`: `Number('')` es **0** y `Number(null)` tambien, asi que
+   una cadena vacia pasaria por aviso. El backend ya lo tiene anotado (*«`Number('')` es 0,
+   ojo»*) y aqui se repite el guardia, no el error.
+   ⛔ NI `_validaPuntosSanc_`, que es su gemela del FORMULARIO: esa rechaza positivos porque
+   la pantalla de sancionar va de −5 a 0, y en el almacen hay **premios** (Art. 31b/31c; 2 de
+   las 85 reales son +1). Usarla aqui los convertiria todos en «sin dato». Una guarda de
+   ENTRADA es mas estrecha que el almacen a proposito: leer con ella es cerrar la puerta al
+   dato que ya existe. */
+function _ptsSanc_(crudo){
+  if (crudo === null || crudo === undefined) return null;                // no llego
+  var t = String(crudo).replace(/^\s+|\s+$/g, '');
+  if (t === '') return null;                                            // ni la cadena vacia
+  var n = Number(t);
+  return isNaN(n) ? null : n;
+}
+
+/* El rotulo de esos puntos, UNO para las dos caras. ⛔ Hasta hoy el escritorio escribia
+   `(x.pts===0?'aviso':x.pts)` y el movil `(+x.puntos||0)`: dos textos para el mismo dato, y
+   ninguno de los dos sabia decir «no lo se».
+   ⚠️ El **+** del premio no es cosmetico: sin el, un +1 se lee como un −1 y la fila dice que
+   quita un punto cuando lo da. */
+function _etPtsSanc_(pts){
+  if (pts === null || pts === undefined) return 'sin dato';
+  if (pts === 0) return 'aviso';
+  var n = Number(pts);
+  return (n > 0 ? '+' : '−') + Math.abs(n) + ' ' + (Math.abs(n) === 1 ? 'punto' : 'puntos');
+}
+
+/* ══ UN PREMIO (O UNA REVOCACION) NO ES UNA SANCION, Y LA COLA ES LA MISMA ═════════
+
+   📏 Y NO ES HIPOTETICO: `flujos/construir_reunion.py` mete los premiados **en el MISMO
+   lote** que los sancionados (`origen:'premio'`, `articulo:'31b'`, `puntos:0` y la recompensa en
+   `extra.compensacion`, que son HORAS). O sea que un bloque de reunion general trae las dos
+   cosas, y hasta hoy la cara no leia `origen` en ningun sitio: medido, **2 escrituras de
+   `origen:'manual'` y CERO lecturas** en toda la app.
+
+   ⛔ El dano no es cosmetico, son dos:
+   1. Un premio con `puntos:0` se pintaba **«aviso»** -- un apercibimiento disciplinario -- a
+      quien se le esta premiando por cubrir su disponibilidad.
+   2. La fila ofrecia **«Justifica»**, y el servidor **se la salta en silencio**
+      (`_marcarLote_`: *«una revocacion o un premio no se "justifican": se dejan como estaban, no
+      se falsean»*) devolviendola en `saltadas` -- cuyo texto dice *«no la puedes decidir tu»*, o
+      sea **culpa al permiso** cuando la causa es otra. Un mensaje que describe otro fallo cuesta
+      mas que ninguno.
+   ✅ Al no ofrecer el boton, `saltadas` vuelve a tener UNA sola causa desde esta cara -- el
+   permiso -- y su texto deja de mentir sin tocarlo.
+
+   ⚠️ GEMELA DE DOS REGLAS QUE YA EXISTEN, y por eso se escribe igual: `_marcarLote_`
+   (`Codigo.gs`) usa `origen==='revocacion'` / `origen==='premio' || extra.compensacion`, y
+   `reglas/gradiente.py:64` usa `origen in ("premio","revocacion")` para devolver `no-sancion`.
+   Tres sitios para la misma regla es lo que hay; lo que no puede haber es tres CRITERIOS. */
+function _esNoJustificable_(origen, extra){
+  var o = String(origen == null ? '' : origen);
+  if (o === 'premio' || o === 'revocacion') return true;
+  return !!(extra && extra.compensacion);
+}
+
+/* El rotulo de una fila de la cola: dice QUE ES antes de decir cuanto. ⛔ `_etPtsSanc_` solo
+   sabe de puntos, y la recompensa de un premio **no son puntos**: son horas
+   (`extra.compensacion`). Pintar su `puntos:0` como «aviso» era decir lo contrario de lo que es. */
+function _etSancFila_(pts, origen, extra){
+  var o = String(origen == null ? '' : origen);
+  var comp = extra && extra.compensacion;
+  if (o === 'premio' || (comp && o !== 'revocacion'))
+    /* ⚠️ `nf2`, a 40 líneas de aquí en este mismo fichero: formatea decimales en es-ES
+       (`nf2(0.5)` → «0,5»). Iba a escribir un `_hh_` nuevo — §5b lo caza. */
+    return 'premio' + (comp ? ' · +' + nf2(comp) + ' h' : '');
+  if (o === 'revocacion') return 'revocación · ' + _etPtsSanc_(_ptsSanc_(pts));
+  return _etPtsSanc_(_ptsSanc_(pts));
+}
+
+/* ══ REVOCAR UNA SANCION = LA VIA DE APELACION DEL RRI ══════════════════════
+
+   📏 El servidor NO necesita nada nuevo: una revocacion es un `pushSancion` normal con
+   `origen:'revocacion'`, los puntos EN POSITIVO y una clave natural (`revoca-<id>`).
+   `_pushSancion_` la acepta, `_marcarLote_` la trata aparte (no se justifica) y
+   `gradiente.familia_de` la manda a `no-sancion`. Lo que faltaba era la PANTALLA, que
+   `navegador/app.html` tiene entera y ronda3 habia perdido -- y la auditoria ya lo decia:
+   *«Revocar... es la via de apelacion del RRI y ya esta desplegada en el backend»*.
+   📏 Y esta USADO: las 2 filas con `origen:'revocacion'` del volcado llevan *«razon:
+   Apelacion aceptada: presento una justificacion valida»*. Apelar ya ocurria, a mano.
+
+   ⛔⛔ EL PREDICADO NO ES «ESTA APLICADA»: son CUATRO condiciones, y la tercera es la que
+   cuesta. Si ya hay una revocacion VIVA apuntando a esta sancion y se manda otra, **se
+   regalan puntos** -- una revocacion los manda en positivo. Una RECHAZADA si deja
+   reintentar: un «no» del bloque no puede cerrar la apelacion para siempre.
+   ⚠️ La tercera mira OTRAS filas del array, asi que es la que se cae al «simplificar». */
+function _puedeRevocarSanc_(s, arr){
+  if (!s || s.estado !== 'aplicada') return false;     // solo la que ya quito puntos
+  if (s.origen === 'revocacion') return false;         // una revocacion no se revoca
+  /* ⛔ Y SI NO SE SABE CUANTOS PUNTOS TENIA, NO SE REVOCA (759.a aplicada aqui). El
+     original hacia `-Number(s.puntos||0)`, que convierte «no llego» en un **0** -- y en esta
+     pantalla el 0 no es «nada», es la revocacion de un AVISO. Mejor no ofrecerlo. */
+  if (_ptsSanc_(s.puntos) === null) return false;
+  var L = arr || [], i, x;
+  for (i = 0; i < L.length; i++){
+    x = L[i];
+    if (x && x.origen === 'revocacion' && x.extra
+        && String(x.extra.revoca) === String(s.id) && x.estado !== 'rechazada') return false;
+  }
+  return true;
+}
+
+/* La fila que viaja, IGUAL que la del panel viejo -- y eso no es nostalgia: es la forma que
+   tienen las 2 revocaciones REALES del almacen, y la que lee `flujos/enviar_revocacion.py`.
+   ⛔ Los puntos EN POSITIVO: son los que se devuelven. Con el signo de la original la
+   revocacion volveria a restar, o sea castigaria dos veces a quien gano la apelacion.
+   ⛔ La clave es NATURAL (`revoca-<id>`) y hace falta: `api._post` hace **tres intentos**, y
+   si lo que se pierde es la RESPUESTA el servidor ya escribio -- sin clave, el reintento
+   regala los puntos otra vez. Y una sancion concreta se revoca UNA vez, asi que `revoca-<id>`
+   es exactamente lo que no puede repetirse. El `lote` NO sirve: sale `null` en las manuales.
+   ⚠️ El lote es `revoca-<lote original>` para que varias del mismo bloque caigan en UNA
+   tarjeta y salgan con UN comunicado -- que es lo que el selector de varias buscaba. */
+function _filaRevocacion_(s, texto){
+  return { origen:'revocacion', clave:'revoca-' + s.id,
+    lote: s.lote ? ('revoca-' + s.lote) : null,
+    nombre: s.nombre,
+    motivo: 'Revocación de «' + (s.motivo || 'sanción') + '» — ' + texto,
+    articulo: s.articulo || 'libre',
+    puntos: -(_ptsSanc_(s.puntos) || 0),
+    extra: { revoca: s.id, loteOriginal: s.lote || null,
+             motivoOriginal: s.motivo || null, razon: texto } };
+}
+
 function _validaPuntosSanc_(crudo){
   var t = String(crudo === null || crudo === undefined ? '' : crudo).replace(/^\s+|\s+$/g, '');
   if (t === '')
@@ -2209,6 +2363,17 @@ function _automatismosHTML_(){
       'cambiado después no sale aquí.</div>'
     : '<div class="msub" data-est="sinfecha"><b>Sin fecha</b>: no se sabe de cuándo es esta foto, '+
       'así que no la des por actual.</div>');
+  /* ⛔ EL BOTON DE COMPROBAR (765.a). Daniel (10/09): «darle a un boton y que checkee».
+     ⛔⛔ NO COMPRUEBA LA APP, Y EL TEXTO LO DICE: el inventario se DERIVA del repo y el
+     backend no tiene repo. Lo que hace el boton es levantar el flag `comprobar_automatismos`;
+     el gate lo recoge en su siguiente pasada -- hasta 2 minutos -- y publica el resultado.
+     Decir «comprobado» al pulsar seria mentir justo durante esa espera.
+     ⚠️ Solo en el escritorio: en el movil no hay donde poner esto y nadie lo ha pedido. */
+  h+='<p class="rnota" style="margin:10px 0 0">'+
+    '<button class="btn sm" data-comprauto>Comprobarlo ahora</button> '+
+    '<span style="color:var(--ink3)">Lo calcula el gate en su siguiente pasada, '+
+    '<b>hasta 2 min</b>: la app no puede comprobarlo ella, porque esto sale del '+
+    '<b>repositorio</b> y el servidor no lo tiene.</span></p>';
   h+='<div class="mdoc"><h3>¿Hay algo desviado?</h3>';
   var c=A.comprobacion;
   if(!(c instanceof Array) || !c.length){
@@ -3931,6 +4096,77 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-02-puntos-sin-dato', fecha:'2026-10-02',
+      titulo:'Los puntos de una sanción, dichos igual en las dos caras',
+      items:[
+        /* ⛔ La vista es `estado` en el móvil (la cola es un MODAL desde la tarjeta del PD) y
+           `sanciones` en el escritorio, donde sí es una vista. Lo cazó `probar_novedades.py`
+           la última vez que me equivoqué justo con esta pantalla. */
+        {cara:'escritorio', vista:'sanciones', txt:'En el bloque de sanciones, los puntos de cada '
+          +'persona ya se leen igual: 0 pone «aviso» y un premio lleva su signo («+1 punto»), '
+          +'que antes salía como si quitara. Y si a una fila NO le ha llegado el dato, pone '
+          +'«sin dato» y la previsión «antes → después» se queda quieta en vez de prometer un '
+          +'número que no sabe. El rótulo del bloque dice aparte cuántas son avisos y cuántas '
+          +'están sin dato.'},
+        {cara:'movil', vista:'estado', txt:'En la cola de Sanciones del menú ⋮ los puntos ponen '
+          +'lo mismo que en el ordenador — «aviso», «−1 punto», «+1 punto» — en vez de un número '
+          +'suelto. Antes un 0 se veía igual que un dato que no había llegado.'}
+      ] },
+    { id:'2026-10-02-premio-en-la-cola', fecha:'2026-10-02',
+      titulo:'Un premio ya no se lee como una sanción',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'Los bloques de una reunión traen premiados y '
+          +'sancionados MEZCLADOS, y hasta ahora un premio salía como «aviso» — un apercibimiento '
+          +'a quien se le está premiando por cubrir su disponibilidad. Ahora su fila pone '
+          +'«premio · +0,5 h» (la recompensa son horas, no puntos) y una revocación pone '
+          +'«revocación». Y sobre un premio ya no sale el botón «Justifica»: el servidor nunca lo '
+          +'aceptaba — se lo saltaba y te decía que no podías decidirlo tú, que no era la razón. '
+          +'«Acepta» y «Rechaza» siguen, que son las dos decisiones que sí existen.'},
+        {cara:'movil', vista:'estado', txt:'La cola de Sanciones del menú ⋮ también distingue un '
+          +'premio de una sanción, con el mismo texto que el ordenador.'}
+      ] },
+    { id:'2026-10-02-cargos-turno', fecha:'2026-10-02',
+      titulo:'Al convocar, las tres responsabilidades llegan de verdad',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Marcar <b>Responsable audiovisual</b> o <b>de '
+          +'memoria</b> al convocar <b>no llegaba a ningún sitio</b>: se marcaba, se convocaba, y '
+          +'el turno volvía de Notion sin esas dos asignaciones. Solo el de turno y el coche '
+          +'pasaban al reparto. Ya pasan las tres.<br>Y arriba del reparto hay un recuadro con '
+          +'las <b>responsabilidades pendientes de asignar</b>, que se vacía al repartirlas: '
+          +'antes solo te lo decía el botón de convocar, cuando ya lo intentabas. Una por '
+          +'persona, y la misma persona puede llevar varias.'}
+      ] },
+    { id:'2026-10-02-revocar', fecha:'2026-10-02',
+      titulo:'Revocar una sanción, otra vez desde el escritorio',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'Vuelve la <b>vía de apelación del Art. 34</b>, '
+          +'que estaba en el panel viejo y se había quedado por el camino. En Sanciones hay un '
+          +'bloque <b>«Se pueden revocar»</b> con las ya aplicadas: escribes el motivo '
+          +'(obligatorio) y la revocación entra en la cola <b>como pendiente</b> — se confirma '
+          +'con su bloque, igual que una sanción, y sale un solo comunicado. <b>No borra la '
+          +'sanción</b>: crea la devolución de puntos, y queda el rastro de las dos. Si era un '
+          +'aviso no devuelve puntos, retira el registro. Y no deja revocar dos veces la misma.'}
+      ] },
+    { id:'2026-10-02-apelar-donde', fecha:'2026-10-02',
+      titulo:'Apelar una tarea: ahora dice dónde',
+      items:[
+        {cara:'movil', vista:'tareas', txt:'La tarjeta de Mis tareas decía «si crees que una no '
+          +'te corresponde, puedes apelarla (Art. 34)» — y la app no tramita apelaciones, así '
+          +'que eso mandaba a buscar un botón que no existe. El derecho sigue dicho (es del RRI), '
+          +'y ahora dice dónde se ejerce: <b>fuera de la app</b>, en privado al Project Director.'}
+      ] },
+    { id:'2026-10-02-iphone-instalar', fecha:'2026-10-02',
+      titulo:'En iPhone, el panel ya dice cómo recibir los avisos',
+      items:[
+        /* ⚠️ La vista es `ajustes`… que NO es una de las 7 del móvil. El panel de notificaciones
+           es un MODAL que se abre desde el menú ⋮, igual que Sanciones, así que la vista es
+           `estado` — es la misma trampa que ya me comió `probar_novedades.py` una vez. */
+        {cara:'movil', vista:'estado', txt:'Si abres el panel en <b>Safari del iPhone</b> sin '
+          +'haberlo añadido a la pantalla de inicio, ahora te lo dice y te explica cómo: '
+          +'Compartir → Añadir a pantalla de inicio. Antes te dejaba entrar **sin avisos y sin '
+          +'decir nada**, y en Ajustes ponía «Ábrelo en el móvil» — estando en el móvil. Apple '
+          +'sólo manda notificaciones a las apps abiertas desde ese icono.'}
+      ] },
     { id:'2026-10-01-cola-sanciones-fresca', fecha:'2026-10-01',
       titulo:'La cola de sanciones del m\u00f3vil se pone al d\u00eda sola',
       items:[

@@ -95,14 +95,25 @@ function anilloHTML(valor,etiqueta){
 /* el rango de puntos del bloque se CALCULA, nunca se escribe a mano: un aviso (0
    puntos) no es «-1 punto», y un bloque puede mezclar valores. */
 function rangoLote(){
-  var vals=[],avisos=0;
-  LOTE.items.forEach(function(x){ if(!Number(x.pts)) avisos++; else if(vals.indexOf(x.pts)<0) vals.push(x.pts); });
+  /* ⛔⛔ TRES CUBOS Y NO DOS. Esto era `if(!Number(x.pts)) avisos++`, y `!Number(x)` es
+     cierto para el **0** y para el **hueco**: un bloque con un dato perdido salia
+     indistinguible de uno con un aviso de verdad -- la pantalla decia «1 aviso» sobre
+     algo que no sabia. Hoy el hueco tiene su propio recuento y SE NOMBRA. */
+  var vals=[],avisos=0,huecos=0;
+  LOTE.items.forEach(function(x){
+    var p=_ptsSanc_(x.pts);
+    if(p===null){ huecos++; return; }
+    if(p===0){ avisos++; return; }
+    if(vals.indexOf(p)<0) vals.push(p);
+  });
   vals.sort(function(a,b){return Math.abs(a)-Math.abs(b);});
-  var et=function(pp){ return (pp>0?'+':'−')+Math.abs(pp)+' '+(Math.abs(pp)===1?'punto':'puntos'); };
-  var nS=LOTE.items.length-avisos;
-  var t = !vals.length ? '' : (vals.length===1 ? et(vals[0])+(nS>1?' c/u':'')
-        : 'de '+et(vals[0])+' a '+et(vals[vals.length-1]));
+  /* el rotulo de un valor sale de `_etPtsSanc_`, que es el que usan tambien la fila de
+     la persona y la cola del movil: un solo texto para el mismo dato. */
+  var nS=LOTE.items.length-avisos-huecos;
+  var t = !vals.length ? '' : (vals.length===1 ? _etPtsSanc_(vals[0])+(nS>1?' c/u':'')
+        : 'de '+_etPtsSanc_(vals[0])+' a '+_etPtsSanc_(vals[vals.length-1]));
   if(avisos) t += (t?' · ':'')+avisos+' aviso'+(avisos===1?'':'s');
+  if(huecos) t += (t?' · ':'')+huecos+' sin dato';
   return t;
 }
 
@@ -190,6 +201,115 @@ function _panelSueltas_(){
     '<b>Editar</b> corrige puntos, motivo y artículo <b>al aplicarla</b> —es lo único que deja el '+
     'backend—. <b>Revocar una ya aplicada no se hace desde aquí</b>: el servidor no deja tocar '+
     'lo aplicado, y la revocación va por <span class="mono">flujos/enviar_revocacion.py</span>.</div>');
+}
+
+
+/* ══ REVOCAR: LA VIA DE APELACION, DE VUELTA EN ESTA CARA (763.a, 02/10) ════════════
+
+   ⛔ VA EN UN PANEL PROPIO Y NO EN LA TABLA DEL HISTORIAL: revocar **exige un motivo**, y una
+   celda de tabla no tiene sitio para un motivo obligatorio. Misma forma que «Ya firmaste» de
+   horas (`_escRevPanel_`), que es la que Daniel ya usa para deshacer con motivo.
+   ⛔ Y MARCADORES PROPIOS (`data-rvsid`/`data-rvsmot`/`data-rvs`), no los de decidir: las dos
+   listas conviven en la MISMA pantalla y los manejadores enganchan por atributo **sin acotar**.
+   Es la leccion de `data-revid` en horas y de `data-pdr` en el movil.
+   ⛔ SI NO HAY NADA, NO EXISTE: un panel «Se pueden revocar · 0» en cada visita anuncia trabajo
+   que no hay y compite con la cola de verdad. */
+function _revocablesSanc_(){
+  if (!Array.isArray(SANC_BACK)) return [];
+  return SANC_BACK.filter(function(s){ return _puedeRevocarSanc_(s, SANC_BACK); });
+}
+
+function _revocarSancCard_(s){
+  var m = _m(s.nombre), pts = _ptsSanc_(s.puntos);
+  return '<div class="parte" data-rvsid="' + esc(s.id) + '">' +
+    '<div class="h"><b>' + esc((m && m.pila) || s.nombre) + '</b>' +
+      '<span class="u">' + esc(s.articulo ? ('Art. ' + s.articulo) : '\u2014') + '</span>' +
+      '<span class="u">' + esc(s.lote || 'suelta') + '</span>' +
+      '<span class="q">' + esc(_etSancFila_(s.puntos, s.origen, s.extra)) + '</span></div>' +
+    '<div class="just"><span class="sc">' + esc(s.motivo || '\u2014') + '</span></div>' +
+    /* ⛔ EL AVISO CAMBIA SEGUN SI DEVUELVE PUNTOS O NO. Un solo texto esconderia justo el
+       caso raro: revocar un aviso **no devuelve nada**, retira el registro -- y eso es lo que
+       pesa en el gradiente, que cuenta ocurrencias. */
+    '<div class="ruta">' + (pts
+      ? 'Revocar le <b>devuelve ' + Math.abs(pts) + ' punto' + (Math.abs(pts) === 1 ? '' : 's') +
+        '</b>. Entra en la cola como pendiente y se confirma con su bloque.'
+      : 'Era un <b>aviso</b>: no devuelve puntos, retira el <b>registro</b> y su reincidencia. '+
+        'Entra en la cola como pendiente y se confirma con su bloque.') + '</div>' +
+    '<textarea data-rvsmot placeholder="Motivo de la revocaci\u00f3n \u2014 obligatorio, al menos 8 caracteres\u2026"></textarea>' +
+    '<div class="acts"><button class="btn no" data-rvs="' + esc(s.id) + '">Revocar</button></div>' +
+  '</div>';
+}
+
+function _panelRevocarSanc_(){
+  var lista = _revocablesSanc_(), i, cuerpo = '';
+  if (!lista.length) return '';
+  for (i = 0; i < lista.length; i++) cuerpo += _revocarSancCard_(lista[i]);
+  return pan('Se pueden revocar', lista.length + '',
+    '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">' +
+    'La v\u00eda de apelaci\u00f3n del <b>Art. 34</b>: una sanci\u00f3n ya aplicada se retira con un ' +
+    '<b>motivo</b>, y la revocaci\u00f3n entra en la cola como pendiente \u2014 se confirma con su ' +
+    'bloque, igual que una sanci\u00f3n. <b>Queda el rastro de las dos.</b></p></div>' + cuerpo);
+}
+
+/* ⛔⛔ Y ESTO ES EL CABLE, que es donde murio la version anterior de esta pantalla: «Denegar» y
+   «Estimar» estaban pintados y **no enganchados a nada** -- pulsarlos no hacia absolutamente
+   nada y no lo decia. Sobre puntos de personas, eso es lo mas parecido a mentir que puede hacer
+   una interfaz. */
+async function _engRevocarSanc_(){
+  $$('[data-rvs]').forEach(function(b){
+    b.onclick = async function(){
+      if (b.disabled) return;
+      var caja = b.closest('[data-rvsid]'); if (!caja) return;
+      var ta = caja.querySelector('[data-rvsmot]'), mot = ta ? ta.value.trim() : '';
+      /* El mismo minimo que «Revertir» de horas (8): un viaje de red para que te digan lo que
+         ya se sabia es una pantalla que te hace perder el rato. */
+      if (mot.length < 8){
+        if (ta){ ta.focus(); ta.style.borderColor = 'rgba(232,145,46,.6)';
+          setTimeout(function(){ ta.style.borderColor = ''; }, 1600); }
+        tost('Revocar exige un motivo de al menos 8 caracteres. Sin \u00e9l no se env\u00eda.');
+        return;
+      }
+      if (typeof backendOK === 'undefined' || !backendOK || !SESION
+          || !Array.isArray(SANC_BACK)){
+        tost('Sin conexi\u00f3n no se puede revocar: no se ha guardado nada.'); return; }
+      /* ⛔ SE RELEE DE `SANC_BACK` POR SU ID, no se confia en lo pintado: entre pintar y pulsar
+         hay un refresco cada 9 s, y la sancion puede haber cambiado de estado. */
+      var s = null, i;
+      for (i = 0; i < SANC_BACK.length; i++)
+        if (String(SANC_BACK[i].id) === String(caja.dataset.rvsid)) s = SANC_BACK[i];
+      if (!s){ tost('Esa sanci\u00f3n ya no est\u00e1 en la cola: recarga la pantalla.'); return; }
+      /* ⛔ Y SE VUELVE A PREGUNTAR AL PREDICADO sobre el dato releido: si mientras escribias el
+         motivo entro una revocacion de otro, mandar la segunda REGALA puntos. */
+      if (!_puedeRevocarSanc_(s, SANC_BACK)){
+        tost('Esa sanci\u00f3n ya no se puede revocar: puede que haya entrado otra revocaci\u00f3n.');
+        pintar(); return; }
+      var _p = _ptsSanc_(s.puntos) || 0;
+      if (!confirm('Revocar esta sanci\u00f3n.' + String.fromCharCode(10, 10) +
+        (_p ? 'Le devuelve ' + Math.abs(_p) + ' punto' + (Math.abs(_p) === 1 ? '' : 's') + '.'
+            : 'Era un aviso: retira el registro, no devuelve puntos.') +
+        String.fromCharCode(10, 10) +
+        'Entra en la cola como PENDIENTE y se confirma con su bloque. \u00bfSigo?')) return;
+      b.disabled = true; var prev = b.textContent; b.textContent = 'Revocando\u2026';
+      try{
+        var r = await api.pushSancion([_filaRevocacion_(s, mot)]);
+        /* ⛔⛔ SE LEE `rechazadas`. El backend **SALTA** a quien no es de tu jurisdiccion en vez
+           de lanzar, asi que sin mirarlo el `tost` cantaria una revocacion que NO EXISTE -- y
+           sobre los puntos de una persona. Se relanza para caer en el `catch` de siempre. */
+        if (r && r.rechazadas && r.rechazadas.length)
+          throw new Error('no puedes tocar la sanci\u00f3n de ' + r.rechazadas.join(', ') +
+                          ': est\u00e1 fuera de tu jurisdicci\u00f3n');
+        /* ⚠️ Y LO QUE ENTRO, no lo que se mando: `nuevas` puede ser 0 si la clave ya estaba
+           -- o sea si ya la habias mandado --, y decir «hecho» ahi manda a esperar algo que no
+           va a pasar dos veces. */
+        var _n = (r && typeof r.nuevas === 'number') ? r.nuevas : 1;
+        tost(_n ? 'Revocaci\u00f3n en la cola, pendiente de confirmar con su bloque.'
+                : 'Esa revocaci\u00f3n ya estaba en la cola: no se ha duplicado.');
+        await _cargarSanciones_();
+        pintar();
+      }catch(e){ tostErr('No se pudo revocar', e); }
+      finally{ b.disabled = false; b.textContent = prev || 'Revocar'; }
+    };
+  });
 }
 
 function _panelHistSanc_(){
@@ -539,7 +659,15 @@ function _loteReal_(){
   var its=pend.filter(function(s){ return s.lote===lote; });
   LOTE={ real:true, lote:lote, nombre:lote, cerrado:false,
     motivo:its[0].motivo||'—', art:its[0].articulo||'libre',
-    items:its.map(function(s){ return {id:s.id, n:s.nombre, pts:Number(s.puntos)||0,
+    /* ⛔ `_ptsSanc_`, NO `Number(s.puntos)||0` (758.a bis). Aqui es donde el «no llego»
+       se convertia en un **0**, y a partir de este punto ya no hay forma de distinguirlo
+       de un aviso de verdad: todo lo de abajo media un dato fabricado aqui. */
+    /* ⛔ `origen` Y `extra` VIAJAN (759.a bis). Sin ellos la fila no puede saber que es un
+       PREMIO -- y `construir_reunion.py` los mete en el mismo lote --, asi que se pintaba
+       como «aviso» y se le ofrecia «Justifica», que el servidor se salta en silencio.
+       📏 Medido antes: 2 escrituras de `origen` en la app y CERO lecturas. */
+    items:its.map(function(s){ return {id:s.id, n:s.nombre, pts:_ptsSanc_(s.puntos),
+      origen:s.origen||null, extra:s.extra||null,
       /* ⛔ `null`, NO `'aceptar'`. Aqui se fabricaba la decision de todo lo que nadie
          habia tocado, y el panel la pintaba como ELEGIDA: los 30 con el boton «Acepta»
          encendido, la prevision de puntos restando, y el boton de cerrar diciendo

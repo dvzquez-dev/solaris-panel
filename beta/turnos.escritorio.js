@@ -38,6 +38,31 @@ function _pintarBotonConvocar_(){
   return motivo;
 }
 
+/* ⛔ EL RECUADRO DE RESPONSABILIDADES PENDIENTES (764.a, 02/10). Daniel: *«un recuadrito que
+   ponga responsabilidades pendientes a asignar»*. Hasta hoy lo que faltaba solo se decia en el
+   AVISO DEL BOTON (`_porQueNoSeConvoca_`), o sea **cuando ya intentabas convocar**: esto lo pone
+   delante mientras reparte.
+   ⛔ Sale de `_cargosQueFaltan_`, que es LA MISMA puerta que usa el boton. Dos criterios para
+   «que falta» acaban diciendo cosas distintas en la misma pantalla.
+   ⚠️ Y NO DESAPARECE al completarse, al contrario que los paneles: son un conjunto FIJO de
+   tres, no una lista de trabajo que crece. Ver «las tres asignadas» es la confirmacion de que ya
+   se puede convocar -- y la regla de «si no hay nada, no existe» es para lo otro.
+   ⚠️ El nombre LARGO, igual que en el aviso: un «falta AV» no le dice nada a quien convoca por
+   primera vez. */
+function _cajaCargosPend_(cargos){
+  var faltan = _cargosQueFaltan_(cargos || TUR_CARGOS), nombres = [], i, j;
+  for(i=0;i<faltan.length;i++)
+    for(j=0;j<CARGOS_TURNO.length;j++)
+      if(CARGOS_TURNO[j].k === faltan[i]) nombres.push(CARGOS_TURNO[j].et);
+  if(!nombres.length)
+    return '<div class="nota" style="margin:0 0 9px">✅ <b>Las tres responsabilidades están '+
+      'asignadas.</b> Una misma persona puede llevar varias.</div>';
+  return '<div class="nota" style="margin:0 0 9px;border-color:rgba(232,145,46,.35)">'+
+    '<b>Pendientes de asignar:</b> '+esc(_unirY_(nombres))+'. '+
+    '<span style="color:var(--ink3)">Una por persona — y la misma persona puede llevar '+
+    'varias.</span></div>';
+}
+
 function pintarReparto(){
   var c=document.getElementById('tuLista'); if(!c) return;
   var nn=Object.keys(TUR_SEL);
@@ -46,7 +71,9 @@ function pintarReparto(){
       'Pulsa arriba a qui\u00e9n convocas y aqu\u00ed le pones su papel.</p>';
     return;
   }
-  c.innerHTML=nn.map(function(n){
+  /* ⛔ EL RECUADRO VA DELANTE de las fichas: lo que falta se lee antes de repartir, no
+     despues. Y se recompone en cada `pintarReparto()`, que es lo que lo vacia solo. */
+  c.innerHTML=_cajaCargosPend_()+nn.map(function(n){
     var e=TUR_SEL[n], m=_m(n);
     return '<div class="repf">'+
       '<b>'+esc((m&&m.pila)||n)+'</b>'+

@@ -30,8 +30,16 @@ function _notisMsg(t){ var b=$('#notisMsg'); if(b) b.textContent=t; }
      · `'denegado'`  — se denego. El navegador no vuelve a preguntar solo: hay que ir a los
        ajustes del sistema, y la pantalla dice donde. */
 function _faltanNotis_(){
-  if(!_pushSoportado_()) return null;                       // no puede: se pasa
+  /* ⛔⛔ EL ORDEN ES EL ARREGLO (761.a, 02/10). Aqui `!_pushSoportado_()` iba PRIMERO, y
+     ese predicado exige `PushManager` **y** `Notification` -- que es exactamente lo que
+     Apple NO da en una pestana de Safari: el push web de iOS vive solo en las apps
+     anadidas a la pantalla de inicio. O sea que en el unico caso para el que existe la
+     rama `'ios'`, la guarda de arriba salia antes con `null` y el gate dejaba pasar al
+     iPhone **sin avisos y en silencio**, en una app que los da por obligatorios.
+     ✅ Primero «¿se puede cumplir?» (iPhone sin instalar: si, instalandola) y despues
+     «¿puede este aparato?» (no: se pasa). Es el criterio que la cabecera ya describia. */
   if(_esIOS_() && !_esStandalone_()) return 'ios';
+  if(!_pushSoportado_()) return null;                       // no puede: se pasa
   if(Notification.permission==='granted') return null;
   return (Notification.permission==='denied') ? 'denegado' : 'pedir';
 }
@@ -146,13 +154,17 @@ function _notisHTML_(){
     '<b>No se pudo confirmar tu registro de avisos</b> la ultima vez que abriste el panel, '+
     'asi que puede que no te lleguen: '+esc(String(_fp))+'.<br>Cierra y vuelve a abrir; si '+
     'sigue, avisa.</p></div>' : '';
+  /* ⛔⛔ MISMO ORDEN QUE `_faltanNotis_`, Y POR LO MISMO (761.a). Con el viejo, un iPhone
+     en Safari leia «Ábrelo en el movil» **sujetando el movil** -- y sin la unica frase que
+     lo arregla, que estaba escrita justo debajo y no la alcanzaba nadie. Un mensaje que
+     describe otro problema cuesta mas que ninguno: manda a hacer lo que ya se ha hecho. */
+  if(_esIOS_() && !_esStandalone_())
+    return _avisoFallo+'<div class="tarj"><p class="rnota" style="margin:0;line-height:1.6">Para recibir avisos en <b>iPhone</b>: '+
+      'pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> y abre la app desde ese icono.</p></div>';
   if(!_pushSoportado_())
     return _avisoFallo+'<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador '+
       'no admite notificaciones. El panel las da por <b>obligatorias</b>, así que aquí te '+
       'estás perdiendo los avisos de turnos, reuniones y decisiones. Ábrelo en el móvil.</p></div>';
-  if(_esIOS_() && !_esStandalone_())
-    return _avisoFallo+'<div class="tarj"><p class="rnota" style="margin:0;line-height:1.6">Para recibir avisos en <b>iPhone</b>: '+
-      'pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> y abre la app desde ese icono.</p></div>';
   /* El botón de «activar» se fue: para llegar hasta aquí ya has pasado el gate del arranque.
      Lo que queda es elegir QUÉ te llega. */
   return _avisoFallo+'<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
