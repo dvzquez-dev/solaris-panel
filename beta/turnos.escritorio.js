@@ -861,20 +861,17 @@ function _puedeConvocarDisp_(){
 
 function _convocarDispPanel_(){
   if(!_puedeConvocarDisp_()) return '';
-  /* ⛔ Y EL BOTÓN QUE EL SERVIDOR RECHAZABA SIEMPRE (643.ª). Con la cuenta del PD esto pintaba
-     el formulario y el interruptor, y los dos acaban en `setControl`, que sólo acepta la
-     cuenta admin. Se dice ANTES de pulsar, y se dice QUÉ cuenta: un botón que siempre falla
-     es un rótulo.
-     ⚠️ El interruptor se va con él: su estado lo lee `getControl`, con la misma puerta, así
-     que con esta cuenta `AVISOS_ON` se queda en `false` sin haber preguntado — un «no lo sé»
-     pintado como «apagado» (§3c-24).
-     ⚠️ Sin SESIÓN (demo local) no hay cuenta de la que hablar: sale el formulario, y su clic
-     ya contesta «Sin conexión no se puede convocar». */
-  if(SESION && !_puedeImpersonar_()) return pan('Convocar disponibilidad','solo con la cuenta admin',
-    '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      '<b>Desde esta cuenta el servidor lo rechaza.</b> Abrir la disponibilidad y encender los '+
-      'avisos pasan por una acción que hoy solo acepta la cuenta de administración '+
-      '(<b>'+esc(ADMIN_EMAIL)+'</b>): entra con ella y este panel sale aquí entero.</p></div>');
+  /* ⛔⛔ AQUÍ HABÍA UNA SEGUNDA GUARDA, Y SE RETIRA PORQUE YA NO ES VERDAD (643.ª → 758.ª).
+     Decía «solo con la cuenta admin» y era cierta: `setControl` exigía `admin` para cualquier
+     control, así que con la cuenta del PD el botón siempre fallaba y se avisaba antes de
+     pulsarlo. El 02/10 la 758.ª abrió esa puerta —`CONTROLES_PD` + `_rangoEscritorio_() >= 3`,
+     y `convocar_disponibilidad` está en la lista—, pero **se hizo sólo la mitad de servidor**:
+     esta guarda siguió tapando el formulario a la única persona a la que el permiso nuevo iba
+     dirigido. Desplegar no habría bastado. *Una guarda ciega puede proteger algo YA IMPOSIBLE.*
+     ⚠️ No se abre a nadie más: `_puedeConvocarDisp_` ya exige **rango >= 3**, que es la misma
+     condición que mira el servidor. José (2) y los coordinadores (1) siguen sin ver el panel.
+     ⛔ ORDEN: esta cara sólo puede llegar a producción **después** de desplegar el backend. Al
+     revés, el botón sale y el servidor lo rechaza, que es el defecto de partida del revés. */
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   return pan('Convocar disponibilidad','abre el plazo · solo dirección',
