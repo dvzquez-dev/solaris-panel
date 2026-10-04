@@ -1902,7 +1902,10 @@ function vHoras(){
           '</div><div class="d">banda sana 70–120</div></div>'
         : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+
     '</div>'+
-    '<h2 class="sec">Ranking de horas<span class="ln"></span>temporada '+DATA.temporada+'</h2>'+
+    /* ⛔ La gemela del «ciclo» de la portada: sin temporada esto decía **«temporada
+       null»**. El rótulo se calla entero, que es lo honesto cuando no se sabe de qué
+       temporada son las horas que hay debajo. */
+    '<h2 class="sec">Ranking de horas<span class="ln"></span>'+(DATA.temporada?('temporada '+DATA.temporada):'')+'</h2>'+
     '<div class="tarj rank">'+
       (filas
         ? filas+'<p class="rnota">Se ponderan tus horas de la temporada entre los meses que llevas en el '+
@@ -1922,7 +1925,15 @@ function _rankSubsHTML_(){
      panel trae la lista. El panel real **no la trae**, así que esto pintaba la semilla
      numerada 1..5 como si fuera un ranking — y las unidades nuevas ni aparecían.
      `_llego_('subs')` lo dice, y es la misma puerta que ya usan los movimientos. */
-  var subs=_llego_('subs') ? (DATA.subsistemas||[]) : [];
+  /* ⛔⛔ AQUÍ SE LEÍA LA FOTO: `DATA.subsistemas` trae `media` y `n` CONGELADOS, y medido
+     el 04/10 contra el panel vivo no cuadraban con sus propios miembros (GNC 32,2 frente
+     a 22,7). Ahora los números se calculan con la gente que esta pantalla tiene delante
+     — `_subsEnVivo_`, al lado de `_activos_` en `comun.js` —, así que **no pueden**
+     discrepar de ella y se mueven en cuanto se mueven las horas. Del array del panel solo
+     se conservan los NOMBRES: quién compite es de `flujos/umbral.SUBSISTEMAS`.
+     ⚠️ `_llego_('subs')` se queda: sin la lista del servidor no hay nombres que rankear,
+     y la semilla de maqueta volvería a pintarse como un ranking. */
+  var subs=_llego_('subs') ? _subsEnVivo_() : [];
   /* ⛔ Y EL DIVISOR NO PUEDE SER 0. Con el subsistema de cabeza a `media:0` —un mes
      recién cerrado— el ancho sale `NaN%`, que es CSS INVÁLIDO: el navegador lo descarta,
      y como este `<i>` no tiene regla propia cae a `width:auto` y **todas las barras

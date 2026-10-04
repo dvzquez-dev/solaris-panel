@@ -570,7 +570,11 @@ function _libroPuntosHTML_(){
     (r.ultimos.length ? r.ultimos.map(function(m){
       /* El 0 no lleva signo: «−0» obliga a leerlo dos veces para acabar sabiendo que no te
          quitaron nada. Es el caso de una justificada. */
-      var sg = m.p>0 ? '+'+m.p : (m.p<0 ? '−'+Math.abs(m.p) : '0');
+      /* ⛔ Y el HUECO no se pinta como un 0. Con `m.p === null` las dos comparaciones de
+         abajo son falsas y caía en la rama del 0 — o sea que «no se sabe lo que te costó»
+         se leía como «no te costó nada». `_etPtsSanc_` ya es el rótulo de los tres casos. */
+      var sg = (m.p === null || m.p === undefined) ? _etPtsSanc_(null)
+             : (m.p>0 ? '+'+m.p : (m.p<0 ? '−'+Math.abs(m.p) : '0'));
       return '<div class="retf"><span class="pt'+(m.p>0?' mas':'')+'">'+sg+'</span>'+
         '<span class="mo"><b>'+esc(m.t)+'</b><small>ART. '+esc(m.art)+' · '+esc(m.f)+'</small></span>'+
         '<span class="vv">'+(m.vv || (m.rep?'vuelve el<br>'+m.rep:'no caduca'))+'</span></div>';

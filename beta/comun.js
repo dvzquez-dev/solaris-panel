@@ -262,6 +262,153 @@ function _genUnion_(rangos, slot){
 function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre) : 0; }
 
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
+/* El mes ABIERTO, calculado con quien esta: `{media, gente}`, o `null` si no se sabe.
+   Daniel, 04/10: *«y el objetivo de horas q aparece recuerda q tiene q estar vivo y eso»*.
+
+   ⛔⛔ EL `mesAbierto` DEL PANEL ES UNA FOTO, Y MEDIDA ERA DE OTRO MES. El 04/10 el panel vivo
+   traía `{periodo: '2026-07', gente: 32, media: 15.5781}` — **julio, y las 32 filas incluyendo
+   a los nueve que se fueron** — mientras la media de los **23 activos** con `horasMes` era
+   **18,91**. Ese número es el ingrediente del objetivo del mes, o sea de lo que la gente lee
+   para planificar.
+
+   ⛔ LAS BAJAS NO CUENTAN (`_activos_`) y LAS HORAS SE PIDEN A `_hMesReal_`, que es la única
+   puerta: `hMes` significa dos cosas según la cara. Quien no tiene el dato vivo **se cae de la
+   muestra**, no entra como un cero.
+   ⛔ Y SIN NADIE CONTESTA `null`, NO 0 (§3c-24): un 0 es un objetivo — diría que el equipo no
+   ha hecho nada este mes — y `null` deja que el llamador caiga a su respaldo. */
+function _mesAbiertoVivo_(){
+  var act = (typeof _activos_ === 'function') ? _activos_() : [], v = [], i;
+  for(i = 0; i < act.length; i++){
+    var h = _hMesReal_(act[i]);
+    if(typeof h === 'number' && isFinite(h)) v.push(h);
+  }
+  if(!v.length) return null;
+  var s = 0;
+  for(i = 0; i < v.length; i++) s += v[i];
+  return { media: s / v.length, gente: v.length };
+}
+
+/* Los meses cerrados que SON de la temporada en curso. `[]` si no consta que lo sean.
+
+   ⛔⛔ PROMEDIAR MESES DE OTRA TEMPORADA CON EL DE AHORA ES LA 776.ª OTRA VEZ, y aquí con un
+   objetivo contra el que la gente planifica. Medido el 04/10: el panel vivo trae
+   `umbral.temporada: '25/26'` con sus **10 meses cerrados**, y la temporada en curso es la
+   **26/27**, que no tiene ninguno. Con los diez dentro el objetivo salía **12,85 h**; con el
+   mes vivo solo, **12,60**.
+   ⛔ Y SI EL UMBRAL NO DICE DE QUÉ TEMPORADA ES, TAMPOCO CUENTAN (§3c-24): «no lo sé» no es
+   «cuadra», y el lado seguro es no promediar meses que podrían ser de otro año.
+   ⚠️ Lo que NO se hace es dejar de contarlos siempre: con la temporada igual cuentan todos,
+   que es para lo que `medias` existe. */
+function _mediasDeEstaTemp_(ing){
+  if(!ing || !ing.medias || !ing.medias.length) return [];
+  var t = ing.temporada, hoy = (typeof DATA !== 'undefined') ? DATA.temporada : null;
+  if(!t || !hoy || t !== hoy) return [];
+  return ing.medias;
+}
+
+/* Redondear a UN decimal exactamente como `round(x, 1)` de Python.
+
+   ⛔⛔ EXISTE PORQUE LAS DOS IMPLEMENTACIONES DABAN DOS NÚMEROS. La media de Propulsión
+   salía **7,1 en la cara y 7,0 en `flujos/umbral.subsistemas_vivos`**, y lo cazó compararlas
+   sobre los **23 activos** — que es lo único que lo caza: cada una, por separado, parece
+   correcta. (El panel trae **32 filas**: 23 activos y **9 de baja**. Decir «32» por el
+   equipo es contar a los que se fueron — lo corrigió Daniel el 04/10.)
+   📏 Medido: los activos de Propulsión tienen `[2, 2, 2, 27.25, 2]`, suma **35,25**, media
+   **7,05**. El doble de 7,05 está **justo por debajo** del medio, así que Python contesta
+   **7,0**. Y `Math.round(7.05*10)/10` contesta **7,1**, porque `7.05*10` da **70,5 exacto**:
+   la multiplicación redondea hacia arriba y se pierde la información que deciía. `toFixed(1)`
+   hace lo mismo.
+
+   ✅ LA CURA ES NO MULTIPLICAR PARA DECIDIR: el punto medio entre `f/10` y `(f+1)/10` se
+   construye como `(2f+1)/20` y se compara contra `x` **en su propio espacio**. Con 7,05 el
+   medio sale el MISMO doble que `x`, o sea empate, y el empate va al par — que es la regla de
+   Python. Con 7,04 y 7,06 contesta 7,0 y 7,1 como se espera.
+
+   ⚠️ Y es una GEMELA, no una copia inocente: si algún día cambia el redondeo de un lado hay
+   que cambiarlo en el otro. Lo vigila el banco comparando las dos sobre un caso con empate. */
+function _red1_(x){
+  if(typeof x !== 'number' || !isFinite(x)) return null;
+  var neg = x < 0;
+  if(neg) x = -x;
+  var f = Math.floor(x * 10), medio = (2 * f + 1) / 20, n;
+  if(x > medio) n = f + 1;
+  else if(x < medio) n = f;
+  else n = (f % 2 === 0) ? f : f + 1;        /* empate: al par, como Python */
+  return (neg ? -n : n) / 10;
+}
+
+/* La media de horas del mes por persona y subsistema, **calculada con los miembros que la
+   pantalla tiene delante**. Daniel, 04/10: *«q las horas por subsistema etc todo eso se tiene
+   q actualizar en directo»*.
+
+   ⛔⛔ EL AGREGADO DEL PANEL ES UNA FOTO, Y NO CUADRA CON SUS PROPIOS MIEMBROS. Medido el
+   04/10 contra el panel vivo (`generado: 2026-09-23`), recalculando con sus **23 activos**
+   (de 32 filas, 9 de baja):
+
+       GNC              congelado 32,2   en vivo 22,7
+       Aviónica         congelado 17,7   en vivo 14,3
+       Aeroestructuras  congelado  6,9   en vivo  9,8
+       Propulsión       congelado  5,5   en vivo  7,0
+       Org&Mark         congelado 11,5   — no es un subsistema
+
+   O sea que la tarjeta enseñaba un número que **no cuadra con la gente que tiene al lado**, y
+   encima un subsistema que ya no compite — el congelado salió de una versión vieja de
+   `flujos/umbral.SUBSISTEMAS`.
+
+   ⛔⛔ EL PROJECT DIRECTOR Y ORG&MARK NO COMPITEN, Y ESO ES DELIBERADO. Daniel, 04/10:
+   *«marta y yo no somos de ningun subsistema»* y *«claro estamos en el ranking individual
+   pero no en el de subsistemas»*. Su `unidad` es `Project Director` y `Org&Mark`, ninguna
+   en `SUBSISTEMAS`, así que caen del ranking de unidades **y siguen en el individual**,
+   que sale de `ranking_personas` y no mira la unidad. Los 23 activos son **21 en los 4
+   subsistemas + los dos**.
+   ⚠️ Y por eso el agregado congelado traía **Org&Mark con media 11,5**: sobra. Si alguien
+   vuelve a «arreglar» esto añadiéndolos, está metiendo a una persona sola como si fuera un
+   subsistema de uno — y entonces encabeza o cierra el ranking por su propia cifra.
+
+   ✅ LOS NOMBRES LOS DECIDE EL PANEL, LOS NÚMEROS SE CALCULAN AQUÍ. Quién compite es una regla
+   de negocio cuyo dueno es `flujos/umbral.SUBSISTEMAS`, y la cara **no la reinventa**: coge los
+   `u` del array. Lo que deja de leer son la `media` y el `n`, que es lo que envejece.
+
+   ⛔ LAS BAJAS NO CUENTAN, y por eso se pasa por `_activos_`: con 8 personas donde hay 4 la
+   media dice otra cosa. Es la misma razon escrita en `flujos/umbral.subsistemas_vivos`.
+   ⛔ Y LAS HORAS SE PIDEN A `_hMesReal_`, que es LA UNICA PUERTA: `hMes` significa dos cosas
+   según la cara —en el escritorio `_aplicarPanel_` lo pisa con las del mes— y mezclar las dos
+   magnitudes en una media es como se obtiene un número que no es de nadie. Quien no tiene el
+   dato vivo **se cae de la muestra**, no cuenta como un cero: *«quien no aparece no estaba»*.
+   ⚠️ Esto divergiría de Python si algún subsistema se quedara sin nadie con `horasMes`:
+   `subsistemas_vivos` cae a `hMes` y aquí no. Medido el 04/10 con los 23 activos: **0 de ellos**
+   caen a ese respaldo (los 9 sin `horasMes` son exactamente los 9 `baja`), así que hoy las dos
+   contestan lo mismo. Queda fichado en `docs/pendientes.md`. */
+function _subsEnVivo_(){
+  var nom = [], i, j;
+  var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [];
+  for(i = 0; i < lista.length; i++) nom.push((lista[i] && lista[i].u) || lista[i]);
+  var por = {}, act = _activos_();
+  for(i = 0; i < act.length; i++){
+    var m = act[i], u = m.unidad;
+    if(!u) continue;
+    var k = -1;
+    for(j = 0; j < nom.length; j++) if(nom[j] === u){ k = j; break; }
+    if(k < 0) continue;                      /* no compite: fuera del ranking, sin ruido */
+    var h = _hMesReal_(m);
+    if(typeof h !== 'number' || !isFinite(h)) continue;
+    if(!por[u]) por[u] = [];
+    por[u].push(h);
+  }
+  var out = [];
+  for(i = 0; i < nom.length; i++){
+    var v = por[nom[i]];
+    if(!v || !v.length) continue;            /* nombrado pero sin nadie activo: NO sale */
+    var s = 0;
+    for(j = 0; j < v.length; j++) s += v[j];
+    /* ⛔ `_red1_`, no `Math.round(x*10)/10`: aquel daba 7,1 donde Python da 7,0.
+       Ver la cabecera de `_red1_`, con la medición. */
+    out.push({ u: nom[i], media: _red1_(s / v.length), n: v.length });
+  }
+  out.sort(function(a, b){ return (b.media - a.media) || (a.u < b.u ? -1 : 1); });
+  return out;
+}
+
 
 /* Las horas del mes ANTERIOR, **del panel de verdad**. `null` si no llegan.
 
@@ -551,10 +698,23 @@ function _umbral_(){
      ⚠️ Y el `if(den>0)` de abajo PASA A ESTAR VIVO con esto: hasta hoy `medias`
      traia al menos un mes, asi que `den>=1` siempre. Ahora `den` puede ser 0 -sin
      meses cerrados y sin mes abierto- y sin esa guarda seria `0/0` = NaN en pantalla. */
-  if(ing && ing.medias){
+  /* ⛔⛔ LOS DOS INGREDIENTES SE PIDEN, NO SE LEEN DE LA FOTO (779.ª, orden de Daniel:
+     *«el objetivo de horas q aparece recuerda q tiene q estar vivo»*). Los meses cerrados
+     sólo cuentan si son **de esta temporada** — el panel del 04/10 traía los **10 de la
+     25/26** — y el mes abierto se **calcula** con los activos — el panel decía `periodo:
+     2026-07` y `gente: 32`. Medido: el objetivo pasaba de **12,85** a **12,60 h**. */
+  var _med=_mediasDeEstaTemp_(ing), _mv=_mesAbiertoVivo_();
+  /* ⚠️ El vivo MANDA sobre el del panel, y el del panel sigue siendo el respaldo: un
+     roster sin horas de nadie -lo que `Codigo.gs` le sirve a un raso- no puede dejar la
+     pantalla sin objetivo. */
+  var ma=(ing && (_mv || ing.mesAbierto)) || null;
+  /* ⛔⛔ EL MES ABIERTO CUENTA COMO INGREDIENTE, VENGA DEL VIVO O DE LA FOTO. Mi primera
+     version exigia `_med.length || _mv` y con **cero meses cerrados** -- que es TODO el
+     primer mes de cada temporada, y cuando mas importa -- se caia al respaldo cableado.
+     Lo cazaron los dos casos que fosilizan esa leccion, y tenian razon. */
+  if(ing && (_med.length || (ma && typeof ma.media==='number'))){
     var num=0, den=0;
-    ing.medias.forEach(function(x){ num+=x; den+=1; });        // cada mes cerrado pesa 1
-    var ma=ing.mesAbierto;
+    _med.forEach(function(x){ num+=x; den+=1; });              // cada mes cerrado pesa 1
     if(ma && typeof ma.media==='number'){
       var w=_fraccionDelMes_();                                 // el abierto, a prorrata
       num+=ma.media*w; den+=w;
@@ -571,7 +731,11 @@ function _umbral_(){
      es la misma cuenta -pondera por persona, no por mes- pero es del mismo orden y honesta.
      Y si ni eso, al ultimo valor conocido: nunca a 2/3 de tus propias horas, que no es el
      umbral de nadie. */
-  var hs=(DATA.miembros||[]).map(function(m){
+  /* ⛔ `_activos_`, NO `DATA.miembros`: el panel trae **32 filas con 9 de baja**, y este
+     respaldo promediaba el ritmo de los nueve que se fueron dentro del objetivo del mes
+     — que es contra lo que la gente planifica. Lo corrigió Daniel: *«recuerda que ahora
+     hay 23 miembros»*. */
+  var hs=_activos_().map(function(m){
       return (typeof m.horasTemp==='number' && m.meses) ? (m.horasTemp/m.meses) : null;
     }).filter(function(h){ return typeof h==='number'; });
   if(hs.length<2) return UMBRAL;
@@ -1776,7 +1940,11 @@ function _movDeSancion_(s){
        justificada, pero si algun dia mandara el valor crudo se veria «−1» al lado de «no
        restó», que es lo peor que puede pasar aqui: dos cosas ciertas por separado que juntas
        se contradicen, y la persona sin saber si le quitaron el punto o no. */
-    p: just ? 0 : (Number(s.puntos)||0),
+    /* ⛔⛔ AQUI HABIA `Number(s.puntos)||0`, EL MISMO FALLO DE LA 759.ª EN EL LIBRO QUE CADA
+       UNO VE DE SI MISMO: un `puntos` que no llegó salía como **0**, que no es «no lo sé»
+       sino «aviso, no me costó nada». Se reutiliza `_ptsSanc_` en vez de reescribir la regla.
+       ⚠️ El 0 de una **justificada** se queda: ése es deliberado y está explicado. */
+    p: just ? 0 : _ptsSanc_(s.puntos),
     /* Los puntos SE REINICIAN CADA TEMPORADA (RRI Art. 29), no caducan sanción a sanción. Se
        dice así, con palabras, en vez de inventarse una fecha exacta que el RRI no fija. */
     vv: just ? 'justificada<br>no restó' : 'hasta el fin<br>de temporada'

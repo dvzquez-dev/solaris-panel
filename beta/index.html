@@ -108,17 +108,17 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=89f50ab"></script>
+<script src="comun.js?v=6790987"></script>
 <script src="notis.movil.js?v=8199ae8"></script>
 <script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=e46c287"></script>
 <script src="turnos.movil.js?v=d8976c3"></script>
 <script src="buzon.movil.js?v=49f2aa6"></script>
 <script src="documentos.movil.js?v=7c63a19"></script>
-<script src="sanciones.movil.js?v=1016b3e"></script>
+<script src="sanciones.movil.js?v=221cccc"></script>
 <script src="reuniones.movil.js?v=4dd9f9e"></script>
-<script src="horas.movil.js?v=5509be9"></script>
-<script src="equipo.movil.js?v=fa1ed99"></script>
+<script src="horas.movil.js?v=aa2239f"></script>
+<script src="equipo.movil.js?v=6b7e2bf"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -197,7 +197,17 @@ var _DIAS3_=['dom','lun','mar','mié','jue','vie','sáb'];
 var REV2_NOM='Jos\u00e9 Manuel Torres Rodr\u00edguez';
 
 var DATA={
-  generado:'2026-07-24', temporada:'25/26',
+  /* ⛔⛔ UNA SEMILLA NO AFIRMA: `null`, NO UNA FECHA TECLEADA. Aquí ponía
+     `generado:'2026-07-24', temporada:'25/26'` y el móvil los pintaba **sin ninguna
+     marca**: «SOLARIS · datos a 24/07/2026», «ciclo 25/26» y «Ranking de horas ·
+     temporada 25/26» salían igual que si vinieran del servidor. Una fecha tecleada **no
+     se pone roja al caducar**: deja la pantalla afirmando, y el «0 vistas rotas» de
+     `pintar_vistas.py` sigue saliendo igual (741.ª, la misma avería en la convocatoria).
+     ✅ Con `null`, cada lector cae a su rama de «todavía no hay dato» — §3c-24: *un «no lo
+     sé» se devuelve como `null`*— y el panel real los sobreescribe igual (`:403`).
+     ⚠️ Y NO es lo que le pasaba a Daniel con el 25/26: eso es el panel REAL,
+     `ensamblar.py:344` sellando `panel["temporada"]` desde `horas_temporada.json`. */
+  generado:null, temporada:null,
   subsistemas:[
     {u:'Aviónica',media:20.5,n:8},
     {u:'GNC',media:19.2,n:8},
@@ -1569,7 +1579,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='cb8f2ee';
+var BUILD='78642ac';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';

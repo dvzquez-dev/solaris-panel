@@ -109,7 +109,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=89f50ab"></script>
+<script src="comun.js?v=6790987"></script>
 <script src="notis.escritorio.js?v=6ac9b14"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=9f01417"></script>
@@ -407,7 +407,11 @@ var PD_NOM='Daniel V\u00e1zquez Pi\u00f1eiro', REV2_NOM='Jos\u00e9 Manuel Torres
 
 
 /* ═══ DATOS ficticios con el esquema real de app.html ═══════════════════ */
-var DATA={generado:'2026-07-24',temporada:'25/26',subsistemas:[],miembros:[]};
+/* ⛔⛔ UNA SEMILLA NO AFIRMA (ver el bloque gemelo de `movil.html`): aquí ponía
+   `generado:'2026-07-24',temporada:'25/26'`. Su fila de diagnóstico de Ajustes **sí**
+   decía «· de la semilla, no del servidor», así que esta cara era la honesta y el móvil
+   no: §3c-9, *lo que sólo está en una cara es el fallo que nadie ve*. */
+var DATA={generado:null,temporada:null,subsistemas:[],miembros:[]};
 /* semilla ficticia: lo que se ve SIN backend. Tras el login la sustituye
    entera la respuesta de `bootstrap`, con el filtrado por rol del servidor. */
 DATA.miembros=[
@@ -2299,7 +2303,12 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
     ? tabla([['Motivo'],['Puntos',1]], rp.ultimos.map(function(x){
         return '<tr><td>'+esc(x.t)+'<div class="sc">'+esc(x.f)+
           (x.art?' · '+esc(x.art):'')+' · '+x.vv.replace(/<br>/g,' ')+'</div></td>'+
-          '<td class="r mono">'+(x.p>0?'+':'')+x.p+'</td></tr>'; }).join(''))+
+          /* ⛔⛔ CON `x.p === null` ESTO PINTABA LA PALABRA «null» en la columna de puntos de
+             una persona: `(null>0?'+':'') + null` da `"null"`. Era el motivo medido por el
+             que la 759.ª dejó el backend fuera de su alcance — media cura es peor que el 0.
+             `_etPtsSanc_` es el rótulo de los tres casos y ya existe desde aquélla. */
+          '<td class="r mono">'+((x.p===null||x.p===undefined) ? _etPtsSanc_(null)
+             : (x.p>0?'+':'')+x.p)+'</td></tr>'; }).join(''))+
       '<p class="rnota">'+_notaRegistro_(rp.total,'temporada')+'</p>'
     /* ⛔ Y AQUI SE DECIDIA POR LA LISTA VACIA, que no dice POR QUE esta vacia. La
        frase de abajo culpaba a la version del servidor de lo que muchas veces era la
@@ -2455,8 +2464,14 @@ V.ajustes={g:'Ajustes',t:'Ajustes',f:function(){
   /* Sin backend lo que hay es la semilla, y su fecha es de mentira: se dice, en vez de
      presentarla como si fuera el dato real. */
   var hayBack=(typeof backendOK!=='undefined' && backendOK && SESION);
-  var gen=!DATA.generado ? '—' : (hayBack ? _isoADMY_(DATA.generado)
-         : (_isoADMY_(DATA.generado)+' · de la semilla, no del servidor'));
+  /* ⛔⛔ LAS DOS MITADES DICEN COSAS DISTINTAS Y ANTES DECÍAN LA MISMA. Sin `generado`
+     lo que hay **es** la semilla; con `generado` y sin conexión, el dato **es del
+     servidor** y lo que falta es la conexión. El texto viejo —«· de la semilla, no del
+     servidor» sobre un `generado` presente— afirmaba justo lo contrario en su único
+     caso vivo: el panel llegó y la conexión se cayó después. */
+  var gen=!DATA.generado ? 'sin datos del servidor · lo que ves es la semilla'
+         : (hayBack ? _isoADMY_(DATA.generado)
+                    : (_isoADMY_(DATA.generado)+' · sin conexión ahora mismo'));
   /* ⛔ SE PIDE AL ABRIR AJUSTES, no al arrancar: es una pantalla de la que casi nadie tira, y
      cargarla siempre serían 32 llamadas de más a Apps Script al día. El cerrojo está dentro
      (`NOTIS_SRV`), así que repintar no vuelve a preguntar. */
@@ -2468,7 +2483,10 @@ V.ajustes={g:'Ajustes',t:'Ajustes',f:function(){
       '<tr><td>Actúas como</td><td>'+esc(ACTOR)+' · '+esc(_rolDe_(ACTOR))+'</td></tr>'+
       '<tr><td>Temporada</td><td>'+esc((DATA&&DATA.temporada)||'—')+'</td></tr>'+
       '<tr><td>Datos del panel</td><td>'+esc(gen)+'</td></tr>'+
-      '<tr><td>Backend</td><td>'+((typeof backendOK!=='undefined'&&backendOK)?'conectado':'sin conexión · lo que ves es la semilla')+'</td></tr>')+
+            /* ⚠️ Y la fila de al lado tenía la misma mezcla: «sin conexión» y «es la
+         semilla» no son lo mismo, y ahora el segundo trozo se **deriva** de que no haya
+         `generado` en vez de darse por hecho. */
+      '<tr><td>Backend</td><td>'+((typeof backendOK!=='undefined'&&backendOK)?'conectado':('sin conexión'+(DATA.generado?'':' · lo que ves es la semilla')))+'</td></tr>')+
     '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn no" data-salir>Cerrar sesión</button></div>')+
     '<div class="pan"><div class="nota">Los avisos van al <b>navegador</b>, no al correo. Si cierras '+
     'sesión o cambias de equipo hay que volver a activarlos aquí.</div></div>';
@@ -2984,7 +3002,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='3a8aba4';
+var BUILD='defbe8b';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

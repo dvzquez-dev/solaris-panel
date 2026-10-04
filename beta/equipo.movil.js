@@ -141,7 +141,11 @@ function vEstado(){
 
   /* EL ORDEN: Conducta ABRE la pantalla. Se probo a mandarla al final (MEJ-1) y Daniel
      lo revirtio el 28/07: «estaba muchisimo mas guapo antes que estuviese arriba». */
-  return _nov+'<div class="tarj">'+cab('Conducta','ciclo '+DATA.temporada)+medidorHTML()+'</div>'+
+    /* ⛔ EL SUBTÍTULO NO SE RELLENA: NO SE CONSTRUYE. Con `'ciclo '+DATA.temporada` a
+     secas, una semilla sin temporada pinta literalmente **«ciclo null»**; y con un
+     `||''` quedaría **«ciclo »** colgando. `cab(t,d)` ya omite su `<span>` cuando `d`
+     es vacío, así que la cura es la que ya existía ahí dentro. */
+  return _nov+'<div class="tarj">'+cab('Conducta',DATA.temporada?('ciclo '+DATA.temporada):'')+medidorHTML()+'</div>'+
     av+
     /* LAS HORAS SALIERON DE AQUI (Daniel, 28/07: «quitaria las horas de estado y las
        dejaria solo en horas»). Estaban en dos pantallas con la misma cifra y la misma barra.
@@ -185,6 +189,9 @@ function _coordinacionHTML_(){
         '<small>'+esc(f.txt)+'</small></div></div>';
     }).join('')
     : vacio('Sin datos de coordinación','Todavía no ha llegado quién coordina cada subsistema.','',false))+'</div>'+
-    '<p class="rnota" style="text-align:center;margin:14px 0 0">SOLARIS · datos a '+esc(_isoADMY_(DATA.generado||''))+'</p>';
+    /* ⛔ EL SEPARADOR Y LA PREPOSICIÓN VAN DENTRO DE LA GUARDA. Con `DATA.generado||''`
+       el pie quedaba **«SOLARIS · datos a »** apuntando a nada, que se lee como un fallo
+       de carga — peor que la fecha vieja. */
+    '<p class="rnota" style="text-align:center;margin:14px 0 0">SOLARIS'+(DATA.generado?(' · datos a '+esc(_isoADMY_(DATA.generado))):'')+'</p>';
 }
 
