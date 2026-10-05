@@ -38,6 +38,31 @@ function _pintarBotonConvocar_(){
   return motivo;
 }
 
+/* ⛔ EL RECUADRO DE RESPONSABILIDADES PENDIENTES (764.a, 02/10). Daniel: *«un recuadrito que
+   ponga responsabilidades pendientes a asignar»*. Hasta hoy lo que faltaba solo se decia en el
+   AVISO DEL BOTON (`_porQueNoSeConvoca_`), o sea **cuando ya intentabas convocar**: esto lo pone
+   delante mientras reparte.
+   ⛔ Sale de `_cargosQueFaltan_`, que es LA MISMA puerta que usa el boton. Dos criterios para
+   «que falta» acaban diciendo cosas distintas en la misma pantalla.
+   ⚠️ Y NO DESAPARECE al completarse, al contrario que los paneles: son un conjunto FIJO de
+   tres, no una lista de trabajo que crece. Ver «las tres asignadas» es la confirmacion de que ya
+   se puede convocar -- y la regla de «si no hay nada, no existe» es para lo otro.
+   ⚠️ El nombre LARGO, igual que en el aviso: un «falta AV» no le dice nada a quien convoca por
+   primera vez. */
+function _cajaCargosPend_(cargos){
+  var faltan = _cargosQueFaltan_(cargos || TUR_CARGOS), nombres = [], i, j;
+  for(i=0;i<faltan.length;i++)
+    for(j=0;j<CARGOS_TURNO.length;j++)
+      if(CARGOS_TURNO[j].k === faltan[i]) nombres.push(CARGOS_TURNO[j].et);
+  if(!nombres.length)
+    return '<div class="nota" style="margin:0 0 9px">✅ <b>Las tres responsabilidades están '+
+      'asignadas.</b> Una misma persona puede llevar varias.</div>';
+  return '<div class="nota" style="margin:0 0 9px;border-color:rgba(232,145,46,.35)">'+
+    '<b>Pendientes de asignar:</b> '+esc(_unirY_(nombres))+'. '+
+    '<span style="color:var(--ink3)">Una por persona — y la misma persona puede llevar '+
+    'varias.</span></div>';
+}
+
 function pintarReparto(){
   var c=document.getElementById('tuLista'); if(!c) return;
   var nn=Object.keys(TUR_SEL);
@@ -46,7 +71,9 @@ function pintarReparto(){
       'Pulsa arriba a qui\u00e9n convocas y aqu\u00ed le pones su papel.</p>';
     return;
   }
-  c.innerHTML=nn.map(function(n){
+  /* ⛔ EL RECUADRO VA DELANTE de las fichas: lo que falta se lee antes de repartir, no
+     despues. Y se recompone en cada `pintarReparto()`, que es lo que lo vacia solo. */
+  c.innerHTML=_cajaCargosPend_()+nn.map(function(n){
     var e=TUR_SEL[n], m=_m(n);
     return '<div class="repf">'+
       '<b>'+esc((m&&m.pila)||n)+'</b>'+
@@ -834,20 +861,17 @@ function _puedeConvocarDisp_(){
 
 function _convocarDispPanel_(){
   if(!_puedeConvocarDisp_()) return '';
-  /* ⛔ Y EL BOTÓN QUE EL SERVIDOR RECHAZABA SIEMPRE (643.ª). Con la cuenta del PD esto pintaba
-     el formulario y el interruptor, y los dos acaban en `setControl`, que sólo acepta la
-     cuenta admin. Se dice ANTES de pulsar, y se dice QUÉ cuenta: un botón que siempre falla
-     es un rótulo.
-     ⚠️ El interruptor se va con él: su estado lo lee `getControl`, con la misma puerta, así
-     que con esta cuenta `AVISOS_ON` se queda en `false` sin haber preguntado — un «no lo sé»
-     pintado como «apagado» (§3c-24).
-     ⚠️ Sin SESIÓN (demo local) no hay cuenta de la que hablar: sale el formulario, y su clic
-     ya contesta «Sin conexión no se puede convocar». */
-  if(SESION && !_puedeImpersonar_()) return pan('Convocar disponibilidad','solo con la cuenta admin',
-    '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      '<b>Desde esta cuenta el servidor lo rechaza.</b> Abrir la disponibilidad y encender los '+
-      'avisos pasan por una acción que hoy solo acepta la cuenta de administración '+
-      '(<b>'+esc(ADMIN_EMAIL)+'</b>): entra con ella y este panel sale aquí entero.</p></div>');
+  /* ⛔⛔ AQUÍ HABÍA UNA SEGUNDA GUARDA, Y SE RETIRA PORQUE YA NO ES VERDAD (643.ª → 758.ª).
+     Decía «solo con la cuenta admin» y era cierta: `setControl` exigía `admin` para cualquier
+     control, así que con la cuenta del PD el botón siempre fallaba y se avisaba antes de
+     pulsarlo. El 02/10 la 758.ª abrió esa puerta —`CONTROLES_PD` + `_rangoEscritorio_() >= 3`,
+     y `convocar_disponibilidad` está en la lista—, pero **se hizo sólo la mitad de servidor**:
+     esta guarda siguió tapando el formulario a la única persona a la que el permiso nuevo iba
+     dirigido. Desplegar no habría bastado. *Una guarda ciega puede proteger algo YA IMPOSIBLE.*
+     ⚠️ No se abre a nadie más: `_puedeConvocarDisp_` ya exige **rango >= 3**, que es la misma
+     condición que mira el servidor. José (2) y los coordinadores (1) siguen sin ver el panel.
+     ⛔ ORDEN: esta cara sólo puede llegar a producción **después** de desplegar el backend. Al
+     revés, el botón sale y el servidor lo rechaza, que es el defecto de partida del revés. */
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   return pan('Convocar disponibilidad','abre el plazo · solo dirección',
@@ -1014,11 +1038,89 @@ function pintarCoches(){
               '<select data-co-vdst="'+i+'">'+_opcionesPunto_(co.vueltaDestino)+'</select></label>'+
           '</div>'
         : '')+
+      _gentePorCoche_(co, i)+
     '</div>';
   }).join('');
   cablearCoches();
 }
 
+
+/* ═══ QUIEN CONDUCE Y QUIEN VA (754.ª, 01/10) ════════════════════════════════════
+   Daniel: *«que haya una opción de poner quién es el que conduce, quién lleva el coche. Y
+   luego sumarle pasajeros»*, *«que puedas arrastrarlos de un coche a otro, ¿sabes? Y que sea
+   fácil»*.
+
+   ⛔ EL DUEÑO ES EL CONDUCTOR — *«se supone q el conductor es el dueño del coche»* —, así que
+   NO hay un campo `conductor` aparte: el coche es de alguien y ese alguien conduce.
+   ⛔ Y SOLO SALE GENTE DEL TURNO: la lista de candidatos es `TUR_SEL`, que es quien va. El
+   servidor filtra igual (`_cochesDeTurno_` valida contra el reparto), así que ofrecer a quien
+   no va sería prometer algo que el backend va a tirar.
+   ⚠️ Quien ya va en OTRO coche no se ofrece: estar en dos coches a la vez no es un estado
+   posible, y dejarlo elegir obliga a decidir después cuál vale. */
+function _enOtroCoche_(nombre, salvo){
+  var k, co;
+  for(k = 0; k < TUR_COCHES.length; k++){
+    if(k === salvo) continue;
+    co = TUR_COCHES[k] || {};
+    if(co.dueno === nombre) return true;
+    if(_llevaA_(co.pasajeros, nombre)) return true;
+  }
+  return false;
+}
+
+/* Sin `Array.indexOf` por lo mismo que el backend: el arnés de los bancos corre bajo
+   JScript (ES3) y no lo lleva. Usarlo dejaría esto sin poder probarse. */
+function _llevaA_(lista, nombre){
+  var k, L = lista || [];
+  for(k = 0; k < L.length; k++) if(L[k] === nombre) return true;
+  return false;
+}
+
+function _gentePorCoche_(co, i){
+  var libres = [], n, nn = Object.keys(TUR_SEL);
+  for(n = 0; n < nn.length; n++){
+    if(nn[n] === co.dueno) continue;
+    if(_llevaA_(co.pasajeros, nn[n])) continue;
+    if(_enOtroCoche_(nn[n], i)) continue;
+    libres.push(nn[n]);
+  }
+  var ops = '<option value="">— nadie —</option>';
+  var cand = co.dueno ? [co.dueno].concat(libres) : libres;
+  for(n = 0; n < cand.length; n++)
+    ops += '<option value="'+esc(cand[n])+'"'+(cand[n]===co.dueno?' selected':'')+'>'+
+           esc(cand[n])+'</option>';
+
+  /* ⚠️ Cada pasajero es `draggable` Y lleva su botón de quitar: arrastrar es el ATAJO, no el
+     único camino. En un móvil o con el teclado no hay arrastre, y una función que sólo se
+     alcanza arrastrando no la tiene quien no puede arrastrar. */
+  var chips = '';
+  var ps = co.pasajeros || [];
+  for(n = 0; n < ps.length; n++)
+    chips += '<span class="chip" draggable="true" data-pas-de="'+i+'" '+
+             'data-pas-quien="'+esc(ps[n])+'" style="cursor:grab">'+esc(ps[n])+
+             ' <button type="button" class="mini" data-quitapas="'+i+'" '+
+             'data-quien="'+esc(ps[n])+'">×</button></span>';
+  if(!ps.length) chips = '<span style="font-size:12px;color:var(--ink3)">nadie todavía</span>';
+
+  var sobran = '<option value="">+ añadir quien va</option>';
+  for(n = 0; n < libres.length; n++)
+    sobran += '<option value="'+esc(libres[n])+'">'+esc(libres[n])+'</option>';
+
+  /* Sin clase propia: `cochegente` no existe en `escritorio.css` y una clase que llega
+     sin regla no da error -- el elemento sale, ocupa sitio y no se parece a nada. Lo
+     canto `probar_clases_escritorio.py`. El gancho es `data-coche-caja`, que ya esta. */
+  return '<div data-coche-caja="'+i+'" style="margin-top:8px">'+
+    '<label style="display:block;margin-bottom:6px"><span class="sc">Lo lleva</span>'+
+      '<select data-coche-due="'+i+'">'+ops+'</select></label>'+
+    '<div class="sc" style="margin-bottom:4px">Van con él</div>'+
+    '<div data-coche-pas="'+i+'" style="display:flex;gap:6px;flex-wrap:wrap;'+
+      'min-height:28px;align-items:center;padding:4px;border:1px dashed var(--bor);'+
+      'border-radius:6px">'+chips+'</div>'+
+    (libres.length
+      ? '<select data-coche-add="'+i+'" style="margin-top:6px">'+sobran+'</select>'
+      : '')+
+  '</div>';
+}
 function cablearCoches(){
   $$('#tuCoches [data-co-org]').forEach(function(el){
     el.onchange = function(){ TUR_COCHES[+el.dataset.coOrg].origen = el.value; pintarCoches(); }; });
@@ -1035,6 +1137,66 @@ function cablearCoches(){
       /* ⚠️ Al APAGARLA se borran sus campos: dejarlos puestos manda una vuelta que la
          casilla dice que no existe, y el backend no sabria cual de las dos creer. */
       if(!co.vueltaDistinta){ co.vueltaOrigen = null; co.vueltaDestino = null; }
+      pintarCoches();
+    }; });
+  /* ═══ QUIEN CONDUCE Y QUIEN VA (754.ª) ══════════════════════════════════════
+     ⚠️ Todo repinta al final: `pintarCoches` recalcula quién queda libre en CADA coche, y
+     sin repintar los desplegables de los demás seguirían ofreciendo a alguien que acaba de
+     subirse a otro. */
+  $$('#tuCoches [data-coche-due]').forEach(function(el){
+    el.onchange = function(){
+      var co = TUR_COCHES[+el.dataset.cocheDue];
+      co.dueno = el.value || null;
+      /* ⛔ Si el nuevo dueño iba de pasajero en SU PROPIO coche, se le quita de la lista: el
+         servidor lo filtra igual, y dejarlo aquí enseñaría a alguien dos veces en el mismo
+         coche hasta convocar. */
+      if(co.dueno) co.pasajeros = (co.pasajeros || []).filter(function(p){
+        return p !== co.dueno; });
+      pintarCoches();
+    }; });
+  $$('#tuCoches [data-coche-add]').forEach(function(el){
+    el.onchange = function(){
+      if(!el.value) return;
+      var co = TUR_COCHES[+el.dataset.cocheAdd];
+      co.pasajeros = co.pasajeros || [];
+      if(!_llevaA_(co.pasajeros, el.value)) co.pasajeros.push(el.value);
+      pintarCoches();
+    }; });
+  $$('#tuCoches [data-quitapas]').forEach(function(b){
+    b.onclick = function(ev){
+      ev.stopPropagation();          // el chip entero es arrastrable; el botón no arrastra
+      var co = TUR_COCHES[+b.dataset.quitapas];
+      co.pasajeros = (co.pasajeros || []).filter(function(p){ return p !== b.dataset.quien; });
+      pintarCoches();
+    }; });
+
+  /* ⛔ EL ARRASTRE, que él pidió dos veces («y que sea fácil»). Es el ATAJO: lo mismo se hace
+     con el desplegable y la ✕, porque en un móvil no hay `dragstart` y una función que sólo
+     se alcanza arrastrando no la tiene quien no puede arrastrar.
+     ⚠️ Se mueve, no se copia: se quita del coche de origen ANTES de meterlo en el destino, y
+     soltar en el mismo coche no hace nada. */
+  $$('#tuCoches [data-pas-de]').forEach(function(el){
+    el.ondragstart = function(ev){
+      try { ev.dataTransfer.setData('text/plain',
+              el.dataset.pasDe + '|' + el.dataset.pasQuien); } catch(_e){}
+    }; });
+  $$('#tuCoches [data-coche-caja]').forEach(function(caja){
+    caja.ondragover = function(ev){ ev.preventDefault(); };
+    caja.ondrop = function(ev){
+      ev.preventDefault();
+      var dato = ''; try { dato = ev.dataTransfer.getData('text/plain') || ''; } catch(_e){}
+      var corte = dato.indexOf('|');
+      if(corte < 0) return;
+      var de = +dato.slice(0, corte), quien = dato.slice(corte + 1);
+      var a = +caja.dataset.cocheCaja;
+      if(de === a || !quien) return;
+      var orig = TUR_COCHES[de], dest = TUR_COCHES[a];
+      if(!orig || !dest) return;
+      orig.pasajeros = (orig.pasajeros || []).filter(function(p){ return p !== quien; });
+      dest.pasajeros = dest.pasajeros || [];
+      /* ⚠️ Nadie va de pasajero en el coche que conduce: si lo sueltas en el suyo, se queda
+         fuera en vez de aparecer dos veces. El servidor aplica la misma regla. */
+      if(dest.dueno !== quien && !_llevaA_(dest.pasajeros, quien)) dest.pasajeros.push(quien);
       pintarCoches();
     }; });
   $$('#tuCoches [data-quitacoche]').forEach(function(b){

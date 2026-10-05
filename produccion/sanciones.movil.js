@@ -173,7 +173,10 @@ function _sancColaHTML_(){
         return '<div class="lote-i" style="flex-wrap:wrap;gap:6px">'+
           '<span class="n">'+esc(_pilaDeM_(x.nombre)||x.nombre||'')+'</span>'+
           '<span class="mono" style="color:var(--ink3);font-size:10.5px;flex:1">'+esc(x.motivo||'')+
-            ' · '+(+x.puntos||0)+'</span>'+
+            /* ⛔ `_etPtsSanc_`, no `(+x.puntos||0)`: esto pintaba **0** para un hueco, y
+               en esta pantalla el 0 se lee «aviso». Y es el MISMO rotulo que el
+               escritorio: dos textos para el mismo dato es la leccion de la gemela. */
+            ' · '+esc(_etSancFila_(x.puntos, x.origen, x.extra))+'</span>'+
           (suelta
             ? '<button class="btn mini" data-sok="'+esc(x.id)+'" data-p>Aprobar</button>'+
               '<button class="btn mini" data-sno="'+esc(x.id)+'" data-p style="color:var(--warn);border-color:var(--warn)">Rechazar</button>'
@@ -567,7 +570,11 @@ function _libroPuntosHTML_(){
     (r.ultimos.length ? r.ultimos.map(function(m){
       /* El 0 no lleva signo: «−0» obliga a leerlo dos veces para acabar sabiendo que no te
          quitaron nada. Es el caso de una justificada. */
-      var sg = m.p>0 ? '+'+m.p : (m.p<0 ? '−'+Math.abs(m.p) : '0');
+      /* ⛔ Y el HUECO no se pinta como un 0. Con `m.p === null` las dos comparaciones de
+         abajo son falsas y caía en la rama del 0 — o sea que «no se sabe lo que te costó»
+         se leía como «no te costó nada». `_etPtsSanc_` ya es el rótulo de los tres casos. */
+      var sg = (m.p === null || m.p === undefined) ? _etPtsSanc_(null)
+             : (m.p>0 ? '+'+m.p : (m.p<0 ? '−'+Math.abs(m.p) : '0'));
       return '<div class="retf"><span class="pt'+(m.p>0?' mas':'')+'">'+sg+'</span>'+
         '<span class="mo"><b>'+esc(m.t)+'</b><small>ART. '+esc(m.art)+' · '+esc(m.f)+'</small></span>'+
         '<span class="vv">'+(m.vv || (m.rep?'vuelve el<br>'+m.rep:'no caduca'))+'</span></div>';

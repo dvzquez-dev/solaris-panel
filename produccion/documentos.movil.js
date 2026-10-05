@@ -506,7 +506,18 @@ function verDoc(id){
          esta cara se quedo fuera del arreglo. Misma leccion que `_pilEstDoc_`: «no lo
          se» no es «confirmado». Desde el 19/08 `_normSev_` corta esto en el servidor;
          esto de aqui es el cinturon, porque la maqueta no pasa por el. */
-      (e.sev?'<span class="pil '+(e.sev==='alta'?'no':e.sev==='media'?'pend':e.sev==='baja'?'conf':'neu')+'">calidad '+(sevTxt[e.sev]||'sin medir')+'</span>':'')+
+      /* ⛔⛔ EL CHIP SE PINTA SIEMPRE, TAMBIÉN CON `null` (05/10). Aquí había un
+         `(e.sev? … :'')`, así que una severidad que nadie reconoció **no pintaba NADA** en
+         esta cara — y `null` NO es el caso raro: es lo que `_normSev_` devuelve para todo lo
+         que no esté en el enum, y lo que `_normDocM_` pone a propósito.
+         ⛔ Lo decidido es lo contrario, y está escrito desde el 27/07 (`decisiones-app.md`):
+         *«si no hay dato, «calidad sin medir», NO un valor»*. El escritorio ya lo cumplía —
+         `chipSevDoc` pinta siempre, desde sus TRES llamadas — y esta cara se quedó fuera.
+         ⚠️ Y no da igual omitirlo: sin chip, el revisor no distingue «nadie midió la
+         calidad» de «esta pantalla no enseña la calidad». Son dos cosas, y la primera es un
+         motivo para mirar el documento antes de firmarlo. Es §3c-9 otra vez: lo que sólo
+         está en una cara es el fallo que nadie ve. */
+      '<span class="pil '+(e.sev==='alta'?'no':e.sev==='media'?'pend':e.sev==='baja'?'conf':'neu')+'">calidad '+(sevTxt[e.sev]||'sin medir')+'</span>'+
     '</div>'+
     /* ANTES del resumen a propósito: si el expediente está trabado o es una
        revisión de otro, eso cambia lo que hay que mirar en todo lo de abajo. */

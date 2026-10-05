@@ -317,7 +317,7 @@ function sumaE(e){return PARTES.filter(function(p){return p.e===e;}).reduce(func
    ⚠️ La regla ya estaba enunciada seis lineas mas arriba -`vHoras` parte la lista en
    `mias`/`viejas` con `_esDeMesPasado_` desde el 13/08- y no aplicada aqui, que es la barra
    que va **entre las dos** en la misma tarjeta (§3c-19).
-   ✅ Y el periodo es el de TRABAJO (`_diasDelMes_().periodo`, de cierre a cierre), no el del
+   ✅ Y el periodo es el de TRABAJO (`_periodoAbierto_()`, de cierre a cierre), no el del
    reloj del telefono: la misma puerta que la cifra grande. Sin periodo se suma todo, que es
    la cortesia de `_esDeMesPasado_`: ante la duda, se ve -- esconder horas por no saber el mes
    hace que un parte que de verdad FALTE sea indistinguible del que la vista tapa. */
@@ -326,7 +326,13 @@ function sumaE(e){return PARTES.filter(function(p){return p.e===e;}).reduce(func
    copia de ese recorte es como acaban discrepando justo en la frontera del cierre, que
    es el unico dia en que se nota. */
 function sumaSiMes(pred){
-  var per = (typeof _diasDelMes_==='function') ? (_diasDelMes_()||{}).periodo : null;
+  /* ⛔ POR LA PUERTA (791.ª): `_diasDelMes_().periodo` sale de `DATA.equipo_mes.periodo`,
+     que el backend SÍ manda —pero con el mes del **CALENDARIO**—, así que esto se iba al
+     mes del reloj. §2b.
+     ⛔⛔ **AQUÍ PONÍA «el backend NO manda» Y ERA FALSO** (corregido el 05/10, el mismo
+     día): lo manda desde el **07/08** (`cecd8bba`). 📏 Medido contra el backend VIVO:
+     `periodo: '2026-10'` con **septiembre** abierto. */
+  var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
   return PARTES.filter(function(p){
     return pred(p) && !(typeof _esDeMesPasado_==='function' && _esDeMesPasado_(p, per));
   }).reduce(function(a,p){return a+p.q;},0);
@@ -1152,7 +1158,7 @@ function filaParte(p){
      decide aquí: sale de `_selloAprobado_`, la puerta de las dos caras. El periodo abierto es el del
      SERVIDOR y el último cierre solo lo tiene el PD: sin ellos la puerta dice lo que no sabe. */
   if(_cuentaYa_(p.e)){
-    var _perS=(typeof _diasDelMes_==='function' && typeof DATA!=='undefined' && DATA) ? (_diasDelMes_()||{}).periodo : null;
+    var _perS=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;   /* ⛔ por la puerta (791.ª) */
     sub += ' · '+esc(_selloAprobado_(p, _perS, (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null));
   }
   var catTxt = _cuentaYa_(p.e) ? ' · sumó a '+catEti(p.cat)
@@ -1175,7 +1181,11 @@ function filaParte(p){
     '<div class="d">'+accion+pil+' <b class="mono">'+h1(p.q)+'</b></div></div>';
 }
 
-function _movHorasHTML_(confs){
+/* ⛔ `pends` SON LOS DE ESTE MES QUE NO CUENTAN TODAVÍA (793.ª, 05/10), y llegan por
+   argumento en vez de releer `PARTES` aquí dentro: quién decide qué es «de este mes» ya lo
+   decidió el llamador con `_perAhora`, y preguntarlo dos veces es como se acaba teniendo dos
+   respuestas. ⚠️ Opcional a propósito: el banco saca esta función suelta al arnés. */
+function _movHorasHTML_(confs, pends){
   var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
   var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO), comp=_compMensual_(YO);
   /* El rotulo dice lo que SE SABE. Sin el dato de Notion no se puede afirmar que sea el tuyo:
@@ -1200,9 +1210,15 @@ function _movHorasHTML_(confs){
      fallo del reves. Con el defecto del cargo nunca es 0 (`_compBase_` da 2 h).
      ⚠️ Y la EXTRA no suma otro: va dentro del mismo apunte -- lo dice el comentario
      de abajo y por eso comparten hueco. */
+  var _ef = (typeof _esperanFirma_==='function') ? _esperanFirma_(pends)
+                                                 : {n:0, horas:0, lista:[]};
   var _ap = _apuntesMes_(r.total, _cr?_cb:comp, _cx);
   return '<div class="plg" style="margin-top:11px"><div class="plgh" data-plg data-p>'+
-      '<b>Últimos movimientos</b><small>'+_ap+' apunte'+(_ap===1?'':'s')+' este mes · '+
+      /* ⚠️ EL CONTADOR SIGUE SIENDO EL DE LOS QUE CUENTAN. `_apuntesMes_` anuncia lo que
+         YA suma --su contrato lo vigila su banco--, y lo que espera firma se dice APARTE
+         con su propio número: sumarlo ahí diría que cuenta. */
+      '<b>Últimos movimientos</b><small>'+_ap+' apunte'+(_ap===1?'':'s')+' este mes'+
+        (_ef.n?(' · '+_ef.n+' esperando firma'):'')+' · '+
         'de qué se componen estas horas</small>'+
       '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
         'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
@@ -1224,6 +1240,20 @@ function _movHorasHTML_(confs){
          aparte y encima de los 10, asi que la pantalla anunciaba un numero y ensenaba otro.
          La extra, cuando la hay, va DENTRO de ese mismo apunte: es la misma contribucion. */
       r.todos.slice(0, Math.max(0, MOVS_N-1)).map(filaParte).join('')+
+      /* ⛔⛔ Y LO QUE ESPERA FIRMA, CON SU RAYADO (793.ª). Va DEBAJO y con su propio
+         rótulo: lo de arriba suma el total de la cabecera y esto **todavía no**, y
+         mezclarlos haría que la suma dejara de cuadrar -- que es justo el fallo que esta
+         tanda vino a arreglar. La trama es la MISMA que la barra usa para «pendientes ·
+         no cuentan»: quien mira la barra y quien mira la lista ven el mismo lenguaje. */
+      (_ef.n
+        ? '<div class="fila borde-pe" style="border-top:1px solid var(--line);margin-top:4px">'+
+            '<div class="a"><b>Esperando firma</b><small>'+_ef.n+' parte'+
+            (_ef.n===1?'':'s')+' de este mes · todavía no cuentan</small>'+
+            '<div style="height:7px;border-radius:4px;margin-top:6px;overflow:hidden;'+
+            'background:repeating-linear-gradient(45deg,rgba(232,145,46,.9) 0 3px,transparent 3px 6px)"></div>'+
+            '</div><div class="d"><b class="mono">+'+nf2(_ef.horas)+' h</b></div></div>'+
+          _ef.lista.slice(0, MOVS_N).map(filaParte).join('')
+        : '')+
       '<button class="btn mini" data-desgmes data-p style="margin-top:9px">'+
         'Ver el desglose completo de este mes</button>'+
     '</div></div>';
@@ -1259,14 +1289,14 @@ function _desgloseMesHTML_(confs){
       'la compensación vuelve a la base</small></div>'+
     '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>');
   /* ⛔ EL TITULO, DEL PERIODO — NO DEL RELOJ DEL TELEFONO. El contenido de esta ventana va
-     de CIERRE A CIERRE (`_ultimosMov_(…,'mes')` → `_deEsteMes_` → `_diasDelMes_().periodo`)
+     de CIERRE A CIERRE (`_ultimosMov_(…,'mes')` → `_deEsteMes_` → `_periodoAbierto_()`)
      y el titulo salia de `new Date()`. Julio se aplico el 04/08, asi que del 01 al 04 de
      agosto esto se titulaba «Desglose de agosto 2026» y listaba los partes de JULIO.
      Es el mismo fallo que `_deEsteMes_` documenta como corregido, y lo dice mejor
      `_compHorasHTML_`: «el fallo nunca fue comparar con junio: fue LLAMARLO julio».
      ⚠️ `_nomPeriodo_` es la puerta que ya existe para esto, con su cita dentro; el reloj
      se queda SOLO de respaldo, para cuando el backend no manda periodo. */
-  var _perD=(_diasDelMes_()||{}).periodo;
+  var _perD=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;   /* ⛔ por la puerta (791.ª) */
   return '<div class="mtit">Desglose de '+
       esc(_perD ? _nomPeriodo_(_perD) : _mesLargo_(_hoyDateM_()))+'</div>'+
     '<div class="msub">Todas tus contribuciones de este mes, sin recortar.</div>'+
@@ -1596,7 +1626,10 @@ function _pdRevertible_(p){
      ✅ La salida es la misma que dice el escritorio: si te pasaste revirtiendo, se
      vuelven a poner las horas con «Otorgar horas directamente». */
   if(p && p.origen==='reversion') return false;
-  return e==='aprobada' || e==='rechazada' || e==='otorgada' || e==='aplicada';
+  /* ⛔ LA LISTA NO SE ESCRIBE AQUI: vive en `_estadosRevertibles_` (`comun.js`), y su
+     arbitro es `_revertirParte_` del servidor. Copiada, a esta cara le faltaba
+     `'detalle'` y la del escritorio lo tenia. */
+  return _esEstadoRevertible_(e);
 }
 
 /* Como quedo el parte, en las palabras de quien lo mira -- no en las del backend. «aplicada»
@@ -1738,6 +1771,10 @@ function _engPartesDec_(){
 }
 
 function vHoras(){
+  /* ⛔ LA BANDA SANA SE PIDE UNA VEZ, ARRIBA: la pintan DOS rotulos de esta misma vista
+     (la cabecera y el pie del anillo), y hasta el 05/10 la llevaban **teclada los dos**.
+     Pedirla en cada sitio seria volver a tener dos copias, un piso mas abajo. */
+  var _bs = _bandaSana_();
   /* DEL MES, como la barra de abajo: el titular de esta pantalla dice «lo que ya
      cuenta **este mes**». Con `sumaE` la pildora y la barra podian decir numeros
      distintos en la misma tarjeta en cuanto una de las dos se arreglara. */
@@ -1770,7 +1807,9 @@ function vHoras(){
      `_compHorasHTML_` —donde `var d=_diasDelMes_()` si existe— y en esta funcion no: la
      pantalla de Horas reventaba entera con `ReferenceError`. El banco no lo vio porque miraba
      el texto; lo cazó pintar la pantalla en el navegador. */
-  var _perAhora=_diasDelMes_().periodo;
+  var _perAhora=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;   /* ⛔ por la puerta (791.ª): decide que partes
+     son «de meses pasados», o sea cuales se PLIEGAN. Con el calendario, el dia 1 se
+     plegaba el mes de trabajo entero. */
   var mias=_todasMias.filter(function(x){ return !_esDeMesPasado_(x, _perAhora); });
   var viejas=_todasMias.filter(function(x){ return _esDeMesPasado_(x, _perAhora); });
 
@@ -1819,7 +1858,9 @@ function vHoras(){
       /* EL DESGLOSE, PEGADO A LA CIFRA (Daniel, 31/07: «como desplegable opcional donde estan
          las horas, no aparte»). Antes vivia al fondo, dentro del historial: para saber de que
          se componia tu numero habia que bajar la pantalla entera y abrir otra cosa. */
-      _movHorasHTML_(confs)+
+      /* ⛔ `mias` son los de ESTE MES que no cuentan todavía --ya filtrados arriba por
+         `_perAhora`--: la función se queda con los que esperan firma. */
+      _movHorasHTML_(confs, mias)+
     '</div>'+
 
     /* ⛔ UN SOLO NIVEL, no dos. Daniel (07/08): *«la misma lógica del desplegable, pero esta
@@ -1871,7 +1912,10 @@ function vHoras(){
        que un 30 % del numero es historia (`reglas/carga.py`). Y ademas viene del PANEL, que
        hoy es una foto — el overlay en vivo trae puntos, horas y compensaciones, `carga` no.
        Daniel: «y la carga del mes que aparece no se si esta bien». Tenia razon. */
-    '<h2 class="sec">Mi índice de carga<span class="ln"></span>banda sana 70–120</h2>'+
+    /* ⛔ LA BANDA SE PIDE (05/10): estaba teclada aquí y en el pie de abajo. Ver
+       `_bandaSana_` en `comun.js`. */
+    '<h2 class="sec">Mi índice de carga<span class="ln"></span>banda sana '
+      + _bs.lo + '–' + _bs.hi + '</h2>'+
     '<div class="tarj">'+
       (typeof YO.carga==='number'
         ? '<div style="position:relative;height:30px;margin:4px 0 8px">'+
@@ -1899,10 +1943,13 @@ function vHoras(){
              día que el motor vuelva a poblar `desglose` ya no miente. */
           (YO.desglose?'<small>índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes '+nf(YO.desglose.aporta_mes_actual||0,1)+' · arrastre '+nf(YO.desglose.arrastre||0,1)+'</small>':'')+
           (_hMesReal_(YO)!=null?'<small>este mes llevas '+h1(_hMesReal_(YO))+', en vivo</small>':'')+
-          '</div><div class="d">banda sana 70–120</div></div>'
+          '</div><div class="d">banda sana ' + _bs.lo + '–' + _bs.hi + '</div></div>'
         : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+
     '</div>'+
-    '<h2 class="sec">Ranking de horas<span class="ln"></span>temporada '+DATA.temporada+'</h2>'+
+    /* ⛔ La gemela del «ciclo» de la portada: sin temporada esto decía **«temporada
+       null»**. El rótulo se calla entero, que es lo honesto cuando no se sabe de qué
+       temporada son las horas que hay debajo. */
+    '<h2 class="sec">Ranking de horas<span class="ln"></span>'+(DATA.temporada?('temporada '+DATA.temporada):'')+'</h2>'+
     '<div class="tarj rank">'+
       (filas
         ? filas+'<p class="rnota">Se ponderan tus horas de la temporada entre los meses que llevas en el '+
@@ -1922,7 +1969,15 @@ function _rankSubsHTML_(){
      panel trae la lista. El panel real **no la trae**, así que esto pintaba la semilla
      numerada 1..5 como si fuera un ranking — y las unidades nuevas ni aparecían.
      `_llego_('subs')` lo dice, y es la misma puerta que ya usan los movimientos. */
-  var subs=_llego_('subs') ? (DATA.subsistemas||[]) : [];
+  /* ⛔⛔ AQUÍ SE LEÍA LA FOTO: `DATA.subsistemas` trae `media` y `n` CONGELADOS, y medido
+     el 04/10 contra el panel vivo no cuadraban con sus propios miembros (GNC 32,2 frente
+     a 22,7). Ahora los números se calculan con la gente que esta pantalla tiene delante
+     — `_subsEnVivo_`, al lado de `_activos_` en `comun.js` —, así que **no pueden**
+     discrepar de ella y se mueven en cuanto se mueven las horas. Del array del panel solo
+     se conservan los NOMBRES: quién compite es de `flujos/umbral.SUBSISTEMAS`.
+     ⚠️ `_llego_('subs')` se queda: sin la lista del servidor no hay nombres que rankear,
+     y la semilla de maqueta volvería a pintarse como un ranking. */
+  var subs=_llego_('subs') ? _subsEnVivo_() : [];
   /* ⛔ Y EL DIVISOR NO PUEDE SER 0. Con el subsistema de cabeza a `media:0` —un mes
      recién cerrado— el ancho sale `NaN%`, que es CSS INVÁLIDO: el navegador lo descarta,
      y como este `<i>` no tiene regla propia cae a `width:auto` y **todas las barras

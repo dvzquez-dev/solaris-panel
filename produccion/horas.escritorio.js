@@ -233,7 +233,9 @@ function _escRevertible_(p){
      la tarjeta existe; aquel explica por que no hay boton si alguna vez vuelve a
      listarse. Una guarda cubre un escalon, no la escalera. */
   if(p && p.origen==='reversion') return false;
-  return e==='aprobada' || e==='rechazada' || e==='detalle' || e==='otorgada' || e==='aplicada';
+  /* ⛔ Misma puerta que el movil: `_estadosRevertibles_` (`comun.js`). Esta cara
+     tenia los cinco y la otra cuatro, y nada lo decia. */
+  return _esEstadoRevertible_(e);
 }
 
 /* ⛔ «YA ESTÁ EN LA FICHA» NO ES SÓLO `estado==='aplicada'` — es el MISMO predicado que usa

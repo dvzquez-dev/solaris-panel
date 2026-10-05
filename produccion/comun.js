@@ -262,6 +262,177 @@ function _genUnion_(rangos, slot){
 function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre) : 0; }
 
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
+/* El mes ABIERTO, calculado con quien esta: `{media, gente}`, o `null` si no se sabe.
+   Daniel, 04/10: *«y el objetivo de horas q aparece recuerda q tiene q estar vivo y eso»*.
+
+   ⛔⛔ EL `mesAbierto` DEL PANEL ES UNA FOTO, Y MEDIDA ERA DE OTRO MES. El 04/10 el panel vivo
+   traía `{periodo: '2026-07', gente: 32, media: 15.5781}` — **julio, y las 32 filas incluyendo
+   a los nueve que se fueron** — mientras la media de los **23 activos** con `horasMes` era
+   **18,91**. Ese número es el ingrediente del objetivo del mes, o sea de lo que la gente lee
+   para planificar.
+
+   ⛔ LAS BAJAS NO CUENTAN (`_activos_`) y LAS HORAS SE PIDEN A `_hMesReal_`, que es la única
+   puerta: `hMes` significa dos cosas según la cara. Quien no tiene el dato vivo **se cae de la
+   muestra**, no entra como un cero.
+   ⛔ Y SIN NADIE CONTESTA `null`, NO 0 (§3c-24): un 0 es un objetivo — diría que el equipo no
+   ha hecho nada este mes — y `null` deja que el llamador caiga a su respaldo. */
+function _mesAbiertoVivo_(){
+  var act = (typeof _activos_ === 'function') ? _activos_() : [], v = [], i;
+  for(i = 0; i < act.length; i++){
+    var h = _hMesReal_(act[i]);
+    if(typeof h === 'number' && isFinite(h)) v.push(h);
+  }
+  if(!v.length) return null;
+  var s = 0;
+  for(i = 0; i < v.length; i++) s += v[i];
+  return { media: s / v.length, gente: v.length };
+}
+
+/* Los meses cerrados que SON de la temporada en curso. `[]` si no consta que lo sean.
+
+   ⛔⛔ PROMEDIAR MESES DE OTRA TEMPORADA CON EL DE AHORA ES LA 776.ª OTRA VEZ, y aquí con un
+   objetivo contra el que la gente planifica. Medido el 04/10: el panel vivo trae
+   `umbral.temporada: '25/26'` con sus **10 meses cerrados**, y la temporada en curso es la
+   **26/27**, que no tiene ninguno. Con los diez dentro el objetivo salía **12,85 h**; con el
+   mes vivo solo, **12,60**.
+   ⛔ Y SI EL UMBRAL NO DICE DE QUÉ TEMPORADA ES, TAMPOCO CUENTAN (§3c-24): «no lo sé» no es
+   «cuadra», y el lado seguro es no promediar meses que podrían ser de otro año.
+   ⚠️ Lo que NO se hace es dejar de contarlos siempre: con la temporada igual cuentan todos,
+   que es para lo que `medias` existe. */
+function _mediasDeEstaTemp_(ing){
+  if(!ing || !ing.medias || !ing.medias.length) return [];
+  var t = ing.temporada, hoy = (typeof DATA !== 'undefined') ? DATA.temporada : null;
+  if(!t || !hoy || t !== hoy) return [];
+  return ing.medias;
+}
+
+/* Redondear a UN decimal exactamente como `round(x, 1)` de Python.
+
+   ⛔⛔ EXISTE PORQUE LAS DOS IMPLEMENTACIONES DABAN DOS NÚMEROS. La media de Propulsión
+   salía **7,1 en la cara y 7,0 en `flujos/umbral.subsistemas_vivos`**, y lo cazó compararlas
+   sobre los **23 activos** — que es lo único que lo caza: cada una, por separado, parece
+   correcta. (El panel trae **32 filas**: 23 activos y **9 de baja**. Decir «32» por el
+   equipo es contar a los que se fueron — lo corrigió Daniel el 04/10.)
+   📏 Medido: los activos de Propulsión tienen `[2, 2, 2, 27.25, 2]`, suma **35,25**, media
+   **7,05**. El doble de 7,05 está **justo por debajo** del medio, así que Python contesta
+   **7,0**. Y `Math.round(7.05*10)/10` contesta **7,1**, porque `7.05*10` da **70,5 exacto**:
+   la multiplicación redondea hacia arriba y se pierde la información que deciía. `toFixed(1)`
+   hace lo mismo.
+
+   ✅ LA CURA ES NO MULTIPLICAR PARA DECIDIR: el punto medio entre `f/10` y `(f+1)/10` se
+   construye como `(2f+1)/20` y se compara contra `x` **en su propio espacio**. Con 7,05 el
+   medio sale el MISMO doble que `x`, o sea empate, y el empate va al par — que es la regla de
+   Python. Con 7,04 y 7,06 contesta 7,0 y 7,1 como se espera.
+
+   ⚠️ Y es una GEMELA, no una copia inocente: si algún día cambia el redondeo de un lado hay
+   que cambiarlo en el otro. Lo vigila el banco comparando las dos sobre un caso con empate. */
+/* ⛔⛔ LOS ESTADOS QUE SE PUEDEN REVERTIR — UNA sola lista, y el ARBITRO es el servidor.
+   `_revertirParte_` (`Codigo.gs`) lanza con cualquier otro, asi que una cara que ofrezca MAS
+   pinta un boton que solo sabe dar error, y una que ofrezca MENOS esconde una decision que si
+   se puede deshacer.
+   📏 El 05/10/2026 estaba COPIADA en las dos caras y discrepaban: al movil le faltaba
+   `'detalle'` -- un estado real, el de «pedir detalle» --, asi que eso se podia deshacer desde
+   el ordenador y no desde el telefono, que es la cara desde la que se decide sobre la marcha.
+   ⛔ Y era la SEGUNDA desincronizacion de estas dos, la anterior en la direccion contraria (el
+   `origen==='reversion'`): mover el arreglo de lado en lado no lo arregla.
+   ⚠️ Lo que NO se unifica son las dos funciones: `ARRANQUE.md` §5b corta **por cara** porque hay
+   gemelas que deben divergir, y el escritorio tiene un segundo escalon (`_escRevBloqueo_`). Lo
+   que se unifica es la DECISION.
+   ⚠️ Y el bucle no es por gusto: el arnes de los bancos corre en JScript, que es ES3 y no tiene
+   `indexOf` de array. */
+function _estadosRevertibles_(){
+  return ['aprobada','rechazada','detalle','otorgada','aplicada'];
+}
+
+function _esEstadoRevertible_(e){
+  var L = _estadosRevertibles_(), i;
+  for(i = 0; i < L.length; i++) if(L[i] === e) return true;
+  return false;
+}
+
+function _red1_(x){
+  if(typeof x !== 'number' || !isFinite(x)) return null;
+  var neg = x < 0;
+  if(neg) x = -x;
+  var f = Math.floor(x * 10), medio = (2 * f + 1) / 20, n;
+  if(x > medio) n = f + 1;
+  else if(x < medio) n = f;
+  else n = (f % 2 === 0) ? f : f + 1;        /* empate: al par, como Python */
+  return (neg ? -n : n) / 10;
+}
+
+/* La media de horas del mes por persona y subsistema, **calculada con los miembros que la
+   pantalla tiene delante**. Daniel, 04/10: *«q las horas por subsistema etc todo eso se tiene
+   q actualizar en directo»*.
+
+   ⛔⛔ EL AGREGADO DEL PANEL ES UNA FOTO, Y NO CUADRA CON SUS PROPIOS MIEMBROS. Medido el
+   04/10 contra el panel vivo (`generado: 2026-09-23`), recalculando con sus **23 activos**
+   (de 32 filas, 9 de baja):
+
+       GNC              congelado 32,2   en vivo 22,7
+       Aviónica         congelado 17,7   en vivo 14,3
+       Aeroestructuras  congelado  6,9   en vivo  9,8
+       Propulsión       congelado  5,5   en vivo  7,0
+       Org&Mark         congelado 11,5   — no es un subsistema
+
+   O sea que la tarjeta enseñaba un número que **no cuadra con la gente que tiene al lado**, y
+   encima un subsistema que ya no compite — el congelado salió de una versión vieja de
+   `flujos/umbral.SUBSISTEMAS`.
+
+   ⛔⛔ EL PROJECT DIRECTOR Y ORG&MARK NO COMPITEN, Y ESO ES DELIBERADO. Daniel, 04/10:
+   *«marta y yo no somos de ningun subsistema»* y *«claro estamos en el ranking individual
+   pero no en el de subsistemas»*. Su `unidad` es `Project Director` y `Org&Mark`, ninguna
+   en `SUBSISTEMAS`, así que caen del ranking de unidades **y siguen en el individual**,
+   que sale de `ranking_personas` y no mira la unidad. Los 23 activos son **21 en los 4
+   subsistemas + los dos**.
+   ⚠️ Y por eso el agregado congelado traía **Org&Mark con media 11,5**: sobra. Si alguien
+   vuelve a «arreglar» esto añadiéndolos, está metiendo a una persona sola como si fuera un
+   subsistema de uno — y entonces encabeza o cierra el ranking por su propia cifra.
+
+   ✅ LOS NOMBRES LOS DECIDE EL PANEL, LOS NÚMEROS SE CALCULAN AQUÍ. Quién compite es una regla
+   de negocio cuyo dueno es `flujos/umbral.SUBSISTEMAS`, y la cara **no la reinventa**: coge los
+   `u` del array. Lo que deja de leer son la `media` y el `n`, que es lo que envejece.
+
+   ⛔ LAS BAJAS NO CUENTAN, y por eso se pasa por `_activos_`: con 8 personas donde hay 4 la
+   media dice otra cosa. Es la misma razon escrita en `flujos/umbral.subsistemas_vivos`.
+   ⛔ Y LAS HORAS SE PIDEN A `_hMesReal_`, que es LA UNICA PUERTA: `hMes` significa dos cosas
+   según la cara —en el escritorio `_aplicarPanel_` lo pisa con las del mes— y mezclar las dos
+   magnitudes en una media es como se obtiene un número que no es de nadie. Quien no tiene el
+   dato vivo **se cae de la muestra**, no cuenta como un cero: *«quien no aparece no estaba»*.
+   ⚠️ Esto divergiría de Python si algún subsistema se quedara sin nadie con `horasMes`:
+   `subsistemas_vivos` cae a `hMes` y aquí no. Medido el 04/10 con los 23 activos: **0 de ellos**
+   caen a ese respaldo (los 9 sin `horasMes` son exactamente los 9 `baja`), así que hoy las dos
+   contestan lo mismo. Queda fichado en `docs/pendientes.md`. */
+function _subsEnVivo_(){
+  var nom = [], i, j;
+  var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [];
+  for(i = 0; i < lista.length; i++) nom.push((lista[i] && lista[i].u) || lista[i]);
+  var por = {}, act = _activos_();
+  for(i = 0; i < act.length; i++){
+    var m = act[i], u = m.unidad;
+    if(!u) continue;
+    var k = -1;
+    for(j = 0; j < nom.length; j++) if(nom[j] === u){ k = j; break; }
+    if(k < 0) continue;                      /* no compite: fuera del ranking, sin ruido */
+    var h = _hMesReal_(m);
+    if(typeof h !== 'number' || !isFinite(h)) continue;
+    if(!por[u]) por[u] = [];
+    por[u].push(h);
+  }
+  var out = [];
+  for(i = 0; i < nom.length; i++){
+    var v = por[nom[i]];
+    if(!v || !v.length) continue;            /* nombrado pero sin nadie activo: NO sale */
+    var s = 0;
+    for(j = 0; j < v.length; j++) s += v[j];
+    /* ⛔ `_red1_`, no `Math.round(x*10)/10`: aquel daba 7,1 donde Python da 7,0.
+       Ver la cabecera de `_red1_`, con la medición. */
+    out.push({ u: nom[i], media: _red1_(s / v.length), n: v.length });
+  }
+  out.sort(function(a, b){ return (b.media - a.media) || (a.u < b.u ? -1 : 1); });
+  return out;
+}
+
 
 /* Las horas del mes ANTERIOR, **del panel de verdad**. `null` si no llegan.
 
@@ -535,6 +706,29 @@ function _curvaCuota_(h, ancla, umbral, techo){
 
 /* Trunca al centimo, SIEMPRE a la baja. Gemela de `reglas/cuota.py:truncar_centimo`, con
    su mismo margen: sin el `1e-9`, 0,29 cae a 0,28 por el binario. */
+/* ⛔⛔ LA BANDA SANA DE CARGA, PEDIDA AL PANEL — no teclada. Devuelve `{lo, hi, viva}`.
+
+   📏 Hasta el 05/10 `horas.movil.js` llevaba «banda sana 70–120» **escrito a mano en dos
+   sitios**, y la cara no puede importar `reglas/carga.py`. Es la misma avería que el **manual**,
+   que estuvo **dos meses** diciendo 60–90 después de que Daniel moviera la banda a 70–120 — y
+   lo cazó él, no un guardia. Ahora el número **viaja** (`flujos/volcado.py` lo mete en el panel
+   desde la única puerta, y la proyección del backend lo lista).
+
+   ⚠️ EL RESPALDO LLEVA EL VALOR DE HOY, y eso es deliberado: hasta que se despliegue la
+   proyección, el campo **no llega** al miembro raso — y enseñar «banda sana null–null» sería
+   peor que el número de hoy. Lo que impide que ese respaldo se podra es `probar_banda.py`, que
+   ya exige que coincida con `reglas/carga.py`: el día que la banda se mueva, ese banco se pone
+   rojo y hay que tocar **un** sitio en vez de tres.
+   ⚠️ `viva` dice de dónde salió. No se pinta, pero el banco lo mira: sin él, «viaja» y «cayó al
+   respaldo» se leen igual de bien, que es §3c-24. */
+function _bandaSana_(){
+  var d = (typeof DATA !== 'undefined' && DATA) ? DATA : null;
+  var lo = d ? d.banda_min : null, hi = d ? d.banda_max : null;
+  if(typeof lo === 'number' && typeof hi === 'number' && lo < hi)
+    return { lo: lo, hi: hi, viva: true };
+  return { lo: 70, hi: 120, viva: false };
+}
+
 function _truncarCentimo_(x){ return Math.floor(x * 100 + 1e-9) / 100; }
 
 function _umbral_(){
@@ -551,10 +745,23 @@ function _umbral_(){
      ⚠️ Y el `if(den>0)` de abajo PASA A ESTAR VIVO con esto: hasta hoy `medias`
      traia al menos un mes, asi que `den>=1` siempre. Ahora `den` puede ser 0 -sin
      meses cerrados y sin mes abierto- y sin esa guarda seria `0/0` = NaN en pantalla. */
-  if(ing && ing.medias){
+  /* ⛔⛔ LOS DOS INGREDIENTES SE PIDEN, NO SE LEEN DE LA FOTO (779.ª, orden de Daniel:
+     *«el objetivo de horas q aparece recuerda q tiene q estar vivo»*). Los meses cerrados
+     sólo cuentan si son **de esta temporada** — el panel del 04/10 traía los **10 de la
+     25/26** — y el mes abierto se **calcula** con los activos — el panel decía `periodo:
+     2026-07` y `gente: 32`. Medido: el objetivo pasaba de **12,85** a **12,60 h**. */
+  var _med=_mediasDeEstaTemp_(ing), _mv=_mesAbiertoVivo_();
+  /* ⚠️ El vivo MANDA sobre el del panel, y el del panel sigue siendo el respaldo: un
+     roster sin horas de nadie -lo que `Codigo.gs` le sirve a un raso- no puede dejar la
+     pantalla sin objetivo. */
+  var ma=(ing && (_mv || ing.mesAbierto)) || null;
+  /* ⛔⛔ EL MES ABIERTO CUENTA COMO INGREDIENTE, VENGA DEL VIVO O DE LA FOTO. Mi primera
+     version exigia `_med.length || _mv` y con **cero meses cerrados** -- que es TODO el
+     primer mes de cada temporada, y cuando mas importa -- se caia al respaldo cableado.
+     Lo cazaron los dos casos que fosilizan esa leccion, y tenian razon. */
+  if(ing && (_med.length || (ma && typeof ma.media==='number'))){
     var num=0, den=0;
-    ing.medias.forEach(function(x){ num+=x; den+=1; });        // cada mes cerrado pesa 1
-    var ma=ing.mesAbierto;
+    _med.forEach(function(x){ num+=x; den+=1; });              // cada mes cerrado pesa 1
     if(ma && typeof ma.media==='number'){
       var w=_fraccionDelMes_();                                 // el abierto, a prorrata
       num+=ma.media*w; den+=w;
@@ -571,7 +778,11 @@ function _umbral_(){
      es la misma cuenta -pondera por persona, no por mes- pero es del mismo orden y honesta.
      Y si ni eso, al ultimo valor conocido: nunca a 2/3 de tus propias horas, que no es el
      umbral de nadie. */
-  var hs=(DATA.miembros||[]).map(function(m){
+  /* ⛔ `_activos_`, NO `DATA.miembros`: el panel trae **32 filas con 9 de baja**, y este
+     respaldo promediaba el ritmo de los nueve que se fueron dentro del objetivo del mes
+     — que es contra lo que la gente planifica. Lo corrigió Daniel: *«recuerda que ahora
+     hay 23 miembros»*. */
+  var hs=_activos_().map(function(m){
       return (typeof m.horasTemp==='number' && m.meses) ? (m.horasTemp/m.meses) : null;
     }).filter(function(h){ return typeof h==='number'; });
   if(hs.length<2) return UMBRAL;
@@ -1500,9 +1711,27 @@ function _rolDeTurno_(escrito, marcas){
   var m = marcas || {}, partes = [], i;
   var puesto = String(escrito == null ? '' : escrito).replace(/^\s+|\s+$/g,'');
   if(puesto) partes.push(puesto);
-  var auto = [];
-  if(m.responsable) auto.push('Responsable de turno');
-  if(m.coche)       auto.push('Coche');
+  /* ⛔⛔ LOS TRES CARGOS SALEN DE `CARGOS_TURNO`, NO ESCRITOS AQUI (764.a, 02/10). Aqui
+     habia dos `if` a mano -- el de turno y el coche -- y la pantalla deja marcar TRES
+     cargos desde que existe `TUR_CARGOS`. Los otros dos se marcaban, se mandaban en
+     `cargos:TUR_CARGOS`... y **el backend no lee `cargos` en ningun sitio** (`grep` -> 0).
+     Como `Reparto` --el campo autoritativo, el unico que `_turnoDeNotion_` vuelve a leer--
+     se compone del `rol`, esas dos asignaciones **se perdian en silencio**: se marcaban, se
+     convocaba, y el turno volvia sin ellas. Y son 22 y 21 de los 23 turnos reales.
+     ✅ Recorriendo `CARGOS_TURNO` esto no puede volver a desincronizarse: un cargo nuevo
+     entra solo, con su etiqueta larga, que es la que ya se usa en los mensajes. */
+  var auto = [], _c;
+  for(i=0;i<CARGOS_TURNO.length;i++){
+    _c = CARGOS_TURNO[i];
+    /* ⚠️ `responsable` es el nombre VIEJO de la marca del cargo `turno`, y el envio sigue
+       llamando con el. Valen las dos y se dice: media migracion silenciosa es peor que
+       dos nombres documentados. */
+    if(m[_c.k] || (_c.k === 'turno' && m.responsable)) auto.push(_c.et);
+  }
+  /* ⛔ EL COCHE VA APARTE Y NO ES UN CARGO DE `CARGOS_TURNO`, a proposito: aquellos son de
+     UNA sola persona --medido, nunca pasan de 1 en los 23 turnos reales-- y el coche llega
+     a 2. Quien lo lleva se decide en la pantalla de coches (754.a), con su dueno. */
+  if(m.coche) auto.push('Coche');
   var bajo = puesto.toLowerCase();
   for(i=0;i<auto.length;i++){
     /* ⛔ NO SE DUPLICA lo que ya escribio a mano: `cuota.py` cuenta por SUBCADENA, asi que un
@@ -1758,7 +1987,11 @@ function _movDeSancion_(s){
        justificada, pero si algun dia mandara el valor crudo se veria «−1» al lado de «no
        restó», que es lo peor que puede pasar aqui: dos cosas ciertas por separado que juntas
        se contradicen, y la persona sin saber si le quitaron el punto o no. */
-    p: just ? 0 : (Number(s.puntos)||0),
+    /* ⛔⛔ AQUI HABIA `Number(s.puntos)||0`, EL MISMO FALLO DE LA 759.ª EN EL LIBRO QUE CADA
+       UNO VE DE SI MISMO: un `puntos` que no llegó salía como **0**, que no es «no lo sé»
+       sino «aviso, no me costó nada». Se reutiliza `_ptsSanc_` en vez de reescribir la regla.
+       ⚠️ El 0 de una **justificada** se queda: ése es deliberado y está explicado. */
+    p: just ? 0 : _ptsSanc_(s.puntos),
     /* Los puntos SE REINICIAN CADA TEMPORADA (RRI Art. 29), no caducan sanción a sanción. Se
        dice así, con palabras, en vez de inventarse una fecha exacta que el RRI no fija. */
     vv: just ? 'justificada<br>no restó' : 'hasta el fin<br>de temporada'
@@ -1962,6 +2195,142 @@ function _tareasDe_(nombre, alLlegar){
    ⚠️ `trim` por regex y no `String.prototype.trim`: en el ES3 de `cscript` -donde corren los
    bancos- ese metodo no existe, y un banco que revienta se lee igual que uno que no encuentra
    nada. */
+/* ══ LOS PUNTOS DE UNA SANCION LEIDOS DEL ALMACEN ══════════════════════════
+
+   ⛔⛔ AQUI EL 0 SIGNIFICA ALGO: es un **aviso** de la 1.a ocurrencia, con su registro y su
+   reincidencia. Asi que `Number(s.puntos) || 0` no es un respaldo -- convierte **«no me ha
+   llegado el dato»** en **«aviso»**, y nadie lo ve: `rangoLote` lo cuenta y lo imprime, y la
+   fila de la persona lo pinta como tal.
+   ⚠️ La frase ya estaba escrita en el backend, encima de `_puntosSancValidos_`: *«de paso
+   muere el `|| 0`, que era un "no lo se" leido como dato»*. La CARA se quedo con el `|| 0`.
+   📏 Y hoy no fabrica ninguno: de las **85 sanciones reales** del ultimo volcado, las 85
+   traen un numero (−1 x24, 0 x59, +1 x2). Lo que mantiene limpio el almacen es la guarda de
+   ESCRITURA, no esta. Esto es una guarda contra el productor que venga.
+
+   ⛔ NO ES `_oNum_(Number(v), null)`: `Number('')` es **0** y `Number(null)` tambien, asi que
+   una cadena vacia pasaria por aviso. El backend ya lo tiene anotado (*«`Number('')` es 0,
+   ojo»*) y aqui se repite el guardia, no el error.
+   ⛔ NI `_validaPuntosSanc_`, que es su gemela del FORMULARIO: esa rechaza positivos porque
+   la pantalla de sancionar va de −5 a 0, y en el almacen hay **premios** (Art. 31b/31c; 2 de
+   las 85 reales son +1). Usarla aqui los convertiria todos en «sin dato». Una guarda de
+   ENTRADA es mas estrecha que el almacen a proposito: leer con ella es cerrar la puerta al
+   dato que ya existe. */
+function _ptsSanc_(crudo){
+  if (crudo === null || crudo === undefined) return null;                // no llego
+  var t = String(crudo).replace(/^\s+|\s+$/g, '');
+  if (t === '') return null;                                            // ni la cadena vacia
+  var n = Number(t);
+  return isNaN(n) ? null : n;
+}
+
+/* El rotulo de esos puntos, UNO para las dos caras. ⛔ Hasta hoy el escritorio escribia
+   `(x.pts===0?'aviso':x.pts)` y el movil `(+x.puntos||0)`: dos textos para el mismo dato, y
+   ninguno de los dos sabia decir «no lo se».
+   ⚠️ El **+** del premio no es cosmetico: sin el, un +1 se lee como un −1 y la fila dice que
+   quita un punto cuando lo da. */
+function _etPtsSanc_(pts){
+  if (pts === null || pts === undefined) return 'sin dato';
+  if (pts === 0) return 'aviso';
+  var n = Number(pts);
+  return (n > 0 ? '+' : '−') + Math.abs(n) + ' ' + (Math.abs(n) === 1 ? 'punto' : 'puntos');
+}
+
+/* ══ UN PREMIO (O UNA REVOCACION) NO ES UNA SANCION, Y LA COLA ES LA MISMA ═════════
+
+   📏 Y NO ES HIPOTETICO: `flujos/construir_reunion.py` mete los premiados **en el MISMO
+   lote** que los sancionados (`origen:'premio'`, `articulo:'31b'`, `puntos:0` y la recompensa en
+   `extra.compensacion`, que son HORAS). O sea que un bloque de reunion general trae las dos
+   cosas, y hasta hoy la cara no leia `origen` en ningun sitio: medido, **2 escrituras de
+   `origen:'manual'` y CERO lecturas** en toda la app.
+
+   ⛔ El dano no es cosmetico, son dos:
+   1. Un premio con `puntos:0` se pintaba **«aviso»** -- un apercibimiento disciplinario -- a
+      quien se le esta premiando por cubrir su disponibilidad.
+   2. La fila ofrecia **«Justifica»**, y el servidor **se la salta en silencio**
+      (`_marcarLote_`: *«una revocacion o un premio no se "justifican": se dejan como estaban, no
+      se falsean»*) devolviendola en `saltadas` -- cuyo texto dice *«no la puedes decidir tu»*, o
+      sea **culpa al permiso** cuando la causa es otra. Un mensaje que describe otro fallo cuesta
+      mas que ninguno.
+   ✅ Al no ofrecer el boton, `saltadas` vuelve a tener UNA sola causa desde esta cara -- el
+   permiso -- y su texto deja de mentir sin tocarlo.
+
+   ⚠️ GEMELA DE DOS REGLAS QUE YA EXISTEN, y por eso se escribe igual: `_marcarLote_`
+   (`Codigo.gs`) usa `origen==='revocacion'` / `origen==='premio' || extra.compensacion`, y
+   `reglas/gradiente.py:64` usa `origen in ("premio","revocacion")` para devolver `no-sancion`.
+   Tres sitios para la misma regla es lo que hay; lo que no puede haber es tres CRITERIOS. */
+function _esNoJustificable_(origen, extra){
+  var o = String(origen == null ? '' : origen);
+  if (o === 'premio' || o === 'revocacion') return true;
+  return !!(extra && extra.compensacion);
+}
+
+/* El rotulo de una fila de la cola: dice QUE ES antes de decir cuanto. ⛔ `_etPtsSanc_` solo
+   sabe de puntos, y la recompensa de un premio **no son puntos**: son horas
+   (`extra.compensacion`). Pintar su `puntos:0` como «aviso» era decir lo contrario de lo que es. */
+function _etSancFila_(pts, origen, extra){
+  var o = String(origen == null ? '' : origen);
+  var comp = extra && extra.compensacion;
+  if (o === 'premio' || (comp && o !== 'revocacion'))
+    /* ⚠️ `nf2`, a 40 líneas de aquí en este mismo fichero: formatea decimales en es-ES
+       (`nf2(0.5)` → «0,5»). Iba a escribir un `_hh_` nuevo — §5b lo caza. */
+    return 'premio' + (comp ? ' · +' + nf2(comp) + ' h' : '');
+  if (o === 'revocacion') return 'revocación · ' + _etPtsSanc_(_ptsSanc_(pts));
+  return _etPtsSanc_(_ptsSanc_(pts));
+}
+
+/* ══ REVOCAR UNA SANCION = LA VIA DE APELACION DEL RRI ══════════════════════
+
+   📏 El servidor NO necesita nada nuevo: una revocacion es un `pushSancion` normal con
+   `origen:'revocacion'`, los puntos EN POSITIVO y una clave natural (`revoca-<id>`).
+   `_pushSancion_` la acepta, `_marcarLote_` la trata aparte (no se justifica) y
+   `gradiente.familia_de` la manda a `no-sancion`. Lo que faltaba era la PANTALLA, que
+   `navegador/app.html` tiene entera y ronda3 habia perdido -- y la auditoria ya lo decia:
+   *«Revocar... es la via de apelacion del RRI y ya esta desplegada en el backend»*.
+   📏 Y esta USADO: las 2 filas con `origen:'revocacion'` del volcado llevan *«razon:
+   Apelacion aceptada: presento una justificacion valida»*. Apelar ya ocurria, a mano.
+
+   ⛔⛔ EL PREDICADO NO ES «ESTA APLICADA»: son CUATRO condiciones, y la tercera es la que
+   cuesta. Si ya hay una revocacion VIVA apuntando a esta sancion y se manda otra, **se
+   regalan puntos** -- una revocacion los manda en positivo. Una RECHAZADA si deja
+   reintentar: un «no» del bloque no puede cerrar la apelacion para siempre.
+   ⚠️ La tercera mira OTRAS filas del array, asi que es la que se cae al «simplificar». */
+function _puedeRevocarSanc_(s, arr){
+  if (!s || s.estado !== 'aplicada') return false;     // solo la que ya quito puntos
+  if (s.origen === 'revocacion') return false;         // una revocacion no se revoca
+  /* ⛔ Y SI NO SE SABE CUANTOS PUNTOS TENIA, NO SE REVOCA (759.a aplicada aqui). El
+     original hacia `-Number(s.puntos||0)`, que convierte «no llego» en un **0** -- y en esta
+     pantalla el 0 no es «nada», es la revocacion de un AVISO. Mejor no ofrecerlo. */
+  if (_ptsSanc_(s.puntos) === null) return false;
+  var L = arr || [], i, x;
+  for (i = 0; i < L.length; i++){
+    x = L[i];
+    if (x && x.origen === 'revocacion' && x.extra
+        && String(x.extra.revoca) === String(s.id) && x.estado !== 'rechazada') return false;
+  }
+  return true;
+}
+
+/* La fila que viaja, IGUAL que la del panel viejo -- y eso no es nostalgia: es la forma que
+   tienen las 2 revocaciones REALES del almacen, y la que lee `flujos/enviar_revocacion.py`.
+   ⛔ Los puntos EN POSITIVO: son los que se devuelven. Con el signo de la original la
+   revocacion volveria a restar, o sea castigaria dos veces a quien gano la apelacion.
+   ⛔ La clave es NATURAL (`revoca-<id>`) y hace falta: `api._post` hace **tres intentos**, y
+   si lo que se pierde es la RESPUESTA el servidor ya escribio -- sin clave, el reintento
+   regala los puntos otra vez. Y una sancion concreta se revoca UNA vez, asi que `revoca-<id>`
+   es exactamente lo que no puede repetirse. El `lote` NO sirve: sale `null` en las manuales.
+   ⚠️ El lote es `revoca-<lote original>` para que varias del mismo bloque caigan en UNA
+   tarjeta y salgan con UN comunicado -- que es lo que el selector de varias buscaba. */
+function _filaRevocacion_(s, texto){
+  return { origen:'revocacion', clave:'revoca-' + s.id,
+    lote: s.lote ? ('revoca-' + s.lote) : null,
+    nombre: s.nombre,
+    motivo: 'Revocación de «' + (s.motivo || 'sanción') + '» — ' + texto,
+    articulo: s.articulo || 'libre',
+    puntos: -(_ptsSanc_(s.puntos) || 0),
+    extra: { revoca: s.id, loteOriginal: s.lote || null,
+             motivoOriginal: s.motivo || null, razon: texto } };
+}
+
 function _validaPuntosSanc_(crudo){
   var t = String(crudo === null || crudo === undefined ? '' : crudo).replace(/^\s+|\s+$/g, '');
   if (t === '')
@@ -2209,6 +2578,17 @@ function _automatismosHTML_(){
       'cambiado después no sale aquí.</div>'
     : '<div class="msub" data-est="sinfecha"><b>Sin fecha</b>: no se sabe de cuándo es esta foto, '+
       'así que no la des por actual.</div>');
+  /* ⛔ EL BOTON DE COMPROBAR (765.a). Daniel (10/09): «darle a un boton y que checkee».
+     ⛔⛔ NO COMPRUEBA LA APP, Y EL TEXTO LO DICE: el inventario se DERIVA del repo y el
+     backend no tiene repo. Lo que hace el boton es levantar el flag `comprobar_automatismos`;
+     el gate lo recoge en su siguiente pasada -- hasta 2 minutos -- y publica el resultado.
+     Decir «comprobado» al pulsar seria mentir justo durante esa espera.
+     ⚠️ Solo en el escritorio: en el movil no hay donde poner esto y nadie lo ha pedido. */
+  h+='<p class="rnota" style="margin:10px 0 0">'+
+    '<button class="btn sm" data-comprauto>Comprobarlo ahora</button> '+
+    '<span style="color:var(--ink3)">Lo calcula el gate en su siguiente pasada, '+
+    '<b>hasta 2 min</b>: la app no puede comprobarlo ella, porque esto sale del '+
+    '<b>repositorio</b> y el servidor no lo tiene.</span></p>';
   h+='<div class="mdoc"><h3>¿Hay algo desviado?</h3>';
   var c=A.comprobacion;
   if(!(c instanceof Array) || !c.length){
@@ -2303,7 +2683,16 @@ function _fechaDMY_(s){
    llegue el panel, y callar el libro entero seria peor que enseñarlo con un mes de margen. */
 function _deEstaTemporada_(d){
   if(!d) return false;
-  var per = (typeof _diasDelMes_==='function') ? (_diasDelMes_()||{}).periodo : null;
+  /* ⛔ POR `_periodoAbierto_` (791.ª): `_diasDelMes_().periodo` sale de
+     `DATA.equipo_mes.periodo`. El mes de trabajo va de cierre a cierre (§2b).
+     ⛔⛔ **Y LO DE «EL BACKEND NO MANDA» ERA FALSO** (corregido el 05/10, el mismo día
+     que lo escribí): lo manda desde el **07/08** (`cecd8bba`) y lo desplegado es del
+     02/10 — medido contra el backend VIVO, llega `periodo: '2026-10'`. Lo malo no es que
+     falte: es que trae el mes del **CALENDARIO**, no el de trabajo.
+     ⚠️ Y se curó EN LAS DOS: `_deEsteMes_` y `_deEstaTemporada_` tenían la línea
+     idéntica, y el `parche` lo cantó al contar el ancla (salía 2 veces). Una lección
+     curada en una y no en su gemela es exactamente como se repite. */
+  var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
   if(/^\d{4}-\d{2}$/.test(String(per||''))){
     return _temporadaDe_(d) === _temporadaDe_(new Date(+per.slice(0,4), (+per.slice(5,7))-1, 1));
   }
@@ -2355,9 +2744,72 @@ function _esDeMesPasado_(p, periodo){
    ⚠️ **Sin periodo se sigue cayendo al calendario**, y hace falta: `_esDeMesPasado_`
    contesta `false` a todo cuando no lo hay —su «ante la duda, se ve»—, y tomar eso por
    «todo es de este mes» metería en la lista partes de hace medio año. */
+/* EL MES DE TRABAJO ABIERTO (`AAAA-MM`), o `null`. **Una sola puerta.**
+
+   ⛔⛔ EXISTE PORQUE LA TARJETA DE HORAS CONTABA DOS MESES A LA VEZ (791.ª, 05/10). La cifra
+   grande sale de Notion, que lleva el mes abierto **desde el último cierre**; el desglose
+   preguntaba por `DATA.equipo_mes.periodo`, que **el backend no manda** --medido: `_equipoMesDe_`
+   escribe `dia`, `diaCont`, `dias_mes` y `periodo_ant`, y `periodo` no--, así que caía al
+   calendario. El 5 de octubre eso es octubre: arriba «82,5 h este mes» y abajo «todavía no se te
+   ha contado ningún fichaje», con diez partes de septiembre dentro del mes abierto.
+
+   ✅ El último cierre SÍ llega a la cara (`CIERRE_UC`, de `api.getCierre`), así que el periodo
+   abierto **se deriva**: el mes siguiente al último CERRADO. Es §2b -- *un mes va de cierre a
+   cierre, no del 1 al 31*.
+
+   ⚠️ ORDEN: lo que mande el backend manda sobre lo derivado; si no hay ninguno de los dos se
+   devuelve `null` y cada lector decide (hoy: el calendario, que es lo de siempre). Un `null` aquí
+   no apaga nada -- devolver un mes inventado sí. */
+function _mesSiguiente_(per){
+  var m = /^(\d{4})-(\d{2})$/.exec(String(per||''));
+  if(!m) return null;
+  var a = +m[1], n = +m[2] + 1;
+  if(n > 12){ n = 1; a += 1; }
+  return a + '-' + (n < 10 ? '0' : '') + n;
+}
+
+/* ⛔⛔ LA DERIVACION VA PRIMERO, Y HASTA EL 05/10 IBA AL FINAL -- o sea que esta puerta
+   preferia el campo del backend, que es el MES DEL CALENDARIO.
+   📏 Medido contra el backend VIVO el 05/10: `equipo_mes` llega con
+   `{"periodo":"2026-10","dia":26,"dias_mes":31,...}` — **octubre**, mientras el mes de
+   trabajo abierto es **septiembre** (`_periodoActual_()` del backend usa `new Date()`).
+   📏 Y el dano, medido EJECUTANDO: de 10 partes de septiembre, con `2026-10` se
+   **pliegan los 10** como «de meses pasados»; con `2026-09`, **ninguno**. Es el sintoma que
+   reporto Daniel — la cifra grande diciendo las horas y la lista diciendo *«todavia no se te
+   ha contado ningun fichaje»*.
+   ⚠️ Y AQUI AL LADO PUSE UNA PREMISA FALSA el mismo dia: el comentario de `_deEsteMes_`
+   decia que `equipo_mes.periodo` *«el backend NO manda --medido--»*. Lo manda desde el
+   **07/08** (`cecd8bba`) y lo desplegado es del 02/10. Un dato del MUNDO se RE-MIDE.
+   ⚠️ El campo servido se queda como RESPALDO, no se tira: a un miembro raso `getCierre`
+   le esta **vedado** (*«solo el Project Director»*), asi que sin el no tendria nada — y el
+   calendario es aproximado pero no inventado. La cura de fondo va en el PRODUCTOR
+   (`_equipoMesDe_`), que es la que lo arregla para los 23. */
+function _periodoAbierto_(){
+  /* ⚠️ LAS DOS CARAS, y se llaman distinto: el movil guarda el ultimo cierre en
+     `CIERRE_UC` y el escritorio en `CIERRE.ultimo_cierre`. Mirar solo uno dejaria la
+     otra cara cayendo al calendario -- una leccion curada en una cara y no en su
+     gemela es exactamente como se repite. */
+  var uc = (typeof CIERRE_UC !== 'undefined' && CIERRE_UC) ? CIERRE_UC
+         : ((typeof CIERRE !== 'undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
+  var p = uc && uc.periodo;
+  if(/^\d{4}-\d{2}$/.test(String(p || ''))) return _mesSiguiente_(p);
+  var e = (typeof DATA !== 'undefined' && DATA) ? DATA.equipo_mes : null;
+  if(e && /^\d{4}-\d{2}$/.test(String(e.periodo || ''))) return e.periodo;
+  return null;
+}
+
 function _deEsteMes_(d){
   if(!d) return false;
-  var per = (typeof _diasDelMes_==='function') ? (_diasDelMes_()||{}).periodo : null;
+  /* ⛔ POR `_periodoAbierto_` (791.ª): `_diasDelMes_().periodo` sale de
+     `DATA.equipo_mes.periodo`. El mes de trabajo va de cierre a cierre (§2b).
+     ⛔⛔ **Y LO DE «EL BACKEND NO MANDA» ERA FALSO** (corregido el 05/10, el mismo día
+     que lo escribí): lo manda desde el **07/08** (`cecd8bba`) y lo desplegado es del
+     02/10 — medido contra el backend VIVO, llega `periodo: '2026-10'`. Lo malo no es que
+     falte: es que trae el mes del **CALENDARIO**, no el de trabajo.
+     ⚠️ Y se curó EN LAS DOS: `_deEsteMes_` y `_deEstaTemporada_` tenían la línea
+     idéntica, y el `parche` lo cantó al contar el ancla (salía 2 veces). Una lección
+     curada en una y no en su gemela es exactamente como se repite. */
+  var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
   if(/^\d{4}-\d{2}$/.test(String(per||''))){
     var m = d.getMonth()+1;
     var iso = d.getFullYear() + '-' + (m<10?'0':'') + m + '-01';
@@ -3625,6 +4077,18 @@ function _perfilesDe_(m){
   if(!m||typeof m!=='object') return [];
   var orden=[], por={}, i, u, unidad=_limpio_(m.unidad);
   if(unidad){ por[unidad]={unidad:unidad,rol:'miembro',txt:'miembro de '+unidad}; orden.push(unidad); }
+  /* ⛔ DONDE ESTA ADEMAS (01/10). Gemela de `reglas/perfiles.py` y de
+     `_perfilesDeNombre_` del backend: tres sitios, una sola regla, y el campo
+     `unidades` no lo leia ninguno aunque `roster_set.py` lo escribe desde el 18/08.
+     ⚠️ Se reutiliza `_unidadesCoord_`, que NO es «las que coordina» pese al nombre:
+     es el normalizador de un campo de lista del roster (cadena -> [cadena], recorte,
+     huecos fuera). Copiarlo habria duplicado tambien la trampa de la cadena.
+     ⚠️ Y va ANTES de `coordina`, que PISA a miembro en la misma unidad. */
+  var us=_unidadesCoord_(m.unidades);
+  for(i=0;i<us.length;i++){
+    u=us[i];
+    if(!por[u]){ por[u]={unidad:u,rol:'miembro',txt:'miembro de '+u}; orden.push(u); }
+  }
   var cs=_unidadesCoord_(m.coordina);
   for(i=0;i<cs.length;i++){
     u=cs[i];
@@ -3714,6 +4178,27 @@ function _perfilValido_(m,unidad){
 
    Vive aparte porque es lo unico de esa tarjeta que se puede EJECUTAR en un banco: el resto es
    HTML con medio modulo detras. */
+/* QUE ESPERA FIRMA DE ESTE MES: `{n, horas, lista}`. **Una sola puerta.**
+
+   ⛔ ORDEN DE DANIEL (05/10, 793.ª): *«el desglose ha de aparecer partes pendientes con las
+   barritas esas amarillas y negras y ha de aparecer los partes aprobados»*. Con la 791.ª los
+   aprobados y otorgados del mes abierto ya salen; esto es la otra mitad.
+
+   ⛔ **SOLO `pend` Y `det`.** Un parte rechazado, caducado o revertido **no espera nada de
+   nadie**, así que enseñarlo como «esperando firma» sería prometer una decisión que no va a
+   llegar. Es la misma distinción que ya hace la lista del historial con `rev`.
+
+   ⚠️ Vive aquí, fuera del HTML, porque una regla enterrada en una concatenación de cadenas
+   **no se puede poner roja**: es lo mismo que dice el comentario de `_apuntesMes_`. */
+function _esperanFirma_(partes){
+  var out = [], h = 0, i;
+  for(i = 0; i < (partes||[]).length; i++){
+    var p = partes[i];
+    if(p && (p.e === 'pend' || p.e === 'det')){ out.push(p); h += (+p.q || 0); }
+  }
+  return { n: out.length, horas: Math.round(h * 100) / 100, lista: out };
+}
+
 function _apuntesMes_(fichajes, horasComp, horasExtra){
   return (fichajes||0) + (((horasComp||0)!==0 || (horasExtra||0)!==0) ? 1 : 0);
 }
@@ -3919,6 +4404,158 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-05-periodo-del-cierre', fecha:'2026-10-05',
+      titulo:'El mes abierto se cuenta desde el ultimo cierre, no desde el calendario',
+      items:[
+        {cara:'movil', vista:'horas', txt:'<b>Y el arreglo de arriba estaba a medias: no '
+          +'cambiaba nada en pantalla.</b> La pieza de antes mando las dos mitades de la '
+          +'tarjeta a preguntar «que mes esta abierto» por una sola puerta, pero esa puerta '
+          +'hacia caso al dato del servidor, <b>que trae el mes del calendario</b>. Medido '
+          +'contra el backend de verdad: el 5 de octubre decia <b>octubre</b> con septiembre '
+          +'sin cerrar, y con eso <b>los diez partes de septiembre se plegaban</b> como «de '
+          +'meses pasados» justo debajo del total que los contaba. Ahora el mes abierto se '
+          +'deduce del ultimo cierre aplicado, y el dato del servidor queda solo de '
+          +'respaldo.'},
+        {cara:'escritorio', vista:'horas', txt:'<b>Lo mismo en el escritorio</b>, que guarda el ultimo cierre con otro nombre: una correccion en una cara y no en la otra es '
+          +'como esto se repite.'}
+      ] },
+    { id:'2026-10-05-horas-un-solo-mes', fecha:'2026-10-05',
+      titulo:'La tarjeta de Horas ya cuenta UN solo mes, y ensena de que se compone',
+      items:[
+        {cara:'movil', vista:'horas', txt:'<b>«Ultimos movimientos» enseñaba casi nada.</b> La '
+          +'cifra grande cuenta el mes de trabajo —de cierre a cierre— y el desglose de abajo '
+          +'contaba el mes del <b>calendario</b>, asi que del dia 1 hasta que se cierra el mes '
+          +'anterior ponia tu total arriba y <b>«todavia no se te ha contado ningun fichaje»</b> '
+          +'debajo. Ahora las dos mitades cuentan lo mismo y ahi salen tus partes del mes, '
+          +'con su concepto.'},
+        {cara:'movil', vista:'horas', txt:'<b>Y lo que esta esperando firma tambien sale</b>, '
+          +'con el mismo rayado que la barra usa para «pendientes · no cuentan» y con su propio '
+          +'rotulo: va aparte porque todavia <b>no</b> suma al total de arriba. Solo lo que de '
+          +'verdad espera una decision — lo rechazado o caducado no espera nada de nadie.'}
+      ] },
+    { id:'2026-10-05-revertir-detalle', fecha:'2026-10-05',
+      titulo:'Desde el movil ya se puede deshacer un «pedir detalle»',
+      items:[
+        {cara:'movil', vista:'horas', txt:'En <b>Ya decidiste</b>, un parte al que le pediste '
+          +'detalle ya se puede <b>revertir desde el telefono</b>. Hasta hoy solo se podia desde '
+          +'el ordenador: el servidor lo admitia, el escritorio lo ofrecia y <b>esta cara no</b> '
+          +'— y es la cara desde la que se decide sobre la marcha. La lista de lo que se puede '
+          +'deshacer vive ahora en <b>un solo sitio</b>, asi que las dos caras no pueden volver a '
+          +'contestar distinto.'}
+      ] },
+    { id:'2026-10-04-objetivo-vivo', fecha:'2026-10-04',
+      titulo:'El objetivo de horas del mes se calcula, ya no viene congelado',
+      items:[
+        /* ⛔ La vista es `horas`: `_umbral_` se usa desde `vHoras` (medido expandiendo el
+           grafo de llamadas de `horas.movil.js`, no por el nombre del modulo). */
+        {cara:'movil', vista:'horas', txt:'La <b>marca vertical de la barra de Horas</b> — el '
+          +'objetivo del mes — se calcula ahora con <b>la gente que esta de alta</b> y contando '
+          +'solo los meses cerrados <b>de esta temporada</b>. Antes llegaba hecho desde el '
+          +'servidor, y lo que llegaba era de <b>julio</b>: 32 personas y media 15,58, cuando '
+          +'los 23 de alta dan 18,91. El objetivo pasa de <b>12,85 a 12,60 h</b>.'}
+      ] },
+    { id:'2026-10-04-subsistemas-vivo', fecha:'2026-10-04',
+      titulo:'Las horas por subsistema se calculan con la gente que tienes delante',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La tarjeta de <b>subsistemas</b> ya no ensena una '
+          +'foto del servidor: los <b>nombres</b> los sigue poniendo el motor y los <b>numeros</b> '
+          +'se calculan con los miembros de alta que la pantalla tiene delante, asi que no pueden '
+          +'discrepar de ella. La foto anterior era del 23/09 y daba <b>GNC 32,2</b> cuando sus '
+          +'miembros dan <b>22,7</b>, y metia dentro a Org&amp;Mark, que no compite.'}
+      ] },
+    { id:'2026-10-04-semilla-sin-fecha', fecha:'2026-10-04',
+      titulo:'La demostracion ya no afirma una fecha que no tiene',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Abriendo el panel <b>sin conexion con el servidor</b> '
+          +'se ve una demostracion, y el pie ponia <b>«SOLARIS · datos a 24/07/2026»</b> y '
+          +'<b>«ciclo 25/26»</b> con la misma cara que un dato de verdad — una fecha de julio '
+          +'leida en octubre. Ahora, sin datos, <b>cada rotulo se calla</b>; con datos vuelve a '
+          +'decirse. El escritorio ya lo distinguia: era el movil el que no.'}
+      ] },
+    /* ⛔⛔ TRES ENTRADAS SE ESCRIBIERON AQUI EL 04/10 Y SE RETIRARON EL MISMO DIA, y el
+       motivo va escrito para que nadie las vuelva a meter antes de tiempo. El criterio no es
+       «¿esta hecho?» sino «¿puede MIRARLO alguien HOY?»:
+       · `2026-10-04-libro-temporada` (769.a) — el filtro por temporada vive en `Codigo.gs` y
+         lo desplegado sigue siendo el **v83**. Entra CON el despliegue.
+       · `2026-10-04-temporada-en-curso` (776.a) — arregla `flujos/ensamblar.py`, o sea **lo
+         que se sube**; el panel vivo es del 23/09 y sirve `temporada: '25/26'`. Entra con la
+         proxima subida del panel.
+       · `2026-10-04-multiunidad` (773.a) — **ya estaba vivo desde el 23/09**: la 661.a subio
+         `coordina` ya partido y el panel trae las dos unidades de Jose. La pieza arreglo el
+         dato local y dejo una sola puerta; en pantalla no cambia nada, asi que NO entra.
+       📏 Las tres se midieron LEYENDO EL PANEL VIVO (solo lectura), no la ficha:
+       sirve `temporada: '25/26'`, es del 23/09 y ya trae las dos unidades de Jose. */
+    { id:'2026-10-02-puntos-sin-dato', fecha:'2026-10-02',
+      titulo:'Los puntos de una sanción, dichos igual en las dos caras',
+      items:[
+        /* ⛔ La vista es `estado` en el móvil (la cola es un MODAL desde la tarjeta del PD) y
+           `sanciones` en el escritorio, donde sí es una vista. Lo cazó `probar_novedades.py`
+           la última vez que me equivoqué justo con esta pantalla. */
+        {cara:'escritorio', vista:'sanciones', txt:'En el bloque de sanciones, los puntos de cada '
+          +'persona ya se leen igual: 0 pone «aviso» y un premio lleva su signo («+1 punto»), '
+          +'que antes salía como si quitara. Y si a una fila NO le ha llegado el dato, pone '
+          +'«sin dato» y la previsión «antes → después» se queda quieta en vez de prometer un '
+          +'número que no sabe. El rótulo del bloque dice aparte cuántas son avisos y cuántas '
+          +'están sin dato.'},
+        {cara:'movil', vista:'estado', txt:'En la cola de Sanciones del menú ⋮ los puntos ponen '
+          +'lo mismo que en el ordenador — «aviso», «−1 punto», «+1 punto» — en vez de un número '
+          +'suelto. Antes un 0 se veía igual que un dato que no había llegado.'}
+      ] },
+    { id:'2026-10-02-premio-en-la-cola', fecha:'2026-10-02',
+      titulo:'Un premio ya no se lee como una sanción',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'Los bloques de una reunión traen premiados y '
+          +'sancionados MEZCLADOS, y hasta ahora un premio salía como «aviso» — un apercibimiento '
+          +'a quien se le está premiando por cubrir su disponibilidad. Ahora su fila pone '
+          +'«premio · +0,5 h» (la recompensa son horas, no puntos) y una revocación pone '
+          +'«revocación». Y sobre un premio ya no sale el botón «Justifica»: el servidor nunca lo '
+          +'aceptaba — se lo saltaba y te decía que no podías decidirlo tú, que no era la razón. '
+          +'«Acepta» y «Rechaza» siguen, que son las dos decisiones que sí existen.'},
+        {cara:'movil', vista:'estado', txt:'La cola de Sanciones del menú ⋮ también distingue un '
+          +'premio de una sanción, con el mismo texto que el ordenador.'}
+      ] },
+    { id:'2026-10-02-cargos-turno', fecha:'2026-10-02',
+      titulo:'Al convocar, las tres responsabilidades llegan de verdad',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Marcar <b>Responsable audiovisual</b> o <b>de '
+          +'memoria</b> al convocar <b>no llegaba a ningún sitio</b>: se marcaba, se convocaba, y '
+          +'el turno volvía de Notion sin esas dos asignaciones. Solo el de turno y el coche '
+          +'pasaban al reparto. Ya pasan las tres.<br>Y arriba del reparto hay un recuadro con '
+          +'las <b>responsabilidades pendientes de asignar</b>, que se vacía al repartirlas: '
+          +'antes solo te lo decía el botón de convocar, cuando ya lo intentabas. Una por '
+          +'persona, y la misma persona puede llevar varias.'}
+      ] },
+    { id:'2026-10-02-revocar', fecha:'2026-10-02',
+      titulo:'Revocar una sanción, otra vez desde el escritorio',
+      items:[
+        {cara:'escritorio', vista:'sanciones', txt:'Vuelve la <b>vía de apelación del Art. 34</b>, '
+          +'que estaba en el panel viejo y se había quedado por el camino. En Sanciones hay un '
+          +'bloque <b>«Se pueden revocar»</b> con las ya aplicadas: escribes el motivo '
+          +'(obligatorio) y la revocación entra en la cola <b>como pendiente</b> — se confirma '
+          +'con su bloque, igual que una sanción, y sale un solo comunicado. <b>No borra la '
+          +'sanción</b>: crea la devolución de puntos, y queda el rastro de las dos. Si era un '
+          +'aviso no devuelve puntos, retira el registro. Y no deja revocar dos veces la misma.'}
+      ] },
+    { id:'2026-10-02-apelar-donde', fecha:'2026-10-02',
+      titulo:'Apelar una tarea: ahora dice dónde',
+      items:[
+        {cara:'movil', vista:'tareas', txt:'La tarjeta de Mis tareas decía «si crees que una no '
+          +'te corresponde, puedes apelarla (Art. 34)» — y la app no tramita apelaciones, así '
+          +'que eso mandaba a buscar un botón que no existe. El derecho sigue dicho (es del RRI), '
+          +'y ahora dice dónde se ejerce: <b>fuera de la app</b>, en privado al Project Director.'}
+      ] },
+    { id:'2026-10-02-iphone-instalar', fecha:'2026-10-02',
+      titulo:'En iPhone, el panel ya dice cómo recibir los avisos',
+      items:[
+        /* ⚠️ La vista es `ajustes`… que NO es una de las 7 del móvil. El panel de notificaciones
+           es un MODAL que se abre desde el menú ⋮, igual que Sanciones, así que la vista es
+           `estado` — es la misma trampa que ya me comió `probar_novedades.py` una vez. */
+        {cara:'movil', vista:'estado', txt:'Si abres el panel en <b>Safari del iPhone</b> sin '
+          +'haberlo añadido a la pantalla de inicio, ahora te lo dice y te explica cómo: '
+          +'Compartir → Añadir a pantalla de inicio. Antes te dejaba entrar **sin avisos y sin '
+          +'decir nada**, y en Ajustes ponía «Ábrelo en el móvil» — estando en el móvil. Apple '
+          +'sólo manda notificaciones a las apps abiertas desde ese icono.'}
+      ] },
     { id:'2026-10-01-cola-sanciones-fresca', fecha:'2026-10-01',
       titulo:'La cola de sanciones del m\u00f3vil se pone al d\u00eda sola',
       items:[
