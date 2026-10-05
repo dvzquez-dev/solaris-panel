@@ -1771,6 +1771,10 @@ function _engPartesDec_(){
 }
 
 function vHoras(){
+  /* ⛔ LA BANDA SANA SE PIDE UNA VEZ, ARRIBA: la pintan DOS rotulos de esta misma vista
+     (la cabecera y el pie del anillo), y hasta el 05/10 la llevaban **teclada los dos**.
+     Pedirla en cada sitio seria volver a tener dos copias, un piso mas abajo. */
+  var _bs = _bandaSana_();
   /* DEL MES, como la barra de abajo: el titular de esta pantalla dice «lo que ya
      cuenta **este mes**». Con `sumaE` la pildora y la barra podian decir numeros
      distintos en la misma tarjeta en cuanto una de las dos se arreglara. */
@@ -1908,7 +1912,10 @@ function vHoras(){
        que un 30 % del numero es historia (`reglas/carga.py`). Y ademas viene del PANEL, que
        hoy es una foto — el overlay en vivo trae puntos, horas y compensaciones, `carga` no.
        Daniel: «y la carga del mes que aparece no se si esta bien». Tenia razon. */
-    '<h2 class="sec">Mi índice de carga<span class="ln"></span>banda sana 70–120</h2>'+
+    /* ⛔ LA BANDA SE PIDE (05/10): estaba teclada aquí y en el pie de abajo. Ver
+       `_bandaSana_` en `comun.js`. */
+    '<h2 class="sec">Mi índice de carga<span class="ln"></span>banda sana '
+      + _bs.lo + '–' + _bs.hi + '</h2>'+
     '<div class="tarj">'+
       (typeof YO.carga==='number'
         ? '<div style="position:relative;height:30px;margin:4px 0 8px">'+
@@ -1936,7 +1943,7 @@ function vHoras(){
              día que el motor vuelva a poblar `desglose` ya no miente. */
           (YO.desglose?'<small>índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes '+nf(YO.desglose.aporta_mes_actual||0,1)+' · arrastre '+nf(YO.desglose.arrastre||0,1)+'</small>':'')+
           (_hMesReal_(YO)!=null?'<small>este mes llevas '+h1(_hMesReal_(YO))+', en vivo</small>':'')+
-          '</div><div class="d">banda sana 70–120</div></div>'
+          '</div><div class="d">banda sana ' + _bs.lo + '–' + _bs.hi + '</div></div>'
         : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+
     '</div>'+
     /* ⛔ La gemela del «ciclo» de la portada: sin temporada esto decía **«temporada

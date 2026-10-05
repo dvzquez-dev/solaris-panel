@@ -706,6 +706,29 @@ function _curvaCuota_(h, ancla, umbral, techo){
 
 /* Trunca al centimo, SIEMPRE a la baja. Gemela de `reglas/cuota.py:truncar_centimo`, con
    su mismo margen: sin el `1e-9`, 0,29 cae a 0,28 por el binario. */
+/* ⛔⛔ LA BANDA SANA DE CARGA, PEDIDA AL PANEL — no teclada. Devuelve `{lo, hi, viva}`.
+
+   📏 Hasta el 05/10 `horas.movil.js` llevaba «banda sana 70–120» **escrito a mano en dos
+   sitios**, y la cara no puede importar `reglas/carga.py`. Es la misma avería que el **manual**,
+   que estuvo **dos meses** diciendo 60–90 después de que Daniel moviera la banda a 70–120 — y
+   lo cazó él, no un guardia. Ahora el número **viaja** (`flujos/volcado.py` lo mete en el panel
+   desde la única puerta, y la proyección del backend lo lista).
+
+   ⚠️ EL RESPALDO LLEVA EL VALOR DE HOY, y eso es deliberado: hasta que se despliegue la
+   proyección, el campo **no llega** al miembro raso — y enseñar «banda sana null–null» sería
+   peor que el número de hoy. Lo que impide que ese respaldo se podra es `probar_banda.py`, que
+   ya exige que coincida con `reglas/carga.py`: el día que la banda se mueva, ese banco se pone
+   rojo y hay que tocar **un** sitio en vez de tres.
+   ⚠️ `viva` dice de dónde salió. No se pinta, pero el banco lo mira: sin él, «viaja» y «cayó al
+   respaldo» se leen igual de bien, que es §3c-24. */
+function _bandaSana_(){
+  var d = (typeof DATA !== 'undefined' && DATA) ? DATA : null;
+  var lo = d ? d.banda_min : null, hi = d ? d.banda_max : null;
+  if(typeof lo === 'number' && typeof hi === 'number' && lo < hi)
+    return { lo: lo, hi: hi, viva: true };
+  return { lo: 70, hi: 120, viva: false };
+}
+
 function _truncarCentimo_(x){ return Math.floor(x * 100 + 1e-9) / 100; }
 
 function _umbral_(){
