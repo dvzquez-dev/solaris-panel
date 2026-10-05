@@ -326,6 +326,30 @@ function _mediasDeEstaTemp_(ing){
 
    ⚠️ Y es una GEMELA, no una copia inocente: si algún día cambia el redondeo de un lado hay
    que cambiarlo en el otro. Lo vigila el banco comparando las dos sobre un caso con empate. */
+/* ⛔⛔ LOS ESTADOS QUE SE PUEDEN REVERTIR — UNA sola lista, y el ARBITRO es el servidor.
+   `_revertirParte_` (`Codigo.gs`) lanza con cualquier otro, asi que una cara que ofrezca MAS
+   pinta un boton que solo sabe dar error, y una que ofrezca MENOS esconde una decision que si
+   se puede deshacer.
+   📏 El 05/10/2026 estaba COPIADA en las dos caras y discrepaban: al movil le faltaba
+   `'detalle'` -- un estado real, el de «pedir detalle» --, asi que eso se podia deshacer desde
+   el ordenador y no desde el telefono, que es la cara desde la que se decide sobre la marcha.
+   ⛔ Y era la SEGUNDA desincronizacion de estas dos, la anterior en la direccion contraria (el
+   `origen==='reversion'`): mover el arreglo de lado en lado no lo arregla.
+   ⚠️ Lo que NO se unifica son las dos funciones: `ARRANQUE.md` §5b corta **por cara** porque hay
+   gemelas que deben divergir, y el escritorio tiene un segundo escalon (`_escRevBloqueo_`). Lo
+   que se unifica es la DECISION.
+   ⚠️ Y el bucle no es por gusto: el arnes de los bancos corre en JScript, que es ES3 y no tiene
+   `indexOf` de array. */
+function _estadosRevertibles_(){
+  return ['aprobada','rechazada','detalle','otorgada','aplicada'];
+}
+
+function _esEstadoRevertible_(e){
+  var L = _estadosRevertibles_(), i;
+  for(i = 0; i < L.length; i++) if(L[i] === e) return true;
+  return false;
+}
+
 function _red1_(x){
   if(typeof x !== 'number' || !isFinite(x)) return null;
   var neg = x < 0;
@@ -2636,7 +2660,13 @@ function _fechaDMY_(s){
    llegue el panel, y callar el libro entero seria peor que enseñarlo con un mes de margen. */
 function _deEstaTemporada_(d){
   if(!d) return false;
-  var per = (typeof _diasDelMes_==='function') ? (_diasDelMes_()||{}).periodo : null;
+  /* ⛔ POR `_periodoAbierto_` (791.ª): `_diasDelMes_().periodo` sale de
+     `DATA.equipo_mes.periodo`, que **el backend NO manda** --medido--, así que esto caía
+     SIEMPRE al calendario de abajo. El mes de trabajo va de cierre a cierre (§2b).
+     ⚠️ Y se curó EN LAS DOS: `_deEsteMes_` y `_deEstaTemporada_` tenían la línea
+     idéntica, y el `parche` lo cantó al contar el ancla (salía 2 veces). Una lección
+     curada en una y no en su gemela es exactamente como se repite. */
+  var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
   if(/^\d{4}-\d{2}$/.test(String(per||''))){
     return _temporadaDe_(d) === _temporadaDe_(new Date(+per.slice(0,4), (+per.slice(5,7))-1, 1));
   }
@@ -2688,9 +2718,52 @@ function _esDeMesPasado_(p, periodo){
    ⚠️ **Sin periodo se sigue cayendo al calendario**, y hace falta: `_esDeMesPasado_`
    contesta `false` a todo cuando no lo hay —su «ante la duda, se ve»—, y tomar eso por
    «todo es de este mes» metería en la lista partes de hace medio año. */
+/* EL MES DE TRABAJO ABIERTO (`AAAA-MM`), o `null`. **Una sola puerta.**
+
+   ⛔⛔ EXISTE PORQUE LA TARJETA DE HORAS CONTABA DOS MESES A LA VEZ (791.ª, 05/10). La cifra
+   grande sale de Notion, que lleva el mes abierto **desde el último cierre**; el desglose
+   preguntaba por `DATA.equipo_mes.periodo`, que **el backend no manda** --medido: `_equipoMesDe_`
+   escribe `dia`, `diaCont`, `dias_mes` y `periodo_ant`, y `periodo` no--, así que caía al
+   calendario. El 5 de octubre eso es octubre: arriba «82,5 h este mes» y abajo «todavía no se te
+   ha contado ningún fichaje», con diez partes de septiembre dentro del mes abierto.
+
+   ✅ El último cierre SÍ llega a la cara (`CIERRE_UC`, de `api.getCierre`), así que el periodo
+   abierto **se deriva**: el mes siguiente al último CERRADO. Es §2b -- *un mes va de cierre a
+   cierre, no del 1 al 31*.
+
+   ⚠️ ORDEN: lo que mande el backend manda sobre lo derivado; si no hay ninguno de los dos se
+   devuelve `null` y cada lector decide (hoy: el calendario, que es lo de siempre). Un `null` aquí
+   no apaga nada -- devolver un mes inventado sí. */
+function _mesSiguiente_(per){
+  var m = /^(\d{4})-(\d{2})$/.exec(String(per||''));
+  if(!m) return null;
+  var a = +m[1], n = +m[2] + 1;
+  if(n > 12){ n = 1; a += 1; }
+  return a + '-' + (n < 10 ? '0' : '') + n;
+}
+
+function _periodoAbierto_(){
+  var e = (typeof DATA !== 'undefined' && DATA) ? DATA.equipo_mes : null;
+  if(e && /^\d{4}-\d{2}$/.test(String(e.periodo || ''))) return e.periodo;
+  /* ⚠️ LAS DOS CARAS, y se llaman distinto: el movil guarda el ultimo cierre en
+     `CIERRE_UC` y el escritorio en `CIERRE.ultimo_cierre`. Mirar solo uno dejaria la
+     otra cara cayendo al calendario -- una leccion curada en una cara y no en su
+     gemela es exactamente como se repite. */
+  var uc = (typeof CIERRE_UC !== 'undefined' && CIERRE_UC) ? CIERRE_UC
+         : ((typeof CIERRE !== 'undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
+  var p = uc && uc.periodo;
+  return /^\d{4}-\d{2}$/.test(String(p || '')) ? _mesSiguiente_(p) : null;
+}
+
 function _deEsteMes_(d){
   if(!d) return false;
-  var per = (typeof _diasDelMes_==='function') ? (_diasDelMes_()||{}).periodo : null;
+  /* ⛔ POR `_periodoAbierto_` (791.ª): `_diasDelMes_().periodo` sale de
+     `DATA.equipo_mes.periodo`, que **el backend NO manda** --medido--, así que esto caía
+     SIEMPRE al calendario de abajo. El mes de trabajo va de cierre a cierre (§2b).
+     ⚠️ Y se curó EN LAS DOS: `_deEsteMes_` y `_deEstaTemporada_` tenían la línea
+     idéntica, y el `parche` lo cantó al contar el ancla (salía 2 veces). Una lección
+     curada en una y no en su gemela es exactamente como se repite. */
+  var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
   if(/^\d{4}-\d{2}$/.test(String(per||''))){
     var m = d.getMonth()+1;
     var iso = d.getFullYear() + '-' + (m<10?'0':'') + m + '-01';
@@ -4059,6 +4132,27 @@ function _perfilValido_(m,unidad){
 
    Vive aparte porque es lo unico de esa tarjeta que se puede EJECUTAR en un banco: el resto es
    HTML con medio modulo detras. */
+/* QUE ESPERA FIRMA DE ESTE MES: `{n, horas, lista}`. **Una sola puerta.**
+
+   ⛔ ORDEN DE DANIEL (05/10, 793.ª): *«el desglose ha de aparecer partes pendientes con las
+   barritas esas amarillas y negras y ha de aparecer los partes aprobados»*. Con la 791.ª los
+   aprobados y otorgados del mes abierto ya salen; esto es la otra mitad.
+
+   ⛔ **SOLO `pend` Y `det`.** Un parte rechazado, caducado o revertido **no espera nada de
+   nadie**, así que enseñarlo como «esperando firma» sería prometer una decisión que no va a
+   llegar. Es la misma distinción que ya hace la lista del historial con `rev`.
+
+   ⚠️ Vive aquí, fuera del HTML, porque una regla enterrada en una concatenación de cadenas
+   **no se puede poner roja**: es lo mismo que dice el comentario de `_apuntesMes_`. */
+function _esperanFirma_(partes){
+  var out = [], h = 0, i;
+  for(i = 0; i < (partes||[]).length; i++){
+    var p = partes[i];
+    if(p && (p.e === 'pend' || p.e === 'det')){ out.push(p); h += (+p.q || 0); }
+  }
+  return { n: out.length, horas: Math.round(h * 100) / 100, lista: out };
+}
+
 function _apuntesMes_(fichajes, horasComp, horasExtra){
   return (fichajes||0) + (((horasComp||0)!==0 || (horasExtra||0)!==0) ? 1 : 0);
 }
@@ -4264,6 +4358,72 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-05-horas-un-solo-mes', fecha:'2026-10-05',
+      titulo:'La tarjeta de Horas ya cuenta UN solo mes, y ensena de que se compone',
+      items:[
+        {cara:'movil', vista:'horas', txt:'<b>«Ultimos movimientos» enseñaba casi nada.</b> La '
+          +'cifra grande cuenta el mes de trabajo —de cierre a cierre— y el desglose de abajo '
+          +'contaba el mes del <b>calendario</b>, asi que del dia 1 hasta que se cierra el mes '
+          +'anterior ponia tu total arriba y <b>«todavia no se te ha contado ningun fichaje»</b> '
+          +'debajo. Ahora las dos mitades cuentan lo mismo y ahi salen tus partes del mes, '
+          +'con su concepto.'},
+        {cara:'movil', vista:'horas', txt:'<b>Y lo que esta esperando firma tambien sale</b>, '
+          +'con el mismo rayado que la barra usa para «pendientes · no cuentan» y con su propio '
+          +'rotulo: va aparte porque todavia <b>no</b> suma al total de arriba. Solo lo que de '
+          +'verdad espera una decision — lo rechazado o caducado no espera nada de nadie.'}
+      ] },
+    { id:'2026-10-05-revertir-detalle', fecha:'2026-10-05',
+      titulo:'Desde el movil ya se puede deshacer un «pedir detalle»',
+      items:[
+        {cara:'movil', vista:'horas', txt:'En <b>Ya decidiste</b>, un parte al que le pediste '
+          +'detalle ya se puede <b>revertir desde el telefono</b>. Hasta hoy solo se podia desde '
+          +'el ordenador: el servidor lo admitia, el escritorio lo ofrecia y <b>esta cara no</b> '
+          +'— y es la cara desde la que se decide sobre la marcha. La lista de lo que se puede '
+          +'deshacer vive ahora en <b>un solo sitio</b>, asi que las dos caras no pueden volver a '
+          +'contestar distinto.'}
+      ] },
+    { id:'2026-10-04-objetivo-vivo', fecha:'2026-10-04',
+      titulo:'El objetivo de horas del mes se calcula, ya no viene congelado',
+      items:[
+        /* ⛔ La vista es `horas`: `_umbral_` se usa desde `vHoras` (medido expandiendo el
+           grafo de llamadas de `horas.movil.js`, no por el nombre del modulo). */
+        {cara:'movil', vista:'horas', txt:'La <b>marca vertical de la barra de Horas</b> — el '
+          +'objetivo del mes — se calcula ahora con <b>la gente que esta de alta</b> y contando '
+          +'solo los meses cerrados <b>de esta temporada</b>. Antes llegaba hecho desde el '
+          +'servidor, y lo que llegaba era de <b>julio</b>: 32 personas y media 15,58, cuando '
+          +'los 23 de alta dan 18,91. El objetivo pasa de <b>12,85 a 12,60 h</b>.'}
+      ] },
+    { id:'2026-10-04-subsistemas-vivo', fecha:'2026-10-04',
+      titulo:'Las horas por subsistema se calculan con la gente que tienes delante',
+      items:[
+        {cara:'movil', vista:'horas', txt:'La tarjeta de <b>subsistemas</b> ya no ensena una '
+          +'foto del servidor: los <b>nombres</b> los sigue poniendo el motor y los <b>numeros</b> '
+          +'se calculan con los miembros de alta que la pantalla tiene delante, asi que no pueden '
+          +'discrepar de ella. La foto anterior era del 23/09 y daba <b>GNC 32,2</b> cuando sus '
+          +'miembros dan <b>22,7</b>, y metia dentro a Org&amp;Mark, que no compite.'}
+      ] },
+    { id:'2026-10-04-semilla-sin-fecha', fecha:'2026-10-04',
+      titulo:'La demostracion ya no afirma una fecha que no tiene',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Abriendo el panel <b>sin conexion con el servidor</b> '
+          +'se ve una demostracion, y el pie ponia <b>«SOLARIS · datos a 24/07/2026»</b> y '
+          +'<b>«ciclo 25/26»</b> con la misma cara que un dato de verdad — una fecha de julio '
+          +'leida en octubre. Ahora, sin datos, <b>cada rotulo se calla</b>; con datos vuelve a '
+          +'decirse. El escritorio ya lo distinguia: era el movil el que no.'}
+      ] },
+    /* ⛔⛔ TRES ENTRADAS SE ESCRIBIERON AQUI EL 04/10 Y SE RETIRARON EL MISMO DIA, y el
+       motivo va escrito para que nadie las vuelva a meter antes de tiempo. El criterio no es
+       «¿esta hecho?» sino «¿puede MIRARLO alguien HOY?»:
+       · `2026-10-04-libro-temporada` (769.a) — el filtro por temporada vive en `Codigo.gs` y
+         lo desplegado sigue siendo el **v83**. Entra CON el despliegue.
+       · `2026-10-04-temporada-en-curso` (776.a) — arregla `flujos/ensamblar.py`, o sea **lo
+         que se sube**; el panel vivo es del 23/09 y sirve `temporada: '25/26'`. Entra con la
+         proxima subida del panel.
+       · `2026-10-04-multiunidad` (773.a) — **ya estaba vivo desde el 23/09**: la 661.a subio
+         `coordina` ya partido y el panel trae las dos unidades de Jose. La pieza arreglo el
+         dato local y dejo una sola puerta; en pantalla no cambia nada, asi que NO entra.
+       📏 Las tres se midieron LEYENDO EL PANEL VIVO (solo lectura), no la ficha:
+       sirve `temporada: '25/26'`, es del 23/09 y ya trae las dos unidades de Jose. */
     { id:'2026-10-02-puntos-sin-dato', fecha:'2026-10-02',
       titulo:'Los puntos de una sanción, dichos igual en las dos caras',
       items:[
