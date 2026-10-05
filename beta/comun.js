@@ -824,6 +824,46 @@ function _puedeDeshacerTarea_(t, ahora){
   return ms >= 0 && ms <= _minDeshacerTarea_() * 60000;
 }
 
+/* ══ EL PESO DE CADA MES, GEMELA DE `reglas/cuota.PESOS_MES` ════════════════════
+   🗣️ Daniel: *«te acuerdas que había unos multiplicadores de que los meses ponderaban distinto,
+   todo eso está definido»* y *«va ponderado desde inicio de temporada hasta el día actual»*. Julio
+   y agosto a la mitad, porque el equipo no trabaja igual en verano.
+   ⚠️ **Es una GEMELA, no una copia por pereza**: son dos motores sin un `require` entre medias
+   —el mismo caso que `_ptsDe_` o `_isoFechaHora_`—, y el banco **deriva los pesos esperados de
+   `reglas/cuota.PESOS_MES`** en vez de escribirlos, así que mover el peso en Python pone roja la
+   cara hasta que se mueva aquí.
+   ⛔⛔ **Y UN PERIODO QUE NO SE RECONOCE VALE `null`, NO 1.** Es la misma decisión que su gemela
+   de Python, y por el mismo motivo escrito allí: un 1 convertiría una cadena rota en «un mes
+   normal» **en silencio**, y si esa cadena era julio esas horas pasarían a pesar el doble de lo
+   que Daniel dijo. Quien llama decide qué hace con el `null` (§3c-24). */
+function _pesoDeMes_(periodo){
+  var s = String(periodo == null ? '' : periodo), m;
+  if(!/^\d{4}-\d{2}$/.test(s)) return null;
+  m = parseInt(s.slice(5, 7), 10);
+  if(!(m >= 1 && m <= 12)) return null;
+  return (m === 7 || m === 8) ? 0.5 : 1;
+}
+
+/* Los meses CERRADOS de la temporada en curso, con su periodo — lo que hace falta para pesar.
+   ⛔ Misma puerta de temporada que `_mediasDeEstaTemp_` (`_temporadaVigente_`), y no por
+   simetría: si una dijera «esta temporada» y la otra otra cosa, el umbral se calcularía con
+   unos meses y se rotularía con otros.
+   ⛔ **Y se descarta lo que no se puede pesar**: una entrada sin `periodo` reconocible o sin
+   `media` numérica no entra. Quien llama ve que salen menos de las que hay — y eso es lo que
+   le hace caer al respaldo en vez de pesar media lista. */
+function _detalleDeEstaTemp_(ing){
+  if(!ing || !ing.detalle || !ing.detalle.length) return [];
+  var t = ing.temporada, hoy = _temporadaVigente_(), out = [], i, c;
+  if(!t || !hoy || t !== hoy) return [];
+  for(i = 0; i < ing.detalle.length; i++){
+    c = ing.detalle[i];
+    if(!c || _pesoDeMes_(c.periodo) === null) continue;
+    if(typeof c.media !== 'number') continue;
+    out.push(c);
+  }
+  return out;
+}
+
 function _temporadaVigente_(){
   /* ⛔ NI UN CAMPO GUARDADO NI DOS: SE DERIVA DEL PERIODO ABIERTO. La primera version de
      esto rankeaba `umbral.temporada` por encima de `DATA.temporada`, o sea elegia el menos
@@ -887,7 +927,21 @@ function _umbral_(){
      Lo cazaron los dos casos que fosilizan esa leccion, y tenian razon. */
   if(ing && (_med.length || (ma && typeof ma.media==='number'))){
     var num=0, den=0;
-    _med.forEach(function(x){ num+=x; den+=1; });              // cada mes cerrado pesa 1
+    /* ⛔⛔ AQUÍ CADA MES CERRADO PESABA 1, Y EL MOTOR NO. Desde el 05/10
+       `reglas/cuota.umbral_temporada` pesa julio y agosto a la mitad, y esta línea daba
+       otro número sobre los mismos datos — de este número sale la cuota de todo el equipo,
+       y Daniel lo llamó **«gravísimo»**.
+       ⛔ **SÓLO se pesa si el detalle cubre TODOS los meses** (`_det.length === _med.length`).
+       Si falta alguno —un panel viejo sin `detalle`, o una entrada con el periodo roto— se
+       cae al promedio sin pesos, que es el número que la cara daba hasta hoy: conocido y
+       definido. Pesar MEDIA lista sería inventar un tercer número que nadie podría
+       reconocer, y sería peor que no pesar. */
+    var _det=_detalleDeEstaTemp_(ing);
+    if(_det.length && _det.length===_med.length){
+      _det.forEach(function(c){ var w=_pesoDeMes_(c.periodo); num+=w*c.media; den+=w; });
+    } else {
+      _med.forEach(function(x){ num+=x; den+=1; });            // respaldo: cada mes pesa 1
+    }
     if(ma && typeof ma.media==='number'){
       var w=_fraccionDelMes_();                                 // el abierto, a prorrata
       num+=ma.media*w; den+=w;
