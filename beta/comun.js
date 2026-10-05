@@ -744,6 +744,86 @@ function _curvaCuota_(h, ancla, umbral, techo){
    respaldo. Es la misma inversión que ya se hizo hoy con el periodo abierto.
    ⚠️ `null` si no hay ninguno de los dos, nunca una cadena inventada: el rótulo entero **se
    calla** cuando no se sabe de qué temporada son las horas de debajo, que es lo honesto. */
+/* ══ EL FLUJO DE UNA TAREA, Y EL PLAZO PARA DESHACERLO ════════════════════
+   🗣️ Daniel, 05/10, y la cadena es suya palabra por palabra: *«las están sin empezar, y hay
+   q darle a empezar para que ponga en desarrollo. Y luego, una vez la entregas… le das al
+   botón de entregada o lo que sea, y pone revisando. Y siempre que haya un botón de
+   deshacer… que tengas un plazo para deshacer… revisando ya significa básicamente que lo has
+   subido al coso de los documentos, al formulario, o que se lo has entregado al coordinador.
+   Pero bueno, tú das fe de que ya está»*.
+   📏 **Y el vocabulario NO se inventa: se midió.** Contra `datos/tareas.json` de la raíz el
+   05/10 —las 28 tareas que alimentan a las 32 personas— los estados reales de los Kanban son
+   **`Sin empezar` (10) · `En desarrollo` (14) · `Revisando` (4)**: exactamente los tres que
+   describió, con sus nombres.
+   ⛔ **DESDE `Revisando` NO SE AVANZA.** El último paso que una persona declara es «entregada»;
+   cerrarla es del coordinador o de Notion. Dejar declarar «hecha» aquí sería firmar la propia
+   revisión, y es justo lo que la frase *«tú das fe de que ya está»* delimita.
+   ⛔ **Y un estado FUERA de la cadena no recibe ningún botón.** Una tarea ya hecha —o un estado
+   que Notion añada mañana— cae a `-1` y se queda sin acción: un flujo que avanzara «desde
+   cualquier cosa» le aplicaría el primer paso de la cadena sin dar ningún error.
+   ⚠️ **Van en `comun.js` y no en la cara**: el escritorio también filtra tareas
+   (`sanciones.escritorio.js`), y una cadena de estados copiada en dos caras es exactamente como
+   divergió `_estadosRevertibles_`, que hubo que unificar el 05/10.
+   ⚠️ Y van como **funciones**, no como `var`: `comun.js` no lleva ni una sentencia ejecutable de
+   nivel superior (ARRANQUE §5b), y el arnés de los bancos corre en JScript — ES3, sin
+   `Array.indexOf`. De ahí el bucle de `_tareaPaso_`. */
+
+/* ⛔⛔ ESTO VIVÍA COPIADO CINCO VECES EN `ronda3`, con TRES tratamientos distintos del nulo.
+   📏 Medido el 05/10 antes de tocar nada: `tareas.movil.js` **3** (`t.e`, `t.e`, `t&&t.e`),
+   `sanciones.movil.js` **1** y `sanciones.escritorio.js` **1** (las dos `t.e||''`). Las cinco
+   contestan la MISMA pregunta —¿está hecha esta tarea?— sobre el mismo vocabulario, así que no
+   es una coincidencia que haya que respetar: es una verdad escrita cinco veces.
+   ✅ **Y unificarlas ARREGLA algo, no sólo ordena**: dos de las copias no guardaban el nulo, o
+   sea que hacían `/…/i.test(undefined)` — probaban la **cadena** «undefined», que no casa, y
+   salían correctas **por casualidad**. Aquí el ausente es `false` a propósito. */
+function _tareaHecha_(e){
+  return /hech|finaliz|complet|termin|cerrad/i.test(String(e == null ? '' : e));
+}
+
+function _tareaFlujo_(){ return ['Sin empezar', 'En desarrollo', 'Revisando']; }
+
+function _tareaPaso_(e){
+  var F = _tareaFlujo_(), i;
+  for(i = 0; i < F.length; i++){ if(F[i] === e) return i; }
+  return -1;                       /* fuera de la cadena, y eso NO es «el primero» */
+}
+
+function _tareaSiguiente_(e){
+  var F = _tareaFlujo_(), i = _tareaPaso_(e);
+  return (i >= 0 && i < F.length - 1) ? F[i + 1] : null;
+}
+
+function _tareaAnterior_(e){
+  var F = _tareaFlujo_(), i = _tareaPaso_(e);
+  return i > 0 ? F[i - 1] : null;
+}
+
+/* La acción lleva **la etiqueta Y a dónde va**: con sólo la etiqueta, quien la pinta tiene que
+   volver a preguntar el siguiente estado, y entonces hay dos sitios decidiendo lo mismo. */
+function _tareaAccion_(e){
+  var ETIQ = ['Empezar', 'Entregada'], i = _tareaPaso_(e), a = _tareaSiguiente_(e);
+  return (a === null || i < 0 || i >= ETIQ.length) ? null : {etiqueta: ETIQ[i], a: a};
+}
+
+/* ⚠️ EL PLAZO ES PROVISIONAL Y ÉL NO LO HA DICHO. Pidió *«que tengas un plazo para
+   deshacer»* sin número, y un «tienes N minutos» escrito a ojo **suena oficial**, que es peor
+   que no decirlo — la misma trampa que el plazo del Art. 34 en esta misma pantalla. Por eso va
+   en UNA puerta con nombre: cambiarlo cuando lo diga es **una línea**, y la pantalla deriva de
+   aquí el texto que ensena, sin repetir el número. */
+function _minDeshacerTarea_(){ return 30; }
+
+/* ⛔ EL INSTANTE ENTRA POR ARGUMENTO. Un caso que dependa de `new Date()` acierta o falla
+   según la hora a la que se corra la batería (§3c-36, la única ciega de 2.430).
+   ⛔ Y SIN `desde` NO SE DESHACE: si no se sabe **cuándo** se declaró, no se puede saber si el
+   plazo vive, y «no lo sé» cae al lado seguro (§3c-24). Eso además delimita el botón a lo que
+   la persona ha hecho **en esta sesión**: el estado que viene de Notion no trae `desde`, así que
+   no se ofrece «deshacer» sobre algo que no has tocado tú. */
+function _puedeDeshacerTarea_(t, ahora){
+  if(!t || typeof t.desde !== 'number') return false;
+  var ms = (typeof ahora === 'number' ? ahora : (new Date()).getTime()) - t.desde;
+  return ms >= 0 && ms <= _minDeshacerTarea_() * 60000;
+}
+
 function _temporadaVigente_(){
   /* ⛔ NI UN CAMPO GUARDADO NI DOS: SE DERIVA DEL PERIODO ABIERTO. La primera version de
      esto rankeaba `umbral.temporada` por encima de `DATA.temporada`, o sea elegia el menos
@@ -4450,6 +4530,18 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-05-tareas-flujo', fecha:'2026-10-05',
+      titulo:'Tus tareas se mueven desde la app, y siempre puedes deshacerlo',
+      items:[
+        {cara:'movil', vista:'tareas', txt:'<b>Empezar, Entregada y Deshacer.</b> Una tarea '
+          +'sin empezar trae el botón <b>Empezar</b> y pasa a «en desarrollo»; cuando la '
+          +'entregas, <b>Entregada</b> la pone en «revisando». Cerrarla no se declara desde '
+          +'aquí: entregarla es tuyo, cerrarla es de tu coordinador. Y hay un <b>plazo para '
+          +'deshacer</b> que la pantalla te dice.'},
+        {cara:'movil', vista:'tareas', txt:'<b>Y la lista es la TUYA.</b> «Mis tareas» '
+          +'listaba las de todo el equipo — el servidor las manda todas y la pantalla no '
+          +'filtraba. Ahora sólo salen las que tienes asignadas.'}
+      ] },
     { id:'2026-10-05-periodo-del-cierre', fecha:'2026-10-05',
       titulo:'El mes abierto se cuenta desde el ultimo cierre, no desde el calendario',
       items:[

@@ -105,7 +105,11 @@ function _sancionesHTML_(){
   var cargandoT=(_tt===null) && !(SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien
                                   && SANC_TAREAS.error);
   var tareas=(_tt||[]).filter(function(t){
-    return t && t.url && !/hech|finaliz|complet|termin|cerrad/i.test(t.e||''); });
+    /* ⛔ LA MISMA PREGUNTA QUE «Mis tareas», y por eso la misma puerta: aquí se
+       eligen las tareas a las que se pueden imputar horas, y una tarea cerrada no
+       admite horas. Con el predicado copiado, cerrar una tarea dejaría de ocultarla
+       **en una pantalla y no en la otra** el día que Notion añada un estado. */
+    return t && t.url && !_tareaHecha_(t.e); });
   return '<div class="mtit">Sanciones</div>'+
     '<div class="msub">Ponerlas y decidirlas. El comunicado sigue saliendo del escritorio.</div>'+
     '<h4>Poner una sanción</h4><div class="tarj">'+
