@@ -1967,7 +1967,10 @@ function vHoras(){
     /* ⛔ La gemela del «ciclo» de la portada: sin temporada esto decía **«temporada
        null»**. El rótulo se calla entero, que es lo honesto cuando no se sabe de qué
        temporada son las horas que hay debajo. */
-    '<h2 class="sec">Ranking de horas<span class="ln"></span>'+(DATA.temporada?('temporada '+DATA.temporada):'')+'</h2>'+
+    /* ⛔ POR LA PUERTA: `DATA.temporada` lo sella `push.py`, que lleva sin correr desde
+       que el motor se quedó en la 25/26 — este rótulo decía **temporada 25/26** en octubre.
+       `_temporadaVigente_` prefiere lo que recalcula `umbral.py --subir`. */
+    '<h2 class="sec">Ranking de horas<span class="ln"></span>'+(_temporadaVigente_()?('temporada '+_temporadaVigente_()):'')+'</h2>'+
     '<div class="tarj rank">'+
       (filas
         ? filas+'<p class="rnota">Se ponderan tus horas de la temporada entre los meses que llevas en el '+

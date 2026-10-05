@@ -145,7 +145,7 @@ function vEstado(){
      secas, una semilla sin temporada pinta literalmente **«ciclo null»**; y con un
      `||''` quedaría **«ciclo »** colgando. `cab(t,d)` ya omite su `<span>` cuando `d`
      es vacío, así que la cura es la que ya existía ahí dentro. */
-  return _nov+'<div class="tarj">'+cab('Conducta',DATA.temporada?('ciclo '+DATA.temporada):'')+medidorHTML()+'</div>'+
+  return _nov+'<div class="tarj">'+cab('Conducta',_temporadaVigente_()?('ciclo '+_temporadaVigente_()):'')+medidorHTML()+'</div>'+
     av+
     /* LAS HORAS SALIERON DE AQUI (Daniel, 28/07: «quitaria las horas de estado y las
        dejaria solo en horas»). Estaban en dos pantallas con la misma cifra y la misma barra.

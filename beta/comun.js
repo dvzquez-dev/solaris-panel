@@ -301,7 +301,16 @@ function _mesAbiertoVivo_(){
    que es para lo que `medias` existe. */
 function _mediasDeEstaTemp_(ing){
   if(!ing || !ing.medias || !ing.medias.length) return [];
-  var t = ing.temporada, hoy = (typeof DATA !== 'undefined') ? DATA.temporada : null;
+  /* ⛔⛔ ESTO COMPARABA CONTRA `DATA.temporada`, EL ROTULO SELLADO Y VIEJO, y por eso
+     el filtro decia NO a las medias buenas: con `umbral.temporada`='26/27' y la raiz en
+     '25/26' -- medido el 05/10 contra el backend vivo -- `t !== hoy` y se devuelve [].
+     ⚠️ Y lo que HOY se pierde es **cero**, porque la 26/27 todavia no tiene ningun mes
+     cerrado en el umbral (`umbral.medias` = 0, medido en la misma respuesta). O sea que
+     el defecto es LATENTE: muerde el dia que el cierre de septiembre entre en `medias`,
+     y entonces el umbral de la cara se calcularia con CERO meses teniendolos. No se
+     arregla porque duela hoy, se arregla porque el rotulo con el que compara es el que
+     Daniel reporto viejo tres veces. Ahora compara contra la temporada DERIVADA. */
+  var t = ing.temporada, hoy = _temporadaVigente_();
   if(!t || !hoy || t !== hoy) return [];
   return ing.medias;
 }
@@ -721,6 +730,43 @@ function _curvaCuota_(h, ancla, umbral, techo){
    rojo y hay que tocar **un** sitio en vez de tres.
    ⚠️ `viva` dice de dónde salió. No se pinta, pero el banco lo mira: sin él, «viaja» y «cayó al
    respaldo» se leen igual de bien, que es §3c-24. */
+/* ⛔⛔ LA TEMPORADA QUE SE ENSEÑA, EN UNA PUERTA — Y EL CAMPO SELLADO ES EL RESPALDO.
+   🗣️ Daniel, 05/10: *«sigue lo de 25/26 en los rankings de horas, explícate»*.
+   📏 La cadena, medida: el rótulo imprimía `DATA.temporada`, que **sella `push.py`** en la
+   raíz del panel — y `push.py` **se niega a correr** porque el motor sigue en la 25/26, que
+   sale de `datos/horas_temporada.json`, un agregado **mantenido a mano** y sin tocar desde el
+   **21/07**. O sea que el rótulo era el último eslabón de una foto de hace dos meses y medio.
+   ✅ **Y hay un dato FRESCO que ya llega**: `panel.umbral.temporada`, que escribe
+   `flujos/umbral.py --subir` cada vez que corre. Verificado releyendo el panel vivo el
+   05/10: dice **26/27** mientras la raíz decía **25/26**. Dos campos, dos verdades, y el que
+   se pintaba era el viejo.
+   ⛔ Por eso el orden es éste y no al revés: **manda lo que se recalcula**, y lo sellado es el
+   respaldo. Es la misma inversión que ya se hizo hoy con el periodo abierto.
+   ⚠️ `null` si no hay ninguno de los dos, nunca una cadena inventada: el rótulo entero **se
+   calla** cuando no se sabe de qué temporada son las horas de debajo, que es lo honesto. */
+function _temporadaVigente_(){
+  /* ⛔ NI UN CAMPO GUARDADO NI DOS: SE DERIVA DEL PERIODO ABIERTO. La primera version de
+     esto rankeaba `umbral.temporada` por encima de `DATA.temporada`, o sea elegia el menos
+     viejo de dos rotulos SELLADOS -- y un rotulo sellado envejece sin dar ningun error.
+     📏 Medido contra el backend VIVO el 05/10, en la MISMA respuesta: `generado`
+     '2026-10-05' (el servidor lo sella con su reloj), `temporada` **'25/26'** y
+     `umbral.temporada` **'26/27'**. Un panel fechado hoy, rotulado con la temporada pasada.
+     ✅ Y la derivacion correcta YA ESTABA ESCRITA, enterrada dentro de `_deEstaTemporada_`:
+     el dia 1 del periodo abierto por `_temporadaDe_`. Esto es esa extraccion, nada nuevo.
+     🗣️ Daniel, 05/10: *«ese es el tipo de cosas que deberian estar en comun.js en lugar
+     de desperdigado y puesto por separado en 872384562938659238 sitios distintos»*. Por eso
+     no hay un segundo calculo en ninguna cara: `_deEstaTemporada_`, el ranking de horas, el
+     ciclo de Conducta, Ajustes y la cabecera del escritorio llaman AQUI. */
+  var per = (typeof _periodoAbierto_ === 'function') ? _periodoAbierto_() : null;
+  if(/^\d{4}-\d{2}$/.test(String(per || ''))){
+    return _temporadaDe_(new Date(+per.slice(0, 4), (+per.slice(5, 7)) - 1, 1));
+  }
+  /* ⚠️ Sin periodo se cae al reloj, y hace falta: es lo unico que hay antes de que llegue
+     el panel. Es la misma caida que `_deEstaTemporada_` lleva documentada desde el 13/08. */
+  if(typeof _hoyDateM_ === 'function') return _temporadaDe_(_hoyDateM_());
+  return null;
+}
+
 function _bandaSana_(){
   var d = (typeof DATA !== 'undefined' && DATA) ? DATA : null;
   var lo = d ? d.banda_min : null, hi = d ? d.banda_max : null;
@@ -2692,11 +2738,11 @@ function _deEstaTemporada_(d){
      ⚠️ Y se curó EN LAS DOS: `_deEsteMes_` y `_deEstaTemporada_` tenían la línea
      idéntica, y el `parche` lo cantó al contar el ancla (salía 2 veces). Una lección
      curada en una y no en su gemela es exactamente como se repite. */
-  var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
-  if(/^\d{4}-\d{2}$/.test(String(per||''))){
-    return _temporadaDe_(d) === _temporadaDe_(new Date(+per.slice(0,4), (+per.slice(5,7))-1, 1));
-  }
-  return _temporadaDe_(d) === _temporadaDe_(_hoyDateM_());
+  /* ✅ POR LA PUERTA (05/10): estas cuatro lineas ERAN la definicion de «la temporada en
+     curso», escritas dentro de un predicado por fecha, asi que nadie mas podia usarlas y
+     cada rotulo se invento la suya. Ahora viven en `_temporadaVigente_` y aqui solo se
+     compara. Mismo resultado, un solo sitio donde cambiarlo. */
+  return _temporadaDe_(d) === _temporadaVigente_();
 }
 
 /* ⛔ CADA MAGNITUD SE REINICIA CON LO SUYO, y confundirlo hace que la app diga otra cosa que el
