@@ -117,7 +117,7 @@
 <script src="documentos.movil.js?v=5ec6ade"></script>
 <script src="sanciones.movil.js?v=221cccc"></script>
 <script src="reuniones.movil.js?v=4dd9f9e"></script>
-<script src="horas.movil.js?v=172078d"></script>
+<script src="horas.movil.js?v=4cff63b"></script>
 <script src="equipo.movil.js?v=6b7e2bf"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -421,6 +421,21 @@ function _aplicarPanel_(pnl){
      respaldo del calendario. O sea que el mes se volvia a medir del 1 al 31 EN LA CARA,
      con el backend midiendolo bien desde el cierre — y sin dar ningun error. */
   if(pnl.equipo_mes) DATA.equipo_mes=pnl.equipo_mes;
+  /* ⛔⛔ LA BANDA SANA, QUE LLEGABA Y SE CAÍA AL SUELO — Y EL COMENTARIO DECÍA QUE VIAJABA.
+     El 05/10 proyecté `banda_min`/`banda_max` en el panel (`Codigo.gs:875-876`) y escribí
+     en `_bandaSana_` que «el número ya viaja». **No viajaba**: nadie lo copiaba aquí, así
+     que `_bandaSana_` devolvía siempre `viva:false` y pintaba el **70–120 cableado**.
+     ⛔ Es §3c-28 exacto — *lo que no tiene banco es lo que está ENTRE dos que sí* — y la
+     misma avería que `equipo_mes` tres líneas más arriba: los dos extremos vigilados, el
+     cable del medio sin escribir. Lo cazó una auditoría, no un banco.
+     ⚠️ `typeof` y no `if(pnl.banda_min)`: un **0** es un número válido y `if` lo tiraría. */
+  if(typeof pnl.banda_min === 'number') DATA.banda_min = pnl.banda_min;
+  if(typeof pnl.banda_max === 'number') DATA.banda_max = pnl.banda_max;
+  /* ⛔⛔ Y EL CONSEJO, IGUAL: lo manda `Codigo.gs:862` y no lo copiaba nadie, así que
+     `DATA.consejo` era `undefined` **siempre**. En pantalla eso es convocar un «Consejo»
+     que **no invita a nadie**, y un mapa de turnos que dice «nadie del consejo puede» en
+     **todas** las casillas — justo lo que sus comentarios daban por arreglado. */
+  if(Array.isArray(pnl.consejo)) DATA.consejo = pnl.consejo;
   /* `horasMesReal` se dejo de usar: derivaba de un snapshot y le ganaba al dato vivo.
      Si el backend lo sigue mandando, se ignora. */
   /* ⛔ Y SE APUNTA QUE LLEGÓ, que es lo que la semilla hacía indistinguible. La lista
@@ -1579,7 +1594,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d2950d0';
+var BUILD='f3e8d36';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';

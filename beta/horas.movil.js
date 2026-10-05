@@ -1833,7 +1833,25 @@ function vHoras(){
      es OTRO campo — y `flujos/temporada.py` asigna puesto también a los de `meses = 0`.
      ⚠️ Esto NO decide dónde va en el ranking (eso lo decide Daniel): decide que, sea
      donde sea, no se le enseña un número inventado. */
-  var _hm=(typeof YO.horasTemp==='number' && YO.meses) ? (YO.horasTemp/YO.meses) : null;
+  /* ⛔⛔ POR LA PUERTA, Y NO A MANO: AQUÍ SALÍA OTRO NÚMERO QUE EL DEL PUESTO DE AL LADO.
+     Esto hacía `YO.horasTemp / YO.meses` — una división **plana**, todos los meses a peso 1
+     — mientras el **puesto** de esa misma fila lo calcula el motor con la media
+     **ponderada** (`ensamblar.py` → `ranking_personas`, con julio y agosto a la mitad).
+     📏 O sea: el número que lees y el puesto en el que te coloca **no son la misma
+     cuenta**, y el pie de esta misma tarjeta promete *«Se ponderan tus horas de la
+     temporada entre los meses que llevas en el equipo»*. Con el ejemplo medido del repo,
+     la fila decía **17,3 h** y el puesto se había calculado con **18,55**.
+     ⚠️ Y es justo lo que él señaló el 05/10 mirando a Adrián: *«¿cómo que 22,44? si sólo ha
+     pasado un mes de temporada»* — 246,8 h entre 11 meses, la división plana en pantalla.
+     ✅ `_hMesDe_` es LA puerta (`comun.js`): prefiere el `hRitmo`/`hMes` que ya calculó el
+     motor —ponderado— y sólo cae a `horasTemp/meses` si el panel no lo trae, que es el
+     respaldo honesto. Un número que decide un ranking no se vuelve a calcular a mano. */
+  var _hm=_hMesDe_(YO);
+  /* ⛔ Y LA GUARDA DE ESTA PANTALLA SE QUEDA, que la puerta no la puede dar. El respaldo
+     de `_hMesDe_` con `meses:0` devuelve las horas **CRUDAS sin dividir** — decisión suya
+     del 14/08 —, y aquí eso sería un TOTAL disfrazado de ritmo en la columna de h/mes.
+     Si el motor no mandó ritmo y no hay meses, **no se finge**: sale «—». */
+  if(_hm!=null && !YO.meses && typeof YO.hRitmo!=='number' && typeof YO.hMes!=='number') _hm=null;
   for(var i=Math.max(1,puesto-2); puesto>0 && i<=Math.min(total,puesto+2); i++){
     filas += (i===puesto)
       ? '<div class="r yo"><span class="p mono">'+i+'</span><span class="n">'+esc(YO.pila)+' (tú)</span>'+
