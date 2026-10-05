@@ -2661,8 +2661,11 @@ function _fechaDMY_(s){
 function _deEstaTemporada_(d){
   if(!d) return false;
   /* ⛔ POR `_periodoAbierto_` (791.ª): `_diasDelMes_().periodo` sale de
-     `DATA.equipo_mes.periodo`, que **el backend NO manda** --medido--, así que esto caía
-     SIEMPRE al calendario de abajo. El mes de trabajo va de cierre a cierre (§2b).
+     `DATA.equipo_mes.periodo`. El mes de trabajo va de cierre a cierre (§2b).
+     ⛔⛔ **Y LO DE «EL BACKEND NO MANDA» ERA FALSO** (corregido el 05/10, el mismo día
+     que lo escribí): lo manda desde el **07/08** (`cecd8bba`) y lo desplegado es del
+     02/10 — medido contra el backend VIVO, llega `periodo: '2026-10'`. Lo malo no es que
+     falte: es que trae el mes del **CALENDARIO**, no el de trabajo.
      ⚠️ Y se curó EN LAS DOS: `_deEsteMes_` y `_deEstaTemporada_` tenían la línea
      idéntica, y el `parche` lo cantó al contar el ancla (salía 2 veces). Una lección
      curada en una y no en su gemela es exactamente como se repite. */
@@ -2742,9 +2745,23 @@ function _mesSiguiente_(per){
   return a + '-' + (n < 10 ? '0' : '') + n;
 }
 
+/* ⛔⛔ LA DERIVACION VA PRIMERO, Y HASTA EL 05/10 IBA AL FINAL -- o sea que esta puerta
+   preferia el campo del backend, que es el MES DEL CALENDARIO.
+   📏 Medido contra el backend VIVO el 05/10: `equipo_mes` llega con
+   `{"periodo":"2026-10","dia":26,"dias_mes":31,...}` — **octubre**, mientras el mes de
+   trabajo abierto es **septiembre** (`_periodoActual_()` del backend usa `new Date()`).
+   📏 Y el dano, medido EJECUTANDO: de 10 partes de septiembre, con `2026-10` se
+   **pliegan los 10** como «de meses pasados»; con `2026-09`, **ninguno**. Es el sintoma que
+   reporto Daniel — la cifra grande diciendo las horas y la lista diciendo *«todavia no se te
+   ha contado ningun fichaje»*.
+   ⚠️ Y AQUI AL LADO PUSE UNA PREMISA FALSA el mismo dia: el comentario de `_deEsteMes_`
+   decia que `equipo_mes.periodo` *«el backend NO manda --medido--»*. Lo manda desde el
+   **07/08** (`cecd8bba`) y lo desplegado es del 02/10. Un dato del MUNDO se RE-MIDE.
+   ⚠️ El campo servido se queda como RESPALDO, no se tira: a un miembro raso `getCierre`
+   le esta **vedado** (*«solo el Project Director»*), asi que sin el no tendria nada — y el
+   calendario es aproximado pero no inventado. La cura de fondo va en el PRODUCTOR
+   (`_equipoMesDe_`), que es la que lo arregla para los 23. */
 function _periodoAbierto_(){
-  var e = (typeof DATA !== 'undefined' && DATA) ? DATA.equipo_mes : null;
-  if(e && /^\d{4}-\d{2}$/.test(String(e.periodo || ''))) return e.periodo;
   /* ⚠️ LAS DOS CARAS, y se llaman distinto: el movil guarda el ultimo cierre en
      `CIERRE_UC` y el escritorio en `CIERRE.ultimo_cierre`. Mirar solo uno dejaria la
      otra cara cayendo al calendario -- una leccion curada en una cara y no en su
@@ -2752,14 +2769,20 @@ function _periodoAbierto_(){
   var uc = (typeof CIERRE_UC !== 'undefined' && CIERRE_UC) ? CIERRE_UC
          : ((typeof CIERRE !== 'undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
   var p = uc && uc.periodo;
-  return /^\d{4}-\d{2}$/.test(String(p || '')) ? _mesSiguiente_(p) : null;
+  if(/^\d{4}-\d{2}$/.test(String(p || ''))) return _mesSiguiente_(p);
+  var e = (typeof DATA !== 'undefined' && DATA) ? DATA.equipo_mes : null;
+  if(e && /^\d{4}-\d{2}$/.test(String(e.periodo || ''))) return e.periodo;
+  return null;
 }
 
 function _deEsteMes_(d){
   if(!d) return false;
   /* ⛔ POR `_periodoAbierto_` (791.ª): `_diasDelMes_().periodo` sale de
-     `DATA.equipo_mes.periodo`, que **el backend NO manda** --medido--, así que esto caía
-     SIEMPRE al calendario de abajo. El mes de trabajo va de cierre a cierre (§2b).
+     `DATA.equipo_mes.periodo`. El mes de trabajo va de cierre a cierre (§2b).
+     ⛔⛔ **Y LO DE «EL BACKEND NO MANDA» ERA FALSO** (corregido el 05/10, el mismo día
+     que lo escribí): lo manda desde el **07/08** (`cecd8bba`) y lo desplegado es del
+     02/10 — medido contra el backend VIVO, llega `periodo: '2026-10'`. Lo malo no es que
+     falte: es que trae el mes del **CALENDARIO**, no el de trabajo.
      ⚠️ Y se curó EN LAS DOS: `_deEsteMes_` y `_deEstaTemporada_` tenían la línea
      idéntica, y el `parche` lo cantó al contar el ancla (salía 2 veces). Una lección
      curada en una y no en su gemela es exactamente como se repite. */
@@ -4358,6 +4381,21 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-05-periodo-del-cierre', fecha:'2026-10-05',
+      titulo:'El mes abierto se cuenta desde el ultimo cierre, no desde el calendario',
+      items:[
+        {cara:'movil', vista:'horas', txt:'<b>Y el arreglo de arriba estaba a medias: no '
+          +'cambiaba nada en pantalla.</b> La pieza de antes mando las dos mitades de la '
+          +'tarjeta a preguntar «que mes esta abierto» por una sola puerta, pero esa puerta '
+          +'hacia caso al dato del servidor, <b>que trae el mes del calendario</b>. Medido '
+          +'contra el backend de verdad: el 5 de octubre decia <b>octubre</b> con septiembre '
+          +'sin cerrar, y con eso <b>los diez partes de septiembre se plegaban</b> como «de '
+          +'meses pasados» justo debajo del total que los contaba. Ahora el mes abierto se '
+          +'deduce del ultimo cierre aplicado, y el dato del servidor queda solo de '
+          +'respaldo.'},
+        {cara:'escritorio', vista:'horas', txt:'<b>Lo mismo en el escritorio</b>, que guarda el ultimo cierre con otro nombre: una correccion en una cara y no en la otra es '
+          +'como esto se repite.'}
+      ] },
     { id:'2026-10-05-horas-un-solo-mes', fecha:'2026-10-05',
       titulo:'La tarjeta de Horas ya cuenta UN solo mes, y ensena de que se compone',
       items:[

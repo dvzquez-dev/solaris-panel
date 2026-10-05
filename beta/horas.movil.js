@@ -327,7 +327,11 @@ function sumaE(e){return PARTES.filter(function(p){return p.e===e;}).reduce(func
    es el unico dia en que se nota. */
 function sumaSiMes(pred){
   /* ⛔ POR LA PUERTA (791.ª): `_diasDelMes_().periodo` sale de `DATA.equipo_mes.periodo`,
-     que **el backend NO manda** --medido--, así que esto caía al calendario. §2b. */
+     que el backend SÍ manda —pero con el mes del **CALENDARIO**—, así que esto se iba al
+     mes del reloj. §2b.
+     ⛔⛔ **AQUÍ PONÍA «el backend NO manda» Y ERA FALSO** (corregido el 05/10, el mismo
+     día): lo manda desde el **07/08** (`cecd8bba`). 📏 Medido contra el backend VIVO:
+     `periodo: '2026-10'` con **septiembre** abierto. */
   var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
   return PARTES.filter(function(p){
     return pred(p) && !(typeof _esDeMesPasado_==='function' && _esDeMesPasado_(p, per));
