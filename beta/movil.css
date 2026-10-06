@@ -905,6 +905,23 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 /* ⛔ EL LOTE TAMBIEN MARCA, y hasta el 11/08 no lo hacia. Faltaba la regla — y aunque no
    hubiera faltado, el boton emitia DOS atributos `class` y el segundo se descartaba. Mismo
    vocabulario que `.decs`, para no inventar paleta: `a` acepta (verde), `r` rechaza (rojo). */
+/* ⛔⛔ EL CONTENEDOR QUE NUNCA SE DECLARO (06/10). `sanciones.movil.js` pinta cada fila
+   con `class="lote-i" style="flex-wrap:wrap;gap:6px"` y el motivo con `flex:1`… y aqui
+   solo habia TRES reglas de color (`button.on.a/j/r`): ni una de layout. Sin
+   `display:flex`, `flex-wrap`, `gap` y `flex:1` son **inertes** -- el div es un bloque,
+   los `<span>` van en linea y los botones Aprobar/Rechazar se meten DENTRO del texto.
+   🗣️ Daniel: *«Se ve feisimo, mira como se pisa el texto con los botones»*.
+   ⚠️ Ninguna prueba de DOM podia verlo: el HTML es correcto y el texto esta entero. Lo
+   vigila ahora `probar_bundle_caras.py`, que mide la familia entera (1 de 1 al nacer).
+   ⛔ EL MOTIVO SE LLEVA SU PROPIA LINEA (`flex-basis:100%`) en vez de competir por el
+   hueco: en un movil, nombre + motivo + dos botones en una fila deja el motivo en una
+   columna de cuatro palabras. Y `min-width:0` porque un item con `flex:1` NO baja de su
+   contenido sin el, que es la otra mitad de este mismo desbordamiento. */
+.lote-i{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:9px 0;
+  border-top:1px solid rgba(50,44,46,.8)}
+.lote-i .n{font-size:13px;font-weight:600}
+.lote-i .mono{min-width:0;flex:1 1 100%;line-height:1.45}
+.lote-i button{white-space:nowrap}
 .lote-i button.on.a{background:var(--ok);color:#fff;border-color:var(--ok)}
 /* ⛔ Y `j` DESDE EL 30/09, con el lote del movil: sin esta regla la clase llega y no pinta,
    que es exactamente la segunda causa de muerte que tuvo `a` el 11/08. El color sale de

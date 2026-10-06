@@ -190,6 +190,22 @@ function _convAviso_(){
     '<b>No se pudo preguntar al servidor</b>, as\u00ed que <b>no se sabe</b> si hay una semana '+
     'convocada. Esto <b>no</b> quiere decir que no la haya, y el plazo corre igual.'+
     '<br><br><button class="btn" data-convreint>Reintentar</button></p></div>';
+  /* ⛔⛔ «TODAVIA NO» TIENE SU PROPIO AVISO, Y NO CULPA A NADIE (06/10). El de abajo
+     manda a entrar con tu cuenta, y Daniel lo leyo **estando dentro**: `_engConv_` corre al
+     pintar y `SESION` aun no habia llegado. Un mensaje que describe otro problema cuesta mas
+     que ninguno -- manda a hacer lo que ya se ha hecho. */
+  if(e === 'esperando sesion') return '<div class="tarj" style="opacity:.85">'+
+    '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
+    '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
+    'Tu sesi\u00f3n <b>todav\u00eda estaba cargando</b> cuando se mir\u00f3, as\u00ed que <b>no se sabe</b> si '+
+    'hay una semana convocada. Sale sola al volver a esta pantalla.</p></div>';
+  /* ⚠️ Y que falte la ACCION es un problema de DESPLIEGUE: tampoco se arregla volviendo
+     a entrar, asi que no se le pide. */
+  if(e === 'sin accion') return '<div class="tarj" style="opacity:.85">'+
+    '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
+    '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
+    'Esta versi\u00f3n de la app <b>no trae la consulta de disponibilidad</b>, as\u00ed que '+
+    '<b>no se sabe</b> si hay una semana convocada. No es cosa tuya: av\u00edsalo.</p></div>';
   if(e === 'sin sesion') return '<div class="tarj" style="opacity:.85">'+
     '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
     '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
@@ -401,12 +417,28 @@ function _convEstadoSrv_(v){
 }
 
 function _convCargar_(repintar){
-  if (_convEstadoSrv_() !== 'sin pedir') return;
+  /* ⛔⛔ «TODAVIA NO» NO ES «NO», Y NO PUEDE SER TERMINAL (06/10). Aqui se volvia para
+     siempre en cuanto el estado dejaba de ser 'sin pedir', y `_engConv_` corre **al
+     pintar**, cuando `SESION` todavia puede no haber llegado -- la app pinta lo que tiene
+     y completa despues. Resultado: se sellaba 'sin sesion' en el primer pintado y **no se
+     volvia a preguntar en toda la carga**, con el usuario dentro. 🗣️ Daniel: *«Como que
+     "no hay sesion" que dices animal si estoy con mi cuenta personal logueado»*.
+     ⚠️ Y el arreglo perezoso --dejarlo en 'sin pedir'-- **desharia la 578.ª**, que curo lo
+     contrario: salir mudo mete *no he preguntado* y *no puedo preguntar* en el mismo valor.
+     Por eso el estado nuevo AVISA y ademas deja reintentar. */
+  var _e = _convEstadoSrv_();
+  if (_e !== 'sin pedir' && _e !== 'esperando sesion') return;
   /* ⛔⛔ NO SE SALE MUDO (578.ª). Dejar el estado en `'sin pedir'` mete *todavia no he
      preguntado* y *no PUEDO preguntar* en el mismo valor, y el de arriba — que es quien
      pinta — no puede distinguirlos. Curado en la gemela del escritorio en la 577.ª; esta
      es la misma FORMA en la otra cara, que es lo que hay que buscar y no el fichero. */
-  if (typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getConvocatoria){ _convEstadoSrv_('sin sesion'); return; }
+  /* ⛔ TRES CAUSAS, TRES ESTADOS. Aqui habia CUATRO condiciones compartiendo la etiqueta
+     'sin sesion', y la que se enseñaba era la unica que **culpa a quien mira**: le mandaba a
+     entrar con su cuenta estando dentro. Que falte la accion es un problema de DESPLIEGUE y
+     que la sesion no haya llegado aun es cuestion de milisegundos; ninguna de las dos se
+     arregla volviendo a entrar. Se mira la accion PRIMERO porque es la terminal de verdad. */
+  if (typeof api==='undefined' || !api.getConvocatoria){ _convEstadoSrv_('sin accion'); return; }
+  if (typeof SESION==='undefined' || !SESION){ _convEstadoSrv_('esperando sesion'); return; }
   _convEstadoSrv_('pidiendo');
   api.getConvocatoria().then(function(r){
     _convEstadoSrv_('ok');

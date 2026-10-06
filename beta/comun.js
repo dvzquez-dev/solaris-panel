@@ -6224,6 +6224,16 @@ function _novPorVista_(cara){
    `cara` es 'movil' | 'escritorio'. Si no hay nada de esa cara, devuelve '' — y entonces la
    capa **no existe**, que es lo que la hace «completamente retirable». */
 function _novHTML_(cara){
+  /* ⛔⛔ LA PUERTA VA AQUI DENTRO, NO EN LOS LLAMADORES (06/10). `_puedeVerNovedades_`
+     existia y la vigilaba un banco entero... pero solo la cruzaban el MENU y el MODAL: este
+     panel se pinta **lo primero** de la pantalla de inicio en las dos caras --
+     `equipo.movil.js` y `escritorio.html` lo llaman a pelo-- y no preguntaba nada. Resultado:
+     las novedades salian en PRODUCCION para los 32. Lo vio Daniel, no un banco.
+     ⚠️ Repetir la guarda en los dos llamadores es como se separan: el dia que entre una
+     tercera cara, su autor no sabra que hacia falta. Aqui no se puede olvidar.
+     ⚠️ Y falla CERRADO: si la puerta no esta cargada, no se pinta. Un escape aqui es la
+     capa de revision interna delante del equipo entero. */
+  if(typeof _puedeVerNovedades_!=='function' || !_puedeVerNovedades_()) return '';
   var d=_novDe_(cara);
   if(!d.pendientes.length && !d.hechas.length) return '';
   var item=function(i){ return '<li>'+esc(i.txt)+'</li>'; };
