@@ -3051,6 +3051,44 @@ function _horasSinBase_(m, h){
   return Math.max(0, Math.round((h - _compBase_(m))*100)/100);
 }
 
+/* LO QUE LE TOCA LLEVAR A DIA DE HOY, que NO es lo mismo que lo que ha trabajado.
+
+   🗣️ Daniel, 06/10: *«las compensaciones, para no meter literalmente un step, tienen que
+   sumarse tambien a las medias/comparaciones/promedios, etc. de forma progresiva dia a dia»*.
+
+   ⛔⛔ EL CASO, MEDIDO CONTRA EL PANEL VIVO EL 06/10: las `horasMes` de los 32 eran
+   **[2, 3.5, 7, None]** — o sea EXACTAMENTE las tres compensaciones base (miembro 2,
+   coordinador 3.5, PD 7) y **ni una hora de trabajo real contada en octubre**. El cierre mensual
+   devuelve `compensaciones` al defecto del cargo (`flujos/cierre.py`), asi que **el mes entero
+   se acredita el dia 1**. Y la columna «vs. objetivo a hoy» del escritorio prorrateaba el
+   LISTON y no el escalon, con lo que pintaba a las 23 filas **por delante del objetivo** con
+   cero trabajo dentro — y la ventaja se deshacia sola segun pasaban los dias.
+
+   ✅ LAS DOS MITADES, Y LAS DOS SON DECISIONES SUYAS:
+   · el TRABAJO entra entero (`_horasSinBase_`): ya se hizo, y prorratearlo seria el fallo
+     simetrico — retrasar el reconocimiento de algo que esa persona hizo el dia 2.
+   · la BASE se devenga (`_compBase_` × fraccion): es lo que «llega solo por el puesto»
+     (Daniel, 02/08), y por eso es la que mete el escalon.
+   ⚠️ Y la EXTRA **no se prorratea**, por lo mismo que no se descuenta en `_horasSinBase_`:
+   *«esa se la ha ganado alguien haciendo algo de mas»* y tiene su fecha. Va dentro de `h`.
+
+   ⛔ LA FRACCION SE TOPA EN 1: un periodo que se pase de largo no puede devengar mas base de
+   la que hay, y sin el tope la cifra crece sola al final del mes.
+   ⛔ Y UN «NO LO SE» ES `null`, NUNCA 0 (§3c-24): un 0 aqui afirma «no ha devengado nada», que
+   es justo el fallo que `_horasSinBase_` lleva cerrado desde el 10/08. */
+function _devengadoAHoy_(m, h, frac){
+  if(typeof h !== 'number' || !isFinite(h)) return null;
+  if(typeof frac !== 'number' || !isFinite(frac) || frac < 0) return null;
+  /* ⛔⛔ LA RAMPA ES `h - base×(1-frac)`, NO `(h-base) + base×frac`. Las dos dan lo
+     mismo mientras `h >= base`, y se separan justo donde importa: con el mes CERRADO
+     (`frac` 1) la primera da **`h` exacto** y la segunda daba `base`, o sea que a quien
+     tiene menos horas que su base le **inventaba horas**. Era un fallo mio de hace un
+     rato: el suelo de `_horasSinBase_` protege una resta, no una rampa.
+     ✅ Y asi la rampa GENERALIZA: un mes acabado devenga su valor crudo, sin caso
+     especial — que es lo que deja compararlo con el mes anterior sin dos cuentas. */
+  return Math.max(0, Math.round((h - _compBase_(m) * (1 - Math.min(1, frac))) * 100) / 100);
+}
+
 function _compExtra_(m){
   if(!_compEsReal_(m)) return 0;                 // sin el dato de Notion no se puede saber
   return Math.round((m.compensaciones-_compBase_(m))*100)/100;

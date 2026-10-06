@@ -109,7 +109,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=eb86dbc"></script>
+<script src="comun.js?v=f701495"></script>
 <script src="notis.escritorio.js?v=6ac9b14"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=9f01417"></script>
@@ -1214,7 +1214,38 @@ V.registro={g:'Horas',t:'Registro del mes',f:function(){
              ⚠️ Daniel autorizo el prorrateo -*«no se que es prorratear pero supongo
              que si»*, 06/10-; que el hueco se exprese en horas y no en por ciento es
              decision mia, escrita en `decisiones-app.md` para que la pueda tumbar. */
-          var d=hay?((m.hMes-m.hAnt)/m.hAnt*100):null, o=(_obj!=null && _hm!=null)?(_hm-_obj):null;
+          /* ⛔⛔ LAS DOS COLUMNAS COMPARABAN EL CARGO, NO EL TRABAJO (780.ª, 06/10).
+             🗣️ Daniel, 06/10: *«las compensaciones, para no meter literalmente un step,
+             tienen que sumarse tambien a las medias/comparaciones/promedios de forma
+             progresiva dia a dia»*.
+             📏 MEDIDO CONTRA EL PANEL VIVO: las `horasMes` de los 32 eran **[2, 3.5, 7,
+             None]**, o sea EXACTAMENTE las tres compensaciones base — y ni una hora de
+             trabajo real contada en octubre. El cierre devuelve `compensaciones` al defecto
+             del cargo, asi que el mes entero se acredita el **dia 1**.
+             ⛔ Y aqui se prorrateaba el LISTON y no el escalon, con lo que las 23 filas
+             salian **por delante del objetivo** con cero trabajo dentro, y la ventaja se
+             deshacia sola segun pasaban los dias. Eso es el «steps» que el no quiere.
+             ⛔⛔ Y LA OTRA MITAD YA ERA UNA DECISION SUYA DEL 07/08, con su puerta escrita:
+             *«la comparacion de horas con el mes anterior deberia tener en cuenta que las
+             compensaciones deberian ser descontadas (la compensacion base, no las que se
+             apañan a posteriori)»* — `_horasSinBase_`. 📏 Medido: la llamaban **3 sitios
+             del movil y NINGUNO del escritorio**. Una leccion curada en una cara y no en su
+             gemela, y esta tabla estaba en la que no la aplica.
+             ✅ Las dos van por las puertas de `comun.js`, no por una cuenta de aqui: la base
+             7/3,5/2 ya tiene tres copias contadas y una cuarta seria el bug. */
+          /* ⛔⛔ DANIEL TUMBO SU PROPIA DECISION DEL 07/08, Y LO DIJO ASI: 🗣️ *«si pero
+             mejor q se vaya sumando en rampa el tiempo d las compensaciones»* · *«mejor q
+             esa decision q tome»* (06/10). La del 07/08 era **descontar la base**
+             (`_horasSinBase_`); la nueva es **devengarla en rampa**, y es mejor por una
+             razon medible: descontando, la columna deja de poder reproducirse a ojo
+             desde las dos de al lado, y ademas un mes cerrado y uno a medias se
+             comparaban con la base dentro de uno y fuera del otro.
+             ✅ Y LA RAMPA GENERALIZA: un mes ACABADO devenga su valor crudo, asi que el
+             mes anterior entra tal cual y no hace falta una segunda cuenta para el.
+             Por eso aqui solo se devenga el mes EN CURSO. */
+          var _devM=(typeof _fraccionDelMes_==='function')?_devengadoAHoy_(m, m.hMes, _fraccionDelMes_()):null;
+          var d=(hay && _devM!=null)?((_devM-m.hAnt)/m.hAnt*100):null,
+              o=(_obj!=null && _devM!=null)?(_devM-_obj):null;
           /* ⛔ EL COLOR SE DECIDE SOBRE EL NUMERO QUE SE IMPRIME, no sobre el crudo.
              📏 Visto en la cara servida: con 2,4 h y un liston de 2,3612 el hueco es
              -0,0012, y la celda salia **«-0,0 h» en ROJO**: un numero que se lee cero
@@ -3173,7 +3204,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='5111f71';
+var BUILD='2e848cf';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
