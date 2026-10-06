@@ -1936,14 +1936,28 @@ function vHoras(){
       + _bs.lo + '–' + _bs.hi + '</h2>'+
     '<div class="tarj">'+
       (typeof YO.carga==='number'
-        ? '<div style="position:relative;height:30px;margin:4px 0 8px">'+
+        /* ⛔⛔ Y EL DIBUJO TAMBIEN SE DERIVA, QUE ES LA MITAD QUE FALTABA (06/10). El 05/10 se
+           saco la banda del TITULO a `_bandaSana_`… y la BARRA se quedo cableada: `left:38.9%`,
+           `width:27.8%`, `left:66.7%` y los rotulos **70** y **120** escritos a mano.
+           ⛔ O sea que el dia que Daniel mueva la banda otra vez -ya la movio una: *«cambia la
+           banda sana de 60 a 90 a de 70 a 120»*, 09/08- el titulo diria lo nuevo y **el dibujo
+           seguiria pintando lo viejo**, con la marca roja cayendo en la zona equivocada. Un
+           rotulo y su dibujo que discrepan no dan ningun error: se leen como un dato.
+           ✅ La escala es `hi * 1.5` -con 120 da los 180 de siempre, y los cuatro numeros de
+           arriba salen exactos: 70/180=38,9 · 50/180=27,8 · 120/180=66,7 · carga/1,8-, asi que
+           derivarla reproduce el dibujo de hoy y ademas sigue a la banda manana. */
+        ? (function(){
+            var _esc = _bs.hi * 1.5;
+            var _pLo = (_bs.lo / _esc * 100), _pHi = (_bs.hi / _esc * 100);
+            return '<div style="position:relative;height:30px;margin:4px 0 8px">'+
             '<div style="position:absolute;top:11px;left:0;right:0;height:8px;border-radius:5px;background:var(--sur2)"></div>'+
-            '<div style="position:absolute;top:11px;left:38.9%;width:27.8%;height:8px;background:#1d3a2b"></div>'+
-            '<div style="position:absolute;top:6px;left:calc('+Math.min(100,YO.carga/1.8).toFixed(1)+'% - 1.5px);width:3px;height:18px;'+
+            '<div style="position:absolute;top:11px;left:'+_pLo.toFixed(1)+'%;width:'+(_pHi-_pLo).toFixed(1)+'%;height:8px;background:#1d3a2b"></div>'+
+            '<div style="position:absolute;top:6px;left:calc('+Math.min(100,YO.carga/_esc*100).toFixed(1)+'% - 1.5px);width:3px;height:18px;'+
               'background:var(--red);border-radius:2px;box-shadow:0 0 8px rgba(228,30,37,.55)"></div>'+
-            '<span style="position:absolute;top:-2px;left:38.9%;font-family:var(--mono);font-size:9px;color:var(--ink3)">70</span>'+
-            '<span style="position:absolute;top:-2px;left:66.7%;font-family:var(--mono);font-size:9px;color:var(--ink3)">120</span>'+
-          '</div>'+
+            '<span style="position:absolute;top:-2px;left:'+_pLo.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.lo+'</span>'+
+            '<span style="position:absolute;top:-2px;left:'+_pHi.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.hi+'</span>'+
+          '</div>';
+          })()+
           '<div class="fila" style="padding-bottom:0;border:0"><div class="a"><b>Carga '+nf(YO.carga,0)+'</b>'+
           /* ⛔ «de este mes» era FALSO: ese reparto se calculo cuando se genero el panel,
              no hoy. Ahora dice de cuando es, y debajo van las horas VIVAS — que es lo que

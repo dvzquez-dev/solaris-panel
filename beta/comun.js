@@ -4586,6 +4586,13 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-06-objetivo-a-hoy', fecha:'2026-10-06',
+      titulo:'«vs. objetivo» compara con lo que toca A DÍA DE HOY, y en horas',
+      items:[
+        {cara:'escritorio', vista:'registro', txt:'<b>Horas › Horas por miembro.</b> La última columna compara tus horas del mes contra el objetivo <b>del mes entero</b>, así que el día 10 salía casi todo el equipo en rojo — y quién va al <b>doble</b> del ritmo también. Ahora compara contra la parte del objetivo que toca a día de hoy.'},
+        {cara:'escritorio', vista:'registro', txt:'<b>Y lo dice en horas, no en porcentaje.</b> Al principio del mes el objetivo a hoy es pequeño, y un porcentaje sobre él salía de cuatro cifras. En horas se lee a la primera: <b>+6,3 h</b> es ir seis horas por delante de lo que te toca.'},
+        {cara:'escritorio', vista:'registro', txt:'<b>Y a quien no le han llegado las horas, la tabla lo dice.</b> Antes salía un <b>0,0</b>, que se lee como «no ha hecho nada»; ahora sale una raya, que es lo que de verdad se sabe.'}
+      ] },
     { id:'2026-10-06-subsis-escritorio', fecha:'2026-10-06',
       titulo:'Horas por subsistema, ahora también en el escritorio',
       items:[
