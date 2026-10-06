@@ -213,8 +213,14 @@ function _mediaEquipo_(){
        *«esto no se puede hacer en el móvil»* porque a un miembro raso no le llegan las
        horas ni el cargo de los demás — y es cierto. Pero esta rama **solo corre cuando
        ya tienes el roster entero delante**, que es justo cuando el cargo está ahí.
-       Por la misma puerta que el ritmo (`_horasSinBase_`), no por una copia. */
-    if(typeof x==='number'){ h+=_horasSinBase_(ms[i], x); n++; }
+       Por la misma puerta que el ritmo, no por una copia. */
+    /* ⛔⛔ Y DESDE EL 06/10 SE DEVENGA EN RAMPA, no se descuenta. Daniel tumbó su propia
+       decisión del 07/08: *«sí pero mejor q se vaya sumando en rampa el tiempo d las
+       compensaciones»* · *«mejor q esa decisión q tomé»*. ⚠️ Y este respaldo tiene que
+       moverse **con** `_equipoMesDe_` del backend, que es de donde sale la media cuando
+       llega: si uno descuenta y el otro devenga, la comparativa mezcla las dos cuentas
+       según si el overlay vino flaco — y eso no da ningún error. */
+    if(typeof x==='number'){ h+=_devengadoAHoy_(ms[i], x, _fraccionDelMes_()); n++; }
   }
   return n>=3 ? h/n : null;
 }
@@ -380,10 +386,15 @@ function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
    distintas es como se lee mal un numero correcto. */
 function _compHorasHTML_(base){
   var f='', d=_diasDelMes_(), dia=Math.max(1, d.dia);
-  /* ⛔ SIN LA COMPENSACION BASE, Y EN LOS DOS LADOS. La del cargo no se trabaja: se cobra
-     por el puesto, es la MISMA todos los meses y meterla mide el cargo en vez del trabajo.
-     Descontarla en uno solo de los dos lados seria peor que no descontarla. */
-  var _bt=_horasSinBase_(YO, base);
+  /* ⛔ LA COMPENSACION BASE NO SE TRABAJA: se cobra por el puesto, es la MISMA todos los
+     meses y meterla en bruto mide el cargo en vez del trabajo. Y en los DOS lados o en
+     ninguno.
+     ⛔⛔ PERO DESDE EL 06/10 SE DEVENGA EN RAMPA, NO SE DESCUENTA. Daniel tumbó su decisión
+     del 07/08: *«sí pero mejor q se vaya sumando en rampa el tiempo d las compensaciones»*
+     · *«mejor q esa decisión q tomé»* · *«simplemente la compensación inicial sube poco a
+     poco»*. ✅ Y el numerador que se IMPRIME abajo es este mismo, así que la división
+     sigue cuadrando a ojo — que es lo que se curó el 13/08 y no se puede volver a romper. */
+  var _bt=_devengadoAHoy_(YO, base, _fraccionDelMes_());
   /* ⛔ EL NUMERADOR SE GUARDA PORQUE LA NOTA DE ABAJO LO ENSEÑA. Hasta el 13/08 el
      ritmo se calculaba con las horas SIN la base y el paréntesis que dice de dónde
      sale enseñaba `base`, o sea las horas EN BRUTO: la división impresa no daba
@@ -412,7 +423,11 @@ function _compHorasHTML_(base){
   var _ant=_antDelMesAnterior_(_antComparable_(YO), d.periodo);
   if(_ant!=null){
     var _hA=_ant.h;
-    var _bA=_horasSinBase_(YO, _hA);
+    /* ⛔ EL MES ANTERIOR VA A FRACCION 1: está CERRADO, o sea que su base está entera
+       devengada y la rampa devuelve su valor crudo. Por eso no hay un caso especial — la
+       misma puerta contesta las dos preguntas según la fracción que se le pase, y los dos
+       lados de la fila siguen saliendo de UNA cuenta. */
+    var _bA=_devengadoAHoy_(YO, _hA, 1);
     /* ⛔ EL DATO DEL SERVIDOR MIDE **EL MES ANTERIOR AL PERIODO**, y solo eso. Si lo que
        estamos comparando es el RESPALDO viejo —que trae su propio mes (`_ant.mes`) y puede ser
        otro distinto—, esos dias no son los suyos: dividir horas de junio entre los dias que
