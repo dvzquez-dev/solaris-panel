@@ -995,7 +995,12 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
   return '<div class="kpis">'+
       kpi('Esperan tu decisión',mias.length,mias.length?'los firmas tú':'nada tuyo en cola',mias.length?'wa':'up')+
       kpi('Horas en el aire',nf(totH,1)+'<small> h</small>','no cuentan hasta aprobarse','wa')+
-      kpi('Cola completa',cola.length,'de todo el equipo','')+
+      /* ⛔ «COLA COMPLETA» FUERA (782.ª, 06/10): era `mias.length` + `otras.length`, y
+         **los dos están impresos** — el primero en el KPI de arriba y el segundo en el
+         panel «En la cola de otros» de 30 líneas más abajo. Y la parte de otros **no la
+         decides tú**, así que sumarlas da un número sin acción detrás.
+         🗣️ Daniel, 05/10: *«y no pongas stats INÚTILES»*. ✅ Los dos sumandos siguen
+         en pantalla, que es lo que distingue «quitar ruido» de «borrar información». */
       /* ⛔⛔ ANTES ERA `hist.length`: el histórico ENTERO bajo un rótulo que dice «este
          mes», y **el mismo número** que el panel «Histórico» de 25 líneas más abajo. Un
          duplicado y una mentira a la vez (781.ª, 06/10 — 🗣️ *«y no pongas stats
@@ -1044,7 +1049,10 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
   var cad=PARTES.filter(function(p){return p.estado==='cad';});
   return '<div class="kpis">'+
       kpi('Sin declarar ahora',sd.length,sd.length?'fichajes cerrados que nadie justificó':'todo declarado',sd.length?'wa':'up')+
-      kpi('Caducados',cad.length,'pasaron 7 días sin declarar','')+
+      /* ⛔ «CADUCADOS» FUERA (782.ª, 06/10): el mismo `cad.length` que el panel
+         «Caducados» de **8 líneas más abajo**, que además lo explica («se perdieron sin
+         declarar»). Y **no tiene acción detrás**: un caducado ya no lo declara nadie.
+         ✅ El número se queda en su panel, con su explicación al lado. */
     '</div>'+
     pan('Fichajes sin declarar', sd.length+' · solo su autor los declara, y en «Lo tuyo»',
       sd.length?sd.map(function(p){
@@ -2431,7 +2439,13 @@ V.buzon={g:'Buzón',t:'Reportes',f:function(){
       '<span class="chip">ABIERTOS <b style="color:var(--ink)">'+abiertos.length+'</b></span>'+
       '<span class="chip">MÓVIL <b style="color:var(--ink)">'+enCara('movil')+'</b></span>'+
       '<span class="chip">ESCRITORIO <b style="color:var(--ink)">'+enCara('escritorio')+'</b></span>'+
-      '<span class="chip '+(tuyos.length?'wa':'')+'">ESPERANDO TU DECISIÓN <b style="color:var(--ink)">'+tuyos.length+'</b></span>'+
+      /* ⛔ EL CHIP «ESPERANDO TU DECISIÓN» FUERA (782.ª, 06/10): el panel de **dos
+         líneas más abajo** se llama igual y pinta el mismo `tuyos.length`. Un duplicado
+         literal, palabra y número. 🗣️ *«y no pongas stats INÚTILES»*.
+         ⚠️ **«ABIERTOS» se queda**, y no por inercia: es el Único total en pantalla — los
+         paneles de abajo lo **parten** en «esperando», «resto» y «cerrados», así que sin
+         él hay que sumar dos para saber cuántos hay. Y «MÓVIL»/«ESCRITORIO» tampoco se
+         derivan de nada de abajo. ⬜ Si él lo quiere fuera igual, es una línea. */
     '</div>'+
     pan('Esperando tu decisión', tuyos.length+'',
       tuyos.length? tuyos.map(_fichaBuzon_).join('')
@@ -3228,7 +3242,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='4e56274';
+var BUILD='2f8b974';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
