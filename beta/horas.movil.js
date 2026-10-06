@@ -1233,8 +1233,23 @@ function _movHorasHTML_(confs, pends){
         (r.total
           ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes. '+
             _notaRegistro_(r.total,'mes', Math.max(0, MOVS_N-1))
-          : 'Este mes todavía no se te ha contado ningún fichaje. Al cerrar el mes esto vuelve a '+
-            'empezar; el registro <b>no se borra</b>.')+'</p>'+
+          /* ⛔⛔ «NO HA LLEGADO» NO ES «NO HAS FICHADO NADA» (06/10). Esta rama afirmaba
+             que no te habían contado ningún fichaje **sin mirar si los fichajes habían
+             llegado**, y el camino que la dispara está escrito en el arranque:
+             `catch(_){ PARTES=[]; }`, o sea **una petición que falló**. Así que a quien se
+             le cae la red la app le decía que no ha trabajado.
+             ✅ `CARGA.partes` ya existía para esto — lo pone `_cargarMisPartes_` al llegar —
+             y hasta hoy sólo lo leía el reintento pasivo. Es el mismo patrón que esta cara
+             tiene resuelto dos puertas más allá (`_sinReuniones_`/`_reunionesCargando_`), y
+             el mismo fallo que se curó el 12/08 en el libro de PUNTOS: una lección curada
+             en una puerta y no en su gemela.
+             ⚠️ Y el mensaje de «no hay nada» SE QUEDA: la cura no es callarse, es decir
+             cuál de las dos cosas pasa. */
+          : (typeof CARGA!=='undefined' && CARGA && !CARGA.partes)
+            ? 'Todavía no han llegado tus fichajes de este mes. Si no aparecen, es la conexión: '+
+              'la app lo reintenta sola.'
+            : 'Este mes todavía no se te ha contado ningún fichaje. Al cerrar el mes esto vuelve a '+
+              'empezar; el registro <b>no se borra</b>.')+'</p>'+
       /* LA COMPENSACION CUENTA COMO UNO DE LOS CINCO (Daniel, 03/08: «los ultimos 5 tambien
          son los ultimos 5 del mes, INCLUYENDO la compensacion inicial»). Antes se pintaba
          aparte y encima de los 10, asi que la pantalla anunciaba un numero y ensenaba otro.
