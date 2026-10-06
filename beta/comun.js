@@ -2502,13 +2502,28 @@ function _puedeRevocarSanc_(s, arr){
    es exactamente lo que no puede repetirse. El `lote` NO sirve: sale `null` en las manuales.
    ⚠️ El lote es `revoca-<lote original>` para que varias del mismo bloque caigan en UNA
    tarjeta y salgan con UN comunicado -- que es lo que el selector de varias buscaba. */
+/* ⛔⛔ DEVUELVE `null` SI LOS PUNTOS NO LLEGARON (06/10). Aqui habia
+   `puntos: -(_ptsSanc_(s.puntos) || 0)`: llamaba a la puerta **y le ponia `|| 0`
+   detras**, o sea que deshacia su unica aportacion -- distinguir el **0 que es un
+   aviso** del **null que es «no lo se»**.
+   ⛔ Y ESTO ESCRIBE, NO PINTA: la fila va a `api.pushSancion`, asi que revocar una
+   sancion cuyos puntos no llegaron encolaba **«devuelve 0 puntos»**, y el `confirm`
+   de al lado se lo ensenaba a quien pulsa como *«Era un aviso: no devuelve
+   puntos»*. No se puede devolver una cantidad que no se sabe.
+   ✅ Se para y se dice, que es lo que este repo ya eligio dos veces para lo mismo:
+   `rutinas/backend.py:90` con la fecha ilegible y el `SystemExit` de `contador`.
+   ⚠️ Y un 0 DE VERDAD sigue revocandose: 0 es un dato. Confundirlo con el hueco en
+   la otra direccion bloquearia revocaciones legitimas, y hay un caso de control
+   en `probar_revocar_sancion.py` para que no se cure asi. */
 function _filaRevocacion_(s, texto){
+  var _pts = _ptsSanc_(s && s.puntos);
+  if (_pts === null) return null;
   return { origen:'revocacion', clave:'revoca-' + s.id,
     lote: s.lote ? ('revoca-' + s.lote) : null,
     nombre: s.nombre,
     motivo: 'Revocación de «' + (s.motivo || 'sanción') + '» — ' + texto,
     articulo: s.articulo || 'libre',
-    puntos: -(_ptsSanc_(s.puntos) || 0),
+    puntos: -_pts,
     extra: { revoca: s.id, loteOriginal: s.lote || null,
              motivoOriginal: s.motivo || null, razon: texto } };
 }

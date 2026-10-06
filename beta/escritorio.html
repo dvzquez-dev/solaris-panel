@@ -109,13 +109,13 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=112b857"></script>
+<script src="comun.js?v=eb86dbc"></script>
 <script src="notis.escritorio.js?v=6ac9b14"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=9f01417"></script>
 <script src="buzon.escritorio.js?v=99fbf62"></script>
 <script src="documentos.escritorio.js?v=e55ad55"></script>
-<script src="sanciones.escritorio.js?v=241f4c9"></script>
+<script src="sanciones.escritorio.js?v=b90d05c"></script>
 <script src="reuniones.escritorio.js?v=289f0d1"></script>
 <script src="horas.escritorio.js?v=f55d0ec"></script>
 <script src="equipo.escritorio.js?v=9fb27c7"></script>
@@ -3173,7 +3173,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='538b320';
+var BUILD='5111f71';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3250,7 +3250,13 @@ function _pinSancEditar_(m){
       var s=(SANC_BACK||[]).filter(function(x){ return x.id===id; })[0]; if(!s) return;
       if(!backendOK||!SESION){ tost('Sin conexión no se puede editar.'); return; }
       var m=_m(s.nombre), quien=(m&&m.pila)||s.nombre;
-      var pts=prompt('Puntos para '+quien+' (0 = aviso, negativo = resta):', String(Number(s.puntos)||0));
+      /* ⛔⛔ EL VALOR POR DEFECTO NO PUEDE SER UN 0 INVENTADO, y este es el peor de
+         los seis: el propio texto del prompt dice **«0 = aviso»**, asi que si los
+         puntos no llegaron se le ofrece «aviso» y basta con pulsar Aceptar para
+         **escribirlo** en el backend. Vacio obliga a teclear lo que de verdad fue. */
+      var _ptsIni=_ptsSanc_(s.puntos);
+      var pts=prompt('Puntos para '+quien+' (0 = aviso, negativo = resta):',
+        _ptsIni===null?'':String(_ptsIni));
       if(pts===null) return;
       if(isNaN(Number(pts))){ tost('Los puntos tienen que ser un número.'); return; }
       var mot=prompt('Motivo:', s.motivo||''); if(mot===null) return;
