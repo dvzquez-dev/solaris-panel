@@ -412,6 +412,38 @@ function _red1_(x){
    `subsistemas_vivos` cae a `hMes` y aquí no. Medido el 04/10 con los 23 activos: **0 de ellos**
    caen a ese respaldo (los 9 sin `horasMes` son exactamente los 9 `baja`), así que hoy las dos
    contestan lo mismo. Queda fichado en `docs/pendientes.md`. */
+/* CUÁNTA GENTE ACTIVA HAY EN CADA UNIDAD. Devuelve `[{u, n}]` ordenado de más a menos.
+
+   ⛔⛔ NO ES `_subsEnVivo_`, Y CONFUNDIRLAS ERA EL FALLO. Aquella contesta «qué media de horas
+   lleva cada unidad que COMPITE», y su `n` es «cuántos de esa unidad tienen horas este mes».
+   Esta contesta «cuánta gente hay», que es otra pregunta — y es la que necesita la pantalla
+   «Equipo › Miembros».
+
+   📏 EL CASO, MEDIDO CONTRA EL PANEL REAL (06/10): la fila de chips pintaba
+   `DATA.subsistemas`, o sea **las unidades que compiten**, que sobre el panel real suman **21**
+   — pegados a una tabla de **32** y con **23** activos de verdad. Tres números en pantalla y
+   ninguno reconciliado. Y lo que faltaba eran **dos personas**: la **Dirección** y **Org&Mark**,
+   que no compiten en el ranking de unidades **a propósito** (decisión de Daniel, 04/10: su
+   `unidad` no está en `umbral.SUBSISTEMAS`) pero **son equipo**.
+
+   ✅ Por la misma puerta que todo lo demás: `_activos_()`, así que una baja no cuenta.
+   ⚠️ Y una unidad sin nadie **no sale**, en vez de salir a 0: un chip «X 0» se lee como «esa
+   unidad no trabaja» cuando lo que pasa es que no existe en este roster. Misma razón que
+   `_subsEnVivo_` para omitir las vacías. */
+function _gentePorUnidad_(){
+  var act = _activos_(), por = {}, orden = [], i, u;
+  for(i = 0; i < act.length; i++){
+    u = act[i] && act[i].unidad;
+    if(!u) continue;                        /* sin unidad no se inventa un grupo */
+    if(por[u] == null){ por[u] = 0; orden.push(u); }
+    por[u]++;
+  }
+  orden.sort(function(a, b){ return (por[b] - por[a]) || (a < b ? -1 : 1); });
+  var out = [];
+  for(i = 0; i < orden.length; i++) out.push({ u: orden[i], n: por[orden[i]] });
+  return out;
+}
+
 function _subsEnVivo_(){
   var nom = [], i, j;
   var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [];
