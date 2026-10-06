@@ -4586,6 +4586,17 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-06-subsis-escritorio', fecha:'2026-10-06',
+      titulo:'Horas por subsistema, ahora también en el escritorio',
+      items:[
+        {cara:'escritorio', vista:'subsis', txt:'<b>Equipo › Horas por subsistema.</b> El '
+          +'ranking de unidades por media de horas por persona estaba <b>sólo en el '
+          +'móvil</b>, así que para verlo había que sacar el teléfono. Ahora está aquí, con '
+          +'su barra y cuánta gente hay en cada unidad.'},
+        {cara:'escritorio', vista:'subsis', txt:'<b>Y los números son los de ahora.</b> Se '
+          +'calculan con la gente que la pantalla tiene delante, no con la foto que manda '
+          +'el servidor — que llegaba congelada y no cuadraba con sus propios miembros.'}
+      ] },
     { id:'2026-10-05-tareas-flujo', fecha:'2026-10-05',
       titulo:'Tus tareas se mueven desde la app, y siempre puedes deshacerlo',
       items:[
