@@ -188,7 +188,12 @@ function _panelSueltas_(){
         return '<tr><td>'+esc((m&&m.pila)||s.nombre)+'</td>'+
           '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
           '<td class="mono" style="color:var(--ink3)">'+esc(s.articulo||'libre')+'</td>'+
-          '<td class="r mono '+((+s.puntos||0)<0?'dn':'')+'">'+(Number(s.puntos)||0)+'</td>'+
+          /* ⛔ EL IDIOMA QUE ESTA CARA YA USA (`escritorio.html:2463`): un hueco
+             dice «sin dato», no **0** -- que en esta columna se lee como «fue un
+             aviso». Y el color sale del MISMO valor, asi que un hueco no se pinta
+             de rojo por un `<0` sobre un cero inventado. */
+          '<td class="r mono '+(_ptsSanc_(s.puntos)<0?'dn':'')+'">'
+            +(_ptsSanc_(s.puntos)===null?_etPtsSanc_(null):_ptsSanc_(s.puntos))+'</td>'+
           '<td class="r"><span class="decs" data-sid="'+s.id+'">'+
             '<button data-sdec="aprobar">Aplica</button>'+
             '<button data-sdec="justificar">Justifica</button>'+
@@ -283,7 +288,14 @@ async function _engRevocarSanc_(){
       if (!_puedeRevocarSanc_(s, SANC_BACK)){
         tost('Esa sanci\u00f3n ya no se puede revocar: puede que haya entrado otra revocaci\u00f3n.');
         pintar(); return; }
-      var _p = _ptsSanc_(s.puntos) || 0;
+      /* ⛔ SIN `|| 0`: un `null` aqui es «no se cuantos puntos devuelve», y el texto
+         de abajo afirmaba *«Era un aviso: no devuelve puntos»* -- ensenandole a quien
+         pulsa una cosa que no se sabe, justo antes de escribirla. */
+      var _p = _ptsSanc_(s.puntos);
+      if (_p === null){
+        tost('Esta sanci\u00f3n no dice cu\u00e1ntos puntos quit\u00f3, as\u00ed que no se puede saber '
+           + 'cu\u00e1ntos devolver. Arr\u00e9glalos antes de revocarla.');
+        return; }
       if (!confirm('Revocar esta sanci\u00f3n.' + String.fromCharCode(10, 10) +
         (_p ? 'Le devuelve ' + Math.abs(_p) + ' punto' + (Math.abs(_p) === 1 ? '' : 's') + '.'
             : 'Era un aviso: retira el registro, no devuelve puntos.') +
@@ -341,7 +353,9 @@ function _panelHistSanc_(){
         return '<tr><td>'+esc((m&&m.pila)||s.nombre)+'</td>'+
           '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
           '<td class="mono '+tono+'">'+esc(et)+'</td>'+
-          '<td class="r mono">'+(Number(s.puntos)||0)+'</td>'+
+          /* ⛔ Igual que su gemela de arriba: el hueco se dice, no se rellena. */
+          '<td class="r mono">'
+            +(_ptsSanc_(s.puntos)===null?_etPtsSanc_(null):_ptsSanc_(s.puntos))+'</td>'+
           '<td class="r mono" style="color:var(--ink3)">'+esc(String(s.creado_at||'').slice(0,10))+'</td></tr>';
       }).join(''))+
     (hs.length>40?'<div class="nota">Se muestran las 40 más recientes de '+hs.length+'.</div>':''));
@@ -386,7 +400,11 @@ function _ponerSancCuerpo_(){
   var cargandoT=(_tt===null) && !(SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien
                                   && SANC_TAREAS.error);
   var tareas=(_tt||[]).filter(function(t){
-    return t && t.url && !/hech|finaliz|complet|termin|cerrad/i.test(t.e||''); });
+    /* ⛔ LA MISMA PREGUNTA QUE «Mis tareas», y por eso la misma puerta: aquí se
+       eligen las tareas a las que se pueden imputar horas, y una tarea cerrada no
+       admite horas. Con el predicado copiado, cerrar una tarea dejaría de ocultarla
+       **en una pantalla y no en la otra** el día que Notion añada un estado. */
+    return t && t.url && !_tareaHecha_(t.e); });
   return '<div class="sanwrap">'+
     '<div>'+
       '<label style="display:block;margin-bottom:9px">'+lab('A qui\u00e9n')+

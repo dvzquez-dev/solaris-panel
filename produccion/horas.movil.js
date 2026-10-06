@@ -213,8 +213,14 @@ function _mediaEquipo_(){
        *«esto no se puede hacer en el móvil»* porque a un miembro raso no le llegan las
        horas ni el cargo de los demás — y es cierto. Pero esta rama **solo corre cuando
        ya tienes el roster entero delante**, que es justo cuando el cargo está ahí.
-       Por la misma puerta que el ritmo (`_horasSinBase_`), no por una copia. */
-    if(typeof x==='number'){ h+=_horasSinBase_(ms[i], x); n++; }
+       Por la misma puerta que el ritmo, no por una copia. */
+    /* ⛔⛔ Y DESDE EL 06/10 SE DEVENGA EN RAMPA, no se descuenta. Daniel tumbó su propia
+       decisión del 07/08: *«sí pero mejor q se vaya sumando en rampa el tiempo d las
+       compensaciones»* · *«mejor q esa decisión q tomé»*. ⚠️ Y este respaldo tiene que
+       moverse **con** `_equipoMesDe_` del backend, que es de donde sale la media cuando
+       llega: si uno descuenta y el otro devenga, la comparativa mezcla las dos cuentas
+       según si el overlay vino flaco — y eso no da ningún error. */
+    if(typeof x==='number'){ h+=_devengadoAHoy_(ms[i], x, _fraccionDelMes_()); n++; }
   }
   return n>=3 ? h/n : null;
 }
@@ -380,10 +386,15 @@ function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
    distintas es como se lee mal un numero correcto. */
 function _compHorasHTML_(base){
   var f='', d=_diasDelMes_(), dia=Math.max(1, d.dia);
-  /* ⛔ SIN LA COMPENSACION BASE, Y EN LOS DOS LADOS. La del cargo no se trabaja: se cobra
-     por el puesto, es la MISMA todos los meses y meterla mide el cargo en vez del trabajo.
-     Descontarla en uno solo de los dos lados seria peor que no descontarla. */
-  var _bt=_horasSinBase_(YO, base);
+  /* ⛔ LA COMPENSACION BASE NO SE TRABAJA: se cobra por el puesto, es la MISMA todos los
+     meses y meterla en bruto mide el cargo en vez del trabajo. Y en los DOS lados o en
+     ninguno.
+     ⛔⛔ PERO DESDE EL 06/10 SE DEVENGA EN RAMPA, NO SE DESCUENTA. Daniel tumbó su decisión
+     del 07/08: *«sí pero mejor q se vaya sumando en rampa el tiempo d las compensaciones»*
+     · *«mejor q esa decisión q tomé»* · *«simplemente la compensación inicial sube poco a
+     poco»*. ✅ Y el numerador que se IMPRIME abajo es este mismo, así que la división
+     sigue cuadrando a ojo — que es lo que se curó el 13/08 y no se puede volver a romper. */
+  var _bt=_devengadoAHoy_(YO, base, _fraccionDelMes_());
   /* ⛔ EL NUMERADOR SE GUARDA PORQUE LA NOTA DE ABAJO LO ENSEÑA. Hasta el 13/08 el
      ritmo se calculaba con las horas SIN la base y el paréntesis que dice de dónde
      sale enseñaba `base`, o sea las horas EN BRUTO: la división impresa no daba
@@ -412,7 +423,11 @@ function _compHorasHTML_(base){
   var _ant=_antDelMesAnterior_(_antComparable_(YO), d.periodo);
   if(_ant!=null){
     var _hA=_ant.h;
-    var _bA=_horasSinBase_(YO, _hA);
+    /* ⛔ EL MES ANTERIOR VA A FRACCION 1: está CERRADO, o sea que su base está entera
+       devengada y la rampa devuelve su valor crudo. Por eso no hay un caso especial — la
+       misma puerta contesta las dos preguntas según la fracción que se le pase, y los dos
+       lados de la fila siguen saliendo de UNA cuenta. */
+    var _bA=_devengadoAHoy_(YO, _hA, 1);
     /* ⛔ EL DATO DEL SERVIDOR MIDE **EL MES ANTERIOR AL PERIODO**, y solo eso. Si lo que
        estamos comparando es el RESPALDO viejo —que trae su propio mes (`_ant.mes`) y puede ser
        otro distinto—, esos dias no son los suyos: dividir horas de junio entre los dias que
@@ -1233,8 +1248,23 @@ function _movHorasHTML_(confs, pends){
         (r.total
           ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes. '+
             _notaRegistro_(r.total,'mes', Math.max(0, MOVS_N-1))
-          : 'Este mes todavía no se te ha contado ningún fichaje. Al cerrar el mes esto vuelve a '+
-            'empezar; el registro <b>no se borra</b>.')+'</p>'+
+          /* ⛔⛔ «NO HA LLEGADO» NO ES «NO HAS FICHADO NADA» (06/10). Esta rama afirmaba
+             que no te habían contado ningún fichaje **sin mirar si los fichajes habían
+             llegado**, y el camino que la dispara está escrito en el arranque:
+             `catch(_){ PARTES=[]; }`, o sea **una petición que falló**. Así que a quien se
+             le cae la red la app le decía que no ha trabajado.
+             ✅ `CARGA.partes` ya existía para esto — lo pone `_cargarMisPartes_` al llegar —
+             y hasta hoy sólo lo leía el reintento pasivo. Es el mismo patrón que esta cara
+             tiene resuelto dos puertas más allá (`_sinReuniones_`/`_reunionesCargando_`), y
+             el mismo fallo que se curó el 12/08 en el libro de PUNTOS: una lección curada
+             en una puerta y no en su gemela.
+             ⚠️ Y el mensaje de «no hay nada» SE QUEDA: la cura no es callarse, es decir
+             cuál de las dos cosas pasa. */
+          : (typeof CARGA!=='undefined' && CARGA && !CARGA.partes)
+            ? 'Todavía no han llegado tus fichajes de este mes. Si no aparecen, es la conexión: '+
+              'la app lo reintenta sola.'
+            : 'Este mes todavía no se te ha contado ningún fichaje. Al cerrar el mes esto vuelve a '+
+              'empezar; el registro <b>no se borra</b>.')+'</p>'+
       /* LA COMPENSACION CUENTA COMO UNO DE LOS CINCO (Daniel, 03/08: «los ultimos 5 tambien
          son los ultimos 5 del mes, INCLUYENDO la compensacion inicial»). Antes se pintaba
          aparte y encima de los 10, asi que la pantalla anunciaba un numero y ensenaba otro.
@@ -1296,9 +1326,12 @@ function _desgloseMesHTML_(confs){
      `_compHorasHTML_`: «el fallo nunca fue comparar con junio: fue LLAMARLO julio».
      ⚠️ `_nomPeriodo_` es la puerta que ya existe para esto, con su cita dentro; el reloj
      se queda SOLO de respaldo, para cuando el backend no manda periodo. */
-  var _perD=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;   /* ⛔ por la puerta (791.ª) */
+  /* ⛔ Y ESTA COMPOSICION SE MUDO A `_nomMesAbierto_` (06/10): era la unica copia, y
+     el escritorio necesitaba la misma pregunta en TRES sitios. Cuatro copias de
+     «como se llama el mes abierto» acaban siendo cuatro respuestas. El respaldo al
+     reloj (`_hoyDateM_`, no `new Date()`) viaja dentro de la puerta. */
   return '<div class="mtit">Desglose de '+
-      esc(_perD ? _nomPeriodo_(_perD) : _mesLargo_(_hoyDateM_()))+'</div>'+
+      esc(_nomMesAbierto_())+'</div>'+
     '<div class="msub">Todas tus contribuciones de este mes, sin recortar.</div>'+
     '<div class="tarj">'+
       '<div class="cifh"><span class="g mono">'+nf2(total)+'</span><span class="sc">h '+
@@ -1833,7 +1866,25 @@ function vHoras(){
      es OTRO campo — y `flujos/temporada.py` asigna puesto también a los de `meses = 0`.
      ⚠️ Esto NO decide dónde va en el ranking (eso lo decide Daniel): decide que, sea
      donde sea, no se le enseña un número inventado. */
-  var _hm=(typeof YO.horasTemp==='number' && YO.meses) ? (YO.horasTemp/YO.meses) : null;
+  /* ⛔⛔ POR LA PUERTA, Y NO A MANO: AQUÍ SALÍA OTRO NÚMERO QUE EL DEL PUESTO DE AL LADO.
+     Esto hacía `YO.horasTemp / YO.meses` — una división **plana**, todos los meses a peso 1
+     — mientras el **puesto** de esa misma fila lo calcula el motor con la media
+     **ponderada** (`ensamblar.py` → `ranking_personas`, con julio y agosto a la mitad).
+     📏 O sea: el número que lees y el puesto en el que te coloca **no son la misma
+     cuenta**, y el pie de esta misma tarjeta promete *«Se ponderan tus horas de la
+     temporada entre los meses que llevas en el equipo»*. Con el ejemplo medido del repo,
+     la fila decía **17,3 h** y el puesto se había calculado con **18,55**.
+     ⚠️ Y es justo lo que él señaló el 05/10 mirando a Adrián: *«¿cómo que 22,44? si sólo ha
+     pasado un mes de temporada»* — 246,8 h entre 11 meses, la división plana en pantalla.
+     ✅ `_hMesDe_` es LA puerta (`comun.js`): prefiere el `hRitmo`/`hMes` que ya calculó el
+     motor —ponderado— y sólo cae a `horasTemp/meses` si el panel no lo trae, que es el
+     respaldo honesto. Un número que decide un ranking no se vuelve a calcular a mano. */
+  var _hm=_hMesDe_(YO);
+  /* ⛔ Y LA GUARDA DE ESTA PANTALLA SE QUEDA, que la puerta no la puede dar. El respaldo
+     de `_hMesDe_` con `meses:0` devuelve las horas **CRUDAS sin dividir** — decisión suya
+     del 14/08 —, y aquí eso sería un TOTAL disfrazado de ritmo en la columna de h/mes.
+     Si el motor no mandó ritmo y no hay meses, **no se finge**: sale «—». */
+  if(_hm!=null && !YO.meses && typeof YO.hRitmo!=='number' && typeof YO.hMes!=='number') _hm=null;
   for(var i=Math.max(1,puesto-2); puesto>0 && i<=Math.min(total,puesto+2); i++){
     filas += (i===puesto)
       ? '<div class="r yo"><span class="p mono">'+i+'</span><span class="n">'+esc(YO.pila)+' (tú)</span>'+
@@ -1866,12 +1917,21 @@ function vHoras(){
     /* ⛔ UN SOLO NIVEL, no dos. Daniel (07/08): *«la misma lógica del desplegable, pero esta
        vez, como son tuyos, no hace falta desplegable de desplegables sino solo uno»*. Agrupar
        tus propios partes por autor sería agruparlos por ti. */
-    /* El contador del titulo cuenta SOLO los de este mes: si sumara los plegados, el
-       numero no cuadraria con lo que se ve al abrir. */
+    /* ⛔⛔ EL CONTADOR DEL TÍTULO SE QUEDA, Y ME LO CORRIGIÓ UN BANCO (782.ª, 06/10). Lo quité
+       por duplicado —el desplegable de abajo dice el mismo `mias.length` y además las horas—
+       y `probar_partes_viejos.py` se puso **rojo**: ese contador está vigilado a propósito
+       porque cuenta **sólo los de este mes** (`mias`, no `_todasMias`), y sumar los plegados
+       daría un número que no cuadra con lo que se ve al abrir. Sin contador, esa propiedad
+       **no se puede comprobar**.
+       ✅ Lo que SÍ era duplicado y se fue es el **rótulo**: «Tus partes» salía dos veces, en
+       el título y en el desplegable, los dos a la vista. 🗣️ *«y no pongas stats INÚTILES»*. */
     '<h2 class="sec">Tus partes<span class="ln"></span>'+mias.length+'</h2>'+
     '<div class="tarj">'+
       (mias.length
-        ? '<details class="pdgrupo"><summary><b>Tus partes</b><span class="pdnum">'+
+        /* ⛔ EL RÓTULO, UNA VEZ (782.ª): el `<h2>` de la línea de arriba ya dice «Tus
+           partes» y se ve a la vez que esto. El desplegable se queda con lo que añade — el
+           número y las HORAS —, que es lo que el título no tiene. */
+        ? '<details class="pdgrupo"><summary><span class="pdnum">'+
             mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
             nf2(mias.reduce(function(t,x){ return t+(Number(x.q)||0); },0))+' h</span></summary>'+
           mias.map(filaParte).join('')+'</details>'
@@ -1914,18 +1974,37 @@ function vHoras(){
        Daniel: «y la carga del mes que aparece no se si esta bien». Tenia razon. */
     /* ⛔ LA BANDA SE PIDE (05/10): estaba teclada aquí y en el pie de abajo. Ver
        `_bandaSana_` en `comun.js`. */
-    '<h2 class="sec">Mi índice de carga<span class="ln"></span>banda sana '
-      + _bs.lo + '–' + _bs.hi + '</h2>'+
+    /* ⛔ LA BANDA SE DICE UNA VEZ (782.ª, 06/10): estaba aquí **y** en el pie de la misma
+       tarjeta, los dos visibles a la vez y con el mismo `_bs.lo`–`_bs.hi`.
+       ✅ Se queda **la de abajo**, que es la que está **pegada a la barra que describe**:
+       ahí el rango explica el dibujo; en el título era un número suelto.
+       ⚠️ Y la banda sigue saliendo de `_bandaSana_`, que es lo que se curó el 05/10 — esto
+       quita una copia del RÓTULO, no la derivación. */
+    '<h2 class="sec">Mi índice de carga<span class="ln"></span></h2>'+
     '<div class="tarj">'+
       (typeof YO.carga==='number'
-        ? '<div style="position:relative;height:30px;margin:4px 0 8px">'+
+        /* ⛔⛔ Y EL DIBUJO TAMBIEN SE DERIVA, QUE ES LA MITAD QUE FALTABA (06/10). El 05/10 se
+           saco la banda del TITULO a `_bandaSana_`… y la BARRA se quedo cableada: `left:38.9%`,
+           `width:27.8%`, `left:66.7%` y los rotulos **70** y **120** escritos a mano.
+           ⛔ O sea que el dia que Daniel mueva la banda otra vez -ya la movio una: *«cambia la
+           banda sana de 60 a 90 a de 70 a 120»*, 09/08- el titulo diria lo nuevo y **el dibujo
+           seguiria pintando lo viejo**, con la marca roja cayendo en la zona equivocada. Un
+           rotulo y su dibujo que discrepan no dan ningun error: se leen como un dato.
+           ✅ La escala es `hi * 1.5` -con 120 da los 180 de siempre, y los cuatro numeros de
+           arriba salen exactos: 70/180=38,9 · 50/180=27,8 · 120/180=66,7 · carga/1,8-, asi que
+           derivarla reproduce el dibujo de hoy y ademas sigue a la banda manana. */
+        ? (function(){
+            var _esc = _bs.hi * 1.5;
+            var _pLo = (_bs.lo / _esc * 100), _pHi = (_bs.hi / _esc * 100);
+            return '<div style="position:relative;height:30px;margin:4px 0 8px">'+
             '<div style="position:absolute;top:11px;left:0;right:0;height:8px;border-radius:5px;background:var(--sur2)"></div>'+
-            '<div style="position:absolute;top:11px;left:38.9%;width:27.8%;height:8px;background:#1d3a2b"></div>'+
-            '<div style="position:absolute;top:6px;left:calc('+Math.min(100,YO.carga/1.8).toFixed(1)+'% - 1.5px);width:3px;height:18px;'+
+            '<div style="position:absolute;top:11px;left:'+_pLo.toFixed(1)+'%;width:'+(_pHi-_pLo).toFixed(1)+'%;height:8px;background:#1d3a2b"></div>'+
+            '<div style="position:absolute;top:6px;left:calc('+Math.min(100,YO.carga/_esc*100).toFixed(1)+'% - 1.5px);width:3px;height:18px;'+
               'background:var(--red);border-radius:2px;box-shadow:0 0 8px rgba(228,30,37,.55)"></div>'+
-            '<span style="position:absolute;top:-2px;left:38.9%;font-family:var(--mono);font-size:9px;color:var(--ink3)">70</span>'+
-            '<span style="position:absolute;top:-2px;left:66.7%;font-family:var(--mono);font-size:9px;color:var(--ink3)">120</span>'+
-          '</div>'+
+            '<span style="position:absolute;top:-2px;left:'+_pLo.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.lo+'</span>'+
+            '<span style="position:absolute;top:-2px;left:'+_pHi.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.hi+'</span>'+
+          '</div>';
+          })()+
           '<div class="fila" style="padding-bottom:0;border:0"><div class="a"><b>Carga '+nf(YO.carga,0)+'</b>'+
           /* ⛔ «de este mes» era FALSO: ese reparto se calculo cuando se genero el panel,
              no hoy. Ahora dice de cuando es, y debajo van las horas VIVAS — que es lo que
@@ -1949,7 +2028,10 @@ function vHoras(){
     /* ⛔ La gemela del «ciclo» de la portada: sin temporada esto decía **«temporada
        null»**. El rótulo se calla entero, que es lo honesto cuando no se sabe de qué
        temporada son las horas que hay debajo. */
-    '<h2 class="sec">Ranking de horas<span class="ln"></span>'+(DATA.temporada?('temporada '+DATA.temporada):'')+'</h2>'+
+    /* ⛔ POR LA PUERTA: `DATA.temporada` lo sella `push.py`, que lleva sin correr desde
+       que el motor se quedó en la 25/26 — este rótulo decía **temporada 25/26** en octubre.
+       `_temporadaVigente_` prefiere lo que recalcula `umbral.py --subir`. */
+    '<h2 class="sec">Ranking de horas<span class="ln"></span>'+(_temporadaVigente_()?('temporada '+_temporadaVigente_()):'')+'</h2>'+
     '<div class="tarj rank">'+
       (filas
         ? filas+'<p class="rnota">Se ponderan tus horas de la temporada entre los meses que llevas en el '+

@@ -31,9 +31,16 @@ function _rederivarCargos_(){
 function _m(n){
   var x=miembro(n); if(x) return x;
   var nom=String(n||'').trim();
+  /* ⛔⛔ LOS NUMEROS VAN A `null`, NO A CERO (§3c-24). Aqui ponia `hMes:0, horasTemp:0,
+     meses:1` — tres valores INVENTADOS que pasan los filtros `typeof === 'number'` como si
+     estuvieran medidos, en el MISMO objeto donde `puntos`, `hAnt` y `cuota` ya decian
+     `null`. Y `meses:1` era el peor: `horasTemp/meses` da un ritmo de 0, o sea que un
+     nombre que no casa con el roster entraba en el ranking como si no hubiera trabajado.
+     ⚠️ Lo que NO cambia es que `_m()` siempre devuelve algo pintable y marcado `_fuera`:
+     esa es su razon de existir, y devolver `null` romperia sus dos llamadas. */
   return {nombre:nom||'\u2014', pila:(nom.split(' ')[0]||'\u2014'), unidad:'\u2014',
-          cargo:null, puntos:null, hMes:0, hAnt:null, horasTemp:0, meses:1, cuota:null,
-          coche:0, infraccion:false, _fuera:true};
+          cargo:null, puntos:null, hMes:null, hAnt:null, horasTemp:null, meses:null,
+          cuota:null, coche:null, infraccion:false, _fuera:true};
 }
 
 

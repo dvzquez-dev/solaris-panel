@@ -301,7 +301,16 @@ function _mesAbiertoVivo_(){
    que es para lo que `medias` existe. */
 function _mediasDeEstaTemp_(ing){
   if(!ing || !ing.medias || !ing.medias.length) return [];
-  var t = ing.temporada, hoy = (typeof DATA !== 'undefined') ? DATA.temporada : null;
+  /* ⛔⛔ ESTO COMPARABA CONTRA `DATA.temporada`, EL ROTULO SELLADO Y VIEJO, y por eso
+     el filtro decia NO a las medias buenas: con `umbral.temporada`='26/27' y la raiz en
+     '25/26' -- medido el 05/10 contra el backend vivo -- `t !== hoy` y se devuelve [].
+     ⚠️ Y lo que HOY se pierde es **cero**, porque la 26/27 todavia no tiene ningun mes
+     cerrado en el umbral (`umbral.medias` = 0, medido en la misma respuesta). O sea que
+     el defecto es LATENTE: muerde el dia que el cierre de septiembre entre en `medias`,
+     y entonces el umbral de la cara se calcularia con CERO meses teniendolos. No se
+     arregla porque duela hoy, se arregla porque el rotulo con el que compara es el que
+     Daniel reporto viejo tres veces. Ahora compara contra la temporada DERIVADA. */
+  var t = ing.temporada, hoy = _temporadaVigente_();
   if(!t || !hoy || t !== hoy) return [];
   return ing.medias;
 }
@@ -403,6 +412,38 @@ function _red1_(x){
    `subsistemas_vivos` cae a `hMes` y aquí no. Medido el 04/10 con los 23 activos: **0 de ellos**
    caen a ese respaldo (los 9 sin `horasMes` son exactamente los 9 `baja`), así que hoy las dos
    contestan lo mismo. Queda fichado en `docs/pendientes.md`. */
+/* CUÁNTA GENTE ACTIVA HAY EN CADA UNIDAD. Devuelve `[{u, n}]` ordenado de más a menos.
+
+   ⛔⛔ NO ES `_subsEnVivo_`, Y CONFUNDIRLAS ERA EL FALLO. Aquella contesta «qué media de horas
+   lleva cada unidad que COMPITE», y su `n` es «cuántos de esa unidad tienen horas este mes».
+   Esta contesta «cuánta gente hay», que es otra pregunta — y es la que necesita la pantalla
+   «Equipo › Miembros».
+
+   📏 EL CASO, MEDIDO CONTRA EL PANEL REAL (06/10): la fila de chips pintaba
+   `DATA.subsistemas`, o sea **las unidades que compiten**, que sobre el panel real suman **21**
+   — pegados a una tabla de **32** y con **23** activos de verdad. Tres números en pantalla y
+   ninguno reconciliado. Y lo que faltaba eran **dos personas**: la **Dirección** y **Org&Mark**,
+   que no compiten en el ranking de unidades **a propósito** (decisión de Daniel, 04/10: su
+   `unidad` no está en `umbral.SUBSISTEMAS`) pero **son equipo**.
+
+   ✅ Por la misma puerta que todo lo demás: `_activos_()`, así que una baja no cuenta.
+   ⚠️ Y una unidad sin nadie **no sale**, en vez de salir a 0: un chip «X 0» se lee como «esa
+   unidad no trabaja» cuando lo que pasa es que no existe en este roster. Misma razón que
+   `_subsEnVivo_` para omitir las vacías. */
+function _gentePorUnidad_(){
+  var act = _activos_(), por = {}, orden = [], i, u;
+  for(i = 0; i < act.length; i++){
+    u = act[i] && act[i].unidad;
+    if(!u) continue;                        /* sin unidad no se inventa un grupo */
+    if(por[u] == null){ por[u] = 0; orden.push(u); }
+    por[u]++;
+  }
+  orden.sort(function(a, b){ return (por[b] - por[a]) || (a < b ? -1 : 1); });
+  var out = [];
+  for(i = 0; i < orden.length; i++) out.push({ u: orden[i], n: por[orden[i]] });
+  return out;
+}
+
 function _subsEnVivo_(){
   var nom = [], i, j;
   var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [];
@@ -721,6 +762,165 @@ function _curvaCuota_(h, ancla, umbral, techo){
    rojo y hay que tocar **un** sitio en vez de tres.
    ⚠️ `viva` dice de dónde salió. No se pinta, pero el banco lo mira: sin él, «viaja» y «cayó al
    respaldo» se leen igual de bien, que es §3c-24. */
+/* ⛔⛔ LA TEMPORADA QUE SE ENSEÑA, EN UNA PUERTA — Y EL CAMPO SELLADO ES EL RESPALDO.
+   🗣️ Daniel, 05/10: *«sigue lo de 25/26 en los rankings de horas, explícate»*.
+   📏 La cadena, medida: el rótulo imprimía `DATA.temporada`, que **sella `push.py`** en la
+   raíz del panel — y `push.py` **se niega a correr** porque el motor sigue en la 25/26, que
+   sale de `datos/horas_temporada.json`, un agregado **mantenido a mano** y sin tocar desde el
+   **21/07**. O sea que el rótulo era el último eslabón de una foto de hace dos meses y medio.
+   ✅ **Y hay un dato FRESCO que ya llega**: `panel.umbral.temporada`, que escribe
+   `flujos/umbral.py --subir` cada vez que corre. Verificado releyendo el panel vivo el
+   05/10: dice **26/27** mientras la raíz decía **25/26**. Dos campos, dos verdades, y el que
+   se pintaba era el viejo.
+   ⛔ Por eso el orden es éste y no al revés: **manda lo que se recalcula**, y lo sellado es el
+   respaldo. Es la misma inversión que ya se hizo hoy con el periodo abierto.
+   ⚠️ `null` si no hay ninguno de los dos, nunca una cadena inventada: el rótulo entero **se
+   calla** cuando no se sabe de qué temporada son las horas de debajo, que es lo honesto. */
+/* ══ EL FLUJO DE UNA TAREA, Y EL PLAZO PARA DESHACERLO ════════════════════
+   🗣️ Daniel, 05/10, y la cadena es suya palabra por palabra: *«las están sin empezar, y hay
+   q darle a empezar para que ponga en desarrollo. Y luego, una vez la entregas… le das al
+   botón de entregada o lo que sea, y pone revisando. Y siempre que haya un botón de
+   deshacer… que tengas un plazo para deshacer… revisando ya significa básicamente que lo has
+   subido al coso de los documentos, al formulario, o que se lo has entregado al coordinador.
+   Pero bueno, tú das fe de que ya está»*.
+   📏 **Y el vocabulario NO se inventa: se midió.** Contra `datos/tareas.json` de la raíz el
+   05/10 —las 28 tareas que alimentan a las 32 personas— los estados reales de los Kanban son
+   **`Sin empezar` (10) · `En desarrollo` (14) · `Revisando` (4)**: exactamente los tres que
+   describió, con sus nombres.
+   ⛔ **DESDE `Revisando` NO SE AVANZA.** El último paso que una persona declara es «entregada»;
+   cerrarla es del coordinador o de Notion. Dejar declarar «hecha» aquí sería firmar la propia
+   revisión, y es justo lo que la frase *«tú das fe de que ya está»* delimita.
+   ⛔ **Y un estado FUERA de la cadena no recibe ningún botón.** Una tarea ya hecha —o un estado
+   que Notion añada mañana— cae a `-1` y se queda sin acción: un flujo que avanzara «desde
+   cualquier cosa» le aplicaría el primer paso de la cadena sin dar ningún error.
+   ⚠️ **Van en `comun.js` y no en la cara**: el escritorio también filtra tareas
+   (`sanciones.escritorio.js`), y una cadena de estados copiada en dos caras es exactamente como
+   divergió `_estadosRevertibles_`, que hubo que unificar el 05/10.
+   ⚠️ Y van como **funciones**, no como `var`: `comun.js` no lleva ni una sentencia ejecutable de
+   nivel superior (ARRANQUE §5b), y el arnés de los bancos corre en JScript — ES3, sin
+   `Array.indexOf`. De ahí el bucle de `_tareaPaso_`. */
+
+/* ⛔⛔ ESTO VIVÍA COPIADO CINCO VECES EN `ronda3`, con TRES tratamientos distintos del nulo.
+   📏 Medido el 05/10 antes de tocar nada: `tareas.movil.js` **3** (`t.e`, `t.e`, `t&&t.e`),
+   `sanciones.movil.js` **1** y `sanciones.escritorio.js` **1** (las dos `t.e||''`). Las cinco
+   contestan la MISMA pregunta —¿está hecha esta tarea?— sobre el mismo vocabulario, así que no
+   es una coincidencia que haya que respetar: es una verdad escrita cinco veces.
+   ✅ **Y unificarlas ARREGLA algo, no sólo ordena**: dos de las copias no guardaban el nulo, o
+   sea que hacían `/…/i.test(undefined)` — probaban la **cadena** «undefined», que no casa, y
+   salían correctas **por casualidad**. Aquí el ausente es `false` a propósito. */
+function _tareaHecha_(e){
+  return /hech|finaliz|complet|termin|cerrad/i.test(String(e == null ? '' : e));
+}
+
+function _tareaFlujo_(){ return ['Sin empezar', 'En desarrollo', 'Revisando']; }
+
+function _tareaPaso_(e){
+  var F = _tareaFlujo_(), i;
+  for(i = 0; i < F.length; i++){ if(F[i] === e) return i; }
+  return -1;                       /* fuera de la cadena, y eso NO es «el primero» */
+}
+
+function _tareaSiguiente_(e){
+  var F = _tareaFlujo_(), i = _tareaPaso_(e);
+  return (i >= 0 && i < F.length - 1) ? F[i + 1] : null;
+}
+
+function _tareaAnterior_(e){
+  var F = _tareaFlujo_(), i = _tareaPaso_(e);
+  return i > 0 ? F[i - 1] : null;
+}
+
+/* La acción lleva **la etiqueta Y a dónde va**: con sólo la etiqueta, quien la pinta tiene que
+   volver a preguntar el siguiente estado, y entonces hay dos sitios decidiendo lo mismo. */
+function _tareaAccion_(e){
+  var ETIQ = ['Empezar', 'Entregada'], i = _tareaPaso_(e), a = _tareaSiguiente_(e);
+  return (a === null || i < 0 || i >= ETIQ.length) ? null : {etiqueta: ETIQ[i], a: a};
+}
+
+/* ⚠️ EL PLAZO ES PROVISIONAL Y ÉL NO LO HA DICHO. Pidió *«que tengas un plazo para
+   deshacer»* sin número, y un «tienes N minutos» escrito a ojo **suena oficial**, que es peor
+   que no decirlo — la misma trampa que el plazo del Art. 34 en esta misma pantalla. Por eso va
+   en UNA puerta con nombre: cambiarlo cuando lo diga es **una línea**, y la pantalla deriva de
+   aquí el texto que ensena, sin repetir el número. */
+function _minDeshacerTarea_(){ return 15; }   /* 15, y lo dijo Daniel el 06/10: «15 min».
+  Los 30 de antes eran PROVISIONALES MIOS, no suyos. La pantalla deriva su texto de aqui,
+  asi que cambiar este numero no deja ningun rotulo viejo. */
+
+/* ⛔ EL INSTANTE ENTRA POR ARGUMENTO. Un caso que dependa de `new Date()` acierta o falla
+   según la hora a la que se corra la batería (§3c-36, la única ciega de 2.430).
+   ⛔ Y SIN `desde` NO SE DESHACE: si no se sabe **cuándo** se declaró, no se puede saber si el
+   plazo vive, y «no lo sé» cae al lado seguro (§3c-24). Eso además delimita el botón a lo que
+   la persona ha hecho **en esta sesión**: el estado que viene de Notion no trae `desde`, así que
+   no se ofrece «deshacer» sobre algo que no has tocado tú. */
+function _puedeDeshacerTarea_(t, ahora){
+  if(!t || typeof t.desde !== 'number') return false;
+  var ms = (typeof ahora === 'number' ? ahora : (new Date()).getTime()) - t.desde;
+  return ms >= 0 && ms <= _minDeshacerTarea_() * 60000;
+}
+
+/* ══ EL PESO DE CADA MES, GEMELA DE `reglas/cuota.PESOS_MES` ════════════════════
+   🗣️ Daniel: *«te acuerdas que había unos multiplicadores de que los meses ponderaban distinto,
+   todo eso está definido»* y *«va ponderado desde inicio de temporada hasta el día actual»*. Julio
+   y agosto a la mitad, porque el equipo no trabaja igual en verano.
+   ⚠️ **Es una GEMELA, no una copia por pereza**: son dos motores sin un `require` entre medias
+   —el mismo caso que `_ptsDe_` o `_isoFechaHora_`—, y el banco **deriva los pesos esperados de
+   `reglas/cuota.PESOS_MES`** en vez de escribirlos, así que mover el peso en Python pone roja la
+   cara hasta que se mueva aquí.
+   ⛔⛔ **Y UN PERIODO QUE NO SE RECONOCE VALE `null`, NO 1.** Es la misma decisión que su gemela
+   de Python, y por el mismo motivo escrito allí: un 1 convertiría una cadena rota en «un mes
+   normal» **en silencio**, y si esa cadena era julio esas horas pasarían a pesar el doble de lo
+   que Daniel dijo. Quien llama decide qué hace con el `null` (§3c-24). */
+function _pesoDeMes_(periodo){
+  var s = String(periodo == null ? '' : periodo), m;
+  if(!/^\d{4}-\d{2}$/.test(s)) return null;
+  m = parseInt(s.slice(5, 7), 10);
+  if(!(m >= 1 && m <= 12)) return null;
+  return (m === 7 || m === 8) ? 0.5 : 1;
+}
+
+/* Los meses CERRADOS de la temporada en curso, con su periodo — lo que hace falta para pesar.
+   ⛔ Misma puerta de temporada que `_mediasDeEstaTemp_` (`_temporadaVigente_`), y no por
+   simetría: si una dijera «esta temporada» y la otra otra cosa, el umbral se calcularía con
+   unos meses y se rotularía con otros.
+   ⛔ **Y se descarta lo que no se puede pesar**: una entrada sin `periodo` reconocible o sin
+   `media` numérica no entra. Quien llama ve que salen menos de las que hay — y eso es lo que
+   le hace caer al respaldo en vez de pesar media lista. */
+function _detalleDeEstaTemp_(ing){
+  if(!ing || !ing.detalle || !ing.detalle.length) return [];
+  var t = ing.temporada, hoy = _temporadaVigente_(), out = [], i, c;
+  if(!t || !hoy || t !== hoy) return [];
+  for(i = 0; i < ing.detalle.length; i++){
+    c = ing.detalle[i];
+    if(!c || _pesoDeMes_(c.periodo) === null) continue;
+    if(typeof c.media !== 'number') continue;
+    out.push(c);
+  }
+  return out;
+}
+
+function _temporadaVigente_(){
+  /* ⛔ NI UN CAMPO GUARDADO NI DOS: SE DERIVA DEL PERIODO ABIERTO. La primera version de
+     esto rankeaba `umbral.temporada` por encima de `DATA.temporada`, o sea elegia el menos
+     viejo de dos rotulos SELLADOS -- y un rotulo sellado envejece sin dar ningun error.
+     📏 Medido contra el backend VIVO el 05/10, en la MISMA respuesta: `generado`
+     '2026-10-05' (el servidor lo sella con su reloj), `temporada` **'25/26'** y
+     `umbral.temporada` **'26/27'**. Un panel fechado hoy, rotulado con la temporada pasada.
+     ✅ Y la derivacion correcta YA ESTABA ESCRITA, enterrada dentro de `_deEstaTemporada_`:
+     el dia 1 del periodo abierto por `_temporadaDe_`. Esto es esa extraccion, nada nuevo.
+     🗣️ Daniel, 05/10: *«ese es el tipo de cosas que deberian estar en comun.js en lugar
+     de desperdigado y puesto por separado en 872384562938659238 sitios distintos»*. Por eso
+     no hay un segundo calculo en ninguna cara: `_deEstaTemporada_`, el ranking de horas, el
+     ciclo de Conducta, Ajustes y la cabecera del escritorio llaman AQUI. */
+  var per = (typeof _periodoAbierto_ === 'function') ? _periodoAbierto_() : null;
+  if(/^\d{4}-\d{2}$/.test(String(per || ''))){
+    return _temporadaDe_(new Date(+per.slice(0, 4), (+per.slice(5, 7)) - 1, 1));
+  }
+  /* ⚠️ Sin periodo se cae al reloj, y hace falta: es lo unico que hay antes de que llegue
+     el panel. Es la misma caida que `_deEstaTemporada_` lleva documentada desde el 13/08. */
+  if(typeof _hoyDateM_ === 'function') return _temporadaDe_(_hoyDateM_());
+  return null;
+}
+
 function _bandaSana_(){
   var d = (typeof DATA !== 'undefined' && DATA) ? DATA : null;
   var lo = d ? d.banda_min : null, hi = d ? d.banda_max : null;
@@ -761,7 +961,21 @@ function _umbral_(){
      Lo cazaron los dos casos que fosilizan esa leccion, y tenian razon. */
   if(ing && (_med.length || (ma && typeof ma.media==='number'))){
     var num=0, den=0;
-    _med.forEach(function(x){ num+=x; den+=1; });              // cada mes cerrado pesa 1
+    /* ⛔⛔ AQUÍ CADA MES CERRADO PESABA 1, Y EL MOTOR NO. Desde el 05/10
+       `reglas/cuota.umbral_temporada` pesa julio y agosto a la mitad, y esta línea daba
+       otro número sobre los mismos datos — de este número sale la cuota de todo el equipo,
+       y Daniel lo llamó **«gravísimo»**.
+       ⛔ **SÓLO se pesa si el detalle cubre TODOS los meses** (`_det.length === _med.length`).
+       Si falta alguno —un panel viejo sin `detalle`, o una entrada con el periodo roto— se
+       cae al promedio sin pesos, que es el número que la cara daba hasta hoy: conocido y
+       definido. Pesar MEDIA lista sería inventar un tercer número que nadie podría
+       reconocer, y sería peor que no pesar. */
+    var _det=_detalleDeEstaTemp_(ing);
+    if(_det.length && _det.length===_med.length){
+      _det.forEach(function(c){ var w=_pesoDeMes_(c.periodo); num+=w*c.media; den+=w; });
+    } else {
+      _med.forEach(function(x){ num+=x; den+=1; });            // respaldo: cada mes pesa 1
+    }
     if(ma && typeof ma.media==='number'){
       var w=_fraccionDelMes_();                                 // el abierto, a prorrata
       num+=ma.media*w; den+=w;
@@ -2320,13 +2534,28 @@ function _puedeRevocarSanc_(s, arr){
    es exactamente lo que no puede repetirse. El `lote` NO sirve: sale `null` en las manuales.
    ⚠️ El lote es `revoca-<lote original>` para que varias del mismo bloque caigan en UNA
    tarjeta y salgan con UN comunicado -- que es lo que el selector de varias buscaba. */
+/* ⛔⛔ DEVUELVE `null` SI LOS PUNTOS NO LLEGARON (06/10). Aqui habia
+   `puntos: -(_ptsSanc_(s.puntos) || 0)`: llamaba a la puerta **y le ponia `|| 0`
+   detras**, o sea que deshacia su unica aportacion -- distinguir el **0 que es un
+   aviso** del **null que es «no lo se»**.
+   ⛔ Y ESTO ESCRIBE, NO PINTA: la fila va a `api.pushSancion`, asi que revocar una
+   sancion cuyos puntos no llegaron encolaba **«devuelve 0 puntos»**, y el `confirm`
+   de al lado se lo ensenaba a quien pulsa como *«Era un aviso: no devuelve
+   puntos»*. No se puede devolver una cantidad que no se sabe.
+   ✅ Se para y se dice, que es lo que este repo ya eligio dos veces para lo mismo:
+   `rutinas/backend.py:90` con la fecha ilegible y el `SystemExit` de `contador`.
+   ⚠️ Y un 0 DE VERDAD sigue revocandose: 0 es un dato. Confundirlo con el hueco en
+   la otra direccion bloquearia revocaciones legitimas, y hay un caso de control
+   en `probar_revocar_sancion.py` para que no se cure asi. */
 function _filaRevocacion_(s, texto){
+  var _pts = _ptsSanc_(s && s.puntos);
+  if (_pts === null) return null;
   return { origen:'revocacion', clave:'revoca-' + s.id,
     lote: s.lote ? ('revoca-' + s.lote) : null,
     nombre: s.nombre,
     motivo: 'Revocación de «' + (s.motivo || 'sanción') + '» — ' + texto,
     articulo: s.articulo || 'libre',
-    puntos: -(_ptsSanc_(s.puntos) || 0),
+    puntos: -_pts,
     extra: { revoca: s.id, loteOriginal: s.lote || null,
              motivoOriginal: s.motivo || null, razon: texto } };
 }
@@ -2692,11 +2921,11 @@ function _deEstaTemporada_(d){
      ⚠️ Y se curó EN LAS DOS: `_deEsteMes_` y `_deEstaTemporada_` tenían la línea
      idéntica, y el `parche` lo cantó al contar el ancla (salía 2 veces). Una lección
      curada en una y no en su gemela es exactamente como se repite. */
-  var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
-  if(/^\d{4}-\d{2}$/.test(String(per||''))){
-    return _temporadaDe_(d) === _temporadaDe_(new Date(+per.slice(0,4), (+per.slice(5,7))-1, 1));
-  }
-  return _temporadaDe_(d) === _temporadaDe_(_hoyDateM_());
+  /* ✅ POR LA PUERTA (05/10): estas cuatro lineas ERAN la definicion de «la temporada en
+     curso», escritas dentro de un predicado por fecha, asi que nadie mas podia usarlas y
+     cada rotulo se invento la suya. Ahora viven en `_temporadaVigente_` y aqui solo se
+     compara. Mismo resultado, un solo sitio donde cambiarlo. */
+  return _temporadaDe_(d) === _temporadaVigente_();
 }
 
 /* ⛔ CADA MAGNITUD SE REINICIA CON LO SUYO, y confundirlo hace que la app diga otra cosa que el
@@ -2722,6 +2951,37 @@ function _deEstaTemporada_(d){
    sin cerrarse. Se usa el mes porque es lo que la cara puede saber sola, y para lo
    que esto hace —quitar ruido de lo viejo— basta. Lo que **nunca** se pliega es el
    mes en curso. */
+/* CUANTOS SE RESOLVIERON EN EL PERIODO ABIERTO. Devuelve `{n, sinFecha}` o `null`.
+
+   🗣️ Daniel, 05/10: *«y no pongas stats INÚTILES»*. Y el criterio que salió con el encargo:
+   una stat es inútil si **se deriva de otra que está al lado**.
+
+   ⛔⛔ EL KPI «Resueltos este mes» IMPRIMÍA `hist.length`, o sea `PARTES.filter(estado!=='pend')`
+   **sin ningún filtro de mes** — y el panel «Histórico» de **25 líneas más abajo** imprime el
+   MISMO número. Un duplicado **y** un rótulo que miente, los dos a la vez. Y el daño no es
+   estético: ese número no baja nunca, así que no dice nada del mes en el que estamos.
+
+   ✅ Y EL DATO PARA HACERLO VERDAD YA VIAJA: `decidido_at`, que el backend escribe como ISO
+   (`Codigo.gs:2454`) y traen los 2 de 2 decididos de la semilla. No había que añadir nada.
+
+   ⛔ UN DECIDIDO SIN FECHA NO SE CUENTA COMO «de otro mes»: `Codigo.gs:2522` inicializa
+   `decidido_at: ''`, así que el caso existe de verdad. Se cuentan aparte (`sinFecha`) y la
+   tarjeta lo DICE — esconderlos hace que el número parezca completo cuando no lo es.
+
+   ⛔ Y SIN PERIODO DEVUELVE `null`, NO 0 (§3c-24): un 0 ahí afirma «este mes no has resuelto
+   nada» cuando lo que pasa es que no se sabe qué mes es. ⚠️ Con la lista VACÍA sí devuelve
+   `{n:0}`: «no hay partes» se sabe, y es otra cosa. */
+function _resueltosDelPeriodo_(partes, periodo){
+  if(!/^\d{4}-\d{2}$/.test(String(periodo||''))) return null;
+  var L = partes || [], n = 0, sf = 0, i, d;
+  for(i = 0; i < L.length; i++){
+    d = String((L[i] || {}).decidido_at || '');
+    if(!/^\d{4}-\d{2}/.test(d)){ sf++; continue; }
+    if(d.slice(0, 7) === String(periodo)) n++;
+  }
+  return { n: n, sinFecha: sf };
+}
+
 function _esDeMesPasado_(p, periodo){
   var per = String(periodo||'');
   if(!/^\d{4}-\d{2}$/.test(per)) return false;
@@ -2852,6 +3112,44 @@ function _compMensual_(m){ return _compEsReal_(m) ? m.compensaciones : _compBase
 function _horasSinBase_(m, h){
   if(typeof h!=='number' || !isFinite(h)) return null;
   return Math.max(0, Math.round((h - _compBase_(m))*100)/100);
+}
+
+/* LO QUE LE TOCA LLEVAR A DIA DE HOY, que NO es lo mismo que lo que ha trabajado.
+
+   🗣️ Daniel, 06/10: *«las compensaciones, para no meter literalmente un step, tienen que
+   sumarse tambien a las medias/comparaciones/promedios, etc. de forma progresiva dia a dia»*.
+
+   ⛔⛔ EL CASO, MEDIDO CONTRA EL PANEL VIVO EL 06/10: las `horasMes` de los 32 eran
+   **[2, 3.5, 7, None]** — o sea EXACTAMENTE las tres compensaciones base (miembro 2,
+   coordinador 3.5, PD 7) y **ni una hora de trabajo real contada en octubre**. El cierre mensual
+   devuelve `compensaciones` al defecto del cargo (`flujos/cierre.py`), asi que **el mes entero
+   se acredita el dia 1**. Y la columna «vs. objetivo a hoy» del escritorio prorrateaba el
+   LISTON y no el escalon, con lo que pintaba a las 23 filas **por delante del objetivo** con
+   cero trabajo dentro — y la ventaja se deshacia sola segun pasaban los dias.
+
+   ✅ LAS DOS MITADES, Y LAS DOS SON DECISIONES SUYAS:
+   · el TRABAJO entra entero (`_horasSinBase_`): ya se hizo, y prorratearlo seria el fallo
+     simetrico — retrasar el reconocimiento de algo que esa persona hizo el dia 2.
+   · la BASE se devenga (`_compBase_` × fraccion): es lo que «llega solo por el puesto»
+     (Daniel, 02/08), y por eso es la que mete el escalon.
+   ⚠️ Y la EXTRA **no se prorratea**, por lo mismo que no se descuenta en `_horasSinBase_`:
+   *«esa se la ha ganado alguien haciendo algo de mas»* y tiene su fecha. Va dentro de `h`.
+
+   ⛔ LA FRACCION SE TOPA EN 1: un periodo que se pase de largo no puede devengar mas base de
+   la que hay, y sin el tope la cifra crece sola al final del mes.
+   ⛔ Y UN «NO LO SE» ES `null`, NUNCA 0 (§3c-24): un 0 aqui afirma «no ha devengado nada», que
+   es justo el fallo que `_horasSinBase_` lleva cerrado desde el 10/08. */
+function _devengadoAHoy_(m, h, frac){
+  if(typeof h !== 'number' || !isFinite(h)) return null;
+  if(typeof frac !== 'number' || !isFinite(frac) || frac < 0) return null;
+  /* ⛔⛔ LA RAMPA ES `h - base×(1-frac)`, NO `(h-base) + base×frac`. Las dos dan lo
+     mismo mientras `h >= base`, y se separan justo donde importa: con el mes CERRADO
+     (`frac` 1) la primera da **`h` exacto** y la segunda daba `base`, o sea que a quien
+     tiene menos horas que su base le **inventaba horas**. Era un fallo mio de hace un
+     rato: el suelo de `_horasSinBase_` protege una resta, no una rampa.
+     ✅ Y asi la rampa GENERALIZA: un mes acabado devenga su valor crudo, sin caso
+     especial — que es lo que deja compararlo con el mes anterior sin dos cuentas. */
+  return Math.max(0, Math.round((h - _compBase_(m) * (1 - Math.min(1, frac))) * 100) / 100);
 }
 
 function _compExtra_(m){
@@ -3026,6 +3324,35 @@ function _nomPeriodo_(p){
   if(!m) return String(p||'');
   var i=parseInt(m[2],10)-1;
   return (MESES_L[i]||m[2])+' de '+m[1];
+}
+
+/* ⛔⛔ COMO SE LLAMA EL MES QUE SE ESTA PINTANDO — UNA SOLA PUERTA (06/10/2026).
+
+   El mes de trabajo va **de cierre a cierre** (§2b), no del 1 al 31, asi que el nombre NO
+   puede salir del reloj: del 1 al 4 de cada mes el periodo abierto sigue siendo el
+   anterior. ⛔ Ya paso, y esta escrito en `horas.movil.js`: *«del 01 al 04 de agosto esto
+   se titulaba «Desglose de agosto 2026» y listaba los partes de JULIO»*. Y lo dice mejor
+   `_compHorasHTML_`: **«el fallo nunca fue comparar con junio: fue LLAMARLO julio»**.
+
+   ⛔ EXISTE PORQUE LA LECCION ESTABA CURADA EN UNA CARA Y NO EN SU GEMELA. El movil ya
+   componia `_periodoAbierto_` + `_nomPeriodo_` con el reloj de respaldo; el escritorio
+   rotulaba con `_mesLargo_(new Date())` en **tres** sitios — el titulo de «Horas por
+   miembro», su columna del mes y el subtitulo de «Este mes». Escribir la composicion otras
+   tres veces habria dejado **cuatro copias** de la misma pregunta.
+
+   ⚠️ Y EL RESPALDO ES `_hoyDateM_()`, NO `new Date()`: aquel sale de `HOY`, que es la
+   fecha con la que la app trabaja; el reloj crudo puede no ser la misma. El respaldo se
+   usa solo cuando NO se sabe el periodo — antes de que llegue el panel, o sin cierres —,
+   y callar el rotulo entero seria peor: la pantalla no diria de que mes habla.
+
+   `corto` da solo el mes («octubre») para una cabecera de columna; sin el, el nombre
+   completo con su ano, en el mismo formato que ya usaba cada sitio. */
+function _nomMesAbierto_(corto){
+  var p = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  var m = /^(\d{4})-(\d{2})$/.exec(String(p||''));
+  if(m) return corto ? (MESES_L[parseInt(m[2],10)-1]||m[2]) : _nomPeriodo_(p);
+  var d = _hoyDateM_();
+  return corto ? MESES_L[d.getMonth()] : _mesLargo_(d);
 }
 
 /* ⚠️ `hoy` ES OPCIONAL Y EXISTE PARA PODER PREGUNTARLE, igual que en `_finDeMes_`: sin
@@ -4393,1312 +4720,9 @@ function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.
 function _imputacion_(f){ return f.cat==='tareas' ? (f.tarea==='__otro__' ? f.detalle.trim() : f.tarea) : f.detalle.trim(); }
 
 function _novedades_(){
-  /* Lo más nuevo primero. Al cerrar una pieza se añade su tanda AQUÍ, en ese momento.
-
-     ⛔ CRITERIO DE ENTRADA: **solo entra lo que se puede MIRAR en la app**. Esta capa existe
-     para que Daniel revise; una regla de Python sin pantalla no tiene nada que revisar, y
-     meterla aquí le manda a buscar algo que no está. El 06/08 quedaron fuera a propósito
-     `reglas/convocatoria.que_toca` y `reglas/perfiles.py`: son la base de dos pantallas que
-     todavía no existen, y entrarán **cuando entre su pantalla**.
-
-     El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
-     documentos: aquí lo que se toca, allí lo que se hizo. */
-  return [
-    { id:'2026-10-05-periodo-del-cierre', fecha:'2026-10-05',
-      titulo:'El mes abierto se cuenta desde el ultimo cierre, no desde el calendario',
-      items:[
-        {cara:'movil', vista:'horas', txt:'<b>Y el arreglo de arriba estaba a medias: no '
-          +'cambiaba nada en pantalla.</b> La pieza de antes mando las dos mitades de la '
-          +'tarjeta a preguntar «que mes esta abierto» por una sola puerta, pero esa puerta '
-          +'hacia caso al dato del servidor, <b>que trae el mes del calendario</b>. Medido '
-          +'contra el backend de verdad: el 5 de octubre decia <b>octubre</b> con septiembre '
-          +'sin cerrar, y con eso <b>los diez partes de septiembre se plegaban</b> como «de '
-          +'meses pasados» justo debajo del total que los contaba. Ahora el mes abierto se '
-          +'deduce del ultimo cierre aplicado, y el dato del servidor queda solo de '
-          +'respaldo.'},
-        {cara:'escritorio', vista:'horas', txt:'<b>Lo mismo en el escritorio</b>, que guarda el ultimo cierre con otro nombre: una correccion en una cara y no en la otra es '
-          +'como esto se repite.'}
-      ] },
-    { id:'2026-10-05-horas-un-solo-mes', fecha:'2026-10-05',
-      titulo:'La tarjeta de Horas ya cuenta UN solo mes, y ensena de que se compone',
-      items:[
-        {cara:'movil', vista:'horas', txt:'<b>«Ultimos movimientos» enseñaba casi nada.</b> La '
-          +'cifra grande cuenta el mes de trabajo —de cierre a cierre— y el desglose de abajo '
-          +'contaba el mes del <b>calendario</b>, asi que del dia 1 hasta que se cierra el mes '
-          +'anterior ponia tu total arriba y <b>«todavia no se te ha contado ningun fichaje»</b> '
-          +'debajo. Ahora las dos mitades cuentan lo mismo y ahi salen tus partes del mes, '
-          +'con su concepto.'},
-        {cara:'movil', vista:'horas', txt:'<b>Y lo que esta esperando firma tambien sale</b>, '
-          +'con el mismo rayado que la barra usa para «pendientes · no cuentan» y con su propio '
-          +'rotulo: va aparte porque todavia <b>no</b> suma al total de arriba. Solo lo que de '
-          +'verdad espera una decision — lo rechazado o caducado no espera nada de nadie.'}
-      ] },
-    { id:'2026-10-05-revertir-detalle', fecha:'2026-10-05',
-      titulo:'Desde el movil ya se puede deshacer un «pedir detalle»',
-      items:[
-        {cara:'movil', vista:'horas', txt:'En <b>Ya decidiste</b>, un parte al que le pediste '
-          +'detalle ya se puede <b>revertir desde el telefono</b>. Hasta hoy solo se podia desde '
-          +'el ordenador: el servidor lo admitia, el escritorio lo ofrecia y <b>esta cara no</b> '
-          +'— y es la cara desde la que se decide sobre la marcha. La lista de lo que se puede '
-          +'deshacer vive ahora en <b>un solo sitio</b>, asi que las dos caras no pueden volver a '
-          +'contestar distinto.'}
-      ] },
-    { id:'2026-10-04-objetivo-vivo', fecha:'2026-10-04',
-      titulo:'El objetivo de horas del mes se calcula, ya no viene congelado',
-      items:[
-        /* ⛔ La vista es `horas`: `_umbral_` se usa desde `vHoras` (medido expandiendo el
-           grafo de llamadas de `horas.movil.js`, no por el nombre del modulo). */
-        {cara:'movil', vista:'horas', txt:'La <b>marca vertical de la barra de Horas</b> — el '
-          +'objetivo del mes — se calcula ahora con <b>la gente que esta de alta</b> y contando '
-          +'solo los meses cerrados <b>de esta temporada</b>. Antes llegaba hecho desde el '
-          +'servidor, y lo que llegaba era de <b>julio</b>: 32 personas y media 15,58, cuando '
-          +'los 23 de alta dan 18,91. El objetivo pasa de <b>12,85 a 12,60 h</b>.'}
-      ] },
-    { id:'2026-10-04-subsistemas-vivo', fecha:'2026-10-04',
-      titulo:'Las horas por subsistema se calculan con la gente que tienes delante',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La tarjeta de <b>subsistemas</b> ya no ensena una '
-          +'foto del servidor: los <b>nombres</b> los sigue poniendo el motor y los <b>numeros</b> '
-          +'se calculan con los miembros de alta que la pantalla tiene delante, asi que no pueden '
-          +'discrepar de ella. La foto anterior era del 23/09 y daba <b>GNC 32,2</b> cuando sus '
-          +'miembros dan <b>22,7</b>, y metia dentro a Org&amp;Mark, que no compite.'}
-      ] },
-    { id:'2026-10-04-semilla-sin-fecha', fecha:'2026-10-04',
-      titulo:'La demostracion ya no afirma una fecha que no tiene',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Abriendo el panel <b>sin conexion con el servidor</b> '
-          +'se ve una demostracion, y el pie ponia <b>«SOLARIS · datos a 24/07/2026»</b> y '
-          +'<b>«ciclo 25/26»</b> con la misma cara que un dato de verdad — una fecha de julio '
-          +'leida en octubre. Ahora, sin datos, <b>cada rotulo se calla</b>; con datos vuelve a '
-          +'decirse. El escritorio ya lo distinguia: era el movil el que no.'}
-      ] },
-    /* ⛔⛔ TRES ENTRADAS SE ESCRIBIERON AQUI EL 04/10 Y SE RETIRARON EL MISMO DIA, y el
-       motivo va escrito para que nadie las vuelva a meter antes de tiempo. El criterio no es
-       «¿esta hecho?» sino «¿puede MIRARLO alguien HOY?»:
-       · `2026-10-04-libro-temporada` (769.a) — el filtro por temporada vive en `Codigo.gs` y
-         lo desplegado sigue siendo el **v83**. Entra CON el despliegue.
-       · `2026-10-04-temporada-en-curso` (776.a) — arregla `flujos/ensamblar.py`, o sea **lo
-         que se sube**; el panel vivo es del 23/09 y sirve `temporada: '25/26'`. Entra con la
-         proxima subida del panel.
-       · `2026-10-04-multiunidad` (773.a) — **ya estaba vivo desde el 23/09**: la 661.a subio
-         `coordina` ya partido y el panel trae las dos unidades de Jose. La pieza arreglo el
-         dato local y dejo una sola puerta; en pantalla no cambia nada, asi que NO entra.
-       📏 Las tres se midieron LEYENDO EL PANEL VIVO (solo lectura), no la ficha:
-       sirve `temporada: '25/26'`, es del 23/09 y ya trae las dos unidades de Jose. */
-    { id:'2026-10-02-puntos-sin-dato', fecha:'2026-10-02',
-      titulo:'Los puntos de una sanción, dichos igual en las dos caras',
-      items:[
-        /* ⛔ La vista es `estado` en el móvil (la cola es un MODAL desde la tarjeta del PD) y
-           `sanciones` en el escritorio, donde sí es una vista. Lo cazó `probar_novedades.py`
-           la última vez que me equivoqué justo con esta pantalla. */
-        {cara:'escritorio', vista:'sanciones', txt:'En el bloque de sanciones, los puntos de cada '
-          +'persona ya se leen igual: 0 pone «aviso» y un premio lleva su signo («+1 punto»), '
-          +'que antes salía como si quitara. Y si a una fila NO le ha llegado el dato, pone '
-          +'«sin dato» y la previsión «antes → después» se queda quieta en vez de prometer un '
-          +'número que no sabe. El rótulo del bloque dice aparte cuántas son avisos y cuántas '
-          +'están sin dato.'},
-        {cara:'movil', vista:'estado', txt:'En la cola de Sanciones del menú ⋮ los puntos ponen '
-          +'lo mismo que en el ordenador — «aviso», «−1 punto», «+1 punto» — en vez de un número '
-          +'suelto. Antes un 0 se veía igual que un dato que no había llegado.'}
-      ] },
-    { id:'2026-10-02-premio-en-la-cola', fecha:'2026-10-02',
-      titulo:'Un premio ya no se lee como una sanción',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'Los bloques de una reunión traen premiados y '
-          +'sancionados MEZCLADOS, y hasta ahora un premio salía como «aviso» — un apercibimiento '
-          +'a quien se le está premiando por cubrir su disponibilidad. Ahora su fila pone '
-          +'«premio · +0,5 h» (la recompensa son horas, no puntos) y una revocación pone '
-          +'«revocación». Y sobre un premio ya no sale el botón «Justifica»: el servidor nunca lo '
-          +'aceptaba — se lo saltaba y te decía que no podías decidirlo tú, que no era la razón. '
-          +'«Acepta» y «Rechaza» siguen, que son las dos decisiones que sí existen.'},
-        {cara:'movil', vista:'estado', txt:'La cola de Sanciones del menú ⋮ también distingue un '
-          +'premio de una sanción, con el mismo texto que el ordenador.'}
-      ] },
-    { id:'2026-10-02-cargos-turno', fecha:'2026-10-02',
-      titulo:'Al convocar, las tres responsabilidades llegan de verdad',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Marcar <b>Responsable audiovisual</b> o <b>de '
-          +'memoria</b> al convocar <b>no llegaba a ningún sitio</b>: se marcaba, se convocaba, y '
-          +'el turno volvía de Notion sin esas dos asignaciones. Solo el de turno y el coche '
-          +'pasaban al reparto. Ya pasan las tres.<br>Y arriba del reparto hay un recuadro con '
-          +'las <b>responsabilidades pendientes de asignar</b>, que se vacía al repartirlas: '
-          +'antes solo te lo decía el botón de convocar, cuando ya lo intentabas. Una por '
-          +'persona, y la misma persona puede llevar varias.'}
-      ] },
-    { id:'2026-10-02-revocar', fecha:'2026-10-02',
-      titulo:'Revocar una sanción, otra vez desde el escritorio',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'Vuelve la <b>vía de apelación del Art. 34</b>, '
-          +'que estaba en el panel viejo y se había quedado por el camino. En Sanciones hay un '
-          +'bloque <b>«Se pueden revocar»</b> con las ya aplicadas: escribes el motivo '
-          +'(obligatorio) y la revocación entra en la cola <b>como pendiente</b> — se confirma '
-          +'con su bloque, igual que una sanción, y sale un solo comunicado. <b>No borra la '
-          +'sanción</b>: crea la devolución de puntos, y queda el rastro de las dos. Si era un '
-          +'aviso no devuelve puntos, retira el registro. Y no deja revocar dos veces la misma.'}
-      ] },
-    { id:'2026-10-02-apelar-donde', fecha:'2026-10-02',
-      titulo:'Apelar una tarea: ahora dice dónde',
-      items:[
-        {cara:'movil', vista:'tareas', txt:'La tarjeta de Mis tareas decía «si crees que una no '
-          +'te corresponde, puedes apelarla (Art. 34)» — y la app no tramita apelaciones, así '
-          +'que eso mandaba a buscar un botón que no existe. El derecho sigue dicho (es del RRI), '
-          +'y ahora dice dónde se ejerce: <b>fuera de la app</b>, en privado al Project Director.'}
-      ] },
-    { id:'2026-10-02-iphone-instalar', fecha:'2026-10-02',
-      titulo:'En iPhone, el panel ya dice cómo recibir los avisos',
-      items:[
-        /* ⚠️ La vista es `ajustes`… que NO es una de las 7 del móvil. El panel de notificaciones
-           es un MODAL que se abre desde el menú ⋮, igual que Sanciones, así que la vista es
-           `estado` — es la misma trampa que ya me comió `probar_novedades.py` una vez. */
-        {cara:'movil', vista:'estado', txt:'Si abres el panel en <b>Safari del iPhone</b> sin '
-          +'haberlo añadido a la pantalla de inicio, ahora te lo dice y te explica cómo: '
-          +'Compartir → Añadir a pantalla de inicio. Antes te dejaba entrar **sin avisos y sin '
-          +'decir nada**, y en Ajustes ponía «Ábrelo en el móvil» — estando en el móvil. Apple '
-          +'sólo manda notificaciones a las apps abiertas desde ese icono.'}
-      ] },
-    { id:'2026-10-01-cola-sanciones-fresca', fecha:'2026-10-01',
-      titulo:'La cola de sanciones del m\u00f3vil se pone al d\u00eda sola',
-      items:[
-        {cara:'movil', vista:'estado', txt:'La lista de sanciones que esperan decisi\u00f3n se '
-          +'vuelve a leer cada minuto y medio, como ya hac\u00edan los turnos y las tareas. Antes se '
-          +'cargaba una sola vez al abrir la app, as\u00ed que si dejabas el tel\u00e9fono abierto '
-          +'segu\u00edas viendo las de cuando entraste. Lo que tengas marcado NO se pierde al '
-          +'actualizarse, y si est\u00e1s escribiendo una sanci\u00f3n no se te mueve la pantalla.'}
-      ] },
-    { id:'2026-09-30-justificar-movil', fecha:'2026-09-30',
-      titulo:'Justificar una sanci\u00f3n, desde el m\u00f3vil',
-      items:[
-        {cara:'movil', vista:'estado', txt:'En el bloque de sanciones ya hay TRES botones \u2014 '
-          +'Acepta, Justifica y Rechaza \u2014, como en el ordenador. Antes s\u00f3lo hab\u00eda S\u00ed y No, '
-          +'as\u00ed que desde el tel\u00e9fono no se pod\u00eda dejar una sanci\u00f3n en justificada.'}
-      ] },
-    { id:'2026-09-30-cerrar-bloque-relee', fecha:'2026-09-30',
-      titulo:'Cerrar el bloque comprueba la cola de verdad',
-      items:[
-        /* ⛔ La vista es `estado`, NO `sanciones`. En el móvil las 7 son estado, fichar, horas,
-           tareas, turnos, docs y reu: la cola de sanciones es un MODAL que se abre desde la
-           tarjeta del PD, o sea desde `estado`. Puse `sanciones` contando `vista:'…'` en este
-           fichero — y ese recuento incluye el ESCRITORIO, donde sí es una vista. Lo cazó
-           `probar_novedades.py` en la primera corrida. */
-        {cara:'movil', vista:'estado', txt:'Al pulsar «Cerrar el bloque entero», la cola se vuelve '
-          +'a leer antes de cerrar: si ha entrado una sanción nueva sin decidir, el bloque NO se '
-          +'cierra y la nueva aparece en la lista. Si no se pudo leer la cola, tampoco se cierra.'}
-      ] },
-    { id:'2026-09-14-bloque-horas', fecha:'2026-09-14',
-      titulo:'El bloque de horas dice lo que pas\u00f3',
-      items:[
-        {cara:'escritorio', vista:'horas', txt:'Al otorgar un bloque de horas, el aviso dice cu\u00e1ntas se otorgaron de verdad (y si ninguna, lo dice), y no deja mandar m\u00e1s horas que el tope de un parte.'}
-      ] },
-    { id:'2026-09-14-ambito-legible', fecha:'2026-09-14',
-      titulo:'El \u00e1mbito de un documento, en legible',
-      items:[
-        {cara:'movil', vista:'docs', txt:'En la lista y en la ficha de un documento, el \u00e1mbito dice '
-          +'\u00abinforme de subsistema\u00bb o \u00abarchivo de miembro\u00bb, como en el ordenador, en vez de la '
-          +'palabra interna.'}
-      ] },
-    { id:'2026-09-14-convocar-cuenta', fecha:'2026-09-14',
-      titulo:'Convocar disponibilidad dice qu\u00e9 cuenta puede',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Con la cuenta de administraci\u00f3n, el panel de convocar disponibilidad sale entero y convoca. Con tu cuenta personal dice qu\u00e9 cuenta puede, en vez de un bot\u00f3n que el servidor rechaza.'}
-      ] },
-    { id:'2026-09-14-automatismos', fecha:'2026-09-14',
-      titulo:'Lo que el repo ya hace solo, desde la app',
-      items:[
-        {cara:'movil', vista:'estado', txt:'En el men\u00fa \u22ee, al lado de Novedades, **Automatismos**: lo que corre solo, lo que se lanza a mano, los guardias y lo que se arregla solo, con la \u00faltima comprobaci\u00f3n y su fecha.'},
-        {cara:'escritorio', vista:'estado', txt:'Lo mismo en el escritorio. Es la foto de cu\u00e1ndo se public\u00f3, no un comprobar ahora.'}
-      ] },
-    { id:'2026-09-14-sello-aprobado', fecha:'2026-09-14',
-      titulo:'Cada parte aprobado dice qui\u00e9n lo aprob\u00f3 y cu\u00e1ndo',
-      items:[
-        {cara:'movil', vista:'horas', txt:'En **Tus partes**, lo aprobado dice *aprobado el DD/MM/AAAA por X* (u *otorgado*) y el mes al que cuenta. Si no se sabe el mes, dice *sin mes confirmado* en vez de adivinarlo.'},
-        {cara:'escritorio', vista:'partes', txt:'En el **Hist\u00f3rico** de partes, lo mismo; y ya no pone un nombre cuando no consta qui\u00e9n decidi\u00f3, ni afirma una decisi\u00f3n sobre un fichaje sin declarar.'}
-      ] },
-    { id:'2026-09-14-detalle-sin-caducar', fecha:'2026-09-14',
-      titulo:'Contestar un \u00abm\u00e1s detalle\u00bb ya no dice que caduca',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Si un coordinador te pide **m\u00e1s detalle** de un parte y lo abres para contestar, la tarjeta ya no dice \u00abFichaje sin declarar\u2026 caduca a los 7 d\u00edas\u00bb: dice **Te piden m\u00e1s detalle**, ense\u00f1a lo que te preguntaron y te recuerda que corrijas lo que ya mandaste. Un parte as\u00ed no caduca.'}
-      ] },
-    { id:'2026-09-14-autor-decidido', fecha:'2026-09-14',
-      titulo:'Tu documento ya decidido te lo cuenta tambi\u00e9n el escritorio',
-      items:[
-        {cara:'escritorio', vista:'docs', txt:'Si abres un expediente **tuyo** que ya est\u00e1 decidido \u2014aprobado, aprobado con anotaciones o rechazado\u2014, el escritorio ya no dice \u00abEs tuyo: lo firma X\u00bb: dice qu\u00e9 decidieron, qui\u00e9n y cu\u00e1ndo, qu\u00e9 te ajustaron, el motivo si te lo rechazaron y, si est\u00e1 publicado, c\u00f3mo mandar una versi\u00f3n nueva. Lo mismo que ya dec\u00eda el m\u00f3vil.'},
-        {cara:'movil', vista:'docs', txt:'Y en las dos caras, un documento tuyo que se est\u00e1 **publicando** ya lo dice, en vez de \u00abEste expediente lo revisa X\u00bb.'}
-      ] },
-    { id:'2026-09-12-recorte-dias', fecha:'2026-09-12',
-      titulo:'Convocar dec\u00eda \u00ab62 d\u00edas\u00bb sin avisar de que hab\u00eda recortado',
-      items:[
-        {cara:'movil', vista:'reu', txt:'Al crear una encuesta, la app reparte como mucho **62 d\u00edas**. Si ped\u00edas m\u00e1s \u2014por ejemplo de enero a diciembre\u2014 recortaba **en silencio**: el resumen dec\u00eda \u00ab\u2026 en 62 d\u00edas\u00bb, el selector segu\u00eda marcando el 31/12 y la rejilla acababa en marzo, sin una palabra. Ahora lo dice antes de convocar, con cu\u00e1ntos d\u00edas se han quedado fuera. \u26a0\ufe0f Importa porque lo que se convoca es lo recortado: a partir de ah\u00ed **eso ES la convocatoria**, tambi\u00e9n para las sanciones.'}
-      ] },
-    { id:'2026-09-12-ruta-firma-pd', fecha:'2026-09-12',
-      titulo:'Fichar le dec\u00eda al Project Director que coordina una unidad que no coordina',
-      items:[
-        {cara:'movil', vista:'horas', txt:'En **Antes de enviar**, el recuadro de qui\u00e9n firma el parte le sal\u00eda al PD en may\u00fasculas: **\u00abCOMO COORDINAS \u2039SU UNIDAD\u203a, PASA AL PROJECT DIRECTOR\u00bb** \u2014 una coordinaci\u00f3n que no tiene, y anunci\u00e1ndole que su parte pasa a alguien que **es \u00e9l mismo**. Ahora dice lo que de verdad ocurre. \u26a0\ufe0f Para todos los dem\u00e1s no cambia nada.'}
-      ] },
-    { id:'2026-09-12-lote-sin-leer', fecha:'2026-09-12',
-      titulo:'El panel de sanciones ya no ense\u00f1a un bloque de gente inventada',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'Si el servidor no contestaba, la pantalla de inicio segu\u00eda ense\u00f1ando **\u00abBloque abierto \u00b7 5 personas\u00bb** con nombres de **ejemplo** \u2014 su globo rojo, sus puntos y con **\u00abAcepta\u00bb ya marcado** \u2014, y el bot\u00f3n dec\u00eda que iba a aplicarlo en Notion y mandar el comunicado. Era la semilla de demostraci\u00f3n, que s\u00f3lo deber\u00eda verse sin servidor. Ahora, con sesi\u00f3n abierta y sin respuesta, el bloque **no se pinta**.'}
-      ] },
-    { id:'2026-09-12-clave-buzon-movil', fecha:'2026-09-12',
-      titulo:'Reintentar un reporte que no sali\u00f3 ya no lo manda dos veces',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Si al enviar un reporte fallaba la red, el bot\u00f3n volv\u00eda a habilitarse \u2014bien\u2014 y al pulsarlo otra vez el reporte entraba **dos veces** en la lista, porque cada pulsaci\u00f3n le pon\u00eda una marca distinta y el servidor no pod\u00eda saber que era el mismo. Ahora la marca es una por reporte. \u26a0\ufe0f Y al rev\u00e9s tambi\u00e9n: abrir el buz\u00f3n para reportar otra cosa empieza con marca nueva, as\u00ed que no se te pierde ninguno.'}
-      ] },
-    { id:'2026-09-12-consejo-turnos', fecha:'2026-09-12',
-      titulo:'El mapa de turnos dec\u00eda que nadie pod\u00eda liderar el turno',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Al pasar el rat\u00f3n por una casilla, la cesta **Pueden ser responsables** sal\u00eda con \u00abnadie del consejo puede\u00bb en **todas** las casillas \u2014 porque la convocatoria que baja del servidor **no trae la lista del consejo** y la pantalla le\u00eda ese hueco como un \u00abno hay nadie\u00bb. Ahora usa la lista que el panel ya manda, y si de verdad no la sabe lo **dice** en vez de afirmar. \u26a0\ufe0f Importa porque es la pantalla desde la que se elige qui\u00e9n lidera el turno.'}
-      ] },
-    { id:'2026-09-12-borrador-buzon', fecha:'2026-09-12',
-      titulo:'Un fallo de red ya no se lleva el reporte que acabas de escribir',
-      items:[
-        {cara:'escritorio', vista:'buzon', txt:'Al reportar un fallo desde el escritorio se contestan varias preguntas seguidas y, si quieres, se **marca una captura a l\u00e1piz**. Si al enviarlo fallaba la red, sal\u00eda un aviso y **se perd\u00eda todo**: t\u00edtulo, detalle, gravedad y la foto ya marcada, sin nada que pulsar para reintentarlo. Ahora se guarda lo escrito y **la pr\u00f3xima vez que pulses \u00abReportar\u00bb te ofrece enviarlo tal cual**, sin volver a teclear nada. \u26a0\ufe0f Se reenv\u00eda con la misma marca, as\u00ed que no puede acabar dos veces en la lista.'}
-      ] },
-    { id:'2026-09-12-partes-sin-leer', fecha:'2026-09-12',
-      titulo:'\u00abVer como\u00bb ya no dice \u00abning\u00fan parte en cola\u00bb cuando no lo sabe',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Mirando la ficha de otra persona, si el servidor no contestaba la pantalla afirmaba **\u00abNo tienes horas esperando firma\u00bb** sobre alguien de quien no se hab\u00eda podido leer nada \u2014 y es la pantalla desde la que se **otorgan horas**. Ahora dice **\u00abNo se han podido leer sus partes\u00bb** y que eso no quiere decir que no tenga ninguno.'}
-      ] },
-    { id:'2026-09-12-cuota-estimacion-movil', fecha:'2026-09-12',
-      titulo:'Tu cuota en el m\u00f3vil ya dice que es una **estimaci\u00f3n**',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La cifra sal\u00eda en verde con «\u20ac al a\u00f1o» y nada m\u00e1s \u2014 se lee como una factura. **La cuota es anual**: se cierra en agosto con las horas de toda la temporada, y no se paga mes a mes. Ahora lo dice en la propia cifra y debajo. \u26a0\ufe0f El n\u00famero no cambia: cambia lo que significa.'}
-      ] },
-    { id:'2026-09-12-declarar-ajeno', fecha:'2026-09-12',
-      titulo:'Se pod\u00eda declarar el parte de otra persona desde \u00abVer como\u00bb',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La app ya ten\u00eda escrita la regla de que **nadie declara por nadie**\u2026 y no funcionaba: al preparar cada parte para pintarlo **no se copiaba qui\u00e9n lo hab\u00eda escrito**, as\u00ed que la comprobaci\u00f3n dec\u00eda siempre \u00abes tuyo\u00bb. Mirando a otra persona con **Ver como** sal\u00edan sus botones de **Declarar** y **Responder**, y al pulsarlos su parte se enviaba con **tu tarea, tu categor\u00eda y tu justificaci\u00f3n** \u2014 y perd\u00eda su fecha l\u00edmite. Ya no.'}
-      ] },
-    { id:'2026-09-12-reintentar-turnos', fecha:'2026-09-12',
-      titulo:'El \u00abReintentar\u00bb del mapa de turnos no hac\u00eda nada',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Cuando el servidor no contestaba sal\u00eda **\u00abNo se pudo preguntar \u00b7 Reintentar\u00bb**\u2026 y el bot\u00f3n **estaba muerto**: se le enganchaba el manejador en un punto del c\u00f3digo al que no se llega en ese estado. Y como es lo \u00fanico que vuelve a pedir los datos, una ca\u00edda de red dejaba el mapa **y** \u00abTu disponibilidad\u00bb muertos **el resto de la sesi\u00f3n** \u2014 con lo que quien iba a contestar perd\u00eda la semana.'}
-      ] },
-    { id:'2026-09-12-foto-buzon', fecha:'2026-09-12',
-      titulo:'La captura de un reporte se colaba en el siguiente',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Si adjuntabas una captura al buz\u00f3n y cerrabas sin enviar \u2014tocando fuera de la tarjeta\u2014, la foto **se quedaba puesta**: al abrir el buz\u00f3n otra vez para reportar otra cosa, se enviaba **la imagen de la pantalla anterior** con el nombre de la nueva. Ahora una apertura nueva empieza sin foto, y al cambiar entre \u00abfallo\u00bb y \u00abmejora\u00bb se conserva, que es cuando s\u00ed toca.'}
-      ] },
-    { id:'2026-09-11-sanc-sin-leer', fecha:'2026-09-11',
-      titulo:'Los paneles de sanciones ya no dicen \u00abninguna\u00bb cuando no lo saben',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'Si el servidor no contestaba, **Sanciones sueltas** dec\u00eda \u00abninguna\u00bb y **Historial** dec\u00eda \u00abvac\u00edo\u00bb \u2014 con sanciones pendientes contra gente esperando decisi\u00f3n, invisibles en la pantalla donde se deciden. Y \u00abtodav\u00eda no hay sanciones resueltas\u00bb se lee como que no se ha sancionado a nadie **nunca**. Ahora los dos dicen **\u00absin leer\u00bb** y por qu\u00e9. \u26a0\ufe0f Se reintenta solo cada 90 s.'}
-      ] },
-    { id:'2026-09-11-rol-subcoordina', fecha:'2026-09-11',
-      titulo:'Si subcoordinas un equipo, la app ya no te llama \u00abMiembro\u00bb',
-      items:[
-        {cara:'escritorio', vista:'equipo', txt:'La l\u00ednea que te dice **qui\u00e9n eres** dec\u00eda **\u00abMiembro\u00bb** a quien **subcoordina un equipo** \u2014 aunque el servidor le reconoce **rango 1** y tiene gente a su cargo. Ahora dice **qu\u00e9 subcoordina**. \u26a0\ufe0f Y a quien coordina una **Unidad** se le nombra **la Unidad**, no su subsistema: son cosas distintas y antes sal\u00eda la segunda.'}
-      ] },
-    { id:'2026-09-11-notis-sin-confirmar', fecha:'2026-09-11',
-      titulo:'\u00abActivadas\u00bb en verde cuando el aviso no se hab\u00eda registrado',
-      items:[
-        {cara:'escritorio', vista:'ajustes', txt:'Al pulsar **Activar notificaciones**, si el navegador daba el permiso pero el registro fallaba, el distintivo se pon\u00eda **verde \u00abactivadas\u00bb** \u2014 al lado del mensaje de error. Y no llegaba nada: **ni el aviso de 24 h del parte a punto de caducar**, que gasta ah\u00ed su \u00fanico disparo. Ahora queda como **\u00absin confirmar\u00bb** hasta que el servidor lo tenga de verdad, y al conseguirlo se pone verde solo.'}
-      ] },
-    { id:'2026-09-11-vision-escritorio', fecha:'2026-09-11',
-      titulo:'Desde el ordenador ya se puede convocar una reuni\u00f3n oculta',
-      items:[
-        {cara:'escritorio', vista:'reuniones', txt:'Al convocar, el m\u00f3vil te dejaba elegir **qui\u00e9n ve el mapa de disponibilidad** \u2014 p\u00fablica, an\u00f3nima u oculta \u2014 y el ordenador **no**: mandaba siempre **an\u00f3nima**, sin ense\u00f1ar siquiera la opci\u00f3n. Y por el ordenador es como se convocan **junta y consejo**, que son justo las que pueden querer el modo m\u00e1s restrictivo. Ahora salen los tres botones con su explicaci\u00f3n, y lo que elijas es lo que viaja. \u26a0\ufe0f El defecto sigue siendo **an\u00f3nima**: no cambia nada de lo ya convocado.'}
-      ] },
-    { id:'2026-09-11-declaras-como', fecha:'2026-09-11',
-      titulo:'\u00abDeclaras como\u00bb dejaba elegir algo que ya estaba decidido',
-      items:[
-        {cara:'escritorio', vista:'horas', txt:'Si coordinas alguna unidad tienes **dos perfiles**, y al declarar un fichaje que ya estaba abierto la pantalla te dejaba cambiarlo \u2014 y te promet\u00eda **el coordinador del que eligieras**. Pero ese fichaje naci\u00f3 con su subsistema y eso ya no se mueve: le\u00edas \u00abse env\u00eda a Ana\u00bb y lo firmaba **Bea**. Ahora el desplegable se convierte en un r\u00f3tulo que dice **d\u00f3nde naci\u00f3**, y quien firma sale de ah\u00ed. \u26a0\ufe0f Al declarar un bloque **nuevo** sigues eligiendo, porque ah\u00ed s\u00ed decide.'}
-      ] },
-    { id:'2026-09-11-conv-sin-saber', fecha:'2026-09-11',
-      titulo:'\u00abNo hay ninguna semana convocada\u00bb ya no se dice cuando no se sabe',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'Si el servidor no contesta \u2014 o si no has entrado con tu cuenta \u2014 esta pantalla dec\u00eda **\u00abAhora mismo no hay ninguna semana convocada\u00bb**. Eso es una afirmaci\u00f3n, y la verdad era que **no se sab\u00eda**: pod\u00eda haber un plazo abierto corriendo. Ahora lo dice, y con el bot\u00f3n para reintentar. \u26a0\ufe0f No contestar es justo lo que hace que te pongan un turno cuando no puedes.'}
-      ] },
-    { id:'2026-09-11-mapa-sin-sesion', fecha:'2026-09-11',
-      titulo:'El mapa de turnos ya no ense\u00f1a el de ejemplo como si fuera el de verdad',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Si abres el mapa de disponibilidad **sin haber entrado con tu cuenta**, el servidor no puede contestar qui\u00e9n puede cada franja \u2014 y hasta hoy lo que ve\u00edas era **el mapa de ejemplo**, sin ninguna se\u00f1al de que lo fuera. Con \u00e9l se reparten turnos de verdad. Ahora lo dice, dice **por qu\u00e9** (falta la sesi\u00f3n, no es que el servidor est\u00e9 ca\u00eddo) y trae un bot\u00f3n para reintentar, porque el login puede llegar despu\u00e9s.'}
-      ] },
-    { id:'2026-09-11-antecedentes-reales', fecha:'2026-09-11',
-      titulo:'La escala de sanciones ya sale de tus antecedentes DE VERDAD',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'Hasta hoy la escala de puntos por no cubrir una encuesta sal\u00eda de una **tabla de seis nombres de ejemplo** escrita a mano. El equipo son 23 personas, as\u00ed que a casi nadie le casaba: primero dec\u00eda «1.\u00aa vez» a todo el mundo, y desde esta ma\u00f1ana dec\u00eda «no consta». Ahora es **el dato real**: lo cuenta el motor sobre el registro de sanciones aplicadas, **por familia de motivo** \u2014 faltar a la disponibilidad no reincide con no rellenar un formulario.'},
-        {cara:'escritorio', vista:'sanciones', txt:'Y sigue diciendo **no consta** cuando de verdad no consta: si a tu sesi\u00f3n el servidor no le manda ese dato, la pantalla no se lo inventa.'}
-      ] },
-    { id:'2026-09-11-sanciones-no-inventan', fecha:'2026-09-11',
-      titulo:'La pantalla de sanciones deja de inventarse lo que no sabe',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'A quien **no est\u00e1 en la tabla de antecedentes** \u2014 que hoy es casi todo el equipo \u2014 la pantalla le dec\u00eda **\u00abaviso \u00b7 1.\u00aa vez, sin puntos\u00bb** y **\u00ab0 antecedentes esta temporada\u00bb**. Eso no era un dato: era **no saberlo**, escrito como si se supiera. Ahora lo dice: *no consta su historial*.'},
-        {cara:'escritorio', vista:'sanciones', txt:'Con **varios bloques** abiertos, el desplegable pod\u00eda nombrar uno y el panel ense\u00f1ar **otro** \u2014 y debajo est\u00e1 el bot\u00f3n que aplica en Notion. Ahora los dos miran el mismo.'},
-        {cara:'escritorio', vista:'sanciones', txt:'Al sancionar **por plazo**, si fallaba la lectura de tareas la pantalla se quedaba en **\u00abBuscando las tareas de X\u2026\u00bb para siempre**. Ahora dice que no se pudieron leer \u2014 y que eso **no** significa que no las tenga.'},
-        {cara:'escritorio', vista:'libros', txt:'Y **\u00abCargando tus movimientos\u2026\u00bb** ya no dura toda la sesi\u00f3n: se reintenta cada minuto y medio, como el resto.'}
-      ] },
-    { id:'2026-09-11-ya-firmaste', fecha:'2026-09-11',
-      titulo:'\u00abYa firmaste\u00bb ya no dice \u00ab2 \u00b7 0 h\u00bb despu\u00e9s de revertir',
-      items:[
-        {cara:'escritorio', vista:'partes', txt:'Al **revertir** un parte, el servidor crea una contrapartida con las horas en negativo. Esa contrapartida **se colaba en el panel \u00abYa firmaste\u00bb** \u2014 nace como \u00abaprobada\u00bb, igual que un parte normal \u2014 y el panel **suma las horas de lo que ense\u00f1a**.'},
-        {cara:'escritorio', vista:'partes', txt:'Resultado: revertir un parte de 3 h dejaba el t\u00edtulo en **\u00ab2 \u00b7 0 h\u00bb** \u2014 dos tarjetas que se anulan \u2014, y si era el \u00fanico, **\u00ab1 \u00b7 \u22123 h\u00bb**: un total en negativo encima de una tarjeta que adem\u00e1s no se pod\u00eda revertir.'},
-        {cara:'escritorio', vista:'partes', txt:'\u2705 Ahora la contrapartida **no se lista**, as\u00ed que el t\u00edtulo vuelve a contar lo que de verdad puedes deshacer. En el m\u00f3vil ya era as\u00ed: **al escritorio le faltaba la misma l\u00ednea**.'}
-      ] },
-    { id:'2026-09-11-cierre-anual-a-medias', fecha:'2026-09-11',
-      titulo:'El cierre de temporada ya no dice \u00abAPLICADO\u00bb con dos fichas escritas',
-      items:[
-        {cara:'escritorio', vista:'temporada', txt:'El panel pon\u00eda **\u00abAPLICADO\u00bb** en cuanto hubiera **una sola ficha escrita** \u2014 y como el bot\u00f3n s\u00f3lo sal\u00eda si NO estaba aplicado, **desaparec\u00eda justo cuando hac\u00eda falta**: un cierre parado en la 2.\u00aa de 32 dec\u00eda \u00abhecho\u00bb y no dejaba terminarlo.'},
-        {cara:'escritorio', vista:'temporada', txt:'\u2705 Ahora son **tres estados**, como en el cierre mensual: **PARADO A MEDIAS** (hubo un descuadre \u2014 sin bot\u00f3n, y te dice que hay fichas nuevas y viejas conviviendo), **APLICADO A MEDIAS: faltan N** (s\u00f3lo falta gente sin ficha \u2014 **con bot\u00f3n**, y lleva el n\u00famero dentro) y **APLICADO**.'},
-        {cara:'escritorio', vista:'temporada', txt:'\u26d4 Con un cierre **parado** el bot\u00f3n NO vuelve, a prop\u00f3sito: un descuadre significa que alguien toc\u00f3 una ficha despu\u00e9s de calcular el plan, y relanzar sin mirarlo escribir\u00eda encima de un cambio que nadie ha visto.'},
-        {cara:'escritorio', vista:'temporada', txt:'Y el panel dice ahora **cu\u00e1ntas fichas se escribieron** y **cu\u00e1ntos descuadres** hubo: \u00abparado\u00bb dice que pasa algo, el n\u00famero dice cu\u00e1nto \u2014 que es lo que separa mirar una ficha de mirar el cierre entero.'}
-      ] },
-    { id:'2026-09-10-vs-mes-anterior', fecha:'2026-09-10',
-      titulo:'La comparaci\u00f3n de tu ritmo ya no sale contra un mes de hace tres meses',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Sal\u00eda **\u00abvs. junio\u00bb estando en septiembre**, con un \u2212100 %. Lo cazaste t\u00fa: \u00ab\u00bfpor qu\u00e9 vas junio?\u00bb. La fila no compara con el mes anterior: compara con **lo que traiga el panel**, y el panel lleva **44 d\u00edas** sin regenerarse.'},
-        {cara:'movil', vista:'horas', txt:'\u26d4 Y junio es de la temporada **25/26**, con el equipo ya en la **26/27**: comparar tu septiembre contra un mes de la temporada cerrada **no mide nada**, y ese \u2212100 % se lee como un juicio.'},
-        {cara:'movil', vista:'horas', txt:'\u2705 Ahora la fila sale **si y s\u00f3lo si es el mes inmediatamente anterior**. Si el panel trae otro, no se pinta. Y si ese mes **no existe en tu historial**, tampoco: no se puede comparar contra un mes que no hubo.'},
-        {cara:'movil', vista:'horas', txt:'\u26a0\ufe0f Lo que **no** se hizo: quitar la comparaci\u00f3n entera. Eso ya pas\u00f3 una vez y lo cazaste (\u00ab\u00bfy por qu\u00e9 ya no me aparece?\u00bb). Con un mes anterior de verdad, la fila sigue saliendo.'}
-      ] },
-    { id:'2026-09-10-version-nueva', fecha:'2026-09-10',
-      titulo:'La app te avisa cuando hay una versi\u00f3n nueva',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Guardarla en el m\u00f3vil hac\u00eda que abriera al instante, y el precio era que **la primera apertura te ense\u00f1aba la de ayer**. T\u00fa lo viste: \u00abno me lleg\u00f3 nada a la app ni siquiera ninguna novedad\u00bb.'},
-        {cara:'movil', vista:'estado', txt:'Ahora **sigue abriendo al instante** y, cuando por detr\u00e1s llega algo distinto, sale abajo una barra: \u00abHay una versi\u00f3n nueva de la app\u00bb, con **Actualizar** y **Ahora no**.'},
-        {cara:'movil', vista:'estado', txt:'\u26d4 **No se recarga sola, y es a prop\u00f3sito**: si est\u00e1s marcando disponibilidad o escribiendo un motivo, un refresco te lo borrar\u00eda. Decides t\u00fa.'},
-        {cara:'movil', vista:'estado', txt:'Y **no sale la primera vez** que abres la app \u2014ah\u00ed no hay versi\u00f3n nueva, hay **la primera**\u2014 ni cuando no se puede saber si algo cambi\u00f3: avisar sin base ser\u00eda una barra en cada carga.'}
-      ] },
-    { id:'2026-09-10-abre-rapido', fecha:'2026-09-10',
-      titulo:'La app tardaba en abrir \u00aba veces\u00bb, y ahora se guarda en el m\u00f3vil',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Abrir la app se descargaba **entera cada vez**: **13 peticiones y 378 KB** por la red. Y el servidor dice \u00abvale diez minutos\u00bb, as\u00ed que pasados esos diez minutos **las trece se vuelven a pedir** \u2014 de ah\u00ed el \u00aba veces\u00bb, que depend\u00eda de cu\u00e1nto hac\u00eda que la hab\u00edas abierto.'},
-        {cara:'movil', vista:'estado', txt:'Ahora **se queda guardada en el tel\u00e9fono** y arranca con lo que ya tiene, mientras busca lo nuevo por detr\u00e1s. \u26a0\ufe0f El precio: **la primera vez despu\u00e9s de publicar puedes ver la versi\u00f3n de antes**; la siguiente ya es la nueva. Y esta primera apertura a\u00fan no lo notas \u2014 es la que llena el gu\u00e1rdate.'},
-        {cara:'movil', vista:'estado', txt:'\u26d4 Lo que **no** se guarda, a prop\u00f3sito: nada de lo que manda datos (fichajes, sanciones), nada del servidor, y nada del otro canal. Guardar una respuesta del servidor ser\u00eda ense\u00f1arte el panel del equipo **desde el disco del m\u00f3vil y viejo**.'}
-      ] },
-    { id:'2026-09-10-barra-abajo', fecha:'2026-09-10',
-      titulo:'La barra de abajo tapada en Android: era el enlace, no la app',
-      items:[
-        {cara:'movil', vista:'estado', txt:'La barra sal\u00eda **debajo de los botones de Android** hasta minimizar y volver a abrir. Medido en tu m\u00f3vil: la ventana mide **791 px** y el hueco donde cabe la app **735** \u2014 esos **56 px** son la barra de gestos, y el sistema **no nos dice** que est\u00e1n ah\u00ed.'},
-        {cara:'movil', vista:'estado', txt:'\u2705 Lo que lo arregla de verdad es **entrar por el enlace directo** (`\u2026/solaris-panel/beta/`) en vez del atajo viejo, que pasa por un redirector y por el camino pierde el modo aplicaci\u00f3n. \u26a0\ufe0f Hay que **reinstalar el acceso directo**: el que ya tengas apunta al viejo.'},
-        {cara:'movil', vista:'estado', txt:'Y de propina la app se **re-mide sola** al volver al frente, girar el m\u00f3vil o volver de atr\u00e1s, que es lo que antes hac\u00edas t\u00fa a mano minimizando.'}
-      ] },
-    { id:'2026-09-06-raso-ordenador', fecha:'2026-09-06',
-      titulo:'Desde el ordenador, quien no coordina no pod\u00eda contestar su disponibilidad',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'El ordenador ped\u00eda **el mapa de todo el equipo** para poder pintar tu rejilla, y ese mapa **solo lo puede ver quien reparte los turnos**. As\u00ed que a todo el mundo salvo a la coordinaci\u00f3n le sal\u00eda **\u00abNo se pudo preguntar al servidor\u00bb** y se quedaba **sin poder contestar**. Y el aviso era falso: el servidor contestaba perfectamente.'},
-        {cara:'escritorio', vista:'turnos', txt:'Ahora, si no te toca ver el mapa, el ordenador pide **solo lo tuyo** y puedes marcar y guardar igual que en el m\u00f3vil. Donde antes estaba el mapa del equipo sale **\u00abel mapa de todo el equipo es para quien reparte los turnos\u00bb**, en vez de un error. Y si de verdad se cae el servidor, **el aviso vuelve a salir** \u2014 se ha mudado al \u00fanico sitio donde es verdad.'}
-      ] },
-    { id:'2026-09-06-plazo-con-hora', fecha:'2026-09-06',
-      titulo:'El plazo de una semana depend\u00eda de C\u00d3MO se hubiera escrito la fecha',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'Si el l\u00edmite se escribi\u00f3 con hora \u2014**\u00ab14/09/2026 22:00\u00bb**, que es como se teclea\u2014 la app no lo entend\u00eda y el d\u00eda del plazo sal\u00eda **cerrado o abierto seg\u00fan la decena del d\u00eda**, no seg\u00fan la fecha. Medido: **139 de 336** d\u00edas contestaban distinto del mismo d\u00eda escrito en la otra forma. Ahora las dos formas dicen lo mismo.'},
-        {cara:'movil', vista:'turnos', txt:'Y el **desde cu\u00e1ndo** se puede contestar no pasaba por ning\u00fan sitio: una semana que abr\u00eda **el 1 de octubre** se ofrec\u00eda como abierta \u2014contestar un plazo que a\u00fan no ha empezado\u2014 y una que abri\u00f3 **el 12 de agosto** sal\u00eda sin abrir, o sea que **la semana desaparec\u00eda de la pantalla**.'}
-      ] },
-    { id:'2026-09-06-semana-sin-abrir', fecha:'2026-09-06',
-      titulo:'El tel\u00e9fono dec\u00eda que no hab\u00eda semana convocada teni\u00e9ndola',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Y en el ordenador era peor: el panel **\u00abTu disponibilidad\u00bb desaparec\u00eda entero**, sin una palabra, mientras el mapa de al lado pintaba **esa misma semana** con su plazo y la lista de qui\u00e9n no ha contestado. Ahora sale la semana con las casillas en gris y **cu\u00e1ndo se abre**, y el bot\u00f3n de guardar no aparece hasta que empieza el plazo.'},
-        {cara:'movil', vista:'turnos', txt:'Desde que se convoca una semana hasta que se abre el plazo pueden pasar **d\u00edas**, y en todo ese rato la pantalla dec\u00eda **\u00abahora mismo no hay ninguna semana convocada\u00bb** \u2014 teni\u00e9ndola. Ahora sale **la semana entera**: qu\u00e9 d\u00edas, qu\u00e9 franjas y **cu\u00e1ndo se abre**. Las casillas se ven en gris y no se pueden marcar hasta que empiece el plazo, que es cuando el equipo recibe el aviso.'}
-      ] },
-    { id:'2026-09-06-minimo-rotulo', fecha:'2026-09-06',
-      titulo:'El panel de riesgo dec\u00eda que el m\u00ednimo lo hab\u00eda fijado alguien, y no',
-      items:[
-        {cara:'escritorio', vista:'dispo', txt:'Debajo de cada nombre en riesgo se le\u00eda **\u00abN franjas (lo fij\u00f3 quien convoca)\u00bb** \u2014 tambi\u00e9n en reuniones donde **nadie fij\u00f3 nada**, que hoy son **todas**: ese campo no lo escribe ning\u00fan sitio en producci\u00f3n. Ahora, cuando el m\u00ednimo lo calcula la app, se dice **contra qu\u00e9 porcentaje y sobre cu\u00e1ntas franjas** \u2014 \u00ab3 franjas (30 % de 8)\u00bb \u2014, que es lo que hace falta para discutir un \u00ab\u22121 punto\u00bb.'}
-      ] },
-    { id:'2026-09-06-just-duplicada-movil', fecha:'2026-09-06',
-      titulo:'El m\u00f3vil repet\u00eda la tarea debajo de s\u00ed misma al firmar horas',
-      items:[
-        {cara:'movil', vista:'horas', txt:'En la ficha con la que se **firman** horas, una justificaci\u00f3n que repet\u00eda la tarea sal\u00eda **otra vez debajo** \u2014 y una de s\u00f3lo espacios dejaba una **caja con borde y nada dentro**. El ordenador ya lo filtraba desde el 18/08; el tel\u00e9fono, que es la cara con la que se firma, no. Ahora las dos usan la misma regla, y lo que S\u00cD aporta se sigue viendo entero.'},
-        {cara:'movil', vista:'horas', txt:'Y en **\u00abTus partes\u00bb** tampoco se repite: esa lista lo le\u00eda por otro campo, as\u00ed que el mismo parte sal\u00eda duplicado en la otra lista de la misma pantalla. \u26a0\ufe0f Lo que **no** cambia es el *\u00abte piden: \u2026\u00bb* de un parte al que se le pide detalle: ah\u00ed se sigue ense\u00f1ando la pregunta entera, aunque coincida con la tarea.'}
-      ] },
-    { id:'2026-08-24-push-sin-suscripcion', fecha:'2026-08-24',
-      titulo:'Las notificaciones pod\u00edan salir en verde sin que llegara ni un aviso',
-      items:[
-        {cara:'movil', vista:'estado', txt:'**Con el permiso dado pero sin suscripci\u00f3n, la app se quedaba callada**: no re-suscrib\u00eda a nadie y no dejaba se\u00f1al, as\u00ed que las dos caras dec\u00edan \u00abactivadas\u00bb y no llegaba **ni un aviso**. Ahora lo dice, y te manda volver a entrar para reactivarlos.'},
-        {cara:'escritorio', vista:'estado', txt:'**Con el permiso dado pero sin suscripci\u00f3n, la app se quedaba callada**: no re-suscrib\u00eda a nadie y no dejaba se\u00f1al, as\u00ed que las dos caras dec\u00edan \u00abactivadas\u00bb y no llegaba **ni un aviso**. Ahora lo dice, y te manda volver a entrar para reactivarlos.'}
-      ] },
-    { id:'2026-08-24-visor-cargando', fecha:'2026-08-24',
-      titulo:'El visor de documentos no dec\u00eda \u00abCargando\u00bb: ense\u00f1aba un rect\u00e1ngulo gris mudo',
-      items:[
-        /* ⛔ UNA ENTRADA POR CARA, no `cara:'ambas'`: `probar_novedades.py` se pone rojo
-           porque una cara desconocida **no casa con el filtro y el punto DESAPARECE**. */
-        {cara:'movil', vista:'docs', txt:'**Al abrir un documento sal\u00eda un bloque gris de 280-340 px sin una palabra**, hasta **6 segundos**. El aviso \u00abCargando el documento\u2026\u00bb s\u00ed se escrib\u00eda \u2014 y se borraba **cuatro sentencias despu\u00e9s, en el mismo instante**, antes de que la pantalla llegara a pintarlo. Quien revisaba no sab\u00eda si esperar o si estaba roto.'},
-        {cara:'escritorio', vista:'docs', txt:'**Al abrir un documento sal\u00eda un bloque gris de 280-340 px sin una palabra**, hasta **6 segundos**. El aviso \u00abCargando el documento\u2026\u00bb s\u00ed se escrib\u00eda \u2014 y se borraba **cuatro sentencias despu\u00e9s, en el mismo instante**, antes de que la pantalla llegara a pintarlo. Quien revisaba no sab\u00eda si esperar o si estaba roto.'},
-        {cara:'movil', vista:'docs', txt:'**Ahora el aviso se queda hasta que el visor carga**, y desaparece justo cuando hay algo que mirar. Si a los 6 s no ha cargado, sigue diciendo por qu\u00e9 y ofreciendo el enlace de Drive.'},
-        {cara:'escritorio', vista:'docs', txt:'**Ahora el aviso se queda hasta que el visor carga**, y desaparece justo cuando hay algo que mirar. Si a los 6 s no ha cargado, sigue diciendo por qu\u00e9 y ofreciendo el enlace de Drive.'}
-      ] },
-    { id:'2026-08-23-pie-turnos-unidad', fecha:'2026-08-23',
-      titulo:'El pie de Turnos mezclaba horas y casillas en la misma frase',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'**De los cuatro contadores del pie, s\u00f3lo uno estaba en horas.** Con turnos de 4 h, un solo \u00abno puedo\u00bb sobre un turno entero pinta cuatro celdas, as\u00ed que el pie dec\u00eda **\u00abno puedo en 4\u00bb** \u2014 que se lee como cuatro negativas cuando has dicho **una** cosa. Es el mismo malentendido que ya se hab\u00eda arreglado para \u00abmarcadas\u00bb, dos operandos m\u00e1s all\u00e1.'},
-        {cara:'movil', vista:'turnos', txt:'**Y \u00absin contestar\u00bb contaba celdas.** Con la convocatoria horaria son **91 celdas**, as\u00ed que quien no hab\u00eda tocado nada le\u00eda \u00ab91 sin contestar\u00bb y ve\u00eda el n\u00famero bajar **de cuatro en cuatro** al marcar un turno. Ahora los cuatro dicen horas y sus turnos: \u00abno puedo en 4 h (1 turno)\u00bb.'}
-      ] },
-    { id:'2026-08-23-plazo-portero-movil', fecha:'2026-08-23',
-      titulo:'La pantalla de Turnos del m\u00f3vil pod\u00eda decir que no hay ninguna semana convocada habi\u00e9ndola',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'**El portero de la pantalla de Turnos le\u00eda el plazo con otro criterio que el r\u00f3tulo de al lado.** El que decide **si la rejilla existe** se hab\u00eda quedado sin arreglar, as\u00ed que con un plazo escrito como fecha sin hora la pantalla pod\u00eda escribir \u00abahora mismo no hay ninguna semana convocada\u00bb el mismo d\u00eda del plazo, mientras el r\u00f3tulo de arriba dec\u00eda \u00abte quedan 14 h\u00bb. Quien no contesta por eso se lleva un Art. 30g.'},
-        {cara:'movil', vista:'turnos', txt:'**Y el m\u00f3vil tiraba la respuesta del servidor sobre el plazo.** El servidor la manda en cada carga \u2014y es su reloj el que acepta o rechaza lo que env\u00edes\u2014; el escritorio ya la le\u00eda y esta cara, que es donde contest\u00e1is los 32, decid\u00eda con **el reloj del tel\u00e9fono**. Ahora manda el servidor: s\u00f3lo puede cerrar, nunca adelantar una semana que a\u00fan no ha abierto.'}
-      ] },
-    { id:'2026-08-23-plazo-un-solo-criterio', fecha:'2026-08-23',
-      titulo:'El r\u00f3tulo del plazo dec\u00eda \u00abte quedan N h\u00bb sobre plazos ya cerrados',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'**Un plazo con la fecha en formato `DD/MM/AAAA` se le\u00eda con el d\u00eda y el mes cambiados.** As\u00ed que un plazo muerto el 9 de enero se tomaba por el 1 de septiembre y la tarjeta rotulaba \u00abte quedan N h para contestar\u00bb: se contestaba un plazo cerrado, y esa respuesta no cuenta. Medido: **76 de 264** combinaciones de fecha contestaban distinto seg\u00fan qui\u00e9n preguntara.'},
-        {cara:'escritorio', vista:'turnos', txt:'**Y al rev\u00e9s: una fecha sin hora cerraba el plazo el d\u00eda entero.** \u00abCierra el 20/08\u00bb significa que tienes el 20 \u2014 y sal\u00eda cerrado desde la medianoche.'},
-        {cara:'escritorio', vista:'turnos', txt:'**Ahora manda el servidor.** \u00c9l ya dec\u00eda en cada respuesta si el plazo sigue abierto \u2014y es su reloj el que acepta o rechaza lo que env\u00edes\u2014, pero la pantalla guardaba ese dato y no lo miraba nunca. Cuando dice que est\u00e1 cerrado, la tarjeta lo dice.'}
-      ] },
-    { id:'2026-08-23-rejilla-turnos-movil', fecha:'2026-08-23',
-      titulo:'Tu rejilla de turnos sal\u00eda en blanco, y los pinceles no eran los de esa semana',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'**Mirando la app como otra persona, tu rejilla de disponibilidad sal\u00eda vac\u00eda.** El servidor manda **tus** celdas \u2014te reconoce por la sesi\u00f3n, no por a qui\u00e9n est\u00e9s mirando\u2014 y la pantalla las guardaba bajo el nombre de la otra persona, as\u00ed que al buscarlas no las encontraba: rejilla en blanco y el pie diciendo \u00abte faltan N por contestar\u00bb a quien ya hab\u00eda contestado. Y **no se arreglaba al volver a tu nombre**: se pide una sola vez por carga.'},
-        {cara:'movil', vista:'turnos', txt:'**Y los botones de pincel eran siempre los mismos cuatro** \u2014CUVI, CITI, Los dos, No puedo\u2014 sin mirar qu\u00e9 sitios se hab\u00edan convocado esa semana. En una semana de un solo sitio se pod\u00eda marcar uno **al que nadie va**, y esa marca se quedaba pegada a la celda al repintar. Ahora los botones son los de **esa** convocatoria, y el que viene marcado tambi\u00e9n.'}
-      ] },
-    { id:'2026-08-23-escritorio-disponibilidad', fecha:'2026-08-23',
-      titulo:'El escritorio no hab\u00eda recibido nunca la disponibilidad de nadie',
-      items:[
-        {cara:'escritorio', vista:'dispo', txt:'**El panel de escritorio ped\u00eda la reuni\u00f3n al servidor y tiraba la respuesta.** El servidor manda las disponibilidades en un campo llamado `respuestas` y esta cara le\u00eda uno llamado `resp`, que no existe \u2014 as\u00ed que la rejilla, el mapa de calor y el recuento se quedaban con lo que hubiera al entrar. El m\u00f3vil ya lo le\u00eda bien.'},
-        {cara:'escritorio', vista:'dispo', txt:'**Y lo que sal\u00eda en su lugar acusaba a gente que s\u00ed hab\u00eda cubierto.** Con una reuni\u00f3n de 18 convocados y 14 cubiertas, el panel dec\u00eda **0 han cubierto** y listaba a **17 personas** en \u00abquien falta\u00bb, cada una con su chip de la sanci\u00f3n que le tocar\u00eda. Ahora dice 14 y 4.'},
-        {cara:'escritorio', vista:'dispo', txt:'**Y las reuniones OCULTAS volv\u00edan a ense\u00f1ar lo que t\u00fa pediste esconder.** En ese modo el servidor manda **s\u00f3lo tu fila**, y la protecci\u00f3n que hay para no inventar la lista nominal **no pod\u00eda dispararse**, porque la se\u00f1al viajaba en el mismo paquete que se estaba tirando. Medido: 16 nombres donde no deb\u00eda salir ninguno.'},
-        {cara:'escritorio', vista:'convoc', txt:'**Y \u00abEliminar reuni\u00f3n\u00bb no hac\u00eda nada.** Llamaba a una funci\u00f3n que se hab\u00eda mudado de sitio hace tres d\u00edas y cambiado de nombre: el bot\u00f3n fallaba en silencio, **antes incluso de preguntarte si estabas seguro**.'}
-      ] },
-    { id:'2026-08-22-boton-sin-boton', fecha:'2026-08-22',
-      titulo:'El bot\u00f3n de guardar de Reuniones no parec\u00eda un bot\u00f3n, y deshabilitado se ve\u00eda igual',
-      items:[
-        {cara:'escritorio', vista:'reuniones', txt:'**El \u00fanico bot\u00f3n de la pantalla \u2014\u00abGuardar mi disponibilidad\u00bb\u2014 sal\u00eda sin fondo, sin borde y sin relleno**, indistinguible del texto de ayuda que lleva justo al lado. Y **deshabilitado se ve\u00eda exactamente igual que activo**, con la manita del cursor: se pod\u00eda pulsar y no pasaba nada. Le faltaba **una palabra** en la clase \u2014 el fichero de al lado (Turnos) lo hac\u00eda bien, y este mismo lo hac\u00eda bien dos veces de tres.'},
-        {cara:'escritorio', vista:'turnos', txt:'**El formulario de \u00abCerrar un turno\u00bb ten\u00eda el r\u00f3tulo y el campo en la misma l\u00ednea, y los dos desplegables sin estilo ninguno** \u2014 con el aspecto por defecto del navegador, no el de la app. La hoja del escritorio **no ten\u00eda ni una regla para `select`**.'},
-        {cara:'escritorio', vista:'estado', txt:'**La pantalla de Novedades sal\u00eda sin tarjeta**, con el t\u00edtulo a tama\u00f1o de texto normal y el subt\u00edtulo igual de brillante que el cuerpo. Y las notas al pie de las fichas, tambi\u00e9n a tama\u00f1o de cuerpo con el margen que les pone el navegador.'},
-        {cara:'escritorio', vista:'estado', txt:'**Todo esto era la misma causa**: el escritorio carga **una sola hoja de estilos**, y cinco clases que sus pantallas usan viv\u00edan **solo en la del m\u00f3vil**. Una clase que llega y no encuentra su regla **no da ning\u00fan error** \u2014 el elemento sale, ocupa su sitio y no se parece a lo previsto. Ahora lo vigila un banco, **por nombre**.'}
-      ] },
-    { id:'2026-08-21-disponibilidad-muda', fecha:'2026-08-21',
-      titulo:'La disponibilidad de turnos desaparec\u00eda sin decir nada, y no volv\u00eda',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'**Si el servidor no contestaba, los dos paneles de disponibilidad se borraban de la pantalla sin una palabra** \u2014 el mapa de calor y \u00abTu disponibilidad\u00bb\u2014, y **no volv\u00edan en toda la sesi\u00f3n**: se preguntaba una sola vez y nada reabr\u00eda esa puerta. Quien iba a contestar perd\u00eda la semana entera sin enterarse, y quien reparte turnos se quedaba sin mapa sin saber por qu\u00e9. Ahora la pantalla **lo dice** y trae **Reintentar**.'},
-        {cara:'escritorio', vista:'turnos', txt:'**Vaciar el mapa segu\u00eda siendo lo correcto** \u2014 con uno de mentira se reparte gente de verdad, y eso no se ha tocado. Lo que faltaba era la otra mitad: **decir que no se pudo preguntar** en vez de dejar el hueco. Es lo que \u00abSesiones abiertas ahora mismo\u00bb y los avisos del m\u00f3vil ya hac\u00edan en esta misma cara.'}
-      ] },
-    { id:'2026-08-21-en-curso-movil', fecha:'2026-08-21',
-      titulo:'«En curso» en el móvil listaba también lo ya cerrado, y repetía lo tuyo',
-      items:[
-        {cara:'movil', vista:'docs', txt:'**La lista «En curso» traía el pipeline entero, no lo que sigue en vuelo.** Bajo el título «Todos los expedientes abiertos ahora mismo» salían también los **publicados** —con su píldora verde— y los **rechazados**, que están cerrados a propósito; a fin de temporada esa lista era el histórico completo. Ahora pasa por la misma puerta que el escritorio.'},
-        {cara:'movil', vista:'docs', txt:'**Y todo lo de «Pendiente de tu revisión» salía otra vez debajo**, en la misma pantalla y con el mismo contador: eran la misma lista, una filtrada y la otra no. Ahora las dos son disjuntas, como en el escritorio.'},
-        {cara:'escritorio', vista:'docs', txt:'**El chip de calidad del expediente abierto tenía su propia copia de la regla de color.** La lista y la ficha la pintaban por caminos distintos, así que arreglar una dejaba la otra igual — que es como nació la divergencia del «verde para lo que no se ha medido». Ahora las dos llaman a la misma función.'}
-      ] },
-    { id:'2026-08-20-sancionables-sin-unidad', fecha:'2026-08-20',
-      titulo:'El r\u00f3tulo contaba a alguien que la lista no pod\u00eda ense\u00f1arte',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'**\u00abN personas bajo tu jurisdicci\u00f3n\u00bb contaba a una persona m\u00e1s de las que sal\u00edan en la lista.** A quien no tuviera subsistema puesto se le hac\u00eda un caj\u00f3n aparte y acto seguido se tiraba, as\u00ed que **no se le pod\u00eda sancionar desde ninguna de las dos caras** \u2014 ni verla, ni marcarla. Hoy no le pasa a nadie del equipo; le pasar\u00eda a la primera alta de septiembre que llegue sin subsistema.'},
-        {cara:'escritorio', vista:'sanciones', txt:'**Y con la caja de b\u00fasqueda vac\u00eda pon\u00eda \u00abNadie con ese filtro\u00bb**, que manda a borrar una b\u00fasqueda que no has escrito. Ahora distingue \u00abno hay nadie\u00bb de \u00abtu filtro no encuentra a nadie\u00bb.'}
-      ] },
-    { id:'2026-08-20-borrar-reunion-cuenta', fecha:'2026-08-20',
-      titulo:'\u00abTodav\u00eda no la ha cubierto nadie\u00bb, y detr\u00e1s se borraban 14 respuestas',
-      items:[
-        {cara:'movil', vista:'reu', txt:'**Al eliminar una reuni\u00f3n, el aviso pod\u00eda decir que no la hab\u00eda cubierto nadie cuando s\u00ed.** Contaba solo a quien hab\u00eda marcado alg\u00fan hueco, y solo si el detalle ya hab\u00eda llegado del servidor \u2014 que nada m\u00e1s abrir la ficha normalmente **no ha llegado**. As\u00ed que una reuni\u00f3n cubierta por catorce personas se anunciaba como vac\u00eda justo antes de borrarla, y eso no se deshace. Ahora cuenta igual que el escritorio: por el n\u00famero que da el servidor, y contando tambi\u00e9n a quien contest\u00f3 \u00abno puedo ning\u00fan d\u00eda\u00bb.'}
-      ] },
-    { id:'2026-08-20-turno-entero-escritorio', fecha:'2026-08-20',
-      titulo:'Marcabas el turno en el escritorio y declarabas una hora',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'**Un clic en la rejilla de disponibilidad marcaba UNA franja, no el turno.** Ve\u00edas la casilla pintada, guardabas, y hab\u00edas declarado **una hora** cuando un turno son **cuatro**. No saltaba ning\u00fan aviso: en el reparto sal\u00eda un turno corto y nadie sab\u00eda por qu\u00e9 \u2014 con la misma pantalla dici\u00e9ndote que no contestar es lo que hace que te pongan un turno que no puedes. Ahora un clic marca el turno entero, igual que en el m\u00f3vil, y volver a pulsarlo lo quita entero.'}
-      ] },
-    { id:'2026-08-20-cuota-sin-dato', fecha:'2026-08-20',
-      titulo:'\u00ab0,00 \u20ac al a\u00f1o\u00bb cuando lo que pasa es que tu cuota no ha llegado',
-      items:[
-        {cara:'movil', vista:'estado', txt:'**La cifra grande de \u00abTu cuota\u00bb pod\u00eda decir 0,00 \u20ac al a\u00f1o, en verde, sin que eso fuera verdad.** Pasaba cuando el servidor a\u00fan no hab\u00eda mandado tu cuota: la pantalla pintaba el hueco como si fuera un cero. Y un cero ah\u00ed se lee como \u00abno pagas\u00bb \u2014 que es lo contrario de \u00abtodav\u00eda no se sabe\u00bb, y lo \u00fanico que te dar\u00eda una raz\u00f3n para no reservar el dinero. Ahora pone \u00ab\u2014\u00bb y lo explica. La versi\u00f3n de escritorio ya lo hac\u00eda as\u00ed.'}
-      ] },
-    { id:'2026-08-20-plazo-y-semilla', fecha:'2026-08-20',
-      titulo:'Con el servidor ca\u00eddo ve\u00edas una convocatoria de mentira, y el plazo dec\u00eda 0 h media hora antes',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'**Si el servidor no contestaba, la pantalla se quedaba con la convocatoria de DEMOSTRACI\u00d3N.** Marcaba el error, s\u00ed, pero no borraba lo que hab\u00eda debajo \u2014 as\u00ed que se ve\u00eda una rejilla con d\u00edas y horas que **no exist\u00edan**, y quien contestaba estaba contestando a un plazo inventado. Ahora, si no hay datos, no hay rejilla.'},
-        {cara:'movil', vista:'estado', txt:'**El recibo de la cuota pon\u00eda \u00ab\u2212-24,18 \u20ac\u00bb, con dos signos menos.** Pasaba cuando el servidor a\u00fan no hab\u00eda mandado tu cuota base y ten\u00edas descuento por coche. La l\u00ednea de al lado \u2014la de exento\u2014 ya se proteg\u00eda de eso, y el escritorio tambi\u00e9n; faltaba \u00e9sta. Ahora pone \u00ab\u2014\u00bb y lo dice.'},
-        {cara:'escritorio', vista:'turnos', txt:'**\u00abTe quedan 0 h\u00bb durante la \u00faltima media hora, con la rejilla todav\u00eda abierta.** El r\u00f3tulo redondeaba a horas, as\u00ed que cualquier plazo por debajo de 60 minutos sal\u00eda como cero y parec\u00eda cerrado. Ahora los \u00faltimos minutos se dicen **en minutos**, y \u00abcerrado\u00bb s\u00f3lo cuando lo est\u00e1.'}
-      ] },
-    { id:'2026-08-20-cuota-poblacion', fecha:'2026-08-20',
-      titulo:'La cuota que ve\u00edas en directo se calculaba con una sola persona: t\u00fa',
-      items:[
-        {cara:'movil', vista:'estado', txt:'**Si no eres el Project Director, tu cuota \u00abse recalcula con tus horas de ahora mismo\u00bb sal\u00eda mal.** El servidor te manda **tu** ficha entera y de los dem\u00e1s s\u00f3lo el nombre \u2014por privacidad\u2014, as\u00ed que la cuenta en directo se hac\u00eda con una poblaci\u00f3n de **una** persona: t\u00fa. Y con eso el resultado se clavaba en **20,00 \u20ac** para casi cualquier ritmo.'},
-        {cara:'escritorio', vista:'estado', txt:'**Siempre por debajo, y m\u00e1s cuanto menos horas.** A 8 h/mes se ense\u00f1aban 20,00 \u20ac donde tocan **34,95**. Ahora, cuando no hay poblaci\u00f3n suficiente para hacer la cuenta, se ense\u00f1a la cifra que calcul\u00f3 el servidor con las 32 \u2014y se dice que es esa\u2014, en vez de inventar una con una muestra de uno.'}
-      ] },
-    { id:'2026-08-20-objetivo-primer-mes', fecha:'2026-08-20',
-      titulo:'El objetivo del mes deja de congelarse al empezar temporada',
-      items:[
-        {cara:'movil', vista:'estado', txt:'**El \u00abobjetivo\u00bb de la barra de horas se quedaba clavado en 11,8 h todo septiembre.** Al empezar temporada no hay ning\u00fan mes cerrado, y la pantalla le\u00eda eso como \u00abno hay datos\u00bb \u2014 tirando tambi\u00e9n las horas del mes en curso, que **s\u00ed** son un dato. As\u00ed que ense\u00f1aba el valor de la temporada **vieja**: el 1 de septiembre el motor dice **8,0 h** y la barra dec\u00eda 11,8.'},
-        {cara:'escritorio', vista:'estado', txt:'**Y con ello el chip OBJETIVO, la columna \u00abvs. objetivo\u00bb y qui\u00e9n sale en verde o en rojo.** No es que el n\u00famero fuera alto: es que **no se mov\u00eda**. Con el equipo a 30 h/mes el objetivo real son 15,0 h y la pantalla segu\u00eda diciendo 11,8, o sea corta. Ahora sigue las horas de verdad desde el primer d\u00eda.'}
-      ] },
-    { id:'2026-08-20-exencion-primer-mes', fecha:'2026-08-20',
-      titulo:'El primer mes ya no lleva cuota tambi\u00e9n en la app',
-      items:[
-        {cara:'movil', vista:'estado', txt:'**Quien est\u00e1 en su primer mes ve 0,00 \u20ac, y ve POR QU\u00c9.** Lo decidiste el 15/08 \u2014*\u00abel primer mes\u2026 deber\u00edan no ponerle la cuota\u00bb*\u2014 y el motor lo aplicaba desde entonces, pero **la pantalla no se hab\u00eda enterado**: calculaba la cuota en directo sin saber de la exenci\u00f3n. El 1 de septiembre las 32 pas\u00e1is a cero meses cerrados a la vez, y ah\u00ed la curva clava **67,80 \u20ac** \u2014la cuota m\u00e1s cara que existe\u2014 mientras lo archivado son **0,00**.'},
-        {cara:'escritorio', vista:'estado', txt:'**Y el perd\u00f3n ya no se le cuelga al coche.** El recibo calculaba el descuento como *base menos lo que pagas*, as\u00ed que con la exenci\u00f3n el importe entero sal\u00eda como \u00abPor poner el coche \u00b7 0 turnos\u00bb \u2014a quien no ha conducido nunca. Ahora tiene su propia l\u00ednea, **Tu primer mes**: un 0 \u20ac sin motivo al lado no se distingue de un 0 \u20ac por el suelo del descuento del coche.'}
-      ] },
-    { id:'2026-08-19-subcoordinacion-en-las-caras', fecha:'2026-08-19',
-      titulo:'Una subcoordinaci\u00f3n ya cuenta como coordinaci\u00f3n en las dos caras',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'**Quien tiene una subcoordinaci\u00f3n ya ve los paneles de coordinaci\u00f3n.** El servidor le daba rango de coordinaci\u00f3n \u2014por eso le dejaba entrar al ordenador\u2014 y una vez dentro las pantallas no le ense\u00f1aban **ninguno**: ni convocar turno, ni el bloque de horas, ni el desglose de disponibilidad con nombres. La pantalla ten\u00eda el dato bueno y preguntaba a otro sitio.'},
-        {cara:'movil', vista:'reu', txt:'**Y en el tel\u00e9fono ya puede convocar algo que no sea una reuni\u00f3n de trabajo.** El m\u00f3vil decid\u00eda mirando s\u00f3lo el **cargo**, as\u00ed que a quien tiene gente a su cargo sin figurar como coordinador le ofrec\u00eda un solo tipo \u2014mientras el ordenador y el servidor le admit\u00edan los seis.'}
-      ] },
-    { id:'2026-08-19-docs-ninguna-lista', fecha:'2026-08-19',
-      titulo:'Documentos: ya no se pierde ningún expediente entre las listas',
-      items:[
-        {cara:'escritorio', vista:'docdec', txt:'**«Publicados» ahora es «Resueltos»**, y lista también los **rechazados**. Antes, al rechazar un expediente desaparecía de las tres vistas —también para su autor, que aquí no tiene ninguna lista propia—, así que se lo rechazaban y no se enteraba por esta pantalla.'},
-        {cara:'escritorio', vista:'docurso', txt:'**Y «En curso» ya no se deja fuera lo que se está publicando.** Cuando el pipeline vuelve a publicar un documento, queda un rato en «publicando»: hasta ahora ese estado no salía ni aquí ni en publicados, así que el expediente **desaparecía de la pantalla** mientras duraba. Los números del menú y las listas salen ya del mismo sitio, así que no pueden decir cosas distintas.'},
-        {cara:'movil', vista:'docs', txt:'**El segundo revisor ve «En curso» en el teléfono.** El servidor le mandaba el pipeline entero del equipo y la pantalla sólo se lo enseñaba al Project Director — y si no tenía nada propio, le decía «Nada por aquí» teniendo la lista cargada.'}
-      ] },
-    { id:'2026-08-19-docs-anotaciones-y-calidad', fecha:'2026-08-19',
-      titulo:'Documentos: el título de «con anotaciones», tus etiquetas y el chip de calidad',
-      items:[
-        {cara:'movil', vista:'docs', txt:'**«Aprobar con anotaciones» ahora te pide el título** antes de mandarlo, como ya hacía el ordenador. Antes salía sin él: el documento quedaba diciendo que le habías ajustado el título y las etiquetas **sin haber ajustado nada**, y al autor no se le podía decir qué le habías cambiado.'},
-        {cara:'movil', vista:'docs', txt:'**Y ya no se pierden tus etiquetas.** Si dejabas el título en blanco se caían también las etiquetas que acababas de escribir — y como el teléfono sí te las enseñaba cambiadas, **volvían solas** al refrescar. Vaciarlas del todo sigue valiendo: es una decisión tuya, no un descuido.'},
-        {cara:'movil', vista:'docs', txt:'**El chip de calidad ya no miente.** Una calidad que el pipeline no sepa medir salía en **verde** —el color de «salió bien»— y con el texto «calidad undefined». Ahora sale en gris y dice **«calidad sin medir»**, que es lo que se sabe.'}
-      ] },
-    { id:'2026-08-19-coches-no-se-guardaron', fecha:'2026-08-19',
-      titulo:'Si el trayecto de los coches no se guarda, ahora te lo dice',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Al convocar, el turno se crea en Notion y el **trayecto de los coches** se guarda aparte, en el servidor. Si eso segundo falla, el turno sigue existiendo —y así tiene que ser: reintentar te diría «ya hay turno ese día»—, pero **hasta ahora no te enterabas**: salía «Turno convocado en Notion» y los kilómetros no estaban en ningún sitio. El servidor ya lo contestaba; **nadie lo leía**. Ahora, si habías puesto coches y no se guardaron, el aviso te lo dice y te dice qué hacer.'}
-      ] },
-    { id:'2026-08-19-articulo-rri-correcto', fecha:'2026-08-19',
-      titulo:'Dos de los seis motivos de sanción llevaban el artículo cambiado',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'La lista de motivos se ve igual, pero **el artículo que salía era otro**: «no rellenar un formulario» iba como **Art. 30g** —que es el Doodle general— y «no cubrir la disponibilidad» como **30h** —que es el de subsistema **reiterado**, a partir de 2 veces—. ⛔ Y el artículo **no es decoración**: es lo que decide en qué cuenta suma la reincidencia (0 / −1 / −2). 📏 Medido sobre el registro real: si hoy sancionabas por formulario, **10 de 14 personas** habrían recibido puntos distintos de los que les tocan, 9 de ellas **de más** — y su contador de formulario no avanzaba nunca. Ahora salen **29i** y **30g**.'},
-        /* En el móvil las sanciones NO son una pantalla: salen del **menú**
-           (`_abrirSanciones_`, un modal), así que la vista que se señala es la de
-           inicio — igual que el buzón. Lo dice ya la entrada del 18/08 de aquí abajo. */
-        {cara:'movil', vista:'estado', txt:'Lo mismo en el móvil (**menú → Sanciones**): el catálogo es una copia literal del del ordenador, así que el fallo estaba en las dos caras — y ésta es desde la que se sanciona sobre la marcha.'}
-      ] },
-    { id:'2026-08-19-duracion-las-dos-caras', fecha:'2026-08-19',
-      titulo:'Las dos pantallas comparten quién decide por qué no vale una duración',
-      items:[
-        {cara:'escritorio', vista:'horas', txt:'**Las dos pantallas ya preguntan lo mismo**: hay una sola función que decide *cuál* de las cuatro causas invalida una duración, y cada pantalla escribe su frase. Antes cada una decidía por su cuenta, y por eso se contradecían. ⚠️ **Corrección**: aquí ponía que además arreglaba el aviso «con la entrada y la salida en blanco». **No se puede llegar a ese estado**: los campos de hora son desplegables sin opción vacía, así que un bloque nuevo siempre trae una hora puesta. El aviso existe, pero no vas a verlo — y decírtelo como si fuera un cambio visible era falso.'},
-        {cara:'movil', vista:'horas', txt:'En el móvil pasa lo mismo, y con la misma corrección: lo que cambia de verdad es que **las dos caras comparten la decisión**, no que vayas a ver frases nuevas. Un bloque de siete minutos **no se puede escribir** —las horas van de cuarto en cuarto—, así que ese caso no existía en la pantalla aunque el código lo supiera contestar.'}
-      ] },
-    { id:'2026-08-19-por-que-no-vale-la-duracion', fecha:'2026-08-19',
-      titulo:'Cuando una duración no vale, la app dice POR QUÉ',
-      items:[
-        {cara:'escritorio', vista:'horas', txt:'Antes, **cualquier** duración que no valiera —incluida la de pasarse del tope— salía con la misma frase: «La salida tiene que ser posterior a la entrada». Ahora cada causa tiene la suya, así que pasarse de las 14 h te lo dice tal cual en vez de mandarte a mirar unas horas que están bien. ⚠️ **Corregido el 19/08**: aquí ponía que esto arreglaba «un bloque de siete minutos», y **ese bloque no se puede escribir**: los campos de hora son desplegables de **cuarto en cuarto** (96 opciones, sin opción vacía), así que no hay forma de teclear 7 minutos. La frase existía y el caso no.'},
-        {cara:'movil', vista:'horas', txt:'El botón decía «Falta la duración» también cuando la duración **estaba y pasaba del tope** — o sea que te mandaba a rellenar lo que ya tenías puesto. Ahora te dice que son demasiadas horas.'}
-      ] },
-    { id:'2026-08-19-coches-del-turno', fecha:'2026-08-19',
-      titulo:'Los coches de un turno ya se rellenan, y el trayecto se guarda',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Al convocar un turno, **«+ añadir coche» ya funciona**: abre sus dos desplegables —de dónde sale y a dónde va— y, si la vuelta no es la misma, los otros dos. Estaba escrito y **el botón no hacía nada**. ⛔ Y el trayecto **viaja con el turno**: hasta ahora lo único que llegaba era «esta persona lleva coche», **sin decir de dónde a dónde** — y es el trayecto el que decide el descuento de **4 € por turno**. ⚠️ No deja convocar un coche a medias, y al convocar se vacía para que el turno siguiente no arrastre los kilómetros del anterior. ⚠️ Falta decidir en qué columna de Notion cae; hoy vive en el servidor y vuelve con cada turno, y necesita **desplegarlo**.'}
-      ] },
-    { id:'2026-08-19-ritmo-del-motor', fecha:'2026-08-19',
-      titulo:'Tu ritmo h/mes sale del motor, no se lo calcula la pantalla',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La pantalla se calculaba tus **h/mes** por su cuenta dividiendo horas entre meses, en vez de leer el ritmo que ya calcula el motor — que es el que pondera **julio y agosto a la mitad**. Eran dos números para lo mismo. ⚠️ Hoy cambia poco (16 de 32, como mucho **0,37 €**) porque el panel subido se generó sin el histórico; se vuelve correcto cuando se suba uno con él.'},
-        {cara:'escritorio', vista:'ranking', txt:'Lo mismo en la clasificación y en la cuota del escritorio: el ritmo ya no se recalcula aquí.'}
-      ] },
-    { id:'2026-08-19-aviso-documentos', fecha:'2026-08-19',
-      titulo:'La app ya te avisa al móvil de tus documentos',
-      items:[
-        {cara:'escritorio', vista:'ajustes', txt:'El interruptor de **Documentos** ya no dice «hoy no se manda ninguno de este tipo»: ahora sí se mandan. Te llega un aviso cuando **deciden sobre lo tuyo** —aprobado, cambios o rechazado— y, si eres revisor, cuando **entra algo que te toca revisar a ti** por tu unidad o tu cargo, no a los dos revisores fijos. ⛔ Y sigue siendo de los que **puedes apagar** desde aquí.'},
-        {cara:'movil', vista:'docs', txt:'Lo mismo en el móvil: la decisión sobre tu documento te llega sin tener que entrar a mirar. ⚠️ Necesita el despliegue del backend para empezar a funcionar.'}
-      ] },
-    { id:'2026-08-19-sustituir-documento', fecha:'2026-08-19',
-      titulo:'La app ya explica cómo sustituir un documento publicado',
-      items:[
-        {cara:'movil', vista:'docs', txt:'Si tu documento **ya está publicado** y tienes una versión nueva, la ficha te dice los pasos. ⛔ Y **no son los de corregir**: aquí es un envío **nuevo**, marcado como «sustituye a» con la referencia de éste. Seguir los de corregir —misma referencia— **le pisaría el archivo al documento que el equipo está leyendo**. El original no se borra: sigue publicado hasta que aprueben el nuevo.'},
-        {cara:'escritorio', vista:'docs', txt:'Lo mismo en la tarjeta del escritorio, donde además decía «Es tuyo: lo firma X» sobre algo que **ya estaba firmado**.'}
-      ] },
-    { id:'2026-08-19-botones-reunion-verdad', fecha:'2026-08-19',
-      titulo:'Los botones de una reunión ya dicen la verdad',
-      items:[
-        {cara:'movil', vista:'reu', txt:'«Fijar fecha», «Cancelar fijado» y «Orden del día» salían para **cualquier coordinador**, y el servidor solo se los acepta a **quien convocó la reunión** (o al admin). Si no era tuya, abrías el modal, elegías el día, arrastrabas las franjas, pulsabas Confirmar… y te decía que no. Ahora sólo salen si de verdad puedes. ⚠️ Si la convocaste tú, **igual que antes**.'}
-      ] },
-    { id:'2026-08-19-cuota-en-cero-meses', fecha:'2026-08-19',
-      titulo:'La nota de tu cuota ya no dice \u00ab0 meses\u00bb',
-      items:[
-        {cara:'escritorio', vista:'horas', txt:'Debajo del importe explic\u00e1bamos de d\u00f3nde sale: \u00abde tus 132 h de la temporada en 11 meses dentro del equipo\u00bb. Correcto \u2014 salvo si llevas **cero meses cerrados**, donde pon\u00eda \u00aben 0 meses\u00bb y describ\u00eda una divisi\u00f3n que **no se hace**: sin ning\u00fan mes cerrado tus horas se usan **tal cual, sin dividir**. Ahora lo dice as\u00ed, y de paso te explica por qu\u00e9 tampoco sales todav\u00eda en la clasificaci\u00f3n.'},
-        {cara:'escritorio', vista:'horas', txt:'\u26a0\ufe0f Y hab\u00eda un tercer caso escondido: si el panel **no trae** cu\u00e1ntos meses llevas, se pintaba un **0** igual que a quien de verdad no ha cerrado ninguno. No es lo mismo \u2014 uno es un dato y el otro es \u00abno lo s\u00e9\u00bb \u2014, y ahora se distingue.'}
-      ] },
-    { id:'2026-08-19-ranking-numero-fresco', fecha:'2026-08-19',
-      titulo:'El filtro del ranking ya mira un n\u00famero de HOY',
-      items:[
-        {cara:'escritorio', vista:'ranking', txt:'Ayer se puso que quien no ha cerrado ning\u00fan mes no sale en la tabla. El filtro estaba bien \u2014 pero le\u00eda un n\u00famero que **s\u00f3lo se refrescaba al recalcular el umbral**, no al subir el panel: pod\u00eda ser de hace d\u00edas. Ahora se reescribe **cada vez que se arma el panel**.'},
-        {cara:'escritorio', vista:'ranking', txt:'\u26a0\ufe0f **Y por qu\u00e9 importa la fecha**: el **1 de septiembre** la temporada nueva empieza con **cero meses cerrados para los 32 a la vez**. Con el n\u00famero viejo, el m\u00f3vil te habr\u00eda dicho \u00abSin puesto todav\u00eda\u00bb y esta tabla habr\u00eda seguido pintando **la clasificaci\u00f3n entera de la temporada pasada**, como si fuera la de esta. Las dos pantallas contestaban a la misma pregunta y una de las dos iba a mentir.'}
-      ] },
-    { id:'2026-08-19-ranking-primer-cierre', fecha:'2026-08-19',
-      titulo:'La clasificación empieza en tu primer cierre de mes',
-      items:[
-        {cara:'escritorio', vista:'ranking', txt:'Quien todavía **no ha cerrado ningún mes** ya no sale en la tabla del ranking: hasta el primer cierre no hay con qué compararle. Antes salía, y no discretamente — con cero meses sus horas **no se dividen por nada**, así que un alta con 40 h entraba directa por arriba. Y ahora **se dice al pie** a cuántas personas deja fuera, que es lo que faltaba: un filtro mudo se lee como un fallo.'},
-        {cara:'escritorio', vista:'ranking', txt:'⚠️ Pero **siguen contando en «CUOTA MEDIA» y en «A CERO»**: sus horas mueven la cuota de todo el equipo, así que ahí sí entran. Y si no hay ninguna fila —lo que pasará el **1 de septiembre**, cuando la temporada nueva deja a las 32 sin cierres a la vez— sale «Todavía no hay clasificación» en vez de una tabla vacía.'},
-        {cara:'movil', vista:'horas', txt:'En el móvil ya funcionaba solo: sin puesto sale «Sin puesto todavía» en vez de un número inventado.'}
-      ] },
-    { id:'2026-08-19-globo-reuniones', fecha:'2026-08-19',
-      titulo:'El globo rojo de Reuniones ya cuenta lo que te falta a ti',
-      items:[
-        {cara:'movil', vista:'reu', txt:'El número rojo de la pestaña **Reuniones** miraba **la reunión que tuvieras abierta**, no las que te faltan por cubrir. Con dos convocadas, si la más próxima ya la habías cubierto, **la que cerraba mañana no avisaba** — y de no cubrir a tiempo salen puntos (Art. 30g). Encima el globo cambiaba según lo que mirabas: abrir una reunión ya cubierta te apagaba tu propio aviso. Ahora cuenta **cuántas te faltan de verdad**, y dice el número, no un «hay algo».'},
-        {cara:'movil', vista:'reu', txt:'Y si **la convocas tú**, ya no te sale globo: organizas, no cubres. Antes lo llevabas encendido siempre, y al tocarlo la propia pantalla te decía que a ti no se te pide disponibilidad.'}
-      ] },
-    { id:'2026-08-19-doc-corregir-dos-pasos', fecha:'2026-08-19',
-      titulo:'Corregir un documento: la app ya te dice los dos pasos',
-      items:[
-        {cara:'movil', vista:'docs', txt:'Si te piden cambios, el botón decía «Reenviar corregido» y **no sube nada**: sólo devuelve el expediente a la cola. Ahora dice lo que hace —«Ya está corregido: devolver a revisión»— y encima salen **los dos pasos**: reenviar el archivo corregido por el formulario **con la MISMA referencia** (⚠️ no como «sustituye a…», que crearía un expediente nuevo y dejaría éste con la versión mala) y luego volver y pulsar. Y en ese orden: al pulsar **se borra el motivo** que te escribieron, que es donde pone qué corregir.'},
-        {cara:'movil', vista:'docs', txt:'Y el aviso de después ya no te confirma algo que no ha pasado: si no has subido el archivo, te dice que el revisor verá la versión anterior. Antes ponía «Reenviado a revisión.» y se te apagaba el globo, así que te ibas convencido.'},
-        {cara:'escritorio', vista:'docs', txt:'Las mismas instrucciones en el escritorio. ⚠️ Falta **el enlace al formulario**: hasta que lo tengamos, la app te dice a quién pedírselo en vez de mandarte a una página que no existe.'}
-      ] },
-    { id:'2026-08-19-doc-analisis-completo', fecha:'2026-08-19',
-      titulo:'La ficha ya enseña las Acciones y los Pendientes del documento',
-      items:[
-        {cara:'movil', vista:'docs', txt:'El análisis que hace Cowork trae seis secciones y la ficha sólo pintaba cuatro: faltaban **Acciones** —los compromisos que crea el documento, con responsable y fecha— y **Pendientes** —lo que queda abierto—. Son justo lo que decide **aprobar o pedir cambios**, así que se firmaba sin verlas. Ya salen, y debajo la línea de números («2 decisiones · 3 acciones»).'},
-        {cara:'escritorio', vista:'docs', txt:'Lo mismo en la tarjeta del escritorio. Y la lista de secciones vive ahora en **un solo sitio** para las dos caras: la siguiente que añada el pipeline entra en las dos o en ninguna, que es como se perdieron estas.'}
-      ] },
-    { id:'2026-08-19-doc-etiquetas', fecha:'2026-08-19',
-      titulo:'«Aprobar con anotaciones» ya ajusta también las etiquetas',
-      items:[
-        {cara:'movil', vista:'docs', txt:'El botón dice «con anotaciones» y hasta hoy sólo dejaba corregir el **título**: las **etiquetas** no se podían tocar, aunque el servidor lleva desde siempre sabiendo aplicarlas. Ya salen en la ficha y hay un campo para ajustarlas al firmar —separadas por comas—. Se ven **aunque no te toque decidir**, para que el autor sepa con cuáles le publicaron su documento.'},
-        {cara:'escritorio', vista:'docs', txt:'Lo mismo en la tarjeta del expediente: las etiquetas se ven y se ajustan al aprobar con anotaciones.'}
-      ] },
-    { id:'2026-08-19-doc-trabado-y-revision', fecha:'2026-08-19',
-      titulo:'La ficha te avisa si el expediente está trabado o es una revisión',
-      items:[
-        {cara:'movil', vista:'docs', txt:'Si Cowork manda un expediente **trabado** —le falta algo y hace falta arreglarlo a mano: una referencia sin rellenar, anexos que no están, un **Acta**, que no existe como tipo en Notion— la ficha te lo dice **con el motivo escrito**, antes del resumen. Es un aviso, no un candado: sigues pudiendo decidir, pero ahora lo sabes. Antes esa información llegaba al servidor y **no la veía nadie** en esta cara.'},
-        {cara:'movil', vista:'docs', txt:'Y si lo que te toca firmar es la **segunda versión** de un documento, la ficha te dice **a cuál sustituye** y que el original sigue publicado. Es una `ref` nueva, no una edición del anterior, así que no es lo mismo que juzgar un envío de primera vuelta.'},
-        {cara:'escritorio', vista:'docs', txt:'Los dos avisos salen también en el escritorio, en la tarjeta del expediente. Y **sólo cuando los hay**: la mayoría no traen ninguno, y un «sustituye a: —» en todas las fichas es ruido que se aprende a saltar.'}
-      ] },
-    { id:'2026-08-18-reu-se-refresca', fecha:'2026-08-18',
-      titulo:'La reunión que tienes abierta ya se actualiza sola',
-      items:[
-        {cara:'escritorio', vista:'reuniones', txt:'El mapa de calor, el contador de cobertura y la lista de quién no ha cubierto se quedaban **como estaban al entrar**: aunque la gente fuera contestando, la pantalla no se enteraba hasta recargar. Ahora se actualiza sola cada 20 segundos, como en el móvil. Importa al **fijar** una reunión —se decidía sobre un mapa viejo— y en «Disponibilidad y riesgo», donde la lista podía señalar a alguien que **ya había contestado**.'}
-      ] },
-    { id:'2026-08-18-riesgo-anonima', fecha:'2026-08-18',
-      titulo:'La lista de riesgo ya no nombra a quien sí cubrió',
-      items:[
-        {cara:'escritorio', vista:'reuniones', txt:'En una reunión **anónima**, el panel de riesgo daba por no cubierta la disponibilidad de todo el que no fueras tú —porque sus filas llegan sin nombre— y **los listaba con nombre y apellidos** bajo «Sin cubrir», con su chip de la sanción que implicaría. Ahora dice **cuántos** han cubierto, que eso sí se sabe, y **no nombra a nadie**.'}
-      ] },
-    { id:'2026-08-18-doc-te-lo-cuentan', fecha:'2026-08-18',
-      titulo:'Tu documento rechazado ya te dice por qué',
-      items:[
-        {cara:'movil', vista:'docs', txt:'Si te **rechazan** un expediente, ahora la ficha te dice **el motivo, quién lo decidió y cuándo**. Antes ahí ponía «Este expediente lo revisa Fulano. Tú no decides aquí» —sobre tu propio documento—, y el motivo sólo llegaba por correo. Lo mismo cuando te lo **aprueban**: antes tampoco se te contaba.'},
-        {cara:'movil', vista:'docs', txt:'Y si te lo aprobaron **con anotaciones**, la app te dice **qué te cambiaron** —el título, las etiquetas—. Esa parte de la acción no se veía en ningún sitio: te cambiaban el título de tu documento y te enterabas comparándolo de memoria.'},
-        {cara:'escritorio', vista:'docs', txt:'Al revisar, la **decisión anterior** ya lleva **la fecha** y, si fue «con anotaciones», **qué se ajustó** — que es lo que hay que juzgar para decidir si la pisas. Y sobre un aprobado ya no dice «Sin motivo escrito»: un aprobado no lleva motivo, así que esa frase mandaba a buscar una explicación que nunca existió.'}
-      ] },
-    { id:'2026-08-18-desglose-cuadra', fecha:'2026-08-18',
-      titulo:'El desglose del mes ya dice el mismo número que la tarjeta',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La tarjeta de **Horas** decía una cifra y la ventana que se abre al tocar «Ver el desglose completo» decía **otra**, las dos rotuladas «h este mes». La tarjeta ya contaba reuniones, cursos y turnos de fabricación; la ventana sumaba **sólo tus partes**, así que con tres turnos había **12 h de diferencia**. Ahora las dos leen el mismo dato. Y si el servidor todavía no lo sabe, la ventana suma tus partes **y lo dice**: pone «que cuentan» en vez de «este mes».'},
-        {cara:'movil', vista:'horas', txt:'Y el **título** de esa ventana sale del mes de trabajo, no del reloj del teléfono. Un mes va **de cierre a cierre**: julio se cerró el 4 de agosto, así que del 1 al 4 la ventana se titulaba «Desglose de agosto» y listaba los partes de **julio**.'}
-      ] },
-    { id:'2026-08-18-minimo-avisa', fecha:'2026-08-18',
-      titulo:'El mínimo de franjas avisa, no te bloquea',
-      items:[
-        {cara:'movil', vista:'reu', txt:'Mientras marcas disponibilidad, la app te dice **cu\u00e1ntas franjas te faltan para el m\u00ednimo sin sanci\u00f3n**, no un n\u00famero suelto. Y **puedes entregar menos**: se guarda igual, pero te avisa antes de que te llegue la propuesta de puntos.'}
-      ] },
-    { id:'2026-08-18-plazo-ultimo-dia', fecha:'2026-08-18',
-      titulo:'El último día del plazo ya cuenta',
-      items:[
-        {cara:'movil', vista:'reu', txt:'Si una reuni\u00f3n \u00abcierra el 20/08\u00bb, ahora el **d\u00eda 20 cuenta entero**. Antes el servidor cerraba a las 00:00 de ese d\u00eda y quien cubr\u00eda se llevaba el aviso por no responder. Y si el plazo ya pas\u00f3, **la pantalla te lo dice** en vez de dejarte marcar y fallar al guardar.'}
-      ] },
-    { id:'2026-08-18-minimo-exigido', fecha:'2026-08-18',
-      titulo:'El mínimo de franjas ya es el mismo que el del motor',
-      items:[
-        {cara:'movil', vista:'reu', txt:'Mientras marcas tu disponibilidad, el tel\u00e9fono ya te dice **cu\u00e1ntas franjas te piden** \u2014 el n\u00famero contra el que se decide si te cae una sanci\u00f3n. Antes s\u00f3lo estaba en el ordenador, y encima ped\u00eda **una menos** de la que el motor exige.'}
-      ] },
-    { id:'2026-08-18-hueco-minimo-e', fecha:'2026-08-18',
-      titulo:'Marcar disponibilidad en el ordenador ya exige el hueco entero',
-      items:[
-        {cara:'escritorio', vista:'convoc', txt:'Al marcar cu\u00e1ndo puedes, **un clic marca lo que dura la reuni\u00f3n** \u2014 como en el tel\u00e9fono. Media hora suelta para una reuni\u00f3n de hora y media no serv\u00eda para ir, y encima el m\u00f3vil te la borraba despu\u00e9s. Y si algo se queda corto, ahora **te lo dice**.'}
-      ] },
-    { id:'2026-08-18-aprobada', fecha:'2026-08-18',
-      titulo:'Un fichaje aprobado ya no dice «otorgada»',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Un parte que trabajaste y te firmaron ya dice **\u00abaprobada\u00bb**, no \u00abotorgada\u00bb \u2014 esa palabra queda para las horas que te **da** la coordinaci\u00f3n. Y la tarjeta del mes las ense\u00f1a por separado: **\u00abX h aprobadas\u00bb** y **\u00abY h otorgadas\u00bb**.'}
-      ] },
-    { id:'2026-08-18-mejor-hueco', fecha:'2026-08-18',
-      titulo:'«Mejor hueco» ya es donde cabe la reunión entera',
-      items:[
-        {cara:'escritorio', vista:'convoc', txt:'En el mapa de una reuni\u00f3n, **\u00abmejor franja\u00bb** te dec\u00eda la media hora con m\u00e1s gente \u2014 que no es donde cabe la reuni\u00f3n: si a las 18:00 pueden 12 y a las 18:30 s\u00f3lo 2, ah\u00ed **no cabe** una hora. Ahora dice **el hueco entero** y cu\u00e1nta gente puede **toda** la reuni\u00f3n. Y en vista Ponderada ya no llama \u00abpersonas\u00bb a los puntos.'}
-      ] },
-    { id:'2026-08-18-tareas-fecha', fecha:'2026-08-18',
-      titulo:'«Tus tareas» ya son las tuyas, y la fecha se comprueba',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Al fichar, el desplegable **\u00abelige una de tus tareas\u00bb** listaba las de **todo el equipo** si tienes permisos de direcci\u00f3n, y se pod\u00eda imputar el rato a la tarea de otra persona. Ya salen s\u00f3lo las tuyas. Y la **fecha** de un bloque declarado a mano ya se comprueba antes de enviarlo: una fecha mal escrita hac\u00eda que esas horas contaran en el mes equivocado \u2014y que se sumaran mes tras mes.'}
-      ] },
-    { id:'2026-08-18-reuniones', fecha:'2026-08-18',
-      titulo:'El mapa ya no dice «nadie ha respondido» con respuestas dentro',
-      items:[
-        {cara:'movil', vista:'reu', txt:'En el mapa de una reuni\u00f3n, el titular dec\u00eda **\u00abtodav\u00eda no ha respondido nadie\u00bb** aunque hubiera respuestas: pasaba cuando **ninguno puede la reuni\u00f3n entera**, o cuando han contestado que **no pueden ning\u00fan d\u00eda**. Ahora dice cu\u00e1ntos han contestado. Y ya no se puede crear una reuni\u00f3n **sin invitar a nadie** \u2014 una reuni\u00f3n sin lista se le ped\u00eda a todo el equipo.'},
-        {cara:'escritorio', vista:'convoc', txt:'Al convocar, el tipo **\u00abConsejo\u00bb** no marcaba a nadie: hab\u00eda que ponerlos a mano. Ya entran solos los del Consejo que sigan activos.'}
-      ] },
-    { id:'2026-08-18-candado-parte', fecha:'2026-08-18',
-      titulo:'Un parte ya no se puede mandar dos veces sin querer',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Al enviar un parte desde el tel\u00e9fono, el bot\u00f3n **no se apagaba**: dos toques seguidos \u2014o uno mientras el env\u00edo viajaba\u2014 mandaban **las mismas horas dos veces**. Ya se bloquea mientras se env\u00eda, y vuelve si falla. Y si se corta la red y lo reintentas a mano, el servidor **reconoce el env\u00edo** en vez de guardarlo otra vez.'}
-      ] },
-    { id:'2026-08-18-pildora-doc', fecha:'2026-08-18',
-      titulo:'Un expediente rechazado ya no se pinta en verde',
-      items:[
-        {cara:'movil', vista:'docs', txt:'En la pantalla de **Documentos**, un expediente **rechazado** se pintaba **en verde** \u2014el mismo color que uno aprobado\u2014, y la lista ense\u00f1aba la palabra interna del sistema (\u00abpublicando\u00bb, \u00abanot\u00bb) en vez del nombre en castellano. Ya sale **en rojo** y con su nombre, y la lista y la ficha dicen lo mismo.'}
-      ] },
-    { id:'2026-08-18-cierre-a-medias', fecha:'2026-08-18',
-      titulo:'Un cierre que acaba corto ya no se da por hecho',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Un cierre del mes que acaba **corto** \u2014porque a alguien ya no se le encuentra la ficha en Notion\u2014 se titulaba **\u00abYa est\u00e1 aplicado\u00bb**, en verde, y **sin bot\u00f3n**: no hab\u00eda forma de terminarlo. Ahora sale **\u00abAplicado a medias\u00bb** en rojo, con **cu\u00e1ntas faltan de cu\u00e1ntas**, y vuelve el bot\u00f3n para terminar lo que queda. Si el cierre se par\u00f3 por un descuadre, el bot\u00f3n **no** vuelve: eso hay que mirarlo antes.'},
-        {cara:'escritorio', vista:'cierre', txt:'Un cierre del mes que acaba **corto** \u2014porque a alguien ya no se le encuentra la ficha en Notion\u2014 se titulaba **\u00abYa est\u00e1 aplicado\u00bb**, en verde, y **sin bot\u00f3n**: no hab\u00eda forma de terminarlo. Ahora sale **\u00abAplicado a medias\u00bb** en rojo, con **cu\u00e1ntas faltan de cu\u00e1ntas**, y vuelve el bot\u00f3n para terminar lo que queda. Si el cierre se par\u00f3 por un descuadre, el bot\u00f3n **no** vuelve: eso hay que mirarlo antes.'}
-      ] },
-    { id:'2026-08-18-cerrar-turno', fecha:'2026-08-18',
-      titulo:'El panel de cerrar un turno ya responde',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'El panel **\u00abCerrar un turno\u00bb** se pintaba entero \u2014selector, duraci\u00f3n, qui\u00e9n fue, horas extra, bot\u00f3n\u2014 y **no respond\u00eda a nada**: faltaba engancharlo. Adem\u00e1s s\u00f3lo se pod\u00eda llegar al primer turno de la lista. Ya funciona. Y ahora la tabla incluye tambi\u00e9n a quien figuraba como **\u00abPosible\u00bb o \u00abReserva\u00bb y al final fue**: sale **sin marcar** y con **0 h** de partida, para que lo decidas t\u00fa.'}
-      ] },
-    { id:'2026-08-18-quien-coordina', fecha:'2026-08-18',
-      titulo:'Qui\u00e9n coordina cada unidad, bien \u2014 con la UCT dentro',
-      items:[
-        {cara:'movil', vista:'estado', txt:'En **men\u00fa \u2192 El equipo**, la lista de qui\u00e9n coordina cada unidad dec\u00eda el **subsistema** de cada coordinador en vez de **lo que coordina** \u2014 as\u00ed que la **Unidad de Documentaci\u00f3n T\u00e9cnica no aparec\u00eda nunca**, y quien coordina algo sin tener el cargo tampoco sal\u00eda. Ya est\u00e1. Y en la pantalla de inicio: el aviso de horas pendientes ya no te nombra un firmante cuando tienes **dos perfiles** (lo decide el subsistema del parte, no tu unidad), y el de documentos con cambios **cuenta** en vez de decir \u00abun documento\u00bb habiendo dos.'}
-      ] },
-    { id:'2026-08-18-avisos-registro', fecha:'2026-08-18',
-      titulo:'Los avisos ya no dicen «activadas» cuando no lo est\u00e1n',
-      items:[
-        {cara:'escritorio', vista:'estado', txt:'El chip verde de \u00abactivadas\u00bb miraba **s\u00f3lo el permiso del navegador**, no si el servidor sabe a d\u00f3nde mandarte los avisos. Y el ordenador **no volv\u00eda a registrarse nunca** despu\u00e9s de entrar, as\u00ed que cuando el navegador renovaba la suscripci\u00f3n los avisos dejaban de llegar **sin decir nada**. Ahora se registra al entrar, y si no se pudo confirmar el chip dice **\u00absin confirmar\u00bb** y explica por qu\u00e9. Los mensajes de esta pantalla tampoco desaparecen ya solos.'}
-      ] },
-    { id:'2026-08-18-bloque-a-medias', fecha:'2026-08-18',
-      titulo:'Un bloque que se cierra a medias ahora lo dice',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'Al cerrar un bloque, el servidor **s\u00f3lo aplica las que t\u00fa puedes decidir**. Si alguna es de otra unidad, se la salta \u2014 y hasta ahora la pantalla no lo dec\u00eda: pon\u00eda \u00abBloque cerrado\u00bb y las saltadas **desaparec\u00edan del panel** sin que nadie hubiera decidido sobre ellas. Ahora dice cu\u00e1ntas quedan y **no da el bloque por cerrado** hasta que no quede ninguna. Y \u00abAceptan todas\u00bb ya marca el bloque **de una vez** en vez de una por una.'}
-      ] },
-    { id:'2026-08-18-mes-contable', fecha:'2026-08-18',
-      titulo:'Revertir ya no se ofrece sobre un mes que est\u00e1 cerrado',
-      items:[
-        {cara:'escritorio', vista:'horas', txt:'Un parte trabajado en los primeros d\u00edas del mes, pero **creado antes de que se aplicara el cierre del mes anterior**, sal\u00eda con su bot\u00f3n **Revertir** y con la promesa \u00abrevertir le resta N h\u00bb. Al pulsarlo, el servidor contestaba que el mes est\u00e1 cerrado. Pasaba todos los meses, entre el d\u00eda 1 y el d\u00eda del cierre. Ahora la pantalla usa **el mismo criterio que el servidor** \u2014el mes de trabajo va **de cierre a cierre**, no del 1 al 31\u2014 y en su lugar dice que ese mes est\u00e1 cerrado y por qu\u00e9.'},
-        {cara:'movil', vista:'horas', txt:'Lo mismo en la cola de partes del m\u00f3vil: donde antes sal\u00eda el bot\u00f3n, ahora sale la raz\u00f3n.'}
-      ] },
-    { id:'2026-08-18-riesgo-oculta', fecha:'2026-08-18',
-      titulo:'Qui\u00e9n est\u00e1 en riesgo por no cubrir, sin inventarse a nadie',
-      items:[
-        {cara:'escritorio', vista:'dispo', txt:'En **Disponibilidad y riesgo** sal\u00eda, reuni\u00f3n por reuni\u00f3n, qui\u00e9n no ha cubierto y qu\u00e9 sanci\u00f3n le caer\u00eda. Fallaban dos cosas: a quien abr\u00eda la encuesta y la dejaba **entera a cero** no le nombraba ninguna de las dos listas \u2014y a \u00e9se el motor s\u00ed le pone los puntos\u2014, y en una reuni\u00f3n **oculta** se inventaba la lista de todos los dem\u00e1s, porque el servidor s\u00f3lo manda tu fila y aqu\u00ed se restaba \u00abconvocados \u2212 los que han contestado\u00bb. Ahora el primero sale donde tiene que salir, y una reuni\u00f3n oculta dice que lo es en vez de listar a nadie. **Cubrir tu disponibilidad sigue igual**: eso no se toca.'}
-      ] },
-    { id:'2026-08-18-lote-sin-marcar', fecha:'2026-08-18',
-      titulo:'El bloque de sanciones ya no viene con todo marcado en \u00abAcepta\u00bb',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'Cuando el motor agrupa varias sanciones en un bloque, el ordenador te las ense\u00f1aba **todas marcadas en \u00abAcepta\u00bb** sin que t\u00fa hubieras tocado ninguna, con la previsi\u00f3n de puntos ya restando y el bot\u00f3n diciendo \u00abAprobar el bloque \u00b7 30 sanciones\u00bb. Un clic las aplicaba en Notion y mandaba el comunicado con los treinta nombres. Ahora **lo que no has marcado sale sin marcar** (ni aceptado ni tachado), el resumen dice **cu\u00e1ntas te faltan** y el bloque **no se cierra** hasta que las hayas mirado todas.'},
-        /* En el m\u00f3vil las sanciones NO son una pantalla: salen del **men\u00fa**
-           (`_abrirSanciones_`, un modal), as\u00ed que la vista que se se\u00f1ala es la de
-           inicio \u2014 igual que el buz\u00f3n. */
-        {cara:'movil', vista:'estado', txt:'En el m\u00f3vil (**men\u00fa \u2192 Sanciones**) esto ya estaba bien y no cambia: sigue avisando de las que te faltan antes de cerrar. Lo que cambia es que ahora **las dos caras cuentan por la misma puerta**, as\u00ed que no se pueden volver a separar.'}
-      ] },
-    { id:'2026-08-18-cuota-en-directo', fecha:'2026-08-18',
-      titulo:'Tu cuota se recalcula sola, con tus horas de ahora',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La cuota que ves ya **no es la del \u00faltimo '+
-          'cierre**: se calcula con tus horas de ahora mismo, cada vez que abres la '+
-          'pantalla. Antes fichabas cuatro turnos y el n\u00famero no se mov\u00eda hasta '+
-          'que se volv\u00eda a subir el panel. Y si el equipo a\u00fan no ha cargado, te '+
-          'lo dice: **\u00abes la \u00faltima cifra que sirvi\u00f3 el servidor\u00bb**.'},
-        {cara:'escritorio', vista:'estado', txt:'Lo mismo en **Tu cuota** del ordenador, '+
-          'por la misma puerta: la fila de abajo dice si el importe es el de ahora o el de '+
-          'la \u00faltima foto.'}
-      ] },
-    { id:'2026-08-18-pintor-cancelar', fecha:'2026-08-18',
-      titulo:'Cancelar el l\u00e1piz ya no se lleva por delante el reporte',
-      items:[
-        {cara:'escritorio', vista:'buzon', txt:'Si adjuntabas una captura, la marcabas y '+
-          'luego pulsabas **Cancelar**, el reporte **se perd\u00eda entero** \u2014 el '+
-          't\u00edtulo, el detalle y la gravedad que acababas de escribir\u2014 y la app '+
-          'no dec\u00eda nada. Ahora se env\u00eda igual, con la **foto sin las marcas**: '+
-          'lo que descartas al cancelar son los trazos, no la captura.'},
-        /* En el m\u00f3vil el buz\u00f3n NO es una pantalla: sale del **men\u00fa**, as\u00ed
-           que la vista que se se\u00f1ala es la de inicio. */
-        {cara:'movil', vista:'estado', txt:'Y en el m\u00f3vil (**men\u00fa \u2192 Reportar un fallo**) '+
-          'el bot\u00f3n de **Pintar/Mover** ya no se '+
-          'queda con el modo de la vez anterior: dec\u00eda \u00abMover\u00bb desde la '+
-          'segunda vez que abr\u00edas el l\u00e1piz **mientras el dedo pintaba**.'}
-      ] },
-    { id:'2026-08-18-gravedad-viaja', fecha:'2026-08-18',
-      titulo:'La gravedad que eliges ya no se borra al cambiar de tipo',
-      items:[
-        {cara:'movil', vista:'estado', txt:'En **men\u00fa \u2192 Reportar un fallo**: marcabas '+
-          '**Me bloquea**, te dabas cuenta de '+
-          'que era m\u00e1s bien una mejora, y al volver a **Un fallo** la gravedad hab\u00eda '+
-          'vuelto a **Molesta** \u2014 y con el chip marcado, as\u00ed que no se ve\u00eda. '+
-          'Ahora sigue elegida la tuya. No es un detalle: de eso salen las horas que se te '+
-          'proponen por el reporte, y son **2,00 h** contra **0,50 h**.'}
-      ] },
-    { id:'2026-08-18-coche-a-medias', fecha:'2026-08-18',
-      titulo:'Un coche sin trayecto ya no deja convocar el turno',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Si a\u00f1ades un coche y le falta **de '+
-          'd\u00f3nde sale** o **a d\u00f3nde va**, el bot\u00f3n de convocar te lo dice y no '+
-          'te deja \u2014 y te dice **qu\u00e9 coche**, no un aviso gen\u00e9rico. Antes se '+
-          'convocaba igual, con el transporte a medias y sin avisar. Tambi\u00e9n cuenta la '+
-          'vuelta, si marcaste que no es la misma que la ida.'}
-      ] },
-    { id:'2026-08-18-puntos-sancion-con-tope', fecha:'2026-08-18',
-      titulo:'Los puntos de una sanci\u00f3n ya no admiten cualquier n\u00famero',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'El campo de **Puntos** dec\u00eda \u00abde '+
-          '\u22125 a 0\u00bb y no lo comprobaba nadie: se pod\u00eda mandar un **\u221250**, '+
-          'que llegaba a la cola, **se anunciaba en Discord con ese n\u00famero** y dejaba a la '+
-          'persona en 0 de una sola sanci\u00f3n. Ahora se comprueba, y los decimales '+
-          '(`-3,7`) se rechazan en vez de recortarse a `-3` sin decir nada. El **0** sigue '+
-          'valiendo: es el aviso de la primera vez.'},
-        {cara:'movil', vista:'estado', txt:'Lo mismo en **men\u00fa \u2192 Sanciones**. Y el '+
-          'n\u00famero que sale por defecto ya no es un \u22121 fijo: es **el que el RRI le pone '+
-          'a ese art\u00edculo**, que hasta ahora la app tra\u00eda escrito y no miraba.'}
-      ] },
-    { id:'2026-08-18-sancion-no-pierde-lo-escrito', fecha:'2026-08-18',
-      titulo:'Poner una sanci\u00f3n ya no se traga lo que acabas de escribir',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'Los **puntos** y el **art\u00edculo** que '+
-          'teclees ya no se pierden cuando la pantalla se refresca sola. Pasaba al elegir el '+
-          'motivo \u00abincumplir un plazo\u00bb: mientras llegaban las tareas de esa persona, '+
-          'lo escrito se borraba **y volv\u00eda a \u2212\u00a01**, que es el valor por '+
-          'defecto. Con lo cual se enviaba \u2212\u00a01 sin que nadie lo hubiera elegido.'},
-        {cara:'movil', vista:'estado', txt:'Lo mismo en el m\u00f3vil, en **men\u00fa \u2192 '+
-          'Sanciones**: los puntos y el art\u00edculo tecleados sobreviven al refresco. Y aqu\u00ed '+
-          'pasaba adem\u00e1s al **marcar una sanci\u00f3n del bloque** y al abrir la pantalla '+
-          'mientras cargaba la cola \u2014 la lista y el formulario comparten pantalla, as\u00ed '+
-          'que repintar una repintaba el otro.'}
-      ] },
-    { id:'2026-08-18-cierre-mes-correcto', fecha:'2026-08-18',
-      titulo:'La cabecera del cierre ya no anuncia la fecha del mes que NO se cierra',
-      items:[
-        {cara:'escritorio', vista:'cierre', txt:'Las chapas de arriba hablan del **mes que se '+
-          'cierra**: **TERMIN\u00d3 31/07/2026 \u00b7 LLEVA 18 d\u00edas**. Antes dec\u00edan '+
-          '**CIERRA 31/08/2026 \u00b7 QUEDAN 13 d\u00edas** encima de un panel titulado '+
-          '\u00abCierre de julio\u00bb \u2014 dos meses distintos en la misma tarjeta.'}
-      ] },
-    { id:'2026-08-18-gravedad-se-pregunta', fecha:'2026-08-18',
-      titulo:'Al reportar un fallo desde el escritorio, ahora te pregunta cu\u00e1nto molesta',
-      items:[
-        {cara:'escritorio', vista:'buzon', txt:'Reportar un fallo pide ahora la **gravedad** '+
-          '(**Bloquea \u00b7 Molesta \u00b7 Cosm\u00e9tico**). Antes la pon\u00eda la app '+
-          'sola, siempre **\u00abMolesta\u00bb**: un fallo que **bloquea** sal\u00eda sin el '+
-          'chip rojo y se propon\u00eda a **0,50 h en vez de 2,00**.'},
-        {cara:'escritorio', vista:'buzon', txt:'Y si lo dejas en blanco **no se inventa nada**: '+
-          'el eje queda **sin medir** y la ficha lo pide, en vez de callarlo.'}
-      ] },
-    { id:'2026-08-17-posible-no-es-ir', fecha:'2026-08-17',
-      titulo:'Al cerrar un turno, quien solo era \u00abPosible\u00bb ya no llega con las horas puestas',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'En **Cerrar un turno**, quien figuraba como **\u00abPosible\u00bb** o **\u00abReserva\u00bb** en el anuncio del canal ya **no** sale con el tiempo extra entero puesto: sale a **0**. Sigue en la lista \u2014t\u00fa sabes si al final vino\u2014 pero hay que **sub\u00edrselo a prop\u00f3sito**, que es lo contrario de tener que acordarse de baj\u00e1rselo.'},
-        {cara:'escritorio', vista:'turnos', txt:'\u26a0\ufe0f El motivo: `turnos.json` es el **anuncio** del canal, no un acta. Sobre los 23 turnos reales son **3 personas** con ese rol. Contarlas como asistencia son **12 h** que entran en la cuota y en el ranking sin que nadie lo haya dicho.'}
-      ] },
-    { id:'2026-08-17-deshacer-movil', fecha:'2026-08-17',
-      titulo:'Deshacer una decisi\u00f3n sobre un documento, tambi\u00e9n desde el m\u00f3vil',
-      items:[
-        {cara:'movil', vista:'docs', txt:'En un expediente **ya decidido** aparece **\u00abDeshacer y devolver a revisi\u00f3n\u00bb**. Lo ten\u00eda el escritorio y aqu\u00ed no, y esta es la cara desde la que se revisa: quien se equivocaba de bot\u00f3n en el tel\u00e9fono se quedaba mirando un candado que dice *\u00absolo alguien de m\u00e1s rango puede cambiarlo\u00bb*. El servidor ya aceptaba la orden desde la v28.'},
-        {cara:'movil', vista:'docs', txt:'Sale **solo si hay una decisi\u00f3n que deshacer** \u2014estado decidido **y** revisor\u2014, pregunta antes (**borra la firma de otra persona**) y deja el expediente **como estaba**: en revisi\u00f3n y **sin revisor**. No lo firma quien lo deshace.'}
-      ] },
-    { id:'2026-08-15-cierre-turno', fecha:'2026-08-15',
-      titulo:'Cerrar un turno y repartir el tiempo extra, persona a persona',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Panel nuevo **\u00abCerrar un turno\u00bb**: si eres **responsable** de un turno (o el PD), eliges el turno, dices **cu\u00e1nto dur\u00f3 de verdad**, confirmas **qui\u00e9n fue** y repartes el tiempo extra. Hasta hoy no hab\u00eda d\u00f3nde declararlo.'},
-        {cara:'escritorio', vista:'turnos', txt:'El extra se rellena **fila a fila**, no con un n\u00famero para todo el turno: *\u00aba lo mejor es tiempo extra que no le cuenta a alguien que vive cerca, pero s\u00ed a alguien que vive lejos\u00bb*. Arranca con **lo que dur\u00f3 el turno** para todos y se **baja** a quien no le corresponda.'},
-        {cara:'escritorio', vista:'turnos', txt:'Y **nadie puede llevarse m\u00e1s horas de las que el turno dur\u00f3**: la base son **4 h** y el techo es lo que pase de ah\u00ed. \u26a0\ufe0f El bot\u00f3n **no escribe en Notion**: deja la propuesta a la vista para aplicarla.'},
-        {cara:'movil', vista:'horas', txt:'Y en **Horas**, al declarar un bloque a mano, si pones la **salida antes que la entrada** ahora se te dice. Antes se daba por hecho que cruzaba medianoche **sin avisar**, as\u00ed que equivocarse de casilla no daba ning\u00fan error: daba una duraci\u00f3n cre\u00edble que se mandaba a firmar.'},
-        {cara:'escritorio', vista:'horas', txt:'Mismo aviso aqu\u00ed. Y distingue **tres casos**: si solo cabe una lectura te lo dice como un dato (**turno nocturno**), y si caben **las dos** te **pregunta** en vez de decidir por su cuenta \u2014 porque no se puede saber cu\u00e1l quisiste. Ning\u00fan parte se bloquea: los turnos de noche son legales.'}
-      ] },
-    { id:'2026-08-15-cuota-estimacion', fecha:'2026-08-15',
-      titulo:'La cuota se presenta como lo que es: una ESTIMACI\u00d3N',
-      items:[
-        {cara:'escritorio', vista:'horas', txt:'La fila que cierra el recibo dec\u00eda **\u00abLo que pagas\u00bb** sobre una cifra que **todav\u00eda se mueve**: la curva divide tus horas entre tus meses, y los dos n\u00fameros cambian en cada cierre. Ahora dice **\u00abEstimaci\u00f3n de lo que pagar\u00e1s\u00bb**, y debajo **cu\u00e1ndo se cierra de verdad** (en agosto, al acabar la temporada).'},
-        {cara:'movil', vista:'estado', txt:'Y la entrada del men\u00fa promet\u00eda **\u00abLo que te toca pagar esta temporada\u00bb**. Es lo mismo: la cuota es **anual** y se cierra al final, as\u00ed que lo que ves hoy es a cu\u00e1nto **va camino** de irte. Ahora se llama **\u00abEstimaci\u00f3n de la cuota de esta temporada\u00bb**.'},
-        {cara:'movil', vista:'estado', txt:'\u26a0\ufe0f Y lo que **NO** est\u00e1 arreglado, para que no te pille: quien no tiene ning\u00fan mes cerrado **sigue apareciendo en la clasificaci\u00f3n** y su estimaci\u00f3n sale de dividir por sus meses. **El 1 de septiembre pasa por ah\u00ed el equipo entero a la vez.**'}
-      ] },
-    { id:'2026-08-14-convocar-turnos', fecha:'2026-08-14',
-      titulo:'Convocar la disponibilidad de turnos ya llega al servidor',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'Convocar una semana estaba escrito entero \u2014el bot\u00f3n, el calendario, la rejilla\u2014 y **no llegaba al servidor**: la convocatoria se calculaba y se quedaba en el ordenador de quien la lanzaba. Por eso Turnos dec\u00eda siempre \u00abno hay ninguna semana convocada\u00bb y el reparto se hac\u00eda a ojo. Ya se sube.'},
-        {cara:'movil', vista:'turnos', txt:'Y el **m\u00ednimo de 4 horas por turno** se perd\u00eda por el camino: al marcar una casilla se marcaba **una sola hora** en vez del bloque entero, as\u00ed que se pod\u00eda decir \u00abpuedo\u00bb sin llegar al m\u00ednimo y sin que nada avisara. *(Necesita el backend desplegado.)*'},
-        {cara:'escritorio', vista:'turnos', txt:'A quien convocas y qui\u00e9n puede ser responsable de turno tambi\u00e9n se perd\u00edan al guardar la convocatoria: viajaban desde el bot\u00f3n y el servidor no los guardaba.'}
-      ] },
-    { id:'2026-08-13-horas-lo-que-no-se-sabe', fecha:'2026-08-13',
-      titulo:'Horas dejaba de ense\u00f1ar datos que no eran tuyos',
-      items:[
-        {cara:'movil', vista:'horas', txt:'\u00abHoras por subsistema\u00bb ense\u00f1aba **cinco unidades de la maqueta** \u2014Avi\u00f3nica, GNC, Aeroestructuras, Propulsi\u00f3n, Org&Mark\u2014 con medias inventadas y numeradas como un ranking, porque el servidor todav\u00eda no manda esa lista. Ahora dice que falta el dato. Y las unidades nuevas (Recovery, Documentaci\u00f3n T\u00e9cnica, Seguridad y Verificaci\u00f3n, Log\u00edstica, Patrocinios) ya no quedan fuera de su propia pantalla.'},
-        {cara:'movil', vista:'horas', txt:'Y en esa misma pantalla, \u00abeste mes\u00bb quer\u00eda decir **dos cosas distintas**: la cifra grande contaba el mes de trabajo (de cierre a cierre) y el desglose de abajo, el mes del calendario de tu m\u00f3vil. Del d\u00eda 1 al d\u00eda del cierre arriba pon\u00eda \u00ab37 h este mes\u00bb y abajo \u00abtodav\u00eda no se te ha contado ning\u00fan fichaje\u00bb. Ahora las dos mitades cuentan lo mismo.'}
-      ] },
-    { id:'2026-08-13-horas-numeros-que-no-cuadraban', fecha:'2026-08-13',
-      titulo:'Tres n\u00fameros de Horas que no cuadraban con lo que dec\u00edan',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La nota que explica tu ritmo ense\u00f1aba una divisi\u00f3n que **no daba ese ritmo**: dec\u00eda \u00ab1,65 h/d\u00eda (20 h en 10 d\u00edas)\u00bb, y 20 \u00f7 10 = 2. El ritmo va **sin la compensaci\u00f3n base** de tu cargo y el par\u00e9ntesis ense\u00f1aba las horas en bruto. Ahora ense\u00f1a el n\u00famero de verdad y dice por qu\u00e9 no son tus horas del mes.'},
-        {cara:'movil', vista:'horas', txt:'En el ranking, tu fila **no se pintaba** si eras la \u00faltima persona del equipo: el total estaba escrito a mano en 32 y ahora sale del dato del servidor. Ve\u00edas dos rayas an\u00f3nimas y ninguna pista de que faltaba la tuya.'},
-        {cara:'movil', vista:'horas', txt:'Y en esa misma fila, quien todav\u00eda no tiene ning\u00fan mes cerrado ve\u00eda **\u00ab\u221e h\u00bb**. Ahora sale una raya: no se sabe, y se dice.'}
-      ] },
-    { id:'2026-08-13-medidor-se-contradecia', fecha:'2026-08-13',
-      titulo:'El medidor de conducta se contradec\u00eda a s\u00ed mismo',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Con **2 puntos exactos** pon\u00eda \u00abEn evaluaci\u00f3n.\u00bb arriba y, justo debajo, \u00abpor debajo de 2 puntos se abre expediente\u00bb \u2014 o sea que a\u00fan te quedaba margen. El expediente se abre **con 2** (RRI Art. 32). Ahora el n\u00famero de la frase sale de la propia regla, as\u00ed que no pueden volver a separarse.'}
-      ] },
-    { id:'2026-08-12-plazos-que-se-escondian', fecha:'2026-08-12',
-      titulo:'Dos pantallas escond\u00edan un dato que s\u00ed ten\u00edan',
-      items:[
-        {cara:'movil', vista:'tareas', txt:'**Todas** tus tareas dec\u00edan \u00absin fecha l\u00edmite\u00bb, tuvieran plazo o no \u2014 y por eso ninguna sal\u00eda en rojo. La pantalla que existe para que no se te pase un plazo era la que te lo tapaba. Ahora dice el plazo y avisa cuando corre prisa.'},
-        {cara:'movil', vista:'reu', txt:'El **orden del d\u00eda** de una reuni\u00f3n sal\u00eda siempre vac\u00edo aunque el servidor lo tuviera, y el bot\u00f3n de quitarlo no se pintaba. Peor: guardar con el campo vac\u00edo **borraba el enlace para todo el equipo**. Ya no.'},
-        {cara:'movil', vista:'reu', txt:'Y la disponibilidad de los dem\u00e1s te llega **sin sus nombres** salvo que repartas turnos o hayas convocado t\u00fa. El mapa de calor y el \u00abya has cubierto\u00bb se ven igual: lo \u00fanico que cambia es que qui\u00e9n dijo que no pod\u00eda deja de ser p\u00fablico.'}
-      ] },
-    { id:'2026-08-12-libro-horas-dice-lo-que-ensena', fecha:'2026-08-12',
-      titulo:'El libro de horas anunciaba un n\u00famero y ense\u00f1aba otro',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La lista de \u00abÚltimos movimientos\u00bb reserva un hueco para la compensaci\u00f3n, as\u00ed que pinta **4 fichajes**. La nota de abajo compraba contra 5: con **exactamente 5 fichajes** dec\u00eda \u00abTodo lo de este mes\u00bb **escondiendo uno**, y con 6 dec\u00eda \u00abse ense\u00f1an los 5\u00bb ense\u00f1ando 4.'},
-        {cara:'movil', vista:'horas', txt:'Duele porque esa es la pantalla a la que entras **justo a comprobar si te contaron un parte**: uno que de verdad FALTE era indistinguible del que la vista escond\u00eda, y la nota te firmaba que estaban todos. Ahora dice **lo que pinta**.'},
-        {cara:'escritorio', vista:'horas', txt:'Y al rev\u00e9s: el escritorio los pinta **todos** sin recortar, y anunciaba que escond\u00eda cosas que no escond\u00eda. Ahora dice que est\u00e1n todos.'}
-      ] },
-    { id:'2026-08-12-otorgar-confirma-lo-guardado', fecha:'2026-08-12',
-      titulo:'Al otorgar horas, el aviso dice lo que se ha GUARDADO, no lo que tecleaste',
-      items:[
-        {cara:'escritorio', vista:'horas', txt:'El tope por parte son **14 h**. Si escrib\u00edas 20, se guardaban 14 y el aviso verde dec\u00eda \u00ab20 otorgadas\u00bb: **seis horas perdidas** sin un solo error.'},
-        {cara:'escritorio', vista:'horas', txt:'Ahora el aviso sale con **las horas que se han guardado** y dice que se recortaron. El registro tambi\u00e9n guarda que hubo recorte, para que se note despu\u00e9s.'},
-        {cara:'escritorio', vista:'horas', txt:'Y por debajo: el servidor ya **no acepta que quien otorga elija contra qu\u00e9 subsistema se mide su potestad** \u2014 antes bastaba con decir \u00abel m\u00edo\u00bb para otorgarle horas a cualquiera.'}
-      ] },
-    { id:'2026-08-11-cola-sanciones-movil', fecha:'2026-08-11',
-      titulo:'La cola de sanciones del m\u00f3vil ya se carga (y respeta lo que marcaste en el ordenador)',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La tarjeta \u00abPanel del PD \u00b7 disciplina\u00bb se quedaba en \u00abCargando la cola\u2026\u00bb **para siempre**. La cola se ped\u00eda antes de que la app supiera qui\u00e9n eres, as\u00ed que la pregunta \u00ab\u00bferes el PD?\u00bb se contestaba sobre un usuario de relleno y sal\u00eda siempre que no. Ahora la pide siempre y **decide el servidor** qui\u00e9n ve qu\u00e9.'},
-        {cara:'movil', vista:'horas', txt:'Y los **coordinadores** ya ven su cola: el men\u00fa os ofrec\u00eda Sanciones y el servidor ya os la serv\u00eda, pero la pantalla solo la ped\u00eda si eras el PD, as\u00ed que \u00abPendientes de decidir\u00bb se quedaba cargando sin fin.'},
-        {cara:'movil', vista:'horas', txt:'Y lo que marques en el **ordenador** ya llega al m\u00f3vil: marcabas 30 y al abrir el m\u00f3vil para cerrar el bloque te dec\u00eda \u00abFaltan 30 por marcar\u00bb. El servidor lo guardaba bien; era el m\u00f3vil, que lo buscaba con otro nombre.'}
-      ] },
-    { id:'2026-08-11-boton-lote-marcado', fecha:'2026-08-11',
-      titulo:'Al marcar una sanci\u00f3n del bloque, ahora SE VE',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Marcabas **S\u00ed** o **No** en una sanci\u00f3n del bloque y la pantalla quedaba **exactamente igual**: no hab\u00eda forma de saber cu\u00e1les llevabas. Ahora el bot\u00f3n marcado se queda en **verde** (o en rojo si rechazas). El ordenador ya lo hac\u00eda bien; era el m\u00f3vil el que se lo com\u00eda.'},
-        {cara:'movil', vista:'estado', txt:'Y el bot\u00f3n **No** tampoco pod\u00eda verse marcado nunca: le faltaba directamente. Importa porque al cerrar el bloque, **lo que no marcas se da por aceptado**.'}
-      ] },
-    { id:'2026-08-11-mes-de-cierre-a-cierre', fecha:'2026-08-11',
-      titulo:'Tu ritmo del mes vuelve a contarse de cierre a cierre',
-      items:[
-        {cara:'movil', vista:'horas', txt:'El servidor ya calculaba bien los d\u00edas del mes \u2014desde el \u00faltimo cierre, no desde el 1 del calendario\u2014 pero la app **no llegaba a recogerlo** y volv\u00eda a dividir por el calendario. Con julio cerrado el 4 de agosto, el 7 contaba 7 d\u00edas donde llevabas 4: tu ritmo sal\u00eda a poco m\u00e1s de la mitad del real, y le pasaba a todo el equipo a la vez sin dar ning\u00fan aviso. Tambi\u00e9n afecta a \u00abvs. equipo\u00bb y a la comparaci\u00f3n con el mes pasado.'},
-        {cara:'escritorio', vista:'horas', txt:'Lo mismo en el ordenador: la misma cifra la calculaba el servidor y la cara la tiraba.'}
-      ] },
-    { id:'2026-08-09-recarga-sin-cero', fecha:'2026-08-09',
-      titulo:'Al recargar, la pantalla ya no se queda en blanco',
-      items:[
-        {cara:'escritorio', vista:'buzon', txt:'Entrar al buz\u00f3n borraba la cola y '
-          + 'la dejaba en \u00abcargando\u2026\u00bb cada vez, aunque no hubiera cambiado nada. '
-          + 'Ahora se queda lo que ya hab\u00eda y arriba pone \u00abACTUALIZANDO\u2026\u00bb, para que '
-          + 'sepas que lo que est\u00e1s leyendo es lo \u00faltimo que se pudo traer y no algo '
-          + 'reci\u00e9n llegado. Y si no hay conexi\u00f3n ya no se ve la cola vac\u00eda: eso se '
-          + 'le\u00eda como \u00abno hay reportes\u00bb cuando en realidad no se hab\u00edan podido leer.'}
-      ] },
-    { id:'2026-08-09-login-vuelve', fecha:'2026-08-09',
-      titulo:'Si la sesi\u00f3n caduca, vuelve a salir el bot\u00f3n de entrar',
-      items:[
-        {cara:'escritorio', vista:'panel', txt:'Cuando la sesi\u00f3n se ca\u00eda estando dentro, la '
-          + 'app avisaba y ah\u00ed se quedaba: pantalla muerta, datos de ejemplo con pinta de '
-          + 'reales y nada que pulsar. Ahora vuelve a ofrecerte la entrada con tu cuenta.'},
-        {cara:'movil', vista:'estado', txt:'Lo mismo en el m\u00f3vil: si la sesi\u00f3n caduca mientras '
-          + 'lo usas, vuelve a salir el bot\u00f3n de entrar en vez de dejarte mirando datos que ya '
-          + 'no se actualizan.'}
-      ] },
-    { id:'2026-08-10-mes-rotulado', fecha:'2026-08-10',
-      titulo:'El panel dec\u00eda \u00abjulio\u00bb en agosto',
-      items:[
-        {cara:'escritorio', vista:'panel', txt:'El mes iba escrito a mano en cuatro '
-          + 'sitios, as\u00ed que en agosto tus horas de este mes se presentaban como las '
-          + 'de julio. Ahora el mes sale de la fecha. Y la chapa \u00abCIERRA 31/07\u00bb se ha '
-          + 'quitado: un mes no cierra el \u00faltimo d\u00eda del calendario, y esa pantalla no '
-          + 'sabe la fecha real \u2014 mejor no decirla que inventarla.'}
-      ] },
-    { id:'2026-08-09-carga-viva', fecha:'2026-08-09',
-      titulo:'La carga que ve\u00edas era de julio',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La tarjeta de carga daba un n\u00famero '
-          + 'calculado el d\u00eda que se gener\u00f3 el panel, no hoy \u2014 y encima se '
-          + 'titulaba \u00abMi carga del mes\u00bb. Ahora dice que es un \u00edndice, de qu\u00e9 '
-          + 'fecha es, y a su lado las horas que llevas este mes en vivo.'},
-        {cara:'escritorio', vista:'panel', txt:'Y en el escritorio las horas del mes '
-          + 'sal\u00edan de esa misma foto aunque el dato al d\u00eda ya hubiera llegado: '
-          + 'ahora manda el dato al d\u00eda.'}
-      ] },
-    { id:'2026-08-09-banda-carga', fecha:'2026-08-09',
-      titulo:'La banda sana de carga pasa a 70\u2013120',
-      items:[
-        {cara:'movil', vista:'horas', txt:'En tu tarjeta de carga la franja verde iba de '
-          + '60 a 90 y ahora va de 70 a 120, por decisi\u00f3n del Project Director. Se ha '
-          + 'movido tambi\u00e9n la barra y sus n\u00fameros, no solo el r\u00f3tulo: si no, dir\u00eda una '
-          + 'cosa y pintar\u00eda otra.'}
-      ] },
-    { id:'2026-08-09-plazo-escritorio', fecha:'2026-08-09',
-      titulo:'El escritorio tambi\u00e9n dice el plazo en palabras',
-      items:[
-        {cara:'escritorio', vista:'equipo', txt:'En el panel de convocatorias, cada reuni\u00f3n '
-          + 'dec\u00eda «cierra el 20/08/2026» mientras el m\u00f3vil ya dec\u00eda «cierra HOY». Ahora las dos '
-          + 'caras usan el mismo texto. Y de paso entiende las fechas en los dos formatos: con '
-          + 'una en formato DD/MM/AAAA antes sal\u00eda «sin l\u00edmite», o sea la pantalla diciendo que '
-          + 'no hay plazo cuando s\u00ed lo hay.'}
-      ] },
-    { id:'2026-08-09-aviso-portada', fecha:'2026-08-09',
-      titulo:'El aviso de la portada dice si el plazo es HOY',
-      items:[
-        {cara:'movil', vista:'estado', txt:'El aviso «Te falta cubrir una disponibilidad» '
-          + 'terminaba en «cierra el 20/08/2026»: dentro de una alerta, y aun as\u00ed hab\u00eda que '
-          + 'mirar el calendario. Ahora acaba en «cierra HOY», «cierra ma\u00f1ana» o «el plazo '
-          + 'cerr\u00f3 el 07/08». Es el mismo texto que ver\u00e1s en Reuniones: cuatro sitios diciendo '
-          + 'lo mismo con las mismas palabras.'}
-      ] },
-    { id:'2026-08-09-plazo-palabras', fecha:'2026-08-09',
-      titulo:'El plazo para cubrir ya se dice en palabras',
-      items:[
-        {cara:'movil', vista:'reu', txt:'Antes ponía «cierra el 20/08/2026» y tenías que '
-          + 'mirar el calendario. Ahora dice «cierra HOY», «cierra mañana» o «cierra en 2 días» '
-          + 'cuando corre prisa, y «el plazo cerró el 08/08» si ya venció — en la lista, en la '
-          + 'ficha y en la tarjeta de Próxima reunión. Ese plazo es el que mira el motor de '
-          + 'sanciones, así que no es un adorno.'}
-      ] },
-    { id:'2026-08-09-dura-reunion', fecha:'2026-08-09',
-      titulo:'Ahora se ve cuánto dura cada reunión, antes de abrirla',
-      items:[
-        {cara:'movil', vista:'reu', txt:'En Reuniones, cada una dice lo que dura junto a '
-          + 'cuándo cierra y a cuánta gente hay convocada — «cierra el 20/08 · 12 convocados · '
-          + 'dura 1 h 30 min». Antes ese dato solo aparecía al abrir «Cubrir mi disponibilidad», '
-          + 'así que no sabías si te cuadraba hasta estar dentro. Las reuniones creadas antes de '
-          + 'este modelo no lo traen y no dicen nada, en vez de inventarse una hora.'}
-      ] },
-    { id:'2026-08-09-fijar-minimo', fecha:'2026-08-09',
-      titulo:'Fijar una reunión ya no la deja en menos de lo que dura',
-      items:[
-        {cara:'escritorio', vista:'reuniones', txt:'Al fijar la fecha, «Desde» y «Hasta» '
-          + 'admitían cualquier cosa: una reunión de 1 h 30 se podía fijar en media hora y '
-          + 'nadie avisaba. Ahora el panel dice cuántas franjas dura, se estira sola al '
-          + 'mínimo si te quedas corto —y te lo dice— y no deja fijarla si desde esa hora no '
-          + 'cabe entera. El móvil ya lo hacía; esta es la pantalla donde de verdad se fija.'}
-      ] },
-    { id:'2026-08-08-arreglos-web', fecha:'2026-08-08',
-      titulo:'Tres arreglos que solo se ven cuando algo va mal',
-      items:[
-        {cara:'escritorio', vista:'panel', txt:'Si el inicio de sesión de Google no carga, ahora '
-          + 'lo DICE, con un botón de reintentar. Antes entrabas directo a la app con la semilla '
-          + 'de demostración y con pinta de funcionar: cualquier decisión tomada ahí era sobre '
-          + 'datos inventados. Ver la demo sigue estando, pero como elección tuya.'},
-        {cara:'movil', vista:'estado', txt:'La app instalada de beta vuelve a abrir: al mudar la '
-          + 'web a carpetas, el acceso directo arrancaba en una página que ya no existía. Si la '
-          + 'tienes en la pantalla de inicio, mejor bórrala y vuelve a añadirla.'},
-        {cara:'movil', vista:'estado', txt:'Las notificaciones vuelven a llevar su icono: pedían '
-          + 'una imagen que se había movido de sitio, así que llegaban peladas.'}
-      ] },
-    { id:'2026-08-08-partes-viejos', fecha:'2026-08-08',
-      titulo:'Tus partes de meses anteriores ya no estorban',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Los partes de meses pasados se han ido a su propio '
-          + 'bloque plegado, «De meses anteriores», que nace cerrado. Los de este mes se ven '
-          + 'solos y el contador de arriba cuenta solo esos, para que cuadre con lo que ves.'},
-        {cara:'movil', vista:'horas', txt:'No se han ocultado ni borrado: son horas tuyas y '
-          + 'siguen a un toque. Si prefieres que desaparezcan del todo o que solo se marquen, '
-          + 'dilo y se cambia — esto es reversible.'}
-      ] },
-    { id:'2026-08-08-mes-anterior-vivo', fecha:'2026-08-08',
-      titulo:'Ya puedes compararte con el mes pasado',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La fila «vs. el mes pasado» llevaba sin funcionar '
-          + 'desde que se escribio, y no daba ningun error: una parte del programa se rompia por '
-          + 'dentro al leer el registro del Drive y devolvia una lista vacia sin quejarse. Ya '
-          + 'esta: el servidor devuelve la media real del equipo en julio.'},
-        {cara:'movil', vista:'horas', txt:'Falta un detalle para afinarlo del todo: para saber '
-          + 'cuantos dias duro julio hacen falta DOS cierres guardados y de momento solo esta el '
-          + 'suyo. En cuanto cierres agosto se ajusta solo, sin tocar nada.'}
-      ] },
-    { id:'2026-08-08-anio-hoja', fecha:'2026-08-08',
-      titulo:'La comparacion con el mes pasado, un paso mas cerca',
-      items:[
-        {cara:'movil', vista:'horas', txt:'El registro del Drive escribe el año una sola vez y '
-          + 'luego encadena los meses, asi que al buscar «julio de 2026» no se encontraba nada: '
-          + 'para el programa ese mes no existia. Ahora el año se deduce del orden de los meses. '
-          + 'Todavia falta un detalle para que la fila del mes pasado aparezca, y esta localizado.'}
-      ] },
-    { id:'2026-08-08-mes-real', fecha:'2026-08-08',
-      titulo:'Lo del mes de cierre a cierre ya funciona DE VERDAD',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Estaba escrito pero no llegaba a funcionar: la parte '
-          + 'que mira cuando se cerro el mes buscaba la fecha en un sitio y quien la guarda la '
-          + 'escribe en otro, asi que no la encontraba nunca y se caia a contar dias de '
-          + 'calendario — siempre, desde el primer dia. Hoy 8 de agosto: el calendario diria 8 '
-          + 'dias y ahora dice 5, que son los que van desde que se cerro julio el dia 4.'},
-        {cara:'movil', vista:'horas', txt:'Lo que esto cambia es tu ritmo: dividir tus horas '
-          + 'entre 8 dias en vez de entre 5 lo dejaba en poco mas de la mitad, y a todo el '
-          + 'equipo a la vez.'}
-      ] },
-    { id:'2026-08-07-pd-agregado', fecha:'2026-08-07',
-      titulo:'Daniel: tu propia app era la unica que no recibia esto',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Todo lo del mes de cierre a cierre estaba llegando a '
-          + 'todo el equipo menos a ti. El servidor manda un resumen del mes (los dias que lleva, '
-          + 'la media del equipo) y a quien tiene rango de Project Director se le devolvia el '
-          + 'panel completo por otro camino, sin ese resumen. Tu app entonces se lo calculaba '
-          + 'sola: contaba los dias del calendario en vez de los que van desde el cierre, y '
-          + 'sacaba una media del equipo sin descontar la compensacion de cada cargo — o sea '
-          + 'comparaba tus horas ya descontadas contra una media sin descontar.'},
-        {cara:'movil', vista:'horas', txt:'No daba ningun error porque cada una de esas lecturas '
-          + 'tiene un plan B, y el plan B es justo el numero equivocado. Ahora el resumen viaja '
-          + 'por la misma puerta para todo el mundo.'}
-      ] },
-    { id:'2026-08-07-mes-anterior-cierre', fecha:'2026-08-07',
-      titulo:'Y el mes ANTERIOR tambien se mide de cierre a cierre',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La comparativa «vs. el mes pasado» ya no divide entre los días del calendario, sino entre los que ese mes duró de verdad: del cierre del mes anterior al suyo. Tu ejemplo: si junio se cerró el 29 y julio el 4 de agosto, julio duró 37 días, no 31 — y dividir por 31 inflaba el ritmo de julio, del equipo entero a la vez y sin dar ningún error.'},
-        {cara:'movil', vista:'horas', txt:'Hacen falta DOS cierres guardados para saber cuándo empezó un mes, y ahora mismo solo está el de julio. Hasta el próximo cierre mensual se sigue usando el calendario: aproximado, pero no inventado. En cuanto cierres agosto, el número pasa a ser el real y no hay que tocar nada.'}
-      ] },
-    { id:'2026-08-07-mes-de-cierre', fecha:'2026-08-07',
-      titulo:'Tus horas se comparan por el mes DE VERDAD, no por el calendario',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Un mes no dura lo que dice el calendario: dura desde que se cierra el anterior hasta que se cierra ese. Julio se cerró el 4 de agosto, así que agosto empezó ese día. La app dividía tus horas entre los días del calendario, y a principios de mes eso hacía que el ritmo saliera a poco más de la mitad del real — a todo el equipo a la vez.'},
-        {cara:'movil', vista:'horas', txt:'Y la comparación con el mes anterior sale ahora del registro del Drive, que es donde está el dato bueno. Eso quiere decir que si se corrige algo a mano en el panel, la app lo respeta en vez de ignorarlo.'}
-      ] },
-    { id:'2026-08-07-medidor-memoria', fecha:'2026-08-07',
-      titulo:'El medidor ya no se cae a cero cada vez que abres la app',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Al entrar, el medidor de conducta se vaciaba y volvía a llenarse aunque no hubiera pasado nada. Ahora recuerda tus puntos entre recargas: si no han cambiado, aparece lleno y ya. Si han cambiado, se anima — que es cuando la animación dice algo.'},
-        {cara:'movil', vista:'estado', txt:'Y si lo tocas, se rearma desde cero a propósito: ahí la animación es lo que has pedido.'}
-      ] },
-    { id:'2026-08-07-partes-orden', fecha:'2026-08-07',
-      titulo:'Tus partes de horas salen ordenados por fecha',
-      items:[
-        {cara:'movil', vista:'horas', txt:'No estaban ordenados por nada: salían en el orden en que los mandara el servidor, así que uno de un mes viejo podía aparecer por encima de los de hoy. Ahora lo más reciente va primero y lo antiguo cae al fondo.'}
-      ] },
-    { id:'2026-08-07-turnos-hueco', fecha:'2026-08-07',
-      titulo:'Turnos dice qué falta cuando no hay semana convocada',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'Si no hay ninguna semana abierta, la pantalla no decía absolutamente nada — así que parecía que lo de rellenar disponibilidad no existía. Ahora avisa de que no hay nada que rellenar todavía, y a quien puede convocar le dice dónde se hace.'}
-      ] },
-    { id:'2026-08-07-arranque-escritorio', fecha:'2026-08-07',
-      titulo:'El escritorio tampoco se recarga solo al entrar',
-      items:[
-        {cara:'escritorio', vista:'estado', txt:'Igual que en el móvil: al entrar volvía a pedir las siete cosas —turnos, tareas, panel, sanciones, partes, documentos y reuniones— 300 ms después de haberlas recibido, y repintaba encima. Aquí molestaba más, porque repintar pierde el scroll de donde estuvieras.'},
-        {cara:'escritorio', vista:'estado', txt:'Si el servidor no contesta a la primera, esa recarga SIGUE ocurriendo: es lo que salva la pantalla, y sin ella turnos, tareas y documentos se quedarían con datos de ejemplo hasta el minuto y medio.'}
-      ] },
-    { id:'2026-08-07-lote-congelado', fecha:'2026-08-07',
-      titulo:'El bloque de sanciones del escritorio se quedaba en el lote de cuando entrabas',
-      items:[
-        {cara:'escritorio', vista:'sanciones', txt:'El panel se refresca solo cada 90 segundos, pero al traer las sanciones nuevas no volvía a montar el bloque: seguías viendo el lote que había al entrar, con una pantalla recién repintada que lo hacía parecer al día. Si se cerraba un bloque nuevo mientras tenías la pestaña abierta, no aparecía hasta recargar.'},
-        {cara:'escritorio', vista:'horas', txt:'Lo mismo con la cola de partes de horas. Y de paso: si se cae la red durante un refresco, ya no se pierde la cola real —antes volvía a salir la de ejemplo, sin avisar—.'}
-      ] },
-    { id:'2026-08-07-fosil-escritorio', fecha:'2026-08-07',
-      titulo:'El escritorio comparaba las horas contra un mes fosilizado',
-      items:[
-        {cara:'escritorio', vista:'equipo', txt:'Las «lecturas automáticas» de Equipo decían quién sube y quién baja «respecto al mes pasado», y el mes pasado que usaban era JUNIO — un número viejo que se quedó guardado en el servidor y que ya no actualiza nadie. Es el mismo fallo que estaba en el móvil, en la otra cara, y con el rótulo correcto no se notaba.'},
-        {cara:'escritorio', vista:'equipo', txt:'Ahora sale del dato real; y si no lo hay, en vez de inventarse una comparación dice que todavía no se puede comparar la evolución.'}
-      ] },
-    { id:'2026-08-07-widget-extra', fecha:'2026-08-07',
-      titulo:'La pantalla de entrada ya no se carga una vez de más',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Al entrar, la app volvía a pedir turnos, tareas, reuniones y tu panel 300 ms después de haberlos recibido, y repintaba la pantalla encima de la que acababa de dibujar. Esa segunda pasada era el parpadeo que quedaba. Ahora, si el arranque trajo los datos, no se pide nada más.'},
-        {cara:'movil', vista:'estado', txt:'Si el arranque falla, ese refresco SIGUE ocurriendo: es lo que salva la pantalla cuando el servidor no contesta a la primera, y sin él los turnos y las tareas se quedarían vacíos hasta el minuto y medio.'}
-      ] },
-    { id:'2026-08-07-sin-base', fecha:'2026-08-07',
-      titulo:'La comparativa de horas ya no cuenta la compensación de tu cargo',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La fila «vs. <mes anterior>» sumaba la compensación que te llega por el cargo (PD 7 h, coordinador 3,5 h, miembro 2 h). Esa no se trabaja: se cobra por el puesto y es la misma todos los meses, así que la comparativa medía tu cargo en vez de tu trabajo — y comparado contigo mismo no se movía nunca. Ahora se descuenta en los DOS lados.'},
-        {cara:'movil', vista:'horas', txt:'La compensación EXTRA (la que asigna el PD a mano por cubrir un turno o un reporte) SÍ sigue contando: es lo único de las dos que reconoce trabajo real. Y con menos horas que tu base la cuenta se queda en 0, no en negativo.'},
-        {cara:'movil', vista:'horas', txt:'Y la fila «vs. equipo» también, que esa hubo que arreglarla en el servidor (backend v69): la base depende del cargo de cada uno, y tu móvil no conoce ni las horas ni el cargo de los demás. Si se hubiera descontado solo en tu lado, la comparación sería con descuento contra sin descuento — peor que no tocarla.'}
-      ] },
-    { id:'2026-08-08-panel-congelado', fecha:'2026-08-08',
-      titulo:'El panel ya avisa cuando deja de actualizarse',
-      items:[
-        {cara:'escritorio', vista:'estado', txt:'Si tu sesi\u00f3n caduca con el panel abierto, **dejaba de actualizarse sin decir nada**: segu\u00eda repintando lo de hace horas y no aparec\u00eda ning\u00fan error. Se pod\u00eda estar decidiendo sobre una cola vieja creyendo que estaba al d\u00eda. Ahora lo dice, una vez y sin que se vaya solo.'},
-        {cara:'movil', vista:'estado', txt:'Igual en el m\u00f3vil, aunque ah\u00ed pasa menos porque se recarga m\u00e1s.'}
-      ] },
-    { id:'2026-08-08-aviso-que-se-lee', fecha:'2026-08-08',
-      titulo:'Los avisos importantes ya no se van solos',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Si no se puede enviar un fichaje porque tu sesi\u00f3n ha caducado, el aviso **se queda hasta que lo tocas**. Antes desaparec\u00eda en dos segundos y medio, que no da tiempo a leer lo que hay que hacer.'}
-      ] },
-    { id:'2026-08-08-avisos-de-verdad', fecha:'2026-08-08',
-      titulo:'Activar los avisos ya no se da por hecho',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Al activar las notificaciones, si el registro en el servidor fallaba **no se dec\u00eda nada** y entrabas igual: el tel\u00e9fono ten\u00eda el permiso, pero el servidor no sab\u00eda a d\u00f3nde mandarte los avisos, as\u00ed que no te llegaba ninguno. Ahora lo dice y puedes reintentar.'},
-        {cara:'movil', vista:'estado', txt:'Y si al abrir el panel no se puede confirmar tu registro, sale un aviso en la pantalla de notificaciones. Los navegadores rotan esa suscripci\u00f3n de vez en cuando, y si no se vuelve a guardar los avisos dejan de llegar sin que nadie se entere.'}
-      ] },
-    { id:'2026-08-08-sesion-caducada', fecha:'2026-08-08',
-      titulo:'\u00abToken inv\u00e1lido\u00bb al cerrar el fichaje: ahora dice qu\u00e9 hacer',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Si dejas la app abierta m\u00e1s de una hora, tu identidad de Google caduca y el servidor rechaza lo que env\u00edes. Sal\u00eda un \u00abtoken no v\u00e1lido\u00bb que no dec\u00eda nada. Ahora dice que la sesi\u00f3n ha caducado, que vuelvas a entrar, y que NO se ha guardado nada \u2014 as\u00ed sabes que puedes repetir sin miedo a fichar dos veces.'},
-        {cara:'escritorio', vista:'horas', txt:'Igual aqu\u00ed, y es donde m\u00e1s pasa: este panel se deja abierto toda la tarde.'}
-      ] },
-    { id:'2026-08-08-reu-en-vivo', fecha:'2026-08-08',
-      titulo:'El mapa de calor del escritorio ya se llena solo',
-      items:[
-        {cara:'escritorio', vista:'reuniones', txt:'La reuni\u00f3n que tengas abierta se actualiza sola cada 20 segundos: ves llegar las respuestas de la gente sin recargar. Antes esta pantalla se quedaba con lo que trajo al entrar \u2014 y no lo dec\u00eda, as\u00ed que pod\u00edas estar decidiendo la fecha mirando un mapa de hace una hora.'},
-        {cara:'escritorio', vista:'reuniones', txt:'Solo se refresca si est\u00e1s en Reuniones, y no repinta si nadie ha contestado nada nuevo: una pantalla que se reconstruye sola cada 20 segundos para dejarse igual, molesta.'},
-        {cara:'movil', vista:'reu', txt:'En el m\u00f3vil esto ya funcionaba. Lo que cambia es que ahora las dos caras usan la misma pieza para saber si algo ha cambiado, en vez de una copia cada una.'}
-      ] },
-    { id:'2026-08-07-horas-cuatro', fecha:'2026-08-07',
-      titulo:'El parseo de horas estaba escrito cuatro veces',
-      items:[
-        {cara:'movil', vista:'horas', txt:'La duración de un parte se calculaba con un parseo de horas propio, distinto del que usan las reuniones. Con un dato raro daba NaN, y eso se propaga a las horas sin dar error: el parte saldría en blanco. Ahora las dos caras usan la misma.'},
-        {cara:'escritorio', vista:'reuniones', txt:'La rejilla de franjas de una convocatoria también estaba duplicada entre las dos caras. Una sola, y probada: dos días que empiezan a horas distintas ya no dan franjas que se pisen.'}
-      ] },
-    { id:'2026-08-07-novedades-tuyas', fecha:'2026-08-07',
-      titulo:'Novedades ya es solo tuya, y la app entra de una pasada',
-      items:[
-        {cara:'movil', vista:'estado', txt:'La entrada «Novedades» del menú NO tenía ninguna condición: en beta no se notaba, pero producción sirve el mismo HTML, así que los 32 la tenían con el registro de cambios de desarrollo. Ahora exige beta Y ser PD.'},
-        {cara:'escritorio', vista:'estado', txt:'Lo mismo aquí, y filtrado también por donde se entra de verdad: esconder el botón no cierra la puerta.'},
-        {cara:'movil', vista:'horas', txt:'El widget de la entrada se pintaba dos veces de más al abrir la app: había dos funciones pidiendo los mismos datos y la primera no marcaba la hora del último refresco, que es lo único que frena a la siguiente.'}
-      ] },
-    { id:'2026-08-07-curso', fecha:'2026-08-07',
-      titulo:'Ya se ve quién está fichado ahora mismo',
-      items:[
-        {cara:'escritorio', vista:'horas', txt:'La vista «Fichajes en curso» pintaba tres personas de mentira. Ahora pregunta al servidor: quién tiene la entrada abierta, desde qué hora, en qué unidad y cuánto lleva.'},
-        {cara:'escritorio', vista:'horas', txt:'Quien pasa de 10 h sale en ámbar, y quien está en pausa se pinta distinto de quien está trabajando.'},
-        {cara:'escritorio', vista:'horas', txt:'Si el servidor no contesta lo dice, en vez de enseñar una lista vieja donde alguien que cerró hace horas seguiría saliendo como fichado.'}
-      ] },
-    { id:'2026-08-07-ritmo', fecha:'2026-08-07',
-      titulo:'La comparativa de horas ya no dice que vas peor cuando vas mejor',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Debajo de la barra se comparaba tu mes A MEDIAS contra el mes anterior ENTERO. A día 7, con 9,8 h este mes y 31 h el pasado, salía −68 % — y salía en rojo a principios de todos los meses, arreglándose sola según pasaban los días. Ahora se compara el RITMO (h/día): ese mismo caso sale +40 %.'},
-        {cara:'movil', vista:'horas', txt:'Y «vs. equipo» compara con la media real de horas que lleva el equipo este mes, no con un 10,9 que estaba escrito a mano en el código y no se movía nunca. Si no hay dato, la fila no se pinta.'}
-      ] },
-    { id:'2026-08-07-avisos', fecha:'2026-08-07', titulo:'Los avisos de la convocatoria: los enciendes tú',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Interruptor nuevo «mandar los avisos al móvil». Nace APAGADO: hasta que lo enciendas no le llega nada a nadie.'},
-        {cara:'escritorio', vista:'turnos', txt:'Apagado la rutina sigue calculando y deja escrito lo que mandaría, así que cuando lo enciendas ya habrás leído el texto exacto.'},
-        {cara:'escritorio', vista:'turnos', txt:'Encendido avisa al abrir, a las 24 h, a las 3 h y a los 10 min — y el recordatorio solo a quien no ha contestado.'}
-      ]},
-    { id:'2026-08-07-mapa', fecha:'2026-08-07', titulo:'El mapa de disponibilidad ya es de verdad',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Pintaba los datos de ejemplo: se veía un mapa de calor con nombres y horas que no eran de nadie. Ahora sale de lo que ha contestado la gente.'},
-        {cara:'escritorio', vista:'turnos', txt:'Y si no hay convocatoria abierta, el mapa NO se queda con el de mentira — que es con lo que se repartirían turnos.'}
-      ]},
-    { id:'2026-08-07-convocar', fecha:'2026-08-07', titulo:'El botón de convocar ya hace algo',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Encolaba la convocatoria y NADIE la recogía: decía «Encolado» y no pasaba nada, nunca. Ya la monta la rutina.'},
-        {cara:'escritorio', vista:'turnos', txt:'Y hay una casilla nueva: «preguntar POR HORAS» — un toque marca el turno de 4 h. Antes era una constante del código y decidías tú por mensaje.'}
-      ]},
-    { id:'2026-08-07-sw', fecha:'2026-08-07', titulo:'Una notificación de la beta abría la app del equipo',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Las notificaciones llevaban la dirección de producción escrita a mano, así que tocar una de la beta te abría la app de verdad — y si la tenías abierta, se la traía encima.'},
-        {cara:'movil', vista:'estado', txt:'Ahora cada canal abre el suyo. No hacía falta que se notase para estar mal: siempre abría *una* app.'}
-      ]},
-    { id:'2026-08-07-detalle', fecha:'2026-08-07', titulo:'«Pedir detalle» ya sirve para algo',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Si te piden detalle, ahora VES LA PREGUNTA en la propia ficha — antes solo ponía «te piden más detalle» y tocaba adivinar.'},
-        {cara:'movil', vista:'horas', txt:'Y hay botón «Responder»: llega al formulario con lo que ya habías escrito, para corregir en vez de rehacerlo.'},
-        {cara:'movil', vista:'horas', txt:'Al responder, el parte vuelve a la cola y la petición deja de colgar — el coordinador ya no relee una queja que está contestada.'}
-      ]},
-    { id:'2026-08-07-origen', fecha:'2026-08-07', titulo:'Los partes ya dicen DE DÓNDE salen sus horas',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Tenías razón al dudar: «declarado sin fichaje» salía hasta en partes que enseñan su hora de entrada y de salida. Ahora esos dicen «declarado a mano».'},
-        {cara:'movil', vista:'horas', txt:'Y lo que otorga la coordinación dice «otorgada por» con el nombre, en gris — no en ámbar, que era acusar al miembro de algo que hizo el sistema.'},
-        {cara:'escritorio', vista:'horas', txt:'En el escritorio un parte otorgado salía con DOS etiquetas a la vez, contradiciéndose. Ahora sale una, y la misma que en el móvil.'},
-        {cara:'movil', vista:'horas', txt:'Y «Últimos movimientos» ya no dice «0 apuntes este mes» teniendo tu compensación ahí: la cuenta, que es un apunte.'}
-      ]},
-    { id:'2026-08-07-revertir', fecha:'2026-08-07', titulo:'Ya puedes deshacer un parte que firmaste',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Tarjeta nueva «Ya decidiste», debajo de la cola: ahí está lo que ya firmaste, por si te equivocaste.'},
-        {cara:'movil', vista:'horas', txt:'Revertir exige un motivo. Si las horas ya contaban en su mes, se le RESTAN — y la ficha te lo avisa antes, con la cifra.'},
-        {cara:'movil', vista:'horas', txt:'Y el aviso de aprobar ya no dice «no se puede deshacer»: desde hoy sería mentira.'}
-      ]},
-    { id:'2026-08-07-horas', fecha:'2026-08-07', titulo:'Horas: desplegables, y el parte aprobado ya desaparece',
-      items:[
-        {cara:'movil', vista:'horas', txt:'«Esperan tu decisión» es ahora un desplegable que dice cuántos partes y cuántas horas hay que conceder, sin abrirlo. Dentro, uno por miembro.'},
-        {cara:'movil', vista:'horas', txt:'«Tus partes» igual, con un solo nivel.'},
-        {cara:'movil', vista:'horas', txt:'Y al aprobar, el parte YA desaparece de la lista: antes se quedaba hasta que aprobabas el siguiente.'},
-        {cara:'movil', vista:'fichar', txt:'Un envío no puede crear dos partes aunque la red falle y se reintente.'}
-      ]},
-    { id:'2026-08-07-registro', fecha:'2026-08-07', titulo:'Lo que marcas como visto ya no se queda en tu móvil',
-      items:[
-        {cara:'movil', vista:'estado', txt:'El «Ya lo he visto» se guarda en el servidor, con la fecha y quién lo marcó — así lo ve también quien programa.'},
-        {cara:'escritorio', vista:'panel', txt:'Mismo registro en las dos caras: marcas en una y aparece marcado en la otra.'},
-        {cara:'movil', vista:'estado', txt:'Si el servidor no contesta, te lo dice en vez de perderlo en silencio.'}
-      ]},
-    { id:'2026-08-06-perfil', fecha:'2026-08-06', titulo:'Elegir con qué cargo fichas',
-      items:[
-        {cara:'movil', vista:'fichar', txt:'Si tienes más de un cargo, arriba de la justificación sale «Fichas como»: eliges con cuál. Con uno solo no aparece nada.'},
-        {cara:'movil', vista:'fichar', txt:'Debajo te dice QUIÉN LO VA A FIRMAR y a qué subsistema cuentan esas horas, antes de enviarlo.'},
-        {cara:'movil', vista:'fichar', txt:'Si fichas como coordinador de lo tuyo, sube al PD: nadie firma lo suyo.'}
-      ]},
-    { id:'2026-08-06-horas', fecha:'2026-08-06', titulo:'Aprobar horas desde el teléfono',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Bloque «Esperan tu decisión» lo primero de Horas: aprobar, pedir detalle o rechazar las horas de tu gente, con motivo obligatorio.'},
-        {cara:'movil', vista:'horas', txt:'Lo que no está enrutado cae en el PD — sale solo de que nadie decide lo suyo.'}
-      ]},
-    { id:'2026-08-06-turnos-admin', fecha:'2026-08-06', titulo:'Convocar y ver la disponibilidad',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'«Convocar disponibilidad»: abres el plazo de una semana. Solo rango ≥ 3.'},
-        {cara:'escritorio', vista:'turnos', txt:'Mapa de la semana: cuánta gente puede, filtro CUVI/CITI, símbolo de coche y desglose en tres cestas al pasar el ratón.'},
-        {cara:'escritorio', vista:'turnos', txt:'Debajo del mapa: cuánta gente ha contestado y QUIÉN NO.'}
-      ]},
-    { id:'2026-08-06-turnos-movil', fecha:'2026-08-06', titulo:'Cubrir disponibilidad de turnos',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'Pincel arriba (CUVI · CITI · Los dos · No puedo + coche) y rejilla de la semana. Repintar lo mismo lo borra.'},
-        {cara:'movil', vista:'turnos', txt:'El pie dice cuántas horas quedan de plazo y cuántas casillas llevas SIN contestar.'}
-      ]}
-  ];
+  /* PODADO AL PUBLICAR A PRODUCCION: 152 KB que esta cara no puede pintar.
+     El original vive en `comun.js` y viaja entero a beta. */
+  return [];
 }
 
 /* Lo que YA se ha visto, en este navegador: `{id: {at}}`. Nunca lanza. */
@@ -5861,6 +4885,16 @@ function _novPorVista_(cara){
    `cara` es 'movil' | 'escritorio'. Si no hay nada de esa cara, devuelve '' — y entonces la
    capa **no existe**, que es lo que la hace «completamente retirable». */
 function _novHTML_(cara){
+  /* ⛔⛔ LA PUERTA VA AQUI DENTRO, NO EN LOS LLAMADORES (06/10). `_puedeVerNovedades_`
+     existia y la vigilaba un banco entero... pero solo la cruzaban el MENU y el MODAL: este
+     panel se pinta **lo primero** de la pantalla de inicio en las dos caras --
+     `equipo.movil.js` y `escritorio.html` lo llaman a pelo-- y no preguntaba nada. Resultado:
+     las novedades salian en PRODUCCION para los 32. Lo vio Daniel, no un banco.
+     ⚠️ Repetir la guarda en los dos llamadores es como se separan: el dia que entre una
+     tercera cara, su autor no sabra que hacia falta. Aqui no se puede olvidar.
+     ⚠️ Y falla CERRADO: si la puerta no esta cargada, no se pinta. Un escape aqui es la
+     capa de revision interna delante del equipo entero. */
+  if(typeof _puedeVerNovedades_!=='function' || !_puedeVerNovedades_()) return '';
   var d=_novDe_(cara);
   if(!d.pendientes.length && !d.hechas.length) return '';
   var item=function(i){ return '<li>'+esc(i.txt)+'</li>'; };
