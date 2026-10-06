@@ -1296,9 +1296,12 @@ function _desgloseMesHTML_(confs){
      `_compHorasHTML_`: «el fallo nunca fue comparar con junio: fue LLAMARLO julio».
      ⚠️ `_nomPeriodo_` es la puerta que ya existe para esto, con su cita dentro; el reloj
      se queda SOLO de respaldo, para cuando el backend no manda periodo. */
-  var _perD=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;   /* ⛔ por la puerta (791.ª) */
+  /* ⛔ Y ESTA COMPOSICION SE MUDO A `_nomMesAbierto_` (06/10): era la unica copia, y
+     el escritorio necesitaba la misma pregunta en TRES sitios. Cuatro copias de
+     «como se llama el mes abierto» acaban siendo cuatro respuestas. El respaldo al
+     reloj (`_hoyDateM_`, no `new Date()`) viaja dentro de la puerta. */
   return '<div class="mtit">Desglose de '+
-      esc(_perD ? _nomPeriodo_(_perD) : _mesLargo_(_hoyDateM_()))+'</div>'+
+      esc(_nomMesAbierto_())+'</div>'+
     '<div class="msub">Todas tus contribuciones de este mes, sin recortar.</div>'+
     '<div class="tarj">'+
       '<div class="cifh"><span class="g mono">'+nf2(total)+'</span><span class="sc">h '+

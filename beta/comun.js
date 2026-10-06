@@ -3210,6 +3210,35 @@ function _nomPeriodo_(p){
   return (MESES_L[i]||m[2])+' de '+m[1];
 }
 
+/* ⛔⛔ COMO SE LLAMA EL MES QUE SE ESTA PINTANDO — UNA SOLA PUERTA (06/10/2026).
+
+   El mes de trabajo va **de cierre a cierre** (§2b), no del 1 al 31, asi que el nombre NO
+   puede salir del reloj: del 1 al 4 de cada mes el periodo abierto sigue siendo el
+   anterior. ⛔ Ya paso, y esta escrito en `horas.movil.js`: *«del 01 al 04 de agosto esto
+   se titulaba «Desglose de agosto 2026» y listaba los partes de JULIO»*. Y lo dice mejor
+   `_compHorasHTML_`: **«el fallo nunca fue comparar con junio: fue LLAMARLO julio»**.
+
+   ⛔ EXISTE PORQUE LA LECCION ESTABA CURADA EN UNA CARA Y NO EN SU GEMELA. El movil ya
+   componia `_periodoAbierto_` + `_nomPeriodo_` con el reloj de respaldo; el escritorio
+   rotulaba con `_mesLargo_(new Date())` en **tres** sitios — el titulo de «Horas por
+   miembro», su columna del mes y el subtitulo de «Este mes». Escribir la composicion otras
+   tres veces habria dejado **cuatro copias** de la misma pregunta.
+
+   ⚠️ Y EL RESPALDO ES `_hoyDateM_()`, NO `new Date()`: aquel sale de `HOY`, que es la
+   fecha con la que la app trabaja; el reloj crudo puede no ser la misma. El respaldo se
+   usa solo cuando NO se sabe el periodo — antes de que llegue el panel, o sin cierres —,
+   y callar el rotulo entero seria peor: la pantalla no diria de que mes habla.
+
+   `corto` da solo el mes («octubre») para una cabecera de columna; sin el, el nombre
+   completo con su ano, en el mismo formato que ya usaba cada sitio. */
+function _nomMesAbierto_(corto){
+  var p = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  var m = /^(\d{4})-(\d{2})$/.exec(String(p||''));
+  if(m) return corto ? (MESES_L[parseInt(m[2],10)-1]||m[2]) : _nomPeriodo_(p);
+  var d = _hoyDateM_();
+  return corto ? MESES_L[d.getMonth()] : _mesLargo_(d);
+}
+
 /* ⚠️ `hoy` ES OPCIONAL Y EXISTE PARA PODER PREGUNTARLE, igual que en `_finDeMes_`: sin
    fecha inyectable, su caso solo se puede escribir para el mes en el que corre el banco -- y
    el que importa es el SALTO DE AÑO, que solo pasa en enero. Produccion la sigue llamando sin
@@ -4586,6 +4615,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-06-mes-de-trabajo', fecha:'2026-10-06',
+      titulo:'El mes que ves es el de TRABAJO, no el del calendario',
+      items:[
+        {cara:'escritorio', vista:'registro', txt:'<b>Horas › Horas por miembro.</b> El título y la columna del mes salían del <b>reloj</b>, y el mes de trabajo va de cierre a cierre. Los primeros días de cada mes eso ponía el nombre del mes nuevo encima de los partes del viejo. Ahora dicen el mes que de verdad está abierto.'},
+        {cara:'movil', vista:'horas', txt:'<b>Y en el móvil el «Desglose de…» ya lo hacía bien</b>, pero cada cara lo calculaba por su cuenta. Ahora las dos preguntan en el mismo sitio, así que no pueden volver a decir cosas distintas.'}
+      ] },
     { id:'2026-10-06-objetivo-a-hoy', fecha:'2026-10-06',
       titulo:'«vs. objetivo» compara con lo que toca A DÍA DE HOY, y en horas',
       items:[
