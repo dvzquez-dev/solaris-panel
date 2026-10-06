@@ -582,15 +582,20 @@ function deltaHTML(k,v,ref,txt){
     '<span class="rr">'+esc(txt)+'</span></span></div>';
 }
 
-function animarDeltas(root){
+function animarDeltas(root, silencioso){
   $$('.dlt',root||document).forEach(function(el){
     var w=parseFloat(el.dataset.w), l=parseFloat(el.dataset.l);
     var f=$('.f',el), m=$('.m',el);
-    f.style.width='0'; f.style.left='50%'; m.style.left='50%';
-    setTimeout(function(){
+    var fin=function(){
       f.style.width=w+'%'; f.style.left=l+'%';
       m.style.left=(el.classList.contains('pos')?50+w:50-w)+'%';
-    }, redu()?0:80);
+    };
+    /* ⛔ CON DATO DE FONDO SE PINTA EL ESTADO **FINAL**, no el inicial: es la regla
+       que ya seguían `armarMedidor` y `animarBarras` y que esta se saltaba. Pasar por
+       cero es justo lo que se ve como un parpadeo. */
+    if(silencioso){ fin(); return; }
+    f.style.width='0'; f.style.left='50%'; m.style.left='50%';
+    setTimeout(fin, redu()?0:80);
   });
 }
 
