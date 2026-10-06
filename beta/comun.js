@@ -810,7 +810,9 @@ function _tareaAccion_(e){
    que no decirlo — la misma trampa que el plazo del Art. 34 en esta misma pantalla. Por eso va
    en UNA puerta con nombre: cambiarlo cuando lo diga es **una línea**, y la pantalla deriva de
    aquí el texto que ensena, sin repetir el número. */
-function _minDeshacerTarea_(){ return 30; }
+function _minDeshacerTarea_(){ return 15; }   /* 15, y lo dijo Daniel el 06/10: «15 min».
+  Los 30 de antes eran PROVISIONALES MIOS, no suyos. La pantalla deriva su texto de aqui,
+  asi que cambiar este numero no deja ningun rotulo viejo. */
 
 /* ⛔ EL INSTANTE ENTRA POR ARGUMENTO. Un caso que dependa de `new Date()` acierta o falla
    según la hora a la que se corra la batería (§3c-36, la única ciega de 2.430).
