@@ -109,7 +109,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=f701495"></script>
+<script src="comun.js?v=407a15b"></script>
 <script src="notis.escritorio.js?v=6ac9b14"></script>
 <script src="cierre.escritorio.js?v=ddcd168"></script>
 <script src="turnos.escritorio.js?v=9f01417"></script>
@@ -996,7 +996,18 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
       kpi('Esperan tu decisión',mias.length,mias.length?'los firmas tú':'nada tuyo en cola',mias.length?'wa':'up')+
       kpi('Horas en el aire',nf(totH,1)+'<small> h</small>','no cuentan hasta aprobarse','wa')+
       kpi('Cola completa',cola.length,'de todo el equipo','')+
-      kpi('Resueltos este mes',hist.length,'con su motivo registrado','up')+
+      /* ⛔⛔ ANTES ERA `hist.length`: el histórico ENTERO bajo un rótulo que dice «este
+         mes», y **el mismo número** que el panel «Histórico» de 25 líneas más abajo. Un
+         duplicado y una mentira a la vez (781.ª, 06/10 — 🗣️ *«y no pongas stats
+         INÚTILES»*). Ahora sale de `decidido_at`, que ya viajaba.
+         ⚠️ Y si algún decidido no trae fecha, la tarjeta lo DICE en vez de dejar que el
+         número parezca completo. Sin periodo, «—»: no se sabe qué mes es. */
+      (function(){
+        var _rp=_resueltosDelPeriodo_(hist, _perH);
+        return kpi('Resueltos este mes', _rp?_rp.n:'\u2014',
+          _rp ? ('con su motivo registrado'+(_rp.sinFecha?' · '+_rp.sinFecha+' sin fecha de decisión':''))
+              : 'no se sabe qué mes está abierto', _rp?'up':'');
+      })()+
     '</div>'+
     pan('Requieren tu decisión',mias.length+' partes',
       mias.length?mias.map(parteCard).join(''):vacioSimple('La cola está limpia',
@@ -3204,7 +3215,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='2e848cf';
+var BUILD='04550ac';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

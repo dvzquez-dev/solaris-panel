@@ -2919,6 +2919,37 @@ function _deEstaTemporada_(d){
    sin cerrarse. Se usa el mes porque es lo que la cara puede saber sola, y para lo
    que esto hace —quitar ruido de lo viejo— basta. Lo que **nunca** se pliega es el
    mes en curso. */
+/* CUANTOS SE RESOLVIERON EN EL PERIODO ABIERTO. Devuelve `{n, sinFecha}` o `null`.
+
+   🗣️ Daniel, 05/10: *«y no pongas stats INÚTILES»*. Y el criterio que salió con el encargo:
+   una stat es inútil si **se deriva de otra que está al lado**.
+
+   ⛔⛔ EL KPI «Resueltos este mes» IMPRIMÍA `hist.length`, o sea `PARTES.filter(estado!=='pend')`
+   **sin ningún filtro de mes** — y el panel «Histórico» de **25 líneas más abajo** imprime el
+   MISMO número. Un duplicado **y** un rótulo que miente, los dos a la vez. Y el daño no es
+   estético: ese número no baja nunca, así que no dice nada del mes en el que estamos.
+
+   ✅ Y EL DATO PARA HACERLO VERDAD YA VIAJA: `decidido_at`, que el backend escribe como ISO
+   (`Codigo.gs:2454`) y traen los 2 de 2 decididos de la semilla. No había que añadir nada.
+
+   ⛔ UN DECIDIDO SIN FECHA NO SE CUENTA COMO «de otro mes»: `Codigo.gs:2522` inicializa
+   `decidido_at: ''`, así que el caso existe de verdad. Se cuentan aparte (`sinFecha`) y la
+   tarjeta lo DICE — esconderlos hace que el número parezca completo cuando no lo es.
+
+   ⛔ Y SIN PERIODO DEVUELVE `null`, NO 0 (§3c-24): un 0 ahí afirma «este mes no has resuelto
+   nada» cuando lo que pasa es que no se sabe qué mes es. ⚠️ Con la lista VACÍA sí devuelve
+   `{n:0}`: «no hay partes» se sabe, y es otra cosa. */
+function _resueltosDelPeriodo_(partes, periodo){
+  if(!/^\d{4}-\d{2}$/.test(String(periodo||''))) return null;
+  var L = partes || [], n = 0, sf = 0, i, d;
+  for(i = 0; i < L.length; i++){
+    d = String((L[i] || {}).decidido_at || '');
+    if(!/^\d{4}-\d{2}/.test(d)){ sf++; continue; }
+    if(d.slice(0, 7) === String(periodo)) n++;
+  }
+  return { n: n, sinFecha: sf };
+}
+
 function _esDeMesPasado_(p, periodo){
   var per = String(periodo||'');
   if(!/^\d{4}-\d{2}$/.test(per)) return false;
