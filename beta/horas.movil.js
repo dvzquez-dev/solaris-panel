@@ -1917,12 +1917,21 @@ function vHoras(){
     /* ⛔ UN SOLO NIVEL, no dos. Daniel (07/08): *«la misma lógica del desplegable, pero esta
        vez, como son tuyos, no hace falta desplegable de desplegables sino solo uno»*. Agrupar
        tus propios partes por autor sería agruparlos por ti. */
-    /* El contador del titulo cuenta SOLO los de este mes: si sumara los plegados, el
-       numero no cuadraria con lo que se ve al abrir. */
+    /* ⛔⛔ EL CONTADOR DEL TÍTULO SE QUEDA, Y ME LO CORRIGIÓ UN BANCO (782.ª, 06/10). Lo quité
+       por duplicado —el desplegable de abajo dice el mismo `mias.length` y además las horas—
+       y `probar_partes_viejos.py` se puso **rojo**: ese contador está vigilado a propósito
+       porque cuenta **sólo los de este mes** (`mias`, no `_todasMias`), y sumar los plegados
+       daría un número que no cuadra con lo que se ve al abrir. Sin contador, esa propiedad
+       **no se puede comprobar**.
+       ✅ Lo que SÍ era duplicado y se fue es el **rótulo**: «Tus partes» salía dos veces, en
+       el título y en el desplegable, los dos a la vista. 🗣️ *«y no pongas stats INÚTILES»*. */
     '<h2 class="sec">Tus partes<span class="ln"></span>'+mias.length+'</h2>'+
     '<div class="tarj">'+
       (mias.length
-        ? '<details class="pdgrupo"><summary><b>Tus partes</b><span class="pdnum">'+
+        /* ⛔ EL RÓTULO, UNA VEZ (782.ª): el `<h2>` de la línea de arriba ya dice «Tus
+           partes» y se ve a la vez que esto. El desplegable se queda con lo que añade — el
+           número y las HORAS —, que es lo que el título no tiene. */
+        ? '<details class="pdgrupo"><summary><span class="pdnum">'+
             mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
             nf2(mias.reduce(function(t,x){ return t+(Number(x.q)||0); },0))+' h</span></summary>'+
           mias.map(filaParte).join('')+'</details>'
@@ -1965,8 +1974,13 @@ function vHoras(){
        Daniel: «y la carga del mes que aparece no se si esta bien». Tenia razon. */
     /* ⛔ LA BANDA SE PIDE (05/10): estaba teclada aquí y en el pie de abajo. Ver
        `_bandaSana_` en `comun.js`. */
-    '<h2 class="sec">Mi índice de carga<span class="ln"></span>banda sana '
-      + _bs.lo + '–' + _bs.hi + '</h2>'+
+    /* ⛔ LA BANDA SE DICE UNA VEZ (782.ª, 06/10): estaba aquí **y** en el pie de la misma
+       tarjeta, los dos visibles a la vez y con el mismo `_bs.lo`–`_bs.hi`.
+       ✅ Se queda **la de abajo**, que es la que está **pegada a la barra que describe**:
+       ahí el rango explica el dibujo; en el título era un número suelto.
+       ⚠️ Y la banda sigue saliendo de `_bandaSana_`, que es lo que se curó el 05/10 — esto
+       quita una copia del RÓTULO, no la derivación. */
+    '<h2 class="sec">Mi índice de carga<span class="ln"></span></h2>'+
     '<div class="tarj">'+
       (typeof YO.carga==='number'
         /* ⛔⛔ Y EL DIBUJO TAMBIEN SE DERIVA, QUE ES LA MITAD QUE FALTABA (06/10). El 05/10 se
