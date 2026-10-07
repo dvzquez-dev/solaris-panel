@@ -531,7 +531,15 @@ function barraHorasHTML(id){
     /* La comparativa se compara contra lo que YA CUENTA, no contra el total con lo
        pendiente: lo pendiente puede caerse en la firma y entonces la comparacion
        habria dicho lo contrario de lo que acaba pasando. */
-    _compHorasHTML_(cont);
+    /* ⛔⛔ CRUDAS, NO DEVENGADAS: `_compHorasHTML_` aplica la rampa ELLA (su línea 428),
+       así que pasarle `cont` —que ya viene de `_hMesDevengado_` para la barra— descontaba la
+       base **dos veces**. 📏 Medido con el PD el 07/10 (7 h, base 7, fracción 0,1137):
+       `cont` 0,796 → `_bt` −5,41 → `max(0,…)` **0**, y la pantalla decía *«Tu ritmo: 0 h/día
+       (0 h en 3 de 30.45 días)»* con 7 h hechas. Lo cazó Daniel mirando su móvil, no un banco.
+       ⛔ Y no dio ningún error porque el suelo `Math.max(0, …)` —que está para que nadie
+       salga en negativo— convirtió un número **imposible** en uno **plausible**.
+       ⚠️ El camino sin Notion ya pasaba el crudo, así que con datos de demo esto NO se veía. */
+    _compHorasHTML_(notion ? _hm : cont);
 }
 
 function _guardarAnchos_(){ try{ localStorage.setItem('sol_anchos',JSON.stringify(_anchoPrev_)); }catch(_){} }
