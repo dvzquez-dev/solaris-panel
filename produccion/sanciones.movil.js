@@ -164,7 +164,12 @@ function _sancionesHTML_(){
 }
 
 function _sancColaHTML_(){
-  if(SANC_M===null) return '<div class="tarj">'+vacio('Cargando…','Buscando qué espera decisión.','',true)+'</div>';
+  /* ⛔ TRES ESTADOS, NO DOS: `null` + `SANC_FALLO` es «no contestó», y lleva su botón.
+     ⚠️ El radar se para (`buscando=false`): un radar girando sobre un fallo es la misma
+     mentira de antes con otro texto. */
+  if(SANC_M===null) return '<div class="tarj">'+(SANC_FALLO
+    ? vacio('No se pudo cargar','El servidor no contestó. <button class="btn mini" data-p data-sreint>Reintentar</button>','',false)
+    : vacio('Cargando…','Buscando qué espera decisión.','',true))+'</div>';
   if(!SANC_M.length) return '<div class="tarj">'+vacio('Nada pendiente','Ninguna sanción espera decisión.','',false)+'</div>';
   var porLote={};
   SANC_M.forEach(function(x){ var k=x.lote||'(sueltas)'; (porLote[k]=porLote[k]||[]).push(x); });
@@ -225,8 +230,13 @@ async function _abrirSanciones_(){
   /* ⛔ Y EL SEGUNDO REPINTADO, EL DE DESPUES DE ESPERAR A LA COLA, TAMBIEN POR LA PUERTA: entre
      que se abre la pantalla y llega `getSanciones` hay una espera de red, y ahi ya se puede
      estar escribiendo. Era la misma ventana que la del callback de tareas. */
-  if(SANC_M===null){ await _cargarSancionesM_(); if($('#modal').classList.contains('on')){
-    _repintarSancM_(); } }
+  /* ⛔ Y SE MIRA LO QUE DEVUELVE. Aquí ponía `await _cargarSancionesM_();` a secas: si
+     fallaba, `SANC_M` seguía `null` y la cola se quedaba diciendo «Cargando…» **para
+     siempre**. La función devuelve `false` justo para esto. */
+  if(SANC_M===null){ SANC_FALLO=false;
+    var _okS = await _cargarSancionesM_();
+    SANC_FALLO = (_okS === false);
+    if($('#modal').classList.contains('on')){ _repintarSancM_(); } }
 }
 
 /* ⛔ LA UNICA PUERTA PARA REPINTAR EL MODAL DE SANCIONES. Gemela de `_repintarPonerSanc_`
@@ -380,6 +390,13 @@ function _cablearSanciones_(){
     }
   };
 
+  /* ⛔ EL BOTÓN DE REINTENTAR. Vuelve a `_abrirSanciones_`, que con `SANC_M===null` carga
+     otra vez — o sea que el reintento usa **la misma puerta**, no una segunda copia de la
+     carga. Se apaga `SANC_FALLO` antes de repintar para que se vea el «Cargando…» de
+     verdad mientras va. */
+  $$('[data-sreint]').forEach(function(b){
+    b.onclick=function(){ SANC_FALLO=false; _repintarSancM_(); _abrirSanciones_(); };
+  });
   /* Sueltas: se deciden una a una. */
   $$('[data-sok]').forEach(function(b){ b.onclick=function(){ _decidirSancM_(b.dataset.sok,'aprobar',b); }; });
   $$('[data-sno]').forEach(function(b){ b.onclick=function(){ _decidirSancM_(b.dataset.sno,'rechazar',b); }; });

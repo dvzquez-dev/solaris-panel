@@ -167,6 +167,37 @@ function _rearmarCargas_(){
   if(!CARGA.fichaje   && _reintentoPasivo_('fichaje',   _cargarFichajeAbierto_, repintar)) n++;
   if(!CARGA.partes    && _reintentoPasivo_('partes',    _cargarMisPartes_,      repintar)) n++;
   if(!CARGA.reuniones && _reintentoPasivo_('reuniones', _cargarReunionesM_,     repintar)) n++;
+  /* ⛔⛔ EL LIBRO DE PUNTOS ENTRA AQUI (07/10), Y LA COLA DE SANCIONES **NO** — CON SU
+     MEDICION. La ficha pedía cablear `_cargarSancionesM_` y `_cargarMovimientosM_`; al medirlas
+     resulta que **sólo una se puede**:
+       ✅ `_cargarMovimientosM_` → **sí**. `MOVS` lo escribe **sólo su propia carga** (medido: los
+          únicos escritores son ella y el vaciado al cambiar de persona), así que un reintento
+          tardío no puede pisar nada del usuario. Y es la lista de DISCIPLINA: su silencio se lee
+          como «estoy limpio», que es el peor de los silencios — por eso es la que más falta.
+       ⛔ `_cargarSancionesM_` → **NO, y el motivo de verdad es OTRO — re-medido el 07/10.**
+          ⛔⛔ **Aquí puse que un reintento «te borra lo marcado», y es FALSO.** La marca va al
+          backend **antes** de tocar nada local: `sanciones.movil.js:390` hace
+          `await api.decidirSancion(…,'marcar',{decision:…})` y sólo en la línea siguiente
+          escribe `x.dec`; si el servidor falla, no se escribe y sale un aviso. O sea que
+          **no existe marca sin enviar**, y el servidor ya guarda el borrador en
+          `s.decision`. Lo único que queda es una ventana estrecha: una respuesta **rancia**
+          que salga antes de marcar y llegue después enseñaría el estado viejo **hasta la
+          siguiente carga**, que no es pérdida.
+          ✅ **El motivo real para no cablearla es que NO ES UNA CARGA DE ARRANQUE**: sus dos
+          únicos llamadores son `_abrirSanciones_` (al abrir el modal) y el refresco de antes
+          de cerrar un bloque. `SANC_M===null` al arrancar **es lo normal**, no un fallo, así
+          que armarle un reintento aquí cargaría de más a **todo el mundo** por una pantalla
+          que casi nadie abre. Lo que sí fallaba era que su fallo se veía como «Cargando…»
+          para siempre, y eso **ya está arreglado** (`SANC_FALLO`, 07/10) — donde toca, que es
+          en la pantalla, no aquí.
+          ⚠️ Así que son **tres** las que no se cablean, no cuatro: `_cargarFichajeAbierto_`
+          resucita una sesión cerrada, `_cargarPartesDec_` devuelve a la cola un parte
+          firmado y `_cargarReunionesM_` desalinea la rejilla. La de sanciones no está en
+          esa familia: está fuera por ser **perezosa**.
+     ⚠️ Y la bandera que se pregunta es `_llego_('movs')`, no una de `CARGA`: el libro no tiene
+     entrada en `CARGA`, y su bandera ya existe justo porque «`MOVS` vacío» no decía por qué. */
+  if(typeof MOVS !== 'undefined' && !_llego_('movs') &&
+     _reintentoPasivo_('movs', _cargarMovimientosM_, repintar)) n++;
   return n;
 }
 
@@ -1237,7 +1268,11 @@ function _movHorasHTML_(confs, pends){
       /* ⚠️ EL CONTADOR SIGUE SIENDO EL DE LOS QUE CUENTAN. `_apuntesMes_` anuncia lo que
          YA suma --su contrato lo vigila su banco--, y lo que espera firma se dice APARTE
          con su propio número: sumarlo ahí diría que cuenta. */
+      /* ⛔ Y LOS QUE NO TIENEN FECHA LEGIBLE, DICHOS. `_ultimosMov_` los deja en la lista
+         a proposito (esconder una hora seria peor) pero **no puede saber de que mes son**,
+         y hasta hoy iban dentro del «este mes» sin mas. Ver `sinFecha` en `comun.js`. */
       '<b>Últimos movimientos</b><small>'+_ap+' apunte'+(_ap===1?'':'s')+' este mes'+
+        (r.sinFecha?(' · '+r.sinFecha+' sin fecha'):'')+
         (_ef.n?(' · '+_ef.n+' esperando firma'):'')+' · '+
         'de qué se componen estas horas</small>'+
       '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
@@ -1526,7 +1561,22 @@ function _cargarPartesDec_(){
   return _cargarCierrePlan_().then(function(){ return api.getPartes({}); }).then(function(arr){
     if(!Array.isArray(arr)) return;
     var yo=(typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
-    var _mando = (typeof rangoNom==='function' ? rangoNom(yo) : 0) >= 3;
+    var _rg = (typeof rangoNom==='function' ? rangoNom(yo) : 0);
+    var _mando = _rg >= 3;
+    /* ⛔⛔ QUIEN NO PUEDE FIRMAR NO TIENE COLA, NI LA DE ESPERA NI LA DE «YA DECIDISTE».
+       🗣️ Daniel, 07/10/2026: *«y claro, para muchos no deberia contar evidentemtne los q no
+       puieden aprobar partes no les viene nada a cuento ese boton»*.
+       ⚠️ Y NO es solo cortesia: a un miembro raso el backend ya le sirve SOLO lo suyo
+       (`_getPartes_`: sin rango, `ver` pide `p.autor === nom`) y los dos filtros de abajo
+       quitan lo propio, asi que las dos listas le salian vacias de todas formas. **Donde SI
+       se veia es con «Ver como»**: ahi `arr` es la respuesta que el backend dio A TI --la cola
+       entera que TU puedes firmar-- y la vista previa le pintaba al otro una tarjeta de
+       decision que esa persona no vera nunca. La prevision mentia sobre la pantalla que
+       prometia ensenar.
+       ✅ El criterio es `rangoNom >= 1` --«tiene gente bajo su jurisdiccion»-- que es LA MISMA
+       puerta que usa el backend para dejar decidir (`_puedeSobreParte_`: rango 3, o rango 1 y
+       coordinador del subsistema del autor). Un segundo criterio aqui seria otra verdad. */
+    if (_rg < 1){ PARTES_DEC = []; PARTES_REV = []; return; }
     PARTES_DEC = arr.filter(function(p){
       return (p.estado==='pendiente' || p.estado==='detalle') && (_mando || p.autor!==yo);
     }).map(_normPDec_);
@@ -1715,8 +1765,11 @@ function _pdRevFichaHTML_(p){
    Daniel (07/08): *«un sitio donde revisar/modificar/revertir los partes aprobados, como las
    sanciones»*. Hasta hoy una firma equivocada se quedaba firmada para siempre.
 
-   ⛔ **Nace cerrado, y va DEBAJO de «Esperan tu decision»**: lo que hay que hacer va antes que
-   lo que ya esta hecho. Arriba competiria por la atencion con la cola de verdad. */
+   ⛔ **Nace cerrado, y va DEBAJO DE «TUS PARTES»** --o sea al fondo de los tres bloques de
+   partes--: lo que hay que hacer va antes que lo que ya esta hecho. Arriba competia por la
+   atencion con la cola de verdad Y ademas empujaba tus propias horas media pantalla abajo.
+   ⚠️ Hasta el 07/10/2026 ponia «debajo de "Esperan tu decision"» y estaba AHI, o sea segunda
+   de todo. Daniel: 🗣️ *«no tiene sentido ninguno. deberia estar debajo de tus partes no?»*. */
 function _pdRevHTML_(){
   return _pdGrupoHTML_('prev', 'Ya decidiste',
     'Repasa lo que ya firmaste. <b>Revertir exige un motivo</b>; si las horas ya contaban, se '+
@@ -1884,23 +1937,41 @@ function vHoras(){
      ✅ `_hMesDe_` es LA puerta (`comun.js`): prefiere el `hRitmo`/`hMes` que ya calculó el
      motor —ponderado— y sólo cae a `horasTemp/meses` si el panel no lo trae, que es el
      respaldo honesto. Un número que decide un ranking no se vuelve a calcular a mano. */
-  var _hm=_hMesDe_(YO);
+  /* ⛔⛔ ESTE NO ES EL MISMO NÚMERO QUE EL `_hm` DE LA TARJETA, Y HASTA EL 07/10
+     COMPARTÍAN NOMBRE DENTRO DE LA MISMA FUNCIÓN. En JS el `var` es de FUNCIÓN, así que
+     este **pisaba** al de arriba para el resto de `vHoras`, y son **dos magnitudes**:
+       · `_hMesReal_(m)` → `m.horasMes`: las horas **reales del mes**. Es lo que dice la
+         tarjeta «Horas del mes» y de lo que sale `cuentan`.
+       · `_hMesDe_(m)` → `hRitmo` → `hMes` → `horasTemp/meses`: un **PONDERADO**, que es
+         lo que ordena el ranking — y por eso es el que va en la fila de «(tú)».
+     📏 Medido el 07/10: de los **8** usos de `_hm` en la función, **3** leen el de arriba
+     y **5** este, y hoy **no se solapan** — o sea que **no hay ningún número mal en
+     pantalla**. Lo que hay es una trampa cargada: quien añada una línea entre las dos y
+     lea `_hm` se lleva **la que le toque por orden de ejecución**, y las dos son
+     plausibles — una en h/mes reales y la otra en h/mes ponderadas.
+     ✅ Un nombre, una magnitud. Es lo único que lo cierra. */
+  var _hmPond=_hMesDe_(YO);
   /* ⛔ Y LA GUARDA DE ESTA PANTALLA SE QUEDA, que la puerta no la puede dar. El respaldo
      de `_hMesDe_` con `meses:0` devuelve las horas **CRUDAS sin dividir** — decisión suya
      del 14/08 —, y aquí eso sería un TOTAL disfrazado de ritmo en la columna de h/mes.
      Si el motor no mandó ritmo y no hay meses, **no se finge**: sale «—». */
-  if(_hm!=null && !YO.meses && typeof YO.hRitmo!=='number' && typeof YO.hMes!=='number') _hm=null;
+  if(_hmPond!=null && !YO.meses && typeof YO.hRitmo!=='number' && typeof YO.hMes!=='number') _hmPond=null;
   for(var i=Math.max(1,puesto-2); puesto>0 && i<=Math.min(total,puesto+2); i++){
     filas += (i===puesto)
       ? '<div class="r yo"><span class="p mono">'+i+'</span><span class="n">'+esc(YO.pila)+' (tú)</span>'+
-        '<span class="h mono">'+(_hm==null?'—':h1(_hm))+'</span></div>'
+        '<span class="h mono">'+(_hmPond==null?'—':h1(_hmPond))+'</span></div>'
       : '<div class="r"><span class="p mono">'+i+'</span><span class="cens"></span></div>';
   }
 
-  /* Lo que ESPERA TU FIRMA va lo primero: es de otra gente y tiene a alguien esperando. */
+  /* Lo que ESPERA TU FIRMA va lo primero: es de otra gente y tiene a alguien esperando.
+     ⛔ Y «YA DECIDISTE» NO: ESA VA ABAJO, DEBAJO DE «TUS PARTES» (Daniel, 07/10/2026).
+     🗣️ *«no entiendo porque la pensataña de "Ya decidiste" está arriba de todo, no tiene
+     sentido ninguno. deberia estar debajo de tus partes no?»*.
+     ✅ Y no contradice la decision del 07/08 --«va debajo de "Esperan tu decision"»-- sino
+     que la extiende: lo que hay que HACER va antes que lo tuyo, y lo que ya esta HECHO va
+     despues. En medio quedaba empujando tus propias horas media pantalla abajo. */
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     _partesDecHTML_()+
-    _pdRevHTML_()+
     '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'aprobadas · otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
@@ -1967,6 +2038,10 @@ function vHoras(){
           viejas.map(filaParte).join('')+'</details>'
         : '')+
     '</div>'+
+
+    /* ⛔ AQUI, Y NO ARRIBA: lo que ya firmaste va DESPUES de lo tuyo (Daniel, 07/10). Ver
+       el porque entero al principio de esta funcion. */
+    _pdRevHTML_()+
 
     /* Las horas por subsistema van JUSTO detras de tus partes (Daniel, 28/07): lo tuyo
        primero, y al lado con que se compara. El historial se fue al fondo. */

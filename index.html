@@ -4,6 +4,22 @@
 <title>Solaris · se ha mudado</title>
 <meta http-equiv="refresh" content="0; url=produccion/index.html">
 <link rel="canonical" href="produccion/index.html">
+<!-- ⛔⛔ EL MANIFIESTO SE ENLAZA, Y LLEVABA AQUI SIN ENLAZAR. `redir/manifest.webmanifest`
+     existe (704 B) y su propio texto dice para que: *«para que las PWA ya instaladas en la
+     raiz no se queden sin el»*. Pero esta pagina **no lo citaba**, y un manifiesto que no
+     se enlaza no existe para el navegador: una instalacion NUEVA desde la raiz se queda
+     sin nombre, sin iconos y sin `start_url`, y Chrome **genera** el icono con la primera
+     letra del titulo -- o sea una «S» de «Solaris · se ha mudado», que es exactamente la
+     forma del icono negro que se vio el 06/10.
+     ⚠️ Lo que esto NO afirma: que fuera la causa de aquel caso concreto. Daniel dijo que
+     esa persona tenia el de produccion, y el icono de produccion esta comprobado (bajado y
+     abierto: 180x180, la insignia correcta). Esto arregla un defecto medible de la raiz,
+     no un diagnostico.
+     ✅ Y no crea una app paralela: el manifiesto manda `start_url` a
+     `./produccion/index.html`, asi que instalar desde aqui abre LA MISMA app. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="produccion/apple-touch-icon.png">
+<meta name="theme-color" content="#0D0A0B">
 <style>body{background:#151113;color:#F4F3F3;font:15px/1.6 system-ui;
   display:grid;place-items:center;min-height:100vh;margin:0;text-align:center}
 a{color:#E41E25}</style>
