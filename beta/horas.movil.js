@@ -582,15 +582,20 @@ function deltaHTML(k,v,ref,txt){
     '<span class="rr">'+esc(txt)+'</span></span></div>';
 }
 
-function animarDeltas(root){
+function animarDeltas(root, silencioso){
   $$('.dlt',root||document).forEach(function(el){
     var w=parseFloat(el.dataset.w), l=parseFloat(el.dataset.l);
     var f=$('.f',el), m=$('.m',el);
-    f.style.width='0'; f.style.left='50%'; m.style.left='50%';
-    setTimeout(function(){
+    var fin=function(){
       f.style.width=w+'%'; f.style.left=l+'%';
       m.style.left=(el.classList.contains('pos')?50+w:50-w)+'%';
-    }, redu()?0:80);
+    };
+    /* ⛔ CON DATO DE FONDO SE PINTA EL ESTADO **FINAL**, no el inicial: es la regla
+       que ya seguían `armarMedidor` y `animarBarras` y que esta se saltaba. Pasar por
+       cero es justo lo que se ve como un parpadeo. */
+    if(silencioso){ fin(); return; }
+    f.style.width='0'; f.style.left='50%'; m.style.left='50%';
+    setTimeout(fin, redu()?0:80);
   });
 }
 
@@ -1521,7 +1526,22 @@ function _cargarPartesDec_(){
   return _cargarCierrePlan_().then(function(){ return api.getPartes({}); }).then(function(arr){
     if(!Array.isArray(arr)) return;
     var yo=(typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
-    var _mando = (typeof rangoNom==='function' ? rangoNom(yo) : 0) >= 3;
+    var _rg = (typeof rangoNom==='function' ? rangoNom(yo) : 0);
+    var _mando = _rg >= 3;
+    /* ⛔⛔ QUIEN NO PUEDE FIRMAR NO TIENE COLA, NI LA DE ESPERA NI LA DE «YA DECIDISTE».
+       🗣️ Daniel, 07/10/2026: *«y claro, para muchos no deberia contar evidentemtne los q no
+       puieden aprobar partes no les viene nada a cuento ese boton»*.
+       ⚠️ Y NO es solo cortesia: a un miembro raso el backend ya le sirve SOLO lo suyo
+       (`_getPartes_`: sin rango, `ver` pide `p.autor === nom`) y los dos filtros de abajo
+       quitan lo propio, asi que las dos listas le salian vacias de todas formas. **Donde SI
+       se veia es con «Ver como»**: ahi `arr` es la respuesta que el backend dio A TI --la cola
+       entera que TU puedes firmar-- y la vista previa le pintaba al otro una tarjeta de
+       decision que esa persona no vera nunca. La prevision mentia sobre la pantalla que
+       prometia ensenar.
+       ✅ El criterio es `rangoNom >= 1` --«tiene gente bajo su jurisdiccion»-- que es LA MISMA
+       puerta que usa el backend para dejar decidir (`_puedeSobreParte_`: rango 3, o rango 1 y
+       coordinador del subsistema del autor). Un segundo criterio aqui seria otra verdad. */
+    if (_rg < 1){ PARTES_DEC = []; PARTES_REV = []; return; }
     PARTES_DEC = arr.filter(function(p){
       return (p.estado==='pendiente' || p.estado==='detalle') && (_mando || p.autor!==yo);
     }).map(_normPDec_);
@@ -1710,8 +1730,11 @@ function _pdRevFichaHTML_(p){
    Daniel (07/08): *«un sitio donde revisar/modificar/revertir los partes aprobados, como las
    sanciones»*. Hasta hoy una firma equivocada se quedaba firmada para siempre.
 
-   ⛔ **Nace cerrado, y va DEBAJO de «Esperan tu decision»**: lo que hay que hacer va antes que
-   lo que ya esta hecho. Arriba competiria por la atencion con la cola de verdad. */
+   ⛔ **Nace cerrado, y va DEBAJO DE «TUS PARTES»** --o sea al fondo de los tres bloques de
+   partes--: lo que hay que hacer va antes que lo que ya esta hecho. Arriba competia por la
+   atencion con la cola de verdad Y ademas empujaba tus propias horas media pantalla abajo.
+   ⚠️ Hasta el 07/10/2026 ponia «debajo de "Esperan tu decision"» y estaba AHI, o sea segunda
+   de todo. Daniel: 🗣️ *«no tiene sentido ninguno. deberia estar debajo de tus partes no?»*. */
 function _pdRevHTML_(){
   return _pdGrupoHTML_('prev', 'Ya decidiste',
     'Repasa lo que ya firmaste. <b>Revertir exige un motivo</b>; si las horas ya contaban, se '+
@@ -1892,10 +1915,15 @@ function vHoras(){
       : '<div class="r"><span class="p mono">'+i+'</span><span class="cens"></span></div>';
   }
 
-  /* Lo que ESPERA TU FIRMA va lo primero: es de otra gente y tiene a alguien esperando. */
+  /* Lo que ESPERA TU FIRMA va lo primero: es de otra gente y tiene a alguien esperando.
+     ⛔ Y «YA DECIDISTE» NO: ESA VA ABAJO, DEBAJO DE «TUS PARTES» (Daniel, 07/10/2026).
+     🗣️ *«no entiendo porque la pensataña de "Ya decidiste" está arriba de todo, no tiene
+     sentido ninguno. deberia estar debajo de tus partes no?»*.
+     ✅ Y no contradice la decision del 07/08 --«va debajo de "Esperan tu decision"»-- sino
+     que la extiende: lo que hay que HACER va antes que lo tuyo, y lo que ya esta HECHO va
+     despues. En medio quedaba empujando tus propias horas media pantalla abajo. */
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     _partesDecHTML_()+
-    _pdRevHTML_()+
     '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'aprobadas · otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
@@ -1962,6 +1990,10 @@ function vHoras(){
           viejas.map(filaParte).join('')+'</details>'
         : '')+
     '</div>'+
+
+    /* ⛔ AQUI, Y NO ARRIBA: lo que ya firmaste va DESPUES de lo tuyo (Daniel, 07/10). Ver
+       el porque entero al principio de esta funcion. */
+    _pdRevHTML_()+
 
     /* Las horas por subsistema van JUSTO detras de tus partes (Daniel, 28/07): lo tuyo
        primero, y al lado con que se compara. El historial se fue al fondo. */

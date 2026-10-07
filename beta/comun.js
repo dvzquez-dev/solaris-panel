@@ -261,6 +261,46 @@ function _genUnion_(rangos, slot){
    -horas y documentos- y darles el mismo nombre las haria parecer la misma. */
 function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre) : 0; }
 
+/* ⛔⛔ SI NO CAMBIA NADA, NO SE REPINTA — DECISION DE DANIEL (06/10/2026).
+
+   🗣️ Literal: *«si, reanimar lo de horas tambien molesta, molaria q no lo haga salvo q
+   cambie algun dato, igual con todas las pantallas, si no cambia nada no se repinta»*. Y
+   antes, describiendo el sintoma del arranque: *«de repente pasa como dos segundos y como que
+   se oscurece (...) se vuelve medio transparente todo lo que hay y vuelve a spawnear es muy
+   raro y bastante incomodo»*.
+
+   ⛔ **QUE LO PINTA**: `@keyframes entra{from{opacity:0;transform:translateY(8px)}}`
+   (`movil.css:946`), que entra con la clase `.entra`. Reconstruir `innerHTML` tira el DOM y
+   lo vuelve a crear, asi que la animacion se reproduce entera **aunque el HTML sea identico**.
+
+   ⛔⛔ **Y POR QUE LA CURA VA AQUI Y NO EN EL LLAMADOR**: esto se arreglo **dos veces**
+   quitando repintados concretos (🗣️ *«carga 2 veces extra el widget»*, *«me sigue cargando
+   el widget 1 vez extra»*) y volvio las dos veces. Cazar llamadas de una en una no cierra la
+   familia: **cualquier** camino que repinte con el mismo dato la reabre. La pregunta que
+   decide no es *¿quien repinta de mas?* sino *¿por que repintar cuando no hay nada nuevo?*.
+
+   Devuelve **si ha cambiado**, que es lo que el llamador necesita para saltarse tambien las
+   animaciones — reconstruir el DOM no es lo unico que se nota: `animarDeltas` pone las barras
+   a cero y las vuelve a crecer, y eso se ve igual de raro.
+
+   ⚠️ **El recuerdo va en la FUNCION, no en un `var` de modulo**, porque `comun.js` solo
+   admite declaraciones `function` (`ARRANQUE.md` §5b): un `var` aqui lo cargaria tambien el
+   escritorio y seria una global compartida entre dos caras que no comparten estado.
+
+   ⚠️ **Y se comprueba que el nodo tenga algo dentro.** Sin eso, un `innerHTML` vaciado por
+   otro camino se quedaria vacio **para siempre**: el recuerdo seguiria diciendo «ya esta
+   pintado» y no se volveria a escribir nunca. Es un «no lo se» leido como un dato.
+*/
+function _pintarSiCambia_(el, clave, html){
+  if (!el) return false;
+  var memo = _pintarSiCambia_.memo || (_pintarSiCambia_.memo = {});
+  if (memo[clave] === html && el.innerHTML) return false;
+  memo[clave] = html;
+  el.innerHTML = html;
+  return true;
+}
+
+
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
 /* El mes ABIERTO, calculado con quien esta: `{media, gente}`, o `null` si no se sabe.
    Daniel, 04/10: *«y el objetivo de horas q aparece recuerda q tiene q estar vivo y eso»*.
@@ -4731,6 +4771,21 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-07-partes-legibles', fecha:'2026-10-07',
+      titulo:'«Ya decidiste» baja de sitio, y los partes dejan de tener tope',
+      items:[
+        {cara:'movil', vista:'horas', txt:'«Ya decidiste» estaba arriba de todo y empujaba tus propias horas media pantalla abajo. Ahora va DEBAJO de «Tus partes»: primero lo que hay que hacer, luego lo tuyo, y al final lo que ya está hecho.'},
+        {cara:'movil', vista:'horas', txt:'Y a quien no puede firmar partes ya no le sale ninguna de las dos colas — tampoco al mirar su ficha con «Ver como», que antes le ensenaba una tarjeta de aprobar que esa persona no ve.'},
+        {cara:'movil', vista:'horas', txt:'Por dentro: todos los partes del equipo vivían como un texto en UNA celda de la hoja, y ahi caben 74. El 04/10 se llenó y se quedaron 5,75 h de cuatro personas fuera. Ahora es UNA FILA POR PARTE: sin tope, y legible.'}
+      ]},
+    { id:'2026-10-06-no-repintar', fecha:'2026-10-06',
+      titulo:'La app deja de parpadear al abrir, y entra más ligera',
+      items:[
+        {cara:'movil', vista:'estado', txt:'<b>Ya no se oscurece y vuelve a aparecer a los dos segundos de entrar.</b> Al llegar los datos se reconstruía la pantalla entera <b>aunque fuera idéntica</b>, y el navegador reproducía la animación de entrada: todo se ponía medio transparente y volvía a aparecer. Ahora, <b>si no ha cambiado nada, no se repinta</b> — en todas las pantallas.'},
+        {cara:'movil', vista:'horas', txt:'<b>Y las barras de Horas dejan de caerse a cero y volver a crecer</b> cada vez que llegan datos de fondo. Eran la única animación que no sabía distinguir «esto lo ha pedido un dedo» de «esto ha llegado solo».'},
+        {cara:'escritorio', vista:'panel', txt:'<b>Lo mismo en el escritorio</b>: su pantalla también se reconstruía entera en cada pintada. Las dos caras pasan ahora por el mismo sitio, así que no pueden volver a divergir.'},
+        {cara:'movil', vista:'estado', txt:'<b>Y la app pesa 153 KB menos al abrir.</b> Se descargaba un texto interno que esta versión no llega a enseñar.'}
+      ] },
     { id:'2026-10-06-mes-de-trabajo', fecha:'2026-10-06',
       titulo:'El mes que ves es el de TRABAJO, no el del calendario',
       items:[
