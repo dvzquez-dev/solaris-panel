@@ -167,6 +167,26 @@ function _rearmarCargas_(){
   if(!CARGA.fichaje   && _reintentoPasivo_('fichaje',   _cargarFichajeAbierto_, repintar)) n++;
   if(!CARGA.partes    && _reintentoPasivo_('partes',    _cargarMisPartes_,      repintar)) n++;
   if(!CARGA.reuniones && _reintentoPasivo_('reuniones', _cargarReunionesM_,     repintar)) n++;
+  /* ⛔⛔ EL LIBRO DE PUNTOS ENTRA AQUI (07/10), Y LA COLA DE SANCIONES **NO** — CON SU
+     MEDICION. La ficha pedía cablear `_cargarSancionesM_` y `_cargarMovimientosM_`; al medirlas
+     resulta que **sólo una se puede**:
+       ✅ `_cargarMovimientosM_` → **sí**. `MOVS` lo escribe **sólo su propia carga** (medido: los
+          únicos escritores son ella y el vaciado al cambiar de persona), así que un reintento
+          tardío no puede pisar nada del usuario. Y es la lista de DISCIPLINA: su silencio se lee
+          como «estoy limpio», que es el peor de los silencios — por eso es la que más falta.
+       ⛔ `_cargarSancionesM_` → **NO, y no es prudencia: es una medición.** Las marcas que pone
+          la persona viven **dentro de `SANC_M`** (`sanciones.movil.js:391`:
+          `(SANC_M||[]).forEach(… x.dec=b.dataset.dec)`), y la carga hace `SANC_M=a` **sin
+          condición**: un reintento que vuelva mientras marcas **te borra lo marcado y sin
+          decirlo**. Es la misma familia que las tres que la ficha ya excluía
+          (`_cargarFichajeAbierto_` resucita una sesión cerrada, `_cargarPartesDec_` devuelve a
+          la cola un parte firmado, `_cargarReunionesM_` desalinea la rejilla) — o sea **cuatro**,
+          no tres. Cablearla pide antes que la carga **respete lo no enviado**, y eso es otra
+          pieza.
+     ⚠️ Y la bandera que se pregunta es `_llego_('movs')`, no una de `CARGA`: el libro no tiene
+     entrada en `CARGA`, y su bandera ya existe justo porque «`MOVS` vacío» no decía por qué. */
+  if(typeof MOVS !== 'undefined' && !_llego_('movs') &&
+     _reintentoPasivo_('movs', _cargarMovimientosM_, repintar)) n++;
   return n;
 }
 
