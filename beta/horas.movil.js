@@ -1281,6 +1281,49 @@ function _histHorasHTML_(todos){
     return b.d - a.d;
   });
   var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  /* ⛔⛔ LA COMPENSACIÓN DEVENGADA A DÍA DE HOY, COMO MOVIMIENTO DEL MES EN CURSO (07/10).
+     🗣️ Daniel: *«en octubre 2026 debería aparecer lo que llevo de compensación devengada a
+     día de hoy»*.
+     ⛔ **SÓLO el mes en curso.** Su diseño dice que **el parte nace al cerrar**, así que una
+     fila sintética en un mes CERRADO saldría **dos veces** el día que el despliegue escriba
+     los partes de verdad — y las dos serían correctas por separado, que es lo que hace que
+     nadie lo vea venir.
+     ⛔ **Se SUMA al total del grupo**: la cabecera imprime la suma de sus filas, y una fila
+     que no suma deja la división impresa sin dar el número impreso (el fallo del 13/08).
+     ⛔ **Y el grupo se CREA si no existe**: quien sólo tiene la compensación no tiene ningún
+     apunte en el registro, o sea ningún grupo — y entonces esto sería invisible justo para
+     el caso que lo motivó. */
+  var _cDev = null;
+  if(per && typeof _compBase_==='function' && typeof _devengadoAHoy_==='function' &&
+     typeof _fraccionDelMes_==='function' && typeof YO!=='undefined' && YO){
+    var _cb0 = _compBase_(YO);
+    /* `_devengadoAHoy_(m, base, frac)` con la BASE como horas devuelve `base × frac`, o sea
+       lo devengado. Es la MISMA puerta que usan la cifra y el ritmo: no se reinventa la
+       rampa aquí, que es como se acaban teniendo dos números para lo mismo. */
+    if(typeof _cb0==='number' && _cb0>0) _cDev = _devengadoAHoy_(YO, _cb0, _fraccionDelMes_());
+  }
+  if(_cDev!=null && _cDev>0){
+    var _gi = idx[per];
+    if(_gi==null){
+      /* Sin apuntes este mes no hay grupo: se crea con la fecha de hoy para que caiga en su
+         sitio al ordenar. */
+      var _hoy = new Date();
+      idx[per] = g.length; _gi = g.length;
+      g.push({k:per, d:_hoy, items:[], h:0});
+      g.sort(function(a,b){
+        if(!a.d && !b.d) return 0;
+        if(!a.d) return 1;
+        if(!b.d) return -1;
+        return b.d - a.d;
+      });
+      /* ⛔ Al reordenar, `idx` apunta a posiciones VIEJAS: se reconstruye o la fila se
+         cuelga del mes equivocado — y un apunte en el mes que no es se lee como un dato. */
+      idx = {}; for(var _q=0;_q<g.length;_q++) idx[g[_q].k]=_q;
+      _gi = idx[per];
+    }
+    g[_gi].comp = _cDev;
+    g[_gi].h += _cDev;
+  }
   var out='', tempPrev=null;
   for(j=0;j<g.length;j++){
     var gr=g[j], temp = gr.d ? _temporadaDe_(gr.d) : null;
@@ -1296,6 +1339,15 @@ function _histHorasHTML_(todos){
     out += '<div class="rnota" style="margin:9px 0 3px;display:flex;gap:8px;align-items:baseline">'+
       '<b style="text-transform:capitalize">'+rot+'</b><span class="sc">'+est.replace(' · ','')+
       '</span><span class="ln" style="flex:1"></span><span class="mono">'+h1(gr.h)+'</span></div>';
+    /* ⛔ LA FILA VA MARCADA COMO CALCULADA, no disfrazada de parte. Cuando el cierre
+       escriba el parte de verdad, ése vendrá del registro y se pintará con `filaParte` como
+       todos: si esta se pareciera a un parte, nadie distinguiría la una de la otra. */
+    if(gr.comp!=null){
+      out += '<div class="rnota" style="margin:3px 0;display:flex;gap:8px;align-items:baseline">'+
+        '<span style="flex:1">Compensación base · <span class="sc">devengada a día de hoy · '+
+        'se cierra a fin de mes</span></span>'+
+        '<span class="mono">'+h1(gr.comp)+'</span></div>';
+    }
     for(i=0;i<gr.items.length;i++) out += filaParte(gr.items[i]);
   }
   return out;
