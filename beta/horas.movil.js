@@ -1902,16 +1902,29 @@ function vHoras(){
      ✅ `_hMesDe_` es LA puerta (`comun.js`): prefiere el `hRitmo`/`hMes` que ya calculó el
      motor —ponderado— y sólo cae a `horasTemp/meses` si el panel no lo trae, que es el
      respaldo honesto. Un número que decide un ranking no se vuelve a calcular a mano. */
-  var _hm=_hMesDe_(YO);
+  /* ⛔⛔ ESTE NO ES EL MISMO NÚMERO QUE EL `_hm` DE LA TARJETA, Y HASTA EL 07/10
+     COMPARTÍAN NOMBRE DENTRO DE LA MISMA FUNCIÓN. En JS el `var` es de FUNCIÓN, así que
+     este **pisaba** al de arriba para el resto de `vHoras`, y son **dos magnitudes**:
+       · `_hMesReal_(m)` → `m.horasMes`: las horas **reales del mes**. Es lo que dice la
+         tarjeta «Horas del mes» y de lo que sale `cuentan`.
+       · `_hMesDe_(m)` → `hRitmo` → `hMes` → `horasTemp/meses`: un **PONDERADO**, que es
+         lo que ordena el ranking — y por eso es el que va en la fila de «(tú)».
+     📏 Medido el 07/10: de los **8** usos de `_hm` en la función, **3** leen el de arriba
+     y **5** este, y hoy **no se solapan** — o sea que **no hay ningún número mal en
+     pantalla**. Lo que hay es una trampa cargada: quien añada una línea entre las dos y
+     lea `_hm` se lleva **la que le toque por orden de ejecución**, y las dos son
+     plausibles — una en h/mes reales y la otra en h/mes ponderadas.
+     ✅ Un nombre, una magnitud. Es lo único que lo cierra. */
+  var _hmPond=_hMesDe_(YO);
   /* ⛔ Y LA GUARDA DE ESTA PANTALLA SE QUEDA, que la puerta no la puede dar. El respaldo
      de `_hMesDe_` con `meses:0` devuelve las horas **CRUDAS sin dividir** — decisión suya
      del 14/08 —, y aquí eso sería un TOTAL disfrazado de ritmo en la columna de h/mes.
      Si el motor no mandó ritmo y no hay meses, **no se finge**: sale «—». */
-  if(_hm!=null && !YO.meses && typeof YO.hRitmo!=='number' && typeof YO.hMes!=='number') _hm=null;
+  if(_hmPond!=null && !YO.meses && typeof YO.hRitmo!=='number' && typeof YO.hMes!=='number') _hmPond=null;
   for(var i=Math.max(1,puesto-2); puesto>0 && i<=Math.min(total,puesto+2); i++){
     filas += (i===puesto)
       ? '<div class="r yo"><span class="p mono">'+i+'</span><span class="n">'+esc(YO.pila)+' (tú)</span>'+
-        '<span class="h mono">'+(_hm==null?'—':h1(_hm))+'</span></div>'
+        '<span class="h mono">'+(_hmPond==null?'—':h1(_hmPond))+'</span></div>'
       : '<div class="r"><span class="p mono">'+i+'</span><span class="cens"></span></div>';
   }
 
