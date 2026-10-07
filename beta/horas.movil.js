@@ -487,7 +487,9 @@ function barraHorasHTML(id){
      «de donde salen las horas del mes». */
   var _hm=_hMesReal_(YO), notion=(_hm!=null);
   /* `sumaEMes`, no `sumaE`: esta barra es la del MES, y `_hm` ya lo es. */
-  var cont=notion?_hm:sumaCuentanMes(), p=sumaEMes('pend');   /* aprobadas + otorgadas */
+  /* ⛔ Y LA BARRA POR LA MISMA PUERTA que la cifra: pintarla con el bruto mientras la
+     cifra va devengada deja las dos cosas de la misma tarjeta diciendo números distintos. */
+  var cont=notion?_hMesDevengado_(YO):sumaCuentanMes(), p=sumaEMes('pend');   /* aprobadas + otorgadas */
   /* La barra NUNCA se llena (escala asintótica), pero dentro del ancho que ocupa el total
      (otorgadas+pendientes) el reparto es LINEAL: si 4 de 20 h están pendientes, el rayado
      ocupa 1/5 de lo pintado — no un pixel al final como si fueran un extra. */
@@ -1236,6 +1238,61 @@ function filaParte(p){
    argumento en vez de releer `PARTES` aquí dentro: quién decide qué es «de este mes» ya lo
    decidió el llamador con `_perAhora`, y preguntarlo dos veces es como se acaba teniendo dos
    respuestas. ⚠️ Opcional a propósito: el banco saca esta función suelta al arnés. */
+/* ⛔⛔ TODO EL HISTÓRICO DE MOVIMIENTOS DE HORAS, SEPARADO POR CIERRES (07/10/2026).
+   🗣️ Daniel: *«ahí debajo de «Ultimos movimientos» debería aparecer … toda la lista de todos
+   los movimientos de horas de este expediente. Obviamente teniendo en cuenta cierres de mes,
+   cierres mensuales y cierres de temporada. Pero debería aparecer todo el histórico de todo.
+   Obviamente eso, separados unos de otros, pero todo en una lista, pero por los cierres»*.
+
+   📏 **Y el dato ya estaba**: `_getPartes_` del backend **no filtra por mes** -- sirve todo lo
+   que esa persona puede ver --, y `confs` en `vHoras` tampoco. El recorte al mes vive sólo dentro
+   de `_ultimosMov_(…, 'mes')`. O sea que esto no pide un dato nuevo: pide **dejar de tirarlo**.
+
+   ⚠️ LOS SIN FECHA VAN AL FINAL, no al principio. `_ultimosMov_` los ponía los primeros
+   (`sinD.concat(conD)`); aquí, en una lista ordenada por tiempo, «no sé cuándo» no puede ir
+   delante de «hoy», y lleva su propio rótulo.
+
+   ⚠️ EL MES ABIERTO SE ROTULA «sin cerrar». Un mes sin cerrar y uno cerrado no son la misma
+   cosa -- el abierto aún puede cambiar --, y pintarlos iguales es lo que hace que un total viejo
+   se lea como definitivo. El periodo abierto sale de `_periodoAbierto_()`, que es el mes
+   siguiente al último cierre; si no se sabe, no se rotula ninguno (no se inventa). */
+function _histHorasHTML_(todos){
+  if(!todos || !todos.length) return '';
+  var g=[], idx={}, i, j;
+  for(i=0;i<todos.length;i++){
+    var p=todos[i], d=(typeof _fechaDMY_==='function') ? _fechaDMY_(p.f) : null;
+    var k = d ? (d.getFullYear()+'-'+((d.getMonth()+1)<10?'0':'')+(d.getMonth()+1)) : '';
+    if(!(k in idx)){ idx[k]=g.length; g.push({k:k, d:d, items:[], h:0}); }
+    g[idx[k]].items.push(p); g[idx[k]].h += (Number(p.q)||0);
+  }
+  /* Del más nuevo al más viejo, y los sin fecha al final. */
+  g.sort(function(a,b){
+    if(!a.d && !b.d) return 0;
+    if(!a.d) return 1;
+    if(!b.d) return -1;
+    return b.d - a.d;
+  });
+  var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  var out='', tempPrev=null;
+  for(j=0;j<g.length;j++){
+    var gr=g[j], temp = gr.d ? _temporadaDe_(gr.d) : null;
+    /* El salto de temporada va ANTES del grupo más viejo: lo que hay debajo de la línea es la
+       temporada que cerró. */
+    if(temp && tempPrev && temp!==tempPrev){
+      out += '<div class="rnota" style="margin:10px 0 4px;text-align:center;opacity:.85">'+
+        '— cierre de temporada '+esc(temp)+' —</div>';
+    }
+    if(temp) tempPrev=temp;
+    var rot = gr.d ? esc(_mesLargo_(gr.d)) : 'Sin fecha';
+    var est = !gr.d ? '' : (per && gr.k===per ? ' · sin cerrar' : ' · cerrado');
+    out += '<div class="rnota" style="margin:9px 0 3px;display:flex;gap:8px;align-items:baseline">'+
+      '<b style="text-transform:capitalize">'+rot+'</b><span class="sc">'+est.replace(' · ','')+
+      '</span><span class="ln" style="flex:1"></span><span class="mono">'+h1(gr.h)+'</span></div>';
+    for(i=0;i<gr.items.length;i++) out += filaParte(gr.items[i]);
+  }
+  return out;
+}
+
 function _movHorasHTML_(confs, pends){
   var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
   var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO), comp=_compMensual_(YO);
@@ -1326,7 +1383,20 @@ function _movHorasHTML_(confs, pends){
         : '')+
       '<button class="btn mini" data-desgmes data-p style="margin-top:9px">'+
         'Ver el desglose completo de este mes</button>'+
-    '</div></div>';
+    '</div></div>'+
+    /* ⛔ Y DEBAJO, TODO EL HISTÓRICO. Va en su propio desplegable y no dentro del de
+       arriba: aquel responde «de qué se componen las horas DE ESTE MES» y éste «qué he
+       hecho desde que entré». Meterlo dentro obligaría a abrir el del mes para ver el
+       histórico, que es justo lo contrario de lo que se pidió. */
+    (confs.length
+      ? '<div class="plg" style="margin-top:9px"><div class="plgh" data-plg data-p>'+
+          '<b>Todo tu histórico</b><small>'+confs.length+' movimiento'+
+          (confs.length===1?'':'s')+' de horas · separados por cierres</small>'+
+          '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;'+
+          'fill:none;stroke:currentColor;stroke-width:2.4;transition:transform .3s">'+
+          '<path d="M6 9l6 6 6-6"/></svg></div>'+
+        '<div class="plgc" hidden>'+_histHorasHTML_(confs)+'</div></div>'
+      : '');
 }
 
 function _desgloseMesHTML_(confs){
@@ -1881,7 +1951,9 @@ function vHoras(){
      salen las horas, se cambia en `_hMesReal_` y las dos se enteran. */
   var _hm=_hMesReal_(YO);
   var notion=(_hm!=null);
-  var cuentan=notion?_hm:o;
+  /* ⛔ LA CIFRA VA DEVENGADA: `_hm` se queda sólo para saber **si hay dato** del Panel.
+     Ver `_hMesDevengado_` en `comun.js` — el step que Daniel señaló el 07/10. */
+  var cuentan=notion?_hMesDevengado_(YO):o;
   /* ⛔ ORDENADOS POR FECHA, lo más nuevo primero. No había **ni un solo `sort`** en toda la
      pantalla: los partes salían en el orden en que los mandara el servidor, así que los de un
      mes viejo podían aparecer por delante de los de hoy. Daniel: *«¿por qué siguen
@@ -1972,7 +2044,7 @@ function vHoras(){
      despues. En medio quedaba empujando tus propias horas media pantalla abajo. */
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     _partesDecHTML_()+
-    '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos':'aprobadas · otorgadas · pendientes')+
+    '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos · base al día':'aprobadas · otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
         (notion
