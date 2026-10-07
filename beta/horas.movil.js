@@ -1268,7 +1268,11 @@ function _movHorasHTML_(confs, pends){
       /* ⚠️ EL CONTADOR SIGUE SIENDO EL DE LOS QUE CUENTAN. `_apuntesMes_` anuncia lo que
          YA suma --su contrato lo vigila su banco--, y lo que espera firma se dice APARTE
          con su propio número: sumarlo ahí diría que cuenta. */
+      /* ⛔ Y LOS QUE NO TIENEN FECHA LEGIBLE, DICHOS. `_ultimosMov_` los deja en la lista
+         a proposito (esconder una hora seria peor) pero **no puede saber de que mes son**,
+         y hasta hoy iban dentro del «este mes» sin mas. Ver `sinFecha` en `comun.js`. */
       '<b>Últimos movimientos</b><small>'+_ap+' apunte'+(_ap===1?'':'s')+' este mes'+
+        (r.sinFecha?(' · '+r.sinFecha+' sin fecha'):'')+
         (_ef.n?(' · '+_ef.n+' esperando firma'):'')+' · '+
         'de qué se componen estas horas</small>'+
       '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+

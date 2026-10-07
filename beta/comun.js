@@ -3212,7 +3212,17 @@ function _ultimosMov_(lista, fecha, cuanto, ambito){
   });
   conD.sort(function(a,b){ return b.d-a.d; });
   var todos=sinD.concat(conD.map(function(o){ return o.x; }));
-  return { total: todos.length, ultimos: todos.slice(0,MOVS_N), todos: todos, suma: suma };
+  /* ⛔⛔ `sinFecha` NO ES ADORNO: a `sinD` **no se le aplica el filtro del mes** -- un
+     apunte cuya fecha no se puede leer entra siempre, sale PRIMERO y suma --, y quien
+     llama rotula el resultado «N apuntes **este mes**». O sea que se presentaba como de
+     este mes **en todos los meses**, sin dar ningun error. Daniel (06/10): *«siguen
+     apareciendo las de mes anterior a pesar q pone de este mes»*.
+     ⚠️ Y la cura **no esconde nada**: el apunte se queda en la lista y sus horas en la
+     suma -- ocultar una hora de alguien es peor que no saber de que mes es. Lo que se
+     arregla es el ROTULO: con este contador el llamador puede decir «· N sin fecha» en
+     vez de afirmar que son de este mes. Es §3c-24: un «no lo se» no se dice como un dato. */
+  return { total: todos.length, ultimos: todos.slice(0,MOVS_N), todos: todos,
+           suma: suma, sinFecha: sinD.length };
 }
 
 /* La coletilla que aparece en los dos libros. Una sola frase, en un sitio. */
@@ -4771,6 +4781,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-07-apunte-sin-fecha', fecha:'2026-10-07',
+      titulo:'«Ultimos movimientos» ya dice cuántos apuntes no tienen fecha',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Un apunte cuya fecha no se puede leer se contaba dentro de «N apuntes este mes» — y a ésos no se les aplica el filtro del mes, así que salían en TODOS los meses. Ahora siguen en la lista (esconder una hora tuya sería peor) pero el rótulo dice «· N sin fecha».'}
+      ] },
     { id:'2026-10-07-cola-sanciones-fallo', fecha:'2026-10-07',
       titulo:'La cola de sanciones ya dice cuándo NO ha podido cargar',
       items:[
