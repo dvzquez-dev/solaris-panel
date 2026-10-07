@@ -495,7 +495,22 @@ function _subsEnVivo_(){
     var k = -1;
     for(j = 0; j < nom.length; j++) if(nom[j] === u){ k = j; break; }
     if(k < 0) continue;                      /* no compite: fuera del ranking, sin ruido */
-    var h = _hMesReal_(m);
+    /* ⛔⛔ DEVENGADA, NO ENTERA: la compensacion del MES EN CURSO se va sumando poco a
+       poco. Hasta el 07/10 esto leia `_hMesReal_`, que trae la base ENTERA, asi que el dia
+       del cierre **todo el equipo sumaba de golpe** su compensacion (2 h un raso, 3,5 un
+       coordinador, 7 el PD) y el ranking de unidades daba un ESCALON que no corresponde a
+       trabajo hecho. Daniel, 07/10: *«un step al inicio de mes que todo el mundo sume dos
+       horas. Eso no tiene sentido … que la compensacion del mes actual se vaya sumando poco
+       a poco»*.
+       ✅ Y SOLO EL MES EN CURSO: `_subsEnVivo_` lee unicamente el mes ABIERTO, asi que un
+       mes ya cerrado sigue aportando su compensacion **entera** y las pasadas **no se
+       devengan** — que es justo lo que pidio y lo que esta puerta ya hace.
+       ⚠️ `_hMesDevengado_` se declara MAS ABAJO (582) que esta linea: vale por el hoisting
+       de las `function` declaradas, no hay que moverla.
+       ⚠️ Devuelve `null` con las mismas entradas con las que `_hMesReal_` devolvia `null`,
+       asi que el `if` de debajo sigue siendo el que descarta a quien no tiene dato vivo:
+       un «no lo se» no entra como un cero (§3c-24). */
+    var h = _hMesDevengado_(m);
     if(typeof h !== 'number' || !isFinite(h)) continue;
     if(!por[u]) por[u] = [];
     por[u].push(h);
@@ -563,6 +578,28 @@ function _hAntReal_(m){
   return (typeof v==='number' && v>0) ? v : null;
 }
 
+/* ⛔⛔ LAS HORAS DEL MES **CON LA COMPENSACION DEVENGADA**, QUE ES LO QUE SE ENSEÑA (07/10/2026).
+   🗣️ Daniel: *«claro que van devengadas al dia actual. O sea, no tiene sentido otra cosa … lo
+   que no puede aparecer es el step de compensacion, que es lo que aparece ahora»*.
+   📏 El step, en su pantalla del 07/10 (dia 7 de 31): la cifra decia **7 h este mes** con
+   objetivo 8 — y 7 h es **exactamente su compensacion de Project Director**, acreditada entera el
+   dia 1, mientras el rotulo de debajo decia **0,78 h** de trabajo real. O sea que la cifra media
+   el cargo y no el trabajo, y encima llegaba al objetivo sola.
+   ✅ Su decision del 06/10 ya lo dice — *«si pero mejor q se vaya sumando en rampa el tiempo d las
+   compensaciones»* — y la rampa ya estaba en el ritmo, en la media del equipo y en el mes
+   anterior. Lo que faltaba era **la cifra**, que es justo la que se mira.
+   ⛔ Y ES UNA PUERTA, no dos cuentas: la cifra (`vHoras`) y la BARRA (`barraHorasHTML`) leian el
+   mismo numero por separado. Con dos lecturas, el dia que una se devengue y la otra no, la misma
+   tarjeta dice dos numeros — que es el fallo que este proyecto lleva arreglado tres veces.
+   ⚠️ Si no hay dato devuelve `null` (no 0): «no se» no es «cero». Y si la fraccion del mes no se
+   puede calcular, cae al valor CRUDO en vez de inventar uno — ensenar el bruto es peor que nada,
+   pero inventar un devengado es peor que las dos. */
+function _hMesDevengado_(m){
+  var h = _hMesReal_(m);
+  if (h == null) return null;
+  var d = _devengadoAHoy_(m, h, _fraccionDelMes_());
+  return (d == null) ? h : d;
+}
 function _hMesReal_(m){
   m = m || {};
   /* Las horas de ESTE MES, o `null` si no han llegado. `horasMes` es el campo que el
