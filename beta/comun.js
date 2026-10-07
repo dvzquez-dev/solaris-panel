@@ -495,7 +495,22 @@ function _subsEnVivo_(){
     var k = -1;
     for(j = 0; j < nom.length; j++) if(nom[j] === u){ k = j; break; }
     if(k < 0) continue;                      /* no compite: fuera del ranking, sin ruido */
-    var h = _hMesReal_(m);
+    /* ⛔⛔ DEVENGADA, NO ENTERA: la compensacion del MES EN CURSO se va sumando poco a
+       poco. Hasta el 07/10 esto leia `_hMesReal_`, que trae la base ENTERA, asi que el dia
+       del cierre **todo el equipo sumaba de golpe** su compensacion (2 h un raso, 3,5 un
+       coordinador, 7 el PD) y el ranking de unidades daba un ESCALON que no corresponde a
+       trabajo hecho. Daniel, 07/10: *«un step al inicio de mes que todo el mundo sume dos
+       horas. Eso no tiene sentido … que la compensacion del mes actual se vaya sumando poco
+       a poco»*.
+       ✅ Y SOLO EL MES EN CURSO: `_subsEnVivo_` lee unicamente el mes ABIERTO, asi que un
+       mes ya cerrado sigue aportando su compensacion **entera** y las pasadas **no se
+       devengan** — que es justo lo que pidio y lo que esta puerta ya hace.
+       ⚠️ `_hMesDevengado_` se declara MAS ABAJO (582) que esta linea: vale por el hoisting
+       de las `function` declaradas, no hay que moverla.
+       ⚠️ Devuelve `null` con las mismas entradas con las que `_hMesReal_` devolvia `null`,
+       asi que el `if` de debajo sigue siendo el que descarta a quien no tiene dato vivo:
+       un «no lo se» no entra como un cero (§3c-24). */
+    var h = _hMesDevengado_(m);
     if(typeof h !== 'number' || !isFinite(h)) continue;
     if(!por[u]) por[u] = [];
     por[u].push(h);
