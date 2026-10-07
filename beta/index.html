@@ -108,16 +108,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=ff2df20"></script>
+<script src="comun.js?v=a484591"></script>
 <script src="notis.movil.js?v=8199ae8"></script>
 <script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=454b2ea"></script>
 <script src="turnos.movil.js?v=28480c2"></script>
 <script src="buzon.movil.js?v=49f2aa6"></script>
 <script src="documentos.movil.js?v=5ec6ade"></script>
-<script src="sanciones.movil.js?v=591a1ef"></script>
+<script src="sanciones.movil.js?v=685b5e5"></script>
 <script src="reuniones.movil.js?v=4dd9f9e"></script>
-<script src="horas.movil.js?v=e9188a5"></script>
+<script src="horas.movil.js?v=40fcfdd"></script>
 <script src="equipo.movil.js?v=7da6c9e"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -809,6 +809,15 @@ _aplicarEscala_();
 /* La cola de sanciones DE VERDAD, para el Panel del PD. Solo lectura: decidir se hace
    desde el escritorio, que es donde estan el motivo, el articulo y el comunicado. */
 var SANC_M=null;   // null = todavia no se sabe · [] = se pregunto y no hay
+/* ⛔⛔ EL TERCER ESTADO, que faltaba: «se preguntó y NO CONTESTÓ». Con sólo dos, un fallo
+   de red es indistinguible de «todavía no se sabe», y `_sancColaHTML_` pinta con `null` el
+   estado **«Cargando…» con el radar girando** — o sea que la pantalla AFIRMA que está
+   trabajando cuando no hay nada en vuelo, y así se queda hasta que cierras y vuelves a
+   abrir. `_cargarSancionesM_` **ya devolvía `false`** al fallar (está escrito y bancado);
+   lo que faltaba era que alguien lo mirara. Es la familia de «un «no hay nada» que
+   también significa «no lo entiendo»», y aquí en su forma peor: no dice «nada», dice
+   «espera». */
+var SANC_FALLO=false;  // true = se intento y el servidor no contesto
 
 
 /* DEMO = solo para ver la maqueta en local SIN cuenta (?demo en la URL). En la app
@@ -1605,7 +1614,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='cc006cc';
+var BUILD='809fbcf';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';

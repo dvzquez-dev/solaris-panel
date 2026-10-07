@@ -174,15 +174,26 @@ function _rearmarCargas_(){
           únicos escritores son ella y el vaciado al cambiar de persona), así que un reintento
           tardío no puede pisar nada del usuario. Y es la lista de DISCIPLINA: su silencio se lee
           como «estoy limpio», que es el peor de los silencios — por eso es la que más falta.
-       ⛔ `_cargarSancionesM_` → **NO, y no es prudencia: es una medición.** Las marcas que pone
-          la persona viven **dentro de `SANC_M`** (`sanciones.movil.js:391`:
-          `(SANC_M||[]).forEach(… x.dec=b.dataset.dec)`), y la carga hace `SANC_M=a` **sin
-          condición**: un reintento que vuelva mientras marcas **te borra lo marcado y sin
-          decirlo**. Es la misma familia que las tres que la ficha ya excluía
-          (`_cargarFichajeAbierto_` resucita una sesión cerrada, `_cargarPartesDec_` devuelve a
-          la cola un parte firmado, `_cargarReunionesM_` desalinea la rejilla) — o sea **cuatro**,
-          no tres. Cablearla pide antes que la carga **respete lo no enviado**, y eso es otra
-          pieza.
+       ⛔ `_cargarSancionesM_` → **NO, y el motivo de verdad es OTRO — re-medido el 07/10.**
+          ⛔⛔ **Aquí puse que un reintento «te borra lo marcado», y es FALSO.** La marca va al
+          backend **antes** de tocar nada local: `sanciones.movil.js:390` hace
+          `await api.decidirSancion(…,'marcar',{decision:…})` y sólo en la línea siguiente
+          escribe `x.dec`; si el servidor falla, no se escribe y sale un aviso. O sea que
+          **no existe marca sin enviar**, y el servidor ya guarda el borrador en
+          `s.decision`. Lo único que queda es una ventana estrecha: una respuesta **rancia**
+          que salga antes de marcar y llegue después enseñaría el estado viejo **hasta la
+          siguiente carga**, que no es pérdida.
+          ✅ **El motivo real para no cablearla es que NO ES UNA CARGA DE ARRANQUE**: sus dos
+          únicos llamadores son `_abrirSanciones_` (al abrir el modal) y el refresco de antes
+          de cerrar un bloque. `SANC_M===null` al arrancar **es lo normal**, no un fallo, así
+          que armarle un reintento aquí cargaría de más a **todo el mundo** por una pantalla
+          que casi nadie abre. Lo que sí fallaba era que su fallo se veía como «Cargando…»
+          para siempre, y eso **ya está arreglado** (`SANC_FALLO`, 07/10) — donde toca, que es
+          en la pantalla, no aquí.
+          ⚠️ Así que son **tres** las que no se cablean, no cuatro: `_cargarFichajeAbierto_`
+          resucita una sesión cerrada, `_cargarPartesDec_` devuelve a la cola un parte
+          firmado y `_cargarReunionesM_` desalinea la rejilla. La de sanciones no está en
+          esa familia: está fuera por ser **perezosa**.
      ⚠️ Y la bandera que se pregunta es `_llego_('movs')`, no una de `CARGA`: el libro no tiene
      entrada en `CARGA`, y su bandera ya existe justo porque «`MOVS` vacío» no decía por qué. */
   if(typeof MOVS !== 'undefined' && !_llego_('movs') &&

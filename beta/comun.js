@@ -4771,6 +4771,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-07-cola-sanciones-fallo', fecha:'2026-10-07',
+      titulo:'La cola de sanciones ya dice cuándo NO ha podido cargar',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Si abrías Disciplina y la cola no cargaba, se quedaba diciendo «Cargando…» con el radar girando PARA SIEMPRE — afirmando que estaba trabajando cuando no había nada en vuelo. Ahora dice «No se pudo cargar», para el radar y te da un botón de Reintentar.'}
+      ] },
     { id:'2026-10-07-partes-legibles', fecha:'2026-10-07',
       titulo:'«Ya decidiste» baja de sitio, y los partes dejan de tener tope',
       items:[
