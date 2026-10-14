@@ -490,22 +490,35 @@ function vReu(){
       return -1;
     });
   });
-  var g='<div style="overflow-x:auto;margin:0 2px"><div style="display:grid;gap:2px;grid-template-columns:auto repeat('+eje.length+',minmax(20px,1fr));min-width:280px">';
-  g+='<div></div>';
-  eje.forEach(function(t,ix){
-    /* decision cerrada: la etiqueta va al LIMITE izquierdo = hora de inicio. Con paso fino
-       solo se rotula la hora en punto, o no se leeria nada. */
-    var enPunto=(t%60===0);
-    g+='<div style="position:relative;min-height:15px">'+
-      (enPunto?'<span style="position:absolute;left:0;top:2px;transform:translateX(-50%);'+
-        'font-family:var(--mono);font-size:8.5px;color:var(--ink3)">'+pad(Math.floor(t/60)%24)+'</span>':'')+
-      (ix===eje.length-1?'<span style="position:absolute;right:0;top:2px;font-family:var(--mono);'+
-        'font-size:8.5px;color:var(--ink3)">'+_hhmm(t1).replace(':00','')+'</span>':'')+
-      '</div>';
-  });
+  /* 🗣️ Daniel: *«las horas en las FILAS, los dias en las COLUMNAS; es lo que hace
+     Xoyondo y when2meet»*. Antes el eje de TIEMPO iba en `grid-template-columns` y los
+     dias eran filas: en un telefono eso obliga a deslizar en horizontal para leer la
+     hora, que es justo lo que no cabe.
+     ⛔ Y LAS CELDAS SE COLOCAN A MANO (`grid-column`/`grid-row`), no por flujo: al girar,
+     la fusion pasa de `span` de columnas a `span` de FILAS, y con el flujo implicito una
+     celda que ocupa varias filas descoloca todo lo que venga detras. */
+  var g='<div style="margin:0 2px"><div style="display:grid;gap:2px;grid-template-columns:28px repeat('+R.dias.length+',minmax(20px,1fr));grid-template-rows:auto repeat('+eje.length+',13px)">';
+  g+='<div style="grid-column:1;grid-row:1"></div>';
   R.dias.forEach(function(d,di){
-    g+='<div style="font-family:var(--mono);font-size:9.5px;color:var(--ink2);display:flex;'+
-      'align-items:center;justify-content:flex-end;padding-right:6px">'+d+'</div>';
+    g+='<div style="grid-column:'+(di+2)+';grid-row:1;font-family:var(--mono);'+
+      'font-size:9px;color:var(--ink2);text-align:center;padding-bottom:3px">'+esc(d)+'</div>';
+  });
+  /* La etiqueta de la hora va al LIMITE SUPERIOR de su fila, que es la misma decision
+     que estaba escrita para el eje horizontal (iba al limite izquierdo = hora de inicio)
+     girada 90 grados. Centrarla seria ambiguo: `docs/decisiones-app.md`.
+     Con paso fino solo se rotula la hora en punto, o no se leeria nada. */
+  eje.forEach(function(t,ix){
+    if(t%60!==0) return;
+    g+='<div style="grid-column:1;grid-row:'+(ix+2)+';font-family:var(--mono);'+
+      'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px;'+
+      'line-height:1">'+pad(Math.floor(t/60)%24)+'</div>';
+  });
+  /* y la hora de FIN, al pie de la ultima fila: cierra el eje igual que antes lo cerraba
+     por la derecha. Sin esto el mapa no dice hasta que hora llega. */
+  g+='<div style="grid-column:1;grid-row:'+(eje.length+2)+';font-family:var(--mono);'+
+    'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px">'+
+    _hhmm(t1).replace(':00','')+'</div>';
+  R.dias.forEach(function(d,di){
     /* UNA CELDA POR FRANJA, ancha lo que la franja dura. Antes se pintaba una celda por
        INSTANTE del eje y el numero solo en la que arrancaba: con paso de 30 min y franjas
        de una hora salia «3 · 3 · 3 ·», y parecia que en la mitad de los huecos no podia
@@ -514,7 +527,10 @@ function vReu(){
     while(ix<eje.length){
       var fi=cubre[di][ix], k=1;
       while(ix+k<eje.length && cubre[di][ix+k]===fi) k++;      // hasta donde llega esta franja
-      var geo='grid-column:span '+k+';height:21px;border-radius:2px';
+      /* ⛔ `span` DE FILAS y columna FIJA, y los dos dichos a mano. Antes era
+         `grid-column:span k` con altura fija; girado, lo que se fusiona son las filas
+         del eje de tiempo y la columna es la del dia. */
+      var geo='grid-column:'+(di+2)+';grid-row:'+(ix+2)+'/span '+k+';border-radius:2px';
       if(fi<0){                                                // fuera del horario de ese dia
         /* ...salvo que ahi este la reunion FIJADA. La fijada es una DECISION, no un dato de
            disponibilidad: tiene que verse aunque esa franja no estuviera ofertada ese dia.
@@ -568,7 +584,21 @@ function vReu(){
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
           '<b style="color:var(--ok)">📌 Reunión fijada · '+esc(R.fijada)+'</b><br>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</div>'
         : (R.exento
-            ? ''                                   /* organizas: no se te pide cubrir */
+            /* 🗣️ Daniel (14/10): *«que permita, por favor, al que organiza la reunión
+               poner su disponibilidad. Si le apetece. En plan, opcional. Pero básicamente
+               así es más fácil de debuguear»*.
+               ⛔ Aquí había un `''`: al convocante NO se le ofrecía la rejilla. Ahora
+               `exento` significa **no se te EXIGE**, no «no puedes» -- y la diferencia
+               importa fuera de depurar: quien convoca también va a la reunión, y su hueco
+               cuenta para elegir la franja.
+               ✅ Y es el MISMO botón `#btnCubrir` de abajo, no uno nuevo: su manejador ya
+               está enganchado y `guardarDisp` no mira si eres el convocante. Un botón
+               propio sería una segunda puerta a la misma cosa. */
+            ? (!R.fijada && _plazoAbierto_(R.limite)
+                ? '<button class="btn full" data-p id="btnCubrir" style="margin-top:10px">'+
+                  (R.cubierta?'Editar mi disponibilidad':'Marcar la mía también (opcional)')+
+                  '</button>'
+                : '')
             /* ⛔ CON EL PLAZO CERRADO NO SE OFRECE CUBRIR. El servidor lo RECHAZA
                (`Codigo.gs:4582`) y hasta hoy la pantalla no preguntaba nada: se pintaba la
                rejilla entera, se marcaba, y sólo al pulsar «Guardar» salía un error crudo.
@@ -583,7 +613,7 @@ function vReu(){
               : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
                 (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
     /* si ya está fijada, el aviso de organizador sobra y quedaba colgando debajo del cartel verde */
-    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas, no cubres</b>. No se te pide disponibilidad.</p>':'')+
+    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas</b>, así que no se te <i>pide</i> disponibilidad — pero puedes marcarla si quieres, y cuenta como la de cualquiera.</p>':'')+
       /* ⛔ LA REGLA ES LA DEL BACKEND, Y NO ES `esCoord()`. Aqui se ofrecian los tres
          botones a CUALQUIER coordinador, y las tres acciones que llaman las gatea
          `Codigo.gs` por **convocante o admin** -con la misma linea en las tres:
@@ -649,20 +679,28 @@ function cubrirModal(){
       var v=+_mio[i]||0; if(v>0) ST.sel.set(b[0]+'_'+b[1], v);
     });
   }
+  /* ⛔⛔ UN DÍA = UNA COLUMNA, UNA FRANJA = UNA FILA (13/10). Estaba al revés y por
+     eso no cabía en un teléfono: las franjas son MUCHAS y los días POCOS, así que el
+     eje largo tiene que ser el vertical, que es el que un móvil tiene de sobra.
+     🗣️ Daniel: *«un día una columna con sus horas, y en las filas los bloques
+     horarios … no tiene mucho que ver con lo que es la pantalla de un teléfono»*. */
   var hd='<div class="rc"></div>';
-  R.franjas.forEach(function(f,ix){
-    hd+='<div class="rc rh"><span>'+f.ini.replace(':00','')+'</span>'+
-      (ix===nF-1?'<span class="fin">23</span>':'')+'</div>';
+  R.dias.forEach(function(d){
+    hd+='<div class="rc rh rhd">'+esc(d)+'</div>';
   });
   /* Las casillas NO OFERTADAS ya no se pueden pintar. Antes se pintaban igual, se veian
      marcadas, y al guardar se caian sin decir nada: `vals` se arma recorriendo `bloques`,
      asi que lo que no era bloque no existia. */
   var _ofer={}; (R.bloques||[]).forEach(function(b){ _ofer[b[0]+'_'+b[1]]=1; });
+  /* ⛔ LA CLAVE NO CAMBIA: sigue siendo `dia_franja`, así que ni `ST.sel` ni lo que se
+     guarda se enteran de que la rejilla se ha girado. Lo único que cambia es el ORDEN en
+     que se pintan las celdas — y el arrastre va por `elementFromPoint`, no por posición.
+     ✅ Y la etiqueta de la hora es además **el asa para deslizar**: ver `.rc.rd` en el CSS. */
   var rows='';
-  R.dias.forEach(function(d,di){
-    rows+='<div class="rc rd">'+d+'</div>';
-    for(var f=0;f<nF;f++){
-      var k=di+'_'+f;
+  R.franjas.forEach(function(f,fi){
+    rows+='<div class="rc rd" aria-hidden="true"><span>'+f.ini.replace(':00','')+'</span></div>';
+    for(var di=0;di<nD;di++){
+      var k=di+'_'+fi;
       if(!_ofer[k]){ rows+='<div class="ecel off" title="fuera del horario de ese día"></div>'; continue; }
       var v=ST.sel.get(k)||0;
       rows+='<div class="ecel '+(v===2?'on2':v===1?'on1':'')+'" data-k="'+k+'"></div>';
@@ -673,7 +711,7 @@ function cubrirModal(){
     (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">La reunión dura <b>'+_durTxt_(_minS*_slot)+
       '</b>, así que cada toque marca <b>'+_minS+' casillas seguidas</b> a partir de ahí. '+
       'Puedes estirar más arrastrando; lo que quede más corto se quita solo.</p>':'')+
-    '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nF+',minmax(30px,1fr))">'+hd+rows+'</div></div>'+
+    '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nD+',minmax(44px,1fr))">'+hd+rows+'</div></div>'+
     '<div class="leyh" style="margin-top:10px">'+ley+'</div>'+
     '<div class="sc" id="ecount" style="margin:12px 0 10px"></div>'+
     '<button class="btn pri full" data-p id="btnGuardarDisp">Guardar disponibilidad</button>');
@@ -1038,7 +1076,14 @@ function crearModal(){
   }
   var tipoUpd=function(){ var t=val('ceTipo');
     if($('#ceMixW')) $('#ceMixW').style.display=(t==='mixta')?'':'none';
-    if($('#ceInvW')) $('#ceInvW').style.display=(t==='general')?'none':'';
+    /* ⛔⛔ CON «GENERAL» **TAMBIEN** SE ENSEÑA LA LISTA. Aqui se escondia, y los
+       invitados SI estaban puestos: `_presetInvitados_('general')` devuelve a todos
+       los activos menos tu, y `tipoUpd()` corre al abrir. Pero una pantalla que no
+       ensena a nadie dice «no hay nadie» — Daniel lo leyo asi y tenia razon:
+       *«si le das a reunion general, no te mete automaticamente a todos los
+       miembros»*. Y encima no dejaba QUITAR a uno, que es justo para lo que sirve.
+       ⚠️ El ESCRITORIO nunca lo escondio: era una asimetria de una sola cara. */
+    if($('#ceInvW')) $('#ceInvW').style.display='';
     $$('#ceMix .cmixb').forEach(function(b){ b.classList.remove('on'); });
     INV=new Set(_presetInvitados_(t)); invRender(); upd(); };
   $('#ceTipo').onchange=tipoUpd;

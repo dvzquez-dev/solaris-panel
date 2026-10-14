@@ -3578,6 +3578,24 @@ function _cablearVisor_(raiz){
   }
 }
 
+/* ⛔⛔ EL `subscribe` SE CAZA, Y ES UN FALLO REPORTADO: `BUG-M-2026-10-07-1` (Óscar,
+   **Bloquea**): *«no me deja activar notificaciones»*, y Daniel al aprobarlo anotó *«estaba
+   en PC y en Brave»*. Brave de escritorio trae **APAGADO** «Usar los servicios de Google para
+   la mensajería push», así que `pushManager.subscribe` **lanza** — y aquí no había `catch`,
+   o sea que el usuario no se enteraba ni de por qué ni de qué hacer.
+   📏 Y cuadra con lo medido el 14/10: `notisPrefs` tiene **UNA sola persona** en todo el
+   equipo. Si nadie consigue suscribirse, no hay a quién mandar nada.
+   ✅ Se caza el fallo y se dice QUÉ HACER. La detección de Brave sólo afina el consejo: un
+   navegador que falle por otra razón también recibe algo útil en vez de un silencio. */
+function _consejoSuscribir_(err){
+  var e=String((err&&err.message)||err||'');
+  if(navigator.brave) return 'Brave trae apagado \u00abUsar los servicios de Google para la '+
+    'mensajer\u00eda push\u00bb. \u00c1brelo en brave://settings/privacy, act\u00edvalo y vuelve a intentarlo. '+
+    '(El navegador dijo: '+e+')';
+  return 'Este navegador no deja preparar el aviso: '+e+'. En el m\u00f3vil, prueba a abrir el '+
+    'panel desde el icono de la pantalla de inicio.';
+}
+
 function _urlB64_(b64){
   var pad='='.repeat((4-b64.length%4)%4);
   var t=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');

@@ -45,6 +45,21 @@
   --ink:#F4F3F3;       /* L 95,5 % */
 
   --red:#E41E25; --red2:#FF4A4F; --red3:#8E1418;
+
+/* ⛔⛔ LO NATIVO TAMBIÉN ES LA APP: `color-scheme:dark` (13/10).
+   🗣️ Daniel: *«hay desplegables que son de estos blancos, cutres, clásicos de
+   Windows, básicos, en lugar de ser con la temática un poco de Solaris»*.
+   ⛔ Y la caja del `<select>` YA estaba estilada: lo que sale blanco es **la lista
+   desplegada**, que la dibuja el SISTEMA. Sin esta línea Chrome la pinta en modo CLARO
+   por mucho que el resto de la página sea negra — y con ella van también las barras de
+   desplazamiento, los campos de fecha y los menús de autocompletado.
+   ✅ Es una DECLARACIÓN, no una reimplementación: un desplegable dibujado a mano pierde
+   el teclado, el gesto táctil y el lector de pantalla. */
+:root{color-scheme:dark}
+/* ⚠️ Y las opciones, para los navegadores que SÍ las dejan pintar. La paleta no se
+   elige: son las variables que ya salen de la insignia (ARRANQUE §2). */
+select option{background:var(--sur2);color:var(--ink)}
+select option:checked{background:var(--line2)}
   --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6;
 
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,monospace;
@@ -55,6 +70,21 @@
   --arco:cubic-bezier(.34,1.42,.5,1);
 }
 *{box-sizing:border-box}
+/* ⛔⛔ `overflow-x:hidden` EN `html`, Y ES UN FALLO REPORTADO: `BUG-M-2026-10-07-2`
+   (Fernando, 07/10, Safari 402x874): *«la pantalla se puede desplazar lateralmente y se
+   dejan de ver cosas»*. 📏 Medido el 14/10 ejecutando JS a 402 px: `scrollWidth` 450
+   contra 402, y `window.scrollTo(200,0)` dejaba `scrollX` en **48**. O sea que se desliza
+   de verdad, y al hacerlo los 48 px de la izquierda se van de pantalla — exactamente lo
+   que describe.
+   ⚠️ LA CAUSA es la marca de agua: `.marcagua{right:-12%}` sangra 48 px por la derecha
+   **a propósito** (es el diseño). Así que se RECORTA, no se mueve: tocar el `-12%`
+   cambiaría cómo se ve la insignia, que es una decisión de diseño, y no hace falta.
+   ⚠️ Y no basta con el `overflow:hidden` de `body`: cuando `html` es `visible`, el valor
+   de `body` **se propaga al viewport** y `body` pasa a comportarse como `visible`. Por eso
+   había `overflow:hidden` en `body` y la página se desplazaba igual.
+   ✅ `overflow-x` y no `overflow`: lo vertical lo lleva `main`, y cerrarlo aquí también
+   sería apagar algo que no estorba. */
+html{overflow-x:hidden}
 html,body{margin:0;padding:0;touch-action:manipulation}
 body{
   background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px;
@@ -71,7 +101,18 @@ body{
      navegador no entiende `var()`: sin el, un fallo del JS dejaria la app sin armazon. */
   height:100vh; height:100dvh; height:var(--alto, 100dvh);
   display:flex; flex-direction:column;
-  overflow:hidden; position:relative;
+  /* ⛔⛔ `clip` DETRAS DE `hidden`, Y LAS DOS HACEN FALTA (14/10). Con `hidden` a secas,
+     `body` es un CONTENEDOR DE SCROLL: recorta su area desplazable y eso **mueve** a la
+     marca de agua 48 px a la izquierda, que deja de sangrar por el borde — o sea, cambia
+     el diseño. Con `clip` no hay contenedor de scroll, no hay nada que recortar y la
+     insignia se queda donde estaba.
+     📏 Medido a 402 px con las cuatro combinaciones: sólo `html{overflow-x:hidden}` → la
+     página no se desliza **pero la marca salta a 48/402**; sólo `clip` → la marca se queda
+     en 96/450 **pero la página sigue deslizándose**; **las dos** → no se desliza Y la marca
+     sigue en 96/450. El original: se desliza 48 px.
+     ✅ Y el orden es el mismo truco que las tres alturas de arriba: un navegador que no
+     entienda `clip` ignora esa línea y se queda con `hidden`, que es lo que había. */
+  overflow:hidden; overflow:clip; position:relative;
   /* Arriba SI: la muesca tapa la cabecera. Abajo NO: reservarlo aqui y otra vez en la
      `nav` contaba el inset dos veces y dejaba la barra flotando sobre 68 px de fondo
      (MEJ-M-2026-07-27-4, Adrian). En iOS la barra inferior TOCA el borde y su fondo
@@ -778,12 +819,31 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .cajsec.on{max-height:20000px}   /* 3000px cortaba la lista con 20+ turnos */
 
 /* ═══ REJILLA DE DISPONIBILIDAD (cubrir · arrastre) ══════════════════════ */
-.rejw{overflow-x:auto;margin:0 2px;padding-bottom:3px}
+/* ⛔⛔ LA REJILLA VA GIRADA DESDE EL 13/10: un DÍA = una COLUMNA, una FRANJA = una
+   FILA. Antes era al revés y por eso no entraba en un teléfono — las franjas son muchas
+   y los días pocos, así que el eje largo tiene que ser el vertical.
+   ⛔ Y ESO OBLIGA AL ASA: `.rej` lleva `touch-action:none` para poder PINTAR
+   arrastrando, así que sin un sitio por donde tirar una rejilla alta no se puede
+   recorrer. El asa es la COLUMNA DE LAS HORAS (`.rc.rd`), que ya ocupa todo el alto y
+   no es pintable. 🗣️ *«tendría que haber una barra bien clara para deslizar»*. */
+.rejw{overflow-x:auto;overflow-y:visible;margin:0 2px;padding-bottom:3px}
 .rej{display:grid;gap:2px;touch-action:none;user-select:none}
 .rc{font-family:var(--mono);font-size:8.5px;color:var(--ink3);display:flex;align-items:center;justify-content:center}
-.rc.rd{justify-content:flex-end;padding-right:6px;white-space:nowrap;font-size:9.5px;color:var(--ink2);
+/* ✅ EL ASA. `touch-action:pan-y` devuelve el gesto de deslizar SÓLO en esta columna:
+   el dedo pinta en las casillas y arrastra aquí, sin modos ocultos ni botones.
+   ⚠️ Y la etiqueta va arriba del todo de su fila, no centrada: la decisión del 05/08
+   dice que *la etiqueta de franja va al límite, centrarla es ambigua*, y en vertical el
+   límite de una franja es el borde de ARRIBA de su fila. */
+.rc.rd{touch-action:pan-y;cursor:grab;align-items:flex-start;
+  border-left:2px solid var(--line);
+  justify-content:flex-end;padding-right:6px;white-space:nowrap;font-size:9.5px;color:var(--ink2);
   position:sticky;left:0;background:var(--sur);z-index:2}
 .rc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
+/* ⛔ LA CABECERA YA NO ES UNA HORA, ES UN DÍA: un rótulo de columna, y los rótulos de
+   columna SÍ van centrados — lo que la decisión del 05/08 manda poner «al límite» es la
+   etiqueta de FRANJA, porque marca una frontera en el tiempo; un día no marca ninguna. */
+.rc.rh.rhd{position:static;align-items:center;justify-content:center;font-size:9.5px;
+  color:var(--ink2);padding-bottom:3px}
 /* decisión cerrada: la etiqueta va al LÍMITE izquierdo de la celda = hora de inicio */
 .rc.rh span{position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}
 .rc.rh span.fin{left:auto;right:0;transform:none}

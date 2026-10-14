@@ -64,7 +64,10 @@ async function _asegurarPush_(msg){
   }
   await navigator.serviceWorker.ready;
   var sub=await reg.pushManager.getSubscription();
-  if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
+  if(!sub){
+    try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)}); }
+    catch(err){ if(msg) msg.textContent=_consejoSuscribir_(err); return false; }
+  }
   if(typeof SESION!=='undefined' && SESION){
     try{ await api.guardarPush(sub.toJSON()); }
     catch(err){

@@ -582,11 +582,25 @@ function _miDispoPanel_(r){
   _paso=Math.max(15, Math.min(60, _paso||60));
   var _eje=[]; for(var _t=_t0; _t<_t1; _t+=_paso) _eje.push(_t);
   var COL=['transparent','var(--tel)','var(--red)'];
-  var g='<div class="heat"><div class="hg" style="grid-template-columns:auto repeat('+_eje.length+',minmax(20px,1fr))">';
-  g+='<div class="hc"></div>';
-  _eje.forEach(function(t){ g+='<div class="hc rh">'+((t%60===0)?'<span>'+pad(Math.floor(t/60)%24)+'</span>':'')+'</div>'; });
+  /* 🗣️ Daniel: *«las horas en las filas, los dias en las columnas»*. Girada igual que
+     la del movil: no dijo «solo en el movil», y dos caras que ordenan la MISMA rejilla al
+     reves es la asimetria del §3c-9.
+     ⛔ Y las celdas se colocan EXPLICITAS: al girar, la fusion pasa de `span` de columnas
+     a `span` de FILAS, y con el flujo implicito una celda que ocupa varias filas
+     descoloca todo lo que venga detras. */
+  var g='<div class="heat"><div class="hg vert" style="grid-template-columns:28px repeat('+r.dias.length+',minmax(20px,1fr));grid-template-rows:auto repeat('+_eje.length+',13px)">';
+  g+='<div class="hc" style="grid-column:1;grid-row:1"></div>';
   r.dias.forEach(function(d,di){
-    g+='<div class="hc rd">'+d+'</div>';
+    g+='<div class="hc rhd" style="grid-column:'+(di+2)+';grid-row:1">'+d+'</div>';
+  });
+  /* La hora va al limite SUPERIOR de su fila -- el mismo criterio que estaba escrito
+     para el eje horizontal (al limite izquierdo = hora de inicio), girado. */
+  _eje.forEach(function(t,ix){
+    if(t%60!==0) return;
+    g+='<div class="hc rh" style="grid-column:1;grid-row:'+(ix+2)+'"><span>'+
+      pad(Math.floor(t/60)%24)+'</span></div>';
+  });
+  r.dias.forEach(function(d,di){
     var ix=0;
     while(ix<_eje.length){
       /* que franja ofertada cubre este instante de este dia */
@@ -607,7 +621,8 @@ function _miDispoPanel_(r){
         if(fi2!==fi) break;
         k++;
       }
-      var geo='grid-column:span '+k;
+      /* columna FIJA (el dia) y `span` de FILAS (los pasos del eje de tiempo). */
+      var geo='grid-column:'+(di+2)+';grid-row:'+(ix+2)+'/span '+k;
       if(fi<0){ g+='<div class="cel" style="'+geo+';background:transparent"></div>'; }
       else{
         var bi=pos[di+'_'+fi], v=+vals[bi]||0;

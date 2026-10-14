@@ -28,6 +28,21 @@
   --bg:#0C0B0B; --sur:#181616; --sur2:#221E1F; --gris:#231F20;
   --line:#322C2E; --line2:#463E40; --ink3:#7C6E72; --ink2:#B2A8AB; --ink:#F4F3F3;
   --red:#E41E25; --red2:#FF4A4F; --red3:#8E1418;
+
+/* ⛔⛔ LO NATIVO TAMBIÉN ES LA APP: `color-scheme:dark` (13/10).
+   🗣️ Daniel: *«hay desplegables que son de estos blancos, cutres, clásicos de
+   Windows, básicos, en lugar de ser con la temática un poco de Solaris»*.
+   ⛔ Y la caja del `<select>` YA estaba estilada: lo que sale blanco es **la lista
+   desplegada**, que la dibuja el SISTEMA. Sin esta línea Chrome la pinta en modo CLARO
+   por mucho que el resto de la página sea negra — y con ella van también las barras de
+   desplazamiento, los campos de fecha y los menús de autocompletado.
+   ✅ Es una DECLARACIÓN, no una reimplementación: un desplegable dibujado a mano pierde
+   el teclado, el gesto táctil y el lector de pantalla. */
+:root{color-scheme:dark}
+/* ⚠️ Y las opciones, para los navegadores que SÍ las dejan pintar. La paleta no se
+   elige: son las variables que ya salen de la insignia (ARRANQUE §2). */
+select option{background:var(--sur2);color:var(--ink)}
+select option:checked{background:var(--line2)}
   --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6;
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,monospace;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -381,6 +396,17 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 /* mapa de calor */
 .heat{overflow-x:auto;padding-bottom:4px}
 .hg{display:grid;gap:2px;min-width:430px}
+/* ⛔⛔ LA VARIANTE GIRADA (14/10): dias en COLUMNAS, horas en FILAS, que es lo que pidio
+   Daniel (*«es lo que hace Xoyondo y when2meet»*). Va con una clase PROPIA y no
+   reescribiendo `.hc.rh`, porque esas reglas las comparte con la OTRA copia del mapa
+   (`escritorio.html:1913`) que todavia esta en horizontal: cambiarlas a secas la romperia.
+   ✅ Cuando esa copia se gire, se le pone `vert` y estas tres reglas valen para las dos. */
+.hg.vert{min-width:0}
+/* la hora al limite SUPERIOR de su fila y pegada a la derecha de su columna estrecha: es la
+   misma decision que en horizontal (al limite izquierdo), girada 90 grados. */
+.hg.vert .hc.rh{min-height:0;align-items:flex-start;justify-content:flex-end}
+.hg.vert .hc.rh span{position:static;transform:none;left:auto;top:auto;padding-right:4px;line-height:1}
+.hg.vert .hc.rhd{justify-content:center;white-space:nowrap;font-size:9.5px;color:var(--ink2);padding-bottom:3px}
 .hc{font-family:var(--mono);font-size:8.5px;color:var(--ink3);display:flex;align-items:center;justify-content:center;min-height:18px}
 .hc.rd{justify-content:flex-end;padding-right:7px;white-space:nowrap;font-size:9.5px;color:var(--ink2)}
 .hc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
