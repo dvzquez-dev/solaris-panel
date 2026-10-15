@@ -401,7 +401,7 @@ var HOY=_hoyTxt_(), UMBRAL=11.8, MEDIA_EQ=10.9;   /* 841.ª: HOY por la puerta (
 
 /* los valores internos van sin tildes (convencion del proyecto: lo estructural en
    ingles/ASCII); lo que se PINTA lleva su nombre en castellano correcto. */
-var MOD_ET={presencial:'presencial',telematica:'telemática',hibrida:'híbrida'};
+/* (943.ª: aquí vivía `MOD_ET`, la tabla de modalidades de esta cara; ahora es `_modalidadTxt_` de `comun.js`.) */
 /* Nombres canonicos: los de verdad (app.html los tiene igual). Ademas se
    REDERIVAN del roster al aplicar el panel, para no depender de un literal:
    si manana cambia el PD, el panel no se queda hablando del anterior. */
@@ -1778,7 +1778,7 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
           conv:(r0.conv!=null?r0.conv:cob.conv), cubren:(r0.cubren!=null?r0.cubren:cob.cubren),
           limite:r0.limite||'\u2014'});
         return '<tr><td>'+esc(r.tit)+'</td><td class="mono" style="color:var(--ink3)">'+r.tipo+'</td>'+
-          '<td class="mono" style="color:var(--ink3)">'+(MOD_ET[r.mod]||r.mod)+'</td>'+
+          '<td class="mono" style="color:var(--ink3)">'+_modalidadTxt_(r.mod).toLowerCase()+'</td>'+
           /* ⛔ Con la reunion OCULTA el servidor no manda las demas filas, asi que estos
              dos numeros NO SE SABEN: se pinta «—», no un «1 de 30» fabricado, y NO en
              verde. Las dos reglas viven en `reuniones.escritorio.js` para poder
@@ -1837,7 +1837,7 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
     if(cob.oculto)
       return '<div class="acord" id="reu-'+r0.id+'"><div class="hh" data-acord>'+
         '<span class="tx"><b>'+esc(r0.tit||r0.titulo)+'</b><small>'+r0.tipo+' \u00b7 '+
-          (MOD_ET[r0.mod||r0.modalidad]||r0.mod||r0.modalidad)+' \u00b7 '+
+          (_modalidadTxt_(r0.mod||r0.modalidad).toLowerCase())+' \u00b7 '+
           _plazoReuE_(r0).txt+'</small></span>'+
         '<span class="chip">oculta</span>'+
         '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
@@ -1991,7 +1991,7 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
        seguía diciendo «cierra el 14/10/2026 · 1 en riesgo», cuando esa persona ya NO cumplió. */
     var _pz=_plazoReuE_(r);
     return '<div class="acord" id="reu-'+r.id+'"><div class="hh" data-acord>'+
-      '<span class="tx"><b>'+esc(r.tit)+'</b><small>'+r.tipo+' · '+(MOD_ET[r.mod]||r.mod)+' · '+r.cubren+' de '+r.conv+
+      '<span class="tx"><b>'+esc(r.tit)+'</b><small>'+r.tipo+' · '+_modalidadTxt_(r.mod).toLowerCase()+' · '+r.cubren+' de '+r.conv+
       ' han cubierto \u00b7 '+_pz.txt+'</small></span>'+
       '<span class="chip '+_pz.cls+'">'+_pz.chip+'</span>'+
       '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
@@ -3264,7 +3264,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='fbf2004';
+var BUILD='4227523';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
