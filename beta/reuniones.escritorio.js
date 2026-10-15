@@ -753,6 +753,13 @@ function _cablearMiDispo_(){
    móvil, que no lo tiene, y deja sin borrar una reunión cancelada después de fijarse. Se
    **avisa** en el `confirm` y decide quien la convocó. */
 
+/* ¿PUEDE FIJARLA DESDE ESTE BOTÓN? (960.ª) — `_fijarReunion_` y `_borrarReunion_` exigen LO MISMO (el convocante o la
+   cuenta admin), así que es la misma regla y no una copia: con la SESIÓN, porque es un botón que habla con el servidor.
+   Hasta aquí «Fijar» y «Cancelar fijado» salían activos a un coordinador sobre reuniones que no convocó. */
+function _puedeFijarReuE_(r){
+  return _puedeBorrarReuE_(r);
+}
+
 /* ⛔ ¿TE TOCA FIJARLA? (950.ª) — para «Requiere tu decisión». La regla es la del BACKEND: `_fijarReunion_`
    contesta «solo el convocante o admin pueden fijar la fecha». A un coordinador le salían ahí la general y la
    junta «sin fijar»: una lista que se llama «tu decisión» y pide lo que el servidor va a negar enseña a no leerla.
@@ -864,6 +871,7 @@ function _fijarPanel_(){
      «Fijar» no cambia); sólo cambia lo que se lee. El móvil ya lo decía así (`_hFinFranja_`). */
   var frFin=(r.franjas||[]).map(function(f,i){
     return '<option value="'+i+'">'+esc(_hFinFranja_(r,i))+'</option>'; }).join('');
+  var _pf=_puedeFijarReuE_(r);
   return pan('Fijar fecha y orden del día', r.fijada?('fijada · '+esc(r.fijada)):'sin fijar',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
@@ -881,9 +889,12 @@ function _fijarPanel_(){
       '<label style="width:130px">'+lab('Día')+'<select id="reDia" style="'+E+'">'+dias+'</select></label>'+
       '<label style="width:120px">'+lab('Desde')+'<select id="reF0" style="'+E+'">'+fr+'</select></label>'+
       '<label style="width:120px">'+lab('Hasta')+'<select id="reF1" style="'+E+'">'+frFin+'</select></label>'+
-      '<button class="btn pri" data-fijar>Fijar</button>'+
-      (r.fijada?'<button class="btn" data-desfijar style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
+      '<button class="btn pri" data-fijar'+(_pf?'':' disabled')+'>Fijar</button>'+
+      (r.fijada?'<button class="btn" data-desfijar'+(_pf?'':' disabled')+' style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
     '</div>'+
+    (_pf ? '' : '<p class="mini" style="margin:-4px 0 12px;color:var(--ink3)">La fija quien la convocó'+
+      (r.convocante ? ' (<b>'+esc(_pilaDeM_(r.convocante)||r.convocante)+'</b>)' : '')+
+      ' o la cuenta admin: el servidor no deja a nadie más.</p>')+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
       '<label style="flex:1;min-width:240px">'+lab('Orden del día · enlace o texto')+
         '<input id="reOrden" value="'+esc(r.ordenDia||'')+'" placeholder="https://… o los puntos a tratar" style="'+E+'"></label>'+
