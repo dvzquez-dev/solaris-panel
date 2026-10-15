@@ -825,6 +825,12 @@ function _fijarPanel_(){
   var dias=(r.dias||[]).map(function(d,i){ return '<option value="'+i+'">'+esc(d)+'</option>'; }).join('');
   var fr=(r.franjas||[]).map(function(f,i){
     return '<option value="'+i+'">'+esc(_iniF(f))+'</option>'; }).join('');
+  /* ⛔ 927.ª: «Hasta» dice a qué hora ACABA la franja, no a qué hora empieza. Con la misma lista en
+     los dos desplegables la tarjeta arrancaba en «desde 16:00 · hasta 16:00» — se leía como una
+     reunión de cero minutos y era 16:00–17:00. El valor sigue siendo el índice (el manejador de
+     «Fijar» no cambia); sólo cambia lo que se lee. El móvil ya lo decía así (`_hFinFranja_`). */
+  var frFin=(r.franjas||[]).map(function(f,i){
+    return '<option value="'+i+'">'+esc(_hFinFranja_(r,i))+'</option>'; }).join('');
   return pan('Fijar fecha y orden del día', r.fijada?('fijada · '+esc(r.fijada)):'sin fijar',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
@@ -841,7 +847,7 @@ function _fijarPanel_(){
         '<select id="reSel" style="'+E+'">'+opts+'</select></label>'+
       '<label style="width:130px">'+lab('Día')+'<select id="reDia" style="'+E+'">'+dias+'</select></label>'+
       '<label style="width:120px">'+lab('Desde')+'<select id="reF0" style="'+E+'">'+fr+'</select></label>'+
-      '<label style="width:120px">'+lab('Hasta')+'<select id="reF1" style="'+E+'">'+fr+'</select></label>'+
+      '<label style="width:120px">'+lab('Hasta')+'<select id="reF1" style="'+E+'">'+frFin+'</select></label>'+
       '<button class="btn pri" data-fijar>Fijar</button>'+
       (r.fijada?'<button class="btn" data-desfijar style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
     '</div>'+

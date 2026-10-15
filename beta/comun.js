@@ -5035,6 +5035,8 @@ function _novedades_(){
         {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
         {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
         {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
+        {cara:'escritorio', vista:'convoc', txt:'**Al fijar una reunión, el «Hasta» dice a qué hora ACABA**: arrancaba en «desde 16:00 · hasta 16:00», que parecía una reunión de cero minutos y era 16:00–17:00.'},
+        {cara:'movil', vista:'horas', txt:'**La cabecera de «Horas del mes» ya cabe en la tarjeta**: «pendientes» se cortaba por la derecha en pantallas estrechas.'},
         {cara:'escritorio', vista:'panel', txt:'**Debajo del escritorio ya no queda un hueco vacío enorme** al bajar del todo: era la barra del móvil, escondida, ocupando sitio.'},
         {cara:'movil', vista:'estado', txt:'**Si tu sesión caduca, la app lo dice una vez** y te pide entrar otra vez, en lugar de ir fallando en silencio.'}
       ] },
