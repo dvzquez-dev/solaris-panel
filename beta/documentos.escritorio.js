@@ -373,7 +373,16 @@ function docCard(d){
          aqui para que esta linea no sea byte a byte la de alli -- si lo fuera, el ancla de
          la mutacion de la fila saldria DOS VECES y esa mutacion dejaria de aplicarse en
          silencio. Es la regla de «la sangria no desambigua un ancla», por su otra cara. */
-      (d.fecha?'<span class="chip">'+esc(d.fecha)+'</span>':'')+
+      /* ⛔ POR LA PUERTA `_isoADMY_` (14/10): aqui se pintaba `esc(d.fecha)` en
+         CRUDO, o sea en ISO, contra la convencion vinculante de `CLAUDE.md`
+         -prosa en DD/MM/AAAA- y teniendo la puerta a cuatro lineas: esta misma
+         cara la usa 4 veces en su HTML y este modulo la usaba 0.
+         📏 Nadie lo veia porque la semilla `DOCS` trae 7 de 7 SIN campo
+         `fecha`: en demo el chip no se pinta nunca. Solo sale con dato real.
+         ⚠️ `_isoADMY_` devuelve TAL CUAL lo que no sea ISO, asi que no inventa
+         un dia a partir de lo que no entiende. Lo ejecuta
+         `probar_documentos_pintado.py`. */
+      (d.fecha?'<span class="chip">'+esc(_isoADMY_(d.fecha))+'</span>':'')+
       /* Mismo motivo que en el móvil: verlas no es decidir. */
       (_etiquetasDe_(d).length
         ? '<span class="chip">'+esc(_etiquetasDe_(d).join(' · '))+'</span>' : '')+

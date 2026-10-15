@@ -727,7 +727,13 @@ nav{flex:none;position:relative;height:calc(70px + env(safe-area-inset-bottom,0p
   color:#241a08;background:var(--warn);border-radius:5px;padding:2px 5px;flex:none}
 /* aviso flotante */
 .tost{position:absolute;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));
-  transform:translate(-50%,10px);z-index:40;
+  /* ⛔⛔ EL AVISO ES LA CAPA MAS ALTA. Estaba en 40, DEBAJO del modal (50): pulsabas
+     «Crear encuesta» sin convocados, la app lo rechazaba, y el mensaje se pintaba
+     detras del modal. Para quien lo usa eso es un boton muerto — medido el 14/10
+     usando la app, no leyendo el codigo. Y no basta con pasar de 50: estan el pintor
+     (90), el menu (900/901) y el visor de documento (9000). Un aviso que no se ve es
+     peor que no avisar. */
+  transform:translate(-50%,10px);z-index:10000;
   background:var(--sur2);border:1px solid var(--line);border-left:2px solid var(--red);
   border-radius:var(--r2);padding:9px 14px;font-size:12px;opacity:0;pointer-events:none;
   transition:opacity .2s linear,transform .28s var(--sal);max-width:86%;text-align:center;
@@ -825,7 +831,20 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
    ⛔ Y ESO OBLIGA AL ASA: `.rej` lleva `touch-action:none` para poder PINTAR
    arrastrando, así que sin un sitio por donde tirar una rejilla alta no se puede
    recorrer. El asa es la COLUMNA DE LAS HORAS (`.rc.rd`), que ya ocupa todo el alto y
-   no es pintable. 🗣️ *«tendría que haber una barra bien clara para deslizar»*. */
+   no es pintable. 🗣️ *«tendría que haber una barra bien clara para deslizar»*.
+   ⛔⛔ **Y EL ASA, SOLA, NO BASTABA — medido el 14/10.** Por la especificación, el
+   `touch-action` efectivo es la **intersección** del elemento y **sus ancestros** hasta el
+   que desliza: `.rc.rd` dice `pan-y` y su padre `.rej` dice `none` → intersección **vacía**.
+   Y cuadra con la fecha: él dijo *«el problema es que NO SE PODÍA deslizar»* el **14/10**, un
+   día **después** de ponerse el asa. ✅ Desde la 746.ª deslizar lo hace **`_dosDedos_` en JS**
+   (`comun.js`), donde el `touch-action` del padre deja de mandar. El `pan-y` se conserva
+   porque **no estorba** y porque en un navegador donde sí valiera sería una salida más. */
+/* 🗣️ «Y que lo ponga escrito en algún lugar» (Daniel, 14/10). El rótulo del gesto va ENCIMA de
+   la rejilla y pegado a ella — debajo de doce filas lo lee quien ya se ha rendido —, y con el
+   tamaño de una nota: es una instrucción, no un aviso. ⚠️ No lleva color de alerta a propósito:
+   lo que explica es cómo se usa algo que funciona, no que algo vaya mal. */
+.rgesto{font-size:10.5px;color:var(--ink3);padding:0 2px 4px;letter-spacing:.2px}
+.rgesto b{color:var(--ink2);font-weight:600}
 .rejw{overflow-x:auto;overflow-y:visible;margin:0 2px;padding-bottom:3px}
 .rej{display:grid;gap:2px;touch-action:none;user-select:none}
 .rc{font-family:var(--mono);font-size:8.5px;color:var(--ink3);display:flex;align-items:center;justify-content:center}
@@ -838,6 +857,25 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
   border-left:2px solid var(--line);
   justify-content:flex-end;padding-right:6px;white-space:nowrap;font-size:9.5px;color:var(--ink2);
   position:sticky;left:0;background:var(--sur);z-index:2}
+/* ⛔⛔ LA HORA VA CENTRADA EN LA LÍNEA, NO DENTRO DE LA CELDA (746.ª, 14/10).
+   🗣️ Daniel: *«las horas… han de aparecer **justo en el medio de dos slots**. Porque realmente
+   es donde están. **No están ni para arriba ni para abajo.** Están ahí. Ojo a los detalles»*.
+   📏 Medido antes: el centro del texto caía **6,7 px por debajo** de la línea — o sea centrado
+   dentro de su propia casilla, que es decir que las 10:00 pasan **durante** la franja de las 10
+   en vez de **al empezarla**.
+   ✅ Y no contradice la decisión del 05/08 (*«la etiqueta de franja va al límite, centrarla es
+   ambiguo»*): la **refina**. El límite es la línea; lo que faltaba es que el texto esté **a
+   caballo** de ella y no apoyado debajo.
+   ⚠️ Se sube con `transform` y **no se saca del flujo**, y eso no es indiferente: la primera
+   versión usaba `position:absolute` copiando a `.rc.rh span`. En Turnos daba igual —su columna
+   mide **56 px fijos**—, pero en **Reuniones la columna es `auto`**: se dimensiona **por su
+   contenido**, y un hijo absoluto no cuenta como contenido. La columna habría colapsado a ~8 px
+   (borde + padding) y las horas se habrían comido la rejilla. Un `transform` **no cambia la caja
+   que el grid mide**: el texto sube media línea y la columna sigue valiendo lo que vale.
+   ⚠️ Y tampoco con márgenes negativos: arrastran el fondo `sticky` y el borde de la celda.
+   ⛔ Las dos rejillas comparten `.rc.rd`, así que **una regla escrita mirando una sola cara
+   toca las dos** — que es como se rompe la pantalla de al lado sin enterarse. */
+.rc.rd span{display:block;transform:translateY(-50%)}
 .rc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
 /* ⛔ LA CABECERA YA NO ES UNA HORA, ES UN DÍA: un rótulo de columna, y los rótulos de
    columna SÍ van centrados — lo que la decisión del 05/08 manda poner «al límite» es la

@@ -1308,10 +1308,41 @@ function _ApiSesion(m){ this.message=m; this.sesion=true; }
    ⛔ Se mira con una lista CERRADA, no con un `/token/`: hay errores que llevan la palabra
    «token» y no son de sesión — mandar a alguien a volver a entrar cuando el problema es otro
    le hace perder el trabajo que tenga a medias. */
+/* ⛔⛔ LA MAQUETA SIN CUENTA, SÓLO EN LOCAL (832.ª, 15/10) — UNA puerta para las dos caras.
+   El móvil decía «en la app publicada NUNCA se activa» y lo único que lo encendía era la URL:
+   📏 medido el 15/10 abriendo `produccion/index.html?demo` en Chromium, entraba a la maqueta
+   SIN login (DEMO=true, sin sesión; datos inventados — los 4 nombres no casan con el roster).
+   Daniel, 11/08: «yo quiero login q no puedo ver nada». Y en el escritorio la fecha se congelaba
+   con `indexOf('demo')`, o sea con CUALQUIER «demo» en la URL y CON la sesión real puesta.
+   Ahora hacen falta las dos cosas: `?demo` como parámetro entero (`\b`: «demolition» no vale) y
+   que la página la sirva esta máquina (localhost, 127.0.0.1, [::1] o un fichero).
+   ⚠️ No lanza: ante cualquier duda, `false` — el lado seguro es pedir login. */
+function _demoLocal_(){
+  try{
+    if(!/[?&]demo\b/.test(location.search)) return false;
+    return location.protocol==='file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  }catch(e){ return false; }
+}
+/* ⛔⛔ «HOY» SE RECALCULA, NO SE FOTOGRAFÍA (841.ª, 15/10) — una puerta para las dos caras.
+   Cada cara calculaba `HOY` UNA vez, al cargar, con su propia copia. Pero un móvil deja la app
+   abierta de un día para otro, y `_diasHasta_` cuenta contra `HOY` mientras `_plazoAbierto_` mira
+   la hora REAL: pasada la medianoche la tarjeta decía «cierra mañana» con el plazo ya cerrado — y
+   no cubrir sanciona. 📏 Se vio en la demo, donde los dos relojes discrepan siempre: «cierra en
+   2 días · TE FALTA» encima de «El plazo cerró». Ahora las caras la recalculan al empezar cada
+   refresco vivo (al volver a la app y cada 90 s). `ahora` es para el banco (§3c-36).
+   En la maqueta (`_demoLocal_`) sigue congelada: las capturas salen estables. */
+function _hoyTxt_(ahora){
+  if(_demoLocal_()) return '24/07/2026';
+  return _isoADMY_(_ahoraLocalISO_(ahora).slice(0, 10));
+}
 function _esErrorDeSesion_(err){
   var e=String(err||'');
   return /token no v\u00e1lido|token no valido/i.test(e) ||
-         /^sin token$/i.test(e) ||
+         /* ⛔ `^(Error: )?`: Apps Script contesta `String(err)`, o sea «Error: sin token». Con
+            `^sin token$` a secas esta rama NO CASABA NUNCA en produccion (816.a, medido con
+            `rutinas/servidor.py --comparar`). Va anclado a proposito: «sin token» suelto dentro de
+            otro mensaje no es una sesion caducada. */
+         /^(Error: )?sin token$/i.test(e) ||
          /token de otra aplicaci/i.test(e);
 }
 
@@ -3932,6 +3963,34 @@ function _ahoraLocalISO_(d){
    ⚠️ **`ahora` va por argumento** porque si no el caso no puede discriminar: con la fecha
    tecleada, dos instantes separados dan la misma respuesta ('cerrada' las dos), y con ésta dan
    'abierta' las dos. Un caso que dependa del reloj de quien corra el banco no distingue nada. */
+/* LAS FRANJAS DE LA SEMILLA: bloques de UNA HORA, con el hueco de la comida (745.ª).
+
+   🗣️ Daniel, 14/10/2026: *«aparecen de disponibilidades los días de forma distinta… no
+   tiene mucho sentido poner mañana y que no se sepa qué hora es mañana… Que sea como las
+   reuniones. Que sea POR BLOQUES HORARIOS… hasta las once de la noche… no antes de las 9
+   de la mañana, dejar el espacio para comer… de dos a cuatro, no haya turnos»*.
+
+   ⛔ **Las dos caras la llaman; la lista NO se copia en sus dos semillas.** La lección ya
+   estaba escrita al lado, para los sitios: *«los sitios NO se cablean … para que las dos
+   caras no acaben con dos listas distintas»*. Con la lista en los dos `.html`, tocar una
+   deja la otra con la semana vieja y nadie se entera hasta que alguien compara.
+
+   ⛔ **Y es el espejo de `calcular_convocatoria.franjas_horarias()`, que es quien las
+   monta de verdad.** Aquí sólo se siembra la demostración; `probar_convocar.py` compara
+   las dos listas clave por clave, porque una semilla que enseñe una semana que el
+   servidor no manda es una pantalla que miente sin dar ningún error.
+
+   ⚠️ El hueco no se pinta gris: **no existe**. Una franja ofertada que nadie puede hacer
+   recoge ceros, y un cero de «no puedo» no se distingue de un cero de «nadie contestó». */
+function _franjasDemo_(){
+  var out=[], h, p=function(n){ return (n<10?'0':'')+n; };
+  for(h=9;h<23;h++){
+    if(h>=14 && h<16) continue;
+    out.push({k:'h'+p(h), txt:p(h)+':00'});
+  }
+  return out;
+}
+
 function _semanaDemo_(ahora){
   var hoy = ahora ? new Date(+ahora) : new Date();
   var mas = function(b, n){ return new Date(b.getFullYear(), b.getMonth(), b.getDate() + n); };
@@ -4013,7 +4072,17 @@ function _normAbre_(abre){
 function _plazoAbierto_(limite, ahora){
   var s = _normLimite_(limite);
   if (!s) return true;
-  return s >= (ahora || _ahoraLocalISO_());
+  return s >= (ahora || _ahoraApp_());
+}
+
+/* ⛔⛔ EL «AHORA» DE LA APP — el mismo día que `HOY` (858.ª).
+   En la maqueta local `HOY` es el 24/07/2026 (`_hoyTxt_`), y `_plazoTxt_` cuenta desde él: la tarjeta
+   decía «cierra en 2 días»… y debajo «El plazo cerró · 26/07/2026», porque `_plazoAbierto_` miraba el
+   reloj REAL. Dos relojes en la misma tarjeta (visto con `mirar_app.js movil`, 15/10).
+   ✅ Publicado no cambia nada: fuera de la maqueta es `_ahoraLocalISO_` tal cual. */
+function _ahoraApp_(d){
+  var a = _ahoraLocalISO_(d);
+  return _demoLocal_() ? _dmyAISO_(_hoyTxt_(d)) + a.slice(10) : a;
 }
 
 /* ⛔⛔ CUÁNTAS FRANJAS SE TE EXIGEN — y por qué esto vive en una sola puerta.
@@ -4212,6 +4281,122 @@ function _minTurno_(cv){
   return (typeof m==='number' && m>0) ? m : _minHorasTurno_();
 }
 
+/* ⛔⛔ LOS TRAMOS CONTIGUOS — espejo de `reglas/turnos.py:tramos`. Existe porque el HUECO
+   DE LA COMIDA parte el día en dos. Daniel (14/10/2026): *«de dos a cuatro, no haya
+   turnos»*. Con `h09..h13` y `h16..h22`, contar POSICIONES en la lista hace que tocar las
+   13:00 marque `[h13, h16, h17, h18]`: cuatro casillas, cuatro horas… y un agujero de DOS
+   en medio. Nadie puede hacer ese turno y **no da ningún error** — sale un turno partido
+   en el reparto y nadie sabe por qué.
+   ⛔ Dos claves van en el MISMO tramo salvo que las dos sean horarias y no sean
+   consecutivas. Escrito al revés a propósito: con `m`/`t` no hay hora que leer, sale UN
+   tramo y el bloque se comporta igual que antes.
+   ⚠️ TODO EN ES3, sin `indexOf` de array ni `map`: el arnés de `probar_turnos.py` corre
+   esta función con `cscript` (JScript), que no los lleva. La hora se lee carácter a
+   carácter por lo mismo. */
+function _tramosFranja_(claves){
+  var out=[], act=[], prev=null, i, s, h;
+  for(i=0;i<(claves||[]).length;i++){
+    s=String(claves[i]==null?'':claves[i]); h=null;
+    if(s.length===3 && s.charAt(0)==='h' && s.charAt(1)>='0' && s.charAt(1)<='9'
+       && s.charAt(2)>='0' && s.charAt(2)<='9') h=parseInt(s.charAt(1)+s.charAt(2),10);
+    if(act.length && prev!==null && h!==null && h!==prev+1){ out.push(act); act=[]; }
+    act.push(claves[i]);
+    prev=h;
+  }
+  if(act.length) out.push(act);
+  return out;
+}
+
+/* ⛔⛔ UN DEDO PINTA · DOS DEDOS DESLIZAN (746.ª, 14/10/2026).
+
+   🗣️ Daniel: *«tal vez la solución sería que para deslizar que lo hagas con los DOS DEDOS a la
+   vez. Y que lo ponga escrito en algún lugar… La solución de la app NO es que no se deslice…
+   Deslizar para las reuniones va a ser completamente OBLIGATORIO… el problema es que NO SE PODÍA
+   deslizar»*.
+
+   ⛔ **Se hace en JS y no con `touch-action`.** El asa de `.rc.rd` (`pan-y`) existe desde el
+   13/10 y **no funciona**: por la especificación, el `touch-action` efectivo es la
+   **intersección** del elemento y **sus ancestros**, y su padre `.rej` dice `none` → vacía.
+   Delegar en el navegador obliga a quitarle el `none` al padre, y eso **mata el pintado por
+   arrastre** — que es justo lo que él dijo que no. En JS el padre deja de mandar.
+
+   ✅ **Y un segundo motivo, de verificación**: un gesto **nativo** no se dispara con eventos
+   sintéticos, así que sería una capacidad imposible de probar sin un dedo humano. Hecha en JS se
+   mide con `PointerEvent`s.
+
+   ⛔ **Al entrar el SEGUNDO dedo se ABORTA el trazo**, no se deja a medias: el primer dedo ya ha
+   pintado algo en el `pointerdown`, y quien pone dos dedos quería deslizar, no pintar. Por eso
+   `alAbortar` existe y por eso quien llama tiene que saber deshacerlo — en Turnos con una copia
+   de las celdas, en Reuniones basta con tirar la previsualización, que aún no ha confirmado nada.
+
+   ⚠️ **Y no se vuelve a pintar hasta que se levantan TODOS los dedos.** Levantar uno de los dos
+   dejaría al que queda pintando en mitad de un gesto de deslizar, que es peor que no deslizar.
+
+   ⚠️ El que desliza se **busca**, no se cablea: es el ancestro con `overflow-y` desbordado. En
+   el móvil hoy es `#main`, pero cablearlo ata esta función a una cara y a un maquetado. */
+function _dosDedos_(rej, alAbortar){
+  var act = {}, n = 0, desl = false, cx = 0, cy = 0, scr = null, wrap = rej.parentElement;
+  var buscarScroller = function(){
+    var p = rej.parentElement;
+    while(p && p !== document.body){
+      var ov = getComputedStyle(p).overflowY;
+      if((ov === 'auto' || ov === 'scroll') && p.scrollHeight > p.clientHeight + 1) return p;
+      p = p.parentElement;
+    }
+    return document.scrollingElement || document.documentElement;
+  };
+  var centro = function(){
+    var sx = 0, sy = 0, m = 0, k;
+    for(k in act){ if(act.hasOwnProperty(k)){ sx += act[k].x; sy += act[k].y; m++; } }
+    return m ? {x: sx / m, y: sy / m} : null;
+  };
+  rej.addEventListener('pointerdown', function(e){
+    if(act[e.pointerId]) return;
+    act[e.pointerId] = {x: e.clientX, y: e.clientY}; n++;
+    if(n < 2) return;
+    /* El segundo dedo: se deja de pintar, se deshace lo del primero y se desliza. */
+    if(!desl){ desl = true; scr = buscarScroller();
+               if(typeof alAbortar === 'function') alAbortar(); }
+    var c = centro(); if(c){ cx = c.x; cy = c.y; }
+  });
+  rej.addEventListener('pointermove', function(e){
+    if(!act[e.pointerId]) return;
+    act[e.pointerId].x = e.clientX; act[e.pointerId].y = e.clientY;
+    if(!desl || n < 2) return;
+    var c = centro(); if(!c) return;
+    /* El contenido sigue al dedo: subir el dedo baja el contenido. */
+    if(scr) scr.scrollTop -= (c.y - cy);
+    if(wrap) wrap.scrollLeft -= (c.x - cx);
+    cx = c.x; cy = c.y;
+  });
+  var suelta = function(e){
+    if(!act[e.pointerId]) return;
+    delete act[e.pointerId]; n--;
+    if(n <= 0){ n = 0; desl = false; }
+  };
+  rej.addEventListener('pointerup', suelta);
+  rej.addEventListener('pointercancel', suelta);
+  return { deslizando: function(){ return desl; }, dedos: function(){ return n; } };
+}
+
+/* Una copia de las celdas marcadas, para poder DESHACER un trazo abortado. ⚠️ Plana a
+   propósito: `_convPintar_` asigna y borra ENTRADAS enteras, nunca toca un valor por dentro,
+   así que copiar las referencias basta y no hay que serializar nada. */
+function _copiaCeldas_(o){
+  var out = {}, k;
+  for(k in (o || {})){ if(o.hasOwnProperty(k)) out[k] = o[k]; }
+  return out;
+}
+
+/* Devuelve `dst` a como estaba, **sin cambiar de objeto**: quien lo tenga guardado (la
+   convocatoria viva) tiene que ver la vuelta atrás. */
+function _restaurarCeldas_(dst, src){
+  var k;
+  for(k in dst){ if(dst.hasOwnProperty(k)) delete dst[k]; }
+  for(k in (src || {})){ if(src.hasOwnProperty(k)) dst[k] = src[k]; }
+  return dst;
+}
+
 function _bloqueDesde_(franjas, k, minimo){
   var claves=[], i;
   for(i=0;i<(franjas||[]).length;i++){
@@ -4221,9 +4406,16 @@ function _bloqueDesde_(franjas, k, minimo){
   var pos=-1;
   for(i=0;i<claves.length;i++) if(claves[i]===k) pos=i;
   if(pos<0) return [];
-  if(!(minimo>1) || claves.length<minimo) return [k];
-  var ini=Math.min(pos, claves.length-minimo);
-  return claves.slice(ini, ini+minimo);
+  if(!(minimo>1)) return [k];
+  /* ⛔ EL MÍNIMO, EL ANCLAJE Y EL «no caben» SE MIDEN SOBRE EL TRAMO, no sobre la lista:
+     con el hueco puesto, `claves.length` dice 12 y el tramo de la mañana tiene 5. */
+  var tr=_tramosFranja_(claves), t=null, j;
+  for(i=0;i<tr.length;i++){ for(j=0;j<tr[i].length;j++) if(tr[i][j]===k) t=tr[i]; }
+  if(!t || t.length<minimo) return [k];
+  var p=-1;
+  for(j=0;j<t.length;j++) if(t[j]===k) p=j;
+  var ini=Math.min(p, t.length-minimo);
+  return t.slice(ini, ini+minimo);
 }
 
 /* Quien FIRMA un parte enrutado a esa unidad, contando que nadie decide lo suyo.
@@ -4836,6 +5028,31 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-15-convocados-y-arreglos', fecha:'2026-10-15',
+      titulo:'Cambiar a quién se convoca después de crear la reunión, y cinco cosas que molestaban',
+      items:[
+        {cara:'movil', vista:'reu', txt:'**Los convocados de una reunión ya se pueden cambiar desde su ficha**, con el mismo buscador por nombre que al crearla. Antes, quien se olvidaba a alguien tenía que crear otra.'},
+        {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
+        {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
+        {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
+        {cara:'escritorio', vista:'panel', txt:'**Debajo del escritorio ya no queda un hueco vacío enorme** al bajar del todo: era la barra del móvil, escondida, ocupando sitio.'},
+        {cara:'movil', vista:'estado', txt:'**Si tu sesión caduca, la app lo dice una vez** y te pide entrar otra vez, en lugar de ir fallando en silencio.'}
+      ] },
+    { id:'2026-10-14-dos-dedos', fecha:'2026-10-14',
+      titulo:'Un dedo marca · dos dedos deslizan (y la hora va en la línea)',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'**Ya se puede deslizar encima de la rejilla: con DOS dedos.** Un dedo sigue marcando y arrastrando — que es como se cubre —, y dos dedos mueven la pantalla. Lo pone escrito encima del mapa, porque un gesto que no se anuncia no existe. ⚠️ Y si pones el segundo dedo a mitad de un trazo, **lo que había marcado el primero se deshace**: querías deslizar, no marcar.'},
+        {cara:'movil', vista:'reu', txt:'**Lo mismo al cubrir una encuesta de reunión**, que es donde más se nota: la rejilla es alta y antes el dedo se quedaba pegado a ella.'},
+        {cara:'movil', vista:'turnos', txt:'**Y las horas ya salen justo en la raya que separa dos casillas**, no dentro de una. Las 10:00 son la frontera entre la franja de las 9 y la de las 10, no un punto dentro de ninguna de las dos.'}
+      ] },
+    { id:'2026-10-14-disponibilidad-por-horas', fecha:'2026-10-14',
+      titulo:'La disponibilidad de turnos ya se pide POR BLOQUES DE UNA HORA',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'Hasta hoy la semana se preguntaba con **dos casillas por día**: «Mañana» y «Tarde/noche». Lo dijiste: *«no tiene mucho sentido poner mañana y que no se sepa qué hora es mañana»*. Ahora son **bloques de una hora**, igual que en Reuniones: de **09:00 a 14:00** y de **16:00 a 23:00** — las **horas en las filas** y los días en las columnas.'},
+        {cara:'movil', vista:'turnos', txt:'**De dos a cuatro no hay nada que marcar**, porque lo pediste así. Y no está en gris: **no existe**. Una franja que se oferta y nadie puede hacer recoge ceros, y un cero de «no puedo» no se distingue de un cero de «nadie contestó».'},
+        {cara:'movil', vista:'turnos', txt:'**Un toque sigue marcando el turno entero** (4 h), y ahora **no salta la hora de comer**: si tocas las 13:00 se marca de **10 a 14**, no «13, 16, 17 y 18». Eso último eran cuatro horas con un agujero de dos en medio — un turno que nadie puede hacer.'},
+        {cara:'escritorio', vista:'turnos', txt:'Y al convocar, la casilla **«preguntar POR HORAS» nace marcada**: el modo horario existía desde agosto y estaba **apagado**, así que lo que veías era siempre la versión de dos casillas.'}
+      ] },
     { id:'2026-10-07-apunte-sin-fecha', fecha:'2026-10-07',
       titulo:'«Ultimos movimientos» ya dice cuántos apuntes no tienen fecha',
       items:[

@@ -704,9 +704,12 @@ function vFichar(){
         : '')+
       '<div class="sesbtn">'+
         (s.estado==='parada'
-          ? (CARGA.fichaje
+          ? ((CARGA.fichaje || DEMO)
               /* Sin saber si YA tienes un fichaje abierto no se puede ofrecer «fichar
-                 entrada»: dirias «parado» a alguien que esta fichando y ficharia dos veces. */
+                 entrada»: dirias «parado» a alguien que esta fichando y ficharia dos veces.
+                 ⛔ 840.ª: en la DEMO no hay nube que preguntar (`DEMO` ⇒ nunca hay login, y desde la
+                 832.ª sólo en local), así que la bandera no llegaba NUNCA: el botón se quedaba en
+                 «Comprobando…» para siempre y fichar —la pantalla que más se usa— no se podía probar. */
               ? '<button class="btn pri full" data-p id="btnIni">Fichar entrada</button>'
               : '<button class="btn full" disabled>Comprobando si ya tienes un fichaje abierto…</button>')
           /* ⛔ AQUÍ HABÍA UN TERNARIO CON LAS DOS RAMAS IDÉNTICAS — byte a byte. Se

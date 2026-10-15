@@ -267,8 +267,12 @@ function _convHTML_(cv){
     var p=String(_diaTxtM_(_isoADMY_(d)||d)||'').split(' ');
     return '<div class="rc">'+esc(p[0]||'')+'<br>'+esc(String(p[1]||'').slice(0,2))+'</div>';
   }).join('');
+  /* 🗣️ «Han de aparecer JUSTO EN EL MEDIO DE DOS SLOTS. Porque realmente es donde están. No
+     están ni para arriba ni para abajo»* (Daniel, 14/10). Por eso la hora va en un **span**: sin
+     un elemento no hay nada que anclar a la línea, y empujar la celda entera arrastraría su
+     fondo `sticky` y su borde. Reuniones ya lo hacía así. El anclaje está en `movil.css`. */
   var filas=F.map(function(fr){
-    return '<div class="rc rd">'+esc(fr.txt)+'</div>'+
+    return '<div class="rc rd"><span>'+esc(fr.txt)+'</span></div>'+
       D.map(function(d){ return _convCelHTML_(cv,d,fr.k); }).join('');
   }).join('');
   return '<div class="tarj" id="convC">'+
@@ -276,10 +280,18 @@ function _convHTML_(cv){
     '<div class="tpin">'+clases.map(function(k){ return pin(k, esc(_convEtiq_(k))); }).join('')+
       '<button data-pin-coche class="coche '+(CONV_COCHE?'on':'')+'" data-p>🚗 con coche</button>'+
     '</div>'+
-    /* 78 px y no 64: «Tarde/noche» no cabe en 64 y, al ser `nowrap` + `flex-end` + `sticky`,
-       se sale por la izquierda y SE CORTA. No lo caza ninguna prueba de DOM —el `textContent`
-       está entero— sino mirar la pantalla. Con 7 días a 34 px mínimos siguen cabiendo 316 px. */
-    '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:78px repeat('+
+    /* 🗣️ «Y que lo ponga escrito en algún lugar» (14/10). Va **encima** de la rejilla y pegado
+       a ella: una instrucción de gesto escrita **debajo** de doce filas la lee quien ya se ha
+       rendido. Y dice las dos mitades, porque la de pintar también hay que descubrirla. */
+    '<div class="rgesto">Un dedo <b>pinta</b> · dos dedos <b>deslizan</b></div>'+
+    /* ⛔ EL CARRIL LO DECIDE `_carrilFranjas_`, y el 78 fijo se fue por esto: decía aquí que
+       «con 7 días a 34 px mínimos siguen cabiendo 316 px». 📏 Medido a 375×812: el sitio donde vive
+       la rejilla mide **311**, no 316 — la cuenta se había hecho contra el ancho de la PANTALLA y
+       no contra el del CONTENEDOR, y por eso el domingo salía cortado. Lo de «Tarde/noche» sigue
+       siendo cierto y por eso la función devuelve 78 cuando la etiqueta es larga: con `nowrap` +
+       `flex-end` + `sticky` se sale por la izquierda y se corta, y eso **no lo caza ninguna prueba
+       de DOM** —el `textContent` está entero—, sino mirar la pantalla. */
+    '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+
       D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
     '<div class="tplazo'+(urge?' urge':'')+'" id="convPie">'+_convPieHTML_(cv)+'</div>'+
     '<p class="rnota" style="margin-top:10px">Hasta el <b>'+esc(lim)+'</b> a las '+esc(hora)+
@@ -303,6 +315,31 @@ function _convHTML_(cv){
    horario de ese día» de las encuestas — la misma situación exacta, y la decisión ya tomada.
    ⚠️ `data-abre` es un asidero **ASCII** para el banco: anclar en la frase la ata a una tilde
    que `cscript` destroza, y a prosa que el propio comentario puede repetir. */
+/* ⛔ EL CARRIL DE LA IZQUIERDA SE MIDE POR LA ETIQUETA MÁS LARGA (745.ª, 14/10).
+
+   📏 **Medido a 375×812 con la rejilla ya horaria**: el carril de la tarjeta mide **311 px**
+   y la rejilla pide **330** (78 + 7×34), así que **desborda 19** y el **domingo sale cortado**. Y
+   como `#convRej` lleva `touch-action:none`, ese desbordamiento **no se desliza con el dedo**:
+   el domingo queda **inalcanzable** en un móvil — y un domingo es un día de taller como otro.
+
+   ⛔ **Los 78 px eran de «Tarde/noche»**, y está escrito tres líneas más abajo: *«78 px y no 64:
+   "Tarde/noche" no cabe en 64 y, al ser `nowrap` + `flex-end` + `sticky`, se sale por la izquierda
+   y SE CORTA»*. Con la etiqueta horaria («09:00», **5** caracteres) ese motivo **ya no existe**, y
+   los 22 px que sobran son **justo los que le faltan al domingo**: 56 + 7×34 = 294 en 311.
+
+   ✅ **Y el criterio es el TEXTO, no «si es horaria»**: lo que tiene que caber es la etiqueta. Así
+   sigue dando 78 el día que se use la tarde partida («Tarde (16:00)») sin tocar nada aquí — que es
+   la misma regla que el resto de esta pantalla: **los datos mandan, no el modo**. */
+function _carrilFranjas_(franjas){
+  var i, t, max = 0;
+  for(i=0;i<(franjas||[]).length;i++){
+    t = franjas[i] && typeof franjas[i]==='object' ? (franjas[i].txt || franjas[i].k) : franjas[i];
+    t = String(t==null ? '' : t);
+    if(t.length > max) max = t.length;
+  }
+  return max > 5 ? 78 : 56;
+}
+
 function _convPreHTML_(cv){
   var D=cv.dias||[], F=cv.franjas||[];
   /* ⛔ POR `_normAbre_` (463.ª): con `_dmyAISO_` a pelo, un `abre` sin hora —o en
@@ -318,13 +355,15 @@ function _convPreHTML_(cv){
     var p=String(_diaTxtM_(_isoADMY_(d)||d)||'').split(' ');
     return '<div class="rc">'+esc(p[0]||'')+'<br>'+esc(String(p[1]||'').slice(0,2))+'</div>';
   }).join('');
+  /* ⚠️ Y aquí igual, que es la misma rejilla antes de abrir: dos formas de pintar la misma
+     etiqueta es como una de las dos se queda vieja. */
   var filas=F.map(function(fr){
-    return '<div class="rc rd">'+esc(fr.txt)+'</div>'+
+    return '<div class="rc rd"><span>'+esc(fr.txt)+'</span></div>'+
       D.map(function(){ return '<div class="tcel off"></div>'; }).join('');
   }).join('');
   return '<div class="tarj" id="convC" data-abre="'+esc(ab)+'">'+
     _convCabHTML_(cv)+
-    '<div class="rejw"><div class="rej" style="grid-template-columns:78px repeat('+
+    '<div class="rejw"><div class="rej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+
       D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
     '<div class="tplazo">Se abre el <b>'+esc(abD)+'</b> a las '+esc(abH)+
       '. Entonces podr\u00e1s pintar tus ratos.</div>'+
@@ -536,8 +575,19 @@ function _engConv_(){
   if(bc) bc.onclick=function(){ CONV_COCHE=!CONV_COCHE; bc.classList.toggle('on', CONV_COCHE); };
   /* Pintar a dedo y de arrastre, como en reuniones. ⚠️ `setPointerCapture` LANZA si el puntero
      no es suyo, y al lanzar aborta el resto del manejador: va envuelto (ya pasó en el pintor). */
-  var pintando=false;
+  var pintando=false, antes=null;
+  /* ⛔⛔ EL GESTO VA ENGANCHADO **ANTES** QUE EL PINTOR, y no es un detalle de orden: los dos
+     escuchan en el MISMO elemento, así que corren en el orden en que se registran. Si el
+     pintor fuera primero, el `pointerdown` del segundo dedo **pintaría una celda** antes de que
+     nadie supiera que vienen dos dedos — y el usuario vería una marca por querer deslizar.
+     ✅ `alAbortar` deshace lo que el PRIMER dedo ya había pintado: `_convPintar_` escribe en el
+     `pointerdown`, no al soltar, así que sin esto el trazo abortado se queda puesto. */
+  var dd=_dosDedos_(rej, function(){
+    if(antes) _restaurarCeldas_(_convMias_(cv), antes);
+    antes=null; pintando=false; repinta();
+  });
   rej.addEventListener('pointerdown', function(e){
+    if(dd.deslizando()) return;
     var el=e.target.closest('[data-tk]'); if(!el) return;
     /* ⛔ ESTE GUARDIA ES LA TERCERA CAPA, NO LA PRIMERA (456.ª — corregido MIDIENDO).
        Escribí aquí que «ahora manda» y era **falso**: `_convPreHTML_` no pinta
@@ -568,11 +618,17 @@ function _engConv_(){
        cerrar `Codigo.gs:_guardarDisponibilidad_`, no al revés. Ficha en `pendientes.md`. */
     if(_convEstado_(cv)!=='abierta') return;
     pintando=true;
-    try{ rej.setPointerCapture(e.pointerId); }catch(_){}
+    /* ⚠️ LA COPIA SE SACA ANTES DE PINTAR, que es la única forma de poder deshacerla. Es
+       **plana** porque `_convPintar_` asigna y borra entradas enteras. */
+    antes=_copiaCeldas_(_convMias_(cv));
+    /* ⛔ Y NO SE CAPTURA EL PUNTERO: con captura, el `pointerdown` del SEGUNDO dedo se
+       entrega al elemento capturado igual, pero los `pointermove` del segundo **dejan de
+       llegar** en algunos navegadores y el centroide se queda quieto. El pintor ya no la
+       necesita: `pointermove` resuelve la celda con `elementFromPoint`. */
     _convPintar_(cv, el.dataset.tk); repinta();
   });
   rej.addEventListener('pointermove', function(e){
-    if(!pintando) return;
+    if(dd.deslizando() || !pintando) return;
     var el=document.elementFromPoint(e.clientX, e.clientY);
     el=el&&el.closest?el.closest('[data-tk]'):null;
     if(!el||el._ult===CONV_PINCEL+CONV_COCHE) return;
@@ -584,7 +640,7 @@ function _engConv_(){
        fila entera son 14 celdas. `pintando` lo vigila para no guardar en un `pointerup`
        que no venía de pintar nada. */
     if(pintando) _convGuardar_(cv);
-    pintando=false;
+    pintando=false; antes=null;
     $$('#convC [data-tk]').forEach(function(x){ x._ult=null; });
   };
   rej.addEventListener('pointerup', fin);

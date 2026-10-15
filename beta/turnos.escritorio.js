@@ -895,8 +895,8 @@ function _convocarDispPanel_(){
          dependia de que alguien tocara el codigo. La etiqueta dice lo que CAMBIA
          -«un toque marca 4 h»- y no el nombre del modo, que no le dice nada a nadie. */
       '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px">'+
-        '<input type="checkbox" id="cdHoraria"> preguntar POR HORAS (09:00–22:00); un '+
-        'toque marca el turno de 4 h</label>'+
+        '<input type="checkbox" id="cdHoraria" checked> preguntar POR HORAS '+
+        '(09:00–14:00 y 16:00–23:00); un toque marca el turno de 4 h</label>'+
     '</div>'+
     '<button class="btn" data-convdisp>Convocar disponibilidad</button>'+
     '<div class="nota" id="cdNota">Se encola y la rutina lo recoge en la siguiente pasada. '+

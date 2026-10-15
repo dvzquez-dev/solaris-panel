@@ -136,10 +136,7 @@ function convocarReunionPanel(){
   var subs={}; _activos_().forEach(function(m){ if(m.unidad) subs[m.unidad]=1; });
   var chipsSub=Object.keys(subs).sort().map(function(u){
     return '<button type="button" class="pick" data-csub="'+esc(u)+'">'+esc(u)+'</button>'; }).join('');
-  var pool=_activos_().slice().sort(function(a,b){ return String(a.pila).localeCompare(String(b.pila)); });
-  var chips=pool.map(function(m){
-    return '<button type="button" class="pick'+(CONV_INV.has(m.nombre)?' on':'')+'" data-cinv="'+esc(m.nombre)+'">'+
-      esc(m.pila)+'</button>'; }).join('');
+  var chips=_poolPicksE_(CONV_INV, 'data-cinv');
   return pan('Convocar reunión','sale el mapa de disponibilidad',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
@@ -791,6 +788,33 @@ function _borrarReuBoxE_(r){
       ' <b>No se puede deshacer.</b></div></div>';
 }
 
+/* ⭐ LA CUADRÍCULA DE PERSONAS, UNA SOLA VEZ (818.a): un botón `pick` por persona activa, ordenado por
+   nombre de pila, encendido si está en `set`. `attr` = el atributo que lleva el nombre (`data-cinv` al
+   convocar, `data-einv` al editar los convocados). Antes vivía dentro de `convocarReunionPanel`. */
+function _poolPicksE_(set, attr){
+  return _activos_().slice().sort(function(a,b){ return String(a.pila).localeCompare(String(b.pila)); })
+    .map(function(m){
+      return '<button type="button" class="pick'+(set.has(m.nombre)?' on':'')+'" '+attr+'="'+esc(m.nombre)+'">'+
+        esc(m.pila)+'</button>'; }).join('');
+}
+
+/* ⭐ EDITAR LOS CONVOCADOS (818.a; el móvil es la 817.a). Mismas reglas, escritas en
+   `docs/decisiones-app.md`: sólo quien convoca o un admin (`_puedeBorrarReuE_`), se parte de
+   `r.invitados` TAL COMO LO SIRVE el backend, y sin esa lista no se ofrece — guardar desde una lista
+   incompleta borraría a quien no saliera en ella. `RE_INV` (en `escritorio.html`) guarda lo que se
+   está editando y se rehace al cambiar de reunión (`RE_INV_ID`). */
+function _convocadosBoxE_(r){
+  if(!r || !_puedeBorrarReuE_(r)) return '';
+  var inv = Array.isArray(r.invitados) ? r.invitados.filter(function(n){ return !!n; }) : [];
+  if(!inv.length) return '<div class="nota" style="margin-top:14px">Esta reuni\u00f3n lleg\u00f3 sin lista de '+
+    'convocados: no se puede editar desde aqu\u00ed.</div>';
+  if(RE_INV_ID!==r.id || !RE_INV){ RE_INV=new Set(inv); RE_INV_ID=r.id; }
+  return '<div style="margin-top:16px">'+
+    '<span class="sc" style="display:block;margin-bottom:5px">Convocados <b id="reInvN">'+RE_INV.size+'</b></span>'+
+    '<div id="reInvPool" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px">'+_poolPicksE_(RE_INV, 'data-einv')+'</div>'+
+    '<button class="btn" data-guardarinv>Guardar convocados</button></div>';
+}
+
 function _fijarPanel_(){
   if(!REUS.length) return '';
   var opts=REUS.map(function(r,i){
@@ -826,6 +850,7 @@ function _fijarPanel_(){
         '<input id="reOrden" value="'+esc(r.ordenDia||'')+'" placeholder="https://… o los puntos a tratar" style="'+E+'"></label>'+
       '<button class="btn" data-orden>Guardar orden del día</button>'+
     '</div>'+
+    _convocadosBoxE_(r)+
     _borrarReuBoxE_(r)+
     '</div>');
 }

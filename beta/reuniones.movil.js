@@ -199,6 +199,12 @@ function _normReuM_(r){
        una casilla y todo se comporta como se comportaba. */
     slot: +r.slot || (F[0] && +F[0].dur) || 60, duracion: +r.duracion || 0,
     calor:calor, pond:pond, nInv:(r.invitados||[]).length,
+    /* ⛔ LOS NOMBRES, no solo cuantos (817.a). Sin ellos no se pueden editar los convocados, y
+       `_fuenteReuM_` devolvia `new Array(nInv)` -un array con HUECOS-: al hidratar, `invitado`
+       (abajo) daba `false` a todos menos al convocante, porque `indexOf` no encuentra a nadie
+       en un array sin nombres. Hoy `invitado` solo se lee al cargar la lista, asi que no mordia;
+       pero era una trampa armada. Lista blanca: lo que no se nombra aqui se pierde. */
+    invitados: Array.isArray(r.invitados) ? r.invitados.slice() : [],
     /* nResp = la cuenta del SERVIDOR (`_listar_`). `_nRespReu_` la necesita para no decir
        'nadie' sobre una reunion sin hidratar justo antes de BORRARLA. Lista blanca: lo que
        no se nombra aqui, se pierde (640.ª). */
@@ -238,7 +244,9 @@ function _fuenteReuM_(R, base, resp, ag){
        es el fallo que ya paso CUATRO veces en este mismo objeto. */
     fecha:R.fecha, creado:R.creado,
     limite:R.limite, convocante:R.convocante, slot:R.slot, duracion:R.duracion,
-    invitados:new Array(R.nInv), resp:resp, nResp:R.nResp,
+    /* ⛔ Los NOMBRES si los hay (817.a); `new Array(nInv)` solo para una reunion que llego sin ellos. */
+    invitados:(Array.isArray(R.invitados) && R.invitados.length) ? R.invitados.slice() : new Array(R.nInv),
+    resp:resp, nResp:R.nResp,
     /* ⛔ `agregado` LO DECIDE EL SERVIDOR Y AQUI SOLO SE ARRASTRA. Volver a aplicar la regla
        («¿es oculta? ¿convoco yo?») serian DOS criterios para la misma pregunta, y acaban
        siendo dos preguntas distintas. Y deducirlo de «no me han llegado filas» tampoco vale:
@@ -628,6 +636,7 @@ function vReu(){
         '<button class="btn mini" data-p id="btnFijar" style="flex:1">'+(R.fijada?'Cambiar fecha/hora':'📌 Fijar fecha')+'</button>'+
         (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
         '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
+        '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
       '</div>':'')+
     '</div>'+
     '<h2 class="sec">Cuándo puede el equipo<span class="ln"></span></h2>'+
@@ -711,6 +720,11 @@ function cubrirModal(){
     (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">La reunión dura <b>'+_durTxt_(_minS*_slot)+
       '</b>, así que cada toque marca <b>'+_minS+' casillas seguidas</b> a partir de ahí. '+
       'Puedes estirar más arrastrando; lo que quede más corto se quita solo.</p>':'')+
+    /* 🗣️ «Y que lo ponga escrito en algún lugar» (14/10). **El mismo texto y la misma clase que
+       en Turnos**: dos frases distintas para el mismo gesto en dos pantallas es como se aprende
+       que la app es incoherente. Y va **encima** de la rejilla: debajo lo lee quien ya se ha
+       rendido. */
+    '<div class="rgesto">Un dedo <b>marca</b> · dos dedos <b>deslizan</b></div>'+
     '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nD+',minmax(44px,1fr))">'+hd+rows+'</div></div>'+
     '<div class="leyh" style="margin-top:10px">'+ley+'</div>'+
     '<div class="sc" id="ecount" style="margin:12px 0 10px"></div>'+
@@ -815,7 +829,16 @@ function engancharRejilla(){
        parece que lo guardo. */
     var _av=_avisoCorto_(q, minS, slot); if(_av) tost(_av);
   };
+  /* ⛔⛔ EL GESTO VA ENGANCHADO **ANTES** QUE EL PINTOR: los dos escuchan en el MISMO elemento,
+     así que corren en el orden en que se registran, y al revés el `pointerdown` del segundo dedo
+     movería el ancla antes de que nadie sepa que vienen dos.
+     ✅ Abortar aquí es **más barato que en Turnos y por eso no hay copia**: el `pointerdown` sólo
+     pone el ancla y **previsualiza**; lo que escribe es `commit()`, en el `pointerup`. Así que
+     abortar es tirar el ancla y limpiar — no se ha confirmado nada.
+     🗣️ Daniel (14/10): *«Deslizar para las reuniones va a ser completamente OBLIGATORIO»*. */
+  var dd=_dosDedos_(grid, function(){ ancla=null; ultimo=null; limpia(); });
   grid.addEventListener('pointerdown',function(ev){
+    if(dd.deslizando()) return;
     var el=ev.target.closest('.ecel'); if(!el || !el.dataset.k) return;   // no ofertada: no se toca
     ev.preventDefault();
     var A=kk(el.dataset.k);
@@ -829,10 +852,13 @@ function engancharRejilla(){
     prev();
   });
   grid.addEventListener('pointermove',function(ev){
-    if(!ancla) return;
+    if(dd.deslizando() || !ancla) return;
     var el=document.elementFromPoint(ev.clientX,ev.clientY);
     if(el && el.classList.contains('ecel') && el.dataset.k){ ultimo=el.dataset.k; prev(); }
   });
+  /* ⚠️ Con el trazo abortado por el segundo dedo, `ancla` ya es `null`, así que `commit`
+     **no corre**: deslizar no confirma nada. La guarda ya estaba y por eso no hay que tocarla;
+     va dicho porque es la línea que decide si lo previsualizado se escribe. */
   grid.addEventListener('pointerup',function(){ if(ancla){ commit(); ancla=null; ultimo=null; } });
   var g=$('#btnGuardarDisp');
   /* GUARDA EN EL SERVIDOR. Antes solo ponia una marca local y decia «guardada»: en el
@@ -923,6 +949,32 @@ function _diasLargos_(modo,d0,d1,fecha,nd){
    ⚠️ La lista **llega en el panel** (`DATA.consejo`) y no se copia aquí: dos copias de la misma
    verdad acaban siendo dos verdades. Si el panel no la trae —backend viejo—, se devuelve vacío
    como antes y el convocante los pone a mano: se degrada, no se inventa. */
+/* ⭐ EL SELECTOR DE INVITADOS, UNA SOLA VEZ (817.a). `ids` = {chips, sug, input}; `dame()` devuelve el
+   Set VIGENTE (getter: quien lo usa puede sustituirlo); `alCambiar` se llama tras cada alta o baja;
+   `excluir()` = el nombre que no se ofrece (quien convoca no se invita a si mismo). Devuelve
+   {pintar, sugerir, enganchar}. Antes eran dos closures dentro de `crearModal`. */
+function _selInvM_(ids, dame, alCambiar, excluir){
+  var S={};
+  var cambio=function(){ if(alCambiar) alCambiar(); };
+  S.pintar=function(){ var c=$('#'+ids.chips); if(!c) return; var INV=dame();
+    c.innerHTML=Array.from(INV).map(function(n){
+      var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
+      return '<span class="cchip"><b>'+esc((m&&m.pila)||n)+'</b><button data-n="'+esc(n)+'" data-p>×</button></span>'; }).join('');
+    $$('#'+ids.chips+' button').forEach(function(b){ b.onclick=function(){ dame().delete(b.dataset.n); S.pintar(); cambio(); }; }); };
+  S.sugerir=function(q){ var sg=$('#'+ids.sug); if(!sg) return; q=_sinTildes_((q||'').trim());
+    if(!q){ sg.style.display='none'; return; }
+    var INV=dame(), fuera=excluir ? excluir() : null;
+    var hits=_activos_().filter(function(m){ return m.nombre!==fuera && !INV.has(m.nombre) && _sinTildes_(m.nombre).indexOf(q)>=0; }).slice(0,6);
+    if(!hits.length){ sg.style.display='none'; return; }
+    sg.innerHTML=hits.map(function(m){ return '<div data-n="'+esc(m.nombre)+'" data-p>'+esc(m.nombre)+' <small>'+esc(m.cargo||m.unidad||'')+'</small></div>'; }).join('');
+    sg.style.display='';
+    $$('#'+ids.sug+' div').forEach(function(d){ d.onclick=function(){ dame().add(d.dataset.n); var i=$('#'+ids.input); if(i) i.value=''; sg.style.display='none'; S.pintar(); cambio(); }; }); };
+  S.enganchar=function(){ var inp=$('#'+ids.input); if(!inp) return;
+    inp.oninput=function(){ S.sugerir(inp.value); };
+    inp.onblur=function(){ setTimeout(function(){ var s=$('#'+ids.sug); if(s) s.style.display='none'; },180); }; };
+  return S;
+}
+
 function _presetInvitados_(tipo){
   var yo=(YO&&YO.nombre)||'', ms=_activos_(), out=[];
   if(tipo==='consejo'){
@@ -1017,18 +1069,14 @@ function crearModal(){
     return ds.map(function(_,i){ var r=rows[i]; if(!r||r.classList.contains('off')) return [0,0];
       return [hNum(r.querySelector('.dr0').value), hNum(r.querySelector('.dr1').value)]; }); };
   var INV=new Set();
-  var invRender=function(){ var c=$('#ceChips'); if(!c) return;
-    c.innerHTML=Array.from(INV).map(function(n){
-      var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
-      return '<span class="cchip"><b>'+esc((m&&m.pila)||n)+'</b><button data-n="'+esc(n)+'" data-p>×</button></span>'; }).join('');
-    $$('#ceChips button').forEach(function(b){ b.onclick=function(){ INV.delete(b.dataset.n); invRender(); upd(); }; }); };
-  var sugRender=function(q){ var sg=$('#ceSug'); if(!sg) return; q=_sinTildes_((q||'').trim());
-    if(!q){ sg.style.display='none'; return; }
-    var hits=_activos_().filter(function(m){ return m.nombre!==(YO&&YO.nombre) && !INV.has(m.nombre) && _sinTildes_(m.nombre).indexOf(q)>=0; }).slice(0,6);
-    if(!hits.length){ sg.style.display='none'; return; }
-    sg.innerHTML=hits.map(function(m){ return '<div data-n="'+esc(m.nombre)+'" data-p>'+esc(m.nombre)+' <small>'+esc(m.cargo||m.unidad||'')+'</small></div>'; }).join('');
-    sg.style.display='';
-    $$('#ceSug div').forEach(function(d){ d.onclick=function(){ INV.add(d.dataset.n); $('#ceInv').value=''; sg.style.display='none'; invRender(); upd(); }; }); };
+  /* El selector vive en `_selInvM_` (817.a): la ficha de la reunion lo usa tambien para editar
+     los convocados, y copiarlo seria la segunda implementacion de «elige personas del roster».
+     ⚠️ Se le pasa un GETTER y no el Set: `tipoUpd` hace `INV=new Set(...)` y un Set capturado
+     seguiria apuntando al viejo. */
+  var _selCE=_selInvM_({chips:'ceChips', sug:'ceSug', input:'ceInv'}, function(){ return INV; },
+                       function(){ upd(); }, function(){ return YO&&YO.nombre; });
+  var invRender=_selCE.pintar;
+  var sugRender=_selCE.sugerir;
   var renderDias=function(){ var ds=_diasLargos_(val('ceModo'), val('ceD0'), val('ceD1'), val('ceFecha')||_dmyAISO_(HOY), Math.max(1,+val('ceND')||1));
     if(!ds.length) ds=dias();
     var prev=$$('#ceDias .drow').map(function(r){
