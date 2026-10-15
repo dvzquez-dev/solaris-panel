@@ -753,6 +753,19 @@ function _cablearMiDispo_(){
    móvil, que no lo tiene, y deja sin borrar una reunión cancelada después de fijarse. Se
    **avisa** en el `confirm` y decide quien la convocó. */
 
+/* ⛔ ¿TE TOCA FIJARLA? (950.ª) — para «Requiere tu decisión». La regla es la del BACKEND: `_fijarReunion_`
+   contesta «solo el convocante o admin pueden fijar la fecha». A un coordinador le salían ahí la general y la
+   junta «sin fijar»: una lista que se llama «tu decisión» y pide lo que el servidor va a negar enseña a no leerla.
+   ⚠️ La identidad es `ACTOR`, como el resto de esa lista (y NO la sesión, al revés que `_puedeBorrarReuE_`, que
+   gatea un BOTÓN): con «Actúas como» se ve lo que vería esa persona. Por eso la cuenta admin cuenta sólo cuando
+   `ACTOR` es el PD — que es quien la tiene —, no cuando el admin está mirando como otro. */
+function _fijarEsMio_(r){
+  var yo=(typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '';
+  if(!yo || !r) return false;
+  if(r.convocante && yo===String(r.convocante)) return true;
+  return yo===String(PD_NOM) && typeof esAdmin==='function' && !!esAdmin();
+}
+
 /* ⛔ ¿PUEDE BORRAR ESTA REUNIÓN? Es la regla del BACKEND —`_borrarReunion_` exige convocante o
    admin, **no rango**— porque un botón que ofrece lo que el servidor va a negar es peor que no
    tenerlo.
