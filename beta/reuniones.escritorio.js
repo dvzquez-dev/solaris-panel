@@ -816,6 +816,16 @@ function _convocadosBoxE_(r){
     '<button class="btn" data-guardarinv>Guardar convocados</button></div>';
 }
 
+/* LA CELDA «CIERRA» DE CONVOCATORIAS (939.ª). Pintaba el límite crudo: el 15/10 decía «14/10/2026» de un plazo ya
+   cerrado, en una tabla titulada «Reuniones abiertas». Con el plazo pasado dice «cerró el …» (y se apaga); abierta,
+   la fecha en DD/MM/AAAA como siempre; sin límite, «—». La regla de «pasado» es `_plazoAbierto_`, la de toda la app. */
+function _cierraCeldaE_(limite){
+  var s=String(limite==null?'':limite);
+  if(!s || s==='\u2014') return {txt:'\u2014', cls:''};
+  var f=_isoADMY_(_dmyAISO_(s).slice(0,10));
+  return _plazoAbierto_(s) ? {txt:f, cls:''} : {txt:'cerró el '+f, cls:'cerrado'};
+}
+
 /* EL PLAZO DE UNA REUNIÓN EN UNA TARJETA DEL ESCRITORIO (928.ª): el texto (`_plazoTxt_`, el mismo de toda la
    app) y el chip. Abierta (o sin límite): «N en riesgo» — aún pueden cubrir. Cerrada: «N sin cumplir» — ya no
    pueden, y es lo que va a sanción. Cuenta los sin cubrir Y los de por debajo del mínimo, como antes. */

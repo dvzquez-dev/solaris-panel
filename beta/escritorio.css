@@ -56,6 +56,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.
   -webkit-font-smoothing:antialiased;min-height:100vh;padding:18px;display:flex;flex-direction:column;gap:13px}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.cerrado{color:var(--ink3)}   /* 939.ª: un plazo ya pasado se apaga, no se lee como uno vivo */
 .sc{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);line-height:1}
 .up{color:var(--ok)} .dn{color:var(--red2)} .wa{color:var(--warn)}
 
