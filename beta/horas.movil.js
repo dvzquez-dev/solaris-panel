@@ -1939,7 +1939,7 @@ function _engPartesRev_(){
          contaban». Quien lo lea se cree el último — y decide con el número equivocado. */
       if(!confirm('Revertir este parte.\n\n'+(_yaCuentaEnSuMes_(p)
         ? 'Las horas YA cuentan: se emitira un apunte que se las resta de su ficha.'
-        : 'Todavia no contaban: vuelve a la cola de decision.')+'\n\n¿Sigo?')) return;
+        : 'Todavía no contaban: vuelve a la cola de decisión.')+'\n\n¿Sigo?')) return;
       $$('#prev [data-pdrev]').forEach(function(x){ x.disabled=true; });
       var prev=b.textContent; b.textContent='…';
       try{

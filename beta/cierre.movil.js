@@ -145,13 +145,13 @@ function _cierreHTML_(est, err, cargando){
      ⚠️ Van ARRIBA del plan, no al final: leidos despues de decidir no sirven de nada. */
   if(plan) return cab+(filas ? '<div class="rec">'+filas+'</div>'+
       '<p class="rnota" style="color:var(--warn)"><b>Esto entra en la cuenta y sigue sin '+
-      'resolver.</b> Si aplicas el cierre ahora, lo que se decida despues deja mal la cuota '+
+      'resolver.</b> Si aplicas el cierre ahora, lo que se decida después deja mal la cuota '+
       'de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan);
   if(enc) return cab+'<p class="rnota">Encolado. La rutina lo recoge en la siguiente pasada '+
     '(va cada 2 minutos) y deja el plan.</p>';
   return cab+(filas ? '<div class="rec">'+filas+'</div>'+
       '<p class="rnota">Estas bloquean porque entran en la cuenta: unas horas que se decidan '+
-      'despues del cierre dejan mal la cuota de alguien.</p>' : '')+
+      'después del cierre dejan mal la cuota de alguien.</p>' : '')+
     '<button class="btn pri" data-cerrarmes'+(bloq.length?' disabled':'')+
       ' style="width:100%;margin-top:10px">'+
       (bloq.length?'Bloqueado · '+bloq.length+' sin resolver'
@@ -168,8 +168,8 @@ function _abrirCierre_(){
       var pl=(est&&est.plan)||{}, n=((pl.totales&&pl.totales.personas)||pl.personas||'?');
       if(!confirm('APLICAR el cierre de '+_nomPeriodo_(pl.periodo)+'.\n\nEsto ESCRIBE en Notion en '+n+
                   ' fichas: pone las cargas a cero, hace rodar los puntos y devuelve las '+
-                  'compensaciones al defecto del cargo.\n\nDe aqui salen la cuota y la '+
-                  'renovacion.\n\n¿Seguro?')) return;
+                  'compensaciones al defecto del cargo.\n\nDe aquí salen la cuota y la '+
+                  'renovación.\n\n¿Seguro?')) return;
       ap.disabled=true; ap.textContent='Encolando…';
       try{ await api.aplicarCierre(pl.periodo||null);
            tost('Aplicación encolada. La rutina la recoge en la siguiente pasada.');

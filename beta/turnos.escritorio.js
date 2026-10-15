@@ -620,7 +620,7 @@ function _dispPanel_(){
   if(_dispEstadoSrv_() === 'solo mio') return pan('Disponibilidad para turnos',
     'no es tu pantalla',
     vacioSimple('El mapa de todo el equipo es para quien reparte los turnos',
-      'Tu disponibilidad si la puedes contestar, aqui debajo.'));
+      'Tu disponibilidad sí la puedes contestar, aquí debajo.'));
   var cv=_dispViva_(); if(!cv) return '';
   var calor=_calorTurnos_(cv, DISP_SITIO);
   var top=_mejorTurno_(calor);

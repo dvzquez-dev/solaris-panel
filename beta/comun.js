@@ -2671,14 +2671,14 @@ function _filaRevocacion_(s, texto){
 function _validaPuntosSanc_(crudo){
   var t = String(crudo === null || crudo === undefined ? '' : crudo).replace(/^\s+|\s+$/g, '');
   if (t === '')
-    return { ok:false, msg:'Pon los puntos: el campo esta vacio.' };
+    return { ok:false, msg:'Pon los puntos: el campo está vacío.' };
   if (!/^-?\d+$/.test(t))
-    return { ok:false, msg:'Los puntos son un numero entero: \u00ab'+t+'\u00bb no lo es.' };
+    return { ok:false, msg:'Los puntos son un número entero: «'+t+'\u00bb no lo es.' };
   var n = parseInt(t, 10);
   if (n > 0)
-    return { ok:false, msg:'Una sancion resta: pon 0 (aviso) o un numero negativo.' };
+    return { ok:false, msg:'Una sanción resta: pon 0 (aviso) o un número negativo.' };
   if (n < -5)
-    return { ok:false, msg:'Lo maximo que quita una sancion del RRI son 5 puntos, y has puesto '+n+'.' };
+    return { ok:false, msg:'Lo máximo que quita una sanción del RRI son 5 puntos, y has puesto '+n+'.' };
   return { ok:true, pts:n };
 }
 
@@ -5104,6 +5104,7 @@ function _novedades_(){
         {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
         {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
         {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
+        {cara:'movil', vista:'estado', txt:'**Tildes**: quince textos que se leían sin ellas —el aviso de beta, los avisos al móvil, el cierre del mes, los puntos de una sanción…— ya las llevan.'},
         {cara:'escritorio', vista:'docdec', txt:'**Un expediente sin archivo te dice qué hacer**: «Pídeselo a quien lo subió antes de decidir», como en el móvil. Antes te mandaba a buscar un campo de Cowork.'},
         {cara:'escritorio', vista:'panel', txt:'**Las horas, a la centésima también aquí**: «Horas en el aire» decía 15,5 donde «Este mes» decía 15,50; con 15,75 h habría dicho 15,8. Igual en Miembros, Ranking y la nota de tu cuota.'},
         {cara:'escritorio', vista:'panel', txt:'**«Requiere tu decisión» ya no te pide fijar reuniones que no puedes fijar**: las «sin fijar» salen sólo a quien la convocó (o al PD con la cuenta admin), que es a quien el servidor deja.'},
@@ -6754,10 +6755,10 @@ function _pasosSustituirDoc_(e, yo){
   var ref = e.ref || 'la referencia de este expediente';
   var url = _urlFormDocs_();
   return [
-    { n:1, t:'Manda la version nueva por el formulario, marcada como «sustituye a»',
-      d:'Ahi pones la referencia de este: ' + ref + '. Es un envio NUEVO: crea su propio '+
-        'expediente y vuelve a pasar por revision. Al reves que corregir: aqui NO se reutiliza '+
-        'la misma referencia, porque este ya esta publicado y no se toca.',
+    { n:1, t:'Manda la versión nueva por el formulario, marcada como «sustituye a»',
+      d:'Ahí pones la referencia de este: ' + ref + '. Es un envío NUEVO: crea su propio '+
+        'expediente y vuelve a pasar por revisión. Al revés que corregir: aquí NO se reutiliza '+
+        'la misma referencia, porque este ya está publicado y no se toca.',
       url: (url && url.indexOf('http') === 0) ? url : '',
       /* El respaldo vive en la PUERTA, no en una cara: es la misma leccion del 19/08 que
          dejo al escritorio mandando al formulario sin decir a quien pedir el enlace. */

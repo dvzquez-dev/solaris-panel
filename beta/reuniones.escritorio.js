@@ -874,7 +874,7 @@ function _fijarPanel_(){
          minimo es 1 y no se dice nada, que es como se comportaba siempre. */
       (_slotsMin_(r.duracion, r.slot)>1
         ? (' Dura <b>'+_slotsMin_(r.duracion, r.slot)+' franjas</b> ('+_durTxt_(r.duracion)+
-           '), asi que no se puede fijar en menos.') : '')+'</p>'+
+           '), así que no se puede fijar en menos.') : '')+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
       '<label style="flex:2;min-width:190px">'+lab('Reunión')+
         '<select id="reSel" style="'+E+'">'+opts+'</select></label>'+
