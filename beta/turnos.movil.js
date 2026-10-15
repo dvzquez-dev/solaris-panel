@@ -312,14 +312,14 @@ function _convHTML_(cv){
      trozo es el día de la semana y el segundo el número. */
   var cab='<div class="rc rd"></div>'+D.map(function(d){
     var p=String(_diaTxtM_(_isoADMY_(d)||d)||'').split(' ');
-    return '<div class="rc">'+esc(p[0]||'')+'<br>'+esc(String(p[1]||'').slice(0,2))+'</div>';
+    return '<div class="rc" data-tdia="'+esc(d)+'" data-p>'+esc(p[0]||'')+'<br>'+esc(String(p[1]||'').slice(0,2))+'</div>';
   }).join('');
   /* 🗣️ «Han de aparecer JUSTO EN EL MEDIO DE DOS SLOTS. Porque realmente es donde están. No
      están ni para arriba ni para abajo»* (Daniel, 14/10). Por eso la hora va en un **span**: sin
      un elemento no hay nada que anclar a la línea, y empujar la celda entera arrastraría su
      fondo `sticky` y su borde. Reuniones ya lo hacía así. El anclaje está en `movil.css`. */
   var filas=F.map(function(fr){
-    return '<div class="rc rd"><span>'+esc(fr.txt)+'</span></div>'+
+    return '<div class="rc rd" data-tfr="'+esc(fr.k)+'" data-p><span>'+esc(fr.txt)+'</span></div>'+
       D.map(function(d){ return _convCelHTML_(cv,d,fr.k); }).join('');
   }).join('');
   return '<div class="tarj" id="convC">'+
@@ -335,6 +335,7 @@ function _convHTML_(cv){
       '\u21ba Reutilizar la disponibilidad del turno anterior</button>'+
       '<p class="rnota" style="margin:-2px 0 10px">Se copia lo que marcaste la semana pasada y lo puedes cambiar.</p>' : '')+
     '<div class="rgesto">Un dedo <b>pinta</b> · dos dedos <b>deslizan</b></div>'+
+    '<div class="rgesto" data-ratajo>Toca el <b>día</b> para marcarlo entero · la <b>hora</b>, para toda la semana</div>'+
     /* ⛔ EL CARRIL LO DECIDE `_carrilFranjas_`, y el 78 fijo se fue por esto: decía aquí que
        «con 7 días a 34 px mínimos siguen cabiendo 316 px». 📏 Medido a 375×812: el sitio donde vive
        la rejilla mide **311**, no 316 — la cuenta se había hecho contra el ancho de la PANTALLA y
@@ -485,6 +486,44 @@ function _convPintar_(cv, k){
     if(igual) delete mias[kk]; else mias[kk]=quiere;
   });
   return !igual;
+}
+
+/* ⭐ LOS ATAJOS DE UN TOQUE (935.ª). 🗣️ Daniel, 14/10: *«Debería ser fácil marcar muchos bloques de golpe… Piensa
+   que la gente lo va a tener que cubrir mucho»*. Con 84 casillas a la semana, tocar la CABECERA de un día lo marca
+   entero, y tocar la HORA la marca en los siete días (`docs/decisiones-app.md`, «bloques de una hora»).
+   Esta función sólo dice QUÉ casillas; pintarlas es de `_convAtajo_`. Con la hora se toma el bloque que marcaría un
+   toque en esa casilla (`_bloqueDesde_`), en cada día: una hora suelta no es disponibilidad para nada, y el atajo no
+   puede querer decir otra cosa que el toque. Un día o una franja que esta semana no existen dan `[]`, no una fila
+   inventada. */
+function _convClavesAtajo_(cv, dia, fk){
+  var F=cv.franjas||[], D=cv.dias||[], out=[];
+  if(dia){
+    if(D.indexOf(dia)<0) return out;
+    F.forEach(function(f){ out.push(_convClave_(dia, f.k)); });
+    return out;
+  }
+  var bloque=_bloqueDesde_(F, fk, _minTurno_(cv));
+  D.forEach(function(d){ bloque.forEach(function(k){ out.push(_convClave_(d, k)); }); });
+  return out;
+}
+
+/* Pinta esas casillas con el pincel activo y la MISMA regla que `_convPintar_`: si TODAS dicen ya lo que dice el
+   pincel, el toque las BORRA — sin eso un atajo no tiene vuelta atrás. ⛔ «Todas», no «alguna»: con media fila
+   marcada el toque COMPLETA la fila; borrar lo que ya estaba castigaría a quien sólo quería rellenar el resto.
+   Devuelve 'marca', 'borra' o `null` (nada que tocar). */
+function _convAtajo_(cv, claves){
+  if(!claves || !claves.length) return null;
+  var mias=_convMias_(cv);
+  var no = CONV_PINCEL==='no';
+  var todas = claves.every(function(k){
+    var v=mias[k];
+    return !!v && v.s===CONV_PINCEL && (no || !!v.c===!!CONV_COCHE);
+  });
+  claves.forEach(function(k){
+    if(todas) delete mias[k];
+    else mias[k] = no ? {s:'no'} : {s:CONV_PINCEL, c:!!CONV_COCHE};
+  });
+  return todas ? 'borra' : 'marca';
 }
 
 /* ═══ LA CONVOCATORIA VIENE DEL SERVIDOR (v64) ═════════════════════════════════════
@@ -638,6 +677,15 @@ function _engConv_(){
   var dd=_dosDedos_(rej, function(){
     if(antes) _restaurarCeldas_(_convMias_(cv), antes);
     antes=null; pintando=false; repinta();
+  });
+  /* Los atajos (935.ª) van por `onclick`: es un TOQUE, y el navegador no lo dispara tras arrastrar. Mismo guardia de
+     plazo que el pintor, y se guarda igual que al soltar el dedo. */
+  $$('#convRej [data-tdia], #convRej [data-tfr]').forEach(function(h){
+    h.onclick=function(){
+      if(dd.deslizando() || _convEstado_(cv)!=='abierta') return;
+      if(!_convAtajo_(cv, _convClavesAtajo_(cv, h.dataset.tdia||'', h.dataset.tfr||''))) return;
+      repinta(); _convGuardar_(cv);
+    };
   });
   rej.addEventListener('pointerdown', function(e){
     if(dd.deslizando()) return;

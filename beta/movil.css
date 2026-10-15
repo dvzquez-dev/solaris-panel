@@ -848,6 +848,9 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
    lo que explica es cómo se usa algo que funciona, no que algo vaya mal. */
 .rgesto{font-size:10.5px;color:var(--ink3);padding:0 2px 4px;letter-spacing:.2px}
 .rgesto b{color:var(--ink2);font-weight:600}
+/* Los atajos de un toque (935.ª): la cabecera del día marca el día entero. Se ve pulsable — un atajo que nadie
+   descubre no ahorra nada. La hora ya era el asa (`cursor:grab`) y se queda así: deslizar va antes. */
+.rc[data-tdia]{cursor:pointer;border-radius:6px;color:var(--ink2);text-decoration:underline dotted;text-underline-offset:2px}
 .rejw{overflow-x:auto;overflow-y:visible;margin:0 2px;padding-bottom:3px}
 .rej{display:grid;gap:2px;touch-action:none;user-select:none}
 .rc{font-family:var(--mono);font-size:8.5px;color:var(--ink3);display:flex;align-items:center;justify-content:center}
