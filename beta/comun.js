@@ -3866,6 +3866,14 @@ function _ddmm_(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1); }
    ⛔ Y se escribe como FUNCION, no como `var`: el arnes de los bancos extrae funciones
    (`jsfuente.funcion`), no globals. Un `var` no llegaria al arnes y el caso no podria ni
    llamarlo -- o sea que el tope quedaria sin poder comprobarse. */
+/* CÓMO SE ESCRIBE LA MODALIDAD de una reunión (937.ª). El valor es un id ASCII (`telematica`, `hibrida`) y se
+   pintaba tal cual: Estado decía «TELEMATICA». Se escribe como en el desplegable donde se elige. Lo que no es una
+   de las tres se deja como viene (no se inventa una etiqueta), y lo vacío, vacío. */
+function _modalidadTxt_(m){
+  var k=String(m==null?'':m), t={presencial:'Presencial', telematica:'Telemática', hibrida:'Híbrida'}[k.toLowerCase()];
+  return t || k;
+}
+
 /* Una fecha ISO `AAAA-MM-DD` movida `n` días, en ISO (932.ª). En UTC a propósito: con hora local, el día del
    cambio de hora una resta de 7×24 h cae en el día de al lado. Lo que no es una fecha ISO devuelve `null`, no
    una fecha inventada (§3c-24). */
@@ -5044,6 +5052,7 @@ function _novedades_(){
         {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
         {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
         {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
+        {cara:'movil', vista:'estado', txt:'**«Telemática» con su tilde**: la tarjeta de la próxima reunión y su ficha decían «TELEMATICA».'},
         {cara:'movil', vista:'turnos', txt:'**Marcar muchos bloques de golpe, con un toque**: tocar el **día** (la cabecera de su columna) lo marca entero, y tocar la **hora** la marca en toda la semana — el turno que empieza ahí, como un toque en la casilla. Otro toque igual lo quita. Lo dice el rótulo de encima de la rejilla.'},
         {cara:'movil', vista:'turnos', txt:'**«Reutilizar la disponibilidad del turno anterior»**: un botón encima de la rejilla copia lo de la semana pasada y lo deja pintado para cambiarlo. Lo pediste el 14/10. (En la maqueta no hay semana anterior: se prueba con cuenta.)'},
         {cara:'movil', vista:'estado', txt:'**En la maqueta, Estado ya enseña la próxima reunión** y el aviso de «te falta cubrir»: decía «Ninguna reunión convocada» mientras la pestaña Reunión enseñaba una con «TE FALTA». Con cuenta real ya cuadraba.'},

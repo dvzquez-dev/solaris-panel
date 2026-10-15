@@ -367,7 +367,7 @@ function _proxReuHTML_(){
   return '<h2 class="sec">'+rotulo+'<span class="ln"></span></h2>'+
     '<div class="tarj clic" data-ir="reu" data-reuid="'+esc(String(R.id))+'" data-p>'+
     '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
-    '<small>'+cuando+' · '+esc((R.modalidad||'').toUpperCase())+'</small></div>'+
+    '<small>'+cuando+' · '+esc(_modalidadTxt_(R.modalidad).toUpperCase())+'</small></div>'+
     '<div class="d"><span class="pil '+((R.fijada||R.cubierta||R.exento)?'conf':'pend')+'">'+
       (R.fijada?'fijada':(R.exento?'organizas':(R.cubierta?'cubierta':'te falta')))+'</span></div></div></div>';
 }
@@ -582,7 +582,7 @@ function vReu(){
             _duraTxtM_(x)+'</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':'<span class="chev">›</span>')+'</div></div>'; }).join('')+'</div>'
       : '')+
-    '<div class="tarj">'+cab(R.tipo||'General', R.modalidad||'')+
+    '<div class="tarj">'+cab(R.tipo||'General', _modalidadTxt_(R.modalidad))+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
       '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+R.nInv+' convocados'+
       _duraTxtM_(R)+'</small></div>'+
