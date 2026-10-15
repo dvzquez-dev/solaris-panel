@@ -785,7 +785,7 @@ function vFichar(){
       '</div>'+
       '<div class="durb"><span class="q mono" id="fDurQ">'+nf(durForm(),2)+' h</span>'+
         '<span class="t">de trabajo declarado.<br><span style="color:var(--ink3)">Sin cronómetro se marca '+
-        '<b>sin fichaje</b>, y tu coordinador lo verá al firmarlo.</span></span></div>'+
+        '<b>sin fichaje</b>, y quien lo firme lo verá.</span></span></div>'+
     '</div>';
 
   var decl = ST.form.declararId!=null ? PARTES.filter(function(x){return x.id===ST.form.declararId;})[0] : null;
@@ -1034,6 +1034,17 @@ function _perfilElegido_(){
   var d = _perfilDefecto_(_q);
   return d ? d.unidad : (ps[0] ? ps[0].unidad : '');
 }
+/* A LA COLA DE QUIÉN VA LO QUE ENVÍAS (958.ª). Los avisos de declarar y enviar mandaban siempre «a tu coordinador»
+   mientras esta misma pantalla decía «Lo firma <b>X</b>»: un coordinador (que lo manda al PD) o quien imputa a otro
+   subsistema leía dos cosas distintas. Sale de la MISMA cuenta (`_firmaDe_` con el perfil elegido), y quien la usa la
+   calcula ANTES de borrar el formulario: después `f.perfil` ya es `null`. */
+function _colaTxtM_(){
+  var yo=_fichaYo_(), f=_firmaDe_(_perfilElegido_(), yo);
+  if(!f) return 'a la cola de quien coordina el subsistema';
+  if(f===yo) return 'pendiente de tu firma';
+  return 'a la cola de '+_pilaDeM_(f);
+}
+
 function _perfilSelHTML_(){
   var _q = _fichaM_();                 /* ⛔ por la misma puerta que `_perfilElegido_`:
                                           si una mira a la sesión y otra a `YO`, el
@@ -1098,8 +1109,9 @@ async function enviarFichaje(){
          silencio y sin volver a preguntar*— y aquí no se había aplicado: §3c-19 dentro
          de la misma función. Se llega escribiendo una fecha vieja, respondiendo a un
          «sin declarar» y volviendo a declarar. */
+      var _cola=_colaTxtM_();
       f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY;
-      tost('Declarado · a la cola de tu coordinador.'); irA('horas');
+      tost('Declarado · '+_cola+'.'); irA('horas');
     }catch(e){
       /* ⛔ Y EL BOTÓN VUELVE A ESTAR VIVO, con el formulario intacto: una escritura que
          falla y deja el botón muerto es peor que no tener candado — quien lo lee cree que
@@ -1151,13 +1163,14 @@ async function enviarFichaje(){
          se le aplico. Declaras un bloque atrasado del 30/07 y TODOS los siguientes de
          esa sesion salen con el 30/07, en silencio y sin volver a preguntar. Vuelve a
          HOY, que es el caso normal. */
+      var _cola=_colaTxtM_();
       ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
       f.fecha=HOY;
       /* ⚠️ Y el aviso lo DICE en vez de inventarse un número: sin las horas de vuelta,
          se confirma el envío y se manda a mirar la lista, que es donde estarán. */
       tost(h==null
-        ? 'Fichaje enviado a la cola de tu coordinador (las horas te las confirma él)'
-        : 'Fichaje enviado · '+nf(h,2)+' h a la cola de tu coordinador');
+        ? 'Fichaje enviado · '+_cola+' (las horas te las confirman al firmar)'
+        : 'Fichaje enviado · '+nf(h,2)+' h · '+_cola);
       irA('horas');
     }catch(e){
       /* ⛔ SI LA CULPA ES LA SESION, EL AVISO NO CADUCA. Es el caso que reportó José
@@ -2173,7 +2186,7 @@ function vHoras(){
                   'ninguno. Vuelve a entrar en su ficha para reintentarlo.', '', false)
               : vacio('Ningún parte en cola',
                 'No tienes horas esperando firma. Las que envíes aparecerán aquí con su estado '+
-                'hasta que tu coordinador las apruebe.','ficha desde la pestaña Fichar', false))))+
+                'hasta que se firmen.','ficha desde la pestaña Fichar', false))))+
       /* ⛔ CERRADO POR DEFECTO (sin `open`): es justo lo que estorbaba. Pero **sigue estando**,
          porque son horas suyas y esconderlas del todo es perder información — plegar se puede
          deshacer con un dedo, borrar el bloque no. */
