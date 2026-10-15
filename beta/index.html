@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=a0c2ae8"></script>
+<script src="comun.js?v=110b1a9"></script>
 <script src="notis.movil.js?v=20c512f"></script>
 <script src="cierre.movil.js?v=380b6e0"></script>
 <script src="tareas.movil.js?v=454b2ea"></script>
@@ -1094,6 +1094,11 @@ var REUNION={titulo:'Reunión general de fin de temporada',tipo:'general',modali
            {ini:'20:00',dur:60},{ini:'21:00',dur:60},{ini:'22:00',dur:60}],
   calor:[[3,5,8,11,14,15,12],[2,4,7,9,12,13,11],[4,6,9,13,17,19,16],[3,4,6,8,11,12,9],[5,8,12,15,18,21,17]],
   nInv:24};
+/* ⛔ 930.ª: EN LA MAQUETA, ESTA SEMILLA TAMBIÉN ES LA LISTA. Estado (`_proxReuHTML_`), el aviso «te falta cubrir» y el
+   globo leen `REUNIONES_M`, que sin servidor estaba vacía: Estado decía «Ninguna reunión convocada» mientras la pestaña
+   Reunión enseñaba ésta con «TE FALTA». Con cuenta real las dos leen la lista del servidor. `_hidratada`: abrirla no
+   llama al servidor, que en la maqueta no hay. Sólo con `DEMO`: fuera de la maqueta no se cuela nada inventado. */
+if(DEMO){ REUNION.id='demo-general'; REUNION._hidratada=true; REUNIONES_M=[REUNION]; }
 
 /* objetivos de turno (app.html: principales/secundarios + memoria) */
 TURNOS[0].principales=['Laminado de las dos últimas capas de fibra del tramo 2.',
@@ -1651,7 +1656,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='aabf313';
+var BUILD='91aafd7';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';

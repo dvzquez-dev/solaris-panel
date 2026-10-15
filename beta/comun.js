@@ -5035,6 +5035,7 @@ function _novedades_(){
         {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
         {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
         {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
+        {cara:'movil', vista:'estado', txt:'**En la maqueta, Estado ya enseña la próxima reunión** y el aviso de «te falta cubrir»: decía «Ninguna reunión convocada» mientras la pestaña Reunión enseñaba una con «TE FALTA». Con cuenta real ya cuadraba.'},
         {cara:'movil', vista:'estado', txt:'**Al Project Director, sus horas en cola le dicen «Las firmas tú»**, no «Las firma Lois» siendo él Lois. Y en la maqueta, «Coord.» y «PD» ya son Xoán y Lois de verdad: «Mis documentos» eran los de Nerea.'},
         {cara:'escritorio', vista:'dispo', txt:'**Con el plazo ya cerrado, la reunión lo dice**: «el plazo cerró el 14/10 · 1 sin cumplir» en vez de «cierra el 14/10 · 1 en riesgo». (En la maqueta no se ve: vive el 24/07.)'},
         {cara:'escritorio', vista:'convoc', txt:'**Al fijar una reunión, el «Hasta» dice a qué hora ACABA**: arrancaba en «desde 16:00 · hasta 16:00», que parecía una reunión de cero minutos y era 16:00–17:00.'},
