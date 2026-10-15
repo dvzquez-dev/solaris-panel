@@ -169,6 +169,10 @@ header::after{content:"";position:absolute;left:16px;right:16px;bottom:0;height:
 /* marca de agua: la insignia real, en % para que ocupe igual en cualquier ancho */
 .marcagua{position:absolute;bottom:88px;right:-12%;width:88%;height:auto;opacity:.05;
   z-index:0;pointer-events:none}
+/* 956.ª: puede ENCOGERSE y partir una palabra larga. «COORDINADOR DE AEROESTRUCTURAS» no cabía y empujaba el ⋮
+   fuera de la pantalla: un hijo de flex no baja de su palabra más larga sin `min-width:0`. */
+.hquien{min-width:0}
+.hquien span{overflow-wrap:anywhere}
 .hquien b{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em}
 .hquien span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--ink3)}
 .hlado{margin-left:auto;display:flex;align-items:center;gap:8px}
