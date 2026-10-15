@@ -5104,6 +5104,7 @@ function _novedades_(){
         {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
         {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
         {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
+        {cara:'escritorio', vista:'docdec', txt:'**Un expediente sin archivo te dice qué hacer**: «Pídeselo a quien lo subió antes de decidir», como en el móvil. Antes te mandaba a buscar un campo de Cowork.'},
         {cara:'escritorio', vista:'panel', txt:'**Las horas, a la centésima también aquí**: «Horas en el aire» decía 15,5 donde «Este mes» decía 15,50; con 15,75 h habría dicho 15,8. Igual en Miembros, Ranking y la nota de tu cuota.'},
         {cara:'escritorio', vista:'panel', txt:'**«Requiere tu decisión» ya no te pide fijar reuniones que no puedes fijar**: las «sin fijar» salen sólo a quien la convocó (o al PD con la cuenta admin), que es a quien el servidor deja.'},
         {cara:'escritorio', vista:'turnos', txt:'**«Reutilizar la disponibilidad del turno anterior», también aquí**: en «Tu disponibilidad» copia lo que marcaste la semana pasada. No se guarda hasta que pulses «Guardar».'},

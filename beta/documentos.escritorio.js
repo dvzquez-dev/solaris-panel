@@ -293,8 +293,7 @@ function docCard(d){
   }
   var avisos = (d.avisos&&d.avisos.length) ? lista('Avisos de calidad · '+d.avisos.length, d.avisos)
     : (d.iss ? '<div class="sub"><span class="sc">Calidad</span><p style="margin:4px 0 0;font-size:12px;'+
-        'color:var(--ink3);line-height:1.55">'+d.iss+' aviso'+(d.iss===1?'':'s')+' de calidad, sin detalle. '+
-        'Los manda Cowork con el expediente.</p></div>' : '');
+        'color:var(--ink3);line-height:1.55">'+d.iss+' aviso'+(d.iss===1?'':'s')+' de calidad, sin detalle.</p></div>' : '');
   var previa = _previaDocE_(d, st);
   /* ⛔ POR LA PUERTA UNICA (`_visorDocHTML_`). Esta cara ya acertaba -- preguntaba «¿hay
      enlace?» --, y va por la puerta igual: dos criterios para la misma pregunta se separan
@@ -302,7 +301,9 @@ function docCard(d){
      Nace ABIERTO: esta ficha existe para leer el archivo antes de decidir. */
   var visor = _visorDocHTML_(d.drive, d.ref,
     '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
-    'Cowork lo manda en <span class="mono">enlaceDrive</span>; sin él no hay nada que leer aquí.</div></div>');
+    /* 954.ª: lo que HACER, como el móvil — aquí mandaba a buscar un nombre de campo de un asistente
+       que ya no está en el camino. */
+    'Pídeselo a quien lo subió antes de decidir.</div></div>');
   var acc, _aut;
   if(puede){
     acc='<label style="display:block;margin-top:11px">'+
