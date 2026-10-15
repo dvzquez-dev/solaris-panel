@@ -3866,6 +3866,15 @@ function _ddmm_(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1); }
    ⛔ Y se escribe como FUNCION, no como `var`: el arnes de los bancos extrae funciones
    (`jsfuente.funcion`), no globals. Un `var` no llegaria al arnes y el caso no podria ni
    llamarlo -- o sea que el tope quedaria sin poder comprobarse. */
+/* Una fecha ISO `AAAA-MM-DD` movida `n` días, en ISO (932.ª). En UTC a propósito: con hora local, el día del
+   cambio de hora una resta de 7×24 h cae en el día de al lado. Lo que no es una fecha ISO devuelve `null`, no
+   una fecha inventada (§3c-24). */
+function _isoMasDias_(iso, n){
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso==null?'':iso));
+  if(!m) return null;
+  return new Date(Date.UTC(+m[1], +m[2]-1, +m[3]+(+n||0))).toISOString().slice(0,10);
+}
+
 function _topeDias_(){ return 62; }
 
 function _diasDesde_(iso,n){ var out=[],b=new Date(iso+'T00:00:00');
@@ -5035,6 +5044,7 @@ function _novedades_(){
         {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
         {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
         {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
+        {cara:'movil', vista:'turnos', txt:'**«Reutilizar la disponibilidad del turno anterior»**: un botón encima de la rejilla copia lo de la semana pasada y lo deja pintado para cambiarlo. Lo pediste el 14/10. (En la maqueta no hay semana anterior: se prueba con cuenta.)'},
         {cara:'movil', vista:'estado', txt:'**En la maqueta, Estado ya enseña la próxima reunión** y el aviso de «te falta cubrir»: decía «Ninguna reunión convocada» mientras la pestaña Reunión enseñaba una con «TE FALTA». Con cuenta real ya cuadraba.'},
         {cara:'movil', vista:'estado', txt:'**Al Project Director, sus horas en cola le dicen «Las firmas tú»**, no «Las firma Lois» siendo él Lois. Y en la maqueta, «Coord.» y «PD» ya son Xoán y Lois de verdad: «Mis documentos» eran los de Nerea.'},
         {cara:'escritorio', vista:'dispo', txt:'**Con el plazo ya cerrado, la reunión lo dice**: «el plazo cerró el 14/10 · 1 sin cumplir» en vez de «cierra el 14/10 · 1 en riesgo». (En la maqueta no se ve: vive el 24/07.)'},
