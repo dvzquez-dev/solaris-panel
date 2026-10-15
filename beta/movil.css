@@ -196,6 +196,9 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .tarj.acc{background:linear-gradient(160deg,#241416,#171112);border-color:#3d2224}
 .tarj .tt{display:flex;align-items:center;gap:8px;margin:-2px 0 10px}
 .tarj .tt .sc{flex:none} .tarj .tt .ln{flex:1;height:1px;background:var(--line)}
+/* 922.ª: a 375 px «aprobadas · otorgadas · pendientes» se salía de la tarjeta (`flex:none` no deja encoger).
+   Sólo el texto de la DERECHA encoge y parte línea; el título y la raya se quedan como estaban. */
+.tarj .tt .ln + .sc{flex:0 1 auto;min-width:0;text-align:right;line-height:1.35}
 
 /* ── PULSAR: acuse barato, <120 ms, en el propio elemento ─────────────────── */
 /* Decisión cerrada: NADA de círculo que se expande bajo el dedo, y no se mueve
