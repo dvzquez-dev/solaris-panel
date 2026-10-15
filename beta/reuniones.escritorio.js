@@ -704,7 +704,8 @@ function _cablearMiDispo_(){
          haber entrado un refresco, y el plazo vence solo. Una guarda que solo vive en el
          pintado es un rotulo -- la que decide se pregunta al PULSAR. */
       if(!_plazoAbierto_(r.limite)){
-        tost('El plazo cerr\u00f3 el '+_plazoTxt_(r.limite)+': el servidor ya no acepta respuestas.');
+        /* 928.ª: `_plazoTxt_` ya dice «el plazo cerró el …»; con el prefijo salía repetido. */
+        tost('Ya no se aceptan respuestas: '+_plazoTxt_(r.limite)+'.');
         return;
       }
       var vals=_misValores_(r);
@@ -813,6 +814,15 @@ function _convocadosBoxE_(r){
     '<span class="sc" style="display:block;margin-bottom:5px">Convocados <b id="reInvN">'+RE_INV.size+'</b></span>'+
     '<div id="reInvPool" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px">'+_poolPicksE_(RE_INV, 'data-einv')+'</div>'+
     '<button class="btn" data-guardarinv>Guardar convocados</button></div>';
+}
+
+/* EL PLAZO DE UNA REUNIÓN EN UNA TARJETA DEL ESCRITORIO (928.ª): el texto (`_plazoTxt_`, el mismo de toda la
+   app) y el chip. Abierta (o sin límite): «N en riesgo» — aún pueden cubrir. Cerrada: «N sin cumplir» — ya no
+   pueden, y es lo que va a sanción. Cuenta los sin cubrir Y los de por debajo del mínimo, como antes. */
+function _plazoReuE_(r){
+  var n=((r && r.sinCubrir) || []).length + ((r && r.bajoMin) || []).length;
+  var abierta=_plazoAbierto_(r && r.limite);
+  return { txt:_plazoTxt_(r && r.limite), chip:n+(abierta?' en riesgo':' sin cumplir'), cls:(n?'no':'ok') };
 }
 
 function _fijarPanel_(){
