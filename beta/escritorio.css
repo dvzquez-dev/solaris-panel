@@ -353,7 +353,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .lote-m{font-size:12px;color:var(--ink2);margin-top:5px;line-height:1.5}
 .lrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(50,44,46,.8);flex-wrap:wrap}
 .lrow .nm{flex:1;min-width:130px;font-size:12.5px;font-weight:600}
-.lrow .vl{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--red2);width:52px;text-align:right}
+.lrow .vl{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--red2);min-width:84px;white-space:nowrap;text-align:right}
 .lrow .vl.tach{opacity:.38;text-decoration:line-through}
 .decs{display:inline-flex;border:1px solid var(--line);border-radius:var(--r2);overflow:hidden}
 .decs button{border-right:1px solid var(--line);padding:5px 10px;font-size:11px;font-weight:600;color:var(--ink3);white-space:nowrap}

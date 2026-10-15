@@ -5107,6 +5107,7 @@ function _novedades_(){
         {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
         {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
         {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
+        {cara:'escritorio', vista:'sanciones', txt:'**«−1 punto» en una línea**: en la cola de sanciones, lo que quita cada sanción salía partido («−1» arriba, «punto» abajo) en todas las filas del bloque.'},
         {cara:'escritorio', vista:'panel', txt:'**Las horas, sin ceros de cola en toda la app**: en el panel salía «15,5» arriba y «15,50 h están sin firmar» debajo. Ahora todas las horas siguen la misma regla: 15,5 · 86,25 · 2.'},
         {cara:'escritorio', vista:'apela', txt:'**Una negrita dentro del texto de una pantalla vacía ya no sale como segundo título**: en Apelaciones, «Sanciones» salía en mayúsculas en su propia línea y el punto colgando debajo.'},
         {cara:'escritorio', vista:'convoc', txt:'**«Fijar» ya no se ofrece a quien no puede fijar**: sale deshabilitado y dice quién la fija (quien la convocó, o la cuenta admin), que es lo que el servidor deja.'},
