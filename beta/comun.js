@@ -43,8 +43,11 @@ function nf2(v){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,ma
 /* Las horas van con los decimales que TENGAN, no con uno fijo. Con `nf(v,1)` un cuarto de
    hora -0,25- se pintaba «0,3 h», que ademas no es ningun escalon de la escala de
    compensacion. Se muestran dos decimales solo si el numero los usa: 2 h se lee mejor que
-   2,00 h, y 0,25 h tiene que leerse 0,25 h. GEMELA en las dos caras. */
-function h1(v){ var n=Number(v)||0; return nf(n, (Math.round(n*100)%100===0) ? 0 : 2)+' h'; }
+   2,00 h, y 0,25 h tiene que leerse 0,25 h. GEMELA en las dos caras.
+   ⛔ 963.ª: y SIN CEROS DE COLA, que es la regla escrita (decisiones-app: «86,25, no 86,3 ni 86,00»). Aquí se
+   elegían 0 ó 2 decimales, así que 15,5 salía «15,50 h» y en el panel del PD convivía con el «15,5» de `nf2`.
+   Ahora es `nf2`: una sola cifra para las horas en toda la app. */
+function h1(v){ return nf2(Number(v)||0)+' h'; }
 
 function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 
@@ -5104,6 +5107,7 @@ function _novedades_(){
         {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
         {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
         {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
+        {cara:'escritorio', vista:'panel', txt:'**Las horas, sin ceros de cola en toda la app**: en el panel salía «15,5» arriba y «15,50 h están sin firmar» debajo. Ahora todas las horas siguen la misma regla: 15,5 · 86,25 · 2.'},
         {cara:'escritorio', vista:'apela', txt:'**Una negrita dentro del texto de una pantalla vacía ya no sale como segundo título**: en Apelaciones, «Sanciones» salía en mayúsculas en su propia línea y el punto colgando debajo.'},
         {cara:'escritorio', vista:'convoc', txt:'**«Fijar» ya no se ofrece a quien no puede fijar**: sale deshabilitado y dice quién la fija (quien la convocó, o la cuenta admin), que es lo que el servidor deja.'},
         {cara:'movil', vista:'fichar', txt:'**Al declarar o enviar horas, el aviso dice a la cola de quién van**, por su nombre: lo mismo que «Lo firma …» en la pantalla de Fichar. Antes decía «tu coordinador» siempre, también a los coordinadores.'},
@@ -5111,7 +5115,7 @@ function _novedades_(){
         {cara:'movil', vista:'estado', txt:'**La cabecera ya no deja el «·» solo en una línea**, y en la maqueta el botón de rol enseña lo mismo que ve esa persona («Coordinador de …»).'},
         {cara:'movil', vista:'estado', txt:'**Tildes**: quince textos que se leían sin ellas —el aviso de beta, los avisos al móvil, el cierre del mes, los puntos de una sanción…— ya las llevan.'},
         {cara:'escritorio', vista:'docdec', txt:'**Un expediente sin archivo te dice qué hacer**: «Pídeselo a quien lo subió antes de decidir», como en el móvil. Antes te mandaba a buscar un campo de Cowork.'},
-        {cara:'escritorio', vista:'panel', txt:'**Las horas, a la centésima también aquí**: «Horas en el aire» decía 15,5 donde «Este mes» decía 15,50; con 15,75 h habría dicho 15,8. Igual en Miembros, Ranking y la nota de tu cuota.'},
+        {cara:'escritorio', vista:'panel', txt:'**Las horas, a la centésima también aquí**: «Horas en el aire» iba a la décima: con 15,75 h habría dicho 15,8. Igual en Miembros, Ranking y la nota de tu cuota.'},
         {cara:'escritorio', vista:'panel', txt:'**«Requiere tu decisión» ya no te pide fijar reuniones que no puedes fijar**: las «sin fijar» salen sólo a quien la convocó (o al PD con la cuenta admin), que es a quien el servidor deja.'},
         {cara:'escritorio', vista:'turnos', txt:'**«Reutilizar la disponibilidad del turno anterior», también aquí**: en «Tu disponibilidad» copia lo que marcaste la semana pasada. No se guarda hasta que pulses «Guardar».'},
         {cara:'movil', vista:'fichar', txt:'**Fichar dice quién firma tus horas, por su nombre**: a un coordinador le decía «tu coordinador las firma», siendo él el coordinador. Ahora, como en Estado: «las firma Lois, Project Director».'},
