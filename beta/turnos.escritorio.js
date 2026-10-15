@@ -468,6 +468,7 @@ function _miTurnoPanel_(){
       'Elige <b>d\u00f3nde puedes</b> y haz clic en los huecos. Lo que marques aqu\u00ed es lo que '+
       'cuenta para el reparto \u2014 y no contestar es lo que hace que te pongan un turno '+
       'cuando no puedes.</p>'+
+    '<button class="btn" data-mtreusar style="display:block;margin:0 0 12px">↺ Reutilizar la disponibilidad del turno anterior</button>'+
     '<div class="dsit">'+pin+'</div>'+
     '<label class="campo" style="margin:9px 0;display:flex;gap:7px;align-items:center">'+
       '<input type="checkbox" data-mtcoche'+(MIT_COCHE?' checked':'')+'>'+
@@ -480,7 +481,30 @@ function _miTurnoPanel_(){
     '</div></div>');
 }
 
+/* ⭐ REUTILIZAR LA SEMANA ANTERIOR, TAMBIÉN AQUÍ (949.ª). La petición de Daniel (14/10) no nombró cara y el móvil
+   ya lo tenía (932.ª); esta cara contesta la misma convocatoria. Lo copiado entra como CAMBIO SIN GUARDAR
+   (`MIT_CELDAS`): aquí nada se guarda hasta pulsar «Guardar mi disponibilidad», y copiar no es la excepción. */
+async function _reusarMiTurno_(cv){
+  if(!cv) return;
+  if(typeof _identidadPrestada_==='function' && _identidadPrestada_(
+       (typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '')){
+    tost('Estás actuando como otra persona: tus turnos no se tocan desde aquí.'); return;
+  }
+  if(_convEstado_(cv)!=='abierta'){ tost('El plazo no está abierto: no hay nada que contestar.'); return; }
+  var res=await _traerSemanaAnterior_(cv); if(!res) return;
+  var mias=_misCeldas_(cv);
+  if(Object.keys(mias).length &&
+     !confirm('Se sustituye lo que llevas marcado esta semana por lo de la anterior. No se guarda hasta que pulses «Guardar». ¿Seguir?')) return;
+  MIT_CELDAS=res.mapa;
+  pintar();
+  tost('Copiada la semana anterior: revísala y pulsa «Guardar mi disponibilidad».'+
+       (res.fuera ? ' ('+res.fuera+' casilla'+(res.fuera===1?' no cabía':'s no cabían')+'.)' : ''));
+}
+
 function _cablearMiTurno_(){
+  $$('[data-mtreusar]').forEach(function(b){
+    b.onclick=function(){ _reusarMiTurno_(_miTurnoCv_()); };
+  });
   $$('[data-mtpin]').forEach(function(b){
     b.onclick=function(){ MIT_PIN=b.dataset.mtpin; pintar(); };
   });

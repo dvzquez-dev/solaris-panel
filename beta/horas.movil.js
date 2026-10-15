@@ -671,6 +671,17 @@ function durForm(){
   return Math.round(d/15)/4;             // a cuartos de hora
 }
 
+/* QUIÉN FIRMA, EN UNA FRASE (948.ª). Fichar le decía a un COORDINADOR que lo firmaba «su» coordinador —y él es el
+   coordinador—, mientras Estado ya decía bien «Las firma Lois, Project Director». Se sale del MISMO `rt` que la tarjeta
+   «Quién lo firma» de esta pantalla (`aprobadorDe`): al PD no se le nombra a sí mismo; sin aprobador (varios perfiles),
+   no se afirma un nombre. */
+function _firmaTxtM_(rt){
+  if(!rt) return 'no cuentan hasta que las firma quien coordine el subsistema';
+  if(rt.propio) return 'cuentan cuando las firmas tú: eres el Project Director';
+  return 'no cuentan hasta que las firma '+esc(String(rt.nom||'').split(' ')[0])+', '+
+    (rt.escalado?'Project Director':'coordinador de tu unidad');
+}
+
 function vFichar(){
   var s=ST.ses, min=minSes(), largo=min>=600, corre=s.estado==='corriendo';
   var nube=(typeof backendOK!=='undefined' && backendOK && SESION);   // sesión respaldada por la nube
@@ -732,7 +743,7 @@ function vFichar(){
            tocar las horas (`dur = declP.q`). ⚠️ Sin «no cuenta tal cual»: hoy el autocierre
            nace `pendiente` y SÍ cuenta si lo firman. */
         'A las <b>14 h</b> se cierra sola con el tope: 14 h desde tu entrada, menos las pausas.</div>':
-        '<p class="rnota">Al fichar salida tendrás que justificar las horas. No cuentan hasta que tu coordinador las firma.</p>')+
+        '<p class="rnota">Al fichar salida tendrás que justificar las horas. Tus horas '+_firmaTxtM_(rt)+'.</p>')+
     '</div>';
 
   var bloque=
@@ -778,7 +789,7 @@ function vFichar(){
     '</div>';
 
   var decl = ST.form.declararId!=null ? PARTES.filter(function(x){return x.id===ST.form.declararId;})[0] : null;
-  return '<div class="h1">Fichar</div><p class="h1s">'+HOY+' · tus horas no cuentan hasta que tu coordinador las firma.</p>'+
+  return '<div class="h1">Fichar</div><p class="h1s">'+HOY+' · tus horas '+_firmaTxtM_(rt)+'.</p>'+
     (decl
       ? '<div class="tarj" style="border-color:rgba(232,145,46,.5)"><div class="fila" style="padding-top:0"><div class="a"><b>'+(decl.e==='det' ? 'Te piden más detalle' : 'Fichaje sin declarar')+'</b>'+
         /* ⛔ 633.ª LA CADUCIDAD DEL PARTE, NO UN PLAZO CABLEADO: un autocierre caduca a las 24 h,

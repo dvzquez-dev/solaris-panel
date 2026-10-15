@@ -67,18 +67,8 @@ function _cablearMemoria_(){ _cablearVisor_(); }
    lleva coche. Los TRES estados, no dos: es el único acierto de diseño del excel que se
    viene a sustituir, y la diferencia importa porque solo al mudo se le puede insistir. */
 
-/* GEMELA de `reglas/turnos.py:clave`. El separador se prueba contra el de Python en
-   `rutinas/probar_turnos.py` §12: si alguien cambia uno, el banco lo canta. */
-function _convClave_(dia, franja){ return dia+'|'+franja; }
-
-/* La otra mitad de la puerta: DESCOMPONER la clave. Vive pegada a `_convClave_` y el separador
-   lo saca de ELLA — escribirlo aquí otra vez sería tener el formato en dos sitios, que es justo
-   lo que `_convClave_` existe para impedir: el día que uno cambie, el otro deja de casar y la
-   respuesta DESAPARECE sin dar error. */
-function _convDeClave_(k){
-  var sep=_convClave_('',''), s=String(k), i=s.indexOf(sep);
-  return i<0 ? [s, ''] : [s.slice(0,i), s.slice(i+sep.length)];
-}
+/* ⚠️ `_convClave_` y `_convDeClave_` SE MUDARON A `comun.js` en la 949.ª, con `_reusarDispo_`: el escritorio
+   también reutiliza la semana anterior y no carga este fichero. */
 
 /* ⚠️ `_convEstado_`, `_convQuedan_` y `_convClases_` SE MUDARON A `comun.js` el 14/08,
    cuando el escritorio necesito contestar la convocatoria: esta cara no carga
@@ -126,42 +116,17 @@ function _convMias_(cv){
 
 /* Cuántas celdas has marcado y cuántas has dejado en blanco. El segundo número es el que
    importa: en blanco no es «no puedo», es «no has contestado». */
-/* ⭐ REUTILIZAR LA DISPONIBILIDAD DEL TURNO ANTERIOR (932.ª). 🗣️ Daniel, 14/10: *«que haya una opción clara que
-   ponga reutilizar disponibilidad del turno anterior (se puede editar)»*.
-   Lo que se marcó la semana anterior cae en el MISMO día de la semana de ésta (+7 días), en la misma franja,
-   con su sitio y su coche. Lo que no cabe —una franja que esta semana no existe, un sitio que no se ofrece—
-   se CUENTA en `fuera`, no se inventa ni se acerca a lo más parecido. Pura: no toca nada. */
-function _reusarDispo_(cv, previas){
-  var dias=cv.dias||[], fr={}, cl={}, out={}, n=0, fuera=0;
-  (cv.franjas||[]).forEach(function(f){ fr[f.k]=1; });
-  _convClases_(cv).forEach(function(c){ cl[c]=1; });
-  Object.keys(previas||{}).forEach(function(k){
-    var p=_convDeClave_(k), v=previas[k], d=_isoMasDias_(p[0], 7);
-    if(!v || !v.s || !d || dias.indexOf(d)<0 || !fr[p[1]] || !cl[v.s]){ fuera++; return; }
-    out[_convClave_(d, p[1])] = (v.s==='no') ? {s:'no'} : {s:v.s, c:!!v.c};
-    n++;
-  });
-  return {mapa:out, n:n, fuera:fuera};
-}
+/* (`_reusarDispo_` y `_traerSemanaAnterior_` viven en `comun.js` desde la 949.ª: las usan las dos caras.) */
 
-/* La acción del botón. Pide TU disponibilidad de la semana anterior (`getConvocatoria(semana)` ya resolvía por
-   `semana_ini`), la copia en tu rejilla, la GUARDA y repinta: lo copiado queda pintado y se cambia como
-   siempre, con el dedo — «se puede editar» es la mitad de la función. Si ya tenías algo marcado, pregunta
-   antes de SUSTITUIRLO (mezclar dejaría restos de las dos semanas sin que se vea cuáles). */
+/* La acción del botón. Trae TU disponibilidad de la semana anterior (`_traerSemanaAnterior_`, en `comun.js`), la
+   copia en tu rejilla, la GUARDA y repinta: lo copiado queda pintado y se cambia como siempre, con el dedo —
+   «se puede editar» es la mitad de la función. Si ya tenías algo marcado, pregunta antes de SUSTITUIRLO
+   (mezclar dejaría restos de las dos semanas sin que se vea cuáles). */
 async function _reusarConv_(cv, repinta){
   if(!cv) return;
-  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getConvocatoria){
-    tost('Sin conexi\u00f3n no se puede traer la semana anterior.'); return;
-  }
   var _prestada=(typeof _identidadPrestada_==='function') && _identidadPrestada_(yoNombre());
   if(_prestada){ tost('Est\u00e1s viendo la app como otra persona: sus turnos no se tocan desde aqu\u00ed.'); return; }
-  var sem=_isoMasDias_(cv.semana_ini || cv.semana || (cv.dias||[])[0], -7), r;
-  try{ r=await api.getConvocatoria(sem); }
-  catch(e){ tostErr('No se pudo traer la semana anterior: ', e); return; }
-  var prev=(r && r.convocatoria && r.mias) || {};
-  if(!Object.keys(prev).length){ tost('La semana anterior no marcaste nada: no hay qu\u00e9 reutilizar.'); return; }
-  var res=_reusarDispo_(cv, prev);
-  if(!res.n){ tost('Lo de la semana anterior no cabe en esta rejilla: otras horas u otros sitios.'); return; }
+  var res=await _traerSemanaAnterior_(cv); if(!res) return;
   var mias=_convMias_(cv);
   if(Object.keys(mias).length &&
      !confirm('Se sustituye lo que llevas marcado esta semana por lo de la anterior. Luego lo puedes cambiar. \u00bfSeguir?')) return;

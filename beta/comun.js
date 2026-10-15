@@ -4689,6 +4689,58 @@ function _convQuedan_(cv, ahora){
    haría que un sitio nuevo dejara restos de la clase anterior al repintar. */
 function _convClases_(cv){ return (cv.sitios||[]).concat(['ambos','no']); }
 
+/* GEMELA de `reglas/turnos.py:clave`. El separador se prueba contra el de Python en
+   `rutinas/probar_turnos.py` §12: si alguien cambia uno, el banco lo canta.
+   ⚠️ Vivía en `turnos.movil.js`; se mudó aquí en la 949.ª con `_convDeClave_` y `_reusarDispo_`, porque el
+   escritorio también reutiliza la semana anterior y no carga ese fichero. */
+function _convClave_(dia, franja){ return dia+'|'+franja; }
+
+/* La otra mitad de la puerta: DESCOMPONER la clave. Vive pegada a `_convClave_` y el separador
+   lo saca de ELLA — escribirlo aquí otra vez sería tener el formato en dos sitios, que es justo
+   lo que `_convClave_` existe para impedir: el día que uno cambie, el otro deja de casar y la
+   respuesta DESAPARECE sin dar error. */
+function _convDeClave_(k){
+  var sep=_convClave_('',''), s=String(k), i=s.indexOf(sep);
+  return i<0 ? [s, ''] : [s.slice(0,i), s.slice(i+sep.length)];
+}
+
+/* ⭐ REUTILIZAR LA DISPONIBILIDAD DEL TURNO ANTERIOR (932.ª). 🗣️ Daniel, 14/10: *«que haya una opción clara que
+   ponga reutilizar disponibilidad del turno anterior (se puede editar)»*.
+   Lo que se marcó la semana anterior cae en el MISMO día de la semana de ésta (+7 días), en la misma franja,
+   con su sitio y su coche. Lo que no cabe —una franja que esta semana no existe, un sitio que no se ofrece—
+   se CUENTA en `fuera`, no se inventa ni se acerca a lo más parecido. Pura: no toca nada. */
+function _reusarDispo_(cv, previas){
+  var dias=cv.dias||[], fr={}, cl={}, out={}, n=0, fuera=0;
+  (cv.franjas||[]).forEach(function(f){ fr[f.k]=1; });
+  _convClases_(cv).forEach(function(c){ cl[c]=1; });
+  Object.keys(previas||{}).forEach(function(k){
+    var p=_convDeClave_(k), v=previas[k], d=_isoMasDias_(p[0], 7);
+    if(!v || !v.s || !d || dias.indexOf(d)<0 || !fr[p[1]] || !cl[v.s]){ fuera++; return; }
+    out[_convClave_(d, p[1])] = (v.s==='no') ? {s:'no'} : {s:v.s, c:!!v.c};
+    n++;
+  });
+  return {mapa:out, n:n, fuera:fuera};
+}
+
+/* Lo que comparten las dos caras al reutilizar (949.ª): pedir TU disponibilidad de la semana anterior
+   (`getConvocatoria(semana)` resuelve por `semana_ini`) y encajarla en ésta. Devuelve lo de `_reusarDispo_`, o
+   `null` después de DECIR por qué no: sin conexión, sin respuesta, nada marcado, nada que quepa.
+   Qué se hace con lo copiado lo decide cada cara: el móvil lo guarda al momento; el escritorio lo deja SIN
+   GUARDAR hasta que se pulsa «Guardar», que es como funciona esa cara. */
+async function _traerSemanaAnterior_(cv){
+  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getConvocatoria){
+    tost('Sin conexión no se puede traer la semana anterior.'); return null;
+  }
+  var sem=_isoMasDias_(cv.semana_ini || cv.semana || (cv.dias||[])[0], -7), r;
+  try{ r=await api.getConvocatoria(sem); }
+  catch(e){ tostErr('No se pudo traer la semana anterior: ', e); return null; }
+  var prev=(r && r.convocatoria && r.mias) || {};
+  if(!Object.keys(prev).length){ tost('La semana anterior no marcaste nada: no hay qué reutilizar.'); return null; }
+  var res=_reusarDispo_(cv, prev);
+  if(!res.n){ tost('Lo de la semana anterior no cabe en esta rejilla: otras horas u otros sitios.'); return null; }
+  return res;
+}
+
 /* Y el RÓTULO de cada una. Vive aquí, pegado a `_convClases_`, porque son **la misma
    decisión** —qué se puede contestar esta semana— y tenerlas separadas es exactamente cómo
    el móvil acabó limpiando las clases con la lista de los datos y **pintando los botones
@@ -5052,6 +5104,8 @@ function _novedades_(){
         {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
         {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
         {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
+        {cara:'escritorio', vista:'turnos', txt:'**«Reutilizar la disponibilidad del turno anterior», también aquí**: en «Tu disponibilidad» copia lo que marcaste la semana pasada. No se guarda hasta que pulses «Guardar».'},
+        {cara:'movil', vista:'fichar', txt:'**Fichar dice quién firma tus horas, por su nombre**: a un coordinador le decía «tu coordinador las firma», siendo él el coordinador. Ahora, como en Estado: «las firma Lois, Project Director».'},
         {cara:'movil', vista:'estado', txt:'**«Telemática» con su tilde**: la tarjeta de la próxima reunión y su ficha decían «TELEMATICA».'},
         {cara:'movil', vista:'turnos', txt:'**Marcar muchos bloques de golpe, con un toque**: tocar el **día** (la cabecera de su columna) lo marca entero, y tocar la **hora** la marca en toda la semana — el turno que empieza ahí, como un toque en la casilla. Otro toque igual lo quita. Lo dice el rótulo de encima de la rejilla.'},
         {cara:'movil', vista:'turnos', txt:'**«Reutilizar la disponibilidad del turno anterior»**: un botón encima de la rejilla copia lo de la semana pasada y lo deja pintado para cambiarlo. Lo pediste el 14/10. (En la maqueta no hay semana anterior: se prueba con cuenta.)'},
