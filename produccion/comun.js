@@ -43,8 +43,11 @@ function nf2(v){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,ma
 /* Las horas van con los decimales que TENGAN, no con uno fijo. Con `nf(v,1)` un cuarto de
    hora -0,25- se pintaba «0,3 h», que ademas no es ningun escalon de la escala de
    compensacion. Se muestran dos decimales solo si el numero los usa: 2 h se lee mejor que
-   2,00 h, y 0,25 h tiene que leerse 0,25 h. GEMELA en las dos caras. */
-function h1(v){ var n=Number(v)||0; return nf(n, (Math.round(n*100)%100===0) ? 0 : 2)+' h'; }
+   2,00 h, y 0,25 h tiene que leerse 0,25 h. GEMELA en las dos caras.
+   ⛔ 963.ª: y SIN CEROS DE COLA, que es la regla escrita (decisiones-app: «86,25, no 86,3 ni 86,00»). Aquí se
+   elegían 0 ó 2 decimales, así que 15,5 salía «15,50 h» y en el panel del PD convivía con el «15,5» de `nf2`.
+   Ahora es `nf2`: una sola cifra para las horas en toda la app. */
+function h1(v){ return nf2(Number(v)||0)+' h'; }
 
 function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 
@@ -1006,6 +1009,41 @@ function _bandaSana_(){
   return { lo: 70, hi: 120, viva: false };
 }
 
+/* ═══ LA BARRA DEL ÍNDICE DE CARGA — una puerta para las dos caras (19/10) ════════════════
+   Vivía INLINE en la vista de Horas del móvil (`horas.movil.js`, «Mi índice de carga») y el
+   escritorio NO LA TENÍA: `decisiones-app.md:2791` prohíbe que una capacidad del móvil falte en
+   el escritorio, y la vara que debía cazarlo (comparar los `api.*` de cada cara) sale verde con
+   ella fuera porque no gasta ninguno. Se saca aquí para que las dos pinten EL MISMO dibujo:
+   copiarla habría dejado dos barras que divergen el día que se mueva la banda.
+   Devuelve `''` si no hay un número que pintar, y cada cara pone SU vacío (`vacio` en el móvil,
+   `vacioSimple` en el escritorio: son dos piezas distintas, mapa §5 D10).
+   ⛔⛔ EL DIBUJO SE DERIVA DE LA BANDA, que es la mitad que faltaba el 06/10. El 05/10 se sacó
+   la banda del TÍTULO a `_bandaSana_`… y la BARRA se quedó cableada: `left:38.9%`,
+   `width:27.8%`, `left:66.7%` y los rótulos **70** y **120** escritos a mano.
+   ⛔ O sea que el día que Daniel mueva la banda otra vez -ya la movió una: *«cambia la banda
+   sana de 60 a 90 a de 70 a 120»*, 09/08- el título diría lo nuevo y **el dibujo seguiría
+   pintando lo viejo**, con la marca roja cayendo en la zona equivocada.
+   ✅ La escala es `hi * 1.5` -con 120 da los 180 de siempre: 70/180=38,9 · 50/180=27,8 ·
+   120/180=66,7 · carga/1,8-, así que derivarla reproduce el dibujo de hoy y sigue a la banda.
+   ⚠️ Y LA MARCA SE ACOTA POR LOS DOS LADOS: con un índice negativo (un ajuste a mano en
+   Notion) la marca salía con `left:calc(-5.6% …)`, fuera de la barra; y con `NaN` -que
+   `typeof` deja pasar como número- el `left` era CSS inválido y la marca caía a la izquierda,
+   o sea en «sin carga», en silencio. `isFinite` corta el segundo y `Math.max(0,…)` el primero. */
+function _cargaBarraHTML_(carga){
+  if(typeof carga !== 'number' || !isFinite(carga)) return '';
+  var _bs = _bandaSana_();
+  var _esc = _bs.hi * 1.5;
+  var _pLo = (_bs.lo / _esc * 100), _pHi = (_bs.hi / _esc * 100);
+  return '<div style="position:relative;height:30px;margin:4px 0 8px">'+
+    '<div style="position:absolute;top:11px;left:0;right:0;height:8px;border-radius:5px;background:var(--sur2)"></div>'+
+    '<div style="position:absolute;top:11px;left:'+_pLo.toFixed(1)+'%;width:'+(_pHi-_pLo).toFixed(1)+'%;height:8px;background:#1d3a2b"></div>'+
+    '<div style="position:absolute;top:6px;left:calc('+Math.max(0, Math.min(100, carga/_esc*100)).toFixed(1)+'% - 1.5px);width:3px;height:18px;'+
+      'background:var(--red);border-radius:2px;box-shadow:0 0 8px rgba(228,30,37,.55)"></div>'+
+    '<span style="position:absolute;top:-2px;left:'+_pLo.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.lo+'</span>'+
+    '<span style="position:absolute;top:-2px;left:'+_pHi.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.hi+'</span>'+
+  '</div>';
+}
+
 function _truncarCentimo_(x){ return Math.floor(x * 100 + 1e-9) / 100; }
 
 function _umbral_(){
@@ -1308,10 +1346,41 @@ function _ApiSesion(m){ this.message=m; this.sesion=true; }
    ⛔ Se mira con una lista CERRADA, no con un `/token/`: hay errores que llevan la palabra
    «token» y no son de sesión — mandar a alguien a volver a entrar cuando el problema es otro
    le hace perder el trabajo que tenga a medias. */
+/* ⛔⛔ LA MAQUETA SIN CUENTA, SÓLO EN LOCAL (832.ª, 15/10) — UNA puerta para las dos caras.
+   El móvil decía «en la app publicada NUNCA se activa» y lo único que lo encendía era la URL:
+   📏 medido el 15/10 abriendo `produccion/index.html?demo` en Chromium, entraba a la maqueta
+   SIN login (DEMO=true, sin sesión; datos inventados — los 4 nombres no casan con el roster).
+   Daniel, 11/08: «yo quiero login q no puedo ver nada». Y en el escritorio la fecha se congelaba
+   con `indexOf('demo')`, o sea con CUALQUIER «demo» en la URL y CON la sesión real puesta.
+   Ahora hacen falta las dos cosas: `?demo` como parámetro entero (`\b`: «demolition» no vale) y
+   que la página la sirva esta máquina (localhost, 127.0.0.1, [::1] o un fichero).
+   ⚠️ No lanza: ante cualquier duda, `false` — el lado seguro es pedir login. */
+function _demoLocal_(){
+  try{
+    if(!/[?&]demo\b/.test(location.search)) return false;
+    return location.protocol==='file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  }catch(e){ return false; }
+}
+/* ⛔⛔ «HOY» SE RECALCULA, NO SE FOTOGRAFÍA (841.ª, 15/10) — una puerta para las dos caras.
+   Cada cara calculaba `HOY` UNA vez, al cargar, con su propia copia. Pero un móvil deja la app
+   abierta de un día para otro, y `_diasHasta_` cuenta contra `HOY` mientras `_plazoAbierto_` mira
+   la hora REAL: pasada la medianoche la tarjeta decía «cierra mañana» con el plazo ya cerrado — y
+   no cubrir sanciona. 📏 Se vio en la demo, donde los dos relojes discrepan siempre: «cierra en
+   2 días · TE FALTA» encima de «El plazo cerró». Ahora las caras la recalculan al empezar cada
+   refresco vivo (al volver a la app y cada 90 s). `ahora` es para el banco (§3c-36).
+   En la maqueta (`_demoLocal_`) sigue congelada: las capturas salen estables. */
+function _hoyTxt_(ahora){
+  if(_demoLocal_()) return '24/07/2026';
+  return _isoADMY_(_ahoraLocalISO_(ahora).slice(0, 10));
+}
 function _esErrorDeSesion_(err){
   var e=String(err||'');
   return /token no v\u00e1lido|token no valido/i.test(e) ||
-         /^sin token$/i.test(e) ||
+         /* ⛔ `^(Error: )?`: Apps Script contesta `String(err)`, o sea «Error: sin token». Con
+            `^sin token$` a secas esta rama NO CASABA NUNCA en produccion (816.a, medido con
+            `rutinas/servidor.py --comparar`). Va anclado a proposito: «sin token» suelto dentro de
+            otro mensaje no es una sesion caducada. */
+         /^(Error: )?sin token$/i.test(e) ||
          /token de otra aplicaci/i.test(e);
 }
 
@@ -2640,14 +2709,14 @@ function _filaRevocacion_(s, texto){
 function _validaPuntosSanc_(crudo){
   var t = String(crudo === null || crudo === undefined ? '' : crudo).replace(/^\s+|\s+$/g, '');
   if (t === '')
-    return { ok:false, msg:'Pon los puntos: el campo esta vacio.' };
+    return { ok:false, msg:'Pon los puntos: el campo está vacío.' };
   if (!/^-?\d+$/.test(t))
-    return { ok:false, msg:'Los puntos son un numero entero: \u00ab'+t+'\u00bb no lo es.' };
+    return { ok:false, msg:'Los puntos son un número entero: «'+t+'\u00bb no lo es.' };
   var n = parseInt(t, 10);
   if (n > 0)
-    return { ok:false, msg:'Una sancion resta: pon 0 (aviso) o un numero negativo.' };
+    return { ok:false, msg:'Una sanción resta: pon 0 (aviso) o un número negativo.' };
   if (n < -5)
-    return { ok:false, msg:'Lo maximo que quita una sancion del RRI son 5 puntos, y has puesto '+n+'.' };
+    return { ok:false, msg:'Lo máximo que quita una sanción del RRI son 5 puntos, y has puesto '+n+'.' };
   return { ok:true, pts:n };
 }
 
@@ -2837,6 +2906,11 @@ function _mdPlegado_(md){
 /* La pantalla de novedades. Si el sellado no se hizo, se DICE en vez de enseñar un hueco:
    un changelog vacio parece que no ha cambiado nada, que es lo contrario de la verdad. */
 function _novedadesHTML_(){
+  /* ⛔ 19/10 (auditoría): la MISMA guarda que su gemela `_automatismosHTML_`, dentro. Hoy los tres llamadores (menú del
+     móvil, menú y `ir` del escritorio) ya preguntan antes; esto es para el cuarto, que no lo hará. */
+  if(!_puedeVerNovedades_()){
+    return '<div class="mtit">Novedades</div><p class="rnota" data-est="nopuede">Esta pantalla es del director, y sólo en la beta.</p>';
+  }
   var cuerpo = String(CHANGELOG_MD||'').trim()
     ? '<div class="mdoc">'+_mdPlegado_(CHANGELOG_MD)+'</div>'
     : '<p class="rnota">El changelog no se selló en esta build. Está en '+
@@ -3578,6 +3652,45 @@ function _cablearVisor_(raiz){
   }
 }
 
+/* ⛔⛔ EL `subscribe` SE CAZA, Y ES UN FALLO REPORTADO: `BUG-M-2026-10-07-1` (Óscar,
+   **Bloquea**): *«no me deja activar notificaciones»*, y Daniel al aprobarlo anotó *«estaba
+   en PC y en Brave»*. Brave de escritorio trae **APAGADO** «Usar los servicios de Google para
+   la mensajería push», así que `pushManager.subscribe` **lanza** — y aquí no había `catch`,
+   o sea que el usuario no se enteraba ni de por qué ni de qué hacer.
+   📏 Y cuadra con lo medido el 14/10: `notisPrefs` tiene **UNA sola persona** en todo el
+   equipo. Si nadie consigue suscribirse, no hay a quién mandar nada.
+   ✅ Se caza el fallo y se dice QUÉ HACER. La detección de Brave sólo afina el consejo: un
+   navegador que falle por otra razón también recibe algo útil en vez de un silencio. */
+/* ═══ ENTRAR CON GOOGLE, UNA PUERTA (19/10) ════════════════════════════════════════════════════════════════
+   ⛔ Estaba COPIADO en las dos caras (`_pintarLogin_`, 0,97 de parecido medido por `gemelas.py`): el mismo `initialize`,
+   el mismo botón y el mismo `prompt`, y sólo cambiaban la cabecera y el texto del error. Una copia de cómo se entra es
+   la que diverge el día que Google cambie algo y sólo se arregle en una cara. Cada cara pone SU cabecera (lo que de
+   verdad difiere) y esto pone el resto. El error es el del móvil, que dice qué pasa en vez de «Error iniciando Google
+   Sign-In». `_gate_` es de cada cara (se resuelve al llamar). */
+function _iniciarGoogle_(cabeceraHTML){
+  _gate_(cabeceraHTML+'<div id="gbtn"></div>');
+  try{
+    var hint=''; try{ hint=localStorage.getItem('sol_last_email')||''; }catch(_){}
+    var cfg={client_id:GOOGLE_CLIENT_ID,callback:_onCredencial_,auto_select:true,
+             itp_support:true,use_fedcm_for_prompt:true};
+    if(hint) cfg.login_hint=hint;
+    google.accounts.id.initialize(cfg);
+    google.accounts.id.renderButton(document.getElementById('gbtn'),
+      {theme:'filled_black',size:'large',text:'signin_with',shape:'pill'});
+    try{ google.accounts.id.prompt(); }catch(_){}
+    api.ping(); setTimeout(function(){ api.ping(); },4000);   // pre-calienta el contenedor
+  }catch(e){ _gate_('<div style="color:#ffb3b0">No se pudo iniciar sesión con Google: '+((e&&e.message)||e)+'</div>'); }
+}
+
+function _consejoSuscribir_(err){
+  var e=String((err&&err.message)||err||'');
+  if(navigator.brave) return 'Brave trae apagado \u00abUsar los servicios de Google para la '+
+    'mensajer\u00eda push\u00bb. \u00c1brelo en brave://settings/privacy, act\u00edvalo y vuelve a intentarlo. '+
+    '(El navegador dijo: '+e+')';
+  return 'Este navegador no deja preparar el aviso: '+e+'. En el m\u00f3vil, prueba a abrir el '+
+    'panel desde el icono de la pantalla de inicio.';
+}
+
 function _urlB64_(b64){
   var pad='='.repeat((4-b64.length%4)%4);
   var t=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');
@@ -3817,6 +3930,23 @@ function _ddmm_(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1); }
    ⛔ Y se escribe como FUNCION, no como `var`: el arnes de los bancos extrae funciones
    (`jsfuente.funcion`), no globals. Un `var` no llegaria al arnes y el caso no podria ni
    llamarlo -- o sea que el tope quedaria sin poder comprobarse. */
+/* CÓMO SE ESCRIBE LA MODALIDAD de una reunión (937.ª). El valor es un id ASCII (`telematica`, `hibrida`) y se
+   pintaba tal cual: Estado decía «TELEMATICA». Se escribe como en el desplegable donde se elige. Lo que no es una
+   de las tres se deja como viene (no se inventa una etiqueta), y lo vacío, vacío. */
+function _modalidadTxt_(m){
+  var k=String(m==null?'':m), t={presencial:'Presencial', telematica:'Telemática', hibrida:'Híbrida'}[k.toLowerCase()];
+  return t || k;
+}
+
+/* Una fecha ISO `AAAA-MM-DD` movida `n` días, en ISO (932.ª). En UTC a propósito: con hora local, el día del
+   cambio de hora una resta de 7×24 h cae en el día de al lado. Lo que no es una fecha ISO devuelve `null`, no
+   una fecha inventada (§3c-24). */
+function _isoMasDias_(iso, n){
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso==null?'':iso));
+  if(!m) return null;
+  return new Date(Date.UTC(+m[1], +m[2]-1, +m[3]+(+n||0))).toISOString().slice(0,10);
+}
+
 function _topeDias_(){ return 62; }
 
 function _diasDesde_(iso,n){ var out=[],b=new Date(iso+'T00:00:00');
@@ -3914,6 +4044,34 @@ function _ahoraLocalISO_(d){
    ⚠️ **`ahora` va por argumento** porque si no el caso no puede discriminar: con la fecha
    tecleada, dos instantes separados dan la misma respuesta ('cerrada' las dos), y con ésta dan
    'abierta' las dos. Un caso que dependa del reloj de quien corra el banco no distingue nada. */
+/* LAS FRANJAS DE LA SEMILLA: bloques de UNA HORA, con el hueco de la comida (745.ª).
+
+   🗣️ Daniel, 14/10/2026: *«aparecen de disponibilidades los días de forma distinta… no
+   tiene mucho sentido poner mañana y que no se sepa qué hora es mañana… Que sea como las
+   reuniones. Que sea POR BLOQUES HORARIOS… hasta las once de la noche… no antes de las 9
+   de la mañana, dejar el espacio para comer… de dos a cuatro, no haya turnos»*.
+
+   ⛔ **Las dos caras la llaman; la lista NO se copia en sus dos semillas.** La lección ya
+   estaba escrita al lado, para los sitios: *«los sitios NO se cablean … para que las dos
+   caras no acaben con dos listas distintas»*. Con la lista en los dos `.html`, tocar una
+   deja la otra con la semana vieja y nadie se entera hasta que alguien compara.
+
+   ⛔ **Y es el espejo de `calcular_convocatoria.franjas_horarias()`, que es quien las
+   monta de verdad.** Aquí sólo se siembra la demostración; `probar_convocar.py` compara
+   las dos listas clave por clave, porque una semilla que enseñe una semana que el
+   servidor no manda es una pantalla que miente sin dar ningún error.
+
+   ⚠️ El hueco no se pinta gris: **no existe**. Una franja ofertada que nadie puede hacer
+   recoge ceros, y un cero de «no puedo» no se distingue de un cero de «nadie contestó». */
+function _franjasDemo_(){
+  var out=[], h, p=function(n){ return (n<10?'0':'')+n; };
+  for(h=9;h<23;h++){
+    if(h>=14 && h<16) continue;
+    out.push({k:'h'+p(h), txt:p(h)+':00'});
+  }
+  return out;
+}
+
 function _semanaDemo_(ahora){
   var hoy = ahora ? new Date(+ahora) : new Date();
   var mas = function(b, n){ return new Date(b.getFullYear(), b.getMonth(), b.getDate() + n); };
@@ -3995,7 +4153,17 @@ function _normAbre_(abre){
 function _plazoAbierto_(limite, ahora){
   var s = _normLimite_(limite);
   if (!s) return true;
-  return s >= (ahora || _ahoraLocalISO_());
+  return s >= (ahora || _ahoraApp_());
+}
+
+/* ⛔⛔ EL «AHORA» DE LA APP — el mismo día que `HOY` (858.ª).
+   En la maqueta local `HOY` es el 24/07/2026 (`_hoyTxt_`), y `_plazoTxt_` cuenta desde él: la tarjeta
+   decía «cierra en 2 días»… y debajo «El plazo cerró · 26/07/2026», porque `_plazoAbierto_` miraba el
+   reloj REAL. Dos relojes en la misma tarjeta (visto con `mirar_app.js movil`, 15/10).
+   ✅ Publicado no cambia nada: fuera de la maqueta es `_ahoraLocalISO_` tal cual. */
+function _ahoraApp_(d){
+  var a = _ahoraLocalISO_(d);
+  return _demoLocal_() ? _dmyAISO_(_hoyTxt_(d)) + a.slice(10) : a;
 }
 
 /* ⛔⛔ CUÁNTAS FRANJAS SE TE EXIGEN — y por qué esto vive en una sola puerta.
@@ -4194,6 +4362,122 @@ function _minTurno_(cv){
   return (typeof m==='number' && m>0) ? m : _minHorasTurno_();
 }
 
+/* ⛔⛔ LOS TRAMOS CONTIGUOS — espejo de `reglas/turnos.py:tramos`. Existe porque el HUECO
+   DE LA COMIDA parte el día en dos. Daniel (14/10/2026): *«de dos a cuatro, no haya
+   turnos»*. Con `h09..h13` y `h16..h22`, contar POSICIONES en la lista hace que tocar las
+   13:00 marque `[h13, h16, h17, h18]`: cuatro casillas, cuatro horas… y un agujero de DOS
+   en medio. Nadie puede hacer ese turno y **no da ningún error** — sale un turno partido
+   en el reparto y nadie sabe por qué.
+   ⛔ Dos claves van en el MISMO tramo salvo que las dos sean horarias y no sean
+   consecutivas. Escrito al revés a propósito: con `m`/`t` no hay hora que leer, sale UN
+   tramo y el bloque se comporta igual que antes.
+   ⚠️ TODO EN ES3, sin `indexOf` de array ni `map`: el arnés de `probar_turnos.py` corre
+   esta función con `cscript` (JScript), que no los lleva. La hora se lee carácter a
+   carácter por lo mismo. */
+function _tramosFranja_(claves){
+  var out=[], act=[], prev=null, i, s, h;
+  for(i=0;i<(claves||[]).length;i++){
+    s=String(claves[i]==null?'':claves[i]); h=null;
+    if(s.length===3 && s.charAt(0)==='h' && s.charAt(1)>='0' && s.charAt(1)<='9'
+       && s.charAt(2)>='0' && s.charAt(2)<='9') h=parseInt(s.charAt(1)+s.charAt(2),10);
+    if(act.length && prev!==null && h!==null && h!==prev+1){ out.push(act); act=[]; }
+    act.push(claves[i]);
+    prev=h;
+  }
+  if(act.length) out.push(act);
+  return out;
+}
+
+/* ⛔⛔ UN DEDO PINTA · DOS DEDOS DESLIZAN (746.ª, 14/10/2026).
+
+   🗣️ Daniel: *«tal vez la solución sería que para deslizar que lo hagas con los DOS DEDOS a la
+   vez. Y que lo ponga escrito en algún lugar… La solución de la app NO es que no se deslice…
+   Deslizar para las reuniones va a ser completamente OBLIGATORIO… el problema es que NO SE PODÍA
+   deslizar»*.
+
+   ⛔ **Se hace en JS y no con `touch-action`.** El asa de `.rc.rd` (`pan-y`) existe desde el
+   13/10 y **no funciona**: por la especificación, el `touch-action` efectivo es la
+   **intersección** del elemento y **sus ancestros**, y su padre `.rej` dice `none` → vacía.
+   Delegar en el navegador obliga a quitarle el `none` al padre, y eso **mata el pintado por
+   arrastre** — que es justo lo que él dijo que no. En JS el padre deja de mandar.
+
+   ✅ **Y un segundo motivo, de verificación**: un gesto **nativo** no se dispara con eventos
+   sintéticos, así que sería una capacidad imposible de probar sin un dedo humano. Hecha en JS se
+   mide con `PointerEvent`s.
+
+   ⛔ **Al entrar el SEGUNDO dedo se ABORTA el trazo**, no se deja a medias: el primer dedo ya ha
+   pintado algo en el `pointerdown`, y quien pone dos dedos quería deslizar, no pintar. Por eso
+   `alAbortar` existe y por eso quien llama tiene que saber deshacerlo — en Turnos con una copia
+   de las celdas, en Reuniones basta con tirar la previsualización, que aún no ha confirmado nada.
+
+   ⚠️ **Y no se vuelve a pintar hasta que se levantan TODOS los dedos.** Levantar uno de los dos
+   dejaría al que queda pintando en mitad de un gesto de deslizar, que es peor que no deslizar.
+
+   ⚠️ El que desliza se **busca**, no se cablea: es el ancestro con `overflow-y` desbordado. En
+   el móvil hoy es `#main`, pero cablearlo ata esta función a una cara y a un maquetado. */
+function _dosDedos_(rej, alAbortar){
+  var act = {}, n = 0, desl = false, cx = 0, cy = 0, scr = null, wrap = rej.parentElement;
+  var buscarScroller = function(){
+    var p = rej.parentElement;
+    while(p && p !== document.body){
+      var ov = getComputedStyle(p).overflowY;
+      if((ov === 'auto' || ov === 'scroll') && p.scrollHeight > p.clientHeight + 1) return p;
+      p = p.parentElement;
+    }
+    return document.scrollingElement || document.documentElement;
+  };
+  var centro = function(){
+    var sx = 0, sy = 0, m = 0, k;
+    for(k in act){ if(act.hasOwnProperty(k)){ sx += act[k].x; sy += act[k].y; m++; } }
+    return m ? {x: sx / m, y: sy / m} : null;
+  };
+  rej.addEventListener('pointerdown', function(e){
+    if(act[e.pointerId]) return;
+    act[e.pointerId] = {x: e.clientX, y: e.clientY}; n++;
+    if(n < 2) return;
+    /* El segundo dedo: se deja de pintar, se deshace lo del primero y se desliza. */
+    if(!desl){ desl = true; scr = buscarScroller();
+               if(typeof alAbortar === 'function') alAbortar(); }
+    var c = centro(); if(c){ cx = c.x; cy = c.y; }
+  });
+  rej.addEventListener('pointermove', function(e){
+    if(!act[e.pointerId]) return;
+    act[e.pointerId].x = e.clientX; act[e.pointerId].y = e.clientY;
+    if(!desl || n < 2) return;
+    var c = centro(); if(!c) return;
+    /* El contenido sigue al dedo: subir el dedo baja el contenido. */
+    if(scr) scr.scrollTop -= (c.y - cy);
+    if(wrap) wrap.scrollLeft -= (c.x - cx);
+    cx = c.x; cy = c.y;
+  });
+  var suelta = function(e){
+    if(!act[e.pointerId]) return;
+    delete act[e.pointerId]; n--;
+    if(n <= 0){ n = 0; desl = false; }
+  };
+  rej.addEventListener('pointerup', suelta);
+  rej.addEventListener('pointercancel', suelta);
+  return { deslizando: function(){ return desl; }, dedos: function(){ return n; } };
+}
+
+/* Una copia de las celdas marcadas, para poder DESHACER un trazo abortado. ⚠️ Plana a
+   propósito: `_convPintar_` asigna y borra ENTRADAS enteras, nunca toca un valor por dentro,
+   así que copiar las referencias basta y no hay que serializar nada. */
+function _copiaCeldas_(o){
+  var out = {}, k;
+  for(k in (o || {})){ if(o.hasOwnProperty(k)) out[k] = o[k]; }
+  return out;
+}
+
+/* Devuelve `dst` a como estaba, **sin cambiar de objeto**: quien lo tenga guardado (la
+   convocatoria viva) tiene que ver la vuelta atrás. */
+function _restaurarCeldas_(dst, src){
+  var k;
+  for(k in dst){ if(dst.hasOwnProperty(k)) delete dst[k]; }
+  for(k in (src || {})){ if(src.hasOwnProperty(k)) dst[k] = src[k]; }
+  return dst;
+}
+
 function _bloqueDesde_(franjas, k, minimo){
   var claves=[], i;
   for(i=0;i<(franjas||[]).length;i++){
@@ -4203,9 +4487,16 @@ function _bloqueDesde_(franjas, k, minimo){
   var pos=-1;
   for(i=0;i<claves.length;i++) if(claves[i]===k) pos=i;
   if(pos<0) return [];
-  if(!(minimo>1) || claves.length<minimo) return [k];
-  var ini=Math.min(pos, claves.length-minimo);
-  return claves.slice(ini, ini+minimo);
+  if(!(minimo>1)) return [k];
+  /* ⛔ EL MÍNIMO, EL ANCLAJE Y EL «no caben» SE MIDEN SOBRE EL TRAMO, no sobre la lista:
+     con el hueco puesto, `claves.length` dice 12 y el tramo de la mañana tiene 5. */
+  var tr=_tramosFranja_(claves), t=null, j;
+  for(i=0;i<tr.length;i++){ for(j=0;j<tr[i].length;j++) if(tr[i][j]===k) t=tr[i]; }
+  if(!t || t.length<minimo) return [k];
+  var p=-1;
+  for(j=0;j<t.length;j++) if(t[j]===k) p=j;
+  var ini=Math.min(p, t.length-minimo);
+  return t.slice(ini, ini+minimo);
 }
 
 /* Quien FIRMA un parte enrutado a esa unidad, contando que nadie decide lo suyo.
@@ -4461,6 +4752,58 @@ function _convQuedan_(cv, ahora){
 /* Las clases de estado que puede llevar una celda, sacadas de la convocatoria. Cablearlas
    haría que un sitio nuevo dejara restos de la clase anterior al repintar. */
 function _convClases_(cv){ return (cv.sitios||[]).concat(['ambos','no']); }
+
+/* GEMELA de `reglas/turnos.py:clave`. El separador se prueba contra el de Python en
+   `rutinas/probar_turnos.py` §12: si alguien cambia uno, el banco lo canta.
+   ⚠️ Vivía en `turnos.movil.js`; se mudó aquí en la 949.ª con `_convDeClave_` y `_reusarDispo_`, porque el
+   escritorio también reutiliza la semana anterior y no carga ese fichero. */
+function _convClave_(dia, franja){ return dia+'|'+franja; }
+
+/* La otra mitad de la puerta: DESCOMPONER la clave. Vive pegada a `_convClave_` y el separador
+   lo saca de ELLA — escribirlo aquí otra vez sería tener el formato en dos sitios, que es justo
+   lo que `_convClave_` existe para impedir: el día que uno cambie, el otro deja de casar y la
+   respuesta DESAPARECE sin dar error. */
+function _convDeClave_(k){
+  var sep=_convClave_('',''), s=String(k), i=s.indexOf(sep);
+  return i<0 ? [s, ''] : [s.slice(0,i), s.slice(i+sep.length)];
+}
+
+/* ⭐ REUTILIZAR LA DISPONIBILIDAD DEL TURNO ANTERIOR (932.ª). 🗣️ Daniel, 14/10: *«que haya una opción clara que
+   ponga reutilizar disponibilidad del turno anterior (se puede editar)»*.
+   Lo que se marcó la semana anterior cae en el MISMO día de la semana de ésta (+7 días), en la misma franja,
+   con su sitio y su coche. Lo que no cabe —una franja que esta semana no existe, un sitio que no se ofrece—
+   se CUENTA en `fuera`, no se inventa ni se acerca a lo más parecido. Pura: no toca nada. */
+function _reusarDispo_(cv, previas){
+  var dias=cv.dias||[], fr={}, cl={}, out={}, n=0, fuera=0;
+  (cv.franjas||[]).forEach(function(f){ fr[f.k]=1; });
+  _convClases_(cv).forEach(function(c){ cl[c]=1; });
+  Object.keys(previas||{}).forEach(function(k){
+    var p=_convDeClave_(k), v=previas[k], d=_isoMasDias_(p[0], 7);
+    if(!v || !v.s || !d || dias.indexOf(d)<0 || !fr[p[1]] || !cl[v.s]){ fuera++; return; }
+    out[_convClave_(d, p[1])] = (v.s==='no') ? {s:'no'} : {s:v.s, c:!!v.c};
+    n++;
+  });
+  return {mapa:out, n:n, fuera:fuera};
+}
+
+/* Lo que comparten las dos caras al reutilizar (949.ª): pedir TU disponibilidad de la semana anterior
+   (`getConvocatoria(semana)` resuelve por `semana_ini`) y encajarla en ésta. Devuelve lo de `_reusarDispo_`, o
+   `null` después de DECIR por qué no: sin conexión, sin respuesta, nada marcado, nada que quepa.
+   Qué se hace con lo copiado lo decide cada cara: el móvil lo guarda al momento; el escritorio lo deja SIN
+   GUARDAR hasta que se pulsa «Guardar», que es como funciona esa cara. */
+async function _traerSemanaAnterior_(cv){
+  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getConvocatoria){
+    tost('Sin conexión no se puede traer la semana anterior.'); return null;
+  }
+  var sem=_isoMasDias_(cv.semana_ini || cv.semana || (cv.dias||[])[0], -7), r;
+  try{ r=await api.getConvocatoria(sem); }
+  catch(e){ tostErr('No se pudo traer la semana anterior: ', e); return null; }
+  var prev=(r && r.convocatoria && r.mias) || {};
+  if(!Object.keys(prev).length){ tost('La semana anterior no marcaste nada: no hay qué reutilizar.'); return null; }
+  var res=_reusarDispo_(cv, prev);
+  if(!res.n){ tost('Lo de la semana anterior no cabe en esta rejilla: otras horas u otros sitios.'); return null; }
+  return res;
+}
 
 /* Y el RÓTULO de cada una. Vive aquí, pegado a `_convClases_`, porque son **la misma
    decisión** —qué se puede contestar esta semana— y tenerlas separadas es exactamente cómo
@@ -5072,10 +5415,10 @@ function _pasosSustituirDoc_(e, yo){
   var ref = e.ref || 'la referencia de este expediente';
   var url = _urlFormDocs_();
   return [
-    { n:1, t:'Manda la version nueva por el formulario, marcada como «sustituye a»',
-      d:'Ahi pones la referencia de este: ' + ref + '. Es un envio NUEVO: crea su propio '+
-        'expediente y vuelve a pasar por revision. Al reves que corregir: aqui NO se reutiliza '+
-        'la misma referencia, porque este ya esta publicado y no se toca.',
+    { n:1, t:'Manda la versión nueva por el formulario, marcada como «sustituye a»',
+      d:'Ahí pones la referencia de este: ' + ref + '. Es un envío NUEVO: crea su propio '+
+        'expediente y vuelve a pasar por revisión. Al revés que corregir: aquí NO se reutiliza '+
+        'la misma referencia, porque este ya está publicado y no se toca.',
       url: (url && url.indexOf('http') === 0) ? url : '',
       /* El respaldo vive en la PUERTA, no en una cara: es la misma leccion del 19/08 que
          dejo al escritorio mandando al formulario sin decir a quien pedir el enlace. */

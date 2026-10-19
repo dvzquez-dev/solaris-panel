@@ -402,6 +402,20 @@ function _mitPlazoTxt_(cv, ahora){
    capa, no la primera — y el botón no se pinta.
    ⚠️ `_mitPlazoTxt_` NO vale de subtítulo: mide contra `limite`, y en `sin_abrir` rotula «te
    quedan N h para contestar» cuando **no se puede contestar nada**. */
+/* ⛔ EL RÓTULO DE UNA FRANJA DE LA REJILLA DE TURNOS (19/10). 🗣️ Daniel, 14/10: *«las horas… tanto
+   en reuniones como en turnos como en lo que sea, han de aparecer justo en el medio de dos slots …
+   No están ni para arriba ni para abajo»*. El móvil lo cumple desde ese día (`.rc.rd span`); aquí
+   `.dmc` centraba «10:00» DENTRO de su casilla de 36 px, que es justo lo que rechazó.
+   Sólo una HORA (`HH:MM`) se sube a la línea: un rótulo que no es una hora («Mañana») nombra la
+   franja entera y se queda centrado en ella. Una puerta y no tres copias: la rejilla sale en tres
+   pantallas (antes de abrir, la tuya y la del coordinador). */
+function _rotFranjaE_(txt){
+  var t = String(txt == null ? '' : txt);
+  return /^\d{1,2}:\d{2}$/.test(t)
+    ? '<div class="dmc dml dmh"><span>' + esc(t) + '</span></div>'
+    : '<div class="dmc dml">' + esc(t) + '</div>';
+}
+
 function _miTurnoPreHTML_(cv){
   var D=cv.dias||[], F=cv.franjas||[];
   /* ⛔ POR `_normAbre_` (463.ª): con `_dmyAISO_` a pelo, un `abre` sin hora —o en
@@ -414,7 +428,7 @@ function _miTurnoPreHTML_(cv){
     return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
   }).join('');
   var filas=F.map(function(fr){
-    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+
+    return _rotFranjaE_(fr.txt)+
       D.map(function(){ return '<div class="dcel off"></div>'; }).join('');
   }).join('');
   return pan('Tu disponibilidad', 'se abre el '+esc(abD)+' a las '+esc(abH),
@@ -452,7 +466,7 @@ function _miTurnoPanel_(){
   }).join('');
   var COL={cuvi:'rgba(228,30,37,.78)', citi:'rgba(63,158,214,.78)', ambos:'rgba(53,199,89,.78)'};
   var filas=F.map(function(fr){
-    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+D.map(function(d){
+    return _rotFranjaE_(fr.txt)+D.map(function(d){
       var k=_dispClave_(d,fr.k), v=mias[k];
       var st = (v && v.s && v.s!=='no') ? ('background:'+(COL[v.s]||'rgba(228,30,37,.78)')) : '';
       return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" '+
@@ -468,6 +482,7 @@ function _miTurnoPanel_(){
       'Elige <b>d\u00f3nde puedes</b> y haz clic en los huecos. Lo que marques aqu\u00ed es lo que '+
       'cuenta para el reparto \u2014 y no contestar es lo que hace que te pongan un turno '+
       'cuando no puedes.</p>'+
+    '<button class="btn" data-mtreusar style="display:block;margin:0 0 12px">↺ Reutilizar la disponibilidad del turno anterior</button>'+
     '<div class="dsit">'+pin+'</div>'+
     '<label class="campo" style="margin:9px 0;display:flex;gap:7px;align-items:center">'+
       '<input type="checkbox" data-mtcoche'+(MIT_COCHE?' checked':'')+'>'+
@@ -480,7 +495,30 @@ function _miTurnoPanel_(){
     '</div></div>');
 }
 
+/* ⭐ REUTILIZAR LA SEMANA ANTERIOR, TAMBIÉN AQUÍ (949.ª). La petición de Daniel (14/10) no nombró cara y el móvil
+   ya lo tenía (932.ª); esta cara contesta la misma convocatoria. Lo copiado entra como CAMBIO SIN GUARDAR
+   (`MIT_CELDAS`): aquí nada se guarda hasta pulsar «Guardar mi disponibilidad», y copiar no es la excepción. */
+async function _reusarMiTurno_(cv){
+  if(!cv) return;
+  if(typeof _identidadPrestada_==='function' && _identidadPrestada_(
+       (typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '')){
+    tost('Estás actuando como otra persona: tus turnos no se tocan desde aquí.'); return;
+  }
+  if(_convEstado_(cv)!=='abierta'){ tost('El plazo no está abierto: no hay nada que contestar.'); return; }
+  var res=await _traerSemanaAnterior_(cv); if(!res) return;
+  var mias=_misCeldas_(cv);
+  if(Object.keys(mias).length &&
+     !confirm('Se sustituye lo que llevas marcado esta semana por lo de la anterior. No se guarda hasta que pulses «Guardar». ¿Seguir?')) return;
+  MIT_CELDAS=res.mapa;
+  pintar();
+  tost('Copiada la semana anterior: revísala y pulsa «Guardar mi disponibilidad».'+
+       (res.fuera ? ' ('+res.fuera+' casilla'+(res.fuera===1?' no cabía':'s no cabían')+'.)' : ''));
+}
+
 function _cablearMiTurno_(){
+  $$('[data-mtreusar]').forEach(function(b){
+    b.onclick=function(){ _reusarMiTurno_(_miTurnoCv_()); };
+  });
   $$('[data-mtpin]').forEach(function(b){
     b.onclick=function(){ MIT_PIN=b.dataset.mtpin; pintar(); };
   });
@@ -596,7 +634,7 @@ function _dispPanel_(){
   if(_dispEstadoSrv_() === 'solo mio') return pan('Disponibilidad para turnos',
     'no es tu pantalla',
     vacioSimple('El mapa de todo el equipo es para quien reparte los turnos',
-      'Tu disponibilidad si la puedes contestar, aqui debajo.'));
+      'Tu disponibilidad sí la puedes contestar, aquí debajo.'));
   var cv=_dispViva_(); if(!cv) return '';
   var calor=_calorTurnos_(cv, DISP_SITIO);
   var top=_mejorTurno_(calor);
@@ -612,7 +650,7 @@ function _dispPanel_(){
     return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
   }).join('');
   var filas=F.map(function(fr){
-    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+D.map(function(d){
+    return _rotFranjaE_(fr.txt)+D.map(function(d){
       var k=_dispClave_(d,fr.k), c=calor[k];
       /* El color es la INTENSIDAD del rojo Solaris según cuánta gente puede: el mapa se lee
          de un vistazo y el número exacto está dentro. Con nadie, la celda se queda apagada. */
@@ -895,8 +933,8 @@ function _convocarDispPanel_(){
          dependia de que alguien tocara el codigo. La etiqueta dice lo que CAMBIA
          -«un toque marca 4 h»- y no el nombre del modo, que no le dice nada a nadie. */
       '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px">'+
-        '<input type="checkbox" id="cdHoraria"> preguntar POR HORAS (09:00–22:00); un '+
-        'toque marca el turno de 4 h</label>'+
+        '<input type="checkbox" id="cdHoraria" checked> preguntar POR HORAS '+
+        '(09:00–14:00 y 16:00–23:00); un toque marca el turno de 4 h</label>'+
     '</div>'+
     '<button class="btn" data-convdisp>Convocar disponibilidad</button>'+
     '<div class="nota" id="cdNota">Se encola y la rutina lo recoge en la siguiente pasada. '+

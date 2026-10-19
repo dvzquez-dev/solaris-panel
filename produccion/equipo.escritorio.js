@@ -95,7 +95,8 @@ function colaDecision(){
       s:LOTE.items.length+' personas · Art. '+LOTE.art+' · nada se aplica hasta cerrarlo entero',
       chip:'<span class="chip no">bloque abierto</span>',ir:'sanciones',foco:'lote'});
   REUS.forEach(function(r0){
-    if(r0.fijada) return;
+    /* 950.ª: sólo si te toca a ti fijarla (el convocante, o el PD con la cuenta admin) — ver `_fijarEsMio_`. */
+    if(r0.fijada || !_fijarEsMio_(r0)) return;
     var cob=_cobertura_(r0);
     /* ⛔ REUNION OCULTA: no se sabe cuantos han cubierto, asi que no hay tarjeta. Sin
        esto salia por accidente —`null>=null` es `0>=0`, cierto, y caia en el `return`

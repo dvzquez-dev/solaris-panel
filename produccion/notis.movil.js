@@ -64,12 +64,15 @@ async function _asegurarPush_(msg){
   }
   await navigator.serviceWorker.ready;
   var sub=await reg.pushManager.getSubscription();
-  if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
+  if(!sub){
+    try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)}); }
+    catch(err){ if(msg) msg.textContent=_consejoSuscribir_(err); return false; }
+  }
   if(typeof SESION!=='undefined' && SESION){
     try{ await api.guardarPush(sub.toJSON()); }
     catch(err){
-      if(msg) msg.textContent='El permiso esta dado, pero no se pudo registrar el aviso '+
-        'en el servidor, asi que NO te llegaria nada: '+((err&&err.message)||err);
+      if(msg) msg.textContent='El permiso está dado, pero no se pudo registrar el aviso '+
+        'en el servidor, así que NO te llegaría nada: '+((err&&err.message)||err);
       return false;
     }
   }
@@ -151,8 +154,8 @@ function _notisHTML_(){
      cosa. Va arriba del todo: debajo de los interruptores no lo lee nadie. */
   var _fp=(typeof _pushFallo_==='function') ? _pushFallo_() : null;
   var _avisoFallo = _fp ? '<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">'+
-    '<b>No se pudo confirmar tu registro de avisos</b> la ultima vez que abriste el panel, '+
-    'asi que puede que no te lleguen: '+esc(String(_fp))+'.<br>Cierra y vuelve a abrir; si '+
+    '<b>No se pudo confirmar tu registro de avisos</b> la última vez que abriste el panel, '+
+    'así que puede que no te lleguen: '+esc(String(_fp))+'.<br>Cierra y vuelve a abrir; si '+
     'sigue, avisa.</p></div>' : '';
   /* ⛔⛔ MISMO ORDEN QUE `_faltanNotis_`, Y POR LO MISMO (761.a). Con el viejo, un iPhone
      en Safari leia «Ábrelo en el movil» **sujetando el movil** -- y sin la unica frase que

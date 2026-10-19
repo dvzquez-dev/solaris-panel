@@ -67,18 +67,8 @@ function _cablearMemoria_(){ _cablearVisor_(); }
    lleva coche. Los TRES estados, no dos: es el único acierto de diseño del excel que se
    viene a sustituir, y la diferencia importa porque solo al mudo se le puede insistir. */
 
-/* GEMELA de `reglas/turnos.py:clave`. El separador se prueba contra el de Python en
-   `rutinas/probar_turnos.py` §12: si alguien cambia uno, el banco lo canta. */
-function _convClave_(dia, franja){ return dia+'|'+franja; }
-
-/* La otra mitad de la puerta: DESCOMPONER la clave. Vive pegada a `_convClave_` y el separador
-   lo saca de ELLA — escribirlo aquí otra vez sería tener el formato en dos sitios, que es justo
-   lo que `_convClave_` existe para impedir: el día que uno cambie, el otro deja de casar y la
-   respuesta DESAPARECE sin dar error. */
-function _convDeClave_(k){
-  var sep=_convClave_('',''), s=String(k), i=s.indexOf(sep);
-  return i<0 ? [s, ''] : [s.slice(0,i), s.slice(i+sep.length)];
-}
+/* ⚠️ `_convClave_` y `_convDeClave_` SE MUDARON A `comun.js` en la 949.ª, con `_reusarDispo_`: el escritorio
+   también reutiliza la semana anterior y no carga este fichero. */
 
 /* ⚠️ `_convEstado_`, `_convQuedan_` y `_convClases_` SE MUDARON A `comun.js` el 14/08,
    cuando el escritorio necesito contestar la convocatoria: esta cara no carga
@@ -126,6 +116,28 @@ function _convMias_(cv){
 
 /* Cuántas celdas has marcado y cuántas has dejado en blanco. El segundo número es el que
    importa: en blanco no es «no puedo», es «no has contestado». */
+/* (`_reusarDispo_` y `_traerSemanaAnterior_` viven en `comun.js` desde la 949.ª: las usan las dos caras.) */
+
+/* La acción del botón. Trae TU disponibilidad de la semana anterior (`_traerSemanaAnterior_`, en `comun.js`), la
+   copia en tu rejilla, la GUARDA y repinta: lo copiado queda pintado y se cambia como siempre, con el dedo —
+   «se puede editar» es la mitad de la función. Si ya tenías algo marcado, pregunta antes de SUSTITUIRLO
+   (mezclar dejaría restos de las dos semanas sin que se vea cuáles). */
+async function _reusarConv_(cv, repinta){
+  if(!cv) return;
+  var _prestada=(typeof _identidadPrestada_==='function') && _identidadPrestada_(yoNombre());
+  if(_prestada){ tost('Est\u00e1s viendo la app como otra persona: sus turnos no se tocan desde aqu\u00ed.'); return; }
+  var res=await _traerSemanaAnterior_(cv); if(!res) return;
+  var mias=_convMias_(cv);
+  if(Object.keys(mias).length &&
+     !confirm('Se sustituye lo que llevas marcado esta semana por lo de la anterior. Luego lo puedes cambiar. \u00bfSeguir?')) return;
+  Object.keys(mias).forEach(function(k){ delete mias[k]; });
+  Object.keys(res.mapa).forEach(function(k){ mias[k]=res.mapa[k]; });
+  repinta();
+  _convGuardar_(cv);
+  tost('Copiada la semana anterior. Puedes cambiar lo que quieras: un dedo pinta.'+
+       (res.fuera ? ' ('+res.fuera+' casilla'+(res.fuera===1?' no cab\u00eda':'s no cab\u00edan')+'.)' : ''));
+}
+
 function _convCuenta_(cv){
   var mias=_convMias_(cv), n=0, no=0, coches=0, total=0;
   (cv.dias||[]).forEach(function(d){
@@ -265,10 +277,14 @@ function _convHTML_(cv){
      trozo es el día de la semana y el segundo el número. */
   var cab='<div class="rc rd"></div>'+D.map(function(d){
     var p=String(_diaTxtM_(_isoADMY_(d)||d)||'').split(' ');
-    return '<div class="rc">'+esc(p[0]||'')+'<br>'+esc(String(p[1]||'').slice(0,2))+'</div>';
+    return '<div class="rc" data-tdia="'+esc(d)+'" data-p>'+esc(p[0]||'')+'<br>'+esc(String(p[1]||'').slice(0,2))+'</div>';
   }).join('');
+  /* 🗣️ «Han de aparecer JUSTO EN EL MEDIO DE DOS SLOTS. Porque realmente es donde están. No
+     están ni para arriba ni para abajo»* (Daniel, 14/10). Por eso la hora va en un **span**: sin
+     un elemento no hay nada que anclar a la línea, y empujar la celda entera arrastraría su
+     fondo `sticky` y su borde. Reuniones ya lo hacía así. El anclaje está en `movil.css`. */
   var filas=F.map(function(fr){
-    return '<div class="rc rd">'+esc(fr.txt)+'</div>'+
+    return '<div class="rc rd" data-tfr="'+esc(fr.k)+'" data-p><span>'+esc(fr.txt)+'</span></div>'+
       D.map(function(d){ return _convCelHTML_(cv,d,fr.k); }).join('');
   }).join('');
   return '<div class="tarj" id="convC">'+
@@ -276,10 +292,23 @@ function _convHTML_(cv){
     '<div class="tpin">'+clases.map(function(k){ return pin(k, esc(_convEtiq_(k))); }).join('')+
       '<button data-pin-coche class="coche '+(CONV_COCHE?'on':'')+'" data-p>🚗 con coche</button>'+
     '</div>'+
-    /* 78 px y no 64: «Tarde/noche» no cabe en 64 y, al ser `nowrap` + `flex-end` + `sticky`,
-       se sale por la izquierda y SE CORTA. No lo caza ninguna prueba de DOM —el `textContent`
-       está entero— sino mirar la pantalla. Con 7 días a 34 px mínimos siguen cabiendo 316 px. */
-    '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:78px repeat('+
+    /* 🗣️ «Y que lo ponga escrito en algún lugar» (14/10). Va **encima** de la rejilla y pegado
+       a ella: una instrucción de gesto escrita **debajo** de doce filas la lee quien ya se ha
+       rendido. Y dice las dos mitades, porque la de pintar también hay que descubrirla. */
+    /* 932.ª: sólo con el plazo ABIERTO — en `sin_abrir` no se llega aquí y en `cerrada` no hay qué copiar. */
+    (_convEstado_(cv)==='abierta' ? '<button class="btn full" data-reusar data-p style="margin:4px 0 8px">'+
+      '\u21ba Reutilizar la disponibilidad del turno anterior</button>'+
+      '<p class="rnota" style="margin:-2px 0 10px">Se copia lo que marcaste la semana pasada y lo puedes cambiar.</p>' : '')+
+    '<div class="rgesto">Un dedo <b>pinta</b> · dos dedos <b>deslizan</b></div>'+
+    '<div class="rgesto" data-ratajo>Toca el <b>día</b> para marcarlo entero · la <b>hora</b>, para toda la semana</div>'+
+    /* ⛔ EL CARRIL LO DECIDE `_carrilFranjas_`, y el 78 fijo se fue por esto: decía aquí que
+       «con 7 días a 34 px mínimos siguen cabiendo 316 px». 📏 Medido a 375×812: el sitio donde vive
+       la rejilla mide **311**, no 316 — la cuenta se había hecho contra el ancho de la PANTALLA y
+       no contra el del CONTENEDOR, y por eso el domingo salía cortado. Lo de «Tarde/noche» sigue
+       siendo cierto y por eso la función devuelve 78 cuando la etiqueta es larga: con `nowrap` +
+       `flex-end` + `sticky` se sale por la izquierda y se corta, y eso **no lo caza ninguna prueba
+       de DOM** —el `textContent` está entero—, sino mirar la pantalla. */
+    '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+
       D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
     '<div class="tplazo'+(urge?' urge':'')+'" id="convPie">'+_convPieHTML_(cv)+'</div>'+
     '<p class="rnota" style="margin-top:10px">Hasta el <b>'+esc(lim)+'</b> a las '+esc(hora)+
@@ -303,6 +332,31 @@ function _convHTML_(cv){
    horario de ese día» de las encuestas — la misma situación exacta, y la decisión ya tomada.
    ⚠️ `data-abre` es un asidero **ASCII** para el banco: anclar en la frase la ata a una tilde
    que `cscript` destroza, y a prosa que el propio comentario puede repetir. */
+/* ⛔ EL CARRIL DE LA IZQUIERDA SE MIDE POR LA ETIQUETA MÁS LARGA (745.ª, 14/10).
+
+   📏 **Medido a 375×812 con la rejilla ya horaria**: el carril de la tarjeta mide **311 px**
+   y la rejilla pide **330** (78 + 7×34), así que **desborda 19** y el **domingo sale cortado**. Y
+   como `#convRej` lleva `touch-action:none`, ese desbordamiento **no se desliza con el dedo**:
+   el domingo queda **inalcanzable** en un móvil — y un domingo es un día de taller como otro.
+
+   ⛔ **Los 78 px eran de «Tarde/noche»**, y está escrito tres líneas más abajo: *«78 px y no 64:
+   "Tarde/noche" no cabe en 64 y, al ser `nowrap` + `flex-end` + `sticky`, se sale por la izquierda
+   y SE CORTA»*. Con la etiqueta horaria («09:00», **5** caracteres) ese motivo **ya no existe**, y
+   los 22 px que sobran son **justo los que le faltan al domingo**: 56 + 7×34 = 294 en 311.
+
+   ✅ **Y el criterio es el TEXTO, no «si es horaria»**: lo que tiene que caber es la etiqueta. Así
+   sigue dando 78 el día que se use la tarde partida («Tarde (16:00)») sin tocar nada aquí — que es
+   la misma regla que el resto de esta pantalla: **los datos mandan, no el modo**. */
+function _carrilFranjas_(franjas){
+  var i, t, max = 0;
+  for(i=0;i<(franjas||[]).length;i++){
+    t = franjas[i] && typeof franjas[i]==='object' ? (franjas[i].txt || franjas[i].k) : franjas[i];
+    t = String(t==null ? '' : t);
+    if(t.length > max) max = t.length;
+  }
+  return max > 5 ? 78 : 56;
+}
+
 function _convPreHTML_(cv){
   var D=cv.dias||[], F=cv.franjas||[];
   /* ⛔ POR `_normAbre_` (463.ª): con `_dmyAISO_` a pelo, un `abre` sin hora —o en
@@ -318,13 +372,15 @@ function _convPreHTML_(cv){
     var p=String(_diaTxtM_(_isoADMY_(d)||d)||'').split(' ');
     return '<div class="rc">'+esc(p[0]||'')+'<br>'+esc(String(p[1]||'').slice(0,2))+'</div>';
   }).join('');
+  /* ⚠️ Y aquí igual, que es la misma rejilla antes de abrir: dos formas de pintar la misma
+     etiqueta es como una de las dos se queda vieja. */
   var filas=F.map(function(fr){
-    return '<div class="rc rd">'+esc(fr.txt)+'</div>'+
+    return '<div class="rc rd"><span>'+esc(fr.txt)+'</span></div>'+
       D.map(function(){ return '<div class="tcel off"></div>'; }).join('');
   }).join('');
   return '<div class="tarj" id="convC" data-abre="'+esc(ab)+'">'+
     _convCabHTML_(cv)+
-    '<div class="rejw"><div class="rej" style="grid-template-columns:78px repeat('+
+    '<div class="rejw"><div class="rej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+
       D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
     '<div class="tplazo">Se abre el <b>'+esc(abD)+'</b> a las '+esc(abH)+
       '. Entonces podr\u00e1s pintar tus ratos.</div>'+
@@ -395,6 +451,44 @@ function _convPintar_(cv, k){
     if(igual) delete mias[kk]; else mias[kk]=quiere;
   });
   return !igual;
+}
+
+/* ⭐ LOS ATAJOS DE UN TOQUE (935.ª). 🗣️ Daniel, 14/10: *«Debería ser fácil marcar muchos bloques de golpe… Piensa
+   que la gente lo va a tener que cubrir mucho»*. Con 84 casillas a la semana, tocar la CABECERA de un día lo marca
+   entero, y tocar la HORA la marca en los siete días (`docs/decisiones-app.md`, «bloques de una hora»).
+   Esta función sólo dice QUÉ casillas; pintarlas es de `_convAtajo_`. Con la hora se toma el bloque que marcaría un
+   toque en esa casilla (`_bloqueDesde_`), en cada día: una hora suelta no es disponibilidad para nada, y el atajo no
+   puede querer decir otra cosa que el toque. Un día o una franja que esta semana no existen dan `[]`, no una fila
+   inventada. */
+function _convClavesAtajo_(cv, dia, fk){
+  var F=cv.franjas||[], D=cv.dias||[], out=[];
+  if(dia){
+    if(D.indexOf(dia)<0) return out;
+    F.forEach(function(f){ out.push(_convClave_(dia, f.k)); });
+    return out;
+  }
+  var bloque=_bloqueDesde_(F, fk, _minTurno_(cv));
+  D.forEach(function(d){ bloque.forEach(function(k){ out.push(_convClave_(d, k)); }); });
+  return out;
+}
+
+/* Pinta esas casillas con el pincel activo y la MISMA regla que `_convPintar_`: si TODAS dicen ya lo que dice el
+   pincel, el toque las BORRA — sin eso un atajo no tiene vuelta atrás. ⛔ «Todas», no «alguna»: con media fila
+   marcada el toque COMPLETA la fila; borrar lo que ya estaba castigaría a quien sólo quería rellenar el resto.
+   Devuelve 'marca', 'borra' o `null` (nada que tocar). */
+function _convAtajo_(cv, claves){
+  if(!claves || !claves.length) return null;
+  var mias=_convMias_(cv);
+  var no = CONV_PINCEL==='no';
+  var todas = claves.every(function(k){
+    var v=mias[k];
+    return !!v && v.s===CONV_PINCEL && (no || !!v.c===!!CONV_COCHE);
+  });
+  claves.forEach(function(k){
+    if(todas) delete mias[k];
+    else mias[k] = no ? {s:'no'} : {s:CONV_PINCEL, c:!!CONV_COCHE};
+  });
+  return todas ? 'borra' : 'marca';
 }
 
 /* ═══ LA CONVOCATORIA VIENE DEL SERVIDOR (v64) ═════════════════════════════════════
@@ -534,10 +628,32 @@ function _engConv_(){
   });
   var bc=$('#convC [data-pin-coche]');
   if(bc) bc.onclick=function(){ CONV_COCHE=!CONV_COCHE; bc.classList.toggle('on', CONV_COCHE); };
+  var br=$('#convC [data-reusar]');
+  if(br) br.onclick=function(){ _reusarConv_(cv, repinta); };
   /* Pintar a dedo y de arrastre, como en reuniones. ⚠️ `setPointerCapture` LANZA si el puntero
      no es suyo, y al lanzar aborta el resto del manejador: va envuelto (ya pasó en el pintor). */
-  var pintando=false;
+  var pintando=false, antes=null;
+  /* ⛔⛔ EL GESTO VA ENGANCHADO **ANTES** QUE EL PINTOR, y no es un detalle de orden: los dos
+     escuchan en el MISMO elemento, así que corren en el orden en que se registran. Si el
+     pintor fuera primero, el `pointerdown` del segundo dedo **pintaría una celda** antes de que
+     nadie supiera que vienen dos dedos — y el usuario vería una marca por querer deslizar.
+     ✅ `alAbortar` deshace lo que el PRIMER dedo ya había pintado: `_convPintar_` escribe en el
+     `pointerdown`, no al soltar, así que sin esto el trazo abortado se queda puesto. */
+  var dd=_dosDedos_(rej, function(){
+    if(antes) _restaurarCeldas_(_convMias_(cv), antes);
+    antes=null; pintando=false; repinta();
+  });
+  /* Los atajos (935.ª) van por `onclick`: es un TOQUE, y el navegador no lo dispara tras arrastrar. Mismo guardia de
+     plazo que el pintor, y se guarda igual que al soltar el dedo. */
+  $$('#convRej [data-tdia], #convRej [data-tfr]').forEach(function(h){
+    h.onclick=function(){
+      if(dd.deslizando() || _convEstado_(cv)!=='abierta') return;
+      if(!_convAtajo_(cv, _convClavesAtajo_(cv, h.dataset.tdia||'', h.dataset.tfr||''))) return;
+      repinta(); _convGuardar_(cv);
+    };
+  });
   rej.addEventListener('pointerdown', function(e){
+    if(dd.deslizando()) return;
     var el=e.target.closest('[data-tk]'); if(!el) return;
     /* ⛔ ESTE GUARDIA ES LA TERCERA CAPA, NO LA PRIMERA (456.ª — corregido MIDIENDO).
        Escribí aquí que «ahora manda» y era **falso**: `_convPreHTML_` no pinta
@@ -568,11 +684,17 @@ function _engConv_(){
        cerrar `Codigo.gs:_guardarDisponibilidad_`, no al revés. Ficha en `pendientes.md`. */
     if(_convEstado_(cv)!=='abierta') return;
     pintando=true;
-    try{ rej.setPointerCapture(e.pointerId); }catch(_){}
+    /* ⚠️ LA COPIA SE SACA ANTES DE PINTAR, que es la única forma de poder deshacerla. Es
+       **plana** porque `_convPintar_` asigna y borra entradas enteras. */
+    antes=_copiaCeldas_(_convMias_(cv));
+    /* ⛔ Y NO SE CAPTURA EL PUNTERO: con captura, el `pointerdown` del SEGUNDO dedo se
+       entrega al elemento capturado igual, pero los `pointermove` del segundo **dejan de
+       llegar** en algunos navegadores y el centroide se queda quieto. El pintor ya no la
+       necesita: `pointermove` resuelve la celda con `elementFromPoint`. */
     _convPintar_(cv, el.dataset.tk); repinta();
   });
   rej.addEventListener('pointermove', function(e){
-    if(!pintando) return;
+    if(dd.deslizando() || !pintando) return;
     var el=document.elementFromPoint(e.clientX, e.clientY);
     el=el&&el.closest?el.closest('[data-tk]'):null;
     if(!el||el._ult===CONV_PINCEL+CONV_COCHE) return;
@@ -584,7 +706,7 @@ function _engConv_(){
        fila entera son 14 celdas. `pintando` lo vigila para no guardar en un `pointerup`
        que no venía de pintar nada. */
     if(pintando) _convGuardar_(cv);
-    pintando=false;
+    pintando=false; antes=null;
     $$('#convC [data-tk]').forEach(function(x){ x._ult=null; });
   };
   rej.addEventListener('pointerup', fin);

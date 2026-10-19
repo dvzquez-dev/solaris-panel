@@ -136,10 +136,7 @@ function convocarReunionPanel(){
   var subs={}; _activos_().forEach(function(m){ if(m.unidad) subs[m.unidad]=1; });
   var chipsSub=Object.keys(subs).sort().map(function(u){
     return '<button type="button" class="pick" data-csub="'+esc(u)+'">'+esc(u)+'</button>'; }).join('');
-  var pool=_activos_().slice().sort(function(a,b){ return String(a.pila).localeCompare(String(b.pila)); });
-  var chips=pool.map(function(m){
-    return '<button type="button" class="pick'+(CONV_INV.has(m.nombre)?' on':'')+'" data-cinv="'+esc(m.nombre)+'">'+
-      esc(m.pila)+'</button>'; }).join('');
+  var chips=_poolPicksE_(CONV_INV, 'data-cinv');
   return pan('Convocar reunión','sale el mapa de disponibilidad',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
@@ -582,11 +579,25 @@ function _miDispoPanel_(r){
   _paso=Math.max(15, Math.min(60, _paso||60));
   var _eje=[]; for(var _t=_t0; _t<_t1; _t+=_paso) _eje.push(_t);
   var COL=['transparent','var(--tel)','var(--red)'];
-  var g='<div class="heat"><div class="hg" style="grid-template-columns:auto repeat('+_eje.length+',minmax(20px,1fr))">';
-  g+='<div class="hc"></div>';
-  _eje.forEach(function(t){ g+='<div class="hc rh">'+((t%60===0)?'<span>'+pad(Math.floor(t/60)%24)+'</span>':'')+'</div>'; });
+  /* 🗣️ Daniel: *«las horas en las filas, los dias en las columnas»*. Girada igual que
+     la del movil: no dijo «solo en el movil», y dos caras que ordenan la MISMA rejilla al
+     reves es la asimetria del §3c-9.
+     ⛔ Y las celdas se colocan EXPLICITAS: al girar, la fusion pasa de `span` de columnas
+     a `span` de FILAS, y con el flujo implicito una celda que ocupa varias filas
+     descoloca todo lo que venga detras. */
+  var g='<div class="heat"><div class="hg vert" style="grid-template-columns:28px repeat('+r.dias.length+',minmax(20px,1fr));grid-template-rows:auto repeat('+_eje.length+',13px)">';
+  g+='<div class="hc" style="grid-column:1;grid-row:1"></div>';
   r.dias.forEach(function(d,di){
-    g+='<div class="hc rd">'+d+'</div>';
+    g+='<div class="hc rhd" style="grid-column:'+(di+2)+';grid-row:1">'+d+'</div>';
+  });
+  /* La hora va al limite SUPERIOR de su fila -- el mismo criterio que estaba escrito
+     para el eje horizontal (al limite izquierdo = hora de inicio), girado. */
+  _eje.forEach(function(t,ix){
+    if(t%60!==0) return;
+    g+='<div class="hc rh" style="grid-column:1;grid-row:'+(ix+2)+'"><span>'+
+      pad(Math.floor(t/60)%24)+'</span></div>';
+  });
+  r.dias.forEach(function(d,di){
     var ix=0;
     while(ix<_eje.length){
       /* que franja ofertada cubre este instante de este dia */
@@ -607,7 +618,8 @@ function _miDispoPanel_(r){
         if(fi2!==fi) break;
         k++;
       }
-      var geo='grid-column:span '+k;
+      /* columna FIJA (el dia) y `span` de FILAS (los pasos del eje de tiempo). */
+      var geo='grid-column:'+(di+2)+';grid-row:'+(ix+2)+'/span '+k;
       if(fi<0){ g+='<div class="cel" style="'+geo+';background:transparent"></div>'; }
       else{
         var bi=pos[di+'_'+fi], v=+vals[bi]||0;
@@ -692,7 +704,8 @@ function _cablearMiDispo_(){
          haber entrado un refresco, y el plazo vence solo. Una guarda que solo vive en el
          pintado es un rotulo -- la que decide se pregunta al PULSAR. */
       if(!_plazoAbierto_(r.limite)){
-        tost('El plazo cerr\u00f3 el '+_plazoTxt_(r.limite)+': el servidor ya no acepta respuestas.');
+        /* 928.ª: `_plazoTxt_` ya dice «el plazo cerró el …»; con el prefijo salía repetido. */
+        tost('Ya no se aceptan respuestas: '+_plazoTxt_(r.limite)+'.');
         return;
       }
       var vals=_misValores_(r);
@@ -740,6 +753,26 @@ function _cablearMiDispo_(){
    móvil, que no lo tiene, y deja sin borrar una reunión cancelada después de fijarse. Se
    **avisa** en el `confirm` y decide quien la convocó. */
 
+/* ¿PUEDE FIJARLA DESDE ESTE BOTÓN? (960.ª) — `_fijarReunion_` y `_borrarReunion_` exigen LO MISMO (el convocante o la
+   cuenta admin), así que es la misma regla y no una copia: con la SESIÓN, porque es un botón que habla con el servidor.
+   Hasta aquí «Fijar» y «Cancelar fijado» salían activos a un coordinador sobre reuniones que no convocó. */
+function _puedeFijarReuE_(r){
+  return _puedeBorrarReuE_(r);
+}
+
+/* ⛔ ¿TE TOCA FIJARLA? (950.ª) — para «Requiere tu decisión». La regla es la del BACKEND: `_fijarReunion_`
+   contesta «solo el convocante o admin pueden fijar la fecha». A un coordinador le salían ahí la general y la
+   junta «sin fijar»: una lista que se llama «tu decisión» y pide lo que el servidor va a negar enseña a no leerla.
+   ⚠️ La identidad es `ACTOR`, como el resto de esa lista (y NO la sesión, al revés que `_puedeBorrarReuE_`, que
+   gatea un BOTÓN): con «Actúas como» se ve lo que vería esa persona. Por eso la cuenta admin cuenta sólo cuando
+   `ACTOR` es el PD — que es quien la tiene —, no cuando el admin está mirando como otro. */
+function _fijarEsMio_(r){
+  var yo=(typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '';
+  if(!yo || !r) return false;
+  if(r.convocante && yo===String(r.convocante)) return true;
+  return yo===String(PD_NOM) && typeof esAdmin==='function' && !!esAdmin();
+}
+
 /* ⛔ ¿PUEDE BORRAR ESTA REUNIÓN? Es la regla del BACKEND —`_borrarReunion_` exige convocante o
    admin, **no rango**— porque un botón que ofrece lo que el servidor va a negar es peor que no
    tenerlo.
@@ -776,6 +809,52 @@ function _borrarReuBoxE_(r){
       ' <b>No se puede deshacer.</b></div></div>';
 }
 
+/* ⭐ LA CUADRÍCULA DE PERSONAS, UNA SOLA VEZ (818.a): un botón `pick` por persona activa, ordenado por
+   nombre de pila, encendido si está en `set`. `attr` = el atributo que lleva el nombre (`data-cinv` al
+   convocar, `data-einv` al editar los convocados). Antes vivía dentro de `convocarReunionPanel`. */
+function _poolPicksE_(set, attr){
+  return _activos_().slice().sort(function(a,b){ return String(a.pila).localeCompare(String(b.pila)); })
+    .map(function(m){
+      return '<button type="button" class="pick'+(set.has(m.nombre)?' on':'')+'" '+attr+'="'+esc(m.nombre)+'">'+
+        esc(m.pila)+'</button>'; }).join('');
+}
+
+/* ⭐ EDITAR LOS CONVOCADOS (818.a; el móvil es la 817.a). Mismas reglas, escritas en
+   `docs/decisiones-app.md`: sólo quien convoca o un admin (`_puedeBorrarReuE_`), se parte de
+   `r.invitados` TAL COMO LO SIRVE el backend, y sin esa lista no se ofrece — guardar desde una lista
+   incompleta borraría a quien no saliera en ella. `RE_INV` (en `escritorio.html`) guarda lo que se
+   está editando y se rehace al cambiar de reunión (`RE_INV_ID`). */
+function _convocadosBoxE_(r){
+  if(!r || !_puedeBorrarReuE_(r)) return '';
+  var inv = Array.isArray(r.invitados) ? r.invitados.filter(function(n){ return !!n; }) : [];
+  if(!inv.length) return '<div class="nota" style="margin-top:14px">Esta reuni\u00f3n lleg\u00f3 sin lista de '+
+    'convocados: no se puede editar desde aqu\u00ed.</div>';
+  if(RE_INV_ID!==r.id || !RE_INV){ RE_INV=new Set(inv); RE_INV_ID=r.id; }
+  return '<div style="margin-top:16px">'+
+    '<span class="sc" style="display:block;margin-bottom:5px">Convocados <b id="reInvN">'+RE_INV.size+'</b></span>'+
+    '<div id="reInvPool" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px">'+_poolPicksE_(RE_INV, 'data-einv')+'</div>'+
+    '<button class="btn" data-guardarinv>Guardar convocados</button></div>';
+}
+
+/* LA CELDA «CIERRA» DE CONVOCATORIAS (939.ª). Pintaba el límite crudo: el 15/10 decía «14/10/2026» de un plazo ya
+   cerrado, en una tabla titulada «Reuniones abiertas». Con el plazo pasado dice «cerró el …» (y se apaga); abierta,
+   la fecha en DD/MM/AAAA como siempre; sin límite, «—». La regla de «pasado» es `_plazoAbierto_`, la de toda la app. */
+function _cierraCeldaE_(limite){
+  var s=String(limite==null?'':limite);
+  if(!s || s==='\u2014') return {txt:'\u2014', cls:''};
+  var f=_isoADMY_(_dmyAISO_(s).slice(0,10));
+  return _plazoAbierto_(s) ? {txt:f, cls:''} : {txt:'cerró el '+f, cls:'cerrado'};
+}
+
+/* EL PLAZO DE UNA REUNIÓN EN UNA TARJETA DEL ESCRITORIO (928.ª): el texto (`_plazoTxt_`, el mismo de toda la
+   app) y el chip. Abierta (o sin límite): «N en riesgo» — aún pueden cubrir. Cerrada: «N sin cumplir» — ya no
+   pueden, y es lo que va a sanción. Cuenta los sin cubrir Y los de por debajo del mínimo, como antes. */
+function _plazoReuE_(r){
+  var n=((r && r.sinCubrir) || []).length + ((r && r.bajoMin) || []).length;
+  var abierta=_plazoAbierto_(r && r.limite);
+  return { txt:_plazoTxt_(r && r.limite), chip:n+(abierta?' en riesgo':' sin cumplir'), cls:(n?'no':'ok') };
+}
+
 function _fijarPanel_(){
   if(!REUS.length) return '';
   var opts=REUS.map(function(r,i){
@@ -786,6 +865,13 @@ function _fijarPanel_(){
   var dias=(r.dias||[]).map(function(d,i){ return '<option value="'+i+'">'+esc(d)+'</option>'; }).join('');
   var fr=(r.franjas||[]).map(function(f,i){
     return '<option value="'+i+'">'+esc(_iniF(f))+'</option>'; }).join('');
+  /* ⛔ 927.ª: «Hasta» dice a qué hora ACABA la franja, no a qué hora empieza. Con la misma lista en
+     los dos desplegables la tarjeta arrancaba en «desde 16:00 · hasta 16:00» — se leía como una
+     reunión de cero minutos y era 16:00–17:00. El valor sigue siendo el índice (el manejador de
+     «Fijar» no cambia); sólo cambia lo que se lee. El móvil ya lo decía así (`_hFinFranja_`). */
+  var frFin=(r.franjas||[]).map(function(f,i){
+    return '<option value="'+i+'">'+esc(_hFinFranja_(r,i))+'</option>'; }).join('');
+  var _pf=_puedeFijarReuE_(r);
   return pan('Fijar fecha y orden del día', r.fijada?('fijada · '+esc(r.fijada)):'sin fijar',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
@@ -796,21 +882,25 @@ function _fijarPanel_(){
          minimo es 1 y no se dice nada, que es como se comportaba siempre. */
       (_slotsMin_(r.duracion, r.slot)>1
         ? (' Dura <b>'+_slotsMin_(r.duracion, r.slot)+' franjas</b> ('+_durTxt_(r.duracion)+
-           '), asi que no se puede fijar en menos.') : '')+'</p>'+
+           '), así que no se puede fijar en menos.') : '')+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
       '<label style="flex:2;min-width:190px">'+lab('Reunión')+
         '<select id="reSel" style="'+E+'">'+opts+'</select></label>'+
       '<label style="width:130px">'+lab('Día')+'<select id="reDia" style="'+E+'">'+dias+'</select></label>'+
       '<label style="width:120px">'+lab('Desde')+'<select id="reF0" style="'+E+'">'+fr+'</select></label>'+
-      '<label style="width:120px">'+lab('Hasta')+'<select id="reF1" style="'+E+'">'+fr+'</select></label>'+
-      '<button class="btn pri" data-fijar>Fijar</button>'+
-      (r.fijada?'<button class="btn" data-desfijar style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
+      '<label style="width:120px">'+lab('Hasta')+'<select id="reF1" style="'+E+'">'+frFin+'</select></label>'+
+      '<button class="btn pri" data-fijar'+(_pf?'':' disabled')+'>Fijar</button>'+
+      (r.fijada?'<button class="btn" data-desfijar'+(_pf?'':' disabled')+' style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
     '</div>'+
+    (_pf ? '' : '<p class="mini" style="margin:-4px 0 12px;color:var(--ink3)">La fija quien la convocó'+
+      (r.convocante ? ' (<b>'+esc(_pilaDeM_(r.convocante)||r.convocante)+'</b>)' : '')+
+      ' o la cuenta admin: el servidor no deja a nadie más.</p>')+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
       '<label style="flex:1;min-width:240px">'+lab('Orden del día · enlace o texto')+
         '<input id="reOrden" value="'+esc(r.ordenDia||'')+'" placeholder="https://… o los puntos a tratar" style="'+E+'"></label>'+
       '<button class="btn" data-orden>Guardar orden del día</button>'+
     '</div>'+
+    _convocadosBoxE_(r)+
     _borrarReuBoxE_(r)+
     '</div>');
 }

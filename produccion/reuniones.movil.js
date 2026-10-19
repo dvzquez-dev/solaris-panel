@@ -199,6 +199,12 @@ function _normReuM_(r){
        una casilla y todo se comporta como se comportaba. */
     slot: +r.slot || (F[0] && +F[0].dur) || 60, duracion: +r.duracion || 0,
     calor:calor, pond:pond, nInv:(r.invitados||[]).length,
+    /* ⛔ LOS NOMBRES, no solo cuantos (817.a). Sin ellos no se pueden editar los convocados, y
+       `_fuenteReuM_` devolvia `new Array(nInv)` -un array con HUECOS-: al hidratar, `invitado`
+       (abajo) daba `false` a todos menos al convocante, porque `indexOf` no encuentra a nadie
+       en un array sin nombres. Hoy `invitado` solo se lee al cargar la lista, asi que no mordia;
+       pero era una trampa armada. Lista blanca: lo que no se nombra aqui se pierde. */
+    invitados: Array.isArray(r.invitados) ? r.invitados.slice() : [],
     /* nResp = la cuenta del SERVIDOR (`_listar_`). `_nRespReu_` la necesita para no decir
        'nadie' sobre una reunion sin hidratar justo antes de BORRARLA. Lista blanca: lo que
        no se nombra aqui, se pierde (640.ª). */
@@ -238,7 +244,9 @@ function _fuenteReuM_(R, base, resp, ag){
        es el fallo que ya paso CUATRO veces en este mismo objeto. */
     fecha:R.fecha, creado:R.creado,
     limite:R.limite, convocante:R.convocante, slot:R.slot, duracion:R.duracion,
-    invitados:new Array(R.nInv), resp:resp, nResp:R.nResp,
+    /* ⛔ Los NOMBRES si los hay (817.a); `new Array(nInv)` solo para una reunion que llego sin ellos. */
+    invitados:(Array.isArray(R.invitados) && R.invitados.length) ? R.invitados.slice() : new Array(R.nInv),
+    resp:resp, nResp:R.nResp,
     /* ⛔ `agregado` LO DECIDE EL SERVIDOR Y AQUI SOLO SE ARRASTRA. Volver a aplicar la regla
        («¿es oculta? ¿convoco yo?») serian DOS criterios para la misma pregunta, y acaban
        siendo dos preguntas distintas. Y deducirlo de «no me han llegado filas» tampoco vale:
@@ -359,7 +367,7 @@ function _proxReuHTML_(){
   return '<h2 class="sec">'+rotulo+'<span class="ln"></span></h2>'+
     '<div class="tarj clic" data-ir="reu" data-reuid="'+esc(String(R.id))+'" data-p>'+
     '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
-    '<small>'+cuando+' · '+esc((R.modalidad||'').toUpperCase())+'</small></div>'+
+    '<small>'+cuando+' · '+esc(_modalidadTxt_(R.modalidad).toUpperCase())+'</small></div>'+
     '<div class="d"><span class="pil '+((R.fijada||R.cubierta||R.exento)?'conf':'pend')+'">'+
       (R.fijada?'fijada':(R.exento?'organizas':(R.cubierta?'cubierta':'te falta')))+'</span></div></div></div>';
 }
@@ -490,22 +498,38 @@ function vReu(){
       return -1;
     });
   });
-  var g='<div style="overflow-x:auto;margin:0 2px"><div style="display:grid;gap:2px;grid-template-columns:auto repeat('+eje.length+',minmax(20px,1fr));min-width:280px">';
-  g+='<div></div>';
-  eje.forEach(function(t,ix){
-    /* decision cerrada: la etiqueta va al LIMITE izquierdo = hora de inicio. Con paso fino
-       solo se rotula la hora en punto, o no se leeria nada. */
-    var enPunto=(t%60===0);
-    g+='<div style="position:relative;min-height:15px">'+
-      (enPunto?'<span style="position:absolute;left:0;top:2px;transform:translateX(-50%);'+
-        'font-family:var(--mono);font-size:8.5px;color:var(--ink3)">'+pad(Math.floor(t/60)%24)+'</span>':'')+
-      (ix===eje.length-1?'<span style="position:absolute;right:0;top:2px;font-family:var(--mono);'+
-        'font-size:8.5px;color:var(--ink3)">'+_hhmm(t1).replace(':00','')+'</span>':'')+
-      '</div>';
-  });
+  /* 🗣️ Daniel: *«las horas en las FILAS, los dias en las COLUMNAS; es lo que hace
+     Xoyondo y when2meet»*. Antes el eje de TIEMPO iba en `grid-template-columns` y los
+     dias eran filas: en un telefono eso obliga a deslizar en horizontal para leer la
+     hora, que es justo lo que no cabe.
+     ⛔ Y LAS CELDAS SE COLOCAN A MANO (`grid-column`/`grid-row`), no por flujo: al girar,
+     la fusion pasa de `span` de columnas a `span` de FILAS, y con el flujo implicito una
+     celda que ocupa varias filas descoloca todo lo que venga detras. */
+  var g='<div style="margin:0 2px"><div style="display:grid;gap:2px;grid-template-columns:28px repeat('+R.dias.length+',minmax(20px,1fr));grid-template-rows:auto repeat('+eje.length+',13px)">';
+  g+='<div style="grid-column:1;grid-row:1"></div>';
   R.dias.forEach(function(d,di){
-    g+='<div style="font-family:var(--mono);font-size:9.5px;color:var(--ink2);display:flex;'+
-      'align-items:center;justify-content:flex-end;padding-right:6px">'+d+'</div>';
+    g+='<div style="grid-column:'+(di+2)+';grid-row:1;font-family:var(--mono);'+
+      'font-size:9px;color:var(--ink2);text-align:center;padding-bottom:3px">'+esc(d)+'</div>';
+  });
+  /* ⛔ 19/10: y A CABALLO de ese límite, no debajo (Daniel, 14/10: «justo en el medio de dos slots»):
+     media línea más medio `gap` (2 px) hacia arriba, con `transform` para no tocar la caja del grid.
+     La hora de FIN igual, sobre la raya de abajo de la última fila.
+     La etiqueta de la hora va al LIMITE SUPERIOR de su fila, que es la misma decision
+     que estaba escrita para el eje horizontal (iba al limite izquierdo = hora de inicio)
+     girada 90 grados. Centrarla seria ambiguo: `docs/decisiones-app.md`.
+     Con paso fino solo se rotula la hora en punto, o no se leeria nada. */
+  eje.forEach(function(t,ix){
+    if(t%60!==0) return;
+    g+='<div style="grid-column:1;grid-row:'+(ix+2)+';font-family:var(--mono);'+
+      'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px;'+
+      'line-height:1;transform:translateY(calc(-50% - 1px))">'+pad(Math.floor(t/60)%24)+'</div>';
+  });
+  /* y la hora de FIN, al pie de la ultima fila: cierra el eje igual que antes lo cerraba
+     por la derecha. Sin esto el mapa no dice hasta que hora llega. */
+  g+='<div style="grid-column:1;grid-row:'+(eje.length+2)+';font-family:var(--mono);'+
+    'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px;line-height:1;'+
+    'transform:translateY(calc(-50% - 1px))">'+_hhmm(t1).replace(':00','')+'</div>';
+  R.dias.forEach(function(d,di){
     /* UNA CELDA POR FRANJA, ancha lo que la franja dura. Antes se pintaba una celda por
        INSTANTE del eje y el numero solo en la que arrancaba: con paso de 30 min y franjas
        de una hora salia «3 · 3 · 3 ·», y parecia que en la mitad de los huecos no podia
@@ -514,7 +538,10 @@ function vReu(){
     while(ix<eje.length){
       var fi=cubre[di][ix], k=1;
       while(ix+k<eje.length && cubre[di][ix+k]===fi) k++;      // hasta donde llega esta franja
-      var geo='grid-column:span '+k+';height:21px;border-radius:2px';
+      /* ⛔ `span` DE FILAS y columna FIJA, y los dos dichos a mano. Antes era
+         `grid-column:span k` con altura fija; girado, lo que se fusiona son las filas
+         del eje de tiempo y la columna es la del dia. */
+      var geo='grid-column:'+(di+2)+';grid-row:'+(ix+2)+'/span '+k+';border-radius:2px';
       if(fi<0){                                                // fuera del horario de ese dia
         /* ...salvo que ahi este la reunion FIJADA. La fijada es una DECISION, no un dato de
            disponibilidad: tiene que verse aunque esa franja no estuviera ofertada ese dia.
@@ -558,7 +585,7 @@ function vReu(){
             _duraTxtM_(x)+'</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':'<span class="chev">›</span>')+'</div></div>'; }).join('')+'</div>'
       : '')+
-    '<div class="tarj">'+cab(R.tipo||'General', R.modalidad||'')+
+    '<div class="tarj">'+cab(R.tipo||'General', _modalidadTxt_(R.modalidad))+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
       '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+R.nInv+' convocados'+
       _duraTxtM_(R)+'</small></div>'+
@@ -568,7 +595,21 @@ function vReu(){
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
           '<b style="color:var(--ok)">📌 Reunión fijada · '+esc(R.fijada)+'</b><br>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</div>'
         : (R.exento
-            ? ''                                   /* organizas: no se te pide cubrir */
+            /* 🗣️ Daniel (14/10): *«que permita, por favor, al que organiza la reunión
+               poner su disponibilidad. Si le apetece. En plan, opcional. Pero básicamente
+               así es más fácil de debuguear»*.
+               ⛔ Aquí había un `''`: al convocante NO se le ofrecía la rejilla. Ahora
+               `exento` significa **no se te EXIGE**, no «no puedes» -- y la diferencia
+               importa fuera de depurar: quien convoca también va a la reunión, y su hueco
+               cuenta para elegir la franja.
+               ✅ Y es el MISMO botón `#btnCubrir` de abajo, no uno nuevo: su manejador ya
+               está enganchado y `guardarDisp` no mira si eres el convocante. Un botón
+               propio sería una segunda puerta a la misma cosa. */
+            ? (!R.fijada && _plazoAbierto_(R.limite)
+                ? '<button class="btn full" data-p id="btnCubrir" style="margin-top:10px">'+
+                  (R.cubierta?'Editar mi disponibilidad':'Marcar la mía también (opcional)')+
+                  '</button>'
+                : '')
             /* ⛔ CON EL PLAZO CERRADO NO SE OFRECE CUBRIR. El servidor lo RECHAZA
                (`Codigo.gs:4582`) y hasta hoy la pantalla no preguntaba nada: se pintaba la
                rejilla entera, se marcaba, y sólo al pulsar «Guardar» salía un error crudo.
@@ -583,7 +624,7 @@ function vReu(){
               : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
                 (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
     /* si ya está fijada, el aviso de organizador sobra y quedaba colgando debajo del cartel verde */
-    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas, no cubres</b>. No se te pide disponibilidad.</p>':'')+
+    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas</b>, así que no se te <i>pide</i> disponibilidad — pero puedes marcarla si quieres, y cuenta como la de cualquiera.</p>':'')+
       /* ⛔ LA REGLA ES LA DEL BACKEND, Y NO ES `esCoord()`. Aqui se ofrecian los tres
          botones a CUALQUIER coordinador, y las tres acciones que llaman las gatea
          `Codigo.gs` por **convocante o admin** -con la misma linea en las tres:
@@ -598,6 +639,7 @@ function vReu(){
         '<button class="btn mini" data-p id="btnFijar" style="flex:1">'+(R.fijada?'Cambiar fecha/hora':'📌 Fijar fecha')+'</button>'+
         (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
         '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
+        '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
       '</div>':'')+
     '</div>'+
     '<h2 class="sec">Cuándo puede el equipo<span class="ln"></span></h2>'+
@@ -649,20 +691,28 @@ function cubrirModal(){
       var v=+_mio[i]||0; if(v>0) ST.sel.set(b[0]+'_'+b[1], v);
     });
   }
+  /* ⛔⛔ UN DÍA = UNA COLUMNA, UNA FRANJA = UNA FILA (13/10). Estaba al revés y por
+     eso no cabía en un teléfono: las franjas son MUCHAS y los días POCOS, así que el
+     eje largo tiene que ser el vertical, que es el que un móvil tiene de sobra.
+     🗣️ Daniel: *«un día una columna con sus horas, y en las filas los bloques
+     horarios … no tiene mucho que ver con lo que es la pantalla de un teléfono»*. */
   var hd='<div class="rc"></div>';
-  R.franjas.forEach(function(f,ix){
-    hd+='<div class="rc rh"><span>'+f.ini.replace(':00','')+'</span>'+
-      (ix===nF-1?'<span class="fin">23</span>':'')+'</div>';
+  R.dias.forEach(function(d){
+    hd+='<div class="rc rh rhd">'+esc(d)+'</div>';
   });
   /* Las casillas NO OFERTADAS ya no se pueden pintar. Antes se pintaban igual, se veian
      marcadas, y al guardar se caian sin decir nada: `vals` se arma recorriendo `bloques`,
      asi que lo que no era bloque no existia. */
   var _ofer={}; (R.bloques||[]).forEach(function(b){ _ofer[b[0]+'_'+b[1]]=1; });
+  /* ⛔ LA CLAVE NO CAMBIA: sigue siendo `dia_franja`, así que ni `ST.sel` ni lo que se
+     guarda se enteran de que la rejilla se ha girado. Lo único que cambia es el ORDEN en
+     que se pintan las celdas — y el arrastre va por `elementFromPoint`, no por posición.
+     ✅ Y la etiqueta de la hora es además **el asa para deslizar**: ver `.rc.rd` en el CSS. */
   var rows='';
-  R.dias.forEach(function(d,di){
-    rows+='<div class="rc rd">'+d+'</div>';
-    for(var f=0;f<nF;f++){
-      var k=di+'_'+f;
+  R.franjas.forEach(function(f,fi){
+    rows+='<div class="rc rd" aria-hidden="true"><span>'+f.ini.replace(':00','')+'</span></div>';
+    for(var di=0;di<nD;di++){
+      var k=di+'_'+fi;
       if(!_ofer[k]){ rows+='<div class="ecel off" title="fuera del horario de ese día"></div>'; continue; }
       var v=ST.sel.get(k)||0;
       rows+='<div class="ecel '+(v===2?'on2':v===1?'on1':'')+'" data-k="'+k+'"></div>';
@@ -673,7 +723,12 @@ function cubrirModal(){
     (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">La reunión dura <b>'+_durTxt_(_minS*_slot)+
       '</b>, así que cada toque marca <b>'+_minS+' casillas seguidas</b> a partir de ahí. '+
       'Puedes estirar más arrastrando; lo que quede más corto se quita solo.</p>':'')+
-    '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nF+',minmax(30px,1fr))">'+hd+rows+'</div></div>'+
+    /* 🗣️ «Y que lo ponga escrito en algún lugar» (14/10). **El mismo texto y la misma clase que
+       en Turnos**: dos frases distintas para el mismo gesto en dos pantallas es como se aprende
+       que la app es incoherente. Y va **encima** de la rejilla: debajo lo lee quien ya se ha
+       rendido. */
+    '<div class="rgesto">Un dedo <b>marca</b> · dos dedos <b>deslizan</b></div>'+
+    '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nD+',minmax(44px,1fr))">'+hd+rows+'</div></div>'+
     '<div class="leyh" style="margin-top:10px">'+ley+'</div>'+
     '<div class="sc" id="ecount" style="margin:12px 0 10px"></div>'+
     '<button class="btn pri full" data-p id="btnGuardarDisp">Guardar disponibilidad</button>');
@@ -777,7 +832,16 @@ function engancharRejilla(){
        parece que lo guardo. */
     var _av=_avisoCorto_(q, minS, slot); if(_av) tost(_av);
   };
+  /* ⛔⛔ EL GESTO VA ENGANCHADO **ANTES** QUE EL PINTOR: los dos escuchan en el MISMO elemento,
+     así que corren en el orden en que se registran, y al revés el `pointerdown` del segundo dedo
+     movería el ancla antes de que nadie sepa que vienen dos.
+     ✅ Abortar aquí es **más barato que en Turnos y por eso no hay copia**: el `pointerdown` sólo
+     pone el ancla y **previsualiza**; lo que escribe es `commit()`, en el `pointerup`. Así que
+     abortar es tirar el ancla y limpiar — no se ha confirmado nada.
+     🗣️ Daniel (14/10): *«Deslizar para las reuniones va a ser completamente OBLIGATORIO»*. */
+  var dd=_dosDedos_(grid, function(){ ancla=null; ultimo=null; limpia(); });
   grid.addEventListener('pointerdown',function(ev){
+    if(dd.deslizando()) return;
     var el=ev.target.closest('.ecel'); if(!el || !el.dataset.k) return;   // no ofertada: no se toca
     ev.preventDefault();
     var A=kk(el.dataset.k);
@@ -791,10 +855,13 @@ function engancharRejilla(){
     prev();
   });
   grid.addEventListener('pointermove',function(ev){
-    if(!ancla) return;
+    if(dd.deslizando() || !ancla) return;
     var el=document.elementFromPoint(ev.clientX,ev.clientY);
     if(el && el.classList.contains('ecel') && el.dataset.k){ ultimo=el.dataset.k; prev(); }
   });
+  /* ⚠️ Con el trazo abortado por el segundo dedo, `ancla` ya es `null`, así que `commit`
+     **no corre**: deslizar no confirma nada. La guarda ya estaba y por eso no hay que tocarla;
+     va dicho porque es la línea que decide si lo previsualizado se escribe. */
   grid.addEventListener('pointerup',function(){ if(ancla){ commit(); ancla=null; ultimo=null; } });
   var g=$('#btnGuardarDisp');
   /* GUARDA EN EL SERVIDOR. Antes solo ponia una marca local y decia «guardada»: en el
@@ -885,6 +952,32 @@ function _diasLargos_(modo,d0,d1,fecha,nd){
    ⚠️ La lista **llega en el panel** (`DATA.consejo`) y no se copia aquí: dos copias de la misma
    verdad acaban siendo dos verdades. Si el panel no la trae —backend viejo—, se devuelve vacío
    como antes y el convocante los pone a mano: se degrada, no se inventa. */
+/* ⭐ EL SELECTOR DE INVITADOS, UNA SOLA VEZ (817.a). `ids` = {chips, sug, input}; `dame()` devuelve el
+   Set VIGENTE (getter: quien lo usa puede sustituirlo); `alCambiar` se llama tras cada alta o baja;
+   `excluir()` = el nombre que no se ofrece (quien convoca no se invita a si mismo). Devuelve
+   {pintar, sugerir, enganchar}. Antes eran dos closures dentro de `crearModal`. */
+function _selInvM_(ids, dame, alCambiar, excluir){
+  var S={};
+  var cambio=function(){ if(alCambiar) alCambiar(); };
+  S.pintar=function(){ var c=$('#'+ids.chips); if(!c) return; var INV=dame();
+    c.innerHTML=Array.from(INV).map(function(n){
+      var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
+      return '<span class="cchip"><b>'+esc((m&&m.pila)||n)+'</b><button data-n="'+esc(n)+'" data-p>×</button></span>'; }).join('');
+    $$('#'+ids.chips+' button').forEach(function(b){ b.onclick=function(){ dame().delete(b.dataset.n); S.pintar(); cambio(); }; }); };
+  S.sugerir=function(q){ var sg=$('#'+ids.sug); if(!sg) return; q=_sinTildes_((q||'').trim());
+    if(!q){ sg.style.display='none'; return; }
+    var INV=dame(), fuera=excluir ? excluir() : null;
+    var hits=_activos_().filter(function(m){ return m.nombre!==fuera && !INV.has(m.nombre) && _sinTildes_(m.nombre).indexOf(q)>=0; }).slice(0,6);
+    if(!hits.length){ sg.style.display='none'; return; }
+    sg.innerHTML=hits.map(function(m){ return '<div data-n="'+esc(m.nombre)+'" data-p>'+esc(m.nombre)+' <small>'+esc(m.cargo||m.unidad||'')+'</small></div>'; }).join('');
+    sg.style.display='';
+    $$('#'+ids.sug+' div').forEach(function(d){ d.onclick=function(){ dame().add(d.dataset.n); var i=$('#'+ids.input); if(i) i.value=''; sg.style.display='none'; S.pintar(); cambio(); }; }); };
+  S.enganchar=function(){ var inp=$('#'+ids.input); if(!inp) return;
+    inp.oninput=function(){ S.sugerir(inp.value); };
+    inp.onblur=function(){ setTimeout(function(){ var s=$('#'+ids.sug); if(s) s.style.display='none'; },180); }; };
+  return S;
+}
+
 function _presetInvitados_(tipo){
   var yo=(YO&&YO.nombre)||'', ms=_activos_(), out=[];
   if(tipo==='consejo'){
@@ -979,18 +1072,14 @@ function crearModal(){
     return ds.map(function(_,i){ var r=rows[i]; if(!r||r.classList.contains('off')) return [0,0];
       return [hNum(r.querySelector('.dr0').value), hNum(r.querySelector('.dr1').value)]; }); };
   var INV=new Set();
-  var invRender=function(){ var c=$('#ceChips'); if(!c) return;
-    c.innerHTML=Array.from(INV).map(function(n){
-      var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
-      return '<span class="cchip"><b>'+esc((m&&m.pila)||n)+'</b><button data-n="'+esc(n)+'" data-p>×</button></span>'; }).join('');
-    $$('#ceChips button').forEach(function(b){ b.onclick=function(){ INV.delete(b.dataset.n); invRender(); upd(); }; }); };
-  var sugRender=function(q){ var sg=$('#ceSug'); if(!sg) return; q=_sinTildes_((q||'').trim());
-    if(!q){ sg.style.display='none'; return; }
-    var hits=_activos_().filter(function(m){ return m.nombre!==(YO&&YO.nombre) && !INV.has(m.nombre) && _sinTildes_(m.nombre).indexOf(q)>=0; }).slice(0,6);
-    if(!hits.length){ sg.style.display='none'; return; }
-    sg.innerHTML=hits.map(function(m){ return '<div data-n="'+esc(m.nombre)+'" data-p>'+esc(m.nombre)+' <small>'+esc(m.cargo||m.unidad||'')+'</small></div>'; }).join('');
-    sg.style.display='';
-    $$('#ceSug div').forEach(function(d){ d.onclick=function(){ INV.add(d.dataset.n); $('#ceInv').value=''; sg.style.display='none'; invRender(); upd(); }; }); };
+  /* El selector vive en `_selInvM_` (817.a): la ficha de la reunion lo usa tambien para editar
+     los convocados, y copiarlo seria la segunda implementacion de «elige personas del roster».
+     ⚠️ Se le pasa un GETTER y no el Set: `tipoUpd` hace `INV=new Set(...)` y un Set capturado
+     seguiria apuntando al viejo. */
+  var _selCE=_selInvM_({chips:'ceChips', sug:'ceSug', input:'ceInv'}, function(){ return INV; },
+                       function(){ upd(); }, function(){ return YO&&YO.nombre; });
+  var invRender=_selCE.pintar;
+  var sugRender=_selCE.sugerir;
   var renderDias=function(){ var ds=_diasLargos_(val('ceModo'), val('ceD0'), val('ceD1'), val('ceFecha')||_dmyAISO_(HOY), Math.max(1,+val('ceND')||1));
     if(!ds.length) ds=dias();
     var prev=$$('#ceDias .drow').map(function(r){
@@ -1038,7 +1127,14 @@ function crearModal(){
   }
   var tipoUpd=function(){ var t=val('ceTipo');
     if($('#ceMixW')) $('#ceMixW').style.display=(t==='mixta')?'':'none';
-    if($('#ceInvW')) $('#ceInvW').style.display=(t==='general')?'none':'';
+    /* ⛔⛔ CON «GENERAL» **TAMBIEN** SE ENSEÑA LA LISTA. Aqui se escondia, y los
+       invitados SI estaban puestos: `_presetInvitados_('general')` devuelve a todos
+       los activos menos tu, y `tipoUpd()` corre al abrir. Pero una pantalla que no
+       ensena a nadie dice «no hay nadie» — Daniel lo leyo asi y tenia razon:
+       *«si le das a reunion general, no te mete automaticamente a todos los
+       miembros»*. Y encima no dejaba QUITAR a uno, que es justo para lo que sirve.
+       ⚠️ El ESCRITORIO nunca lo escondio: era una asimetria de una sola cara. */
+    if($('#ceInvW')) $('#ceInvW').style.display='';
     $$('#ceMix .cmixb').forEach(function(b){ b.classList.remove('on'); });
     INV=new Set(_presetInvitados_(t)); invRender(); upd(); };
   $('#ceTipo').onchange=tipoUpd;

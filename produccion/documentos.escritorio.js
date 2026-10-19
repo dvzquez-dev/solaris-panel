@@ -293,8 +293,7 @@ function docCard(d){
   }
   var avisos = (d.avisos&&d.avisos.length) ? lista('Avisos de calidad · '+d.avisos.length, d.avisos)
     : (d.iss ? '<div class="sub"><span class="sc">Calidad</span><p style="margin:4px 0 0;font-size:12px;'+
-        'color:var(--ink3);line-height:1.55">'+d.iss+' aviso'+(d.iss===1?'':'s')+' de calidad, sin detalle. '+
-        'Los manda Cowork con el expediente.</p></div>' : '');
+        'color:var(--ink3);line-height:1.55">'+d.iss+' aviso'+(d.iss===1?'':'s')+' de calidad, sin detalle.</p></div>' : '');
   var previa = _previaDocE_(d, st);
   /* ⛔ POR LA PUERTA UNICA (`_visorDocHTML_`). Esta cara ya acertaba -- preguntaba «¿hay
      enlace?» --, y va por la puerta igual: dos criterios para la misma pregunta se separan
@@ -302,7 +301,9 @@ function docCard(d){
      Nace ABIERTO: esta ficha existe para leer el archivo antes de decidir. */
   var visor = _visorDocHTML_(d.drive, d.ref,
     '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
-    'Cowork lo manda en <span class="mono">enlaceDrive</span>; sin él no hay nada que leer aquí.</div></div>');
+    /* 954.ª: lo que HACER, como el móvil — aquí mandaba a buscar un nombre de campo de un asistente
+       que ya no está en el camino. */
+    'Pídeselo a quien lo subió antes de decidir.</div></div>');
   var acc, _aut;
   if(puede){
     acc='<label style="display:block;margin-top:11px">'+
@@ -373,7 +374,16 @@ function docCard(d){
          aqui para que esta linea no sea byte a byte la de alli -- si lo fuera, el ancla de
          la mutacion de la fila saldria DOS VECES y esa mutacion dejaria de aplicarse en
          silencio. Es la regla de «la sangria no desambigua un ancla», por su otra cara. */
-      (d.fecha?'<span class="chip">'+esc(d.fecha)+'</span>':'')+
+      /* ⛔ POR LA PUERTA `_isoADMY_` (14/10): aqui se pintaba `esc(d.fecha)` en
+         CRUDO, o sea en ISO, contra la convencion vinculante de `CLAUDE.md`
+         -prosa en DD/MM/AAAA- y teniendo la puerta a cuatro lineas: esta misma
+         cara la usa 4 veces en su HTML y este modulo la usaba 0.
+         📏 Nadie lo veia porque la semilla `DOCS` trae 7 de 7 SIN campo
+         `fecha`: en demo el chip no se pinta nunca. Solo sale con dato real.
+         ⚠️ `_isoADMY_` devuelve TAL CUAL lo que no sea ISO, asi que no inventa
+         un dia a partir de lo que no entiende. Lo ejecuta
+         `probar_documentos_pintado.py`. */
+      (d.fecha?'<span class="chip">'+esc(_isoADMY_(d.fecha))+'</span>':'')+
       /* Mismo motivo que en el móvil: verlas no es decidir. */
       (_etiquetasDe_(d).length
         ? '<span class="chip">'+esc(_etiquetasDe_(d).join(' · '))+'</span>' : '')+

@@ -545,7 +545,7 @@ function verDoc(id){
        sin abrirlo es aprobar a ciegas. */
     _visorDocHTML_(e.drive, e.ref,
       '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
-      'Pideselo a quien lo subio antes de decidir.</div></div>')+
+      'Pídeselo a quien lo subió antes de decidir.</div></div>')+
     '<p class="rnota" style="margin-top:10px">Revisa: <b>'+revs+'</b></p>'+
     acc);
   /* Se cablea DESPUES de abrir el modal: un iframe dentro de la cadena de strings no

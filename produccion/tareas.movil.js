@@ -87,8 +87,9 @@ function vTareas(){
   return '<div class="h1">Mis tareas</div><p class="h1s">'+act.length+' activa'+(act.length===1?'':'s')+
     ' · ordenadas por urgencia y fecha límite.</p>'+
     '<div class="tarj">'+(act.length?act.map(fila).join(''):
-      vacio('Sin tareas asignadas','No tienes ninguna tarea asignada ahora mismo. Cuando tu coordinador '+
-        'te asigne una, aparecerá aquí.','',false))+'</div>'+
+      /* 957.ª: «cuando te asignen», no «cuando tu coordinador»: el PD y los coordinadores no tienen coordinador. */
+      vacio('Sin tareas asignadas','No tienes ninguna tarea asignada ahora mismo. Cuando te asignen una, '+
+        'aparecerá aquí.','',false))+'</div>'+
     (act.length?'<div class="tarj" style="background:rgba(63,158,214,.05);border-color:rgba(63,158,214,.3)">'+
       '<p class="rnota" style="margin:0">Al fichar puedes imputar tus horas a cualquiera de estas tareas. '+
       /* ⛔ Y DICE DÓNDE SE APELA (762.ª, 02/10). Aquí ponía «puedes apelarla (Art. 34)» a
@@ -141,7 +142,7 @@ function _engTareas_(){
          pulsa fuera de plazo. Y se DICE por qué, que un botón que no hace nada se lee como
          pantalla rota. */
       if(!_puedeDeshacerTarea_(t)){
-        tost('Ya pasó el plazo para deshacerlo ('+_minDeshacerTarea_()+' min). Habla con tu coordinador.');
+        tost('Ya pasó el plazo para deshacerlo ('+_minDeshacerTarea_()+' min). Habla con quien te la asignó.');
         t.desde=null; pintar(); return;
       }
       var a=_tareaAnterior_(t.e);

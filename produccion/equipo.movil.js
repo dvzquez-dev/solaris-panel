@@ -93,9 +93,12 @@ function vEstado(){
     var rt=_unPerfil?aprobadorDe(YO.nombre,YO.unidad):null;
     av+='<div class="aviso" data-ir="horas" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
       '<div style="flex:1"><b>'+h1(pend)+' esperando aprobación</b>'+
+      /* ⛔ 929.ª: y al PROPIO PD no se le nombra a sí mismo — `rt.propio`, como ya hacía Fichar. Le decía
+         «Las firma Lois, Project Director» siendo él Lois. */
       '<p>Todavía no cuentan. '+(rt
-        ? ('Las firma '+esc(rt.nom.split(' ')[0])+', '+
-           (rt.escalado?'Project Director':'coordinador de tu unidad')+'.')
+        ? (rt.propio ? 'Las firmas tú: eres el Project Director.'
+           : ('Las firma '+esc(rt.nom.split(' ')[0])+', '+
+              (rt.escalado?'Project Director':'coordinador de tu unidad')+'.'))
         : 'Las firma quien coordine el subsistema de cada parte.')+'</p></div>'+
       '<span class="chev">›</span></div>';
   }

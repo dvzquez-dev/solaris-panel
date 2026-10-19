@@ -19,7 +19,9 @@
      `./produccion/index.html`, asi que instalar desde aqui abre LA MISMA app. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="produccion/apple-touch-icon.png">
-<meta name="theme-color" content="#0D0A0B">
+<!-- ⛔ EL MISMO COLOR QUE `--bg` de las caras (#0C0B0B). Aqui habia #0D0A0B, que
+     no es ningun color de la paleta. Lo compara `probar_color_chrome.py`. -->
+<meta name="theme-color" content="#0C0B0B">
 <style>body{background:#151113;color:#F4F3F3;font:15px/1.6 system-ui;
   display:grid;place-items:center;min-height:100vh;margin:0;text-align:center}
 a{color:#E41E25}</style>

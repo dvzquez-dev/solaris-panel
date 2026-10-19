@@ -50,7 +50,10 @@ async function activarNotis(btn){
     if(!reg){ _notisFallo_('No se pudo preparar el service worker.'); return; }
     await navigator.serviceWorker.ready;
     var sub=await reg.pushManager.getSubscription();
-    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)});
+    if(!sub){
+      try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)}); }
+      catch(err){ _notisFallo_(_consejoSuscribir_(err)); return; }
+    }
     if(typeof SESION!=='undefined' && SESION) await api.guardarPush(sub.toJSON());
     else { _notisFallo_('Permiso dado, pero sin sesión no se puede registrar el aviso en el servidor.'); return; }
     /* ✅ Y EL ÉXITO LO BORRA: un aviso que no se retira miente igual que uno que no sale.
