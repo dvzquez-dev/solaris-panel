@@ -2262,6 +2262,60 @@ function _mcd_(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; }
    `Promise.all`, el TypeError mataba tambien el refresco de reuniones que iba al lado.
    Devuelve `null` en vez de reventar, y deja rastro en la consola para que no vuelva a
    pasar en silencio. */
+/* ══ 20/10 · LO VIVO — «¿hay algo nuevo?» cada segundo, y si lo hay, SÓLO eso ══════════════════════════════
+   🗣️ Daniel: «Igual cada segundo que checkee si hay algo nuevo, si lo hay pide eso concretamente si no pues nada,
+   sigue checkeandolo». El servidor del mini PC contesta `queHayNuevo` con un SELLO por fuente (sin datos); si alguno
+   cambia, la cara pide sólo las acciones que tocan esa fuente (`VIVO_GRUPOS`) y repinta con su refresco de siempre.
+   ⛔ Contra Apps Script NO arranca: no conoce la acción y una llamada por segundo le fundiría la cuota.
+   ⛔ Si el refresco no pudo correr (modal abierto, escribiendo, otro en vuelo) devuelve `false` y los sellos NO se
+      dan por vistos: al segundo siguiente se vuelve a intentar, y el cambio no se pierde. */
+var VIVO_CADA_MS = 1000;
+var VIVO_GRUPOS = {
+  getTurnos:      ['turnos','kv/turnos','kv/turnos_coches'],
+  getTareas:      ['tareas','kv/tareas'],
+  getEntregables: ['entregables','kv/entregables'],
+  reuniones:      ['reuniones','respuestas','avisos-reunion','kv/convocatorias','kv/reu_max_id'],
+  sanciones:      ['sanciones','kv/sanciones']
+};
+/* Las fuentes cuyo sello difiere (o aparece/desaparece) entre dos lecturas. */
+function _vivoCambios_(viejo, nuevo){
+  var out=[];
+  Object.keys(nuevo||{}).forEach(function(k){ if(!viejo || viejo[k]!==nuevo[k]) out.push(k); });
+  Object.keys(viejo||{}).forEach(function(k){ if(!(k in (nuevo||{}))) out.push(k); });
+  return out;
+}
+/* ¿Le toca a este grupo? Sin `que` (el reloj, la vuelta a la pestaña), a todos. `resto` = lo que no es de ningún
+   grupo con nombre (el panel, partes, movimientos…): un sello sin dueño refresca lo general, no se pierde. */
+function _vivoToca_(que, grupo){
+  if(!que) return true;
+  if(grupo!=='resto') return que.some(function(x){ return (VIVO_GRUPOS[grupo]||[]).indexOf(x)>=0; });
+  return que.some(function(x){
+    return !Object.keys(VIVO_GRUPOS).some(function(g){ return VIVO_GRUPOS[g].indexOf(x)>=0; });
+  });
+}
+/* `_pide_` sólo si le toca; si no, `null` — que es lo que los manejadores ya tratan como «no ha venido nada». */
+function _pideSi_(que, grupo, accion, arg){
+  return _vivoToca_(que, grupo) ? _pide_(accion, arg) : Promise.resolve(null);
+}
+function _arrancarVivo_(refrescar){
+  if(typeof BACKEND_URL==='string' && BACKEND_URL.indexOf('script.google.com')>=0) return false;
+  var sellos=null, en=false;
+  setInterval(async function(){
+    if(en || document.hidden) return;
+    if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
+    en=true;
+    try{
+      var r=await _pide_('queHayNuevo');
+      if(!r || !r.sellos) return;
+      if(!sellos){ sellos=r.sellos; return; }                 // la primera vuelta sólo toma la foto
+      var c=_vivoCambios_(sellos, r.sellos);
+      if(!c.length) return;
+      if((await refrescar(c))!==false) sellos=r.sellos;
+    }catch(_){} finally{ en=false; }
+  }, VIVO_CADA_MS);
+  return true;
+}
+
 function _pide_(accion, arg){
   try{
     if(typeof api[accion]!=='function'){
