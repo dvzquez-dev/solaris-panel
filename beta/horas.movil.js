@@ -1612,8 +1612,13 @@ function _cuotaHTML_(){
        lo que evita que alguien cuadre su recibo con un número que la app se ha inventado. */
     ? (_bM
       ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(_q.base)+'</span></div>'+
-        '<div class="rl desc"><span>Por poner el coche · '+YO.coche+' turno'+(YO.coche===1?'':'s')+'</span>'+
+        /* ⛔ SÓLO SI RESTA ALGO (19/10): con la cuota ya en su suelo, `base-final` es 0 y salía
+           «Por poner el coche · 3 turnos −0,00 €», un descuento que no descuenta. El escritorio ya
+           lo hacía así (`if(desc>0)`); se copia su criterio. */
+        ((_q.base-_q.final) >= 0.005
+        ? '<div class="rl desc"><span>Por poner el coche · '+YO.coche+' turno'+(YO.coche===1?'':'s')+'</span>'+
         '<span class="ra">−'+eur(_q.base-_q.final)+'</span></div>'
+        : '')
       : '<div class="rl"><span>Cuota por tus horas</span><span class="ra">—</span></div>'+
         '<p class="rnota">Llevas el coche en '+YO.coche+' turno'+(YO.coche===1?'':'s')+' fuera de '+
         'Vigo, pero el servidor aún no ha servido tu cuota <b>sin</b> descuentos: no se puede '+
@@ -1716,6 +1721,13 @@ function _cargarPartesDec_(){
      selector, `YO` es la persona real y no a quien estás mirando, así que la cola se filtraba
      por el de siempre. Es el mismo fallo que ya se cerró en `_puedeBorrarReuM_`. */
   return _cargarCierrePlan_().then(function(){ return api.getPartes({}); }).then(function(arr){
+    /* ⛔ LA BANDERA DEL FALLO (19/10). El `catch` de abajo era MUDO: un corte al entrar dejaba
+       `PARTES_DEC=[]` y la tarjeta «Esperan tu decisión» DESAPARECÍA — un coordinador leía «no
+       tengo nada que firmar» y las horas de su gente se quedaban sin contar. Es el mismo arreglo
+       que `SANC_FALLO`: «no contestó» es un tercer estado, no una cola vacía.
+       ⚠️ Sin rearme automático, a propósito: un reintento tardío puede devolver a la cola un parte
+       que ya firmaste (medido por un agente el 11/08). Reintenta quien pulsa. */
+    PDEC_FALLO = !Array.isArray(arr);
     if(!Array.isArray(arr)) return;
     var yo=(typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
     var _rg = (typeof rangoNom==='function' ? rangoNom(yo) : 0);
@@ -1750,7 +1762,7 @@ function _cargarPartesDec_(){
       n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN, CIERRE_UC);
       return n;
     });
-  }).catch(function(){});
+  }).catch(function(){ PDEC_FALLO = true; });
 }
 
 /* El rótulo de procedencia en la ficha de decisión: mismo texto que en «Tus partes», otro
@@ -1846,6 +1858,15 @@ function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
 }
 
 function _partesDecHTML_(){
+  /* Sin cola y con el fallo puesto: se DICE, con su botón. Sólo a quien firma (rango ≥ 1, la
+     misma puerta que `_cargarPartesDec_`): a un miembro raso esta tarjeta no le sale nunca. */
+  if(PDEC_FALLO && !PARTES_DEC.length){
+    var _yoF=(typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
+    if((typeof rangoNom==='function' ? rangoNom(_yoF) : 0) < 1) return '';
+    return '<div class="tarj" id="pdec">'+cab('Esperan tu decisión','')+
+      vacio('No se pudo cargar','El servidor no contestó, así que no sé qué partes esperan tu firma. '+
+        '<button class="btn mini" data-p data-pdreint>Reintentar</button>','',false)+'</div>';
+  }
   return _pdGrupoHTML_('pdec', 'Esperan tu decisión',
     'Son horas de tu gente: <b>no cuentan hasta que las firmes</b>. Rechazar o pedir detalle '+
     'exige un motivo.', PARTES_DEC, _pdFichaHTML_);
@@ -1975,6 +1996,8 @@ function _engPartesRev_(){
 
 function _engPartesDec_(){
   var c=$('#pdec'); if(!c) return;
+  var _re=$('#pdec [data-pdreint]');
+  if(_re) _re.onclick=function(){ _re.disabled=true; _re.textContent='…'; _cargarPartesDec_().then(pintar); };
   $$('#pdec [data-pdacc]').forEach(function(b){
     b.onclick=async function(){
       if(b.disabled) return;
@@ -2072,7 +2095,9 @@ function vHoras(){
      guarda (`DATA._ranking`), o sea que era una asimetría entre caras (§3c-9). */
   var _rk=(typeof DATA!=='undefined' && DATA && DATA._ranking) || null;
   var puesto=+YO.puesto||0;
-  var total=Math.max(+((_rk&&_rk.total))||0, (DATA&&DATA.miembros&&DATA.miembros.length)||0, puesto);
+  /* ⛔ 19/10: SIN LAS BAJAS, como el `ranking.total` que ya las quita: contar las 32 de `miembros` pisaba ese 23 por
+     el `max` y al último de verdad le salían dos rayas debajo que eran bajas. */
+  var total=Math.max(+((_rk&&_rk.total))||0, (DATA&&DATA.miembros&&DATA.miembros.filter(function(m){ return !m.baja; }).length)||0, puesto);
   var filas='';
   /* ⛔ Y «NO SÉ CUÁNTAS HORAS POR MES» NO SE PINTA COMO UN NÚMERO. `YO.horasTemp/YO.meses`
      sin guarda da **Infinity** con `meses:0` —y `h1` lo formatea como **«∞ h»**—, y **NaN**
@@ -2118,7 +2143,10 @@ function vHoras(){
   for(var i=Math.max(1,puesto-2); puesto>0 && i<=Math.min(total,puesto+2); i++){
     filas += (i===puesto)
       ? '<div class="r yo"><span class="p mono">'+i+'</span><span class="n">'+esc(YO.pila)+' (tú)</span>'+
-        '<span class="h mono">'+(_hmPond==null?'—':h1(_hmPond))+'</span></div>'
+        /* ⛔ A UNA DECIMAL, como el escritorio (19/10): la ponderada es un COCIENTE, no horas
+           fichadas, y la regla de la centésima es para las fichadas (951.ª). «18,55 h» aquí y
+           «18,6» allí era el mismo número dicho de dos formas. */
+        '<span class="h mono">'+(_hmPond==null?'—':nf(_hmPond,1)+' h')+'</span></div>'
       : '<div class="r"><span class="p mono">'+i+'</span><span class="cens"></span></div>';
   }
 
@@ -2222,28 +2250,10 @@ function vHoras(){
     '<h2 class="sec">Mi índice de carga<span class="ln"></span></h2>'+
     '<div class="tarj">'+
       (typeof YO.carga==='number'
-        /* ⛔⛔ Y EL DIBUJO TAMBIEN SE DERIVA, QUE ES LA MITAD QUE FALTABA (06/10). El 05/10 se
-           saco la banda del TITULO a `_bandaSana_`… y la BARRA se quedo cableada: `left:38.9%`,
-           `width:27.8%`, `left:66.7%` y los rotulos **70** y **120** escritos a mano.
-           ⛔ O sea que el dia que Daniel mueva la banda otra vez -ya la movio una: *«cambia la
-           banda sana de 60 a 90 a de 70 a 120»*, 09/08- el titulo diria lo nuevo y **el dibujo
-           seguiria pintando lo viejo**, con la marca roja cayendo en la zona equivocada. Un
-           rotulo y su dibujo que discrepan no dan ningun error: se leen como un dato.
-           ✅ La escala es `hi * 1.5` -con 120 da los 180 de siempre, y los cuatro numeros de
-           arriba salen exactos: 70/180=38,9 · 50/180=27,8 · 120/180=66,7 · carga/1,8-, asi que
-           derivarla reproduce el dibujo de hoy y ademas sigue a la banda manana. */
-        ? (function(){
-            var _esc = _bs.hi * 1.5;
-            var _pLo = (_bs.lo / _esc * 100), _pHi = (_bs.hi / _esc * 100);
-            return '<div style="position:relative;height:30px;margin:4px 0 8px">'+
-            '<div style="position:absolute;top:11px;left:0;right:0;height:8px;border-radius:5px;background:var(--sur2)"></div>'+
-            '<div style="position:absolute;top:11px;left:'+_pLo.toFixed(1)+'%;width:'+(_pHi-_pLo).toFixed(1)+'%;height:8px;background:#1d3a2b"></div>'+
-            '<div style="position:absolute;top:6px;left:calc('+Math.min(100,YO.carga/_esc*100).toFixed(1)+'% - 1.5px);width:3px;height:18px;'+
-              'background:var(--red);border-radius:2px;box-shadow:0 0 8px rgba(228,30,37,.55)"></div>'+
-            '<span style="position:absolute;top:-2px;left:'+_pLo.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.lo+'</span>'+
-            '<span style="position:absolute;top:-2px;left:'+_pHi.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.hi+'</span>'+
-          '</div>';
-          })()+
+        /* ⛔⛔ EL DIBUJO SE DERIVA DE LA BANDA (06/10) y desde el 19/10 vive en `comun.js`
+           (`_cargaBarraHTML_`), que es donde está su porqué entero: el escritorio pinta la
+           MISMA barra en «Lo tuyo», y dos copias habrían divergido al mover la banda. */
+        ? _cargaBarraHTML_(YO.carga)+
           '<div class="fila" style="padding-bottom:0;border:0"><div class="a"><b>Carga '+nf(YO.carga,0)+'</b>'+
           /* ⛔ «de este mes» era FALSO: ese reparto se calculo cuando se genero el panel,
              no hoy. Ahora dice de cuando es, y debajo van las horas VIVAS — que es lo que
@@ -2260,7 +2270,7 @@ function vHoras(){
              dicho en vez de repetido. Se arregla igual porque cuesta una línea y el
              día que el motor vuelva a poblar `desglose` ya no miente. */
           (YO.desglose?'<small>índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes '+nf(YO.desglose.aporta_mes_actual||0,1)+' · arrastre '+nf(YO.desglose.arrastre||0,1)+'</small>':'')+
-          (_hMesReal_(YO)!=null?'<small>este mes llevas '+h1(_hMesReal_(YO))+', en vivo</small>':'')+
+          (_hMesDevengado_(YO)!=null?'<small>este mes llevas '+h1(_hMesDevengado_(YO))+', en vivo</small>':'')+   /* devengada, como la cifra (07/10) */
           '</div><div class="d">banda sana ' + _bs.lo + '–' + _bs.hi + '</div></div>'
         : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+
     '</div>'+

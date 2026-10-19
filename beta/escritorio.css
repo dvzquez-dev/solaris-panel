@@ -229,6 +229,8 @@ main.entrando>*:nth-child(4){animation-delay:.15s}
 /* La nota al pie de una ficha: sin regla salia a tamano y brillo de cuerpo, y con el
    margen de 1em que le pone el navegador. */
 .rnota{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5}
+/* 19/10: suelta en el panel (tras una tabla, en «Lo tuyo») iba pegada al borde; dentro de `.pb` ya tiene margen. */
+.pan>.rnota{padding:0 13px 10px}
 
 /* KPIs */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:13px}
@@ -406,7 +408,10 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 /* la hora al limite SUPERIOR de su fila y pegada a la derecha de su columna estrecha: es la
    misma decision que en horizontal (al limite izquierdo), girada 90 grados. */
 .hg.vert .hc.rh{min-height:0;align-items:flex-start;justify-content:flex-end}
-.hg.vert .hc.rh span{position:static;transform:none;left:auto;top:auto;padding-right:4px;line-height:1}
+.hg.vert .hc.rh span{position:static;transform:translateY(calc(-50% - 1px));left:auto;top:auto;padding-right:4px;line-height:1}
+/* ⛔ 19/10: la hora EN LA RAYA entre dos franjas, no arriba DENTRO de la suya (Daniel, 14/10: «justo en el medio
+   de dos slots … ni para arriba ni para abajo»): media línea más medio `gap` (2 px). Con `transform`, que no
+   cambia la caja que el grid mide. Vale para las DOS copias del mapa (las dos llevan `hg vert`). */
 .hg.vert .hc.rhd{justify-content:center;white-space:nowrap;font-size:9.5px;color:var(--ink2);padding-bottom:3px}
 .hc{font-family:var(--mono);font-size:8.5px;color:var(--ink3);display:flex;align-items:center;justify-content:center;min-height:18px}
 .hc.rd{justify-content:flex-end;padding-right:7px;white-space:nowrap;font-size:9.5px;color:var(--ink2)}
@@ -503,6 +508,11 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .dmc{font-family:var(--mono);font-size:10px;color:var(--ink3);display:flex;
   align-items:center;justify-content:center;text-align:center;line-height:1.25}
 .dmc.dml{justify-content:flex-end;padding-right:8px;white-space:nowrap;color:var(--ink2);font-size:11px}
+/* ⛔ LA HORA EN LA LÍNEA (19/10, decisión del 14/10): arriba de su casilla y media línea más arriba, más
+   la mitad del `gap` de 3 px de `.dmapa`, que es donde está la raya entre dos franjas. Con `transform` y no
+   con márgenes: no cambia la caja que el grid mide (lo mismo que `.rc.rd span` en el móvil). */
+.dmc.dmh{align-items:flex-start}
+.dmc.dmh span{display:block;line-height:1;transform:translateY(calc(-50% - 1.5px))}
 .dcel{height:36px;border-radius:4px;background:var(--sur2);display:grid;place-items:center;
   font-family:var(--mono);font-size:13px;font-weight:600;color:#fff;cursor:pointer;
   position:relative;transition:outline-color .12s}

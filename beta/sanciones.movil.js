@@ -530,6 +530,15 @@ function _colorTick_(i, p){
 
 function medidorHTML(){
   var p=YO.puntos, segs='', ticks='', halo='', i;
+  /* ⛔ SIN DATO NO HAY EXPEDIENTE (19/10). Con `puntos:null`, `estadoPts(null)` da `null<=2` →
+     «En evaluación.» y «Estás en zona crítica: … se abre expediente», o sea un expediente
+     anunciado a quien sólo le falta el dato — y el escritorio, con lo mismo, pinta «—». Un «no
+     lo sé» leído como 0 (§3c-24), en la pantalla de disciplina. Sin `#med`, `armarMedidor` sale
+     solo por su primera línea. */
+  if(typeof p !== 'number' || !isFinite(p))
+    return '<div class="medcaja"><p class="rnota" style="margin:0;padding:9px 2px;text-align:center">'+
+      'Aún no ha llegado tu dato de puntos. No es un 0: en cuanto llegue, sale aquí.</p></div>'+
+      _libroPuntosHTML_();
   for(i=0;i<10;i++){
     var lleno=i<p, crit=i<3;
     var col = lleno ? _colorSeg_(i,p) : '';

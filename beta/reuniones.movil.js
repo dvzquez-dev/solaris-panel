@@ -511,7 +511,10 @@ function vReu(){
     g+='<div style="grid-column:'+(di+2)+';grid-row:1;font-family:var(--mono);'+
       'font-size:9px;color:var(--ink2);text-align:center;padding-bottom:3px">'+esc(d)+'</div>';
   });
-  /* La etiqueta de la hora va al LIMITE SUPERIOR de su fila, que es la misma decision
+  /* ⛔ 19/10: y A CABALLO de ese límite, no debajo (Daniel, 14/10: «justo en el medio de dos slots»):
+     media línea más medio `gap` (2 px) hacia arriba, con `transform` para no tocar la caja del grid.
+     La hora de FIN igual, sobre la raya de abajo de la última fila.
+     La etiqueta de la hora va al LIMITE SUPERIOR de su fila, que es la misma decision
      que estaba escrita para el eje horizontal (iba al limite izquierdo = hora de inicio)
      girada 90 grados. Centrarla seria ambiguo: `docs/decisiones-app.md`.
      Con paso fino solo se rotula la hora en punto, o no se leeria nada. */
@@ -519,13 +522,13 @@ function vReu(){
     if(t%60!==0) return;
     g+='<div style="grid-column:1;grid-row:'+(ix+2)+';font-family:var(--mono);'+
       'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px;'+
-      'line-height:1">'+pad(Math.floor(t/60)%24)+'</div>';
+      'line-height:1;transform:translateY(calc(-50% - 1px))">'+pad(Math.floor(t/60)%24)+'</div>';
   });
   /* y la hora de FIN, al pie de la ultima fila: cierra el eje igual que antes lo cerraba
      por la derecha. Sin esto el mapa no dice hasta que hora llega. */
   g+='<div style="grid-column:1;grid-row:'+(eje.length+2)+';font-family:var(--mono);'+
-    'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px">'+
-    _hhmm(t1).replace(':00','')+'</div>';
+    'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px;line-height:1;'+
+    'transform:translateY(calc(-50% - 1px))">'+_hhmm(t1).replace(':00','')+'</div>';
   R.dias.forEach(function(d,di){
     /* UNA CELDA POR FRANJA, ancha lo que la franja dura. Antes se pintaba una celda por
        INSTANTE del eje y el numero solo en la que arrancaba: con paso de 30 min y franjas

@@ -1009,6 +1009,41 @@ function _bandaSana_(){
   return { lo: 70, hi: 120, viva: false };
 }
 
+/* ═══ LA BARRA DEL ÍNDICE DE CARGA — una puerta para las dos caras (19/10) ════════════════
+   Vivía INLINE en la vista de Horas del móvil (`horas.movil.js`, «Mi índice de carga») y el
+   escritorio NO LA TENÍA: `decisiones-app.md:2791` prohíbe que una capacidad del móvil falte en
+   el escritorio, y la vara que debía cazarlo (comparar los `api.*` de cada cara) sale verde con
+   ella fuera porque no gasta ninguno. Se saca aquí para que las dos pinten EL MISMO dibujo:
+   copiarla habría dejado dos barras que divergen el día que se mueva la banda.
+   Devuelve `''` si no hay un número que pintar, y cada cara pone SU vacío (`vacio` en el móvil,
+   `vacioSimple` en el escritorio: son dos piezas distintas, mapa §5 D10).
+   ⛔⛔ EL DIBUJO SE DERIVA DE LA BANDA, que es la mitad que faltaba el 06/10. El 05/10 se sacó
+   la banda del TÍTULO a `_bandaSana_`… y la BARRA se quedó cableada: `left:38.9%`,
+   `width:27.8%`, `left:66.7%` y los rótulos **70** y **120** escritos a mano.
+   ⛔ O sea que el día que Daniel mueva la banda otra vez -ya la movió una: *«cambia la banda
+   sana de 60 a 90 a de 70 a 120»*, 09/08- el título diría lo nuevo y **el dibujo seguiría
+   pintando lo viejo**, con la marca roja cayendo en la zona equivocada.
+   ✅ La escala es `hi * 1.5` -con 120 da los 180 de siempre: 70/180=38,9 · 50/180=27,8 ·
+   120/180=66,7 · carga/1,8-, así que derivarla reproduce el dibujo de hoy y sigue a la banda.
+   ⚠️ Y LA MARCA SE ACOTA POR LOS DOS LADOS: con un índice negativo (un ajuste a mano en
+   Notion) la marca salía con `left:calc(-5.6% …)`, fuera de la barra; y con `NaN` -que
+   `typeof` deja pasar como número- el `left` era CSS inválido y la marca caía a la izquierda,
+   o sea en «sin carga», en silencio. `isFinite` corta el segundo y `Math.max(0,…)` el primero. */
+function _cargaBarraHTML_(carga){
+  if(typeof carga !== 'number' || !isFinite(carga)) return '';
+  var _bs = _bandaSana_();
+  var _esc = _bs.hi * 1.5;
+  var _pLo = (_bs.lo / _esc * 100), _pHi = (_bs.hi / _esc * 100);
+  return '<div style="position:relative;height:30px;margin:4px 0 8px">'+
+    '<div style="position:absolute;top:11px;left:0;right:0;height:8px;border-radius:5px;background:var(--sur2)"></div>'+
+    '<div style="position:absolute;top:11px;left:'+_pLo.toFixed(1)+'%;width:'+(_pHi-_pLo).toFixed(1)+'%;height:8px;background:#1d3a2b"></div>'+
+    '<div style="position:absolute;top:6px;left:calc('+Math.max(0, Math.min(100, carga/_esc*100)).toFixed(1)+'% - 1.5px);width:3px;height:18px;'+
+      'background:var(--red);border-radius:2px;box-shadow:0 0 8px rgba(228,30,37,.55)"></div>'+
+    '<span style="position:absolute;top:-2px;left:'+_pLo.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.lo+'</span>'+
+    '<span style="position:absolute;top:-2px;left:'+_pHi.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.hi+'</span>'+
+  '</div>';
+}
+
 function _truncarCentimo_(x){ return Math.floor(x * 100 + 1e-9) / 100; }
 
 function _umbral_(){
@@ -2871,6 +2906,11 @@ function _mdPlegado_(md){
 /* La pantalla de novedades. Si el sellado no se hizo, se DICE en vez de enseñar un hueco:
    un changelog vacio parece que no ha cambiado nada, que es lo contrario de la verdad. */
 function _novedadesHTML_(){
+  /* ⛔ 19/10 (auditoría): la MISMA guarda que su gemela `_automatismosHTML_`, dentro. Hoy los tres llamadores (menú del
+     móvil, menú y `ir` del escritorio) ya preguntan antes; esto es para el cuarto, que no lo hará. */
+  if(!_puedeVerNovedades_()){
+    return '<div class="mtit">Novedades</div><p class="rnota" data-est="nopuede">Esta pantalla es del director, y sólo en la beta.</p>';
+  }
   var cuerpo = String(CHANGELOG_MD||'').trim()
     ? '<div class="mdoc">'+_mdPlegado_(CHANGELOG_MD)+'</div>'
     : '<p class="rnota">El changelog no se selló en esta build. Está en '+
@@ -3621,6 +3661,27 @@ function _cablearVisor_(raiz){
    equipo. Si nadie consigue suscribirse, no hay a quién mandar nada.
    ✅ Se caza el fallo y se dice QUÉ HACER. La detección de Brave sólo afina el consejo: un
    navegador que falle por otra razón también recibe algo útil en vez de un silencio. */
+/* ═══ ENTRAR CON GOOGLE, UNA PUERTA (19/10) ════════════════════════════════════════════════════════════════
+   ⛔ Estaba COPIADO en las dos caras (`_pintarLogin_`, 0,97 de parecido medido por `gemelas.py`): el mismo `initialize`,
+   el mismo botón y el mismo `prompt`, y sólo cambiaban la cabecera y el texto del error. Una copia de cómo se entra es
+   la que diverge el día que Google cambie algo y sólo se arregle en una cara. Cada cara pone SU cabecera (lo que de
+   verdad difiere) y esto pone el resto. El error es el del móvil, que dice qué pasa en vez de «Error iniciando Google
+   Sign-In». `_gate_` es de cada cara (se resuelve al llamar). */
+function _iniciarGoogle_(cabeceraHTML){
+  _gate_(cabeceraHTML+'<div id="gbtn"></div>');
+  try{
+    var hint=''; try{ hint=localStorage.getItem('sol_last_email')||''; }catch(_){}
+    var cfg={client_id:GOOGLE_CLIENT_ID,callback:_onCredencial_,auto_select:true,
+             itp_support:true,use_fedcm_for_prompt:true};
+    if(hint) cfg.login_hint=hint;
+    google.accounts.id.initialize(cfg);
+    google.accounts.id.renderButton(document.getElementById('gbtn'),
+      {theme:'filled_black',size:'large',text:'signin_with',shape:'pill'});
+    try{ google.accounts.id.prompt(); }catch(_){}
+    api.ping(); setTimeout(function(){ api.ping(); },4000);   // pre-calienta el contenedor
+  }catch(e){ _gate_('<div style="color:#ffb3b0">No se pudo iniciar sesión con Google: '+((e&&e.message)||e)+'</div>'); }
+}
+
 function _consejoSuscribir_(err){
   var e=String((err&&err.message)||err||'');
   if(navigator.brave) return 'Brave trae apagado \u00abUsar los servicios de Google para la '+
@@ -5100,6 +5161,18 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-19-ranking-estimacion', fecha:'2026-10-19',
+      titulo:'La cuota del ranking dice que es una estimación, y el ranking cuenta sin las bajas',
+      items:[
+        {cara:'escritorio', vista:'ranking', txt:'**La cuota del ranking ya dice que es una estimación**: «CUOTA MEDIA ESTIMADA», la columna «Cuota est.» y una nota que empieza por «la cuota es anual y se cierra en agosto». Hasta hoy eran 32 importes en € a secas.'},
+        {cara:'movil', vista:'horas', txt:'**Tu fila del ranking ya no tiene bajas debajo**: si eres el último de verdad, no te salen filas de gente que ya no está en el equipo.'}
+      ] },
+    { id:'2026-10-19-indice-de-carga-escritorio', fecha:'2026-10-19',
+      titulo:'Tu índice de carga ya sale también en el escritorio',
+      items:[
+        {cara:'escritorio', vista:'libros', txt:'**«Lo tuyo» enseña tu índice de carga**, con la misma barra que el móvil: la banda sana en verde, tu marca en rojo, y debajo tus horas de este mes en vivo. Hasta hoy sólo estaba en el móvil. Dice que es un ÍNDICE: arrastra parte de los dos meses anteriores, así que no es la carga de este mes.'},
+        {cara:'movil', vista:'horas', txt:'**Mi índice de carga no cambia**: la barra es la misma de antes, ahora compartida con el escritorio. Sólo cambia ante un dato raro: sin un número de verdad sale «Sin dato de carga» en vez de una marca en el cero.'}
+      ] },
     { id:'2026-10-15-convocados-y-arreglos', fecha:'2026-10-15',
       titulo:'Cambiar a quién se convoca después de crear la reunión, y cinco cosas que molestaban',
       items:[

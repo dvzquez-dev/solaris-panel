@@ -402,6 +402,20 @@ function _mitPlazoTxt_(cv, ahora){
    capa, no la primera — y el botón no se pinta.
    ⚠️ `_mitPlazoTxt_` NO vale de subtítulo: mide contra `limite`, y en `sin_abrir` rotula «te
    quedan N h para contestar» cuando **no se puede contestar nada**. */
+/* ⛔ EL RÓTULO DE UNA FRANJA DE LA REJILLA DE TURNOS (19/10). 🗣️ Daniel, 14/10: *«las horas… tanto
+   en reuniones como en turnos como en lo que sea, han de aparecer justo en el medio de dos slots …
+   No están ni para arriba ni para abajo»*. El móvil lo cumple desde ese día (`.rc.rd span`); aquí
+   `.dmc` centraba «10:00» DENTRO de su casilla de 36 px, que es justo lo que rechazó.
+   Sólo una HORA (`HH:MM`) se sube a la línea: un rótulo que no es una hora («Mañana») nombra la
+   franja entera y se queda centrado en ella. Una puerta y no tres copias: la rejilla sale en tres
+   pantallas (antes de abrir, la tuya y la del coordinador). */
+function _rotFranjaE_(txt){
+  var t = String(txt == null ? '' : txt);
+  return /^\d{1,2}:\d{2}$/.test(t)
+    ? '<div class="dmc dml dmh"><span>' + esc(t) + '</span></div>'
+    : '<div class="dmc dml">' + esc(t) + '</div>';
+}
+
 function _miTurnoPreHTML_(cv){
   var D=cv.dias||[], F=cv.franjas||[];
   /* ⛔ POR `_normAbre_` (463.ª): con `_dmyAISO_` a pelo, un `abre` sin hora —o en
@@ -414,7 +428,7 @@ function _miTurnoPreHTML_(cv){
     return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
   }).join('');
   var filas=F.map(function(fr){
-    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+
+    return _rotFranjaE_(fr.txt)+
       D.map(function(){ return '<div class="dcel off"></div>'; }).join('');
   }).join('');
   return pan('Tu disponibilidad', 'se abre el '+esc(abD)+' a las '+esc(abH),
@@ -452,7 +466,7 @@ function _miTurnoPanel_(){
   }).join('');
   var COL={cuvi:'rgba(228,30,37,.78)', citi:'rgba(63,158,214,.78)', ambos:'rgba(53,199,89,.78)'};
   var filas=F.map(function(fr){
-    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+D.map(function(d){
+    return _rotFranjaE_(fr.txt)+D.map(function(d){
       var k=_dispClave_(d,fr.k), v=mias[k];
       var st = (v && v.s && v.s!=='no') ? ('background:'+(COL[v.s]||'rgba(228,30,37,.78)')) : '';
       return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" '+
@@ -636,7 +650,7 @@ function _dispPanel_(){
     return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
   }).join('');
   var filas=F.map(function(fr){
-    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+D.map(function(d){
+    return _rotFranjaE_(fr.txt)+D.map(function(d){
       var k=_dispClave_(d,fr.k), c=calor[k];
       /* El color es la INTENSIDAD del rojo Solaris según cuánta gente puede: el mapa se lee
          de un vistazo y el número exacto está dentro. Con nadie, la celda se queda apagada. */
