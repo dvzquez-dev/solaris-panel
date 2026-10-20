@@ -31,8 +31,11 @@
 async function _cargarSancionesM_(){
   try{ var a=await api.getSanciones({estado:'pendiente'});
        if(Array.isArray(a)){ a.forEach(function(s){ if(!s.dec && s.decision) s.dec=s.decision; });
-                             SANC_M=a; return true; } }
+                             SANC_M=a; SANC_FALLO=false; return true; } }
   catch(e){}
+  /* ⛔ 21/10 (auditor de sanciones): el «no contestó» lo deja el CARGADOR, no sólo el modal — si no, el Panel del PD
+     decía «Cargando…» con el radar girando tras un fallo del arranque. Con una cola ya leída, se conserva. */
+  if(SANC_M===null) SANC_FALLO=true;
   /* ⛔⛔ DEVUELVE SI TRAJO ALGO, y no es adorno: el `catch(e){}` de arriba se traga el error
      a proposito — un refresco fallido no debe tirar la pantalla —, y eso deja a quien llama
      sin forma de distinguir «la cola esta al dia» de «no contesto nadie». Quien cierra un
@@ -190,6 +193,10 @@ function _sancColaHTML_(){
             ' · '+esc(_etSancFila_(x.puntos, x.origen, x.extra))+'</span>'+
           (suelta
             ? '<button class="btn mini" data-sok="'+esc(x.id)+'" data-p>Aprobar</button>'+
+              /* ⛔ 21/10 (auditor de sanciones): «Justificar» también en una suelta, como el escritorio — y con su mismo
+                 gate: una revocación o un premio no se justifica. */
+              (_esNoJustificable_(x.origen, x.extra) ? '' :
+              '<button class="btn mini" data-sjust="'+esc(x.id)+'" data-p>Justificar</button>')+
               '<button class="btn mini" data-sno="'+esc(x.id)+'" data-p style="color:var(--warn);border-color:var(--warn)">Rechazar</button>'
             /* ⛔ UN SOLO ATRIBUTO `class`, CON EL TERNARIO DENTRO. Hasta el 11/08 el boton
                abria con `class="btn mini"` y el ternario anadia un SEGUNDO `class`: el parser
@@ -211,8 +218,12 @@ function _sancColaHTML_(){
                dato en la misma app es como se acaba dudando de cual manda. */
             : '<button class="btn mini'+(x.dec==='aceptar'?' on a':'')+'" data-smarc="'+esc(x.id)+
                 '" data-dec="aceptar" data-p>Acepta</button>'+
+              /* ⛔ 21/10 (auditor de sanciones): una REVOCACIÓN o un PREMIO no se justifica — como en el escritorio.
+                 Aquí se ofrecía, el servidor lo aceptaba por `marcar` y al cerrar el bloque quedaba `justificada`: la
+                 revocación no devolvía los puntos y ya no se podía volver a revocar. */
+              (_esNoJustificable_(x.origen, x.extra) ? '' :
               '<button class="btn mini'+(x.dec==='justificar'?' on j':'')+'" data-smarc="'+esc(x.id)+
-                '" data-dec="justificar" data-p>Justifica</button>'+
+                '" data-dec="justificar" data-p>Justifica</button>')+
               '<button class="btn mini'+(x.dec==='rechazar'?' on r':'')+'" data-smarc="'+esc(x.id)+
                 '" data-dec="rechazar" data-p>Rechaza</button>')+
         '</div>';
@@ -402,6 +413,10 @@ function _cablearSanciones_(){
   /* Sueltas: se deciden una a una. */
   $$('[data-sok]').forEach(function(b){ b.onclick=function(){ _decidirSancM_(b.dataset.sok,'aprobar',b); }; });
   $$('[data-sno]').forEach(function(b){ b.onclick=function(){ _decidirSancM_(b.dataset.sno,'rechazar',b); }; });
+  /* 21/10: justificar pide el motivo, como el escritorio; sin motivo no se manda nada. */
+  $$('[data-sjust]').forEach(function(b){ b.onclick=function(){
+    var just=prompt('Motivo de la justificación:'); if(!just || !just.trim()) return;
+    _decidirSancM_(b.dataset.sjust,'justificar',b,{justificacion:just.trim()}); }; });
   /* De lote: se MARCA, y el bloque se cierra entero. */
   $$('[data-smarc]').forEach(function(b){
     b.onclick=async function(){
@@ -472,10 +487,11 @@ function _cablearSanciones_(){
   });
 }
 
-async function _decidirSancM_(id, accion, b){
+async function _decidirSancM_(id, accion, b, opts){
   b.disabled=true;
-  try{ await api.decidirSancion(id, accion, {});
-    SANC_M=null; tost(accion==='aprobar'?'Sanción aprobada.':'Sanción rechazada.'); _abrirSanciones_();
+  try{ await api.decidirSancion(id, accion, opts||{});
+    SANC_M=null; tost({aprobar:'Sanción aprobada.', justificar:'Sanción justificada: no resta puntos.'}[accion]||'Sanción rechazada.');
+    _abrirSanciones_();
   }catch(e){ b.disabled=false; tostErr('No se pudo: ', e); }
 }
 
@@ -788,7 +804,9 @@ function panelPD(){
      Ahora sale de `SANC_M` (`getSanciones`), y si todavia no ha llegado se DICE, en vez de
      enseñar un cero que parece una respuesta. Decidir es del modal de Sanciones: ver abajo. */
   if(SANC_M===null) return '<h2 class="sec">Panel del PD<span class="ln"></span>disciplina</h2>'+
-    '<div class="tarj">'+vacio('Cargando la cola…','Buscando qué sanciones esperan decisión.','',true)+'</div>';
+    '<div class="tarj">'+(SANC_FALLO   /* 21/10: «no contestó» no es «cargando» */
+      ? vacio('No se pudo cargar','El servidor no contestó: se reintenta solo cada 90 s.','',false)
+      : vacio('Cargando la cola…','Buscando qué sanciones esperan decisión.','',true))+'</div>';
   if(!SANC_M.length) return '<h2 class="sec">Panel del PD<span class="ln"></span>disciplina</h2>'+
     '<div class="tarj">'+vacio('Nada pendiente','Ninguna sanción espera decisión ahora mismo.','',false)+'</div>';
   var porLote={};

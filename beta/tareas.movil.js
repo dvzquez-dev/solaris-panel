@@ -104,7 +104,7 @@ function vTareas(){
          ⛔ Y NO se inventa el PLAZO: el texto del Art. 34 no está en el repo, y un «tienes
          N días» escrito a ojo suena oficial — que es peor que no decirlo. */
       'Si crees que una no te corresponde, el RRI te deja apelarla (Art. 34): '+
-      'de momento es <b>fuera de la app</b>, en privado al Project Director.</p></div>':'')+
+      'se habla en privado al Project Director, y si procede la revoca desde la app y te devuelve los puntos.</p></div>':'')+
     /* mismo cajon que en Turnos: cuenta y la ultima, para que las dos pantallas se lean igual */
     (fin.length?'<div class="cajon" data-caj data-p><span>Tareas pasadas <b>· '+fin.length+'</b>'+
         (fin[0]&&_plazoDMY_(fin[0].l)?' <span style="color:var(--ink3)">· la última, '+_plazoDMY_(fin[0].l)+'</span>':'')+'</span>'+

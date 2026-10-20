@@ -169,6 +169,38 @@ function _selectorLotes_(){
     '</select></label></div>';
 }
 
+/* ⛔ 21/10 (auditor de sanciones): LA PREVISIÓN «antes → después» DE UNA FILA DEL BLOQUE, o '' si no se sabe. Era
+   `var antes=m?m.puntos:10`: a quien no es PD el roster le llega SIN `puntos`, y salía «undefined → NaN»; a quien no
+   está en el roster, un 10 inventado. Sin puntos de verdad no hay previsión (§3c-24). Si la decisión no es «aceptar» o
+   los puntos de la sanción no llegaron, se queda quieta: lo que va a pasar de verdad al cerrar el bloque. */
+function _prevPuntosLote_(m, x){
+  var antes = (m && typeof m.puntos === 'number' && isFinite(m.puntos)) ? m.puntos : null;
+  if(antes === null) return '';
+  var desp = (x && x.dec === 'aceptar' && typeof x.pts === 'number') ? Math.max(0, Math.min(10, antes + x.pts)) : antes;
+  return antes + ' → ' + desp;
+}
+
+/* ⛔ 21/10 (auditor de sanciones): EL DÍA DE UNA SANCIÓN RESUELTA, como se lee: `decidido_at` (si no, `creado_at`), en
+   el día de Madrid (`_ahoraLocalISO_`) y en DD/MM/AAAA. Sin fecha legible, «—». */
+function _diaSancHist_(s){
+  var f = (s && (s.decidido_at || s.creado_at)) || '', d = f ? new Date(String(f)) : null;
+  if(d && !isNaN(+d)) return _isoADMY_(_ahoraLocalISO_(d).slice(0, 10));
+  return /^\d{4}-\d{2}-\d{2}/.test(String(f)) ? _isoADMY_(String(f).slice(0, 10)) : '\u2014';
+}
+
+/* ⛔ 21/10 (auditor de sanciones): QUÉ SUELTAS CABEN EN UN PAQUETE. El servidor no mete dos veces a la misma persona en
+   el mismo paquete y es TODO O NADA, así que mandar todas hacía fallar la operación entera en cuanto alguien tenía dos.
+   Va UNA por persona — la más antigua (`creado_at`) — y las demás se quedan sueltas: `{van:[…], quedan:[…]}`. */
+function _sueltasAgrupables_(ss){
+  var orden = (ss||[]).slice().sort(function(a,b){ return String(a.creado_at||'').localeCompare(String(b.creado_at||'')); });
+  var visto = {}, van = [], quedan = [];
+  orden.forEach(function(s){
+    var k = String(s.nombre||'');
+    if(visto.hasOwnProperty(k)) quedan.push(s); else { visto[k] = 1; van.push(s); }
+  });
+  return {van: van, quedan: quedan};
+}
+
 function _panelSueltas_(){
   var ss=_sancSueltas_();
   /* ⛔⛔ «NINGUNA» Y «NO LO SÉ» NO SE PINTAN IGUAL. `SANC_BACK` arranca en `null` y se
@@ -192,11 +224,14 @@ function _panelSueltas_(){
              dice «sin dato», no **0** -- que en esta columna se lee como «fue un
              aviso». Y el color sale del MISMO valor, asi que un hueco no se pinta
              de rojo por un `<0` sobre un cero inventado. */
+          /* ⛔ 21/10 (auditor de sanciones): el ROTULO de las dos caras (`_etSancFila_`), no el número en crudo — una
+             revocación de +2 salía «2» y un premio «0», que en esta columna se lee «aviso». */
           '<td class="r mono '+(_ptsSanc_(s.puntos)<0?'dn':'')+'">'
-            +(_ptsSanc_(s.puntos)===null?_etPtsSanc_(null):_ptsSanc_(s.puntos))+'</td>'+
+            +esc(_etSancFila_(s.puntos, s.origen, s.extra))+'</td>'+
           '<td class="r"><span class="decs" data-sid="'+s.id+'">'+
             '<button data-sdec="aprobar">Aplica</button>'+
-            '<button data-sdec="justificar">Justifica</button>'+
+            /* ⛔ 21/10: una revocación o un premio suelto no se justifica — el servidor lo rechaza. */
+            (_esNoJustificable_(s.origen, s.extra) ? '' : '<button data-sdec="justificar">Justifica</button>')+
             '<button data-sdec="rechazar">Rechaza</button>'+
           '</span> <button class="btn sm" data-seditar="'+s.id+'">Editar</button></td></tr>';
       }).join(''))+
@@ -204,8 +239,8 @@ function _panelSueltas_(){
       '<span class="sc" style="margin-left:9px">un solo comunicado para todas</span></div>'+
     '<div class="nota">Cada suelta se decide por su cuenta: no comparten motivo ni comunicado. '+
     '<b>Editar</b> corrige puntos, motivo y artículo <b>al aplicarla</b> —es lo único que deja el '+
-    'backend—. <b>Revocar una ya aplicada no se hace desde aquí</b>: el servidor no deja tocar '+
-    'lo aplicado, y la revocación va por <span class="mono">flujos/enviar_revocacion.py</span>.</div>');
+    'backend—. Una ya aplicada no se edita: se <b>revoca</b> abajo, en «Se pueden revocar», que es la vía de '+
+    'apelación del Art. 34.</div>');
 }
 
 
@@ -354,9 +389,10 @@ function _panelHistSanc_(){
           '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
           '<td class="mono '+tono+'">'+esc(et)+'</td>'+
           /* ⛔ Igual que su gemela de arriba: el hueco se dice, no se rellena. */
-          '<td class="r mono">'
-            +(_ptsSanc_(s.puntos)===null?_etPtsSanc_(null):_ptsSanc_(s.puntos))+'</td>'+
-          '<td class="r mono" style="color:var(--ink3)">'+esc(String(s.creado_at||'').slice(0,10))+'</td></tr>';
+          '<td class="r mono">'+esc(_etSancFila_(s.puntos, s.origen, s.extra))+'</td>'+   /* 21/10: el rótulo, no el número */
+          /* ⛔ 21/10 (auditor de sanciones): la fecha de la DECISIÓN (la de propuesta si no consta), en el día de Madrid y
+             en DD/MM/AAAA — era `creado_at` recortado: ISO, UTC y otra fecha. */
+          '<td class="r mono" style="color:var(--ink3)">'+esc(_diaSancHist_(s))+'</td></tr>';
       }).join(''))+
     (hs.length>40?'<div class="nota">Se muestran las 40 más recientes de '+hs.length+'.</div>':''));
 }

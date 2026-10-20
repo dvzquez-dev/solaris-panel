@@ -210,7 +210,11 @@ function conteo(k){
      a la vez, que es lo que pasa cuando una regla vive en dos sitios. */
   if(k==='docurso')return DOCS.filter(function(d){return _docEnCurso_(d.est);}).length;
   if(k==='docpub') return DOCS.filter(function(d){return _docResuelto_(d.est);}).length;
-  if(k==='sanciones') return LOTE.cerrado?0:LOTE.items.length;
+  /* ⛔ 21/10 (auditor de sanciones): TODAS las pendientes — todos los bloques y las sueltas —, no sólo el bloque del
+     desplegable (decía 2 con 7 esperando, y cambiaba al cambiar el desplegable). Sin respuesta, lo de antes. */
+  if(k==='sanciones') return Array.isArray(SANC_BACK)
+    ? SANC_BACK.filter(function(s){ return s && s.estado==='pendiente'; }).length
+    : (LOTE.cerrado?0:LOTE.items.length);
   if(k==='apela')  return 0;        // no hay cola de apelaciones: contar la maqueta era mentir
   if(k==='convoc') return REUS.length;
   if(k==='turnos') return TURNOS.length;

@@ -4346,6 +4346,16 @@ function _avisoMinimo_(marcadas, exigido){
    ⚠️ Sin `limite` no hay plazo que vencer: abierto. */
 function _ahoraLocalISO_(d){
   var x = d || new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
+  /* ⛔ 21/10 (auditor de reuniones): LA HORA DE MADRID, no la del aparato — la del servidor. Con el teléfono en otra
+     zona la cara decía «abierta» de un plazo ya cerrado (o al revés), y no cubrir a tiempo sanciona. Si `Intl` no puede
+     (sin soporte, o un doble de `Date`), el reloj local como hasta hoy. */
+  try{
+    var o = {}, ps = new Intl.DateTimeFormat('en-GB', {timeZone:'Europe/Madrid', year:'numeric', month:'2-digit',
+      day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23'}).formatToParts(x), i;
+    for(i = 0; i < ps.length; i++) o[ps[i].type] = ps[i].value;
+    if(o.year && o.month && o.day && o.hour && o.minute)
+      return o.year + '-' + o.month + '-' + o.day + 'T' + (o.hour === '24' ? '00' : o.hour) + ':' + o.minute;
+  }catch(_){ }
   return x.getFullYear() + '-' + p(x.getMonth() + 1) + '-' + p(x.getDate()) +
          'T' + p(x.getHours()) + ':' + p(x.getMinutes());
 }
@@ -5540,6 +5550,16 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-21-sanciones-auditor', fecha:'2026-10-21',
+      titulo:'Sanciones: lo que ofrece cada pantalla, igual que el servidor',
+      items:[
+        {cara:'movil', vista:'horas', txt:'En tu Panel del PD, una **revocación o un premio** ya no ofrece «Justifica» (el servidor la dejaba justificada y no devolvía los puntos); y una sanción **suelta** sí se puede justificar, pidiendo el motivo, como en el ordenador.'},
+        {cara:'movil', vista:'horas', txt:'Si la cola de sanciones no llega al abrir la app, el Panel del PD dice **«No se pudo cargar»** en vez de «Cargando la cola…» sin fin.'},
+        {cara:'escritorio', vista:'sanciones', txt:'Sueltas e historial dicen **«revocación · +2 puntos»** o **«premio · +1,5 h»** (antes «2» y «0», que se leía «aviso»); el historial lleva la fecha de la **decisión** en DD/MM/AAAA; y una sola explicación de cómo se apela.'},
+        {cara:'escritorio', vista:'sanciones', txt:'Aprobar una suelta la deja **«aprobada: se aplica en Notion en unos minutos»** (no «aplicada» en el acto); «Editar» pide los puntos con la misma regla que «Poner»; y la previsión del bloque ya no sale «undefined → NaN».'},
+        {cara:'escritorio', vista:'sanciones', txt:'El número de la pestaña cuenta **todas** las pendientes (no sólo el bloque elegido); el botón dice **«3 sanciones · 1 premio»**; y «Agrupar en un paquete» va **una por persona** (antes fallaba entero si alguien tenía dos).'},
+        {cara:'movil', vista:'reu', txt:'Los plazos de las convocatorias se cuentan con la **hora de Madrid**, aunque el teléfono esté en otra zona.'}
+      ] },
     { id:'2026-10-20-partes-auditor', fecha:'2026-10-20',
       titulo:'Partes: lo que dice cada pantalla, igual que el servidor',
       items:[
