@@ -318,25 +318,6 @@ function _antDelMesAnterior_(ant, periodo){
   return (trae === _mesAnteriorDe_(periodo)) ? ant : null;
 }
 
-/* Cuantos dias DURO el mes anterior al periodo `AAAA-MM`. Sin periodo, se deduce de hoy.
-
-   ⛔ UN MES NO DURA LO QUE DICE EL CALENDARIO: dura del cierre del anterior al cierre de este
-   (Daniel, 07/08: *«Bueno y si junio se cerro el 29, imaginate»*). Si junio cerro el 29/06 y
-   julio el 04/08, julio duro **37 dias**, no 31 — y dividir por 31 infla el ritmo de julio de
-   las 32 personas a la vez, sin dar ningun error.
-
-   `servidor` es el `equipo_mes.dias_ant` que calcula el backend con el historico de cierres. Si
-   no hay dos cierres guardados llega `null` y se cae al calendario: aproximado, pero no
-   inventado. */
-function _diasMesAnterior_(periodo, servidor){
-  var sv = Number(servidor);
-  if(isFinite(sv) && sv > 0) return sv;
-  var y, m;
-  if(/^\d{4}-\d{2}$/.test(String(periodo||''))){ y=+periodo.slice(0,4); m=+periodo.slice(5,7)-1; }
-  else { var d=new Date(); y=d.getFullYear(); m=d.getMonth(); }
-  return new Date(y, m, 0).getDate();          /* dia 0 del mes actual = ultimo del anterior */
-}
-
 function sumaE(e){return PARTES.filter(function(p){return p.e===e;}).reduce(function(a,p){return a+p.q;},0);}
 
 /* ⛔ DOS PUERTAS A PROPOSITO, Y LA DIFERENCIA ES QUIEN PREGUNTA.

@@ -38,11 +38,11 @@
    desplazamiento, los campos de fecha y los menús de autocompletado.
    ✅ Es una DECLARACIÓN, no una reimplementación: un desplegable dibujado a mano pierde
    el teclado, el gesto táctil y el lector de pantalla. */
-:root{color-scheme:dark}
-/* ⚠️ Y las opciones, para los navegadores que SÍ las dejan pintar. La paleta no se
-   elige: son las variables que ya salen de la insignia (ARRANQUE §2). */
-select option{background:var(--sur2);color:var(--ink)}
-select option:checked{background:var(--line2)}
+  /* ⛔⛔ COMO DECLARACIÓN DE ESTE BLOQUE, NO COMO REGLA (20/10). Estaba escrita `:root{color-scheme:dark}`
+     AQUÍ DENTRO: anidada es `:root :root`, que no casa con nada. 📏 Chromium, las dos caras: `colorScheme`
+     "normal". O sea que el arreglo del 13/10 NUNCA se aplicó, y Daniel lo volvió a ver el 20/10: *«en el puto
+     ordenador aparece un desplegable blanco sin nada de la estética del móvil»*. */
+  color-scheme:dark;
   --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6;
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,monospace;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -50,6 +50,11 @@ select option:checked{background:var(--line2)}
   --sal:cubic-bezier(.16,.84,.44,1);
   --arco:cubic-bezier(.34,1.42,.5,1);
 }
+/* ⚠️ Y las opciones, para los navegadores que SÍ las dejan pintar. La paleta no se
+   elige: son las variables que ya salen de la insignia (ARRANQUE §2). Van FUERA del
+   bloque `:root` (20/10): dentro, anidadas, dependían del soporte de CSS anidado. */
+select option{background:var(--sur2);color:var(--ink)}
+select option:checked{background:var(--line2)}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.45;

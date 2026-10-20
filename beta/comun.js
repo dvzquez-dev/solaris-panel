@@ -686,6 +686,27 @@ function _diasDelMes_(){
     periodo:null};
 }
 
+/* Cuantos dias DURO el mes anterior al periodo `AAAA-MM`. Sin periodo, se deduce de hoy.
+   ⚠️ Vive aquí desde el 20/10 (era de `horas.movil.js`): el panel del escritorio compara
+   también por ritmo, y sin los días que duró el mes pasado no hay ritmo que comparar.
+
+   ⛔ UN MES NO DURA LO QUE DICE EL CALENDARIO: dura del cierre del anterior al cierre de este
+   (Daniel, 07/08: *«Bueno y si junio se cerro el 29, imaginate»*). Si junio cerro el 29/06 y
+   julio el 04/08, julio duro **37 dias**, no 31 — y dividir por 31 infla el ritmo de julio de
+   las 32 personas a la vez, sin dar ningun error.
+
+   `servidor` es el `equipo_mes.dias_ant` que calcula el backend con el historico de cierres. Si
+   no hay dos cierres guardados llega `null` y se cae al calendario: aproximado, pero no
+   inventado. */
+function _diasMesAnterior_(periodo, servidor){
+  var sv = Number(servidor);
+  if(isFinite(sv) && sv > 0) return sv;
+  var y, m;
+  if(/^\d{4}-\d{2}$/.test(String(periodo||''))){ y=+periodo.slice(0,4); m=+periodo.slice(5,7)-1; }
+  else { var d=new Date(); y=d.getFullYear(); m=d.getMonth(); }
+  return new Date(y, m, 0).getDate();          /* dia 0 del mes actual = ultimo del anterior */
+}
+
 function _fraccionDelMes_(d){
   /* ⛔ SIN ARGUMENTO, EL PESO SALE DEL DIA DESDE EL CIERRE, no del dia del calendario.
      Hasta el 12/08 esto dividia `d.getDate()` por los dias del mes natural, teniendo
@@ -5430,6 +5451,22 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-20-select-oscuro', fecha:'2026-10-20',
+      titulo:'Las listas desplegables, por fin en oscuro',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'Abre cualquier desplegable (`<select>`): la lista sale **oscura**, con los colores de la app, no blanca. El arreglo del 13/10 no se aplicaba.'},
+        {cara:'movil', vista:'fichar', txt:'Lo mismo en el móvil, donde el navegador dibuje la lista.'}
+      ] },
+    { id:'2026-10-20-registro-ant', fecha:'2026-10-20',
+      titulo:'«Registro del mes»: el mes anterior aparece, y la Δ compara ritmos',
+      items:[
+        {cara:'escritorio', vista:'registro', txt:'La columna **Mes anterior** ya enseña las horas del mes pasado (salía «—» para todos: leía un campo viejo). Y la **Δ ritmo** compara h/día, no el total a medias contra el mes entero.'}
+      ] },
+    { id:'2026-10-20-sube-por-ritmo', fecha:'2026-10-20',
+      titulo:'«Quién más sube» compara ritmos, no totales',
+      items:[
+        {cara:'escritorio', vista:'panel', txt:'En «Este mes» del **Panel de mando**, «quien más sube / más baja» compara **h/día** contra el mes pasado (como el móvil), no el total a medias contra el mes entero: antes, a mitad de mes, casi todos «bajaban».'}
+      ] },
     { id:'2026-10-20-apuntes-rotulo', fecha:'2026-10-20',
       titulo:'«1 apunte que ya cuenta», no «1 partes»',
       items:[

@@ -143,13 +143,25 @@ function insightsHTML(){
   var conAnt=_activos_().filter(function(m){
     return _ant(m)!=null && typeof m.hMes==='number'; });
   if(conAnt.length>=2){
-    var vpc=function(m){ return (m.hMes-_ant(m))/_ant(m)*100; };
+    /* ⛔⛔ RITMO CONTRA RITMO, NO TOTAL CONTRA TOTAL (20/10). Aquí se comparaba `hMes` —las horas que
+       LLEVA el mes en curso— contra el mes anterior ENTERO, así que antes de fin de mes casi todo el
+       equipo «bajaba», y quien más subía podía salir con un porcentaje NEGATIVO («X es quien más sube:
+       −40 %»). El móvil compara por ritmo desde el 13/08 (`_compHorasHTML_`: «el mes en curso va a
+       medias y el anterior está entero»); ésta es la misma cuenta: h/día con la base DEVENGADA, el mes
+       pasado a fracción 1 y entre los días que DURÓ (`_diasMesAnterior_`, de cierre a cierre).
+       ⚠️ Y el verbo sale del SIGNO: con todos subiendo, el último no «baja», «sube menos». */
+    var _dm=_diasDelMes_(), _dia=Math.max(1,_dm.dia), _fr=_fraccionDelMes_();
+    var _dAnt=_diasMesAnterior_(_dm.periodo, DATA.equipo_mes ? DATA.equipo_mes.dias_ant : null);
+    var _rit=function(m){ var b=_devengadoAHoy_(m, m.hMes, _fr); return (b==null?m.hMes:b)/_dia; };
+    var _ritAnt=function(m){ var a=_ant(m), b=_devengadoAHoy_(m, a, 1); return (b==null?a:b)/_dAnt; };
+    var _rh=function(v){ return nf2(Math.round(v*100)/100); };
+    var vpc=function(m){ return (_rit(m)-_ritAnt(m))/_ritAnt(m)*100; };
     var subida=conAnt.slice().sort(function(a,b){return vpc(b)-vpc(a);})[0];
     var bajada=conAnt.slice().sort(function(a,b){return vpc(a)-vpc(b);})[0];
-    xs.push(['up',esc(subida.pila)+' es quien m\u00e1s sube: '+pc(vpc(subida))+
-      ' respecto al mes pasado ('+h1(_ant(subida))+' \u2192 '+h1(subida.hMes)+').']);
-    xs.push(['dn',esc(bajada.pila)+' es quien m\u00e1s baja: '+pc(vpc(bajada))+
-      ' ('+h1(_ant(bajada))+' \u2192 '+h1(bajada.hMes)+').']);
+    xs.push(['up',esc(subida.pila)+(vpc(subida)>=0?' es quien m\u00e1s sube: ':' es quien menos baja: ')+pc(vpc(subida))+
+      ' de ritmo respecto al mes pasado ('+_rh(_ritAnt(subida))+' \u2192 '+_rh(_rit(subida))+' h/d\u00eda).']);
+    xs.push(['dn',esc(bajada.pila)+(vpc(bajada)<0?' es quien m\u00e1s baja: ':' es quien menos sube: ')+pc(vpc(bajada))+
+      ' ('+_rh(_ritAnt(bajada))+' \u2192 '+_rh(_rit(bajada))+' h/d\u00eda).']);
   } else {
     /* no se finge una comparativa que no existe: se dice que falta el dato */
     xs.push(['wa','Todav\u00eda no hay horas del mes anterior, as\u00ed que no se puede comparar la evoluci\u00f3n.']);
