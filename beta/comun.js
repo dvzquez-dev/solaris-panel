@@ -2200,7 +2200,12 @@ function _selloAprobado_(p, perAbierto, uc){
   var verbo = o === 'otorgada' ? 'otorgado' : (o === 'reversion' ? 'revertido' : 'aprobado');
   var per = /^\d{4}-\d{2}$/.test(String(perAbierto || '')) ? String(perAbierto) : null;
   var cre = String((p && p.creado_at) || ''), mes = null, cerrado = false;
-  if (/^\d{4}-\d{2}-\d{2}/.test(cre)){
+  /* ⛔⛔ 20/10 EL MES QUE GRABÓ EL SERVIDOR MANDA: `periodo` lo pone `marcarPartesAplicadas` con el mes abierto en el
+     instante en que las horas entraron en Notion — el «siempre registrado» que pidió Daniel. Lo de abajo es la
+     deducción para lo que aún no lo trae (aprobado y sin aplicar, o de antes del 20/10). */
+  var pg = String((p && p.periodo) || '');
+  if (/^\d{4}-\d{2}$/.test(pg)) mes = pg;
+  else if (/^\d{4}-\d{2}-\d{2}/.test(cre)){
     var c = (uc && uc.at) ? _mesCerradoParte_(p, null, uc) : null;
     if (c === false) mes = per;
     else if (c){ if (cre.slice(0, 7) > c) mes = c; else cerrado = true; }
@@ -5215,6 +5220,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-20-mes-del-parte', fecha:'2026-10-20',
+      titulo:'Cada parte dice a qué mes cuenta, y ya no lo adivina',
+      items:[
+        {cara:'movil', vista:'horas', txt:'**«cuenta en octubre de 2026»** en tus partes ya aplicados: el mes lo apunta el servidor en el momento en que tus horas entran en el panel, así que es el mes en el que cuentan de verdad — también lo atrasado, que entra siempre en el mes abierto. Antes casi todos decían «sin mes confirmado».'},
+        {cara:'escritorio', vista:'horas', txt:'**El Histórico de partes dice el mismo mes que el móvil**, el apuntado al aplicarlas. Lo aprobado que aún no se ha sumado (un par de minutos) y lo de antes del 20/10 siguen con el mes deducido.'}
+      ] },
     { id:'2026-10-20-en-vivo', fecha:'2026-10-20',
       titulo:'La app se actualiza sola, al segundo, cuando cambia algo',
       items:[

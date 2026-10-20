@@ -143,6 +143,7 @@ function normParte(p){
        lee `_selloAprobado_`/`_firmaParte_` (comun.js), la misma puerta que el móvil, y `creado_at`
        viaja porque de él sale A QUÉ MES cuenta. */
     decidido_por:p.decidido_por||null, decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
+    periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo */
     motivo:p.motivo||null, _real:true };
 }
 

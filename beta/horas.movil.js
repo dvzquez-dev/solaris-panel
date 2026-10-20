@@ -110,6 +110,7 @@ function normPMovil(p){
        parte que SÍ lo registra. Es la QUINTA vez que este normalizador tira un campo; el caso de
        `probar_origen_parte.py` pasa el parte CRUDO por aquí a propósito. */
     decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
+    periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo (la SEXTA vez) */
     origen:p.origen||null, caduca:p.caduca_at||null }; }
 
 /* ⚠️ MISMO DEFECTO QUE EL DE ABAJO, y se arregla igual aunque HOY no haga daño:
