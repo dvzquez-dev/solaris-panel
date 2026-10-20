@@ -434,7 +434,7 @@ function _ponerSancCuerpo_(){
             ? '<label style="display:block;margin-bottom:9px">'+lab('Qu\u00e9 tarea')+
                 '<select id="snTarea" style="'+E+'"><option value="">\u2014 elige la tarea \u2014</option>'+
                 tareas.map(function(t){ return '<option value="'+esc(t.url)+'"'+(SANC_FORM.tarea===t.url?' selected':'')+'>'+esc(t.n||t.nombre||'(sin t\u00edtulo)')+
-                  (t.l?' \u00b7 venc\u00eda '+esc(_isoADMY_(t.l)):'')+'</option>'; }).join('')+
+                  (t.l?(_venciaTarea_(t.l)?' \u00b7 venci\u00f3 el ':' \u00b7 vence el ')+esc(_plazoDMY_(t.l)||_isoADMY_(t.l)):'')+'</option>'; }).join('')+   /* 20/10: «vencía» de lo que aún no vence */
               '</select></label>'+
               '<label style="display:block;margin-bottom:9px">'+lab('Plazo nuevo')+
                 '<input type="date" id="snPlazo" value="'+esc(SANC_FORM.plazo||'')+'" style="'+E+'"></label>'+

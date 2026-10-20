@@ -163,8 +163,13 @@ function insightsHTML(){
     xs.push(['dn',esc(bajada.pila)+(vpc(bajada)<0?' es quien m\u00e1s baja: ':' es quien menos sube: ')+pc(vpc(bajada))+
       ' ('+_rh(_ritAnt(bajada))+' \u2192 '+_rh(_rit(bajada))+' h/d\u00eda).']);
   } else {
-    /* no se finge una comparativa que no existe: se dice que falta el dato */
-    xs.push(['wa','Todav\u00eda no hay horas del mes anterior, as\u00ed que no se puede comparar la evoluci\u00f3n.']);
+    /* no se finge una comparativa que no existe: se dice que falta el dato.
+       ⛔ 20/10 (auditoría): SIN `equipo_mes` NO ES QUE NO HAYA HORAS — el servidor no manda las del mes anterior porque
+       la cara no sabría con qué mes rotularlas. Eso es «no lo sé» (§3c-24), y se dice así. */
+    var _sinMes=!(DATA && DATA.equipo_mes);
+    xs.push(['wa', _sinMes
+      ? 'Todavía no ha llegado el dato del mes (cuál está abierto y cuántos días lleva), así que no se puede comparar con el anterior.'
+      : 'Todav\u00eda no hay horas del mes anterior, as\u00ed que no se puede comparar la evoluci\u00f3n.']);
     var top=_activos_().slice().sort(function(a,b){return (b.hMes||0)-(a.hMes||0);})[0];
     if(top) xs.push(['up',esc(top.pila)+' es quien m\u00e1s horas lleva este mes: '+h1(top.hMes||0)+'.']);
   }
@@ -209,7 +214,7 @@ function conteo(k){
   if(k==='apela')  return 0;        // no hay cola de apelaciones: contar la maqueta era mentir
   if(k==='convoc') return REUS.length;
   if(k==='turnos') return TURNOS.length;
-  if(k==='tareas') return TAREAS.length;
+  if(k==='tareas') return TAREAS.filter(function(t){ return !_tareaHecha_(t&&t.e); }).length;   // 20/10: las vivas, como la pantalla
   if(k==='miembros') return DATA.miembros.length;
   if(k==='reclutar') return 0;      // idem: no hay candidaturas en ningun sistema
   return 0;

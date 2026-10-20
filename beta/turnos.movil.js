@@ -727,7 +727,7 @@ function vTurnos(){
   var nTodos=TURNOS.length, nMios=TURNOS.filter(_mioTurno_).length;
   function tarjeta(t){
     return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+
-      cab(t.f+(t.crucial?' · crucial':''), t.hora)+
+      cab(t.f+(t.crucial?' · crucial':'')+(t.estado==='Cancelado'?' · cancelado':''), t.hora)+   /* 20/10: se dice */
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b>'+
       '<small>'+esc(t.hora)+' · '+esc(t.dur)+(t.lugar?' · '+esc(t.lugar):'')+'</small></div>'+
       '<div class="d"><span class="chev">›</span></div></div>'+

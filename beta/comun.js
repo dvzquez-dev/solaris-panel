@@ -610,6 +610,15 @@ function _hMesDevengado_(m){
   var d = _devengadoAHoy_(m, h, _fraccionDelMes_());
   return (d == null) ? h : d;
 }
+/* ⛔ 20/10 (auditoría): LA MISMA CIFRA DEVENGADA, PARA EL MIEMBRO DE LA CARA. `_hMesDevengado_` lee el del PANEL
+   (`horasMes`); el de la cara trae `hMes`. Las tablas del escritorio enseñaban `hMes` en BRUTO —la base del cargo
+   entera desde el día 1— al lado de columnas devengadas. 🗣️ Daniel, 07/10: «claro que van devengadas al dia actual
+   … lo que no puede aparecer es el step de compensacion». Sin dato, `null`; si no se puede devengar, el crudo. */
+function _hMesDevCara_(m){
+  if(!m || typeof m.hMes!=='number') return null;
+  var d = (typeof _fraccionDelMes_==='function') ? _devengadoAHoy_(m, m.hMes, _fraccionDelMes_()) : null;
+  return (d == null) ? m.hMes : d;
+}
 function _hMesReal_(m){
   m = m || {};
   /* Las horas de ESTE MES, o `null` si no han llegado. `horasMes` es el campo que el
@@ -666,7 +675,7 @@ function _hMesReal_(m){
    el escritorio- no podia usarlo y pesaba el mes abierto con el CALENDARIO. Regla de
    negocio de Daniel: «un mes dura desde el anterior cierre del mes anterior al cierre de
    ese mes». `equipo_mes.dia` lo calcula `_diasDesdeCierre_` en el backend. */
-function _diasDelMes_(){
+function _diasDelMes_(ahora){
   var e=DATA.equipo_mes;
   /* ⛔ `cont` ES EL MISMO DIA CON DECIMALES, y va aparte del entero porque son DOS PREGUNTAS:
      `dia` se IMPRIME («20 h en 10 de 31 dias») y `cont` PESA. Daniel (15/08): «cuando pase de
@@ -678,7 +687,20 @@ function _diasDelMes_(){
   if(e && e.dia>0 && e.dias_mes>0) return {dia:e.dia, total:e.dias_mes,
     cont:(typeof e.diaCont==='number' && e.diaCont>0) ? e.diaCont : e.dia,
     periodo:e.periodo||null};
-  var d=new Date();
+  /* ⛔ 20/10 (auditoría): SIN `equipo_mes`, PERO CON EL ÚLTIMO CIERRE, SE CUENTA COMO EL SERVIDOR. Si no, el título
+     (`_periodoAbierto_`, del cierre) y el divisor (el reloj) hablaban de meses distintos: el 2 de noviembre con octubre
+     abierto, «octubre» y horas de octubre ÷ 2. Días desde la MEDIANOCHE local del cierre (mínimo 1), el mes abierto y
+     sus días de calendario (el servidor manda una media; aquí no la hay). `ahora` es opcional, para poder preguntarle. */
+  var _uc=(typeof CIERRE_UC!=='undefined' && CIERRE_UC) ? CIERRE_UC
+         : ((typeof CIERRE!=='undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
+  var _ab=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  var _at=(_uc && _uc.at) ? new Date(_uc.at) : null;
+  if(_at && !isNaN(_at.getTime()) && /^\d{4}-\d{2}$/.test(String(_ab||''))){
+    var _m0=new Date(_at.getFullYear(), _at.getMonth(), _at.getDate()).getTime();
+    var _c=Math.max(1, ((ahora||new Date()).getTime()-_m0)/86400000);
+    return {dia:Math.floor(_c), total:new Date(+_ab.slice(0,4), +_ab.slice(5,7), 0).getDate(), cont:_c, periodo:_ab};
+  }
+  var d=ahora||new Date();
   /* El respaldo del calendario tambien lleva su hora: mismo criterio que el servidor -- el
      dia N va de N,0 a N,999-, para que caer al respaldo no cambie la FORMA del numero. */
   return {dia:d.getDate(), total:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),
@@ -2328,6 +2350,19 @@ function _plazoTxt_(limite){
   return 'cierra el ' + _isoADMY_(iso);
 }
 
+/* El plazo de una tarea (ISO de Notion o `DD/MM/AAAA` de la semilla) en `DD/MM/AAAA`, o `null` si no hay uno legible.
+   Y si ya venció (antes de hoy). 20/10: el escritorio pintaba el ISO crudo y «null». */
+function _plazoDMY_(l){
+  var iso=_dmyAISO_(String(l == null ? '' : l)).slice(0, 10);
+  return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(iso) ? _isoADMY_(iso) : null;
+}
+function _venciaTarea_(l){
+  var p=_plazoDMY_(l);
+  if(!p) return false;
+  var d=_diasHasta_(Date.parse(_dmyAISO_(p)));
+  return d !== null && d < 0;
+}
+
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
 
 function _hmMin_(m){                       // minutos -> 'HH:MM'
@@ -3745,8 +3780,16 @@ function _nomMesAbierto_(corto){
 function _mesACerrar_(hoy){
   var h=hoy||new Date(), a=h.getFullYear(), m=h.getMonth();  /* getMonth() es 0-11 */
   if(m===0){ a-=1; m=11; } else { m-=1; }
-  var mm=m+1;
-  return { p:a+'-'+(mm<10?'0':'')+mm, mes:MESES_L[m] };
+  var mm=m+1, p=a+'-'+(mm<10?'0':'')+mm;
+  /* ⛔ 20/10 (auditoría): SI EL MES ABIERTO ES MÁS VIEJO QUE «EL ANTERIOR AL DEL RELOJ», SE CIERRA ÉSE. Un mes no se
+     salta: el 1 de diciembre con octubre sin cerrar, lo que toca cerrar es octubre, no noviembre (🗣️ «mientras no se
+     cierre el mes no cambiamos de mes realmente»). Si no es más viejo, nada cambia: con septiembre cerrado, el 20 de
+     octubre sigue proponiendo septiembre (ya cerrado), como siempre. */
+  var abierto=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  if(/^\d{4}-\d{2}$/.test(String(abierto||'')) && abierto < p){
+    p=abierto; m=parseInt(abierto.slice(5,7),10)-1;
+  }
+  return { p:p, mes:MESES_L[m] };
 }
 
 function _numPlan_(v){
@@ -5459,10 +5502,18 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-20-tareas-caras', fecha:'2026-10-20',
+      titulo:'Tareas: sólo las abiertas, y el plazo como fecha',
+      items:[
+        {cara:'escritorio', vista:'tareas', txt:'Tareas cuenta y lista sólo las **abiertas** (las hechas ya no suman «activas», tampoco en el número de la pestaña); el plazo sale como **fecha**, en rojo si ya pasó, y «—» sin plazo (no «null»).'},
+        {cara:'movil', vista:'tareas', txt:'Una tarea ya **hecha** no sale en rojo como «venció hace N días»; el cajón de las pasadas dice la fecha como fecha.'},
+        {cara:'escritorio', vista:'turnos', txt:'Un turno **cancelado** lo dice al lado de su referencia, y la fecha sale en DD/MM/AAAA. En el móvil, la tarjeta también dice «cancelado».'}
+      ] },
     { id:'2026-10-20-mes-abierto', fecha:'2026-10-20',
       titulo:'«Este mes» es el mes abierto en todas partes',
       items:[
         {cara:'escritorio', vista:'libros', txt:'«Lo tuyo»: el rótulo de tus horas dice el mes **abierto** (el de trabajo), no el del calendario.'},
+        {cara:'escritorio', vista:'registro', txt:'Registro del mes, Miembros y «Este mes» del Panel de mando: las horas del mes van **al día de hoy** (la compensación del cargo se suma día a día), como el resto de columnas de la fila.'},
         {cara:'movil', vista:'horas', txt:'Tus movimientos del mes y el histórico ponen cada apunte en el mes en que **contó** (lo declarado tarde, en el mes en que entró); la lista suma lo mismo que la cifra grande. Y la nota del ritmo dice «X h en N días», sin el «de 30.45».'}
       ] },
     { id:'2026-10-20-select-oscuro', fecha:'2026-10-20',

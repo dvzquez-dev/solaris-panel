@@ -75,6 +75,9 @@ function _finDeMes_(hoy){
 function _plazoCierre_(hoy){
   var h=hoy||new Date();
   var fin=new Date(h.getFullYear(), h.getMonth(), 0);   /* el ultimo dia del mes anterior */
+  /* ⛔ 20/10 (auditoría): con un mes abierto MÁS VIEJO, el plazo es el de ése (como `_mesACerrar_`). */
+  var _ab=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null, _am=/^(\d{4})-(\d{2})$/.exec(String(_ab||''));
+  if(_am){ var _af=new Date(+_am[1], +_am[2], 0); if(_af < fin) fin=_af; }
   var f=_finDeMes_(fin);
   return { txt:f.txt, mes:f.mes, dias:Math.max(0, Math.round((_diaUTC_(h)-_diaUTC_(fin))/86400000)) };
 }

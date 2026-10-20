@@ -67,7 +67,9 @@ function vTareas(){
      MISMAS referencias, así que `===` las encuentra. */
   function iDe(t){ var k; for(k=0;k<TAREAS.length;k++){ if(TAREAS[k]===t) return k; } return -1; }
   function fila(t){
-    var v=vence(t.l), i=iDe(t), ac=_tareaAccion_(t.e), des=_puedeDeshacerTarea_(t);
+    /* ⛔ 20/10 (auditoría): una tarea HECHA no «venció»: se dice su plazo, neutro (salía en rojo «venció hace 49 días»). */
+    var v=_tareaHecha_(t&&t.e) ? [_plazoDMY_(t.l) ? 'plazo '+_plazoDMY_(t.l) : 'sin fecha límite', false] : vence(t.l),
+        i=iDe(t), ac=_tareaAccion_(t.e), des=_puedeDeshacerTarea_(t);
     return '<div class="fila"><div class="a"><b>'+esc(t.n)+'</b>'+
       '<small>'+esc(t.s)+' · '+esc(t.pr)+' · <span style="color:'+(v[1]?'var(--red2)':'var(--ink3)')+'">'+v[0]+'</span></small>'+
       /* ⚠️ El aviso del plazo sale de la PUERTA, no de un número escrito aquí: con el número
@@ -105,7 +107,7 @@ function vTareas(){
       'de momento es <b>fuera de la app</b>, en privado al Project Director.</p></div>':'')+
     /* mismo cajon que en Turnos: cuenta y la ultima, para que las dos pantallas se lean igual */
     (fin.length?'<div class="cajon" data-caj data-p><span>Tareas pasadas <b>· '+fin.length+'</b>'+
-        (fin[0]&&fin[0].l?' <span style="color:var(--ink3)">· la última, '+esc(fin[0].l)+'</span>':'')+'</span>'+
+        (fin[0]&&_plazoDMY_(fin[0].l)?' <span style="color:var(--ink3)">· la última, '+_plazoDMY_(fin[0].l)+'</span>':'')+'</span>'+
       '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
       '<div class="cajsec"><div class="tarj">'+fin.map(fila).join('')+'</div></div>':'');
 }

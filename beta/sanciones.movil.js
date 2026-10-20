@@ -141,7 +141,7 @@ function _sancionesHTML_(){
             ? '<label class="campo"><span class="sc">Qué tarea</span><select id="snTarea">'+
                 '<option value="">— elige la tarea —</option>'+
                 tareas.map(function(t){ return '<option value="'+esc(t.url)+'"'+(SANC_FORM.tarea===t.url?' selected':'')+'>'+esc(t.n||t.nombre||'(sin título)')+
-                  (t.l?' · vencía '+esc(_isoADMY_(t.l)):'')+'</option>'; }).join('')+
+                  (t.l?(_venciaTarea_(t.l)?' · venció el ':' · vence el ')+esc(_plazoDMY_(t.l)||_isoADMY_(t.l)):'')+'</option>'; }).join('')+   /* 20/10: «vencía» de lo que aún no vence */
               '</select></label>'+
               '<label class="campo"><span class="sc">Plazo nuevo</span><input type="date" id="snPlazo" value="'+esc(SANC_FORM.plazo||'')+'"></label>'+
               '<p class="rnota" style="margin:0 0 10px">El plazo nuevo se escribe <b>en Notion</b>. '+
