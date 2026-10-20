@@ -3528,11 +3528,19 @@ function _compExtra_(m){
    es la forma mas rapida de que nadie se entere de que esta roto. */
 function _ultimosMov_(lista, fecha, cuanto, ambito){
   var dentro = (ambito==='mes') ? _deEsteMes_ : _deEstaTemporada_;
+  /* ⛔ 20/10 (auditoría): «ESTE MES» POR EL MES QUE GRABÓ EL SERVIDOR, como la cifra grande. `_deEsteMes_` sólo ve
+     la fecha, y la cifra (`sumaSiMes` → `_esDeMesPasado_`) lee antes el `periodo`: la base de septiembre, fechada el
+     día del cierre (5 de octubre), salía en la lista de octubre, y lo atrasado (de septiembre declarado en octubre) no.
+     La cifra decía 7 h y la lista sumaba 6. Sin `periodo` en el apunte, la fecha, como siempre. */
+  var _per = (ambito==='mes' && typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  var _rePer = /^\d{4}-\d{2}$/;
   var conD=[], sinD=[], suma=0;
   (lista||[]).forEach(function(x){
     var d=_fechaDMY_(fecha(x));
     if(!d){ sinD.push(x); suma+=(cuanto?(+cuanto(x)||0):0); return; }
-    if(!dentro(d)) return;
+    if(typeof _esDeMesPasado_==='function' && _rePer.test(String(_per||'')) && _rePer.test(String((x&&x.periodo)||''))){
+      if(_esDeMesPasado_({periodo:x.periodo}, _per)) return;
+    } else if(!dentro(d)) return;
     conD.push({x:x,d:d}); suma+=(cuanto?(+cuanto(x)||0):0);
   });
   conD.sort(function(a,b){ return b.d-a.d; });
@@ -5451,6 +5459,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-20-mes-abierto', fecha:'2026-10-20',
+      titulo:'«Este mes» es el mes abierto en todas partes',
+      items:[
+        {cara:'escritorio', vista:'libros', txt:'«Lo tuyo»: el rótulo de tus horas dice el mes **abierto** (el de trabajo), no el del calendario.'},
+        {cara:'movil', vista:'horas', txt:'Tus movimientos del mes y el histórico ponen cada apunte en el mes en que **contó** (lo declarado tarde, en el mes en que entró); la lista suma lo mismo que la cifra grande. Y la nota del ritmo dice «X h en N días», sin el «de 30.45».'}
+      ] },
     { id:'2026-10-20-select-oscuro', fecha:'2026-10-20',
       titulo:'Las listas desplegables, por fin en oscuro',
       items:[

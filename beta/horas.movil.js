@@ -459,7 +459,7 @@ function _compHorasHTML_(base){
      distingue de «+12 %» respecto a un total, y son cosas distintas. */
   return '<div class="comph">'+f+
     '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(_num)+
-    ' h en '+dia+' de '+d.total+' días'+(_bt==null?'':', sin la compensación base')+
+    ' h en '+dia+' días'+(_bt==null?'':', sin la compensación base')+   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
     '). Se compara el <b>ritmo</b>, no el total: el mes '+
     'en curso va a medias y el anterior está entero.</p></div>';
 }
@@ -1300,7 +1300,10 @@ function _histHorasHTML_(todos){
   if(!todos || !todos.length) return '';
   var g=[], idx={}, i, j;
   for(i=0;i<todos.length;i++){
-    var p=todos[i], d=(typeof _fechaDMY_==='function') ? _fechaDMY_(p.f) : null;
+    /* ⛔ 20/10 (auditoría): el grupo es el MES QUE GRABÓ EL SERVIDOR (`periodo`), como la cifra; sin él, la fecha.
+       Si no, lo atrasado salía en el mes de su fecha y la base del mes cerrado en el mes siguiente. */
+    var p=todos[i], _mp=/^(\d{4})-(\d{2})$/.exec(String(p.periodo||''));
+    var d = _mp ? new Date(+_mp[1], +_mp[2]-1, 1) : ((typeof _fechaDMY_==='function') ? _fechaDMY_(p.f) : null);
     var k = d ? (d.getFullYear()+'-'+((d.getMonth()+1)<10?'0':'')+(d.getMonth()+1)) : '';
     if(!(k in idx)){ idx[k]=g.length; g.push({k:k, d:d, items:[], h:0}); }
     g[idx[k]].items.push(p); g[idx[k]].h += (Number(p.q)||0);
