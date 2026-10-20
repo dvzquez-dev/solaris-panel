@@ -33,7 +33,7 @@ function _normTurnoM_(t, ix){
   /* `hecho` manda sobre la fecha: lo que decide si un turno sale suelto o al cajon es
      su ESTADO en Notion, no que la fecha haya pasado (un turno de ayer sin cerrar sigue vivo). */
   var est=t.estado||'';
-  return { id: t.id || ('T-'+(iso||ix)), f:f, iso:iso, hora:t.hora||'—', punto:t.punto||'—', dur:dur,
+  return { id: _refTurno_(t, ix), f:f, iso:iso,   /* 20/10: la puerta de las dos caras, con la hora (dos turnos el mismo día) */ hora:t.hora||'—', punto:t.punto||'—', dur:dur,
     lugar:t.lugar||null, estado:est, hecho: est ? (est==='Realizado'||est==='Cancelado') : !!(iso && iso < hoyISO),
     mio:mio, roles:roles, pasado: !!(iso && iso < hoyISO),
     principales:t.principales||[], secundarios:t.secundarios||[],

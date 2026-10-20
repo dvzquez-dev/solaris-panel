@@ -2340,10 +2340,15 @@ var _DIAS_PRISA_ = 3;
    ⚠️ Las **palabras** son las de una reunión (*cierra*). Una tarea *vence*, y esa pantalla tiene
    las suyas: lo que comparten es la **cuenta** (`_diasHasta_`), no el verbo. */
 function _plazoTxt_(limite){
-  var iso = _dmyAISO_(String(limite == null ? '' : limite)).slice(0, 10);
+  /* ⛔ 20/10 (auditoría): LA FECHA POR `_normLimite_` (la que usa la REGLA): con `_dmyAISO_` a secas, «20/10/2026 10:00»
+     salía «sin límite». Y EL MISMO DÍA, POR LA HORA: el texto iba por días y la regla por minutos, así que un plazo
+     que cerró a las 10:00 seguía diciendo «cierra HOY» a las 15:00, al lado de «El plazo cerró». */
+  var _nl = (typeof _normLimite_ === 'function') ? _normLimite_(limite) : '';
+  var iso = (_nl || _dmyAISO_(String(limite == null ? '' : limite))).slice(0, 10);
   var dias = _diasHasta_(Date.parse(iso));
   if (dias === null) return 'sin l\u00edmite';
-  if (dias < 0)  return 'el plazo cerr\u00f3 el ' + _isoADMY_(iso);
+  if (dias < 0 || (dias === 0 && typeof _plazoAbierto_ === 'function' && !_plazoAbierto_(limite)))
+    return 'el plazo cerr\u00f3 el ' + _isoADMY_(iso);
   if (dias === 0) return 'cierra HOY';
   if (dias === 1) return 'cierra ma\u00f1ana';
   if (dias <= _DIAS_PRISA_) return 'cierra en ' + dias + ' d\u00edas';
@@ -3269,6 +3274,17 @@ function optHoras(sel){
   return s;
 }
 
+/* ⛔ 20/10 (auditor de turnos): LA REFERENCIA DE UN TURNO SIN `id`, una sola para las dos caras — «T·MMDD·HH:MM».
+   Cada cara fabricaba la suya («T-2026-10-25» / «T·1025·17:00»), y la del móvil es su CLAVE: dos turnos del mismo día
+   salían con la misma y al pulsar el segundo se abría el primero. Con la hora se distinguen. Sin fecha legible, el
+   índice (`ix`) — no una fecha inventada. Acepta ISO y DD/MM/AAAA. */
+function _refTurno_(t, ix){
+  if(t && t.id) return String(t.id);
+  var iso = _dmyAISO_(String((t && (t.fecha || t.f)) || ''));
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return 'T·' + (ix == null ? '?' : ix);
+  return 'T·' + iso.slice(5, 7) + iso.slice(8, 10) + (t.hora ? '·' + String(t.hora).slice(0, 5) : '');
+}
+
 function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?(m[3]+'-'+m[2]+'-'+m[1]):f; }
 
 /* La temporada va de septiembre a agosto · GEMELA de `reglas/disciplina.py:temporada_de`.
@@ -3365,13 +3381,23 @@ function _deEstaTemporada_(d){
    ⛔ Y SIN PERIODO DEVUELVE `null`, NO 0 (§3c-24): un 0 ahí afirma «este mes no has resuelto
    nada» cuando lo que pasa es que no se sabe qué mes es. ⚠️ Con la lista VACÍA sí devuelve
    `{n:0}`: «no hay partes» se sabe, y es otra cosa. */
-function _resueltosDelPeriodo_(partes, periodo){
+function _resueltosDelPeriodo_(partes, periodo, uc){
   if(!/^\d{4}-\d{2}$/.test(String(periodo||''))) return null;
-  var L = partes || [], n = 0, sf = 0, i, d;
+  /* ⛔ 20/10 (auditor de partes): DE CIERRE A CIERRE, como `periodo_en` del servidor (ARRANQUE §2b). Antes era el mes de
+     calendario EN UTC de la cadena: lo decidido el 30/09 a las 22:30Z (01/10 en Madrid) contaba en septiembre, y lo del
+     1 al cierre de septiembre contaba en octubre. Con el último cierre (`uc`, el del mes anterior a `periodo`), cuenta
+     lo decidido DESDE su instante; sin él, el mes LOCAL de la decisión — un respaldo que yerra entre el día 1 y el
+     cierre, no un dato. */
+  var tUc = (uc && typeof _mesSiguiente_ === 'function' && _mesSiguiente_(uc.periodo) === String(periodo))
+            ? Date.parse(String(uc.at || '')) : NaN;
+  var L = partes || [], n = 0, sf = 0, i, d, t, f;
   for(i = 0; i < L.length; i++){
     d = String((L[i] || {}).decidido_at || '');
-    if(!/^\d{4}-\d{2}/.test(d)){ sf++; continue; }
-    if(d.slice(0, 7) === String(periodo)) n++;
+    t = /^\d{4}-\d{2}/.test(d) ? Date.parse(d) : NaN;
+    if(isNaN(t)){ sf++; continue; }
+    if(!isNaN(tUc)){ if(t >= tUc) n++; continue; }
+    f = new Date(t);
+    if(f.getFullYear() + '-' + ('0' + (f.getMonth() + 1)).slice(-2) === String(periodo)) n++;
   }
   return { n: n, sinFecha: sf };
 }
@@ -3385,6 +3411,18 @@ function _esDeMesPasado_(p, periodo){
      mes en que entró, 🗣️ «Siempre al actual». Sin `periodo` (lo de antes del 20/10), la fecha, como siempre. */
   var pp = String((p&&p.periodo)||'');
   if(/^\d{4}-\d{2}$/.test(pp)) return pp < per;
+  /* ⛔ 20/10 (auditor de partes): SIN `periodo`, CUÁNDO ENTRÓ (`creado_at`) y no la fecha del trabajo — el mismo
+     criterio que el sello (`_mesCerradoParte_`) y el servidor. Trabajado el 28/09 y creado el 06/10 con septiembre
+     cerrado el 05/10 se plegaba en «De meses anteriores» mientras su sello decía «cuenta en octubre». Con el último
+     cierre (`CIERRE_UC`, el del mes anterior a `per`), su instante; sin él, el mes LOCAL de la creación. */
+  var cre = String((p&&p.creado_at)||''), tc = /^\d{4}-\d{2}-\d{2}T/.test(cre) ? Date.parse(cre) : NaN;
+  if(!isNaN(tc)){
+    var uc = (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null;
+    if(uc && uc.at && typeof _mesSiguiente_==='function' && _mesSiguiente_(uc.periodo)===per
+       && !isNaN(Date.parse(String(uc.at)))) return tc < Date.parse(String(uc.at));
+    var dc = new Date(tc);
+    return (dc.getFullYear()+'-'+('0'+(dc.getMonth()+1)).slice(-2)) < per;
+  }
   var iso = String((p&&p.iso)||'');
   if(!/^\d{4}-\d{2}/.test(iso)) return false;
   return iso.slice(0,7) < per;
@@ -5502,6 +5540,21 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-20-partes-auditor', fecha:'2026-10-20',
+      titulo:'Partes: lo que dice cada pantalla, igual que el servidor',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Con datos de Notion, lo **aprobado que aún no ha llegado a tu ficha** sale en su propia píldora («+N h aprobadas · aún no en tu ficha») en vez de no salir en ninguna cifra.'},
+        {cara:'movil', vista:'horas', txt:'Un parte **devuelto** («pedir detalle») sale una sola vez, en «Esperan tu decisión», con lo que se pidió; y un parte declarado tras el cierre ya no se pliega en «De meses anteriores».'},
+        {cara:'escritorio', vista:'horas', txt:'Un parte **devuelto** cuenta en la cola y en «Horas en el aire» (el servidor no deja cerrar el mes con él) y su tarjeta dice qué se pidió; «Resueltos este mes» va de cierre a cierre.'},
+        {cara:'escritorio', vista:'horas', txt:'Sólo ves Aprobar/Rechazar en los partes que el servidor te deja decidir (José ya no), y «Otorgar horas» sólo ofrece a quien se le puede otorgar.'},
+        {cara:'movil', vista:'turnos', txt:'Dos turnos del **mismo día** ya no se confunden: al pulsar el de la tarde se abría el de la mañana.'}
+      ] },
+    { id:'2026-10-20-reu-plazos', fecha:'2026-10-20',
+      titulo:'Reuniones: lo que ya cerró, no cuenta',
+      items:[
+        {cara:'movil', vista:'reu', txt:'Una reunión cuyo plazo **ya cerró** (y nadie fijó) deja de contar en «te falta cubrir» y en el globo; y un plazo que cerró esta mañana ya no dice «cierra HOY».'},
+        {cara:'escritorio', vista:'panel', txt:'En la cola de Inicio, cada expediente dice su ámbito con su nombre («informe de subsistema»), como la lista de Documentos.'}
+      ] },
     { id:'2026-10-20-tareas-caras', fecha:'2026-10-20',
       titulo:'Tareas: sólo las abiertas, y el plazo como fecha',
       items:[

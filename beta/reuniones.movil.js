@@ -63,7 +63,10 @@ function _limMsM_(r){
 
 function _pendientesCubrirM_(){
   return (REUNIONES_M||[]).filter(function(r){
-    return r && !r.cubierta && !r.exento && !r.fijada;   // fijada = el plazo ya se cerro
+    /* ⛔ 20/10 (auditoría): Y CON EL PLAZO ABIERTO. Sin fijar y con el plazo ya cerrado, la ficha dice «Ya no se puede
+       cubrir» y esto la seguía contando —la primera del aviso y el globo en rojo hasta que alguien la fijara—. */
+    return r && !r.cubierta && !r.exento && !r.fijada &&   // fijada = el plazo ya se cerro
+      !(typeof _plazoAbierto_==='function' && !_plazoAbierto_(r.limite));
   }).sort(function(a,b){ return _limMsM_(a)-_limMsM_(b); });
 }
 

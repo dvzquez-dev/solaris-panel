@@ -77,7 +77,7 @@ function colaDecision(){
       chip:'<span class="chip wa">parte de horas</span>',ir:'partes',foco:'parte-'+p.id});
   });
   docsMios().forEach(function(d){
-    out.push({ic:'i-doc',b:esc(d.tit),s:d.ref+' · '+_m(d.autor).pila+' · ámbito '+d.amb+
+    out.push({ic:'i-doc',b:esc(d.tit),s:d.ref+' · '+_m(d.autor).pila+' · '+esc(ambDoc(d.amb))+   /* 20/10: como la lista, no el crudo */
       (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):''),
       /* ⛔ POR LA PUERTA UNICA. Aqui habia una copia con el `else` en `'ok'` -verde-, asi
          que `null`, un valor fuera del enum y la cadena vacia salian los TRES con el chip

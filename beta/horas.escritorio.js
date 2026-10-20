@@ -25,18 +25,27 @@ function revisoresDeParte(p){
   if(p.autor===PD_NOM) return [PD_NOM];
   var c=coordinadorDe(p.unidad);
   if(c!==p.autor) return [c];
-  return [PD_NOM,REV2_NOM].filter(function(n){return n!==p.autor;});
+  /* ⛔ 20/10 (auditor de partes): el de un coordinador, SÓLO el PD. Aquí escalaba también a José, y el servidor
+     (`_puede_sobre_parte`: rango ≥ 3 o coordinar esa unidad) le rechaza: «Lo firma Daniel o José» prometía una firma
+     que no existe. */
+  return [PD_NOM];
 }
 
 function puedeDecidirParte(p,quien){
   /* ⛔ La excepción es SOLO del rango 3, igual que en `_decidirParte_`. Si esto y el backend
      divergen manda el backend, que es donde no se puede hacer trampa. */
   if(quien===p.autor && rangoNom(quien)<3) return false;
-  var rev=revisoresDeParte(p), maxR=Math.max.apply(null,rev.map(rangoNom));
-  return rev.indexOf(quien)>=0 || rangoNom(quien)>maxR;
+  /* ⛔⛔ 20/10 (auditor de partes): LA MISMA PUERTA QUE EL SERVIDOR (`_puede_sobre_parte`) — el PD (rango 3), o quien
+     coordina ESA unidad. Antes escalaba «por rango» (`rangoNom(quien)>maxR`), y eso sólo cambiaba algo para José
+     (rango 2): le pintaba Aprobar/Rechazar en partes que el servidor le niega, y con «Actúas como José» el PD los veía
+     y la llamada salía con SU token, firmada como suya. El rango 2 es documental; en horas no manda. */
+  return rangoNom(quien)>=3 || (rangoNom(quien)>=1 && coordinadorDe(p.unidad)===quien);
 }
 
-function pendientes(){return PARTES.filter(function(p){return p.estado==='pend';});}
+/* ⛔ 20/10 (auditor de partes): un parte en `detalle` es SIN DECIDIR — así lo cuenta el servidor (`bloqueos_cierre`,
+   no deja cerrar el mes) y así lo pone el móvil en «Esperan tu decisión». Con sólo `'pend'` quedaba fuera del KPI, del
+   globo y de «Horas en el aire», y caía en el Histórico como si estuviera decidido. */
+function pendientes(){return PARTES.filter(function(p){return p.estado==='pend' || p.estado==='detalle';});}
 
 function parteCard(p){
   var m=_m(p.autor), rev=revisoresDeParte(p), puede=puedeDecidirParte(p,ACTOR);
@@ -54,9 +63,11 @@ function parteCard(p){
        repite la tarea o esta vacia -- los dos casos que Daniel senalo el 18/08. */
     (function(_j){ return '<div class="just"><span class="sc">'+esc(p.tarea)+'</span>'+
       (_j?esc(_j):'')+'</div>'; })(_justUtil_(p.tarea, p.just))+
-    '<div class="fl">'+p.flags.map(function(f){
+    '<div class="fl">'+(p.flags||[]).map(function(f){   /* 20/10: un parte sin avisos (la semilla, un `detalle`) no revienta la cola */
       return '<span class="chip '+(f[0]==='ok'?'ok':'wa')+'">'+esc(f[1])+'</span>';}).join('')+
-      (p.origen==='fichaje'?'<span class="chip ok">con fichaje</span>':'')+'</div>'+
+      (p.origen==='fichaje'?'<span class="chip ok">con fichaje</span>':'')+
+      /* 20/10: lo devuelto se DICE — está en la cola esperando al autor, y se ve qué se le pidió. */
+      (p.estado==='detalle'?'<span class="chip wa">devuelto · falta detalle'+(p.motivo?' — «'+esc(p.motivo)+'»':'')+'</span>':'')+'</div>'+
     '<div class="ruta">'+(puede?'Puedes decidirlo.':'Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.')+'</div>'+
     (puede?'<textarea data-motivo placeholder="Motivo — obligatorio para rechazar o pedir detalle…"></textarea>'+
       '<div class="acts">'+
@@ -136,7 +147,10 @@ function normParte(p){
        («no se le inventa procedencia»), y la que el MOVIL ya cumplia (`horas.movil.js:78`:
        `origen:p.origen||null`). Esta cara era la unica que la rompia. */
     origen:p.origen||(p.sinFichaje?'manual':null), just:p.justificacion||'', flags:fl,
-    estado:_EST_PARTE_[p.estado]||'pend',
+    /* ⛔ 20/10 (auditor de partes): un estado que no conocemos NO es «pendiente» (§3c-24). Con `||'pend'` salía en
+       la cola con Aprobar/Rechazar —que el servidor rechaza— y sumaba en «Horas en el aire». 'raro' no lo recoge
+       `pendientes()` y el Histórico lo dice tal cual. */
+    estado:_EST_PARTE_[p.estado]||'raro',
     /* ⛔⛔ 635.ª LOS CAMPOS CRUDOS, con su nombre del backend, y no `decisor`/`dec`. `dec` salía ya
        recortado a la fecha UTC y `decisor` era un TERCER nombre para el mismo dato; el «Histórico»
        los leía con `p.decisor||PD_NOM`, o sea un nombre de relleno donde no consta nadie. Ahora los
@@ -158,6 +172,7 @@ function normParte(p){
 function _escHistFilaHTML_(p, per, uc){
   var et=p.estado==='aprobado'?'<span class="chip ok">aprobado</span>'
         :p.estado==='rechazado'?'<span class="chip no">rechazado</span>'
+        :p.estado==='raro'?'<span class="chip">estado desconocido</span>'
         :'<span class="chip wa">devuelto · falta detalle</span>';
   var dec=p.estado==='aprobado' ? _selloAprobado_(p, per, uc)
         : (p.estado==='rechazado' || p.estado==='detalle') ? 'decidido '+_firmaParte_(p) : '';
@@ -210,10 +225,9 @@ function _escEstParte_(e){
    backend; el día que admita uno más, se toca una línea.
    ⚠️ `pendiente` NO está y no es un olvido: no hay ninguna decisión que deshacer y el servidor
    lo rechaza — sería un botón que sólo sabe dar error.
-   ⚠️ `detalle` SÍ está, y aquí esta cara DIVERGE del móvil a propósito: allí un parte en
-   `detalle` sigue en «Esperan tu decisión» y se vuelve a decidir, así que revertirlo sobra.
-   Aquí `pendientes()` sólo recoge `'pend'`, o sea que un `detalle` cae en el Histórico y **no
-   hay ninguna otra forma de deshacer un “pedir detalle”**.
+   ⚠️ `detalle` SÍ está (el servidor lo admite), pero desde el 20/10 la LISTA de revertir no lo enseña: está en la
+   cola de `pendientes()`, como en el móvil, y desde ahí se vuelve a decidir — que es como se deshace un «pedir
+   detalle». Listarlo en los dos sitios era enseñar el mismo parte dos veces (lo vio el auditor de partes).
    ⚠️ `revertida`, `anulada`, `sin_declarar` y `caducada` tampoco: el backend las niega. */
 function _escRevertible_(p){
   var e = p && p.estado;
@@ -315,6 +329,7 @@ function _escRevertibles_(){
   for(i=0;i<PART_BACK.length;i++){
     p=PART_BACK[i];
     if(!_escRevertible_(p)) continue;
+    if(p.estado==='detalle') continue;   /* 20/10: ya está en la cola (`pendientes()`); allí se vuelve a decidir */
     /* ⛔ LA MISMA PUERTA QUE DECIDIR, ESTRECHADA -- no una segunda copia de la regla:
        cinco copias de una autoridad acaban siendo cinco autoridades, y las diferencias son los
        bugs. Se le pasa la forma que entiende (`unidad`), que en el crudo del backend se llama

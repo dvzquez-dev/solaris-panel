@@ -62,7 +62,7 @@ function _origenParte_(p){
    decida. Normalizar es tirar lo que no nombras, y aquí se estaba tirando la fecha de verdad. */
 function normPMovil(p){
   return { id:p.id, f:_isoADMY_(p.fecha), iso:String(p.fecha||''), t:p.tarea||'', q:Number(p.horas)||0,
-    e:_E_MOVIL_[p.estado]||'pend', ini:p.ini||'', fin:p.fin||'', cat:p.categoria||null,
+    e:_E_MOVIL_[p.estado]||'raro', ini:p.ini||'',   /* 20/10: lo que no conocemos NO es «en cola» (§3c-24) */ fin:p.fin||'', cat:p.categoria||null,
     /* ⛔ LA PUERTA VA DENTRO DEL `||`, NO ENVOLVIENDOLO, y no es estilo: `nota` mezcla
        DOS cosas distintas --el motivo de una decision y la justificacion del autor-- y
        el motivo pasa ENTERO, sin gatear, porque `filaParte` tiene escrito «SE ENSENA LA
@@ -111,6 +111,7 @@ function normPMovil(p){
        `probar_origen_parte.py` pasa el parte CRUDO por aquí a propósito. */
     decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
     periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo (la SEXTA vez) */
+    enFicha:(typeof _yaCuentaEnSuMes_==='function') ? _yaCuentaEnSuMes_(p) : null,   /* 20/10: `aplicada` y `aprobada` caen los dos en 'conf'; esto los distingue */
     origen:p.origen||null, caduca:p.caduca_at||null }; }
 
 /* ⚠️ MISMO DEFECTO QUE EL DE ABAJO, y se arregla igual aunque HOY no haga daño:
@@ -1154,7 +1155,10 @@ async function enviarFichaje(){
         var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, horas:dur,
           ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true,
           subsistema:_perfilElegido_(), clave:f.clave });
-        if(rec&&rec.partes&&rec.partes[0]){ nuevo=normPMovil(rec.partes[0]); h=dur; }
+        /* ⛔ 20/10 (auditor de partes): las horas que GUARDÓ el servidor, no las tecleadas — redondea a cuartos y recorta
+           al tope; anunciar `dur` era prometer horas que no existen. Ilegibles → `null` y el aviso no inventa número. */
+        if(rec&&rec.partes&&rec.partes[0]){ nuevo=normPMovil(rec.partes[0]);
+          h=(rec.partes[0].horas!=null && isFinite(+rec.partes[0].horas)) ? +rec.partes[0].horas : null; }
         f.clave=null;
       }
       if(nuevo) PARTES.unshift(nuevo);
@@ -1175,7 +1179,7 @@ async function enviarFichaje(){
          se confirma el envío y se manda a mirar la lista, que es donde estarán. */
       tost(h==null
         ? 'Fichaje enviado · '+_cola+' (las horas te las confirman al firmar)'
-        : 'Fichaje enviado · '+nf(h,2)+' h · '+_cola);
+        : 'Fichaje enviado · '+nf2(h)+' h · '+_cola);
       irA('horas');
     }catch(e){
       /* ⛔ SI LA CULPA ES LA SESION, EL AVISO NO CADUCA. Es el caso que reportó José
@@ -1196,7 +1200,7 @@ async function enviarFichaje(){
     sinFichaje: ST.modo==='bloque'});
   ST.ses={estado:'parada',ini:null,acum:0,desde:null,ult:ST.ses.ult};
   f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
-  tost('Enviado · '+nf(durd,2)+' h pendientes de firma');
+  tost('Enviado · '+nf2(durd)+' h pendientes de firma');   /* 20/10: sin ceros de cola */
   irA('horas');
 }
 
@@ -1224,6 +1228,7 @@ function filaParte(p){
           : p.e==='cad' ?'<span class="pil no">caducada</span>'
           : p.e==='rev' ?'<span class="pil no">revertida</span>'
           : p.e==='sindecl'?'<span class="pil pend">sin declarar</span>'
+          : p.e==='raro'?'<span class="pil neu">estado desconocido</span>'
           : '<span class="pil pend">en cola</span>';
   /* ⛔ `conf` LLEVA SU PROPIA RAMA. Cuando `aprobada` caía en `'otor'`, una nota escrita
      al aprobar se veía **en lugar de** la fecha; al separarlos se habría perdido sin que
@@ -1697,7 +1702,7 @@ function _normPDec_(p){
        se construye campo a campo, asi que `_yaCuentaEnSuMes_` recibia `undefined` ahi y el
        `|| p.aplicado_at` no podia decidir nada -- el movil seguia mirando SOLO el estado.
        ⚠️ La funcion estaba bien y la llamada tambien: lo que faltaba estaba EN MEDIO. */
-    aplicado_at:p.aplicado_at||null,
+    aplicado_at:p.aplicado_at||null, motivo:p.motivo||null,   /* 20/10: lo que se pidió, en la ficha de un `detalle` */
     estado:p.estado, origen:p.origen||null };
 }
 
@@ -1764,7 +1769,9 @@ function _cargarPartesDec_(){
     /* ⛔ Se quedan en la lista y se MARCAN, no se esconden: esconderlos deja la misma
        pregunta sin respuesta («¿dónde está el parte que firmé?») y encima calla el motivo. */
     PARTES_REV = arr.filter(function(p){
-      return _pdRevertible_(p) && p.autor!==yo;
+      /* ⛔ 20/10 (auditor de partes): un `detalle` YA está arriba, en «Esperan tu decisión», y desde ahí se vuelve a
+         decidir. Aquí salía otra vez: el mismo parte en las dos listas. */
+      return _pdRevertible_(p) && p.estado!=='detalle' && p.autor!==yo;
     }).map(function(p){
       var n = _normPDec_(p);
       n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN, CIERRE_UC);
@@ -1808,6 +1815,8 @@ function _pdFichaHTML_(p){
            Daniel tiene delante cuando firma horas de alguien: ahi el rotulo tiene que decir
            de donde salen, no que les falta. */
         _pdOrigenHTML_(p)+
+        /* 20/10: un parte DEVUELTO se dice — espera al autor, y se ve qué se le pidió */
+        (p.estado==='detalle'?'<span class="pdw">devuelto · falta detalle'+(p.motivo?' — «'+esc(p.motivo)+'»':'')+'</span>':'')+
         '<input class="pdm" type="text" placeholder="Motivo — obligatorio para rechazar o pedir detalle">'+
         '<div class="pdb">'+
           '<button data-pdacc="aprobar" data-p>Aprobar</button>'+
@@ -2072,6 +2081,10 @@ function vHoras(){
   /* ⛔ LA CIFRA VA DEVENGADA: `_hm` se queda sólo para saber **si hay dato** del Panel.
      Ver `_hMesDevengado_` en `comun.js` — el step que Daniel señaló el 07/10. */
   var cuentan=notion?_hMesDevengado_(YO):o;
+  /* ⛔ 20/10 (auditor de partes): con Notion la cifra es la de tu FICHA, y lo aprobado/otorgado que la rutina aún no ha
+     aplicado no salía en ninguna parte (la píldora sólo suma lo pendiente). Se dice APARTE: sumarlo a la cifra
+     arriesgaría contarlo dos veces en la ventana en que ya está en Notion y el parte aún no se ha marcado. */
+  var sinFicha=notion ? sumaSiMes(function(x){ return _cuentaYa_(x.e) && x.enFicha===false; }) : 0;
   /* ⛔ ORDENADOS POR FECHA, lo más nuevo primero. No había **ni un solo `sort`** en toda la
      pantalla: los partes salían en el orden en que los mandara el servidor, así que los de un
      mes viejo podían aparecer por delante de los de hoy. Daniel: *«¿por qué siguen
@@ -2080,7 +2093,7 @@ function vHoras(){
   var _porFecha=function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); };
   /* ⛔ `rev` entra en ESTA lista -- la del historial -- y NO en la de pendientes: un parte
      revertido se ve, pero no espera nada de nadie. */
-  var _todasMias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad'||x.e==='rev';}).sort(_porFecha);   // en cola / con detalle pedido / rechazados / sin declarar / caducados
+  var _todasMias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad'||x.e==='rev'||x.e==='raro';}).sort(_porFecha);   // en cola / con detalle pedido / rechazados / sin declarar / caducados
   var confs=PARTES.filter(function(x){return _cuentaYa_(x.e);}).sort(_porFecha);   // aprobadas + otorgadas
   /* ⛔ LOS DE MESES PASADOS, APARTE. Ordenarlos los mandaba al fondo, pero seguían **en la
      misma lista** — y la queja de Daniel era que **aparecen**, no que aparezcan arriba. */
@@ -2171,7 +2184,8 @@ function vHoras(){
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
         (notion
-          ? (p?'<span class="pil pend">+'+nf2(p)+' h fichadas · pendientes de firma</span>':'')
+          ? ((sinFicha?'<span class="pil conf">+'+nf2(sinFicha)+' h aprobadas · aún no en tu ficha</span>':'')+
+             (p?'<span class="pil pend">+'+nf2(p)+' h fichadas · pendientes de firma</span>':''))
           : ((oAp?'<span class="pil conf">'+nf2(oAp)+' h aprobadas</span>':'')+
              (oOt?'<span class="pil otor">'+nf2(oOt)+' h otorgadas</span>':'')+
              (p?'<span class="pil pend">+'+nf2(p)+' h pendientes</span>':'')))+
