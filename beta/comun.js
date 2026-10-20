@@ -3205,6 +3205,12 @@ function _resueltosDelPeriodo_(partes, periodo){
 function _esDeMesPasado_(p, periodo){
   var per = String(periodo||'');
   if(!/^\d{4}-\d{2}$/.test(per)) return false;
+  /* ⛔ 20/10 (2846) EL MES QUE GRABÓ EL SERVIDOR MANDA SOBRE LA FECHA, como en `_selloAprobado_`. Lo hacen falta dos
+     casos: el parte DEL SISTEMA con la compensación base de septiembre lleva la fecha del CIERRE (5 de octubre) y por
+     fecha caería en octubre —la base contada dos veces—; y lo atrasado («de julio declarado en agosto») cuenta en el
+     mes en que entró, 🗣️ «Siempre al actual». Sin `periodo` (lo de antes del 20/10), la fecha, como siempre. */
+  var pp = String((p&&p.periodo)||'');
+  if(/^\d{4}-\d{2}$/.test(pp)) return pp < per;
   var iso = String((p&&p.iso)||'');
   if(!/^\d{4}-\d{2}/.test(iso)) return false;
   return iso.slice(0,7) < per;
@@ -5230,6 +5236,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-20-puesto-fresco', fecha:'2026-10-20',
+      titulo:'Tu puesto en la clasificación, al día cada vez que abres la app',
+      items:[
+        {cara:'movil', vista:'horas', txt:'**Tu puesto ya no espera a que alguien actualice el panel**: se calcula al abrir la app, con las horas de los meses ya cerrados de esta temporada. Si aún no tienes ningún mes cerrado, sigue saliendo «Sin puesto todavía».'},
+        {cara:'escritorio', vista:'ranking', txt:'**La clasificación usa el mismo cálculo, en el momento**: el puesto de cada persona sale de los meses cerrados de la temporada en curso, no de la última foto del panel.'}
+      ] },
     { id:'2026-10-20-sin-convocar', fecha:'2026-10-20',
       titulo:'Las reuniones sin convocar ya aparecen, con su acta',
       items:[
