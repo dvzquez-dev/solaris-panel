@@ -76,10 +76,10 @@ function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 function _justUtil_(tarea, just){
   var j = String(just == null ? '' : just).replace(/^\s+|\s+$/g, '');
   if(!j) return '';
+  /* ⛔ 20/10 (D-b): era una tabla escrita a mano de 15 vocales y la ñ — `ç`, `â`, `õ` salían distintas —, copia
+     peor de `_sinTildes_` (§4.1). Ahora es ésa más el recorte de espacios. */
   var pela = function(s){
-    return String(s).toLowerCase().replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ')
-      .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
-      .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n');
+    return _sinTildes_(String(s)).replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ');
   };
   return pela(j) === pela(tarea || '') ? '' : j;
 }
@@ -1053,6 +1053,30 @@ function _bandaSana_(){
    Notion) la marca salía con `left:calc(-5.6% …)`, fuera de la barra; y con `NaN` -que
    `typeof` deja pasar como número- el `left` era CSS inválido y la marca caía a la izquierda,
    o sea en «sin carga», en silencio. `isFinite` corta el segundo y `Math.max(0,…)` el primero. */
+/* ⛔ 20/10 · LA CARGA QUE SE ENSEÑA ES LA PREVISTA. 🗣️ Daniel (05/10): *«la carga que te pone en la app debería ser la
+   carga prevista. Contando lo que ya has arrastrado y tal»* · *«y la carga tiene que cambiar en consecuencia»*. La
+   calcula el servidor (`reglas/carga.carga_prevista`, ritmo de tus últimos 14 días); sin ella, el índice del cierre. */
+function _cargaVista_(m){
+  var p=m && m.carga_prevista;
+  if(p && typeof p.prevista==='number') return p.prevista;
+  return (m && typeof m.carga==='number') ? m.carga : null;
+}
+/* De cuándo es el desglose: «en vivo» si lo ha puesto el servidor desde Notion (`vivo`), o la fecha del panel si es la
+   foto. La misma frase en las dos caras. */
+function _cargaDesgloseTxt_(d){
+  return (d.vivo ? 'en vivo · de este mes ' : 'índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes ')+
+    nf(d.aporta_mes_actual||0,1)+' · arrastre '+nf(d.arrastre||0,1);
+}
+function _cargaPrevistaTxt_(m){
+  var p=m && m.carga_prevista;
+  if(!p || typeof p.prevista!=='number') return '';
+  return 'Prevista a fin de mes si sigues a tu ritmo '+(p.ritmo_de==='14d'?'de los últimos 14 días':'de este mes')+
+    ' ('+nf(p.ritmo_dia,1)+' h/día → '+nf(p.horas_previstas,1)+' h)'+
+    /* ⛔ Desde `cargas_vivas_en` (20/10) `m.carga` es el índice DE HOY si el desglose es vivo: «del último cierre» se
+       contradecía con el «en vivo» de debajo (auditoría del 20/10). */
+    (typeof m.carga==='number'?' · índice '+(m.desglose && m.desglose.vivo?'de hoy':'del panel')+': '+nf(m.carga,0):'');
+}
+
 function _cargaBarraHTML_(carga){
   if(typeof carga !== 'number' || !isFinite(carga)) return '';
   var _bs = _bandaSana_();
@@ -3898,6 +3922,17 @@ function _hayAMedias_(){
   if (m && m.classList && m.classList.contains('on')) return true;
   var ts = document.getElementsByTagName ? document.getElementsByTagName('textarea') : [];
   for (var i = 0; i < ts.length; i++) if (ts[i].value && String(ts[i].value).trim()) return true;
+  /* ⛔ Y EL ESCRITORIO (auditoría del 20/10): no tiene `#modal`, pero sí botones de guardar que SÓLO se habilitan con
+     cambios pendientes (tu disponibilidad de turno y la de reunión), el montaje de un turno (`TUR_SEL`) y campos
+     tecleados que ya no tienen el foco. */
+  if (document.querySelector && document.querySelector('[data-mtguardar]:not([disabled]),[data-midguardar]:not([disabled])')) return true;
+  if (typeof TUR_SEL === 'object' && TUR_SEL && Object.keys(TUR_SEL).length) return true;
+  var ins = document.getElementsByTagName ? document.getElementsByTagName('input') : [];
+  for (var j = 0; j < ins.length; j++) {
+    var x = ins[j], ty = String(x.type || '').toLowerCase();
+    if (ty === 'checkbox' || ty === 'radio') { if (x.checked !== x.defaultChecked) return true; }
+    else if (ty !== 'hidden' && ty !== 'button' && ty !== 'submit' && x.value !== x.defaultValue) return true;
+  }
   return false;
 }
 
@@ -4772,6 +4807,40 @@ function _quienPuedeCelda_(r, di, fi){
   return out.sort(function(a,b){ return a.localeCompare(b,'es'); });
 }
 
+/* Lo que dice la caja de debajo del mapa al tocar un hueco. ⛔ LOS NOMBRES LOS DECIDE EL SERVIDOR, no esto: con la
+   encuesta `anonima` y sin mandar, le llegan las filas de los demás como `#1`, `#2`… (`servidor.py`, «anon»). Aquí
+   sólo se cuentan aparte y se dice por qué no hay nombre — repetir la regla serían dos criterios para una pregunta. */
+function _quienPuedeHTML_(r, di, fi, rotulo){
+  var l=_quienPuedeCelda_(r, di, fi), nom=[], anon=0;
+  l.forEach(function(n){ if(/^#\d+$/.test(n)) anon++; else nom.push(n); });
+  /* ⛔ LA CAJA NO PUEDE CONTRADECIR AL NÚMERO DE LA CELDA. Si `calor` (personas) cuenta más de las que tienen fila en
+     `resp` —la maqueta trae `calor` sin respuestas; una lista sin hidratar, igual—, las que faltan se dicen, no se callan:
+     «no puede nadie» debajo de un 21 es mentir. */
+  var c=r && r.calor && r.calor[di] ? +r.calor[di][fi] : NaN, sinDetalle=(c>l.length) ? c-l.length : 0, tot=l.length+sinDetalle;
+  var h='<b>'+esc(rotulo||'')+'</b> · ';
+  if(!tot) return h+'no puede nadie.';
+  h+=(tot===1?'puede 1':'pueden '+tot)+(nom.length?': '+nom.map(esc).join(', '):'');
+  if(anon) h+=(nom.length?' y ':' — ')+anon+' sin nombre (encuesta anónima: los nombres sólo los ve quien convoca)';
+  if(sinDetalle) h+=((nom.length||anon)?' y ':' — ')+sinDetalle+' sin el detalle de quién';
+  return h+'.';
+}
+
+/* Engancha las celdas `data-qp="id|día|franja"` con su caja `data-qpbox="id"`. `buscar(id)` da la reunión: cada cara
+   guarda las suyas en un sitio distinto. Devuelve cuántas enganchó. */
+function _cablearQuienPuede_(buscar){
+  if(typeof document==='undefined' || !document.querySelectorAll) return 0;
+  var els=document.querySelectorAll('[data-qp]'), cajas=document.querySelectorAll('[data-qpbox]'), n=0;
+  for(var i=0;i<els.length;i++) (function(el){
+    el.onclick=function(){
+      var p=String(el.getAttribute('data-qp')).split('|'), r=buscar(p[0]), box=null;
+      for(var j=0;j<cajas.length;j++) if(cajas[j].getAttribute('data-qpbox')===p[0]) box=cajas[j];
+      if(r && box) box.innerHTML=_quienPuedeHTML_(r, +p[1], +p[2], el.getAttribute('data-qpt')||'');
+    };
+    n++;
+  })(els[i]);
+  return n;
+}
+
 /* ⛔ ¿ES LA UNIDAD DE DOCUMENTACIÓN TÉCNICA? El nombre llega de tres sitios y no coincide:
    `UCT` (el viejo, y el que sigue usando Cowork), `Documentación Técnica` (el del roster) y
    `Unidad de Documentación Técnica` (el canónico que devuelve `umbral.coordinadas`). Se
@@ -5361,6 +5430,47 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-20-apuntes-rotulo', fecha:'2026-10-20',
+      titulo:'«1 apunte que ya cuenta», no «1 partes»',
+      items:[
+        {cara:'escritorio', vista:'libros', txt:'El KPI **Apuntes del mes** de «Lo tuyo» concuerda con su número: con sólo tu compensación dice «1 apunte que ya cuenta» (la compensación no es un parte).'}
+      ] },
+    { id:'2026-10-20-sin-v54', fecha:'2026-10-20',
+      titulo:'Fuera un aviso de una versión vieja del servidor',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Si tus extras de compensación no han llegado, la pantalla dice **«el servidor aún no los manda»**, no «hace falta el backend v54» (una versión que ya no existe).'},
+        {cara:'escritorio', vista:'libros', txt:'Lo mismo en el KPI de **Compensación** de «Lo tuyo», y «Sin movimientos» ya no culpa a «un servidor anterior a la v53».'},
+        {cara:'escritorio', vista:'buzon', txt:'Si al compensar un reporte el servidor no guarda las horas, el aviso dice eso, sin «falta desplegar v46».'}
+      ] },
+    { id:'2026-10-20-sin-convocar-orden', fecha:'2026-10-20',
+      titulo:'Las actas de reuniones sin convocar, en su sitio y con su fecha',
+      items:[
+        {cara:'movil', vista:'reu', txt:'**«Sin convocar» va al final de Reuniones.** Se colaba entre «Mis reuniones» y la tarjeta de tu reunión, y con una sola reunión parecía que ésa era la sin convocar.'},
+        {cara:'escritorio', vista:'actas', txt:'**La fecha de cada acta en DD/MM/AAAA**, no en el formato del ordenador (2026-07-21).'}
+      ] },
+    { id:'2026-10-20-cuota-estimada', fecha:'2026-10-20',
+      titulo:'Tu cuota, en grande, ya dice que es una estimación',
+      items:[
+        {cara:'escritorio', vista:'libros', txt:'**«Tu cuota» pone «€ · estimación al año»** en la cifra grande, como el móvil. Antes ponía «€ al año» a secas, y se leía como una factura: la cuota es anual y se cierra en agosto.'}
+      ] },
+    { id:'2026-10-20-carga-viva', fecha:'2026-10-20',
+      titulo:'Tu índice de carga, al día: ya no es la foto de hace semanas',
+      items:[
+        {cara:'movil', vista:'horas', txt:'**El índice de carga es el de hoy**, el mismo que pone Notion, y debajo dice «en vivo». Antes enseñaba el de cuando se generó el panel (semanas atrás).'},
+        {cara:'escritorio', vista:'libros', txt:'**«Tu índice de carga» es el de hoy**, con «en vivo» en el desglose.'}
+      ] },
+    { id:'2026-10-20-carga-prevista', fecha:'2026-10-20',
+      titulo:'Tu carga es la PREVISTA a fin de mes, a tu ritmo de los últimos 14 días',
+      items:[
+        {cara:'movil', vista:'horas', txt:'**Mi índice de carga enseña la carga PREVISTA**: a dónde llegas a fin de mes si sigues a tu ritmo de los últimos 14 días (con el arrastre incluido). Debajo dice el ritmo y el índice del último cierre.'},
+        {cara:'escritorio', vista:'libros', txt:'**«Tu índice de carga» enseña la prevista**, con la misma cuenta que el móvil.'}
+      ] },
+    { id:'2026-10-20-quien-puede', fecha:'2026-10-20',
+      titulo:'Toca un hueco del mapa de calor y te dice quién puede',
+      items:[
+        {cara:'movil', vista:'reu', txt:'**En la reunión, toca un hueco del mapa de calor** y debajo sale quién puede ese día a esa hora. En una encuesta **pública** salen los nombres de todos; en una anónima, sólo quien convoca los ve (al resto le dice cuántos, sin nombre).'},
+        {cara:'escritorio', vista:'dispo', txt:'**Disponibilidad y riesgo: pulsa un hueco del mapa** y debajo sale quién puede, con la misma regla que el móvil.'}
+      ] },
     { id:'2026-10-20-ultima-version', fecha:'2026-10-20',
       titulo:'Siempre abres la última versión, sin botón de actualizar',
       items:[

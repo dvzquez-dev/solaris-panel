@@ -470,12 +470,9 @@ var MIDISP = {};        /* id de reunion -> {de:quién, vals:array alineado a `b
    —la SESIÓN— y no de `ACTOR`, que lo reescribe «ver como»»).
    ⚠️ Y lo usan las DOS: la que decide si se te ofrece cubrir y la que pinta lo tuyo. Con
    una en `ACTOR` y otra en la sesión quedaban dos criterios para la misma pregunta, y se
-   te ofrecía cubrir una reunión a la que la invitada era la otra persona. */
-function _yoDisp_(){
-  var s = (typeof _actorSanc_==='function') ? _actorSanc_() : null;
-  if(s) return String(s);
-  return (typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '';
-}
+   te ofrecía cubrir una reunión a la que la invitada era la otra persona.
+   ⛔ La puerta es `_fichaYo_` (`horas.escritorio.js`), la misma con la que se ficha: hasta el
+   20/10 aquí vivía una copia propia (`_yoDisp_`) con otro vacío (D-c). */
 
 /* Lo que llevas sin guardar EN ESTA REUNIÓN Y SIENDO TÚ, o `null`. El dueño viaja con el
    valor — igual que `ST._selDe` en el móvil — en vez de vivir en un `delete` colgado del
@@ -484,12 +481,12 @@ function _yoDisp_(){
    para que deje de valer. */
 function _midPend_(r){
   var p = r ? MIDISP[r.id] : null;
-  return (p && p.de === _yoDisp_()) ? p.vals : null;
+  return (p && p.de === _fichaYo_()) ? p.vals : null;
 }
 
 function _puedoCubrir_(r){
   if(!r || r.fijada) return false;                     /* fijada = ya no se contesta */
-  var yo = _yoDisp_();                                 /* la SESIÓN, no `ACTOR` — ver `_yoDisp_` */
+  var yo = _fichaYo_();                                /* la SESIÓN, no `ACTOR` — ver `_fichaYo_` */
   if(!yo) return false;
   /* ⛔ SIN LISTA DE INVITADOS, LA REUNION ES DE TODOS — y aqui se leia como «de nadie», asi que
      el panel devolvia '' y NADIE podia cubrirla desde el escritorio. Lo peor es que la misma
@@ -507,7 +504,7 @@ function _puedoCubrir_(r){
 }
 
 function _misValores_(r){
-  var yo = _yoDisp_();                 /* ⛔ la SESIÓN, no `ACTOR` — ver `_yoDisp_` */
+  var yo = _fichaYo_();                /* ⛔ la SESIÓN, no `ACTOR` — ver `_fichaYo_` */
   var pend = _midPend_(r);             /* ⛔ y sólo lo pendiente que es TUYO */
   if(pend) return pend;
   var prev = (r.resp && r.resp[yo]) || [];
@@ -683,7 +680,7 @@ function _cablearMiDispo_(){
         tost('Ahí no entra la reunión entera ('+_durTxt_(d.nocabe)+'): el horario de ese día acaba antes.');
         return;
       }
-      MIDISP[r.id]={de:_yoDisp_(), vals:d.vals};   /* ⛔ lo pendiente viaja con su dueño */
+      MIDISP[r.id]={de:_fichaYo_(), vals:d.vals};   /* ⛔ lo pendiente viaja con su dueño */
       pintar();
       var av=_avisoCorto_(d.cortas, d.minS, d.slot); if(av) tost(av);
     };

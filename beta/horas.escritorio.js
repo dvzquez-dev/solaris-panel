@@ -479,8 +479,16 @@ function _engPartesRev_(){
    forma de recuperar unas horas olvidadas.
    ═════════════════════════════════════════════════════════════════════════════════════════ */
 
-/* La cuenta que ficha. ⛔ `_actorSanc_` y no `ACTOR`: ver la cabecera. */
-function _fichaYo_(){ return _actorSanc_(); }
+/* La cuenta que ficha. ⛔ `_actorSanc_` y no `ACTOR`: ver la cabecera.
+   ⛔⛔ Y ES LA ÚNICA PUERTA DE «¿QUIÉN ERES?» DE ESTA CARA (D-c, 20/10). La disponibilidad
+   tenía la suya (`_yoDisp_`, en `reuniones.escritorio.js`), con la misma pregunta y un vacío
+   distinto (`''` allí, `undefined` aquí). El móvil ya lo dejó escrito en su `_fichaYo_`: dos
+   nombres para la misma pregunta acaban siendo dos respuestas. ✅ El vacío se decide AQUÍ y
+   es `''`, como en el móvil: nadie compara un nombre contra `undefined` sin querer. */
+function _fichaYo_(){
+  var n = (typeof _actorSanc_==='function') ? _actorSanc_() : null;
+  return String(n || '');
+}
 
 /* El fichaje vive en el servidor: sin sesion no hay nada que abrir ni que cerrar. */
 function _fichaHayBack_(){ return !!(typeof backendOK!=='undefined' && backendOK && SESION); }

@@ -613,6 +613,10 @@ function _dispAviso_(titulo){
      ⚠️ Ofrece Reintentar igual que el de `'error'`: la sesion puede llegar tarde (el
      login es asincrono), y entonces ese boton es lo unico que vuelve a abrir la puerta --
      `_dispCargar_` es de un solo disparo y `_refrescoVivo_` no lo toca. */
+  if(e === 'sin accion') return pan(titulo, 'sin datos',
+    vacioSimple('Esta versi\u00f3n de la app no sabe pedir la disponibilidad',
+      'No es tu cuenta: a la app le falta la acci\u00f3n que pregunta al servidor. Recarga la p\u00e1gina para coger la '+
+      '\u00faltima versi\u00f3n, y si sigue, av\u00edsalo desde el buz\u00f3n.'));
   if(e === 'sin sesion') return pan(titulo, 'sin sesi\u00f3n',
     vacioSimple('No se pudo preguntar: no hay sesi\u00f3n',
       'Sin identidad el servidor no contesta qui\u00e9n puede cada franja, y lo que se ve\u00eda aqu\u00ed era el mapa de ejemplo. '+
@@ -709,7 +713,11 @@ function _dispCargar_(repintar){
      ⚠️ Y el arreglo ingenuo -- hacer que `_dispAviso_` cubra `'sin pedir'` -- ROMPE la
      pantalla normal: sacaria el aviso en cada primer pintado. Por eso la cura va aqui, en
      quien sabe POR QUE no se pregunto, y no en quien lo pinta (§3c-24). */
-  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getDisponibilidad){ _dispEstadoSrv_('sin sesion'); return; }
+  /* ⛔ 20/10 · DOS CAUSAS, DOS ESTADOS (como `_convCargar_` en el móvil). Juntas en `'sin sesion'`, a quien SÍ ha
+     entrado y le falta la ACCIÓN (una cara de otra versión que el backend) se le decía «Entra con tu cuenta»: le culpaba
+     a él de algo que no arregla volviendo a entrar. La sesión se mira PRIMERO: sin ella no se sabe nada más. */
+  if(typeof SESION==='undefined' || !SESION){ _dispEstadoSrv_('sin sesion'); return; }
+  if(typeof api==='undefined' || !api.getDisponibilidad){ _dispEstadoSrv_('sin accion'); return; }
   _dispEstadoSrv_('pidiendo');
   /* El interruptor se lee EN PARALELO con el mapa, no encadenado: son dos preguntas
      independientes y encadenarlas sumaria las dos esperas para pintar la misma pantalla.

@@ -580,7 +580,9 @@ function vReu(){
         var fondo = fij ? 'rgba(53,199,89,.85)' : 'rgba(228,30,37,'+a+')';
         var borde = fij ? ';outline:1px solid var(--ok);outline-offset:-1px'
                    : (esBest?';outline:1px solid var(--ink);outline-offset:-1px':'');
-        g+='<div title="'+_hhmm(ini)+'\u2013'+_hhmm(ini+_du(R.franjas[fi]))+' \u00b7 '+v+'" style="'+geo+';'+
+        /* 20/10 · «quién puede»: tocar la celda lo dice en la caja de debajo (`_cablearQuienPuede_`). */
+        g+='<div data-qp="'+esc(R.id)+'|'+di+'|'+fi+'" data-qpt="'+esc(d+' · '+_hhmm(ini)+'\u2013'+_hhmm(ini+_du(R.franjas[fi])))+'"'+
+          ' title="'+_hhmm(ini)+'\u2013'+_hhmm(ini+_du(R.franjas[fi]))+' \u00b7 '+v+'" style="'+geo+';cursor:pointer;'+
           'display:grid;place-items:center;font-family:var(--mono);font-size:8.5px;color:#fff;'+
           'background:'+fondo+borde+'">'+v+'</div>';
       }
@@ -601,7 +603,6 @@ function vReu(){
             _duraTxtM_(x)+'</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':'<span class="chev">›</span>')+'</div></div>'; }).join('')+'</div>'
       : '')+
-    _sinConvocarHTMLM_()+
     '<div class="tarj">'+cab(R.tipo||'General', _modalidadTxt_(R.modalidad))+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
       '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+R.nInv+' convocados'+
@@ -677,12 +678,17 @@ function vReu(){
       '<p class="rnota" style="margin:0 0 10px"><b>'+R.nInv+'</b> convocados · mejor hueco '+
       _titularHueco_(R, vent, _nresp, pondOn)+'</p>'+
       g+
+      '<p class="rnota" data-qpbox="'+esc(R.id)+'" style="margin:9px 0 0">Toca un hueco del mapa para ver quién puede.</p>'+
       '<div class="leyh" style="margin-top:11px"><span>'+
         (pondOn?'el número son PUNTOS: presencial+telemático 2 · solo telemático 1'
                :'el número es cuánta gente puede')+'</span>'+
         '<span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>fuera del horario de ese día</span></div>'+
     '</div>')+
-    (_puedeBorrarReuM_(R)?'<button class="btn full" data-p id="btnBorrar" style="margin-top:6px;color:var(--red2);border-color:var(--red)">Eliminar reunión</button>':'');
+    (_puedeBorrarReuM_(R)?'<button class="btn full" data-p id="btnBorrar" style="margin-top:6px;color:var(--red2);border-color:var(--red)">Eliminar reunión</button>':'')+
+    /* ⛔ 20/10: «Sin convocar» va AL FINAL. Estaba entre el rótulo «Mis reuniones» y la tarjeta de la reunión, y con
+       una sola reunión (la lista no se pinta) el rótulo quedaba vacío y la reunión parecía «sin convocar». Visto en
+       la maqueta al darle un acta sin convocar; ningún banco miraba el ORDEN. */
+    _sinConvocarHTMLM_();
 }
 
 /* ── CUBRIR DISPONIBILIDAD — pintar a dedo/arrastre, ciclo según modalidad ─

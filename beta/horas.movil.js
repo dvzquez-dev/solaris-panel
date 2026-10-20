@@ -1566,7 +1566,7 @@ function _desgloseMesHTML_(confs){
         'más, y <b>no se arrastra</b>: en el cierre la compensación vuelve a la base.'
       : 'La compensación por cargo es la <b>base</b> (Project Director 7 h · Coordinador 3,5 h · '+
         'miembro 2 h). Si tienes extras oficiales encima, están en Notion y esta pantalla '+
-        '<b>todavía no los conoce</b>: hace falta el backend v54.')+'<br>'+
+        '<b>todavía no los conoce</b>: el servidor aún no los manda.')+'<br>'+
       'El registro <b>no se borra nunca</b>: al cerrar el mes estas horas pasan al histórico y '+
       'aquí empieza el mes nuevo.</p>';
 }
@@ -2273,12 +2273,14 @@ function vHoras(){
        quita una copia del RÓTULO, no la derivación. */
     '<h2 class="sec">Mi índice de carga<span class="ln"></span></h2>'+
     '<div class="tarj">'+
-      (typeof YO.carga==='number'
+      (_cargaVista_(YO)!=null
         /* ⛔⛔ EL DIBUJO SE DERIVA DE LA BANDA (06/10) y desde el 19/10 vive en `comun.js`
            (`_cargaBarraHTML_`), que es donde está su porqué entero: el escritorio pinta la
            MISMA barra en «Lo tuyo», y dos copias habrían divergido al mover la banda. */
-        ? _cargaBarraHTML_(YO.carga)+
-          '<div class="fila" style="padding-bottom:0;border:0"><div class="a"><b>Carga '+nf(YO.carga,0)+'</b>'+
+        ? _cargaBarraHTML_(_cargaVista_(YO))+
+          '<div class="fila" style="padding-bottom:0;border:0"><div class="a"><b>'+(_cargaPrevistaTxt_(YO)?'Carga prevista ':'Carga ')+
+            nf(_cargaVista_(YO),0)+'</b>'+
+          (_cargaPrevistaTxt_(YO)?'<small>'+esc(_cargaPrevistaTxt_(YO))+'</small>':'')+
           /* ⛔ «de este mes» era FALSO: ese reparto se calculo cuando se genero el panel,
              no hoy. Ahora dice de cuando es, y debajo van las horas VIVAS — que es lo que
              se puede afirmar del mes en curso sin inventar nada. */
@@ -2293,7 +2295,7 @@ function vHoras(){
              lo ha visto. No pude reproducir el «6 de 32» que dio el agente, y queda
              dicho en vez de repetido. Se arregla igual porque cuesta una línea y el
              día que el motor vuelva a poblar `desglose` ya no miente. */
-          (YO.desglose?'<small>índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes '+nf(YO.desglose.aporta_mes_actual||0,1)+' · arrastre '+nf(YO.desglose.arrastre||0,1)+'</small>':'')+
+          (YO.desglose?'<small>'+_cargaDesgloseTxt_(YO.desglose)+'</small>':'')+
           (_hMesDevengado_(YO)!=null?'<small>este mes llevas '+h1(_hMesDevengado_(YO))+', en vivo</small>':'')+   /* devengada, como la cifra (07/10) */
           '</div><div class="d">banda sana ' + _bs.lo + '–' + _bs.hi + '</div></div>'
         : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+

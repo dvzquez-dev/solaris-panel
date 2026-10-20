@@ -113,6 +113,29 @@ function _hayVersionNueva_(guardado, fresca){
   return a !== b;
 }
 
+/* ══ ¿Y LO QUE CARGA LA PAGINA? DE LA MISMA VERSION QUE SU HTML (auditoria del 20/10)
+
+   ⛔ Cada fichero competia por separado con `ESPERA_RED_MS`: con red lenta el HTML podia salir
+   de la cache (el de ayer) y `comun.js` llegar de la red (el de hoy) -- o al reves --, y una
+   cara con el JS de otra version puede romper sin que nadie lo vea.
+   ✅ Lo decide la NAVEGACION, y lo demas la sigue:
+   · la navegacion compite como siempre (`carrera`);
+   · si salio lo GUARDADO, lo demas tambien (`guardado`): la pagina vieja entera, y la red
+     sigue por detras y avisa -- la recarga sola trae la nueva entera;
+   · si salio de la RED, lo demas tambien (`red`): sin carrera, que la carrera es justo lo que
+     mezclaba. Si la red falla, lo guardado (como siempre);
+   · sin saber como salio (`null`: el worker se reinicio entre medias), la carrera de antes.
+   · Y sin nada guardado, la red: no hay nada con que mezclar. */
+function _modoSubrecurso_(esNavegacion, navVieja, hayGuardado){
+  if (esNavegacion) return 'carrera';
+  if (!hayGuardado) return 'red';
+  if (navVieja === true) return 'guardado';
+  if (navVieja === false) return 'red';
+  return 'carrera';
+}
+/* Como salio la ultima navegacion: `true` lo guardado, `false` la red, `null` no se sabe. */
+let _navVieja = null;
+
 /* Se lo dice a las pestanas abiertas. ⚠️ NO recarga: alguien puede estar marcando su
    disponibilidad, y recargar por su cuenta le borra lo que llevaba. La pagina decide. */
 async function _avisarVersion_(){
@@ -165,13 +188,21 @@ self.addEventListener('fetch', (e) => {
          quedaria sin cargar, y peor que hoy: sin worker el navegador al menos da su
          propio error de red. `Response.error()` es exactamente ese error. */
     }).catch(() => { llego = true; return guardado || Response.error(); });
-    if (!guardado) return red;
+    /* ⛔ `waitUntil`: si se sirvió lo guardado, la descarga sigue FUERA de la respuesta, y el navegador puede apagar el
+       worker a los ~30 s y matarla — sin `put` ni aviso, en cada apertura con red lenta (auditoría del 20/10). */
+    try { e.waitUntil(red.then(() => {}, () => {})); } catch (_) {}
+    const nav = e.request.mode === 'navigate';
+    if (!guardado) { if (nav) _navVieja = false; return red; }
+    const modo = _modoSubrecurso_(nav, _navVieja, true);
+    if (modo === 'guardado') { servidoViejo = true; return guardado; }
+    if (modo === 'red') return red;
     /* ⛔ LO GUARDADO, SOLO SI LA RED NO LLEGA A TIEMPO: sin cobertura (o con una que tarda
        mas de `ESPERA_RED_MS`) la app sigue abriendo con lo que tenia, y cuando llegue lo
        nuevo la pagina recarga sola (`_recargarVersionNueva_`, `comun.js`). */
-    return Promise.race([red, new Promise((ok) => setTimeout(() => {
-      if (!llego) { servidoViejo = true; ok(guardado); }
-    }, ESPERA_RED_MS))]);
+    return Promise.race([red.then((r) => { if (nav && !servidoViejo) _navVieja = false; return r; }),
+      new Promise((ok) => setTimeout(() => {
+        if (!llego) { servidoViejo = true; if (nav) _navVieja = true; ok(guardado); }
+      }, ESPERA_RED_MS))]);
   })());
 });
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
