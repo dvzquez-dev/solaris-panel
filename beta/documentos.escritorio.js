@@ -58,6 +58,7 @@ function _normDocE_(d, i){
        proposito ni riesgos que leer, sin `nota` no se ve por que se pidieron cambios, y
        sin `revisor` no se puede saber si ya decidio alguien ni si puedes pisarlo. */
     analisis:  d.analisis || null,
+    reunion:   d.reunion || null,          // 20/10: de qué reunión es el acta, o que no la hubo (`_deReunionSinConvocar_`)
     nota:      d.nota || '',
     revisor:   d.revisor || null,
     decision:  d.decision || null,

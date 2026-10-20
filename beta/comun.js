@@ -2168,6 +2168,16 @@ function _mesCerradoParte_(p, plan, uc){
       cadena dice el día ANTERIOR a lo firmado entre las 00:00 y las 02:00 de verano. Se parsea a
       mano y se pasa por `Date.UTC`: `new Date(cadena)` da NaN en JScript, que es donde corre el banco.
    ⚠️ La pila la pone cada cara (`_pilaDeM_`); si no está, el nombre ENTERO — nunca otro nombre. */
+/* ⛔⛔ 20/10 — EL ACTA DE UNA REUNIÓN SIN CONVOCAR (Daniel, 14/10: «Si es una reunion SIN CONVOCAR, no aparece. Eso es
+   un error, deberia aparecer algo»). Lo dice el campo `reunion` del expediente, que pone `acta_a_expediente.py`.
+   ⛔ Sólo `sinConvocar === true` cuenta: sin el campo es «no lo sé», y un expediente de antes no se bautiza.
+   UNA puerta: la leen las Reuniones del móvil y las Actas del escritorio. */
+function _deReunionSinConvocar_(d){ return !!(d && d.reunion && d.reunion.sinConvocar === true); }
+function _actasSinConvocar_(lista){
+  return (lista || []).filter(_deReunionSinConvocar_).sort(function(a, b){
+    return String(b.fecha || '').localeCompare(String(a.fecha || '')); });
+}
+
 function _firmaParte_(p){
   var at = String((p && p.decidido_at) || ''), por = String((p && p.decidido_por) || '');
   var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?Z$/.exec(at), el = null;
@@ -5220,6 +5230,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-20-sin-convocar', fecha:'2026-10-20',
+      titulo:'Las reuniones sin convocar ya aparecen, con su acta',
+      items:[
+        {cara:'movil', vista:'reu', txt:'**Reuniones → «Sin convocar»**: si se grabó una reunión que nadie convocó, aquí sale con su fecha y su acta; pulsarla abre el expediente para leerlo o firmarlo. Sale aunque no tengas ninguna reunión convocada.'},
+        {cara:'escritorio', vista:'actas', txt:'**Actas marca las de reuniones sin convocar**, con una etiqueta junto al título.'}
+      ] },
     { id:'2026-10-20-mes-del-parte', fecha:'2026-10-20',
       titulo:'Cada parte dice a qué mes cuenta, y ya no lo adivina',
       items:[

@@ -415,6 +415,21 @@ function _titularHueco_(R, vent, nresp, pondOn){
                : '<b>todavía no ha respondido nadie</b>.';
 }
 
+/* ⛔ 20/10 — LAS REUNIONES SIN CONVOCAR, con su acta: fecha, la etiqueta y el expediente (pulsar abre `verDoc`, por
+   el `[data-doc]` que ya engancha `_engTurnosYDocs_`). Salen de los expedientes que el backend te manda: hoy los ve
+   quien los firma o los revisa, y el PD. Sin ninguna, no ocupa nada. */
+function _sinConvocarHTMLM_(){
+  var l=_actasSinConvocar_((typeof ENTREGABLES!=='undefined'?ENTREGABLES:[]).concat(typeof ENT_REV!=='undefined'?ENT_REV:[]));
+  if(!l.length) return '';
+  return '<h2 class="sec">Sin convocar<span class="ln"></span>'+l.length+'</h2>'+
+    '<div class="tarj">'+l.map(function(d){
+      var f=String(d.fecha||'');
+      return '<div class="fila clic" data-doc="'+d.id+'" data-p><div class="a"><b>'+esc(d.titulo||d.ref||'Acta')+'</b>'+
+        '<small>'+(/^\d{4}-\d{2}-\d{2}/.test(f)?esc(_isoADMY_(f.slice(0,10)))+' · ':'')+'reunión sin convocar · ver su acta</small></div>'+
+        '<div class="d"><span class="pil '+_pilEstDoc_(d.estado)+'">'+esc(estDoc(d.estado)[0])+'</span> <span class="chev">›</span></div></div>';
+    }).join('')+'</div>';
+}
+
 function vReu(){
   if(_reunionesCargando_())
     return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
@@ -422,6 +437,7 @@ function vReu(){
   if(_sinReuniones_())
     return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
       '<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar '+(esCoord()?'reunión':'reunión de trabajo')+'</button>'+
+      _sinConvocarHTMLM_()+
       '<div class="tarj">'+vacio('Ninguna reunión convocada','Ahora mismo no estás convocado a ninguna '+
         'reunión. Cuando alguien convoque una, aparecerá aquí para que cubras tu disponibilidad.','',false)+'</div>';
   var R=REUNION, nF=R.franjas.length;
@@ -585,6 +601,7 @@ function vReu(){
             _duraTxtM_(x)+'</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':'<span class="chev">›</span>')+'</div></div>'; }).join('')+'</div>'
       : '')+
+    _sinConvocarHTMLM_()+
     '<div class="tarj">'+cab(R.tipo||'General', _modalidadTxt_(R.modalidad))+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
       '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+R.nInv+' convocados'+
