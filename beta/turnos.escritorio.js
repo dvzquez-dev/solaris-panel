@@ -1253,14 +1253,27 @@ function cablearCoches(){
    Un solo campo por turno reparte a partes iguales, que es justo lo que ese ejemplo descarta.
    ⚠️ NO ESCRIBE EN NOTION. Deja la propuesta a la vista para aplicarla: escribir en Notion
    exige el visto bueno de Daniel **cada vez**, y son los puntos de personas reales. */
+/* ⛔ 20/10 (ficha del 20/08): ¿se puede CERRAR este turno hoy? No si Notion ya lo da por `Realizado` o `Cancelado`
+   —cerrar un cancelado acredita «+1 turno» (×4 h) a gente que no fue— y no si es FUTURO. El estado manda sobre la
+   fecha, igual que `_normTurnoM_` en el móvil. Sin fecha legible no se esconde: «no lo sé» no es «no se puede». */
+function _turnoCerrable_(t, hoy){
+  if(!t) return false;
+  var est = t.estado || '';
+  if(est==='Realizado' || est==='Cancelado') return false;
+  var iso = _dmyAISO_(t.f || t.fecha || '');
+  if(/^\d{4}-\d{2}-\d{2}$/.test(iso) && hoy && iso > hoy) return false;
+  return true;
+}
+
 function _turnosCerrables_(){
-  var out = [];
+  var out = [], _d = new Date(),
+      hoy = _d.getFullYear()+'-'+('0'+(_d.getMonth()+1)).slice(-2)+'-'+('0'+_d.getDate()).slice(-2);
   /* ⛔ CLAVES, NO POSICIONES. `escritorio.html` rellena `TURNOS` EN SITIO en sus dos
      cargas (`TURNOS.length=0; t.forEach(push)`), asi que un indice guardado sobrevive al
      refresco apuntando a OTRO turno -- y esto es justo lo que viaja al `value` del
      `<option>` y vuelve por el `onchange`. */
   (typeof TURNOS !== 'undefined' ? TURNOS : []).forEach(function(t){
-    if(_puedeCerrarTurno_(t, ACTOR)) out.push(_claveTurno_(t));
+    if(_puedeCerrarTurno_(t, ACTOR) && _turnoCerrable_(t, hoy)) out.push(_claveTurno_(t));
   });
   return out;
 }
@@ -1299,6 +1312,15 @@ function _cierreTurSel_(){
 function _cierreTurTope_(){
   var d = parseFloat(String(CIERRE_TUR.dur).replace(',', '.'));
   return _extraTope_(isFinite(d) ? d : 0);
+}
+
+/* ⛔ 20/10 (ficha del 20/08): ¿falta la duracion? El 0 de arriba es el lado seguro para el NUMERO, pero el panel
+   lo convertia en una AFIRMACION —«el turno no ha pasado de las 4 h de base»— en la primera pintada, sin que nadie
+   hubiera tecleado nada, y dejaba «Cerrar el turno» suelto: +1 turno a cada uno, sin extra, sin decir cuanto duro.
+   Un 0 escrito a mano SI es una duracion (quien lo pone lo dice); vacio o no-numero, no. */
+function _cierreTurSinDur_(){
+  var d = parseFloat(String(CIERRE_TUR.dur == null ? '' : CIERRE_TUR.dur).replace(',', '.'));
+  return !isFinite(d);
 }
 
 /* Lo que se mandaria: SOLO los confirmados.
@@ -1349,7 +1371,8 @@ function _cierreTurnoPanel_(){
     dud.forEach(function(n){ CIERRE_TUR.quien[n] = false; });
   }
 
-  var mapa = _cierreTurMapa_(), falta = _cierreTurnoFalta_(mapa, tope);
+  var mapa = _cierreTurMapa_(), sinDur = _cierreTurSinDur_(),
+      falta = sinDur ? 'Di cu\u00e1nto dur\u00f3 el turno' : _cierreTurnoFalta_(mapa, tope);
 
   /* ⚠️ EL `value` VA POR `esc`: la clave lleva el `punto`, que es texto libre del
      Discord y puede traer comillas -- sin escapar, romperia el atributo y el `<option>`
@@ -1380,7 +1403,10 @@ function _cierreTurnoPanel_(){
         (on?'':' disabled')+'> h</td></tr>';
   }).join('');
 
-  var aviso = (tope <= 0)
+  var aviso = sinDur
+    ? '<div class="nota">Di primero <b>cu\u00e1nto dur\u00f3</b> de verdad: de eso sale el tiempo extra que se '+
+      'reparte por encima de la base de <b>'+_horasTurnoBase_()+' h</b>.</div>'
+    : (tope <= 0)
     ? '<div class="nota">El turno no ha pasado de las <b>'+_horasTurnoBase_()+' h</b> de base, '+
       'as\u00ed que <b>no hay tiempo extra que repartir</b>. Cerrarlo sigue valiendo: confirma qui\u00e9n fue.</div>'
     : '<div class="nota">El turno dio <b>'+h1(tope)+'</b> por encima de la base de '+
@@ -1394,7 +1420,7 @@ function _cierreTurnoPanel_(){
       'font-size:12px;margin:8px 0 0">'+esc(CIERRE_TUR.hecho)+'</pre></div>'
     : '';
 
-  return pan('Cerrar un turno', cerrables.length+' tuyo(s)',
+  return pan('Cerrar un turno', cerrables.length+' por cerrar',
     '<label class="campo"><span class="sc">Qu\u00e9 turno</span>'+
       '<select id="ctSel">'+opciones+'</select></label>'+
     '<label class="campo"><span class="sc">Cu\u00e1nto dur\u00f3 de verdad (horas)</span>'+

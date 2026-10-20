@@ -51,6 +51,9 @@ self.addEventListener('install', () => self.skipWaiting());
    ⚠️ El manejador `fetch` en si NO se ejecuta en ningun banco, y hay que decirlo: usa
    `async`/`await` y `caches`, que el arnes de `cscript` (ES3) no tiene. Se vigila por forma. */
 const CACHE = 'solaris-estaticos-v1';
+/* Cuanto se espera a la red antes de abrir con lo guardado (20/10). Corto a proposito: es
+   lo que tarda en abrir en el peor caso con red mala; con red buena llega antes. */
+const ESPERA_RED_MS = 3500;
 
 /* ¿Esta peticion se puede guardar? La puerta unica, y por eso es una funcion aparte.
 
@@ -133,26 +136,42 @@ self.addEventListener('fetch', (e) => {
     try { c = await caches.open(CACHE); } catch (_) { return fetch(e.request); }
     let guardado = null;
     try { guardado = await c.match(e.request); } catch (_) { guardado = null; }
-    const red = fetch(e.request).then((r) => {
+    /* ⛔⛔ 20/10: LA RED PRIMERO. 🗣️ Daniel: *«el botón de actualizar es inútil pq la gente no lo
+       ve, directamente actualiza a la última cada vez q lo abres y ya»*. Hasta hoy esto era
+       `guardado || red` (abrir ya con la cara de ayer y sacar una barra), decidido el 10/09.
+       ⛔ `cache:'no-cache'` NO ES ADORNO: sin el, `fetch` puede contestar con la copia del
+       PROPIO navegador (`max-age=600`, diez minutos) y «la red primero» seguiria siendo la de
+       ayer. Con el se revalida contra el servidor (`ETag`: si no cambio, un 304 vacio). */
+    let llego = false, servidoViejo = false;
+    const red = fetch(e.request, { cache: 'no-cache' }).then((r) => {
+      llego = true;
       /* ⛔ Solo se guarda lo que llego BIEN: un 404 o un 500 cacheados se sirven como si
          fueran la app, y entonces el fallo dura hasta que alguien borre los datos. */
       /* ⚠️ El `put` tambien puede lanzar (cuota): que no se pueda guardar no es motivo
          para no devolver la respuesta que YA ha llegado. */
       if (r && r.ok) {
         /* ⛔ SE COMPARA ANTES DE PISAR: despues del `put`, `guardado` ya es lo
-           nuevo y la comparacion saldria SIEMPRE igual -- verde para siempre. */
-        if (_hayVersionNueva_(guardado, r)) { _avisarVersion_(); }
+           nuevo y la comparacion saldria SIEMPRE igual -- verde para siempre.
+           ⛔ Y SOLO SI SE SIRVIO LO VIEJO: si la red llego a tiempo, la pagina YA es la nueva,
+           y avisar la haria recargar para nada. */
+        if (servidoViejo && _hayVersionNueva_(guardado, r)) { _avisarVersion_(); }
         try { c.put(e.request, r.clone()); } catch (_) {}
+        return r;
       }
-      return r;
+      /* Un 404 o un 500 con copia buena guardada: mejor la copia que una app rota. */
+      return guardado || r;
       /* ⛔⛔ `|| Response.error()` NO ES ADORNO: sin cache Y sin red, esto devolvia
          `undefined`, y `respondWith(undefined)` **rompe la peticion**. La app se
          quedaria sin cargar, y peor que hoy: sin worker el navegador al menos da su
          propio error de red. `Response.error()` es exactamente ese error. */
-    }).catch(() => guardado || Response.error());
-    /* ⛔ `guardado || red`: se devuelve lo de la cache SIN esperar a la red -eso es lo que
-       hace que abra ya-, y la promesa de red sigue viva por detras refrescando. */
-    return guardado || red;
+    }).catch(() => { llego = true; return guardado || Response.error(); });
+    if (!guardado) return red;
+    /* ⛔ LO GUARDADO, SOLO SI LA RED NO LLEGA A TIEMPO: sin cobertura (o con una que tarda
+       mas de `ESPERA_RED_MS`) la app sigue abriendo con lo que tenia, y cuando llegue lo
+       nuevo la pagina recarga sola (`_recargarVersionNueva_`, `comun.js`). */
+    return Promise.race([red, new Promise((ok) => setTimeout(() => {
+      if (!llego) { servidoViejo = true; ok(guardado); }
+    }, ESPERA_RED_MS))]);
   })());
 });
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));

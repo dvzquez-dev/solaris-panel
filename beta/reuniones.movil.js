@@ -1198,9 +1198,12 @@ function crearModal(){
        retiró: con la rejilla única ya no puede pasar. Lo que sí hay que decir es si
        algún día se queda demasiado corto para que quepa la reunión entera. */
     var _nS=_slotsMin_(_du,_sl);
-    var _cortos=u.perDia.filter(function(idxs,i){ return (rangos()[i]||[0,0])[1]>(rangos()[i]||[0,0])[0] && idxs.length<_nS; }).length;
-    if(_cortos && !window.__avisoCorto__){
-      window.__avisoCorto__=1;
+    var _cortos=_diasCortosConv_(u.perDia, rangos(), _nS);
+    /* ⛔ «Pulsa otra vez» se ata a ESTA configuración (en el botón), no a la sesión: con `window.__avisoCorto__` el aviso
+       se apagaba para siempre al primer uso y la segunda reunión con días cortos se creaba sin decir nada. */
+    var _firma=_cortos+'|'+_nS+'|'+bloques.length;
+    if(_cortos && bt.dataset.avisado!==_firma){
+      bt.dataset.avisado=_firma;
       tost('Ojo: '+_cortos+' día'+(_cortos===1?'':'s')+' no da'+(_cortos===1?'':'n')+' para '+_durTxt_(_nS*_sl)+
         ' seguidos, así que ahí nadie podrá marcar. Pulsa otra vez para crearla igual.');
       bt.disabled=false; return;

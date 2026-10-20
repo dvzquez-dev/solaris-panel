@@ -2720,10 +2720,29 @@ function _esNoJustificable_(origen, extra){
 /* El rotulo de una fila de la cola: dice QUE ES antes de decir cuanto. ⛔ `_etPtsSanc_` solo
    sabe de puntos, y la recompensa de un premio **no son puntos**: son horas
    (`extra.compensacion`). Pintar su `puntos:0` como «aviso» era decir lo contrario de lo que es. */
+/* ¿Esta fila de la cola es un PREMIO? UNA puerta para el rótulo de la fila (`_etSancFila_`) y la cabecera del lote
+   (`_rotuloLote_`): con el criterio copiado, el día que cambie uno la cabecera y las filas dirían cosas distintas. */
+function _esPremioSanc_(origen, extra){
+  var o = String(origen == null ? '' : origen);
+  return o === 'premio' || !!(extra && extra.compensacion && o !== 'revocacion');
+}
+
+/* ⛔ 20/10 (ficha «un PREMIO se pinta como sanción»): la cabecera del lote en el móvil era `it.length+' sanciones'`, y
+   los bloques de reunión traen premiados en el MISMO lote — «2 sanciones» sobre una sanción y un premio. El escritorio
+   dice «N personas», que no miente; aquí se separa, que es lo que el PD necesita leer antes de decidir. */
+function _rotuloLote_(it){
+  var n = (it || []).length, p = 0;
+  for (var i = 0; i < n; i++) if (_esPremioSanc_(it[i].origen, it[i].extra)) p++;
+  var s = n - p, out = [];
+  if (s || !p) out.push(s + ' ' + (s === 1 ? 'sanción' : 'sanciones'));
+  if (p) out.push(p + ' ' + (p === 1 ? 'premio' : 'premios'));
+  return out.join(' · ');
+}
+
 function _etSancFila_(pts, origen, extra){
   var o = String(origen == null ? '' : origen);
   var comp = extra && extra.compensacion;
-  if (o === 'premio' || (comp && o !== 'revocacion'))
+  if (_esPremioSanc_(o, extra))
     /* ⚠️ `nf2`, a 40 líneas de aquí en este mismo fichero: formatea decimales en es-ES
        (`nf2(0.5)` → «0,5»). Iba a escribir un `_hh_` nuevo — §5b lo caza. */
     return 'premio' + (comp ? ' · +' + nf2(comp) + ' h' : '');
@@ -2820,6 +2839,28 @@ function _puntosDeMotivo_(mot){
   for (i = 0; i < L.length; i++)
     if (L[i] && L[i][0] === mot && typeof L[i][2] === 'number') return String(L[i][2]);
   return null;
+}
+
+/* ⛔ 20/10 (ficha «el prefill de puntos se congela en el primer motivo elegido»). El campo de puntos se pintaba con
+   `SANC_FORM.pts||_puntosDeMotivo_(motivo)`, y `_recogerSancForm_` guarda en `pts` LO QUE PUSO EL PROPIO PREFILL: al
+   cambiar de motivo el `||` cortocircuitaba y la sanción salía con los puntos del artículo ANTERIOR, sin que ninguna
+   capa (ni `_validaPuntosSanc_`, sólo rango, ni el servidor) cruce puntos con artículo.
+   ⛔ Y NO se invierte el `||`: ese orden arregló el fallo contrario (un repintado asíncrono pisando lo tecleado). Lo
+   que distingue es POR QUÉ se repinta: un repintado conserva; un CAMBIO DE MOTIVO vuelve a proponer — salvo que la
+   persona haya tecleado otro número, que entonces es suyo. Por eso se recuerda lo PROPUESTO (`ptsPropuesto`). */
+function _ptsPrefillSanc_(){
+  if (SANC_FORM.pts) return SANC_FORM.pts;
+  var p = _puntosDeMotivo_(SANC_FORM.motivo) || '';
+  SANC_FORM.ptsPropuesto = p;
+  return p;
+}
+function _motivoCambiaSanc_(){
+  var e = (typeof $ === 'function') ? $('#snPts') : null;
+  var v = e ? e.value : SANC_FORM.pts;
+  if (SANC_FORM.ptsPropuesto != null && String(v == null ? '' : v) === String(SANC_FORM.ptsPropuesto)) {
+    SANC_FORM.pts = '';
+    if (e) e.value = '';
+  }
 }
 
 function _sancCampos_(){
@@ -3033,19 +3074,48 @@ function _novedadesHTML_(){
    pregunta AQUÍ DENTRO además de en el menú — esconder el botón es cortesía, y en el escritorio
    a una vista se llega también por `ir()`.
    Los `data-est`/`data-fam` no pintan nada: son lo que el banco cuenta, en ASCII. */
+/* ⛔ 20/10 (ficha 22489): EL PULSO DEL GATE, en Automatismos. El inventario de abajo es una FOTO de cuando se publicó;
+   esto es lo único de la pantalla que dice si el motor está pasando AHORA. El estado vive en `_pulsoGateCargar_.p`
+   (un módulo sólo lleva declaraciones `function`, ARRANQUE §5b): `undefined` = sin pedir, `null` = en vuelo,
+   `{error}` = no se pudo preguntar, objeto = la respuesta del mini PC. */
+function _pulsoGateCargar_(repintar){
+  var F=_pulsoGateCargar_;
+  if(F.p!==undefined) return;
+  if(typeof api==='undefined' || typeof api.getPulsoGate!=='function'){ F.p={error:'esta cara no lo pregunta'}; return; }
+  F.p=null;
+  Promise.resolve().then(function(){ return api.getPulsoGate(); })
+    .then(function(r){ F.p=(r && typeof r==='object') ? r : {error:'respuesta vacía'}; })
+    .catch(function(e){ F.p={error:String((e&&e.message)||e||'sin detalle')}; })
+    .then(function(){ if(typeof repintar==='function') repintar(); });
+}
+function _pulsoGateHTML_(p){
+  if(p===undefined || p===null) return '<p class="rnota" data-pulso="cargando">Preguntando al servidor cuándo pasó el motor por última vez…</p>';
+  if(p.error) return '<p class="rnota" data-pulso="error">⚠ No pude preguntar cuándo pasó el motor ('+esc(p.error)+
+    '). Eso NO dice que esté parado: dice que no lo sé.</p>';
+  var m=p.minutos, mu=(typeof p.muerto_min==='number') ? p.muerto_min : 10, ca=p.cadencia_min||2;
+  if(m===null || m===undefined) return '<p class="rnota" data-pulso="nolose" style="color:var(--rojo,#E41E25)">⛔ El motor '+
+    '<b>no ha dejado constancia de ninguna pasada</b> en el mini PC: o no ha corrido nunca, o su estado no se lee.</p>';
+  var cuando=(m<1) ? 'hace menos de 1 min' : ('hace '+m+' min');
+  if(m>mu) return '<p class="rnota" data-pulso="parado" style="color:var(--rojo,#E41E25)">⛔ <b>El motor lleva '+m+
+    ' min sin pasar</b> (toca cada '+ca+'): nadie cierra fichajes, caduca partes ni manda avisos mientras tanto.</p>';
+  return '<p class="rnota" data-pulso="vivo">✅ El motor pasó <b>'+cuando+'</b> (toca cada '+ca+' min).</p>';
+}
 function _automatismosHTML_(){
   var tit='<div class="mtit">Automatismos</div>';
   if(!_puedeVerNovedades_()){
     return tit+'<p class="rnota" data-est="nopuede">Esta pantalla es del director, y sólo en la beta.</p>';
   }
+  /* El pulso va ARRIBA de todo: es lo vivo de la pantalla (lo de debajo es la foto de publicar), y sale también
+     cuando el inventario no se selló — que es justo cuando más falta saber si el motor pasa. */
+  var pul=(typeof _pulsoGateCargar_==='function' && _pulsoGateCargar_.p!==undefined) ? _pulsoGateHTML_(_pulsoGateCargar_.p) : '';
   var A=(typeof AUTOMATISMOS==='undefined') ? null : AUTOMATISMOS;
   if(!A || typeof A!=='object'){
-    return tit+'<div class="msub">Lo que el repositorio ya hace solo.</div>'+
+    return tit+pul+'<div class="msub">Lo que el repositorio ya hace solo.</div>'+
       '<p class="rnota" data-est="sinsellar">El inventario no se selló en esta build. Sale de '+
       '<span class="mono">rutinas/automatismos.py</span> del repositorio, al publicar.</p>';
   }
   var m=String(A.generado||'').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-  var h=tit+(m
+  var h=tit+pul+(m
     ? '<div class="msub" data-est="foto">Foto del momento de publicar: <b>'+
       m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>. No es un «comprobar ahora»: lo que haya '+
       'cambiado después no sale aquí.</div>'
@@ -3798,49 +3868,44 @@ function _urlB64_(b64){
   return arr;
 }
 
-/* ══ HAY UNA VERSION NUEVA (545.ª, 10/09/2026) ═══════════════════════
+/* ══ HAY UNA VERSION NUEVA → SE CARGA SOLA (20/10/2026; antes, barra con botón desde el 10/09) ═══
 
-   ⛔⛔ Daniel, 10/09: *«no me llego nada a la app ni siquiera ninguna novedad»*. La cache
-   del worker sirve `guardado || red`, o sea **la cara de ayer** en la primera apertura.
-   Quitarla no vale: entro para arreglar *«tarda mucho en abrir a veces»*, que tambien lo
-   reporto el. Asi que se sigue abriendo al instante **y se avisa** cuando la red trae algo
-   distinto -- lo detecta `_hayVersionNueva_` en `sw.js` comparando la huella (`ETag`).
+   🗣️ Daniel, 20/10: *«quita la opción de actualizar la app directamente actualizasela a todo dios»* · *«el botón de
+   actualizar es inútil pq la gente no lo ve, directamente actualiza a la última cada vez q lo abres y ya»*.
+   Lo grueso está en `sw.js`, que ahora pide a la RED primero: casi siempre se abre ya en la última. Esto cubre el
+   resto -- la red tardó, se abrió con lo guardado, y luego llegó lo nuevo (`version-nueva`).
+   ⛔ Y NO HAY BARRA NI BOTÓN: se recarga. Lo que queda de la decisión del 10/09 es su MIEDO, no su conclusión:
+   recargar encima de una disponibilidad a medio pintar o un motivo a medio escribir pierde trabajo. Por eso:
+   · si aún no has tocado nada desde que abrió → **al momento**;
+   · si ya estabas usándola → **la próxima vez que vuelvas a la app** (es «cada vez que la abres»), y sólo si no
+     hay nada a medias en ese instante. */
+var _avisoVersion = false;   // hay una versión nueva esperando a cargarse
 
-   ⛔ **NO RECARGA SOLA, Y ESO ES LA DECISION.** El arreglo obvio es `location.reload()` al
-   recibir el mensaje, y borraria lo que alguien lleve marcado -- una disponibilidad a medio
-   pintar, un motivo escrito a medias. Se ofrece; decide quien esta delante. */
-var _avisoVersion = false;
+/* La decisión, pura (la ejecuta `probar_sw.py`). `st` = {tocado, aMedias, volviendo}. */
+function _recargaVersionYa_(st){
+  st = st || {};
+  if (st.aMedias) return false;            // ⛔ nunca encima de algo a medio hacer
+  if (!st.tocado) return true;             // recién abierta: nadie ha empezado nada
+  return !!st.volviendo;                   // usándola: al volver a ella, no en mitad
+}
 
-function _pintarVersionNueva_(){
-  /* ⛔ UNA SOLA VEZ. El worker manda un mensaje **por fichero** que cambia, y en una
-     publicacion cambian varios: sin esto salen cinco barras encima de la pantalla. */
-  if (_avisoVersion) return false;
-  if (typeof document === 'undefined' || !document.body) return false;
-  _avisoVersion = true;
-  var d = document.createElement('div');
-  d.id = 'vnueva';
-  d.setAttribute('style', 'position:fixed;left:10px;right:10px;bottom:calc(10px + '
-    + 'env(safe-area-inset-bottom,0px));z-index:9999;display:flex;gap:10px;'
-    + 'align-items:center;padding:11px 12px;border-radius:12px;font-size:12.5px;'
-    + 'background:#1b1a19;border:1px solid rgba(255,255,255,.18);color:#f2f0ee;'
-    + 'box-shadow:0 6px 22px rgba(0,0,0,.45)');
-  var t = document.createElement('span');
-  t.setAttribute('style', 'flex:1;line-height:1.4');
-  t.textContent = 'Hay una versión nueva de la app.';
-  var b = document.createElement('button');
-  b.setAttribute('style', 'flex:none;padding:7px 12px;border-radius:9px;border:0;'
-    + 'background:#E41E25;color:#fff;font:inherit;font-weight:600;cursor:pointer');
-  b.textContent = 'Actualizar';
-  b.onclick = function(){ try { location.reload(); } catch (_) {} };
-  var x = document.createElement('button');
-  x.setAttribute('style', 'flex:none;padding:7px 9px;border-radius:9px;border:0;'
-    + 'background:transparent;color:#9d9894;font:inherit;cursor:pointer');
-  x.textContent = 'Ahora no';
-  /* ⚠️ Cerrar NO vuelve a poner `_avisoVersion` en false: si lo hiciera, el siguiente
-     fichero que refresque lo volveria a sacar y seria imposible quitarselo de encima. */
-  x.onclick = function(){ try { d.parentNode.removeChild(d); } catch (_) {} };
-  d.appendChild(t); d.appendChild(x); d.appendChild(b);
-  document.body.appendChild(d);
+/* ¿Hay algo a medias en pantalla? Un campo con el foco, el modal del móvil abierto, o texto escrito sin enviar. */
+function _hayAMedias_(){
+  if (typeof document === 'undefined') return false;
+  var a = document.activeElement, t = a && a.tagName;
+  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || (a && a.isContentEditable)) return true;
+  var m = document.getElementById('modal');
+  if (m && m.classList && m.classList.contains('on')) return true;
+  var ts = document.getElementsByTagName ? document.getElementsByTagName('textarea') : [];
+  for (var i = 0; i < ts.length; i++) if (ts[i].value && String(ts[i].value).trim()) return true;
+  return false;
+}
+
+function _recargarVersionNueva_(volviendo){
+  if (!_avisoVersion) return false;
+  var st = { tocado: !!_recargarVersionNueva_.tocado, aMedias: _hayAMedias_(), volviendo: !!volviendo };
+  if (!_recargaVersionYa_(st)) return false;
+  try { location.reload(); } catch (_) { return false; }
   return true;
 }
 
@@ -3849,8 +3914,15 @@ function _pintarVersionNueva_(){
 function _escucharSW_(){
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false;
   try {
+    /* «Tocado» = el primer toque o tecla desde que abrió: a partir de ahí ya no se recarga en mitad. */
+    var marca = function(){ _recargarVersionNueva_.tocado = true; };
+    document.addEventListener('pointerdown', marca, true);
+    document.addEventListener('keydown', marca, true);
+    document.addEventListener('visibilitychange', function(){
+      if (document.visibilityState === 'visible') _recargarVersionNueva_(true);
+    });
     navigator.serviceWorker.addEventListener('message', function(ev){
-      if (ev && ev.data && ev.data.tipo === 'version-nueva') _pintarVersionNueva_();
+      if (ev && ev.data && ev.data.tipo === 'version-nueva') { _avisoVersion = true; _recargarVersionNueva_(false); }
     });
     return true;
   } catch (_) { return false; }
@@ -4077,6 +4149,19 @@ function _diasPedidos_(modo,d0,d1,nd){
 /* Cuantas casillas seguidas hacen falta para cubrir la reunión. Se redondea HACIA ARRIBA:
    media casilla no existe, y quedarse corto es no poder ir. Sin `duracion` (reuniones de
    antes de este modelo) da 1, que es como se comportaba la app hasta ahora. */
+/* ⛔ 20/10 (ficha «el aviso de "ese día nadie podrá marcar": dos reglas distintas»). ¿Cuántos días de la convocatoria
+   NO dan para la reunión entera? UNA regla para las dos caras, y POR DÍA: el escritorio miraba la UNIÓN de todos
+   (`u.F.length<nS`), así que con horario distinto por día casi nunca avisaba aunque un día se quedara corto.
+   Un día sin horario (desactivado) no cuenta: ahí no se ofrece nada a propósito. */
+function _diasCortosConv_(perDia, rangos, nS){
+  var n = 0;
+  for (var i = 0; i < perDia.length; i++) {
+    var r = rangos[i] || [0, 0];
+    if (r[1] > r[0] && perDia[i].length < nS) n++;
+  }
+  return n;
+}
+
 function _slotsMin_(duracion, slot){
   var d=+duracion||0, s=Math.max(5, +slot||60);
   return Math.max(1, Math.ceil(d/s) || 1);
@@ -4671,6 +4756,22 @@ function _calorDe_(r, pond){
   return cel;
 }
 
+/* ⛔ 20/10 — QUIÉN PUEDE EN UNA CELDA (día `di`, franja `fi`). 🗣️ Daniel: *«no aparecen los nombres de los que pueden
+   cada día»* · *«en modo público debería haber una forma de verlo»*. El texto de crear lo promete en las dos caras
+   («cualquiera puede tocar un hueco y ver quién puede») y ninguna pintaba un nombre. MISMA lectura que `_calorDe_`, de
+   la que es la otra cara: `resp[nombre]` alineado con `bloques`, y puede quien tiene `> 0`. Quién PUEDE VER la lista
+   (pública, o quien manda) lo decide quien la pinta; esto sólo dice quién hay. */
+function _quienPuedeCelda_(r, di, fi){
+  var bl=(r && r.bloques)||[], resp=(r && r.resp)||{}, out=[];
+  Object.keys(resp).forEach(function(nom){
+    var w=resp[nom]; if(!Array.isArray(w)) return;
+    for(var i=0;i<bl.length;i++){
+      if(Array.isArray(bl[i]) && bl[i][0]===di && bl[i][1]===fi && (+w[i]||0)>0){ out.push(nom); return; }
+    }
+  });
+  return out.sort(function(a,b){ return a.localeCompare(b,'es'); });
+}
+
 /* ⛔ ¿ES LA UNIDAD DE DOCUMENTACIÓN TÉCNICA? El nombre llega de tres sitios y no coincide:
    `UCT` (el viejo, y el que sigue usando Cowork), `Documentación Técnica` (el del roster) y
    `Unidad de Documentación Técnica` (el canónico que devuelve `umbral.coordinadas`). Se
@@ -5260,6 +5361,60 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-20-ultima-version', fecha:'2026-10-20',
+      titulo:'Siempre abres la última versión, sin botón de actualizar',
+      items:[
+        {cara:'movil', vista:'estado', txt:'**Al abrir la app ya es la versión nueva**: no sale la barra de «Hay una versión nueva» ni hay que pulsar Actualizar. Sin cobertura abre con lo que tenía y se pone al día sola en cuanto puede, nunca en mitad de algo a medias.'},
+        {cara:'escritorio', vista:'automatismos', txt:'**Lo mismo en el escritorio**: abre siempre en la última versión, sin barra ni botón.'}
+      ] },
+    { id:'2026-10-20-doc-sin-red', fecha:'2026-10-20',
+      titulo:'Decidir un documento sin conexión ya no finge que se publicó',
+      items:[
+        {cara:'movil', vista:'docs', txt:'**Sin conexión, aprobar o rechazar un documento dice «la decisión NO se ha guardado»** y no lo cambia, como el escritorio. Antes lo cambiaba en el teléfono y decía «publicado en Notion y en el Libro de Datos».'}
+      ] },
+    { id:'2026-10-20-buzon-sin-red', fecha:'2026-10-20',
+      titulo:'El buzón sin conexión ya no esconde lo que habías leído',
+      items:[
+        {cara:'escritorio', vista:'buzon', txt:'**La hora de «decidido» va en tu hora y con fecha española** («21/10/2026, 01:30»): antes se recortaba en UTC y de madrugada decía el día anterior. Lo mismo en el «visto el …» de Novedades.'},
+        {cara:'escritorio', vista:'buzon', txt:'**Si falla la conexión, el buzón sigue enseñando los reportes que ya había leído**, con una chapa arriba: «no se pudo actualizar · lo de abajo es lo último que se pudo leer». Antes los tapaba con «no se pudo cargar».'}
+      ] },
+    { id:'2026-10-20-aviso-corto', fecha:'2026-10-20',
+      titulo:'Crear una reunión avisa de los días que se quedan cortos, en las dos caras',
+      items:[
+        {cara:'escritorio', vista:'reuniones', txt:'**Al convocar, avisa si UN día no da para la reunión entera** aunque los demás sí: antes sólo miraba el horario de todos juntos y con horario distinto por día casi nunca avisaba.'},
+        {cara:'movil', vista:'reu', txt:'**El aviso de «ese día nadie podrá marcar» vuelve a salir en la segunda reunión** que crees: antes se apagaba para toda la sesión tras el primero.'}
+      ] },
+    { id:'2026-10-20-rotulo-lote', fecha:'2026-10-20',
+      titulo:'En el móvil, un bloque con premios ya no dice «N sanciones»',
+      items:[
+        {cara:'movil', vista:'estado', txt:'**La cabecera de cada bloque separa sanciones y premios** («1 sanción · 1 premio»): antes contaba a los premiados como sancionados. En la cola del menú ⋮ y en tu panel del PD.'}
+      ] },
+    { id:'2026-10-20-pulso-gate', fecha:'2026-10-20',
+      titulo:'Automatismos dice si el motor está pasando AHORA',
+      items:[
+        {cara:'escritorio', vista:'automatismos', txt:'**Arriba de Automatismos sale «el motor pasó hace N min»**, en rojo si lleva más de 10 sin pasar (nadie cierra fichajes ni manda avisos mientras tanto). Lo lee el mini PC de su propio disco, sin escribir nada; si no puede preguntarlo lo dice, y eso no es «parado».'}
+      ] },
+    { id:'2026-10-20-doc-previa-movil', fecha:'2026-10-20',
+      titulo:'Documentos en el móvil: ves qué estás pisando',
+      items:[
+        {cara:'movil', vista:'docs', txt:'**La ficha de un expediente ya decidido dice quién lo decidió, cuándo, qué y por qué** antes de los botones, como en el escritorio: antes sólo lo veía el autor.'},
+        {cara:'movil', vista:'docs', txt:'**«Rechazar» pregunta antes**, como el escritorio: cierra el expediente de otra persona.'}
+      ] },
+    { id:'2026-10-20-sanc-jurisdiccion', fecha:'2026-10-20',
+      titulo:'El móvil dice a cuánta gente puedes sancionar',
+      items:[
+        {cara:'movil', vista:'estado', txt:'**En Sanciones del menú ⋮, «Poner una sanción» dice ya «N personas bajo tu jurisdicción»**, como el escritorio: el número se calculaba y no se enseñaba.'}
+      ] },
+    { id:'2026-10-20-turnos-cerrables', fecha:'2026-10-20',
+      titulo:'«Cerrar un turno» ya sólo ofrece los que toca cerrar',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'**La lista de «Cerrar un turno» ya no trae turnos cancelados, ya realizados ni futuros**: cerrar un cancelado sumaba «+1 turno» (×4 h) a gente que no fue. Y el contador dice **«N por cerrar»**, no «N tuyo(s)», que al PD le salía sobre turnos en los que no estuvo.'}
+      ] },
+    { id:'2026-10-20-turno-sin-duracion', fecha:'2026-10-20',
+      titulo:'Cerrar un turno ya no da por hecho que fue corto',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'**Sin la duración escrita, «Cerrar un turno» la pide** en vez de decir que el turno no pasó de las 4 h, y el botón no se suelta hasta que la pongas: antes se podía cerrar sin decir cuánto duró y a cada uno le caía el turno sin extra.'}
+      ] },
     { id:'2026-10-20-tareas-guardan', fecha:'2026-10-20',
       titulo:'Los botones de Tareas guardan el paso (o dicen que no pudieron)',
       items:[
@@ -7201,11 +7356,17 @@ function _ajustesDocTxt_(e){
 }
 
 /* `2026-08-06T19:12:00.000Z` → `06/08/2026, 21:12`. Formato, no calendario. */
+/* ⛔ 20/10 (ficha «`decidido_at` se pinta en UTC recortando la cadena»): aquí la FECHA salía de la cadena UTC
+   (`s.slice(0,10)`) y la HORA del reloj local — mezcladas, a partir de las 22:00 en verano decía el día ANTERIOR con la
+   hora de hoy («20/10, 01:30» para la 01:30 del 21). Las dos mitades salen ahora de la misma fecha LOCAL, por la puerta
+   que ya existía (`_ahoraLocalISO_`). Una fecha sola (AAAA-MM-DD) no tiene hora que convertir: se da tal cual. */
 function _novCuando_(iso){
   var s=String(iso||''); if(s.length<10) return s;
+  if(s.length===10) return _isoADMY_(s);
   var d=new Date(s);
   if(isNaN(+d)) return s.slice(0,10);
-  return _isoADMY_(s.slice(0,10))+', '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+  var l=_ahoraLocalISO_(d);
+  return _isoADMY_(l.slice(0,10))+', '+l.slice(11,16);
 }
 
 /* Cablea los dos botones. `repintar` es la función de pintado de la cara — las dos se llaman

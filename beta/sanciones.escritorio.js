@@ -454,7 +454,7 @@ function _ponerSancCuerpo_(){
               'a Notion, as\u00ed que no se puede mover ning\u00fan plazo. Elige otro motivo.</div>')
         : '')+
       '<label style="display:block;margin-bottom:11px;max-width:130px">'+lab('Puntos')+
-        '<input type="number" id="snPts" value="'+esc(SANC_FORM.pts||_puntosDeMotivo_(SANC_FORM.motivo)||'')+'" step="1" min="-5" max="0" style="'+E+'"></label>'+
+        '<input type="number" id="snPts" value="'+esc(_ptsPrefillSanc_())+'" step="1" min="-5" max="0" style="'+E+'"></label>'+
       '<button class="btn pri" id="btnSanc">Poner la sanci\u00f3n</button>'+
       '<div class="nota" id="snMsg" style="margin:9px 0 0">La sanci\u00f3n entra <b>pendiente</b>: se decide '+
       'abajo, y el comunicado sale despu\u00e9s.</div>'+
@@ -503,7 +503,7 @@ function _cablearPonerSanc_(){
     $$('[data-sanq]',c).forEach(function(b){ b.onclick=function(){ marcar(b); }; });
   };
   /* El motivo decide QUE MAS se pide, asi que ese si repinta. */
-  var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ _repintarPonerSanc_(); };
+  var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ _motivoCambiaSanc_(); _repintarPonerSanc_(); };
   var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
 
   var bt=$('#btnSanc');

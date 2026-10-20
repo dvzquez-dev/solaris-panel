@@ -112,7 +112,9 @@ function _sancionesHTML_(){
     return t && t.url && !_tareaHecha_(t.e); });
   return '<div class="mtit">Sanciones</div>'+
     '<div class="msub">Ponerlas y decidirlas. El comunicado sigue saliendo del escritorio.</div>'+
-    '<h4>Poner una sanción</h4><div class="tarj">'+
+    /* A cuánta gente puedes sancionar, como el `pan(...)` del escritorio (ficha del 20/08: `nTotal` se
+       calculaba aquí y no se pintaba nunca). */
+    '<h4>Poner una sanción <span class="sc">· '+nTotal+(nTotal===1?' persona':' personas')+' bajo tu jurisdicción</span></h4><div class="tarj">'+
       /* BUSCADOR, no desplegable. Con 40 personas un `<select>` es una lista que hay que
          recorrer con el pulgar; aquí se escriben tres letras. Filtra por nombre, pila o
          subsistema, y SIN TILDES: «aaron» encuentra a «Aarón». */
@@ -156,7 +158,7 @@ function _sancionesHTML_(){
               esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+' no tiene ninguna tarea viva con enlace '+
               'a Notion, así que no se puede mover ningún plazo. Elige otro motivo.</p>')
         : '')+
-      '<label class="campo"><span class="sc">Puntos</span><input type="number" id="snPts" value="'+esc(SANC_FORM.pts||_puntosDeMotivo_(SANC_FORM.motivo)||'')+'" step="1" min="-5" max="0"></label>'+
+      '<label class="campo"><span class="sc">Puntos</span><input type="number" id="snPts" value="'+esc(_ptsPrefillSanc_())+'" step="1" min="-5" max="0"></label>'+
       '<button class="btn pri full" data-p id="btnSanc">Poner la sanción</button>'+
       '<p class="rnota" id="snMsg" style="margin:8px 0 0"></p>'+
     '</div>'+
@@ -176,7 +178,7 @@ function _sancColaHTML_(){
   return Object.keys(porLote).map(function(k){
     var it=porLote[k], suelta=(k==='(sueltas)');
     return '<div class="tarj"><div class="lote"><div class="lote-h">'+
-      '<b>'+it.length+' '+(it.length===1?'sanción':'sanciones')+'</b>'+
+      '<b>'+esc(_rotuloLote_(it))+'</b>'+
       '<span class="mono" style="color:var(--red2)">'+esc(k)+'</span></div>'+
       it.map(function(x){
         return '<div class="lote-i" style="flex-wrap:wrap;gap:6px">'+
@@ -288,7 +290,7 @@ function _cablearSanciones_(){
   /* El motivo decide QUE MAS se pide, asi que al cambiarlo hay que repintar. Pero se recoge
      todo antes, y `_sancionesHTML_` vuelve a pintar lo elegido. */
   var mo=$('#snMotivo');
-  if(mo) mo.onchange=function(){ _repintarSancM_(); };
+  if(mo) mo.onchange=function(){ _motivoCambiaSanc_(); _repintarSancM_(); };
   var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
 
   var bt=$('#btnSanc');
@@ -795,7 +797,7 @@ function panelPD(){
     Object.keys(porLote).map(function(k){
       var it=porLote[k];
       return '<div class="tarj"><div class="lote"><div class="lote-h">'+
-        '<b>'+it.length+' '+(it.length===1?'sanción':'sanciones')+'</b>'+
+        '<b>'+esc(_rotuloLote_(it))+'</b>'+
         '<span class="mono" style="color:var(--red2)">'+esc(k)+'</span></div>'+
         it.slice(0,8).map(function(x){
           return '<div class="lote-i"><span class="n">'+esc(_pilaDeM_(x.nombre)||x.nombre||'')+'</span>'+
@@ -877,6 +879,9 @@ function _panelPDmaqueta_(){
     (sueltas?'<h2 class="sec">Sueltas<span class="ln"></span>'+SUELTAS.length+'</h2><div class="tarj">'+sueltas+'</div>':'');
 }
 
+/* ⚠️ PARTE DE LA MAQUETA (`_panelPDmaqueta_`, sin llamadores): su «Añadida a la cola» NO crea nada. Se
+   conserva sin usar a propósito (837.ª, 15/10); si algo vuelve a pintar `#btnSancionar`, esto se porta a
+   `api.*` antes — la sanción de verdad sale de `_sancionesHTML_`. */
 function sancionarModal(){
   var motivos=RRI.restas.concat(RRI.sumas);
   abrirModal('<div class="mtit">🔨 Sancionar</div>'+

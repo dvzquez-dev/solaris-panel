@@ -382,6 +382,22 @@ async function _cargarBuzon_(){
   pintar();
 }
 
+/* ⛔ 20/10 (ficha «"Sin conexión no se borra lo que ya había" es un rótulo»). El cargador CONSERVABA la cola al fallar
+   —y lo dice su comentario—, pero `V.buzon` salía antes en cuanto había `BUZON_ERR`: justo el único caso en que hay algo
+   que conservar. Medido por un agente: la misma pantalla con 2 reportes guardados que con `[]`.
+   Ahora la vista sólo se rinde si NO hay nada que enseñar; con cola ya leída la pinta, y la chapa de arriba dice que
+   no se pudo actualizar (callarlo la haría pasar por fresca, que es el fallo del lote congelado). */
+function _buzonSinNadaQueEnsenar_(){
+  return !!BUZON_ERR && !(BUZON && BUZON.length);
+}
+function _buzonAvisoHTML_(){
+  if (BUZON_CARGANDO) return '<div class="chips"><span class="chip wa">ACTUALIZANDO… <b style="color:var(--ink)">'+
+    'lo de abajo es lo último que se pudo leer</b></span></div>';
+  if (BUZON_ERR) return '<div class="chips"><span class="chip wa">NO SE PUDO ACTUALIZAR ('+esc(BUZON_ERR)+') · '+
+    '<b style="color:var(--ink)">lo de abajo es lo último que se pudo leer</b></span></div>';
+  return '';
+}
+
 function _fichaBuzon_(r){
   var st=_estBuzon_(r.estado), esBug=!_esMejora_(r);
   var campo=function(t,v){ return v? ('<div class="sub"><span class="sc">'+t+'</span>'+
@@ -456,7 +472,7 @@ function _verCapturaBuzon_(id, b){
     BZ_CAPS[id] = d && d.captura; pintar();
   }).catch(function(e){
     if(b) b.disabled=false;
-    tost('No se pudo traer la captura: '+((e&&e.message)||e));
+    tostErr('No se pudo traer la captura: ', e);   /* por la puerta: con la sesión caducada el aviso se queda fijo */
   });
 }
 
@@ -644,7 +660,7 @@ function _accBuzon_(r, esBug){
   if(r.estado==='Publicado' || r.estado==='Descartado'){
     return '<div class="ruta">Este reporte ya está <b>'+esc(r.estado.toLowerCase())+'</b>'+
       (r.decidido_por?', decidido por <b>'+esc(_m(r.decidido_por).pila||r.decidido_por)+'</b>':'')+
-      (r.decidido_at?' · '+esc(String(r.decidido_at).slice(0,16).replace('T',' ')):'')+
+      (r.decidido_at?' · '+esc(_novCuando_(r.decidido_at)):'')+
       '. No quedan decisiones que tomar.'+
       ((notas||'').trim()?'<br><span style="color:var(--ink3)">Anotaciones: '+esc(notas.trim())+'</span>':'')+
       '</div>';

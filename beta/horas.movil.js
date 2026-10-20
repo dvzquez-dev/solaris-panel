@@ -789,8 +789,11 @@ function vFichar(){
         '<b>sin fichaje</b>, y quien lo firme lo verá.</span></span></div>'+
     '</div>';
 
-  var decl = ST.form.declararId!=null ? PARTES.filter(function(x){return x.id===ST.form.declararId;})[0] : null;
+  var decl = _declVivo_(ST.form), _perdido = !!ST.form._declPerdido;
+  ST.form._declPerdido = false;
   return '<div class="h1">Fichar</div><p class="h1s">'+HOY+' · tus horas '+_firmaTxtM_(rt)+'.</p>'+
+    (_perdido ? '<div class="nota">El parte que ibas a declarar <b>ya no está</b> (se cerró o caducó). Este es el '+
+      'formulario normal: revisa lo que haya y vuelve a enviar si hace falta.</div>' : '')+
     (decl
       ? '<div class="tarj" style="border-color:rgba(232,145,46,.5)"><div class="fila" style="padding-top:0"><div class="a"><b>'+(decl.e==='det' ? 'Te piden más detalle' : 'Fichaje sin declarar')+'</b>'+
         /* ⛔ 633.ª LA CADUCIDAD DEL PARTE, NO UN PLAZO CABLEADO: un autocierre caduca a las 24 h,
@@ -883,10 +886,22 @@ function vFichar(){
     'Solo cuenta cuando '+esc(rt.nom.split(' ')[0])+' lo aprueba.</p>';
 }
 
+/* ⛔ 20/10 (ficha 🔴 del 20/08): el parte que se iba a DECLARAR, si sigue existiendo. Si el refresco de 90 s se lo
+   llevó (se cerró, caducó o lo declaró otra pestaña), se SUELTA `declararId`: si no, el banner con «Cancelar» dejaba
+   de pintarse, el id se quedaba pegado sin forma de soltarlo y el envío se iba por `declararParte` con un id que el
+   servidor rechaza. `_declPerdido` deja el aviso para la próxima pintura. El escritorio ya lo cubría (`_bloqFalta_`). */
+function _declVivo_(f){
+  if(!f || f.declararId==null) return null;
+  var p = PARTES.filter(function(x){return x.id===f.declararId;})[0];
+  if(p) return p;
+  f.declararId = null; f._declPerdido = true;
+  return null;
+}
+
 /* validación: los tres nodos y las dos aristas */
 function validarFichaje(){
   var f=ST.form;
-  var declP = f.declararId!=null ? PARTES.filter(function(x){return x.id===f.declararId;})[0] : null;
+  var declP = _declVivo_(f);
   var haySes = !!declP || ST.modo!=='vivo' || minSes()>0 || !!ST.ses.cloudIni;   /* declarar: ya hay sesión cerrada */
   var dur = declP ? declP.q : (ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durForm());
   /* ⛔ EL TOPE SALE DE `_maxHorasParte_()`, no de un 12 escrito aqui: el servidor topa
@@ -1098,6 +1113,14 @@ async function enviarFichaje(){
      ⚠️ Y va ANTES del candado, no después: aquí el botón todavía está vivo, así que no hay
      nada que soltar. Soltarlo igual sería un segundo mecanismo para lo mismo. */
   if(!_fechaDMY_(ST.form.fecha)){ tost('La fecha va como DD/MM/AAAA y tiene que existir.'); return; }
+  /* ⛔ 20/10: si el parte a declarar ya no existe, NO se manda nada — ni por `declararParte` (lo rechazaría) ni como
+     fichaje normal (no es lo que se pidió): se avisa y se vuelve a pintar el formulario. Y va ANTES del
+     candado, como la fecha de arriba: escrito después, había que soltarlo y era un tercer `disabled=false`
+     fuera de los `catch` (lo cantó `probar_clave_parte.py`). */
+  if(ST.form.declararId!=null && !_declVivo_(ST.form)){
+    tost('El parte que ibas a declarar ya no está (se cerró o caducó). Revisa y vuelve a enviar.');
+    irA('horas'); return;
+  }
   if(_be) _be.disabled=true;
   var f=ST.form, imput=_imputacion_(f);
   if(f.declararId!=null && backendOK && SESION){   // declarar un parte 'sin declarar' ya cerrado

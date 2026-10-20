@@ -392,10 +392,13 @@ function _cablearConvocar_(){
     var nS=_slotsMin_(du,sl);
     /* Si el horario no da para la reunión entera, NADIE podrá marcar y la reunión nace
        muerta. Se avisa una vez y se deja convocar igual: puede ser a propósito. */
-    if(u.F.length<nS && !bt.dataset.avisado){
-      bt.dataset.avisado='1';
-      tost('Ojo: el horario no da para '+_durTxt_(nS*sl)+' seguidos, así que nadie podrá '+
-        'marcar. Pulsa otra vez para convocarla igual.');
+    /* ⛔ 20/10: POR DÍA, con la misma regla que el móvil (`_diasCortosConv_`). Mirar la unión dejaba pasar un día corto
+       en cuanto otro día fuera largo. Y el «pulsa otra vez» se ata a la configuración: cambiarla vuelve a avisar. */
+    var cortos=_diasCortosConv_(u.perDia, rangos(), nS), firma=cortos+'|'+nS+'|'+bloques.length;
+    if(cortos && bt.dataset.avisado!==firma){
+      bt.dataset.avisado=firma;
+      tost('Ojo: '+cortos+' día'+(cortos===1?'':'s')+' no da'+(cortos===1?'':'n')+' para '+_durTxt_(nS*sl)+
+        ' seguidos, así que ahí nadie podrá marcar. Pulsa otra vez para convocarla igual.');
       return;
     }
     var reu={ titulo:(val('cvTit')||'').trim()||'Reunión sin título',

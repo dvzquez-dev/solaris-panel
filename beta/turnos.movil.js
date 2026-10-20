@@ -78,7 +78,10 @@ function _cablearMemoria_(){ _cablearVisor_(); }
 
 /* La convocatoria que hay que enseñar: la primera abierta a la que estás convocado. */
 function _convAbierta_(){
-  var yo=(YO&&YO.nombre)||'';
+  /* ⛔ LA SESIÓN, NO `YO` (ficha del 20/08): «Ver como» reescribe `YO`, y `_convMias_` —en la MISMA
+     tarjeta— ya lee por `_actorSanc_()`. Con dos identidades, si tú estás invitado y el suplantado no,
+     la tarjeta decía «no hay ninguna semana convocada» teniendo una abierta. Igual que `_miTurnoCv_`. */
+  var yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
   var vivas=(typeof CONVOCATORIAS!=='undefined'?CONVOCATORIAS:[]).filter(function(cv){
     /* ⛔⛔ TRES ESTADOS, NO DOS (456.ª). Esto preguntaba `!=='abierta'` a una función
        que devuelve `sin_abrir | abierta | cerrada`, así que durante `sin_abrir` —la
