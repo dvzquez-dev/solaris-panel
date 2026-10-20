@@ -290,7 +290,7 @@ async function _enviarReporte_(datos, esMejora){
     _borradorBuzon_(null);
     /* Si la foto no se guardo, se dice: el backend solo devuelve `captura` cuando la ha
        subido a Drive. Callarse seria dejar creer que la marcaste para nada. */
-    var sinFoto = datos.captura && !(r && r.captura);
+    var sinFoto = datos.captura && !_capturaGuardada_(r);
     tost((esMejora?'Mejora enviada':'Fallo reportado')+' · '+((r&&r.id)||'')+'.'+
       (sinFoto?' ⚠️ La foto NO se ha guardado: al servidor le falta ese paso.':''));
     if(vista==='buzon') _cargarBuzon_();
@@ -411,11 +411,7 @@ function _fichaBuzon_(r){
        '<p style="margin:4px 0 0;font-size:12.5px;color:#f0cf9e;line-height:1.55">'+
        esc(r.anotaciones)+'</p></div>' : '')+
     /* La captura que adjuntó quien reporta. Para lo visual vale por tres párrafos. */
-    (r.captura && /^https?:/.test(String(r.captura))
-      ? '<div class="sub"><span class="sc">Captura</span>'+
-        '<p style="margin:4px 0 0"><a href="'+esc(r.captura)+'" target="_blank" rel="noopener" '+
-        'style="color:var(--red2);font-size:12.5px">ver la captura que adjuntó</a></p></div>'
-      : (r.captura ? campo('Captura', r.captura) : ''))+
+    _capturaHTML_(r, BZ_CAPS, campo)+
     (r.vista_previa? '<div class="sub"><span class="sc">Vista previa</span>'+
        '<p style="margin:4px 0 0"><a href="'+esc(r.vista_previa)+'" target="_blank" rel="noopener" '+
        'style="color:var(--red2);font-size:12.5px">abrir el artefacto con los cambios puestos</a></p></div>' : '')+
@@ -431,6 +427,39 @@ function _fichaBuzon_(r){
 /* ¿ES UNA MEJORA? **Manda el ID**, igual que en el backend (`_decidirReporte_`): lleva dentro
    el tipo y la cara, asi que no se puede acabar mirando el eje equivocado por un `tipo` mal
    puesto o ausente. `tipo` queda de respaldo para lo que venga sin id. */
+/* ⛔ 20/10 — LA CAPTURA, SEGÚN DÓNDE VIVA. Un enlace `http(s)` (Drive, lo de antes) se abre; una del mini PC
+   (`mini-pc:…`, desde la mudanza) se TRAE con `getCaptura` al pulsar y se pinta aquí — antes salía como texto y no se
+   podía ver. Lo traído vive en `caps` (por id) y sólo se pinta si es una imagen en data URL. Lo demás (p. ej. «no se
+   pudo subir: …») se enseña tal cual: es lo que pasó. */
+function _capturaHTML_(r, caps, campo){
+  var c = r && r.captura ? String(r.captura) : '', ya = caps && r ? caps[r.id] : null;
+  if(!c) return '';
+  var cab = '<div class="sub"><span class="sc">Captura</span>';
+  if(/^https?:/.test(c)) return cab+'<p style="margin:4px 0 0"><a href="'+esc(c)+'" target="_blank" rel="noopener" '+
+    'style="color:var(--red2);font-size:12.5px">ver la captura que adjuntó</a></p></div>';
+  if(/^mini-pc:/.test(c)){
+    if(typeof ya === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(ya))
+      return cab+'<p style="margin:6px 0 0"><img src="'+esc(ya)+'" alt="captura que adjuntó" '+
+        'style="max-width:100%;border-radius:8px;border:1px solid var(--line,#333)"></p></div>';
+    return cab+'<p style="margin:4px 0 0"><button class="btn" data-bzcap="'+esc(r.id)+'">ver la captura que adjuntó</button>'+
+      '</p></div>';
+  }
+  return campo('Captura', c);
+}
+
+/* La trae del mini PC y repinta; si no puede, el botón revive y se dice por qué. */
+function _verCapturaBuzon_(id, b){
+  var r = ((BUZON||[]).filter(function(x){ return x.id===id; })[0]||null);
+  if(!r) return;
+  if(b) b.disabled=true;
+  api.getCaptura(r.captura).then(function(d){
+    BZ_CAPS[id] = d && d.captura; pintar();
+  }).catch(function(e){
+    if(b) b.disabled=false;
+    tost('No se pudo traer la captura: '+((e&&e.message)||e));
+  });
+}
+
 function _esMejora_(r){
   var id=String((r&&r.id)||'');
   if(id.indexOf('MEJ-')===0) return true;

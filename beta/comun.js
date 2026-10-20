@@ -172,6 +172,13 @@ function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; 
    ⚠️ Es una condicion MAS DURA que `_puedeBeta_`, no la misma: aquella deja pasar a todos
    fuera de beta (es un gate de canal), y esta exige **beta Y rango**. Reutilizarla habria
    dejado el agujero igual. */
+/* ⛔ 20/10: ¿SE GUARDÓ LA FOTO DEL BUZÓN? El servidor del mini PC devuelve en `captura` DÓNDE la dejó — o el texto
+   «no se pudo subir: …» si falló, que es una cadena VERDADERA. Las dos caras hacían `!(r && r.captura)` y daban por
+   guardada una foto que no lo estaba. Una sola puerta para las dos. */
+function _capturaGuardada_(r){
+  var c = r && r.captura;
+  return typeof c === 'string' && c !== '' && c.indexOf('no se pudo subir') !== 0;
+}
 function _puedeVerNovedades_(){ return CANAL==='beta' && (esAdmin() || _rangoBeta_()>=3); }
 
 /* 'HH:MM' (o `{ini:'HH:MM'}`) -> minutos. **UNA sola puerta**, aqui, que cargan las dos caras.
@@ -932,6 +939,23 @@ function _minDeshacerTarea_(){ return 15; }   /* 15, y lo dijo Daniel el 06/10: 
    plazo vive, y «no lo sé» cae al lado seguro (§3c-24). Eso además delimita el botón a lo que
    la persona ha hecho **en esta sesión**: el estado que viene de Notion no trae `desde`, así que
    no se ofrece «deshacer» sobre algo que no has tocado tú. */
+/* ⛔ 20/10 — EL PASO DADO SOBREVIVE AL REFRESCO. Desde que los botones guardan en Notion (`moverEstadoTarea`), el
+   refresco vivo rehace `TAREAS` con lo del servidor, y eso tira el `desde` de la tarea recién movida: el «deshacer» que
+   el aviso acababa de prometer desaparecía en el siguiente refresco. Aquí se anota el paso por la URL de su ficha y se
+   repone tras rellenar la lista — sólo si la tarea SIGUE en el estado al que la llevaste (si otro la movió en
+   Notion, ese deshacer ya no es tuyo). */
+function _anotarPasoTarea_(pasos, t){
+  if(!pasos || !t || !t.url) return;
+  if(typeof t.desde === 'number') pasos[t.url] = {e: t.e, desde: t.desde};
+  else delete pasos[t.url];
+}
+function _reponerPasosTarea_(lista, pasos){
+  (lista || []).forEach(function(t){
+    var p = t && t.url && pasos ? pasos[t.url] : null;
+    if(p && p.e === t.e) t.desde = p.desde;
+  });
+}
+
 function _puedeDeshacerTarea_(t, ahora){
   if(!t || typeof t.desde !== 'number') return false;
   var ms = (typeof ahora === 'number' ? ahora : (new Date()).getTime()) - t.desde;
@@ -5236,6 +5260,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-20-tareas-guardan', fecha:'2026-10-20',
+      titulo:'Los botones de Tareas guardan el paso (o dicen que no pudieron)',
+      items:[
+        {cara:'movil', vista:'tareas', txt:'**«Empezar», «Entregada» y «Deshacer» esperan a que el servidor guarde el paso** antes de darlo por hecho. Si no puede, el aviso lo dice y la tarea se queda como estaba: ya no cambia en pantalla para volver sola a los 90 segundos. ⚠️ Hasta que Notion abra los Kanban a la integración, el aviso será que no se pudo guardar.'}
+      ] },
     { id:'2026-10-20-puesto-fresco', fecha:'2026-10-20',
       titulo:'Tu puesto en la clasificación, al día cada vez que abres la app',
       items:[

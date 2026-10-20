@@ -130,8 +130,13 @@ function _engTareas_(){
          clic puede haber llegado un panel nuevo con otro estado, y avanzar desde el estado
          viejo escribiría un paso que ya no toca. */
       if(!ac){ tost('Esa tarea ya no admite ese paso.'); return; }
-      t.e=ac.a; t.desde=(new Date()).getTime();
-      pintar(); tost('«'+t.n+'»: '+ac.a+'. Puedes deshacerlo durante '+_minDeshacerTarea_()+' min.');
+      /* ⛔ 20/10 — EL PASO SE GUARDA ANTES DE DARLO POR HECHO. Hasta hoy esto sólo cambiaba la memoria del móvil y el
+         siguiente refresco lo deshacía en silencio, con el aviso prometiendo «puedes deshacerlo» (§3c-8: una escritura
+         que no ocurre, contada como hecha). Daniel, 15/10: no se ocultan, se guardan. */
+      _guardarPasoTarea_(t, ac.a, b, function(){
+        t.e=ac.a; t.desde=(new Date()).getTime(); _anotarPasoTarea_(TAREA_PASOS, t);
+        pintar(); tost('«'+t.n+'»: '+ac.a+'. Puedes deshacerlo durante '+_minDeshacerTarea_()+' min.');
+      });
     };
   });
   $$('[data-tdes]',c).forEach(function(b){
@@ -149,9 +154,24 @@ function _engTareas_(){
       if(a===null){ tost('No hay ningún paso que deshacer.'); return; }
       /* `desde` a `null` al deshacer: se vuelve al estado que vino del servidor, y sobre eso
          no se ofrece deshacer — deshacer un deshacer es avanzar, y para eso está el otro botón. */
-      t.e=a; t.desde=null;
-      pintar(); tost('Deshecho: «'+t.n+'» vuelve a '+a+'.');
+      _guardarPasoTarea_(t, a, b, function(){
+        t.e=a; t.desde=null; _anotarPasoTarea_(TAREA_PASOS, t);
+        pintar(); tost('Deshecho: «'+t.n+'» vuelve a '+a+'.');
+      });
     };
+  });
+}
+
+/* ⛔ 20/10 — UNA puerta para los dos botones: guarda el paso `t.e → a` en el servidor y sólo entonces llama a `hecho`.
+   Si no se puede, el botón revive y se DICE por qué, con la tarea como estaba. En la maqueta (`DEMO`) no hay servidor:
+   el paso se da en memoria, sin aviso propio (taparía el de «puedes deshacerlo», que es lo que se prueba ahí). */
+function _guardarPasoTarea_(t, a, b, hecho){
+  if(typeof DEMO!=='undefined' && DEMO){ hecho(); return; }
+  if(!t.url){ tost('Esa tarea no trae su ficha de Notion: no se puede guardar el paso.'); return; }
+  if(b) b.disabled=true;
+  api.moverEstadoTarea(t.url, t.e, a).then(function(){ hecho(); }).catch(function(e){
+    if(b) b.disabled=false;
+    tost('No se pudo guardar el paso de «'+t.n+'»: '+((e&&e.message)||e)+'. La tarea sigue como estaba.');
   });
 }
 

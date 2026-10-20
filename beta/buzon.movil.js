@@ -400,7 +400,7 @@ function buzonModal(tipo, prev){
       /* SI LA FOTO NO SE GUARDÓ, SE DICE. El backend solo devuelve `captura` cuando la ha
          subido a Drive; mientras esa parte no esté desplegada, callarse sería dejar creer
          que la marcaste para nada. */
-      var sinFoto = datos.captura && !(r && r.captura);
+      var sinFoto = datos.captura && !_capturaGuardada_(r);
       /* ⛔ Y LA FILA SE REPINTA AL VACIAR LA FOTO. Antes solo se ponia `BZ_FOTO=null` y la
          fila se quedaba con el lapiz en pantalla **y cableado**: pulsarlo entraba en el
          pintor con `BZ_FOTO.url` sobre `null` -> `TypeError` y **no pasaba nada**, sin

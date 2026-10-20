@@ -743,7 +743,8 @@ function _cablearMiDispo_(){
    · el riesgo **ya está aceptado** —el móvil borra desde el 06/08, contra el mismo backend—,
      así que no tenerlo aquí no protege: obliga a hacerlo en la pantalla donde peor se lee
      cuánta gente pierde su trabajo;
-   · **quien convoca está aquí** (`convocarReunionPanel` pide rango >= 1) y el backend deja
+   · **quien convoca está aquí** (desde el 12/08 un raso también convoca, pero el servidor le degrada el tipo a
+     `trabajo`: `servidor.py`, `e_crear_reunion`) y el backend deja
      borrar al **convocante o admin**: es casi exactamente la población de esta cara;
    · y **sin la puerta la salida es peor**: con una reunión convocada por error, lo único que
      esta pantalla ofrecía era **fijarla** — cerrar la disponibilidad y afirmar una fecha que
