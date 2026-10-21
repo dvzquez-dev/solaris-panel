@@ -760,7 +760,7 @@ function cubrirModal(){
        en Turnos**: dos frases distintas para el mismo gesto en dos pantallas es como se aprende
        que la app es incoherente. Y va **encima** de la rejilla: debajo lo lee quien ya se ha
        rendido. */
-    '<div class="rgesto">Un dedo <b>marca</b> · dos dedos <b>deslizan</b></div>'+
+    '<div class="rgesto">Un dedo <b>pinta</b> · dos dedos <b>deslizan</b></div>'+
     '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nD+',minmax(44px,1fr))">'+hd+rows+'</div></div>'+
     '<div class="leyh" style="margin-top:10px">'+ley+'</div>'+
     '<div class="sc" id="ecount" style="margin:12px 0 10px"></div>'+
@@ -934,12 +934,16 @@ function engancharRejilla(){
            guardó, no con lo que había en pantalla. */
         var _gm=0; for(var _i=0;_i<vals.length;_i++) if((+vals[_i]||0)>0) _gm++;
         var _ga=_avisoMinimo_(_gm, _minimoExigido_(R2), R2.tipo);
-        if(_ga.falta) tost('Guardado: '+_gm+' franja'+(_gm===1?'':'s')+'. Ojo, '+_ga.txt+' \u2014 por debajo se propone Art. 29i.');
         var re=_normReuM_(R2); REUNION=re;                    // recalcula el mapa con lo tuyo dentro
         var ix=REUNIONES_M.findIndex(function(x){ return x.id===re.id; });
         if(ix>=0) REUNIONES_M[ix]=re;
         ST._selDe=null;
-        cerrarModal(); tost('Disponibilidad guardada.'); pintar();
+        /* ⛔ 21/10 (auditor 19, 🟠 1): O el aviso del Art. 29i O «guardada», nunca los dos: el segundo `tost` pisaba al
+           primero en el mismo tick y la persona sólo leía «Disponibilidad guardada.» (el escritorio ya lo hacía así). */
+        cerrarModal();
+        tost(_ga.falta ? ('Guardado: '+_gm+' franja'+(_gm===1?'':'s')+'. Ojo, '+_ga.txt+' \u2014 por debajo se propone Art. 29i.')
+                       : 'Disponibilidad guardada.');
+        pintar();
       }catch(e){
         g.disabled=false; g.textContent=prev;
         tost('No se pudo guardar: '+((e&&e.message)||e)+'. Vuelve a intentarlo.');

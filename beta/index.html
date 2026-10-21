@@ -61,7 +61,7 @@
     <div class="menu" id="menu" aria-hidden="true">
       <div class="caja">
         <button data-mnu="sanciones" data-p>Sanciones<small>Ponerlas y decidir las pendientes</small></button>
-        <button data-mnu="cierre" style="display:none">Cierre mensual<small>Encolar el calculo del corte</small></button>
+        <button data-mnu="cierre" style="display:none">Cierre mensual<small>Encolar el cálculo del corte</small></button>
         <button data-mnu="cuota" data-cuota data-p>Tu cuota<small>Estimación de la cuota de esta temporada</small></button>
         <button data-mnu="equipo" data-p>El equipo<small>Quién coordina cada unidad</small></button>
         <button data-mnu="novedades" data-p>Novedades<small>Qué ha cambiado en cada versión</small></button>
@@ -113,16 +113,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=f240c8c"></script>
+<script src="comun.js?v=b0378d4"></script>
 <script src="notis.movil.js?v=e922c9d"></script>
-<script src="cierre.movil.js?v=34daff6"></script>
+<script src="cierre.movil.js?v=a96280b"></script>
 <script src="tareas.movil.js?v=b60e726"></script>
 <script src="turnos.movil.js?v=c3394c6"></script>
 <script src="buzon.movil.js?v=3831011"></script>
-<script src="documentos.movil.js?v=5fc82c9"></script>
+<script src="documentos.movil.js?v=c77af75"></script>
 <script src="sanciones.movil.js?v=028bb6e"></script>
-<script src="reuniones.movil.js?v=c1fca32"></script>
-<script src="horas.movil.js?v=1af01a1"></script>
+<script src="reuniones.movil.js?v=da9189a"></script>
+<script src="horas.movil.js?v=ad6280a"></script>
 <script src="equipo.movil.js?v=9f8527e"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -401,6 +401,8 @@ var api={
      columna `invitados` (`_reuFromRow_`), y solo si trae algo: por eso aqui nunca se manda vacia. */
   setInvitados:     function(id,l){ return api._post({action:"actualizarReunion",id:id,campos:{invitados:l}}); },
   guardarPush:      function(sub){ return api._post({action:"guardarPush",sub:sub}); },
+  /* al cerrar sesión (auditor 10, 🟡 13) — el comentario va ENCIMA: detrás rompe el lector de `cabos_sueltos` */
+  borrarPush:       function(endpoint){ return api._post({action:"borrarPush",endpoint:endpoint}); },
   /* ⛔ FALTABA, y `_pide_` lo avisaba por consola —«api.getEntregables no existe: ese dato
      no se refresca»— donde no lo lee nadie: en este dominio la consola esta denegada. Sin
      ella el movil solo veia los documentos del bootstrap, o sea los de cuando entro. */
@@ -1701,7 +1703,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='5f22a09';
+var BUILD='86cbe97';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2645,7 +2647,9 @@ document.addEventListener('click',function(ev){
       /* ⛔ 21/10 (auditor 11, 🟠 3): y la ficha se VUELVE A ABRIR con el estado nuevo. Se cerraba en seco, el expediente
          decidido salía de las listas del móvil y el «Deshacer» de abajo —que existe para el error de dedo— no se
          alcanzaba nunca. (Tras deshacer o reenviar no hace falta: vuelve a la lista de pendientes.) */
-      cerrarModal(); tost(_avisoDocTxt_(_aviso, upd)); pintar(); if(acc!=='deshacer' && acc!=='reenviar') verDoc(e.id);
+      /* 21/10 (auditor 19, 🟡 7): el aviso al reenviar son ~190 caracteres — en 2,6 s no se leen. Largo → fijo. */
+      var _tav=_avisoDocTxt_(_aviso, upd);
+      cerrarModal(); tost(_tav, _tostLargo_(_tav)); pintar(); if(acc!=='deshacer' && acc!=='reenviar') verDoc(e.id);
     }).catch(function(err){
       b.disabled=false;
       tost('No se pudo registrar la decisión: '+((err&&err.message)||err));
@@ -2659,7 +2663,7 @@ document.addEventListener('click',function(ev){
      ninguna publicación. */
   var _dec=_decSinRedDoc_(_aviso, (typeof _demoLocal_==='function') && _demoLocal_());
   if(_dec.aplicar){ _aplicar(); cerrarModal(); }
-  tost(_dec.txt); if(_dec.aplicar) pintar();
+  tost(_dec.txt, _tostLargo_(_dec.txt)); if(_dec.aplicar) pintar();   // 🟡 7 (auditor 19)
 });
 
 /* reloj de la barra de estado + cronómetro de la sesión */

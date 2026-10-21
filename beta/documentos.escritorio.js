@@ -312,7 +312,9 @@ function docCard(d){
     '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
     /* 954.ª: lo que HACER, como el móvil — aquí mandaba a buscar un nombre de campo de un asistente
        que ya no está en el camino. */
-    'Pídeselo a quien lo subió antes de decidir.</div></div>');
+    /* 21/10 (auditor 19, 🟡 6): la gemela del móvil — a quien lo SUBIÓ, qué hacer él. */
+    ((typeof ACTOR!=='undefined' && d.autor===ACTOR) ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
+      : 'Pídeselo a quien lo subió antes de decidir.</div></div>'));
   var acc, _aut;
   if(puede){
     acc='<label style="display:block;margin-top:11px">'+

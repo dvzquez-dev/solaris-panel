@@ -128,10 +128,10 @@ function _cierreHTML_(est, err, cargando){
   var cer=_mesACerrar_();
   var cab='<h3 style="margin:0 0 4px">Cierre de '+esc(cer.mes)+'</h3>'+
     '<p class="rnota" style="margin:0 0 12px">Cierra el corte que va desde el cierre anterior '+
-    'hasta hoy. <b>No aplica nada</b>: encola el calculo y el plan se revisa antes.</p>';
-  if(cargando) return cab+'<p class="rnota">Preguntando al servidor en que punto esta…</p>';
+    'hasta hoy. <b>No aplica nada</b>: encola el cálculo y el plan se revisa antes.</p>';
+  if(cargando) return cab+'<p class="rnota">Preguntando al servidor en qué punto está…</p>';
   if(err) return cab+'<p class="rnota" style="color:var(--warn)">No se pudo comprobar: '+
-    esc(err)+'. <b>No</b> quiere decir que este todo listo.</p>';
+    esc(String(err).replace(/\.\s*$/,''))+'. <b>No</b> quiere decir que esté todo listo.</p>';   // 🟡 13 (auditor 19): sin «..»
   /* ⛔ 21/10 (auditor 9, 🟠 1/🟠 2): sólo el plan del mes que toca cerrar (`_planVigente_`). Con el de JULIO que trae hoy
      la ranura, esto pintaba «se paró a medias» y salía por el `if(plan)` de abajo SIN el botón «Calcular». */
   var bloq=(est&&est.bloqueos)||[], enc=(est&&est.encolado)||null, plan=_planVigente_((est&&est.plan)||null);

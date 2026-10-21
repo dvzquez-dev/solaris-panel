@@ -2017,7 +2017,7 @@ function _engPartesRev_(){
         pintar();
         _cargarPartesDec_().then(pintar);
       }catch(e){
-        tost('No se pudo: '+e);
+        tostErr('No se pudo: ', e);       // 🟠 2 (auditor 19): antes «No se pudo: [object Object]»
         $$('#prev [data-pdrev]').forEach(function(x){ x.disabled=false; });
         b.textContent=prev;
       }
@@ -2064,7 +2064,7 @@ function _engPartesDec_(){
         pintar();
         _cargarPartesDec_().then(pintar);        // y se re-sincroniza por detrás
       }catch(e){
-        tost('No se pudo: '+e);
+        tostErr('No se pudo: ', e);       // 🟠 2 (auditor 19)
         $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=false; });
         b.textContent=prev;
       }

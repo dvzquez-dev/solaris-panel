@@ -985,7 +985,7 @@ function _engAvisosConv_(m){
     }catch(e){
       /* ⛔ Si no se pudo guardar, la casilla VUELVE a donde estaba: dejarla marcada diria que
          los avisos estan encendidos cuando el servidor no se ha enterado. */
-      c.checked=!on; tost('No se pudo: '+e);
+      c.checked=!on; tostErr('No se pudo: ', e);       // 🟠 2 (auditor 19)
     }finally{ c.disabled=false; }
   };
 }
@@ -1030,7 +1030,7 @@ function _pinConvDisp_(m){
       if(n) n.innerHTML='<b>Encolado</b> para la semana del '+esc(sem)+'. El plazo lo calcula '+
         'el servidor; cuando lo procese, la convocatoria aparece arriba.';
     }catch(e){
-      tost('No se pudo encolar: '+e);
+      tostErr('No se pudo encolar: ', e);       // 🟠 2 (auditor 19)
     }finally{
       b.disabled=false; b.textContent=prev;
     }

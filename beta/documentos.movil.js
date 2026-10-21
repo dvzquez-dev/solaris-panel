@@ -582,7 +582,9 @@ function verDoc(id){
        sin abrirlo es aprobar a ciegas. */
     _visorDocHTML_(e.drive, e.ref,
       '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
-      'Pídeselo a quien lo subió antes de decidir.</div></div>')+
+      /* 21/10 (auditor 19, 🟡 6): a quien lo SUBIÓ no se le manda a pedírselo a quien lo subió. */
+      (_mioDoc ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
+               : 'Pídeselo a quien lo subió antes de decidir.</div></div>'))+
     '<p class="rnota" style="margin-top:10px">Revisa: <b>'+revs+'</b></p>'+
     (_mioDoc ? '' : _previaDocM_(e))+
     acc);

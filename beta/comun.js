@@ -1577,6 +1577,10 @@ function tost(m, o){
 
    ⚠️ Solo se queda fijo lo que EXIGE una acción. Un «no hay red» sigue siendo efímero: reintentar
    es obvio y un aviso que hay que cerrar a mano, si sale por todo, se ignora. */
+/* 21/10 (auditor 19, 🟡 7): las opciones de `tost` para un aviso que puede ser LARGO. Pasados 110 caracteres no se lee
+   en los 2,6 s del toast (≈ 40 por segundo leyendo de un móvil), así que se queda fijo hasta que se toque. */
+function _tostLargo_(m){ return String(m == null ? '' : m).length > 110 ? {fijo:true} : null; }
+
 function tostErr(prefijo, e){
   tost(String(prefijo || '') + ((e && e.message) || e), (e && e.sesion) ? {fijo:true} : null);
 }
@@ -2590,11 +2594,34 @@ function _movDeSancion_(s){
   };
 }
 
+/* ⛔ 21/10 (auditor 10, 🟡 13 de fondo): al cerrar sesión, los avisos de esa cuenta SEGUÍAN llegando a este navegador
+   — la suscripción quedaba a su nombre en el servidor; en un ordenador prestado, los de otra persona. Se le pide al
+   servidor que la suelte (`borrarPush`), y a propósito NO se da de baja aquí: al volver a entrar, `_pushInit_` la
+   re-guarda a nombre de quien entre sin pedir permiso otra vez. Devuelve qué hizo (para el banco y la consola). */
+async function _soltarPushDelServidor_(){
+  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.borrarPush) return 'sin sesion';
+  if(typeof navigator==='undefined' || !navigator.serviceWorker) return 'sin worker';
+  var reg=await navigator.serviceWorker.getRegistration();
+  var sub=(reg && reg.pushManager) ? await reg.pushManager.getSubscription() : null;
+  if(!sub) return 'sin suscripcion';
+  await api.borrarPush(sub.endpoint);
+  return 'soltada';
+}
+
 function cerrarSesion(){
-  SESION=null;
-  try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
-  try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
-  location.reload();
+  var hecho=false;
+  var fin=function(){
+    if(hecho) return;
+    hecho=true;
+    SESION=null;
+    try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
+    try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
+    location.reload();
+  };
+  /* Se sale SIEMPRE: si el servidor no contesta o falla, a los 3 s igual (no se retiene a nadie dentro). Lo que queda
+     entonces es su endpoint en el servidor, y el emisor lo poda en cuanto el navegador cambie de cuenta. */
+  setTimeout(fin, 3000);
+  try{ _soltarPushDelServidor_().then(fin, fin); }catch(_){ fin(); }
 }
 
 /* ⛔ 21/10 (auditor 10, 🟡 8): LO QUE ES una persona, en una frase, por UNA puerta para las dos caras. Cada sitio lo
@@ -5790,6 +5817,20 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-21-avisos-que-se-leen', fecha:'2026-10-21',
+      titulo:'Los avisos dicen lo que pasa, y se dejan leer',
+      items:[
+        {cara:'movil', vista:'reu', txt:'Al **guardar tu disponibilidad por debajo del mínimo**, el aviso de que se propondrá el **Art. 29i** ya se ve (antes lo tapaba al instante «Disponibilidad guardada»).'},
+        {cara:'movil', vista:'horas', txt:'Si **firmar o revertir un parte** falla, el aviso dice por qué (antes: «No se pudo: [object Object]»); con la sesión caducada se queda fijo y dice que vuelvas a entrar.'},
+        {cara:'movil', vista:'docs', txt:'Un aviso **largo** de documentos (p. ej. al devolver uno a revisión) se queda en pantalla hasta que lo toques. Y si un documento tuyo no trae enlace, se te dice que lo **vuelvas a mandar**, no que se lo pidas a quien lo subió.'},
+        {cara:'escritorio', vista:'docs', txt:'Lo mismo en el escritorio: a la persona que subió un documento sin enlace se le dice que lo vuelva a mandar.'}
+      ] },
+    { id:'2026-10-21-cerrar-sesion-avisos', fecha:'2026-10-21',
+      titulo:'Cerrar sesión deja de mandar tus avisos a ese navegador',
+      items:[
+        {cara:'escritorio', vista:'ajustes', txt:'Al **cerrar sesión**, tus avisos dejan de llegar a ese navegador (antes seguían llegando, también si luego lo usaba otra persona). Al volver a entrar se reconectan solos, sin pedir permiso otra vez. **Ajustes** lo dice así.'},
+        {cara:'movil', vista:'estado', txt:'Lo mismo en el móvil al «Cerrar sesión» (en el menú).'}
+      ] },
     { id:'2026-10-21-sanciones-reuniones-auditores', fecha:'2026-10-21',
       titulo:'Sanciones y reuniones: revocar de verdad, y los avisos donde tocan',
       items:[
