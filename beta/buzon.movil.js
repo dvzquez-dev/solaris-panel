@@ -434,8 +434,7 @@ function buzonModal(tipo, prev){
         _av.style.cssText='margin-top:10px;border-color:rgba(232,145,46,.45);'+
           'background:rgba(232,145,46,.10);color:#f0cf9e';
         _av.innerHTML='<b style="color:var(--warn)">El texto se ha guardado · '+esc((r&&r.id)||'')+'</b><br>'+
-          'Pero <b>la foto no</b>: al servidor todavía le falta el paso que la sube. '+
-          'Cuéntaselo a Daniel — es un despliegue de dos líneas.';
+          'Pero <b>la foto no</b>: '+esc(_avisoSinFoto_(r))+'. Cuéntaselo a Daniel con este id.';
         env.parentNode.insertBefore(_av, env.nextSibling);
         _av.scrollIntoView({block:'nearest'});
         return;

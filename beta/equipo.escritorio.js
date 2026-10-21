@@ -225,10 +225,10 @@ function conteo(k){
     ? SANC_BACK.filter(function(s){ return s && s.estado==='pendiente'; }).length
     : (LOTE.cerrado?0:LOTE.items.length);
   if(k==='apela')  return 0;        // no hay cola de apelaciones: contar la maqueta era mentir
-  if(k==='convoc') return REUS.length;
+  if(k==='convoc') return _nReusAbiertas_();   // 21/10 (auditor 10, 🟡 11): las abiertas, no todas
   if(k==='turnos') return TURNOS.length;
   if(k==='tareas') return TAREAS.filter(function(t){ return !_tareaHecha_(t&&t.e); }).length;   // 20/10: las vivas, como la pantalla
-  if(k==='miembros') return DATA.miembros.length;
+  if(k==='miembros') return _activos_().length;   // 21/10 (auditor 10, 🟡 9): las bajas no son el equipo
   if(k==='reclutar') return 0;      // idem: no hay candidaturas en ningun sistema
   return 0;
 }

@@ -73,7 +73,7 @@
         <button data-mnu="automatismos" hidden style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Automatismos &middot; lo que el repo ya hace solo</button>
         <button data-mnu="cierre" hidden style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Cierre mensual</button>
         <button data-mnu="reportar" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Reportar un fallo o una mejora</button>
-        <button data-mnu="buzon" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Buzón · la cola de reportes</button>
+        <button data-mnu="buzon" hidden style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Buzón · la cola de reportes</button>
         <button data-mnu="salir" style="display:block;width:100%;background:none;border:0;color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Cerrar sesión</button>
       </div>
     </div>
@@ -113,16 +113,16 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=f9f1bf5"></script>
+<script src="comun.js?v=2103691"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
 <script src="turnos.escritorio.js?v=f52ae87"></script>
-<script src="buzon.escritorio.js?v=b1da392"></script>
+<script src="buzon.escritorio.js?v=750fdd3"></script>
 <script src="documentos.escritorio.js?v=e72bdea"></script>
 <script src="sanciones.escritorio.js?v=948b2a9"></script>
-<script src="reuniones.escritorio.js?v=37c95de"></script>
+<script src="reuniones.escritorio.js?v=f0071b0"></script>
 <script src="horas.escritorio.js?v=97bc56f"></script>
-<script src="equipo.escritorio.js?v=e9587c4"></script>
+<script src="equipo.escritorio.js?v=7bfd6f5"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -1845,11 +1845,13 @@ V.apela={g:'Disciplina',t:'Apelaciones',f:function(){
 var RE_SEL=0;
 var RE_INV=null, RE_INV_ID=null;   // 818.a: los convocados que se están editando, y de qué reunión
 V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
-  if(!REUS.length) return pan('Reuniones abiertas','ninguna',
-    vacioSimple('No hay ninguna reunión abierta','Convoca una para que el equipo cubra su disponibilidad.')+
+  /* ⛔ 21/10 (auditor 10, 🟡 11): se titulaba «Reuniones abiertas» y listaba también las cerradas (la celda ya dice
+     «cerró el …»). La tabla las lista todas a propósito; lo que miente es el título. */
+  if(!REUS.length) return pan('Reuniones','ninguna',
+    vacioSimple('No hay ninguna reunión convocada','Convoca una para que el equipo cubra su disponibilidad.')+
     '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>')+
     convocarReunionPanel();
-  return pan('Reuniones abiertas',REUS.length+'',
+  return pan('Reuniones',_nReusAbiertas_()+(_nReusAbiertas_()===1?' abierta':' abiertas')+' · '+REUS.length+' en total',
     tabla([['Reunión'],['Tipo'],['Modalidad'],['Convocados',1],['Han cubierto',1],['Cierra',1],['Estado',1]],
       REUS.map(function(r0){
         var cob=_cobertura_(r0);
@@ -1919,15 +1921,23 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
         '<span class="tx"><b>'+esc(r0.tit||r0.titulo)+'</b><small>'+r0.tipo+' \u00b7 '+
           (_modalidadTxt_(r0.mod||r0.modalidad).toLowerCase())+' \u00b7 '+
           _plazoReuE_(r0).txt+'</small></span>'+
-        '<span class="chip">oculta</span>'+
+        /* ⛔ 21/10 (auditor 10, 🟠 3 y 🟠 5): `oculto` tiene TRES motivos y cada uno se dice como es: la oculta no
+           enseña nada; la anónima sabe CUÁNTOS y no QUIÉNES; y la que aún no se ha leído, tampoco quiénes. */
+        '<span class="chip">'+(cob.motivo==='anonima'?'anónima':cob.motivo==='sinleer'?'sin leer':'oculta')+'</span>'+
         '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
         '<div class="bb"><div style="padding:13px">'+
           _miDispoPanel_(r0)+
-          '<p class="nota" style="margin:12px 0 0;border:0;padding:11px 0 0">Esta '+
-          'reuni\u00f3n es <b>oculta</b>: el mapa de calor y qui\u00e9n ha cubierto los '+
-          've <b>solo quien la convoca</b>'+
-          (r0.convocante?' ('+esc(r0.convocante)+')':'')+'. T\u00fa cubres tu '+
-          'disponibilidad y ya est\u00e1.</p>'+
+          '<p class="nota" style="margin:12px 0 0;border:0;padding:11px 0 0">'+
+          (cob.motivo==='anonima'
+            ? 'Esta reuni\u00f3n es <b>an\u00f3nima</b>: han cubierto <b>'+cob.cubren+' de '+cob.conv+'</b>, pero no '+
+              'se dice qui\u00e9nes.'
+           : cob.motivo==='sinleer'
+            ? 'Todav\u00eda no se ha le\u00eddo qui\u00e9n ha cubierto: el servidor dice que han contestado <b>'+
+              cob.cubren+'</b>. Vuelve a abrirla en un rato; si sigue as\u00ed, no se pudo leer.'
+            : 'Esta reuni\u00f3n es <b>oculta</b>: el mapa de calor y qui\u00e9n ha cubierto los '+
+              've <b>solo quien la convoca</b>'+
+              (r0.convocante?' ('+esc(r0.convocante)+')':'')+'. T\u00fa cubres tu '+
+              'disponibilidad y ya est\u00e1.')+'</p>'+
         '</div></div></div>';
     var hib=(r0.modalidad==='hibrida');
     var pondOn=hib && DISPO_POND;
@@ -2068,7 +2078,11 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
       var m=miembro(n);
       return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(m?m.nombre:n)+'</b>'+
         '<small>cubrió por debajo del mínimo exigido · '+_etiquetaMinimo_(r)+'</small></span>'+
-        '<span class="der"><span class="chip wa">−1 punto · Art. 30·P3</span></span></div>';
+        /* ⛔ 21/10 (auditor 10, 🟠 4): el chip sale de la MISMA regla por tipo que la de «no ha cubierto»
+           (`sancionPor`): en subsistema, mixta o de trabajo, no cubrir no sanciona, y cubrir poco tampoco puede
+           sancionar MÁS. En las demás, el motor la gradúa (Art. 29i): no es un −1 fijo. */
+        '<span class="der"><span class="chip wa">'+(sancionPor(r.tipo,n).p===0 && ['general','junta','consejo'].indexOf(r.tipo)<0
+          ? 'sin sanción automática · potestad del coordinador' : 'sanción graduada · Art. 29i')+'</span></span></div>';
     }).join('');
     /* ⛔ 928.ª: el plazo y el chip por `_plazoReuE_`. Aquí iba «cierra el '+r.limite» a pelo: pasado el plazo
        seguía diciendo «cierra el 14/10/2026 · 1 en riesgo», cuando esa persona ya NO cumplió. */
@@ -2108,11 +2122,16 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
 V.actas={g:'Reuniones',t:'Actas',f:function(){
   var actas=(DOCS||[]).filter(_esActa_).sort(function(a,b){
     return String(b.fecha||'').localeCompare(String(a.fecha||'')); });
-  if(!actas.length) return pan('Actas de la temporada','ninguna',
+  /* ⛔ 21/10 (auditor 10, 🟡 10): se titulaba «Actas de la temporada» y no filtraba (la única, de 25/26). Se listan
+     TODAS, y el subtítulo dice cuántas son de la temporada en curso, por la fecha del acta. */
+  var _tv=_temporadaVigente_(), _nTv=actas.filter(function(d){
+    var f=new Date(String(d.fecha||'').slice(0,10)+'T12:00:00');
+    return !isNaN(f.getTime()) && _temporadaDe_(f)===_tv; }).length;
+  if(!actas.length) return pan('Actas','ninguna',
     vacioSimple('Todavía no hay ningún acta','Un acta es un expediente más: se sube por el formulario '+
       'con <b>Tipo de documento = Acta</b> y aparece aquí en cuanto entra. Su referencia '+
       'empieza por <span class="mono">Acta_S-</span>.'));
-  return pan('Actas de la temporada',actas.length+(actas.length===1?' registrada':' registradas'),
+  return pan('Actas',actas.length+(actas.length===1?' registrada':' registradas')+(_tv?' · '+_nTv+' de la '+_tv:''),
     tabla([['Referencia'],['Título'],['Autor'],['Fecha'],['Estado',1]],
       actas.map(function(d){
         return '<tr><td class="mono" style="color:var(--red2)">'+esc(d.ref)+'</td>'+
@@ -2219,7 +2238,9 @@ V.miembros={g:'Equipo',t:'Miembros',f:function(){
       tabla([['Miembro'],['Unidad'],['Cargo'],['Pts',1],[_nomMesAbierto_(true),1],['Temporada',1]],
         DATA.miembros.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).map(function(m){
           return '<tr><td><span class="mem"><span class="av">'+ini(m.nombre)+'</span>'+esc(m.nombre)+
-            (m.infraccion?' <span class="dn">⚠</span>':'')+'</span></td>'+
+            (m.infraccion?' <span class="dn">⚠</span>':'')+
+            /* ⛔ 21/10 (auditor 10, 🟡 9): el subtítulo dice «con las bajas» y ninguna fila decía cuál es baja. */
+            (m.baja?' <span class="chip">baja</span>':'')+'</span></td>'+
             '<td style="color:var(--ink3)">'+esc(m.unidad)+'</td>'+
             '<td style="color:var(--ink3)">'+(m.cargo||'—')+'</td>'+
             '<td class="r mono '+(m.puntos==null?'':(m.puntos<=3?'dn':m.puntos>=9?'up':''))+'">'+(m.puntos==null?'—':m.puntos)+'</td>'+
@@ -2557,7 +2578,9 @@ V.buzon={g:'Buzón',t:'Reportes',f:function(){
     vacioSimple('No se pudo cargar la cola', esc(BUZON_ERR)+'. No es que no haya reportes: es que no se han podido leer.'));
   var abiertos=BUZON.filter(function(r){ return ['Publicado','Descartado'].indexOf(r.estado)<0; });
   var cerrados=BUZON.filter(function(r){ return ['Publicado','Descartado'].indexOf(r.estado)>=0; });
-  var tuyos=abiertos.filter(function(r){ return !!r.recomendacion; });
+  /* ⛔ 21/10 (auditor 10, 🟠 1): «esperando tu decisión» = analizado y SIN decidir. Un `Adelante` ya lo autorizaste y
+     uno `Listo para revisar` ya está en la beta: contaban aquí (7 donde eran 4, con los datos reales). */
+  var tuyos=abiertos.filter(function(r){ return !!r.recomendacion && ['Adelante','Listo para revisar'].indexOf(r.estado)<0; });
   /* El recuento por CARA a la vista: movil y escritorio son artefactos distintos y el
      mismo fallo puede estar en uno y no en el otro. Saber donde se acumulan es la mitad
      del triaje. */
@@ -2888,8 +2911,11 @@ V.ajustes={g:'Ajustes',t:'Ajustes',f:function(){
          `generado` en vez de darse por hecho. */
       '<tr><td>Backend</td><td>'+((typeof backendOK!=='undefined'&&backendOK)?'conectado':('sin conexión'+(DATA.generado?'':' · lo que ves es la semilla')))+'</td></tr>')+
     '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn no" data-salir>Cerrar sesión</button></div>')+
-    '<div class="pan"><div class="nota">Los avisos van al <b>navegador</b>, no al correo. Si cierras '+
-    'sesión o cambias de equipo hay que volver a activarlos aquí.</div></div>';
+    /* ⛔ 21/10 (auditor 10, 🟡 13): `cerrarSesion` no toca la suscripción y `_pushInit_` la vuelve a guardar sola al
+       entrar: decir «hay que volver a activarlos» era falso. */
+    '<div class="pan"><div class="nota">Los avisos van al <b>navegador</b>, no al correo. Se activan una vez en '+
+    'cada navegador y <b>no se apagan al cerrar sesión</b>: al volver a entrar se reconectan solos a tu cuenta. '+
+    'En otro ordenador hay que activarlos allí.</div></div>';
 }};
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3149,7 +3175,9 @@ async function _onCredencial_(resp,_silente){
       _aplicarBootstrap_(boot);
     } else {
       var yo=await api.quienSoy(resp.credential);
-      SESION={token:resp.credential,email:yo.email,nombre:yo.nombre};
+      /* ⛔ 21/10 (auditor 10, 🟠 2): con `rango` — `quienSoy` lo trae justo para el muro de abajo; sin él, por esta
+         rama un raso ENTRABA al escritorio. */
+      SESION={token:resp.credential,email:yo.email,nombre:yo.nombre,rango:yo.rango};
       var pnl=null; try{ pnl=await api.getPanel(); }catch(_){}
       _aplicarPanel_(pnl); backendOK=true;
       /* ⛔ AQUI SÍ HACE FALTA. Por esta rama se entra cuando el bootstrap **no** contestó, y
@@ -3320,6 +3348,9 @@ function _cablearSalir_(){
          el mismo HTML y alli el gate de beta no filtra a nadie. */
       var nv=m.querySelector('[data-mnu="novedades"]'); if(nv) nv.hidden=!_puedeVerNovedades_();
       var au=m.querySelector('[data-mnu="automatismos"]'); if(au) au.hidden=!_puedeVerNovedades_();
+      /* ⛔ 21/10 (auditor 10, 🟡 14): el Buzón, con la MISMA puerta que su vista y que el servidor (`_puede_buzon`):
+         a los demás se les ofrecía una cola que luego se rechaza. */
+      var bz=m.querySelector('[data-mnu="buzon"]'); if(bz) bz.hidden=(rangoNom(ACTOR)<3 && !esAdmin());
       m.hidden=!m.hidden;
     };
     document.addEventListener('click', function(){ if(!m.hidden) m.hidden=true; });
@@ -3373,7 +3404,7 @@ var GRUPOS=[
   ['Documentos',['docdec','docurso','docpub']],
   ['Disciplina',['sanciones','apela']],
   ['Reuniones',['convoc','dispo','actas']],
-  ['Equipo',['miembros','ranking','reclutar']]
+  ['Equipo',['miembros','ranking','subsis','reclutar']]   /* 21/10 (auditor 10, 🟠 6): `subsis` no tenía entrada */
 ];
 var vista='panel';
 
@@ -3426,7 +3457,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='0eab866';
+var BUILD='529d258';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

@@ -179,6 +179,17 @@ function _capturaGuardada_(r){
   var c = r && r.captura;
   return typeof c === 'string' && c !== '' && c.indexOf('no se pudo subir') !== 0;
 }
+/* ⛔ 21/10 (auditor 10, 🟡 7): POR QUÉ no se guardó la foto, en una frase para pantalla. Las dos caras decían «al
+   servidor le falta el paso que la sube», y el mini PC lo tiene (`directo.guardar_captura`) y devuelve el motivo real
+   en `captura` («no se pudo subir: …»). Sin `captura`, no dijo dónde la puso — que no es lo mismo que «le falta». */
+function _avisoSinFoto_(r){
+  var c = r && r.captura;
+  if (typeof c === 'string' && c.indexOf('no se pudo subir') === 0) {
+    var m = c.replace(/^no se pudo subir:?\s*/, '');
+    return 'el servidor no pudo guardarla' + (m ? ' («' + m + '»)' : '');
+  }
+  return 'el servidor no dijo dónde la guardó';
+}
 function _puedeVerNovedades_(){ return CANAL==='beta' && (esAdmin() || _rangoBeta_()>=3); }
 
 /* 'HH:MM' (o `{ini:'HH:MM'}`) -> minutos. **UNA sola puerta**, aqui, que cargan las dos caras.
@@ -5730,6 +5741,20 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-21-equipo-auditor', fecha:'2026-10-21',
+      titulo:'Buzón, Disponibilidad y Equipo: lo que ya decidiste, lo que aún no se sabe y el menú',
+      items:[
+        {cara:'escritorio', vista:'buzon', txt:'**Esperando tu decisión** ya no cuenta lo que autorizaste ni lo que ya está en la beta; y un reporte **autorizado** sólo deja **descartarlo con anotaciones** (no vuelve a ofrecer «Adelante, hazlo»). En las gafas, igual.'},
+        {cara:'escritorio', vista:'dispo', txt:'Una reunión cuyas respuestas **aún no se han leído** ya no dice «0 de N han cubierto · N en riesgo» con nombres: dice cuántos han contestado según el servidor (chip «sin leer»).'},
+        {cara:'escritorio', vista:'dispo', txt:'Una reunión **anónima** dice «anónima» y cuántos han cubierto, no «oculta»; y el aviso de **bajo el mínimo** depende del tipo de reunión (ya no pone «−1 punto» fijo).'},
+        {cara:'escritorio', vista:'subsis', txt:'**Horas por subsistema** tiene su entrada en el menú de **Equipo**.'},
+        {cara:'escritorio', vista:'buzon', txt:'Si la **foto** de un reporte no se guarda, se dice el motivo que da el servidor (en el móvil, igual); y el **Buzón** sólo sale en el menú ⋮ a quien puede abrirlo.'},
+        {cara:'escritorio', vista:'miembros', txt:'**Miembros** marca quién es **baja** en su fila, y el número del menú cuenta sólo a los activos.'},
+        {cara:'escritorio', vista:'actas', txt:'**Actas** ya no dice «de la temporada» sin filtrar: lista todas y dice cuántas son de la temporada en curso.'},
+        {cara:'escritorio', vista:'convoc', txt:'**Convocatorias** se titula «Reuniones» y dice cuántas siguen **abiertas** y cuántas hay en total; el número del menú cuenta las abiertas. Y «1 franja», no «1 franjas».'},
+        {cara:'escritorio', vista:'ajustes', txt:'**Ajustes** dice lo que pasa con los avisos al cerrar sesión: no se apagan y se reconectan solos al volver a entrar.'},
+        {cara:'movil', vista:'estado', txt:'**Ajustes › Sesión** dice quién ha entrado, y aparte a quién estás viendo con «ver como».'}
+      ] },
     { id:'2026-10-21-horas-auditor', fecha:'2026-10-21',
       titulo:'Horas: lo que cuenta en qué mes, los fichajes de más de 14 h y quién puede otorgar',
       items:[

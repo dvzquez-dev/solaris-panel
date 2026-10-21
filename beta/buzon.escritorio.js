@@ -292,7 +292,7 @@ async function _enviarReporte_(datos, esMejora){
        subido a Drive. Callarse seria dejar creer que la marcaste para nada. */
     var sinFoto = datos.captura && !_capturaGuardada_(r);
     tost((esMejora?'Mejora enviada':'Fallo reportado')+' · '+((r&&r.id)||'')+'.'+
-      (sinFoto?' ⚠️ La foto NO se ha guardado: al servidor le falta ese paso.':''));
+      (sinFoto?' ⚠️ La foto NO se ha guardado: '+_avisoSinFoto_(r)+'.':''));
     if(vista==='buzon') _cargarBuzon_();
   }catch(e){
     /* ⛔ AQUI SE PERDIA TODO. Ahora se guarda el envio entero y se dice que se ha
@@ -657,6 +657,17 @@ function _accBuzon_(r, esBug){
      ofrecerla: parece que queda algo por decidir cuando ya se decidio.
      El freno de verdad esta en `_decidirReporte_` (las caras son dos y el dato uno); esto es
      lo que evita que se llegue a pulsar. */
+  /* ⛔ 21/10 (auditor 10, 🟠 1): YA AUTORIZADO. Caía al bloque de las cuatro decisiones («Adelante, hazlo» otra vez);
+     lo único que tiene sentido aquí es echarse atrás, con anotaciones. */
+  if(r.estado==='Adelante'){
+    return '<div class="ruta"><b>Autorizado</b>'+
+      (r.decidido_por?' por <b>'+esc(_m(r.decidido_por).pila||r.decidido_por)+'</b>':'')+
+      (r.decidido_at?' · '+esc(_novCuando_(r.decidido_at)):'')+
+      ': se está construyendo y pasará a «listo para revisar» cuando esté en la beta.'+
+      '<br>Si ya no debe hacerse, descártalo con tus anotaciones.</div>'+
+      '<textarea data-bznotas="'+ID+'" placeholder="Por qué se para…">'+esc(notas)+'</textarea>'+
+      '<div class="acts">'+bot('Descartado+','Descartar con anotaciones','no')+'</div>';
+  }
   if(r.estado==='Publicado' || r.estado==='Descartado'){
     return '<div class="ruta">Este reporte ya está <b>'+esc(r.estado.toLowerCase())+'</b>'+
       (r.decidido_por?', decidido por <b>'+esc(_m(r.decidido_por).pila||r.decidido_por)+'</b>':'')+

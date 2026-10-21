@@ -113,12 +113,12 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=f9f1bf5"></script>
+<script src="comun.js?v=2103691"></script>
 <script src="notis.movil.js?v=e922c9d"></script>
 <script src="cierre.movil.js?v=34daff6"></script>
 <script src="tareas.movil.js?v=b60e726"></script>
 <script src="turnos.movil.js?v=c3394c6"></script>
-<script src="buzon.movil.js?v=613b7ef"></script>
+<script src="buzon.movil.js?v=3831011"></script>
 <script src="documentos.movil.js?v=5a8674b"></script>
 <script src="sanciones.movil.js?v=6b9e1e6"></script>
 <script src="reuniones.movil.js?v=0204ab0"></script>
@@ -1695,10 +1695,14 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='c547911';
+var BUILD='6428b54';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
-  var quien=(YO&&YO.nombre)?esc(YO.nombre):'sin sesión';
+  /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
+     el nombre de la persona vista. Si no es la misma, se dice aparte, como el «Actúas como» del escritorio. */
+  var _ses=(typeof SESION!=='undefined' && SESION) ? (SESION.nombre||SESION.email||'') : '';
+  var quien=_ses ? esc(_ses) : ((YO&&YO.nombre)?esc(YO.nombre):'sin sesión');
+  var _viendo=(_ses && YO && YO.nombre && YO.nombre!==SESION.nombre) ? '<br>viendo como <b>'+esc(YO.nombre)+'</b>' : '';
   return '<div class="mtit">Ajustes</div><div class="ajus">'+
     '<h4>Tamaño de letra</h4><div class="tarj"><div class="modos" id="ajEscala">'+
       ESCALAS.map(function(e){ return '<button data-esc="'+e[0]+'" class="'+
@@ -1716,7 +1720,7 @@ function _ajustesHTML_(){
       }).join('')+'</div>'+
     '<h4>Notificaciones</h4>'+_notisHTML_()+
     '<h4>Sesión</h4><div class="tarj"><div class="fila"><div class="a"><b>'+quien+'</b>'+
-      '<small>'+v+'</small></div></div></div>'+
+      '<small>'+v+_viendo+'</small></div></div></div>'+
     /* QUE VERSION ES. Lo primero que hay que poder responder cuando alguien dice «sigue
        fallando»: Pages cachea el HTML 10 min, asi que dos personas pueden estar mirando
        codigo distinto sin saberlo. Pasó el 27/07, dos veces. */

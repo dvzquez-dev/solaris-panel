@@ -837,6 +837,12 @@ function _convocadosBoxE_(r){
     '<button class="btn" data-guardarinv>Guardar convocados</button></div>';
 }
 
+/* Las reuniones con el plazo AÚN ABIERTO, por la misma regla que la celda «Cierra» (`_plazoAbierto_`). 21/10 (auditor 10,
+   🟡 11): el título y el globo de Convocatorias contaban también las cerradas. */
+function _nReusAbiertas_(){
+  return (REUS||[]).filter(function(r){ return _plazoAbierto_(String(r && r.limite==null ? '' : r.limite)); }).length;
+}
+
 /* LA CELDA «CIERRA» DE CONVOCATORIAS (939.ª). Pintaba el límite crudo: el 15/10 decía «14/10/2026» de un plazo ya
    cerrado, en una tabla titulada «Reuniones abiertas». Con el plazo pasado dice «cerró el …» (y se apaga); abierta,
    la fecha en DD/MM/AAAA como siempre; sin límite, «—». La regla de «pasado» es `_plazoAbierto_`, la de toda la app. */
@@ -966,9 +972,9 @@ function _etiquetaMinimo_(r){
      pidió ver: contra qué porcentaje y sobre cuántas franjas se le exige.
      ⚠️ `minFijado` lo deriva `_cobertura_` de si el campo **venía**; no se recalcula aquí,
      que serían dos criterios para la misma pregunta. */
-  if(r.minFijado) return r.minimo+' franjas (lo fijó quien convoca)';
-  var pct=Math.round(_pctMinimo_(_refMinimo_(r))*100);
-  return _minimoExigido_(r)+' franjas ('+pct+' % de '+tot+')';
+  if(r.minFijado) return r.minimo+(r.minimo===1?' franja':' franjas')+' (lo fijó quien convoca)';
+  var pct=Math.round(_pctMinimo_(_refMinimo_(r))*100), _nm=_minimoExigido_(r);
+  return _nm+(_nm===1?' franja':' franjas')+' ('+pct+' % de '+tot+')';   /* 21/10 (auditor 10, 🟡 16): «1 franjas» */
 }
 
 /* ⛔ UN RECUENTO QUE NO SE SABE SE PINTA «—», Y NUNCA EN VERDE.
@@ -999,12 +1005,20 @@ function _cobertura_(r){
      `if(cob.oculto) return`. Por eso **no se muta**: nacería ciega. */
   if(r && r.agregado === false)
     return {cubren:null, conv:null, sinCubrir:null, bajoMin:null,
-            minimo:_minimoExigido_(r), minFijado:(r.minimo!=null), oculto:true};
+            minimo:_minimoExigido_(r), minFijado:(r.minimo!=null), oculto:true, motivo:'oculta'};
   var cubren=Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); });
   var universo = (r.invitados&&r.invitados.length) ? r.invitados
                : (r.tipo==='general' ? _activos_().map(function(m){return m.nombre;}) : cubren);
   /* el convocante organiza: esta exento de cubrir su propia encuesta */
   universo = universo.filter(function(n){ return n!==r.convocante; });
+  /* ⛔⛔ 21/10 (auditor 10, 🟠 3): AÚN SIN LEER. Las filas llegan después (`_hidratarReus_`), y si esa lectura falla
+     se quedan vacías: contarlas decía «0 de 3 han cubierto · 3 en riesgo» con nombres y apellidos, cuando el
+     servidor dice que han contestado (`nResp`). Sin filas y con respuestas, no se sabe quién: el recuento del
+     servidor y `null` en las listas (§3c-24), como la anónima. */
+  if(!cubren.length && _nRespReu_(r) > 0)
+    return {cubren:_nRespReu_(r), conv:universo.length, sinCubrir:null, bajoMin:null,
+            minimo:(r.minimo!=null ? r.minimo : _minimoExigido_(r)),
+            minFijado:(r.minimo!=null), oculto:true, motivo:'sinleer'};
   /* ⛔⛔ Y LAS FILAS ANONIMIZADAS TAMPOCO SIRVEN PARA NOMBRAR A NADIE (18/08).
      La guarda de arriba cubre `oculta`. Falta su hermana: con `vision:'anonima'` el
      servidor conserva TU fila con tu nombre y renombra las ajenas a `#1`, `#2`…
@@ -1030,7 +1044,7 @@ function _cobertura_(r){
   if(_sinNombre.length)
     return {cubren:cubren.length, conv:universo.length, sinCubrir:null, bajoMin:null,
             minimo:(r.minimo!=null ? r.minimo : _minimoExigido_(r)),
-            minFijado:(r.minimo!=null), oculto:true};
+            minFijado:(r.minimo!=null), oculto:true, motivo:'anonima'};
   var sin = universo.filter(function(n){ return cubren.indexOf(n)<0; });
   var minimo = r.minimo!=null ? r.minimo : _minimoExigido_(r);
   /* ⛔⛔ EL `c>0` ESCONDIA JUSTO A QUIEN EL MOTOR VA A SANCIONAR. Quien abre la encuesta,
