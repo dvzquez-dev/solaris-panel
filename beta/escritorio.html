@@ -113,14 +113,14 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=7136952"></script>
+<script src="comun.js?v=175d273"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
 <script src="turnos.escritorio.js?v=f52ae87"></script>
 <script src="buzon.escritorio.js?v=750fdd3"></script>
 <script src="documentos.escritorio.js?v=865da1f"></script>
-<script src="sanciones.escritorio.js?v=948b2a9"></script>
-<script src="reuniones.escritorio.js?v=f0071b0"></script>
+<script src="sanciones.escritorio.js?v=dc78b0b"></script>
+<script src="reuniones.escritorio.js?v=d2ac50f"></script>
 <script src="horas.escritorio.js?v=97bc56f"></script>
 <script src="equipo.escritorio.js?v=6bc0159"></script>
 <script>
@@ -327,7 +327,7 @@ var api={
   /* 818.a: GEMELA de la del movil (817.a). Nunca vacia: `extra.invitados` vacio no pisa la columna. */
   setInvitados: function(id,l){ return api._post({action:"actualizarReunion",id:id,campos:{invitados:l}}); },
   responder:   function(id,n,v){ return api._post({action:"responder",id:id,nombre:n,valores:v}); },
-  decidir:     function(id,a,m,x){ return api._post({action:"decidir",id:id,accion:a,motivo:m,extra:x}); },
+  decidir:     function(id,a,m,x,r){ return api._post({action:"decidir",id:id,accion:a,motivo:m,extra:x,ref:r||undefined}); },
   getSanciones:function(f){ return api._post({action:"getSanciones",filtro:f||{}}); },
   pushSancion: function(ss){ return api._post({action:"pushSancion",sanciones:ss}); },
   /* GEMELA del movil. La necesita la sancion por incumplir un plazo: mueve la fecha en
@@ -3468,7 +3468,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='309fa7c';
+var BUILD='795dfa4';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4332,7 +4332,7 @@ function _engDocsDecidir_(){
       b.disabled=true; var prev=b.textContent; b.textContent='Enviando…';
       try{
         if(typeof backendOK!=='undefined' && backendOK && SESION){
-          var upd=await api.decidir(d.id, accion, motivo, extra);   // el actor sale del token
+          var upd=await api.decidir(d.id, accion, motivo, extra, d.ref);   // el actor sale del token; la ref, para que el servidor compruebe que es ESTE documento
           /* `upd` viene con las claves LARGAS del backend. Metiendolo crudo en DOCS la fila
              se quedaba sin titulo y con el estado en blanco hasta recargar. */
           if(upd){ var i=DOCS.findIndex(function(x){return x.id===d.id;}); if(i>=0) DOCS[i]=_normDocE_(upd,i); }

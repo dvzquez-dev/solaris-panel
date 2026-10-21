@@ -653,7 +653,7 @@ function _miDispoPanel_(r){
          tiene que verlo MIENTRAS marca. Avisa; no impide (decisión de Daniel, 18/08). */
       (function(){
         var _n=0, _k; for(_k=0;_k<vals.length;_k++) if((+vals[_k]||0)>0) _n++;
-        var _a=_avisoMinimo_(_n, _minimoExigido_(r));
+        var _a=_avisoMinimo_(_n, _minimoExigido_(r), r.tipo);
         return _a.txt ? ('<small'+(_a.falta?' style="color:var(--warn)"':' style="color:var(--ink2)"')+
           '>'+_a.txt+'</small>') : '';
       })()+
@@ -721,7 +721,7 @@ function _cablearMiDispo_(){
         /* ⛔ SE GUARDA IGUAL Y SE AVISA, como en el móvil: entregar menos es una opción, pero
            nadie puede enterarse de la propuesta de puntos al día siguiente. */
         var _gn=0, _gi; for(_gi=0;_gi<vals.length;_gi++) if((+vals[_gi]||0)>0) _gn++;
-        var _gav=_avisoMinimo_(_gn, _minimoExigido_(r));
+        var _gav=_avisoMinimo_(_gn, _minimoExigido_(r), r.tipo);
         tost(_gav.falta
           ? ('Guardado: '+_gn+' franja'+(_gn===1?'':'s')+'. Ojo, '+_gav.txt+' \u2014 por debajo se propone Art. 29i.')
           : 'Disponibilidad guardada.');

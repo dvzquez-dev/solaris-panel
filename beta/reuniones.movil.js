@@ -815,7 +815,7 @@ function engancharRejilla(){
        es que 26 es **el mínimo sin sanción**, y cuántas te faltan para llegar. Daniel (18/08):
        *«puedes entregar un numero inferior, eso si te tiene que advertir de que cual es el
        minimo sin sancion»*. Se avisa; no se impide. */
-    var _av = _tot ? _avisoMinimo_(cas, _minimoExigido_(R)) : {falta:0, txt:''};
+    var _av = _tot ? _avisoMinimo_(cas, _minimoExigido_(R), R.tipo) : {falta:0, txt:''};
     var _pide = _av.txt ? (' · <b'+(_av.falta?' style="color:var(--warn)"':'')+'>'+_av.txt+'</b>') : '';
     e.innerHTML = !hue
       ? 'Sin marcar todavía'+(minS>1?(' · cada toque marca '+_durTxt_(minS*slot)):'')+_pide
@@ -926,7 +926,7 @@ function engancharRejilla(){
            propuesta de puntos esperando. Va DESPUÉS del `await`, con lo que de verdad se
            guardó, no con lo que había en pantalla. */
         var _gm=0; for(var _i=0;_i<vals.length;_i++) if((+vals[_i]||0)>0) _gm++;
-        var _ga=_avisoMinimo_(_gm, _minimoExigido_(R2));
+        var _ga=_avisoMinimo_(_gm, _minimoExigido_(R2), R2.tipo);
         if(_ga.falta) tost('Guardado: '+_gm+' franja'+(_gm===1?'':'s')+'. Ojo, '+_ga.txt+' \u2014 por debajo se propone Art. 29i.');
         var re=_normReuM_(R2); REUNION=re;                    // recalcula el mapa con lo tuyo dentro
         var ix=REUNIONES_M.findIndex(function(x){ return x.id===re.id; });

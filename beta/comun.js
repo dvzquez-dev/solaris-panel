@@ -2577,7 +2577,13 @@ function _movDeSancion_(s){
     p: just ? 0 : _ptsSanc_(s.puntos),
     /* Los puntos SE REINICIAN CADA TEMPORADA (RRI Art. 29), no caducan sanción a sanción. Se
        dice así, con palabras, en vez de inventarse una fecha exacta que el RRI no fija. */
-    vv: just ? 'justificada<br>no restó' : 'hasta el fin<br>de temporada'
+    /* ⛔ 21/10 (auditor 12, 🟠 5 y 🟡 12): una REVOCADA se devolvió, una REVOCACIÓN devuelve y un PREMIO no resta.
+       Con el rótulo de siempre, «−1 hasta el fin de temporada» al lado de su «+1» se leía como dos cosas vivas. */
+    vv: just ? 'justificada<br>no restó'
+      : (s.estado === 'revocada') ? 'revocada<br>se devolvió'
+      : (s.origen === 'revocacion') ? 'devuelve<br>una sanción'
+      : (s.origen === 'premio') ? 'premio<br>no resta'
+      : 'hasta el fin<br>de temporada'
   };
 }
 
@@ -4501,9 +4507,19 @@ function _slotsMin_(duracion, slot){
    ⛔ Y NO CONFUNDIR CON `_slotsMin_`, que sí es una restricción dura: una racha más corta que
    la reunión no sirve para ir a nada. Son dos mínimos distintos y se dicen distinto.
    Devuelve `{falta, exigido, txt}`; `falta` a 0 significa que no hay nada que advertir. */
-function _avisoMinimo_(marcadas, exigido){
+/* ⛔ 21/10 (auditor 13, 🟠 4): ¿esta reunión SANCIONA SOLA? Sólo general, junta y consejo — la regla del PD del
+   22/07 (`decisiones-app.md`, «Sanciones de reuniones») y `construir_reunion.TIPOS_AUTO`. En subsistema, trabajo o
+   mixta, no cubrir queda a potestad del coordinador: la cara no puede amenazar con un artículo que nadie aplica. */
+function _sancionaSola_(tipo){
+  return ['general','junta','consejo'].indexOf(String(tipo == null ? '' : tipo).trim().toLowerCase()) >= 0;
+}
+
+function _avisoMinimo_(marcadas, exigido, tipo){
   var m = +marcadas || 0, e = +exigido || 0;
   if(!e) return {falta:0, exigido:0, txt:''};
+  /* 21/10 (auditor 13, 🟠 4): con el TIPO dicho y una reunión que no sanciona sola, no hay «mínimo sin sanción» que
+     advertir. Sin tipo (llamadas viejas), como antes. */
+  if(tipo !== undefined && !_sancionaSola_(tipo)) return {falta:0, exigido:e, txt:''};
   var falta = Math.max(0, e - m);
   return { falta: falta, exigido: e,
     txt: falta
@@ -5761,6 +5777,14 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-21-sanciones-reuniones-auditores', fecha:'2026-10-21',
+      titulo:'Sanciones y reuniones: revocar de verdad, y los avisos donde tocan',
+      items:[
+        {cara:'escritorio', vista:'libros', txt:'Tu **libro de puntos** ya no borra la sanción que te devolvieron: sale «**revocada** · se devolvió» junto a su «+1» («devuelve una sanción»), y un **premio** dice «no resta» en vez de «hasta el fin de temporada».'},
+        {cara:'movil', vista:'estado', txt:'Lo mismo en el libro de puntos del móvil.'},
+        {cara:'escritorio', vista:'sanciones', txt:'**Revocar** una sanción de −3, −4 o −5 ya entra en la cola (antes decía «ya estaba en la cola» sin haber entrado), y se puede **volver a revocar** una cuya revocación se rechazó.'},
+        {cara:'movil', vista:'reu', txt:'Al cubrir una reunión de **trabajo, subsistema o mixta** ya no se avisa del «mínimo sin sanción» ni del Art. 29i: en esas reuniones no hay sanción automática.'}
+      ] },
     { id:'2026-10-21-documentos-auditor', fecha:'2026-10-21',
       titulo:'Documentos: aprobar ya no dice que se ha publicado',
       items:[

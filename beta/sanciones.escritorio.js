@@ -344,6 +344,9 @@ async function _engRevocarSanc_(){
         if (r && r.rechazadas && r.rechazadas.length)
           throw new Error('no puedes tocar la sanci\u00f3n de ' + r.rechazadas.join(', ') +
                           ': est\u00e1 fuera de tu jurisdicci\u00f3n');
+        /* 21/10 (auditor 12, 🟠 3): y si el servidor dice que los puntos no valen, NO es «ya estaba en la cola». */
+        if (r && r.invalidas && r.invalidas.length)
+          throw new Error('el servidor no acepta esos puntos para ' + r.invalidas.join(', '));
         /* ⚠️ Y LO QUE ENTRO, no lo que se mando: `nuevas` puede ser 0 si la clave ya estaba
            -- o sea si ya la habias mandado --, y decir «hecho» ahi manda a esperar algo que no
            va a pasar dos veces. */

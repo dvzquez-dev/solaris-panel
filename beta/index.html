@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=7136952"></script>
+<script src="comun.js?v=175d273"></script>
 <script src="notis.movil.js?v=e922c9d"></script>
 <script src="cierre.movil.js?v=34daff6"></script>
 <script src="tareas.movil.js?v=b60e726"></script>
@@ -121,7 +121,7 @@
 <script src="buzon.movil.js?v=3831011"></script>
 <script src="documentos.movil.js?v=5fc82c9"></script>
 <script src="sanciones.movil.js?v=6b9e1e6"></script>
-<script src="reuniones.movil.js?v=0204ab0"></script>
+<script src="reuniones.movil.js?v=26a7117"></script>
 <script src="horas.movil.js?v=1af01a1"></script>
 <script src="equipo.movil.js?v=9f8527e"></script>
 <script>
@@ -394,7 +394,7 @@ var api={
   /* Estaban en app.html y se perdieron al partir el artefacto: sin ellas, cubrir y
      decidir se quedaban en la memoria del movil y no llegaban nunca al servidor. */
   responder:        function(id,n,v){ return api._post({action:"responder",id:id,nombre:n,valores:v}); },
-  decidir:          function(id,a,m,x){ return api._post({action:"decidir",id:id,accion:a,motivo:m,extra:x}); },
+  decidir:          function(id,a,m,x,r){ return api._post({action:"decidir",id:id,accion:a,motivo:m,extra:x,ref:r||undefined}); },
   fijar:            function(id,f){ return api._post({action:"fijarReunion",id:id,fijada:f}); },
   setOrdenDia:      function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); },
   /* 817.a: la misma accion, desplegada desde el 24/07. `extra.invitados` lo SUPERPONE el lector a la
@@ -1701,7 +1701,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f375464';
+var BUILD='5f22a09';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2637,7 +2637,7 @@ document.addEventListener('click',function(ev){
          es la guarda de arriba, y desde el 19/08 tambien el servidor. */
       extra={titulo:t2, etiquetas:e2};
     }
-    api.decidir(id, acc, mot||null, extra).then(function(upd){
+    api.decidir(id, acc, mot||null, extra, e && e.ref).then(function(upd){
       /* ⛔ 21/10 (auditor 11, 🟡 8): con red manda LO QUE DEVUELVE EL SERVIDOR (como el escritorio): la copia local de
          `_aplicarDecDoc_` dejaba revisor y decisión viejos al reenviar. Sin respuesta útil, la copia local. */
       if(upd && typeof upd==='object' && upd.id!=null && String(upd.id)===String(e.id)){ Object.assign(e, upd); delete e._aviso; }
