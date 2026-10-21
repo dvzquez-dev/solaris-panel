@@ -2931,6 +2931,7 @@ function _puedeRevocarSanc_(s, arr){
   /* 21/10 (auditor 15, 🔴 2): ni un PREMIO — revocarlo no quita sus horas, desmarca la casilla de otra sancion y borra
      una falta del gradiente. Hasta que Daniel diga si se revoca y que hace, no se ofrece (el servidor tampoco lo acepta). */
   if (s.origen === 'premio') return false;
+  if (s.extra && s.extra.compensacion) return false;   /* 21/10 (verificador): un premio «manual» tambien es premio */
   /* ⛔ Y SI NO SE SABE CUANTOS PUNTOS TENIA, NO SE REVOCA (759.a aplicada aqui). El
      original hacia `-Number(s.puntos||0)`, que convierte «no llego» en un **0** -- y en esta
      pantalla el 0 no es «nada», es la revocacion de un AVISO. Mejor no ofrecerlo. */
