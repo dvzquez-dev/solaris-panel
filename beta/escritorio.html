@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=a4da1c6"></script>
+<script src="comun.js?v=94afe82"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
 <script src="turnos.escritorio.js?v=03f760c"></script>
@@ -122,7 +122,7 @@
 <script src="sanciones.escritorio.js?v=b2dc300"></script>
 <script src="reuniones.escritorio.js?v=e7761ba"></script>
 <script src="horas.escritorio.js?v=97bc56f"></script>
-<script src="equipo.escritorio.js?v=6bc0159"></script>
+<script src="equipo.escritorio.js?v=2434048"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -455,6 +455,14 @@ DATA.subsistemas=[{u:'Aviónica',n:4},{u:'GNC',n:3},{u:'Aeroestructuras',n:5},
    julio (`_hoyTxt_` congela el 24/07). Sólo en la maqueta local: con cuenta real lo pone el panel. */
 if(_demoLocal_() && !DATA.equipo_mes) DATA.equipo_mes={media:16.2, n:18, periodo:'2026-07', dia:24, diaCont:24.5,
   dias_mes:31, dias_ant:30};
+/* ⛔ 21/10 (auditor 19, 🟡 16): Y LA FORMA DE UN PANEL REAL. En esta cara `hMes` son las horas de ESTE mes y el ritmo va
+   en `hRitmo` (los dos los pone `_aplicarPanel_`); la semilla no pasa por ahí, así que Ranking leía `hMes` como ritmo,
+   Miembros como mes, y «Lo tuyo» no tenía `horasMes` («—»). Aquí: `horasMes` = el `hMes` de la semilla, y el ritmo por
+   la puerta común (`_hMesDe_` sin `hMes`: horasTemp/meses), que es su respaldo cuando el motor no lo manda. */
+if(_demoLocal_()) (DATA.miembros||[]).forEach(function(m){
+  if(typeof m.hMes==='number' && m.horasMes==null) m.horasMes=m.hMes;
+  if(m.hRitmo==null){ var _r=_hMesDe_({horasTemp:m.horasTemp, meses:m.meses}); if(_r!=null) m.hRitmo=_r; }
+});
 
 
 /* GEMELA (la otra cara: misma funcion, mismo nombre).
@@ -504,11 +512,13 @@ var PARTES=[
 /* «ahora» son las 19:39: los minutos abiertos se DERIVAN de la hora de entrada, no se
    escriben a mano, o tres sesiones simultaneas darian tres relojes distintos. */
 var AHORA_MIN=19*60+39;
-var CURSO=[
+/* ⛔ 21/10 (auditor 20, 🟠): LA SEMILLA, SÓLO EN LA MAQUETA. Se publicaba tal cual y el Panel de mando decía en
+   producción —al PD y al coordinador— «1 fichaje lleva más de 10 h abierto» por la Xela de ejemplo. */
+var CURSO=_demoLocal_() ? [
  {n:'Nerea Ferreiro Lamas',lugar:'Taller de estructuras',desde:'16:05'},
  {n:'Breogán Cives Doural',lugar:'Sala de cálculo',desde:'18:40'},
  {n:'Xela Rendo Trigueiro',lugar:'Taller de estructuras',desde:'09:10'}
-];
+] : [];
 CURSO.forEach(function(c){ var q=c.desde.split(':'); c.min=AHORA_MIN-(+q[0]*60 + +q[1]); });
 
 /* ── EXPEDIENTES ───────────────────────────────────────────────────────── */
@@ -550,6 +560,16 @@ var LOTE={nombre:'Formulario de O&M · 25/07',motivo:'No rellenar el formulario 
   {id:3,n:'Tomé Vilariño Estévez',pts:-1,dec:null},
   {id:4,n:'Comba Sarmiento Nogueira',pts:0,dec:null},
   {id:5,n:'Sabela Ordóñez Pacio',pts:-1,dec:null}]};
+/* 21/10 (auditor 19, 🟡 12, la mitad de jurisdicción): en la maqueta el bloque se filtra por QUIÉN ACTÚA, con la misma
+   puerta que rotula «N personas bajo tu jurisdicción» (`sancionablesPor`). En real lo filtra el servidor
+   (`_getSanciones_`) y llega ya en `SANC_BACK`, así que esto no corre. Mismos objetos: lo marcado se conserva. */
+var LOTE_SEMILLA=LOTE.items.slice();
+function _loteDemoDelActor_(){
+  if(SANC_BACK!==null || !_demoLocal_()) return;
+  var vale={};
+  sancionablesPor(ACTOR).forEach(function(m){ vale[m.nombre]=1; });
+  LOTE.items=LOTE_SEMILLA.filter(function(x){ return !!vale[x.n]; });
+}
 var APELA=[
  {n:'Tomé Vilariño Estévez',motivo:'Ausencia a la reunión general del 14/07',razon:'Aportó justificante médico del mismo día.',pts:1},
  {n:'Ledicia Amoedo Cambeses',motivo:'Deadline de la memoria de patrocinio',razon:'La tarea se reasignó y no se le comunicó.',pts:1}
@@ -3472,7 +3492,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='696d3a8';
+var BUILD='add1e63';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

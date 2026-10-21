@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=a4da1c6"></script>
+<script src="comun.js?v=94afe82"></script>
 <script src="notis.movil.js?v=e922c9d"></script>
 <script src="cierre.movil.js?v=a96280b"></script>
 <script src="tareas.movil.js?v=b60e726"></script>
@@ -1706,7 +1706,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='e536b5d';
+var BUILD='9f0559e';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2699,6 +2699,15 @@ function _cambiarRolDemo_(rol){
   if(!m) return false;
   YO=m;
   if(typeof _repartirEntregablesM_==='function') _repartirEntregablesM_(ENTREGABLES.concat(ENT_REV));
+  /* 21/10 (auditor 19, 🟡 11): SUS horas y SUS puntos, no los de Nerea. `PARTES` y `MOVS` son de la semilla de Nerea;
+     el resto lleva sólo lo que la semilla común dice de él (sus partes de `PARTES_DEMO`, por la puerta de los reales)
+     y ningún movimiento: no se inventa. `MOVS` se vacía EN SITIO porque hay quien guarda la referencia. */
+  if(!_cambiarRolDemo_.nerea) _cambiarRolDemo_.nerea={partes:PARTES.slice(), movs:MOVS.slice()};
+  var _sem=_cambiarRolDemo_.nerea, _esNerea=(rol==='miembro');
+  PARTES = _esNerea ? _sem.partes.slice()
+         : PARTES_DEMO.filter(function(p){ return p.autor===m.nombre; }).map(normPMovil);
+  MOVS.length=0;
+  if(_esNerea) _sem.movs.forEach(function(x){ MOVS.push(x); });
   return true;
 }
 $$('#rolsel button').forEach(function(b){

@@ -314,9 +314,13 @@ function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre)
 */
 function _pintarSiCambia_(el, clave, html){
   if (!el) return false;
-  var memo = _pintarSiCambia_.memo || (_pintarSiCambia_.memo = {});
-  if (memo[clave] === html && el.innerHTML) return false;
-  memo[clave] = html;
+  /* ⛔⛔ 21/10 (auditor 20, 🔴): EL RECUERDO ES LO QUE ESTE NODO TIENE PUESTO, no lo último que se pintó para esa VISTA.
+     Era `memo[clave]`, y el escritorio pinta sus 22 vistas en el MISMO `#main`: Panel → Partes → Panel, con el html del
+     Panel igual que la primera vez, contestaba «no ha cambiado» y dejaba los PARTES debajo del título «Panel de mando».
+     El móvil no lo veía porque allí cada vista tiene su nodo. `clave` se queda en la firma (los dos llamadores la pasan)
+     y ya no decide nada: con un nodo por vista, recordar por nodo ES recordar por vista. */
+  if (el._pintado === html && el.innerHTML) return false;
+  el._pintado = html;
   el.innerHTML = html;
   return true;
 }
@@ -4644,7 +4648,9 @@ function _franjasDemo_(){
 }
 
 function _semanaDemo_(ahora){
-  var hoy = ahora ? new Date(+ahora) : new Date();
+  /* 21/10 (auditor 19, 🟡 15): sin instante, el de la APP (`_ahoraApp_`), no el real: la maqueta vive el 24/07 y la
+     semana de ejemplo salía en octubre — dos relojes en la misma pantalla. */
+  var hoy = ahora ? new Date(+ahora) : (typeof _ahoraApp_ === 'function' ? new Date(_ahoraApp_()) : new Date());
   var mas = function(b, n){ return new Date(b.getFullYear(), b.getMonth(), b.getDate() + n); };
   var dia = function(d){ return _ahoraLocalISO_(d).slice(0, 10); };
   var lim = mas(hoy, 1), abre = mas(hoy, -1);
@@ -5347,7 +5353,10 @@ function _convEstado_(cv, ahora){
      «cerrada» y allí «abierta», y aquí además manda el `abierta` que llegue en falso. No llega así ninguna: las crea
      `convocatoria.py` con las dos fechas (1 de 1 el 21/10) y ese campo sólo lo pone el servidor. Si llegara, la cara
      quedaría del lado prudente (no deja contestar). */
-  var t=_ahoraLocalISO_(ahora ? new Date(+ahora) : new Date());
+  /* 21/10 (auditor 19, 🟡 15): sin instante, el reloj de la APP (`_ahoraApp_`), como `_plazoAbierto_` (858.ª). Con el
+     real, la convocatoria de la maqueta (24/07) salía cerrada o en otra semana. Publicado es el mismo reloj. */
+  var t = ahora ? _ahoraLocalISO_(new Date(+ahora))
+                : (typeof _ahoraApp_ === 'function' ? _ahoraApp_() : _ahoraLocalISO_(new Date()));
   /* ⛔ POR `_normAbre_`, QUE ES LA HERMANA DE `_normLimite_` (463.ª). Aqui habia un
      `_dmyAISO_` a pelo, o sea el mismo defecto que la 295.ª curo para `limite` y que
      aqui seguia vivo: `Date.parse('01/10/2026 22:00')` lee **MM/DD** y devolvia
@@ -5830,7 +5839,9 @@ function _novedades_(){
         {cara:'movil', vista:'reu', txt:'En **Marca tu disponibilidad**, las casillas fuera del horario de ese día van **rayadas** (como en el mapa de calor) y la leyenda lo explica: antes casi no se distinguían de las vacías.'},
         {cara:'movil', vista:'docs', txt:'Con una ficha abierta (p. ej. decidir un documento), los avisos salen **arriba**: abajo tapaban los botones de Aprobar.'},
         {cara:'movil', vista:'estado', txt:'La **cabecera** ya no parte el nombre de tu unidad en trozos («AEROESTRUCT / URAS»), tampoco con «Ver como».'},
-        {cara:'movil', vista:'turnos', txt:'Si marcas tu disponibilidad de **turnos** sin conexión, ahora te lo dice: antes se pintaba y no se guardaba.'}
+        {cara:'movil', vista:'turnos', txt:'Si marcas tu disponibilidad de **turnos** sin conexión, ahora te lo dice: antes se pintaba y no se guardaba.'},
+        {cara:'escritorio', vista:'panel', txt:'Al **volver** a una pantalla ya visitada se veía la anterior (el Panel de mando con los partes debajo). Arreglado en todas.'},
+        {cara:'escritorio', vista:'panel', txt:'El aviso de **fichaje de más de 10 h** del Panel ya sale de los fichajes de verdad (antes salía de uno de ejemplo, y los reales no lo encendían).'}
       ] },
     { id:'2026-10-21-cerrar-sesion-avisos', fecha:'2026-10-21',
       titulo:'Cerrar sesión deja de mandar tus avisos a ese navegador',

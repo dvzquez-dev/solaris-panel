@@ -188,7 +188,14 @@ function insightsHTML(){
     return a+((sc&&sc.length)||0); },0);
   if(sinCubrir) xs.push(['wa',sinCubrir+' personas no han cubierto alguna disponibilidad abierta. '+
     'Mira «Disponibilidad y riesgo» para ver qué sanción implicaría a cada una.']);
-  var largos=CURSO.filter(function(c){return c.min>=600;}).length;
+  /* ⛔ 21/10 (auditor 20, 🟠): por `horas`, que es lo que trae el servidor (`getFichajesAbiertos`); `min` sólo lo
+     tiene la semilla de la maqueta. Contando `min`, los fichajes REALES no encendían el aviso nunca. Y se piden aquí
+     también, por la misma puerta que «Fichajes en curso» (una sola vez): si no, el PD no se enteraba sin abrirla. */
+  if(typeof _cursoCargar_==='function') _cursoCargar_(typeof pintar==='function'?pintar:null);
+  var largos=CURSO.filter(function(c){
+    var h = (typeof c.horas==='number') ? c.horas : (typeof c.min==='number' ? c.min/60 : null);
+    return h!=null && h>=10;
+  }).length;
   if(largos) xs.push(['wa',largos+' fichaje'+(largos===1?'':'s')+' lleva'+(largos===1?'':'n')+
     ' más de 10 h abierto. A las 14 h se cierran solos y quedan sin declarar (caducan a las '+_caducaAutocierreH_()+' h).']);
   return xs.map(function(x){
@@ -276,6 +283,8 @@ function _pintarActua_(){
       est.style.transform='translateX('+(b.offsetLeft-5)+'px)';
       if(!redu() && dx>2){ est.classList.remove('vuela'); void est.offsetWidth; est.classList.add('vuela');
         setTimeout(function(){est.classList.remove('vuela');},380); }
+      /* 21/10 (auditor 19, 🟡 12): en la maqueta, el bloque de sanciones de ejemplo es el de SU jurisdicción. */
+      if(typeof _loteDemoDelActor_==='function') _loteDemoDelActor_();
       pintar();
     };
   });
