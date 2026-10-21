@@ -173,7 +173,7 @@ function convocarReunionPanel(){
       '<label style="width:150px">'+lab('Dura la reunión')+'<select id="cvDura" style="'+E+'">'+
         '<option value="30">30 min</option><option value="60" selected>1 h</option>'+
         '<option value="90">1 h 30 min</option><option value="120">2 h</option></select></label>'+
-      '<label style="width:150px">'+lab('Fecha límite')+'<input type="date" id="cvLim" value="'+mas(hoy,5)+'" style="'+E+'"></label>'+
+      '<label style="width:150px">'+lab('Fecha límite')+'<input type="date" id="cvLim" min="'+hoy+'" value="'+mas(hoy,5)+'" style="'+E+'"></label>'+
       '<label style="flex:1;min-width:220px">'+lab('Orden del día · enlace')+
         '<input id="cvOrden" placeholder="https://drive.google.com/…" style="'+E+'"></label>'+
     '</div>'+

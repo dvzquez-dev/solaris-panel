@@ -2928,6 +2928,9 @@ function _etSancFila_(pts, origen, extra){
 function _puedeRevocarSanc_(s, arr){
   if (!s || s.estado !== 'aplicada') return false;     // solo la que ya quito puntos
   if (s.origen === 'revocacion') return false;         // una revocacion no se revoca
+  /* 21/10 (auditor 15, 🔴 2): ni un PREMIO — revocarlo no quita sus horas, desmarca la casilla de otra sancion y borra
+     una falta del gradiente. Hasta que Daniel diga si se revoca y que hace, no se ofrece (el servidor tampoco lo acepta). */
+  if (s.origen === 'premio') return false;
   /* ⛔ Y SI NO SE SABE CUANTOS PUNTOS TENIA, NO SE REVOCA (759.a aplicada aqui). El
      original hacia `-Number(s.puntos||0)`, que convierte «no llego» en un **0** -- y en esta
      pantalla el 0 no es «nada», es la revocacion de un AVISO. Mejor no ofrecerlo. */
@@ -5308,7 +5311,11 @@ function _identidadPrestada_(visto){
 function _convEstado_(cv, ahora){
   /* ⛔ 21/10 (auditor 13, 🟡 10): EN HORA DE MADRID Y COMO CADENA, igual que el servidor (`estado_conv`). Con
      `Date.parse` el plazo dependía de la zona del aparato: en Canarias o fuera de España salía «abierta» un plazo que el
-     servidor ya cerraba. `ahora` (milisegundos) sigue valiendo para los casos. */
+     servidor ya cerraba. `ahora` (milisegundos) sigue valiendo para los casos.
+     ⚠️ «Igual que el servidor» no del todo, y está medido (verificador 21/10, 🟡 9): sin `abre` o sin `limite` aquí sale
+     «cerrada» y allí «abierta», y aquí además manda el `abierta` que llegue en falso. No llega así ninguna: las crea
+     `convocatoria.py` con las dos fechas (1 de 1 el 21/10) y ese campo sólo lo pone el servidor. Si llegara, la cara
+     quedaría del lado prudente (no deja contestar). */
   var t=_ahoraLocalISO_(ahora ? new Date(+ahora) : new Date());
   /* ⛔ POR `_normAbre_`, QUE ES LA HERMANA DE `_normLimite_` (463.ª). Aqui habia un
      `_dmyAISO_` a pelo, o sea el mismo defecto que la 295.ª curo para `limite` y que

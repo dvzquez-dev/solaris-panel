@@ -1081,7 +1081,7 @@ function crearModal(){
         '<option value="90">1 h 30 min</option><option value="120">2 h</option>'+
         '<option value="180">3 h</option></select></label></div>'+
     '<p class="rnota" id="ceSlotHint"></p>'+
-    '<div class="dosc"><label class="campo"><span class="sc">Límite para responder</span><input class="mono" id="ceLim" type="date" value="'+mas(hoyISO,5)+'"></label>'+
+    '<div class="dosc"><label class="campo"><span class="sc">Límite para responder</span><input class="mono" id="ceLim" type="date" min="'+hoyISO+'" value="'+mas(hoyISO,5)+'"></label>'+
       '<label class="campo"><span class="sc">Hora (opcional)</span><input class="mono" id="ceLimH" type="time"></label></div>'+
     '<label class="campo"><span class="sc">Orden del día (enlace a Drive, opcional)</span>'+
       '<input id="ceOrden" placeholder="https://drive.google.com/…"></label>'+
