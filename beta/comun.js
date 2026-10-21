@@ -2588,6 +2588,26 @@ function cerrarSesion(){
   location.reload();
 }
 
+/* ⛔ 21/10 (auditor 10, 🟡 8): LO QUE ES una persona, en una frase, por UNA puerta para las dos caras. Cada sitio lo
+   decía a su manera y se contradecían con los datos reales: quien coordina una Unidad SIN `cargo` era «Miembro» en el
+   escritorio y «coordina…» en el móvil; un subcoordinador, «MIEMBRO» en la cabecera; y `coordina` (una lista) se
+   concatenaba con «+» («GNC,Unidad…»). Describe, no da permisos: el rango lo decide `rangoNom` y el servidor. */
+function _cargoTxt_(m){
+  if(!m) return 'Miembro';
+  if(m.cargo==='Project Director') return 'Project Director';
+  var us=_unidadesCoord_(m.coordina);
+  /* `coordina` es LO QUE coordina (con los datos reales ya trae su subsistema cuando también lo coordina); `unidad`,
+     sólo si no consta nada: decir «Coordinador de <su subsistema>» de quien coordina una Unidad le atribuye otra cosa. */
+  if(m.cargo==='Coordinador'){
+    if(!us.length && m.unidad) us=[m.unidad];
+    return us.length ? 'Coordinador de '+us.join(' · ') : 'Coordinador';
+  }
+  if(us.length) return 'Coordina '+us.join(' · ');
+  var sc=_subcoordDe_(m.nombre);
+  if(sc) return 'Subcoordina '+sc.equipo+' ('+sc.unidad+')';
+  return m.cargo || 'Miembro';
+}
+
 /* La subcoordinacion de alguien, o `null`. */
 function _subcoordDe_(n){
   for (var i=0;i<SUBCOORD.length;i++) if (SUBCOORD[i].quien === String(n)) return SUBCOORD[i];
@@ -5741,6 +5761,16 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-21-documentos-auditor', fecha:'2026-10-21',
+      titulo:'Documentos: aprobar ya no dice que se ha publicado',
+      items:[
+        {cara:'escritorio', vista:'docdec', txt:'**Aprobar** deja el documento **aprobado y pendiente de publicar** (está en «En curso»), en vez de darlo por publicado en Notion sin que nadie lo publicara. Al autor le llega «queda pendiente de publicar».'},
+        {cara:'movil', vista:'docs', txt:'**Aprobar** dice «queda pendiente de publicar», no «publicado en Notion»; y tras decidir, la ficha se queda con lo que guardó el servidor.'},
+        {cara:'escritorio', vista:'docurso', txt:'Un expediente **trabado** sigue diciendo por qué tras aprobarlo (aprobar ya no borra el aviso); y «En curso» remite a **Resueltos**.'},
+        {cara:'escritorio', vista:'docdec', txt:'Si el servidor no manda los expedientes al entrar, las tres pantallas de Documentos dicen **«No se han podido leer»** y se vuelven a pedir solos, en vez de enseñar los de la maqueta como si fueran reales.'},
+        {cara:'movil', vista:'docs', txt:'Lo mismo en el móvil: sin expedientes leídos ya no dice «Nada por aquí». Y tras decidir, la ficha se **vuelve a abrir** con su botón **Deshacer** (antes no se podía llegar a él).'},
+        {cara:'escritorio', vista:'docdec', txt:'**Rechazar** ya no promete que el autor «tendrá que enviar uno nuevo» (no está decidido): dice que recibe el motivo y que se puede deshacer. En el móvil, igual.'}
+      ] },
     { id:'2026-10-21-equipo-auditor', fecha:'2026-10-21',
       titulo:'Buzón, Disponibilidad y Equipo: lo que ya decidiste, lo que aún no se sabe y el menú',
       items:[
@@ -5753,7 +5783,8 @@ function _novedades_(){
         {cara:'escritorio', vista:'actas', txt:'**Actas** ya no dice «de la temporada» sin filtrar: lista todas y dice cuántas son de la temporada en curso.'},
         {cara:'escritorio', vista:'convoc', txt:'**Convocatorias** se titula «Reuniones» y dice cuántas siguen **abiertas** y cuántas hay en total; el número del menú cuenta las abiertas. Y «1 franja», no «1 franjas».'},
         {cara:'escritorio', vista:'ajustes', txt:'**Ajustes** dice lo que pasa con los avisos al cerrar sesión: no se apagan y se reconectan solos al volver a entrar.'},
-        {cara:'movil', vista:'estado', txt:'**Ajustes › Sesión** dice quién ha entrado, y aparte a quién estás viendo con «ver como».'}
+        {cara:'movil', vista:'estado', txt:'**Ajustes › Sesión** dice quién ha entrado, y aparte a quién estás viendo con «ver como».'},
+        {cara:'escritorio', vista:'miembros', txt:'El **cargo** de cada uno dice lo mismo en todas partes: quien coordina una Unidad sin cargo ya no sale «Miembro», y la columna Cargo lo dice. En la cabecera del móvil, un subcoordinador ya no sale «MIEMBRO».'}
       ] },
     { id:'2026-10-21-horas-auditor', fecha:'2026-10-21',
       titulo:'Horas: lo que cuenta en qué mes, los fichajes de más de 14 h y quién puede otorgar',
@@ -7885,12 +7916,22 @@ function _firmaDocTxt_(e){
       costó caro en `coordina` el 18/08—, así que se pregunta si sabe hacer `join` en vez de
       suponerlo. En JS una cadena tiene `.length` y es indexable: la forma equivocada no da
       error, da basura. */
+/* ⛔ 21/10 (auditor 11, 🟡 12): el texto de «hecho» tras decidir un documento, con lo que el servidor dice del AVISO
+   (`_aviso`, que no se guarda): si no se pudo avisar a nadie, se dice — «le llega al autor» era falso para quien no tiene
+   móvil con avisos. Sin `_aviso` (maqueta, respuesta vieja), el texto tal cual. */
+function _avisoDocTxt_(base, upd){
+  var av = upd && upd._aviso;
+  if (!av || av.ok !== false) return base;
+  return base + ' Pero no se ha podido avisar' + (av.nota ? ' (' + av.nota + ')' : '') + ': díselo tú.';
+}
+
 function _ajustesDocTxt_(e){
   var a=e&&e.decision&&e.decision.ajustes;
   if(!a) return '';
   var p=[];
   if(a.titulo) p.push('título → «'+a.titulo+'»');
-  if(a.etiquetas) p.push('etiquetas → '+(a.etiquetas.join?a.etiquetas.join(', '):a.etiquetas));
+  /* 21/10 (auditor 11, 🟡 10): vaciarlas es un ajuste, y se dice — no «etiquetas → » con la cola vacía. */
+  if(a.etiquetas) p.push('etiquetas → '+(a.etiquetas.join?(a.etiquetas.length?a.etiquetas.join(', '):'(ninguna)'):a.etiquetas));
   return p.length ? p.join(' · ') : '';
 }
 

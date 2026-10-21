@@ -113,13 +113,13 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=2103691"></script>
+<script src="comun.js?v=7136952"></script>
 <script src="notis.movil.js?v=e922c9d"></script>
 <script src="cierre.movil.js?v=34daff6"></script>
 <script src="tareas.movil.js?v=b60e726"></script>
 <script src="turnos.movil.js?v=c3394c6"></script>
 <script src="buzon.movil.js?v=3831011"></script>
-<script src="documentos.movil.js?v=5a8674b"></script>
+<script src="documentos.movil.js?v=5fc82c9"></script>
 <script src="sanciones.movil.js?v=6b9e1e6"></script>
 <script src="reuniones.movil.js?v=0204ab0"></script>
 <script src="horas.movil.js?v=1af01a1"></script>
@@ -541,7 +541,9 @@ function _pintarCabecera_(){
   /* Nada de 'PROJECT DIRECTOR · PROJECT DIRECTOR': el PD no tiene subsistema, su unidad
      ES su cargo. Y a un coordinador le dice de QUÉ lo es, que es la información util. */
   if(hr){
-    var u=YO.unidad||'', c=YO.cargo||'Miembro', txt;
+    /* 21/10 (auditor 10, 🟡 8): sin `cargo`, lo que ES por `_cargoTxt_` — un subcoordinador o quien coordina una Unidad
+       salían «MIEMBRO». Con cargo, como siempre («Coordinador de» SU unidad: la cabecera no cabe una lista). */
+    var u=YO.unidad||'', c=YO.cargo||_cargoTxt_(YO), txt;
     if(!u || u===c) txt=c;
     else if(c==='Coordinador') txt='Coordinador de '+u;
     /* 956.ª: espacio DURO antes del «·»: a 375 px el punto se quedaba solo en su línea. */
@@ -636,8 +638,8 @@ async function _refrescoVivo_(motivo, que){
     /* ⛔ LOS DOCUMENTOS TAMBIEN, y faltaban desde que existe la pantalla. Cowork empuja un
        expediente y quien tiene el telefono abierto NO LO VEIA NUNCA — y el telefono es la
        cara con la que se revisa. El escritorio lo trae desde el principio. */
-    var dcs=_pideSi_(que,'getEntregables','getEntregables').then(function(x){
-      if(Array.isArray(x)) _repartirEntregablesM_(x); }).catch(function(){});
+    var dcs=_pideSi_(ENT_LLEGO===false ? null : que,'getEntregables','getEntregables').then(function(x){
+      if(Array.isArray(x)){ _repartirEntregablesM_(x); ENT_LLEGO=true; } }).catch(function(){});   /* 21/10 (🟠 2) */
     var r=(_vivoToca_(que,'reuniones') ? _cargarReunionesM_() : Promise.resolve()).catch(function(){});
     /* EL PANEL TAMBIEN. Aqui vivian solo turnos, tareas y reuniones, asi que tus horas del
        mes, tus puntos y tu cuota se quedaban con el valor de cuando entraste — y esas son
@@ -722,6 +724,7 @@ function _aplicarBootstrapMovil_(boot){
      segunda version del mismo reparto. Ahora las dos entradas —arranque y refresco— pasan
      por la misma. */
   _repartirEntregablesM_(boot.entregables||[]);
+  ENT_LLEGO=Array.isArray(boot.entregables);   /* 21/10 (🟠 2): vacío por no llegar ≠ vacío de verdad */
   if(typeof LOTE!=='undefined' && LOTE && LOTE.items) LOTE.items=[];   // bloque de sanciones: era semilla
   if(typeof SUELTAS!=='undefined') SUELTAS.length=0;                   // sanciones sueltas: eran semilla
   /* ⛔ UNA SOLA PUERTA PARA REFRESCAR. Aqui se llamaba a `_refrescarEnSegundoPlano_`, que
@@ -1166,6 +1169,9 @@ var ENT_REV=[
    estado:'revision',fecha:'21/07/2026',sev:'baja',
    resumen:'Masas medidas del tramo 2 en configuración A, con incertidumbre por componente.',issues:[]}
 ];
+/* ⛔ 21/10 (auditor 11, 🟠 2): ¿llegaron los expedientes? `null` maqueta · `false` aún no · `true` sí. Sin esto, un
+   arranque sin ellos decía «Nada por aquí» con el globo a 0. */
+var ENT_LLEGO=null;
 
 /* cola de sanciones del Panel PD — bloque de julio (misma mecánica que app.html:
    se MARCA la decisión de cada persona y el bloque se cierra ENTERO) */
@@ -1695,7 +1701,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='6428b54';
+var BUILD='f375464';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2580,8 +2586,10 @@ document.addEventListener('click',function(ev){
   }
   /* RECHAZAR CIERRA EL EXPEDIENTE: se pregunta, como en el escritorio (ficha del 20/08: el móvil no lo
      hacía, y es la cara en la que revisa Daniel; un dedo que se escurre cerraba el documento de otro). */
-  if(acc==='rechazado' && !confirm('Rechazar «'+e.titulo+'». El expediente queda cerrado y el autor'+
-    ' tendrá que enviar uno nuevo. ¿Seguro?')) return;
+  /* 21/10 (auditor 11, 🟡 13): sin prometer lo no decidido (cómo reenvía un rechazado es pregunta de Daniel) ni un
+     cierre que no es tal: se puede deshacer desde la ficha. */
+  if(acc==='rechazado' && !confirm('Rechazar «'+e.titulo+'». El autor recibe el motivo; la decisión se puede '+
+    'deshacer desde la ficha. ¿Seguro?')) return;
   /* DESHACER BORRA LA DECISION DE OTRA PERSONA: se pregunta, como en el escritorio. */
   if(acc==='deshacer' && !confirm('Devolver «'+e.titulo+'» a revisión y borrar la decisión de '+
     (e.revisor||'quien la tomó')+'. ¿Seguro?')) return;
@@ -2601,8 +2609,8 @@ document.addEventListener('click',function(ev){
      globo se apagaba, asi que se iba convencido. `Codigo.gs:967` no toca `enlaceDrive`:
      el revisor abriria la version vieja. */
   var _aviso={reenviar:'Devuelto a revisión. Si todavía no has subido el archivo corregido por el formulario, el revisor abrirá la versión anterior.',
-    aprobado:'Aprobado · publicado en Notion y en el Libro de Datos.',
-    anot:'Aprobado con anotaciones · título y etiquetas ajustados.',
+    aprobado:'Aprobado: queda pendiente de publicar en Notion y en el Libro de Datos.',   /* 21/10 (🔴 1) */
+    anot:'Aprobado con anotaciones · título y etiquetas ajustados; queda pendiente de publicar.',
     cambios:'Cambios pedidos: le llega al autor.',
     deshacer:'Decisión deshecha: vuelve a revisión.',
     rechazado:'Rechazado.'}[acc]||'Hecho.';
@@ -2629,8 +2637,15 @@ document.addEventListener('click',function(ev){
          es la guarda de arriba, y desde el 19/08 tambien el servidor. */
       extra={titulo:t2, etiquetas:e2};
     }
-    api.decidir(id, acc, mot||null, extra).then(function(){
-      _aplicar(); cerrarModal(); tost(_aviso); pintar();
+    api.decidir(id, acc, mot||null, extra).then(function(upd){
+      /* ⛔ 21/10 (auditor 11, 🟡 8): con red manda LO QUE DEVUELVE EL SERVIDOR (como el escritorio): la copia local de
+         `_aplicarDecDoc_` dejaba revisor y decisión viejos al reenviar. Sin respuesta útil, la copia local. */
+      if(upd && typeof upd==='object' && upd.id!=null && String(upd.id)===String(e.id)){ Object.assign(e, upd); delete e._aviso; }
+      else _aplicar();
+      /* ⛔ 21/10 (auditor 11, 🟠 3): y la ficha se VUELVE A ABRIR con el estado nuevo. Se cerraba en seco, el expediente
+         decidido salía de las listas del móvil y el «Deshacer» de abajo —que existe para el error de dedo— no se
+         alcanzaba nunca. (Tras deshacer o reenviar no hace falta: vuelve a la lista de pendientes.) */
+      cerrarModal(); tost(_avisoDocTxt_(_aviso, upd)); pintar(); if(acc!=='deshacer' && acc!=='reenviar') verDoc(e.id);
     }).catch(function(err){
       b.disabled=false;
       tost('No se pudo registrar la decisión: '+((err&&err.message)||err));

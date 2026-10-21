@@ -33,6 +33,14 @@ function revisoresDe(d){
    issues[], subsistema) y estas vistas leen la corta (tit, amb, est, sev, iss, sub).
    Sin este adaptador la bandeja salia vacia y las filas sin titulo. Ojo: `iss` es una
    CUENTA, no la lista, porque la vista escribe «N avisos». */
+/* ⛔ 21/10 (auditor 11, 🟠 2): con sesión y sin expedientes llegados, se DICE — no una bandeja «limpia» que es un «no
+   lo sé» pintado como un cero. `''` cuando sí llegaron (o en la maqueta). */
+function _docsSinLeerE_(){
+  if(typeof DOCS_LLEGO==='undefined' || DOCS_LLEGO!==false) return '';
+  return pan('Expedientes','sin leer', vacioSimple('No se han podido leer los expedientes',
+    'El servidor todavía no los ha mandado; se vuelven a pedir solos. Mientras tanto no se sabe qué hay pendiente.'));
+}
+
 function _normDocE_(d, i){
   if(!d) return d;
   if(d.tit!==undefined && d.est!==undefined) return d;      // ya viene corta (semilla)

@@ -113,16 +113,16 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=2103691"></script>
+<script src="comun.js?v=7136952"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
 <script src="turnos.escritorio.js?v=f52ae87"></script>
 <script src="buzon.escritorio.js?v=750fdd3"></script>
-<script src="documentos.escritorio.js?v=e72bdea"></script>
+<script src="documentos.escritorio.js?v=865da1f"></script>
 <script src="sanciones.escritorio.js?v=948b2a9"></script>
 <script src="reuniones.escritorio.js?v=f0071b0"></script>
 <script src="horas.escritorio.js?v=97bc56f"></script>
-<script src="equipo.escritorio.js?v=7bfd6f5"></script>
+<script src="equipo.escritorio.js?v=6bc0159"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -529,6 +529,10 @@ var DOCS=[
  {id:7,ref:'Acta_S-6302_26',tit:'Acta del consejo del 10/07/2026',autor:'Lois Carballo Sendón',
   sub:'Dirección',amb:'general',est:'publicado',sev:'baja',iss:0}
 ];
+/* ⛔ 21/10 (auditor 11, 🟠 2): ¿LLEGARON los expedientes de verdad? `null` = maqueta (no se pregunta), `false` = hay
+   sesión y aún no han llegado, `true` = llegaron. Sin esto, si el arranque fallaba, la semilla de arriba se quedaba
+   toda la sesión haciéndose pasar por real — con ids que chocan con los reales. */
+var DOCS_LLEGO=null;
 
 
 /* ── DISCIPLINA ────────────────────────────────────────────────────────── */
@@ -1645,6 +1649,7 @@ var DOC_SEL=null;                 // expediente desplegado en las listas compact
 
 
 V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
+  var _sl=_docsSinLeerE_(); if(_sl) return _sl;   /* 21/10 (auditor 11, 🟠 2) */
   var m=docsMios();
   /* Aqui van SIEMPRE desplegados: son los que tienes que decidir, y decidir exige leer.
      En «En curso» y «Publicados» se pliegan, porque ahi se consulta, no se firma. */
@@ -1654,13 +1659,15 @@ V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
       'el Project Director o '+esc(_m(REV2_NOM).pila)+'; el informe general, solo el Project Director. '+
       'Nadie firma lo suyo.'),'destaca')+
     '<div class="pan"><div class="nota">Decidir aquí sustituye a contestar el correo de aprobación. '+
-    'Al aprobar, el documento se publica solo en Notion, Drive y el Libro de Datos, y se avisa en Discord.</div></div>';
+    /* 21/10 (auditor 11, 🔴 1): aprobar no publica — queda pendiente de que lo publique quien publica. */
+    'Al aprobar, el documento queda <b>aprobado y pendiente de publicar</b> en Notion, Drive y el Libro de Datos.</div></div>';
 }};
 V.docurso={g:'Documentos',t:'En curso',f:function(){
+  var _sl=_docsSinLeerE_(); if(_sl) return _sl;   /* 21/10 (auditor 11, 🟠 2) */
   var c=DOCS.filter(function(d){return _docEnCurso_(d.est);});
   return pan('Expedientes en curso',c.length+(c.length===1?' expediente':' expedientes'),
     c.length?c.map(filaDoc).join(''):vacioSimple('Nada en curso','Ningún documento espera revisión ni corrección. '+
-      'Los que ya se aprobaron están en Publicados.'));
+      'Los publicados y los rechazados están en Resueltos.'));   /* 21/10 (🟡 11): la vista se llama así desde el 19/08 */
 }};
 /* ⛔ ERA «Publicados» Y SOLO LISTABA `publicado`, asi que un RECHAZADO no salia en ninguna
    de las tres vistas: al rechazarlo desde aqui (`DOC_SEL=null; pintar()`) desaparecia de la
@@ -1668,6 +1675,7 @@ V.docurso={g:'Documentos',t:'En curso',f:function(){
    quedaba sin saber que se lo habian rechazado. Ahora es la lista de lo RESUELTO: publicado o
    rechazado. La pildora de cada fila ya dice cual de los dos es. */
 V.docpub={g:'Documentos',t:'Resueltos',f:function(){
+  var _sl=_docsSinLeerE_(); if(_sl) return _sl;   /* 21/10 (auditor 11, 🟠 2) */
   var p=DOCS.filter(function(d){return _docResuelto_(d.est);});
   var _pub=0, _i;
   for(_i=0;_i<p.length;_i++) if(p[_i].est==='publicado') _pub++;
@@ -2242,7 +2250,7 @@ V.miembros={g:'Equipo',t:'Miembros',f:function(){
             /* ⛔ 21/10 (auditor 10, 🟡 9): el subtítulo dice «con las bajas» y ninguna fila decía cuál es baja. */
             (m.baja?' <span class="chip">baja</span>':'')+'</span></td>'+
             '<td style="color:var(--ink3)">'+esc(m.unidad)+'</td>'+
-            '<td style="color:var(--ink3)">'+(m.cargo||'—')+'</td>'+
+            '<td style="color:var(--ink3)">'+(_cargoTxt_(m)==='Miembro'?'—':esc(_cargoTxt_(m)))+'</td>'+   /* 21/10 (🟡 8) */
             '<td class="r mono '+(m.puntos==null?'':(m.puntos<=3?'dn':m.puntos>=9?'up':''))+'">'+(m.puntos==null?'—':m.puntos)+'</td>'+
             '<td class="r mono">'+(_hMesDevCara_(m)==null?'—':nf2(_hMesDevCara_(m)))+'</td>'+   /* 20/10: devengadas */
             '<td class="r mono" style="color:var(--ink3)">'+(typeof m.horasTemp==='number'?nf2(m.horasTemp):'—')+'</td></tr>';
@@ -3001,7 +3009,9 @@ async function _refrescoVivo_(motivo, que){
        deje de ser permanente. ⚠️ Y va por la MISMA puerta que ya existe: no se duplica la
        carga -- dos puertas para el mismo dato acaban siendo dos funciones distintas. */
     var _mv=_vivoToca_(que,'resto') ? _cargarMovimientosE_() : null;
-    var _d=_pideSi_(que,'getEntregables','getEntregables').then(function(a){ if(Array.isArray(a)){ DOCS.length=0; a.forEach(function(x,i){ DOCS.push(_normDocE_(x,i)); }); } });
+    /* 21/10 (🟠 2): mientras no hayan llegado, se piden en CADA vuelta (no sólo cuando cambia su sello). */
+    var _d=_pideSi_(DOCS_LLEGO===false ? null : que,'getEntregables','getEntregables').then(function(a){
+      if(Array.isArray(a)){ DOCS.length=0; a.forEach(function(x,i){ DOCS.push(_normDocE_(x,i)); }); DOCS_LLEGO=true; } });
     /* Las reuniones, con cuidado: la lista NO trae las respuestas (viven en su propia hoja),
        asi que refrescarla a lo bruto deja los mapas de calor a cero. Se conservan las que ya
        estaban hidratadas, emparejando por id. */
@@ -3132,7 +3142,7 @@ function _aplicarBootstrap_(boot){
   _aplicarPanel_(boot.panel);
   if(Array.isArray(boot.tareas)){ TAREAS.length=0; boot.tareas.forEach(function(t){TAREAS.push(t);}); }
   if(Array.isArray(boot.turnos)){ TURNOS.length=0; boot.turnos.forEach(function(t){TURNOS.push(t);}); }
-  if(Array.isArray(boot.entregables)){ DOCS.length=0; boot.entregables.forEach(function(d,i){DOCS.push(_normDocE_(d,i));}); }
+  if(Array.isArray(boot.entregables)){ DOCS.length=0; boot.entregables.forEach(function(d,i){DOCS.push(_normDocE_(d,i));}); DOCS_LLEGO=true; }
   if(Array.isArray(boot.reuniones)){
     REUS.length=0; boot.reuniones.map(normReu).forEach(function(r){REUS.push(r);});
     _hidratarReus_();          // el bootstrap NO trae `resp`: sin esto el mapa sale a cero
@@ -3170,6 +3180,7 @@ async function _onCredencial_(resp,_silente){
   _gate_(_insigniaHTML_()+'<div style="opacity:.8">Verificando…</div>');
   try{
     var boot=null; try{ boot=await api.bootstrap(resp.credential); }catch(_){ boot=null; }
+    DOCS.length=0; DOCS_LLEGO=false;   /* 21/10 (🟠 2): con sesión real, la semilla fuera — hasta que lleguen, «sin leer» */
     if(boot && boot.identidad){
       SESION={token:resp.credential,email:boot.identidad.email,nombre:boot.identidad.nombre,rango:boot.identidad.rango};
       _aplicarBootstrap_(boot);
@@ -3457,7 +3468,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='529d258';
+var BUILD='309fa7c';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4287,8 +4298,9 @@ function _engDocsDecidir_(){
      solo usaba dos. El servidor revalida la autoridad por token; esto es el disparo.
      El motivo y el titulo salen de la propia ficha: un prompt() no deja releer el
      expediente mientras escribes por que lo rechazas. */
-  var ETI_DOC={aprobado:'Aprobado. Se publica en Notion, Drive y el Libro de Datos.',
-    anot:'Aprobado con anotaciones. Se publica con el título corregido.',
+  /* 21/10 (auditor 11, 🔴 1): aprobar NO publica (el servidor deja `aprobado`): se dice que queda pendiente. */
+  var ETI_DOC={aprobado:'Aprobado. Queda pendiente de publicar en Notion, Drive y el Libro de Datos.',
+    anot:'Aprobado con anotaciones. Queda pendiente de publicar, con el título corregido.',
     cambios:'Cambios pedidos. Le llega al autor, que podrá reenviarlo corregido.',
     rechazado:'Rechazado. El autor recibe el motivo.',
     deshacer:'Decisión deshecha: vuelve a revisión.',
@@ -4307,8 +4319,10 @@ function _engDocsDecidir_(){
         tost(accion==='cambios'?'Sin motivo no se piden cambios: el autor no sabría qué corregir.'
           :'Sin motivo no se rechaza.'); if(ta) ta.focus(); return; }
       if(accion==='anot' && !titulo){ tost('Con anotaciones hace falta un título.'); return; }
-      if(accion==='rechazado' && !confirm('Rechazar «'+d.tit+'». El expediente queda cerrado y el autor'+
-        ' tendrá que enviar uno nuevo. ¿Seguro?')) return;
+      /* 21/10 (auditor 11, 🟡 13): sin prometer lo no decidido (cómo reenvía un rechazado es pregunta de Daniel) ni un
+         cierre que no es tal: se puede deshacer desde la ficha. */
+      if(accion==='rechazado' && !confirm('Rechazar «'+d.tit+'». El autor recibe el motivo; la decisión se puede '+
+        'deshacer desde la ficha. ¿Seguro?')) return;
       if(accion==='deshacer' && !confirm('Devolver «'+d.tit+'» a revisión y borrar la decisión de '+
         (d.revisor||'quien la tomó')+'. ¿Seguro?')) return;
       /* Las DOS mitades: el contrato define la accion como ajustar titulo Y etiquetas, y
@@ -4322,7 +4336,7 @@ function _engDocsDecidir_(){
           /* `upd` viene con las claves LARGAS del backend. Metiendolo crudo en DOCS la fila
              se quedaba sin titulo y con el estado en blanco hasta recargar. */
           if(upd){ var i=DOCS.findIndex(function(x){return x.id===d.id;}); if(i>=0) DOCS[i]=_normDocE_(upd,i); }
-          tost(ETI_DOC[accion]||'Hecho.');
+          tost(_avisoDocTxt_(ETI_DOC[accion]||'Hecho.', upd));   /* 21/10 (auditor 11, 🟡 12) */
         } else {
           tost('Sin conexión con el backend: la decisión NO se ha guardado.');
           b.disabled=false; b.textContent=prev; return;

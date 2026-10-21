@@ -61,11 +61,9 @@ function _m(n){
 function _rolDe_(nombre){
   if(nombre===PD_NOM) return 'Project Director';
   if(nombre===REV2_NOM) return 'Revisor fijo';
-  var m=miembro(nombre);
-  if(m&&m.cargo==='Coordinador') return 'Coordinador de '+(m.coordina||m.unidad);
-  var sc=(typeof _subcoordDe_==='function') ? _subcoordDe_(nombre) : null;
-  if(sc) return 'Subcoordina '+sc.equipo+' ('+sc.unidad+')';
-  return 'Miembro';
+  /* 21/10 (auditor 10, 🟡 8): por `_cargoTxt_`, la de las dos caras (antes «Miembro» a quien coordina sin cargo, y
+     `coordina` concatenado con «+»). Sin ficha, sólo el nombre: la subcoordinación se pregunta igual. */
+  return _cargoTxt_(miembro(nombre) || {nombre:nombre});
 }
 
 function colaDecision(){

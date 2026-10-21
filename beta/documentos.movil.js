@@ -93,7 +93,7 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq){
        `movil.html` ya se planta antes (*«Con anotaciones hace falta un titulo»*). Son el
        mismo `if` con dos significados distintos, que es justo lo que los confundio. */
     if(acc==='anot' && etq) e.etiquetas=etq;
-    e.estado='publicado';
+    e.estado='aprobado';   /* 21/10 (auditor 11, 🔴 1): como el servidor — `publicado` lo pone quien publica */
   } else if(acc==='cambios'){ e.estado='cambios'; e.nota=mot; }
   else if(acc==='rechazado'){ e.estado='rechazado'; e.nota=mot; }
   else return null;                       /* desconocida: no se toca NADA */
@@ -280,9 +280,19 @@ function vDocs(){
   var h='<div class="h1">Documentos</div><p class="h1s">Tus documentos y los que tienes que revisar.</p>';
   /* NADA DE NADA: una sola caja explicada, en vez de tres estados vacios decorados que
      juntos miden media pantalla. La explicacion hace falta UNA vez, no tres. */
+  /* ⛔ 21/10 (auditor 11, 🟠 2): sin expedientes LLEGADOS no se dice «Nada por aquí»: no se sabe. */
+  if(typeof ENT_LLEGO!=='undefined' && ENT_LLEGO===false)
+    return h+'<div class="tarj">'+vacio('No se han podido leer los documentos',
+      'El servidor todavía no los ha mandado; se vuelven a pedir solos. Mientras tanto no se sabe si tienes algo que revisar.',
+      '',false)+'</div>';
   if(!_docsRelevantes_()){
     return h+'<div class="tarj">'+vacio('Nada por aquí',
-      (esCoord()
+      /* 21/10 (auditor 11, 🟡 7): `esCoord()` incluye al SUBCOORDINADOR, y el reparto (`coordinadorDe`, y el servidor)
+         sólo nombra a quien tiene `cargo:'Coordinador'`: a él no le llega nada, y se le prometía. */
+      ((typeof YO!=='undefined' && YO && YO.cargo!=='Coordinador' && YO.cargo!=='Project Director' && _subcoordDe_(YO.nombre))
+        ? 'No has enviado ningún documento y no tienes ninguno que revisar. Los archivos de tu unidad los firma '+
+          'su coordinador, no la subcoordinación.'
+        : esCoord()
         ? 'No hay ningún documento esperando tu firma, y tú no has enviado ninguno. Cuando '+
           'alguien de tu unidad envíe un archivo, te llegará aquí.'
         : 'No has enviado ningún documento y no tienes ninguno que revisar: los tuyos los '+
