@@ -3875,10 +3875,64 @@ function _mesACerrar_(hoy){
      cierre el mes no cambiamos de mes realmente»). Si no es más viejo, nada cambia: con septiembre cerrado, el 20 de
      octubre sigue proponiendo septiembre (ya cerrado), como siempre. */
   var abierto=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
-  if(/^\d{4}-\d{2}$/.test(String(abierto||'')) && abierto < p){
+  /* ⛔⛔ 21/10 (auditor 9, 🟠 4): Y SI ES MÁS NUEVO, TAMBIÉN. Lo que toca cerrar es el mes ABIERTO —el siguiente al último
+     cierre—, sea más viejo o más nuevo que «el anterior al del reloj»: del 6 al 31 de octubre, con septiembre cerrado el
+     05/10, esto proponía «Cierre de septiembre · LLEVA 21 días» y el botón «Calcular el cierre de septiembre». Sin
+     último cierre conocido, el reloj como hasta hoy. */
+  if(/^\d{4}-\d{2}$/.test(String(abierto||'')) && abierto !== p){
     p=abierto; m=parseInt(abierto.slice(5,7),10)-1;
   }
-  return { p:p, mes:MESES_L[m] };
+  /* …pero un mes que AÚN CORRE no se cierra (la gemela del auditor del 20/10): `curso` = el mes de `p` no ha terminado
+     el día `h`. Las caras bloquean «Calcular» con él: el corte va del cierre anterior HASTA HOY, y calcular octubre el
+     20/10 lo cortaría a medias. */
+  var _hoyYM=h.getFullYear()+'-'+(h.getMonth()<9?'0':'')+(h.getMonth()+1);
+  return { p:p, mes:MESES_L[m], curso:(p >= _hoyYM) };
+}
+
+/* ⛔ 21/10 (auditor 9, 🟠 1/🟠 2): EL PLAN DE LA RANURA, SÓLO SI ES DEL MES QUE TOCA CERRAR (o de uno posterior). La
+   ranura `cierre_plan` guarda el ÚLTIMO plan que alguien escribió, y no se vacía: hoy trae el de JULIO «parado a medias»
+   (una pasada del 19/10), con julio aplicado el 04/08. Creérselo pintaba «PARADO A MEDIAS · hay fichas nuevas y viejas
+   conviviendo» y, en el móvil, tapaba el botón «Calcular». Un plan de un periodo ANTERIOR es de un ciclo pasado: `null`.
+   Sin periodo legible en alguno de los dos, se queda el plan (no lo sé no es «viejo»). */
+/* ⛔ 21/10 (auditor 9, 🟠 3): EL ÚLTIMO CÁLCULO DEL CIERRE FALLÓ. `calcular_cierre.py` baja su flag con la nota «plan NO
+   calculado (salida N)» y el servidor la devuelve en `ultimo_calculo`; sin esto, pulsar «Calcular» y que fallase dejaba
+   la pantalla con el plan anterior y ni una palabra. Texto plano (la cara lo escapa), o '' si no hay fallo o si hay un
+   cálculo en cola (entonces manda ése). */
+/* ⛔ 21/10 (auditor 9, 🟡 1): UN INSTANTE DEL CIERRE, PARA LEERLO UNA PERSONA: «DD/MM/AAAA HH:MM» en hora de MADRID
+   (el `resultado.at` viaja en UTC: «2026-10-19 11:20» eran las 13:20). Una fecha sin hora sale «DD/MM/AAAA»; lo que no
+   se entienda, tal cual (no se inventa una fecha). */
+function _cuandoMadrid_(iso){
+  var s = String(iso || ''), d = new Date(s);
+  if(/T\d{2}:\d{2}/.test(s) && !isNaN(d.getTime())){
+    var x = _ahoraLocalISO_(d);
+    return _isoADMY_(x.slice(0,10)) + ' ' + x.slice(11,16);
+  }
+  if(/T\d{2}:\d{2}/.test(s)) return _isoADMY_(s.slice(0,10)) + ' ' + s.slice(11,16);
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? _isoADMY_(s.slice(0,10)) : s;
+}
+
+/* ⛔ 21/10 (auditor 9, 🟡 2): «HAY FICHAS NUEVAS Y VIEJAS CONVIVIENDO» SÓLO SI SE ESCRIBIÓ ALGUNA. `parado` = un
+   descuadre o un fallo, aunque no se haya escrito nada: se decía «conviven» sobre 0 fichas escritas. Sin `resultado`
+   o sin `aplicadas`, no se sabe: se queda el aviso de siempre (el lado prudente). */
+function _convivenFichas_(plan){
+  var r = plan && plan.resultado;
+  if(!r || r.aplicadas == null) return true;
+  return Number(r.aplicadas) > 0;
+}
+
+function _avisoCalculoCierre_(est){
+  var uc = est && est.ultimo_calculo;
+  if(!uc || (est && est.encolado) || !/NO calculado/.test(String(uc.nota || ''))) return '';
+  var dia = _diaMadridDe_(uc.at);
+  return 'El último cálculo del cierre FALLÓ' + (dia ? ' (' + dia + ')' : '') + ': «' + String(uc.nota) + '». No hay ' +
+         'plan nuevo; el aviso del gate dice por qué. Míralo antes de volver a pulsar.';
+}
+
+function _planVigente_(plan, hoy){
+  if(!plan) return null;
+  var p=String(plan.periodo||''), toca=_mesACerrar_(hoy).p;
+  if(/^\d{4}-\d{2}$/.test(p) && /^\d{4}-\d{2}$/.test(String(toca||'')) && p < toca) return null;
+  return plan;
 }
 
 function _numPlan_(v){
@@ -5684,7 +5738,22 @@ function _novedades_(){
         {cara:'movil', vista:'horas', txt:'Las horas sin ceros de más («1,5 h», no «1,50 h») y la fecha de caducidad en el día de Madrid.'},
         {cara:'escritorio', vista:'partes', txt:'**Otorgar horas** y **Bloque de horas** sólo ofrecen a quien el servidor te deja (el PD, o el coordinador de esa unidad); un subcoordinador ya no ve una lista que luego se rechaza entera.'},
         {cara:'escritorio', vista:'partes', txt:'El **Histórico** dice «revertido», «caducado» o «sin declarar» en vez de «devuelto · falta detalle»; y revertir unas horas **otorgadas** avisa de que se anulan (no vuelven a ninguna cola).'},
-        {cara:'escritorio', vista:'curso', txt:'**Fichajes en curso** le dice a un coordinador que la lista es del Project Director, en vez de «No se pudo preguntar al servidor».'}
+        {cara:'escritorio', vista:'curso', txt:'**Fichajes en curso** le dice a un coordinador que la lista es del Project Director, en vez de «No se pudo preguntar al servidor».'},
+        {cara:'escritorio', vista:'libros', txt:'**Lo tuyo** lleva globo cuando te han devuelto un parte pidiendo detalle (bloquea el cierre del mes): antes no salía ningún número.'},
+        {cara:'escritorio', vista:'partes', txt:'Un parte que vuelve después de **contestar un detalle** dice qué se le había preguntado («contestó a lo que se le pidió — «…»»); en el móvil también.'},
+        {cara:'movil', vista:'horas', txt:'En **Tus partes**, uno revertido dice el **porqué de la reversión**, no tu propia justificación.'},
+        {cara:'movil', vista:'horas', txt:'**Ya decidiste** dice cuántos partes **aún se pueden revertir** (los de un mes cerrado ya no); y aprobar dice que las horas se suman **al aplicarse, en unos minutos**, no «Ya cuenta».'},
+        {cara:'escritorio', vista:'partes', txt:'**Ya firmaste** dice «N aún revertibles · M en total»; y aprobar u otorgar horas dicen lo mismo: se suman al aplicarse, en unos minutos.'}
+      ] },
+    { id:'2026-10-21-cierre-mes-abierto', fecha:'2026-10-21',
+      titulo:'Cierre del mes: el mes abierto, y no antes de que termine',
+      items:[
+        {cara:'escritorio', vista:'cierre', txt:'El **cierre del mes** propone el mes **abierto** (hoy octubre: septiembre ya está cerrado) y, mientras aún corre, dice **«TERMINA … · QUEDAN n días»** y el botón **Calcular** sale bloqueado hasta que acabe.'},
+        {cara:'escritorio', vista:'cierre', txt:'Un plan de un mes **ya cerrado** que traiga el servidor ya no se pinta como el cierre de ahora («parado a medias»): se dice en una línea y no cuenta.'},
+        {cara:'movil', vista:'estado', txt:'En el **cierre del mes** del móvil, lo mismo: el mes abierto, «aún no ha terminado» mientras corre, y el plan de un mes ya cerrado ya no tapa el botón de calcular.'},
+        {cara:'escritorio', vista:'cierre', txt:'Las horas del cierre salen en **hora de Madrid** y con fecha DD/MM/AAAA; «fichas nuevas y viejas conviviendo» sólo si se llegó a escribir alguna; y con algo **sin decidir**, «Aplicar» sale bloqueado (el servidor no lo deja) en vez de fallar al pulsarlo. En el móvil, igual.'},
+        {cara:'escritorio', vista:'temporada', txt:'El **cierre de temporada** dice de qué temporada es el plan (y cuál corre ahora, si no es la misma), ya no llama «listo para aplicar» a uno aplicado, y **Calcular** avisa antes de sustituir el plan aplicado.'},
+        {cara:'escritorio', vista:'cierre', txt:'Tras pulsar **Calcular** con un plan ya en pantalla, se dice que hay uno **nuevo en cola** (chip «RECALCULÁNDOSE»); y si el cálculo **falla**, se dice con el día y el motivo. En el móvil, igual.'}
       ] },
     { id:'2026-10-21-automatismos-estado', fecha:'2026-10-21',
       titulo:'Automatismos: cada interruptor dice si está encendido ahora',

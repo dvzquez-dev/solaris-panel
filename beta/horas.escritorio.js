@@ -67,7 +67,9 @@ function parteCard(p){
       return '<span class="chip '+(f[0]==='ok'?'ok':'wa')+'">'+esc(f[1])+'</span>';}).join('')+
       (p.origen==='fichaje'?'<span class="chip ok">con fichaje</span>':'')+
       /* 20/10: lo devuelto se DICE — está en la cola esperando al autor, y se ve qué se le pidió. */
-      (p.estado==='detalle'?'<span class="chip wa">devuelto · falta detalle'+(p.motivo?' — «'+esc(p.motivo)+'»':'')+'</span>':'')+'</div>'+
+      (p.estado==='detalle'?'<span class="chip wa">devuelto · falta detalle'+(p.motivo?' — «'+esc(p.motivo)+'»':'')+'</span>':'')+
+      /* 21/10 (auditor 8, 🟡 6): y si ya lo CONTESTÓ, qué se le había preguntado */
+      (p.estado==='pend' && p.pedido?'<span class="chip">contestó a lo que se le pidió — «'+esc(p.pedido)+'»</span>':'')+'</div>'+
     '<div class="ruta">'+(puede?'Puedes decidirlo.':'Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.')+'</div>'+
     (puede?'<textarea data-motivo placeholder="Motivo — obligatorio para rechazar o pedir detalle…"></textarea>'+
       '<div class="acts">'+
@@ -164,7 +166,8 @@ function normParte(p){
        viaja porque de él sale A QUÉ MES cuenta. */
     decidido_por:p.decidido_por||null, decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
     periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo */
-    motivo:p.motivo||null, _real:true };
+    motivo:p.motivo||null, pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya contestada */
+    _real:true };
 }
 
 /* ⛔⛔ 635.ª UNA FILA DEL «HISTÓRICO» DE PARTES. Vivía dentro de `V.partes` (escritorio.html), donde
@@ -402,17 +405,21 @@ function _escRevCard_(p){
    ⛔ Y VA DEBAJO de «Requieren tu decisión» (lo coloca `V.partes`): lo que hay que hacer va
    antes que lo ya hecho, igual que en el móvil. */
 function _escRevPanel_(){
-  var lista=_escRevertibles_(), i, h=0, cuerpo='';
+  var lista=_escRevertibles_(), i, h=0, cuerpo='', vivos=0;
   if(!lista.length) return '';
-  for(i=0;i<lista.length;i++){ h+=Number(lista[i].horas)||0; cuerpo+=_escRevCard_(lista[i]); }
+  /* ⛔ 21/10 (auditor 8, 🟡 11): el número dice cuántos AÚN se pueden revertir — la lista trae también los de meses
+     cerrados (con su «ya no se revierte») y lo otorgado por el sistema: 53 para el PD con 8 vivos. */
+  for(i=0;i<lista.length;i++){ h+=Number(lista[i].horas)||0; cuerpo+=_escRevCard_(lista[i]);
+    if(!_escRevBloqueo_(lista[i])) vivos++; }
   /* ⛔ `nf2`, NO `nf(...,1)` (20/08, 130.ª). Era el ULTIMO redondeo a la decima sobre
      horas que quedaba, y estaba en el panel que CONTIENE las tarjetas -- que ya usaban
      `nf2` desde el 18/08. El fichaje redondea a CUARTOS, asi que la mitad de los totales
      salian falseados: tres partes de 0,75 daban «3 · 2,3 h» encima de tres tarjetas que
      dicen 0,75. El titular no cuadraba con lo que hay debajo. */
-  return pan('Ya firmaste', lista.length+' · '+nf2(h)+' h',
+  return pan('Ya firmaste', vivos+' aún revertibles · '+lista.length+' en total · '+nf2(h)+' h',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-    'Lo que ya decidiste y todavía se puede deshacer. <b>Revertir exige un motivo</b>; si las '+
+    'Lo ya decidido en tu ámbito —también lo que otorgó el sistema—; lo de un mes ya cerrado sale, pero ya no se '+
+    'deshace. <b>Revertir exige un motivo</b>; si las '+
     'horas ya contaban, se emite un apunte que se las resta de su ficha. <b>Nadie revierte lo '+
     'suyo.</b></p></div>'+cuerpo);
 }

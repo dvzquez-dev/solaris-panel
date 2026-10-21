@@ -28,7 +28,7 @@ function _fichaPlanHTML_(f){
 
 function _planHTML_(plan){
   var t=plan.totales||{}, fs=plan.fichas||[];
-  var cuando=plan.calculado ? String(plan.calculado).slice(0,16).replace('T',' ') : '';
+  var cuando=plan.calculado ? _cuandoMadrid_(plan.calculado) : '';   /* 21/10 (auditor 9, 🟡 1) */
   var cab='<div class="rec">'+
     '<div class="rl"><span>Personas</span><span class="ra"><b>'+(t.personas||fs.length||0)+'</b></span></div>'+
     '<div class="rl"><span>Horas que se ponen a cero</span><span class="ra"><b>'+
@@ -58,7 +58,8 @@ function _planHTML_(plan){
      aplicado» porque `parado` solo mira descuadres y fallos -- un `ausente` no para al
      aplicador. Las 7 que faltan se quedan con la carga del mes sin poner a cero. */
   var _inc = _cierreIncompleto_(plan);
-  var _estado = _parado ? '<b>Se paró a medias.</b> Hay fichas nuevas y viejas conviviendo.'
+  var _estado = _parado ? '<b>Se paró a medias.</b> '+(_convivenFichas_(plan)?'Hay fichas nuevas y viejas conviviendo.'
+                                                                :'No llegó a escribir ninguna ficha.')
               : _inc   ? '<b>Aplicado a medias:</b> se escribieron '+_inc.hechas+
                          (_inc.de?' de '+_inc.de:'')+'. <b>Faltan '+_inc.faltan+'.</b>'
               : _hecho  ? '<b>Ya está aplicado.</b>'
@@ -86,7 +87,7 @@ function _planHTML_(plan){
         'renovación. Revísalo antes: el botón está abajo.')+'</p>';
 }
 
-function _decidirCierreHTML_(plan){
+function _decidirCierreHTML_(plan, nBloq){
   var r=plan.resultado||null;
   /* ⛔ El botón vuelve SOLO si faltan fichas, y con el número dentro. La regla «aplicado =
      sin botón» sigue en pie para el camino normal; lo que no puede seguir es que 25 de 32
@@ -104,19 +105,20 @@ function _decidirCierreHTML_(plan){
       '<span class="ra"><b>'+(plan.parado?'PARADO A MEDIAS':inc?'APLICADO A MEDIAS':'aplicado')+
       '</b></span></div></div>'+
       '<p class="rnota">'+lin.join(' · ')+
-      (r&&r.at?' · '+esc(String(r.at).slice(0,16).replace('T',' ')):'')+'</p>'+
-      (plan.parado?'<p class="rnota" style="color:var(--warn)">Se paró a medias: hay fichas '+
-        'nuevas y viejas conviviendo. <b>No lo vuelvas a lanzar sin mirarlo.</b></p>'
+      (r&&r.at?' · '+esc(_cuandoMadrid_(r.at)):'')+'</p>'+
+      (plan.parado?'<p class="rnota" style="color:var(--warn)">Se paró a medias'+(_convivenFichas_(plan)?': hay fichas '+
+        'nuevas y viejas conviviendo':' sin escribir ninguna ficha')+'. <b>No lo vuelvas a lanzar sin mirarlo.</b></p>'
        :inc?'<p class="rnota" style="color:var(--warn)"><b>Faltan '+inc.faltan+'</b>'+
         (inc.de?' de '+inc.de:'')+': su carga del mes cerrado sigue puesta y el mes que viene '+
         'esas horas se cuentan dos veces.</p>'+
-        '<button class="btn pri" data-aplicarcierre style="width:100%;margin-top:10px">'+
-        'Terminar el cierre · faltan '+inc.faltan+'</button>'+
+        '<button class="btn pri" '+(nBloq?'disabled ':'')+'data-aplicarcierre style="width:100%;margin-top:10px">'+
+        (nBloq?'Bloqueado · '+nBloq+' sin resolver':'Terminar el cierre · faltan '+inc.faltan)+'</button>'+
         '<p class="rnota">Relanzarlo es seguro: sigue por donde iba y no reescribe a quien ya '+
         'está. Si alguna sigue sin ficha en Notion, volverá a salir aquí.</p>':'');
   }
-  return '<button class="btn pri" data-aplicarcierre style="width:100%;margin-top:14px">'+
-      'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo))+'</button>'+
+  /* 21/10 (auditor 9, 🟡 4): con bloqueos el servidor NO deja aplicar — no se ofrece un botón que acaba en error. */
+  return '<button class="btn pri" '+(nBloq?'disabled ':'')+'data-aplicarcierre style="width:100%;margin-top:14px">'+
+      (nBloq?'Bloqueado · '+nBloq+' sin resolver':'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo)))+'</button>'+
     '<p class="rnota">Esto <b>sí escribe</b> en Notion, en '+((plan.totales&&plan.totales.personas)||
       plan.personas||'?')+' fichas. Lo hace un script determinista que comprueba el «antes» de '+
       'cada una y se planta si algo no cuadra.</p>';
@@ -130,7 +132,19 @@ function _cierreHTML_(est, err, cargando){
   if(cargando) return cab+'<p class="rnota">Preguntando al servidor en que punto esta…</p>';
   if(err) return cab+'<p class="rnota" style="color:var(--warn)">No se pudo comprobar: '+
     esc(err)+'. <b>No</b> quiere decir que este todo listo.</p>';
-  var bloq=(est&&est.bloqueos)||[], enc=(est&&est.encolado)||null, plan=(est&&est.plan)||null;
+  /* ⛔ 21/10 (auditor 9, 🟠 1/🟠 2): sólo el plan del mes que toca cerrar (`_planVigente_`). Con el de JULIO que trae hoy
+     la ranura, esto pintaba «se paró a medias» y salía por el `if(plan)` de abajo SIN el botón «Calcular». */
+  var bloq=(est&&est.bloqueos)||[], enc=(est&&est.encolado)||null, plan=_planVigente_((est&&est.plan)||null);
+  /* …y se dice en una línea, para que el plan viejo no parezca perdido. */
+  var _viejo=(est && est.plan && !plan) ? est.plan : null;
+  if(_viejo) cab+='<p class="rnota">La última ranura del servidor trae el plan de <b>'+
+    esc(_nomPeriodo_(_viejo.periodo))+'</b>, de un mes ya cerrado: no es el cierre de ahora y no cuenta.</p>';
+  /* ⛔ 21/10 (auditor 9, 🟠 3): un cálculo FALLIDO se dice, y uno NUEVO en cola también cuando ya hay plan (el `if(plan)`
+     de abajo sale antes que el `if(enc)`, y tras pulsar «Calcular» se seguía viendo el plan anterior sin una palabra). */
+  var _avc=_avisoCalculoCierre_(est);
+  if(_avc) cab+='<p class="rnota" style="color:var(--warn)">'+esc(_avc)+'</p>';
+  if(enc && plan) cab+='<p class="rnota">Hay un cálculo <b>nuevo</b> en cola: el plan de abajo es el anterior y se '+
+    'sustituye en la siguiente pasada (va cada 2 minutos).</p>';
   var filas=bloq.map(function(b){
     return '<div class="rl"><span>'+esc(b.texto||b.que)+'</span>'+
       '<span class="ra" style="color:var(--warn)">bloquea</span></div>'; }).join('');
@@ -145,16 +159,20 @@ function _cierreHTML_(est, err, cargando){
      ⚠️ Van ARRIBA del plan, no al final: leidos despues de decidir no sirven de nada. */
   if(plan) return cab+(filas ? '<div class="rec">'+filas+'</div>'+
       '<p class="rnota" style="color:var(--warn)"><b>Esto entra en la cuenta y sigue sin '+
-      'resolver.</b> Si aplicas el cierre ahora, lo que se decida después deja mal la cuota '+
-      'de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan);
+      'resolver.</b> El servidor no deja aplicar el cierre hasta que se decida: lo que se decidiera después dejaría '+
+      'mal la cuota de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan, bloq.length);
   if(enc) return cab+'<p class="rnota">Encolado. La rutina lo recoge en la siguiente pasada '+
     '(va cada 2 minutos) y deja el plan.</p>';
   return cab+(filas ? '<div class="rec">'+filas+'</div>'+
       '<p class="rnota">Estas bloquean porque entran en la cuenta: unas horas que se decidan '+
       'después del cierre dejan mal la cuota de alguien.</p>' : '')+
-    '<button class="btn pri" data-cerrarmes'+(bloq.length?' disabled':'')+
+    /* 21/10 (auditor 9): un mes que aún corre no se calcula — el corte acabaría hoy, a medias. */
+    (cer.curso ? '<p class="rnota">'+esc(cer.mes.charAt(0).toUpperCase()+cer.mes.slice(1))+' aún no ha terminado: '+
+      'el cierre se calcula a partir del día 1 del mes siguiente.</p>' : '')+
+    '<button class="btn pri" data-cerrarmes'+(bloq.length || cer.curso?' disabled':'')+
       ' style="width:100%;margin-top:10px">'+
-      (bloq.length?'Bloqueado · '+bloq.length+' sin resolver'
+      (cer.curso?'Aún no ha terminado'
+       :bloq.length?'Bloqueado · '+bloq.length+' sin resolver'
                   :'Calcular el cierre de '+esc(cer.mes))+'</button>';
 }
 

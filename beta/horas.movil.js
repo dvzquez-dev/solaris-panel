@@ -72,7 +72,10 @@ function normPMovil(p){
        que en `_pdFichaHTML_`, que recibe lo normalizado--. Se cura en el PRODUCTOR
        porque cierra de golpe las cinco ramas de `filaParte`: la sub-expresion
        `(p.nota?' · '+esc(p.nota):'')` sale TRES veces y no se puede parchear una a una. */
-    just:p.justificacion||'', nota:p.motivo||_justUtil_(p.tarea, p.justificacion)||'', sinFichaje:!!p.sinFichaje,
+    /* ⛔ 21/10 (auditor 8, 🟡 6): en un parte REVERTIDO (o anulado) la nota es el porqué de la reversión
+       (`revertido_motivo`): con `motivo||justificación` salía «revertida · <tu propia justificación>». */
+    just:p.justificacion||'', nota:((p.estado==='revertida'||p.estado==='anulada') && p.revertido_motivo) ||
+      p.motivo||_justUtil_(p.tarea, p.justificacion)||'', sinFichaje:!!p.sinFichaje,
     /* DE DONDE VIENE la hora: 'fichaje' | 'manual' | 'otorgada'. El backend lo guarda desde
        siempre y aqui se tiraba, asi que la vista solo tenia el booleano `sinFichaje` —que
        dice lo que FALTA, no de donde sale— y llamaba «sin fichaje» a lo que otorga el
@@ -1705,6 +1708,7 @@ function _normPDec_(p){
        `|| p.aplicado_at` no podia decidir nada -- el movil seguia mirando SOLO el estado.
        ⚠️ La funcion estaba bien y la llamada tambien: lo que faltaba estaba EN MEDIO. */
     aplicado_at:p.aplicado_at||null, motivo:p.motivo||null,   /* 20/10: lo que se pidió, en la ficha de un `detalle` */
+    pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya CONTESTADA (el servidor la guarda al responder) */
     estado:p.estado, origen:p.origen||null };
 }
 
@@ -1819,6 +1823,8 @@ function _pdFichaHTML_(p){
         _pdOrigenHTML_(p)+
         /* 20/10: un parte DEVUELTO se dice — espera al autor, y se ve qué se le pidió */
         (p.estado==='detalle'?'<span class="pdw">devuelto · falta detalle'+(p.motivo?' — «'+esc(p.motivo)+'»':'')+'</span>':'')+
+        /* 21/10 (auditor 8, 🟡 6): y si ya lo CONTESTÓ, qué se le había preguntado — si no, vuelve como uno cualquiera */
+        (p.estado==='pendiente' && p.pedido?'<span class="pdw">contestó a lo que se le pidió — «'+esc(p.pedido)+'»</span>':'')+
         '<input class="pdm" type="text" placeholder="Motivo — obligatorio para rechazar o pedir detalle">'+
         '<div class="pdb">'+
           '<button data-pdacc="aprobar" data-p>Aprobar</button>'+
@@ -1969,8 +1975,12 @@ function _pdRevFichaHTML_(p){
    ⚠️ Hasta el 07/10/2026 ponia «debajo de "Esperan tu decision"» y estaba AHI, o sea segunda
    de todo. Daniel: 🗣️ *«no tiene sentido ninguno. deberia estar debajo de tus partes no?»*. */
 function _pdRevHTML_(){
+  /* ⛔ 21/10 (auditor 8, 🟡 11): cuántos AÚN se pueden revertir — la lista trae también los de meses cerrados (`cerrado`)
+     y lo otorgado por el sistema, y la cabecera los sumaba todos («53 partes» para 8 vivos). */
+  var vivos=PARTES_REV.filter(function(p){ return !p.cerrado; }).length;
   return _pdGrupoHTML_('prev', 'Ya decidiste',
-    'Repasa lo que ya firmaste. <b>Revertir exige un motivo</b>; si las horas ya contaban, se '+
+    'Lo ya decidido en tu ámbito —también lo que otorgó el sistema—: <b>'+vivos+' aún se pueden revertir</b>; lo '+
+    'de un mes ya cerrado ya no. <b>Revertir exige un motivo</b>; si las horas ya contaban, se '+
     'le restan.', PARTES_REV, _pdRevFichaHTML_);
 }
 
@@ -2039,7 +2049,7 @@ function _engPartesDec_(){
       var prev=b.textContent; b.textContent='…';
       try{
         var upd=await api.decidirParte(id, acc, mot||null);
-        tost(acc==='aprobar'?'Aprobado. Ya cuenta.':(acc==='rechazar'?'Rechazado.':'Detalle pedido.'));
+        tost(acc==='aprobar'?'Aprobado: se suma a sus horas al aplicarse (en unos minutos).':(acc==='rechazar'?'Rechazado.':'Detalle pedido.'));
         /* ⛔ SE QUITA DE LA LISTA CON LA RESPUESTA QUE YA TENEMOS, sin volver a preguntar.
            `decidirParte` DEVUELVE el parte decidido: pedirlo otra vez era, además de un
            viaje de más, una carrera — la lectura salía antes de que el Sheet confirmase la

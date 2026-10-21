@@ -203,6 +203,10 @@ function insightsHTML(){
 function conteo(k){
   if(k==='partes') return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).length;
   if(k==='sindeclarar') return PARTES.filter(function(p){return p.estado==='sindecl';}).length;
+  /* ⛔ 21/10 (auditor 8, 🟡 13): TUS partes DEVUELTOS (`detalle`), que «Lo tuyo» enseña y que bloquean el cierre del mes.
+     Daba 0: un coordinador con un parte suyo devuelto no veía ningún número. Los `sin_declarar` van en «Sin declarar». */
+  if(k==='libros') return (typeof _bloqMios_==='function')
+    ? _bloqMios_().filter(function(p){ return p.estado==='detalle'; }).length : 0;
   /* ⛔ AQUI PONIA `CURSO_CONECTADO`, QUE NO EXISTE EN NINGUN SITIO, y esa sola
      palabra dejaba entrar al panel sin login: el `ReferenceError` reventaba
      `pintar()` en el arranque, abortaba el bloque `<script>` entero y la linea que

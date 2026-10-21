@@ -77,9 +77,11 @@ function _plazoCierre_(hoy){
   var fin=new Date(h.getFullYear(), h.getMonth(), 0);   /* el ultimo dia del mes anterior */
   /* ⛔ 20/10 (auditoría): con un mes abierto MÁS VIEJO, el plazo es el de ése (como `_mesACerrar_`). */
   var _ab=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null, _am=/^(\d{4})-(\d{2})$/.exec(String(_ab||''));
-  if(_am){ var _af=new Date(+_am[1], +_am[2], 0); if(_af < fin) fin=_af; }
-  var f=_finDeMes_(fin);
-  return { txt:f.txt, mes:f.mes, dias:Math.max(0, Math.round((_diaUTC_(h)-_diaUTC_(fin))/86400000)) };
+  /* ⛔ 21/10 (auditor 9, 🟠 4): el fin es el del mes ABIERTO también si es más nuevo (como `_mesACerrar_`); y si aún no
+     ha llegado, `curso` y los días que QUEDAN — un mes que corre no «lleva» días esperando. */
+  if(_am) fin=new Date(+_am[1], +_am[2], 0);
+  var f=_finDeMes_(fin), _d=Math.round((_diaUTC_(h)-_diaUTC_(fin))/86400000);
+  return { txt:f.txt, mes:f.mes, dias:Math.max(0, _d), curso:_d < 0, quedan:Math.max(0, -_d) };
 }
 
 /* Lo que el movil pinta en `<details>` uno por persona, aqui es UNA tabla: en 1920 px se
@@ -143,7 +145,12 @@ function _pinTemporada_(m){
       '«si».', '');
     var pro = (r===null || !String(r).trim()) ? null
             : /^s/i.test(String(r).trim()) ? true : /^n/i.test(String(r).trim()) ? false : null;
-    if(!confirm('Calcular el cierre de TEMPORADA.' + String.fromCharCode(10,10) +
+    /* ⛔ 21/10 (auditor 9, 🟠 7): calcular otro SUSTITUYE en la app el plan ya aplicado (la ranura `temporada_plan`), y
+       no avisaba — el mensual sí. La copia de Drive y `salidas/` se conservan. */
+    var _tpa=(typeof TEMP!=='undefined' && TEMP && TEMP.plan && TEMP.plan.aplicado) ? TEMP.plan : null;
+    if(!confirm((_tpa ? '⚠️ Ya hay un cierre de temporada APLICADO (' + String(_tpa.temporada||'?') + '). Calcular otro lo '+
+      'SUSTITUYE en la app: la pantalla dejará de enseñarlo (la copia de Drive y salidas/ se conservan).' +
+      String.fromCharCode(10,10) : '') + 'Calcular el cierre de TEMPORADA.' + String.fromCharCode(10,10) +
       'NO se aplica nada: la rutina saca el plan (a quién le sube los puntos al suelo de 5, la '+
       'cuota de cada uno y el ranking) y lo dejará aquí para que lo revises.' +
       String.fromCharCode(10,10) + 'Prórroga: ' +
