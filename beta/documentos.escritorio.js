@@ -382,7 +382,7 @@ function docCard(d){
       /* 21/10 (auditor 20, 🟡 1): «Cerrar» sólo si esta ficha está DESPLEGADA a mano (`DOC_SEL`). En «Requiere tu
          decisión» van siempre abiertas y el botón no hacía nada — y en un pipeline con estado `cerrado` se leía como
          «cerrar el expediente». */
-      (typeof DOC_SEL!=='undefined' && DOC_SEL===d.id
+      (typeof DOC_SEL!=='undefined' && DOC_SEL===d.id && !(typeof vista!=='undefined' && vista==='docdec')   /* 🟡 2 (refutador) */
         ? '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button>' : '')+'</div>'+
     '<div class="pils">'+
       '<span class="chip">'+esc(_m(d.autor).pila)+' · '+esc(d.sub||'—')+'</span>'+

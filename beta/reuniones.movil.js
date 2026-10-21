@@ -236,8 +236,10 @@ function _normReuM_(r){
     bajoMin: (function(){
       if(!YO || !resp[YO.nombre]) return false;
       var n = resp[YO.nombre].filter(function(x){ return +x>0; }).length;
-      if(!n || typeof _minimoExigido_!=='function' || typeof _avisoMinimo_!=='function') return false;
-      return _avisoMinimo_(n, _minimoExigido_(r), r.tipo).falta > 0;
+      if(!n) return false;   /* sin `typeof` de respaldo: `comun.js` va siempre, y un respaldo callaba el aviso (probar_cobertura) */
+      /* 22/10 (refutador, 🟠 5): SIN el tipo. En subsistema/mixta/trabajo el escritorio la lista igual («por debajo del
+         mínimo · potestad del coordinador»); con el tipo, el móvil decía «cubierta» a esa misma persona. */
+      return _avisoMinimo_(n, _minimoExigido_(r)).falta > 0;
     })(),
     exento: !!(YO && r.convocante && YO.nombre===r.convocante),   // quien convoca ORGANIZA: no cubre su propia encuesta
     _real:true };

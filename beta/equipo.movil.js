@@ -162,9 +162,13 @@ function vEstado(){
     av+='<div class="aviso" data-ir="reu" data-reuid="'+esc(String(_p0.id))+'" data-p>'+
       '<span class="ic"><svg><use href="#i-warn"/></svg></span>'+
       /* 22/10 (auditor 21, 🔴 1): si TODAS las que quedan están marcadas pero por debajo del mínimo, se dice eso. */
-      '<div style="flex:1"><b>'+(_pend.every(function(x){ return x.bajoMin; })
-        ? ('Vas por debajo del mínimo sin sanción en '+(_pend.length>1?(_pend.length+' reuniones'):'una reunión'))
-        : ('Te falta cubrir '+(_pend.length>1?(_pend.length+' disponibilidades'):'una disponibilidad')))+'</b>'+
+      /* 22/10 (refutador, 🟡 1): mezcladas, se cuentan las DOS («Te falta cubrir 1 y vas por debajo del mínimo en otra»). */
+      '<div style="flex:1"><b>'+(function(){
+        var nB=_pend.filter(function(x){ return x.bajoMin; }).length, nF=_pend.length-nB;
+        if(!nF) return 'Vas por debajo del mínimo en '+(nB>1?(nB+' reuniones'):'una reunión');
+        return 'Te falta cubrir '+(nF>1?(nF+' disponibilidades'):'una disponibilidad')+
+          (nB ? (' y vas por debajo del mínimo en '+(nB>1?(nB+' más'):'otra')) : '');
+      })()+'</b>'+
       /* ⛔ EL PLAZO EN PALABRAS, no la fecha cruda — y aqui es donde mas se nota: **este
          aviso existe justo para que no te caigan sanciones** (lo dice el comentario de
          arriba). «Cierra el 20/08/2026» obliga a mirar el calendario **dentro de una

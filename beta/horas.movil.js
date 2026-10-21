@@ -401,7 +401,7 @@ function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
    Con «vs. equipo» el sesgo ya se cancelaba —los dos numeros son del mismo mes al mismo dia—,
    pero se pasa igual a h/dia: son la misma fila, y dos filas contiguas que miden en unidades
    distintas es como se lee mal un numero correcto. */
-function _compHorasHTML_(base){
+function _compHorasHTML_(base, crudo){
   /* 22/10 (auditor 21, 🟡 4): sin cifra que comparar, no hay comparativa — la misma regla que la fila del mes anterior
      («si no llega, la fila no se pinta»). Sin el dato vivo y sin nada firmado, aquí salía «vs. equipo −100 %» en rojo:
      un juicio sobre un dato que falta (el escritorio dice «—»). */
@@ -415,7 +415,9 @@ function _compHorasHTML_(base){
      · *«mejor q esa decisión q tomé»* · *«simplemente la compensación inicial sube poco a
      poco»*. ✅ Y el numerador que se IMPRIME abajo es este mismo, así que la división
      sigue cuadrando a ojo — que es lo que se curó el 13/08 y no se puede volver a romper. */
-  var _bt=_devengadoAHoy_(YO, base, _fraccionDelMes_());
+  /* 22/10 (refutador, 🟡 4): `crudo` = la cifra son sólo PARTES (sin el dato vivo): la base nunca se sumó, así que la
+     rampa no se le resta — se le quitaban 2×(1−fracción) h que no estaban. */
+  var _bt=crudo ? null : _devengadoAHoy_(YO, base, _fraccionDelMes_());
   /* ⛔ EL NUMERADOR SE GUARDA PORQUE LA NOTA DE ABAJO LO ENSEÑA. Hasta el 13/08 el
      ritmo se calculaba con las horas SIN la base y el paréntesis que dice de dónde
      sale enseñaba `base`, o sea las horas EN BRUTO: la división impresa no daba
@@ -467,7 +469,7 @@ function _compHorasHTML_(base){
      distingue de «+12 %» respecto a un total, y son cosas distintas. */
   return '<div class="comph">'+f+
     '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(_num)+
-    ' h en '+dia+' días'+(_bt==null?'':', con la compensación de tu cargo repartida hasta hoy')+   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
+    ' h en '+dia+' días'+(_bt==null?'':', con la compensación base repartida hasta hoy')+   /* 🟡 4 (refutador): también la tiene quien no tiene cargo */   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
     '). Se compara el <b>ritmo</b>, no el total: el mes '+
     'en curso va a medias y el anterior está entero.</p></div>';
 }
@@ -529,7 +531,7 @@ function barraHorasHTML(id){
        ⛔ Y no dio ningún error porque el suelo `Math.max(0, …)` —que está para que nadie
        salga en negativo— convirtió un número **imposible** en uno **plausible**.
        ⚠️ El camino sin Notion ya pasaba el crudo, así que con datos de demo esto NO se veía. */
-    _compHorasHTML_(notion ? _hm : (cont > 0 ? cont : null));   /* 🟡 4 (auditor 21): sin dato ni nada firmado, sin comparativa */
+    _compHorasHTML_(notion ? _hm : (cont > 0 ? cont : null), !notion);   /* 🟡 4 (auditor 21): sin dato ni nada firmado, sin comparativa */
 }
 
 function _guardarAnchos_(){ try{ localStorage.setItem('sol_anchos',JSON.stringify(_anchoPrev_)); }catch(_){} }

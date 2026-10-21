@@ -5857,7 +5857,10 @@ function _novedades_(){
         {cara:'escritorio', vista:'docdec', txt:'En **Documentos**, «Cerrar» ya sólo sale en la ficha que has desplegado, y un expediente sin resumen ni archivo ya no te manda a «leerlo abajo».'},
         {cara:'escritorio', vista:'actas', txt:'En **Actas**, un acta con la fecha sólo en el título («… del 17/07/2026») ya cuenta en su temporada y enseña su fecha.'},
         {cara:'movil', vista:'reu', txt:'Si marcas **menos franjas del mínimo**, la reunión ya no sale «cubierta»: dice **«bajo el mínimo»** y el aviso de la portada sigue (es lo que el motor sanciona).'},
-        {cara:'movil', vista:'horas', txt:'El **objetivo de horas del mes** es ya el mismo para todo el equipo (antes, a cada uno se le calculaba con sus propias horas).'}
+        {cara:'movil', vista:'horas', txt:'El **objetivo de horas del mes** es ya el mismo para todo el equipo (antes, a cada uno se le calculaba con sus propias horas).'},
+        {cara:'escritorio', vista:'dispo', txt:'En **Disponibilidad y riesgo**, el titular de cada reunión dice también cuántos han quedado **por debajo del mínimo** («14 de 18 han cubierto (2 por debajo del mínimo)»).'},
+        {cara:'escritorio', vista:'panel', txt:'El **Panel de mando** de un coordinador ya no enseña una «media del equipo» que es su propia cifra ni «0 en infracción»: dice «—» y que su cuenta no ve lo del resto. Y el aviso de **fichaje de más de 10 h** se refresca solo.'},
+        {cara:'movil', vista:'reu', txt:'**«Bajo el mínimo»** sale también en las reuniones de subsistema, y el aviso de la portada cuenta a la vez lo que te falta cubrir y dónde vas por debajo.'}
       ] },
     { id:'2026-10-21-cerrar-sesion-avisos', fecha:'2026-10-21',
       titulo:'Cerrar sesión deja de mandar tus avisos a ese navegador',

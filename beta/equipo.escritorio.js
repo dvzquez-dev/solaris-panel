@@ -173,7 +173,10 @@ function insightsHTML(){
       ? 'Todavía no ha llegado el dato del mes (cuál está abierto y cuántos días lleva), así que no se puede comparar con el anterior.'
       : 'Todav\u00eda no hay horas del mes anterior, as\u00ed que no se puede comparar la evoluci\u00f3n.']);
     /* 21/10 (auditor 6): devengado, como Miembros y Registro — en crudo el PD (7 h de base el día 1) ganaba por su cargo */
-    var top=_activos_().slice().sort(function(a,b){return (_hMesDevCara_(b)||0)-(_hMesDevCara_(a)||0);})[0];
+    /* 22/10 (refutador, 🟠 1): sólo entre quienes TIENEN dato, y con dos como mínimo — a un coordinador (sólo ve sus
+       horas) se le decía que era quien más horas llevaba del equipo. */
+    var _conDev=_activos_().filter(function(m){ return typeof _hMesDevCara_(m)==='number'; });
+    var top=_conDev.length>=2 ? _conDev.slice().sort(function(a,b){return _hMesDevCara_(b)-_hMesDevCara_(a);})[0] : null;
     if(top) xs.push(['up',esc(top.pila)+' es quien m\u00e1s horas lleva este mes: '+h1(_hMesDevCara_(top)||0)+'.']);
   }
   var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);

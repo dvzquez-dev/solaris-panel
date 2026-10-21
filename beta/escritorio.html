@@ -113,16 +113,16 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=3bec03a"></script>
+<script src="comun.js?v=b65b74f"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
 <script src="turnos.escritorio.js?v=3197a86"></script>
 <script src="buzon.escritorio.js?v=750fdd3"></script>
-<script src="documentos.escritorio.js?v=d63da43"></script>
+<script src="documentos.escritorio.js?v=b51dd4e"></script>
 <script src="sanciones.escritorio.js?v=b2dc300"></script>
 <script src="reuniones.escritorio.js?v=c2d54c8"></script>
 <script src="horas.escritorio.js?v=97bc56f"></script>
-<script src="equipo.escritorio.js?v=2434048"></script>
+<script src="equipo.escritorio.js?v=dc512c9"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -941,8 +941,12 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
          ritmo y no haya fichado este mes. */
       (conR.length<2   /* 22/10 (auditor 21, 🟠 3): «0 de 1» era tu propia fila, no el equipo */
         ? kpi('Bajo el umbral','—','tu cuenta no ve las horas del resto del equipo','','')
-        : kpi('Bajo el umbral',bajo,'de '+conR.length+' · media de temporada bajo '+nf2(UMBRAL)+' h/mes','wa',(bajo/conR.length*100).toFixed(0)+'%'))+
-      kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(EQUIPO.length?(infra/EQUIPO.length*100).toFixed(0):0)+'%')+
+        : kpi('Bajo el umbral',bajo,'de '+conR.length+' · media de temporada bajo '+nf2(UMBRAL)+' h/mes','wa',(conR.length?(bajo/conR.length*100).toFixed(0):0)+'%'))+
+      /* 22/10 (refutador, 🟠 2): a quien no es PD no le llega `infraccion` del resto; «0» en verde era afirmar sobre lo
+         que no ve. Con menos de dos fichas con el dato, «—» y por qué. */
+      (EQUIPO.filter(function(m){ return typeof m.infraccion==='boolean'; }).length<2
+        ? kpi('En infracción este mes','—','tu cuenta no ve las infracciones del resto','','')
+        : kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(EQUIPO.length?(infra/EQUIPO.length*100).toFixed(0):0)+'%'))+
     '</div>'+
     '<div style="display:grid;grid-template-columns:300px 1fr;gap:13px;align-items:start">'+
       pan('Conducta del equipo', media==null?'sin datos':('media de '+conPts.length),
@@ -962,7 +966,8 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
         '<div class="pb">'+
           '<div class="chips">'+
             '<span class="chip">TOTAL <b style="color:var(--ink)">'+h1(totMes)+'</b>'+(parcial?' <span style="color:var(--warn)">(parcial)</span>':'')+'</span>'+
-            '<span class="chip">MEDIA <b style="color:var(--ink)">'+(baseMes.length?nf(totMes/baseMes.length,1):'—')+' h</b></span>'+
+            /* 22/10 (refutador, 🟠 1): con UNA persona la «media» es su propia cifra (lo que ve un coordinador) */
+            '<span class="chip">MEDIA <b style="color:var(--ink)">'+(baseMes.length>=2?nf(totMes/baseMes.length,1):'—')+' h</b></span>'+
             /* ⛔ 20/10 (auditoría): la MEDIA de un mes a medias al lado del objetivo del mes ENTERO invita a comparar
                mal. Con el mes abierto va también el objetivo A HOY, por la misma puerta que «vs. objetivo a hoy». */
             '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+h1(UMBRAL)+'</b>'+
@@ -1166,9 +1171,15 @@ var CURSO_SRV='sin pedir';
    Y si el servidor no contesta se marca el estado — un panel de sesiones abiertas que se queda
    con la lista vieja diría que hay gente fichada que ya cerró. */
 function _cursoCargar_(repintar){
-  if(CURSO_SRV!=='sin pedir') return;
+  /* ⛔ 22/10 (refutador, 🟠 4): se pedía UNA vez por carga de página, así que un fichaje que cruzaba las 10 h con el
+     escritorio abierto no encendía nunca el aviso del Panel, y un fallo de red dejaba «error» toda la sesión. Ahora se
+     vuelve a pedir al pintar si lo último tiene más de un minuto. «vedado» no cambia. Sin dos peticiones a la vez: `t`
+     se apunta ANTES de pedir, así que el mismo tope las frena (una marca «en vuelo» aparte era redundante). */
+  if(CURSO_SRV==='pidiendo' || CURSO_SRV==='vedado') return;
+  if(CURSO_SRV!=='sin pedir' && (Date.now() - (_cursoCargar_.t||0)) < 60000) return;
   if(typeof api==='undefined' || !api.getFichajesAbiertos) return;
-  CURSO_SRV='pidiendo';
+  if(CURSO_SRV==='sin pedir') CURSO_SRV='pidiendo';
+  _cursoCargar_.t=Date.now();
   api.getFichajesAbiertos().then(function(a){
     CURSO_SRV='ok';
     CURSO.length=0;
@@ -2126,7 +2137,11 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
     var _pz=_plazoReuE_(r);
     return '<div class="acord" id="reu-'+r.id+'"><div class="hh" data-acord>'+
       '<span class="tx"><b>'+esc(r.tit)+'</b><small>'+r.tipo+' · '+_modalidadTxt_(r.mod).toLowerCase()+' · '+r.cubren+' de '+r.conv+
-      ' han cubierto \u00b7 '+_pz.txt+'</small></span>'+
+      ' han cubierto'+
+      /* 22/10 (auditor 21, de paso): «han cubierto» cuenta a quien marcó ALGO; si alguien quedó por debajo del mínimo, se
+         dice aquí también — si no, el titular decía «18 de 18» encima de una persona nombrada en riesgo. */
+      ((Array.isArray(r.bajoMin) && r.bajoMin.length) ? ' ('+r.bajoMin.length+' por debajo del m\u00ednimo)' : '')+
+      ' \u00b7 '+_pz.txt+'</small></span>'+
       '<span class="chip '+_pz.cls+'">'+_pz.chip+'</span>'+
       '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
       '<div class="bb"><div style="padding:13px">'+
@@ -2165,9 +2180,11 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
      sin el campo no contaba en la temporada y salía «—», con la fecha escrita al lado. */
   var _fActa=function(d){
     if(d.fecha) return String(d.fecha).slice(0,10);
-    var mt=String(d.tit||'').match(/\b(\d{2}\/\d{2}\/\d{4})\b/);
+    var mt=String(d.tit||'').match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/);   /* 🟡 3 (refutador): «1/7/2026» también */
     return mt ? _dmyAISO_(mt[1]) : '';
   };
+  /* 🟡 3 (refutador): se ordena por la MISMA fecha que se pinta (antes, por `fecha` cruda: las del título, al final). */
+  actas.sort(function(a,b){ return _fActa(b).localeCompare(_fActa(a)); });
   var _tv=_temporadaVigente_(), _nTv=actas.filter(function(d){
     var f=new Date(_fActa(d)+'T12:00:00');
     return !isNaN(f.getTime()) && _temporadaDe_(f)===_tv; }).length;
@@ -3504,7 +3521,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f41225f';
+var BUILD='a34aad6';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
