@@ -347,7 +347,11 @@ function _mesAbiertoVivo_(){
     var h = _hMesReal_(act[i]);
     if(typeof h === 'number' && isFinite(h)) v.push(h);
   }
-  if(!v.length) return null;
+  /* ⛔ 22/10 (auditor 21, 🟠 2): UNA MUESTRA DE UNO NO ES EL EQUIPO. A quien no es PD el servidor le manda el resto sin
+     horas, y aquí su propia cifra salía como «la media del equipo»: el objetivo del mes era distinto para cada uno (PD
+     11,17 · Uxía 10,34 · Xoán 11,72). Con menos de dos, `null`, y el llamador cae al `mesAbierto` del servidor (calculado
+     con todos) — la misma guarda que ya tienen `_umbralDinamico_` (`hs.length<2`) y `_umbralCuota_`. */
+  if(v.length < 2) return null;
   var s = 0;
   for(i = 0; i < v.length; i++) s += v[i];
   return { media: s / v.length, gente: v.length };
@@ -4770,11 +4774,19 @@ function _ahoraApp_(d){
    y quien cubre desde el teléfono no veía nunca cuántas franjas se le exigen. */
 var MESES_MINIMO_BAJO=[1,5,6,7,8,12];
 
+/* El PD del roster cargado (en la maqueta, Lois); `PD_NOM` si no hay ninguno. Para que la semilla no firme con un nombre
+   que no está en su propio roster (auditor 20, 🟡 9). */
+function _pdSemilla_(){
+  var ms = (typeof DATA!=='undefined' && DATA && DATA.miembros) || [];
+  for(var i=0;i<ms.length;i++) if(ms[i] && ms[i].cargo==='Project Director') return ms[i].nombre;
+  return (typeof PD_NOM!=='undefined') ? PD_NOM : '';
+}
+
 function _pctMinimo_(iso){
   var mes=null;
   var m=String(iso||'').match(/^(\d{4})-(\d{2})/);
   if(m) mes=+m[2];
-  if(mes==null) mes=new Date().getMonth()+1;
+  if(mes==null) mes=+String(_ahoraApp_()).slice(5,7);   /* 21/10 (auditor 20, 🟡 5): el reloj de la APP (maqueta: julio) */
   return MESES_MINIMO_BAJO.indexOf(mes)>=0 ? 0.25 : 0.30;
 }
 
@@ -5843,7 +5855,9 @@ function _novedades_(){
         {cara:'escritorio', vista:'panel', txt:'Al **volver** a una pantalla ya visitada se veía la anterior (el Panel de mando con los partes debajo). Arreglado en todas.'},
         {cara:'escritorio', vista:'panel', txt:'El aviso de **fichaje de más de 10 h** del Panel ya sale de los fichajes de verdad (antes salía de uno de ejemplo, y los reales no lo encendían).'},
         {cara:'escritorio', vista:'docdec', txt:'En **Documentos**, «Cerrar» ya sólo sale en la ficha que has desplegado, y un expediente sin resumen ni archivo ya no te manda a «leerlo abajo».'},
-        {cara:'escritorio', vista:'actas', txt:'En **Actas**, un acta con la fecha sólo en el título («… del 17/07/2026») ya cuenta en su temporada y enseña su fecha.'}
+        {cara:'escritorio', vista:'actas', txt:'En **Actas**, un acta con la fecha sólo en el título («… del 17/07/2026») ya cuenta en su temporada y enseña su fecha.'},
+        {cara:'movil', vista:'reu', txt:'Si marcas **menos franjas del mínimo**, la reunión ya no sale «cubierta»: dice **«bajo el mínimo»** y el aviso de la portada sigue (es lo que el motor sanciona).'},
+        {cara:'movil', vista:'horas', txt:'El **objetivo de horas del mes** es ya el mismo para todo el equipo (antes, a cada uno se le calculaba con sus propias horas).'}
       ] },
     { id:'2026-10-21-cerrar-sesion-avisos', fecha:'2026-10-21',
       titulo:'Cerrar sesión deja de mandar tus avisos a ese navegador',

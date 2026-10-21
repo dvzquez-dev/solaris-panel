@@ -131,7 +131,7 @@ function convocarReunionPanel(){
   /* ⚠️ Y el preset arranca por el tipo que ESA persona puede convocar: con `'general'`
      fijo, un raso abría el panel con las 32 marcadas para una reunión de trabajo. */
   if(CONV_INV===null) CONV_INV=new Set(_presetInvitados_(_coord ? 'general' : 'trabajo'));
-  var hoy=new Date(), iso=function(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
+  var hoy=new Date(String(_ahoraApp_()).slice(0,10)+'T12:00:00'), iso=function(d){   /* 🟡 5 (auditor 20): reloj de la app */ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
   var mas=function(d,n){ var x=new Date(d); x.setDate(x.getDate()+n); return iso(x); };
   var subs={}; _activos_().forEach(function(m){ if(m.unidad) subs[m.unidad]=1; });
   var chipsSub=Object.keys(subs).sort().map(function(u){
@@ -416,6 +416,16 @@ function _cablearConvocar_(){
          pintaba, no un valor nuevo. */
       ordenDia:(val('cvOrden')||'').trim(),
       vision:(function(){ var v=$('#cvVision [data-cv].on'); return (v&&v.dataset.cv)||'anonima'; })(), resp:{} };
+    /* 21/10 (auditor 20, 🟡 8): en la MAQUETA local se convoca en memoria (como decide partes), diciendo que no avisa a
+       nadie; fuera de ella, sin conexión no se convoca. */
+    if((!backendOK || !SESION) && _demoLocal_()){
+      reu.id = REUS.reduce(function(m,x){ return Math.max(m, +(x&&x.id)||0); }, 0)+1;
+      reu.creado = _ahoraApp_();
+      REUS.unshift(normReu(reu)); CONV_INV=null; CONV_HOR={};
+      tost('Convocada en la maqueta · '+reu.invitados.length+' convocados, '+bloques.length+
+        ' bloques (sólo en este navegador: no se ha avisado a nadie).');
+      pintar(); return;
+    }
     if(!backendOK || !SESION){ tost('Sin conexión no se puede convocar.'); return; }
     if(!confirm('Convocar «'+reu.titulo+'» a '+reu.invitados.length+' personas.'+
       String.fromCharCode(10,10)+'Les tocará cubrir su disponibilidad, y de no cubrirla '+

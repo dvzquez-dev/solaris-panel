@@ -284,6 +284,20 @@ function _pasosCorregirE_(d){
     _pasosHTML_(ps, 6, 5)+'</div>';
 }
 
+/* Aplica en memoria una decisión de documento (sólo la MAQUETA local; auditor 20, 🟡 8). Campos cortos de esta cara;
+   el móvil tiene su gemela con los largos (`_aplicarDecDoc_`). Pura, para que un banco la ejecute. */
+function _decDocLocalE_(d, acc, mot, tit, actor, at){
+  if(!d) return null;
+  if(acc==='reenviar'){ d.est='revision'; d.nota=''; return d; }
+  if(acc==='deshacer'){ d.est='revision'; d.nota=''; d.revisor=null; d.decision=null; return d; }
+  d.est = (acc==='anot') ? 'aprobado' : acc;
+  if(acc==='anot' && tit) d.tit = tit;
+  d.nota = (acc==='cambios' || acc==='rechazado') ? (mot||'') : '';
+  d.revisor = actor || null;
+  d.decision = {accion:acc, revisor:actor || null, at:at || null};
+  return d;
+}
+
 function docCard(d){
   var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
   var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';

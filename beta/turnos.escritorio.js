@@ -1276,8 +1276,8 @@ function _turnoCerrable_(t, hoy){
 }
 
 function _turnosCerrables_(){
-  var out = [], _d = new Date(),
-      hoy = _d.getFullYear()+'-'+('0'+(_d.getMonth()+1)).slice(-2)+'-'+('0'+_d.getDate()).slice(-2);
+  /* 21/10 (auditor 20, 🟡 5): el reloj de la APP; en real es el mismo día local que antes. */
+  var out = [], hoy = String(_ahoraApp_()).slice(0,10);
   /* ⛔ CLAVES, NO POSICIONES. `escritorio.html` rellena `TURNOS` EN SITIO en sus dos
      cargas (`TURNOS.length=0; t.forEach(push)`), asi que un indice guardado sobrevive al
      refresco apuntando a OTRO turno -- y esto es justo lo que viaja al `value` del

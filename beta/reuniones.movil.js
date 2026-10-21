@@ -65,7 +65,7 @@ function _pendientesCubrirM_(){
   return (REUNIONES_M||[]).filter(function(r){
     /* ⛔ 20/10 (auditoría): Y CON EL PLAZO ABIERTO. Sin fijar y con el plazo ya cerrado, la ficha dice «Ya no se puede
        cubrir» y esto la seguía contando —la primera del aviso y el globo en rojo hasta que alguien la fijara—. */
-    return r && !r.cubierta && !r.exento && !r.fijada &&   // fijada = el plazo ya se cerro
+    return r && (!r.cubierta || r.bajoMin) && !r.exento && !r.fijada &&   // fijada = el plazo ya se cerro; bajoMin: 🔴 1 (auditor 21)
       !(typeof _plazoAbierto_==='function' && !_plazoAbierto_(r.limite));
   }).sort(function(a,b){ return _limMsM_(a)-_limMsM_(b); });
 }
@@ -228,6 +228,17 @@ function _normReuM_(r){
       return inv.indexOf(YO.nombre)>=0 || YO.nombre===r.convocante;   // convocas = es tuya
     })(),
     cubierta: !!(YO && resp[YO.nombre] && resp[YO.nombre].some(function(x){ return +x>0; })),
+    /* ⛔ 22/10 (auditor 21, 🔴 1): `cubierta` es «has marcado algo» (de ahí «Editar mi disponibilidad»), y con eso solo la
+       chapa decía «cubierta» y el aviso de la portada se iba con 2 de 9 franjas — a la persona a la que el motor le encola
+       la sanción (`sanciones.py`: `cubrio_minimo = voto and bloques >= minimo`), mientras el escritorio la nombraba «en
+       riesgo · Art. 29i». La misma puerta que el escritorio: `_avisoMinimo_` con `_minimoExigido_` (y el tipo, que ya
+       calla en las reuniones que no sancionan solas). */
+    bajoMin: (function(){
+      if(!YO || !resp[YO.nombre]) return false;
+      var n = resp[YO.nombre].filter(function(x){ return +x>0; }).length;
+      if(!n || typeof _minimoExigido_!=='function' || typeof _avisoMinimo_!=='function') return false;
+      return _avisoMinimo_(n, _minimoExigido_(r), r.tipo).falta > 0;
+    })(),
     exento: !!(YO && r.convocante && YO.nombre===r.convocante),   // quien convoca ORGANIZA: no cubre su propia encuesta
     _real:true };
 }
@@ -378,8 +389,8 @@ function _proxReuHTML_(){
     '<div class="tarj clic" data-ir="reu" data-reuid="'+esc(String(R.id))+'" data-p>'+
     '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
     '<small>'+cuando+' · '+esc(_modalidadTxt_(R.modalidad).toUpperCase())+'</small></div>'+
-    '<div class="d"><span class="pil '+((R.fijada||R.cubierta||R.exento)?'conf':'pend')+'">'+
-      (R.fijada?'fijada':(R.exento?'organizas':(R.cubierta?'cubierta':'te falta')))+'</span></div></div></div>';
+    '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento)?'conf':'pend')+'">'+
+      (R.fijada?'fijada':(R.exento?'organizas':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div></div>';
 }
 
 /* ⛔ CUANTO DURA LA REUNION, EN UNA SOLA FORMA. Hasta el 09/08 el dato existia (`duracion`)
@@ -617,8 +628,8 @@ function vReu(){
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
       '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+R.nInv+' convocados'+
       _duraTxtM_(R)+'</small></div>'+
-      '<div class="d"><span class="pil '+((R.fijada||R.cubierta||R.exento)?'conf':'no')+'">'+
-        (R.fijada?'fijada':(R.exento?'organizas':(R.cubierta?'cubierta':'te falta')))+'</span></div></div>'+
+      '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento)?'conf':'no')+'">'+
+        (R.fijada?'fijada':(R.exento?'organizas':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div>'+
       (R.fijada
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
           '<b style="color:var(--ok)">📌 Reunión fijada · '+esc(R.fijada)+'</b><br>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</div>'

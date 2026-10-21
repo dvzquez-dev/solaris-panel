@@ -402,6 +402,10 @@ function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
    pero se pasa igual a h/dia: son la misma fila, y dos filas contiguas que miden en unidades
    distintas es como se lee mal un numero correcto. */
 function _compHorasHTML_(base){
+  /* 22/10 (auditor 21, 🟡 4): sin cifra que comparar, no hay comparativa — la misma regla que la fila del mes anterior
+     («si no llega, la fila no se pinta»). Sin el dato vivo y sin nada firmado, aquí salía «vs. equipo −100 %» en rojo:
+     un juicio sobre un dato que falta (el escritorio dice «—»). */
+  if(base == null) return '';
   var f='', d=_diasDelMes_(), dia=Math.max(1, d.dia);
   /* ⛔ LA COMPENSACION BASE NO SE TRABAJA: se cobra por el puesto, es la MISMA todos los
      meses y meterla en bruto mide el cargo en vez del trabajo. Y en los DOS lados o en
@@ -463,7 +467,7 @@ function _compHorasHTML_(base){
      distingue de «+12 %» respecto a un total, y son cosas distintas. */
   return '<div class="comph">'+f+
     '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(_num)+
-    ' h en '+dia+' días'+(_bt==null?'':', sin la compensación base')+   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
+    ' h en '+dia+' días'+(_bt==null?'':', con la compensación de tu cargo repartida hasta hoy')+   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
     '). Se compara el <b>ritmo</b>, no el total: el mes '+
     'en curso va a medias y el anterior está entero.</p></div>';
 }
@@ -525,7 +529,7 @@ function barraHorasHTML(id){
        ⛔ Y no dio ningún error porque el suelo `Math.max(0, …)` —que está para que nadie
        salga en negativo— convirtió un número **imposible** en uno **plausible**.
        ⚠️ El camino sin Notion ya pasaba el crudo, así que con datos de demo esto NO se veía. */
-    _compHorasHTML_(notion ? _hm : cont);
+    _compHorasHTML_(notion ? _hm : (cont > 0 ? cont : null));   /* 🟡 4 (auditor 21): sin dato ni nada firmado, sin comparativa */
 }
 
 function _guardarAnchos_(){ try{ localStorage.setItem('sol_anchos',JSON.stringify(_anchoPrev_)); }catch(_){} }

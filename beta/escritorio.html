@@ -113,14 +113,14 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=4c01ba1"></script>
+<script src="comun.js?v=3bec03a"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
-<script src="turnos.escritorio.js?v=03f760c"></script>
+<script src="turnos.escritorio.js?v=3197a86"></script>
 <script src="buzon.escritorio.js?v=750fdd3"></script>
-<script src="documentos.escritorio.js?v=db56948"></script>
+<script src="documentos.escritorio.js?v=d63da43"></script>
 <script src="sanciones.escritorio.js?v=b2dc300"></script>
-<script src="reuniones.escritorio.js?v=e7761ba"></script>
+<script src="reuniones.escritorio.js?v=c2d54c8"></script>
 <script src="horas.escritorio.js?v=97bc56f"></script>
 <script src="equipo.escritorio.js?v=2434048"></script>
 <script>
@@ -502,10 +502,10 @@ var PARTES=[
   estado:'pend',flags:[['wa','lo firma el coordinador de la unidad → escala']]},
  {id:4,autor:'Noa Pardiñas Quintás',unidad:'Aeroestructuras',fecha:'20/07/2026',ini:'17:00',fin:'19:30',
   horas:2.5,tarea:'Mecanizado de anillos',origen:'turno',just:'Mecanizado y verificación de cotas.',
-  estado:'aprobado',decidido_por:PD_NOM,decidido_at:'2026-07-21T10:00:00Z'},
+  estado:'aprobado',decidido_por:_pdSemilla_(),decidido_at:'2026-07-21T10:00:00Z'},
  {id:5,autor:'Xurxo Ameixeiras Codesal',unidad:'Propulsión',fecha:'19/07/2026',ini:'10:00',fin:'19:00',
   horas:9.0,tarea:'Inventario de propulsante',origen:'bloque',just:'Recuento.',
-  estado:'detalle',decidido_por:PD_NOM,decidido_at:'2026-07-20T10:00:00Z',motivo:'Nueve horas para un recuento: detalla qué se hizo en cada tramo.'}
+  estado:'detalle',decidido_por:_pdSemilla_(),decidido_at:'2026-07-20T10:00:00Z',motivo:'Nueve horas para un recuento: detalla qué se hizo en cada tramo.'}
 ];
 
 
@@ -579,7 +579,7 @@ var APELA=[
 /* ── REUNIONES ─────────────────────────────────────────────────────────── */
 var REUS=[
  {id:1,tit:'Reunión general de fin de temporada',tipo:'general',mod:'telematica',limite:'26/07/2026',
-  conv:18,cubren:14,minimo:4,fijada:null,
+  conv:18,cubren:14,fijada:null,   /* 🟡 6 (auditor 20): sin `minimo`, como en real */
   dias:['L 27','M 28','X 29','J 30','V 31'],
   franjas:['16:00','17:00','18:00','19:00','20:00','21:00','22:00'],
   /* ningun valor puede superar a `cubren`: quien no ha cubierto no puede estar disponible */
@@ -587,10 +587,10 @@ var REUS=[
   sinCubrir:['Xurxo Ameixeiras Codesal','Sabela Ordóñez Pacio','Comba Sarmiento Nogueira'],
   bajoMin:['Uxía Berdiales Randín','Tomé Vilariño Estévez']},
  {id:2,tit:'Junta ordinaria de agosto',tipo:'junta',mod:'hibrida',limite:'02/08/2026',
-  conv:6,cubren:5,minimo:2,fijada:null,dias:['L 03','M 04','X 05'],franjas:['18:00','19:00','20:00'],
+  conv:6,cubren:5,fijada:null,dias:['L 03','M 04','X 05'],franjas:['18:00','19:00','20:00'],
   calor:[[2,4,5],[3,5,4],[1,3,3]],sinCubrir:['Ledicia Amoedo Cambeses'],bajoMin:[]},
  {id:3,tit:'Consejo · cierre de temporada',tipo:'consejo',mod:'presencial',limite:'10/08/2026',
-  conv:10,cubren:10,minimo:3,fijada:'M 11 · 19:00–21:00',dias:['L 10','M 11'],franjas:['18:00','19:00','20:00'],
+  conv:10,cubren:10,fijada:'M 11 · 19:00–21:00',dias:['L 10','M 11'],franjas:['18:00','19:00','20:00'],
   calor:[[5,7,6],[8,10,9]],sinCubrir:[],bajoMin:[]}
 ];
 /* LO OFERTADO Y LOS PLAZOS DE ESTAS TRES TAMBIÉN SE DERIVAN DE HOY (741.ª).
@@ -888,7 +888,9 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
   var EQUIPO=_activos_();
   var conPts=EQUIPO.filter(function(m){return typeof m.puntos==='number';});
   var conH  =EQUIPO.filter(function(m){return typeof m.hMes==='number';});
-  var media=conPts.length?conPts.reduce(function(a,m){return a+m.puntos;},0)/conPts.length:null;
+  /* ⛔ 22/10 (auditor 21, 🟠 3): con UNO no hay «media del equipo» — es tu propia ficha (un coordinador ve sólo la suya)
+     y se leía «media de 1 · 10/10». Con menos de dos, el vacío que ya estaba escrito. */
+  var media=conPts.length>=2?conPts.reduce(function(a,m){return a+m.puntos;},0)/conPts.length:null;
   var totH =conH.reduce(function(a,m){return a+m.hMes;},0);
   /* ⛔⛔ EL RITMO, NO LAS HORAS DE ESTE MES — Y LO DECÍA EL COMENTARIO DE ABAJO.
      La etiqueta de este KPI promete *«media de temporada bajo X h/mes»* y las tres líneas
@@ -937,7 +939,9 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
          en el denominador y el ritmo en el numerador, el porcentaje compararía dos
          conjuntos distintos — y saldría por encima del 100 % en cuanto alguien tenga
          ritmo y no haya fichado este mes. */
-      kpi('Bajo el umbral',bajo,'de '+conR.length+' · media de temporada bajo '+nf2(UMBRAL)+' h/mes','wa',(conR.length?(bajo/conR.length*100).toFixed(0):0)+'%')+
+      (conR.length<2   /* 22/10 (auditor 21, 🟠 3): «0 de 1» era tu propia fila, no el equipo */
+        ? kpi('Bajo el umbral','—','tu cuenta no ve las horas del resto del equipo','','')
+        : kpi('Bajo el umbral',bajo,'de '+conR.length+' · media de temporada bajo '+nf2(UMBRAL)+' h/mes','wa',(bajo/conR.length*100).toFixed(0)+'%'))+
       kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(EQUIPO.length?(infra/EQUIPO.length*100).toFixed(0):0)+'%')+
     '</div>'+
     '<div style="display:grid;grid-template-columns:300px 1fr;gap:13px;align-items:start">'+
@@ -3500,7 +3504,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='3421368';
+var BUILD='f41225f';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4095,7 +4099,9 @@ function _engPartes_(){
         return;
       }
       p.estado = acc==='aprobar'?'aprobado':acc==='rechazar'?'rechazado':'detalle';   // semilla local
-      p.decidido_por=ACTOR; p.decidido_at=new Date().toISOString(); if(mot) p.motivo=mot;
+      /* 21/10 (auditor 20, 🟡 5): con el reloj de la APP — en la maqueta, el 24/07: con el real, «Resueltos este mes» no
+         contaba lo que acababas de aprobar. */
+      p.decidido_por=ACTOR; p.decidido_at=(_demoLocal_() ? _ahoraApp_() : new Date().toISOString()); if(mot) p.motivo=mot;
       card.classList.add('asienta'); tost(okMsg); setTimeout(pintar,420);
     };
   });
@@ -4375,6 +4381,11 @@ function _engDocsDecidir_(){
              se quedaba sin titulo y con el estado en blanco hasta recargar. */
           if(upd){ var i=DOCS.findIndex(function(x){return x.id===d.id;}); if(i>=0) DOCS[i]=_normDocE_(upd,i); }
           tost(_avisoDocTxt_(ETI_DOC[accion]||'Hecho.', upd));   /* 21/10 (auditor 11, 🟡 12) */
+        } else if(_demoLocal_()){
+          /* 21/10 (auditor 20, 🟡 8): la maqueta decide en memoria, como ya hacía con los partes y el móvil con esto. */
+          _decDocLocalE_(d, accion, motivo, titulo, ACTOR, _ahoraApp_());
+          tost(String(ETI_DOC[accion]||'Hecho.').split('. ')[0].replace(/\.$/,'')+
+            ' (maqueta: sólo en este navegador, no se ha publicado nada).');
         } else {
           tost('Sin conexión con el backend: la decisión NO se ha guardado.');
           b.disabled=false; b.textContent=prev; return;
