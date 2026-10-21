@@ -183,9 +183,8 @@ function _prevPuntosLote_(m, x){
 /* ⛔ 21/10 (auditor de sanciones): EL DÍA DE UNA SANCIÓN RESUELTA, como se lee: `decidido_at` (si no, `creado_at`), en
    el día de Madrid (`_ahoraLocalISO_`) y en DD/MM/AAAA. Sin fecha legible, «—». */
 function _diaSancHist_(s){
-  var f = (s && (s.decidido_at || s.creado_at)) || '', d = f ? new Date(String(f)) : null;
-  if(d && !isNaN(+d)) return _isoADMY_(_ahoraLocalISO_(d).slice(0, 10));
-  return /^\d{4}-\d{2}-\d{2}/.test(String(f)) ? _isoADMY_(String(f).slice(0, 10)) : '\u2014';
+  /* 21/10: el día de Madrid sale de la puerta común (`_diaMadridDe_`), la misma que la caducidad de los partes. */
+  return _diaMadridDe_((s && (s.decidido_at || s.creado_at)) || '') || '\u2014';
 }
 
 /* ⛔ 21/10 (auditor de sanciones): QUÉ SUELTAS CABEN EN UN PAQUETE. El servidor no mete dos veces a la misma persona en

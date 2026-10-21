@@ -192,7 +192,7 @@ function insightsHTML(){
     'Mira «Disponibilidad y riesgo» para ver qué sanción implicaría a cada una.']);
   var largos=CURSO.filter(function(c){return c.min>=600;}).length;
   if(largos) xs.push(['wa',largos+' fichaje'+(largos===1?'':'s')+' lleva'+(largos===1?'':'n')+
-    ' más de 10 h abierto. A las 14 h se cierran solos con la hora de la última actividad.']);
+    ' más de 10 h abierto. A las 14 h se cierran solos y quedan sin declarar (caducan a las '+_caducaAutocierreH_()+' h).']);
   return xs.map(function(x){
     return '<div style="display:flex;gap:9px;padding:8px 0;border-top:1px solid rgba(50,44,46,.7);font-size:12.5px;color:var(--ink2);line-height:1.55">'+
       '<span class="'+x[0]+'" style="flex:none;font-family:var(--mono)">'+(x[0]==='up'?'▲':x[0]==='dn'?'▼':'!')+'</span>'+

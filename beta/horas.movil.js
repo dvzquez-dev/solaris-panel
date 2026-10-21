@@ -723,9 +723,10 @@ function vFichar(){
            las pausas. Aquí decía «con la hora de tu última actividad», y al retomar la sesión
            de la nube `s.ult` es la hora de ENTRADA (`_cargarFichajeAbierto_`); y «podrás
            ajustarla antes de enviarla», que no tiene camino: la tarjeta de declarar no deja
-           tocar las horas (`dur = declP.q`). ⚠️ Sin «no cuenta tal cual»: hoy el autocierre
-           nace `pendiente` y SÍ cuenta si lo firman. */
-        'A las <b>14 h</b> se cierra sola con el tope: 14 h desde tu entrada, menos las pausas.</div>':
+           tocar las horas (`dur = declP.q`). ⛔ 21/10 (auditor 8): desde el 09/09 el autocierre nace
+           `sin_declarar` y caduca a las 24 h (aquí decía «nace `pendiente`»), y eso se dice. */
+        'A las <b>14 h</b> se cierra sola con el tope: 14 h desde tu entrada, menos las pausas, y queda <b>sin declarar</b>: '+
+        'decláralo antes de '+_caducaAutocierreH_()+' h.</div>':
         '<p class="rnota">Al fichar salida tendrás que justificar las horas. Tus horas '+_firmaTxtM_(rt)+'.</p>')+
     '</div>';
 
@@ -739,7 +740,7 @@ function vFichar(){
       (function(){ var m=(typeof _avisoMesDelBloque_==='function')
           ? _avisoMesDelBloque_(ST.form.fecha, HOY) : '';
         return m ? '<p class="rnota" style="margin:2px 0 0">Es de otro mes: estas '+
-          'horas contarán en <b>'+esc(m)+'</b>, el mes en curso. Las de un mes ya '+
+          'horas contarán en <b>'+esc(_nomPeriodo_(m))+'</b>, el mes de trabajo en curso. Las de un mes ya '+
           'cerrado no se pueden mover.</p>' : ''; })()+
       /* ⛔ Y SE DICE SI EL RANGO CRUZA MEDIANOCHE. `durForm` ya envuelve
          (`if(d<0) d+=1440`) y no lo dice en ningun sitio: quien se equivoca de casilla
@@ -748,7 +749,7 @@ function vFichar(){
       (function(){ var c=(typeof _cruceNoche_==='function')
           ? _cruceNoche_(ST.form.ini, ST.form.fin) : '';
         if(!c) return '';
-        var e=nf(durForm(),2), r=nf(24-durForm(),2);
+        var e=nf2(durForm()), r=nf2(24-durForm());
         if(c==='noche') return '<p class="rnota" style="margin:2px 0 0">Cruza '+
           'medianoche: cuentan <b>'+e+' h</b>.</p>';
         if(c==='duda') return '<p class="rnota" style="margin:2px 0 0;color:var(--warn)">'+
@@ -766,7 +767,7 @@ function vFichar(){
         '<button data-add="15" data-p>+15 min</button><button data-add="30" data-p>+30 min</button>'+
         '<button data-add="60" data-p>+1 h</button><button data-add="-60" data-p>−1 h</button>'+
       '</div>'+
-      '<div class="durb"><span class="q mono" id="fDurQ">'+nf(durForm(),2)+' h</span>'+
+      '<div class="durb"><span class="q mono" id="fDurQ">'+nf2(durForm())+' h</span>'+
         '<span class="t">de trabajo declarado.<br><span style="color:var(--ink3)">Sin cronómetro se marca '+
         '<b>sin fichaje</b>, y quien lo firme lo verá.</span></span></div>'+
     '</div>';
@@ -781,7 +782,7 @@ function vFichar(){
         /* ⛔ 633.ª LA CADUCIDAD DEL PARTE, NO UN PLAZO CABLEADO: un autocierre caduca a las 24 h,
            y la fila de «Tus partes», a un toque, ya enseña su fecha de verdad (`caduca`).
            Sin ella se queda el texto de siempre. */
-        '<small>'+nf(decl.q,2)+' h · '+esc(decl.f)+(decl.e==='det' ? ' — '+(decl.nota ? 'te piden: '+esc(decl.nota) : 'te piden más detalle')+' · corrige abajo lo que ya mandaste, no empieces de cero.' : ' — elige categoría y justifícalo abajo. '+(decl.caduca ? 'Si no, caduca el '+_isoADMY_((''+decl.caduca).slice(0,10))+'.' : 'Si no, caduca a los 7 días.'))+'</small></div>'+
+        '<small>'+nf2(decl.q)+' h · '+esc(decl.f)+(decl.e==='det' ? ' — '+(decl.nota ? 'te piden: '+esc(decl.nota) : 'te piden más detalle')+' · corrige abajo lo que ya mandaste, no empieces de cero.' : ' — elige categoría y justifícalo abajo. '+(decl.caduca ? 'Si no, caduca el '+_diaMadridDe_(decl.caduca)+'.' : 'Si no, caduca a los 7 días.'))+'</small></div>'+
         '<div class="d"><button class="btn mini" data-canceldecl data-p>Cancelar</button></div></div>'+
         /* ⛔⛔ 633.ª EL AVISO DE DANIEL (09/09): «si fueron 14 h sin querer pero si q trabajaste o
            algo asi q mejor lo declares como bloque dsps en lugar de usar los de 14». Sin él,
@@ -968,7 +969,7 @@ function validarFichaje(){
        falta es el rango. Eso solo lo sabe el llamador -- depende del modo de la pantalla,
        no de la duracion --, asi que no puede vivir dentro de la puerta. */
     var _faltaDur = _pgM==='largo'
-      ? ('Son más de '+nf(_topeH,2)+' h: un parte no puede pasar de ahí')
+      ? ('Son más de '+nf2(_topeH)+' h: un parte no puede pasar de ahí')
       : _pgM==='corto'
         ? 'Ese bloque es demasiado corto: las horas van en cuartos y menos de 8 min es cero'
         : _pgM==='sin'
@@ -976,7 +977,7 @@ function validarFichaje(){
                     : 'Todavía no hay ninguna sesión que declarar')
           : (_pgM==='cero' ? 'La salida tiene que ser posterior a la entrada'
                            : 'Falta la duración');
-    if(l) l.textContent = todo ? ('Enviar '+nf(dur,2)+' h a aprobación')
+    if(l) l.textContent = todo ? ('Enviar '+nf2(dur)+' h a aprobación')
       : (!n1?_faltaDur:(!n2?'Falta a qué imputarlas':'Falta la justificación'));
   }
   return todo;
@@ -1249,7 +1250,7 @@ function filaParte(p){
           /* ⛔ 633.ª UN AUTOCIERRE SE DICE EN LA LISTA, ANTES DE PULSAR «Declarar»: la tarjeta
              con el aviso sólo existe después del toque, y es aquí donde se decide. El
              criterio NO se copia: sale de `_avisoAutocierre_`, la puerta de las dos caras. */
-          : p.e==='sindecl' ? ((_avisoAutocierre_(p)?'autocerrado al tope · ':'')+p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · caduca '+_isoADMY_((''+p.caduca).slice(0,10)):''))
+          : p.e==='sindecl' ? ((_avisoAutocierre_(p)?'autocerrado al tope · ':'')+p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · caduca '+_diaMadridDe_(p.caduca):''))
           : (p.f+(p.ini?' · '+p.ini+'–'+p.fin:''));
   /* ⛔⛔ 635.ª LO QUE YA CUENTA DICE CUÁNDO, QUIÉN Y A QUÉ MES (Daniel, 15/08: «que te diga
      aprobado esta fecha y por quien fue aprobado … una etiqueta de este mes»). El texto NO se
@@ -1951,7 +1952,8 @@ function _pdRevFichaHTML_(p){
   return cab+
         '<span class="pdw">'+(enFicha
           ? 'Ya sumadas: revertir le RESTA '+nf2(p.q)+' h de su ficha'
-          : 'Aun no cuenta: revertir lo devuelve a la cola')+'</span>'+
+          : (p.estado==='otorgada' ? 'Aun no cuenta: revertir ANULA estas horas otorgadas'   /* 21/10, auditor 8 🟡 12 */
+            : 'Aun no cuenta: revertir lo devuelve a la cola'))+'</span>'+
         '<input class="pdrm" type="text" placeholder="Motivo — obligatorio (al menos 8 letras)">'+
         '<div class="pdb"><button data-pdrev="1" class="no" data-p>Revertir</button></div>'+
       '</div>';
@@ -1991,7 +1993,8 @@ function _engPartesRev_(){
          contaban». Quien lo lea se cree el último — y decide con el número equivocado. */
       if(!confirm('Revertir este parte.\n\n'+(_yaCuentaEnSuMes_(p)
         ? 'Las horas YA cuentan: se emitira un apunte que se las resta de su ficha.'
-        : 'Todavía no contaban: vuelve a la cola de decisión.')+'\n\n¿Sigo?')) return;
+        : (p.estado==='otorgada' ? 'Todavía no contaban: se ANULAN estas horas otorgadas.'
+          : 'Todavía no contaban: vuelve a la cola de decisión.'))+'\n\n¿Sigo?')) return;
       $$('#prev [data-pdrev]').forEach(function(x){ x.disabled=true; });
       var prev=b.textContent; b.textContent='…';
       try{

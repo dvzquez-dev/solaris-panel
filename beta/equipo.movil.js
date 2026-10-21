@@ -85,7 +85,7 @@ function _avisosQueTeTocanM_(){
     return p && (!p.autor || p.autor===yo); }) : [];
   var sd=mios.filter(function(p){ return p.e==='sindecl'; }).length, dt=mios.filter(function(p){ return p.e==='det'; }).length;
   if(sd) h+=uno('horas', sd===1 ? 'Un fichaje tuyo sin declarar' : (sd+' fichajes tuyos sin declarar'),
-    'Caducan a los 7 días y se pierden: decláralos en Horas.', true);
+    'Caducan a los 7 días (a las '+_caducaAutocierreH_()+' h si se cerraron solos a las '+_maxHorasParte_()+' h) y se pierden: decláralos en Horas.', true);
   if(dt) h+=uno('horas', dt===1 ? 'Te piden detalle de un parte' : ('Te piden detalle de '+dt+' partes'),
     'Hasta que lo des no se firma.');
   var rev=(typeof _docsPend_==='function') ? (_docsPend_()||[]).length : 0;

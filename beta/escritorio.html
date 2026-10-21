@@ -113,16 +113,16 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=aa4c8d1"></script>
+<script src="comun.js?v=2ae2b8c"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=045e199"></script>
 <script src="turnos.escritorio.js?v=f52ae87"></script>
 <script src="buzon.escritorio.js?v=b1da392"></script>
 <script src="documentos.escritorio.js?v=e72bdea"></script>
-<script src="sanciones.escritorio.js?v=e1ccc20"></script>
+<script src="sanciones.escritorio.js?v=948b2a9"></script>
 <script src="reuniones.escritorio.js?v=37c95de"></script>
-<script src="horas.escritorio.js?v=c165f82"></script>
-<script src="equipo.escritorio.js?v=57493e0"></script>
+<script src="horas.escritorio.js?v=0e8c72e"></script>
+<script src="equipo.escritorio.js?v=3059f0f"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -373,6 +373,7 @@ var api={
   getNovedadesVistas: function(){ return api._post({action:"getNovedadesVistas"}); },
   marcarNovedadVista: function(id,visto){ return api._post({action:"marcarNovedadVista",id:id,visto:!!visto}); },
   getControl:  function(){ return api._post({action:"getControl"}); },
+  getEstadoAutomatismos: function(){ return api._post({action:"getEstadoAutomatismos"}); },
   /* ⛔ LAS CINCO DEL FICHAJE, QUE ESTA CARA NO TENIA. `getFichajesAbiertos` (la de
      abajo) sirve las sesiones de LOS DEMAS y esta gateada a rango >= 3; estas cinco son
      las TUYAS y no llevan gate de rol: el que gobierna tambien es miembro. GEMELAS byte
@@ -702,7 +703,10 @@ var ACX=75,ACY=75,AR=52,AGAP=8,ASTEP=36;
 /* ═══ EL INVENTARIO DE AUTOMATISMOS, DENTRO DE LA APP (638.ª) · GEMELA (movil/escritorio) ═══
    `AUTOMATISMOS` lo sella `rutinas/sellar_automatismos.py` al publicar y lo pinta
    `_automatismosHTML_` (comun.js). No se escribe a mano; `null` es «no se selló». */
-/*AUTOMATISMOS_INI*/var AUTOMATISMOS={"arreglan": [{"arregla": "", "con_orden": true, "nombre": "referencias del mapa", "que": "las líneas que el mapa funcional cita de cada función"}, {"arregla": "se re-anclan a mano (nunca se borran)", "con_orden": false, "nombre": "anclas de las mutaciones", "que": "que cada mutación siga encontrando su sitio"}, {"arregla": "", "con_orden": true, "nombre": "orden de las tablas de mutación", "que": "que cada `TABLAS[x] += [...]` vaya detrás de su `= [`"}], "comprobacion": [{"desviado": false, "linea": "referencias corregidas: 0", "nombre": "referencias del mapa"}, {"desviado": false, "linea": "0 con el ancla rota", "nombre": "anclas de las mutaciones"}, {"desviado": false, "linea": "= todos los `+=` ya van", "nombre": "orden de las tablas de mutación"}], "flujos": [{"escribe_fuera": "", "nombre": "estado", "que": "Cómo está el equipo: evaluación, sorteo, punto mensual, carga"}, {"escribe_fuera": "", "nombre": "tareas", "que": "Espejo de los Kanban de tareas de Notion"}, {"escribe_fuera": "", "nombre": "turno", "que": "Genera el anuncio de turno para Discord / parsea pegados"}, {"escribe_fuera": "", "nombre": "cuotas", "que": "Cuota final por persona: curva + descuento por conducir"}, {"escribe_fuera": "", "nombre": "contador turnos", "que": "Turnos de cada persona para el contador de Notion (propone, no escribe)"}, {"escribe_fuera": "", "nombre": "reunion", "que": "Las mejores horas para quedar, para que elijas tú"}, {"escribe_fuera": "", "nombre": "alta", "que": "Alta y baja de un miembro, con la lista de todos los sitios"}, {"escribe_fuera": "", "nombre": "tendencias", "que": "Quién se está apagando: participación por persona"}, {"escribe_fuera": "", "nombre": "analiticas", "que": "Participación histórica en las encuestas de disponibilidad"}, {"escribe_fuera": "", "nombre": "volcado", "que": "Notion → panel.json (recalcula la carga)"}, {"escribe_fuera": "", "nombre": "sanciones", "que": "Calcula las sanciones de una encuesta y saca el Excel"}, {"escribe_fuera": "escribe en Discord", "nombre": "publicar", "que": "Redacta y manda el mensaje"}, {"escribe_fuera": "", "nombre": "cierre", "que": "Calcula el cierre de mes (no aplica nada)"}, {"escribe_fuera": "", "nombre": "plazas", "que": "Reparte plazas de competición: roles a dedo + escalera"}, {"escribe_fuera": "", "nombre": "proyectar", "que": "Qué celdas de puntos del Drive no cuadran con Notion"}, {"escribe_fuera": "", "nombre": "libro", "que": "Genera el Registro mensual en xlsx"}, {"escribe_fuera": "", "nombre": "limpiar panel", "que": "Quien sale del Panel de Rendimientos al cerrar la temporada (propone, no toca Notion)"}, {"escribe_fuera": "", "nombre": "encuestas", "que": "Reconstruye catálogo, enlaces y base de datos"}, {"escribe_fuera": "escribe en el backend", "nombre": "push", "que": "Arma el panel desde el motor y lo sube al backend (--tareas/--turnos aparte)"}, {"escribe_fuera": "escribe en el backend", "nombre": "subir coordina", "que": "Sube al panel SOLO `coordina` (quien coordina que): la puerta estrecha, en seco por defecto"}, {"escribe_fuera": "escribe en el backend", "nombre": "push entregable", "que": "Empuja UN expediente documental a la pantalla Documentos, en seco por defecto (del almacen no se puede borrar)"}, {"escribe_fuera": "llama a push_entregable", "nombre": "acta a expediente", "que": "De un acta generada al expediente documental: deriva el organo del tipo de la reunion, rechaza el marcador 63xx y entra en revision. En seco por defecto"}, {"escribe_fuera": "", "nombre": "temporada", "que": "Cierre de TEMPORADA (sep→ago). No escribe en ningún sitio"}, {"escribe_fuera": "escribe en el backend con --subir", "nombre": "umbral", "que": "Umbral de la temporada, y deja sus ingredientes en el panel"}, {"escribe_fuera": "escribe en el Drive", "nombre": "historico", "que": "Sube el bloque de un mes al histórico de Drive (--ensayo no sube)"}, {"escribe_fuera": "", "nombre": "espejo historico", "que": "Trae el histórico del Registro de Drive al espejo local (--ensayo no escribe)"}, {"escribe_fuera": "", "nombre": "identidad", "que": "Quién es quién: nombre ↔ page-id de Notion ↔ correo"}, {"escribe_fuera": "escribe en Discord con --real", "nombre": "comunicar", "que": "Emisor genérico del comunicado de sanciones, con el formato bueno"}, {"escribe_fuera": "empuja las sanciones al backend", "nombre": "construir reunion", "que": "Monta el bloque entero de sanciones de una reunión vencida"}, {"escribe_fuera": "", "nombre": "reunion a votos", "que": "Adaptador: de una reunión de la app a los votos que come `sanciones`"}, {"escribe_fuera": "", "nombre": "refrescar roster", "que": "Refresca equipo.json desde el Panel de Rendimientos"}, {"escribe_fuera": "publica la app con --subir", "nombre": "publicar web", "que": "Publica la app en GitHub Pages por la API de Contents"}, {"escribe_fuera": "", "nombre": "wheel", "que": "Genera el `.wheel` de Wheel of Names con el equipo y los pesos de ahora"}, {"escribe_fuera": "", "nombre": "horas temporada", "que": "Deriva `horas_temporada.json` del histórico (base de la cuota y el ranking)"}], "gate": [{"con_interruptor": false, "interruptor_en": "", "modelo": "", "nombre": "construir", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar horas", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "calcular cierre", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "calcular convocatoria", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "publicar automatismos", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar cierre", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "calcular temporada", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar temporada", "siempre": false, "tipo": "py"}, {"con_interruptor": false, "interruptor_en": "", "modelo": "", "nombre": "cerrar fichajes", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "interruptor_en": "", "modelo": "", "nombre": "caducar partes", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "interruptor_en": "", "modelo": "", "nombre": "refrescar panel", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "interruptor_en": "Turnos", "modelo": "", "nombre": "avisar convocatoria", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "convocar semana", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "avisar reunion", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "avisar turno", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "actividad", "siempre": false, "tipo": "py"}, {"con_interruptor": false, "interruptor_en": "", "modelo": "", "nombre": "triaje", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "", "nombre": "tanda", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "opus", "nombre": "tanda trabajo", "siempre": false, "tipo": "ia"}, {"con_interruptor": false, "interruptor_en": "", "modelo": "", "nombre": "reunion a notion", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "sonnet", "nombre": "triar buzon", "siempre": false, "tipo": "ia"}, {"con_interruptor": true, "interruptor_en": "", "modelo": "opus", "nombre": "construir buzon", "siempre": false, "tipo": "ia"}], "generado": "2026-10-21T03:04", "plantan": [{"evento": "PostToolUse", "nombre": "contexto hook"}, {"evento": "PostToolUse", "nombre": "mapa hook"}]};/*AUTOMATISMOS_FIN*/
+/*AUTOMATISMOS_INI*/var AUTOMATISMOS={"arreglan": [{"arregla": "", "con_orden": true, "nombre": "referencias del mapa", "que": "las líneas que el mapa funcional cita de cada función"}, {"arregla": "se re-anclan a mano (nunca se borran)", "con_orden": false, "nombre": "anclas de las mutaciones", "que": "que cada mutación siga encontrando su sitio"}, {"arregla": "", "con_orden": true, "nombre": "orden de las tablas de mutación", "que": "que cada `TABLAS[x] += [...]` vaya detrás de su `= [`"}], "comprobacion": [{"desviado": false, "linea": "referencias corregidas: 0", "nombre": "referencias del mapa"}, {"desviado": false, "linea": "0 con el ancla rota", "nombre": "anclas de las mutaciones"}, {"desviado": false, "linea": "= todos los `+=` ya van", "nombre": "orden de las tablas de mutación"}], "flujos": [{"escribe_fuera": "", "nombre": "estado", "que": "Cómo está el equipo: evaluación, sorteo, punto mensual, carga"}, {"escribe_fuera": "", "nombre": "tareas", "que": "Espejo de los Kanban de tareas de Notion"}, {"escribe_fuera": "", "nombre": "turno", "que": "Genera el anuncio de turno para Discord / parsea pegados"}, {"escribe_fuera": "", "nombre": "cuotas", "que": "Cuota final por persona: curva + descuento por conducir"}, {"escribe_fuera": "", "nombre": "contador turnos", "que": "Turnos de cada persona para el contador de Notion (propone, no escribe)"}, {"escribe_fuera": "", "nombre": "reunion", "que": "Las mejores horas para quedar, para que elijas tú"}, {"escribe_fuera": "", "nombre": "alta", "que": "Alta y baja de un miembro, con la lista de todos los sitios"}, {"escribe_fuera": "", "nombre": "tendencias", "que": "Quién se está apagando: participación por persona"}, {"escribe_fuera": "", "nombre": "analiticas", "que": "Participación histórica en las encuestas de disponibilidad"}, {"escribe_fuera": "", "nombre": "volcado", "que": "Notion → panel.json (recalcula la carga)"}, {"escribe_fuera": "", "nombre": "sanciones", "que": "Calcula las sanciones de una encuesta y saca el Excel"}, {"escribe_fuera": "escribe en Discord", "nombre": "publicar", "que": "Redacta y manda el mensaje"}, {"escribe_fuera": "", "nombre": "cierre", "que": "Calcula el cierre de mes (no aplica nada)"}, {"escribe_fuera": "", "nombre": "plazas", "que": "Reparte plazas de competición: roles a dedo + escalera"}, {"escribe_fuera": "", "nombre": "proyectar", "que": "Qué celdas de puntos del Drive no cuadran con Notion"}, {"escribe_fuera": "", "nombre": "libro", "que": "Genera el Registro mensual en xlsx"}, {"escribe_fuera": "", "nombre": "limpiar panel", "que": "Quien sale del Panel de Rendimientos al cerrar la temporada (propone, no toca Notion)"}, {"escribe_fuera": "", "nombre": "encuestas", "que": "Reconstruye catálogo, enlaces y base de datos"}, {"escribe_fuera": "escribe en el backend", "nombre": "push", "que": "Arma el panel desde el motor y lo sube al backend (--tareas/--turnos aparte)"}, {"escribe_fuera": "escribe en el backend", "nombre": "subir coordina", "que": "Sube al panel SOLO `coordina` (quien coordina que): la puerta estrecha, en seco por defecto"}, {"escribe_fuera": "escribe en el backend", "nombre": "push entregable", "que": "Empuja UN expediente documental a la pantalla Documentos, en seco por defecto (del almacen no se puede borrar)"}, {"escribe_fuera": "llama a push_entregable", "nombre": "acta a expediente", "que": "De un acta generada al expediente documental: deriva el organo del tipo de la reunion, rechaza el marcador 63xx y entra en revision. En seco por defecto"}, {"escribe_fuera": "", "nombre": "temporada", "que": "Cierre de TEMPORADA (sep→ago). No escribe en ningún sitio"}, {"escribe_fuera": "escribe en el backend con --subir", "nombre": "umbral", "que": "Umbral de la temporada, y deja sus ingredientes en el panel"}, {"escribe_fuera": "escribe en el Drive", "nombre": "historico", "que": "Sube el bloque de un mes al histórico de Drive (--ensayo no sube)"}, {"escribe_fuera": "", "nombre": "espejo historico", "que": "Trae el histórico del Registro de Drive al espejo local (--ensayo no escribe)"}, {"escribe_fuera": "", "nombre": "identidad", "que": "Quién es quién: nombre ↔ page-id de Notion ↔ correo"}, {"escribe_fuera": "escribe en Discord con --real", "nombre": "comunicar", "que": "Emisor genérico del comunicado de sanciones, con el formato bueno"}, {"escribe_fuera": "empuja las sanciones al backend", "nombre": "construir reunion", "que": "Monta el bloque entero de sanciones de una reunión vencida"}, {"escribe_fuera": "", "nombre": "reunion a votos", "que": "Adaptador: de una reunión de la app a los votos que come `sanciones`"}, {"escribe_fuera": "", "nombre": "refrescar roster", "que": "Refresca equipo.json desde el Panel de Rendimientos"}, {"escribe_fuera": "publica la app con --subir", "nombre": "publicar web", "que": "Publica la app en GitHub Pages por la API de Contents"}, {"escribe_fuera": "", "nombre": "wheel", "que": "Genera el `.wheel` de Wheel of Names con el equipo y los pesos de ahora"}, {"escribe_fuera": "", "nombre": "horas temporada", "que": "Deriva `horas_temporada.json` del histórico (base de la cuota y el ranking)"}], "gate": [{"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "construir", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar horas", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "calcular cierre", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "calcular convocatoria", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "publicar automatismos", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar cierre", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "calcular temporada", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar temporada", "siempre": false, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "cerrar fichajes", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "caducar partes", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "refrescar panel", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "Turnos", "modelo": "", "nombre": "avisar convocatoria", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "convocar semana", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "avisar reunion", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "avisar turno", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "actividad", "siempre": false, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "triaje", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "tanda", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "opus", "nombre": "tanda trabajo", "siempre": false, "tipo": "ia"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "reunion a notion", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "sonnet", "nombre": "triar buzon", "siempre": false, "tipo": "ia"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "opus", "nombre": "construir buzon", "siempre": false, "tipo": "ia"}], "generado": "2026-10-21T04:11", "plantan": [{"evento": "PostToolUse", "nombre": "contexto hook"}, {"evento": "PostToolUse", "nombre": "mapa hook"}]};/*AUTOMATISMOS_FIN*/
+/* 21/10: el ESTADO de cada interruptor, {nombre legible: true|false|null}, del servidor (`getEstadoAutomatismos`); `null`
+   = no se ha preguntado. La clave del flag no viaja: se cruza por el nombre de la rutina. */
+var AUTO_ESTADO=null;
 /* ═══ EL CHANGELOG, DENTRO DE LA APP · GEMELA (movil/escritorio) ═══════════════════
    `CHANGELOG_MD` lo rellena `rutinas/sellar_changelog.py` desde `docs/changelog.md`, antes de
    publicar. **No se escribe a mano aqui**: la CSP obliga a que cada cara sea autocontenida, asi
@@ -1050,8 +1054,10 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
         '<select style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
         /* ⛔ 20/10 (auditoría): a quien el servidor DEJA otorgar — nunca a uno mismo, y un coordinador sólo a su
            unidad (el PD, a cualquiera). Ofrecer al resto era un error del servidor esperando a que lo eligieras. */
+        /* ⛔ 21/10 (auditor 8, 🟠 3): y por la MISMA puerta que decidir (`puedeDecidirParte`): «misma unidad» le
+           ofrecía al subcoordinador su unidad entera, y el servidor sólo deja al coordinador de ESA unidad. */
         _activos_().filter(function(m){ return m.nombre!==ACTOR &&
-          (rangoNom(ACTOR)>=3 || m.unidad===((_m(ACTOR)||{}).unidad||'')); })
+          puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, ACTOR); })
           .map(function(m){return '<option>'+esc(m.nombre)+'</option>';}).join('')+'</select></label>'+
         '<label style="width:110px"><span class="sc" style="display:block;margin-bottom:5px">Horas</span>'+
         '<input class="mono" value="3,0" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-family:var(--mono);font-size:12.5px"></label>'+
@@ -1068,9 +1074,11 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
     pan('Histórico',hist.length+' decisiones',
       hist.length?hist.map(function(p){ return _escHistFilaHTML_(p, _perH, _ucH); }).join(''):vacioSimple('Todavía no hay decisiones','Cada parte que apruebes, devuelvas o rechaces queda aquí '+
         'con su motivo y con quién lo firmó.'))+
+    /* ⛔ 21/10 (auditor 8, 🟡 15): lo que hacen `revisoresDeParte` y el servidor — sin «revisor fijo» (el rango 2 es
+       documental: en horas no firma) y con la excepción del PD, que sí firma lo suyo (Daniel, 15/08). */
     '<div class="pan"><div class="nota">Un parte lo firma el <b>coordinador de la unidad de quien lo declara</b>. '+
-      'Si el autor es ese coordinador, pasa al revisor de más rango: primero el Project Director, luego el '+
-      'revisor fijo. <b>Nadie firma sus propias horas.</b></div></div>';
+      'Si el autor es ese coordinador, lo firma el <b>Project Director</b>. Nadie más firma sus propias horas: '+
+      'sólo el Project Director, que no tiene a nadie por encima.</div></div>';
 }};
 V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
   var sd=PARTES.filter(function(p){return p.estado==='sindecl';});
@@ -1087,7 +1095,7 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
         return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+h1(p.horas)+'</b>'+
           '<small>'+esc(p.unidad)+' · '+p.fecha+(p.ini!=='—'?' · '+p.ini+'–'+p.fin:'')+'</small></span>'+
           '<span class="der"><span class="chip wa">sin declarar</span></span></div>';
-      }).join(''):vacioSimple('Nada sin declarar','Cuando alguien fiche salida sin justificar aparece aquí, hasta que lo declare o caduque (7 días).'),'destaca')+
+      }).join(''):vacioSimple('Nada sin declarar','Cuando fiches salida sin justificar aparecerá aquí, hasta que lo declares o caduque (7 días; '+_caducaAutocierreH_()+' h si se cerró solo a las '+_maxHorasParte_()+' h).'),'destaca')+
     (cad.length?pan('Caducados',cad.length+' · se perdieron sin declarar',
       cad.map(function(p){
         return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+h1(p.horas)+'</b>'+
@@ -1096,7 +1104,7 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
     '<div class="pan"><div class="nota">Un fichaje <b>sin declarar</b> es una salida que se cerró sin categoría ni justificación. '+
       'No entra en la cola de nadie: solo su autor puede declararlo —en <b>«Lo tuyo»</b> o desde el móvil—, '+
       'y a los <b>7 días</b> '+
-      'caduca, con un aviso 24 h antes. '+
+      'caduca, con un aviso 24 h antes — o a las <b>'+_caducaAutocierreH_()+' h</b> si se cerró solo al llegar a las '+_maxHorasParte_()+' h. '+
       '<b>Y aquí solo salen los TUYOS</b>: el servidor no sirve los fichajes sin declarar de otras personas, ni siquiera al Project Director. Lo que ves no es la lista del equipo.</div></div>';
 }};
 
@@ -1133,14 +1141,19 @@ function _cursoCargar_(repintar){
     CURSO.length=0;
     if(Array.isArray(a)) a.forEach(function(x){ CURSO.push(x); });
     if(typeof repintar==='function') repintar();
-  }).catch(function(){
-    CURSO_SRV='error'; CURSO.length=0;
+  }).catch(function(e){
+    /* ⛔ 21/10 (auditor 8, 🟡 9): «solo el PD» NO es una avería. `getFichajesAbiertos` es del PD (por el token, no por
+       «Actúas como»), y a un coordinador se le pintaba «No se pudo preguntar al servidor». */
+    CURSO_SRV=/solo el (PD|Project Director)/i.test(String((e&&e.message)||e||'')) ? 'vedado' : 'error'; CURSO.length=0;
     if(typeof repintar==='function') repintar();
   });
 }
 
 V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
   _cursoCargar_(typeof pintar==='function'?pintar:null);
+  if(CURSO_SRV==='vedado') return pan('Sesiones abiertas ahora mismo','del Project Director',
+    vacioSimple('Esta lista es del Project Director','Quién está fichado ahora mismo sólo lo ve el Project Director; '+
+      'tus fichajes están en «Lo tuyo».'));
   if(CURSO_SRV==='error') return pan('Sesiones abiertas ahora mismo','sin datos',
     vacioSimple('No se pudo preguntar al servidor','Se dice en vez de enseñar una lista vieja: '+
       'alguien que cerró hace horas seguiría saliendo como fichado.'));
@@ -1164,8 +1177,8 @@ V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
     }).join(''):vacioSimple('Nadie fichado ahora mismo','Cuando alguien fiche entrada aparece aquí, con su '+
       'unidad y cuánto lleva abierto.'))+
     '<div class="nota">Un fichaje que pasa de <b>10 horas abiertas</b> se marca en ámbar. A las '+
-    '<b>14 h</b> se cierra solo con la hora de su última actividad y le queda pendiente de '+
-    'corregir. Las <b>pausas ya están descontadas</b>.</div>');
+    '<b>14 h</b> se cierra solo (14 h desde la entrada, menos las pausas) y le queda <b>sin declarar</b>: caduca a '+
+    'las '+_caducaAutocierreH_()+' h si no lo declara. Las <b>pausas ya están descontadas</b>.</div>');
 }};
 
 /* ── REGISTRO DEL MES ────────────────────────────────────────────────────── */
@@ -3382,7 +3395,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7e01498';
+var BUILD='27b0dc5';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4456,6 +4469,8 @@ function _automatismosKV_(repintar){
   F.vuelo=true;
   Promise.resolve().then(function(){ return api.getDatos('automatismos'); })
     .then(function(r){ var v=r && r.valor; if(_automatismosNuevo_(v)){ AUTOMATISMOS=v; if(typeof repintar==='function') repintar(); } })
+    .then(function(){ return api.getEstadoAutomatismos(); })
+    .then(function(e){ if(e && typeof e==='object'){ AUTO_ESTADO=e; if(typeof repintar==='function') repintar(); } })
     .catch(function(){})
     .then(function(){ F.vuelo=false; F.t=Date.now(); });
 }

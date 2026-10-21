@@ -1776,10 +1776,26 @@ function _apiParse(txt, accion){
    contabiliza de otra, que es como se firma una cosa creyendo otra.
    ✅ Devuelve el aviso cuando la fecha escrita cae en un mes distinto del actual, y '' cuando
    no hay nada que avisar. */
-function _avisoMesDelBloque_(fechaDMY, hoyDMY){
+function _avisoMesDelBloque_(fechaDMY, hoyDMY, uc){
   var f = _dmyAISO_(String(fechaDMY || ''));
   var h = _dmyAISO_(String(hoyDMY || ''));
   if(!/^\d{4}-\d{2}/.test(f) || !/^\d{4}-\d{2}/.test(h)) return '';
+  /* ⛔ 21/10 (auditor 8, 🟠 1): EL MES DE TRABAJO VA DE CIERRE A CIERRE (ARRANQUE §2b), no del 1 al 31. Con el último
+     cierre a mano (`uc`, o el de la cara: `CIERRE_UC` en el móvil, `CIERRE.ultimo_cierre` en el escritorio), un bloque
+     cuenta en el mes abierto y sólo es «de otro mes» si su fecha cae ANTES del cierre (su mes ya se cerró) o en un mes
+     de calendario POSTERIOR al de hoy. Con el calendario, un bloque del 30/10 declarado el 03/11 con octubre abierto
+     decía «contarán en 2026-11» cuando el servidor (`periodo_en`) y el sello de la propia cara lo cuentan en octubre.
+     Sin cierre conocido se queda lo de antes (el calendario): no lo sé no es un aviso nuevo. */
+  if(uc === undefined) uc = (typeof CIERRE_UC !== 'undefined' && CIERRE_UC) ? CIERRE_UC
+       : ((typeof CIERRE !== 'undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
+  var ab = (uc && /^\d{4}-\d{2}$/.test(String(uc.periodo || ''))) ? _mesSiguiente_(uc.periodo) : null;
+  var at = (uc && uc.at) ? new Date(uc.at) : null;
+  if(ab && at && !isNaN(at.getTime())){
+    var _2 = function(n){ return (n < 10 ? '0' : '') + n; };
+    var corte = at.getFullYear() + '-' + _2(at.getMonth() + 1) + '-' + _2(at.getDate());
+    if(f.slice(0,10) < corte) return ab;
+    return f.slice(0,7) > h.slice(0,7) ? ab : '';
+  }
   return f.slice(0,7) === h.slice(0,7) ? '' : h.slice(0,7);
 }
 
@@ -3276,7 +3292,8 @@ function _automatismosHTML_(){
       if(fams[k][0]==='gate'){
         /* 21/10 (auditor 7, 🟠 5): «siempre» de algo que manda según un control de otra pantalla era falso. */
         t=(x.siempre ? (x.interruptor_en ? 'cada pasada, pero sólo manda si está encendido su interruptor de '+
-            esc(x.interruptor_en) : 'siempre') : (x.con_interruptor ? 'si su interruptor está encendido' : 'sin interruptor'))+
+            esc(x.interruptor_en) : 'siempre') : (x.con_interruptor ? (x.encargo
+              ? 'cuando se le encarga (una vez; se apaga sola al acabar)' : 'si su interruptor está encendido') : 'sin interruptor'))+
           (x.tipo==='ia' ? ' · ⚠ llama a un modelo ('+esc(x.modelo||'sin decir cuál')+')' : '');
       } else if(fams[k][0]==='arreglan'){
         t=esc(x.que)+' · '+(x.con_orden ? 'tiene una orden que lo arregla' : esc(x.arregla||'sin decir cómo'));
@@ -3285,6 +3302,10 @@ function _automatismosHTML_(){
       } else {
         t=esc(x.que||'(sin describir)')+(x.escribe_fuera ? ' · ⚠ '+esc(x.escribe_fuera) : '');
       }
+      /* 21/10: y si el servidor lo dijo, en qué estado está AHORA (`AUTO_ESTADO`, sólo el escritorio lo pregunta). */
+      if(fams[k][0]==='gate' && x.con_interruptor && typeof AUTO_ESTADO==='object' && AUTO_ESTADO &&
+         Object.prototype.hasOwnProperty.call(AUTO_ESTADO, x.nombre))
+        t+=' · '+(AUTO_ESTADO[x.nombre]===true ? '<b>encendido ahora</b>' : (AUTO_ESTADO[x.nombre]===false ? 'apagado ahora' : 'no consta'));
       h+='<li data-fam="'+fams[k][0]+'"><b>'+esc(x.nombre)+'</b> — '+t+'</li>';
     }
     h+='</ul>';
@@ -5452,6 +5473,32 @@ function _etiOrigenParte_(p){
    `function`: las capacidades no se llevan sus globales. */
 function _maxHorasParte_(){ return 14; }
 
+/* ⛔ 21/10 (auditor 8, 🟡 7): un fichaje que se CIERRA SOLO al tope caduca a las 24 h, no a los 7 días
+   (`CADUCA_AUTOCIERRE_H` de `Codigo.gs`, que lee el servidor; decisión de Daniel del 09/09). Una puerta, para no
+   teclear el 24 en cada rótulo. */
+function _caducaAutocierreH_(){ return 24; }
+
+/* ⛔ 21/10 (auditor 8, 🟡 14): EL DÍA DE MADRID DE UN INSTANTE, en DD/MM/AAAA. `caduca_at` viaja en UTC, y recortarlo
+   (`.slice(0,10)`) da el día ANTERIOR a un fichaje cerrado pasada la medianoche de Madrid (en verano, hasta las 02:00).
+   Mismo reloj que `_ahoraLocalISO_` (Madrid por `Intl`); sin instante legible, el recorte de siempre. */
+function _diaMadridDe_(iso){
+  var s = String(iso || ''), d = new Date(s);
+  if(!isNaN(d.getTime()) && /T/.test(s)) return _isoADMY_(_ahoraLocalISO_(d).slice(0,10));
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? _isoADMY_(s.slice(0,10)) : '';
+}
+
+/* ⛔ 21/10 (auditor 8, 🟠 2): FICHAR SALIDA PASADO EL TOPE NO DECLARA NADA. El servidor recorta a `_maxHorasParte_()`,
+   devuelve `autocierre: true` y deja el parte `sin_declarar` (aunque traiga tarea y justificación) con 24 h de vida.
+   Las dos caras decían «Fichaje declarado · a la cola de X»: el parte no estaba en la cola de nadie y se perdía al
+   día siguiente. Devuelve el aviso, o '' si el servidor no dice que se cerró solo (entonces cada cara dice lo suyo). */
+function _tostAutocierre_(r){
+  var p = r && r.parte;
+  if(!(r && (r.autocierre === true || (p && p.autocierre === true && p.estado === 'sin_declarar')))) return '';
+  var t = _maxHorasParte_();
+  return 'Pasaba de '+t+' h: el fichaje se cerró solo en '+t+' h y queda SIN declarar. Decláralo con lo que '+
+    'trabajaste antes de '+_caducaAutocierreH_()+' h o se pierde.';
+}
+
 /* ⛔⛔ UN PARTE DE AUTOCIERRE NO SE DECLARA TAL CUAL, Y SE DICE IGUAL EN LAS DOS CARAS (633.ª).
    Daniel (09/09): «si fueron 14 h sin querer pero si q trabajaste o algo asi q mejor lo declares
    como bloque dsps en lugar de usar los de 14». Devuelve el aviso, o '' si no toca.
@@ -5629,6 +5676,21 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-21-horas-auditor', fecha:'2026-10-21',
+      titulo:'Horas: lo que cuenta en qué mes, los fichajes de más de 14 h y quién puede otorgar',
+      items:[
+        {cara:'movil', vista:'horas', txt:'«Es de otro mes» se mide de **cierre a cierre**: un bloque del 30/10 declarado el 03/11 con octubre aún abierto ya no dice que contará en noviembre. Y el mes sale por su nombre («octubre de 2026»).'},
+        {cara:'movil', vista:'horas', txt:'Al fichar salida pasadas **14 h**, la app ya no dice «Fichaje declarado»: el fichaje se cierra solo, queda **sin declarar** y caduca en **24 h** — y lo dice.'},
+        {cara:'movil', vista:'horas', txt:'Las horas sin ceros de más («1,5 h», no «1,50 h») y la fecha de caducidad en el día de Madrid.'},
+        {cara:'escritorio', vista:'partes', txt:'**Otorgar horas** y **Bloque de horas** sólo ofrecen a quien el servidor te deja (el PD, o el coordinador de esa unidad); un subcoordinador ya no ve una lista que luego se rechaza entera.'},
+        {cara:'escritorio', vista:'partes', txt:'El **Histórico** dice «revertido», «caducado» o «sin declarar» en vez de «devuelto · falta detalle»; y revertir unas horas **otorgadas** avisa de que se anulan (no vuelven a ninguna cola).'},
+        {cara:'escritorio', vista:'curso', txt:'**Fichajes en curso** le dice a un coordinador que la lista es del Project Director, en vez de «No se pudo preguntar al servidor».'}
+      ] },
+    { id:'2026-10-21-automatismos-estado', fecha:'2026-10-21',
+      titulo:'Automatismos: cada interruptor dice si está encendido ahora',
+      items:[
+        {cara:'escritorio', vista:'automatismos', txt:'Cada automatismo con interruptor dice ahora si está **encendido ahora**, **apagado ahora** o **no consta**, leído del servidor al abrir la pantalla (y cada 30 s como mucho). Lo que corre siempre no lleva estado.'}
+      ] },
     { id:'2026-10-21-avisos-auditor', fecha:'2026-10-21',
       titulo:'Avisos: cada uno a su pantalla, y la portada dice lo que te toca',
       items:[
@@ -5637,7 +5699,7 @@ function _novedades_(){
         {cara:'movil', vista:'horas', txt:'El número de la pestaña **Horas** cuenta lo que te toca hacer (firmar, declarar, dar detalle), no tus partes esperando a otra persona: un coordinador con 4 por firmar veía 0.'},
         {cara:'escritorio', vista:'panel', txt:'La tarjeta de sanciones del Panel de mando dice **cuántas hay por decidir en total**, la misma cifra que la pestaña (antes, sólo las del bloque elegido).'},
         {cara:'escritorio', vista:'sindeclarar', txt:'**«Sin declarar»** sale para todos (son tus fichajes): antes sólo la veía el admin.'},
-        {cara:'escritorio', vista:'automatismos', txt:'Automatismos: «Comprobarlo ahora» ya no deja la pantalla en «Sin fecha» con todo «sin interruptor»; lo comprobado se rotula «Comprobado por el motor el …»; el aviso de «el motor pasó hace…» se refresca; y los avisos de la convocatoria dicen que dependen de su interruptor de Turnos.'},
+        {cara:'escritorio', vista:'automatismos', txt:'Automatismos: «Comprobarlo ahora» ya no deja la pantalla en «Sin fecha» con todo «sin interruptor»; lo comprobado se rotula «Comprobado por el motor el …»; el aviso de «el motor pasó hace…» se refresca; los avisos de la convocatoria dicen que dependen de su interruptor de Turnos; y un **encargo** de una vez («cuando se le encarga») ya no se pinta como un interruptor.'},
         {cara:'movil', vista:'estado', txt:'En Ajustes, Reuniones dice que avisa también **cuando te convocan**, y turnos y reuniones «no se pueden apagar aquí» (antes «llegan siempre», aunque el envío dependa del director).'}
       ] },
     { id:'2026-10-21-ranking-cuota', fecha:'2026-10-21',

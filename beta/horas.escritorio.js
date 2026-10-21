@@ -93,10 +93,16 @@ function bloquePanel(){
      -- se ofrecia horas a SI MISMO, y el servidor tiene una guarda explicita contra eso. */
   var actor=_m(ACTOR), mandaEnTodo=rangoNom(ACTOR)>=3, unidad=(actor&&actor.unidad)||'';
   var reg=_activos_().filter(function(m){ return !m.cargo && m.nombre!==ACTOR; }); // de subsistema, sin bajas, sin uno mismo
-  var pool=mandaEnTodo?reg:reg.filter(function(m){ return m.unidad===unidad; });
+  /* ⛔ 21/10 (auditor 8, 🟠 3): A QUIEN EL SERVIDOR DEJA, por la misma puerta que decidir un parte (`puedeDecidirParte`
+     = `_puede_sobre_parte`: el PD, o quien coordina ESA unidad). Con «misma unidad que el actor», al subcoordinador
+     (rango 1, sin ser el coordinador) se le ofrecía su unidad entera —su propio coordinador incluido— y el servidor
+     rechazaba cada uno («sin potestad»). */
+  var pool=mandaEnTodo?reg:reg.filter(function(m){ return puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, ACTOR); });
   if(!pool.length) return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-    'No hay nadie de tu subsistema a quien otorgar horas en bloque.</p></div>');
+    (coordinadorDe(unidad)===ACTOR ? 'No hay nadie de tu subsistema a quien otorgar horas en bloque.'
+      : 'Otorgar horas es del coordinador de la unidad y del Project Director: el servidor no lo deja a nadie más.')+
+    '</p></div>');
   var subs=[]; reg.forEach(function(m){ if(subs.indexOf(m.unidad)<0) subs.push(m.unidad); });
   var filtro = mandaEnTodo
     ? '<label style="display:block;margin-bottom:10px"><span class="sc" style="display:block;margin-bottom:5px">Subsistema</span>'+
@@ -173,6 +179,11 @@ function _escHistFilaHTML_(p, per, uc){
   var et=p.estado==='aprobado'?'<span class="chip ok">aprobado</span>'
         :p.estado==='rechazado'?'<span class="chip no">rechazado</span>'
         :p.estado==='raro'?'<span class="chip">estado desconocido</span>'
+        /* ⛔ 21/10 (auditor 8, 🟡 5): cada estado por su nombre. Todo lo que no era aprobado/rechazado caía a «devuelto ·
+           falta detalle»: un REVERTIDO (o anulado), un CADUCADO y un SIN DECLARAR se leían como un parte devuelto. */
+        :p.estado==='rev'?'<span class="chip">revertido</span>'
+        :p.estado==='cad'?'<span class="chip no">caducado</span>'
+        :p.estado==='sindecl'?'<span class="chip wa">sin declarar</span>'
         :'<span class="chip wa">devuelto · falta detalle</span>';
   var dec=p.estado==='aprobado' ? _selloAprobado_(p, per, uc)
         : (p.estado==='rechazado' || p.estado==='detalle') ? 'decidido '+_firmaParte_(p) : '';
@@ -377,7 +388,10 @@ function _escRevCard_(p){
     '<div class="ruta">'+(cuenta
       ? 'Esas horas <b>ya cuentan</b>: revertir emite un apunte que le RESTA '+h1(p.horas)+
         ' de su ficha.'
-      : 'Todavía no cuentan: revertir deshace la decisión y el parte vuelve a la cola.')+'</div>'+
+      : (p.estado==='otorgada'
+        /* ⛔ 21/10 (auditor 8, 🟡 12): el servidor manda una `otorgada` a `anulada` (terminal), no a `pendiente`. */
+        ? 'Todavía no cuentan: revertir ANULA estas horas otorgadas (no vuelven a ninguna cola).'
+        : 'Todavía no cuentan: revertir deshace la decisión y el parte vuelve a la cola.'))+'</div>'+
     '<textarea data-revmot placeholder="Motivo — obligatorio, al menos 8 caracteres…"></textarea>'+
     '<div class="acts"><button class="btn no" data-rev="'+esc(p.id)+'">Revertir</button></div>'+
   '</div>';
@@ -638,8 +652,10 @@ function _fichaPanel_(){
         (abierta
           ? 'Corre en el <b>servidor</b>: puedes cerrar esta pesta\u00f1a. A las <b>14 h</b> se cierra sola '+
             /* ⛔ 633.ª el barrido cierra en entrada + 14 h y graba eso menos las pausas: la
-               «última actividad» no la mira nadie. Sin «no cuenta tal cual»: hoy SÍ cuenta. */
-            'con el tope: 14 h desde tu entrada, menos las pausas.'
+               «última actividad» no la mira nadie. 21/10 (auditor 8): y nace SIN DECLARAR, con 24 h de vida
+               (decisión del 09/09); aquí no se decía. */
+            'con el tope: 14 h desde tu entrada, menos las pausas, y queda <b>sin declarar</b>: decl\u00e1ralo antes de '+
+            _caducaAutocierreH_()+' h.'
           : 'Tus horas no cuentan hasta que las firma quien te corresponde.')+'</p>'+
       '</div>'+
       '<div style="display:flex;gap:9px;flex-wrap:wrap">'+botones+'</div>'+
@@ -803,7 +819,8 @@ function _engFicharE_(){
       /* ⚠️ `h = null` es «no lo se», y CERO seria un dato: sin las horas de vuelta se
          confirma el envio sin inventarse un numero. */
       var h=(r&&r.parte&&typeof r.parte.horas==='number')?r.parte.horas:null;
-      tost(declara
+      var _ac=_tostAutocierre_(r);
+      if(_ac) tost(_ac); else tost(declara
         ? ('Fichaje declarado'+(h==null?'':' \u00b7 '+nf2(h)+' h')+' \u00b7 a la cola de '+(_firmaP||'tu coordinador')+'.')
         : 'Fichaje cerrado SIN declarar. Decl\u00e1ralo en el panel de abajo antes de 7 d\u00edas.');
       pintar();
@@ -1043,7 +1060,7 @@ function _bloqPanel_(){
   var lista = !pend.length ? '' :
     '<div class="pb" style="padding:0">'+pend.map(function(p){
       var det=(p.estado==='detalle'), sel=!!(decl && decl.id===p.id);
-      var cad=p.caduca_at ? ' \u00b7 caduca '+esc(_isoADMY_((''+p.caduca_at).slice(0,10))) : '';
+      var cad=p.caduca_at ? ' \u00b7 caduca '+esc(_diaMadridDe_(p.caduca_at)) : '';
       return '<div class="dec" style="cursor:default"><span class="tx"><b>'+
         h1(p.horas)+' \u00b7 '+esc(_isoADMY_(String(p.fecha||'')))+
         (p.ini&&p.fin?' \u00b7 '+esc(p.ini)+'\u2013'+esc(p.fin):'')+'</b><small>'+
@@ -1063,7 +1080,7 @@ function _bloqPanel_(){
   var mes=(typeof _avisoMesDelBloque_==='function') ? _avisoMesDelBloque_(f.fecha, HOY) : '';
   var avisoMes = (decl || !mes) ? '' :
     '<div class="nota" style="margin-top:11px">Es de <b>otro mes</b>: estas horas contar\u00e1n en '+
-    '<b>'+esc(mes)+'</b>, el mes en curso. Las de un mes ya cerrado no se pueden mover.</div>';
+    '<b>'+esc(_nomPeriodo_(mes))+'</b>, el mes de trabajo en curso. Las de un mes ya cerrado no se pueden mover.</div>';
 
   /* ⛔ Y SI EL RANGO CRUZA MEDIANOCHE, SE DICE. `_bloqDur_` ya envuelve
      (`d<0?d+1440`) y no lo dice: quien se equivoca de casilla ve una duracion plausible
