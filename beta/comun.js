@@ -5841,7 +5841,9 @@ function _novedades_(){
         {cara:'movil', vista:'estado', txt:'La **cabecera** ya no parte el nombre de tu unidad en trozos («AEROESTRUCT / URAS»), tampoco con «Ver como».'},
         {cara:'movil', vista:'turnos', txt:'Si marcas tu disponibilidad de **turnos** sin conexión, ahora te lo dice: antes se pintaba y no se guardaba.'},
         {cara:'escritorio', vista:'panel', txt:'Al **volver** a una pantalla ya visitada se veía la anterior (el Panel de mando con los partes debajo). Arreglado en todas.'},
-        {cara:'escritorio', vista:'panel', txt:'El aviso de **fichaje de más de 10 h** del Panel ya sale de los fichajes de verdad (antes salía de uno de ejemplo, y los reales no lo encendían).'}
+        {cara:'escritorio', vista:'panel', txt:'El aviso de **fichaje de más de 10 h** del Panel ya sale de los fichajes de verdad (antes salía de uno de ejemplo, y los reales no lo encendían).'},
+        {cara:'escritorio', vista:'docdec', txt:'En **Documentos**, «Cerrar» ya sólo sale en la ficha que has desplegado, y un expediente sin resumen ni archivo ya no te manda a «leerlo abajo».'},
+        {cara:'escritorio', vista:'actas', txt:'En **Actas**, un acta con la fecha sólo en el título («… del 17/07/2026») ya cuenta en su temporada y enseña su fecha.'}
       ] },
     { id:'2026-10-21-cerrar-sesion-avisos', fecha:'2026-10-21',
       titulo:'Cerrar sesión deja de mandar tus avisos a ese navegador',

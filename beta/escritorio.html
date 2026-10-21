@@ -113,12 +113,12 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=94afe82"></script>
+<script src="comun.js?v=4c01ba1"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
 <script src="turnos.escritorio.js?v=03f760c"></script>
 <script src="buzon.escritorio.js?v=750fdd3"></script>
-<script src="documentos.escritorio.js?v=f67e9e5"></script>
+<script src="documentos.escritorio.js?v=db56948"></script>
 <script src="sanciones.escritorio.js?v=b2dc300"></script>
 <script src="reuniones.escritorio.js?v=e7761ba"></script>
 <script src="horas.escritorio.js?v=97bc56f"></script>
@@ -457,10 +457,11 @@ if(_demoLocal_() && !DATA.equipo_mes) DATA.equipo_mes={media:16.2, n:18, periodo
   dias_mes:31, dias_ant:30};
 /* ⛔ 21/10 (auditor 19, 🟡 16): Y LA FORMA DE UN PANEL REAL. En esta cara `hMes` son las horas de ESTE mes y el ritmo va
    en `hRitmo` (los dos los pone `_aplicarPanel_`); la semilla no pasa por ahí, así que Ranking leía `hMes` como ritmo,
-   Miembros como mes, y «Lo tuyo» no tenía `horasMes` («—»). Aquí: `horasMes` = el `hMes` de la semilla, y el ritmo por
-   la puerta común (`_hMesDe_` sin `hMes`: horasTemp/meses), que es su respaldo cuando el motor no lo manda. */
+   Miembros como mes. Aquí: el ritmo por la puerta común (`_hMesDe_` sin `hMes`: horasTemp/meses), que es su respaldo
+   cuando el motor no lo manda.
+   ⚠️ 21/10 (auditor 20, 🟡 7): `horasMes` NO se rellena: con el `hMes` de la semilla, «Lo tuyo» decía 43,33 h encima de un
+   desglose de 7 h (el libro de la maqueta está vacío). Un «—» honesto es mejor que dos cifras que no cuadran. */
 if(_demoLocal_()) (DATA.miembros||[]).forEach(function(m){
-  if(typeof m.hMes==='number' && m.horasMes==null) m.horasMes=m.hMes;
   if(m.hRitmo==null){ var _r=_hMesDe_({horasTemp:m.horasTemp, meses:m.meses}); if(_r!=null) m.hRitmo=_r; }
 });
 
@@ -1070,7 +1071,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
               : 'no se sabe qué mes está abierto', _rp?'up':'');
       })()+
     '</div>'+
-    pan('Requieren tu decisión',mias.length+' partes',
+    pan('Requieren tu decisión',mias.length+(mias.length===1?' parte':' partes'),   /* 🟡 3 (auditor 20) */
       mias.length?mias.map(parteCard).join(''):vacioSimple('La cola está limpia',
         'Cuando alguien de tu unidad declare horas, aparecerá aquí con su justificación a la vista.'),'destaca')+
     pan('Otorgar horas directamente','sin que nadie las pida',
@@ -1099,7 +1100,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
     /* ⛔ DEBAJO de la cola y ENCIMA del histórico: lo que hay que hacer va antes que lo ya
        hecho, y lo que todavía se puede deshacer, antes que lo que ya no. */
     _escRevPanel_()+
-    pan('Histórico',hist.length+' decisiones',
+    pan('Histórico',hist.length+(hist.length===1?' decisión':' decisiones'),   /* 🟡 3 (auditor 20) */
       hist.length?hist.map(function(p){ return _escHistFilaHTML_(p, _perH, _ucH); }).join(''):vacioSimple('Todavía no hay decisiones','Cada parte que apruebes, devuelvas o rechaces queda aquí '+
         'con su motivo y con quién lo firmó.'))+
     /* ⛔ 21/10 (auditor 8, 🟡 15): lo que hacen `revisoresDeParte` y el servidor — sin «revisor fijo» (el rango 2 es
@@ -1677,7 +1678,7 @@ V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
   var m=docsMios();
   /* Aqui van SIEMPRE desplegados: son los que tienes que decidir, y decidir exige leer.
      En «En curso» y «Publicados» se pliegan, porque ahi se consulta, no se firma. */
-  return pan('Expedientes que firmas tú',m.length+' pendientes',
+  return pan('Expedientes que firmas tú',m.length+(m.length===1?' pendiente':' pendientes'),   /* 🟡 3 (auditor 20) */
     m.length?m.map(docCard).join(''):vacioSimple('Bandeja limpia',
       'Nada esperando tu firma. El archivo de un miembro lo firma su coordinador; el informe de subsistema, '+
       'el Project Director o '+esc(_m(REV2_NOM).pila)+'; el informe general, solo el Project Director. '+
@@ -2156,8 +2157,15 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
     return String(b.fecha||'').localeCompare(String(a.fecha||'')); });
   /* ⛔ 21/10 (auditor 10, 🟡 10): se titulaba «Actas de la temporada» y no filtraba (la única, de 25/26). Se listan
      TODAS, y el subtítulo dice cuántas son de la temporada en curso, por la fecha del acta. */
+  /* 21/10 (auditor 20, 🟡 10): sin `fecha`, la del TÍTULO («Acta de la junta del 17/07/2026»): si no, un acta que llega
+     sin el campo no contaba en la temporada y salía «—», con la fecha escrita al lado. */
+  var _fActa=function(d){
+    if(d.fecha) return String(d.fecha).slice(0,10);
+    var mt=String(d.tit||'').match(/\b(\d{2}\/\d{2}\/\d{4})\b/);
+    return mt ? _dmyAISO_(mt[1]) : '';
+  };
   var _tv=_temporadaVigente_(), _nTv=actas.filter(function(d){
-    var f=new Date(String(d.fecha||'').slice(0,10)+'T12:00:00');
+    var f=new Date(_fActa(d)+'T12:00:00');
     return !isNaN(f.getTime()) && _temporadaDe_(f)===_tv; }).length;
   if(!actas.length) return pan('Actas','ninguna',
     vacioSimple('Todavía no hay ningún acta','Un acta es un expediente más: se sube por el formulario '+
@@ -2172,7 +2180,7 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
           /* ⛔ 20/10: por `_isoADMY_`, como el visor de Documentos desde el 14/10. Llega en ISO (`acta_a_expediente`
              manda `--fecha AAAA-MM-DD`) y aquí se pintaba tal cual; y la fecha es lo que más importa de un acta sin
              convocar (Daniel, 14/10: «deberia aparecer algo»). */
-          '<td class="mono" style="color:var(--ink3)">'+esc(d.fecha?_isoADMY_(d.fecha):'—')+'</td>'+
+          '<td class="mono" style="color:var(--ink3)">'+esc(_fActa(d)?_isoADMY_(_fActa(d)):'—')+'</td>'+
           '<td class="r"><span class="chip '+estDoc(d.est)[1]+'">'+esc(estDoc(d.est)[0])+'</span></td></tr>';
       }).join(''))+
     '<div class="nota">Las actas no se llevan aparte: son <b>expedientes</b> del pipeline '+
@@ -2413,7 +2421,7 @@ V.subsis={g:'Equipo',t:'Horas por subsistema',f:function(){
   var subs=_llego_('subs') ? _subsEnVivo_() : [];
   if(!subs.length) return pan('Horas por subsistema','sin datos',
     vacioSimple('Sin datos de subsistemas','La media por unidad se calcula con la gente que '+
-      'esta pantalla tiene delante, pero el servidor todavia no ha mandado QUE unidades '+
+      'esta pantalla tiene delante, pero el servidor todavía no ha mandado qué unidades '+
       'compiten. Sin esa lista no hay nada que rankear.'));
   /* ⛔ EL DIVISOR NO PUEDE SER 0, y el fallo cae del lado malo. Con el subsistema de cabeza a
      `media:0` —un mes recien cerrado— el ancho sale `NaN%`, que es CSS INVALIDO: el navegador
@@ -3492,7 +3500,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='add1e63';
+var BUILD='3421368';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

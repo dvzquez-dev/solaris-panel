@@ -365,7 +365,11 @@ function docCard(d){
     '<div class="h"><b>'+esc(d.tit)+'</b>'+
       '<span class="u">'+esc(d.ref)+'</span>'+
       '<span class="u">'+esc(d.tipo||'documento')+'</span>'+
-      '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button></div>'+
+      /* 21/10 (auditor 20, 🟡 1): «Cerrar» sólo si esta ficha está DESPLEGADA a mano (`DOC_SEL`). En «Requiere tu
+         decisión» van siempre abiertas y el botón no hacía nada — y en un pipeline con estado `cerrado` se leía como
+         «cerrar el expediente». */
+      (typeof DOC_SEL!=='undefined' && DOC_SEL===d.id
+        ? '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button>' : '')+'</div>'+
     '<div class="pils">'+
       '<span class="chip">'+esc(_m(d.autor).pila)+' · '+esc(d.sub||'—')+'</span>'+
       '<span class="chip">'+ambDoc(d.amb)+'</span>'+
@@ -401,7 +405,10 @@ function docCard(d){
     '</div>'+
     _avisosDocE_(d)+
     '<div class="just"><span class="sc">Resumen ejecutivo</span>'+
-      esc(d.resumen||'El expediente llegó sin resumen. Léelo abajo antes de firmar.')+'</div>'+
+      /* 21/10 (auditor 20, 🟡 2): «léelo abajo» sólo si abajo HAY archivo; si no, decía «léelo abajo» encima de «no trae
+         enlace al archivo». */
+      esc(d.resumen||(d.drive ? 'El expediente llegó sin resumen. Léelo abajo antes de firmar.'
+                              : 'El expediente llegó sin resumen y sin enlace al archivo: no hay nada que leer antes de firmar.'))+'</div>'+
     previa+secs+avisos+visor+
     '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':'Firma: <b>'+esc(rev)+'</b>')+
       ' · Decidir aquí sustituye a contestar el correo de aprobación.</div>'+
