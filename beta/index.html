@@ -21,7 +21,7 @@
      ⚠️ Si `--bg` cambia, esto cambia con él: lo vigila `probar_reunion_movil`. -->
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=e52fc07">
+<link rel="stylesheet" href="movil.css?v=489a385">
 </head>
 <body>
 
@@ -113,15 +113,15 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=b0378d4"></script>
+<script src="comun.js?v=a4da1c6"></script>
 <script src="notis.movil.js?v=e922c9d"></script>
 <script src="cierre.movil.js?v=a96280b"></script>
 <script src="tareas.movil.js?v=b60e726"></script>
-<script src="turnos.movil.js?v=c3394c6"></script>
+<script src="turnos.movil.js?v=a8a3505"></script>
 <script src="buzon.movil.js?v=3831011"></script>
 <script src="documentos.movil.js?v=c77af75"></script>
 <script src="sanciones.movil.js?v=028bb6e"></script>
-<script src="reuniones.movil.js?v=da9189a"></script>
+<script src="reuniones.movil.js?v=ad8997d"></script>
 <script src="horas.movil.js?v=ad6280a"></script>
 <script src="equipo.movil.js?v=9f8527e"></script>
 <script>
@@ -1110,6 +1110,9 @@ var REUNION={titulo:'Reunión general de fin de temporada',tipo:'general',modali
   franjas:[{ini:'16:00',dur:60},{ini:'17:00',dur:60},{ini:'18:00',dur:60},{ini:'19:00',dur:60},
            {ini:'20:00',dur:60},{ini:'21:00',dur:60},{ini:'22:00',dur:60}],
   calor:[[3,5,8,11,14,15,12],[2,4,7,9,12,13,11],[4,6,9,13,17,19,16],[3,4,6,8,11,12,9],[5,8,12,15,18,21,17]],
+  /* 21/10 (auditor 19, 🟡 3): lo OFERTADO, como lo escribe el creador (`bloques`). Sin él, `cubrirModal` apagaba las 35
+     casillas y el flujo central del miembro no se podía probar en la maqueta (el mapa de calor sí las pintaba). */
+  bloques:(function(){ var o=[], d, f; for(d=0; d<5; d++) for(f=0; f<7; f++) o.push([d,f]); return o; })(),
   nInv:24};
 /* ⛔ 930.ª: EN LA MAQUETA, ESTA SEMILLA TAMBIÉN ES LA LISTA. Estado (`_proxReuHTML_`), el aviso «te falta cubrir» y el
    globo leen `REUNIONES_M`, que sin servidor estaba vacía: Estado decía «Ninguna reunión convocada» mientras la pestaña
@@ -1703,7 +1706,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='86cbe97';
+var BUILD='e536b5d';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

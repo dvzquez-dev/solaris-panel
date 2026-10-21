@@ -587,7 +587,12 @@ function _convCargar_(repintar){
    cambiar— pero **avisando si falla**: una disponibilidad que se pierde en silencio es la que
    luego hace que te pongan un turno cuando no puedes. */
 function _convGuardar_(cv){
-  if(!cv || typeof SESION==='undefined' || !SESION) return;
+  if(!cv) return;
+  /* 21/10 (auditor 19, 🟡 14): sin sesión se pintaba y NO se guardaba, sin decir nada. Reuniones ya lo dice. */
+  if(typeof SESION==='undefined' || !SESION){
+    if(typeof tost==='function') tost('Sin conexión no se puede guardar tu disponibilidad.');
+    return;
+  }
   /* ⛔ Y NO SE CONTESTA POR NADIE: el arrastre dispara esto solo, en `pointerup` y sin
      confirmación, así que mirando como otra persona bastaba rozar la rejilla. */
   if(typeof _identidadPrestada_==='function' && _identidadPrestada_(yoNombre())){

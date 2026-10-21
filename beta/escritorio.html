@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=b0378d4"></script>
+<script src="comun.js?v=a4da1c6"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
 <script src="turnos.escritorio.js?v=03f760c"></script>
@@ -541,13 +541,15 @@ var DOCS_LLEGO=null;
 var SANC_BACK=null;   /* cola real de sanciones del backend; null = semilla ficticia */
 var LOTES_PEND=[], LOTE_SEL=0;   /* todos los bloques pendientes, y cual se esta mirando */
 var PART_BACK=null;   /* cola real de partes de horas del backend; null = semilla ficticia */
+/* 21/10 (auditor 19, 🟡 12): SIN MARCAR, como llega el lote real (`dec:s.decision||null`). Con las cinco en «Acepta» la
+   maqueta volvía a enseñar el fallo que el changelog da por arreglado. */
 var LOTE={nombre:'Formulario de O&M · 25/07',motivo:'No rellenar el formulario de O&M para la publicación del 25/07',
   art:'30g',cerrado:false,items:[
-  {id:1,n:'Uxía Berdiales Randín',pts:-1,dec:'aceptar'},
-  {id:2,n:'Xurxo Ameixeiras Codesal',pts:-1,dec:'aceptar'},
-  {id:3,n:'Tomé Vilariño Estévez',pts:-1,dec:'aceptar'},
-  {id:4,n:'Comba Sarmiento Nogueira',pts:0,dec:'aceptar'},
-  {id:5,n:'Sabela Ordóñez Pacio',pts:-1,dec:'aceptar'}]};
+  {id:1,n:'Uxía Berdiales Randín',pts:-1,dec:null},
+  {id:2,n:'Xurxo Ameixeiras Codesal',pts:-1,dec:null},
+  {id:3,n:'Tomé Vilariño Estévez',pts:-1,dec:null},
+  {id:4,n:'Comba Sarmiento Nogueira',pts:0,dec:null},
+  {id:5,n:'Sabela Ordóñez Pacio',pts:-1,dec:null}]};
 var APELA=[
  {n:'Tomé Vilariño Estévez',motivo:'Ausencia a la reunión general del 14/07',razon:'Aportó justificante médico del mismo día.',pts:1},
  {n:'Ledicia Amoedo Cambeses',motivo:'Deadline de la memoria de patrocinio',razon:'La tarea se reasignó y no se le comunicó.',pts:1}
@@ -3470,7 +3472,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7206711';
+var BUILD='696d3a8';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

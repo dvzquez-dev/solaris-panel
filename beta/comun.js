@@ -1551,6 +1551,9 @@ function tost(m, o){
   t.textContent=m;
   clearTimeout(t._h);
   var cerrar=function(){ t.classList.remove('on','fijo'); t.onclick=null; };
+  /* 21/10 (auditor 19, 🟡 8): con una hoja abierta el aviso sale ARRIBA. Abajo tapaba sus botones de decisión
+     («Cambios y rechazo exigen motivo.» encima de «Aprobar»). Sin la regla `.tost.arriba` (escritorio) no cambia nada. */
+  t.classList.toggle('arriba', !!document.querySelector('.modal.on'));
   t.classList.add('on');
   if(o && o.fijo){
     /* `.fijo` es lo que le devuelve el `pointer-events`: en reposo el toast no captura
@@ -5823,7 +5826,11 @@ function _novedades_(){
         {cara:'movil', vista:'reu', txt:'Al **guardar tu disponibilidad por debajo del mínimo**, el aviso de que se propondrá el **Art. 29i** ya se ve (antes lo tapaba al instante «Disponibilidad guardada»).'},
         {cara:'movil', vista:'horas', txt:'Si **firmar o revertir un parte** falla, el aviso dice por qué (antes: «No se pudo: [object Object]»); con la sesión caducada se queda fijo y dice que vuelvas a entrar.'},
         {cara:'movil', vista:'docs', txt:'Un aviso **largo** de documentos (p. ej. al devolver uno a revisión) se queda en pantalla hasta que lo toques. Y si un documento tuyo no trae enlace, se te dice que lo **vuelvas a mandar**, no que se lo pidas a quien lo subió.'},
-        {cara:'escritorio', vista:'docs', txt:'Lo mismo en el escritorio: a la persona que subió un documento sin enlace se le dice que lo vuelva a mandar.'}
+        {cara:'escritorio', vista:'docs', txt:'Lo mismo en el escritorio: a la persona que subió un documento sin enlace se le dice que lo vuelva a mandar.'},
+        {cara:'movil', vista:'reu', txt:'En **Marca tu disponibilidad**, las casillas fuera del horario de ese día van **rayadas** (como en el mapa de calor) y la leyenda lo explica: antes casi no se distinguían de las vacías.'},
+        {cara:'movil', vista:'docs', txt:'Con una ficha abierta (p. ej. decidir un documento), los avisos salen **arriba**: abajo tapaban los botones de Aprobar.'},
+        {cara:'movil', vista:'estado', txt:'La **cabecera** ya no parte el nombre de tu unidad en trozos («AEROESTRUCT / URAS»), tampoco con «Ver como».'},
+        {cara:'movil', vista:'turnos', txt:'Si marcas tu disponibilidad de **turnos** sin conexión, ahora te lo dice: antes se pintaba y no se guardaba.'}
       ] },
     { id:'2026-10-21-cerrar-sesion-avisos', fecha:'2026-10-21',
       titulo:'Cerrar sesión deja de mandar tus avisos a ese navegador',

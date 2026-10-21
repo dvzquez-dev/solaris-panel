@@ -741,12 +741,12 @@ function cubrirModal(){
      guarda se enteran de que la rejilla se ha girado. Lo único que cambia es el ORDEN en
      que se pintan las celdas — y el arrastre va por `elementFromPoint`, no por posición.
      ✅ Y la etiqueta de la hora es además **el asa para deslizar**: ver `.rc.rd` en el CSS. */
-  var rows='';
+  var rows='', _hayOff=false;
   R.franjas.forEach(function(f,fi){
     rows+='<div class="rc rd" aria-hidden="true"><span>'+f.ini.replace(':00','')+'</span></div>';
     for(var di=0;di<nD;di++){
       var k=di+'_'+fi;
-      if(!_ofer[k]){ rows+='<div class="ecel off" title="fuera del horario de ese día"></div>'; continue; }
+      if(!_ofer[k]){ _hayOff=true; rows+='<div class="ecel off" title="fuera del horario de ese día"></div>'; continue; }
       var v=ST.sel.get(k)||0;
       rows+='<div class="ecel '+(v===2?'on2':v===1?'on1':'')+'" data-k="'+k+'"></div>';
     }
@@ -762,7 +762,8 @@ function cubrirModal(){
        rendido. */
     '<div class="rgesto">Un dedo <b>pinta</b> · dos dedos <b>deslizan</b></div>'+
     '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nD+',minmax(44px,1fr))">'+hd+rows+'</div></div>'+
-    '<div class="leyh" style="margin-top:10px">'+ley+'</div>'+
+    /* 🟡 4 (auditor 19): la leyenda explica la casilla rayada, igual que la del mapa de calor — sólo si la hay. */
+    '<div class="leyh" style="margin-top:10px">'+ley+(_hayOff?'<span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>fuera del horario de ese día</span>':'')+'</div>'+
     '<div class="sc" id="ecount" style="margin:12px 0 10px"></div>'+
     '<button class="btn pri full" data-p id="btnGuardarDisp">Guardar disponibilidad</button>');
   engancharRejilla();
