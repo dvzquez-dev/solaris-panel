@@ -148,9 +148,9 @@ function _notisPrefsHTML_(){
   }
   if(!filas) return '<div class="nota">El servidor no ha listado ningún tipo de aviso.</div>';
   return '<div class="pan" style="border:0;margin:0">'+filas+'</div>'+
-    '<div class="nota"><b>Turnos</b>, <b>reuniones</b> y <b>avisos y sanciones</b> llegan '+
-    'siempre: llevan plazo y consecuencias, y perdérselos no es una molestia, es una sanción. '+
-    'Lo decide el servidor, no esta pantalla.'+
+    '<div class="nota"><b>Turnos</b>, <b>reuniones</b> y <b>avisos y sanciones</b> no se pueden '+
+    'apagar aquí: llevan plazo y consecuencias, y perdérselos no es una molestia, es una sanción. '+
+    'Que salgan depende de que el director tenga encendido cada envío (Automatismos).'+
     (hayApagable?' Lo demás lo eliges tú, y se aplica antes de enviarlo.':'')+
     '</div><p class="sc" id="notisMsgPref" style="padding:0 13px 11px"></p>';
 }

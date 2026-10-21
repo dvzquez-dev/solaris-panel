@@ -68,6 +68,39 @@ function esCoord(){ return ST.rol==='coord' || ST.rol==='pd' || (typeof YO!=='un
 
 function esPD(){ return ST.rol==='pd' || (typeof YO!=='undefined' && YO && YO.cargo==='Project Director'); }
 
+/* ⛔ 21/10 (auditor 7, 🟡 11): LO QUE TE TOCA HACER, en la portada — lo mismo que ya cuentan los globos (`badges`) y
+   lo que te llega por notificación: partes que esperan tu firma, fichajes TUYOS sin declarar (caducan) o con detalle
+   pedido, documentos que esperan tu revisión, y la disponibilidad de turnos abierta sin contestar. Antes la portada
+   callaba justo eso. Cada aviso lleva a su pestaña (`data-ir`). */
+function _avisosQueTeTocanM_(){
+  function uno(ir, tit, txt, mal){
+    return '<div class="aviso'+(mal?' mal':'')+'" data-ir="'+ir+'" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
+      '<div style="flex:1"><b>'+tit+'</b><p>'+txt+'</p></div><span class="chev">›</span></div>';
+  }
+  var h='', yo=(typeof _fichaYo_==='function') ? _fichaYo_() : '';
+  var pdec=(typeof PARTES_DEC!=='undefined' && Array.isArray(PARTES_DEC)) ? PARTES_DEC.length : 0;
+  if(pdec) h+=uno('horas', pdec===1 ? 'Un parte espera tu firma' : (pdec+' partes esperan tu firma'),
+    pdec===1 ? 'Hasta que lo decidas no le cuenta a quien lo hizo.' : 'Hasta que los decidas no le cuentan a nadie.');
+  var mios=(typeof PARTES!=='undefined' && Array.isArray(PARTES)) ? PARTES.filter(function(p){
+    return p && (!p.autor || p.autor===yo); }) : [];
+  var sd=mios.filter(function(p){ return p.e==='sindecl'; }).length, dt=mios.filter(function(p){ return p.e==='det'; }).length;
+  if(sd) h+=uno('horas', sd===1 ? 'Un fichaje tuyo sin declarar' : (sd+' fichajes tuyos sin declarar'),
+    'Caducan a los 7 días y se pierden: decláralos en Horas.', true);
+  if(dt) h+=uno('horas', dt===1 ? 'Te piden detalle de un parte' : ('Te piden detalle de '+dt+' partes'),
+    'Hasta que lo des no se firma.');
+  var rev=(typeof _docsPend_==='function') ? (_docsPend_()||[]).length : 0;
+  if(rev) h+=uno('docs', rev===1 ? 'Un documento espera tu revisión' : (rev+' documentos esperan tu revisión'),
+    rev===1 ? 'Léelo y decide en Docs.' : 'Léelos y decide en Docs.');
+  var cv=(typeof _convAbierta_==='function') ? _convAbierta_() : null;
+  if(cv && typeof _convEstado_==='function' && _convEstado_(cv)==='abierta'){
+    var ac=(typeof _actorSanc_==='function') ? _actorSanc_() : yo;
+    var r=cv.resp && cv.resp[ac];
+    if(!(r && typeof r==='object' && Object.keys(r).length))
+      h+=uno('turnos', 'Di tu disponibilidad para los turnos', 'Si no dices nada, se reparte sin contar contigo.', true);
+  }
+  return h;
+}
+
 function vEstado(){
   /* La capa de NOVEDADES va lo primero de la pantalla de inicio: es lo que hay que
      mirar antes que nada, y desaparece sola en cuanto se marca todo como visto. */
@@ -138,6 +171,8 @@ function vEstado(){
         (_resto>0 ? (', y '+_resto+' más después') : '')+'.</p></div>'+
       '<span class="chev">›</span></div>';
   }
+
+  av+=_avisosQueTeTocanM_();
 
   /* Las tareas salieron de aqui: tienen pestana propia y en la portada solo alargaban
      la primera pantalla repitiendo lo mismo. */

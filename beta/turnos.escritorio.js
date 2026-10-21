@@ -960,7 +960,8 @@ function _convocarDispPanel_(){
       '<b>mandar los avisos al móvil</b></label>'+
     '<div class="nota" id="cdAvNota">Apagado, la rutina sigue calculando y deja escrito '+
       'lo que mandaría, pero <b>no sale nada</b>. Encendido, avisa al abrir, a las 24 h, '+
-      'a las 3 h y a los 10 min — y el recordatorio <b>solo a quien no ha contestado</b>.</div>'+
+      'a las 3 h y a los 10 min — y el recordatorio <b>solo a quien no ha contestado</b> —, y '+
+      'al <b>cerrarse</b> el plazo, a <b>todo el equipo</b>.</div>'+
     '</div>');
 }
 
@@ -974,7 +975,8 @@ function _engAvisosConv_(m){
     if(on && !confirm('Vas a ENCENDER los avisos de la convocatoria.'+String.fromCharCode(10,10)+
       'A partir de ahora salen notificaciones al movil del equipo: al abrir la disponibilidad, '+
       'a las 24 h, a las 3 h y a los 10 minutos del cierre.'+String.fromCharCode(10,10)+
-      'El recordatorio solo le llega a quien no ha contestado. Sigo?')){ c.checked=false; return; }
+      'El recordatorio solo le llega a quien no ha contestado. Y al cerrarse el plazo sale otro a todo el equipo. '+
+      'Sigo?')){ c.checked=false; return; }
     c.disabled=true;
     try{
       await api.setControl(INTERRUPTOR_AVISOS, on, on?'avisos ENCENDIDOS':'avisos apagados');

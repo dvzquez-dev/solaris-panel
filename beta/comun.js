@@ -494,7 +494,25 @@ function _gentePorUnidad_(){
   return out;
 }
 
+/* ⛔ 21/10 (auditor 6): LA MEDIA POR UNIDAD QUE MANDA EL SERVIDOR, para quien no tiene las horas de los demás. Desde
+   el 07/10 el panel de un miembro trae SÓLO sus horas (decisión de Daniel: *«cada persona solo debe recibir sus
+   horas/mes y su puesto, no las horas de todos»*), así que calcular «en vivo» le daba SU unidad sola, primera y con
+   «1 personas». El agregado (`subsistemas` con `media` y `n`) sí le llega. Sólo entran las que traen una media de
+   verdad y alguien dentro; mismo orden que `_subsEnVivo_`. `foto:true` lo dice: no es en vivo. */
+function _subsDelServidor_(){
+  var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [], out = [], i, s;
+  for(i = 0; i < lista.length; i++){
+    s = lista[i];
+    if(!s || !s.u || typeof s.media !== 'number' || !isFinite(s.media) || !(s.n > 0)) continue;
+    out.push({ u: s.u, media: _red1_(s.media), n: s.n, foto: true });
+  }
+  out.sort(function(a, b){ return (b.media - a.media) || (a.u < b.u ? -1 : 1); });
+  return out;
+}
+
 function _subsEnVivo_(){
+  /* ⛔ 21/10 (auditor 6): con el panel en forma MIEMBRO no hay «gente delante» con la que calcular — el agregado. */
+  if(typeof DATA !== 'undefined' && DATA._rol === 'miembro') return _subsDelServidor_();
   var nom = [], i, j;
   var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [];
   for(i = 0; i < lista.length; i++) nom.push((lista[i] && lista[i].u) || lista[i]);
@@ -3165,13 +3183,16 @@ function _novedadesHTML_(){
    `{error}` = no se pudo preguntar, objeto = la respuesta del mini PC. */
 function _pulsoGateCargar_(repintar){
   var F=_pulsoGateCargar_;
-  if(F.p!==undefined) return;
-  if(typeof api==='undefined' || typeof api.getPulsoGate!=='function'){ F.p={error:'esta cara no lo pregunta'}; return; }
-  F.p=null;
+  /* ⛔ 21/10 (auditor 7, 🟠 3): se preguntaba UNA vez por sesión — con el motor parado 47 min, la segunda apertura seguía
+     diciendo «pasó hace 1 min». Ahora se vuelve a preguntar si la respuesta tiene más de 30 s; mientras vuela se sigue
+     pintando la anterior (`F.vuelo`), y sólo la primera vez sale «preguntando…». */
+  if(F.vuelo || (F.p!==undefined && (Date.now()-(F.t||0))<30000)) return;
+  if(typeof api==='undefined' || typeof api.getPulsoGate!=='function'){ F.p={error:'esta cara no lo pregunta'}; F.t=Date.now(); return; }
+  F.vuelo=true; if(F.p===undefined) F.p=null;
   Promise.resolve().then(function(){ return api.getPulsoGate(); })
     .then(function(r){ F.p=(r && typeof r==='object') ? r : {error:'respuesta vacía'}; })
     .catch(function(e){ F.p={error:String((e&&e.message)||e||'sin detalle')}; })
-    .then(function(){ if(typeof repintar==='function') repintar(); });
+    .then(function(){ F.vuelo=false; F.t=Date.now(); if(typeof repintar==='function') repintar(); });
 }
 function _pulsoGateHTML_(p){
   if(p===undefined || p===null) return '<p class="rnota" data-pulso="cargando">Preguntando al servidor cuándo pasó el motor por última vez…</p>';
@@ -3201,9 +3222,13 @@ function _automatismosHTML_(){
   }
   var m=String(A.generado||'').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   var h=tit+pul+(m
-    ? '<div class="msub" data-est="foto">Foto del momento de publicar: <b>'+
+    ? (A.calculado
+      ? '<div class="msub" data-est="foto">Comprobado por el motor el <b>'+
+        m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>, con «Comprobarlo ahora». Lo que haya cambiado después '+
+        'no sale aquí.</div>'
+      : '<div class="msub" data-est="foto">Foto del momento de publicar: <b>'+
       m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>. No es un «comprobar ahora»: lo que haya '+
-      'cambiado después no sale aquí.</div>'
+      'cambiado después no sale aquí.</div>')
     : '<div class="msub" data-est="sinfecha"><b>Sin fecha</b>: no se sabe de cuándo es esta foto, '+
       'así que no la des por actual.</div>');
   /* ⛔ EL BOTON DE COMPROBAR (765.a). Daniel (10/09): «darle a un boton y que checkee».
@@ -3211,8 +3236,9 @@ function _automatismosHTML_(){
      backend no tiene repo. Lo que hace el boton es levantar el flag `comprobar_automatismos`;
      el gate lo recoge en su siguiente pasada -- hasta 2 minutos -- y publica el resultado.
      Decir «comprobado» al pulsar seria mentir justo durante esa espera.
-     ⚠️ Solo en el escritorio: en el movil no hay donde poner esto y nadie lo ha pedido. */
-  h+='<p class="rnota" style="margin:10px 0 0">'+
+     ⚠️ Solo en el escritorio: en el movil no hay donde poner esto y nadie lo ha pedido.
+     ⛔ 21/10 (auditor 7, 🟠 6): y por eso se pinta sólo donde existe su manejador; en el móvil era un botón muerto. */
+  if(typeof _engComprobarAuto_==='function') h+='<p class="rnota" style="margin:10px 0 0">'+
     '<button class="btn sm" data-comprauto>Comprobarlo ahora</button> '+
     '<span style="color:var(--ink3)">Lo calcula el gate en su siguiente pasada, '+
     '<b>hasta 2 min</b>: la app no puede comprobarlo ella, porque esto sale del '+
@@ -3248,7 +3274,9 @@ function _automatismosHTML_(){
     for(var j=0;j<fil.length;j++){
       var x=fil[j], t;
       if(fams[k][0]==='gate'){
-        t=(x.siempre ? 'siempre' : (x.con_interruptor ? 'si su interruptor está encendido' : 'sin interruptor'))+
+        /* 21/10 (auditor 7, 🟠 5): «siempre» de algo que manda según un control de otra pantalla era falso. */
+        t=(x.siempre ? (x.interruptor_en ? 'cada pasada, pero sólo manda si está encendido su interruptor de '+
+            esc(x.interruptor_en) : 'siempre') : (x.con_interruptor ? 'si su interruptor está encendido' : 'sin interruptor'))+
           (x.tipo==='ia' ? ' · ⚠ llama a un modelo ('+esc(x.modelo||'sin decir cuál')+')' : '');
       } else if(fams[k][0]==='arreglan'){
         t=esc(x.que)+' · '+(x.con_orden ? 'tiene una orden que lo arregla' : esc(x.arregla||'sin decir cómo'));
@@ -3285,7 +3313,9 @@ function _refTurno_(t, ix){
   return 'T·' + iso.slice(5, 7) + iso.slice(8, 10) + (t.hora ? '·' + String(t.hora).slice(0, 5) : '');
 }
 
-function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?(m[3]+'-'+m[2]+'-'+m[1]):f; }
+/* 21/10: también `6/9/2026` y `06/09/26` — sin enderezar, `_normLimite_` los comparaba como cadena y «6» > «2»: plazo
+   abierto para siempre. Día y mes de 1-2 cifras, año de 2 (→ 20AA) o 4. */
+function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})$/); return m?((m[3].length===2?'20'+m[3]:m[3])+'-'+(m[2].length<2?'0':'')+m[2]+'-'+(m[1].length<2?'0':'')+m[1]):f; }
 
 /* La temporada va de septiembre a agosto · GEMELA de `reglas/disciplina.py:temporada_de`.
    Si esto y el Python discrepan, el que manda es el Python: ahi se calculan los puntos. */
@@ -4054,6 +4084,47 @@ function _recargarVersionNueva_(volviendo){
   return true;
 }
 
+/* ⛔ 21/10 (auditor 7, 🟡 13): EL DESTINO DE UN AVISO → la vista de ESTA cara. Los emisores dicen `horas`,
+   `reuniones`, `turnos`, `docs` o `estado`; cada cara lo traduce a la suya. Lo que no conoce → `null` (se queda donde
+   esté: abrir la raíz es lo que pasaba antes, no un fallo nuevo). */
+function _vistaDeAviso_(destino, cara){
+  var d=String(destino||'').replace(/^#/,'');
+  var M=(cara==='escritorio')
+    ? {estado:'panel', horas:'libros', reuniones:'convoc', turnos:'turnos', docs:'docdec'}
+    : {estado:'estado', horas:'horas', reuniones:'reu', turnos:'turnos', docs:'docs'};
+  return Object.prototype.hasOwnProperty.call(M,d) ? M[d] : null;
+}
+function _irDesdeAviso_(destino){
+  try{
+    if(typeof VISTAS==='object' && VISTAS && typeof ST==='object' && ST){
+      var m=_vistaDeAviso_(destino,'movil');
+      if(!m || !VISTAS[m]) return null;
+      ST.vista=m; if(typeof pintar==='function') pintar();
+      return m;
+    }
+    /* `ir` sólo existe en el escritorio: se toma en una variable, no se llama por su nombre desde el módulo común
+       (`probar_bundle_caras.py`). */
+    var irF=(typeof ir==='function') ? ir : null;
+    if(typeof V==='object' && V && irF){
+      var e=_vistaDeAviso_(destino,'escritorio');
+      if(!e || !V[e]) return null;
+      irF(e);
+      return e;
+    }
+  }catch(_){}
+  return null;
+}
+/* Al abrir desde un aviso con la app cerrada, el destino llega en el hash; se lee una vez y se quita de la barra. */
+function _irAlAbrir_(){
+  try{
+    var h=(typeof location!=='undefined' && location.hash) ? String(location.hash).slice(1) : '';
+    if(!h) return null;
+    var r=_irDesdeAviso_(h);
+    if(r && typeof history!=='undefined' && history.replaceState) history.replaceState(null,'',location.pathname+location.search);
+    return r;
+  }catch(_){ return null; }
+}
+
 /* Engancha el canal del worker. Devuelve si se pudo enganchar, para que quien llame lo
    sepa: un `catch` vacio aqui dejaria el aviso muerto sin que nadie se entere. */
 function _escucharSW_(){
@@ -4068,6 +4139,7 @@ function _escucharSW_(){
     });
     navigator.serviceWorker.addEventListener('message', function(ev){
       if (ev && ev.data && ev.data.tipo === 'version-nueva') { _avisoVersion = true; _recargarVersionNueva_(false); }
+      else if (ev && ev.data && ev.data.tipo === 'ir') _irDesdeAviso_(ev.data.a);
     });
     return true;
   } catch (_) { return false; }
@@ -4091,6 +4163,7 @@ async function _pushInit_(){
      ⚠️ Y con ellas se iba el aviso de version nueva, que viaja por el mismo canal. */
   var reg=await _registrarSW_();
   _escucharSW_();
+  _irAlAbrir_();
   if(!_pushSoportado_()) return;
   try{
     if(reg && Notification.permission==='granted'){
@@ -4468,6 +4541,12 @@ function _isoFechaHora_(v, hora){
      ⚠️ En ES3 no hay `trim()`: `cscript` corre ES3 y Apps Script tambien lo acepta. */
   var s = String(v == null ? '' : v).replace(/^\s+|\s+$/g, '');
   if (!s || s === 'null' || s === 'undefined') return '';
+  /* ⛔ 21/10: un INSTANTE con zona (`…Z`, `…+02:00`: lo que deja `toISOString`) no es hora de Madrid — compararlo como
+     cadena regalaba dos horas de plazo en verano. Se pasa a la hora de Madrid (`_ahoraLocalISO_`) antes de comparar. */
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/.test(s) && typeof _ahoraLocalISO_ === 'function') {
+    var _dz = new Date(s);
+    if (!isNaN(_dz.getTime())) return _ahoraLocalISO_(_dz);
+  }
   var i = s.search(/[T ]/);
   var f = _dmyAISO_(i < 0 ? s : s.slice(0, i));
   /* ⚠️ Y LA HORA SE RECORTA POR DELANTE: con DOS espacios, `r` empezaba por un blanco
@@ -5550,6 +5629,25 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-21-avisos-auditor', fecha:'2026-10-21',
+      titulo:'Avisos: cada uno a su pantalla, y la portada dice lo que te toca',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Tocar un aviso abre **su pantalla** (Horas, Docs, Reuniones, Turnos), no la portada; y con la app ya abierta cambia de pestaña **sin recargar** (no pierdes lo que estuvieras escribiendo).'},
+        {cara:'movil', vista:'estado', txt:'La **portada** avisa de lo que te toca: partes por firmar, tus fichajes sin declarar o con detalle pedido, documentos por revisar y la disponibilidad de turnos sin contestar.'},
+        {cara:'movil', vista:'horas', txt:'El número de la pestaña **Horas** cuenta lo que te toca hacer (firmar, declarar, dar detalle), no tus partes esperando a otra persona: un coordinador con 4 por firmar veía 0.'},
+        {cara:'escritorio', vista:'panel', txt:'La tarjeta de sanciones del Panel de mando dice **cuántas hay por decidir en total**, la misma cifra que la pestaña (antes, sólo las del bloque elegido).'},
+        {cara:'escritorio', vista:'sindeclarar', txt:'**«Sin declarar»** sale para todos (son tus fichajes): antes sólo la veía el admin.'},
+        {cara:'escritorio', vista:'automatismos', txt:'Automatismos: «Comprobarlo ahora» ya no deja la pantalla en «Sin fecha» con todo «sin interruptor»; lo comprobado se rotula «Comprobado por el motor el …»; el aviso de «el motor pasó hace…» se refresca; y los avisos de la convocatoria dicen que dependen de su interruptor de Turnos.'},
+        {cara:'movil', vista:'estado', txt:'En Ajustes, Reuniones dice que avisa también **cuando te convocan**, y turnos y reuniones «no se pueden apagar aquí» (antes «llegan siempre», aunque el envío dependa del director).'}
+      ] },
+    { id:'2026-10-21-ranking-cuota', fecha:'2026-10-21',
+      titulo:'Ranking y cuota: las cifras de cada uno, como las calcula el servidor',
+      items:[
+        {cara:'movil', vista:'horas', txt:'«Horas por subsistema» ya no te pone tu unidad primera con «1 personas»: usa la media por unidad que manda el servidor.'},
+        {cara:'escritorio', vista:'ranking', txt:'Un coordinador ve **su puesto** («Vas 5.º de 22»), como en el móvil; la columna Coche dice 0 a quien no ha ido con coche.'},
+        {cara:'escritorio', vista:'registro', txt:'El Registro del mes y el titular «quien más horas lleva» se ordenan por la cifra que enseñan (el día 1, el PD ya no gana por su cargo).'},
+        {cara:'movil', vista:'reu', txt:'Un plazo escrito corto (6/9/2026, 06/09/26) o guardado en UTC se lee bien: antes podía quedarse abierto para siempre o con dos horas de más.'}
+      ] },
     { id:'2026-10-21-sanciones-auditor', fecha:'2026-10-21',
       titulo:'Sanciones: lo que ofrece cada pantalla, igual que el servidor',
       items:[

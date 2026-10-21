@@ -90,10 +90,14 @@ function colaDecision(){
   /* ⛔ …y con `LOTE.items.length`: sin eso, la tarjeta seguía saliendo diciendo
      «0 personas · Art. libre · nada se aplica hasta cerrarlo entero», que manda al PD
      a una pantalla donde no hay nada que hacer. */
-  if(!LOTE.cerrado && LOTE.items.length && rangoNom(ACTOR)>=3)
-    out.push({ic:'i-gavel',b:'Bloque de sanciones · '+LOTE.nombre,
-      s:LOTE.items.length+' personas · Art. '+LOTE.art+' · nada se aplica hasta cerrarlo entero',
-      chip:'<span class="chip no">bloque abierto</span>',ir:'sanciones',foco:'lote'});
+  /* ⛔ 21/10 (auditor 7, 🟡 10): y con la MISMA cuenta que el globo de Sanciones (`conteo`: todas las pendientes, de
+     todos los bloques y las sueltas), no `LOTE.items` — con 7 en tres bloques decía 2, y con el bloque del desplegable
+     cerrado desaparecía con 5 esperando. Sin respuesta del servidor, `conteo` cae al bloque (lo de antes). */
+  var _sp=conteo('sanciones');
+  if(_sp && rangoNom(ACTOR)>=3)
+    out.push({ic:'i-gavel',b:'Sanciones por decidir',
+      s:_sp+(_sp===1?' pendiente':' pendientes')+' · nada se aplica hasta cerrar su bloque',
+      chip:'<span class="chip no">por decidir</span>',ir:'sanciones',foco:'lote'});
   REUS.forEach(function(r0){
     /* 950.ª: sólo si te toca a ti fijarla (el convocante, o el PD con la cuenta admin) — ver `_fijarEsMio_`. */
     if(r0.fijada || !_fijarEsMio_(r0)) return;
@@ -170,8 +174,9 @@ function insightsHTML(){
     xs.push(['wa', _sinMes
       ? 'Todavía no ha llegado el dato del mes (cuál está abierto y cuántos días lleva), así que no se puede comparar con el anterior.'
       : 'Todav\u00eda no hay horas del mes anterior, as\u00ed que no se puede comparar la evoluci\u00f3n.']);
-    var top=_activos_().slice().sort(function(a,b){return (b.hMes||0)-(a.hMes||0);})[0];
-    if(top) xs.push(['up',esc(top.pila)+' es quien m\u00e1s horas lleva este mes: '+h1(top.hMes||0)+'.']);
+    /* 21/10 (auditor 6): devengado, como Miembros y Registro — en crudo el PD (7 h de base el día 1) ganaba por su cargo */
+    var top=_activos_().slice().sort(function(a,b){return (_hMesDevCara_(b)||0)-(_hMesDevCara_(a)||0);})[0];
+    if(top) xs.push(['up',esc(top.pila)+' es quien m\u00e1s horas lleva este mes: '+h1(_hMesDevCara_(top)||0)+'.']);
   }
   var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
   if(enAire>0) xs.push(['wa',h1(enAire)+' están sin firmar. Mientras sigan ahí, el umbral del mes y el '+

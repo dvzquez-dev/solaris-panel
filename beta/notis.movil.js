@@ -217,8 +217,9 @@ function _pintarNotisLista_(){
   if(!filas){ c.innerHTML='<p class="rnota" style="margin:0">El servidor no ha listado '+
     'ningún tipo de aviso.</p>'; return; }
   c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0"><b>Turnos</b>, <b>reuniones</b> y '+
-    '<b>avisos y sanciones</b> llegan siempre: llevan plazo y consecuencias, y perdérselos no '+
-    'es una molestia, es una sanción. Lo demás lo eliges tú.</p>';
+    '<b>avisos y sanciones</b> no se pueden apagar aquí: llevan plazo y consecuencias, y perdérselos '+
+    'no es una molestia, es una sanción. (Que salgan depende de que el director tenga encendido cada envío.) '+
+    'Lo demás lo eliges tú.</p>';
   $$('[data-noti]',c).forEach(function(b){
     b.onclick=async function(){
       var k=b.dataset.noti, antes=NOTIS_PREF[k]!==false;

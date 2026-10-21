@@ -1668,8 +1668,9 @@ function _cuotaHTML_(){
         ? 'Se recalcula <b>con tus horas de ahora mismo</b>, no en el último cierre. '
         : '<b>Es la última cifra que sirvió el servidor</b>, no la de ahora: aún falta el '+
           'padrón del equipo para recalcularla aquí. ')+
-      'Sale de tus horas de la temporada: el objetivo se mueve entre 8 y 15 h/mes, con '+
-      nf2(_compBase_(YO))+' h de base. Se descuentan 4 € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>';
+      /* 21/10 (auditor 6): las cifras salen de sus constantes, no se teclean */
+      'Sale de tus horas de la temporada: el objetivo se mueve entre '+nf2(UMBRAL_LO)+' y '+nf2(UMBRAL_HI)+' h/mes, con '+
+      nf2(_compBase_(YO))+' h de base. Se descuentan '+nf2(_descuentoCoche_())+' € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>';
 }
 
 /* ═══ DECIDIR PARTES DE HORAS DESDE EL MÓVIL ════════════════════════════════════════

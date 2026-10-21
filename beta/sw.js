@@ -207,6 +207,12 @@ self.addEventListener('fetch', (e) => {
 });
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
+/* ⛔ 21/10 (auditor 7, 🟡 13): un aviso LLEVA A SU PANTALLA. El emisor manda un destino corto (`#horas`) y aquí se
+   cuelga de NUESTRO ámbito — el mismo aviso sirve a beta y a producción sin que el emisor sepa en cuál estás. */
+function _urlAviso_(u){
+  return (typeof u === 'string' && u.charAt(0) === '#') ? APP_URL + u : (u || APP_URL);
+}
+
 // Llega una push: el emisor manda un JSON {title, body, url?, tag?, icon?, badge?}.
 self.addEventListener('push', (event) => {
   let d = {};
@@ -219,7 +225,7 @@ self.addEventListener('push', (event) => {
     badge: d.badge || BADGE,
     tag: d.tag || undefined,                  // mismo tag = agrupa/reemplaza (p.ej. una reunión concreta)
     renotify: !!d.tag,
-    data: { url: d.url || APP_URL },
+    data: { url: _urlAviso_(d.url) },
   };
   event.waitUntil(self.registration.showNotification(title, opts));
 });
@@ -235,6 +241,10 @@ self.addEventListener('notificationclick', (event) => {
       // producción y le NAVEGABA encima. Se compara contra el ámbito propio.
       if (c.url.indexOf(APP_URL) === 0 && 'focus' in c) {
         await c.focus();
+        /* 21/10 (🟡 13): con la app YA abierta, a su pantalla por MENSAJE: navegar la recargaría y perdería lo que
+           estuvieras escribiendo. */
+        const h = url.indexOf('#');
+        if (h >= 0 && url.indexOf(APP_URL) === 0) { try { c.postMessage({ tipo: 'ir', a: url.slice(h + 1) }); } catch (_) {} return; }
         if ('navigate' in c && url && !c.url.endsWith(url)) { try { await c.navigate(url); } catch (_) {} }
         return;
       }
