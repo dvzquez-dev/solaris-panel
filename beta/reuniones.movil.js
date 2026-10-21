@@ -175,6 +175,10 @@ function _normReuM_(r){
              : (Array.isArray(r.fijadaBl) ? r.fijadaBl : []);
   var _ord=_ordenarFranjas_({franjas:F, bloques:bl, fijadaBl:_fijPrev});
   F=_ord.franjas; bl=_ord.bloques; _fijPrev=_ord.fijadaBl;
+  /* 21/10 (auditor 13, 🟡 11): la permutación hasta los índices ORIGINALES, COMPUESTA con la que ya traía (aquí se
+     re-normaliza lo ya normalizado, y entonces `_ord.orig` es la identidad). Fijar la usa para hablar con el servidor. */
+  var _o0=Array.isArray(r._franjaOrig) ? r._franjaOrig : null;
+  var _forig=(_ord.orig||[]).map(function(i){ return (_o0 && _o0[i]!==undefined) ? _o0[i] : i; });
   var calor=_calorDe_({dias:dias, franjas:F, bloques:bl, resp:resp}, false);
   var pond =_calorDe_({dias:dias, franjas:F, bloques:bl, resp:resp}, true);
   /* `fijada` viene del backend como OBJETO con los indices ({fecha,franjas,bloques,label}).
@@ -189,7 +193,7 @@ function _normReuM_(r){
        una cadena distinta a la del motor. */
     modalidad:r.modalidad||'hibrida', limite:r.limite||null, fijada:fij||null, fijadaBl:fijBl,
     fecha:r.fecha||null, creado:r.creado||null,
-    convocante:r.convocante||'', dias:dias, franjas:F, bloques:bl, resp:resp,
+    convocante:r.convocante||'', dias:dias, franjas:F, bloques:bl, resp:resp, _franjaOrig:_forig,
     /* ⛔ Se LEE y se conserva: el cable entre las dos funciones lo vigila `probar_reunion_movil.py`
        comparando lo que esta lee con lo que `_fuenteReuM_` entrega. Un campo que una lee y la
        otra no entrega es el fallo que ya paso CUATRO veces en este mismo objeto. */
@@ -250,6 +254,9 @@ function _fuenteReuM_(R, base, resp, ag){
     /* ⛔ Los NOMBRES si los hay (817.a); `new Array(nInv)` solo para una reunion que llego sin ellos. */
     invitados:(Array.isArray(R.invitados) && R.invitados.length) ? R.invitados.slice() : new Array(R.nInv),
     resp:resp, nResp:R.nResp,
+    /* 21/10 (auditor 13, 🟡 11): la permutación hasta los índices ORIGINALES sólo vale si se re-normaliza LO YA
+       NORMALIZADO (`R`); con las franjas del servidor (`base`, en su orden original) se calcula de cero. */
+    _franjaOrig: delServidor ? null : R._franjaOrig,
     /* ⛔ `agregado` LO DECIDE EL SERVIDOR Y AQUI SOLO SE ARRASTRA. Volver a aplicar la regla
        («¿es oculta? ¿convoco yo?») serian DOS criterios para la misma pregunta, y acaban
        siendo dos preguntas distintas. Y deducirlo de «no me han llegado filas» tampoco vale:
@@ -1310,7 +1317,10 @@ function fijarModal(){
       tost('Sin conexión no se puede fijar: no llegaría a nadie más.'); return; }
     b.disabled=true; var prev=b.textContent; b.textContent='Fijando…';
     try{
-      await api.fijar(R2.id, {label:etiqueta, bloques:bloques, franjas:[lo,hi]});
+      /* 21/10 (auditor 13, 🟡 11): al servidor, en índices ORIGINALES (como fija el escritorio); aquí, los de pantalla. */
+      var _O=R2._franjaOrig||[], _ox=function(f){ return _O[f]===undefined ? f : _O[f]; };
+      var _bloqSrv=bloques.map(function(x){ return [x[0], _ox(x[1])]; });
+      await api.fijar(R2.id, {label:etiqueta, bloques:_bloqSrv, franjas:[_ox(lo),_ox(hi)]});
       R2.fijada=etiqueta; R2.fijadaBl=bloques;
       cerrarModal();
       tost('Reunión fijada: '+etiqueta+'. La disponibilidad queda cerrada.');

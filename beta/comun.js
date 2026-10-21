@@ -2544,15 +2544,18 @@ function _avisarSesionMuerta_(){
 function _ordenarFranjas_(r){
   var F=(r&&r.franjas)||[], bl=(r&&r.bloques)||[], fij=(r&&r.fijadaBl)||[];
   var idx=F.map(function(_,i){ return i; });
+  /* 21/10 (auditor 13, 🟡 11): `orig[k]` = el índice ORIGINAL de la franja que queda en la posición k. Lo que vuelve al
+     servidor (fijar) va en índices originales: es como lo guarda y como lo re-mapean las dos caras al recargar. */
   if(idx.every(function(i){ return i===0 || _minHM_(F[i-1])<=_minHM_(F[i]); }))
-    return {franjas:F, bloques:bl, fijadaBl:fij, cambio:false};
+    return {franjas:F, bloques:bl, fijadaBl:fij, cambio:false, orig:idx};
   idx.sort(function(a,b){ return _minHM_(F[a])-_minHM_(F[b]); });
   var pos=[]; idx.forEach(function(vi,k){ pos[vi]=k; });
   return {
     franjas:  idx.map(function(i){ return F[i]; }),
     bloques:  bl.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
     fijadaBl: fij.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
-    cambio:   true
+    cambio:   true,
+    orig:     idx
   };
 }
 
@@ -5303,14 +5306,16 @@ function _identidadPrestada_(visto){
    «¿se acabó el plazo?», no «¿empezó?». Y `=== false`, no `!cv.abierta`: una
    convocatoria vieja sin el campo es «no lo sé», y cerrarla sería inventar. */
 function _convEstado_(cv, ahora){
-  var t=ahora?+ahora:Date.now();
+  /* ⛔ 21/10 (auditor 13, 🟡 10): EN HORA DE MADRID Y COMO CADENA, igual que el servidor (`estado_conv`). Con
+     `Date.parse` el plazo dependía de la zona del aparato: en Canarias o fuera de España salía «abierta» un plazo que el
+     servidor ya cerraba. `ahora` (milisegundos) sigue valiendo para los casos. */
+  var t=_ahoraLocalISO_(ahora ? new Date(+ahora) : new Date());
   /* ⛔ POR `_normAbre_`, QUE ES LA HERMANA DE `_normLimite_` (463.ª). Aqui habia un
      `_dmyAISO_` a pelo, o sea el mismo defecto que la 295.ª curo para `limite` y que
      aqui seguia vivo: `Date.parse('01/10/2026 22:00')` lee **MM/DD** y devolvia
      `abierta` sobre un plazo que aun no ha abierto. */
-  var a=Date.parse(_normAbre_(cv&&cv.abre)),
-      l=Date.parse(_normLimite_(cv&&cv.limite));
-  if(isNaN(a)||isNaN(l)) return 'cerrada';
+  var a=_normAbre_(cv&&cv.abre), l=_normLimite_(cv&&cv.limite);
+  if(isNaN(Date.parse(a))||isNaN(Date.parse(l))) return 'cerrada';
   if(t<a) return 'sin_abrir';
   if(cv && cv.abierta === false) return 'cerrada';
   return t<=l ? 'abierta' : 'cerrada';

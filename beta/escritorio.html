@@ -113,13 +113,13 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=175d273"></script>
+<script src="comun.js?v=b40468c"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
 <script src="turnos.escritorio.js?v=f52ae87"></script>
 <script src="buzon.escritorio.js?v=750fdd3"></script>
 <script src="documentos.escritorio.js?v=865da1f"></script>
-<script src="sanciones.escritorio.js?v=dc78b0b"></script>
+<script src="sanciones.escritorio.js?v=b2dc300"></script>
 <script src="reuniones.escritorio.js?v=d2ac50f"></script>
 <script src="horas.escritorio.js?v=97bc56f"></script>
 <script src="equipo.escritorio.js?v=6bc0159"></script>
@@ -3468,7 +3468,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='795dfa4';
+var BUILD='19aa3e5';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3561,7 +3561,12 @@ function _pinSancEditar_(m){
       /* ⛔ 21/10 (auditor de sanciones): la puerta de «Poner» (`_validaPuntosSanc_`), no `isNaN(Number(pts))` — con eso el
          campo VACÍO pasaba como 0 = aviso, y `1.5`/`-7` llegaban al servidor para que los rechazase. Una revocación o un
          premio no son una sanción: entero de −5 a 2, como el servidor. */
-      var _vpE = _esNoJustificable_(s.origen, s.extra)
+      /* 21/10 (auditor 12, 🟡 10): una REVOCACIÓN devuelve puntos, de 0 a 5 (como el servidor): en negativo restaría y
+         además anularía la original. */
+      var _vpE = (s.origen === 'revocacion')
+        ? (/^\s*[+]?\d+\s*$/.test(String(pts)) && +pts >= 0 && +pts <= 5 ? {ok:true, pts:parseInt(pts,10)}
+                                                                  : {ok:false, msg:'Una revocación devuelve un entero de 0 a 5.'})
+        : _esNoJustificable_(s.origen, s.extra)
         ? (/^\s*[+-]?\d+\s*$/.test(String(pts)) && +pts >= -5 && +pts <= 2 ? {ok:true, pts:parseInt(pts,10)}
                                                                      : {ok:false, msg:'Un entero de −5 a 2.'})
         : _validaPuntosSanc_(pts);

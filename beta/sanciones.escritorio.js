@@ -239,7 +239,7 @@ function _panelSueltas_(){
     '<div class="nota">Cada suelta se decide por su cuenta: no comparten motivo ni comunicado. '+
     '<b>Editar</b> corrige puntos, motivo y artículo <b>al aplicarla</b> —es lo único que deja el '+
     'backend—. Una ya aplicada no se edita: se <b>revoca</b> abajo, en «Se pueden revocar», que es la vía de '+
-    'apelación del Art. 34.</div>');
+    'apelación.</div>');
 }
 
 
@@ -285,7 +285,7 @@ function _panelRevocarSanc_(){
   for (i = 0; i < lista.length; i++) cuerpo += _revocarSancCard_(lista[i]);
   return pan('Se pueden revocar', lista.length + '',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">' +
-    'La v\u00eda de apelaci\u00f3n del <b>Art. 34</b>: una sanci\u00f3n ya aplicada se retira con un ' +
+    'La v\u00eda de apelaci\u00f3n: una sanci\u00f3n ya aplicada se retira con un ' +
     '<b>motivo</b>, y la revocaci\u00f3n entra en la cola como pendiente \u2014 se confirma con su ' +
     'bloque, igual que una sanci\u00f3n. <b>Queda el rastro de las dos.</b></p></div>' + cuerpo);
 }
@@ -577,11 +577,12 @@ function _cablearPonerSanc_(){
     }
     if(!backendOK || !SESION){ msg('Sin conexi\u00f3n no se puede: esto escribe en la cola de verdad.', true); return; }
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando\u2026';
+    var _movido=false;
     try{
       /* EL ORDEN IMPORTA: primero Notion, luego la sancion. Al reves quedaria la sancion puesta
          y la tarea con la fecha vieja, que es la unica de las dos combinaciones malas que NO se
          ve mirando la cola. */
-      if(esDePlazo){ msg('Moviendo el plazo en Notion\u2026'); await api.moverLimiteTarea(urlTarea, plazo); }
+      if(esDePlazo){ msg('Moviendo el plazo en Notion\u2026'); await api.moverLimiteTarea(urlTarea, plazo); _movido=true; }
       /* ⛔ GEMELA DE `sanciones.movil.js`: la respuesta se lee. El backend salta a quien no
          es tuyo y lo devuelve en `rechazadas`; sin mirarlo, el `tost` cantaria una sancion
          que no existe. Se relanza para caer en el `catch` de siempre. */
@@ -635,7 +636,8 @@ function _cablearPonerSanc_(){
       pintar();
     }catch(e){
       bt.disabled=false; bt.textContent=prev;
-      msg('No se pudo: '+((e&&e.message)||e), true);
+      /* 21/10 (auditor 12, 🟡 11): si el plazo YA se movió, se dice — y reintentar es seguro (misma fecha, misma clave). */
+      msg('No se pudo: '+((e&&e.message)||e)+(_movido ? ' — el plazo YA se movió en Notion; reintentar es seguro.' : ''), true);
     }
   };
 }

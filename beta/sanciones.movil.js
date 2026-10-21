@@ -338,6 +338,7 @@ function _cablearSanciones_(){
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
       msg('Sin conexión no se puede: esto escribe en la cola de verdad.', true); return; }
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando…';
+    var _movido=false;
     try{
       /* EL ORDEN IMPORTA: primero Notion, luego la sancion. Si Notion falla no se sanciona;
          al reves quedaria la sancion puesta y la tarea con la fecha vieja, que es la unica de
@@ -345,6 +346,7 @@ function _cablearSanciones_(){
       if(mot==='plazo'||mot==='plazoUrg'){
         msg('Moviendo el plazo en Notion…');
         await api.moverLimiteTarea(urlTarea, plazo);
+        _movido=true;
       }
       /* ⛔ LA RESPUESTA SE LEE. El backend ya no lanza cuando la persona no es tuya: la
          SALTA y la devuelve en `rechazadas`. Sin mirarlo, el `tost` de abajo diria
@@ -399,7 +401,8 @@ function _cablearSanciones_(){
       _abrirSanciones_();
     }catch(e){
       bt.disabled=false; bt.textContent=prev;
-      msg('No se pudo: '+((e&&e.message)||e), true);
+      /* 21/10 (auditor 12, 🟡 11): si el plazo YA se movió, se dice — y reintentar es seguro (misma fecha, misma clave). */
+      msg('No se pudo: '+((e&&e.message)||e)+(_movido ? ' — el plazo YA se movió en Notion; reintentar es seguro.' : ''), true);
     }
   };
 
@@ -411,7 +414,11 @@ function _cablearSanciones_(){
     b.onclick=function(){ SANC_FALLO=false; _repintarSancM_(); _abrirSanciones_(); };
   });
   /* Sueltas: se deciden una a una. */
-  $$('[data-sok]').forEach(function(b){ b.onclick=function(){ _decidirSancM_(b.dataset.sok,'aprobar',b); }; });
+  /* 21/10 (auditor 12, 🟡 8): aprobar se CONFIRMA, como en el escritorio: levanta `aplicar_sanciones` y en dos minutos
+     va a Notion y al comunicado. */
+  $$('[data-sok]').forEach(function(b){ b.onclick=function(){
+    if(!confirm('¿Aprobar? Esto se aplica ya, no es un borrador.')) return;
+    _decidirSancM_(b.dataset.sok,'aprobar',b); }; });
   $$('[data-sno]').forEach(function(b){ b.onclick=function(){ _decidirSancM_(b.dataset.sno,'rechazar',b); }; });
   /* 21/10: justificar pide el motivo, como el escritorio; sin motivo no se manda nada. */
   $$('[data-sjust]').forEach(function(b){ b.onclick=function(){
@@ -490,7 +497,7 @@ function _cablearSanciones_(){
 async function _decidirSancM_(id, accion, b, opts){
   b.disabled=true;
   try{ await api.decidirSancion(id, accion, opts||{});
-    SANC_M=null; tost({aprobar:'Sanción aprobada.', justificar:'Sanción justificada: no resta puntos.'}[accion]||'Sanción rechazada.');
+    SANC_M=null; tost({aprobar:'Aprobada: se aplica ya.', justificar:'Sanción justificada: no resta puntos.'}[accion]||'Rechazada.');
     _abrirSanciones_();
   }catch(e){ b.disabled=false; tostErr('No se pudo: ', e); }
 }
