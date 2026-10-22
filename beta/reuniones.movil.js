@@ -412,6 +412,14 @@ function _proxReuHTML_(){
    apagaría a las 33 personas el día que el backend vaya por detrás del `.html`. */
 function _sinAgregadoM_(R){ return !!R && R.agregado === false; }
 
+/* 22/10 (auditor 23, 🟠 8): el NÚMERO de convocados que se enseña, sin quien ya está de baja (`_invitadosVivos_`).
+   `nInv` no se toca: es la cuenta del servidor y `#btnInvitados` la usa para saber si tiene la lista entera. Sin los
+   nombres (o con huecos), el número del servidor tal cual. */
+function _nConvM_(x){
+  var l = (x && Array.isArray(x.invitados)) ? x.invitados : [];
+  if(!l.length || l.length !== x.nInv || l.some(function(n){ return !n; })) return x ? x.nInv : 0;
+  return _invitadosVivos_(l).length;
+}
 function _duraTxtM_(r){
   var d = +(r && r.duracion) || 0;
   return d > 0 ? ' \u00b7 dura ' + _durTxt_(d) : '';
@@ -622,13 +630,13 @@ function vReu(){
           var sel=(x.id===R.id);
           return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
             '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
-            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+x.nInv+' convocados'+
+            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+_nConvM_(x)+' convocados'+
             _duraTxtM_(x)+'</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':'<span class="chev">›</span>')+'</div></div>'; }).join('')+'</div>'
       : '')+
     '<div class="tarj">'+cab(R.tipo||'General', _modalidadTxt_(R.modalidad))+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
-      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+R.nInv+' convocados'+
+      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+_nConvM_(R)+' convocados'+
       _duraTxtM_(R)+'</small></div>'+
       '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento)?'conf':'no')+'">'+
         (R.fijada?'fijada':(R.exento?'organizas':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div>'+
@@ -698,7 +706,7 @@ function vReu(){
       (hib?'<div class="modos" id="calModo" style="margin-bottom:10px">'+
         '<button data-pond="0" class="'+(pondOn?'':'on')+'" data-p>Personas</button>'+
         '<button data-pond="1" class="'+(pondOn?'on':'')+'" data-p>Ponderada</button></div>':'')+
-      '<p class="rnota" style="margin:0 0 10px"><b>'+R.nInv+'</b> convocados · mejor hueco '+
+      '<p class="rnota" style="margin:0 0 10px"><b>'+_nConvM_(R)+'</b> convocados · mejor hueco '+
       _titularHueco_(R, vent, _nresp, pondOn)+'</p>'+
       g+
       '<p class="rnota" data-qpbox="'+esc(R.id)+'" style="margin:9px 0 0">Toca un hueco del mapa para ver quién puede.</p>'+

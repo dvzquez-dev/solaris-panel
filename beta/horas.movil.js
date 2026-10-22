@@ -463,7 +463,13 @@ function _compHorasHTML_(base, crudo){
     f+=deltaHTML('vs. '+_nomAnt, ritmo, rAnt, nf2(rAnt)+' h/día en '+_nomAnt);
   }
   var me=_mediaEquipo_();
-  if(me>0) f+=deltaHTML('vs. equipo', ritmo, me/dia, nf2(me/dia)+' h/día de media');
+  /* 22/10 (auditor 23, 🟠 10): a quien acaba de ENTRAR, su ritmo se dividía por los días desde el cierre (18), no por
+     los suyos: «VS. EQUIPO −100 %» en rojo el primer día. La app no sabe su día de alta, así que no se finge un
+     prorrateo (eso lo decide Daniel): se dice por qué no hay comparación. */
+  var _nuevo=_recienLlegado_(YO);
+  if(me>0 && !_nuevo) f+=deltaHTML('vs. equipo', ritmo, me/dia, nf2(me/dia)+' h/día de media');
+  if(_nuevo) return '<div class="comph"><p class="rnota" style="margin:0">Es tu primer mes en el equipo: la comparación '+
+    'con el resto sale después de tu primer cierre (hoy se haría con días en los que aún no estabas).</p></div>';
   if(!f) return '';
   /* Que se vea CONTRA QUE se compara uno. Sin esto, «+12 %» respecto a un ritmo no se
      distingue de «+12 %» respecto a un total, y son cosas distintas. */
@@ -2138,7 +2144,9 @@ function vHoras(){
   var puesto=+YO.puesto||0;
   /* ⛔ 19/10: SIN LAS BAJAS, como el `ranking.total` que ya las quita: contar las 32 de `miembros` pisaba ese 23 por
      el `max` y al último de verdad le salían dos rayas debajo que eran bajas. */
-  var total=Math.max(+((_rk&&_rk.total))||0, (DATA&&DATA.miembros&&DATA.miembros.filter(function(m){ return !m.baja; }).length)||0, puesto);
+  /* 22/10 (auditor 23, 🟡 3): y sin quien NO TIENE CIERRES, que el servidor tampoco cuenta (no tiene puesto): cada alta
+     nueva añadía una raya anónima debajo del último. */
+  var total=Math.max(+((_rk&&_rk.total))||0, (DATA&&DATA.miembros&&DATA.miembros.filter(function(m){ return !m.baja && !_sinCierres_(m); }).length)||0, puesto);
   var filas='';
   /* ⛔ Y «NO SÉ CUÁNTAS HORAS POR MES» NO SE PINTA COMO UN NÚMERO. `YO.horasTemp/YO.meses`
      sin guarda da **Infinity** con `meses:0` —y `h1` lo formatea como **«∞ h»**—, y **NaN**
@@ -2251,9 +2259,14 @@ function vHoras(){
                horas. `_llego_` es la misma puerta que ya usan el libro de puntos y las
                sanciones del escritorio. */
             : (typeof _llego_==='function' && !_llego_('partesM')
-              ? vacio('No se han podido leer sus partes',
+              /* 22/10 (auditor 23, 🟡 11): en tercera persona sólo con «Ver como»; los TUYOS, en segunda. */
+              ? (_fichaYo_()===String((YO&&YO.nombre)||'')
+                ? vacio('No se han podido leer tus partes',
+                    'El servidor no ha contestado, as\u00ed que esto NO quiere decir que no tengas '+
+                    'ninguno. Vuelve a entrar en Horas para reintentarlo.', '', false)
+                : vacio('No se han podido leer sus partes',
                   'El servidor no ha contestado, as\u00ed que esto NO quiere decir que no tenga '+
-                  'ninguno. Vuelve a entrar en su ficha para reintentarlo.', '', false)
+                  'ninguno. Vuelve a entrar en su ficha para reintentarlo.', '', false))
               : vacio('Ningún parte en cola',
                 'No tienes horas esperando firma. Las que envíes aparecerán aquí con su estado '+
                 'hasta que se firmen.','ficha desde la pestaña Fichar', false))))+

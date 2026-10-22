@@ -327,6 +327,12 @@ function _pintarSiCambia_(el, clave, html){
 
 
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
+/* 22/10 (auditor 23, 🟠 8): los convocados que SIGUEN en el equipo, como el motor (`universo_convocado` sobre vivos).
+   Si el censo no se conoce (menos de 2 activos: maqueta sin panel), la lista tal cual -- «no lo sé» no vacía a nadie. */
+function _invitadosVivos_(lista){
+  var viv = _activos_().map(function(m){ return m.nombre; });
+  return viv.length >= 2 ? (lista||[]).filter(function(n){ return viv.indexOf(n) >= 0; }) : (lista||[]).slice();
+}
 /* El mes ABIERTO, calculado con quien esta: `{media, gente}`, o `null` si no se sabe.
    Daniel, 04/10: *«y el objetivo de horas q aparece recuerda q tiene q estar vivo y eso»*.
 
@@ -1308,6 +1314,13 @@ function _sinCierres_(m){
    con un mes en curso). Aqui solo se anade el brazo del «no lo se», porque las dos
    preguntas son distintas: para el RANKING, ausente = no se echa a nadie; para el
    DINERO, ausente = no se perdona nada. */
+/* 22/10 (auditor 23, 🟠 10): quien ha ENTRADO A MITAD de temporada — sin cierres suyos cuando otros del equipo ya los
+   tienen. En septiembre nadie tiene cierres y esto da `false` a todos (la comparativa sigue como siempre). Si el panel no
+   trae `cierres` de los demás, también `false`: «no lo sé» deja la pantalla como estaba. */
+function _recienLlegado_(m){
+  return _sinCierres_(m) && _activos_().some(function(x){ return typeof x.cierres === 'number' && x.cierres > 0; });
+}
+
 function _exentoPrimerMes_(m){
   if(!m || typeof m.cierres !== 'number') return null;
   return _sinCierres_(m);
@@ -5895,6 +5908,13 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-22-primer-dia', fecha:'2026-10-22',
+      titulo:'El primer día de quien entra a mitad de temporada',
+      items:[
+        {cara:'movil', vista:'horas', txt:'En **Horas**, quien acaba de entrar (sin cierres suyos mientras el resto sí los tiene) ya no ve «vs. equipo −100 %» en rojo: ve que la comparación sale tras su primer cierre. Y el ranking ya no pinta rayas vacías debajo del último.'},
+        {cara:'movil', vista:'reu', txt:'En **Reuniones**, «N convocados» ya no cuenta a quien se ha dado de baja.'},
+        {cara:'escritorio', vista:'panel', txt:'En el **Panel de mando**, «bajo el umbral» ya no cuenta a quien aún no tiene cierres; y en el **Registro del mes**, con una sola ficha visible la «MEDIA» es «—».'}
+      ]},
     { id:'2026-10-22-bajas', fecha:'2026-10-22',
       titulo:'Quien se da de baja deja de salir en riesgo',
       items:[

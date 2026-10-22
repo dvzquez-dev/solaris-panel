@@ -1025,8 +1025,7 @@ function _cobertura_(r){
      sobre `vivos`, `sanciones.py:679`). Una baja invitada —la reunión se convocó antes de que se fuera— salía aquí «sin
      cubrir · sanción que implicaría» con su nombre. Se cruza con los activos que la cara conoce; con menos de dos no hay
      lista fiable de quién está (§3c-24) y no se filtra. */
-  var _viv = _activos_().map(function(m){ return m.nombre; });
-  if(_viv.length >= 2) universo = universo.filter(function(n){ return _viv.indexOf(n) >= 0; });
+  universo = _invitadosVivos_(universo);
   /* ⛔⛔ 21/10 (auditor 10, 🟠 3): AÚN SIN LEER. Las filas llegan después (`_hidratarReus_`), y si esa lectura falla
      se quedan vacías: contarlas decía «0 de 3 han cubierto · 3 en riesgo» con nombres y apellidos, cuando el
      servidor dice que han contestado (`nResp`). Sin filas y con respuestas, no se sabe quién: el recuento del
