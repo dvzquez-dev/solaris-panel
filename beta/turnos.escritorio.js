@@ -729,12 +729,18 @@ function _dispCargar_(repintar){
        **no el valor a secas**: leer la entrada directamente daría un OBJETO —que es
        cierto— y el interruptor saldría encendido siempre, incluido el día que esté
        apagado. Es el mismo fallo que tuvo el gate meses con `calcular_cierre`. */
+    AVISOS_EST='leyendo';
     api.getControl().then(function(c){
       var e = c && c[INTERRUPTOR_AVISOS];
       var val = (e && typeof e==='object' && 'valor' in e) ? e.valor : e;
       AVISOS_ON = (val===true || val==='true' || val===1 || val==='1');
+      AVISOS_EST='ok';
       if(typeof repintar==='function') repintar();
-    }).catch(function(){});
+    }).catch(function(){
+      /* ⛔ 22/10 (auditor 26, 🟡 11): «no se pudo leer» NO es «apagado» — se pinta como lo que es. */
+      AVISOS_EST='error';
+      if(typeof repintar==='function') repintar();
+    });
   }
   api.getDisponibilidad().then(function(r){
     _dispEstadoSrv_('ok');
@@ -956,8 +962,12 @@ function _convocarDispPanel_(){
        a ciegas. */
     '<div class="sep"></div>'+
     '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px">'+
-      '<input type="checkbox" id="cdAvisos"'+(AVISOS_ON?' checked':'')+'> '+
+      '<input type="checkbox" id="cdAvisos"'+(AVISOS_ON?' checked':'')+(AVISOS_EST!=='ok'?' disabled':'')+'> '+
       '<b>mandar los avisos al móvil</b></label>'+
+    /* 22/10 (auditor 26, 🟡 11): sin saber lo que hay guardado, la casilla no se toca y se dice por qué. */
+    (AVISOS_EST==='error' ? '<div class="nota" data-avisosest="error">⚠️ <b>No se pudo leer</b> si están encendidos: '+
+       'la casilla vacía <b>no</b> quiere decir apagados. Recarga para volver a mirar.</div>' :
+     AVISOS_EST==='leyendo' ? '<div class="nota" data-avisosest="leyendo">Leyendo si están encendidos…</div>' : '')+
     '<div class="nota" id="cdAvNota">Apagado, la rutina sigue calculando y deja escrito '+
       'lo que mandaría, pero <b>no sale nada</b>. Encendido, avisa al abrir, a las 24 h, '+
       'a las 3 h y a los 10 min — y el recordatorio <b>solo a quien no ha contestado</b> —, y '+
