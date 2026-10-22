@@ -5895,6 +5895,11 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-22-bajas', fecha:'2026-10-22',
+      titulo:'Quien se da de baja deja de salir en riesgo',
+      items:[
+        {cara:'escritorio', vista:'dispo', txt:'En **Disponibilidad y riesgo**, una persona que se dio de baja después de que la convocaran ya no sale «sin cubrir · sanción que implicaría» (el motor no la sanciona) ni cuenta en los convocados.'}
+      ]},
     { id:'2026-10-22-cierre-aplicando', fecha:'2026-10-22',
       titulo:'El cierre del mes dice si se está aplicando',
       items:[
