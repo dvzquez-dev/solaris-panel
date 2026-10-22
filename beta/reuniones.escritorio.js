@@ -840,7 +840,8 @@ function _convocadosBoxE_(r){
   var inv = Array.isArray(r.invitados) ? r.invitados.filter(function(n){ return !!n; }) : [];
   if(!inv.length) return '<div class="nota" style="margin-top:14px">Esta reuni\u00f3n lleg\u00f3 sin lista de '+
     'convocados: no se puede editar desde aqu\u00ed.</div>';
-  if(RE_INV_ID!==r.id || !RE_INV){ RE_INV=new Set(inv); RE_INV_ID=r.id; }
+  /* 22/10 (refutador 23, 🟡 5): sin quien ya está de baja — el «Convocados N» y lo que se guarda (🟡 4). */
+  if(RE_INV_ID!==r.id || !RE_INV){ RE_INV=new Set(_invitadosVivos_(inv)); RE_INV_ID=r.id; }
   return '<div style="margin-top:16px">'+
     '<span class="sc" style="display:block;margin-bottom:5px">Convocados <b id="reInvN">'+RE_INV.size+'</b></span>'+
     '<div id="reInvPool" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px">'+_poolPicksE_(RE_INV, 'data-einv')+'</div>'+

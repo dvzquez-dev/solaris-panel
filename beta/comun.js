@@ -1318,7 +1318,13 @@ function _sinCierres_(m){
    tienen. En septiembre nadie tiene cierres y esto da `false` a todos (la comparativa sigue como siempre). Si el panel no
    trae `cierres` de los demás, también `false`: «no lo sé» deja la pantalla como estaba. */
 function _recienLlegado_(m){
-  return _sinCierres_(m) && _activos_().some(function(x){ return typeof x.cierres === 'number' && x.cierres > 0; });
+  if(!_sinCierres_(m)) return false;
+  /* ⛔ 22/10 (refutador 23, 🟠 1): a un miembro RASO la forma miembro del panel NO le trae `cierres` de los demás, así
+     que lo de abajo no decidía nada justo para quien entra. Lo que sí le llega es `ranking.total`: cuenta sólo a quien
+     tiene PUESTO (= cierres), y en septiembre vale 0. */
+  var rk = (typeof DATA !== 'undefined' && DATA && DATA._ranking) || null;
+  if(rk && +rk.total > 0) return true;
+  return _activos_().some(function(x){ return typeof x.cierres === 'number' && x.cierres > 0; });
 }
 
 function _exentoPrimerMes_(m){

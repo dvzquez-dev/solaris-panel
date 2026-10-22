@@ -124,10 +124,13 @@ function normPMovil(p){
    ⛔ Y al fallar, `PARTES` se queda con la SEMILLA de fabrica: seis partes
    inventados que se ven como tus horas, en el desglose y en el globo del nav. */
 async function _cargarMisPartes_(){
+  /* ⛔ 22/10 (refutador 23, 🟠 2): `partesM` es lo que decide «no se han podido leer» frente a «ningún parte en cola», y
+     SÓLO lo marcaba `_verComo_`: a quien no tenía partes se le decía que el servidor no había contestado. */
+  var _ll=(typeof _llego_==='function') ? _llego_ : function(){};
   try{ var arr=await api.getPartes({mias:true});
-    if(!Array.isArray(arr)) return false;
-    PARTES=arr.map(normPMovil); CARGA.partes=true; return true; }
-  catch(e){ return false; }
+    if(!Array.isArray(arr)){ _ll('partesM', false); return false; }
+    PARTES=arr.map(normPMovil); CARGA.partes=true; _ll('partesM', true); return true; }
+  catch(e){ _ll('partesM', false); return false; }
 }
 
 /* Al entrar, retoma el fichaje que hubiera abierto en la nube: el reloj sigue desde la
@@ -2146,7 +2149,10 @@ function vHoras(){
      el `max` y al último de verdad le salían dos rayas debajo que eran bajas. */
   /* 22/10 (auditor 23, 🟡 3): y sin quien NO TIENE CIERRES, que el servidor tampoco cuenta (no tiene puesto): cada alta
      nueva añadía una raya anónima debajo del último. */
-  var total=Math.max(+((_rk&&_rk.total))||0, (DATA&&DATA.miembros&&DATA.miembros.filter(function(m){ return !m.baja && !_sinCierres_(m); }).length)||0, puesto);
+  /* ⛔ 22/10 (refutador 23, 🟡 3): y si el servidor manda `total`, MANDA ÉL. A un raso no le llegan los `cierres` de
+     los demás, así que contarlos aquí volvía a pintar las rayas anónimas; contar `miembros` queda para un panel sin total. */
+  var _nAct=(_rk && +_rk.total>0) ? 0 : ((DATA&&DATA.miembros&&DATA.miembros.filter(function(m){ return !m.baja && !_sinCierres_(m); }).length)||0);
+  var total=Math.max(+((_rk&&_rk.total))||0, _nAct, puesto);
   var filas='';
   /* ⛔ Y «NO SÉ CUÁNTAS HORAS POR MES» NO SE PINTA COMO UN NÚMERO. `YO.horasTemp/YO.meses`
      sin guarda da **Infinity** con `meses:0` —y `h1` lo formatea como **«∞ h»**—, y **NaN**
