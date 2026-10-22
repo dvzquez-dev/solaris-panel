@@ -137,8 +137,7 @@ function _cierreHTML_(est, err, cargando){
   var bloq=(est&&est.bloqueos)||[], enc=(est&&est.encolado)||null, plan=_planVigente_((est&&est.plan)||null);
   /* …y se dice en una línea, para que el plan viejo no parezca perdido. */
   var _viejo=(est && est.plan && !plan) ? est.plan : null;
-  if(_viejo) cab+='<p class="rnota">La última ranura del servidor trae el plan de <b>'+
-    esc(_nomPeriodo_(_viejo.periodo))+'</b>, de un mes ya cerrado: no es el cierre de ahora y no cuenta.</p>';
+  if(_viejo) cab+='<p class="rnota">'+_notaPlanViejo_(_viejo)+'</p>';   /* 22/10 (auditor 22, 🟡 6): la puerta común */
   /* ⛔ 21/10 (auditor 9, 🟠 3): un cálculo FALLIDO se dice, y uno NUEVO en cola también cuando ya hay plan (el `if(plan)`
      de abajo sale antes que el `if(enc)`, y tras pulsar «Calcular» se seguía viendo el plan anterior sin una palabra). */
   var _avc=_avisoCalculoCierre_(est);

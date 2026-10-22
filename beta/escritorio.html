@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=7a1f5bd"></script>
+<script src="comun.js?v=cfad145"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
 <script src="turnos.escritorio.js?v=3197a86"></script>
@@ -1440,6 +1440,9 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
              : (plan && enc) ? ['RECALCULÁNDOSE','wa']
              : hecho ? ['APLICADO','ok']
              : plan ? ['PLAN CALCULADO','ok'] : enc ? ['CALCULÁNDOSE','wa']
+             /* 22/10 (auditor 22, 🟡 6): con el mes aún corriendo no hay nada «listo para calcular» (el botón dice que
+                no ha terminado); el chip lo decía igual. */
+             : cer.curso ? ['MES EN CURSO','wa']
              : listo ? ['LISTO PARA CALCULAR','ok'] : ['BLOQUEADO','no'];
   var pasos=[
     ['Decidir los partes de horas', !bloq.filter(function(b){return b.que==='partes';}).length,
@@ -1465,8 +1468,7 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
       'aprueban después del cierre moverían el umbral y la cuota de alguien saldría mal, y una '+
       'sanción sin confirmar dejaría el comunicado incompleto.</div>')+
     /* 21/10 (auditor 9): la ranura trae un plan de un mes ANTERIOR al que toca cerrar — se dice, no se pinta como vigente */
-    (_planViejo ? '<div class="nota">La última ranura del servidor trae el plan de <b>'+esc(_nomPeriodo_(_planViejo.periodo))+
-      '</b>, de un mes ya cerrado: no es el cierre de ahora y no cuenta.</div>' : '')+
+    (_planViejo ? '<div class="nota">'+_notaPlanViejo_(_planViejo)+'</div>' : '')+   /* 22/10 (auditor 22, 🟡 6) */
     (plan
       ? pan('El plan está calculado', plan.personas+' personas',
           tabla([['Dato'],['Valor']],
@@ -3531,7 +3533,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b4055b2';
+var BUILD='8b6f2f6';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

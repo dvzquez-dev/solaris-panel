@@ -4021,6 +4021,20 @@ function _avisoCalculoCierre_(est){
          'plan nuevo; el aviso del gate dice por qué. Míralo antes de volver a pulsar.';
 }
 
+/* 22/10 (auditor 22, 🟡 6): LA LÍNEA DEL PLAN DE UN MES YA CERRADO, en las dos caras. Si quedó APLICADO entero es el
+   cierre que se acaba de hacer, y se dice así —con cuántas fichas—: nada más sellar, la pantalla decía de él «no es el
+   cierre de ahora y no cuenta» y escondía el resultado. Parado o a medias, la de siempre. Devuelve HTML (lleva <b>). */
+function _notaPlanViejo_(v){
+  if(!v) return '';
+  var mes='<b>'+esc(_nomPeriodo_(v.periodo))+'</b>', r=v.resultado||null;
+  if(v.aplicado && !v.parado && !_cierreIncompleto_(v)){
+    var n=(r && typeof r.aplicadas==='number') ? r.aplicadas : null;
+    return 'El último cierre, el de '+mes+', está <b>aplicado</b>'+
+      (n!==null ? ' ('+n+' ficha'+(n===1?'':'s')+' escrita'+(n===1?'':'s')+' en Notion)' : '')+'.';
+  }
+  return 'La última ranura del servidor trae el plan de '+mes+', de un mes ya cerrado: no es el cierre de ahora y no cuenta.';
+}
+
 function _planVigente_(plan, hoy){
   if(!plan) return null;
   var p=String(plan.periodo||''), toca=_mesACerrar_(hoy).p;
@@ -5857,6 +5871,7 @@ function _novedades_(){
       items:[
         {cara:'escritorio', vista:'cierre', txt:'Al pulsar **«Aplicar el cierre»**, el botón pasa a **«Aplicando…»** y se bloquea mientras la rutina escribe; si el último «Aplicar» **no terminó**, se dice con su día y su motivo encima del botón. Antes se veía igual que sin pulsar.'},
         {cara:'movil', vista:'estado', txt:'Lo mismo en el **cierre** del móvil: un «Aplicar» en curso o que no terminó se dice arriba.'},
+        {cara:'escritorio', vista:'cierre', txt:'**Nada más sellar** un cierre, la pantalla dice «El último cierre, el de octubre, está aplicado (N fichas escritas)» en vez de «no cuenta»; y mientras el mes corre, el chip dice **«MES EN CURSO»** (no «LISTO PARA CALCULAR»).'},
         {cara:'escritorio', vista:'cierre', txt:'Si el plan se quedó viejo (alguien tocó Notion entre «Calcular» y «Aplicar»), el aplicador **se planta sin escribir nada** — ni el Registro ni Notion — en vez de dejar el mes a medias.'},
         {cara:'escritorio', vista:'temporada', txt:'En el cierre de **temporada**, la cabeza del ranking enseña la columna **«h/mes (ordena)»**: el orden sale del ritmo (julio y agosto cuentan la mitad), no de las horas totales, y antes no se podía ver por qué alguien con menos horas iba delante.'}
       ]},
