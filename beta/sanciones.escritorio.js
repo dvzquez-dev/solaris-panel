@@ -715,7 +715,9 @@ function _loteReal_(){
      una red que no existe. */
   var lote=LOTES_PEND[_loteIdx_()];
   var its=pend.filter(function(s){ return s.lote===lote; });
-  LOTE={ real:true, lote:lote, nombre:lote, cerrado:false,
+  /* 22/10 (ensayo de la reunión #3, 🟡 8): el bloque dice de QUÉ reunión es, no sólo su código */
+  var _tl=_tituloLote_(lote, typeof REUS!=='undefined' ? REUS : []);
+  LOTE={ real:true, lote:lote, nombre:_tl ? _tl+' · '+lote : lote, cerrado:false,
     motivo:its[0].motivo||'—', art:its[0].articulo||'libre',
     /* ⛔ `_ptsSanc_`, NO `Number(s.puntos)||0` (758.a bis). Aqui es donde el «no llego»
        se convertia en un **0**, y a partir de este punto ya no hay forma de distinguirlo

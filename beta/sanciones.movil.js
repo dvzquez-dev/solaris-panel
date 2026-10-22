@@ -180,9 +180,10 @@ function _sancColaHTML_(){
   SANC_M.forEach(function(x){ var k=x.lote||'(sueltas)'; (porLote[k]=porLote[k]||[]).push(x); });
   return Object.keys(porLote).map(function(k){
     var it=porLote[k], suelta=(k==='(sueltas)');
+    var _tl=_tituloLote_(k, typeof REUNIONES_M!=='undefined' ? REUNIONES_M : []);   /* 🟡 8: de QUÉ reunión es */
     return '<div class="tarj"><div class="lote"><div class="lote-h">'+
       '<b>'+esc(_rotuloLote_(it))+'</b>'+
-      '<span class="mono" style="color:var(--red2)">'+esc(k)+'</span></div>'+
+      '<span class="mono" style="color:var(--red2)">'+esc(_tl ? _tl+' · '+k : k)+'</span></div>'+
       it.map(function(x){
         return '<div class="lote-i" style="flex-wrap:wrap;gap:6px">'+
           '<span class="n">'+esc(_pilaDeM_(x.nombre)||x.nombre||'')+'</span>'+
@@ -820,10 +821,10 @@ function panelPD(){
   SANC_M.forEach(function(x){ var k=x.lote||'(sueltas)'; (porLote[k]=porLote[k]||[]).push(x); });
   return '<h2 class="sec">Panel del PD<span class="ln"></span>disciplina</h2>'+
     Object.keys(porLote).map(function(k){
-      var it=porLote[k];
+      var it=porLote[k], _tl=_tituloLote_(k, typeof REUNIONES_M!=='undefined' ? REUNIONES_M : []);
       return '<div class="tarj"><div class="lote"><div class="lote-h">'+
         '<b>'+esc(_rotuloLote_(it))+'</b>'+
-        '<span class="mono" style="color:var(--red2)">'+esc(k)+'</span></div>'+
+        '<span class="mono" style="color:var(--red2)">'+esc(_tl ? _tl+' · '+k : k)+'</span></div>'+
         it.slice(0,8).map(function(x){
           return '<div class="lote-i"><span class="n">'+esc(_pilaDeM_(x.nombre)||x.nombre||'')+'</span>'+
             '<span class="mono" style="color:var(--ink3);font-size:10.5px">'+esc(x.motivo||'')+'</span></div>';

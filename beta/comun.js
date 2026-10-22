@@ -2984,6 +2984,21 @@ function _rotuloLote_(it){
   return out.join(' · ');
 }
 
+/* 22/10 (ensayo de la reunión #3, 🟡 8): el TÍTULO de la reunión de un lote `reunion-<id>`, buscado en la lista de
+   reuniones que ya tiene la cara (`titulo`, o `tit` en la semilla del escritorio). '' si el lote no es de una reunión,
+   o la reunión no está en la lista: entonces se queda el código, que es lo que había. ⛔ Con DOS lotes de las mismas
+   personas (la #2 pendiente y la #3), sólo el código no decía que eran reuniones distintas. */
+function _tituloLote_(lote, reus){
+  var m = /^reunion-(\d+)$/.exec(String(lote == null ? '' : lote));
+  if (!m) return '';
+  var L = Array.isArray(reus) ? reus : [];
+  for (var i = 0; i < L.length; i++){
+    var r = L[i];
+    if (r && String(r.id) === m[1]) return String(r.titulo || r.tit || '');
+  }
+  return '';
+}
+
 function _etSancFila_(pts, origen, extra){
   var o = String(origen == null ? '' : origen);
   var comp = extra && extra.compensacion;
@@ -5945,6 +5960,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-22-titulo-lote', fecha:'2026-10-22',
+      titulo:'Las propuestas de sanciones dicen de qué reunión son',
+      items:[
+        {cara:'movil', vista:'estado', txt:'En **Sanciones** del menú ⋮ (y en el Panel del PD), cada propuesta lleva el **título de su reunión** delante del código (`reunion-3`): con dos propuestas de las mismas personas se ve que son reuniones distintas.'},
+        {cara:'escritorio', vista:'sanciones', txt:'En la **Cola de sanciones**, el bloque abierto se llama por **su reunión** — también en el aviso de «Vas a cerrar el bloque…».'}
+      ]},
     { id:'2026-10-22-coches-turno', fecha:'2026-10-22',
       titulo:'Los coches de un turno, a la vista',
       items:[
