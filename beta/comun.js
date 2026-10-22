@@ -2333,8 +2333,12 @@ function _periodoParte_(p){
    el servidor explique; hacia «esconder» quita una acción legítima **sin decir por qué**, y
    eso no se puede depurar desde el móvil. */
 function _mesCerradoParte_(p, plan, uc){
-  var at  = (uc && uc.at) || (plan && plan.resultado && plan.resultado.at) || null;
-  var per = (uc && uc.periodo) || (plan && plan.periodo) || null;
+  /* ⛔ 22/10 (refutador 27, H3): un cierre APLICADO y aún sin sellar manda sobre el último sellado, como en el servidor
+     (`_parte_en_mes_cerrado`): sus horas ya están a cero en Notion y el servidor rechaza revertir. */
+  var _ps = (plan && plan.aplicado && plan.periodo && plan.resultado && plan.resultado.at &&
+             (!uc || !uc.periodo || String(plan.periodo) > String(uc.periodo))) ? plan : null;
+  var at  = _ps ? _ps.resultado.at : ((uc && uc.at) || (plan && plan.resultado && plan.resultado.at) || null);
+  var per = _ps ? _ps.periodo : ((uc && uc.periodo) || (plan && plan.periodo) || null);
   if (at && per){
     var cre = String((p && p.creado_at) || '');
     /* ⛔ `null` y no `false`: un parte sin `creado_at` es «no lo sé» (§3c-24), y es lo mismo
@@ -2499,7 +2503,7 @@ function _mcd_(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; }
       dan por vistos: al segundo siguiente se vuelve a intentar, y el cambio no se pierde. */
 var VIVO_CADA_MS = 1000;
 var VIVO_GRUPOS = {
-  getTurnos:      ['turnos','kv/turnos','kv/turnos_coches'],
+  getTurnos:      ['turnos','kv/turnos','kv/turnos_coches','kv/turnos_convocado_at'],   // la última: refutador 25, 🟡 9
   getTareas:      ['tareas','kv/tareas'],
   getEntregables: ['entregables','kv/entregables'],
   reuniones:      ['reuniones','respuestas','avisos-reunion','kv/convocatorias','kv/reu_max_id'],

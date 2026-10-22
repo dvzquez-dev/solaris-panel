@@ -730,7 +730,9 @@ function _dispCargar_(repintar){
        cierto— y el interruptor saldría encendido siempre, incluido el día que esté
        apagado. Es el mismo fallo que tuvo el gate meses con `calcular_cierre`. */
     AVISOS_EST='leyendo';
-    api.getControl().then(function(c){
+    /* 🟡 R4 (refutador 26): con tiempo límite — un `getControl` colgado dejaba la casilla en «Leyendo…» para siempre. */
+    Promise.race([api.getControl(), new Promise(function(_, no){ setTimeout(function(){ no(new Error('tiempo')); }, 15000); })])
+    .then(function(c){
       var e = c && c[INTERRUPTOR_AVISOS];
       var val = (e && typeof e==='object' && 'valor' in e) ? e.valor : e;
       AVISOS_ON = (val===true || val==='true' || val===1 || val==='1');
@@ -741,6 +743,10 @@ function _dispCargar_(repintar){
       AVISOS_EST='error';
       if(typeof repintar==='function') repintar();
     });
+  } else {
+    /* 🟡 R4 (refutador 26): sin la acción no se puede leer — y nacía 'leyendo'. En diferido: esto corre DENTRO de `pintar`. */
+    AVISOS_EST='error';
+    if(typeof repintar==='function') setTimeout(repintar, 0);
   }
   api.getDisponibilidad().then(function(r){
     _dispEstadoSrv_('ok');
@@ -913,6 +919,8 @@ function _puedeConvocarDisp_(){
 
 function _convocarDispPanel_(){
   if(!_puedeConvocarDisp_()) return '';
+  /* 🟡 R4 (refutador 26): lo que se PINTA del interruptor. 'leyendo' sin sesión no es «leyendo»: nadie va a preguntar. */
+  var _ae = (AVISOS_EST==='leyendo' && (typeof SESION==='undefined' || !SESION)) ? 'sinsesion' : AVISOS_EST;
   /* ⛔⛔ AQUÍ HABÍA UNA SEGUNDA GUARDA, Y SE RETIRA PORQUE YA NO ES VERDAD (643.ª → 758.ª).
      Decía «solo con la cuenta admin» y era cierta: `setControl` exigía `admin` para cualquier
      control, así que con la cuenta del PD el botón siempre fallaba y se avisaba antes de
@@ -962,12 +970,13 @@ function _convocarDispPanel_(){
        a ciegas. */
     '<div class="sep"></div>'+
     '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px">'+
-      '<input type="checkbox" id="cdAvisos"'+(AVISOS_ON?' checked':'')+(AVISOS_EST!=='ok'?' disabled':'')+'> '+
+      '<input type="checkbox" id="cdAvisos"'+(AVISOS_ON?' checked':'')+(_ae!=='ok'?' disabled':'')+'> '+
       '<b>mandar los avisos al móvil</b></label>'+
     /* 22/10 (auditor 26, 🟡 11): sin saber lo que hay guardado, la casilla no se toca y se dice por qué. */
-    (AVISOS_EST==='error' ? '<div class="nota" data-avisosest="error">⚠️ <b>No se pudo leer</b> si están encendidos: '+
+    (_ae==='error' ? '<div class="nota" data-avisosest="error">⚠️ <b>No se pudo leer</b> si están encendidos: '+
        'la casilla vacía <b>no</b> quiere decir apagados. Recarga para volver a mirar.</div>' :
-     AVISOS_EST==='leyendo' ? '<div class="nota" data-avisosest="leyendo">Leyendo si están encendidos…</div>' : '')+
+     _ae==='sinsesion' ? '<div class="nota" data-avisosest="sinsesion">Sin sesión no se puede saber si están encendidos.</div>' :
+     _ae==='leyendo' ? '<div class="nota" data-avisosest="leyendo">Leyendo si están encendidos…</div>' : '')+
     '<div class="nota" id="cdAvNota">Apagado, la rutina sigue calculando y deja escrito '+
       'lo que mandaría, pero <b>no sale nada</b>. Encendido, avisa al abrir, a las 24 h, '+
       'a las 3 h y a los 10 min — y el recordatorio <b>solo a quien no ha contestado</b> —, y '+
