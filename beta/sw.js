@@ -213,7 +213,7 @@ function _urlAviso_(u){
   return (typeof u === 'string' && u.charAt(0) === '#') ? APP_URL + u : (u || APP_URL);
 }
 
-// Llega una push: el emisor manda un JSON {title, body, url?, tag?, icon?, badge?}.
+// Llega una push: el emisor manda un JSON {title, body, url?, ir?, tag?, icon?, badge?} (`ir`: el destino corto `#…`).
 self.addEventListener('push', (event) => {
   let d = {};
   try { d = event.data ? event.data.json() : {}; }
@@ -225,7 +225,7 @@ self.addEventListener('push', (event) => {
     badge: d.badge || BADGE,
     tag: d.tag || undefined,                  // mismo tag = agrupa/reemplaza (p.ej. una reunión concreta)
     renotify: !!d.tag,
-    data: { url: _urlAviso_(d.url) },
+    data: { url: _urlAviso_(d.ir || d.url) },   // 22/10 (auditor 26, 🔴 1): el destino corto viaja en `ir`
   };
   event.waitUntil(self.registration.showNotification(title, opts));
 });
