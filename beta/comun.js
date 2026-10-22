@@ -4002,6 +4002,17 @@ function _convivenFichas_(plan){
   return Number(r.aplicadas) > 0;
 }
 
+/* 22/10 (auditor 22, 🟠 2): la gemela para APLICAR. En vuelo, que no se pulse otra vez; fallado («cierre NO aplicado»),
+   que se diga — antes las dos se veían igual que «sin pulsar», con el botón activo. */
+function _avisoAplicarCierre_(est){
+  if(est && est.aplicando) return 'Aplicando el cierre: la rutina lo está escribiendo ahora (va cada 2 minutos). No lo pulses otra vez.';
+  var ua = est && est.ultimo_aplicar;
+  if(!ua || !/NO aplicado/.test(String(ua.nota || ''))) return '';
+  var dia = _diaMadridDe_(ua.at);
+  return 'El último «Aplicar» NO terminó' + (dia ? ' (' + dia + ')' : '') + ': «' + String(ua.nota) + '». El aviso del ' +
+         'gate dice por qué; míralo antes de volver a pulsar.';
+}
+
 function _avisoCalculoCierre_(est){
   var uc = est && est.ultimo_calculo;
   if(!uc || (est && est.encolado) || !/NO calculado/.test(String(uc.nota || ''))) return '';
@@ -5841,6 +5852,14 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-22-cierre-aplicando', fecha:'2026-10-22',
+      titulo:'El cierre del mes dice si se está aplicando',
+      items:[
+        {cara:'escritorio', vista:'cierre', txt:'Al pulsar **«Aplicar el cierre»**, el botón pasa a **«Aplicando…»** y se bloquea mientras la rutina escribe; si el último «Aplicar» **no terminó**, se dice con su día y su motivo encima del botón. Antes se veía igual que sin pulsar.'},
+        {cara:'movil', vista:'estado', txt:'Lo mismo en el **cierre** del móvil: un «Aplicar» en curso o que no terminó se dice arriba.'},
+        {cara:'escritorio', vista:'cierre', txt:'Si el plan se quedó viejo (alguien tocó Notion entre «Calcular» y «Aplicar»), el aplicador **se planta sin escribir nada** — ni el Registro ni Notion — en vez de dejar el mes a medias.'},
+        {cara:'escritorio', vista:'temporada', txt:'En el cierre de **temporada**, la cabeza del ranking enseña la columna **«h/mes (ordena)»**: el orden sale del ritmo (julio y agosto cuentan la mitad), no de las horas totales, y antes no se podía ver por qué alguien con menos horas iba delante.'}
+      ]},
     { id:'2026-10-21-avisos-que-se-leen', fecha:'2026-10-21',
       titulo:'Los avisos dicen lo que pasa, y se dejan leer',
       items:[

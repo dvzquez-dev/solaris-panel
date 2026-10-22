@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=b65b74f"></script>
+<script src="comun.js?v=7a1f5bd"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=a4edc10"></script>
 <script src="turnos.escritorio.js?v=3197a86"></script>
@@ -1514,13 +1514,20 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
     (plan && (!hecho || (inc && !plan.parado))
       ? pan((inc?'Terminar':'Aplicar')+' el cierre de '+_nomPeriodo_(plan.periodo),'esto sí escribe',
           /* 21/10 (auditor 9, 🟡 4): con bloqueos el servidor NO deja aplicar (`_encolar_cierre`): no se ofrece. */
-          '<div class="pb"><button class="btn pri" '+(bloq.length?'disabled ':'')+'data-aplicarcierre>'+
-          (bloq.length?'Bloqueado · resuelve lo de arriba'
+          /* 22/10 (auditor 22, 🟠 2): en vuelo, deshabilitado y dicho; fallado, la nota debajo. */
+          (_avisoAplicarCierre_(CIERRE)
+            ? '<div class="nota" style="border-top:0;color:var(--warn)">'+esc(_avisoAplicarCierre_(CIERRE))+'</div>' : '')+
+          '<div class="pb"><button class="btn pri" '+((bloq.length||CIERRE.aplicando)?'disabled ':'')+'data-aplicarcierre>'+
+          (CIERRE.aplicando?'Aplicando… (la rutina lo está escribiendo)'
+           :bloq.length?'Bloqueado · resuelve lo de arriba'
            :inc?'Terminar el cierre · faltan '+inc.faltan
               :'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo)))+'</button></div>'+
           '<div class="nota">Escribe en <b>'+((plan.totales&&plan.totales.personas)||plan.personas||0)+
           ' fichas de Notion</b>. Es idempotente —aplicarlo dos veces no rueda los puntos dos '+
-          'veces— y si sale torcido se deshace con <span class="mono">rutinas/revertir_cierre.py</span>.</div>')
+          /* 22/10 (auditor 22, 🟠 4): `revertir_cierre.py` deshace las fichas, NO el bloque del mes en el Registro
+             (lo dice él mismo). Prometer un «deshacer» entero era decir que el error sale gratis. */
+          'veces—. <span class="mono">rutinas/revertir_cierre.py</span> deshace las fichas, pero <b>no</b> el bloque del mes '+
+          'que se escribe en el Registro: revísalo antes.</div>')
       : '')+
     pan('Cerrar '+cer.mes,'',
       /* ⛔ 21/10 (auditor 9, 🟠 3): lo encolado se dice TAMBIÉN con plan — si no, tras pulsar «Calcular» la pantalla
@@ -1636,9 +1643,12 @@ V.temporada={g:'Horas',t:'Cierre de temporada',f:function(){
       'El Art. 29l empieza con un «si»: sin decisión registrada el plan no es aplicable, y eso '+
       'es lo correcto — no se ajustan puntos que nadie ha aprobado.</div>';
     if((pl.ranking_top||[]).length){
-      cuerpo+=tabla([['Cabeza del ranking'],['Horas',1],['Meses',1]],
+      /* 22/10 (auditor 22, 🟡 8): el orden sale del RITMO (h/mes, julio y agosto a la mitad), no de las horas: sin
+         esa columna se veía a alguien con MENOS horas por encima. Un plan de antes no la trae: «—». */
+      cuerpo+=tabla([['Cabeza del ranking'],['h/mes (ordena)',1],['Horas',1],['Meses',1]],
         pl.ranking_top.map(function(f){
-          return '<tr><td>'+esc(String(f.n||''))+'</td><td class="r mono">'+esc(f.h==null?'—':nf2(f.h))+
+          return '<tr><td>'+esc(String(f.n||''))+'</td><td class="r mono">'+esc(f.r==null?'—':nf2(f.r))+
+                 '</td><td class="r mono">'+esc(f.h==null?'—':nf2(f.h))+
                  '</td><td class="r mono">'+esc(String(f.m))+'</td></tr>'; }).join(''));
     }
   }
@@ -3521,7 +3531,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='a34aad6';
+var BUILD='b4055b2';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3843,7 +3853,7 @@ function _pinAplicarCierre_(m){
     var n=(pl.totales&&pl.totales.personas)||pl.personas||0;
     if(!confirm('APLICAR el cierre de '+_nomPeriodo_(pl.periodo)+'.'+String.fromCharCode(10,10)+
       'Esto SI escribe en '+n+' fichas de Notion: pone la carga a cero, rueda los puntos al mes '+
-      'anterior y marca las infracciones. De ahi salen la cuota y la renovacion.'+
+      'anterior y desmarca las infracciones (empieza mes nuevo). De ahi salen la cuota y la renovacion.'+   /* 🟡 5 (auditor 22): el cierre las DESMARCA */
       String.fromCharCode(10,10)+'¿Lo has revisado persona a persona?')) return;
     _ac.disabled=true; var prev=_ac.textContent; _ac.textContent='Encolando…';
     try{

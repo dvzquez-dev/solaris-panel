@@ -143,6 +143,8 @@ function _cierreHTML_(est, err, cargando){
      de abajo sale antes que el `if(enc)`, y tras pulsar «Calcular» se seguía viendo el plan anterior sin una palabra). */
   var _avc=_avisoCalculoCierre_(est);
   if(_avc) cab+='<p class="rnota" style="color:var(--warn)">'+esc(_avc)+'</p>';
+  var _ava=_avisoAplicarCierre_(est);   /* 22/10 (auditor 22, 🟠 2): aplicar en vuelo o fallado, también aquí */
+  if(_ava) cab+='<p class="rnota" style="color:var(--warn)">'+esc(_ava)+'</p>';
   if(enc && plan) cab+='<p class="rnota">Hay un cálculo <b>nuevo</b> en cola: el plan de abajo es el anterior y se '+
     'sustituye en la siguiente pasada (va cada 2 minutos).</p>';
   var filas=bloq.map(function(b){
