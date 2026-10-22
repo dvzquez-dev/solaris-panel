@@ -1655,7 +1655,7 @@ function _cuotaHTML_(){
         '<p class="rnota">Llevas el coche en '+YO.coche+' turno'+(YO.coche===1?'':'s')+' fuera de '+
         'Vigo, pero el servidor aún no ha servido tu cuota <b>sin</b> descuentos: no se puede '+
         'decir cuánto te resta.</p>')
-    : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta 4 € por turno.</p>';
+    : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta '+nf2(_descuentoCoche_())+' € por turno.</p>';
   /* ⛔⛔ ES UNA ESTIMACIÓN, Y LA CIFRA GRANDE TIENE QUE DECIRLO. Daniel, 15/08, literal:
      *«No se paga mes a mes, animal. **La cuota es anual**, dios. Lo que te aparece en la
      persona es una **estimacion**. ¿Como no puedes tener eso en cuenta? ¿Te has leido

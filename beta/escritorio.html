@@ -2451,7 +2451,7 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
          cuota» ya lo decía en las dos caras; el chip, la columna y esta nota, no — 32 importes en € a secas. */
       '<div class="nota">'+(_conQ ? 'La cuota es <b>anual</b> y se cierra en agosto: lo que sale aquí es una '+
       '<b>estimación</b> con las horas de ahora, no lo que se paga este mes. Baja cuantas más horas se hacen: se calcula sobre el objetivo del mes, '+
-      'descuenta <b>4 €</b> por cada turno con coche fuera de Vigo y nunca baja de <b>0 €</b>. '+
+      'descuenta <b>'+nf2(_descuentoCoche_())+' €</b> por cada turno con coche fuera de Vigo y nunca baja de <b>0 €</b>. '+
       'Aquí solo se consulta.' : 'La clasificación ordena por horas ponderadas de la temporada. Aquí solo se consulta.')+
       (_aun.length ? ' <b>'+_aun.length+'</b> '+(_aun.length===1?'persona todavía no sale'
         :'personas todavía no salen')+' en la clasificación: aún no han cerrado ningún '+
@@ -2926,7 +2926,7 @@ function _cuotaPanelE_(mi){
       'ningún mes, así que esta temporada aún no te toca pagar</div></td>'+
       '<td class="r mono up">−'+eur(base==null?0:base)+'</td></tr>';
   if(desc>0) filas+='<tr><td><b>Por poner el coche</b><div class="sc">'+(mi.coche||0)+' turno'+
-      ((mi.coche===1)?'':'s')+' fuera de Vigo · 4 € cada uno</div></td>'+
+      ((mi.coche===1)?'':'s')+' fuera de Vigo · '+nf2(_descuentoCoche_())+' € cada uno</div></td>'+
       '<td class="r mono up">−'+eur(desc)+'</td></tr>';
   filas+='<tr><td><b>Estimación de lo que pagarás</b><div class="sc">al año · '+
       (_q.viva ? 'con tus horas de ahora mismo' : 'última cifra servida, no la de ahora')+
@@ -3559,7 +3559,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='38152f0';
+var BUILD='b160121';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
