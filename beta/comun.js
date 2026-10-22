@@ -4004,10 +4004,35 @@ function _convivenFichas_(plan){
 
 /* 22/10 (auditor 22, 🟠 2): la gemela para APLICAR. En vuelo, que no se pulse otra vez; fallado («cierre NO aplicado»),
    que se diga — antes las dos se veían igual que «sin pulsar», con el botón activo. */
-function _avisoAplicarCierre_(est){
-  if(est && est.aplicando) return 'Aplicando el cierre: la rutina lo está escribiendo ahora (va cada 2 minutos). No lo pulses otra vez.';
+/* 22/10 (refutador 22, 🟠 2): cuántos MINUTOS lleva arriba el flag de «Aplicar» (`aplicando.at`), o `null` si no se
+   sabe. El flag arriba quiere decir «encolado o escribiéndose», no «escribiéndose»: si el motor no pasa, se queda arriba. */
+function _minAplicando_(est, hoy){
+  var at = est && est.aplicando && est.aplicando.at, t = at ? Date.parse(at) : NaN;
+  if(isNaN(t)) return null;
+  return Math.max(0, Math.floor(((hoy || new Date()).getTime() - t) / 60000));
+}
+
+/* 22/10 (refutador 22, 🟠 1/🟠 2): ¿se BLOQUEA «Aplicar»? Sí mientras el flag está arriba y es reciente; pasados 15 min
+   el motor (que va cada 2) ya lo habría recogido, así que lo más probable es que esté parado: se deja volver a pulsar
+   (encolar otra vez sólo reescribe el flag) en vez de dejar el botón muerto para siempre. */
+function _aplicandoVivo_(est, hoy){
+  if(!(est && est.aplicando)) return false;
+  var m = _minAplicando_(est, hoy);
+  return m === null || m < 15;
+}
+
+function _avisoAplicarCierre_(est, hoy){
+  if(est && est.aplicando){
+    var m = _minAplicando_(est, hoy);
+    if(!_aplicandoVivo_(est, hoy))
+      return 'El «Aplicar» lleva ' + m + ' min en cola y el motor no lo ha recogido (pasa cada 2 minutos): puede que esté ' +
+             'parado — míralo en Automatismos. Puedes volver a pulsarlo.';
+    return 'Aplicando el cierre: en cola o escribiéndose' + (m === null ? '' : ' (pulsado hace ' + m + ' min)') +
+           '; el motor pasa cada 2 minutos. No lo pulses otra vez.';
+  }
   var ua = est && est.ultimo_aplicar;
-  if(!ua || !/NO aplicado/.test(String(ua.nota || ''))) return '';
+  /* «NO terminado» desde el 22/10 (refutador 22, 🟡 5); «NO aplicado» es la nota de antes, que puede seguir en la fila. */
+  if(!ua || !/NO (terminado|aplicado)/.test(String(ua.nota || ''))) return '';
   var dia = _diaMadridDe_(ua.at);
   return 'El último «Aplicar» NO terminó' + (dia ? ' (' + dia + ')' : '') + ': «' + String(ua.nota) + '». El aviso del ' +
          'gate dice por qué; míralo antes de volver a pulsar.';
@@ -4027,10 +4052,14 @@ function _avisoCalculoCierre_(est){
 function _notaPlanViejo_(v){
   if(!v) return '';
   var mes='<b>'+esc(_nomPeriodo_(v.periodo))+'</b>', r=v.resultado||null;
-  if(v.aplicado && !v.parado && !_cierreIncompleto_(v)){
+  /* ⛔ 22/10 (refutador 22, 🟡 6): un AUSENTE (se fue: su ficha ya no está en Notion) no impide sellar, así que no
+     convierte el cierre en «a medias»: sólo cuenta como a medias lo que falta MÁS ALLÁ de los ausentes. */
+  var inc=_cierreIncompleto_(v);
+  if(v.aplicado && !v.parado && (!inc || inc.faltan===inc.ausentes)){
     var n=(r && typeof r.aplicadas==='number') ? r.aplicadas : null;
     return 'El último cierre, el de '+mes+', está <b>aplicado</b>'+
-      (n!==null ? ' ('+n+' ficha'+(n===1?'':'s')+' escrita'+(n===1?'':'s')+' en Notion)' : '')+'.';
+      (n!==null ? ' ('+n+' ficha'+(n===1?'':'s')+' escrita'+(n===1?'':'s')+' en Notion'+
+        (inc ? '; '+inc.ausentes+' ya no tiene'+(inc.ausentes===1?'':'n')+' ficha' : '')+')' : '')+'.';
   }
   return 'La última ranura del servidor trae el plan de '+mes+', de un mes ya cerrado: no es el cierre de ahora y no cuenta.';
 }
@@ -5870,7 +5899,8 @@ function _novedades_(){
       titulo:'El cierre del mes dice si se está aplicando',
       items:[
         {cara:'escritorio', vista:'cierre', txt:'Al pulsar **«Aplicar el cierre»**, el botón pasa a **«Aplicando…»** y se bloquea mientras la rutina escribe; si el último «Aplicar» **no terminó**, se dice con su día y su motivo encima del botón. Antes se veía igual que sin pulsar.'},
-        {cara:'movil', vista:'estado', txt:'Lo mismo en el **cierre** del móvil: un «Aplicar» en curso o que no terminó se dice arriba.'},
+        {cara:'movil', vista:'estado', txt:'Lo mismo en el **cierre** del móvil: un «Aplicar» en curso o que no terminó se dice arriba, y el botón de aplicar (o «Terminar») se bloquea mientras tanto.'},
+        {cara:'escritorio', vista:'cierre', txt:'Si el motor no recoge un «Aplicar» en **15 minutos**, la pantalla dice que puede estar parado y deja volver a pulsarlo (antes se quedaba bloqueada). Mientras se aplica, el cierre se refresca solo.'},
         {cara:'escritorio', vista:'cierre', txt:'**Nada más sellar** un cierre, la pantalla dice «El último cierre, el de octubre, está aplicado (N fichas escritas)» en vez de «no cuenta»; y mientras el mes corre, el chip dice **«MES EN CURSO»** (no «LISTO PARA CALCULAR»).'},
         {cara:'escritorio', vista:'cierre', txt:'Si el plan se quedó viejo (alguien tocó Notion entre «Calcular» y «Aplicar»), el aplicador **se planta sin escribir nada** — ni el Registro ni Notion — en vez de dejar el mes a medias.'},
         {cara:'escritorio', vista:'temporada', txt:'En el cierre de **temporada**, la cabeza del ranking enseña la columna **«h/mes (ordena)»**: el orden sale del ritmo (julio y agosto cuentan la mitad), no de las horas totales, y antes no se podía ver por qué alguien con menos horas iba delante.'}

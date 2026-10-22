@@ -87,7 +87,9 @@ function _planHTML_(plan){
         'renovación. Revísalo antes: el botón está abajo.')+'</p>';
 }
 
-function _decidirCierreHTML_(plan, nBloq){
+/* 22/10 (refutador 22, 🟠 1): `vuela` = hay un «Aplicar» en vuelo (`_aplicandoVivo_`): los dos botones se bloquean,
+   como en el escritorio. Antes la cabecera decía «No lo pulses otra vez» encima de un botón activo. */
+function _decidirCierreHTML_(plan, nBloq, vuela){
   var r=plan.resultado||null;
   /* ⛔ El botón vuelve SOLO si faltan fichas, y con el número dentro. La regla «aplicado =
      sin botón» sigue en pie para el camino normal; lo que no puede seguir es que 25 de 32
@@ -111,14 +113,14 @@ function _decidirCierreHTML_(plan, nBloq){
        :inc?'<p class="rnota" style="color:var(--warn)"><b>Faltan '+inc.faltan+'</b>'+
         (inc.de?' de '+inc.de:'')+': su carga del mes cerrado sigue puesta y el mes que viene '+
         'esas horas se cuentan dos veces.</p>'+
-        '<button class="btn pri" '+(nBloq?'disabled ':'')+'data-aplicarcierre style="width:100%;margin-top:10px">'+
-        (nBloq?'Bloqueado · '+nBloq+' sin resolver':'Terminar el cierre · faltan '+inc.faltan)+'</button>'+
+        '<button class="btn pri" '+((nBloq||vuela)?'disabled ':'')+'data-aplicarcierre style="width:100%;margin-top:10px">'+
+        (vuela?'Aplicando… (en cola o escribiéndose)':nBloq?'Bloqueado · '+nBloq+' sin resolver':'Terminar el cierre · faltan '+inc.faltan)+'</button>'+
         '<p class="rnota">Relanzarlo es seguro: sigue por donde iba y no reescribe a quien ya '+
         'está. Si alguna sigue sin ficha en Notion, volverá a salir aquí.</p>':'');
   }
   /* 21/10 (auditor 9, 🟡 4): con bloqueos el servidor NO deja aplicar — no se ofrece un botón que acaba en error. */
-  return '<button class="btn pri" '+(nBloq?'disabled ':'')+'data-aplicarcierre style="width:100%;margin-top:14px">'+
-      (nBloq?'Bloqueado · '+nBloq+' sin resolver':'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo)))+'</button>'+
+  return '<button class="btn pri" '+((nBloq||vuela)?'disabled ':'')+'data-aplicarcierre style="width:100%;margin-top:14px">'+
+      (vuela?'Aplicando… (en cola o escribiéndose)':nBloq?'Bloqueado · '+nBloq+' sin resolver':'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo)))+'</button>'+
     '<p class="rnota">Esto <b>sí escribe</b> en Notion, en '+((plan.totales&&plan.totales.personas)||
       plan.personas||'?')+' fichas. Lo hace un script determinista que comprueba el «antes» de '+
       'cada una y se planta si algo no cuadra.</p>';
@@ -161,7 +163,7 @@ function _cierreHTML_(est, err, cargando){
   if(plan) return cab+(filas ? '<div class="rec">'+filas+'</div>'+
       '<p class="rnota" style="color:var(--warn)"><b>Esto entra en la cuenta y sigue sin '+
       'resolver.</b> El servidor no deja aplicar el cierre hasta que se decida: lo que se decidiera después dejaría '+
-      'mal la cuota de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan, bloq.length);
+      'mal la cuota de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan, bloq.length, _aplicandoVivo_(est));
   if(enc) return cab+'<p class="rnota">Encolado. La rutina lo recoge en la siguiente pasada '+
     '(va cada 2 minutos) y deja el plan.</p>';
   return cab+(filas ? '<div class="rec">'+filas+'</div>'+
