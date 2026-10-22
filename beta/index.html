@@ -443,7 +443,8 @@ function _aplicarPanel_(pnl){
   if(typeof pnl.banda_max === 'number') DATA.banda_max = pnl.banda_max;
   /* ⛔ 22/10 (auditor 30, 🟡 3): la curva de la cuota del MOTOR (umbral y techo, con las bajas). Sin esta línea se
      caería al suelo como `banda_min` (§3c-28) y la cara volvería a su curva SIN las bajas. */
-  if(pnl.cuota_curva && typeof pnl.cuota_curva === 'object') DATA.cuota_curva = pnl.cuota_curva;
+  /* (refutador 33, 🟡 3) y un `null` que LLEGA la borra: es el motor diciendo «no la uses» (otra temporada) */
+  if('cuota_curva' in pnl) DATA.cuota_curva = (pnl.cuota_curva && typeof pnl.cuota_curva === 'object') ? pnl.cuota_curva : null;
   /* ⛔⛔ Y EL CONSEJO, IGUAL: lo manda `Codigo.gs:862` y no lo copiaba nadie, así que
      `DATA.consejo` era `undefined` **siempre**. En pantalla eso es convocar un «Consejo»
      que **no invita a nadie**, y un mapa de turnos que dice «nadie del consejo puede» en
@@ -1711,7 +1712,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='a184d9d';
+var BUILD='5c4e0a2';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
