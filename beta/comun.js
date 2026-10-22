@@ -1399,7 +1399,17 @@ function _ritmosEquipo_(){
    **+27,23 EUR** tocando a **28 personas**. Las dos conviven a proposito: unificarlas cambia
    lo que paga cada uno y **esa decision no esta tomada**.
    ⚠️ Por eso se llama `_umbralCuota_` y no `_umbral2_`: el nombre dice para que sirve. */
+/* ⛔ 22/10 (auditor 30, 🟡 3): el UMBRAL y el TECHO de la curva que calculó el MOTOR (`DATA.cuota_curva`, de
+   `reglas/cuota.curva_equipo` sobre el `hm` de `flujos/cuotas.calcular`), o `null`. El motor lleva a las BAJAS (ARRANQUE
+   §2c: su trabajo cuenta) y el panel ya no las trae, así que con `_ritmosEquipo_` la cara calculaba OTRA curva (con
+   datos de la 25/26, 24 de 27 personas con otra cifra). Medio dato no es dato: sin los dos números, `null`. */
+function _curvaMotor_(){
+  var c = DATA.cuota_curva;
+  return (c && typeof c.umbral === 'number' && isFinite(c.umbral) && typeof c.techo === 'number' && isFinite(c.techo)) ? c : null;
+}
 function _umbralCuota_(){
+  var _cc = _curvaMotor_();
+  if(_cc) return _cc.umbral;                 /* el del motor primero; sin él, el de siempre */
   var L = _ritmosEquipo_(), s = 0, i;
   /* ⛔⛔ UNA PERSONA NO ES UN EQUIPO, y con `!L.length` esto se calculaba con UNA sola.
      A rango < 3 el backend sirve la forma MIEMBRO -tu ficha entera y las demas SOLO con
@@ -1424,6 +1434,8 @@ function _umbralCuota_(){
 
 /* El techo de la curva: el maximo h/mes del equipo (`reglas/cuota.py:cuotas`). */
 function _techoCuota_(){
+  var _cc = _curvaMotor_();
+  if(_cc) return _cc.techo;                  /* (auditor 30, 🟡 3) el del motor primero */
   var L = _ritmosEquipo_();
   /* ⛔ LA GEMELA, y hace falta: con el techo igual a TU ritmo la curva se clava en su
      extremo. Un maximo de una muestra de uno eres tu mismo, no el equipo. */

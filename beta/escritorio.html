@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=0cddf4a"></script>
+<script src="comun.js?v=2f1e912"></script>
 <script src="notis.escritorio.js?v=34b2672"></script>
 <script src="cierre.escritorio.js?v=471a14e"></script>
 <script src="turnos.escritorio.js?v=9bec4b0"></script>
@@ -3164,6 +3164,9 @@ function _aplicarPanel_(pnl){
      ⚠️ `typeof` y no `if(pnl.banda_min)`: un **0** es un número válido y `if` lo tiraría. */
   if(typeof pnl.banda_min === 'number') DATA.banda_min = pnl.banda_min;
   if(typeof pnl.banda_max === 'number') DATA.banda_max = pnl.banda_max;
+  /* ⛔ 22/10 (auditor 30, 🟡 3): la curva de la cuota del MOTOR (umbral y techo, con las bajas). Sin esta línea se
+     caería al suelo como `banda_min` (§3c-28) y la cara volvería a su curva SIN las bajas. */
+  if(pnl.cuota_curva && typeof pnl.cuota_curva === 'object') DATA.cuota_curva = pnl.cuota_curva;
   /* ⛔⛔ Y EL CONSEJO, IGUAL: lo manda `Codigo.gs:862` y no lo copiaba nadie, así que
      `DATA.consejo` era `undefined` **siempre**. En pantalla eso es convocar un «Consejo»
      que **no invita a nadie**, y un mapa de turnos que dice «nadie del consejo puede» en
@@ -3559,7 +3562,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b160121';
+var BUILD='7cd4d47';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
