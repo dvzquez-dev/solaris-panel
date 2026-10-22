@@ -1532,7 +1532,9 @@ function convocarPanel(){
       '<label style="width:135px">'+lab('Duraci\u00f3n')+
         '<input id="tuDur" placeholder="~ 3 horas" style="'+E+'"></label>'+
       '<label style="width:135px">'+lab('D\u00f3nde se trabaja')+'<select id="tuLugar" style="'+E+'">'+
-        '<option>CITI</option><option>Vigo</option><option>Coasa</option><option>Otro</option></select></label>'+
+        /* 22/10 (auditor 25, 🟡 9): SIN elegir por defecto — antes todo turno salía «CITI» aunque nadie lo dijera, y
+           de este campo saldría el descuento de Vigo. Vacío = no se escribe en Notion (`_verdad(lugar)`). */
+        '<option value="">— sin decir —</option><option>CITI</option><option>Vigo</option><option>Coasa</option><option>Otro</option></select></label>'+
       '<label style="flex:1;min-width:190px">'+lab('D\u00f3nde se queda')+
         '<input id="tuPunto" placeholder="enfrente del polit\u00e9cnico" style="'+E+'"></label>'+
       '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px;cursor:pointer">'+

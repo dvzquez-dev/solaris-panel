@@ -37,7 +37,9 @@ function _normTurnoM_(t, ix){
     lugar:t.lugar||null, estado:est, hecho: est ? (est==='Realizado'||est==='Cancelado') : !!(iso && iso < hoyISO),
     mio:mio, roles:roles, pasado: !!(iso && iso < hoyISO),
     principales:t.principales||[], secundarios:t.secundarios||[],
-    nota:t.nota||null, crucial:!!t.crucial, memoria:t.memoria||null, _real:true };
+    nota:t.nota||null, crucial:!!t.crucial, memoria:t.memoria||null,
+    coches: Array.isArray(t.coches) ? t.coches : [],   /* 22/10 (auditor 25, 🟠 3): se tiraban aquí */
+    _real:true };
 }
 
 /* Solo TUS turnos: aqui no pinta ver los de los demas. (Un boton de 'ver todos'

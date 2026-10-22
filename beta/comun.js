@@ -1879,6 +1879,31 @@ function _trayectoCruzaCiudad_(origenId, destinoId){
   return o.ciudad !== d.ciudad;
 }
 
+/* 22/10 (auditor 25, 🟠 3): QUIÉN VA EN QUÉ COCHE, para LEERLO. Los coches se guardaban y viajaban (`turnos_vivos` los
+   pega por id) y ninguna pantalla los enseñaba: «un almacén que nadie lee no es un dato». Una fila por coche, con los
+   puntos por su NOMBRE del catálogo (un id que no está se enseña tal cual, no se inventa) y la vuelta sólo si es
+   distinta y tiene sus dos patas. `pila(n)` traduce el nombre (cada cara tiene la suya); sin `pila`, el nombre entero. */
+function _cochesTurnoLineas_(coches, pila){
+  pila = pila || function(n){ return n; };
+  var nom = function(id){ var p = _puntoTurno_(id); return p ? p.nombre + ' (' + p.ciudad + ')' : String(id || '—'); };
+  return (Array.isArray(coches) ? coches : []).filter(function(c){ return c && typeof c === 'object'; })
+    .map(function(c, i){
+      var vuelta = (c.vueltaDistinta && c.vueltaOrigen && c.vueltaDestino) ? nom(c.vueltaOrigen) + ' → ' + nom(c.vueltaDestino) : null;
+      return { n: i + 1, conduce: c.dueno ? pila(c.dueno) : null, ida: nom(c.origen) + ' → ' + nom(c.destino),
+               vuelta: vuelta, pasajeros: (Array.isArray(c.pasajeros) ? c.pasajeros : []).map(pila) };
+    });
+}
+/* …y su bloque de ficha (móvil). Sin coches, '' — no ocupa nada. */
+function _cochesTurnoHTML_(coches, pila){
+  var ls = _cochesTurnoLineas_(coches, pila);
+  if (!ls.length) return '';
+  return '<h4>Coches</h4><div class="tarj" style="margin:0">' + ls.map(function(l){
+    return '<div class="fila"><div class="a"><b>🚗 Coche ' + l.n + ' · ' + esc(l.conduce || 'sin conductor') + '</b>' +
+      '<small>' + esc(l.ida) + (l.vuelta ? ' · vuelta: ' + esc(l.vuelta) : '') + '</small>' +
+      '<small>' + (l.pasajeros.length ? 'Van: ' + esc(l.pasajeros.join(', ')) : 'Sin pasajeros') + '</small></div></div>';
+  }).join('') + '</div>';
+}
+
 /* ═══ EL TIEMPO EXTRA DE UN TURNO · EL MODELO ════════════════════════════════════
    Daniel (15/08/2026), literal: *«si nos quedamos mas de cuatro horas … tiene que haber un
    mecanismo en el escritorio: el responsable de turno le da a un boton, se valida, y hay un
@@ -5525,7 +5550,9 @@ async function _traerSemanaAnterior_(cv){
   var sem=_isoMasDias_(cv.semana_ini || cv.semana || (cv.dias||[])[0], -7), r;
   try{ r=await api.getConvocatoria(sem); }
   catch(e){ tostErr('No se pudo traer la semana anterior: ', e); return null; }
-  var prev=(r && r.convocatoria && r.mias) || {};
+  /* 22/10 (auditor 25, 🟡 10): «no hubo convocatoria» NO es «no contestaste» — antes las dos salían como lo segundo. */
+  if(!r || !r.convocatoria){ tost('La semana anterior no hubo convocatoria de disponibilidad: no hay qué reutilizar.'); return null; }
+  var prev=r.mias || {};
   if(!Object.keys(prev).length){ tost('La semana anterior no marcaste nada: no hay qué reutilizar.'); return null; }
   var res=_reusarDispo_(cv, prev);
   if(!res.n){ tost('Lo de la semana anterior no cabe en esta rejilla: otras horas u otros sitios.'); return null; }
@@ -5914,6 +5941,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-22-coches-turno', fecha:'2026-10-22',
+      titulo:'Los coches de un turno, a la vista',
+      items:[
+        {cara:'movil', vista:'turnos', txt:'Abre un turno en **Turnos**: la ficha dice **en qué coche vas** — quién conduce, de dónde a dónde (y la vuelta si es distinta) y quién más va.'},
+        {cara:'escritorio', vista:'turnos', txt:'En **Turnos**, la columna **Coches** (pasa por encima para el detalle); **«Van»** cuenta a quien va seguro y los «posible/reserva» salen como «+N ?»; y al convocar, **«Dónde se trabaja»** empieza sin elegir.'}
+      ]},
     { id:'2026-10-22-primer-dia', fecha:'2026-10-22',
       titulo:'El primer día de quien entra a mitad de temporada',
       items:[
