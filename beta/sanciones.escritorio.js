@@ -716,7 +716,8 @@ function _loteReal_(){
   var lote=LOTES_PEND[_loteIdx_()];
   var its=pend.filter(function(s){ return s.lote===lote; });
   /* 22/10 (ensayo de la reunión #3, 🟡 8): el bloque dice de QUÉ reunión es, no sólo su código */
-  var _tl=_tituloLote_(lote, typeof REUS!=='undefined' ? REUS : []);
+  /* (refutador 29, 🟡 4) sólo reuniones del SERVIDOR (`_srv`): los ids de la semilla son ids reales */
+  var _tl=_tituloLote_(lote, (typeof REUS!=='undefined' && Array.isArray(REUS) ? REUS : []).filter(function(r){ return r && r._srv; }));
   LOTE={ real:true, lote:lote, nombre:_tl ? _tl+' · '+lote : lote, cerrado:false,
     motivo:its[0].motivo||'—', art:its[0].articulo||'libre',
     /* ⛔ `_ptsSanc_`, NO `Number(s.puntos)||0` (758.a bis). Aqui es donde el «no llego»
