@@ -144,10 +144,17 @@ async function _cargarMisPartes_(){
    las 14 h el autocierre emite un SEGUNDO parte por las mismas horas.
    ✅ La bandera se pone donde significa algo: cuando la respuesta LLEGO. Que `f` sea
    nulo es una respuesta valida -no tienes ninguno abierto-; que reviente, no. */
+/* 25/10 (auditor 33, 🟡 B4): la sesión de la app a partir de un fichaje del SERVIDOR — en pausa si su última pausa no
+   tiene fin, y con sus pausas. Una puerta para la carga al entrar y para «Fichar»: el servidor contesta a «Fichar» con la
+   sesión YA abierta si la había (abierta en otro aparato), y el botón la pintaba corriendo y sin pausas. */
+function _sesDeFichaje_(f){
+  var ps=(f&&f.pausas)||[], ult=ps[ps.length-1];
+  return {estado:(ult&&!ult.fin)?'pausada':'corriendo', cloudIni:f.ini, pausas:ps, desde:_hhmmDe_(f.ini), ult:_hhmmDe_(f.ini)};
+}
+
 async function _cargarFichajeAbierto_(){
   try{ var f=await api.getFichajeAbierto();
-    if(f && f.ini){ var ps=f.pausas||[], ult=ps[ps.length-1];
-      ST.ses={estado:(ult&&!ult.fin)?'pausada':'corriendo', cloudIni:f.ini, pausas:ps, desde:_hhmmDe_(f.ini), ult:_hhmmDe_(f.ini)}; }
+    if(f && f.ini) ST.ses=_sesDeFichaje_(f);
     CARGA.fichaje=true; return true; }
   catch(e){ return false; }
 }
@@ -1174,8 +1181,9 @@ async function enviarFichaje(){
         var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, horas:dur,
           ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true,
           subsistema:_perfilElegido_(), clave:f.clave });
-        /* ⛔ 20/10 (auditor de partes): las horas que GUARDÓ el servidor, no las tecleadas — redondea a cuartos y recorta
-           al tope; anunciar `dur` era prometer horas que no existen. Ilegibles → `null` y el aviso no inventa número. */
+        /* ⛔ 20/10 (auditor de partes): las horas que GUARDÓ el servidor, no las tecleadas — recorta al tope y redondea
+           al CÉNTIMO (los cuartos los pone esta cara, `durForm`; 25/10, auditor 33 🟡 B3: aquí ponía que los ponía él);
+           anunciar `dur` era prometer horas que no existen. Ilegibles → `null` y el aviso no inventa número. */
         if(rec&&rec.partes&&rec.partes[0]){ nuevo=normPMovil(rec.partes[0]);
           h=(rec.partes[0].horas!=null && isFinite(+rec.partes[0].horas)) ? +rec.partes[0].horas : null; }
         f.clave=null;

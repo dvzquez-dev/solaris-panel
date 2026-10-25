@@ -484,10 +484,11 @@ function _cablearSanciones_(){
            bloque se da por cerrado entero. */
         var ap=(r&&r.aprobadas!=null)?r.aprobadas:it.length, re=(r&&r.rechazadas)||0;
         var ju=(r&&r.justificadas)||0, sp=(r&&r.sinPermiso)||0;
+        var yr=(r&&r.yaRevocadas)||0;   /* 25/10 (auditor 33, 🟡 C2): las que se quedan pendientes por otra vía */
         SANC_M=null;
-        tost((sp?'Bloque cerrado A MEDIAS · ':'Bloque cerrado · ')+
+        tost(((sp || yr)?'Bloque cerrado A MEDIAS · ':'Bloque cerrado · ')+
           ap+' aprobadas'+(re?' · '+re+' rechazadas':'')+
-          (ju?' · '+ju+' justificadas':'')+_saltadasTxt_(sp));
+          (ju?' · '+ju+' justificadas':'')+_saltadasTxt_(sp)+_yaRevTxt_(yr));
         _abrirSanciones_();
       }catch(e){ b.disabled=false; b.textContent='Cerrar el bloque entero';
         tostErr('No se pudo cerrar el bloque: ', e); }

@@ -113,16 +113,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=2f1e912"></script>
+<script src="comun.js?v=50c9ba5"></script>
 <script src="notis.movil.js?v=e922c9d"></script>
 <script src="cierre.movil.js?v=95a36c8"></script>
 <script src="tareas.movil.js?v=b60e726"></script>
 <script src="turnos.movil.js?v=7b6703d"></script>
-<script src="buzon.movil.js?v=3831011"></script>
+<script src="buzon.movil.js?v=ed752a8"></script>
 <script src="documentos.movil.js?v=c77af75"></script>
-<script src="sanciones.movil.js?v=01b604e"></script>
+<script src="sanciones.movil.js?v=2591260"></script>
 <script src="reuniones.movil.js?v=09d3416"></script>
-<script src="horas.movil.js?v=c0255f4"></script>
+<script src="horas.movil.js?v=41f8951"></script>
 <script src="equipo.movil.js?v=502b5c7"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -665,7 +665,12 @@ async function _refrescoVivo_(motivo, que){
        ⚠️ Va por LA PUERTA que ya existe -- dos puertas para el mismo dato acaban siendo
        dos funciones distintas, que es lo que mordio en el escritorio. */
     var snc=(_vivoToca_(que,'sanciones') ? _cargarSancionesM_() : Promise.resolve()).catch(function(){});
-    await Promise.all([t,q,r,pnl,dcs,snc]);
+    /* 25/10 (auditor 33, 🟡 D5): y TUS PARTES — con el móvil abierto, tu coordinador te aprobaba uno y «Tus partes» seguía en
+       «pendiente» mientras la cifra del panel ya lo contaba. Sólo la lista de los tuyos: el fichaje y la cola a decidir NO
+       se recargan solos a propósito (`horas.movil.js`: resucitarían un fichaje cerrado o un parte ya firmado). */
+    var mps=(_vivoToca_(que,'resto') && !_sesionMuerta_() && typeof _cargarMisPartes_==='function')
+      ? _cargarMisPartes_().catch(function(){}) : Promise.resolve();
+    await Promise.all([t,q,r,pnl,dcs,snc,mps]);
     /* ⛔ SI LA SESION MURIO, ESTE REFRESCO NO HA TRAÍDO NADA. `_pide_` devuelve `null`
        por diseño —para que un dato que falta no tumbe a los demás— y el repintado deja
        la pantalla igual: se sigue viendo lo de hace horas, sin un solo error. */
@@ -1712,7 +1717,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='5c4e0a2';
+var BUILD='c8dc0c5';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2153,8 +2158,9 @@ function _engFichar_(){
       bi.disabled=true;
       try{
         var rec=await api.ficharEntrada(_perfilElegido_());
-        ST.ses={estado:'corriendo', cloudIni:rec.ini, desde:_hhmmDe_(rec.ini), ult:_hhmmDe_(rec.ini)};
-        tost('Fichando. Corre en la nube: aunque cierres la app, sigue contando.');
+        ST.ses=_sesDeFichaje_(rec);      /* 25/10 (auditor 33, 🟡 B4): la que DIGA el servidor, con sus pausas */
+        tost(ST.ses.estado==='pausada' ? 'Ya tenías una sesión abierta, y está en pausa.'
+             : 'Fichando. Corre en la nube: aunque cierres la app, sigue contando.');
         pintar();
       }catch(e){ bi.disabled=false; tostErr('No se pudo fichar entrada: ', e); }
       return;

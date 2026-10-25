@@ -2547,6 +2547,9 @@ function _arrancarVivo_(refrescar){
   setInterval(async function(){
     if(en || document.hidden) return;
     if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
+    /* 25/10 (auditor 33, 🟡 D2): con la sesión ya muerta no se pregunta — 60 fallos por minuto en el diario por una pestaña
+       olvidada. No se para el reloj: al volver a entrar, `_sesionMuerta_` vuelve a falso y sigue solo. */
+    if(typeof _sesionMuerta_==='function' && _sesionMuerta_()) return;
     en=true;
     try{
       var r=await _pide_('queHayNuevo');
@@ -2637,11 +2640,20 @@ function _ordenarFranjas_(r){
 /* De sanción a movimiento del libro. La forma que espera `medidorHTML` es `{f,art,t,p,vv}`.
    `vv` es la tercera columna —lo que pasa con esos puntos— y se resuelve AQUI y no al pintar,
    porque depende del estado y el pintado no tiene por qué saber de estados de sanción. */
+/* 25/10 (auditor 33, 🟡 C2): lo que `confirmarLote` dejó PENDIENTE porque su sanción ya tiene otra revocación aprobada
+   (`yaRevocadas`). Ninguna cara lo leía: el bloque se daba por cerrado entero. */
+function _yaRevTxt_(n){
+  n=+n||0;
+  return n ? ' \u00b7 '+n+(n===1 ? ' revocación se queda pendiente (su sanción ya tiene otra aprobada)'
+                                  : ' revocaciones se quedan pendientes (sus sanciones ya tienen otra aprobada)') : '';
+}
+
 function _movDeSancion_(s){
   var just=(s.estado==='justificada');
-  var iso=String(s.fecha||'').slice(0,10);
   return {
-    f: (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? _isoADMY_(iso) : (s.fecha||'')),
+    /* 25/10 (auditor 33, 🟡 C1): el día de MADRID (`_diaMadridDe_`), no el corte UTC del sello — lo decidido entre las 00:00
+       y las 02:00 salía con el día anterior, y el historial del PD (que ya pasaba por aquí) decía otro. */
+    f: _diaMadridDe_(s.fecha) || (s.fecha||''),
     art: String(s.articulo||'—'),
     t: String(s.motivo||'(sin motivo)'),
     /* La insignia y la etiqueta salen del MISMO dato. El backend ya manda 0 en una
@@ -4521,12 +4533,27 @@ function _leerImagen_(file){
         var w=Math.max(1,Math.round(im.naturalWidth*k)), h=Math.max(1,Math.round(im.naturalHeight*k));
         var c=document.createElement('canvas'); c.width=w; c.height=h;
         c.getContext('2d').drawImage(im,0,0,w,h);
-        ok({ url:c.toDataURL('image/jpeg',0.85), w:w, h:h });
+        ok({ url:_jpegQueCabe_(c,0.85), w:w, h:h });
       };
       im.src=fr.result;
     };
     fr.readAsDataURL(file);
   });
+}
+
+/* 25/10 (auditor 33, 🟡 D4): el JPEG de un lienzo, bajando la calidad (y, si no basta, el tamaño) hasta que el data URL
+   cabe holgado en una petición — el servidor rechaza un cuerpo de más de 1 MiB ENTERO, así que una captura con mucho
+   detalle (1,6 MB medido) tumbaba el reporte y no sólo la foto, y cada reintento fallaba igual. */
+function _jpegQueCabe_(c, q){
+  var TOPE=900*1024, url=c.toDataURL('image/jpeg', q);
+  for(var k=1; url.length>TOPE && k<=3; k++) url=c.toDataURL('image/jpeg', q-0.15*k);
+  for(var i=0; url.length>TOPE && i<4; i++){
+    var d=document.createElement('canvas');
+    d.width=Math.max(1, Math.round(c.width*0.75)); d.height=Math.max(1, Math.round(c.height*0.75));
+    d.getContext('2d').drawImage(c, 0, 0, d.width, d.height);
+    c=d; url=c.toDataURL('image/jpeg', 0.6);
+  }
+  return url;
 }
 
 function _pesoKB_(dataUrl){
@@ -5972,6 +5999,15 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-25-caras-servidor', fecha:'2026-10-25',
+      titulo:'Lo que las caras pedían y el servidor no daba',
+      items:[
+        {cara:'movil', vista:'horas', txt:'Si fichas y ya tenías una sesión abierta en **pausa** (desde el ordenador u otro móvil), se pinta **en pausa** — antes salía corriendo.'},
+        {cara:'movil', vista:'horas', txt:'Con el móvil abierto, **Tus partes** se actualiza solo cuando te aprueban uno (antes seguía en «pendiente» hasta recargar). Y el aviso de «estas horas contarán en…» ya sabe cuándo cerró el último mes, seas quien seas.'},
+        {cara:'movil', vista:'estado', txt:'En **Mis movimientos**, la fecha es la del día de aquí: lo decidido de madrugada ya no sale con el día anterior.'},
+        {cara:'escritorio', vista:'sanciones', txt:'Al cerrar un bloque con una revocación que se queda pendiente, dice **«A MEDIAS»** y cuántas quedan.'},
+        {cara:'movil', vista:'estado', txt:'Una **captura muy detallada** en un reporte se comprime hasta caber, en vez de tumbar el reporte entero.'}
+      ]},
     { id:'2026-10-22-titulo-lote', fecha:'2026-10-22',
       titulo:'Las propuestas de sanciones dicen de qué reunión son',
       items:[

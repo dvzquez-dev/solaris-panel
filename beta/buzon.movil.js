@@ -215,7 +215,7 @@ function _abrirPintor_(fondoUrl, alTerminar){
     cerrar();
     /* Por la MISMA puerta que cancelar: así un clic tardío en «Cancelar» no puede
        contestar por segunda vez y pisar la imagen marcada con la foto en crudo. */
-    contestar(out.toDataURL('image/jpeg', 0.82), trazos.length);
+    contestar(_jpegQueCabe_(out, 0.82), trazos.length);   /* 25/10 (auditor 33, 🟡 D4): que quepa */
   };
 
   img.onload=function(){
