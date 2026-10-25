@@ -215,7 +215,7 @@ function _abrirPintor_(fondoUrl, alTerminar){
     cerrar();
     /* Por la MISMA puerta que cancelar: así un clic tardío en «Cancelar» no puede
        contestar por segunda vez y pisar la imagen marcada con la foto en crudo. */
-    contestar(_jpegQueCabe_(out, 0.82), trazos.length);   /* 25/10 (auditor 33, 🟡 D4): que quepa */
+    contestar(out.toDataURL('image/jpeg', 0.82), trazos.length);
   };
 
   img.onload=function(){
@@ -400,7 +400,7 @@ function buzonModal(tipo, prev){
       /* SI LA FOTO NO SE GUARDÓ, SE DICE. El backend solo devuelve `captura` cuando la ha
          subido a Drive; mientras esa parte no esté desplegada, callarse sería dejar creer
          que la marcaste para nada. */
-      var sinFoto = datos.captura && !_capturaGuardada_(r);
+      var sinFoto = datos.captura && !(r && r.captura);
       /* ⛔ Y LA FILA SE REPINTA AL VACIAR LA FOTO. Antes solo se ponia `BZ_FOTO=null` y la
          fila se quedaba con el lapiz en pantalla **y cableado**: pulsarlo entraba en el
          pintor con `BZ_FOTO.url` sobre `null` -> `TypeError` y **no pasaba nada**, sin
@@ -434,7 +434,8 @@ function buzonModal(tipo, prev){
         _av.style.cssText='margin-top:10px;border-color:rgba(232,145,46,.45);'+
           'background:rgba(232,145,46,.10);color:#f0cf9e';
         _av.innerHTML='<b style="color:var(--warn)">El texto se ha guardado · '+esc((r&&r.id)||'')+'</b><br>'+
-          'Pero <b>la foto no</b>: '+esc(_avisoSinFoto_(r))+'. Cuéntaselo a Daniel con este id.';
+          'Pero <b>la foto no</b>: al servidor todavía le falta el paso que la sube. '+
+          'Cuéntaselo a Daniel — es un despliegue de dos líneas.';
         env.parentNode.insertBefore(_av, env.nextSibling);
         _av.scrollIntoView({block:'nearest'});
         return;

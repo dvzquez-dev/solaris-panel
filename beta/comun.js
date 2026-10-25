@@ -43,11 +43,8 @@ function nf2(v){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,ma
 /* Las horas van con los decimales que TENGAN, no con uno fijo. Con `nf(v,1)` un cuarto de
    hora -0,25- se pintaba «0,3 h», que ademas no es ningun escalon de la escala de
    compensacion. Se muestran dos decimales solo si el numero los usa: 2 h se lee mejor que
-   2,00 h, y 0,25 h tiene que leerse 0,25 h. GEMELA en las dos caras.
-   ⛔ 963.ª: y SIN CEROS DE COLA, que es la regla escrita (decisiones-app: «86,25, no 86,3 ni 86,00»). Aquí se
-   elegían 0 ó 2 decimales, así que 15,5 salía «15,50 h» y en el panel del PD convivía con el «15,5» de `nf2`.
-   Ahora es `nf2`: una sola cifra para las horas en toda la app. */
-function h1(v){ return nf2(Number(v)||0)+' h'; }
+   2,00 h, y 0,25 h tiene que leerse 0,25 h. GEMELA en las dos caras. */
+function h1(v){ var n=Number(v)||0; return nf(n, (Math.round(n*100)%100===0) ? 0 : 2)+' h'; }
 
 function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 
@@ -76,10 +73,10 @@ function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 function _justUtil_(tarea, just){
   var j = String(just == null ? '' : just).replace(/^\s+|\s+$/g, '');
   if(!j) return '';
-  /* ⛔ 20/10 (D-b): era una tabla escrita a mano de 15 vocales y la ñ — `ç`, `â`, `õ` salían distintas —, copia
-     peor de `_sinTildes_` (§4.1). Ahora es ésa más el recorte de espacios. */
   var pela = function(s){
-    return _sinTildes_(String(s)).replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ');
+    return String(s).toLowerCase().replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ')
+      .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
+      .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n');
   };
   return pela(j) === pela(tarea || '') ? '' : j;
 }
@@ -172,24 +169,6 @@ function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; 
    ⚠️ Es una condicion MAS DURA que `_puedeBeta_`, no la misma: aquella deja pasar a todos
    fuera de beta (es un gate de canal), y esta exige **beta Y rango**. Reutilizarla habria
    dejado el agujero igual. */
-/* ⛔ 20/10: ¿SE GUARDÓ LA FOTO DEL BUZÓN? El servidor del mini PC devuelve en `captura` DÓNDE la dejó — o el texto
-   «no se pudo subir: …» si falló, que es una cadena VERDADERA. Las dos caras hacían `!(r && r.captura)` y daban por
-   guardada una foto que no lo estaba. Una sola puerta para las dos. */
-function _capturaGuardada_(r){
-  var c = r && r.captura;
-  return typeof c === 'string' && c !== '' && c.indexOf('no se pudo subir') !== 0;
-}
-/* ⛔ 21/10 (auditor 10, 🟡 7): POR QUÉ no se guardó la foto, en una frase para pantalla. Las dos caras decían «al
-   servidor le falta el paso que la sube», y el mini PC lo tiene (`directo.guardar_captura`) y devuelve el motivo real
-   en `captura` («no se pudo subir: …»). Sin `captura`, no dijo dónde la puso — que no es lo mismo que «le falta». */
-function _avisoSinFoto_(r){
-  var c = r && r.captura;
-  if (typeof c === 'string' && c.indexOf('no se pudo subir') === 0) {
-    var m = c.replace(/^no se pudo subir:?\s*/, '');
-    return 'el servidor no pudo guardarla' + (m ? ' («' + m + '»)' : '');
-  }
-  return 'el servidor no dijo dónde la guardó';
-}
 function _puedeVerNovedades_(){ return CANAL==='beta' && (esAdmin() || _rangoBeta_()>=3); }
 
 /* 'HH:MM' (o `{ini:'HH:MM'}`) -> minutos. **UNA sola puerta**, aqui, que cargan las dos caras.
@@ -282,57 +261,7 @@ function _genUnion_(rangos, slot){
    -horas y documentos- y darles el mismo nombre las haria parecer la misma. */
 function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre) : 0; }
 
-/* ⛔⛔ SI NO CAMBIA NADA, NO SE REPINTA — DECISION DE DANIEL (06/10/2026).
-
-   🗣️ Literal: *«si, reanimar lo de horas tambien molesta, molaria q no lo haga salvo q
-   cambie algun dato, igual con todas las pantallas, si no cambia nada no se repinta»*. Y
-   antes, describiendo el sintoma del arranque: *«de repente pasa como dos segundos y como que
-   se oscurece (...) se vuelve medio transparente todo lo que hay y vuelve a spawnear es muy
-   raro y bastante incomodo»*.
-
-   ⛔ **QUE LO PINTA**: `@keyframes entra{from{opacity:0;transform:translateY(8px)}}`
-   (`movil.css:946`), que entra con la clase `.entra`. Reconstruir `innerHTML` tira el DOM y
-   lo vuelve a crear, asi que la animacion se reproduce entera **aunque el HTML sea identico**.
-
-   ⛔⛔ **Y POR QUE LA CURA VA AQUI Y NO EN EL LLAMADOR**: esto se arreglo **dos veces**
-   quitando repintados concretos (🗣️ *«carga 2 veces extra el widget»*, *«me sigue cargando
-   el widget 1 vez extra»*) y volvio las dos veces. Cazar llamadas de una en una no cierra la
-   familia: **cualquier** camino que repinte con el mismo dato la reabre. La pregunta que
-   decide no es *¿quien repinta de mas?* sino *¿por que repintar cuando no hay nada nuevo?*.
-
-   Devuelve **si ha cambiado**, que es lo que el llamador necesita para saltarse tambien las
-   animaciones — reconstruir el DOM no es lo unico que se nota: `animarDeltas` pone las barras
-   a cero y las vuelve a crecer, y eso se ve igual de raro.
-
-   ⚠️ **El recuerdo va en la FUNCION, no en un `var` de modulo**, porque `comun.js` solo
-   admite declaraciones `function` (`ARRANQUE.md` §5b): un `var` aqui lo cargaria tambien el
-   escritorio y seria una global compartida entre dos caras que no comparten estado.
-
-   ⚠️ **Y se comprueba que el nodo tenga algo dentro.** Sin eso, un `innerHTML` vaciado por
-   otro camino se quedaria vacio **para siempre**: el recuerdo seguiria diciendo «ya esta
-   pintado» y no se volveria a escribir nunca. Es un «no lo se» leido como un dato.
-*/
-function _pintarSiCambia_(el, clave, html){
-  if (!el) return false;
-  /* ⛔⛔ 21/10 (auditor 20, 🔴): EL RECUERDO ES LO QUE ESTE NODO TIENE PUESTO, no lo último que se pintó para esa VISTA.
-     Era `memo[clave]`, y el escritorio pinta sus 22 vistas en el MISMO `#main`: Panel → Partes → Panel, con el html del
-     Panel igual que la primera vez, contestaba «no ha cambiado» y dejaba los PARTES debajo del título «Panel de mando».
-     El móvil no lo veía porque allí cada vista tiene su nodo. `clave` se queda en la firma (los dos llamadores la pasan)
-     y ya no decide nada: con un nodo por vista, recordar por nodo ES recordar por vista. */
-  if (el._pintado === html && el.innerHTML) return false;
-  el._pintado = html;
-  el.innerHTML = html;
-  return true;
-}
-
-
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
-/* 22/10 (auditor 23, 🟠 8): los convocados que SIGUEN en el equipo, como el motor (`universo_convocado` sobre vivos).
-   Si el censo no se conoce (menos de 2 activos: maqueta sin panel), la lista tal cual -- «no lo sé» no vacía a nadie. */
-function _invitadosVivos_(lista){
-  var viv = _activos_().map(function(m){ return m.nombre; });
-  return viv.length >= 2 ? (lista||[]).filter(function(n){ return viv.indexOf(n) >= 0; }) : (lista||[]).slice();
-}
 /* El mes ABIERTO, calculado con quien esta: `{media, gente}`, o `null` si no se sabe.
    Daniel, 04/10: *«y el objetivo de horas q aparece recuerda q tiene q estar vivo y eso»*.
 
@@ -353,11 +282,7 @@ function _mesAbiertoVivo_(){
     var h = _hMesReal_(act[i]);
     if(typeof h === 'number' && isFinite(h)) v.push(h);
   }
-  /* ⛔ 22/10 (auditor 21, 🟠 2): UNA MUESTRA DE UNO NO ES EL EQUIPO. A quien no es PD el servidor le manda el resto sin
-     horas, y aquí su propia cifra salía como «la media del equipo»: el objetivo del mes era distinto para cada uno (PD
-     11,17 · Uxía 10,34 · Xoán 11,72). Con menos de dos, `null`, y el llamador cae al `mesAbierto` del servidor (calculado
-     con todos) — la misma guarda que ya tienen `_umbralDinamico_` (`hs.length<2`) y `_umbralCuota_`. */
-  if(v.length < 2) return null;
+  if(!v.length) return null;
   var s = 0;
   for(i = 0; i < v.length; i++) s += v[i];
   return { media: s / v.length, gente: v.length };
@@ -519,25 +444,7 @@ function _gentePorUnidad_(){
   return out;
 }
 
-/* ⛔ 21/10 (auditor 6): LA MEDIA POR UNIDAD QUE MANDA EL SERVIDOR, para quien no tiene las horas de los demás. Desde
-   el 07/10 el panel de un miembro trae SÓLO sus horas (decisión de Daniel: *«cada persona solo debe recibir sus
-   horas/mes y su puesto, no las horas de todos»*), así que calcular «en vivo» le daba SU unidad sola, primera y con
-   «1 personas». El agregado (`subsistemas` con `media` y `n`) sí le llega. Sólo entran las que traen una media de
-   verdad y alguien dentro; mismo orden que `_subsEnVivo_`. `foto:true` lo dice: no es en vivo. */
-function _subsDelServidor_(){
-  var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [], out = [], i, s;
-  for(i = 0; i < lista.length; i++){
-    s = lista[i];
-    if(!s || !s.u || typeof s.media !== 'number' || !isFinite(s.media) || !(s.n > 0)) continue;
-    out.push({ u: s.u, media: _red1_(s.media), n: s.n, foto: true });
-  }
-  out.sort(function(a, b){ return (b.media - a.media) || (a.u < b.u ? -1 : 1); });
-  return out;
-}
-
 function _subsEnVivo_(){
-  /* ⛔ 21/10 (auditor 6): con el panel en forma MIEMBRO no hay «gente delante» con la que calcular — el agregado. */
-  if(typeof DATA !== 'undefined' && DATA._rol === 'miembro') return _subsDelServidor_();
   var nom = [], i, j;
   var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [];
   for(i = 0; i < lista.length; i++) nom.push((lista[i] && lista[i].u) || lista[i]);
@@ -548,22 +455,7 @@ function _subsEnVivo_(){
     var k = -1;
     for(j = 0; j < nom.length; j++) if(nom[j] === u){ k = j; break; }
     if(k < 0) continue;                      /* no compite: fuera del ranking, sin ruido */
-    /* ⛔⛔ DEVENGADA, NO ENTERA: la compensacion del MES EN CURSO se va sumando poco a
-       poco. Hasta el 07/10 esto leia `_hMesReal_`, que trae la base ENTERA, asi que el dia
-       del cierre **todo el equipo sumaba de golpe** su compensacion (2 h un raso, 3,5 un
-       coordinador, 7 el PD) y el ranking de unidades daba un ESCALON que no corresponde a
-       trabajo hecho. Daniel, 07/10: *«un step al inicio de mes que todo el mundo sume dos
-       horas. Eso no tiene sentido … que la compensacion del mes actual se vaya sumando poco
-       a poco»*.
-       ✅ Y SOLO EL MES EN CURSO: `_subsEnVivo_` lee unicamente el mes ABIERTO, asi que un
-       mes ya cerrado sigue aportando su compensacion **entera** y las pasadas **no se
-       devengan** — que es justo lo que pidio y lo que esta puerta ya hace.
-       ⚠️ `_hMesDevengado_` se declara MAS ABAJO (582) que esta linea: vale por el hoisting
-       de las `function` declaradas, no hay que moverla.
-       ⚠️ Devuelve `null` con las mismas entradas con las que `_hMesReal_` devolvia `null`,
-       asi que el `if` de debajo sigue siendo el que descarta a quien no tiene dato vivo:
-       un «no lo se» no entra como un cero (§3c-24). */
-    var h = _hMesDevengado_(m);
+    var h = _hMesReal_(m);
     if(typeof h !== 'number' || !isFinite(h)) continue;
     if(!por[u]) por[u] = [];
     por[u].push(h);
@@ -631,37 +523,6 @@ function _hAntReal_(m){
   return (typeof v==='number' && v>0) ? v : null;
 }
 
-/* ⛔⛔ LAS HORAS DEL MES **CON LA COMPENSACION DEVENGADA**, QUE ES LO QUE SE ENSEÑA (07/10/2026).
-   🗣️ Daniel: *«claro que van devengadas al dia actual. O sea, no tiene sentido otra cosa … lo
-   que no puede aparecer es el step de compensacion, que es lo que aparece ahora»*.
-   📏 El step, en su pantalla del 07/10 (dia 7 de 31): la cifra decia **7 h este mes** con
-   objetivo 8 — y 7 h es **exactamente su compensacion de Project Director**, acreditada entera el
-   dia 1, mientras el rotulo de debajo decia **0,78 h** de trabajo real. O sea que la cifra media
-   el cargo y no el trabajo, y encima llegaba al objetivo sola.
-   ✅ Su decision del 06/10 ya lo dice — *«si pero mejor q se vaya sumando en rampa el tiempo d las
-   compensaciones»* — y la rampa ya estaba en el ritmo, en la media del equipo y en el mes
-   anterior. Lo que faltaba era **la cifra**, que es justo la que se mira.
-   ⛔ Y ES UNA PUERTA, no dos cuentas: la cifra (`vHoras`) y la BARRA (`barraHorasHTML`) leian el
-   mismo numero por separado. Con dos lecturas, el dia que una se devengue y la otra no, la misma
-   tarjeta dice dos numeros — que es el fallo que este proyecto lleva arreglado tres veces.
-   ⚠️ Si no hay dato devuelve `null` (no 0): «no se» no es «cero». Y si la fraccion del mes no se
-   puede calcular, cae al valor CRUDO en vez de inventar uno — ensenar el bruto es peor que nada,
-   pero inventar un devengado es peor que las dos. */
-function _hMesDevengado_(m){
-  var h = _hMesReal_(m);
-  if (h == null) return null;
-  var d = _devengadoAHoy_(m, h, _fraccionDelMes_());
-  return (d == null) ? h : d;
-}
-/* ⛔ 20/10 (auditoría): LA MISMA CIFRA DEVENGADA, PARA EL MIEMBRO DE LA CARA. `_hMesDevengado_` lee el del PANEL
-   (`horasMes`); el de la cara trae `hMes`. Las tablas del escritorio enseñaban `hMes` en BRUTO —la base del cargo
-   entera desde el día 1— al lado de columnas devengadas. 🗣️ Daniel, 07/10: «claro que van devengadas al dia actual
-   … lo que no puede aparecer es el step de compensacion». Sin dato, `null`; si no se puede devengar, el crudo. */
-function _hMesDevCara_(m){
-  if(!m || typeof m.hMes!=='number') return null;
-  var d = (typeof _fraccionDelMes_==='function') ? _devengadoAHoy_(m, m.hMes, _fraccionDelMes_()) : null;
-  return (d == null) ? m.hMes : d;
-}
 function _hMesReal_(m){
   m = m || {};
   /* Las horas de ESTE MES, o `null` si no han llegado. `horasMes` es el campo que el
@@ -718,7 +579,7 @@ function _hMesReal_(m){
    el escritorio- no podia usarlo y pesaba el mes abierto con el CALENDARIO. Regla de
    negocio de Daniel: «un mes dura desde el anterior cierre del mes anterior al cierre de
    ese mes». `equipo_mes.dia` lo calcula `_diasDesdeCierre_` en el backend. */
-function _diasDelMes_(ahora){
+function _diasDelMes_(){
   var e=DATA.equipo_mes;
   /* ⛔ `cont` ES EL MISMO DIA CON DECIMALES, y va aparte del entero porque son DOS PREGUNTAS:
      `dia` se IMPRIME («20 h en 10 de 31 dias») y `cont` PESA. Daniel (15/08): «cuando pase de
@@ -730,46 +591,12 @@ function _diasDelMes_(ahora){
   if(e && e.dia>0 && e.dias_mes>0) return {dia:e.dia, total:e.dias_mes,
     cont:(typeof e.diaCont==='number' && e.diaCont>0) ? e.diaCont : e.dia,
     periodo:e.periodo||null};
-  /* ⛔ 20/10 (auditoría): SIN `equipo_mes`, PERO CON EL ÚLTIMO CIERRE, SE CUENTA COMO EL SERVIDOR. Si no, el título
-     (`_periodoAbierto_`, del cierre) y el divisor (el reloj) hablaban de meses distintos: el 2 de noviembre con octubre
-     abierto, «octubre» y horas de octubre ÷ 2. Días desde la MEDIANOCHE local del cierre (mínimo 1), el mes abierto y
-     sus días de calendario (el servidor manda una media; aquí no la hay). `ahora` es opcional, para poder preguntarle. */
-  var _uc=(typeof CIERRE_UC!=='undefined' && CIERRE_UC) ? CIERRE_UC
-         : ((typeof CIERRE!=='undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
-  var _ab=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
-  var _at=(_uc && _uc.at) ? new Date(_uc.at) : null;
-  if(_at && !isNaN(_at.getTime()) && /^\d{4}-\d{2}$/.test(String(_ab||''))){
-    var _m0=new Date(_at.getFullYear(), _at.getMonth(), _at.getDate()).getTime();
-    var _c=Math.max(1, ((ahora||new Date()).getTime()-_m0)/86400000);
-    return {dia:Math.floor(_c), total:new Date(+_ab.slice(0,4), +_ab.slice(5,7), 0).getDate(), cont:_c, periodo:_ab};
-  }
-  var d=ahora||new Date();
+  var d=new Date();
   /* El respaldo del calendario tambien lleva su hora: mismo criterio que el servidor -- el
      dia N va de N,0 a N,999-, para que caer al respaldo no cambie la FORMA del numero. */
   return {dia:d.getDate(), total:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),
     cont:d.getDate() + (d.getHours()*3600 + d.getMinutes()*60 + d.getSeconds())/86400,
     periodo:null};
-}
-
-/* Cuantos dias DURO el mes anterior al periodo `AAAA-MM`. Sin periodo, se deduce de hoy.
-   ⚠️ Vive aquí desde el 20/10 (era de `horas.movil.js`): el panel del escritorio compara
-   también por ritmo, y sin los días que duró el mes pasado no hay ritmo que comparar.
-
-   ⛔ UN MES NO DURA LO QUE DICE EL CALENDARIO: dura del cierre del anterior al cierre de este
-   (Daniel, 07/08: *«Bueno y si junio se cerro el 29, imaginate»*). Si junio cerro el 29/06 y
-   julio el 04/08, julio duro **37 dias**, no 31 — y dividir por 31 infla el ritmo de julio de
-   las 32 personas a la vez, sin dar ningun error.
-
-   `servidor` es el `equipo_mes.dias_ant` que calcula el backend con el historico de cierres. Si
-   no hay dos cierres guardados llega `null` y se cae al calendario: aproximado, pero no
-   inventado. */
-function _diasMesAnterior_(periodo, servidor){
-  var sv = Number(servidor);
-  if(isFinite(sv) && sv > 0) return sv;
-  var y, m;
-  if(/^\d{4}-\d{2}$/.test(String(periodo||''))){ y=+periodo.slice(0,4); m=+periodo.slice(5,7)-1; }
-  else { var d=new Date(); y=d.getFullYear(); m=d.getMonth(); }
-  return new Date(y, m, 0).getDate();          /* dia 0 del mes actual = ultimo del anterior */
 }
 
 function _fraccionDelMes_(d){
@@ -1025,23 +852,6 @@ function _minDeshacerTarea_(){ return 15; }   /* 15, y lo dijo Daniel el 06/10: 
    plazo vive, y «no lo sé» cae al lado seguro (§3c-24). Eso además delimita el botón a lo que
    la persona ha hecho **en esta sesión**: el estado que viene de Notion no trae `desde`, así que
    no se ofrece «deshacer» sobre algo que no has tocado tú. */
-/* ⛔ 20/10 — EL PASO DADO SOBREVIVE AL REFRESCO. Desde que los botones guardan en Notion (`moverEstadoTarea`), el
-   refresco vivo rehace `TAREAS` con lo del servidor, y eso tira el `desde` de la tarea recién movida: el «deshacer» que
-   el aviso acababa de prometer desaparecía en el siguiente refresco. Aquí se anota el paso por la URL de su ficha y se
-   repone tras rellenar la lista — sólo si la tarea SIGUE en el estado al que la llevaste (si otro la movió en
-   Notion, ese deshacer ya no es tuyo). */
-function _anotarPasoTarea_(pasos, t){
-  if(!pasos || !t || !t.url) return;
-  if(typeof t.desde === 'number') pasos[t.url] = {e: t.e, desde: t.desde};
-  else delete pasos[t.url];
-}
-function _reponerPasosTarea_(lista, pasos){
-  (lista || []).forEach(function(t){
-    var p = t && t.url && pasos ? pasos[t.url] : null;
-    if(p && p.e === t.e) t.desde = p.desde;
-  });
-}
-
 function _puedeDeshacerTarea_(t, ahora){
   if(!t || typeof t.desde !== 'number') return false;
   var ms = (typeof ahora === 'number' ? ahora : (new Date()).getTime()) - t.desde;
@@ -1117,65 +927,6 @@ function _bandaSana_(){
   if(typeof lo === 'number' && typeof hi === 'number' && lo < hi)
     return { lo: lo, hi: hi, viva: true };
   return { lo: 70, hi: 120, viva: false };
-}
-
-/* ═══ LA BARRA DEL ÍNDICE DE CARGA — una puerta para las dos caras (19/10) ════════════════
-   Vivía INLINE en la vista de Horas del móvil (`horas.movil.js`, «Mi índice de carga») y el
-   escritorio NO LA TENÍA: `decisiones-app.md:2791` prohíbe que una capacidad del móvil falte en
-   el escritorio, y la vara que debía cazarlo (comparar los `api.*` de cada cara) sale verde con
-   ella fuera porque no gasta ninguno. Se saca aquí para que las dos pinten EL MISMO dibujo:
-   copiarla habría dejado dos barras que divergen el día que se mueva la banda.
-   Devuelve `''` si no hay un número que pintar, y cada cara pone SU vacío (`vacio` en el móvil,
-   `vacioSimple` en el escritorio: son dos piezas distintas, mapa §5 D10).
-   ⛔⛔ EL DIBUJO SE DERIVA DE LA BANDA, que es la mitad que faltaba el 06/10. El 05/10 se sacó
-   la banda del TÍTULO a `_bandaSana_`… y la BARRA se quedó cableada: `left:38.9%`,
-   `width:27.8%`, `left:66.7%` y los rótulos **70** y **120** escritos a mano.
-   ⛔ O sea que el día que Daniel mueva la banda otra vez -ya la movió una: *«cambia la banda
-   sana de 60 a 90 a de 70 a 120»*, 09/08- el título diría lo nuevo y **el dibujo seguiría
-   pintando lo viejo**, con la marca roja cayendo en la zona equivocada.
-   ✅ La escala es `hi * 1.5` -con 120 da los 180 de siempre: 70/180=38,9 · 50/180=27,8 ·
-   120/180=66,7 · carga/1,8-, así que derivarla reproduce el dibujo de hoy y sigue a la banda.
-   ⚠️ Y LA MARCA SE ACOTA POR LOS DOS LADOS: con un índice negativo (un ajuste a mano en
-   Notion) la marca salía con `left:calc(-5.6% …)`, fuera de la barra; y con `NaN` -que
-   `typeof` deja pasar como número- el `left` era CSS inválido y la marca caía a la izquierda,
-   o sea en «sin carga», en silencio. `isFinite` corta el segundo y `Math.max(0,…)` el primero. */
-/* ⛔ 20/10 · LA CARGA QUE SE ENSEÑA ES LA PREVISTA. 🗣️ Daniel (05/10): *«la carga que te pone en la app debería ser la
-   carga prevista. Contando lo que ya has arrastrado y tal»* · *«y la carga tiene que cambiar en consecuencia»*. La
-   calcula el servidor (`reglas/carga.carga_prevista`, ritmo de tus últimos 14 días); sin ella, el índice del cierre. */
-function _cargaVista_(m){
-  var p=m && m.carga_prevista;
-  if(p && typeof p.prevista==='number') return p.prevista;
-  return (m && typeof m.carga==='number') ? m.carga : null;
-}
-/* De cuándo es el desglose: «en vivo» si lo ha puesto el servidor desde Notion (`vivo`), o la fecha del panel si es la
-   foto. La misma frase en las dos caras. */
-function _cargaDesgloseTxt_(d){
-  return (d.vivo ? 'en vivo · de este mes ' : 'índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes ')+
-    nf(d.aporta_mes_actual||0,1)+' · arrastre '+nf(d.arrastre||0,1);
-}
-function _cargaPrevistaTxt_(m){
-  var p=m && m.carga_prevista;
-  if(!p || typeof p.prevista!=='number') return '';
-  return 'Prevista a fin de mes si sigues a tu ritmo '+(p.ritmo_de==='14d'?'de los últimos 14 días':'de este mes')+
-    ' ('+nf(p.ritmo_dia,1)+' h/día → '+nf(p.horas_previstas,1)+' h)'+
-    /* ⛔ Desde `cargas_vivas_en` (20/10) `m.carga` es el índice DE HOY si el desglose es vivo: «del último cierre» se
-       contradecía con el «en vivo» de debajo (auditoría del 20/10). */
-    (typeof m.carga==='number'?' · índice '+(m.desglose && m.desglose.vivo?'de hoy':'del panel')+': '+nf(m.carga,0):'');
-}
-
-function _cargaBarraHTML_(carga){
-  if(typeof carga !== 'number' || !isFinite(carga)) return '';
-  var _bs = _bandaSana_();
-  var _esc = _bs.hi * 1.5;
-  var _pLo = (_bs.lo / _esc * 100), _pHi = (_bs.hi / _esc * 100);
-  return '<div style="position:relative;height:30px;margin:4px 0 8px">'+
-    '<div style="position:absolute;top:11px;left:0;right:0;height:8px;border-radius:5px;background:var(--sur2)"></div>'+
-    '<div style="position:absolute;top:11px;left:'+_pLo.toFixed(1)+'%;width:'+(_pHi-_pLo).toFixed(1)+'%;height:8px;background:#1d3a2b"></div>'+
-    '<div style="position:absolute;top:6px;left:calc('+Math.max(0, Math.min(100, carga/_esc*100)).toFixed(1)+'% - 1.5px);width:3px;height:18px;'+
-      'background:var(--red);border-radius:2px;box-shadow:0 0 8px rgba(228,30,37,.55)"></div>'+
-    '<span style="position:absolute;top:-2px;left:'+_pLo.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.lo+'</span>'+
-    '<span style="position:absolute;top:-2px;left:'+_pHi.toFixed(1)+'%;font-family:var(--mono);font-size:9px;color:var(--ink3)">'+_bs.hi+'</span>'+
-  '</div>';
 }
 
 function _truncarCentimo_(x){ return Math.floor(x * 100 + 1e-9) / 100; }
@@ -1314,19 +1065,6 @@ function _sinCierres_(m){
    con un mes en curso). Aqui solo se anade el brazo del «no lo se», porque las dos
    preguntas son distintas: para el RANKING, ausente = no se echa a nadie; para el
    DINERO, ausente = no se perdona nada. */
-/* 22/10 (auditor 23, 🟠 10): quien ha ENTRADO A MITAD de temporada — sin cierres suyos cuando otros del equipo ya los
-   tienen. En septiembre nadie tiene cierres y esto da `false` a todos (la comparativa sigue como siempre). Si el panel no
-   trae `cierres` de los demás, también `false`: «no lo sé» deja la pantalla como estaba. */
-function _recienLlegado_(m){
-  if(!_sinCierres_(m)) return false;
-  /* ⛔ 22/10 (refutador 23, 🟠 1): a un miembro RASO la forma miembro del panel NO le trae `cierres` de los demás, así
-     que lo de abajo no decidía nada justo para quien entra. Lo que sí le llega es `ranking.total`: cuenta sólo a quien
-     tiene PUESTO (= cierres), y en septiembre vale 0. */
-  var rk = (typeof DATA !== 'undefined' && DATA && DATA._ranking) || null;
-  if(rk && +rk.total > 0) return true;
-  return _activos_().some(function(x){ return typeof x.cierres === 'number' && x.cierres > 0; });
-}
-
 function _exentoPrimerMes_(m){
   if(!m || typeof m.cierres !== 'number') return null;
   return _sinCierres_(m);
@@ -1399,17 +1137,7 @@ function _ritmosEquipo_(){
    **+27,23 EUR** tocando a **28 personas**. Las dos conviven a proposito: unificarlas cambia
    lo que paga cada uno y **esa decision no esta tomada**.
    ⚠️ Por eso se llama `_umbralCuota_` y no `_umbral2_`: el nombre dice para que sirve. */
-/* ⛔ 22/10 (auditor 30, 🟡 3): el UMBRAL y el TECHO de la curva que calculó el MOTOR (`DATA.cuota_curva`, de
-   `reglas/cuota.curva_equipo` sobre el `hm` de `flujos/cuotas.calcular`), o `null`. El motor lleva a las BAJAS (ARRANQUE
-   §2c: su trabajo cuenta) y el panel ya no las trae, así que con `_ritmosEquipo_` la cara calculaba OTRA curva (con
-   datos de la 25/26, 24 de 27 personas con otra cifra). Medio dato no es dato: sin los dos números, `null`. */
-function _curvaMotor_(){
-  var c = DATA.cuota_curva;
-  return (c && typeof c.umbral === 'number' && isFinite(c.umbral) && typeof c.techo === 'number' && isFinite(c.techo)) ? c : null;
-}
 function _umbralCuota_(){
-  var _cc = _curvaMotor_();
-  if(_cc) return _cc.umbral;                 /* el del motor primero; sin él, el de siempre */
   var L = _ritmosEquipo_(), s = 0, i;
   /* ⛔⛔ UNA PERSONA NO ES UN EQUIPO, y con `!L.length` esto se calculaba con UNA sola.
      A rango < 3 el backend sirve la forma MIEMBRO -tu ficha entera y las demas SOLO con
@@ -1434,8 +1162,6 @@ function _umbralCuota_(){
 
 /* El techo de la curva: el maximo h/mes del equipo (`reglas/cuota.py:cuotas`). */
 function _techoCuota_(){
-  var _cc = _curvaMotor_();
-  if(_cc) return _cc.techo;                  /* (auditor 30, 🟡 3) el del motor primero */
   var L = _ritmosEquipo_();
   /* ⛔ LA GEMELA, y hace falta: con el techo igual a TU ritmo la curva se clava en su
      extremo. Un maximo de una muestra de uno eres tu mismo, no el equipo. */
@@ -1505,41 +1231,10 @@ function _ApiSesion(m){ this.message=m; this.sesion=true; }
    ⛔ Se mira con una lista CERRADA, no con un `/token/`: hay errores que llevan la palabra
    «token» y no son de sesión — mandar a alguien a volver a entrar cuando el problema es otro
    le hace perder el trabajo que tenga a medias. */
-/* ⛔⛔ LA MAQUETA SIN CUENTA, SÓLO EN LOCAL (832.ª, 15/10) — UNA puerta para las dos caras.
-   El móvil decía «en la app publicada NUNCA se activa» y lo único que lo encendía era la URL:
-   📏 medido el 15/10 abriendo `produccion/index.html?demo` en Chromium, entraba a la maqueta
-   SIN login (DEMO=true, sin sesión; datos inventados — los 4 nombres no casan con el roster).
-   Daniel, 11/08: «yo quiero login q no puedo ver nada». Y en el escritorio la fecha se congelaba
-   con `indexOf('demo')`, o sea con CUALQUIER «demo» en la URL y CON la sesión real puesta.
-   Ahora hacen falta las dos cosas: `?demo` como parámetro entero (`\b`: «demolition» no vale) y
-   que la página la sirva esta máquina (localhost, 127.0.0.1, [::1] o un fichero).
-   ⚠️ No lanza: ante cualquier duda, `false` — el lado seguro es pedir login. */
-function _demoLocal_(){
-  try{
-    if(!/[?&]demo\b/.test(location.search)) return false;
-    return location.protocol==='file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
-  }catch(e){ return false; }
-}
-/* ⛔⛔ «HOY» SE RECALCULA, NO SE FOTOGRAFÍA (841.ª, 15/10) — una puerta para las dos caras.
-   Cada cara calculaba `HOY` UNA vez, al cargar, con su propia copia. Pero un móvil deja la app
-   abierta de un día para otro, y `_diasHasta_` cuenta contra `HOY` mientras `_plazoAbierto_` mira
-   la hora REAL: pasada la medianoche la tarjeta decía «cierra mañana» con el plazo ya cerrado — y
-   no cubrir sanciona. 📏 Se vio en la demo, donde los dos relojes discrepan siempre: «cierra en
-   2 días · TE FALTA» encima de «El plazo cerró». Ahora las caras la recalculan al empezar cada
-   refresco vivo (al volver a la app y cada 90 s). `ahora` es para el banco (§3c-36).
-   En la maqueta (`_demoLocal_`) sigue congelada: las capturas salen estables. */
-function _hoyTxt_(ahora){
-  if(_demoLocal_()) return '24/07/2026';
-  return _isoADMY_(_ahoraLocalISO_(ahora).slice(0, 10));
-}
 function _esErrorDeSesion_(err){
   var e=String(err||'');
   return /token no v\u00e1lido|token no valido/i.test(e) ||
-         /* ⛔ `^(Error: )?`: Apps Script contesta `String(err)`, o sea «Error: sin token». Con
-            `^sin token$` a secas esta rama NO CASABA NUNCA en produccion (816.a, medido con
-            `rutinas/servidor.py --comparar`). Va anclado a proposito: «sin token» suelto dentro de
-            otro mensaje no es una sesion caducada. */
-         /^(Error: )?sin token$/i.test(e) ||
+         /^sin token$/i.test(e) ||
          /token de otra aplicaci/i.test(e);
 }
 
@@ -1590,9 +1285,6 @@ function tost(m, o){
   t.textContent=m;
   clearTimeout(t._h);
   var cerrar=function(){ t.classList.remove('on','fijo'); t.onclick=null; };
-  /* 21/10 (auditor 19, 🟡 8): con una hoja abierta el aviso sale ARRIBA. Abajo tapaba sus botones de decisión
-     («Cambios y rechazo exigen motivo.» encima de «Aprobar»). Sin la regla `.tost.arriba` (escritorio) no cambia nada. */
-  t.classList.toggle('arriba', !!document.querySelector('.modal.on'));
   t.classList.add('on');
   if(o && o.fijo){
     /* `.fijo` es lo que le devuelve el `pointer-events`: en reposo el toast no captura
@@ -1619,10 +1311,6 @@ function tost(m, o){
 
    ⚠️ Solo se queda fijo lo que EXIGE una acción. Un «no hay red» sigue siendo efímero: reintentar
    es obvio y un aviso que hay que cerrar a mano, si sale por todo, se ignora. */
-/* 21/10 (auditor 19, 🟡 7): las opciones de `tost` para un aviso que puede ser LARGO. Pasados 110 caracteres no se lee
-   en los 2,6 s del toast (≈ 40 por segundo leyendo de un móvil), así que se queda fijo hasta que se toque. */
-function _tostLargo_(m){ return String(m == null ? '' : m).length > 110 ? {fijo:true} : null; }
-
 function tostErr(prefijo, e){
   tost(String(prefijo || '') + ((e && e.message) || e), (e && e.sesion) ? {fijo:true} : null);
 }
@@ -1833,26 +1521,10 @@ function _apiParse(txt, accion){
    contabiliza de otra, que es como se firma una cosa creyendo otra.
    ✅ Devuelve el aviso cuando la fecha escrita cae en un mes distinto del actual, y '' cuando
    no hay nada que avisar. */
-function _avisoMesDelBloque_(fechaDMY, hoyDMY, uc){
+function _avisoMesDelBloque_(fechaDMY, hoyDMY){
   var f = _dmyAISO_(String(fechaDMY || ''));
   var h = _dmyAISO_(String(hoyDMY || ''));
   if(!/^\d{4}-\d{2}/.test(f) || !/^\d{4}-\d{2}/.test(h)) return '';
-  /* ⛔ 21/10 (auditor 8, 🟠 1): EL MES DE TRABAJO VA DE CIERRE A CIERRE (ARRANQUE §2b), no del 1 al 31. Con el último
-     cierre a mano (`uc`, o el de la cara: `CIERRE_UC` en el móvil, `CIERRE.ultimo_cierre` en el escritorio), un bloque
-     cuenta en el mes abierto y sólo es «de otro mes» si su fecha cae ANTES del cierre (su mes ya se cerró) o en un mes
-     de calendario POSTERIOR al de hoy. Con el calendario, un bloque del 30/10 declarado el 03/11 con octubre abierto
-     decía «contarán en 2026-11» cuando el servidor (`periodo_en`) y el sello de la propia cara lo cuentan en octubre.
-     Sin cierre conocido se queda lo de antes (el calendario): no lo sé no es un aviso nuevo. */
-  if(uc === undefined) uc = (typeof CIERRE_UC !== 'undefined' && CIERRE_UC) ? CIERRE_UC
-       : ((typeof CIERRE !== 'undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
-  var ab = (uc && /^\d{4}-\d{2}$/.test(String(uc.periodo || ''))) ? _mesSiguiente_(uc.periodo) : null;
-  var at = (uc && uc.at) ? new Date(uc.at) : null;
-  if(ab && at && !isNaN(at.getTime())){
-    var _2 = function(n){ return (n < 10 ? '0' : '') + n; };
-    var corte = at.getFullYear() + '-' + _2(at.getMonth() + 1) + '-' + _2(at.getDate());
-    if(f.slice(0,10) < corte) return ab;
-    return f.slice(0,7) > h.slice(0,7) ? ab : '';
-  }
   return f.slice(0,7) === h.slice(0,7) ? '' : h.slice(0,7);
 }
 
@@ -1889,31 +1561,6 @@ function _trayectoCruzaCiudad_(origenId, destinoId){
   var o = _puntoTurno_(origenId), d = _puntoTurno_(destinoId);
   if (!o || !d) return null;
   return o.ciudad !== d.ciudad;
-}
-
-/* 22/10 (auditor 25, 🟠 3): QUIÉN VA EN QUÉ COCHE, para LEERLO. Los coches se guardaban y viajaban (`turnos_vivos` los
-   pega por id) y ninguna pantalla los enseñaba: «un almacén que nadie lee no es un dato». Una fila por coche, con los
-   puntos por su NOMBRE del catálogo (un id que no está se enseña tal cual, no se inventa) y la vuelta sólo si es
-   distinta y tiene sus dos patas. `pila(n)` traduce el nombre (cada cara tiene la suya); sin `pila`, el nombre entero. */
-function _cochesTurnoLineas_(coches, pila){
-  pila = pila || function(n){ return n; };
-  var nom = function(id){ var p = _puntoTurno_(id); return p ? p.nombre + ' (' + p.ciudad + ')' : String(id || '—'); };
-  return (Array.isArray(coches) ? coches : []).filter(function(c){ return c && typeof c === 'object'; })
-    .map(function(c, i){
-      var vuelta = (c.vueltaDistinta && c.vueltaOrigen && c.vueltaDestino) ? nom(c.vueltaOrigen) + ' → ' + nom(c.vueltaDestino) : null;
-      return { n: i + 1, conduce: c.dueno ? pila(c.dueno) : null, ida: nom(c.origen) + ' → ' + nom(c.destino),
-               vuelta: vuelta, pasajeros: (Array.isArray(c.pasajeros) ? c.pasajeros : []).map(pila) };
-    });
-}
-/* …y su bloque de ficha (móvil). Sin coches, '' — no ocupa nada. */
-function _cochesTurnoHTML_(coches, pila){
-  var ls = _cochesTurnoLineas_(coches, pila);
-  if (!ls.length) return '';
-  return '<h4>Coches</h4><div class="tarj" style="margin:0">' + ls.map(function(l){
-    return '<div class="fila"><div class="a"><b>🚗 Coche ' + l.n + ' · ' + esc(l.conduce || 'sin conductor') + '</b>' +
-      '<small>' + esc(l.ida) + (l.vuelta ? ' · vuelta: ' + esc(l.vuelta) : '') + '</small>' +
-      '<small>' + (l.pasajeros.length ? 'Van: ' + esc(l.pasajeros.join(', ')) : 'Sin pasajeros') + '</small></div></div>';
-  }).join('') + '</div>';
 }
 
 /* ═══ EL TIEMPO EXTRA DE UN TURNO · EL MODELO ════════════════════════════════════
@@ -2345,12 +1992,8 @@ function _periodoParte_(p){
    el servidor explique; hacia «esconder» quita una acción legítima **sin decir por qué**, y
    eso no se puede depurar desde el móvil. */
 function _mesCerradoParte_(p, plan, uc){
-  /* ⛔ 22/10 (refutador 27, H3): un cierre APLICADO y aún sin sellar manda sobre el último sellado, como en el servidor
-     (`_parte_en_mes_cerrado`): sus horas ya están a cero en Notion y el servidor rechaza revertir. */
-  var _ps = (plan && plan.aplicado && plan.periodo && plan.resultado && plan.resultado.at &&
-             (!uc || !uc.periodo || String(plan.periodo) > String(uc.periodo))) ? plan : null;
-  var at  = _ps ? _ps.resultado.at : ((uc && uc.at) || (plan && plan.resultado && plan.resultado.at) || null);
-  var per = _ps ? _ps.periodo : ((uc && uc.periodo) || (plan && plan.periodo) || null);
+  var at  = (uc && uc.at) || (plan && plan.resultado && plan.resultado.at) || null;
+  var per = (uc && uc.periodo) || (plan && plan.periodo) || null;
   if (at && per){
     var cre = String((p && p.creado_at) || '');
     /* ⛔ `null` y no `false`: un parte sin `creado_at` es «no lo sé» (§3c-24), y es lo mismo
@@ -2379,16 +2022,6 @@ function _mesCerradoParte_(p, plan, uc){
       cadena dice el día ANTERIOR a lo firmado entre las 00:00 y las 02:00 de verano. Se parsea a
       mano y se pasa por `Date.UTC`: `new Date(cadena)` da NaN en JScript, que es donde corre el banco.
    ⚠️ La pila la pone cada cara (`_pilaDeM_`); si no está, el nombre ENTERO — nunca otro nombre. */
-/* ⛔⛔ 20/10 — EL ACTA DE UNA REUNIÓN SIN CONVOCAR (Daniel, 14/10: «Si es una reunion SIN CONVOCAR, no aparece. Eso es
-   un error, deberia aparecer algo»). Lo dice el campo `reunion` del expediente, que pone `acta_a_expediente.py`.
-   ⛔ Sólo `sinConvocar === true` cuenta: sin el campo es «no lo sé», y un expediente de antes no se bautiza.
-   UNA puerta: la leen las Reuniones del móvil y las Actas del escritorio. */
-function _deReunionSinConvocar_(d){ return !!(d && d.reunion && d.reunion.sinConvocar === true); }
-function _actasSinConvocar_(lista){
-  return (lista || []).filter(_deReunionSinConvocar_).sort(function(a, b){
-    return String(b.fecha || '').localeCompare(String(a.fecha || '')); });
-}
-
 function _firmaParte_(p){
   var at = String((p && p.decidido_at) || ''), por = String((p && p.decidido_por) || '');
   var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?Z$/.exec(at), el = null;
@@ -2421,12 +2054,7 @@ function _selloAprobado_(p, perAbierto, uc){
   var verbo = o === 'otorgada' ? 'otorgado' : (o === 'reversion' ? 'revertido' : 'aprobado');
   var per = /^\d{4}-\d{2}$/.test(String(perAbierto || '')) ? String(perAbierto) : null;
   var cre = String((p && p.creado_at) || ''), mes = null, cerrado = false;
-  /* ⛔⛔ 20/10 EL MES QUE GRABÓ EL SERVIDOR MANDA: `periodo` lo pone `marcarPartesAplicadas` con el mes abierto en el
-     instante en que las horas entraron en Notion — el «siempre registrado» que pidió Daniel. Lo de abajo es la
-     deducción para lo que aún no lo trae (aprobado y sin aplicar, o de antes del 20/10). */
-  var pg = String((p && p.periodo) || '');
-  if (/^\d{4}-\d{2}$/.test(pg)) mes = pg;
-  else if (/^\d{4}-\d{2}-\d{2}/.test(cre)){
+  if (/^\d{4}-\d{2}-\d{2}/.test(cre)){
     var c = (uc && uc.at) ? _mesCerradoParte_(p, null, uc) : null;
     if (c === false) mes = per;
     else if (c){ if (cre.slice(0, 7) > c) mes = c; else cerrado = true; }
@@ -2460,32 +2088,14 @@ var _DIAS_PRISA_ = 3;
    ⚠️ Las **palabras** son las de una reunión (*cierra*). Una tarea *vence*, y esa pantalla tiene
    las suyas: lo que comparten es la **cuenta** (`_diasHasta_`), no el verbo. */
 function _plazoTxt_(limite){
-  /* ⛔ 20/10 (auditoría): LA FECHA POR `_normLimite_` (la que usa la REGLA): con `_dmyAISO_` a secas, «20/10/2026 10:00»
-     salía «sin límite». Y EL MISMO DÍA, POR LA HORA: el texto iba por días y la regla por minutos, así que un plazo
-     que cerró a las 10:00 seguía diciendo «cierra HOY» a las 15:00, al lado de «El plazo cerró». */
-  var _nl = (typeof _normLimite_ === 'function') ? _normLimite_(limite) : '';
-  var iso = (_nl || _dmyAISO_(String(limite == null ? '' : limite))).slice(0, 10);
+  var iso = _dmyAISO_(String(limite == null ? '' : limite)).slice(0, 10);
   var dias = _diasHasta_(Date.parse(iso));
   if (dias === null) return 'sin l\u00edmite';
-  if (dias < 0 || (dias === 0 && typeof _plazoAbierto_ === 'function' && !_plazoAbierto_(limite)))
-    return 'el plazo cerr\u00f3 el ' + _isoADMY_(iso);
+  if (dias < 0)  return 'el plazo cerr\u00f3 el ' + _isoADMY_(iso);
   if (dias === 0) return 'cierra HOY';
   if (dias === 1) return 'cierra ma\u00f1ana';
   if (dias <= _DIAS_PRISA_) return 'cierra en ' + dias + ' d\u00edas';
   return 'cierra el ' + _isoADMY_(iso);
-}
-
-/* El plazo de una tarea (ISO de Notion o `DD/MM/AAAA` de la semilla) en `DD/MM/AAAA`, o `null` si no hay uno legible.
-   Y si ya venció (antes de hoy). 20/10: el escritorio pintaba el ISO crudo y «null». */
-function _plazoDMY_(l){
-  var iso=_dmyAISO_(String(l == null ? '' : l)).slice(0, 10);
-  return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(iso) ? _isoADMY_(iso) : null;
-}
-function _venciaTarea_(l){
-  var p=_plazoDMY_(l);
-  if(!p) return false;
-  var d=_diasHasta_(Date.parse(_dmyAISO_(p)));
-  return d !== null && d < 0;
 }
 
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
@@ -2506,63 +2116,6 @@ function _mcd_(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; }
    `Promise.all`, el TypeError mataba tambien el refresco de reuniones que iba al lado.
    Devuelve `null` en vez de reventar, y deja rastro en la consola para que no vuelva a
    pasar en silencio. */
-/* ══ 20/10 · LO VIVO — «¿hay algo nuevo?» cada segundo, y si lo hay, SÓLO eso ══════════════════════════════
-   🗣️ Daniel: «Igual cada segundo que checkee si hay algo nuevo, si lo hay pide eso concretamente si no pues nada,
-   sigue checkeandolo». El servidor del mini PC contesta `queHayNuevo` con un SELLO por fuente (sin datos); si alguno
-   cambia, la cara pide sólo las acciones que tocan esa fuente (`VIVO_GRUPOS`) y repinta con su refresco de siempre.
-   ⛔ Contra Apps Script NO arranca: no conoce la acción y una llamada por segundo le fundiría la cuota.
-   ⛔ Si el refresco no pudo correr (modal abierto, escribiendo, otro en vuelo) devuelve `false` y los sellos NO se
-      dan por vistos: al segundo siguiente se vuelve a intentar, y el cambio no se pierde. */
-var VIVO_CADA_MS = 1000;
-var VIVO_GRUPOS = {
-  getTurnos:      ['turnos','kv/turnos','kv/turnos_coches','kv/turnos_convocado_at'],   // la última: refutador 25, 🟡 9
-  getTareas:      ['tareas','kv/tareas'],
-  getEntregables: ['entregables','kv/entregables'],
-  reuniones:      ['reuniones','respuestas','avisos-reunion','kv/convocatorias','kv/reu_max_id'],
-  sanciones:      ['sanciones','kv/sanciones']
-};
-/* Las fuentes cuyo sello difiere (o aparece/desaparece) entre dos lecturas. */
-function _vivoCambios_(viejo, nuevo){
-  var out=[];
-  Object.keys(nuevo||{}).forEach(function(k){ if(!viejo || viejo[k]!==nuevo[k]) out.push(k); });
-  Object.keys(viejo||{}).forEach(function(k){ if(!(k in (nuevo||{}))) out.push(k); });
-  return out;
-}
-/* ¿Le toca a este grupo? Sin `que` (el reloj, la vuelta a la pestaña), a todos. `resto` = lo que no es de ningún
-   grupo con nombre (el panel, partes, movimientos…): un sello sin dueño refresca lo general, no se pierde. */
-function _vivoToca_(que, grupo){
-  if(!que) return true;
-  if(grupo!=='resto') return que.some(function(x){ return (VIVO_GRUPOS[grupo]||[]).indexOf(x)>=0; });
-  return que.some(function(x){
-    return !Object.keys(VIVO_GRUPOS).some(function(g){ return VIVO_GRUPOS[g].indexOf(x)>=0; });
-  });
-}
-/* `_pide_` sólo si le toca; si no, `null` — que es lo que los manejadores ya tratan como «no ha venido nada». */
-function _pideSi_(que, grupo, accion, arg){
-  return _vivoToca_(que, grupo) ? _pide_(accion, arg) : Promise.resolve(null);
-}
-function _arrancarVivo_(refrescar){
-  if(typeof BACKEND_URL==='string' && BACKEND_URL.indexOf('script.google.com')>=0) return false;
-  var sellos=null, en=false;
-  setInterval(async function(){
-    if(en || document.hidden) return;
-    if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
-    /* 25/10 (auditor 33, 🟡 D2): con la sesión ya muerta no se pregunta — 60 fallos por minuto en el diario por una pestaña
-       olvidada. No se para el reloj: al volver a entrar, `_sesionMuerta_` vuelve a falso y sigue solo. */
-    if(typeof _sesionMuerta_==='function' && _sesionMuerta_()) return;
-    en=true;
-    try{
-      var r=await _pide_('queHayNuevo');
-      if(!r || !r.sellos) return;
-      if(!sellos){ sellos=r.sellos; return; }                 // la primera vuelta sólo toma la foto
-      var c=_vivoCambios_(sellos, r.sellos);
-      if(!c.length) return;
-      if((await refrescar(c))!==false) sellos=r.sellos;
-    }catch(_){} finally{ en=false; }
-  }, VIVO_CADA_MS);
-  return true;
-}
-
 function _pide_(accion, arg){
   try{
     if(typeof api[accion]!=='function'){
@@ -2622,38 +2175,26 @@ function _avisarSesionMuerta_(){
 function _ordenarFranjas_(r){
   var F=(r&&r.franjas)||[], bl=(r&&r.bloques)||[], fij=(r&&r.fijadaBl)||[];
   var idx=F.map(function(_,i){ return i; });
-  /* 21/10 (auditor 13, 🟡 11): `orig[k]` = el índice ORIGINAL de la franja que queda en la posición k. Lo que vuelve al
-     servidor (fijar) va en índices originales: es como lo guarda y como lo re-mapean las dos caras al recargar. */
   if(idx.every(function(i){ return i===0 || _minHM_(F[i-1])<=_minHM_(F[i]); }))
-    return {franjas:F, bloques:bl, fijadaBl:fij, cambio:false, orig:idx};
+    return {franjas:F, bloques:bl, fijadaBl:fij, cambio:false};
   idx.sort(function(a,b){ return _minHM_(F[a])-_minHM_(F[b]); });
   var pos=[]; idx.forEach(function(vi,k){ pos[vi]=k; });
   return {
     franjas:  idx.map(function(i){ return F[i]; }),
     bloques:  bl.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
     fijadaBl: fij.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
-    cambio:   true,
-    orig:     idx
+    cambio:   true
   };
 }
 
 /* De sanción a movimiento del libro. La forma que espera `medidorHTML` es `{f,art,t,p,vv}`.
    `vv` es la tercera columna —lo que pasa con esos puntos— y se resuelve AQUI y no al pintar,
    porque depende del estado y el pintado no tiene por qué saber de estados de sanción. */
-/* 25/10 (auditor 33, 🟡 C2): lo que `confirmarLote` dejó PENDIENTE porque su sanción ya tiene otra revocación aprobada
-   (`yaRevocadas`). Ninguna cara lo leía: el bloque se daba por cerrado entero. */
-function _yaRevTxt_(n){
-  n=+n||0;
-  return n ? ' \u00b7 '+n+(n===1 ? ' revocación se queda pendiente (su sanción ya tiene otra aprobada)'
-                                  : ' revocaciones se quedan pendientes (sus sanciones ya tienen otra aprobada)') : '';
-}
-
 function _movDeSancion_(s){
   var just=(s.estado==='justificada');
+  var iso=String(s.fecha||'').slice(0,10);
   return {
-    /* 25/10 (auditor 33, 🟡 C1): el día de MADRID (`_diaMadridDe_`), no el corte UTC del sello — lo decidido entre las 00:00
-       y las 02:00 salía con el día anterior, y el historial del PD (que ya pasaba por aquí) decía otro. */
-    f: _diaMadridDe_(s.fecha) || (s.fecha||''),
+    f: (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? _isoADMY_(iso) : (s.fecha||'')),
     art: String(s.articulo||'—'),
     t: String(s.motivo||'(sin motivo)'),
     /* La insignia y la etiqueta salen del MISMO dato. El backend ya manda 0 en una
@@ -2667,64 +2208,15 @@ function _movDeSancion_(s){
     p: just ? 0 : _ptsSanc_(s.puntos),
     /* Los puntos SE REINICIAN CADA TEMPORADA (RRI Art. 29), no caducan sanción a sanción. Se
        dice así, con palabras, en vez de inventarse una fecha exacta que el RRI no fija. */
-    /* ⛔ 21/10 (auditor 12, 🟠 5 y 🟡 12): una REVOCADA se devolvió, una REVOCACIÓN devuelve y un PREMIO no resta.
-       Con el rótulo de siempre, «−1 hasta el fin de temporada» al lado de su «+1» se leía como dos cosas vivas. */
-    vv: just ? 'justificada<br>no restó'
-      : (s.estado === 'revocada') ? 'revocada<br>se devolvió'
-      : (s.origen === 'revocacion') ? 'devuelve<br>una sanción'
-      : (s.origen === 'premio') ? 'premio<br>no resta'
-      : 'hasta el fin<br>de temporada'
+    vv: just ? 'justificada<br>no restó' : 'hasta el fin<br>de temporada'
   };
-}
-
-/* ⛔ 21/10 (auditor 10, 🟡 13 de fondo): al cerrar sesión, los avisos de esa cuenta SEGUÍAN llegando a este navegador
-   — la suscripción quedaba a su nombre en el servidor; en un ordenador prestado, los de otra persona. Se le pide al
-   servidor que la suelte (`borrarPush`), y a propósito NO se da de baja aquí: al volver a entrar, `_pushInit_` la
-   re-guarda a nombre de quien entre sin pedir permiso otra vez. Devuelve qué hizo (para el banco y la consola). */
-async function _soltarPushDelServidor_(){
-  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.borrarPush) return 'sin sesion';
-  if(typeof navigator==='undefined' || !navigator.serviceWorker) return 'sin worker';
-  var reg=await navigator.serviceWorker.getRegistration();
-  var sub=(reg && reg.pushManager) ? await reg.pushManager.getSubscription() : null;
-  if(!sub) return 'sin suscripcion';
-  await api.borrarPush(sub.endpoint);
-  return 'soltada';
 }
 
 function cerrarSesion(){
-  var hecho=false;
-  var fin=function(){
-    if(hecho) return;
-    hecho=true;
-    SESION=null;
-    try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
-    try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
-    location.reload();
-  };
-  /* Se sale SIEMPRE: si el servidor no contesta o falla, a los 3 s igual (no se retiene a nadie dentro). Lo que queda
-     entonces es su endpoint en el servidor, y el emisor lo poda en cuanto el navegador cambie de cuenta. */
-  setTimeout(fin, 3000);
-  try{ _soltarPushDelServidor_().then(fin, fin); }catch(_){ fin(); }
-}
-
-/* ⛔ 21/10 (auditor 10, 🟡 8): LO QUE ES una persona, en una frase, por UNA puerta para las dos caras. Cada sitio lo
-   decía a su manera y se contradecían con los datos reales: quien coordina una Unidad SIN `cargo` era «Miembro» en el
-   escritorio y «coordina…» en el móvil; un subcoordinador, «MIEMBRO» en la cabecera; y `coordina` (una lista) se
-   concatenaba con «+» («GNC,Unidad…»). Describe, no da permisos: el rango lo decide `rangoNom` y el servidor. */
-function _cargoTxt_(m){
-  if(!m) return 'Miembro';
-  if(m.cargo==='Project Director') return 'Project Director';
-  var us=_unidadesCoord_(m.coordina);
-  /* `coordina` es LO QUE coordina (con los datos reales ya trae su subsistema cuando también lo coordina); `unidad`,
-     sólo si no consta nada: decir «Coordinador de <su subsistema>» de quien coordina una Unidad le atribuye otra cosa. */
-  if(m.cargo==='Coordinador'){
-    if(!us.length && m.unidad) us=[m.unidad];
-    return us.length ? 'Coordinador de '+us.join(' · ') : 'Coordinador';
-  }
-  if(us.length) return 'Coordina '+us.join(' · ');
-  var sc=_subcoordDe_(m.nombre);
-  if(sc) return 'Subcoordina '+sc.equipo+' ('+sc.unidad+')';
-  return m.cargo || 'Miembro';
+  SESION=null;
+  try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
+  try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
+  location.reload();
 }
 
 /* La subcoordinacion de alguien, o `null`. */
@@ -2989,44 +2481,10 @@ function _esNoJustificable_(origen, extra){
 /* El rotulo de una fila de la cola: dice QUE ES antes de decir cuanto. ⛔ `_etPtsSanc_` solo
    sabe de puntos, y la recompensa de un premio **no son puntos**: son horas
    (`extra.compensacion`). Pintar su `puntos:0` como «aviso» era decir lo contrario de lo que es. */
-/* ¿Esta fila de la cola es un PREMIO? UNA puerta para el rótulo de la fila (`_etSancFila_`) y la cabecera del lote
-   (`_rotuloLote_`): con el criterio copiado, el día que cambie uno la cabecera y las filas dirían cosas distintas. */
-function _esPremioSanc_(origen, extra){
-  var o = String(origen == null ? '' : origen);
-  return o === 'premio' || !!(extra && extra.compensacion && o !== 'revocacion');
-}
-
-/* ⛔ 20/10 (ficha «un PREMIO se pinta como sanción»): la cabecera del lote en el móvil era `it.length+' sanciones'`, y
-   los bloques de reunión traen premiados en el MISMO lote — «2 sanciones» sobre una sanción y un premio. El escritorio
-   dice «N personas», que no miente; aquí se separa, que es lo que el PD necesita leer antes de decidir. */
-function _rotuloLote_(it){
-  var n = (it || []).length, p = 0;
-  for (var i = 0; i < n; i++) if (_esPremioSanc_(it[i].origen, it[i].extra)) p++;
-  var s = n - p, out = [];
-  if (s || !p) out.push(s + ' ' + (s === 1 ? 'sanción' : 'sanciones'));
-  if (p) out.push(p + ' ' + (p === 1 ? 'premio' : 'premios'));
-  return out.join(' · ');
-}
-
-/* 22/10 (ensayo de la reunión #3, 🟡 8): el TÍTULO de la reunión de un lote `reunion-<id>`, buscado en la lista de
-   reuniones que ya tiene la cara (`titulo`, o `tit` en la semilla del escritorio). '' si el lote no es de una reunión,
-   o la reunión no está en la lista: entonces se queda el código, que es lo que había. ⛔ Con DOS lotes de las mismas
-   personas (la #2 pendiente y la #3), sólo el código no decía que eran reuniones distintas. */
-function _tituloLote_(lote, reus){
-  var m = /^reunion-(\d+)$/.exec(String(lote == null ? '' : lote));
-  if (!m) return '';
-  var L = Array.isArray(reus) ? reus : [];
-  for (var i = 0; i < L.length; i++){
-    var r = L[i];
-    if (r && String(r.id) === m[1]) return String(r.titulo || r.tit || '');
-  }
-  return '';
-}
-
 function _etSancFila_(pts, origen, extra){
   var o = String(origen == null ? '' : origen);
   var comp = extra && extra.compensacion;
-  if (_esPremioSanc_(o, extra))
+  if (o === 'premio' || (comp && o !== 'revocacion'))
     /* ⚠️ `nf2`, a 40 líneas de aquí en este mismo fichero: formatea decimales en es-ES
        (`nf2(0.5)` → «0,5»). Iba a escribir un `_hh_` nuevo — §5b lo caza. */
     return 'premio' + (comp ? ' · +' + nf2(comp) + ' h' : '');
@@ -3053,10 +2511,6 @@ function _etSancFila_(pts, origen, extra){
 function _puedeRevocarSanc_(s, arr){
   if (!s || s.estado !== 'aplicada') return false;     // solo la que ya quito puntos
   if (s.origen === 'revocacion') return false;         // una revocacion no se revoca
-  /* 21/10 (auditor 15, 🔴 2): ni un PREMIO — revocarlo no quita sus horas, desmarca la casilla de otra sancion y borra
-     una falta del gradiente. Hasta que Daniel diga si se revoca y que hace, no se ofrece (el servidor tampoco lo acepta). */
-  if (s.origen === 'premio') return false;
-  if (s.extra && s.extra.compensacion) return false;   /* 21/10 (verificador): un premio «manual» tambien es premio */
   /* ⛔ Y SI NO SE SABE CUANTOS PUNTOS TENIA, NO SE REVOCA (759.a aplicada aqui). El
      original hacia `-Number(s.puntos||0)`, que convierte «no llego» en un **0** -- y en esta
      pantalla el 0 no es «nada», es la revocacion de un AVISO. Mejor no ofrecerlo. */
@@ -3109,14 +2563,14 @@ function _filaRevocacion_(s, texto){
 function _validaPuntosSanc_(crudo){
   var t = String(crudo === null || crudo === undefined ? '' : crudo).replace(/^\s+|\s+$/g, '');
   if (t === '')
-    return { ok:false, msg:'Pon los puntos: el campo está vacío.' };
+    return { ok:false, msg:'Pon los puntos: el campo esta vacio.' };
   if (!/^-?\d+$/.test(t))
-    return { ok:false, msg:'Los puntos son un número entero: «'+t+'\u00bb no lo es.' };
+    return { ok:false, msg:'Los puntos son un numero entero: \u00ab'+t+'\u00bb no lo es.' };
   var n = parseInt(t, 10);
   if (n > 0)
-    return { ok:false, msg:'Una sanción resta: pon 0 (aviso) o un número negativo.' };
+    return { ok:false, msg:'Una sancion resta: pon 0 (aviso) o un numero negativo.' };
   if (n < -5)
-    return { ok:false, msg:'Lo máximo que quita una sanción del RRI son 5 puntos, y has puesto '+n+'.' };
+    return { ok:false, msg:'Lo maximo que quita una sancion del RRI son 5 puntos, y has puesto '+n+'.' };
   return { ok:true, pts:n };
 }
 
@@ -3127,28 +2581,6 @@ function _puntosDeMotivo_(mot){
   for (i = 0; i < L.length; i++)
     if (L[i] && L[i][0] === mot && typeof L[i][2] === 'number') return String(L[i][2]);
   return null;
-}
-
-/* ⛔ 20/10 (ficha «el prefill de puntos se congela en el primer motivo elegido»). El campo de puntos se pintaba con
-   `SANC_FORM.pts||_puntosDeMotivo_(motivo)`, y `_recogerSancForm_` guarda en `pts` LO QUE PUSO EL PROPIO PREFILL: al
-   cambiar de motivo el `||` cortocircuitaba y la sanción salía con los puntos del artículo ANTERIOR, sin que ninguna
-   capa (ni `_validaPuntosSanc_`, sólo rango, ni el servidor) cruce puntos con artículo.
-   ⛔ Y NO se invierte el `||`: ese orden arregló el fallo contrario (un repintado asíncrono pisando lo tecleado). Lo
-   que distingue es POR QUÉ se repinta: un repintado conserva; un CAMBIO DE MOTIVO vuelve a proponer — salvo que la
-   persona haya tecleado otro número, que entonces es suyo. Por eso se recuerda lo PROPUESTO (`ptsPropuesto`). */
-function _ptsPrefillSanc_(){
-  if (SANC_FORM.pts) return SANC_FORM.pts;
-  var p = _puntosDeMotivo_(SANC_FORM.motivo) || '';
-  SANC_FORM.ptsPropuesto = p;
-  return p;
-}
-function _motivoCambiaSanc_(){
-  var e = (typeof $ === 'function') ? $('#snPts') : null;
-  var v = e ? e.value : SANC_FORM.pts;
-  if (SANC_FORM.ptsPropuesto != null && String(v == null ? '' : v) === String(SANC_FORM.ptsPropuesto)) {
-    SANC_FORM.pts = '';
-    if (e) e.value = '';
-  }
 }
 
 function _sancCampos_(){
@@ -3328,11 +2760,6 @@ function _mdPlegado_(md){
 /* La pantalla de novedades. Si el sellado no se hizo, se DICE en vez de enseñar un hueco:
    un changelog vacio parece que no ha cambiado nada, que es lo contrario de la verdad. */
 function _novedadesHTML_(){
-  /* ⛔ 19/10 (auditoría): la MISMA guarda que su gemela `_automatismosHTML_`, dentro. Hoy los tres llamadores (menú del
-     móvil, menú y `ir` del escritorio) ya preguntan antes; esto es para el cuarto, que no lo hará. */
-  if(!_puedeVerNovedades_()){
-    return '<div class="mtit">Novedades</div><p class="rnota" data-est="nopuede">Esta pantalla es del director, y sólo en la beta.</p>';
-  }
   var cuerpo = String(CHANGELOG_MD||'').trim()
     ? '<div class="mdoc">'+_mdPlegado_(CHANGELOG_MD)+'</div>'
     : '<p class="rnota">El changelog no se selló en esta build. Está en '+
@@ -3362,58 +2789,22 @@ function _novedadesHTML_(){
    pregunta AQUÍ DENTRO además de en el menú — esconder el botón es cortesía, y en el escritorio
    a una vista se llega también por `ir()`.
    Los `data-est`/`data-fam` no pintan nada: son lo que el banco cuenta, en ASCII. */
-/* ⛔ 20/10 (ficha 22489): EL PULSO DEL GATE, en Automatismos. El inventario de abajo es una FOTO de cuando se publicó;
-   esto es lo único de la pantalla que dice si el motor está pasando AHORA. El estado vive en `_pulsoGateCargar_.p`
-   (un módulo sólo lleva declaraciones `function`, ARRANQUE §5b): `undefined` = sin pedir, `null` = en vuelo,
-   `{error}` = no se pudo preguntar, objeto = la respuesta del mini PC. */
-function _pulsoGateCargar_(repintar){
-  var F=_pulsoGateCargar_;
-  /* ⛔ 21/10 (auditor 7, 🟠 3): se preguntaba UNA vez por sesión — con el motor parado 47 min, la segunda apertura seguía
-     diciendo «pasó hace 1 min». Ahora se vuelve a preguntar si la respuesta tiene más de 30 s; mientras vuela se sigue
-     pintando la anterior (`F.vuelo`), y sólo la primera vez sale «preguntando…». */
-  if(F.vuelo || (F.p!==undefined && (Date.now()-(F.t||0))<30000)) return;
-  if(typeof api==='undefined' || typeof api.getPulsoGate!=='function'){ F.p={error:'esta cara no lo pregunta'}; F.t=Date.now(); return; }
-  F.vuelo=true; if(F.p===undefined) F.p=null;
-  Promise.resolve().then(function(){ return api.getPulsoGate(); })
-    .then(function(r){ F.p=(r && typeof r==='object') ? r : {error:'respuesta vacía'}; })
-    .catch(function(e){ F.p={error:String((e&&e.message)||e||'sin detalle')}; })
-    .then(function(){ F.vuelo=false; F.t=Date.now(); if(typeof repintar==='function') repintar(); });
-}
-function _pulsoGateHTML_(p){
-  if(p===undefined || p===null) return '<p class="rnota" data-pulso="cargando">Preguntando al servidor cuándo pasó el motor por última vez…</p>';
-  if(p.error) return '<p class="rnota" data-pulso="error">⚠ No pude preguntar cuándo pasó el motor ('+esc(p.error)+
-    '). Eso NO dice que esté parado: dice que no lo sé.</p>';
-  var m=p.minutos, mu=(typeof p.muerto_min==='number') ? p.muerto_min : 10, ca=p.cadencia_min||2;
-  if(m===null || m===undefined) return '<p class="rnota" data-pulso="nolose" style="color:var(--rojo,#E41E25)">⛔ El motor '+
-    '<b>no ha dejado constancia de ninguna pasada</b> en el mini PC: o no ha corrido nunca, o su estado no se lee.</p>';
-  var cuando=(m<1) ? 'hace menos de 1 min' : ('hace '+m+' min');
-  if(m>mu) return '<p class="rnota" data-pulso="parado" style="color:var(--rojo,#E41E25)">⛔ <b>El motor lleva '+m+
-    ' min sin pasar</b> (toca cada '+ca+'): nadie cierra fichajes, caduca partes ni manda avisos mientras tanto.</p>';
-  return '<p class="rnota" data-pulso="vivo">✅ El motor pasó <b>'+cuando+'</b> (toca cada '+ca+' min).</p>';
-}
 function _automatismosHTML_(){
   var tit='<div class="mtit">Automatismos</div>';
   if(!_puedeVerNovedades_()){
     return tit+'<p class="rnota" data-est="nopuede">Esta pantalla es del director, y sólo en la beta.</p>';
   }
-  /* El pulso va ARRIBA de todo: es lo vivo de la pantalla (lo de debajo es la foto de publicar), y sale también
-     cuando el inventario no se selló — que es justo cuando más falta saber si el motor pasa. */
-  var pul=(typeof _pulsoGateCargar_==='function' && _pulsoGateCargar_.p!==undefined) ? _pulsoGateHTML_(_pulsoGateCargar_.p) : '';
   var A=(typeof AUTOMATISMOS==='undefined') ? null : AUTOMATISMOS;
   if(!A || typeof A!=='object'){
-    return tit+pul+'<div class="msub">Lo que el repositorio ya hace solo.</div>'+
+    return tit+'<div class="msub">Lo que el repositorio ya hace solo.</div>'+
       '<p class="rnota" data-est="sinsellar">El inventario no se selló en esta build. Sale de '+
       '<span class="mono">rutinas/automatismos.py</span> del repositorio, al publicar.</p>';
   }
   var m=String(A.generado||'').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-  var h=tit+pul+(m
-    ? (A.calculado
-      ? '<div class="msub" data-est="foto">Comprobado por el motor el <b>'+
-        m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>, con «Comprobarlo ahora». Lo que haya cambiado después '+
-        'no sale aquí.</div>'
-      : '<div class="msub" data-est="foto">Foto del momento de publicar: <b>'+
+  var h=tit+(m
+    ? '<div class="msub" data-est="foto">Foto del momento de publicar: <b>'+
       m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>. No es un «comprobar ahora»: lo que haya '+
-      'cambiado después no sale aquí.</div>')
+      'cambiado después no sale aquí.</div>'
     : '<div class="msub" data-est="sinfecha"><b>Sin fecha</b>: no se sabe de cuándo es esta foto, '+
       'así que no la des por actual.</div>');
   /* ⛔ EL BOTON DE COMPROBAR (765.a). Daniel (10/09): «darle a un boton y que checkee».
@@ -3421,9 +2812,8 @@ function _automatismosHTML_(){
      backend no tiene repo. Lo que hace el boton es levantar el flag `comprobar_automatismos`;
      el gate lo recoge en su siguiente pasada -- hasta 2 minutos -- y publica el resultado.
      Decir «comprobado» al pulsar seria mentir justo durante esa espera.
-     ⚠️ Solo en el escritorio: en el movil no hay donde poner esto y nadie lo ha pedido.
-     ⛔ 21/10 (auditor 7, 🟠 6): y por eso se pinta sólo donde existe su manejador; en el móvil era un botón muerto. */
-  if(typeof _engComprobarAuto_==='function') h+='<p class="rnota" style="margin:10px 0 0">'+
+     ⚠️ Solo en el escritorio: en el movil no hay donde poner esto y nadie lo ha pedido. */
+  h+='<p class="rnota" style="margin:10px 0 0">'+
     '<button class="btn sm" data-comprauto>Comprobarlo ahora</button> '+
     '<span style="color:var(--ink3)">Lo calcula el gate en su siguiente pasada, '+
     '<b>hasta 2 min</b>: la app no puede comprobarlo ella, porque esto sale del '+
@@ -3459,10 +2849,7 @@ function _automatismosHTML_(){
     for(var j=0;j<fil.length;j++){
       var x=fil[j], t;
       if(fams[k][0]==='gate'){
-        /* 21/10 (auditor 7, 🟠 5): «siempre» de algo que manda según un control de otra pantalla era falso. */
-        t=(x.siempre ? (x.interruptor_en ? 'cada pasada, pero sólo manda si está encendido su interruptor de '+
-            esc(x.interruptor_en) : 'siempre') : (x.con_interruptor ? (x.encargo
-              ? 'cuando se le encarga (una vez; se apaga sola al acabar)' : 'si su interruptor está encendido') : 'sin interruptor'))+
+        t=(x.siempre ? 'siempre' : (x.con_interruptor ? 'si su interruptor está encendido' : 'sin interruptor'))+
           (x.tipo==='ia' ? ' · ⚠ llama a un modelo ('+esc(x.modelo||'sin decir cuál')+')' : '');
       } else if(fams[k][0]==='arreglan'){
         t=esc(x.que)+' · '+(x.con_orden ? 'tiene una orden que lo arregla' : esc(x.arregla||'sin decir cómo'));
@@ -3471,10 +2858,6 @@ function _automatismosHTML_(){
       } else {
         t=esc(x.que||'(sin describir)')+(x.escribe_fuera ? ' · ⚠ '+esc(x.escribe_fuera) : '');
       }
-      /* 21/10: y si el servidor lo dijo, en qué estado está AHORA (`AUTO_ESTADO`, sólo el escritorio lo pregunta). */
-      if(fams[k][0]==='gate' && x.con_interruptor && typeof AUTO_ESTADO==='object' && AUTO_ESTADO &&
-         Object.prototype.hasOwnProperty.call(AUTO_ESTADO, x.nombre))
-        t+=' · '+(AUTO_ESTADO[x.nombre]===true ? '<b>encendido ahora</b>' : (AUTO_ESTADO[x.nombre]===false ? 'apagado ahora' : 'no consta'));
       h+='<li data-fam="'+fams[k][0]+'"><b>'+esc(x.nombre)+'</b> — '+t+'</li>';
     }
     h+='</ul>';
@@ -3492,20 +2875,7 @@ function optHoras(sel){
   return s;
 }
 
-/* ⛔ 20/10 (auditor de turnos): LA REFERENCIA DE UN TURNO SIN `id`, una sola para las dos caras — «T·MMDD·HH:MM».
-   Cada cara fabricaba la suya («T-2026-10-25» / «T·1025·17:00»), y la del móvil es su CLAVE: dos turnos del mismo día
-   salían con la misma y al pulsar el segundo se abría el primero. Con la hora se distinguen. Sin fecha legible, el
-   índice (`ix`) — no una fecha inventada. Acepta ISO y DD/MM/AAAA. */
-function _refTurno_(t, ix){
-  if(t && t.id) return String(t.id);
-  var iso = _dmyAISO_(String((t && (t.fecha || t.f)) || ''));
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return 'T·' + (ix == null ? '?' : ix);
-  return 'T·' + iso.slice(5, 7) + iso.slice(8, 10) + (t.hora ? '·' + String(t.hora).slice(0, 5) : '');
-}
-
-/* 21/10: también `6/9/2026` y `06/09/26` — sin enderezar, `_normLimite_` los comparaba como cadena y «6» > «2»: plazo
-   abierto para siempre. Día y mes de 1-2 cifras, año de 2 (→ 20AA) o 4. */
-function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})$/); return m?((m[3].length===2?'20'+m[3]:m[3])+'-'+(m[2].length<2?'0':'')+m[2]+'-'+(m[1].length<2?'0':'')+m[1]):f; }
+function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?(m[3]+'-'+m[2]+'-'+m[1]):f; }
 
 /* La temporada va de septiembre a agosto · GEMELA de `reglas/disciplina.py:temporada_de`.
    Si esto y el Python discrepan, el que manda es el Python: ahi se calculan los puntos. */
@@ -3601,23 +2971,13 @@ function _deEstaTemporada_(d){
    ⛔ Y SIN PERIODO DEVUELVE `null`, NO 0 (§3c-24): un 0 ahí afirma «este mes no has resuelto
    nada» cuando lo que pasa es que no se sabe qué mes es. ⚠️ Con la lista VACÍA sí devuelve
    `{n:0}`: «no hay partes» se sabe, y es otra cosa. */
-function _resueltosDelPeriodo_(partes, periodo, uc){
+function _resueltosDelPeriodo_(partes, periodo){
   if(!/^\d{4}-\d{2}$/.test(String(periodo||''))) return null;
-  /* ⛔ 20/10 (auditor de partes): DE CIERRE A CIERRE, como `periodo_en` del servidor (ARRANQUE §2b). Antes era el mes de
-     calendario EN UTC de la cadena: lo decidido el 30/09 a las 22:30Z (01/10 en Madrid) contaba en septiembre, y lo del
-     1 al cierre de septiembre contaba en octubre. Con el último cierre (`uc`, el del mes anterior a `periodo`), cuenta
-     lo decidido DESDE su instante; sin él, el mes LOCAL de la decisión — un respaldo que yerra entre el día 1 y el
-     cierre, no un dato. */
-  var tUc = (uc && typeof _mesSiguiente_ === 'function' && _mesSiguiente_(uc.periodo) === String(periodo))
-            ? Date.parse(String(uc.at || '')) : NaN;
-  var L = partes || [], n = 0, sf = 0, i, d, t, f;
+  var L = partes || [], n = 0, sf = 0, i, d;
   for(i = 0; i < L.length; i++){
     d = String((L[i] || {}).decidido_at || '');
-    t = /^\d{4}-\d{2}/.test(d) ? Date.parse(d) : NaN;
-    if(isNaN(t)){ sf++; continue; }
-    if(!isNaN(tUc)){ if(t >= tUc) n++; continue; }
-    f = new Date(t);
-    if(f.getFullYear() + '-' + ('0' + (f.getMonth() + 1)).slice(-2) === String(periodo)) n++;
+    if(!/^\d{4}-\d{2}/.test(d)){ sf++; continue; }
+    if(d.slice(0, 7) === String(periodo)) n++;
   }
   return { n: n, sinFecha: sf };
 }
@@ -3625,24 +2985,6 @@ function _resueltosDelPeriodo_(partes, periodo, uc){
 function _esDeMesPasado_(p, periodo){
   var per = String(periodo||'');
   if(!/^\d{4}-\d{2}$/.test(per)) return false;
-  /* ⛔ 20/10 (2846) EL MES QUE GRABÓ EL SERVIDOR MANDA SOBRE LA FECHA, como en `_selloAprobado_`. Lo hacen falta dos
-     casos: el parte DEL SISTEMA con la compensación base de septiembre lleva la fecha del CIERRE (5 de octubre) y por
-     fecha caería en octubre —la base contada dos veces—; y lo atrasado («de julio declarado en agosto») cuenta en el
-     mes en que entró, 🗣️ «Siempre al actual». Sin `periodo` (lo de antes del 20/10), la fecha, como siempre. */
-  var pp = String((p&&p.periodo)||'');
-  if(/^\d{4}-\d{2}$/.test(pp)) return pp < per;
-  /* ⛔ 20/10 (auditor de partes): SIN `periodo`, CUÁNDO ENTRÓ (`creado_at`) y no la fecha del trabajo — el mismo
-     criterio que el sello (`_mesCerradoParte_`) y el servidor. Trabajado el 28/09 y creado el 06/10 con septiembre
-     cerrado el 05/10 se plegaba en «De meses anteriores» mientras su sello decía «cuenta en octubre». Con el último
-     cierre (`CIERRE_UC`, el del mes anterior a `per`), su instante; sin él, el mes LOCAL de la creación. */
-  var cre = String((p&&p.creado_at)||''), tc = /^\d{4}-\d{2}-\d{2}T/.test(cre) ? Date.parse(cre) : NaN;
-  if(!isNaN(tc)){
-    var uc = (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null;
-    if(uc && uc.at && typeof _mesSiguiente_==='function' && _mesSiguiente_(uc.periodo)===per
-       && !isNaN(Date.parse(String(uc.at)))) return tc < Date.parse(String(uc.at));
-    var dc = new Date(tc);
-    return (dc.getFullYear()+'-'+('0'+(dc.getMonth()+1)).slice(-2)) < per;
-  }
   var iso = String((p&&p.iso)||'');
   if(!/^\d{4}-\d{2}/.test(iso)) return false;
   return iso.slice(0,7) < per;
@@ -3821,34 +3163,16 @@ function _compExtra_(m){
    es la forma mas rapida de que nadie se entere de que esta roto. */
 function _ultimosMov_(lista, fecha, cuanto, ambito){
   var dentro = (ambito==='mes') ? _deEsteMes_ : _deEstaTemporada_;
-  /* ⛔ 20/10 (auditoría): «ESTE MES» POR EL MES QUE GRABÓ EL SERVIDOR, como la cifra grande. `_deEsteMes_` sólo ve
-     la fecha, y la cifra (`sumaSiMes` → `_esDeMesPasado_`) lee antes el `periodo`: la base de septiembre, fechada el
-     día del cierre (5 de octubre), salía en la lista de octubre, y lo atrasado (de septiembre declarado en octubre) no.
-     La cifra decía 7 h y la lista sumaba 6. Sin `periodo` en el apunte, la fecha, como siempre. */
-  var _per = (ambito==='mes' && typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
-  var _rePer = /^\d{4}-\d{2}$/;
   var conD=[], sinD=[], suma=0;
   (lista||[]).forEach(function(x){
     var d=_fechaDMY_(fecha(x));
     if(!d){ sinD.push(x); suma+=(cuanto?(+cuanto(x)||0):0); return; }
-    if(typeof _esDeMesPasado_==='function' && _rePer.test(String(_per||'')) && _rePer.test(String((x&&x.periodo)||''))){
-      if(_esDeMesPasado_({periodo:x.periodo}, _per)) return;
-    } else if(!dentro(d)) return;
+    if(!dentro(d)) return;
     conD.push({x:x,d:d}); suma+=(cuanto?(+cuanto(x)||0):0);
   });
   conD.sort(function(a,b){ return b.d-a.d; });
   var todos=sinD.concat(conD.map(function(o){ return o.x; }));
-  /* ⛔⛔ `sinFecha` NO ES ADORNO: a `sinD` **no se le aplica el filtro del mes** -- un
-     apunte cuya fecha no se puede leer entra siempre, sale PRIMERO y suma --, y quien
-     llama rotula el resultado «N apuntes **este mes**». O sea que se presentaba como de
-     este mes **en todos los meses**, sin dar ningun error. Daniel (06/10): *«siguen
-     apareciendo las de mes anterior a pesar q pone de este mes»*.
-     ⚠️ Y la cura **no esconde nada**: el apunte se queda en la lista y sus horas en la
-     suma -- ocultar una hora de alguien es peor que no saber de que mes es. Lo que se
-     arregla es el ROTULO: con este contador el llamador puede decir «· N sin fecha» en
-     vez de afirmar que son de este mes. Es §3c-24: un «no lo se» no se dice como un dato. */
-  return { total: todos.length, ultimos: todos.slice(0,MOVS_N), todos: todos,
-           suma: suma, sinFecha: sinD.length };
+  return { total: todos.length, ultimos: todos.slice(0,MOVS_N), todos: todos, suma: suma };
 }
 
 /* La coletilla que aparece en los dos libros. Una sola frase, en un sitio. */
@@ -4038,124 +3362,8 @@ function _nomMesAbierto_(corto){
 function _mesACerrar_(hoy){
   var h=hoy||new Date(), a=h.getFullYear(), m=h.getMonth();  /* getMonth() es 0-11 */
   if(m===0){ a-=1; m=11; } else { m-=1; }
-  var mm=m+1, p=a+'-'+(mm<10?'0':'')+mm;
-  /* ⛔ 20/10 (auditoría): SI EL MES ABIERTO ES MÁS VIEJO QUE «EL ANTERIOR AL DEL RELOJ», SE CIERRA ÉSE. Un mes no se
-     salta: el 1 de diciembre con octubre sin cerrar, lo que toca cerrar es octubre, no noviembre (🗣️ «mientras no se
-     cierre el mes no cambiamos de mes realmente»). Si no es más viejo, nada cambia: con septiembre cerrado, el 20 de
-     octubre sigue proponiendo septiembre (ya cerrado), como siempre. */
-  var abierto=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
-  /* ⛔⛔ 21/10 (auditor 9, 🟠 4): Y SI ES MÁS NUEVO, TAMBIÉN. Lo que toca cerrar es el mes ABIERTO —el siguiente al último
-     cierre—, sea más viejo o más nuevo que «el anterior al del reloj»: del 6 al 31 de octubre, con septiembre cerrado el
-     05/10, esto proponía «Cierre de septiembre · LLEVA 21 días» y el botón «Calcular el cierre de septiembre». Sin
-     último cierre conocido, el reloj como hasta hoy. */
-  if(/^\d{4}-\d{2}$/.test(String(abierto||'')) && abierto !== p){
-    p=abierto; m=parseInt(abierto.slice(5,7),10)-1;
-  }
-  /* …pero un mes que AÚN CORRE no se cierra (la gemela del auditor del 20/10): `curso` = el mes de `p` no ha terminado
-     el día `h`. Las caras bloquean «Calcular» con él: el corte va del cierre anterior HASTA HOY, y calcular octubre el
-     20/10 lo cortaría a medias. */
-  var _hoyYM=h.getFullYear()+'-'+(h.getMonth()<9?'0':'')+(h.getMonth()+1);
-  return { p:p, mes:MESES_L[m], curso:(p >= _hoyYM) };
-}
-
-/* ⛔ 21/10 (auditor 9, 🟠 1/🟠 2): EL PLAN DE LA RANURA, SÓLO SI ES DEL MES QUE TOCA CERRAR (o de uno posterior). La
-   ranura `cierre_plan` guarda el ÚLTIMO plan que alguien escribió, y no se vacía: hoy trae el de JULIO «parado a medias»
-   (una pasada del 19/10), con julio aplicado el 04/08. Creérselo pintaba «PARADO A MEDIAS · hay fichas nuevas y viejas
-   conviviendo» y, en el móvil, tapaba el botón «Calcular». Un plan de un periodo ANTERIOR es de un ciclo pasado: `null`.
-   Sin periodo legible en alguno de los dos, se queda el plan (no lo sé no es «viejo»). */
-/* ⛔ 21/10 (auditor 9, 🟠 3): EL ÚLTIMO CÁLCULO DEL CIERRE FALLÓ. `calcular_cierre.py` baja su flag con la nota «plan NO
-   calculado (salida N)» y el servidor la devuelve en `ultimo_calculo`; sin esto, pulsar «Calcular» y que fallase dejaba
-   la pantalla con el plan anterior y ni una palabra. Texto plano (la cara lo escapa), o '' si no hay fallo o si hay un
-   cálculo en cola (entonces manda ése). */
-/* ⛔ 21/10 (auditor 9, 🟡 1): UN INSTANTE DEL CIERRE, PARA LEERLO UNA PERSONA: «DD/MM/AAAA HH:MM» en hora de MADRID
-   (el `resultado.at` viaja en UTC: «2026-10-19 11:20» eran las 13:20). Una fecha sin hora sale «DD/MM/AAAA»; lo que no
-   se entienda, tal cual (no se inventa una fecha). */
-function _cuandoMadrid_(iso){
-  var s = String(iso || ''), d = new Date(s);
-  if(/T\d{2}:\d{2}/.test(s) && !isNaN(d.getTime())){
-    var x = _ahoraLocalISO_(d);
-    return _isoADMY_(x.slice(0,10)) + ' ' + x.slice(11,16);
-  }
-  if(/T\d{2}:\d{2}/.test(s)) return _isoADMY_(s.slice(0,10)) + ' ' + s.slice(11,16);
-  return /^\d{4}-\d{2}-\d{2}/.test(s) ? _isoADMY_(s.slice(0,10)) : s;
-}
-
-/* ⛔ 21/10 (auditor 9, 🟡 2): «HAY FICHAS NUEVAS Y VIEJAS CONVIVIENDO» SÓLO SI SE ESCRIBIÓ ALGUNA. `parado` = un
-   descuadre o un fallo, aunque no se haya escrito nada: se decía «conviven» sobre 0 fichas escritas. Sin `resultado`
-   o sin `aplicadas`, no se sabe: se queda el aviso de siempre (el lado prudente). */
-function _convivenFichas_(plan){
-  var r = plan && plan.resultado;
-  if(!r || r.aplicadas == null) return true;
-  return Number(r.aplicadas) > 0;
-}
-
-/* 22/10 (auditor 22, 🟠 2): la gemela para APLICAR. En vuelo, que no se pulse otra vez; fallado («cierre NO aplicado»),
-   que se diga — antes las dos se veían igual que «sin pulsar», con el botón activo. */
-/* 22/10 (refutador 22, 🟠 2): cuántos MINUTOS lleva arriba el flag de «Aplicar» (`aplicando.at`), o `null` si no se
-   sabe. El flag arriba quiere decir «encolado o escribiéndose», no «escribiéndose»: si el motor no pasa, se queda arriba. */
-function _minAplicando_(est, hoy){
-  var at = est && est.aplicando && est.aplicando.at, t = at ? Date.parse(at) : NaN;
-  if(isNaN(t)) return null;
-  return Math.max(0, Math.floor(((hoy || new Date()).getTime() - t) / 60000));
-}
-
-/* 22/10 (refutador 22, 🟠 1/🟠 2): ¿se BLOQUEA «Aplicar»? Sí mientras el flag está arriba y es reciente; pasados 15 min
-   el motor (que va cada 2) ya lo habría recogido, así que lo más probable es que esté parado: se deja volver a pulsar
-   (encolar otra vez sólo reescribe el flag) en vez de dejar el botón muerto para siempre. */
-function _aplicandoVivo_(est, hoy){
-  if(!(est && est.aplicando)) return false;
-  var m = _minAplicando_(est, hoy);
-  return m === null || m < 15;
-}
-
-function _avisoAplicarCierre_(est, hoy){
-  if(est && est.aplicando){
-    var m = _minAplicando_(est, hoy);
-    if(!_aplicandoVivo_(est, hoy))
-      return 'El «Aplicar» lleva ' + m + ' min en cola y el motor no lo ha recogido (pasa cada 2 minutos): puede que esté ' +
-             'parado — míralo en Automatismos. Puedes volver a pulsarlo.';
-    return 'Aplicando el cierre: en cola o escribiéndose' + (m === null ? '' : ' (pulsado hace ' + m + ' min)') +
-           '; el motor pasa cada 2 minutos. No lo pulses otra vez.';
-  }
-  var ua = est && est.ultimo_aplicar;
-  /* «NO terminado» desde el 22/10 (refutador 22, 🟡 5); «NO aplicado» es la nota de antes, que puede seguir en la fila. */
-  if(!ua || !/NO (terminado|aplicado)/.test(String(ua.nota || ''))) return '';
-  var dia = _diaMadridDe_(ua.at);
-  return 'El último «Aplicar» NO terminó' + (dia ? ' (' + dia + ')' : '') + ': «' + String(ua.nota) + '». El aviso del ' +
-         'gate dice por qué; míralo antes de volver a pulsar.';
-}
-
-function _avisoCalculoCierre_(est){
-  var uc = est && est.ultimo_calculo;
-  if(!uc || (est && est.encolado) || !/NO calculado/.test(String(uc.nota || ''))) return '';
-  var dia = _diaMadridDe_(uc.at);
-  return 'El último cálculo del cierre FALLÓ' + (dia ? ' (' + dia + ')' : '') + ': «' + String(uc.nota) + '». No hay ' +
-         'plan nuevo; el aviso del gate dice por qué. Míralo antes de volver a pulsar.';
-}
-
-/* 22/10 (auditor 22, 🟡 6): LA LÍNEA DEL PLAN DE UN MES YA CERRADO, en las dos caras. Si quedó APLICADO entero es el
-   cierre que se acaba de hacer, y se dice así —con cuántas fichas—: nada más sellar, la pantalla decía de él «no es el
-   cierre de ahora y no cuenta» y escondía el resultado. Parado o a medias, la de siempre. Devuelve HTML (lleva <b>). */
-function _notaPlanViejo_(v){
-  if(!v) return '';
-  var mes='<b>'+esc(_nomPeriodo_(v.periodo))+'</b>', r=v.resultado||null;
-  /* ⛔ 22/10 (refutador 22, 🟡 6): un AUSENTE (se fue: su ficha ya no está en Notion) no impide sellar, así que no
-     convierte el cierre en «a medias»: sólo cuenta como a medias lo que falta MÁS ALLÁ de los ausentes. */
-  var inc=_cierreIncompleto_(v);
-  if(v.aplicado && !v.parado && (!inc || inc.faltan===inc.ausentes)){
-    var n=(r && typeof r.aplicadas==='number') ? r.aplicadas : null;
-    return 'El último cierre, el de '+mes+', está <b>aplicado</b>'+
-      (n!==null ? ' ('+n+' ficha'+(n===1?'':'s')+' escrita'+(n===1?'':'s')+' en Notion'+
-        (inc ? '; '+inc.ausentes+' ya no tiene'+(inc.ausentes===1?'':'n')+' ficha' : '')+')' : '')+'.';
-  }
-  return 'La última ranura del servidor trae el plan de '+mes+', de un mes ya cerrado: no es el cierre de ahora y no cuenta.';
-}
-
-function _planVigente_(plan, hoy){
-  if(!plan) return null;
-  var p=String(plan.periodo||''), toca=_mesACerrar_(hoy).p;
-  if(/^\d{4}-\d{2}$/.test(p) && /^\d{4}-\d{2}$/.test(String(toca||'')) && p < toca) return null;
-  return plan;
+  var mm=m+1;
+  return { p:a+'-'+(mm<10?'0':'')+mm, mes:MESES_L[m] };
 }
 
 function _numPlan_(v){
@@ -4283,45 +3491,6 @@ function _cablearVisor_(raiz){
   }
 }
 
-/* ⛔⛔ EL `subscribe` SE CAZA, Y ES UN FALLO REPORTADO: `BUG-M-2026-10-07-1` (Óscar,
-   **Bloquea**): *«no me deja activar notificaciones»*, y Daniel al aprobarlo anotó *«estaba
-   en PC y en Brave»*. Brave de escritorio trae **APAGADO** «Usar los servicios de Google para
-   la mensajería push», así que `pushManager.subscribe` **lanza** — y aquí no había `catch`,
-   o sea que el usuario no se enteraba ni de por qué ni de qué hacer.
-   📏 Y cuadra con lo medido el 14/10: `notisPrefs` tiene **UNA sola persona** en todo el
-   equipo. Si nadie consigue suscribirse, no hay a quién mandar nada.
-   ✅ Se caza el fallo y se dice QUÉ HACER. La detección de Brave sólo afina el consejo: un
-   navegador que falle por otra razón también recibe algo útil en vez de un silencio. */
-/* ═══ ENTRAR CON GOOGLE, UNA PUERTA (19/10) ════════════════════════════════════════════════════════════════
-   ⛔ Estaba COPIADO en las dos caras (`_pintarLogin_`, 0,97 de parecido medido por `gemelas.py`): el mismo `initialize`,
-   el mismo botón y el mismo `prompt`, y sólo cambiaban la cabecera y el texto del error. Una copia de cómo se entra es
-   la que diverge el día que Google cambie algo y sólo se arregle en una cara. Cada cara pone SU cabecera (lo que de
-   verdad difiere) y esto pone el resto. El error es el del móvil, que dice qué pasa en vez de «Error iniciando Google
-   Sign-In». `_gate_` es de cada cara (se resuelve al llamar). */
-function _iniciarGoogle_(cabeceraHTML){
-  _gate_(cabeceraHTML+'<div id="gbtn"></div>');
-  try{
-    var hint=''; try{ hint=localStorage.getItem('sol_last_email')||''; }catch(_){}
-    var cfg={client_id:GOOGLE_CLIENT_ID,callback:_onCredencial_,auto_select:true,
-             itp_support:true,use_fedcm_for_prompt:true};
-    if(hint) cfg.login_hint=hint;
-    google.accounts.id.initialize(cfg);
-    google.accounts.id.renderButton(document.getElementById('gbtn'),
-      {theme:'filled_black',size:'large',text:'signin_with',shape:'pill'});
-    try{ google.accounts.id.prompt(); }catch(_){}
-    api.ping(); setTimeout(function(){ api.ping(); },4000);   // pre-calienta el contenedor
-  }catch(e){ _gate_('<div style="color:#ffb3b0">No se pudo iniciar sesión con Google: '+((e&&e.message)||e)+'</div>'); }
-}
-
-function _consejoSuscribir_(err){
-  var e=String((err&&err.message)||err||'');
-  if(navigator.brave) return 'Brave trae apagado \u00abUsar los servicios de Google para la '+
-    'mensajer\u00eda push\u00bb. \u00c1brelo en brave://settings/privacy, act\u00edvalo y vuelve a intentarlo. '+
-    '(El navegador dijo: '+e+')';
-  return 'Este navegador no deja preparar el aviso: '+e+'. En el m\u00f3vil, prueba a abrir el '+
-    'panel desde el icono de la pantalla de inicio.';
-}
-
 function _urlB64_(b64){
   var pad='='.repeat((4-b64.length%4)%4);
   var t=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');
@@ -4330,97 +3499,50 @@ function _urlB64_(b64){
   return arr;
 }
 
-/* ══ HAY UNA VERSION NUEVA → SE CARGA SOLA (20/10/2026; antes, barra con botón desde el 10/09) ═══
+/* ══ HAY UNA VERSION NUEVA (545.ª, 10/09/2026) ═══════════════════════
 
-   🗣️ Daniel, 20/10: *«quita la opción de actualizar la app directamente actualizasela a todo dios»* · *«el botón de
-   actualizar es inútil pq la gente no lo ve, directamente actualiza a la última cada vez q lo abres y ya»*.
-   Lo grueso está en `sw.js`, que ahora pide a la RED primero: casi siempre se abre ya en la última. Esto cubre el
-   resto -- la red tardó, se abrió con lo guardado, y luego llegó lo nuevo (`version-nueva`).
-   ⛔ Y NO HAY BARRA NI BOTÓN: se recarga. Lo que queda de la decisión del 10/09 es su MIEDO, no su conclusión:
-   recargar encima de una disponibilidad a medio pintar o un motivo a medio escribir pierde trabajo. Por eso:
-   · si aún no has tocado nada desde que abrió → **al momento**;
-   · si ya estabas usándola → **la próxima vez que vuelvas a la app** (es «cada vez que la abres»), y sólo si no
-     hay nada a medias en ese instante. */
-var _avisoVersion = false;   // hay una versión nueva esperando a cargarse
+   ⛔⛔ Daniel, 10/09: *«no me llego nada a la app ni siquiera ninguna novedad»*. La cache
+   del worker sirve `guardado || red`, o sea **la cara de ayer** en la primera apertura.
+   Quitarla no vale: entro para arreglar *«tarda mucho en abrir a veces»*, que tambien lo
+   reporto el. Asi que se sigue abriendo al instante **y se avisa** cuando la red trae algo
+   distinto -- lo detecta `_hayVersionNueva_` en `sw.js` comparando la huella (`ETag`).
 
-/* La decisión, pura (la ejecuta `probar_sw.py`). `st` = {tocado, aMedias, volviendo}. */
-function _recargaVersionYa_(st){
-  st = st || {};
-  if (st.aMedias) return false;            // ⛔ nunca encima de algo a medio hacer
-  if (!st.tocado) return true;             // recién abierta: nadie ha empezado nada
-  return !!st.volviendo;                   // usándola: al volver a ella, no en mitad
-}
+   ⛔ **NO RECARGA SOLA, Y ESO ES LA DECISION.** El arreglo obvio es `location.reload()` al
+   recibir el mensaje, y borraria lo que alguien lleve marcado -- una disponibilidad a medio
+   pintar, un motivo escrito a medias. Se ofrece; decide quien esta delante. */
+var _avisoVersion = false;
 
-/* ¿Hay algo a medias en pantalla? Un campo con el foco, el modal del móvil abierto, o texto escrito sin enviar. */
-function _hayAMedias_(){
-  if (typeof document === 'undefined') return false;
-  var a = document.activeElement, t = a && a.tagName;
-  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || (a && a.isContentEditable)) return true;
-  var m = document.getElementById('modal');
-  if (m && m.classList && m.classList.contains('on')) return true;
-  var ts = document.getElementsByTagName ? document.getElementsByTagName('textarea') : [];
-  for (var i = 0; i < ts.length; i++) if (ts[i].value && String(ts[i].value).trim()) return true;
-  /* ⛔ Y EL ESCRITORIO (auditoría del 20/10): no tiene `#modal`, pero sí botones de guardar que SÓLO se habilitan con
-     cambios pendientes (tu disponibilidad de turno y la de reunión), el montaje de un turno (`TUR_SEL`) y campos
-     tecleados que ya no tienen el foco. */
-  if (document.querySelector && document.querySelector('[data-mtguardar]:not([disabled]),[data-midguardar]:not([disabled])')) return true;
-  if (typeof TUR_SEL === 'object' && TUR_SEL && Object.keys(TUR_SEL).length) return true;
-  var ins = document.getElementsByTagName ? document.getElementsByTagName('input') : [];
-  for (var j = 0; j < ins.length; j++) {
-    var x = ins[j], ty = String(x.type || '').toLowerCase();
-    if (ty === 'checkbox' || ty === 'radio') { if (x.checked !== x.defaultChecked) return true; }
-    else if (ty !== 'hidden' && ty !== 'button' && ty !== 'submit' && x.value !== x.defaultValue) return true;
-  }
-  return false;
-}
-
-function _recargarVersionNueva_(volviendo){
-  if (!_avisoVersion) return false;
-  var st = { tocado: !!_recargarVersionNueva_.tocado, aMedias: _hayAMedias_(), volviendo: !!volviendo };
-  if (!_recargaVersionYa_(st)) return false;
-  try { location.reload(); } catch (_) { return false; }
+function _pintarVersionNueva_(){
+  /* ⛔ UNA SOLA VEZ. El worker manda un mensaje **por fichero** que cambia, y en una
+     publicacion cambian varios: sin esto salen cinco barras encima de la pantalla. */
+  if (_avisoVersion) return false;
+  if (typeof document === 'undefined' || !document.body) return false;
+  _avisoVersion = true;
+  var d = document.createElement('div');
+  d.id = 'vnueva';
+  d.setAttribute('style', 'position:fixed;left:10px;right:10px;bottom:calc(10px + '
+    + 'env(safe-area-inset-bottom,0px));z-index:9999;display:flex;gap:10px;'
+    + 'align-items:center;padding:11px 12px;border-radius:12px;font-size:12.5px;'
+    + 'background:#1b1a19;border:1px solid rgba(255,255,255,.18);color:#f2f0ee;'
+    + 'box-shadow:0 6px 22px rgba(0,0,0,.45)');
+  var t = document.createElement('span');
+  t.setAttribute('style', 'flex:1;line-height:1.4');
+  t.textContent = 'Hay una versión nueva de la app.';
+  var b = document.createElement('button');
+  b.setAttribute('style', 'flex:none;padding:7px 12px;border-radius:9px;border:0;'
+    + 'background:#E41E25;color:#fff;font:inherit;font-weight:600;cursor:pointer');
+  b.textContent = 'Actualizar';
+  b.onclick = function(){ try { location.reload(); } catch (_) {} };
+  var x = document.createElement('button');
+  x.setAttribute('style', 'flex:none;padding:7px 9px;border-radius:9px;border:0;'
+    + 'background:transparent;color:#9d9894;font:inherit;cursor:pointer');
+  x.textContent = 'Ahora no';
+  /* ⚠️ Cerrar NO vuelve a poner `_avisoVersion` en false: si lo hiciera, el siguiente
+     fichero que refresque lo volveria a sacar y seria imposible quitarselo de encima. */
+  x.onclick = function(){ try { d.parentNode.removeChild(d); } catch (_) {} };
+  d.appendChild(t); d.appendChild(x); d.appendChild(b);
+  document.body.appendChild(d);
   return true;
-}
-
-/* ⛔ 21/10 (auditor 7, 🟡 13): EL DESTINO DE UN AVISO → la vista de ESTA cara. Los emisores dicen `horas`,
-   `reuniones`, `turnos`, `docs` o `estado`; cada cara lo traduce a la suya. Lo que no conoce → `null` (se queda donde
-   esté: abrir la raíz es lo que pasaba antes, no un fallo nuevo). */
-function _vistaDeAviso_(destino, cara){
-  var d=String(destino||'').replace(/^#/,'');
-  var M=(cara==='escritorio')
-    ? {estado:'panel', horas:'libros', reuniones:'convoc', turnos:'turnos', docs:'docdec'}
-    : {estado:'estado', horas:'horas', reuniones:'reu', turnos:'turnos', docs:'docs'};
-  return Object.prototype.hasOwnProperty.call(M,d) ? M[d] : null;
-}
-function _irDesdeAviso_(destino){
-  try{
-    if(typeof VISTAS==='object' && VISTAS && typeof ST==='object' && ST){
-      var m=_vistaDeAviso_(destino,'movil');
-      if(!m || !VISTAS[m]) return null;
-      ST.vista=m; if(typeof pintar==='function') pintar();
-      return m;
-    }
-    /* `ir` sólo existe en el escritorio: se toma en una variable, no se llama por su nombre desde el módulo común
-       (`probar_bundle_caras.py`). */
-    var irF=(typeof ir==='function') ? ir : null;
-    if(typeof V==='object' && V && irF){
-      var e=_vistaDeAviso_(destino,'escritorio');
-      if(!e || !V[e]) return null;
-      irF(e);
-      return e;
-    }
-  }catch(_){}
-  return null;
-}
-/* Al abrir desde un aviso con la app cerrada, el destino llega en el hash; se lee una vez y se quita de la barra. */
-function _irAlAbrir_(){
-  try{
-    var h=(typeof location!=='undefined' && location.hash) ? String(location.hash).slice(1) : '';
-    if(!h) return null;
-    var r=_irDesdeAviso_(h);
-    if(r && typeof history!=='undefined' && history.replaceState) history.replaceState(null,'',location.pathname+location.search);
-    return r;
-  }catch(_){ return null; }
 }
 
 /* Engancha el canal del worker. Devuelve si se pudo enganchar, para que quien llame lo
@@ -4428,16 +3550,8 @@ function _irAlAbrir_(){
 function _escucharSW_(){
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false;
   try {
-    /* «Tocado» = el primer toque o tecla desde que abrió: a partir de ahí ya no se recarga en mitad. */
-    var marca = function(){ _recargarVersionNueva_.tocado = true; };
-    document.addEventListener('pointerdown', marca, true);
-    document.addEventListener('keydown', marca, true);
-    document.addEventListener('visibilitychange', function(){
-      if (document.visibilityState === 'visible') _recargarVersionNueva_(true);
-    });
     navigator.serviceWorker.addEventListener('message', function(ev){
-      if (ev && ev.data && ev.data.tipo === 'version-nueva') { _avisoVersion = true; _recargarVersionNueva_(false); }
-      else if (ev && ev.data && ev.data.tipo === 'ir') _irDesdeAviso_(ev.data.a);
+      if (ev && ev.data && ev.data.tipo === 'version-nueva') _pintarVersionNueva_();
     });
     return true;
   } catch (_) { return false; }
@@ -4461,7 +3575,6 @@ async function _pushInit_(){
      ⚠️ Y con ellas se iba el aviso de version nueva, que viaja por el mismo canal. */
   var reg=await _registrarSW_();
   _escucharSW_();
-  _irAlAbrir_();
   if(!_pushSoportado_()) return;
   try{
     if(reg && Notification.permission==='granted'){
@@ -4517,6 +3630,25 @@ function _pushFallo_(v){
   return window.__PUSH_FALLO || null;
 }
 
+/* ⛔ POR QUE NO SE PUDO SUSCRIBIR, DICHO PARA QUIEN PUEDE ARREGLARLO (BUG-M-2026-10-07-1).
+   Oscar no podia activar los avisos y era **Brave en el PC**: Brave concede el permiso, pero
+   trae APAGADO de serie el servicio de push de Google, asi que `pushManager.subscribe` falla
+   con «Registration failed - push service error». El gate enseñaba ese texto en crudo y no
+   dejaba pasar: bloqueado y sin saber que tocar. El arreglo es UN interruptor de Brave, y por
+   eso se nombra. Fuera de Brave se dice lo de siempre, con el mensaje del navegador detras.
+   `(e, prefijo)` → texto para pantalla. La usan las dos caras: el gate del movil
+   (`_asegurarPush_`) y el boton del escritorio (`activarNotis`). */
+function _motivoFalloPush_(e, prefijo){
+  var m = (e && e.message) || String(e || '');
+  var brave = typeof navigator!=='undefined' && !!navigator.brave;
+  if(brave && ((e && e.name==='AbortError') || /push service/i.test(m)))
+    return 'Estás usando Brave, que trae los avisos apagados de serie. Para activarlos: abre '+
+      'brave://settings/privacy, enciende «Usar los servicios de Google para la mensajería push» '+
+      '(en inglés, «Use Google services for push messaging»), reinicia Brave y vuelve a entrar. '+
+      'O entra con Chrome, Edge o Firefox.';
+  return (prefijo || 'No se pudo activar: ') + m;
+}
+
 /* Reduce ANTES de nada. No es solo por el peso del envío: pintar sobre un lienzo de 12 Mpx
    en un móvil va a tirones, y la captura se sigue leyendo a 1600. */
 function _leerImagen_(file){
@@ -4533,27 +3665,12 @@ function _leerImagen_(file){
         var w=Math.max(1,Math.round(im.naturalWidth*k)), h=Math.max(1,Math.round(im.naturalHeight*k));
         var c=document.createElement('canvas'); c.width=w; c.height=h;
         c.getContext('2d').drawImage(im,0,0,w,h);
-        ok({ url:_jpegQueCabe_(c,0.85), w:w, h:h });
+        ok({ url:c.toDataURL('image/jpeg',0.85), w:w, h:h });
       };
       im.src=fr.result;
     };
     fr.readAsDataURL(file);
   });
-}
-
-/* 25/10 (auditor 33, 🟡 D4): el JPEG de un lienzo, bajando la calidad (y, si no basta, el tamaño) hasta que el data URL
-   cabe holgado en una petición — el servidor rechaza un cuerpo de más de 1 MiB ENTERO, así que una captura con mucho
-   detalle (1,6 MB medido) tumbaba el reporte y no sólo la foto, y cada reintento fallaba igual. */
-function _jpegQueCabe_(c, q){
-  var TOPE=900*1024, url=c.toDataURL('image/jpeg', q);
-  for(var k=1; url.length>TOPE && k<=3; k++) url=c.toDataURL('image/jpeg', q-0.15*k);
-  for(var i=0; url.length>TOPE && i<4; i++){
-    var d=document.createElement('canvas');
-    d.width=Math.max(1, Math.round(c.width*0.75)); d.height=Math.max(1, Math.round(c.height*0.75));
-    d.getContext('2d').drawImage(c, 0, 0, d.width, d.height);
-    c=d; url=c.toDataURL('image/jpeg', 0.6);
-  }
-  return url;
 }
 
 function _pesoKB_(dataUrl){
@@ -4632,23 +3749,6 @@ function _ddmm_(d){ return pad(d.getDate())+'/'+pad(d.getMonth()+1); }
    ⛔ Y se escribe como FUNCION, no como `var`: el arnes de los bancos extrae funciones
    (`jsfuente.funcion`), no globals. Un `var` no llegaria al arnes y el caso no podria ni
    llamarlo -- o sea que el tope quedaria sin poder comprobarse. */
-/* CÓMO SE ESCRIBE LA MODALIDAD de una reunión (937.ª). El valor es un id ASCII (`telematica`, `hibrida`) y se
-   pintaba tal cual: Estado decía «TELEMATICA». Se escribe como en el desplegable donde se elige. Lo que no es una
-   de las tres se deja como viene (no se inventa una etiqueta), y lo vacío, vacío. */
-function _modalidadTxt_(m){
-  var k=String(m==null?'':m), t={presencial:'Presencial', telematica:'Telemática', hibrida:'Híbrida'}[k.toLowerCase()];
-  return t || k;
-}
-
-/* Una fecha ISO `AAAA-MM-DD` movida `n` días, en ISO (932.ª). En UTC a propósito: con hora local, el día del
-   cambio de hora una resta de 7×24 h cae en el día de al lado. Lo que no es una fecha ISO devuelve `null`, no
-   una fecha inventada (§3c-24). */
-function _isoMasDias_(iso, n){
-  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso==null?'':iso));
-  if(!m) return null;
-  return new Date(Date.UTC(+m[1], +m[2]-1, +m[3]+(+n||0))).toISOString().slice(0,10);
-}
-
 function _topeDias_(){ return 62; }
 
 function _diasDesde_(iso,n){ var out=[],b=new Date(iso+'T00:00:00');
@@ -4680,19 +3780,6 @@ function _diasPedidos_(modo,d0,d1,nd){
 /* Cuantas casillas seguidas hacen falta para cubrir la reunión. Se redondea HACIA ARRIBA:
    media casilla no existe, y quedarse corto es no poder ir. Sin `duracion` (reuniones de
    antes de este modelo) da 1, que es como se comportaba la app hasta ahora. */
-/* ⛔ 20/10 (ficha «el aviso de "ese día nadie podrá marcar": dos reglas distintas»). ¿Cuántos días de la convocatoria
-   NO dan para la reunión entera? UNA regla para las dos caras, y POR DÍA: el escritorio miraba la UNIÓN de todos
-   (`u.F.length<nS`), así que con horario distinto por día casi nunca avisaba aunque un día se quedara corto.
-   Un día sin horario (desactivado) no cuenta: ahí no se ofrece nada a propósito. */
-function _diasCortosConv_(perDia, rangos, nS){
-  var n = 0;
-  for (var i = 0; i < perDia.length; i++) {
-    var r = rangos[i] || [0, 0];
-    if (r[1] > r[0] && perDia[i].length < nS) n++;
-  }
-  return n;
-}
-
 function _slotsMin_(duracion, slot){
   var d=+duracion||0, s=Math.max(5, +slot||60);
   return Math.max(1, Math.ceil(d/s) || 1);
@@ -4708,19 +3795,9 @@ function _slotsMin_(duracion, slot){
    ⛔ Y NO CONFUNDIR CON `_slotsMin_`, que sí es una restricción dura: una racha más corta que
    la reunión no sirve para ir a nada. Son dos mínimos distintos y se dicen distinto.
    Devuelve `{falta, exigido, txt}`; `falta` a 0 significa que no hay nada que advertir. */
-/* ⛔ 21/10 (auditor 13, 🟠 4): ¿esta reunión SANCIONA SOLA? Sólo general, junta y consejo — la regla del PD del
-   22/07 (`decisiones-app.md`, «Sanciones de reuniones») y `construir_reunion.TIPOS_AUTO`. En subsistema, trabajo o
-   mixta, no cubrir queda a potestad del coordinador: la cara no puede amenazar con un artículo que nadie aplica. */
-function _sancionaSola_(tipo){
-  return ['general','junta','consejo'].indexOf(String(tipo == null ? '' : tipo).trim().toLowerCase()) >= 0;
-}
-
-function _avisoMinimo_(marcadas, exigido, tipo){
+function _avisoMinimo_(marcadas, exigido){
   var m = +marcadas || 0, e = +exigido || 0;
   if(!e) return {falta:0, exigido:0, txt:''};
-  /* 21/10 (auditor 13, 🟠 4): con el TIPO dicho y una reunión que no sanciona sola, no hay «mínimo sin sanción» que
-     advertir. Sin tipo (llamadas viejas), como antes. */
-  if(tipo !== undefined && !_sancionaSola_(tipo)) return {falta:0, exigido:e, txt:''};
   var falta = Math.max(0, e - m);
   return { falta: falta, exigido: e,
     txt: falta
@@ -4742,16 +3819,6 @@ function _avisoMinimo_(marcadas, exigido, tipo){
    ⚠️ Sin `limite` no hay plazo que vencer: abierto. */
 function _ahoraLocalISO_(d){
   var x = d || new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
-  /* ⛔ 21/10 (auditor de reuniones): LA HORA DE MADRID, no la del aparato — la del servidor. Con el teléfono en otra
-     zona la cara decía «abierta» de un plazo ya cerrado (o al revés), y no cubrir a tiempo sanciona. Si `Intl` no puede
-     (sin soporte, o un doble de `Date`), el reloj local como hasta hoy. */
-  try{
-    var o = {}, ps = new Intl.DateTimeFormat('en-GB', {timeZone:'Europe/Madrid', year:'numeric', month:'2-digit',
-      day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23'}).formatToParts(x), i;
-    for(i = 0; i < ps.length; i++) o[ps[i].type] = ps[i].value;
-    if(o.year && o.month && o.day && o.hour && o.minute)
-      return o.year + '-' + o.month + '-' + o.day + 'T' + (o.hour === '24' ? '00' : o.hour) + ':' + o.minute;
-  }catch(_){ }
   return x.getFullYear() + '-' + p(x.getMonth() + 1) + '-' + p(x.getDate()) +
          'T' + p(x.getHours()) + ':' + p(x.getMinutes());
 }
@@ -4779,38 +3846,8 @@ function _ahoraLocalISO_(d){
    ⚠️ **`ahora` va por argumento** porque si no el caso no puede discriminar: con la fecha
    tecleada, dos instantes separados dan la misma respuesta ('cerrada' las dos), y con ésta dan
    'abierta' las dos. Un caso que dependa del reloj de quien corra el banco no distingue nada. */
-/* LAS FRANJAS DE LA SEMILLA: bloques de UNA HORA, con el hueco de la comida (745.ª).
-
-   🗣️ Daniel, 14/10/2026: *«aparecen de disponibilidades los días de forma distinta… no
-   tiene mucho sentido poner mañana y que no se sepa qué hora es mañana… Que sea como las
-   reuniones. Que sea POR BLOQUES HORARIOS… hasta las once de la noche… no antes de las 9
-   de la mañana, dejar el espacio para comer… de dos a cuatro, no haya turnos»*.
-
-   ⛔ **Las dos caras la llaman; la lista NO se copia en sus dos semillas.** La lección ya
-   estaba escrita al lado, para los sitios: *«los sitios NO se cablean … para que las dos
-   caras no acaben con dos listas distintas»*. Con la lista en los dos `.html`, tocar una
-   deja la otra con la semana vieja y nadie se entera hasta que alguien compara.
-
-   ⛔ **Y es el espejo de `calcular_convocatoria.franjas_horarias()`, que es quien las
-   monta de verdad.** Aquí sólo se siembra la demostración; `probar_convocar.py` compara
-   las dos listas clave por clave, porque una semilla que enseñe una semana que el
-   servidor no manda es una pantalla que miente sin dar ningún error.
-
-   ⚠️ El hueco no se pinta gris: **no existe**. Una franja ofertada que nadie puede hacer
-   recoge ceros, y un cero de «no puedo» no se distingue de un cero de «nadie contestó». */
-function _franjasDemo_(){
-  var out=[], h, p=function(n){ return (n<10?'0':'')+n; };
-  for(h=9;h<23;h++){
-    if(h>=14 && h<16) continue;
-    out.push({k:'h'+p(h), txt:p(h)+':00'});
-  }
-  return out;
-}
-
 function _semanaDemo_(ahora){
-  /* 21/10 (auditor 19, 🟡 15): sin instante, el de la APP (`_ahoraApp_`), no el real: la maqueta vive el 24/07 y la
-     semana de ejemplo salía en octubre — dos relojes en la misma pantalla. */
-  var hoy = ahora ? new Date(+ahora) : (typeof _ahoraApp_ === 'function' ? new Date(_ahoraApp_()) : new Date());
+  var hoy = ahora ? new Date(+ahora) : new Date();
   var mas = function(b, n){ return new Date(b.getFullYear(), b.getMonth(), b.getDate() + n); };
   var dia = function(d){ return _ahoraLocalISO_(d).slice(0, 10); };
   var lim = mas(hoy, 1), abre = mas(hoy, -1);
@@ -4866,12 +3903,6 @@ function _isoFechaHora_(v, hora){
      ⚠️ En ES3 no hay `trim()`: `cscript` corre ES3 y Apps Script tambien lo acepta. */
   var s = String(v == null ? '' : v).replace(/^\s+|\s+$/g, '');
   if (!s || s === 'null' || s === 'undefined') return '';
-  /* ⛔ 21/10: un INSTANTE con zona (`…Z`, `…+02:00`: lo que deja `toISOString`) no es hora de Madrid — compararlo como
-     cadena regalaba dos horas de plazo en verano. Se pasa a la hora de Madrid (`_ahoraLocalISO_`) antes de comparar. */
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/.test(s) && typeof _ahoraLocalISO_ === 'function') {
-    var _dz = new Date(s);
-    if (!isNaN(_dz.getTime())) return _ahoraLocalISO_(_dz);
-  }
   var i = s.search(/[T ]/);
   var f = _dmyAISO_(i < 0 ? s : s.slice(0, i));
   /* ⚠️ Y LA HORA SE RECORTA POR DELANTE: con DOS espacios, `r` empezaba por un blanco
@@ -4896,17 +3927,7 @@ function _normAbre_(abre){
 function _plazoAbierto_(limite, ahora){
   var s = _normLimite_(limite);
   if (!s) return true;
-  return s >= (ahora || _ahoraApp_());
-}
-
-/* ⛔⛔ EL «AHORA» DE LA APP — el mismo día que `HOY` (858.ª).
-   En la maqueta local `HOY` es el 24/07/2026 (`_hoyTxt_`), y `_plazoTxt_` cuenta desde él: la tarjeta
-   decía «cierra en 2 días»… y debajo «El plazo cerró · 26/07/2026», porque `_plazoAbierto_` miraba el
-   reloj REAL. Dos relojes en la misma tarjeta (visto con `mirar_app.js movil`, 15/10).
-   ✅ Publicado no cambia nada: fuera de la maqueta es `_ahoraLocalISO_` tal cual. */
-function _ahoraApp_(d){
-  var a = _ahoraLocalISO_(d);
-  return _demoLocal_() ? _dmyAISO_(_hoyTxt_(d)) + a.slice(10) : a;
+  return s >= (ahora || _ahoraLocalISO_());
 }
 
 /* ⛔⛔ CUÁNTAS FRANJAS SE TE EXIGEN — y por qué esto vive en una sola puerta.
@@ -4930,19 +3951,11 @@ function _ahoraApp_(d){
    y quien cubre desde el teléfono no veía nunca cuántas franjas se le exigen. */
 var MESES_MINIMO_BAJO=[1,5,6,7,8,12];
 
-/* El PD del roster cargado (en la maqueta, Lois); `PD_NOM` si no hay ninguno. Para que la semilla no firme con un nombre
-   que no está en su propio roster (auditor 20, 🟡 9). */
-function _pdSemilla_(){
-  var ms = (typeof DATA!=='undefined' && DATA && DATA.miembros) || [];
-  for(var i=0;i<ms.length;i++) if(ms[i] && ms[i].cargo==='Project Director') return ms[i].nombre;
-  return (typeof PD_NOM!=='undefined') ? PD_NOM : '';
-}
-
 function _pctMinimo_(iso){
   var mes=null;
   var m=String(iso||'').match(/^(\d{4})-(\d{2})/);
   if(m) mes=+m[2];
-  if(mes==null) mes=+String(_ahoraApp_()).slice(5,7);   /* 21/10 (auditor 20, 🟡 5): el reloj de la APP (maqueta: julio) */
+  if(mes==null) mes=new Date().getMonth()+1;
   return MESES_MINIMO_BAJO.indexOf(mes)>=0 ? 0.25 : 0.30;
 }
 
@@ -5113,122 +4126,6 @@ function _minTurno_(cv){
   return (typeof m==='number' && m>0) ? m : _minHorasTurno_();
 }
 
-/* ⛔⛔ LOS TRAMOS CONTIGUOS — espejo de `reglas/turnos.py:tramos`. Existe porque el HUECO
-   DE LA COMIDA parte el día en dos. Daniel (14/10/2026): *«de dos a cuatro, no haya
-   turnos»*. Con `h09..h13` y `h16..h22`, contar POSICIONES en la lista hace que tocar las
-   13:00 marque `[h13, h16, h17, h18]`: cuatro casillas, cuatro horas… y un agujero de DOS
-   en medio. Nadie puede hacer ese turno y **no da ningún error** — sale un turno partido
-   en el reparto y nadie sabe por qué.
-   ⛔ Dos claves van en el MISMO tramo salvo que las dos sean horarias y no sean
-   consecutivas. Escrito al revés a propósito: con `m`/`t` no hay hora que leer, sale UN
-   tramo y el bloque se comporta igual que antes.
-   ⚠️ TODO EN ES3, sin `indexOf` de array ni `map`: el arnés de `probar_turnos.py` corre
-   esta función con `cscript` (JScript), que no los lleva. La hora se lee carácter a
-   carácter por lo mismo. */
-function _tramosFranja_(claves){
-  var out=[], act=[], prev=null, i, s, h;
-  for(i=0;i<(claves||[]).length;i++){
-    s=String(claves[i]==null?'':claves[i]); h=null;
-    if(s.length===3 && s.charAt(0)==='h' && s.charAt(1)>='0' && s.charAt(1)<='9'
-       && s.charAt(2)>='0' && s.charAt(2)<='9') h=parseInt(s.charAt(1)+s.charAt(2),10);
-    if(act.length && prev!==null && h!==null && h!==prev+1){ out.push(act); act=[]; }
-    act.push(claves[i]);
-    prev=h;
-  }
-  if(act.length) out.push(act);
-  return out;
-}
-
-/* ⛔⛔ UN DEDO PINTA · DOS DEDOS DESLIZAN (746.ª, 14/10/2026).
-
-   🗣️ Daniel: *«tal vez la solución sería que para deslizar que lo hagas con los DOS DEDOS a la
-   vez. Y que lo ponga escrito en algún lugar… La solución de la app NO es que no se deslice…
-   Deslizar para las reuniones va a ser completamente OBLIGATORIO… el problema es que NO SE PODÍA
-   deslizar»*.
-
-   ⛔ **Se hace en JS y no con `touch-action`.** El asa de `.rc.rd` (`pan-y`) existe desde el
-   13/10 y **no funciona**: por la especificación, el `touch-action` efectivo es la
-   **intersección** del elemento y **sus ancestros**, y su padre `.rej` dice `none` → vacía.
-   Delegar en el navegador obliga a quitarle el `none` al padre, y eso **mata el pintado por
-   arrastre** — que es justo lo que él dijo que no. En JS el padre deja de mandar.
-
-   ✅ **Y un segundo motivo, de verificación**: un gesto **nativo** no se dispara con eventos
-   sintéticos, así que sería una capacidad imposible de probar sin un dedo humano. Hecha en JS se
-   mide con `PointerEvent`s.
-
-   ⛔ **Al entrar el SEGUNDO dedo se ABORTA el trazo**, no se deja a medias: el primer dedo ya ha
-   pintado algo en el `pointerdown`, y quien pone dos dedos quería deslizar, no pintar. Por eso
-   `alAbortar` existe y por eso quien llama tiene que saber deshacerlo — en Turnos con una copia
-   de las celdas, en Reuniones basta con tirar la previsualización, que aún no ha confirmado nada.
-
-   ⚠️ **Y no se vuelve a pintar hasta que se levantan TODOS los dedos.** Levantar uno de los dos
-   dejaría al que queda pintando en mitad de un gesto de deslizar, que es peor que no deslizar.
-
-   ⚠️ El que desliza se **busca**, no se cablea: es el ancestro con `overflow-y` desbordado. En
-   el móvil hoy es `#main`, pero cablearlo ata esta función a una cara y a un maquetado. */
-function _dosDedos_(rej, alAbortar){
-  var act = {}, n = 0, desl = false, cx = 0, cy = 0, scr = null, wrap = rej.parentElement;
-  var buscarScroller = function(){
-    var p = rej.parentElement;
-    while(p && p !== document.body){
-      var ov = getComputedStyle(p).overflowY;
-      if((ov === 'auto' || ov === 'scroll') && p.scrollHeight > p.clientHeight + 1) return p;
-      p = p.parentElement;
-    }
-    return document.scrollingElement || document.documentElement;
-  };
-  var centro = function(){
-    var sx = 0, sy = 0, m = 0, k;
-    for(k in act){ if(act.hasOwnProperty(k)){ sx += act[k].x; sy += act[k].y; m++; } }
-    return m ? {x: sx / m, y: sy / m} : null;
-  };
-  rej.addEventListener('pointerdown', function(e){
-    if(act[e.pointerId]) return;
-    act[e.pointerId] = {x: e.clientX, y: e.clientY}; n++;
-    if(n < 2) return;
-    /* El segundo dedo: se deja de pintar, se deshace lo del primero y se desliza. */
-    if(!desl){ desl = true; scr = buscarScroller();
-               if(typeof alAbortar === 'function') alAbortar(); }
-    var c = centro(); if(c){ cx = c.x; cy = c.y; }
-  });
-  rej.addEventListener('pointermove', function(e){
-    if(!act[e.pointerId]) return;
-    act[e.pointerId].x = e.clientX; act[e.pointerId].y = e.clientY;
-    if(!desl || n < 2) return;
-    var c = centro(); if(!c) return;
-    /* El contenido sigue al dedo: subir el dedo baja el contenido. */
-    if(scr) scr.scrollTop -= (c.y - cy);
-    if(wrap) wrap.scrollLeft -= (c.x - cx);
-    cx = c.x; cy = c.y;
-  });
-  var suelta = function(e){
-    if(!act[e.pointerId]) return;
-    delete act[e.pointerId]; n--;
-    if(n <= 0){ n = 0; desl = false; }
-  };
-  rej.addEventListener('pointerup', suelta);
-  rej.addEventListener('pointercancel', suelta);
-  return { deslizando: function(){ return desl; }, dedos: function(){ return n; } };
-}
-
-/* Una copia de las celdas marcadas, para poder DESHACER un trazo abortado. ⚠️ Plana a
-   propósito: `_convPintar_` asigna y borra ENTRADAS enteras, nunca toca un valor por dentro,
-   así que copiar las referencias basta y no hay que serializar nada. */
-function _copiaCeldas_(o){
-  var out = {}, k;
-  for(k in (o || {})){ if(o.hasOwnProperty(k)) out[k] = o[k]; }
-  return out;
-}
-
-/* Devuelve `dst` a como estaba, **sin cambiar de objeto**: quien lo tenga guardado (la
-   convocatoria viva) tiene que ver la vuelta atrás. */
-function _restaurarCeldas_(dst, src){
-  var k;
-  for(k in dst){ if(dst.hasOwnProperty(k)) delete dst[k]; }
-  for(k in (src || {})){ if(src.hasOwnProperty(k)) dst[k] = src[k]; }
-  return dst;
-}
-
 function _bloqueDesde_(franjas, k, minimo){
   var claves=[], i;
   for(i=0;i<(franjas||[]).length;i++){
@@ -5238,16 +4135,9 @@ function _bloqueDesde_(franjas, k, minimo){
   var pos=-1;
   for(i=0;i<claves.length;i++) if(claves[i]===k) pos=i;
   if(pos<0) return [];
-  if(!(minimo>1)) return [k];
-  /* ⛔ EL MÍNIMO, EL ANCLAJE Y EL «no caben» SE MIDEN SOBRE EL TRAMO, no sobre la lista:
-     con el hueco puesto, `claves.length` dice 12 y el tramo de la mañana tiene 5. */
-  var tr=_tramosFranja_(claves), t=null, j;
-  for(i=0;i<tr.length;i++){ for(j=0;j<tr[i].length;j++) if(tr[i][j]===k) t=tr[i]; }
-  if(!t || t.length<minimo) return [k];
-  var p=-1;
-  for(j=0;j<t.length;j++) if(t[j]===k) p=j;
-  var ini=Math.min(p, t.length-minimo);
-  return t.slice(ini, ini+minimo);
+  if(!(minimo>1) || claves.length<minimo) return [k];
+  var ini=Math.min(pos, claves.length-minimo);
+  return claves.slice(ini, ini+minimo);
 }
 
 /* Quien FIRMA un parte enrutado a esa unidad, contando que nadie decide lo suyo.
@@ -5321,56 +4211,6 @@ function _calorDe_(r, pond){
     }
   });
   return cel;
-}
-
-/* ⛔ 20/10 — QUIÉN PUEDE EN UNA CELDA (día `di`, franja `fi`). 🗣️ Daniel: *«no aparecen los nombres de los que pueden
-   cada día»* · *«en modo público debería haber una forma de verlo»*. El texto de crear lo promete en las dos caras
-   («cualquiera puede tocar un hueco y ver quién puede») y ninguna pintaba un nombre. MISMA lectura que `_calorDe_`, de
-   la que es la otra cara: `resp[nombre]` alineado con `bloques`, y puede quien tiene `> 0`. Quién PUEDE VER la lista
-   (pública, o quien manda) lo decide quien la pinta; esto sólo dice quién hay. */
-function _quienPuedeCelda_(r, di, fi){
-  var bl=(r && r.bloques)||[], resp=(r && r.resp)||{}, out=[];
-  Object.keys(resp).forEach(function(nom){
-    var w=resp[nom]; if(!Array.isArray(w)) return;
-    for(var i=0;i<bl.length;i++){
-      if(Array.isArray(bl[i]) && bl[i][0]===di && bl[i][1]===fi && (+w[i]||0)>0){ out.push(nom); return; }
-    }
-  });
-  return out.sort(function(a,b){ return a.localeCompare(b,'es'); });
-}
-
-/* Lo que dice la caja de debajo del mapa al tocar un hueco. ⛔ LOS NOMBRES LOS DECIDE EL SERVIDOR, no esto: con la
-   encuesta `anonima` y sin mandar, le llegan las filas de los demás como `#1`, `#2`… (`servidor.py`, «anon»). Aquí
-   sólo se cuentan aparte y se dice por qué no hay nombre — repetir la regla serían dos criterios para una pregunta. */
-function _quienPuedeHTML_(r, di, fi, rotulo){
-  var l=_quienPuedeCelda_(r, di, fi), nom=[], anon=0;
-  l.forEach(function(n){ if(/^#\d+$/.test(n)) anon++; else nom.push(n); });
-  /* ⛔ LA CAJA NO PUEDE CONTRADECIR AL NÚMERO DE LA CELDA. Si `calor` (personas) cuenta más de las que tienen fila en
-     `resp` —la maqueta trae `calor` sin respuestas; una lista sin hidratar, igual—, las que faltan se dicen, no se callan:
-     «no puede nadie» debajo de un 21 es mentir. */
-  var c=r && r.calor && r.calor[di] ? +r.calor[di][fi] : NaN, sinDetalle=(c>l.length) ? c-l.length : 0, tot=l.length+sinDetalle;
-  var h='<b>'+esc(rotulo||'')+'</b> · ';
-  if(!tot) return h+'no puede nadie.';
-  h+=(tot===1?'puede 1':'pueden '+tot)+(nom.length?': '+nom.map(esc).join(', '):'');
-  if(anon) h+=(nom.length?' y ':' — ')+anon+' sin nombre (encuesta anónima: los nombres sólo los ve quien convoca)';
-  if(sinDetalle) h+=((nom.length||anon)?' y ':' — ')+sinDetalle+' sin el detalle de quién';
-  return h+'.';
-}
-
-/* Engancha las celdas `data-qp="id|día|franja"` con su caja `data-qpbox="id"`. `buscar(id)` da la reunión: cada cara
-   guarda las suyas en un sitio distinto. Devuelve cuántas enganchó. */
-function _cablearQuienPuede_(buscar){
-  if(typeof document==='undefined' || !document.querySelectorAll) return 0;
-  var els=document.querySelectorAll('[data-qp]'), cajas=document.querySelectorAll('[data-qpbox]'), n=0;
-  for(var i=0;i<els.length;i++) (function(el){
-    el.onclick=function(){
-      var p=String(el.getAttribute('data-qp')).split('|'), r=buscar(p[0]), box=null;
-      for(var j=0;j<cajas.length;j++) if(cajas[j].getAttribute('data-qpbox')===p[0]) box=cajas[j];
-      if(r && box) box.innerHTML=_quienPuedeHTML_(r, +p[1], +p[2], el.getAttribute('data-qpt')||'');
-    };
-    n++;
-  })(els[i]);
-  return n;
 }
 
 /* ⛔ ¿ES LA UNIDAD DE DOCUMENTACIÓN TÉCNICA? El nombre llega de tres sitios y no coincide:
@@ -5514,23 +4354,14 @@ function _identidadPrestada_(visto){
    «¿se acabó el plazo?», no «¿empezó?». Y `=== false`, no `!cv.abierta`: una
    convocatoria vieja sin el campo es «no lo sé», y cerrarla sería inventar. */
 function _convEstado_(cv, ahora){
-  /* ⛔ 21/10 (auditor 13, 🟡 10): EN HORA DE MADRID Y COMO CADENA, igual que el servidor (`estado_conv`). Con
-     `Date.parse` el plazo dependía de la zona del aparato: en Canarias o fuera de España salía «abierta» un plazo que el
-     servidor ya cerraba. `ahora` (milisegundos) sigue valiendo para los casos.
-     ⚠️ «Igual que el servidor» no del todo, y está medido (verificador 21/10, 🟡 9): sin `abre` o sin `limite` aquí sale
-     «cerrada» y allí «abierta», y aquí además manda el `abierta` que llegue en falso. No llega así ninguna: las crea
-     `convocatoria.py` con las dos fechas (1 de 1 el 21/10) y ese campo sólo lo pone el servidor. Si llegara, la cara
-     quedaría del lado prudente (no deja contestar). */
-  /* 21/10 (auditor 19, 🟡 15): sin instante, el reloj de la APP (`_ahoraApp_`), como `_plazoAbierto_` (858.ª). Con el
-     real, la convocatoria de la maqueta (24/07) salía cerrada o en otra semana. Publicado es el mismo reloj. */
-  var t = ahora ? _ahoraLocalISO_(new Date(+ahora))
-                : (typeof _ahoraApp_ === 'function' ? _ahoraApp_() : _ahoraLocalISO_(new Date()));
+  var t=ahora?+ahora:Date.now();
   /* ⛔ POR `_normAbre_`, QUE ES LA HERMANA DE `_normLimite_` (463.ª). Aqui habia un
      `_dmyAISO_` a pelo, o sea el mismo defecto que la 295.ª curo para `limite` y que
      aqui seguia vivo: `Date.parse('01/10/2026 22:00')` lee **MM/DD** y devolvia
      `abierta` sobre un plazo que aun no ha abierto. */
-  var a=_normAbre_(cv&&cv.abre), l=_normLimite_(cv&&cv.limite);
-  if(isNaN(Date.parse(a))||isNaN(Date.parse(l))) return 'cerrada';
+  var a=Date.parse(_normAbre_(cv&&cv.abre)),
+      l=Date.parse(_normLimite_(cv&&cv.limite));
+  if(isNaN(a)||isNaN(l)) return 'cerrada';
   if(t<a) return 'sin_abrir';
   if(cv && cv.abierta === false) return 'cerrada';
   return t<=l ? 'abierta' : 'cerrada';
@@ -5562,60 +4393,6 @@ function _convQuedan_(cv, ahora){
 /* Las clases de estado que puede llevar una celda, sacadas de la convocatoria. Cablearlas
    haría que un sitio nuevo dejara restos de la clase anterior al repintar. */
 function _convClases_(cv){ return (cv.sitios||[]).concat(['ambos','no']); }
-
-/* GEMELA de `reglas/turnos.py:clave`. El separador se prueba contra el de Python en
-   `rutinas/probar_turnos.py` §12: si alguien cambia uno, el banco lo canta.
-   ⚠️ Vivía en `turnos.movil.js`; se mudó aquí en la 949.ª con `_convDeClave_` y `_reusarDispo_`, porque el
-   escritorio también reutiliza la semana anterior y no carga ese fichero. */
-function _convClave_(dia, franja){ return dia+'|'+franja; }
-
-/* La otra mitad de la puerta: DESCOMPONER la clave. Vive pegada a `_convClave_` y el separador
-   lo saca de ELLA — escribirlo aquí otra vez sería tener el formato en dos sitios, que es justo
-   lo que `_convClave_` existe para impedir: el día que uno cambie, el otro deja de casar y la
-   respuesta DESAPARECE sin dar error. */
-function _convDeClave_(k){
-  var sep=_convClave_('',''), s=String(k), i=s.indexOf(sep);
-  return i<0 ? [s, ''] : [s.slice(0,i), s.slice(i+sep.length)];
-}
-
-/* ⭐ REUTILIZAR LA DISPONIBILIDAD DEL TURNO ANTERIOR (932.ª). 🗣️ Daniel, 14/10: *«que haya una opción clara que
-   ponga reutilizar disponibilidad del turno anterior (se puede editar)»*.
-   Lo que se marcó la semana anterior cae en el MISMO día de la semana de ésta (+7 días), en la misma franja,
-   con su sitio y su coche. Lo que no cabe —una franja que esta semana no existe, un sitio que no se ofrece—
-   se CUENTA en `fuera`, no se inventa ni se acerca a lo más parecido. Pura: no toca nada. */
-function _reusarDispo_(cv, previas){
-  var dias=cv.dias||[], fr={}, cl={}, out={}, n=0, fuera=0;
-  (cv.franjas||[]).forEach(function(f){ fr[f.k]=1; });
-  _convClases_(cv).forEach(function(c){ cl[c]=1; });
-  Object.keys(previas||{}).forEach(function(k){
-    var p=_convDeClave_(k), v=previas[k], d=_isoMasDias_(p[0], 7);
-    if(!v || !v.s || !d || dias.indexOf(d)<0 || !fr[p[1]] || !cl[v.s]){ fuera++; return; }
-    out[_convClave_(d, p[1])] = (v.s==='no') ? {s:'no'} : {s:v.s, c:!!v.c};
-    n++;
-  });
-  return {mapa:out, n:n, fuera:fuera};
-}
-
-/* Lo que comparten las dos caras al reutilizar (949.ª): pedir TU disponibilidad de la semana anterior
-   (`getConvocatoria(semana)` resuelve por `semana_ini`) y encajarla en ésta. Devuelve lo de `_reusarDispo_`, o
-   `null` después de DECIR por qué no: sin conexión, sin respuesta, nada marcado, nada que quepa.
-   Qué se hace con lo copiado lo decide cada cara: el móvil lo guarda al momento; el escritorio lo deja SIN
-   GUARDAR hasta que se pulsa «Guardar», que es como funciona esa cara. */
-async function _traerSemanaAnterior_(cv){
-  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getConvocatoria){
-    tost('Sin conexión no se puede traer la semana anterior.'); return null;
-  }
-  var sem=_isoMasDias_(cv.semana_ini || cv.semana || (cv.dias||[])[0], -7), r;
-  try{ r=await api.getConvocatoria(sem); }
-  catch(e){ tostErr('No se pudo traer la semana anterior: ', e); return null; }
-  /* 22/10 (auditor 25, 🟡 10): «no hubo convocatoria» NO es «no contestaste» — antes las dos salían como lo segundo. */
-  if(!r || !r.convocatoria){ tost('La semana anterior no hubo convocatoria de disponibilidad: no hay qué reutilizar.'); return null; }
-  var prev=r.mias || {};
-  if(!Object.keys(prev).length){ tost('La semana anterior no marcaste nada: no hay qué reutilizar.'); return null; }
-  var res=_reusarDispo_(cv, prev);
-  if(!res.n){ tost('Lo de la semana anterior no cabe en esta rejilla: otras horas u otros sitios.'); return null; }
-  return res;
-}
 
 /* Y el RÓTULO de cada una. Vive aquí, pegado a `_convClases_`, porque son **la misma
    decisión** —qué se puede contestar esta semana— y tenerlas separadas es exactamente cómo
@@ -5796,32 +4573,6 @@ function _etiOrigenParte_(p){
    `function`: las capacidades no se llevan sus globales. */
 function _maxHorasParte_(){ return 14; }
 
-/* ⛔ 21/10 (auditor 8, 🟡 7): un fichaje que se CIERRA SOLO al tope caduca a las 24 h, no a los 7 días
-   (`CADUCA_AUTOCIERRE_H` de `Codigo.gs`, que lee el servidor; decisión de Daniel del 09/09). Una puerta, para no
-   teclear el 24 en cada rótulo. */
-function _caducaAutocierreH_(){ return 24; }
-
-/* ⛔ 21/10 (auditor 8, 🟡 14): EL DÍA DE MADRID DE UN INSTANTE, en DD/MM/AAAA. `caduca_at` viaja en UTC, y recortarlo
-   (`.slice(0,10)`) da el día ANTERIOR a un fichaje cerrado pasada la medianoche de Madrid (en verano, hasta las 02:00).
-   Mismo reloj que `_ahoraLocalISO_` (Madrid por `Intl`); sin instante legible, el recorte de siempre. */
-function _diaMadridDe_(iso){
-  var s = String(iso || ''), d = new Date(s);
-  if(!isNaN(d.getTime()) && /T/.test(s)) return _isoADMY_(_ahoraLocalISO_(d).slice(0,10));
-  return /^\d{4}-\d{2}-\d{2}/.test(s) ? _isoADMY_(s.slice(0,10)) : '';
-}
-
-/* ⛔ 21/10 (auditor 8, 🟠 2): FICHAR SALIDA PASADO EL TOPE NO DECLARA NADA. El servidor recorta a `_maxHorasParte_()`,
-   devuelve `autocierre: true` y deja el parte `sin_declarar` (aunque traiga tarea y justificación) con 24 h de vida.
-   Las dos caras decían «Fichaje declarado · a la cola de X»: el parte no estaba en la cola de nadie y se perdía al
-   día siguiente. Devuelve el aviso, o '' si el servidor no dice que se cerró solo (entonces cada cara dice lo suyo). */
-function _tostAutocierre_(r){
-  var p = r && r.parte;
-  if(!(r && (r.autocierre === true || (p && p.autocierre === true && p.estado === 'sin_declarar')))) return '';
-  var t = _maxHorasParte_();
-  return 'Pasaba de '+t+' h: el fichaje se cerró solo en '+t+' h y queda SIN declarar. Decláralo con lo que '+
-    'trabajaste antes de '+_caducaAutocierreH_()+' h o se pierde.';
-}
-
 /* ⛔⛔ UN PARTE DE AUTOCIERRE NO SE DECLARA TAL CUAL, Y SE DICE IGUAL EN LAS DOS CARAS (633.ª).
    Daniel (09/09): «si fueron 14 h sin querer pero si q trabajaste o algo asi q mejor lo declares
    como bloque dsps en lugar de usar los de 14». Devuelve el aviso, o '' si no toca.
@@ -5999,422 +4750,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
-    { id:'2026-10-25-caras-servidor', fecha:'2026-10-25',
-      titulo:'Lo que las caras pedían y el servidor no daba',
+    { id:'2026-10-25-buzon', fecha:'2026-10-25',
+      titulo:'Tres reportes del buzón: pantalla que se arrastraba, icono y Brave',
       items:[
-        {cara:'movil', vista:'horas', txt:'Si fichas y ya tenías una sesión abierta en **pausa** (desde el ordenador u otro móvil), se pinta **en pausa** — antes salía corriendo.'},
-        {cara:'movil', vista:'horas', txt:'Con el móvil abierto, **Tus partes** se actualiza solo cuando te aprueban uno (antes seguía en «pendiente» hasta recargar). Y el aviso de «estas horas contarán en…» ya sabe cuándo cerró el último mes, seas quien seas.'},
-        {cara:'movil', vista:'estado', txt:'En **Mis movimientos**, la fecha es la del día de aquí: lo decidido de madrugada ya no sale con el día anterior.'},
-        {cara:'escritorio', vista:'sanciones', txt:'Al cerrar un bloque con una revocación que se queda pendiente, dice **«A MEDIAS»** y cuántas quedan.'},
-        {cara:'movil', vista:'estado', txt:'Una **captura muy detallada** en un reporte se comprime hasta caber, en vez de tumbar el reporte entero.'}
-      ]},
-    { id:'2026-10-22-titulo-lote', fecha:'2026-10-22',
-      titulo:'Las propuestas de sanciones dicen de qué reunión son',
-      items:[
-        {cara:'movil', vista:'estado', txt:'En **Sanciones** del menú ⋮ (y en el Panel del PD), cada propuesta lleva el **título de su reunión** delante del código (`reunion-3`): con dos propuestas de las mismas personas se ve que son reuniones distintas.'},
-        {cara:'escritorio', vista:'sanciones', txt:'En la **Cola de sanciones**, el bloque abierto se llama por **su reunión** — también en el aviso de «Vas a cerrar el bloque…».'}
-      ]},
-    { id:'2026-10-22-coches-turno', fecha:'2026-10-22',
-      titulo:'Los coches de un turno, a la vista',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'Abre un turno en **Turnos**: la ficha dice **en qué coche vas** — quién conduce, de dónde a dónde (y la vuelta si es distinta) y quién más va.'},
-        {cara:'escritorio', vista:'turnos', txt:'En **Turnos**, la columna **Coches** (pasa por encima para el detalle); **«Van»** cuenta a quien va seguro y los «posible/reserva» salen como «+N ?»; y al convocar, **«Dónde se trabaja»** empieza sin elegir.'}
-      ]},
-    { id:'2026-10-22-primer-dia', fecha:'2026-10-22',
-      titulo:'El primer día de quien entra a mitad de temporada',
-      items:[
-        {cara:'movil', vista:'horas', txt:'En **Horas**, quien acaba de entrar (sin cierres suyos mientras el resto sí los tiene) ya no ve «vs. equipo −100 %» en rojo: ve que la comparación sale tras su primer cierre. Y el ranking ya no pinta rayas vacías debajo del último.'},
-        {cara:'movil', vista:'reu', txt:'En **Reuniones**, «N convocados» ya no cuenta a quien se ha dado de baja.'},
-        {cara:'escritorio', vista:'panel', txt:'En el **Panel de mando**, «bajo el umbral» ya no cuenta a quien aún no tiene cierres; y en el **Registro del mes**, con una sola ficha visible la «MEDIA» es «—».'}
-      ]},
-    { id:'2026-10-22-bajas', fecha:'2026-10-22',
-      titulo:'Quien se da de baja deja de salir en riesgo',
-      items:[
-        {cara:'escritorio', vista:'dispo', txt:'En **Disponibilidad y riesgo**, una persona que se dio de baja después de que la convocaran ya no sale «sin cubrir · sanción que implicaría» (el motor no la sanciona) ni cuenta en los convocados.'}
-      ]},
-    { id:'2026-10-22-cierre-aplicando', fecha:'2026-10-22',
-      titulo:'El cierre del mes dice si se está aplicando',
-      items:[
-        {cara:'escritorio', vista:'cierre', txt:'Al pulsar **«Aplicar el cierre»**, el botón pasa a **«Aplicando…»** y se bloquea mientras la rutina escribe; si el último «Aplicar» **no terminó**, se dice con su día y su motivo encima del botón. Antes se veía igual que sin pulsar.'},
-        {cara:'movil', vista:'estado', txt:'Lo mismo en el **cierre** del móvil: un «Aplicar» en curso o que no terminó se dice arriba, y el botón de aplicar (o «Terminar») se bloquea mientras tanto.'},
-        {cara:'escritorio', vista:'cierre', txt:'Si el motor no recoge un «Aplicar» en **15 minutos**, la pantalla dice que puede estar parado y deja volver a pulsarlo (antes se quedaba bloqueada). Mientras se aplica, el cierre se refresca solo.'},
-        {cara:'escritorio', vista:'cierre', txt:'**Nada más sellar** un cierre, la pantalla dice «El último cierre, el de octubre, está aplicado (N fichas escritas)» en vez de «no cuenta»; y mientras el mes corre, el chip dice **«MES EN CURSO»** (no «LISTO PARA CALCULAR»).'},
-        {cara:'escritorio', vista:'cierre', txt:'Si el plan se quedó viejo (alguien tocó Notion entre «Calcular» y «Aplicar»), el aplicador **se planta sin escribir nada** — ni el Registro ni Notion — en vez de dejar el mes a medias.'},
-        {cara:'escritorio', vista:'temporada', txt:'En el cierre de **temporada**, la cabeza del ranking enseña la columna **«h/mes (ordena)»**: el orden sale del ritmo (julio y agosto cuentan la mitad), no de las horas totales, y antes no se podía ver por qué alguien con menos horas iba delante.'}
-      ]},
-    { id:'2026-10-21-avisos-que-se-leen', fecha:'2026-10-21',
-      titulo:'Los avisos dicen lo que pasa, y se dejan leer',
-      items:[
-        {cara:'movil', vista:'reu', txt:'Al **guardar tu disponibilidad por debajo del mínimo**, el aviso de que se propondrá el **Art. 29i** ya se ve (antes lo tapaba al instante «Disponibilidad guardada»).'},
-        {cara:'movil', vista:'horas', txt:'Si **firmar o revertir un parte** falla, el aviso dice por qué (antes: «No se pudo: [object Object]»); con la sesión caducada se queda fijo y dice que vuelvas a entrar.'},
-        {cara:'movil', vista:'docs', txt:'Un aviso **largo** de documentos (p. ej. al devolver uno a revisión) se queda en pantalla hasta que lo toques. Y si un documento tuyo no trae enlace, se te dice que lo **vuelvas a mandar**, no que se lo pidas a quien lo subió.'},
-        {cara:'escritorio', vista:'docs', txt:'Lo mismo en el escritorio: a la persona que subió un documento sin enlace se le dice que lo vuelva a mandar.'},
-        {cara:'movil', vista:'reu', txt:'En **Marca tu disponibilidad**, las casillas fuera del horario de ese día van **rayadas** (como en el mapa de calor) y la leyenda lo explica: antes casi no se distinguían de las vacías.'},
-        {cara:'movil', vista:'docs', txt:'Con una ficha abierta (p. ej. decidir un documento), los avisos salen **arriba**: abajo tapaban los botones de Aprobar.'},
-        {cara:'movil', vista:'estado', txt:'La **cabecera** ya no parte el nombre de tu unidad en trozos («AEROESTRUCT / URAS»), tampoco con «Ver como».'},
-        {cara:'movil', vista:'turnos', txt:'Si marcas tu disponibilidad de **turnos** sin conexión, ahora te lo dice: antes se pintaba y no se guardaba.'},
-        {cara:'escritorio', vista:'panel', txt:'Al **volver** a una pantalla ya visitada se veía la anterior (el Panel de mando con los partes debajo). Arreglado en todas.'},
-        {cara:'escritorio', vista:'panel', txt:'El aviso de **fichaje de más de 10 h** del Panel ya sale de los fichajes de verdad (antes salía de uno de ejemplo, y los reales no lo encendían).'},
-        {cara:'escritorio', vista:'docdec', txt:'En **Documentos**, «Cerrar» ya sólo sale en la ficha que has desplegado, y un expediente sin resumen ni archivo ya no te manda a «leerlo abajo».'},
-        {cara:'escritorio', vista:'actas', txt:'En **Actas**, un acta con la fecha sólo en el título («… del 17/07/2026») ya cuenta en su temporada y enseña su fecha.'},
-        {cara:'movil', vista:'reu', txt:'Si marcas **menos franjas del mínimo**, la reunión ya no sale «cubierta»: dice **«bajo el mínimo»** y el aviso de la portada sigue (es lo que el motor sanciona).'},
-        {cara:'movil', vista:'horas', txt:'El **objetivo de horas del mes** es ya el mismo para todo el equipo (antes, a cada uno se le calculaba con sus propias horas).'},
-        {cara:'escritorio', vista:'dispo', txt:'En **Disponibilidad y riesgo**, el titular de cada reunión dice también cuántos han quedado **por debajo del mínimo** («14 de 18 han cubierto (2 por debajo del mínimo)»).'},
-        {cara:'escritorio', vista:'panel', txt:'El **Panel de mando** de un coordinador ya no enseña una «media del equipo» que es su propia cifra ni «0 en infracción»: dice «—» y que su cuenta no ve lo del resto. Y el aviso de **fichaje de más de 10 h** se refresca solo.'},
-        {cara:'movil', vista:'reu', txt:'**«Bajo el mínimo»** sale también en las reuniones de subsistema, y el aviso de la portada cuenta a la vez lo que te falta cubrir y dónde vas por debajo.'}
-      ] },
-    { id:'2026-10-21-cerrar-sesion-avisos', fecha:'2026-10-21',
-      titulo:'Cerrar sesión deja de mandar tus avisos a ese navegador',
-      items:[
-        {cara:'escritorio', vista:'ajustes', txt:'Al **cerrar sesión**, tus avisos dejan de llegar a ese navegador (antes seguían llegando, también si luego lo usaba otra persona). Al volver a entrar se reconectan solos, sin pedir permiso otra vez. **Ajustes** lo dice así.'},
-        {cara:'movil', vista:'estado', txt:'Lo mismo en el móvil al «Cerrar sesión» (en el menú).'}
-      ] },
-    { id:'2026-10-21-sanciones-reuniones-auditores', fecha:'2026-10-21',
-      titulo:'Sanciones y reuniones: revocar de verdad, y los avisos donde tocan',
-      items:[
-        {cara:'escritorio', vista:'libros', txt:'Tu **libro de puntos** ya no borra la sanción que te devolvieron: sale «**revocada** · se devolvió» junto a su «+1» («devuelve una sanción»), y un **premio** dice «no resta» en vez de «hasta el fin de temporada».'},
-        {cara:'movil', vista:'estado', txt:'Lo mismo en el libro de puntos del móvil.'},
-        {cara:'escritorio', vista:'sanciones', txt:'**Revocar** una sanción de −3, −4 o −5 ya entra en la cola (antes decía «ya estaba en la cola» sin haber entrado), y se puede **volver a revocar** una cuya revocación se rechazó.'},
-        {cara:'movil', vista:'reu', txt:'Al cubrir una reunión de **trabajo, subsistema o mixta** ya no se avisa del «mínimo sin sanción» ni del Art. 29i: en esas reuniones no hay sanción automática.'}
-      ] },
-    { id:'2026-10-21-documentos-auditor', fecha:'2026-10-21',
-      titulo:'Documentos: aprobar ya no dice que se ha publicado',
-      items:[
-        {cara:'escritorio', vista:'docdec', txt:'**Aprobar** deja el documento **aprobado y pendiente de publicar** (está en «En curso»), en vez de darlo por publicado en Notion sin que nadie lo publicara. Al autor le llega «queda pendiente de publicar».'},
-        {cara:'movil', vista:'docs', txt:'**Aprobar** dice «queda pendiente de publicar», no «publicado en Notion»; y tras decidir, la ficha se queda con lo que guardó el servidor.'},
-        {cara:'escritorio', vista:'docurso', txt:'Un expediente **trabado** sigue diciendo por qué tras aprobarlo (aprobar ya no borra el aviso); y «En curso» remite a **Resueltos**.'},
-        {cara:'escritorio', vista:'docdec', txt:'Si el servidor no manda los expedientes al entrar, las tres pantallas de Documentos dicen **«No se han podido leer»** y se vuelven a pedir solos, en vez de enseñar los de la maqueta como si fueran reales.'},
-        {cara:'movil', vista:'docs', txt:'Lo mismo en el móvil: sin expedientes leídos ya no dice «Nada por aquí». Y tras decidir, la ficha se **vuelve a abrir** con su botón **Deshacer** (antes no se podía llegar a él).'},
-        {cara:'escritorio', vista:'docdec', txt:'**Rechazar** ya no promete que el autor «tendrá que enviar uno nuevo» (no está decidido): dice que recibe el motivo y que se puede deshacer. En el móvil, igual.'}
-      ] },
-    { id:'2026-10-21-equipo-auditor', fecha:'2026-10-21',
-      titulo:'Buzón, Disponibilidad y Equipo: lo que ya decidiste, lo que aún no se sabe y el menú',
-      items:[
-        {cara:'escritorio', vista:'buzon', txt:'**Esperando tu decisión** ya no cuenta lo que autorizaste ni lo que ya está en la beta; y un reporte **autorizado** sólo deja **descartarlo con anotaciones** (no vuelve a ofrecer «Adelante, hazlo»). En las gafas, igual.'},
-        {cara:'escritorio', vista:'dispo', txt:'Una reunión cuyas respuestas **aún no se han leído** ya no dice «0 de N han cubierto · N en riesgo» con nombres: dice cuántos han contestado según el servidor (chip «sin leer»).'},
-        {cara:'escritorio', vista:'dispo', txt:'Una reunión **anónima** dice «anónima» y cuántos han cubierto, no «oculta»; y el aviso de **bajo el mínimo** depende del tipo de reunión (ya no pone «−1 punto» fijo).'},
-        {cara:'escritorio', vista:'subsis', txt:'**Horas por subsistema** tiene su entrada en el menú de **Equipo**.'},
-        {cara:'escritorio', vista:'buzon', txt:'Si la **foto** de un reporte no se guarda, se dice el motivo que da el servidor (en el móvil, igual); y el **Buzón** sólo sale en el menú ⋮ a quien puede abrirlo.'},
-        {cara:'escritorio', vista:'miembros', txt:'**Miembros** marca quién es **baja** en su fila, y el número del menú cuenta sólo a los activos.'},
-        {cara:'escritorio', vista:'actas', txt:'**Actas** ya no dice «de la temporada» sin filtrar: lista todas y dice cuántas son de la temporada en curso.'},
-        {cara:'escritorio', vista:'convoc', txt:'**Convocatorias** se titula «Reuniones» y dice cuántas siguen **abiertas** y cuántas hay en total; el número del menú cuenta las abiertas. Y «1 franja», no «1 franjas».'},
-        {cara:'escritorio', vista:'ajustes', txt:'**Ajustes** dice lo que pasa con los avisos al cerrar sesión: no se apagan y se reconectan solos al volver a entrar.'},
-        {cara:'movil', vista:'estado', txt:'**Ajustes › Sesión** dice quién ha entrado, y aparte a quién estás viendo con «ver como».'},
-        {cara:'escritorio', vista:'miembros', txt:'El **cargo** de cada uno dice lo mismo en todas partes: quien coordina una Unidad sin cargo ya no sale «Miembro», y la columna Cargo lo dice. En la cabecera del móvil, un subcoordinador ya no sale «MIEMBRO».'}
-      ] },
-    { id:'2026-10-21-horas-auditor', fecha:'2026-10-21',
-      titulo:'Horas: lo que cuenta en qué mes, los fichajes de más de 14 h y quién puede otorgar',
-      items:[
-        {cara:'movil', vista:'horas', txt:'«Es de otro mes» se mide de **cierre a cierre**: un bloque del 30/10 declarado el 03/11 con octubre aún abierto ya no dice que contará en noviembre. Y el mes sale por su nombre («octubre de 2026»).'},
-        {cara:'movil', vista:'horas', txt:'Al fichar salida pasadas **14 h**, la app ya no dice «Fichaje declarado»: el fichaje se cierra solo, queda **sin declarar** y caduca en **24 h** — y lo dice.'},
-        {cara:'movil', vista:'horas', txt:'Las horas sin ceros de más («1,5 h», no «1,50 h») y la fecha de caducidad en el día de Madrid.'},
-        {cara:'escritorio', vista:'partes', txt:'**Otorgar horas** y **Bloque de horas** sólo ofrecen a quien el servidor te deja (el PD, o el coordinador de esa unidad); un subcoordinador ya no ve una lista que luego se rechaza entera.'},
-        {cara:'escritorio', vista:'partes', txt:'El **Histórico** dice «revertido», «caducado» o «sin declarar» en vez de «devuelto · falta detalle»; y revertir unas horas **otorgadas** avisa de que se anulan (no vuelven a ninguna cola).'},
-        {cara:'escritorio', vista:'curso', txt:'**Fichajes en curso** le dice a un coordinador que la lista es del Project Director, en vez de «No se pudo preguntar al servidor».'},
-        {cara:'escritorio', vista:'libros', txt:'**Lo tuyo** lleva globo cuando te han devuelto un parte pidiendo detalle (bloquea el cierre del mes): antes no salía ningún número.'},
-        {cara:'escritorio', vista:'partes', txt:'Un parte que vuelve después de **contestar un detalle** dice qué se le había preguntado («contestó a lo que se le pidió — «…»»); en el móvil también.'},
-        {cara:'movil', vista:'horas', txt:'En **Tus partes**, uno revertido dice el **porqué de la reversión**, no tu propia justificación.'},
-        {cara:'movil', vista:'horas', txt:'**Ya decidiste** dice cuántos partes **aún se pueden revertir** (los de un mes cerrado ya no); y aprobar dice que las horas se suman **al aplicarse, en unos minutos**, no «Ya cuenta».'},
-        {cara:'escritorio', vista:'partes', txt:'**Ya firmaste** dice «N aún revertibles · M en total»; y aprobar u otorgar horas dicen lo mismo: se suman al aplicarse, en unos minutos.'}
-      ] },
-    { id:'2026-10-21-cierre-mes-abierto', fecha:'2026-10-21',
-      titulo:'Cierre del mes: el mes abierto, y no antes de que termine',
-      items:[
-        {cara:'escritorio', vista:'cierre', txt:'El **cierre del mes** propone el mes **abierto** (hoy octubre: septiembre ya está cerrado) y, mientras aún corre, dice **«TERMINA … · QUEDAN n días»** y el botón **Calcular** sale bloqueado hasta que acabe.'},
-        {cara:'escritorio', vista:'cierre', txt:'Un plan de un mes **ya cerrado** que traiga el servidor ya no se pinta como el cierre de ahora («parado a medias»): se dice en una línea y no cuenta.'},
-        {cara:'movil', vista:'estado', txt:'En el **cierre del mes** del móvil, lo mismo: el mes abierto, «aún no ha terminado» mientras corre, y el plan de un mes ya cerrado ya no tapa el botón de calcular.'},
-        {cara:'escritorio', vista:'cierre', txt:'Las horas del cierre salen en **hora de Madrid** y con fecha DD/MM/AAAA; «fichas nuevas y viejas conviviendo» sólo si se llegó a escribir alguna; y con algo **sin decidir**, «Aplicar» sale bloqueado (el servidor no lo deja) en vez de fallar al pulsarlo. En el móvil, igual.'},
-        {cara:'escritorio', vista:'temporada', txt:'El **cierre de temporada** dice de qué temporada es el plan (y cuál corre ahora, si no es la misma), ya no llama «listo para aplicar» a uno aplicado, y **Calcular** avisa antes de sustituir el plan aplicado.'},
-        {cara:'escritorio', vista:'cierre', txt:'Tras pulsar **Calcular** con un plan ya en pantalla, se dice que hay uno **nuevo en cola** (chip «RECALCULÁNDOSE»); y si el cálculo **falla**, se dice con el día y el motivo. En el móvil, igual.'}
-      ] },
-    { id:'2026-10-21-automatismos-estado', fecha:'2026-10-21',
-      titulo:'Automatismos: cada interruptor dice si está encendido ahora',
-      items:[
-        {cara:'escritorio', vista:'automatismos', txt:'Cada automatismo con interruptor dice ahora si está **encendido ahora**, **apagado ahora** o **no consta**, leído del servidor al abrir la pantalla (y cada 30 s como mucho). Lo que corre siempre no lleva estado.'}
-      ] },
-    { id:'2026-10-21-avisos-auditor', fecha:'2026-10-21',
-      titulo:'Avisos: cada uno a su pantalla, y la portada dice lo que te toca',
-      items:[
-        {cara:'movil', vista:'estado', txt:'Tocar un aviso abre **su pantalla** (Horas, Docs, Reuniones, Turnos), no la portada; y con la app ya abierta cambia de pestaña **sin recargar** (no pierdes lo que estuvieras escribiendo).'},
-        {cara:'movil', vista:'estado', txt:'La **portada** avisa de lo que te toca: partes por firmar, tus fichajes sin declarar o con detalle pedido, documentos por revisar y la disponibilidad de turnos sin contestar.'},
-        {cara:'movil', vista:'horas', txt:'El número de la pestaña **Horas** cuenta lo que te toca hacer (firmar, declarar, dar detalle), no tus partes esperando a otra persona: un coordinador con 4 por firmar veía 0.'},
-        {cara:'escritorio', vista:'panel', txt:'La tarjeta de sanciones del Panel de mando dice **cuántas hay por decidir en total**, la misma cifra que la pestaña (antes, sólo las del bloque elegido).'},
-        {cara:'escritorio', vista:'sindeclarar', txt:'**«Sin declarar»** sale para todos (son tus fichajes): antes sólo la veía el admin.'},
-        {cara:'escritorio', vista:'automatismos', txt:'Automatismos: «Comprobarlo ahora» ya no deja la pantalla en «Sin fecha» con todo «sin interruptor»; lo comprobado se rotula «Comprobado por el motor el …»; el aviso de «el motor pasó hace…» se refresca; los avisos de la convocatoria dicen que dependen de su interruptor de Turnos; y un **encargo** de una vez («cuando se le encarga») ya no se pinta como un interruptor.'},
-        {cara:'movil', vista:'estado', txt:'En Ajustes, Reuniones dice que avisa también **cuando te convocan**, y turnos y reuniones «no se pueden apagar aquí» (antes «llegan siempre», aunque el envío dependa del director).'}
-      ] },
-    { id:'2026-10-21-ranking-cuota', fecha:'2026-10-21',
-      titulo:'Ranking y cuota: las cifras de cada uno, como las calcula el servidor',
-      items:[
-        {cara:'movil', vista:'horas', txt:'«Horas por subsistema» ya no te pone tu unidad primera con «1 personas»: usa la media por unidad que manda el servidor.'},
-        {cara:'escritorio', vista:'ranking', txt:'Un coordinador ve **su puesto** («Vas 5.º de 22»), como en el móvil; la columna Coche dice 0 a quien no ha ido con coche.'},
-        {cara:'escritorio', vista:'registro', txt:'El Registro del mes y el titular «quien más horas lleva» se ordenan por la cifra que enseñan (el día 1, el PD ya no gana por su cargo).'},
-        {cara:'movil', vista:'reu', txt:'Un plazo escrito corto (6/9/2026, 06/09/26) o guardado en UTC se lee bien: antes podía quedarse abierto para siempre o con dos horas de más.'}
-      ] },
-    { id:'2026-10-21-sanciones-auditor', fecha:'2026-10-21',
-      titulo:'Sanciones: lo que ofrece cada pantalla, igual que el servidor',
-      items:[
-        {cara:'movil', vista:'horas', txt:'En tu Panel del PD, una **revocación o un premio** ya no ofrece «Justifica» (el servidor la dejaba justificada y no devolvía los puntos); y una sanción **suelta** sí se puede justificar, pidiendo el motivo, como en el ordenador.'},
-        {cara:'movil', vista:'horas', txt:'Si la cola de sanciones no llega al abrir la app, el Panel del PD dice **«No se pudo cargar»** en vez de «Cargando la cola…» sin fin.'},
-        {cara:'escritorio', vista:'sanciones', txt:'Sueltas e historial dicen **«revocación · +2 puntos»** o **«premio · +1,5 h»** (antes «2» y «0», que se leía «aviso»); el historial lleva la fecha de la **decisión** en DD/MM/AAAA; y una sola explicación de cómo se apela.'},
-        {cara:'escritorio', vista:'sanciones', txt:'Aprobar una suelta la deja **«aprobada: se aplica en Notion en unos minutos»** (no «aplicada» en el acto); «Editar» pide los puntos con la misma regla que «Poner»; y la previsión del bloque ya no sale «undefined → NaN».'},
-        {cara:'escritorio', vista:'sanciones', txt:'El número de la pestaña cuenta **todas** las pendientes (no sólo el bloque elegido); el botón dice **«3 sanciones · 1 premio»**; y «Agrupar en un paquete» va **una por persona** (antes fallaba entero si alguien tenía dos).'},
-        {cara:'movil', vista:'reu', txt:'Los plazos de las convocatorias se cuentan con la **hora de Madrid**, aunque el teléfono esté en otra zona.'}
-      ] },
-    { id:'2026-10-20-partes-auditor', fecha:'2026-10-20',
-      titulo:'Partes: lo que dice cada pantalla, igual que el servidor',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Con datos de Notion, lo **aprobado que aún no ha llegado a tu ficha** sale en su propia píldora («+N h aprobadas · aún no en tu ficha») en vez de no salir en ninguna cifra.'},
-        {cara:'movil', vista:'horas', txt:'Un parte **devuelto** («pedir detalle») sale una sola vez, en «Esperan tu decisión», con lo que se pidió; y un parte declarado tras el cierre ya no se pliega en «De meses anteriores».'},
-        {cara:'escritorio', vista:'horas', txt:'Un parte **devuelto** cuenta en la cola y en «Horas en el aire» (el servidor no deja cerrar el mes con él) y su tarjeta dice qué se pidió; «Resueltos este mes» va de cierre a cierre.'},
-        {cara:'escritorio', vista:'horas', txt:'Sólo ves Aprobar/Rechazar en los partes que el servidor te deja decidir (José ya no), y «Otorgar horas» sólo ofrece a quien se le puede otorgar.'},
-        {cara:'movil', vista:'turnos', txt:'Dos turnos del **mismo día** ya no se confunden: al pulsar el de la tarde se abría el de la mañana.'}
-      ] },
-    { id:'2026-10-20-reu-plazos', fecha:'2026-10-20',
-      titulo:'Reuniones: lo que ya cerró, no cuenta',
-      items:[
-        {cara:'movil', vista:'reu', txt:'Una reunión cuyo plazo **ya cerró** (y nadie fijó) deja de contar en «te falta cubrir» y en el globo; y un plazo que cerró esta mañana ya no dice «cierra HOY».'},
-        {cara:'escritorio', vista:'panel', txt:'En la cola de Inicio, cada expediente dice su ámbito con su nombre («informe de subsistema»), como la lista de Documentos.'}
-      ] },
-    { id:'2026-10-20-tareas-caras', fecha:'2026-10-20',
-      titulo:'Tareas: sólo las abiertas, y el plazo como fecha',
-      items:[
-        {cara:'escritorio', vista:'tareas', txt:'Tareas cuenta y lista sólo las **abiertas** (las hechas ya no suman «activas», tampoco en el número de la pestaña); el plazo sale como **fecha**, en rojo si ya pasó, y «—» sin plazo (no «null»).'},
-        {cara:'movil', vista:'tareas', txt:'Una tarea ya **hecha** no sale en rojo como «venció hace N días»; el cajón de las pasadas dice la fecha como fecha.'},
-        {cara:'escritorio', vista:'turnos', txt:'Un turno **cancelado** lo dice al lado de su referencia, y la fecha sale en DD/MM/AAAA. En el móvil, la tarjeta también dice «cancelado».'}
-      ] },
-    { id:'2026-10-20-mes-abierto', fecha:'2026-10-20',
-      titulo:'«Este mes» es el mes abierto en todas partes',
-      items:[
-        {cara:'escritorio', vista:'libros', txt:'«Lo tuyo»: el rótulo de tus horas dice el mes **abierto** (el de trabajo), no el del calendario.'},
-        {cara:'escritorio', vista:'registro', txt:'Registro del mes, Miembros y «Este mes» del Panel de mando: las horas del mes van **al día de hoy** (la compensación del cargo se suma día a día), como el resto de columnas de la fila.'},
-        {cara:'movil', vista:'horas', txt:'Tus movimientos del mes y el histórico ponen cada apunte en el mes en que **contó** (lo declarado tarde, en el mes en que entró); la lista suma lo mismo que la cifra grande. Y la nota del ritmo dice «X h en N días», sin el «de 30.45».'}
-      ] },
-    { id:'2026-10-20-select-oscuro', fecha:'2026-10-20',
-      titulo:'Las listas desplegables, por fin en oscuro',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'Abre cualquier desplegable (`<select>`): la lista sale **oscura**, con los colores de la app, no blanca. El arreglo del 13/10 no se aplicaba.'},
-        {cara:'movil', vista:'fichar', txt:'Lo mismo en el móvil, donde el navegador dibuje la lista.'}
-      ] },
-    { id:'2026-10-20-registro-ant', fecha:'2026-10-20',
-      titulo:'«Registro del mes»: el mes anterior aparece, y la Δ compara ritmos',
-      items:[
-        {cara:'escritorio', vista:'registro', txt:'La columna **Mes anterior** ya enseña las horas del mes pasado (salía «—» para todos: leía un campo viejo). Y la **Δ ritmo** compara h/día, no el total a medias contra el mes entero.'}
-      ] },
-    { id:'2026-10-20-sube-por-ritmo', fecha:'2026-10-20',
-      titulo:'«Quién más sube» compara ritmos, no totales',
-      items:[
-        {cara:'escritorio', vista:'panel', txt:'En «Este mes» del **Panel de mando**, «quien más sube / más baja» compara **h/día** contra el mes pasado (como el móvil), no el total a medias contra el mes entero: antes, a mitad de mes, casi todos «bajaban».'}
-      ] },
-    { id:'2026-10-20-apuntes-rotulo', fecha:'2026-10-20',
-      titulo:'«1 apunte que ya cuenta», no «1 partes»',
-      items:[
-        {cara:'escritorio', vista:'libros', txt:'El KPI **Apuntes del mes** de «Lo tuyo» concuerda con su número: con sólo tu compensación dice «1 apunte que ya cuenta» (la compensación no es un parte).'}
-      ] },
-    { id:'2026-10-20-sin-v54', fecha:'2026-10-20',
-      titulo:'Fuera un aviso de una versión vieja del servidor',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Si tus extras de compensación no han llegado, la pantalla dice **«el servidor aún no los manda»**, no «hace falta el backend v54» (una versión que ya no existe).'},
-        {cara:'escritorio', vista:'libros', txt:'Lo mismo en el KPI de **Compensación** de «Lo tuyo», y «Sin movimientos» ya no culpa a «un servidor anterior a la v53».'},
-        {cara:'escritorio', vista:'buzon', txt:'Si al compensar un reporte el servidor no guarda las horas, el aviso dice eso, sin «falta desplegar v46».'}
-      ] },
-    { id:'2026-10-20-sin-convocar-orden', fecha:'2026-10-20',
-      titulo:'Las actas de reuniones sin convocar, en su sitio y con su fecha',
-      items:[
-        {cara:'movil', vista:'reu', txt:'**«Sin convocar» va al final de Reuniones.** Se colaba entre «Mis reuniones» y la tarjeta de tu reunión, y con una sola reunión parecía que ésa era la sin convocar.'},
-        {cara:'escritorio', vista:'actas', txt:'**La fecha de cada acta en DD/MM/AAAA**, no en el formato del ordenador (2026-07-21).'}
-      ] },
-    { id:'2026-10-20-cuota-estimada', fecha:'2026-10-20',
-      titulo:'Tu cuota, en grande, ya dice que es una estimación',
-      items:[
-        {cara:'escritorio', vista:'libros', txt:'**«Tu cuota» pone «€ · estimación al año»** en la cifra grande, como el móvil. Antes ponía «€ al año» a secas, y se leía como una factura: la cuota es anual y se cierra en agosto.'}
-      ] },
-    { id:'2026-10-20-carga-viva', fecha:'2026-10-20',
-      titulo:'Tu índice de carga, al día: ya no es la foto de hace semanas',
-      items:[
-        {cara:'movil', vista:'horas', txt:'**El índice de carga es el de hoy**, el mismo que pone Notion, y debajo dice «en vivo». Antes enseñaba el de cuando se generó el panel (semanas atrás).'},
-        {cara:'escritorio', vista:'libros', txt:'**«Tu índice de carga» es el de hoy**, con «en vivo» en el desglose.'}
-      ] },
-    { id:'2026-10-20-carga-prevista', fecha:'2026-10-20',
-      titulo:'Tu carga es la PREVISTA a fin de mes, a tu ritmo de los últimos 14 días',
-      items:[
-        {cara:'movil', vista:'horas', txt:'**Mi índice de carga enseña la carga PREVISTA**: a dónde llegas a fin de mes si sigues a tu ritmo de los últimos 14 días (con el arrastre incluido). Debajo dice el ritmo y el índice del último cierre.'},
-        {cara:'escritorio', vista:'libros', txt:'**«Tu índice de carga» enseña la prevista**, con la misma cuenta que el móvil.'}
-      ] },
-    { id:'2026-10-20-quien-puede', fecha:'2026-10-20',
-      titulo:'Toca un hueco del mapa de calor y te dice quién puede',
-      items:[
-        {cara:'movil', vista:'reu', txt:'**En la reunión, toca un hueco del mapa de calor** y debajo sale quién puede ese día a esa hora. En una encuesta **pública** salen los nombres de todos; en una anónima, sólo quien convoca los ve (al resto le dice cuántos, sin nombre).'},
-        {cara:'escritorio', vista:'dispo', txt:'**Disponibilidad y riesgo: pulsa un hueco del mapa** y debajo sale quién puede, con la misma regla que el móvil.'}
-      ] },
-    { id:'2026-10-20-ultima-version', fecha:'2026-10-20',
-      titulo:'Siempre abres la última versión, sin botón de actualizar',
-      items:[
-        {cara:'movil', vista:'estado', txt:'**Al abrir la app ya es la versión nueva**: no sale la barra de «Hay una versión nueva» ni hay que pulsar Actualizar. Sin cobertura abre con lo que tenía y se pone al día sola en cuanto puede, nunca en mitad de algo a medias.'},
-        {cara:'escritorio', vista:'automatismos', txt:'**Lo mismo en el escritorio**: abre siempre en la última versión, sin barra ni botón.'}
-      ] },
-    { id:'2026-10-20-doc-sin-red', fecha:'2026-10-20',
-      titulo:'Decidir un documento sin conexión ya no finge que se publicó',
-      items:[
-        {cara:'movil', vista:'docs', txt:'**Sin conexión, aprobar o rechazar un documento dice «la decisión NO se ha guardado»** y no lo cambia, como el escritorio. Antes lo cambiaba en el teléfono y decía «publicado en Notion y en el Libro de Datos».'}
-      ] },
-    { id:'2026-10-20-buzon-sin-red', fecha:'2026-10-20',
-      titulo:'El buzón sin conexión ya no esconde lo que habías leído',
-      items:[
-        {cara:'escritorio', vista:'buzon', txt:'**La hora de «decidido» va en tu hora y con fecha española** («21/10/2026, 01:30»): antes se recortaba en UTC y de madrugada decía el día anterior. Lo mismo en el «visto el …» de Novedades.'},
-        {cara:'escritorio', vista:'buzon', txt:'**Si falla la conexión, el buzón sigue enseñando los reportes que ya había leído**, con una chapa arriba: «no se pudo actualizar · lo de abajo es lo último que se pudo leer». Antes los tapaba con «no se pudo cargar».'}
-      ] },
-    { id:'2026-10-20-aviso-corto', fecha:'2026-10-20',
-      titulo:'Crear una reunión avisa de los días que se quedan cortos, en las dos caras',
-      items:[
-        {cara:'escritorio', vista:'reuniones', txt:'**Al convocar, avisa si UN día no da para la reunión entera** aunque los demás sí: antes sólo miraba el horario de todos juntos y con horario distinto por día casi nunca avisaba.'},
-        {cara:'movil', vista:'reu', txt:'**El aviso de «ese día nadie podrá marcar» vuelve a salir en la segunda reunión** que crees: antes se apagaba para toda la sesión tras el primero.'}
-      ] },
-    { id:'2026-10-20-rotulo-lote', fecha:'2026-10-20',
-      titulo:'En el móvil, un bloque con premios ya no dice «N sanciones»',
-      items:[
-        {cara:'movil', vista:'estado', txt:'**La cabecera de cada bloque separa sanciones y premios** («1 sanción · 1 premio»): antes contaba a los premiados como sancionados. En la cola del menú ⋮ y en tu panel del PD.'}
-      ] },
-    { id:'2026-10-20-pulso-gate', fecha:'2026-10-20',
-      titulo:'Automatismos dice si el motor está pasando AHORA',
-      items:[
-        {cara:'escritorio', vista:'automatismos', txt:'**Arriba de Automatismos sale «el motor pasó hace N min»**, en rojo si lleva más de 10 sin pasar (nadie cierra fichajes ni manda avisos mientras tanto). Lo lee el mini PC de su propio disco, sin escribir nada; si no puede preguntarlo lo dice, y eso no es «parado».'}
-      ] },
-    { id:'2026-10-20-doc-previa-movil', fecha:'2026-10-20',
-      titulo:'Documentos en el móvil: ves qué estás pisando',
-      items:[
-        {cara:'movil', vista:'docs', txt:'**La ficha de un expediente ya decidido dice quién lo decidió, cuándo, qué y por qué** antes de los botones, como en el escritorio: antes sólo lo veía el autor.'},
-        {cara:'movil', vista:'docs', txt:'**«Rechazar» pregunta antes**, como el escritorio: cierra el expediente de otra persona.'}
-      ] },
-    { id:'2026-10-20-sanc-jurisdiccion', fecha:'2026-10-20',
-      titulo:'El móvil dice a cuánta gente puedes sancionar',
-      items:[
-        {cara:'movil', vista:'estado', txt:'**En Sanciones del menú ⋮, «Poner una sanción» dice ya «N personas bajo tu jurisdicción»**, como el escritorio: el número se calculaba y no se enseñaba.'}
-      ] },
-    { id:'2026-10-20-turnos-cerrables', fecha:'2026-10-20',
-      titulo:'«Cerrar un turno» ya sólo ofrece los que toca cerrar',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'**La lista de «Cerrar un turno» ya no trae turnos cancelados, ya realizados ni futuros**: cerrar un cancelado sumaba «+1 turno» (×4 h) a gente que no fue. Y el contador dice **«N por cerrar»**, no «N tuyo(s)», que al PD le salía sobre turnos en los que no estuvo.'}
-      ] },
-    { id:'2026-10-20-turno-sin-duracion', fecha:'2026-10-20',
-      titulo:'Cerrar un turno ya no da por hecho que fue corto',
-      items:[
-        {cara:'escritorio', vista:'turnos', txt:'**Sin la duración escrita, «Cerrar un turno» la pide** en vez de decir que el turno no pasó de las 4 h, y el botón no se suelta hasta que la pongas: antes se podía cerrar sin decir cuánto duró y a cada uno le caía el turno sin extra.'}
-      ] },
-    { id:'2026-10-20-tareas-guardan', fecha:'2026-10-20',
-      titulo:'Los botones de Tareas guardan el paso (o dicen que no pudieron)',
-      items:[
-        {cara:'movil', vista:'tareas', txt:'**«Empezar», «Entregada» y «Deshacer» esperan a que el servidor guarde el paso** antes de darlo por hecho. Si no puede, el aviso lo dice y la tarea se queda como estaba: ya no cambia en pantalla para volver sola a los 90 segundos. ⚠️ Hasta que Notion abra los Kanban a la integración, el aviso será que no se pudo guardar.'}
-      ] },
-    { id:'2026-10-20-puesto-fresco', fecha:'2026-10-20',
-      titulo:'Tu puesto en la clasificación, al día cada vez que abres la app',
-      items:[
-        {cara:'movil', vista:'horas', txt:'**Tu puesto ya no espera a que alguien actualice el panel**: se calcula al abrir la app, con las horas de los meses ya cerrados de esta temporada. Si aún no tienes ningún mes cerrado, sigue saliendo «Sin puesto todavía».'},
-        {cara:'escritorio', vista:'ranking', txt:'**La clasificación usa el mismo cálculo, en el momento**: el puesto de cada persona sale de los meses cerrados de la temporada en curso, no de la última foto del panel.'}
-      ] },
-    { id:'2026-10-20-sin-convocar', fecha:'2026-10-20',
-      titulo:'Las reuniones sin convocar ya aparecen, con su acta',
-      items:[
-        {cara:'movil', vista:'reu', txt:'**Reuniones → «Sin convocar»**: si se grabó una reunión que nadie convocó, aquí sale con su fecha y su acta; pulsarla abre el expediente para leerlo o firmarlo. Sale aunque no tengas ninguna reunión convocada.'},
-        {cara:'escritorio', vista:'actas', txt:'**Actas marca las de reuniones sin convocar**, con una etiqueta junto al título.'}
-      ] },
-    { id:'2026-10-20-mes-del-parte', fecha:'2026-10-20',
-      titulo:'Cada parte dice a qué mes cuenta, y ya no lo adivina',
-      items:[
-        {cara:'movil', vista:'horas', txt:'**«cuenta en octubre de 2026»** en tus partes ya aplicados: el mes lo apunta el servidor en el momento en que tus horas entran en el panel, así que es el mes en el que cuentan de verdad — también lo atrasado, que entra siempre en el mes abierto. Antes casi todos decían «sin mes confirmado».'},
-        {cara:'escritorio', vista:'horas', txt:'**El Histórico de partes dice el mismo mes que el móvil**, el apuntado al aplicarlas. Lo aprobado que aún no se ha sumado (un par de minutos) y lo de antes del 20/10 siguen con el mes deducido.'}
-      ] },
-    { id:'2026-10-20-en-vivo', fecha:'2026-10-20',
-      titulo:'La app se actualiza sola, al segundo, cuando cambia algo',
-      items:[
-        {cara:'movil', vista:'estado', txt:'**Ya no hace falta salir y volver a entrar para ver lo nuevo**: la app pregunta cada segundo si ha cambiado algo y, si es así, trae SÓLO eso. Si alguien ficha, responde a una reunión o entra una sanción, lo ves en tu pantalla al momento. Antes tardaba hasta 90 segundos.'},
-        {cara:'movil', vista:'reu', txt:'**La reunión que tienes abierta se va llenando sola** mientras los demás marcan su disponibilidad.'},
-        {cara:'escritorio', vista:'panel', txt:'**Lo mismo en el escritorio**: lo que cambie se repinta solo, sin tocar lo que estés escribiendo — si estás a mitad de algo, espera a que acabes.'},
-        {cara:'movil', vista:'turnos', txt:'⚠️ Turnos y tareas siguen refrescándose cada 90 s mientras se termina de conectar Notion.'}
-      ] },
-    { id:'2026-10-19-ranking-estimacion', fecha:'2026-10-19',
-      titulo:'La cuota del ranking dice que es una estimación, y el ranking cuenta sin las bajas',
-      items:[
-        {cara:'escritorio', vista:'ranking', txt:'**La cuota del ranking ya dice que es una estimación**: «CUOTA MEDIA ESTIMADA», la columna «Cuota est.» y una nota que empieza por «la cuota es anual y se cierra en agosto». Hasta hoy eran 32 importes en € a secas.'},
-        {cara:'movil', vista:'horas', txt:'**Tu fila del ranking ya no tiene bajas debajo**: si eres el último de verdad, no te salen filas de gente que ya no está en el equipo.'}
-      ] },
-    { id:'2026-10-19-indice-de-carga-escritorio', fecha:'2026-10-19',
-      titulo:'Tu índice de carga ya sale también en el escritorio',
-      items:[
-        {cara:'escritorio', vista:'libros', txt:'**«Lo tuyo» enseña tu índice de carga**, con la misma barra que el móvil: la banda sana en verde, tu marca en rojo, y debajo tus horas de este mes en vivo. Hasta hoy sólo estaba en el móvil. Dice que es un ÍNDICE: arrastra parte de los dos meses anteriores, así que no es la carga de este mes.'},
-        {cara:'movil', vista:'horas', txt:'**Mi índice de carga no cambia**: la barra es la misma de antes, ahora compartida con el escritorio. Sólo cambia ante un dato raro: sin un número de verdad sale «Sin dato de carga» en vez de una marca en el cero.'}
-      ] },
-    { id:'2026-10-15-convocados-y-arreglos', fecha:'2026-10-15',
-      titulo:'Cambiar a quién se convoca después de crear la reunión, y cinco cosas que molestaban',
-      items:[
-        {cara:'movil', vista:'reu', txt:'**Los convocados de una reunión ya se pueden cambiar desde su ficha**, con el mismo buscador por nombre que al crearla. Antes, quien se olvidaba a alguien tenía que crear otra.'},
-        {cara:'escritorio', vista:'reuniones', txt:'**Y lo mismo desde el escritorio**: la ficha de la reunión deja añadir y quitar convocados.'},
-        {cara:'movil', vista:'reu', txt:'**Tocar fuera de una ventana ya no tira lo que estabas escribiendo**: si has tocado algo, pregunta antes de cerrar. Sin tocar nada, se cierra como siempre.'},
-        {cara:'movil', vista:'turnos', txt:'**Con la app abierta de un día para otro, «hoy» ya es hoy**: decía «cierra mañana» de un plazo ya cerrado, y el formulario de declarar bloque salía con la fecha de ayer.'},
-        {cara:'escritorio', vista:'sanciones', txt:'**«−1 punto» en una línea**: en la cola de sanciones, lo que quita cada sanción salía partido («−1» arriba, «punto» abajo) en todas las filas del bloque.'},
-        {cara:'escritorio', vista:'panel', txt:'**Las horas, sin ceros de cola en toda la app**: en el panel salía «15,5» arriba y «15,50 h están sin firmar» debajo. Ahora todas las horas siguen la misma regla: 15,5 · 86,25 · 2.'},
-        {cara:'escritorio', vista:'apela', txt:'**Una negrita dentro del texto de una pantalla vacía ya no sale como segundo título**: en Apelaciones, «Sanciones» salía en mayúsculas en su propia línea y el punto colgando debajo.'},
-        {cara:'escritorio', vista:'convoc', txt:'**«Fijar» ya no se ofrece a quien no puede fijar**: sale deshabilitado y dice quién la fija (quien la convocó, o la cuenta admin), que es lo que el servidor deja.'},
-        {cara:'movil', vista:'fichar', txt:'**Al declarar o enviar horas, el aviso dice a la cola de quién van**, por su nombre: lo mismo que «Lo firma …» en la pantalla de Fichar. Antes decía «tu coordinador» siempre, también a los coordinadores.'},
-        {cara:'movil', vista:'tareas', txt:'**Tareas vacía ya no habla de «tu coordinador»** a quien no lo tiene: «Cuando te asignen una, aparecerá aquí».'},
-        {cara:'movil', vista:'estado', txt:'**La cabecera ya no deja el «·» solo en una línea**, y en la maqueta el botón de rol enseña lo mismo que ve esa persona («Coordinador de …»).'},
-        {cara:'movil', vista:'estado', txt:'**Tildes**: quince textos que se leían sin ellas —el aviso de beta, los avisos al móvil, el cierre del mes, los puntos de una sanción…— ya las llevan.'},
-        {cara:'escritorio', vista:'docdec', txt:'**Un expediente sin archivo te dice qué hacer**: «Pídeselo a quien lo subió antes de decidir», como en el móvil. Antes te mandaba a buscar un campo de Cowork.'},
-        {cara:'escritorio', vista:'panel', txt:'**Las horas, a la centésima también aquí**: «Horas en el aire» iba a la décima: con 15,75 h habría dicho 15,8. Igual en Miembros, Ranking y la nota de tu cuota.'},
-        {cara:'escritorio', vista:'panel', txt:'**«Requiere tu decisión» ya no te pide fijar reuniones que no puedes fijar**: las «sin fijar» salen sólo a quien la convocó (o al PD con la cuenta admin), que es a quien el servidor deja.'},
-        {cara:'escritorio', vista:'turnos', txt:'**«Reutilizar la disponibilidad del turno anterior», también aquí**: en «Tu disponibilidad» copia lo que marcaste la semana pasada. No se guarda hasta que pulses «Guardar».'},
-        {cara:'movil', vista:'fichar', txt:'**Fichar dice quién firma tus horas, por su nombre**: a un coordinador le decía «tu coordinador las firma», siendo él el coordinador. Ahora, como en Estado: «las firma Lois, Project Director».'},
-        {cara:'movil', vista:'estado', txt:'**«Telemática» con su tilde**: la tarjeta de la próxima reunión y su ficha decían «TELEMATICA».'},
-        {cara:'movil', vista:'turnos', txt:'**Marcar muchos bloques de golpe, con un toque**: tocar el **día** (la cabecera de su columna) lo marca entero, y tocar la **hora** la marca en toda la semana — el turno que empieza ahí, como un toque en la casilla. Otro toque igual lo quita. Lo dice el rótulo de encima de la rejilla.'},
-        {cara:'movil', vista:'turnos', txt:'**«Reutilizar la disponibilidad del turno anterior»**: un botón encima de la rejilla copia lo de la semana pasada y lo deja pintado para cambiarlo. Lo pediste el 14/10. (En la maqueta no hay semana anterior: se prueba con cuenta.)'},
-        {cara:'movil', vista:'estado', txt:'**En la maqueta, Estado ya enseña la próxima reunión** y el aviso de «te falta cubrir»: decía «Ninguna reunión convocada» mientras la pestaña Reunión enseñaba una con «TE FALTA». Con cuenta real ya cuadraba.'},
-        {cara:'movil', vista:'estado', txt:'**Al Project Director, sus horas en cola le dicen «Las firmas tú»**, no «Las firma Lois» siendo él Lois. Y en la maqueta, «Coord.» y «PD» ya son Xoán y Lois de verdad: «Mis documentos» eran los de Nerea.'},
-        {cara:'escritorio', vista:'convoc', txt:'**«Reuniones abiertas» ya no da por vivo un plazo pasado**: la columna «Cierra» dice «cerró el …» y se apaga. (En la maqueta no se ve: vive el 24/07.)'},
-        {cara:'escritorio', vista:'dispo', txt:'**Con el plazo ya cerrado, la reunión lo dice**: «el plazo cerró el 14/10 · 1 sin cumplir» en vez de «cierra el 14/10 · 1 en riesgo». (En la maqueta no se ve: vive el 24/07.)'},
-        {cara:'escritorio', vista:'convoc', txt:'**Al fijar una reunión, el «Hasta» dice a qué hora ACABA**: arrancaba en «desde 16:00 · hasta 16:00», que parecía una reunión de cero minutos y era 16:00–17:00.'},
-        {cara:'movil', vista:'horas', txt:'**La cabecera de «Horas del mes» ya cabe en la tarjeta**: «pendientes» se cortaba por la derecha en pantallas estrechas.'},
-        {cara:'escritorio', vista:'panel', txt:'**Debajo del escritorio ya no queda un hueco vacío enorme** al bajar del todo: era la barra del móvil, escondida, ocupando sitio.'},
-        {cara:'movil', vista:'estado', txt:'**Si tu sesión caduca, la app lo dice una vez** y te pide entrar otra vez, en lugar de ir fallando en silencio.'}
-      ] },
-    { id:'2026-10-14-dos-dedos', fecha:'2026-10-14',
-      titulo:'Un dedo marca · dos dedos deslizan (y la hora va en la línea)',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'**Ya se puede deslizar encima de la rejilla: con DOS dedos.** Un dedo sigue marcando y arrastrando — que es como se cubre —, y dos dedos mueven la pantalla. Lo pone escrito encima del mapa, porque un gesto que no se anuncia no existe. ⚠️ Y si pones el segundo dedo a mitad de un trazo, **lo que había marcado el primero se deshace**: querías deslizar, no marcar.'},
-        {cara:'movil', vista:'reu', txt:'**Lo mismo al cubrir una encuesta de reunión**, que es donde más se nota: la rejilla es alta y antes el dedo se quedaba pegado a ella.'},
-        {cara:'movil', vista:'turnos', txt:'**Y las horas ya salen justo en la raya que separa dos casillas**, no dentro de una. Las 10:00 son la frontera entre la franja de las 9 y la de las 10, no un punto dentro de ninguna de las dos.'}
-      ] },
-    { id:'2026-10-14-disponibilidad-por-horas', fecha:'2026-10-14',
-      titulo:'La disponibilidad de turnos ya se pide POR BLOQUES DE UNA HORA',
-      items:[
-        {cara:'movil', vista:'turnos', txt:'Hasta hoy la semana se preguntaba con **dos casillas por día**: «Mañana» y «Tarde/noche». Lo dijiste: *«no tiene mucho sentido poner mañana y que no se sepa qué hora es mañana»*. Ahora son **bloques de una hora**, igual que en Reuniones: de **09:00 a 14:00** y de **16:00 a 23:00** — las **horas en las filas** y los días en las columnas.'},
-        {cara:'movil', vista:'turnos', txt:'**De dos a cuatro no hay nada que marcar**, porque lo pediste así. Y no está en gris: **no existe**. Una franja que se oferta y nadie puede hacer recoge ceros, y un cero de «no puedo» no se distingue de un cero de «nadie contestó».'},
-        {cara:'movil', vista:'turnos', txt:'**Un toque sigue marcando el turno entero** (4 h), y ahora **no salta la hora de comer**: si tocas las 13:00 se marca de **10 a 14**, no «13, 16, 17 y 18». Eso último eran cuatro horas con un agujero de dos en medio — un turno que nadie puede hacer.'},
-        {cara:'escritorio', vista:'turnos', txt:'Y al convocar, la casilla **«preguntar POR HORAS» nace marcada**: el modo horario existía desde agosto y estaba **apagado**, así que lo que veías era siempre la versión de dos casillas.'}
-      ] },
-    { id:'2026-10-07-apunte-sin-fecha', fecha:'2026-10-07',
-      titulo:'«Ultimos movimientos» ya dice cuántos apuntes no tienen fecha',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Un apunte cuya fecha no se puede leer se contaba dentro de «N apuntes este mes» — y a ésos no se les aplica el filtro del mes, así que salían en TODOS los meses. Ahora siguen en la lista (esconder una hora tuya sería peor) pero el rótulo dice «· N sin fecha».'}
-      ] },
-    { id:'2026-10-07-cola-sanciones-fallo', fecha:'2026-10-07',
-      titulo:'La cola de sanciones ya dice cuándo NO ha podido cargar',
-      items:[
-        {cara:'movil', vista:'horas', txt:'Si abrías Disciplina y la cola no cargaba, se quedaba diciendo «Cargando…» con el radar girando PARA SIEMPRE — afirmando que estaba trabajando cuando no había nada en vuelo. Ahora dice «No se pudo cargar», para el radar y te da un botón de Reintentar.'}
-      ] },
-    { id:'2026-10-07-partes-legibles', fecha:'2026-10-07',
-      titulo:'«Ya decidiste» baja de sitio, y los partes dejan de tener tope',
-      items:[
-        {cara:'movil', vista:'horas', txt:'«Ya decidiste» estaba arriba de todo y empujaba tus propias horas media pantalla abajo. Ahora va DEBAJO de «Tus partes»: primero lo que hay que hacer, luego lo tuyo, y al final lo que ya está hecho.'},
-        {cara:'movil', vista:'horas', txt:'Y a quien no puede firmar partes ya no le sale ninguna de las dos colas — tampoco al mirar su ficha con «Ver como», que antes le ensenaba una tarjeta de aprobar que esa persona no ve.'},
-        {cara:'movil', vista:'horas', txt:'Por dentro: todos los partes del equipo vivían como un texto en UNA celda de la hoja, y ahi caben 74. El 04/10 se llenó y se quedaron 5,75 h de cuatro personas fuera. Ahora es UNA FILA POR PARTE: sin tope, y legible.'}
-      ]},
-    { id:'2026-10-06-no-repintar', fecha:'2026-10-06',
-      titulo:'La app deja de parpadear al abrir, y entra más ligera',
-      items:[
-        {cara:'movil', vista:'estado', txt:'<b>Ya no se oscurece y vuelve a aparecer a los dos segundos de entrar.</b> Al llegar los datos se reconstruía la pantalla entera <b>aunque fuera idéntica</b>, y el navegador reproducía la animación de entrada: todo se ponía medio transparente y volvía a aparecer. Ahora, <b>si no ha cambiado nada, no se repinta</b> — en todas las pantallas.'},
-        {cara:'movil', vista:'horas', txt:'<b>Y las barras de Horas dejan de caerse a cero y volver a crecer</b> cada vez que llegan datos de fondo. Eran la única animación que no sabía distinguir «esto lo ha pedido un dedo» de «esto ha llegado solo».'},
-        {cara:'escritorio', vista:'panel', txt:'<b>Lo mismo en el escritorio</b>: su pantalla también se reconstruía entera en cada pintada. Las dos caras pasan ahora por el mismo sitio, así que no pueden volver a divergir.'},
-        {cara:'movil', vista:'estado', txt:'<b>Y la app pesa 153 KB menos al abrir.</b> Se descargaba un texto interno que esta versión no llega a enseñar.'}
+        {cara:'movil', vista:'estado', txt:'<b>La pantalla ya no se arrastra de lado.</b> La insignia de fondo era un 12 % más ancha que la pantalla y en iPhone se podía desplazar todo (Fernando). Ahora se ve igual y el documento mide lo que la pantalla.'},
+        {cara:'movil', vista:'estado', txt:'<b>El icono de la beta</b> tiene ya el fondo del mismo gris que el aro de la insignia, y sale del original grande. Para verlo hay que borrar el acceso directo y volver a añadirlo. El de producción va con el próximo release.'},
+        {cara:'escritorio', vista:'ajustes', txt:'<b>Brave y las notificaciones.</b> Si el navegador no consigue suscribirse, en vez del error en crudo sale qué hacer; en Brave, el ajuste exacto que hay que encender (Óscar). En el móvil sale en la pantalla de activar avisos.'}
       ] },
     { id:'2026-10-06-mes-de-trabajo', fecha:'2026-10-06',
       titulo:'El mes que ves es el de TRABAJO, no el del calendario',
@@ -8009,10 +6350,10 @@ function _pasosSustituirDoc_(e, yo){
   var ref = e.ref || 'la referencia de este expediente';
   var url = _urlFormDocs_();
   return [
-    { n:1, t:'Manda la versión nueva por el formulario, marcada como «sustituye a»',
-      d:'Ahí pones la referencia de este: ' + ref + '. Es un envío NUEVO: crea su propio '+
-        'expediente y vuelve a pasar por revisión. Al revés que corregir: aquí NO se reutiliza '+
-        'la misma referencia, porque este ya está publicado y no se toca.',
+    { n:1, t:'Manda la version nueva por el formulario, marcada como «sustituye a»',
+      d:'Ahi pones la referencia de este: ' + ref + '. Es un envio NUEVO: crea su propio '+
+        'expediente y vuelve a pasar por revision. Al reves que corregir: aqui NO se reutiliza '+
+        'la misma referencia, porque este ya esta publicado y no se toca.',
       url: (url && url.indexOf('http') === 0) ? url : '',
       /* El respaldo vive en la PUERTA, no en una cara: es la misma leccion del 19/08 que
          dejo al escritorio mandando al formulario sin decir a quien pedir el enlace. */
@@ -8232,37 +6573,21 @@ function _firmaDocTxt_(e){
       costó caro en `coordina` el 18/08—, así que se pregunta si sabe hacer `join` en vez de
       suponerlo. En JS una cadena tiene `.length` y es indexable: la forma equivocada no da
       error, da basura. */
-/* ⛔ 21/10 (auditor 11, 🟡 12): el texto de «hecho» tras decidir un documento, con lo que el servidor dice del AVISO
-   (`_aviso`, que no se guarda): si no se pudo avisar a nadie, se dice — «le llega al autor» era falso para quien no tiene
-   móvil con avisos. Sin `_aviso` (maqueta, respuesta vieja), el texto tal cual. */
-function _avisoDocTxt_(base, upd){
-  var av = upd && upd._aviso;
-  if (!av || av.ok !== false) return base;
-  return base + ' Pero no se ha podido avisar' + (av.nota ? ' (' + av.nota + ')' : '') + ': díselo tú.';
-}
-
 function _ajustesDocTxt_(e){
   var a=e&&e.decision&&e.decision.ajustes;
   if(!a) return '';
   var p=[];
   if(a.titulo) p.push('título → «'+a.titulo+'»');
-  /* 21/10 (auditor 11, 🟡 10): vaciarlas es un ajuste, y se dice — no «etiquetas → » con la cola vacía. */
-  if(a.etiquetas) p.push('etiquetas → '+(a.etiquetas.join?(a.etiquetas.length?a.etiquetas.join(', '):'(ninguna)'):a.etiquetas));
+  if(a.etiquetas) p.push('etiquetas → '+(a.etiquetas.join?a.etiquetas.join(', '):a.etiquetas));
   return p.length ? p.join(' · ') : '';
 }
 
 /* `2026-08-06T19:12:00.000Z` → `06/08/2026, 21:12`. Formato, no calendario. */
-/* ⛔ 20/10 (ficha «`decidido_at` se pinta en UTC recortando la cadena»): aquí la FECHA salía de la cadena UTC
-   (`s.slice(0,10)`) y la HORA del reloj local — mezcladas, a partir de las 22:00 en verano decía el día ANTERIOR con la
-   hora de hoy («20/10, 01:30» para la 01:30 del 21). Las dos mitades salen ahora de la misma fecha LOCAL, por la puerta
-   que ya existía (`_ahoraLocalISO_`). Una fecha sola (AAAA-MM-DD) no tiene hora que convertir: se da tal cual. */
 function _novCuando_(iso){
   var s=String(iso||''); if(s.length<10) return s;
-  if(s.length===10) return _isoADMY_(s);
   var d=new Date(s);
   if(isNaN(+d)) return s.slice(0,10);
-  var l=_ahoraLocalISO_(d);
-  return _isoADMY_(l.slice(0,10))+', '+l.slice(11,16);
+  return _isoADMY_(s.slice(0,10))+', '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
 }
 
 /* Cablea los dos botones. `repintar` es la función de pintado de la cara — las dos se llaman

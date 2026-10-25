@@ -217,7 +217,7 @@ function _abrirPintor_(fondoUrl, alTerminar){
     cerrar();
     /* Por la MISMA puerta que cancelar: así un clic tardío en «Cancelar» no puede
        contestar por segunda vez y pisar la imagen marcada con la foto en crudo. */
-    contestar(_jpegQueCabe_(out, 0.82), trazos.length);   /* 25/10 (auditor 33, 🟡 D4): que quepa */
+    contestar(out.toDataURL('image/jpeg', 0.82), trazos.length);
   };
 
   img.onload=function(){
@@ -290,9 +290,9 @@ async function _enviarReporte_(datos, esMejora){
     _borradorBuzon_(null);
     /* Si la foto no se guardo, se dice: el backend solo devuelve `captura` cuando la ha
        subido a Drive. Callarse seria dejar creer que la marcaste para nada. */
-    var sinFoto = datos.captura && !_capturaGuardada_(r);
+    var sinFoto = datos.captura && !(r && r.captura);
     tost((esMejora?'Mejora enviada':'Fallo reportado')+' · '+((r&&r.id)||'')+'.'+
-      (sinFoto?' ⚠️ La foto NO se ha guardado: '+_avisoSinFoto_(r)+'.':''));
+      (sinFoto?' ⚠️ La foto NO se ha guardado: al servidor le falta ese paso.':''));
     if(vista==='buzon') _cargarBuzon_();
   }catch(e){
     /* ⛔ AQUI SE PERDIA TODO. Ahora se guarda el envio entero y se dice que se ha
@@ -382,22 +382,6 @@ async function _cargarBuzon_(){
   pintar();
 }
 
-/* ⛔ 20/10 (ficha «"Sin conexión no se borra lo que ya había" es un rótulo»). El cargador CONSERVABA la cola al fallar
-   —y lo dice su comentario—, pero `V.buzon` salía antes en cuanto había `BUZON_ERR`: justo el único caso en que hay algo
-   que conservar. Medido por un agente: la misma pantalla con 2 reportes guardados que con `[]`.
-   Ahora la vista sólo se rinde si NO hay nada que enseñar; con cola ya leída la pinta, y la chapa de arriba dice que
-   no se pudo actualizar (callarlo la haría pasar por fresca, que es el fallo del lote congelado). */
-function _buzonSinNadaQueEnsenar_(){
-  return !!BUZON_ERR && !(BUZON && BUZON.length);
-}
-function _buzonAvisoHTML_(){
-  if (BUZON_CARGANDO) return '<div class="chips"><span class="chip wa">ACTUALIZANDO… <b style="color:var(--ink)">'+
-    'lo de abajo es lo último que se pudo leer</b></span></div>';
-  if (BUZON_ERR) return '<div class="chips"><span class="chip wa">NO SE PUDO ACTUALIZAR ('+esc(BUZON_ERR)+') · '+
-    '<b style="color:var(--ink)">lo de abajo es lo último que se pudo leer</b></span></div>';
-  return '';
-}
-
 function _fichaBuzon_(r){
   var st=_estBuzon_(r.estado), esBug=!_esMejora_(r);
   var campo=function(t,v){ return v? ('<div class="sub"><span class="sc">'+t+'</span>'+
@@ -427,7 +411,11 @@ function _fichaBuzon_(r){
        '<p style="margin:4px 0 0;font-size:12.5px;color:#f0cf9e;line-height:1.55">'+
        esc(r.anotaciones)+'</p></div>' : '')+
     /* La captura que adjuntó quien reporta. Para lo visual vale por tres párrafos. */
-    _capturaHTML_(r, BZ_CAPS, campo)+
+    (r.captura && /^https?:/.test(String(r.captura))
+      ? '<div class="sub"><span class="sc">Captura</span>'+
+        '<p style="margin:4px 0 0"><a href="'+esc(r.captura)+'" target="_blank" rel="noopener" '+
+        'style="color:var(--red2);font-size:12.5px">ver la captura que adjuntó</a></p></div>'
+      : (r.captura ? campo('Captura', r.captura) : ''))+
     (r.vista_previa? '<div class="sub"><span class="sc">Vista previa</span>'+
        '<p style="margin:4px 0 0"><a href="'+esc(r.vista_previa)+'" target="_blank" rel="noopener" '+
        'style="color:var(--red2);font-size:12.5px">abrir el artefacto con los cambios puestos</a></p></div>' : '')+
@@ -443,39 +431,6 @@ function _fichaBuzon_(r){
 /* ¿ES UNA MEJORA? **Manda el ID**, igual que en el backend (`_decidirReporte_`): lleva dentro
    el tipo y la cara, asi que no se puede acabar mirando el eje equivocado por un `tipo` mal
    puesto o ausente. `tipo` queda de respaldo para lo que venga sin id. */
-/* ⛔ 20/10 — LA CAPTURA, SEGÚN DÓNDE VIVA. Un enlace `http(s)` (Drive, lo de antes) se abre; una del mini PC
-   (`mini-pc:…`, desde la mudanza) se TRAE con `getCaptura` al pulsar y se pinta aquí — antes salía como texto y no se
-   podía ver. Lo traído vive en `caps` (por id) y sólo se pinta si es una imagen en data URL. Lo demás (p. ej. «no se
-   pudo subir: …») se enseña tal cual: es lo que pasó. */
-function _capturaHTML_(r, caps, campo){
-  var c = r && r.captura ? String(r.captura) : '', ya = caps && r ? caps[r.id] : null;
-  if(!c) return '';
-  var cab = '<div class="sub"><span class="sc">Captura</span>';
-  if(/^https?:/.test(c)) return cab+'<p style="margin:4px 0 0"><a href="'+esc(c)+'" target="_blank" rel="noopener" '+
-    'style="color:var(--red2);font-size:12.5px">ver la captura que adjuntó</a></p></div>';
-  if(/^mini-pc:/.test(c)){
-    if(typeof ya === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(ya))
-      return cab+'<p style="margin:6px 0 0"><img src="'+esc(ya)+'" alt="captura que adjuntó" '+
-        'style="max-width:100%;border-radius:8px;border:1px solid var(--line,#333)"></p></div>';
-    return cab+'<p style="margin:4px 0 0"><button class="btn" data-bzcap="'+esc(r.id)+'">ver la captura que adjuntó</button>'+
-      '</p></div>';
-  }
-  return campo('Captura', c);
-}
-
-/* La trae del mini PC y repinta; si no puede, el botón revive y se dice por qué. */
-function _verCapturaBuzon_(id, b){
-  var r = ((BUZON||[]).filter(function(x){ return x.id===id; })[0]||null);
-  if(!r) return;
-  if(b) b.disabled=true;
-  api.getCaptura(r.captura).then(function(d){
-    BZ_CAPS[id] = d && d.captura; pintar();
-  }).catch(function(e){
-    if(b) b.disabled=false;
-    tostErr('No se pudo traer la captura: ', e);   /* por la puerta: con la sesión caducada el aviso se queda fijo */
-  });
-}
-
 function _esMejora_(r){
   var id=String((r&&r.id)||'');
   if(id.indexOf('MEJ-')===0) return true;
@@ -657,21 +612,10 @@ function _accBuzon_(r, esBug){
      ofrecerla: parece que queda algo por decidir cuando ya se decidio.
      El freno de verdad esta en `_decidirReporte_` (las caras son dos y el dato uno); esto es
      lo que evita que se llegue a pulsar. */
-  /* ⛔ 21/10 (auditor 10, 🟠 1): YA AUTORIZADO. Caía al bloque de las cuatro decisiones («Adelante, hazlo» otra vez);
-     lo único que tiene sentido aquí es echarse atrás, con anotaciones. */
-  if(r.estado==='Adelante'){
-    return '<div class="ruta"><b>Autorizado</b>'+
-      (r.decidido_por?' por <b>'+esc(_m(r.decidido_por).pila||r.decidido_por)+'</b>':'')+
-      (r.decidido_at?' · '+esc(_novCuando_(r.decidido_at)):'')+
-      ': se está construyendo y pasará a «listo para revisar» cuando esté en la beta.'+
-      '<br>Si ya no debe hacerse, descártalo con tus anotaciones.</div>'+
-      '<textarea data-bznotas="'+ID+'" placeholder="Por qué se para…">'+esc(notas)+'</textarea>'+
-      '<div class="acts">'+bot('Descartado+','Descartar con anotaciones','no')+'</div>';
-  }
   if(r.estado==='Publicado' || r.estado==='Descartado'){
     return '<div class="ruta">Este reporte ya está <b>'+esc(r.estado.toLowerCase())+'</b>'+
       (r.decidido_por?', decidido por <b>'+esc(_m(r.decidido_por).pila||r.decidido_por)+'</b>':'')+
-      (r.decidido_at?' · '+esc(_novCuando_(r.decidido_at)):'')+
+      (r.decidido_at?' · '+esc(String(r.decidido_at).slice(0,16).replace('T',' ')):'')+
       '. No quedan decisiones que tomar.'+
       ((notas||'').trim()?'<br><span style="color:var(--ink3)">Anotaciones: '+esc(notas.trim())+'</span>':'')+
       '</div>';

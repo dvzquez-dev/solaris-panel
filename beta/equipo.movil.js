@@ -68,39 +68,6 @@ function esCoord(){ return ST.rol==='coord' || ST.rol==='pd' || (typeof YO!=='un
 
 function esPD(){ return ST.rol==='pd' || (typeof YO!=='undefined' && YO && YO.cargo==='Project Director'); }
 
-/* ⛔ 21/10 (auditor 7, 🟡 11): LO QUE TE TOCA HACER, en la portada — lo mismo que ya cuentan los globos (`badges`) y
-   lo que te llega por notificación: partes que esperan tu firma, fichajes TUYOS sin declarar (caducan) o con detalle
-   pedido, documentos que esperan tu revisión, y la disponibilidad de turnos abierta sin contestar. Antes la portada
-   callaba justo eso. Cada aviso lleva a su pestaña (`data-ir`). */
-function _avisosQueTeTocanM_(){
-  function uno(ir, tit, txt, mal){
-    return '<div class="aviso'+(mal?' mal':'')+'" data-ir="'+ir+'" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
-      '<div style="flex:1"><b>'+tit+'</b><p>'+txt+'</p></div><span class="chev">›</span></div>';
-  }
-  var h='', yo=(typeof _fichaYo_==='function') ? _fichaYo_() : '';
-  var pdec=(typeof PARTES_DEC!=='undefined' && Array.isArray(PARTES_DEC)) ? PARTES_DEC.length : 0;
-  if(pdec) h+=uno('horas', pdec===1 ? 'Un parte espera tu firma' : (pdec+' partes esperan tu firma'),
-    pdec===1 ? 'Hasta que lo decidas no le cuenta a quien lo hizo.' : 'Hasta que los decidas no le cuentan a nadie.');
-  var mios=(typeof PARTES!=='undefined' && Array.isArray(PARTES)) ? PARTES.filter(function(p){
-    return p && (!p.autor || p.autor===yo); }) : [];
-  var sd=mios.filter(function(p){ return p.e==='sindecl'; }).length, dt=mios.filter(function(p){ return p.e==='det'; }).length;
-  if(sd) h+=uno('horas', sd===1 ? 'Un fichaje tuyo sin declarar' : (sd+' fichajes tuyos sin declarar'),
-    'Caducan a los 7 días (a las '+_caducaAutocierreH_()+' h si se cerraron solos a las '+_maxHorasParte_()+' h) y se pierden: decláralos en Horas.', true);
-  if(dt) h+=uno('horas', dt===1 ? 'Te piden detalle de un parte' : ('Te piden detalle de '+dt+' partes'),
-    'Hasta que lo des no se firma.');
-  var rev=(typeof _docsPend_==='function') ? (_docsPend_()||[]).length : 0;
-  if(rev) h+=uno('docs', rev===1 ? 'Un documento espera tu revisión' : (rev+' documentos esperan tu revisión'),
-    rev===1 ? 'Léelo y decide en Docs.' : 'Léelos y decide en Docs.');
-  var cv=(typeof _convAbierta_==='function') ? _convAbierta_() : null;
-  if(cv && typeof _convEstado_==='function' && _convEstado_(cv)==='abierta'){
-    var ac=(typeof _actorSanc_==='function') ? _actorSanc_() : yo;
-    var r=cv.resp && cv.resp[ac];
-    if(!(r && typeof r==='object' && Object.keys(r).length))
-      h+=uno('turnos', 'Di tu disponibilidad para los turnos', 'Si no dices nada, se reparte sin contar contigo.', true);
-  }
-  return h;
-}
-
 function vEstado(){
   /* La capa de NOVEDADES va lo primero de la pantalla de inicio: es lo que hay que
      mirar antes que nada, y desaparece sola en cuanto se marca todo como visto. */
@@ -126,12 +93,9 @@ function vEstado(){
     var rt=_unPerfil?aprobadorDe(YO.nombre,YO.unidad):null;
     av+='<div class="aviso" data-ir="horas" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
       '<div style="flex:1"><b>'+h1(pend)+' esperando aprobación</b>'+
-      /* ⛔ 929.ª: y al PROPIO PD no se le nombra a sí mismo — `rt.propio`, como ya hacía Fichar. Le decía
-         «Las firma Lois, Project Director» siendo él Lois. */
       '<p>Todavía no cuentan. '+(rt
-        ? (rt.propio ? 'Las firmas tú: eres el Project Director.'
-           : ('Las firma '+esc(rt.nom.split(' ')[0])+', '+
-              (rt.escalado?'Project Director':'coordinador de tu unidad')+'.'))
+        ? ('Las firma '+esc(rt.nom.split(' ')[0])+', '+
+           (rt.escalado?'Project Director':'coordinador de tu unidad')+'.')
         : 'Las firma quien coordine el subsistema de cada parte.')+'</p></div>'+
       '<span class="chev">›</span></div>';
   }
@@ -161,14 +125,7 @@ function vEstado(){
     var _p0=_pend[0], _resto=_pend.length-1;
     av+='<div class="aviso" data-ir="reu" data-reuid="'+esc(String(_p0.id))+'" data-p>'+
       '<span class="ic"><svg><use href="#i-warn"/></svg></span>'+
-      /* 22/10 (auditor 21, 🔴 1): si TODAS las que quedan están marcadas pero por debajo del mínimo, se dice eso. */
-      /* 22/10 (refutador, 🟡 1): mezcladas, se cuentan las DOS («Te falta cubrir 1 y vas por debajo del mínimo en otra»). */
-      '<div style="flex:1"><b>'+(function(){
-        var nB=_pend.filter(function(x){ return x.bajoMin; }).length, nF=_pend.length-nB;
-        if(!nF) return 'Vas por debajo del mínimo en '+(nB>1?(nB+' reuniones'):'una reunión');
-        return 'Te falta cubrir '+(nF>1?(nF+' disponibilidades'):'una disponibilidad')+
-          (nB ? (' y vas por debajo del mínimo en '+(nB>1?(nB+' más'):'otra')) : '');
-      })()+'</b>'+
+      '<div style="flex:1"><b>Te falta cubrir '+(_pend.length>1?(_pend.length+' disponibilidades'):'una disponibilidad')+'</b>'+
       /* ⛔ EL PLAZO EN PALABRAS, no la fecha cruda — y aqui es donde mas se nota: **este
          aviso existe justo para que no te caigan sanciones** (lo dice el comentario de
          arriba). «Cierra el 20/08/2026» obliga a mirar el calendario **dentro de una
@@ -178,8 +135,6 @@ function vEstado(){
         (_resto>0 ? (', y '+_resto+' más después') : '')+'.</p></div>'+
       '<span class="chev">›</span></div>';
   }
-
-  av+=_avisosQueTeTocanM_();
 
   /* Las tareas salieron de aqui: tienen pestana propia y en la portada solo alargaban
      la primera pantalla repitiendo lo mismo. */

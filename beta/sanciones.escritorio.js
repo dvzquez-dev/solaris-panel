@@ -169,37 +169,6 @@ function _selectorLotes_(){
     '</select></label></div>';
 }
 
-/* ⛔ 21/10 (auditor de sanciones): LA PREVISIÓN «antes → después» DE UNA FILA DEL BLOQUE, o '' si no se sabe. Era
-   `var antes=m?m.puntos:10`: a quien no es PD el roster le llega SIN `puntos`, y salía «undefined → NaN»; a quien no
-   está en el roster, un 10 inventado. Sin puntos de verdad no hay previsión (§3c-24). Si la decisión no es «aceptar» o
-   los puntos de la sanción no llegaron, se queda quieta: lo que va a pasar de verdad al cerrar el bloque. */
-function _prevPuntosLote_(m, x){
-  var antes = (m && typeof m.puntos === 'number' && isFinite(m.puntos)) ? m.puntos : null;
-  if(antes === null) return '';
-  var desp = (x && x.dec === 'aceptar' && typeof x.pts === 'number') ? Math.max(0, Math.min(10, antes + x.pts)) : antes;
-  return antes + ' → ' + desp;
-}
-
-/* ⛔ 21/10 (auditor de sanciones): EL DÍA DE UNA SANCIÓN RESUELTA, como se lee: `decidido_at` (si no, `creado_at`), en
-   el día de Madrid (`_ahoraLocalISO_`) y en DD/MM/AAAA. Sin fecha legible, «—». */
-function _diaSancHist_(s){
-  /* 21/10: el día de Madrid sale de la puerta común (`_diaMadridDe_`), la misma que la caducidad de los partes. */
-  return _diaMadridDe_((s && (s.decidido_at || s.creado_at)) || '') || '\u2014';
-}
-
-/* ⛔ 21/10 (auditor de sanciones): QUÉ SUELTAS CABEN EN UN PAQUETE. El servidor no mete dos veces a la misma persona en
-   el mismo paquete y es TODO O NADA, así que mandar todas hacía fallar la operación entera en cuanto alguien tenía dos.
-   Va UNA por persona — la más antigua (`creado_at`) — y las demás se quedan sueltas: `{van:[…], quedan:[…]}`. */
-function _sueltasAgrupables_(ss){
-  var orden = (ss||[]).slice().sort(function(a,b){ return String(a.creado_at||'').localeCompare(String(b.creado_at||'')); });
-  var visto = {}, van = [], quedan = [];
-  orden.forEach(function(s){
-    var k = String(s.nombre||'');
-    if(visto.hasOwnProperty(k)) quedan.push(s); else { visto[k] = 1; van.push(s); }
-  });
-  return {van: van, quedan: quedan};
-}
-
 function _panelSueltas_(){
   var ss=_sancSueltas_();
   /* ⛔⛔ «NINGUNA» Y «NO LO SÉ» NO SE PINTAN IGUAL. `SANC_BACK` arranca en `null` y se
@@ -223,14 +192,11 @@ function _panelSueltas_(){
              dice «sin dato», no **0** -- que en esta columna se lee como «fue un
              aviso». Y el color sale del MISMO valor, asi que un hueco no se pinta
              de rojo por un `<0` sobre un cero inventado. */
-          /* ⛔ 21/10 (auditor de sanciones): el ROTULO de las dos caras (`_etSancFila_`), no el número en crudo — una
-             revocación de +2 salía «2» y un premio «0», que en esta columna se lee «aviso». */
           '<td class="r mono '+(_ptsSanc_(s.puntos)<0?'dn':'')+'">'
-            +esc(_etSancFila_(s.puntos, s.origen, s.extra))+'</td>'+
+            +(_ptsSanc_(s.puntos)===null?_etPtsSanc_(null):_ptsSanc_(s.puntos))+'</td>'+
           '<td class="r"><span class="decs" data-sid="'+s.id+'">'+
             '<button data-sdec="aprobar">Aplica</button>'+
-            /* ⛔ 21/10: una revocación o un premio suelto no se justifica — el servidor lo rechaza. */
-            (_esNoJustificable_(s.origen, s.extra) ? '' : '<button data-sdec="justificar">Justifica</button>')+
+            '<button data-sdec="justificar">Justifica</button>'+
             '<button data-sdec="rechazar">Rechaza</button>'+
           '</span> <button class="btn sm" data-seditar="'+s.id+'">Editar</button></td></tr>';
       }).join(''))+
@@ -238,8 +204,8 @@ function _panelSueltas_(){
       '<span class="sc" style="margin-left:9px">un solo comunicado para todas</span></div>'+
     '<div class="nota">Cada suelta se decide por su cuenta: no comparten motivo ni comunicado. '+
     '<b>Editar</b> corrige puntos, motivo y artículo <b>al aplicarla</b> —es lo único que deja el '+
-    'backend—. Una ya aplicada no se edita: se <b>revoca</b> abajo, en «Se pueden revocar», que es la vía de '+
-    'apelación.</div>');
+    'backend—. <b>Revocar una ya aplicada no se hace desde aquí</b>: el servidor no deja tocar '+
+    'lo aplicado, y la revocación va por <span class="mono">flujos/enviar_revocacion.py</span>.</div>');
 }
 
 
@@ -285,7 +251,7 @@ function _panelRevocarSanc_(){
   for (i = 0; i < lista.length; i++) cuerpo += _revocarSancCard_(lista[i]);
   return pan('Se pueden revocar', lista.length + '',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">' +
-    'La v\u00eda de apelaci\u00f3n: una sanci\u00f3n ya aplicada se retira con un ' +
+    'La v\u00eda de apelaci\u00f3n del <b>Art. 34</b>: una sanci\u00f3n ya aplicada se retira con un ' +
     '<b>motivo</b>, y la revocaci\u00f3n entra en la cola como pendiente \u2014 se confirma con su ' +
     'bloque, igual que una sanci\u00f3n. <b>Queda el rastro de las dos.</b></p></div>' + cuerpo);
 }
@@ -344,9 +310,6 @@ async function _engRevocarSanc_(){
         if (r && r.rechazadas && r.rechazadas.length)
           throw new Error('no puedes tocar la sanci\u00f3n de ' + r.rechazadas.join(', ') +
                           ': est\u00e1 fuera de tu jurisdicci\u00f3n');
-        /* 21/10 (auditor 12, 🟠 3): y si el servidor dice que los puntos no valen, NO es «ya estaba en la cola». */
-        if (r && r.invalidas && r.invalidas.length)
-          throw new Error('el servidor no acepta esos puntos para ' + r.invalidas.join(', '));
         /* ⚠️ Y LO QUE ENTRO, no lo que se mando: `nuevas` puede ser 0 si la clave ya estaba
            -- o sea si ya la habias mandado --, y decir «hecho» ahi manda a esperar algo que no
            va a pasar dos veces. */
@@ -391,10 +354,9 @@ function _panelHistSanc_(){
           '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
           '<td class="mono '+tono+'">'+esc(et)+'</td>'+
           /* ⛔ Igual que su gemela de arriba: el hueco se dice, no se rellena. */
-          '<td class="r mono">'+esc(_etSancFila_(s.puntos, s.origen, s.extra))+'</td>'+   /* 21/10: el rótulo, no el número */
-          /* ⛔ 21/10 (auditor de sanciones): la fecha de la DECISIÓN (la de propuesta si no consta), en el día de Madrid y
-             en DD/MM/AAAA — era `creado_at` recortado: ISO, UTC y otra fecha. */
-          '<td class="r mono" style="color:var(--ink3)">'+esc(_diaSancHist_(s))+'</td></tr>';
+          '<td class="r mono">'
+            +(_ptsSanc_(s.puntos)===null?_etPtsSanc_(null):_ptsSanc_(s.puntos))+'</td>'+
+          '<td class="r mono" style="color:var(--ink3)">'+esc(String(s.creado_at||'').slice(0,10))+'</td></tr>';
       }).join(''))+
     (hs.length>40?'<div class="nota">Se muestran las 40 más recientes de '+hs.length+'.</div>':''));
 }
@@ -472,7 +434,7 @@ function _ponerSancCuerpo_(){
             ? '<label style="display:block;margin-bottom:9px">'+lab('Qu\u00e9 tarea')+
                 '<select id="snTarea" style="'+E+'"><option value="">\u2014 elige la tarea \u2014</option>'+
                 tareas.map(function(t){ return '<option value="'+esc(t.url)+'"'+(SANC_FORM.tarea===t.url?' selected':'')+'>'+esc(t.n||t.nombre||'(sin t\u00edtulo)')+
-                  (t.l?(_venciaTarea_(t.l)?' \u00b7 venci\u00f3 el ':' \u00b7 vence el ')+esc(_plazoDMY_(t.l)||_isoADMY_(t.l)):'')+'</option>'; }).join('')+   /* 20/10: «vencía» de lo que aún no vence */
+                  (t.l?' \u00b7 venc\u00eda '+esc(_isoADMY_(t.l)):'')+'</option>'; }).join('')+
               '</select></label>'+
               '<label style="display:block;margin-bottom:9px">'+lab('Plazo nuevo')+
                 '<input type="date" id="snPlazo" value="'+esc(SANC_FORM.plazo||'')+'" style="'+E+'"></label>'+
@@ -492,7 +454,7 @@ function _ponerSancCuerpo_(){
               'a Notion, as\u00ed que no se puede mover ning\u00fan plazo. Elige otro motivo.</div>')
         : '')+
       '<label style="display:block;margin-bottom:11px;max-width:130px">'+lab('Puntos')+
-        '<input type="number" id="snPts" value="'+esc(_ptsPrefillSanc_())+'" step="1" min="-5" max="0" style="'+E+'"></label>'+
+        '<input type="number" id="snPts" value="'+esc(SANC_FORM.pts||_puntosDeMotivo_(SANC_FORM.motivo)||'')+'" step="1" min="-5" max="0" style="'+E+'"></label>'+
       '<button class="btn pri" id="btnSanc">Poner la sanci\u00f3n</button>'+
       '<div class="nota" id="snMsg" style="margin:9px 0 0">La sanci\u00f3n entra <b>pendiente</b>: se decide '+
       'abajo, y el comunicado sale despu\u00e9s.</div>'+
@@ -541,7 +503,7 @@ function _cablearPonerSanc_(){
     $$('[data-sanq]',c).forEach(function(b){ b.onclick=function(){ marcar(b); }; });
   };
   /* El motivo decide QUE MAS se pide, asi que ese si repinta. */
-  var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ _motivoCambiaSanc_(); _repintarPonerSanc_(); };
+  var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ _repintarPonerSanc_(); };
   var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
 
   var bt=$('#btnSanc');
@@ -577,12 +539,11 @@ function _cablearPonerSanc_(){
     }
     if(!backendOK || !SESION){ msg('Sin conexi\u00f3n no se puede: esto escribe en la cola de verdad.', true); return; }
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando\u2026';
-    var _movido=false;
     try{
       /* EL ORDEN IMPORTA: primero Notion, luego la sancion. Al reves quedaria la sancion puesta
          y la tarea con la fecha vieja, que es la unica de las dos combinaciones malas que NO se
          ve mirando la cola. */
-      if(esDePlazo){ msg('Moviendo el plazo en Notion\u2026'); await api.moverLimiteTarea(urlTarea, plazo); _movido=true; }
+      if(esDePlazo){ msg('Moviendo el plazo en Notion\u2026'); await api.moverLimiteTarea(urlTarea, plazo); }
       /* ⛔ GEMELA DE `sanciones.movil.js`: la respuesta se lee. El backend salta a quien no
          es tuyo y lo devuelve en `rechazadas`; sin mirarlo, el `tost` cantaria una sancion
          que no existe. Se relanza para caer en el `catch` de siempre. */
@@ -636,8 +597,7 @@ function _cablearPonerSanc_(){
       pintar();
     }catch(e){
       bt.disabled=false; bt.textContent=prev;
-      /* 21/10 (auditor 12, 🟡 11): si el plazo YA se movió, se dice — y reintentar es seguro (misma fecha, misma clave). */
-      msg('No se pudo: '+((e&&e.message)||e)+(_movido ? ' — el plazo YA se movió en Notion; reintentar es seguro.' : ''), true);
+      msg('No se pudo: '+((e&&e.message)||e), true);
     }
   };
 }
@@ -715,10 +675,7 @@ function _loteReal_(){
      una red que no existe. */
   var lote=LOTES_PEND[_loteIdx_()];
   var its=pend.filter(function(s){ return s.lote===lote; });
-  /* 22/10 (ensayo de la reunión #3, 🟡 8): el bloque dice de QUÉ reunión es, no sólo su código */
-  /* (refutador 29, 🟡 4) sólo reuniones del SERVIDOR (`_srv`): los ids de la semilla son ids reales */
-  var _tl=_tituloLote_(lote, (typeof REUS!=='undefined' && Array.isArray(REUS) ? REUS : []).filter(function(r){ return r && r._srv; }));
-  LOTE={ real:true, lote:lote, nombre:_tl ? _tl+' · '+lote : lote, cerrado:false,
+  LOTE={ real:true, lote:lote, nombre:lote, cerrado:false,
     motivo:its[0].motivo||'—', art:its[0].articulo||'libre',
     /* ⛔ `_ptsSanc_`, NO `Number(s.puntos)||0` (758.a bis). Aqui es donde el «no llego»
        se convertia en un **0**, y a partir de este punto ya no hay forma de distinguirlo

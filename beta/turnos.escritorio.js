@@ -402,20 +402,6 @@ function _mitPlazoTxt_(cv, ahora){
    capa, no la primera — y el botón no se pinta.
    ⚠️ `_mitPlazoTxt_` NO vale de subtítulo: mide contra `limite`, y en `sin_abrir` rotula «te
    quedan N h para contestar» cuando **no se puede contestar nada**. */
-/* ⛔ EL RÓTULO DE UNA FRANJA DE LA REJILLA DE TURNOS (19/10). 🗣️ Daniel, 14/10: *«las horas… tanto
-   en reuniones como en turnos como en lo que sea, han de aparecer justo en el medio de dos slots …
-   No están ni para arriba ni para abajo»*. El móvil lo cumple desde ese día (`.rc.rd span`); aquí
-   `.dmc` centraba «10:00» DENTRO de su casilla de 36 px, que es justo lo que rechazó.
-   Sólo una HORA (`HH:MM`) se sube a la línea: un rótulo que no es una hora («Mañana») nombra la
-   franja entera y se queda centrado en ella. Una puerta y no tres copias: la rejilla sale en tres
-   pantallas (antes de abrir, la tuya y la del coordinador). */
-function _rotFranjaE_(txt){
-  var t = String(txt == null ? '' : txt);
-  return /^\d{1,2}:\d{2}$/.test(t)
-    ? '<div class="dmc dml dmh"><span>' + esc(t) + '</span></div>'
-    : '<div class="dmc dml">' + esc(t) + '</div>';
-}
-
 function _miTurnoPreHTML_(cv){
   var D=cv.dias||[], F=cv.franjas||[];
   /* ⛔ POR `_normAbre_` (463.ª): con `_dmyAISO_` a pelo, un `abre` sin hora —o en
@@ -428,7 +414,7 @@ function _miTurnoPreHTML_(cv){
     return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
   }).join('');
   var filas=F.map(function(fr){
-    return _rotFranjaE_(fr.txt)+
+    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+
       D.map(function(){ return '<div class="dcel off"></div>'; }).join('');
   }).join('');
   return pan('Tu disponibilidad', 'se abre el '+esc(abD)+' a las '+esc(abH),
@@ -466,7 +452,7 @@ function _miTurnoPanel_(){
   }).join('');
   var COL={cuvi:'rgba(228,30,37,.78)', citi:'rgba(63,158,214,.78)', ambos:'rgba(53,199,89,.78)'};
   var filas=F.map(function(fr){
-    return _rotFranjaE_(fr.txt)+D.map(function(d){
+    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+D.map(function(d){
       var k=_dispClave_(d,fr.k), v=mias[k];
       var st = (v && v.s && v.s!=='no') ? ('background:'+(COL[v.s]||'rgba(228,30,37,.78)')) : '';
       return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" '+
@@ -482,7 +468,6 @@ function _miTurnoPanel_(){
       'Elige <b>d\u00f3nde puedes</b> y haz clic en los huecos. Lo que marques aqu\u00ed es lo que '+
       'cuenta para el reparto \u2014 y no contestar es lo que hace que te pongan un turno '+
       'cuando no puedes.</p>'+
-    '<button class="btn" data-mtreusar style="display:block;margin:0 0 12px">↺ Reutilizar la disponibilidad del turno anterior</button>'+
     '<div class="dsit">'+pin+'</div>'+
     '<label class="campo" style="margin:9px 0;display:flex;gap:7px;align-items:center">'+
       '<input type="checkbox" data-mtcoche'+(MIT_COCHE?' checked':'')+'>'+
@@ -495,30 +480,7 @@ function _miTurnoPanel_(){
     '</div></div>');
 }
 
-/* ⭐ REUTILIZAR LA SEMANA ANTERIOR, TAMBIÉN AQUÍ (949.ª). La petición de Daniel (14/10) no nombró cara y el móvil
-   ya lo tenía (932.ª); esta cara contesta la misma convocatoria. Lo copiado entra como CAMBIO SIN GUARDAR
-   (`MIT_CELDAS`): aquí nada se guarda hasta pulsar «Guardar mi disponibilidad», y copiar no es la excepción. */
-async function _reusarMiTurno_(cv){
-  if(!cv) return;
-  if(typeof _identidadPrestada_==='function' && _identidadPrestada_(
-       (typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '')){
-    tost('Estás actuando como otra persona: tus turnos no se tocan desde aquí.'); return;
-  }
-  if(_convEstado_(cv)!=='abierta'){ tost('El plazo no está abierto: no hay nada que contestar.'); return; }
-  var res=await _traerSemanaAnterior_(cv); if(!res) return;
-  var mias=_misCeldas_(cv);
-  if(Object.keys(mias).length &&
-     !confirm('Se sustituye lo que llevas marcado esta semana por lo de la anterior. No se guarda hasta que pulses «Guardar». ¿Seguir?')) return;
-  MIT_CELDAS=res.mapa;
-  pintar();
-  tost('Copiada la semana anterior: revísala y pulsa «Guardar mi disponibilidad».'+
-       (res.fuera ? ' ('+res.fuera+' casilla'+(res.fuera===1?' no cabía':'s no cabían')+'.)' : ''));
-}
-
 function _cablearMiTurno_(){
-  $$('[data-mtreusar]').forEach(function(b){
-    b.onclick=function(){ _reusarMiTurno_(_miTurnoCv_()); };
-  });
   $$('[data-mtpin]').forEach(function(b){
     b.onclick=function(){ MIT_PIN=b.dataset.mtpin; pintar(); };
   });
@@ -613,10 +575,6 @@ function _dispAviso_(titulo){
      ⚠️ Ofrece Reintentar igual que el de `'error'`: la sesion puede llegar tarde (el
      login es asincrono), y entonces ese boton es lo unico que vuelve a abrir la puerta --
      `_dispCargar_` es de un solo disparo y `_refrescoVivo_` no lo toca. */
-  if(e === 'sin accion') return pan(titulo, 'sin datos',
-    vacioSimple('Esta versi\u00f3n de la app no sabe pedir la disponibilidad',
-      'No es tu cuenta: a la app le falta la acci\u00f3n que pregunta al servidor. Recarga la p\u00e1gina para coger la '+
-      '\u00faltima versi\u00f3n, y si sigue, av\u00edsalo desde el buz\u00f3n.'));
   if(e === 'sin sesion') return pan(titulo, 'sin sesi\u00f3n',
     vacioSimple('No se pudo preguntar: no hay sesi\u00f3n',
       'Sin identidad el servidor no contesta qui\u00e9n puede cada franja, y lo que se ve\u00eda aqu\u00ed era el mapa de ejemplo. '+
@@ -638,7 +596,7 @@ function _dispPanel_(){
   if(_dispEstadoSrv_() === 'solo mio') return pan('Disponibilidad para turnos',
     'no es tu pantalla',
     vacioSimple('El mapa de todo el equipo es para quien reparte los turnos',
-      'Tu disponibilidad sí la puedes contestar, aquí debajo.'));
+      'Tu disponibilidad si la puedes contestar, aqui debajo.'));
   var cv=_dispViva_(); if(!cv) return '';
   var calor=_calorTurnos_(cv, DISP_SITIO);
   var top=_mejorTurno_(calor);
@@ -654,7 +612,7 @@ function _dispPanel_(){
     return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
   }).join('');
   var filas=F.map(function(fr){
-    return _rotFranjaE_(fr.txt)+D.map(function(d){
+    return '<div class="dmc dml">'+esc(fr.txt)+'</div>'+D.map(function(d){
       var k=_dispClave_(d,fr.k), c=calor[k];
       /* El color es la INTENSIDAD del rojo Solaris según cuánta gente puede: el mapa se lee
          de un vistazo y el número exacto está dentro. Con nadie, la celda se queda apagada. */
@@ -713,11 +671,7 @@ function _dispCargar_(repintar){
      ⚠️ Y el arreglo ingenuo -- hacer que `_dispAviso_` cubra `'sin pedir'` -- ROMPE la
      pantalla normal: sacaria el aviso en cada primer pintado. Por eso la cura va aqui, en
      quien sabe POR QUE no se pregunto, y no en quien lo pinta (§3c-24). */
-  /* ⛔ 20/10 · DOS CAUSAS, DOS ESTADOS (como `_convCargar_` en el móvil). Juntas en `'sin sesion'`, a quien SÍ ha
-     entrado y le falta la ACCIÓN (una cara de otra versión que el backend) se le decía «Entra con tu cuenta»: le culpaba
-     a él de algo que no arregla volviendo a entrar. La sesión se mira PRIMERO: sin ella no se sabe nada más. */
-  if(typeof SESION==='undefined' || !SESION){ _dispEstadoSrv_('sin sesion'); return; }
-  if(typeof api==='undefined' || !api.getDisponibilidad){ _dispEstadoSrv_('sin accion'); return; }
+  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getDisponibilidad){ _dispEstadoSrv_('sin sesion'); return; }
   _dispEstadoSrv_('pidiendo');
   /* El interruptor se lee EN PARALELO con el mapa, no encadenado: son dos preguntas
      independientes y encadenarlas sumaria las dos esperas para pintar la misma pantalla.
@@ -729,24 +683,12 @@ function _dispCargar_(repintar){
        **no el valor a secas**: leer la entrada directamente daría un OBJETO —que es
        cierto— y el interruptor saldría encendido siempre, incluido el día que esté
        apagado. Es el mismo fallo que tuvo el gate meses con `calcular_cierre`. */
-    AVISOS_EST='leyendo';
-    /* 🟡 R4 (refutador 26): con tiempo límite — un `getControl` colgado dejaba la casilla en «Leyendo…» para siempre. */
-    Promise.race([api.getControl(), new Promise(function(_, no){ setTimeout(function(){ no(new Error('tiempo')); }, 15000); })])
-    .then(function(c){
+    api.getControl().then(function(c){
       var e = c && c[INTERRUPTOR_AVISOS];
       var val = (e && typeof e==='object' && 'valor' in e) ? e.valor : e;
       AVISOS_ON = (val===true || val==='true' || val===1 || val==='1');
-      AVISOS_EST='ok';
       if(typeof repintar==='function') repintar();
-    }).catch(function(){
-      /* ⛔ 22/10 (auditor 26, 🟡 11): «no se pudo leer» NO es «apagado» — se pinta como lo que es. */
-      AVISOS_EST='error';
-      if(typeof repintar==='function') repintar();
-    });
-  } else {
-    /* 🟡 R4 (refutador 26): sin la acción no se puede leer — y nacía 'leyendo'. En diferido: esto corre DENTRO de `pintar`. */
-    AVISOS_EST='error';
-    if(typeof repintar==='function') setTimeout(repintar, 0);
+    }).catch(function(){});
   }
   api.getDisponibilidad().then(function(r){
     _dispEstadoSrv_('ok');
@@ -919,8 +861,6 @@ function _puedeConvocarDisp_(){
 
 function _convocarDispPanel_(){
   if(!_puedeConvocarDisp_()) return '';
-  /* 🟡 R4 (refutador 26): lo que se PINTA del interruptor. 'leyendo' sin sesión no es «leyendo»: nadie va a preguntar. */
-  var _ae = (AVISOS_EST==='leyendo' && (typeof SESION==='undefined' || !SESION)) ? 'sinsesion' : AVISOS_EST;
   /* ⛔⛔ AQUÍ HABÍA UNA SEGUNDA GUARDA, Y SE RETIRA PORQUE YA NO ES VERDAD (643.ª → 758.ª).
      Decía «solo con la cuenta admin» y era cierta: `setControl` exigía `admin` para cualquier
      control, así que con la cuenta del PD el botón siempre fallaba y se avisaba antes de
@@ -955,8 +895,8 @@ function _convocarDispPanel_(){
          dependia de que alguien tocara el codigo. La etiqueta dice lo que CAMBIA
          -«un toque marca 4 h»- y no el nombre del modo, que no le dice nada a nadie. */
       '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px">'+
-        '<input type="checkbox" id="cdHoraria" checked> preguntar POR HORAS '+
-        '(09:00–14:00 y 16:00–23:00); un toque marca el turno de 4 h</label>'+
+        '<input type="checkbox" id="cdHoraria"> preguntar POR HORAS (09:00–22:00); un '+
+        'toque marca el turno de 4 h</label>'+
     '</div>'+
     '<button class="btn" data-convdisp>Convocar disponibilidad</button>'+
     '<div class="nota" id="cdNota">Se encola y la rutina lo recoge en la siguiente pasada. '+
@@ -970,17 +910,11 @@ function _convocarDispPanel_(){
        a ciegas. */
     '<div class="sep"></div>'+
     '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px">'+
-      '<input type="checkbox" id="cdAvisos"'+(AVISOS_ON?' checked':'')+(_ae!=='ok'?' disabled':'')+'> '+
+      '<input type="checkbox" id="cdAvisos"'+(AVISOS_ON?' checked':'')+'> '+
       '<b>mandar los avisos al móvil</b></label>'+
-    /* 22/10 (auditor 26, 🟡 11): sin saber lo que hay guardado, la casilla no se toca y se dice por qué. */
-    (_ae==='error' ? '<div class="nota" data-avisosest="error">⚠️ <b>No se pudo leer</b> si están encendidos: '+
-       'la casilla vacía <b>no</b> quiere decir apagados. Recarga para volver a mirar.</div>' :
-     _ae==='sinsesion' ? '<div class="nota" data-avisosest="sinsesion">Sin sesión no se puede saber si están encendidos.</div>' :
-     _ae==='leyendo' ? '<div class="nota" data-avisosest="leyendo">Leyendo si están encendidos…</div>' : '')+
     '<div class="nota" id="cdAvNota">Apagado, la rutina sigue calculando y deja escrito '+
       'lo que mandaría, pero <b>no sale nada</b>. Encendido, avisa al abrir, a las 24 h, '+
-      'a las 3 h y a los 10 min — y el recordatorio <b>solo a quien no ha contestado</b> —, y '+
-      'al <b>cerrarse</b> el plazo, a <b>todo el equipo</b>.</div>'+
+      'a las 3 h y a los 10 min — y el recordatorio <b>solo a quien no ha contestado</b>.</div>'+
     '</div>');
 }
 
@@ -994,8 +928,7 @@ function _engAvisosConv_(m){
     if(on && !confirm('Vas a ENCENDER los avisos de la convocatoria.'+String.fromCharCode(10,10)+
       'A partir de ahora salen notificaciones al movil del equipo: al abrir la disponibilidad, '+
       'a las 24 h, a las 3 h y a los 10 minutos del cierre.'+String.fromCharCode(10,10)+
-      'El recordatorio solo le llega a quien no ha contestado. Y al cerrarse el plazo sale otro a todo el equipo. '+
-      'Sigo?')){ c.checked=false; return; }
+      'El recordatorio solo le llega a quien no ha contestado. Sigo?')){ c.checked=false; return; }
     c.disabled=true;
     try{
       await api.setControl(INTERRUPTOR_AVISOS, on, on?'avisos ENCENDIDOS':'avisos apagados');
@@ -1004,7 +937,7 @@ function _engAvisosConv_(m){
     }catch(e){
       /* ⛔ Si no se pudo guardar, la casilla VUELVE a donde estaba: dejarla marcada diria que
          los avisos estan encendidos cuando el servidor no se ha enterado. */
-      c.checked=!on; tostErr('No se pudo: ', e);       // 🟠 2 (auditor 19)
+      c.checked=!on; tost('No se pudo: '+e);
     }finally{ c.disabled=false; }
   };
 }
@@ -1049,7 +982,7 @@ function _pinConvDisp_(m){
       if(n) n.innerHTML='<b>Encolado</b> para la semana del '+esc(sem)+'. El plazo lo calcula '+
         'el servidor; cuando lo procese, la convocatoria aparece arriba.';
     }catch(e){
-      tostErr('No se pudo encolar: ', e);       // 🟠 2 (auditor 19)
+      tost('No se pudo encolar: '+e);
     }finally{
       b.disabled=false; b.textContent=prev;
     }
@@ -1282,27 +1215,14 @@ function cablearCoches(){
    Un solo campo por turno reparte a partes iguales, que es justo lo que ese ejemplo descarta.
    ⚠️ NO ESCRIBE EN NOTION. Deja la propuesta a la vista para aplicarla: escribir en Notion
    exige el visto bueno de Daniel **cada vez**, y son los puntos de personas reales. */
-/* ⛔ 20/10 (ficha del 20/08): ¿se puede CERRAR este turno hoy? No si Notion ya lo da por `Realizado` o `Cancelado`
-   —cerrar un cancelado acredita «+1 turno» (×4 h) a gente que no fue— y no si es FUTURO. El estado manda sobre la
-   fecha, igual que `_normTurnoM_` en el móvil. Sin fecha legible no se esconde: «no lo sé» no es «no se puede». */
-function _turnoCerrable_(t, hoy){
-  if(!t) return false;
-  var est = t.estado || '';
-  if(est==='Realizado' || est==='Cancelado') return false;
-  var iso = _dmyAISO_(t.f || t.fecha || '');
-  if(/^\d{4}-\d{2}-\d{2}$/.test(iso) && hoy && iso > hoy) return false;
-  return true;
-}
-
 function _turnosCerrables_(){
-  /* 21/10 (auditor 20, 🟡 5): el reloj de la APP; en real es el mismo día local que antes. */
-  var out = [], hoy = String(_ahoraApp_()).slice(0,10);
+  var out = [];
   /* ⛔ CLAVES, NO POSICIONES. `escritorio.html` rellena `TURNOS` EN SITIO en sus dos
      cargas (`TURNOS.length=0; t.forEach(push)`), asi que un indice guardado sobrevive al
      refresco apuntando a OTRO turno -- y esto es justo lo que viaja al `value` del
      `<option>` y vuelve por el `onchange`. */
   (typeof TURNOS !== 'undefined' ? TURNOS : []).forEach(function(t){
-    if(_puedeCerrarTurno_(t, ACTOR) && _turnoCerrable_(t, hoy)) out.push(_claveTurno_(t));
+    if(_puedeCerrarTurno_(t, ACTOR)) out.push(_claveTurno_(t));
   });
   return out;
 }
@@ -1341,15 +1261,6 @@ function _cierreTurSel_(){
 function _cierreTurTope_(){
   var d = parseFloat(String(CIERRE_TUR.dur).replace(',', '.'));
   return _extraTope_(isFinite(d) ? d : 0);
-}
-
-/* ⛔ 20/10 (ficha del 20/08): ¿falta la duracion? El 0 de arriba es el lado seguro para el NUMERO, pero el panel
-   lo convertia en una AFIRMACION —«el turno no ha pasado de las 4 h de base»— en la primera pintada, sin que nadie
-   hubiera tecleado nada, y dejaba «Cerrar el turno» suelto: +1 turno a cada uno, sin extra, sin decir cuanto duro.
-   Un 0 escrito a mano SI es una duracion (quien lo pone lo dice); vacio o no-numero, no. */
-function _cierreTurSinDur_(){
-  var d = parseFloat(String(CIERRE_TUR.dur == null ? '' : CIERRE_TUR.dur).replace(',', '.'));
-  return !isFinite(d);
 }
 
 /* Lo que se mandaria: SOLO los confirmados.
@@ -1400,8 +1311,7 @@ function _cierreTurnoPanel_(){
     dud.forEach(function(n){ CIERRE_TUR.quien[n] = false; });
   }
 
-  var mapa = _cierreTurMapa_(), sinDur = _cierreTurSinDur_(),
-      falta = sinDur ? 'Di cu\u00e1nto dur\u00f3 el turno' : _cierreTurnoFalta_(mapa, tope);
+  var mapa = _cierreTurMapa_(), falta = _cierreTurnoFalta_(mapa, tope);
 
   /* ⚠️ EL `value` VA POR `esc`: la clave lleva el `punto`, que es texto libre del
      Discord y puede traer comillas -- sin escapar, romperia el atributo y el `<option>`
@@ -1432,10 +1342,7 @@ function _cierreTurnoPanel_(){
         (on?'':' disabled')+'> h</td></tr>';
   }).join('');
 
-  var aviso = sinDur
-    ? '<div class="nota">Di primero <b>cu\u00e1nto dur\u00f3</b> de verdad: de eso sale el tiempo extra que se '+
-      'reparte por encima de la base de <b>'+_horasTurnoBase_()+' h</b>.</div>'
-    : (tope <= 0)
+  var aviso = (tope <= 0)
     ? '<div class="nota">El turno no ha pasado de las <b>'+_horasTurnoBase_()+' h</b> de base, '+
       'as\u00ed que <b>no hay tiempo extra que repartir</b>. Cerrarlo sigue valiendo: confirma qui\u00e9n fue.</div>'
     : '<div class="nota">El turno dio <b>'+h1(tope)+'</b> por encima de la base de '+
@@ -1449,7 +1356,7 @@ function _cierreTurnoPanel_(){
       'font-size:12px;margin:8px 0 0">'+esc(CIERRE_TUR.hecho)+'</pre></div>'
     : '';
 
-  return pan('Cerrar un turno', cerrables.length+' por cerrar',
+  return pan('Cerrar un turno', cerrables.length+' tuyo(s)',
     '<label class="campo"><span class="sc">Qu\u00e9 turno</span>'+
       '<select id="ctSel">'+opciones+'</select></label>'+
     '<label class="campo"><span class="sc">Cu\u00e1nto dur\u00f3 de verdad (horas)</span>'+
@@ -1551,9 +1458,7 @@ function convocarPanel(){
       '<label style="width:135px">'+lab('Duraci\u00f3n')+
         '<input id="tuDur" placeholder="~ 3 horas" style="'+E+'"></label>'+
       '<label style="width:135px">'+lab('D\u00f3nde se trabaja')+'<select id="tuLugar" style="'+E+'">'+
-        /* 22/10 (auditor 25, 🟡 9): SIN elegir por defecto — antes todo turno salía «CITI» aunque nadie lo dijera, y
-           de este campo saldría el descuento de Vigo. Vacío = no se escribe en Notion (`_verdad(lugar)`). */
-        '<option value="">— sin decir —</option><option>CITI</option><option>Vigo</option><option>Coasa</option><option>Otro</option></select></label>'+
+        '<option>CITI</option><option>Vigo</option><option>Coasa</option><option>Otro</option></select></label>'+
       '<label style="flex:1;min-width:190px">'+lab('D\u00f3nde se queda')+
         '<input id="tuPunto" placeholder="enfrente del polit\u00e9cnico" style="'+E+'"></label>'+
       '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px;cursor:pointer">'+

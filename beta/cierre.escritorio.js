@@ -16,11 +16,6 @@ async function _cargarCierre_(){
   try{ CIERRE=await api.getCierre(); CIERRE_ERR=null; }
   catch(e){ CIERRE=null; CIERRE_ERR=(e&&e.message)||String(e); }
   pintar();
-  /* 22/10 (refutador 22, 🟠 2): `CIERRE` sólo se cargaba al abrir la pantalla o tras pulsar, así que «Aplicando…» se
-     quedaba puesto aunque el aplicador acabara a los 2 minutos. Con un «Aplicar» en vuelo se vuelve a preguntar a los
-     30 s — sólo si sigues en el cierre; al bajar el flag se deja de preguntar. */
-  if(CIERRE && _aplicandoVivo_(CIERRE))
-    setTimeout(function(){ if(vista==='cierre') _cargarCierre_(); }, 30000);
 }
 
 /* El ultimo dia del mes y los que faltan, CALCULADOS. Estaban escritos a mano en el HTML
@@ -80,13 +75,8 @@ function _finDeMes_(hoy){
 function _plazoCierre_(hoy){
   var h=hoy||new Date();
   var fin=new Date(h.getFullYear(), h.getMonth(), 0);   /* el ultimo dia del mes anterior */
-  /* ⛔ 20/10 (auditoría): con un mes abierto MÁS VIEJO, el plazo es el de ése (como `_mesACerrar_`). */
-  var _ab=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null, _am=/^(\d{4})-(\d{2})$/.exec(String(_ab||''));
-  /* ⛔ 21/10 (auditor 9, 🟠 4): el fin es el del mes ABIERTO también si es más nuevo (como `_mesACerrar_`); y si aún no
-     ha llegado, `curso` y los días que QUEDAN — un mes que corre no «lleva» días esperando. */
-  if(_am) fin=new Date(+_am[1], +_am[2], 0);
-  var f=_finDeMes_(fin), _d=Math.round((_diaUTC_(h)-_diaUTC_(fin))/86400000);
-  return { txt:f.txt, mes:f.mes, dias:Math.max(0, _d), curso:_d < 0, quedan:Math.max(0, -_d) };
+  var f=_finDeMes_(fin);
+  return { txt:f.txt, mes:f.mes, dias:Math.max(0, Math.round((_diaUTC_(h)-_diaUTC_(fin))/86400000)) };
 }
 
 /* Lo que el movil pinta en `<details>` uno por persona, aqui es UNA tabla: en 1920 px se
@@ -150,12 +140,7 @@ function _pinTemporada_(m){
       '«si».', '');
     var pro = (r===null || !String(r).trim()) ? null
             : /^s/i.test(String(r).trim()) ? true : /^n/i.test(String(r).trim()) ? false : null;
-    /* ⛔ 21/10 (auditor 9, 🟠 7): calcular otro SUSTITUYE en la app el plan ya aplicado (la ranura `temporada_plan`), y
-       no avisaba — el mensual sí. La copia de Drive y `salidas/` se conservan. */
-    var _tpa=(typeof TEMP!=='undefined' && TEMP && TEMP.plan && TEMP.plan.aplicado) ? TEMP.plan : null;
-    if(!confirm((_tpa ? '⚠️ Ya hay un cierre de temporada APLICADO (' + String(_tpa.temporada||'?') + '). Calcular otro lo '+
-      'SUSTITUYE en la app: la pantalla dejará de enseñarlo (la copia de Drive y salidas/ se conservan).' +
-      String.fromCharCode(10,10) : '') + 'Calcular el cierre de TEMPORADA.' + String.fromCharCode(10,10) +
+    if(!confirm('Calcular el cierre de TEMPORADA.' + String.fromCharCode(10,10) +
       'NO se aplica nada: la rutina saca el plan (a quién le sube los puntos al suelo de 5, la '+
       'cuota de cada uno y el ranking) y lo dejará aquí para que lo revises.' +
       String.fromCharCode(10,10) + 'Prórroga: ' +

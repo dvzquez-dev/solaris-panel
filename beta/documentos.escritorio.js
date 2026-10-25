@@ -33,14 +33,6 @@ function revisoresDe(d){
    issues[], subsistema) y estas vistas leen la corta (tit, amb, est, sev, iss, sub).
    Sin este adaptador la bandeja salia vacia y las filas sin titulo. Ojo: `iss` es una
    CUENTA, no la lista, porque la vista escribe «N avisos». */
-/* ⛔ 21/10 (auditor 11, 🟠 2): con sesión y sin expedientes llegados, se DICE — no una bandeja «limpia» que es un «no
-   lo sé» pintado como un cero. `''` cuando sí llegaron (o en la maqueta). */
-function _docsSinLeerE_(){
-  if(typeof DOCS_LLEGO==='undefined' || DOCS_LLEGO!==false) return '';
-  return pan('Expedientes','sin leer', vacioSimple('No se han podido leer los expedientes',
-    'El servidor todavía no los ha mandado; se vuelven a pedir solos. Mientras tanto no se sabe qué hay pendiente.'));
-}
-
 function _normDocE_(d, i){
   if(!d) return d;
   if(d.tit!==undefined && d.est!==undefined) return d;      // ya viene corta (semilla)
@@ -66,7 +58,6 @@ function _normDocE_(d, i){
        proposito ni riesgos que leer, sin `nota` no se ve por que se pidieron cambios, y
        sin `revisor` no se puede saber si ya decidio alguien ni si puedes pisarlo. */
     analisis:  d.analisis || null,
-    reunion:   d.reunion || null,          // 20/10: de qué reunión es el acta, o que no la hubo (`_deReunionSinConvocar_`)
     nota:      d.nota || '',
     revisor:   d.revisor || null,
     decision:  d.decision || null,
@@ -284,20 +275,6 @@ function _pasosCorregirE_(d){
     _pasosHTML_(ps, 6, 5)+'</div>';
 }
 
-/* Aplica en memoria una decisión de documento (sólo la MAQUETA local; auditor 20, 🟡 8). Campos cortos de esta cara;
-   el móvil tiene su gemela con los largos (`_aplicarDecDoc_`). Pura, para que un banco la ejecute. */
-function _decDocLocalE_(d, acc, mot, tit, actor, at){
-  if(!d) return null;
-  if(acc==='reenviar'){ d.est='revision'; d.nota=''; return d; }
-  if(acc==='deshacer'){ d.est='revision'; d.nota=''; d.revisor=null; d.decision=null; return d; }
-  d.est = (acc==='anot') ? 'aprobado' : acc;
-  if(acc==='anot' && tit) d.tit = tit;
-  d.nota = (acc==='cambios' || acc==='rechazado') ? (mot||'') : '';
-  d.revisor = actor || null;
-  d.decision = {accion:acc, revisor:actor || null, at:at || null};
-  return d;
-}
-
 function docCard(d){
   var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
   var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';
@@ -316,7 +293,8 @@ function docCard(d){
   }
   var avisos = (d.avisos&&d.avisos.length) ? lista('Avisos de calidad · '+d.avisos.length, d.avisos)
     : (d.iss ? '<div class="sub"><span class="sc">Calidad</span><p style="margin:4px 0 0;font-size:12px;'+
-        'color:var(--ink3);line-height:1.55">'+d.iss+' aviso'+(d.iss===1?'':'s')+' de calidad, sin detalle.</p></div>' : '');
+        'color:var(--ink3);line-height:1.55">'+d.iss+' aviso'+(d.iss===1?'':'s')+' de calidad, sin detalle. '+
+        'Los manda Cowork con el expediente.</p></div>' : '');
   var previa = _previaDocE_(d, st);
   /* ⛔ POR LA PUERTA UNICA (`_visorDocHTML_`). Esta cara ya acertaba -- preguntaba «¿hay
      enlace?» --, y va por la puerta igual: dos criterios para la misma pregunta se separan
@@ -324,11 +302,7 @@ function docCard(d){
      Nace ABIERTO: esta ficha existe para leer el archivo antes de decidir. */
   var visor = _visorDocHTML_(d.drive, d.ref,
     '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
-    /* 954.ª: lo que HACER, como el móvil — aquí mandaba a buscar un nombre de campo de un asistente
-       que ya no está en el camino. */
-    /* 21/10 (auditor 19, 🟡 6): la gemela del móvil — a quien lo SUBIÓ, qué hacer él. */
-    ((typeof ACTOR!=='undefined' && d.autor===ACTOR) ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
-      : 'Pídeselo a quien lo subió antes de decidir.</div></div>'));
+    'Cowork lo manda en <span class="mono">enlaceDrive</span>; sin él no hay nada que leer aquí.</div></div>');
   var acc, _aut;
   if(puede){
     acc='<label style="display:block;margin-top:11px">'+
@@ -379,11 +353,7 @@ function docCard(d){
     '<div class="h"><b>'+esc(d.tit)+'</b>'+
       '<span class="u">'+esc(d.ref)+'</span>'+
       '<span class="u">'+esc(d.tipo||'documento')+'</span>'+
-      /* 21/10 (auditor 20, 🟡 1): «Cerrar» sólo si esta ficha está DESPLEGADA a mano (`DOC_SEL`). En «Requiere tu
-         decisión» van siempre abiertas y el botón no hacía nada — y en un pipeline con estado `cerrado` se leía como
-         «cerrar el expediente». */
-      (typeof DOC_SEL!=='undefined' && DOC_SEL===d.id && !(typeof vista!=='undefined' && vista==='docdec')   /* 🟡 2 (refutador) */
-        ? '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button>' : '')+'</div>'+
+      '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button></div>'+
     '<div class="pils">'+
       '<span class="chip">'+esc(_m(d.autor).pila)+' · '+esc(d.sub||'—')+'</span>'+
       '<span class="chip">'+ambDoc(d.amb)+'</span>'+
@@ -403,26 +373,14 @@ function docCard(d){
          aqui para que esta linea no sea byte a byte la de alli -- si lo fuera, el ancla de
          la mutacion de la fila saldria DOS VECES y esa mutacion dejaria de aplicarse en
          silencio. Es la regla de «la sangria no desambigua un ancla», por su otra cara. */
-      /* ⛔ POR LA PUERTA `_isoADMY_` (14/10): aqui se pintaba `esc(d.fecha)` en
-         CRUDO, o sea en ISO, contra la convencion vinculante de `CLAUDE.md`
-         -prosa en DD/MM/AAAA- y teniendo la puerta a cuatro lineas: esta misma
-         cara la usa 4 veces en su HTML y este modulo la usaba 0.
-         📏 Nadie lo veia porque la semilla `DOCS` trae 7 de 7 SIN campo
-         `fecha`: en demo el chip no se pinta nunca. Solo sale con dato real.
-         ⚠️ `_isoADMY_` devuelve TAL CUAL lo que no sea ISO, asi que no inventa
-         un dia a partir de lo que no entiende. Lo ejecuta
-         `probar_documentos_pintado.py`. */
-      (d.fecha?'<span class="chip">'+esc(_isoADMY_(d.fecha))+'</span>':'')+
+      (d.fecha?'<span class="chip">'+esc(d.fecha)+'</span>':'')+
       /* Mismo motivo que en el móvil: verlas no es decidir. */
       (_etiquetasDe_(d).length
         ? '<span class="chip">'+esc(_etiquetasDe_(d).join(' · '))+'</span>' : '')+
     '</div>'+
     _avisosDocE_(d)+
     '<div class="just"><span class="sc">Resumen ejecutivo</span>'+
-      /* 21/10 (auditor 20, 🟡 2): «léelo abajo» sólo si abajo HAY archivo; si no, decía «léelo abajo» encima de «no trae
-         enlace al archivo». */
-      esc(d.resumen||(d.drive ? 'El expediente llegó sin resumen. Léelo abajo antes de firmar.'
-                              : 'El expediente llegó sin resumen y sin enlace al archivo: no hay nada que leer antes de firmar.'))+'</div>'+
+      esc(d.resumen||'El expediente llegó sin resumen. Léelo abajo antes de firmar.')+'</div>'+
     previa+secs+avisos+visor+
     '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':'Firma: <b>'+esc(rev)+'</b>')+
       ' · Decidir aquí sustituye a contestar el correo de aprobación.</div>'+

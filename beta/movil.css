@@ -45,21 +45,6 @@
   --ink:#F4F3F3;       /* L 95,5 % */
 
   --red:#E41E25; --red2:#FF4A4F; --red3:#8E1418;
-
-/* ⛔⛔ LO NATIVO TAMBIÉN ES LA APP: `color-scheme:dark` (13/10).
-   🗣️ Daniel: *«hay desplegables que son de estos blancos, cutres, clásicos de
-   Windows, básicos, en lugar de ser con la temática un poco de Solaris»*.
-   ⛔ Y la caja del `<select>` YA estaba estilada: lo que sale blanco es **la lista
-   desplegada**, que la dibuja el SISTEMA. Sin esta línea Chrome la pinta en modo CLARO
-   por mucho que el resto de la página sea negra — y con ella van también las barras de
-   desplazamiento, los campos de fecha y los menús de autocompletado.
-   ✅ Es una DECLARACIÓN, no una reimplementación: un desplegable dibujado a mano pierde
-   el teclado, el gesto táctil y el lector de pantalla. */
-  /* ⛔⛔ COMO DECLARACIÓN DE ESTE BLOQUE, NO COMO REGLA (20/10). Estaba escrita `:root{color-scheme:dark}`
-     AQUÍ DENTRO: anidada es `:root :root`, que no casa con nada. 📏 Chromium, las dos caras: `colorScheme`
-     "normal". O sea que el arreglo del 13/10 NUNCA se aplicó, y Daniel lo volvió a ver el 20/10: *«en el puto
-     ordenador aparece un desplegable blanco sin nada de la estética del móvil»*. */
-  color-scheme:dark;
   --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6;
 
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,monospace;
@@ -69,27 +54,7 @@
   --sal:cubic-bezier(.16,.84,.44,1);
   --arco:cubic-bezier(.34,1.42,.5,1);
 }
-/* ⚠️ Y las opciones, para los navegadores que SÍ las dejan pintar. La paleta no se
-   elige: son las variables que ya salen de la insignia (ARRANQUE §2). Van FUERA del
-   bloque `:root` (20/10): dentro, anidadas, dependían del soporte de CSS anidado. */
-select option{background:var(--sur2);color:var(--ink)}
-select option:checked{background:var(--line2)}
 *{box-sizing:border-box}
-/* ⛔⛔ `overflow-x:hidden` EN `html`, Y ES UN FALLO REPORTADO: `BUG-M-2026-10-07-2`
-   (Fernando, 07/10, Safari 402x874): *«la pantalla se puede desplazar lateralmente y se
-   dejan de ver cosas»*. 📏 Medido el 14/10 ejecutando JS a 402 px: `scrollWidth` 450
-   contra 402, y `window.scrollTo(200,0)` dejaba `scrollX` en **48**. O sea que se desliza
-   de verdad, y al hacerlo los 48 px de la izquierda se van de pantalla — exactamente lo
-   que describe.
-   ⚠️ LA CAUSA es la marca de agua: `.marcagua{right:-12%}` sangra 48 px por la derecha
-   **a propósito** (es el diseño). Así que se RECORTA, no se mueve: tocar el `-12%`
-   cambiaría cómo se ve la insignia, que es una decisión de diseño, y no hace falta.
-   ⚠️ Y no basta con el `overflow:hidden` de `body`: cuando `html` es `visible`, el valor
-   de `body` **se propaga al viewport** y `body` pasa a comportarse como `visible`. Por eso
-   había `overflow:hidden` en `body` y la página se desplazaba igual.
-   ✅ `overflow-x` y no `overflow`: lo vertical lo lleva `main`, y cerrarlo aquí también
-   sería apagar algo que no estorba. */
-html{overflow-x:hidden}
 html,body{margin:0;padding:0;touch-action:manipulation}
 body{
   background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14px;
@@ -106,18 +71,7 @@ body{
      navegador no entiende `var()`: sin el, un fallo del JS dejaria la app sin armazon. */
   height:100vh; height:100dvh; height:var(--alto, 100dvh);
   display:flex; flex-direction:column;
-  /* ⛔⛔ `clip` DETRAS DE `hidden`, Y LAS DOS HACEN FALTA (14/10). Con `hidden` a secas,
-     `body` es un CONTENEDOR DE SCROLL: recorta su area desplazable y eso **mueve** a la
-     marca de agua 48 px a la izquierda, que deja de sangrar por el borde — o sea, cambia
-     el diseño. Con `clip` no hay contenedor de scroll, no hay nada que recortar y la
-     insignia se queda donde estaba.
-     📏 Medido a 402 px con las cuatro combinaciones: sólo `html{overflow-x:hidden}` → la
-     página no se desliza **pero la marca salta a 48/402**; sólo `clip` → la marca se queda
-     en 96/450 **pero la página sigue deslizándose**; **las dos** → no se desliza Y la marca
-     sigue en 96/450. El original: se desliza 48 px.
-     ✅ Y el orden es el mismo truco que las tres alturas de arriba: un navegador que no
-     entienda `clip` ignora esa línea y se queda con `hidden`, que es lo que había. */
-  overflow:hidden; overflow:clip; position:relative;
+  overflow:hidden; position:relative;
   /* Arriba SI: la muesca tapa la cabecera. Abajo NO: reservarlo aqui y otra vez en la
      `nav` contaba el inset dos veces y dejaba la barra flotando sobre 68 px de fondo
      (MEJ-M-2026-07-27-4, Adrian). En iOS la barra inferior TOCA el borde y su fondo
@@ -171,22 +125,18 @@ header::after{content:"";position:absolute;left:16px;right:16px;bottom:0;height:
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
 .avat svg{width:17px;height:17px;fill:currentColor}
 .avat img{width:30px;height:30px;object-fit:contain;display:block}
-/* marca de agua: la insignia real, en % para que ocupe igual en cualquier ancho */
-.marcagua{position:absolute;bottom:88px;right:-12%;width:88%;height:auto;opacity:.05;
-  z-index:0;pointer-events:none}
-/* 956.ª: puede ENCOGERSE y partir una palabra larga. «COORDINADOR DE AEROESTRUCTURAS» no cabía y empujaba el ⋮
-   fuera de la pantalla: un hijo de flex no baja de su palabra más larga sin `min-width:0`. */
-/* ⛔ 21/10 (auditor 19, 🟡 9): …pero con `min-width:0` A SECAS cedía él solo todo el sitio. Medido a 375 px: 76 px y
-   «AEROESTRUCT/URAS» en 4 líneas; con el «Ver como» del admin —lo que ve Daniel—, 28 px y 8 líneas, porque el selector
-   NO encogía nunca. Ahora encoge el selector (`#verComo`) y el nombre guarda 93 px, lo que
-   ocupa «AEROESTRUCTURAS» a .05em: 2 líneas, nada partido y el ⋮ dentro. El `anywhere` se queda de último recurso. */
-.hquien{flex:1 1 auto;min-width:min(93px,40vw)}
-.hquien span{overflow-wrap:anywhere}
+/* marca de agua: la insignia real, en % para que ocupe igual en cualquier ancho.
+   ⛔ NO SE SALE DEL CUERPO (BUG-M-2026-10-07-2). Era `right:-12%;width:88%`: el 12 % de
+   fuera ensanchaba el DOCUMENTO (402 px de pantalla, 450 de documento, medido en todas las
+   vistas) y Safari de iOS deja arrastrar de lado aunque `body` tenga overflow:hidden, asi
+   que la pantalla entera se descolocaba. Ahora la caja mide SOLO la parte visible (76 %) y
+   el recorte lo hace la propia imagen: alto = 88 % del ancho del cuerpo (`aspect-ratio`) y
+   `object-fit:cover` anclado a la izquierda. Se ve exactamente igual y no desborda. */
+.marcagua{position:absolute;bottom:88px;right:0;width:76%;aspect-ratio:76/88;height:auto;
+  object-fit:cover;object-position:left center;opacity:.05;z-index:0;pointer-events:none}
 .hquien b{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em}
-.hquien span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;color:var(--ink3)}
-.hlado{margin-left:auto;display:flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0}
-/* …salvo con el conmutador de la maqueta: sus botones no encogen, y encogiendo la caja se metían bajo el ⋮. */
-.hlado:has(.rolsel>button){min-width:auto}
+.hquien span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--ink3)}
+.hlado{margin-left:auto;display:flex;align-items:center;gap:8px}
 
 /* ── cuerpo con scroll ────────────────────────────────────────────────────── */
 main{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:10px 15px 18px;scrollbar-width:thin}
@@ -211,9 +161,6 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .tarj.acc{background:linear-gradient(160deg,#241416,#171112);border-color:#3d2224}
 .tarj .tt{display:flex;align-items:center;gap:8px;margin:-2px 0 10px}
 .tarj .tt .sc{flex:none} .tarj .tt .ln{flex:1;height:1px;background:var(--line)}
-/* 922.ª: a 375 px «aprobadas · otorgadas · pendientes» se salía de la tarjeta (`flex:none` no deja encoger).
-   Sólo el texto de la DERECHA encoge y parte línea; el título y la raya se quedan como estaban. */
-.tarj .tt .ln + .sc{flex:0 1 auto;min-width:0;text-align:right;line-height:1.35}
 
 /* ── PULSAR: acuse barato, <120 ms, en el propio elemento ─────────────────── */
 /* Decisión cerrada: NADA de círculo que se expande bajo el dedo, y no se mueve
@@ -745,21 +692,12 @@ nav{flex:none;position:relative;height:calc(70px + env(safe-area-inset-bottom,0p
   color:#241a08;background:var(--warn);border-radius:5px;padding:2px 5px;flex:none}
 /* aviso flotante */
 .tost{position:absolute;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));
-  /* ⛔⛔ EL AVISO ES LA CAPA MAS ALTA. Estaba en 40, DEBAJO del modal (50): pulsabas
-     «Crear encuesta» sin convocados, la app lo rechazaba, y el mensaje se pintaba
-     detras del modal. Para quien lo usa eso es un boton muerto — medido el 14/10
-     usando la app, no leyendo el codigo. Y no basta con pasar de 50: estan el pintor
-     (90), el menu (900/901) y el visor de documento (9000). Un aviso que no se ve es
-     peor que no avisar. */
-  transform:translate(-50%,10px);z-index:10000;
+  transform:translate(-50%,10px);z-index:40;
   background:var(--sur2);border:1px solid var(--line);border-left:2px solid var(--red);
   border-radius:var(--r2);padding:9px 14px;font-size:12px;opacity:0;pointer-events:none;
   transition:opacity .2s linear,transform .28s var(--sal);max-width:86%;text-align:center;
   box-shadow:0 12px 30px rgba(0,0,0,.5)}
 .tost.on{opacity:1;transform:translate(-50%,0)}
-/* 21/10 (auditor 19, 🟡 8): con un modal abierto, ARRIBA — abajo están los botones de la hoja. La pone `tost()`. */
-.tost.arriba{bottom:auto;top:calc(14px + env(safe-area-inset-top,0px));transform:translate(-50%,-10px)}
-.tost.arriba.on{transform:translate(-50%,0)}
 /* ⛔ El aviso FIJO se queda hasta que lo tocas, así que tiene que poder recibir el toque:
    en reposo `.tost` lleva `pointer-events:none`. Sin esto no habría forma de cerrarlo. */
 .tost.fijo{pointer-events:auto;cursor:pointer}
@@ -846,66 +784,12 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .cajsec.on{max-height:20000px}   /* 3000px cortaba la lista con 20+ turnos */
 
 /* ═══ REJILLA DE DISPONIBILIDAD (cubrir · arrastre) ══════════════════════ */
-/* ⛔⛔ LA REJILLA VA GIRADA DESDE EL 13/10: un DÍA = una COLUMNA, una FRANJA = una
-   FILA. Antes era al revés y por eso no entraba en un teléfono — las franjas son muchas
-   y los días pocos, así que el eje largo tiene que ser el vertical.
-   ⛔ Y ESO OBLIGA AL ASA: `.rej` lleva `touch-action:none` para poder PINTAR
-   arrastrando, así que sin un sitio por donde tirar una rejilla alta no se puede
-   recorrer. El asa es la COLUMNA DE LAS HORAS (`.rc.rd`), que ya ocupa todo el alto y
-   no es pintable. 🗣️ *«tendría que haber una barra bien clara para deslizar»*.
-   ⛔⛔ **Y EL ASA, SOLA, NO BASTABA — medido el 14/10.** Por la especificación, el
-   `touch-action` efectivo es la **intersección** del elemento y **sus ancestros** hasta el
-   que desliza: `.rc.rd` dice `pan-y` y su padre `.rej` dice `none` → intersección **vacía**.
-   Y cuadra con la fecha: él dijo *«el problema es que NO SE PODÍA deslizar»* el **14/10**, un
-   día **después** de ponerse el asa. ✅ Desde la 746.ª deslizar lo hace **`_dosDedos_` en JS**
-   (`comun.js`), donde el `touch-action` del padre deja de mandar. El `pan-y` se conserva
-   porque **no estorba** y porque en un navegador donde sí valiera sería una salida más. */
-/* 🗣️ «Y que lo ponga escrito en algún lugar» (Daniel, 14/10). El rótulo del gesto va ENCIMA de
-   la rejilla y pegado a ella — debajo de doce filas lo lee quien ya se ha rendido —, y con el
-   tamaño de una nota: es una instrucción, no un aviso. ⚠️ No lleva color de alerta a propósito:
-   lo que explica es cómo se usa algo que funciona, no que algo vaya mal. */
-.rgesto{font-size:10.5px;color:var(--ink3);padding:0 2px 4px;letter-spacing:.2px}
-.rgesto b{color:var(--ink2);font-weight:600}
-/* Los atajos de un toque (935.ª): la cabecera del día marca el día entero. Se ve pulsable — un atajo que nadie
-   descubre no ahorra nada. La hora ya era el asa (`cursor:grab`) y se queda así: deslizar va antes. */
-.rc[data-tdia]{cursor:pointer;border-radius:6px;color:var(--ink2);text-decoration:underline dotted;text-underline-offset:2px}
-.rejw{overflow-x:auto;overflow-y:visible;margin:0 2px;padding-bottom:3px}
+.rejw{overflow-x:auto;margin:0 2px;padding-bottom:3px}
 .rej{display:grid;gap:2px;touch-action:none;user-select:none}
 .rc{font-family:var(--mono);font-size:8.5px;color:var(--ink3);display:flex;align-items:center;justify-content:center}
-/* ✅ EL ASA. `touch-action:pan-y` devuelve el gesto de deslizar SÓLO en esta columna:
-   el dedo pinta en las casillas y arrastra aquí, sin modos ocultos ni botones.
-   ⚠️ Y la etiqueta va arriba del todo de su fila, no centrada: la decisión del 05/08
-   dice que *la etiqueta de franja va al límite, centrarla es ambigua*, y en vertical el
-   límite de una franja es el borde de ARRIBA de su fila. */
-.rc.rd{touch-action:pan-y;cursor:grab;align-items:flex-start;
-  border-left:2px solid var(--line);
-  justify-content:flex-end;padding-right:6px;white-space:nowrap;font-size:9.5px;color:var(--ink2);
+.rc.rd{justify-content:flex-end;padding-right:6px;white-space:nowrap;font-size:9.5px;color:var(--ink2);
   position:sticky;left:0;background:var(--sur);z-index:2}
-/* ⛔⛔ LA HORA VA CENTRADA EN LA LÍNEA, NO DENTRO DE LA CELDA (746.ª, 14/10).
-   🗣️ Daniel: *«las horas… han de aparecer **justo en el medio de dos slots**. Porque realmente
-   es donde están. **No están ni para arriba ni para abajo.** Están ahí. Ojo a los detalles»*.
-   📏 Medido antes: el centro del texto caía **6,7 px por debajo** de la línea — o sea centrado
-   dentro de su propia casilla, que es decir que las 10:00 pasan **durante** la franja de las 10
-   en vez de **al empezarla**.
-   ✅ Y no contradice la decisión del 05/08 (*«la etiqueta de franja va al límite, centrarla es
-   ambiguo»*): la **refina**. El límite es la línea; lo que faltaba es que el texto esté **a
-   caballo** de ella y no apoyado debajo.
-   ⚠️ Se sube con `transform` y **no se saca del flujo**, y eso no es indiferente: la primera
-   versión usaba `position:absolute` copiando a `.rc.rh span`. En Turnos daba igual —su columna
-   mide **56 px fijos**—, pero en **Reuniones la columna es `auto`**: se dimensiona **por su
-   contenido**, y un hijo absoluto no cuenta como contenido. La columna habría colapsado a ~8 px
-   (borde + padding) y las horas se habrían comido la rejilla. Un `transform` **no cambia la caja
-   que el grid mide**: el texto sube media línea y la columna sigue valiendo lo que vale.
-   ⚠️ Y tampoco con márgenes negativos: arrastran el fondo `sticky` y el borde de la celda.
-   ⛔ Las dos rejillas comparten `.rc.rd`, así que **una regla escrita mirando una sola cara
-   toca las dos** — que es como se rompe la pantalla de al lado sin enterarse. */
-.rc.rd span{display:block;transform:translateY(-50%)}
 .rc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
-/* ⛔ LA CABECERA YA NO ES UNA HORA, ES UN DÍA: un rótulo de columna, y los rótulos de
-   columna SÍ van centrados — lo que la decisión del 05/08 manda poner «al límite» es la
-   etiqueta de FRANJA, porque marca una frontera en el tiempo; un día no marca ninguna. */
-.rc.rh.rhd{position:static;align-items:center;justify-content:center;font-size:9.5px;
-  color:var(--ink2);padding-bottom:3px}
 /* decisión cerrada: la etiqueta va al LÍMITE izquierdo de la celda = hora de inicio */
 .rc.rh span{position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}
 .rc.rh span.fin{left:auto;right:0;transform:none}
@@ -913,9 +797,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .ecel.on1{background:var(--tel)}          /* telemático */
 .ecel.on2{background:var(--red)}          /* presencial + telemático */
 .ecel.prev{outline:2px solid var(--red2);outline-offset:-1px}
-/* 21/10 (auditor 19, 🟡 4): RAYADA, como en el mapa de calor y su leyenda. Con el borde al 40 % sobre negro se
-   confundía con una vacía, y lo que se decidió el 27/07 es que no se pinte, no que no se vea. */
-.ecel.off{background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line);cursor:default}
+.ecel.off{background:transparent;border:1px solid var(--line);opacity:.4;cursor:default}
 .celc{height:23px;border-radius:2px;display:grid;place-items:center;font-family:var(--mono);
   font-size:8.5px;font-weight:600;color:#fff}
 .celc.best{outline:1px solid var(--ink);outline-offset:-1px}
@@ -997,7 +879,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
    del horario de ese día» de las encuestas, o sea **una celda que existe, se ve y no se
    toca** — la misma situación exacta que una convocatoria que aún no abre. Inventar un
    gris distinto para lo mismo es como acaban dos criterios donde había uno. */
-.tcel.off{background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line);cursor:default}
+.tcel.off{background:transparent;border:1px solid var(--line);opacity:.4;cursor:default}
 .tcel.cuvi{background:var(--red)}
 .tcel.citi{background:var(--tel)}
 .tcel.ambos{background:linear-gradient(135deg,var(--red) 50%,var(--tel) 50%)}
@@ -1059,11 +941,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 
 /* conmutador de rol (solo de la maqueta) */
 .rolsel{display:flex;gap:5px;border:1px solid var(--line);border-radius:20px;padding:3px;background:var(--sur2)}
-/* 🟡 9: el selector del admin es lo que encoge (lo elegido se sigue leyendo; el cargo detrás del «·» se corta). ⛔ Y SÓLO
-   él: con `min-width:0` también en `.hlado`/`.rolsel`, el conmutador de la maqueta se metía debajo del ⋮ con el PD. */
-.rolsel:not(:has(>button)){min-width:0}
-#verComo{min-width:0;flex:1 1 auto}
-.rolsel button{padding:4px 7px;border-radius:16px;font-family:var(--mono);font-size:9px;
+.rolsel button{padding:4px 10px;border-radius:16px;font-family:var(--mono);font-size:9px;
   letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
 .rolsel button.on{background:var(--red);color:#fff}
 

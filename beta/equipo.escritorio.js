@@ -61,9 +61,11 @@ function _m(n){
 function _rolDe_(nombre){
   if(nombre===PD_NOM) return 'Project Director';
   if(nombre===REV2_NOM) return 'Revisor fijo';
-  /* 21/10 (auditor 10, 🟡 8): por `_cargoTxt_`, la de las dos caras (antes «Miembro» a quien coordina sin cargo, y
-     `coordina` concatenado con «+»). Sin ficha, sólo el nombre: la subcoordinación se pregunta igual. */
-  return _cargoTxt_(miembro(nombre) || {nombre:nombre});
+  var m=miembro(nombre);
+  if(m&&m.cargo==='Coordinador') return 'Coordinador de '+(m.coordina||m.unidad);
+  var sc=(typeof _subcoordDe_==='function') ? _subcoordDe_(nombre) : null;
+  if(sc) return 'Subcoordina '+sc.equipo+' ('+sc.unidad+')';
+  return 'Miembro';
 }
 
 function colaDecision(){
@@ -75,7 +77,7 @@ function colaDecision(){
       chip:'<span class="chip wa">parte de horas</span>',ir:'partes',foco:'parte-'+p.id});
   });
   docsMios().forEach(function(d){
-    out.push({ic:'i-doc',b:esc(d.tit),s:d.ref+' · '+_m(d.autor).pila+' · '+esc(ambDoc(d.amb))+   /* 20/10: como la lista, no el crudo */
+    out.push({ic:'i-doc',b:esc(d.tit),s:d.ref+' · '+_m(d.autor).pila+' · ámbito '+d.amb+
       (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):''),
       /* ⛔ POR LA PUERTA UNICA. Aqui habia una copia con el `else` en `'ok'` -verde-, asi
          que `null`, un valor fuera del enum y la cadena vacia salian los TRES con el chip
@@ -88,17 +90,12 @@ function colaDecision(){
   /* ⛔ …y con `LOTE.items.length`: sin eso, la tarjeta seguía saliendo diciendo
      «0 personas · Art. libre · nada se aplica hasta cerrarlo entero», que manda al PD
      a una pantalla donde no hay nada que hacer. */
-  /* ⛔ 21/10 (auditor 7, 🟡 10): y con la MISMA cuenta que el globo de Sanciones (`conteo`: todas las pendientes, de
-     todos los bloques y las sueltas), no `LOTE.items` — con 7 en tres bloques decía 2, y con el bloque del desplegable
-     cerrado desaparecía con 5 esperando. Sin respuesta del servidor, `conteo` cae al bloque (lo de antes). */
-  var _sp=conteo('sanciones');
-  if(_sp && rangoNom(ACTOR)>=3)
-    out.push({ic:'i-gavel',b:'Sanciones por decidir',
-      s:_sp+(_sp===1?' pendiente':' pendientes')+' · nada se aplica hasta cerrar su bloque',
-      chip:'<span class="chip no">por decidir</span>',ir:'sanciones',foco:'lote'});
+  if(!LOTE.cerrado && LOTE.items.length && rangoNom(ACTOR)>=3)
+    out.push({ic:'i-gavel',b:'Bloque de sanciones · '+LOTE.nombre,
+      s:LOTE.items.length+' personas · Art. '+LOTE.art+' · nada se aplica hasta cerrarlo entero',
+      chip:'<span class="chip no">bloque abierto</span>',ir:'sanciones',foco:'lote'});
   REUS.forEach(function(r0){
-    /* 950.ª: sólo si te toca a ti fijarla (el convocante, o el PD con la cuenta admin) — ver `_fijarEsMio_`. */
-    if(r0.fijada || !_fijarEsMio_(r0)) return;
+    if(r0.fijada) return;
     var cob=_cobertura_(r0);
     /* ⛔ REUNION OCULTA: no se sabe cuantos han cubierto, asi que no hay tarjeta. Sin
        esto salia por accidente —`null>=null` es `0>=0`, cierto, y caia en el `return`
@@ -145,39 +142,18 @@ function insightsHTML(){
   var conAnt=_activos_().filter(function(m){
     return _ant(m)!=null && typeof m.hMes==='number'; });
   if(conAnt.length>=2){
-    /* ⛔⛔ RITMO CONTRA RITMO, NO TOTAL CONTRA TOTAL (20/10). Aquí se comparaba `hMes` —las horas que
-       LLEVA el mes en curso— contra el mes anterior ENTERO, así que antes de fin de mes casi todo el
-       equipo «bajaba», y quien más subía podía salir con un porcentaje NEGATIVO («X es quien más sube:
-       −40 %»). El móvil compara por ritmo desde el 13/08 (`_compHorasHTML_`: «el mes en curso va a
-       medias y el anterior está entero»); ésta es la misma cuenta: h/día con la base DEVENGADA, el mes
-       pasado a fracción 1 y entre los días que DURÓ (`_diasMesAnterior_`, de cierre a cierre).
-       ⚠️ Y el verbo sale del SIGNO: con todos subiendo, el último no «baja», «sube menos». */
-    var _dm=_diasDelMes_(), _dia=Math.max(1,_dm.dia), _fr=_fraccionDelMes_();
-    var _dAnt=_diasMesAnterior_(_dm.periodo, DATA.equipo_mes ? DATA.equipo_mes.dias_ant : null);
-    var _rit=function(m){ var b=_devengadoAHoy_(m, m.hMes, _fr); return (b==null?m.hMes:b)/_dia; };
-    var _ritAnt=function(m){ var a=_ant(m), b=_devengadoAHoy_(m, a, 1); return (b==null?a:b)/_dAnt; };
-    var _rh=function(v){ return nf2(Math.round(v*100)/100); };
-    var vpc=function(m){ return (_rit(m)-_ritAnt(m))/_ritAnt(m)*100; };
+    var vpc=function(m){ return (m.hMes-_ant(m))/_ant(m)*100; };
     var subida=conAnt.slice().sort(function(a,b){return vpc(b)-vpc(a);})[0];
     var bajada=conAnt.slice().sort(function(a,b){return vpc(a)-vpc(b);})[0];
-    xs.push(['up',esc(subida.pila)+(vpc(subida)>=0?' es quien m\u00e1s sube: ':' es quien menos baja: ')+pc(vpc(subida))+
-      ' de ritmo respecto al mes pasado ('+_rh(_ritAnt(subida))+' \u2192 '+_rh(_rit(subida))+' h/d\u00eda).']);
-    xs.push(['dn',esc(bajada.pila)+(vpc(bajada)<0?' es quien m\u00e1s baja: ':' es quien menos sube: ')+pc(vpc(bajada))+
-      ' ('+_rh(_ritAnt(bajada))+' \u2192 '+_rh(_rit(bajada))+' h/d\u00eda).']);
+    xs.push(['up',esc(subida.pila)+' es quien m\u00e1s sube: '+pc(vpc(subida))+
+      ' respecto al mes pasado ('+h1(_ant(subida))+' \u2192 '+h1(subida.hMes)+').']);
+    xs.push(['dn',esc(bajada.pila)+' es quien m\u00e1s baja: '+pc(vpc(bajada))+
+      ' ('+h1(_ant(bajada))+' \u2192 '+h1(bajada.hMes)+').']);
   } else {
-    /* no se finge una comparativa que no existe: se dice que falta el dato.
-       ⛔ 20/10 (auditoría): SIN `equipo_mes` NO ES QUE NO HAYA HORAS — el servidor no manda las del mes anterior porque
-       la cara no sabría con qué mes rotularlas. Eso es «no lo sé» (§3c-24), y se dice así. */
-    var _sinMes=!(DATA && DATA.equipo_mes);
-    xs.push(['wa', _sinMes
-      ? 'Todavía no ha llegado el dato del mes (cuál está abierto y cuántos días lleva), así que no se puede comparar con el anterior.'
-      : 'Todav\u00eda no hay horas del mes anterior, as\u00ed que no se puede comparar la evoluci\u00f3n.']);
-    /* 21/10 (auditor 6): devengado, como Miembros y Registro — en crudo el PD (7 h de base el día 1) ganaba por su cargo */
-    /* 22/10 (refutador, 🟠 1): sólo entre quienes TIENEN dato, y con dos como mínimo — a un coordinador (sólo ve sus
-       horas) se le decía que era quien más horas llevaba del equipo. */
-    var _conDev=_activos_().filter(function(m){ return typeof _hMesDevCara_(m)==='number'; });
-    var top=_conDev.length>=2 ? _conDev.slice().sort(function(a,b){return _hMesDevCara_(b)-_hMesDevCara_(a);})[0] : null;
-    if(top) xs.push(['up',esc(top.pila)+' es quien m\u00e1s horas lleva este mes: '+h1(_hMesDevCara_(top)||0)+'.']);
+    /* no se finge una comparativa que no existe: se dice que falta el dato */
+    xs.push(['wa','Todav\u00eda no hay horas del mes anterior, as\u00ed que no se puede comparar la evoluci\u00f3n.']);
+    var top=_activos_().slice().sort(function(a,b){return (b.hMes||0)-(a.hMes||0);})[0];
+    if(top) xs.push(['up',esc(top.pila)+' es quien m\u00e1s horas lleva este mes: '+h1(top.hMes||0)+'.']);
   }
   var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
   if(enAire>0) xs.push(['wa',h1(enAire)+' están sin firmar. Mientras sigan ahí, el umbral del mes y el '+
@@ -191,16 +167,9 @@ function insightsHTML(){
     return a+((sc&&sc.length)||0); },0);
   if(sinCubrir) xs.push(['wa',sinCubrir+' personas no han cubierto alguna disponibilidad abierta. '+
     'Mira «Disponibilidad y riesgo» para ver qué sanción implicaría a cada una.']);
-  /* ⛔ 21/10 (auditor 20, 🟠): por `horas`, que es lo que trae el servidor (`getFichajesAbiertos`); `min` sólo lo
-     tiene la semilla de la maqueta. Contando `min`, los fichajes REALES no encendían el aviso nunca. Y se piden aquí
-     también, por la misma puerta que «Fichajes en curso» (una sola vez): si no, el PD no se enteraba sin abrirla. */
-  if(typeof _cursoCargar_==='function') _cursoCargar_(typeof pintar==='function'?pintar:null);
-  var largos=CURSO.filter(function(c){
-    var h = (typeof c.horas==='number') ? c.horas : (typeof c.min==='number' ? c.min/60 : null);
-    return h!=null && h>=10;
-  }).length;
+  var largos=CURSO.filter(function(c){return c.min>=600;}).length;
   if(largos) xs.push(['wa',largos+' fichaje'+(largos===1?'':'s')+' lleva'+(largos===1?'':'n')+
-    ' más de 10 h abierto. A las 14 h se cierran solos y quedan sin declarar (caducan a las '+_caducaAutocierreH_()+' h).']);
+    ' más de 10 h abierto. A las 14 h se cierran solos con la hora de la última actividad.']);
   return xs.map(function(x){
     return '<div style="display:flex;gap:9px;padding:8px 0;border-top:1px solid rgba(50,44,46,.7);font-size:12.5px;color:var(--ink2);line-height:1.55">'+
       '<span class="'+x[0]+'" style="flex:none;font-family:var(--mono)">'+(x[0]==='up'?'▲':x[0]==='dn'?'▼':'!')+'</span>'+
@@ -211,10 +180,6 @@ function insightsHTML(){
 function conteo(k){
   if(k==='partes') return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).length;
   if(k==='sindeclarar') return PARTES.filter(function(p){return p.estado==='sindecl';}).length;
-  /* ⛔ 21/10 (auditor 8, 🟡 13): TUS partes DEVUELTOS (`detalle`), que «Lo tuyo» enseña y que bloquean el cierre del mes.
-     Daba 0: un coordinador con un parte suyo devuelto no veía ningún número. Los `sin_declarar` van en «Sin declarar». */
-  if(k==='libros') return (typeof _bloqMios_==='function')
-    ? _bloqMios_().filter(function(p){ return p.estado==='detalle'; }).length : 0;
   /* ⛔ AQUI PONIA `CURSO_CONECTADO`, QUE NO EXISTE EN NINGUN SITIO, y esa sola
      palabra dejaba entrar al panel sin login: el `ReferenceError` reventaba
      `pintar()` en el arranque, abortaba el bloque `<script>` entero y la linea que
@@ -227,16 +192,12 @@ function conteo(k){
      a la vez, que es lo que pasa cuando una regla vive en dos sitios. */
   if(k==='docurso')return DOCS.filter(function(d){return _docEnCurso_(d.est);}).length;
   if(k==='docpub') return DOCS.filter(function(d){return _docResuelto_(d.est);}).length;
-  /* ⛔ 21/10 (auditor de sanciones): TODAS las pendientes — todos los bloques y las sueltas —, no sólo el bloque del
-     desplegable (decía 2 con 7 esperando, y cambiaba al cambiar el desplegable). Sin respuesta, lo de antes. */
-  if(k==='sanciones') return Array.isArray(SANC_BACK)
-    ? SANC_BACK.filter(function(s){ return s && s.estado==='pendiente'; }).length
-    : (LOTE.cerrado?0:LOTE.items.length);
+  if(k==='sanciones') return LOTE.cerrado?0:LOTE.items.length;
   if(k==='apela')  return 0;        // no hay cola de apelaciones: contar la maqueta era mentir
-  if(k==='convoc') return _nReusAbiertas_();   // 21/10 (auditor 10, 🟡 11): las abiertas, no todas
+  if(k==='convoc') return REUS.length;
   if(k==='turnos') return TURNOS.length;
-  if(k==='tareas') return TAREAS.filter(function(t){ return !_tareaHecha_(t&&t.e); }).length;   // 20/10: las vivas, como la pantalla
-  if(k==='miembros') return _activos_().length;   // 21/10 (auditor 10, 🟡 9): las bajas no son el equipo
+  if(k==='tareas') return TAREAS.length;
+  if(k==='miembros') return DATA.miembros.length;
   if(k==='reclutar') return 0;      // idem: no hay candidaturas en ningun sistema
   return 0;
 }
@@ -286,8 +247,6 @@ function _pintarActua_(){
       est.style.transform='translateX('+(b.offsetLeft-5)+'px)';
       if(!redu() && dx>2){ est.classList.remove('vuela'); void est.offsetWidth; est.classList.add('vuela');
         setTimeout(function(){est.classList.remove('vuela');},380); }
-      /* 21/10 (auditor 19, 🟡 12): en la maqueta, el bloque de sanciones de ejemplo es el de SU jurisdicción. */
-      if(typeof _loteDemoDelActor_==='function') _loteDemoDelActor_();
       pintar();
     };
   });
