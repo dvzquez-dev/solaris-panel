@@ -51,6 +51,9 @@ self.addEventListener('install', () => self.skipWaiting());
    ⚠️ El manejador `fetch` en si NO se ejecuta en ningun banco, y hay que decirlo: usa
    `async`/`await` y `caches`, que el arnes de `cscript` (ES3) no tiene. Se vigila por forma. */
 const CACHE = 'solaris-estaticos-v1';
+/* Cuanto se espera a la red antes de abrir con lo guardado (20/10). Corto a proposito: es
+   lo que tarda en abrir en el peor caso con red mala; con red buena llega antes. */
+const ESPERA_RED_MS = 3500;
 
 /* ¿Esta peticion se puede guardar? La puerta unica, y por eso es una funcion aparte.
 
@@ -110,6 +113,29 @@ function _hayVersionNueva_(guardado, fresca){
   return a !== b;
 }
 
+/* ══ ¿Y LO QUE CARGA LA PAGINA? DE LA MISMA VERSION QUE SU HTML (auditoria del 20/10)
+
+   ⛔ Cada fichero competia por separado con `ESPERA_RED_MS`: con red lenta el HTML podia salir
+   de la cache (el de ayer) y `comun.js` llegar de la red (el de hoy) -- o al reves --, y una
+   cara con el JS de otra version puede romper sin que nadie lo vea.
+   ✅ Lo decide la NAVEGACION, y lo demas la sigue:
+   · la navegacion compite como siempre (`carrera`);
+   · si salio lo GUARDADO, lo demas tambien (`guardado`): la pagina vieja entera, y la red
+     sigue por detras y avisa -- la recarga sola trae la nueva entera;
+   · si salio de la RED, lo demas tambien (`red`): sin carrera, que la carrera es justo lo que
+     mezclaba. Si la red falla, lo guardado (como siempre);
+   · sin saber como salio (`null`: el worker se reinicio entre medias), la carrera de antes.
+   · Y sin nada guardado, la red: no hay nada con que mezclar. */
+function _modoSubrecurso_(esNavegacion, navVieja, hayGuardado){
+  if (esNavegacion) return 'carrera';
+  if (!hayGuardado) return 'red';
+  if (navVieja === true) return 'guardado';
+  if (navVieja === false) return 'red';
+  return 'carrera';
+}
+/* Como salio la ultima navegacion: `true` lo guardado, `false` la red, `null` no se sabe. */
+let _navVieja = null;
+
 /* Se lo dice a las pestanas abiertas. ⚠️ NO recarga: alguien puede estar marcando su
    disponibilidad, y recargar por su cuenta le borra lo que llevaba. La pagina decide. */
 async function _avisarVersion_(){
@@ -133,31 +159,61 @@ self.addEventListener('fetch', (e) => {
     try { c = await caches.open(CACHE); } catch (_) { return fetch(e.request); }
     let guardado = null;
     try { guardado = await c.match(e.request); } catch (_) { guardado = null; }
-    const red = fetch(e.request).then((r) => {
+    /* ⛔⛔ 20/10: LA RED PRIMERO. 🗣️ Daniel: *«el botón de actualizar es inútil pq la gente no lo
+       ve, directamente actualiza a la última cada vez q lo abres y ya»*. Hasta hoy esto era
+       `guardado || red` (abrir ya con la cara de ayer y sacar una barra), decidido el 10/09.
+       ⛔ `cache:'no-cache'` NO ES ADORNO: sin el, `fetch` puede contestar con la copia del
+       PROPIO navegador (`max-age=600`, diez minutos) y «la red primero» seguiria siendo la de
+       ayer. Con el se revalida contra el servidor (`ETag`: si no cambio, un 304 vacio). */
+    let llego = false, servidoViejo = false;
+    const red = fetch(e.request, { cache: 'no-cache' }).then((r) => {
+      llego = true;
       /* ⛔ Solo se guarda lo que llego BIEN: un 404 o un 500 cacheados se sirven como si
          fueran la app, y entonces el fallo dura hasta que alguien borre los datos. */
       /* ⚠️ El `put` tambien puede lanzar (cuota): que no se pueda guardar no es motivo
          para no devolver la respuesta que YA ha llegado. */
       if (r && r.ok) {
         /* ⛔ SE COMPARA ANTES DE PISAR: despues del `put`, `guardado` ya es lo
-           nuevo y la comparacion saldria SIEMPRE igual -- verde para siempre. */
-        if (_hayVersionNueva_(guardado, r)) { _avisarVersion_(); }
+           nuevo y la comparacion saldria SIEMPRE igual -- verde para siempre.
+           ⛔ Y SOLO SI SE SIRVIO LO VIEJO: si la red llego a tiempo, la pagina YA es la nueva,
+           y avisar la haria recargar para nada. */
+        if (servidoViejo && _hayVersionNueva_(guardado, r)) { _avisarVersion_(); }
         try { c.put(e.request, r.clone()); } catch (_) {}
+        return r;
       }
-      return r;
+      /* Un 404 o un 500 con copia buena guardada: mejor la copia que una app rota. */
+      return guardado || r;
       /* ⛔⛔ `|| Response.error()` NO ES ADORNO: sin cache Y sin red, esto devolvia
          `undefined`, y `respondWith(undefined)` **rompe la peticion**. La app se
          quedaria sin cargar, y peor que hoy: sin worker el navegador al menos da su
          propio error de red. `Response.error()` es exactamente ese error. */
-    }).catch(() => guardado || Response.error());
-    /* ⛔ `guardado || red`: se devuelve lo de la cache SIN esperar a la red -eso es lo que
-       hace que abra ya-, y la promesa de red sigue viva por detras refrescando. */
-    return guardado || red;
+    }).catch(() => { llego = true; return guardado || Response.error(); });
+    /* ⛔ `waitUntil`: si se sirvió lo guardado, la descarga sigue FUERA de la respuesta, y el navegador puede apagar el
+       worker a los ~30 s y matarla — sin `put` ni aviso, en cada apertura con red lenta (auditoría del 20/10). */
+    try { e.waitUntil(red.then(() => {}, () => {})); } catch (_) {}
+    const nav = e.request.mode === 'navigate';
+    if (!guardado) { if (nav) _navVieja = false; return red; }
+    const modo = _modoSubrecurso_(nav, _navVieja, true);
+    if (modo === 'guardado') { servidoViejo = true; return guardado; }
+    if (modo === 'red') return red;
+    /* ⛔ LO GUARDADO, SOLO SI LA RED NO LLEGA A TIEMPO: sin cobertura (o con una que tarda
+       mas de `ESPERA_RED_MS`) la app sigue abriendo con lo que tenia, y cuando llegue lo
+       nuevo la pagina recarga sola (`_recargarVersionNueva_`, `comun.js`). */
+    return Promise.race([red.then((r) => { if (nav && !servidoViejo) _navVieja = false; return r; }),
+      new Promise((ok) => setTimeout(() => {
+        if (!llego) { servidoViejo = true; if (nav) _navVieja = true; ok(guardado); }
+      }, ESPERA_RED_MS))]);
   })());
 });
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
-// Llega una push: el emisor manda un JSON {title, body, url?, tag?, icon?, badge?}.
+/* ⛔ 21/10 (auditor 7, 🟡 13): un aviso LLEVA A SU PANTALLA. El emisor manda un destino corto (`#horas`) y aquí se
+   cuelga de NUESTRO ámbito — el mismo aviso sirve a beta y a producción sin que el emisor sepa en cuál estás. */
+function _urlAviso_(u){
+  return (typeof u === 'string' && u.charAt(0) === '#') ? APP_URL + u : (u || APP_URL);
+}
+
+// Llega una push: el emisor manda un JSON {title, body, url?, ir?, tag?, icon?, badge?} (`ir`: el destino corto `#…`).
 self.addEventListener('push', (event) => {
   let d = {};
   try { d = event.data ? event.data.json() : {}; }
@@ -169,7 +225,7 @@ self.addEventListener('push', (event) => {
     badge: d.badge || BADGE,
     tag: d.tag || undefined,                  // mismo tag = agrupa/reemplaza (p.ej. una reunión concreta)
     renotify: !!d.tag,
-    data: { url: d.url || APP_URL },
+    data: { url: _urlAviso_(d.ir || d.url) },   // 22/10 (auditor 26, 🔴 1): el destino corto viaja en `ir`
   };
   event.waitUntil(self.registration.showNotification(title, opts));
 });
@@ -185,6 +241,10 @@ self.addEventListener('notificationclick', (event) => {
       // producción y le NAVEGABA encima. Se compara contra el ámbito propio.
       if (c.url.indexOf(APP_URL) === 0 && 'focus' in c) {
         await c.focus();
+        /* 21/10 (🟡 13): con la app YA abierta, a su pantalla por MENSAJE: navegar la recargaría y perdería lo que
+           estuvieras escribiendo. */
+        const h = url.indexOf('#');
+        if (h >= 0 && url.indexOf(APP_URL) === 0) { try { c.postMessage({ tipo: 'ir', a: url.slice(h + 1) }); } catch (_) {} return; }
         if ('navigate' in c && url && !c.url.endsWith(url)) { try { await c.navigate(url); } catch (_) {} }
         return;
       }

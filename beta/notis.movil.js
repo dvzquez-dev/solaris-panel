@@ -64,21 +64,15 @@ async function _asegurarPush_(msg){
   }
   await navigator.serviceWorker.ready;
   var sub=await reg.pushManager.getSubscription();
-  /* ⛔ SI EL NAVEGADOR NO SUSCRIBE, SE DICE POR QUE Y SE QUEDA EN EL GATE (BUG-M-2026-10-07-1).
-     Antes la excepcion subia sin mas: por el boton salia «No se pudo: Registration failed…»
-     y por el `visibilitychange` no salia NADA. Ahora las dos salidas reciben `false`. */
   if(!sub){
     try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)}); }
-    catch(err){
-      if(msg) msg.textContent=_motivoFalloPush_(err, 'No se pudo preparar el aviso en este navegador: ');
-      return false;
-    }
+    catch(err){ if(msg) msg.textContent=_consejoSuscribir_(err); return false; }
   }
   if(typeof SESION!=='undefined' && SESION){
     try{ await api.guardarPush(sub.toJSON()); }
     catch(err){
-      if(msg) msg.textContent='El permiso esta dado, pero no se pudo registrar el aviso '+
-        'en el servidor, asi que NO te llegaria nada: '+((err&&err.message)||err);
+      if(msg) msg.textContent='El permiso está dado, pero no se pudo registrar el aviso '+
+        'en el servidor, así que NO te llegaría nada: '+((err&&err.message)||err);
       return false;
     }
   }
@@ -160,8 +154,8 @@ function _notisHTML_(){
      cosa. Va arriba del todo: debajo de los interruptores no lo lee nadie. */
   var _fp=(typeof _pushFallo_==='function') ? _pushFallo_() : null;
   var _avisoFallo = _fp ? '<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">'+
-    '<b>No se pudo confirmar tu registro de avisos</b> la ultima vez que abriste el panel, '+
-    'asi que puede que no te lleguen: '+esc(String(_fp))+'.<br>Cierra y vuelve a abrir; si '+
+    '<b>No se pudo confirmar tu registro de avisos</b> la última vez que abriste el panel, '+
+    'así que puede que no te lleguen: '+esc(String(_fp))+'.<br>Cierra y vuelve a abrir; si '+
     'sigue, avisa.</p></div>' : '';
   /* ⛔⛔ MISMO ORDEN QUE `_faltanNotis_`, Y POR LO MISMO (761.a). Con el viejo, un iPhone
      en Safari leia «Ábrelo en el movil» **sujetando el movil** -- y sin la unica frase que
@@ -223,8 +217,9 @@ function _pintarNotisLista_(){
   if(!filas){ c.innerHTML='<p class="rnota" style="margin:0">El servidor no ha listado '+
     'ningún tipo de aviso.</p>'; return; }
   c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0"><b>Turnos</b>, <b>reuniones</b> y '+
-    '<b>avisos y sanciones</b> llegan siempre: llevan plazo y consecuencias, y perdérselos no '+
-    'es una molestia, es una sanción. Lo demás lo eliges tú.</p>';
+    '<b>avisos y sanciones</b> no se pueden apagar aquí: llevan plazo y consecuencias, y perdérselos '+
+    'no es una molestia, es una sanción. (Que salgan depende de que el director tenga encendido cada envío.) '+
+    'Lo demás lo eliges tú.</p>';
   $$('[data-noti]',c).forEach(function(b){
     b.onclick=async function(){
       var k=b.dataset.noti, antes=NOTIS_PREF[k]!==false;

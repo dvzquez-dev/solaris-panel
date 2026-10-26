@@ -25,18 +25,27 @@ function revisoresDeParte(p){
   if(p.autor===PD_NOM) return [PD_NOM];
   var c=coordinadorDe(p.unidad);
   if(c!==p.autor) return [c];
-  return [PD_NOM,REV2_NOM].filter(function(n){return n!==p.autor;});
+  /* ⛔ 20/10 (auditor de partes): el de un coordinador, SÓLO el PD. Aquí escalaba también a José, y el servidor
+     (`_puede_sobre_parte`: rango ≥ 3 o coordinar esa unidad) le rechaza: «Lo firma Daniel o José» prometía una firma
+     que no existe. */
+  return [PD_NOM];
 }
 
 function puedeDecidirParte(p,quien){
   /* ⛔ La excepción es SOLO del rango 3, igual que en `_decidirParte_`. Si esto y el backend
      divergen manda el backend, que es donde no se puede hacer trampa. */
   if(quien===p.autor && rangoNom(quien)<3) return false;
-  var rev=revisoresDeParte(p), maxR=Math.max.apply(null,rev.map(rangoNom));
-  return rev.indexOf(quien)>=0 || rangoNom(quien)>maxR;
+  /* ⛔⛔ 20/10 (auditor de partes): LA MISMA PUERTA QUE EL SERVIDOR (`_puede_sobre_parte`) — el PD (rango 3), o quien
+     coordina ESA unidad. Antes escalaba «por rango» (`rangoNom(quien)>maxR`), y eso sólo cambiaba algo para José
+     (rango 2): le pintaba Aprobar/Rechazar en partes que el servidor le niega, y con «Actúas como José» el PD los veía
+     y la llamada salía con SU token, firmada como suya. El rango 2 es documental; en horas no manda. */
+  return rangoNom(quien)>=3 || (rangoNom(quien)>=1 && coordinadorDe(p.unidad)===quien);
 }
 
-function pendientes(){return PARTES.filter(function(p){return p.estado==='pend';});}
+/* ⛔ 20/10 (auditor de partes): un parte en `detalle` es SIN DECIDIR — así lo cuenta el servidor (`bloqueos_cierre`,
+   no deja cerrar el mes) y así lo pone el móvil en «Esperan tu decisión». Con sólo `'pend'` quedaba fuera del KPI, del
+   globo y de «Horas en el aire», y caía en el Histórico como si estuviera decidido. */
+function pendientes(){return PARTES.filter(function(p){return p.estado==='pend' || p.estado==='detalle';});}
 
 function parteCard(p){
   var m=_m(p.autor), rev=revisoresDeParte(p), puede=puedeDecidirParte(p,ACTOR);
@@ -54,9 +63,13 @@ function parteCard(p){
        repite la tarea o esta vacia -- los dos casos que Daniel senalo el 18/08. */
     (function(_j){ return '<div class="just"><span class="sc">'+esc(p.tarea)+'</span>'+
       (_j?esc(_j):'')+'</div>'; })(_justUtil_(p.tarea, p.just))+
-    '<div class="fl">'+p.flags.map(function(f){
+    '<div class="fl">'+(p.flags||[]).map(function(f){   /* 20/10: un parte sin avisos (la semilla, un `detalle`) no revienta la cola */
       return '<span class="chip '+(f[0]==='ok'?'ok':'wa')+'">'+esc(f[1])+'</span>';}).join('')+
-      (p.origen==='fichaje'?'<span class="chip ok">con fichaje</span>':'')+'</div>'+
+      (p.origen==='fichaje'?'<span class="chip ok">con fichaje</span>':'')+
+      /* 20/10: lo devuelto se DICE — está en la cola esperando al autor, y se ve qué se le pidió. */
+      (p.estado==='detalle'?'<span class="chip wa">devuelto · falta detalle'+(p.motivo?' — «'+esc(p.motivo)+'»':'')+'</span>':'')+
+      /* 21/10 (auditor 8, 🟡 6): y si ya lo CONTESTÓ, qué se le había preguntado */
+      (p.estado==='pend' && p.pedido?'<span class="chip">contestó a lo que se le pidió — «'+esc(p.pedido)+'»</span>':'')+'</div>'+
     '<div class="ruta">'+(puede?'Puedes decidirlo.':'Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.')+'</div>'+
     (puede?'<textarea data-motivo placeholder="Motivo — obligatorio para rechazar o pedir detalle…"></textarea>'+
       '<div class="acts">'+
@@ -82,10 +95,16 @@ function bloquePanel(){
      -- se ofrecia horas a SI MISMO, y el servidor tiene una guarda explicita contra eso. */
   var actor=_m(ACTOR), mandaEnTodo=rangoNom(ACTOR)>=3, unidad=(actor&&actor.unidad)||'';
   var reg=_activos_().filter(function(m){ return !m.cargo && m.nombre!==ACTOR; }); // de subsistema, sin bajas, sin uno mismo
-  var pool=mandaEnTodo?reg:reg.filter(function(m){ return m.unidad===unidad; });
+  /* ⛔ 21/10 (auditor 8, 🟠 3): A QUIEN EL SERVIDOR DEJA, por la misma puerta que decidir un parte (`puedeDecidirParte`
+     = `_puede_sobre_parte`: el PD, o quien coordina ESA unidad). Con «misma unidad que el actor», al subcoordinador
+     (rango 1, sin ser el coordinador) se le ofrecía su unidad entera —su propio coordinador incluido— y el servidor
+     rechazaba cada uno («sin potestad»). */
+  var pool=mandaEnTodo?reg:reg.filter(function(m){ return puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, ACTOR); });
   if(!pool.length) return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-    'No hay nadie de tu subsistema a quien otorgar horas en bloque.</p></div>');
+    (coordinadorDe(unidad)===ACTOR ? 'No hay nadie de tu subsistema a quien otorgar horas en bloque.'
+      : 'Otorgar horas es del coordinador de la unidad y del Project Director: el servidor no lo deja a nadie más.')+
+    '</p></div>');
   var subs=[]; reg.forEach(function(m){ if(subs.indexOf(m.unidad)<0) subs.push(m.unidad); });
   var filtro = mandaEnTodo
     ? '<label style="display:block;margin-bottom:10px"><span class="sc" style="display:block;margin-bottom:5px">Subsistema</span>'+
@@ -136,14 +155,19 @@ function normParte(p){
        («no se le inventa procedencia»), y la que el MOVIL ya cumplia (`horas.movil.js:78`:
        `origen:p.origen||null`). Esta cara era la unica que la rompia. */
     origen:p.origen||(p.sinFichaje?'manual':null), just:p.justificacion||'', flags:fl,
-    estado:_EST_PARTE_[p.estado]||'pend',
+    /* ⛔ 20/10 (auditor de partes): un estado que no conocemos NO es «pendiente» (§3c-24). Con `||'pend'` salía en
+       la cola con Aprobar/Rechazar —que el servidor rechaza— y sumaba en «Horas en el aire». 'raro' no lo recoge
+       `pendientes()` y el Histórico lo dice tal cual. */
+    estado:_EST_PARTE_[p.estado]||'raro',
     /* ⛔⛔ 635.ª LOS CAMPOS CRUDOS, con su nombre del backend, y no `decisor`/`dec`. `dec` salía ya
        recortado a la fecha UTC y `decisor` era un TERCER nombre para el mismo dato; el «Histórico»
        los leía con `p.decisor||PD_NOM`, o sea un nombre de relleno donde no consta nadie. Ahora los
        lee `_selloAprobado_`/`_firmaParte_` (comun.js), la misma puerta que el móvil, y `creado_at`
        viaja porque de él sale A QUÉ MES cuenta. */
     decidido_por:p.decidido_por||null, decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
-    motivo:p.motivo||null, _real:true };
+    periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo */
+    motivo:p.motivo||null, pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya contestada */
+    _real:true };
 }
 
 /* ⛔⛔ 635.ª UNA FILA DEL «HISTÓRICO» DE PARTES. Vivía dentro de `V.partes` (escritorio.html), donde
@@ -157,6 +181,12 @@ function normParte(p){
 function _escHistFilaHTML_(p, per, uc){
   var et=p.estado==='aprobado'?'<span class="chip ok">aprobado</span>'
         :p.estado==='rechazado'?'<span class="chip no">rechazado</span>'
+        :p.estado==='raro'?'<span class="chip">estado desconocido</span>'
+        /* ⛔ 21/10 (auditor 8, 🟡 5): cada estado por su nombre. Todo lo que no era aprobado/rechazado caía a «devuelto ·
+           falta detalle»: un REVERTIDO (o anulado), un CADUCADO y un SIN DECLARAR se leían como un parte devuelto. */
+        :p.estado==='rev'?'<span class="chip">revertido</span>'
+        :p.estado==='cad'?'<span class="chip no">caducado</span>'
+        :p.estado==='sindecl'?'<span class="chip wa">sin declarar</span>'
         :'<span class="chip wa">devuelto · falta detalle</span>';
   var dec=p.estado==='aprobado' ? _selloAprobado_(p, per, uc)
         : (p.estado==='rechazado' || p.estado==='detalle') ? 'decidido '+_firmaParte_(p) : '';
@@ -209,10 +239,9 @@ function _escEstParte_(e){
    backend; el día que admita uno más, se toca una línea.
    ⚠️ `pendiente` NO está y no es un olvido: no hay ninguna decisión que deshacer y el servidor
    lo rechaza — sería un botón que sólo sabe dar error.
-   ⚠️ `detalle` SÍ está, y aquí esta cara DIVERGE del móvil a propósito: allí un parte en
-   `detalle` sigue en «Esperan tu decisión» y se vuelve a decidir, así que revertirlo sobra.
-   Aquí `pendientes()` sólo recoge `'pend'`, o sea que un `detalle` cae en el Histórico y **no
-   hay ninguna otra forma de deshacer un “pedir detalle”**.
+   ⚠️ `detalle` SÍ está (el servidor lo admite), pero desde el 20/10 la LISTA de revertir no lo enseña: está en la
+   cola de `pendientes()`, como en el móvil, y desde ahí se vuelve a decidir — que es como se deshace un «pedir
+   detalle». Listarlo en los dos sitios era enseñar el mismo parte dos veces (lo vio el auditor de partes).
    ⚠️ `revertida`, `anulada`, `sin_declarar` y `caducada` tampoco: el backend las niega. */
 function _escRevertible_(p){
   var e = p && p.estado;
@@ -314,6 +343,7 @@ function _escRevertibles_(){
   for(i=0;i<PART_BACK.length;i++){
     p=PART_BACK[i];
     if(!_escRevertible_(p)) continue;
+    if(p.estado==='detalle') continue;   /* 20/10: ya está en la cola (`pendientes()`); allí se vuelve a decidir */
     /* ⛔ LA MISMA PUERTA QUE DECIDIR, ESTRECHADA -- no una segunda copia de la regla:
        cinco copias de una autoridad acaban siendo cinco autoridades, y las diferencias son los
        bugs. Se le pasa la forma que entiende (`unidad`), que en el crudo del backend se llama
@@ -361,7 +391,10 @@ function _escRevCard_(p){
     '<div class="ruta">'+(cuenta
       ? 'Esas horas <b>ya cuentan</b>: revertir emite un apunte que le RESTA '+h1(p.horas)+
         ' de su ficha.'
-      : 'Todavía no cuentan: revertir deshace la decisión y el parte vuelve a la cola.')+'</div>'+
+      : (p.estado==='otorgada'
+        /* ⛔ 21/10 (auditor 8, 🟡 12): el servidor manda una `otorgada` a `anulada` (terminal), no a `pendiente`. */
+        ? 'Todavía no cuentan: revertir ANULA estas horas otorgadas (no vuelven a ninguna cola).'
+        : 'Todavía no cuentan: revertir deshace la decisión y el parte vuelve a la cola.'))+'</div>'+
     '<textarea data-revmot placeholder="Motivo — obligatorio, al menos 8 caracteres…"></textarea>'+
     '<div class="acts"><button class="btn no" data-rev="'+esc(p.id)+'">Revertir</button></div>'+
   '</div>';
@@ -372,17 +405,21 @@ function _escRevCard_(p){
    ⛔ Y VA DEBAJO de «Requieren tu decisión» (lo coloca `V.partes`): lo que hay que hacer va
    antes que lo ya hecho, igual que en el móvil. */
 function _escRevPanel_(){
-  var lista=_escRevertibles_(), i, h=0, cuerpo='';
+  var lista=_escRevertibles_(), i, h=0, cuerpo='', vivos=0;
   if(!lista.length) return '';
-  for(i=0;i<lista.length;i++){ h+=Number(lista[i].horas)||0; cuerpo+=_escRevCard_(lista[i]); }
+  /* ⛔ 21/10 (auditor 8, 🟡 11): el número dice cuántos AÚN se pueden revertir — la lista trae también los de meses
+     cerrados (con su «ya no se revierte») y lo otorgado por el sistema: 53 para el PD con 8 vivos. */
+  for(i=0;i<lista.length;i++){ h+=Number(lista[i].horas)||0; cuerpo+=_escRevCard_(lista[i]);
+    if(!_escRevBloqueo_(lista[i])) vivos++; }
   /* ⛔ `nf2`, NO `nf(...,1)` (20/08, 130.ª). Era el ULTIMO redondeo a la decima sobre
      horas que quedaba, y estaba en el panel que CONTIENE las tarjetas -- que ya usaban
      `nf2` desde el 18/08. El fichaje redondea a CUARTOS, asi que la mitad de los totales
      salian falseados: tres partes de 0,75 daban «3 · 2,3 h» encima de tres tarjetas que
      dicen 0,75. El titular no cuadraba con lo que hay debajo. */
-  return pan('Ya firmaste', lista.length+' · '+nf2(h)+' h',
+  return pan('Ya firmaste', vivos+' aún revertibles · '+lista.length+' en total · '+nf2(h)+' h',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-    'Lo que ya decidiste y todavía se puede deshacer. <b>Revertir exige un motivo</b>; si las '+
+    'Lo ya decidido en tu ámbito —también lo que otorgó el sistema—; lo de un mes ya cerrado sale, pero ya no se '+
+    'deshace. <b>Revertir exige un motivo</b>; si las '+
     'horas ya contaban, se emite un apunte que se las resta de su ficha. <b>Nadie revierte lo '+
     'suyo.</b></p></div>'+cuerpo);
 }
@@ -478,8 +515,16 @@ function _engPartesRev_(){
    forma de recuperar unas horas olvidadas.
    ═════════════════════════════════════════════════════════════════════════════════════════ */
 
-/* La cuenta que ficha. ⛔ `_actorSanc_` y no `ACTOR`: ver la cabecera. */
-function _fichaYo_(){ return _actorSanc_(); }
+/* La cuenta que ficha. ⛔ `_actorSanc_` y no `ACTOR`: ver la cabecera.
+   ⛔⛔ Y ES LA ÚNICA PUERTA DE «¿QUIÉN ERES?» DE ESTA CARA (D-c, 20/10). La disponibilidad
+   tenía la suya (`_yoDisp_`, en `reuniones.escritorio.js`), con la misma pregunta y un vacío
+   distinto (`''` allí, `undefined` aquí). El móvil ya lo dejó escrito en su `_fichaYo_`: dos
+   nombres para la misma pregunta acaban siendo dos respuestas. ✅ El vacío se decide AQUÍ y
+   es `''`, como en el móvil: nadie compara un nombre contra `undefined` sin querer. */
+function _fichaYo_(){
+  var n = (typeof _actorSanc_==='function') ? _actorSanc_() : null;
+  return String(n || '');
+}
 
 /* El fichaje vive en el servidor: sin sesion no hay nada que abrir ni que cerrar. */
 function _fichaHayBack_(){ return !!(typeof backendOK!=='undefined' && backendOK && SESION); }
@@ -614,8 +659,10 @@ function _fichaPanel_(){
         (abierta
           ? 'Corre en el <b>servidor</b>: puedes cerrar esta pesta\u00f1a. A las <b>14 h</b> se cierra sola '+
             /* ⛔ 633.ª el barrido cierra en entrada + 14 h y graba eso menos las pausas: la
-               «última actividad» no la mira nadie. Sin «no cuenta tal cual»: hoy SÍ cuenta. */
-            'con el tope: 14 h desde tu entrada, menos las pausas.'
+               «última actividad» no la mira nadie. 21/10 (auditor 8): y nace SIN DECLARAR, con 24 h de vida
+               (decisión del 09/09); aquí no se decía. */
+            'con el tope: 14 h desde tu entrada, menos las pausas, y queda <b>sin declarar</b>: decl\u00e1ralo antes de '+
+            _caducaAutocierreH_()+' h.'
           : 'Tus horas no cuentan hasta que las firma quien te corresponde.')+'</p>'+
       '</div>'+
       '<div style="display:flex;gap:9px;flex-wrap:wrap">'+botones+'</div>'+
@@ -779,7 +826,8 @@ function _engFicharE_(){
       /* ⚠️ `h = null` es «no lo se», y CERO seria un dato: sin las horas de vuelta se
          confirma el envio sin inventarse un numero. */
       var h=(r&&r.parte&&typeof r.parte.horas==='number')?r.parte.horas:null;
-      tost(declara
+      var _ac=_tostAutocierre_(r);
+      if(_ac) tost(_ac); else tost(declara
         ? ('Fichaje declarado'+(h==null?'':' \u00b7 '+nf2(h)+' h')+' \u00b7 a la cola de '+(_firmaP||'tu coordinador')+'.')
         : 'Fichaje cerrado SIN declarar. Decl\u00e1ralo en el panel de abajo antes de 7 d\u00edas.');
       pintar();
@@ -843,8 +891,8 @@ function _engFicharE_(){
    pieza. Lo que las ata es una comprobacion de SIMETRIA -- `probar_curso.py` §8d corre las dos
    con los mismos cinco casos y exige el mismo resultado--, que es lo que caza que divergan. */
 function _bloqDur_(){
-  var d=_minHM_(BLOQ_FORM.fin)-_minHM_(BLOQ_FORM.ini);
-  return Math.round((d<0?d+1440:d)/15)/4;              // cruza medianoche + cuartos de hora
+  var d=_minutosReales_(BLOQ_FORM.fecha, BLOQ_FORM.ini, BLOQ_FORM.fin);   // medianoche y cambio de hora (auditor 34)
+  return Math.round(d/15)/4;                           // a cuartos de hora
 }
 
 /* Los TUYOS que esperan declaracion: un fichaje cerrado sin justificar (`sin_declarar`) o uno
@@ -910,8 +958,7 @@ function _bloqFalta_(){
           no redondea nunca. `'corto'` y `'sin'` son CONTRATO de una puerta compartida, no
           casos que el usuario alcance. Lo vigila `probar_pega_duracion.py`, que se pone
           rojo el dia que el catalogo cambie -- y entonces hay que revisar el changelog. */
-    var _cr=_minHM_(BLOQ_FORM.fin)-_minHM_(BLOQ_FORM.ini);
-    if(_cr<0) _cr+=1440;                                  /* cruza medianoche */
+    var _cr=_minutosReales_(BLOQ_FORM.fecha, BLOQ_FORM.ini, BLOQ_FORM.fin);   /* medianoche y cambio de hora */
     /* ⛔ Y EL RANGO VACIO SE DICE APARTE, que es la cuarta causa y estaba MUERTA.
        `_bloqDur_` pasa por `_minHM_`, que hace `parseInt(...)||0`: con los dos campos en
        blanco devuelve **0** -- o sea un numero --, asi que la rama `'sin'` de la puerta
@@ -1019,7 +1066,7 @@ function _bloqPanel_(){
   var lista = !pend.length ? '' :
     '<div class="pb" style="padding:0">'+pend.map(function(p){
       var det=(p.estado==='detalle'), sel=!!(decl && decl.id===p.id);
-      var cad=p.caduca_at ? ' \u00b7 caduca '+esc(_isoADMY_((''+p.caduca_at).slice(0,10))) : '';
+      var cad=p.caduca_at ? ' \u00b7 caduca '+esc(_diaMadridDe_(p.caduca_at)) : '';
       return '<div class="dec" style="cursor:default"><span class="tx"><b>'+
         h1(p.horas)+' \u00b7 '+esc(_isoADMY_(String(p.fecha||'')))+
         (p.ini&&p.fin?' \u00b7 '+esc(p.ini)+'\u2013'+esc(p.fin):'')+'</b><small>'+
@@ -1039,7 +1086,7 @@ function _bloqPanel_(){
   var mes=(typeof _avisoMesDelBloque_==='function') ? _avisoMesDelBloque_(f.fecha, HOY) : '';
   var avisoMes = (decl || !mes) ? '' :
     '<div class="nota" style="margin-top:11px">Es de <b>otro mes</b>: estas horas contar\u00e1n en '+
-    '<b>'+esc(mes)+'</b>, el mes en curso. Las de un mes ya cerrado no se pueden mover.</div>';
+    '<b>'+esc(_nomPeriodo_(mes))+'</b>, el mes de trabajo en curso. Las de un mes ya cerrado no se pueden mover.</div>';
 
   /* ⛔ Y SI EL RANGO CRUZA MEDIANOCHE, SE DICE. `_bloqDur_` ya envuelve
      (`d<0?d+1440`) y no lo dice: quien se equivoca de casilla ve una duracion plausible

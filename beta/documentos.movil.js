@@ -61,6 +61,14 @@ function _puedeDeshacerDoc_(e){
 }
 
 
+/* Qué hacer con una decisión de documento SIN conexión. Puro, para que un banco lo ejecute (el listener no se puede).
+   Fuera de la maqueta: nada, y decirlo. En la maqueta: aplicar en memoria y decir sólo la decisión —la parte de antes
+   del « · », que es la que promete publicar—. */
+function _decSinRedDoc_(aviso, maqueta){
+  if (!maqueta) return { aplicar:false, txt:'Sin conexión con el servidor: la decisión NO se ha guardado. Vuelve a intentarlo con red.' };
+  return { aplicar:true, txt:String(aviso||'Hecho.').split(' · ')[0].replace(/\.$/, '')+' (maqueta: sólo en este teléfono, no se ha publicado nada).' };
+}
+
 function _aplicarDecDoc_(e, acc, mot, tit, etq){
   if(!e) return null;
   if(acc==='reenviar'){ e.estado='revision'; e.nota=null; return e; }
@@ -85,7 +93,7 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq){
        `movil.html` ya se planta antes (*«Con anotaciones hace falta un titulo»*). Son el
        mismo `if` con dos significados distintos, que es justo lo que los confundio. */
     if(acc==='anot' && etq) e.etiquetas=etq;
-    e.estado='publicado';
+    e.estado='aprobado';   /* 21/10 (auditor 11, 🔴 1): como el servidor — `publicado` lo pone quien publica */
   } else if(acc==='cambios'){ e.estado='cambios'; e.nota=mot; }
   else if(acc==='rechazado'){ e.estado='rechazado'; e.nota=mot; }
   else return null;                       /* desconocida: no se toca NADA */
@@ -112,6 +120,7 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq){
    su pantalla: «En curso», la que ven el PD y el segundo revisor, ensena tambien `recibido` y
    `analizado`. */
 function puedeDecidirDoc(e){
+  if(!e) return false;                                     /* como el escritorio: sin expediente, nadie decide */
   var yo=yoNombre();
   if(yo===e.autor) return false;                          /* ni mandando por rango */
   var rev=revisoresDe(e), maxR=Math.max.apply(null,rev.map(rangoNom));
@@ -135,7 +144,9 @@ function puedeDecidirDoc(e){
    devolvía el ámbito tal cual («subsistema») y el escritorio, del mismo expediente, decía «informe de
    subsistema». Decisión [27/07]: el vocabulario de Cowork no se enseña. */
 function ambDocM(a){ return AMB_DOC[a] || String(a || '—'); }
-function filaDoc(e,mio){
+/* ⚠️ `esAutor`, no `mio` (20/10): en el escritorio `filaDoc(d, mio)` significa «puedo decidir», o sea lo
+   CONTRARIO; con el mismo nombre, portar una línea de una cara a la otra la invertía sin error. */
+function filaDoc(e,esAutor){
   /* ⛔ ESTA FUNCION NO LLAMABA A `estDoc` NUNCA: reescribia el mapa a mano y caia a
      `[e.estado,'neu']`, o sea al **enum crudo del backend** — la lista decia «publicando»
      o «analizado» y la ficha de esa misma fila decia otra cosa. Y ese arreglo YA se habia
@@ -151,7 +162,7 @@ function filaDoc(e,mio){
      nueva: el día que se añada un estado, esto lo hereda en vez de quedarse viejo — que
      es exactamente cómo nació este fallo. */
   var _pend = _docEnCurso_(e.estado) && e.estado!=='cambios';
-  return '<div class="fila clic '+(mio?(e.estado==='cambios'?'borde-no':(_pend?'borde-pe':''))+'':'')+'" data-doc="'+e.id+'" data-p>'+
+  return '<div class="fila clic '+(esAutor?(e.estado==='cambios'?'borde-no':(_pend?'borde-pe':''))+'':'')+'" data-doc="'+e.id+'" data-p>'+
     '<div class="a"><b>'+esc(e.titulo)+'</b><small><span class="mono">'+e.ref+'</span> · '+
     esc(e.autor.split(' ')[0])+' · '+ambDocM(e.ambito)+'</small></div>'+
     '<div class="d"><span class="pil '+st[1]+'">'+st[0]+'</span> <span class="chev">›</span></div></div>';
@@ -269,9 +280,19 @@ function vDocs(){
   var h='<div class="h1">Documentos</div><p class="h1s">Tus documentos y los que tienes que revisar.</p>';
   /* NADA DE NADA: una sola caja explicada, en vez de tres estados vacios decorados que
      juntos miden media pantalla. La explicacion hace falta UNA vez, no tres. */
+  /* ⛔ 21/10 (auditor 11, 🟠 2): sin expedientes LLEGADOS no se dice «Nada por aquí»: no se sabe. */
+  if(typeof ENT_LLEGO!=='undefined' && ENT_LLEGO===false)
+    return h+'<div class="tarj">'+vacio('No se han podido leer los documentos',
+      'El servidor todavía no los ha mandado; se vuelven a pedir solos. Mientras tanto no se sabe si tienes algo que revisar.',
+      '',false)+'</div>';
   if(!_docsRelevantes_()){
     return h+'<div class="tarj">'+vacio('Nada por aquí',
-      (esCoord()
+      /* 21/10 (auditor 11, 🟡 7): `esCoord()` incluye al SUBCOORDINADOR, y el reparto (`coordinadorDe`, y el servidor)
+         sólo nombra a quien tiene `cargo:'Coordinador'`: a él no le llega nada, y se le prometía. */
+      ((typeof YO!=='undefined' && YO && YO.cargo!=='Coordinador' && YO.cargo!=='Project Director' && _subcoordDe_(YO.nombre))
+        ? 'No has enviado ningún documento y no tienes ninguno que revisar. Los archivos de tu unidad los firma '+
+          'su coordinador, no la subcoordinación.'
+        : esCoord()
         ? 'No hay ningún documento esperando tu firma, y tú no has enviado ninguno. Cuando '+
           'alguien de tu unidad envíe un archivo, te llegará aquí.'
         : 'No has enviado ningún documento y no tienes ninguno que revisar: los tuyos los '+
@@ -433,6 +454,22 @@ function _botonesDecM_(e){
     '<button class="btn no" style="flex:1 1 46%" data-p data-dec="rechazado" data-id="'+e.id+'">Rechazar</button>';
 }
 
+/* ⛔ QUÉ ESTÁS PISANDO (ficha del 20/08). La decisión anterior —quién, cuándo, qué y por qué— sólo la
+   veía el AUTOR (`_docAutorHTML_`); el escritorio la pinta siempre (`_previaDocE_`), con su porqué:
+   «es lo que hay que juzgar para decidir si se pisa». Y el PD, que puede pisar a cualquiera, revisa
+   en el teléfono: se le ofrecían los cuatro botones sin decirle sobre qué. Mismas tres puertas de
+   `comun.js` que la gemela; sólo cambia la envoltura y que aquí el campo es `estado`, no `est`. */
+function _previaDocM_(e){
+  if(!e) return '';
+  if(!(e.estado==='cambios'||e.estado==='rechazado'||e.revisor)) return '';
+  var acc=_accionDocTxt_(e.decision&&e.decision.accion)||_accionDocTxt_(e.estado);
+  var aju=_ajustesDocTxt_(e), fir=_firmaDocTxt_(e);
+  return '<div class="avisolargo" style="margin:10px 0"><b>'+
+    (fir?('Decidió '+esc(fir)):'Última decisión')+(acc?' · '+esc(acc):'')+'</b> '+
+    (e.nota ? esc(e.nota) : (acc==='Aprobado' ? 'Aprobado sin anotaciones.' : ''))+
+    (aju?'<br>Ajustó: '+esc(aju):'')+'</div>';
+}
+
 function verDoc(id){
   var e=ENTREGABLES.concat(ENT_REV).filter(function(x){return x.id===id;})[0];
   if(!e) return;
@@ -545,8 +582,11 @@ function verDoc(id){
        sin abrirlo es aprobar a ciegas. */
     _visorDocHTML_(e.drive, e.ref,
       '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
-      'Pideselo a quien lo subio antes de decidir.</div></div>')+
+      /* 21/10 (auditor 19, 🟡 6): a quien lo SUBIÓ no se le manda a pedírselo a quien lo subió. */
+      (_mioDoc ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
+               : 'Pídeselo a quien lo subió antes de decidir.</div></div>'))+
     '<p class="rnota" style="margin-top:10px">Revisa: <b>'+revs+'</b></p>'+
+    (_mioDoc ? '' : _previaDocM_(e))+
     acc);
   /* Se cablea DESPUES de abrir el modal: un iframe dentro de la cadena de strings no
      arranca hasta que esta en el DOM. */
