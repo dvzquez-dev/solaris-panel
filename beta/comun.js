@@ -8526,6 +8526,17 @@ function _anotCambios_(act, campos){
 
 /* El `extra` de la decisión: sólo lo que cambia, y la indicación que se le dio a SolarIA (queda de nota). `null` si no
    cambia nada — y entonces no es «con anotaciones», es «aprobar». */
+/* ⛔⛔ 28/10: ¿HA EDITADO EL PANEL Y VA A PULSAR «APROBAR» A SECAS? Daniel cambió el subtítulo del 4102 («Almacenamiento seco
+   para cargas CANDY»), pulsó «Aprobar» y se publicó con el sugerido: `aprobado` no lee el panel. La base es lo que el panel
+   trae RELLENO (la portada sugerida, si la hay): aprobar la sugerencia sin tocarla sigue siendo «Aprobar». */
+var _AVISO_APROBAR_EDITADO_='Has cambiado campos de «Aprobar con anotaciones»: con «Aprobar» se perderían. Usa «Aprobar con anotaciones» (y «Comprobar portada»).';
+function _anotEditadoSinAnot_(e, pre){
+  var a = _anotActualDe_(e), base = {};
+  for (var k in a) base[k] = a[k];
+  if (a.sugerida){ base.titulo = a.sugerida.titulo; base.subtitulo = a.sugerida.subtitulo; }
+  return _anotCambios_(base, _anotLeer_(pre)).length > 0;
+}
+
 function _anotExtra_(act, form){
   form = form || {};
   var c = _anotCambios_(act, form);
