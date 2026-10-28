@@ -76,10 +76,10 @@ function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 function _justUtil_(tarea, just){
   var j = String(just == null ? '' : just).replace(/^\s+|\s+$/g, '');
   if(!j) return '';
+  /* ⛔ 20/10 (D-b): era una tabla escrita a mano de 15 vocales y la ñ — `ç`, `â`, `õ` salían distintas —, copia
+     peor de `_sinTildes_` (§4.1). Ahora es ésa más el recorte de espacios. */
   var pela = function(s){
-    return String(s).toLowerCase().replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ')
-      .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
-      .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n');
+    return _sinTildes_(String(s)).replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ');
   };
   return pela(j) === pela(tarea || '') ? '' : j;
 }
@@ -172,6 +172,24 @@ function _puedeBeta_(){ return CANAL!=='beta' || esAdmin() || _rangoBeta_()>=3; 
    ⚠️ Es una condicion MAS DURA que `_puedeBeta_`, no la misma: aquella deja pasar a todos
    fuera de beta (es un gate de canal), y esta exige **beta Y rango**. Reutilizarla habria
    dejado el agujero igual. */
+/* ⛔ 20/10: ¿SE GUARDÓ LA FOTO DEL BUZÓN? El servidor del mini PC devuelve en `captura` DÓNDE la dejó — o el texto
+   «no se pudo subir: …» si falló, que es una cadena VERDADERA. Las dos caras hacían `!(r && r.captura)` y daban por
+   guardada una foto que no lo estaba. Una sola puerta para las dos. */
+function _capturaGuardada_(r){
+  var c = r && r.captura;
+  return typeof c === 'string' && c !== '' && c.indexOf('no se pudo subir') !== 0;
+}
+/* ⛔ 21/10 (auditor 10, 🟡 7): POR QUÉ no se guardó la foto, en una frase para pantalla. Las dos caras decían «al
+   servidor le falta el paso que la sube», y el mini PC lo tiene (`directo.guardar_captura`) y devuelve el motivo real
+   en `captura` («no se pudo subir: …»). Sin `captura`, no dijo dónde la puso — que no es lo mismo que «le falta». */
+function _avisoSinFoto_(r){
+  var c = r && r.captura;
+  if (typeof c === 'string' && c.indexOf('no se pudo subir') === 0) {
+    var m = c.replace(/^no se pudo subir:?\s*/, '');
+    return 'el servidor no pudo guardarla' + (m ? ' («' + m + '»)' : '');
+  }
+  return 'el servidor no dijo dónde la guardó';
+}
 function _puedeVerNovedades_(){ return CANAL==='beta' && (esAdmin() || _rangoBeta_()>=3); }
 
 /* 'HH:MM' (o `{ini:'HH:MM'}`) -> minutos. **UNA sola puerta**, aqui, que cargan las dos caras.
@@ -191,6 +209,43 @@ function _minHM_(v){
   var t=(v && typeof v==='object') ? v.ini : v;
   var p=String(t==null?'':t).split(':');
   return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
+}
+
+/* ⛔ 25/10/2026 (auditor 34, 🟠 1): LOS MINUTOS DE VERDAD de un rango tecleado (entrada y salida a mano), contando el
+   CAMBIO DE HORA. `_minHM_(fin)-_minHM_(ini)` resta horas de RELOJ: la noche del último domingo de octubre, 01:30–03:30
+   son 3 h reales y salían 2 (y en marzo, 1 h real salía 2). El servidor se fía de las `horas` del parte, así que nadie
+   lo corregía detrás. Lo de siempre se queda: si `fin < ini` cruza medianoche (y entonces la salida es del día
+   siguiente). Sólo se corrige cuando la diferencia es EXACTAMENTE la hora del cambio; sin fecha o sin `Intl`, el reloj
+   como antes. La hora repetida (02:00–03:00 de octubre) se lee como la PRIMERA, la de verano, igual que `new Date`. */
+function _offMadridMin_(ms){
+  try{
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(_ahoraLocalISO_(new Date(ms)));  /* la hora de MADRID */
+    if(!m) return null;
+    var w = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    var r = Math.round((w - Math.floor(ms / 60000) * 60000) / 60000);
+    return (r === 60 || r === 120) ? r : null;
+  }catch(_){ return null; }
+}
+function _instanteMadrid_(iso, hm){
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso == null ? '' : iso)), cand = [120, 60], k, t;
+  if(!m) return null;
+  var w = Date.UTC(+m[1], +m[2] - 1, +m[3]) + _minHM_(hm) * 60000;
+  for(k = 0; k < cand.length; k++){ t = w - cand[k] * 60000; if(_offMadridMin_(t) === cand[k]) return t; }
+  return _offMadridMin_(w) === null ? null : w - 60 * 60000;     /* la hora que en marzo NO existe: como la lee JS */
+}
+function _minutosReales_(fecha, ini, fin){
+  var d = _minHM_(fin) - _minHM_(ini), cruza = d < 0;
+  if(cruza) d += 1440;                                              /* cruza medianoche */
+  var iso = _dmyAISO_(fecha), a = _instanteMadrid_(iso, ini),
+      b = _instanteMadrid_(cruza ? _isoMasDias_(iso, 1) : iso, fin);
+  if(a === null || b === null || b <= a) return d;
+  /* …y dentro de la hora REPETIDA, una salida «antes» que la entrada (02:30 → 02:15) es la segunda vez que el reloj
+     marca esa hora: 45 minutos, no 24 h menos cuarto. */
+  var b1 = cruza ? _instanteMadrid_(iso, fin) : null;
+  if(b1 !== null && _offMadridMin_(b1) === 120 && _offMadridMin_(b1 + 3600000) === 60 && b1 + 3600000 > a)
+    return Math.round((b1 + 3600000 - a) / 60000);
+  var r = Math.round((b - a) / 60000);
+  return Math.abs(r - d) === 60 ? r : d;
 }
 
 /* LA REJILLA DE FRANJAS de una convocatoria: **UNA sola**, contigua y anclada al tamaño de
@@ -296,15 +351,25 @@ function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre)
 */
 function _pintarSiCambia_(el, clave, html){
   if (!el) return false;
-  var memo = _pintarSiCambia_.memo || (_pintarSiCambia_.memo = {});
-  if (memo[clave] === html && el.innerHTML) return false;
-  memo[clave] = html;
+  /* ⛔⛔ 21/10 (auditor 20, 🔴): EL RECUERDO ES LO QUE ESTE NODO TIENE PUESTO, no lo último que se pintó para esa VISTA.
+     Era `memo[clave]`, y el escritorio pinta sus 22 vistas en el MISMO `#main`: Panel → Partes → Panel, con el html del
+     Panel igual que la primera vez, contestaba «no ha cambiado» y dejaba los PARTES debajo del título «Panel de mando».
+     El móvil no lo veía porque allí cada vista tiene su nodo. `clave` se queda en la firma (los dos llamadores la pasan)
+     y ya no decide nada: con un nodo por vista, recordar por nodo ES recordar por vista. */
+  if (el._pintado === html && el.innerHTML) return false;
+  el._pintado = html;
   el.innerHTML = html;
   return true;
 }
 
 
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
+/* 22/10 (auditor 23, 🟠 8): los convocados que SIGUEN en el equipo, como el motor (`universo_convocado` sobre vivos).
+   Si el censo no se conoce (menos de 2 activos: maqueta sin panel), la lista tal cual -- «no lo sé» no vacía a nadie. */
+function _invitadosVivos_(lista){
+  var viv = _activos_().map(function(m){ return m.nombre; });
+  return viv.length >= 2 ? (lista||[]).filter(function(n){ return viv.indexOf(n) >= 0; }) : (lista||[]).slice();
+}
 /* El mes ABIERTO, calculado con quien esta: `{media, gente}`, o `null` si no se sabe.
    Daniel, 04/10: *«y el objetivo de horas q aparece recuerda q tiene q estar vivo y eso»*.
 
@@ -325,7 +390,11 @@ function _mesAbiertoVivo_(){
     var h = _hMesReal_(act[i]);
     if(typeof h === 'number' && isFinite(h)) v.push(h);
   }
-  if(!v.length) return null;
+  /* ⛔ 22/10 (auditor 21, 🟠 2): UNA MUESTRA DE UNO NO ES EL EQUIPO. A quien no es PD el servidor le manda el resto sin
+     horas, y aquí su propia cifra salía como «la media del equipo»: el objetivo del mes era distinto para cada uno (PD
+     11,17 · Uxía 10,34 · Xoán 11,72). Con menos de dos, `null`, y el llamador cae al `mesAbierto` del servidor (calculado
+     con todos) — la misma guarda que ya tienen `_umbralDinamico_` (`hs.length<2`) y `_umbralCuota_`. */
+  if(v.length < 2) return null;
   var s = 0;
   for(i = 0; i < v.length; i++) s += v[i];
   return { media: s / v.length, gente: v.length };
@@ -487,7 +556,25 @@ function _gentePorUnidad_(){
   return out;
 }
 
+/* ⛔ 21/10 (auditor 6): LA MEDIA POR UNIDAD QUE MANDA EL SERVIDOR, para quien no tiene las horas de los demás. Desde
+   el 07/10 el panel de un miembro trae SÓLO sus horas (decisión de Daniel: *«cada persona solo debe recibir sus
+   horas/mes y su puesto, no las horas de todos»*), así que calcular «en vivo» le daba SU unidad sola, primera y con
+   «1 personas». El agregado (`subsistemas` con `media` y `n`) sí le llega. Sólo entran las que traen una media de
+   verdad y alguien dentro; mismo orden que `_subsEnVivo_`. `foto:true` lo dice: no es en vivo. */
+function _subsDelServidor_(){
+  var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [], out = [], i, s;
+  for(i = 0; i < lista.length; i++){
+    s = lista[i];
+    if(!s || !s.u || typeof s.media !== 'number' || !isFinite(s.media) || !(s.n > 0)) continue;
+    out.push({ u: s.u, media: _red1_(s.media), n: s.n, foto: true });
+  }
+  out.sort(function(a, b){ return (b.media - a.media) || (a.u < b.u ? -1 : 1); });
+  return out;
+}
+
 function _subsEnVivo_(){
+  /* ⛔ 21/10 (auditor 6): con el panel en forma MIEMBRO no hay «gente delante» con la que calcular — el agregado. */
+  if(typeof DATA !== 'undefined' && DATA._rol === 'miembro') return _subsDelServidor_();
   var nom = [], i, j;
   var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [];
   for(i = 0; i < lista.length; i++) nom.push((lista[i] && lista[i].u) || lista[i]);
@@ -603,6 +690,15 @@ function _hMesDevengado_(m){
   var d = _devengadoAHoy_(m, h, _fraccionDelMes_());
   return (d == null) ? h : d;
 }
+/* ⛔ 20/10 (auditoría): LA MISMA CIFRA DEVENGADA, PARA EL MIEMBRO DE LA CARA. `_hMesDevengado_` lee el del PANEL
+   (`horasMes`); el de la cara trae `hMes`. Las tablas del escritorio enseñaban `hMes` en BRUTO —la base del cargo
+   entera desde el día 1— al lado de columnas devengadas. 🗣️ Daniel, 07/10: «claro que van devengadas al dia actual
+   … lo que no puede aparecer es el step de compensacion». Sin dato, `null`; si no se puede devengar, el crudo. */
+function _hMesDevCara_(m){
+  if(!m || typeof m.hMes!=='number') return null;
+  var d = (typeof _fraccionDelMes_==='function') ? _devengadoAHoy_(m, m.hMes, _fraccionDelMes_()) : null;
+  return (d == null) ? m.hMes : d;
+}
 function _hMesReal_(m){
   m = m || {};
   /* Las horas de ESTE MES, o `null` si no han llegado. `horasMes` es el campo que el
@@ -659,7 +755,7 @@ function _hMesReal_(m){
    el escritorio- no podia usarlo y pesaba el mes abierto con el CALENDARIO. Regla de
    negocio de Daniel: «un mes dura desde el anterior cierre del mes anterior al cierre de
    ese mes». `equipo_mes.dia` lo calcula `_diasDesdeCierre_` en el backend. */
-function _diasDelMes_(){
+function _diasDelMes_(ahora){
   var e=DATA.equipo_mes;
   /* ⛔ `cont` ES EL MISMO DIA CON DECIMALES, y va aparte del entero porque son DOS PREGUNTAS:
      `dia` se IMPRIME («20 h en 10 de 31 dias») y `cont` PESA. Daniel (15/08): «cuando pase de
@@ -671,12 +767,46 @@ function _diasDelMes_(){
   if(e && e.dia>0 && e.dias_mes>0) return {dia:e.dia, total:e.dias_mes,
     cont:(typeof e.diaCont==='number' && e.diaCont>0) ? e.diaCont : e.dia,
     periodo:e.periodo||null};
-  var d=new Date();
+  /* ⛔ 20/10 (auditoría): SIN `equipo_mes`, PERO CON EL ÚLTIMO CIERRE, SE CUENTA COMO EL SERVIDOR. Si no, el título
+     (`_periodoAbierto_`, del cierre) y el divisor (el reloj) hablaban de meses distintos: el 2 de noviembre con octubre
+     abierto, «octubre» y horas de octubre ÷ 2. Días desde la MEDIANOCHE local del cierre (mínimo 1), el mes abierto y
+     sus días de calendario (el servidor manda una media; aquí no la hay). `ahora` es opcional, para poder preguntarle. */
+  var _uc=(typeof CIERRE_UC!=='undefined' && CIERRE_UC) ? CIERRE_UC
+         : ((typeof CIERRE!=='undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
+  var _ab=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  var _at=(_uc && _uc.at) ? new Date(_uc.at) : null;
+  if(_at && !isNaN(_at.getTime()) && /^\d{4}-\d{2}$/.test(String(_ab||''))){
+    var _m0=new Date(_at.getFullYear(), _at.getMonth(), _at.getDate()).getTime();
+    var _c=Math.max(1, ((ahora||new Date()).getTime()-_m0)/86400000);
+    return {dia:Math.floor(_c), total:new Date(+_ab.slice(0,4), +_ab.slice(5,7), 0).getDate(), cont:_c, periodo:_ab};
+  }
+  var d=ahora||new Date();
   /* El respaldo del calendario tambien lleva su hora: mismo criterio que el servidor -- el
      dia N va de N,0 a N,999-, para que caer al respaldo no cambie la FORMA del numero. */
   return {dia:d.getDate(), total:new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),
     cont:d.getDate() + (d.getHours()*3600 + d.getMinutes()*60 + d.getSeconds())/86400,
     periodo:null};
+}
+
+/* Cuantos dias DURO el mes anterior al periodo `AAAA-MM`. Sin periodo, se deduce de hoy.
+   ⚠️ Vive aquí desde el 20/10 (era de `horas.movil.js`): el panel del escritorio compara
+   también por ritmo, y sin los días que duró el mes pasado no hay ritmo que comparar.
+
+   ⛔ UN MES NO DURA LO QUE DICE EL CALENDARIO: dura del cierre del anterior al cierre de este
+   (Daniel, 07/08: *«Bueno y si junio se cerro el 29, imaginate»*). Si junio cerro el 29/06 y
+   julio el 04/08, julio duro **37 dias**, no 31 — y dividir por 31 infla el ritmo de julio de
+   las 32 personas a la vez, sin dar ningun error.
+
+   `servidor` es el `equipo_mes.dias_ant` que calcula el backend con el historico de cierres. Si
+   no hay dos cierres guardados llega `null` y se cae al calendario: aproximado, pero no
+   inventado. */
+function _diasMesAnterior_(periodo, servidor){
+  var sv = Number(servidor);
+  if(isFinite(sv) && sv > 0) return sv;
+  var y, m;
+  if(/^\d{4}-\d{2}$/.test(String(periodo||''))){ y=+periodo.slice(0,4); m=+periodo.slice(5,7)-1; }
+  else { var d=new Date(); y=d.getFullYear(); m=d.getMonth(); }
+  return new Date(y, m, 0).getDate();          /* dia 0 del mes actual = ultimo del anterior */
 }
 
 function _fraccionDelMes_(d){
@@ -932,6 +1062,23 @@ function _minDeshacerTarea_(){ return 15; }   /* 15, y lo dijo Daniel el 06/10: 
    plazo vive, y «no lo sé» cae al lado seguro (§3c-24). Eso además delimita el botón a lo que
    la persona ha hecho **en esta sesión**: el estado que viene de Notion no trae `desde`, así que
    no se ofrece «deshacer» sobre algo que no has tocado tú. */
+/* ⛔ 20/10 — EL PASO DADO SOBREVIVE AL REFRESCO. Desde que los botones guardan en Notion (`moverEstadoTarea`), el
+   refresco vivo rehace `TAREAS` con lo del servidor, y eso tira el `desde` de la tarea recién movida: el «deshacer» que
+   el aviso acababa de prometer desaparecía en el siguiente refresco. Aquí se anota el paso por la URL de su ficha y se
+   repone tras rellenar la lista — sólo si la tarea SIGUE en el estado al que la llevaste (si otro la movió en
+   Notion, ese deshacer ya no es tuyo). */
+function _anotarPasoTarea_(pasos, t){
+  if(!pasos || !t || !t.url) return;
+  if(typeof t.desde === 'number') pasos[t.url] = {e: t.e, desde: t.desde};
+  else delete pasos[t.url];
+}
+function _reponerPasosTarea_(lista, pasos){
+  (lista || []).forEach(function(t){
+    var p = t && t.url && pasos ? pasos[t.url] : null;
+    if(p && p.e === t.e) t.desde = p.desde;
+  });
+}
+
 function _puedeDeshacerTarea_(t, ahora){
   if(!t || typeof t.desde !== 'number') return false;
   var ms = (typeof ahora === 'number' ? ahora : (new Date()).getTime()) - t.desde;
@@ -1029,6 +1176,30 @@ function _bandaSana_(){
    Notion) la marca salía con `left:calc(-5.6% …)`, fuera de la barra; y con `NaN` -que
    `typeof` deja pasar como número- el `left` era CSS inválido y la marca caía a la izquierda,
    o sea en «sin carga», en silencio. `isFinite` corta el segundo y `Math.max(0,…)` el primero. */
+/* ⛔ 20/10 · LA CARGA QUE SE ENSEÑA ES LA PREVISTA. 🗣️ Daniel (05/10): *«la carga que te pone en la app debería ser la
+   carga prevista. Contando lo que ya has arrastrado y tal»* · *«y la carga tiene que cambiar en consecuencia»*. La
+   calcula el servidor (`reglas/carga.carga_prevista`, ritmo de tus últimos 14 días); sin ella, el índice del cierre. */
+function _cargaVista_(m){
+  var p=m && m.carga_prevista;
+  if(p && typeof p.prevista==='number') return p.prevista;
+  return (m && typeof m.carga==='number') ? m.carga : null;
+}
+/* De cuándo es el desglose: «en vivo» si lo ha puesto el servidor desde Notion (`vivo`), o la fecha del panel si es la
+   foto. La misma frase en las dos caras. */
+function _cargaDesgloseTxt_(d){
+  return (d.vivo ? 'en vivo · de este mes ' : 'índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes ')+
+    nf(d.aporta_mes_actual||0,1)+' · arrastre '+nf(d.arrastre||0,1);
+}
+function _cargaPrevistaTxt_(m){
+  var p=m && m.carga_prevista;
+  if(!p || typeof p.prevista!=='number') return '';
+  return 'Prevista a fin de mes si sigues a tu ritmo '+(p.ritmo_de==='14d'?'de los últimos 14 días':'de este mes')+
+    ' ('+nf(p.ritmo_dia,1)+' h/día → '+nf(p.horas_previstas,1)+' h)'+
+    /* ⛔ Desde `cargas_vivas_en` (20/10) `m.carga` es el índice DE HOY si el desglose es vivo: «del último cierre» se
+       contradecía con el «en vivo» de debajo (auditoría del 20/10). */
+    (typeof m.carga==='number'?' · índice '+(m.desglose && m.desglose.vivo?'de hoy':'del panel')+': '+nf(m.carga,0):'');
+}
+
 function _cargaBarraHTML_(carga){
   if(typeof carga !== 'number' || !isFinite(carga)) return '';
   var _bs = _bandaSana_();
@@ -1093,7 +1264,10 @@ function _umbral_(){
     }
     if(ma && typeof ma.media==='number'){
       var w=_fraccionDelMes_();                                 // el abierto, a prorrata
-      num+=ma.media*w; den+=w;
+      /* ⛔⛔ 26/10 · Daniel: «Que pese su ritmo» (gemela de `reglas/cuota.umbral_temporada`): `ma.media` son las horas
+         HECHAS hasta hoy; entra su RITMO (÷ w) con el peso w, o sea `ma.media` tal cual. Con `ma.media*w` se prorrateaba
+         dos veces y el objetivo bajaba a mitad de mes. */
+      if(w>0){ num+=ma.media; den+=w; }
     }
     /* ⛔ `||` NO VALE AQUI: un `lo:0` legitimo -«sin suelo»- es falsy y saldria 8,
        y un `frac:0` saldria 2/3. Son tres numeros que el backend PUEDE mandar a cero
@@ -1180,6 +1354,19 @@ function _sinCierres_(m){
    con un mes en curso). Aqui solo se anade el brazo del «no lo se», porque las dos
    preguntas son distintas: para el RANKING, ausente = no se echa a nadie; para el
    DINERO, ausente = no se perdona nada. */
+/* 22/10 (auditor 23, 🟠 10): quien ha ENTRADO A MITAD de temporada — sin cierres suyos cuando otros del equipo ya los
+   tienen. En septiembre nadie tiene cierres y esto da `false` a todos (la comparativa sigue como siempre). Si el panel no
+   trae `cierres` de los demás, también `false`: «no lo sé» deja la pantalla como estaba. */
+function _recienLlegado_(m){
+  if(!_sinCierres_(m)) return false;
+  /* ⛔ 22/10 (refutador 23, 🟠 1): a un miembro RASO la forma miembro del panel NO le trae `cierres` de los demás, así
+     que lo de abajo no decidía nada justo para quien entra. Lo que sí le llega es `ranking.total`: cuenta sólo a quien
+     tiene PUESTO (= cierres), y en septiembre vale 0. */
+  var rk = (typeof DATA !== 'undefined' && DATA && DATA._ranking) || null;
+  if(rk && +rk.total > 0) return true;
+  return _activos_().some(function(x){ return typeof x.cierres === 'number' && x.cierres > 0; });
+}
+
 function _exentoPrimerMes_(m){
   if(!m || typeof m.cierres !== 'number') return null;
   return _sinCierres_(m);
@@ -1252,7 +1439,17 @@ function _ritmosEquipo_(){
    **+27,23 EUR** tocando a **28 personas**. Las dos conviven a proposito: unificarlas cambia
    lo que paga cada uno y **esa decision no esta tomada**.
    ⚠️ Por eso se llama `_umbralCuota_` y no `_umbral2_`: el nombre dice para que sirve. */
+/* ⛔ 22/10 (auditor 30, 🟡 3): el UMBRAL y el TECHO de la curva que calculó el MOTOR (`DATA.cuota_curva`, de
+   `reglas/cuota.curva_equipo` sobre el `hm` de `flujos/cuotas.calcular`), o `null`. El motor lleva a las BAJAS (ARRANQUE
+   §2c: su trabajo cuenta) y el panel ya no las trae, así que con `_ritmosEquipo_` la cara calculaba OTRA curva (con
+   datos de la 25/26, 24 de 27 personas con otra cifra). Medio dato no es dato: sin los dos números, `null`. */
+function _curvaMotor_(){
+  var c = DATA.cuota_curva;
+  return (c && typeof c.umbral === 'number' && isFinite(c.umbral) && typeof c.techo === 'number' && isFinite(c.techo)) ? c : null;
+}
 function _umbralCuota_(){
+  var _cc = _curvaMotor_();
+  if(_cc) return _cc.umbral;                 /* el del motor primero; sin él, el de siempre */
   var L = _ritmosEquipo_(), s = 0, i;
   /* ⛔⛔ UNA PERSONA NO ES UN EQUIPO, y con `!L.length` esto se calculaba con UNA sola.
      A rango < 3 el backend sirve la forma MIEMBRO -tu ficha entera y las demas SOLO con
@@ -1277,6 +1474,8 @@ function _umbralCuota_(){
 
 /* El techo de la curva: el maximo h/mes del equipo (`reglas/cuota.py:cuotas`). */
 function _techoCuota_(){
+  var _cc = _curvaMotor_();
+  if(_cc) return _cc.techo;                  /* (auditor 30, 🟡 3) el del motor primero */
   var L = _ritmosEquipo_();
   /* ⛔ LA GEMELA, y hace falta: con el techo igual a TU ritmo la curva se clava en su
      extremo. Un maximo de una muestra de uno eres tu mismo, no el equipo. */
@@ -1431,6 +1630,9 @@ function tost(m, o){
   t.textContent=m;
   clearTimeout(t._h);
   var cerrar=function(){ t.classList.remove('on','fijo'); t.onclick=null; };
+  /* 21/10 (auditor 19, 🟡 8): con una hoja abierta el aviso sale ARRIBA. Abajo tapaba sus botones de decisión
+     («Cambios y rechazo exigen motivo.» encima de «Aprobar»). Sin la regla `.tost.arriba` (escritorio) no cambia nada. */
+  t.classList.toggle('arriba', !!document.querySelector('.modal.on'));
   t.classList.add('on');
   if(o && o.fijo){
     /* `.fijo` es lo que le devuelve el `pointer-events`: en reposo el toast no captura
@@ -1457,6 +1659,10 @@ function tost(m, o){
 
    ⚠️ Solo se queda fijo lo que EXIGE una acción. Un «no hay red» sigue siendo efímero: reintentar
    es obvio y un aviso que hay que cerrar a mano, si sale por todo, se ignora. */
+/* 21/10 (auditor 19, 🟡 7): las opciones de `tost` para un aviso que puede ser LARGO. Pasados 110 caracteres no se lee
+   en los 2,6 s del toast (≈ 40 por segundo leyendo de un móvil), así que se queda fijo hasta que se toque. */
+function _tostLargo_(m){ return String(m == null ? '' : m).length > 110 ? {fijo:true} : null; }
+
 function tostErr(prefijo, e){
   tost(String(prefijo || '') + ((e && e.message) || e), (e && e.sesion) ? {fijo:true} : null);
 }
@@ -1667,10 +1873,26 @@ function _apiParse(txt, accion){
    contabiliza de otra, que es como se firma una cosa creyendo otra.
    ✅ Devuelve el aviso cuando la fecha escrita cae en un mes distinto del actual, y '' cuando
    no hay nada que avisar. */
-function _avisoMesDelBloque_(fechaDMY, hoyDMY){
+function _avisoMesDelBloque_(fechaDMY, hoyDMY, uc){
   var f = _dmyAISO_(String(fechaDMY || ''));
   var h = _dmyAISO_(String(hoyDMY || ''));
   if(!/^\d{4}-\d{2}/.test(f) || !/^\d{4}-\d{2}/.test(h)) return '';
+  /* ⛔ 21/10 (auditor 8, 🟠 1): EL MES DE TRABAJO VA DE CIERRE A CIERRE (ARRANQUE §2b), no del 1 al 31. Con el último
+     cierre a mano (`uc`, o el de la cara: `CIERRE_UC` en el móvil, `CIERRE.ultimo_cierre` en el escritorio), un bloque
+     cuenta en el mes abierto y sólo es «de otro mes» si su fecha cae ANTES del cierre (su mes ya se cerró) o en un mes
+     de calendario POSTERIOR al de hoy. Con el calendario, un bloque del 30/10 declarado el 03/11 con octubre abierto
+     decía «contarán en 2026-11» cuando el servidor (`periodo_en`) y el sello de la propia cara lo cuentan en octubre.
+     Sin cierre conocido se queda lo de antes (el calendario): no lo sé no es un aviso nuevo. */
+  if(uc === undefined) uc = (typeof CIERRE_UC !== 'undefined' && CIERRE_UC) ? CIERRE_UC
+       : ((typeof CIERRE !== 'undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
+  var ab = (uc && /^\d{4}-\d{2}$/.test(String(uc.periodo || ''))) ? _mesSiguiente_(uc.periodo) : null;
+  var at = (uc && uc.at) ? new Date(uc.at) : null;
+  if(ab && at && !isNaN(at.getTime())){
+    var _2 = function(n){ return (n < 10 ? '0' : '') + n; };
+    var corte = at.getFullYear() + '-' + _2(at.getMonth() + 1) + '-' + _2(at.getDate());
+    if(f.slice(0,10) < corte) return ab;
+    return f.slice(0,7) > h.slice(0,7) ? ab : '';
+  }
   return f.slice(0,7) === h.slice(0,7) ? '' : h.slice(0,7);
 }
 
@@ -1707,6 +1929,31 @@ function _trayectoCruzaCiudad_(origenId, destinoId){
   var o = _puntoTurno_(origenId), d = _puntoTurno_(destinoId);
   if (!o || !d) return null;
   return o.ciudad !== d.ciudad;
+}
+
+/* 22/10 (auditor 25, 🟠 3): QUIÉN VA EN QUÉ COCHE, para LEERLO. Los coches se guardaban y viajaban (`turnos_vivos` los
+   pega por id) y ninguna pantalla los enseñaba: «un almacén que nadie lee no es un dato». Una fila por coche, con los
+   puntos por su NOMBRE del catálogo (un id que no está se enseña tal cual, no se inventa) y la vuelta sólo si es
+   distinta y tiene sus dos patas. `pila(n)` traduce el nombre (cada cara tiene la suya); sin `pila`, el nombre entero. */
+function _cochesTurnoLineas_(coches, pila){
+  pila = pila || function(n){ return n; };
+  var nom = function(id){ var p = _puntoTurno_(id); return p ? p.nombre + ' (' + p.ciudad + ')' : String(id || '—'); };
+  return (Array.isArray(coches) ? coches : []).filter(function(c){ return c && typeof c === 'object'; })
+    .map(function(c, i){
+      var vuelta = (c.vueltaDistinta && c.vueltaOrigen && c.vueltaDestino) ? nom(c.vueltaOrigen) + ' → ' + nom(c.vueltaDestino) : null;
+      return { n: i + 1, conduce: c.dueno ? pila(c.dueno) : null, ida: nom(c.origen) + ' → ' + nom(c.destino),
+               vuelta: vuelta, pasajeros: (Array.isArray(c.pasajeros) ? c.pasajeros : []).map(pila) };
+    });
+}
+/* …y su bloque de ficha (móvil). Sin coches, '' — no ocupa nada. */
+function _cochesTurnoHTML_(coches, pila){
+  var ls = _cochesTurnoLineas_(coches, pila);
+  if (!ls.length) return '';
+  return '<h4>Coches</h4><div class="tarj" style="margin:0">' + ls.map(function(l){
+    return '<div class="fila"><div class="a"><b>🚗 Coche ' + l.n + ' · ' + esc(l.conduce || 'sin conductor') + '</b>' +
+      '<small>' + esc(l.ida) + (l.vuelta ? ' · vuelta: ' + esc(l.vuelta) : '') + '</small>' +
+      '<small>' + (l.pasajeros.length ? 'Van: ' + esc(l.pasajeros.join(', ')) : 'Sin pasajeros') + '</small></div></div>';
+  }).join('') + '</div>';
 }
 
 /* ═══ EL TIEMPO EXTRA DE UN TURNO · EL MODELO ════════════════════════════════════
@@ -2137,10 +2384,22 @@ function _periodoParte_(p){
    ⛔ Y SIN INSTANTE se conserva lo de antes, que es cortesía: fallar hacia «ofrecer» deja que
    el servidor explique; hacia «esconder» quita una acción legítima **sin decir por qué**, y
    eso no se puede depurar desde el móvil. */
-function _mesCerradoParte_(p, plan, uc){
-  var at  = (uc && uc.at) || (plan && plan.resultado && plan.resultado.at) || null;
-  var per = (uc && uc.periodo) || (plan && plan.periodo) || null;
+/* ⛔ 26/10 · `paraRevertir` (Daniel: «Sí» — manda el mes en que contó y sólo bloquea lo que llegó a Notion): la MISMA
+   regla que el servidor al revertir (`_parte_en_mes_cerrado`). Sin él, la deducción de siempre, que es lo que usa
+   `_selloAprobado_` con partes que pueden venir normalizados y sin `aplicado_at`. */
+function _mesCerradoParte_(p, plan, uc, paraRevertir){
+  /* ⛔ 22/10 (refutador 27, H3): un cierre APLICADO y aún sin sellar manda sobre el último sellado, como en el servidor
+     (`_parte_en_mes_cerrado`): sus horas ya están a cero en Notion y el servidor rechaza revertir. */
+  var _ps = (plan && plan.aplicado && plan.periodo && plan.resultado && plan.resultado.at &&
+             (!uc || !uc.periodo || String(plan.periodo) > String(uc.periodo))) ? plan : null;
+  var at  = _ps ? _ps.resultado.at : ((uc && uc.at) || (plan && plan.resultado && plan.resultado.at) || null);
+  var per = _ps ? _ps.periodo : ((uc && uc.periodo) || (plan && plan.periodo) || null);
   if (at && per){
+    if (paraRevertir){
+      var _pg = String((p && p.periodo) || '');
+      if (/^\d{4}-\d{2}$/.test(_pg)) return _pg <= String(per) ? _pg : false;
+      if (!(p && (p.estado === 'aplicada' || p.aplicado_at))) return false;
+    }
     var cre = String((p && p.creado_at) || '');
     /* ⛔ `null` y no `false`: un parte sin `creado_at` es «no lo sé» (§3c-24), y es lo mismo
        que contesta el servidor ahí. Leerlo como «abierto» vuelve a ofrecer el botón. */
@@ -2168,6 +2427,16 @@ function _mesCerradoParte_(p, plan, uc){
       cadena dice el día ANTERIOR a lo firmado entre las 00:00 y las 02:00 de verano. Se parsea a
       mano y se pasa por `Date.UTC`: `new Date(cadena)` da NaN en JScript, que es donde corre el banco.
    ⚠️ La pila la pone cada cara (`_pilaDeM_`); si no está, el nombre ENTERO — nunca otro nombre. */
+/* ⛔⛔ 20/10 — EL ACTA DE UNA REUNIÓN SIN CONVOCAR (Daniel, 14/10: «Si es una reunion SIN CONVOCAR, no aparece. Eso es
+   un error, deberia aparecer algo»). Lo dice el campo `reunion` del expediente, que pone `acta_a_expediente.py`.
+   ⛔ Sólo `sinConvocar === true` cuenta: sin el campo es «no lo sé», y un expediente de antes no se bautiza.
+   UNA puerta: la leen las Reuniones del móvil y las Actas del escritorio. */
+function _deReunionSinConvocar_(d){ return !!(d && d.reunion && d.reunion.sinConvocar === true); }
+function _actasSinConvocar_(lista){
+  return (lista || []).filter(_deReunionSinConvocar_).sort(function(a, b){
+    return String(b.fecha || '').localeCompare(String(a.fecha || '')); });
+}
+
 function _firmaParte_(p){
   var at = String((p && p.decidido_at) || ''), por = String((p && p.decidido_por) || '');
   var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?Z$/.exec(at), el = null;
@@ -2200,7 +2469,12 @@ function _selloAprobado_(p, perAbierto, uc){
   var verbo = o === 'otorgada' ? 'otorgado' : (o === 'reversion' ? 'revertido' : 'aprobado');
   var per = /^\d{4}-\d{2}$/.test(String(perAbierto || '')) ? String(perAbierto) : null;
   var cre = String((p && p.creado_at) || ''), mes = null, cerrado = false;
-  if (/^\d{4}-\d{2}-\d{2}/.test(cre)){
+  /* ⛔⛔ 20/10 EL MES QUE GRABÓ EL SERVIDOR MANDA: `periodo` lo pone `marcarPartesAplicadas` con el mes abierto en el
+     instante en que las horas entraron en Notion — el «siempre registrado» que pidió Daniel. Lo de abajo es la
+     deducción para lo que aún no lo trae (aprobado y sin aplicar, o de antes del 20/10). */
+  var pg = String((p && p.periodo) || '');
+  if (/^\d{4}-\d{2}$/.test(pg)) mes = pg;
+  else if (/^\d{4}-\d{2}-\d{2}/.test(cre)){
     var c = (uc && uc.at) ? _mesCerradoParte_(p, null, uc) : null;
     if (c === false) mes = per;
     else if (c){ if (cre.slice(0, 7) > c) mes = c; else cerrado = true; }
@@ -2234,14 +2508,32 @@ var _DIAS_PRISA_ = 3;
    ⚠️ Las **palabras** son las de una reunión (*cierra*). Una tarea *vence*, y esa pantalla tiene
    las suyas: lo que comparten es la **cuenta** (`_diasHasta_`), no el verbo. */
 function _plazoTxt_(limite){
-  var iso = _dmyAISO_(String(limite == null ? '' : limite)).slice(0, 10);
+  /* ⛔ 20/10 (auditoría): LA FECHA POR `_normLimite_` (la que usa la REGLA): con `_dmyAISO_` a secas, «20/10/2026 10:00»
+     salía «sin límite». Y EL MISMO DÍA, POR LA HORA: el texto iba por días y la regla por minutos, así que un plazo
+     que cerró a las 10:00 seguía diciendo «cierra HOY» a las 15:00, al lado de «El plazo cerró». */
+  var _nl = (typeof _normLimite_ === 'function') ? _normLimite_(limite) : '';
+  var iso = (_nl || _dmyAISO_(String(limite == null ? '' : limite))).slice(0, 10);
   var dias = _diasHasta_(Date.parse(iso));
   if (dias === null) return 'sin l\u00edmite';
-  if (dias < 0)  return 'el plazo cerr\u00f3 el ' + _isoADMY_(iso);
+  if (dias < 0 || (dias === 0 && typeof _plazoAbierto_ === 'function' && !_plazoAbierto_(limite)))
+    return 'el plazo cerr\u00f3 el ' + _isoADMY_(iso);
   if (dias === 0) return 'cierra HOY';
   if (dias === 1) return 'cierra ma\u00f1ana';
   if (dias <= _DIAS_PRISA_) return 'cierra en ' + dias + ' d\u00edas';
   return 'cierra el ' + _isoADMY_(iso);
+}
+
+/* El plazo de una tarea (ISO de Notion o `DD/MM/AAAA` de la semilla) en `DD/MM/AAAA`, o `null` si no hay uno legible.
+   Y si ya venció (antes de hoy). 20/10: el escritorio pintaba el ISO crudo y «null». */
+function _plazoDMY_(l){
+  var iso=_dmyAISO_(String(l == null ? '' : l)).slice(0, 10);
+  return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(iso) ? _isoADMY_(iso) : null;
+}
+function _venciaTarea_(l){
+  var p=_plazoDMY_(l);
+  if(!p) return false;
+  var d=_diasHasta_(Date.parse(_dmyAISO_(p)));
+  return d !== null && d < 0;
 }
 
 function _isoADMY_(f){ f=String(f||''); var m=f.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):f; }
@@ -2271,7 +2563,7 @@ function _mcd_(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; }
       dan por vistos: al segundo siguiente se vuelve a intentar, y el cambio no se pierde. */
 var VIVO_CADA_MS = 1000;
 var VIVO_GRUPOS = {
-  getTurnos:      ['turnos','kv/turnos','kv/turnos_coches'],
+  getTurnos:      ['turnos','kv/turnos','kv/turnos_coches','kv/turnos_convocado_at'],   // la última: refutador 25, 🟡 9
   getTareas:      ['tareas','kv/tareas'],
   getEntregables: ['entregables','kv/entregables'],
   reuniones:      ['reuniones','respuestas','avisos-reunion','kv/convocatorias','kv/reu_max_id'],
@@ -2303,6 +2595,9 @@ function _arrancarVivo_(refrescar){
   setInterval(async function(){
     if(en || document.hidden) return;
     if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
+    /* 25/10 (auditor 33, 🟡 D2): con la sesión ya muerta no se pregunta — 60 fallos por minuto en el diario por una pestaña
+       olvidada. No se para el reloj: al volver a entrar, `_sesionMuerta_` vuelve a falso y sigue solo. */
+    if(typeof _sesionMuerta_==='function' && _sesionMuerta_()) return;
     en=true;
     try{
       var r=await _pide_('queHayNuevo');
@@ -2338,6 +2633,10 @@ function _pide_(accion, arg){
    variable de módulo: `comun.js` no lleva ni una sentencia ejecutable de nivel superior. */
 function _sesionMuerta_(v){
   if (v !== undefined) window.__SESION_MUERTA = !!v;
+  /* ⛔ 26/10 (refutador 36, 🟡 1): al REVIVIR (volver a entrar) se rearma también el aviso. Sin esto, tras una muerte
+     falsa —un `e.sesion` de paso— lo vivo se paraba hasta recargar aunque volvieras a entrar, y la próxima muerte de
+     verdad ya no se decía. */
+  if (v === false) window.__SESION_MUERTA_DICHA = false;
   return !!window.__SESION_MUERTA;
 }
 
@@ -2375,26 +2674,38 @@ function _avisarSesionMuerta_(){
 function _ordenarFranjas_(r){
   var F=(r&&r.franjas)||[], bl=(r&&r.bloques)||[], fij=(r&&r.fijadaBl)||[];
   var idx=F.map(function(_,i){ return i; });
+  /* 21/10 (auditor 13, 🟡 11): `orig[k]` = el índice ORIGINAL de la franja que queda en la posición k. Lo que vuelve al
+     servidor (fijar) va en índices originales: es como lo guarda y como lo re-mapean las dos caras al recargar. */
   if(idx.every(function(i){ return i===0 || _minHM_(F[i-1])<=_minHM_(F[i]); }))
-    return {franjas:F, bloques:bl, fijadaBl:fij, cambio:false};
+    return {franjas:F, bloques:bl, fijadaBl:fij, cambio:false, orig:idx};
   idx.sort(function(a,b){ return _minHM_(F[a])-_minHM_(F[b]); });
   var pos=[]; idx.forEach(function(vi,k){ pos[vi]=k; });
   return {
     franjas:  idx.map(function(i){ return F[i]; }),
     bloques:  bl.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
     fijadaBl: fij.map(function(b){ return Array.isArray(b)?[b[0],pos[b[1]]]:b; }),
-    cambio:   true
+    cambio:   true,
+    orig:     idx
   };
 }
 
 /* De sanción a movimiento del libro. La forma que espera `medidorHTML` es `{f,art,t,p,vv}`.
    `vv` es la tercera columna —lo que pasa con esos puntos— y se resuelve AQUI y no al pintar,
    porque depende del estado y el pintado no tiene por qué saber de estados de sanción. */
+/* 25/10 (auditor 33, 🟡 C2): lo que `confirmarLote` dejó PENDIENTE porque su sanción ya tiene otra revocación aprobada
+   (`yaRevocadas`). Ninguna cara lo leía: el bloque se daba por cerrado entero. */
+function _yaRevTxt_(n){
+  n=+n||0;
+  return n ? ' \u00b7 '+n+(n===1 ? ' revocación se queda pendiente (su sanción ya tiene otra aprobada)'
+                                  : ' revocaciones se quedan pendientes (sus sanciones ya tienen otra aprobada)') : '';
+}
+
 function _movDeSancion_(s){
   var just=(s.estado==='justificada');
-  var iso=String(s.fecha||'').slice(0,10);
   return {
-    f: (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? _isoADMY_(iso) : (s.fecha||'')),
+    /* 25/10 (auditor 33, 🟡 C1): el día de MADRID (`_diaMadridDe_`), no el corte UTC del sello — lo decidido entre las 00:00
+       y las 02:00 salía con el día anterior, y el historial del PD (que ya pasaba por aquí) decía otro. */
+    f: _diaMadridDe_(s.fecha) || (s.fecha||''),
     art: String(s.articulo||'—'),
     t: String(s.motivo||'(sin motivo)'),
     /* La insignia y la etiqueta salen del MISMO dato. El backend ya manda 0 en una
@@ -2408,15 +2719,64 @@ function _movDeSancion_(s){
     p: just ? 0 : _ptsSanc_(s.puntos),
     /* Los puntos SE REINICIAN CADA TEMPORADA (RRI Art. 29), no caducan sanción a sanción. Se
        dice así, con palabras, en vez de inventarse una fecha exacta que el RRI no fija. */
-    vv: just ? 'justificada<br>no restó' : 'hasta el fin<br>de temporada'
+    /* ⛔ 21/10 (auditor 12, 🟠 5 y 🟡 12): una REVOCADA se devolvió, una REVOCACIÓN devuelve y un PREMIO no resta.
+       Con el rótulo de siempre, «−1 hasta el fin de temporada» al lado de su «+1» se leía como dos cosas vivas. */
+    vv: just ? 'justificada<br>no restó'
+      : (s.estado === 'revocada') ? 'revocada<br>se devolvió'
+      : (s.origen === 'revocacion') ? 'devuelve<br>una sanción'
+      : (s.origen === 'premio') ? 'premio<br>no resta'
+      : 'hasta el fin<br>de temporada'
   };
 }
 
+/* ⛔ 21/10 (auditor 10, 🟡 13 de fondo): al cerrar sesión, los avisos de esa cuenta SEGUÍAN llegando a este navegador
+   — la suscripción quedaba a su nombre en el servidor; en un ordenador prestado, los de otra persona. Se le pide al
+   servidor que la suelte (`borrarPush`), y a propósito NO se da de baja aquí: al volver a entrar, `_pushInit_` la
+   re-guarda a nombre de quien entre sin pedir permiso otra vez. Devuelve qué hizo (para el banco y la consola). */
+async function _soltarPushDelServidor_(){
+  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.borrarPush) return 'sin sesion';
+  if(typeof navigator==='undefined' || !navigator.serviceWorker) return 'sin worker';
+  var reg=await navigator.serviceWorker.getRegistration();
+  var sub=(reg && reg.pushManager) ? await reg.pushManager.getSubscription() : null;
+  if(!sub) return 'sin suscripcion';
+  await api.borrarPush(sub.endpoint);
+  return 'soltada';
+}
+
 function cerrarSesion(){
-  SESION=null;
-  try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
-  try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
-  location.reload();
+  var hecho=false;
+  var fin=function(){
+    if(hecho) return;
+    hecho=true;
+    SESION=null;
+    try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
+    try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
+    location.reload();
+  };
+  /* Se sale SIEMPRE: si el servidor no contesta o falla, a los 3 s igual (no se retiene a nadie dentro). Lo que queda
+     entonces es su endpoint en el servidor, y el emisor lo poda en cuanto el navegador cambie de cuenta. */
+  setTimeout(fin, 3000);
+  try{ _soltarPushDelServidor_().then(fin, fin); }catch(_){ fin(); }
+}
+
+/* ⛔ 21/10 (auditor 10, 🟡 8): LO QUE ES una persona, en una frase, por UNA puerta para las dos caras. Cada sitio lo
+   decía a su manera y se contradecían con los datos reales: quien coordina una Unidad SIN `cargo` era «Miembro» en el
+   escritorio y «coordina…» en el móvil; un subcoordinador, «MIEMBRO» en la cabecera; y `coordina` (una lista) se
+   concatenaba con «+» («GNC,Unidad…»). Describe, no da permisos: el rango lo decide `rangoNom` y el servidor. */
+function _cargoTxt_(m){
+  if(!m) return 'Miembro';
+  if(m.cargo==='Project Director') return 'Project Director';
+  var us=_unidadesCoord_(m.coordina);
+  /* `coordina` es LO QUE coordina (con los datos reales ya trae su subsistema cuando también lo coordina); `unidad`,
+     sólo si no consta nada: decir «Coordinador de <su subsistema>» de quien coordina una Unidad le atribuye otra cosa. */
+  if(m.cargo==='Coordinador'){
+    if(!us.length && m.unidad) us=[m.unidad];
+    return us.length ? 'Coordinador de '+us.join(' · ') : 'Coordinador';
+  }
+  if(us.length) return 'Coordina '+us.join(' · ');
+  var sc=_subcoordDe_(m.nombre);
+  if(sc) return 'Subcoordina '+sc.equipo+' ('+sc.unidad+')';
+  return m.cargo || 'Miembro';
 }
 
 /* La subcoordinacion de alguien, o `null`. */
@@ -2444,7 +2804,9 @@ function rangoSanc(nombre){
      jurisdiccion propia declarada (un subcoordinador). */
   if (_subcoordDe_(n)) return 1;
   var m = _mSanc_(n);
-  if (m && m.cargo === 'Coordinador') return 1;
+  /* 26/10, Daniel, sobre Bruno (Logistica) y Marta (Patrocinios), sin cargo y con `coordina`: «Si, en su unidad».
+     Coordinador = el CARGO o coordinar alguna unidad (gemela de `servidor.es_coordinador` y `_rangoSanc_`). */
+  if (m && (m.cargo === 'Coordinador' || _unidadesCoord_(m.coordina).length > 0)) return 1;
   return 0;
 }
 
@@ -2453,7 +2815,9 @@ function rangoSanc(nombre){
 function puedeSancionarA(actor, objetivo){
   var r = rangoSanc(actor);
   if (r <= 0) return false;
-  if (r >= 3) return true;                                   // el PD, a cualquiera
+  /* 26/10 (triaje A5d): el PD, a cualquiera MENOS a sí mismo — nadie decide lo suyo y nadie le supera en rango, así
+     que esa sanción no la decidiría nadie. */
+  if (r >= 3) return String(objetivo) !== String(actor);
   /* Rango 2: a todos menos a quien tenga MAS rango que el. Se mira el RANGO y no el
      nombre: escrito con el nombre dentro, el dia que cambie el PD el nuevo queda
      DESPROTEGIDO y el anterior sigue blindado. Lo comprueba `probar_sancionar.py`. */
@@ -2464,6 +2828,7 @@ function puedeSancionarA(actor, objetivo){
   /* Coordinador de la unidad: la unidad ENTERA, subequipos incluidos. Se mira ANTES que la
      subcoordinacion porque Oscar es las dos cosas y lo que manda es lo mas amplio. */
   if (a && a.cargo === 'Coordinador' && o && a.unidad && a.unidad === o.unidad) return true;
+  if (o && o.unidad) { var _cu = _unidadesCoord_(a && a.coordina); for (var _k = 0; _k < _cu.length; _k++){ if (_cu[_k] === o.unidad) return true; } }  // 26/10
   /* Subcoordinador: SU equipo y nada mas. No se le suma el subsistema — eso es justo lo
      que lo distingue del coordinador. */
   var sc = _subcoordDe_(String(actor));
@@ -2681,10 +3046,44 @@ function _esNoJustificable_(origen, extra){
 /* El rotulo de una fila de la cola: dice QUE ES antes de decir cuanto. ⛔ `_etPtsSanc_` solo
    sabe de puntos, y la recompensa de un premio **no son puntos**: son horas
    (`extra.compensacion`). Pintar su `puntos:0` como «aviso» era decir lo contrario de lo que es. */
+/* ¿Esta fila de la cola es un PREMIO? UNA puerta para el rótulo de la fila (`_etSancFila_`) y la cabecera del lote
+   (`_rotuloLote_`): con el criterio copiado, el día que cambie uno la cabecera y las filas dirían cosas distintas. */
+function _esPremioSanc_(origen, extra){
+  var o = String(origen == null ? '' : origen);
+  return o === 'premio' || !!(extra && extra.compensacion && o !== 'revocacion');
+}
+
+/* ⛔ 20/10 (ficha «un PREMIO se pinta como sanción»): la cabecera del lote en el móvil era `it.length+' sanciones'`, y
+   los bloques de reunión traen premiados en el MISMO lote — «2 sanciones» sobre una sanción y un premio. El escritorio
+   dice «N personas», que no miente; aquí se separa, que es lo que el PD necesita leer antes de decidir. */
+function _rotuloLote_(it){
+  var n = (it || []).length, p = 0;
+  for (var i = 0; i < n; i++) if (_esPremioSanc_(it[i].origen, it[i].extra)) p++;
+  var s = n - p, out = [];
+  if (s || !p) out.push(s + ' ' + (s === 1 ? 'sanción' : 'sanciones'));
+  if (p) out.push(p + ' ' + (p === 1 ? 'premio' : 'premios'));
+  return out.join(' · ');
+}
+
+/* 22/10 (ensayo de la reunión #3, 🟡 8): el TÍTULO de la reunión de un lote `reunion-<id>`, buscado en la lista de
+   reuniones que ya tiene la cara (`titulo`, o `tit` en la semilla del escritorio). '' si el lote no es de una reunión,
+   o la reunión no está en la lista: entonces se queda el código, que es lo que había. ⛔ Con DOS lotes de las mismas
+   personas (la #2 pendiente y la #3), sólo el código no decía que eran reuniones distintas. */
+function _tituloLote_(lote, reus){
+  var m = /^reunion-(\d+)$/.exec(String(lote == null ? '' : lote));
+  if (!m) return '';
+  var L = Array.isArray(reus) ? reus : [];
+  for (var i = 0; i < L.length; i++){
+    var r = L[i];
+    if (r && String(r.id) === m[1]) return String(r.titulo || r.tit || '');
+  }
+  return '';
+}
+
 function _etSancFila_(pts, origen, extra){
   var o = String(origen == null ? '' : origen);
   var comp = extra && extra.compensacion;
-  if (o === 'premio' || (comp && o !== 'revocacion'))
+  if (_esPremioSanc_(o, extra))
     /* ⚠️ `nf2`, a 40 líneas de aquí en este mismo fichero: formatea decimales en es-ES
        (`nf2(0.5)` → «0,5»). Iba a escribir un `_hh_` nuevo — §5b lo caza. */
     return 'premio' + (comp ? ' · +' + nf2(comp) + ' h' : '');
@@ -2711,6 +3110,10 @@ function _etSancFila_(pts, origen, extra){
 function _puedeRevocarSanc_(s, arr){
   if (!s || s.estado !== 'aplicada') return false;     // solo la que ya quito puntos
   if (s.origen === 'revocacion') return false;         // una revocacion no se revoca
+  /* 21/10 (auditor 15, 🔴 2): ni un PREMIO — revocarlo no quita sus horas, desmarca la casilla de otra sancion y borra
+     una falta del gradiente. Hasta que Daniel diga si se revoca y que hace, no se ofrece (el servidor tampoco lo acepta). */
+  if (s.origen === 'premio') return false;
+  if (s.extra && s.extra.compensacion) return false;   /* 21/10 (verificador): un premio «manual» tambien es premio */
   /* ⛔ Y SI NO SE SABE CUANTOS PUNTOS TENIA, NO SE REVOCA (759.a aplicada aqui). El
      original hacia `-Number(s.puntos||0)`, que convierte «no llego» en un **0** -- y en esta
      pantalla el 0 no es «nada», es la revocacion de un AVISO. Mejor no ofrecerlo. */
@@ -2781,6 +3184,51 @@ function _puntosDeMotivo_(mot){
   for (i = 0; i < L.length; i++)
     if (L[i] && L[i][0] === mot && typeof L[i][2] === 'number') return String(L[i][2]);
   return null;
+}
+
+/* ⛔ 20/10 (ficha «el prefill de puntos se congela en el primer motivo elegido»). El campo de puntos se pintaba con
+   `SANC_FORM.pts||_puntosDeMotivo_(motivo)`, y `_recogerSancForm_` guarda en `pts` LO QUE PUSO EL PROPIO PREFILL: al
+   cambiar de motivo el `||` cortocircuitaba y la sanción salía con los puntos del artículo ANTERIOR, sin que ninguna
+   capa (ni `_validaPuntosSanc_`, sólo rango, ni el servidor) cruce puntos con artículo.
+   ⛔ Y NO se invierte el `||`: ese orden arregló el fallo contrario (un repintado asíncrono pisando lo tecleado). Lo
+   que distingue es POR QUÉ se repinta: un repintado conserva; un CAMBIO DE MOTIVO vuelve a proponer — salvo que la
+   persona haya tecleado otro número, que entonces es suyo. Por eso se recuerda lo PROPUESTO (`ptsPropuesto`). */
+/* ⛔ 26/10 (triaje A5b): EL 30g VA POR GRADIENTE, NO POR CATÁLOGO. El catálogo le pone −1 siempre, y el RRI reformado
+   dice: 1.ª vez aviso (0), 2.ª −1, 3.ª o más −2 — contado dentro de su familia (`disponibilidad`), que es lo que trae
+   `_vecesSinCubrir_`. Sin persona elegida o sin constancia de su historial: `''` — el campo vacío obliga a decidirlo, un
+   −1 puesto solo se envía con pinta de elegido. `undefined` = este motivo no va por gradiente (manda el catálogo). */
+function _ptsGradienteSanc_(mot, quien){
+  if (mot !== '30g') return undefined;
+  if (!quien) return '';
+  var v = (typeof _vecesSinCubrir_ === 'function') ? _vecesSinCubrir_(quien) : null;
+  if (v === null) return '';
+  return v === 0 ? '0' : (v === 1 ? '-1' : '-2');
+}
+function _ptsPrefillSanc_(){
+  if (SANC_FORM.pts) return SANC_FORM.pts;
+  var p = _ptsGradienteSanc_(SANC_FORM.motivo, SANC_FORM.quien);
+  if (p === undefined) p = _puntosDeMotivo_(SANC_FORM.motivo) || '';
+  SANC_FORM.ptsPropuesto = p;
+  return p;
+}
+/* 26/10 (A5b): con el 30g, CAMBIAR DE PERSONA cambia lo propuesto (es su historial). Elegir persona no repinta el
+   formulario —a propósito—, así que se toca sólo el campo, y sólo si sigue con lo propuesto: lo tecleado es suyo. */
+function _quienCambiaSanc_(){
+  if (SANC_FORM.motivo !== '30g') return;
+  var e = (typeof $ === 'function') ? $('#snPts') : null;
+  var v = e ? e.value : SANC_FORM.pts;
+  if (String(v == null ? '' : v) !== '' && String(v) !== String(SANC_FORM.ptsPropuesto)) return;
+  SANC_FORM.pts = '';
+  var p = _ptsPrefillSanc_();
+  if (e) e.value = p;
+}
+function _motivoCambiaSanc_(){
+  var e = (typeof $ === 'function') ? $('#snPts') : null;
+  var v = e ? e.value : SANC_FORM.pts;
+  if (SANC_FORM.ptsPropuesto != null && String(v == null ? '' : v) === String(SANC_FORM.ptsPropuesto)) {
+    SANC_FORM.pts = '';
+    if (e) e.value = '';
+  }
 }
 
 function _sancCampos_(){
@@ -2994,22 +3442,58 @@ function _novedadesHTML_(){
    pregunta AQUÍ DENTRO además de en el menú — esconder el botón es cortesía, y en el escritorio
    a una vista se llega también por `ir()`.
    Los `data-est`/`data-fam` no pintan nada: son lo que el banco cuenta, en ASCII. */
+/* ⛔ 20/10 (ficha 22489): EL PULSO DEL GATE, en Automatismos. El inventario de abajo es una FOTO de cuando se publicó;
+   esto es lo único de la pantalla que dice si el motor está pasando AHORA. El estado vive en `_pulsoGateCargar_.p`
+   (un módulo sólo lleva declaraciones `function`, ARRANQUE §5b): `undefined` = sin pedir, `null` = en vuelo,
+   `{error}` = no se pudo preguntar, objeto = la respuesta del mini PC. */
+function _pulsoGateCargar_(repintar){
+  var F=_pulsoGateCargar_;
+  /* ⛔ 21/10 (auditor 7, 🟠 3): se preguntaba UNA vez por sesión — con el motor parado 47 min, la segunda apertura seguía
+     diciendo «pasó hace 1 min». Ahora se vuelve a preguntar si la respuesta tiene más de 30 s; mientras vuela se sigue
+     pintando la anterior (`F.vuelo`), y sólo la primera vez sale «preguntando…». */
+  if(F.vuelo || (F.p!==undefined && (Date.now()-(F.t||0))<30000)) return;
+  if(typeof api==='undefined' || typeof api.getPulsoGate!=='function'){ F.p={error:'esta cara no lo pregunta'}; F.t=Date.now(); return; }
+  F.vuelo=true; if(F.p===undefined) F.p=null;
+  Promise.resolve().then(function(){ return api.getPulsoGate(); })
+    .then(function(r){ F.p=(r && typeof r==='object') ? r : {error:'respuesta vacía'}; })
+    .catch(function(e){ F.p={error:String((e&&e.message)||e||'sin detalle')}; })
+    .then(function(){ F.vuelo=false; F.t=Date.now(); if(typeof repintar==='function') repintar(); });
+}
+function _pulsoGateHTML_(p){
+  if(p===undefined || p===null) return '<p class="rnota" data-pulso="cargando">Preguntando al servidor cuándo pasó el motor por última vez…</p>';
+  if(p.error) return '<p class="rnota" data-pulso="error">⚠ No pude preguntar cuándo pasó el motor ('+esc(p.error)+
+    '). Eso NO dice que esté parado: dice que no lo sé.</p>';
+  var m=p.minutos, mu=(typeof p.muerto_min==='number') ? p.muerto_min : 10, ca=p.cadencia_min||2;
+  if(m===null || m===undefined) return '<p class="rnota" data-pulso="nolose" style="color:var(--rojo,#E41E25)">⛔ El motor '+
+    '<b>no ha dejado constancia de ninguna pasada</b> en el mini PC: o no ha corrido nunca, o su estado no se lee.</p>';
+  var cuando=(m<1) ? 'hace menos de 1 min' : ('hace '+m+' min');
+  if(m>mu) return '<p class="rnota" data-pulso="parado" style="color:var(--rojo,#E41E25)">⛔ <b>El motor lleva '+m+
+    ' min sin pasar</b> (toca cada '+ca+'): nadie cierra fichajes, caduca partes ni manda avisos mientras tanto.</p>';
+  return '<p class="rnota" data-pulso="vivo">✅ El motor pasó <b>'+cuando+'</b> (toca cada '+ca+' min).</p>';
+}
 function _automatismosHTML_(){
   var tit='<div class="mtit">Automatismos</div>';
   if(!_puedeVerNovedades_()){
     return tit+'<p class="rnota" data-est="nopuede">Esta pantalla es del director, y sólo en la beta.</p>';
   }
+  /* El pulso va ARRIBA de todo: es lo vivo de la pantalla (lo de debajo es la foto de publicar), y sale también
+     cuando el inventario no se selló — que es justo cuando más falta saber si el motor pasa. */
+  var pul=(typeof _pulsoGateCargar_==='function' && _pulsoGateCargar_.p!==undefined) ? _pulsoGateHTML_(_pulsoGateCargar_.p) : '';
   var A=(typeof AUTOMATISMOS==='undefined') ? null : AUTOMATISMOS;
   if(!A || typeof A!=='object'){
-    return tit+'<div class="msub">Lo que el repositorio ya hace solo.</div>'+
+    return tit+pul+'<div class="msub">Lo que el repositorio ya hace solo.</div>'+
       '<p class="rnota" data-est="sinsellar">El inventario no se selló en esta build. Sale de '+
       '<span class="mono">rutinas/automatismos.py</span> del repositorio, al publicar.</p>';
   }
   var m=String(A.generado||'').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-  var h=tit+(m
-    ? '<div class="msub" data-est="foto">Foto del momento de publicar: <b>'+
+  var h=tit+pul+(m
+    ? (A.calculado
+      ? '<div class="msub" data-est="foto">Comprobado por el motor el <b>'+
+        m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>, con «Comprobarlo ahora». Lo que haya cambiado después '+
+        'no sale aquí.</div>'
+      : '<div class="msub" data-est="foto">Foto del momento de publicar: <b>'+
       m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>. No es un «comprobar ahora»: lo que haya '+
-      'cambiado después no sale aquí.</div>'
+      'cambiado después no sale aquí.</div>')
     : '<div class="msub" data-est="sinfecha"><b>Sin fecha</b>: no se sabe de cuándo es esta foto, '+
       'así que no la des por actual.</div>');
   /* ⛔ EL BOTON DE COMPROBAR (765.a). Daniel (10/09): «darle a un boton y que checkee».
@@ -3017,8 +3501,9 @@ function _automatismosHTML_(){
      backend no tiene repo. Lo que hace el boton es levantar el flag `comprobar_automatismos`;
      el gate lo recoge en su siguiente pasada -- hasta 2 minutos -- y publica el resultado.
      Decir «comprobado» al pulsar seria mentir justo durante esa espera.
-     ⚠️ Solo en el escritorio: en el movil no hay donde poner esto y nadie lo ha pedido. */
-  h+='<p class="rnota" style="margin:10px 0 0">'+
+     ⚠️ Solo en el escritorio: en el movil no hay donde poner esto y nadie lo ha pedido.
+     ⛔ 21/10 (auditor 7, 🟠 6): y por eso se pinta sólo donde existe su manejador; en el móvil era un botón muerto. */
+  if(typeof _engComprobarAuto_==='function') h+='<p class="rnota" style="margin:10px 0 0">'+
     '<button class="btn sm" data-comprauto>Comprobarlo ahora</button> '+
     '<span style="color:var(--ink3)">Lo calcula el gate en su siguiente pasada, '+
     '<b>hasta 2 min</b>: la app no puede comprobarlo ella, porque esto sale del '+
@@ -3054,7 +3539,10 @@ function _automatismosHTML_(){
     for(var j=0;j<fil.length;j++){
       var x=fil[j], t;
       if(fams[k][0]==='gate'){
-        t=(x.siempre ? 'siempre' : (x.con_interruptor ? 'si su interruptor está encendido' : 'sin interruptor'))+
+        /* 21/10 (auditor 7, 🟠 5): «siempre» de algo que manda según un control de otra pantalla era falso. */
+        t=(x.siempre ? (x.interruptor_en ? 'cada pasada, pero sólo manda si está encendido su interruptor de '+
+            esc(x.interruptor_en) : 'siempre') : (x.con_interruptor ? (x.encargo
+              ? 'cuando se le encarga (una vez; se apaga sola al acabar)' : 'si su interruptor está encendido') : 'sin interruptor'))+
           (x.tipo==='ia' ? ' · ⚠ llama a un modelo ('+esc(x.modelo||'sin decir cuál')+')' : '');
       } else if(fams[k][0]==='arreglan'){
         t=esc(x.que)+' · '+(x.con_orden ? 'tiene una orden que lo arregla' : esc(x.arregla||'sin decir cómo'));
@@ -3063,6 +3551,10 @@ function _automatismosHTML_(){
       } else {
         t=esc(x.que||'(sin describir)')+(x.escribe_fuera ? ' · ⚠ '+esc(x.escribe_fuera) : '');
       }
+      /* 21/10: y si el servidor lo dijo, en qué estado está AHORA (`AUTO_ESTADO`, sólo el escritorio lo pregunta). */
+      if(fams[k][0]==='gate' && x.con_interruptor && typeof AUTO_ESTADO==='object' && AUTO_ESTADO &&
+         Object.prototype.hasOwnProperty.call(AUTO_ESTADO, x.nombre))
+        t+=' · '+(AUTO_ESTADO[x.nombre]===true ? '<b>encendido ahora</b>' : (AUTO_ESTADO[x.nombre]===false ? 'apagado ahora' : 'no consta'));
       h+='<li data-fam="'+fams[k][0]+'"><b>'+esc(x.nombre)+'</b> — '+t+'</li>';
     }
     h+='</ul>';
@@ -3080,7 +3572,20 @@ function optHoras(sel){
   return s;
 }
 
-function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?(m[3]+'-'+m[2]+'-'+m[1]):f; }
+/* ⛔ 20/10 (auditor de turnos): LA REFERENCIA DE UN TURNO SIN `id`, una sola para las dos caras — «T·MMDD·HH:MM».
+   Cada cara fabricaba la suya («T-2026-10-25» / «T·1025·17:00»), y la del móvil es su CLAVE: dos turnos del mismo día
+   salían con la misma y al pulsar el segundo se abría el primero. Con la hora se distinguen. Sin fecha legible, el
+   índice (`ix`) — no una fecha inventada. Acepta ISO y DD/MM/AAAA. */
+function _refTurno_(t, ix){
+  if(t && t.id) return String(t.id);
+  var iso = _dmyAISO_(String((t && (t.fecha || t.f)) || ''));
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return 'T·' + (ix == null ? '?' : ix);
+  return 'T·' + iso.slice(5, 7) + iso.slice(8, 10) + (t.hora ? '·' + String(t.hora).slice(0, 5) : '');
+}
+
+/* 21/10: también `6/9/2026` y `06/09/26` — sin enderezar, `_normLimite_` los comparaba como cadena y «6» > «2»: plazo
+   abierto para siempre. Día y mes de 1-2 cifras, año de 2 (→ 20AA) o 4. */
+function _dmyAISO_(f){ f=String(f||''); var m=f.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})$/); return m?((m[3].length===2?'20'+m[3]:m[3])+'-'+(m[2].length<2?'0':'')+m[2]+'-'+(m[1].length<2?'0':'')+m[1]):f; }
 
 /* La temporada va de septiembre a agosto · GEMELA de `reglas/disciplina.py:temporada_de`.
    Si esto y el Python discrepan, el que manda es el Python: ahi se calculan los puntos. */
@@ -3176,13 +3681,23 @@ function _deEstaTemporada_(d){
    ⛔ Y SIN PERIODO DEVUELVE `null`, NO 0 (§3c-24): un 0 ahí afirma «este mes no has resuelto
    nada» cuando lo que pasa es que no se sabe qué mes es. ⚠️ Con la lista VACÍA sí devuelve
    `{n:0}`: «no hay partes» se sabe, y es otra cosa. */
-function _resueltosDelPeriodo_(partes, periodo){
+function _resueltosDelPeriodo_(partes, periodo, uc){
   if(!/^\d{4}-\d{2}$/.test(String(periodo||''))) return null;
-  var L = partes || [], n = 0, sf = 0, i, d;
+  /* ⛔ 20/10 (auditor de partes): DE CIERRE A CIERRE, como `periodo_en` del servidor (ARRANQUE §2b). Antes era el mes de
+     calendario EN UTC de la cadena: lo decidido el 30/09 a las 22:30Z (01/10 en Madrid) contaba en septiembre, y lo del
+     1 al cierre de septiembre contaba en octubre. Con el último cierre (`uc`, el del mes anterior a `periodo`), cuenta
+     lo decidido DESDE su instante; sin él, el mes LOCAL de la decisión — un respaldo que yerra entre el día 1 y el
+     cierre, no un dato. */
+  var tUc = (uc && typeof _mesSiguiente_ === 'function' && _mesSiguiente_(uc.periodo) === String(periodo))
+            ? Date.parse(String(uc.at || '')) : NaN;
+  var L = partes || [], n = 0, sf = 0, i, d, t, f;
   for(i = 0; i < L.length; i++){
     d = String((L[i] || {}).decidido_at || '');
-    if(!/^\d{4}-\d{2}/.test(d)){ sf++; continue; }
-    if(d.slice(0, 7) === String(periodo)) n++;
+    t = /^\d{4}-\d{2}/.test(d) ? Date.parse(d) : NaN;
+    if(isNaN(t)){ sf++; continue; }
+    if(!isNaN(tUc)){ if(t >= tUc) n++; continue; }
+    f = new Date(t);
+    if(f.getFullYear() + '-' + ('0' + (f.getMonth() + 1)).slice(-2) === String(periodo)) n++;
   }
   return { n: n, sinFecha: sf };
 }
@@ -3190,6 +3705,24 @@ function _resueltosDelPeriodo_(partes, periodo){
 function _esDeMesPasado_(p, periodo){
   var per = String(periodo||'');
   if(!/^\d{4}-\d{2}$/.test(per)) return false;
+  /* ⛔ 20/10 (2846) EL MES QUE GRABÓ EL SERVIDOR MANDA SOBRE LA FECHA, como en `_selloAprobado_`. Lo hacen falta dos
+     casos: el parte DEL SISTEMA con la compensación base de septiembre lleva la fecha del CIERRE (5 de octubre) y por
+     fecha caería en octubre —la base contada dos veces—; y lo atrasado («de julio declarado en agosto») cuenta en el
+     mes en que entró, 🗣️ «Siempre al actual». Sin `periodo` (lo de antes del 20/10), la fecha, como siempre. */
+  var pp = String((p&&p.periodo)||'');
+  if(/^\d{4}-\d{2}$/.test(pp)) return pp < per;
+  /* ⛔ 20/10 (auditor de partes): SIN `periodo`, CUÁNDO ENTRÓ (`creado_at`) y no la fecha del trabajo — el mismo
+     criterio que el sello (`_mesCerradoParte_`) y el servidor. Trabajado el 28/09 y creado el 06/10 con septiembre
+     cerrado el 05/10 se plegaba en «De meses anteriores» mientras su sello decía «cuenta en octubre». Con el último
+     cierre (`CIERRE_UC`, el del mes anterior a `per`), su instante; sin él, el mes LOCAL de la creación. */
+  var cre = String((p&&p.creado_at)||''), tc = /^\d{4}-\d{2}-\d{2}T/.test(cre) ? Date.parse(cre) : NaN;
+  if(!isNaN(tc)){
+    var uc = (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null;
+    if(uc && uc.at && typeof _mesSiguiente_==='function' && _mesSiguiente_(uc.periodo)===per
+       && !isNaN(Date.parse(String(uc.at)))) return tc < Date.parse(String(uc.at));
+    var dc = new Date(tc);
+    return (dc.getFullYear()+'-'+('0'+(dc.getMonth()+1)).slice(-2)) < per;
+  }
   var iso = String((p&&p.iso)||'');
   if(!/^\d{4}-\d{2}/.test(iso)) return false;
   return iso.slice(0,7) < per;
@@ -3368,11 +3901,19 @@ function _compExtra_(m){
    es la forma mas rapida de que nadie se entere de que esta roto. */
 function _ultimosMov_(lista, fecha, cuanto, ambito){
   var dentro = (ambito==='mes') ? _deEsteMes_ : _deEstaTemporada_;
+  /* ⛔ 20/10 (auditoría): «ESTE MES» POR EL MES QUE GRABÓ EL SERVIDOR, como la cifra grande. `_deEsteMes_` sólo ve
+     la fecha, y la cifra (`sumaSiMes` → `_esDeMesPasado_`) lee antes el `periodo`: la base de septiembre, fechada el
+     día del cierre (5 de octubre), salía en la lista de octubre, y lo atrasado (de septiembre declarado en octubre) no.
+     La cifra decía 7 h y la lista sumaba 6. Sin `periodo` en el apunte, la fecha, como siempre. */
+  var _per = (ambito==='mes' && typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  var _rePer = /^\d{4}-\d{2}$/;
   var conD=[], sinD=[], suma=0;
   (lista||[]).forEach(function(x){
     var d=_fechaDMY_(fecha(x));
     if(!d){ sinD.push(x); suma+=(cuanto?(+cuanto(x)||0):0); return; }
-    if(!dentro(d)) return;
+    if(typeof _esDeMesPasado_==='function' && _rePer.test(String(_per||'')) && _rePer.test(String((x&&x.periodo)||''))){
+      if(_esDeMesPasado_({periodo:x.periodo}, _per)) return;
+    } else if(!dentro(d)) return;
     conD.push({x:x,d:d}); suma+=(cuanto?(+cuanto(x)||0):0);
   });
   conD.sort(function(a,b){ return b.d-a.d; });
@@ -3577,8 +4118,136 @@ function _nomMesAbierto_(corto){
 function _mesACerrar_(hoy){
   var h=hoy||new Date(), a=h.getFullYear(), m=h.getMonth();  /* getMonth() es 0-11 */
   if(m===0){ a-=1; m=11; } else { m-=1; }
-  var mm=m+1;
-  return { p:a+'-'+(mm<10?'0':'')+mm, mes:MESES_L[m] };
+  var mm=m+1, p=a+'-'+(mm<10?'0':'')+mm;
+  /* ⛔ 20/10 (auditoría): SI EL MES ABIERTO ES MÁS VIEJO QUE «EL ANTERIOR AL DEL RELOJ», SE CIERRA ÉSE. Un mes no se
+     salta: el 1 de diciembre con octubre sin cerrar, lo que toca cerrar es octubre, no noviembre (🗣️ «mientras no se
+     cierre el mes no cambiamos de mes realmente»). Si no es más viejo, nada cambia: con septiembre cerrado, el 20 de
+     octubre sigue proponiendo septiembre (ya cerrado), como siempre. */
+  var abierto=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  /* ⛔⛔ 21/10 (auditor 9, 🟠 4): Y SI ES MÁS NUEVO, TAMBIÉN. Lo que toca cerrar es el mes ABIERTO —el siguiente al último
+     cierre—, sea más viejo o más nuevo que «el anterior al del reloj»: del 6 al 31 de octubre, con septiembre cerrado el
+     05/10, esto proponía «Cierre de septiembre · LLEVA 21 días» y el botón «Calcular el cierre de septiembre». Sin
+     último cierre conocido, el reloj como hasta hoy. */
+  if(/^\d{4}-\d{2}$/.test(String(abierto||'')) && abierto !== p){
+    p=abierto; m=parseInt(abierto.slice(5,7),10)-1;
+  }
+  /* …pero un mes que AÚN CORRE no se cierra (la gemela del auditor del 20/10): `curso` = el mes de `p` no ha terminado
+     el día `h`. Las caras bloquean «Calcular» con él: el corte va del cierre anterior HASTA HOY, y calcular octubre el
+     20/10 lo cortaría a medias. */
+  var _hoyYM=h.getFullYear()+'-'+(h.getMonth()<9?'0':'')+(h.getMonth()+1);
+  return { p:p, mes:MESES_L[m], curso:(p >= _hoyYM) };
+}
+
+/* ⛔ 21/10 (auditor 9, 🟠 1/🟠 2): EL PLAN DE LA RANURA, SÓLO SI ES DEL MES QUE TOCA CERRAR (o de uno posterior). La
+   ranura `cierre_plan` guarda el ÚLTIMO plan que alguien escribió, y no se vacía: hoy trae el de JULIO «parado a medias»
+   (una pasada del 19/10), con julio aplicado el 04/08. Creérselo pintaba «PARADO A MEDIAS · hay fichas nuevas y viejas
+   conviviendo» y, en el móvil, tapaba el botón «Calcular». Un plan de un periodo ANTERIOR es de un ciclo pasado: `null`.
+   Sin periodo legible en alguno de los dos, se queda el plan (no lo sé no es «viejo»). */
+/* ⛔ 21/10 (auditor 9, 🟠 3): EL ÚLTIMO CÁLCULO DEL CIERRE FALLÓ. `calcular_cierre.py` baja su flag con la nota «plan NO
+   calculado (salida N)» y el servidor la devuelve en `ultimo_calculo`; sin esto, pulsar «Calcular» y que fallase dejaba
+   la pantalla con el plan anterior y ni una palabra. Texto plano (la cara lo escapa), o '' si no hay fallo o si hay un
+   cálculo en cola (entonces manda ése). */
+/* ⛔ 21/10 (auditor 9, 🟡 1): UN INSTANTE DEL CIERRE, PARA LEERLO UNA PERSONA: «DD/MM/AAAA HH:MM» en hora de MADRID
+   (el `resultado.at` viaja en UTC: «2026-10-19 11:20» eran las 13:20). Una fecha sin hora sale «DD/MM/AAAA»; lo que no
+   se entienda, tal cual (no se inventa una fecha). */
+function _cuandoMadrid_(iso){
+  var s = String(iso || ''), d = new Date(s);
+  if(/T\d{2}:\d{2}/.test(s) && !isNaN(d.getTime())){
+    var x = _ahoraLocalISO_(d);
+    return _isoADMY_(x.slice(0,10)) + ' ' + x.slice(11,16);
+  }
+  if(/T\d{2}:\d{2}/.test(s)) return _isoADMY_(s.slice(0,10)) + ' ' + s.slice(11,16);
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? _isoADMY_(s.slice(0,10)) : s;
+}
+
+/* ⛔ 21/10 (auditor 9, 🟡 2): «HAY FICHAS NUEVAS Y VIEJAS CONVIVIENDO» SÓLO SI SE ESCRIBIÓ ALGUNA. `parado` = un
+   descuadre o un fallo, aunque no se haya escrito nada: se decía «conviven» sobre 0 fichas escritas. Sin `resultado`
+   o sin `aplicadas`, no se sabe: se queda el aviso de siempre (el lado prudente). */
+function _convivenFichas_(plan){
+  var r = plan && plan.resultado;
+  if(!r || r.aplicadas == null) return true;
+  return Number(r.aplicadas) > 0;
+}
+
+/* 22/10 (auditor 22, 🟠 2): la gemela para APLICAR. En vuelo, que no se pulse otra vez; fallado («cierre NO aplicado»),
+   que se diga — antes las dos se veían igual que «sin pulsar», con el botón activo. */
+/* 22/10 (refutador 22, 🟠 2): cuántos MINUTOS lleva arriba el flag de «Aplicar» (`aplicando.at`), o `null` si no se
+   sabe. El flag arriba quiere decir «encolado o escribiéndose», no «escribiéndose»: si el motor no pasa, se queda arriba. */
+function _minAplicando_(est, hoy){
+  var at = est && est.aplicando && est.aplicando.at, t = at ? Date.parse(at) : NaN;
+  if(isNaN(t)) return null;
+  return Math.max(0, Math.floor(((hoy || new Date()).getTime() - t) / 60000));
+}
+
+/* 22/10 (refutador 22, 🟠 1/🟠 2): ¿se BLOQUEA «Aplicar»? Sí mientras el flag está arriba y es reciente; pasados 15 min
+   el motor (que va cada 2) ya lo habría recogido, así que lo más probable es que esté parado: se deja volver a pulsar
+   (encolar otra vez sólo reescribe el flag) en vez de dejar el botón muerto para siempre. */
+function _aplicandoVivo_(est, hoy){
+  if(!(est && est.aplicando)) return false;
+  var m = _minAplicando_(est, hoy);
+  return m === null || m < 15;
+}
+
+/* 26/10 (triaje 5.2): quien sigue FICHADO al cerrar el mes. Un AVISO, no un bloqueo: su parte cuenta en el mes en que se
+   APLIQUE (decisión 3.1; 11/08: «Siempre al actual»), así que si lo declara después del cierre entra en el siguiente.
+   `''` si no hay ninguno o el servidor no lo dice (una respuesta vieja sin el campo no es «nadie fichado» que contar). */
+function _avisoFichajesCierre_(est){
+  var fa=(est && Array.isArray(est.fichajes_abiertos)) ? est.fichajes_abiertos : [];
+  var ns=fa.map(function(f){ return f && f.autor; }).filter(Boolean);
+  if(!ns.length) return '';
+  return (ns.length===1 ? ns[0]+' sigue fichado' : ns.length+' personas siguen fichadas ('+ns.join(', ')+')')+
+    ': no bloquea el cierre. Lo que declare'+(ns.length===1?'':'n')+' cuenta en el mes en que se apruebe — '+
+    'si es después de cerrar, en el siguiente.';
+}
+
+function _avisoAplicarCierre_(est, hoy){
+  if(est && est.aplicando){
+    var m = _minAplicando_(est, hoy);
+    if(!_aplicandoVivo_(est, hoy))
+      return 'El «Aplicar» lleva ' + m + ' min en cola y el motor no lo ha recogido (pasa cada 2 minutos): puede que esté ' +
+             'parado — míralo en Automatismos. Puedes volver a pulsarlo.';
+    return 'Aplicando el cierre: en cola o escribiéndose' + (m === null ? '' : ' (pulsado hace ' + m + ' min)') +
+           '; el motor pasa cada 2 minutos. No lo pulses otra vez.';
+  }
+  var ua = est && est.ultimo_aplicar;
+  /* «NO terminado» desde el 22/10 (refutador 22, 🟡 5); «NO aplicado» es la nota de antes, que puede seguir en la fila. */
+  if(!ua || !/NO (terminado|aplicado)/.test(String(ua.nota || ''))) return '';
+  var dia = _diaMadridDe_(ua.at);
+  return 'El último «Aplicar» NO terminó' + (dia ? ' (' + dia + ')' : '') + ': «' + String(ua.nota) + '». El aviso del ' +
+         'gate dice por qué; míralo antes de volver a pulsar.';
+}
+
+function _avisoCalculoCierre_(est){
+  var uc = est && est.ultimo_calculo;
+  if(!uc || (est && est.encolado) || !/NO calculado/.test(String(uc.nota || ''))) return '';
+  var dia = _diaMadridDe_(uc.at);
+  return 'El último cálculo del cierre FALLÓ' + (dia ? ' (' + dia + ')' : '') + ': «' + String(uc.nota) + '». No hay ' +
+         'plan nuevo; el aviso del gate dice por qué. Míralo antes de volver a pulsar.';
+}
+
+/* 22/10 (auditor 22, 🟡 6): LA LÍNEA DEL PLAN DE UN MES YA CERRADO, en las dos caras. Si quedó APLICADO entero es el
+   cierre que se acaba de hacer, y se dice así —con cuántas fichas—: nada más sellar, la pantalla decía de él «no es el
+   cierre de ahora y no cuenta» y escondía el resultado. Parado o a medias, la de siempre. Devuelve HTML (lleva <b>). */
+function _notaPlanViejo_(v){
+  if(!v) return '';
+  var mes='<b>'+esc(_nomPeriodo_(v.periodo))+'</b>', r=v.resultado||null;
+  /* ⛔ 22/10 (refutador 22, 🟡 6): un AUSENTE (se fue: su ficha ya no está en Notion) no impide sellar, así que no
+     convierte el cierre en «a medias»: sólo cuenta como a medias lo que falta MÁS ALLÁ de los ausentes. */
+  var inc=_cierreIncompleto_(v);
+  if(v.aplicado && !v.parado && (!inc || inc.faltan===inc.ausentes)){
+    var n=(r && typeof r.aplicadas==='number') ? r.aplicadas : null;
+    return 'El último cierre, el de '+mes+', está <b>aplicado</b>'+
+      (n!==null ? ' ('+n+' ficha'+(n===1?'':'s')+' escrita'+(n===1?'':'s')+' en Notion'+
+        (inc ? '; '+inc.ausentes+' ya no tiene'+(inc.ausentes===1?'':'n')+' ficha' : '')+')' : '')+'.';
+  }
+  return 'La última ranura del servidor trae el plan de '+mes+', de un mes ya cerrado: no es el cierre de ahora y no cuenta.';
+}
+
+function _planVigente_(plan, hoy){
+  if(!plan) return null;
+  var p=String(plan.periodo||''), toca=_mesACerrar_(hoy).p;
+  if(/^\d{4}-\d{2}$/.test(p) && /^\d{4}-\d{2}$/.test(String(toca||'')) && p < toca) return null;
+  return plan;
 }
 
 function _numPlan_(v){
@@ -3753,50 +4422,97 @@ function _urlB64_(b64){
   return arr;
 }
 
-/* ══ HAY UNA VERSION NUEVA (545.ª, 10/09/2026) ═══════════════════════
+/* ══ HAY UNA VERSION NUEVA → SE CARGA SOLA (20/10/2026; antes, barra con botón desde el 10/09) ═══
 
-   ⛔⛔ Daniel, 10/09: *«no me llego nada a la app ni siquiera ninguna novedad»*. La cache
-   del worker sirve `guardado || red`, o sea **la cara de ayer** en la primera apertura.
-   Quitarla no vale: entro para arreglar *«tarda mucho en abrir a veces»*, que tambien lo
-   reporto el. Asi que se sigue abriendo al instante **y se avisa** cuando la red trae algo
-   distinto -- lo detecta `_hayVersionNueva_` en `sw.js` comparando la huella (`ETag`).
+   🗣️ Daniel, 20/10: *«quita la opción de actualizar la app directamente actualizasela a todo dios»* · *«el botón de
+   actualizar es inútil pq la gente no lo ve, directamente actualiza a la última cada vez q lo abres y ya»*.
+   Lo grueso está en `sw.js`, que ahora pide a la RED primero: casi siempre se abre ya en la última. Esto cubre el
+   resto -- la red tardó, se abrió con lo guardado, y luego llegó lo nuevo (`version-nueva`).
+   ⛔ Y NO HAY BARRA NI BOTÓN: se recarga. Lo que queda de la decisión del 10/09 es su MIEDO, no su conclusión:
+   recargar encima de una disponibilidad a medio pintar o un motivo a medio escribir pierde trabajo. Por eso:
+   · si aún no has tocado nada desde que abrió → **al momento**;
+   · si ya estabas usándola → **la próxima vez que vuelvas a la app** (es «cada vez que la abres»), y sólo si no
+     hay nada a medias en ese instante. */
+var _avisoVersion = false;   // hay una versión nueva esperando a cargarse
 
-   ⛔ **NO RECARGA SOLA, Y ESO ES LA DECISION.** El arreglo obvio es `location.reload()` al
-   recibir el mensaje, y borraria lo que alguien lleve marcado -- una disponibilidad a medio
-   pintar, un motivo escrito a medias. Se ofrece; decide quien esta delante. */
-var _avisoVersion = false;
+/* La decisión, pura (la ejecuta `probar_sw.py`). `st` = {tocado, aMedias, volviendo}. */
+function _recargaVersionYa_(st){
+  st = st || {};
+  if (st.aMedias) return false;            // ⛔ nunca encima de algo a medio hacer
+  if (!st.tocado) return true;             // recién abierta: nadie ha empezado nada
+  return !!st.volviendo;                   // usándola: al volver a ella, no en mitad
+}
 
-function _pintarVersionNueva_(){
-  /* ⛔ UNA SOLA VEZ. El worker manda un mensaje **por fichero** que cambia, y en una
-     publicacion cambian varios: sin esto salen cinco barras encima de la pantalla. */
-  if (_avisoVersion) return false;
-  if (typeof document === 'undefined' || !document.body) return false;
-  _avisoVersion = true;
-  var d = document.createElement('div');
-  d.id = 'vnueva';
-  d.setAttribute('style', 'position:fixed;left:10px;right:10px;bottom:calc(10px + '
-    + 'env(safe-area-inset-bottom,0px));z-index:9999;display:flex;gap:10px;'
-    + 'align-items:center;padding:11px 12px;border-radius:12px;font-size:12.5px;'
-    + 'background:#1b1a19;border:1px solid rgba(255,255,255,.18);color:#f2f0ee;'
-    + 'box-shadow:0 6px 22px rgba(0,0,0,.45)');
-  var t = document.createElement('span');
-  t.setAttribute('style', 'flex:1;line-height:1.4');
-  t.textContent = 'Hay una versión nueva de la app.';
-  var b = document.createElement('button');
-  b.setAttribute('style', 'flex:none;padding:7px 12px;border-radius:9px;border:0;'
-    + 'background:#E41E25;color:#fff;font:inherit;font-weight:600;cursor:pointer');
-  b.textContent = 'Actualizar';
-  b.onclick = function(){ try { location.reload(); } catch (_) {} };
-  var x = document.createElement('button');
-  x.setAttribute('style', 'flex:none;padding:7px 9px;border-radius:9px;border:0;'
-    + 'background:transparent;color:#9d9894;font:inherit;cursor:pointer');
-  x.textContent = 'Ahora no';
-  /* ⚠️ Cerrar NO vuelve a poner `_avisoVersion` en false: si lo hiciera, el siguiente
-     fichero que refresque lo volveria a sacar y seria imposible quitarselo de encima. */
-  x.onclick = function(){ try { d.parentNode.removeChild(d); } catch (_) {} };
-  d.appendChild(t); d.appendChild(x); d.appendChild(b);
-  document.body.appendChild(d);
+/* ¿Hay algo a medias en pantalla? Un campo con el foco, el modal del móvil abierto, o texto escrito sin enviar. */
+function _hayAMedias_(){
+  if (typeof document === 'undefined') return false;
+  var a = document.activeElement, t = a && a.tagName;
+  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || (a && a.isContentEditable)) return true;
+  var m = document.getElementById('modal');
+  if (m && m.classList && m.classList.contains('on')) return true;
+  var ts = document.getElementsByTagName ? document.getElementsByTagName('textarea') : [];
+  for (var i = 0; i < ts.length; i++) if (ts[i].value && String(ts[i].value).trim()) return true;
+  /* ⛔ Y EL ESCRITORIO (auditoría del 20/10): no tiene `#modal`, pero sí botones de guardar que SÓLO se habilitan con
+     cambios pendientes (tu disponibilidad de turno y la de reunión), el montaje de un turno (`TUR_SEL`) y campos
+     tecleados que ya no tienen el foco. */
+  if (document.querySelector && document.querySelector('[data-mtguardar]:not([disabled]),[data-midguardar]:not([disabled])')) return true;
+  if (typeof TUR_SEL === 'object' && TUR_SEL && Object.keys(TUR_SEL).length) return true;
+  var ins = document.getElementsByTagName ? document.getElementsByTagName('input') : [];
+  for (var j = 0; j < ins.length; j++) {
+    var x = ins[j], ty = String(x.type || '').toLowerCase();
+    if (ty === 'checkbox' || ty === 'radio') { if (x.checked !== x.defaultChecked) return true; }
+    else if (ty !== 'hidden' && ty !== 'button' && ty !== 'submit' && x.value !== x.defaultValue) return true;
+  }
+  return false;
+}
+
+function _recargarVersionNueva_(volviendo){
+  if (!_avisoVersion) return false;
+  var st = { tocado: !!_recargarVersionNueva_.tocado, aMedias: _hayAMedias_(), volviendo: !!volviendo };
+  if (!_recargaVersionYa_(st)) return false;
+  try { location.reload(); } catch (_) { return false; }
   return true;
+}
+
+/* ⛔ 21/10 (auditor 7, 🟡 13): EL DESTINO DE UN AVISO → la vista de ESTA cara. Los emisores dicen `horas`,
+   `reuniones`, `turnos`, `docs` o `estado`; cada cara lo traduce a la suya. Lo que no conoce → `null` (se queda donde
+   esté: abrir la raíz es lo que pasaba antes, no un fallo nuevo). */
+function _vistaDeAviso_(destino, cara){
+  var d=String(destino||'').replace(/^#/,'');
+  var M=(cara==='escritorio')
+    ? {estado:'panel', horas:'libros', reuniones:'convoc', turnos:'turnos', docs:'docdec'}
+    : {estado:'estado', horas:'horas', reuniones:'reu', turnos:'turnos', docs:'docs'};
+  return Object.prototype.hasOwnProperty.call(M,d) ? M[d] : null;
+}
+function _irDesdeAviso_(destino){
+  try{
+    if(typeof VISTAS==='object' && VISTAS && typeof ST==='object' && ST){
+      var m=_vistaDeAviso_(destino,'movil');
+      if(!m || !VISTAS[m]) return null;
+      ST.vista=m; if(typeof pintar==='function') pintar();
+      return m;
+    }
+    /* `ir` sólo existe en el escritorio: se toma en una variable, no se llama por su nombre desde el módulo común
+       (`probar_bundle_caras.py`). */
+    var irF=(typeof ir==='function') ? ir : null;
+    if(typeof V==='object' && V && irF){
+      var e=_vistaDeAviso_(destino,'escritorio');
+      if(!e || !V[e]) return null;
+      irF(e);
+      return e;
+    }
+  }catch(_){}
+  return null;
+}
+/* Al abrir desde un aviso con la app cerrada, el destino llega en el hash; se lee una vez y se quita de la barra. */
+function _irAlAbrir_(){
+  try{
+    var h=(typeof location!=='undefined' && location.hash) ? String(location.hash).slice(1) : '';
+    if(!h) return null;
+    var r=_irDesdeAviso_(h);
+    if(r && typeof history!=='undefined' && history.replaceState) history.replaceState(null,'',location.pathname+location.search);
+    return r;
+  }catch(_){ return null; }
 }
 
 /* Engancha el canal del worker. Devuelve si se pudo enganchar, para que quien llame lo
@@ -3804,14 +4520,31 @@ function _pintarVersionNueva_(){
 function _escucharSW_(){
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false;
   try {
+    /* «Tocado» = el primer toque o tecla desde que abrió: a partir de ahí ya no se recarga en mitad. */
+    var marca = function(){ _recargarVersionNueva_.tocado = true; };
+    document.addEventListener('pointerdown', marca, true);
+    document.addEventListener('keydown', marca, true);
+    document.addEventListener('visibilitychange', function(){
+      if (document.visibilityState === 'visible') _recargarVersionNueva_(true);
+    });
     navigator.serviceWorker.addEventListener('message', function(ev){
-      if (ev && ev.data && ev.data.tipo === 'version-nueva') _pintarVersionNueva_();
+      if (ev && ev.data && ev.data.tipo === 'version-nueva') { _avisoVersion = true; _recargarVersionNueva_(false); }
+      else if (ev && ev.data && ev.data.tipo === 'ir') _irDesdeAviso_(ev.data.a);
     });
     return true;
   } catch (_) { return false; }
 }
 
 function _pushSoportado_(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+
+/* ⛔ 26/10 (triaje C3c): la suscripción que se guarda dice de qué APP es (`app`: beta | produccion). Con las dos apps
+   instaladas cada aviso sonaba dos veces; el servidor (`get_push_pendientes`) deja sólo la beta a quien la tiene. Es la
+   ÚNICA forma de guardar una suscripción: las tres llamadas (al abrir y al activar en cada cara) pasan por aquí. */
+function _subConCanal_(sub){
+  var j = (sub && typeof sub.toJSON === 'function') ? sub.toJSON() : (sub || {});
+  j.app = (typeof CANAL !== 'undefined' && CANAL === 'beta') ? 'beta' : 'produccion';
+  return j;
+}
 
 async function _registrarSW_(){
   if(!('serviceWorker' in navigator)) return null;
@@ -3829,6 +4562,7 @@ async function _pushInit_(){
      ⚠️ Y con ellas se iba el aviso de version nueva, que viaja por el mismo canal. */
   var reg=await _registrarSW_();
   _escucharSW_();
+  _irAlAbrir_();
   if(!_pushSoportado_()) return;
   try{
     if(reg && Notification.permission==='granted'){
@@ -3839,7 +4573,7 @@ async function _pushInit_(){
          SI es aceptable -esto corre en cada apertura y se reintenta solo-, pero tiene
          que ser un silencio elegido, no un error que se escapa por un hueco. */
       if(sub && typeof SESION!=='undefined' && SESION){
-        await api.guardarPush(sub.toJSON());
+        await api.guardarPush(_subConCanal_(sub));
         _pushFallo_(null);   /* ⛔ y el exito lo BORRA: un aviso que no se retira miente */
       } else if(sub){
         /* ⛔⛔ UN NO-OP MUDO NO SE DISTINGUE DE UN EXITO. Sin sesion esto no lanza, asi
@@ -3900,12 +4634,27 @@ function _leerImagen_(file){
         var w=Math.max(1,Math.round(im.naturalWidth*k)), h=Math.max(1,Math.round(im.naturalHeight*k));
         var c=document.createElement('canvas'); c.width=w; c.height=h;
         c.getContext('2d').drawImage(im,0,0,w,h);
-        ok({ url:c.toDataURL('image/jpeg',0.85), w:w, h:h });
+        ok({ url:_jpegQueCabe_(c,0.85), w:w, h:h });
       };
       im.src=fr.result;
     };
     fr.readAsDataURL(file);
   });
+}
+
+/* 25/10 (auditor 33, 🟡 D4): el JPEG de un lienzo, bajando la calidad (y, si no basta, el tamaño) hasta que el data URL
+   cabe holgado en una petición — el servidor rechaza un cuerpo de más de 1 MiB ENTERO, así que una captura con mucho
+   detalle (1,6 MB medido) tumbaba el reporte y no sólo la foto, y cada reintento fallaba igual. */
+function _jpegQueCabe_(c, q){
+  var TOPE=900*1024, url=c.toDataURL('image/jpeg', q);
+  for(var k=1; url.length>TOPE && k<=3; k++) url=c.toDataURL('image/jpeg', q-0.15*k);
+  for(var i=0; url.length>TOPE && i<4; i++){
+    var d=document.createElement('canvas');
+    d.width=Math.max(1, Math.round(c.width*0.75)); d.height=Math.max(1, Math.round(c.height*0.75));
+    d.getContext('2d').drawImage(c, 0, 0, d.width, d.height);
+    c=d; url=c.toDataURL('image/jpeg', 0.6);
+  }
+  return url;
 }
 
 function _pesoKB_(dataUrl){
@@ -4032,6 +4781,19 @@ function _diasPedidos_(modo,d0,d1,nd){
 /* Cuantas casillas seguidas hacen falta para cubrir la reunión. Se redondea HACIA ARRIBA:
    media casilla no existe, y quedarse corto es no poder ir. Sin `duracion` (reuniones de
    antes de este modelo) da 1, que es como se comportaba la app hasta ahora. */
+/* ⛔ 20/10 (ficha «el aviso de "ese día nadie podrá marcar": dos reglas distintas»). ¿Cuántos días de la convocatoria
+   NO dan para la reunión entera? UNA regla para las dos caras, y POR DÍA: el escritorio miraba la UNIÓN de todos
+   (`u.F.length<nS`), así que con horario distinto por día casi nunca avisaba aunque un día se quedara corto.
+   Un día sin horario (desactivado) no cuenta: ahí no se ofrece nada a propósito. */
+function _diasCortosConv_(perDia, rangos, nS){
+  var n = 0;
+  for (var i = 0; i < perDia.length; i++) {
+    var r = rangos[i] || [0, 0];
+    if (r[1] > r[0] && perDia[i].length < nS) n++;
+  }
+  return n;
+}
+
 function _slotsMin_(duracion, slot){
   var d=+duracion||0, s=Math.max(5, +slot||60);
   return Math.max(1, Math.ceil(d/s) || 1);
@@ -4047,9 +4809,19 @@ function _slotsMin_(duracion, slot){
    ⛔ Y NO CONFUNDIR CON `_slotsMin_`, que sí es una restricción dura: una racha más corta que
    la reunión no sirve para ir a nada. Son dos mínimos distintos y se dicen distinto.
    Devuelve `{falta, exigido, txt}`; `falta` a 0 significa que no hay nada que advertir. */
-function _avisoMinimo_(marcadas, exigido){
+/* ⛔ 21/10 (auditor 13, 🟠 4): ¿esta reunión SANCIONA SOLA? Sólo general, junta y consejo — la regla del PD del
+   22/07 (`decisiones-app.md`, «Sanciones de reuniones») y `construir_reunion.TIPOS_AUTO`. En subsistema, trabajo o
+   mixta, no cubrir queda a potestad del coordinador: la cara no puede amenazar con un artículo que nadie aplica. */
+function _sancionaSola_(tipo){
+  return ['general','junta','consejo'].indexOf(String(tipo == null ? '' : tipo).trim().toLowerCase()) >= 0;
+}
+
+function _avisoMinimo_(marcadas, exigido, tipo){
   var m = +marcadas || 0, e = +exigido || 0;
   if(!e) return {falta:0, exigido:0, txt:''};
+  /* 21/10 (auditor 13, 🟠 4): con el TIPO dicho y una reunión que no sanciona sola, no hay «mínimo sin sanción» que
+     advertir. Sin tipo (llamadas viejas), como antes. */
+  if(tipo !== undefined && !_sancionaSola_(tipo)) return {falta:0, exigido:e, txt:''};
   var falta = Math.max(0, e - m);
   return { falta: falta, exigido: e,
     txt: falta
@@ -4071,6 +4843,16 @@ function _avisoMinimo_(marcadas, exigido){
    ⚠️ Sin `limite` no hay plazo que vencer: abierto. */
 function _ahoraLocalISO_(d){
   var x = d || new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; };
+  /* ⛔ 21/10 (auditor de reuniones): LA HORA DE MADRID, no la del aparato — la del servidor. Con el teléfono en otra
+     zona la cara decía «abierta» de un plazo ya cerrado (o al revés), y no cubrir a tiempo sanciona. Si `Intl` no puede
+     (sin soporte, o un doble de `Date`), el reloj local como hasta hoy. */
+  try{
+    var o = {}, ps = new Intl.DateTimeFormat('en-GB', {timeZone:'Europe/Madrid', year:'numeric', month:'2-digit',
+      day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23'}).formatToParts(x), i;
+    for(i = 0; i < ps.length; i++) o[ps[i].type] = ps[i].value;
+    if(o.year && o.month && o.day && o.hour && o.minute)
+      return o.year + '-' + o.month + '-' + o.day + 'T' + (o.hour === '24' ? '00' : o.hour) + ':' + o.minute;
+  }catch(_){ }
   return x.getFullYear() + '-' + p(x.getMonth() + 1) + '-' + p(x.getDate()) +
          'T' + p(x.getHours()) + ':' + p(x.getMinutes());
 }
@@ -4127,7 +4909,9 @@ function _franjasDemo_(){
 }
 
 function _semanaDemo_(ahora){
-  var hoy = ahora ? new Date(+ahora) : new Date();
+  /* 21/10 (auditor 19, 🟡 15): sin instante, el de la APP (`_ahoraApp_`), no el real: la maqueta vive el 24/07 y la
+     semana de ejemplo salía en octubre — dos relojes en la misma pantalla. */
+  var hoy = ahora ? new Date(+ahora) : (typeof _ahoraApp_ === 'function' ? new Date(_ahoraApp_()) : new Date());
   var mas = function(b, n){ return new Date(b.getFullYear(), b.getMonth(), b.getDate() + n); };
   var dia = function(d){ return _ahoraLocalISO_(d).slice(0, 10); };
   var lim = mas(hoy, 1), abre = mas(hoy, -1);
@@ -4183,6 +4967,12 @@ function _isoFechaHora_(v, hora){
      ⚠️ En ES3 no hay `trim()`: `cscript` corre ES3 y Apps Script tambien lo acepta. */
   var s = String(v == null ? '' : v).replace(/^\s+|\s+$/g, '');
   if (!s || s === 'null' || s === 'undefined') return '';
+  /* ⛔ 21/10: un INSTANTE con zona (`…Z`, `…+02:00`: lo que deja `toISOString`) no es hora de Madrid — compararlo como
+     cadena regalaba dos horas de plazo en verano. Se pasa a la hora de Madrid (`_ahoraLocalISO_`) antes de comparar. */
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/.test(s) && typeof _ahoraLocalISO_ === 'function') {
+    var _dz = new Date(s);
+    if (!isNaN(_dz.getTime())) return _ahoraLocalISO_(_dz);
+  }
   var i = s.search(/[T ]/);
   var f = _dmyAISO_(i < 0 ? s : s.slice(0, i));
   /* ⚠️ Y LA HORA SE RECORTA POR DELANTE: con DOS espacios, `r` empezaba por un blanco
@@ -4208,6 +4998,26 @@ function _plazoAbierto_(limite, ahora){
   var s = _normLimite_(limite);
   if (!s) return true;
   return s >= (ahora || _ahoraApp_());
+}
+
+/* ⛔ 26/10/2026 — FIJAR CON EL PLAZO VIVO SE AVISA Y SE CONFIRMA (auditor 33, 🟠 A1). Fijar una reunión cierra el plazo de
+   TODOS en el acto y el motor construye ya las propuestas de sanción de quien no haya contestado (lo reproduje en el
+   ensayo de la #3: Marta ya no podía contestar). Daniel (25/10), a «¿lo impido, lo aviso, o es como debe ser?»:
+   *«Avisar y confirmar»*. Devuelve el texto del `confirm()` —con el límite y cuántos faltan— o '' si no hay nada que
+   avisar (sin límite, o el plazo ya cerró). Una sola puerta para las dos caras. `ahora` sólo para el banco. */
+function _avisoFijarAntes_(r, ahora){
+  if (!r) return '';
+  var lim = _normLimite_(r.limite);
+  if (!lim || !_plazoAbierto_(r.limite, ahora)) return '';
+  var conv = (r.invitados || []).filter(function(n){ return n && n !== r.convocante; }).length;
+  var han = _nRespReu_(r);
+  var cuenta = conv
+    ? (conv > han ? ('Faltan por contestar ' + (conv - han) + ' de ' + conv + ' convocados.')
+                  : ('Han contestado los ' + conv + ' convocados.'))
+    : ('Han contestado ' + han + '.');
+  return 'El plazo para contestar sigue ABIERTO: cierra el ' + _isoADMY_(lim.slice(0, 10)) + ' a las ' + lim.slice(11, 16) +
+    '.\n' + cuenta + '\n\nSi la fijas ahora, el plazo se cierra para todos YA y se preparan las propuestas de sanci\u00f3n ' +
+    'de quien no haya contestado.\n\n\u00bfFijarla igualmente?';
 }
 
 /* ⛔⛔ EL «AHORA» DE LA APP — el mismo día que `HOY` (858.ª).
@@ -4241,11 +5051,19 @@ function _ahoraApp_(d){
    y quien cubre desde el teléfono no veía nunca cuántas franjas se le exigen. */
 var MESES_MINIMO_BAJO=[1,5,6,7,8,12];
 
+/* El PD del roster cargado (en la maqueta, Lois); `PD_NOM` si no hay ninguno. Para que la semilla no firme con un nombre
+   que no está en su propio roster (auditor 20, 🟡 9). */
+function _pdSemilla_(){
+  var ms = (typeof DATA!=='undefined' && DATA && DATA.miembros) || [];
+  for(var i=0;i<ms.length;i++) if(ms[i] && ms[i].cargo==='Project Director') return ms[i].nombre;
+  return (typeof PD_NOM!=='undefined') ? PD_NOM : '';
+}
+
 function _pctMinimo_(iso){
   var mes=null;
   var m=String(iso||'').match(/^(\d{4})-(\d{2})/);
   if(m) mes=+m[2];
-  if(mes==null) mes=new Date().getMonth()+1;
+  if(mes==null) mes=+String(_ahoraApp_()).slice(5,7);   /* 21/10 (auditor 20, 🟡 5): el reloj de la APP (maqueta: julio) */
   return MESES_MINIMO_BAJO.indexOf(mes)>=0 ? 0.25 : 0.30;
 }
 
@@ -4575,11 +5393,21 @@ function _firmaDe_(unidad, quien){
    lo unico que tenia pendiente, **no veia ni la pestana**.
    ✅ El recorrido de `coordina` es `_unidadesCoord_`, que ya existe: llega como cadena, lista
    o nada, y **una cadena no se itera** (daria doce unidades de una letra). */
+/* ⛔ 26/10 — QUIÉN MUEVE EL PLAZO DE UNA TAREA. Daniel (25/10): *«Sólo coordinador y tú»* — el coordinador de la unidad
+   de la tarea (`t.s`) y el PD. GEMELA de la puerta de `servidor.e_mover_limite_tarea` (que usa `coordinador_doc`, como
+   `coordinadorDe`): la sanción por plazo sólo ofrece las tareas cuyo plazo puedes mover, para no fallar al guardar. */
+function _puedeMoverPlazo_(t, nombre){
+  if (!t || !nombre) return false;
+  var r = rangoNom(nombre);
+  if (r >= 3) return true;
+  return r >= 1 && !!t.s && coordinadorDe(t.s) === nombre;
+}
+
 function coordinadorDe(u){
   var c = buscaMiembro(function(m){ return m.cargo==='Coordinador' && m.unidad===u; });
   if (c) return c.nombre;
   c = buscaMiembro(function(m){
-    if (m.cargo!=='Coordinador') return false;
+    /* 26/10: quien la COORDINE, con cargo o sin el (Bruno lleva Logistica; Marta, Patrocinios: «Si, en su unidad») */
     var v = (typeof _unidadesCoord_==='function') ? _unidadesCoord_(m.coordina) : [], i;
     for (i=0;i<v.length;i++) if (v[i]===u) return true;
     return false;
@@ -4624,6 +5452,56 @@ function _calorDe_(r, pond){
     }
   });
   return cel;
+}
+
+/* ⛔ 20/10 — QUIÉN PUEDE EN UNA CELDA (día `di`, franja `fi`). 🗣️ Daniel: *«no aparecen los nombres de los que pueden
+   cada día»* · *«en modo público debería haber una forma de verlo»*. El texto de crear lo promete en las dos caras
+   («cualquiera puede tocar un hueco y ver quién puede») y ninguna pintaba un nombre. MISMA lectura que `_calorDe_`, de
+   la que es la otra cara: `resp[nombre]` alineado con `bloques`, y puede quien tiene `> 0`. Quién PUEDE VER la lista
+   (pública, o quien manda) lo decide quien la pinta; esto sólo dice quién hay. */
+function _quienPuedeCelda_(r, di, fi){
+  var bl=(r && r.bloques)||[], resp=(r && r.resp)||{}, out=[];
+  Object.keys(resp).forEach(function(nom){
+    var w=resp[nom]; if(!Array.isArray(w)) return;
+    for(var i=0;i<bl.length;i++){
+      if(Array.isArray(bl[i]) && bl[i][0]===di && bl[i][1]===fi && (+w[i]||0)>0){ out.push(nom); return; }
+    }
+  });
+  return out.sort(function(a,b){ return a.localeCompare(b,'es'); });
+}
+
+/* Lo que dice la caja de debajo del mapa al tocar un hueco. ⛔ LOS NOMBRES LOS DECIDE EL SERVIDOR, no esto: con la
+   encuesta `anonima` y sin mandar, le llegan las filas de los demás como `#1`, `#2`… (`servidor.py`, «anon»). Aquí
+   sólo se cuentan aparte y se dice por qué no hay nombre — repetir la regla serían dos criterios para una pregunta. */
+function _quienPuedeHTML_(r, di, fi, rotulo){
+  var l=_quienPuedeCelda_(r, di, fi), nom=[], anon=0;
+  l.forEach(function(n){ if(/^#\d+$/.test(n)) anon++; else nom.push(n); });
+  /* ⛔ LA CAJA NO PUEDE CONTRADECIR AL NÚMERO DE LA CELDA. Si `calor` (personas) cuenta más de las que tienen fila en
+     `resp` —la maqueta trae `calor` sin respuestas; una lista sin hidratar, igual—, las que faltan se dicen, no se callan:
+     «no puede nadie» debajo de un 21 es mentir. */
+  var c=r && r.calor && r.calor[di] ? +r.calor[di][fi] : NaN, sinDetalle=(c>l.length) ? c-l.length : 0, tot=l.length+sinDetalle;
+  var h='<b>'+esc(rotulo||'')+'</b> · ';
+  if(!tot) return h+'no puede nadie.';
+  h+=(tot===1?'puede 1':'pueden '+tot)+(nom.length?': '+nom.map(esc).join(', '):'');
+  if(anon) h+=(nom.length?' y ':' — ')+anon+' sin nombre (encuesta anónima: los nombres sólo los ve quien convoca)';
+  if(sinDetalle) h+=((nom.length||anon)?' y ':' — ')+sinDetalle+' sin el detalle de quién';
+  return h+'.';
+}
+
+/* Engancha las celdas `data-qp="id|día|franja"` con su caja `data-qpbox="id"`. `buscar(id)` da la reunión: cada cara
+   guarda las suyas en un sitio distinto. Devuelve cuántas enganchó. */
+function _cablearQuienPuede_(buscar){
+  if(typeof document==='undefined' || !document.querySelectorAll) return 0;
+  var els=document.querySelectorAll('[data-qp]'), cajas=document.querySelectorAll('[data-qpbox]'), n=0;
+  for(var i=0;i<els.length;i++) (function(el){
+    el.onclick=function(){
+      var p=String(el.getAttribute('data-qp')).split('|'), r=buscar(p[0]), box=null;
+      for(var j=0;j<cajas.length;j++) if(cajas[j].getAttribute('data-qpbox')===p[0]) box=cajas[j];
+      if(r && box) box.innerHTML=_quienPuedeHTML_(r, +p[1], +p[2], el.getAttribute('data-qpt')||'');
+    };
+    n++;
+  })(els[i]);
+  return n;
 }
 
 /* ⛔ ¿ES LA UNIDAD DE DOCUMENTACIÓN TÉCNICA? El nombre llega de tres sitios y no coincide:
@@ -4741,6 +5619,15 @@ function _identidadPrestada_(visto){
   return !!v && v !== String(SESION.nombre);
 }
 
+/* ⛔ 26/10/2026 — CONVOCAR «EN NOMBRE DE» SE DICE (auditor 33, 🟡 A2). Con «Ver como X» la reunión queda a nombre de X:
+   X queda exento de cubrirla y es quien puede fijarla o borrarla. Daniel (25/10), a «¿es algo que quieres?»:
+   *«Sí, en nombre de X»* — se deja, y se avisa antes de convocar. '' si convocas como tú. */
+function _avisoEnNombreDe_(convocante){
+  if (!_identidadPrestada_(convocante)) return '';
+  return 'La convocas EN NOMBRE DE ' + convocante + ' (est\u00e1s viendo la app como esa persona): saldr\u00e1 como ' +
+    'convocante, quedar\u00e1 exento de cubrirla y ser\u00e1 quien pueda fijarla o borrarla.\n\n';
+}
+
 /* ⛔⛔ ERA LA **CUARTA** PUERTA DEL PLAZO, NO LA TERCERA (308.ª, 23/08). Aquí seguía
    `Date.parse(cv.limite)` **a pelo** cuando la 295.ª curó a la vecina —que vive DIEZ
    LÍNEAS MÁS ABAJO, en este mismo fichero, con un comentario celebrándolo—. Y la que se
@@ -4767,14 +5654,23 @@ function _identidadPrestada_(visto){
    «¿se acabó el plazo?», no «¿empezó?». Y `=== false`, no `!cv.abierta`: una
    convocatoria vieja sin el campo es «no lo sé», y cerrarla sería inventar. */
 function _convEstado_(cv, ahora){
-  var t=ahora?+ahora:Date.now();
+  /* ⛔ 21/10 (auditor 13, 🟡 10): EN HORA DE MADRID Y COMO CADENA, igual que el servidor (`estado_conv`). Con
+     `Date.parse` el plazo dependía de la zona del aparato: en Canarias o fuera de España salía «abierta» un plazo que el
+     servidor ya cerraba. `ahora` (milisegundos) sigue valiendo para los casos.
+     ⚠️ «Igual que el servidor» no del todo, y está medido (verificador 21/10, 🟡 9): sin `abre` o sin `limite` aquí sale
+     «cerrada» y allí «abierta», y aquí además manda el `abierta` que llegue en falso. No llega así ninguna: las crea
+     `convocatoria.py` con las dos fechas (1 de 1 el 21/10) y ese campo sólo lo pone el servidor. Si llegara, la cara
+     quedaría del lado prudente (no deja contestar). */
+  /* 21/10 (auditor 19, 🟡 15): sin instante, el reloj de la APP (`_ahoraApp_`), como `_plazoAbierto_` (858.ª). Con el
+     real, la convocatoria de la maqueta (24/07) salía cerrada o en otra semana. Publicado es el mismo reloj. */
+  var t = ahora ? _ahoraLocalISO_(new Date(+ahora))
+                : (typeof _ahoraApp_ === 'function' ? _ahoraApp_() : _ahoraLocalISO_(new Date()));
   /* ⛔ POR `_normAbre_`, QUE ES LA HERMANA DE `_normLimite_` (463.ª). Aqui habia un
      `_dmyAISO_` a pelo, o sea el mismo defecto que la 295.ª curo para `limite` y que
      aqui seguia vivo: `Date.parse('01/10/2026 22:00')` lee **MM/DD** y devolvia
      `abierta` sobre un plazo que aun no ha abierto. */
-  var a=Date.parse(_normAbre_(cv&&cv.abre)),
-      l=Date.parse(_normLimite_(cv&&cv.limite));
-  if(isNaN(a)||isNaN(l)) return 'cerrada';
+  var a=_normAbre_(cv&&cv.abre), l=_normLimite_(cv&&cv.limite);
+  if(isNaN(Date.parse(a))||isNaN(Date.parse(l))) return 'cerrada';
   if(t<a) return 'sin_abrir';
   if(cv && cv.abierta === false) return 'cerrada';
   return t<=l ? 'abierta' : 'cerrada';
@@ -4827,12 +5723,13 @@ function _convDeClave_(k){
    Lo que se marcó la semana anterior cae en el MISMO día de la semana de ésta (+7 días), en la misma franja,
    con su sitio y su coche. Lo que no cabe —una franja que esta semana no existe, un sitio que no se ofrece—
    se CUENTA en `fuera`, no se inventa ni se acerca a lo más parecido. Pura: no toca nada. */
-function _reusarDispo_(cv, previas){
-  var dias=cv.dias||[], fr={}, cl={}, out={}, n=0, fuera=0;
+function _reusarDispo_(cv, previas, salto){
+  /* 26/10 (triaje C4e): `salto` = los días que hay entre aquella semana y ésta (7 por semana); sin él, 7. */
+  var dias=cv.dias||[], fr={}, cl={}, out={}, n=0, fuera=0, sd=salto||7;
   (cv.franjas||[]).forEach(function(f){ fr[f.k]=1; });
   _convClases_(cv).forEach(function(c){ cl[c]=1; });
   Object.keys(previas||{}).forEach(function(k){
-    var p=_convDeClave_(k), v=previas[k], d=_isoMasDias_(p[0], 7);
+    var p=_convDeClave_(k), v=previas[k], d=_isoMasDias_(p[0], sd);
     if(!v || !v.s || !d || dias.indexOf(d)<0 || !fr[p[1]] || !cl[v.s]){ fuera++; return; }
     out[_convClave_(d, p[1])] = (v.s==='no') ? {s:'no'} : {s:v.s, c:!!v.c};
     n++;
@@ -4845,17 +5742,29 @@ function _reusarDispo_(cv, previas){
    `null` después de DECIR por qué no: sin conexión, sin respuesta, nada marcado, nada que quepa.
    Qué se hace con lo copiado lo decide cada cara: el móvil lo guarda al momento; el escritorio lo deja SIN
    GUARDAR hasta que se pulsa «Guardar», que es como funciona esa cara. */
+var SEMANAS_REUSO = 8;   /* 26/10 (triaje C4e): hasta cuántas semanas atrás se busca la última convocatoria */
 async function _traerSemanaAnterior_(cv){
   if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getConvocatoria){
     tost('Sin conexión no se puede traer la semana anterior.'); return null;
   }
-  var sem=_isoMasDias_(cv.semana_ini || cv.semana || (cv.dias||[])[0], -7), r;
-  try{ r=await api.getConvocatoria(sem); }
-  catch(e){ tostErr('No se pudo traer la semana anterior: ', e); return null; }
-  var prev=(r && r.convocatoria && r.mias) || {};
-  if(!Object.keys(prev).length){ tost('La semana anterior no marcaste nada: no hay qué reutilizar.'); return null; }
-  var res=_reusarDispo_(cv, prev);
-  if(!res.n){ tost('Lo de la semana anterior no cabe en esta rejilla: otras horas u otros sitios.'); return null; }
+  /* ⛔ 26/10 (triaje C4e): la ÚLTIMA convocatoria que HUBO, no la de hace exactamente 7 días — una semana sin
+     turnos dejaba el botón sin nada que copiar. Se busca hacia atrás semana a semana (hasta SEMANAS_REUSO) y el
+     aviso dice DE CUÁNDO es lo copiado. */
+  var ini=cv.semana_ini || cv.semana || (cv.dias||[])[0], r=null, sem=null, k;
+  for(k=1; k<=SEMANAS_REUSO; k++){
+    sem=_isoMasDias_(ini, -7*k);
+    try{ r=await api.getConvocatoria(sem); }
+    catch(e){ tostErr('No se pudo traer la convocatoria anterior: ', e); return null; }
+    if(r && r.convocatoria) break;
+  }
+  /* 22/10 (auditor 25, 🟡 10): «no hubo convocatoria» NO es «no contestaste» — antes las dos salían como lo segundo. */
+  if(!r || !r.convocatoria){ tost('En las últimas '+SEMANAS_REUSO+' semanas no hubo convocatoria de disponibilidad: no hay qué reutilizar.'); return null; }
+  var rot = (k===1) ? 'la semana anterior' : 'la semana del '+String(sem).slice(8,10)+'/'+String(sem).slice(5,7);
+  var prev=r.mias || {};
+  if(!Object.keys(prev).length){ tost('En la última convocatoria ('+rot+') no marcaste nada: no hay qué reutilizar.'); return null; }
+  var res=_reusarDispo_(cv, prev, 7*k);
+  if(!res.n){ tost('Lo de '+rot+' no cabe en esta rejilla: otras horas u otros sitios.'); return null; }
+  res.rotulo=rot;
   return res;
 }
 
@@ -5037,6 +5946,47 @@ function _etiOrigenParte_(p){
    ⚠️ Va como FUNCION y no como `var` porque un modulo solo lleva declaraciones
    `function`: las capacidades no se llevan sus globales. */
 function _maxHorasParte_(){ return 14; }
+
+/* ⛔ 26/10 · Daniel: «Sí, mientras no esté firmado» — el autor corrige las horas de su parte sin firmar
+   (`corregirParte`), y el servidor deja el rastro en `correcciones` [{at, de, a}]. Esto lo dice en una línea, para las
+   dos caras y para las dos puntas (quien lo escribió y quien lo firma): de la PRIMERA cifra a la ÚLTIMA. '' si no hay. */
+function _txtCorreccion_(corr){
+  if(!Array.isArray(corr) || !corr.length) return '';
+  /* 26/10: las de la DESCRIPCIÓN llevan `campo:'tarea'`; las de horas, ninguno (las primeras ya no lo traían). */
+  var hs=corr.filter(function(c){ return c && !c.campo; }), ts=corr.filter(function(c){ return c && c.campo==='tarea'; });
+  var f=function(x){ return (typeof nf2==='function') ? nf2(Number(x)||0) : String(x); };
+  var out=[];
+  if(hs.length) out.push('horas corregidas por su autor: '+f(hs[0].de)+' → '+f(hs[hs.length-1].a)+' h');
+  if(ts.length){ var o=String(ts[0].de||'');
+    out.push('descripción corregida por su autor'+(o ? ' (antes: «'+(o.length>60 ? o.slice(0,59)+'…' : o)+'»)' : '')); }
+  return out.join(' · ');
+}
+
+/* ⛔ 21/10 (auditor 8, 🟡 7): un fichaje que se CIERRA SOLO al tope caduca a las 24 h, no a los 7 días
+   (`CADUCA_AUTOCIERRE_H` de `Codigo.gs`, que lee el servidor; decisión de Daniel del 09/09). Una puerta, para no
+   teclear el 24 en cada rótulo. */
+function _caducaAutocierreH_(){ return 24; }
+
+/* ⛔ 21/10 (auditor 8, 🟡 14): EL DÍA DE MADRID DE UN INSTANTE, en DD/MM/AAAA. `caduca_at` viaja en UTC, y recortarlo
+   (`.slice(0,10)`) da el día ANTERIOR a un fichaje cerrado pasada la medianoche de Madrid (en verano, hasta las 02:00).
+   Mismo reloj que `_ahoraLocalISO_` (Madrid por `Intl`); sin instante legible, el recorte de siempre. */
+function _diaMadridDe_(iso){
+  var s = String(iso || ''), d = new Date(s);
+  if(!isNaN(d.getTime()) && /T/.test(s)) return _isoADMY_(_ahoraLocalISO_(d).slice(0,10));
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? _isoADMY_(s.slice(0,10)) : '';
+}
+
+/* ⛔ 21/10 (auditor 8, 🟠 2): FICHAR SALIDA PASADO EL TOPE NO DECLARA NADA. El servidor recorta a `_maxHorasParte_()`,
+   devuelve `autocierre: true` y deja el parte `sin_declarar` (aunque traiga tarea y justificación) con 24 h de vida.
+   Las dos caras decían «Fichaje declarado · a la cola de X»: el parte no estaba en la cola de nadie y se perdía al
+   día siguiente. Devuelve el aviso, o '' si el servidor no dice que se cerró solo (entonces cada cara dice lo suyo). */
+function _tostAutocierre_(r){
+  var p = r && r.parte;
+  if(!(r && (r.autocierre === true || (p && p.autocierre === true && p.estado === 'sin_declarar')))) return '';
+  var t = _maxHorasParte_();
+  return 'Pasaba de '+t+' h: el fichaje se cerró solo en '+t+' h y queda SIN declarar. Decláralo con lo que '+
+    'trabajaste antes de '+_caducaAutocierreH_()+' h o se pierde.';
+}
 
 /* ⛔⛔ UN PARTE DE AUTOCIERRE NO SE DECLARA TAL CUAL, Y SE DICE IGUAL EN LAS DOS CARAS (633.ª).
    Daniel (09/09): «si fueron 14 h sin querer pero si q trabajaste o algo asi q mejor lo declares
@@ -5468,19 +6418,23 @@ function _pasosSustituirDoc_(e, yo){
   if(!yo || !e.autor || String(e.autor) !== String(yo)) return [];
   var ref = e.ref || 'la referencia de este expediente';
   var url = _urlFormDocs_();
+  /* ⛔⛔ 27/10 — CAMBIÓ EL MODELO (Daniel: «me parece bien, trabajalo»): lo publicado se SUSTITUYE con la MISMA
+     referencia, eligiendo en el formulario «¿Qué estás enviando?» → «Sustituir uno publicado: cambiarlo» (errata, sin
+     versión nueva) o «…: actualizarlo» (versión nueva; la anterior se guarda). Vuelve a revisión, y al aprobarse se
+     cambia el PDF de la MISMA página y la MISMA carpeta. Lo de abajo («envío NUEVO, NO se reutiliza la referencia»)
+     era el modelo viejo, y el pipeline ya no lo hace. */
   return [
-    { n:1, t:'Manda la versión nueva por el formulario, marcada como «sustituye a»',
-      d:'Ahí pones la referencia de este: ' + ref + '. Es un envío NUEVO: crea su propio '+
-        'expediente y vuelve a pasar por revisión. Al revés que corregir: aquí NO se reutiliza '+
-        'la misma referencia, porque este ya está publicado y no se toca.',
+    { n:1, t:'Manda la versión nueva por el formulario: «Sustituir uno publicado»',
+      d:'En «¿Qué estás enviando?» elige «cambiarlo» si es una errata, o «actualizarlo» si es una versión nueva '+
+        '(la anterior se guarda). Pon la referencia de este: ' + ref + ', que NO cambia. Vuelve a pasar por revisión.',
       url: (url && url.indexOf('http') === 0) ? url : '',
       /* El respaldo vive en la PUERTA, no en una cara: es la misma leccion del 19/08 que
          dejo al escritorio mandando al formulario sin decir a quien pedir el enlace. */
       sinUrl: (url && url.indexOf('http') === 0) ? ''
             : 'Si no tienes a mano el enlace del formulario, pideselo al Project Director.' },
     { n:2, t:'Este sigue publicado mientras tanto',
-      d:'No se borra ni se retira. El original queda donde esta, y cuando aprueben el nuevo '+
-        'constara a cual sustituye. Hasta entonces, lo que el equipo lee es este.',
+      d:'No se borra ni se retira: hasta que aprueben la nueva, lo que el equipo lee es este. Al aprobarse, '+
+        'la misma página pasa a la versión nueva.',
       url:'', sinUrl:'' }
   ];
 }
@@ -5491,10 +6445,12 @@ function _pasosCorregirDoc_(e){
   var ref = e.ref || 'la misma referencia';
   var url = _urlFormDocs_();
   return [
+    /* ⛔ 27/10: con «¿Qué estás enviando?» → «Corrección tras cambios pedidos» y la MISMA referencia, la corrección
+       llega a ESTE expediente y lo devuelve SOLA a revisión (`servidor.e_push_entregable`, un envío nuevo = ronda
+       nueva). Ya no hay botón que pulsar: era lo que borraba el motivo y no subía nada. */
     { n:1, t:'Vuelve a enviar el archivo corregido por el formulario',
-      d:'Con la MISMA referencia: ' + ref + '. Así se actualiza el archivo de este mismo '+
-        'expediente. NO lo mandes como «sustituye a…»: eso crea un expediente nuevo y deja '+
-        'éste con la versión sin corregir.',
+      d:'En «¿Qué estás enviando?» elige «Corrección tras cambios pedidos» y pon la MISMA referencia: ' + ref +
+        '. Así llega a este mismo expediente.',
       url: (url && url.indexOf('http')===0) ? url : '',
       // ⛔ EL RESPALDO VIVE EN LA PUERTA, NO EN UNA CARA. Estaba escrito dentro del
       //    renderizador del móvil, así que el escritorio pintaba «reenvíalo por el
@@ -5503,9 +6459,9 @@ function _pasosCorregirDoc_(e){
       //    refutar el changelog del 19/08 antes de publicarlo, no un banco.
       sinUrl: (url && url.indexOf('http')===0) ? ''
             : 'Si no tienes a mano el enlace del formulario, pídeselo al Project Director.' },
-    { n:2, t:'Vuelve aquí y pulsa el botón de abajo',
-      d:'Es lo único que devuelve el expediente a la cola de revisión. Hazlo DESPUÉS: al '+
-        'pulsarlo se borra el motivo que te escribieron, y es donde pone qué hay que corregir.',
+    { n:2, t:'Vuelve solo a revisión',
+      d:'No tienes que pulsar nada: en cuanto llegue la corrección, el expediente vuelve a la cola de revisión. '+
+        'Lo que te pidieron corregir sigue aquí arriba hasta entonces.',
       url:'' }
   ];
 }
@@ -5692,21 +6648,227 @@ function _firmaDocTxt_(e){
       costó caro en `coordina` el 18/08—, así que se pregunta si sabe hacer `join` en vez de
       suponerlo. En JS una cadena tiene `.length` y es indexable: la forma equivocada no da
       error, da basura. */
+/* ⛔ 21/10 (auditor 11, 🟡 12): el texto de «hecho» tras decidir un documento, con lo que el servidor dice del AVISO
+   (`_aviso`, que no se guarda): si no se pudo avisar a nadie, se dice — «le llega al autor» era falso para quien no tiene
+   móvil con avisos. Sin `_aviso` (maqueta, respuesta vieja), el texto tal cual. */
+function _avisoDocTxt_(base, upd){
+  var av = upd && upd._aviso;
+  if (!av || av.ok !== false) return base;
+  return base + ' Pero no se ha podido avisar' + (av.nota ? ' (' + av.nota + ')' : '') + ': díselo tú.';
+}
+
 function _ajustesDocTxt_(e){
   var a=e&&e.decision&&e.decision.ajustes;
   if(!a) return '';
   var p=[];
   if(a.titulo) p.push('título → «'+a.titulo+'»');
-  if(a.etiquetas) p.push('etiquetas → '+(a.etiquetas.join?a.etiquetas.join(', '):a.etiquetas));
+  /* 21/10 (auditor 11, 🟡 10): vaciarlas es un ajuste, y se dice — no «etiquetas → » con la cola vacía. */
+  if(a.etiquetas) p.push('etiquetas → '+(a.etiquetas.join?(a.etiquetas.length?a.etiquetas.join(', '):'(ninguna)'):a.etiquetas));
+  /* 28/10: los dos campos nuevos de «con anotaciones». `''` en el subtítulo es QUITARLO, y se dice. */
+  if(a.subtitulo!=null) p.push(a.subtitulo ? 'subtítulo → «'+a.subtitulo+'»' : 'sin subtítulo');
+  if(a.confidencialidad) p.push('confidencialidad → '+a.confidencialidad);
   return p.length ? p.join(' · ') : '';
 }
 
+/* ══ 28/10 · «APROBAR CON ANOTACIONES» CON SolarIA, EN LAS DOS CARAS ══════════════════════════════════════════════
+   🗣️ Daniel: «Que por default te ponga el cuadro de texto para IA. Pero que te deje ambas» · «mientras esté la IA
+   trabajando, que se bloquee… que te ponga ahí que esperes 10-20 segundos» · «la confidencialidad en la app podria ser
+   un desplegable y ya (publico, interno)» · «un boton de "Enviar a SolarIA"».
+   Las dos caras pintan EL MISMO panel (`_anotPanelHTML_`), cada una con su prefijo de ids (móvil `d`, escritorio
+   `d<id>-`). SolarIA (`interpretarAnotacion`) sólo PROPONE: rellena los campos y se pueden retocar. Lo que viaja al
+   decidir sale de `_anotExtra_`, que manda SÓLO lo que cambia — el servidor exige que cambie al menos uno. */
+
+/* Lo que el expediente tiene AHORA en los cuatro campos. El título es `titulo` en el móvil y `tit` en el escritorio. */
+function _anotActualDe_(e){
+  e = e || {};
+  var n = e.confidencialidad;
+  return { titulo: String(e.titulo != null ? e.titulo : (e.tit || '')),
+           subtitulo: String(e.subtitulo || ''),
+           confidencialidad: (n === 'publico' || n === 'interno') ? n : '',
+           etiquetas: _etiquetasDe_(e) };
+}
+
+/* Qué campos de `campos` difieren de `act`. Un campo que NO llega (`null`/ausente) no cuenta como cambio: un input que
+   no existe no puede borrar nada. El título vacío tampoco (no es un estado válido); el subtítulo vacío SÍ (es quitarlo). */
+function _anotCambios_(act, campos){
+  act = act || {}; campos = campos || {};
+  var c = [], t = campos.titulo, s = campos.subtitulo, n = campos.confidencialidad, q = campos.etiquetas;
+  if (t != null && String(t).trim() && String(t).trim() !== String(act.titulo || '')) c.push('titulo');
+  if (s != null && String(s).trim() !== String(act.subtitulo || '')) c.push('subtitulo');
+  if ((n === 'publico' || n === 'interno') && n !== act.confidencialidad) c.push('confidencialidad');
+  if (Array.isArray(q) && JSON.stringify(q) !== JSON.stringify(act.etiquetas || [])) c.push('etiquetas');
+  return c;
+}
+
+/* El `extra` de la decisión: sólo lo que cambia, y la indicación que se le dio a SolarIA (queda de nota). `null` si no
+   cambia nada — y entonces no es «con anotaciones», es «aprobar». */
+function _anotExtra_(act, form){
+  form = form || {};
+  var c = _anotCambios_(act, form);
+  if (!c.length) return null;
+  var x = {};
+  c.forEach(function(k){ x[k] = (k === 'titulo' || k === 'subtitulo') ? String(form[k]).trim() : form[k]; });
+  var ind = String(form.indicacion || '').trim();
+  if (ind) x.indicacion = ind;
+  return x;
+}
+
+/* El panel. `css` es el estilo de los campos de la cara (el escritorio pasa `CAMPO_CSS`; el móvil, nada). */
+function _anotPanelHTML_(pre, act, id, css){
+  act = act || {};
+  var st = css ? ' style="' + css + '"' : '';
+  var opc = function(v, t){ return '<option value="' + v + '"' + (act.confidencialidad === v ? ' selected' : '') + '>' + t + '</option>'; };
+  var campo = function(rot, html){ return '<label class="campo" style="display:block;margin-top:9px">' +
+    '<span class="sc" style="display:block;margin-bottom:5px">' + rot + '</span>' + html + '</label>'; };
+  var bt = 'padding:5px 12px;font-size:12px';
+  return '<div id="' + pre + 'Anot" data-anot="' + pre + '" data-doc="' + esc(String(id)) + '" data-modo="ia" style="margin-top:10px">' +
+    '<span class="sc" style="display:block;margin-bottom:6px">Con anotaciones · lo que se ajusta al aprobar</span>' +
+    '<div style="display:flex;gap:6px">' +
+      '<button type="button" class="btn pri" style="' + bt + '" data-anotmodo="ia" data-pre="' + pre + '">SolarIA</button>' +
+      '<button type="button" class="btn" style="' + bt + '" data-anotmodo="mano" data-pre="' + pre + '">A mano</button></div>' +
+    /* La caja va en su `label.campo`, como los demás: suelta, el móvil la pintaba gris y pegada al botón (captura 28/10). */
+    '<div data-anotia>' +
+      campo('Qué cambiar · SolarIA rellena los campos de abajo', '<textarea id="' + pre + 'Ind" maxlength="2000"' + st +
+        ' placeholder="«acorta el título», «ponle de subtítulo…», «es interno», «añade la etiqueta…»"></textarea>') +
+      '<button type="button" class="btn" style="margin-top:8px;width:100%" data-solaria="' + pre + '">Enviar a SolarIA</button>' +
+      '<p class="rnota" id="' + pre + 'AnotEst" style="margin:6px 0 0"></p></div>' +
+    campo('Título · una línea en la portada', '<input id="' + pre + 'Tit" value="' + esc(act.titulo || '') + '"' + st + '>') +
+    campo('Subtítulo · hasta dos líneas; vacío = sin subtítulo', '<input id="' + pre + 'Sub" value="' + esc(act.subtitulo || '') + '"' + st + '>') +
+    campo('Confidencialidad', '<select id="' + pre + 'Conf"' + st + '>' + (act.confidencialidad ? '' : opc('', '— sin indicar —')) +
+      opc('publico', 'Público') + opc('interno', 'Interno') + '</select>') +
+    campo('Etiquetas · separadas por comas', '<input id="' + pre + 'Etq" value="' + esc((act.etiquetas || []).join(', ')) + '"' + st + '>') +
+  '</div>';
+}
+
+/* Lo que hay escrito en el panel. Un campo que no existe sale `null` (y `_anotCambios_` lo ignora). */
+function _anotLeer_(pre){
+  var v = function(k){ var x = document.getElementById(pre + k); return x ? String(x.value || '') : null; };
+  var t = v('Tit'), s = v('Sub'), q = v('Etq');
+  return { titulo: t == null ? null : t.trim(), subtitulo: s == null ? null : s.trim(), confidencialidad: v('Conf') || '',
+           etiquetas: q == null ? null : _etiquetasDeTexto_(q), indicacion: String(v('Ind') || '').trim() };
+}
+
+function _anotOcupado_(pre){
+  var c = document.getElementById(pre + 'Anot');
+  return !!(c && c.getAttribute('data-ocupado') === '1');
+}
+
+/* ¿Hay un panel con algo a medias? Ocupado, con la indicación escrita o con un campo tocado. Para que el refresco en vivo
+   no lo repinte encima — borraría lo que SolarIA acaba de proponer. */
+function _anotAMedias_(){
+  if (typeof document === 'undefined' || !document.querySelectorAll) return false;
+  var cs = document.querySelectorAll('[data-anot]');
+  for (var i = 0; i < cs.length; i++){
+    if (cs[i].getAttribute('data-ocupado') === '1') return true;
+    var xs = cs[i].querySelectorAll('input,textarea,select');
+    for (var j = 0; j < xs.length; j++){
+      var x = xs[j];
+      if (x.tagName === 'SELECT' ? (x.selectedIndex >= 0 && x.options[x.selectedIndex] && !x.options[x.selectedIndex].defaultSelected)
+                                 : (x.value !== x.defaultValue)) return true;
+    }
+  }
+  return false;
+}
+
+/* ⛔ BLOQUEA EL PANEL ENTERO mientras SolarIA trabaja: un campo tocado en esos segundos lo pisaría la respuesta. */
+function _anotBloquear_(pre, on, txt){
+  var c = document.getElementById(pre + 'Anot');
+  if (!c) return;
+  c.setAttribute('data-ocupado', on ? '1' : '');
+  Array.prototype.forEach.call(c.querySelectorAll('input,select,textarea,button'), function(x){ x.disabled = !!on; });
+  if (txt != null) _anotEstado_(pre, txt);
+}
+
+function _anotEstado_(pre, txt){
+  var s = document.getElementById(pre + 'AnotEst');
+  if (s) s.textContent = txt || '';
+}
+
+function _anotModo_(pre, modo){
+  var c = document.getElementById(pre + 'Anot');
+  if (!c) return;
+  c.setAttribute('data-modo', modo === 'mano' ? 'mano' : 'ia');
+  var ia = c.querySelector('[data-anotia]');
+  if (ia) ia.style.display = modo === 'mano' ? 'none' : '';
+  Array.prototype.forEach.call(c.querySelectorAll('[data-anotmodo]'), function(b){
+    b.classList.toggle('pri', b.getAttribute('data-anotmodo') === (modo === 'mano' ? 'mano' : 'ia'));
+  });
+}
+
+/* El nombre de un campo, para decirlo en pantalla. */
+function _anotNombre_(k){
+  return ({titulo:'título', subtitulo:'subtítulo', confidencialidad:'confidencialidad', etiquetas:'etiquetas'})[k] || k;
+}
+
+/* Pone en el panel lo que SolarIA propone, SÓLO en los campos que cambia, y los marca (azul Solaris). */
+function _anotRellenar_(pre, campos, cambios){
+  (cambios || []).forEach(function(k){
+    var x = document.getElementById(pre + ({titulo:'Tit', subtitulo:'Sub', confidencialidad:'Conf', etiquetas:'Etq'})[k]);
+    if (!x) return;
+    x.value = k === 'etiquetas' ? (campos.etiquetas || []).join(', ') : String(campos[k] == null ? '' : campos[k]);
+    x.style.outline = '2px solid #3f9ed6';
+    x.title = 'Lo ha cambiado SolarIA: revísalo';
+  });
+}
+
+/* El botón «Enviar a SolarIA». Lo que manda como «actual» es lo que hay EN PANTALLA (puede estar retocado). */
+async function _anotEnviarIA_(pre, e){
+  if (!e || _anotOcupado_(pre)) return;
+  var f = _anotLeer_(pre);
+  if (!f.indicacion){
+    var ti = document.getElementById(pre + 'Ind'); if (ti) ti.focus();
+    tost('Escribe primero qué quieres que cambie SolarIA.');
+    return;
+  }
+  if (!(typeof backendOK !== 'undefined' && backendOK && typeof SESION !== 'undefined' && SESION)){
+    _anotModo_(pre, 'mano');
+    tost('SolarIA necesita conexión con el servidor. Ajusta los campos a mano.');
+    return;
+  }
+  var act = { titulo: f.titulo, subtitulo: f.subtitulo, confidencialidad: f.confidencialidad, etiquetas: f.etiquetas || [] };
+  _anotBloquear_(pre, true, 'SolarIA está trabajando · espera 10-20 s…');
+  try {
+    var r = await api.interpretarAnotacion(e.id, e.ref, f.indicacion, act);
+    _anotBloquear_(pre, false);
+    if (!r || r.ok === false){
+      _anotEstado_(pre, 'SolarIA no ha podido' + (r && r.motivo ? ': ' + r.motivo : '') + '. Ajusta los campos a mano.');
+      return;
+    }
+    var cam = _anotCambios_(act, r.campos || {});
+    _anotRellenar_(pre, r.campos || {}, cam);
+    _anotEstado_(pre, (cam.length ? 'SolarIA propone cambiar ' + cam.map(_anotNombre_).join(', ') + '. Revísalo y aprueba con anotaciones.'
+                                  : 'SolarIA no ve nada que cambiar con esa indicación.') +
+                      (r.avisos && r.avisos.length ? ' Ojo: ' + r.avisos.join(' · ') : ''));
+  } catch (err) {
+    _anotBloquear_(pre, false);
+    _anotEstado_(pre, 'No se pudo hablar con SolarIA: ' + ((err && err.message) || err) + '. Puedes ajustarlo a mano.');
+  }
+}
+
+/* El manejador, delegado: cada cara lo engancha UNA vez a `document` con su forma de encontrar el expediente. */
+function _anotClic_(ev, buscar){
+  var t = ev && ev.target && ev.target.closest ? ev.target : null;
+  if (!t) return;
+  var m = t.closest('[data-anotmodo]');
+  if (m){ _anotModo_(m.getAttribute('data-pre'), m.getAttribute('data-anotmodo')); return; }
+  var s = t.closest('[data-solaria]');
+  if (!s) return;
+  var pre = s.getAttribute('data-solaria'), c = document.getElementById(pre + 'Anot');
+  _anotEnviarIA_(pre, c ? buscar(c.getAttribute('data-doc')) : null);
+}
+
 /* `2026-08-06T19:12:00.000Z` → `06/08/2026, 21:12`. Formato, no calendario. */
+/* ⛔ 20/10 (ficha «`decidido_at` se pinta en UTC recortando la cadena»): aquí la FECHA salía de la cadena UTC
+   (`s.slice(0,10)`) y la HORA del reloj local — mezcladas, a partir de las 22:00 en verano decía el día ANTERIOR con la
+   hora de hoy («20/10, 01:30» para la 01:30 del 21). Las dos mitades salen ahora de la misma fecha LOCAL, por la puerta
+   que ya existía (`_ahoraLocalISO_`). Una fecha sola (AAAA-MM-DD) no tiene hora que convertir: se da tal cual. */
 function _novCuando_(iso){
   var s=String(iso||''); if(s.length<10) return s;
+  if(s.length===10) return _isoADMY_(s);
   var d=new Date(s);
   if(isNaN(+d)) return s.slice(0,10);
-  return _isoADMY_(s.slice(0,10))+', '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+  var l=_ahoraLocalISO_(d);
+  return _isoADMY_(l.slice(0,10))+', '+l.slice(11,16);
 }
 
 /* Cablea los dos botones. `repintar` es la función de pintado de la cara — las dos se llaman
@@ -5894,7 +7056,8 @@ function rangoNom(n){
      `maxR` vale 1 o 3, nunca 0. El control (subcoordinador a rango 2) dio 256. */
   if(_subcoordDe_(n)) return 1;
   var m=miembro(n);
-  return (m && m.cargo==='Coordinador') ? 1 : 0;
+  /* 26/10, Daniel, sobre Bruno y Marta: «Si, en su unidad» -- coordinar una unidad, sin el cargo, tambien da el 1. */
+  return (m && (m.cargo==='Coordinador' || _unidadesCoord_(m.coordina).length>0)) ? 1 : 0;
 }
 
 /* La huella de las respuestas de una reunion: `{nombre:[bloques]}` -> una cadena estable.

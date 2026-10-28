@@ -69,7 +69,7 @@ async function _asegurarPush_(msg){
     catch(err){ if(msg) msg.textContent=_consejoSuscribir_(err); return false; }
   }
   if(typeof SESION!=='undefined' && SESION){
-    try{ await api.guardarPush(sub.toJSON()); }
+    try{ await api.guardarPush(_subConCanal_(sub)); }   /* 26/10: con su app */
     catch(err){
       if(msg) msg.textContent='El permiso está dado, pero no se pudo registrar el aviso '+
         'en el servidor, así que NO te llegaría nada: '+((err&&err.message)||err);
@@ -217,8 +217,9 @@ function _pintarNotisLista_(){
   if(!filas){ c.innerHTML='<p class="rnota" style="margin:0">El servidor no ha listado '+
     'ningún tipo de aviso.</p>'; return; }
   c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0"><b>Turnos</b>, <b>reuniones</b> y '+
-    '<b>avisos y sanciones</b> llegan siempre: llevan plazo y consecuencias, y perdérselos no '+
-    'es una molestia, es una sanción. Lo demás lo eliges tú.</p>';
+    '<b>avisos y sanciones</b> no se pueden apagar aquí: llevan plazo y consecuencias, y perdérselos '+
+    'no es una molestia, es una sanción. (Que salgan depende de que el director tenga encendido cada envío.) '+
+    'Lo demás lo eliges tú.</p>';
   $$('[data-noti]',c).forEach(function(b){
     b.onclick=async function(){
       var k=b.dataset.noti, antes=NOTIS_PREF[k]!==false;

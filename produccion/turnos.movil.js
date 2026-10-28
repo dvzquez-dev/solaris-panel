@@ -33,11 +33,13 @@ function _normTurnoM_(t, ix){
   /* `hecho` manda sobre la fecha: lo que decide si un turno sale suelto o al cajon es
      su ESTADO en Notion, no que la fecha haya pasado (un turno de ayer sin cerrar sigue vivo). */
   var est=t.estado||'';
-  return { id: t.id || ('T-'+(iso||ix)), f:f, iso:iso, hora:t.hora||'—', punto:t.punto||'—', dur:dur,
+  return { id: _refTurno_(t, ix), f:f, iso:iso,   /* 20/10: la puerta de las dos caras, con la hora (dos turnos el mismo día) */ hora:t.hora||'—', punto:t.punto||'—', dur:dur,
     lugar:t.lugar||null, estado:est, hecho: est ? (est==='Realizado'||est==='Cancelado') : !!(iso && iso < hoyISO),
     mio:mio, roles:roles, pasado: !!(iso && iso < hoyISO),
     principales:t.principales||[], secundarios:t.secundarios||[],
-    nota:t.nota||null, crucial:!!t.crucial, memoria:t.memoria||null, _real:true };
+    nota:t.nota||null, crucial:!!t.crucial, memoria:t.memoria||null,
+    coches: Array.isArray(t.coches) ? t.coches : [],   /* 22/10 (auditor 25, 🟠 3): se tiraban aquí */
+    _real:true };
 }
 
 /* Solo TUS turnos: aqui no pinta ver los de los demas. (Un boton de 'ver todos'
@@ -78,7 +80,10 @@ function _cablearMemoria_(){ _cablearVisor_(); }
 
 /* La convocatoria que hay que enseñar: la primera abierta a la que estás convocado. */
 function _convAbierta_(){
-  var yo=(YO&&YO.nombre)||'';
+  /* ⛔ LA SESIÓN, NO `YO` (ficha del 20/08): «Ver como» reescribe `YO`, y `_convMias_` —en la MISMA
+     tarjeta— ya lee por `_actorSanc_()`. Con dos identidades, si tú estás invitado y el suplantado no,
+     la tarjeta decía «no hay ninguna semana convocada» teniendo una abierta. Igual que `_miTurnoCv_`. */
+  var yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
   var vivas=(typeof CONVOCATORIAS!=='undefined'?CONVOCATORIAS:[]).filter(function(cv){
     /* ⛔⛔ TRES ESTADOS, NO DOS (456.ª). Esto preguntaba `!=='abierta'` a una función
        que devuelve `sin_abrir | abierta | cerrada`, así que durante `sin_abrir` —la
@@ -134,7 +139,7 @@ async function _reusarConv_(cv, repinta){
   Object.keys(res.mapa).forEach(function(k){ mias[k]=res.mapa[k]; });
   repinta();
   _convGuardar_(cv);
-  tost('Copiada la semana anterior. Puedes cambiar lo que quieras: un dedo pinta.'+
+  tost('Copiada '+(res.rotulo||'la semana anterior')+'. Puedes cambiar lo que quieras: un dedo pinta.'+
        (res.fuera ? ' ('+res.fuera+' casilla'+(res.fuera===1?' no cab\u00eda':'s no cab\u00edan')+'.)' : ''));
 }
 
@@ -584,7 +589,12 @@ function _convCargar_(repintar){
    cambiar— pero **avisando si falla**: una disponibilidad que se pierde en silencio es la que
    luego hace que te pongan un turno cuando no puedes. */
 function _convGuardar_(cv){
-  if(!cv || typeof SESION==='undefined' || !SESION) return;
+  if(!cv) return;
+  /* 21/10 (auditor 19, 🟡 14): sin sesión se pintaba y NO se guardaba, sin decir nada. Reuniones ya lo dice. */
+  if(typeof SESION==='undefined' || !SESION){
+    if(typeof tost==='function') tost('Sin conexión no se puede guardar tu disponibilidad.');
+    return;
+  }
   /* ⛔ Y NO SE CONTESTA POR NADIE: el arrastre dispara esto solo, en `pointerup` y sin
      confirmación, así que mirando como otra persona bastaba rozar la rejilla. */
   if(typeof _identidadPrestada_==='function' && _identidadPrestada_(yoNombre())){
@@ -724,7 +734,7 @@ function vTurnos(){
   var nTodos=TURNOS.length, nMios=TURNOS.filter(_mioTurno_).length;
   function tarjeta(t){
     return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+
-      cab(t.f+(t.crucial?' · crucial':''), t.hora)+
+      cab(t.f+(t.crucial?' · crucial':'')+(t.estado==='Cancelado'?' · cancelado':''), t.hora)+   /* 20/10: se dice */
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b>'+
       '<small>'+esc(t.hora)+' · '+esc(t.dur)+(t.lugar?' · '+esc(t.lugar):'')+'</small></div>'+
       '<div class="d"><span class="chev">›</span></div></div>'+

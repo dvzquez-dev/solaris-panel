@@ -55,11 +55,11 @@
    desplazamiento, los campos de fecha y los menús de autocompletado.
    ✅ Es una DECLARACIÓN, no una reimplementación: un desplegable dibujado a mano pierde
    el teclado, el gesto táctil y el lector de pantalla. */
-:root{color-scheme:dark}
-/* ⚠️ Y las opciones, para los navegadores que SÍ las dejan pintar. La paleta no se
-   elige: son las variables que ya salen de la insignia (ARRANQUE §2). */
-select option{background:var(--sur2);color:var(--ink)}
-select option:checked{background:var(--line2)}
+  /* ⛔⛔ COMO DECLARACIÓN DE ESTE BLOQUE, NO COMO REGLA (20/10). Estaba escrita `:root{color-scheme:dark}`
+     AQUÍ DENTRO: anidada es `:root :root`, que no casa con nada. 📏 Chromium, las dos caras: `colorScheme`
+     "normal". O sea que el arreglo del 13/10 NUNCA se aplicó, y Daniel lo volvió a ver el 20/10: *«en el puto
+     ordenador aparece un desplegable blanco sin nada de la estética del móvil»*. */
+  color-scheme:dark;
   --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6;
 
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,monospace;
@@ -69,6 +69,11 @@ select option:checked{background:var(--line2)}
   --sal:cubic-bezier(.16,.84,.44,1);
   --arco:cubic-bezier(.34,1.42,.5,1);
 }
+/* ⚠️ Y las opciones, para los navegadores que SÍ las dejan pintar. La paleta no se
+   elige: son las variables que ya salen de la insignia (ARRANQUE §2). Van FUERA del
+   bloque `:root` (20/10): dentro, anidadas, dependían del soporte de CSS anidado. */
+select option{background:var(--sur2);color:var(--ink)}
+select option:checked{background:var(--line2)}
 *{box-sizing:border-box}
 /* ⛔⛔ `overflow-x:hidden` EN `html`, Y ES UN FALLO REPORTADO: `BUG-M-2026-10-07-2`
    (Fernando, 07/10, Safari 402x874): *«la pantalla se puede desplazar lateralmente y se
@@ -171,11 +176,17 @@ header::after{content:"";position:absolute;left:16px;right:16px;bottom:0;height:
   z-index:0;pointer-events:none}
 /* 956.ª: puede ENCOGERSE y partir una palabra larga. «COORDINADOR DE AEROESTRUCTURAS» no cabía y empujaba el ⋮
    fuera de la pantalla: un hijo de flex no baja de su palabra más larga sin `min-width:0`. */
-.hquien{min-width:0}
+/* ⛔ 21/10 (auditor 19, 🟡 9): …pero con `min-width:0` A SECAS cedía él solo todo el sitio. Medido a 375 px: 76 px y
+   «AEROESTRUCT/URAS» en 4 líneas; con el «Ver como» del admin —lo que ve Daniel—, 28 px y 8 líneas, porque el selector
+   NO encogía nunca. Ahora encoge el selector (`#verComo`) y el nombre guarda 93 px, lo que
+   ocupa «AEROESTRUCTURAS» a .05em: 2 líneas, nada partido y el ⋮ dentro. El `anywhere` se queda de último recurso. */
+.hquien{flex:1 1 auto;min-width:min(93px,40vw)}
 .hquien span{overflow-wrap:anywhere}
 .hquien b{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em}
-.hquien span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--ink3)}
-.hlado{margin-left:auto;display:flex;align-items:center;gap:8px}
+.hquien span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;color:var(--ink3)}
+.hlado{margin-left:auto;display:flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0}
+/* …salvo con el conmutador de la maqueta: sus botones no encogen, y encogiendo la caja se metían bajo el ⋮. */
+.hlado:has(.rolsel>button){min-width:auto}
 
 /* ── cuerpo con scroll ────────────────────────────────────────────────────── */
 main{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:10px 15px 18px;scrollbar-width:thin}
@@ -746,6 +757,9 @@ nav{flex:none;position:relative;height:calc(70px + env(safe-area-inset-bottom,0p
   transition:opacity .2s linear,transform .28s var(--sal);max-width:86%;text-align:center;
   box-shadow:0 12px 30px rgba(0,0,0,.5)}
 .tost.on{opacity:1;transform:translate(-50%,0)}
+/* 21/10 (auditor 19, 🟡 8): con un modal abierto, ARRIBA — abajo están los botones de la hoja. La pone `tost()`. */
+.tost.arriba{bottom:auto;top:calc(14px + env(safe-area-inset-top,0px));transform:translate(-50%,-10px)}
+.tost.arriba.on{transform:translate(-50%,0)}
 /* ⛔ El aviso FIJO se queda hasta que lo tocas, así que tiene que poder recibir el toque:
    en reposo `.tost` lleva `pointer-events:none`. Sin esto no habría forma de cerrarlo. */
 .tost.fijo{pointer-events:auto;cursor:pointer}
@@ -899,7 +913,9 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .ecel.on1{background:var(--tel)}          /* telemático */
 .ecel.on2{background:var(--red)}          /* presencial + telemático */
 .ecel.prev{outline:2px solid var(--red2);outline-offset:-1px}
-.ecel.off{background:transparent;border:1px solid var(--line);opacity:.4;cursor:default}
+/* 21/10 (auditor 19, 🟡 4): RAYADA, como en el mapa de calor y su leyenda. Con el borde al 40 % sobre negro se
+   confundía con una vacía, y lo que se decidió el 27/07 es que no se pinte, no que no se vea. */
+.ecel.off{background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line);cursor:default}
 .celc{height:23px;border-radius:2px;display:grid;place-items:center;font-family:var(--mono);
   font-size:8.5px;font-weight:600;color:#fff}
 .celc.best{outline:1px solid var(--ink);outline-offset:-1px}
@@ -981,7 +997,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
    del horario de ese día» de las encuestas, o sea **una celda que existe, se ve y no se
    toca** — la misma situación exacta que una convocatoria que aún no abre. Inventar un
    gris distinto para lo mismo es como acaban dos criterios donde había uno. */
-.tcel.off{background:transparent;border:1px solid var(--line);opacity:.4;cursor:default}
+.tcel.off{background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line);cursor:default}
 .tcel.cuvi{background:var(--red)}
 .tcel.citi{background:var(--tel)}
 .tcel.ambos{background:linear-gradient(135deg,var(--red) 50%,var(--tel) 50%)}
@@ -1043,7 +1059,11 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 
 /* conmutador de rol (solo de la maqueta) */
 .rolsel{display:flex;gap:5px;border:1px solid var(--line);border-radius:20px;padding:3px;background:var(--sur2)}
-.rolsel button{padding:4px 10px;border-radius:16px;font-family:var(--mono);font-size:9px;
+/* 🟡 9: el selector del admin es lo que encoge (lo elegido se sigue leyendo; el cargo detrás del «·» se corta). ⛔ Y SÓLO
+   él: con `min-width:0` también en `.hlado`/`.rolsel`, el conmutador de la maqueta se metía debajo del ⋮ con el PD. */
+.rolsel:not(:has(>button)){min-width:0}
+#verComo{min-width:0;flex:1 1 auto}
+.rolsel button{padding:4px 7px;border-radius:16px;font-family:var(--mono);font-size:9px;
   letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
 .rolsel button.on{background:var(--red);color:#fff}
 

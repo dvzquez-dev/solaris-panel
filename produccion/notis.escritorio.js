@@ -54,7 +54,7 @@ async function activarNotis(btn){
       try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)}); }
       catch(err){ _notisFallo_(_consejoSuscribir_(err)); return; }
     }
-    if(typeof SESION!=='undefined' && SESION) await api.guardarPush(sub.toJSON());
+    if(typeof SESION!=='undefined' && SESION) await api.guardarPush(_subConCanal_(sub));   /* 26/10: con su app */
     else { _notisFallo_('Permiso dado, pero sin sesión no se puede registrar el aviso en el servidor.'); return; }
     /* ✅ Y EL ÉXITO LO BORRA: un aviso que no se retira miente igual que uno que no sale.
        Es lo mismo que hace `_pushInit_` con su `_pushFallo_(null)`. */
@@ -148,9 +148,9 @@ function _notisPrefsHTML_(){
   }
   if(!filas) return '<div class="nota">El servidor no ha listado ningún tipo de aviso.</div>';
   return '<div class="pan" style="border:0;margin:0">'+filas+'</div>'+
-    '<div class="nota"><b>Turnos</b>, <b>reuniones</b> y <b>avisos y sanciones</b> llegan '+
-    'siempre: llevan plazo y consecuencias, y perdérselos no es una molestia, es una sanción. '+
-    'Lo decide el servidor, no esta pantalla.'+
+    '<div class="nota"><b>Turnos</b>, <b>reuniones</b> y <b>avisos y sanciones</b> no se pueden '+
+    'apagar aquí: llevan plazo y consecuencias, y perdérselos no es una molestia, es una sanción. '+
+    'Que salgan depende de que el director tenga encendido cada envío (Automatismos).'+
     (hayApagable?' Lo demás lo eliges tú, y se aplica antes de enviarlo.':'')+
     '</div><p class="sc" id="notisMsgPref" style="padding:0 13px 11px"></p>';
 }

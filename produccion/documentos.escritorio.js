@@ -33,6 +33,14 @@ function revisoresDe(d){
    issues[], subsistema) y estas vistas leen la corta (tit, amb, est, sev, iss, sub).
    Sin este adaptador la bandeja salia vacia y las filas sin titulo. Ojo: `iss` es una
    CUENTA, no la lista, porque la vista escribe «N avisos». */
+/* ⛔ 21/10 (auditor 11, 🟠 2): con sesión y sin expedientes llegados, se DICE — no una bandeja «limpia» que es un «no
+   lo sé» pintado como un cero. `''` cuando sí llegaron (o en la maqueta). */
+function _docsSinLeerE_(){
+  if(typeof DOCS_LLEGO==='undefined' || DOCS_LLEGO!==false) return '';
+  return pan('Expedientes','sin leer', vacioSimple('No se han podido leer los expedientes',
+    'El servidor todavía no los ha mandado; se vuelven a pedir solos. Mientras tanto no se sabe qué hay pendiente.'));
+}
+
 function _normDocE_(d, i){
   if(!d) return d;
   if(d.tit!==undefined && d.est!==undefined) return d;      // ya viene corta (semilla)
@@ -41,6 +49,9 @@ function _normDocE_(d, i){
     id:      (d.id!==undefined ? d.id : i),
     ref:     d.ref || '',
     tit:     d.titulo || d.tit || d.ref || '',
+    /* 28/10: lo que ajusta «con anotaciones» además del título (`sub` ya es el SUBSISTEMA en esta cara). */
+    subtitulo:        d.subtitulo || '',
+    confidencialidad: d.confidencialidad || '',
     autor:   d.autor || '',
     sub:     d.subsistema || d.sub || '',
     tipo:    d.tipo || '',
@@ -58,6 +69,7 @@ function _normDocE_(d, i){
        proposito ni riesgos que leer, sin `nota` no se ve por que se pidieron cambios, y
        sin `revisor` no se puede saber si ya decidio alguien ni si puedes pisarlo. */
     analisis:  d.analisis || null,
+    reunion:   d.reunion || null,          // 20/10: de qué reunión es el acta, o que no la hubo (`_deReunionSinConvocar_`)
     nota:      d.nota || '',
     revisor:   d.revisor || null,
     decision:  d.decision || null,
@@ -275,6 +287,26 @@ function _pasosCorregirE_(d){
     _pasosHTML_(ps, 6, 5)+'</div>';
 }
 
+/* Aplica en memoria una decisión de documento (sólo la MAQUETA local; auditor 20, 🟡 8). Campos cortos de esta cara;
+   el móvil tiene su gemela con los largos (`_aplicarDecDoc_`). Pura, para que un banco la ejecute. */
+function _decDocLocalE_(d, acc, mot, tit, actor, at, aj){
+  if(!d) return null;
+  if(acc==='reenviar'){ d.est='revision'; d.nota=''; return d; }
+  if(acc==='deshacer'){ d.est='revision'; d.nota=''; d.revisor=null; d.decision=null; return d; }
+  d.est = (acc==='anot') ? 'aprobado' : acc;
+  if(acc==='anot' && tit) d.tit = tit;
+  /* 28/10: los otros tres campos, como el móvil (`_aplicarDecDoc_`). `aj` es el `extra` de `_anotExtra_`. */
+  if(acc==='anot' && aj){
+    if(aj.etiquetas) d.etiquetas = aj.etiquetas;
+    if(aj.subtitulo!=null) d.subtitulo = aj.subtitulo;
+    if(aj.confidencialidad) d.confidencialidad = aj.confidencialidad;
+  }
+  d.nota = (acc==='cambios' || acc==='rechazado') ? (mot||'') : '';
+  d.revisor = actor || null;
+  d.decision = {accion:acc, revisor:actor || null, at:at || null};
+  return d;
+}
+
 function docCard(d){
   var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
   var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';
@@ -303,15 +335,14 @@ function docCard(d){
     '<div class="doc"><div class="dcar">Este expediente no trae enlace al archivo.<br>'+
     /* 954.ª: lo que HACER, como el móvil — aquí mandaba a buscar un nombre de campo de un asistente
        que ya no está en el camino. */
-    'Pídeselo a quien lo subió antes de decidir.</div></div>');
+    /* 21/10 (auditor 19, 🟡 6): la gemela del móvil — a quien lo SUBIÓ, qué hacer él. */
+    ((typeof ACTOR!=='undefined' && d.autor===ACTOR) ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
+      : 'Pídeselo a quien lo subió antes de decidir.</div></div>'));
   var acc, _aut;
   if(puede){
-    acc='<label style="display:block;margin-top:11px">'+
-      '<span class="sc" style="display:block;margin-bottom:5px">Título · puedes corregirlo al aprobar con anotaciones</span>'+
-      '<input id="dtit-'+d.id+'" value="'+esc(d.tit)+'" style="'+CAMPO_CSS+'"></label>'+
-      '<label style="display:block;margin-top:9px">'+
-      '<span class="sc" style="display:block;margin-bottom:5px">Etiquetas · separadas por comas</span>'+
-      '<input id="detq-'+d.id+'" value="'+esc(_etiquetasDe_(d).join(', '))+'" style="'+CAMPO_CSS+'"></label>'+
+    /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el móvil (`comun.js` `_anotPanelHTML_`), con
+       prefijo `d<id>-`: aquí se pintan varias fichas a la vez. Sólo donde se puede aprobar. */
+    acc=(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS) : '')+
       '<textarea data-motivo placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
       /* ⛔⛔ APROBAR = PUBLICAR, y no se publica lo que nadie ha analizado. Esta cara ve
          `recibido` y `analizado` a proposito -Daniel, 05/08: en el movil «no aparecen
@@ -335,7 +366,8 @@ function docCard(d){
        ⚠️ Y el escritorio nombra el estado `est`, no `estado`: por eso `_pasosCorregirE_`
        traduce antes de preguntar. Pasarle el objeto crudo daria SIEMPRE lista vacia --
        instrucciones escritas, probadas y mudas en una cara entera. */
-    acc=_pasosCorregirE_(d)+'<div class="acts"><button class="btn pri" data-doc="'+d.id+'" data-acc="reenviar">Ya está corregido: devolver a revisión</button></div>';
+    /* ⛔ 27/10: sin el botón «Ya está corregido» (la corrección por el formulario vuelve sola a revisión). */
+    acc=_pasosCorregirE_(d);
   /* ⛔ `cerrado` fuera: no existe -- `_normEstado_` lo traduce a `publicado`. */
   } else if((_aut=_docAutorE_(d))){
     /* ⛔ AQUI PONIA «Es tuyo: lo firma X», Y YA ESTABA FIRMADO -- y no solo en `publicado`
@@ -354,7 +386,11 @@ function docCard(d){
     '<div class="h"><b>'+esc(d.tit)+'</b>'+
       '<span class="u">'+esc(d.ref)+'</span>'+
       '<span class="u">'+esc(d.tipo||'documento')+'</span>'+
-      '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button></div>'+
+      /* 21/10 (auditor 20, 🟡 1): «Cerrar» sólo si esta ficha está DESPLEGADA a mano (`DOC_SEL`). En «Requiere tu
+         decisión» van siempre abiertas y el botón no hacía nada — y en un pipeline con estado `cerrado` se leía como
+         «cerrar el expediente». */
+      (typeof DOC_SEL!=='undefined' && DOC_SEL===d.id && !(typeof vista!=='undefined' && vista==='docdec')   /* 🟡 2 (refutador) */
+        ? '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button>' : '')+'</div>'+
     '<div class="pils">'+
       '<span class="chip">'+esc(_m(d.autor).pila)+' · '+esc(d.sub||'—')+'</span>'+
       '<span class="chip">'+ambDoc(d.amb)+'</span>'+
@@ -390,7 +426,10 @@ function docCard(d){
     '</div>'+
     _avisosDocE_(d)+
     '<div class="just"><span class="sc">Resumen ejecutivo</span>'+
-      esc(d.resumen||'El expediente llegó sin resumen. Léelo abajo antes de firmar.')+'</div>'+
+      /* 21/10 (auditor 20, 🟡 2): «léelo abajo» sólo si abajo HAY archivo; si no, decía «léelo abajo» encima de «no trae
+         enlace al archivo». */
+      esc(d.resumen||(d.drive ? 'El expediente llegó sin resumen. Léelo abajo antes de firmar.'
+                              : 'El expediente llegó sin resumen y sin enlace al archivo: no hay nada que leer antes de firmar.'))+'</div>'+
     previa+secs+avisos+visor+
     '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':'Firma: <b>'+esc(rev)+'</b>')+
       ' · Decidir aquí sustituye a contestar el correo de aprobación.</div>'+

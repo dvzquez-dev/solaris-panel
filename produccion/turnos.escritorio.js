@@ -511,7 +511,7 @@ async function _reusarMiTurno_(cv){
      !confirm('Se sustituye lo que llevas marcado esta semana por lo de la anterior. No se guarda hasta que pulses «Guardar». ¿Seguir?')) return;
   MIT_CELDAS=res.mapa;
   pintar();
-  tost('Copiada la semana anterior: revísala y pulsa «Guardar mi disponibilidad».'+
+  tost('Copiada '+(res.rotulo||'la semana anterior')+': revísala y pulsa «Guardar mi disponibilidad».'+
        (res.fuera ? ' ('+res.fuera+' casilla'+(res.fuera===1?' no cabía':'s no cabían')+'.)' : ''));
 }
 
@@ -613,6 +613,10 @@ function _dispAviso_(titulo){
      ⚠️ Ofrece Reintentar igual que el de `'error'`: la sesion puede llegar tarde (el
      login es asincrono), y entonces ese boton es lo unico que vuelve a abrir la puerta --
      `_dispCargar_` es de un solo disparo y `_refrescoVivo_` no lo toca. */
+  if(e === 'sin accion') return pan(titulo, 'sin datos',
+    vacioSimple('Esta versi\u00f3n de la app no sabe pedir la disponibilidad',
+      'No es tu cuenta: a la app le falta la acci\u00f3n que pregunta al servidor. Recarga la p\u00e1gina para coger la '+
+      '\u00faltima versi\u00f3n, y si sigue, av\u00edsalo desde el buz\u00f3n.'));
   if(e === 'sin sesion') return pan(titulo, 'sin sesi\u00f3n',
     vacioSimple('No se pudo preguntar: no hay sesi\u00f3n',
       'Sin identidad el servidor no contesta qui\u00e9n puede cada franja, y lo que se ve\u00eda aqu\u00ed era el mapa de ejemplo. '+
@@ -709,7 +713,11 @@ function _dispCargar_(repintar){
      ⚠️ Y el arreglo ingenuo -- hacer que `_dispAviso_` cubra `'sin pedir'` -- ROMPE la
      pantalla normal: sacaria el aviso en cada primer pintado. Por eso la cura va aqui, en
      quien sabe POR QUE no se pregunto, y no en quien lo pinta (§3c-24). */
-  if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getDisponibilidad){ _dispEstadoSrv_('sin sesion'); return; }
+  /* ⛔ 20/10 · DOS CAUSAS, DOS ESTADOS (como `_convCargar_` en el móvil). Juntas en `'sin sesion'`, a quien SÍ ha
+     entrado y le falta la ACCIÓN (una cara de otra versión que el backend) se le decía «Entra con tu cuenta»: le culpaba
+     a él de algo que no arregla volviendo a entrar. La sesión se mira PRIMERO: sin ella no se sabe nada más. */
+  if(typeof SESION==='undefined' || !SESION){ _dispEstadoSrv_('sin sesion'); return; }
+  if(typeof api==='undefined' || !api.getDisponibilidad){ _dispEstadoSrv_('sin accion'); return; }
   _dispEstadoSrv_('pidiendo');
   /* El interruptor se lee EN PARALELO con el mapa, no encadenado: son dos preguntas
      independientes y encadenarlas sumaria las dos esperas para pintar la misma pantalla.
@@ -721,12 +729,24 @@ function _dispCargar_(repintar){
        **no el valor a secas**: leer la entrada directamente daría un OBJETO —que es
        cierto— y el interruptor saldría encendido siempre, incluido el día que esté
        apagado. Es el mismo fallo que tuvo el gate meses con `calcular_cierre`. */
-    api.getControl().then(function(c){
+    AVISOS_EST='leyendo';
+    /* 🟡 R4 (refutador 26): con tiempo límite — un `getControl` colgado dejaba la casilla en «Leyendo…» para siempre. */
+    Promise.race([api.getControl(), new Promise(function(_, no){ setTimeout(function(){ no(new Error('tiempo')); }, 15000); })])
+    .then(function(c){
       var e = c && c[INTERRUPTOR_AVISOS];
       var val = (e && typeof e==='object' && 'valor' in e) ? e.valor : e;
       AVISOS_ON = (val===true || val==='true' || val===1 || val==='1');
+      AVISOS_EST='ok';
       if(typeof repintar==='function') repintar();
-    }).catch(function(){});
+    }).catch(function(){
+      /* ⛔ 22/10 (auditor 26, 🟡 11): «no se pudo leer» NO es «apagado» — se pinta como lo que es. */
+      AVISOS_EST='error';
+      if(typeof repintar==='function') repintar();
+    });
+  } else {
+    /* 🟡 R4 (refutador 26): sin la acción no se puede leer — y nacía 'leyendo'. En diferido: esto corre DENTRO de `pintar`. */
+    AVISOS_EST='error';
+    if(typeof repintar==='function') setTimeout(repintar, 0);
   }
   api.getDisponibilidad().then(function(r){
     _dispEstadoSrv_('ok');
@@ -899,6 +919,8 @@ function _puedeConvocarDisp_(){
 
 function _convocarDispPanel_(){
   if(!_puedeConvocarDisp_()) return '';
+  /* 🟡 R4 (refutador 26): lo que se PINTA del interruptor. 'leyendo' sin sesión no es «leyendo»: nadie va a preguntar. */
+  var _ae = (AVISOS_EST==='leyendo' && (typeof SESION==='undefined' || !SESION)) ? 'sinsesion' : AVISOS_EST;
   /* ⛔⛔ AQUÍ HABÍA UNA SEGUNDA GUARDA, Y SE RETIRA PORQUE YA NO ES VERDAD (643.ª → 758.ª).
      Decía «solo con la cuenta admin» y era cierta: `setControl` exigía `admin` para cualquier
      control, así que con la cuenta del PD el botón siempre fallaba y se avisaba antes de
@@ -948,11 +970,17 @@ function _convocarDispPanel_(){
        a ciegas. */
     '<div class="sep"></div>'+
     '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px">'+
-      '<input type="checkbox" id="cdAvisos"'+(AVISOS_ON?' checked':'')+'> '+
+      '<input type="checkbox" id="cdAvisos"'+(AVISOS_ON?' checked':'')+(_ae!=='ok'?' disabled':'')+'> '+
       '<b>mandar los avisos al móvil</b></label>'+
+    /* 22/10 (auditor 26, 🟡 11): sin saber lo que hay guardado, la casilla no se toca y se dice por qué. */
+    (_ae==='error' ? '<div class="nota" data-avisosest="error">⚠️ <b>No se pudo leer</b> si están encendidos: '+
+       'la casilla vacía <b>no</b> quiere decir apagados. Recarga para volver a mirar.</div>' :
+     _ae==='sinsesion' ? '<div class="nota" data-avisosest="sinsesion">Sin sesión no se puede saber si están encendidos.</div>' :
+     _ae==='leyendo' ? '<div class="nota" data-avisosest="leyendo">Leyendo si están encendidos…</div>' : '')+
     '<div class="nota" id="cdAvNota">Apagado, la rutina sigue calculando y deja escrito '+
       'lo que mandaría, pero <b>no sale nada</b>. Encendido, avisa al abrir, a las 24 h, '+
-      'a las 3 h y a los 10 min — y el recordatorio <b>solo a quien no ha contestado</b>.</div>'+
+      'a las 3 h y a los 10 min — y el recordatorio <b>solo a quien no ha contestado</b> —, y '+
+      'al <b>cerrarse</b> el plazo, a <b>todo el equipo</b>.</div>'+
     '</div>');
 }
 
@@ -966,7 +994,8 @@ function _engAvisosConv_(m){
     if(on && !confirm('Vas a ENCENDER los avisos de la convocatoria.'+String.fromCharCode(10,10)+
       'A partir de ahora salen notificaciones al movil del equipo: al abrir la disponibilidad, '+
       'a las 24 h, a las 3 h y a los 10 minutos del cierre.'+String.fromCharCode(10,10)+
-      'El recordatorio solo le llega a quien no ha contestado. Sigo?')){ c.checked=false; return; }
+      'El recordatorio solo le llega a quien no ha contestado. Y al cerrarse el plazo sale otro a todo el equipo. '+
+      'Sigo?')){ c.checked=false; return; }
     c.disabled=true;
     try{
       await api.setControl(INTERRUPTOR_AVISOS, on, on?'avisos ENCENDIDOS':'avisos apagados');
@@ -975,7 +1004,7 @@ function _engAvisosConv_(m){
     }catch(e){
       /* ⛔ Si no se pudo guardar, la casilla VUELVE a donde estaba: dejarla marcada diria que
          los avisos estan encendidos cuando el servidor no se ha enterado. */
-      c.checked=!on; tost('No se pudo: '+e);
+      c.checked=!on; tostErr('No se pudo: ', e);       // 🟠 2 (auditor 19)
     }finally{ c.disabled=false; }
   };
 }
@@ -1020,7 +1049,7 @@ function _pinConvDisp_(m){
       if(n) n.innerHTML='<b>Encolado</b> para la semana del '+esc(sem)+'. El plazo lo calcula '+
         'el servidor; cuando lo procese, la convocatoria aparece arriba.';
     }catch(e){
-      tost('No se pudo encolar: '+e);
+      tostErr('No se pudo encolar: ', e);       // 🟠 2 (auditor 19)
     }finally{
       b.disabled=false; b.textContent=prev;
     }
@@ -1253,14 +1282,34 @@ function cablearCoches(){
    Un solo campo por turno reparte a partes iguales, que es justo lo que ese ejemplo descarta.
    ⚠️ NO ESCRIBE EN NOTION. Deja la propuesta a la vista para aplicarla: escribir en Notion
    exige el visto bueno de Daniel **cada vez**, y son los puntos de personas reales. */
+/* ⛔ 20/10 (ficha del 20/08): ¿se puede CERRAR este turno hoy? No si Notion ya lo da por `Realizado` o `Cancelado`
+   —cerrar un cancelado acredita «+1 turno» (×4 h) a gente que no fue— y no si es FUTURO. El estado manda sobre la
+   fecha, igual que `_normTurnoM_` en el móvil. Sin fecha legible no se esconde: «no lo sé» no es «no se puede». */
+function _turnoCerrable_(t, hoy){
+  if(!t) return false;
+  var est = t.estado || '';
+  if(est==='Realizado' || est==='Cancelado') return false;
+  var iso = _dmyAISO_(t.f || t.fecha || '');
+  if(/^\d{4}-\d{2}-\d{2}$/.test(iso) && hoy && iso > hoy) return false;
+  return true;
+}
+
+/* 26/10 (refutador 37, 🟡 4): la misma puerta que `e_estado_turno` para «Cancelado»: el PD siempre; el resto, sólo un
+   turno de hoy (los de la lista ya no son futuros). Sin fecha legible, no: el servidor tampoco lo sabría. */
+function _puedeCancelarTurno_(t){
+  if(typeof rangoNom === 'function' && typeof _actorSanc_ === 'function' && rangoNom(_actorSanc_()) >= 3) return true;
+  var iso = t ? String(_dmyAISO_(t.f || t.fecha || '') || '') : '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) && iso >= String(_ahoraApp_()).slice(0,10);
+}
 function _turnosCerrables_(){
-  var out = [];
+  /* 21/10 (auditor 20, 🟡 5): el reloj de la APP; en real es el mismo día local que antes. */
+  var out = [], hoy = String(_ahoraApp_()).slice(0,10);
   /* ⛔ CLAVES, NO POSICIONES. `escritorio.html` rellena `TURNOS` EN SITIO en sus dos
      cargas (`TURNOS.length=0; t.forEach(push)`), asi que un indice guardado sobrevive al
      refresco apuntando a OTRO turno -- y esto es justo lo que viaja al `value` del
      `<option>` y vuelve por el `onchange`. */
   (typeof TURNOS !== 'undefined' ? TURNOS : []).forEach(function(t){
-    if(_puedeCerrarTurno_(t, ACTOR)) out.push(_claveTurno_(t));
+    if(_puedeCerrarTurno_(t, ACTOR) && _turnoCerrable_(t, hoy)) out.push(_claveTurno_(t));
   });
   return out;
 }
@@ -1301,6 +1350,15 @@ function _cierreTurTope_(){
   return _extraTope_(isFinite(d) ? d : 0);
 }
 
+/* ⛔ 20/10 (ficha del 20/08): ¿falta la duracion? El 0 de arriba es el lado seguro para el NUMERO, pero el panel
+   lo convertia en una AFIRMACION —«el turno no ha pasado de las 4 h de base»— en la primera pintada, sin que nadie
+   hubiera tecleado nada, y dejaba «Cerrar el turno» suelto: +1 turno a cada uno, sin extra, sin decir cuanto duro.
+   Un 0 escrito a mano SI es una duracion (quien lo pone lo dice); vacio o no-numero, no. */
+function _cierreTurSinDur_(){
+  var d = parseFloat(String(CIERRE_TUR.dur == null ? '' : CIERRE_TUR.dur).replace(',', '.'));
+  return !isFinite(d);
+}
+
 /* Lo que se mandaria: SOLO los confirmados.
    ⛔ Quien no fue no lleva fila, en vez de llevar una con 0: son dos afirmaciones distintas
    —«estuvo y no le toca extra» frente a «no estuvo»— y el turno tambien cuenta un turno en el
@@ -1321,10 +1379,27 @@ function _cierreTurMapa_(){
   return out;
 }
 
+/* 26/10 (triaje C4b): ¿llevó coche, según el reparto? Es lo que se PROPONE marcado; lo que cuenta es lo que confirme
+   quien cierra (Daniel, 11/08: «si tenía lo de coche también se le añade eso ahí… antes no»). */
+function _llevaCocheTurno_(t, n){
+  return ((t && t.roles) || []).some(function(r){ return r && r.miembro === n && /coche/i.test(String(r.rol || '')); });
+}
+
+/* 26/10 (triaje C4a/C4b): lo que queda a la vista tras cerrar o cancelar — el turno ya NO es cerrable y saldría de la
+   lista, pero la propuesta para Compensaciones es lo que se aplica: no puede desaparecer con él. */
+function _cierreTurListoHTML_(){
+  var l = CIERRE_TUR.listo;
+  if(!l) return '';
+  return '<div class="nota" style="margin-bottom:11px"><b>'+esc(l.titulo)+'</b>'+
+    (l.aviso ? '<div>'+esc(l.aviso)+'</div>' : '')+
+    (l.txt ? '<pre class="mono" style="white-space:pre-wrap;font-size:12px;margin:8px 0 0">'+esc(l.txt)+'</pre>' : '')+
+    '</div>';
+}
+
 function _cierreTurnoPanel_(){
-  var cerrables = _turnosCerrables_();
-  if(!cerrables.length) return '';
-  if(CIERRE_TUR.k == null) CIERRE_TUR.k = cerrables[0];
+  var cerrables = _turnosCerrables_(), listo = _cierreTurListoHTML_();
+  if(!cerrables.length) return listo ? pan('Cerrar un turno', 'hecho', listo) : '';
+  if(CIERRE_TUR.k == null || cerrables.indexOf(CIERRE_TUR.k) < 0) CIERRE_TUR.k = cerrables[0];
 
   var t = _cierreTurSel_(), firmes = _asistentesTurno_(t), tope = _cierreTurTope_();
   var resp = _responsableTurno_(t);
@@ -1347,9 +1422,12 @@ function _cierreTurnoPanel_(){
   if(!Object.keys(CIERRE_TUR.quien).length){
     firmes.forEach(function(n){ CIERRE_TUR.quien[n] = true; });
     dud.forEach(function(n){ CIERRE_TUR.quien[n] = false; });
+    /* 26/10 (C4b): el coche del reparto, propuesto; se confirma aquí */
+    asis.forEach(function(n){ CIERRE_TUR.coche[n] = _llevaCocheTurno_(t, n); });
   }
 
-  var mapa = _cierreTurMapa_(), falta = _cierreTurnoFalta_(mapa, tope);
+  var mapa = _cierreTurMapa_(), sinDur = _cierreTurSinDur_(),
+      falta = sinDur ? 'Di cu\u00e1nto dur\u00f3 el turno' : _cierreTurnoFalta_(mapa, tope);
 
   /* ⚠️ EL `value` VA POR `esc`: la clave lleva el `punto`, que es texto libre del
      Discord y puede traer comillas -- sin escapar, romperia el atributo y el `<option>`
@@ -1374,13 +1452,20 @@ function _cierreTurnoPanel_(){
       '<td><label style="display:flex;align-items:center;gap:7px;cursor:pointer">'+
         '<input type="checkbox" data-ct-fue="'+esc(n)+'"'+(on?' checked':'')+'>'+
         esc((miembro(n)||{}).pila || n)+
-        (n===resp?' <span class="chip">responsable</span>':'')+'</label></td>'+
+        (n===resp?' <span class="chip">responsable</span>':'')+'</label>'+
+        /* 26/10 (C4b): «llevó coche» va al ACTA (Notion `Coche`, almacén `coche_confirmado`). ⚠️ La cuota aún cuenta el
+           coche del REPARTO (espejo): que cuente sólo el confirmado es la 2.ª mitad de C4b, ficha abierta. */
+        ' <label style="display:flex;align-items:center;gap:6px;font-size:12px;opacity:.85;cursor:pointer"><input type="checkbox" data-ct-coche="'+esc(n)+'"'+
+        (CIERRE_TUR.coche[n]?' checked':'')+(on?'':' disabled')+'> llev\u00f3 coche</label></td>'+
       '<td class="r"><input class="mono" type="number" step="0.25" min="0" max="'+tope+'" '+
         'data-ct-extra="'+esc(n)+'" value="'+val+'" style="width:88px;text-align:right"'+
         (on?'':' disabled')+'> h</td></tr>';
   }).join('');
 
-  var aviso = (tope <= 0)
+  var aviso = sinDur
+    ? '<div class="nota">Di primero <b>cu\u00e1nto dur\u00f3</b> de verdad: de eso sale el tiempo extra que se '+
+      'reparte por encima de la base de <b>'+_horasTurnoBase_()+' h</b>.</div>'
+    : (tope <= 0)
     ? '<div class="nota">El turno no ha pasado de las <b>'+_horasTurnoBase_()+' h</b> de base, '+
       'as\u00ed que <b>no hay tiempo extra que repartir</b>. Cerrarlo sigue valiendo: confirma qui\u00e9n fue.</div>'
     : '<div class="nota">El turno dio <b>'+h1(tope)+'</b> por encima de la base de '+
@@ -1394,7 +1479,8 @@ function _cierreTurnoPanel_(){
       'font-size:12px;margin:8px 0 0">'+esc(CIERRE_TUR.hecho)+'</pre></div>'
     : '';
 
-  return pan('Cerrar un turno', cerrables.length+' tuyo(s)',
+  return pan('Cerrar un turno', cerrables.length+' por cerrar', '<div class="pb">'+
+    listo+
     '<label class="campo"><span class="sc">Qu\u00e9 turno</span>'+
       '<select id="ctSel">'+opciones+'</select></label>'+
     '<label class="campo"><span class="sc">Cu\u00e1nto dur\u00f3 de verdad (horas)</span>'+
@@ -1406,7 +1492,11 @@ function _cierreTurnoPanel_(){
         '<th class="r">Extra</th></tr></thead><tbody>'+filas+'</tbody></table>'
       : '<div class="nota">Este turno no tiene a nadie resuelto en el roster.</div>')+
     '<button class="btn pri" id="ctEnviar"'+(falta?' disabled':'')+' style="margin-top:11px">'+
-      (falta ? esc(falta) : 'Cerrar el turno')+'</button>');
+      (falta ? esc(falta) : 'Cerrar el turno')+'</button>'+
+    /* 26/10 (triaje C4a): cancelar = «Cancelado»; no cuenta como turno para nadie, ni su coche */
+    /* ⛔ (refutador 37, 🟡 4): un turno YA PASADO sólo lo cancela el PD (el servidor se lo niega al resto) */
+    (_puedeCancelarTurno_(t) ? ' <button class="btn" id="ctCancelar" style="margin-top:11px">Cancelar este turno</button>' : '')+
+    '</div>');
 }
 
 /* ⛔⛔ ESTE PANEL ESTUVO ROTO 5 DE 5, POR DOS CAUSAS DISTINTAS (23/08).
@@ -1437,7 +1527,7 @@ function _cablearCierreTurno_(){
        cara de haber sido tecleadas ahi. */
     /* ⚠️ SIN `+`: el valor es una CLAVE, no un numero. Con `+` daba `NaN` y el panel
        se quedaba sin turno elegido. */
-    CIERRE_TUR.k = sel.value; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {};
+    CIERRE_TUR.k = sel.value; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {};
     CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
   };
   var dur = document.getElementById('ctDur');
@@ -1452,6 +1542,8 @@ function _cablearCierreTurno_(){
   };
   $$('[data-ct-fue]').forEach(function(el){
     el.onchange = function(){ CIERRE_TUR.quien[el.dataset.ctFue] = !!el.checked; pintar(); }; });
+  $$('[data-ct-coche]').forEach(function(el){
+    el.onchange = function(){ CIERRE_TUR.coche[el.dataset.ctCoche] = !!el.checked; }; });
   $$('[data-ct-extra]').forEach(function(el){
     el.onchange = function(){
       var v = parseFloat(String(el.value).replace(',', '.'));
@@ -1459,17 +1551,44 @@ function _cablearCierreTurno_(){
       CIERRE_TUR.hecho = null; pintar();
     }; });
   var b = document.getElementById('ctEnviar');
-  if(b) b.onclick = function(){
+  if(b) b.onclick = async function(){
     var mapa = _cierreTurMapa_(), tope = _cierreTurTope_();
     var falta = _cierreTurnoFalta_(mapa, tope);
     if(falta){ b.textContent = falta; return; }
     var t = _cierreTurSel_();
-    CIERRE_TUR.hecho = 'Turno ' + ((t && (t.fecha_txt || t.fecha || t.f)) || '?') +
+    var txt = 'Turno ' + ((t && (t.fecha_txt || t.fecha || t.f)) || '?') +
       ' \u00b7 ' + Object.keys(mapa).length + ' persona(s), +1 turno cada una\n' +
       Object.keys(mapa).map(function(n){
         return '  ' + n + ' \u2192 ' + (mapa[n] ? ('+' + mapa[n] + ' h a Compensaciones')
-                                                : 'sin extra'); }).join('\n');
-    pintar();
+                                                : 'sin extra') + (CIERRE_TUR.coche[n] ? ' \u00b7 llev\u00f3 coche' : ''); }).join('\n');
+    /* ⛔ 26/10 (triaje C4a/C4b): y el turno queda «Realizado», con el acta — quién fue y, de ellos, quién llevó coche.
+       Sin `id` (un turno del espejo de Discord) no hay a qué página ir: la propuesta sale igual y se dice. */
+    if(!t || !t.id){ CIERRE_TUR.hecho = txt + '\n(Este turno no trae su ID de Notion: márcalo «Realizado» a mano.)'; pintar(); return; }
+    var fueron = Object.keys(mapa), coche = fueron.filter(function(n){ return !!CIERRE_TUR.coche[n]; });
+    b.disabled = true; b.textContent = 'Cerrando\u2026';
+    try{
+      var r = await api.estadoTurno({id:t.id, estado:'Realizado', fueron:fueron, coche:coche});
+      t.estado = 'Realizado';
+      var se = (r && r.sinEtiquetar) || [];
+      CIERRE_TUR.listo = {titulo:'Turno cerrado: queda «Realizado». Propuesta para Compensaciones (la aplica Daniel):', txt:txt,
+        aviso: se.length ? ('Sin usuario de Notion, no entran en Asistentes: ' + se.join(', ')) : ''};
+      CIERRE_TUR.k = null; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {};
+      CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
+    }catch(e){ b.disabled = false; b.textContent = 'No se pudo cerrar: ' + ((e && e.message) || e); }
+  };
+  var bc = document.getElementById('ctCancelar');
+  if(bc) bc.onclick = async function(){
+    var t = _cierreTurSel_(), f = (t && (t.fecha_txt || t.fecha || t.f)) || '?';
+    if(!t || !t.id){ bc.textContent = 'Este turno no trae su ID de Notion: cancélalo allí'; return; }
+    if(!confirm('Cancelar el turno del ' + f + '. No contará como turno para nadie, ni su coche. ¿Seguro?')) return;
+    bc.disabled = true; bc.textContent = 'Cancelando\u2026';
+    try{
+      await api.estadoTurno({id:t.id, estado:'Cancelado'});
+      t.estado = 'Cancelado';
+      CIERRE_TUR.listo = {titulo:'Turno del ' + f + ' cancelado: no cuenta como turno ni su coche.', txt:'', aviso:''};
+      CIERRE_TUR.k = null; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {};
+      CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
+    }catch(e){ bc.disabled = false; bc.textContent = 'No se pudo cancelar: ' + ((e && e.message) || e); }
   };
 }
 
@@ -1496,7 +1615,9 @@ function convocarPanel(){
       '<label style="width:135px">'+lab('Duraci\u00f3n')+
         '<input id="tuDur" placeholder="~ 3 horas" style="'+E+'"></label>'+
       '<label style="width:135px">'+lab('D\u00f3nde se trabaja')+'<select id="tuLugar" style="'+E+'">'+
-        '<option>CITI</option><option>Vigo</option><option>Coasa</option><option>Otro</option></select></label>'+
+        /* 22/10 (auditor 25, 🟡 9): SIN elegir por defecto — antes todo turno salía «CITI» aunque nadie lo dijera, y
+           de este campo saldría el descuento de Vigo. Vacío = no se escribe en Notion (`_verdad(lugar)`). */
+        '<option value="">— sin decir —</option><option>CITI</option><option>Vigo</option><option>Coasa</option><option>Otro</option></select></label>'+
       '<label style="flex:1;min-width:190px">'+lab('D\u00f3nde se queda')+
         '<input id="tuPunto" placeholder="enfrente del polit\u00e9cnico" style="'+E+'"></label>'+
       '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px;cursor:pointer">'+
