@@ -6169,7 +6169,8 @@ function _novedades_(){
       titulo:'Comprobar la portada antes de aprobar con anotaciones',
       items:[
         {cara:'movil', vista:'docs', txt:'En **Con anotaciones**, el botón **Comprobar portada** mete el título y el subtítulo en la portada de verdad y te dice si caben o **cuántos caracteres sobran**. Sin el ✓ no se aprueba con anotaciones, y editar lo apaga.'},
-        {cara:'escritorio', vista:'docdec', txt:'El mismo botón en la ficha del expediente; tras SolarIA se comprueba solo.'}
+        {cara:'escritorio', vista:'docdec', txt:'El mismo botón en la ficha del expediente; tras SolarIA se comprueba solo.'},
+        {cara:'movil', vista:'docs', txt:'Si el título no cabe en la portada, el expediente llega con el título y el subtítulo **ya editados** (en azul) y te dice por qué y cuál era.'}
       ] },
     { id:'2026-10-28-solaria', fecha:'2026-10-28',
       titulo:'Aprobar con anotaciones, con SolarIA',
@@ -8484,10 +8485,26 @@ function _ajustesDocTxt_(e){
 function _anotActualDe_(e){
   e = e || {};
   var n = e.confidencialidad;
-  return { titulo: String(e.titulo != null ? e.titulo : (e.tit || '')),
+  var a = { titulo: String(e.titulo != null ? e.titulo : (e.tit || '')),
            subtitulo: String(e.subtitulo || ''),
            confidencialidad: (n === 'publico' || n === 'interno') ? n : '',
            etiquetas: _etiquetasDe_(e) };
+  var sg = _anotSugerida_(e);
+  if (sg) a.sugerida = sg;
+  return a;
+}
+
+/* 28/10 — LA PORTADA SUGERIDA AL LLEGAR (`analisis.portada`, del análisis): si el título no cabía, el bot ya propone
+   título y subtítulo. 🗣️ Daniel: «te tiene que poner que […] se ha editado porque era demasiado largo». `null` si no hay,
+   o si el expediente ya tiene ESE título (no hay nada que editar). */
+function _anotSugerida_(e){
+  var p = e && e.analisis && e.analisis.portada;
+  if (!p || typeof p !== 'object' || !String(p.titulo || '').trim()) return null;
+  var tit = String(e.titulo != null ? e.titulo : (e.tit || ''));
+  if (String(p.titulo).trim() === tit.trim() && String(p.subtitulo || '').trim() === String(e.subtitulo || '').trim()) return null;
+  return { titulo: String(p.titulo).trim(), subtitulo: String(p.subtitulo || '').trim(),
+           motivo: String(p.motivo || '').trim() || 'el título no cabía en la portada',
+           original: String(p.original || '').trim() || tit };
 }
 
 /* Qué campos de `campos` difieren de `act`. Un campo que NO llega (`null`/ausente) no cuenta como cambio: un input que
@@ -8519,6 +8536,9 @@ function _anotExtra_(act, form){
 function _anotPanelHTML_(pre, act, id, css){
   act = act || {};
   var st = css ? ' style="' + css + '"' : '';
+  var sg = act.sugerida || null;
+  /* El contorno azul de «lo ha cambiado el bot», en el MISMO atributo style que el de la cara. */
+  var stS = sg ? ' style="' + (css ? css + ';' : '') + 'outline:2px solid #3f9ed6"' : st;
   var opc = function(v, t){ return '<option value="' + v + '"' + (act.confidencialidad === v ? ' selected' : '') + '>' + t + '</option>'; };
   var campo = function(rot, html){ return '<label class="campo" style="display:block;margin-top:9px">' +
     '<span class="sc" style="display:block;margin-bottom:5px">' + rot + '</span>' + html + '</label>'; };
@@ -8536,8 +8556,11 @@ function _anotPanelHTML_(pre, act, id, css){
         ' placeholder="«acorta el título», «ponle de subtítulo…», «es interno», «añade la etiqueta…»"></textarea>') +
       '<button type="button" class="btn" style="margin-top:8px;width:100%" data-solaria="' + pre + '">Enviar a SolarIA</button>' +
       '<p class="rnota" id="' + pre + 'AnotEst" style="margin:6px 0 0"></p></div>' +
-    campo('Título · una línea en la portada', '<input id="' + pre + 'Tit" value="' + esc(act.titulo || '') + '"' + st + '>') +
-    campo('Subtítulo · hasta dos líneas; vacío = sin subtítulo', '<input id="' + pre + 'Sub" value="' + esc(act.subtitulo || '') + '"' + st + '>') +
+    /* 28/10: con la portada SUGERIDA al llegar, título y subtítulo salen ya editados (en azul) y se dice por qué. */
+    (sg ? '<p class="rnota" id="' + pre + 'Sug" style="margin:9px 0 0;color:#3f9ed6">✎ Título editado al llegar: ' +
+      esc(sg.motivo) + ' (era «' + esc(sg.original) + '»). Revísalo; puedes cambiarlo.</p>' : '') +
+    campo('Título · una línea en la portada', '<input id="' + pre + 'Tit" value="' + esc(sg ? sg.titulo : (act.titulo || '')) + '"' + stS + '>') +
+    campo('Subtítulo · hasta dos líneas; vacío = sin subtítulo', '<input id="' + pre + 'Sub" value="' + esc(sg ? sg.subtitulo : (act.subtitulo || '')) + '"' + stS + '>') +
     /* 28/10: el CHECK — «un tick […] que cada vez que editen algo se desactive» (ver `_anotComprobar_`). */
     '<div style="margin-top:9px"><button type="button" class="btn" style="width:100%" id="' + pre + 'Chk" data-anotchk="' + pre +
       '">Comprobar portada</button><p class="rnota" id="' + pre + 'ChkEst" style="margin:6px 0 0">' +
