@@ -6165,6 +6165,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-28-portada', fecha:'2026-10-28',
+      titulo:'Comprobar la portada antes de aprobar con anotaciones',
+      items:[
+        {cara:'movil', vista:'docs', txt:'En **Con anotaciones**, el botón **Comprobar portada** mete el título y el subtítulo en la portada de verdad y te dice si caben o **cuántos caracteres sobran**. Sin el ✓ no se aprueba con anotaciones, y editar lo apaga.'},
+        {cara:'escritorio', vista:'docdec', txt:'El mismo botón en la ficha del expediente; tras SolarIA se comprueba solo.'}
+      ] },
     { id:'2026-10-28-solaria', fecha:'2026-10-28',
       titulo:'Aprobar con anotaciones, con SolarIA',
       items:[
@@ -8517,7 +8523,9 @@ function _anotPanelHTML_(pre, act, id, css){
   var campo = function(rot, html){ return '<label class="campo" style="display:block;margin-top:9px">' +
     '<span class="sc" style="display:block;margin-bottom:5px">' + rot + '</span>' + html + '</label>'; };
   var bt = 'padding:5px 12px;font-size:12px';
-  return '<div id="' + pre + 'Anot" data-anot="' + pre + '" data-doc="' + esc(String(id)) + '" data-modo="ia" style="margin-top:10px">' +
+  /* ⛔ 28/10: `data-anotdoc`, NO `data-doc`: el móvil le pone a todo `[data-doc]` un onclick que ABRE la ficha, y un toque
+     dentro del panel la repintaba con lo escrito borrado (visto probando el check como usuario). */
+  return '<div id="' + pre + 'Anot" data-anot="' + pre + '" data-anotdoc="' + esc(String(id)) + '" data-modo="ia" style="margin-top:10px">' +
     '<span class="sc" style="display:block;margin-bottom:6px">Con anotaciones · lo que se ajusta al aprobar</span>' +
     '<div style="display:flex;gap:6px">' +
       '<button type="button" class="btn pri" style="' + bt + '" data-anotmodo="ia" data-pre="' + pre + '">SolarIA</button>' +
@@ -8530,6 +8538,10 @@ function _anotPanelHTML_(pre, act, id, css){
       '<p class="rnota" id="' + pre + 'AnotEst" style="margin:6px 0 0"></p></div>' +
     campo('Título · una línea en la portada', '<input id="' + pre + 'Tit" value="' + esc(act.titulo || '') + '"' + st + '>') +
     campo('Subtítulo · hasta dos líneas; vacío = sin subtítulo', '<input id="' + pre + 'Sub" value="' + esc(act.subtitulo || '') + '"' + st + '>') +
+    /* 28/10: el CHECK — «un tick […] que cada vez que editen algo se desactive» (ver `_anotComprobar_`). */
+    '<div style="margin-top:9px"><button type="button" class="btn" style="width:100%" id="' + pre + 'Chk" data-anotchk="' + pre +
+      '">Comprobar portada</button><p class="rnota" id="' + pre + 'ChkEst" style="margin:6px 0 0">' +
+      'Hace falta para aprobar con anotaciones: mete el título y el subtítulo en la portada de verdad.</p></div>' +
     campo('Confidencialidad', '<select id="' + pre + 'Conf"' + st + '>' + (act.confidencialidad ? '' : opc('', '— sin indicar —')) +
       opc('publico', 'Público') + opc('interno', 'Interno') + '</select>') +
     campo('Etiquetas · separadas por comas', '<input id="' + pre + 'Etq" value="' + esc((act.etiquetas || []).join(', ')) + '"' + st + '>') +
@@ -8632,13 +8644,97 @@ async function _anotEnviarIA_(pre, e){
     }
     var cam = _anotCambios_(act, r.campos || {});
     _anotRellenar_(pre, r.campos || {}, cam);
+    _anotChkPintar_(pre);
     _anotEstado_(pre, (cam.length ? 'SolarIA propone cambiar ' + cam.map(_anotNombre_).join(', ') + '. Revísalo y aprueba con anotaciones.'
                                   : 'SolarIA no ve nada que cambiar con esa indicación.') +
                       (r.avisos && r.avisos.length ? ' Ojo: ' + r.avisos.join(' · ') : ''));
+    /* «el propio Haiku […] sabe más o menos cómo poner los títulos» — y aun así se comprueba, sin pedirlo. */
+    _anotComprobar_(pre, e);
   } catch (err) {
     _anotBloquear_(pre, false);
     _anotEstado_(pre, 'No se pudo hablar con SolarIA: ' + ((err && err.message) || err) + '. Puedes ajustarlo a mano.');
   }
+}
+
+/* ══ 28/10 · EL CHECK DE LA PORTADA antes de «aprobar con anotaciones» ═══════════════════════════════════════════
+   🗣️ Daniel: «te compruebe todos los campos y mire que sea compatible […] inyectarlo en la plantilla de verdad […] ve si
+   se desborda […] cuántos caracteres se han desbordado […] Un tick […] que cada vez que editen algo se desactive, y que
+   para darle a aprobar con anotaciones, tiene que estar con el tick». El servidor (`comprobarPortada`) renderiza la
+   plantilla real; aquí se guarda QUÉ se comprobó (`data-chk` = `_anotClaveChk_`) y el tick vale sólo mientras el título
+   y el subtítulo sigan siendo ésos. Las etiquetas no tienen límite. */
+
+/* La clave de lo comprobado: título y subtítulo, recortados. */
+function _anotClaveChk_(f){
+  f = f || {};
+  return JSON.stringify([String(f.titulo == null ? '' : f.titulo).trim(), String(f.subtitulo == null ? '' : f.subtitulo).trim()]);
+}
+
+/* La respuesta del servidor, dicha para una persona: si caben, o qué sobra de cada uno. */
+function _anotChkTexto_(r){
+  if (!r || r.ok === false) return 'No se pudo comprobar' + (r && r.motivo ? ': ' + r.motivo : '') + '. Vuelve a intentarlo.';
+  if (r.cabe === true) return '✓ Caben en la portada.';
+  var p = [], t = r.titulo || {}, s = r.subtitulo || {};
+  if (t.vacio) p.push('el título está vacío');
+  else if (t.cabe === false) p.push('el título ocupa ' + t.lineas + ' líneas (cabe 1): sobran ' + t.sobran + ' caracteres');
+  else if (t.cabe == null) p.push('el título no se encontró en la portada');
+  if (s.cabe === false) p.push('el subtítulo ocupa ' + s.lineas + ' líneas (caben 2): sobran ' + s.sobran + ' caracteres');
+  else if (s.cabe == null) p.push('el subtítulo no se encontró en la portada');
+  return '✗ ' + (p.length ? p.join(' · ') : 'no se pudo saber si caben') + '. Acórtalo y vuelve a comprobar.';
+}
+
+/* ¿El tick vale para lo que hay escrito AHORA? */
+function _anotChkOK_(pre){
+  var c = document.getElementById(pre + 'Anot');
+  var k = c ? c.getAttribute('data-chk') : '';
+  return !!(k && k === _anotClaveChk_(_anotLeer_(pre)));
+}
+
+/* El botón según el tick: «✓ Portada comprobada» o «Comprobar portada». Si se editó lo comprobado, el tick se APAGA. */
+function _anotChkPintar_(pre){
+  var c = document.getElementById(pre + 'Anot'), b = document.getElementById(pre + 'Chk');
+  if (!c || !b) return;
+  var ok = _anotChkOK_(pre);
+  if (!ok && c.getAttribute('data-chk')){
+    c.setAttribute('data-chk', '');
+    var est = document.getElementById(pre + 'ChkEst');
+    if (est) est.textContent = 'Has cambiado el título o el subtítulo: vuelve a comprobar la portada.';
+  }
+  b.textContent = ok ? '✓ Portada comprobada' : 'Comprobar portada';
+  b.style.borderColor = ok ? '#3f9ed6' : '';
+}
+
+/* Al teclear en el título o el subtítulo de un panel, su tick se repinta (y se apaga). Cada cara lo engancha a `input`. */
+function _anotInput_(ev){
+  var t = ev && ev.target;
+  var c = t && t.closest ? t.closest('[data-anot]') : null;
+  if (!c) return;
+  var pre = c.getAttribute('data-anot');
+  if (t.id === pre + 'Tit' || t.id === pre + 'Sub') _anotChkPintar_(pre);
+}
+
+/* El botón «Comprobar portada»: el título y el subtítulo de la PANTALLA al servidor; el panel, bloqueado mientras. */
+async function _anotComprobar_(pre, e){
+  if (!e || _anotOcupado_(pre)) return;
+  var c = document.getElementById(pre + 'Anot'), est = document.getElementById(pre + 'ChkEst');
+  var f = _anotLeer_(pre), clave = _anotClaveChk_(f);
+  var di = function(t){ if (est) est.textContent = t; };
+  if (!(typeof backendOK !== 'undefined' && backendOK && typeof SESION !== 'undefined' && SESION)){
+    di('Comprobar la portada necesita conexión con el servidor.');
+    return;
+  }
+  _anotBloquear_(pre, true);
+  di('Comprobando en la plantilla de la portada…');
+  try {
+    var r = await api.comprobarPortada(e.id, e.ref, f.titulo, f.subtitulo);
+    _anotBloquear_(pre, false);
+    if (c) c.setAttribute('data-chk', (r && r.ok !== false && r.cabe === true) ? clave : '');
+    di(_anotChkTexto_(r));
+  } catch (err) {
+    _anotBloquear_(pre, false);
+    if (c) c.setAttribute('data-chk', '');
+    di('No se pudo comprobar: ' + ((err && err.message) || err) + '.');
+  }
+  _anotChkPintar_(pre);
 }
 
 /* El manejador, delegado: cada cara lo engancha UNA vez a `document` con su forma de encontrar el expediente. */
@@ -8647,10 +8743,13 @@ function _anotClic_(ev, buscar){
   if (!t) return;
   var m = t.closest('[data-anotmodo]');
   if (m){ _anotModo_(m.getAttribute('data-pre'), m.getAttribute('data-anotmodo')); return; }
+  var k = t.closest('[data-anotchk]');
+  if (k){ var pk = k.getAttribute('data-anotchk'), ck = document.getElementById(pk + 'Anot');
+          _anotComprobar_(pk, ck ? buscar(ck.getAttribute('data-anotdoc')) : null); return; }
   var s = t.closest('[data-solaria]');
   if (!s) return;
   var pre = s.getAttribute('data-solaria'), c = document.getElementById(pre + 'Anot');
-  _anotEnviarIA_(pre, c ? buscar(c.getAttribute('data-doc')) : null);
+  _anotEnviarIA_(pre, c ? buscar(c.getAttribute('data-anotdoc')) : null);
 }
 
 /* `2026-08-06T19:12:00.000Z` → `06/08/2026, 21:12`. Formato, no calendario. */
