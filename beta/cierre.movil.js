@@ -146,6 +146,8 @@ function _cierreHTML_(est, err, cargando){
   if(_avc) cab+='<p class="rnota" style="color:var(--warn)">'+esc(_avc)+'</p>';
   var _ava=_avisoAplicarCierre_(est);   /* 22/10 (auditor 22, 🟠 2): aplicar en vuelo o fallado, también aquí */
   if(_ava) cab+='<p class="rnota" style="color:var(--warn)">'+esc(_ava)+'</p>';
+  var _avf=_avisoFichajesCierre_(est);   /* 26/10 (triaje 5.2): quien sigue fichado, sin bloquear */
+  if(_avf) cab+='<p class="rnota" style="color:var(--warn)">'+esc(_avf)+'</p>';
   if(enc && plan) cab+='<p class="rnota">Hay un cálculo <b>nuevo</b> en cola: el plan de abajo es el anterior y se '+
     'sustituye en la siguiente pasada (va cada 2 minutos).</p>';
   var filas=bloq.map(function(b){

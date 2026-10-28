@@ -69,7 +69,9 @@ function parteCard(p){
       /* 20/10: lo devuelto se DICE — está en la cola esperando al autor, y se ve qué se le pidió. */
       (p.estado==='detalle'?'<span class="chip wa">devuelto · falta detalle'+(p.motivo?' — «'+esc(p.motivo)+'»':'')+'</span>':'')+
       /* 21/10 (auditor 8, 🟡 6): y si ya lo CONTESTÓ, qué se le había preguntado */
-      (p.estado==='pend' && p.pedido?'<span class="chip">contestó a lo que se le pidió — «'+esc(p.pedido)+'»</span>':'')+'</div>'+
+      (p.estado==='pend' && p.pedido?'<span class="chip">contestó a lo que se le pidió — «'+esc(p.pedido)+'»</span>':'')+
+      /* 26/10 · «Sí, mientras no esté firmado»: las horas que vas a firmar las corrigió su autor — y de cuánto eran */
+      (_txtCorreccion_(p.corr)?'<span class="chip wa">'+esc(_txtCorreccion_(p.corr))+'</span>':'')+'</div>'+
     '<div class="ruta">'+(puede?'Puedes decidirlo.':'Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.')+'</div>'+
     (puede?'<textarea data-motivo placeholder="Motivo — obligatorio para rechazar o pedir detalle…"></textarea>'+
       '<div class="acts">'+
@@ -167,6 +169,7 @@ function normParte(p){
     decidido_por:p.decidido_por||null, decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
     periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo */
     motivo:p.motivo||null, pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya contestada */
+    corr:p.correcciones||null,   /* 26/10 («Sí, mientras no esté firmado»): las horas las corrigió su autor */
     _real:true };
 }
 
@@ -306,7 +309,7 @@ function _escRevBloqueo_(p){
      la pisa un calculo nuevo y con ella se va el instante. Es esta la cara desde la que
      de verdad se revierte, y la que tenia el boton prometiendo lo que el servidor niega. */
   var _ce=(typeof CIERRE!=='undefined' && CIERRE) || null;
-  var cer=_mesCerradoParte_(p, (_ce && _ce.plan) || null, (_ce && _ce.ultimo_cierre) || null);
+  var cer=_mesCerradoParte_(p, (_ce && _ce.plan) || null, (_ce && _ce.ultimo_cierre) || null, true);   /* 26/10: para revertir */
   if(cer)
     return 'Mes cerrado ('+esc(cer)+'): ya no se revierte. Esas horas ya cuentan y de ahí salió '+
       'la cuota. Si hay que corregirlo, se hace en la ficha.';
@@ -332,8 +335,10 @@ function _escRevBloqueo_(p){
    puntas coincidian, asi que esto es una asimetria y no una decision de producto. La pregunta
    de producto -¿deberia el PD poder revertir lo suyo, como puede decidirlo?- esta apuntada en
    `docs/pendientes.md` y NO bloquea: mande lo que mande, las dos puntas dicen lo mismo. */
+/* ✅ 26/10 · Daniel (25/10), a «¿te dejo revertir tu propio parte?»: *«Sí, como lo firmo»*. El servidor ya lleva la
+   excepción de rango 3 también al revertir, así que la puerta vuelve a ser la de decidir. Se queda como función
+   aparte para que, si un día las dos puertas vuelven a separarse, haya UN sitio donde se separan. */
 function _escPuedeRevertir_(p, quien){
-  if(String(p && p.autor) === String(quien)) return false;
   return puedeDecidirParte(p, quien);
 }
 
@@ -1259,6 +1264,70 @@ function _bloqAviso_(){
   if(d) d.textContent = h1(_bloqDur_());
   if(b){ b.disabled=!!falta;
          b.textContent = decl ? 'Declarar este fichaje' : ('Declarar '+h1(_bloqDur_())); }
+}
+
+/* ⭐ 26/10 · Daniel: «Sí, mientras no esté firmado». TUS partes que nadie ha firmado (`pendiente` o con detalle pedido),
+   para RETIRARLOS o CORREGIR sus horas — lo que el móvil ya hace en «Tus partes». Del crudo `PART_BACK`, como
+   `_bloqMios_`, y SÓLO los tuyos (`_fichaYo_`): bajo «Actúas como» no se toca lo ajeno. El servidor es quien se planta
+   (sólo el autor, sólo sin firmar); esto no ofrece lo que rechazaría. */
+function _misSinFirmarE_(){
+  if(!Array.isArray(PART_BACK)) return [];
+  var yo=_fichaYo_();
+  return PART_BACK.filter(function(p){ return p && p.autor===yo && (p.estado==='pendiente' || p.estado==='detalle'); });
+}
+
+function _misSinFirmarHTML_(){
+  var l=_misSinFirmarE_();
+  if(!l.length) return '';
+  return pan('Tus partes sin firmar', l.length+(l.length===1?' parte':' partes')+' · los puedes retirar o corregir',
+    '<div class="pb" style="padding:0">'+l.map(function(p){
+      var _ctc=_txtCorreccion_(p.correcciones);
+      return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(p.tarea||'Parte')+'</b><small>'+
+        esc(_isoADMY_(p.fecha)||'')+' · '+nf2(Number(p.horas)||0)+' h'+(p.estado==='detalle'?' · te piden detalle':'')+
+        (_ctc?' · '+esc(_ctc):'')+'</small></span>'+
+        '<button class="btn mini" data-epcorr="'+p.id+'">Corregir horas</button> '+
+        /* 26/10: «horas y descripción». Sólo en `pendiente`: con detalle pedido ya la cambia la respuesta. */
+        (p.estado==='pendiente' ? '<button class="btn mini" data-epdesc="'+p.id+'">Corregir descripción</button> ' : '')+
+        '<button class="btn mini" data-epret="'+p.id+'">Retirar</button></div>';
+    }).join('')+'</div>'+
+    '<div class="nota">Mientras nadie lo firme. Quien firma ve que lo corregiste («… corregidas por su autor»).</div>');
+}
+
+function _engMisSinFirmarE_(){
+  $$('[data-epret]').forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var _id=+b.dataset.epret;
+    if(!confirm('Retirar este parte.\n\nNo llegará a firmarse ni contará. Se queda en tu lista como «retirada».\n\n¿Sigo?')) return;
+    b.disabled=true;
+    try{ await api.retirarParte(_id); tost('Parte retirado.'); await _cargarPartes_(); pintar(); }
+    catch(e){ tostErr('No se pudo: ', e); b.disabled=false; }
+  }; });
+  $$('[data-epcorr]').forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var _id=+b.dataset.epcorr;
+    var _p=_misSinFirmarE_().filter(function(x){ return x.id===_id; })[0];
+    if(!_p){ tost('Ese parte ya no está sin firmar.'); pintar(); return; }
+    var _t=prompt('Horas de este parte (máximo '+_maxHorasParte_()+'):', String(_p.horas).replace('.', ','));
+    if(_t==null) return;
+    var _h=Number(String(_t).trim().replace(',', '.'));
+    if(!(_h>0) || _h>_maxHorasParte_()){ tost('Pon unas horas entre 0 y '+_maxHorasParte_()+'.'); return; }
+    b.disabled=true;
+    try{ await api.corregirParte(_id, _h); tost('Horas corregidas.'); await _cargarPartes_(); pintar(); }
+    catch(e){ tostErr('No se pudo: ', e); b.disabled=false; }
+  }; });
+  $$('[data-epdesc]').forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var _id=+b.dataset.epdesc;
+    var _p=_misSinFirmarE_().filter(function(x){ return x.id===_id; })[0];
+    if(!_p){ tost('Ese parte ya no está sin firmar.'); pintar(); return; }
+    var _t=prompt('Descripción de este parte:', _p.tarea||'');
+    if(_t==null) return;
+    _t=String(_t).trim();
+    if(!_t){ tost('La descripción no puede quedar vacía.'); return; }
+    b.disabled=true;
+    try{ await api.corregirParte(_id, null, _t); tost('Descripción corregida.'); await _cargarPartes_(); pintar(); }
+    catch(e){ tostErr('No se pudo: ', e); b.disabled=false; }
+  }; });
 }
 
 function _engBloqueE_(){

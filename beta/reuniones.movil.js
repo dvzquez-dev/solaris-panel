@@ -242,6 +242,9 @@ function _normReuM_(r){
       return _avisoMinimo_(n, _minimoExigido_(r)).falta > 0;
     })(),
     exento: !!(YO && r.convocante && YO.nombre===r.convocante),   // quien convoca ORGANIZA: no cubre su propia encuesta
+    /* 26/10 (triaje A4d): te convocaron con el plazo YA VENCIDO: no se te sanciona por no cubrirla */
+    tarde: !!(YO && Array.isArray(r.invitados_tarde) && r.invitados_tarde.indexOf(YO.nombre)>=0),
+    invitados_tarde: Array.isArray(r.invitados_tarde) ? r.invitados_tarde.slice() : [],   /* para re-hidratar */
     _real:true };
 }
 
@@ -266,6 +269,7 @@ function _fuenteReuM_(R, base, resp, ag){
     limite:R.limite, convocante:R.convocante, slot:R.slot, duracion:R.duracion,
     /* ⛔ Los NOMBRES si los hay (817.a); `new Array(nInv)` solo para una reunion que llego sin ellos. */
     invitados:(Array.isArray(R.invitados) && R.invitados.length) ? R.invitados.slice() : new Array(R.nInv),
+    invitados_tarde:Array.isArray(R.invitados_tarde) ? R.invitados_tarde.slice() : [],   /* 26/10 (A4d) */
     resp:resp, nResp:R.nResp,
     /* 21/10 (auditor 13, 🟡 11): la permutación hasta los índices ORIGINALES sólo vale si se re-normaliza LO YA
        NORMALIZADO (`R`); con las franjas del servidor (`base`, en su orden original) se calcula de cero. */
@@ -391,8 +395,8 @@ function _proxReuHTML_(){
     '<div class="tarj clic" data-ir="reu" data-reuid="'+esc(String(R.id))+'" data-p>'+
     '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
     '<small>'+cuando+' · '+esc(_modalidadTxt_(R.modalidad).toUpperCase())+'</small></div>'+
-    '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento)?'conf':'pend')+'">'+
-      (R.fijada?'fijada':(R.exento?'organizas':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div></div>';
+    '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento||R.tarde)?'conf':'pend')+'">'+
+      (R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div></div>';
 }
 
 /* ⛔ CUANTO DURA LA REUNION, EN UNA SOLA FORMA. Hasta el 09/08 el dato existia (`duracion`)
@@ -638,8 +642,8 @@ function vReu(){
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
       '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+_nConvM_(R)+' convocados'+
       _duraTxtM_(R)+'</small></div>'+
-      '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento)?'conf':'no')+'">'+
-        (R.fijada?'fijada':(R.exento?'organizas':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div>'+
+      '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento||R.tarde)?'conf':'no')+'">'+
+        (R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div>'+
       (R.fijada
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
           '<b style="color:var(--ok)">📌 Reunión fijada · '+esc(R.fijada)+'</b><br>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</div>'

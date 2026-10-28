@@ -139,7 +139,7 @@ async function _reusarConv_(cv, repinta){
   Object.keys(res.mapa).forEach(function(k){ mias[k]=res.mapa[k]; });
   repinta();
   _convGuardar_(cv);
-  tost('Copiada la semana anterior. Puedes cambiar lo que quieras: un dedo pinta.'+
+  tost('Copiada '+(res.rotulo||'la semana anterior')+'. Puedes cambiar lo que quieras: un dedo pinta.'+
        (res.fuera ? ' ('+res.fuera+' casilla'+(res.fuera===1?' no cab\u00eda':'s no cab\u00edan')+'.)' : ''));
 }
 

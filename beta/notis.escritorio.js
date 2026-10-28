@@ -54,7 +54,7 @@ async function activarNotis(btn){
       try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_urlB64_(VAPID_PUBLIC)}); }
       catch(err){ _notisFallo_(_consejoSuscribir_(err)); return; }
     }
-    if(typeof SESION!=='undefined' && SESION) await api.guardarPush(sub.toJSON());
+    if(typeof SESION!=='undefined' && SESION) await api.guardarPush(_subConCanal_(sub));   /* 26/10: con su app */
     else { _notisFallo_('Permiso dado, pero sin sesión no se puede registrar el aviso en el servidor.'); return; }
     /* ✅ Y EL ÉXITO LO BORRA: un aviso que no se retira miente igual que uno que no sale.
        Es lo mismo que hace `_pushInit_` con su `_pushFallo_(null)`. */

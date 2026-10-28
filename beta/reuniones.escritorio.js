@@ -26,6 +26,8 @@ function normReu(r){ r=r||{};
     total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null,
     creado:r.creado||null,
     ordenDia:r.ordenDia||"", vision:r.vision||"anonima",
+    /* 26/10 (triaje A4d): convocados con el plazo YA VENCIDO — el motor no les sanciona, y `_cobertura_` tampoco */
+    invitados_tarde:Array.isArray(r.invitados_tarde) ? r.invitados_tarde.slice() : [],
     /* ⛔⛔ `agregado` SE TIRABA AQUI, y con el la unica señal de que el servidor NO ha
        mandado las demas filas. Daniel (15/08): *«Oculta: solo quien convoca ve cualquier
        cosa. O sea, el resto solo puede cubrir su disponibilidad y ya esta.»* El backend
@@ -1023,6 +1025,10 @@ function _cobertura_(r){
                : (r.tipo==='general' ? _activos_().map(function(m){return m.nombre;}) : cubren);
   /* el convocante organiza: esta exento de cubrir su propia encuesta */
   universo = universo.filter(function(n){ return n!==r.convocante; });
+  /* 26/10 (triaje A4d): quien se convocó con el plazo YA VENCIDO no pudo cumplirlo: el motor no le sanciona
+     (`sanciones.universo_convocado`) y aquí no sale en riesgo. */
+  var _tarde = Array.isArray(r.invitados_tarde) ? r.invitados_tarde : [];
+  universo = universo.filter(function(n){ return _tarde.indexOf(n) < 0; });
   /* ⛔ 22/10 (auditor 23, 🟠 8): EL MOTOR SÓLO SANCIONA A LOS VIVOS QUE ESTÁN INVITADOS (`sanciones.universo_convocado`
      sobre `vivos`, `sanciones.py:679`). Una baja invitada —la reunión se convocó antes de que se fuera— salía aquí «sin
      cubrir · sanción que implicaría» con su nombre. Se cruza con los activos que la cara conoce; con menos de dos no hay

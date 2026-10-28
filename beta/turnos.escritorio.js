@@ -511,7 +511,7 @@ async function _reusarMiTurno_(cv){
      !confirm('Se sustituye lo que llevas marcado esta semana por lo de la anterior. No se guarda hasta que pulses «Guardar». ¿Seguir?')) return;
   MIT_CELDAS=res.mapa;
   pintar();
-  tost('Copiada la semana anterior: revísala y pulsa «Guardar mi disponibilidad».'+
+  tost('Copiada '+(res.rotulo||'la semana anterior')+': revísala y pulsa «Guardar mi disponibilidad».'+
        (res.fuera ? ' ('+res.fuera+' casilla'+(res.fuera===1?' no cabía':'s no cabían')+'.)' : ''));
 }
 
@@ -1294,6 +1294,13 @@ function _turnoCerrable_(t, hoy){
   return true;
 }
 
+/* 26/10 (refutador 37, 🟡 4): la misma puerta que `e_estado_turno` para «Cancelado»: el PD siempre; el resto, sólo un
+   turno de hoy (los de la lista ya no son futuros). Sin fecha legible, no: el servidor tampoco lo sabría. */
+function _puedeCancelarTurno_(t){
+  if(typeof rangoNom === 'function' && typeof _actorSanc_ === 'function' && rangoNom(_actorSanc_()) >= 3) return true;
+  var iso = t ? String(_dmyAISO_(t.f || t.fecha || '') || '') : '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) && iso >= String(_ahoraApp_()).slice(0,10);
+}
 function _turnosCerrables_(){
   /* 21/10 (auditor 20, 🟡 5): el reloj de la APP; en real es el mismo día local que antes. */
   var out = [], hoy = String(_ahoraApp_()).slice(0,10);
@@ -1372,10 +1379,27 @@ function _cierreTurMapa_(){
   return out;
 }
 
+/* 26/10 (triaje C4b): ¿llevó coche, según el reparto? Es lo que se PROPONE marcado; lo que cuenta es lo que confirme
+   quien cierra (Daniel, 11/08: «si tenía lo de coche también se le añade eso ahí… antes no»). */
+function _llevaCocheTurno_(t, n){
+  return ((t && t.roles) || []).some(function(r){ return r && r.miembro === n && /coche/i.test(String(r.rol || '')); });
+}
+
+/* 26/10 (triaje C4a/C4b): lo que queda a la vista tras cerrar o cancelar — el turno ya NO es cerrable y saldría de la
+   lista, pero la propuesta para Compensaciones es lo que se aplica: no puede desaparecer con él. */
+function _cierreTurListoHTML_(){
+  var l = CIERRE_TUR.listo;
+  if(!l) return '';
+  return '<div class="nota" style="margin-bottom:11px"><b>'+esc(l.titulo)+'</b>'+
+    (l.aviso ? '<div>'+esc(l.aviso)+'</div>' : '')+
+    (l.txt ? '<pre class="mono" style="white-space:pre-wrap;font-size:12px;margin:8px 0 0">'+esc(l.txt)+'</pre>' : '')+
+    '</div>';
+}
+
 function _cierreTurnoPanel_(){
-  var cerrables = _turnosCerrables_();
-  if(!cerrables.length) return '';
-  if(CIERRE_TUR.k == null) CIERRE_TUR.k = cerrables[0];
+  var cerrables = _turnosCerrables_(), listo = _cierreTurListoHTML_();
+  if(!cerrables.length) return listo ? pan('Cerrar un turno', 'hecho', listo) : '';
+  if(CIERRE_TUR.k == null || cerrables.indexOf(CIERRE_TUR.k) < 0) CIERRE_TUR.k = cerrables[0];
 
   var t = _cierreTurSel_(), firmes = _asistentesTurno_(t), tope = _cierreTurTope_();
   var resp = _responsableTurno_(t);
@@ -1398,6 +1422,8 @@ function _cierreTurnoPanel_(){
   if(!Object.keys(CIERRE_TUR.quien).length){
     firmes.forEach(function(n){ CIERRE_TUR.quien[n] = true; });
     dud.forEach(function(n){ CIERRE_TUR.quien[n] = false; });
+    /* 26/10 (C4b): el coche del reparto, propuesto; se confirma aquí */
+    asis.forEach(function(n){ CIERRE_TUR.coche[n] = _llevaCocheTurno_(t, n); });
   }
 
   var mapa = _cierreTurMapa_(), sinDur = _cierreTurSinDur_(),
@@ -1426,7 +1452,11 @@ function _cierreTurnoPanel_(){
       '<td><label style="display:flex;align-items:center;gap:7px;cursor:pointer">'+
         '<input type="checkbox" data-ct-fue="'+esc(n)+'"'+(on?' checked':'')+'>'+
         esc((miembro(n)||{}).pila || n)+
-        (n===resp?' <span class="chip">responsable</span>':'')+'</label></td>'+
+        (n===resp?' <span class="chip">responsable</span>':'')+'</label>'+
+        /* 26/10 (C4b): «llevó coche» va al ACTA (Notion `Coche`, almacén `coche_confirmado`). ⚠️ La cuota aún cuenta el
+           coche del REPARTO (espejo): que cuente sólo el confirmado es la 2.ª mitad de C4b, ficha abierta. */
+        ' <label style="display:flex;align-items:center;gap:6px;font-size:12px;opacity:.85;cursor:pointer"><input type="checkbox" data-ct-coche="'+esc(n)+'"'+
+        (CIERRE_TUR.coche[n]?' checked':'')+(on?'':' disabled')+'> llev\u00f3 coche</label></td>'+
       '<td class="r"><input class="mono" type="number" step="0.25" min="0" max="'+tope+'" '+
         'data-ct-extra="'+esc(n)+'" value="'+val+'" style="width:88px;text-align:right"'+
         (on?'':' disabled')+'> h</td></tr>';
@@ -1449,7 +1479,8 @@ function _cierreTurnoPanel_(){
       'font-size:12px;margin:8px 0 0">'+esc(CIERRE_TUR.hecho)+'</pre></div>'
     : '';
 
-  return pan('Cerrar un turno', cerrables.length+' por cerrar',
+  return pan('Cerrar un turno', cerrables.length+' por cerrar', '<div class="pb">'+
+    listo+
     '<label class="campo"><span class="sc">Qu\u00e9 turno</span>'+
       '<select id="ctSel">'+opciones+'</select></label>'+
     '<label class="campo"><span class="sc">Cu\u00e1nto dur\u00f3 de verdad (horas)</span>'+
@@ -1461,7 +1492,11 @@ function _cierreTurnoPanel_(){
         '<th class="r">Extra</th></tr></thead><tbody>'+filas+'</tbody></table>'
       : '<div class="nota">Este turno no tiene a nadie resuelto en el roster.</div>')+
     '<button class="btn pri" id="ctEnviar"'+(falta?' disabled':'')+' style="margin-top:11px">'+
-      (falta ? esc(falta) : 'Cerrar el turno')+'</button>');
+      (falta ? esc(falta) : 'Cerrar el turno')+'</button>'+
+    /* 26/10 (triaje C4a): cancelar = «Cancelado»; no cuenta como turno para nadie, ni su coche */
+    /* ⛔ (refutador 37, 🟡 4): un turno YA PASADO sólo lo cancela el PD (el servidor se lo niega al resto) */
+    (_puedeCancelarTurno_(t) ? ' <button class="btn" id="ctCancelar" style="margin-top:11px">Cancelar este turno</button>' : '')+
+    '</div>');
 }
 
 /* ⛔⛔ ESTE PANEL ESTUVO ROTO 5 DE 5, POR DOS CAUSAS DISTINTAS (23/08).
@@ -1492,7 +1527,7 @@ function _cablearCierreTurno_(){
        cara de haber sido tecleadas ahi. */
     /* ⚠️ SIN `+`: el valor es una CLAVE, no un numero. Con `+` daba `NaN` y el panel
        se quedaba sin turno elegido. */
-    CIERRE_TUR.k = sel.value; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {};
+    CIERRE_TUR.k = sel.value; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {};
     CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
   };
   var dur = document.getElementById('ctDur');
@@ -1507,6 +1542,8 @@ function _cablearCierreTurno_(){
   };
   $$('[data-ct-fue]').forEach(function(el){
     el.onchange = function(){ CIERRE_TUR.quien[el.dataset.ctFue] = !!el.checked; pintar(); }; });
+  $$('[data-ct-coche]').forEach(function(el){
+    el.onchange = function(){ CIERRE_TUR.coche[el.dataset.ctCoche] = !!el.checked; }; });
   $$('[data-ct-extra]').forEach(function(el){
     el.onchange = function(){
       var v = parseFloat(String(el.value).replace(',', '.'));
@@ -1514,17 +1551,44 @@ function _cablearCierreTurno_(){
       CIERRE_TUR.hecho = null; pintar();
     }; });
   var b = document.getElementById('ctEnviar');
-  if(b) b.onclick = function(){
+  if(b) b.onclick = async function(){
     var mapa = _cierreTurMapa_(), tope = _cierreTurTope_();
     var falta = _cierreTurnoFalta_(mapa, tope);
     if(falta){ b.textContent = falta; return; }
     var t = _cierreTurSel_();
-    CIERRE_TUR.hecho = 'Turno ' + ((t && (t.fecha_txt || t.fecha || t.f)) || '?') +
+    var txt = 'Turno ' + ((t && (t.fecha_txt || t.fecha || t.f)) || '?') +
       ' \u00b7 ' + Object.keys(mapa).length + ' persona(s), +1 turno cada una\n' +
       Object.keys(mapa).map(function(n){
         return '  ' + n + ' \u2192 ' + (mapa[n] ? ('+' + mapa[n] + ' h a Compensaciones')
-                                                : 'sin extra'); }).join('\n');
-    pintar();
+                                                : 'sin extra') + (CIERRE_TUR.coche[n] ? ' \u00b7 llev\u00f3 coche' : ''); }).join('\n');
+    /* ⛔ 26/10 (triaje C4a/C4b): y el turno queda «Realizado», con el acta — quién fue y, de ellos, quién llevó coche.
+       Sin `id` (un turno del espejo de Discord) no hay a qué página ir: la propuesta sale igual y se dice. */
+    if(!t || !t.id){ CIERRE_TUR.hecho = txt + '\n(Este turno no trae su ID de Notion: márcalo «Realizado» a mano.)'; pintar(); return; }
+    var fueron = Object.keys(mapa), coche = fueron.filter(function(n){ return !!CIERRE_TUR.coche[n]; });
+    b.disabled = true; b.textContent = 'Cerrando\u2026';
+    try{
+      var r = await api.estadoTurno({id:t.id, estado:'Realizado', fueron:fueron, coche:coche});
+      t.estado = 'Realizado';
+      var se = (r && r.sinEtiquetar) || [];
+      CIERRE_TUR.listo = {titulo:'Turno cerrado: queda «Realizado». Propuesta para Compensaciones (la aplica Daniel):', txt:txt,
+        aviso: se.length ? ('Sin usuario de Notion, no entran en Asistentes: ' + se.join(', ')) : ''};
+      CIERRE_TUR.k = null; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {};
+      CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
+    }catch(e){ b.disabled = false; b.textContent = 'No se pudo cerrar: ' + ((e && e.message) || e); }
+  };
+  var bc = document.getElementById('ctCancelar');
+  if(bc) bc.onclick = async function(){
+    var t = _cierreTurSel_(), f = (t && (t.fecha_txt || t.fecha || t.f)) || '?';
+    if(!t || !t.id){ bc.textContent = 'Este turno no trae su ID de Notion: cancélalo allí'; return; }
+    if(!confirm('Cancelar el turno del ' + f + '. No contará como turno para nadie, ni su coche. ¿Seguro?')) return;
+    bc.disabled = true; bc.textContent = 'Cancelando\u2026';
+    try{
+      await api.estadoTurno({id:t.id, estado:'Cancelado'});
+      t.estado = 'Cancelado';
+      CIERRE_TUR.listo = {titulo:'Turno del ' + f + ' cancelado: no cuenta como turno ni su coche.', txt:'', aviso:''};
+      CIERRE_TUR.k = null; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {};
+      CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
+    }catch(e){ bc.disabled = false; bc.textContent = 'No se pudo cancelar: ' + ((e && e.message) || e); }
   };
 }
 

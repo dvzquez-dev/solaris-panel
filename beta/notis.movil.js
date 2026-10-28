@@ -69,7 +69,7 @@ async function _asegurarPush_(msg){
     catch(err){ if(msg) msg.textContent=_consejoSuscribir_(err); return false; }
   }
   if(typeof SESION!=='undefined' && SESION){
-    try{ await api.guardarPush(sub.toJSON()); }
+    try{ await api.guardarPush(_subConCanal_(sub)); }   /* 26/10: con su app */
     catch(err){
       if(msg) msg.textContent='El permiso está dado, pero no se pudo registrar el aviso '+
         'en el servidor, así que NO te llegaría nada: '+((err&&err.message)||err);

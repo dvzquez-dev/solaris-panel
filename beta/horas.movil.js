@@ -115,7 +115,9 @@ function normPMovil(p){
     decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
     periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo (la SEXTA vez) */
     enFicha:(typeof _yaCuentaEnSuMes_==='function') ? _yaCuentaEnSuMes_(p) : null,   /* 20/10: `aplicada` y `aprobada` caen los dos en 'conf'; esto los distingue */
-    origen:p.origen||null, caduca:p.caduca_at||null }; }
+    origen:p.origen||null, caduca:p.caduca_at||null,
+    /* 26/10 · «Sí, mientras no esté firmado»: retirado por ti (es `anulada` con `retirado_at`) y las horas corregidas */
+    ret:!!p.retirado_at, corr:p.correcciones||null }; }
 
 /* ⚠️ MISMO DEFECTO QUE EL DE ABAJO, y se arregla igual aunque HOY no haga daño:
    `CARGA.partes` no lo lee nadie todavia (medido: una sola aparicion, la escritura).
@@ -1268,6 +1270,7 @@ function filaParte(p){
           : p.e==='rech'?'<span class="pil no">rechazada</span>'
           : p.e==='det' ?'<span class="pil pend">falta detalle</span>'
           : p.e==='cad' ?'<span class="pil no">caducada</span>'
+          : (p.e==='rev' && p.ret) ?'<span class="pil no">retirada</span>'   /* 26/10: la retiraste tú */
           : p.e==='rev' ?'<span class="pil no">revertida</span>'
           : p.e==='sindecl'?'<span class="pil pend">sin declarar</span>'
           : p.e==='raro'?'<span class="pil neu">estado desconocido</span>'
@@ -1287,6 +1290,7 @@ function filaParte(p){
           : p.e==='rech' ? 'rechazada'+(p.nota?' · '+esc(p.nota):'')
           /* ⚠️ Se dice que se DESHIZO, no que se rechazo: son cosas distintas y a esa
              persona le importan de forma distinta. */
+          : (p.e==='rev' && p.ret) ? 'la retiraste: no se firma ni cuenta'
           : p.e==='rev'  ? 'revertida'+(p.nota?' · '+esc(p.nota):'')
           /* ⛔ 633.ª UN AUTOCIERRE SE DICE EN LA LISTA, ANTES DE PULSAR «Declarar»: la tarjeta
              con el aviso sólo existe después del toque, y es aquí donde se decide. El
@@ -1316,8 +1320,21 @@ function filaParte(p){
     ? '<button class="btn mini" data-declarar="'+p.id+'" data-p style="margin-right:7px">'+
         (p.e==='det' ? 'Responder' : 'Declarar')+'</button>'
     : '';
+  /* ⛔ 26/10 · Daniel: «Sí, mientras no esté firmado». Mientras nadie lo ha firmado (`pend`, `det`; y un `sindecl` se
+     puede retirar), el autor lo RETIRA o le CORRIGE las horas. Van debajo, no al lado: con «Responder» serían tres
+     botones y la cifra en una fila de móvil. ⛔ `_mio`, como «Declarar»: bajo «Ver como» no se toca lo ajeno. */
+  var _sinFirmar = p.e==='pend' || p.e==='det';
+  var _ctc = _txtCorreccion_(p.corr);
+  if(_ctc && _sinFirmar) sub += ' · '+esc(_ctc);
+  var _accs = _mio && (_sinFirmar || p.e==='sindecl')
+    ? '<div class="pacc" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:7px">'+
+        (_sinFirmar ? '<button class="btn mini" data-pcorr="'+p.id+'" data-p>Corregir horas</button>' : '')+
+        /* 26/10: «horas y descripción». Sólo en `pend`: en `det` ya la cambia «Responder». */
+        (p.e==='pend' ? '<button class="btn mini" data-pdesc="'+p.id+'" data-p>Corregir descripción</button>' : '')+
+        '<button class="btn mini" data-pret="'+p.id+'" data-p>Retirar</button></div>'
+    : '';
   return '<div class="fila '+cls+'"><div class="a"><b>'+esc(p.t||'Fichaje sin declarar')+'</b><small>'+sub+catTxt+
-    _origenParte_(p)+'</small></div>'+
+    _origenParte_(p)+'</small>'+_accs+'</div>'+
     '<div class="d">'+accion+pil+' <b class="mono">'+h1(p.q)+'</b></div></div>';
 }
 
@@ -1712,7 +1729,7 @@ function _cuotaHTML_(){
           'padrón del equipo para recalcularla aquí. ')+
       /* 21/10 (auditor 6): las cifras salen de sus constantes, no se teclean */
       'Sale de tus horas de la temporada: el objetivo se mueve entre '+nf2(UMBRAL_LO)+' y '+nf2(UMBRAL_HI)+' h/mes, con '+
-      nf2(_compBase_(YO))+' h de base. Se descuentan '+nf2(_descuentoCoche_())+' € por cada turno al que lleves el coche fuera de Vigo, y nunca baja de 0 €.</p></div>';
+      nf2(_compBase_(YO))+' h de base. Se descuentan '+nf2(_descuentoCoche_())+' € por cada turno al que lleves el coche entre Ourense y Vigo, y nunca baja de 0 €.</p></div>';
 }
 
 /* ═══ DECIDIR PARTES DE HORAS DESDE EL MÓVIL ════════════════════════════════════════
@@ -1747,7 +1764,8 @@ function _normPDec_(p){
        ⚠️ La funcion estaba bien y la llamada tambien: lo que faltaba estaba EN MEDIO. */
     aplicado_at:p.aplicado_at||null, motivo:p.motivo||null,   /* 20/10: lo que se pidió, en la ficha de un `detalle` */
     pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya CONTESTADA (el servidor la guarda al responder) */
-    estado:p.estado, origen:p.origen||null };
+    estado:p.estado, origen:p.origen||null,
+    corr:p.correcciones||null };   /* 26/10: si su autor corrigió las horas, quien firma lo ve */
 }
 
 /* ⛔ EL PERIODO CERRADO, para no ofrecer un botón que el servidor va a negar. `getCierre`
@@ -1815,10 +1833,11 @@ function _cargarPartesDec_(){
     PARTES_REV = arr.filter(function(p){
       /* ⛔ 20/10 (auditor de partes): un `detalle` YA está arriba, en «Esperan tu decisión», y desde ahí se vuelve a
          decidir. Aquí salía otra vez: el mismo parte en las dos listas. */
-      return _pdRevertible_(p) && p.estado!=='detalle' && p.autor!==yo;
+      /* 26/10 · Daniel: «Sí, como lo firmo» — el PD (`_mando`) revierte lo suyo igual que lo firma. */
+      return _pdRevertible_(p) && p.estado!=='detalle' && (_mando || p.autor!==yo);
     }).map(function(p){
       var n = _normPDec_(p);
-      n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN, CIERRE_UC);
+      n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN, CIERRE_UC, true);   /* 26/10: para revertir */
       return n;
     });
   }).catch(function(){ PDEC_FALLO = true; });
@@ -1863,6 +1882,8 @@ function _pdFichaHTML_(p){
         (p.estado==='detalle'?'<span class="pdw">devuelto · falta detalle'+(p.motivo?' — «'+esc(p.motivo)+'»':'')+'</span>':'')+
         /* 21/10 (auditor 8, 🟡 6): y si ya lo CONTESTÓ, qué se le había preguntado — si no, vuelve como uno cualquiera */
         (p.estado==='pendiente' && p.pedido?'<span class="pdw">contestó a lo que se le pidió — «'+esc(p.pedido)+'»</span>':'')+
+        /* 26/10 · «Sí, mientras no esté firmado»: las horas que tienes delante las corrigió su autor — y de cuánto eran */
+        (_txtCorreccion_(p.corr)?'<span class="pdw">'+esc(_txtCorreccion_(p.corr))+'</span>':'')+
         '<input class="pdm" type="text" placeholder="Motivo — obligatorio para rechazar o pedir detalle">'+
         '<div class="pdb">'+
           '<button data-pdacc="aprobar" data-p>Aprobar</button>'+

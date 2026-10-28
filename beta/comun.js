@@ -1264,7 +1264,10 @@ function _umbral_(){
     }
     if(ma && typeof ma.media==='number'){
       var w=_fraccionDelMes_();                                 // el abierto, a prorrata
-      num+=ma.media*w; den+=w;
+      /* ⛔⛔ 26/10 · Daniel: «Que pese su ritmo» (gemela de `reglas/cuota.umbral_temporada`): `ma.media` son las horas
+         HECHAS hasta hoy; entra su RITMO (÷ w) con el peso w, o sea `ma.media` tal cual. Con `ma.media*w` se prorrateaba
+         dos veces y el objetivo bajaba a mitad de mes. */
+      if(w>0){ num+=ma.media; den+=w; }
     }
     /* ⛔ `||` NO VALE AQUI: un `lo:0` legitimo -«sin suelo»- es falsy y saldria 8,
        y un `frac:0` saldria 2/3. Son tres numeros que el backend PUEDE mandar a cero
@@ -2381,7 +2384,10 @@ function _periodoParte_(p){
    ⛔ Y SIN INSTANTE se conserva lo de antes, que es cortesía: fallar hacia «ofrecer» deja que
    el servidor explique; hacia «esconder» quita una acción legítima **sin decir por qué**, y
    eso no se puede depurar desde el móvil. */
-function _mesCerradoParte_(p, plan, uc){
+/* ⛔ 26/10 · `paraRevertir` (Daniel: «Sí» — manda el mes en que contó y sólo bloquea lo que llegó a Notion): la MISMA
+   regla que el servidor al revertir (`_parte_en_mes_cerrado`). Sin él, la deducción de siempre, que es lo que usa
+   `_selloAprobado_` con partes que pueden venir normalizados y sin `aplicado_at`. */
+function _mesCerradoParte_(p, plan, uc, paraRevertir){
   /* ⛔ 22/10 (refutador 27, H3): un cierre APLICADO y aún sin sellar manda sobre el último sellado, como en el servidor
      (`_parte_en_mes_cerrado`): sus horas ya están a cero en Notion y el servidor rechaza revertir. */
   var _ps = (plan && plan.aplicado && plan.periodo && plan.resultado && plan.resultado.at &&
@@ -2389,6 +2395,11 @@ function _mesCerradoParte_(p, plan, uc){
   var at  = _ps ? _ps.resultado.at : ((uc && uc.at) || (plan && plan.resultado && plan.resultado.at) || null);
   var per = _ps ? _ps.periodo : ((uc && uc.periodo) || (plan && plan.periodo) || null);
   if (at && per){
+    if (paraRevertir){
+      var _pg = String((p && p.periodo) || '');
+      if (/^\d{4}-\d{2}$/.test(_pg)) return _pg <= String(per) ? _pg : false;
+      if (!(p && (p.estado === 'aplicada' || p.aplicado_at))) return false;
+    }
     var cre = String((p && p.creado_at) || '');
     /* ⛔ `null` y no `false`: un parte sin `creado_at` es «no lo sé» (§3c-24), y es lo mismo
        que contesta el servidor ahí. Leerlo como «abierto» vuelve a ofrecer el botón. */
@@ -2793,7 +2804,9 @@ function rangoSanc(nombre){
      jurisdiccion propia declarada (un subcoordinador). */
   if (_subcoordDe_(n)) return 1;
   var m = _mSanc_(n);
-  if (m && m.cargo === 'Coordinador') return 1;
+  /* 26/10, Daniel, sobre Bruno (Logistica) y Marta (Patrocinios), sin cargo y con `coordina`: «Si, en su unidad».
+     Coordinador = el CARGO o coordinar alguna unidad (gemela de `servidor.es_coordinador` y `_rangoSanc_`). */
+  if (m && (m.cargo === 'Coordinador' || _unidadesCoord_(m.coordina).length > 0)) return 1;
   return 0;
 }
 
@@ -2802,7 +2815,9 @@ function rangoSanc(nombre){
 function puedeSancionarA(actor, objetivo){
   var r = rangoSanc(actor);
   if (r <= 0) return false;
-  if (r >= 3) return true;                                   // el PD, a cualquiera
+  /* 26/10 (triaje A5d): el PD, a cualquiera MENOS a sí mismo — nadie decide lo suyo y nadie le supera en rango, así
+     que esa sanción no la decidiría nadie. */
+  if (r >= 3) return String(objetivo) !== String(actor);
   /* Rango 2: a todos menos a quien tenga MAS rango que el. Se mira el RANGO y no el
      nombre: escrito con el nombre dentro, el dia que cambie el PD el nuevo queda
      DESPROTEGIDO y el anterior sigue blindado. Lo comprueba `probar_sancionar.py`. */
@@ -2813,6 +2828,7 @@ function puedeSancionarA(actor, objetivo){
   /* Coordinador de la unidad: la unidad ENTERA, subequipos incluidos. Se mira ANTES que la
      subcoordinacion porque Oscar es las dos cosas y lo que manda es lo mas amplio. */
   if (a && a.cargo === 'Coordinador' && o && a.unidad && a.unidad === o.unidad) return true;
+  if (o && o.unidad) { var _cu = _unidadesCoord_(a && a.coordina); for (var _k = 0; _k < _cu.length; _k++){ if (_cu[_k] === o.unidad) return true; } }  // 26/10
   /* Subcoordinador: SU equipo y nada mas. No se le suma el subsistema — eso es justo lo
      que lo distingue del coordinador. */
   var sc = _subcoordDe_(String(actor));
@@ -3177,11 +3193,34 @@ function _puntosDeMotivo_(mot){
    ⛔ Y NO se invierte el `||`: ese orden arregló el fallo contrario (un repintado asíncrono pisando lo tecleado). Lo
    que distingue es POR QUÉ se repinta: un repintado conserva; un CAMBIO DE MOTIVO vuelve a proponer — salvo que la
    persona haya tecleado otro número, que entonces es suyo. Por eso se recuerda lo PROPUESTO (`ptsPropuesto`). */
+/* ⛔ 26/10 (triaje A5b): EL 30g VA POR GRADIENTE, NO POR CATÁLOGO. El catálogo le pone −1 siempre, y el RRI reformado
+   dice: 1.ª vez aviso (0), 2.ª −1, 3.ª o más −2 — contado dentro de su familia (`disponibilidad`), que es lo que trae
+   `_vecesSinCubrir_`. Sin persona elegida o sin constancia de su historial: `''` — el campo vacío obliga a decidirlo, un
+   −1 puesto solo se envía con pinta de elegido. `undefined` = este motivo no va por gradiente (manda el catálogo). */
+function _ptsGradienteSanc_(mot, quien){
+  if (mot !== '30g') return undefined;
+  if (!quien) return '';
+  var v = (typeof _vecesSinCubrir_ === 'function') ? _vecesSinCubrir_(quien) : null;
+  if (v === null) return '';
+  return v === 0 ? '0' : (v === 1 ? '-1' : '-2');
+}
 function _ptsPrefillSanc_(){
   if (SANC_FORM.pts) return SANC_FORM.pts;
-  var p = _puntosDeMotivo_(SANC_FORM.motivo) || '';
+  var p = _ptsGradienteSanc_(SANC_FORM.motivo, SANC_FORM.quien);
+  if (p === undefined) p = _puntosDeMotivo_(SANC_FORM.motivo) || '';
   SANC_FORM.ptsPropuesto = p;
   return p;
+}
+/* 26/10 (A5b): con el 30g, CAMBIAR DE PERSONA cambia lo propuesto (es su historial). Elegir persona no repinta el
+   formulario —a propósito—, así que se toca sólo el campo, y sólo si sigue con lo propuesto: lo tecleado es suyo. */
+function _quienCambiaSanc_(){
+  if (SANC_FORM.motivo !== '30g') return;
+  var e = (typeof $ === 'function') ? $('#snPts') : null;
+  var v = e ? e.value : SANC_FORM.pts;
+  if (String(v == null ? '' : v) !== '' && String(v) !== String(SANC_FORM.ptsPropuesto)) return;
+  SANC_FORM.pts = '';
+  var p = _ptsPrefillSanc_();
+  if (e) e.value = p;
 }
 function _motivoCambiaSanc_(){
   var e = (typeof $ === 'function') ? $('#snPts') : null;
@@ -4149,6 +4188,18 @@ function _aplicandoVivo_(est, hoy){
   return m === null || m < 15;
 }
 
+/* 26/10 (triaje 5.2): quien sigue FICHADO al cerrar el mes. Un AVISO, no un bloqueo: su parte cuenta en el mes en que se
+   APLIQUE (decisión 3.1; 11/08: «Siempre al actual»), así que si lo declara después del cierre entra en el siguiente.
+   `''` si no hay ninguno o el servidor no lo dice (una respuesta vieja sin el campo no es «nadie fichado» que contar). */
+function _avisoFichajesCierre_(est){
+  var fa=(est && Array.isArray(est.fichajes_abiertos)) ? est.fichajes_abiertos : [];
+  var ns=fa.map(function(f){ return f && f.autor; }).filter(Boolean);
+  if(!ns.length) return '';
+  return (ns.length===1 ? ns[0]+' sigue fichado' : ns.length+' personas siguen fichadas ('+ns.join(', ')+')')+
+    ': no bloquea el cierre. Lo que declare'+(ns.length===1?'':'n')+' cuenta en el mes en que se apruebe — '+
+    'si es después de cerrar, en el siguiente.';
+}
+
 function _avisoAplicarCierre_(est, hoy){
   if(est && est.aplicando){
     var m = _minAplicando_(est, hoy);
@@ -4486,6 +4537,15 @@ function _escucharSW_(){
 
 function _pushSoportado_(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
 
+/* ⛔ 26/10 (triaje C3c): la suscripción que se guarda dice de qué APP es (`app`: beta | produccion). Con las dos apps
+   instaladas cada aviso sonaba dos veces; el servidor (`get_push_pendientes`) deja sólo la beta a quien la tiene. Es la
+   ÚNICA forma de guardar una suscripción: las tres llamadas (al abrir y al activar en cada cara) pasan por aquí. */
+function _subConCanal_(sub){
+  var j = (sub && typeof sub.toJSON === 'function') ? sub.toJSON() : (sub || {});
+  j.app = (typeof CANAL !== 'undefined' && CANAL === 'beta') ? 'beta' : 'produccion';
+  return j;
+}
+
 async function _registrarSW_(){
   if(!('serviceWorker' in navigator)) return null;
   try{ _swReg=await navigator.serviceWorker.register('sw.js'); return _swReg; }catch(e){ return null; }
@@ -4513,7 +4573,7 @@ async function _pushInit_(){
          SI es aceptable -esto corre en cada apertura y se reintenta solo-, pero tiene
          que ser un silencio elegido, no un error que se escapa por un hueco. */
       if(sub && typeof SESION!=='undefined' && SESION){
-        await api.guardarPush(sub.toJSON());
+        await api.guardarPush(_subConCanal_(sub));
         _pushFallo_(null);   /* ⛔ y el exito lo BORRA: un aviso que no se retira miente */
       } else if(sub){
         /* ⛔⛔ UN NO-OP MUDO NO SE DISTINGUE DE UN EXITO. Sin sesion esto no lanza, asi
@@ -5347,7 +5407,7 @@ function coordinadorDe(u){
   var c = buscaMiembro(function(m){ return m.cargo==='Coordinador' && m.unidad===u; });
   if (c) return c.nombre;
   c = buscaMiembro(function(m){
-    if (m.cargo!=='Coordinador') return false;
+    /* 26/10: quien la COORDINE, con cargo o sin el (Bruno lleva Logistica; Marta, Patrocinios: «Si, en su unidad») */
     var v = (typeof _unidadesCoord_==='function') ? _unidadesCoord_(m.coordina) : [], i;
     for (i=0;i<v.length;i++) if (v[i]===u) return true;
     return false;
@@ -5663,12 +5723,13 @@ function _convDeClave_(k){
    Lo que se marcó la semana anterior cae en el MISMO día de la semana de ésta (+7 días), en la misma franja,
    con su sitio y su coche. Lo que no cabe —una franja que esta semana no existe, un sitio que no se ofrece—
    se CUENTA en `fuera`, no se inventa ni se acerca a lo más parecido. Pura: no toca nada. */
-function _reusarDispo_(cv, previas){
-  var dias=cv.dias||[], fr={}, cl={}, out={}, n=0, fuera=0;
+function _reusarDispo_(cv, previas, salto){
+  /* 26/10 (triaje C4e): `salto` = los días que hay entre aquella semana y ésta (7 por semana); sin él, 7. */
+  var dias=cv.dias||[], fr={}, cl={}, out={}, n=0, fuera=0, sd=salto||7;
   (cv.franjas||[]).forEach(function(f){ fr[f.k]=1; });
   _convClases_(cv).forEach(function(c){ cl[c]=1; });
   Object.keys(previas||{}).forEach(function(k){
-    var p=_convDeClave_(k), v=previas[k], d=_isoMasDias_(p[0], 7);
+    var p=_convDeClave_(k), v=previas[k], d=_isoMasDias_(p[0], sd);
     if(!v || !v.s || !d || dias.indexOf(d)<0 || !fr[p[1]] || !cl[v.s]){ fuera++; return; }
     out[_convClave_(d, p[1])] = (v.s==='no') ? {s:'no'} : {s:v.s, c:!!v.c};
     n++;
@@ -5681,19 +5742,29 @@ function _reusarDispo_(cv, previas){
    `null` después de DECIR por qué no: sin conexión, sin respuesta, nada marcado, nada que quepa.
    Qué se hace con lo copiado lo decide cada cara: el móvil lo guarda al momento; el escritorio lo deja SIN
    GUARDAR hasta que se pulsa «Guardar», que es como funciona esa cara. */
+var SEMANAS_REUSO = 8;   /* 26/10 (triaje C4e): hasta cuántas semanas atrás se busca la última convocatoria */
 async function _traerSemanaAnterior_(cv){
   if(typeof SESION==='undefined' || !SESION || typeof api==='undefined' || !api.getConvocatoria){
     tost('Sin conexión no se puede traer la semana anterior.'); return null;
   }
-  var sem=_isoMasDias_(cv.semana_ini || cv.semana || (cv.dias||[])[0], -7), r;
-  try{ r=await api.getConvocatoria(sem); }
-  catch(e){ tostErr('No se pudo traer la semana anterior: ', e); return null; }
+  /* ⛔ 26/10 (triaje C4e): la ÚLTIMA convocatoria que HUBO, no la de hace exactamente 7 días — una semana sin
+     turnos dejaba el botón sin nada que copiar. Se busca hacia atrás semana a semana (hasta SEMANAS_REUSO) y el
+     aviso dice DE CUÁNDO es lo copiado. */
+  var ini=cv.semana_ini || cv.semana || (cv.dias||[])[0], r=null, sem=null, k;
+  for(k=1; k<=SEMANAS_REUSO; k++){
+    sem=_isoMasDias_(ini, -7*k);
+    try{ r=await api.getConvocatoria(sem); }
+    catch(e){ tostErr('No se pudo traer la convocatoria anterior: ', e); return null; }
+    if(r && r.convocatoria) break;
+  }
   /* 22/10 (auditor 25, 🟡 10): «no hubo convocatoria» NO es «no contestaste» — antes las dos salían como lo segundo. */
-  if(!r || !r.convocatoria){ tost('La semana anterior no hubo convocatoria de disponibilidad: no hay qué reutilizar.'); return null; }
+  if(!r || !r.convocatoria){ tost('En las últimas '+SEMANAS_REUSO+' semanas no hubo convocatoria de disponibilidad: no hay qué reutilizar.'); return null; }
+  var rot = (k===1) ? 'la semana anterior' : 'la semana del '+String(sem).slice(8,10)+'/'+String(sem).slice(5,7);
   var prev=r.mias || {};
-  if(!Object.keys(prev).length){ tost('La semana anterior no marcaste nada: no hay qué reutilizar.'); return null; }
-  var res=_reusarDispo_(cv, prev);
-  if(!res.n){ tost('Lo de la semana anterior no cabe en esta rejilla: otras horas u otros sitios.'); return null; }
+  if(!Object.keys(prev).length){ tost('En la última convocatoria ('+rot+') no marcaste nada: no hay qué reutilizar.'); return null; }
+  var res=_reusarDispo_(cv, prev, 7*k);
+  if(!res.n){ tost('Lo de '+rot+' no cabe en esta rejilla: otras horas u otros sitios.'); return null; }
+  res.rotulo=rot;
   return res;
 }
 
@@ -5875,6 +5946,21 @@ function _etiOrigenParte_(p){
    ⚠️ Va como FUNCION y no como `var` porque un modulo solo lleva declaraciones
    `function`: las capacidades no se llevan sus globales. */
 function _maxHorasParte_(){ return 14; }
+
+/* ⛔ 26/10 · Daniel: «Sí, mientras no esté firmado» — el autor corrige las horas de su parte sin firmar
+   (`corregirParte`), y el servidor deja el rastro en `correcciones` [{at, de, a}]. Esto lo dice en una línea, para las
+   dos caras y para las dos puntas (quien lo escribió y quien lo firma): de la PRIMERA cifra a la ÚLTIMA. '' si no hay. */
+function _txtCorreccion_(corr){
+  if(!Array.isArray(corr) || !corr.length) return '';
+  /* 26/10: las de la DESCRIPCIÓN llevan `campo:'tarea'`; las de horas, ninguno (las primeras ya no lo traían). */
+  var hs=corr.filter(function(c){ return c && !c.campo; }), ts=corr.filter(function(c){ return c && c.campo==='tarea'; });
+  var f=function(x){ return (typeof nf2==='function') ? nf2(Number(x)||0) : String(x); };
+  var out=[];
+  if(hs.length) out.push('horas corregidas por su autor: '+f(hs[0].de)+' → '+f(hs[hs.length-1].a)+' h');
+  if(ts.length){ var o=String(ts[0].de||'');
+    out.push('descripción corregida por su autor'+(o ? ' (antes: «'+(o.length>60 ? o.slice(0,59)+'…' : o)+'»)' : '')); }
+  return out.join(' · ');
+}
 
 /* ⛔ 21/10 (auditor 8, 🟡 7): un fichaje que se CIERRA SOLO al tope caduca a las 24 h, no a los 7 días
    (`CADUCA_AUTOCIERRE_H` de `Codigo.gs`, que lee el servidor; decisión de Daniel del 09/09). Una puerta, para no
@@ -6079,14 +6165,39 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-28-solaria', fecha:'2026-10-28',
+      titulo:'Aprobar con anotaciones, con SolarIA',
+      items:[
+        {cara:'movil', vista:'docs', txt:'**Con anotaciones** trae cuatro campos (título, subtítulo, **confidencialidad en desplegable** Público/Interno, etiquetas) y, por defecto, la caja para **decirle a SolarIA qué cambiar** con su botón **Enviar a SolarIA**: tarda 10-20 s, bloquea el panel mientras tanto y marca en azul lo que propone. «A mano» esconde la caja.'},
+        {cara:'escritorio', vista:'docdec', txt:'El mismo panel en la ficha del expediente: SolarIA o a mano, y al aprobar con anotaciones sólo viaja lo que cambió (más lo que le pediste a SolarIA, que queda de nota).'}
+      ] },
     { id:'2026-10-26-tren', fecha:'2026-10-26',
       titulo:'Lo que decidiste en el tren',
       items:[
+        {cara:'escritorio', vista:'equipo', txt:'**Bruno y Marta** ya son coordinadores de su unidad: los documentos y partes de **Logística** le llegan a Bruno y los de **Patrocinios** a Marta, y Marta entra al escritorio.'},
+        {cara:'escritorio', vista:'sanciones', txt:'**Poner una sanción** a mano ya la deja **aprobada**: se aplica en Notion en unos minutos y el aviso sale al **canal real de Discord**. Las de las reuniones siguen esperando tu visto bueno.'},
+        {cara:'escritorio', vista:'tareas', txt:'**Nueva tarea**: crea una tarea desde la app — qué hay que hacer, a quién de esa unidad y para cuándo. Tú en cualquier unidad; cada coordinador en la suya.'},
+        {cara:'escritorio', vista:'turnos', txt:'**Cerrar un turno** lo deja **Realizado** con quién fue y quién **llevó coche** (casilla por persona), y la propuesta para Compensaciones sigue a la vista. Nuevo botón **«Cancelar este turno»**: no cuenta como turno ni su coche.'},
+        {cara:'escritorio', vista:'libros', txt:'El descuento del coche ya dice la regla: **por cada turno con coche entre Ourense y Vigo** (antes ponía «fuera de Vigo»).'},
+        {cara:'escritorio', vista:'sanciones', txt:'**Sancionar por no cubrir la disponibilidad (30g)** propone los puntos que tocan a esa persona: 1.ª vez 0 (aviso), 2.ª −1, más −2. Sin historial, el campo sale vacío.'},
+        {cara:'movil', vista:'estado', txt:'Lo mismo al sancionar desde el móvil: el 30g propone los puntos por su historial, no −1 siempre.'},
+        {cara:'escritorio', vista:'reuniones', txt:'**Convocado con el plazo vencido, sin sanción**: si añades a alguien a una reunión cuyo plazo ya pasó, no sale «en riesgo» ni se le sanciona por no cubrirla.'},
+        {cara:'movil', vista:'reu', txt:'**«Convocado tarde»**: si te añaden a una reunión cuyo plazo ya pasó, la ficha lo dice y no se te sanciona por no cubrirla.'},
+        {cara:'movil', vista:'horas', txt:'**Corregir la descripción de tu parte**: un parte tuyo pendiente trae «Corregir descripción» junto a «Corregir horas». Quien lo firma ve qué ponía antes.'},
+        {cara:'escritorio', vista:'libros', txt:'**Corregir la descripción, también aquí**: en «Tus partes sin firmar», los pendientes traen «Corregir descripción».'},
+        {cara:'escritorio', vista:'libros', txt:'**Retirar o corregir tu parte, también aquí**: en «Lo tuyo», «Tus partes sin firmar» trae «Corregir horas» y «Retirar» mientras nadie lo haya firmado.'},
+        {cara:'escritorio', vista:'cierre', txt:'**La pantalla de cierre dice quién sigue fichado** (también en el móvil). No bloquea: lo que declare cuenta en el mes en que lo apruebes.'},
+        {cara:'movil', vista:'turnos', txt:'**«Reutilizar la disponibilidad del turno anterior» copia la ÚLTIMA convocatoria que hubo**, aunque la semana pasada no hubiera turno, y te dice de qué semana es («Copiada la semana del 05/10»). También en el escritorio.'},
+        {cara:'escritorio', vista:'turnos', txt:'**Un día con el turno cancelado se puede volver a convocar**: antes salía «ya hay un turno ese día».'},
         {cara:'escritorio', vista:'reuniones', txt:'**Fijar** una reunión con el plazo aún abierto te avisa antes: cuándo cierra, cuántos faltan por contestar y que se preparan ya las sanciones. Con el plazo cerrado, no pregunta.'},
         {cara:'movil', vista:'reu', txt:'Lo mismo al fijar desde el móvil. Y si convocas con **«Ver como»**, te dice que va **en nombre de** esa persona.'},
         {cara:'escritorio', vista:'reuniones', txt:'Convocar con «Ver como X» lo dice delante del «Convocar…»: X sale como convocante.'},
         {cara:'escritorio', vista:'panel', txt:'Si un coordinador mueve el **plazo de una tarea suya**, te sale en **«Requiere tu decisión»** (qué tarea, de qué plazo a cuál), durante 14 días.'},
-        {cara:'escritorio', vista:'sanciones', txt:'Al sancionar **por plazo** sólo salen las tareas cuyo plazo puedes mover: las de tu unidad (o todas, si eres el PD).'}
+        {cara:'escritorio', vista:'sanciones', txt:'Al sancionar **por plazo** sólo salen las tareas cuyo plazo puedes mover: las de tu unidad (o todas, si eres el PD).'},
+        {cara:'escritorio', vista:'partes', txt:'Puedes **revertir tus propios partes** ya firmados, igual que los firmas (con motivo).'},
+        {cara:'movil', vista:'horas', txt:'Lo mismo desde el móvil: tus partes firmados salen en **«Ya decidiste»**.'},
+        {cara:'movil', vista:'horas', txt:'En **«Tus partes»**, mientras nadie lo haya firmado, puedes **retirar** un parte o **corregirle las horas**. Quien lo firma ve que lo corregiste.'},
+        {cara:'movil', vista:'horas', txt:'**El objetivo del mes** ya no baja a mitad de mes si el equipo trabaja igual: el mes en curso cuenta por su ritmo.'}
       ]},
     { id:'2026-10-25-cambio-hora', fecha:'2026-10-25',
       titulo:'La noche del cambio de hora',
@@ -8103,19 +8214,23 @@ function _pasosSustituirDoc_(e, yo){
   if(!yo || !e.autor || String(e.autor) !== String(yo)) return [];
   var ref = e.ref || 'la referencia de este expediente';
   var url = _urlFormDocs_();
+  /* ⛔⛔ 27/10 — CAMBIÓ EL MODELO (Daniel: «me parece bien, trabajalo»): lo publicado se SUSTITUYE con la MISMA
+     referencia, eligiendo en el formulario «¿Qué estás enviando?» → «Sustituir uno publicado: cambiarlo» (errata, sin
+     versión nueva) o «…: actualizarlo» (versión nueva; la anterior se guarda). Vuelve a revisión, y al aprobarse se
+     cambia el PDF de la MISMA página y la MISMA carpeta. Lo de abajo («envío NUEVO, NO se reutiliza la referencia»)
+     era el modelo viejo, y el pipeline ya no lo hace. */
   return [
-    { n:1, t:'Manda la versión nueva por el formulario, marcada como «sustituye a»',
-      d:'Ahí pones la referencia de este: ' + ref + '. Es un envío NUEVO: crea su propio '+
-        'expediente y vuelve a pasar por revisión. Al revés que corregir: aquí NO se reutiliza '+
-        'la misma referencia, porque este ya está publicado y no se toca.',
+    { n:1, t:'Manda la versión nueva por el formulario: «Sustituir uno publicado»',
+      d:'En «¿Qué estás enviando?» elige «cambiarlo» si es una errata, o «actualizarlo» si es una versión nueva '+
+        '(la anterior se guarda). Pon la referencia de este: ' + ref + ', que NO cambia. Vuelve a pasar por revisión.',
       url: (url && url.indexOf('http') === 0) ? url : '',
       /* El respaldo vive en la PUERTA, no en una cara: es la misma leccion del 19/08 que
          dejo al escritorio mandando al formulario sin decir a quien pedir el enlace. */
       sinUrl: (url && url.indexOf('http') === 0) ? ''
             : 'Si no tienes a mano el enlace del formulario, pideselo al Project Director.' },
     { n:2, t:'Este sigue publicado mientras tanto',
-      d:'No se borra ni se retira. El original queda donde esta, y cuando aprueben el nuevo '+
-        'constara a cual sustituye. Hasta entonces, lo que el equipo lee es este.',
+      d:'No se borra ni se retira: hasta que aprueben la nueva, lo que el equipo lee es este. Al aprobarse, '+
+        'la misma página pasa a la versión nueva.',
       url:'', sinUrl:'' }
   ];
 }
@@ -8126,10 +8241,12 @@ function _pasosCorregirDoc_(e){
   var ref = e.ref || 'la misma referencia';
   var url = _urlFormDocs_();
   return [
+    /* ⛔ 27/10: con «¿Qué estás enviando?» → «Corrección tras cambios pedidos» y la MISMA referencia, la corrección
+       llega a ESTE expediente y lo devuelve SOLA a revisión (`servidor.e_push_entregable`, un envío nuevo = ronda
+       nueva). Ya no hay botón que pulsar: era lo que borraba el motivo y no subía nada. */
     { n:1, t:'Vuelve a enviar el archivo corregido por el formulario',
-      d:'Con la MISMA referencia: ' + ref + '. Así se actualiza el archivo de este mismo '+
-        'expediente. NO lo mandes como «sustituye a…»: eso crea un expediente nuevo y deja '+
-        'éste con la versión sin corregir.',
+      d:'En «¿Qué estás enviando?» elige «Corrección tras cambios pedidos» y pon la MISMA referencia: ' + ref +
+        '. Así llega a este mismo expediente.',
       url: (url && url.indexOf('http')===0) ? url : '',
       // ⛔ EL RESPALDO VIVE EN LA PUERTA, NO EN UNA CARA. Estaba escrito dentro del
       //    renderizador del móvil, así que el escritorio pintaba «reenvíalo por el
@@ -8138,9 +8255,9 @@ function _pasosCorregirDoc_(e){
       //    refutar el changelog del 19/08 antes de publicarlo, no un banco.
       sinUrl: (url && url.indexOf('http')===0) ? ''
             : 'Si no tienes a mano el enlace del formulario, pídeselo al Project Director.' },
-    { n:2, t:'Vuelve aquí y pulsa el botón de abajo',
-      d:'Es lo único que devuelve el expediente a la cola de revisión. Hazlo DESPUÉS: al '+
-        'pulsarlo se borra el motivo que te escribieron, y es donde pone qué hay que corregir.',
+    { n:2, t:'Vuelve solo a revisión',
+      d:'No tienes que pulsar nada: en cuanto llegue la corrección, el expediente vuelve a la cola de revisión. '+
+        'Lo que te pidieron corregir sigue aquí arriba hasta entonces.',
       url:'' }
   ];
 }
@@ -8343,7 +8460,197 @@ function _ajustesDocTxt_(e){
   if(a.titulo) p.push('título → «'+a.titulo+'»');
   /* 21/10 (auditor 11, 🟡 10): vaciarlas es un ajuste, y se dice — no «etiquetas → » con la cola vacía. */
   if(a.etiquetas) p.push('etiquetas → '+(a.etiquetas.join?(a.etiquetas.length?a.etiquetas.join(', '):'(ninguna)'):a.etiquetas));
+  /* 28/10: los dos campos nuevos de «con anotaciones». `''` en el subtítulo es QUITARLO, y se dice. */
+  if(a.subtitulo!=null) p.push(a.subtitulo ? 'subtítulo → «'+a.subtitulo+'»' : 'sin subtítulo');
+  if(a.confidencialidad) p.push('confidencialidad → '+a.confidencialidad);
   return p.length ? p.join(' · ') : '';
+}
+
+/* ══ 28/10 · «APROBAR CON ANOTACIONES» CON SolarIA, EN LAS DOS CARAS ══════════════════════════════════════════════
+   🗣️ Daniel: «Que por default te ponga el cuadro de texto para IA. Pero que te deje ambas» · «mientras esté la IA
+   trabajando, que se bloquee… que te ponga ahí que esperes 10-20 segundos» · «la confidencialidad en la app podria ser
+   un desplegable y ya (publico, interno)» · «un boton de "Enviar a SolarIA"».
+   Las dos caras pintan EL MISMO panel (`_anotPanelHTML_`), cada una con su prefijo de ids (móvil `d`, escritorio
+   `d<id>-`). SolarIA (`interpretarAnotacion`) sólo PROPONE: rellena los campos y se pueden retocar. Lo que viaja al
+   decidir sale de `_anotExtra_`, que manda SÓLO lo que cambia — el servidor exige que cambie al menos uno. */
+
+/* Lo que el expediente tiene AHORA en los cuatro campos. El título es `titulo` en el móvil y `tit` en el escritorio. */
+function _anotActualDe_(e){
+  e = e || {};
+  var n = e.confidencialidad;
+  return { titulo: String(e.titulo != null ? e.titulo : (e.tit || '')),
+           subtitulo: String(e.subtitulo || ''),
+           confidencialidad: (n === 'publico' || n === 'interno') ? n : '',
+           etiquetas: _etiquetasDe_(e) };
+}
+
+/* Qué campos de `campos` difieren de `act`. Un campo que NO llega (`null`/ausente) no cuenta como cambio: un input que
+   no existe no puede borrar nada. El título vacío tampoco (no es un estado válido); el subtítulo vacío SÍ (es quitarlo). */
+function _anotCambios_(act, campos){
+  act = act || {}; campos = campos || {};
+  var c = [], t = campos.titulo, s = campos.subtitulo, n = campos.confidencialidad, q = campos.etiquetas;
+  if (t != null && String(t).trim() && String(t).trim() !== String(act.titulo || '')) c.push('titulo');
+  if (s != null && String(s).trim() !== String(act.subtitulo || '')) c.push('subtitulo');
+  if ((n === 'publico' || n === 'interno') && n !== act.confidencialidad) c.push('confidencialidad');
+  if (Array.isArray(q) && JSON.stringify(q) !== JSON.stringify(act.etiquetas || [])) c.push('etiquetas');
+  return c;
+}
+
+/* El `extra` de la decisión: sólo lo que cambia, y la indicación que se le dio a SolarIA (queda de nota). `null` si no
+   cambia nada — y entonces no es «con anotaciones», es «aprobar». */
+function _anotExtra_(act, form){
+  form = form || {};
+  var c = _anotCambios_(act, form);
+  if (!c.length) return null;
+  var x = {};
+  c.forEach(function(k){ x[k] = (k === 'titulo' || k === 'subtitulo') ? String(form[k]).trim() : form[k]; });
+  var ind = String(form.indicacion || '').trim();
+  if (ind) x.indicacion = ind;
+  return x;
+}
+
+/* El panel. `css` es el estilo de los campos de la cara (el escritorio pasa `CAMPO_CSS`; el móvil, nada). */
+function _anotPanelHTML_(pre, act, id, css){
+  act = act || {};
+  var st = css ? ' style="' + css + '"' : '';
+  var opc = function(v, t){ return '<option value="' + v + '"' + (act.confidencialidad === v ? ' selected' : '') + '>' + t + '</option>'; };
+  var campo = function(rot, html){ return '<label class="campo" style="display:block;margin-top:9px">' +
+    '<span class="sc" style="display:block;margin-bottom:5px">' + rot + '</span>' + html + '</label>'; };
+  var bt = 'padding:5px 12px;font-size:12px';
+  return '<div id="' + pre + 'Anot" data-anot="' + pre + '" data-doc="' + esc(String(id)) + '" data-modo="ia" style="margin-top:10px">' +
+    '<span class="sc" style="display:block;margin-bottom:6px">Con anotaciones · lo que se ajusta al aprobar</span>' +
+    '<div style="display:flex;gap:6px">' +
+      '<button type="button" class="btn pri" style="' + bt + '" data-anotmodo="ia" data-pre="' + pre + '">SolarIA</button>' +
+      '<button type="button" class="btn" style="' + bt + '" data-anotmodo="mano" data-pre="' + pre + '">A mano</button></div>' +
+    /* La caja va en su `label.campo`, como los demás: suelta, el móvil la pintaba gris y pegada al botón (captura 28/10). */
+    '<div data-anotia>' +
+      campo('Qué cambiar · SolarIA rellena los campos de abajo', '<textarea id="' + pre + 'Ind" maxlength="2000"' + st +
+        ' placeholder="«acorta el título», «ponle de subtítulo…», «es interno», «añade la etiqueta…»"></textarea>') +
+      '<button type="button" class="btn" style="margin-top:8px;width:100%" data-solaria="' + pre + '">Enviar a SolarIA</button>' +
+      '<p class="rnota" id="' + pre + 'AnotEst" style="margin:6px 0 0"></p></div>' +
+    campo('Título · una línea en la portada', '<input id="' + pre + 'Tit" value="' + esc(act.titulo || '') + '"' + st + '>') +
+    campo('Subtítulo · hasta dos líneas; vacío = sin subtítulo', '<input id="' + pre + 'Sub" value="' + esc(act.subtitulo || '') + '"' + st + '>') +
+    campo('Confidencialidad', '<select id="' + pre + 'Conf"' + st + '>' + (act.confidencialidad ? '' : opc('', '— sin indicar —')) +
+      opc('publico', 'Público') + opc('interno', 'Interno') + '</select>') +
+    campo('Etiquetas · separadas por comas', '<input id="' + pre + 'Etq" value="' + esc((act.etiquetas || []).join(', ')) + '"' + st + '>') +
+  '</div>';
+}
+
+/* Lo que hay escrito en el panel. Un campo que no existe sale `null` (y `_anotCambios_` lo ignora). */
+function _anotLeer_(pre){
+  var v = function(k){ var x = document.getElementById(pre + k); return x ? String(x.value || '') : null; };
+  var t = v('Tit'), s = v('Sub'), q = v('Etq');
+  return { titulo: t == null ? null : t.trim(), subtitulo: s == null ? null : s.trim(), confidencialidad: v('Conf') || '',
+           etiquetas: q == null ? null : _etiquetasDeTexto_(q), indicacion: String(v('Ind') || '').trim() };
+}
+
+function _anotOcupado_(pre){
+  var c = document.getElementById(pre + 'Anot');
+  return !!(c && c.getAttribute('data-ocupado') === '1');
+}
+
+/* ¿Hay un panel con algo a medias? Ocupado, con la indicación escrita o con un campo tocado. Para que el refresco en vivo
+   no lo repinte encima — borraría lo que SolarIA acaba de proponer. */
+function _anotAMedias_(){
+  if (typeof document === 'undefined' || !document.querySelectorAll) return false;
+  var cs = document.querySelectorAll('[data-anot]');
+  for (var i = 0; i < cs.length; i++){
+    if (cs[i].getAttribute('data-ocupado') === '1') return true;
+    var xs = cs[i].querySelectorAll('input,textarea,select');
+    for (var j = 0; j < xs.length; j++){
+      var x = xs[j];
+      if (x.tagName === 'SELECT' ? (x.selectedIndex >= 0 && x.options[x.selectedIndex] && !x.options[x.selectedIndex].defaultSelected)
+                                 : (x.value !== x.defaultValue)) return true;
+    }
+  }
+  return false;
+}
+
+/* ⛔ BLOQUEA EL PANEL ENTERO mientras SolarIA trabaja: un campo tocado en esos segundos lo pisaría la respuesta. */
+function _anotBloquear_(pre, on, txt){
+  var c = document.getElementById(pre + 'Anot');
+  if (!c) return;
+  c.setAttribute('data-ocupado', on ? '1' : '');
+  Array.prototype.forEach.call(c.querySelectorAll('input,select,textarea,button'), function(x){ x.disabled = !!on; });
+  if (txt != null) _anotEstado_(pre, txt);
+}
+
+function _anotEstado_(pre, txt){
+  var s = document.getElementById(pre + 'AnotEst');
+  if (s) s.textContent = txt || '';
+}
+
+function _anotModo_(pre, modo){
+  var c = document.getElementById(pre + 'Anot');
+  if (!c) return;
+  c.setAttribute('data-modo', modo === 'mano' ? 'mano' : 'ia');
+  var ia = c.querySelector('[data-anotia]');
+  if (ia) ia.style.display = modo === 'mano' ? 'none' : '';
+  Array.prototype.forEach.call(c.querySelectorAll('[data-anotmodo]'), function(b){
+    b.classList.toggle('pri', b.getAttribute('data-anotmodo') === (modo === 'mano' ? 'mano' : 'ia'));
+  });
+}
+
+/* El nombre de un campo, para decirlo en pantalla. */
+function _anotNombre_(k){
+  return ({titulo:'título', subtitulo:'subtítulo', confidencialidad:'confidencialidad', etiquetas:'etiquetas'})[k] || k;
+}
+
+/* Pone en el panel lo que SolarIA propone, SÓLO en los campos que cambia, y los marca (azul Solaris). */
+function _anotRellenar_(pre, campos, cambios){
+  (cambios || []).forEach(function(k){
+    var x = document.getElementById(pre + ({titulo:'Tit', subtitulo:'Sub', confidencialidad:'Conf', etiquetas:'Etq'})[k]);
+    if (!x) return;
+    x.value = k === 'etiquetas' ? (campos.etiquetas || []).join(', ') : String(campos[k] == null ? '' : campos[k]);
+    x.style.outline = '2px solid #3f9ed6';
+    x.title = 'Lo ha cambiado SolarIA: revísalo';
+  });
+}
+
+/* El botón «Enviar a SolarIA». Lo que manda como «actual» es lo que hay EN PANTALLA (puede estar retocado). */
+async function _anotEnviarIA_(pre, e){
+  if (!e || _anotOcupado_(pre)) return;
+  var f = _anotLeer_(pre);
+  if (!f.indicacion){
+    var ti = document.getElementById(pre + 'Ind'); if (ti) ti.focus();
+    tost('Escribe primero qué quieres que cambie SolarIA.');
+    return;
+  }
+  if (!(typeof backendOK !== 'undefined' && backendOK && typeof SESION !== 'undefined' && SESION)){
+    _anotModo_(pre, 'mano');
+    tost('SolarIA necesita conexión con el servidor. Ajusta los campos a mano.');
+    return;
+  }
+  var act = { titulo: f.titulo, subtitulo: f.subtitulo, confidencialidad: f.confidencialidad, etiquetas: f.etiquetas || [] };
+  _anotBloquear_(pre, true, 'SolarIA está trabajando · espera 10-20 s…');
+  try {
+    var r = await api.interpretarAnotacion(e.id, e.ref, f.indicacion, act);
+    _anotBloquear_(pre, false);
+    if (!r || r.ok === false){
+      _anotEstado_(pre, 'SolarIA no ha podido' + (r && r.motivo ? ': ' + r.motivo : '') + '. Ajusta los campos a mano.');
+      return;
+    }
+    var cam = _anotCambios_(act, r.campos || {});
+    _anotRellenar_(pre, r.campos || {}, cam);
+    _anotEstado_(pre, (cam.length ? 'SolarIA propone cambiar ' + cam.map(_anotNombre_).join(', ') + '. Revísalo y aprueba con anotaciones.'
+                                  : 'SolarIA no ve nada que cambiar con esa indicación.') +
+                      (r.avisos && r.avisos.length ? ' Ojo: ' + r.avisos.join(' · ') : ''));
+  } catch (err) {
+    _anotBloquear_(pre, false);
+    _anotEstado_(pre, 'No se pudo hablar con SolarIA: ' + ((err && err.message) || err) + '. Puedes ajustarlo a mano.');
+  }
+}
+
+/* El manejador, delegado: cada cara lo engancha UNA vez a `document` con su forma de encontrar el expediente. */
+function _anotClic_(ev, buscar){
+  var t = ev && ev.target && ev.target.closest ? ev.target : null;
+  if (!t) return;
+  var m = t.closest('[data-anotmodo]');
+  if (m){ _anotModo_(m.getAttribute('data-pre'), m.getAttribute('data-anotmodo')); return; }
+  var s = t.closest('[data-solaria]');
+  if (!s) return;
+  var pre = s.getAttribute('data-solaria'), c = document.getElementById(pre + 'Anot');
+  _anotEnviarIA_(pre, c ? buscar(c.getAttribute('data-doc')) : null);
 }
 
 /* `2026-08-06T19:12:00.000Z` → `06/08/2026, 21:12`. Formato, no calendario. */
@@ -8545,7 +8852,8 @@ function rangoNom(n){
      `maxR` vale 1 o 3, nunca 0. El control (subcoordinador a rango 2) dio 256. */
   if(_subcoordDe_(n)) return 1;
   var m=miembro(n);
-  return (m && m.cargo==='Coordinador') ? 1 : 0;
+  /* 26/10, Daniel, sobre Bruno y Marta: «Si, en su unidad» -- coordinar una unidad, sin el cargo, tambien da el 1. */
+  return (m && (m.cargo==='Coordinador' || _unidadesCoord_(m.coordina).length>0)) ? 1 : 0;
 }
 
 /* La huella de las respuestas de una reunion: `{nombre:[bloques]}` -> una cadena estable.

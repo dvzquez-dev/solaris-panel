@@ -526,6 +526,7 @@ function _cablearPonerSanc_(){
   function marcar(b){
     SANC_FORM.quien=b.dataset.sanq;
     $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
+    _quienCambiaSanc_();   /* 26/10 (A5b): con el 30g, los puntos son los del historial de ESTA persona */
     /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS: hay que repintar.
        Con los demas motivos no se toca nada, que seria tirar lo escrito por nada. */
     if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarPonerSanc_(); }
@@ -632,7 +633,7 @@ function _cablearPonerSanc_(){
       var _yaEstaba = !!(r && r.duplicadas && r.duplicadas.length);
       SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
       tost((_yaEstaba ? 'Esa sanci\u00f3n YA estaba puesta (era un reintento): a '
-                      : 'Sanci\u00f3n puesta a ')+(_pilaDeM_(quien)||quien)+'.'+(esDePlazo?' Plazo movido en Notion.':''));
+                      : 'Sanci\u00f3n puesta a ')+(_pilaDeM_(quien)||quien)+'.'+(_yaEstaba ? '' : ' Se aplica en Notion y se avisa en Discord en unos minutos.')+(esDePlazo?' Plazo movido en Notion.':''));
       await _cargarSanciones_();     // la cola de abajo tiene que enterarse
       pintar();
     }catch(e){

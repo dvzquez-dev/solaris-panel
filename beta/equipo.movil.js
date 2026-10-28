@@ -64,7 +64,7 @@ function aprobadorDe(autor,unidad){
    ⚠️ No se delega en `rangoNom` a proposito: `rangoNom` compara contra `PD_NOM`, que
    `_rederivarPD_` fija desde el roster REAL, y aqui hay funciones que se llaman antes de
    que la identidad este resuelta. Añadir un brazo no mete esa dependencia; delegar si. */
-function esCoord(){ return ST.rol==='coord' || ST.rol==='pd' || (typeof YO!=='undefined' && YO && (YO.cargo==='Coordinador' || YO.cargo==='Project Director' || !!_subcoordDe_(YO.nombre))); }
+function esCoord(){ return ST.rol==='coord' || ST.rol==='pd' || (typeof YO!=='undefined' && YO && (YO.cargo==='Coordinador' || YO.cargo==='Project Director' || _unidadesCoord_(YO.coordina).length>0 || !!_subcoordDe_(YO.nombre))); }   // 26/10: `coordina` (Bruno, Marta)
 
 function esPD(){ return ST.rol==='pd' || (typeof YO!=='undefined' && YO && YO.cargo==='Project Director'); }
 

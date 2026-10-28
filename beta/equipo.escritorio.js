@@ -98,7 +98,7 @@ function colaDecision(){
       chip:'<span class="chip no">por decidir</span>',ir:'sanciones',foco:'lote'});
   /* ⛔ 26/10 — Daniel (25/10): un coordinador puede mover el plazo de una tarea SUYA, *«pero me notifica en algun lugar
      del escritorio (app)»*. Aquí: una fila por plazo movido así en los últimos 14 días (los sirve el bootstrap, sólo al PD). */
-  if(rangoNom(ACTOR)>=3) (window.PLAZOS_PROPIOS||[]).forEach(function(x){
+  if(rangoNom(ACTOR)>=3) ((typeof PLAZOS_PROPIOS!=='undefined' && PLAZOS_PROPIOS)||[]).forEach(function(x){
     out.push({ic:'i-reloj',b:'\u00ab'+esc(x.tarea||'una tarea')+'\u00bb: plazo movido por su responsable',
       s:esc(x.por||'?')+' \u00b7 '+(x.de?esc(_isoADMY_(String(x.de).slice(0,10))):'sin plazo')+' \u2192 '+
         esc(_isoADMY_(String(x.a||'').slice(0,10)))+(x.at?' \u00b7 el '+esc(_isoADMY_(String(x.at).slice(0,10))):''),

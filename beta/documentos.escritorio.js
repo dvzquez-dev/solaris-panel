@@ -49,6 +49,9 @@ function _normDocE_(d, i){
     id:      (d.id!==undefined ? d.id : i),
     ref:     d.ref || '',
     tit:     d.titulo || d.tit || d.ref || '',
+    /* 28/10: lo que ajusta «con anotaciones» además del título (`sub` ya es el SUBSISTEMA en esta cara). */
+    subtitulo:        d.subtitulo || '',
+    confidencialidad: d.confidencialidad || '',
     autor:   d.autor || '',
     sub:     d.subsistema || d.sub || '',
     tipo:    d.tipo || '',
@@ -286,12 +289,18 @@ function _pasosCorregirE_(d){
 
 /* Aplica en memoria una decisión de documento (sólo la MAQUETA local; auditor 20, 🟡 8). Campos cortos de esta cara;
    el móvil tiene su gemela con los largos (`_aplicarDecDoc_`). Pura, para que un banco la ejecute. */
-function _decDocLocalE_(d, acc, mot, tit, actor, at){
+function _decDocLocalE_(d, acc, mot, tit, actor, at, aj){
   if(!d) return null;
   if(acc==='reenviar'){ d.est='revision'; d.nota=''; return d; }
   if(acc==='deshacer'){ d.est='revision'; d.nota=''; d.revisor=null; d.decision=null; return d; }
   d.est = (acc==='anot') ? 'aprobado' : acc;
   if(acc==='anot' && tit) d.tit = tit;
+  /* 28/10: los otros tres campos, como el móvil (`_aplicarDecDoc_`). `aj` es el `extra` de `_anotExtra_`. */
+  if(acc==='anot' && aj){
+    if(aj.etiquetas) d.etiquetas = aj.etiquetas;
+    if(aj.subtitulo!=null) d.subtitulo = aj.subtitulo;
+    if(aj.confidencialidad) d.confidencialidad = aj.confidencialidad;
+  }
   d.nota = (acc==='cambios' || acc==='rechazado') ? (mot||'') : '';
   d.revisor = actor || null;
   d.decision = {accion:acc, revisor:actor || null, at:at || null};
@@ -331,12 +340,9 @@ function docCard(d){
       : 'Pídeselo a quien lo subió antes de decidir.</div></div>'));
   var acc, _aut;
   if(puede){
-    acc='<label style="display:block;margin-top:11px">'+
-      '<span class="sc" style="display:block;margin-bottom:5px">Título · puedes corregirlo al aprobar con anotaciones</span>'+
-      '<input id="dtit-'+d.id+'" value="'+esc(d.tit)+'" style="'+CAMPO_CSS+'"></label>'+
-      '<label style="display:block;margin-top:9px">'+
-      '<span class="sc" style="display:block;margin-bottom:5px">Etiquetas · separadas por comas</span>'+
-      '<input id="detq-'+d.id+'" value="'+esc(_etiquetasDe_(d).join(', '))+'" style="'+CAMPO_CSS+'"></label>'+
+    /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el móvil (`comun.js` `_anotPanelHTML_`), con
+       prefijo `d<id>-`: aquí se pintan varias fichas a la vez. Sólo donde se puede aprobar. */
+    acc=(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS) : '')+
       '<textarea data-motivo placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
       /* ⛔⛔ APROBAR = PUBLICAR, y no se publica lo que nadie ha analizado. Esta cara ve
          `recibido` y `analizado` a proposito -Daniel, 05/08: en el movil «no aparecen
@@ -360,7 +366,8 @@ function docCard(d){
        ⚠️ Y el escritorio nombra el estado `est`, no `estado`: por eso `_pasosCorregirE_`
        traduce antes de preguntar. Pasarle el objeto crudo daria SIEMPRE lista vacia --
        instrucciones escritas, probadas y mudas en una cara entera. */
-    acc=_pasosCorregirE_(d)+'<div class="acts"><button class="btn pri" data-doc="'+d.id+'" data-acc="reenviar">Ya está corregido: devolver a revisión</button></div>';
+    /* ⛔ 27/10: sin el botón «Ya está corregido» (la corrección por el formulario vuelve sola a revisión). */
+    acc=_pasosCorregirE_(d);
   /* ⛔ `cerrado` fuera: no existe -- `_normEstado_` lo traduce a `publicado`. */
   } else if((_aut=_docAutorE_(d))){
     /* ⛔ AQUI PONIA «Es tuyo: lo firma X», Y YA ESTABA FIRMADO -- y no solo en `publicado`

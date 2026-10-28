@@ -69,7 +69,7 @@ function _decSinRedDoc_(aviso, maqueta){
   return { aplicar:true, txt:String(aviso||'Hecho.').split(' · ')[0].replace(/\.$/, '')+' (maqueta: sólo en este teléfono, no se ha publicado nada).' };
 }
 
-function _aplicarDecDoc_(e, acc, mot, tit, etq){
+function _aplicarDecDoc_(e, acc, mot, tit, etq, aj){
   if(!e) return null;
   if(acc==='reenviar'){ e.estado='revision'; e.nota=null; return e; }
   if(acc==='deshacer'){ e.estado='revision'; e.nota=null; e.revisor=null; return e; }
@@ -93,6 +93,8 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq){
        `movil.html` ya se planta antes (*«Con anotaciones hace falta un titulo»*). Son el
        mismo `if` con dos significados distintos, que es justo lo que los confundio. */
     if(acc==='anot' && etq) e.etiquetas=etq;
+    /* 28/10: subtítulo ('' = quitarlo) y confidencialidad, como el servidor. `aj` es el `extra` de `_anotExtra_`. */
+    if(acc==='anot' && aj){ if(aj.subtitulo!=null) e.subtitulo=aj.subtitulo; if(aj.confidencialidad) e.confidencialidad=aj.confidencialidad; }
     e.estado='aprobado';   /* 21/10 (auditor 11, 🔴 1): como el servidor — `publicado` lo pone quien publica */
   } else if(acc==='cambios'){ e.estado='cambios'; e.nota=mot; }
   else if(acc==='rechazado'){ e.estado='rechazado'; e.nota=mot; }
@@ -371,14 +373,17 @@ function _docAutorHTML_(e){
          solo cambia el estado. Un boton que promete subir un archivo hace que quien lo
          pulsa CREA que ya lo ha subido, y se queda esperando a un revisor que abriria el
          archivo viejo. Ahora dice lo que hace. */
-      '<button class="btn pri full" style="margin-top:10px" data-p data-dec="reenviar" data-id="'+e.id+'">Ya está corregido: devolver a revisión</button>';
+      /* ⛔ 27/10: SIN el botón «Ya está corregido»: la corrección que llega por el formulario devuelve el
+         expediente a revisión sola (un envío nuevo = una ronda nueva, `servidor.e_push_entregable`). */
+      '';
   /* ⛔ AQUI NO VAN LOS DOS PASOS, Y ES LA MITAD QUE SE ME ESCAPABA: `Codigo.gs:966` exige
      `estado==='cambios'` para reenviar, asi que desde un RECHAZADO **no hay boton**.
      Decirle a esta persona «vuelve y pulsa» la manda a buscar algo que no existe: lo suyo
      es un envio NUEVO -referencia nueva- enlazado al original, que no se borra. */
   if(est==='rechazado')
     return '<div class="avisolargo" style="margin-top:14px"><b>Te lo rechazaron.</b> '+
-      esc(e.nota||'Sin motivo escrito.')+pie+'</div>';
+      esc(e.nota||'Sin motivo escrito.')+pie+
+      '<div style="margin-top:8px">Si lo rehaces, mándalo por el formulario como «Documento nuevo».</div></div>';
   /* ⛔⛔ AQUI ESTABA PINCHADA LA RAMA MUERTA Y FALTABA LA VIVA. `cerrado` no existe
      -- `_normEstado_` lo traduce a `publicado` --, mientras que `anot` SI llega: el mapa
      lo produce (`'anot':'anot'`) y un push historico de Cowork lo trae. O sea que el
@@ -498,9 +503,9 @@ function verDoc(id){
          etiquetas, y el escritorio ya lo rotulaba bien.
          ⚠️ Y el móvil se contradecía A SÍ MISMO dos líneas más abajo: las etiquetas SÍ
          decían «al aprobar con anotaciones». Asimetría entre caras Y dentro de una cara. */
-      '<label class="campo"><span class="sc">Título · puedes corregirlo al aprobar con anotaciones</span><input id="dTit" value="'+esc(e.titulo)+'"></label>'+
-      '<label class="campo"><span class="sc">Etiquetas · separadas por comas, al aprobar con anotaciones</span>'+
-      '<input id="dEtq" value="'+esc(_etiquetasDe_(e).join(', '))+'"></label>'+
+      /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el escritorio (`comun.js` `_anotPanelHTML_`):
+         título, subtítulo, confidencialidad (desplegable público/interno) y etiquetas. Sólo donde se puede aprobar. */
+      (_yaAnalizado_(e) ? _anotPanelHTML_('d', _anotActualDe_(e), e.id, '') : '')+
       '<label class="campo"><span class="sc">Motivo <span class="req">*</span> si pides cambios o rechazas</span>'+
       '<textarea id="dMot" placeholder="lo leerá el autor…"></textarea></label>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
