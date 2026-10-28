@@ -4328,7 +4328,10 @@ function _cargarVisor_(cuerpo, id){
   cuerpo.appendChild(car);
   var f=document.createElement('iframe');
   f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
-  f.src='https://drive.google.com/file/d/'+id+'/preview';
+  /* ⛔ 28/10: CON LA CUENTA DE LA SESIÓN. Sin `authuser` Drive abre con la cuenta POR DEFECTO del navegador (la /u/0/),
+     y la de Aerotech de Daniel es la /u/2/: con permiso sólo para el dominio, el visor no enseñaba el PDF de revisión. */
+  var _em=''; try{ _em=(typeof SESION!=='undefined' && SESION && SESION.email) || localStorage.getItem('sol_last_email') || ''; }catch(_){}
+  f.src='https://drive.google.com/file/d/'+id+'/preview'+(_em ? '?authuser='+encodeURIComponent(_em) : '');
   var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
     cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
   f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo);
