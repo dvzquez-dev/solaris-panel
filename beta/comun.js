@@ -4258,7 +4258,9 @@ function _numPlan_(v){
 }
 
 /* De una URL de Drive saca el id del fichero, para poder pedir su visor incrustable. */
-function _idDrive_(u){ var m=String(u||'').match(/\/d\/([A-Za-z0-9_-]{20,})/); return m?m[1]:null; }
+/* ✅ 28/10: también `open?id=<ID>` (así llega el original del formulario): sin esto el visor decía «el enlace no es un
+   archivo de Drive reconocible» sobre uno que sí lo es (Daniel, con el 4201). */
+function _idDrive_(u){ var s=String(u||''); var m=s.match(/\/d\/([A-Za-z0-9_-]{20,})/)||s.match(/[?&]id=([A-Za-z0-9_-]{20,})/); return m?m[1]:null; }
 
 /* ⛔⛔ LA PUERTA UNICA DEL VISOR DE UN DOCUMENTO, Y LA PREGUNTA ES «¿HAY ENLACE?».
    Las dos caras contestaban esto con criterios distintos: el escritorio preguntaba
