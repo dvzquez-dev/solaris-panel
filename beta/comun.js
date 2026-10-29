@@ -3096,6 +3096,9 @@ function _rotuloLote_(it){
    o la reunión no está en la lista: entonces se queda el código, que es lo que había. ⛔ Con DOS lotes de las mismas
    personas (la #2 pendiente y la #3), sólo el código no decía que eran reuniones distintas. */
 function _tituloLote_(lote, reus){
+  /* 29/10 (Daniel): las sanciones por no abrir la app van en un lote MENSUAL `actividad-AAAA-MM` */
+  var a = /^actividad-(\d{4})-(0[1-9]|1[0-2])$/.exec(String(lote == null ? '' : lote));
+  if (a) return 'Sin abrir la app · ' + ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][+a[2] - 1] + ' ' + a[1];
   var m = /^reunion-(\d+)$/.exec(String(lote == null ? '' : lote));
   if (!m) return '';
   var L = Array.isArray(reus) ? reus : [];
