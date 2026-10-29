@@ -4328,7 +4328,10 @@ function _cargarVisor_(cuerpo, id){
   cuerpo.appendChild(car);
   var f=document.createElement('iframe');
   f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
-  f.src='https://drive.google.com/file/d/'+id+'/preview';
+  /* ⛔ 28/10: CON LA CUENTA DE LA SESIÓN. Sin `authuser` Drive abre con la cuenta POR DEFECTO del navegador (la /u/0/),
+     y la de Aerotech de Daniel es la /u/2/: con permiso sólo para el dominio, el visor no enseñaba el PDF de revisión. */
+  var _em=''; try{ _em=(typeof SESION!=='undefined' && SESION && SESION.email) || localStorage.getItem('sol_last_email') || ''; }catch(_){}
+  f.src='https://drive.google.com/file/d/'+id+'/preview'+(_em ? '?authuser='+encodeURIComponent(_em) : '');
   var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
     cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
   f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo);
@@ -6720,6 +6723,17 @@ function _anotCambios_(act, campos){
 
 /* El `extra` de la decisión: sólo lo que cambia, y la indicación que se le dio a SolarIA (queda de nota). `null` si no
    cambia nada — y entonces no es «con anotaciones», es «aprobar». */
+/* ⛔⛔ 28/10: ¿HA EDITADO EL PANEL Y VA A PULSAR «APROBAR» A SECAS? Daniel cambió el subtítulo del 4102 («Almacenamiento seco
+   para cargas CANDY»), pulsó «Aprobar» y se publicó con el sugerido: `aprobado` no lee el panel. La base es lo que el panel
+   trae RELLENO (la portada sugerida, si la hay): aprobar la sugerencia sin tocarla sigue siendo «Aprobar». */
+var _AVISO_APROBAR_EDITADO_='Has cambiado campos de «Aprobar con anotaciones»: con «Aprobar» se perderían. Usa «Aprobar con anotaciones» (y «Comprobar portada»).';
+function _anotEditadoSinAnot_(e, pre){
+  var a = _anotActualDe_(e), base = {};
+  for (var k in a) base[k] = a[k];
+  if (a.sugerida){ base.titulo = a.sugerida.titulo; base.subtitulo = a.sugerida.subtitulo; }
+  return _anotCambios_(base, _anotLeer_(pre)).length > 0;
+}
+
 function _anotExtra_(act, form){
   form = form || {};
   var c = _anotCambios_(act, form);
