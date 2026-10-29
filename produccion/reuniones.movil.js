@@ -245,6 +245,7 @@ function _normReuM_(r){
     /* 26/10 (triaje A4d): te convocaron con el plazo YA VENCIDO: no se te sanciona por no cubrirla */
     tarde: !!(YO && Array.isArray(r.invitados_tarde) && r.invitados_tarde.indexOf(YO.nombre)>=0),
     invitados_tarde: Array.isArray(r.invitados_tarde) ? r.invitados_tarde.slice() : [],   /* para re-hidratar */
+    en_curso: (r.en_curso && typeof r.en_curso==='object') ? r.en_curso : null,   /* 29/10: la pone `empezarReunion`; la ficha enseña el cronómetro */
     _real:true };
 }
 
@@ -294,6 +295,7 @@ function _fuenteReuM_(R, base, resp, ag){
        enuncio y no donde se citaba (§3c-19). Por eso la comprobacion de su banco es
        ESTRUCTURAL: compara lo que `_normReuM_` LEE con lo que esta ENTREGA. */
     ordenDia:R.ordenDia,
+    en_curso:R.en_curso,   /* 29/10: sin esto el cronómetro de la ficha se perdía al rehidratar (lo cazó `probar_reunion_movil`) */
     dias:s.dias||R.dias, franjas:s.franjas||R.franjas, bloques:s.bloques||R.bloques,
     /* Del servidor viene el objeto `fijada` con sus indices; de lo nuestro, la etiqueta ya
        aplanada mas `fijadaBl` YA remapeado. Cada camino, entero. */
@@ -694,6 +696,7 @@ function vReu(){
         '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
         '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
       '</div>':'')+
+    _bloqueReuHTML_(R, _puedeBloqueReu_(R, (typeof _actorSanc_==='function'?_actorSanc_():(YO&&YO.nombre)), (typeof esAdmin==='function' && esAdmin())))+
     '</div>'+
     '<h2 class="sec">Cuándo puede el equipo<span class="ln"></span></h2>'+
     /* ⛔ EN `oculta` NO SE PINTA EL AGREGADO, y no basta con que el servidor deje de mandarlo:

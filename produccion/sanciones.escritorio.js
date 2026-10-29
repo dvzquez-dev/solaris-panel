@@ -353,7 +353,7 @@ async function _engRevocarSanc_(){
         var _n = (r && typeof r.nuevas === 'number') ? r.nuevas : 1;
         tost(_n ? 'Revocaci\u00f3n en la cola, pendiente de confirmar con su bloque.'
                 : 'Esa revocaci\u00f3n ya estaba en la cola: no se ha duplicado.');
-        await _cargarSanciones_();
+        await _cargarSancionesCon_(r);
         pintar();
       }catch(e){ tostErr('No se pudo revocar', e); }
       finally{ b.disabled = false; b.textContent = prev || 'Revocar'; }
@@ -634,7 +634,7 @@ function _cablearPonerSanc_(){
       SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
       tost((_yaEstaba ? 'Esa sanci\u00f3n YA estaba puesta (era un reintento): a '
                       : 'Sanci\u00f3n puesta a ')+(_pilaDeM_(quien)||quien)+'.'+(_yaEstaba ? '' : ' Se aplica en Notion y se avisa en Discord en unos minutos.')+(esDePlazo?' Plazo movido en Notion.':''));
-      await _cargarSanciones_();     // la cola de abajo tiene que enterarse
+      await _cargarSancionesCon_(r);     // la cola de abajo tiene que enterarse
       pintar();
     }catch(e){
       bt.disabled=false; bt.textContent=prev;
@@ -658,6 +658,14 @@ async function _cargarSanciones_(){
   try{ var arr=await api.getSanciones({}); if(Array.isArray(arr)){ SANC_BACK=arr; _llego_('sanc', true); } }
   catch(e){ if(!Array.isArray(SANC_BACK)) SANC_BACK=null; }
   _loteReal_();
+}
+
+/* 29/10 (la pantalla iba lenta): las escrituras de sanciones contestan con `cola` — la cola ya escrita, la misma que daria
+   `getSanciones` justo despues—, asi que se pinta con eso y no se pide aparte. Sin `cola` (Apps Script, un servidor viejo,
+   una respuesta rara) se pide como siempre: nunca se pinta una cola que no llego. Mismos efectos que `_cargarSanciones_`. */
+async function _cargarSancionesCon_(r){
+  if(r && Array.isArray(r.cola)){ SANC_BACK=r.cola; _llego_('sanc', true); _loteReal_(); return; }
+  await _cargarSanciones_();
 }
 
 /* Construye el BLOQUE de sanciones desde la cola REAL del backend (SANC_BACK) cuando hay
