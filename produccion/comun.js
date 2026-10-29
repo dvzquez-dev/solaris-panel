@@ -363,6 +363,32 @@ function _pintarSiCambia_(el, clave, html){
 }
 
 
+/* ⛔⛔ Un repintado de la MISMA vista no mueve el scroll (Daniel, 28/10, cerrando el mes: *«me resetea la página arriba
+   del todo cada vez q hago algo»*). `pintar()` reconstruye el contenido y, si en medio hay un estado más corto (datos a
+   `null`, «Cargando…», la cola que se vacía), el navegador recorta `scrollTop` y al volver a crecer ya se quedó en 0.
+   Una acción repinta DOS veces (la optimista y la que llega con la respuesta), así que recordar el `scrollTop` de la
+   entrada no basta: la segunda entrada ya lo trae recortado. Por eso se recuerda lo que se QUERÍA (`_scrollQuiero`)
+   hasta que el usuario toque la pantalla (rueda, dedo, tecla, clic): entonces vuelve a mandar lo que él ha dejado.
+   Sólo cuenta si la vista es la misma que la última pintada: al cambiar de pestaña `ir()`/`irA()` ponen 0, y es lo correcto.
+   ⚠️ El recuerdo va en el NODO, no en un `var` de módulo (ver `_pintarSiCambia_`: aquí sólo hay `function`). */
+function _scrollGuardar_(m, vista){
+  if(!m) return null;
+  if(!m._scrollCableado && m.addEventListener){
+    m._scrollCableado=true;
+    ['wheel','touchstart','keydown','pointerdown'].forEach(function(ev){
+      m.addEventListener(ev, function(){ m._scrollQuiero=null; }, {passive:true, capture:true});
+    });
+  }
+  var mismo=(m._scrollVista===vista);
+  m._scrollVista=vista;
+  return mismo ? (m._scrollQuiero!=null ? m._scrollQuiero : m.scrollTop) : null;
+}
+function _scrollRestaurar_(m, y){
+  if(!m || !y) { if(m) m._scrollQuiero=null; return; }
+  m.scrollTop=y;
+  m._scrollQuiero=(m.scrollTop<y) ? y : null;    // recortado: se sigue queriendo, para la siguiente pintada
+}
+
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
 /* 22/10 (auditor 23, 🟠 8): los convocados que SIGUEN en el equipo, como el motor (`universo_convocado` sobre vivos).
    Si el censo no se conoce (menos de 2 activos: maqueta sin panel), la lista tal cual -- «no lo sé» no vacía a nadie. */
