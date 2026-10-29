@@ -9032,3 +9032,293 @@ function _firmaResp_(r){
   for(var i=0;i<k.length;i++) out.push(k[i]+':'+(q[k[i]]||[]).join(''));
   return out.join('|');
 }
+
+
+/* ═══ EL PARTE DE BLOQUE (29/10) — UNA SOLA PIEZA PARA LAS DOS CARAS ═══════════════════════════════
+   🗣️ Daniel: *«una persona fiche por el resto (el organizador de la reunión) y que las horas le sumen a todos
+   los que añada […] durante una reunión te debería dejar darle al botón de empezar y finalizar»*.
+   El servidor (`declararBloque`, `decidirBloque`, `empezarReunion`, `finalizarReunion`, `cancelarReunionEnCurso`)
+   crea UNA línea `pendiente` por participante, todas con el mismo `bloque`; las decide el PD de una vez.
+
+   ⛔ ESTÁ AQUÍ Y NO EN CADA CARA porque el formulario, el cronómetro y la tarjeta de la cola son los mismos
+   en el móvil y en el escritorio: dos copias serían la gemela número N. Cada cara sólo aporta DÓNDE se pinta
+   (modal en el móvil, panel en el escritorio) y qué refresca al acabar (`cb`).
+   ⚠️ El formulario vive en `BLQ` (no en el DOM): un `pintar()` lo repinta con lo que llevabas escrito. */
+var BLQ_MIN_RESUMEN = 20;                      // el mismo mínimo que `MIN_RESUMEN_BLOQUE` del servidor
+var BLQ = null;                                // {modo:'finalizar'|'declarar', reunion, reunion_id, titulo, fecha, ini, fin,
+                                               //  en_curso, resumen, parts:[{nombre,horas}], res, env, clave}
+var _BLQ_INPUT_ = 'background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;'+
+                  'color:var(--ink);font:inherit;font-size:13px;width:100%;box-sizing:border-box';
+
+/* ¿Puede esta persona empezar/finalizar/declarar el bloque de ESTA reunión? La regla del servidor
+   (`_puerta_reunion_bloque`): su convocante, el PD o el admin. */
+function _puedeBloqueReu_(r, yo, admin){
+  if(!r) return false;
+  if(admin) return true;
+  if(!yo) return false;
+  return rangoNom(yo)>=3 || (!!r.convocante && String(yo)===String(r.convocante));
+}
+
+/* Tiempo corriendo desde `iso`: m:ss, o h:mm:ss pasada la hora. */
+function _cronoTxt_(iso, ahora){
+  var t=Date.parse(iso); if(t!==t) return '--:--';
+  var s=Math.max(0, Math.floor(((ahora==null?Date.now():ahora)-t)/1000));
+  var h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60;
+  return (h?h+':'+pad(m):m)+':'+pad(x);
+}
+/* Se actualiza el TEXTO, no se repinta la pantalla: el cronómetro no puede mover el scroll. */
+function _cronoTick_(){
+  if(typeof document==='undefined') return;
+  var els=document.querySelectorAll('[data-crono]');
+  for(var i=0;i<els.length;i++) els[i].textContent=_cronoTxt_(els[i].getAttribute('data-crono'));
+}
+if(typeof document!=='undefined' && typeof setInterval==='function'){
+  var _cronoT_=setInterval(_cronoTick_, 1000); if(_cronoT_ && _cronoT_.unref) _cronoT_.unref();
+}
+
+function _bloqueDurH_(fecha, ini, fin){
+  var a=Date.parse(fecha+'T'+ini+':00'), b=Date.parse(fecha+'T'+fin+':00');
+  return (a!==a || b!==b || b<=a) ? 0 : Math.round((b-a)/3600000*100)/100;
+}
+
+/* Abre el formulario. `c.parts` = nombres de partida (los invitados). */
+function _bloqueAbrir_(c){
+  BLQ={modo:c.modo, reunion:c.reunion||null, reunion_id:c.reunion_id==null?null:c.reunion_id, titulo:c.titulo||'',
+    fecha:c.fecha||'', ini:c.ini||'', fin:c.fin||'', en_curso:c.en_curso||null, resumen:'', res:null, env:false,
+    parts:(c.parts||[]).map(function(n){ return {nombre:n, horas:''}; }), clave:_claveUso_()};
+}
+
+/* El cuerpo que se manda, o un Error con lo que falta (el mismo mínimo que el servidor: no se gasta un viaje). */
+function _bloqueCuerpo_(B){
+  var resumen=(B.resumen||'').trim();
+  if(resumen.length<BLQ_MIN_RESUMEN)
+    throw new Error('Cuenta qué se hizo: el resumen necesita al menos '+BLQ_MIN_RESUMEN+' caracteres (llevas '+resumen.length+').');
+  if(!B.parts.length) throw new Error('Añade al menos un participante.');
+  var parts=B.parts.map(function(p){
+    var t=String(p.horas==null?'':p.horas).trim().replace(',','.');
+    if(!t) return {nombre:p.nombre};
+    var h=parseFloat(t);
+    if(!(h>0)) throw new Error('Las horas de '+p.nombre+' tienen que ser un número mayor que 0 (o déjalas vacías).');
+    return {nombre:p.nombre, horas:h};
+  });
+  if(B.modo==='finalizar')
+    return {id:B.reunion_id, participantes:parts, resumen:resumen, clave:B.clave};
+  if(!B.fecha || !B.ini || !B.fin) throw new Error('Pon la fecha y la hora de inicio y de fin.');
+  var d=_bloqueDurH_(B.fecha, B.ini, B.fin);
+  if(!(d>0)) throw new Error('La hora de fin tiene que ser posterior a la de inicio.');
+  if(d>_maxHorasParte_()) throw new Error('Un bloque no pasa de '+_maxHorasParte_()+' h.');
+  var o={fecha:B.fecha, ini:B.ini, fin:B.fin, participantes:parts, resumen:resumen, clave:B.clave};
+  if(B.reunion_id!=null){ o.reunion_id=B.reunion_id; o.tarea=B.titulo||undefined; }
+  return o;
+}
+
+/* Lo que contestó el servidor, persona a persona: las líneas que NO nacieron (solape, horas de más) se dicen. */
+function _bloqueResHTML_(resp){
+  var l=(resp && resp.resultados) || [], ok=0;
+  var filas=l.map(function(x){
+    var bien=!x.error;
+    if(bien) ok++;
+    return '<li data-blqr="'+esc(x.nombre||'')+'" style="margin:0 0 5px;color:'+(bien?'var(--ink)':'var(--warn)')+'">'+
+      (bien ? '✓ <b>'+esc(x.nombre||'')+'</b>'+(x.repetido?' · ya estaba':(x.parte&&x.parte.horas!=null?' · '+nf2(x.parte.horas)+' h':''))
+            : '⚠ '+esc(x.error))+'</li>';
+  }).join('');
+  return '<div id="blqRes"><p style="margin:0 0 8px;font-size:13px"><b>'+ok+' de '+l.length+'</b> líneas creadas, pendientes del PD'+
+    (resp && resp.autocierre ? ' (se cerró solo al tope de horas)' : '')+'.</p>'+
+    '<ul style="margin:0 0 12px;padding-left:2px;list-style:none;font-size:12.5px;line-height:1.5">'+filas+'</ul></div>';
+}
+
+/* Los participantes: chips con sus horas opcionales + el autocompletado de siempre (activos, sin tildes). */
+function _bloqueChipsHTML_(){
+  return BLQ.parts.map(function(p){
+    var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===p.nombre; })[0];
+    return '<div data-blqp="'+esc(p.nombre)+'" style="display:flex;gap:7px;align-items:center;margin:0 0 6px">'+
+      '<span style="flex:1;font-size:13px"><b>'+esc((m&&m.pila)||p.nombre)+'</b></span>'+
+      '<input class="mono" data-blqh="'+esc(p.nombre)+'" inputmode="decimal" placeholder="h" value="'+esc(p.horas)+'" '+
+        'style="'+_BLQ_INPUT_+';width:64px;text-align:right">'+
+      '<button type="button" class="btn mini" data-blqx="'+esc(p.nombre)+'" data-p aria-label="Quitar">×</button></div>';
+  }).join('') || '<p style="margin:0 0 8px;font-size:12.5px;color:var(--ink3)">Nadie todavía: escribe un nombre.</p>';
+}
+
+function _bloqueFormHTML_(){
+  var B=BLQ; if(!B) return '';
+  var fin=B.modo==='finalizar';
+  if(B.res)
+    return '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 10px">Parte de bloque enviado</div>'+
+      _bloqueResHTML_(B.res)+'<button class="btn pri" data-blqcerrar data-p>Cerrar</button>';
+  var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
+  return '<div id="blqForm">'+
+    '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 4px">'+(fin?'Finalizar la reunión':'Declarar parte de bloque')+'</div>'+
+    '<p class="rnota" style="margin:0 0 12px">'+(fin
+      ? 'Se crea <b>un parte pendiente por participante</b> con lo que ha durado'+(B.en_curso?' (<b data-crono="'+esc(B.en_curso.ini)+'">'+esc(_cronoTxt_(B.en_curso.ini))+'</b> hasta ahora)':'')+
+        '. Lo decide el PD de una vez.'
+      : 'Varias personas, un mismo horario. Se crea <b>un parte pendiente por participante</b> y lo decide el PD de una vez.')+
+      (B.titulo?' <br><b>'+esc(B.titulo)+'</b>':'')+'</p>'+
+    (fin ? '' :
+      '<div style="display:flex;gap:8px;margin:0 0 12px"><label style="flex:2">'+lab('Fecha')+
+        '<input id="blqFecha" type="date" value="'+esc(B.fecha)+'" style="'+_BLQ_INPUT_+'"></label>'+
+      '<label style="flex:1">'+lab('Desde')+'<input id="blqIni" type="time" value="'+esc(B.ini)+'" style="'+_BLQ_INPUT_+'"></label>'+
+      '<label style="flex:1">'+lab('Hasta')+'<input id="blqFin" type="time" value="'+esc(B.fin)+'" style="'+_BLQ_INPUT_+'"></label></div>')+
+    lab('Participantes · horas opcionales (por defecto, la duración)')+
+    '<div id="blqChips">'+_bloqueChipsHTML_()+'</div>'+
+    '<div style="position:relative;margin:0 0 12px"><input id="blqInv" placeholder="añadir a alguien…" autocomplete="off" style="'+_BLQ_INPUT_+'">'+
+      '<div id="blqSug" style="display:none;position:absolute;left:0;right:0;z-index:5;background:#141111;border:1px solid var(--line);border-radius:8px;margin-top:2px"></div></div>'+
+    '<label style="display:block;margin:0 0 12px">'+lab('Resumen de lo que se hizo · mínimo '+BLQ_MIN_RESUMEN+' caracteres')+
+      '<textarea id="blqResumen" rows="4" style="'+_BLQ_INPUT_+';resize:vertical" placeholder="Qué se trató o se hizo…">'+esc(B.resumen)+'</textarea>'+
+      '<small id="blqCuenta" style="color:var(--ink3)">'+(B.resumen||'').trim().length+' / '+BLQ_MIN_RESUMEN+'</small></label>'+
+    '<div style="display:flex;gap:8px"><button class="btn pri" id="blqEnviar" data-p style="flex:1">'+(fin?'Finalizar y enviar':'Enviar parte')+'</button>'+
+      '<button class="btn" data-blqcerrar data-p>Cancelar</button></div></div>';
+}
+
+/* Engancha el formulario. `cb` = {refrescar(), cerrar(), hecho(resp)} de la cara: repintar el formulario,
+   quitarlo, y refrescar lo que depende de él (la reunión, la cola de partes). */
+function _bloqueCablear_(cb){
+  var B=BLQ; if(!B) return;
+  $$('[data-blqcerrar]').forEach(function(b){ b.onclick=function(){ BLQ=null; cb.cerrar(); }; });
+  if(B.res) return;
+  var chips=function(){ var c=$('#blqChips'); if(c){ c.innerHTML=_bloqueChipsHTML_(); lig(); } };
+  var lig=function(){
+    $$('[data-blqh]').forEach(function(i){ i.oninput=function(){
+      BLQ.parts.forEach(function(p){ if(p.nombre===i.dataset.blqh) p.horas=i.value; }); }; });
+    $$('[data-blqx]').forEach(function(b){ b.onclick=function(){
+      BLQ.parts=BLQ.parts.filter(function(p){ return p.nombre!==b.dataset.blqx; }); chips(); }; });
+  };
+  lig();
+  [['blqFecha','fecha'],['blqIni','ini'],['blqFin','fin']].forEach(function(x){
+    var e=$('#'+x[0]); if(e) e.oninput=function(){ BLQ[x[1]]=e.value; }; });
+  var rs=$('#blqResumen');
+  if(rs) rs.oninput=function(){ BLQ.resumen=rs.value; var c=$('#blqCuenta'); if(c) c.textContent=rs.value.trim().length+' / '+BLQ_MIN_RESUMEN; };
+  var inv=$('#blqInv'), sg=$('#blqSug');
+  if(inv) inv.oninput=function(){
+    var q=_sinTildes_(inv.value.trim());
+    if(!q){ sg.style.display='none'; return; }
+    var ya={}; BLQ.parts.forEach(function(p){ ya[p.nombre]=1; });
+    var hits=_activos_().filter(function(m){ return !ya[m.nombre] && _sinTildes_(m.nombre).indexOf(q)>=0; }).slice(0,6);
+    if(!hits.length){ sg.style.display='none'; return; }
+    sg.innerHTML=hits.map(function(m){ return '<div data-blqs="'+esc(m.nombre)+'" data-p style="padding:8px 10px;cursor:pointer">'+
+      esc(m.nombre)+' <small style="color:var(--ink3)">'+esc(m.cargo||m.unidad||'')+'</small></div>'; }).join('');
+    sg.style.display='';
+    $$('[data-blqs]').forEach(function(d){ d.onclick=function(){
+      BLQ.parts.push({nombre:d.dataset.blqs, horas:''}); inv.value=''; sg.style.display='none'; chips(); }; });
+  };
+  var env=$('#blqEnviar');
+  if(env) env.onclick=async function(){
+    if(env.disabled || B.env) return;
+    var cuerpo;
+    try{ cuerpo=_bloqueCuerpo_(B); }catch(e){ tost(e.message); return; }
+    B.env=true; env.disabled=true; var prev=env.textContent; env.textContent='…';
+    try{
+      var resp=B.modo==='finalizar' ? await api.finalizarReunion(cuerpo) : await api.declararBloque(cuerpo);
+      B.res=resp||{resultados:[]};
+      if(B.modo==='finalizar' && B.reunion) B.reunion.en_curso=null;
+      tost('Parte de bloque enviado: pendiente de aprobar.');
+      if(cb.hecho) cb.hecho(B.res);
+      cb.refrescar();
+    }catch(e){
+      B.env=false; env.disabled=false; env.textContent=prev;
+      tostErr('No se pudo: ', e);
+    }
+  };
+}
+
+/* La ficha de la reunión: Empezar · (cronómetro + Finalizar + Cancelar) · Declarar a mano. `puede` = ¿te toca? */
+function _bloqueReuHTML_(r, puede){
+  if(!r || !puede) return '';
+  var ec=r.en_curso;
+  return '<div id="reuBloque" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)">'+
+    (ec
+      ? '<div style="display:flex;gap:9px;align-items:center;margin:0 0 9px"><span style="color:var(--red2)">●</span>'+
+        '<b>En curso</b><span class="mono" data-crono="'+esc(ec.ini)+'" style="font-size:18px">'+esc(_cronoTxt_(ec.ini))+'</span></div>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-p id="btnFinalizar" style="flex:2">Finalizar</button>'+
+        '<button class="btn" data-p id="btnCancelarCurso" style="flex:1">Cancelar</button></div>'
+      : '<button class="btn pri full" data-p id="btnEmpezar">Empezar la reunión</button>')+
+    '<button class="btn mini full" data-p id="btnDeclararBloque" style="margin-top:8px">Declarar parte de bloque</button>'+
+    '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan el tiempo como un fichaje de todos los participantes; '+
+    'el PD aprueba el parte de una vez.</p></div>';
+}
+
+/* `getR()` da la reunión AHORA (la lista se rehace al refrescar); `abrir()` pinta el formulario. */
+function _bloqueReuCablear_(getR, cb){
+  var on=function(id, f){ var e=$('#'+id); if(e) e.onclick=async function(){ if(e.disabled) return; e.disabled=true;
+    try{ await f(); }catch(x){ tostErr('No se pudo: ', x); } finally{ e.disabled=false; } }; };
+  var base=function(r, modo){
+    var h=new Date(), f=h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate());
+    var inv=(Array.isArray(r.invitados)?r.invitados:[]).filter(function(n){ return !!n; });
+    return {modo:modo, reunion:r, reunion_id:r.id, titulo:r.titulo||'', parts:inv, fecha:f, en_curso:r.en_curso};
+  };
+  on('btnEmpezar', async function(){
+    var r=getR(); if(!r) return;
+    var resp=await api.empezarReunion({id:r.id});
+    r.en_curso=(resp && resp.en_curso) || {ini:new Date().toISOString()};
+    tost('Reunión en marcha: el tiempo cuenta.'); cb.refrescar();
+  });
+  on('btnCancelarCurso', async function(){
+    var r=getR(); if(!r) return;
+    if(!confirm('Cancelar la reunión en curso.\n\nNo se crea ningún parte.\n\n¿Sigo?')) return;
+    await api.cancelarReunionEnCurso({id:r.id});
+    r.en_curso=null; tost('Cancelada: no se ha creado nada.'); cb.refrescar();
+  });
+  on('btnFinalizar', async function(){ var r=getR(); if(!r) return; _bloqueAbrir_(base(r,'finalizar')); cb.abrir(); });
+  on('btnDeclararBloque', async function(){ var r=getR(); if(!r) return; _bloqueAbrir_(base(r,'declarar')); cb.abrir(); });
+}
+
+/* ── La cola del PD: las líneas con el mismo `bloque` salen en UNA tarjeta ─────────────────────────── */
+function _bloqueGrupos_(lista){
+  var orden=[], por={}, sueltas=[];
+  lista.forEach(function(p){
+    if(p.bloque==null || p.bloque===''){ sueltas.push(p); return; }
+    var k=String(p.bloque);
+    if(!por[k]){ por[k]={bloque:k, reunion_id:p.reunion_id, resumen:p.resumen||'', lineas:[]}; orden.push(k); }
+    por[k].lineas.push(p);
+  });
+  return {grupos:orden.map(function(k){ return por[k]; }), sueltas:sueltas};
+}
+
+/* o = {titulo(reunion_id), decide:bool, horas(p), nombre(p)} — `decide` falso: se ve, no se decide (coordinador). */
+function _bloqueColaHTML_(grupos, o){
+  return grupos.map(function(g){
+    var tot=0; g.lineas.forEach(function(p){ tot+=o.horas(p); });
+    var tit=(g.reunion_id!=null && o.titulo(g.reunion_id)) || 'Bloque';
+    return '<div data-bloque-card="'+esc(g.bloque)+'" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 10px">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(tit)+'</b>'+
+        '<span class="mono">'+g.lineas.length+' · '+nf2(tot)+' h</span></div>'+
+      '<p style="margin:6px 0 9px;font-size:12.5px;color:var(--ink2);line-height:1.5">'+esc(g.resumen||'(sin resumen)')+'</p>'+
+      g.lineas.map(function(p){
+        return '<div data-bq-linea="'+esc(p.id)+'" style="margin:0 0 6px"><div style="display:flex;gap:8px;align-items:center">'+
+          '<span style="flex:1;font-size:13px">'+esc(o.nombre(p))+'</span><span class="mono">'+nf2(o.horas(p))+' h</span>'+
+          (o.decide ? '<button type="button" class="btn mini" data-p data-bq-rech="'+esc(p.id)+'">Rechazar</button>' : '')+'</div>'+
+          (o.decide ? '<input data-bq-mot="'+esc(p.id)+'" placeholder="Motivo (8+ caracteres)" style="'+_BLQ_INPUT_+';display:none;margin-top:5px">' : '')+'</div>';
+      }).join('')+
+      (o.decide ? '<button class="btn pri full" data-p data-bq-aprobar="'+esc(g.bloque)+'" style="margin-top:8px">Aprobar bloque</button>'
+                : '<p class="rnota" style="margin:6px 0 0">Los partes de bloque (reuniones) los decide sólo el PD.</p>')+
+      '</div>';
+  }).join('');
+}
+
+/* `cb.decidido(bloque, rechazadas)` quita el bloque de la cola con lo que ya sabemos y la recarga por detrás (leer antes
+   de que el servidor confirme devolvería la foto de antes). Rechazar una línea = marcarla con su motivo; «Aprobar bloque» aprueba las demás. */
+function _bloqueColaCablear_(cb){
+  $$('[data-bq-rech]').forEach(function(b){ b.onclick=function(){
+    var i=document.querySelector('[data-bq-mot="'+b.dataset.bqRech+'"]'); if(!i) return;
+    var on=i.style.display==='none'; i.style.display=on?'':'none'; b.classList.toggle('pri', on);
+    b.textContent=on?'Se rechazará':'Rechazar'; if(on) i.focus(); }; });
+  $$('[data-bq-aprobar]').forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var card=b.closest('[data-bloque-card]'), rech=[];
+    var falta=false;
+    card.querySelectorAll('[data-bq-mot]').forEach(function(i){
+      if(i.style.display==='none') return;
+      var m=i.value.trim();
+      if(m.length<8){ falta=true; i.focus(); return; }
+      rech.push({id:i.getAttribute('data-bq-mot'), motivo:m});
+    });
+    if(falta){ tost('Pon un motivo (al menos 8 caracteres) a cada línea que rechazas.'); return; }
+    if(!confirm('Aprobar este bloque'+(rech.length?' (rechazando '+rech.length+')':'')+'.\n\nLas horas pasan a contar en el mes de cada participante.\n\n¿Sigo?')) return;
+    b.disabled=true; var prev=b.textContent; b.textContent='…';
+    try{
+      var cuerpo={bloque:b.dataset.bqAprobar}; if(rech.length) cuerpo.rechazar=rech;
+      var r=await api.decidirBloque(cuerpo);
+      tost('Bloque aprobado'+(r && r.horas!=null?': '+nf2(r.horas)+' h':'')+(r && r.rechazadas?' · '+r.rechazadas+' rechazada(s)':'')+'.');
+      cb.hecho();
+    }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo: ', e); }
+  }; });
+}

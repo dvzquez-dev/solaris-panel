@@ -26,6 +26,7 @@ function normReu(r){ r=r||{};
     total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null,
     creado:r.creado||null,
     ordenDia:r.ordenDia||"", vision:r.vision||"anonima",
+    en_curso:(r.en_curso && typeof r.en_curso==='object') ? r.en_curso : null,   /* 29/10: la pone `empezarReunion` */
     /* 26/10 (triaje A4d): convocados con el plazo YA VENCIDO — el motor no les sanciona, y `_cobertura_` tampoco */
     invitados_tarde:Array.isArray(r.invitados_tarde) ? r.invitados_tarde.slice() : [],
     /* ⛔⛔ `agregado` SE TIRABA AQUI, y con el la unica señal de que el servidor NO ha

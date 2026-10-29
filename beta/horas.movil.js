@@ -1765,7 +1765,8 @@ function _normPDec_(p){
     aplicado_at:p.aplicado_at||null, motivo:p.motivo||null,   /* 20/10: lo que se pidió, en la ficha de un `detalle` */
     pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya CONTESTADA (el servidor la guarda al responder) */
     estado:p.estado, origen:p.origen||null,
-    corr:p.correcciones||null };   /* 26/10: si su autor corrigió las horas, quien firma lo ve */
+    corr:p.correcciones||null,   /* 26/10: si su autor corrigió las horas, quien firma lo ve */
+    bloque:p.bloque||null, reunion_id:p.reunion_id==null?null:p.reunion_id, resumen:p.resumen||'' };   /* 29/10: el parte de bloque */
 }
 
 /* ⛔ EL PERIODO CERRADO, para no ofrecer un botón que el servidor va a negar. `getCierre`
@@ -1951,9 +1952,50 @@ function _partesDecHTML_(){
       vacio('No se pudo cargar','El servidor no contestó, así que no sé qué partes esperan tu firma. '+
         '<button class="btn mini" data-p data-pdreint>Reintentar</button>','',false)+'</div>';
   }
-  return _pdGrupoHTML_('pdec', 'Esperan tu decisión',
-    'Son horas de tu gente: <b>no cuentan hasta que las firmes</b>. Rechazar o pedir detalle '+
-    'exige un motivo.', PARTES_DEC, _pdFichaHTML_);
+  var _bq=_bloqueGrupos_(PARTES_DEC);
+  return _bloqueTarjetaM_(_bq.grupos)+
+    _pdGrupoHTML_('pdec', 'Esperan tu decisión',
+      'Son horas de tu gente: <b>no cuentan hasta que las firmes</b>. Rechazar o pedir detalle '+
+      'exige un motivo.', _bq.sueltas, _pdFichaHTML_);
+}
+
+/* ═══ EL PARTE DE BLOQUE EN EL MÓVIL (29/10) ═══════════════════════════════════════════════════════
+   La lógica vive en `comun.js` (`_bloque*_`); aquí sólo dónde se pinta: la cola agrupada (UNA tarjeta por
+   `bloque`, con «Aprobar bloque»), el botón de declarar a mano para PD/coordinador, y el modal del formulario.
+   ⛔ Un coordinador VE el bloque pero no lo decide (`decidirBloque` es del PD): sin botones, con la razón. */
+function _bloquePuedeDecidirM_(){
+  var yo=(typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
+  return rangoNom(yo)>=3 || (typeof esAdmin==='function' && esAdmin());
+}
+function _bloqueTarjetaM_(grupos){
+  if(!grupos.length) return '';
+  var dec=_bloquePuedeDecidirM_();
+  return '<div class="tarj" id="pbloq">'+cab('Partes de bloque', grupos.length+(grupos.length===1?' bloque':' bloques'))+
+    _bloqueColaHTML_(grupos, {decide:dec, horas:function(p){ return p.q; }, nombre:function(p){ return p.pila||p.autor; },
+      titulo:function(id){ var r=(REUNIONES_M||[]).filter(function(x){ return String(x.id)===String(id); })[0]; return r&&r.titulo; }})+'</div>';
+}
+/* Declarar un bloque SIN reunión: PD o coordinador (lo que el servidor deja). */
+function _bloqueManualM_(){
+  var yo=(typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
+  if(rangoNom(yo)<1) return '';
+  return '<div class="tarj" id="pbloqman"><button class="btn full" data-p id="btnBloqueManual">Declarar parte de bloque</button>'+
+    '<p class="rnota" style="margin:7px 0 0">Varias personas, un mismo horario: un parte pendiente por cada una.</p></div>';
+}
+var _bloqueCbM_={
+  abrir:function(){ abrirModal(_bloqueFormHTML_()); _bloqueCablear_(_bloqueCbM_); },
+  refrescar:function(){ if(BLQ && $('#modal').classList.contains('on')){ $('#modal-body').innerHTML=_bloqueFormHTML_(); _bloqueCablear_(_bloqueCbM_); } pintar(); },
+  cerrar:function(){ cerrarModal(); pintar(); },
+  hecho:function(){ _cargarPartesDec_().then(pintar); },
+  decidido:function(bq){ PARTES_DEC=PARTES_DEC.filter(function(x){ return String(x.bloque)!==String(bq); }); pintar(); _cargarPartesDec_().then(pintar); }
+};
+function _engBloqueM_(){
+  _bloqueColaCablear_(_bloqueCbM_);
+  var b=$('#btnBloqueManual');
+  if(b) b.onclick=function(){
+    var h=new Date();
+    _bloqueAbrir_({modo:'declarar', fecha:h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate()), parts:[]});
+    _bloqueCbM_.abrir();
+  };
 }
 
 /* ⛔ QUE SE PUEDE REVERTIR, EN UN SOLO SITIO. La lista de estados vive aqui y no repartida
@@ -2258,6 +2300,7 @@ function vHoras(){
      despues. En medio quedaba empujando tus propias horas media pantalla abajo. */
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     _partesDecHTML_()+
+    _bloqueManualM_()+
     '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos · base al día':'aprobadas · otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+

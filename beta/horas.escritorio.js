@@ -170,6 +170,7 @@ function normParte(p){
     periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo */
     motivo:p.motivo||null, pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya contestada */
     corr:p.correcciones||null,   /* 26/10 («Sí, mientras no esté firmado»): las horas las corrigió su autor */
+    bloque:p.bloque||null, reunion_id:p.reunion_id==null?null:p.reunion_id, resumen:p.resumen||'',   /* 29/10: el parte de bloque */
     _real:true };
 }
 
@@ -1454,3 +1455,59 @@ function _engBloqueE_(){
 
 
 
+
+
+/* ═══ EL PARTE DE BLOQUE EN EL ESCRITORIO (29/10) ═════════════════════════════════════════════════════
+   La lógica vive en `comun.js` (`_bloque*_`); aquí sólo dónde se pinta. No hay modal en esta cara: el formulario
+   va DENTRO del panel desde el que se abrió (`BLQ.donde` = la vista), y como vive en `BLQ` sobrevive a `pintar()`.
+   ⛔ `mias`/`otras` ya vienen partidas por `puedeDecidirParte`: un coordinador no decide un bloque (lo decide el PD,
+   `decidirBloque`), así que a él las líneas de bloque le salen SIN botones. */
+var _bloqueCbE_={
+  abrir:function(){ BLQ.donde=vista; pintar(); },
+  refrescar:function(){ pintar(); },
+  cerrar:function(){ pintar(); },
+  hecho:function(){ _cargarPartes_().then(pintar); },
+  decidido:function(bq, rech){
+    var no={}; (rech||[]).forEach(function(x){ no[String(x.id)]=1; });
+    (PART_BACK||[]).forEach(function(x){ if(String(x.bloque)===String(bq) && x.estado==='pendiente') x.estado=no[String(x.id)]?'rechazada':'aprobada'; });
+    _partesReal_(); pintar(); _cargarPartes_().then(pintar);
+  }
+};
+function _bloquePuedeDecidirE_(){ return rangoNom(ACTOR)>=3 || (typeof esAdmin==='function' && esAdmin()); }
+function _bloqueTituloE_(id){
+  var r=(REUS||[]).filter(function(x){ return String(x.id)===String(id); })[0]; return r && (r.titulo||r.tit);
+}
+function _bloqueColaPanelE_(lista){
+  var g=_bloqueGrupos_(lista).grupos;
+  if(!g.length) return '';
+  var dec=_bloquePuedeDecidirE_();
+  return pan('Partes de bloque', g.length+(g.length===1?' bloque':' bloques'),
+    '<div class="pb">'+_bloqueColaHTML_(g, {decide:dec, horas:function(p){ return p.horas; },
+      nombre:function(p){ return _m(p.autor).pila||p.autor; }, titulo:_bloqueTituloE_})+'</div>', 'destaca');
+}
+function _bloqueReuPanelE_(){
+  if(!(REUS||[]).length) return '';
+  var r=REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0];
+  var puede=_puedeBloqueReu_(r, _actorSanc_(), (typeof esAdmin==='function' && esAdmin()));
+  var abierto=!!(BLQ && BLQ.donde===vista);
+  if(!puede && !abierto) return '';
+  return pan('Parte de bloque', r.en_curso?'<span class="chip wa">en curso</span>':esc(r.titulo||r.tit||''),
+    '<div class="pb">'+(abierto?_bloqueFormHTML_():_bloqueReuHTML_(r, puede))+'</div>');
+}
+function _bloqueManualPanelE_(){
+  if(rangoNom(ACTOR)<1) return '';
+  var abierto=!!(BLQ && BLQ.donde===vista);
+  return pan('Declarar parte de bloque','varias personas, un mismo horario',
+    '<div class="pb">'+(abierto?_bloqueFormHTML_():
+      '<button class="btn pri" data-bloqueman>Declarar parte de bloque</button>'+
+      '<p class="mini" style="margin:8px 0 0;color:var(--ink3)">Se crea un parte pendiente por participante; lo decide el PD de una vez.</p>')+'</div>');
+}
+function _engBloqueE_(){
+  _bloqueColaCablear_(_bloqueCbE_);
+  if(BLQ && BLQ.donde===vista) _bloqueCablear_(_bloqueCbE_);
+  _bloqueReuCablear_(function(){ return REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0]; }, _bloqueCbE_);
+  $$('[data-bloqueman]').forEach(function(b){ b.onclick=function(){
+    var h=new Date();
+    _bloqueAbrir_({modo:'declarar', fecha:h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate()), parts:[]});
+    _bloqueCbE_.abrir(); }; });
+}
