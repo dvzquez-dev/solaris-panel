@@ -116,7 +116,7 @@
 <script src="comun.js?v=582e69b"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=471a14e"></script>
-<script src="turnos.escritorio.js?v=d72d3a4"></script>
+<script src="turnos.escritorio.js?v=a6361ee"></script>
 <script src="buzon.escritorio.js?v=a3871ed"></script>
 <script src="documentos.escritorio.js?v=37e0b2e"></script>
 <script src="sanciones.escritorio.js?v=6017df0"></script>
@@ -457,6 +457,8 @@ var api={
   pushParte:    function(p){ return api._post({action:"pushParte",parte:p}); },
   declararParte:function(id,tarea,just,cat,subcat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat,subcat:subcat||null}); },
   setControl:  function(clave,valor,nota){ return api._post({action:"setControl",clave:clave,valor:valor,nota:nota}); },
+  /* 01/11: marcar/desmarcar una semana de la cola de disponibilidad. Lo decide el SERVIDOR (rango 3; una mandada no se quita). */
+  marcarSemanaDisp: function(semana,marcar){ return api._post({action:"marcarSemanaDisp",semana:semana,marcar:!!marcar}); },
   /* ⛔ Lee una clave del KV. El servidor tiene DOS listas blancas: `KV_LEIBLES` (qué claves
      son legibles) y `KV_DEL_PD` (cuáles sin ser admin). De la cara sólo se pide `automatismos`. */
   getDatos:    function(clave){ return api._post({action:"getDatos",clave:clave}); },
@@ -4089,7 +4091,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='249ee8c';
+var BUILD='4f55a4e';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

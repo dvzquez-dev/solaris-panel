@@ -1037,8 +1037,10 @@ function _pinBorradorDisp_(m){
    🗣️ Daniel: *«que semanas quiero que se pida fabricación por adelantado, sin necesidad de ir cada jueves a decidirlo [...]
    y si no quisiera podría haber quitado esa solicitud encolada antes»*. El PD marca/desmarca semanas (por su lunes) en el
    CONTROL `disponibilidad_cola` ({semanas:[{semana_ini, por, at, estado: marcada|enviada, enviada_at}]}); la rutina
-   (`convocar_semana.py`) lanza sola las marcadas el día de su apertura y las apunta `enviada`. Una enviada ya no se toca.
-   ⛔ Al marcar se RELEE el control antes de escribir: la rutina pudo apuntar una `enviada` entre medias y no se pisa. */
+   (`convocar_semana.py`) lanza sola las marcadas el día de su apertura y las apunta `enviada` (en pantalla, «mandada»).
+   ⛔ MARCAR Y DESMARCAR LO DECIDE EL SERVIDOR (`marcarSemanaDisp`, rango 3, `convocar_semana.marcar_semana`): lee el control
+   él mismo, no deja quitar una mandada ni pisa lo que apuntó la rutina, y devuelve la lista entera. La cara no escribe el
+   control (sólo la maqueta `?demo`, que no tiene servidor). */
 var CLAVE_DISP_COLA='disponibilidad_cola';
 var DISP_COLA=null;                    /* {semanas:[…]}, o `null` (no hay / no se leyó) */
 /* Cuándo abre cada semana lo DICE el servidor (`reglas/convocatoria.py`, calculado al servir): llega en el mismo control,
@@ -1046,7 +1048,7 @@ var DISP_COLA=null;                    /* {semanas:[…]}, o `null` (no hay / no
    abre una semana: pinta `txt`. ⛔ Sin él (backend viejo, demo) NO inventa una hora. */
 var CLAVE_DISP_APERT='disponibilidad_cola_aperturas';
 var DISP_APERT=null;
-var COLA_SEMANAS=8;
+var COLA_SEMANAS=10;
 
 function _dispColaVal_(c){
   var e=c && c[CLAVE_DISP_COLA], v=(e && typeof e==='object' && 'valor' in e) ? e.valor : e;
@@ -1084,10 +1086,10 @@ function _colaDispPanel_(){
     if(on && !env) marcadas.push(sem);
     var col=env ? 'var(--ok)' : on ? 'var(--red2)' : 'var(--ink2)';
     chips+='<button class="btn" data-dispcola="'+esc(sem)+'"'+(env?' disabled':'')+' aria-pressed="'+(on?'true':'false')+'" style="'+
-      'min-width:92px;padding:9px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;'+
+      'min-width:112px;padding:9px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;'+
       'color:'+col+';border-color:'+(on ? col : 'var(--line2)')+';background:'+(env ? 'rgba(62,180,137,.08)' : on ? 'rgba(228,30,37,.09)' : 'transparent')+'">'+
-      '<span style="font-size:13px;font-weight:600">'+esc(_dispDM_(sem))+'</span>'+
-      '<span style="font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase">'+(env ? 'enviada' : on ? 'marcada' : 'sin marcar')+'</span></button>';
+      '<span style="font-size:13px;font-weight:600">del '+esc(_dispDM_(sem))+' al '+esc(_dispDM_(_isoMasDias_(sem, 6)))+'</span>'+
+      '<span style="font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase">'+(env ? 'mandada' : on ? 'marcada' : 'sin marcar')+'</span></button>';
   });
   var lineas=marcadas.map(function(sem){
     return '<div style="font-size:12.5px;color:var(--ink2);line-height:1.7">Semana del <b>'+esc(_dispDM_(sem))+'</b> · se pedirá sola '+esc(_colaAbreTxt_(sem))+'</div>';
@@ -1111,18 +1113,23 @@ function _pinColaDisp_(m){
       var sem=b.getAttribute('data-dispcola'), yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ACTOR;
       raiz.querySelectorAll('[data-dispcola]').forEach(function(x){ x.disabled=true; });
       try{
-        var base=DISP_COLA;
-        if(!local){ try{ base=_dispColaVal_(await api.getControl()) || base; }catch(x){ /* sin releer, lo que hay */ } }
-        var m0=_colaMarca_(base, sem);
-        if(m0 && m0.estado==='enviada'){ DISP_COLA=base; tost('Esa semana ya salió.'); pintar(); return; }
-        var lista=((base && base.semanas) || []).filter(function(e){ return e && e.semana_ini!==sem; });
-        if(!m0) lista.push({semana_ini:sem, por:yo, at:_ahoraApp_().slice(0,16), estado:'marcada'});
-        lista.sort(function(a,c){ return a.semana_ini<c.semana_ini ? -1 : 1; });
-        var nueva={semanas:lista};
-        if(!local) await api.setControl(CLAVE_DISP_COLA, nueva, m0 ? 'semana desmarcada' : 'semana marcada por adelantado');
+        var m0=_colaMarca_(DISP_COLA, sem), nueva;
+        if(local){                          /* la maqueta no tiene servidor: sólo ella marca a mano */
+          var lista=((DISP_COLA && DISP_COLA.semanas) || []).filter(function(e){ return e && e.semana_ini!==sem; });
+          if(!m0) lista.push({semana_ini:sem, por:yo, at:_ahoraApp_().slice(0,16), estado:'marcada'});
+          lista.sort(function(a,c){ return a.semana_ini<c.semana_ini ? -1 : 1; });
+          nueva={semanas:lista};
+        }else{
+          var r=await api.marcarSemanaDisp(sem, !m0);
+          nueva={semanas:(r && Array.isArray(r.semanas)) ? r.semanas : []};
+        }
         DISP_COLA=nueva;
         tost(m0 ? 'Quitada: no se pedirá sola.' : 'Marcada: se pedirá sola.');
-      }catch(e){ tostErr('No se pudo guardar: ', e); }
+      }catch(e){
+        tostErr('No se pudo guardar: ', e);
+        /* una mandada o un cambio ajeno: se vuelve a mirar lo que hay para no seguir pintando algo que ya no es verdad */
+        if(!local){ try{ _dispColaDe_(await api.getControl()); }catch(x){ /* sin releer, lo que hay */ } }
+      }
       pintar();
     };
   });
