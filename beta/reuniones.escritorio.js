@@ -939,6 +939,7 @@ function _fijarPanel_(){
       '<button class="btn" data-orden'+(_pf?'':' disabled')+'>Guardar orden del día</button>'+
     '</div>'+
     _convocadosBoxE_(r)+
+    _ordenDiaReuHTML_(r)+
     _audioReuHTML_(r)+
     _asisBoxE_(r)+
     _borrarReuBoxE_(r)+

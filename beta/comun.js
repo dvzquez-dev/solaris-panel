@@ -4042,6 +4042,20 @@ function _esDeMesPasado_(p, periodo){
   return iso.slice(0,7) < per;
 }
 
+/* ⛔ 31/10 (Daniel: «los partes caducados o que no cuentan o que te rechazaron deberían de verse un mes y a partir de ahí
+   desaparecer de la app, porque molestan»): CUÁNTO SE VE UN PARTE QUE NO CUENTA. UNA constante y UNA puerta para las dos caras.
+   Cuenta desde que dejó de contar (decisión, retirada o caducidad); sin ese dato, desde que se creó; y sin eso, desde su fecha.
+   Un parte sin fecha legible SE VE: no saber cuándo fue no es motivo para esconderlo. */
+var DIAS_VISIBLE_SIN_CONTAR = 30;
+function _sigueVisibleSinContar_(p, ahoraMs){
+  var c = [p && p.decidido_at, p && p.retirado_at, p && p.caduca, p && p.creado_at, p && p.iso && (String(p.iso).slice(0, 10) + 'T23:59:59')];
+  for(var i = 0; i < c.length; i++){
+    var t = /^\d{4}-\d{2}-\d{2}/.test(String(c[i] || '')) ? Date.parse(c[i]) : NaN;
+    if(!isNaN(t)) return (ahoraMs - t) <= DIAS_VISIBLE_SIN_CONTAR * 86400000;
+  }
+  return true;
+}
+
 /* ⛔ «ESTE MES» ES «LO QUE NO ES DE UN MES PASADO», Y POR LA MISMA PUERTA QUE LA CIFRA
    GRANDE. Hasta el 13/08 esto comó el mes del **reloj del teléfono** mientras `vHoras`
    —seis líneas más arriba en la misma tarjeta— usaba `equipo_mes.periodo`, o sea el mes
@@ -10014,4 +10028,160 @@ function _asisListaTxt_(v){
   var p=(v&&v.presentes)||{};
   var filas=Object.keys(p).sort(function(a,b){ return p[a]<p[b]?-1:(p[a]>p[b]?1:0); });
   return filas.map(function(n){ return _hhmmDe_(p[n])+'  '+n; }).join('\n');
+}
+
+/* ══ 31/10 · EL ORDEN DEL DÍA DE UNA REUNIÓN, FASE 1: LA TABLA EDITABLE Y EL PDF (las dos caras) ═════════════════
+   🗣️ Daniel (31/10): *«Si tienes un PDF de orden del día, que puedas subirlo y se incruste en la página de la reunión y
+   listo»* · *«una tablita […] de tal hora a tal hora se va a hablar de esto […] quién introduce este punto»*.
+   Backend: `rutinas/orden_dia.py` (`getOrdenDia`, `guardarOrdenDia`, `getOrdenPdf`, `subirOrdenPdf`, `borrarOrdenPdf`).
+   ⛔ Quién edita lo decide el SERVIDOR (`getOrdenDia` → `puede`): esto no copia la regla, la pregunta. Los topes de abajo
+   son los de `orden_dia.py` (el servidor los vuelve a comprobar). Una sola implementación para las dos caras. */
+var ORD_TOPE_FILAS=40, ORD_TOPE_TEMA=200, ORD_TOPE_QUIEN=80;
+var ORD_PDF_MAX=8*1024*1024;              // = `orden_dia.PDF_MAX`
+var ORD={};                               // id -> {e:{filas,por,at,puede,pdf}, draft:[…]|null, visor:url|null, sub:{pct,nombre}|null}
+function _ordSt_(id){ return ORD[id]||(ORD[id]={e:null,draft:null,visor:null,sub:null}); }
+function _ordHoras_(f){ return f.desde ? (f.hasta ? f.desde+' – '+f.hasta : f.desde) : (f.hasta||''); }
+function _ordKB_(n){ return n>=1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
+
+function _ordenDiaReuHTML_(r){
+  if(!r || !r.id) return '';
+  if(!(typeof backendOK!=='undefined' && backendOK && typeof SESION!=='undefined' && SESION)) return '';
+  var st=_ordSt_(r.id);
+  setTimeout(function(){ if(!st.e) _ordenRefrescar_(r.id); else _ordenPintar_(r.id); },0);
+  return '<div data-ordendia="'+esc(r.id)+'">'+(st.e?_ordenHTML_(r.id):'')+'</div>';
+}
+function _ordenHTML_(id){
+  var st=_ordSt_(id), e=st.e; if(!e) return '';
+  var cab='<span class="sc" style="display:block;margin-bottom:4px">Orden del día</span>', cuerpo='';
+  if(st.draft){
+    cuerpo=_ordenEditHTML_(st);
+  } else {
+    if(e.filas&&e.filas.length) cuerpo='<table style="width:100%;border-collapse:collapse;font-size:13px" data-ordtabla>'+
+      e.filas.map(function(f){
+        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px 5px 0;white-space:nowrap;color:var(--ink3);vertical-align:top">'+esc(_ordHoras_(f))+'</td>'+
+          '<td style="padding:5px 8px 5px 0;vertical-align:top">'+esc(f.tema)+'</td>'+
+          '<td style="padding:5px 0;color:var(--ink3);vertical-align:top;text-align:right">'+esc(f.quien||'')+'</td></tr>';
+      }).join('')+'</table>'+(e.por?'<p class="rnota" style="margin:6px 0 0">Editado por '+esc(e.por)+'.</p>':'');
+    else if(!e.pdf) cuerpo='<div class="rnota">Todavía no hay orden del día.</div>';
+    if(e.puede) cuerpo+='<button class="btn mini" style="margin-top:7px" data-ordeditar>✏️ '+(e.filas&&e.filas.length?'Editar la tabla':'Escribir el orden del día')+'</button>';
+  }
+  return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+cab+cuerpo+_ordenPdfHTML_(st)+'</div>';
+}
+function _ordenEditHTML_(st){
+  var nombres=(typeof _activos_==='function'?_activos_():[]).map(function(m){ return m.nombre; });
+  var ls='<datalist id="ordQuienLs">'+nombres.map(function(n){ return '<option value="'+esc(n)+'">'; }).join('')+'</datalist>';
+  var inp='width:100%;box-sizing:border-box;min-width:0';
+  var filas=st.draft.map(function(f,i){
+    return '<div data-ordfila="'+i+'" style="border-top:1px solid var(--line);padding:7px 0">'+
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+
+        '<input type="time" data-ordcampo="desde" value="'+esc(f.desde)+'" aria-label="Desde" style="width:104px">'+
+        '<span>–</span><input type="time" data-ordcampo="hasta" value="'+esc(f.hasta)+'" aria-label="Hasta" style="width:104px">'+
+        '<span style="display:flex;gap:6px;margin-left:auto">'+       // los tres botones envuelven JUNTOS, no uno a uno
+        '<button type="button" class="btn mini" data-ordsubir="'+i+'" aria-label="Subir punto"'+(i?'':' disabled')+'>▲</button>'+
+        '<button type="button" class="btn mini" data-ordbajar="'+i+'" aria-label="Bajar punto"'+(i<st.draft.length-1?'':' disabled')+'>▼</button>'+
+        '<button type="button" class="btn mini" data-ordborrar="'+i+'" aria-label="Quitar punto" style="color:var(--warn);border-color:var(--warn)">✕</button></span></div>'+
+      '<input data-ordcampo="tema" value="'+esc(f.tema)+'" maxlength="'+ORD_TOPE_TEMA+'" placeholder="De qué se habla" style="'+inp+';margin-top:6px">'+
+      '<input data-ordcampo="quien" list="ordQuienLs" value="'+esc(f.quien)+'" maxlength="'+ORD_TOPE_QUIEN+'" placeholder="Quién lo introduce" autocomplete="off" style="'+inp+';margin-top:6px"></div>';
+  }).join('');
+  return ls+(filas||'<div class="rnota">Sin puntos. Añade el primero.</div>')+
+    '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'+
+      '<button type="button" class="btn mini" data-ordanadir'+(st.draft.length>=ORD_TOPE_FILAS?' disabled':'')+'>+ Añadir punto</button>'+
+      '<span style="flex:1"></span><button type="button" class="btn mini" data-ordcancelar>Cancelar</button>'+
+      '<button type="button" class="btn mini pri" data-ordguardar>Guardar</button></div>';
+}
+function _ordenPdfHTML_(st){
+  var e=st.e, sub=st.sub, h='';
+  if(sub) return '<div style="margin-top:10px"><div class="rnota">Subiendo <b>'+esc(sub.nombre)+'</b>… '+sub.pct+' %</div>'+
+    '<div style="height:5px;background:var(--line);border-radius:3px;margin-top:6px"><div style="height:5px;width:'+sub.pct+'%;background:var(--red);border-radius:3px"></div></div></div>';
+  if(e.pdf){
+    h+='<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="rnota" style="flex:1;margin:0">📄 '+esc(e.pdf.nombre||'orden.pdf')+' · '+_ordKB_(e.pdf.bytes||0)+'</span>'+
+      '<button type="button" class="btn mini" data-ordver>'+(st.visor?'Ocultar':'Ver PDF')+'</button>'+
+      (e.puede?'<button type="button" class="btn mini" data-ordquitarpdf style="color:var(--warn);border-color:var(--warn)">Quitar</button>':'')+'</div>';
+    if(st.visor) h+='<iframe src="'+esc(st.visor)+'" title="Orden del día (PDF)" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:6px;margin-top:8px;background:#fff"></iframe>';
+  }
+  if(e.puede) h+='<label class="btn mini" style="display:inline-block;margin-top:8px;cursor:pointer">📄 '+(e.pdf?'Subir otro PDF':'Subir PDF del orden del día')+
+    '<input type="file" accept="application/pdf,.pdf" data-ordpdffile style="display:none"></label>';
+  return h;
+}
+function _ordenPintar_(id){
+  var st=_ordSt_(id);
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ordendia="'+String(id).replace(/"/g,'')+'"]'), function(el){
+    el.innerHTML=_ordenHTML_(id);
+    el.onclick=function(ev){ _ordenClic_(id, ev); };
+    el.oninput=function(ev){
+      var c=ev.target.closest?ev.target.closest('[data-ordcampo]'):null, fi=c&&c.closest('[data-ordfila]');
+      if(c&&fi&&st.draft) st.draft[+fi.getAttribute('data-ordfila')][c.getAttribute('data-ordcampo')]=c.value;
+    };
+    var f=el.querySelector('[data-ordpdffile]');
+    if(f) f.onchange=function(){ if(f.files&&f.files[0]) _ordenSubirPdf_(id, f.files[0]); f.value=''; };
+  });
+}
+async function _ordenRefrescar_(id){
+  var st=_ordSt_(id);
+  try{ st.e=await api.getOrdenDia(id); }catch(_){ st.e={filas:[],puede:false,pdf:null,por:null,at:null}; }
+  if(!st.e.filas) st.e.filas=[];
+  _ordenPintar_(id);
+}
+function _ordenQuitarVisor_(st){ if(st.visor){ try{ URL.revokeObjectURL(st.visor); }catch(_){} st.visor=null; } }
+async function _ordenClic_(id, ev){
+  var st=_ordSt_(id), t=ev.target&&ev.target.closest?ev.target:null; if(!t||!st.e) return;
+  var q=function(a){ return t.closest('['+a+']'); }, n=function(a){ return +q(a).getAttribute(a); };
+  if(q('data-ordeditar')){ st.draft=(st.e.filas||[]).map(function(f){ return {desde:f.desde||'',hasta:f.hasta||'',tema:f.tema||'',quien:f.quien||''}; });
+    if(!st.draft.length) st.draft.push({desde:'',hasta:'',tema:'',quien:''});
+    return _ordenPintar_(id); }
+  if(q('data-ordcancelar')){ st.draft=null; return _ordenPintar_(id); }
+  if(q('data-ordanadir') && st.draft && st.draft.length<ORD_TOPE_FILAS){
+    var ult=st.draft[st.draft.length-1];
+    st.draft.push({desde:ult?ult.hasta:'',hasta:'',tema:'',quien:''}); return _ordenPintar_(id); }
+  if(q('data-ordborrar') && st.draft){ st.draft.splice(n('data-ordborrar'),1); return _ordenPintar_(id); }
+  if(q('data-ordsubir') && st.draft){ var i=n('data-ordsubir'); if(i>0){ st.draft.splice(i-1,0,st.draft.splice(i,1)[0]); } return _ordenPintar_(id); }
+  if(q('data-ordbajar') && st.draft){ var j=n('data-ordbajar'); if(j<st.draft.length-1){ st.draft.splice(j+1,0,st.draft.splice(j,1)[0]); } return _ordenPintar_(id); }
+  if(q('data-ordguardar') && st.draft){
+    var b=q('data-ordguardar'); if(b.disabled) return;
+    /* En blanco = sin tema, sin quién y sin hora de fin: la hora de inicio sola es la que `Añadir punto` ya pone. */
+    var filas=st.draft.filter(function(f){ return f.hasta||String(f.tema).trim()||String(f.quien).trim(); });
+    b.disabled=true;
+    try{
+      var r=await api.guardarOrdenDia(id, filas);
+      st.e.filas=r.filas||filas; st.e.por=(typeof YO!=='undefined'&&YO&&YO.nombre)||st.e.por; st.draft=null;
+      tost('Orden del día guardado.');
+    }catch(e){ b.disabled=false; tostErr('No se pudo guardar: ', e); return; }
+    return _ordenPintar_(id);
+  }
+  if(q('data-ordver')){
+    if(st.visor){ _ordenQuitarVisor_(st); return _ordenPintar_(id); }
+    try{
+      var d=await api.getOrdenPdf(id);
+      if(!d||!d.datos){ tost('Ya no hay PDF.'); return _ordenRefrescar_(id); }
+      var bin=atob(d.datos), u8=new Uint8Array(bin.length); for(var k=0;k<bin.length;k++) u8[k]=bin.charCodeAt(k);
+      st.visor=URL.createObjectURL(new Blob([u8],{type:'application/pdf'}));
+    }catch(e){ tostErr('No se pudo abrir el PDF: ', e); return; }
+    return _ordenPintar_(id);
+  }
+  if(q('data-ordquitarpdf')){
+    if(!window.confirm('¿Quitar el PDF del orden del día?')) return;
+    try{ await api.borrarOrdenPdf(id); _ordenQuitarVisor_(st); tost('PDF quitado.'); }
+    catch(e){ tostErr('No se pudo quitar: ', e); return; }
+    return _ordenRefrescar_(id);
+  }
+}
+async function _ordenSubirPdf_(id, file){
+  var st=_ordSt_(id); if(st.sub) return;
+  if(!/\.pdf$/i.test(file.name)){ tost('Solo se admite un PDF (el fichero debe acabar en .pdf).'); return; }
+  if(!file.size){ tost('Ese fichero está vacío.'); return; }
+  if(file.size>ORD_PDF_MAX){ tost('El PDF pesa '+_ordKB_(file.size)+': el máximo es '+_ordKB_(ORD_PDF_MAX)+'.'); return; }
+  if(!(typeof backendOK!=='undefined' && backendOK && typeof SESION!=='undefined' && SESION)){ tost('Sin conexión no se puede subir el PDF.'); return; }
+  var partes=Math.max(1, Math.ceil(file.size/AUDIO_TROZO)), sesion='';
+  for(var k=0;k<20;k++) sesion+='abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random()*36));
+  st.sub={pct:0,nombre:file.name}; _ordenPintar_(id);
+  try{
+    for(var i=0;i<partes;i++){
+      var datos=await _audioB64_(file.slice(i*AUDIO_TROZO, Math.min(file.size,(i+1)*AUDIO_TROZO)));
+      await api.subirOrdenPdf(id, sesion, i, partes, file.name, datos);
+      st.sub.pct=Math.floor((i+1)*100/partes); _ordenPintar_(id);
+    }
+    _ordenQuitarVisor_(st); tost('PDF subido.');
+  }catch(e){ tostErr('No se pudo subir el PDF: ', e); }
+  st.sub=null;
+  _ordenRefrescar_(id);
 }

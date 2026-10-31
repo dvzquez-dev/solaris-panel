@@ -172,6 +172,7 @@ function normParte(p){
        lee `_selloAprobado_`/`_firmaParte_` (comun.js), la misma puerta que el móvil, y `creado_at`
        viaja porque de él sale A QUÉ MES cuenta. */
     decidido_por:p.decidido_por||null, decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
+    retirado_at:p.retirado_at||null, caduca:p.caduca_at||null,   /* 31/10: de cuándo cuentan los 30 días que se ve un parte que no cuenta */
     periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo */
     motivo:p.motivo||null, pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya contestada */
     corr:p.correcciones||null,   /* 26/10 («Sí, mientras no esté firmado»): las horas las corrigió su autor */
@@ -909,6 +910,21 @@ function _bloqDur_(){
   return Math.round(d/15)/4;                           // a cuartos de hora
 }
 
+/* ⛔ 31/10 (Daniel: «me está obligando a poner fecha de entrada, fecha de salida… no hay opción de que me ponga las horas
+   automáticamente»): un parte que viene de un FICHAJE ya trae fecha, entrada y salida. Al declararlo el formulario las lleva
+   puestas; si las cambias, las horas se RECALCULAN (por `_bloqDur_`, la regla de siempre) y se corrigen en el servidor
+   DESPUÉS de declarar (`corregirParte`, que deja el rastro). La FECHA no se cambia: la fijó el fichaje. */
+function _horaHHMM_(v){ return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v||'').trim()); }
+function _bloqEditado_(decl){
+  var f=BLOQ_FORM;
+  return !!(decl && _horaHHMM_(decl.ini) && _horaHHMM_(decl.fin) && (f.ini!==decl.ini || f.fin!==decl.fin));
+}
+/* Las horas que se van a declarar: las del fichaje mientras no toques la entrada/salida; las recalculadas si las tocas. */
+function _bloqHoras_(){
+  var d=_bloqDecl_();
+  return (d && !_bloqEditado_(d)) ? (Number(d.horas)||0) : _bloqDur_();
+}
+
 /* Los TUYOS que esperan declaracion: un fichaje cerrado sin justificar (`sin_declarar`) o uno
    al que el coordinador le ha pedido detalle (`detalle`).
 
@@ -956,12 +972,15 @@ function _bloqDecl_(){
 function _bloqFalta_(){
   var f=BLOQ_FORM, decl=_bloqDecl_();
   if(f.declararId!=null && !decl) return 'Ese parte ya no espera declaraci\u00f3n';
-  if(!decl){
+  if(!decl || _bloqEditado_(decl)){
     /* ⛔ ESTO VALIDABA SOLO EL FORMATO: `31/02/2026` pasaba, `_dmyAISO_` lo convertía a
        `2026-02-31` y el servidor lo aceptaba —su comprobación es `^\d{4}-\d{2}`—. La
        puerta buena ya existía en `comun.js`: `_fechaDMY_` rechaza además las fechas
        imposibles, porque `new Date(2026,1,31)` **no falla, rueda al mes siguiente**. */
-    if(!_fechaDMY_(f.fecha)) return 'La fecha va como DD/MM/AAAA y tiene que existir';
+    if(!decl && !_fechaDMY_(f.fecha)) return 'La fecha va como DD/MM/AAAA y tiene que existir';
+    /* 31/10: la entrada y la salida son campos de texto (los desplegables no admitían 17:43 de un fichaje): se exige el formato. */
+    if((String(f.ini||'').trim() && !_horaHHMM_(f.ini)) || (String(f.fin||'').trim() && !_horaHHMM_(f.fin)))
+      return 'La hora va como HH:MM (p. ej. 09:30)';
     var d=_bloqDur_(), tope=_maxHorasParte_();
     /* ⛔ CUATRO CAUSAS, CUATRO FRASES. Esto decia «La salida tiene que ser posterior a la
        entrada» para CUALQUIER duracion invalida, incluida la de pasarse del tope: quien lo
@@ -1059,6 +1078,63 @@ function _bloqFirma_(){
   return n ? ((miembro(n)||{}).pila||n) : '';
 }
 
+/* Entrada/salida: texto HH:MM, no `<select>` de cuartos (no admitía 17:43, la hora de un fichaje, y es un control nativo). */
+/* 31/10 (decisión «nada de desplegables nativos»): elegir entre pocas opciones = botones; la elegida, resaltada. */
+function _bloqChips_(attr, sel, ops){
+  return '<span style="display:flex;gap:6px;flex-wrap:wrap">'+ops.map(function(o){
+    return '<button type="button" class="btn sm'+(sel===o[0]?' pri':'')+'" '+attr+'="'+esc(o[0])+'">'+esc(o[1])+'</button>';
+  }).join('')+'</span>';
+}
+function _bloqHoraCampo_(id, rot, v){
+  return '<label style="width:104px"><span class="sc" style="display:block;margin-bottom:5px">'+rot+'</span>'+
+    '<input class="mono" id="'+id+'" value="'+esc(v)+'" placeholder="HH:MM" maxlength="5" inputmode="numeric" style="'+CAMPO_CSS+'"></label>';
+}
+/* El bloque de fecha/entrada/salida de un FICHAJE por declarar: la fecha, fija; la entrada y la salida, editables. */
+function _bloqCamposFichaje_(decl){
+  if(!(_horaHHMM_(decl.ini) && _horaHHMM_(decl.fin))) return '';
+  return '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-top:11px">'+
+    '<div style="width:150px"><span class="sc" style="display:block;margin-bottom:5px">Fecha</span>'+
+      '<div class="mono" style="padding:8px 0">'+esc(BLOQ_FORM.fecha)+'</div></div>'+
+    _bloqHoraCampo_('bqIni','Entrada',BLOQ_FORM.ini)+_bloqHoraCampo_('bqFin','Salida',BLOQ_FORM.fin)+
+    '<div style="flex:1;min-width:150px"><div class="mono" id="bqDur" style="font-size:24px;line-height:1;font-weight:600">'+
+      h1(_bloqHoras_())+'</div><div class="sc" style="margin-top:5px">de trabajo \u00b7 del fichaje</div></div></div>';
+}
+
+/* Los avisos que dependen de fecha/entrada/salida (otro mes, cruza medianoche). Función aparte para repintarlos SIN repintar la
+   pantalla: `pintar()` desde un `onchange` destruye el campo al que acabas de hacer clic y se come el clic (31/10). */
+function _bloqAvisosHTML_(){
+  var f=BLOQ_FORM, decl=_bloqDecl_();
+  /* ⛔ Y SE DICE A QUE MES VA A CONTAR. Daniel (11/08): «tu puedes declarar un bloque horario
+     atrasado de julio en agosto, si… pero eso tendra que entrar al nuevo mes, nunca al
+     anterior». El backend ya lo hace asi -`_periodoParte_` no mira `fecha` y cae en
+     `creado_at`-; lo que faltaba en esta cara es DECIRLO donde se ve. Se pinta de una forma y
+     se contabiliza de otra es como se firma una cosa creyendo otra. */
+  var mes=(typeof _avisoMesDelBloque_==='function') ? _avisoMesDelBloque_(f.fecha, HOY) : '';
+  var avisoMes = (decl || !mes) ? '' :
+    '<div class="nota" style="margin-top:11px">Es de <b>otro mes</b>: estas horas contar\u00e1n en '+
+    '<b>'+esc(_nomPeriodo_(mes))+'</b>, el mes de trabajo en curso. Las de un mes ya cerrado no se pueden mover.</div>';
+
+  /* ⛔ Y SI EL RANGO CRUZA MEDIANOCHE, SE DICE. `_bloqDur_` ya envuelve
+     (`d<0?d+1440`) y no lo dice: quien se equivoca de casilla ve una duracion plausible
+     y la manda a firmar. La banda sale de `_maxHorasParte_()` - ver `_cruceNoche_`.
+     ⚠️ Va aparte de `_bloqFalta_` A PROPOSITO: eso BLOQUEA el envio, y hay turno
+     nocturno real en produccion. Un aviso informa; una validacion rompe un parte legitimo. */
+  var cruce=(typeof _cruceNoche_==='function') ? _cruceNoche_(f.ini, f.fin) : '';
+  var avisoNoche = (decl || !cruce) ? '' : (
+    cruce==='noche'
+      ? '<div class="nota" style="margin-top:11px">Cruza <b>medianoche</b>: se cuentan '+
+        '<b>'+h1(_bloqDur_())+'</b>.</div>'
+      : cruce==='duda'
+      ? '<div class="nota" style="margin-top:11px;color:var(--warn)"><b>¿Seguro?</b> '+
+        'La salida es anterior a la entrada. Si cruzó medianoche son <b>'+h1(_bloqDur_())+
+        '</b>; si te equivocaste de casilla, <b>'+h1(24-_bloqDur_())+'</b>. <b>Las dos '+
+        'caben en un parte</b>, así que esto no se decide solo: míralo antes de firmarlo.</div>'
+      : '<div class="nota" style="margin-top:11px;color:var(--warn)"><b>Parece del '+
+        'revés.</b> Así son <b>'+h1(_bloqDur_())+'</b>, más de lo que un parte admite; '+
+        'al revés serían <b>'+h1(24-_bloqDur_())+'</b>. Cambia entrada por salida si es eso.</div>');
+  return avisoMes+avisoNoche;
+}
+
 function _bloqPanel_(){
   /* Sin backend no se declara, y no se apunta en local: un parte que el servidor no tiene no
      son horas de nadie, y en esta cara la semilla ya ha mentido antes. Misma regla que el
@@ -1088,37 +1164,11 @@ function _bloqPanel_(){
              : (_avisoAutocierre_(p) ? 'autocerrado al tope de '+_maxHorasParte_()+' h' : 'fichaje cerrado sin justificar')+cad)+'</small></span>'+
         '<span class="der"><span class="chip wa">'+(det?'falta detalle':'sin declarar')+'</span>'+
         '<button class="btn sm'+(sel?' pri':'')+'" data-bdecl="'+p.id+'">'+
-          (sel?'rellen\u00e1ndolo':(det?'Responder':'Declarar'))+'</button></span></div>';
+          (sel?'rellen\u00e1ndolo':(det?'Responder':'Declarar'))+'</button>'+
+        /* 31/10: «no puedo eliminar el parte sin declarar». `retirarParte` ya acepta un `sin_declarar`; faltaba el botón. */
+        (det?'':' <button class="btn sm" data-bdesc="'+p.id+'">Descartar</button>')+'</span></div>';
     }).join('')+'</div>';
 
-  /* ⛔ Y SE DICE A QUE MES VA A CONTAR. Daniel (11/08): «tu puedes declarar un bloque horario
-     atrasado de julio en agosto, si… pero eso tendra que entrar al nuevo mes, nunca al
-     anterior». El backend ya lo hace asi -`_periodoParte_` no mira `fecha` y cae en
-     `creado_at`-; lo que faltaba en esta cara es DECIRLO donde se ve. Se pinta de una forma y
-     se contabiliza de otra es como se firma una cosa creyendo otra. */
-  var mes=(typeof _avisoMesDelBloque_==='function') ? _avisoMesDelBloque_(f.fecha, HOY) : '';
-  var avisoMes = (decl || !mes) ? '' :
-    '<div class="nota" style="margin-top:11px">Es de <b>otro mes</b>: estas horas contar\u00e1n en '+
-    '<b>'+esc(_nomPeriodo_(mes))+'</b>, el mes de trabajo en curso. Las de un mes ya cerrado no se pueden mover.</div>';
-
-  /* ⛔ Y SI EL RANGO CRUZA MEDIANOCHE, SE DICE. `_bloqDur_` ya envuelve
-     (`d<0?d+1440`) y no lo dice: quien se equivoca de casilla ve una duracion plausible
-     y la manda a firmar. La banda sale de `_maxHorasParte_()` - ver `_cruceNoche_`.
-     ⚠️ Va aparte de `_bloqFalta_` A PROPOSITO: eso BLOQUEA el envio, y hay turno
-     nocturno real en produccion. Un aviso informa; una validacion rompe un parte legitimo. */
-  var cruce=(typeof _cruceNoche_==='function') ? _cruceNoche_(f.ini, f.fin) : '';
-  var avisoNoche = (decl || !cruce) ? '' : (
-    cruce==='noche'
-      ? '<div class="nota" style="margin-top:11px">Cruza <b>medianoche</b>: se cuentan '+
-        '<b>'+h1(_bloqDur_())+'</b>.</div>'
-      : cruce==='duda'
-      ? '<div class="nota" style="margin-top:11px;color:var(--warn)"><b>¿Seguro?</b> '+
-        'La salida es anterior a la entrada. Si cruzó medianoche son <b>'+h1(_bloqDur_())+
-        '</b>; si te equivocaste de casilla, <b>'+h1(24-_bloqDur_())+'</b>. <b>Las dos '+
-        'caben en un parte</b>, así que esto no se decide solo: míralo antes de firmarlo.</div>'
-      : '<div class="nota" style="margin-top:11px;color:var(--warn)"><b>Parece del '+
-        'revés.</b> Así son <b>'+h1(_bloqDur_())+'</b>, más de lo que un parte admite; '+
-        'al revés serían <b>'+h1(24-_bloqDur_())+'</b>. Cambia entrada por salida si es eso.</div>');
 
   var cab;
   if(decl){
@@ -1126,10 +1176,11 @@ function _bloqPanel_(){
       '<div class="nota" style="border-top:0;padding:0"><b>'+h1(decl.horas)+'</b> del '+
         esc(_isoADMY_(String(decl.fecha||'')))+
         (decl.ini&&decl.fin?' ('+esc(decl.ini)+'\u2013'+esc(decl.fin)+')':'')+
-        ' \u00b7 la <b>duraci\u00f3n ya la fij\u00f3 el servidor</b> al cerrar el fichaje y aqu\u00ed no se toca. '+
+        ' \u00b7 son las horas del fichaje; si no son las que trabajaste, <b>cambia la entrada o la salida</b> y se recalculan. '+
         (decl.estado==='detalle'
           ? 'Te pidieron m\u00e1s detalle: corrige lo que ya mandaste, no empieces de cero.'
           : 'Solo falta decir a qu\u00e9 imputarlas y justificarlas.')+'</div>'+
+      _bloqCamposFichaje_(decl)+
       /* ⛔⛔ 633.ª EL AVISO DE DANIEL (09/09), ENCIMA DEL BOTÓN QUE LO RESUELVE: «si fueron 14 h
          sin querer pero si q trabajaste o algo asi q mejor lo declares como bloque dsps en
          lugar de usar los de 14». Sin él, esta cabecera dice «la duración ya la fijó el
@@ -1154,24 +1205,19 @@ function _bloqPanel_(){
       '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
         '<label style="width:150px"><span class="sc" style="display:block;margin-bottom:5px">Fecha</span>'+
           '<input class="mono" id="bqFecha" value="'+esc(f.fecha)+'" placeholder="DD/MM/AAAA" style="'+CAMPO_CSS+'"></label>'+
-        '<label style="width:128px"><span class="sc" style="display:block;margin-bottom:5px">Entrada</span>'+
-          '<select id="bqIni" style="'+CAMPO_CSS+'">'+optHoras(f.ini)+'</select></label>'+
-        '<label style="width:128px"><span class="sc" style="display:block;margin-bottom:5px">Salida</span>'+
-          '<select id="bqFin" style="'+CAMPO_CSS+'">'+optHoras(f.fin)+'</select></label>'+
+        _bloqHoraCampo_('bqIni','Entrada',f.ini)+_bloqHoraCampo_('bqFin','Salida',f.fin)+
         '<div style="flex:1;min-width:190px">'+
           '<div class="mono" id="bqDur" style="font-size:24px;line-height:1;font-weight:600">'+h1(_bloqDur_())+'</div>'+
           '<div class="sc" style="margin-top:5px">de trabajo declarado \u00b7 sin fichaje</div>'+
         '</div>'+
-      '</div>'+avisoMes+avisoNoche+
+      '</div><div id="bqAvisos">'+_bloqAvisosHTML_()+'</div>'+
     '</div>';
   }
 
   /* ⚠️ TUS tareas, y filtradas por responsable como en el reloj: `getTareas` le sirve al admin
      las de TODO el equipo (v52), asi que sin filtro esta cara ofreceria imputar tus horas a la
      tarea de otra persona. Se reusa `_fichaTareas_`: es la misma pregunta. */
-  var opts=_fichaTareas_().map(function(t){
-    return '<option value="'+esc(t.n)+'"'+(f.tarea===t.n?' selected':'')+'>'+esc(t.n)+'</option>';
-  }).join('');
+  var opts=_fichaTareas_().map(function(t){ return [t.n, t.n]; });
   /* ⛔ POR LA PUERTA DE ARRIBA (581.ª): aqui se montaba a pelo con `ps.length>1` y **sin
      mirar si hay parte**, asi que al declarar uno que ya existe se ofrecia elegir algo que
      no decide nada. Y dentro de esta funcion no habia forma de ejecutarlo en el arnes. */
@@ -1179,13 +1225,9 @@ function _bloqPanel_(){
   var etiDet = f.cat==='reunion' ? 'Nombre de la reuni\u00f3n'
              : f.cat==='turno'   ? 'Qu\u00e9 turno' : 'Concepto';
   var campoImput = f.cat==='tareas'
-    ? '<label style="flex:2;min-width:240px"><span class="sc" style="display:block;margin-bottom:5px">Imputar a</span>'+
-      '<select id="bqTarea" style="'+CAMPO_CSS+'">'+
-        '<option value="">\u2014 elige una de tus tareas \u2014</option>'+opts+
-        '<option value="Trabajo de subsistema"'+(f.tarea==='Trabajo de subsistema'?' selected':'')+
-          '>Trabajo de subsistema \u00b7 '+esc(perf)+'</option>'+
-        '<option value="__otro__"'+(f.tarea==='__otro__'?' selected':'')+'>Otro (lo escribo)</option>'+
-      '</select></label>'+
+    ? '<div style="flex:2;min-width:240px"><span class="sc" style="display:block;margin-bottom:5px">Imputar a</span>'+
+      _bloqChips_('data-bqtar', f.tarea, opts.concat([['Trabajo de subsistema','Trabajo de subsistema \u00b7 '+perf],
+        ['__otro__','Otro (lo escribo)']]))+'</div>'+
       (f.tarea==='__otro__'
         ? '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Cu\u00e1l</span>'+
           '<input id="bqDet" value="'+esc(f.detalle)+'" placeholder="nombre de la tarea" style="'+CAMPO_CSS+'"></label>'
@@ -1228,13 +1270,9 @@ function _bloqPanel_(){
   var form='<div class="pb" style="border-top:1px solid var(--line)">'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
       selPerfil+
-      '<label style="min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">Categor\u00eda</span>'+
-      '<select id="bqCat" style="'+CAMPO_CSS+'">'+
-        '<option value="tareas"'+(f.cat==='tareas'?' selected':'')+'>Tarea</option>'+
-        '<option value="reunion"'+(f.cat==='reunion'?' selected':'')+'>Reuni\u00f3n no convocada</option>'+
-        '<option value="turno"'+(f.cat==='turno'?' selected':'')+'>Turno no convocado</option>'+
-        '<option value="compensacion"'+(f.cat==='compensacion'?' selected':'')+'>Compensaci\u00f3n</option>'+
-      '</select></label>'+
+      '<div style="min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">Categor\u00eda</span>'+
+      _bloqChips_('data-bqcat', f.cat, [['tareas','Tarea'],['reunion','Reuni\u00f3n no convocada'],
+        ['turno','Turno no convocado'],['compensacion','Compensaci\u00f3n']])+'</div>'+
       campoImput+
     '</div>'+
     '<label style="display:block"><span class="sc" style="display:block;margin-bottom:5px">Qu\u00e9 estuviste haciendo</span>'+
@@ -1244,7 +1282,7 @@ function _bloqPanel_(){
       esc(falta||('Todo listo: se env\u00eda a '+(firmaP||'tu coordinador')+'.'))+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:11px">'+
       '<button class="btn pri" id="bqEnviar"'+(falta?' disabled':'')+'>'+
-        (decl?'Declarar este fichaje':'Declarar '+h1(_bloqDur_()))+'</button>'+
+        (decl?('Declarar este fichaje \u00b7 '+h1(_bloqHoras_())):'Declarar '+h1(_bloqDur_()))+'</button>'+
       (firmaP?'<span class="sc">lo firma '+esc(firmaP)+'</span>':'')+
     '</div>'+
     avisoFirma+
@@ -1272,9 +1310,10 @@ function _bloqAviso_(){
   var t=document.getElementById('bqFalta'), b=document.getElementById('bqEnviar');
   var d=document.getElementById('bqDur');
   if(t) t.textContent = falta || ('Todo listo: se env\u00eda a '+(firmaP||'tu coordinador')+'.');
-  if(d) d.textContent = h1(_bloqDur_());
+  if(d) d.textContent = h1(_bloqHoras_());
+  var av=document.getElementById('bqAvisos'); if(av) av.innerHTML=_bloqAvisosHTML_();
   if(b){ b.disabled=!!falta;
-         b.textContent = decl ? 'Declarar este fichaje' : ('Declarar '+h1(_bloqDur_())); }
+         b.textContent = decl ? ('Declarar este fichaje \u00b7 '+h1(_bloqHoras_())) : ('Declarar '+h1(_bloqDur_())); }
 }
 
 /* ⭐ 26/10 · Daniel: «Sí, mientras no esté firmado». TUS partes que nadie ha firmado (`pendiente` o con detalle pedido),
@@ -1322,9 +1361,12 @@ var _ESTADOS_NO_CUENTAN_E_=['rechazado','cad','rev','raro'];
 /* TUS partes que no cuentan, partidos por mes: los de este mes y «De meses anteriores» (los plegados). Por la MISMA
    puerta que el móvil (`_esDeMesPasado_` con `_periodoAbierto_`, que ya lee `periodo`, `creado_at` y `iso`). */
 function _misPartesNoCuentanE_(){
-  var yo=_fichaYo_(), per=_periodoAbierto_();
+  var yo=_fichaYo_(), per=_periodoAbierto_(), ahora=Date.parse(_ahoraApp_());
   var l=(PARTES||[]).filter(function(p){
     return p && yo && p.autor===yo && _ESTADOS_NO_CUENTAN_E_.indexOf(p.estado)>=0;
+  }).filter(function(p){
+    /* 31/10: pasados `DIAS_VISIBLE_SIN_CONTAR` días de dejar de contar, fuera de la lista (el `raro` no: no sabemos qué es). */
+    return p.estado==='raro' || _sigueVisibleSinContar_(p, ahora);
   }).sort(function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); });
   return { mias:l.filter(function(p){ return !_esDeMesPasado_(p, per); }),
            viejas:l.filter(function(p){ return _esDeMesPasado_(p, per); }) };
@@ -1538,6 +1580,31 @@ function _engMisSinFirmarE_(){
   }; });
 }
 
+/* «Descartar» un fichaje sin declarar: va aparte de `_engBloqueE_` para que el cableado del envío (que `probar_curso.py` mide entero) siga
+   siendo SÓLO el del envío. Lo llama `enganchar()`. */
+function _engBloqueDescE_(){
+  /* 31/10: «no puedo eliminar el parte sin declarar». Se pide un toque de confirmación y el servidor sólo lo retira si es tuyo
+     y no está firmado (`retirarParte`): queda en «Tus partes que no cuentan» como retirado. */
+  $$('[data-bdesc]').forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var id=+b.dataset.bdesc;
+    if(!confirm('Descartar este fichaje sin declarar.\n\nNo contar\u00e1 ni llegar\u00e1 a nadie para firmar.\n\n\u00bfSigo?')) return;
+    b.disabled=true;
+    try{
+      await api.retirarParte(id);
+      if(BLOQ_FORM.declararId===id) _bloqSoltar_();
+      tost('Fichaje descartado.'); await _cargarPartes_(); pintar();
+    }catch(e){ tostErr('No se pudo descartar: ', e); b.disabled=false; }
+  }; });
+}
+
+/* Suelta el parte que se estaba declarando y devuelve el formulario a su estado de partida: lo del fichaje (fecha, entrada, salida)
+   no debe colarse en el siguiente bloque a posteriori. */
+function _bloqSoltar_(){
+  BLOQ_FORM.declararId=null; BLOQ_FORM.just=''; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle='';
+  BLOQ_FORM.fecha=HOY; BLOQ_FORM.ini='09:00'; BLOQ_FORM.fin='11:00';
+}
+
 function _engBloqueE_(){
   /* Elegir uno de la lista. ⛔ RESPONDER NO ES EMPEZAR DE CERO: un `sin declarar` viene vacio y
      hay que rellenarlo; uno al que le PIDEN DETALLE ya trae tarea, categoria y justificacion, y
@@ -1553,6 +1620,8 @@ function _engBloqueE_(){
     BLOQ_FORM.tarea='';
     BLOQ_FORM.detalle = det ? (p.tarea||'') : '';
     BLOQ_FORM.just = det ? (p.justificacion||'') : '';
+    /* 31/10: fecha, entrada y salida del fichaje, ya puestas (la fecha ISO del parte pasa a DD/MM/AAAA, como la escribe el formulario). */
+    if(_horaHHMM_(p.ini) && _horaHHMM_(p.fin)){ BLOQ_FORM.fecha=_isoADMY_(String(p.fecha||'')); BLOQ_FORM.ini=p.ini; BLOQ_FORM.fin=p.fin; }
     /* ⛔ La clave del bloque se tira: pertenecia al envio que estabas preparando, y
        `declararParte` no la usa. Arrastrarla haria que el siguiente bloque naciera con la
        clave de otro y el servidor devolviera aquel en vez de crear este. */
@@ -1561,21 +1630,18 @@ function _engBloqueE_(){
   }; });
 
   var bc=document.querySelector('[data-bcancel]');
-  if(bc) bc.onclick=function(){
-    BLOQ_FORM.declararId=null; BLOQ_FORM.just=''; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle='';
-    pintar();
-  };
+  if(bc) bc.onclick=function(){ _bloqSoltar_(); pintar(); };
 
   var bp=document.getElementById('bqPerfil');
   /* `pintar()` y no un repintado del select: al cambiar de perfil cambian TAMBIEN el rotulo de
      «Trabajo de subsistema» y la linea de quien firma. Repintar solo lo que se toco dejaria a
      las otras dos diciendo lo de antes, que es peor que no decir nada. */
   if(bp) bp.onchange=function(){ BLOQ_FORM.perfil=bp.value; pintar(); };
-  var bcat=document.getElementById('bqCat');
-  if(bcat) bcat.onchange=function(){ BLOQ_FORM.cat=bcat.value; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle=''; pintar(); };
-  var bt=document.getElementById('bqTarea');
-  if(bt) bt.onchange=function(){ BLOQ_FORM.tarea=bt.value;
-    if(bt.value==='__otro__'){ BLOQ_FORM.detalle=''; pintar(); } else _bloqAviso_(); };
+  $$('[data-bqcat]').forEach(function(b){ b.onclick=function(){
+    BLOQ_FORM.cat=b.dataset.bqcat; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle=''; pintar(); }; });
+  $$('[data-bqtar]').forEach(function(b){ b.onclick=function(){
+    BLOQ_FORM.tarea=b.dataset.bqtar; if(b.dataset.bqtar==='__otro__') BLOQ_FORM.detalle='';
+    pintar(); }; });
   var bd=document.getElementById('bqDet');
   if(bd) bd.oninput=function(){ BLOQ_FORM.detalle=bd.value; _bloqAviso_(); };
   var bj=document.getElementById('bqJust');
@@ -1583,11 +1649,14 @@ function _engBloqueE_(){
   /* La fecha repinta: de ella depende el aviso de «es de otro mes», que es una frase entera y
      no un rotulo. Los desplegables de hora, no: solo cambian la duracion y el boton. */
   var bfe=document.getElementById('bqFecha');
-  if(bfe) bfe.onchange=function(){ BLOQ_FORM.fecha=bfe.value; pintar(); };
-  var bi=document.getElementById('bqIni');
-  if(bi) bi.onchange=function(){ BLOQ_FORM.ini=bi.value; _bloqAviso_(); };
-  var bfi=document.getElementById('bqFin');
-  if(bfi) bfi.onchange=function(){ BLOQ_FORM.fin=bfi.value; _bloqAviso_(); };
+  if(bfe) bfe.onchange=function(){ BLOQ_FORM.fecha=bfe.value.trim(); _bloqAviso_(); };
+  /* `oninput` recalcula al teclear (rótulo, candado y avisos, SIN repintar la pantalla: se perdería el foco, y el clic en el campo
+     siguiente caía en un campo ya destruido). */
+  [['bqIni','ini'],['bqFin','fin']].forEach(function(x){
+    var el=document.getElementById(x[0]); if(!el) return;
+    el.oninput=function(){ BLOQ_FORM[x[1]]=el.value.trim(); _bloqAviso_(); };
+    el.onchange=function(){ BLOQ_FORM[x[1]]=el.value.trim(); _bloqAviso_(); };
+  });
 
   var be=document.getElementById('bqEnviar');
   if(be) be.onclick=async function(){
@@ -1601,7 +1670,7 @@ function _engBloqueE_(){
     var f=BLOQ_FORM, falta=_bloqFalta_();
     if(falta){ tost(falta+'.'); return; }
     var decl=_bloqDecl_(), imput=_imputacion_(f), perf=_bloqPerfil_()||null;
-    var teclea=_bloqDur_(), firmaP=_bloqFirma_();
+    var teclea=_bloqHoras_(), firmaP=_bloqFirma_(), editado=_bloqEditado_(decl);
     be.disabled=true; var prev=be.textContent; be.textContent='Declarando\u2026';
     try{
       var guardado=null;
@@ -1617,7 +1686,17 @@ function _engBloqueE_(){
           if(i>=0) PART_BACK[i]=upd; else PART_BACK.push(upd);
           _partesReal_();
         }
-        guardado=upd; f.declararId=null;
+        guardado=upd;
+        /* 31/10: cambiaste la entrada o la salida → las horas del parte se corrigen YA declarado (`corregirParte` deja el
+           rastro «corregidas por su autor»). Si falla, el parte ya está declarado con las del fichaje: se dice, no se calla. */
+        if(editado){
+          try{ var cor=await api.corregirParte(decl.id, teclea);
+               if(cor && cor.id!=null && Array.isArray(PART_BACK)){
+                 for(var q=0;q<PART_BACK.length;q++) if(PART_BACK[q] && PART_BACK[q].id===cor.id){ PART_BACK[q]=cor; break; }
+                 _partesReal_(); guardado=cor; }
+          }catch(e2){ tost('Declarado con las horas del fichaje; no se pudieron corregir: '+(e2&&e2.message||e2)); }
+        }
+        f.declararId=null;
       } else {
         /* ⛔ LA CLAVE DE UN SOLO USO NACE FUERA DE `api.pushParte` Y SOBREVIVE AL FALLO.
            `api._post` reintenta hasta tres veces: nacida dentro, cada reintento seria un envio
@@ -1640,6 +1719,7 @@ function _engBloqueE_(){
          lo siguiente igual, en silencio y sin volver a preguntar. Es el fallo exacto que ya
          mordio dos veces en el movil, campo a campo. */
       f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY;
+      if(decl){ f.ini='09:00'; f.fin='11:00'; }   /* lo del fichaje no se arrastra al siguiente bloque */
       /* ⛔ SE CONFIRMA LO GUARDADO, NO LO TECLEADO. El backend recorta al tope y devuelve el
          parte: teclear 20 h guardaba 14 y esto habria cantado «20 declaradas», seis horas
          perdidas con un mensaje en verde. Y si no vuelve el parte, `h` es `null` = «no lo se»,
@@ -1709,7 +1789,11 @@ function _bloqueManualPanelE_(){
       '<button class="btn pri" data-bloqueman>Declarar parte de bloque</button>'+
       '<p class="mini" style="margin:8px 0 0;color:var(--ink3)">Se crea un parte pendiente por participante; lo decide el PD de una vez.</p>')+'</div>');
 }
-function _engBloqueE_(){
+/* ⛔⛔ 31/10 (Daniel: «Le doy clic a declarar. Y no hace nada»): ESTA SE LLAMABA `_engBloqueE_`, IGUAL QUE LA DE «Declarar
+   horas que no fichaste» (arriba). En JS la segunda `function` con el mismo nombre PISA a la primera, así que NINGÚN
+   manejador del formulario se cableaba: ni «Declarar», ni el desplegable de imputar, ni las horas. Pintado y sin cable
+   (el fallo del 15/08). Nombre propio, y `enganchar()` llama a las dos. */
+function _engBloqueParteE_(){
   _bloqueColaCablear_(_bloqueCbE_);
   if(BLQ && BLQ.donde===vista) _bloqueCablear_(_bloqueCbE_);
   _bloqueReuCablear_(_reuSelE_, _bloqueCbE_);

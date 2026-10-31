@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=994f5bd"></script>
+<script src="comun.js?v=76aeccb"></script>
 <script src="notis.movil.js?v=9a87f14"></script>
 <script src="cierre.movil.js?v=2c15573"></script>
 <script src="tareas.movil.js?v=139e6a5"></script>
@@ -121,8 +121,8 @@
 <script src="buzon.movil.js?v=4a205c9"></script>
 <script src="documentos.movil.js?v=82b4c65"></script>
 <script src="sanciones.movil.js?v=d26174c"></script>
-<script src="reuniones.movil.js?v=acc0092"></script>
-<script src="horas.movil.js?v=f60d20f"></script>
+<script src="reuniones.movil.js?v=813a6ef"></script>
+<script src="horas.movil.js?v=90efd54"></script>
 <script src="equipo.movil.js?v=a924514"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -429,6 +429,12 @@ var api={
   estadoAudio:      function(id){ return api._post({action:"estadoAudioReunion",id:id}); },
   subirAudio:       function(id,sesion,parte,partes,nombre,datos){ return api._post({action:"subirAudioReunion",id:id,sesion:sesion,parte:parte,partes:partes,nombre:nombre,datos:datos}); },
   setOrdenDia:      function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); },
+  /* 31/10: el orden del día (`_ordenDiaReuHTML_`, `comun.js`; backend `rutinas/orden_dia.py`): la tabla y el PDF. */
+  getOrdenDia:      function(id){ return api._post({action:"getOrdenDia",id:id}); },
+  guardarOrdenDia:  function(id,filas){ return api._post({action:"guardarOrdenDia",id:id,filas:filas}); },
+  getOrdenPdf:      function(id){ return api._post({action:"getOrdenPdf",id:id}); },
+  borrarOrdenPdf:   function(id){ return api._post({action:"borrarOrdenPdf",id:id}); },
+  subirOrdenPdf:    function(id,sesion,parte,partes,nombre,datos){ return api._post({action:"subirOrdenPdf",id:id,sesion:sesion,parte:parte,partes:partes,nombre:nombre,datos:datos}); },
   /* 817.a: la misma accion, desplegada desde el 24/07. `extra.invitados` lo SUPERPONE el lector a la
      columna `invitados` (`_reuFromRow_`), y solo si trae algo: por eso aqui nunca se manda vacia. */
   setInvitados:     function(id,l){ return api._post({action:"actualizarReunion",id:id,campos:{invitados:l}}); },
@@ -1753,7 +1759,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='08c103d';
+var BUILD='7373244';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

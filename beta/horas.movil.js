@@ -112,7 +112,7 @@ function normPMovil(p){
        (`_selloAprobado_`, comun.js). Sin ellos el sello no da error: dice «no consta» sobre un
        parte que SÍ lo registra. Es la QUINTA vez que este normalizador tira un campo; el caso de
        `probar_origen_parte.py` pasa el parte CRUDO por aquí a propósito. */
-    decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
+    decidido_at:p.decidido_at||null, creado_at:p.creado_at||null, retirado_at:p.retirado_at||null,   /* 31/10: de cuándo cuentan los 30 días visibles */
     periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo (la SEXTA vez) */
     enFicha:(typeof _yaCuentaEnSuMes_==='function') ? _yaCuentaEnSuMes_(p) : null,   /* 20/10: `aplicada` y `aprobada` caen los dos en 'conf'; esto los distingue */
     origen:p.origen||null, caduca:p.caduca_at||null,
@@ -2219,7 +2219,10 @@ function vHoras(){
   var _porFecha=function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); };
   /* ⛔ `rev` entra en ESTA lista -- la del historial -- y NO en la de pendientes: un parte
      revertido se ve, pero no espera nada de nadie. */
-  var _todasMias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad'||x.e==='rev'||x.e==='raro';}).sort(_porFecha);   // en cola / con detalle pedido / rechazados / sin declarar / caducados
+  /* 31/10: lo que NO cuenta (rechazado, caducado, revertido/retirado) se ve `DIAS_VISIBLE_SIN_CONTAR` días y luego desaparece. */
+  var _ahoraMs=Date.parse(_ahoraApp_());
+  var _todasMias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad'||x.e==='rev'||x.e==='raro';}).sort(_porFecha);
+  _todasMias=_todasMias.filter(function(x){ return !(x.e==='rech'||x.e==='cad'||x.e==='rev') || _sigueVisibleSinContar_(x, _ahoraMs); });   // en cola / con detalle pedido / rechazados / sin declarar / caducados
   var confs=PARTES.filter(function(x){return _cuentaYa_(x.e);}).sort(_porFecha);   // aprobadas + otorgadas
   /* ⛔ LOS DE MESES PASADOS, APARTE. Ordenarlos los mandaba al fondo, pero seguían **en la
      misma lista** — y la queja de Daniel era que **aparecen**, no que aparezcan arriba. */

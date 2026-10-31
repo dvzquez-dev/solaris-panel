@@ -113,15 +113,15 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=994f5bd"></script>
+<script src="comun.js?v=76aeccb"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=471a14e"></script>
 <script src="turnos.escritorio.js?v=d63eb29"></script>
 <script src="buzon.escritorio.js?v=a3871ed"></script>
 <script src="documentos.escritorio.js?v=f1eb2c6"></script>
 <script src="sanciones.escritorio.js?v=44cc6f5"></script>
-<script src="reuniones.escritorio.js?v=b991d8d"></script>
-<script src="horas.escritorio.js?v=a937ed6"></script>
+<script src="reuniones.escritorio.js?v=6481582"></script>
+<script src="horas.escritorio.js?v=08f68bc"></script>
 <script src="equipo.escritorio.js?v=9c30d01"></script>
 <script src="directo.escritorio.js?v=d7ffec0"></script>
 <script>
@@ -340,6 +340,12 @@ var api={
   estadoAudio: function(id){ return api._post({action:"estadoAudioReunion",id:id}); },
   subirAudio:  function(id,sesion,parte,partes,nombre,datos){ return api._post({action:"subirAudioReunion",id:id,sesion:sesion,parte:parte,partes:partes,nombre:nombre,datos:datos}); },
   setOrdenDia: function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); },
+  /* 31/10: el orden del día (`_ordenDiaReuHTML_`, `comun.js`; backend `rutinas/orden_dia.py`): la tabla y el PDF. */
+  getOrdenDia:      function(id){ return api._post({action:"getOrdenDia",id:id}); },
+  guardarOrdenDia:  function(id,filas){ return api._post({action:"guardarOrdenDia",id:id,filas:filas}); },
+  getOrdenPdf:      function(id){ return api._post({action:"getOrdenPdf",id:id}); },
+  borrarOrdenPdf:   function(id){ return api._post({action:"borrarOrdenPdf",id:id}); },
+  subirOrdenPdf:    function(id,sesion,parte,partes,nombre,datos){ return api._post({action:"subirOrdenPdf",id:id,sesion:sesion,parte:parte,partes:partes,nombre:nombre,datos:datos}); },
   /* 818.a: GEMELA de la del movil (817.a). Nunca vacia: `extra.invitados` vacio no pisa la columna. */
   setInvitados: function(id,l){ return api._post({action:"actualizarReunion",id:id,campos:{invitados:l}}); },
   responder:   function(id,n,v){ return api._post({action:"responder",id:id,nombre:n,valores:v}); },
@@ -3837,7 +3843,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='cc9570a';
+var BUILD='e937664';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4993,7 +4999,7 @@ function enganchar(){
   _engIrYAcordeones_();
   _engPartes_();
   _engPartesRev_();
-  _engBloqueE_();
+  _engBloqueParteE_();   /* el parte de BLOQUE (29/10); `_engBloqueE_` es el de «Declarar horas que no fichaste» (abajo) */
   _engOtorgar_();
   _engBloqueHoras_();
   _engConvocarTurno_();
@@ -5015,6 +5021,7 @@ function enganchar(){
   _engFicharE_();
   _engMisSinFirmarE_();   /* 26/10: «Retirar» y «Corregir horas» de tus partes */
   _engBloqueE_();
+  _engBloqueDescE_();   /* 31/10: «Descartar» un fichaje sin declarar */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

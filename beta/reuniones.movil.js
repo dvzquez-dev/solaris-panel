@@ -695,6 +695,7 @@ function vReu(){
         '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
         '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
       '</div>':'')+
+    _ordenDiaReuHTML_(R)+
     _audioReuHTML_(R)+
     _bloqueReuHTML_(R, _puedeBloqueReu_(R, (typeof _actorSanc_==='function'?_actorSanc_():(YO&&YO.nombre)), (typeof esAdmin==='function' && esAdmin())))+
     '</div>'+
