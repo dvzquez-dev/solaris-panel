@@ -1029,32 +1029,6 @@ function _horarioPrevPorDia_(prev, ds){
    ⚠️ La lista **llega en el panel** (`DATA.consejo`) y no se copia aquí: dos copias de la misma
    verdad acaban siendo dos verdades. Si el panel no la trae —backend viejo—, se devuelve vacío
    como antes y el convocante los pone a mano: se degrada, no se inventa. */
-/* ⭐ EL SELECTOR DE INVITADOS, UNA SOLA VEZ (817.a). `ids` = {chips, sug, input}; `dame()` devuelve el
-   Set VIGENTE (getter: quien lo usa puede sustituirlo); `alCambiar` se llama tras cada alta o baja;
-   `excluir()` = el nombre que no se ofrece (quien convoca no se invita a si mismo). Devuelve
-   {pintar, sugerir, enganchar}. Antes eran dos closures dentro de `crearModal`. */
-function _selInvM_(ids, dame, alCambiar, excluir){
-  var S={};
-  var cambio=function(){ if(alCambiar) alCambiar(); };
-  S.pintar=function(){ var c=$('#'+ids.chips); if(!c) return; var INV=dame();
-    c.innerHTML=Array.from(INV).map(function(n){
-      var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
-      return '<span class="cchip"><b>'+esc((m&&m.pila)||n)+'</b><button data-n="'+esc(n)+'" data-p>×</button></span>'; }).join('');
-    $$('#'+ids.chips+' button').forEach(function(b){ b.onclick=function(){ dame().delete(b.dataset.n); S.pintar(); cambio(); }; }); };
-  S.sugerir=function(q){ var sg=$('#'+ids.sug); if(!sg) return; q=_sinTildes_((q||'').trim());
-    if(!q){ sg.style.display='none'; return; }
-    var INV=dame(), fuera=excluir ? excluir() : null;
-    var hits=_activos_().filter(function(m){ return m.nombre!==fuera && !INV.has(m.nombre) && _sinTildes_(m.nombre).indexOf(q)>=0; }).slice(0,6);
-    if(!hits.length){ sg.style.display='none'; return; }
-    sg.innerHTML=hits.map(function(m){ return '<div data-n="'+esc(m.nombre)+'" data-p>'+esc(m.nombre)+' <small>'+esc(m.cargo||m.unidad||'')+'</small></div>'; }).join('');
-    sg.style.display='';
-    $$('#'+ids.sug+' div').forEach(function(d){ d.onclick=function(){ dame().add(d.dataset.n); var i=$('#'+ids.input); if(i) i.value=''; sg.style.display='none'; S.pintar(); cambio(); }; }); };
-  S.enganchar=function(){ var inp=$('#'+ids.input); if(!inp) return;
-    inp.oninput=function(){ S.sugerir(inp.value); };
-    inp.onblur=function(){ setTimeout(function(){ var s=$('#'+ids.sug); if(s) s.style.display='none'; },180); }; };
-  return S;
-}
-
 function _presetInvitados_(tipo){
   var yo=(YO&&YO.nombre)||'', ms=_activos_(), out=[];
   if(tipo==='consejo'){
@@ -1101,8 +1075,10 @@ function crearModal(){
       '<option value="telematica">Telemática</option></select></label>'+
     '<div id="ceMixW" style="display:none"><span class="sc" style="display:block;margin-bottom:5px">Subsistemas que participan</span>'+
       '<div class="cmix" id="ceMix">'+subs+'</div></div>'+
-    '<div id="ceInvW"><label class="campo"><span class="sc">Invitar</span><input id="ceInv" placeholder="escribe un nombre…" autocomplete="off"></label>'+
-      '<div class="csug" id="ceSug" style="display:none"></div><div class="cchips" id="ceChips"></div></div>'+
+    '<div id="ceInvW"><span class="sc" style="display:block;margin-bottom:5px">Invitar</span>'+
+      /* El selector de personas ÚNICO (comun.js): el equipo entero menos quien convoca. */
+      elegirPersonas('ceInv', {universo:_activos_().map(function(m){ return m.nombre; }).filter(function(n){ return n!==(YO&&YO.nombre); }),
+        titulo:'Invitados', alCambiar:function(l){ INV=new Set(l); upd(); }})+'</div>'+
     plant+
     '<label class="campo"><span class="sc">Título</span><input id="ceTit" placeholder="Reunión sin título"></label>'+
     '<label class="campo"><span class="sc">Fechas por</span><select id="ceModo"><option value="rango">Desde / hasta</option><option value="dur">Desde + nº de días</option></select></label>'+
@@ -1150,14 +1126,9 @@ function crearModal(){
     return ds.map(function(_,i){ var r=rows[i]; if(!r||r.classList.contains('off')) return [0,0];
       return [hNum(r.querySelector('.dr0').value), hNum(r.querySelector('.dr1').value)]; }); };
   var INV=new Set();
-  /* El selector vive en `_selInvM_` (817.a): la ficha de la reunion lo usa tambien para editar
-     los convocados, y copiarlo seria la segunda implementacion de «elige personas del roster».
-     ⚠️ Se le pasa un GETTER y no el Set: `tipoUpd` hace `INV=new Set(...)` y un Set capturado
-     seguiria apuntando al viejo. */
-  var _selCE=_selInvM_({chips:'ceChips', sug:'ceSug', input:'ceInv'}, function(){ return INV; },
-                       function(){ upd(); }, function(){ return YO&&YO.nombre; });
-  var invRender=_selCE.pintar;
-  var sugRender=_selCE.sugerir;
+  /* El selector es el de `comun.js` (`elegirPersonas`): `INV` es el Set que se manda, y `invRender` le dice al
+     selector lo que `tipoUpd` o los subsistemas marcados han puesto (sin avisar a `alCambiar`: no hay bucle). */
+  var invRender=function(){ elegirPersonasPoner('ceInv', Array.from(INV)); };
   var renderDias=function(){ var ds=_diasLargos_(val('ceModo'), val('ceD0'), val('ceD1'), val('ceFecha')||_dmyAISO_(HOY), Math.max(1,+val('ceND')||1));
     if(!ds.length) ds=dias();
     var prev=$$('#ceDias .drow').map(function(r){
@@ -1222,9 +1193,6 @@ function crearModal(){
     var u=b.dataset.u, on=b.classList.contains('on');
     _activos_().forEach(function(m){ if(m.unidad===u && m.nombre!==(YO&&YO.nombre)){ if(on) INV.add(m.nombre); else INV.delete(m.nombre); } });
     invRender(); upd(); }; });
-  var inp=$('#ceInv');
-  if(inp){ inp.oninput=function(){ sugRender(inp.value); };
-    inp.onblur=function(){ setTimeout(function(){ if($('#ceSug')) $('#ceSug').style.display='none'; },180); }; }
   ['ceModo','ceH0','ceH1','ceSlot','ceDura','ceND','ceD0','ceD1','ceLim','ceLimH'].forEach(function(id){
     var e=$('#'+id); if(e) e.onchange=function(){ if(per()) renderDias(); upd(); }; });
   $('#cePerdia').onchange=function(){ if(per()) renderDias(); upd(); };

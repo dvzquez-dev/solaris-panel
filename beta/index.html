@@ -21,7 +21,7 @@
      ⚠️ Si `--bg` cambia, esto cambia con él: lo vigila `probar_reunion_movil`. -->
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=19adb43">
+<link rel="stylesheet" href="movil.css?v=977654d">
 </head>
 <body>
 
@@ -114,15 +114,15 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=c71a09f"></script>
+<script src="comun.js?v=582e69b"></script>
 <script src="notis.movil.js?v=9a87f14"></script>
 <script src="cierre.movil.js?v=2c15573"></script>
 <script src="tareas.movil.js?v=139e6a5"></script>
-<script src="turnos.movil.js?v=9e3fa23"></script>
+<script src="turnos.movil.js?v=ef720c9"></script>
 <script src="buzon.movil.js?v=4a205c9"></script>
 <script src="documentos.movil.js?v=82b4c65"></script>
-<script src="sanciones.movil.js?v=bd72aeb"></script>
-<script src="reuniones.movil.js?v=813a6ef"></script>
+<script src="sanciones.movil.js?v=45bf2a2"></script>
+<script src="reuniones.movil.js?v=3f36fff"></script>
 <script src="horas.movil.js?v=0276a39"></script>
 <script src="equipo.movil.js?v=a924514"></script>
 <script>
@@ -437,6 +437,10 @@ var api={
   getOrdenDia:      function(id){ return api._post({action:"getOrdenDia",id:id}); },
   guardarOrdenDia:  function(id,filas){ return api._post({action:"guardarOrdenDia",id:id,filas:filas}); },
   getOrdenPdf:      function(id){ return api._post({action:"getOrdenPdf",id:id}); },
+  /* 01/11: copiar el orden de otra reunión, pedírselo a SolarIA y dictarlo (`servidor.py`; ninguna guarda nada). */
+  listarOrdenesDia: function(id){ return api._post({action:"listarOrdenesDia",id:id}); },
+  proponerOrdenDia: function(id,filas,texto,base){ return api._post({action:"proponerOrdenDia",id:id,filas:filas,texto:texto,base:base||undefined}); },
+  transcribirVoz:   function(id,ext,datos){ return api._post({action:"transcribirVoz",id:id,ext:ext,datos:datos}); },
   borrarOrdenPdf:   function(id){ return api._post({action:"borrarOrdenPdf",id:id}); },
   subirOrdenPdf:    function(id,sesion,parte,partes,nombre,datos){ return api._post({action:"subirOrdenPdf",id:id,sesion:sesion,parte:parte,partes:partes,nombre:nombre,datos:datos}); },
   /* 817.a: la misma accion, desplegada desde el 24/07. `extra.invitados` lo SUPERPONE el lector a la
@@ -1362,7 +1366,7 @@ function yoNombre(){
    motivo y la fecha: al cambiar el motivo se repinta el modal y la persona elegida volvia
    al primero de la lista -«me cambia a Aarón por la puta cara»-. Un formulario que se
    borra solo no es un fallo de pintado: es que el estado estaba en el DOM. */
-var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
+var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:''};
 var RRI_MOTIVOS=[
   ['30i','Faltar a un turno de trabajo sin justificar', -1],
   /* ⛔ LA CLAVE **ES** EL ARTÍCULO QUE SE ENVÍA (`var art=mot`), y `gradiente.familia_de`
@@ -1772,7 +1776,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='cea6522';
+var BUILD='566e79e';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2437,11 +2441,10 @@ function _engReuniones_(){
     var SEL=new Set(_invitadosVivos_(base));   /* 22/10 (refutador 23, 🟡 4): guardar no reescribe bajas */
     abrirModal('<div class="mtit">Convocados</div>'+
       '<div class="msub">Añade o quita gente de «'+esc(R2.titulo)+'». Quien ya marcó disponibilidad la conserva.</div>'+
-      '<label class="campo"><span class="sc">Añadir</span><input id="eiInv" placeholder="escribe un nombre…" autocomplete="off"></label>'+
-      '<div class="csug" id="eiSug" style="display:none"></div><div class="cchips" id="eiChips"></div>'+
+      /* El selector de personas ÚNICO (comun.js): el equipo entero, con los convocados ya marcados. */
+      elegirPersonas('eiInv', {universo:_activos_().map(function(m){ return m.nombre; }), marcadas:Array.from(SEL), titulo:'Convocados',
+        alCambiar:function(l){ SEL=new Set(l); }})+
       '<button class="btn pri full" data-p id="btnEIok" style="margin-top:10px">Guardar</button>');
-    var sel=_selInvM_({chips:'eiChips', sug:'eiSug', input:'eiInv'}, function(){ return SEL; }, null, null);
-    sel.pintar(); sel.enganchar();
     $('#btnEIok').onclick=async function(){
       var lista=Array.from(SEL);
       if(!lista.length){ tost('Una reunión necesita al menos una persona convocada.'); return; }

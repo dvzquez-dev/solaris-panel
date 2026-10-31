@@ -771,7 +771,7 @@ function vTurnos(){
 /* ═══ PROGRAMAR UN TURNO DESDE EL MÓVIL (01/11/2026) ═══════════════════════════════════════
    🗣️ Daniel: «implementar en la versión móvil alguna cosa para poder poner los turnos desde el teléfono».
    Es la hoja del `convocarPanel` del escritorio, con el dedo en mente: día (`nxFecha`), hora y duración
-   (`nxHora`, `nxNum`), lugar en chips (`nxElige`), quién (`_selInvM_`, el mismo selector que las reuniones) y,
+   (`nxHora`, `nxNum`), lugar en chips (`nxElige`), quién (`elegirPersonas`, el selector único de la app) y,
    para cada uno, sus cargos y el coche. Ni un desplegable, casilla ni fecha nativos.
    ⛔ NO HAY LÓGICA PROPIA: quién puede (`_puedeProgramarTurno_`), el cuerpo (`_armarTurno_`) y el motivo de que no
    se pueda (`_porQueNoSeProgramaTurno_`) son de `comun.js` y el escritorio llama a las mismas. Lo que no cabe en
@@ -835,21 +835,18 @@ function progTurnoAbrir(){
     '<label class="campo" style="margin-top:12px"><span class="sc">Dónde se queda</span><input id="ptPunto" placeholder="enfrente del politécnico"></label>'+
     '<div class="nt-fila"><button type="button" class="pick" id="ptCrucial">Crucial</button></div>'+
     lab('Quién va')+
-    '<label class="campo" style="margin-bottom:6px"><input id="ptInv" placeholder="escribe un nombre…" autocomplete="off"></label>'+
-    '<div class="csug" id="ptSug" style="display:none"></div><div class="cchips" id="ptChips"></div>'+
+    elegirPersonas('ptQuien', {universo:_activos_().map(function(m){ return m.nombre; }), titulo:'Quién va al turno',
+      alCambiar:function(l){
+        Object.keys(PROG_T.sel).forEach(function(n){ if(l.indexOf(n) < 0) _progQuitar_(n); });
+        l.forEach(function(n){ if(!PROG_T.sel[n]) PROG_T.sel[n] = {rol:'', coche:false}; });
+        _progPintar_(); }})+
     '<div id="ptReparto"></div>'+
     '<label class="campo" style="margin-top:12px"><span class="sc">Objetivos principales · uno por línea</span><textarea id="ptObj1" rows="3"></textarea></label>'+
     '<label class="campo"><span class="sc">Objetivos secundarios · si sobra tiempo</span><textarea id="ptObj2" rows="2"></textarea></label>'+
     '<label class="campo"><span class="sc">Aviso para los convocados</span><input id="ptNota" placeholder="traed guantes y mascarilla"></label>'+
     '<p class="rnota" id="ptMotivo" style="color:var(--ink2)"></p>'+
     '<button class="btn pri full" data-p id="ptOK" disabled>Convocar el turno</button>');
-  /* el selector guarda un Set de nombres; el reparto con cargos vive en PROG_T.sel */
-  var INV = new Set();
-  var sel = _selInvM_({chips:'ptChips', sug:'ptSug', input:'ptInv'}, function(){ return INV; }, function(){
-    Object.keys(PROG_T.sel).forEach(function(n){ if(!INV.has(n)) _progQuitar_(n); });
-    INV.forEach(function(n){ if(!PROG_T.sel[n]) PROG_T.sel[n] = {rol:'', coche:false}; });
-    _progPintar_(); }, function(){ return null; });
-  sel.enganchar();
+  /* el selector (`ptQuien`) dice quién va; el reparto con cargos vive en PROG_T.sel */
   $('#ptCrucial').onclick = function(){ this.classList.toggle('on'); };
   ['ptFecha','ptHora','ptDur','ptLugar'].forEach(function(id){ $('#'+id).addEventListener('change', _progPintar_); });
   $('#ptOK').onclick = async function(){

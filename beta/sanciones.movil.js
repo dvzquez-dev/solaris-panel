@@ -89,7 +89,6 @@ function _sancionesHTML_(){
   /* La lista sale de la MISMA regla que el permiso. Ofrecer a alguien y que luego el envio
      falle es peor que no ofrecerlo: parece un fallo cuando es la norma. Y uno mismo SI esta,
      en los tres rangos, que es parte del modelo. */
-  var grupos=_gruposSanc_(_actorSanc_(), SANC_FORM.filtro);
   var nTotal=sancionablesPor(_actorSanc_()).length;
   var esPlazo=(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg');
   /* LAS TAREAS DEL SANCIONADO, no las mias -antes se ofrecian las propias y por eso no se
@@ -119,13 +118,18 @@ function _sancionesHTML_(){
     /* A cuánta gente puedes sancionar, como el `pan(...)` del escritorio (ficha del 20/08: `nTotal` se
        calculaba aquí y no se pintaba nunca). */
     '<h4>Poner una sanción <span class="sc">· '+nTotal+(nTotal===1?' persona':' personas')+' bajo tu jurisdicción</span></h4><div class="tarj">'+
-      /* BUSCADOR, no desplegable. Con 40 personas un `<select>` es una lista que hay que
-         recorrer con el pulgar; aquí se escriben tres letras. Filtra por nombre, pila o
-         subsistema, y SIN TILDES: «aaron» encuentra a «Aarón». */
-      '<label class="campo"><span class="sc">A quién</span>'+
-        '<input id="snFiltro" placeholder="Escribe para filtrar · nombre o subsistema" '+
-        'value="'+esc(SANC_FORM.filtro||'')+'" autocomplete="off"></label>'+
-      '<div class="sanlista" id="snLista">'+_listaSancHTML_(grupos)+'</div>'+
+      /* El selector de personas ÚNICO: se escribe y salen los nombres; «Ver lista» enseña a todos los que alcanzas, por
+         unidad. El universo sale de la MISMA regla que el permiso (`personasDeAlcance`), no de otra copia. */
+      '<span class="sc" style="display:block;margin-bottom:5px">A quién</span>'+
+      elegirPersonas('snQuien', {universo:personasDeAlcance(_actorSanc_()), multi:false, titulo:'A quién sancionar',
+        marcadas:SANC_FORM.quien?[SANC_FORM.quien]:[], vacio:nTotal ? 'Escribe un nombre o pulsa «Ver lista».' : 'No hay nadie bajo tu jurisdicción todavía.',
+        alCambiar:function(l){
+          SANC_FORM.quien=l[0]||'';
+          _quienCambiaSanc_();   /* 26/10 (A5b): con el 30g, los puntos son los del historial de ESTA persona */
+          var m=$('#snMsg'); if(m && SANC_FORM.quien){ m.textContent='A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'; m.style.color='var(--ink3)'; }
+          /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS, asi que hay que repintar. */
+          if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarSancM_(); }
+        }})+
       '<label class="campo"><span class="sc">Motivo</span><select id="snMotivo">'+
         '<option value="">— elige —</option>'+
         RRI_MOTIVOS.map(function(r){ return '<option value="'+r[0]+'"'+(SANC_FORM.motivo===r[0]?' selected':'')+'>'+esc(r[1])+'</option>'; }).join('')+
@@ -271,35 +275,6 @@ function _cablearSanciones_(){
   /* ⛔ Y NO HAY `recoger`/`repintar` LOCALES: se llama a `_repintarSancM_` por su nombre en
      cada sitio, que es lo unico que hace visible que la puerta es UNA. */
 
-  /* Elegir persona NO repinta el formulario: solo se marca en la lista. Repintar por esto
-     seria volver a tirar lo escrito, que es el fallo que se acaba de arreglar. */
-  $$('[data-sanq]').forEach(function(b){
-    b.onclick=function(){
-      SANC_FORM.quien=b.dataset.sanq;
-      $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
-      _quienCambiaSanc_();   /* 26/10 (A5b): con el 30g, los puntos son los del historial de ESTA persona */
-      var m=$('#snMsg'); if(m){ m.textContent='A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'; m.style.color='var(--ink3)'; }
-      /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS, asi que hay que
-         repintar. En los demas motivos no se repinta: seria tirar lo escrito por nada. */
-      if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarSancM_(); }
-    };
-  });
-  /* Teclear rehace SOLO la lista, no el formulario. Y no pierde el foco ni el cursor. */
-  var fi=$('#snFiltro');
-  if(fi) fi.oninput=function(){
-    SANC_FORM.filtro=fi.value;
-    var c=$('#snLista'); if(!c) return;
-    c.innerHTML=_listaSancHTML_(_gruposSanc_(_actorSanc_(), SANC_FORM.filtro));
-    $$('[data-sanq]',c).forEach(function(b){
-      b.onclick=function(){
-        SANC_FORM.quien=b.dataset.sanq;
-        $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
-        _quienCambiaSanc_();   /* 26/10 (A5b) */
-        if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarSancM_(); }
-      };
-    });
-  };
-
   /* El motivo decide QUE MAS se pide, asi que al cambiarlo hay que repintar. Pero se recoge
      todo antes, y `_sancionesHTML_` vuelve a pintar lo elegido. */
   var mo=$('#snMotivo');
@@ -397,7 +372,7 @@ function _cablearSanciones_(){
          MANDÓ»—, y aquí además tapa el caso en que la persona cambió el destinatario
          tras un error. No es un error: se dice, y se sigue. */
       var _yaEstaba = !!(r && r.duplicadas && r.duplicadas.length);
-      SANC_M=null; SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
+      SANC_M=null; SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:''};
       tost((_yaEstaba ? 'Esa sanción YA estaba puesta (era un reintento): a '
                       : 'Sanción puesta a ')+(_pilaDeM_(quien)||quien)+'.'+(_yaEstaba ? '' : ' Se aplica en Notion y se avisa en Discord en unos minutos.')+(esDePlazo?' Plazo movido en Notion.':''));
       _abrirSanciones_();

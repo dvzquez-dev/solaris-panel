@@ -139,7 +139,6 @@ function convocarReunionPanel(){
   var subs={}; _activos_().forEach(function(m){ if(m.unidad) subs[m.unidad]=1; });
   var chipsSub=Object.keys(subs).sort().map(function(u){
     return '<button type="button" class="pick" data-csub="'+esc(u)+'">'+esc(u)+'</button>'; }).join('');
-  var chips=_poolPicksE_(CONV_INV, 'data-cinv');
   return pan('Convocar reunión','sale el mapa de disponibilidad',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
@@ -157,7 +156,9 @@ function convocarReunionPanel(){
     lab('Subsistemas · marca uno y entra su gente')+
     '<div class="chips" style="margin:0 0 8px">'+chipsSub+'</div>'+
     lab('Convocados <b id="cvN">'+CONV_INV.size+'</b>')+
-    '<div class="chips" id="cvPool" style="margin:0 0 12px">'+chips+'</div>'+
+    /* El selector de personas ÚNICO (comun.js): el equipo entero menos quien convoca. */
+    elegirPersonas('cvInv', {universo:_activos_().map(function(m){ return m.nombre; }).filter(function(n){ return n!==ACTOR; }),
+      marcadas:Array.from(CONV_INV), titulo:'Convocados'})+
     '<div style="display:flex;gap:9px 18px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
       '<div>'+lab('Desde')+nxFecha('cvD0', iso(hoy), {min:iso(hoy)})+'</div>'+
       '<div>'+lab('Hasta')+nxFecha('cvD1', mas(hoy,6), {min:iso(hoy)})+'</div>'+
@@ -221,9 +222,9 @@ function _cablearConvocar_(){
       return [_horasHM_(c.h0||val('cvH0')), _horasHM_(c.h1||val('cvH1'))];
     });
   };
+  elegirPersonasAlCambiar('cvInv', function(l){ CONV_INV=new Set(l); var n=$('#cvN'); if(n) n.textContent=CONV_INV.size; upd(); });
   function pintaChips(){
-    $$('#cvPool [data-cinv]').forEach(function(b){
-      b.classList.toggle('on', CONV_INV.has(b.dataset.cinv)); });
+    elegirPersonasPoner('cvInv', Array.from(CONV_INV));
     var n=$('#cvN'); if(n) n.textContent=CONV_INV.size;
   }
   function upd(){
@@ -347,11 +348,6 @@ function _cablearConvocar_(){
         if(on) CONV_INV.add(m.nombre); else CONV_INV.delete(m.nombre); } });
       pintaChips(); upd();
     };
-  });
-  $$('#cvPool [data-cinv]').forEach(function(b){
-    b.onclick=function(){ var n=b.dataset.cinv;
-      if(CONV_INV.has(n)) CONV_INV.delete(n); else CONV_INV.add(n);
-      pintaChips(); upd(); };
   });
   /* ⛔ LA VISIÓN ELEGIDA VIVE EN EL DOM, no en un global. `CONV_INV` y `CONV_HOR` son
      globales porque hay que CONSERVARLOS al repintar el panel; esto no: el botón con
@@ -816,16 +812,6 @@ function _borrarReuBoxE_(r){
       ' <b>No se puede deshacer.</b></div></div>';
 }
 
-/* ⭐ LA CUADRÍCULA DE PERSONAS, UNA SOLA VEZ (818.a): un botón `pick` por persona activa, ordenado por
-   nombre de pila, encendido si está en `set`. `attr` = el atributo que lleva el nombre (`data-cinv` al
-   convocar, `data-einv` al editar los convocados). Antes vivía dentro de `convocarReunionPanel`. */
-function _poolPicksE_(set, attr){
-  return _activos_().slice().sort(function(a,b){ return String(a.pila).localeCompare(String(b.pila)); })
-    .map(function(m){
-      return '<button type="button" class="pick'+(set.has(m.nombre)?' on':'')+'" '+attr+'="'+esc(m.nombre)+'">'+
-        esc(m.pila)+'</button>'; }).join('');
-}
-
 /* ⭐ EDITAR LOS CONVOCADOS (818.a; el móvil es la 817.a). Mismas reglas, escritas en
    `docs/decisiones-app.md`: sólo quien convoca o un admin (`_puedeBorrarReuE_`), se parte de
    `r.invitados` TAL COMO LO SIRVE el backend, y sin esa lista no se ofrece — guardar desde una lista
@@ -840,7 +826,8 @@ function _convocadosBoxE_(r){
   if(RE_INV_ID!==r.id || !RE_INV){ RE_INV=new Set(_invitadosVivos_(inv)); RE_INV_ID=r.id; }
   return '<div style="margin-top:16px">'+
     '<span class="sc" style="display:block;margin-bottom:5px">Convocados <b id="reInvN">'+RE_INV.size+'</b></span>'+
-    '<div id="reInvPool" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px">'+_poolPicksE_(RE_INV, 'data-einv')+'</div>'+
+    elegirPersonas('reInv', {universo:_activos_().map(function(m){ return m.nombre; }), marcadas:Array.from(RE_INV), titulo:'Convocados',
+      alCambiar:function(l){ RE_INV=new Set(l); var c=$('#reInvN'); if(c) c.textContent=RE_INV.size; }})+
     '<button class="btn" data-guardarinv>Guardar convocados</button></div>';
 }
 

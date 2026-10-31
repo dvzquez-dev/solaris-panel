@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=72f910a">
+<link rel="stylesheet" href="escritorio.css?v=46455f2">
 </head>
 <body>
 
@@ -113,17 +113,17 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=c71a09f"></script>
+<script src="comun.js?v=582e69b"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=471a14e"></script>
 <script src="turnos.escritorio.js?v=d72d3a4"></script>
 <script src="buzon.escritorio.js?v=a3871ed"></script>
 <script src="documentos.escritorio.js?v=37e0b2e"></script>
-<script src="sanciones.escritorio.js?v=6a500ac"></script>
-<script src="reuniones.escritorio.js?v=344cdd5"></script>
-<script src="horas.escritorio.js?v=7341571"></script>
+<script src="sanciones.escritorio.js?v=6017df0"></script>
+<script src="reuniones.escritorio.js?v=63aa9dd"></script>
+<script src="horas.escritorio.js?v=d930f5e"></script>
 <script src="equipo.escritorio.js?v=a56e62b"></script>
-<script src="directo.escritorio.js?v=74620c4"></script>
+<script src="directo.escritorio.js?v=90ebc8f"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -347,6 +347,10 @@ var api={
   getOrdenDia:      function(id){ return api._post({action:"getOrdenDia",id:id}); },
   guardarOrdenDia:  function(id,filas){ return api._post({action:"guardarOrdenDia",id:id,filas:filas}); },
   getOrdenPdf:      function(id){ return api._post({action:"getOrdenPdf",id:id}); },
+  /* 01/11: copiar el orden de otra reunión, pedírselo a SolarIA y dictarlo (`servidor.py`; ninguna guarda nada). */
+  listarOrdenesDia: function(id){ return api._post({action:"listarOrdenesDia",id:id}); },
+  proponerOrdenDia: function(id,filas,texto,base){ return api._post({action:"proponerOrdenDia",id:id,filas:filas,texto:texto,base:base||undefined}); },
+  transcribirVoz:   function(id,ext,datos){ return api._post({action:"transcribirVoz",id:id,ext:ext,datos:datos}); },
   borrarOrdenPdf:   function(id){ return api._post({action:"borrarOrdenPdf",id:id}); },
   subirOrdenPdf:    function(id,sesion,parte,partes,nombre,datos){ return api._post({action:"subirOrdenPdf",id:id,sesion:sesion,parte:parte,partes:partes,nombre:nombre,datos:datos}); },
   /* 818.a: GEMELA de la del movil (817.a). Nunca vacia: `extra.invitados` vacio no pisa la columna. */
@@ -1006,7 +1010,9 @@ var V={};
    Todo lo que pasa en la app, animado: las funciones en `directo.escritorio.js`, el estado aquí (los módulos sólo
    declaran funciones). `DIRECTO_MAX`: lo que se guarda y lo que corre en el registro. ─────── */
 var DIRECTO_MAX=60, DIRECTO_CADA_MS=5000, DIRECTO_TODO_CADA_MS=2500, DIRECTO_TODO_MAX=200;
-var DIRECTO={eventos:[], cursor:null, cuenta:{}, vistos:{}, reloj:null, demo:0, err:null, enVuelo:false, tab:'mapa',
+/* 01/11: sonidos — su interruptor (por dispositivo) y el tope de sonidos por segundo. */
+var DIRECTO_SND_LS='solaris_directo_sonido', DIRECTO_SONIDOS_S=4;
+var DIRECTO={sonados:[], eventos:[], cursor:null, cuenta:{}, vistos:{}, reloj:null, demo:0, err:null, enVuelo:false, tab:'mapa',
   todo:{lineas:[], vistos:{}, cursor:null, cont:null, timers:[], sesgo:0, err:null, enVuelo:false, reloj:null, n:0}};
 /* 01/11: «Mandar aviso» (push a mano), sólo el PD. El formulario es de `comun.js`; esta cara lo pinta como vista (no hay modales). */
 V.aviso={g:'Operación',t:'Mandar aviso',f:function(){ return _puedeMandarAviso_() ? _avisoHTML_('btn sm') : '<div class="mtit">Mandar aviso</div><p class="rnota" data-est="nopuede">Solo para el director.</p>'; }};
@@ -1236,8 +1242,8 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
       'Cuentan igual y al miembro le salen como <b>otorgadas</b>.</p>'+
       '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
         '<div style="flex-basis:100%"><span class="sc" style="display:block;margin-bottom:5px">A quién</span>'+
-        nxElige('otNombre', _activos_().filter(function(m){ return m.nombre!==ACTOR &&
-          puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, ACTOR); }).map(function(m){ return [m.nombre, m.nombre]; }), '')+'</div>'+
+        elegirPersonas('otNombre', {universo:_activos_().filter(function(m){ return m.nombre!==ACTOR &&
+          puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, ACTOR); }).map(function(m){ return m.nombre; }), multi:false, titulo:'A quién otorgar horas'})+'</div>'+
         /* ⛔ 20/10 (auditoría): a quien el servidor DEJA otorgar — nunca a uno mismo, y un coordinador sólo a su
            unidad (el PD, a cualquiera). Ofrecer al resto era un error del servidor esperando a que lo eligieras. */
         /* ⛔ 21/10 (auditor 8, 🟠 3): y por la MISMA puerta que decidir (`puedeDecidirParte`): «misma unidad» le
@@ -1915,7 +1921,7 @@ V.docpub={g:'Documentos',t:'Resueltos',f:function(){
    Daniel (28/07): «y en ordenador que se puedan poner y aprobar tambien», «en ordenador es
    una cosa en un apartado normal». Aprobar ya se podia; poner, no.
 
-   ⚠️ Todo lo que va de aqui a `_listaSancHTML_` esta COPIADO DEL MOVIL BYTE A BYTE y se
+   ⚠️ Todo lo que va de aqui al final de Sanciones esta COPIADO DEL MOVIL BYTE A BYTE y se
    llama igual: son GEMELAS. La CSP impide compartir codigo entre los dos artefactos, asi
    ⛔ ESA PREMISA ES FALSA DESDE EL 04/08: GitHub Pages **no manda CSP** y las caras
       no la declaran. La estricta es la de los Artifacts de claude.ai. El porqué
@@ -1931,7 +1937,7 @@ V.docpub={g:'Documentos',t:'Resueltos',f:function(){
    motivo y la fecha: al cambiar el motivo se repinta el modal y la persona elegida volvia
    al primero de la lista -«me cambia a Aarón por la puta cara»-. Un formulario que se
    borra solo no es un fallo de pintado: es que el estado estaba en el DOM. */
-var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
+var SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:''};
 var RRI_MOTIVOS=[
   ['30i','Faltar a un turno de trabajo sin justificar', -1],
   /* ⛔ LA CLAVE **ES** EL ARTÍCULO QUE SE ENVÍA (`var art=mot`), y `gradiente.familia_de`
@@ -2491,13 +2497,11 @@ function _nuevaTareaPanel_(){
     '<div class="campo"><span class="sc">Unidad</span><div class="nt-fila">'+us.map(function(u){
       return '<button type="button" class="pick'+(u===NUEVA_TAREA.u ? ' on' : '')+'" data-ntu="'+esc(u)+'">'+esc(u)+'</button>'; }).join('')+'</div></div>'+
     '<div class="campo"><span class="sc">Responsable(s)</span>'+
-      (gente.length > 8 ? '<input id="ntB" class="nt-bus" placeholder="Buscar por nombre…" value="'+esc(NUEVA_TAREA.b)+'">' : '')+
-      '<div class="nt-fila nt-gente">'+(gente.length ? gente.map(function(n){
-        var q = String(NUEVA_TAREA.b || '').toLowerCase();
-        return '<button type="button" class="pick nt-p'+(NUEVA_TAREA.r[n] ? ' on' : '')+'" data-ntr="'+esc(n)+'"'+
-          (q && n.toLowerCase().indexOf(q) < 0 ? ' style="display:none"' : '')+'><span class="av">'+esc(ini(n))+'</span>'+
-          esc((miembro(n)||{}).pila || n)+'</button>'; }).join('') : '<span class="nota">Nadie activo en '+esc(NUEVA_TAREA.u)+'.</span>')+
-    '</div></div>'+
+      /* El selector de personas ÚNICO (comun.js): la gente de la unidad, con buscador y «Ver lista». */
+      elegirPersonas('ntResp', {universo:gente, marcadas:Object.keys(NUEVA_TAREA.r).filter(function(n){ return NUEVA_TAREA.r[n]; }),
+        titulo:'Responsables · '+NUEVA_TAREA.u, vacio:gente.length ? 'Elige al menos uno: escribe un nombre o pulsa «Ver lista».' : 'Nadie activo en '+NUEVA_TAREA.u+'.',
+        alCambiar:function(l){ NUEVA_TAREA.r = {}; l.forEach(function(n){ NUEVA_TAREA.r[n] = true; }); NUEVA_TAREA.ok = ''; _ntVivo_(); }})+
+    '</div>'+
     '<div class="campo"><span class="sc">Fecha límite</span>'+_fechaNuevaTareaHtml_(hoy)+'</div>'+
     (conPrio ? '<div class="campo"><span class="sc">Urgencia</span><div class="nt-fila">'+['baja','media','alta'].map(function(p){
       return '<button type="button" class="pick'+(NUEVA_TAREA.p===p ? ' on' : '')+'" data-ntp="'+p+'">'+p.charAt(0).toUpperCase()+p.slice(1)+'</button>'; }).join('')+'</div></div>' : '')+
@@ -2708,24 +2712,22 @@ function _repintarNuevaTarea_(){
   el.outerHTML = _nuevaTareaPanel_();
   _cablearNuevaTarea_();
 }
+/* El botón «Crear la tarea» dice lo que falta (sin repintar el panel). */
+function _ntVivo_(){
+  var b = document.getElementById('ntCrear'); if(!b) return;
+  var f = _nuevaTareaFalta_(); b.disabled = !!f; b.textContent = f || 'Crear la tarea';
+}
 function _cablearNuevaTarea_(){
   $$('[data-ntab]').forEach(function(el){ el.onclick = function(){
     NUEVA_TAREA.ab = el.dataset.ntab === '1'; if(NUEVA_TAREA.ab) NUEVA_TAREA.ok = ''; _repintarNuevaTarea_(); }; });
   var b = document.getElementById('ntCrear');
-  var vivo = function(){ if(!b) return; var f = _nuevaTareaFalta_(); b.disabled = !!f; b.textContent = f || 'Crear la tarea'; };
+  var vivo = _ntVivo_;
   var n = document.getElementById('ntN');
   /* sin repintar al teclear: se perdería el foco a cada letra; sólo el botón dice lo que falta */
   if(n) n.oninput = function(){ NUEVA_TAREA.n = n.value; NUEVA_TAREA.ok = ''; vivo(); };
   $$('[data-ntu]').forEach(function(el){ el.onclick = function(){
     if(el.dataset.ntu === NUEVA_TAREA.u) return;
-    NUEVA_TAREA.u = el.dataset.ntu; NUEVA_TAREA.r = {}; NUEVA_TAREA.b = ''; NUEVA_TAREA.ok = ''; _repintarNuevaTarea_(); }; });
-  $$('[data-ntr]').forEach(function(el){ el.onclick = function(){
-    var on = !NUEVA_TAREA.r[el.dataset.ntr];
-    NUEVA_TAREA.r[el.dataset.ntr] = on; el.classList.toggle('on', on); vivo(); }; });
-  var bus = document.getElementById('ntB');
-  if(bus) bus.oninput = function(){
-    var q = bus.value.toLowerCase(); NUEVA_TAREA.b = bus.value;
-    $$('[data-ntr]').forEach(function(el){ el.style.display = (q && el.dataset.ntr.toLowerCase().indexOf(q) < 0) ? 'none' : ''; }); };
+    NUEVA_TAREA.u = el.dataset.ntu; NUEVA_TAREA.r = {}; NUEVA_TAREA.ok = ''; _repintarNuevaTarea_(); }; });
   $$('[data-ntf]').forEach(function(el){ el.onclick = function(){
     NUEVA_TAREA.l = el.dataset.ntf; if(!el.classList.contains('nt-d')) NUEVA_TAREA.cal = ''; _repintarNuevaTarea_(); }; });
   $$('[data-ntcal]').forEach(function(el){ el.onclick = function(){
@@ -4087,7 +4089,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='a07abb7';
+var BUILD='249ee8c';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4305,14 +4307,8 @@ function _pinReunionFijar_(m){
       }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo guardar: ', e); }
     };
   });
-  /* 818.a: editar los convocados. Pulsar enciende/apaga SIN repintar el panel (se perderia lo
+  /* 818.a: editar los convocados. El selector (`elegirPersonas`) cambia SIN repintar el panel (se perderia lo
      tecleado en el orden del dia); guardar manda la lista entera y nunca vacia. */
-  $$('#reInvPool [data-einv]').forEach(function(b){
-    b.onclick=function(){ if(!RE_INV) return; var n=b.dataset.einv;
-      if(RE_INV.has(n)) RE_INV.delete(n); else RE_INV.add(n);
-      b.classList.toggle('on', RE_INV.has(n));
-      var c=$('#reInvN'); if(c) c.textContent=RE_INV.size; };
-  });
   $$('[data-guardarinv]').forEach(function(b){
     b.onclick=async function(){
       var r=_reuSel(); if(!r || !RE_INV || RE_INV_ID!==r.id) return;
@@ -4711,7 +4707,7 @@ function _engOtorgar_(){
     b.onclick=async function(){
       if(b.disabled) return;
       var caja=b.parentNode;
-      var nombre=($('#otNombre')||{}).value||'';
+      var nombre=elegirPersonasMarcadas('otNombre')[0]||'';
       var horas=parseFloat(String(($('#otHoras')||{}).value||'').replace(',','.'))||0;
       var concepto=($('#otConcepto')||{}).value||'';
       if(!nombre || horas<=0){ tost('Elige a quién y unas horas > 0.'); return; }
@@ -4738,18 +4734,10 @@ function _engBloqueHoras_(){
   /* bloque de horas: marca a varios de tu subsistema y otórgales lo mismo (api.otorgarBloque).
      Un solo disparo crea todas las partes 'otorgada'; el servidor revalida jurisdicción por token
      y persona. Con backend real viaja; sin él, semilla local. */
-  var _bs=$('#bloSub');
-  if(_bs) _bs.onchange=function(){
-    var u=_bs.value;
-    $$('#bloPool .pick').forEach(function(c){
-      var vis=!u||c.dataset.unidad===u; c.style.display=vis?'':'none'; if(!vis) c.classList.remove('on');
-    });
-  };
-  $$('#bloPool .pick').forEach(function(c){ c.onclick=function(){ c.classList.toggle('on'); }; });
   $$('[data-bloque]').forEach(function(b){
     b.onclick=async function(){
       if(b.disabled) return;
-      var marcados=$$('#bloPool .pick.on').map(function(c){ return c.dataset.nom; });
+      var marcados=elegirPersonasMarcadas('bloInv');
       var horas=parseFloat(String(($('#bloH')||{}).value||'').replace(',','.'))||0;
       var concepto=($('#bloC')||{}).value||'';
       if(!marcados.length){ tost('Marca al menos a una persona del subsistema.'); return; }

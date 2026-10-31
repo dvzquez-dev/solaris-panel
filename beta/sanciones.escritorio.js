@@ -99,12 +99,6 @@ function arco(i,r,frac){
     ' A'+r+' '+r+' 0 0 1 '+(ACX+r*Math.cos(a1)).toFixed(2)+' '+(ACY+r*Math.sin(a1)).toFixed(2);
 }
 
-/* 31/10 (feosesc #21): la lista «A quién» enseña ~7 de 17 y nada decía que hay más: cuántas son, y si hay que desplazar. */
-function _snMas_(){
-  var c=document.getElementById('snLista'), m=document.getElementById('snMas'); if(!c||!m) return;
-  var n=c.querySelectorAll('[data-sanq]').length;
-  m.textContent=n ? n+(n===1?' persona':' personas')+(c.scrollHeight>c.clientHeight+2 ? ' · desplaza la lista para ver todas' : '') : '';
-}
 function anilloHTML(valor,etiqueta){
   var segs='',ticks='',i;
   for(i=0;i<10;i++){
@@ -517,7 +511,6 @@ function _ponerSancionHTML_(){
 function _ponerSancCuerpo_(){
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   var E=CAMPO_CSS;
-  var grupos=_gruposSanc_(_actorSanc_(), SANC_FORM.filtro);
   var esPlazo=(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg');
   /* LAS TAREAS DEL SANCIONADO, no las mias -antes se ofrecian las propias y por eso no se podia
      sancionar a nadie por un plazo-. `null` = todavia se estan pidiendo. Y solo las VIVAS con
@@ -549,10 +542,17 @@ function _ponerSancCuerpo_(){
     return t && t.url && !_tareaHecha_(t.e) && _puedeMoverPlazo_(t, _actorSanc_()); });
   return '<div class="sanwrap">'+
     '<div>'+
-      '<label style="display:block;margin-bottom:9px">'+lab('A qui\u00e9n')+
-        '<input id="snFiltro" placeholder="Escribe para filtrar \u00b7 nombre o subsistema" '+
-        'value="'+esc(SANC_FORM.filtro||'')+'" autocomplete="off" style="'+E+'"></label>'+
-      '<div class="sanlista" id="snLista">'+_listaSancHTML_(grupos)+'</div><div class="nota" id="snMas" style="margin:-6px 0 11px"></div>'+
+      lab('A qui\u00e9n')+
+      /* El selector de personas ÚNICO (comun.js): el universo sale de la MISMA regla que el permiso (`personasDeAlcance`). */
+      elegirPersonas('snQuien', {universo:personasDeAlcance(_actorSanc_()), multi:false, titulo:'A quién sancionar',
+        marcadas:SANC_FORM.quien?[SANC_FORM.quien]:[], vacio:'Escribe un nombre o pulsa «Ver lista».',
+        alCambiar:function(l){
+          SANC_FORM.quien=l[0]||'';
+          _quienCambiaSanc_();   /* 26/10 (A5b): con el 30g, los puntos son los del historial de ESTA persona */
+          var b=$('#snMsg'); if(b && SANC_FORM.quien){ b.textContent='A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'; b.style.color=''; }
+          /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS: hay que repintar. */
+          if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarPonerSanc_(); }
+        }})+
     '</div>'+
     '<div>'+
       '<div style="display:block;margin-bottom:9px">'+lab('Motivo')+
@@ -622,27 +622,6 @@ function _cablearPonerSanc_(){
   /* ⛔ Y NO HAY `recoger`/`repintar` LOCALES: se llama a `_repintarPonerSanc_` por su nombre
      en cada sitio, que es lo unico que hace visible que la puerta es UNA. Un alias local con el
      nombre viejo deja el codigo leyendose igual que antes, y la proxima copia se escribe sola. */
-  function marcar(b){
-    SANC_FORM.quien=b.dataset.sanq;
-    $$('[data-sanq]').forEach(function(x){ x.classList.toggle('on', x===b); });
-    _quienCambiaSanc_();   /* 26/10 (A5b): con el 30g, los puntos son los del historial de ESTA persona */
-    /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS: hay que repintar.
-       Con los demas motivos no se toca nada, que seria tirar lo escrito por nada. */
-    if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarPonerSanc_(); }
-  }
-  /* Elegir persona NO repinta: solo se marca. */
-  $$('[data-sanq]').forEach(function(b){ b.onclick=function(){ marcar(b);
-    msg('A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'); }; });
-  /* Teclear rehace SOLO la lista: ni pierde el foco ni borra lo ya elegido. */
-  var fi=$('#snFiltro');
-  if(fi) fi.oninput=function(){
-    SANC_FORM.filtro=fi.value;
-    var c=$('#snLista'); if(!c) return;
-    c.innerHTML=_listaSancHTML_(_gruposSanc_(_actorSanc_(), SANC_FORM.filtro));
-    $$('[data-sanq]',c).forEach(function(b){ b.onclick=function(){ marcar(b); }; });
-    _snMas_();
-  };
-  _snMas_();
   /* El motivo decide QUE MAS se pide, asi que ese si repinta. */
   var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ _motivoCambiaSanc_(); _repintarPonerSanc_(); };
   var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
@@ -732,7 +711,7 @@ function _cablearPonerSanc_(){
          MANDÓ»—, y aquí además tapa el caso en que la persona cambió el destinatario
          tras un error. No es un error: se dice, y se sigue. */
       var _yaEstaba = !!(r && r.duplicadas && r.duplicadas.length);
-      SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:'', filtro:''};
+      SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:''};
       tost((_yaEstaba ? 'Esa sanci\u00f3n YA estaba puesta (era un reintento): a '
                       : 'Sanci\u00f3n puesta a ')+(_pilaDeM_(quien)||quien)+'.'+(_yaEstaba ? '' : ' Se aplica en Notion y se avisa en Discord en unos minutos.')+(esDePlazo?' Plazo movido en Notion.':''));
       await _cargarSancionesCon_(r);     // la cola de abajo tiene que enterarse

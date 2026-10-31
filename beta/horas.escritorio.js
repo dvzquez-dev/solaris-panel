@@ -114,20 +114,13 @@ function bloquePanel(){
     (coordinadorDe(unidad)===ACTOR ? 'No hay nadie de tu subsistema a quien otorgar horas en bloque.'
       : 'Otorgar horas es del coordinador de la unidad y del Project Director: el servidor no lo deja a nadie más.')+
     '</p></div>');
-  var subs=[]; reg.forEach(function(m){ if(subs.indexOf(m.unidad)<0) subs.push(m.unidad); });
-  var filtro = mandaEnTodo
-    ? '<div style="display:block;margin-bottom:10px"><span class="sc" style="display:block;margin-bottom:5px">Subsistema</span>'+
-      nxElige('bloSub', [['','Todos']].concat(subs.map(function(u){ return [u, u]; })), '')+'</div>'
-    : '<div class="chips" style="margin-bottom:10px"><span class="chip">'+esc(unidad)+'</span></div>';
-  var chips=pool.map(function(m){
-    return '<button type="button" class="pick" data-nom="'+esc(m.nombre)+'" data-unidad="'+esc(m.unidad)+'">'+esc(m.pila)+'</button>';
-  }).join('');
   return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
     'Para un traslado, un montaje o una feria: <b>marca a quienes fueron</b> y ponles las mismas '+
     'horas de una vez. No se otorga nada hasta que pulses el botón.</p>'+
-    filtro+
-    '<div class="chips" id="bloPool" style="margin-bottom:12px">'+chips+'</div>'+
+    /* El selector de personas ÚNICO (comun.js); «Ver lista» las agrupa por unidad. Lo que se manda son los marcados. */
+    elegirPersonas('bloInv', {universo:pool.map(function(m){ return m.nombre; }), titulo:'A quién otorgar el bloque',
+      vacio:'Nadie marcado: escribe un nombre o pulsa «Ver lista».'})+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
       '<div><span class="sc" style="display:block;margin-bottom:5px">Categoría</span>'+
         nxElige('bloCat', [['reunion','Reunión'],['tareas','Tarea'],['turno','Turno'],['compensacion','Compensación']], 'compensacion')+'</div>'+

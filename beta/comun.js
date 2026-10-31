@@ -3536,6 +3536,228 @@ function sancionablesPor(actor){
   });
 }
 
+/* ═══ ⭐ EL SELECTOR DE PERSONAS, UNO SOLO (01/11, ficha «UN SOLO SELECTOR DE PERSONAS EN TODA LA APP») ═══════════════
+   Daniel: «unifica los formatos de todo»; «te aparecen los nombres justo encima del teclado» y «un botón ver lista que
+   te aparezca todo el equipo […] PD, luego cada subsistema por orden alfabético […] iluminados los marcados […] y no hay
+   nada que escribir». Sustituye a los selectores sueltos de invitados, parte de bloque, orden del día, cambiar autor,
+   responsables de tarea y «A quién» de sanciones y partes.
+     elegirPersonas(id, {universo, marcadas, multi, titulo, vacio, confirmarQuitar, alCambiar}) → HTML (el campo; ya viene
+                                      cableado: se mete donde sea, sin enganchar nada)
+     elegirPersonasMarcadas(id)      → nombres elegidos ahora
+   `universo` = NOMBRES entre los que se puede elegir: lo decide quien llama, con `personasDeAlcance(actor)` si es «a quién
+   puedes tocar tú» o con la lista que toque (los convocados de una reunión, el equipo…). El estado vive aquí, por `id`. */
+var PSEL = {};
+
+/* LA regla de alcance, una vez: a quién alcanza `actor`. NO es una regla nueva: es `puedeSancionarA` —PD → todos menos
+   él; coordinador → su unidad con todas sus subunidades; subcoordinador → su equipo; sin jurisdicción → sólo él—, que
+   ya decide quién puede sancionar o aprobar a quién. Una copia aquí diría otra cosa en dos semanas. */
+function personasDeAlcance(actor){
+  return sancionablesPor(actor).map(function(m){ return m.nombre; });
+}
+
+/* Los miembros del universo, AGRUPADOS para «Ver lista»: el Project Director solo y primero, luego cada unidad en orden
+   alfabético, y quien no tenga unidad en un cajón «Sin unidad» al final. Dentro de cada grupo, por nombre. */
+function personasAgrupadas(universo){
+  var por={}, pd=[], sin=[];
+  (universo||[]).forEach(function(n){
+    var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0] || {nombre:n};
+    if(m.cargo==='Project Director'){ pd.push(m); return; }
+    var u=_limpio_(m.unidad);
+    if(!u){ sin.push(m); return; }
+    (por[u]=por[u]||[]).push(m);
+  });
+  var cmp=function(a,b){ return String(a.nombre||'').localeCompare(String(b.nombre||''),'es'); };
+  var out=[];
+  if(pd.length) out.push({unidad:'Project Director', gente:pd.sort(cmp)});
+  Object.keys(por).sort(function(a,b){ return a.localeCompare(b,'es'); })
+    .forEach(function(u){ out.push({unidad:u, gente:por[u].sort(cmp)}); });
+  if(sin.length) out.push({unidad:'Sin unidad', gente:sin.sort(cmp)});
+  return out;
+}
+
+function _pselCss_(){
+  _pselDeleg_();
+  if(document.getElementById('pselCss')) return;
+  var s=document.createElement('style'); s.id='pselCss';
+  s.textContent=
+    '.psel{margin:0 0 12px}.psel-fila{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 7px}'+
+    '.psel-c{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:12px;'+
+      'min-height:32px;padding:5px 12px;border-radius:20px;border:1px solid var(--line);background:var(--sur2);color:var(--ink2);white-space:nowrap}'+
+    '.psel-c:hover{border-color:var(--ink3);color:var(--ink)}'+
+    '.psel-c.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}'+
+    '.psel-c.on b{font-weight:600}.psel-c i{font-style:normal;font-size:15px;line-height:1;color:var(--ink3)}'+
+    '.psel-campo{display:flex;gap:8px;align-items:stretch}'+
+    '.psel-campo input{flex:1;min-width:0;background:var(--sur2);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 11px;font-size:14px}'+
+    '.psel-ver{flex:none;cursor:pointer;font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;padding:0 13px;border-radius:10px;'+
+      'border:1px solid var(--line);background:var(--sur2);color:var(--ink2)}'+
+    '.psel-ver:hover{border-color:var(--ink3);color:var(--ink)}'+
+    '.psel-vacio{margin:0 0 7px;font-size:12.5px;color:var(--ink3)}'+
+    '.psel-ov{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center}'+
+    '.psel-hoja{background:var(--sur);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-height:88%;overflow-y:auto;'+
+      'padding:18px 16px calc(22px + env(safe-area-inset-bottom,0px));color:var(--ink)}'+
+    '.psel-hoja h3{margin:0 0 4px;font-size:17px;font-weight:700}'+
+    '.psel-g{margin:14px 0 7px;font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3)}'+
+    '@media(min-width:900px){.psel-ov{justify-content:flex-end;align-items:stretch}'+
+      '.psel-hoja{width:430px;max-height:none;height:100%;border-radius:0;border-width:0 0 0 1px}}';
+  document.head.appendChild(s);
+}
+
+function elegirPersonas(id, o){
+  o=o||{}; _pselCss_();
+  var marc=(o.marcadas||[]).slice();
+  if(o.multi===false) marc=marc.slice(0,1);
+  /* `confirmarQuitar:true` → quitar a alguien (× o desmarcar en la lista) pregunta antes. */
+  PSEL[id]={universo:(o.universo||[]).slice(), marcadas:marc, multi:o.multi!==false, titulo:o.titulo||'Personas',
+    vacio:o.vacio||'Nadie todavía: escribe un nombre o pulsa «Ver lista».', alCambiar:o.alCambiar||null, confirmarQuitar:!!o.confirmarQuitar};
+  return '<div class="psel" id="psel-'+esc(id)+'">'+_pselCuerpo_(id)+'</div>';
+}
+
+function elegirPersonasMarcadas(id){ return PSEL[id] ? PSEL[id].marcadas.slice() : []; }
+
+/* Para quien monta el campo en un sitio y cablea su consecuencia en otro (el HTML se pinta antes de que existan sus funciones). */
+function elegirPersonasAlCambiar(id, f){ if(PSEL[id]) PSEL[id].alCambiar=f; }
+
+/* Cambia lo marcado desde fuera (p. ej. «tipo de reunión» recalcula los convocados) y repinta. */
+function elegirPersonasPoner(id, marcadas, universo){
+  var S=PSEL[id]; if(!S) return;
+  if(universo) S.universo=universo.slice();
+  S.marcadas=S.multi ? marcadas.slice() : marcadas.slice(0,1);
+  _pselPintar_(id);
+}
+
+function _pselCuerpo_(id){
+  return '<div class="psel-fila" data-psel-marc="'+esc(id)+'">'+_pselMarcadasHTML_(id)+'</div>'+
+    '<div class="psel-campo"><input data-psel-in="'+esc(id)+'" placeholder="Escribe un nombre…" autocomplete="off">'+
+      '<button type="button" class="psel-ver" data-psel-ver="'+esc(id)+'" data-p>Ver lista</button></div>'+
+    '<div class="psel-fila" data-psel-sug="'+esc(id)+'" style="margin:7px 0 0"></div>';
+}
+
+function _pselMarcadasHTML_(id){
+  var S=PSEL[id];
+  return S.marcadas.length
+    ? S.marcadas.map(function(n){
+        return '<span class="psel-c on" data-psel-q="'+esc(n)+'" data-p><b>'+esc(_pilaDeM_(n)||n)+'</b><i>×</i></span>'; }).join('')
+    : '<p class="psel-vacio">'+esc(S.vacio)+'</p>';
+}
+
+/* Las sugerencias de lo escrito: sin tildes, por nombre, pila o unidad; las ya marcadas no se ofrecen. */
+function _pselSugerencias_(id, q){
+  var S=PSEL[id]; q=_sinTildes_((q||'').trim());
+  if(!q) return [];
+  var hits=[];
+  S.universo.forEach(function(n){
+    if(S.marcadas.indexOf(n)>=0 && S.multi) return;
+    var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0] || {nombre:n};
+    var t=_sinTildes_(n+' '+(m.pila||'')+' '+(m.unidad||''));
+    if(t.indexOf(q)>=0) hits.push(n);
+  });
+  return hits.slice(0,8);
+}
+
+/* Repinta los chips y las sugerencias SIN tocar el campo: repintarlo entero es lo que le quita el foco al teclear. */
+function _pselPintar_(id){
+  var S=PSEL[id], raiz=document.getElementById('psel-'+id); if(!S || !raiz) return;
+  var f=raiz.querySelector('[data-psel-marc]'); if(f) f.innerHTML=_pselMarcadasHTML_(id);
+  var inp=raiz.querySelector('[data-psel-in]'), sg=raiz.querySelector('[data-psel-sug]');
+  if(sg){ sg.innerHTML=_pselSugerencias_(id, inp?inp.value:'').map(function(n){
+    return '<span class="psel-c" data-psel-s="'+esc(n)+'" data-p>'+esc(n)+'</span>'; }).join(''); }
+}
+
+/* Marca o desmarca una persona: la única puerta por donde cambia `marcadas`. */
+function _pselAlternar_(id, n, forzar){
+  var S=PSEL[id]; if(!S) return;
+  var i=S.marcadas.indexOf(n), esta=i>=0, quiere=forzar==null ? !esta : !!forzar;
+  if(quiere===esta) return;
+  var hacer=function(){
+    var j=S.marcadas.indexOf(n);
+    if(!quiere){ if(j>=0) S.marcadas.splice(j,1); }
+    else if(S.multi) S.marcadas.push(n); else S.marcadas=[n];
+    _pselPintar_(id);
+    if(S.alCambiar) S.alCambiar(S.marcadas.slice());
+  };
+  /* `quitar`: quitar a alguien pide «¿Quitar a X? Sí / No» (con un diálogo propio). Devuelve la promesa para que
+     «Ver lista» repinte DESPUÉS de la respuesta y no antes. */
+  if(!quiere && S.confirmarQuitar)
+    return dialogoSiNo('¿Quitar a '+(_pilaDeM_(n)||n)+'?').then(function(si){ if(si) hacer(); });
+  hacer();
+}
+
+/* EL CABLEADO ES DELEGADO, UNA VEZ: los chips, el campo y «Ver lista» se repintan por todas partes (ficha de reunión,
+   formulario de bloque, orden del día…) y enganchar cada vez es lo que se olvida. Un oyente en `document` que saca el `id`
+   del `.psel` más cercano: meter el HTML de `elegirPersonas` donde sea basta. */
+function _pselDeleg_(){
+  if(window._pselListo) return; window._pselListo=true;
+  var idDe=function(el){ var r=el.closest('.psel'); return r ? r.id.slice(5) : null; };
+  document.addEventListener('click', function(ev){
+    var t=ev.target && ev.target.closest ? ev.target : null; if(!t) return;
+    var b=t.closest('[data-psel-s],[data-psel-q],[data-psel-ver]'); if(!b) return;
+    var id=idDe(b); if(!id || !PSEL[id]) return;
+    if(b.hasAttribute('data-psel-ver')){ personasVerLista(id); return; }
+    var inp=b.closest('.psel').querySelector('[data-psel-in]');
+    if(b.hasAttribute('data-psel-s')){ if(inp) inp.value=''; _pselAlternar_(id, b.getAttribute('data-psel-s'), true); if(inp) inp.focus(); return; }
+    _pselAlternar_(id, b.getAttribute('data-psel-q'), false);
+  });
+  document.addEventListener('input', function(ev){
+    var t=ev.target; if(!t || !t.hasAttribute || !t.hasAttribute('data-psel-in')) return;
+    var id=idDe(t); if(id && PSEL[id]) _pselPintar_(id);
+  });
+  /* Enter añade la primera sugerencia: escribir «ana» y Enter es lo más rápido que hay. */
+  document.addEventListener('keydown', function(ev){
+    var t=ev.target; if(ev.key!=='Enter' || !t || !t.hasAttribute || !t.hasAttribute('data-psel-in')) return;
+    var id=idDe(t); if(!id || !PSEL[id]) return;
+    ev.preventDefault();
+    var h=_pselSugerencias_(id, t.value);
+    if(h.length){ t.value=''; _pselAlternar_(id, h[0], true); }
+  });
+}
+
+/* «Ver lista»: la hoja con TODO el universo agrupado; marcar/desmarcar al pulsar; «Listo» cierra. */
+function personasVerLista(id){
+  var S=PSEL[id]; if(!S) return;
+  var ov=document.createElement('div'); ov.className='psel-ov'; ov.id='pselOv';
+  var pinta=function(){
+    var gr=personasAgrupadas(S.universo);
+    ov.innerHTML='<div class="psel-hoja" role="dialog" aria-label="'+esc(S.titulo)+'">'+
+      '<h3>'+esc(S.titulo)+'</h3>'+
+      '<div style="font-size:12px;color:var(--ink3)">'+(S.multi ? S.marcadas.length+' elegidas · pulsa para marcar o quitar' : 'Pulsa para elegir')+'</div>'+
+      (gr.length ? gr.map(function(g){
+        return '<div class="psel-g">'+esc(g.unidad)+'</div><div class="psel-fila">'+g.gente.map(function(m){
+          return '<span class="psel-c'+(S.marcadas.indexOf(m.nombre)>=0?' on':'')+'" data-psel-l="'+esc(m.nombre)+'" data-p>'+esc(m.pila||m.nombre)+'</span>';
+        }).join('')+'</div>'; }).join('')
+        : '<p class="psel-vacio">No hay nadie a quien puedas elegir.</p>')+
+      '<button type="button" class="btn pri full" data-psel-listo data-p style="margin-top:16px">Listo</button></div>';
+    Array.prototype.forEach.call(ov.querySelectorAll('[data-psel-l]'), function(b){
+      b.onclick=function(){
+        var r=_pselAlternar_(id, b.getAttribute('data-psel-l'));
+        if(!S.multi){ ov.remove(); return; }
+        Promise.resolve(r).then(function(){ var h=ov.querySelector('.psel-hoja'); if(!h) return;
+          var y=h.scrollTop; pinta(); ov.querySelector('.psel-hoja').scrollTop=y; }); }; });
+    ov.querySelector('[data-psel-listo]').onclick=function(){ ov.remove(); };
+  };
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  pinta();
+  document.body.appendChild(ov);
+}
+
+/* Diálogo de sí/no PROPIO de la app (nada de `confirm()` nativo, que en el móvil es una ventana del navegador que no
+   se parece a nada). Devuelve una promesa de true/false. */
+function dialogoSiNo(texto, o){
+  o=o||{}; _pselCss_();
+  return new Promise(function(res){
+    var ov=document.createElement('div'); ov.className='psel-ov'; ov.setAttribute('data-dlg','1');
+    ov.style.alignItems='center';
+    ov.innerHTML='<div class="psel-hoja" role="alertdialog" style="width:min(340px,92%);height:auto;max-height:none;border-radius:16px;border-width:1px">'+
+      '<p style="margin:0 0 14px;font-size:15px;line-height:1.45">'+esc(texto)+'</p>'+
+      '<div style="display:flex;gap:8px"><button type="button" class="btn pri" data-dlg-si data-p style="flex:1">'+esc(o.si||'Sí')+'</button>'+
+      '<button type="button" class="btn" data-dlg-no data-p style="flex:1">'+esc(o.no||'No')+'</button></div></div>';
+    var fin=function(v){ ov.remove(); res(v); };
+    ov.onclick=function(e){ if(e.target===ov) fin(false); };
+    ov.querySelector('[data-dlg-si]').onclick=function(){ fin(true); };
+    ov.querySelector('[data-dlg-no]').onclick=function(){ fin(false); };
+    document.body.appendChild(ov);
+  });
+}
+
 /* EL ORDEN DE LOS SUBSISTEMAS, deducido y no escrito a mano: es el orden en que vienen los
    miembros del panel, que es el que trae Notion. Una constante aqui se quedaria vieja el dia
    que se reordene alla, y nadie se enteraria hasta que alguien mirase. */
@@ -3931,7 +4153,7 @@ function _motivoCambiaSanc_(){
 
 function _sancCampos_(){
   return { snMotivo:'motivo', snLibre:'libre', snArt:'art', snTarea:'tarea',
-           snPlazo:'plazo', snPts:'pts', snFiltro:'filtro' };
+           snPlazo:'plazo', snPts:'pts' };
 }
 
 /* La barrida de golpe: sigue haciendo falta porque un campo puede cambiar sin evento -lo
@@ -3945,7 +4167,7 @@ function _recogerSancForm_(){
 }
 
 /* ⛔ `addEventListener` Y NO `e.oninput=`, a proposito: sobre estos mismos campos ya hay
-   manejadores puestos con `on*` -`snFiltro` rehace la lista, `snMotivo` repinta, `snPlazo`
+   manejadores puestos con `on*` -`snMotivo` repinta, `snPlazo`
    guarda el plazo-. Asignar `on*` aqui los PISARIA, o seria pisado por ellos, segun el orden
    en que se cablee; y esa dependencia de orden es de las que se rompen sin dar error. Con
    `addEventListener` conviven, y ademas mueren solos con el nodo en cada repintado. */
@@ -3958,67 +4180,6 @@ function _atarSancForm_(){
       e.addEventListener('input', guardar);
       e.addEventListener('change', guardar);
     })($('#'+id), M[id]); }
-}
-
-function _gruposSanc_(actor, filtro){
-  var f=_sinTildes_(String(filtro||'').trim().toLowerCase());
-  var gente=sancionablesPor(actor).filter(function(m){
-    if(!f) return true;
-    return _sinTildes_((m.nombre||'').toLowerCase()).indexOf(f)>=0 ||
-           _sinTildes_((m.pila||'').toLowerCase()).indexOf(f)>=0 ||
-           _sinTildes_((m.unidad||'').toLowerCase()).indexOf(f)>=0;
-  });
-  var orden=_ordenSubs_(), por={};
-  gente.forEach(function(m){ var u=m.unidad||'—'; (por[u]=por[u]||[]).push(m); });
-  /* ⛔ EL CAJÓN «—» NO SE PINTABA NUNCA, Y LO FABRICA LA LÍNEA DE ARRIBA. `gente.forEach`
-     mete a quien no tiene `unidad` en el cajón `'—'`, y `_ordenSubs_` **sólo devuelve
-     unidades no vacías** (`if(u && vis.indexOf(u)<0)`), así que `orden.filter` lo tiraba
-     SIEMPRE: el respaldo que la línea anterior escribe no podía llegar a pantalla ni una vez.
-     ⛔ Y no es cosmética: `sancionablesPor` **sí** devuelve a esa persona, y con ese número
-     el escritorio rotula «N personas bajo tu jurisdicción» (`_ponerSancionHTML_`,
-     `sanciones.escritorio.js`). O sea: el rótulo la cuenta, la lista no tiene dónde ponerla
-     y **no se le puede sancionar desde ninguna de las dos caras**. Un contador y una lista
-     que suman cosas distintas.
-     ⛔ Un `unidad` vacío no es teórico: `flujos/ensamblar.py` hace
-     `d["unidad"] = v.get("unidad")` con el volcado de Notion delante, así que una ficha con
-     la propiedad sin poner —el alta de septiembre— llega con `null` y **pisa** el valor
-     bueno que hubiera. Medido hoy sobre los datos reales: 0 de 32, o sea que esto **no
-     cambia ningún número ahora mismo**; quita el suelo por el que se cae el día que entre
-     alguien sin unidad.
-     ✅ Se conserva el ORDEN de `_ordenSubs_` —el de Notion— y las que no estén en él van
-     detrás: nadie se cae de la lista por no tener sitio en ese orden. */
-  var vis = orden.filter(function(u){ return por[u]; });
-  Object.keys(por).forEach(function(u){ if(vis.indexOf(u) < 0) vis.push(u); });
-  return vis.map(function(u){
-    var l=por[u].slice().sort(function(a,b){
-      var ca=(a.cargo==='Coordinador')?0:1, cb=(b.cargo==='Coordinador')?0:1;
-      if(ca!==cb) return ca-cb;                       // el coordinador, primero
-      return String(a.nombre||'').localeCompare(String(b.nombre||''), 'es');
-    });
-    return {unidad:u, gente:l};
-  });
-}
-
-/* La lista de personas. Se pinta aparte para poder rehacerla al teclear SIN tocar el resto
-   del formulario: repintar el modal entero es lo que borraba lo ya elegido. */
-function _listaSancHTML_(grupos){
-  /* ⛔ «NADIE CON ESE FILTRO» CULPABA A UN FILTRO QUE PUEDE NO EXISTIR. Esto se pinta
-     también en el primer dibujado, con la caja de búsqueda vacía: entonces la lista sale
-     vacía por otra cosa —te han dado rango y no tienes a nadie debajo, o el roster aún no
-     ha llegado— y el texto manda a corregir un filtro que no hay. Son dos situaciones
-     distintas y una de ellas no se arregla tocando la caja.
-     ⚠️ Se lee `SANC_FORM.filtro`, que es el MISMO global del que ya sale `SANC_FORM.quien`
-     dos líneas más abajo: no se añade ningún argumento ni se toca a los que llaman. */
-  if(!grupos.length) return '<p class="rnota" style="margin:0;padding:8px 2px">'+
-    ((SANC_FORM && SANC_FORM.filtro) ? 'Nadie con ese filtro.'
-      : 'No hay nadie bajo tu jurisdicción todavía.')+'</p>';
-  return grupos.map(function(g){
-    return '<div class="sangrupo">'+esc(g.unidad)+'</div>'+
-      g.gente.map(function(m){
-        return '<button class="sanper'+(SANC_FORM.quien===m.nombre?' on':'')+'" data-sanq="'+esc(m.nombre)+'" data-p>'+
-          '<b>'+esc(m.nombre)+'</b>'+(m.cargo==='Coordinador'?'<i>coord.</i>':'')+'</button>';
-      }).join('');
-  }).join('');
 }
 
 function _mdHTML_(md){
@@ -5439,7 +5600,14 @@ var SONIDOS_NOTAS = {
   aprobar: [[523, 0, 0.09], [659, 0.09, 0.09], [784, 0.18, 0.2]],
   aviso:   [[988, 0, 0.07], [740, 0.11, 0.16]],
   hecho:   [[784, 0, 0.06], [1047, 0.07, 0.1]],
-  rechazar:[[392, 0, 0.1], [294, 0.11, 0.18]]
+  rechazar:[[392, 0, 0.1], [294, 0.11, 0.18]],
+  /* 01/11, «En directo»: los que faltaban para que cada tipo de evento suene distinto (petición = un tic; rutina = grave). */
+  peticion: [[1319, 0, 0.035]],
+  rutina:   [[220, 0, 0.05], [262, 0.06, 0.07]],
+  turno:    [[440, 0, 0.07], [554, 0.08, 0.07], [440, 0.16, 0.09]],
+  sancion:  [[330, 0, 0.08], [330, 0.1, 0.08], [247, 0.2, 0.14]],
+  documento:[[659, 0, 0.05], [988, 0.06, 0.05], [659, 0.12, 0.08]],
+  reunion:  [[698, 0, 0.06], [880, 0.07, 0.06], [1175, 0.14, 0.1]]
 };
 /* 31/10 noche (Daniel: «casi nada suena en la app»): lo que se HACE a menudo y no es fichar ni decidir suena «hecho». */
 var SONIDOS_HECHO = ['declararParte', 'pushParte', 'guardarDisponibilidad', 'responder', 'crearConvocatoria', 'crearReunion',
@@ -9792,6 +9960,7 @@ function _anotAMedias_(){
   var cs = document.querySelectorAll('[data-anot],[data-autor]');   /* 31/10: y el buscador de autor, con un nombre a medias */
   for (var i = 0; i < cs.length; i++){
     if (cs[i].getAttribute('data-ocupado') === '1') return true;
+    if (cs[i].hasAttribute('data-autor') && elegirPersonasMarcadas(cs[i].getAttribute('data-autor') + 'Autor').length) return true;   /* alguien ya elegido */
     var xs = cs[i].querySelectorAll('input,textarea,select');
     for (var j = 0; j < xs.length; j++){
       var x = xs[j];
@@ -9981,7 +10150,7 @@ function _anotClic_(ev, buscar){
 /* ══ 31/10 · CAMBIAR EL AUTOR DE UN DOCUMENTO EN REVISIÓN (las dos caras, PD y José) ═══════════════════════════════
    🗣️ Daniel, 28/10: «en revisión estaría bien q José y yo tengamos el poder de cambiar la autoría de un documento en un
    campo con desplegable y buscador de nombres (a cualquier persona menos nosotros mismos porque entonces sería revisor y
-   autor la misma persona)». El campo es un `<input list>` con `<datalist>`: desplegable y buscador en uno. Lo decide el
+   autor la misma persona)». Hoy el campo es el selector de personas único (`elegirPersonas`). Lo decide el
    SERVIDOR (`e_cambiar_autor_doc`); esto sólo no ofrece lo que sabe que va a rechazar. */
 function _puedeCambiarAutor_(estado, yo){
   return ['recibido','analizado','revision','cambios'].indexOf(estado) >= 0 && !!yo && (yo === PD_NOM || yo === REV2_NOM);
@@ -9995,8 +10164,8 @@ function _autorPanelHTML_(pre, id, actual, css){
   var st = css ? ' style="' + css + '"' : '';
   return '<div id="' + pre + 'Autor" data-autor="' + pre + '" data-autordoc="' + esc(String(id)) + '" style="margin-top:10px">' +
     '<span class="sc" style="display:block;margin-bottom:5px">Autor · ahora ' + esc(actual || '—') + '</span>' +
-    '<input id="' + pre + 'AutorIn" list="' + pre + 'AutorLs" autocomplete="off" placeholder="Busca un nombre…"' + st + '>' +
-    '<datalist id="' + pre + 'AutorLs">' + _autorCandidatos_(actual).map(function(n){ return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
+    /* El selector de personas ÚNICO, de uno en uno (antes: `<input list>` + `<datalist>`). */
+    elegirPersonas(pre + 'Autor', {universo:_autorCandidatos_(actual), multi:false, titulo:'Autor', vacio:'Escribe un nombre o pulsa «Ver lista».'}) +
     '<button type="button" class="btn" style="margin-top:8px;width:100%" data-autorcambiar="' + pre + '">Cambiar autor</button></div>';
 }
 /* «Autor cambiado por X (antes: Y)»: lo ve cualquiera que abra la ficha. Vacío si nadie lo cambió. */
@@ -10012,9 +10181,8 @@ async function _autorClic_(ev, buscar, alCambiar){
   var pre = b.getAttribute('data-autorcambiar'), c = document.getElementById(pre + 'Autor');
   var e = c ? buscar(c.getAttribute('data-autordoc')) : null;
   if (!e) return;
-  var inp = document.getElementById(pre + 'AutorIn'), txt = String((inp && inp.value) || '').trim().toLowerCase();
-  var nuevo = _autorCandidatos_(e.autor).filter(function(n){ return n.toLowerCase() === txt; })[0];
-  if (!nuevo){ tost('Elige un nombre de la lista (no puede ser Daniel ni José).'); if (inp) inp.focus(); return; }
+  var nuevo = _autorCandidatos_(e.autor).filter(function(n){ return n === elegirPersonasMarcadas(pre + 'Autor')[0]; })[0];
+  if (!nuevo){ tost('Elige a alguien de la lista (no puede ser Daniel ni José).'); return; }
   if (typeof backendOK === 'undefined' || !backendOK || typeof SESION === 'undefined' || !SESION){
     tost('Sin conexión con el backend: el autor NO se ha cambiado.'); return; }
   b.disabled = true;
@@ -10306,7 +10474,7 @@ function _bloqueCuerpo_(B){
     throw new Error('Cuenta qué se hizo: el resumen necesita al menos '+BLQ_MIN_RESUMEN+' caracteres (llevas '+resumen.length+').');
   if(!B.parts.length) throw new Error('Añade al menos un participante.');
   var parts=B.parts.map(function(p){
-    var t=String(p.horas==null?'':p.horas).trim().replace(',','.');
+    var t=B.distintas ? String(p.horas==null?'':p.horas).trim().replace(',','.') : '';
     if(!t) return {nombre:p.nombre};
     var h=parseFloat(t);
     if(!(h>0)) throw new Error('Las horas de '+p.nombre+' tienen que ser un número mayor que 0 (o déjalas vacías).');
@@ -10338,16 +10506,24 @@ function _bloqueResHTML_(resp){
     '<ul style="margin:0 0 12px;padding-left:2px;list-style:none;font-size:12.5px;line-height:1.5">'+filas+'</ul></div>';
 }
 
-/* Los participantes: chips con sus horas opcionales + el autocompletado de siempre (activos, sin tildes). */
-function _bloqueChipsHTML_(){
-  return BLQ.parts.map(function(p){
-    var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===p.nombre; })[0];
-    return '<div data-blqp="'+esc(p.nombre)+'" style="display:flex;gap:7px;align-items:center;margin:0 0 6px">'+
-      '<span style="flex:1;font-size:13px"><b>'+esc((m&&m.pila)||p.nombre)+'</b></span>'+
-      '<input class="mono" data-blqh="'+esc(p.nombre)+'" inputmode="decimal" placeholder="h" value="'+esc(p.horas)+'" '+
-        'style="'+_BLQ_INPUT_+';width:64px;text-align:right">'+
-      '<button type="button" class="btn mini" data-blqx="'+esc(p.nombre)+'" data-p aria-label="Quitar">×</button></div>';
-  }).join('') || '<p style="margin:0 0 8px;font-size:12.5px;color:var(--ink3)">Nadie todavía: escribe un nombre.</p>';
+/* Las horas del bloque, a la vista. Por defecto UNA frase —«N h para estas M personas»— y nada que rellenar; las horas
+   por persona sólo salen tras «Horas distintas» (01/10, Daniel: «aunque pone que es opcional, no está muy claro»). */
+function _bloqueHorasHTML_(){
+  var B=BLQ, n=B.parts.length, fin=B.modo==='finalizar';
+  var d=fin ? 0 : _bloqueDurH_(B.fecha, B.ini, B.fin);
+  var tot=fin ? 'La duración de la reunión' : (d>0 ? '<b>'+nf2(d)+' h</b>' : 'Las horas del bloque');
+  var quien=n+(n===1?' persona':' personas');
+  if(!B.distintas)
+    return '<p class="rnota" data-blqtot style="margin:0 0 8px">'+tot+' para estas <b>'+quien+'</b>, las mismas para todas.</p>'+
+      '<button type="button" class="btn mini" data-p data-blqdist>Horas distintas</button>';
+  return '<p class="rnota" style="margin:0 0 8px">Horas de cada persona; en blanco, '+(fin?'lo que dure la reunión':(d>0?nf2(d)+' h':'las del bloque'))+'.</p>'+
+    B.parts.map(function(p){
+      return '<div data-blqp="'+esc(p.nombre)+'" style="display:flex;gap:7px;align-items:center;margin:0 0 6px">'+
+        '<span style="flex:1;font-size:13px"><b>'+esc(_pilaDeM_(p.nombre)||p.nombre)+'</b></span>'+
+        '<input class="mono" data-blqh="'+esc(p.nombre)+'" inputmode="decimal" placeholder="h" value="'+esc(p.horas)+'" '+
+          'style="'+_BLQ_INPUT_+';width:64px;text-align:right"></div>';
+    }).join('')+
+    '<button type="button" class="btn mini" data-p data-blqiguales>Horas iguales para todos</button>';
 }
 
 function _bloqueFormHTML_(){
@@ -10369,15 +10545,29 @@ function _bloqueFormHTML_(){
         '<input id="blqFecha" type="date" value="'+esc(B.fecha)+'" style="'+_BLQ_INPUT_+'"></label>'+
       '<label style="flex:1">'+lab('Desde')+'<input id="blqIni" type="time" value="'+esc(B.ini)+'" style="'+_BLQ_INPUT_+'"></label>'+
       '<label style="flex:1">'+lab('Hasta')+'<input id="blqFin" type="time" value="'+esc(B.fin)+'" style="'+_BLQ_INPUT_+'"></label></div>')+
-    lab('Participantes · horas opcionales (por defecto, la duración)')+
-    '<div id="blqChips">'+_bloqueChipsHTML_()+'</div>'+
-    '<div style="position:relative;margin:0 0 12px"><input id="blqInv" placeholder="añadir a alguien…" autocomplete="off" style="'+_BLQ_INPUT_+'">'+
-      '<div id="blqSug" style="display:none;position:absolute;left:0;right:0;z-index:5;background:#141111;border:1px solid var(--line);border-radius:8px;margin-top:2px"></div></div>'+
+    lab('Participantes')+
+    elegirPersonas('blq', {universo:_activos_().map(function(m){ return m.nombre; }), marcadas:B.parts.map(function(p){ return p.nombre; }),
+      titulo:'Participantes', vacio:'Nadie todavía: escribe un nombre o pulsa «Ver lista».', confirmarQuitar:true,
+      alCambiar:function(l){
+        var antes={}; BLQ.parts.forEach(function(p){ antes[p.nombre]=p.horas; });
+        BLQ.parts=l.map(function(n){ return {nombre:n, horas:antes[n]||''}; });
+        _bloqueHorasPintar_(); }})+
+    '<div id="blqHoras" style="margin:0 0 12px">'+_bloqueHorasHTML_()+'</div>'+
     '<label style="display:block;margin:0 0 12px">'+lab('Resumen de lo que se hizo · mínimo '+BLQ_MIN_RESUMEN+' caracteres')+
       '<textarea id="blqResumen" rows="4" style="'+_BLQ_INPUT_+';resize:vertical" placeholder="Qué se trató o se hizo…">'+esc(B.resumen)+'</textarea>'+
       '<small id="blqCuenta" style="color:var(--ink3)">'+(B.resumen||'').trim().length+' / '+BLQ_MIN_RESUMEN+'</small></label>'+
     '<div style="display:flex;gap:8px"><button class="btn pri" id="blqEnviar" data-p style="flex:1">'+(fin?'Finalizar y enviar':'Enviar parte')+'</button>'+
       '<button class="btn" data-blqcerrar data-p>Cancelar</button></div></div>';
+}
+
+/* Repinta SOLO el bloque de horas (no el formulario: repintarlo entero borraría lo escrito) y engancha sus botones. */
+function _bloqueHorasPintar_(){
+  var c=$('#blqHoras'); if(!c || !BLQ) return;
+  c.innerHTML=_bloqueHorasHTML_();
+  $$('[data-blqh]').forEach(function(i){ i.oninput=function(){
+    BLQ.parts.forEach(function(p){ if(p.nombre===i.dataset.blqh) p.horas=i.value; }); }; });
+  var d=$('[data-blqdist]'); if(d) d.onclick=function(){ BLQ.distintas=true; _bloqueHorasPintar_(); };
+  var g=$('[data-blqiguales]'); if(g) g.onclick=function(){ BLQ.distintas=false; BLQ.parts.forEach(function(p){ p.horas=''; }); _bloqueHorasPintar_(); };
 }
 
 /* Engancha el formulario. `cb` = {refrescar(), cerrar(), hecho(resp)} de la cara: repintar el formulario,
@@ -10386,31 +10576,11 @@ function _bloqueCablear_(cb){
   var B=BLQ; if(!B) return;
   $$('[data-blqcerrar]').forEach(function(b){ b.onclick=function(){ BLQ=null; cb.cerrar(); }; });
   if(B.res) return;
-  var chips=function(){ var c=$('#blqChips'); if(c){ c.innerHTML=_bloqueChipsHTML_(); lig(); } };
-  var lig=function(){
-    $$('[data-blqh]').forEach(function(i){ i.oninput=function(){
-      BLQ.parts.forEach(function(p){ if(p.nombre===i.dataset.blqh) p.horas=i.value; }); }; });
-    $$('[data-blqx]').forEach(function(b){ b.onclick=function(){
-      BLQ.parts=BLQ.parts.filter(function(p){ return p.nombre!==b.dataset.blqx; }); chips(); }; });
-  };
-  lig();
+  _bloqueHorasPintar_();
   [['blqFecha','fecha'],['blqIni','ini'],['blqFin','fin']].forEach(function(x){
-    var e=$('#'+x[0]); if(e) e.oninput=function(){ BLQ[x[1]]=e.value; }; });
+    var e=$('#'+x[0]); if(e) e.oninput=function(){ BLQ[x[1]]=e.value; var t=$('[data-blqtot]'); if(t) _bloqueHorasPintar_(); }; });
   var rs=$('#blqResumen');
   if(rs) rs.oninput=function(){ BLQ.resumen=rs.value; var c=$('#blqCuenta'); if(c) c.textContent=rs.value.trim().length+' / '+BLQ_MIN_RESUMEN; };
-  var inv=$('#blqInv'), sg=$('#blqSug');
-  if(inv) inv.oninput=function(){
-    var q=_sinTildes_(inv.value.trim());
-    if(!q){ sg.style.display='none'; return; }
-    var ya={}; BLQ.parts.forEach(function(p){ ya[p.nombre]=1; });
-    var hits=_activos_().filter(function(m){ return !ya[m.nombre] && _sinTildes_(m.nombre).indexOf(q)>=0; }).slice(0,6);
-    if(!hits.length){ sg.style.display='none'; return; }
-    sg.innerHTML=hits.map(function(m){ return '<div data-blqs="'+esc(m.nombre)+'" data-p style="padding:8px 10px;cursor:pointer">'+
-      esc(m.nombre)+' <small style="color:var(--ink3)">'+esc(m.cargo||m.unidad||'')+'</small></div>'; }).join('');
-    sg.style.display='';
-    $$('[data-blqs]').forEach(function(d){ d.onclick=function(){
-      BLQ.parts.push({nombre:d.dataset.blqs, horas:''}); inv.value=''; sg.style.display='none'; chips(); }; });
-  };
   var env=$('#blqEnviar');
   if(env) env.onclick=async function(){
     if(env.disabled || B.env) return;
@@ -10719,8 +10889,9 @@ function _asisListaTxt_(v){
    son los de `orden_dia.py` (el servidor los vuelve a comprobar). Una sola implementación para las dos caras. */
 var ORD_TOPE_FILAS=40, ORD_TOPE_TEMA=200, ORD_TOPE_QUIEN=80;
 var ORD_PDF_MAX=8*1024*1024;              // = `orden_dia.PDF_MAX`
-var ORD={};                               // id -> {e:{filas,por,at,puede,pdf}, draft:[…]|null, visor:url|null, sub:{pct,nombre}|null}
-function _ordSt_(id){ return ORD[id]||(ORD[id]={e:null,draft:null,visor:null,sub:null}); }
+var ORD={};                               // id -> {e:{filas,por,at,puede,pdf}, draft:[…]|null, visor:url|null, sub:{pct,nombre}|null, copia, ia, mic, base}
+function _ordSt_(id){ return ORD[id]||(ORD[id]={e:null,draft:null,visor:null,sub:null,copia:null,ia:{texto:'',fase:null},mic:null,base:null}); }
+var ORD_VOZ_MAX_S=90;                     // un dictado: 90 s a 24 kbps son ~270 KB, bajo los 600 KB de `servidor.DICTADO_AUDIO_MAX`
 function _ordHoras_(f){ return f.desde ? (f.hasta ? f.desde+' – '+f.hasta : f.desde) : (f.hasta||''); }
 function _ordKB_(n){ return n>=1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
 
@@ -10728,8 +10899,19 @@ function _ordenDiaReuHTML_(r){
   if(!r || !r.id) return '';
   if(!(typeof backendOK!=='undefined' && backendOK && typeof SESION!=='undefined' && SESION)) return '';
   var st=_ordSt_(r.id);
+  /* A quién se puede poner de «quién introduce»: los convocados de ESTA reunión (y quien la convoca). */
+  st.conv=(Array.isArray(r.invitados)?r.invitados:[]).filter(function(n){ return !!n; }).concat(r.convocante?[r.convocante]:[]);
   setTimeout(function(){ if(!st.e) _ordenRefrescar_(r.id); else _ordenPintar_(r.id); },0);
   return '<div data-ordendia="'+esc(r.id)+'">'+(st.e?_ordenHTML_(r.id):'')+'</div>';
+}
+/* La tabla de sólo lectura: la del orden guardado y la de la PROPUESTA de SolarIA (una sola forma de pintar filas). */
+function _ordTablaHTML_(filas){
+  return '<table style="width:100%;border-collapse:collapse;font-size:13px" data-ordtabla>'+
+    filas.map(function(f){
+      return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px 5px 0;white-space:nowrap;color:var(--ink3);vertical-align:top">'+esc(_ordHoras_(f))+'</td>'+
+        '<td style="padding:5px 8px 5px 0;vertical-align:top">'+esc(f.tema)+'</td>'+
+        '<td style="padding:5px 0;color:var(--ink3);vertical-align:top;text-align:right">'+esc(f.quien||'')+'</td></tr>';
+    }).join('')+'</table>';
 }
 function _ordenHTML_(id){
   var st=_ordSt_(id), e=st.e; if(!e) return '';
@@ -10737,20 +10919,13 @@ function _ordenHTML_(id){
   if(st.draft){
     cuerpo=_ordenEditHTML_(st);
   } else {
-    if(e.filas&&e.filas.length) cuerpo='<table style="width:100%;border-collapse:collapse;font-size:13px" data-ordtabla>'+
-      e.filas.map(function(f){
-        return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px 5px 0;white-space:nowrap;color:var(--ink3);vertical-align:top">'+esc(_ordHoras_(f))+'</td>'+
-          '<td style="padding:5px 8px 5px 0;vertical-align:top">'+esc(f.tema)+'</td>'+
-          '<td style="padding:5px 0;color:var(--ink3);vertical-align:top;text-align:right">'+esc(f.quien||'')+'</td></tr>';
-      }).join('')+'</table>'+(e.por?'<p class="rnota" style="margin:6px 0 0">Editado por '+esc(e.por)+'.</p>':'');
+    if(e.filas&&e.filas.length) cuerpo=_ordTablaHTML_(e.filas)+(e.por?'<p class="rnota" style="margin:6px 0 0">Editado por '+esc(e.por)+'.</p>':'');
     else if(!e.pdf) cuerpo='<div class="rnota">Todavía no hay orden del día.</div>';
     if(e.puede) cuerpo+='<button class="btn mini" style="margin-top:7px" data-ordeditar>✏️ '+(e.filas&&e.filas.length?'Editar la tabla':'Escribir el orden del día')+'</button>';
   }
   return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+cab+cuerpo+_ordenPdfHTML_(st)+'</div>';
 }
 function _ordenEditHTML_(st){
-  var nombres=(typeof _activos_==='function'?_activos_():[]).map(function(m){ return m.nombre; });
-  var ls='<datalist id="ordQuienLs">'+nombres.map(function(n){ return '<option value="'+esc(n)+'">'; }).join('')+'</datalist>';
   var inp='width:100%;box-sizing:border-box;min-width:0';
   var filas=st.draft.map(function(f,i){
     return '<div data-ordfila="'+i+'" style="border-top:1px solid var(--line);padding:7px 0">'+
@@ -10762,13 +10937,69 @@ function _ordenEditHTML_(st){
         '<button type="button" class="btn mini" data-ordbajar="'+i+'" aria-label="Bajar punto"'+(i<st.draft.length-1?'':' disabled')+'>▼</button>'+
         '<button type="button" class="btn mini" data-ordborrar="'+i+'" aria-label="Quitar punto" style="color:var(--warn);border-color:var(--warn)">✕</button></span></div>'+
       '<input data-ordcampo="tema" value="'+esc(f.tema)+'" maxlength="'+ORD_TOPE_TEMA+'" placeholder="De qué se habla" style="'+inp+';margin-top:6px">'+
-      '<input data-ordcampo="quien" list="ordQuienLs" value="'+esc(f.quien)+'" maxlength="'+ORD_TOPE_QUIEN+'" placeholder="Quién lo introduce" autocomplete="off" style="'+inp+';margin-top:6px"></div>';
+      '<span class="sc" style="display:block;margin:7px 0 4px">Quién lo introduce</span>'+
+      /* El selector de personas ÚNICO, de uno en uno y entre los convocados (antes: un campo libre con datalist). */
+      elegirPersonas('ordq'+i, {universo:(st.conv||[]).concat(f.quien&&(st.conv||[]).indexOf(f.quien)<0?[f.quien]:[]),
+        marcadas:f.quien?[f.quien]:[], multi:false, titulo:'Quién lo introduce', vacio:'Sin responsable',
+        alCambiar:function(l){ if(st.draft&&st.draft[i]) st.draft[i].quien=l[0]||''; }})+'</div>';
   }).join('');
-  return ls+(filas||'<div class="rnota">Sin puntos. Añade el primero.</div>')+
+  var ia=st.ia, prop=ia.fase==='propuesta';
+  /* Con una propuesta delante la tabla de abajo no se toca (sería de otra tabla): se decide primero. */
+  return (prop ? '<div class="rnota">Tabla actual: '+st.draft.length+' puntos. Abajo, la propuesta de SolarIA.</div>' :
+      (filas||'<div class="rnota">Sin puntos. Añade el primero.</div>'))+
     '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'+
-      '<button type="button" class="btn mini" data-ordanadir'+(st.draft.length>=ORD_TOPE_FILAS?' disabled':'')+'>+ Añadir punto</button>'+
+      '<button type="button" class="btn mini" data-ordanadir'+(prop||st.draft.length>=ORD_TOPE_FILAS?' disabled':'')+'>+ Añadir punto</button>'+
+      '<button type="button" class="btn mini" data-ordcopiar'+(prop?' disabled':'')+'>📋 Copiar de otra reunión</button>'+
       '<span style="flex:1"></span><button type="button" class="btn mini" data-ordcancelar>Cancelar</button>'+
-      '<button type="button" class="btn mini pri" data-ordguardar>Guardar</button></div>';
+      '<button type="button" class="btn mini pri" data-ordguardar'+(prop?' disabled':'')+'>Guardar</button></div>'+
+    _ordenCopiaHTML_(st)+_ordenSolariaHTML_(st);
+}
+/* «Copiar de otra reunión»: buscador de las reuniones que ya tienen orden del día; su tabla entra como BASE (editable) y no
+   se guarda nada hasta «Guardar». `st.copia` = null · {q, lista:null|[…]} ; `st.avisoCopia` = {titulo, antes} para deshacer. */
+function _ordCopiaFiltro_(lista, q){
+  var n=_sinTildes_(String(q||'')).toLowerCase().trim();
+  return (lista||[]).filter(function(x){ return !n || _sinTildes_(String(x.titulo||'')+' '+String(x.fecha||'')).toLowerCase().indexOf(n)>=0; });
+}
+function _ordCopiaListaHTML_(st){
+  var c=st.copia; if(!c) return '';
+  if(!c.lista) return '<div class="rnota">Buscando reuniones con orden del día…</div>';
+  var v=_ordCopiaFiltro_(c.lista, c.q);
+  if(!c.lista.length) return '<div class="rnota">Ninguna otra reunión tiene todavía orden del día.</div>';
+  if(!v.length) return '<div class="rnota">Ninguna reunión coincide.</div>';
+  return v.slice(0,30).map(function(x){
+    return '<button type="button" class="btn mini" data-ordcopiarde="'+esc(x.id)+'" style="display:block;width:100%;text-align:left;margin-top:5px;white-space:normal">'+
+      esc(x.titulo||('Reunión '+x.id))+' <span style="color:var(--ink3)">· '+esc(x.fecha||'sin fecha')+' · '+x.n+' punto'+(x.n===1?'':'s')+'</span></button>';
+  }).join('');
+}
+function _ordenCopiaHTML_(st){
+  var h='';
+  if(st.avisoCopia) h+='<div class="rnota" data-ordavisocopia style="margin-top:8px">Copiada de «'+esc(st.avisoCopia.titulo)+'». <button type="button" class="btn mini" data-ordcopiaundo>Deshacer</button></div>';
+  if(st.copia) h+='<div data-ordcopiapanel style="margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px">'+
+    '<input data-ordbuscar value="'+esc(st.copia.q)+'" placeholder="Busca por título o fecha" autocomplete="off" style="width:100%;box-sizing:border-box">'+
+    '<div data-ordcopialista>'+_ordCopiaListaHTML_(st)+'</div>'+
+    '<div style="text-align:right;margin-top:6px"><button type="button" class="btn mini" data-ordcopiacerrar>Cerrar</button></div></div>';
+  return h;
+}
+/* La caja de SolarIA + el micrófono. `st.ia` = {texto, fase: null·'pensando'·'propuesta'·'usada'·'error', prop, nota, orig, msg, id};
+   `st.mic` = null · {fase:'grabando'|'transcribiendo', rec}. ⛔ La caja está BLOQUEADA mientras se graba, se transcribe o SolarIA
+   piensa, y lo dictado se AÑADE al final de lo que hay: nunca lo pisa (`_ordenMicFin_`). */
+function _ordenOcupado_(st){ return !!((st.mic&&st.mic.fase) || st.ia.fase==='pensando' || st.ia.fase==='propuesta'); }
+function _ordenSolariaHTML_(st){
+  var ia=st.ia, mic=st.mic, h='<div data-ordia style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+
+    '<span class="sc" style="display:block;margin-bottom:4px">Dile a SolarIA qué quieres</span>';
+  h+='<textarea data-ordiatxt rows="3" maxlength="2000"'+(_ordenOcupado_(st)?' readonly':'')+' placeholder="Por ejemplo: basándote en la última reunión, mantén «Inclusión de puntos» y «Ruegos y preguntas», y añade puntos para el presupuesto y el test de motor." style="width:100%;box-sizing:border-box">'+esc(ia.texto)+'</textarea>';
+  h+='<div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">'+
+    '<button type="button" class="btn mini" data-ordmic aria-label="Dictar"'+((mic&&mic.fase==='transcribiendo')||ia.fase==='pensando'||ia.fase==='propuesta'?' disabled':'')+'>'+
+      (mic&&mic.fase==='grabando'?'⏹ Parar':'🎙 Dictar')+'</button>'+
+    '<span class="rnota" style="flex:1;margin:0">'+(mic&&mic.fase==='grabando'?'Grabando… habla y pulsa «Parar».':mic&&mic.fase==='transcribiendo'?'Transcribiendo…':ia.fase==='pensando'?'SolarIA está escribiendo… (unos 20 s)':'')+'</span>'+
+    '<button type="button" class="btn mini pri" data-ordiaenviar'+(_ordenOcupado_(st)||!String(ia.texto||'').trim()?' disabled':'')+'>✨ Enviar a SolarIA</button></div>';
+  if(ia.fase==='propuesta') h+='<div data-ordiaprop style="margin-top:8px"><span class="sc" style="display:block;margin-bottom:4px">Propuesta de SolarIA</span>'+
+    _ordTablaHTML_(ia.prop)+'<p class="rnota" style="margin:6px 0 0">'+esc(ia.nota||'Esta es la propuesta. Revísala antes de usarla.')+'</p>'+
+    '<div style="display:flex;gap:8px;margin-top:6px"><button type="button" class="btn mini pri" data-ordiaok>Usar esto</button>'+
+    '<button type="button" class="btn mini" data-ordiano>Deshacer</button></div></div>';
+  if(ia.fase==='usada') h+='<div class="rnota" style="margin-top:8px">Propuesta aplicada a la tabla. <button type="button" class="btn mini" data-ordiaun>Volver a la anterior</button></div>';
+  if(ia.fase==='error') h+='<div class="rnota" style="margin-top:8px;color:var(--warn)">'+esc(ia.msg)+' Tu tabla sigue como estaba.</div>';
+  return h+'</div>';
 }
 function _ordenPdfHTML_(st){
   var e=st.e, sub=st.sub, h='';
@@ -10792,6 +11023,13 @@ function _ordenPintar_(id){
     el.oninput=function(ev){
       var c=ev.target.closest?ev.target.closest('[data-ordcampo]'):null, fi=c&&c.closest('[data-ordfila]');
       if(c&&fi&&st.draft) st.draft[+fi.getAttribute('data-ordfila')][c.getAttribute('data-ordcampo')]=c.value;
+      if(ev.target.matches&&ev.target.matches('[data-ordiatxt]')){
+        st.ia.texto=ev.target.value; var b=el.querySelector('[data-ordiaenviar]');
+        if(b) b.disabled=_ordenOcupado_(st)||!String(st.ia.texto).trim();
+      }
+      if(ev.target.matches&&ev.target.matches('[data-ordbuscar]')&&st.copia){      // sólo la lista: repintar todo quitaría el foco
+        st.copia.q=ev.target.value; var l=el.querySelector('[data-ordcopialista]'); if(l) l.innerHTML=_ordCopiaListaHTML_(st);
+      }
     };
     var f=el.querySelector('[data-ordpdffile]');
     if(f) f.onchange=function(){ if(f.files&&f.files[0]) _ordenSubirPdf_(id, f.files[0]); f.value=''; };
@@ -10803,14 +11041,108 @@ async function _ordenRefrescar_(id){
   if(!st.e.filas) st.e.filas=[];
   _ordenPintar_(id);
 }
+/* Suelta lo de editar (borrador, copia, caja de SolarIA). ⛔ Una grabación en marcha se corta sin transcribir. */
+function _ordenSoltar_(st, draft){
+  if(st.mic&&st.mic.rec){ st.mic.cancelada=true; try{ st.mic.rec.stop(); }catch(_){} }
+  st.draft=draft||null; st.copia=null; st.avisoCopia=null; st.base=null; st.mic=null;
+  st.ia={texto:'',fase:null,id:(st.ia&&st.ia.id)||0};            // el contador no vuelve a 0: una respuesta tardía no casa con la caja nueva
+}
+async function _ordenCopiaAbrir_(id){
+  var st=_ordSt_(id);
+  if(st.copia){ st.copia=null; return _ordenPintar_(id); }
+  st.copia={q:'',lista:null}; _ordenPintar_(id);
+  try{ st.copia.lista=await api.listarOrdenesDia(id); }
+  catch(e){ st.copia=null; tostErr('No se pudieron buscar las reuniones: ', e); }
+  _ordenPintar_(id);
+}
+async function _ordenCopiarDe_(id, otro){
+  var st=_ordSt_(id), x=st.copia&&(st.copia.lista||[]).filter(function(y){ return String(y.id)===String(otro); })[0];
+  if(!x||!st.draft) return;
+  var d;
+  try{ d=await api.getOrdenDia(x.id); }catch(e){ tostErr('No se pudo copiar: ', e); return; }
+  if(!st.draft||!d||!d.filas||!d.filas.length){ tost('Esa reunión ya no tiene orden del día.'); return; }
+  st.avisoCopia={titulo:x.titulo||('Reunión '+x.id), antes:st.draft};
+  st.draft=d.filas.map(function(f){ return {desde:f.desde||'',hasta:f.hasta||'',tema:f.tema||'',quien:f.quien||''}; });
+  st.base=x.id; st.copia=null; st.ia.fase=null;
+  _ordenPintar_(id);
+}
+/* «Enviar a SolarIA»: la tabla del borrador + el texto + la reunión base (si se copió). Sólo PROPONE: «Usar esto / Deshacer». */
+async function _ordenSolaria_(id){
+  var st=_ordSt_(id), ia=st.ia, texto=String(ia.texto||'').trim();
+  if(!texto||_ordenOcupado_(st)||!st.draft) return;
+  var n=(ia.id||0)+1, filas=st.draft.filter(function(f){ return f.hasta||String(f.tema).trim()||String(f.quien).trim(); }), r;
+  ia.id=n; ia.fase='pensando'; _ordenPintar_(id);
+  var vigente=function(){ return st.ia===ia && ia.fase==='pensando' && ia.id===n; };
+  try{ r=await api.proponerOrdenDia(id, filas, texto, st.base); }
+  catch(e){ if(vigente()){ ia.fase='error'; ia.msg='SolarIA no ha podido: '+((e&&e.message)||e)+'.'; _ordenPintar_(id); } return; }
+  if(!vigente()) return;
+  if(!r||r.ok===false||!r.filas||!r.filas.length){ ia.fase='error'; ia.msg='SolarIA no ha podido'+(r&&r.motivo?': '+r.motivo:'')+'.'; }
+  else{ ia.fase='propuesta'; ia.prop=r.filas; ia.nota=r.nota||''; }
+  _ordenPintar_(id);
+}
+/* El micrófono (MediaRecorder). Graba hasta «Parar» o `ORD_VOZ_MAX_S`; sube el audio de una vez a `transcribirVoz`. */
+function _ordenMicTipo_(){
+  var ts=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];
+  for(var i=0;i<ts.length;i++){ try{ if(MediaRecorder.isTypeSupported(ts[i])) return ts[i]; }catch(_){} }
+  return '';
+}
+function _ordenMicExt_(tipo){ return /mp4/.test(tipo)?'.mp4':/ogg/.test(tipo)?'.ogg':'.webm'; }
+async function _ordenMic_(id){
+  var st=_ordSt_(id), m=st.mic;
+  if(m&&m.fase==='transcribiendo') return;
+  if(m&&m.fase==='grabando'){ try{ m.rec.stop(); }catch(_){} return; }
+  if(_ordenOcupado_(st)) return;
+  if(st.ia.fase==='error') st.ia.fase=null;                         // el aviso de un intento anterior no se queda tapando el dictado
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder)){ tost('Este navegador no puede grabar audio.'); return; }
+  var stream;
+  try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ tost('No tengo permiso para usar el micrófono.'); return; }
+  var tipo=_ordenMicTipo_(), trozos=[], rec;
+  try{ rec=new MediaRecorder(stream, tipo?{mimeType:tipo,audioBitsPerSecond:24000}:{audioBitsPerSecond:24000}); }
+  catch(e){ stream.getTracks().forEach(function(t){ t.stop(); }); tost('Este navegador no puede grabar audio.'); return; }
+  var mic=st.mic={fase:'grabando',rec:rec,cancelada:false}, corte=setTimeout(function(){ try{ rec.stop(); }catch(_){} }, ORD_VOZ_MAX_S*1000);
+  rec.ondataavailable=function(ev){ if(ev.data&&ev.data.size) trozos.push(ev.data); };
+  rec.onstop=function(){
+    clearTimeout(corte); stream.getTracks().forEach(function(t){ t.stop(); });
+    if(mic.cancelada||st.mic!==mic) return;
+    _ordenMicFin_(id, mic, new Blob(trozos,{type:rec.mimeType||tipo||'audio/webm'}));
+  };
+  rec.start();
+  _ordenPintar_(id);
+}
+async function _ordenMicFin_(id, mic, blob){
+  var st=_ordSt_(id), nuevo='';
+  mic.fase='transcribiendo'; _ordenPintar_(id);
+  try{
+    var r=await api.transcribirVoz(id, _ordenMicExt_(blob.type), await _audioB64_(blob));
+    nuevo=String((r&&r.texto)||'').trim();
+    if(!nuevo) tost('No he oído nada. Prueba otra vez.');
+  }catch(e){ tostErr('No se pudo transcribir: ', e); }
+  if(st.mic!==mic) return;                                           // se canceló o se guardó mientras tanto
+  st.mic=null;
+  /* ⛔ NUNCA pisa: se lee lo que hay AHORA en la caja (no una copia vieja) y lo dictado va detrás. */
+  var caja=document.querySelector('[data-ordendia="'+String(id).replace(/"/g,'')+'"] [data-ordiatxt]'), antes=caja?caja.value:String(st.ia.texto||'');
+  st.ia.texto=nuevo ? antes+(antes&&!/\s$/.test(antes)?' ':'')+nuevo : antes;
+  _ordenPintar_(id);
+}
 function _ordenQuitarVisor_(st){ if(st.visor){ try{ URL.revokeObjectURL(st.visor); }catch(_){} st.visor=null; } }
 async function _ordenClic_(id, ev){
   var st=_ordSt_(id), t=ev.target&&ev.target.closest?ev.target:null; if(!t||!st.e) return;
   var q=function(a){ return t.closest('['+a+']'); }, n=function(a){ return +q(a).getAttribute(a); };
   if(q('data-ordeditar')){ st.draft=(st.e.filas||[]).map(function(f){ return {desde:f.desde||'',hasta:f.hasta||'',tema:f.tema||'',quien:f.quien||''}; });
     if(!st.draft.length) st.draft.push({desde:'',hasta:'',tema:'',quien:''});
-    return _ordenPintar_(id); }
-  if(q('data-ordcancelar')){ st.draft=null; return _ordenPintar_(id); }
+    _ordenSoltar_(st, st.draft); return _ordenPintar_(id); }
+  if(q('data-ordcancelar')){ _ordenSoltar_(st); return _ordenPintar_(id); }
+  if(q('data-ordcopiar')) return _ordenCopiaAbrir_(id);
+  if(q('data-ordcopiacerrar')){ st.copia=null; return _ordenPintar_(id); }
+  if(q('data-ordcopiarde')) return _ordenCopiarDe_(id, q('data-ordcopiarde').getAttribute('data-ordcopiarde'));
+  if(q('data-ordcopiaundo') && st.avisoCopia){ st.draft=st.avisoCopia.antes; st.base=null; st.avisoCopia=null; return _ordenPintar_(id); }
+  if(q('data-ordmic')) return _ordenMic_(id);
+  if(q('data-ordiaenviar')) return _ordenSolaria_(id);
+  if(q('data-ordiaok') && st.ia.fase==='propuesta'){ st.ia.orig=st.draft; st.draft=st.ia.prop.map(function(f){ return {desde:f.desde||'',hasta:f.hasta||'',tema:f.tema||'',quien:f.quien||''}; });
+    st.ia.fase='usada'; st.ia.prop=null; st.avisoCopia=null; return _ordenPintar_(id); }
+  if(q('data-ordiano') && st.ia.fase==='propuesta'){ st.ia.fase=null; st.ia.prop=null; return _ordenPintar_(id); }
+  if(q('data-ordiaun') && st.ia.fase==='usada'){ st.draft=st.ia.orig; st.ia.fase=null; st.ia.orig=null; return _ordenPintar_(id); }
   if(q('data-ordanadir') && st.draft && st.draft.length<ORD_TOPE_FILAS){
     var ult=st.draft[st.draft.length-1];
     st.draft.push({desde:ult?ult.hasta:'',hasta:'',tema:'',quien:''}); return _ordenPintar_(id); }
@@ -10825,7 +11157,7 @@ async function _ordenClic_(id, ev){
     try{
       var r=await api.guardarOrdenDia(id, filas);
       st.e.filas=r.filas||filas; st.e.por=(typeof YO!=='undefined'&&YO&&YO.nombre)||st.e.por; st.draft=null;
-      tost('Orden del día guardado.');
+      _ordenSoltar_(st); tost('Orden del día guardado.');
     }catch(e){ b.disabled=false; tostErr('No se pudo guardar: ', e); return; }
     return _ordenPintar_(id);
   }
