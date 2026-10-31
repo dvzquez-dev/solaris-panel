@@ -28,6 +28,19 @@ function _rederivarCargos_(){
    casan con el roster (un turno del Discord firmado con otro apellido, un parte de
    alguien que ya se fue). _m() SIEMPRE devuelve algo pintable y marca al desconocido. */
 
+/* 31/10 (pasada de usuario, fila 2): los chips de unidad de Miembros filtran la tabla. «Todas» (data-mu vacío) quita el filtro;
+   cada unidad se marca/desmarca y se pueden combinar. */
+function _engMiembros_(){
+  $$('[data-mu]').forEach(function(b){
+    b.onclick=function(){
+      var u=b.dataset.mu;
+      if(!u){ Object.keys(MIEMB_U).forEach(function(k){ delete MIEMB_U[k]; }); }
+      else MIEMB_U[u]=!MIEMB_U[u];
+      pintar();
+    };
+  });
+}
+
 function _m(n){
   var x=miembro(n); if(x) return x;
   var nom=String(n||'').trim();

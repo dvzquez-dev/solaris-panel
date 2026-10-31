@@ -75,14 +75,36 @@ var CATS_DESGLOSE=[
   {k:'desplaz', eti:'Desplazamientos',           color:'var(--warn)', cat:[],         pal:['desplaz']},
   {k:'entrev',  eti:'Entrevistas',               color:'#9B7FD1',     cat:[],         pal:['entrevista']},
   {k:'turno',   eti:'Turnos',                    color:'#D9C24A',     cat:['turno'],  pal:[]},
+  {k:'congreso',eti:'Congresos y competiciones', color:'#4FB8A5',     cat:[],         pal:[]},
   {k:'otras',   eti:'Otras contribuciones',      color:'var(--ink2)', cat:[],         pal:[]}
 ];
+
+/* ⛔ 01/11 · LA SUBCATEGORÍA DE LA COMPENSACIÓN (Daniel: *«en compensación escoger a qué subcategoría de compensación va. Algo
+   para lo cual Notion es ciego, pero queremos que la app no»*). Se ELIGE al declarar u otorgar, viaja en el parte como `subcat`
+   y manda sobre las palabras del texto; sin ella (todo lo anterior) se clasifica como hasta hoy. En Notion sigue sumando en
+   «Compensaciones». Los valores son los que acepta `rutinas/servidor.py:SUBCATS_COMP`; el segundo es la `k` de CATS_DESGLOSE. */
+var SUBCATS_COMP=[['desplazamiento','Desplazamiento','desplaz'],['entrevistas','Entrevistas','entrev'],
+  ['congresos','Congresos y competiciones','congreso'],['otras','Otras','otras']];
+function _subcatClave_(v){
+  for(var i=0;i<SUBCATS_COMP.length;i++) if(SUBCATS_COMP[i][0]===v) return SUBCATS_COMP[i][2];
+  return null;
+}
+/* Los chips de la subcategoría de un formulario de «Declarar» (sólo con la categoría «Compensación»; con otra, ''). `attr` es
+   el atributo del botón; `sel`, la elegida (o ''); `clase`, la del botón de la cara. Tocar la elegida la suelta. */
+function _subcatHTML_(attr, sel, cat, clase){
+  if(cat!=='compensacion') return '';
+  return '<div class="campo"><span class="sc" style="display:block;margin-bottom:5px">Subcategoría</span>'+
+    _chipsElegir_(attr, sel, SUBCATS_COMP.map(function(o){ return [o[0],o[1]]; }), clase)+'</div>';
+}
+/* Lo que viaja al servidor: la subcategoría elegida si la categoría es la compensación; si no, nada. */
+function _subcatEnvio_(f){ return (f && f.cat==='compensacion' && _subcatClave_(f.subcat)) ? f.subcat : null; }
 
 /* La clave de categoría de una partida (parte normalizado de cualquiera de las dos caras, o una fila FIJA con `cat`). */
 function catDesglose(p){
   if(!p) return 'otras';
   var i, j, t=_sinTildes_([p.t,p.tarea,p.nota,p.motivo,p.just,p.justificacion,p.decidido_por].join(' '));
   if(p.catDesglose) return p.catDesglose;
+  if(p.subcat && _subcatClave_(p.subcat)) return _subcatClave_(p.subcat);
   for(i=0;i<CATS_DESGLOSE.length;i++) for(j=0;j<CATS_DESGLOSE[i].pal.length;j++)
     if(t.indexOf(CATS_DESGLOSE[i].pal[j])>=0) return CATS_DESGLOSE[i].k;
   for(i=0;i<CATS_DESGLOSE.length;i++) if(CATS_DESGLOSE[i].cat.indexOf(p.cat)>=0) return CATS_DESGLOSE[i].k;
@@ -101,6 +123,30 @@ function agruparDesglose(ps){
     return {k:c.k, eti:c.eti, color:c.color, items:g[c.k],
       h:g[c.k].reduce(function(t,p){ return t+(Number(p.q!=null?p.q:p.horas)||0); },0)};
   });
+}
+
+/* ⛔⛔ LA REGLA DE DANIEL (31/10): *«Siempre está la regla de que compensaciones en el Notion tiene que valer la suma de
+   compensación por tu cargo más otras.»* El desglose por categorías es sólo de la app; en Notion todo lo que no es tarea,
+   turno ni reunión suma en «Compensaciones». Esta puerta comprueba que esa cifra (`m.compensaciones`) vale la base del
+   cargo + las partidas confirmadas del mes que Notion mete en ese cajón (`cat` ni tareas/turno/reunión, y no la base).
+   · `partes`: los partes de ESA persona (o los de todos: se filtra por `m.nombre`). `periodo` 'AAAA-MM'; sin él, el abierto.
+   · Devuelve `{ok, notion, cargo, resto, diferencia}` (diferencia = notion − (cargo+resto)) o `null` si FALTA un dato
+     (sin cifra de Notion, sin lista de partes o sin periodo): «no lo sé» NUNCA es `ok:true` (§3c-24).
+   · Margen: hasta 0,01 h cuadra (los redondeos al céntimo de hora). Sólo la ve el PD (rango ≥ 3), en el Registro del mes. */
+var MARGEN_COMP_H = 0.01;
+function cuadraCompensaciones(m, partes, periodo){
+  var per = periodo || ((typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null);
+  if(!m || !_compEsReal_(m) || !partes || typeof partes.forEach!=='function' || !/^\d{4}-\d{2}$/.test(String(per||''))) return null;
+  var resto = 0;
+  partes.forEach(function(p){
+    if(!p || p.autor!==m.nombre || ['conf','otor','aprobado'].indexOf(p.estado)<0 || _esDeMesPasado_(p, per)) return;
+    if(['tareas','turno','reunion'].indexOf(p.cat)>=0 || catDesglose(p)==='cargo') return;
+    resto += Number(p.q!=null ? p.q : p.horas) || 0;
+  });
+  var cargo = _compBase_(m);
+  var dif = Math.round((m.compensaciones - (cargo + resto))*100)/100;
+  return {ok: Math.abs(dif) <= MARGEN_COMP_H + 1e-9, notion: m.compensaciones, cargo: cargo,
+          resto: Math.round(resto*100)/100, diferencia: dif};
 }
 
 function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
@@ -1223,6 +1269,138 @@ function _semanasDelMes_(ym){
   if(sem.length){ while(sem.length<7) sem.push(''); out.push(sem); }
   return out;
 }
+/* 31/10 · CONTROLES PROPIOS (encargo nativos1; Daniel: «un fucking tick clásico de HTML. Cero customizado»). Un componente
+   se declara UNA vez aquí y cada pantalla lo llama; ninguno es un `<select>` ni un `<input type=date|time|number|checkbox>`.
+   Todos dejan un `<input type="hidden">` (con el `id` y los `attrs` que se le pidan) que guarda el valor, así que el
+   código de la pantalla sigue leyendo `.value` y escuchando `change` sin enterarse. Las fechas viajan en ISO y se
+   enseñan DD/MM/AAAA. Para cambiar el valor desde código: `nxPon(id, valor)` (repinta; no dispara `change`).
+     nxElige(id, [[v,texto],…], val, {attrs, off, buscar})   chips `.pick`; con más de 8 opciones, buscador
+     nxHora(id, 'HH:MM', {paso, attrs, off})                   − / + de `paso` minutos (15) y «‹‹ ››» de una hora
+     nxNum(id, n, {min, max, paso, sufijo, attrs, off})         − / + con el valor en medio
+     nxFecha(id, iso, {min, max, vacio, attrs, off})            Hoy · Mañana · +1 semana · Otro día… (calendario propio) */
+var _MESES_NT_ = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+/* El calendario de un mes (`AAAA-MM`) con `valor` marcado. `a` = {dia, mes}: los atributos `data-…` de cada día y de
+   las flechas, para que «Nueva tarea» y `nxFecha` pinten el MISMO calendario con sus propios manejadores. Lo que cae
+   fuera de `min`/`max` (ISO) sale apagado. */
+function _calendarioHtml_(mes, valor, hoy, a, min, max){
+  var y = +mes.slice(0, 4), m = +mes.slice(5, 7), ant = m === 1 ? (y-1)+'-12' : y+'-'+(m<11 ? '0' : '')+(m-1),
+      sig = m === 12 ? (y+1)+'-01' : y+'-'+(m<9 ? '0' : '')+(m+1);
+  return '<div class="nt-cal"><div class="nt-calh"><button type="button" class="btn sm" aria-label="Mes anterior" '+a.mes+'="'+ant+'">‹</button>'+
+    '<b>'+_MESES_NT_[m-1]+' '+y+'</b><button type="button" class="btn sm" aria-label="Mes siguiente" '+a.mes+'="'+sig+'">›</button></div>'+
+    '<div class="nt-calg">'+['L','M','X','J','V','S','D'].map(function(d){ return '<span class="nt-dw">'+d+'</span>'; }).join('')+
+    _semanasDelMes_(mes).map(function(w){ return w.map(function(d){
+      return d ? '<button type="button" class="nt-d'+(d===valor ? ' on' : '')+(d===hoy ? ' hoy' : '')+'" '+a.dia+'="'+d+'"'+
+                 ((min && d < min) || (max && d > max) ? ' disabled style="opacity:.3;cursor:default"' : '')+'>'+(+d.slice(8))+'</button>'
+               : '<span></span>'; }).join(''); }).join('')+'</div></div>';
+}
+function _nxCaja_(tipo, id, val, o, extra, cuerpo){
+  return '<span class="nx nx-'+tipo+(o.off ? ' nx-off' : '')+'" data-nx="'+esc(id||'')+'" data-tipo="'+tipo+'"'+(extra||'')+'>'+
+    '<input type="hidden"'+(id ? ' id="'+esc(id)+'"' : '')+' value="'+esc(val)+'"'+(o.attrs ? ' '+o.attrs : '')+'>'+cuerpo+'</span>';
+}
+function nxElige(id, ops, val, o){
+  o = o || {}; val = String(val == null ? '' : val);
+  return _nxCaja_('elige', id, val, o, '', (o.buscar !== false && ops.length > 8 ? '<input class="nt-bus nx-bus" data-nxbus placeholder="Buscar…" aria-label="Buscar">' : '')+
+    '<span class="nt-fila">'+ops.map(function(p){
+      return '<button type="button" class="pick'+(String(p[0]) === val ? ' on' : '')+'" data-nxv="'+esc(p[0])+'"'+(o.off ? ' disabled' : '')+'>'+esc(p[1])+'</button>'; }).join('')+'</span>');
+}
+function _nxPasos_(tipo, o, medio){
+  var b = function(d, t, aria){ return '<button type="button" class="btn sm" data-nxs="'+d+'" aria-label="'+aria+'"'+(o.off ? ' disabled' : '')+'>'+t+'</button>'; };
+  return tipo === 'hora'
+    ? b(-60, '‹‹', 'Una hora menos')+b(-o.paso, '−', o.paso+' minutos menos')+medio+b(o.paso, '+', o.paso+' minutos más')+b(60, '››', 'Una hora más')
+    : b(-o.paso, '−', 'Menos')+medio+b(o.paso, '+', 'Más');
+}
+function nxHora(id, val, o){
+  o = o || {}; o.paso = o.paso || 15; val = String(val || '16:00');
+  return _nxCaja_('hora', id, val, o, ' data-paso="'+o.paso+'"', _nxPasos_('hora', o,
+    '<b class="mono nx-val" tabindex="0" role="spinbutton" aria-label="Hora">'+esc(val)+'</b>'));
+}
+function _nxTxtNum_(v, suf){ return v === '' ? '—' : String(v).replace('-', '−').replace('.', ',')+(suf ? ' '+suf : ''); }
+function nxNum(id, val, o){
+  o = o || {}; o.paso = o.paso || 1; val = val == null ? '' : String(val);
+  return _nxCaja_('num', id, val, o, ' data-paso="'+o.paso+'"'+(o.min != null ? ' data-min="'+o.min+'"' : '')+(o.max != null ? ' data-max="'+o.max+'"' : '')+
+    (o.sufijo ? ' data-sufijo="'+esc(o.sufijo)+'"' : ''), _nxPasos_('num', o,
+    '<b class="mono nx-val" tabindex="0" role="spinbutton" aria-label="Valor">'+esc(_nxTxtNum_(val, o.sufijo))+'</b>'));
+}
+function nxFecha(id, iso, o){
+  o = o || {}; iso = String(iso || '');
+  var c = document.createElement('div');   /* se pinta con `nxPinta` para que el HTML inicial y el repintado sean el mismo */
+  c.innerHTML = _nxCaja_('fecha', id, iso, o, (o.min ? ' data-min="'+o.min+'"' : '')+(o.max ? ' data-max="'+o.max+'"' : '')+(o.vacio ? ' data-vacio="1"' : ''),
+    '<span class="nt-fila nx-atajos"></span><b class="mono nx-val nx-fval"></b><span class="nx-cal" hidden></span>');
+  nxPinta(c.firstChild);
+  return c.innerHTML;
+}
+function _hoyNxISO_(){ return _dmyAISO_(typeof HOY === 'string' ? HOY : _hoyTxt_()); }
+function _nxAtajos_(caja){
+  var hoy = _hoyNxISO_(), min = caja.dataset.min || '';
+  var a = [['Hoy', hoy], ['Mañana', _isoMasDias_(hoy, 1)], ['+1 semana', _isoMasDias_(hoy, 7)]].filter(function(p){ return !min || p[1] >= min; });
+  if(caja.dataset.vacio) a.push(['Sin fecha', '']);
+  return a;
+}
+/* Repinta una caja desde su valor oculto. */
+function nxPinta(caja){
+  var inp = caja.querySelector('input[type=hidden]'), v = inp.value, t = caja.dataset.tipo;
+  if(t === 'elige') [].forEach.call(caja.querySelectorAll('[data-nxv]'), function(b){ b.classList.toggle('on', b.dataset.nxv === v); });
+  else if(t === 'hora') caja.querySelector('.nx-val').textContent = v;
+  else if(t === 'num') caja.querySelector('.nx-val').textContent = _nxTxtNum_(v, caja.dataset.sufijo);
+  else if(t === 'fecha'){
+    var cal = caja.querySelector('.nx-cal'), abierto = !cal.hidden, off = caja.classList.contains('nx-off') ? ' disabled' : '',
+        at = _nxAtajos_(caja), esAtajo = at.some(function(p){ return p[1] === v; });
+    caja.querySelector('.nx-atajos').innerHTML = at.map(function(p){
+      return '<button type="button" class="pick'+(p[1] === v && !abierto ? ' on' : '')+'" data-nxf="'+p[1]+'"'+off+'>'+esc(p[0])+'</button>'; }).join('')+
+      '<button type="button" class="pick'+(abierto || (v && !esAtajo) ? ' on' : '')+'" data-nxo="1" aria-expanded="'+abierto+'"'+off+'>Otro día…</button>';
+    caja.querySelector('.nx-fval').textContent = v ? _isoADMY_(v) : 'Sin fecha';
+    if(abierto) cal.innerHTML = _calendarioHtml_(caja.dataset.mes || (v || _hoyNxISO_()).slice(0, 7), v, _hoyNxISO_(), {dia:'data-nxf', mes:'data-nxm'}, caja.dataset.min, caja.dataset.max);
+  }
+}
+function nxPon(id, val){
+  var inp = document.getElementById(id); if(!inp) return;
+  inp.value = val == null ? '' : String(val);
+  var c = inp.closest('.nx'); if(c) nxPinta(c);
+}
+function _nxCambio_(caja, val){
+  var inp = caja.querySelector('input[type=hidden]');
+  if(inp.value === String(val)) return;
+  inp.value = val; nxPinta(caja);
+  inp.dispatchEvent(new Event('change', {bubbles:true}));
+}
+function _nxPaso_(caja, d){
+  var v = caja.querySelector('input[type=hidden]').value;
+  if(caja.dataset.tipo === 'hora'){
+    var hm = /^(\d{1,2}):(\d{2})$/.exec(v) || [0, 16, 0];
+    return _nxCambio_(caja, pad(Math.floor(Math.max(0, Math.min(1439, +hm[1]*60 + +hm[2] + d))/60))+':'+pad(Math.max(0, Math.min(1439, +hm[1]*60 + +hm[2] + d))%60));
+  }
+  var min = caja.dataset.min != null ? +caja.dataset.min : -Infinity, max = caja.dataset.max != null ? +caja.dataset.max : Infinity,
+      base = v === '' ? Math.max(min, Math.min(max, 0)) : +v;
+  _nxCambio_(caja, String(Math.max(min, Math.min(max, Math.round((base + d)*1000)/1000))));
+}
+(function(){
+  if(typeof document === 'undefined' || document._nxPuesto) return;
+  document._nxPuesto = true;
+  document.addEventListener('click', function(e){
+    var t = e.target, caja = t.closest && t.closest('.nx');
+    [].forEach.call(document.querySelectorAll('.nx-fecha .nx-cal:not([hidden])'), function(c){   /* un clic fuera cierra el calendario */
+      if(!caja || c.closest('.nx') !== caja){ c.hidden = true; nxPinta(c.closest('.nx')); } });
+    var b = caja && t.closest('button');
+    if(!b || b.disabled) return;
+    if(b.hasAttribute('data-nxv')) _nxCambio_(caja, b.dataset.nxv);
+    else if(b.hasAttribute('data-nxs')) _nxPaso_(caja, +b.dataset.nxs);
+    else if(b.hasAttribute('data-nxf')){ caja.querySelector('.nx-cal').hidden = true; caja.dataset.mes = ''; _nxCambio_(caja, b.dataset.nxf); nxPinta(caja); }
+    else if(b.hasAttribute('data-nxo')){ var cal = caja.querySelector('.nx-cal'); cal.hidden = !cal.hidden; caja.dataset.mes = ''; nxPinta(caja); }
+    else if(b.hasAttribute('data-nxm')){ caja.dataset.mes = b.dataset.nxm; nxPinta(caja); }
+  });
+  document.addEventListener('input', function(e){
+    var b = e.target; if(!b.hasAttribute || !b.hasAttribute('data-nxbus')) return;
+    var q = b.value.toLowerCase();
+    [].forEach.call(b.closest('.nx').querySelectorAll('[data-nxv]'), function(x){
+      x.style.display = (q && x.textContent.toLowerCase().indexOf(q) < 0 && !x.classList.contains('on')) ? 'none' : ''; });
+  });
+  document.addEventListener('keydown', function(e){   /* flechas en el valor: ±paso; Re Pág / Av Pág: ±1 h (o ±10 pasos) */
+    var v = e.target; if(!v.classList || !v.classList.contains('nx-val')) return;
+    var caja = v.closest('.nx'), p = +caja.dataset.paso || 1, k = e.key, g = caja.dataset.tipo === 'hora' ? 60 : p*10;
+    var d = k === 'ArrowUp' || k === 'ArrowRight' ? p : k === 'ArrowDown' || k === 'ArrowLeft' ? -p : k === 'PageUp' ? g : k === 'PageDown' ? -g : 0;
+    if(d){ e.preventDefault(); _nxPaso_(caja, d); }
+  });
+})();
 /* Insertar formato en el cuerpo: `tipo` = h · b · ul · ol · todo · tabla; `ini`/`fin` = la selección. Devuelve el texto y
    la selección nueva. Los de línea (h, ul, ol, todo, tabla) van al principio de la línea; la negrita envuelve lo marcado. */
 function _mdInsertar_(texto, ini, fin, tipo){
@@ -1469,6 +1647,22 @@ function _enlaceWeb_(url){
   var u=String(url == null ? '' : url).trim();
   return /^https?:\/\//i.test(u) ? '<a href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" style="color:var(--tel);word-break:break-all">'+esc(u)+'</a>' : '';
 }
+/* 31/10: TUS sanciones para apelar, en la cara que sea (`MIS_SANC` está en las dos). Falla hacia LISTA VACÍA (un servidor sin la
+   acción, o un corte, no pinta nada), nunca hacia una inventada. Devuelve si llegaron. */
+async function _cargarMisSanciones_(){
+  if(typeof MIS_SANC==='undefined' || _apelEsDemo_()) return true;     // la maqueta las calcula ella (`_misSancLista_`)
+  try{
+    var a=await api.getMisSanciones();
+    MIS_SANC=Array.isArray(a) ? a : [];
+    return Array.isArray(a);
+  }catch(e){ MIS_SANC=[]; return false; }
+}
+/* Los textos del formulario de apelar: UNO para las dos caras (el móvil lo abre en un modal; el escritorio, bajo la fila). */
+var APEL_SANC_TXT={
+  tienes:function(hasta){ return 'Tienes hasta el ' + (_isoADMY_(hasta) || '') + '. Mientras se resuelve, la sanción sigue aplicada.'; },
+  campo:'Qué pasó', ayuda:'Lo que quieres que se tenga en cuenta.', enlace:'Enlace o foto (si lo hay)',
+  vacio:'Escribe qué pasó: sin motivo no se envía.', enviada:'Apelación enviada. Te avisamos cuando respondan.'
+};
 /* Apelar: manda `{id, motivo, enlace}` y deja la apelación en la lista. Promesa de la apelación. */
 function _apelarSancion_(s, motivo, enlace){
   if(_apelEsDemo_()){
@@ -3679,14 +3873,14 @@ function _quienCambiaSanc_(){
   if (String(v == null ? '' : v) !== '' && String(v) !== String(SANC_FORM.ptsPropuesto)) return;
   SANC_FORM.pts = '';
   var p = _ptsPrefillSanc_();
-  if (e) e.value = p;
+  if (e) nxPon('snPts', p);
 }
 function _motivoCambiaSanc_(){
   var e = (typeof $ === 'function') ? $('#snPts') : null;
   var v = e ? e.value : SANC_FORM.pts;
   if (SANC_FORM.ptsPropuesto != null && String(v == null ? '' : v) === String(SANC_FORM.ptsPropuesto)) {
     SANC_FORM.pts = '';
-    if (e) e.value = '';
+    if (e) nxPon('snPts', '');
   }
 }
 
@@ -4200,6 +4394,39 @@ function _chipsElegir_(attr, sel, ops, clase){
   return '<span style="display:flex;gap:6px;flex-wrap:wrap">'+ops.map(function(o){
     return '<button type="button" class="'+(clase||'btn sm')+(sel===o[0]?' pri':'')+'" '+attr+'="'+esc(o[0])+'">'+esc(o[1])+'</button>';
   }).join('')+'</span>';
+}
+/* ⛔ 01/11 · LOS FICHAJES SIN DECLARAR, EN ORDEN Y SIN LOS CADUCADOS. 🗣️ Daniel: *«¿Por qué está el fichaje sin declarar más antiguo
+   por encima del más reciente? […] no sé cuál es cuál […] no aparece para cuándo expiran, porque al mes deberían de desaparecer
+   de aquí, porque si no es inútil»*. UNA regla para las dos caras (`lista` es la normalizada del móvil —`iso`, `caduca`, `e`— o la
+   cruda del escritorio —`fecha`, `caduca_at`, `estado`—): del MÁS RECIENTE al más antiguo por fecha Y HORA DE ENTRADA (dos
+   fichajes del mismo día empataban por la fecha y salían como llegaran), y fuera los que ya pasaron de su `caduca` (el barrido del
+   servidor puede ir por detrás) o, sin `caduca`, los de hace más de `DIAS_VISIBLE_SIN_CONTAR` días. Sólo toca los `sin declarar`
+   (y `detalle`, que sigue vivo): lo demás pasa tal cual y conserva su sitio. */
+function _claveOrdenFichaje_(p){
+  var iso = String((p && (p.iso || p.fecha)) || '').slice(0, 10), ini = String((p && p.ini) || '');
+  return iso + ' ' + (/^\d{1,2}:\d{2}$/.test(ini) ? ('0' + ini).slice(-5) : '00:00');
+}
+function _fichajeCaducado_(p, ahoraMs){
+  var cad = (p && (p.caduca || p.caduca_at)) || '', t = /^\d{4}-\d{2}-\d{2}/.test(String(cad)) ? Date.parse(cad) : NaN;
+  if(!isNaN(t)) return t < ahoraMs;
+  var f = Date.parse(String((p && (p.iso || p.fecha)) || '').slice(0, 10) + 'T23:59:59');
+  return !isNaN(f) && (ahoraMs - f) > DIAS_VISIBLE_SIN_CONTAR * 86400000;
+}
+function _sinDeclararOrdenados_(lista, ahoraMs){
+  return (lista || []).filter(function(p){
+    var e = p && (p.e || p.estado);
+    return !((e === 'sindecl' || e === 'sin_declarar') && _fichajeCaducado_(p, ahoraMs));
+  }).sort(function(a, b){ return _claveOrdenFichaje_(b).localeCompare(_claveOrdenFichaje_(a)); });
+}
+/* «caduca el DD/MM» de un parte por declarar, o '' si no consta (las dos caras). */
+function _caducaElTxt_(iso){
+  var d = _diaMadridDe_(iso);
+  return d ? 'caduca el ' + d.slice(0, 5) : '';
+}
+/* ¿Es quien mira alguien que APRUEBA partes? (rango >= 1: la misma puerta que `_cargarPartesDec_`). «Ya decidiste» sólo existe para esa gente. */
+function _apruebaPartes_(){
+  var yo = (typeof _actorSanc_==='function' ? _actorSanc_() : null) || (typeof YO!=='undefined' && YO && YO.nombre) || '';
+  return typeof rangoNom==='function' && rangoNom(yo) >= 1;
 }
 /* ¿Cambió la entrada o la salida de un FICHAJE por declarar (`decl`: ini/fin del parte) en el formulario `f`? Las dos caras. */
 function _fichajeEditado_(decl, f){
@@ -4760,6 +4987,19 @@ function _idDrive_(u){ var s=String(u||''); var m=s.match(/\/d\/([A-Za-z0-9_-]{2
    ⚠️ `sinEnlace` lo pone cada cara porque su texto no es el mismo: el escritorio nombra el
    campo `enlaceDrive` de Cowork y el movil manda a pedirselo al autor. Lo que se unifica es
    la PUERTA, no la prosa. */
+/* 31/10 (pasada de usuario, fila 1): «Aprobar» sin archivo que leer se aprobaba de un clic. Devuelve el texto de la
+   confirmación (las dos caras la piden con `confirm()`, como «Rechazar») o '' si se puede decidir sin preguntar. */
+function _avisoSinArchivo_(d, accion){
+  if(accion!=='aprobado' && accion!=='anot') return '';
+  return (d && d.drive) ? '' : 'No hay archivo que leer. ¿Aprobar igualmente?';
+}
+
+/* 31/10 (pasada de usuario, fila 7): un botón apagado dice POR QUÉ, al lado y en una frase. Devuelve el HTML (vacío si no
+   hay motivo: con el botón encendido no se pinta nada). Una sola puerta para las vistas del escritorio. */
+function _porQueApagado_(motivo){
+  return motivo ? ' <span class="porque" data-porque>'+esc(motivo)+'</span>' : '';
+}
+
 function _visorDocHTML_(url, sub, sinEnlace){
   if(!url) return sinEnlace;
   return _visorHTML_({id:_idDrive_(url), url:url, titulo:'El documento', sub:sub,
@@ -9310,7 +9550,6 @@ function _anotPanelHTML_(pre, act, id, css){
   var sg = act.sugerida || null;
   /* El contorno azul de «lo ha cambiado el bot», en el MISMO atributo style que el de la cara. */
   var stS = sg ? ' style="' + (css ? css + ';' : '') + 'outline:2px solid #3f9ed6"' : st;
-  var opc = function(v, t){ return '<option value="' + v + '"' + (act.confidencialidad === v ? ' selected' : '') + '>' + t + '</option>'; };
   var campo = function(rot, html){ return '<label class="campo" style="display:block;margin-top:9px">' +
     '<span class="sc" style="display:block;margin-bottom:5px">' + rot + '</span>' + html + '</label>'; };
   var bt = 'padding:5px 12px;font-size:12px';
@@ -9336,8 +9575,8 @@ function _anotPanelHTML_(pre, act, id, css){
     '<div style="margin-top:9px"><button type="button" class="btn" style="width:100%" id="' + pre + 'Chk" data-anotchk="' + pre +
       '">Comprobar portada</button><p class="rnota" id="' + pre + 'ChkEst" style="margin:6px 0 0">' +
       'Hace falta para aprobar con anotaciones: mete el título y el subtítulo en la portada de verdad.</p></div>' +
-    campo('Confidencialidad', '<select id="' + pre + 'Conf"' + st + '>' + (act.confidencialidad ? '' : opc('', '— sin indicar —')) +
-      opc('publico', 'Público') + opc('interno', 'Interno') + '</select>') +
+    '<div class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">Confidencialidad</span>' +
+      nxElige(pre + 'Conf', (act.confidencialidad ? [] : [['', '— sin indicar —']]).concat([['publico', 'Público'], ['interno', 'Interno']]), act.confidencialidad || '') + '</div>' +
     campo('Etiquetas · separadas por comas', '<input id="' + pre + 'Etq" value="' + esc((act.etiquetas || []).join(', ')) + '"' + st + '>') +
   '</div>';
 }
@@ -9408,8 +9647,10 @@ function _anotRellenar_(pre, campos, cambios){
     var x = document.getElementById(pre + ({titulo:'Tit', subtitulo:'Sub', confidencialidad:'Conf', etiquetas:'Etq'})[k]);
     if (!x) return;
     x.value = k === 'etiquetas' ? (campos.etiquetas || []).join(', ') : String(campos[k] == null ? '' : campos[k]);
-    x.style.outline = '2px solid #3f9ed6';
-    x.title = 'Lo ha cambiado SolarIA: revísalo';
+    var caja = x.type === 'hidden' ? x.closest('.nx') : null;   /* un campo propio (`nxElige`): se repinta y el contorno va a su caja */
+    if (caja) nxPon(x.id, x.value);
+    (caja || x).style.outline = '2px solid #3f9ed6';
+    (caja || x).title = 'Lo ha cambiado SolarIA: revísalo';
   });
 }
 

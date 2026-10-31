@@ -21,7 +21,7 @@
      ⚠️ Si `--bg` cambia, esto cambia con él: lo vigila `probar_reunion_movil`. -->
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=9c1f0d3">
+<link rel="stylesheet" href="movil.css?v=19adb43">
 </head>
 <body>
 
@@ -113,16 +113,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=41a18f3"></script>
+<script src="comun.js?v=8a4932f"></script>
 <script src="notis.movil.js?v=9a87f14"></script>
 <script src="cierre.movil.js?v=2c15573"></script>
 <script src="tareas.movil.js?v=139e6a5"></script>
 <script src="turnos.movil.js?v=d0db9ca"></script>
 <script src="buzon.movil.js?v=4a205c9"></script>
 <script src="documentos.movil.js?v=82b4c65"></script>
-<script src="sanciones.movil.js?v=d26174c"></script>
+<script src="sanciones.movil.js?v=bd72aeb"></script>
 <script src="reuniones.movil.js?v=813a6ef"></script>
-<script src="horas.movil.js?v=dd67501"></script>
+<script src="horas.movil.js?v=0276a39"></script>
 <script src="equipo.movil.js?v=a924514"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -398,11 +398,11 @@ var api={
   calcularCierre:        function(f,p){ return api._post({action:"calcularCierre",forzar:!!f,periodo:p||null}); },
   getNotis:         function(){ return api._post({action:"getNotis"}); },
   guardarNotis:     function(t){ return api._post({action:"guardarNotis",tipos:t}); },
-  ficharSalida:     function(tarea,just,cat,perfil){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat,perfil:perfil||null}); },
+  ficharSalida:     function(tarea,just,cat,perfil,subcat){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat,perfil:perfil||null,subcat:subcat||null}); },
   getFichajeAbierto:function(){ return api._post({action:"getFichajeAbierto"}); },
   pausarFichaje:    function(){ return api._post({action:"pausarFichaje"}); },
   reanudarFichaje:  function(){ return api._post({action:"reanudarFichaje"}); },
-  declararParte:    function(id,tarea,just,cat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat}); },
+  declararParte:    function(id,tarea,just,cat,subcat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat,subcat:subcat||null}); },
   crearReunion:     function(r){ return api._post({action:"crearReunion",reunion:r}); },
   /* Buzones. `quien` NO se manda: lo pone el servidor desde el token, porque si lo
      mandara el navegador cualquiera podria firmar un reporte como cualquier otro. */
@@ -944,7 +944,7 @@ async function _onCredencial_(resp,_silente){
        Puede salir aqui porque `getMisMovimientos` se identifica **por el token**, igual que
        las otras tres, y no necesita saber quien eres: el token ya esta puesto arriba. */
     var pMovs    = _cargarMovimientosM_();
-    var pMisSanc = _cargarMisSancionesM_();
+    var pMisSanc = _cargarMisSanciones_();
     var pReuniones = Promise.resolve().then(function(){ return api.listarReuniones(); })
                        .catch(function(){ return null; });   // se normaliza abajo, con YO ya puesto
     var boot=null; try{ boot=await api.bootstrap(resp.credential); }catch(_){ boot=null; }
@@ -1274,7 +1274,7 @@ var ST={vista:'estado', libro:false, modo:'vivo', rol:'miembro',
   /* `perfil` = con QUE CARGO ficha (la unidad que llevara el parte). Arranca a null y lo
      resuelve `_perfilElegido_()` contra el roster: cablear aqui la unidad de nadie seria
      fijarla ANTES de saber quien ha entrado. */
-  form:{fecha:HOY, ini:'17:00', fin:'20:30', cat:'tareas', tarea:'', detalle:'', just:'', origen:'turno', declararId:null, perfil:null},
+  form:{fecha:HOY, ini:'17:00', fin:'20:30', cat:'tareas', subcat:'', tarea:'', detalle:'', just:'', origen:'turno', declararId:null, perfil:null},
   sel:null            /* Map de la rejilla de cubrir */
 };
 var SEQ=6;
@@ -1759,7 +1759,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='dde20c2';
+var BUILD='29bc7d8';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2250,10 +2250,10 @@ function _engFichar_(){
       bf.disabled=true; var declara=validarFichaje(), f=ST.form;
       tost(declara?'Cerrando y declarando…':'Cerrando sin declarar…');
       try{
-        var r=await api.ficharSalida(declara?_imputacion_(f):'', declara?f.just.trim():'', declara?f.cat:null, _perfilElegido_());
+        var r=await api.ficharSalida(declara?_imputacion_(f):'', declara?f.just.trim():'', declara?f.cat:null, _perfilElegido_(), declara?_subcatEnvio_(f):null);
         if(r && r.parte) PARTES.unshift(normPMovil(r.parte));
         var _cola=_colaTxtM_();   /* 958.ª: antes de borrar el perfil */
-        ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
+        ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null;
         var _ac=_tostAutocierre_(r);
         if(_ac) tost(_ac); else tost(declara?'Fichaje declarado · '+_cola+'.':'Cerrado sin declarar. Decláralo desde «Tus partes».');
         irA('horas');
@@ -2271,7 +2271,8 @@ function _engFichar_(){
      el rotulo de «Trabajo de subsistema» y la linea de quien firma. Repintar solo lo que se
      toco dejaria las otras dos diciendo lo de antes, que es peor que no decir nada. */
   $$('[data-fperfil]').forEach(function(b){ b.onclick=function(){ ST.form.perfil=b.dataset.fperfil; pintar(); }; });
-  $$('[data-fcat]').forEach(function(b){ b.onclick=function(){ ST.form.cat=b.dataset.fcat; ST.form.tarea=''; ST.form.detalle=''; pintar(); }; });
+  $$('[data-fcat]').forEach(function(b){ b.onclick=function(){ ST.form.cat=b.dataset.fcat; ST.form.tarea=''; ST.form.detalle=''; ST.form.subcat=''; pintar(); }; });
+  $$('[data-fsubcat]').forEach(function(b){ b.onclick=function(){ ST.form.subcat=(ST.form.subcat===b.dataset.fsubcat?'':b.dataset.fsubcat); pintar(); }; });
   $$('[data-ftar]').forEach(function(b){ b.onclick=function(){ ST.form.tarea=b.dataset.ftar; ST.form.detalle=''; pintar(); }; });
   var fd=$('#fDetalle');
   if(fd) fd.oninput=function(){ ST.form.detalle=fd.value; validarFichaje(); };
@@ -2306,6 +2307,7 @@ function _engFichar_(){
     var _resp = _p && _p.e==='det';
     ST.form.declararId=_id;
     ST.form.cat=(_resp && _p.cat) ? _p.cat : 'tareas';
+    ST.form.subcat=(_resp && _p.subcat) ? _p.subcat : '';
     ST.form.tarea=''; ST.form.detalle=_resp ? (_p.t||'') : '';
     ST.form.just=_resp ? (_p.just||'') : '';
     /* 31/10: fecha, entrada y salida del fichaje, ya puestas (editables; la fecha no). */
@@ -2722,6 +2724,7 @@ document.addEventListener('click',function(ev){
      hacía, y es la cara en la que revisa Daniel; un dedo que se escurre cerraba el documento de otro). */
   /* 21/10 (auditor 11, 🟡 13): sin prometer lo no decidido (cómo reenvía un rechazado es pregunta de Daniel) ni un
      cierre que no es tal: se puede deshacer desde la ficha. */
+  var _sinA=_avisoSinArchivo_(e, acc); if(_sinA && !confirm(_sinA)) return;   /* 31/10: sin archivo, se pregunta */
   if(acc==='rechazado' && !confirm('Rechazar «'+e.titulo+'». El autor recibe el motivo; la decisión se puede '+
     'deshacer desde la ficha. ¿Seguro?')) return;
   /* DESHACER BORRA LA DECISION DE OTRA PERSONA: se pregunta, como en el escritorio. */

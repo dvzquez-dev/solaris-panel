@@ -1121,3 +1121,28 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
   font-family:var(--mono);font-size:15px;padding:10px 11px}
 .asisIn:focus{border-color:var(--line2);outline:none}
 .asisOk{font-size:20px;color:var(--ok);font-weight:600;padding:2px 0 4px}
+
+/* 31/10 (nativos1) · controles propios de `comun.js` (`nxElige`, `nxHora`, `nxNum`, `nxFecha`) en el móvil: los mismos chips y
+   pasos que el escritorio, con el dedo en mente (36 px de alto). `.pick` aquí sólo existe para ellos. */
+.nt-fila{display:flex;gap:7px;flex-wrap:wrap}
+.pick{cursor:pointer;font-family:var(--mono);font-size:12px;letter-spacing:.03em;min-height:36px;padding:6px 13px;border-radius:20px;
+  border:1px solid var(--line);background:transparent;color:var(--ink2)}
+.pick.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
+.pick.on::before{content:'\2713 '}
+.pick[disabled]{opacity:.5;pointer-events:none}
+.nx{display:inline-flex;flex-direction:column;gap:6px;align-items:flex-start;position:relative;max-width:100%}
+.nx-hora,.nx-num{flex-direction:row;align-items:center;gap:5px}
+.nx-val{min-width:56px;text-align:center;font-size:14px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.nx-fval{border:0;background:none;padding:0;text-align:left;color:var(--ink2);font-size:12px}
+.nx-cal{position:absolute;top:100%;left:0;z-index:40;margin-top:4px;box-shadow:0 10px 28px rgba(0,0,0,.6)}
+.nx-cal[hidden]{display:none}
+.nx-off{opacity:.45;pointer-events:none}
+.nx-elige{display:flex;width:100%}
+.nx-bus{width:100%;max-width:260px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px}
+.nt-cal{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:10px;width:264px}
+.nt-calh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;text-transform:capitalize;font-size:13px}
+.nt-calg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.nt-dw{font-family:var(--mono);font-size:10px;color:var(--ink3);padding:2px 0}
+.nt-d{cursor:pointer;font-family:var(--mono);font-size:12px;padding:8px 0;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--ink2)}
+.nt-d.hoy{border-color:var(--line2)}
+.nt-d.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.28)}

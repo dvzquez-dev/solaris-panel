@@ -62,12 +62,34 @@ async function _cargarMovimientosE_(){
   MOVS_E.length=0;
   _llego_('movsE', false);
   try{
-    var a=await api.getMisMovimientos();
-    if(!Array.isArray(a)) return false;
+    /* 31/10 (pasada de usuario, fila 4): con TOPE. Una petición que no contesta ya no deja «Cargando…» para siempre:
+       a los 20 s se da por fallida y la pantalla ofrece «Reintentar». */
+    var a=await Promise.race([api.getMisMovimientos(),
+      new Promise(function(_, no){ setTimeout(function(){ no(new Error('tiempo')); }, 20000); })]);
+    if(!Array.isArray(a)){ _llego_('movsEerr', true); return false; }
     a.forEach(function(s){ MOVS_E.push(_movDeSancion_(s)); });
-    _llego_('movsE', true);
+    _llego_('movsE', true); _llego_('movsEerr', false);
     return true;
-  }catch(_){ return false; }
+  }catch(_){ _llego_('movsEerr', true); return false; }
+}
+
+/* 31/10 (fila 4): ¿cómo está el libro de puntos? 'ok' (llegó, vacío o no) · 'cargando' (hay sesión y aún no contestó) ·
+   'error' (falló, o no hay sesión: nada lo va a traer). La maqueta no tiene servidor: ahí es «ok», sin movimientos. */
+function _estadoMovsE_(){
+  if(_llego_('movsE')) return 'ok';
+  if(_llego_('movsEerr')) return 'error';
+  var sesion = (typeof backendOK!=='undefined' && backendOK && typeof SESION!=='undefined' && SESION);
+  if(sesion) return 'cargando';
+  return (typeof _demoLocal_==='function' && _demoLocal_()) ? 'ok' : 'error';
+}
+
+function _engMovsE_(){
+  $$('[data-movreint]').forEach(function(b){
+    b.onclick=function(){
+      _llego_('movsEerr', false); pintar();
+      _cargarMovimientosE_().then(function(){ if(vista==='libros') pintar(); });
+    };
+  });
 }
 
 function arco(i,r,frac){
@@ -160,13 +182,10 @@ function _sancHist_(){
 
 function _selectorLotes_(){
   if(LOTES_PEND.length<2) return '';
-  return '<div class="pb" style="padding-bottom:0"><label style="display:block">'+
+  return '<div class="pb" style="padding-bottom:0"><div style="display:block">'+
     '<span class="sc" style="display:block;margin-bottom:5px">Hay '+LOTES_PEND.length+' bloques pendientes</span>'+
-    '<select id="loteSel" style="width:100%;max-width:340px;background:#0A0909;border:1px solid var(--line);'+
-    'border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
-    LOTES_PEND.map(function(l,i){
-      return '<option value="'+i+'"'+(i===_loteIdx_()?' selected':'')+'>'+esc(l)+'</option>'; }).join('')+
-    '</select></label></div>';
+    nxElige('loteSel', LOTES_PEND.map(function(l,i){ return [i, l]; }), _loteIdx_())+
+    '</div></div>';
 }
 
 /* ═══ CORREGIR LOS PUNTOS DE UNA PERSONA DENTRO DEL BLOQUE (31/10, B6) ═══════════════════════════════════════════
@@ -210,9 +229,7 @@ function _lcorrNota_(x){
 function _lcorrForm_(x){
   if(LOTE_EDIT !== x.id || !_lcorrOfrece_(x)) return '';
   return '<div class="lcorrf" data-lcf="'+x.id+'">'+
-    '<input type="number" step="1" min="'+(x.origen==='revocacion'?0:-5)+'" max="'+(x.origen==='revocacion'?5:0)+
-      '" id="lcPts" aria-label="Puntos de '+esc(x.n)+'" placeholder="puntos" value="'+
-      esc(LOTE_EDIT_BORR ? LOTE_EDIT_BORR.pts : (x.pts===null?'':x.pts))+'">'+
+    nxNum('lcPts', LOTE_EDIT_BORR ? LOTE_EDIT_BORR.pts : (x.pts===null?'':x.pts), {min:(x.origen==='revocacion'?0:-5), max:(x.origen==='revocacion'?5:0), sufijo:'pts'})+
     '<input type="text" id="lcMot" maxlength="200" aria-label="Motivo de la corrección" placeholder="Motivo de la corrección (obligatorio)" value="'+
       esc(LOTE_EDIT_BORR ? LOTE_EDIT_BORR.mot : '')+'">'+
     '<button class="btn sm pri" data-lcg="'+x.id+'">Guardar</button>'+
@@ -532,10 +549,8 @@ function _ponerSancCuerpo_(){
       '<div class="sanlista" id="snLista">'+_listaSancHTML_(grupos)+'</div>'+
     '</div>'+
     '<div>'+
-      '<label style="display:block;margin-bottom:9px">'+lab('Motivo')+
-        '<select id="snMotivo" style="'+E+'"><option value="">\u2014 elige \u2014</option>'+
-        RRI_MOTIVOS.map(function(r){ return '<option value="'+r[0]+'"'+(SANC_FORM.motivo===r[0]?' selected':'')+'>'+esc(r[1])+'</option>'; }).join('')+
-      '</select></label>'+
+      '<div style="display:block;margin-bottom:9px">'+lab('Motivo')+
+        nxElige('snMotivo', RRI_MOTIVOS.map(function(r){ return [r[0], r[1]]; }), SANC_FORM.motivo||'')+'</div>'+
       (SANC_FORM.motivo==='libre'
         ? '<label style="display:block;margin-bottom:9px">'+lab('Cu\u00e1l')+
             '<input id="snLibre" placeholder="Qu\u00e9 ha pasado" value="'+esc(SANC_FORM.libre||'')+'" style="'+E+'"></label>'+
@@ -550,13 +565,11 @@ function _ponerSancCuerpo_(){
             ? '<div class="nota" style="margin:0 0 9px">Buscando las tareas de '+
               esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'…</div>'
           : tareas.length
-            ? '<label style="display:block;margin-bottom:9px">'+lab('Qu\u00e9 tarea')+
-                '<select id="snTarea" style="'+E+'"><option value="">\u2014 elige la tarea \u2014</option>'+
-                tareas.map(function(t){ return '<option value="'+esc(t.url)+'"'+(SANC_FORM.tarea===t.url?' selected':'')+'>'+esc(t.n||t.nombre||'(sin t\u00edtulo)')+
-                  (t.l?(_venciaTarea_(t.l)?' \u00b7 venci\u00f3 el ':' \u00b7 vence el ')+esc(_plazoDMY_(t.l)||_isoADMY_(t.l)):'')+'</option>'; }).join('')+   /* 20/10: «vencía» de lo que aún no vence */
-              '</select></label>'+
-              '<label style="display:block;margin-bottom:9px">'+lab('Plazo nuevo')+
-                '<input type="date" id="snPlazo" value="'+esc(SANC_FORM.plazo||'')+'" style="'+E+'"></label>'+
+            ? '<div style="display:block;margin-bottom:9px">'+lab('Qu\u00e9 tarea')+
+                nxElige('snTarea', tareas.map(function(t){ return [t.url, (t.n||t.nombre||'(sin t\u00edtulo)')+
+                  (t.l?(_venciaTarea_(t.l)?' \u00b7 venci\u00f3 el ':' \u00b7 vence el ')+(_plazoDMY_(t.l)||_isoADMY_(t.l)):'')]; }), SANC_FORM.tarea||'')+'</div>'+   /* 20/10: «vencía» de lo que aún no vence */
+              '<div style="display:block;margin-bottom:9px">'+lab('Plazo nuevo')+
+                nxFecha('snPlazo', SANC_FORM.plazo||'', {min:_hoyNxISO_()})+'</div>'+
               '<div class="nota" style="margin:0 0 9px">El plazo nuevo se escribe <b>en Notion</b>. Si eso '+
               'falla, la sanci\u00f3n <b>no</b> se pone: no tiene sentido sancionar por un plazo y dejar la '+
               'tarea con la fecha vencida.</div>'
@@ -572,8 +585,8 @@ function _ponerSancCuerpo_(){
             : '<div class="nota" style="margin:0 0 9px;color:var(--warn)">'+esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+' no tiene ninguna tarea viva con enlace '+
               'a Notion, as\u00ed que no se puede mover ning\u00fan plazo. Elige otro motivo.</div>')
         : '')+
-      '<label style="display:block;margin-bottom:11px;max-width:130px">'+lab('Puntos')+
-        '<input type="number" id="snPts" value="'+esc(_ptsPrefillSanc_())+'" step="1" min="-5" max="0" style="'+E+'"></label>'+
+      '<div style="display:block;margin-bottom:11px">'+lab('Puntos')+
+        nxNum('snPts', _ptsPrefillSanc_(), {min:-5, max:0})+'</div>'+
       '<button class="btn pri" id="btnSanc">Poner la sanci\u00f3n</button>'+
       '<div class="nota" id="snMsg" style="margin:9px 0 0">La sanci\u00f3n entra <b>pendiente</b>: se decide '+
       'abajo, y el comunicado sale despu\u00e9s.</div>'+
@@ -868,8 +881,7 @@ function _apelTarjeta_(a){
     '<div class="just"><span class="sc">' + esc(_apelClausulaTxt_(a.clausula)) + '</span>' + esc(a.motivo) + '</div>' +
     (puedes
       ? '<textarea data-apres placeholder="Tu respuesta — obligatoria si desestimas…"></textarea>' +
-        '<div class="acts"><span class="sc">Nuevo plazo</span><input type="date" data-appl min="' + esc(new Date().toISOString().slice(0, 10)) +
-        '" style="background:#0A0909;border:1px solid var(--line);border-radius:var(--r2);color:var(--ink);padding:6px 8px">' +
+        '<div class="acts"><span class="sc">Nuevo plazo</span>' + nxFecha('', '', {min: _hoyNxISO_(), attrs: 'data-appl'}) +
         '<button class="btn ok" data-apest="plazo">Estimar con ese plazo</button>' +
         '<button class="btn ok" data-apest="quitar">Estimar y quitarle la tarea</button>' +
         '<button class="btn no" data-apdes="1">Desestimar</button></div>'
@@ -897,6 +909,55 @@ function _vApela_(){
     (re.length ? pan('Resueltas · últimos ' + APEL_DIAS_VISTA + ' días', re.length + '', re.map(_apelResuelta_).join('')) : '') +
     '<div class="nota">Una tarea estimada cambia su plazo, o se la quita a quien apeló, y se le avisa. ' +
     'Una sanción estimada devuelve los puntos; «Rebajar a aviso» los devuelve y deja un aviso.</div>';
+}
+/* ═══ TUS PUNTOS Y SANCIONES · «Lo tuyo» del escritorio (31/10, fila 24 de la pasada del escritorio) ═══════════
+   El móvil enseña en Estado la conducta y «Tus sanciones» con «Apelar»; el escritorio sólo tenía la cola de quien RESUELVE.
+   Misma lista (`_misSancLista_`), misma apelación (`_apelarSancion_`) y mismos textos (`APEL_SANC_TXT`) que el móvil: aquí sólo
+   se pinta. La identidad es la SESIÓN (`_actorSanc_`), no «ver como». No hay «Alegar»: se quitó el 31/10 (`apelsanc2`).
+   Dentro del plazo, «Apelar hasta …» abre el formulario BAJO la fila (el escritorio no tiene modal); fuera de plazo, la fila lo dice
+   y no ofrece nada. El PD también sale: sus sanciones las resuelve otra persona (`_puedeResolverApelacion_`), no él. */
+function _misSancPanelE_(mi){
+  var p = mi && mi.puntos, L = _misSancLista_().filter(function(s){ return s; });
+  var cuerpo = L.length ? L.map(function(s){
+    var est = _sancEstadoM_(s), pts = _etSancFila_(s.puntos, null, null);
+    return '<div class="parte" data-msfila="' + esc(s.id) + '"><div class="h"><b>' + esc(s.motivo || 'Sanción') + '</b>' +
+        '<span class="u">' + esc(pts) + ' · ' + esc(_isoADMY_(String(s.fecha || '').slice(0, 10)) || '') + '</span></div>' +
+      (est ? '<div class="ruta msest" style="color:' + est[1] + '">' + esc(est[0]) + '</div>' : '') +
+      (s.apelable
+        ? '<div class="acts"><button class="btn" data-msapelar="' + esc(s.id) + '">Apelar hasta ' + esc(_isoADMY_(s.apelable_hasta) || '') + '</button></div>'
+        : (!s.apelacion ? '<div class="ruta">' + esc(s.no_apelable || 'El plazo para apelar ya pasó.') + '</div>' : '')) +
+    '</div>';
+  }).join('') : vacioSimple('Ninguna sanción', 'No tienes sanciones aplicadas esta temporada.');
+  return '<div id="msBloque">' + pan('Tus puntos y sanciones', (typeof p === 'number' && isFinite(p)) ? 'Conducta ' + p + ' / 10' : 'Conducta —', cuerpo) + '</div>';
+}
+/* Cablea «Apelar»: abre el formulario bajo la fila. Motivo obligatorio (mismo aviso que el móvil); el rechazo del servidor se queda EN la fila. */
+function _engMisSanc_(){
+  $$('[data-msapelar]').forEach(function(b){
+    b.onclick = function(){
+      var fila = b.closest('[data-msfila]'), s = _misSancLista_().filter(function(x){ return x.id === b.dataset.msapelar; })[0];
+      if (!s || !fila || fila.querySelector('[data-msform]')) return;
+      var f = document.createElement('div'); f.setAttribute('data-msform', '1'); f.style.marginTop = '10px';
+      f.innerHTML = '<p class="ruta">' + esc(APEL_SANC_TXT.tienes(s.apelable_hasta)) + '</p>' +
+        '<label class="campo"><span class="sc">' + APEL_SANC_TXT.campo + ' <span class="req">*</span></span>' +
+          '<textarea data-msmotivo placeholder="' + esc(APEL_SANC_TXT.ayuda) + '"></textarea></label>' +
+        '<label class="campo"><span class="sc">' + APEL_SANC_TXT.enlace + '</span>' +
+          '<input data-msenlace type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label>' +
+        '<div class="acts"><button class="btn" data-msno>Cancelar</button><button class="btn ok" data-msenviar>Enviar</button>' +
+          '<span class="err" role="alert" data-mserr style="color:var(--red2);font-size:12px"></span></div>';
+      fila.appendChild(f); b.style.display = 'none';
+      var mo = f.querySelector('[data-msmotivo]'), en = f.querySelector('[data-msenviar]'), er = f.querySelector('[data-mserr]');
+      mo.focus();
+      f.querySelector('[data-msno]').onclick = function(){ f.remove(); b.style.display = ''; };
+      en.onclick = function(){
+        if (!mo.value.trim()){ er.textContent = APEL_SANC_TXT.vacio; mo.focus(); return; }
+        er.textContent = ''; en.disabled = true;
+        _apelarSancion_(s, mo.value.trim(), (f.querySelector('[data-msenlace]').value || '').trim())
+          .then(function(){ return _cargarMisSanciones_(); })
+          .then(function(){ pintar(); tost(APEL_SANC_TXT.enviada); })
+          .catch(function(e){ en.disabled = false; er.textContent = (e && e.message) || String(e); });
+      };
+    };
+  });
 }
 function _engApela_(){
   $$('[data-apid]').forEach(function(caja){

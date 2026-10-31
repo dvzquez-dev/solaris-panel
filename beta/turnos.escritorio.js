@@ -1225,8 +1225,6 @@ function _pinConvDisp_(m){
   var b=(m||document).querySelector('[data-convdisp]'); if(!b) return;
   b.onclick=async function(){
     if(b.disabled) return;
-    if(typeof backendOK==='undefined' || !backendOK || !SESION){
-      tost('Sin conexión no se puede convocar.'); return; }
     var sem=(document.getElementById('cdSemana')||{}).value||'';
     if(!sem){ tost('Elige una semana.'); return; }
     var sitios=[];
@@ -1235,6 +1233,10 @@ function _pinConvDisp_(m){
     /* ⛔ Sin sitio no se convoca: una convocatoria sin dónde no se puede contestar, y dejarla
        salir vacía sería el mismo fallo mudo de siempre. */
     if(!sitios.length){ tost('Marca al menos un sitio (CUVI o CITI).'); return; }
+    /* 31/10 (pasada de usuario, fila 6): primero lo que FALTA (semana, sitio) y sólo después la conexión: el aviso de «sin
+       conexión» tapaba que no habías puesto fecha. */
+    if(typeof backendOK==='undefined' || !backendOK || !SESION){
+      tost('Sin conexión no se puede convocar.'); return; }
     if(!confirm('¿Abrir la disponibilidad de la semana del '+sem+'?')) return;
     b.disabled=true; var prev=b.textContent; b.textContent='Encolando…';
     try{
@@ -1692,7 +1694,7 @@ function _cierreTurnoPanel_(){
         '<th class="r">Extra</th></tr></thead><tbody>'+filas+'</tbody></table>'
       : '<div class="nota">Este turno no tiene a nadie resuelto en el roster.</div>')+
     '<button class="btn pri" id="ctEnviar"'+(falta?' disabled':'')+' style="margin-top:11px">'+
-      (falta ? esc(falta) : 'Cerrar el turno')+'</button>'+
+      'Cerrar el turno</button>'+_porQueApagado_(falta ? falta+'.' : '')+   /* 31/10: el motivo al lado, no en el rótulo */
     /* 26/10 (triaje C4a): cancelar = «Cancelado»; no cuenta como turno para nadie, ni su coche */
     /* ⛔ (refutador 37, 🟡 4): un turno YA PASADO sólo lo cancela el PD (el servidor se lo niega al resto) */
     (_puedeCancelarTurno_(t) ? ' <button class="btn" id="ctCancelar" style="margin-top:11px">Cancelar este turno</button>' : '')+

@@ -116,9 +116,8 @@ function bloquePanel(){
     '</p></div>');
   var subs=[]; reg.forEach(function(m){ if(subs.indexOf(m.unidad)<0) subs.push(m.unidad); });
   var filtro = mandaEnTodo
-    ? '<label style="display:block;margin-bottom:10px"><span class="sc" style="display:block;margin-bottom:5px">Subsistema</span>'+
-      '<select id="bloSub" style="width:100%;max-width:260px;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
-      '<option value="">Todos</option>'+subs.map(function(u){ return '<option>'+esc(u)+'</option>'; }).join('')+'</select></label>'
+    ? '<div style="display:block;margin-bottom:10px"><span class="sc" style="display:block;margin-bottom:5px">Subsistema</span>'+
+      nxElige('bloSub', [['','Todos']].concat(subs.map(function(u){ return [u, u]; })), '')+'</div>'
     : '<div class="chips" style="margin-bottom:10px"><span class="chip">'+esc(unidad)+'</span></div>';
   var chips=pool.map(function(m){
     return '<button type="button" class="pick" data-nom="'+esc(m.nombre)+'" data-unidad="'+esc(m.unidad)+'">'+esc(m.pila)+'</button>';
@@ -130,8 +129,11 @@ function bloquePanel(){
     filtro+
     '<div class="chips" id="bloPool" style="margin-bottom:12px">'+chips+'</div>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
-      '<label style="min-width:150px"><span class="sc" style="display:block;margin-bottom:5px">Categoría</span>'+'<select id="bloCat" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+'<option value="reunion">Reunión</option><option value="tareas">Tarea</option>'+'<option value="turno">Turno</option><option value="compensacion" selected>Compensación</option></select></label>'+'<label style="width:120px"><span class="sc" style="display:block;margin-bottom:5px">Horas c/u</span>'+
-      '<input class="mono" id="bloH" value="2,0" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-family:var(--mono);font-size:12.5px"></label>'+
+      '<div><span class="sc" style="display:block;margin-bottom:5px">Categoría</span>'+
+        nxElige('bloCat', [['reunion','Reunión'],['tareas','Tarea'],['turno','Turno'],['compensacion','Compensación']], 'compensacion')+'</div>'+
+      '<div><span class="sc" style="display:block;margin-bottom:5px">Subcategoría (compensación)</span>'+
+        nxElige('bloSubc', [['','Sin elegir']].concat(SUBCATS_COMP), '')+'</div>'+   /* 01/11 (horasmes), con chips: nada de <select> */
+      '<div><span class="sc" style="display:block;margin-bottom:5px">Horas c/u</span>'+nxNum('bloH', 2, {min:0, paso:0.25, sufijo:'h'})+'</div>'+
       '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Concepto</span>'+
       '<input id="bloC" placeholder="p. ej. Traslado a campo de pruebas" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
       '<button class="btn pri" data-bloque>Otorgar el bloque</button>'+
@@ -724,6 +726,7 @@ function _fichaPanel_(){
           '<option value="turno"'+(FICHA_FORM.cat==='turno'?' selected':'')+'>Turno no convocado</option>'+
           '<option value="compensacion"'+(FICHA_FORM.cat==='compensacion'?' selected':'')+'>Compensaci\u00f3n</option>'+
         '</select></label>'+
+        _subcatHTML_('data-fsubcat', FICHA_FORM.subcat, FICHA_FORM.cat)+
         campoImput+
       '</div>'+
       '<label style="display:block"><span class="sc" style="display:block;margin-bottom:5px">Qu\u00e9 estuviste haciendo</span>'+
@@ -830,14 +833,14 @@ function _engFicharE_(){
          justificacion en blanco meteria el parte en la cola del coordinador **sin nada que
          juzgar** — y de paso le quitaria al autor los 7 dias que tiene para justificarlo. */
       var r=await api.ficharSalida(declara?_imputacion_(f):'', declara?f.just.trim():'',
-                                   declara?f.cat:null, _perfEnvio);
+                                   declara?f.cat:null, _perfEnvio, declara?_subcatEnvio_(f):null);
       /* La sesion queda cerrada pase lo que pase con la lista de partes: el parte ya existe en
          el servidor. Se mete en `PART_BACK` por la MISMA puerta que otorgar (`_partesReal_`,
          que es quien deriva `PARTES`), y si esa lista todavia no ha llegado NO se inventa
          nada — la trae el refresco de 90 s. */
       if(r && r.parte && Array.isArray(PART_BACK)){ PART_BACK.push(r.parte); _partesReal_(); }
       FICHA=null; FICHA_SRV.at=Date.now();
-      f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
+      f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null;
       /* ⚠️ `h = null` es «no lo se», y CERO seria un dato: sin las horas de vuelta se
          confirma el envio sin inventarse un numero. */
       var h=(r&&r.parte&&typeof r.parte.horas==='number')?r.parte.horas:null;
@@ -855,7 +858,9 @@ function _engFicharE_(){
      las otras dos diciendo lo de antes, que es peor que no decir nada. */
   if(fp) fp.onchange=function(){ FICHA_FORM.perfil=fp.value; pintar(); };
   var fc=document.getElementById('fichaCat');
-  if(fc) fc.onchange=function(){ FICHA_FORM.cat=fc.value; FICHA_FORM.tarea=''; FICHA_FORM.detalle=''; pintar(); };
+  if(fc) fc.onchange=function(){ FICHA_FORM.cat=fc.value; FICHA_FORM.tarea=''; FICHA_FORM.detalle=''; FICHA_FORM.subcat=''; pintar(); };
+  $$('[data-fsubcat]').forEach(function(b){ b.onclick=function(){
+    FICHA_FORM.subcat=(FICHA_FORM.subcat===b.dataset.fsubcat?'':b.dataset.fsubcat); pintar(); }; });
   var ft=document.getElementById('fichaTarea');
   if(ft) ft.onchange=function(){ FICHA_FORM.tarea=ft.value;
     if(ft.value==='__otro__'){ FICHA_FORM.detalle=''; pintar(); } else _fichaAviso_(); };
@@ -942,9 +947,10 @@ function _bloqHoras_(){
 function _bloqMios_(){
   if(!Array.isArray(PART_BACK)) return [];
   var yo=_fichaYo_();
-  return PART_BACK.filter(function(p){
+  /* 01/11: del más reciente al más antiguo (fecha y hora) y sin los caducados: `_sinDeclararOrdenados_`, comun.js. */
+  return _sinDeclararOrdenados_(PART_BACK.filter(function(p){
     return p && p.autor===yo && (p.estado==='sin_declarar' || p.estado==='detalle');
-  });
+  }), Date.parse(_ahoraApp_()));
 }
 
 /* El parte que se esta declarando, o `null`. ⛔ Se busca DENTRO de `_bloqMios_()` y no en la
@@ -1147,7 +1153,7 @@ function _bloqPanel_(){
   var lista = !pend.length ? '' :
     '<div class="pb" style="padding:0">'+pend.map(function(p){
       var det=(p.estado==='detalle'), sel=!!(decl && decl.id===p.id);
-      var cad=p.caduca_at ? ' \u00b7 caduca '+esc(_diaMadridDe_(p.caduca_at)) : '';
+      var cad=p.caduca_at ? ' \u00b7 '+esc(_caducaElTxt_(p.caduca_at)) : '';
       return '<div class="dec" style="cursor:default"><span class="tx"><b>'+
         h1(p.horas)+' \u00b7 '+esc(_isoADMY_(String(p.fecha||'')))+
         (p.ini&&p.fin?' \u00b7 '+esc(p.ini)+'\u2013'+esc(p.fin):'')+'</b><small>'+
@@ -1265,6 +1271,7 @@ function _bloqPanel_(){
       '<div style="min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">Categor\u00eda</span>'+
       _chipsElegir_('data-bqcat', f.cat, [['tareas','Tarea'],['reunion','Reuni\u00f3n no convocada'],
         ['turno','Turno no convocado'],['compensacion','Compensaci\u00f3n']])+'</div>'+
+      _subcatHTML_('data-bqsubcat', f.subcat, f.cat)+
       campoImput+
     '</div>'+
     '<label style="display:block"><span class="sc" style="display:block;margin-bottom:5px">Qu\u00e9 estuviste haciendo</span>'+
@@ -1593,7 +1600,7 @@ function _engBloqueDescE_(){
 /* Suelta el parte que se estaba declarando y devuelve el formulario a su estado de partida: lo del fichaje (fecha, entrada, salida)
    no debe colarse en el siguiente bloque a posteriori. */
 function _bloqSoltar_(){
-  BLOQ_FORM.declararId=null; BLOQ_FORM.just=''; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle='';
+  BLOQ_FORM.declararId=null; BLOQ_FORM.just=''; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle=''; BLOQ_FORM.subcat='';
   BLOQ_FORM.fecha=HOY; BLOQ_FORM.ini='09:00'; BLOQ_FORM.fin='11:00';
 }
 
@@ -1609,6 +1616,7 @@ function _engBloqueE_(){
     var p=l[0], det=(p.estado==='detalle');
     BLOQ_FORM.declararId=id;
     BLOQ_FORM.cat = det ? (p.categoria||'tareas') : 'tareas';
+    BLOQ_FORM.subcat = det ? (p.subcat||'') : '';
     BLOQ_FORM.tarea='';
     BLOQ_FORM.detalle = det ? (p.tarea||'') : '';
     BLOQ_FORM.just = det ? (p.justificacion||'') : '';
@@ -1630,7 +1638,9 @@ function _engBloqueE_(){
      las otras dos diciendo lo de antes, que es peor que no decir nada. */
   if(bp) bp.onchange=function(){ BLOQ_FORM.perfil=bp.value; pintar(); };
   $$('[data-bqcat]').forEach(function(b){ b.onclick=function(){
-    BLOQ_FORM.cat=b.dataset.bqcat; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle=''; pintar(); }; });
+    BLOQ_FORM.cat=b.dataset.bqcat; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle=''; BLOQ_FORM.subcat=''; pintar(); }; });
+  $$('[data-bqsubcat]').forEach(function(b){ b.onclick=function(){
+    BLOQ_FORM.subcat=(BLOQ_FORM.subcat===b.dataset.bqsubcat?'':b.dataset.bqsubcat); pintar(); }; });
   $$('[data-bqtar]').forEach(function(b){ b.onclick=function(){
     BLOQ_FORM.tarea=b.dataset.bqtar; if(b.dataset.bqtar==='__otro__') BLOQ_FORM.detalle='';
     pintar(); }; });
@@ -1671,7 +1681,7 @@ function _engBloqueE_(){
            `detalle`) a `pendiente`. Su proteccion contra el envio repetido es el ESTADO -- el
            segundo sale con «este parte no admite declaracion (pendiente)»--, asi que aqui no
            viaja clave: meterle una seria una segunda regla para lo mismo. */
-        var upd=await api.declararParte(decl.id, imput, f.just.trim(), f.cat);
+        var upd=await api.declararParte(decl.id, imput, f.just.trim(), f.cat, _subcatEnvio_(f));
         if(upd && upd.id!=null && Array.isArray(PART_BACK)){
           var i=-1, k;
           for(k=0;k<PART_BACK.length;k++){ if(PART_BACK[k] && PART_BACK[k].id===upd.id){ i=k; break; } }
@@ -1697,7 +1707,7 @@ function _engBloqueE_(){
            `_parteConClave_` devuelve el parte que ya hay en vez de crear un segundo. Es la
            unica proteccion que cubre el envio duplicado que NO es un doble clic. */
         if(!f.clave) f.clave=_claveUso_();
-        var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat,
+        var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, subcat:_subcatEnvio_(f),
           horas:teclea, ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true,
           subsistema:perf, clave:f.clave });
         guardado=(rec && rec.partes && rec.partes[0]) ? rec.partes[0] : null;
@@ -1710,7 +1720,7 @@ function _engBloqueE_(){
          puntual -- «esto fue como coordinador de X», «esto fue del 30/07»-- enrute y feche TODO
          lo siguiente igual, en silencio y sin volver a preguntar. Es el fallo exacto que ya
          mordio dos veces en el movil, campo a campo. */
-      f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY;
+      f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null; f.fecha=HOY;
       if(decl){ f.ini='09:00'; f.fin='11:00'; }   /* lo del fichaje no se arrastra al siguiente bloque */
       /* ⛔ SE CONFIRMA LO GUARDADO, NO LO TECLEADO. El backend recorta al tope y devuelve el
          parte: teclear 20 h guardaba 14 y esto habria cantado «20 declaradas», seis horas

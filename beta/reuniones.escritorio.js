@@ -146,16 +146,10 @@ function convocarReunionPanel(){
       'A los convocados les toca <b>cubrir su disponibilidad</b>, y de no cubrirla salen '+
       'sanciones. Elige bien a quién metes.</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
-      '<label style="width:210px">'+lab('Tipo')+'<select id="cvTipo" style="'+E+'">'+
-        (_coord ? ('<option value="general">General · todo el equipo</option>'+
-        '<option value="junta">Junta Directiva · coordinación</option>'+
-        '<option value="consejo">Consejo</option>'+
-        '<option value="subsistema">Subsistema · tu unidad</option>'+
-        '<option value="mixta">Mixta · varios subsistemas</option>') : '')+
-        '<option value="trabajo">Reunión de trabajo</option></select></label>'+
-      '<label style="width:210px">'+lab('Modalidad')+'<select id="cvMod" style="'+E+'">'+
-        '<option value="hibrida">Híbrida</option><option value="presencial">Presencial</option>'+
-        '<option value="telematica">Telemática</option></select></label>'+
+      '<div>'+lab('Tipo')+nxElige('cvTipo', (_coord ? [['general','General · todo el equipo'],['junta','Junta Directiva · coordinación'],
+        ['consejo','Consejo'],['subsistema','Subsistema · tu unidad'],['mixta','Mixta · varios subsistemas']] : []).concat([['trabajo','Reunión de trabajo']]),
+        _coord ? 'general' : 'trabajo')+'</div>'+
+      '<div>'+lab('Modalidad')+nxElige('cvMod', [['hibrida','Híbrida'],['presencial','Presencial'],['telematica','Telemática']], 'hibrida')+'</div>'+
       '<label style="flex:1;min-width:220px">'+lab('Título')+
         '<input id="cvTit" placeholder="Reunión sin título" style="'+E+'"></label>'+
     '</div>'+
@@ -164,20 +158,18 @@ function convocarReunionPanel(){
     '<div class="chips" style="margin:0 0 8px">'+chipsSub+'</div>'+
     lab('Convocados <b id="cvN">'+CONV_INV.size+'</b>')+
     '<div class="chips" id="cvPool" style="margin:0 0 12px">'+chips+'</div>'+
-    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
-      '<label style="width:150px">'+lab('Desde')+'<input type="date" id="cvD0" value="'+iso(hoy)+'" style="'+E+'"></label>'+
-      '<label style="width:150px">'+lab('Hasta')+'<input type="date" id="cvD1" value="'+mas(hoy,6)+'" style="'+E+'"></label>'+
-      '<label style="width:120px">'+lab('De')+'<select id="cvH0" style="'+E+'">'+optHoras('16:00')+'</select></label>'+
-      '<label style="width:120px">'+lab('A')+'<select id="cvH1" style="'+E+'">'+optHoras('23:00')+'</select></label>'+
+    '<div style="display:flex;gap:9px 18px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+      '<div>'+lab('Desde')+nxFecha('cvD0', iso(hoy), {min:iso(hoy)})+'</div>'+
+      '<div>'+lab('Hasta')+nxFecha('cvD1', mas(hoy,6), {min:iso(hoy)})+'</div>'+
+      '<div>'+lab('Fecha límite')+nxFecha('cvLim', mas(hoy,5), {min:iso(hoy)})+'</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:9px 18px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+      '<div>'+lab('De')+nxHora('cvH0', '16:00')+'</div>'+
+      '<div>'+lab('A')+nxHora('cvH1', '23:00')+'</div>'+
+      '<div>'+lab('Tamaño de casilla')+nxElige('cvSlot', [['15','15 min'],['30','30 min'],['60','1 h']], '30')+'</div>'+
+      '<div>'+lab('Dura la reunión')+nxElige('cvDura', [['30','30 min'],['60','1 h'],['90','1 h 30 min'],['120','2 h']], '60')+'</div>'+
     '</div>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
-      '<label style="width:150px">'+lab('Tamaño de casilla')+'<select id="cvSlot" style="'+E+'">'+
-        '<option value="15">15 min</option><option value="30" selected>30 min</option>'+
-        '<option value="60">1 h</option></select></label>'+
-      '<label style="width:150px">'+lab('Dura la reunión')+'<select id="cvDura" style="'+E+'">'+
-        '<option value="30">30 min</option><option value="60" selected>1 h</option>'+
-        '<option value="90">1 h 30 min</option><option value="120">2 h</option></select></label>'+
-      '<label style="width:150px">'+lab('Fecha límite')+'<input type="date" id="cvLim" min="'+hoy+'" value="'+mas(hoy,5)+'" style="'+E+'"></label>'+
       '<label style="flex:1;min-width:220px">'+lab('Orden del día · enlace')+
         '<input id="cvOrden" placeholder="https://drive.google.com/…" style="'+E+'"></label>'+
     '</div>'+
@@ -185,12 +177,9 @@ function convocarReunionPanel(){
        cambian mientras rellenas. Un día apagado NO es un día con horario vacío: es un día
        que no se ofrece, y eso se ve. */
     '<div style="display:flex;gap:9px;align-items:flex-end;margin-bottom:9px;flex-wrap:wrap">'+
-      '<label style="flex:1;min-width:240px">'+lab('Copiar la distribución de otra reunión')+
-        '<select id="cvCopia" style="'+E+'"><option value="">— sin copiar —</option>'+
-        (REUS||[]).filter(function(r){ return (r.franjas||[]).length; }).map(function(r){
-          return '<option value="'+esc(r.id)+'">'+esc(r.titulo||('Reunión '+r.id))+
-                 ' · '+((r.dias||[]).length)+' días</option>'; }).join('')+
-        '</select></label>'+
+      '<div style="flex:1;min-width:240px">'+lab('Copiar la distribución de otra reunión')+
+        nxElige('cvCopia', [['','— sin copiar —']].concat((REUS||[]).filter(function(r){ return (r.franjas||[]).length; }).map(function(r){
+          return [r.id, (r.titulo||('Reunión '+r.id))+' · '+((r.dias||[]).length)+' días']; })), '')+'</div>'+
       '<button class="btn" id="cvHorAbrir" type="button">Horario por día</button>'+
     '</div>'+
     '<div id="cvDias" hidden style="margin-bottom:11px"></div>'+
@@ -271,10 +260,8 @@ function _cablearConvocar_(){
         return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;'+
           (off?'opacity:.45':'')+'">'+
           '<b style="width:82px;font-size:12.5px">'+esc(d)+'</b>'+
-          '<select data-chd="'+esc(d)+'" data-q="h0" '+(off?'disabled':'')+' style="'+E+';width:118px">'+
-            optHoras(cf.h0||val('cvH0'))+'</select>'+
-          '<select data-chd="'+esc(d)+'" data-q="h1" '+(off?'disabled':'')+' style="'+E+';width:118px">'+
-            optHoras(cf.h1||val('cvH1'))+'</select>'+
+          nxHora('', cf.h0||val('cvH0'), {off:off, attrs:'data-chd="'+esc(d)+'" data-q="h0"'})+
+          nxHora('', cf.h1||val('cvH1'), {off:off, attrs:'data-chd="'+esc(d)+'" data-q="h1"'})+
           '<button class="btn sm" type="button" data-choff="'+esc(d)+'">'+(off?'Apagado':'Activo')+'</button>'+
         '</div>';
       }).join('');
@@ -310,7 +297,7 @@ function _cablearConvocar_(){
        escribe un horario inventado (salían días de 00:00 a 01:00). Antes que eso, se dice. */
     var conHora=F.filter(function(f){ return f && f.ini; }).length;
     if(!conHora){
-      cp.value='';
+      nxPon('cvCopia','');
       tost('Esa reunión no tiene horario que copiar: sus franjas no traen hora.');
       return;
     }
@@ -594,7 +581,7 @@ function _miDispoPanel_(r){
   var _paso=0; r.franjas.forEach(function(f){ _paso=_mcd_(_paso,_minHM_(f)); _paso=_mcd_(_paso,_duF(f)); });
   _paso=Math.max(15, Math.min(60, _paso||60));
   var _eje=[]; for(var _t=_t0; _t<_t1; _t+=_paso) _eje.push(_t);
-  var COL=['transparent','var(--tel)','var(--red)'];
+  var COL=['var(--sur2)','var(--tel)','var(--red)'];   /* 31/10: lo ofertado sin marcar se VE (era transparente: la rejilla salía vacía) */
   /* 🗣️ Daniel: *«las horas en las filas, los dias en las columnas»*. Girada igual que
      la del movil: no dijo «solo en el movil», y dos caras que ordenan la MISMA rejilla al
      reves es la asimetria del §3c-9.
@@ -895,21 +882,17 @@ function _reuSelE_(){
 function _fijarPanel_(){
   if(!REUS.length) return '';
   var _sel=_reuSelE_();
-  var opts=REUS.map(function(r,i){
-    return '<option value="'+i+'"'+(r===_sel?' selected':'')+'>'+esc(r.tit||r.titulo||('Reunión '+r.id))+'</option>'; }).join('');
   var r=_reuSelE_();
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
-  var dias=(r.dias||[]).map(function(d,i){ return '<option value="'+i+'">'+esc(d)+'</option>'; }).join('');
-  var fr=(r.franjas||[]).map(function(f,i){
-    return '<option value="'+i+'">'+esc(_iniF(f))+'</option>'; }).join('');
   /* ⛔ 927.ª: «Hasta» dice a qué hora ACABA la franja, no a qué hora empieza. Con la misma lista en
      los dos desplegables la tarjeta arrancaba en «desde 16:00 · hasta 16:00» — se leía como una
      reunión de cero minutos y era 16:00–17:00. El valor sigue siendo el índice (el manejador de
      «Fijar» no cambia); sólo cambia lo que se lee. El móvil ya lo decía así (`_hFinFranja_`). */
-  var frFin=(r.franjas||[]).map(function(f,i){
-    return '<option value="'+i+'">'+esc(_hFinFranja_(r,i))+'</option>'; }).join('');
   var _pf=_puedeFijarReuE_(r);
+  /* 31/10 (pasada de usuario, fila 7): los botones apagados dicen por qué, al lado. */
+  var _porFija=_pf ? '' : (!r._srv ? 'Es una reunión de muestra: no se puede fijar.'
+    : 'La fija quien la convocó'+(r.convocante ? ' ('+(_pilaDeM_(r.convocante)||r.convocante)+')' : '')+'.');
   return pan('Fijar fecha y orden del día', r.fijada?('fijada · '+esc(r.fijada)):'sin fijar',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
@@ -922,21 +905,17 @@ function _fijarPanel_(){
         ? (' Dura <b>'+_slotsMin_(r.duracion, r.slot)+' franjas</b> ('+_durTxt_(r.duracion)+
            '), así que no se puede fijar en menos.') : '')+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
-      '<label style="flex:2;min-width:190px">'+lab('Reunión')+
-        '<select id="reSel" style="'+E+'">'+opts+'</select></label>'+
-      '<label style="width:130px">'+lab('Día')+'<select id="reDia" style="'+E+'">'+dias+'</select></label>'+
-      '<label style="width:120px">'+lab('Desde')+'<select id="reF0" style="'+E+'">'+fr+'</select></label>'+
-      '<label style="width:120px">'+lab('Hasta')+'<select id="reF1" style="'+E+'">'+frFin+'</select></label>'+
-      '<button class="btn pri" data-fijar'+(_pf?'':' disabled')+'>Fijar</button>'+
+      '<div style="flex-basis:100%">'+lab('Reunión')+nxElige('reSel', REUS.map(function(r,i){ return [i, r.tit||r.titulo||('Reunión '+r.id)]; }), REUS.indexOf(_sel))+'</div>'+
+      '<div style="flex-basis:100%">'+lab('Día')+nxElige('reDia', (r.dias||[]).map(function(d,i){ return [i, d]; }), 0)+'</div>'+
+      '<div style="flex-basis:100%">'+lab('Desde')+nxElige('reF0', (r.franjas||[]).map(function(f,i){ return [i, _iniF(f)]; }), 0, {buscar:false})+'</div>'+
+      '<div style="flex-basis:100%">'+lab('Hasta')+nxElige('reF1', (r.franjas||[]).map(function(f,i){ return [i, _hFinFranja_(r,i)]; }), 0, {buscar:false})+'</div>'+
+      '<button class="btn pri" data-fijar'+(_pf?'':' disabled')+'>Fijar</button>'+_porQueApagado_(_porFija)+
       (r.fijada?'<button class="btn" data-desfijar'+(_pf?'':' disabled')+' style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
     '</div>'+
-    (_pf ? '' : '<p class="mini" style="margin:-4px 0 12px;color:var(--ink3)">La fija quien la convocó'+
-      (r.convocante ? ' (<b>'+esc(_pilaDeM_(r.convocante)||r.convocante)+'</b>)' : '')+
-      '.</p>')+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
       '<label style="flex:1;min-width:240px">'+lab('Orden del día · enlace o texto')+
         '<input id="reOrden" value="'+esc(r.ordenDia||'')+'" placeholder="https://… o los puntos a tratar" style="'+E+'"></label>'+
-      '<button class="btn" data-orden'+(_pf?'':' disabled')+'>Guardar orden del día</button>'+
+      '<button class="btn" data-orden'+(_pf?'':' disabled')+'>Guardar orden del día</button>'+_porQueApagado_(_porFija)+
     '</div>'+
     _convocadosBoxE_(r)+
     _ordenDiaReuHTML_(r)+

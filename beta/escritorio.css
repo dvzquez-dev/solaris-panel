@@ -910,3 +910,26 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .tarl th:nth-child(5){width:130px}.tarl th:nth-child(6){width:104px}.tarl th:nth-child(7){width:170px}
 .tarl td:first-child{white-space:normal;overflow-wrap:anywhere}
 .chip.tuni{white-space:nowrap}
+/* 31/10 · pasada de usuario (rotosesc): la leyenda de «Tu disponibilidad» (sin regla, salía pegada), la celda ofertada sin
+   marcar (se veía vacía), la fila que abre algo / la que no, y la frase que dice por qué un botón está apagado. */
+.leg{display:flex;flex-wrap:wrap;gap:5px 13px;font-size:10px;font-family:var(--mono);letter-spacing:.05em;color:var(--ink3)}
+.leg i{width:10px;height:7px;border-radius:2px;display:inline-block;vertical-align:-1px;margin-right:5px}
+.cel.mid:hover{outline:1px solid var(--ink3);outline-offset:-1px}
+tr.abre{cursor:pointer}
+tr.abre:hover td:first-child{color:var(--ink)}
+tr.fija:hover{background:transparent}
+.porque{font-size:11.5px;color:var(--ink2);align-self:center}
+/* 31/10 (nativos1) · controles propios de `comun.js` (`nxElige`, `nxHora`, `nxNum`, `nxFecha`): sustituyen a `<select>`,
+   `type=date|time|number|checkbox`. Chips `.pick`, pasos − / +, y el calendario de «Nueva tarea» como desplegable. */
+.nx{display:inline-flex;flex-direction:column;gap:6px;align-items:flex-start;position:relative;max-width:100%}
+.nx-hora,.nx-num{flex-direction:row;align-items:center;gap:5px}
+.nx-val{min-width:56px;text-align:center;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#0A0909;color:var(--ink)}
+.nx-val:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+.nx-num .nx-val{min-width:48px}
+.nx-fval{border:0;background:none;padding:0;text-align:left;color:var(--ink2);font-size:12px}
+.nx-cal{position:absolute;top:100%;left:0;z-index:40;margin-top:4px;box-shadow:0 10px 28px rgba(0,0,0,.6)}
+.nx-cal[hidden]{display:none}
+.nx-off{opacity:.45;pointer-events:none}
+.nx-elige{display:flex;width:100%}
+.nx-bus{width:100%;max-width:260px;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px}
+.nx .pick:focus-visible,.nx .btn:focus-visible,.nt-d:focus-visible{outline:2px solid var(--red);outline-offset:1px}

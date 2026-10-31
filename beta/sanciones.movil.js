@@ -66,16 +66,6 @@ async function _cargarMovimientosM_(){
   }catch(e){ return false; }
 }
 
-/* 31/10: TUS sanciones para alegar o apelar. Falla hacia LISTA VACÍA (un servidor sin la acción, o un corte, no pinta nada), nunca hacia una inventada. */
-async function _cargarMisSancionesM_(){
-  if(typeof MIS_SANC==='undefined' || _apelEsDemo_()) return true;     // la maqueta las calcula ella (`_misSancLista_`)
-  try{
-    var a=await api.getMisSanciones();
-    MIS_SANC=Array.isArray(a) ? a : [];
-    return Array.isArray(a);
-  }catch(e){ MIS_SANC=[]; return false; }
-}
-
 /* La misma busqueda con distinto nombre en cada cara; se envuelve para que el bloque de
    autoridad de abajo sea IDENTICO en las dos y un diff lo confirme de un vistazo. */
 /* EQUIVALENTE (no GEMELA): misma busqueda con distinto ayudante en cada cara —existe JUSTO para que el bloque de autoridad de debajo si sea identico—. */
@@ -649,10 +639,10 @@ function _misSancHTML_(){
 /* El formulario de apelar. Motivo obligatorio, enlace opcional. */
 function _formSancion_(s){
   abrirModal('<div class="h1" style="font-size:18px">Apelar «'+esc(s.motivo || 'Sanción')+'»</div>'+
-    '<p class="h1s">Tienes hasta el '+esc(_isoADMY_(s.apelable_hasta) || '')+'. Mientras se resuelve, la sanción sigue aplicada.</p>'+
-    '<label class="campo"><span class="sc">Qué pasó <span class="req">*</span></span>'+
-      '<textarea id="msMotivo" placeholder="Lo que quieres que se tenga en cuenta."></textarea></label>'+
-    '<label class="campo"><span class="sc">Enlace o foto (si lo hay)</span>'+
+    '<p class="h1s">'+esc(APEL_SANC_TXT.tienes(s.apelable_hasta))+'</p>'+
+    '<label class="campo"><span class="sc">'+APEL_SANC_TXT.campo+' <span class="req">*</span></span>'+
+      '<textarea id="msMotivo" placeholder="'+esc(APEL_SANC_TXT.ayuda)+'"></textarea></label>'+
+    '<label class="campo"><span class="sc">'+APEL_SANC_TXT.enlace+'</span>'+
       '<input id="msEnlace" type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label>'+
     '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="msNo" style="flex:1">Cancelar</button>'+
       '<button class="btn pri" id="msSi" style="flex:1" disabled>Enviar</button></div>');
@@ -663,8 +653,8 @@ function _formSancion_(s){
     if(!mo.value.trim()) return;
     si.disabled=true;
     _apelarSancion_(s, mo.value.trim(), ($('#msEnlace').value || '').trim())
-      .then(function(){ return _cargarMisSancionesM_(); })
-      .then(function(){ cerrarModal(); pintar(); tost('Apelación enviada. Te avisamos cuando respondan.'); })
+      .then(function(){ return _cargarMisSanciones_(); })
+      .then(function(){ cerrarModal(); pintar(); tost(APEL_SANC_TXT.enviada); })
       .catch(function(e){ si.disabled=false; tostErr('No se pudo enviar: ', e); });
   };
 }

@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=759f46c">
+<link rel="stylesheet" href="escritorio.css?v=a75924f">
 </head>
 <body>
 
@@ -113,16 +113,16 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=41a18f3"></script>
+<script src="comun.js?v=8a4932f"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=471a14e"></script>
-<script src="turnos.escritorio.js?v=d63eb29"></script>
+<script src="turnos.escritorio.js?v=ceb094e"></script>
 <script src="buzon.escritorio.js?v=a3871ed"></script>
-<script src="documentos.escritorio.js?v=f1eb2c6"></script>
-<script src="sanciones.escritorio.js?v=44cc6f5"></script>
-<script src="reuniones.escritorio.js?v=6481582"></script>
-<script src="horas.escritorio.js?v=a62389a"></script>
-<script src="equipo.escritorio.js?v=9c30d01"></script>
+<script src="documentos.escritorio.js?v=04f424d"></script>
+<script src="sanciones.escritorio.js?v=9fa78c9"></script>
+<script src="reuniones.escritorio.js?v=cd1ecae"></script>
+<script src="horas.escritorio.js?v=35abe25"></script>
+<script src="equipo.escritorio.js?v=a56e62b"></script>
 <script src="directo.escritorio.js?v=74620c4"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -290,6 +290,7 @@ var api={
   apelarTarea: function(t,c,m){ return api._post({action:"apelarTarea",tarea:t,clausula:c,motivo:m}); },
   resolverApelacion: function(d){ return api._post(Object.assign({action:"resolverApelacion"},d)); },
   /* 31/10: apelar una sanción (ya aplicada); TUS sanciones con lo que puedes hacer en cada una. */
+  getMisSanciones: function(){ return api._post({action:"getMisSanciones"}); },
   apelarSancion: function(id,m,e){ return api._post({action:"apelarSancion",id:id,motivo:m,enlace:e||undefined}); },
   crearTarea:  function(t){ return api._post({action:"crearTarea",tarea:t}); },
   /* 31/10: SolarIA PROPONE un texto mejor para las instrucciones; no escribe nada (`servidor.py` `a_mejorar_tarea`). */
@@ -399,7 +400,7 @@ var api={
      veces, y una clave nacida dentro seria distinta en cada intento -- o sea, ninguna
      proteccion justo cuando hace falta. */
   otorgarHoras:function(p){ return api._post({action:"otorgarHoras",parte:p}); },
-  otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria,clave:b.clave}); },
+  otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria,subcat:b.subcat||null,clave:b.clave}); },
   enviarPush:  function(d,t,c,o){ return api._post({action:"enviarPush",destinatario:d,titulo:t,cuerpo:c,opts:o}); },
   /* ⛔ ESTA FALTABA, y en la cara del PD llevaba rota desde siempre — sin dar señal. La llaman
      `activarNotis` (aquí abajo) y `_pushInit_` (comun.js), que corre en LAS DOS caras al
@@ -432,7 +433,7 @@ var api={
      las TUYAS y no llevan gate de rol: el que gobierna tambien es miembro. GEMELAS byte
      a byte de las de `movil.html` — si tocas una, toca la otra. */
   ficharEntrada:    function(perfil){ return api._post({action:"ficharEntrada",perfil:perfil||null}); },
-  ficharSalida:     function(tarea,just,cat,perfil){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat,perfil:perfil||null}); },
+  ficharSalida:     function(tarea,just,cat,perfil,subcat){ return api._post({action:"ficharSalida",tarea:tarea,justificacion:just,categoria:cat,perfil:perfil||null,subcat:subcat||null}); },
   getFichajeAbierto:function(){ return api._post({action:"getFichajeAbierto"}); },
   pausarFichaje:    function(){ return api._post({action:"pausarFichaje"}); },
   reanudarFichaje:  function(){ return api._post({action:"reanudarFichaje"}); },
@@ -448,7 +449,7 @@ var api={
      ⛔ `clave` NO se pone aqui: la pone el llamador, porque `_post` reintenta tres
      veces y una clave nacida dentro seria distinta en cada intento. */
   pushParte:    function(p){ return api._post({action:"pushParte",parte:p}); },
-  declararParte:function(id,tarea,just,cat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat}); },
+  declararParte:function(id,tarea,just,cat,subcat){ return api._post({action:"declararParte",id:id,tarea:tarea,justificacion:just,categoria:cat,subcat:subcat||null}); },
   setControl:  function(clave,valor,nota){ return api._post({action:"setControl",clave:clave,valor:valor,nota:nota}); },
   /* ⛔ Lee una clave del KV. El servidor tiene DOS listas blancas: `KV_LEIBLES` (qué claves
      son legibles) y `KV_DEL_PD` (cuáles sin ser admin). De la cara sólo se pide `automatismos`. */
@@ -968,7 +969,7 @@ var NOTIS_PREF=null, NOTIS_SRV='sin pedir', NOTIS_ERR=null;
    no se sabe». Quien lo mira pregunta antes por `sabido`. */
 var FICHA_SRV={estado:'sin pedir', at:0, sabido:false};
 var FICHA=null;
-var FICHA_FORM={cat:'tareas', tarea:'', detalle:'', just:'', perfil:null};
+var FICHA_FORM={cat:'tareas', subcat:'', tarea:'', detalle:'', just:'', perfil:null};
 /* El reloj de 1 s: UNO para toda la pagina. Ver `_engFicharE_`. */
 var FICHA_TIC=null;
 
@@ -984,7 +985,7 @@ var FICHA_TIC=null;
    la respuesta se perdio -- llega con la misma clave y devuelve el parte que ya hay.
    ⛔ Y `declararId` es «estoy declarando ESE fichaje ya cerrado», no un bloque nuevo:
    ahi la duracion la fijo el servidor y aqui no se toca. */
-var BLOQ_FORM={fecha:HOY, ini:'09:00', fin:'11:00', cat:'tareas', tarea:'', detalle:'',
+var BLOQ_FORM={fecha:HOY, ini:'09:00', fin:'11:00', cat:'tareas', subcat:'', tarea:'', detalle:'',
                just:'', perfil:null, declararId:null, clave:null};
 
 var V={};
@@ -1220,19 +1221,16 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
       'A veces las horas las pone el coordinador (una feria, un traslado, un turno sin fichar). '+
       'Cuentan igual y al miembro le salen como <b>otorgadas</b>.</p>'+
       '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
-        '<label style="flex:1;min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">A quién</span>'+
-        '<select style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
+        '<div style="flex-basis:100%"><span class="sc" style="display:block;margin-bottom:5px">A quién</span>'+
+        nxElige('otNombre', _activos_().filter(function(m){ return m.nombre!==ACTOR &&
+          puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, ACTOR); }).map(function(m){ return [m.nombre, m.nombre]; }), '')+'</div>'+
         /* ⛔ 20/10 (auditoría): a quien el servidor DEJA otorgar — nunca a uno mismo, y un coordinador sólo a su
            unidad (el PD, a cualquiera). Ofrecer al resto era un error del servidor esperando a que lo eligieras. */
         /* ⛔ 21/10 (auditor 8, 🟠 3): y por la MISMA puerta que decidir (`puedeDecidirParte`): «misma unidad» le
            ofrecía al subcoordinador su unidad entera, y el servidor sólo deja al coordinador de ESA unidad. */
-        _activos_().filter(function(m){ return m.nombre!==ACTOR &&
-          puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, ACTOR); })
-          .map(function(m){return '<option>'+esc(m.nombre)+'</option>';}).join('')+'</select></label>'+
-        '<label style="width:110px"><span class="sc" style="display:block;margin-bottom:5px">Horas</span>'+
-        '<input class="mono" value="3,0" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-family:var(--mono);font-size:12.5px"></label>'+
+        '<div><span class="sc" style="display:block;margin-bottom:5px">Horas</span>'+nxNum('otHoras', 3, {min:0, paso:0.25, sufijo:'h'})+'</div>'+
         '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Concepto</span>'+
-        '<input placeholder="p. ej. Feria de divulgación · montaje" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
+        '<input id="otConcepto" placeholder="p. ej. Feria de divulgación · montaje" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
         '<button class="btn pri" data-otorgar>Otorgar</button>'+
       '</div></div>')+
     bloquePanel()+
@@ -1356,6 +1354,27 @@ V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
 }};
 
 /* ── REGISTRO DEL MES ────────────────────────────────────────────────────── */
+/* 31/10 · AVISO «COMPENSACIONES NO CUADRA» (Daniel: Notion tiene que valer cargo + otras). SÓLO PARA EL PD (rango ≥ 3): el
+   miembro no puede arreglarlo y le confundiría. Una fila por persona que no cuadra, con las tres cifras y la diferencia;
+   quien no se puede comprobar (falta el dato) se DICE aparte, no se da por bueno. La regla es `cuadraCompensaciones` (comun.js). */
+function _avisoCompE_(lista){
+  if(!(typeof _rangoBeta_==='function' && _rangoBeta_()>=3)) return '';
+  var mal=[], sin=0;
+  lista.forEach(function(m){
+    var c=cuadraCompensaciones(m, PARTES);
+    if(!c) sin++; else if(!c.ok) mal.push([m,c]);
+  });
+  var nota=sin ? '<span class="chip">sin comprobar: '+sin+'</span>' : '';
+  if(!mal.length) return nota ? '<div class="chips">'+nota+'</div>' : '';
+  return pan('Compensaciones que no cuadran',mal.length+(mal.length===1?' persona':' personas'),
+    tabla([['Miembro'],['Notion',1],['Cargo',1],['Resto',1],['Diferencia',1]], mal.map(function(x){
+      var m=x[0], c=x[1], d=c.diferencia;
+      return '<tr><td><span class="mem"><span class="av">'+ini(m.nombre)+'</span>'+esc(m.pila||m.nombre)+'</span></td>'+
+        '<td class="r mono">'+nf2(c.notion)+' h</td><td class="r mono">'+nf2(c.cargo)+'</td><td class="r mono">'+nf2(c.resto)+'</td>'+
+        '<td class="r mono dn">'+(d>0?'Notion +':'Notion \u2212')+nf2(Math.abs(d))+' h</td></tr>';
+    }).join('')))+(nota ? '<div class="chips">'+nota+'</div>' : '');
+}
+
 V.registro={g:'Horas',t:'Registro del mes',f:function(){
   /* solo entran los ACTIVOS que traen horas: con la forma MIEMBRO el backend no sirve
      las ajenas, y una tabla de filas vacias no es un registro, es ruido. */
@@ -1374,7 +1393,7 @@ V.registro={g:'Horas',t:'Registro del mes',f:function(){
     vacioSimple('Sin horas del equipo','Tu cuenta solo tiene acceso a tus propias horas, no a las del resto. '+
       'Si necesitas el registro completo del mes, pídeselo al Project Director.'));
   var tot=VIS.reduce(function(a,m){return a+(_hMesDevCara_(m)||0);},0);   /* 20/10: devengadas, como la fila */
-  return '<div class="chips"><span class="chip">TOTAL <b style="color:var(--ink)">'+h1(tot)+'</b></span>'+
+  return _avisoCompE_(VIS)+'<div class="chips"><span class="chip">TOTAL <b style="color:var(--ink)">'+h1(tot)+'</b></span>'+
     /* 22/10 (auditor 23, 🟡 5): con UNA ficha visible, «la media» es la tuya: «—», como el Panel de mando. */
     '<span class="chip">MEDIA <b style="color:var(--ink)">'+(VIS.length>=2?h1(tot/VIS.length):'—')+'</b></span>'+
     '<span class="chip">OBJETIVO <b style="color:var(--ink)">'+h1(UMBRAL)+'/mes</b>'+
@@ -2332,7 +2351,8 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
   return pan('Actas',actas.length+(actas.length===1?' registrada':' registradas')+(_tv?' · '+_nTv+' de la '+_tv:''),
     tabla([['Referencia'],['Título'],['Autor'],['Fecha'],['Estado',1]],
       actas.map(function(d){
-        return '<tr><td class="mono" style="color:var(--red2)">'+esc(d.ref)+'</td>'+
+        /* 31/10 (pasada de usuario, fila 3): la fila abre el expediente en Documentos (`_engActas_`). */
+        return '<tr class="abre" data-acta="'+d.id+'"><td class="mono" style="color:var(--red2);text-decoration:underline">'+esc(d.ref)+'</td>'+
           '<td>'+esc(d.tit)+(_deReunionSinConvocar_(d)?' <span class="chip wa">reunión sin convocar</span>':'')+'</td>'+
           '<td>'+esc(_m(d.autor).pila||d.autor)+'</td>'+
           /* ⛔ 20/10: por `_isoADMY_`, como el visor de Documentos desde el 14/10. Llega en ISO (`acta_a_expediente`
@@ -2341,8 +2361,8 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
           '<td class="mono" style="color:var(--ink3)">'+esc(_fActa(d)?_isoADMY_(_fActa(d)):'—')+'</td>'+
           '<td class="r"><span class="chip '+estDoc(d.est)[1]+'">'+esc(estDoc(d.est)[0])+'</span></td></tr>';
       }).join(''))+
-    '<div class="nota">Las actas se revisan como cualquier documento: para decidir sobre una, ve a '+
-    '<b>Documentos</b>.</div>');
+    '<div class="nota">Las actas se revisan como cualquier documento: pulsa una para abrir su expediente '+
+    'en <b>Documentos</b>.</div>');
 }};
 
 /* ── OPERACIÓN ───────────────────────────────────────────────────────────── */
@@ -2355,6 +2375,7 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
 /* 26/10: los plazos que un coordinador movió de su propia tarea (los sirve el bootstrap, sólo al PD). Global DECLARADA,
    no `window.*`: los arneses de node no tienen `window` y reventaban. */
 var PLAZOS_PROPIOS = [];
+var MIS_SANC = [];          // 31/10: tus sanciones con lo que puedes hacer en cada una (`getMisSanciones`)
 var APELACIONES = [];         // 31/10: las apelaciones de tareas que ves (las tuyas y las que puedes resolver)
 var FICHA_TUR = null;         // 31/10: la CLAVE (`_claveTurno_`) del turno cuya ficha está abierta (A3)
 var CIERRE_TUR = { k:null, dur:'', quien:{}, extra:{}, hecho:null, coche:{}, listo:null };   /* coche/listo: 26/10 (C4a/C4b) */
@@ -2426,8 +2447,7 @@ function _nuevaTareaFalta_(){
 /* 31/10 · «Nueva tarea» sin controles nativos (Daniel: «un fucking tick clásico de HTML. Cero customizado»): la unidad y
    los responsables son `.pick` (el chip seleccionable de la app), el plazo son atajos + un calendario propio, la urgencia
    son chips, y el cuerpo es un editor con formato ligero y la vista previa «así se verá en Notion» al lado. */
-var _MESES_NT_ = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-function _hoyNuevaTarea_(){ return _dmyAISO_(typeof HOY === 'string' ? HOY : _hoyTxt_()); }
+function _hoyNuevaTarea_(){ return _hoyNxISO_(); }
 function _fechaNuevaTareaHtml_(hoy){
   var l = NUEVA_TAREA.l, sel = NUEVA_TAREA.cal, atajos = _atajosFechaTarea_(hoy), h = '';
   h += '<div class="chips" style="margin-bottom:6px">'+atajos.map(function(a){
@@ -2435,14 +2455,7 @@ function _fechaNuevaTareaHtml_(hoy){
     '<button type="button" class="pick'+(sel ? ' on' : '')+'" data-ntcal="'+(sel ? 'x' : (l || hoy).slice(0, 7))+'">Otro día…</button></div>';
   h += '<div class="nota" style="padding:2px 0 6px;border:0">'+(l ? 'Vence el <b>'+esc(_isoADMY_(l))+'</b>' : 'Sin fecha límite')+'</div>';
   if(sel){
-    var y = +sel.slice(0, 4), m = +sel.slice(5, 7), ant = m === 1 ? (y-1)+'-12' : y+'-'+(m<11 ? '0' : '')+(m-1),
-        sig = m === 12 ? (y+1)+'-01' : y+'-'+(m<9 ? '0' : '')+(m+1);
-    h += '<div class="nt-cal"><div class="nt-calh"><button type="button" class="btn sm" data-ntcal="'+ant+'">‹</button>'+
-      '<b>'+_MESES_NT_[m-1]+' '+y+'</b><button type="button" class="btn sm" data-ntcal="'+sig+'">›</button></div>'+
-      '<div class="nt-calg">'+['L','M','X','J','V','S','D'].map(function(d){ return '<span class="nt-dw">'+d+'</span>'; }).join('')+
-      _semanasDelMes_(sel).map(function(w){ return w.map(function(d){
-        return d ? '<button type="button" class="nt-d'+(d===l ? ' on' : '')+(d===hoy ? ' hoy' : '')+'" data-ntf="'+d+'">'+(+d.slice(8))+'</button>'
-                 : '<span></span>'; }).join(''); }).join('')+'</div></div>';
+    h += _calendarioHtml_(sel, l, hoy, {dia:'data-ntf', mes:'data-ntcal'});
   }
   return h;
 }
@@ -2758,6 +2771,8 @@ V.tareas={g:'Operación',t:'Tareas',f:function(){
 }};
 
 /* ── EQUIPO ──────────────────────────────────────────────────────────────── */
+/* 31/10 (pasada de usuario, fila 2): las unidades marcadas como filtro de la tabla de Miembros; vacío = todas. */
+var MIEMB_U={};
 V.miembros={g:'Equipo',t:'Miembros',f:function(){
   /* ⛔⛔ LOS CHIPS CONTABAN LAS UNIDADES QUE COMPITEN, NO LA GENTE (782.ª, 06/10).
      Pintaban `DATA.subsistemas`, que el panel pisa con las **4 que compiten**: sobre el
@@ -2772,14 +2787,19 @@ V.miembros={g:'Equipo',t:'Miembros',f:function(){
   var _gu=_gentePorUnidad_(), _nAct=0, _iu;
   for(_iu=0;_iu<_gu.length;_iu++) _nAct+=_gu[_iu].n;
   var _nTot=(DATA.miembros||[]).length;
-  return '<div class="chips">'+_gu.map(function(s){
-      return '<span class="chip">'+esc(s.u)+' <b style="color:var(--ink)">'+s.n+'</b></span>';}).join('')+'</div>'+
-    pan('Todos los miembros',_nAct+' activos · '+_nTot+' con las bajas · solo lectura',
+  /* Los chips FILTRAN (una unidad, varias, o «Todas» para quitar el filtro): son `.pick`, como en «Nueva tarea». */
+  var _fu=Object.keys(MIEMB_U).filter(function(u){ return MIEMB_U[u]; });
+  var _lista=DATA.miembros.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);})
+    .filter(function(m){ return !_fu.length || _fu.indexOf(m.unidad)>=0; });
+  return '<div class="chips"><button type="button" class="pick'+(_fu.length?'':' on')+'" data-mu="">Todas <b>'+_nAct+'</b></button>'+
+      _gu.map(function(s){
+      return '<button type="button" class="pick'+(MIEMB_U[s.u]?' on':'')+'" data-mu="'+esc(s.u)+'">'+esc(s.u)+' <b style="color:var(--ink)">'+s.n+'</b></button>';}).join('')+'</div>'+
+    pan('Todos los miembros',(_fu.length ? _lista.length+' de '+_nTot+' · '+esc(_fu.join(' + ')) : _nAct+' activos · '+_nTot+' con las bajas')+' · solo lectura',
       /* ⛔ 20/10: la columna son las horas de ESTE mes (`hMes` ya traducido), y se rotulaba «H/mes» — al lado del
          «H/mes pond.» del Ranking, que es el ritmo de la TEMPORADA. Con el mes abierto, como el Registro. */
       tabla([['Miembro'],['Unidad'],['Cargo'],['Pts',1],[_nomMesAbierto_(true),1],['Temporada',1]],
-        DATA.miembros.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).map(function(m){
-          return '<tr><td><span class="mem"><span class="av">'+ini(m.nombre)+'</span>'+esc(m.nombre)+
+        _lista.map(function(m){
+          return '<tr class="fija"><td><span class="mem"><span class="av">'+ini(m.nombre)+'</span>'+esc(m.nombre)+
             (m.infraccion?' <span class="dn">⚠</span>':'')+
             /* ⛔ 21/10 (auditor 10, 🟡 9): el subtítulo dice «con las bajas» y ninguna fila decía cuál es baja. */
             (m.baja?' <span class="chip">baja</span>':'')+'</span></td>'+
@@ -3246,8 +3266,12 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
     /* ⛔ Y AQUI SE DECIDIA POR LA LISTA VACIA, que no dice POR QUE esta vacia. La
        frase de abajo culpaba a la version del servidor de lo que muchas veces era la
        RED, y en los dos casos afirmaba «no tienes» sin saberlo. */
-    : (!_llego_('movsE')
+    : (_estadoMovsE_()==='cargando'
       ? vacioSimple('Cargando tus movimientos…','')
+      /* 31/10 (pasada de usuario, fila 4): un fallo o una espera larga ya no son «Cargando» para siempre. */
+      : _estadoMovsE_()==='error'
+      ? vacioSimple('No se pudieron leer tus movimientos','<p style="margin:6px 0 10px">Sin conexión con el servidor, o no contestó a tiempo.</p>'+
+          '<button class="btn" data-movreint>Reintentar</button>')
       : vacioSimple('Sin movimientos','No tienes subidas ni bajadas de puntos esta temporada.'));
 
   /* ⛔ EL RELOJ VA LO PRIMERO, ENCIMA DE LOS KPI. Es la ACCION; los KPI y las tablas de
@@ -3284,6 +3308,7 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
     pan('Tus horas de este mes', _nomMesAbierto_(), libroH)+
     _ritmoHorasHTMLE_(mi)+   /* 31/10: tu ritmo frente al equipo y al mes anterior */
     pan('Tus puntos de la temporada','', libroP)+
+    _misSancPanelE_(mi)+   /* 31/10: tu conducta y TUS sanciones, con «Apelar» (como el móvil) */
     _histHorasHTMLE_(mi)+   /* 31/10: todo tu histórico de horas, separado por cierres */
     _cargaPanelE_(mi)+
     /* ⛔ LA CUOTA VA LA ÚLTIMA, y es la misma decisión que en el móvil («se fue al menú ⋮: es
@@ -3569,6 +3594,7 @@ async function _refrescoVivo_(motivo, que){
        deje de ser permanente. ⚠️ Y va por la MISMA puerta que ya existe: no se duplica la
        carga -- dos puertas para el mismo dato acaban siendo dos funciones distintas. */
     var _mv=_vivoToca_(que,'resto') ? _cargarMovimientosE_() : null;
+    var _ms=_vivoToca_(que,'resto') ? _cargarMisSanciones_() : null;   /* 31/10: TUS sanciones (Lo tuyo) */
     /* 21/10 (🟠 2): mientras no hayan llegado, se piden en CADA vuelta (no sólo cuando cambia su sello). */
     var _d=_pideSi_(DOCS_LLEGO===false ? null : que,'getEntregables','getEntregables').then(function(a){
       if(Array.isArray(a)){ DOCS.length=0; a.forEach(function(x,i){ DOCS.push(_normDocE_(x,i)); }); DOCS_LLEGO=true; } });
@@ -3585,7 +3611,7 @@ async function _refrescoVivo_(motivo, que){
        repintado de abajo corre ANTES de que lleguen los movimientos y el libro se pinta
        con lo de la pasada anterior -- que es media cura, y de las que se leen como
        enteras. */
-    await Promise.all([_t,_q,_p,_s,_r,_d,_u,_mv]);
+    await Promise.all([_t,_q,_p,_s,_r,_d,_u,_mv,_ms]);
     /* ⛔ SI LA SESION MURIO, ESTE REFRESCO NO HA TRAÍDO NADA — y sin esto no se nota:
        `_pide_` devuelve `null` por diseño y el repintado deja la pantalla igual. */
     _avisarSesionMuerta_();
@@ -3728,6 +3754,7 @@ function _aplicarBootstrap_(boot){
     /* El libro de puntos es una llamada mas y NO bloquea la entrada: si falla o el backend es
        viejo, la vista se queda vacia y lo dice. */
     _cargarMovimientosE_().then(function(){ if(vista==='libros') _repintarSuave_(); });
+    _cargarMisSanciones_().then(function(){ if(vista==='libros') _repintarSuave_(); });
   }
   /* ⛔ EL SELLO VA AQUI, FUERA DEL `if`, y no dentro como lo puse primero: lo que se sella es
      «acabo de recibir datos del servidor», no «había reuniones». Con el sello dentro, un
@@ -4040,7 +4067,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='a0c3c13';
+var BUILD='ab0b906';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4657,9 +4684,9 @@ function _engOtorgar_(){
     b.onclick=async function(){
       if(b.disabled) return;
       var caja=b.parentNode;
-      var nombre=(caja.querySelector('select')||{}).value||'';
-      var horas=parseFloat(String((caja.querySelector('input.mono')||{}).value||'').replace(',','.'))||0;
-      var concepto=(caja.querySelector('input:not(.mono)')||{}).value||'';
+      var nombre=($('#otNombre')||{}).value||'';
+      var horas=parseFloat(String(($('#otHoras')||{}).value||'').replace(',','.'))||0;
+      var concepto=($('#otConcepto')||{}).value||'';
       if(!nombre || horas<=0){ tost('Elige a quién y unas horas > 0.'); return; }
       if(PART_BACK!==null && backendOK && SESION){    // hay backend: persiste de verdad
         b.disabled=true; var prev=b.textContent; b.textContent='Otorgando…';
@@ -4712,7 +4739,7 @@ function _engBloqueHoras_(){
         b.disabled=true; var prev=b.textContent; b.textContent='Otorgando\u2026';
         try{
           var cat=($('#bloCat')||{}).value||'compensacion';
-          var r=await api.otorgarBloque({nombres:marcados, horas:horas, tarea:concepto, categoria:cat, clave:_claveUso_()});
+          var r=await api.otorgarBloque({nombres:marcados, horas:horas, tarea:concepto, categoria:cat, subcat:(cat==='compensacion'?(($('#bloSubc')||{}).value||null):null), clave:_claveUso_()});
           var okN=(r&&r.otorgados)||0, res=(r&&r.resultados)||[];
           res.forEach(function(x){ if(x&&x.id) PART_BACK.push(x); });         // las partes creadas
           if(res.length) _partesReal_();
@@ -4920,6 +4947,7 @@ function _engDocsDecidir_(){
         if(!_anotChkOK_(_pre)){ tost('Antes de aprobar con anotaciones, comprueba la portada: «Comprobar portada».');
           var _bk=document.getElementById(_pre+'Chk'); if(_bk) _bk.focus(); return; }
       }
+      var _sinA=_avisoSinArchivo_(d, accion); if(_sinA && !confirm(_sinA)) return;   /* 31/10: sin archivo, se pregunta */
       /* 21/10 (auditor 11, 🟡 13): sin prometer lo no decidido (cómo reenvía un rechazado es pregunta de Daniel) ni un
          cierre que no es tal: se puede deshacer desde la ficha. */
       if(accion==='rechazado' && !confirm('Rechazar «'+d.tit+'». El autor recibe el motivo; la decisión se puede '+
@@ -5119,7 +5147,7 @@ function _engSancCerrar_(){
   /* El botón «Convocar reunión» era un `tost` descriptivo. Ahora lleva al panel de verdad,
      que vive en esta misma vista, y le da el foco. */
   $$('[data-nueva]').forEach(function(b){ b.onclick=function(){
-    var p=$('#cvTipo'); if(p){ p.scrollIntoView({block:'center'}); p.focus(); }
+    var p=$('#cvTipo'); p=p&&p.closest('.nx'); if(p){ p.scrollIntoView({block:'center'}); var q=p.querySelector('button.on')||p.querySelector('button'); if(q) q.focus(); }
     else tost('La convocatoria es solo para coordinación.');
   }; });
   _cablearConvocar_();
@@ -5213,12 +5241,16 @@ function enganchar(){
      entero y muerto en el cable de en medio—, y aquí es sobre puntos de personas. */
   _engRevocarSanc_();
   _engApela_();      // 31/10: Estimar / Desestimar de la cola de Apelaciones
+  _engMisSanc_();    // 31/10: «Apelar» de TUS sanciones, en Lo tuyo
   /* ⛔ Y este, por lo mismo: un boton pintado y sin cablear es lo que tenia Apelaciones. */
   _engComprobarAuto_();
   _engFicharE_();
   _engMisSinFirmarE_();   /* 26/10: «Retirar» y «Corregir horas» de tus partes */
   _engBloqueE_();
   _engBloqueDescE_();   /* 31/10: «Descartar» un fichaje sin declarar */
+  _engMovsE_();         /* 31/10: «Reintentar» tus movimientos */
+  _engActas_();         /* 31/10: una acta abre su expediente */
+  _engMiembros_();      /* 31/10: los chips de unidad filtran Miembros */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -445,6 +445,18 @@ function docCard(d){
    con referencias inventadas. Y el dato ya estaba en casa: el Form del pipeline tiene
    `Acta` como Tipo de documento y la referencia es `Acta_S-6301_26`, asi que la lista de
    actas es un FILTRO sobre los expedientes que esta cara ya carga. */
+/* 31/10 (pasada de usuario, fila 3): una fila de Actas abre el expediente donde vive: la lista de Documentos que lo lleva
+   (tu decisión · en curso · resueltos), desplegado (`DOC_SEL`). */
+function _engActas_(){
+  $$('tr[data-acta]').forEach(function(tr){
+    tr.onclick=function(){
+      var id=+tr.dataset.acta, d=DOCS.filter(function(x){ return x.id===id; })[0]; if(!d) return;
+      var v=docsMios().indexOf(d)>=0 ? 'docdec' : _docResuelto_(d.est) ? 'docpub' : 'docurso';
+      DOC_SEL=id; ir(v, 'doc-'+id);
+    };
+  });
+}
+
 function _esActa_(d){
   /* Por el tipo si viene; si no, por el prefijo de la referencia, que lo lleva siempre.
      Los expedientes viejos pueden no traer `tipo` y la referencia nunca falta. */

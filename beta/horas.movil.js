@@ -62,7 +62,7 @@ function _origenParte_(p){
    decida. Normalizar es tirar lo que no nombras, y aquí se estaba tirando la fecha de verdad. */
 function normPMovil(p){
   return { id:p.id, f:_isoADMY_(p.fecha), iso:String(p.fecha||''), t:p.tarea||'', q:Number(p.horas)||0,
-    e:_E_MOVIL_[p.estado]||'raro', ini:p.ini||'',   /* 20/10: lo que no conocemos NO es «en cola» (§3c-24) */ fin:p.fin||'', cat:p.categoria||null,
+    e:_E_MOVIL_[p.estado]||'raro', ini:p.ini||'',   /* 20/10: lo que no conocemos NO es «en cola» (§3c-24) */ fin:p.fin||'', cat:p.categoria||null, subcat:p.subcat||null,
     /* ⛔ LA PUERTA VA DENTRO DEL `||`, NO ENVOLVIENDOLO, y no es estilo: `nota` mezcla
        DOS cosas distintas --el motivo de una decision y la justificacion del autor-- y
        el motivo pasa ENTERO, sin gatear, porque `filaParte` tiene escrito «SE ENSENA LA
@@ -842,6 +842,7 @@ function vFichar(){
       '<div class="campo"><span class="sc">Categoría <span class="req">*</span></span>'+
         _chipsElegir_('data-fcat', ST.form.cat, [['tareas','Tarea'],['reunion','Reunión no convocada'],['turno','Turno no convocado'],
           ['compensacion','Compensación']], 'btn mini')+'</div>'+
+      _subcatHTML_('data-fsubcat', ST.form.subcat, ST.form.cat, 'btn mini')+
       (ST.form.cat==='tareas'
         ? '<div class="campo"><span class="sc">Imputar a <span class="req">*</span></span>'+
             _chipsElegir_('data-ftar', ST.form.tarea, opts.concat([['Trabajo de subsistema','Trabajo de subsistema · '+_perfilElegido_()],
@@ -1164,7 +1165,7 @@ async function enviarFichaje(){
   if(f.declararId!=null && backendOK && SESION){   // declarar un parte 'sin declarar' ya cerrado
     tost('Declarando…');
     var _editada=_declEditadoM_(_declVivo_(f)), _hCorr=durForm();   /* antes de soltar nada: de ellas salen las horas a corregir */
-    try{ var p=await api.declararParte(f.declararId, imput, f.just.trim(), f.cat);
+    try{ var p=await api.declararParte(f.declararId, imput, f.just.trim(), f.cat, _subcatEnvio_(f));
       /* 31/10: cambiaste la entrada o la salida → las horas se corrigen YA declarado (`corregirParte` deja el rastro «corregidas por su
          autor»). Si falla, el parte ya está declarado con las del fichaje: se dice, no se calla. */
       if(_editada){
@@ -1179,7 +1180,7 @@ async function enviarFichaje(){
          de la misma función. Se llega escribiendo una fecha vieja, respondiendo a un
          «sin declarar» y volviendo a declarar. */
       var _cola=_colaTxtM_();
-      f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY; f.ini='17:00'; f.fin='20:30';   /* lo del fichaje no se arrastra al siguiente bloque */
+      f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null; f.fecha=HOY; f.ini='17:00'; f.fin='20:30';   /* lo del fichaje no se arrastra al siguiente bloque */
       tost('Declarado · '+_cola+'.'); irA('horas');
     }catch(e){
       /* ⛔ Y EL BOTÓN VUELVE A ESTAR VIVO, con el formulario intacto: una escritura que
@@ -1201,7 +1202,7 @@ async function enviarFichaje(){
          que volver a declarar**. §3c-24. */
       var nuevo=null, h=null;
       if(ST.modo==='vivo' && ST.ses.cloudIni){
-        var r=await api.ficharSalida(imput, f.just.trim(), f.cat, _perfilElegido_());   // la nube cierra, calcula y guarda la categoría
+        var r=await api.ficharSalida(imput, f.just.trim(), f.cat, _perfilElegido_(), _subcatEnvio_(f));   // la nube cierra, calcula y guarda la categoría
         if(r && r.parte){ nuevo=normPMovil(r.parte); h=r.parte.horas; }
       } else {
         var dur=durForm();
@@ -1215,7 +1216,7 @@ async function enviarFichaje(){
            ⚠️ Los tres reintentos internos de `api._post` ya mandaban la misma clave (`body`
            se construye FUERA del `for`, `movil.html:272`): eso no era el agujero. */
         if(!f.clave) f.clave=_claveUso_();
-        var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, horas:dur,
+        var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, subcat:_subcatEnvio_(f), horas:dur,
           ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true,
           subsistema:_perfilElegido_(), clave:f.clave });
         /* ⛔ 20/10 (auditor de partes): las horas que GUARDÓ el servidor, no las tecleadas — recorta al tope y redondea
@@ -1237,7 +1238,7 @@ async function enviarFichaje(){
          esa sesion salen con el 30/07, en silencio y sin volver a preguntar. Vuelve a
          HOY, que es el caso normal. */
       var _cola=_colaTxtM_();
-      ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
+      ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null;
       f.fecha=HOY;
       /* ⚠️ Y el aviso lo DICE en vez de inventarse un número: sin las horas de vuelta,
          se confirma el envío y se manda a mirar la lista, que es donde estarán. */
@@ -1263,7 +1264,7 @@ async function enviarFichaje(){
     ini:f.ini, fin:f.fin, just:f.just.trim(),
     sinFichaje: ST.modo==='bloque'});
   ST.ses={estado:'parada',ini:null,acum:0,desde:null,ult:ST.ses.ult};
-  f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
+  f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null;
   tost('Enviado · '+nf2(durd)+' h pendientes de firma');   /* 20/10: sin ceros de cola */
   irA('horas');
 }
@@ -1314,7 +1315,7 @@ function filaParte(p){
           /* ⛔ 633.ª UN AUTOCIERRE SE DICE EN LA LISTA, ANTES DE PULSAR «Declarar»: la tarjeta
              con el aviso sólo existe después del toque, y es aquí donde se decide. El
              criterio NO se copia: sale de `_avisoAutocierre_`, la puerta de las dos caras. */
-          : p.e==='sindecl' ? ((_avisoAutocierre_(p)?'autocerrado al tope · ':'')+p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · caduca '+_diaMadridDe_(p.caduca):''))
+          : p.e==='sindecl' ? ((_avisoAutocierre_(p)?'autocerrado al tope · ':'')+p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.caduca?' · '+_caducaElTxt_(p.caduca):''))
           : (p.f+(p.ini?' · '+p.ini+'–'+p.fin:''));
   /* ⛔⛔ 635.ª LO QUE YA CUENTA DICE CUÁNDO, QUIÉN Y A QUÉ MES (Daniel, 15/08: «que te diga
      aprobado esta fecha y por quien fue aprobado … una etiqueta de este mes»). El texto NO se
@@ -1478,13 +1479,6 @@ function _movHorasHTML_(confs, pends){
      mentira pequena que hace que nadie se fie del resto de la pantalla. */
   var _cet = _cr ? 'la que te toca por tu cargo · no se ficha'
                  : 'se te asigna cada mes · no se ficha';
-  /* LA EXTRA, EN SU PROPIA FILA. Ver `_compExtra_`: no es mas cantidad de lo mismo, es otra
-     cosa — la base llega por el puesto y la extra la asigna el PD por trabajo de mas. */
-  var _fx = !_cx ? '' :
-    '<div class="fila borde-ot"><div class="a"><b>Otras contribuciones</b>'+
-      '<small>'+(_cx>0?'te las ha asignado el Project Director por trabajo de más':
-                       'ajuste sobre la base de tu cargo')+' · solo de este mes</small></div>'+
-      '<div class="d"><b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
   /* ⛔ LA COMPENSACION ES UN APUNTE, Y LA CABECERA NO LA CONTABA. Daniel (07/08):
      *«dice 0 apuntes este mes cuando si los hay: la compensacion inicial es un
      apunte»*. Y tenia razon dos veces: el cuerpo la pinta como una fila mas, y la
@@ -1516,8 +1510,9 @@ function _movHorasHTML_(confs, pends){
          fichas, te la dan- y la que hace que la cuenta cuadre con el Panel de Rendimientos. */
       '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
         '<small>'+esc(_cet)+'</small></div>'+
-        '<div class="d"><b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>'+_fx+
-      (r.total ? desgloseCat(r.todos) : '')+
+        '<div class="d"><b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>'+
+      /* 01/11: SIN «Otras contribuciones» aparte; el mismo desglose por categorías que «Ver el desglose completo». */
+      desgloseCat(_fijasDesglose_().concat(r.todos))+
       '<p class="rnota" style="margin:8px 0 10px">'+
         (r.total
           ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes. '+
@@ -1576,6 +1571,27 @@ function _movHorasHTML_(confs, pends){
       : '');
 }
 
+/* LAS PARTIDAS FIJAS DEL MES (la base del cargo y la extra del PD), que no son partes: entran al desglose con `catDesglose`
+   puesto. UNA vez, y la llaman la tarjeta del mes (`_movHorasHTML_`) y «Ver el desglose completo» (`_desgloseMesHTML_`):
+   01/11, Daniel: *«quitaría otras contribuciones y pondría lo mismo que sale cuando le das a ver desglose completo»*. */
+function _fijasDesglose_(){
+  var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO), comp=_compMensual_(YO), cargo=(YO&&YO.cargo)||'miembro';
+  var filaBase=
+    '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
+      '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha · vuelve a asignarse en el '+
+      'cierre</small></div>'+
+    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>';
+  var filaExtra =
+    '<div class="fila borde-ot"><div class="a"><b>Asignada por el Project Director</b>'+
+      '<small>'+(_cx>0?'por trabajo de más (turnos extra y demás)':'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
+      'la compensación vuelve a la base</small></div>'+
+    '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
+  var fijas=[{catDesglose:'cargo', q:(_cr?_cb:comp), fila:filaBase}];
+  /* Sin el dato de Notion (`_compExtra_` devuelve 0) la extra no existe, en vez de ensenar un cero que no dice nada. */
+  if(_cx) fijas.push({catDesglose:'otras', q:_cx, fila:filaExtra});
+  return fijas;
+}
+
 function _desgloseMesHTML_(confs){
   var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
   var comp=_compMensual_(YO);
@@ -1596,19 +1612,7 @@ function _desgloseMesHTML_(confs){
      debería aparecer compensación por tu cargo y luego … todas estas contribuciones extras»*). La base y la extra no son
      partes: entran en su grupo como filas FIJAS (`catDesglose`), y la extra va a «Otras contribuciones». Lo demás se
      reparte por la tabla de comun.js. La suma de los subtotales es la de antes: ninguna fila se pierde ni se cuenta dos veces. */
-  var filaBase=
-    '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
-      '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha · vuelve a asignarse en el '+
-      'cierre</small></div>'+
-    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>';
-  var filaExtra =
-    '<div class="fila borde-ot"><div class="a"><b>Asignada por el Project Director</b>'+
-      '<small>'+(_cx>0?'por trabajo de más (turnos extra y demás)':'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
-      'la compensación vuelve a la base</small></div>'+
-    '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
-  var fijas=[{catDesglose:'cargo', q:(_cr?_cb:comp), fila:filaBase}];
-  /* Sin el dato de Notion (`_compExtra_` devuelve 0) la extra no existe, en vez de ensenar un cero que no dice nada. */
-  if(_cx) fijas.push({catDesglose:'otras', q:_cx, fila:filaExtra});
+  var fijas=_fijasDesglose_();
   var grupos=agruparDesglose(fijas.concat(r.todos)).map(function(c){
     return '<div class="dgrp" style="border-left-color:'+c.color+'"><div class="dgh"><i class="dgpt" style="background:'+c.color+'"></i>'+
       '<b>'+esc(c.eti)+'</b><span class="ln"></span><span class="mono">'+nf2(c.h)+' h</span></div>'+
@@ -2109,6 +2113,9 @@ function _pdRevFichaHTML_(p){
    ⚠️ Hasta el 07/10/2026 ponia «debajo de "Esperan tu decision"» y estaba AHI, o sea segunda
    de todo. Daniel: 🗣️ *«no tiene sentido ninguno. deberia estar debajo de tus partes no?»*. */
 function _pdRevHTML_(){
+  /* 01/11 (Daniel: «espero que los miembros normales no les aparezca ya decidiste»): sólo quien aprueba partes, aunque la lista
+     traiga algo (un `Ver como` anterior, un respaldo viejo). `_cargarPartesDec_` ya la vaciaba al cargar; esto es la 2.ª puerta. */
+  if(!_apruebaPartes_()) return '';
   /* ⛔ 21/10 (auditor 8, 🟡 11): cuántos AÚN se pueden revertir — la lista trae también los de meses cerrados (`cerrado`)
      y lo otorgado por el sistema, y la cabecera los sumaba todos («53 partes» para 8 vivos). */
   var vivos=PARTES_REV.filter(function(p){ return !p.cerrado; }).length;
@@ -2244,6 +2251,8 @@ function vHoras(){
   /* 31/10: lo que NO cuenta (rechazado, caducado, revertido/retirado) se ve `DIAS_VISIBLE_SIN_CONTAR` días y luego desaparece. */
   var _ahoraMs=Date.parse(_ahoraApp_());
   var _todasMias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad'||x.e==='rev'||x.e==='raro';}).sort(_porFecha);
+  /* 01/11: lo más reciente arriba POR FECHA Y HORA y sin los sin declarar ya caducados (`_sinDeclararOrdenados_`, comun.js). */
+  _todasMias=_sinDeclararOrdenados_(_todasMias, Date.parse(_ahoraApp_()));
   _todasMias=_todasMias.filter(function(x){ return !(x.e==='rech'||x.e==='cad'||x.e==='rev') || _sigueVisibleSinContar_(x, _ahoraMs); });   // en cola / con detalle pedido / rechazados / sin declarar / caducados
   var confs=PARTES.filter(function(x){return _cuentaYa_(x.e);}).sort(_porFecha);   // aprobadas + otorgadas
   /* ⛔ LOS DE MESES PASADOS, APARTE. Ordenarlos los mandaba al fondo, pero seguían **en la
