@@ -1814,6 +1814,10 @@ function _cargarPartesDec_(){
        coordinador del subsistema del autor). Un segundo criterio aqui seria otra verdad. */
     if (_rg < 1){ PARTES_DEC = []; PARTES_REV = []; return; }
     PARTES_DEC = arr.filter(function(p){
+      /* 31/10 · Daniel: «si lo he hecho yo […] le tendría que enrutar a Bruno». El parte del PD de una unidad que coordina
+         OTRO no es «tuyo por aprobar» (sigue pudiendo decidirlo; es del coordinador): `coordinadorDe` es la misma regla que
+         el servidor, que ya puso en `p.subsistema` la unidad de la TAREA. */
+      if(p.autor===yo && coordinadorDe(p.subsistema)!==yo) return false;
       return (p.estado==='pendiente' || p.estado==='detalle') && (_mando || p.autor!==yo);
     }).map(_normPDec_);
     /* ⛔ Y DE LA MISMA RESPUESTA, lo ya decidido. Pedirlo en otra llamada seria un segundo
@@ -1827,7 +1831,7 @@ function _cargarPartesDec_(){
          decidir. Aquí salía otra vez: el mismo parte en las dos listas. */
       /* 26/10 · Daniel: «Sí, como lo firmo» — el PD (`_mando`) revierte lo suyo igual que lo firma. */
       return _pdRevertible_(p) && p.estado!=='detalle' && (_mando || p.autor!==yo);
-    }).map(function(p){
+    }).filter(function(p){ return _pdPuedeRevertir_(p, yo); }).map(function(p){
       var n = _normPDec_(p);
       n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN, CIERRE_UC, true);   /* 26/10: para revertir */
       return n;
@@ -1993,6 +1997,14 @@ function _engBloqueM_(){
    por la pantalla: el dia que el backend admita uno mas, se toca una linea.
    ⚠️ `pendiente` NO esta y no es un olvido: no hay ninguna decision que deshacer, y ofrecerlo
    seria un boton que solo sabe dar error. */
+/* ⛔ 31/10 (bolsa 2): LA JURISDICCIÓN TAMBIÉN AL REVERTIR, como el escritorio (`_escPuedeRevertir_` = `puedeDecidirParte`)
+   y el servidor (`_puede_sobre_parte`): el PD (rango 3) o quien coordina ESA unidad. Con «Ver como» `arr` es la cola entera
+   del PD y la lista ofrecía revertir partes de otras unidades a quien no puede. `p` es el parte CRUDO (`subsistema`). */
+function _pdPuedeRevertir_(p, quien){
+  var r = (typeof rangoNom==='function') ? rangoNom(quien) : 0;
+  return r >= 3 || (r >= 1 && coordinadorDe(p.subsistema||'—') === quien);
+}
+
 function _pdRevertible_(p){
   var e = p && p.estado;
   /* ⛔⛔ LA CONTRAPARTE DE UNA REVERSIÓN NO SE REVIERTE, y esto NO es cosmético.

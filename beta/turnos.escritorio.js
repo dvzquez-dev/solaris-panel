@@ -730,6 +730,8 @@ function _dispCargar_(repintar){
       var val = (e && typeof e==='object' && 'valor' in e) ? e.valor : e;
       AVISOS_ON = (val===true || val==='true' || val===1 || val==='1');
       AVISOS_EST='ok';
+      _dispBorrDe_(c);
+      _dispColaDe_(c);
       if(typeof repintar==='function') repintar();
     }).catch(function(){
       /* ⛔ 22/10 (auditor 26, 🟡 11): «no se pudo leer» NO es «apagado» — se pinta como lo que es. */
@@ -910,6 +912,222 @@ function _puedeConvocarDisp_(){
   return _puedeImpersonar_() || rangoNom(yo) >= 3;
 }
 
+/* ═══ LA DISPONIBILIDAD DE LA SEMANA, PREPARADA POR LA RUTINA Y LANZADA POR EL PD (31/10) ═══════════════════════════
+   🗣️ Daniel: *«Sola, la apruebo yo»*. `rutinas/convocar_semana.py` deja un BORRADOR en el CONTROL
+   `disponibilidad_borrador` ({semana_ini, abre, limite, estado: preparada|lanzada|descartada}) y avisa al PD. Aquí se ve y
+   se decide: **Lanzar** encola `convocar_disponibilidad` por `_encolarConvDisp_` —la MISMA puerta del botón de convocar
+   a mano, no una segunda forma de montarla— y **Descartar** lo quita para esa semana. El plazo es el del calendario:
+   lanzada tarde, abre al momento y NO se mueve. Sólo rango >= 3 (`_puedeConvocarDisp_`), como el botón. */
+var CLAVE_DISP_BORR='disponibilidad_borrador';
+var DISP_BORR=null;                    /* el borrador de la semana, o `null` (no hay / no se leyó) */
+
+function _dispBorrDe_(c){
+  /* ⛔ Cada entrada del control es `{valor, …}`, no el valor a secas (ver `AVISOS_ON`); y el valor puede llegar como cadena JSON. */
+  var e=c && c[CLAVE_DISP_BORR], v=(e && typeof e==='object' && 'valor' in e) ? e.valor : e;
+  if(typeof v==='string'){ try{ v=JSON.parse(v); }catch(x){ v=null; } }
+  DISP_BORR=(v && typeof v==='object' && v.semana_ini) ? v : null;
+}
+
+/* La maqueta (`?demo`, sin sesión): un borrador cuya apertura es HOY a las 22:00, derivado del reloj de la app. Los
+   rótulos «hoy HH:MM» van puestos a mano: en lo real los pone Python (`abre_txt`/`limite_txt`) — la cara no nombra días. */
+function _borradorDemo_(){
+  var w=_semanaDemo_(new Date(+new Date(_ahoraApp_().slice(0,10)+'T12:00')+86400000));
+  return {semana_ini:w.dias[0], semana_fin:w.dias[6], abre:w.abre, limite:w.limite, estado:'preparada', avisado_at:null,
+          abre_txt:'hoy '+w.abre.slice(11,16), limite_txt:'pasado mañana '+w.limite.slice(11,16)};
+}
+
+function _dispBorrFecha_(iso){ return new Date(String(iso||'').slice(0,16)); }
+/* «jue 22:00»: lo dice Python (`convocatoria.dia_hora`), que es quien sabe el calendario; sin él, sólo la hora. */
+function _dispDiaHora_(txt, iso){ return txt || String(iso).slice(11,16); }
+function _dispDM_(iso){ var t=String(iso).slice(0,10).split('-'); return t[2]+'/'+t[1]; }
+/* «31 h», «1 h 36 min», «10 min»: como `reglas/convocatoria.py:cuanto_queda` — por encima de 3 h se TRUNCA (equivocarse hacia
+   «queda menos» cuesta darse prisa; hacia «queda más», llegar tarde). */
+function _quedaTxt_(horas){
+  var mins=Math.round(horas*60);
+  if(mins<60) return Math.max(1,mins)+' min';
+  if(horas<3) return Math.floor(mins/60)+' h'+(mins%60?' '+(mins%60)+' min':'');
+  return Math.floor(horas)+' h';
+}
+
+/* `{tipo, horas}`: `preparada` (aún no abre), `abierta` (la hora de apertura ya pasó: se abre al lanzarla) o `caducada`. */
+function _dispBorrEstado_(b, ahoraISO){
+  var ahora=_dispBorrFecha_(ahoraISO), abre=_dispBorrFecha_(b.abre), lim=_dispBorrFecha_(b.limite);
+  if(ahora>lim) return {tipo:'caducada', horas:0};
+  if(ahora>=abre) return {tipo:'abierta', horas:(lim-ahora)/3600000};
+  return {tipo:'preparada', horas:(lim-abre)/3600000};
+}
+
+/* La puerta ÚNICA que encola una convocatoria: el botón de convocar a mano y «Lanzar» de la tarjeta. */
+function _encolarConvDisp_(o){
+  var carga={
+    semana:o.semana, tarde_partida:!!o.tarde_partida, horaria:!!o.horaria,
+    /* ⛔ LA SESIÓN, NO `ACTOR` (643.ª): la cuenta admin ve este panel aunque «Actúe como» otra persona, y con `ACTOR`
+       la convocatoria saldría pedida por quien está mirando — el «lo pide …» que leen en el móvil las personas convocadas. */
+    por:(typeof _actorSanc_==='function') ? _actorSanc_() : ACTOR,
+    at:new Date().toISOString()
+  };
+  if(o.sitios) carga.sitios=o.sitios;
+  return api.setControl('convocar_disponibilidad', carga, 'convocatoria de disponibilidad para turnos');
+}
+
+function _borradorDispPanel_(){
+  if(!_puedeConvocarDisp_()){ return ''; }
+  if(DISP_BORR===null && !SESION && _demoLocal_()) DISP_BORR=_borradorDemo_();
+  var b=DISP_BORR;
+  if(!b || b.estado!=='preparada') return '';
+  var st=_dispBorrEstado_(b, _ahoraApp_()), sem=_dispDM_(b.semana_ini);
+  var chip=function(t,c){ return '<span class="chip"'+(c?' style="color:'+c+'"':'')+'>'+t+'</span>'; };
+  var txt = st.tipo==='caducada'
+    ? 'El plazo ya cerró y no se puede lanzar. Si todavía hace falta, convócala a mano más abajo.'
+    : st.tipo==='abierta'
+      ? 'Ya pasó la hora de apertura: se abre en cuanto la lances y <b>el plazo no se mueve</b>. Quedan <b>'+_quedaTxt_(st.horas)+'</b> para contestar.'
+      : 'Para todo el equipo. Se abre a su hora, con '+_quedaTxt_(st.horas)+' de plazo. Hasta que no la lances, nadie la ve.';
+  return pan('Disponibilidad de la semana del '+sem,'espera tu visto bueno',
+    '<div class="pb" data-dispborr="'+esc(b.semana_ini)+'">'+
+      '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px">'+
+        chip(st.tipo==='caducada'?'caducada':'preparada', st.tipo==='caducada'?'var(--warn)':'')+
+        chip('abre '+_dispDiaHora_(b.abre_txt, b.abre))+chip('plazo '+_dispDiaHora_(b.limite_txt, b.limite))+'</div>'+
+      '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+txt+'</p>'+
+      (st.tipo==='caducada' ? '' :
+        '<div style="display:flex;gap:8px"><button class="btn pri" data-dispborr-lanzar>Lanzar</button>'+
+        '<button class="btn" data-dispborr-descartar>Descartar</button></div>')+
+    '</div>');
+}
+
+function _pinBorradorDisp_(m){
+  var raiz=(m||document).querySelector('[data-dispborr]'); if(!raiz) return;
+  var bl=raiz.querySelector('[data-dispborr-lanzar]'), bd=raiz.querySelector('[data-dispborr-descartar]');
+  var sem=raiz.getAttribute('data-dispborr'), local=(!SESION && _demoLocal_());
+  var puede=function(){
+    if(!local && (typeof backendOK==='undefined' || !backendOK || !SESION)){ tost('Sin conexión no se puede.'); return false; }
+    return true;
+  };
+  var marcar=function(estado){
+    var nb=Object.assign({}, DISP_BORR, {estado:estado, decidido_por:(typeof _actorSanc_==='function') ? _actorSanc_() : ACTOR,
+      decidido_at:new Date().toISOString()});
+    return local ? Promise.resolve(nb) : api.setControl(CLAVE_DISP_BORR, nb, 'borrador '+estado).then(function(){ return nb; });
+  };
+  if(bl) bl.onclick=async function(){
+    if(bl.disabled || !puede()) return;
+    if(!confirm('¿Lanzar la disponibilidad de la semana del '+_dispDM_(sem)+'? Se abre a todo el equipo.')) return;
+    bl.disabled=bd.disabled=true;
+    try{
+      if(!local) await _encolarConvDisp_({semana:sem, horaria:true});
+    }catch(e){ bl.disabled=bd.disabled=false; tostErr('No se pudo lanzar: ', e); return; }
+    try{
+      DISP_BORR=await marcar('lanzada');
+      tost('Lanzada. La rutina la monta en la siguiente pasada.');
+    }catch(e){
+      /* La convocatoria YA está encolada: sólo falló apuntar el borrador, y se dice (no se vuelve a encolar). */
+      tostErr('Se lanzó, pero no se pudo apuntar: ', e);
+    }
+    pintar();
+  };
+  if(bd) bd.onclick=async function(){
+    if(bd.disabled || !puede()) return;
+    if(!confirm('¿Descartar la disponibilidad de la semana del '+_dispDM_(sem)+'? No se volverá a preparar esa semana.')) return;
+    bl.disabled=bd.disabled=true;
+    try{ DISP_BORR=await marcar('descartada'); tost('Descartada.'); }
+    catch(e){ bl.disabled=bd.disabled=false; tostErr('No se pudo descartar: ', e); return; }
+    pintar();
+  };
+}
+
+/* ═══ LA COLA: SEMANAS MARCADAS POR ADELANTADO (31/10) ══════════════════════════════════════════════════════════════
+   🗣️ Daniel: *«que semanas quiero que se pida fabricación por adelantado, sin necesidad de ir cada jueves a decidirlo [...]
+   y si no quisiera podría haber quitado esa solicitud encolada antes»*. El PD marca/desmarca semanas (por su lunes) en el
+   CONTROL `disponibilidad_cola` ({semanas:[{semana_ini, por, at, estado: marcada|enviada, enviada_at}]}); la rutina
+   (`convocar_semana.py`) lanza sola las marcadas el día de su apertura y las apunta `enviada`. Una enviada ya no se toca.
+   ⛔ Al marcar se RELEE el control antes de escribir: la rutina pudo apuntar una `enviada` entre medias y no se pisa. */
+var CLAVE_DISP_COLA='disponibilidad_cola';
+var DISP_COLA=null;                    /* {semanas:[…]}, o `null` (no hay / no se leyó) */
+/* Cuándo abre cada semana lo DICE el servidor (`reglas/convocatoria.py`, calculado al servir): llega en el mismo control,
+   como `disponibilidad_cola_aperturas` = {valor:{'AAAA-MM-DD (lunes)': {abre, txt}}}. La cara no sabe qué día ni a qué hora
+   abre una semana: pinta `txt`. ⛔ Sin él (backend viejo, demo) NO inventa una hora. */
+var CLAVE_DISP_APERT='disponibilidad_cola_aperturas';
+var DISP_APERT=null;
+var COLA_SEMANAS=8;
+
+function _dispColaVal_(c){
+  var e=c && c[CLAVE_DISP_COLA], v=(e && typeof e==='object' && 'valor' in e) ? e.valor : e;
+  if(typeof v==='string'){ try{ v=JSON.parse(v); }catch(x){ v=null; } }
+  return (v && typeof v==='object' && Array.isArray(v.semanas)) ? v : null;
+}
+function _dispColaDe_(c){
+  var e=c && c[CLAVE_DISP_APERT], v=(e && typeof e==='object' && 'valor' in e) ? e.valor : e;
+  DISP_COLA=_dispColaVal_(c);
+  DISP_APERT=(v && typeof v==='object' && !Array.isArray(v)) ? v : null;
+}
+function _colaMarca_(cola, sem){
+  var l=(cola && cola.semanas) || [], i;
+  for(i=0;i<l.length;i++) if(l[i] && l[i].semana_ini===sem) return l[i];
+  return null;
+}
+/* «el jueves 05/11 a las 22:00»: la apertura de la semana que empieza el lunes `sem`, tal como la rotula el servidor. */
+function _colaAbreTxt_(sem){
+  var a=DISP_APERT && DISP_APERT[sem], t=(a && typeof a==='object') ? a.txt : '';
+  return (typeof t==='string' && t) ? t : 'el día que abra';
+}
+/* La maqueta: una semana ya enviada y dos marcadas, derivadas del reloj de la app. */
+function _colaDemo_(){
+  var l=_lunesDesde_(_ahoraApp_().slice(0,10), COLA_SEMANAS), p=function(s,e){ return {semana_ini:s, por:'Daniel', at:'2026-10-20T10:00', estado:e}; };
+  DISP_APERT={}; DISP_APERT[l[2]]={txt:'el día de su apertura (maqueta)'}; DISP_APERT[l[4]]={txt:'el día de su apertura (maqueta)'};
+  return {semanas:[p(l[0],'enviada'), p(l[2],'marcada'), p(l[4],'marcada')]};
+}
+
+function _colaDispPanel_(){
+  if(!_puedeConvocarDisp_()){ return ''; }
+  if(DISP_COLA===null && !SESION && _demoLocal_()) DISP_COLA=_colaDemo_();
+  var lunes=_lunesDesde_(_ahoraApp_().slice(0,10), COLA_SEMANAS), cola=DISP_COLA, marcadas=[], chips='';
+  lunes.forEach(function(sem){
+    var m=_colaMarca_(cola, sem), env=!!(m && m.estado==='enviada'), on=!!m;
+    if(on && !env) marcadas.push(sem);
+    var col=env ? 'var(--ok)' : on ? 'var(--red2)' : 'var(--ink2)';
+    chips+='<button class="btn" data-dispcola="'+esc(sem)+'"'+(env?' disabled':'')+' aria-pressed="'+(on?'true':'false')+'" style="'+
+      'min-width:92px;padding:9px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;'+
+      'color:'+col+';border-color:'+(on ? col : 'var(--line2)')+';background:'+(env ? 'rgba(62,180,137,.08)' : on ? 'rgba(228,30,37,.09)' : 'transparent')+'">'+
+      '<span style="font-size:13px;font-weight:600">'+esc(_dispDM_(sem))+'</span>'+
+      '<span style="font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase">'+(env ? 'enviada' : on ? 'marcada' : 'sin marcar')+'</span></button>';
+  });
+  var lineas=marcadas.map(function(sem){
+    return '<div style="font-size:12.5px;color:var(--ink2);line-height:1.7">Semana del <b>'+esc(_dispDM_(sem))+'</b> · se pedirá sola '+esc(_colaAbreTxt_(sem))+'</div>';
+  }).join('');
+  return pan('Semanas por adelantado','se piden solas',
+    '<div class="pb" data-dispcola-panel>'+
+      '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">Marca las semanas que quieres que se pidan sin esperar a tu visto bueno. '+
+      'Mientras no haya salido, puedes quitarla.</p>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+chips+'</div>'+
+      (lineas || '<div style="font-size:12.5px;color:var(--ink3)">Ninguna marcada: cada semana te espera como borrador.</div>')+
+    '</div>');
+}
+
+function _pinColaDisp_(m){
+  var raiz=(m||document).querySelector('[data-dispcola-panel]'); if(!raiz) return;
+  var local=(!SESION && _demoLocal_());
+  raiz.querySelectorAll('[data-dispcola]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      if(!local && (typeof backendOK==='undefined' || !backendOK || !SESION)){ tost('Sin conexión no se puede.'); return; }
+      var sem=b.getAttribute('data-dispcola'), yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ACTOR;
+      raiz.querySelectorAll('[data-dispcola]').forEach(function(x){ x.disabled=true; });
+      try{
+        var base=DISP_COLA;
+        if(!local){ try{ base=_dispColaVal_(await api.getControl()) || base; }catch(x){ /* sin releer, lo que hay */ } }
+        var m0=_colaMarca_(base, sem);
+        if(m0 && m0.estado==='enviada'){ DISP_COLA=base; tost('Esa semana ya salió.'); pintar(); return; }
+        var lista=((base && base.semanas) || []).filter(function(e){ return e && e.semana_ini!==sem; });
+        if(!m0) lista.push({semana_ini:sem, por:yo, at:_ahoraApp_().slice(0,16), estado:'marcada'});
+        lista.sort(function(a,c){ return a.semana_ini<c.semana_ini ? -1 : 1; });
+        var nueva={semanas:lista};
+        if(!local) await api.setControl(CLAVE_DISP_COLA, nueva, m0 ? 'semana desmarcada' : 'semana marcada por adelantado');
+        DISP_COLA=nueva;
+        tost(m0 ? 'Quitada: no se pedirá sola.' : 'Marcada: se pedirá sola.');
+      }catch(e){ tostErr('No se pudo guardar: ', e); }
+      pintar();
+    };
+  });
+}
+
 function _convocarDispPanel_(){
   if(!_puedeConvocarDisp_()) return '';
   /* 🟡 R4 (refutador 26): lo que se PINTA del interruptor. 'leyendo' sin sesión no es «leyendo»: nadie va a preguntar. */
@@ -927,7 +1145,7 @@ function _convocarDispPanel_(){
      revés, el botón sale y el servidor lo rechaza, que es el defecto de partida del revés. */
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
-  return pan('Convocar disponibilidad','abre el plazo · solo dirección',
+  return _borradorDispPanel_()+_colaDispPanel_()+pan('Convocar disponibilidad','abre el plazo · solo dirección',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
       'Elige <b>un día</b> de la semana que quieras preguntar (se pregunta de lunes a domingo). '+
@@ -1002,6 +1220,8 @@ function _engAvisosConv_(m){
 
 function _pinConvDisp_(m){
   _engAvisosConv_(m);
+  _pinBorradorDisp_(m);
+  _pinColaDisp_(m);
   var b=(m||document).querySelector('[data-convdisp]'); if(!b) return;
   b.onclick=async function(){
     if(b.disabled) return;
@@ -1018,21 +1238,12 @@ function _pinConvDisp_(m){
     if(!confirm('¿Abrir la disponibilidad de la semana del '+sem+'?')) return;
     b.disabled=true; var prev=b.textContent; b.textContent='Encolando…';
     try{
-      await api.setControl('convocar_disponibilidad', {
-        semana: sem,
-        tarde_partida: !!(document.getElementById('cdTarde')||{}).checked,
+      await _encolarConvDisp_({semana:sem, tarde_partida:!!(document.getElementById('cdTarde')||{}).checked,
         /* ⛔ EL MODO LO ELIGE QUIEN CONVOCA. Era `horaria=False` en la firma de `montar`,
-           o sea una constante que solo se podia cambiar tocando el codigo — y si la próxima
-           semana se pregunta por horas o por medias tardes no es una decisión de quien
+           o sea una constante que solo se podia cambiar tocando el codigo — y si la
+           próxima semana se pregunta por horas o por medias tardes no es una decisión de quien
            programa. Aquí es una casilla y viaja en el encargo. */
-        horaria: !!(document.getElementById('cdHoraria')||{}).checked,
-        sitios: sitios,
-        /* ⛔ LA SESIÓN, NO `ACTOR` (643.ª): la cuenta admin ve este panel aunque «Actúe como»
-           otra persona, y con `ACTOR` la convocatoria saldría pedida por quien está mirando —
-           el «lo pide …» que leen en el móvil las personas convocadas. */
-        por: (typeof _actorSanc_==='function') ? _actorSanc_() : ACTOR,
-        at: new Date().toISOString()
-      }, 'convocatoria de disponibilidad para turnos');
+        horaria:!!(document.getElementById('cdHoraria')||{}).checked, sitios:sitios});
       tost('Encolado. La rutina lo recoge en la siguiente pasada.');
       var n=document.getElementById('cdNota');
       if(n) n.innerHTML='<b>Encolado</b> para la semana del '+esc(sem)+'. El plazo lo calcula '+

@@ -4787,6 +4787,87 @@ function _irDesdeAviso_(destino){
   }catch(_){}
   return null;
 }
+/* ══ 31/10 · SONIDOS CORTOS — fichar, aprobar y avisos, ENCENDIDOS DE SERIE ═════════════════════════════════
+   🗣️ Daniel: «sonidos cortos (fichar, aprobar, avisos)» y, esa noche, «los sonidos por default encendidos eh, no
+   apagados. igual mola estetica retro»: onda CUADRADA (8 bits). Se generan con Web Audio (osciladores y
+   una envolvente): ni ficheros ni CDN, así que no hay nada que instalar ni que cachear. Menos de medio segundo cada uno.
+   ⛔ Apagado = NI SIQUIERA se crea el `AudioContext`: `_sonar_` mira el interruptor antes que nada. El interruptor es
+   por dispositivo (`localStorage`): sólo un '0' guardado lo apaga; sin nada guardado (o sin poder leerlo), suena. Si el `AudioContext` no se puede crear, no pasa nada.
+   ⛔ Los sonidos LARGOS (canciones de easter egg) NO van aquí: se pedirían en el momento y no se guardarían. */
+var SONIDOS_LS = 'solaris_sonidos';
+/* [frecuencia Hz, inicio s, duración s] — fichar sube dos notas; aprobar es un arpegio mayor; el aviso, un ping bajando. */
+var SONIDOS_NOTAS = {
+  fichar:  [[587, 0, 0.09], [880, 0.09, 0.16]],
+  aprobar: [[523, 0, 0.09], [659, 0.09, 0.09], [784, 0.18, 0.2]],
+  aviso:   [[988, 0, 0.07], [740, 0.11, 0.16]]
+};
+function _sonidosOn_(){
+  try{ return localStorage.getItem(SONIDOS_LS) !== '0'; }catch(_){ return true; }
+}
+function _sonidosPon_(v){
+  try{ localStorage.setItem(SONIDOS_LS, v ? '1' : '0'); }catch(_){}
+  return _sonidosOn_();
+}
+/* El contexto se crea la PRIMERA vez que hace falta (y sólo encendido); `null` si el navegador no puede. */
+function _sonidoCtx_(){
+  if (window.__SONIDO_CTX) return window.__SONIDO_CTX;
+  try{
+    var C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return null;
+    window.__SONIDO_CTX = new C();
+    return window.__SONIDO_CTX;
+  }catch(_){ return null; }
+}
+/* Suena `nombre` si el interruptor está encendido. Devuelve si lo programó. Nunca lanza. */
+function _sonar_(nombre){
+  try{
+    var notas = SONIDOS_NOTAS[nombre];
+    if (!notas || !_sonidosOn_()) return false;
+    var ctx = _sonidoCtx_();
+    if (!ctx) return false;
+    if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
+    var t0 = ctx.currentTime + 0.01;
+    notas.forEach(function(n){
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'square'; o.frequency.value = n[0];
+      g.gain.setValueAtTime(0.0001, t0 + n[1]);
+      g.gain.exponentialRampToValueAtTime(0.05, t0 + n[1] + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + n[1] + n[2]);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t0 + n[1]); o.stop(t0 + n[1] + n[2] + 0.02);
+    });
+    return true;
+  }catch(_){ return false; }
+}
+/* Qué sonido le toca a una llamada al backend (`null` = ninguno). UNA tabla para las dos caras: sus `api._post` la llaman
+   cuando el servidor ya ha contestado bien, así que un fichaje o una aprobación que fallan no suenan. */
+function _sonidoDeAccion_(body){
+  var a = body && body.action, c = body && body.accion;
+  if (a === 'ficharEntrada' || a === 'ficharSalida') return 'fichar';
+  if (a === 'decidirParte' || a === 'decidirSancion') return c === 'aprobar' ? 'aprobar' : null;
+  if (a === 'decidir') return (c === 'aprobado' || c === 'anot') ? 'aprobar' : null;
+  if (a === 'decidirBloque' || a === 'confirmarLote') return 'aprobar';
+  return null;
+}
+function _sonarAccion_(body){ var n = _sonidoDeAccion_(body); return n ? _sonar_(n) : false; }
+/* La fila del interruptor de Ajustes, igual en las dos caras; cada una la mete en su propio contenedor. */
+function _sonidosHTML_(){
+  return '<div class="fila"><div class="a"><b>Sonidos</b><small>Un pitido corto al fichar, al aprobar y al llegarte un aviso. '+
+    'Encendido de serie; vale sólo para este dispositivo.</small></div><div class="d">'+
+    '<button class="btn" data-sonidos data-p>'+(_sonidosOn_()?'Sí':'No')+'</button></div></div>';
+}
+/* Engancha el interruptor dentro de `raiz`. Al encenderlo suena el de aprobar, para comprobar que se oye. */
+function _sonidosEnganchar_(raiz){
+  var b = raiz && raiz.querySelector && raiz.querySelector('[data-sonidos]');
+  if (!b) return false;
+  b.onclick = function(){
+    var on = _sonidosPon_(!_sonidosOn_());
+    b.textContent = on ? 'Sí' : 'No';
+    if (on) _sonar_('aprobar');
+  };
+  return true;
+}
+
 /* Al abrir desde un aviso con la app cerrada, el destino llega en el hash; se lee una vez y se quita de la barra. */
 function _irAlAbrir_(){
   try{
@@ -4813,6 +4894,7 @@ function _escucharSW_(){
     navigator.serviceWorker.addEventListener('message', function(ev){
       if (ev && ev.data && ev.data.tipo === 'version-nueva') { _avisoVersion = true; _recargarVersionNueva_(false); }
       else if (ev && ev.data && ev.data.tipo === 'ir') _irDesdeAviso_(ev.data.a);
+      else if (ev && ev.data && ev.data.tipo === 'aviso') _sonar_('aviso');
     });
     return true;
   } catch (_) { return false; }
@@ -5031,6 +5113,18 @@ function _isoMasDias_(iso, n){
   var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso==null?'':iso));
   if(!m) return null;
   return new Date(Date.UTC(+m[1], +m[2]-1, +m[3]+(+n||0))).toISOString().slice(0,10);
+}
+
+/* Los `n` primeros LUNES estrictamente posteriores a `hoyISO`, en ISO. El día de la semana sale de los días desde el
+   1970-01-01 (jueves), sin `getDay` — la misma aritmética en UTC que `_isoMasDias_`. Vive aquí y no en la cara porque
+   dar nombre/lugar a un día de la semana es calendario, y las caras no lo calculan. `[]` si `hoyISO` no es fecha. */
+function _lunesDesde_(hoyISO, n){
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(hoyISO==null?'':hoyISO)), out=[], d0, sem, i;
+  if(!m) return out;
+  d0=Math.floor(Date.UTC(+m[1], +m[2]-1, +m[3])/86400000);
+  sem=((d0+3)%7+7)%7;                                   /* 0 = lunes */
+  for(i=0;i<n;i++) out.push(_isoMasDias_(hoyISO, 7-sem+7*i));
+  return out;
 }
 
 function _topeDias_(){ return 62; }
@@ -5893,8 +5987,9 @@ function _yaCuentaEnSuMes_(p){ return !!(p && (p.estado==='aplicada' || p.aplica
    encuentra EN EL CODIGO, y fue el que canto este cambio antes de que se me ocurriera:
    su mensaje decia, literal, «si FALTA uno -el caso que viene-, dice hoy no se manda
    ninguno de algo que si se manda».
-   🔴 `horas` sigue fuera a proposito: nadie lo emite todavia. */
-function _notisVivos_(){ return ['turnos','reuniones','avisos','documentos']; }
+   ✅ `horas` entra el 31/10: `AVISAR_HORAS` se encendió con su sí (el servidor avisa al firmar, rechazar o pedir
+   detalle de un parte). Hasta entonces estaba fuera a proposito: nadie lo emitia. */
+function _notisVivos_(){ return ['turnos','reuniones','avisos','documentos','horas']; }
 
 function _identidadPrestada_(visto){
   if(typeof SESION==='undefined' || !SESION || !SESION.nombre) return false;
@@ -6494,6 +6589,18 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-31-sonidos', fecha:'2026-10-31',
+      titulo:'Sonidos cortos, de 8 bits',
+      items:[
+        {cara:'movil', vista:'estado', txt:'En **Ajustes › Sonidos**: un pitido corto al **fichar**, al **aprobar** y cuando te **llega un aviso** con la app abierta. Vienen encendidos; si no los quieres, se apagan ahí.'},
+        {cara:'escritorio', vista:'ajustes', txt:'**Ajustes › Sonidos**, lo mismo: fichar, aprobar y avisos, encendidos de serie. Se guarda en cada dispositivo.'}
+      ] },
+    { id:'2026-10-31-dispsemana', fecha:'2026-10-31',
+      titulo:'La disponibilidad de la semana, preparada y por adelantado',
+      items:[
+        {cara:'escritorio', vista:'turnos', txt:'El jueves la convocatoria de disponibilidad llega **ya preparada**: la lanzas o la descartas con un toque.'},
+        {cara:'escritorio', vista:'turnos', txt:'En **Semanas por adelantado** marcas las semanas que quieres pedir; cada una sale sola el día que abre. Desmarcarla antes la cancela.'}
+      ] },
     { id:'2026-10-31-apelsanc', fecha:'2026-10-31',
       titulo:'Alegar y apelar una sanción',
       items:[
@@ -8437,16 +8544,6 @@ function _novDe_(cara, vistas){
     else out.pendientes.push(copia);
   });
   return out;
-}
-
-/* Cuántas novedades sin ver tiene cada pantalla: `{turnos:2, horas:1}`. Es lo que pone el
-   puntito en el nav — «rodear lo nuevo» sin tener que abrir nada. */
-function _novPorVista_(cara){
-  var n={};
-  _novDe_(cara).pendientes.forEach(function(t){
-    t.items.forEach(function(i){ n[i.vista]=(n[i.vista]||0)+1; });
-  });
-  return n;
 }
 
 /* La capa, en HTML. **Un solo constructor para las dos caras**: cada una le pone su CSS a

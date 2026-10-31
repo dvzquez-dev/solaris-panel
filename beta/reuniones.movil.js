@@ -995,6 +995,16 @@ function _diasLargos_(modo,d0,d1,fecha,nd){
   return out;
 }
 
+/* El horario que ya habías puesto, conservado por DÍA y no por posición (31/10): al mover el «desde» una semana,
+   la fila 0 deja de ser el mismo día y el lunes heredaba el horario del jueves. `prev` son las filas de antes
+   `{d:'lun 3', off, a, b}` y `ds` las etiquetas nuevas; devuelve, por cada etiqueta nueva, su fila de antes o null.
+   Cada fila vieja se gasta una vez: «mar 3» sale en febrero y en marzo de un año no bisiesto (28 días). */
+function _horarioPrevPorDia_(prev, ds){
+  var usado=[];
+  return ds.map(function(d){
+    for(var i=0;i<prev.length;i++){ if(!usado[i] && prev[i].d===d){ usado[i]=true; return prev[i]; } }
+    return null; }); }
+
 /* ⛔ `_genUnion_` VIVE EN `comun.js` (07/08), que cargan las dos caras. Estaba
    aqui y en la otra cara con el MISMO cuerpo. No se declara aqui: dos globales con
    el mismo nombre y el navegador se queda con la ultima que cargue, sin dar error. */
@@ -1149,11 +1159,12 @@ function crearModal(){
   var renderDias=function(){ var ds=_diasLargos_(val('ceModo'), val('ceD0'), val('ceD1'), val('ceFecha')||_dmyAISO_(HOY), Math.max(1,+val('ceND')||1));
     if(!ds.length) ds=dias();
     var prev=$$('#ceDias .drow').map(function(r){
-      return {off:r.classList.contains('off'), a:r.querySelector('.dr0').value, b:r.querySelector('.dr1').value}; });
+      return {d:r.querySelector('span').textContent, off:r.classList.contains('off'), a:r.querySelector('.dr0').value, b:r.querySelector('.dr1').value}; });
+    var prevDe=_horarioPrevPorDia_(prev, ds);
     $('#ceDias').innerHTML=ds.map(function(d,i){
       return '<div class="drow" data-d="'+i+'"><button type="button" class="dtog on" data-p aria-label="activar o desactivar el día"></button>'+
         '<span>'+esc(d)+'</span><select class="dr0">'+optHoras(val('ceH0'))+'</select><select class="dr1">'+optHoras(val('ceH1'))+'</select></div>'; }).join('');
-    $$('#ceDias .drow').forEach(function(r,i){ var p=prev[i];
+    $$('#ceDias .drow').forEach(function(r,i){ var p=prevDe[i];
       if(p){ if(p.off) r.classList.add('off'); r.querySelector('.dr0').value=p.a; r.querySelector('.dr1').value=p.b; }
       var apl=function(){ var off=r.classList.contains('off');
         r.querySelectorAll('select').forEach(function(sl){ sl.disabled=off; });

@@ -68,7 +68,7 @@ function _rolDe_(nombre){
 
 function colaDecision(){
   var out=[];
-  pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).forEach(function(p){
+  porAprobar().forEach(function(p){
     out.push({ic:'i-reloj',b:h1(p.horas)+' de '+_m(p.autor).pila,
       /* Mismo vocabulario que las otras dos pantallas: `bloque` ya no existe. */
       s:esc(p.tarea)+' · '+p.fecha+(_etiOrigenParte_(p)?' · '+_etiOrigenParte_(p).txt:''),
@@ -320,7 +320,7 @@ function insightsHTML(){
 }
 
 function conteo(k){
-  if(k==='partes') return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).length;
+  if(k==='partes') return porAprobar().length;
   if(k==='sindeclarar') return PARTES.filter(function(p){return p.estado==='sindecl';}).length;
   /* ⛔ 21/10 (auditor 8, 🟡 13): TUS partes DEVUELTOS (`detalle`), que «Lo tuyo» enseña y que bloquean el cierre del mes.
      Daba 0: un coordinador con un parte suyo devuelto no veía ningún número. Los `sin_declarar` van en «Sin declarar». */
@@ -367,6 +367,13 @@ function enfocar(id){
   },80);
 }
 
+/* Los coordinadores a quienes el PD puede «mirar como» (31/10): rango 1 de `rangoNom` —quien tiene gente bajo su jurisdicción,
+   con el cargo o SIN él: Bruno y Marta coordinan desde el 26/10 sin llevar `cargo:'Coordinador'`—, no el rótulo. Son 3 como
+   mucho: el conmutador es una fila de botones en la barra y no envuelve; el recorte va por orden del roster. */
+function _coordsActuar_(){
+  return DATA.miembros.filter(function(x){ return x.nombre!==PD_NOM && x.nombre!==REV2_NOM && rangoNom(x.nombre)===1; }).slice(0,3);
+}
+
 function _pintarActua_(){
   var caja=$('#actua'); if(!caja) return;
   var m=miembro(ACTOR);
@@ -378,8 +385,7 @@ function _pintarActua_(){
   var opts=[];
   if(miembro(PD_NOM)) opts.push([PD_NOM,'Project Director']);
   if(miembro(REV2_NOM)) opts.push([REV2_NOM,'Revisor fijo']);
-  DATA.miembros.filter(function(x){ return x.cargo==='Coordinador' && x.nombre!==PD_NOM && x.nombre!==REV2_NOM; })
-    .slice(0,3).forEach(function(x){ opts.push([x.nombre, x.pila||x.nombre.split(' ')[0]]); });
+  _coordsActuar_().forEach(function(x){ opts.push([x.nombre, x.pila||x.nombre.split(' ')[0]]); });
   if(!opts.length) opts=[[ACTOR,'Yo']];
   $$('#actua button',caja).forEach(function(b){ b.remove(); });
   opts.forEach(function(o){

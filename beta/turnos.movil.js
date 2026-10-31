@@ -11,7 +11,7 @@
    fusionarlas es otro cambio, con otro riesgo y su propia verificación.
    ═══════════════════════════════════════════════════════════════════════════════════════ */
 
-/* El backend sirve el turno con SU forma (fecha ISO, roles:[{rol,miembro}], duracion, momento,
+/* El backend sirve el turno con SU forma (fecha ISO, roles:[{rol,miembro}], duracion,
    punto, crucial, nota, principales, secundarios). La pantalla espera {id,f,hora,punto,dur,mio,
    roles:[[nombre,rol]],pasado}. Sin este adaptador se volcaba el objeto crudo y la pantalla salía
    vacía. Aquí se traduce y se conserva TODO lo que da el backend (objetivos, nota, memoria). */
@@ -29,7 +29,7 @@ function _normTurnoM_(t, ix){
   var yo=(YO&&YO.nombre)||'', mio=null;
   (t.roles||[]).forEach(function(r){ if(!Array.isArray(r) && (r.miembro===yo)) mio=r.rol||'te toca'; });
   var hoyISO=_dmyAISO_(HOY);
-  var dur=t.duracion || (t.momento==='tarde'?'tarde':(t.momento==='mañana'?'mañana':'—'));
+  var dur=t.duracion || '—';   /* 31/10: el rótulo tarde/mañana no lo sirve `_turnoDeNotion_` (era del espejo, `flujos/turno.py`) */
   /* `hecho` manda sobre la fecha: lo que decide si un turno sale suelto o al cajon es
      su ESTADO en Notion, no que la fecha haya pasado (un turno de ayer sin cerrar sigue vivo). */
   var est=t.estado||'';
@@ -172,11 +172,13 @@ function _convCelHTML_(cv, dia, franja){
    Se dice a todo el mundo (para que nadie lo busque en balde) y a quien puede convocar se le
    añade **dónde** se hace: convocar vive en el escritorio, no aquí.
 
-   ⚠️ Rango ≥ 3 es el MISMO criterio con el que el escritorio deja convocar. No se reutiliza
+   ⚠️ MISMO criterio que `_puedeConvocarDisp_` del escritorio (31/10): la SESIÓN —no «actúas como», que el móvil no
+   tiene— con rango ≥ 3 o la cuenta de administración, que es la que `setControl` acepta y tiene rango 0. No se reutiliza
    `_novPuedeRegistro_`, que da ese mismo número pero significa otra cosa («esto lo revisa el
    PD»): atar dos reglas porque hoy coinciden es cómo se separan mal el día que una cambie. */
 function _puedeConvocarT_(){
-  return (typeof _rangoBeta_==='function') && _rangoBeta_() >= 3;
+  return ((typeof _puedeImpersonar_==='function') && _puedeImpersonar_()) ||
+         ((typeof _rangoBeta_==='function') && _rangoBeta_() >= 3);
 }
 
 /* ⛔⛔ LA PUERTA DE AVISOS QUE ESTA CARA NO TENIA (578.ª). El escritorio la tiene desde la

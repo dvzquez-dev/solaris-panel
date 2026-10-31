@@ -47,6 +47,12 @@ function puedeDecidirParte(p,quien){
    globo y de «Horas en el aire», y caía en el Histórico como si estuviera decidido. */
 function pendientes(){return PARTES.filter(function(p){return p.estado==='pend' || p.estado==='detalle';});}
 
+/* 31/10 · Daniel: el parte del PD de una unidad que coordina OTRO se enruta a ese coordinador: al PD no le sale como «suyo por
+   aprobar» (cola y globo) aunque siga pudiendo decidirlo. Misma regla que el móvil (`_cargarPartesDec_`); el servidor ya
+   fijó en el parte la unidad de la TAREA. */
+function porAprobar(){return pendientes().filter(function(p){
+  return puedeDecidirParte(p,ACTOR) && !(p.autor===ACTOR && coordinadorDe(p.unidad)!==ACTOR);});}
+
 function parteCard(p){
   var m=_m(p.autor), rev=revisoresDeParte(p), puede=puedeDecidirParte(p,ACTOR);
   var esc2=(coordinadorDe(p.unidad)===p.autor);
@@ -602,6 +608,10 @@ function _fichaEnPausa_(){
   var ps=(FICHA&&FICHA.pausas)||[], ult=ps[ps.length-1];
   return !!(ult && !ult.fin);
 }
+/* Cuándo caduca un parte que se cierra SIN declarar, dicho con el plazo de verdad: a mano, 7 días; si lo cierras ya
+   pasado el tope el servidor lo trata como autocierre y vive `_caducaAutocierreH_()` h. `min` = minutos de la sesión. */
+function _plazoSinDeclarar_(min){
+  return min>=_maxHorasParte_()*60 ? 'a las '+_caducaAutocierreH_()+' h (ya pasó del tope)' : 'a los 7 d\u00edas'; }
 function _fichaMin_(){ return FICHA ? _minSesion_(FICHA.ini, FICHA.pausas) : 0; }
 function _fichaHM_(m){ return pad(Math.floor(m/60))+':'+pad(m%60); }
 
@@ -721,8 +731,8 @@ function _fichaPanel_(){
       '<p class="sc" id="fichaFalta" style="margin:8px 0 0;letter-spacing:.08em">'+
         esc(_fichaFalta_()||'Todo listo: al fichar salida se declara.')+'</p>'+
       '<div class="nota" style="margin-top:11px">La <b>duraci\u00f3n</b> sale de la entrada al env\u00edo, menos pausas. '+
-        'Si lo dejas a medias, queda <b>sin declarar</b> y caduca a los <b>7 d\u00edas</b>; '+
-        'lo declaras <b>aqu\u00ed abajo</b> o desde el m\u00f3vil.'+
+        'Si lo cierras sin declarar, caduca a los <b>7 d\u00edas</b>; si se cierra solo al tope, a las <b>'+_caducaAutocierreH_()+' h</b>. '+
+        'Lo declaras <b>aqu\u00ed abajo</b> o desde el m\u00f3vil.'+
         (firmaP?' Lo firma <b>'+esc(firmaP)+'</b>.':'')+'</div>'+
     '</div>';
   }
@@ -803,7 +813,7 @@ function _engFicharE_(){
        declarar», caduca a los 7 dias y hoy solo se declara desde el movil: cerrar y que se
        pierda en silencio es justo lo que esta pantalla viene a quitar. */
     if(!declara && !confirm('Vas a cerrar la sesi\u00f3n SIN declararla.'+String.fromCharCode(10,10)+
-        falta+'.'+String.fromCharCode(10)+'El parte quedar\u00e1 «sin declarar», caduca a los 7 d\u00edas '+
+        falta+'.'+String.fromCharCode(10)+'El parte quedar\u00e1 «sin declarar» y caduca '+_plazoSinDeclarar_(_fichaMin_())+'. '+
         'Lo declaras aqu\u00ed mismo, en el panel de abajo.'+String.fromCharCode(10,10)+
         '\u00bfCerrar igualmente?')) return;
     bf.disabled=true; var prev=bf.textContent; bf.textContent='Cerrando\u2026';
@@ -833,7 +843,7 @@ function _engFicharE_(){
       var _ac=_tostAutocierre_(r);
       if(_ac) tost(_ac); else tost(declara
         ? ('Fichaje declarado'+(h==null?'':' \u00b7 '+nf2(h)+' h')+' \u00b7 a la cola de '+(_firmaP||'tu coordinador')+'.')
-        : 'Fichaje cerrado SIN declarar. Decl\u00e1ralo en el panel de abajo antes de 7 d\u00edas.');
+        : 'Fichaje cerrado SIN declarar. Decl\u00e1ralo en el panel de abajo antes de 7 d\u00edas.');  /* cierre a mano: el tope ya lo contesta `_tostAutocierre_` arriba */
       pintar();
     }catch(e){ bf.disabled=false; bf.textContent=prev; tostErr('No se pudo cerrar: ', e); }
   };
