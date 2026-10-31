@@ -53,6 +53,9 @@ function _normDocE_(d, i){
     subtitulo:        d.subtitulo || '',
     confidencialidad: d.confidencialidad || '',
     autor:   d.autor || '',
+    /* 31/10: el rastro de `cambiarAutorDoc` (PD/José), con los mismos nombres que el servidor y el móvil. */
+    autor_original: d.autor_original || null, autor_cambiado_por: d.autor_cambiado_por || null,
+    autor_cambiado_at: d.autor_cambiado_at || null,
     sub:     d.subsistema || d.sub || '',
     tipo:    d.tipo || '',
     amb:     d.ambito || d.amb || '',
@@ -433,6 +436,9 @@ function docCard(d){
     previa+secs+avisos+visor+
     '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':'Firma: <b>'+esc(rev)+'</b>')+
       ' · Decidir aquí sustituye a contestar el correo de aprobación.</div>'+
+    /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
+    _autorRastroHTML_(d)+
+    (_puedeCambiarAutor_(d.est, ACTOR) ? _autorPanelHTML_('a'+d.id+'-', d.id, d.autor, CAMPO_CSS) : '')+
     acc+
   '</div>';
 }

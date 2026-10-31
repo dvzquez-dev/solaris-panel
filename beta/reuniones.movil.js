@@ -696,6 +696,7 @@ function vReu(){
         '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
         '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
       '</div>':'')+
+    _audioReuHTML_(R)+
     _bloqueReuHTML_(R, _puedeBloqueReu_(R, (typeof _actorSanc_==='function'?_actorSanc_():(YO&&YO.nombre)), (typeof esAdmin==='function' && esAdmin())))+
     '</div>'+
     '<h2 class="sec">Cuándo puede el equipo<span class="ln"></span></h2>'+
@@ -1082,6 +1083,7 @@ function crearModal(){
       '<option value="">— empezar en blanco —</option>'+PLANTILLAS_M.map(function(p,i){ return '<option value="'+i+'">'+esc(p.titulo)+'</option>'; }).join('')+'</select></label>' : '';
   abrirModal('<div class="mtit">Nueva '+(coord?'reunión':'reunión de trabajo')+'</div>'+
     '<label class="campo"><span class="sc">Tipo</span><select id="ceTipo">'+op+'</select></label>'+
+    _avisoGrabaHTML_('ceGraba')+
     (coord?'':'<p class="rnota" style="margin:-4px 0 10px">Como miembro convocas <b>reuniones de trabajo</b> e invitas a quien quieras. Las generales, de junta o de subsistema las convoca coordinación.</p>')+
     '<label class="campo"><span class="sc">Modalidad</span><select id="ceMod">'+
       '<option value="hibrida">Híbrida (presencial + telemática)</option>'+
@@ -1204,6 +1206,7 @@ function crearModal(){
     $$('#ceMix .cmixb').forEach(function(b){ b.classList.remove('on'); });
     INV=new Set(_presetInvitados_(t)); invRender(); upd(); };
   $('#ceTipo').onchange=tipoUpd;
+  _avisoGrabaPon_('ceTipo','ceGraba');
   $$('#ceMix .cmixb').forEach(function(b){ b.onclick=function(){ b.classList.toggle('on');
     var u=b.dataset.u, on=b.classList.contains('on');
     _activos_().forEach(function(m){ if(m.unidad===u && m.nombre!==(YO&&YO.nombre)){ if(on) INV.add(m.nombre); else INV.delete(m.nombre); } });

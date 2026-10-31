@@ -591,6 +591,9 @@ function verDoc(id){
       (_mioDoc ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
                : 'Pídeselo a quien lo subió antes de decidir.</div></div>'))+
     '<p class="rnota" style="margin-top:10px">Revisa: <b>'+revs+'</b></p>'+
+    /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
+    _autorRastroHTML_(e)+
+    (_puedeCambiarAutor_(e.estado, yoNombre()) ? _autorPanelHTML_('dA', e.id, e.autor, '') : '')+
     (_mioDoc ? '' : _previaDocM_(e))+
     acc);
   /* Se cablea DESPUES de abrir el modal: un iframe dentro de la cadena de strings no

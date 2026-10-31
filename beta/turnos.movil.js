@@ -609,6 +609,14 @@ function _convGuardar_(cv){
 
 function _engConv_(){
   _convCargar_(function(){ if(typeof pintar==='function') pintar(); });
+  /* ⛔ El «Reintentar» del aviso de error se engancha ANTES del `if(!cv) return`: el aviso
+     sólo se pinta cuando no hay convocatoria, o sea justo cuando lo de abajo no corre. Hasta
+     el 31/10 era un botón sin manejador (inventario de paridad, B1). Mismo patrón que
+     `data-dreint` del escritorio: volver a 'sin pedir' es lo único que deja a `_convCargar_`
+     preguntar otra vez. */
+  $$('[data-convreint]').forEach(function(b){
+    b.onclick=function(){ _convEstadoSrv_('sin pedir'); _convCargar_(function(){ if(typeof pintar==='function') pintar(); }); if(typeof pintar==='function') pintar(); };
+  });
   var cv=_convAbierta_(); if(!cv) return;
   var rej=$('#convRej'); if(!rej) return;
   var repinta=function(){

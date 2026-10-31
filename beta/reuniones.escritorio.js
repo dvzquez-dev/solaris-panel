@@ -159,6 +159,7 @@ function convocarReunionPanel(){
       '<label style="flex:1;min-width:220px">'+lab('Título')+
         '<input id="cvTit" placeholder="Reunión sin título" style="'+E+'"></label>'+
     '</div>'+
+    _avisoGrabaHTML_('cvGraba')+
     lab('Subsistemas · marca uno y entra su gente')+
     '<div class="chips" style="margin:0 0 8px">'+chipsSub+'</div>'+
     lab('Convocados <b id="cvN">'+CONV_INV.size+'</b>')+
@@ -216,6 +217,7 @@ function convocarReunionPanel(){
 
 function _cablearConvocar_(){
   var t=$('#cvTipo'); if(!t) return;                  // no está la vista o no hay potestad
+  _avisoGrabaPon_('cvTipo','cvGraba');
   var val=function(id){ var e=$('#'+id); return e?e.value:''; };
   var dias=function(){ return _diasEntre_(val('cvD0'), val('cvD1')); };
   /* El rango de CADA dia: el suyo si lo tiene, el general si no, y `null` si esta apagado.
@@ -923,6 +925,7 @@ function _fijarPanel_(){
       '<button class="btn" data-orden>Guardar orden del día</button>'+
     '</div>'+
     _convocadosBoxE_(r)+
+    _audioReuHTML_(r)+
     _borrarReuBoxE_(r)+
     '</div>');
 }

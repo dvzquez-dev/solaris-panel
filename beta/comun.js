@@ -8633,7 +8633,7 @@ function _anotOcupado_(pre){
    no lo repinte encima — borraría lo que SolarIA acaba de proponer. */
 function _anotAMedias_(){
   if (typeof document === 'undefined' || !document.querySelectorAll) return false;
-  var cs = document.querySelectorAll('[data-anot]');
+  var cs = document.querySelectorAll('[data-anot],[data-autor]');   /* 31/10: y el buscador de autor, con un nombre a medias */
   for (var i = 0; i < cs.length; i++){
     if (cs[i].getAttribute('data-ocupado') === '1') return true;
     var xs = cs[i].querySelectorAll('input,textarea,select');
@@ -8818,6 +8818,56 @@ function _anotClic_(ev, buscar){
   if (!s) return;
   var pre = s.getAttribute('data-solaria'), c = document.getElementById(pre + 'Anot');
   _anotEnviarIA_(pre, c ? buscar(c.getAttribute('data-anotdoc')) : null);
+}
+
+/* ══ 31/10 · CAMBIAR EL AUTOR DE UN DOCUMENTO EN REVISIÓN (las dos caras, PD y José) ═══════════════════════════════
+   🗣️ Daniel, 28/10: «en revisión estaría bien q José y yo tengamos el poder de cambiar la autoría de un documento en un
+   campo con desplegable y buscador de nombres (a cualquier persona menos nosotros mismos porque entonces sería revisor y
+   autor la misma persona)». El campo es un `<input list>` con `<datalist>`: desplegable y buscador en uno. Lo decide el
+   SERVIDOR (`e_cambiar_autor_doc`); esto sólo no ofrece lo que sabe que va a rechazar. */
+function _puedeCambiarAutor_(estado, yo){
+  return ['recibido','analizado','revision','cambios'].indexOf(estado) >= 0 && !!yo && (yo === PD_NOM || yo === REV2_NOM);
+}
+/* El roster activo MENOS el PD, José y el autor de ahora: ninguno de los dos revisores puede quedar de autor. */
+function _autorCandidatos_(actual){
+  return _activos_().map(function(m){ return m.nombre; })
+    .filter(function(n){ return n !== PD_NOM && n !== REV2_NOM && n !== actual; });
+}
+function _autorPanelHTML_(pre, id, actual, css){
+  var st = css ? ' style="' + css + '"' : '';
+  return '<div id="' + pre + 'Autor" data-autor="' + pre + '" data-autordoc="' + esc(String(id)) + '" style="margin-top:10px">' +
+    '<span class="sc" style="display:block;margin-bottom:5px">Autor · ahora ' + esc(actual || '—') + '</span>' +
+    '<input id="' + pre + 'AutorIn" list="' + pre + 'AutorLs" autocomplete="off" placeholder="Busca un nombre…"' + st + '>' +
+    '<datalist id="' + pre + 'AutorLs">' + _autorCandidatos_(actual).map(function(n){ return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
+    '<button type="button" class="btn" style="margin-top:8px;width:100%" data-autorcambiar="' + pre + '">Cambiar autor</button></div>';
+}
+/* «Autor cambiado por X (antes: Y)»: lo ve cualquiera que abra la ficha. Vacío si nadie lo cambió. */
+function _autorRastroHTML_(e){
+  if (!e || !e.autor_cambiado_por) return '';
+  return '<p class="rnota" style="margin:8px 0 0">Autor cambiado por ' + esc(e.autor_cambiado_por) +
+    (e.autor_original ? ' (antes: ' + esc(e.autor_original) + ')' : '') + '.</p>';
+}
+/* El delegado de «Cambiar autor». `buscar(id)` da el expediente de la cara; `alCambiar(e, upd)` repinta. */
+async function _autorClic_(ev, buscar, alCambiar){
+  var b = ev && ev.target && ev.target.closest ? ev.target.closest('[data-autorcambiar]') : null;
+  if (!b || b.disabled) return;
+  var pre = b.getAttribute('data-autorcambiar'), c = document.getElementById(pre + 'Autor');
+  var e = c ? buscar(c.getAttribute('data-autordoc')) : null;
+  if (!e) return;
+  var inp = document.getElementById(pre + 'AutorIn'), txt = String((inp && inp.value) || '').trim().toLowerCase();
+  var nuevo = _autorCandidatos_(e.autor).filter(function(n){ return n.toLowerCase() === txt; })[0];
+  if (!nuevo){ tost('Elige un nombre de la lista (no puede ser Daniel ni José).'); if (inp) inp.focus(); return; }
+  if (typeof backendOK === 'undefined' || !backendOK || typeof SESION === 'undefined' || !SESION){
+    tost('Sin conexión con el backend: el autor NO se ha cambiado.'); return; }
+  b.disabled = true;
+  try {
+    var upd = await api.cambiarAutorDoc(e.id, nuevo, e.ref);
+    tost('Autor cambiado a ' + nuevo + '.');
+    alCambiar(e, upd);
+  } catch (err) {
+    b.disabled = false;
+    tost('No se pudo cambiar el autor: ' + ((err && err.message) || err));
+  }
 }
 
 /* `2026-08-06T19:12:00.000Z` → `06/08/2026, 21:12`. Formato, no calendario. */
@@ -9324,4 +9374,106 @@ function _bloqueColaCablear_(cb){
       cb.hecho();
     }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo: ', e); }
   }; });
+}
+
+/* ══ 29/10 · LA GRABACIÓN DE UNA REUNIÓN: AVISO AL CONVOCAR + «SUBIR GRABACIÓN» EN LA FICHA ══════════════════════
+   🗣️ Daniel (29/10): *«se suba un audio de una reunión y a partir de ahí se genere una acta con IA»*. El audio vive SÓLO en
+   el mini PC (se borra a los 12 meses) y NO va a Drive ni a las copias. Backend: `rutinas/audio_reunion.py`.
+   ⛔ Quién puede y qué tipos llevan acta lo decide el SERVIDOR (`estadoAudioReunion` → `aplica`/`puede`): esto no
+   copia la regla, la pregunta. Las reuniones de TRABAJO no se graban. Una sola implementación para las dos caras. */
+var AUDIO_TIPOS_ACTA=['general','junta','consejo','mixta','subsistema'];
+var AUDIO_TROZO=512*1024;                 // = `audio_reunion.TROZO`: en base64 son ~683 KB, bajo el 1 MB del servidor
+var AUDIO_EST={};                         // id -> {t, e:{aplica,puede,estado,texto}}
+var AUDIO_SUBIENDO={};                    // id -> {pct, nombre}
+function _graba_(tipo){ return AUDIO_TIPOS_ACTA.indexOf(String(tipo||''))>=0; }
+
+/* El aviso al convocar. `_avisoGrabaPon_(selId, boxId)` lo enseña u oculta según el tipo elegido, y al cambiarlo. */
+function _avisoGrabaHTML_(boxId){
+  return '<p class="rnota" id="'+boxId+'" style="display:none;margin:2px 0 10px">🎙️ <b>Esta reunión se graba.</b> '+
+    'La grabación se guarda sólo en el servidor del equipo (12 meses) y con ella se redacta el acta. '+
+    'Avisa a los convocados. Las reuniones de trabajo no se graban.</p>';
+}
+function _avisoGrabaPon_(selId, boxId){
+  var s=document.getElementById(selId), b=document.getElementById(boxId); if(!s||!b) return;
+  var pon=function(){ b.style.display=_graba_(s.value)?'':'none'; };
+  s.addEventListener('change', pon); pon();
+}
+
+function _audioBoxHTML_(id, e){
+  var sub=AUDIO_SUBIENDO[id];
+  if(!sub && (!e || !e.aplica || !e.puede)) {
+    /* Quien no puede subirla, pero la reunión se graba y hay audio: sólo se le dice el estado. */
+    return (e && e.aplica && e.estado!=='ninguno') ? '<p class="rnota" style="margin:8px 0 0">🎙️ Grabación: '+esc(_audioTxt_(e))+'</p>' : '';
+  }
+  var cuerpo;
+  if(sub) cuerpo='<div class="rnota">Subiendo <b>'+esc(sub.nombre)+'</b>… '+sub.pct+' % <i>(no cierres esta pantalla)</i></div>'+
+    '<div style="height:5px;background:var(--line);border-radius:3px;margin-top:6px"><div style="height:5px;width:'+sub.pct+'%;background:var(--red);border-radius:3px"></div></div>';
+  else if(e.estado==='hecha') cuerpo='<div class="rnota">'+esc(_audioTxt_(e))+'.</div>';
+  else if(e.estado==='procesando') cuerpo='<div class="rnota">'+esc(_audioTxt_(e))+'</div>';
+  else cuerpo=(e.estado==='ninguno'?'<div class="rnota">Sube el audio de la reunión (mp3, m4a, wav…) y se hará el acta.</div>'
+      :'<div class="rnota">'+esc(_audioTxt_(e))+(e.estado==='en_cola'?' Puedes subir otra y sustituirá a ésta.':'')+'</div>')+
+    '<label class="btn mini" style="display:inline-block;margin-top:7px;cursor:pointer">'+(e.estado==='ninguno'?'🎙️ Subir grabación':'🎙️ Subir otra grabación')+
+    '<input type="file" accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.webm,.aac,.flac" data-audiofile="'+esc(id)+'" style="display:none"></label>';
+  return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><span class="sc" style="display:block;margin-bottom:4px">Grabación del acta</span>'+cuerpo+'</div>';
+}
+function _audioTxt_(e){
+  if(e.estado==='en_cola') return 'En cola: '+String(e.texto||'').replace(/^en curso:\s*/i,'');
+  if(e.estado==='error') return 'El acta no salió ('+String(e.texto||'').replace(/^error:\s*/i,'')+'). Puedes subir la grabación otra vez.';
+  return e.texto||'';
+}
+
+/* El hueco de la ficha. Se pinta con lo que se sabe y pregunta al servidor en cuanto está en pantalla: el resultado
+   REPINTA sólo este hueco (no la ficha entera, que se ha de poder seguir tocando). */
+function _audioReuHTML_(r){
+  if(!r || !r.id || !_graba_(r.tipo)) return '';
+  var c=AUDIO_EST[r.id];
+  if(!(typeof backendOK!=='undefined' && backendOK && typeof SESION!=='undefined' && SESION)) return '';
+  /* Con lo ya sabido se pinta Y se cablea (el `onchange` del fichero lo pone `_audioReuPintar_`, no el HTML). */
+  if(!c || Date.now()-c.t>20000) setTimeout(function(){ _audioReuRefrescar_(r.id); },0);
+  else setTimeout(function(){ _audioReuPintar_(r.id); },0);
+  return '<div data-audioreu="'+esc(r.id)+'">'+(c?_audioBoxHTML_(r.id,c.e):'')+'</div>';
+}
+function _audioReuPintar_(id){
+  var c=AUDIO_EST[id];
+  Array.prototype.forEach.call(document.querySelectorAll('[data-audioreu="'+String(id).replace(/"/g,'')+'"]'), function(el){
+    el.innerHTML=c||AUDIO_SUBIENDO[id]?_audioBoxHTML_(id, c&&c.e):'';
+    var f=el.querySelector('[data-audiofile]');
+    if(f) f.onchange=function(){ if(f.files&&f.files[0]) _audioReuSubir_(id, f.files[0]); f.value=''; };
+  });
+}
+async function _audioReuRefrescar_(id){
+  try{
+    var e=await api.estadoAudio(id);
+    AUDIO_EST[id]={t:Date.now(), e:e};
+  }catch(_){ AUDIO_EST[id]={t:Date.now(), e:{aplica:false,puede:false,estado:'ninguno',texto:''}}; }
+  _audioReuPintar_(id);
+}
+function _audioB64_(blob){
+  return new Promise(function(ok, ko){
+    var fr=new FileReader();
+    fr.onload=function(){ ok(String(fr.result).split(',')[1]||''); };
+    fr.onerror=function(){ ko(fr.error||new Error('no se pudo leer el fichero')); };
+    fr.readAsDataURL(blob);
+  });
+}
+async function _audioReuSubir_(id, file){
+  if(AUDIO_SUBIENDO[id]) return;
+  if(!(typeof backendOK!=='undefined' && backendOK && typeof SESION!=='undefined' && SESION)){ tost('Sin conexión no se puede subir la grabación.'); return; }
+  var partes=Math.max(1, Math.ceil(file.size/AUDIO_TROZO));
+  if(!file.size){ tost('Ese fichero está vacío.'); return; }
+  var sesion=''; for(var k=0;k<20;k++) sesion+='abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random()*36));
+  AUDIO_SUBIENDO[id]={pct:0, nombre:file.name}; _audioReuPintar_(id);
+  try{
+    var r=null;
+    for(var i=0;i<partes;i++){
+      var datos=await _audioB64_(file.slice(i*AUDIO_TROZO, Math.min(file.size,(i+1)*AUDIO_TROZO)));
+      r=await api.subirAudio(id, sesion, i, partes, file.name, datos);
+      AUDIO_SUBIENDO[id].pct=Math.floor((i+1)*100/partes); _audioReuPintar_(id);
+    }
+    delete AUDIO_SUBIENDO[id];
+    if(r && r.estado) AUDIO_EST[id]={t:Date.now(), e:Object.assign({aplica:true,puede:true}, r.estado)};
+    tost('Grabación subida: queda en cola para hacer el acta.');
+  }catch(e){ delete AUDIO_SUBIENDO[id]; tostErr('No se pudo subir la grabación: ', e); }
+  _audioReuPintar_(id);
+  _audioReuRefrescar_(id);
 }
