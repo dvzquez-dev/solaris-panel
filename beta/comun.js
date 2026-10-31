@@ -1102,6 +1102,19 @@ function _tareaHecha_(e){
   return /hech|finaliz|complet|termin|cerrad/i.test(String(e == null ? '' : e));
 }
 
+/* 31/10 · «✨ MEJORAR CON SOLARIA» en las instrucciones de una tarea nueva (`servidor.py` `a_mejorar_tarea`). Sólo PROPONE un
+   texto en la misma gramática de abajo; la pantalla lo enseña antes de aplicarlo. En `?demo` (`_demoLocal_`) no hay servidor:
+   contesta la maqueta, que reordena las líneas en pasos con la última frase como comprobación, para ver el flujo entero. */
+function _mejoraDemo_(titulo, texto){
+  var ls = String(texto || '').split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean), n = 0;
+  var pasos = ls.map(function(l){ return /^(#|\d+[.)]|[-*]\s|\[|\|)/.test(l) ? l : (++n) + '. ' + l.replace(/^(\S+)/, '**$1**'); });
+  return {ok: true, nota: 'Ordenado en pasos y con negrita en lo importante (maqueta).',
+          texto: '## ' + (String(titulo || '').trim() || 'Qué hay que hacer') + '\n' + pasos.join('\n') + '\n\n[ ] Comprobado y avisado al coordinador'};
+}
+function _mejorarTareaPost_(titulo, unidad, texto){
+  if(!_demoLocal_()) return api._post({action: 'mejorarTarea', titulo: titulo, unidad: unidad, texto: texto});
+  return new Promise(function(ok){ setTimeout(function(){ ok(_mejoraDemo_(titulo, texto)); }, 700); });
+}
 /* 31/10 · EL CUERPO DE UNA TAREA NUEVA: texto con formato ligero → bloques de Notion.
    ⛔ Es la MISMA gramática que `rutinas/cuerpo_notion.py` (`a_bloques`), que es la que manda el servidor como `children`;
    esta es la que pinta la vista previa «así se verá en Notion» (`_bloquesAHTML_`, de la MISMA salida: no hay una segunda
@@ -4180,6 +4193,24 @@ function _sigueVisibleSinContar_(p, ahoraMs){
     if(!isNaN(t)) return (ahoraMs - t) <= DIAS_VISIBLE_SIN_CONTAR * 86400000;
   }
   return true;
+}
+/* 31/10 (decisión «nada de desplegables nativos»): elegir entre pocas opciones = botones; la elegida, resaltada. Las dos caras de
+   «Declarar horas» (Categoría, Imputar a, Fichas como). `clase` es el botón de la cara ('btn sm' en el escritorio, 'btn mini' en el móvil). */
+function _chipsElegir_(attr, sel, ops, clase){
+  return '<span style="display:flex;gap:6px;flex-wrap:wrap">'+ops.map(function(o){
+    return '<button type="button" class="'+(clase||'btn sm')+(sel===o[0]?' pri':'')+'" '+attr+'="'+esc(o[0])+'">'+esc(o[1])+'</button>';
+  }).join('')+'</span>';
+}
+/* ¿Cambió la entrada o la salida de un FICHAJE por declarar (`decl`: ini/fin del parte) en el formulario `f`? Las dos caras. */
+function _fichajeEditado_(decl, f){
+  return !!(decl && _horaHHMM_(decl.ini) && _horaHHMM_(decl.fin) && (f.ini!==decl.ini || f.fin!==decl.fin));
+}
+function _horaHHMM_(v){ return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v||'').trim()); }
+
+/* ¿Sale en el «Histórico» de Partes del escritorio (todo el equipo)? Lo APROBADO no caduca nunca: es el registro. Lo que no
+   contó (rechazado, caducado, revertido/retirado) se ve `DIAS_VISIBLE_SIN_CONTAR` días, como en «Tus partes que no cuentan». */
+function _visibleEnHistoricoE_(p, ahoraMs){
+  return !(p && (p.estado==='rechazado' || p.estado==='cad' || p.estado==='rev')) || _sigueVisibleSinContar_(p, ahoraMs);
 }
 
 /* ⛔ «ESTE MES» ES «LO QUE NO ES DE UN MES PASADO», Y POR LA MISMA PUERTA QUE LA CIFRA
@@ -10094,6 +10125,9 @@ function _avisoGrabaPon_(selId, boxId){
   s.addEventListener('change', pon); pon();
 }
 
+/* Los audios que se enseñan (y que el selector de ficheros ofrece). COPIA de `audio_reunion.EXTENSIONES` sin las técnicas (mp4/oga/mka);
+   `probar_audio_reunion.py` compara las dos listas. 31/10 (Daniel: «no sé qué archivos tienes permitidos… mi teléfono graba en WAV»). */
+var AUDIO_EXTENSIONES = ['mp3','m4a','wav','ogg','opus','webm','aac','flac','3gp','amr'];
 function _audioBoxHTML_(id, e){
   var sub=AUDIO_SUBIENDO[id];
   if(!sub && (!e || !e.aplica || !e.puede)) {
@@ -10105,10 +10139,11 @@ function _audioBoxHTML_(id, e){
     '<div style="height:5px;background:var(--line);border-radius:3px;margin-top:6px"><div style="height:5px;width:'+sub.pct+'%;background:var(--red);border-radius:3px"></div></div>';
   else if(e.estado==='hecha') cuerpo='<div class="rnota">'+esc(_audioTxt_(e))+'.</div>';
   else if(e.estado==='procesando') cuerpo='<div class="rnota">'+esc(_audioTxt_(e))+'</div>';
-  else cuerpo=(e.estado==='ninguno'?'<div class="rnota">Sube el audio de la reunión (mp3, m4a, wav…) y se hará el acta.</div>'
+  else cuerpo=(e.estado==='ninguno'?'<div class="rnota">Sube el audio de la reunión y se hará el acta.</div>'
       :'<div class="rnota">'+esc(_audioTxt_(e))+(e.estado==='en_cola'?' Puedes subir otra y sustituirá a ésta.':'')+'</div>')+
     '<label class="btn mini" style="display:inline-block;margin-top:7px;cursor:pointer">'+(e.estado==='ninguno'?'🎙️ Subir grabación':'🎙️ Subir otra grabación')+
-    '<input type="file" accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.webm,.aac,.flac" data-audiofile="'+esc(id)+'" style="display:none"></label>';
+    '<input type="file" accept="audio/*,'+AUDIO_EXTENSIONES.map(function(x){ return '.'+x; }).join(',')+'" data-audiofile="'+esc(id)+'" style="display:none"></label>'+
+    '<p class="rnota" data-audioext style="margin:6px 0 0;font-size:11px">Admite: '+AUDIO_EXTENSIONES.join(', ')+'.</p>';
   return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><span class="sc" style="display:block;margin-bottom:4px">Grabación del acta</span>'+cuerpo+'</div>';
 }
 function _audioTxt_(e){

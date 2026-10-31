@@ -692,6 +692,7 @@ function fmtHM(m){ return pad(Math.floor(m/60))+'<span class="c">:</span>'+pad(m
    propaga a la duracion sin dar error, mientras que el `parseInt(...,10)||0` de la puerta
    se queda con lo que entienda. */
 function durForm(){
+  if(!_horaHHMM_(ST.form.ini) || !_horaHHMM_(ST.form.fin)) return 0;   /* 31/10: la hora se teclea (HH:MM), ya no es un desplegable */
   var d=_minutosReales_(ST.form.fecha, ST.form.ini, ST.form.fin);   // cruza medianoche y el cambio de hora (auditor 34)
   return Math.round(d/15)/4;             // a cuartos de hora
 }
@@ -723,8 +724,8 @@ function vFichar(){
      el teléfono del PD salían las de las 32 personas y el parte se guardaba imputado a la
      de otro **sin un aviso**. El escritorio filtraba desde el 14/08 y lo dejó escrito. */
   var opts=_tareasResp_(TAREAS, _fichaYo_()).map(function(t){
-    return '<option value="'+esc(t.n)+'"'+(ST.form.tarea===t.n?' selected':'')+'>'+esc(t.n)+'</option>';
-  }).join('');
+    return [t.n, t.n];
+  });
 
   var vivo=
     '<div class="tarj">'+cab('Sesión de trabajo', corre?'en curso':(s.estado==='pausada'?'en pausa':'parada'))+
@@ -800,9 +801,9 @@ function vFichar(){
           '<b>Parece del revés:</b> salen <b>'+e+' h</b>, más de lo que admite un parte. '+
           'Si querías <b>'+r+' h</b>, cambia entrada y salida.</p>'; })()+
       '<div class="selh">'+
-        '<label class="campo" style="margin:0"><span class="sc">Entrada</span><select id="fIni">'+optHoras(ST.form.ini)+'</select></label>'+
+        _horaCampoM_('fIni','Entrada',ST.form.ini)+
         '<span class="flecha">→</span>'+
-        '<label class="campo" style="margin:0"><span class="sc">Salida</span><select id="fFin">'+optHoras(ST.form.fin)+'</select></label>'+
+        _horaCampoM_('fFin','Salida',ST.form.fin)+
       '</div>'+
       '<div class="pasos">'+
         '<button data-add="15" data-p>+15 min</button><button data-add="30" data-p>+30 min</button>'+
@@ -824,6 +825,7 @@ function vFichar(){
            Sin ella se queda el texto de siempre. */
         '<small>'+nf2(decl.q)+' h · '+esc(decl.f)+(decl.e==='det' ? ' — '+(decl.nota ? 'te piden: '+esc(decl.nota) : 'te piden más detalle')+' · corrige abajo lo que ya mandaste, no empieces de cero.' : ' — elige categoría y justifícalo abajo. '+(decl.caduca ? 'Si no, caduca el '+_diaMadridDe_(decl.caduca)+'.' : 'Si no, caduca a los 7 días.'))+'</small></div>'+
         '<div class="d"><button class="btn mini" data-canceldecl data-p>Cancelar</button></div></div>'+
+        _declCamposM_(decl)+
         /* ⛔⛔ 633.ª EL AVISO DE DANIEL (09/09): «si fueron 14 h sin querer pero si q trabajaste o
            algo asi q mejor lo declares como bloque dsps en lugar de usar los de 14». Sin él,
            esta tarjeta invita a «Enviar 14,00 h a aprobación» sobre las horas que puso el tope.
@@ -837,19 +839,13 @@ function vFichar(){
 
     '<div class="tarj">'+cab('Justificación','obligatoria')+
       _perfilSelHTML_()+
-      '<label class="campo"><span class="sc">Categoría <span class="req">*</span></span>'+
-        '<select id="fCat">'+
-          '<option value="tareas"'+(ST.form.cat==='tareas'?' selected':'')+'>Tarea</option>'+
-          '<option value="reunion"'+(ST.form.cat==='reunion'?' selected':'')+'>Reunión no convocada</option>'+
-          '<option value="turno"'+(ST.form.cat==='turno'?' selected':'')+'>Turno no convocado</option>'+
-          '<option value="compensacion"'+(ST.form.cat==='compensacion'?' selected':'')+'>Compensación</option>'+
-        '</select></label>'+
+      '<div class="campo"><span class="sc">Categoría <span class="req">*</span></span>'+
+        _chipsElegir_('data-fcat', ST.form.cat, [['tareas','Tarea'],['reunion','Reunión no convocada'],['turno','Turno no convocado'],
+          ['compensacion','Compensación']], 'btn mini')+'</div>'+
       (ST.form.cat==='tareas'
-        ? '<label class="campo"><span class="sc">Imputar a <span class="req">*</span></span>'+
-            '<select id="fTarea"><option value="">— elige una de tus tareas —</option>'+opts+
-            '<option value="Trabajo de subsistema"'+(ST.form.tarea==='Trabajo de subsistema'?' selected':'')+'>Trabajo de subsistema · '+esc(_perfilElegido_())+'</option>'+
-            '<option value="__otro__"'+(ST.form.tarea==='__otro__'?' selected':'')+'>Otro (lo escribo)</option>'+
-            '</select></label>'+
+        ? '<div class="campo"><span class="sc">Imputar a <span class="req">*</span></span>'+
+            _chipsElegir_('data-ftar', ST.form.tarea, opts.concat([['Trabajo de subsistema','Trabajo de subsistema · '+_perfilElegido_()],
+              ['__otro__','Otro (lo escribo)']]), 'btn mini')+'</div>'+
             (ST.form.tarea==='__otro__'
               ? '<label class="campo"><span class="sc">Cuál <span class="req">*</span></span><input id="fDetalle" value="'+esc(ST.form.detalle)+'" placeholder="nombre de la tarea"></label>'
               : '')
@@ -922,16 +918,23 @@ function _declVivo_(f){
 }
 
 /* validación: los tres nodos y las dos aristas */
+/* 31/10: un parte de FICHAJE por declarar trae entrada y salida; si las cambias, las horas se recalculan (`durForm`) y se corrigen en
+   el servidor DESPUÉS de declarar (`corregirParte`, que deja el rastro). Gemela de `_bloqEditado_` del escritorio (misma puerta). */
+function _declEditadoM_(declP){ return _fichajeEditado_(declP, ST.form); }
+function _durMostradaM_(){
+  var d=_declVivo_(ST.form);
+  return (d && !_declEditadoM_(d)) ? d.q : durForm();
+}
 function validarFichaje(){
   var f=ST.form;
   var declP = _declVivo_(f);
   var haySes = !!declP || ST.modo!=='vivo' || minSes()>0 || !!ST.ses.cloudIni;   /* declarar: ya hay sesión cerrada */
-  var dur = declP ? declP.q : (ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durForm());
+  var dur = declP ? _durMostradaM_() : (ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durForm());
   /* ⛔ EL TOPE SALE DE `_maxHorasParte_()`, no de un 12 escrito aqui: el servidor topa
      en 14 y con el 12 de aqui un parte de 13 h quedaba bloqueado POR PANTALLA aunque
      fuera legal. Los dos numeros nacieron con un dia de diferencia y este se quedo. */
   var _topeH = _maxHorasParte_();
-  var n1 = declP ? true : (haySes && dur>0 && dur<=_topeH);
+  var n1 = (declP && !_declEditadoM_(declP)) ? true : (haySes && dur>0 && dur<=_topeH);
   /* la regla de qué es "la imputación" vive en _imputacion_(): un solo sitio, para que si
      cambia no haya que acordarse de tocar aquí Y en enviarFichaje (antes no daba error, solo
      desincronizaba silenciosamente lo que se valida de lo que se envía). */
@@ -943,7 +946,8 @@ function validarFichaje(){
   /* Debajo de cada estrella NO va el valor: que se encienda ya dice que ese requisito
      esta cubierto, y repetirlo recargaba el dibujo. La unica excepcion es pasarse de
      12 h, que no es adorno sino un tope que bloquea el envio. */
-  if(e1) e1.textContent = (dur>_topeH) ? ('excede '+_topeH+' h') : '';
+  if(e1) e1.textContent = (dur>_topeH) ? ('excede '+_topeH+' h') : ((ST.modo!=='vivo' || declP) && !(_horaHHMM_(f.ini) && _horaHHMM_(f.fin)) ? 'hora HH:MM' : '');
+  var q=$('#fDurQ'); if(q) q.textContent=nf2(dur)+' h';
   if(e2) e2.textContent = '';
   if(e3) e3.textContent = '';
 
@@ -1084,6 +1088,19 @@ function _colaTxtM_(){
   return 'a la cola de '+_pilaDeM_(f);
 }
 
+/* Entrada/salida: texto HH:MM, no `<select>` de cuartos (no admitía 17:43, la hora de un fichaje, y es un control nativo). */
+function _horaCampoM_(id, rot, v){
+  return '<label class="campo" style="margin:0"><span class="sc">'+rot+'</span>'+
+    '<input class="mono" id="'+id+'" value="'+esc(v)+'" placeholder="HH:MM" maxlength="5" inputmode="numeric"></label>';
+}
+/* La entrada y la salida del FICHAJE por declarar (editables) y las horas que saldrán. Vacío si el parte no trae hora de verdad. */
+function _declCamposM_(decl){
+  if(!(decl && _horaHHMM_(decl.ini) && _horaHHMM_(decl.fin))) return '';
+  return '<div class="selh" style="margin-top:10px">'+_horaCampoM_('fIni','Entrada',ST.form.ini)+'<span class="flecha">→</span>'+
+      _horaCampoM_('fFin','Salida',ST.form.fin)+'</div>'+
+    '<div class="durb"><span class="q mono" id="fDurQ" style="white-space:nowrap">'+nf2(_durMostradaM_())+' h</span>'+
+      '<span class="t">son las del fichaje; si no son las que trabajaste, <b>cambia la entrada o la salida</b> y se recalculan.</span></div>';
+}
 function _perfilSelHTML_(){
   var _q = _fichaM_();                 /* ⛔ por la misma puerta que `_perfilElegido_`:
                                           si una mira a la sesión y otra a `YO`, el
@@ -1091,10 +1108,8 @@ function _perfilSelHTML_(){
                                           tiene, y el rótulo firma a nombre de otro */
   if (!_hayQuePreguntarPerfil_(_q)) return '';
   var ps = _perfilesDe_(_q), el = _perfilElegido_();
-  return '<label class="campo"><span class="sc">Fichas como <span class="req">*</span></span>'+
-    '<select id="fPerfil">'+ ps.map(function(p){
-      return '<option value="'+esc(p.unidad)+'"'+(p.unidad===el?' selected':'')+'>'+esc(p.txt)+'</option>';
-    }).join('') +'</select></label>'+
+  return '<div class="campo"><span class="sc">Fichas como <span class="req">*</span></span>'+
+    _chipsElegir_('data-fperfil', el, ps.map(function(p){ return [p.unidad, p.txt]; }), 'btn mini')+'</div>'+
     '<p class="mini" style="margin:-4px 0 10px">Lo firma <b>'+esc(_firmaDe_(el, _fichaYo_()))+'</b>'+
     ' · estas horas cuentan para <b>'+esc(el)+'</b></p>';
 }
@@ -1148,7 +1163,14 @@ async function enviarFichaje(){
   var f=ST.form, imput=_imputacion_(f);
   if(f.declararId!=null && backendOK && SESION){   // declarar un parte 'sin declarar' ya cerrado
     tost('Declarando…');
+    var _editada=_declEditadoM_(_declVivo_(f)), _hCorr=durForm();   /* antes de soltar nada: de ellas salen las horas a corregir */
     try{ var p=await api.declararParte(f.declararId, imput, f.just.trim(), f.cat);
+      /* 31/10: cambiaste la entrada o la salida → las horas se corrigen YA declarado (`corregirParte` deja el rastro «corregidas por su
+         autor»). Si falla, el parte ya está declarado con las del fichaje: se dice, no se calla. */
+      if(_editada){
+        try{ p=await api.corregirParte(f.declararId, _hCorr) || p; }
+        catch(e2){ tost('Declarado con las horas del fichaje; no se pudieron corregir: '+(e2&&e2.message||e2)); }
+      }
       if(p){ var i=PARTES.findIndex(function(x){return x.id===f.declararId;}); if(i>=0) PARTES[i]=normPMovil(p); }
       /* ⛔ Y LA FECHA, IGUAL QUE EN LA OTRA RAMA. El comentario de doce líneas más
          abajo razona **este fallo exacto** para esta misma rama —*declaras un bloque
@@ -1157,7 +1179,7 @@ async function enviarFichaje(){
          de la misma función. Se llega escribiendo una fecha vieja, respondiendo a un
          «sin declarar» y volviendo a declarar. */
       var _cola=_colaTxtM_();
-      f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY;
+      f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY; f.ini='17:00'; f.fin='20:30';   /* lo del fichaje no se arrastra al siguiente bloque */
       tost('Declarado · '+_cola+'.'); irA('horas');
     }catch(e){
       /* ⛔ Y EL BOTÓN VUELVE A ESTAR VIVO, con el formulario intacto: una escritura que

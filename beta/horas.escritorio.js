@@ -914,10 +914,8 @@ function _bloqDur_(){
    automáticamente»): un parte que viene de un FICHAJE ya trae fecha, entrada y salida. Al declararlo el formulario las lleva
    puestas; si las cambias, las horas se RECALCULAN (por `_bloqDur_`, la regla de siempre) y se corrigen en el servidor
    DESPUÉS de declarar (`corregirParte`, que deja el rastro). La FECHA no se cambia: la fijó el fichaje. */
-function _horaHHMM_(v){ return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v||'').trim()); }
 function _bloqEditado_(decl){
-  var f=BLOQ_FORM;
-  return !!(decl && _horaHHMM_(decl.ini) && _horaHHMM_(decl.fin) && (f.ini!==decl.ini || f.fin!==decl.fin));
+  return _fichajeEditado_(decl, BLOQ_FORM);
 }
 /* Las horas que se van a declarar: las del fichaje mientras no toques la entrada/salida; las recalculadas si las tocas. */
 function _bloqHoras_(){
@@ -1079,12 +1077,6 @@ function _bloqFirma_(){
 }
 
 /* Entrada/salida: texto HH:MM, no `<select>` de cuartos (no admitía 17:43, la hora de un fichaje, y es un control nativo). */
-/* 31/10 (decisión «nada de desplegables nativos»): elegir entre pocas opciones = botones; la elegida, resaltada. */
-function _bloqChips_(attr, sel, ops){
-  return '<span style="display:flex;gap:6px;flex-wrap:wrap">'+ops.map(function(o){
-    return '<button type="button" class="btn sm'+(sel===o[0]?' pri':'')+'" '+attr+'="'+esc(o[0])+'">'+esc(o[1])+'</button>';
-  }).join('')+'</span>';
-}
 function _bloqHoraCampo_(id, rot, v){
   return '<label style="width:104px"><span class="sc" style="display:block;margin-bottom:5px">'+rot+'</span>'+
     '<input class="mono" id="'+id+'" value="'+esc(v)+'" placeholder="HH:MM" maxlength="5" inputmode="numeric" style="'+CAMPO_CSS+'"></label>';
@@ -1226,7 +1218,7 @@ function _bloqPanel_(){
              : f.cat==='turno'   ? 'Qu\u00e9 turno' : 'Concepto';
   var campoImput = f.cat==='tareas'
     ? '<div style="flex:2;min-width:240px"><span class="sc" style="display:block;margin-bottom:5px">Imputar a</span>'+
-      _bloqChips_('data-bqtar', f.tarea, opts.concat([['Trabajo de subsistema','Trabajo de subsistema \u00b7 '+perf],
+      _chipsElegir_('data-bqtar', f.tarea, opts.concat([['Trabajo de subsistema','Trabajo de subsistema \u00b7 '+perf],
         ['__otro__','Otro (lo escribo)']]))+'</div>'+
       (f.tarea==='__otro__'
         ? '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Cu\u00e1l</span>'+
@@ -1271,7 +1263,7 @@ function _bloqPanel_(){
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
       selPerfil+
       '<div style="min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">Categor\u00eda</span>'+
-      _bloqChips_('data-bqcat', f.cat, [['tareas','Tarea'],['reunion','Reuni\u00f3n no convocada'],
+      _chipsElegir_('data-bqcat', f.cat, [['tareas','Tarea'],['reunion','Reuni\u00f3n no convocada'],
         ['turno','Turno no convocado'],['compensacion','Compensaci\u00f3n']])+'</div>'+
       campoImput+
     '</div>'+

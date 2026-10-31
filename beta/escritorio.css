@@ -808,8 +808,36 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .dir-tipo{display:inline-block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);
   border:1px solid var(--line2);border-radius:5px;padding:0 5px;margin-right:8px;line-height:16px}
 .dir-fila.mal .dir-tipo{color:var(--red2);border-color:rgba(228,30,37,.5)}
+/* «Todo» (31/10): pestañas Mapa · Todo y el registro monoespaciado, un color por tipo (`--c` desde el JS). */
+.dir-tabs{display:flex;gap:8px}
+.dir-tab{font:inherit;font-size:12.5px;font-weight:600;letter-spacing:.02em;color:var(--ink2);background:var(--sur);
+  border:1px solid var(--line2);border-radius:999px;padding:6px 16px;cursor:pointer}
+.dir-tab.on{color:var(--ink);border-color:var(--red);background:rgba(228,30,37,.1)}
+.dir-tab:focus-visible{outline:2px solid var(--red2);outline-offset:2px}
+.dir[data-dv="todo"] .dir-vmapa,.dir:not([data-dv="todo"]) .dir-vtodo{display:none}
+.dir-vmapa,.dir-vtodo{display:flex;flex-direction:column;gap:14px}
+.dtd-ct{display:flex;gap:30px;flex-wrap:wrap;padding:2px 2px 0}
+.dir-cifra.mal b{color:var(--red2)}
+.dtd-tim{display:flex;gap:8px;flex-wrap:wrap}
+.dtd-t{display:inline-flex;flex-direction:column;gap:1px;background:var(--sur);border:1px solid var(--line);
+  border-radius:var(--r2);padding:6px 11px;min-width:118px}
+.dtd-t b{font-size:12px;color:var(--ink);font-weight:600}
+.dtd-t small{font-size:11px;color:var(--ink3)}
+.dtd-t.vivo{border-color:rgba(63,158,214,.5)}
+.dtd-t.mal{border-color:rgba(228,30,37,.55)}.dtd-t.mal small{color:var(--red2)}
+.dtd-nota{font-size:11.5px;color:var(--ink3)}
+.dtd-reg{max-height:52vh}
+.dtd-fila{display:grid;grid-template-columns:76px 112px 1fr auto;align-items:center;gap:12px;padding:6px 14px;
+  border-bottom:1px solid var(--line);font-size:12px;position:relative}
+.dtd-fila.nueva{animation:dirEntra .4s var(--sal)}
+.dtd-k{display:inline-flex;align-items:center;gap:7px;color:var(--c);font-size:11px;letter-spacing:.04em}
+.dtd-k i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.dtd-tx{color:var(--ink2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dtd-fila.mal .dtd-tx{color:var(--red2)}
+.dtd-auto{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line2);
+  border-radius:5px;padding:0 5px;line-height:15px}
 @media (prefers-reduced-motion: reduce){
-  .dir-vivo i,.late .dir-onda,.late .dir-anillo,.late .dir-nucleo,.dir-fila.nueva,.dir-fila.nueva::before{animation:none}
+  .dir-vivo i,.late .dir-onda,.late .dir-anillo,.late .dir-nucleo,.dir-fila.nueva,.dir-fila.nueva::before,.dtd-fila.nueva{animation:none}
   .dir-ln{transition:none}
 }
 
@@ -855,6 +883,8 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .nt-d.hoy{border-color:var(--line2)}
 .nt-d.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.28)}
 .nt-barra{display:flex;gap:6px;flex-wrap:wrap}
+.nt-ia{margin-left:auto;border-color:var(--red)}
+.nt-ia:disabled{border-color:var(--line)}
 .nt-ed{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
 .nt-ed textarea{min-height:200px;font-family:var(--mono);font-size:12.5px}
 .nt-vp{border:1px solid var(--line);border-radius:var(--r2);padding:10px 12px;min-height:200px;background:var(--sur2)}
@@ -868,3 +898,15 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .nb-t{border-collapse:collapse;margin:6px 0;width:100%}
 .nb-t th,.nb-t td{border:1px solid var(--line);padding:5px 8px;text-align:left;font-size:12.5px}
 .nb-t th{background:rgba(255,255,255,.04);font-weight:700}
+
+/* 31/10 · Tareas: UNA lista con chips de filtro por unidad. Columnas de ANCHO FIJO (`table-layout:fixed`): sea cual sea
+   el filtro, las mismas columnas miden lo mismo; la de la tarea se lleva lo que sobra. */
+.tfil{align-items:center}
+.tfil .pick b{color:var(--ink);margin-left:3px}
+.tfil .tdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.tarl table{table-layout:fixed;min-width:900px}
+.tarl th,.tarl td{overflow:hidden;text-overflow:ellipsis}
+.tarl th:nth-child(2){width:172px}.tarl th:nth-child(3){width:150px}.tarl th:nth-child(4){width:92px}
+.tarl th:nth-child(5){width:130px}.tarl th:nth-child(6){width:104px}.tarl th:nth-child(7){width:170px}
+.tarl td:first-child{white-space:normal;overflow-wrap:anywhere}
+.chip.tuni{white-space:nowrap}
