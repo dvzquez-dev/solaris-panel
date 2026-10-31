@@ -66,6 +66,16 @@ async function _cargarMovimientosM_(){
   }catch(e){ return false; }
 }
 
+/* 31/10: TUS sanciones para alegar o apelar. Falla hacia LISTA VACÍA (un servidor sin la acción, o un corte, no pinta nada), nunca hacia una inventada. */
+async function _cargarMisSancionesM_(){
+  if(typeof MIS_SANC==='undefined' || _apelEsDemo_()) return true;     // la maqueta las calcula ella (`_misSancLista_`)
+  try{
+    var a=await api.getMisSanciones();
+    MIS_SANC=Array.isArray(a) ? a : [];
+    return Array.isArray(a);
+  }catch(e){ MIS_SANC=[]; return false; }
+}
+
 /* La misma busqueda con distinto nombre en cada cara; se envuelve para que el bloque de
    autoridad de abajo sea IDENTICO en las dos y un diff lo confirme de un vistazo. */
 /* EQUIVALENTE (no GEMELA): misma busqueda con distinto ayudante en cada cara —existe JUSTO para que el bloque de autoridad de debajo si sea identico—. */
@@ -192,6 +202,9 @@ function _sancColaHTML_(){
                en esta pantalla el 0 se lee «aviso». Y es el MISMO rotulo que el
                escritorio: dos textos para el mismo dato es la leccion de la gemela. */
             ' · '+esc(_etSancFila_(x.puntos, x.origen, x.extra))+'</span>'+
+          /* 31/10: lo que la persona alegó, al lado de la sanción */
+          (x.alegacion && x.alegacion.texto ? '<span class="mono" style="flex-basis:100%;color:var(--ink2);font-size:10.5px">Alega: «'+
+            esc(x.alegacion.texto)+'»'+(_enlaceWeb_(x.alegacion.enlace) ? ' · '+_enlaceWeb_(x.alegacion.enlace) : '')+'</span>' : '')+
           (suelta
             ? '<button class="btn mini" data-sok="'+esc(x.id)+'" data-p>Aprobar</button>'+
               /* ⛔ 21/10 (auditor de sanciones): «Justificar» también en una suelta, como el escritorio — y con su mismo
@@ -566,7 +579,7 @@ function medidorHTML(){
   if(typeof p !== 'number' || !isFinite(p))
     return '<div class="medcaja"><p class="rnota" style="margin:0;padding:9px 2px;text-align:center">'+
       'Todavía no tenemos tus puntos. Saldrán aquí en cuanto lleguen.</p></div>'+
-      _libroPuntosHTML_();
+      _libroPuntosHTML_()+_misSancHTML_();
   for(i=0;i<10;i++){
     var lleno=i<p, crit=i<3;
     var col = lleno ? _colorSeg_(i,p) : '';
@@ -616,7 +629,50 @@ function medidorHTML(){
     '</div>'+
     '<button class="btn mini" data-p id="btnLibro" style="margin-top:11px">Desglose de puntos</button>'+
   '</div>'+
-  _libroPuntosHTML_();
+  _libroPuntosHTML_()+_misSancHTML_();
+}
+
+/* ══ ALEGAR / APELAR TUS SANCIONES (31/10, Art. 32 bis propuesto) ═══════════════════════════════════════
+   Sólo las que tienen algo que hacer o que contar: alegable, apelable, con alegación o con apelación. Lo demás ya está en el
+   desglose de arriba. El servidor dice qué se puede (`alegable`, `apelable`, `apelable_hasta`); la cara no cuenta plazos. */
+function _misSancHTML_(){
+  var L=_misSancLista_().filter(function(s){ return s && (s.alegable || s.apelable || s.alegacion || s.apelacion); });
+  if(!L.length) return '';
+  return '<div class="msanc"><div class="sc" style="margin:14px 0 2px">Tus sanciones</div>'+L.map(function(s){
+    var est=_sancEstadoM_(s), p=(s.puntos === null || s.puntos === undefined) ? _etPtsSanc_(null) : (s.puntos < 0 ? '−' + Math.abs(s.puntos) : String(s.puntos));
+    return '<div class="fila" data-msfila="'+esc(s.id)+'"><div class="a"><b>'+esc(s.motivo || 'Sanción')+'</b>'+
+      '<small>'+esc(p)+' · '+esc(_isoADMY_(String(s.fecha || '').slice(0, 10)) || '')+'</small>'+
+      (est ? '<small class="msest" style="color:'+est[1]+'">'+esc(est[0])+'</small>' : '')+
+      (s.alegable ? '<button class="btn mini" style="margin-top:7px;align-self:flex-start" data-msalegar="'+esc(s.id)+'">Alegar</button>' : '')+
+      (s.apelable ? '<small>Puedes apelar hasta el '+esc(_isoADMY_(s.apelable_hasta) || '')+'</small>'+
+        '<button class="btn mini" style="margin-top:7px;align-self:flex-start" data-msapelar="'+esc(s.id)+'">Apelar</button>' : '')+
+      '</div></div>';
+  }).join('')+'</div>';
+}
+
+/* El formulario de las dos: `modo` = 'alegar' | 'apelar'. Motivo obligatorio, enlace opcional. */
+function _formSancion_(s, modo){
+  var alegar=(modo === 'alegar');
+  abrirModal('<div class="h1" style="font-size:18px">'+(alegar ? 'Alegar' : 'Apelar')+' «'+esc(s.motivo || 'Sanción')+'»</div>'+
+    '<p class="h1s">'+(alegar ? 'Cuéntanos por qué no procede. Quien decide lo verá antes de aplicarla.'
+      : 'Tienes hasta el '+esc(_isoADMY_(s.apelable_hasta) || '')+'. Mientras se resuelve, la sanción sigue aplicada.')+'</p>'+
+    '<label class="campo"><span class="sc">Qué pasó <span class="req">*</span></span>'+
+      '<textarea id="msMotivo" placeholder="Lo que quieres que se tenga en cuenta."></textarea></label>'+
+    '<label class="campo"><span class="sc">Enlace o foto (si lo hay)</span>'+
+      '<input id="msEnlace" type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label>'+
+    '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="msNo" style="flex:1">Cancelar</button>'+
+      '<button class="btn pri" id="msSi" style="flex:1" disabled>Enviar</button></div>');
+  var si=$('#msSi'), mo=$('#msMotivo');
+  mo.oninput=function(){ si.disabled=!mo.value.trim(); };
+  $('#msNo').onclick=cerrarModal;
+  si.onclick=function(){
+    if(!mo.value.trim()) return;
+    si.disabled=true;
+    (alegar ? _alegarSancion_ : _apelarSancion_)(s, mo.value.trim(), ($('#msEnlace').value || '').trim())
+      .then(function(){ return _cargarMisSancionesM_(); })
+      .then(function(){ cerrarModal(); pintar(); tost(alegar ? 'Alegación enviada.' : 'Apelación enviada. Te avisamos cuando respondan.'); })
+      .catch(function(e){ si.disabled=false; tostErr('No se pudo enviar: ', e); });
+  };
 }
 
 /* EL LIBRO DE PUNTOS. Mismo trato que el de horas y por la misma puerta (`_ultimosMov_`):

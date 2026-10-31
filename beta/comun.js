@@ -1161,6 +1161,7 @@ function _puedeApelarTarea_(actor, t, lista){
    coordina (coordinador o subcoordinador) la unidad de la tarea. */
 function _puedeResolverApelacion_(actor, ap){
   if(!ap || !actor || actor === ap.autor) return false;
+  if(ap.clase === 'sancion') return rangoSanc(actor) >= 3;     /* la maqueta: el PD (con servidor manda `puedes_resolver`) */
   if(rangoSanc(actor) >= 3) return true;
   return ap.clausula !== 'otra' && _puedeMoverEstadoTarea_(actor, {s: ap.unidad, r: []});
 }
@@ -1182,6 +1183,7 @@ function _apelPendientesTuyas_(){
 /* Lo que dice la tarea de su apelación, en corto (móvil). */
 function _apelEstadoTxt_(a){
   if(!a) return '';
+  if(a.clase === 'sancion') return _apelSancTxt_(a);
   if(a.estado === 'abierta') return 'Apelada · esperando respuesta';
   if(a.estado === 'estimada') return 'Apelación estimada' + (a.nuevo_plazo ? ': nuevo plazo, el ' + _plazoDMY_(a.nuevo_plazo) : (a.quitada ? ': se te quita la tarea' : '')) +
     (a.resolucion ? '. ' + a.resolucion : '');
@@ -1222,6 +1224,91 @@ function _resolverApelacion_(ap, datos){
     return Promise.resolve(L.filter(function(x){ return x.id === ap.id; })[0]);
   }
   return api.resolverApelacion(Object.assign({id:ap.id}, datos)).then(function(r){ return aplicar(r.apelacion); });
+}
+
+/* ══ ALEGAR Y APELAR SANCIONES (31/10, propuesta Art. 32 bis) ══════════════════════════════════════════
+   Antes de aplicarse se ALEGA; ya aplicada y a menos de 7 días de habérsete comunicado, se APELA. El servidor
+   (`alegarSancion` · `apelarSancion` · `getMisSanciones`) es quien manda; en la maqueta las mismas puertas viven en
+   `localStorage`, con la misma forma de dato, para verlo sin servidor. */
+var SANC_PLAZO_APEL=7, ALEG_DEMO_KEY='solaris_demo_alegaciones';
+function _alegDemoLeer_(){
+  try{ var m=JSON.parse(localStorage.getItem(ALEG_DEMO_KEY) || '{}'); return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; }catch(e){ return {}; }
+}
+function _alegDemoGuardar_(m){ try{ localStorage.setItem(ALEG_DEMO_KEY, JSON.stringify(m)); }catch(e){} }
+/* Cuatro sanciones de la maqueta, con las fechas contadas desde HOY para que el plazo salga siempre igual. */
+function _sancDemoSemilla_(){
+  var h=new Date().toISOString().slice(0, 10), yo=_fichaYo_();
+  function s(id, quien, motivo, pts, estado, dias){
+    var c=_isoMasDias_(h, -dias);
+    return {id:id, nombre:quien, fecha:c, motivo:motivo, articulo:'30', puntos:pts, estado:estado, origen:'motor', comunicada:c};
+  }
+  return [s('SD-1', yo, 'Retraso en el parte', -1, 'pendiente', 0), s('SD-2', yo, 'Falta a la reunión', -2, 'aplicada', 2),
+          s('SD-3', yo, 'Parte fuera de hora', -1, 'aplicada', 20), s('SD-4', 'Otra Persona', 'Sanción de otra persona', -1, 'pendiente', 0)];
+}
+/* La apelación de una sanción: la ABIERTA y, si no hay, la última resuelta. */
+function _apelDeSancion_(id, lista){
+  var L=lista || _apelLista_(), i, ult=null;
+  for(i=0;i<L.length;i++){
+    if(!L[i] || L[i].clase !== 'sancion' || L[i].sancion_id !== id) continue;
+    if(L[i].estado === 'abierta') return L[i];
+    if(!ult || String(L[i].at) > String(ult.at)) ult=L[i];
+  }
+  return ult;
+}
+/* TUS sanciones en la forma de `getMisSanciones`: la del servidor (`MIS_SANC`) o, en la maqueta, la calculada aquí. */
+function _misSancLista_(){
+  if(!_apelEsDemo_()) return (typeof MIS_SANC !== 'undefined' && MIS_SANC) || [];
+  var yo=_fichaYo_(), al=_alegDemoLeer_(), hoy=new Date().toISOString().slice(0, 10), ap=_apelDemoLeer_();
+  return _sancDemoSemilla_().filter(function(s){ return s.nombre === yo; }).map(function(s){
+    var hasta=s.estado === 'aplicada' ? _isoMasDias_(s.comunicada, SANC_PLAZO_APEL) : null, a=_apelDeSancion_(s.id, ap);
+    return {id:s.id, fecha:s.fecha, motivo:s.motivo, articulo:s.articulo, puntos:s.puntos, estado:s.estado, origen:s.origen,
+      comunicada:s.comunicada, alegacion:al[s.id] || null, alegable:s.estado === 'pendiente',
+      apelable:!!(hasta && hoy <= hasta && !a), apelable_hasta:hasta, no_apelable:null, apelacion:a || null};
+  });
+}
+/* Lo que se pinta debajo de una sanción tuya: su alegación o la respuesta a su apelación. `[texto, color]` o `null`. */
+function _sancEstadoM_(s){
+  var a=s && s.apelacion;
+  if(a) return [_apelSancTxt_(a), a.estado === 'desestimada' ? 'var(--red2)' : a.estado === 'abierta' ? 'var(--warn)' : 'var(--ok)'];
+  if(s && s.alegacion) return ['Alegación enviada', 'var(--ink3)'];
+  return null;
+}
+/* Lo que dice la sanción de su apelación, en corto. */
+function _apelSancTxt_(a){
+  var r=a.resolucion ? ': ' + a.resolucion : '';
+  if(a.estado === 'abierta') return 'Apelada · pendiente';
+  if(a.estado === 'estimada') return 'Estimada' + (r || '. Se te devuelven los puntos');
+  if(a.estado === 'parcial') return 'Rebajada a aviso' + r;
+  return 'Desestimada' + (r || ': sin motivo escrito');
+}
+/* Un enlace de quien alega o apela, como `<a>`: sólo http(s) (el servidor ya lo exige; aquí también, que se pinta). `''` si no hay o no vale. */
+function _enlaceWeb_(url){
+  var u=String(url == null ? '' : url).trim();
+  return /^https?:\/\//i.test(u) ? '<a href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" style="color:var(--tel);word-break:break-all">'+esc(u)+'</a>' : '';
+}
+/* Alegar: manda `{id, motivo, enlace}`. Promesa de la alegación. */
+function _alegarSancion_(s, motivo, enlace){
+  if(_apelEsDemo_()){
+    var m=_alegDemoLeer_(); m[s.id]={texto:motivo, enlace:enlace || null, por:_fichaYo_(), at:new Date().toISOString()};
+    _alegDemoGuardar_(m); return Promise.resolve(m[s.id]);
+  }
+  return api.alegarSancion(s.id, motivo, enlace || null).then(function(r){ return r && r.sancion; });
+}
+/* Apelar: manda `{id, motivo, enlace}` y deja la apelación en la lista. Promesa de la apelación. */
+function _apelarSancion_(s, motivo, enlace){
+  if(_apelEsDemo_()){
+    var L=_apelDemoLeer_(), mi=(typeof DATA !== 'undefined' && DATA.miembros || []).filter(function(x){ return x.nombre === _fichaYo_(); })[0],
+      ap={id:'AP-demo' + (L.length + 1), clase:'sancion', sancion_id:s.id, titulo:s.motivo, autor:_fichaYo_(), unidad:(mi && mi.unidad) || null,
+        motivo:motivo, enlace:enlace || null, motivo_sancion:s.motivo, articulo:s.articulo, puntos:s.puntos, fecha_sancion:s.fecha,
+        comunicada:s.comunicada, impuesta_por:[], alegacion:s.alegacion || null, plazo:_isoMasDias_(new Date().toISOString().slice(0, 10), 7),
+        estado:'abierta', at:new Date().toISOString(), decidido_por:null, decidido_at:null, resolucion:null, instancia:'pd', resuelven:[]};
+    L.unshift(ap); _apelDemoGuardar_(L);
+    return Promise.resolve(ap);
+  }
+  return api.apelarSancion(s.id, motivo, enlace || null).then(function(r){
+    var ap=r && r.apelacion; if(ap){ APELACIONES.unshift(ap); }
+    return ap;
+  });
 }
 
 function _tareaAccion_(e){
@@ -6407,6 +6494,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-31-apelsanc', fecha:'2026-10-31',
+      titulo:'Alegar y apelar una sanción',
+      items:[
+        {cara:'movil', vista:'estado', txt:'Bajo el medidor, **Tus sanciones**: **Alegar** mientras está pendiente y **Apelar** (7 días desde que se te comunica) cuando ya está aplicada; y en qué quedó.'},
+        {cara:'escritorio', vista:'apela', txt:'**Apelaciones** junta tareas y sanciones. En una sanción: **Estimar**, **Rebajar a aviso** o **Desestimar**, con motivo. Si eres parte, te dice quién la resuelve.'}
+      ] },
     { id:'2026-10-28-portada', fecha:'2026-10-28',
       titulo:'Comprobar la portada antes de aprobar con anotaciones',
       items:[

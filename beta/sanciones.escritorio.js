@@ -207,6 +207,13 @@ function _lcorrNota_(x){
     (x.pMot ? ' · '+esc(x.pMot) : '')+'</span>';
 }
 
+/* 31/10: lo que la persona alegó contra ESTA sanción, al lado de ella, para decidir el bloque con eso delante. '' si no alegó. */
+function _alegNota_(x){
+  var a=x && x.aleg; if(!a || !a.texto) return '';
+  var l=_enlaceWeb_(a.enlace);
+  return '<span class="lcorrn" style="color:var(--ink2)">Alega: «'+esc(a.texto)+'»'+(l ? ' · '+l : '')+'</span>';
+}
+
 function _lcorrForm_(x){
   if(LOTE_EDIT !== x.id || !_lcorrOfrece_(x)) return '';
   return '<div class="lcorrf" data-lcf="'+x.id+'">'+
@@ -820,6 +827,7 @@ function _loteReal_(){
     items:its.map(function(s){ return {id:s.id, n:s.nombre, pts:_ptsSanc_(s.puntos),
       /* 31/10 (B6): si el PD corrigió sus puntos, la fila dice de cuánto, quién y por qué */
       pAntes:_ptsSanc_(s.puntos_antes), pMot:s.puntos_motivo||null, pPor:s.puntos_corregidos_por||null,
+      aleg:s.alegacion||null,
       origen:s.origen||null, extra:s.extra||null,
       /* ⛔ `null`, NO `'aceptar'`. Aqui se fabricaba la decision de todo lo que nadie
          habia tocado, y el panel la pintaba como ELEGIDA: los 30 con el boton «Acepta»
@@ -835,7 +843,30 @@ function _loteReal_(){
    🗣️ Daniel: *«Móvil es para todos, escritorio es para el consejo»*. El miembro apela desde el móvil; aquí las resuelven
    el PD y el coordinador o subcoordinador de la unidad (la cláusula «otra», sólo el PD). Las puertas viven en `comun.js`
    (`_apelPuedes_`); el servidor es quien manda. Sin `puedes_resolver` no hay botones: se enseña y se dice quién la resuelve. */
+/* La tarjeta de una SANCIÓN apelada: quién, qué sanción, qué dice, y las tres salidas (todas con motivo). Sin permiso, quién resuelve. */
+function _apelTarjetaSanc_(a){
+  var m = _m(a.autor), puedes = _apelPuedes_(a), al = a.alegacion, l = _enlaceWeb_(a.enlace);
+  return '<div class="parte" data-apid="' + esc(a.id) + '" data-apclase="sancion">' +
+    '<div class="h"><b>' + esc((m && m.pila) || a.autor) + '</b>' +
+      '<span class="u">' + esc(a.unidad || '—') + '</span><span class="u">sanción</span>' +
+      '<span class="q" style="font-size:12px;font-family:var(--sans);font-weight:500">' + esc(_apelEspera_(a.at)) + '</span></div>' +
+    '<div class="ruta" style="margin-top:6px"><b>' + esc(a.motivo_sancion || a.titulo) + '</b> · ' + esc(_etSancFila_(a.puntos, null, null)) +
+      ' · ' + esc(_isoADMY_(String(a.fecha_sancion || '').slice(0, 10)) || 'sin fecha') +
+      ((a.impuesta_por || []).length ? ' · puesta por ' + esc(a.impuesta_por.join(', ')) : '') + '</div>' +
+    (al && al.texto ? '<div class="just"><span class="sc">Había alegado</span>' + esc(al.texto) + '</div>' : '') +
+    '<div class="just"><span class="sc">Apela</span>' + esc(a.motivo) + (l ? '<br>' + l : '') + '</div>' +
+    (puedes
+      ? '<textarea data-apres placeholder="Tu respuesta — obligatoria en las tres salidas…"></textarea>' +
+        '<div class="acts"><button class="btn ok" data-apdec="estimada">Estimar</button>' +
+        '<button class="btn ok" data-apdec="parcial">Rebajar a aviso</button>' +
+        '<button class="btn no" data-apdec="desestimada">Desestimar</button>' +
+        '<span class="err" role="alert" data-aperr></span></div>'
+      : '<div class="ruta">' + (a.autor === _fichaYo_() ? 'Es tuya: la resuelve otra persona.'
+        : a.instancia === 'junta' ? 'Resuelve la Junta: el PD es parte.' : 'La resuelve el Project Director.') + '</div>') +
+  '</div>';
+}
 function _apelTarjeta_(a){
+  if (a.clase === 'sancion') return _apelTarjetaSanc_(a);
   var m = _m(a.autor), puedes = _apelPuedes_(a);
   return '<div class="parte" data-apid="' + esc(a.id) + '">' +
     '<div class="h"><b>' + esc((m && m.pila) || a.autor) + '</b>' +
@@ -859,8 +890,8 @@ function _apelResuelta_(a){
   var m = _m(a.autor), q = _m(a.decidido_por);
   return '<div class="parte"><div class="h"><b>' + esc((m && m.pila) || a.autor) + '</b>' +
       '<span class="u">' + esc(a.titulo) + '</span>' +
-      '<span class="q" style="font-size:11px;font-family:var(--mono);color:var(--' + (a.estado === 'estimada' ? 'ok' : 'red2') + ')">' +
-        esc(a.estado) + '</span></div>' +
+      '<span class="q" style="font-size:11px;font-family:var(--mono);color:var(--' + (a.estado === 'desestimada' ? 'red2' : 'ok') + ')">' +
+        esc(a.estado === 'parcial' ? 'a aviso' : a.estado) + '</span></div>' +
     '<div class="ruta">' + esc(_apelEstadoTxt_(a)) + ' <span style="color:var(--ink3)">· ' + esc((q && q.pila) || a.decidido_por || '') +
       ', ' + esc(_isoADMY_(String(a.decidido_at || '').slice(0, 10))) + '</span></div></div>';
 }
@@ -871,10 +902,10 @@ function _vApela_(){
   ab.sort(function(x, y){ return String(x.at).localeCompare(String(y.at)); });      // la que más lleva esperando, arriba
   return pan('Apelaciones abiertas', ab.length + '',
       ab.length ? ab.map(_apelTarjeta_).join('')
-        : vacioSimple('No hay apelaciones abiertas', 'Cuando alguien apele una tarea desde el móvil, aparece aquí.')) +
+        : vacioSimple('No hay apelaciones abiertas', 'Cuando alguien apele una tarea o una sanción desde el móvil, aparece aquí.')) +
     (re.length ? pan('Resueltas · últimos ' + APEL_DIAS_VISTA + ' días', re.length + '', re.map(_apelResuelta_).join('')) : '') +
-    '<div class="nota">Una apelación estimada cambia la tarea (nuevo plazo, o se la quita a quien apeló) y le avisa. ' +
-    'Las <b>sanciones</b> ya aplicadas no se recurren aquí: se revocan desde Sanciones.</div>';
+    '<div class="nota">Una tarea estimada cambia su plazo, o se la quita a quien apeló, y se le avisa. ' +
+    'Una sanción estimada devuelve los puntos; «Rebajar a aviso» los devuelve y deja un aviso.</div>';
 }
 function _engApela_(){
   $$('[data-apid]').forEach(function(caja){
@@ -889,6 +920,21 @@ function _engApela_(){
       }).catch(function(e){ b.disabled = false; tost('No se pudo guardar la respuesta: ' + ((e && e.message) || e)); });
     }
     var ta = caja.querySelector('[data-apres]'), pl = caja.querySelector('[data-appl]');
+    $$('[data-apdec]', caja).forEach(function(b){
+      b.onclick = function(){
+        var er = caja.querySelector('[data-aperr]'), txt = ta ? ta.value.trim() : '', bs = $$('[data-apdec]', caja);
+        if (!txt){ if (er) er.textContent = 'Escribe el motivo: queda con tu nombre.'; if (ta) ta.focus(); return; }
+        if (!ap || ap.estado !== 'abierta'){ tost('Esa apelación ya no está abierta: recarga la pantalla.'); pintar(); return; }
+        if (er) er.textContent = '';
+        bs.forEach(function(x){ x.disabled = true; });
+        _resolverApelacion_(ap, {decision: b.dataset.apdec, resolucion: txt}).then(function(){
+          pintar(); tost({estimada: 'Apelación estimada: vuelven los puntos.', parcial: 'Rebajada a aviso.', desestimada: 'Apelación desestimada.'}[b.dataset.apdec]);
+        }).catch(function(e){        /* el rechazo del servidor se queda EN la tarjeta, con los botones vivos y lo tecleado intacto */
+          bs.forEach(function(x){ x.disabled = false; });
+          if (er) er.textContent = (e && e.message) || String(e);
+        });
+      };
+    });
     $$('[data-apest]', caja).forEach(function(b){
       b.onclick = function(){
         var q = b.dataset.apest === 'quitar';
