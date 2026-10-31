@@ -66,10 +66,12 @@ var CAT_ETI={tareas:'Carga tareas',reunion:'Reuniones',turno:'Turnos fabric.',co
    · Lo que no casa es «Otras contribuciones» (la extra del PD, reuniones de junta…): nunca se tira ni se inventa.
    · Colores: los de la paleta (--tel, --ok, --warn, --ink2) + un violeta y un amarillo; el rojo Solaris NO se usa. */
 /* 31/10 (Daniel): «Tareas, la parte esa que está en verde, bien, y luego la azul, la de compensaciones»: tareas en VERDE y la
-   compensación por tu cargo en AZUL, como ya se veían; el resto, un color propio cada una. */
+   compensación por tu cargo en AZUL, como ya se veían; el resto, un color propio cada una. Y la compensación por tu cargo
+   ARRIBA DEL TODO («la compensación yo la mantendría o arriba de todo o abajo de todo», 31/10 ~19:45): el orden de esta tabla
+   es el de las dos caras. Las categorías son sólo de la app: en Notion todo lo que no es tarea ni turno es «Compensaciones». */
 var CATS_DESGLOSE=[
-  {k:'tareas',  eti:'Tareas',                    color:'var(--ok)',   cat:['tareas'], pal:[]},
   {k:'cargo',   eti:'Compensación por tu cargo', color:'var(--tel)',  cat:[],         pal:['compensacion base']},
+  {k:'tareas',  eti:'Tareas',                    color:'var(--ok)',   cat:['tareas'], pal:[]},
   {k:'desplaz', eti:'Desplazamientos',           color:'var(--warn)', cat:[],         pal:['desplaz']},
   {k:'entrev',  eti:'Entrevistas',               color:'#9B7FD1',     cat:[],         pal:['entrevista']},
   {k:'turno',   eti:'Turnos',                    color:'#D9C24A',     cat:['turno'],  pal:[]},
@@ -6652,6 +6654,12 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-10-31-asistencia', fecha:'2026-10-31',
+      titulo:'Asistencia en directo de las reuniones generales',
+      items:[
+        {cara:'escritorio', vista:'convoc', txt:'En la ficha de una reunión **general**, **Abrir asistencia**: un escenario con un cuadrito por convocado (gris, ámbar al abrir la app, **verde** al escribir la palabra) y una **palabra** en grande para proyectar. Puedes añadir a alguien en directo; al cerrar, la lista por hora, para copiar.'},
+        {cara:'movil', vista:'estado', txt:'Si una general tuya tiene la asistencia abierta, arriba de **Estado** sale la tarjeta: escribe la palabra que se proyecta y pulsa **Estoy presente**.'}
+      ] },
     { id:'2026-10-31-sonidos', fecha:'2026-10-31',
       titulo:'Sonidos cortos, de 8 bits',
       items:[
@@ -9935,4 +9943,75 @@ async function _audioReuSubir_(id, file){
   }catch(e){ delete AUDIO_SUBIENDO[id]; tostErr('No se pudo subir la grabación: ', e); }
   _audioReuPintar_(id);
   _audioReuRefrescar_(id);
+}
+
+/* ══ LA ASISTENCIA EN DIRECTO DE LAS GENERALES (31/10) ═══════════════════════════════════════════════════
+   🗣️ Daniel: «cuadritos que están grises y se van poniendo en verde según la gente va abriendo la app […] que yo proyecte
+   una palabra totalmente aleatoria y que la tengan que poner […] una lista al final de toda la gente que lo hizo y a la
+   hora». La REGLA vive en el servidor (`rutinas/asistencia.py`); aquí, lo que las dos caras comparten: la llamada, la
+   maqueta de `?demo` y la lista final. El escenario es del escritorio (`reuniones.escritorio.js`) y la tarjeta, del móvil
+   (`reuniones.movil.js`). Cada cara tiene sus `api.getAsistencia` & co. y todas pasan por `_asisPost_`. */
+var ASIS_DEMO=null;   // la maqueta (?demo): un servidor de mentira en la página, para poder VER el escenario y la tarjeta
+
+/* Real: `api._post`. En `?demo`, la maqueta. `_demoPd` sólo lo lee la maqueta (¿habla el escritorio del PD o el móvil de un
+   miembro?) y no sale hacia el servidor. */
+function _asisPost_(body){
+  var pd=!!body._demoPd; delete body._demoPd;
+  if(!_demoLocal_()) return api._post(body);
+  try{ return Promise.resolve(_asisDemo_(body, pd)); }catch(e){ return Promise.reject(e); }
+}
+
+function _asisDemoEstado_(){
+  if(ASIS_DEMO) return ASIS_DEMO;
+  var nom=(DATA.miembros||[]).map(function(m){ return m.nombre; }).filter(Boolean);
+  ['Lucía Pérez Rey','Martín Souto Lois','Carla Vidal Núñez','Hugo Ferro Casal','Noa Rivas Mella','Iván Cortés Vaz',
+   'Sara Lage Pardo','Pablo Otero Gil','Alba Mosquera Ron','Dani Seoane Cid','Eva Torres Brea','Rubén Lema Pita']
+    .forEach(function(n){ if(nom.length<14 && nom.indexOf(n)<0) nom.push(n); });
+  return (ASIS_DEMO={id:9001, palabra:'cohete', abierta_at:null, cerrada_at:null, conv:nom, vistos:{}, presentes:{}, extra:[], t0:0});
+}
+
+/* Los cuadritos avanzan solos: cada 1,4 s se ilumina uno más y, dos después, se pone verde (uno de cada cinco se queda en
+   ámbar: así se ve la diferencia). Quien está mirando (`yo`, en el móvil) no se rellena: lo marca él con la palabra. */
+function _asisDemoAvanza_(S, yo){
+  if(!S.abierta_at || S.cerrada_at) return;
+  var n=Math.floor((Date.now()-S.t0)/1400), lista=S.conv.filter(function(x){ return x!==yo; });
+  for(var i=0;i<lista.length && i<n;i++){
+    var at=new Date(S.t0+i*1400).toISOString();
+    if(!S.vistos[lista[i]]) S.vistos[lista[i]]=at;
+    if(i<n-2 && i%5!==4 && !S.presentes[lista[i]]) S.presentes[lista[i]]=new Date(S.t0+(i+2)*1400).toISOString();
+  }
+}
+
+function _asisDemo_(b, pd){
+  var S=_asisDemoEstado_(), yo=(typeof YO!=='undefined' && YO && YO.nombre) || '', ahora=new Date().toISOString();
+  var abre=function(){ if(!S.abierta_at){ S.t0=Date.now(); S.abierta_at=ahora; } S.cerrada_at=null; };
+  switch(b.action){
+    case 'abrirAsistencia': abre(); return {ok:true, id:S.id};
+    case 'cerrarAsistencia': S.cerrada_at=ahora; return {ok:true, id:S.id};
+    case 'anadirAsistente':
+      if(S.conv.indexOf(b.nombre)<0 && S.extra.indexOf(b.nombre)<0) S.extra.push(b.nombre);
+      return {ok:true, id:S.id, nombre:b.nombre};
+    case 'marcarVisto': return {ok:true, id:S.id};
+    case 'estoyPresente':
+      if(!_asisClave_(b.palabra) || _asisClave_(b.palabra)!==_asisClave_(S.palabra)) throw new Error('esa no es la palabra: mira la pantalla de la sala');
+      if(!S.presentes[yo]) S.presentes[yo]=ahora;
+      return {ok:true, id:S.id, presente_at:S.presentes[yo]};
+    case 'getAsistencia':
+      if(!pd) abre();                       // el móvil de la maqueta: la asistencia ya está abierta, para ver la tarjeta
+      _asisDemoAvanza_(S, pd ? '' : yo);
+      if(pd) return {existe:!!S.abierta_at, abierta:!!S.abierta_at && !S.cerrada_at, palabra:S.palabra, abierta_at:S.abierta_at,
+        cerrada_at:S.cerrada_at, convocados:S.conv.concat(S.extra), vistos:S.vistos, presentes:S.presentes};
+      return S.cerrada_at ? {abierta:false} : {abierta:true, convocado:true, presente_at:S.presentes[yo]||null};
+  }
+  throw new Error('acción desconocida: '+b.action);
+}
+
+/* Lo que se compara de la palabra tecleada: sin mayúsculas, tildes ni espacios. Gemela de `clave_palabra` (asistencia.py). */
+function _asisClave_(t){ return _sinTildes_(String(t==null?'':t)).replace(/\s+/g,''); }
+
+/* La lista final, ordenada por hora de llegada: «hh:mm  Nombre», una por línea. Es lo que copia el botón. */
+function _asisListaTxt_(v){
+  var p=(v&&v.presentes)||{};
+  var filas=Object.keys(p).sort(function(a,b){ return p[a]<p[b]?-1:(p[a]>p[b]?1:0); });
+  return filas.map(function(n){ return _hhmmDe_(p[n])+'  '+n; }).join('\n');
 }

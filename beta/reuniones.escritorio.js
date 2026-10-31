@@ -940,6 +940,7 @@ function _fijarPanel_(){
     '</div>'+
     _convocadosBoxE_(r)+
     _audioReuHTML_(r)+
+    _asisBoxE_(r)+
     _borrarReuBoxE_(r)+
     '</div>');
 }
@@ -1221,3 +1222,113 @@ async function _hidratarReus_(){
   try{ pintar(); }catch(_){}
 }
 
+
+
+/* ══ LA ASISTENCIA EN DIRECTO DE LAS GENERALES — el ESCENARIO (31/10) ═══════════════════════════════════════
+   🗣️ Daniel: «como si fuese un escenario […] cuadritos que están grises y se van poniendo en verde según la gente va
+   abriendo la app […] que yo proyecte una palabra totalmente aleatoria […] una lista al final de toda la gente que lo hizo y a
+   la hora». Un cuadrito por convocado: gris = nada · ámbar = ha abierto la app · verde = ha puesto la palabra (con su hora).
+   La regla (palabra, convocados, quién ve qué) es del servidor (`rutinas/asistencia.py`); esto sólo pinta y pregunta cada 3 s
+   por `getAsistencia` (sin canal nuevo). Quien decide abrirla es el PD, también en una telemática. */
+var ASIS_E=null;   // {id, titulo, v, timer, ocupado, hechos:{nombre:true}}
+
+function _asisSoyPD_(){
+  return _demoLocal_() || !!(typeof SESION!=='undefined' && SESION && SESION.rango!=null && SESION.rango>=3);
+}
+
+/* La caja de la ficha: un botón. Se cablea con el truco de `_audioReuHTML_` (el HTML no lleva manejadores). */
+function _asisBoxE_(r){
+  if(!r || r.tipo!=='general' || r.id==null || !_asisSoyPD_() || (!_demoLocal_() && !r._srv)) return '';
+  setTimeout(function(){
+    var b=document.querySelector('[data-asisabrir="'+String(r.id).replace(/"/g,'')+'"]');
+    if(b) b.onclick=function(){ _asisEscenarioE_(r); };
+  },0);
+  return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+
+    '<span class="sc" style="display:block;margin-bottom:4px">Asistencia en directo</span>'+
+    '<button class="btn" data-asisabrir="'+esc(r.id)+'">📋 Abrir asistencia</button>'+
+    '<div class="nota" style="border-top:0;padding:8px 0 0">Un cuadrito por convocado que se pone verde cuando escribe en el '+
+    'móvil la palabra que proyectas. Vale también para una general telemática.</div></div>';
+}
+
+async function _asisEscenarioE_(r){
+  if(ASIS_E) return;
+  var el=document.createElement('div'); el.className='asisEsc'; el.id='asisEsc';
+  el.innerHTML='<div class="asisTop"><div class="asisTit">'+esc(r.titulo||r.tit||('Reunión '+r.id))+'</div>'+
+    '<button class="btn mini" id="asisSalir">Salir</button></div>'+
+    '<div id="asisCuerpo" class="asisCuerpo"><p class="nota">Cargando…</p></div>';
+  document.body.appendChild(el);
+  ASIS_E={id:r.id, titulo:r.titulo||r.tit||'', v:null, timer:null, ocupado:false, hechos:{}};
+  $('#asisSalir').onclick=_asisSalirE_;
+  try{
+    var v=await api.getAsistencia(r.id, true);
+    if(!v.existe) await api.abrirAsistencia(r.id);        // la primera vez se abre sola: el PD ya dijo «Abrir asistencia»
+  }catch(e){ tostErr('No se pudo abrir la asistencia: ', e); _asisSalirE_(); return; }
+  await _asisRefrescarE_();
+  if(ASIS_E) ASIS_E.timer=setInterval(_asisRefrescarE_, 3000);
+}
+
+function _asisSalirE_(){
+  if(ASIS_E && ASIS_E.timer) clearInterval(ASIS_E.timer);
+  ASIS_E=null;
+  var el=document.getElementById('asisEsc'); if(el) el.remove();
+}
+
+async function _asisRefrescarE_(){
+  var A=ASIS_E; if(!A || A.ocupado) return;
+  A.ocupado=true;
+  try{
+    var v=await api.getAsistencia(A.id, true);
+    if(ASIS_E!==A) return;
+    A.v=v; _asisPintarE_();
+  }catch(e){ /* un fallo suelto de red no tumba el escenario: el siguiente ciclo lo recupera */ }
+  finally{ A.ocupado=false; }
+}
+
+/* El cuadrito: `nuevo` sólo la PRIMERA vez que se ve verde (la animación es el gracejo; con `prefers-reduced-motion` el CSS la quita). */
+function _asisCuadroE_(n, v, A){
+  var pres=(v.presentes||{})[n], vis=(v.vistos||{})[n];
+  var cl=pres ? 'ok' : (vis ? 'vis' : '');
+  if(pres && !A.hechos[n]){ A.hechos[n]=true; cl+=' nuevo'; }
+  return '<div class="asisC '+cl+'"><b>'+esc(n)+'</b><span>'+(pres?('✓ '+_hhmmDe_(pres)):(vis?'ha abierto la app':''))+'</span></div>';
+}
+
+function _asisPintarE_(){
+  var A=ASIS_E, v=A&&A.v, c=document.getElementById('asisCuerpo'); if(!c || !v) return;
+  var conv=v.convocados||[], np=conv.filter(function(n){ return (v.presentes||{})[n]; }).length;
+  var cerrada=!v.abierta;
+  if(!document.getElementById('asisGrid') || A.cerrada!==cerrada){
+    A.cerrada=cerrada;
+    c.innerHTML=(cerrada ? '' : '<div class="asisPal" title="La palabra que tienen que escribir">'+esc(v.palabra||'')+'</div>')+
+      '<div class="asisCont" id="asisCont"></div><div id="asisGrid" class="asisGrid"></div>'+
+      (cerrada
+        ? '<div class="asisPie"><button class="btn pri" id="asisCopiar">Copiar la lista</button>'+
+          '<button class="btn" id="asisReabrir">Reabrir</button></div>'
+        : '<div class="asisPie"><input id="asisBuscar" list="asisDL" placeholder="Añadir a alguien en directo…" '+
+          'autocomplete="off" style="'+CAMPO_CSS+';flex:1;min-width:220px"><datalist id="asisDL"></datalist>'+
+          '<button class="btn" id="asisAnadir">Añadir</button>'+
+          '<button class="btn pri" id="asisCerrar">Cerrar asistencia</button></div>');
+    var on=function(id, f){ var b=document.getElementById(id); if(b) b.onclick=async function(){ if(b.disabled) return; b.disabled=true;
+      try{ await f(); }catch(e){ tostErr('No se pudo: ', e); } finally{ b.disabled=false; } }; };
+    on('asisCerrar', async function(){ await api.cerrarAsistencia(A.id); await _asisRefrescarE_(); });
+    on('asisReabrir', async function(){ await api.abrirAsistencia(A.id); await _asisRefrescarE_(); });
+    on('asisAnadir', async function(){
+      var i=document.getElementById('asisBuscar'), n=(i.value||'').trim(); if(!n) return;
+      await api.anadirAsistente(A.id, n); i.value=''; await _asisRefrescarE_(); });
+    on('asisCopiar', async function(){
+      var t=_asisListaTxt_(v);
+      try{ await navigator.clipboard.writeText(t); tost('Lista copiada.'); }
+      catch(_){ var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select();
+        try{ document.execCommand('copy'); tost('Lista copiada.'); }catch(e){ tost('No se pudo copiar.'); } ta.remove(); }
+    });
+  }
+  document.getElementById('asisCont').innerHTML=cerrada
+    ? '<b>'+np+'</b> presentes de '+conv.length+' · asistencia cerrada'
+    : '<b>'+np+'</b> de '+conv.length+' presentes';
+  var g=document.getElementById('asisGrid');
+  g.innerHTML=cerrada
+    ? '<pre class="asisLista">'+esc(_asisListaTxt_(v)||'Nadie marcó presente.')+'</pre>'
+    : conv.map(function(n){ return _asisCuadroE_(n, v, A); }).join('');
+  var dl=document.getElementById('asisDL');
+  if(dl) dl.innerHTML=(DATA.miembros||[]).map(function(m){ return m.nombre; })
+    .filter(function(n){ return n && conv.indexOf(n)<0; }).map(function(n){ return '<option value="'+esc(n)+'">'; }).join('');
+}

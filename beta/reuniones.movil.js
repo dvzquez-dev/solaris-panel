@@ -339,6 +339,7 @@ async function _cargarReunionesM_(yaPedidas){
        «Cargando…». Lo que no vale es que no haya lista. */
     if(!Array.isArray(arr)) return false;
     CARGA.reuniones=true;
+    _asisDeListaM_(arr);       // 31/10: ¿alguna general tuya con la asistencia abierta? (sin esperar: la tarjeta se pinta sola)
     if(arr.length){
       /* SE CONSERVA LA QUE ESTABAS MIRANDO. Esta funcion tambien la llama el refresco en
          vivo cada 90 s: sin esto, estarias viendo una reunion y de pronto te saltaria a otra
@@ -1379,3 +1380,84 @@ function fijarModal(){
   };
 }
 
+
+
+/* ══ LA ASISTENCIA EN DIRECTO DE LAS GENERALES — la TARJETA del móvil (31/10) ═══════════════════════════════
+   🗣️ Daniel: «Simplemente tienen que abrirla, darle al botón estoy presente […] poner una palabra en el cuadrito». Si una
+   general tuya tiene la asistencia abierta, sale ARRIBA de Estado «Estás en la general: escribe la palabra que se proyecta»;
+   al abrir la app con ella abierta se avisa UNA vez (`marcarVisto`: así se ilumina tu cuadrito en el escenario del PD).
+   El servidor decide si estás convocado y nunca manda la palabra: aquí sólo se teclea. */
+var ASIS_M={est:{}, visto:{}, txt:{}, demo:false};   // est[id] = {titulo, v}
+
+/* De la lista cruda de `listarReuniones`: las que traen `asistencia_abierta`. Las que ya no, se quitan. */
+function _asisDeListaM_(arr){
+  var abiertas={};
+  (arr||[]).forEach(function(r){ if(r && r.id!=null && r.asistencia_abierta && r.tipo==='general') abiertas[r.id]=r; });
+  Object.keys(ASIS_M.est).forEach(function(id){ if(!abiertas[id]) delete ASIS_M.est[id]; });
+  Object.keys(abiertas).forEach(function(id){ _asisChequearM_(abiertas[id]); });
+  if(!Object.keys(abiertas).length) _asisPintarM_();
+}
+
+async function _asisChequearM_(r){
+  var id=r.id;
+  try{
+    var v=await api.getAsistencia(id, false);
+    if(v && v.abierta && v.convocado){
+      ASIS_M.est[id]={titulo:r.titulo||'la reunión general', v:v};
+      if(!ASIS_M.visto[id]){ ASIS_M.visto[id]=true; api.marcarVisto(id).catch(function(){}); }
+    } else delete ASIS_M.est[id];
+  }catch(e){ /* sin red o sin sesión: la tarjeta simplemente no sale */ }
+  _asisPintarM_();
+}
+
+function _asisTarjetaHTML_(id, e){
+  var v=e.v, hecho=v.presente_at;
+  return '<div class="tarj acc" data-asisreu="'+esc(id)+'"><div class="tt"><span class="sc">Asistencia en directo</span></div>'+
+    '<b style="display:block;margin-bottom:6px">Estás en la general: '+(hecho?'ya constas presente':'escribe la palabra que se proyecta')+'</b>'+
+    (hecho
+      ? '<div class="asisOk">✓ Presente ('+esc(_hhmmDe_(hecho))+')</div>'
+      : '<div style="display:flex;gap:8px"><input class="asisIn" data-asispal autocomplete="off" autocapitalize="none" '+
+        'placeholder="la palabra" value="'+esc(ASIS_M.txt[id]||'')+'">'+
+        '<button class="btn pri" data-p data-asisok>Estoy presente</button></div>')+
+    '<div class="rnota" data-asismsg style="margin:6px 0 0;min-height:1em"></div></div>';
+}
+
+/* El HTML de las tarjetas abiertas (o ''). Se cablea tras insertarse, con el truco de `_audioReuHTML_`. */
+function _asisTarjetaM_(){
+  if(_demoLocal_() && !ASIS_M.demo){ ASIS_M.demo=true;
+    _asisDeListaM_([{id:9001, titulo:'Reunión General de octubre', tipo:'general', asistencia_abierta:true}]); }
+  var h=Object.keys(ASIS_M.est).map(function(id){ return _asisTarjetaHTML_(id, ASIS_M.est[id]); }).join('');
+  if(h) setTimeout(_asisCablearM_,0);
+  return h;
+}
+
+function _asisCablearM_(){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-asisreu]'), function(t){
+    var id=t.getAttribute('data-asisreu'), i=t.querySelector('[data-asispal]'), b=t.querySelector('[data-asisok]'),
+        m=t.querySelector('[data-asismsg]');
+    if(!i || !b) return;
+    i.oninput=function(){ ASIS_M.txt[id]=i.value; };
+    var enviar=async function(){
+      if(b.disabled || !i.value.trim()) return;
+      b.disabled=true;
+      try{
+        var r=await api.estoyPresente(isNaN(+id)?id:+id, i.value);
+        ASIS_M.est[id].v.presente_at=(r&&r.presente_at)||new Date().toISOString();
+        _asisPintarM_(); tost('Presente: apuntado.');
+      }catch(e){ if(m) m.textContent=String((e&&e.message)||e).replace(/^Error:\s*/,''); b.disabled=false; }
+    };
+    b.onclick=enviar;
+    i.onkeydown=function(ev){ if(ev.key==='Enter') enviar(); };
+  });
+}
+
+/* Repinta SÓLO las tarjetas (no la vista entera: perdería lo que estás tecleando). Si no había y ahora sí, o al revés, la
+   vista entera, una vez. */
+function _asisPintarM_(){
+  var hay=document.querySelectorAll('[data-asisreu]').length, debe=Object.keys(ASIS_M.est).length;
+  if(hay!==debe){ if(typeof _repintarSuave_==='function') _repintarSuave_(); return; }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-asisreu]'), function(t){
+    var id=t.getAttribute('data-asisreu'), e=ASIS_M.est[id];
+    if(e && e.v.presente_at && !t.querySelector('.asisOk')) t.outerHTML=_asisTarjetaHTML_(id, e);
+  });
+}

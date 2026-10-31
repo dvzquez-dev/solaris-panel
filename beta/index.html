@@ -21,7 +21,7 @@
      ⚠️ Si `--bg` cambia, esto cambia con él: lo vigila `probar_reunion_movil`. -->
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=2e24c5e">
+<link rel="stylesheet" href="movil.css?v=9c1f0d3">
 </head>
 <body>
 
@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=389446c"></script>
+<script src="comun.js?v=994f5bd"></script>
 <script src="notis.movil.js?v=9a87f14"></script>
 <script src="cierre.movil.js?v=2c15573"></script>
 <script src="tareas.movil.js?v=139e6a5"></script>
@@ -121,9 +121,9 @@
 <script src="buzon.movil.js?v=4a205c9"></script>
 <script src="documentos.movil.js?v=82b4c65"></script>
 <script src="sanciones.movil.js?v=d26174c"></script>
-<script src="reuniones.movil.js?v=98af94a"></script>
+<script src="reuniones.movil.js?v=acc0092"></script>
 <script src="horas.movil.js?v=f60d20f"></script>
-<script src="equipo.movil.js?v=5fbb997"></script>
+<script src="equipo.movil.js?v=a924514"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -348,6 +348,13 @@ var api={
   empezarReunion: function(b){ b.action="empezarReunion"; return api._post(b); },
   finalizarReunion: function(b){ b.action="finalizarReunion"; return api._post(b); },
   cancelarReunionEnCurso: function(b){ b.action="cancelarReunionEnCurso"; return api._post(b); },
+  /* 31/10 · la asistencia en directo de las generales: todas por `_asisPost_` (comun.js), que en ?demo habla con la maqueta */
+  getAsistencia:    function(id, pd){ return _asisPost_({action:"getAsistencia",id:id,_demoPd:!!pd}); },
+  abrirAsistencia:  function(id){ return _asisPost_({action:"abrirAsistencia",id:id,_demoPd:true}); },
+  cerrarAsistencia: function(id){ return _asisPost_({action:"cerrarAsistencia",id:id,_demoPd:true}); },
+  anadirAsistente:  function(id, nombre){ return _asisPost_({action:"anadirAsistente",id:id,nombre:nombre,_demoPd:true}); },
+  marcarVisto:      function(id){ return _asisPost_({action:"marcarVisto",id:id}); },
+  estoyPresente:    function(id, palabra){ return _asisPost_({action:"estoyPresente",id:id,palabra:palabra}); },
   /* 26/10 · Daniel: «Sí, mientras no esté firmado» — el autor, sobre lo suyo sin firmar (sólo el mini PC) */
   retirarParte: function(id){ return api._post({action:"retirarParte",id:id}); },
   corregirParte: function(id,h,t){ var b={action:"corregirParte",id:id}; if(h!=null) b.horas=h; if(t!=null) b.tarea=t; return api._post(b); },
@@ -1746,7 +1753,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='cba46d9';
+var BUILD='08c103d';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

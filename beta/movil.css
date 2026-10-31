@@ -1115,3 +1115,9 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
   transition:transform .18s ease}
 .novsec[open]>summary::after{transform:rotate(-90deg)}
 .novsec .mdoc,.novsec>p,.novsec>ul{margin-top:8px}
+
+/* ── LA ASISTENCIA EN DIRECTO (31/10): la tarjeta de Estado ── */
+.asisIn{flex:1;min-width:0;background:#0A0909;border:1px solid var(--line);border-radius:8px;color:var(--ink);
+  font-family:var(--mono);font-size:15px;padding:10px 11px}
+.asisIn:focus{border-color:var(--line2);outline:none}
+.asisOk{font-size:20px;color:var(--ok);font-weight:600;padding:2px 0 4px}
