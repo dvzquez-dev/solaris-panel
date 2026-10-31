@@ -4799,8 +4799,13 @@ var SONIDOS_LS = 'solaris_sonidos';
 var SONIDOS_NOTAS = {
   fichar:  [[587, 0, 0.09], [880, 0.09, 0.16]],
   aprobar: [[523, 0, 0.09], [659, 0.09, 0.09], [784, 0.18, 0.2]],
-  aviso:   [[988, 0, 0.07], [740, 0.11, 0.16]]
+  aviso:   [[988, 0, 0.07], [740, 0.11, 0.16]],
+  hecho:   [[784, 0, 0.06], [1047, 0.07, 0.1]],
+  rechazar:[[392, 0, 0.1], [294, 0.11, 0.18]]
 };
+/* 31/10 noche (Daniel: «casi nada suena en la app»): lo que se HACE a menudo y no es fichar ni decidir suena «hecho». */
+var SONIDOS_HECHO = ['declararParte', 'pushParte', 'guardarDisponibilidad', 'responder', 'crearConvocatoria', 'crearReunion',
+  'alegarSancion', 'apelarSancion', 'apelarTarea', 'subirAudioReunion', 'reportarBug', 'reportarMejora'];
 function _sonidosOn_(){
   try{ return localStorage.getItem(SONIDOS_LS) !== '0'; }catch(_){ return true; }
 }
@@ -4825,7 +4830,7 @@ function _sonar_(nombre){
     if (!notas || !_sonidosOn_()) return false;
     var ctx = _sonidoCtx_();
     if (!ctx) return false;
-    if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
+    if (ctx.state !== 'running' && ctx.resume) ctx.resume();   /* 'suspended' y también el 'interrupted' de iOS */
     var t0 = ctx.currentTime + 0.01;
     notas.forEach(function(n){
       var o = ctx.createOscillator(), g = ctx.createGain();
@@ -4844,15 +4849,39 @@ function _sonar_(nombre){
 function _sonidoDeAccion_(body){
   var a = body && body.action, c = body && body.accion;
   if (a === 'ficharEntrada' || a === 'ficharSalida') return 'fichar';
-  if (a === 'decidirParte' || a === 'decidirSancion') return c === 'aprobar' ? 'aprobar' : null;
-  if (a === 'decidir') return (c === 'aprobado' || c === 'anot') ? 'aprobar' : null;
-  if (a === 'decidirBloque' || a === 'confirmarLote') return 'aprobar';
+  if (a === 'decidirParte' || a === 'decidirSancion') return c === 'aprobar' ? 'aprobar' : (c === 'rechazar' ? 'rechazar' : null);
+  if (a === 'decidir') return (c === 'aprobado' || c === 'anot') ? 'aprobar' : ((c === 'rechazado' || c === 'cambios') ? 'rechazar' : null);
+  if (a === 'decidirBloque' || a === 'confirmarLote' || a === 'otorgarBloque' || a === 'otorgarHoras') return 'aprobar';
+  if (SONIDOS_HECHO.indexOf(a) >= 0) return 'hecho';
   return null;
 }
 function _sonarAccion_(body){ var n = _sonidoDeAccion_(body); return n ? _sonar_(n) : false; }
+/* 🔴 31/10 noche, Daniel: «solo escucho el sonido [del interruptor] … casi nada suena en la app». El navegador (Safari en
+   el iPhone sobre todo) sólo deja arrancar el audio DENTRO de un toque; fichar o aprobar suenan cuando contesta el servidor,
+   después de un `await`, ya fuera del toque, y el contexto se quedaba mudo. El interruptor sí sonaba porque suena en su
+   propio clic. Así que en CADA toque o tecla se despierta el contexto (el primero lo crea y toca un silencio de una muestra,
+   que es lo que pide iOS); desde ahí, lo que suena tras el `await` ya sale. Sigue escuchando: si el sistema lo suspende
+   (una llamada, segundo plano), el siguiente toque lo despierta. Apagado no crea nada. Lo llama el arranque de cada cara. */
+function _sonidosDesbloquear_(doc){
+  if (!doc || !doc.addEventListener) return false;
+  var despierta = function(){
+    try{
+      if (!_sonidosOn_()) return;
+      var ctx = _sonidoCtx_();
+      if (!ctx) return;
+      if (ctx.state !== 'running' && ctx.resume) ctx.resume();
+      if (!window.__SONIDO_ABIERTO && ctx.createBuffer && ctx.createBufferSource) {
+        var s = ctx.createBufferSource(); s.buffer = ctx.createBuffer(1, 1, 22050);
+        s.connect(ctx.destination); s.start(0); window.__SONIDO_ABIERTO = true;
+      }
+    }catch(_){}
+  };
+  ['pointerdown', 'touchend', 'keydown'].forEach(function(ev){ doc.addEventListener(ev, despierta, true); });
+  return true;
+}
 /* La fila del interruptor de Ajustes, igual en las dos caras; cada una la mete en su propio contenedor. */
 function _sonidosHTML_(){
-  return '<div class="fila"><div class="a"><b>Sonidos</b><small>Un pitido corto al fichar, al aprobar y al llegarte un aviso. '+
+  return '<div class="fila"><div class="a"><b>Sonidos</b><small>Un pitido corto al fichar, al declarar un parte o tu disponibilidad, al aprobar o rechazar y al llegarte un aviso. '+
     'Encendido de serie; vale sólo para este dispositivo.</small></div><div class="d">'+
     '<button class="btn" data-sonidos data-p>'+(_sonidosOn_()?'Sí':'No')+'</button></div></div>';
 }
@@ -6592,8 +6621,8 @@ function _novedades_(){
     { id:'2026-10-31-sonidos', fecha:'2026-10-31',
       titulo:'Sonidos cortos, de 8 bits',
       items:[
-        {cara:'movil', vista:'estado', txt:'En **Ajustes › Sonidos**: un pitido corto al **fichar**, al **aprobar** y cuando te **llega un aviso** con la app abierta. Vienen encendidos; si no los quieres, se apagan ahí.'},
-        {cara:'escritorio', vista:'ajustes', txt:'**Ajustes › Sonidos**, lo mismo: fichar, aprobar y avisos, encendidos de serie. Se guarda en cada dispositivo.'}
+        {cara:'movil', vista:'estado', txt:'En **Ajustes › Sonidos**: un pitido corto al **fichar**, al **declarar un parte** o tu **disponibilidad**, al **aprobar** (y otro distinto al **rechazar**) y cuando te **llega un aviso** con la app abierta. Vienen encendidos; si no los quieres, se apagan ahí. Si el primero no se oye, toca la pantalla una vez: el navegador sólo deja sonar después de un toque.'},
+        {cara:'escritorio', vista:'ajustes', txt:'**Ajustes › Sonidos**, lo mismo: fichar, declarar, convocar, aprobar, rechazar y avisos, encendidos de serie. Se guarda en cada dispositivo.'}
       ] },
     { id:'2026-10-31-dispsemana', fecha:'2026-10-31',
       titulo:'La disponibilidad de la semana, preparada y por adelantado',

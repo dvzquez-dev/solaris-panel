@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=4e71dca"></script>
+<script src="comun.js?v=8fa24fd"></script>
 <script src="notis.movil.js?v=9a87f14"></script>
 <script src="cierre.movil.js?v=2c15573"></script>
 <script src="tareas.movil.js?v=139e6a5"></script>
@@ -1747,7 +1747,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7dd8cba';
+var BUILD='4e9c546';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2843,6 +2843,8 @@ setTimeout(function(){ colocarViaje(false); }, 60);
    los navegadores la rotan y, si no se vuelve a guardar, los avisos dejan de llegar sin
    que nadie se entere. No pide permiso por su cuenta: eso solo pasa si pulsas el boton. */
 setTimeout(function(){ try{ _pushInit_(); }catch(_){} }, 800);
+/* 31/10 noche: el audio sólo arranca dentro de un toque; esto lo despierta en cada uno (comun.js, `_sonidosDesbloquear_`). */
+try{ _sonidosDesbloquear_(document); }catch(_){}
 
 /* Login OBLIGATORIO (salvo ?demo para verla en local): reanuda sesión guardada
    (<50 min) sin pasar por Google; si no, muestra el gate de marca. La app publicada

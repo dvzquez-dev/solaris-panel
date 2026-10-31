@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=4e71dca"></script>
+<script src="comun.js?v=8fa24fd"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=471a14e"></script>
 <script src="turnos.escritorio.js?v=d63eb29"></script>
@@ -3819,7 +3819,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='12f3eb1';
+var BUILD='d8e7361';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -5045,6 +5045,8 @@ if(GOOGLE_CLIENT_ID && !window.__SIN_LOGIN__){
    avisos dejan de llegar sin que nadie se entere-. No pide permiso por su cuenta: eso solo
    pasa si pulsas el boton de Ajustes. */
 setTimeout(function(){ try{ _pushInit_(); }catch(_){} }, 800);
+/* 31/10 noche: el audio sólo arranca dentro de un toque; esto lo despierta en cada uno (comun.js, `_sonidosDesbloquear_`). */
+try{ _sonidosDesbloquear_(document); }catch(_){}
 </script>
 </body>
 </html>
