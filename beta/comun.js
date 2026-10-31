@@ -1102,6 +1102,132 @@ function _tareaHecha_(e){
   return /hech|finaliz|complet|termin|cerrad/i.test(String(e == null ? '' : e));
 }
 
+/* 31/10 · EL CUERPO DE UNA TAREA NUEVA: texto con formato ligero → bloques de Notion.
+   ⛔ Es la MISMA gramática que `rutinas/cuerpo_notion.py` (`a_bloques`), que es la que manda el servidor como `children`;
+   esta es la que pinta la vista previa «así se verá en Notion» (`_bloquesAHTML_`, de la MISMA salida: no hay una segunda
+   traducción para pintar). `rutinas/probar_cuerpo_notion.py` corre las dos sobre un corpus y exige la misma salida. */
+var CUERPO_TAREA_MAX = 8000, CUERPO_TAREA_BLOQUES = 100, CUERPO_TAREA_RICH = 2000;
+function _richNotion_(texto){
+  var out = [], pos = 0, re = /\*\*(.+?)\*\*/g, m;
+  function trozos(t, bold){
+    for(var i = 0; i < t.length; i += CUERPO_TAREA_RICH){
+      var x = {type:'text', text:{content:t.slice(i, i + CUERPO_TAREA_RICH)}};
+      if(bold) x.annotations = {bold:true};
+      out.push(x);
+    }
+  }
+  while((m = re.exec(texto))){ trozos(texto.slice(pos, m.index), false); trozos(m[1], true); pos = m.index + m[0].length; }
+  trozos(texto.slice(pos), false);
+  return out;
+}
+function _cuerpoABloques_(texto){
+  texto = texto == null ? '' : String(texto);
+  if(texto.length > CUERPO_TAREA_MAX) throw new Error('el cuerpo es demasiado largo (máximo '+CUERPO_TAREA_MAX+' caracteres)');
+  var bloques = [], tabla = [];
+  function bloque(tipo, t, extra){
+    var d = extra || {}; d.rich_text = _richNotion_(t);
+    var b = {object:'block', type:tipo}; b[tipo] = d; return b;
+  }
+  function celdas(l){
+    var s = l.trim(); if(s.charAt(0) === '|') s = s.slice(1); if(s.charAt(s.length - 1) === '|') s = s.slice(0, -1);
+    return s.split('|').map(function(c){ return c.trim(); });
+  }
+  function cierraTabla(){
+    var cab = tabla.length > 1 && tabla[1].every(function(c){ return /^:?-+:?$/.test(c); });
+    var datos = cab ? [tabla[0]].concat(tabla.slice(2)) : tabla, ancho = 0, rows;
+    datos.forEach(function(f){ if(f.length > ancho) ancho = f.length; });
+    rows = datos.map(function(f){
+      var cs = []; for(var i = 0; i < ancho; i++) cs.push(i < f.length ? _richNotion_(f[i]) : []);
+      return {object:'block', type:'table_row', table_row:{cells:cs}};
+    });
+    bloques.push({object:'block', type:'table', table:{table_width:ancho, has_column_header:cab, has_row_header:false, children:rows}});
+    tabla = [];
+  }
+  texto.replace(/\r\n?/g, '\n').split('\n').forEach(function(crudo){
+    var linea = crudo.trim(), m;
+    if(linea.charAt(0) === '|'){ tabla.push(celdas(linea)); return; }
+    if(tabla.length) cierraTabla();
+    if(!linea) return;
+    if((m = /^(#{1,3})\s+(.+)$/.exec(linea))) bloques.push(bloque('heading_'+m[1].length, m[2]));
+    else if((m = /^(?:[-*]\s+)?\[([ xX])\]\s*(.*)$/.exec(linea))) bloques.push(bloque('to_do', m[2], {checked:m[1] !== ' '}));
+    else if((m = /^[-*]\s+(.+)$/.exec(linea))) bloques.push(bloque('bulleted_list_item', m[1]));
+    else if((m = /^[0-9]+[.)]\s+(.+)$/.exec(linea))) bloques.push(bloque('numbered_list_item', m[1]));
+    else bloques.push(bloque('paragraph', linea));
+  });
+  if(tabla.length) cierraTabla();
+  if(bloques.length > CUERPO_TAREA_BLOQUES) throw new Error('el cuerpo tiene demasiados bloques (máximo '+CUERPO_TAREA_BLOQUES+')');
+  return bloques;
+}
+/* La vista previa: pinta los BLOQUES (no el texto). Las listas numeradas se cuentan seguidas, como en Notion. */
+function _bloquesAHTML_(bloques){
+  var n = 0;
+  function rt(arr){ return (arr || []).map(function(x){
+    var t = esc(x.text.content); return x.annotations && x.annotations.bold ? '<b>'+t+'</b>' : t; }).join(''); }
+  return (bloques || []).map(function(b){
+    var d = b[b.type];
+    n = b.type === 'numbered_list_item' ? n + 1 : 0;
+    if(/^heading_/.test(b.type)) return '<div class="nb-h nb-'+b.type+'">'+rt(d.rich_text)+'</div>';
+    if(b.type === 'bulleted_list_item') return '<div class="nb-li"><span class="nb-m">•</span><span>'+rt(d.rich_text)+'</span></div>';
+    if(b.type === 'numbered_list_item') return '<div class="nb-li"><span class="nb-m">'+n+'.</span><span>'+rt(d.rich_text)+'</span></div>';
+    if(b.type === 'to_do') return '<div class="nb-li"><span class="nb-cb'+(d.checked?' on':'')+'"></span><span>'+rt(d.rich_text)+'</span></div>';
+    if(b.type === 'table') return '<table class="nb-t">'+d.children.map(function(r, i){
+      var th = d.has_column_header && i === 0;
+      return '<tr>'+r.table_row.cells.map(function(c){ return '<'+(th?'th':'td')+'>'+rt(c)+'</'+(th?'th':'td')+'>'; }).join('')+'</tr>';
+    }).join('')+'</table>';
+    return '<div class="nb-p">'+rt(d.rich_text)+'</div>';
+  }).join('');
+}
+
+/* 31/10 · «NUEVA TAREA»: fecha y formato del cuerpo, funciones PURAS (el panel de `escritorio.html` sólo las pinta).
+   El día de la semana sale de los días desde 1970-01-01 (jueves), como `_lunesDesde_`: sin `getDay`, sin reloj. */
+var UNIDADES_CON_PRIORIDAD_TAREA = ['Aviónica'];   /* ⛔ espejo de `servidor.UNIDADES_CON_PRIORIDAD` (lo vigila el banco) */
+function _diaSemanaISO_(iso){   /* 0 = lunes … 6 = domingo; -1 si no es fecha */
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso==null?'':iso));
+  if(!m) return -1;
+  var d=Math.floor(Date.UTC(+m[1], +m[2]-1, +m[3])/86400000);
+  return ((d+3)%7+7)%7;
+}
+/* Los atajos de plazo, desde `hoyISO`: Hoy · Mañana · el próximo Viernes (estrictamente posterior a hoy) · +1 semana ·
+   Sin fecha. `[]` si `hoyISO` no es una fecha. */
+function _atajosFechaTarea_(hoyISO){
+  var dow=_diaSemanaISO_(hoyISO);
+  if(dow<0) return [];
+  return [{t:'Hoy', v:hoyISO}, {t:'Mañana', v:_isoMasDias_(hoyISO, 1)},
+          {t:'Viernes', v:_isoMasDias_(hoyISO, ((4-dow+7)%7)||7)},
+          {t:'+1 semana', v:_isoMasDias_(hoyISO, 7)}, {t:'Sin fecha', v:''}];
+}
+/* Las semanas (lunes→domingo) de un mes `AAAA-MM`: cada día es su ISO y el hueco, ''. `[]` si no es un mes. */
+function _semanasDelMes_(ym){
+  var m=/^(\d{4})-(\d{2})$/.exec(String(ym==null?'':ym)), out=[], sem=[], d, i, n, y, mo;
+  if(!m || +m[2]<1 || +m[2]>12) return [];
+  y=+m[1]; mo=+m[2];
+  n=new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  for(i=0;i<_diaSemanaISO_(ym+'-01');i++) sem.push('');
+  for(d=1;d<=n;d++){
+    sem.push(ym+'-'+(d<10?'0':'')+d);
+    if(sem.length===7){ out.push(sem); sem=[]; }
+  }
+  if(sem.length){ while(sem.length<7) sem.push(''); out.push(sem); }
+  return out;
+}
+/* Insertar formato en el cuerpo: `tipo` = h · b · ul · ol · todo · tabla; `ini`/`fin` = la selección. Devuelve el texto y
+   la selección nueva. Los de línea (h, ul, ol, todo, tabla) van al principio de la línea; la negrita envuelve lo marcado. */
+function _mdInsertar_(texto, ini, fin, tipo){
+  texto=String(texto==null?'':texto); ini=Math.max(0, Math.min(+ini||0, texto.length)); fin=Math.max(ini, Math.min(+fin||0, texto.length));
+  var pre={h:'## ', ul:'- ', ol:'1. ', todo:'[ ] '}, ls, ins;
+  if(tipo==='b'){
+    ins=texto.slice(ini, fin) || 'negrita';
+    return {texto:texto.slice(0, ini)+'**'+ins+'**'+texto.slice(fin), ini:ini+2, fin:ini+2+ins.length};
+  }
+  ls=texto.lastIndexOf('\n', ini-1)+1;
+  if(tipo==='tabla'){
+    ins='| Columna | Columna |\n|---|---|\n|  |  |\n';
+    return {texto:texto.slice(0, ls)+ins+texto.slice(ls), ini:ls+ins.length, fin:ls+ins.length};
+  }
+  if(!pre[tipo]) return {texto:texto, ini:ini, fin:fin};
+  return {texto:texto.slice(0, ls)+pre[tipo]+texto.slice(ls), ini:ini+pre[tipo].length, fin:fin+pre[tipo].length};
+}
+
 function _tareaFlujo_(){ return ['Sin empezar', 'En desarrollo', 'Revisando']; }
 
 function _tareaPaso_(e){
@@ -5944,16 +6070,104 @@ function _quienPuedeHTML_(r, di, fi, rotulo){
   return h+'.';
 }
 
-/* Engancha las celdas `data-qp="id|día|franja"` con su caja `data-qpbox="id"`. `buscar(id)` da la reunión: cada cara
-   guarda las suyas en un sitio distinto. Devuelve cuántas enganchó. */
+/* 31/10 — EL GLOBO DE «QUIÉN PUEDE». 🗣️ Daniel: *«para ver la disponibilidad es súper sneaky […] debería de ser con el ratón
+   al menos también haciendo hover sin tener necesidad de hacer clic»* · *«está en gris, súper oscuro, casi no se ve»*.
+   Cuatro grupos de UNA franja, por la MISMA lectura que `_quienPuedeCelda_` (no hay una segunda regla de quién puede):
+   `puede` (con su valor: 2 presencial, 1 telemático), `no` (contestó y en esa franja no), `sin` (convocado que aún no
+   contestó) y los contadores `anon`/`sinDetalle` que la caja de siempre ya sabía decir. Nombres: de pila, y con la inicial
+   del primer apellido sólo si de pila coinciden dos en la lista. */
+function _quienPuedeGrupos_(r, di, fi){
+  var bl=(r && r.bloques)||[], resp=(r && r.resp)||{}, g={puede:[], no:[], sin:[], anon:0, sinDetalle:0}, ix=-1;
+  for(var i=0;i<bl.length;i++) if(Array.isArray(bl[i]) && bl[i][0]===di && bl[i][1]===fi){ ix=i; break; }
+  Object.keys(resp).forEach(function(nom){
+    var w=resp[nom]; if(!Array.isArray(w)) return;
+    var v=(ix>=0) ? (+w[ix]||0) : 0;
+    if(/^#\d+$/.test(nom)){ if(v>0) g.anon++; return; }
+    (v>0 ? g.puede : g.no).push({n:nom, v:v});
+  });
+  (Array.isArray(r && r.invitados) ? r.invitados : []).forEach(function(n){
+    if(typeof n==='string' && n && !resp.hasOwnProperty(n) && !/^#\d+$/.test(n)) g.sin.push({n:n, v:0});
+  });
+  var c=r && r.calor && r.calor[di] ? +r.calor[di][fi] : NaN, hay=g.puede.length+g.anon;
+  if(c>hay) g.sinDetalle=c-hay;
+  [g.puede, g.no, g.sin].forEach(function(l){ l.sort(function(a,b){ return a.n.localeCompare(b.n,'es'); }); });
+  return g;
+}
+
+function _quienPuedePanel_(r, di, fi, rotulo){
+  var g=_quienPuedeGrupos_(r, di, fi), cnt={}, tag=/brid/i.test(String((r && (r.modalidad||r.mod))||''));
+  [g.puede, g.no, g.sin].forEach(function(l){ l.forEach(function(x){ var k=x.n.split(/\s+/)[0]; cnt[k]=(cnt[k]||0)+1; }); });
+  function pila(n){ var t=n.split(/\s+/), k=t[0]; return (cnt[k]>1 && t[1]) ? k+' '+t[1].charAt(0)+'.' : k; }
+  function chip(x, cls){
+    var t=(cls==='p' && tag) ? ' <i style="font-style:normal;font-size:10px;opacity:.8">'+(x.v===2?'presencial':'telemático')+'</i>' : '';
+    var st='display:inline-block;margin:2px 4px 2px 0;padding:3px 9px;border-radius:999px;font-size:13px;line-height:1.25;';
+    st+= cls==='p' ? 'background:rgba(62,180,137,.22);border:1px solid var(--ok);color:var(--ink);font-weight:600'
+                   : 'border:1px solid var(--line2,#463E40);color:var(--ink2);';
+    return '<span style="'+st+'">'+esc(pila(x.n))+t+'</span>';
+  }
+  var tot=g.puede.length+g.anon+g.sinDetalle;
+  var h='<div style="font-size:12px;color:var(--ink2);margin-bottom:5px"><b style="color:var(--ink)">'+esc(rotulo||'')+'</b></div>';
+  h+='<div style="font-size:15px;font-weight:700;color:'+(tot?'var(--ok)':'var(--ink2)')+';margin-bottom:3px">'+
+     (tot ? (tot===1?'Puede 1':'Pueden '+tot) : 'No puede nadie')+'</div>';
+  if(g.puede.length) h+='<div>'+g.puede.map(function(x){ return chip(x,'p'); }).join('')+'</div>';
+  if(g.anon) h+='<div style="font-size:12px;color:var(--ink2)">+ '+g.anon+' sin nombre (encuesta anónima)</div>';
+  if(g.sinDetalle) h+='<div style="font-size:12px;color:var(--ink2)">+ '+g.sinDetalle+' sin el detalle de quién</div>';
+  if(g.no.length) h+='<div style="margin-top:6px;font-size:11px;color:var(--ink2)">No pueden</div><div>'+g.no.map(function(x){ return chip(x,'n'); }).join('')+'</div>';
+  if(g.sin.length) h+='<div style="margin-top:6px;font-size:11px;color:var(--ink2)">Sin contestar</div><div>'+g.sin.map(function(x){ return chip(x,'n'); }).join('')+'</div>';
+  return h;
+}
+
+/* El globo (UNO por documento, `#qpGlobo`), junto a la celda y dentro de la ventana. `pointer-events:none`: no tapa el
+   ratón y así no parpadea al pasar de una celda a otra. */
+function _qpMostrar_(el, html){
+  var gl=document.getElementById('qpGlobo');
+  if(!gl){
+    gl=document.createElement('div'); gl.id='qpGlobo'; gl.setAttribute('role','status');
+    gl.style.cssText='position:fixed;z-index:9999;max-width:min(340px,calc(100vw - 16px));min-width:170px;padding:10px 12px;'+
+      'border-radius:12px;background:var(--sur2,#221E1F);border:1px solid var(--line2,#463E40);color:var(--ink);'+
+      'box-shadow:0 10px 30px rgba(0,0,0,.6);pointer-events:none;display:none';
+    document.body.appendChild(gl);
+  }
+  gl.innerHTML=html; gl.style.display='block';
+  var rc=el.getBoundingClientRect(), W=window.innerWidth, H=window.innerHeight, w=gl.offsetWidth, hh=gl.offsetHeight, x, y;
+  if(rc.right+8+w<=W-8){ x=rc.right+8; y=rc.top+rc.height/2-hh/2; }                 // a la derecha de la celda
+  else if(rc.left-8-w>=8){ x=rc.left-8-w; y=rc.top+rc.height/2-hh/2; }              // o a la izquierda
+  else { x=rc.left+rc.width/2-w/2; y=(rc.bottom+8+hh<=H-8) ? rc.bottom+8 : rc.top-8-hh; }   // o debajo / encima (móvil)
+  x=Math.max(8, Math.min(x, W-w-8)); y=Math.max(8, Math.min(y, H-hh-8));
+  gl.style.left=Math.round(x)+'px'; gl.style.top=Math.round(y)+'px';
+}
+function _qpOcultar_(){ var gl=document.getElementById('qpGlobo'); if(gl) gl.style.display='none'; }
+
+/* Engancha las celdas `data-qp="id|día|franja"`. `buscar(id)` da la reunión: cada cara guarda las suyas en un sitio
+   distinto. Devuelve cuántas enganchó. Pasar el ratón enseña el globo (sin clic); el clic o el toque lo FIJA —y de paso
+   escribe la línea de siempre en `data-qpbox`, que es la versión en texto—; otro clic fuera, o Esc, lo quita. */
+/* La celda fijada vive en `_cablearQuienPuede_.fijo`: `comun.js` no lleva sentencias de nivel superior. */
 function _cablearQuienPuede_(buscar){
   if(typeof document==='undefined' || !document.querySelectorAll) return 0;
   var els=document.querySelectorAll('[data-qp]'), cajas=document.querySelectorAll('[data-qpbox]'), n=0;
+  _cablearQuienPuede_.fijo=null; _qpOcultar_();
+  if(!document.body.getAttribute('data-qpglobal')){
+    document.body.setAttribute('data-qpglobal','1');
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ _cablearQuienPuede_.fijo=null; _qpOcultar_(); } });
+    document.addEventListener('click', function(e){
+      if(_cablearQuienPuede_.fijo && !(e.target && e.target.closest && e.target.closest('[data-qp]'))){ _cablearQuienPuede_.fijo=null; _qpOcultar_(); }
+    });
+  }
+  function datos(el){
+    var p=String(el.getAttribute('data-qp')).split('|'), r=buscar(p[0]);
+    return r ? {p:p, r:r, t:el.getAttribute('data-qpt')||''} : null;
+  }
   for(var i=0;i<els.length;i++) (function(el){
+    el.onmouseenter=function(){
+      if(_cablearQuienPuede_.fijo && _cablearQuienPuede_.fijo!==el) return;                    // fijado: el ratón no lo mueve
+      var d=datos(el); if(d) _qpMostrar_(el, _quienPuedePanel_(d.r, +d.p[1], +d.p[2], d.t));
+    };
+    el.onmouseleave=function(){ if(!_cablearQuienPuede_.fijo) _qpOcultar_(); };
     el.onclick=function(){
-      var p=String(el.getAttribute('data-qp')).split('|'), r=buscar(p[0]), box=null;
-      for(var j=0;j<cajas.length;j++) if(cajas[j].getAttribute('data-qpbox')===p[0]) box=cajas[j];
-      if(r && box) box.innerHTML=_quienPuedeHTML_(r, +p[1], +p[2], el.getAttribute('data-qpt')||'');
+      var d=datos(el), box=null; if(!d) return;
+      for(var j=0;j<cajas.length;j++) if(cajas[j].getAttribute('data-qpbox')===d.p[0]) box=cajas[j];
+      if(box) box.innerHTML=_quienPuedeHTML_(d.r, +d.p[1], +d.p[2], d.t);
+      _cablearQuienPuede_.fijo=el; _qpMostrar_(el, _quienPuedePanel_(d.r, +d.p[1], +d.p[2], d.t));
     };
     n++;
   })(els[i]);

@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=aabe8b0">
+<link rel="stylesheet" href="escritorio.css?v=2785085">
 </head>
 <body>
 
@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=76aeccb"></script>
+<script src="comun.js?v=d5afd6c"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=471a14e"></script>
 <script src="turnos.escritorio.js?v=d63eb29"></script>
@@ -2231,7 +2231,7 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
     g+='<div class="nota" style="margin-top:7px">'+(pondOn
       ? 'El número son <b>puntos</b>: presencial y telemático 2 · solo telemático 1. Las celdas vacías son franjas que <b>no se ofrecieron</b>.'
       : 'El número es <b>cuánta gente puede</b>. Las celdas vacías son franjas que <b>no se ofrecieron</b>.')+'</div>';
-    g+='<div class="nota" data-qpbox="'+esc(r.id)+'" style="margin-top:5px">Pulsa un hueco del mapa para ver quién puede.</div>';
+    g+='<div class="nota" data-qpbox="'+esc(r.id)+'" style="margin-top:5px">Pasa el ratón por un hueco del mapa para ver quién puede; pulsa para fijarlo (Esc lo quita).</div>';
     var riesgo=r.sinCubrir.map(function(n){
       var s=sancionPor(r.tipo,n), m=miembro(n);
       /* ⛔⛔ Y EL SUBTITULO TAMPOCO INVENTA EL CERO (565.ª). Aqui ponia
@@ -2398,7 +2398,7 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
 /* ⛔ 26/10 (triaje C2a): CREAR UNA TAREA DESDE LA APP. 🗣️ Daniel, 20/10: «la fuente de verdad es el propio minipc […]
    notion pasa a ser una proyección», así que las tareas nuevas tienen que poder nacer aquí. El PD en cualquier unidad
    con tablero; un coordinador, en las que coordina. El servidor vuelve a mirarlo todo (`e_crear_tarea`). */
-var NUEVA_TAREA = {u:'', n:'', l:'', r:{}, ok:''};
+var NUEVA_TAREA = {u:'', n:'', l:'', r:{}, ok:'', c:'', p:'media', cal:'', b:''};
 function _unidadesNuevaTarea_(){
   var yo = (typeof _actorSanc_==='function') ? _actorSanc_() : null;
   if(!yo) return [];
@@ -2413,28 +2413,69 @@ function _genteNuevaTarea_(u){
   }).map(function(m){ return m.nombre; }).sort(function(a, b){ return a.localeCompare(b); });
 }
 function _nuevaTareaFalta_(){
-  if(!String(NUEVA_TAREA.n || '').trim()) return 'Escribe qu\u00e9 hay que hacer';
+  if(!String(NUEVA_TAREA.n || '').trim()) return 'Escribe qué hay que hacer';
   if(!Object.keys(NUEVA_TAREA.r).some(function(n){ return NUEVA_TAREA.r[n]; })) return 'Elige al menos un responsable';
   return '';
+}
+/* 31/10 · «Nueva tarea» sin controles nativos (Daniel: «un fucking tick clásico de HTML. Cero customizado»): la unidad y
+   los responsables son `.pick` (el chip seleccionable de la app), el plazo son atajos + un calendario propio, la urgencia
+   son chips, y el cuerpo es un editor con formato ligero y la vista previa «así se verá en Notion» al lado. */
+var _MESES_NT_ = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function _hoyNuevaTarea_(){ return _dmyAISO_(typeof HOY === 'string' ? HOY : _hoyTxt_()); }
+function _fechaNuevaTareaHtml_(hoy){
+  var l = NUEVA_TAREA.l, sel = NUEVA_TAREA.cal, atajos = _atajosFechaTarea_(hoy), h = '';
+  h += '<div class="chips" style="margin-bottom:6px">'+atajos.map(function(a){
+    return '<button type="button" class="pick'+(a.v===l && !(a.v==='' && sel) ? ' on' : '')+'" data-ntf="'+esc(a.v)+'">'+esc(a.t)+'</button>'; }).join('')+
+    '<button type="button" class="pick'+(sel ? ' on' : '')+'" data-ntcal="'+(sel ? 'x' : (l || hoy).slice(0, 7))+'">Otro día…</button></div>';
+  h += '<div class="nota" style="padding:2px 0 6px;border:0">'+(l ? 'Vence el <b>'+esc(_isoADMY_(l))+'</b>' : 'Sin fecha límite')+'</div>';
+  if(sel){
+    var y = +sel.slice(0, 4), m = +sel.slice(5, 7), ant = m === 1 ? (y-1)+'-12' : y+'-'+(m<11 ? '0' : '')+(m-1),
+        sig = m === 12 ? (y+1)+'-01' : y+'-'+(m<9 ? '0' : '')+(m+1);
+    h += '<div class="nt-cal"><div class="nt-calh"><button type="button" class="btn sm" data-ntcal="'+ant+'">‹</button>'+
+      '<b>'+_MESES_NT_[m-1]+' '+y+'</b><button type="button" class="btn sm" data-ntcal="'+sig+'">›</button></div>'+
+      '<div class="nt-calg">'+['L','M','X','J','V','S','D'].map(function(d){ return '<span class="nt-dw">'+d+'</span>'; }).join('')+
+      _semanasDelMes_(sel).map(function(w){ return w.map(function(d){
+        return d ? '<button type="button" class="nt-d'+(d===l ? ' on' : '')+(d===hoy ? ' hoy' : '')+'" data-ntf="'+d+'">'+(+d.slice(8))+'</button>'
+                 : '<span></span>'; }).join(''); }).join('')+'</div></div>';
+  }
+  return h;
 }
 function _nuevaTareaPanel_(){
   var us = _unidadesNuevaTarea_();
   if(!us.length) return '';
   if(us.indexOf(NUEVA_TAREA.u) < 0){ NUEVA_TAREA.u = us[0]; NUEVA_TAREA.r = {}; }
-  var gente = _genteNuevaTarea_(NUEVA_TAREA.u), falta = _nuevaTareaFalta_();
-  return pan('Nueva tarea', 'en el tablero de '+NUEVA_TAREA.u, '<div class="pb">'+
+  var gente = _genteNuevaTarea_(NUEVA_TAREA.u), falta = _nuevaTareaFalta_(), hoy = _hoyNuevaTarea_(),
+      conPrio = UNIDADES_CON_PRIORIDAD_TAREA.indexOf(NUEVA_TAREA.u) >= 0;
+  return '<div id="ntPanel">'+pan('Nueva tarea', 'en el tablero de '+NUEVA_TAREA.u, '<div class="pb">'+
     (NUEVA_TAREA.ok ? '<div class="nota" style="margin-bottom:9px">'+esc(NUEVA_TAREA.ok)+'</div>' : '')+
-    (us.length > 1 ? '<label class="campo"><span class="sc">Unidad</span><select id="ntU">'+us.map(function(u){
-      return '<option value="'+esc(u)+'"'+(u===NUEVA_TAREA.u?' selected':'')+'>'+esc(u)+'</option>'; }).join('')+'</select></label>' : '')+
-    '<label class="campo"><span class="sc">Qu\u00e9 hay que hacer</span><input id="ntN" maxlength="200" value="'+
+    '<label class="campo"><span class="sc">Qué hay que hacer</span><input id="ntN" maxlength="200" value="'+
       esc(NUEVA_TAREA.n)+'" placeholder="p. ej. Soldar la placa de potencia"></label>'+
-    '<div class="campo"><span class="sc">Responsable(s)</span><div style="display:flex;flex-wrap:wrap;gap:6px 14px">'+
-      (gente.length ? gente.map(function(n){
-        return '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-ntr="'+esc(n)+'"'+(NUEVA_TAREA.r[n]?' checked':'')+'> '+
-          esc((miembro(n)||{}).pila || n)+'</label>'; }).join('') : '<span class="nota">Nadie activo en '+esc(NUEVA_TAREA.u)+'.</span>')+
+    '<div class="campo"><span class="sc">Unidad</span><div class="nt-fila">'+us.map(function(u){
+      return '<button type="button" class="pick'+(u===NUEVA_TAREA.u ? ' on' : '')+'" data-ntu="'+esc(u)+'">'+esc(u)+'</button>'; }).join('')+'</div></div>'+
+    '<div class="campo"><span class="sc">Responsable(s)</span>'+
+      (gente.length > 8 ? '<input id="ntB" class="nt-bus" placeholder="Buscar por nombre…" value="'+esc(NUEVA_TAREA.b)+'">' : '')+
+      '<div class="nt-fila nt-gente">'+(gente.length ? gente.map(function(n){
+        var q = String(NUEVA_TAREA.b || '').toLowerCase();
+        return '<button type="button" class="pick nt-p'+(NUEVA_TAREA.r[n] ? ' on' : '')+'" data-ntr="'+esc(n)+'"'+
+          (q && n.toLowerCase().indexOf(q) < 0 ? ' style="display:none"' : '')+'><span class="av">'+esc(ini(n))+'</span>'+
+          esc((miembro(n)||{}).pila || n)+'</button>'; }).join('') : '<span class="nota">Nadie activo en '+esc(NUEVA_TAREA.u)+'.</span>')+
     '</div></div>'+
-    '<label class="campo"><span class="sc">Fecha l\u00edmite (opcional)</span><input id="ntL" type="date" value="'+esc(NUEVA_TAREA.l)+'"></label>'+
-    '<button class="btn pri" id="ntCrear"'+(falta?' disabled':'')+' style="margin-top:9px">'+esc(falta || 'Crear la tarea')+'</button></div>');
+    '<div class="campo"><span class="sc">Fecha límite</span>'+_fechaNuevaTareaHtml_(hoy)+'</div>'+
+    (conPrio ? '<div class="campo"><span class="sc">Urgencia</span><div class="nt-fila">'+['baja','media','alta'].map(function(p){
+      return '<button type="button" class="pick'+(NUEVA_TAREA.p===p ? ' on' : '')+'" data-ntp="'+p+'">'+p.charAt(0).toUpperCase()+p.slice(1)+'</button>'; }).join('')+'</div></div>' : '')+
+    '<div class="campo"><span class="sc">Instrucciones <span class="nota" style="padding:0;border:0">(opcional)</span></span>'+
+      '<div class="nt-barra">'+[['h','Título'],['b','Negrita'],['ul','• Lista'],['ol','1. Lista'],['todo','☐ Casilla'],['tabla','Tabla']].map(function(b){
+        return '<button type="button" class="btn sm" data-ntmd="'+b[0]+'">'+b[1]+'</button>'; }).join('')+'</div>'+
+      '<div class="nt-ed"><textarea id="ntC" rows="9" maxlength="'+CUERPO_TAREA_MAX+'" placeholder="Escribe aquí lo que hay que hacer. Con los botones de arriba pones títulos, listas, casillas y tablas.">'+
+        esc(NUEVA_TAREA.c)+'</textarea>'+
+      '<div class="nt-vp"><span class="sc">Así se verá en Notion</span><div id="ntV" class="nt-prev">'+_vistaNuevaTarea_(NUEVA_TAREA.c)+'</div></div></div></div>'+
+    '<button class="btn pri" id="ntCrear"'+(falta?' disabled':'')+' style="margin-top:9px">'+esc(falta || 'Crear la tarea')+'</button></div>')+'</div>';
+}
+/* La vista previa pinta los BLOQUES que mandará el servidor (`_cuerpoABloques_`), no una segunda traducción. */
+function _vistaNuevaTarea_(texto){
+  if(!String(texto || '').trim()) return '<div class="nota" style="border:0;padding:0">Aquí irá lo que escribas.</div>';
+  try{ return _bloquesAHTML_(_cuerpoABloques_(texto)); }
+  catch(e){ return '<div class="nota dn" style="border:0;padding:0">'+esc((e && e.message) || e)+'</div>'; }
 }
 /* 31/10 (A1/A2): el paso de una tarea, su deshacer y el cajón de las pasadas, como en el móvil (`tareas.movil.js`). Quién
    puede lo dice `_tareaOfertaPaso_` (comun.js): el responsable, el PD y el coordinador o subcoordinador de la unidad; el
@@ -2516,28 +2557,56 @@ function _cablearPasoTarea_(){
     h.onclick = function(){ TAREAS_PASADAS_AB = h.parentNode.classList.toggle('ab'); };
   });
 }
+/* Repinta SÓLO el panel (no la pantalla entera): lo escrito vive en `NUEVA_TAREA`, así que no se pierde nada. */
+function _repintarNuevaTarea_(){
+  var el = document.getElementById('ntPanel');
+  if(!el){ pintar(); return; }
+  el.outerHTML = _nuevaTareaPanel_();
+  _cablearNuevaTarea_();
+}
 function _cablearNuevaTarea_(){
-  var su = document.getElementById('ntU');
-  if(su) su.onchange = function(){ NUEVA_TAREA.u = su.value; NUEVA_TAREA.r = {}; NUEVA_TAREA.ok = ''; pintar(); };
   var b = document.getElementById('ntCrear');
   var vivo = function(){ if(!b) return; var f = _nuevaTareaFalta_(); b.disabled = !!f; b.textContent = f || 'Crear la tarea'; };
   var n = document.getElementById('ntN');
   /* sin repintar al teclear: se perdería el foco a cada letra; sólo el botón dice lo que falta */
   if(n) n.oninput = function(){ NUEVA_TAREA.n = n.value; NUEVA_TAREA.ok = ''; vivo(); };
-  var l = document.getElementById('ntL');
-  if(l) l.onchange = function(){ NUEVA_TAREA.l = l.value; };
-  $$('[data-ntr]').forEach(function(el){ el.onchange = function(){ NUEVA_TAREA.r[el.dataset.ntr] = !!el.checked; vivo(); }; });
+  $$('[data-ntu]').forEach(function(el){ el.onclick = function(){
+    if(el.dataset.ntu === NUEVA_TAREA.u) return;
+    NUEVA_TAREA.u = el.dataset.ntu; NUEVA_TAREA.r = {}; NUEVA_TAREA.b = ''; NUEVA_TAREA.ok = ''; _repintarNuevaTarea_(); }; });
+  $$('[data-ntr]').forEach(function(el){ el.onclick = function(){
+    var on = !NUEVA_TAREA.r[el.dataset.ntr];
+    NUEVA_TAREA.r[el.dataset.ntr] = on; el.classList.toggle('on', on); vivo(); }; });
+  var bus = document.getElementById('ntB');
+  if(bus) bus.oninput = function(){
+    var q = bus.value.toLowerCase(); NUEVA_TAREA.b = bus.value;
+    $$('[data-ntr]').forEach(function(el){ el.style.display = (q && el.dataset.ntr.toLowerCase().indexOf(q) < 0) ? 'none' : ''; }); };
+  $$('[data-ntf]').forEach(function(el){ el.onclick = function(){
+    NUEVA_TAREA.l = el.dataset.ntf; if(!el.classList.contains('nt-d')) NUEVA_TAREA.cal = ''; _repintarNuevaTarea_(); }; });
+  $$('[data-ntcal]').forEach(function(el){ el.onclick = function(){
+    NUEVA_TAREA.cal = el.dataset.ntcal === 'x' ? '' : el.dataset.ntcal; _repintarNuevaTarea_(); }; });
+  $$('[data-ntp]').forEach(function(el){ el.onclick = function(){
+    NUEVA_TAREA.p = el.dataset.ntp; _repintarNuevaTarea_(); }; });
+  var c = document.getElementById('ntC'), v = document.getElementById('ntV');
+  var vista = function(){ if(v) v.innerHTML = _vistaNuevaTarea_(NUEVA_TAREA.c); };
+  if(c) c.oninput = function(){ NUEVA_TAREA.c = c.value; NUEVA_TAREA.ok = ''; vista(); };
+  $$('[data-ntmd]').forEach(function(el){ el.onclick = function(){
+    if(!c) return;
+    var r = _mdInsertar_(c.value, c.selectionStart, c.selectionEnd, el.dataset.ntmd);
+    c.value = r.texto; NUEVA_TAREA.c = r.texto; c.focus(); c.setSelectionRange(r.ini, r.fin); vista(); }; });
   if(b) b.onclick = async function(){
     var f = _nuevaTareaFalta_();
     if(f){ b.textContent = f; return; }
-    var nom = String(NUEVA_TAREA.n).trim(), resp = Object.keys(NUEVA_TAREA.r).filter(function(x){ return NUEVA_TAREA.r[x]; });
-    b.disabled = true; b.textContent = 'Creando\u2026';
+    var nom = String(NUEVA_TAREA.n).trim(), resp = Object.keys(NUEVA_TAREA.r).filter(function(x){ return NUEVA_TAREA.r[x]; }),
+        t = {nombre:nom, unidad:NUEVA_TAREA.u, responsables:resp, limite:NUEVA_TAREA.l || null};
+    if(String(NUEVA_TAREA.c || '').trim()) t.cuerpo = NUEVA_TAREA.c;
+    if(UNIDADES_CON_PRIORIDAD_TAREA.indexOf(NUEVA_TAREA.u) >= 0) t.prioridad = NUEVA_TAREA.p;
+    b.disabled = true; b.textContent = 'Creando…';
     try{
-      var r = await api.crearTarea({nombre:nom, unidad:NUEVA_TAREA.u, responsables:resp, limite:NUEVA_TAREA.l || null});
+      var r = await api.crearTarea(t);
       if(r && r.tarea) TAREAS.push(r.tarea);
       var se = (r && r.sinEtiquetar) || [];
-      NUEVA_TAREA = {u:NUEVA_TAREA.u, n:'', l:'', r:{}, ok:'Tarea creada: \u00ab'+nom+'\u00bb'+
-        (se.length ? ' (sin usuario de Notion, no salen de responsables all\u00ed: '+se.join(', ')+')' : '')};
+      NUEVA_TAREA = {u:NUEVA_TAREA.u, n:'', l:'', r:{}, c:'', p:'media', cal:'', b:'', ok:'Tarea creada: «'+nom+'»'+
+        (se.length ? ' (sin usuario de Notion, no salen de responsables allí: '+se.join(', ')+')' : '')};
       pintar();
     }catch(e){ b.disabled = false; b.textContent = 'No se pudo crear: ' + ((e && e.message) || e); }
   };
@@ -3843,7 +3912,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='e937664';
+var BUILD='d0259f1';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

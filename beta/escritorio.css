@@ -836,3 +836,35 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .asisPie{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}
 .asisLista{grid-column:1/-1;font-family:var(--mono);font-size:15px;line-height:1.7;color:var(--ink);white-space:pre-wrap;margin:0}
 @media (prefers-reduced-motion: reduce){.asisC.nuevo{animation:none}.asisC{transition:none}}
+
+/* 31/10 · «Nueva tarea»: unidad, responsables, plazo y urgencia como chips (`.pick`), calendario propio y el editor del
+   cuerpo con su vista previa «así se verá en Notion» (`.nb-*`, pintada por `_bloquesAHTML_`). Sin controles nativos. */
+.nt-fila{display:flex;gap:7px;flex-wrap:wrap}
+.nt-gente{max-height:150px;overflow:auto;padding:2px}
+.nt-p{display:inline-flex;align-items:center;gap:7px;padding-left:5px}
+.nt-p .av{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:9px;background:var(--bg);border:1px solid var(--line);color:var(--ink2)}
+.nt-p.on::before{content:none}
+.nt-p.on .av{background:var(--red);border-color:var(--red);color:#fff}
+.nt-bus{margin-bottom:7px}
+.nt-cal{border:1px solid var(--line);border-radius:var(--r2);background:#0A0909;padding:10px;width:256px}
+.nt-calh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;text-transform:capitalize;font-size:12.5px}
+.nt-calg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.nt-dw{font-family:var(--mono);font-size:10px;color:var(--ink3);padding:2px 0}
+.nt-d{cursor:pointer;font-family:var(--mono);font-size:11.5px;padding:6px 0;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--ink2)}
+.nt-d:hover{border-color:var(--ink3);color:var(--ink)}
+.nt-d.hoy{border-color:var(--line2)}
+.nt-d.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.28)}
+.nt-barra{display:flex;gap:6px;flex-wrap:wrap}
+.nt-ed{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+.nt-ed textarea{min-height:200px;font-family:var(--mono);font-size:12.5px}
+.nt-vp{border:1px solid var(--line);border-radius:var(--r2);padding:10px 12px;min-height:200px;background:var(--sur2)}
+.nt-prev{margin-top:8px;font-size:13px;line-height:1.5;color:var(--ink)}
+.nb-h{font-weight:700;margin:10px 0 4px}
+.nb-heading_1{font-size:19px}.nb-heading_2{font-size:16px}.nb-heading_3{font-size:14px}
+.nb-p{margin:3px 0}
+.nb-li{display:flex;gap:8px;margin:2px 0}.nb-m{color:var(--ink3);min-width:14px}
+.nb-cb{width:13px;height:13px;margin-top:3px;border:1.5px solid var(--ink3);border-radius:3px;flex:none}
+.nb-cb.on{background:var(--red);border-color:var(--red)}
+.nb-t{border-collapse:collapse;margin:6px 0;width:100%}
+.nb-t th,.nb-t td{border:1px solid var(--line);padding:5px 8px;text-align:left;font-size:12.5px}
+.nb-t th{background:rgba(255,255,255,.04);font-weight:700}
