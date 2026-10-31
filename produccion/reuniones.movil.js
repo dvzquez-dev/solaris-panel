@@ -339,6 +339,7 @@ async function _cargarReunionesM_(yaPedidas){
        «Cargando…». Lo que no vale es que no haya lista. */
     if(!Array.isArray(arr)) return false;
     CARGA.reuniones=true;
+    _asisDeListaM_(arr);       // 31/10: ¿alguna general tuya con la asistencia abierta? (sin esperar: la tarjeta se pinta sola)
     if(arr.length){
       /* SE CONSERVA LA QUE ESTABAS MIRANDO. Esta funcion tambien la llama el refresco en
          vivo cada 90 s: sin esto, estarias viendo una reunion y de pronto te saltaria a otra
@@ -382,8 +383,7 @@ function _proxReuHTML_(){
       '<div class="tarj"><p class="rnota" style="margin:0;padding:6px 0">Cargando tus reuniones…</p></div>';
   if(_sinReuniones_() || !R)
     return '<h2 class="sec">Próxima reunión<span class="ln"></span></h2>'+
-      '<div class="tarj">'+vacio('Ninguna reunión convocada',
-        'Ahora mismo no estás convocado a ninguna reunión.','',false)+'</div>';
+      '<div class="tarj">'+vacio('Ninguna reunión convocada','','',false)+'</div>';
   var c=_cuandoReuM_(R), pasada=(c.ms<_hoyDateM_().getTime());
   /* Si lo único que queda ya ocurrió, se dice: llamar «próxima» a algo de la semana
      pasada es exactamente el tipo de mentira pequeña que hace desconfiar del resto. */
@@ -475,8 +475,7 @@ function vReu(){
     return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
       '<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar '+(esCoord()?'reunión':'reunión de trabajo')+'</button>'+
       _sinConvocarHTMLM_()+
-      '<div class="tarj">'+vacio('Ninguna reunión convocada','Ahora mismo no estás convocado a ninguna '+
-        'reunión. Cuando alguien convoque una, aparecerá aquí para que cubras tu disponibilidad.','',false)+'</div>';
+      '<div class="tarj">'+vacio('Ninguna reunión convocada','Cuando te convoquen a una, saldrá aquí.','',false)+'</div>';
   var R=REUNION, nF=R.franjas.length;
   /* Vista PONDERADA (solo tiene sentido en híbridas): presencial+telemático vale 2 y
      telemático 1, así que la ponderación es literalmente la suma de los valores. En
@@ -648,7 +647,7 @@ function vReu(){
         (R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div>'+
       (R.fijada
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
-          '<b style="color:var(--ok)">📌 Reunión fijada · '+esc(R.fijada)+'</b><br>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</div>'
+          '<b style="color:var(--ok)">Reunión fijada · '+esc(R.fijada)+'</b><br>Disponibilidad cerrada.</div>'
         : (R.exento
             /* 🗣️ Daniel (14/10): *«que permita, por favor, al que organiza la reunión
                poner su disponibilidad. Si le apetece. En plan, opcional. Pero básicamente
@@ -679,7 +678,7 @@ function vReu(){
               : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
                 (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
     /* si ya está fijada, el aviso de organizador sobra y quedaba colgando debajo del cartel verde */
-    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas</b>, así que no se te <i>pide</i> disponibilidad — pero puedes marcarla si quieres, y cuenta como la de cualquiera.</p>':'')+
+    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú, así que no se te <i>pide</i> disponibilidad. Puedes marcarla si quieres.</p>':'')+
       /* ⛔ LA REGLA ES LA DEL BACKEND, Y NO ES `esCoord()`. Aqui se ofrecian los tres
          botones a CUALQUIER coordinador, y las tres acciones que llaman las gatea
          `Codigo.gs` por **convocante o admin** -con la misma linea en las tres:
@@ -696,6 +695,8 @@ function vReu(){
         '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
         '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
       '</div>':'')+
+    _ordenDiaReuHTML_(R)+
+    _audioReuHTML_(R)+
     _bloqueReuHTML_(R, _puedeBloqueReu_(R, (typeof _actorSanc_==='function'?_actorSanc_():(YO&&YO.nombre)), (typeof esAdmin==='function' && esAdmin())))+
     '</div>'+
     '<h2 class="sec">Cuándo puede el equipo<span class="ln"></span></h2>'+
@@ -706,8 +707,8 @@ function vReu(){
        disponibilidad y ya esta». */
     (_sinAgregadoM_(R)
       ? '<div class="tarj"><p class="rnota" style="margin:0;padding:6px 0">Esta reunión es '+
-        '<b>oculta</b>: el mapa de calor lo ve <b>solo quien la convoca</b>'+
-        (R.convocante?' ('+esc(R.convocante)+')':'')+'. Tú cubres tu disponibilidad y ya está.'+
+        '<b>oculta</b>: el mapa solo lo ve <b>quien la convoca</b>'+
+        (R.convocante?' ('+esc(R.convocante)+')':'')+'. Tú solo marcas tu disponibilidad.'+
         '</p></div>'
       : '<div class="tarj">'+
       (hib?'<div class="modos" id="calModo" style="margin-bottom:10px">'+
@@ -781,9 +782,9 @@ function cubrirModal(){
   });
   abrirModal('<div class="mtit">Marca tu disponibilidad</div>'+
     '<div class="msub">'+esc(YO.pila)+' · '+instr+'</div>'+
-    (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">La reunión dura <b>'+_durTxt_(_minS*_slot)+
-      '</b>, así que cada toque marca <b>'+_minS+' casillas seguidas</b> a partir de ahí. '+
-      'Puedes estirar más arrastrando; lo que quede más corto se quita solo.</p>':'')+
+    (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">Dura <b>'+_durTxt_(_minS*_slot)+
+      '</b>: cada toque marca <b>'+_minS+' casillas seguidas</b>. '+
+      'Arrastra para alargar.</p>':'')+
     /* 🗣️ «Y que lo ponga escrito en algún lugar» (14/10). **El mismo texto y la misma clase que
        en Turnos**: dos frases distintas para el mismo gesto en dos pantallas es como se aprende
        que la app es incoherente. Y va **encima** de la rejilla: debajo lo lee quien ya se ha
@@ -996,6 +997,16 @@ function _diasLargos_(modo,d0,d1,fecha,nd){
   return out;
 }
 
+/* El horario que ya habías puesto, conservado por DÍA y no por posición (31/10): al mover el «desde» una semana,
+   la fila 0 deja de ser el mismo día y el lunes heredaba el horario del jueves. `prev` son las filas de antes
+   `{d:'lun 3', off, a, b}` y `ds` las etiquetas nuevas; devuelve, por cada etiqueta nueva, su fila de antes o null.
+   Cada fila vieja se gasta una vez: «mar 3» sale en febrero y en marzo de un año no bisiesto (28 días). */
+function _horarioPrevPorDia_(prev, ds){
+  var usado=[];
+  return ds.map(function(d){
+    for(var i=0;i<prev.length;i++){ if(!usado[i] && prev[i].d===d){ usado[i]=true; return prev[i]; } }
+    return null; }); }
+
 /* ⛔ `_genUnion_` VIVE EN `comun.js` (07/08), que cargan las dos caras. Estaba
    aqui y en la otra cara con el MISMO cuerpo. No se declara aqui: dos globales con
    el mismo nombre y el navegador se queda con la ultima que cargue, sin dar error. */
@@ -1082,6 +1093,7 @@ function crearModal(){
       '<option value="">— empezar en blanco —</option>'+PLANTILLAS_M.map(function(p,i){ return '<option value="'+i+'">'+esc(p.titulo)+'</option>'; }).join('')+'</select></label>' : '';
   abrirModal('<div class="mtit">Nueva '+(coord?'reunión':'reunión de trabajo')+'</div>'+
     '<label class="campo"><span class="sc">Tipo</span><select id="ceTipo">'+op+'</select></label>'+
+    _avisoGrabaHTML_('ceGraba')+
     (coord?'':'<p class="rnota" style="margin:-4px 0 10px">Como miembro convocas <b>reuniones de trabajo</b> e invitas a quien quieras. Las generales, de junta o de subsistema las convoca coordinación.</p>')+
     '<label class="campo"><span class="sc">Modalidad</span><select id="ceMod">'+
       '<option value="hibrida">Híbrida (presencial + telemática)</option>'+
@@ -1149,11 +1161,12 @@ function crearModal(){
   var renderDias=function(){ var ds=_diasLargos_(val('ceModo'), val('ceD0'), val('ceD1'), val('ceFecha')||_dmyAISO_(HOY), Math.max(1,+val('ceND')||1));
     if(!ds.length) ds=dias();
     var prev=$$('#ceDias .drow').map(function(r){
-      return {off:r.classList.contains('off'), a:r.querySelector('.dr0').value, b:r.querySelector('.dr1').value}; });
+      return {d:r.querySelector('span').textContent, off:r.classList.contains('off'), a:r.querySelector('.dr0').value, b:r.querySelector('.dr1').value}; });
+    var prevDe=_horarioPrevPorDia_(prev, ds);
     $('#ceDias').innerHTML=ds.map(function(d,i){
       return '<div class="drow" data-d="'+i+'"><button type="button" class="dtog on" data-p aria-label="activar o desactivar el día"></button>'+
         '<span>'+esc(d)+'</span><select class="dr0">'+optHoras(val('ceH0'))+'</select><select class="dr1">'+optHoras(val('ceH1'))+'</select></div>'; }).join('');
-    $$('#ceDias .drow').forEach(function(r,i){ var p=prev[i];
+    $$('#ceDias .drow').forEach(function(r,i){ var p=prevDe[i];
       if(p){ if(p.off) r.classList.add('off'); r.querySelector('.dr0').value=p.a; r.querySelector('.dr1').value=p.b; }
       var apl=function(){ var off=r.classList.contains('off');
         r.querySelectorAll('select').forEach(function(sl){ sl.disabled=off; });
@@ -1171,9 +1184,9 @@ function crearModal(){
     var nb=u.perDia.reduce(function(a,x){ return a+x.length; },0), nd=dias().length;
     /* Que hay que juntar para que valga, dicho antes de convocar y con la cuenta hecha. */
     var nS=_slotsMin_(du,sl), h=$('#ceSlotHint');
-    if(h) h.innerHTML='Se pintan casillas de <b>'+_durTxt_(sl)+'</b> y hay que juntar '+
+    if(h) h.innerHTML='Cada casilla es de <b>'+_durTxt_(sl)+'</b>; hay que marcar '+
       '<b>'+nS+' seguida'+(nS===1?'':'s')+'</b> ('+_durTxt_(nS*sl)+') para que cuente.'+
-      (du%sl ? ' La duración no es múltiplo del slot, así que se redondea hacia arriba.' : '');
+      (du%sl ? ' Si no encaja, se redondea hacia arriba.' : '');
     /* ⛔⛔ EL RECORTE SE DICE. `nd` es `dias().length`, o sea el número **YA topado** por la
        función del tope: pidiendo 01/01→31/12 esto imprimía «… en **62 días**» y se quedaba
        tan ancho. Y lo silencioso no es la cuenta, es la **contradicción**: el selector
@@ -1204,6 +1217,7 @@ function crearModal(){
     $$('#ceMix .cmixb').forEach(function(b){ b.classList.remove('on'); });
     INV=new Set(_presetInvitados_(t)); invRender(); upd(); };
   $('#ceTipo').onchange=tipoUpd;
+  _avisoGrabaPon_('ceTipo','ceGraba');
   $$('#ceMix .cmixb').forEach(function(b){ b.onclick=function(){ b.classList.toggle('on');
     var u=b.dataset.u, on=b.classList.contains('on');
     _activos_().forEach(function(m){ if(m.unidad===u && m.nombre!==(YO&&YO.nombre)){ if(on) INV.add(m.nombre); else INV.delete(m.nombre); } });
@@ -1367,3 +1381,84 @@ function fijarModal(){
   };
 }
 
+
+
+/* ══ LA ASISTENCIA EN DIRECTO DE LAS GENERALES — la TARJETA del móvil (31/10) ═══════════════════════════════
+   🗣️ Daniel: «Simplemente tienen que abrirla, darle al botón estoy presente […] poner una palabra en el cuadrito». Si una
+   general tuya tiene la asistencia abierta, sale ARRIBA de Estado «Estás en la general: escribe la palabra que se proyecta»;
+   al abrir la app con ella abierta se avisa UNA vez (`marcarVisto`: así se ilumina tu cuadrito en el escenario del PD).
+   El servidor decide si estás convocado y nunca manda la palabra: aquí sólo se teclea. */
+var ASIS_M={est:{}, visto:{}, txt:{}, demo:false};   // est[id] = {titulo, v}
+
+/* De la lista cruda de `listarReuniones`: las que traen `asistencia_abierta`. Las que ya no, se quitan. */
+function _asisDeListaM_(arr){
+  var abiertas={};
+  (arr||[]).forEach(function(r){ if(r && r.id!=null && r.asistencia_abierta && r.tipo==='general') abiertas[r.id]=r; });
+  Object.keys(ASIS_M.est).forEach(function(id){ if(!abiertas[id]) delete ASIS_M.est[id]; });
+  Object.keys(abiertas).forEach(function(id){ _asisChequearM_(abiertas[id]); });
+  if(!Object.keys(abiertas).length) _asisPintarM_();
+}
+
+async function _asisChequearM_(r){
+  var id=r.id;
+  try{
+    var v=await api.getAsistencia(id, false);
+    if(v && v.abierta && v.convocado){
+      ASIS_M.est[id]={titulo:r.titulo||'la reunión general', v:v};
+      if(!ASIS_M.visto[id]){ ASIS_M.visto[id]=true; api.marcarVisto(id).catch(function(){}); }
+    } else delete ASIS_M.est[id];
+  }catch(e){ /* sin red o sin sesión: la tarjeta simplemente no sale */ }
+  _asisPintarM_();
+}
+
+function _asisTarjetaHTML_(id, e){
+  var v=e.v, hecho=v.presente_at;
+  return '<div class="tarj acc" data-asisreu="'+esc(id)+'"><div class="tt"><span class="sc">Asistencia en directo</span></div>'+
+    '<b style="display:block;margin-bottom:6px">Estás en la general: '+(hecho?'ya constas presente':'escribe la palabra que se proyecta')+'</b>'+
+    (hecho
+      ? '<div class="asisOk">✓ Presente ('+esc(_hhmmDe_(hecho))+')</div>'
+      : '<div style="display:flex;gap:8px"><input class="asisIn" data-asispal autocomplete="off" autocapitalize="none" '+
+        'placeholder="la palabra" value="'+esc(ASIS_M.txt[id]||'')+'">'+
+        '<button class="btn pri" data-p data-asisok>Estoy presente</button></div>')+
+    '<div class="rnota" data-asismsg style="margin:6px 0 0;min-height:1em"></div></div>';
+}
+
+/* El HTML de las tarjetas abiertas (o ''). Se cablea tras insertarse, con el truco de `_audioReuHTML_`. */
+function _asisTarjetaM_(){
+  if(_demoLocal_() && !ASIS_M.demo){ ASIS_M.demo=true;
+    _asisDeListaM_([{id:9001, titulo:'Reunión General de octubre', tipo:'general', asistencia_abierta:true}]); }
+  var h=Object.keys(ASIS_M.est).map(function(id){ return _asisTarjetaHTML_(id, ASIS_M.est[id]); }).join('');
+  if(h) setTimeout(_asisCablearM_,0);
+  return h;
+}
+
+function _asisCablearM_(){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-asisreu]'), function(t){
+    var id=t.getAttribute('data-asisreu'), i=t.querySelector('[data-asispal]'), b=t.querySelector('[data-asisok]'),
+        m=t.querySelector('[data-asismsg]');
+    if(!i || !b) return;
+    i.oninput=function(){ ASIS_M.txt[id]=i.value; };
+    var enviar=async function(){
+      if(b.disabled || !i.value.trim()) return;
+      b.disabled=true;
+      try{
+        var r=await api.estoyPresente(isNaN(+id)?id:+id, i.value);
+        ASIS_M.est[id].v.presente_at=(r&&r.presente_at)||new Date().toISOString();
+        _asisPintarM_(); tost('Presente: apuntado.');
+      }catch(e){ if(m) m.textContent=String((e&&e.message)||e).replace(/^Error:\s*/,''); b.disabled=false; }
+    };
+    b.onclick=enviar;
+    i.onkeydown=function(ev){ if(ev.key==='Enter') enviar(); };
+  });
+}
+
+/* Repinta SÓLO las tarjetas (no la vista entera: perdería lo que estás tecleando). Si no había y ahora sí, o al revés, la
+   vista entera, una vez. */
+function _asisPintarM_(){
+  var hay=document.querySelectorAll('[data-asisreu]').length, debe=Object.keys(ASIS_M.est).length;
+  if(hay!==debe){ if(typeof _repintarSuave_==='function') _repintarSuave_(); return; }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-asisreu]'), function(t){
+    var id=t.getAttribute('data-asisreu'), e=ASIS_M.est[id];
+    if(e && e.v.presente_at && !t.querySelector('.asisOk')) t.outerHTML=_asisTarjetaHTML_(id, e);
+  });
+}

@@ -113,6 +113,7 @@ main{z-index:1}
   border:1px solid var(--line);border-radius:9px;padding:0 6px;line-height:15px;min-width:20px;
   text-align:center;flex:none}
 .item .cnt.hot{color:#fff;background:var(--red);border-color:var(--red)}
+.item .pausa{font-size:9.5px;color:var(--ink3);margin-left:auto;padding-left:8px;letter-spacing:.02em}
 .item .cnt.wa{color:#241a08;background:var(--warn);border-color:var(--warn)}
 /* la estrella que viaja, en vertical, con la comba proporcional a la distancia */
 .viajev{position:absolute;left:3px;top:0;width:15px;height:15px;pointer-events:none;z-index:4;
@@ -305,6 +306,31 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .dec .der{display:flex;align-items:center;gap:9px;flex:none}
 .dec .chev{color:var(--ink3);font-family:var(--mono)}
 
+/* ── «LO QUE TE TOCA A TI» (31/10) — filas tipo tarjeta: icono con su tono, título, una línea de detalle y la acción a la
+   derecha. Rojo = caduca o te cuesta una sanción; azul telemático = informativo (la próxima reunión). ─────────────── */
+.tu-g{display:grid;gap:9px}
+.tu-f{display:flex;align-items:center;gap:15px;padding:14px 16px;background:var(--sur2);border:1px solid var(--line);
+  border-radius:var(--r);cursor:pointer;position:relative;transition:border-color .14s linear,background .14s linear,transform .14s var(--sal)}
+.tu-f:hover,.tu-f:focus-visible{border-color:var(--line2);background:#282324;outline:0}
+.tu-f:hover{transform:translateX(2px)}
+.tu-f .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none;
+  color:var(--tel);background:rgba(63,158,214,.12);border:1px solid rgba(63,158,214,.32)}
+.tu-f .ic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8}
+.tu-f.mal .ic{color:var(--red2);background:rgba(228,30,37,.12);border-color:rgba(228,30,37,.38)}
+.tu-f.mal:hover{border-color:rgba(228,30,37,.5)}
+.tu-f .tx{flex:1;min-width:0}
+.tu-f .tx b{display:block;font-size:13.5px;font-weight:600}
+.tu-f .tx small{display:block;font-size:12px;color:var(--ink3);margin-top:3px;line-height:1.5}
+.tu-f .tx small .mono{color:var(--ink2)}
+.tu-f .tu-acc{display:flex;align-items:center;gap:8px;flex:none;font-size:12px;color:var(--ink2);
+  padding:6px 11px 6px 13px;border:1px solid var(--line2);border-radius:20px}
+.tu-f:hover .tu-acc{color:var(--ink);border-color:var(--ink3)}
+.tu-f.mal .tu-acc{color:var(--red2);border-color:rgba(228,30,37,.4)}
+.tu-f .chev{color:var(--ink3);font-family:var(--mono)}
+.tu-nada{display:flex;align-items:center;gap:9px;margin:0 2px 13px;font-size:12.5px;color:var(--ink3)}
+.tu-nada .pt{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.tu-nada+.tu-g{margin:-3px 0 13px}
+
 /* tarjeta de parte de horas */
 .parte{border-top:1px solid var(--line);padding:13px}
 .parte:first-child{border-top:0}
@@ -362,6 +388,15 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .lrow .nm{flex:1;min-width:130px;font-size:12.5px;font-weight:600}
 .lrow .vl{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--red2);min-width:84px;white-space:nowrap;text-align:right}
 .lrow .vl.tach{opacity:.38;text-decoration:line-through}
+.lcorr{font-size:11px;font-weight:600;color:var(--ink3);padding:4px 2px;border-bottom:1px dashed var(--line)}
+.lcorr:hover{color:var(--ink)}
+.lcorrn{display:block;margin-top:3px;font-size:11px;color:var(--ink3);line-height:1.4}
+.lcorrf{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px;margin-top:2px;
+  border:1px solid var(--line);border-radius:var(--r2);background:rgba(127,127,127,.05)}
+.lcorrf input{background:var(--bg);border:1px solid var(--line);border-radius:var(--r2);color:var(--ink);padding:6px 9px;font-size:12px}
+.lcorrf input[type=number]{width:70px;font-family:var(--mono)}
+.lcorrf input[type=text]{flex:1;min-width:180px}
+.lcorrf .err{flex-basis:100%;font-size:11px;color:var(--red2)}
 .decs{display:inline-flex;border:1px solid var(--line);border-radius:var(--r2);overflow:hidden}
 .decs button{border-right:1px solid var(--line);padding:5px 10px;font-size:11px;font-weight:600;color:var(--ink3);white-space:nowrap}
 .decs button:last-child{border-right:0}
@@ -640,3 +675,238 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
   transition:transform .18s ease}
 .novsec[open]>summary::after{transform:rotate(-90deg)}
 .novsec .mdoc,.novsec>p,.novsec>ul{margin-top:8px}
+
+/* ═══ LO TUYO · partes que no cuentan, desglose por categoría, histórico y ritmo (31/10) ═══════════════
+   Componentes propios: nada de `<ul>`/`<table>` sin estilo. El plegable lleva la flecha de la app (como `.novsec`). */
+.ltfila .tx small{overflow-wrap:anywhere}
+.ltfila .der{gap:12px}
+.ltfila .der .mono{font-size:12.5px;color:var(--ink2)}
+.ltmot{display:block;margin-top:7px;padding:6px 10px;border-left:2px solid var(--red3);background:rgba(228,30,37,.05);
+  border-radius:0 var(--r2) var(--r2) 0;font-size:12px;color:var(--ink2);line-height:1.5;white-space:normal}
+.ltmot .sc{display:block;margin-bottom:4px;color:var(--red2)}
+.ltplg{border-top:1px solid var(--line)}
+.ltplg>summary{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;list-style:none;font-size:12.5px}
+.ltplg>summary::-webkit-details-marker{display:none}
+.ltplg>summary:hover{background:rgba(255,255,255,.03)}
+.ltplg>summary .sc{margin-left:auto}
+.ltplg>summary::after{content:'\203a';color:var(--ink3);font-size:15px;flex:none;transition:transform .18s ease}
+.ltplg[open]>summary::after{transform:rotate(90deg)}
+.ltmes{display:flex;align-items:center;gap:10px;padding:9px 13px;background:rgba(255,255,255,.03);
+  border-top:1px solid var(--line)}
+.ltmes b{font-size:12.5px;text-transform:capitalize}
+.ltmes .ln{flex:1;height:1px;background:var(--line)}
+.ltmes .mono{font-size:12.5px}
+.ltsep{display:flex;align-items:center;gap:10px;padding:9px 13px;font-family:var(--mono);font-size:9px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);border-top:1px solid var(--line)}
+.ltsep::before,.ltsep::after{content:'';flex:1;height:1px;background:var(--line2)}
+.ltcat{padding:13px;border-top:1px solid var(--line)}
+.ltcat>.sc{margin-bottom:10px}
+.ltcat .fila{display:grid;grid-template-columns:132px 1fr 64px;align-items:center;gap:12px;padding:4px 0}
+.ltcat .k{font-size:12px;color:var(--ink2)}
+.ltcat .v{text-align:right;font-size:12.5px}
+.ltcat .tr{height:6px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden}
+.ltcat .tr i{display:block;height:100%;border-radius:3px;background:var(--cc,linear-gradient(90deg,var(--red3),var(--red2)))}
+.ltrit{padding:6px 13px 2px}
+.ltdl{display:grid;grid-template-columns:132px 1fr 190px;align-items:center;gap:12px;padding:8px 0}
+.ltdl .k{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+.ltdl .tr{position:relative;height:8px;border-radius:4px;background:rgba(255,255,255,.05)}
+.ltdl .tr .z{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--line2)}
+.ltdl .tr b{position:absolute;top:0;bottom:0;border-radius:4px}
+.ltdl.pos .tr b{background:var(--ok)}
+.ltdl.neg .tr b{background:var(--warn)}
+.ltdl .vv{display:flex;flex-direction:column;gap:2px}
+.ltdl .vv b{font-family:var(--mono);font-size:13px}
+.ltdl.pos .vv b{color:var(--ok)}
+.ltdl.neg .vv b{color:var(--warn)}
+.ltdl .vv small{font-size:11px;color:var(--ink3)}
+/* ═══ LA FICHA DEL TURNO (31/10, paridad A3) ═══════════════════════════════════════
+   Reparto, coches, objetivos, nota y memoria bajo la tabla de «Turnos convocados». Componentes propios:
+   nada de listas por defecto. */
+tr.tur-fila{cursor:pointer}
+tr.tur-fila:focus-visible{outline:1px solid var(--red2);outline-offset:-1px}
+tr.tur-sel{background:rgba(228,30,37,.07)}
+tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
+.ftu .ftu-cab{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;margin-bottom:13px}
+.ftu .ftu-cab b{font-size:15px;letter-spacing:.01em}
+.ftu .ftu-cab .mono{color:var(--ink3);font-size:11px}
+.ftu .ftu-rej{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:12px;margin-bottom:12px}
+.ftu .ftu-sec{background:#0A0909;border:1px solid var(--line);border-radius:var(--r2);padding:11px 12px}
+.ftu .ftu-sec+.ftu-sec{margin-top:12px}
+.ftu .ftu-rej .ftu-sec+.ftu-sec{margin-top:0}
+.ftu .ftu-sec h5{margin:0 0 9px;font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink3);font-weight:400}
+.ftu .ftu-sub{margin:10px 0 5px;font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--warn)}
+.ftu .ftu-pers{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid rgba(50,44,46,.6);flex-wrap:wrap}
+.ftu .ftu-pers:last-child{border-bottom:0}
+.ftu .ftu-pers .av{width:23px;height:23px;border-radius:6px;background:var(--sur2);border:1px solid var(--line);
+  display:grid;place-items:center;font-family:var(--mono);font-size:9px;color:var(--ink2);flex:none}
+.ftu .ftu-pers.yo .av{border-color:var(--red2);color:var(--red2)}
+.ftu .ftu-pers b{font-size:12.5px;font-weight:500}
+.ftu .ftu-roles{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
+.ftu .ftu-coche{display:flex;flex-direction:column;gap:3px;padding:7px 0;border-bottom:1px solid rgba(50,44,46,.6);font-size:11.5px;color:var(--ink2)}
+.ftu .ftu-coche:last-child{border-bottom:0}
+.ftu .ftu-coche b{color:var(--ink);font-size:12.5px;font-weight:500}
+.ftu .ftu-van{color:var(--ink3)}
+.ftu .ftu-obj{position:relative;padding:5px 0 5px 15px;font-size:12.5px;line-height:1.5}
+.ftu .ftu-obj::before{content:"";position:absolute;left:2px;top:12px;width:5px;height:5px;border-radius:50%;background:var(--red2)}
+.ftu .ftu-nota{font-size:12.5px;line-height:1.6;color:var(--ink2);border-left:2px solid var(--red2);padding-left:11px}
+.ftu .ftu-vac{font-size:11.5px;color:var(--ink3);font-style:italic}
+
+/* ═══ EN DIRECTO (31/10) ═══ `directo.escritorio.js`. El mapa: el mini PC en el centro y las piezas alrededor; cada
+   evento es un pulso por su línea. Los colores de pieza llegan por `--c` desde el JS (una sola tabla, `_directoPiezas_`).
+   Con «reducir movimiento» no viaja nada ni late nada: sólo cambian los números. */
+.dir{display:flex;flex-direction:column;gap:14px}
+.dir-cab{display:flex;align-items:center;gap:26px;padding:2px 2px 0}
+.dir-vivo{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink2);margin-right:auto}
+.dir-vivo i{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 0 rgba(228,30,37,.6);
+  animation:dirRespira 2.2s var(--sal) infinite}
+.dir-vivo.maqueta i{background:var(--tel);animation:none}
+.dir-vivo.caido i{background:var(--ink3);animation:none}
+@keyframes dirRespira{0%{box-shadow:0 0 0 0 rgba(228,30,37,.55)}70%{box-shadow:0 0 0 9px rgba(228,30,37,0)}100%{box-shadow:0 0 0 0 rgba(228,30,37,0)}}
+.dir-cifra{display:flex;align-items:baseline;gap:7px}
+.dir-cifra b{font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+.dir-cifra small{font-size:11.5px;color:var(--ink3)}
+.dir-mapa{background:radial-gradient(circle at 50% 50%,rgba(228,30,37,.08),transparent 34%),var(--sur);
+  border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+.dir-svg{display:block;width:100%;height:auto;max-height:46vh}
+.dir-ln{fill:none;stroke:var(--line2);stroke-width:1.5;stroke-dasharray:2 7;stroke-linecap:round;
+  transition:stroke .5s var(--sal),opacity .5s var(--sal);opacity:.8}
+.dir-ln.activa{stroke:var(--c);opacity:.55;stroke-dasharray:none}
+.dir-pulso{filter:drop-shadow(0 0 5px currentColor)}
+.dir-pulso-cola{opacity:.22}
+.dir-nodo .dir-anillo{fill:var(--sur2);stroke:var(--c);stroke-width:1.5}
+.dir-nodo .dir-onda,.dir-centro .dir-onda{fill:none;stroke:var(--c,var(--red));stroke-width:2;opacity:0;transform-box:fill-box;transform-origin:center}
+.dir-centro{--c:var(--red)}
+.dir-centro .dir-halo{fill:rgba(228,30,37,.06);stroke:rgba(228,30,37,.18);stroke-width:1}
+.dir-centro .dir-nucleo{fill:var(--gris);stroke:var(--red);stroke-width:2}
+.dir-n{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:17px;font-weight:600;fill:var(--ink)}
+.dir-et{font-size:13px;font-weight:600;fill:var(--ink2);letter-spacing:.01em}
+.dir-et0{font-size:10px;letter-spacing:.14em;text-transform:uppercase;fill:var(--ink3)}
+.late .dir-onda{animation:dirOnda .7s var(--sal)}
+.late .dir-anillo,.late .dir-nucleo{animation:dirLate .45s var(--arco)}
+.dir-nodo .dir-anillo,.dir-centro .dir-nucleo{transform-box:fill-box;transform-origin:center}
+@keyframes dirOnda{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.9)}}
+@keyframes dirLate{0%{transform:scale(1)}40%{transform:scale(1.12)}100%{transform:scale(1)}}
+.dir-aviso{background:rgba(228,30,37,.08);border:1px solid rgba(228,30,37,.35);border-radius:var(--r2);padding:10px 13px;
+  font-size:12.5px;color:var(--ink)}
+.dir-reg{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);max-height:34vh;overflow:auto;
+  -webkit-mask-image:linear-gradient(#000 78%,transparent);mask-image:linear-gradient(#000 78%,transparent)}
+.dir-reg:empty::before{content:"Esperando al primer evento";display:block;padding:16px 14px;color:var(--ink3);font-size:12.5px}
+.dir-fila{display:grid;grid-template-columns:76px 118px 1fr;align-items:center;gap:12px;padding:8px 14px;
+  border-bottom:1px solid var(--line);font-size:12.5px;position:relative}
+.dir-fila::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--c);opacity:0}
+.dir-fila.nueva{animation:dirEntra .5s var(--sal)}
+.dir-fila.nueva::before{animation:dirMarca 2.4s var(--sal)}
+@keyframes dirEntra{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes dirMarca{0%{opacity:1}100%{opacity:0}}
+.dir-t{color:var(--ink3);font-size:11.5px}
+.dir-pz{display:inline-flex;align-items:center;gap:7px;color:var(--ink2);font-size:11.5px}
+.dir-pz i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.dir-tx{color:var(--ink2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dir-tx b{color:var(--ink);font-weight:600;margin-right:7px}
+.dir-tipo{display:inline-block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);
+  border:1px solid var(--line2);border-radius:5px;padding:0 5px;margin-right:8px;line-height:16px}
+.dir-fila.mal .dir-tipo{color:var(--red2);border-color:rgba(228,30,37,.5)}
+/* «Todo» (31/10): pestañas Mapa · Todo y el registro monoespaciado, un color por tipo (`--c` desde el JS). */
+.dir-tabs{display:flex;gap:8px}
+.dir-tab{font:inherit;font-size:12.5px;font-weight:600;letter-spacing:.02em;color:var(--ink2);background:var(--sur);
+  border:1px solid var(--line2);border-radius:999px;padding:6px 16px;cursor:pointer}
+.dir-tab.on{color:var(--ink);border-color:var(--red);background:rgba(228,30,37,.1)}
+.dir-tab:focus-visible{outline:2px solid var(--red2);outline-offset:2px}
+.dir[data-dv="todo"] .dir-vmapa,.dir:not([data-dv="todo"]) .dir-vtodo{display:none}
+.dir-vmapa,.dir-vtodo{display:flex;flex-direction:column;gap:14px}
+.dtd-ct{display:flex;gap:30px;flex-wrap:wrap;padding:2px 2px 0}
+.dir-cifra.mal b{color:var(--red2)}
+.dtd-tim{display:flex;gap:8px;flex-wrap:wrap}
+.dtd-t{display:inline-flex;flex-direction:column;gap:1px;background:var(--sur);border:1px solid var(--line);
+  border-radius:var(--r2);padding:6px 11px;min-width:118px}
+.dtd-t b{font-size:12px;color:var(--ink);font-weight:600}
+.dtd-t small{font-size:11px;color:var(--ink3)}
+.dtd-t.vivo{border-color:rgba(63,158,214,.5)}
+.dtd-t.mal{border-color:rgba(228,30,37,.55)}.dtd-t.mal small{color:var(--red2)}
+.dtd-nota{font-size:11.5px;color:var(--ink3)}
+.dtd-reg{max-height:52vh}
+.dtd-fila{display:grid;grid-template-columns:76px 112px 1fr auto;align-items:center;gap:12px;padding:6px 14px;
+  border-bottom:1px solid var(--line);font-size:12px;position:relative}
+.dtd-fila.nueva{animation:dirEntra .4s var(--sal)}
+.dtd-k{display:inline-flex;align-items:center;gap:7px;color:var(--c);font-size:11px;letter-spacing:.04em}
+.dtd-k i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.dtd-tx{color:var(--ink2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dtd-fila.mal .dtd-tx{color:var(--red2)}
+.dtd-auto{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line2);
+  border-radius:5px;padding:0 5px;line-height:15px}
+@media (prefers-reduced-motion: reduce){
+  .dir-vivo i,.late .dir-onda,.late .dir-anillo,.late .dir-nucleo,.dir-fila.nueva,.dir-fila.nueva::before,.dtd-fila.nueva{animation:none}
+  .dir-ln{transition:none}
+}
+
+/* ── LA ASISTENCIA EN DIRECTO DE LAS GENERALES (31/10): el escenario a pantalla completa ── */
+.asisEsc{position:fixed;inset:0;z-index:95;background:#0A0909;display:flex;flex-direction:column;padding:22px 30px 26px;overflow:auto}
+.asisTop{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:6px}
+.asisTit{font-size:18px;color:var(--ink2);letter-spacing:.02em}
+.asisCuerpo{flex:1;display:flex;flex-direction:column;min-height:0}
+.asisPal{font-family:var(--mono);font-size:min(14vw,150px);font-weight:700;line-height:1.05;text-align:center;color:#fff;
+  letter-spacing:.06em;padding:10px 0 4px;text-shadow:0 0 38px rgba(228,30,37,.55)}
+.asisCont{text-align:center;font-size:20px;color:var(--ink2);margin:2px 0 18px}
+.asisCont b{color:var(--ok);font-size:30px}
+.asisGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;align-content:start;flex:1}
+.asisC{border:1px solid var(--line);background:var(--sur);border-radius:var(--r);padding:11px 12px;min-height:64px;
+  display:flex;flex-direction:column;justify-content:space-between;gap:4px;color:var(--ink3);transition:background .4s,border-color .4s}
+.asisC b{font-weight:600;font-size:13.5px;color:var(--ink2)}
+.asisC span{font-family:var(--mono);font-size:11px;min-height:1em}
+.asisC.vis{border-color:var(--warn);background:rgba(232,145,46,.13);color:var(--warn)}
+.asisC.ok{border-color:var(--ok);background:rgba(62,180,137,.2);color:var(--ok)}
+.asisC.ok b{color:#fff}
+.asisC.nuevo{animation:asisPop .7s var(--arco)}
+@keyframes asisPop{0%{transform:scale(.8);box-shadow:0 0 0 0 rgba(62,180,137,.8)}55%{transform:scale(1.07)}
+  100%{transform:scale(1);box-shadow:0 0 0 18px rgba(62,180,137,0)}}
+.asisPie{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}
+.asisLista{grid-column:1/-1;font-family:var(--mono);font-size:15px;line-height:1.7;color:var(--ink);white-space:pre-wrap;margin:0}
+@media (prefers-reduced-motion: reduce){.asisC.nuevo{animation:none}.asisC{transition:none}}
+
+/* 31/10 · «Nueva tarea»: unidad, responsables, plazo y urgencia como chips (`.pick`), calendario propio y el editor del
+   cuerpo con su vista previa «así se verá en Notion» (`.nb-*`, pintada por `_bloquesAHTML_`). Sin controles nativos. */
+.nt-fila{display:flex;gap:7px;flex-wrap:wrap}
+.nt-gente{max-height:150px;overflow:auto;padding:2px}
+.nt-p{display:inline-flex;align-items:center;gap:7px;padding-left:5px}
+.nt-p .av{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:9px;background:var(--bg);border:1px solid var(--line);color:var(--ink2)}
+.nt-p.on::before{content:none}
+.nt-p.on .av{background:var(--red);border-color:var(--red);color:#fff}
+.nt-bus{margin-bottom:7px}
+.nt-cal{border:1px solid var(--line);border-radius:var(--r2);background:#0A0909;padding:10px;width:256px}
+.nt-calh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;text-transform:capitalize;font-size:12.5px}
+.nt-calg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.nt-dw{font-family:var(--mono);font-size:10px;color:var(--ink3);padding:2px 0}
+.nt-d{cursor:pointer;font-family:var(--mono);font-size:11.5px;padding:6px 0;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--ink2)}
+.nt-d:hover{border-color:var(--ink3);color:var(--ink)}
+.nt-d.hoy{border-color:var(--line2)}
+.nt-d.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.28)}
+.nt-barra{display:flex;gap:6px;flex-wrap:wrap}
+.nt-ia{margin-left:auto;border-color:var(--red)}
+.nt-ia:disabled{border-color:var(--line)}
+.nt-ed{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+.nt-ed textarea{min-height:200px;font-family:var(--mono);font-size:12.5px}
+.nt-vp{border:1px solid var(--line);border-radius:var(--r2);padding:10px 12px;min-height:200px;background:var(--sur2)}
+.nt-prev{margin-top:8px;font-size:13px;line-height:1.5;color:var(--ink)}
+.nb-h{font-weight:700;margin:10px 0 4px}
+.nb-heading_1{font-size:19px}.nb-heading_2{font-size:16px}.nb-heading_3{font-size:14px}
+.nb-p{margin:3px 0}
+.nb-li{display:flex;gap:8px;margin:2px 0}.nb-m{color:var(--ink3);min-width:14px}
+.nb-cb{width:13px;height:13px;margin-top:3px;border:1.5px solid var(--ink3);border-radius:3px;flex:none}
+.nb-cb.on{background:var(--red);border-color:var(--red)}
+.nb-t{border-collapse:collapse;margin:6px 0;width:100%}
+.nb-t th,.nb-t td{border:1px solid var(--line);padding:5px 8px;text-align:left;font-size:12.5px}
+.nb-t th{background:rgba(255,255,255,.04);font-weight:700}
+
+/* 31/10 · Tareas: UNA lista con chips de filtro por unidad. Columnas de ANCHO FIJO (`table-layout:fixed`): sea cual sea
+   el filtro, las mismas columnas miden lo mismo; la de la tarea se lleva lo que sobra. */
+.tfil{align-items:center}
+.tfil .pick b{color:var(--ink);margin-left:3px}
+.tfil .tdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.tarl table{table-layout:fixed;min-width:900px}
+.tarl th,.tarl td{overflow:hidden;text-overflow:ellipsis}
+.tarl th:nth-child(2){width:172px}.tarl th:nth-child(3){width:150px}.tarl th:nth-child(4){width:92px}
+.tarl th:nth-child(5){width:130px}.tarl th:nth-child(6){width:104px}.tarl th:nth-child(7){width:170px}
+.tarl td:first-child{white-space:normal;overflow-wrap:anywhere}
+.chip.tuni{white-space:nowrap}

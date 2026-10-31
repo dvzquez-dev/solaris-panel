@@ -68,7 +68,7 @@ function _rolDe_(nombre){
 
 function colaDecision(){
   var out=[];
-  pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).forEach(function(p){
+  porAprobar().forEach(function(p){
     out.push({ic:'i-reloj',b:h1(p.horas)+' de '+_m(p.autor).pila,
       /* Mismo vocabulario que las otras dos pantallas: `bloque` ya no existe. */
       s:esc(p.tarea)+' · '+p.fecha+(_etiOrigenParte_(p)?' · '+_etiOrigenParte_(p).txt:''),
@@ -123,6 +123,109 @@ function colaDecision(){
       chip:'<span class="chip">reunión</span>',ir:'dispo',foco:'reu-'+r.id});
   });
   return out;
+}
+
+/* ⛔ 31/10 — «LO QUE TE TOCA A TI» EN EL PANEL DE MANDO. «Requiere tu decisión» (`colaDecision`) es de GOBIERNO: partes
+   ajenos, expedientes, sanciones. Lo que te toca a TI como miembro —cubrir una reunión (de no cubrir a tiempo salen
+   sanciones), declarar tus fichajes (caducan), contestar la semana de turnos— vivía sólo en el móvil. La redacción es
+   `_tuyoItems_` (`comun.js`), la misma del móvil; aquí van las CUENTAS de este modelo de datos (REUS, PART_BACK, DOCS,
+   CONVOCATORIAS) y la tarjeta.
+   ⚠️ Las firmas y las revisiones pendientes NO se repiten aquí: ya salen justo debajo, en «Requiere tu decisión». */
+
+/* Las reuniones que TE falta cubrir (o cubiertas por debajo del mínimo), por lo que CADUCA ANTES. Con el plazo abierto,
+   sin fijar, convocado a ella y sin ser quien la convoca (organiza, no cubre). Sin las filas leídas aún (`_hidratarReus_`)
+   y con respuestas en el servidor no se sabe si has cubierto: no se avisa de lo que no se sabe (§3c-24). */
+function _tuyoReusE_(){
+  var yo=_fichaYo_(); if(!yo) return [];
+  return (REUS||[]).filter(function(r){
+    if(!r || r.fijada || r.convocante===yo || !_puedoCubrir_(r)) return false;
+    if(!_plazoAbierto_(String(r.limite==null?'':r.limite))) return false;
+    if(Array.isArray(r.invitados_tarde) && r.invitados_tarde.indexOf(yo)>=0) return false;   // convocado con el plazo vencido: el motor no le sanciona
+    var fila=r.resp && r.resp[yo];
+    if(!Array.isArray(fila)) return !(!Object.keys(r.resp||{}).length && _nRespReu_(r)>0);
+    var c=0; fila.forEach(function(x){ if((+x||0)>0) c++; });
+    return c<_minimoExigido_(r);
+  }).sort(function(a,b){
+    function ms(r){ var t=Date.parse(_dmyAISO_(String(r.limite==null?'':r.limite)).slice(0,10)); return isNaN(t)?Infinity:t; }
+    return ms(a)-ms(b);
+  });
+}
+
+/* ¿Hay una semana de turnos ABIERTA a la que estás convocado y no has contestado? (`_miTurnoCv_` ya filtra por ti.) */
+function _tuyoConvE_(){
+  var cv=_miTurnoCv_(); if(!cv || _convEstado_(cv)!=='abierta') return false;
+  var r=cv.resp && cv.resp[_fichaYo_()];
+  return !(r && typeof r==='object' && Object.keys(r).length);
+}
+
+function _tuyoItemsE_(){
+  var mios=(typeof _bloqMios_==='function') ? _bloqMios_() : [], yo=_fichaYo_();
+  var reus=_tuyoReusE_();
+  return _tuyoItems_({
+    sindecl:mios.filter(function(p){ return p.estado==='sin_declarar'; }).length,
+    det:mios.filter(function(p){ return p.estado==='detalle'; }).length,
+    cambios:DOCS.filter(function(d){ return d.est==='cambios' && d.autor===yo; }).map(function(d){ return d.ref; }),
+    reus:{lista:reus.map(function(r){ return {id:r.id, titulo:r.tit||r.titulo, bajoMin:Array.isArray(r.resp&&r.resp[yo])}; }),
+          plazo:reus.length ? _plazoTxt_(reus[0].limite) : ''},
+    conv:_tuyoConvE_()});
+}
+
+/* La próxima reunión a la que estás convocado (o que organizas): la más cercana que no ha pasado. Los `dias` llegan como
+   «DD/MM» (o «L 27» en la maqueta: sin mes no se puede ordenar y se salta). */
+function _proxReuE_(){
+  var yo=_fichaYo_(), base=_hoyDateM_().getTime(), mejor=null;
+  function msDe(d){
+    var m=/(\d{1,2})\s*\/\s*(\d{1,2})/.exec(String(d||'')); if(!m) return null;
+    var h=_hoyDateM_(), t=new Date(h.getFullYear(), (+m[2])-1, +m[1]).getTime();
+    return t < base-182*86400000 ? new Date(h.getFullYear()+1, (+m[2])-1, +m[1]).getTime() : t;
+  }
+  (REUS||[]).forEach(function(r){
+    if(!r || !(r.convocante===yo || _puedoCubrir_(r))) return;
+    var dias=r.dias||[], t=null;
+    if(r.fijada && (r.fijadaBl||[]).length) t=msDe(dias[r.fijadaBl[0][0]]);
+    if(t==null){
+      var ts=dias.map(msDe).filter(function(x){ return x!=null && x>=base; });
+      t=ts.length ? Math.min.apply(null,ts) : null;
+    }
+    if(t==null || t<base) return;
+    if(!mejor || t<mejor.t || (t===mejor.t && r.fijada && !mejor.r.fijada)) mejor={r:r, t:t};
+  });
+  return mejor && mejor.r;
+}
+
+/* Cómo se pinta cada aviso en el escritorio: a qué pantalla lleva, con qué icono, y el verbo de la derecha. */
+var _TUYO_E_={
+  sindecl:{ir:'sindeclarar', ic:'i-reloj', acc:'Declarar'},
+  det:    {ir:'libros',      ic:'i-reloj', acc:'Dar detalle'},
+  cambios:{ir:'docurso',     ic:'i-doc',   acc:'Corregir'},
+  reu:    {ir:'dispo',       ic:'i-cal',   acc:'Cubrir'},
+  conv:   {ir:'turnos',      ic:'i-cal',   acc:'Contestar'}
+};
+
+function _tuyoFilaE_(ic, tono, tit, txt, acc, ir, foco){
+  return '<div class="tu-f '+tono+'" data-ir="'+ir+'" data-foco="'+(foco||'')+'" tabindex="0">'+
+    '<span class="ic"><svg><use href="#'+ic+'"/></svg></span>'+
+    '<span class="tx"><b>'+tit+'</b><small>'+txt+'</small></span>'+
+    '<span class="tu-acc">'+acc+'<span class="chev">›</span></span></div>';
+}
+
+function _tuyoHTMLE_(){
+  var its=_tuyoItemsE_(), R=_proxReuE_(), yo=_fichaYo_();
+  var filas=its.map(function(it){
+    var m=_TUYO_E_[it.tipo];
+    return _tuyoFilaE_(m.ic, it.mal?'mal':'', it.tit, it.txt, m.acc, m.ir, it.tipo==='reu'?('reu-'+it.reuid):'');
+  });
+  if(R){
+    var pend=_tuyoReusE_().indexOf(R)>=0;
+    filas.push(_tuyoFilaE_('i-cal','prox','Próxima reunión · '+esc(R.tit||R.titulo),
+      (R.fijada ? esc(R.fijada) : ('sin fecha fija · '+esc(_plazoTxt_(R.limite))))+' · '+esc(_modalidadTxt_(R.modalidad||R.mod).toUpperCase())+
+        (R.fijada ? '' : (R.convocante===yo ? ' · la organizas tú' : (pend ? ' · te falta cubrirla' : ' · ya la cubriste'))),
+      'Ver', 'dispo', 'reu-'+R.id));
+  }
+  if(!its.length) return '<div class="tu-nada"><span class="pt"></span>Nada pendiente por tu parte</div>'+
+    (filas.length ? '<div class="tu-g">'+filas.join('')+'</div>' : '');
+  return pan('Lo que te toca a ti', its.length+(its.length===1?' asunto':' asuntos'),
+    '<div class="pb"><div class="tu-g">'+filas.join('')+'</div></div>');
 }
 
 /* lecturas automáticas: lo que un humano no ve de un vistazo en una tabla */
@@ -217,7 +320,7 @@ function insightsHTML(){
 }
 
 function conteo(k){
-  if(k==='partes') return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);}).length;
+  if(k==='partes') return porAprobar().length;
   if(k==='sindeclarar') return PARTES.filter(function(p){return p.estado==='sindecl';}).length;
   /* ⛔ 21/10 (auditor 8, 🟡 13): TUS partes DEVUELTOS (`detalle`), que «Lo tuyo» enseña y que bloquean el cierre del mes.
      Daba 0: un coordinador con un parte suyo devuelto no veía ningún número. Los `sin_declarar` van en «Sin declarar». */
@@ -240,9 +343,12 @@ function conteo(k){
   if(k==='sanciones') return Array.isArray(SANC_BACK)
     ? SANC_BACK.filter(function(s){ return s && s.estado==='pendiente'; }).length
     : (LOTE.cerrado?0:LOTE.items.length);
-  if(k==='apela')  return 0;        // no hay cola de apelaciones: contar la maqueta era mentir
+  if(k==='apela')  return _apelPendientesTuyas_().length;   // 31/10: las abiertas que TÚ puedes resolver (no las del consejo entero)
   if(k==='convoc') return _nReusAbiertas_();   // 21/10 (auditor 10, 🟡 11): las abiertas, no todas
-  if(k==='turnos') return TURNOS.length;
+  /* 31/10: LO TUYO, como el móvil (antes: `TURNOS.length`, el total de turnos del equipo, que no le pide nada a nadie).
+     `dispo` = las reuniones que te falta cubrir; `turnos` = 1 si hay una semana abierta sin contestar. */
+  if(k==='turnos') return _tuyoConvE_() ? 1 : 0;
+  if(k==='dispo')  return _tuyoReusE_().length;
   if(k==='tareas') return TAREAS.filter(function(t){ return !_tareaHecha_(t&&t.e); }).length;   // 20/10: las vivas, como la pantalla
   if(k==='miembros') return _activos_().length;   // 21/10 (auditor 10, 🟡 9): las bajas no son el equipo
   if(k==='reclutar') return 0;      // idem: no hay candidaturas en ningun sistema
@@ -261,6 +367,13 @@ function enfocar(id){
   },80);
 }
 
+/* Los coordinadores a quienes el PD puede «mirar como» (31/10): rango 1 de `rangoNom` —quien tiene gente bajo su jurisdicción,
+   con el cargo o SIN él: Bruno y Marta coordinan desde el 26/10 sin llevar `cargo:'Coordinador'`—, no el rótulo. Son 3 como
+   mucho: el conmutador es una fila de botones en la barra y no envuelve; el recorte va por orden del roster. */
+function _coordsActuar_(){
+  return DATA.miembros.filter(function(x){ return x.nombre!==PD_NOM && x.nombre!==REV2_NOM && rangoNom(x.nombre)===1; }).slice(0,3);
+}
+
 function _pintarActua_(){
   var caja=$('#actua'); if(!caja) return;
   var m=miembro(ACTOR);
@@ -272,8 +385,7 @@ function _pintarActua_(){
   var opts=[];
   if(miembro(PD_NOM)) opts.push([PD_NOM,'Project Director']);
   if(miembro(REV2_NOM)) opts.push([REV2_NOM,'Revisor fijo']);
-  DATA.miembros.filter(function(x){ return x.cargo==='Coordinador' && x.nombre!==PD_NOM && x.nombre!==REV2_NOM; })
-    .slice(0,3).forEach(function(x){ opts.push([x.nombre, x.pila||x.nombre.split(' ')[0]]); });
+  _coordsActuar_().forEach(function(x){ opts.push([x.nombre, x.pila||x.nombre.split(' ')[0]]); });
   if(!opts.length) opts=[[ACTOR,'Yo']];
   $$('#actua button',caja).forEach(function(b){ b.remove(); });
   opts.forEach(function(o){

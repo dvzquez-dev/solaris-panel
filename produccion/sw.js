@@ -227,7 +227,11 @@ self.addEventListener('push', (event) => {
     renotify: !!d.tag,
     data: { url: _urlAviso_(d.ir || d.url) },   // 22/10 (auditor 26, 🔴 1): el destino corto viaja en `ir`
   };
-  event.waitUntil(self.registration.showNotification(title, opts));
+  /* 31/10: a las ventanas ABIERTAS y a la vista se les dice que ha llegado un aviso, para que suene si tienen los sonidos. */
+  const avisarVentanas = self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cls) => {
+    cls.forEach((c) => { if (c.visibilityState === 'visible') { try { c.postMessage({ tipo: 'aviso' }); } catch (_) {} } });
+  }).catch(() => {});
+  event.waitUntil(Promise.all([self.registration.showNotification(title, opts), avisarVentanas]));
 });
 
 // Tap en la notificación: enfoca una ventana ya abierta del app, o abre una nueva.

@@ -11,7 +11,7 @@
    fusionarlas es otro cambio, con otro riesgo y su propia verificación.
    ═══════════════════════════════════════════════════════════════════════════════════════ */
 
-/* El backend sirve el turno con SU forma (fecha ISO, roles:[{rol,miembro}], duracion, momento,
+/* El backend sirve el turno con SU forma (fecha ISO, roles:[{rol,miembro}], duracion,
    punto, crucial, nota, principales, secundarios). La pantalla espera {id,f,hora,punto,dur,mio,
    roles:[[nombre,rol]],pasado}. Sin este adaptador se volcaba el objeto crudo y la pantalla salía
    vacía. Aquí se traduce y se conserva TODO lo que da el backend (objetivos, nota, memoria). */
@@ -29,7 +29,7 @@ function _normTurnoM_(t, ix){
   var yo=(YO&&YO.nombre)||'', mio=null;
   (t.roles||[]).forEach(function(r){ if(!Array.isArray(r) && (r.miembro===yo)) mio=r.rol||'te toca'; });
   var hoyISO=_dmyAISO_(HOY);
-  var dur=t.duracion || (t.momento==='tarde'?'tarde':(t.momento==='mañana'?'mañana':'—'));
+  var dur=t.duracion || '—';   /* 31/10: el rótulo tarde/mañana no lo sirve `_turnoDeNotion_` (era del espejo, `flujos/turno.py`) */
   /* `hecho` manda sobre la fecha: lo que decide si un turno sale suelto o al cajon es
      su ESTADO en Notion, no que la fecha haya pasado (un turno de ayer sin cerrar sigue vivo). */
   var est=t.estado||'';
@@ -47,16 +47,8 @@ function _normTurnoM_(t, ix){
    lo que sigue vivo va suelto y visible; lo cerrado, al cajon. */
 function _mioTurno_(t){ return !!(t.mio || (t.roles||[]).some(function(r){ return r[2]; })); }
 
-/* La memoria va PLEGADA: la mayoria de las veces se abre la ficha para ver quien va y a
-   que hora, no para leer el informe. */
-function _memoriaHTML_(t){
-  return _visorHTML_({id:_idDrive_(t.memoria), url:t.memoria, titulo:'Memoria de fabricación',
-    sub:t.f, queEs:'la memoria', plegado:true});
-}
-
-/* Se conserva el nombre porque lo llaman las fichas de turno; por dentro ya es el visor
-   unico. Un alias es mas honesto que dejar la copia viva «por si acaso». */
-function _cablearMemoria_(){ _cablearVisor_(); }
+/* ⚠️ `_memoriaHTML_` y `_cablearMemoria_` SE MUDARON A `comun.js` (31/10): la ficha del turno del escritorio
+   también incrusta la memoria. */
 
 /* ═══ CUBRIR DISPONIBILIDAD PARA TURNOS ═════════════════════════════════════════════
    La mitad de miembro: ver qué semana se pregunta, cuánto queda de plazo y marcar.
@@ -180,11 +172,13 @@ function _convCelHTML_(cv, dia, franja){
    Se dice a todo el mundo (para que nadie lo busque en balde) y a quien puede convocar se le
    añade **dónde** se hace: convocar vive en el escritorio, no aquí.
 
-   ⚠️ Rango ≥ 3 es el MISMO criterio con el que el escritorio deja convocar. No se reutiliza
+   ⚠️ MISMO criterio que `_puedeConvocarDisp_` del escritorio (31/10): la SESIÓN —no «actúas como», que el móvil no
+   tiene— con rango ≥ 3 o la cuenta de administración, que es la que `setControl` acepta y tiene rango 0. No se reutiliza
    `_novPuedeRegistro_`, que da ese mismo número pero significa otra cosa («esto lo revisa el
    PD»): atar dos reglas porque hoy coinciden es cómo se separan mal el día que una cambie. */
 function _puedeConvocarT_(){
-  return (typeof _rangoBeta_==='function') && _rangoBeta_() >= 3;
+  return ((typeof _puedeImpersonar_==='function') && _puedeImpersonar_()) ||
+         ((typeof _rangoBeta_==='function') && _rangoBeta_() >= 3);
 }
 
 /* ⛔⛔ LA PUERTA DE AVISOS QUE ESTA CARA NO TENIA (578.ª). El escritorio la tiene desde la
@@ -204,8 +198,7 @@ function _convAviso_(){
   if(e === 'error') return '<div class="tarj" style="opacity:.85">'+
     '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
     '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
-    '<b>No se pudo preguntar al servidor</b>, as\u00ed que <b>no se sabe</b> si hay una semana '+
-    'convocada. Esto <b>no</b> quiere decir que no la haya, y el plazo corre igual.'+
+    '<b>No se ha podido comprobar</b> si hay una semana convocada. Si la hay, el plazo corre igual.'+
     '<br><br><button class="btn" data-convreint>Reintentar</button></p></div>';
   /* ⛔⛔ «TODAVIA NO» TIENE SU PROPIO AVISO, Y NO CULPA A NADIE (06/10). El de abajo
      manda a entrar con tu cuenta, y Daniel lo leyo **estando dentro**: `_engConv_` corre al
@@ -214,21 +207,18 @@ function _convAviso_(){
   if(e === 'esperando sesion') return '<div class="tarj" style="opacity:.85">'+
     '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
     '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
-    'Tu sesi\u00f3n <b>todav\u00eda estaba cargando</b> cuando se mir\u00f3, as\u00ed que <b>no se sabe</b> si '+
-    'hay una semana convocada. Sale sola al volver a esta pantalla.</p></div>';
+    'Aún <b>cargaba tu sesión</b>. Vuelve a esta pantalla y se actualiza.</p></div>';
   /* ⚠️ Y que falte la ACCION es un problema de DESPLIEGUE: tampoco se arregla volviendo
      a entrar, asi que no se le pide. */
   if(e === 'sin accion') return '<div class="tarj" style="opacity:.85">'+
     '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
     '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
-    'Esta versi\u00f3n de la app <b>no trae la consulta de disponibilidad</b>, as\u00ed que '+
-    '<b>no se sabe</b> si hay una semana convocada. No es cosa tuya: av\u00edsalo.</p></div>';
+    'Esta versión <b>no puede consultar la disponibilidad</b>. Recarga la app y, si sigue igual, avísanos.</p></div>';
   if(e === 'sin sesion') return '<div class="tarj" style="opacity:.85">'+
     '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
     '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
-    'No se pudo preguntar: <b>no hay sesi\u00f3n</b>. Sin identidad el servidor no dice qu\u00e9 semana '+
-    'est\u00e1 convocada, as\u00ed que <b>no se sabe</b> si tienes algo que rellenar. Entra con tu '+
-    'cuenta y vuelve a esta pantalla.</p></div>';
+    '<b>No hay sesión</b>, así que no sé si tienes disponibilidad que rellenar. Entra con tu '+
+    'cuenta y vuelve aquí.</p></div>';
   return '';
 }
 function _convHTML_(cv){
@@ -240,10 +230,9 @@ function _convHTML_(cv){
   if(!cv) return '<div class="tarj" style="opacity:.85">'+
     '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
     '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
-    'Ahora mismo <b>no hay ninguna semana convocada</b>, así que no hay nada que rellenar. '+
-    'Cuando se abra un plazo aparece aquí la rejilla para pintar tus ratos.'+
-    (_puedeConvocarT_() ? '<br><br><span style="opacity:.75">Convocar una semana se hace desde el '+
-      '<b>escritorio</b> → Turnos → «Convocar disponibilidad».</span>' : '')+
+    '<b>No hay ninguna semana convocada.</b> Cuando se abra un plazo, saldrá aquí la rejilla.'+
+    (_puedeConvocarT_() ? '<br><br><span style="opacity:.75">Se convoca desde el '+
+      '<b>escritorio</b>, en Turnos.</span>' : '')+
     '</p></div>';
   /* ⛔ EL ESTADO SE PREGUNTA UNA VEZ Y ARRIBA. `_convAbierta_` ya deja pasar `sin_abrir`,
      así que aquí llega una convocatoria de verdad a la que **todavía no se puede
@@ -303,7 +292,7 @@ function _convHTML_(cv){
     /* 932.ª: sólo con el plazo ABIERTO — en `sin_abrir` no se llega aquí y en `cerrada` no hay qué copiar. */
     (_convEstado_(cv)==='abierta' ? '<button class="btn full" data-reusar data-p style="margin:4px 0 8px">'+
       '\u21ba Reutilizar la disponibilidad del turno anterior</button>'+
-      '<p class="rnota" style="margin:-2px 0 10px">Se copia lo que marcaste la semana pasada y lo puedes cambiar.</p>' : '')+
+      '' : '')+
     '<div class="rgesto">Un dedo <b>pinta</b> · dos dedos <b>deslizan</b></div>'+
     '<div class="rgesto" data-ratajo>Toca el <b>día</b> para marcarlo entero · la <b>hora</b>, para toda la semana</div>'+
     /* ⛔ EL CARRIL LO DECIDE `_carrilFranjas_`, y el 78 fijo se fue por esto: decía aquí que
@@ -316,9 +305,8 @@ function _convHTML_(cv){
     '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+
       D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
     '<div class="tplazo'+(urge?' urge':'')+'" id="convPie">'+_convPieHTML_(cv)+'</div>'+
-    '<p class="rnota" style="margin-top:10px">Hasta el <b>'+esc(lim)+'</b> a las '+esc(hora)+
-      '. Fuera de plazo no se puede marcar: por eso una casilla en blanco significa una sola '+
-      'cosa, que no has contestado.</p>'+
+    '<p class="rnota" style="margin-top:10px">Plazo hasta el <b>'+esc(lim)+'</b> a las '+esc(hora)+
+      '. Una casilla en blanco cuenta como que no has contestado.</p>'+
   '</div>';
 }
 
@@ -609,6 +597,14 @@ function _convGuardar_(cv){
 
 function _engConv_(){
   _convCargar_(function(){ if(typeof pintar==='function') pintar(); });
+  /* ⛔ El «Reintentar» del aviso de error se engancha ANTES del `if(!cv) return`: el aviso
+     sólo se pinta cuando no hay convocatoria, o sea justo cuando lo de abajo no corre. Hasta
+     el 31/10 era un botón sin manejador (inventario de paridad, B1). Mismo patrón que
+     `data-dreint` del escritorio: volver a 'sin pedir' es lo único que deja a `_convCargar_`
+     preguntar otra vez. */
+  $$('[data-convreint]').forEach(function(b){
+    b.onclick=function(){ _convEstadoSrv_('sin pedir'); _convCargar_(function(){ if(typeof pintar==='function') pintar(); }); if(typeof pintar==='function') pintar(); };
+  });
   var cv=_convAbierta_(); if(!cv) return;
   var rej=$('#convRej'); if(!rej) return;
   var repinta=function(){
@@ -760,8 +756,8 @@ function vTurnos(){
     (prox.length? prox.map(tarjeta).join('')
       : '<div class="tarj">'+vacio(TURNOS_TODOS?'Sin turnos por delante':'Sin turnos por delante',
           TURNOS_TODOS
-            ? 'No hay ningún turno de fabricación convocado. Cuando alguien convoque uno, aparecerá aquí.'
-            : 'No tienes ningún turno de fabricación asignado. Cuando te convoquen a uno, aparecerá aquí.'+
+            ? 'Cuando se convoque uno, saldrá aquí.'
+            : 'Cuando te convoquen a uno, saldrá aquí.'+
               (nTodos>nMios?' Hay '+nTodos+' del equipo: míralos con «Todos».':''),'',false)+'</div>')+
     (pas.length? '<div class="cajon" data-caj data-p><span>Turnos pasados <b>· '+pas.length+'</b>'+
         (pas[0].f?' <span style="color:var(--ink3)">· el último, '+esc(pas[0].f)+'</span>':'')+'</span>'+

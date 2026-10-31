@@ -117,8 +117,8 @@ function _notisPrefsHTML_(){
      `ReferenceError` aquí aborta `pintar()` entero —ya pasó el 11/08 con `CURSO_CONECTADO`— y
      deja la cara EN BLANCO. */
   if(typeof NOTIS_ETI==='undefined' || typeof NOTIS_FIJOS==='undefined')
-    return '<div class="nota">No se pudo montar el panel de preferencias (faltan sus '+
-      'constantes). Los avisos obligatorios te siguen llegando.</div>';
+    return '<div class="nota">No se pueden mostrar tus preferencias de avisos. '+
+      'Los obligatorios te siguen llegando.</div>';
   if(NOTIS_SRV==='error')
     /* ⛔ NI UN INTERRUPTOR SI NO SE PUDO LEER. Uno con un valor inventado es peor que ninguno:
        se toca creyendo que hace algo, y a partir de ahí tampoco te fías de los que sí
@@ -149,9 +149,8 @@ function _notisPrefsHTML_(){
   if(!filas) return '<div class="nota">El servidor no ha listado ningún tipo de aviso.</div>';
   return '<div class="pan" style="border:0;margin:0">'+filas+'</div>'+
     '<div class="nota"><b>Turnos</b>, <b>reuniones</b> y <b>avisos y sanciones</b> no se pueden '+
-    'apagar aquí: llevan plazo y consecuencias, y perdérselos no es una molestia, es una sanción. '+
-    'Que salgan depende de que el director tenga encendido cada envío (Automatismos).'+
-    (hayApagable?' Lo demás lo eliges tú, y se aplica antes de enviarlo.':'')+
+    'apagar aquí: llevan plazo y perderse uno puede acabar en sanción.'+
+    (hayApagable?' Lo demás lo eliges tú.':'')+
     '</div><p class="sc" id="notisMsgPref" style="padding:0 13px 11px"></p>';
 }
 

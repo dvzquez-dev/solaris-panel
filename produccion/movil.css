@@ -420,6 +420,14 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .pil{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
   padding:3px 8px;border-radius:20px;border:1px solid;white-space:nowrap}
 .pil.pend{color:var(--warn);border-color:rgba(232,145,46,.45);background:rgba(232,145,46,.09)}
+/* 31/10 · desglose agrupado por categoría: cada grupo lleva su color (la tabla `CATS_DESGLOSE` de comun.js) */
+.dgrp{border-left:3px solid var(--line2);margin:0 0 10px;padding-left:9px}
+/* 31/10: dentro de un grupo manda el color del GRUPO; el borde de estado de cada fila (azul de «otorgada»…) lo contradecía */
+.dgrp .borde-ok,.dgrp .borde-ot,.dgrp .borde-no,.dgrp .borde-pe{border-left:0;margin-left:0;padding-left:0}
+.dgh{display:flex;gap:8px;align-items:baseline;margin:2px 0 4px;font-size:13px}
+.dgh .ln{flex:1}
+.dgpt{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+.dgh .dgpt{margin-right:0}
 .pil.otor{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
 .pil.conf{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
 .pil.no{color:var(--red2);border-color:rgba(255,74,79,.42);background:rgba(228,30,37,.09)}
@@ -1107,3 +1115,9 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
   transition:transform .18s ease}
 .novsec[open]>summary::after{transform:rotate(-90deg)}
 .novsec .mdoc,.novsec>p,.novsec>ul{margin-top:8px}
+
+/* ── LA ASISTENCIA EN DIRECTO (31/10): la tarjeta de Estado ── */
+.asisIn{flex:1;min-width:0;background:#0A0909;border:1px solid var(--line);border-radius:8px;color:var(--ink);
+  font-family:var(--mono);font-size:15px;padding:10px 11px}
+.asisIn:focus{border-color:var(--line2);outline:none}
+.asisOk{font-size:20px;color:var(--ok);font-weight:600;padding:2px 0 4px}

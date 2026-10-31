@@ -112,7 +112,7 @@ function normPMovil(p){
        (`_selloAprobado_`, comun.js). Sin ellos el sello no da error: dice «no consta» sobre un
        parte que SÍ lo registra. Es la QUINTA vez que este normalizador tira un campo; el caso de
        `probar_origen_parte.py` pasa el parte CRUDO por aquí a propósito. */
-    decidido_at:p.decidido_at||null, creado_at:p.creado_at||null,
+    decidido_at:p.decidido_at||null, creado_at:p.creado_at||null, retirado_at:p.retirado_at||null,   /* 31/10: de cuándo cuentan los 30 días visibles */
     periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo (la SEXTA vez) */
     enFicha:(typeof _yaCuentaEnSuMes_==='function') ? _yaCuentaEnSuMes_(p) : null,   /* 20/10: `aplicada` y `aprobada` caen los dos en 'conf'; esto los distingue */
     origen:p.origen||null, caduca:p.caduca_at||null,
@@ -497,16 +497,15 @@ function _compHorasHTML_(base, crudo){
      prorrateo (eso lo decide Daniel): se dice por qué no hay comparación. */
   var _nuevo=_recienLlegado_(YO);
   if(me>0 && !_nuevo) f+=deltaHTML('vs. equipo', ritmo, me/dia, nf2(me/dia)+' h/día de media');
-  if(_nuevo) return '<div class="comph"><p class="rnota" style="margin:0">Es tu primer mes en el equipo: la comparación '+
-    'con el resto sale después de tu primer cierre (hoy se haría con días en los que aún no estabas).</p></div>';
+  if(_nuevo) return '<div class="comph"><p class="rnota" style="margin:0">Es tu primer mes: la comparación '+
+    'con el equipo sale después de tu primer cierre.</p></div>';
   if(!f) return '';
   /* Que se vea CONTRA QUE se compara uno. Sin esto, «+12 %» respecto a un ritmo no se
      distingue de «+12 %» respecto a un total, y son cosas distintas. */
   return '<div class="comph">'+f+
     '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(_num)+
     ' h en '+dia+' días'+(_bt==null?'':', con la compensación base repartida hasta hoy')+   /* 🟡 4 (refutador): también la tiene quien no tiene cargo */   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
-    '). Se compara el <b>ritmo</b>, no el total: el mes '+
-    'en curso va a medias y el anterior está entero.</p></div>';
+    '). Se compara el <b>ritmo</b> y no el total porque el mes en curso va a medias.</p></div>';
 }
 
 function barraHorasHTML(id){
@@ -693,6 +692,7 @@ function fmtHM(m){ return pad(Math.floor(m/60))+'<span class="c">:</span>'+pad(m
    propaga a la duracion sin dar error, mientras que el `parseInt(...,10)||0` de la puerta
    se queda con lo que entienda. */
 function durForm(){
+  if(!_horaHHMM_(ST.form.ini) || !_horaHHMM_(ST.form.fin)) return 0;   /* 31/10: la hora se teclea (HH:MM), ya no es un desplegable */
   var d=_minutosReales_(ST.form.fecha, ST.form.ini, ST.form.fin);   // cruza medianoche y el cambio de hora (auditor 34)
   return Math.round(d/15)/4;             // a cuartos de hora
 }
@@ -724,8 +724,8 @@ function vFichar(){
      el teléfono del PD salían las de las 32 personas y el parte se guardaba imputado a la
      de otro **sin un aviso**. El escritorio filtraba desde el 14/08 y lo dejó escrito. */
   var opts=_tareasResp_(TAREAS, _fichaYo_()).map(function(t){
-    return '<option value="'+esc(t.n)+'"'+(ST.form.tarea===t.n?' selected':'')+'>'+esc(t.n)+'</option>';
-  }).join('');
+    return [t.n, t.n];
+  });
 
   var vivo=
     '<div class="tarj">'+cab('Sesión de trabajo', corre?'en curso':(s.estado==='pausada'?'en pausa':'parada'))+
@@ -761,15 +761,14 @@ function vFichar(){
           : '<button class="btn" data-p id="btnPausa">'+(s.estado==='pausada'?'Reanudar':'Pausar')+'</button>'+
             '<button class="btn no" data-p id="btnFin">Fichar salida</button>')+
       '</div>'+
-      (largo?'<div class="avisolargo"><b>Llevas más de 10 h abiertas.</b> Si olvidaste cerrarla, ciérrala ahora. '+
+      (largo?'<div class="avisolargo"><b>Llevas más de 10 h abierta.</b> Si se te olvidó, ciérrala ya. '+
         /* ⛔ 633.ª LO QUE HACE DE VERDAD EL BARRIDO: cierra en entrada + 14 h y graba eso menos
            las pausas. Aquí decía «con la hora de tu última actividad», y al retomar la sesión
            de la nube `s.ult` es la hora de ENTRADA (`_cargarFichajeAbierto_`); y «podrás
            ajustarla antes de enviarla», que no tiene camino: la tarjeta de declarar no deja
            tocar las horas (`dur = declP.q`). ⛔ 21/10 (auditor 8): desde el 09/09 el autocierre nace
            `sin_declarar` y caduca a las 24 h (aquí decía «nace `pendiente`»), y eso se dice. */
-        'A las <b>14 h</b> se cierra sola con el tope: 14 h desde tu entrada, menos las pausas, y queda <b>sin declarar</b>: '+
-        'decláralo antes de '+_caducaAutocierreH_()+' h.</div>':
+        'A las <b>14 h</b> se cierra sola y queda <b>sin declarar</b> (tienes '+_caducaAutocierreH_()+' h para declararla).</div>':
         '<p class="rnota">Al fichar salida tendrás que justificar las horas. Tus horas '+_firmaTxtM_(rt)+'.</p>')+
     '</div>';
 
@@ -782,9 +781,9 @@ function vFichar(){
          cumplida por dentro. */
       (function(){ var m=(typeof _avisoMesDelBloque_==='function')
           ? _avisoMesDelBloque_(ST.form.fecha, HOY) : '';
-        return m ? '<p class="rnota" style="margin:2px 0 0">Es de otro mes: estas '+
-          'horas contarán en <b>'+esc(_nomPeriodo_(m))+'</b>, el mes de trabajo en curso. Las de un mes ya '+
-          'cerrado no se pueden mover.</p>' : ''; })()+
+        return m ? '<p class="rnota" style="margin:2px 0 0">Esa fecha es de otro mes: estas '+
+          'horas contarán en <b>'+esc(_nomPeriodo_(m))+'</b>, que es el abierto. Los meses '+
+          'cerrados no se tocan.</p>' : ''; })()+
       /* ⛔ Y SE DICE SI EL RANGO CRUZA MEDIANOCHE. `durForm` ya envuelve
          (`if(d<0) d+=1440`) y no lo dice en ningun sitio: quien se equivoca de casilla
          ve una duracion PLAUSIBLE y la firma. El umbral sale de `_maxHorasParte_()`,
@@ -796,30 +795,29 @@ function vFichar(){
         if(c==='noche') return '<p class="rnota" style="margin:2px 0 0">Cruza '+
           'medianoche: cuentan <b>'+e+' h</b>.</p>';
         if(c==='duda') return '<p class="rnota" style="margin:2px 0 0;color:var(--warn)">'+
-          '<b>¿Seguro?</b> La salida es anterior a la entrada. Si cruzó medianoche son '+
-          '<b>'+e+' h</b>; si te equivocaste de casilla, <b>'+r+' h</b>. Las dos caben.</p>';
+          'La salida es anterior a la entrada. ¿Pasaste de medianoche (<b>'+e+' h</b>) '+
+          'o te liaste de casilla (<b>'+r+' h</b>)?</p>';
         return '<p class="rnota" style="margin:2px 0 0;color:var(--warn)">'+
-          '<b>Parece del revés.</b> Así son <b>'+e+' h</b>, más de lo que un parte '+
-          'admite. Si querías <b>'+r+' h</b>, cambia entrada por salida.</p>'; })()+
+          '<b>Parece del revés:</b> salen <b>'+e+' h</b>, más de lo que admite un parte. '+
+          'Si querías <b>'+r+' h</b>, cambia entrada y salida.</p>'; })()+
       '<div class="selh">'+
-        '<label class="campo" style="margin:0"><span class="sc">Entrada</span><select id="fIni">'+optHoras(ST.form.ini)+'</select></label>'+
+        _horaCampoM_('fIni','Entrada',ST.form.ini)+
         '<span class="flecha">→</span>'+
-        '<label class="campo" style="margin:0"><span class="sc">Salida</span><select id="fFin">'+optHoras(ST.form.fin)+'</select></label>'+
+        _horaCampoM_('fFin','Salida',ST.form.fin)+
       '</div>'+
       '<div class="pasos">'+
         '<button data-add="15" data-p>+15 min</button><button data-add="30" data-p>+30 min</button>'+
         '<button data-add="60" data-p>+1 h</button><button data-add="-60" data-p>−1 h</button>'+
       '</div>'+
       '<div class="durb"><span class="q mono" id="fDurQ">'+nf2(durForm())+' h</span>'+
-        '<span class="t">de trabajo declarado.<br><span style="color:var(--ink3)">Sin cronómetro se marca '+
-        '<b>sin fichaje</b>, y quien lo firme lo verá.</span></span></div>'+
+        '<span class="t">de trabajo declarado.<br><span style="color:var(--ink3)">Sin cronómetro: '+
+        'quien lo firme verá que <b>no hay fichaje</b>.</span></span></div>'+
     '</div>';
 
   var decl = _declVivo_(ST.form), _perdido = !!ST.form._declPerdido;
   ST.form._declPerdido = false;
   return '<div class="h1">Fichar</div><p class="h1s">'+HOY+' · tus horas '+_firmaTxtM_(rt)+'.</p>'+
-    (_perdido ? '<div class="nota">El parte que ibas a declarar <b>ya no está</b> (se cerró o caducó). Este es el '+
-      'formulario normal: revisa lo que haya y vuelve a enviar si hace falta.</div>' : '')+
+    (_perdido ? '<div class="nota">Ese parte <b>ya no está</b> (se cerró o caducó). Puedes declarar uno nuevo aquí.</div>' : '')+
     (decl
       ? '<div class="tarj" style="border-color:rgba(232,145,46,.5)"><div class="fila" style="padding-top:0"><div class="a"><b>'+(decl.e==='det' ? 'Te piden más detalle' : 'Fichaje sin declarar')+'</b>'+
         /* ⛔ 633.ª LA CADUCIDAD DEL PARTE, NO UN PLAZO CABLEADO: un autocierre caduca a las 24 h,
@@ -827,6 +825,7 @@ function vFichar(){
            Sin ella se queda el texto de siempre. */
         '<small>'+nf2(decl.q)+' h · '+esc(decl.f)+(decl.e==='det' ? ' — '+(decl.nota ? 'te piden: '+esc(decl.nota) : 'te piden más detalle')+' · corrige abajo lo que ya mandaste, no empieces de cero.' : ' — elige categoría y justifícalo abajo. '+(decl.caduca ? 'Si no, caduca el '+_diaMadridDe_(decl.caduca)+'.' : 'Si no, caduca a los 7 días.'))+'</small></div>'+
         '<div class="d"><button class="btn mini" data-canceldecl data-p>Cancelar</button></div></div>'+
+        _declCamposM_(decl)+
         /* ⛔⛔ 633.ª EL AVISO DE DANIEL (09/09): «si fueron 14 h sin querer pero si q trabajaste o
            algo asi q mejor lo declares como bloque dsps en lugar de usar los de 14». Sin él,
            esta tarjeta invita a «Enviar 14,00 h a aprobación» sobre las horas que puso el tope.
@@ -840,19 +839,13 @@ function vFichar(){
 
     '<div class="tarj">'+cab('Justificación','obligatoria')+
       _perfilSelHTML_()+
-      '<label class="campo"><span class="sc">Categoría <span class="req">*</span></span>'+
-        '<select id="fCat">'+
-          '<option value="tareas"'+(ST.form.cat==='tareas'?' selected':'')+'>Tarea</option>'+
-          '<option value="reunion"'+(ST.form.cat==='reunion'?' selected':'')+'>Reunión no convocada</option>'+
-          '<option value="turno"'+(ST.form.cat==='turno'?' selected':'')+'>Turno no convocado</option>'+
-          '<option value="compensacion"'+(ST.form.cat==='compensacion'?' selected':'')+'>Compensación</option>'+
-        '</select></label>'+
+      '<div class="campo"><span class="sc">Categoría <span class="req">*</span></span>'+
+        _chipsElegir_('data-fcat', ST.form.cat, [['tareas','Tarea'],['reunion','Reunión no convocada'],['turno','Turno no convocado'],
+          ['compensacion','Compensación']], 'btn mini')+'</div>'+
       (ST.form.cat==='tareas'
-        ? '<label class="campo"><span class="sc">Imputar a <span class="req">*</span></span>'+
-            '<select id="fTarea"><option value="">— elige una de tus tareas —</option>'+opts+
-            '<option value="Trabajo de subsistema"'+(ST.form.tarea==='Trabajo de subsistema'?' selected':'')+'>Trabajo de subsistema · '+esc(_perfilElegido_())+'</option>'+
-            '<option value="__otro__"'+(ST.form.tarea==='__otro__'?' selected':'')+'>Otro (lo escribo)</option>'+
-            '</select></label>'+
+        ? '<div class="campo"><span class="sc">Imputar a <span class="req">*</span></span>'+
+            _chipsElegir_('data-ftar', ST.form.tarea, opts.concat([['Trabajo de subsistema','Trabajo de subsistema · '+_perfilElegido_()],
+              ['__otro__','Otro (lo escribo)']]), 'btn mini')+'</div>'+
             (ST.form.tarea==='__otro__'
               ? '<label class="campo"><span class="sc">Cuál <span class="req">*</span></span><input id="fDetalle" value="'+esc(ST.form.detalle)+'" placeholder="nombre de la tarea"></label>'
               : '')
@@ -888,7 +881,7 @@ function vFichar(){
         '<div class="nodo" id="n3" style="left:79%;top:80px"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
           '<span>Justificación<em id="e3"></em></span></div>'+
       '</div>'+
-      '<div class="figcierra" id="figMsg"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
+      '<div class="figcierra" id="figMsg" style="display:none"><span class="es"><svg viewBox="0 0 24 24"><use href="#es"/></svg></span>'+
         '<span>Faltan datos: todavía no se puede enviar.</span></div>'+
     '</div>'+
 
@@ -900,16 +893,16 @@ function vFichar(){
         :'Va a <b>'+esc(rt.nom)+'</b>, '+(rt.escalado?'Project Director':'coordinador de '+esc(_perf))+'.')+
       /* ⛔ EL ROTULO SE ELIGE POR `propio`, no por `escalado`: al Project Director le decía
          «COMO COORDINAS ‹UNIDAD›» — una coordinación que no tiene, porque `coordinadorDe`
-         cae a él cuando la unidad no tiene coordinador — y le anunciaba que su parte pasa
-         a alguien que es él mismo. */
+         cae a él cuando la unidad no tiene coordinador. 31/10: para `propio` ya no hay rótulo
+         (lo dice la frase de arriba). */
       (rt.propio
-        ?'<span class="esc">ERES EL PROJECT DIRECTOR · ENCIMA DE TI NO HAY QUIEN FIRME</span>'
-        :(rt.escalado?'<span class="esc">NADIE FIRMA LO SUYO · COMO COORDINAS '+esc(_perf).toUpperCase()+', PASA AL PROJECT DIRECTOR</span>':''))+'</p></div></div>'+
+        ?''
+        :(rt.escalado?'<span class="esc">Coordinas '+esc(_perf)+', así que lo firma el Project Director.</span>':''))+'</p></div></div>'+
 
     '<button class="btn pri full" data-p id="btnEnviar" disabled style="margin-top:13px">'+
       '<span id="lblEnviar">Faltan datos para enviar</span></button>'+
-    '<p class="rnota" style="margin:10px 2px 0">Al enviarlo queda <b style="color:var(--warn)">PENDIENTE</b> y no suma. '+
-    'Solo cuenta cuando '+esc(rt.nom.split(' ')[0])+' lo aprueba.</p>';
+    '<p class="rnota" style="margin:10px 2px 0">Queda <b style="color:var(--warn)">pendiente</b> y no suma '+
+    'hasta que '+esc(rt.nom.split(' ')[0])+' lo apruebe.</p>';
 }
 
 /* ⛔ 20/10 (ficha 🔴 del 20/08): el parte que se iba a DECLARAR, si sigue existiendo. Si el refresco de 90 s se lo
@@ -925,16 +918,23 @@ function _declVivo_(f){
 }
 
 /* validación: los tres nodos y las dos aristas */
+/* 31/10: un parte de FICHAJE por declarar trae entrada y salida; si las cambias, las horas se recalculan (`durForm`) y se corrigen en
+   el servidor DESPUÉS de declarar (`corregirParte`, que deja el rastro). Gemela de `_bloqEditado_` del escritorio (misma puerta). */
+function _declEditadoM_(declP){ return _fichajeEditado_(declP, ST.form); }
+function _durMostradaM_(){
+  var d=_declVivo_(ST.form);
+  return (d && !_declEditadoM_(d)) ? d.q : durForm();
+}
 function validarFichaje(){
   var f=ST.form;
   var declP = _declVivo_(f);
   var haySes = !!declP || ST.modo!=='vivo' || minSes()>0 || !!ST.ses.cloudIni;   /* declarar: ya hay sesión cerrada */
-  var dur = declP ? declP.q : (ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durForm());
+  var dur = declP ? _durMostradaM_() : (ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durForm());
   /* ⛔ EL TOPE SALE DE `_maxHorasParte_()`, no de un 12 escrito aqui: el servidor topa
      en 14 y con el 12 de aqui un parte de 13 h quedaba bloqueado POR PANTALLA aunque
      fuera legal. Los dos numeros nacieron con un dia de diferencia y este se quedo. */
   var _topeH = _maxHorasParte_();
-  var n1 = declP ? true : (haySes && dur>0 && dur<=_topeH);
+  var n1 = (declP && !_declEditadoM_(declP)) ? true : (haySes && dur>0 && dur<=_topeH);
   /* la regla de qué es "la imputación" vive en _imputacion_(): un solo sitio, para que si
      cambia no haya que acordarse de tocar aquí Y en enviarFichaje (antes no daba error, solo
      desincronizaba silenciosamente lo que se valida de lo que se envía). */
@@ -946,7 +946,8 @@ function validarFichaje(){
   /* Debajo de cada estrella NO va el valor: que se encienda ya dice que ese requisito
      esta cubierto, y repetirlo recargaba el dibujo. La unica excepcion es pasarse de
      12 h, que no es adorno sino un tope que bloquea el envio. */
-  if(e1) e1.textContent = (dur>_topeH) ? ('excede '+_topeH+' h') : '';
+  if(e1) e1.textContent = (dur>_topeH) ? ('excede '+_topeH+' h') : ((ST.modo!=='vivo' || declP) && !(_horaHHMM_(f.ini) && _horaHHMM_(f.fin)) ? 'hora HH:MM' : '');
+  var q=$('#fDurQ'); if(q) q.textContent=nf2(dur)+' h';
   if(e2) e2.textContent = '';
   if(e3) e3.textContent = '';
 
@@ -974,6 +975,7 @@ function validarFichaje(){
   var msg=$('#figMsg');
   if(msg){
     msg.classList.toggle('ok',todo);
+    msg.style.display = todo ? '' : 'none';
     $('span:last-child',msg).textContent = todo
       ? 'Todo listo: ya se puede enviar.'
       : 'Faltan datos: todavía no se puede enviar.';
@@ -1086,6 +1088,19 @@ function _colaTxtM_(){
   return 'a la cola de '+_pilaDeM_(f);
 }
 
+/* Entrada/salida: texto HH:MM, no `<select>` de cuartos (no admitía 17:43, la hora de un fichaje, y es un control nativo). */
+function _horaCampoM_(id, rot, v){
+  return '<label class="campo" style="margin:0"><span class="sc">'+rot+'</span>'+
+    '<input class="mono" id="'+id+'" value="'+esc(v)+'" placeholder="HH:MM" maxlength="5" inputmode="numeric"></label>';
+}
+/* La entrada y la salida del FICHAJE por declarar (editables) y las horas que saldrán. Vacío si el parte no trae hora de verdad. */
+function _declCamposM_(decl){
+  if(!(decl && _horaHHMM_(decl.ini) && _horaHHMM_(decl.fin))) return '';
+  return '<div class="selh" style="margin-top:10px">'+_horaCampoM_('fIni','Entrada',ST.form.ini)+'<span class="flecha">→</span>'+
+      _horaCampoM_('fFin','Salida',ST.form.fin)+'</div>'+
+    '<div class="durb"><span class="q mono" id="fDurQ" style="white-space:nowrap">'+nf2(_durMostradaM_())+' h</span>'+
+      '<span class="t">son las del fichaje; si no son las que trabajaste, <b>cambia la entrada o la salida</b> y se recalculan.</span></div>';
+}
 function _perfilSelHTML_(){
   var _q = _fichaM_();                 /* ⛔ por la misma puerta que `_perfilElegido_`:
                                           si una mira a la sesión y otra a `YO`, el
@@ -1093,10 +1108,8 @@ function _perfilSelHTML_(){
                                           tiene, y el rótulo firma a nombre de otro */
   if (!_hayQuePreguntarPerfil_(_q)) return '';
   var ps = _perfilesDe_(_q), el = _perfilElegido_();
-  return '<label class="campo"><span class="sc">Fichas como <span class="req">*</span></span>'+
-    '<select id="fPerfil">'+ ps.map(function(p){
-      return '<option value="'+esc(p.unidad)+'"'+(p.unidad===el?' selected':'')+'>'+esc(p.txt)+'</option>';
-    }).join('') +'</select></label>'+
+  return '<div class="campo"><span class="sc">Fichas como <span class="req">*</span></span>'+
+    _chipsElegir_('data-fperfil', el, ps.map(function(p){ return [p.unidad, p.txt]; }), 'btn mini')+'</div>'+
     '<p class="mini" style="margin:-4px 0 10px">Lo firma <b>'+esc(_firmaDe_(el, _fichaYo_()))+'</b>'+
     ' · estas horas cuentan para <b>'+esc(el)+'</b></p>';
 }
@@ -1150,7 +1163,14 @@ async function enviarFichaje(){
   var f=ST.form, imput=_imputacion_(f);
   if(f.declararId!=null && backendOK && SESION){   // declarar un parte 'sin declarar' ya cerrado
     tost('Declarando…');
+    var _editada=_declEditadoM_(_declVivo_(f)), _hCorr=durForm();   /* antes de soltar nada: de ellas salen las horas a corregir */
     try{ var p=await api.declararParte(f.declararId, imput, f.just.trim(), f.cat);
+      /* 31/10: cambiaste la entrada o la salida → las horas se corrigen YA declarado (`corregirParte` deja el rastro «corregidas por su
+         autor»). Si falla, el parte ya está declarado con las del fichaje: se dice, no se calla. */
+      if(_editada){
+        try{ p=await api.corregirParte(f.declararId, _hCorr) || p; }
+        catch(e2){ tost('Declarado con las horas del fichaje; no se pudieron corregir: '+(e2&&e2.message||e2)); }
+      }
       if(p){ var i=PARTES.findIndex(function(x){return x.id===f.declararId;}); if(i>=0) PARTES[i]=normPMovil(p); }
       /* ⛔ Y LA FECHA, IGUAL QUE EN LA OTRA RAMA. El comentario de doce líneas más
          abajo razona **este fallo exacto** para esta misma rama —*declaras un bloque
@@ -1159,7 +1179,7 @@ async function enviarFichaje(){
          de la misma función. Se llega escribiendo una fecha vieja, respondiendo a un
          «sin declarar» y volviendo a declarar. */
       var _cola=_colaTxtM_();
-      f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY;
+      f.declararId=null; f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY; f.ini='17:00'; f.fin='20:30';   /* lo del fichaje no se arrastra al siguiente bloque */
       tost('Declarado · '+_cola+'.'); irA('horas');
     }catch(e){
       /* ⛔ Y EL BOTÓN VUELVE A ESTAR VIVO, con el formulario intacto: una escritura que
@@ -1254,10 +1274,9 @@ function catEti(c){ return CAT_ETI[c]||CAT_ETI.compensacion; }
    Notion, que además lleva reuniones auto, cursos, etc.): es la parte que puedes verificar tú. */
 function desgloseCat(ps){
   if(!ps.length) return '';
-  var g={}, orden=['reunion','tareas','turno','compensacion'];
-  ps.forEach(function(p){ var k=(p.cat in CAT_ETI)?p.cat:'compensacion'; g[k]=(g[k]||0)+p.q; });
-  var chips=orden.filter(function(k){return g[k];}).map(function(k){
-    return '<span class="pil neu" style="margin:0 6px 6px 0">'+esc(CAT_ETI[k])+' <b class="mono">'+h1(g[k])+'</b></span>';
+  /* 31/10: las categorías y su color salen de `agruparDesglose` (comun.js), la misma puerta que la lista de abajo y que el escritorio. */
+  var chips=agruparDesglose(ps).map(function(c){
+    return '<span class="pil neu" style="margin:0 6px 6px 0"><i class="dgpt" style="background:'+c.color+'"></i>'+esc(c.eti)+' <b class="mono">'+h1(c.h)+'</b></span>';
   }).join('');
   return '<div style="display:flex;flex-wrap:wrap;margin:2px 0 4px">'+chips+'</div>';
 }
@@ -1443,8 +1462,7 @@ function _histHorasHTML_(todos){
        todos: si esta se pareciera a un parte, nadie distinguiría la una de la otra. */
     if(gr.comp!=null){
       out += '<div class="rnota" style="margin:3px 0;display:flex;gap:8px;align-items:baseline">'+
-        '<span style="flex:1">Compensación base · <span class="sc">devengada a día de hoy · '+
-        'se cierra a fin de mes</span></span>'+
+        '<span style="flex:1">Compensación base · <span class="sc">a día de hoy</span></span>'+
         '<span class="mono">'+h1(gr.comp)+'</span></div>';
     }
     for(i=0;i<gr.items.length;i++) out += filaParte(gr.items[i]);
@@ -1463,8 +1481,8 @@ function _movHorasHTML_(confs, pends){
   /* LA EXTRA, EN SU PROPIA FILA. Ver `_compExtra_`: no es mas cantidad de lo mismo, es otra
      cosa — la base llega por el puesto y la extra la asigna el PD por trabajo de mas. */
   var _fx = !_cx ? '' :
-    '<div class="fila borde-ot"><div class="a"><b>Compensación extra</b>'+
-      '<small>'+(_cx>0?'te la ha asignado el Project Director por trabajo de más':
+    '<div class="fila borde-ot"><div class="a"><b>Otras contribuciones</b>'+
+      '<small>'+(_cx>0?'te las ha asignado el Project Director por trabajo de más':
                        'ajuste sobre la base de tu cargo')+' · solo de este mes</small></div>'+
       '<div class="d"><b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
   /* ⛔ LA COMPENSACION ES UN APUNTE, Y LA CABECERA NO LA CONTABA. Daniel (07/08):
@@ -1574,19 +1592,28 @@ function _desgloseMesHTML_(confs){
   var _hmD=_hMesReal_(YO), _notionD=(_hmD!=null);
   var total=_notionD ? _hmD : (r.suma+comp);
   var cargo=(YO&&YO.cargo)||'miembro', _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO);
-  var fila=
+  /* 31/10 · AGRUPADO POR CATEGORÍA, CADA UNA CON SU COLOR (Daniel: *«en vez de poner compensación extra más 12,25,
+     debería aparecer compensación por tu cargo y luego … todas estas contribuciones extras»*). La base y la extra no son
+     partes: entran en su grupo como filas FIJAS (`catDesglose`), y la extra va a «Otras contribuciones». Lo demás se
+     reparte por la tabla de comun.js. La suma de los subtotales es la de antes: ninguna fila se pierde ni se cuenta dos veces. */
+  var filaBase=
     '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
       '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha · vuelve a asignarse en el '+
       'cierre</small></div>'+
-    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>'+
-    /* La EXTRA va en su propia fila: es trabajo reconocido, no mas base. Sin el dato de Notion
-       (`_compExtra_` devuelve 0) esta fila no existe, en vez de ensenar un cero que no dice nada. */
-    (!_cx ? '' :
-    '<div class="fila borde-ot"><div class="a"><b>Compensación extra</b>'+
-      '<small>'+(_cx>0?'asignada por el Project Director por trabajo de más (turnos extra y demás)':
-                       'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
+    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>';
+  var filaExtra =
+    '<div class="fila borde-ot"><div class="a"><b>Asignada por el Project Director</b>'+
+      '<small>'+(_cx>0?'por trabajo de más (turnos extra y demás)':'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
       'la compensación vuelve a la base</small></div>'+
-    '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>');
+    '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
+  var fijas=[{catDesglose:'cargo', q:(_cr?_cb:comp), fila:filaBase}];
+  /* Sin el dato de Notion (`_compExtra_` devuelve 0) la extra no existe, en vez de ensenar un cero que no dice nada. */
+  if(_cx) fijas.push({catDesglose:'otras', q:_cx, fila:filaExtra});
+  var grupos=agruparDesglose(fijas.concat(r.todos)).map(function(c){
+    return '<div class="dgrp" style="border-left-color:'+c.color+'"><div class="dgh"><i class="dgpt" style="background:'+c.color+'"></i>'+
+      '<b>'+esc(c.eti)+'</b><span class="ln"></span><span class="mono">'+nf2(c.h)+' h</span></div>'+
+      c.items.map(function(p){ return p.fila || filaParte(p); }).join('')+'</div>';
+  }).join('');
   /* ⛔ EL TITULO, DEL PERIODO — NO DEL RELOJ DEL TELEFONO. El contenido de esta ventana va
      de CIERRE A CIERRE (`_ultimosMov_(…,'mes')` → `_deEsteMes_` → `_periodoAbierto_()`)
      y el titulo salia de `new Date()`. Julio se aplico el 04/08, asi que del 01 al 04 de
@@ -1601,22 +1628,18 @@ function _desgloseMesHTML_(confs){
      reloj (`_hoyDateM_`, no `new Date()`) viaja dentro de la puerta. */
   return '<div class="mtit">Desglose de '+
       esc(_nomMesAbierto_())+'</div>'+
-    '<div class="msub">Todas tus contribuciones de este mes, sin recortar.</div>'+
     '<div class="tarj">'+
       '<div class="cifh"><span class="g mono">'+nf2(total)+'</span><span class="sc">h '+
         (_notionD?'este mes':'que cuentan')+'</span></div>'+
-      desgloseCat(r.todos)+
+      desgloseCat(fijas.concat(r.todos))+   /* 31/10: con la base y la extra, o el resumen no suma el total */
     '</div>'+
-    '<div class="tarj">'+fila+r.todos.map(filaParte).join('')+'</div>'+
+    '<div class="tarj">'+grupos+'</div>'+
     '<p class="rnota">'+(_cr
-      ? 'La <b>base</b> te toca por el cargo (Project Director 7 h · Coordinador 3,5 h · miembro '+
-        '2 h) y llega sola. La <b>extra</b> la asigna el Project Director cuando haces trabajo de '+
-        'más, y <b>no se arrastra</b>: en el cierre la compensación vuelve a la base.'
-      : 'La compensación por cargo es la <b>base</b> (Project Director 7 h · Coordinador 3,5 h · '+
-        'miembro 2 h). Si tienes extras oficiales encima, están en Notion y esta pantalla '+
-        '<b>todavía no los conoce</b>: el servidor aún no los manda.')+'<br>'+
-      'El registro <b>no se borra nunca</b>: al cerrar el mes estas horas pasan al histórico y '+
-      'aquí empieza el mes nuevo.</p>';
+      ? 'La <b>base</b> depende de tu cargo (Project Director 7 h, Coordinador 3,5 h, miembro '+
+        '2 h) y llega sola. La <b>extra</b> la pone el Project Director por trabajo de '+
+        'más y <b>no pasa al mes siguiente</b>.'
+      : 'Aquí sale la <b>base</b> de tu cargo (Project Director 7 h, Coordinador 3,5 h, '+
+        'miembro 2 h). Si tienes extras, <b>todavía no los vemos</b>.')+'</p>';
 }
 
 function _cuotaHTML_(){
@@ -1645,8 +1668,7 @@ function _cuotaHTML_(){
       '<div class="msub">Se cierra en agosto, al acabar la temporada. Es requisito para renovar.</div>'+
       '<div class="tarj acc">'+
         '<div class="cifh"><span class="g mono">\u2014</span><span class="sc">\u20ac al a\u00f1o</span></div>'+
-        '<p class="rnota">Tu cuota todav\u00eda no ha llegado. Esto <b>no</b> dice que no tengas '+
-        'cuota: dice que el servidor a\u00fan no la ha servido. Sale de tus horas de la '+
+        '<p class="rnota">Tu cuota a\u00fan no est\u00e1 calculada. Sale de tus horas de la '+
         'temporada y se cierra en agosto.</p></div>';
   /* ⛔ EL PRIMER MES NO LLEVA CUOTA, Y SE DICE. Gemela de la del escritorio y por el
      mismo motivo: aquí el descuento se pinta como `_q.base - _q.final`, así que a un
@@ -1712,8 +1734,8 @@ function _cuotaHTML_(){
     '<div class="msub">Se cierra en agosto, al acabar la temporada. Es requisito para renovar.</div>'+
     '<div class="tarj acc">'+
       '<div class="cifh"><span class="g mono" style="color:var(--ok)">'+nf(_q.final,2)+'</span><span class="sc">€ · estimación al año</span></div>'+
-      '<p class="rnota" style="margin-top:6px">Es una <b>estimación</b>: la cuota es <b>anual</b> '+
-        'y se cierra en agosto con las horas de toda la temporada. No se paga mes a mes.</p>'+
+      '<p class="rnota" style="margin-top:6px">Es una <b>estimación</b>: la cuota es <b>anual</b>, '+
+        'no se paga mes a mes.</p>'+
       '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+recibo+'</div>'+
       /* ⛔ LA BASE SALE DE LA REGLA, NO SE TECLEA. Aquí ponía **«2 h de base» para todo
          el mundo**, y la base es la del **cargo**: `COMP_CARGO` da **7 h al PD** y **3,5 a
@@ -1725,11 +1747,10 @@ function _cuotaHTML_(){
          expediente en el medidor de conducta. */
       '<p class="rnota">'+(_q.viva
         ? 'Se recalcula <b>con tus horas de ahora mismo</b>, no en el último cierre. '
-        : '<b>Es la última cifra que sirvió el servidor</b>, no la de ahora: aún falta el '+
-          'padrón del equipo para recalcularla aquí. ')+
+        : '<b>Es la última cifra calculada</b>, no la de ahora. ')+
       /* 21/10 (auditor 6): las cifras salen de sus constantes, no se teclean */
-      'Sale de tus horas de la temporada: el objetivo se mueve entre '+nf2(UMBRAL_LO)+' y '+nf2(UMBRAL_HI)+' h/mes, con '+
-      nf2(_compBase_(YO))+' h de base. Se descuentan '+nf2(_descuentoCoche_())+' € por cada turno al que lleves el coche entre Ourense y Vigo, y nunca baja de 0 €.</p></div>';
+      'El objetivo va de '+nf2(UMBRAL_LO)+' a '+nf2(UMBRAL_HI)+' h/mes ('+
+      nf2(_compBase_(YO))+' h de base). Llevar el coche entre Ourense y Vigo a un turno descuenta '+nf2(_descuentoCoche_())+' €, sin bajar de 0.</p></div>';
 }
 
 /* ═══ DECIDIR PARTES DE HORAS DESDE EL MÓVIL ════════════════════════════════════════
@@ -1823,6 +1844,10 @@ function _cargarPartesDec_(){
        coordinador del subsistema del autor). Un segundo criterio aqui seria otra verdad. */
     if (_rg < 1){ PARTES_DEC = []; PARTES_REV = []; return; }
     PARTES_DEC = arr.filter(function(p){
+      /* 31/10 · Daniel: «si lo he hecho yo […] le tendría que enrutar a Bruno». El parte del PD de una unidad que coordina
+         OTRO no es «tuyo por aprobar» (sigue pudiendo decidirlo; es del coordinador): `coordinadorDe` es la misma regla que
+         el servidor, que ya puso en `p.subsistema` la unidad de la TAREA. */
+      if(p.autor===yo && coordinadorDe(p.subsistema)!==yo) return false;
       return (p.estado==='pendiente' || p.estado==='detalle') && (_mando || p.autor!==yo);
     }).map(_normPDec_);
     /* ⛔ Y DE LA MISMA RESPUESTA, lo ya decidido. Pedirlo en otra llamada seria un segundo
@@ -1836,7 +1861,7 @@ function _cargarPartesDec_(){
          decidir. Aquí salía otra vez: el mismo parte en las dos listas. */
       /* 26/10 · Daniel: «Sí, como lo firmo» — el PD (`_mando`) revierte lo suyo igual que lo firma. */
       return _pdRevertible_(p) && p.estado!=='detalle' && (_mando || p.autor!==yo);
-    }).map(function(p){
+    }).filter(function(p){ return _pdPuedeRevertir_(p, yo); }).map(function(p){
       var n = _normPDec_(p);
       n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN, CIERRE_UC, true);   /* 26/10: para revertir */
       return n;
@@ -1955,8 +1980,8 @@ function _partesDecHTML_(){
   var _bq=_bloqueGrupos_(PARTES_DEC);
   return _bloqueTarjetaM_(_bq.grupos)+
     _pdGrupoHTML_('pdec', 'Esperan tu decisión',
-      'Son horas de tu gente: <b>no cuentan hasta que las firmes</b>. Rechazar o pedir detalle '+
-      'exige un motivo.', _bq.sueltas, _pdFichaHTML_);
+      'Horas de tu gente: <b>no cuentan hasta que las firmes</b>. Para rechazar o pedir detalle '+
+      'hace falta un motivo.', _bq.sueltas, _pdFichaHTML_);
 }
 
 /* ═══ EL PARTE DE BLOQUE EN EL MÓVIL (29/10) ═══════════════════════════════════════════════════════
@@ -2002,6 +2027,14 @@ function _engBloqueM_(){
    por la pantalla: el dia que el backend admita uno mas, se toca una linea.
    ⚠️ `pendiente` NO esta y no es un olvido: no hay ninguna decision que deshacer, y ofrecerlo
    seria un boton que solo sabe dar error. */
+/* ⛔ 31/10 (bolsa 2): LA JURISDICCIÓN TAMBIÉN AL REVERTIR, como el escritorio (`_escPuedeRevertir_` = `puedeDecidirParte`)
+   y el servidor (`_puede_sobre_parte`): el PD (rango 3) o quien coordina ESA unidad. Con «Ver como» `arr` es la cola entera
+   del PD y la lista ofrecía revertir partes de otras unidades a quien no puede. `p` es el parte CRUDO (`subsistema`). */
+function _pdPuedeRevertir_(p, quien){
+  var r = (typeof rangoNom==='function') ? rangoNom(quien) : 0;
+  return r >= 3 || (r >= 1 && coordinadorDe(p.subsistema||'—') === quien);
+}
+
 function _pdRevertible_(p){
   var e = p && p.estado;
   /* ⛔⛔ LA CONTRAPARTE DE UNA REVERSIÓN NO SE REVIERTE, y esto NO es cosmético.
@@ -2144,8 +2177,8 @@ function _engPartesDec_(){
       /* ⛔ ESTE AVISO DECIA «ya no se pueden deshacer desde aquí» Y HOY ES FALSO: desde que
          existe «Ya decidiste», sí se puede. Un aviso que exagera se aprende a ignorar, y el día
          que diga algo de verdad grave nadie lo leerá. */
-      if(acc==='aprobar' && !confirm('Aprobar estas horas.\n\nPasan a contar en el mes de quien '+
-        'las declaró. Si te equivocas, lo deshaces en «Ya decidiste».\n\n¿Sigo?')) return;
+      if(acc==='aprobar' && !confirm('¿Aprobar estas horas?\n\nContarán en el mes de quien '+
+        'las declaró. Puedes deshacerlo en «Ya decidiste».')) return;
       $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=true; });
       var prev=b.textContent; b.textContent='…';
       try{
@@ -2208,7 +2241,10 @@ function vHoras(){
   var _porFecha=function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); };
   /* ⛔ `rev` entra en ESTA lista -- la del historial -- y NO en la de pendientes: un parte
      revertido se ve, pero no espera nada de nadie. */
-  var _todasMias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad'||x.e==='rev'||x.e==='raro';}).sort(_porFecha);   // en cola / con detalle pedido / rechazados / sin declarar / caducados
+  /* 31/10: lo que NO cuenta (rechazado, caducado, revertido/retirado) se ve `DIAS_VISIBLE_SIN_CONTAR` días y luego desaparece. */
+  var _ahoraMs=Date.parse(_ahoraApp_());
+  var _todasMias=PARTES.filter(function(x){return x.e==='pend'||x.e==='det'||x.e==='rech'||x.e==='sindecl'||x.e==='cad'||x.e==='rev'||x.e==='raro';}).sort(_porFecha);
+  _todasMias=_todasMias.filter(function(x){ return !(x.e==='rech'||x.e==='cad'||x.e==='rev') || _sigueVisibleSinContar_(x, _ahoraMs); });   // en cola / con detalle pedido / rechazados / sin declarar / caducados
   var confs=PARTES.filter(function(x){return _cuentaYa_(x.e);}).sort(_porFecha);   // aprobadas + otorgadas
   /* ⛔ LOS DE MESES PASADOS, APARTE. Ordenarlos los mandaba al fondo, pero seguían **en la
      misma lista** — y la queja de Daniel era que **aparecen**, no que aparezcan arriba. */
@@ -2301,7 +2337,7 @@ function vHoras(){
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     _partesDecHTML_()+
     _bloqueManualM_()+
-    '<div class="tarj">'+cab('Horas del mes', notion?'Panel de Rendimientos · base al día':'aprobadas · otorgadas · pendientes')+
+    '<div class="tarj">'+cab('Horas del mes', notion?'base al día':'aprobadas · otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
         (notion
@@ -2354,12 +2390,10 @@ function vHoras(){
             : (typeof _llego_==='function' && !_llego_('partesM')
               /* 22/10 (auditor 23, 🟡 11): en tercera persona sólo con «Ver como»; los TUYOS, en segunda. */
               ? (_fichaYo_()===String((YO&&YO.nombre)||'')
-                ? vacio('No se han podido leer tus partes',
-                    'El servidor no ha contestado, as\u00ed que esto NO quiere decir que no tengas '+
-                    'ninguno. Vuelve a entrar en Horas para reintentarlo.', '', false)
-                : vacio('No se han podido leer sus partes',
-                  'El servidor no ha contestado, as\u00ed que esto NO quiere decir que no tenga '+
-                  'ninguno. Vuelve a entrar en su ficha para reintentarlo.', '', false))
+                ? vacio('No se han podido cargar tus partes',
+                    'Vuelve a entrar en Horas para reintentarlo.', '', false)
+                : vacio('No se han podido cargar sus partes',
+                  'Vuelve a entrar en su ficha para reintentarlo.', '', false))
               : vacio('Ningún parte en cola',
                 'No tienes horas esperando firma. Las que envíes aparecerán aquí con su estado '+
                 'hasta que se firmen.','ficha desde la pestaña Fichar', false))))+
@@ -2422,7 +2456,7 @@ function vHoras(){
           (YO.desglose?'<small>'+_cargaDesgloseTxt_(YO.desglose)+'</small>':'')+
           (_hMesDevengado_(YO)!=null?'<small>este mes llevas '+h1(_hMesDevengado_(YO))+', en vivo</small>':'')+   /* devengada, como la cifra (07/10) */
           '</div><div class="d">banda sana ' + _bs.lo + '–' + _bs.hi + '</div></div>'
-        : vacio('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. Todavía no ha llegado.','',false))+
+        : vacio('Sin dato de carga','Tu carga se calcula al cerrar el mes. Aún no está.','',false))+
     '</div>'+
     /* ⛔ La gemela del «ciclo» de la portada: sin temporada esto decía **«temporada
        null»**. El rótulo se calla entero, que es lo honesto cuando no se sabe de qué
@@ -2433,8 +2467,8 @@ function vHoras(){
     '<h2 class="sec">Ranking de horas<span class="ln"></span>'+(_temporadaVigente_()?('temporada '+_temporadaVigente_()):'')+'</h2>'+
     '<div class="tarj rank">'+
       (filas
-        ? filas+'<p class="rnota">Se ponderan tus horas de la temporada entre los meses que llevas en el '+
-          'equipo. Ves tu puesto y el de tus vecinos; el resto va sin nombre.</p>'
+        ? filas+'<p class="rnota">Horas de la temporada entre los meses que llevas en el '+
+          'equipo. Ves tu puesto y el de los de al lado.</p>'
         : vacio('Sin puesto todavía','Tu posición se calcula con las horas de la temporada al cerrar el mes.','',false))+
     '</div>'+
 

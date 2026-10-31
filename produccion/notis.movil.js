@@ -114,9 +114,9 @@ function _gateNotis_(motivo, seguir){
       'Vuelve aquí después: se comprueba solo.';
     boton='Ya las he activado';
   } else {
-    cuerpo='<b>Antes de entrar</b>, activa las notificaciones.<br><br>El panel avisa de tus '+
-      'turnos, de las reuniones y de las decisiones sobre tus documentos y tus horas. '+
-      '<b>Sin ellas no se puede usar</b>: los avisos llegan tarde y de eso salen faltas.';
+    cuerpo='<b>Para entrar</b> tienes que activar las notificaciones.<br><br>Avisan de '+
+      'turnos, reuniones y decisiones sobre tus horas y documentos. '+
+      '<b>Sin ellas no se puede usar</b>: si no te enteras a tiempo puedes acabar con una falta.';
     boton='Activar notificaciones';
   }
   var g=_gate_(SPLASH+'<div style="max-width:330px;line-height:1.6">'+cuerpo+'</div>'+
@@ -166,12 +166,11 @@ function _notisHTML_(){
       'pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> y abre la app desde ese icono.</p></div>';
   if(!_pushSoportado_())
     return _avisoFallo+'<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador '+
-      'no admite notificaciones. El panel las da por <b>obligatorias</b>, así que aquí te '+
-      'estás perdiendo los avisos de turnos, reuniones y decisiones. Ábrelo en el móvil.</p></div>';
+      'no admite notificaciones y aquí te perderías los avisos. Ábrelo desde el móvil.</p></div>';
   /* El botón de «activar» se fue: para llegar hasta aquí ya has pasado el gate del arranque.
      Lo que queda es elegir QUÉ te llega. */
   return _avisoFallo+'<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
-      '<b>Qué avisos quieres recibir</b><small>Se aplica en el servidor, antes de enviarlos</small>'+
+      '<b>Qué avisos quieres recibir</b>'+
       '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
         'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+
     '<div class="plgc" hidden id="notisLista">'+
@@ -217,9 +216,8 @@ function _pintarNotisLista_(){
   if(!filas){ c.innerHTML='<p class="rnota" style="margin:0">El servidor no ha listado '+
     'ningún tipo de aviso.</p>'; return; }
   c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0"><b>Turnos</b>, <b>reuniones</b> y '+
-    '<b>avisos y sanciones</b> no se pueden apagar aquí: llevan plazo y consecuencias, y perdérselos '+
-    'no es una molestia, es una sanción. (Que salgan depende de que el director tenga encendido cada envío.) '+
-    'Lo demás lo eliges tú.</p>';
+    '<b>avisos y sanciones</b> no se pueden apagar aquí: llevan plazo y perderse uno '+
+    'puede acabar en sanción. Lo demás lo eliges tú.</p>';
   $$('[data-noti]',c).forEach(function(b){
     b.onclick=async function(){
       var k=b.dataset.noti, antes=NOTIS_PREF[k]!==false;

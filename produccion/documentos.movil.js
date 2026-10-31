@@ -275,6 +275,18 @@ function _docsEnCursoM_(){
   });
 }
 
+/* ⛔⛔ EL HISTORIAL: lo que ya está CERRADO (`publicado`, `rechazado`) de los expedientes que NO son tuyos.
+   Daniel, 31/10: «una vez la rechazas, ya no te vuelve a aparecer nunca más». `ENT_REV` lo trae el servidor
+   (`getEntregables`: lo que revisas, sea del estado que sea) y «En curso» lo descarta A PROPÓSITO por `_docEnCurso_`,
+   así que un revisor que rechazaba (o publicaba) un expediente lo perdía de TODA la pantalla, con su «Deshacer»
+   dentro de la ficha. Lo tuyo no hace falta aquí: «Mis documentos» ya lo lista sea cual sea su estado.
+   ✅ Por `_docResuelto_` (comun.js), la misma puerta que usa el escritorio en «Resueltos»; sin lista propia. */
+function _docsResueltosM_(){
+  return (ENT_REV||[]).filter(function(e){ return _docResuelto_(e.estado); });
+}
+/* Plegado de serie: lo pendiente sigue arriba, sin mezclarse con lo cerrado. Un toque lo abre. */
+var DOC_HIST_ABIERTO=false;
+
 function vDocs(){
   var mios=ENTREGABLES;
   var pend=_docsPend_();
@@ -285,20 +297,13 @@ function vDocs(){
   /* ⛔ 21/10 (auditor 11, 🟠 2): sin expedientes LLEGADOS no se dice «Nada por aquí»: no se sabe. */
   if(typeof ENT_LLEGO!=='undefined' && ENT_LLEGO===false)
     return h+'<div class="tarj">'+vacio('No se han podido leer los documentos',
-      'El servidor todavía no los ha mandado; se vuelven a pedir solos. Mientras tanto no se sabe si tienes algo que revisar.',
+      'Se reintenta solo.',
       '',false)+'</div>';
   if(!_docsRelevantes_()){
     return h+'<div class="tarj">'+vacio('Nada por aquí',
       /* 21/10 (auditor 11, 🟡 7): `esCoord()` incluye al SUBCOORDINADOR, y el reparto (`coordinadorDe`, y el servidor)
          sólo nombra a quien tiene `cargo:'Coordinador'`: a él no le llega nada, y se le prometía. */
-      ((typeof YO!=='undefined' && YO && YO.cargo!=='Coordinador' && YO.cargo!=='Project Director' && _subcoordDe_(YO.nombre))
-        ? 'No has enviado ningún documento y no tienes ninguno que revisar. Los archivos de tu unidad los firma '+
-          'su coordinador, no la subcoordinación.'
-        : esCoord()
-        ? 'No hay ningún documento esperando tu firma, y tú no has enviado ninguno. Cuando '+
-          'alguien de tu unidad envíe un archivo, te llegará aquí.'
-        : 'No has enviado ningún documento y no tienes ninguno que revisar: los tuyos los '+
-          'firma tu coordinador.'),
+      'No tienes nada que revisar ni has enviado nada.',
       '',false)+'</div>';
   }
   h+='<h2 class="sec">Pendiente de tu revisión<span class="ln"></span>'+pend.length+'</h2>';
@@ -311,7 +316,7 @@ function vDocs(){
        '<div class="tarj">'+
        (enCurso.length
          ? enCurso.map(function(e){return filaDoc(e,false);}).join('')+
-           '<p class="rnota">Todos los expedientes abiertos ahora mismo. El detalle por subsistema está en el escritorio.</p>'
+           ''
          : vacioMini('Ningún expediente del equipo está abierto.'))+
        '</div>';
   }
@@ -321,6 +326,16 @@ function vDocs(){
        ? mios.map(function(e){return filaDoc(e,true);}).join('')
        : vacioMini('Todavía no has enviado ninguno. Los que envíes aparecerán aquí con su estado.'))+
      '</div>';
+  var hist=_docsResueltosM_();
+  if(hist.length){
+    h+='<h2 class="sec">Historial<span class="ln"></span>'+hist.length+'</h2>'+
+       '<div class="tarj">'+
+       (DOC_HIST_ABIERTO
+         ? hist.map(function(e){return filaDoc(e,false);}).join('')
+         : '<p class="rnota" style="margin:0 0 10px">Rechazados y publicados. Abre uno para verlo o deshacer la decisión.</p>')+
+       '<button class="btn full" data-p data-dochist>'+(DOC_HIST_ABIERTO?'Ocultar historial':'Ver historial ('+hist.length+')')+'</button>'+
+       '</div>';
+  }
   return h;
 }
 
@@ -347,7 +362,7 @@ function _pasosSustituirM_(e){
   var ps = (typeof _pasosSustituirDoc_==='function')
     ? _pasosSustituirDoc_(e, yoNombre()) : [];
   if(!ps.length) return '';
-  return '<div class="avisolargo" style="margin-top:10px"><b>¿Hay una versión nueva de este documento?</b> No se sube encima: se manda como <b>sustitución</b>, y éste sigue publicado hasta que aprueben la nueva.</div>'+
+  return '<div class="avisolargo" style="margin-top:10px"><b>¿Versión nueva?</b> Se envía como <b>sustitución</b> por el formulario; hasta que la aprueben, sigue publicado este.</div>'+
     _pasosHTML_(ps, 8, 6);
 }
 
@@ -355,8 +370,7 @@ function _pasosCorregirM_(e){
   var ps = (typeof _pasosCorregirDoc_==='function') ? _pasosCorregirDoc_(e) : [];
   if(!ps.length) return '';
   return '<div class="avisolargo" style="margin-top:10px"><b>Para corregirlo son dos pasos, '+
-    'en este orden.</b> El botón de abajo <b>no sube nada</b>: sólo devuelve el expediente a '+
-    'la cola.</div>'+
+    'en este orden.</b></div>'+
     _pasosHTML_(ps, 8, 6);
 }
 
@@ -591,6 +605,9 @@ function verDoc(id){
       (_mioDoc ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
                : 'Pídeselo a quien lo subió antes de decidir.</div></div>'))+
     '<p class="rnota" style="margin-top:10px">Revisa: <b>'+revs+'</b></p>'+
+    /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
+    _autorRastroHTML_(e)+
+    (_puedeCambiarAutor_(e.estado, yoNombre()) ? _autorPanelHTML_('dA', e.id, e.autor, '') : '')+
     (_mioDoc ? '' : _previaDocM_(e))+
     acc);
   /* Se cablea DESPUES de abrir el modal: un iframe dentro de la cadena de strings no

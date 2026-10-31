@@ -55,12 +55,10 @@ function _cajaCargosPend_(cargos){
     for(j=0;j<CARGOS_TURNO.length;j++)
       if(CARGOS_TURNO[j].k === faltan[i]) nombres.push(CARGOS_TURNO[j].et);
   if(!nombres.length)
-    return '<div class="nota" style="margin:0 0 9px">✅ <b>Las tres responsabilidades están '+
-      'asignadas.</b> Una misma persona puede llevar varias.</div>';
+    return '<div class="nota" style="margin:0 0 9px"><b>Responsabilidades '+
+      'asignadas.</b></div>';
   return '<div class="nota" style="margin:0 0 9px;border-color:rgba(232,145,46,.35)">'+
-    '<b>Pendientes de asignar:</b> '+esc(_unirY_(nombres))+'. '+
-    '<span style="color:var(--ink3)">Una por persona — y la misma persona puede llevar '+
-    'varias.</span></div>';
+    '<b>Pendientes de asignar:</b> '+esc(_unirY_(nombres))+'.</div>';
 }
 
 function pintarReparto(){
@@ -434,9 +432,8 @@ function _miTurnoPreHTML_(cv){
   return pan('Tu disponibilidad', 'se abre el '+esc(abD)+' a las '+esc(abH),
     '<div class="pb" data-abre="'+esc(ab)+'">'+
     '<p style="margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      'Esta es la semana que se va a preguntar. <b>Todav\u00eda no se puede contestar</b>: el '+
-      'plazo se abre el <b>'+esc(abD)+'</b> a las '+esc(abH)+' \u2014 que es cuando el equipo '+
-      'recibe el aviso \u2014 y entonces esta rejilla se vuelve pintable.</p>'+
+      'El plazo se abre el <b>'+esc(abD)+'</b> a las '+esc(abH)+', cuando el equipo '+
+      'recibe el aviso. Hasta entonces no se puede marcar.</p>'+
     '<div class="dmapa" style="grid-template-columns:104px repeat('+D.length+
       ',minmax(44px,1fr))">'+cab+filas+'</div>'+
     '</div>');
@@ -479,8 +476,7 @@ function _miTurnoPanel_(){
     _mitPlazoTxt_(cv),
     '<div class="pb">'+
     '<p style="margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      'Elige <b>d\u00f3nde puedes</b> y haz clic en los huecos. Lo que marques aqu\u00ed es lo que '+
-      'cuenta para el reparto \u2014 y no contestar es lo que hace que te pongan un turno '+
+      'Elige <b>d\u00f3nde puedes</b> y marca los huecos. Si no contestas, te pueden poner un turno '+
       'cuando no puedes.</p>'+
     '<button class="btn" data-mtreusar style="display:block;margin:0 0 12px">↺ Reutilizar la disponibilidad del turno anterior</button>'+
     '<div class="dsit">'+pin+'</div>'+
@@ -600,8 +596,7 @@ function _cablearMiTurno_(){
 function _dispAviso_(titulo){
   var e = _dispEstadoSrv_();
   if(e === 'error') return pan(titulo, 'sin datos',
-    vacioSimple('No se pudo preguntar al servidor',
-      'Se dice en vez de ense\u00f1ar un mapa viejo: con uno de mentira se reparte gente de verdad. '+
+    vacioSimple('No se pudo cargar el mapa de disponibilidad',
       '<button class="btn" data-dreint>Reintentar</button>'));
   if(e === 'pidiendo') return pan(titulo, '\u2026',
     vacioSimple('Preguntando al servidor', 'Un momento.'));
@@ -614,12 +609,10 @@ function _dispAviso_(titulo){
      login es asincrono), y entonces ese boton es lo unico que vuelve a abrir la puerta --
      `_dispCargar_` es de un solo disparo y `_refrescoVivo_` no lo toca. */
   if(e === 'sin accion') return pan(titulo, 'sin datos',
-    vacioSimple('Esta versi\u00f3n de la app no sabe pedir la disponibilidad',
-      'No es tu cuenta: a la app le falta la acci\u00f3n que pregunta al servidor. Recarga la p\u00e1gina para coger la '+
-      '\u00faltima versi\u00f3n, y si sigue, av\u00edsalo desde el buz\u00f3n.'));
+    vacioSimple('Esta versi\u00f3n no puede consultar la disponibilidad',
+      'Recarga la p\u00e1gina y, si sigue igual, av\u00edsalo desde el buz\u00f3n.'));
   if(e === 'sin sesion') return pan(titulo, 'sin sesi\u00f3n',
-    vacioSimple('No se pudo preguntar: no hay sesi\u00f3n',
-      'Sin identidad el servidor no contesta qui\u00e9n puede cada franja, y lo que se ve\u00eda aqu\u00ed era el mapa de ejemplo. '+
+    vacioSimple('No hay sesi\u00f3n',
       'Entra con tu cuenta y vuelve a esta pesta\u00f1a. '+
       '<button class="btn" data-dreint>Reintentar</button>'));
   return '';
@@ -681,7 +674,7 @@ function _dispPanel_(){
       (nInv ? '<b>'+(nInv-mudos.length)+'</b> de <b>'+nInv+'</b> han contestado'+
               (mudos.length ? ' · <b>sin contestar:</b> '+mudos.map(_dispPila_).map(esc).join(', ') : '')
             : 'Nadie convocado todavía.')+
-      ' — «sin contestar» no es «no puede»: son los únicos a los que tiene sentido insistir.'+
+      ' — A los de «sin contestar» es a quienes hay que insistir.'+
     '</div>'+
     '</div>');
 }
@@ -737,6 +730,8 @@ function _dispCargar_(repintar){
       var val = (e && typeof e==='object' && 'valor' in e) ? e.valor : e;
       AVISOS_ON = (val===true || val==='true' || val===1 || val==='1');
       AVISOS_EST='ok';
+      _dispBorrDe_(c);
+      _dispColaDe_(c);
       if(typeof repintar==='function') repintar();
     }).catch(function(){
       /* ⛔ 22/10 (auditor 26, 🟡 11): «no se pudo leer» NO es «apagado» — se pinta como lo que es. */
@@ -917,6 +912,222 @@ function _puedeConvocarDisp_(){
   return _puedeImpersonar_() || rangoNom(yo) >= 3;
 }
 
+/* ═══ LA DISPONIBILIDAD DE LA SEMANA, PREPARADA POR LA RUTINA Y LANZADA POR EL PD (31/10) ═══════════════════════════
+   🗣️ Daniel: *«Sola, la apruebo yo»*. `rutinas/convocar_semana.py` deja un BORRADOR en el CONTROL
+   `disponibilidad_borrador` ({semana_ini, abre, limite, estado: preparada|lanzada|descartada}) y avisa al PD. Aquí se ve y
+   se decide: **Lanzar** encola `convocar_disponibilidad` por `_encolarConvDisp_` —la MISMA puerta del botón de convocar
+   a mano, no una segunda forma de montarla— y **Descartar** lo quita para esa semana. El plazo es el del calendario:
+   lanzada tarde, abre al momento y NO se mueve. Sólo rango >= 3 (`_puedeConvocarDisp_`), como el botón. */
+var CLAVE_DISP_BORR='disponibilidad_borrador';
+var DISP_BORR=null;                    /* el borrador de la semana, o `null` (no hay / no se leyó) */
+
+function _dispBorrDe_(c){
+  /* ⛔ Cada entrada del control es `{valor, …}`, no el valor a secas (ver `AVISOS_ON`); y el valor puede llegar como cadena JSON. */
+  var e=c && c[CLAVE_DISP_BORR], v=(e && typeof e==='object' && 'valor' in e) ? e.valor : e;
+  if(typeof v==='string'){ try{ v=JSON.parse(v); }catch(x){ v=null; } }
+  DISP_BORR=(v && typeof v==='object' && v.semana_ini) ? v : null;
+}
+
+/* La maqueta (`?demo`, sin sesión): un borrador cuya apertura es HOY a las 22:00, derivado del reloj de la app. Los
+   rótulos «hoy HH:MM» van puestos a mano: en lo real los pone Python (`abre_txt`/`limite_txt`) — la cara no nombra días. */
+function _borradorDemo_(){
+  var w=_semanaDemo_(new Date(+new Date(_ahoraApp_().slice(0,10)+'T12:00')+86400000));
+  return {semana_ini:w.dias[0], semana_fin:w.dias[6], abre:w.abre, limite:w.limite, estado:'preparada', avisado_at:null,
+          abre_txt:'hoy '+w.abre.slice(11,16), limite_txt:'pasado mañana '+w.limite.slice(11,16)};
+}
+
+function _dispBorrFecha_(iso){ return new Date(String(iso||'').slice(0,16)); }
+/* «jue 22:00»: lo dice Python (`convocatoria.dia_hora`), que es quien sabe el calendario; sin él, sólo la hora. */
+function _dispDiaHora_(txt, iso){ return txt || String(iso).slice(11,16); }
+function _dispDM_(iso){ var t=String(iso).slice(0,10).split('-'); return t[2]+'/'+t[1]; }
+/* «31 h», «1 h 36 min», «10 min»: como `reglas/convocatoria.py:cuanto_queda` — por encima de 3 h se TRUNCA (equivocarse hacia
+   «queda menos» cuesta darse prisa; hacia «queda más», llegar tarde). */
+function _quedaTxt_(horas){
+  var mins=Math.round(horas*60);
+  if(mins<60) return Math.max(1,mins)+' min';
+  if(horas<3) return Math.floor(mins/60)+' h'+(mins%60?' '+(mins%60)+' min':'');
+  return Math.floor(horas)+' h';
+}
+
+/* `{tipo, horas}`: `preparada` (aún no abre), `abierta` (la hora de apertura ya pasó: se abre al lanzarla) o `caducada`. */
+function _dispBorrEstado_(b, ahoraISO){
+  var ahora=_dispBorrFecha_(ahoraISO), abre=_dispBorrFecha_(b.abre), lim=_dispBorrFecha_(b.limite);
+  if(ahora>lim) return {tipo:'caducada', horas:0};
+  if(ahora>=abre) return {tipo:'abierta', horas:(lim-ahora)/3600000};
+  return {tipo:'preparada', horas:(lim-abre)/3600000};
+}
+
+/* La puerta ÚNICA que encola una convocatoria: el botón de convocar a mano y «Lanzar» de la tarjeta. */
+function _encolarConvDisp_(o){
+  var carga={
+    semana:o.semana, tarde_partida:!!o.tarde_partida, horaria:!!o.horaria,
+    /* ⛔ LA SESIÓN, NO `ACTOR` (643.ª): la cuenta admin ve este panel aunque «Actúe como» otra persona, y con `ACTOR`
+       la convocatoria saldría pedida por quien está mirando — el «lo pide …» que leen en el móvil las personas convocadas. */
+    por:(typeof _actorSanc_==='function') ? _actorSanc_() : ACTOR,
+    at:new Date().toISOString()
+  };
+  if(o.sitios) carga.sitios=o.sitios;
+  return api.setControl('convocar_disponibilidad', carga, 'convocatoria de disponibilidad para turnos');
+}
+
+function _borradorDispPanel_(){
+  if(!_puedeConvocarDisp_()){ return ''; }
+  if(DISP_BORR===null && !SESION && _demoLocal_()) DISP_BORR=_borradorDemo_();
+  var b=DISP_BORR;
+  if(!b || b.estado!=='preparada') return '';
+  var st=_dispBorrEstado_(b, _ahoraApp_()), sem=_dispDM_(b.semana_ini);
+  var chip=function(t,c){ return '<span class="chip"'+(c?' style="color:'+c+'"':'')+'>'+t+'</span>'; };
+  var txt = st.tipo==='caducada'
+    ? 'El plazo ya cerró y no se puede lanzar. Si todavía hace falta, convócala a mano más abajo.'
+    : st.tipo==='abierta'
+      ? 'Ya pasó la hora de apertura: se abre en cuanto la lances y <b>el plazo no se mueve</b>. Quedan <b>'+_quedaTxt_(st.horas)+'</b> para contestar.'
+      : 'Para todo el equipo. Se abre a su hora, con '+_quedaTxt_(st.horas)+' de plazo. Hasta que no la lances, nadie la ve.';
+  return pan('Disponibilidad de la semana del '+sem,'espera tu visto bueno',
+    '<div class="pb" data-dispborr="'+esc(b.semana_ini)+'">'+
+      '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px">'+
+        chip(st.tipo==='caducada'?'caducada':'preparada', st.tipo==='caducada'?'var(--warn)':'')+
+        chip('abre '+_dispDiaHora_(b.abre_txt, b.abre))+chip('plazo '+_dispDiaHora_(b.limite_txt, b.limite))+'</div>'+
+      '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+txt+'</p>'+
+      (st.tipo==='caducada' ? '' :
+        '<div style="display:flex;gap:8px"><button class="btn pri" data-dispborr-lanzar>Lanzar</button>'+
+        '<button class="btn" data-dispborr-descartar>Descartar</button></div>')+
+    '</div>');
+}
+
+function _pinBorradorDisp_(m){
+  var raiz=(m||document).querySelector('[data-dispborr]'); if(!raiz) return;
+  var bl=raiz.querySelector('[data-dispborr-lanzar]'), bd=raiz.querySelector('[data-dispborr-descartar]');
+  var sem=raiz.getAttribute('data-dispborr'), local=(!SESION && _demoLocal_());
+  var puede=function(){
+    if(!local && (typeof backendOK==='undefined' || !backendOK || !SESION)){ tost('Sin conexión no se puede.'); return false; }
+    return true;
+  };
+  var marcar=function(estado){
+    var nb=Object.assign({}, DISP_BORR, {estado:estado, decidido_por:(typeof _actorSanc_==='function') ? _actorSanc_() : ACTOR,
+      decidido_at:new Date().toISOString()});
+    return local ? Promise.resolve(nb) : api.setControl(CLAVE_DISP_BORR, nb, 'borrador '+estado).then(function(){ return nb; });
+  };
+  if(bl) bl.onclick=async function(){
+    if(bl.disabled || !puede()) return;
+    if(!confirm('¿Lanzar la disponibilidad de la semana del '+_dispDM_(sem)+'? Se abre a todo el equipo.')) return;
+    bl.disabled=bd.disabled=true;
+    try{
+      if(!local) await _encolarConvDisp_({semana:sem, horaria:true});
+    }catch(e){ bl.disabled=bd.disabled=false; tostErr('No se pudo lanzar: ', e); return; }
+    try{
+      DISP_BORR=await marcar('lanzada');
+      tost('Lanzada. La rutina la monta en la siguiente pasada.');
+    }catch(e){
+      /* La convocatoria YA está encolada: sólo falló apuntar el borrador, y se dice (no se vuelve a encolar). */
+      tostErr('Se lanzó, pero no se pudo apuntar: ', e);
+    }
+    pintar();
+  };
+  if(bd) bd.onclick=async function(){
+    if(bd.disabled || !puede()) return;
+    if(!confirm('¿Descartar la disponibilidad de la semana del '+_dispDM_(sem)+'? No se volverá a preparar esa semana.')) return;
+    bl.disabled=bd.disabled=true;
+    try{ DISP_BORR=await marcar('descartada'); tost('Descartada.'); }
+    catch(e){ bl.disabled=bd.disabled=false; tostErr('No se pudo descartar: ', e); return; }
+    pintar();
+  };
+}
+
+/* ═══ LA COLA: SEMANAS MARCADAS POR ADELANTADO (31/10) ══════════════════════════════════════════════════════════════
+   🗣️ Daniel: *«que semanas quiero que se pida fabricación por adelantado, sin necesidad de ir cada jueves a decidirlo [...]
+   y si no quisiera podría haber quitado esa solicitud encolada antes»*. El PD marca/desmarca semanas (por su lunes) en el
+   CONTROL `disponibilidad_cola` ({semanas:[{semana_ini, por, at, estado: marcada|enviada, enviada_at}]}); la rutina
+   (`convocar_semana.py`) lanza sola las marcadas el día de su apertura y las apunta `enviada`. Una enviada ya no se toca.
+   ⛔ Al marcar se RELEE el control antes de escribir: la rutina pudo apuntar una `enviada` entre medias y no se pisa. */
+var CLAVE_DISP_COLA='disponibilidad_cola';
+var DISP_COLA=null;                    /* {semanas:[…]}, o `null` (no hay / no se leyó) */
+/* Cuándo abre cada semana lo DICE el servidor (`reglas/convocatoria.py`, calculado al servir): llega en el mismo control,
+   como `disponibilidad_cola_aperturas` = {valor:{'AAAA-MM-DD (lunes)': {abre, txt}}}. La cara no sabe qué día ni a qué hora
+   abre una semana: pinta `txt`. ⛔ Sin él (backend viejo, demo) NO inventa una hora. */
+var CLAVE_DISP_APERT='disponibilidad_cola_aperturas';
+var DISP_APERT=null;
+var COLA_SEMANAS=8;
+
+function _dispColaVal_(c){
+  var e=c && c[CLAVE_DISP_COLA], v=(e && typeof e==='object' && 'valor' in e) ? e.valor : e;
+  if(typeof v==='string'){ try{ v=JSON.parse(v); }catch(x){ v=null; } }
+  return (v && typeof v==='object' && Array.isArray(v.semanas)) ? v : null;
+}
+function _dispColaDe_(c){
+  var e=c && c[CLAVE_DISP_APERT], v=(e && typeof e==='object' && 'valor' in e) ? e.valor : e;
+  DISP_COLA=_dispColaVal_(c);
+  DISP_APERT=(v && typeof v==='object' && !Array.isArray(v)) ? v : null;
+}
+function _colaMarca_(cola, sem){
+  var l=(cola && cola.semanas) || [], i;
+  for(i=0;i<l.length;i++) if(l[i] && l[i].semana_ini===sem) return l[i];
+  return null;
+}
+/* «el jueves 05/11 a las 22:00»: la apertura de la semana que empieza el lunes `sem`, tal como la rotula el servidor. */
+function _colaAbreTxt_(sem){
+  var a=DISP_APERT && DISP_APERT[sem], t=(a && typeof a==='object') ? a.txt : '';
+  return (typeof t==='string' && t) ? t : 'el día que abra';
+}
+/* La maqueta: una semana ya enviada y dos marcadas, derivadas del reloj de la app. */
+function _colaDemo_(){
+  var l=_lunesDesde_(_ahoraApp_().slice(0,10), COLA_SEMANAS), p=function(s,e){ return {semana_ini:s, por:'Daniel', at:'2026-10-20T10:00', estado:e}; };
+  DISP_APERT={}; DISP_APERT[l[2]]={txt:'el día de su apertura (maqueta)'}; DISP_APERT[l[4]]={txt:'el día de su apertura (maqueta)'};
+  return {semanas:[p(l[0],'enviada'), p(l[2],'marcada'), p(l[4],'marcada')]};
+}
+
+function _colaDispPanel_(){
+  if(!_puedeConvocarDisp_()){ return ''; }
+  if(DISP_COLA===null && !SESION && _demoLocal_()) DISP_COLA=_colaDemo_();
+  var lunes=_lunesDesde_(_ahoraApp_().slice(0,10), COLA_SEMANAS), cola=DISP_COLA, marcadas=[], chips='';
+  lunes.forEach(function(sem){
+    var m=_colaMarca_(cola, sem), env=!!(m && m.estado==='enviada'), on=!!m;
+    if(on && !env) marcadas.push(sem);
+    var col=env ? 'var(--ok)' : on ? 'var(--red2)' : 'var(--ink2)';
+    chips+='<button class="btn" data-dispcola="'+esc(sem)+'"'+(env?' disabled':'')+' aria-pressed="'+(on?'true':'false')+'" style="'+
+      'min-width:92px;padding:9px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;'+
+      'color:'+col+';border-color:'+(on ? col : 'var(--line2)')+';background:'+(env ? 'rgba(62,180,137,.08)' : on ? 'rgba(228,30,37,.09)' : 'transparent')+'">'+
+      '<span style="font-size:13px;font-weight:600">'+esc(_dispDM_(sem))+'</span>'+
+      '<span style="font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase">'+(env ? 'enviada' : on ? 'marcada' : 'sin marcar')+'</span></button>';
+  });
+  var lineas=marcadas.map(function(sem){
+    return '<div style="font-size:12.5px;color:var(--ink2);line-height:1.7">Semana del <b>'+esc(_dispDM_(sem))+'</b> · se pedirá sola '+esc(_colaAbreTxt_(sem))+'</div>';
+  }).join('');
+  return pan('Semanas por adelantado','se piden solas',
+    '<div class="pb" data-dispcola-panel>'+
+      '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">Marca las semanas que quieres que se pidan sin esperar a tu visto bueno. '+
+      'Mientras no haya salido, puedes quitarla.</p>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+chips+'</div>'+
+      (lineas || '<div style="font-size:12.5px;color:var(--ink3)">Ninguna marcada: cada semana te espera como borrador.</div>')+
+    '</div>');
+}
+
+function _pinColaDisp_(m){
+  var raiz=(m||document).querySelector('[data-dispcola-panel]'); if(!raiz) return;
+  var local=(!SESION && _demoLocal_());
+  raiz.querySelectorAll('[data-dispcola]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      if(!local && (typeof backendOK==='undefined' || !backendOK || !SESION)){ tost('Sin conexión no se puede.'); return; }
+      var sem=b.getAttribute('data-dispcola'), yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ACTOR;
+      raiz.querySelectorAll('[data-dispcola]').forEach(function(x){ x.disabled=true; });
+      try{
+        var base=DISP_COLA;
+        if(!local){ try{ base=_dispColaVal_(await api.getControl()) || base; }catch(x){ /* sin releer, lo que hay */ } }
+        var m0=_colaMarca_(base, sem);
+        if(m0 && m0.estado==='enviada'){ DISP_COLA=base; tost('Esa semana ya salió.'); pintar(); return; }
+        var lista=((base && base.semanas) || []).filter(function(e){ return e && e.semana_ini!==sem; });
+        if(!m0) lista.push({semana_ini:sem, por:yo, at:_ahoraApp_().slice(0,16), estado:'marcada'});
+        lista.sort(function(a,c){ return a.semana_ini<c.semana_ini ? -1 : 1; });
+        var nueva={semanas:lista};
+        if(!local) await api.setControl(CLAVE_DISP_COLA, nueva, m0 ? 'semana desmarcada' : 'semana marcada por adelantado');
+        DISP_COLA=nueva;
+        tost(m0 ? 'Quitada: no se pedirá sola.' : 'Marcada: se pedirá sola.');
+      }catch(e){ tostErr('No se pudo guardar: ', e); }
+      pintar();
+    };
+  });
+}
+
 function _convocarDispPanel_(){
   if(!_puedeConvocarDisp_()) return '';
   /* 🟡 R4 (refutador 26): lo que se PINTA del interruptor. 'leyendo' sin sesión no es «leyendo»: nadie va a preguntar. */
@@ -934,13 +1145,11 @@ function _convocarDispPanel_(){
      revés, el botón sale y el servidor lo rechaza, que es el defecto de partida del revés. */
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
-  return pan('Convocar disponibilidad','abre el plazo · solo dirección',
+  return _borradorDispPanel_()+_colaDispPanel_()+pan('Convocar disponibilidad','abre el plazo · solo dirección',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      'Elige <b>cualquier día</b> de la semana que quieras preguntar: se pregunta la semana '+
-      'entera, de lunes a domingo. <b>El plazo lo calcula el servidor</b> con la regla del '+
-      'calendario — aquí no se decide. Recoger disponibilidad <b>no sale de la app</b>: no toca '+
-      'Notion ni el excel de Aerotech.</p>'+
+      'Elige <b>un día</b> de la semana que quieras preguntar (se pregunta de lunes a domingo). '+
+      '<b>El plazo lo calcula el servidor</b>. No toca Notion ni el Excel de Aerotech.</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
       '<label style="width:165px">'+lab('Semana (un día cualquiera)')+
         '<input type="date" id="cdSemana" style="'+E+'"></label>'+
@@ -1011,6 +1220,8 @@ function _engAvisosConv_(m){
 
 function _pinConvDisp_(m){
   _engAvisosConv_(m);
+  _pinBorradorDisp_(m);
+  _pinColaDisp_(m);
   var b=(m||document).querySelector('[data-convdisp]'); if(!b) return;
   b.onclick=async function(){
     if(b.disabled) return;
@@ -1024,26 +1235,15 @@ function _pinConvDisp_(m){
     /* ⛔ Sin sitio no se convoca: una convocatoria sin dónde no se puede contestar, y dejarla
        salir vacía sería el mismo fallo mudo de siempre. */
     if(!sitios.length){ tost('Marca al menos un sitio (CUVI o CITI).'); return; }
-    if(!confirm('Abrir la disponibilidad de la semana del '+sem+'.'+String.fromCharCode(10,10)+
-      'NO sale nada fuera de la app: no toca Notion ni el excel de Aerotech. El servidor '+
-      'calcula el plazo y monta la convocatoria.'+String.fromCharCode(10,10)+'¿Sigo?')) return;
+    if(!confirm('¿Abrir la disponibilidad de la semana del '+sem+'?')) return;
     b.disabled=true; var prev=b.textContent; b.textContent='Encolando…';
     try{
-      await api.setControl('convocar_disponibilidad', {
-        semana: sem,
-        tarde_partida: !!(document.getElementById('cdTarde')||{}).checked,
+      await _encolarConvDisp_({semana:sem, tarde_partida:!!(document.getElementById('cdTarde')||{}).checked,
         /* ⛔ EL MODO LO ELIGE QUIEN CONVOCA. Era `horaria=False` en la firma de `montar`,
-           o sea una constante que solo se podia cambiar tocando el codigo — y si la próxima
-           semana se pregunta por horas o por medias tardes no es una decisión de quien
+           o sea una constante que solo se podia cambiar tocando el codigo — y si la
+           próxima semana se pregunta por horas o por medias tardes no es una decisión de quien
            programa. Aquí es una casilla y viaja en el encargo. */
-        horaria: !!(document.getElementById('cdHoraria')||{}).checked,
-        sitios: sitios,
-        /* ⛔ LA SESIÓN, NO `ACTOR` (643.ª): la cuenta admin ve este panel aunque «Actúe como»
-           otra persona, y con `ACTOR` la convocatoria saldría pedida por quien está mirando —
-           el «lo pide …» que leen en el móvil las personas convocadas. */
-        por: (typeof _actorSanc_==='function') ? _actorSanc_() : ACTOR,
-        at: new Date().toISOString()
-      }, 'convocatoria de disponibilidad para turnos');
+        horaria:!!(document.getElementById('cdHoraria')||{}).checked, sitios:sitios});
       tost('Encolado. La rutina lo recoge en la siguiente pasada.');
       var n=document.getElementById('cdNota');
       if(n) n.innerHTML='<b>Encolado</b> para la semana del '+esc(sem)+'. El plazo lo calcula '+
@@ -1473,9 +1673,9 @@ function _cierreTurnoPanel_(){
       'corresponda: no todo el mundo se qued\u00f3 lo mismo.</div>';
 
   var salida = CIERRE_TUR.hecho
-    ? '<div class="nota" style="margin-top:11px"><b>Propuesta lista.</b> No se ha escrito nada en '+
-      'Notion: eso lo aplica Daniel. Va al campo <b>Compensaciones</b>, y el turno suma '+
-      '<b>1 al contador</b> (el \u00d74 lo pone la f\u00f3rmula).<pre class="mono" style="white-space:pre-wrap;'+
+    ? '<div class="nota" style="margin-top:11px"><b>Propuesta lista.</b> A\u00fan no est\u00e1 en '+
+      'Notion: la aplica Daniel. Va a <b>Compensaciones</b> y el turno suma '+
+      '<b>1 al contador</b>.<pre class="mono" style="white-space:pre-wrap;'+
       'font-size:12px;margin:8px 0 0">'+esc(CIERRE_TUR.hecho)+'</pre></div>'
     : '';
 
@@ -1653,3 +1853,83 @@ function convocarPanel(){
     '</div></div>');
 }
 
+
+/* ═══ LA FICHA DEL TURNO · PARIDAD A3 (31/10/2026) ═══════════════════════════════════
+   🗣️ Daniel: «llevar al escritorio todo lo que hay en el movil». Pulsar una fila de «Turnos convocados» abre
+   su ficha debajo de la tabla: reparto con roles, coches, objetivos, nota y memoria. Antes la cara PEDIA
+   objetivos y nota al convocar y no los ensenaba en ningun sitio.
+   ⛔ Se guarda la CLAVE del turno (`_claveTurno_`), no su posicion: `TURNOS` se rellena en sitio y una
+   posicion apuntaria a otro turno tras el refresco. `FICHA_TUR` es global DECLARADA (⚠️ `TUR_SEL` ya existe: son los convocados) en `escritorio.html`. */
+function _turnoPorClave_(k){
+  if(!k) return null;
+  return TURNOS.filter(function(t){ return _claveTurno_(t)===k; })[0] || null;
+}
+/* Pulsar la fila abierta la cierra; pulsar otra cambia a ella. */
+function _turSelAlternar_(actual, k){ return (actual && actual===k) ? null : k; }
+
+/* El rol es texto libre y acumula papeles («Coche, Responsable de turno»): un chip por papel. */
+function _chipsRolE_(roles){
+  var vistos = {}, out = [];
+  roles.forEach(function(x){
+    String(x||'').split(/[,·]/).forEach(function(p){
+      p = p.replace(/^\s+|\s+$/g,'');
+      if(!p || vistos[p.toLowerCase()]) return;
+      vistos[p.toLowerCase()] = 1;
+      var l = p.toLowerCase();
+      var cl = l.indexOf('responsable')>=0 ? ' ok' : (l.indexOf('coche')>=0 ? ' tel' : (_esFirmeRol_(p) ? '' : ' wa'));
+      out.push('<span class="chip'+cl+'">'+esc(p)+'</span>');
+    });
+  });
+  return out.join('');
+}
+
+function _fichaTurnoE_(t){
+  var k = _claveTurno_(t);
+  var f = _isoADMY_(_dmyAISO_(String(t.fecha||t.f||'')));
+  var vac = function(txt){ return '<div class="ftu-vac">'+txt+'</div>'; };
+  var pers = function(n){
+    var roles = (t.roles||[]).filter(function(r){ return r && r.miembro===n; }).map(function(r){ return r.rol; });
+    return '<div class="ftu-pers'+(n===ACTOR?' yo':'')+'"><span class="av">'+esc(ini(n))+'</span>'+
+      '<b>'+esc(n)+'</b><span class="ftu-roles">'+_chipsRolE_(roles)+'</span></div>';
+  };
+  var firmes = _asistentesTurno_(t), dudosos = _dudososTurno_(t);
+  var reparto = (firmes.length||dudosos.length)
+    ? firmes.map(pers).join('')+(dudosos.length ? '<div class="ftu-sub">Por confirmar</div>'+dudosos.map(pers).join('') : '')
+    : vac('Nadie apuntado todavía');
+  var cl = _cochesTurnoLineas_(t.coches);
+  var coches = cl.length ? cl.map(function(l){
+    return '<div class="ftu-coche"><b>🚗 Coche '+l.n+' · '+esc(l.conduce||'sin conductor')+'</b>'+
+      '<span>'+esc(l.ida)+(l.vuelta ? ' · vuelta: '+esc(l.vuelta) : '')+'</span>'+
+      '<span class="ftu-van">'+(l.pasajeros.length ? 'Van: '+esc(l.pasajeros.join(', ')) : 'Sin pasajeros')+'</span></div>';
+  }).join('') : vac('Sin coches organizados');
+  var obj = function(a, vacio){
+    return (a && a.length) ? a.map(function(o){ return '<div class="ftu-obj">'+esc(o)+'</div>'; }).join('') : vac(vacio);
+  };
+  var sec = function(tit, cuerpo){ return '<section class="ftu-sec"><h5>'+tit+'</h5>'+cuerpo+'</section>'; };
+  return '<div id="ficha-turno">'+pan('Ficha del turno · '+esc(_refTurno_(t)), '<button class="btn sm" data-tursel="'+esc(k)+'">Cerrar</button>',
+    '<div class="pb"><div class="ftu-cab"><b>'+esc(t.punto||'—')+'</b>'+
+      (t.estado==='Cancelado' ? '<span class="chip no">cancelado</span>' : '')+
+      '<span class="mono">'+esc(f)+' · '+esc(t.hora||'—')+' · '+esc(t.duracion||t.dur||'—')+'</span></div>'+
+    '<div class="ftu-rej">'+
+      sec('Quién va', reparto)+sec('Coches', coches)+
+      sec('Objetivos principales', obj(t.principales, 'Sin objetivos principales'))+
+      sec('Objetivos secundarios', obj(t.secundarios, 'Sin objetivos secundarios'))+
+    '</div>'+
+    sec('Nota', t.nota ? '<div class="ftu-nota">'+esc(t.nota)+'</div>' : vac('Sin nota'))+
+    /* la memoria se incrusta como DOCUMENTO (igual que en el movil), no como un enlace suelto */
+    sec('Memoria', t.memoria ? _memoriaHTML_(t) : vac('Memoria del turno · aún no subida'))+'</div>',
+    'ftu destaca')+'</div>';
+}
+
+/* La fila lleva `data-tursel`; el enlace «ver» de la memoria NO abre la ficha. */
+function _engFichaTurno_(){
+  $$('[data-tursel]').forEach(function(el){
+    el.onclick=function(ev){
+      if(ev.target && ev.target.closest && ev.target.closest('a')) return;
+      FICHA_TUR = _turSelAlternar_(FICHA_TUR, el.dataset.tursel);
+      pintar();
+      if(FICHA_TUR){ var c=document.getElementById('ficha-turno'); if(c) c.scrollIntoView({block:'nearest',behavior:redu()?'auto':'smooth'}); }
+    };
+  });
+  _cablearMemoria_();
+}

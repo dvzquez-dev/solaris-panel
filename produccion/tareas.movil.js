@@ -69,12 +69,18 @@ function vTareas(){
   function fila(t){
     /* ⛔ 20/10 (auditoría): una tarea HECHA no «venció»: se dice su plazo, neutro (salía en rojo «venció hace 49 días»). */
     var v=_tareaHecha_(t&&t.e) ? [_plazoDMY_(t.l) ? 'plazo '+_plazoDMY_(t.l) : 'sin fecha límite', false] : vence(t.l),
-        i=iDe(t), ac=_tareaAccion_(t.e), des=_puedeDeshacerTarea_(t);
+        i=iDe(t), ac=_tareaAccion_(t.e), des=_puedeDeshacerTarea_(t),
+        ap=_apelDeTarea_(t), apelar=_puedeApelarTarea_(_fichaYo_(), t);
     return '<div class="fila"><div class="a"><b>'+esc(t.n)+'</b>'+
       '<small>'+esc(t.s)+' · '+esc(t.pr)+' · <span style="color:'+(v[1]?'var(--red2)':'var(--ink3)')+'">'+v[0]+'</span></small>'+
       /* ⚠️ El aviso del plazo sale de la PUERTA, no de un número escrito aquí: con el número
          repetido, cambiarlo dejaría la pantalla prometiendo el viejo. */
       (des?'<small style="color:var(--ink3)">puedes deshacerlo durante '+_minDeshacerTarea_()+' min</small>':'')+
+      /* 31/10: la apelación (RRI Art. 34) en la propia tarea: abierta, o la respuesta si se resolvió hace poco. */
+      (ap&&(ap.estado==='abierta'||_apelReciente_(ap))?'<small class="apelada" style="color:'+
+        (ap.estado==='desestimada'?'var(--red2)':ap.estado==='estimada'?'var(--ok)':'var(--warn)')+'">'+esc(_apelEstadoTxt_(ap))+'</small>':'')+
+      /* el botón va DEBAJO del texto, no en la columna de la derecha: con «Entregada» y el estado al lado, el título se quedaba en 8 renglones */
+      (apelar&&i>=0?'<button class="btn mini" style="margin-top:7px;align-self:flex-start" data-tapel="'+i+'">Apelar</button>':'')+
       '</div>'+
       '<div class="d"><span class="pil '+(t.e==='Revisando'?'conf':t.e==='En desarrollo'?'pend':'neu')+'">'+esc(t.e)+'</span>'+
       /* ⛔ Los dos marcadores son DISTINTOS (`data-tact` / `data-tdes`): con uno solo, el
@@ -90,8 +96,7 @@ function vTareas(){
     ' · ordenadas por urgencia y fecha límite.</p>'+
     '<div class="tarj">'+(act.length?act.map(fila).join(''):
       /* 957.ª: «cuando te asignen», no «cuando tu coordinador»: el PD y los coordinadores no tienen coordinador. */
-      vacio('Sin tareas asignadas','No tienes ninguna tarea asignada ahora mismo. Cuando te asignen una, '+
-        'aparecerá aquí.','',false))+'</div>'+
+      vacio('Sin tareas asignadas','Cuando te asignen una, saldrá aquí.','',false))+'</div>'+
     (act.length?'<div class="tarj" style="background:rgba(63,158,214,.05);border-color:rgba(63,158,214,.3)">'+
       '<p class="rnota" style="margin:0">Al fichar puedes imputar tus horas a cualquiera de estas tareas. '+
       /* ⛔ Y DICE DÓNDE SE APELA (762.ª, 02/10). Aquí ponía «puedes apelarla (Art. 34)» a
@@ -103,8 +108,9 @@ function vTareas(){
          Director»), que es la app que el equipo venía usando.
          ⛔ Y NO se inventa el PLAZO: el texto del Art. 34 no está en el repo, y un «tienes
          N días» escrito a ojo suena oficial — que es peor que no decirlo. */
-      'Si crees que una no te corresponde, el RRI te deja apelarla (Art. 34): '+
-      'se habla en privado al Project Director, y si procede la revoca desde la app y te devuelve los puntos.</p></div>':'')+
+      /* 31/10: YA SE APELA DESDE LA APP (`Apelar`, Art. 34). Antes ponía que se hablaba en privado con el PD. */
+      'Si no puedes con una, o no te corresponde, pulsa <b>Apelar</b> (Art. 34 del RRI): la ven tu coordinador y el Project Director. '+
+      'Las voluntarias no se apelan.</p></div>':'')+
     /* mismo cajon que en Turnos: cuenta y la ultima, para que las dos pantallas se lean igual */
     (fin.length?'<div class="cajon" data-caj data-p><span>Tareas pasadas <b>· '+fin.length+'</b>'+
         (fin[0]&&_plazoDMY_(fin[0].l)?' <span style="color:var(--ink3)">· la última, '+_plazoDMY_(fin[0].l)+'</span>':'')+'</span>'+
@@ -140,6 +146,9 @@ function _engTareas_(){
         pintar(); tost('«'+t.n+'»: '+ac.a+'. Puedes deshacerlo durante '+_minDeshacerTarea_()+' min.');
       });
     };
+  });
+  $$('[data-tapel]',c).forEach(function(b){
+    b.onclick=function(){ var t=TAREAS[+b.dataset.tapel]; if(t) _formApelar_(t); };
   });
   $$('[data-tdes]',c).forEach(function(b){
     b.onclick=function(){
@@ -188,3 +197,43 @@ function _tareasRelevantes_(){
     .some(function(t){ return !_tareaHecha_(t&&t.e); });
 }
 
+
+/* ¿La respuesta a una apelación es de estos días? Pasado el plazo de vista, la tarea deja de contarlo. */
+function _apelReciente_(ap){
+  var f=Date.parse(ap && ap.decidido_at);
+  return f > 0 && (Date.now() - f) < APEL_DIAS_VISTA * 86400000;
+}
+
+/* ══ APELAR UNA TAREA (RRI Art. 34) ═════════════════════════════════════════════════════════════════
+   El formulario: las cláusulas en una línea, una elegida, y el motivo OBLIGATORIO. «Enviar» no se enciende hasta que
+   hay las dos cosas. Se vuelve a mirar al enviar (§ la tarea pudo cambiar con un refresco): el servidor manda. */
+function _formApelar_(t){
+  var cl='', op=APEL_CLAUSULAS.map(function(c){
+    return '<label class="fila clic" style="gap:10px"><input type="radio" name="apelCl" value="'+c.k+'" style="flex:none">'+
+      '<span class="a"><small style="font-size:12.5px;color:var(--ink)">'+esc(c.t)+'</small></span></label>';
+  }).join('');
+  abrirModal('<div class="h1" style="font-size:18px">Apelar «'+esc(t.n)+'»</div>'+
+    '<p class="h1s">Es tu derecho (Art. 34 del RRI). Lo ve tu coordinador y el Project Director. Si no apelas y no la haces, resta 1 punto.</p>'+
+    '<div class="tarj" style="padding:4px 12px">'+op+'</div>'+
+    '<label class="campo" style="margin-top:12px"><span class="sc">Cuéntanos qué pasa <span class="req">*</span></span>'+
+      '<textarea id="apelMotivo" placeholder="Qué te lo impide o por qué no te corresponde."></textarea></label>'+
+    '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="apelNo" style="flex:1">Cancelar</button>'+
+      '<button class="btn pri" id="apelSi" style="flex:1" disabled>Enviar apelación</button></div>');
+  var si=$('#apelSi'), mo=$('#apelMotivo');
+  function mira(){
+    cl=''; $$('input[name=apelCl]').forEach(function(r){ if(r.checked) cl=r.value; });
+    si.disabled=!(cl && mo.value.trim());
+  }
+  $$('input[name=apelCl]').forEach(function(r){ r.onchange=mira; });
+  mo.oninput=mira;
+  $('#apelNo').onclick=cerrarModal;
+  si.onclick=function(){
+    mira(); if(si.disabled) return;
+    si.disabled=true;
+    _apelarTarea_(t, cl, mo.value.trim()).then(function(){
+      cerrarModal(); pintar(); tost('Apelación enviada. Te avisamos cuando respondan.');
+    }).catch(function(e){
+      si.disabled=false; tostErr('No se pudo enviar la apelación: ', e);
+    });
+  };
+}

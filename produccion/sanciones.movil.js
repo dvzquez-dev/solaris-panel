@@ -66,6 +66,16 @@ async function _cargarMovimientosM_(){
   }catch(e){ return false; }
 }
 
+/* 31/10: TUS sanciones para alegar o apelar. Falla hacia LISTA VACÍA (un servidor sin la acción, o un corte, no pinta nada), nunca hacia una inventada. */
+async function _cargarMisSancionesM_(){
+  if(typeof MIS_SANC==='undefined' || _apelEsDemo_()) return true;     // la maqueta las calcula ella (`_misSancLista_`)
+  try{
+    var a=await api.getMisSanciones();
+    MIS_SANC=Array.isArray(a) ? a : [];
+    return Array.isArray(a);
+  }catch(e){ MIS_SANC=[]; return false; }
+}
+
 /* La misma busqueda con distinto nombre en cada cara; se envuelve para que el bloque de
    autoridad de abajo sea IDENTICO en las dos y un diff lo confirme de un vistazo. */
 /* EQUIVALENTE (no GEMELA): misma busqueda con distinto ayudante en cada cara —existe JUSTO para que el bloque de autoridad de debajo si sea identico—. */
@@ -148,16 +158,15 @@ function _sancionesHTML_(){
                   (t.l?(_venciaTarea_(t.l)?' · venció el ':' · vence el ')+esc(_plazoDMY_(t.l)||_isoADMY_(t.l)):'')+'</option>'; }).join('')+   /* 20/10: «vencía» de lo que aún no vence */
               '</select></label>'+
               '<label class="campo"><span class="sc">Plazo nuevo</span><input type="date" id="snPlazo" value="'+esc(SANC_FORM.plazo||'')+'"></label>'+
-              '<p class="rnota" style="margin:0 0 10px">El plazo nuevo se escribe <b>en Notion</b>. '+
-              'Si eso falla, la sanción <b>no</b> se pone: no tiene sentido sancionar por un plazo y '+
-              'dejar la tarea con la fecha vencida.</p>'
+              '<p class="rnota" style="margin:0 0 10px">El plazo nuevo se guarda <b>en Notion</b>. '+
+              'Si falla, la sanción <b>no</b> se pone.</p>'
           /* ⛔ «NO SE PUDO LEER» NO ES «NO TIENE». `SANC_TAREAS.error` lo guardaba la
              puerta desde siempre y NO LO LEIA NADIE, asi que un corte de red se pintaba
              como «elige otro motivo» y el expediente salia con el articulo equivocado. */
           : (SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien && SANC_TAREAS.error)
-            ? '<p class="rnota" style="margin:0 0 10px;color:var(--warn)">No se pudieron leer las tareas de '+
+            ? '<p class="rnota" style="margin:0 0 10px;color:var(--warn)">No se pudieron cargar las tareas de '+
               esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+': '+esc(String(SANC_TAREAS.error))+'.<br>'+
-              'Sin esa lista <b>no se sabe</b> si tiene plazos que mover, así que esto <b>no</b> dice que no los tenga. Vuelve a elegirle para reintentar.</p>'
+              'Vuélvelo a elegir para reintentar.</p>'
             : '<p class="rnota" style="margin:0 0 10px;color:var(--warn)">'+
               esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+' no tiene ninguna tarea viva con enlace '+
               'a Notion, así que no se puede mover ningún plazo. Elige otro motivo.</p>')
@@ -231,8 +240,7 @@ function _sancColaHTML_(){
         '</div>';
       }).join('')+
       (suelta ? ''
-        : '<p class="rnota">Dentro de un lote no se decide una a una: se marca cada una y el '+
-          'bloque se cierra entero, porque aprobar de una en una podía aplicar medio bloque.</p>'+
+        : '<p class="rnota">Se marca cada una y el bloque se cierra entero.</p>'+
           '<button class="btn full" data-scerrar="'+esc(k)+'" data-p>Cerrar el bloque entero</button>')+
     '</div></div>';
   }).join('');
@@ -330,7 +338,7 @@ function _cablearSanciones_(){
     if(mot==='plazo'||mot==='plazoUrg'){
       urlTarea=val('snTarea'); plazo=val('snPlazo');
       if(!urlTarea){ msg('Elige la tarea cuyo plazo se incumplió.', true); return; }
-      if(!plazo){ msg('Pon el plazo nuevo: sancionar por un plazo y no darle otro no arregla nada.', true); return; }
+      if(!plazo){ msg('Pon el plazo nuevo.', true); return; }
       /* De la lista DEL SANCIONADO -`SANC_TAREAS`-, no de `TAREAS`, que son las mias. Si se
          busca aqui, el titulo no aparece y el motivo queda en «una tarea»: es lo que le paso a
          la sancion de Jose del 28/07. Lo que se pinta y lo que se guarda tienen que salir del
@@ -567,8 +575,8 @@ function medidorHTML(){
      solo por su primera línea. */
   if(typeof p !== 'number' || !isFinite(p))
     return '<div class="medcaja"><p class="rnota" style="margin:0;padding:9px 2px;text-align:center">'+
-      'Aún no ha llegado tu dato de puntos. No es un 0: en cuanto llegue, sale aquí.</p></div>'+
-      _libroPuntosHTML_();
+      'Todavía no tenemos tus puntos. Saldrán aquí en cuanto lleguen.</p></div>'+
+      _libroPuntosHTML_()+_misSancHTML_();
   for(i=0;i<10;i++){
     var lleno=i<p, crit=i<3;
     var col = lleno ? _colorSeg_(i,p) : '';
@@ -618,7 +626,47 @@ function medidorHTML(){
     '</div>'+
     '<button class="btn mini" data-p id="btnLibro" style="margin-top:11px">Desglose de puntos</button>'+
   '</div>'+
-  _libroPuntosHTML_();
+  _libroPuntosHTML_()+_misSancHTML_();
+}
+
+/* ══ APELAR TUS SANCIONES (31/10, Art. 32 bis propuesto) ═════════════════════════════════════════════════
+   Sólo las que tienen algo que hacer o que contar: apelable o con apelación. Lo demás ya está en el desglose de arriba.
+   El servidor dice qué se puede (`apelable`, `apelable_hasta`); la cara no cuenta plazos. */
+function _misSancHTML_(){
+  var L=_misSancLista_().filter(function(s){ return s && (s.apelable || s.apelacion); });
+  if(!L.length) return '';
+  return '<div class="msanc"><div class="sc" style="margin:14px 0 2px">Tus sanciones</div>'+L.map(function(s){
+    var est=_sancEstadoM_(s), p=(s.puntos === null || s.puntos === undefined) ? _etPtsSanc_(null) : (s.puntos < 0 ? '−' + Math.abs(s.puntos) : String(s.puntos));
+    return '<div class="fila" data-msfila="'+esc(s.id)+'"><div class="a"><b>'+esc(s.motivo || 'Sanción')+'</b>'+
+      '<small>'+esc(p)+' · '+esc(_isoADMY_(String(s.fecha || '').slice(0, 10)) || '')+'</small>'+
+      (est ? '<small class="msest" style="color:'+est[1]+'">'+esc(est[0])+'</small>' : '')+
+      (s.apelable ? '<small>Puedes apelar hasta el '+esc(_isoADMY_(s.apelable_hasta) || '')+'</small>'+
+        '<button class="btn mini" style="margin-top:7px;align-self:flex-start" data-msapelar="'+esc(s.id)+'">Apelar</button>' : '')+
+      '</div></div>';
+  }).join('')+'</div>';
+}
+
+/* El formulario de apelar. Motivo obligatorio, enlace opcional. */
+function _formSancion_(s){
+  abrirModal('<div class="h1" style="font-size:18px">Apelar «'+esc(s.motivo || 'Sanción')+'»</div>'+
+    '<p class="h1s">Tienes hasta el '+esc(_isoADMY_(s.apelable_hasta) || '')+'. Mientras se resuelve, la sanción sigue aplicada.</p>'+
+    '<label class="campo"><span class="sc">Qué pasó <span class="req">*</span></span>'+
+      '<textarea id="msMotivo" placeholder="Lo que quieres que se tenga en cuenta."></textarea></label>'+
+    '<label class="campo"><span class="sc">Enlace o foto (si lo hay)</span>'+
+      '<input id="msEnlace" type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label>'+
+    '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="msNo" style="flex:1">Cancelar</button>'+
+      '<button class="btn pri" id="msSi" style="flex:1" disabled>Enviar</button></div>');
+  var si=$('#msSi'), mo=$('#msMotivo');
+  mo.oninput=function(){ si.disabled=!mo.value.trim(); };
+  $('#msNo').onclick=cerrarModal;
+  si.onclick=function(){
+    if(!mo.value.trim()) return;
+    si.disabled=true;
+    _apelarSancion_(s, mo.value.trim(), ($('#msEnlace').value || '').trim())
+      .then(function(){ return _cargarMisSancionesM_(); })
+      .then(function(){ cerrarModal(); pintar(); tost('Apelación enviada. Te avisamos cuando respondan.'); })
+      .catch(function(e){ si.disabled=false; tostErr('No se pudo enviar: ', e); });
+  };
 }
 
 /* EL LIBRO DE PUNTOS. Mismo trato que el de horas y por la misma puerta (`_ultimosMov_`):
@@ -641,10 +689,8 @@ function _libroPuntosHTML_(){
     }).join('') : (!_llego_('movs')
       /* ⛔ VACIO Y «TODAVIA NO SE SABE» NO SE PINTAN IGUAL. Es la mitad que faltaba:
          arreglar el dato sin arreglar lo que se PINTA deja el bug intacto. */
-      ? '<div class="retf" style="opacity:.7"><span class="mo"><b>Cargando tus movimientos…</b>'+
-        '<small>El servidor todavía no ha contestado. Se sigue intentando solo.</small></span></div>'
-      : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b>'+
-        '<small>Aquí aparece cada subida o bajada de puntos, con su artículo y su fecha.</small></span></div>'))+
+      ? '<div class="retf" style="opacity:.7"><span class="mo"><b>Cargando tus movimientos…</b></span></div>'
+      : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b></span></div>'))+
     (r.ultimos.length ? '<p class="rnota" style="margin:8px 0 0">'+_notaRegistro_(r.total,'temporada')+'</p>' : '')+
   '</div></div>';
 }
@@ -842,8 +888,7 @@ function panelPD(){
            0 `<button` y la promesa impresa dos veces, una por tarjeta.
            ⚠️ Lo que SI sigue siendo cierto es lo otro: el motivo y el articulo se eligen al
            CREAR el bloque, y eso es del escritorio. */
-        '<p class="rnota">El <b>motivo y el artículo</b> son comunes a todo el bloque y se '+
-        'eligieron al crearlo, desde el escritorio.</p></div></div>';
+        '<p class="rnota">Motivo y artículo son los del bloque (se fijan en el escritorio).</p></div></div>';
     }).join('')+
     /* ⛔ SE DECIDE A UN TOQUE, NO AQUI: el boton abre la MISMA pantalla que el menu ⋮
        (`_abrirSanciones_`), que es donde estan los botones de verdad. NO se copian aqui: una
@@ -863,8 +908,7 @@ function _panelPDmaqueta_(){
   var c={aceptar:0,justificar:0,rechazar:0};
   LOTE.items.forEach(function(x){c[x.dec]++;});
   var lote = !LOTE.items.length
-    ? '<div class="lote">'+vacio('Sin bloques pendientes','Ninguna sanción espera tu decisión. Cuando el '+
-        'motor prepare un bloque, aparecerá aquí para que lo cierres entero.','',false)+'</div>'
+    ? '<div class="lote">'+vacio('Sin bloques pendientes','No hay sanciones pendientes.','',false)+'</div>'
     : LOTE.cerrado
     ? '<div class="lote"><div class="lote-h"><b>'+LOTE.items.length+' personas</b>'+
       '<span class="pil conf">bloque cerrado</span></div>'+
@@ -885,7 +929,7 @@ function _panelPDmaqueta_(){
       }).join('')+
       '<div class="cierre"><div class="tx"><b style="color:var(--ok)">'+c.aceptar+'</b> se aplican · '+
         '<b>'+c.justificar+'</b> justificadas · <b style="color:var(--red2)">'+c.rechazar+'</b> rechazadas'+
-        '<em>Marcar no aplica nada. No se sanciona a nadie hasta que cierras el bloque entero.</em></div>'+
+        '<em>No se sanciona a nadie hasta que cierres el bloque.</em></div>'+
         '<button class="btn pri full" style="margin-top:9px" data-p id="btnLote">Aprobar el bloque · '+c.aceptar+' sanciones</button>'+
       '</div></div>';
 
@@ -915,8 +959,8 @@ function _panelPDmaqueta_(){
 function sancionarModal(){
   var motivos=RRI.restas.concat(RRI.sumas);
   abrirModal('<div class="mtit">🔨 Sancionar</div>'+
-    '<div class="msub">Entra en la cola como <b>pendiente</b>: la confirmas aquí y se aplica después. '+
-    'Varias personas a la vez van en un mismo bloque, con <b>un único comunicado</b>.</div>'+
+    '<div class="msub">Queda <b>pendiente</b> hasta que la confirmes. '+
+    'Si sancionas a varios a la vez, van en un bloque con <b>un solo comunicado</b>.</div>'+
     '<label class="campo"><span class="sc">A quién</span><select id="scPer">'+
       _activos_().map(function(m){return '<option>'+esc(m.nombre)+'</option>';}).join('')+'</select></label>'+
     '<label class="campo"><span class="sc">Motivo del RRI</span><select id="scMot">'+
