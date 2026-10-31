@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=a75924f">
+<link rel="stylesheet" href="escritorio.css?v=72f910a">
 </head>
 <body>
 
@@ -113,15 +113,15 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=8a4932f"></script>
+<script src="comun.js?v=c71a09f"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=471a14e"></script>
-<script src="turnos.escritorio.js?v=ceb094e"></script>
+<script src="turnos.escritorio.js?v=d72d3a4"></script>
 <script src="buzon.escritorio.js?v=a3871ed"></script>
-<script src="documentos.escritorio.js?v=04f424d"></script>
-<script src="sanciones.escritorio.js?v=9fa78c9"></script>
-<script src="reuniones.escritorio.js?v=cd1ecae"></script>
-<script src="horas.escritorio.js?v=35abe25"></script>
+<script src="documentos.escritorio.js?v=37e0b2e"></script>
+<script src="sanciones.escritorio.js?v=6a500ac"></script>
+<script src="reuniones.escritorio.js?v=344cdd5"></script>
+<script src="horas.escritorio.js?v=7341571"></script>
 <script src="equipo.escritorio.js?v=a56e62b"></script>
 <script src="directo.escritorio.js?v=74620c4"></script>
 <script>
@@ -401,6 +401,8 @@ var api={
      proteccion justo cuando hace falta. */
   otorgarHoras:function(p){ return api._post({action:"otorgarHoras",parte:p}); },
   otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria,subcat:b.subcat||null,clave:b.clave}); },
+  /* 01/11: el PD manda un aviso (push) a mano; `mandarAviso` en el servidor, puerta de rango 3. */
+  mandarAviso: function(c){ return api._post({action:"mandarAviso",titulo:c.titulo,texto:c.texto,todo:!!c.todo,unidades:c.unidades||[],personas:c.personas||[]}); },
   enviarPush:  function(d,t,c,o){ return api._post({action:"enviarPush",destinatario:d,titulo:t,cuerpo:c,opts:o}); },
   /* ⛔ ESTA FALTABA, y en la cara del PD llevaba rota desde siempre — sin dar señal. La llaman
      `activarNotis` (aquí abajo) y `_pushInit_` (comun.js), que corre en LAS DOS caras al
@@ -805,6 +807,16 @@ function tabla(cols,filas){
    radar y su parrafo- y dos nombres casi iguales para dos cosas distintas es peor
    que dos nombres distintos. Mapa §5, D10. */
 function vacioSimple(t,p){ return '<div class="vac"><b>'+esc(t)+'</b>'+p+'</div>'; }
+/* 31/10 (feosesc #18 y #25): «Reintentar» de los avisos de error, como el de Turnos (`data-dreint`). `clave` dice qué volver a pedir. */
+function _reintentarHTML_(clave){ return '<button class="btn" data-reint="'+clave+'">Reintentar</button>'; }
+function _cablearReintentos_(){
+  $$('[data-reint]').forEach(function(b){ b.onclick=function(){
+    var k=b.dataset.reint, p;
+    if(k==='curso'){ CURSO_SRV='sin pedir'; _cursoCargar_.t=0; return pintar(); }
+    if(k==='cierre'){ CIERRE=null; CIERRE_ERR=null; p=_cargarCierre_(); }
+    else { TEMP=null; TEMP_ERR=null; p=_cargarTemporada_(); }
+    pintar(); Promise.resolve(p).then(pintar); }; });
+}
 /* ═══ LIBROS DE HORAS Y PUNTOS · GEMELO DE movil.html ══════════════════════════════════
    Copiado del movil POR SCRIPT, byte a byte, no reescrito. Si tocas una, toca la otra:
    «no duplicar» aqui significa que la copia sea IDENTICA y se llame igual (mapa §5).
@@ -996,6 +1008,8 @@ var V={};
 var DIRECTO_MAX=60, DIRECTO_CADA_MS=5000, DIRECTO_TODO_CADA_MS=2500, DIRECTO_TODO_MAX=200;
 var DIRECTO={eventos:[], cursor:null, cuenta:{}, vistos:{}, reloj:null, demo:0, err:null, enVuelo:false, tab:'mapa',
   todo:{lineas:[], vistos:{}, cursor:null, cont:null, timers:[], sesgo:0, err:null, enVuelo:false, reloj:null, n:0}};
+/* 01/11: «Mandar aviso» (push a mano), sólo el PD. El formulario es de `comun.js`; esta cara lo pinta como vista (no hay modales). */
+V.aviso={g:'Operación',t:'Mandar aviso',f:function(){ return _puedeMandarAviso_() ? _avisoHTML_('btn sm') : '<div class="mtit">Mandar aviso</div><p class="rnota" data-est="nopuede">Solo para el director.</p>'; }};
 V.directo={g:'Operación',t:'En directo',f:function(){ return _puedeVerDirecto_() ? _directoHTML_() : '<div class="mtit">En directo</div><p class="rnota" data-est="nopuede">Solo para el director.</p>'; }};
 
 /* ── PANEL DE MANDO ──────────────────────────────────────────────────────
@@ -1295,6 +1309,7 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
    `[{id, autor, subsistema, ini, horas, pausado}]` ordenado por hora de entrada, con las horas ya
    en cuartos y las pausas descontadas. Solo faltaba esta cara. */
 var CURSO_SRV='sin pedir';
+var CURSO_ERR='';
 
 /* ⛔ SE PIDE UNA VEZ, no en cada repintado: `pintar()` corre en cada interacción de la pantalla.
    Y si el servidor no contesta se marca el estado — un panel de sesiones abiertas que se queda
@@ -1318,6 +1333,7 @@ function _cursoCargar_(repintar){
     /* ⛔ 21/10 (auditor 8, 🟡 9): «solo el PD» NO es una avería. `getFichajesAbiertos` es del PD (por el token, no por
        «Actúas como»), y a un coordinador se le pintaba «No se pudo preguntar al servidor». */
     CURSO_SRV=/solo el (PD|Project Director)/i.test(String((e&&e.message)||e||'')) ? 'vedado' : 'error'; CURSO.length=0;
+    CURSO_ERR=String((e&&e.message)||e||'');
     if(typeof repintar==='function') repintar();
   });
 }
@@ -1328,7 +1344,7 @@ V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
     vacioSimple('Esta lista es del Project Director','Quién está fichado ahora mismo sólo lo ve el Project Director; '+
       'tus fichajes están en «Lo tuyo».'));
   if(CURSO_SRV==='error') return pan('Sesiones abiertas ahora mismo','sin datos',
-    vacioSimple('No se pudo cargar la lista de fichados',''));
+    vacioSimple('No se pudo cargar la lista de fichados', (CURSO_ERR ? esc(CURSO_ERR)+'. ' : '')+_reintentarHTML_('curso')));
   if(CURSO_SRV!=='ok') return pan('Sesiones abiertas ahora mismo','…',
     vacioSimple('Preguntando al servidor','Un momento.'));
   return pan('Sesiones abiertas ahora mismo',CURSO.length+(CURSO.length===1?' persona':' personas'),
@@ -1568,7 +1584,7 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
   if(CIERRE_ERR)
     return pan('Cierre de '+cer.mes,'no se pudo comprobar',
       vacioSimple('No se pudo leer el estado del cierre', esc(CIERRE_ERR)+'. No lo cierres sin verlo: '+
-        'mueve la cuota de todo el equipo.'));
+        'mueve la cuota de todo el equipo. '+_reintentarHTML_('cierre')));
   var bloq=(CIERRE.bloqueos)||[], enc=CIERRE.encolado||null, plan=_planVigente_(CIERRE.plan||null);
   /* ⛔ 21/10 (auditor 9): un plan de un mes ANTERIOR al que toca cerrar es de un ciclo pasado (`_planVigente_`): no
      cuenta para el estado. Se dice en una línea, para que no parezca que se ha perdido. */
@@ -1760,7 +1776,7 @@ V.temporada={g:'Horas',t:'Cierre de temporada',f:function(){
   if(TEMP_ERR)
     return pan('Cierre de temporada','no se pudo comprobar',
       vacioSimple('No se pudo leer el estado', esc(TEMP_ERR)+'. No lo cierres sin verlo: '+
-        'mueve la cuota y la renovación de todo el equipo.'));
+        'mueve la cuota y la renovación de todo el equipo. '+_reintentarHTML_('temp')));
   var pl=TEMP.plan||null, enc=TEMP.encolado||null, apl=TEMP.aplicando||null;
   var t=(pl&&pl.totales)||{}, bloq=(pl&&pl.bloqueos)||[];
   /* ⛔ 21/10 (auditor 9, 🟠 7): la cabecera dice la temporada DEL PLAN. Fuera de septiembre el servidor da la que
@@ -2398,7 +2414,7 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
         var id=_refTurno_(t);   /* 20/10: la misma referencia que el móvil (y con DD/MM/AAAA ya no sale «T·1/2025») */
         /* 22/10 (auditor 25, 🟡 12): PERSONAS firmes, no filas de rol (Posible/Reserva aparte, «+N ?»; repetidos, una vez) */
         var _nf=_asistentesTurno_(t).length, _nd=_dudososTurno_(t).length;
-        var quien=_nf+(_nd?' <span class="sc">+'+_nd+' ?</span>':'');
+        var quien=_nf+(_nd?' <span class="sc">· '+_nd+' por confirmar</span>':'');   /* 31/10 (feosesc #22): con palabras, no «+1 ?» */
         /* 22/10 (auditor 25, 🟠 3): los coches, con el detalle al pasar por encima */
         var _cl=_cochesTurnoLineas_(t.coches);
         var coches=_cl.length ? '<span title="'+esc(_cl.map(function(l){ return 'Coche '+l.n+' · '+(l.conduce||'sin conductor')+': '+
@@ -2425,7 +2441,7 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
 /* ⛔ 26/10 (triaje C2a): CREAR UNA TAREA DESDE LA APP. 🗣️ Daniel, 20/10: «la fuente de verdad es el propio minipc […]
    notion pasa a ser una proyección», así que las tareas nuevas tienen que poder nacer aquí. El PD en cualquier unidad
    con tablero; un coordinador, en las que coordina. El servidor vuelve a mirarlo todo (`e_crear_tarea`). */
-var NUEVA_TAREA = {u:'', n:'', l:'', r:{}, ok:'', c:'', p:'media', cal:'', b:''}, _NT_IA_N_ = 0;
+var NUEVA_TAREA = {u:'', n:'', l:'', r:{}, ok:'', c:'', p:'media', cal:'', b:'', ab:false}, _NT_IA_N_ = 0;
 function _unidadesNuevaTarea_(){
   var yo = (typeof _actorSanc_==='function') ? _actorSanc_() : null;
   if(!yo) return [];
@@ -2462,10 +2478,13 @@ function _fechaNuevaTareaHtml_(hoy){
 function _nuevaTareaPanel_(){
   var us = _unidadesNuevaTarea_();
   if(!us.length) return '';
+  /* 31/10 (feosesc): PLEGADO por defecto — abierto empujaba la lista bajo el pliegue. Lo escrito vive en `NUEVA_TAREA`. */
+  if(!NUEVA_TAREA.ab) return '<div id="ntPanel" class="nt-plegado"><button type="button" class="btn sm pri" data-ntab="1">+ Nueva tarea</button>'+
+    (NUEVA_TAREA.ok ? '<span class="nota">'+esc(NUEVA_TAREA.ok)+'</span>' : '')+'</div>';
   if(us.indexOf(NUEVA_TAREA.u) < 0){ NUEVA_TAREA.u = us[0]; NUEVA_TAREA.r = {}; }
   var gente = _genteNuevaTarea_(NUEVA_TAREA.u), falta = _nuevaTareaFalta_(), hoy = _hoyNuevaTarea_(),
       conPrio = UNIDADES_CON_PRIORIDAD_TAREA.indexOf(NUEVA_TAREA.u) >= 0;
-  return '<div id="ntPanel">'+pan('Nueva tarea', 'en el tablero de '+NUEVA_TAREA.u, '<div class="pb">'+
+  return '<div id="ntPanel">'+pan('Nueva tarea', 'en el tablero de '+NUEVA_TAREA.u+' · <button type="button" class="btn sm" data-ntab="0">Cerrar</button>', '<div class="pb">'+
     (NUEVA_TAREA.ok ? '<div class="nota" style="margin-bottom:9px">'+esc(NUEVA_TAREA.ok)+'</div>' : '')+
     '<label class="campo"><span class="sc">Qué hay que hacer</span><input id="ntN" maxlength="200" value="'+
       esc(NUEVA_TAREA.n)+'" placeholder="p. ej. Soldar la placa de potencia"></label>'+
@@ -2690,6 +2709,8 @@ function _repintarNuevaTarea_(){
   _cablearNuevaTarea_();
 }
 function _cablearNuevaTarea_(){
+  $$('[data-ntab]').forEach(function(el){ el.onclick = function(){
+    NUEVA_TAREA.ab = el.dataset.ntab === '1'; if(NUEVA_TAREA.ab) NUEVA_TAREA.ok = ''; _repintarNuevaTarea_(); }; });
   var b = document.getElementById('ntCrear');
   var vivo = function(){ if(!b) return; var f = _nuevaTareaFalta_(); b.disabled = !!f; b.textContent = f || 'Crear la tarea'; };
   var n = document.getElementById('ntN');
@@ -2739,7 +2760,7 @@ function _cablearNuevaTarea_(){
       var r = await api.crearTarea(t);
       if(r && r.tarea) TAREAS.push(r.tarea);
       var se = (r && r.sinEtiquetar) || [];
-      NUEVA_TAREA = {u:NUEVA_TAREA.u, n:'', l:'', r:{}, c:'', p:'media', cal:'', b:'', ok:'Tarea creada: «'+nom+'»'+
+      NUEVA_TAREA = {u:NUEVA_TAREA.u, n:'', l:'', r:{}, c:'', p:'media', cal:'', b:'', ab:false, ok:'Tarea creada: «'+nom+'»'+
         (se.length ? ' (sin usuario de Notion, no salen de responsables allí: '+se.join(', ')+')' : '')};
       pintar();
     }catch(e){ b.disabled = false; b.textContent = 'No se pudo crear: ' + ((e && e.message) || e); }
@@ -2794,7 +2815,7 @@ V.miembros={g:'Equipo',t:'Miembros',f:function(){
   return '<div class="chips"><button type="button" class="pick'+(_fu.length?'':' on')+'" data-mu="">Todas <b>'+_nAct+'</b></button>'+
       _gu.map(function(s){
       return '<button type="button" class="pick'+(MIEMB_U[s.u]?' on':'')+'" data-mu="'+esc(s.u)+'">'+esc(s.u)+' <b style="color:var(--ink)">'+s.n+'</b></button>';}).join('')+'</div>'+
-    pan('Todos los miembros',(_fu.length ? _lista.length+' de '+_nTot+' · '+esc(_fu.join(' + ')) : _nAct+' activos · '+_nTot+' con las bajas')+' · solo lectura',
+    pan('Todos los miembros',(_fu.length ? _lista.length+' de '+_nTot+' · '+esc(_fu.join(' + ')) : _nAct+' activos'+(_nTot>_nAct ? ' · '+(_nTot-_nAct)+' de baja' : ''))+' · solo lectura',
       /* ⛔ 20/10: la columna son las horas de ESTE mes (`hMes` ya traducido), y se rotulaba «H/mes» — al lado del
          «H/mes pond.» del Ranking, que es el ritmo de la TEMPORADA. Con el mes abierto, como el Registro. */
       tabla([['Miembro'],['Unidad'],['Cargo'],['Pts',1],[_nomMesAbierto_(true),1],['Temporada',1]],
@@ -2955,9 +2976,7 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
 V.subsis={g:'Equipo',t:'Horas por subsistema',f:function(){
   var subs=_llego_('subs') ? _subsEnVivo_() : [];
   if(!subs.length) return pan('Horas por subsistema','sin datos',
-    vacioSimple('Sin datos de subsistemas','La media por unidad se calcula con la gente que '+
-      'esta pantalla tiene delante, pero el servidor todavía no ha mandado qué unidades '+
-      'compiten. Sin esa lista no hay nada que rankear.'));
+    vacioSimple('Sin datos de subsistemas','La media por unidad la calcula el motor al cerrar el mes, y todavía no ha llegado.'));
   /* ⛔ EL DIVISOR NO PUEDE SER 0, y el fallo cae del lado malo. Con el subsistema de cabeza a
      `media:0` —un mes recien cerrado— el ancho sale `NaN%`, que es CSS INVALIDO: el navegador
      lo descarta, el `<i>` cae a `width:auto` y **todas las barras salen LLENAS**. `|| 1` es el
@@ -4007,7 +4026,7 @@ var _swReg=null;
    NAVEGACIÓN
    ═══════════════════════════════════════════════════════════════════════════ */
 var GRUPOS=[
-  ['Operación',['panel','directo','turnos','tareas']],
+  ['Operación',['panel','directo','aviso','turnos','tareas']],
   ['Horas',['libros','partes','sindeclarar','curso','registro','cierre','temporada']],
   ['Documentos',['docdec','docurso','docpub']],
   ['Disciplina',['sanciones','apela']],
@@ -4030,6 +4049,7 @@ function pintarNav(){
          entrara al escritorio: el backend le decia que no, pero despues de haberselo ofrecido. */
       if(k==='cierre' && !_puedeCerrarMes_()) return;
       if(k==='directo' && !_puedeVerDirecto_()) return;
+      if(k==='aviso' && !_puedeMandarAviso_()) return;
       if(k==='novedades' && !_puedeVerNovedades_()) return;
       /* El de temporada, igual: de aqui salen la cuota y la renovacion de TODO el equipo. */
       if(k==='temporada' && !_puedeCerrarMes_()) return;
@@ -4067,7 +4087,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='ab0b906';
+var BUILD='a07abb7';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4096,6 +4116,10 @@ function _pinPie_(m){
   _cablearSalir_();
 }
 
+/* 01/11: engancha los gestos del formulario de «Mandar aviso» (`comun.js`) tras cada pintada; sólo en su vista. */
+function _pinAviso_(m){
+  if(vista==='aviso' && _puedeMandarAviso_()) _avisoEnganchar_(m, pintar);
+}
 function _pinHTML_(m){
   /* ⛔ EL HTML VA PRIMERO. Estaba al final, DESPUES de cablear medio panel, asi que
      cada pintada enganchaba manejadores a los nodos de la pintada anterior y acto
@@ -4550,6 +4574,7 @@ function pintar(){
   var _y=_scrollGuardar_(m, vista);
   _pinPie_(m);
   _pinHTML_(m);
+  _pinAviso_(m);
   _pinDirecto_();
   _pinSancSuelta_(m);
   _pinSancEditar_(m);
@@ -4575,6 +4600,7 @@ function ir(k,foco){
   if((k==='cierre'||k==='partes') && CIERRE===null && !CIERRE_ERR) setTimeout(_cargarCierre_,60);
   if(k==='temporada' && TEMP===null && !TEMP_ERR) setTimeout(_cargarTemporada_,60);
   if(k==='directo' && !_puedeVerDirecto_()) return;
+  if(k==='aviso' && !_puedeMandarAviso_()) return;
   if(k===vista && !foco) return;
   vista=k;
   var m=$('#main');
@@ -4615,6 +4641,7 @@ function _engIrYAcordeones_(){
   _cablearCierreTurno_();   // idem
   _cablearNuevaTarea_();    // idem (26/10, triaje C2a)
   _cablearPasoTarea_();     // idem (31/10, el paso de las tareas)
+  _cablearReintentos_();    // idem (31/10, feosesc #18 y #25)
   $$('[data-acord]').forEach(function(h){
     h.onclick=function(){ h.parentNode.classList.toggle('ab'); };
   });
@@ -4807,54 +4834,17 @@ function _engConvocarTurno_(){
       if(b.disabled) return;
       var lin=function(id){ return (($('#'+id)||{}).value||'').split('\n')
         .map(function(x){return x.trim();}).filter(function(x){return x;}); };
-      var nn=Object.keys(TUR_SEL);
-      var t={ fecha:($('#tuFecha')||{}).value||'', hora:($('#tuHora')||{}).value||'',
+      /* El cuerpo y la validación son de `comun.js` (`_armarTurno_`, `_porQueNoSeProgramaTurno_`): el móvil
+         llama a los mismos. Aquí sólo se recoge lo que hay en la pantalla. */
+      var f={ fecha:($('#tuFecha')||{}).value||'', hora:($('#tuHora')||{}).value||'',
         duracion:($('#tuDur')||{}).value||'', lugar:($('#tuLugar')||{}).value||'',
         punto:($('#tuPunto')||{}).value||'', crucial:!!(($('#tuCrucial')||{}).checked),
         nota:($('#tuNota')||{}).value||'', principales:lin('tuObj1'), secundarios:lin('tuObj2'),
-        /* ⚠️ `responsable` se mantiene con el mismo nombre y el mismo significado que
-           antes -el de TURNO-, porque el backend ya escribe esa columna. Los otros dos
-           viajan aparte y, sobre todo, dentro del `rol`, que es lo unico que se lee. */
-        responsable:TUR_CARGOS.turno, cargos:TUR_CARGOS,
-        /* ⛔ EL TRAYECTO VIAJA. Hasta hoy `TUR_COCHES` se rellenaba en pantalla y se
-           quedaba ahi: el unico dato de coche que llegaba a Notion era el BOOLEANO por
-           persona (`t.coche`, via el `rol`), o sea «llevo coche» sin decir de donde a
-           donde. Y eso es justo lo que Daniel pidio que constara.
-           ⚠️ DONDE CAE EN NOTION SIGUE SIENDO DECISION SUYA. Lo que hace esto es que el
-           dato no se pierda: el servidor lo guarda en su almacen y `getTurnos` lo
-           devuelve. Una columna de Notion se puede anadir despues sin tocar la cara. */
-        /* ⛔ Y QUIEN LO LLEVA Y QUIEN VA (754.ª). Sin estas dos lineas el backend
-           validaria `dueno`/`pasajeros` contra el reparto y nunca le llegaria ninguno:
-           un arreglo correcto que no decide nada porque el dato no llega. */
-        coches:TUR_COCHES.map(function(co){ return {origen:co.origen||'',
-          destino:co.destino||'', vueltaDistinta:!!co.vueltaDistinta,
-          vueltaOrigen:co.vueltaOrigen||null, vueltaDestino:co.vueltaDestino||null,
-          dueno:co.dueno||null, pasajeros:co.pasajeros||[]}; }),
-        coche:nn.filter(function(n){ return TUR_SEL[n].coche; }),
-        /* ⛔ EL `rol` LLEVA LO DE LOS BOTONES, no solo lo tecleado. `responsable` y
-           `coche` se mandan tambien aparte (columnas People de Notion), pero NADIE
-           las vuelve a leer: `_turnoDeNotion_` saca los roles solo del texto
-           `Reparto`. Sin esto, marcar el boton del coche no llegaba a ningun sitio
-           — y es el campo del que `reglas/cuota.py` saca el descuento de 4 EUR. */
-        reparto:nn.map(function(n){ return {nombre:n,
-          rol:(typeof _rolDeTurno_==='function'
-                /* ⛔ LAS TRES MARCAS, no solo la del responsable (764.a): `audiovisual` y
-                   `memoria` se marcaban en la pantalla y no llegaban al `rol`, que es de
-                   donde sale `Reparto` -- el unico campo que se vuelve a leer. */
-                ? _rolDeTurno_(TUR_SEL[n].rol, {responsable:(n===TUR_CARGOS.turno),
-                                                audiovisual:(n===TUR_CARGOS.audiovisual),
-                                                memoria:(n===TUR_CARGOS.memoria),
-                                                coche:!!TUR_SEL[n].coche})
-                : (TUR_SEL[n].rol||''))}; }) };
-      if(!t.fecha){ tost('Ponle fecha al turno.'); return; }
-      /* ⛔ LA MISMA FRASE QUE EL BOTON, y la comprobacion se QUEDA aunque el boton ya
-         salga `disabled`: una pantalla puede repintarse mal, y el envio es la ultima
-         linea. Lo que no puede pasar es que digan cosas distintas, y por eso el texto
-         sale de la misma funcion. */
-      /* ⛔ LOS COCHES TAMBIEN, y aqui MAS que en el boton: esto es la comprobacion del
-         ENVIO, la ultima antes de escribir el turno de verdad. */
-      var _mot=(typeof _porQueNoSeConvoca_==='function')
-        ? _porQueNoSeConvoca_(TUR_CARGOS, nn.length, TUR_COCHES) : (nn.length?'':'Marca al menos a una persona.');
+        sel:TUR_SEL, cargos:TUR_CARGOS, coches:TUR_COCHES };
+      var t=_armarTurno_(f);
+      /* ⛔ LA MISMA FRASE QUE EL BOTON, y la comprobacion se QUEDA aunque el boton ya salga `disabled`: una pantalla
+         puede repintarse mal, y el envio es la ultima linea. Los coches cuentan AQUI mas que en el boton. */
+      var _mot=_porQueNoSeProgramaTurno_(f);
       if(_mot){ tost(_mot); return; }
       if(!backendOK || !SESION){ tost('Sin conexión no se puede convocar: el turno se escribe en Notion.'); return; }
       b.disabled=true; var prev=b.textContent; b.textContent='Convocando\u2026';
@@ -4921,6 +4911,8 @@ function _engDocsDecidir_(){
     deshacer:'Decisión deshecha: vuelve a revisión.',
     /* ⛔ Mismo aviso falso que en el movil: pulsar no sube nada. */
     reenviar:'Devuelto a revisión. Si todavía no has subido el archivo corregido por el formulario, el revisor abrirá la versión anterior.'};
+  $$('[data-docedit]').forEach(function(b){ b.onclick=function(){
+    var ab=b.parentNode.classList.toggle('ab'); DOC_EDIT_AB[b.dataset.docedit]=ab; }; });
   $$('.acts [data-doc]').forEach(function(b){
     b.onclick=async function(){
       if(b.disabled) return;

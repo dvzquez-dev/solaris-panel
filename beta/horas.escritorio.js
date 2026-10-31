@@ -1780,8 +1780,11 @@ function _bloqueReuPanelE_(){
   var puede=_puedeBloqueReu_(r, _actorSanc_(), (typeof esAdmin==='function' && esAdmin()));
   var abierto=!!(BLQ && BLQ.donde===vista);
   if(!puede && !abierto) return '';
+  /* 31/10 (feosesc #23): sin nada que enseñar, el panel NO sale (salía un marco con un hueco vacío). */
+  var cuerpo=abierto?_bloqueFormHTML_():_bloqueReuHTML_(r, puede);
+  if(!String(cuerpo||'').replace(/<[^>]*>/g,'').trim()) return '';
   return pan('Parte de bloque', r.en_curso?'<span class="chip wa">en curso</span>':esc(r.titulo||r.tit||''),
-    '<div class="pb">'+(abierto?_bloqueFormHTML_():_bloqueReuHTML_(r, puede))+'</div>');
+    '<div class="pb">'+cuerpo+'</div>');
 }
 function _bloqueManualPanelE_(){
   if(rangoNom(ACTOR)<1) return '';

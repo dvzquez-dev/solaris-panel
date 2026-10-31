@@ -309,6 +309,7 @@ function _decDocLocalE_(d, acc, mot, tit, actor, at, aj){
   return d;
 }
 
+var DOC_EDIT_AB = {};   /* 31/10 (feosesc #16): qué expedientes tienen abierto «Editar antes de decidir», para el repintado */
 function docCard(d){
   var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
   var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';
@@ -340,11 +341,17 @@ function docCard(d){
     /* 21/10 (auditor 19, 🟡 6): la gemela del móvil — a quien lo SUBIÓ, qué hacer él. */
     ((typeof ACTOR!=='undefined' && d.autor===ACTOR) ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
       : 'Pídeselo a quien lo subió antes de decidir.</div></div>'));
-  var acc, _aut;
+  var acc, _aut, arriba='', _autorP=_puedeCambiarAutor_(d.est, ACTOR) ? _autorPanelHTML_('a'+d.id+'-', d.id, d.autor, CAMPO_CSS) : '';
   if(puede){
     /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el móvil (`comun.js` `_anotPanelHTML_`), con
        prefijo `d<id>-`: aquí se pintan varias fichas a la vez. Sólo donde se puede aprobar. */
-    acc=(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS) : '')+
+/* 31/10 (feosesc #16): los botones de decidir ARRIBA (`arriba`, tras los chips) y el formulario de edición PLEGADO bajo
+       «Editar antes de decidir» (`acc`, al fondo): con dos expedientes había que bajar >2 pantallas para decidir el segundo.
+       Sigue en el DOM plegado (los campos se leen por id); lo abierto se recuerda en `DOC_EDIT_AB`. */
+    var _abEd = (typeof DOC_EDIT_AB!=='undefined') && !!DOC_EDIT_AB[d.id];
+    acc=((_yaAnalizado_(d) || _autorP) ? '<div class="doc-edit'+(_abEd?' ab':'')+'"><button type="button" class="btn sm" data-docedit="'+d.id+'">Editar antes de decidir</button>'+
+        '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS) : '')+'</div></div>' : '');
+    arriba=
       '<textarea data-motivo placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
       /* ⛔⛔ APROBAR = PUBLICAR, y no se publica lo que nadie ha analizado. Esta cara ve
          `recibido` y `analizado` a proposito -Daniel, 05/08: en el movil «no aparecen
@@ -426,7 +433,7 @@ function docCard(d){
       (_etiquetasDe_(d).length
         ? '<span class="chip">'+esc(_etiquetasDe_(d).join(' · '))+'</span>' : '')+
     '</div>'+
-    _avisosDocE_(d)+
+    _avisosDocE_(d)+arriba+
     '<div class="just"><span class="sc">Resumen ejecutivo</span>'+
       /* 21/10 (auditor 20, 🟡 2): «léelo abajo» sólo si abajo HAY archivo; si no, decía «léelo abajo» encima de «no trae
          enlace al archivo». */
@@ -436,7 +443,7 @@ function docCard(d){
     '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':'Firma: <b>'+esc(rev)+'</b>')+'</div>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
     _autorRastroHTML_(d)+
-    (_puedeCambiarAutor_(d.est, ACTOR) ? _autorPanelHTML_('a'+d.id+'-', d.id, d.autor, CAMPO_CSS) : '')+
+    (puede ? '' : _autorP)+   /* quien puede decidir lo lleva plegado dentro de `acc` */
     acc+
   '</div>';
 }

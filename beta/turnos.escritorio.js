@@ -1151,7 +1151,7 @@ function _convocarDispPanel_(){
       'Elige <b>un día</b> de la semana que quieras preguntar (se pregunta de lunes a domingo). '+
       '<b>El plazo lo calcula el servidor</b>. No toca Notion ni el Excel de Aerotech.</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
-      '<label style="width:165px">'+lab('Semana (un día cualquiera)')+
+      '<label style="width:190px;white-space:nowrap">'+lab('Semana (cualquier día)')+
         '<input type="date" id="cdSemana" style="'+E+'"></label>'+
       '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;padding-bottom:9px">'+
         '<input type="checkbox" id="cdCuvi" checked> CUVI</label>'+
@@ -1795,7 +1795,7 @@ function _cablearCierreTurno_(){
 }
 
 function convocarPanel(){
-  if(rangoNom(ACTOR)<1) return '';                       // solo coordinaci\u00f3n o superior
+  if(!_puedeProgramarTurno_(ACTOR)) return '';           // solo coordinaci\u00f3n o superior
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   /* las bajas no se convocan: siguen en el roster por su historia, no para turnos nuevos */

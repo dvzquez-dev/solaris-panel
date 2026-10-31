@@ -26,9 +26,10 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 :root{
   --bg:#0C0B0B; --sur:#181616; --sur2:#221E1F; --gris:#231F20;
-  --line:#322C2E; --line2:#463E40; --ink3:#7C6E72; --ink2:#B2A8AB; --ink:#F4F3F3;
+  --line:#322C2E; --line2:#463E40; --ink3:#968A8E; --ink2:#B2A8AB; --ink:#F4F3F3;
   --red:#E41E25; --red2:#FF4A4F; --red3:#8E1418;
 
+/* 31/10 (feosesc #15): `--ink3` era #7C6E72 = 3,4:1 sobre `--sur2` a 9 px; #968A8E da 4,96:1 (≥ 4,5 en el peor fondo). Se toca el TOKEN, no cada sitio. */
 /* ⛔⛔ LO NATIVO TAMBIÉN ES LA APP: `color-scheme:dark` (13/10).
    🗣️ Daniel: *«hay desplegables que son de estos blancos, cutres, clásicos de
    Windows, básicos, en lugar de ser con la temática un poco de Solaris»*.
@@ -398,7 +399,8 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .lcorrf input[type=text]{flex:1;min-width:180px}
 .lcorrf .err{flex-basis:100%;font-size:11px;color:var(--red2)}
 .decs{display:inline-flex;border:1px solid var(--line);border-radius:var(--r2);overflow:hidden}
-.decs button{border-right:1px solid var(--line);padding:5px 10px;font-size:11px;font-weight:600;color:var(--ink3);white-space:nowrap}
+.decs button{border-right:1px solid var(--line);padding:5px 10px;font-size:11px;font-weight:600;color:var(--ink);background:var(--sur2);white-space:nowrap}
+.decs button:hover{background:var(--line)}
 .decs button:last-child{border-right:0}
 .decs button.on.a{background:var(--ok);color:#fff}
 .decs button.on.j{background:var(--ink2);color:#1a1616}
@@ -421,7 +423,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
   justify-content:center;pointer-events:none}
 .anillo .mid .n{font-family:var(--mono);font-size:34px;font-weight:600;letter-spacing:-.04em;line-height:1}
 .anillo .mid .n small{font-size:14px;color:var(--ink3)}
-.anillo .mid .u{font-family:var(--mono);font-size:8px;letter-spacing:.15em;color:var(--ink3);margin-top:5px}
+.anillo .mid .u{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:var(--ink3);margin-top:5px;max-width:74px;text-align:center;line-height:1.3}
 
 /* desplegable por reunión (disponibilidad y riesgo) */
 .acord{border:1px solid var(--line);border-radius:var(--r2);margin-bottom:9px;overflow:hidden;background:var(--sur)}
@@ -933,3 +935,6 @@ tr.fija:hover{background:transparent}
 .nx-elige{display:flex;width:100%}
 .nx-bus{width:100%;max-width:260px;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px}
 .nx .pick:focus-visible,.nx .btn:focus-visible,.nt-d:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+
+.nt-plegado{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.doc-edit{margin-top:11px}.doc-edit-c{display:none;margin-top:6px}.doc-edit.ab .doc-edit-c{display:block}

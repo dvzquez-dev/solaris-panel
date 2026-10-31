@@ -151,7 +151,7 @@ function convocarReunionPanel(){
         _coord ? 'general' : 'trabajo')+'</div>'+
       '<div>'+lab('Modalidad')+nxElige('cvMod', [['hibrida','Híbrida'],['presencial','Presencial'],['telematica','Telemática']], 'hibrida')+'</div>'+
       '<label style="flex:1;min-width:220px">'+lab('Título')+
-        '<input id="cvTit" placeholder="Reunión sin título" style="'+E+'"></label>'+
+        '<input id="cvTit" placeholder="Título de la reunión" style="'+E+'"></label>'+
     '</div>'+
     _avisoGrabaHTML_('cvGraba')+
     lab('Subsistemas · marca uno y entra su gente')+
@@ -375,6 +375,9 @@ function _cablearConvocar_(){
   var bt=$('[data-convreu]');
   if(bt) bt.onclick=async function(){
     if(bt.disabled) return;
+    /* 31/10 (feosesc #23): sin título no se convoca (creaba «Reunión sin título»); se señala el campo. */
+    var _tit=$('#cvTit');
+    if(_tit && !_tit.value.trim()){ _tit.focus(); _tit.style.borderColor='rgba(232,145,46,.6)'; tost('Ponle un título a la reunión.'); return; }
     var ds=dias(); if(!ds.length){ tost('Revisa las fechas: no hay días.'); return; }
     if(!CONV_INV.size){ tost('No has convocado a nadie.'); return; }
     var sl=+val('cvSlot')||30, du=+val('cvDura')||60;
@@ -393,7 +396,7 @@ function _cablearConvocar_(){
         ' seguidos, así que ahí nadie podrá marcar. Pulsa otra vez para convocarla igual.');
       return;
     }
-    var reu={ titulo:(val('cvTit')||'').trim()||'Reunión sin título',
+    var reu={ titulo:(val('cvTit')||'').trim(),
       tipo:val('cvTipo')||'trabajo', modalidad:val('cvMod')||'hibrida',
       convocante:ACTOR||'', invitados:Array.from(CONV_INV),
       dias:ds, franjas:u.F, bloques:bloques, total:bloques.length,

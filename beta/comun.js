@@ -2999,6 +2999,48 @@ function _rolDeTurno_(escrito, marcas){
   return partes.join(', ');
 }
 
+/* ═══ PROGRAMAR UN TURNO · LO QUE COMPARTEN LAS DOS CARAS (01/11/2026) ═══════════════════════
+   🗣️ Daniel: «poner los turnos desde el teléfono». El escritorio ya convocaba (`convocarPanel`); el móvil
+   tiene su hoja. Lo que es LÓGICA —quién puede, qué se valida, qué cuerpo viaja a `crearTurno`— se declara
+   aquí UNA vez y cada cara lo LLAMA: dos cuerpos armados a mano son dos turnos distintos en Notion.
+   ⛔ LA PUERTA es la del servidor (`case 'crearTurno'`: `_rangoNom_ >= 1`), por nombre: el escritorio le pasa
+   `ACTOR`, el móvil `YO.nombre`. */
+function _puedeProgramarTurno_(nombre){ return rangoNom(nombre) >= 1; }
+
+/* Las horas de la duración, dichas como en los turnos reales («3 horas», «1 hora», «2,5 horas»). */
+function _duracionTurnoTxt_(h){
+  var n = Number(h);
+  if (!(n > 0)) return '';
+  return String(n).replace('.', ',') + (n === 1 ? ' hora' : ' horas');
+}
+
+/* El cuerpo de `crearTurno`. `f` = {fecha, hora, duracion, lugar, punto, crucial, nota, principales[], secundarios[],
+   sel:{nombre:{rol,coche}}, cargos:{turno,audiovisual,memoria}, coches[]}; lo que cada cara recoge de su pantalla.
+   ⛔ Es el cuerpo que el escritorio armaba en línea, SIN tocar: `responsable` conserva el significado de antes (el de
+   TURNO) y el `rol` de cada uno sale de `_rolDeTurno_` con las tres marcas, porque es lo único que se vuelve a leer. */
+function _armarTurno_(f){
+  var sel = f.sel || {}, cargos = f.cargos || {}, nn = Object.keys(sel);
+  return { fecha: f.fecha || '', hora: f.hora || '', duracion: f.duracion || '', lugar: f.lugar || '',
+    punto: f.punto || '', crucial: !!f.crucial, nota: f.nota || '',
+    principales: f.principales || [], secundarios: f.secundarios || [],
+    responsable: cargos.turno, cargos: cargos,
+    coches: (f.coches || []).map(function(co){ return {origen: co.origen || '',
+      destino: co.destino || '', vueltaDistinta: !!co.vueltaDistinta,
+      vueltaOrigen: co.vueltaOrigen || null, vueltaDestino: co.vueltaDestino || null,
+      dueno: co.dueno || null, pasajeros: co.pasajeros || []}; }),
+    coche: nn.filter(function(n){ return sel[n].coche; }),
+    reparto: nn.map(function(n){ return {nombre: n,
+      rol: _rolDeTurno_(sel[n].rol, {responsable: (n === cargos.turno), audiovisual: (n === cargos.audiovisual),
+                                     memoria: (n === cargos.memoria), coche: !!sel[n].coche})}; }) };
+}
+
+/* Por qué NO se programa este turno, o '' si se puede. Primero la fecha, luego lo del reparto
+   (`_porQueNoSeConvoca_`): la MISMA frase que el botón y que el envío del escritorio. */
+function _porQueNoSeProgramaTurno_(f){
+  if (!f.fecha) return 'Ponle fecha al turno.';
+  return _porQueNoSeConvoca_(f.cargos, Object.keys(f.sel || {}).length, f.coches);
+}
+
 function _periodoParte_(p){
   var c = [p && p.fin, p && p.ini, p && p.creado_at], i, s;
   for (i = 0; i < c.length; i++){
@@ -3816,8 +3858,11 @@ function _filaRevocacion_(s, texto){
              motivoOriginal: s.motivo || null, razon: texto } };
 }
 
+/* 31/10 (feosesc #21): el campo enseña el menos TIPOGRÁFICO («−1», lo pinta `_nxTxtNum_`); `_ptsPlanoSanc_` lo vuelve
+   al guion antes de validar o comparar, por si llega escrito así. */
+function _ptsPlanoSanc_(v){ return String(v === null || v === undefined ? '' : v).replace(/−/g, '-'); }
 function _validaPuntosSanc_(crudo){
-  var t = String(crudo === null || crudo === undefined ? '' : crudo).replace(/^\s+|\s+$/g, '');
+  var t = _ptsPlanoSanc_(crudo).replace(/^\s+|\s+$/g, '');
   if (t === '')
     return { ok:false, msg:'Pon los puntos: el campo está vacío.' };
   if (!/^-?\d+$/.test(t))
@@ -3870,7 +3915,7 @@ function _quienCambiaSanc_(){
   if (SANC_FORM.motivo !== '30g') return;
   var e = (typeof $ === 'function') ? $('#snPts') : null;
   var v = e ? e.value : SANC_FORM.pts;
-  if (String(v == null ? '' : v) !== '' && String(v) !== String(SANC_FORM.ptsPropuesto)) return;
+  if (String(v == null ? '' : v) !== '' && _ptsPlanoSanc_(v) !== _ptsPlanoSanc_(SANC_FORM.ptsPropuesto)) return;
   SANC_FORM.pts = '';
   var p = _ptsPrefillSanc_();
   if (e) nxPon('snPts', p);
@@ -3878,7 +3923,7 @@ function _quienCambiaSanc_(){
 function _motivoCambiaSanc_(){
   var e = (typeof $ === 'function') ? $('#snPts') : null;
   var v = e ? e.value : SANC_FORM.pts;
-  if (SANC_FORM.ptsPropuesto != null && String(v == null ? '' : v) === String(SANC_FORM.ptsPropuesto)) {
+  if (SANC_FORM.ptsPropuesto != null && _ptsPlanoSanc_(v) === _ptsPlanoSanc_(SANC_FORM.ptsPropuesto)) {
     SANC_FORM.pts = '';
     if (e) nxPon('snPts', '');
   }
@@ -4684,6 +4729,152 @@ function _puedeImpersonar_(){ return !!(SESION && SESION.email && String(SESION.
    exige rango >= 3. Aquí solo se evita ofrecer un botón que al pulsarlo dice que no. */
 function _puedeCerrarMes_(){
   try{ return !!(_puedeImpersonar_() || rangoNom(_actorSanc_())>=3); }catch(_){ return false; }
+}
+
+/* ═══ MANDAR UN AVISO (push) DESDE LA APP · SÓLO EL PD ═══════════════════════════════════════════════════
+   Daniel (01/11): «¿Cómo coño mando yo una notificación? […] Debería dejarme». El servidor ya tenía `enviarPush`, pero ninguna
+   cara lo llamaba. Va por `mandarAviso` (puerta de rango 3: el PD y el admin; José NO) y no por `enviarPush`, porque dice a quién
+   con unidades Y personas a la vez, topa el texto y deja constancia (`avisosPD`). UNA pieza para las dos caras: el HTML y los
+   gestos son de aquí; la cara sólo dice DÓNDE se pinta (móvil: modal desde el ⋮ · escritorio: la vista `aviso`) y pasa su
+   `repintar`. Sin controles nativos de elegir: tarjetas/chips (`docs/decisiones-app.md`). ⛔ En la maqueta `?demo` NADA sale:
+   se apunta en el `localStorage`. */
+var AVISO_TITULO_MAX=60, AVISO_TEXTO_MAX=300, AVISO_DEMO_KEY='solaris_demo_avisos';
+var AVISO=_avisoNuevo_();
+function _avisoNuevo_(){ return {titulo:'', texto:'', todo:false, unidades:[], personas:[], q:'', paso:'form', enviando:false, err:'', hecho:null}; }
+/* La puerta de cortesía = la del cierre (PD o quien lo suplanta); la frontera de verdad es `mandarAviso` en el servidor (rango 3). */
+function _puedeMandarAviso_(){ return _puedeCerrarMes_(); }
+/* Las unidades con gente activa y cuántas son, en el orden en que aparecen. */
+function _avisoUnidades_(){
+  var o=[], n={};
+  _activos_().forEach(function(m){ if(!m.unidad) return; if(!n[m.unidad]){ n[m.unidad]=0; o.push(m.unidad); } n[m.unidad]++; });
+  return o.map(function(u){ return [u, n[u]]; });
+}
+/* A quiénes llegaría: todo el equipo, o la unión de las unidades marcadas y las personas sueltas (sin repetir). */
+function _avisoNombres_(f){
+  var s={}, out=[];
+  _activos_().forEach(function(m){
+    if(f.todo || f.unidades.indexOf(m.unidad)>=0 || f.personas.indexOf(m.nombre)>=0){ if(!s[m.nombre]){ s[m.nombre]=1; out.push(m.nombre); } }
+  });
+  return out;
+}
+/* '' si se puede mandar; si no, el motivo en una frase. */
+function _avisoFalta_(f){
+  var t=String(f.titulo||'').trim();
+  if(!t) return 'Falta el título.';
+  if(t.length>AVISO_TITULO_MAX) return 'El título pasa de '+AVISO_TITULO_MAX+' caracteres.';
+  if(String(f.texto||'').trim().length>AVISO_TEXTO_MAX) return 'El texto pasa de '+AVISO_TEXTO_MAX+' caracteres.';
+  if(!_avisoNombres_(f).length) return 'Elige a quién va.';
+  return '';
+}
+/* Cómo llegará, como en la pantalla del móvil (el título y el texto que se mandan, ya recortados). */
+function _avisoPrevHTML_(){
+  var f=AVISO, t=String(f.titulo||'').trim(), x=String(f.texto||'').trim();
+  if(!t && !x) return '<p class="rnota" data-avprev>Escribe el título y verás cómo llegará.</p>';
+  return '<div data-avprev style="border:1px solid var(--line);border-radius:14px;padding:11px 13px;background:#0A0909;max-width:420px">'+
+    '<div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)">Solaris · ahora</div>'+
+    '<div style="font-weight:600;margin-top:3px;word-break:break-word">'+esc(t||'(sin título)')+'</div>'+
+    (x?'<div style="font-size:13px;color:var(--ink2);margin-top:2px;word-break:break-word">'+esc(x)+'</div>':'')+'</div>';
+}
+/* La pastilla de «a quién»: `clase` es el botón de la cara ('btn sm' / 'btn mini'). */
+function _avisoChip_(attr, val, txt, on, clase){
+  return '<button type="button" class="'+clase+(on?' pri':'')+'" '+attr+'="'+esc(val)+'" aria-pressed="'+(on?'true':'false')+'" data-p>'+esc(txt)+'</button>';
+}
+function _avisoHTML_(clase){
+  var f=AVISO, n=_avisoNombres_(f).length, falta=_avisoFalta_(f), cl=clase||'btn sm';
+  if(f.paso==='hecho' && f.hecho){
+    var h=f.hecho, alc=(h.alcanzables==null)?'':(' · '+h.alcanzables+' con el móvil preparado');
+    return '<div class="mtit">Mandar aviso</div><div class="tarj" data-aviso="hecho"><b>Aviso en cola</b>'+
+      '<p class="rnota" style="margin:8px 0 12px">«'+esc(h.titulo)+'» llegará a '+h.n+' persona'+(h.n===1?'':'s')+alc+
+      '. Se manda en la siguiente pasada del emisor (unos minutos).</p>'+
+      '<button type="button" class="'+cl+' pri" data-avnuevo data-p>Mandar otro</button></div>';
+  }
+  var unid=_avisoUnidades_().map(function(u){ return _avisoChip_('data-avuni', u[0], u[0]+' · '+u[1], f.unidades.indexOf(u[0])>=0, cl); }).join('');
+  var sel=f.personas.map(function(p){
+    var m=_activos_().filter(function(x){ return x.nombre===p; })[0];
+    return '<button type="button" class="'+cl+' pri" data-avquita="'+esc(p)+'" aria-label="Quitar a '+esc(p)+'" data-p>'+esc((m&&m.pila)||p)+' ×</button>';
+  }).join('');
+  var vp=_avisoPrevHTML_();
+  if(f.paso==='confirma'){
+    return '<div class="mtit">Mandar aviso</div><div class="tarj" data-aviso="confirma"><b>Va a llegar a '+n+' persona'+(n===1?'':'s')+'</b>'+
+      '<div style="margin:10px 0">'+vp+'</div>'+
+      (f.err?'<p class="rnota" data-averr style="color:var(--rojo,#E41E25)">'+esc(f.err)+'</p>':'')+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="'+cl+' pri" data-avmandar data-p'+(f.enviando?' disabled':'')+'>'+
+      (f.enviando?'Mandando…':'Mandar')+'</button>'+
+      '<button type="button" class="'+cl+'" data-avvolver data-p'+(f.enviando?' disabled':'')+'>Volver</button></div></div>';
+  }
+  return '<div class="mtit">Mandar aviso</div><div class="tarj" data-aviso="form">'+
+    '<p class="rnota" style="margin:0 0 12px">Llega como notificación al móvil de quien elijas. No se puede deshacer.</p>'+
+    '<h4>A quién</h4><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+
+      _avisoChip_('data-avtodo','1','Todo el equipo · '+_activos_().length, f.todo, cl)+unid+'</div>'+
+    '<div id="avSel" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+sel+'</div>'+
+    '<label class="campo"><span class="sc">Buscar una persona</span><input id="avQ" type="text" autocomplete="off" placeholder="Nombre" value="'+esc(f.q)+'"></label>'+
+    '<div id="avSug"></div>'+
+    '<label class="campo"><span class="sc">Título · <i id="avCT">'+String(f.titulo||'').length+'</i>/'+AVISO_TITULO_MAX+'</span>'+
+      '<input id="avTit" type="text" maxlength="'+AVISO_TITULO_MAX+'" placeholder="Corto: lo que se lee en la pantalla bloqueada" value="'+esc(f.titulo)+'"></label>'+
+    '<label class="campo"><span class="sc">Texto · <i id="avCX">'+String(f.texto||'').length+'</i>/'+AVISO_TEXTO_MAX+'</span>'+
+      '<textarea id="avTxt" maxlength="'+AVISO_TEXTO_MAX+'" placeholder="Opcional">'+esc(f.texto)+'</textarea></label>'+
+    '<h4>Cómo llegará</h4><div id="avPrev" style="margin-bottom:12px">'+vp+'</div>'+
+    '<p class="rnota" id="avFalta" style="margin:0 0 8px">'+(falta?esc(falta):'Llegará a '+n+' persona'+(n===1?'':'s')+'.')+'</p>'+
+    '<button type="button" class="'+cl+' pri" id="avSigue" data-p'+(falta?' disabled':'')+'>Revisar y mandar</button></div>';
+}
+/* Gestos. `raiz` = el nodo que contiene el formulario; `repintar()` lo vuelve a pintar entero (la cara sabe dónde).
+   Teclear NO repinta (se perdería el foco): sólo actualiza contadores, vista previa y el botón. */
+function _avisoEnganchar_(raiz, repintar){
+  if(!raiz) return;
+  var q=function(s){ return raiz.querySelector(s); }, qq=function(s){ return [].slice.call(raiz.querySelectorAll(s)); };
+  var vivo=function(){
+    var ct=q('#avCT'), cx=q('#avCX'), fa=q('#avFalta'), sg2=q('#avSigue'), pv=q('#avPrev'), falta=_avisoFalta_(AVISO), n=_avisoNombres_(AVISO).length;
+    if(ct) ct.textContent=String(AVISO.titulo).length;
+    if(cx) cx.textContent=String(AVISO.texto).length;
+    if(fa) fa.textContent=falta||('Llegará a '+n+' persona'+(n===1?'':'s')+'.');
+    if(sg2) sg2.disabled=!!falta;
+    if(pv) pv.innerHTML=_avisoPrevHTML_();
+  };
+  var ti=q('#avTit'), tx=q('#avTxt'), qi=q('#avQ');
+  if(ti) ti.oninput=function(){ AVISO.titulo=ti.value; vivo(); };
+  if(tx) tx.oninput=function(){ AVISO.texto=tx.value; vivo(); };
+  var sug=function(){
+    var s=q('#avSug'); if(!s) return;
+    var t=_sinTildes_((AVISO.q||'').trim());
+    var hits=t?_activos_().filter(function(m){ return AVISO.personas.indexOf(m.nombre)<0 && _sinTildes_(m.nombre).indexOf(t)>=0; }).slice(0,6):[];
+    s.innerHTML=hits.map(function(m){ return '<button type="button" class="btn" style="display:block;width:100%;text-align:left;margin-bottom:4px" data-avper="'+esc(m.nombre)+'" data-p>'+
+      esc(m.nombre)+' <small>'+esc(m.cargo||m.unidad||'')+'</small></button>'; }).join('');
+    qq('[data-avper]').forEach(function(b){ b.onclick=function(){ AVISO.personas.push(b.dataset.avper); AVISO.q=''; repintar(); }; });
+  };
+  if(qi) qi.oninput=function(){ AVISO.q=qi.value; sug(); };
+  qq('[data-avtodo]').forEach(function(b){ b.onclick=function(){ AVISO.todo=!AVISO.todo; repintar(); }; });
+  qq('[data-avuni]').forEach(function(b){ b.onclick=function(){
+    var i=AVISO.unidades.indexOf(b.dataset.avuni); if(i>=0) AVISO.unidades.splice(i,1); else AVISO.unidades.push(b.dataset.avuni); repintar(); }; });
+  qq('[data-avquita]').forEach(function(b){ b.onclick=function(){
+    var i=AVISO.personas.indexOf(b.dataset.avquita); if(i>=0) AVISO.personas.splice(i,1); repintar(); }; });
+  var sg=q('#avSigue'); if(sg) sg.onclick=function(){ if(_avisoFalta_(AVISO)) return; AVISO.paso='confirma'; AVISO.err=''; repintar(); };
+  var vo=q('[data-avvolver]'); if(vo) vo.onclick=function(){ AVISO.paso='form'; AVISO.err=''; repintar(); };
+  var nu=q('[data-avnuevo]'); if(nu) nu.onclick=function(){ AVISO=_avisoNuevo_(); repintar(); };
+  var ma=q('[data-avmandar]'); if(ma) ma.onclick=function(){
+    if(AVISO.enviando) return;
+    AVISO.enviando=true; AVISO.err=''; repintar();
+    _avisoEnviar_(AVISO).then(function(r){
+      AVISO.enviando=false; AVISO.paso='hecho'; AVISO.hecho=r; repintar();
+    }, function(e){
+      /* El rechazo se DICE en la tarjeta y lo escrito se conserva (vuelve a «confirma», con «Mandar» vivo). */
+      AVISO.enviando=false; AVISO.err=(e&&e.message?String(e.message).replace(/^Error:\s*/,''):'No se pudo mandar.'); repintar();
+    });
+  };
+  sug();
+}
+/* Manda (o, en la maqueta, apunta). Promesa de `{n, alcanzables, titulo}`. */
+function _avisoEnviar_(f){
+  var cuerpo={titulo:String(f.titulo).trim(), texto:String(f.texto||'').trim(), todo:!!f.todo, unidades:f.unidades.slice(), personas:f.personas.slice()};
+  var n=_avisoNombres_(f).length;
+  if(_apelEsDemo_()){
+    try{ var L=JSON.parse(localStorage.getItem(AVISO_DEMO_KEY)||'[]'); L.push(Object.assign({at:new Date().toISOString(), n:n}, cuerpo));
+      localStorage.setItem(AVISO_DEMO_KEY, JSON.stringify(L)); }catch(_){}
+    return Promise.resolve({n:n, alcanzables:null, titulo:cuerpo.titulo});
+  }
+  return api.mandarAviso(cuerpo).then(function(r){
+    if(r && r.ok===false) throw new Error(r.nota||'No se pudo mandar.');
+    return {n:(r&&r.n)||n, alcanzables:(r&&r.alcanzables!=null)?r.alcanzables:null, titulo:cuerpo.titulo};
+  });
 }
 
 /* ⛔⛔ ¿EL CIERRE ACABÓ CORTO? Devuelve null si no, o el desglose si sí.

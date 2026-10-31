@@ -62,6 +62,7 @@
       <div class="caja">
         <button data-mnu="sanciones" data-p>Sanciones<small>Ponerlas y decidir las pendientes</small></button>
         <button data-mnu="cierre" style="display:none">Cierre mensual<small>Calcular el cierre del mes</small></button>
+        <button data-mnu="aviso" style="display:none" data-p>Mandar aviso<small>Una notificación al móvil del equipo</small></button>
         <button data-mnu="cuota" data-cuota data-p>Tu cuota<small>Estimación de la cuota de esta temporada</small></button>
         <button data-mnu="equipo" data-p>El equipo<small>Quién coordina cada unidad</small></button>
         <button data-mnu="novedades" data-p>Novedades<small>Qué ha cambiado en cada versión</small></button>
@@ -113,11 +114,11 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=8a4932f"></script>
+<script src="comun.js?v=c71a09f"></script>
 <script src="notis.movil.js?v=9a87f14"></script>
 <script src="cierre.movil.js?v=2c15573"></script>
 <script src="tareas.movil.js?v=139e6a5"></script>
-<script src="turnos.movil.js?v=d0db9ca"></script>
+<script src="turnos.movil.js?v=9e3fa23"></script>
 <script src="buzon.movil.js?v=4a205c9"></script>
 <script src="documentos.movil.js?v=82b4c65"></script>
 <script src="sanciones.movil.js?v=bd72aeb"></script>
@@ -333,6 +334,7 @@ var api={
      se lo tragaba un `catch` vacio, asi que turnos y tareas no se refrescaban NUNCA y
      nadie se enteraba. El escritorio si las tenia. */
   getTurnos: function(){ return api._post({action:"getTurnos"}); },
+  crearTurno:  function(t){ return api._post({action:"crearTurno",turno:t}); },   // 01/11: igual que el escritorio
   queHayNuevo: function(){ return api._post({action:"queHayNuevo"}); },
   /* `nombre` = las de OTRA persona (backend v52), para sancionar por un plazo. */
   getTareas: function(nombre){ return api._post(nombre ? {action:"getTareas",nombre:nombre} : {action:"getTareas"}); },
@@ -380,6 +382,8 @@ var api={
   apelarTarea: function(t,c,m){ return api._post({action:"apelarTarea",tarea:t,clausula:c,motivo:m}); },
   resolverApelacion: function(d){ return api._post(Object.assign({action:"resolverApelacion"},d)); },
   /* 31/10: apelar una sanción (ya aplicada); TUS sanciones con lo que puedes hacer en cada una. */
+  /* 01/11: el PD manda un aviso (push) a mano; `mandarAviso` en el servidor, puerta de rango 3. */
+  mandarAviso: function(c){ return api._post({action:"mandarAviso",titulo:c.titulo,texto:c.texto,todo:!!c.todo,unidades:c.unidades||[],personas:c.personas||[]}); },
   apelarSancion: function(id,m,e){ return api._post({action:"apelarSancion",id:id,motivo:m,enlace:e||undefined}); },
   getMisSanciones: function(){ return api._post({action:"getMisSanciones"}); },
   getConvocatoria: function(semana){ return api._post({action:"getConvocatoria",semana:semana||null}); },
@@ -1753,13 +1757,22 @@ function _abrirMenu_(v){
   m.classList.toggle('on', !!v);
   m.setAttribute('aria-hidden', v?'false':'true');
 }
+/* Mandar aviso (01/11): el formulario es de `comun.js` (`_avisoHTML_`); aquí sólo se dice DÓNDE se pinta: en el modal. */
+function _abrirAviso_(){
+  var pinta=function(){
+    var c=$('#modal-body'); if(!c) return;
+    c.innerHTML=_avisoHTML_('btn mini');
+    _avisoEnganchar_(c, pinta);
+  };
+  abrirModal(''); pinta();
+}
 /* GEMELA. La versión de ESTE fichero: la huella de su contenido, que reescribe
    `flujos/publicar_web.py` al subir. No hay que acordarse de nada: si esta publicado,
    lleva su huella; en local dice «sin publicar», que tambien es la verdad.
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='29bc7d8';
+var BUILD='cea6522';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2193,6 +2206,7 @@ function _engMedidor_(){
   $$('#turnoModo [data-tt]').forEach(function(b){
     b.onclick=function(){ TURNOS_TODOS=(b.dataset.tt==='1'); pintar(); };
   });
+  $$('[data-progturno]').forEach(function(b){ b.onclick=progTurnoAbrir; });
 }
 
 function _engFichar_(){
@@ -2546,6 +2560,9 @@ function _engTurnosYDocs_(){
      pulsa sin querer. */
   var _mc=$('#menu [data-mnu="cierre"]');
   if(_mc) _mc.style.display = _puedeCerrarMes_() ? '' : 'none';
+  /* 01/11: «Mandar aviso» sólo para el PD (misma puerta que el cierre; el servidor repite rango 3). */
+  var _mav=$('#menu [data-mnu="aviso"]');
+  if(_mav) _mav.style.display = _puedeMandarAviso_() ? '' : 'none';
   /* ⛔ Y la entrada de la cuota, por el MISMO camino que la del cierre. Marcarla con
      `data-cuota` y no escribir quien lee la marca es dejar la capacidad muerta en el cable
      de en medio: el interruptor apagaba la pantalla y el boton seguia ahi, llevando a un
@@ -2575,6 +2592,7 @@ function _engTurnosYDocs_(){
          abriría un modal vacío, que es peor que no tenerlo. */
       if(q==='cuota'){ if(!CUOTAS_ACTIVAS) return; abrirModal(_cuotaHTML_()); return; }
       if(q==='cierre'){ _abrirCierre_(); return; }
+      if(q==='aviso'){ if(_puedeMandarAviso_()) _abrirAviso_(); return; }
       if(q==='novedades'){ if(_puedeVerNovedades_()) abrirModal(_novedadesHTML_()); return; }
       if(q==='automatismos'){ if(_puedeVerNovedades_()) abrirModal(_automatismosHTML_()); return; }
       if(q==='equipo'){ abrirModal(_coordinacionHTML_()); return; }

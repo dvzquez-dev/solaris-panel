@@ -99,6 +99,12 @@ function arco(i,r,frac){
     ' A'+r+' '+r+' 0 0 1 '+(ACX+r*Math.cos(a1)).toFixed(2)+' '+(ACY+r*Math.sin(a1)).toFixed(2);
 }
 
+/* 31/10 (feosesc #21): la lista «A quién» enseña ~7 de 17 y nada decía que hay más: cuántas son, y si hay que desplazar. */
+function _snMas_(){
+  var c=document.getElementById('snLista'), m=document.getElementById('snMas'); if(!c||!m) return;
+  var n=c.querySelectorAll('[data-sanq]').length;
+  m.textContent=n ? n+(n===1?' persona':' personas')+(c.scrollHeight>c.clientHeight+2 ? ' · desplaza la lista para ver todas' : '') : '';
+}
 function anilloHTML(valor,etiqueta){
   var segs='',ticks='',i;
   for(i=0;i<10;i++){
@@ -546,7 +552,7 @@ function _ponerSancCuerpo_(){
       '<label style="display:block;margin-bottom:9px">'+lab('A qui\u00e9n')+
         '<input id="snFiltro" placeholder="Escribe para filtrar \u00b7 nombre o subsistema" '+
         'value="'+esc(SANC_FORM.filtro||'')+'" autocomplete="off" style="'+E+'"></label>'+
-      '<div class="sanlista" id="snLista">'+_listaSancHTML_(grupos)+'</div>'+
+      '<div class="sanlista" id="snLista">'+_listaSancHTML_(grupos)+'</div><div class="nota" id="snMas" style="margin:-6px 0 11px"></div>'+
     '</div>'+
     '<div>'+
       '<div style="display:block;margin-bottom:9px">'+lab('Motivo')+
@@ -634,7 +640,9 @@ function _cablearPonerSanc_(){
     var c=$('#snLista'); if(!c) return;
     c.innerHTML=_listaSancHTML_(_gruposSanc_(_actorSanc_(), SANC_FORM.filtro));
     $$('[data-sanq]',c).forEach(function(b){ b.onclick=function(){ marcar(b); }; });
+    _snMas_();
   };
+  _snMas_();
   /* El motivo decide QUE MAS se pide, asi que ese si repinta. */
   var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ _motivoCambiaSanc_(); _repintarPonerSanc_(); };
   var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };

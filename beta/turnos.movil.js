@@ -744,6 +744,7 @@ function vTurnos(){
   /* los vivos van SUELTOS: sin cabecera de seccion ni etiquetas, para que canten */
   /* La convocatoria va la PRIMERA: lo que caduca manda sobre lo que ya está decidido. */
   return '<div class="h1">Turnos</div><p class="h1s">Fabricación · en cuáles estás y quién más va.</p>'+
+    _progBotonHTML_()+
     _convHTML_(_convAbierta_())+
     /* El conmutador solo aparece si hay algo mas que ver: con todos los turnos siendo tuyos,
        un boton que no cambia nada es ruido que hay que leer igual. */
@@ -765,3 +766,105 @@ function vTurnos(){
         '<div class="cajsec">'+pas.map(tarjeta).join('')+'</div>' : '');
 }
 
+
+
+/* ═══ PROGRAMAR UN TURNO DESDE EL MÓVIL (01/11/2026) ═══════════════════════════════════════
+   🗣️ Daniel: «implementar en la versión móvil alguna cosa para poder poner los turnos desde el teléfono».
+   Es la hoja del `convocarPanel` del escritorio, con el dedo en mente: día (`nxFecha`), hora y duración
+   (`nxHora`, `nxNum`), lugar en chips (`nxElige`), quién (`_selInvM_`, el mismo selector que las reuniones) y,
+   para cada uno, sus cargos y el coche. Ni un desplegable, casilla ni fecha nativos.
+   ⛔ NO HAY LÓGICA PROPIA: quién puede (`_puedeProgramarTurno_`), el cuerpo (`_armarTurno_`) y el motivo de que no
+   se pueda (`_porQueNoSeProgramaTurno_`) son de `comun.js` y el escritorio llama a las mismas. Lo que no cabe en
+   la hoja —los coches con su trayecto, que son opcionales— se hace desde el escritorio; el cuerpo lleva `coches:[]`.
+   ⚠️ «Plazas» no existe en `crearTurno`: el turno lo componen las personas que se marcan, así que no hay campo. */
+var PROG_T = null;   /* {sel:{nombre:{rol,coche}}, cargos:{turno,audiovisual,memoria}} mientras la hoja está abierta */
+
+function _progBotonHTML_(){
+  if(!(YO && _puedeProgramarTurno_(YO.nombre))) return '';
+  return '<button class="btn pri full" data-progturno data-p style="margin-bottom:12px">＋ Programar turno</button>';
+}
+
+/* Lo que se ha recogido en la hoja, en la forma que espera `_armarTurno_`. */
+function _progRecoger_(){
+  var v = function(id){ var e = $('#'+id); return e ? e.value : ''; };
+  var lin = function(id){ return v(id).split('\n').map(function(x){ return x.trim(); }).filter(function(x){ return x; }); };
+  var cr = $('#ptCrucial');
+  return { fecha:v('ptFecha'), hora:v('ptHora'), duracion:_duracionTurnoTxt_(v('ptDur')), lugar:v('ptLugar'),
+    punto:v('ptPunto'), crucial:!!(cr && cr.classList.contains('on')), nota:v('ptNota'),
+    principales:lin('ptObj1'), secundarios:lin('ptObj2'), sel:PROG_T.sel, cargos:PROG_T.cargos, coches:[] };
+}
+
+/* Un cargo lo lleva UNA persona (asignarlo a otra se lo quita a la anterior); quien deja el turno pierde los suyos. */
+function _progQuitar_(n){
+  delete PROG_T.sel[n];
+  CARGOS_TURNO.forEach(function(c){ if(PROG_T.cargos[c.k] === n) PROG_T.cargos[c.k] = null; });
+}
+
+/* Repinta el reparto y el botón: el motivo de `_porQueNoSeProgramaTurno_` va ENCIMA del botón apagado. */
+function _progPintar_(){
+  var nn = Object.keys(PROG_T.sel), c = $('#ptReparto');
+  if(!c) return;
+  c.innerHTML = nn.map(function(n){
+    var m = miembro(n);
+    return '<div class="fila" style="flex-wrap:wrap;gap:6px"><div class="a" style="flex:1 1 100%"><b>'+esc((m && m.pila) || n)+'</b></div>'+
+      CARGOS_TURNO.map(function(cg){
+        return '<button type="button" class="pick'+(PROG_T.cargos[cg.k] === n ? ' on' : '')+'" data-ptcargo="'+cg.k+'" data-ptq="'+esc(n)+
+          '" title="'+esc(cg.et)+'">'+esc(cg.corto)+'</button>'; }).join('')+
+      '<button type="button" class="pick'+(PROG_T.sel[n].coche ? ' on' : '')+'" data-ptcoche="'+esc(n)+'">coche</button></div>';
+  }).join('');
+  $$('#ptReparto [data-ptcargo]').forEach(function(b){ b.onclick = function(){
+    var k = b.dataset.ptcargo, n = b.dataset.ptq;
+    PROG_T.cargos[k] = (PROG_T.cargos[k] === n ? null : n); _progPintar_(); }; });
+  $$('#ptReparto [data-ptcoche]').forEach(function(b){ b.onclick = function(){
+    var n = b.dataset.ptcoche; PROG_T.sel[n].coche = !PROG_T.sel[n].coche; _progPintar_(); }; });
+  var mot = _porQueNoSeProgramaTurno_(_progRecoger_()), ok = $('#ptOK'), av = $('#ptMotivo');
+  if(ok) ok.disabled = !!mot;
+  if(av) av.textContent = mot;
+}
+
+function progTurnoAbrir(){
+  if(!(YO && _puedeProgramarTurno_(YO.nombre))) return;
+  PROG_T = { sel:{}, cargos:{ turno:null, audiovisual:null, memoria:null } };
+  var lab = function(t){ return '<span class="sc" style="display:block;margin:12px 0 6px">'+t+'</span>'; };
+  abrirModal('<div class="mtit">Programar turno</div>'+
+    '<p class="rnota" style="margin:-4px 0 4px">Les llega a los convocados y queda en Notion. No se puede convocar más de un turno el mismo día.</p>'+
+    lab('Día')+nxFecha('ptFecha', '', {min:_hoyNxISO_()})+
+    lab('Hora de inicio')+nxHora('ptHora', '16:00')+
+    lab('Duración')+nxNum('ptDur', 3, {paso:0.5, min:0.5, max:12, sufijo:'h'})+
+    lab('Dónde se trabaja')+nxElige('ptLugar', [['','Sin decir'],['CITI','CITI'],['Vigo','Vigo'],['Coasa','Coasa'],['Otro','Otro']], '')+
+    '<label class="campo" style="margin-top:12px"><span class="sc">Dónde se queda</span><input id="ptPunto" placeholder="enfrente del politécnico"></label>'+
+    '<div class="nt-fila"><button type="button" class="pick" id="ptCrucial">Crucial</button></div>'+
+    lab('Quién va')+
+    '<label class="campo" style="margin-bottom:6px"><input id="ptInv" placeholder="escribe un nombre…" autocomplete="off"></label>'+
+    '<div class="csug" id="ptSug" style="display:none"></div><div class="cchips" id="ptChips"></div>'+
+    '<div id="ptReparto"></div>'+
+    '<label class="campo" style="margin-top:12px"><span class="sc">Objetivos principales · uno por línea</span><textarea id="ptObj1" rows="3"></textarea></label>'+
+    '<label class="campo"><span class="sc">Objetivos secundarios · si sobra tiempo</span><textarea id="ptObj2" rows="2"></textarea></label>'+
+    '<label class="campo"><span class="sc">Aviso para los convocados</span><input id="ptNota" placeholder="traed guantes y mascarilla"></label>'+
+    '<p class="rnota" id="ptMotivo" style="color:var(--ink2)"></p>'+
+    '<button class="btn pri full" data-p id="ptOK" disabled>Convocar el turno</button>');
+  /* el selector guarda un Set de nombres; el reparto con cargos vive en PROG_T.sel */
+  var INV = new Set();
+  var sel = _selInvM_({chips:'ptChips', sug:'ptSug', input:'ptInv'}, function(){ return INV; }, function(){
+    Object.keys(PROG_T.sel).forEach(function(n){ if(!INV.has(n)) _progQuitar_(n); });
+    INV.forEach(function(n){ if(!PROG_T.sel[n]) PROG_T.sel[n] = {rol:'', coche:false}; });
+    _progPintar_(); }, function(){ return null; });
+  sel.enganchar();
+  $('#ptCrucial').onclick = function(){ this.classList.toggle('on'); };
+  ['ptFecha','ptHora','ptDur','ptLugar'].forEach(function(id){ $('#'+id).addEventListener('change', _progPintar_); });
+  $('#ptOK').onclick = async function(){
+    var b = this, f = _progRecoger_(), mot = _porQueNoSeProgramaTurno_(f);
+    if(mot){ tost(mot); return; }
+    if(!backendOK || !SESION){ tost('Sin conexión no se puede convocar: el turno se escribe en Notion.'); return; }
+    b.disabled = true; var prev = b.textContent; b.textContent = 'Convocando…';
+    try{
+      var r = await api.crearTurno(_armarTurno_(f));
+      var sin = (r && r.sinEtiquetar) || [];
+      try{ var tt = await api.getTurnos(); if(Array.isArray(tt) && tt.length){ TURNOS.length = 0; tt.forEach(function(y, i){ TURNOS.push(_normTurnoM_(y, i)); }); } }catch(_){}
+      cerrarModal(); PROG_T = null;
+      tost('Turno '+((r && r.id) || '')+' convocado en Notion'+(sin.length ? ' · no se pudo etiquetar a: '+sin.join(', ') : '')+'.');
+      pintar();
+    }catch(e){ b.disabled = false; b.textContent = prev; tostErr('No se pudo convocar: ', e); }
+  };
+  _progPintar_();
+}
