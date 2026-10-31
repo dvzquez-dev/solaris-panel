@@ -72,33 +72,29 @@ function esPD(){ return ST.rol==='pd' || (typeof YO!=='undefined' && YO && YO.ca
    lo que te llega por notificación: partes que esperan tu firma, fichajes TUYOS sin declarar (caducan) o con detalle
    pedido, documentos que esperan tu revisión, y la disponibilidad de turnos abierta sin contestar. Antes la portada
    callaba justo eso. Cada aviso lleva a su pestaña (`data-ir`). */
+/* ⛔ 31/10: la REDACCIÓN de estos avisos vive en `_tuyoItems_` (`comun.js`), que pinta también el escritorio. Aquí sólo
+   quedan las CUENTAS de este modelo (PARTES con `.e`, `_docsPend_`, `_convAbierta_`) y el HTML de la fila. */
+function _tuyoFilaM_(it){
+  return '<div class="aviso'+(it.mal?' mal':'')+'" data-ir="'+it.ir+'"'+(it.reuid!==''?(' data-reuid="'+esc(it.reuid)+'"'):'')+' data-p>'+
+    '<span class="ic"><svg><use href="#i-warn"/></svg></span>'+
+    '<div style="flex:1"><b>'+it.tit+'</b><p>'+it.txt+'</p></div><span class="chev">›</span></div>';
+}
+
 function _avisosQueTeTocanM_(){
-  function uno(ir, tit, txt, mal){
-    return '<div class="aviso'+(mal?' mal':'')+'" data-ir="'+ir+'" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
-      '<div style="flex:1"><b>'+tit+'</b><p>'+txt+'</p></div><span class="chev">›</span></div>';
-  }
-  var h='', yo=(typeof _fichaYo_==='function') ? _fichaYo_() : '';
+  var yo=(typeof _fichaYo_==='function') ? _fichaYo_() : '';
   var pdec=(typeof PARTES_DEC!=='undefined' && Array.isArray(PARTES_DEC)) ? PARTES_DEC.length : 0;
-  if(pdec) h+=uno('horas', pdec===1 ? 'Un parte espera tu firma' : (pdec+' partes esperan tu firma'),
-    pdec===1 ? 'Hasta que lo decidas no le cuenta a quien lo hizo.' : 'Hasta que los decidas no le cuentan a nadie.');
   var mios=(typeof PARTES!=='undefined' && Array.isArray(PARTES)) ? PARTES.filter(function(p){
     return p && (!p.autor || p.autor===yo); }) : [];
-  var sd=mios.filter(function(p){ return p.e==='sindecl'; }).length, dt=mios.filter(function(p){ return p.e==='det'; }).length;
-  if(sd) h+=uno('horas', sd===1 ? 'Un fichaje tuyo sin declarar' : (sd+' fichajes tuyos sin declarar'),
-    'Caducan a los 7 días (a las '+_caducaAutocierreH_()+' h si se cerraron solos a las '+_maxHorasParte_()+' h) y se pierden: decláralos en Horas.', true);
-  if(dt) h+=uno('horas', dt===1 ? 'Te piden detalle de un parte' : ('Te piden detalle de '+dt+' partes'),
-    'Hasta que lo des no se firma.');
   var rev=(typeof _docsPend_==='function') ? (_docsPend_()||[]).length : 0;
-  if(rev) h+=uno('docs', rev===1 ? 'Un documento espera tu revisión' : (rev+' documentos esperan tu revisión'),
-    rev===1 ? 'Léelo y decide en Docs.' : 'Léelos y decide en Docs.');
-  var cv=(typeof _convAbierta_==='function') ? _convAbierta_() : null;
+  var cv=(typeof _convAbierta_==='function') ? _convAbierta_() : null, conv=false;
   if(cv && typeof _convEstado_==='function' && _convEstado_(cv)==='abierta'){
     var ac=(typeof _actorSanc_==='function') ? _actorSanc_() : yo;
     var r=cv.resp && cv.resp[ac];
-    if(!(r && typeof r==='object' && Object.keys(r).length))
-      h+=uno('turnos', 'Di tu disponibilidad para los turnos', 'Si no dices nada, se reparte sin contar contigo.', true);
+    conv=!(r && typeof r==='object' && Object.keys(r).length);
   }
-  return h;
+  return _tuyoItems_({pdec:pdec, rev:rev, conv:conv,
+    sindecl:mios.filter(function(p){ return p.e==='sindecl'; }).length,
+    det:mios.filter(function(p){ return p.e==='det'; }).length}).map(_tuyoFilaM_).join('');
 }
 
 function vEstado(){
@@ -106,7 +102,7 @@ function vEstado(){
      mirar antes que nada, y desaparece sola en cuanto se marca todo como visto. */
   var _nov=(typeof _novHTML_==='function')?_novHTML_('movil'):'';
   var pend=sumaE('pend');
-  var av='';
+  var av='', cPend=null;
   if(pend>0){
     /* ⛔ QUIEN FIRMA LO DECIDE EL SUBSISTEMA DEL PARTE, NO LA UNIDAD DE LA PERSONA, y aquí se
        nombraba a `coordinadorDe(YO.unidad)` sobre una cola que `sumaE` suma ENTERA. Daniel
@@ -124,60 +120,24 @@ function vEstado(){
        aviso por perfil es el arreglo entero, y toca un fichero que no es éste. */
     var _unPerfil=!_hayQuePreguntarPerfil_(YO);
     var rt=_unPerfil?aprobadorDe(YO.nombre,YO.unidad):null;
-    av+='<div class="aviso" data-ir="horas" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
-      '<div style="flex:1"><b>'+h1(pend)+' esperando aprobación</b>'+
-      /* ⛔ 929.ª: y al PROPIO PD no se le nombra a sí mismo — `rt.propio`, como ya hacía Fichar. Le decía
-         «Las firma Lois, Project Director» siendo él Lois. */
-      '<p>Todavía no cuentan. '+(rt
+    /* ⛔ 929.ª: y al PROPIO PD no se le nombra a sí mismo — `rt.propio`, como ya hacía Fichar. Le decía
+       «Las firma Lois, Project Director» siendo él Lois. */
+    cPend={tit:h1(pend)+' esperando aprobación', txt:'Todavía no cuentan. '+(rt
         ? (rt.propio ? 'Las firmas tú: eres el Project Director.'
            : ('Las firma '+esc(rt.nom.split(' ')[0])+', '+
               (rt.escalado?'Project Director':'coordinador de tu unidad')+'.'))
-        : 'Las firma quien coordine el subsistema de cada parte.')+'</p></div>'+
-      '<span class="chev">›</span></div>';
+        : 'Las firma quien coordine el subsistema de cada parte.')};
   }
-  var cambios=ENTREGABLES.filter(function(e){return e.estado==='cambios';});
-  if(cambios.length){
-    /* ⛔ CON DOS DECÍA «Un documento» Y NOMBRABA SÓLO EL PRIMERO, mientras el globo del nav
-       —`badges()`, con EL MISMO filtro— decía «2». Dos criterios para la misma pregunta en dos
-       sitios que se leen a la vez: se va a Docs, se corrige el que se nombra, y el otro no
-       existe para nadie. La forma se copia del aviso de reuniones, que está diez líneas más
-       abajo en este mismo fichero y ya contaba; no se inventa otra manera de decirlo.
-       ⚠️ Sin el «después» del hermano a propósito: aquella lista va ordenada por lo que caduca
-       antes, y ésta llega en el orden que traiga el servidor. */
-    var _c0=cambios[0], _cresto=cambios.length-1;
-    av+='<div class="aviso mal" data-ir="docs" data-p><span class="ic"><svg><use href="#i-warn"/></svg></span>'+
-      '<div style="flex:1"><b>'+(_cresto>0
-        ? (cambios.length+' documentos tuyos tienen cambios pedidos')
-        : 'Un documento tuyo tiene cambios pedidos')+'</b>'+
-      '<p><span class="mono">'+_c0.ref+'</span>'+(_cresto>0?(', y '+_cresto+' más'):'')+
-        ' · '+(_cresto>0?'corrígelos y reenvíalos':'corrígelo y reenvíalo')+' a revisión.</p></div>'+
-      '<span class="chev">›</span></div>';
-  }
+  /* ⛔ Los documentos con cambios pedidos se CUENTAN (el globo del nav, `badges()`, usa el mismo filtro). */
+  var cambios=ENTREGABLES.filter(function(e){return e.estado==='cambios';}).map(function(e){ return e.ref; });
   /* NO uses `REUNION` aqui: es el puntero de la pantalla de Reuniones y cambia al
      navegar, asi que este aviso te mandaba a cubrir la que estabas mirando mientras la
-     que cierra manana no salia por ningun lado. Y de no cubrir a tiempo salen sanciones. */
+     que cierra manana no salia por ningun lado. Y de no cubrir a tiempo salen sanciones.
+     ⛔ EL PLAZO EN PALABRAS, no la fecha cruda: **este aviso existe justo para que no te caigan sanciones**.
+     «Cierra el 20/08/2026» obliga a mirar el calendario dentro de una alerta; «cierra HOY» es la alerta. */
   var _pend=_pendientesCubrirM_();
-  if(_pend.length){
-    var _p0=_pend[0], _resto=_pend.length-1;
-    av+='<div class="aviso" data-ir="reu" data-reuid="'+esc(String(_p0.id))+'" data-p>'+
-      '<span class="ic"><svg><use href="#i-warn"/></svg></span>'+
-      /* 22/10 (auditor 21, 🔴 1): si TODAS las que quedan están marcadas pero por debajo del mínimo, se dice eso. */
-      /* 22/10 (refutador, 🟡 1): mezcladas, se cuentan las DOS («Te falta cubrir 1 y vas por debajo del mínimo en otra»). */
-      '<div style="flex:1"><b>'+(function(){
-        var nB=_pend.filter(function(x){ return x.bajoMin; }).length, nF=_pend.length-nB;
-        if(!nF) return 'Vas por debajo del mínimo en '+(nB>1?(nB+' reuniones'):'una reunión');
-        return 'Te falta cubrir '+(nF>1?(nF+' disponibilidades'):'una disponibilidad')+
-          (nB ? (' y vas por debajo del mínimo en '+(nB>1?(nB+' más'):'otra')) : '');
-      })()+'</b>'+
-      /* ⛔ EL PLAZO EN PALABRAS, no la fecha cruda — y aqui es donde mas se nota: **este
-         aviso existe justo para que no te caigan sanciones** (lo dice el comentario de
-         arriba). «Cierra el 20/08/2026» obliga a mirar el calendario **dentro de una
-         alerta**; «cierra HOY» es la alerta. Misma puerta que la lista, la ficha y la
-         tarjeta del Estado: cuatro sitios diciendo lo mismo con las mismas palabras. */
-      '<p>«'+esc(_p0.titulo)+'» — '+esc(_plazoTxtM_(_p0))+
-        (_resto>0 ? (', y '+_resto+' más después') : '')+'.</p></div>'+
-      '<span class="chev">›</span></div>';
-  }
+  av+=_tuyoItems_({pend:cPend, cambios:cambios,
+    reus:{lista:_pend, plazo:_pend.length ? _plazoTxtM_(_pend[0]) : ''}}).map(_tuyoFilaM_).join('');
 
   av+=_avisosQueTeTocanM_();
 

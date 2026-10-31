@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=718cdd1">
+<link rel="stylesheet" href="escritorio.css?v=2c07b73">
 </head>
 <body>
 
@@ -70,7 +70,7 @@
       <div id="menuE" hidden style="position:absolute;top:52px;right:18px;min-width:200px;background:#141212;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.55);z-index:900">
         <button data-mnu="ajustes" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Ajustes</button>
         <button data-mnu="novedades" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Novedades &middot; qu&eacute; ha cambiado</button>
-        <button data-mnu="automatismos" hidden style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Automatismos &middot; lo que el repo ya hace solo</button>
+        <button data-mnu="automatismos" hidden style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Automatismos &middot; lo que corre solo</button>
         <button data-mnu="cierre" hidden style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Cierre mensual</button>
         <button data-mnu="reportar" style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Reportar un fallo o una mejora</button>
         <button data-mnu="buzon" hidden style="display:block;width:100%;background:none;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:13px;padding:12px 14px;text-align:left;cursor:pointer">Buzón · la cola de reportes</button>
@@ -113,16 +113,16 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=01386ee"></script>
-<script src="notis.escritorio.js?v=b63617f"></script>
+<script src="comun.js?v=d399ed2"></script>
+<script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=471a14e"></script>
-<script src="turnos.escritorio.js?v=f8f1f00"></script>
-<script src="buzon.escritorio.js?v=3452823"></script>
-<script src="documentos.escritorio.js?v=ff6ccea"></script>
-<script src="sanciones.escritorio.js?v=32db922"></script>
-<script src="reuniones.escritorio.js?v=6a0a2d0"></script>
-<script src="horas.escritorio.js?v=02b9853"></script>
-<script src="equipo.escritorio.js?v=7edfe96"></script>
+<script src="turnos.escritorio.js?v=f883ec2"></script>
+<script src="buzon.escritorio.js?v=a3871ed"></script>
+<script src="documentos.escritorio.js?v=f1eb2c6"></script>
+<script src="sanciones.escritorio.js?v=406f726"></script>
+<script src="reuniones.escritorio.js?v=65feb54"></script>
+<script src="horas.escritorio.js?v=52831ae"></script>
+<script src="equipo.escritorio.js?v=209b9f6"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -282,6 +282,10 @@ var api={
   crearTurno:  function(t){ return api._post({action:"crearTurno",turno:t}); },
   /* 26/10 (triaje C4a/C4b): «Realizado» (con quién fue y quién llevó coche) o «Cancelado». Sólo del mini PC. */
   /* 26/10 (triaje C2a): una tarea nueva en el Kanban de su unidad. Sólo del mini PC. */
+  moverEstadoTarea: function(u,de,a){ return api._post({action:"moverEstadoTarea",url:u,de:de,a:a}); },
+  /* 31/10: apelar una tarea (RRI Art. 34) y resolver la apelación; sólo el mini PC las tiene. */
+  apelarTarea: function(t,c,m){ return api._post({action:"apelarTarea",tarea:t,clausula:c,motivo:m}); },
+  resolverApelacion: function(d){ return api._post(Object.assign({action:"resolverApelacion"},d)); },
   crearTarea:  function(t){ return api._post({action:"crearTarea",tarea:t}); },
   estadoTurno: function(c){ return api._post({action:"estadoTurno",id:c.id,estado:c.estado,fueron:c.fueron,coche:c.coche}); },
   getEntregables: function(){ return api._post({action:"getEntregables"}); },
@@ -351,6 +355,8 @@ var api={
   agruparSanciones: function(ids,l){ return api._post({action:"agruparSanciones",ids:ids,lote:l,devolverCola:true}); },
   confirmarLote: function(l){ return api._post({action:"confirmarLote",lote:l}); },
   marcarLote:  function(l,d){ return api._post({action:"marcarLote",lote:l,decision:d,devolverCola:true}); },
+  /* 31/10 (B6): los puntos de UNA persona del bloque, sin sacarla de él (sólo el mini PC); motivo obligatorio → {…,cola}. */
+  corregirPuntosLote: function(id,p,m){ return api._post({action:"corregirPuntosLote",id:id,puntos:p,motivo:m,devolverCola:true}); },
   /* 29/10: N decisiones sueltas en UNA llamada (sólo el mini PC); `items`=[{id,accion,…}] → {hechas,fallos,cola?}. */
   decidirSanciones: function(items){ return api._post({action:"decidirSanciones",items:items,devolverCola:true}); },
   getPartes:   function(f){ return api._post({action:"getPartes",filtro:f||{}}); },
@@ -480,6 +486,9 @@ DATA.subsistemas=[{u:'Aviónica',n:4},{u:'GNC',n:3},{u:'Aeroestructuras',n:5},
    julio (`_hoyTxt_` congela el 24/07). Sólo en la maqueta local: con cuenta real lo pone el panel. */
 if(_demoLocal_() && !DATA.equipo_mes) DATA.equipo_mes={media:16.2, n:18, periodo:'2026-07', dia:24, diaCont:24.5,
   dias_mes:31, dias_ant:30};
+/* 31/10: Y LAS HORAS VIVAS DE ESTE MES (`horasMes`, lo que superpone Notion) DEL PD DE LA MAQUETA. Sin ellas `_hMesReal_`
+   da `null` y «Tu ritmo» (frente al equipo y al mes anterior) no se pinta nunca: la rama no se vería. Es su `hMes`. */
+if(_demoLocal_()) DATA.miembros.forEach(function(m){ if((m.nombre===_pdSemilla_() || m.nombre==='Xoán Bermúdez Rial') && m.horasMes==null) m.horasMes=m.hMes; });
 /* ⛔ 21/10 (auditor 19, 🟡 16): Y LA FORMA DE UN PANEL REAL. En esta cara `hMes` son las horas de ESTE mes y el ritmo va
    en `hRitmo` (los dos los pone `_aplicarPanel_`); la semilla no pasa por ahí, así que Ranking leía `hMes` como ritmo,
    Miembros como mes. Aquí: el ritmo por la puerta común (`_hMesDe_` sin `hMes`: horasTemp/meses), que es su respaldo
@@ -532,6 +541,54 @@ var PARTES=[
   horas:9.0,tarea:'Inventario de propulsante',origen:'bloque',just:'Recuento.',
   estado:'detalle',decidido_por:_pdSemilla_(),decidido_at:'2026-07-20T10:00:00Z',motivo:'Nueve horas para un recuento: detalla qué se hizo en cada tramo.'}
 ];
+/* 31/10 · «LO TUYO» (rechazados, caducados, revertidos, de meses anteriores, histórico): LA MAQUETA TAMBIÉN TIENE QUE
+   TENER DE ESTOS, a nombre de quien la mira (el PD). Sin ellos `_misPartesNoCuentanHTML_` y `_histHorasHTMLE_` salen
+   vacíos y «0 errores» no prueba nada: la rama no se vería nunca. SÓLO en la maqueta (`_demoLocal_`): en producción
+   estos partes serían de verdad para quien se llame como el PD mientras no llegara la cola real. Fechas absolutas
+   dentro de la semilla congelada de julio de 2026 (las del resto de la semilla, también). */
+if(_demoLocal_()) PARTES=PARTES.concat([
+ {id:101,autor:_pdSemilla_(),unidad:'Dirección',fecha:'14/07/2026',ini:'17:00',fin:'20:00',horas:3.0,
+  tarea:'Revisión de planos del mamparo',origen:'fichaje',just:'Revisión con el coordinador.',estado:'aprobado',
+  cat:'tareas',iso:'2026-07-14',periodo:'2026-07',decidido_por:'José Romero',decidido_at:'2026-07-15T09:00:00Z'},
+ {id:102,autor:_pdSemilla_(),unidad:'Dirección',fecha:'17/07/2026',ini:'18:00',fin:'19:30',horas:1.5,
+  tarea:'Junta de coordinadores',origen:'fichaje',just:'Junta semanal.',estado:'aprobado',
+  cat:'reunion',iso:'2026-07-17',periodo:'2026-07',decidido_por:'José Romero',decidido_at:'2026-07-18T09:00:00Z'},
+ {id:103,autor:_pdSemilla_(),unidad:'Dirección',fecha:'20/06/2026',ini:'10:00',fin:'14:00',horas:4.0,
+  tarea:'Turno de fabricación · tramo 1',origen:'turno',just:'Fabricación.',estado:'aprobado',
+  cat:'turno',iso:'2026-06-20',periodo:'2026-06',decidido_por:'José Romero',decidido_at:'2026-06-21T09:00:00Z'},
+ {id:104,autor:_pdSemilla_(),unidad:'Dirección',fecha:'25/08/2025',ini:'10:00',fin:'12:00',horas:2.0,
+  tarea:'Preparación de la campaña de lanzamiento',origen:'fichaje',just:'Preparación.',estado:'aprobado',
+  cat:'tareas',iso:'2025-08-25',periodo:'2025-08',decidido_por:'José Romero',decidido_at:'2025-08-26T09:00:00Z'},
+ {id:105,autor:_pdSemilla_(),unidad:'Dirección',fecha:'10/07/2026',ini:'16:00',fin:'20:00',horas:4.0,
+  tarea:'Montaje en el taller de estructuras',origen:'manual',sinFichaje:true,just:'Montaje.',estado:'rechazado',
+  iso:'2026-07-10',periodo:null,decidido_por:'José Romero',decidido_at:'2026-07-12T09:00:00Z',
+  motivo:'No hay turno ni fichaje ese día y la justificación no dice qué se montó: vuelve a declararlo con el detalle.'},
+ {id:106,autor:_pdSemilla_(),unidad:'Dirección',fecha:'08/07/2026',ini:'09:00',fin:'11:00',horas:2.0,
+  tarea:'Reunión de seguimiento con el CITI',origen:'fichaje',just:'',estado:'cad',iso:'2026-07-08',periodo:null},
+ {id:107,autor:_pdSemilla_(),unidad:'Dirección',fecha:'11/07/2026',ini:'12:00',fin:'13:00',horas:1.0,
+  tarea:'Llamada con el proveedor de fibra',origen:'manual',just:'Llamada.',estado:'rev',ret:false,
+  revmot:'Duplicaba el parte del 14/07.',iso:'2026-07-11',periodo:null,decidido_por:'José Romero',decidido_at:'2026-07-13T09:00:00Z'},
+ {id:108,autor:_pdSemilla_(),unidad:'Dirección',fecha:'25/06/2026',ini:'10:00',fin:'12:30',horas:2.5,
+  tarea:'Inventario del almacén de resina',origen:'manual',sinFichaje:true,just:'Inventario.',estado:'rechazado',
+  iso:'2026-06-25',periodo:'2026-06',decidido_por:'José Romero',decidido_at:'2026-06-27T09:00:00Z',
+  motivo:'Fuera de plazo: el mes de junio ya estaba cerrado.'},
+ {id:109,autor:_pdSemilla_(),unidad:'Dirección',fecha:'02/06/2026',ini:'18:00',fin:'19:00',horas:1.0,
+  tarea:'Orden del día de la junta',origen:'manual',just:'Preparación.',estado:'rev',ret:true,
+  iso:'2026-06-02',periodo:'2026-06'},
+ /* …y del coordinador de la maqueta (`--rol=coord`), que mira «Lo tuyo» con su propia sesión. */
+ {id:110,autor:'Xoán Bermúdez Rial',unidad:'Aeroestructuras',fecha:'15/07/2026',ini:'16:00',fin:'19:00',horas:3.0,
+  tarea:'Revisión de uniones encoladas',origen:'fichaje',just:'Revisión.',estado:'aprobado',
+  cat:'tareas',iso:'2026-07-15',periodo:'2026-07',decidido_por:_pdSemilla_(),decidido_at:'2026-07-16T09:00:00Z'},
+ {id:111,autor:'Xoán Bermúdez Rial',unidad:'Aeroestructuras',fecha:'18/06/2026',ini:'16:00',fin:'20:00',horas:4.0,
+  tarea:'Turno de laminado',origen:'turno',just:'Laminado.',estado:'aprobado',
+  cat:'turno',iso:'2026-06-18',periodo:'2026-06',decidido_por:_pdSemilla_(),decidido_at:'2026-06-19T09:00:00Z'},
+ {id:112,autor:'Xoán Bermúdez Rial',unidad:'Aeroestructuras',fecha:'12/07/2026',ini:'10:00',fin:'15:00',horas:5.0,
+  tarea:'Mecanizado de anillos',origen:'manual',sinFichaje:true,just:'Mecanizado.',estado:'rechazado',
+  iso:'2026-07-12',periodo:null,decidido_por:_pdSemilla_(),decidido_at:'2026-07-14T09:00:00Z',
+  motivo:'Cinco horas seguidas sin fichaje ni turno: detalla qué máquina y qué piezas.'},
+ {id:113,autor:'Xoán Bermúdez Rial',unidad:'Aeroestructuras',fecha:'05/07/2026',ini:'09:00',fin:'10:30',horas:1.5,
+  tarea:'Reunión con el proveedor de fibra',origen:'fichaje',just:'',estado:'cad',iso:'2026-07-05',periodo:null}
+]);
 
 
 /* fichajes abiertos ahora mismo */
@@ -669,7 +726,10 @@ var TURNOS=[
  {id:'T-119',f:'29/07/2026',hora:'10:00',punto:'CITI · banco de ensayos',dur:'6 h',plazas:'2/3',
   /* 22/10 (auditor 25): con reparto y un coche, para que la maqueta pinte «Van» y «Coches» */
   roles:[{rol:'Responsable',miembro:'Iago Randán'},{rol:'Asistente',miembro:'Uxía Berdiales'},{rol:'Posible',miembro:'Anxo Ferradás'}],
-  coches:[{origen:'cuvi-vi',destino:'citi-ou',dueno:'Uxía Berdiales',pasajeros:['Iago Randán']}]},
+  coches:[{origen:'cuvi-vi',destino:'citi-ou',dueno:'Uxía Berdiales',pasajeros:['Iago Randán']}],
+  /* 31/10 (A3): con objetivos, nota y memoria, para que la maqueta pinte la ficha entera */
+  principales:['Montar el banco de ensayos','Calibrar la célula de carga'], secundarios:['Ordenar el almacén'],
+  nota:'Traed guantes y gafas de protección.', memoria:'https://drive.google.com/file/d/1DemoMemoriaTurno119AbCdEf/view'},
  {id:'T-120',f:'31/07/2026',hora:'17:00',punto:'Taller EEI · nave 2',dur:'4 h',plazas:'2/3'},
  {id:'T-121',f:'05/08/2026',hora:'09:30',punto:'CITI · sala limpia',dur:'5 h',plazas:'2/2'}
 ];
@@ -760,7 +820,7 @@ var ACX=75,ACY=75,AR=52,AGAP=8,ASTEP=36;
 /* ═══ EL INVENTARIO DE AUTOMATISMOS, DENTRO DE LA APP (638.ª) · GEMELA (movil/escritorio) ═══
    `AUTOMATISMOS` lo sella `rutinas/sellar_automatismos.py` al publicar y lo pinta
    `_automatismosHTML_` (comun.js). No se escribe a mano; `null` es «no se selló». */
-/*AUTOMATISMOS_INI*/var AUTOMATISMOS={"arreglan": [{"arregla": "", "con_orden": true, "nombre": "referencias del mapa", "que": "las líneas que el mapa funcional cita de cada función"}, {"arregla": "se re-anclan a mano (nunca se borran)", "con_orden": false, "nombre": "anclas de las mutaciones", "que": "que cada mutación siga encontrando su sitio"}, {"arregla": "", "con_orden": true, "nombre": "orden de las tablas de mutación", "que": "que cada `TABLAS[x] += [...]` vaya detrás de su `= [`"}], "comprobacion": [{"desviado": false, "linea": "referencias corregidas: 0", "nombre": "referencias del mapa"}, {"desviado": true, "linea": "14 con el ancla rota", "nombre": "anclas de las mutaciones"}, {"desviado": false, "linea": "= todos los `+=` ya van", "nombre": "orden de las tablas de mutación"}], "flujos": [{"escribe_fuera": "", "nombre": "estado", "que": "Cómo está el equipo: evaluación, sorteo, punto mensual, carga"}, {"escribe_fuera": "", "nombre": "tareas", "que": "Espejo de los Kanban de tareas de Notion"}, {"escribe_fuera": "", "nombre": "turno", "que": "Genera el anuncio de turno para Discord / parsea pegados"}, {"escribe_fuera": "", "nombre": "cuotas", "que": "Cuota final por persona: curva + descuento por conducir"}, {"escribe_fuera": "", "nombre": "contador turnos", "que": "Turnos de cada persona para el contador de Notion (propone, no escribe)"}, {"escribe_fuera": "", "nombre": "reunion", "que": "Las mejores horas para quedar, para que elijas tú"}, {"escribe_fuera": "", "nombre": "alta", "que": "Alta y baja de un miembro, con la lista de todos los sitios"}, {"escribe_fuera": "", "nombre": "tendencias", "que": "Quién se está apagando: participación por persona"}, {"escribe_fuera": "", "nombre": "analiticas", "que": "Participación histórica en las encuestas de disponibilidad"}, {"escribe_fuera": "", "nombre": "volcado", "que": "Notion → panel.json (recalcula la carga)"}, {"escribe_fuera": "", "nombre": "sanciones", "que": "Calcula las sanciones de una encuesta y saca el Excel"}, {"escribe_fuera": "escribe en Discord", "nombre": "publicar", "que": "Redacta y manda el mensaje"}, {"escribe_fuera": "", "nombre": "cierre", "que": "Calcula el cierre de mes (no aplica nada)"}, {"escribe_fuera": "", "nombre": "plazas", "que": "Reparte plazas de competición: roles a dedo + escalera"}, {"escribe_fuera": "", "nombre": "proyectar", "que": "Qué celdas de puntos del Drive no cuadran con Notion"}, {"escribe_fuera": "", "nombre": "libro", "que": "Genera el Registro mensual en xlsx"}, {"escribe_fuera": "", "nombre": "limpiar panel", "que": "Quien sale del Panel de Rendimientos al cerrar la temporada (propone, no toca Notion)"}, {"escribe_fuera": "", "nombre": "encuestas", "que": "Reconstruye catálogo, enlaces y base de datos"}, {"escribe_fuera": "escribe en el backend", "nombre": "push", "que": "Arma el panel desde el motor y lo sube al backend (--tareas/--turnos aparte)"}, {"escribe_fuera": "escribe en el backend", "nombre": "subir coordina", "que": "Sube al panel SOLO `coordina` (quien coordina que): la puerta estrecha, en seco por defecto"}, {"escribe_fuera": "escribe en el backend", "nombre": "push entregable", "que": "Empuja UN expediente documental a la pantalla Documentos, en seco por defecto (del almacen no se puede borrar)"}, {"escribe_fuera": "llama a push_entregable", "nombre": "acta a expediente", "que": "De un acta generada al expediente documental: deriva el organo del tipo de la reunion, rechaza el marcador 63xx y entra en revision. En seco por defecto"}, {"escribe_fuera": "", "nombre": "temporada", "que": "Cierre de TEMPORADA (sep→ago). No escribe en ningún sitio"}, {"escribe_fuera": "escribe en el backend con --subir", "nombre": "umbral", "que": "Umbral de la temporada, y deja sus ingredientes en el panel"}, {"escribe_fuera": "escribe en el Drive", "nombre": "historico", "que": "Sube el bloque de un mes al histórico de Drive (--ensayo no sube)"}, {"escribe_fuera": "", "nombre": "espejo historico", "que": "Trae el histórico del Registro de Drive al espejo local (--ensayo no escribe)"}, {"escribe_fuera": "", "nombre": "identidad", "que": "Quién es quién: nombre ↔ page-id de Notion ↔ correo"}, {"escribe_fuera": "escribe en Discord con --real", "nombre": "comunicar", "que": "Emisor genérico del comunicado de sanciones, con el formato bueno"}, {"escribe_fuera": "empuja las sanciones al backend", "nombre": "construir reunion", "que": "Monta el bloque entero de sanciones de una reunión vencida"}, {"escribe_fuera": "", "nombre": "reunion a votos", "que": "Adaptador: de una reunión de la app a los votos que come `sanciones`"}, {"escribe_fuera": "", "nombre": "refrescar roster", "que": "Refresca equipo.json desde el Panel de Rendimientos"}, {"escribe_fuera": "publica la app con --subir", "nombre": "publicar web", "que": "Publica la app en GitHub Pages por la API de Contents"}, {"escribe_fuera": "", "nombre": "wheel", "que": "Genera el `.wheel` de Wheel of Names con el equipo y los pesos de ahora"}, {"escribe_fuera": "", "nombre": "horas temporada", "que": "Deriva `horas_temporada.json` del histórico (base de la cuota y el ranking)"}], "gate": [{"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "construir", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar horas", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "calcular cierre", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "calcular convocatoria", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "publicar automatismos", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar cierre", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "calcular temporada", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar temporada", "siempre": false, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "cerrar fichajes", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "caducar partes", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "refrescar panel", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "Turnos", "modelo": "", "nombre": "avisar convocatoria", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "convocar semana", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "avisar reunion", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "avisar turno", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "actividad", "siempre": false, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "triaje", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "tanda", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "opus", "nombre": "tanda trabajo", "siempre": false, "tipo": "ia"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "reunion a notion", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "sonnet", "nombre": "triar buzon", "siempre": false, "tipo": "ia"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "opus", "nombre": "construir buzon", "siempre": false, "tipo": "ia"}], "generado": "2026-10-31T03:04", "plantan": [{"evento": "PostToolUse", "nombre": "contexto hook"}, {"evento": "PostToolUse", "nombre": "mapa hook"}]};/*AUTOMATISMOS_FIN*/
+/*AUTOMATISMOS_INI*/var AUTOMATISMOS={"arreglan": [{"arregla": "", "con_orden": true, "nombre": "referencias del mapa", "que": "las líneas que el mapa funcional cita de cada función"}, {"arregla": "se re-anclan a mano (nunca se borran)", "con_orden": false, "nombre": "anclas de las mutaciones", "que": "que cada mutación siga encontrando su sitio"}, {"arregla": "", "con_orden": true, "nombre": "orden de las tablas de mutación", "que": "que cada `TABLAS[x] += [...]` vaya detrás de su `= [`"}], "comprobacion": [{"desviado": false, "linea": "referencias corregidas: 0", "nombre": "referencias del mapa"}, {"desviado": false, "linea": "0 con el ancla rota", "nombre": "anclas de las mutaciones"}, {"desviado": false, "linea": "= todos los `+=` ya van", "nombre": "orden de las tablas de mutación"}], "flujos": [{"escribe_fuera": "", "nombre": "estado", "que": "Cómo está el equipo: evaluación, sorteo, punto mensual, carga"}, {"escribe_fuera": "", "nombre": "tareas", "que": "Espejo de los Kanban de tareas de Notion"}, {"escribe_fuera": "", "nombre": "turno", "que": "Genera el anuncio de turno para Discord / parsea pegados"}, {"escribe_fuera": "", "nombre": "cuotas", "que": "Cuota final por persona: curva + descuento por conducir"}, {"escribe_fuera": "", "nombre": "contador turnos", "que": "Turnos de cada persona para el contador de Notion (propone, no escribe)"}, {"escribe_fuera": "", "nombre": "reunion", "que": "Las mejores horas para quedar, para que elijas tú"}, {"escribe_fuera": "", "nombre": "alta", "que": "Alta y baja de un miembro, con la lista de todos los sitios"}, {"escribe_fuera": "", "nombre": "tendencias", "que": "Quién se está apagando: participación por persona"}, {"escribe_fuera": "", "nombre": "analiticas", "que": "Participación histórica en las encuestas de disponibilidad"}, {"escribe_fuera": "", "nombre": "volcado", "que": "Notion → panel.json (recalcula la carga)"}, {"escribe_fuera": "", "nombre": "sanciones", "que": "Calcula las sanciones de una encuesta y saca el Excel"}, {"escribe_fuera": "escribe en Discord", "nombre": "publicar", "que": "Redacta y manda el mensaje"}, {"escribe_fuera": "", "nombre": "cierre", "que": "Calcula el cierre de mes (no aplica nada)"}, {"escribe_fuera": "", "nombre": "plazas", "que": "Reparte plazas de competición: roles a dedo + escalera"}, {"escribe_fuera": "", "nombre": "proyectar", "que": "Qué celdas de puntos del Drive no cuadran con Notion"}, {"escribe_fuera": "", "nombre": "libro", "que": "Genera el Registro mensual en xlsx"}, {"escribe_fuera": "", "nombre": "limpiar panel", "que": "Quien sale del Panel de Rendimientos al cerrar la temporada (propone, no toca Notion)"}, {"escribe_fuera": "", "nombre": "encuestas", "que": "Reconstruye catálogo, enlaces y base de datos"}, {"escribe_fuera": "escribe en el backend", "nombre": "push", "que": "Arma el panel desde el motor y lo sube al backend (--tareas/--turnos aparte)"}, {"escribe_fuera": "escribe en el backend", "nombre": "subir coordina", "que": "Sube al panel SOLO `coordina` (quien coordina que): la puerta estrecha, en seco por defecto"}, {"escribe_fuera": "escribe en el backend", "nombre": "push entregable", "que": "Empuja UN expediente documental a la pantalla Documentos, en seco por defecto (del almacen no se puede borrar)"}, {"escribe_fuera": "llama a push_entregable", "nombre": "acta a expediente", "que": "De un acta generada al expediente documental: deriva el organo del tipo de la reunion, rechaza el marcador 63xx y entra en revision. En seco por defecto"}, {"escribe_fuera": "", "nombre": "temporada", "que": "Cierre de TEMPORADA (sep→ago). No escribe en ningún sitio"}, {"escribe_fuera": "escribe en el backend con --subir", "nombre": "umbral", "que": "Umbral de la temporada, y deja sus ingredientes en el panel"}, {"escribe_fuera": "escribe en el Drive", "nombre": "historico", "que": "Sube el bloque de un mes al histórico de Drive (--ensayo no sube)"}, {"escribe_fuera": "", "nombre": "espejo historico", "que": "Trae el histórico del Registro de Drive al espejo local (--ensayo no escribe)"}, {"escribe_fuera": "", "nombre": "identidad", "que": "Quién es quién: nombre ↔ page-id de Notion ↔ correo"}, {"escribe_fuera": "escribe en Discord con --real", "nombre": "comunicar", "que": "Emisor genérico del comunicado de sanciones, con el formato bueno"}, {"escribe_fuera": "empuja las sanciones al backend", "nombre": "construir reunion", "que": "Monta el bloque entero de sanciones de una reunión vencida"}, {"escribe_fuera": "", "nombre": "reunion a votos", "que": "Adaptador: de una reunión de la app a los votos que come `sanciones`"}, {"escribe_fuera": "", "nombre": "refrescar roster", "que": "Refresca equipo.json desde el Panel de Rendimientos"}, {"escribe_fuera": "publica la app con --subir", "nombre": "publicar web", "que": "Publica la app en GitHub Pages por la API de Contents"}, {"escribe_fuera": "", "nombre": "wheel", "que": "Genera el `.wheel` de Wheel of Names con el equipo y los pesos de ahora"}, {"escribe_fuera": "", "nombre": "horas temporada", "que": "Deriva `horas_temporada.json` del histórico (base de la cuota y el ranking)"}], "gate": [{"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "construir", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar horas", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "calcular cierre", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "calcular convocatoria", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "publicar automatismos", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar cierre", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "calcular temporada", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "", "nombre": "aplicar temporada", "siempre": false, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "cerrar fichajes", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "caducar partes", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "refrescar panel", "siempre": true, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "Turnos", "modelo": "", "nombre": "avisar convocatoria", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "convocar semana", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "avisar reunion", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "avisar turno", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "avisar tarea", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "actividad", "siempre": false, "tipo": "py"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "triaje", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "tanda", "siempre": false, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "opus", "nombre": "tanda trabajo", "siempre": false, "tipo": "ia"}, {"con_interruptor": false, "encargo": false, "interruptor_en": "", "modelo": "", "nombre": "reunion a notion", "siempre": true, "tipo": "py"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "sonnet", "nombre": "triar buzon", "siempre": false, "tipo": "ia"}, {"con_interruptor": true, "encargo": true, "interruptor_en": "", "modelo": "opus", "nombre": "construir buzon", "siempre": false, "tipo": "ia"}], "generado": "2026-10-31T10:12", "plantan": [{"evento": "PostToolUse", "nombre": "contexto hook"}, {"evento": "PostToolUse", "nombre": "mapa hook"}]};/*AUTOMATISMOS_FIN*/
 /* 21/10: el ESTADO de cada interruptor, {nombre legible: true|false|null}, del servidor (`getEstadoAutomatismos`); `null`
    = no se ha preguntado. La clave del flag no viaja: se cruza por el nombre de la rutina. */
 var AUTO_ESTADO=null;
@@ -958,10 +1018,12 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
           '<span class="tx"><b>'+x.b+'</b><small>'+x.s+'</small></span>'+
           '<span class="der">'+x.chip+'<span class="chev">›</span></span></div>';
       }).join('')
-    : vacioSimple('Nada requiere tu decisión','No hay partes de horas, expedientes ni sanciones esperando tu firma. Lo que te toque decidir aparecerá aquí.');
+    : vacioSimple('Nada pendiente de decidir','');
 
   /* La capa de NOVEDADES, lo primero del Panel de mando. Si no hay nada, no existe. */
   return ((typeof _novHTML_==='function')?_novHTML_('escritorio'):'')+
+    /* 31/10: LO TUYO va arriba de lo de gobierno — ver `_tuyoHTMLE_` (`equipo.escritorio.js`). */
+    _tuyoHTMLE_()+
     pan('Requiere tu decisión',cola.length+' asuntos',lista,'destaca')+
     '<div class="kpis">'+
       kpi('Horas en el aire',nf2(enAire)+'<small> h</small>','no cuentan hasta que se firmen','wa')+
@@ -986,8 +1048,8 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
       pan('Conducta del equipo', media==null?'sin datos':('media de '+conPts.length),
         '<div class="pb" style="display:flex;flex-direction:column;align-items:center;gap:12px">'+
           (media==null
-            ? vacioSimple('Sin puntos del equipo','Tu cuenta solo ve el nombre, la unidad y el cargo del resto del '+
-                'equipo, no sus puntos. Si necesitas la conducta del equipo, pídesela al Project Director.')
+            ? vacioSimple('Sin puntos del equipo','Solo ves nombre, unidad y cargo del resto del equipo, no sus puntos. '+
+                'Pídeselos al Project Director si los necesitas.')
             : anilloHTML(media,'media del equipo'))+
           '<p style="margin:0;font-size:11.5px;color:var(--ink3);line-height:1.6;text-align:center">'+
           'Media de puntos de todo el equipo, sobre 10. Los tres primeros tramos, en '+
@@ -1120,8 +1182,8 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
         'Cuando alguien de tu unidad declare horas, aparecerá aquí con su justificación a la vista.'),'destaca')+
     pan('Otorgar horas directamente','sin que nadie las pida',
       '<div class="pb"><p style="margin:0 0 11px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      'A veces las horas las pone el coordinador: una feria, un traslado, un turno que no se fichó. '+
-      'Cuentan igual que las declaradas y en la app del miembro salen marcadas como <b>otorgadas</b>.</p>'+
+      'A veces las horas las pone el coordinador (una feria, un traslado, un turno sin fichar). '+
+      'Cuentan igual y al miembro le salen como <b>otorgadas</b>.</p>'+
       '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
         '<label style="flex:1;min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">A quién</span>'+
         '<select style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
@@ -1150,9 +1212,8 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
         'con su motivo y con quién lo firmó.'))+
     /* ⛔ 21/10 (auditor 8, 🟡 15): lo que hacen `revisoresDeParte` y el servidor — sin «revisor fijo» (el rango 2 es
        documental: en horas no firma) y con la excepción del PD, que sí firma lo suyo (Daniel, 15/08). */
-    '<div class="pan"><div class="nota">Un parte lo firma el <b>coordinador de la unidad de quien lo declara</b>. '+
-      'Si el autor es ese coordinador, lo firma el <b>Project Director</b>. Nadie más firma sus propias horas: '+
-      'sólo el Project Director, que no tiene a nadie por encima.</div></div>';
+    '<div class="pan"><div class="nota">Lo firma el <b>coordinador de la unidad de quien lo declara</b>; si es el propio '+
+      'coordinador, el <b>Project Director</b>. Nadie firma lo suyo, salvo el PD, que no tiene a nadie encima.</div></div>';
 }};
 V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
   var sd=PARTES.filter(function(p){return p.estado==='sindecl';});
@@ -1175,11 +1236,10 @@ V.sindeclarar={g:'Horas',t:'Sin declarar',f:function(){
         return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+h1(p.horas)+'</b>'+
           '<small>'+esc(p.unidad)+' · '+p.fecha+'</small></span><span class="der"><span class="chip no">caducada</span></span></div>';
       }).join('')):'')+
-    '<div class="pan"><div class="nota">Un fichaje <b>sin declarar</b> es una salida que se cerró sin categoría ni justificación. '+
-      'No entra en la cola de nadie: solo su autor puede declararlo —en <b>«Lo tuyo»</b> o desde el móvil—, '+
-      'y a los <b>7 días</b> '+
-      'caduca, con un aviso 24 h antes — o a las <b>'+_caducaAutocierreH_()+' h</b> si se cerró solo al llegar a las '+_maxHorasParte_()+' h. '+
-      '<b>Y aquí solo salen los TUYOS</b>: el servidor no sirve los fichajes sin declarar de otras personas, ni siquiera al Project Director. Lo que ves no es la lista del equipo.</div></div>';
+    '<div class="pan"><div class="nota">Un fichaje <b>sin declarar</b> es una salida cerrada sin categoría ni justificación. '+
+      'Solo su autor puede declararlo (en <b>«Lo tuyo»</b> o desde el móvil) y caduca a los <b>7 días</b> '+
+      '(a las <b>'+_caducaAutocierreH_()+' h</b> si se cerró solo a las '+_maxHorasParte_()+' h), con aviso 24 h antes. '+
+      '<b>Aquí solo ves los tuyos.</b></div></div>';
 }};
 
 /* ── FICHAJES EN CURSO ───────────────────────────────────────────────────── */
@@ -1235,8 +1295,7 @@ V.curso={g:'Horas',t:'Fichajes en curso',f:function(){
     vacioSimple('Esta lista es del Project Director','Quién está fichado ahora mismo sólo lo ve el Project Director; '+
       'tus fichajes están en «Lo tuyo».'));
   if(CURSO_SRV==='error') return pan('Sesiones abiertas ahora mismo','sin datos',
-    vacioSimple('No se pudo preguntar al servidor','Se dice en vez de enseñar una lista vieja: '+
-      'alguien que cerró hace horas seguiría saliendo como fichado.'));
+    vacioSimple('No se pudo cargar la lista de fichados',''));
   if(CURSO_SRV!=='ok') return pan('Sesiones abiertas ahora mismo','…',
     vacioSimple('Preguntando al servidor','Un momento.'));
   return pan('Sesiones abiertas ahora mismo',CURSO.length+(CURSO.length===1?' persona':' personas'),
@@ -1454,8 +1513,8 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
       '<div class="nota" style="border-top:0">Preguntando al servidor en qué punto está el cierre…</div>');
   if(CIERRE_ERR)
     return pan('Cierre de '+cer.mes,'no se pudo comprobar',
-      vacioSimple('No se pudo leer el estado del cierre', esc(CIERRE_ERR)+'. No es que esté todo listo: '+
-        'es que no se ha podido comprobar, y cerrar a ciegas mueve la cuota de todo el equipo.'));
+      vacioSimple('No se pudo leer el estado del cierre', esc(CIERRE_ERR)+'. No lo cierres sin verlo: '+
+        'mueve la cuota de todo el equipo.'));
   var bloq=(CIERRE.bloqueos)||[], enc=CIERRE.encolado||null, plan=_planVigente_(CIERRE.plan||null);
   /* ⛔ 21/10 (auditor 9): un plan de un mes ANTERIOR al que toca cerrar es de un ciclo pasado (`_planVigente_`): no
      cuenta para el estado. Se dice en una línea, para que no parezca que se ha perdido. */
@@ -1513,9 +1572,8 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
           '<span class="tx"><b>'+esc(p[0])+'</b><small>'+esc(p[2])+'</small></span>'+
           (p[1]?'<span class="chip ok">listo</span>':'<span class="chip no">bloquea</span>')+'</div>';
       }).join('')+
-      '<div class="nota">Estas dos <b>bloquean</b> porque entran en la cuenta: unas horas que se '+
-      'aprueban después del cierre moverían el umbral y la cuota de alguien saldría mal, y una '+
-      'sanción sin confirmar dejaría el comunicado incompleto.</div>')+
+      '<div class="nota">Estas dos <b>bloquean</b> el cierre: unas horas aprobadas después moverían '+
+      'la cuota de alguien, y una sanción sin confirmar dejaría el comunicado incompleto.</div>')+
     /* 21/10 (auditor 9): la ranura trae un plan de un mes ANTERIOR al que toca cerrar — se dice, no se pinta como vigente */
     (_planViejo ? '<div class="nota">'+_notaPlanViejo_(_planViejo)+'</div>' : '')+   /* 22/10 (auditor 22, 🟡 6) */
     (plan
@@ -1544,9 +1602,8 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
               (plan.parado?'<br><b>'+(_convivenFichas_(plan)?'Hay fichas nuevas y viejas conviviendo. '
                 :'Se paró antes de escribir ninguna ficha. ')+'No lo relances sin mirarlo.</b>':'')+
               '</div>'
-            : '<div class="nota"><b>No se ha aplicado nada.</b> El plan dice qué valor nuevo le toca a '+
-              'cada campo de cada persona. Revísalo aquí abajo antes de aplicarlo: de aquí salen la '+
-              'cuota y la renovación.</div>')+
+            : '<div class="nota">El plan dice qué valor nuevo le toca a cada campo de cada persona. '+
+              'Revísalo antes de aplicarlo: de aquí salen la cuota y la renovación.</div>')+
           /* El desglose por persona SI cabe en un ordenador. En el movil va en desplegables
              porque no cabe; replicarlos aqui seria portar la limitacion, no la funcion. */
           _fichasPlanHTML_(plan))
@@ -1573,11 +1630,10 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
            :inc?'Terminar el cierre · faltan '+inc.faltan
               :'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo)))+'</button></div>'+
           '<div class="nota">Escribe en <b>'+((plan.totales&&plan.totales.personas)||plan.personas||0)+
-          ' fichas de Notion</b>. Es idempotente —aplicarlo dos veces no rueda los puntos dos '+
+          ' fichas de Notion</b>. Si lo aplicas dos veces no se duplican los puntos. '+
           /* 22/10 (auditor 22, 🟠 4): `revertir_cierre.py` deshace las fichas, NO el bloque del mes en el Registro
              (lo dice él mismo). Prometer un «deshacer» entero era decir que el error sale gratis. */
-          'veces—. <span class="mono">rutinas/revertir_cierre.py</span> deshace las fichas, pero <b>no</b> el bloque del mes '+
-          'que se escribe en el Registro: revísalo antes.</div>')
+          'Las fichas se pueden deshacer; el bloque del mes en el Registro, <b>no</b>: revísalo antes.</div>')
       : '')+
     pan('Cerrar '+cer.mes,'',
       /* ⛔ 21/10 (auditor 9, 🟠 3): lo encolado se dice TAMBIÉN con plan — si no, tras pulsar «Calcular» la pantalla
@@ -1601,12 +1657,10 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
          se AVISA de lo que cuesta. */
       (hecho
         ? '<div class="nota" style="color:var(--warn)"><b>Ojo:</b> el cierre de '+
-          esc(_nomPeriodo_(plan.periodo))+' <b>ya está aplicado</b>. Recalcular ahora sobreescribe '+
-          'el plan y <b>borra el rastro de que se aplicó</b> — lo escrito en Notion no se toca, '+
-          'pero esta pantalla dejará de saberlo.</div>'
+          esc(_nomPeriodo_(plan.periodo))+' <b>ya está aplicado</b>. Si recalculas, esta pantalla '+
+          '<b>pierde el rastro de que se aplicó</b> (lo escrito en Notion no se toca).</div>'
         : '')+
-      '<div class="nota">Esto <b>no cierra el mes</b>: encola el cálculo. La rutina saca el plan '+
-      '—ceros de carga, puntos que ruedan al mes anterior, compensaciones al defecto— y tú '+
+      '<div class="nota">Esto <b>no cierra el mes</b>: pide el cálculo. Después revisas el plan y '+
       'decides si se aplica.</div>');
 }};
 
@@ -1651,8 +1705,8 @@ V.temporada={g:'Horas',t:'Cierre de temporada',f:function(){
       '<div class="nota" style="border-top:0">Preguntando al servidor…</div>');
   if(TEMP_ERR)
     return pan('Cierre de temporada','no se pudo comprobar',
-      vacioSimple('No se pudo leer el estado', esc(TEMP_ERR)+'. No es que esté todo listo: es '+
-        'que no se ha podido comprobar, y esto mueve la cuota y la renovación de todo el equipo.'));
+      vacioSimple('No se pudo leer el estado', esc(TEMP_ERR)+'. No lo cierres sin verlo: '+
+        'mueve la cuota y la renovación de todo el equipo.'));
   var pl=TEMP.plan||null, enc=TEMP.encolado||null, apl=TEMP.aplicando||null;
   var t=(pl&&pl.totales)||{}, bloq=(pl&&pl.bloqueos)||[];
   /* ⛔ 21/10 (auditor 9, 🟠 7): la cabecera dice la temporada DEL PLAN. Fuera de septiembre el servidor da la que
@@ -1690,8 +1744,7 @@ V.temporada={g:'Horas',t:'Cierre de temporada',f:function(){
     var pr=pl.prorroga||{};
     cuerpo+='<div class="nota">Prórroga (Art. 29k, 2/3 de la Junta): <b>'+
       (pr.decidida ? (pr.prorrogado?'aprobada':'NO aprobada') : 'todavía sin votar')+'</b>. '+
-      'El Art. 29l empieza con un «si»: sin decisión registrada el plan no es aplicable, y eso '+
-      'es lo correcto — no se ajustan puntos que nadie ha aprobado.</div>';
+      'Sin decisión registrada el plan no es aplicable: no se ajustan puntos que nadie ha aprobado (Art. 29l).</div>';
     if((pl.ranking_top||[]).length){
       /* 22/10 (auditor 22, 🟡 8): el orden sale del RITMO (h/mes, julio y agosto a la mitad), no de las horas: sin
          esa columna se veía a alguien con MENOS horas por encima. Un plan de antes no la trae: «—». */
@@ -1758,9 +1811,9 @@ V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
       'Nada esperando tu firma. El archivo de un miembro lo firma su coordinador; el informe de subsistema, '+
       'el Project Director o '+esc(_m(REV2_NOM).pila)+'; el informe general, solo el Project Director. '+
       'Nadie firma lo suyo.'),'destaca')+
-    '<div class="pan"><div class="nota">Decidir aquí sustituye a contestar el correo de aprobación. '+
-    /* 21/10 (auditor 11, 🔴 1): aprobar no publica — queda pendiente de que lo publique quien publica. */
-    'Al aprobar, el documento queda <b>aprobado y pendiente de publicar</b> en Notion, Drive y el Libro de Datos.</div></div>';
+    /* 31/10: aprobar publica solo — `documentos_ciclo.py` pasa cada minuto (27/10); ya no hay correo de Cowork que sustituir. */
+    '<div class="pan"><div class="nota">Al aprobar, el documento se publica solo en Notion, Drive y el Libro de Datos '+
+    'en un par de minutos.</div></div>';
 }};
 V.docurso={g:'Documentos',t:'En curso',f:function(){
   var _sl=_docsSinLeerE_(); if(_sl) return _sl;   /* 21/10 (auditor 11, 🟠 2) */
@@ -1880,11 +1933,13 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
            `_prevPuntosLote_` (sanciones.escritorio.js), que calla cuando no se sabe en vez de pintar NaN o un 10. */
         var _prev=_prevPuntosLote_(m, x);
         return '<div class="lrow"><span class="nm">'+esc(x.n)+
-          (_prev?'<span class="sc" style="display:block;margin-top:3px">'+_prev+'</span>':'')+'</span>'+
+          (_prev?'<span class="sc" style="display:block;margin-top:3px">'+_prev+'</span>':'')+
+          _lcorrNota_(x)+'</span>'+
           /* ⛔ EL ROTULO DICE QUE ES ANTES DE CUANTO: un premio con `puntos:0` se pintaba
              «aviso» --un apercibimiento-- a quien se le esta premiando, y su recompensa
              son HORAS (`extra.compensacion`), no puntos. */
           '<span class="vl'+t+'">'+_etSancFila_(x.pts, x.origen, x.extra)+'</span>'+
+          _lcorrBoton_(x)+
           '<span class="decs" data-lid="'+x.id+'">'+
             '<button class="'+(x.dec==='aceptar'?'on a':'')+'" data-dec="aceptar">Acepta</button>'+
             /* ⛔⛔ «JUSTIFICA» NO SE OFRECE SOBRE UN PREMIO NI UNA REVOCACION. El
@@ -1895,7 +1950,7 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
             (_esNoJustificable_(x.origen, x.extra) ? ''
               : '<button class="'+(x.dec==='justificar'?'on j':'')+'" data-dec="justificar">Justifica</button>')+
             '<button class="'+(x.dec==='rechazar'?'on r':'')+'" data-dec="rechazar">Rechaza</button>'+
-          '</span></div>';
+          '</span>'+_lcorrForm_(x)+'</div>';
       }).join('')+
       '<div class="pb" style="padding-top:0"><button class="btn sm" data-todas="aceptar">Aceptan todas</button> '+
         '<button class="btn sm" data-todas="rechazar">Rechazan todas</button>'+
@@ -1916,11 +1971,8 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
     _selectorLotes_()+
     pan(LOTE.items.length ? 'Bloque abierto · '+esc(LOTE.nombre) : 'Bloque de sanciones',
         'RRI Título VII',cuerpo,'destaca')+
-    '<div class="pan"><div class="nota">El <b>motivo y el artículo son comunes a todo el bloque</b>: '+
-    'no se cambian fila a fila, y por eso sale un único comunicado. <b>Los puntos de una persona '+
-    'concreta todavía no se pueden corregir desde aquí</b>: el backend solo los cambia al aprobar, '+
-    'y eso la sacaría del bloque. Si hay que corregir una, sácala del paquete y aplícala suelta.'+
-    '</div></div>'+
+    '<div class="pan"><div class="nota">Motivo y artículo son los del <b>bloque entero</b>. '+
+    'Los puntos de cada persona se corrigen en su fila, sin sacarla del bloque.</div></div>'+
     _panelSueltas_()+
     /* ⛔ «Se pueden revocar» va ENTRE las sueltas y el historial, y no al final: es trabajo
        que se puede hacer, y lo que se puede hacer va antes de lo ya hecho — misma regla que
@@ -1928,21 +1980,10 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
     _panelRevocarSanc_()+
     _panelHistSanc_();
 }};
-/* ⛔ NO CONECTADO, y lo peor no eran los datos: eran los BOTONES. «Denegar» y «Estimar»
-   no estaban cableados a nada -ni a una accion, ni a un tost- asi que pulsarlos no hacia
-   absolutamente nada y no lo decia. En una pantalla de disciplina, sobre puntos de
-   personas, eso es lo mas parecido a mentir que puede hacer una interfaz.
-   No hay accion de apelaciones en el backend: ni cola, ni estado, ni devolucion. */
-V.apela={g:'Disciplina',t:'Apelaciones',f:function(){
-  return pan('Apelaciones abiertas','sin conectar',
-    /* ⛔ 21/10 (auditor de sanciones): decía «ni devolución de puntos», y la REVOCACIÓN es justo esa devolución
-       (`pushSancion`, desde «Se pueden revocar»). Lo que no hay es una cola para RECURRIR desde la app. */
-    vacioSimple('Las apelaciones todavía no se recurren desde la app','No hay una cola para que alguien recurra '+
-      'desde aquí. Una apelación se habla con el Project Director, y si procede se <b>revoca</b> la sanción desde '+
-      '<b>Sanciones</b> («Se pueden revocar»): eso devuelve los puntos.')+
-    '<div class="nota">Estimar una apelación no borra la sanción: crea la <b>devolución de puntos</b>, que '+
-    'pasa por la misma cola y se confirma igual. Queda el rastro de las dos.</div>');
-}};
+/* ⛔ ESTA PANTALLA ESTUVO «SIN CONECTAR»: «Denegar» y «Estimar» no estaban cableados a nada, y pulsarlos no hacía nada
+   y no lo decía (763.ª). 31/10: ahora es la cola de apelaciones de TAREAS (RRI Art. 34), con `apelarTarea` /
+   `resolverApelacion` en el servidor del mini PC; pinta `_vApela_` (sanciones.escritorio.js) y la engancha `_engApela_`. */
+V.apela={g:'Disciplina',t:'Apelaciones',f:function(){ return _vApela_(); }};
 
 /* ── REUNIONES ───────────────────────────────────────────────────────────── */
 /* ── Fijar fecha y orden del dia ──────────────────────────────────────────────
@@ -1950,7 +1991,7 @@ V.apela={g:'Disciplina',t:'Apelaciones',f:function(){
    guarda casa con lo que pinta el mapa y se puede resaltar en verde el hueco elegido.
    Quien puede lo decide el backend; aqui solo se ofrece. */
 
-var RE_SEL=0;
+var RE_SEL=0, RE_SEL_ID=null;   // la elegida: por id (`_reuSelE_`); el índice es sólo respaldo
 var RE_INV=null, RE_INV_ID=null;   // 818.a: los convocados que se están editando, y de qué reunión
 V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
   /* ⛔ 21/10 (auditor 10, 🟡 11): se titulaba «Reuniones abiertas» y listaba también las cerradas (la celda ya dice
@@ -2265,8 +2306,7 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
           '<td class="mono" style="color:var(--ink3)">'+esc(_fActa(d)?_isoADMY_(_fActa(d)):'—')+'</td>'+
           '<td class="r"><span class="chip '+estDoc(d.est)[1]+'">'+esc(estDoc(d.est)[0])+'</span></td></tr>';
       }).join(''))+
-    '<div class="nota">Las actas no se llevan aparte: son <b>expedientes</b> del pipeline '+
-    'documental y pasan por la misma revisión que lo demás. Para decidir sobre una, ve a '+
+    '<div class="nota">Las actas se revisan como cualquier documento: para decidir sobre una, ve a '+
     '<b>Documentos</b>.</div>');
 }};
 
@@ -2280,6 +2320,8 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
 /* 26/10: los plazos que un coordinador movió de su propia tarea (los sirve el bootstrap, sólo al PD). Global DECLARADA,
    no `window.*`: los arneses de node no tienen `window` y reventaban. */
 var PLAZOS_PROPIOS = [];
+var APELACIONES = [];         // 31/10: las apelaciones de tareas que ves (las tuyas y las que puedes resolver)
+var FICHA_TUR = null;         // 31/10: la CLAVE (`_claveTurno_`) del turno cuya ficha está abierta (A3)
 var CIERRE_TUR = { k:null, dur:'', quien:{}, extra:{}, hecho:null, coche:{}, listo:null };   /* coche/listo: 26/10 (C4a/C4b) */
 
 V.turnos={g:'Operación',t:'Turnos',f:function(){
@@ -2307,7 +2349,8 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
             l.ida+(l.vuelta?' (vuelta: '+l.vuelta+')':'')+(l.pasajeros.length?' · van '+l.pasajeros.join(', '):''); }).join('\n'))+
             '">'+_cl.length+' 🚗</span>' : '<span style="color:var(--ink3)">—</span>';
         /* ⛔ 20/10 (auditoría): un turno CANCELADO se dice (salía como convocado), y la fecha en DD/MM/AAAA. */
-        return '<tr><td class="mono" style="color:var(--red2)">'+esc(id)+
+        var _k=_claveTurno_(t);
+        return '<tr class="tur-fila'+(_k===FICHA_TUR?' tur-sel':'')+'" data-tursel="'+esc(_k)+'" tabindex="0" title="Ver la ficha del turno"><td class="mono" style="color:var(--red2)">'+esc(id)+
             (t.estado==='Cancelado'?' <span class="sc">· cancelado</span>':'')+'</td>'+
           '<td class="mono">'+esc(_isoADMY_(_dmyAISO_(String(f))))+'</td>'+
           '<td class="mono">'+esc(t.hora||'\u2014')+'</td><td style="color:var(--ink2)">'+esc(t.punto||'\u2014')+'</td>'+
@@ -2319,7 +2362,8 @@ V.turnos={g:'Operación',t:'Turnos',f:function(){
             : '<span style="color:var(--ink3)">—</span>')+'</td></tr>';
       }).join(''))+
     '<div class="nota">Los turnos se leen <b>en vivo de Notion</b>: lo que convoques aquí abajo aparece '+
-    'allí, y lo que se cambie allí tarda unos minutos en verse aquí.</div>')+
+    'allí, y lo que se cambie allí tarda unos minutos en verse aquí. <b>Pulsa un turno</b> para ver su ficha.</div>')+
+    (_turnoPorClave_(FICHA_TUR) ? _fichaTurnoE_(_turnoPorClave_(FICHA_TUR)) : '')+   /* 31/10 (A3): la ficha, bajo la tabla */
     _convocarDispPanel_()+_miTurnoPanel_()+_cierreTurnoPanel_()+_dispPanel_()+convocarPanel();
 }};
 /* ⛔ 26/10 (triaje C2a): CREAR UNA TAREA DESDE LA APP. 🗣️ Daniel, 20/10: «la fuente de verdad es el propio minipc […]
@@ -2363,6 +2407,86 @@ function _nuevaTareaPanel_(){
     '<label class="campo"><span class="sc">Fecha l\u00edmite (opcional)</span><input id="ntL" type="date" value="'+esc(NUEVA_TAREA.l)+'"></label>'+
     '<button class="btn pri" id="ntCrear"'+(falta?' disabled':'')+' style="margin-top:9px">'+esc(falta || 'Crear la tarea')+'</button></div>');
 }
+/* 31/10 (A1/A2): el paso de una tarea, su deshacer y el cajón de las pasadas, como en el móvil (`tareas.movil.js`). Quién
+   puede lo dice `_tareaOfertaPaso_` (comun.js): el responsable, el PD y el coordinador o subcoordinador de la unidad; el
+   servidor vuelve a decidirlo (`e_mover_estado_tarea`). El estado sólo cambia en pantalla cuando el servidor ya lo guardó. */
+var TAREA_PASOS = {}, TAREAS_PASADAS_AB = false, _PASO_TAREA_EN_CURSO_ = {};
+/* La fila de una tarea (viva o pasada): los botones van en la última celda, sólo para quien puede moverla. */
+function _filaTareaE_(t, yo){
+  var resp = Array.isArray(t.r) ? t.r.map(function(x){return String(x).split(' ')[0];}).join(', ') : (t.r||'—'),
+      of = _tareaOfertaPaso_(t, yo), i = TAREAS.indexOf(t);
+  return '<tr><td>'+esc(t.n)+'</td><td style="color:var(--ink2)">'+esc(resp)+'</td>'+
+    '<td><span class="chip '+(t.u==='alta'?'no':t.u==='media'?'wa':'')+'">'+t.u+'</span></td>'+
+    /* ⛔ 20/10 (auditoría): el plazo en DD/MM/AAAA y, sin plazo, «—» (salía el ISO crudo y la palabra «null»).
+       En rojo si ya venció. */
+    '<td style="color:var(--ink3)">'+esc(t.e)+'</td><td class="r mono'+(_venciaTarea_(t.l)?' dn':'')+'">'+
+      (_plazoDMY_(t.l)||'—')+'</td>'+
+    '<td class="r" style="white-space:nowrap">'+(i < 0 ? '' :
+      (of.des ? '<button class="btn" data-tdes="'+i+'" title="Puedes deshacerlo durante '+_minDeshacerTarea_()+' min">Deshacer</button> ' : '')+
+      (of.ac ? '<button class="btn pri" data-tpaso="'+i+'">'+esc(of.ac.etiqueta)+'</button>' : ''))+'</td></tr>';
+}
+/* «Tareas pasadas · N», plegable, con la fecha de la última (la misma cuenta que el cajón del móvil). Por FECHA real. */
+function _tareasPasadasE_(lista, yo){
+  var fin = (lista || []).filter(function(t){ return t && _tareaHecha_(t.e); })
+    .sort(function(a, b){ return String(_dmyAISO_(b.l)||'').localeCompare(String(_dmyAISO_(a.l)||'')); });
+  if(!fin.length) return '';
+  return '<div class="acord'+(TAREAS_PASADAS_AB?' ab':'')+'"><div class="hh" data-tpas><span class="tx"><b>Tareas pasadas <span style="color:var(--ink3)">· '+
+      fin.length+'</span></b>'+(_plazoDMY_(fin[0].l)?'<small>la última, '+_plazoDMY_(fin[0].l)+'</small>':'')+'</span>'+
+    '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+    '<div class="bb">'+tabla([['Tarea'],['Responsable'],['Urgencia'],['Estado'],['Vence',1],['']],
+      fin.map(function(t){ return _filaTareaE_(t, yo); }).join(''))+'</div></div>';
+}
+/* UNA puerta para avanzar y deshacer: guarda `t.e → a` y sólo entonces llama a `hecho`. Una sola escritura por tarea a la
+   vez (el doble clic no manda dos) y, si falla, el botón revive, la tarea queda como estaba y se dice por qué. */
+function _darPasoTareaE_(t, a, b, hecho){
+  var k = t.url;
+  if(_PASO_TAREA_EN_CURSO_[k]) return Promise.resolve();
+  _PASO_TAREA_EN_CURSO_[k] = true;
+  if(b) b.disabled = true;
+  return api.moverEstadoTarea(t.url, t.e, a).then(function(){
+    delete _PASO_TAREA_EN_CURSO_[k];
+    hecho();
+  }, function(e){
+    delete _PASO_TAREA_EN_CURSO_[k];
+    if(b) b.disabled = false;
+    tostErr('No se pudo guardar el paso de \u00ab'+t.n+'\u00bb: ', e);
+  });
+}
+function _cablearPasoTarea_(){
+  $$('[data-tpaso]').forEach(function(b){
+    b.onclick = function(){
+      var t = TAREAS[+b.dataset.tpaso], of = t && _tareaOfertaPaso_(t, _actorSanc_());
+      /* se vuelve a preguntar al pulsar: entre el pintado y el clic puede haber llegado otro estado, o otra cuenta */
+      if(!of || !of.ac){ tost('Esa tarea ya no admite ese paso.'); return; }
+      return _darPasoTareaE_(t, of.ac.a, b, function(){
+        t.e = of.ac.a; t.desde = (new Date()).getTime(); _anotarPasoTarea_(TAREA_PASOS, t);
+        pintar(); tost('«'+t.n+'»: '+of.ac.a+'. Puedes deshacerlo durante '+_minDeshacerTarea_()+' min.');
+      });
+    };
+  });
+  $$('[data-tdes]').forEach(function(b){
+    b.onclick = function(){
+      var t = TAREAS[+b.dataset.tdes], a, of;
+      if(!t) return;
+      of = _tareaOfertaPaso_(t, _actorSanc_());
+      if(!of.ac && !_puedeMoverEstadoTarea_(_actorSanc_(), t)){ tost('Esa tarea ya no es tuya para moverla.'); return; }
+      /* el plazo se comprueba AQUÍ también: la pantalla puede llevar media hora sin repintarse */
+      if(!_puedeDeshacerTarea_(t)){
+        tost('Ya pasó el plazo para deshacerlo ('+_minDeshacerTarea_()+' min). Habla con quien te la asignó.');
+        t.desde = null; _anotarPasoTarea_(TAREA_PASOS, t); pintar(); return;
+      }
+      a = _tareaAnterior_(t.e);
+      if(a === null){ tost('No hay ningún paso que deshacer.'); return; }
+      return _darPasoTareaE_(t, a, b, function(){
+        t.e = a; t.desde = null; _anotarPasoTarea_(TAREA_PASOS, t);
+        pintar(); tost('Deshecho: «'+t.n+'» vuelve a '+a+'.');
+      });
+    };
+  });
+  $$('[data-tpas]').forEach(function(h){
+    h.onclick = function(){ TAREAS_PASADAS_AB = h.parentNode.classList.toggle('ab'); };
+  });
+}
 function _cablearNuevaTarea_(){
   var su = document.getElementById('ntU');
   if(su) su.onchange = function(){ NUEVA_TAREA.u = su.value; NUEVA_TAREA.r = {}; NUEVA_TAREA.ok = ''; pintar(); };
@@ -2400,20 +2524,12 @@ V.tareas={g:'Operación',t:'Tareas',f:function(){
   TAREAS.filter(function(t){ return !_tareaHecha_(t&&t.e); }).forEach(function(t){ (porUni[t.s]=porUni[t.s]||[]).push(t); });
   if(!Object.keys(porUni).length) return _nuevaTareaPanel_()+pan('Tareas','ninguna activa',
     vacioSimple('No hay tareas activas', (_suyas && !(typeof esAdmin==='function' && esAdmin())) ? 'No tienes ninguna tarea activa asignada (aquí ves solo las tuyas).'
-      : 'En cuanto se asigne una tarea aparece aquí, agrupada por subsistema.'));
+      : 'En cuanto se asigne una tarea aparece aquí, agrupada por subsistema.'))+_tareasPasadasE_(TAREAS, _yoT);
   return _nuevaTareaPanel_()+Object.keys(porUni).sort(function(a,b){return porUni[b].length-porUni[a].length;}).map(function(u){
     return pan(u,porUni[u].length+' activa'+(porUni[u].length===1?'':'s')+(_suyas?' · solo las tuyas':''),
-      tabla([['Tarea'],['Responsable'],['Urgencia'],['Estado'],['Vence',1]],
-        porUni[u].map(function(t){
-          var resp = Array.isArray(t.r) ? t.r.map(function(x){return String(x).split(' ')[0];}).join(', ') : (t.r||'—');
-          return '<tr><td>'+esc(t.n)+'</td><td style="color:var(--ink2)">'+esc(resp)+'</td>'+
-            '<td><span class="chip '+(t.u==='alta'?'no':t.u==='media'?'wa':'')+'">'+t.u+'</span></td>'+
-            /* ⛔ 20/10 (auditoría): el plazo en DD/MM/AAAA y, sin plazo, «—» (salía el ISO crudo y la palabra «null»).
-               En rojo si ya venció. */
-            '<td style="color:var(--ink3)">'+esc(t.e)+'</td><td class="r mono'+(_venciaTarea_(t.l)?' dn':'')+'">'+
-              (_plazoDMY_(t.l)||'—')+'</td></tr>';
-        }).join('')));
-  }).join('');
+      tabla([['Tarea'],['Responsable'],['Urgencia'],['Estado'],['Vence',1],['']],
+        porUni[u].map(function(t){ return _filaTareaE_(t, _yoT); }).join('')));
+  }).join('')+_tareasPasadasE_(TAREAS, _yoT);   /* 31/10 (A2): las hechas, plegadas, debajo */
 }};
 
 /* ── EQUIPO ──────────────────────────────────────────────────────────────── */
@@ -2557,9 +2673,7 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
          1 de septiembre esto le pasa a las 32 A LA VEZ, y una rejilla con cabeceras
          y ni una fila se lee como «se ha roto», no como «todavia no toca». */
       : vacioSimple('Todavía no hay clasificación',
-        'La clasificación empieza en cuanto se cierra el primer mes de la temporada: '+
-        'hasta entonces no hay con qué comparar a nadie. Las horas ya cuentan y se ven '+
-        'aquí arriba; lo que falta es el primer cierre.'))+
+        'Empieza cuando se cierre el primer mes de la temporada.'))+
       /* ⛔ SEPTIMA PUERTA: la NOTA AL PIE. La columna y los chips ya se caían, y esto
          seguía explicando la fórmula del dinero — «descuenta 4 € por turno con coche», «nunca
          baja de 0 €» — debajo de una tabla que ya no la enseña. Sin cuotas es peor que
@@ -2567,13 +2681,11 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
       /* ⛔ 19/10 · ARRANQUE §2c: «la cuota es anual. Lo que te aparece es una estimación» (Daniel, 15/08). «Tu
          cuota» ya lo decía en las dos caras; el chip, la columna y esta nota, no — 32 importes en € a secas. */
       '<div class="nota">'+(_conQ ? 'La cuota es <b>anual</b> y se cierra en agosto: lo que sale aquí es una '+
-      '<b>estimación</b> con las horas de ahora, no lo que se paga este mes. Baja cuantas más horas se hacen: se calcula sobre el objetivo del mes, '+
-      'descuenta <b>'+nf2(_descuentoCoche_())+' €</b> por cada turno con coche entre Ourense y Vigo y nunca baja de <b>0 €</b>. '+
-      'Aquí solo se consulta.' : 'La clasificación ordena por horas ponderadas de la temporada. Aquí solo se consulta.')+
+      '<b>estimación</b> con las horas de ahora. Baja cuantas más horas se hacen: se calcula sobre el objetivo del mes, '+
+      'descuenta <b>'+nf2(_descuentoCoche_())+' €</b> por cada turno con coche entre Ourense y Vigo y nunca baja de <b>0 €</b>.' : 'La clasificación ordena por horas ponderadas de la temporada.')+
       (_aun.length ? ' <b>'+_aun.length+'</b> '+(_aun.length===1?'persona todavía no sale'
-        :'personas todavía no salen')+' en la clasificación: aún no han cerrado ningún '+
-        'mes, así que no hay con qué compararlas. Entran solas en el primer cierre — sus '+
-        'horas'+(_conQ ? ' y su cuota' : '')+' sí cuentan en las cifras de arriba.' : '')+
+        :'personas todavía no salen')+' en la clasificación porque aún no han cerrado ningún '+
+        'mes. Entran solas en el primer cierre.' : '')+
       (_fueraRk.length ? ' Fuera de la clasificación porque ya no están en el cálculo: '+
         _fueraRk.map(function(m){ return '<b>'+esc(m.nombre)+'</b>'; }).join(', ')+'.' : '')+
       '</div>');
@@ -2624,13 +2736,11 @@ V.subsis={g:'Equipo',t:'Horas por subsistema',f:function(){
 /* ⛔ NO CONECTADO. Tres candidaturas inventadas con su avalista y su fase, y un boton
    «Ver» que no llevaba a ningun sitio. No hay solicitudes de ingreso en ningun sistema:
    hoy se reciben hablando. El contador del chip tambien mentia: contaba la maqueta. */
-V.reclutar={g:'Equipo',t:'Reclutamiento',f:function(){
-  return pan('Candidaturas abiertas','sin conectar',
-      vacioSimple('Las candidaturas todavía no llegan a la app','No hay ningún sitio donde se '+
-        'recojan las solicitudes de ingreso: hoy llegan hablando o por Instagram. El día que '+
-        'haya un formulario, aparecerán aquí con su avalista y las horas que ofrecen.')+
-    '<div class="nota">Una candidatura no es un miembro: no tiene puntos, ni horas, ni cuota '+
-    'hasta que se le da de alta en el equipo.</div>');
+/* ⏸ 31/10: EN PAUSA, decidido por Daniel — *«Yo diría de dejarlo como vestigial, pero pausado»*. Se queda en el menú
+   con su rótulo «en pausa» (`pausa:true`, lo lee `pintarNav`) y sin globo. */
+V.reclutar={g:'Equipo',t:'Reclutamiento',pausa:true,f:function(){
+  return pan('Candidaturas','en pausa',
+      vacioSimple('Reclutamiento está en pausa','Las candidaturas siguen llegando por fuera de la app.'));
 }};
 
 
@@ -2786,14 +2896,13 @@ V.buzon={g:'Buzón',t:'Reportes',f:function(){
      sensible a mayusculas despues de arreglar las otras dos. */
   if(rangoNom(ACTOR)<3 && !esAdmin())
     return pan('Buzón','', vacioSimple('Esta cola es del Project Director',
-      'Los reportes llevan lo que la gente escribe cuando algo le molesta, así que no son '+
-      'material de consulta general. Para reportar algo, usa el menú de arriba a la derecha.'));
+      'Los reportes solo los ve el Project Director. Para reportar algo, usa el menú de arriba a la derecha.'));
   /* ⛔ `null` = **nunca se ha cargado**: ahí no hay nada que conservar y el hueco es honesto.
      Con dato ya cargado NO se vacía: se enseña y se marca abajo que se está actualizando. */
   if(BUZON===null) return pan('Buzón','cargando…',
     '<div class="nota" style="border-top:0">Pidiendo la cola al servidor…</div>');
   if(_buzonSinNadaQueEnsenar_()) return pan('Buzón','no se pudo leer',
-    vacioSimple('No se pudo cargar la cola', esc(BUZON_ERR)+'. No es que no haya reportes: es que no se han podido leer.'));
+    vacioSimple('No se pudo cargar la cola', esc(BUZON_ERR)+'. Recarga para volver a intentarlo.'));
   var abiertos=BUZON.filter(function(r){ return ['Publicado','Descartado'].indexOf(r.estado)<0; });
   var cerrados=BUZON.filter(function(r){ return ['Publicado','Descartado'].indexOf(r.estado)>=0; });
   /* ⛔ 21/10 (auditor 10, 🟠 1): «esperando tu decisión» = analizado y SIN decidir. Un `Adelante` ya lo autorizaste y
@@ -2829,9 +2938,8 @@ V.buzon={g:'Buzón',t:'Reportes',f:function(){
     pan('Cerrados', cerrados.length+'',
       cerrados.length? cerrados.map(_filaBuzon_).join('')
         : vacioSimple('Todavía no hay ninguno cerrado','Aquí van los publicados y los descartados.'))+
-    '<div class="pan"><div class="nota"><b>Nada se aplica desde aquí.</b> Estos botones solo '+
-    'mueven el reporte: «adelante» autoriza a construirlo, y el visto bueno se da <b>después</b> '+
-    'de mirar el artefacto de vista previa. Publicar sigue siendo un paso aparte.</div></div>';
+    '<div class="pan"><div class="nota">Estos botones solo mueven el reporte: «adelante» autoriza '+
+    'a construirlo y el visto bueno va <b>después</b> de ver la vista previa. Publicar es otro paso.</div></div>';
 }};
 
 /* AJUSTES ERA UN `tost`. Pulsar Ajustes soltaba un mensajito flotante con la sesion y
@@ -2894,6 +3002,9 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
     : vacioSimple('Nada este mes','Aún no se te ha contado ningún fichaje. Al cerrar el mes '+
         'esto vuelve a empezar; el registro no se borra.');
 
+  /* 31/10: y DE QUÉ SE COMPONEN, dentro del mismo panel (el reparto por categoría del móvil). */
+  libroH += _desgloseCatHTMLE_(r.todos);
+
   /* LOS PUNTOS, por TEMPORADA (Art. 29), no por mes: es el otro ambito de `_ultimosMov_`. */
   var rp=_ultimosMov_(MOVS_E, function(x){ return x.f; }, function(x){ return x.p; }, 'temporada');
   var libroP = rp.total
@@ -2911,7 +3022,7 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
        frase de abajo culpaba a la version del servidor de lo que muchas veces era la
        RED, y en los dos casos afirmaba «no tienes» sin saberlo. */
     : (!_llego_('movsE')
-      ? vacioSimple('Cargando tus movimientos…','El servidor todavía no ha contestado. Esto NO dice que no tengas movimientos: dice que aún no se sabe.')
+      ? vacioSimple('Cargando tus movimientos…','')
       : vacioSimple('Sin movimientos','No tienes subidas ni bajadas de puntos esta temporada.'));
 
   /* ⛔ EL RELOJ VA LO PRIMERO, ENCIMA DE LOS KPI. Es la ACCION; los KPI y las tablas de
@@ -2923,6 +3034,7 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
      bloque a posteriori encima del cronómetro invitaría a escribir a mano lo que el reloj
      habría contado solo, que es justo lo que el coordinador no puede verificar. */
   return _fichaPanel_()+_bloqPanel_()+_misSinFirmarHTML_()+   /* 26/10: tus partes sin firmar (retirar / corregir) */
+    _misPartesNoCuentanHTML_()+   /* 31/10: los rechazados (con motivo), caducados y revertidos, y los de meses anteriores */
     '<div class="kpis">'+
       /* ⛔ 20/10 (auditoría): el rótulo es el mes de TRABAJO (de cierre a cierre), no el del reloj — el 2 de
          noviembre con octubre sin cerrar decía «noviembre» encima de las horas de octubre. Como el móvil. */
@@ -2945,7 +3057,9 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
           _apuntesMes_(r.total, base, extra)===1 ? 'apunte que ya cuenta' : 'apuntes que ya cuentan','', null)+
     '</div>'+
     pan('Tus horas de este mes', _nomMesAbierto_(), libroH)+
+    _ritmoHorasHTMLE_(mi)+   /* 31/10: tu ritmo frente al equipo y al mes anterior */
     pan('Tus puntos de la temporada','', libroP)+
+    _histHorasHTMLE_(mi)+   /* 31/10: todo tu histórico de horas, separado por cierres */
     _cargaPanelE_(mi)+
     /* ⛔ LA CUOTA VA LA ÚLTIMA, y es la misma decisión que en el móvil («se fue al menú ⋮: es
        una cifra que se consulta dos veces al año»). Arriba va lo que se hace —fichar— y en
@@ -3017,7 +3131,7 @@ function _cuotaPanelE_(mi){
   var hay=(typeof _q.final==='number') && isFinite(_q.final);
   if(!hay) return pan('Tu cuota','sin dato',
     vacioSimple('Tu cuota todavía no ha llegado','Sale de tus horas de la temporada y se cierra '+
-      'en agosto. Esto NO dice que no tengas cuota: dice que el servidor aún no la ha servido.'));
+      'en agosto.'));
   var eur=function(v){ return nf(v,2)+' €'; };
   var base=_q.base;
   /* ⛔ EL PRIMER MES NO LLEVA CUOTA, Y HAY QUE DECIRLO. Un 0 € sin motivo al lado no
@@ -3079,12 +3193,12 @@ function _cuotaPanelE_(mi){
        : (mi.meses>0
             ? 'en <b>'+mi.meses+'</b> '+((mi.meses===1)?'mes':'meses')+' dentro del equipo. '
             : 'y, como <b>todavía no has cerrado ningún mes</b>, se usan <b>sin dividir</b> '+
-              '— por eso tampoco sales aún en la clasificación. '))+
+              'y por eso tampoco sales aún en la clasificación. '))+
     /* 21/10 (auditor 6): las cifras salen de sus constantes, no se teclean */
-    'El objetivo del mes se mueve entre <b>'+nf2(UMBRAL_LO)+' y '+nf2(UMBRAL_HI)+' h</b>, con '+
+    'El objetivo del mes va de <b>'+nf2(UMBRAL_LO)+' a '+nf2(UMBRAL_HI)+' h</b>, con '+
     nf2(_compBase_(mi))+' h de base por tu cargo. Llevar el coche entre Ourense y Vigo descuenta '+
-    '<b>'+nf2(_descuentoCoche_())+' €</b> por turno y nunca baja de <b>0 €</b>. Se cierra en <b>agosto</b> y es requisito '+
-    'para renovar; aquí solo se consulta.</div>');
+    '<b>'+nf2(_descuentoCoche_())+' €</b> por turno, sin bajar de <b>0 €</b>. Se cierra en <b>agosto</b> y es requisito '+
+    'para renovar.</div>');
 }
 V.novedades={g:'Ajustes',t:'Novedades',f:function(){
   return '<div class="tarj">'+_novedadesHTML_()+'</div>';
@@ -3131,9 +3245,8 @@ V.ajustes={g:'Ajustes',t:'Ajustes',f:function(){
     '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn no" data-salir>Cerrar sesión</button></div>')+
     /* ⛔ 21/10 (auditor 10, 🟡 13): `cerrarSesion` le pide al servidor que suelte la suscripción (no le llegan los tuyos
        a quien use este navegador después) y `_pushInit_` la vuelve a guardar sola al entrar. */
-    '<div class="pan"><div class="nota">Los avisos van al <b>navegador</b>, no al correo. Se activan una vez en '+
-    'cada navegador; <b>al cerrar sesión dejan de llegar aquí</b> y al volver a entrar se reconectan solos a tu cuenta. '+
-    'En otro ordenador hay que activarlos allí.</div></div>';
+    '<div class="pan"><div class="nota">Los avisos llegan al <b>navegador</b>, no al correo. Se activan una vez en '+
+    'cada navegador y <b>dejan de llegar al cerrar sesión</b>; al volver a entrar se reconectan solos.</div></div>';
 }};
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3207,7 +3320,7 @@ async function _refrescoVivo_(motivo, que){
   _REFRESCANDO_=true; _ULT_REFRESCO_=ahora;
   try{
     var _t=_pideSi_(que,'getTurnos','getTurnos').then(function(t){ if(Array.isArray(t)&&t.length){ TURNOS.length=0; t.forEach(function(x){TURNOS.push(x);}); } });
-    var _q=_pideSi_(que,'getTareas','getTareas').then(function(q){ if(Array.isArray(q)&&q.length){ TAREAS.length=0; q.forEach(function(x){TAREAS.push(x);}); } });
+    var _q=_pideSi_(que,'getTareas','getTareas').then(function(q){ if(Array.isArray(q)&&q.length){ TAREAS.length=0; q.forEach(function(x){TAREAS.push(x);}); _reponerPasosTarea_(TAREAS, TAREA_PASOS); } });
     var _p=_pideSi_(que,'resto','getPanel').then(function(p){ if(p) _aplicarPanel_(p); });
     /* ⛔ LAS MISMAS PUERTAS QUE EL ARRANQUE, y no una segunda copia. Aqui se pedía
        `getSanciones`/`getPartes` a mano y se asignaba `SANC_BACK`/`PART_BACK` **sin llamar a
@@ -3364,11 +3477,12 @@ function _aplicarPanel_(pnl){
 }
 function _aplicarBootstrap_(boot){
   _aplicarPanel_(boot.panel);
-  if(Array.isArray(boot.tareas)){ TAREAS.length=0; boot.tareas.forEach(function(t){TAREAS.push(t);}); }
+  if(Array.isArray(boot.tareas)){ TAREAS.length=0; boot.tareas.forEach(function(t){TAREAS.push(t);}); _reponerPasosTarea_(TAREAS, TAREA_PASOS); }
   if(Array.isArray(boot.turnos)){ TURNOS.length=0; boot.turnos.forEach(function(t){TURNOS.push(t);}); }
   if(Array.isArray(boot.entregables)){ DOCS.length=0; boot.entregables.forEach(function(d,i){DOCS.push(_normDocE_(d,i));}); DOCS_LLEGO=true; }
   /* 26/10 («puede pero me notifica»): los plazos que movió su propio responsable; sólo los trae el PD */
   PLAZOS_PROPIOS = Array.isArray(boot.plazosPropios) ? boot.plazosPropios : [];
+  if(Array.isArray(boot.apelaciones)) APELACIONES = boot.apelaciones;
   if(Array.isArray(boot.reuniones)){
     REUS.length=0; boot.reuniones.map(normReu).forEach(function(r){REUS.push(r);});
     _hidratarReus_();          // el bootstrap NO trae `resp`: sin esto el mapa sale a cero
@@ -3476,8 +3590,8 @@ async function _onCredencial_(resp,_silente){
       _gate_(_insigniaHTML_()+'<div style="max-width:390px;line-height:1.55;text-align:center">'+
         '<b>'+(_nomSes?'No llegaron los datos del equipo.':'No se pudo confirmar qui\u00e9n eres.')+
         '</b><br><span style="opacity:.75">'+(_nomSes
-          ? 'Tu cuenta entr\u00f3 bien, pero el servidor no devolvi\u00f3 el roster. Este panel no se '+
-            'abre con datos de muestra: aqu\u00ed se firman horas y se sancionan personas.'
+          ? 'Has entrado, pero no lleg\u00f3 la lista del equipo. Este panel no se abre con datos '+
+            'de muestra porque aqu\u00ed se firman horas y se sancionan personas.'
           : 'El servidor acept\u00f3 tu cuenta pero no dijo tu nombre, y sin nombre no hay forma de '+
             'saber qu\u00e9 te toca decidir.')+
         ' Vuelve a intentarlo; si sigue igual, av\u00edsale al Project Director.</span></div>'+
@@ -3665,8 +3779,9 @@ function pintarNav(){
       if(k==='temporada' && !_puedeCerrarMes_()) return;
       var n=conteo(k), b=document.createElement('button');
       b.className='item'+(k===vista?' on':''); b.dataset.v=k;
-      var cls = (k==='partes'&&n)||(k==='docdec'&&n) ? ' hot' : (k==='sanciones'&&n)||(k==='curso'&&n) ? ' wa' : '';
+      var cls = (k==='partes'&&n)||(k==='docdec'&&n) ? ' hot' : (k==='sanciones'&&n)||(k==='curso'&&n)||(k==='dispo'&&n)||(k==='turnos'&&n) ? ' wa' : '';
       b.innerHTML='<span class="rail"></span><span class="tx">'+V[k].t+'</span>'+
+        (V[k].pausa?'<span class="pausa">en pausa</span>':'')+
         (n?'<span class="cnt'+cls+'">'+n+'</span>':'');
       nav.appendChild(b);
     });
@@ -3696,7 +3811,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='9cd302c';
+var BUILD='ea7c0de';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3804,8 +3919,7 @@ function _pinSancEditar_(m){
       var mot=prompt('Motivo:', s.motivo||''); if(mot===null) return;
       var art=prompt('Artículo del RRI:', s.articulo||'libre'); if(art===null) return;
       if(!confirm('Aplicar la sanción de '+quien+' con '+Number(pts)+' punto(s), art. '+art+'.'+
-        String.fromCharCode(10,10)+'Editar y aplicar son lo mismo: el backend solo guarda los '+
-        'cambios al aprobar. Esto NO es un borrador.')) return;
+        String.fromCharCode(10,10)+'Al guardar, la sanción se aplica. No es un borrador.')) return;
       b.disabled=true;
       try{
         await api.decidirSancion(id,'aprobar',{puntos:Number(pts), motivo:mot, articulo:art});
@@ -3851,8 +3965,8 @@ function _pinSancAgrupar_(m){
 function _pinReunionFijar_(m){
   /* fijar fecha / orden del dia: api.fijar y api.setOrdenDia existian y no las llamaba nadie */
   var _rs=$('#reSel');
-  if(_rs) _rs.onchange=function(){ RE_SEL=+_rs.value||0; pintar(); };
-  var _reuSel=function(){ return REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0]; };
+  if(_rs) _rs.onchange=function(){ RE_SEL=+_rs.value||0; var _q=REUS[RE_SEL]; RE_SEL_ID=_q ? _q.id : null; pintar(); };
+  var _reuSel=_reuSelE_;
   $$('[data-fijar]').forEach(function(b){
     b.onclick=async function(){
       var r=_reuSel(); if(!r) return;
@@ -3941,7 +4055,7 @@ function _pinReunionFijar_(m){
       if(b.disabled) return;
       var r=_reuSel(); if(!r) return;
       /* Se vuelve a preguntar al PULSAR y no solo al pintar: entre las dos cosas puede haber
-         entrado un refresco que cambie la lista, y `_reuSel()` resuelve por índice. */
+         entrado un refresco que cambie la lista, y `_reuSel()` resuelve por `id` (`_reuSelE_`). */
       if(!_puedeBorrarReuE_(r)){ tost('Solo puede eliminarla quien la convocó.'); return; }
       if(typeof backendOK==='undefined' || !backendOK || !SESION){
         tost('Sin conexión no se puede eliminar una reunión.'); return; }
@@ -3968,7 +4082,7 @@ function _pinReunionFijar_(m){
       try{
         await api.borrarReunion(r.id);
         for(var i=0;i<REUS.length;i++){ if(REUS[i] && REUS[i].id===r.id){ REUS.splice(i,1); break; } }
-        RE_SEL=0;                       // la selección apuntaba a la que ya no existe
+        RE_SEL=0; RE_SEL_ID=null;       // la selección apuntaba a la que ya no existe
         tost('Reunión eliminada.');
         pintar();
       }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo eliminar: ', e); }
@@ -4241,6 +4355,7 @@ function _engIrYAcordeones_(){
      accesible **un solo turno**, el primero del array; a los demas no se llegaba. */
   _cablearCierreTurno_();   // idem
   _cablearNuevaTarea_();    // idem (26/10, triaje C2a)
+  _cablearPasoTarea_();     // idem (31/10, el paso de las tareas)
   $$('[data-acord]').forEach(function(h){
     h.onclick=function(){ h.parentNode.classList.toggle('ab'); };
   });
@@ -4540,8 +4655,8 @@ function _engDocsDecidir_(){
      El motivo y el titulo salen de la propia ficha: un prompt() no deja releer el
      expediente mientras escribes por que lo rechazas. */
   /* 21/10 (auditor 11, 🔴 1): aprobar NO publica (el servidor deja `aprobado`): se dice que queda pendiente. */
-  var ETI_DOC={aprobado:'Aprobado. Queda pendiente de publicar en Notion, Drive y el Libro de Datos.',
-    anot:'Aprobado con anotaciones. Queda pendiente de publicar, con los campos ajustados.',
+  var ETI_DOC={aprobado:'Aprobado. Se publica en un par de minutos.',   /* 31/10: documentos_ciclo.py pasa cada minuto (el 4201 tardó 73 s) */
+    anot:'Aprobado con anotaciones. Se publica en un par de minutos, con los campos ajustados.',
     cambios:'Cambios pedidos. Le llega al autor, que podrá reenviarlo corregido.',
     rechazado:'Rechazado. El autor recibe el motivo.',
     deshacer:'Decisión deshecha: vuelve a revisión.',
@@ -4853,9 +4968,11 @@ function enganchar(){
   _engOtorgar_();
   _engBloqueHoras_();
   _engConvocarTurno_();
+  _engFichaTurno_();   // 31/10 (A3): pulsar un turno abre su ficha
   _engDocsAbrir_();
   _engDocsDecidir_();
   _engSancMarcar_();
+  _engSancCorregir_();
   _engSancTodas_();
   _engSancCerrar_();
   /* ⛔⛔ ESTA LÍNEA ES LA PIEZA (763.ª). La versión anterior de Apelaciones tenía los botones
@@ -4863,6 +4980,7 @@ function enganchar(){
      nada y no lo decía. Un panel que se pinta y no se cablea es el fallo del 15/08 —escrito
      entero y muerto en el cable de en medio—, y aquí es sobre puntos de personas. */
   _engRevocarSanc_();
+  _engApela_();      // 31/10: Estimar / Desestimar de la cola de Apelaciones
   /* ⛔ Y este, por lo mismo: un boton pintado y sin cablear es lo que tenia Apelaciones. */
   _engComprobarAuto_();
   _engFicharE_();

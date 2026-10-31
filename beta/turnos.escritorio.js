@@ -55,12 +55,10 @@ function _cajaCargosPend_(cargos){
     for(j=0;j<CARGOS_TURNO.length;j++)
       if(CARGOS_TURNO[j].k === faltan[i]) nombres.push(CARGOS_TURNO[j].et);
   if(!nombres.length)
-    return '<div class="nota" style="margin:0 0 9px">✅ <b>Las tres responsabilidades están '+
-      'asignadas.</b> Una misma persona puede llevar varias.</div>';
+    return '<div class="nota" style="margin:0 0 9px"><b>Responsabilidades '+
+      'asignadas.</b></div>';
   return '<div class="nota" style="margin:0 0 9px;border-color:rgba(232,145,46,.35)">'+
-    '<b>Pendientes de asignar:</b> '+esc(_unirY_(nombres))+'. '+
-    '<span style="color:var(--ink3)">Una por persona — y la misma persona puede llevar '+
-    'varias.</span></div>';
+    '<b>Pendientes de asignar:</b> '+esc(_unirY_(nombres))+'.</div>';
 }
 
 function pintarReparto(){
@@ -434,9 +432,8 @@ function _miTurnoPreHTML_(cv){
   return pan('Tu disponibilidad', 'se abre el '+esc(abD)+' a las '+esc(abH),
     '<div class="pb" data-abre="'+esc(ab)+'">'+
     '<p style="margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      'Esta es la semana que se va a preguntar. <b>Todav\u00eda no se puede contestar</b>: el '+
-      'plazo se abre el <b>'+esc(abD)+'</b> a las '+esc(abH)+' \u2014 que es cuando el equipo '+
-      'recibe el aviso \u2014 y entonces esta rejilla se vuelve pintable.</p>'+
+      'El plazo se abre el <b>'+esc(abD)+'</b> a las '+esc(abH)+', cuando el equipo '+
+      'recibe el aviso. Hasta entonces no se puede marcar.</p>'+
     '<div class="dmapa" style="grid-template-columns:104px repeat('+D.length+
       ',minmax(44px,1fr))">'+cab+filas+'</div>'+
     '</div>');
@@ -479,8 +476,7 @@ function _miTurnoPanel_(){
     _mitPlazoTxt_(cv),
     '<div class="pb">'+
     '<p style="margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      'Elige <b>d\u00f3nde puedes</b> y haz clic en los huecos. Lo que marques aqu\u00ed es lo que '+
-      'cuenta para el reparto \u2014 y no contestar es lo que hace que te pongan un turno '+
+      'Elige <b>d\u00f3nde puedes</b> y marca los huecos. Si no contestas, te pueden poner un turno '+
       'cuando no puedes.</p>'+
     '<button class="btn" data-mtreusar style="display:block;margin:0 0 12px">↺ Reutilizar la disponibilidad del turno anterior</button>'+
     '<div class="dsit">'+pin+'</div>'+
@@ -600,8 +596,7 @@ function _cablearMiTurno_(){
 function _dispAviso_(titulo){
   var e = _dispEstadoSrv_();
   if(e === 'error') return pan(titulo, 'sin datos',
-    vacioSimple('No se pudo preguntar al servidor',
-      'Se dice en vez de ense\u00f1ar un mapa viejo: con uno de mentira se reparte gente de verdad. '+
+    vacioSimple('No se pudo cargar el mapa de disponibilidad',
       '<button class="btn" data-dreint>Reintentar</button>'));
   if(e === 'pidiendo') return pan(titulo, '\u2026',
     vacioSimple('Preguntando al servidor', 'Un momento.'));
@@ -614,12 +609,10 @@ function _dispAviso_(titulo){
      login es asincrono), y entonces ese boton es lo unico que vuelve a abrir la puerta --
      `_dispCargar_` es de un solo disparo y `_refrescoVivo_` no lo toca. */
   if(e === 'sin accion') return pan(titulo, 'sin datos',
-    vacioSimple('Esta versi\u00f3n de la app no sabe pedir la disponibilidad',
-      'No es tu cuenta: a la app le falta la acci\u00f3n que pregunta al servidor. Recarga la p\u00e1gina para coger la '+
-      '\u00faltima versi\u00f3n, y si sigue, av\u00edsalo desde el buz\u00f3n.'));
+    vacioSimple('Esta versi\u00f3n no puede consultar la disponibilidad',
+      'Recarga la p\u00e1gina y, si sigue igual, av\u00edsalo desde el buz\u00f3n.'));
   if(e === 'sin sesion') return pan(titulo, 'sin sesi\u00f3n',
-    vacioSimple('No se pudo preguntar: no hay sesi\u00f3n',
-      'Sin identidad el servidor no contesta qui\u00e9n puede cada franja, y lo que se ve\u00eda aqu\u00ed era el mapa de ejemplo. '+
+    vacioSimple('No hay sesi\u00f3n',
       'Entra con tu cuenta y vuelve a esta pesta\u00f1a. '+
       '<button class="btn" data-dreint>Reintentar</button>'));
   return '';
@@ -681,7 +674,7 @@ function _dispPanel_(){
       (nInv ? '<b>'+(nInv-mudos.length)+'</b> de <b>'+nInv+'</b> han contestado'+
               (mudos.length ? ' · <b>sin contestar:</b> '+mudos.map(_dispPila_).map(esc).join(', ') : '')
             : 'Nadie convocado todavía.')+
-      ' — «sin contestar» no es «no puede»: son los únicos a los que tiene sentido insistir.'+
+      ' — A los de «sin contestar» es a quienes hay que insistir.'+
     '</div>'+
     '</div>');
 }
@@ -937,10 +930,8 @@ function _convocarDispPanel_(){
   return pan('Convocar disponibilidad','abre el plazo · solo dirección',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      'Elige <b>cualquier día</b> de la semana que quieras preguntar: se pregunta la semana '+
-      'entera, de lunes a domingo. <b>El plazo lo calcula el servidor</b> con la regla del '+
-      'calendario — aquí no se decide. Recoger disponibilidad <b>no sale de la app</b>: no toca '+
-      'Notion ni el excel de Aerotech.</p>'+
+      'Elige <b>un día</b> de la semana que quieras preguntar (se pregunta de lunes a domingo). '+
+      '<b>El plazo lo calcula el servidor</b>. No toca Notion ni el Excel de Aerotech.</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
       '<label style="width:165px">'+lab('Semana (un día cualquiera)')+
         '<input type="date" id="cdSemana" style="'+E+'"></label>'+
@@ -1024,9 +1015,7 @@ function _pinConvDisp_(m){
     /* ⛔ Sin sitio no se convoca: una convocatoria sin dónde no se puede contestar, y dejarla
        salir vacía sería el mismo fallo mudo de siempre. */
     if(!sitios.length){ tost('Marca al menos un sitio (CUVI o CITI).'); return; }
-    if(!confirm('Abrir la disponibilidad de la semana del '+sem+'.'+String.fromCharCode(10,10)+
-      'NO sale nada fuera de la app: no toca Notion ni el excel de Aerotech. El servidor '+
-      'calcula el plazo y monta la convocatoria.'+String.fromCharCode(10,10)+'¿Sigo?')) return;
+    if(!confirm('¿Abrir la disponibilidad de la semana del '+sem+'?')) return;
     b.disabled=true; var prev=b.textContent; b.textContent='Encolando…';
     try{
       await api.setControl('convocar_disponibilidad', {
@@ -1473,9 +1462,9 @@ function _cierreTurnoPanel_(){
       'corresponda: no todo el mundo se qued\u00f3 lo mismo.</div>';
 
   var salida = CIERRE_TUR.hecho
-    ? '<div class="nota" style="margin-top:11px"><b>Propuesta lista.</b> No se ha escrito nada en '+
-      'Notion: eso lo aplica Daniel. Va al campo <b>Compensaciones</b>, y el turno suma '+
-      '<b>1 al contador</b> (el \u00d74 lo pone la f\u00f3rmula).<pre class="mono" style="white-space:pre-wrap;'+
+    ? '<div class="nota" style="margin-top:11px"><b>Propuesta lista.</b> A\u00fan no est\u00e1 en '+
+      'Notion: la aplica Daniel. Va a <b>Compensaciones</b> y el turno suma '+
+      '<b>1 al contador</b>.<pre class="mono" style="white-space:pre-wrap;'+
       'font-size:12px;margin:8px 0 0">'+esc(CIERRE_TUR.hecho)+'</pre></div>'
     : '';
 
@@ -1653,3 +1642,83 @@ function convocarPanel(){
     '</div></div>');
 }
 
+
+/* ═══ LA FICHA DEL TURNO · PARIDAD A3 (31/10/2026) ═══════════════════════════════════
+   🗣️ Daniel: «llevar al escritorio todo lo que hay en el movil». Pulsar una fila de «Turnos convocados» abre
+   su ficha debajo de la tabla: reparto con roles, coches, objetivos, nota y memoria. Antes la cara PEDIA
+   objetivos y nota al convocar y no los ensenaba en ningun sitio.
+   ⛔ Se guarda la CLAVE del turno (`_claveTurno_`), no su posicion: `TURNOS` se rellena en sitio y una
+   posicion apuntaria a otro turno tras el refresco. `FICHA_TUR` es global DECLARADA (⚠️ `TUR_SEL` ya existe: son los convocados) en `escritorio.html`. */
+function _turnoPorClave_(k){
+  if(!k) return null;
+  return TURNOS.filter(function(t){ return _claveTurno_(t)===k; })[0] || null;
+}
+/* Pulsar la fila abierta la cierra; pulsar otra cambia a ella. */
+function _turSelAlternar_(actual, k){ return (actual && actual===k) ? null : k; }
+
+/* El rol es texto libre y acumula papeles («Coche, Responsable de turno»): un chip por papel. */
+function _chipsRolE_(roles){
+  var vistos = {}, out = [];
+  roles.forEach(function(x){
+    String(x||'').split(/[,·]/).forEach(function(p){
+      p = p.replace(/^\s+|\s+$/g,'');
+      if(!p || vistos[p.toLowerCase()]) return;
+      vistos[p.toLowerCase()] = 1;
+      var l = p.toLowerCase();
+      var cl = l.indexOf('responsable')>=0 ? ' ok' : (l.indexOf('coche')>=0 ? ' tel' : (_esFirmeRol_(p) ? '' : ' wa'));
+      out.push('<span class="chip'+cl+'">'+esc(p)+'</span>');
+    });
+  });
+  return out.join('');
+}
+
+function _fichaTurnoE_(t){
+  var k = _claveTurno_(t);
+  var f = _isoADMY_(_dmyAISO_(String(t.fecha||t.f||'')));
+  var vac = function(txt){ return '<div class="ftu-vac">'+txt+'</div>'; };
+  var pers = function(n){
+    var roles = (t.roles||[]).filter(function(r){ return r && r.miembro===n; }).map(function(r){ return r.rol; });
+    return '<div class="ftu-pers'+(n===ACTOR?' yo':'')+'"><span class="av">'+esc(ini(n))+'</span>'+
+      '<b>'+esc(n)+'</b><span class="ftu-roles">'+_chipsRolE_(roles)+'</span></div>';
+  };
+  var firmes = _asistentesTurno_(t), dudosos = _dudososTurno_(t);
+  var reparto = (firmes.length||dudosos.length)
+    ? firmes.map(pers).join('')+(dudosos.length ? '<div class="ftu-sub">Por confirmar</div>'+dudosos.map(pers).join('') : '')
+    : vac('Nadie apuntado todavía');
+  var cl = _cochesTurnoLineas_(t.coches);
+  var coches = cl.length ? cl.map(function(l){
+    return '<div class="ftu-coche"><b>🚗 Coche '+l.n+' · '+esc(l.conduce||'sin conductor')+'</b>'+
+      '<span>'+esc(l.ida)+(l.vuelta ? ' · vuelta: '+esc(l.vuelta) : '')+'</span>'+
+      '<span class="ftu-van">'+(l.pasajeros.length ? 'Van: '+esc(l.pasajeros.join(', ')) : 'Sin pasajeros')+'</span></div>';
+  }).join('') : vac('Sin coches organizados');
+  var obj = function(a, vacio){
+    return (a && a.length) ? a.map(function(o){ return '<div class="ftu-obj">'+esc(o)+'</div>'; }).join('') : vac(vacio);
+  };
+  var sec = function(tit, cuerpo){ return '<section class="ftu-sec"><h5>'+tit+'</h5>'+cuerpo+'</section>'; };
+  return '<div id="ficha-turno">'+pan('Ficha del turno · '+esc(_refTurno_(t)), '<button class="btn sm" data-tursel="'+esc(k)+'">Cerrar</button>',
+    '<div class="pb"><div class="ftu-cab"><b>'+esc(t.punto||'—')+'</b>'+
+      (t.estado==='Cancelado' ? '<span class="chip no">cancelado</span>' : '')+
+      '<span class="mono">'+esc(f)+' · '+esc(t.hora||'—')+' · '+esc(t.duracion||t.dur||'—')+'</span></div>'+
+    '<div class="ftu-rej">'+
+      sec('Quién va', reparto)+sec('Coches', coches)+
+      sec('Objetivos principales', obj(t.principales, 'Sin objetivos principales'))+
+      sec('Objetivos secundarios', obj(t.secundarios, 'Sin objetivos secundarios'))+
+    '</div>'+
+    sec('Nota', t.nota ? '<div class="ftu-nota">'+esc(t.nota)+'</div>' : vac('Sin nota'))+
+    /* la memoria se incrusta como DOCUMENTO (igual que en el movil), no como un enlace suelto */
+    sec('Memoria', t.memoria ? _memoriaHTML_(t) : vac('Memoria del turno · aún no subida'))+'</div>',
+    'ftu destaca')+'</div>';
+}
+
+/* La fila lleva `data-tursel`; el enlace «ver» de la memoria NO abre la ficha. */
+function _engFichaTurno_(){
+  $$('[data-tursel]').forEach(function(el){
+    el.onclick=function(ev){
+      if(ev.target && ev.target.closest && ev.target.closest('a')) return;
+      FICHA_TUR = _turSelAlternar_(FICHA_TUR, el.dataset.tursel);
+      pintar();
+      if(FICHA_TUR){ var c=document.getElementById('ficha-turno'); if(c) c.scrollIntoView({block:'nearest',behavior:redu()?'auto':'smooth'}); }
+    };
+  });
+  _cablearMemoria_();
+}

@@ -113,6 +113,7 @@ main{z-index:1}
   border:1px solid var(--line);border-radius:9px;padding:0 6px;line-height:15px;min-width:20px;
   text-align:center;flex:none}
 .item .cnt.hot{color:#fff;background:var(--red);border-color:var(--red)}
+.item .pausa{font-size:9.5px;color:var(--ink3);margin-left:auto;padding-left:8px;letter-spacing:.02em}
 .item .cnt.wa{color:#241a08;background:var(--warn);border-color:var(--warn)}
 /* la estrella que viaja, en vertical, con la comba proporcional a la distancia */
 .viajev{position:absolute;left:3px;top:0;width:15px;height:15px;pointer-events:none;z-index:4;
@@ -305,6 +306,31 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .dec .der{display:flex;align-items:center;gap:9px;flex:none}
 .dec .chev{color:var(--ink3);font-family:var(--mono)}
 
+/* ── «LO QUE TE TOCA A TI» (31/10) — filas tipo tarjeta: icono con su tono, título, una línea de detalle y la acción a la
+   derecha. Rojo = caduca o te cuesta una sanción; azul telemático = informativo (la próxima reunión). ─────────────── */
+.tu-g{display:grid;gap:9px}
+.tu-f{display:flex;align-items:center;gap:15px;padding:14px 16px;background:var(--sur2);border:1px solid var(--line);
+  border-radius:var(--r);cursor:pointer;position:relative;transition:border-color .14s linear,background .14s linear,transform .14s var(--sal)}
+.tu-f:hover,.tu-f:focus-visible{border-color:var(--line2);background:#282324;outline:0}
+.tu-f:hover{transform:translateX(2px)}
+.tu-f .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none;
+  color:var(--tel);background:rgba(63,158,214,.12);border:1px solid rgba(63,158,214,.32)}
+.tu-f .ic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8}
+.tu-f.mal .ic{color:var(--red2);background:rgba(228,30,37,.12);border-color:rgba(228,30,37,.38)}
+.tu-f.mal:hover{border-color:rgba(228,30,37,.5)}
+.tu-f .tx{flex:1;min-width:0}
+.tu-f .tx b{display:block;font-size:13.5px;font-weight:600}
+.tu-f .tx small{display:block;font-size:12px;color:var(--ink3);margin-top:3px;line-height:1.5}
+.tu-f .tx small .mono{color:var(--ink2)}
+.tu-f .tu-acc{display:flex;align-items:center;gap:8px;flex:none;font-size:12px;color:var(--ink2);
+  padding:6px 11px 6px 13px;border:1px solid var(--line2);border-radius:20px}
+.tu-f:hover .tu-acc{color:var(--ink);border-color:var(--ink3)}
+.tu-f.mal .tu-acc{color:var(--red2);border-color:rgba(228,30,37,.4)}
+.tu-f .chev{color:var(--ink3);font-family:var(--mono)}
+.tu-nada{display:flex;align-items:center;gap:9px;margin:0 2px 13px;font-size:12.5px;color:var(--ink3)}
+.tu-nada .pt{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.tu-nada+.tu-g{margin:-3px 0 13px}
+
 /* tarjeta de parte de horas */
 .parte{border-top:1px solid var(--line);padding:13px}
 .parte:first-child{border-top:0}
@@ -362,6 +388,15 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .lrow .nm{flex:1;min-width:130px;font-size:12.5px;font-weight:600}
 .lrow .vl{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--red2);min-width:84px;white-space:nowrap;text-align:right}
 .lrow .vl.tach{opacity:.38;text-decoration:line-through}
+.lcorr{font-size:11px;font-weight:600;color:var(--ink3);padding:4px 2px;border-bottom:1px dashed var(--line)}
+.lcorr:hover{color:var(--ink)}
+.lcorrn{display:block;margin-top:3px;font-size:11px;color:var(--ink3);line-height:1.4}
+.lcorrf{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px;margin-top:2px;
+  border:1px solid var(--line);border-radius:var(--r2);background:rgba(127,127,127,.05)}
+.lcorrf input{background:var(--bg);border:1px solid var(--line);border-radius:var(--r2);color:var(--ink);padding:6px 9px;font-size:12px}
+.lcorrf input[type=number]{width:70px;font-family:var(--mono)}
+.lcorrf input[type=text]{flex:1;min-width:180px}
+.lcorrf .err{flex-basis:100%;font-size:11px;color:var(--red2)}
 .decs{display:inline-flex;border:1px solid var(--line);border-radius:var(--r2);overflow:hidden}
 .decs button{border-right:1px solid var(--line);padding:5px 10px;font-size:11px;font-weight:600;color:var(--ink3);white-space:nowrap}
 .decs button:last-child{border-right:0}
@@ -640,3 +675,79 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
   transition:transform .18s ease}
 .novsec[open]>summary::after{transform:rotate(-90deg)}
 .novsec .mdoc,.novsec>p,.novsec>ul{margin-top:8px}
+
+/* ═══ LO TUYO · partes que no cuentan, desglose por categoría, histórico y ritmo (31/10) ═══════════════
+   Componentes propios: nada de `<ul>`/`<table>` sin estilo. El plegable lleva la flecha de la app (como `.novsec`). */
+.ltfila .tx small{overflow-wrap:anywhere}
+.ltfila .der{gap:12px}
+.ltfila .der .mono{font-size:12.5px;color:var(--ink2)}
+.ltmot{display:block;margin-top:7px;padding:6px 10px;border-left:2px solid var(--red3);background:rgba(228,30,37,.05);
+  border-radius:0 var(--r2) var(--r2) 0;font-size:12px;color:var(--ink2);line-height:1.5;white-space:normal}
+.ltmot .sc{display:block;margin-bottom:4px;color:var(--red2)}
+.ltplg{border-top:1px solid var(--line)}
+.ltplg>summary{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;list-style:none;font-size:12.5px}
+.ltplg>summary::-webkit-details-marker{display:none}
+.ltplg>summary:hover{background:rgba(255,255,255,.03)}
+.ltplg>summary .sc{margin-left:auto}
+.ltplg>summary::after{content:'\203a';color:var(--ink3);font-size:15px;flex:none;transition:transform .18s ease}
+.ltplg[open]>summary::after{transform:rotate(90deg)}
+.ltmes{display:flex;align-items:center;gap:10px;padding:9px 13px;background:rgba(255,255,255,.03);
+  border-top:1px solid var(--line)}
+.ltmes b{font-size:12.5px;text-transform:capitalize}
+.ltmes .ln{flex:1;height:1px;background:var(--line)}
+.ltmes .mono{font-size:12.5px}
+.ltsep{display:flex;align-items:center;gap:10px;padding:9px 13px;font-family:var(--mono);font-size:9px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);border-top:1px solid var(--line)}
+.ltsep::before,.ltsep::after{content:'';flex:1;height:1px;background:var(--line2)}
+.ltcat{padding:13px;border-top:1px solid var(--line)}
+.ltcat>.sc{margin-bottom:10px}
+.ltcat .fila{display:grid;grid-template-columns:132px 1fr 64px;align-items:center;gap:12px;padding:4px 0}
+.ltcat .k{font-size:12px;color:var(--ink2)}
+.ltcat .v{text-align:right;font-size:12.5px}
+.ltcat .tr{height:6px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden}
+.ltcat .tr i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--red3),var(--red2))}
+.ltrit{padding:6px 13px 2px}
+.ltdl{display:grid;grid-template-columns:132px 1fr 190px;align-items:center;gap:12px;padding:8px 0}
+.ltdl .k{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+.ltdl .tr{position:relative;height:8px;border-radius:4px;background:rgba(255,255,255,.05)}
+.ltdl .tr .z{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--line2)}
+.ltdl .tr b{position:absolute;top:0;bottom:0;border-radius:4px}
+.ltdl.pos .tr b{background:var(--ok)}
+.ltdl.neg .tr b{background:var(--warn)}
+.ltdl .vv{display:flex;flex-direction:column;gap:2px}
+.ltdl .vv b{font-family:var(--mono);font-size:13px}
+.ltdl.pos .vv b{color:var(--ok)}
+.ltdl.neg .vv b{color:var(--warn)}
+.ltdl .vv small{font-size:11px;color:var(--ink3)}
+/* ═══ LA FICHA DEL TURNO (31/10, paridad A3) ═══════════════════════════════════════
+   Reparto, coches, objetivos, nota y memoria bajo la tabla de «Turnos convocados». Componentes propios:
+   nada de listas por defecto. */
+tr.tur-fila{cursor:pointer}
+tr.tur-fila:focus-visible{outline:1px solid var(--red2);outline-offset:-1px}
+tr.tur-sel{background:rgba(228,30,37,.07)}
+tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
+.ftu .ftu-cab{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;margin-bottom:13px}
+.ftu .ftu-cab b{font-size:15px;letter-spacing:.01em}
+.ftu .ftu-cab .mono{color:var(--ink3);font-size:11px}
+.ftu .ftu-rej{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:12px;margin-bottom:12px}
+.ftu .ftu-sec{background:#0A0909;border:1px solid var(--line);border-radius:var(--r2);padding:11px 12px}
+.ftu .ftu-sec+.ftu-sec{margin-top:12px}
+.ftu .ftu-rej .ftu-sec+.ftu-sec{margin-top:0}
+.ftu .ftu-sec h5{margin:0 0 9px;font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink3);font-weight:400}
+.ftu .ftu-sub{margin:10px 0 5px;font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--warn)}
+.ftu .ftu-pers{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid rgba(50,44,46,.6);flex-wrap:wrap}
+.ftu .ftu-pers:last-child{border-bottom:0}
+.ftu .ftu-pers .av{width:23px;height:23px;border-radius:6px;background:var(--sur2);border:1px solid var(--line);
+  display:grid;place-items:center;font-family:var(--mono);font-size:9px;color:var(--ink2);flex:none}
+.ftu .ftu-pers.yo .av{border-color:var(--red2);color:var(--red2)}
+.ftu .ftu-pers b{font-size:12.5px;font-weight:500}
+.ftu .ftu-roles{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
+.ftu .ftu-coche{display:flex;flex-direction:column;gap:3px;padding:7px 0;border-bottom:1px solid rgba(50,44,46,.6);font-size:11.5px;color:var(--ink2)}
+.ftu .ftu-coche:last-child{border-bottom:0}
+.ftu .ftu-coche b{color:var(--ink);font-size:12.5px;font-weight:500}
+.ftu .ftu-van{color:var(--ink3)}
+.ftu .ftu-obj{position:relative;padding:5px 0 5px 15px;font-size:12.5px;line-height:1.5}
+.ftu .ftu-obj::before{content:"";position:absolute;left:2px;top:12px;width:5px;height:5px;border-radius:50%;background:var(--red2)}
+.ftu .ftu-nota{font-size:12.5px;line-height:1.6;color:var(--ink2);border-left:2px solid var(--red2);padding-left:11px}
+.ftu .ftu-vac{font-size:11.5px;color:var(--ink3);font-style:italic}

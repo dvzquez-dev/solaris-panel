@@ -169,6 +169,90 @@ function _selectorLotes_(){
     '</select></label></div>';
 }
 
+/* ═══ CORREGIR LOS PUNTOS DE UNA PERSONA DENTRO DEL BLOQUE (31/10, B6) ═══════════════════════════════════════════
+   Antes la cara decía «no se pueden corregir desde aquí» y mandaba a sacar a la persona y aplicarla suelta (y entonces
+   salía otro comunicado). `corregirPuntosLote` cambia `puntos` de UNA pendiente SIN sacarla del bloque: sigue siendo uno y
+   con un solo comunicado, y `aplicar.py`/`comunicar.py` leen la misma fila, así que aplican y dicen los corregidos. Con
+   motivo obligatorio; el servidor manda en el permiso y rechaza una ya aplicada, y aquí se enseña su mensaje tal cual. */
+var LOTE_EDIT = null;     // id de la fila con el editor abierto (sólo uno)
+var LOTE_EDIT_MSG = '';   // lo que dijo el servidor (o la validación) la última vez que no entró
+var LOTE_EDIT_BORR = null; // lo tecleado {pts, mot}: un repintado tras un rechazo NO lo borra
+
+/* ¿Se ofrece corregir esta fila? Sólo con bloque real y sesión (la semilla no tiene a quién escribir), y no un premio:
+   su recompensa son horas, no puntos. */
+function _lcorrOfrece_(x){
+  return !!(LOTE.real && LOTE.lote && typeof backendOK !== 'undefined' && backendOK && SESION &&
+            !_esPremioSanc_(x.origen, x.extra));
+}
+
+/* Los puntos que se teclean: lo de `_validaPuntosSanc_` para una sanción, y 0–5 para una revocación (devuelve puntos). */
+function _lcorrValida_(x, crudo){
+  if(x.origen === 'revocacion'){
+    var t = String(crudo == null ? '' : crudo).replace(/^\s+|\s+$/g, '');
+    return /^\d+$/.test(t) && +t <= 5 ? {ok:true, pts:parseInt(t, 10)}
+                                       : {ok:false, msg:'Una revocación devuelve un entero de 0 a 5.'};
+  }
+  return _validaPuntosSanc_(crudo);
+}
+
+function _lcorrBoton_(x){
+  return _lcorrOfrece_(x) ? '<button class="lcorr" data-corr="'+x.id+'" title="Cambiar los puntos de '+esc(x.n)+
+    ' sin sacarla del bloque">'+(LOTE_EDIT===x.id ? 'Cancelar' : 'Corregir puntos')+'</button>' : '';
+}
+
+/* «corregido de −1 por Pedro: motivo» bajo el nombre, para que lo corregido no pase por lo que propuso el motor */
+function _lcorrNota_(x){
+  if(x.pAntes === null || x.pAntes === undefined || x.pAntes === x.pts) return '';
+  return '<span class="lcorrn">corregido de '+esc(_etPtsSanc_(x.pAntes))+(x.pPor ? ' por '+esc(x.pPor) : '')+
+    (x.pMot ? ' · '+esc(x.pMot) : '')+'</span>';
+}
+
+function _lcorrForm_(x){
+  if(LOTE_EDIT !== x.id || !_lcorrOfrece_(x)) return '';
+  return '<div class="lcorrf" data-lcf="'+x.id+'">'+
+    '<input type="number" step="1" min="'+(x.origen==='revocacion'?0:-5)+'" max="'+(x.origen==='revocacion'?5:0)+
+      '" id="lcPts" aria-label="Puntos de '+esc(x.n)+'" placeholder="puntos" value="'+
+      esc(LOTE_EDIT_BORR ? LOTE_EDIT_BORR.pts : (x.pts===null?'':x.pts))+'">'+
+    '<input type="text" id="lcMot" maxlength="200" aria-label="Motivo de la corrección" placeholder="Motivo de la corrección (obligatorio)" value="'+
+      esc(LOTE_EDIT_BORR ? LOTE_EDIT_BORR.mot : '')+'">'+
+    '<button class="btn sm pri" data-lcg="'+x.id+'">Guardar</button>'+
+    '<span class="sc">no la saca del bloque ni aplica nada</span>'+
+    (LOTE_EDIT_MSG ? '<span class="err" role="alert">'+esc(LOTE_EDIT_MSG)+'</span>' : '')+'</div>';
+}
+
+function _engSancCorregir_(){
+  $$('[data-corr]').forEach(function(b){
+    b.onclick=function(){
+      var id=+b.dataset.corr;
+      LOTE_EDIT = (LOTE_EDIT===id) ? null : id; LOTE_EDIT_MSG=''; LOTE_EDIT_BORR=null;
+      pintar();
+      var p=$('#lcMot'); if(p) p.focus();
+    };
+  });
+  $$('[data-lcg]').forEach(function(b){
+    b.onclick=async function(){
+      var id=+b.dataset.lcg;
+      var x=LOTE.items.filter(function(i){ return i.id===id; })[0]; if(!x) return;
+      var crudo=($('#lcPts')||{}).value, v=_lcorrValida_(x, crudo), mot=String((($('#lcMot')||{}).value)||'').replace(/^\s+|\s+$/g,'');
+      LOTE_EDIT_BORR={pts:crudo, mot:mot};     // por si hay que repintar con un aviso: lo tecleado se queda
+      if(!v.ok){ LOTE_EDIT_MSG=v.msg; pintar(); return; }
+      if(!mot){ LOTE_EDIT_MSG='Pon el motivo de la corrección: queda escrito con tu nombre.'; pintar(); return; }
+      var prev=b.textContent; b.disabled=true; b.textContent='Guardando…';
+      try{
+        var r=await api.corregirPuntosLote(id, v.pts, mot);
+        LOTE_EDIT=null; LOTE_EDIT_MSG=''; LOTE_EDIT_BORR=null;
+        await _cargarSancionesCon_(r);       /* con `cola` en la respuesta no hay viaje aparte */
+        tost('Puntos corregidos. Siguen en el bloque y no se ha aplicado nada.');
+        pintar();
+      }catch(e){
+        /* el botón revive y el motivo del servidor se ve EN el editor (sin permiso, ya aplicada…), no sólo en un aviso */
+        b.disabled=false; b.textContent=prev;
+        LOTE_EDIT_MSG=(e && e.message) || String(e); pintar(); tostErr('No se pudo corregir: ', e);
+      }
+    };
+  });
+}
+
 /* ⛔ 21/10 (auditor de sanciones): LA PREVISIÓN «antes → después» DE UNA FILA DEL BLOQUE, o '' si no se sabe. Era
    `var antes=m?m.puntos:10`: a quien no es PD el roster le llega SIN `puntos`, y salía «undefined → NaN»; a quien no
    está en el roster, un 10 inventado. Sin puntos de verdad no hay previsión (§3c-24). Si la decisión no es «aceptar» o
@@ -207,9 +291,8 @@ function _panelSueltas_(){
      razones — y lo que se leía era la primera: **«ninguna»**, con sanciones pendientes
      contra personas reales **invisibles** en la pantalla donde se deciden. */
   if(!ss.length && !_llego_('sanc')) return pan('Sanciones sueltas','sin leer',
-    vacioSimple('No se han podido leer las sanciones',
-      'El servidor no ha contestado, as\u00ed que esto NO quiere decir que no haya ninguna. '+
-      'Se reintenta solo cada 90 s; si sigue as\u00ed, recarga la p\u00e1gina.'));
+    vacioSimple('No se han podido cargar las sanciones',
+      'Se reintenta cada 90 s; si sigue igual, recarga la p\u00e1gina.'));
   if(!ss.length) return pan('Sanciones sueltas','ninguna',
     vacioSimple('No hay sanciones sueltas','Las que no van en bloque —cada una con su motivo y su artículo— aparecen aquí.'));
   return pan('Sanciones sueltas', ss.length+'',
@@ -236,10 +319,8 @@ function _panelSueltas_(){
       }).join(''))+
     '<div class="pb" style="padding-top:0"><button class="btn sm" data-agrupar>Agrupar en un paquete</button>'+
       '<span class="sc" style="margin-left:9px">un solo comunicado para todas</span></div>'+
-    '<div class="nota">Cada suelta se decide por su cuenta: no comparten motivo ni comunicado. '+
-    '<b>Editar</b> corrige puntos, motivo y artículo <b>al aplicarla</b> —es lo único que deja el '+
-    'backend—. Una ya aplicada no se edita: se <b>revoca</b> abajo, en «Se pueden revocar», que es la vía de '+
-    'apelación.</div>');
+    '<div class="nota">Cada suelta se decide por separado. <b>Editar</b> cambia puntos, motivo y artículo '+
+    '<b>al aplicarla</b>. Una ya aplicada no se edita: se <b>revoca</b> abajo, en «Se pueden revocar».</div>');
 }
 
 
@@ -285,9 +366,8 @@ function _panelRevocarSanc_(){
   for (i = 0; i < lista.length; i++) cuerpo += _revocarSancCard_(lista[i]);
   return pan('Se pueden revocar', lista.length + '',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">' +
-    'La v\u00eda de apelaci\u00f3n: una sanci\u00f3n ya aplicada se retira con un ' +
-    '<b>motivo</b>, y la revocaci\u00f3n entra en la cola como pendiente \u2014 se confirma con su ' +
-    'bloque, igual que una sanci\u00f3n. <b>Queda el rastro de las dos.</b></p></div>' + cuerpo);
+    'Una sanci\u00f3n ya aplicada se retira con un <b>motivo</b>; la revocaci\u00f3n queda ' +
+    'pendiente y se confirma con su bloque.</p></div>' + cuerpo);
 }
 
 /* ⛔⛔ Y ESTO ES EL CABLE, que es donde murio la version anterior de esta pantalla: «Denegar» y
@@ -367,8 +447,8 @@ function _panelHistSanc_(){
      «vacío» por el mismo motivo, y aquí la lectura es peor todavía — «todavía no hay
      sanciones resueltas» se lee como que **no se ha sancionado a nadie nunca**. */
   if(!hs.length && !_llego_('sanc')) return pan('Historial','sin leer',
-    vacioSimple('No se ha podido leer el historial',
-      'El servidor no ha contestado. NO quiere decir que no haya sanciones resueltas.'));
+    vacioSimple('No se ha podido cargar el historial',
+      'Recarga la página.'));
   if(!hs.length) return pan('Historial','vacío',
     vacioSimple('Todavía no hay sanciones resueltas','Cada una que apruebes, justifiques o rechaces queda aquí con su decisión.'));
   return pan('Historial', hs.length+'',
@@ -738,6 +818,8 @@ function _loteReal_(){
        como «aviso» y se le ofrecia «Justifica», que el servidor se salta en silencio.
        📏 Medido antes: 2 escrituras de `origen` en la app y CERO lecturas. */
     items:its.map(function(s){ return {id:s.id, n:s.nombre, pts:_ptsSanc_(s.puntos),
+      /* 31/10 (B6): si el PD corrigió sus puntos, la fila dice de cuánto, quién y por qué */
+      pAntes:_ptsSanc_(s.puntos_antes), pMot:s.puntos_motivo||null, pPor:s.puntos_corregidos_por||null,
       origen:s.origen||null, extra:s.extra||null,
       /* ⛔ `null`, NO `'aceptar'`. Aqui se fabricaba la decision de todo lo que nadie
          habia tocado, y el panel la pintaba como ELEGIDA: los 30 con el boton «Acepta»
@@ -748,3 +830,79 @@ function _loteReal_(){
       dec:s.decision||null}; }) };
 }
 
+
+/* ═══ APELACIONES DE TAREAS · la cola del consejo (31/10, RRI Art. 34) ══════════════════════════════
+   🗣️ Daniel: *«Móvil es para todos, escritorio es para el consejo»*. El miembro apela desde el móvil; aquí las resuelven
+   el PD y el coordinador o subcoordinador de la unidad (la cláusula «otra», sólo el PD). Las puertas viven en `comun.js`
+   (`_apelPuedes_`); el servidor es quien manda. Sin `puedes_resolver` no hay botones: se enseña y se dice quién la resuelve. */
+function _apelTarjeta_(a){
+  var m = _m(a.autor), puedes = _apelPuedes_(a);
+  return '<div class="parte" data-apid="' + esc(a.id) + '">' +
+    '<div class="h"><b>' + esc((m && m.pila) || a.autor) + '</b>' +
+      '<span class="u">' + esc(a.unidad || '—') + '</span>' +
+      '<span class="u">cláusula ' + esc(a.clausula === 'otra' ? 'otra' : a.clausula) + '</span>' +
+      '<span class="q" style="font-size:12px;font-family:var(--sans);font-weight:500">' + esc(_apelEspera_(a.at)) + '</span></div>' +
+    '<div class="ruta" style="margin-top:6px"><b>' + esc(a.titulo) + '</b> · plazo ' + esc(_plazoDMY_(a.plazo) || 'sin fecha') + '</div>' +
+    '<div class="just"><span class="sc">' + esc(_apelClausulaTxt_(a.clausula)) + '</span>' + esc(a.motivo) + '</div>' +
+    (puedes
+      ? '<textarea data-apres placeholder="Tu respuesta — obligatoria si desestimas…"></textarea>' +
+        '<div class="acts"><span class="sc">Nuevo plazo</span><input type="date" data-appl min="' + esc(new Date().toISOString().slice(0, 10)) +
+        '" style="background:#0A0909;border:1px solid var(--line);border-radius:var(--r2);color:var(--ink);padding:6px 8px">' +
+        '<button class="btn ok" data-apest="plazo">Estimar con ese plazo</button>' +
+        '<button class="btn ok" data-apest="quitar">Estimar y quitarle la tarea</button>' +
+        '<button class="btn no" data-apdes="1">Desestimar</button></div>'
+      : '<div class="ruta">' + (a.autor === _fichaYo_() ? 'Es tuya: la resuelve otra persona.'
+        : (a.clausula === 'otra' ? 'La decide la Junta y la apunta el PD.' : 'La resuelve el coordinador de ' + esc(a.unidad) + ' o el PD.')) + '</div>') +
+  '</div>';
+}
+function _apelResuelta_(a){
+  var m = _m(a.autor), q = _m(a.decidido_por);
+  return '<div class="parte"><div class="h"><b>' + esc((m && m.pila) || a.autor) + '</b>' +
+      '<span class="u">' + esc(a.titulo) + '</span>' +
+      '<span class="q" style="font-size:11px;font-family:var(--mono);color:var(--' + (a.estado === 'estimada' ? 'ok' : 'red2') + ')">' +
+        esc(a.estado) + '</span></div>' +
+    '<div class="ruta">' + esc(_apelEstadoTxt_(a)) + ' <span style="color:var(--ink3)">· ' + esc((q && q.pila) || a.decidido_por || '') +
+      ', ' + esc(_isoADMY_(String(a.decidido_at || '').slice(0, 10))) + '</span></div></div>';
+}
+function _vApela_(){
+  var L = _apelLista_(), ab = L.filter(function(a){ return a.estado === 'abierta'; }),
+      re = L.filter(function(a){ return a.estado !== 'abierta'; }).sort(function(x, y){
+        return String(y.decidido_at).localeCompare(String(x.decidido_at)); });
+  ab.sort(function(x, y){ return String(x.at).localeCompare(String(y.at)); });      // la que más lleva esperando, arriba
+  return pan('Apelaciones abiertas', ab.length + '',
+      ab.length ? ab.map(_apelTarjeta_).join('')
+        : vacioSimple('No hay apelaciones abiertas', 'Cuando alguien apele una tarea desde el móvil, aparece aquí.')) +
+    (re.length ? pan('Resueltas · últimos ' + APEL_DIAS_VISTA + ' días', re.length + '', re.map(_apelResuelta_).join('')) : '') +
+    '<div class="nota">Una apelación estimada cambia la tarea (nuevo plazo, o se la quita a quien apeló) y le avisa. ' +
+    'Las <b>sanciones</b> ya aplicadas no se recurren aquí: se revocan desde Sanciones.</div>';
+}
+function _engApela_(){
+  $$('[data-apid]').forEach(function(caja){
+    var ap = null, i, L = _apelLista_();
+    for (i = 0; i < L.length; i++) if (L[i].id === caja.dataset.apid) ap = L[i];
+    function resolver(b, datos){
+      if (!ap || ap.estado !== 'abierta'){ tost('Esa apelación ya no está abierta: recarga la pantalla.'); pintar(); return; }
+      b.disabled = true;
+      _resolverApelacion_(ap, datos).then(function(r){
+        pintar(); tost('Apelación ' + (r && r.estado === 'estimada' ? 'estimada' : 'desestimada') + '. Se le avisa a ' +
+          ((_m(ap.autor) && _m(ap.autor).pila) || ap.autor) + '.');
+      }).catch(function(e){ b.disabled = false; tost('No se pudo guardar la respuesta: ' + ((e && e.message) || e)); });
+    }
+    var ta = caja.querySelector('[data-apres]'), pl = caja.querySelector('[data-appl]');
+    $$('[data-apest]', caja).forEach(function(b){
+      b.onclick = function(){
+        var q = b.dataset.apest === 'quitar';
+        if (!q && !(pl && pl.value)){ if (pl) pl.focus(); tost('Pon el nuevo plazo, o usa «Estimar y quitarle la tarea».'); return; }
+        resolver(b, {decision: 'estimada', resolucion: ta ? ta.value.trim() : '', plazo: q ? undefined : pl.value, quitar: q || undefined});
+      };
+    });
+    $$('[data-apdes]', caja).forEach(function(b){
+      b.onclick = function(){
+        if (!(ta && ta.value.trim())){
+          if (ta){ ta.focus(); ta.style.borderColor = 'rgba(232,145,46,.6)'; setTimeout(function(){ ta.style.borderColor = ''; }, 1600); }
+          tost('Para desestimar hay que dar el motivo.'); return; }
+        resolver(b, {decision: 'desestimada', resolucion: ta.value.trim()});
+      };
+    });
+  });
+}

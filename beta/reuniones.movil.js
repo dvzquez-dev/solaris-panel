@@ -382,8 +382,7 @@ function _proxReuHTML_(){
       '<div class="tarj"><p class="rnota" style="margin:0;padding:6px 0">Cargando tus reuniones…</p></div>';
   if(_sinReuniones_() || !R)
     return '<h2 class="sec">Próxima reunión<span class="ln"></span></h2>'+
-      '<div class="tarj">'+vacio('Ninguna reunión convocada',
-        'Ahora mismo no estás convocado a ninguna reunión.','',false)+'</div>';
+      '<div class="tarj">'+vacio('Ninguna reunión convocada','','',false)+'</div>';
   var c=_cuandoReuM_(R), pasada=(c.ms<_hoyDateM_().getTime());
   /* Si lo único que queda ya ocurrió, se dice: llamar «próxima» a algo de la semana
      pasada es exactamente el tipo de mentira pequeña que hace desconfiar del resto. */
@@ -475,8 +474,7 @@ function vReu(){
     return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
       '<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar '+(esCoord()?'reunión':'reunión de trabajo')+'</button>'+
       _sinConvocarHTMLM_()+
-      '<div class="tarj">'+vacio('Ninguna reunión convocada','Ahora mismo no estás convocado a ninguna '+
-        'reunión. Cuando alguien convoque una, aparecerá aquí para que cubras tu disponibilidad.','',false)+'</div>';
+      '<div class="tarj">'+vacio('Ninguna reunión convocada','Cuando te convoquen a una, saldrá aquí.','',false)+'</div>';
   var R=REUNION, nF=R.franjas.length;
   /* Vista PONDERADA (solo tiene sentido en híbridas): presencial+telemático vale 2 y
      telemático 1, así que la ponderación es literalmente la suma de los valores. En
@@ -648,7 +646,7 @@ function vReu(){
         (R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div>'+
       (R.fijada
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
-          '<b style="color:var(--ok)">📌 Reunión fijada · '+esc(R.fijada)+'</b><br>La disponibilidad está cerrada; el hueco elegido va en verde en el mapa.</div>'
+          '<b style="color:var(--ok)">Reunión fijada · '+esc(R.fijada)+'</b><br>Disponibilidad cerrada.</div>'
         : (R.exento
             /* 🗣️ Daniel (14/10): *«que permita, por favor, al que organiza la reunión
                poner su disponibilidad. Si le apetece. En plan, opcional. Pero básicamente
@@ -679,7 +677,7 @@ function vReu(){
               : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
                 (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
     /* si ya está fijada, el aviso de organizador sobra y quedaba colgando debajo del cartel verde */
-    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú: <b>organizas</b>, así que no se te <i>pide</i> disponibilidad — pero puedes marcarla si quieres, y cuenta como la de cualquiera.</p>':'')+
+    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú, así que no se te <i>pide</i> disponibilidad. Puedes marcarla si quieres.</p>':'')+
       /* ⛔ LA REGLA ES LA DEL BACKEND, Y NO ES `esCoord()`. Aqui se ofrecian los tres
          botones a CUALQUIER coordinador, y las tres acciones que llaman las gatea
          `Codigo.gs` por **convocante o admin** -con la misma linea en las tres:
@@ -707,8 +705,8 @@ function vReu(){
        disponibilidad y ya esta». */
     (_sinAgregadoM_(R)
       ? '<div class="tarj"><p class="rnota" style="margin:0;padding:6px 0">Esta reunión es '+
-        '<b>oculta</b>: el mapa de calor lo ve <b>solo quien la convoca</b>'+
-        (R.convocante?' ('+esc(R.convocante)+')':'')+'. Tú cubres tu disponibilidad y ya está.'+
+        '<b>oculta</b>: el mapa solo lo ve <b>quien la convoca</b>'+
+        (R.convocante?' ('+esc(R.convocante)+')':'')+'. Tú solo marcas tu disponibilidad.'+
         '</p></div>'
       : '<div class="tarj">'+
       (hib?'<div class="modos" id="calModo" style="margin-bottom:10px">'+
@@ -782,9 +780,9 @@ function cubrirModal(){
   });
   abrirModal('<div class="mtit">Marca tu disponibilidad</div>'+
     '<div class="msub">'+esc(YO.pila)+' · '+instr+'</div>'+
-    (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">La reunión dura <b>'+_durTxt_(_minS*_slot)+
-      '</b>, así que cada toque marca <b>'+_minS+' casillas seguidas</b> a partir de ahí. '+
-      'Puedes estirar más arrastrando; lo que quede más corto se quita solo.</p>':'')+
+    (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">Dura <b>'+_durTxt_(_minS*_slot)+
+      '</b>: cada toque marca <b>'+_minS+' casillas seguidas</b>. '+
+      'Arrastra para alargar.</p>':'')+
     /* 🗣️ «Y que lo ponga escrito en algún lugar» (14/10). **El mismo texto y la misma clase que
        en Turnos**: dos frases distintas para el mismo gesto en dos pantallas es como se aprende
        que la app es incoherente. Y va **encima** de la rejilla: debajo lo lee quien ya se ha
@@ -1173,9 +1171,9 @@ function crearModal(){
     var nb=u.perDia.reduce(function(a,x){ return a+x.length; },0), nd=dias().length;
     /* Que hay que juntar para que valga, dicho antes de convocar y con la cuenta hecha. */
     var nS=_slotsMin_(du,sl), h=$('#ceSlotHint');
-    if(h) h.innerHTML='Se pintan casillas de <b>'+_durTxt_(sl)+'</b> y hay que juntar '+
+    if(h) h.innerHTML='Cada casilla es de <b>'+_durTxt_(sl)+'</b>; hay que marcar '+
       '<b>'+nS+' seguida'+(nS===1?'':'s')+'</b> ('+_durTxt_(nS*sl)+') para que cuente.'+
-      (du%sl ? ' La duración no es múltiplo del slot, así que se redondea hacia arriba.' : '');
+      (du%sl ? ' Si no encaja, se redondea hacia arriba.' : '');
     /* ⛔⛔ EL RECORTE SE DICE. `nd` es `dias().length`, o sea el número **YA topado** por la
        función del tope: pidiendo 01/01→31/12 esto imprimía «… en **62 días**» y se quedaba
        tan ancho. Y lo silencioso no es la cuenta, es la **contradicción**: el selector

@@ -594,8 +594,7 @@ function _compHTML_(r){
       'La matriz propone <b>'+p.horas+' h</b> — '+esc(p.porque.join(' · '))+'.'+
       (p.faltan.length? '<br><span style="color:var(--warn)">El triaje no escribió '+
         esc(p.faltan.join(' ni '))+': se ha supuesto lo más conservador.</span>' : '')+
-      '<br><span style="color:var(--ink3)">La escala todavía no la has fijado tú; estos '+
-      'valores son una propuesta y están en <span class="mono">MATRIZ_COMP</span>.</span></p>'+
+      '<br><span style="color:var(--ink3)">Es una propuesta: la escala aún no la has fijado tú.</span></p>'+
     (no
       ? '<div class="ruta">No se puede otorgar: '+esc(no)+'.</div>'
       : '<div class="acts">'+
@@ -641,9 +640,9 @@ function _accBuzon_(r, esBug){
      los cambios sí que es a mi orden por este chat».
      Lo que sí hace falta aquí es poder SACAR uno del lote antes de que salga. */
   if(r.estado==='Listo para revisar'){
-    return '<div class="ruta">Hecho y <b>en la beta</b>, sin publicar. Sale a producción con el '+
-      'próximo release, junto con todo lo demás que haya en la beta — y el release lo pides tú.'+
-      '<br>Si este no debe salir, sácalo del lote descartándolo con tus anotaciones.</div>'+
+    return '<div class="ruta">Hecho y <b>en la beta</b>, sin publicar. Sale con el '+
+      'próximo release.'+
+      '<br>Si no debe salir, descártalo con tus anotaciones.</div>'+
       '<textarea data-bznotas="'+ID+'" placeholder="Por qué lo sacas del lote…">'+esc(notas)+'</textarea>'+
       '<div class="acts">'+
         bot('Adelante+','Devolver: rehacer con anotaciones')+

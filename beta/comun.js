@@ -49,6 +49,12 @@ function nf2(v){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,ma
    Ahora es `nf2`: una sola cifra para las horas en toda la app. */
 function h1(v){ return nf2(Number(v)||0)+' h'; }
 
+/* Etiqueta de la CATEGORÍA de Notion a la que suma cada imputación (fichaje u otorgamiento).
+   El miembro la ve para reconciliar: 'esta hora cayó en Reuniones', 'esta en Carga tareas'.
+   null = cajón por defecto (Compensaciones), igual que hace el motor (aplicar_horas.py).
+   Vivía en `movil.html`; se mudó aquí el 31/10 porque el escritorio (`_sumaPorCatE_`) la necesita igual. */
+var CAT_ETI={tareas:'Carga tareas',reunion:'Reuniones',turno:'Turnos fabric.',compensacion:'Compensaciones'};
+
 function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 
 /* El cuerpo de la justificacion de un parte, o cadena vacia si no aporta nada.
@@ -1068,6 +1074,156 @@ function _tareaAnterior_(e){
 
 /* La acción lleva **la etiqueta Y a dónde va**: con sólo la etiqueta, quien la pinta tiene que
    volver a preguntar el siguiente estado, y entonces hay dos sitios decidiendo lo mismo. */
+/* 31/10 (Daniel: *«El coordinador también»* y, de los subcoordinadores, *«Sí, también»*): ¿puede `actor` cambiar el estado
+   de la tarea `t`? Su responsable, el PD, y el coordinador o subcoordinador de SU unidad (`t.s`); uno de otra unidad, no.
+   Gemela de `servidor._manda_en_unidad` (que es quien manda: esto sólo decide si se OFRECE el botón). */
+function _puedeMoverEstadoTarea_(actor, t){
+  var n = String(actor || ''), u = t && t.s, m, sc, cu, i;
+  if(!n || !t) return false;
+  if(_tareasResp_([t], n).length) return true;
+  if(rangoSanc(n) >= 3) return true;
+  if(!u) return false;
+  m = _mSanc_(n);
+  if(m && m.cargo === 'Coordinador' && m.unidad === u) return true;
+  cu = _unidadesCoord_(m && m.coordina);
+  for(i = 0; i < cu.length; i++){ if(cu[i] === u) return true; }
+  sc = _subcoordDe_(n);
+  return !!(sc && sc.unidad === u);
+}
+
+/* 31/10 (escritorio, A1): lo que se OFRECE en una tarea a `actor`: el paso siguiente (`ac`, con su etiqueta) y el deshacer
+   (`des`, sólo dentro del plazo y con un paso anterior al que volver). Quien no puede moverla (ni responsable, ni PD, ni
+   coordinador de su unidad) no recibe nada. Sin `url` tampoco: sin la ficha de Notion el servidor no sabe qué mover. El
+   servidor vuelve a decidirlo todo; esto sólo evita pintar un botón que va a contestar «no es tuya». */
+function _tareaOfertaPaso_(t, actor, ahora){
+  var nada = {ac: null, des: false};
+  if(!t || !t.url || !_puedeMoverEstadoTarea_(actor, t)) return nada;
+  return {ac: _tareaAccion_(t.e), des: _puedeDeshacerTarea_(t, ahora) && _tareaAnterior_(t.e) !== null};
+}
+
+/* ═══ APELAR UNA TAREA · RRI Art. 34 (31/10) ══════════════════════════════════════════════════════
+   🗣️ Daniel: *«Apelaciones si construyela»* y *«Móvil es para todos, escritorio es para el consejo»*: el miembro apela
+   desde el móvil (`tareas.movil.js`), el consejo resuelve desde el escritorio (`V.apela`). Apelar es el camino legítimo
+   para no hacer una tarea: rechazarla sin apelar resta 1 punto (Art. 30 d). Las puertas son GEMELAS de `servidor.py`
+   (`es_tarea_voluntaria`, `clave_tarea`, `_puede_resolver_apelacion`): el servidor es quien manda, esto decide qué se OFRECE.
+   ⚠️ En la maqueta (`?demo`, sin servidor) las apelaciones viven en el `localStorage` de esa máquina: así el móvil y el
+   escritorio, que son dos páginas, ven las mismas. Con servidor, NUNCA se toca `localStorage`. */
+var APEL_CLAUSULAS=[
+  {k:'a', t:'Tengo demasiado trabajo para el plazo que me han puesto'},
+  {k:'b', t:'La tarea se me escapa por completo: ahora mismo no sé hacerla'},
+  {k:'c', t:'No me han dado el tiempo mínimo para hacerla (72 h; 48 h si era urgente)'},
+  {k:'d', t:'Era importante o urgente y mi coordinador no la ha supervisado como toca'},
+  {k:'e', t:'Era voluntaria y me la han asignado sin querer'},
+  {k:'otra', t:'Otra situación (la decide la Junta)'}
+];
+var APEL_DIAS_VISTA=30, APEL_DEMO_KEY='solaris_demo_apelaciones';
+function _apelClausulaTxt_(k){
+  var i; for(i=0;i<APEL_CLAUSULAS.length;i++){ if(APEL_CLAUSULAS[i].k===k) return APEL_CLAUSULAS[i].t; }
+  return String(k||'');
+}
+/* Gemela de `servidor.es_tarea_voluntaria`: la marca es el `tipo` de Notion («Voluntaria/Difusión»). */
+function _esVoluntaria_(t){ return /voluntari/i.test(String((t && t.tipo) == null ? '' : t.tipo)); }
+/* Gemela de `servidor.clave_tarea`: el id de la página de Notion (últimos 32 hex de la URL) o el `id` local. */
+function _claveTarea_(t){
+  var h=String((t && t.url) || '').replace(/-/g, '').match(/[0-9a-fA-F]{32,}/g);
+  if(h) return h[h.length-1].slice(-32);
+  return (t && t.id != null) ? String(t.id) : '';
+}
+function _apelEsDemo_(){
+  return _demoLocal_() && !(typeof backendOK !== 'undefined' && backendOK && typeof SESION !== 'undefined' && SESION);
+}
+function _apelDemoLeer_(){
+  try{ var l=JSON.parse(localStorage.getItem(APEL_DEMO_KEY) || '[]'); return Array.isArray(l) ? l : []; }catch(e){ return []; }
+}
+function _apelDemoGuardar_(l){ try{ localStorage.setItem(APEL_DEMO_KEY, JSON.stringify(l)); }catch(e){} }
+/* La lista que se pinta: la del servidor (`APELACIONES`, que rellena el bootstrap) o, en la maqueta, la compartida. */
+function _apelLista_(){ return _apelEsDemo_() ? _apelDemoLeer_() : (typeof APELACIONES !== 'undefined' ? APELACIONES : []); }
+/* La apelación de una tarea: la ABIERTA y, si no hay, la última ya resuelta. `null` si nunca se apeló. */
+function _apelDeTarea_(t, lista){
+  var c=_claveTarea_(t), L=lista || _apelLista_(), i, ult=null;
+  if(!c) return null;
+  for(i=0;i<L.length;i++){
+    if(!L[i] || L[i].tarea_id !== c) continue;
+    if(L[i].estado === 'abierta') return L[i];
+    if(!ult || String(L[i].at) > String(ult.at)) ult = L[i];
+  }
+  return ult;
+}
+/* ¿Se OFRECE «Apelar»? Su responsable, tarea no hecha, no voluntaria y sin apelación abierta. */
+function _puedeApelarTarea_(actor, t, lista){
+  var a;
+  if(!t || !actor || !_tareasResp_([t], actor).length) return false;
+  if(_tareaHecha_(t.e) || _esVoluntaria_(t)) return false;
+  a=_apelDeTarea_(t, lista);
+  return !(a && a.estado === 'abierta');
+}
+/* Gemela de `servidor._puede_resolver_apelacion`: nadie la suya; «otra situación», sólo el PD; el resto, el PD y quien
+   coordina (coordinador o subcoordinador) la unidad de la tarea. */
+function _puedeResolverApelacion_(actor, ap){
+  if(!ap || !actor || actor === ap.autor) return false;
+  if(rangoSanc(actor) >= 3) return true;
+  return ap.clausula !== 'otra' && _puedeMoverEstadoTarea_(actor, {s: ap.unidad, r: []});
+}
+function _apelPuedes_(ap){
+  return (ap && ap.puedes_resolver !== undefined) ? !!ap.puedes_resolver : _puedeResolverApelacion_(_fichaYo_(), ap);
+}
+/* Cuánto lleva esperando: «hace 3 h», «hace 2 días». */
+function _apelEspera_(at, ahora){
+  var ms=(ahora == null ? Date.now() : ahora) - Date.parse(at), h=Math.floor(ms/3600000), d=Math.floor(h/24);
+  if(!(ms >= 0)) return 'ahora mismo';
+  if(h < 1) return 'hace menos de una hora';
+  if(h < 48) return 'hace ' + h + (h === 1 ? ' hora' : ' horas');
+  return 'hace ' + d + ' días';
+}
+/* Las abiertas que TÚ puedes resolver (el globo del menú del escritorio). */
+function _apelPendientesTuyas_(){
+  return _apelLista_().filter(function(a){ return a && a.estado === 'abierta' && _apelPuedes_(a); });
+}
+/* Lo que dice la tarea de su apelación, en corto (móvil). */
+function _apelEstadoTxt_(a){
+  if(!a) return '';
+  if(a.estado === 'abierta') return 'Apelada · esperando respuesta';
+  if(a.estado === 'estimada') return 'Apelación estimada' + (a.nuevo_plazo ? ': nuevo plazo, el ' + _plazoDMY_(a.nuevo_plazo) : (a.quitada ? ': se te quita la tarea' : '')) +
+    (a.resolucion ? '. ' + a.resolucion : '');
+  return 'Apelación desestimada: ' + (a.resolucion || 'sin motivo escrito');
+}
+/* Apelar: manda `{tarea, clausula, motivo}` y deja la apelación en la lista. Devuelve una promesa de la apelación. */
+function _apelarTarea_(t, clausula, motivo){
+  if(_apelEsDemo_()){
+    var L=_apelDemoLeer_(), ap={id:'AP-demo' + (L.length + 1), tarea_id:_claveTarea_(t), titulo:t.n, autor:_fichaYo_(), unidad:t.s,
+      clausula:clausula, motivo:motivo, plazo:(_dmyAISO_(String(t.l || '')).slice(0, 10) || null), estado:'abierta',
+      at:new Date().toISOString(), decidido_por:null, decidido_at:null, resolucion:null};
+    L.unshift(ap); _apelDemoGuardar_(L);
+    return Promise.resolve(ap);
+  }
+  return api.apelarTarea(t.url || t.id, clausula, motivo).then(function(r){
+    var ap=r && r.apelacion; if(ap){ APELACIONES.unshift(ap); }
+    return ap;
+  });
+}
+/* Resolver: `datos` = {decision, resolucion, plazo?, quitar?}. Devuelve una promesa de la apelación ya resuelta. */
+function _resolverApelacion_(ap, datos){
+  function aplicar(nueva){
+    var L=_apelLista_(), i;
+    for(i=0;i<L.length;i++){
+      if(L[i].id === nueva.id){ L[i] = Object.assign({}, L[i], nueva, {puedes_resolver:false}); return L[i]; }
+    }
+    return nueva;
+  }
+  if(_apelEsDemo_()){
+    var L=_apelDemoLeer_(), i;
+    for(i=0;i<L.length;i++){ if(L[i].id === ap.id){
+      L[i] = Object.assign({}, L[i], {estado:datos.decision, decidido_por:_fichaYo_(), decidido_at:new Date().toISOString(),
+        resolucion:datos.resolucion || null});
+      if(datos.plazo) L[i].nuevo_plazo = datos.plazo;
+      if(datos.quitar) L[i].quitada = true;
+    } }
+    _apelDemoGuardar_(L);
+    return Promise.resolve(L.filter(function(x){ return x.id === ap.id; })[0]);
+  }
+  return api.resolverApelacion(Object.assign({id:ap.id}, datos)).then(function(r){ return aplicar(r.apelacion); });
+}
+
 function _tareaAccion_(e){
   var ETIQ = ['Empezar', 'Entregada'], i = _tareaPaso_(e), a = _tareaSiguiente_(e);
   return (a === null || i < 0 || i >= ETIQ.length) ? null : {etiqueta: ETIQ[i], a: a};
@@ -1982,6 +2138,18 @@ function _cochesTurnoHTML_(coches, pila){
   }).join('') + '</div>';
 }
 
+/* La memoria va PLEGADA: la mayoria de las veces se abre la ficha para ver quien va y a
+   que hora, no para leer el informe. Es de las DOS caras (31/10: la ficha del escritorio).
+   La fecha: `f` en el movil (DD/MM/AAAA), `fecha` en el escritorio (ISO del dato real). */
+function _memoriaHTML_(t){
+  return _visorHTML_({id:_idDrive_(t.memoria), url:t.memoria, titulo:'Memoria de fabricación',
+    sub:t.f||_isoADMY_(t.fecha), queEs:'la memoria', plegado:true});
+}
+
+/* Se conserva el nombre porque lo llaman las fichas de turno; por dentro ya es el visor
+   unico. Un alias es mas honesto que dejar la copia viva «por si acaso». */
+function _cablearMemoria_(){ _cablearVisor_(); }
+
 /* ═══ EL TIEMPO EXTRA DE UN TURNO · EL MODELO ════════════════════════════════════
    Daniel (15/08/2026), literal: *«si nos quedamos mas de cuatro horas … tiene que haber un
    mecanismo en el escritorio: el responsable de turno le da a un boton, se valida, y hay un
@@ -2676,8 +2844,8 @@ function _sesionMuerta_(v){
 function _avisarSesionMuerta_(){
   if (!_sesionMuerta_() || window.__SESION_MUERTA_DICHA) return false;
   window.__SESION_MUERTA_DICHA = true;
-  tost('Tu sesi\u00f3n ha caducado: esta pantalla ya NO se est\u00e1 actualizando y lo que ves '+
-       'puede ser de hace horas. Vuelve a entrar.', {fijo:true});
+  tost('Tu sesi\u00f3n ha caducado: lo que ves puede estar desactualizado. '+
+       'Vuelve a entrar.', {fijo:true});
   /* \u26d4 Y NO BASTA CON DECIRLO: SE VUELVE A OFRECER LA ENTRADA.
      Daniel (09/08): *\xabno me inicia sesi\u00f3n en escritorio\xbb*. Medido en la beta publicada:
      `SESION` a `null`, **ning\u00fan gate en el DOM** y la app pintada con la semilla de demo y
@@ -3440,7 +3608,7 @@ function _novedadesHTML_(){
   /* ⛔ 19/10 (auditoría): la MISMA guarda que su gemela `_automatismosHTML_`, dentro. Hoy los tres llamadores (menú del
      móvil, menú y `ir` del escritorio) ya preguntan antes; esto es para el cuarto, que no lo hará. */
   if(!_puedeVerNovedades_()){
-    return '<div class="mtit">Novedades</div><p class="rnota" data-est="nopuede">Esta pantalla es del director, y sólo en la beta.</p>';
+    return '<div class="mtit">Novedades</div><p class="rnota" data-est="nopuede">Solo para el director, en la beta.</p>';
   }
   var cuerpo = String(CHANGELOG_MD||'').trim()
     ? '<div class="mdoc">'+_mdPlegado_(CHANGELOG_MD)+'</div>'
@@ -3490,8 +3658,7 @@ function _pulsoGateCargar_(repintar){
 }
 function _pulsoGateHTML_(p){
   if(p===undefined || p===null) return '<p class="rnota" data-pulso="cargando">Preguntando al servidor cuándo pasó el motor por última vez…</p>';
-  if(p.error) return '<p class="rnota" data-pulso="error">⚠ No pude preguntar cuándo pasó el motor ('+esc(p.error)+
-    '). Eso NO dice que esté parado: dice que no lo sé.</p>';
+  if(p.error) return '<p class="rnota" data-pulso="error">⚠ No se pudo comprobar cuándo pasó el motor por última vez ('+esc(p.error)+').</p>';
   var m=p.minutos, mu=(typeof p.muerto_min==='number') ? p.muerto_min : 10, ca=p.cadencia_min||2;
   if(m===null || m===undefined) return '<p class="rnota" data-pulso="nolose" style="color:var(--rojo,#E41E25)">⛔ El motor '+
     '<b>no ha dejado constancia de ninguna pasada</b> en el mini PC: o no ha corrido nunca, o su estado no se lee.</p>';
@@ -3503,28 +3670,24 @@ function _pulsoGateHTML_(p){
 function _automatismosHTML_(){
   var tit='<div class="mtit">Automatismos</div>';
   if(!_puedeVerNovedades_()){
-    return tit+'<p class="rnota" data-est="nopuede">Esta pantalla es del director, y sólo en la beta.</p>';
+    return tit+'<p class="rnota" data-est="nopuede">Solo para el director, en la beta.</p>';
   }
   /* El pulso va ARRIBA de todo: es lo vivo de la pantalla (lo de debajo es la foto de publicar), y sale también
      cuando el inventario no se selló — que es justo cuando más falta saber si el motor pasa. */
   var pul=(typeof _pulsoGateCargar_==='function' && _pulsoGateCargar_.p!==undefined) ? _pulsoGateHTML_(_pulsoGateCargar_.p) : '';
   var A=(typeof AUTOMATISMOS==='undefined') ? null : AUTOMATISMOS;
   if(!A || typeof A!=='object'){
-    return tit+pul+'<div class="msub">Lo que el repositorio ya hace solo.</div>'+
-      '<p class="rnota" data-est="sinsellar">El inventario no se selló en esta build. Sale de '+
-      '<span class="mono">rutinas/automatismos.py</span> del repositorio, al publicar.</p>';
+    return tit+pul+'<div class="msub">Lo que corre solo.</div>'+
+      '<p class="rnota" data-est="sinsellar">Esta versión no trae el inventario.</p>';
   }
   var m=String(A.generado||'').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   var h=tit+pul+(m
     ? (A.calculado
-      ? '<div class="msub" data-est="foto">Comprobado por el motor el <b>'+
-        m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>, con «Comprobarlo ahora». Lo que haya cambiado después '+
-        'no sale aquí.</div>'
-      : '<div class="msub" data-est="foto">Foto del momento de publicar: <b>'+
-      m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>. No es un «comprobar ahora»: lo que haya '+
-      'cambiado después no sale aquí.</div>')
-    : '<div class="msub" data-est="sinfecha"><b>Sin fecha</b>: no se sabe de cuándo es esta foto, '+
-      'así que no la des por actual.</div>');
+      ? '<div class="msub" data-est="foto">Comprobado el <b>'+
+        m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>, con «Comprobarlo ahora».</div>'
+      : '<div class="msub" data-est="foto">Estado al publicar: <b>'+
+      m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>.</div>')
+    : '<div class="msub" data-est="sinfecha"><b>Sin fecha</b>: puede no estar al día.</div>');
   /* ⛔ EL BOTON DE COMPROBAR (765.a). Daniel (10/09): «darle a un boton y que checkee».
      ⛔⛔ NO COMPRUEBA LA APP, Y EL TEXTO LO DICE: el inventario se DERIVA del repo y el
      backend no tiene repo. Lo que hace el boton es levantar el flag `comprobar_automatismos`;
@@ -3534,9 +3697,8 @@ function _automatismosHTML_(){
      ⛔ 21/10 (auditor 7, 🟠 6): y por eso se pinta sólo donde existe su manejador; en el móvil era un botón muerto. */
   if(typeof _engComprobarAuto_==='function') h+='<p class="rnota" style="margin:10px 0 0">'+
     '<button class="btn sm" data-comprauto>Comprobarlo ahora</button> '+
-    '<span style="color:var(--ink3)">Lo calcula el gate en su siguiente pasada, '+
-    '<b>hasta 2 min</b>: la app no puede comprobarlo ella, porque esto sale del '+
-    '<b>repositorio</b> y el servidor no lo tiene.</span></p>';
+    '<span style="color:var(--ink3)">Se calcula en la siguiente pasada '+
+    '(<b>hasta 2 min</b>).</span></p>';
   h+='<div class="mdoc"><h3>¿Hay algo desviado?</h3>';
   var c=A.comprobacion;
   if(!(c instanceof Array) || !c.length){
@@ -3549,7 +3711,7 @@ function _automatismosHTML_(){
       h+='<li data-est="'+est+'">'+
         (est==='desviado' ? '🔴 <b>'+esc(c[i].nombre)+'</b> — desviado'
           : (est==='aldia' ? '✅ <b>'+esc(c[i].nombre)+'</b> — al día'
-            : '⛔ <b>'+esc(c[i].nombre)+'</b> — <b>no lo sé</b>: no se pudo comprobar, y eso NO es «al día»'))+
+            : '⛔ <b>'+esc(c[i].nombre)+'</b>: no se pudo comprobar'))+
         (c[i].linea ? ' · <code>'+esc(c[i].linea)+'</code>' : '')+'</li>';
     }
     h+='</ul>';
@@ -3560,7 +3722,7 @@ function _automatismosHTML_(){
     var fil=A[fams[k][0]];
     h+='<h3>'+fams[k][1]+'</h3>';
     if(!(fil instanceof Array)){
-      h+='<p data-fam="ilegible">⛔ <b>No se pudo leer</b>, y eso NO es «no hay ninguno».</p>';
+      h+='<p data-fam="ilegible">⛔ <b>No se pudo leer.</b></p>';
       continue;
     }
     if(!fil.length){ h+='<p data-fam="vacia">(ninguno)</p>'; continue; }
@@ -5710,6 +5872,53 @@ function _convEstado_(cv, ahora){
   return t<=l ? 'abierta' : 'cerrada';
 }
 
+/* ⛔ LO QUE TE TOCA A TI, COMO DATOS (31/10) — la lista de avisos personales de la portada, que pinta cada cara a su manera.
+   Estaba escrita DENTRO de `vEstado`/`_avisosQueTeTocanM_` (móvil) y el escritorio no tenía nada: quien vive en el
+   ordenador no se enteraba de que tenía algo que cubrir hasta que le caía la sanción. Aquí vive la REDACCIÓN —plurales,
+   cuándo caduca, a dónde lleva—; cada cara le da sus CUENTAS (de dónde sale cada número es de su modelo de datos) y pinta
+   lo que sale. `c`: {pend:{tit,txt}, pdec, sindecl, det, rev (cuentas), cambios:[refs], reus:{lista:[{id,titulo,bajoMin}],
+   plazo}, conv:true si hay una semana de turnos abierta sin contestar}. Cada campo ausente es un aviso que no sale.
+   Devuelve [{tipo, ir, tit, txt (HTML ya escapado), mal, reuid}], en el ORDEN en que el móvil los ha pintado siempre.
+   `ir` es la clave de pestaña del MÓVIL; el escritorio lleva `tipo` a su propia pantalla. */
+function _tuyoItems_(c){
+  c = c || {};
+  var out = [];
+  function add(tipo, ir, tit, txt, mal, reuid){
+    out.push({tipo: tipo, ir: ir, tit: tit, txt: txt, mal: !!mal, reuid: reuid == null ? '' : String(reuid)});
+  }
+  if(c.pend) add('pend', 'horas', c.pend.tit, c.pend.txt, false);
+  var cb = c.cambios || [];
+  if(cb.length){
+    /* Con dos decía «Un documento» y nombraba sólo el primero, mientras el globo (mismo filtro) decía «2». */
+    var cresto = cb.length - 1;
+    add('cambios', 'docs',
+      cresto > 0 ? (cb.length + ' documentos tuyos tienen cambios pedidos') : 'Un documento tuyo tiene cambios pedidos',
+      '<span class="mono">' + esc(cb[0]) + '</span>' + (cresto > 0 ? (', y ' + cresto + ' más') : '') +
+        ' · ' + (cresto > 0 ? 'corrígelos y reenvíalos' : 'corrígelo y reenvíalo') + ' a revisión.', true);
+  }
+  var rl = (c.reus && c.reus.lista) || [];
+  if(rl.length){
+    var r0 = rl[0], resto = rl.length - 1;
+    /* Si TODAS las que quedan están marcadas pero por debajo del mínimo, se dice eso; mezcladas, se cuentan las dos. */
+    var nB = rl.filter(function(x){ return x.bajoMin; }).length, nF = rl.length - nB;
+    var tit = !nF ? ('Vas por debajo del mínimo en ' + (nB > 1 ? (nB + ' reuniones') : 'una reunión'))
+      : ('Te falta cubrir ' + (nF > 1 ? (nF + ' disponibilidades') : 'una disponibilidad') +
+         (nB ? (' y vas por debajo del mínimo en ' + (nB > 1 ? (nB + ' más') : 'otra')) : ''));
+    add('reu', 'reu', tit, '«' + esc(r0.titulo) + '» — ' + esc(c.reus.plazo) +
+      (resto > 0 ? (', y ' + resto + ' más después') : '') + '.', false, r0.id);
+  }
+  if(c.pdec) add('pdec', 'horas', c.pdec === 1 ? 'Un parte espera tu firma' : (c.pdec + ' partes esperan tu firma'),
+    c.pdec === 1 ? 'Hasta que lo decidas no le cuenta a quien lo hizo.' : 'Hasta que los decidas no le cuentan a nadie.', false);
+  if(c.sindecl) add('sindecl', 'horas', c.sindecl === 1 ? 'Un fichaje tuyo sin declarar' : (c.sindecl + ' fichajes tuyos sin declarar'),
+    'Se pierden si no los declaras a tiempo (7 días; ' + _caducaAutocierreH_() + ' h si se cerraron solos). Hazlo en Horas.', true);
+  if(c.det) add('det', 'horas', c.det === 1 ? 'Te piden detalle de un parte' : ('Te piden detalle de ' + c.det + ' partes'),
+    'Hasta que lo des no se firma.', false);
+  if(c.rev) add('rev', 'docs', c.rev === 1 ? 'Un documento espera tu revisión' : (c.rev + ' documentos esperan tu revisión'),
+    c.rev === 1 ? 'Léelo y decide en Docs.' : 'Léelos y decide en Docs.', false);
+  if(c.conv) add('conv', 'turnos', 'Di tu disponibilidad para los turnos', 'Si no dices nada, se reparte sin contar contigo.', true);
+  return out;
+}
+
 /* Las horas que TE quedan a ti para contestar. Ojo: NO es `ventana_real_h` de Python, que
    contesta a otra pregunta —«si convoco ahora, cuánto le queda a la gente»— y es de quien
    convoca. Misma aritmética, distinta pregunta: por eso son dos y no una. */
@@ -6018,8 +6227,8 @@ function _tostAutocierre_(r){
   var p = r && r.parte;
   if(!(r && (r.autocierre === true || (p && p.autocierre === true && p.estado === 'sin_declarar')))) return '';
   var t = _maxHorasParte_();
-  return 'Pasaba de '+t+' h: el fichaje se cerró solo en '+t+' h y queda SIN declarar. Decláralo con lo que '+
-    'trabajaste antes de '+_caducaAutocierreH_()+' h o se pierde.';
+  return 'Pasó de '+t+' h y se cerró solo. Declara lo que trabajaste de verdad antes de '+
+    _caducaAutocierreH_()+' h o se pierde.';
 }
 
 /* ⛔⛔ UN PARTE DE AUTOCIERRE NO SE DECLARA TAL CUAL, Y SE DICE IGUAL EN LAS DOS CARAS (633.ª).
@@ -6039,9 +6248,8 @@ function _tostAutocierre_(r){
 function _avisoAutocierre_(p){
   if(!p || !p.autocierre || p.sinFichaje) return '';
   var t=_maxHorasParte_();
-  return 'Se cerró sola al tope de '+t+' h: esas horas las puso el sistema, no lo que trabajaste. '+
-    'Si fueron '+t+' h sin querer pero sí trabajaste, mejor declara un bloque con lo que trabajaste '+
-    'de verdad, y no declares también este: se contarían dos veces.';
+  return 'Se cerró sola a las '+t+' h: esas horas las puso el sistema, no tú. '+
+    'Declara lo que trabajaste en un bloque y no este, o se contarían dos veces.';
 }
 
 /* ═══ EL AVISO DE CRUCE DE MEDIANOCHE · UNA PUERTA PARA LAS DOS CARAS ════════════
@@ -8269,9 +8477,8 @@ function _pasosSustituirDoc_(e, yo){
          dejo al escritorio mandando al formulario sin decir a quien pedir el enlace. */
       sinUrl: (url && url.indexOf('http') === 0) ? ''
             : 'Si no tienes a mano el enlace del formulario, pideselo al Project Director.' },
-    { n:2, t:'Este sigue publicado mientras tanto',
-      d:'No se borra ni se retira: hasta que aprueben la nueva, lo que el equipo lee es este. Al aprobarse, '+
-        'la misma página pasa a la versión nueva.',
+    { n:2, t:'Al aprobarse',
+      d:'El original no se borra: la misma página pasa a la versión nueva.',
       url:'', sinUrl:'' }
   ];
 }
@@ -8297,8 +8504,7 @@ function _pasosCorregirDoc_(e){
       sinUrl: (url && url.indexOf('http')===0) ? ''
             : 'Si no tienes a mano el enlace del formulario, pídeselo al Project Director.' },
     { n:2, t:'Vuelve solo a revisión',
-      d:'No tienes que pulsar nada: en cuanto llegue la corrección, el expediente vuelve a la cola de revisión. '+
-        'Lo que te pidieron corregir sigue aquí arriba hasta entonces.',
+      d:'En cuanto llegue la corrección.',
       url:'' }
   ];
 }

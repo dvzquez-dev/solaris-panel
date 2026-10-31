@@ -232,8 +232,7 @@ function _abrirPintor_(fondoUrl, alTerminar){
 function _fotoBuzonHTML_(){
   if(!BZ_FOTO)
     return '<div class="bzfoto">'+
-      '<div class="tx"><b>Una foto ayuda mucho</b>Sobre todo si es de sitio: adjunta una '+
-      'captura y márcala con el lápiz.</div>'+
+      '<div class="tx"><b>Adjunta una captura</b>Márcala con el lápiz.</div>'+
       '<button class="btn mini" id="bzAdj" data-p>Adjuntar</button></div>'+
       '<input type="file" id="bzFile" accept="image/*" style="display:none">';
   return '<div class="bzfoto">'+
@@ -330,8 +329,7 @@ function buzonModal(tipo, prev){
       '<button data-g="Cosmético"'+_marcaG_('Cosmético')+
         ' data-p>Es cosmético</button></div>':'')+
     _fotoBuzonHTML_()+
-    '<p class="rnota">Esto <b>no cambia nada por sí solo</b>: va a una cola que revisa el '+
-    'Project Director. Si sale adelante, se prepara y se te avisa.</p>'+
+    '<p class="rnota">Lo revisa el Project Director y, si sale adelante, te avisamos.</p>'+
     '<button class="btn pri full" data-p id="bzEnviar" style="margin-top:10px">Enviar</button>');
   /* (`grav` ya se declaró arriba, con lo que venía en `prev`: aquí se clavaba
      'Molesta' y eso borraba la elección en cada reconstrucción del modal.) */

@@ -657,8 +657,8 @@ function _miDispoPanel_(r){
     '<h4 class="sc" style="margin:0 0 7px">Tu disponibilidad</h4>'+g+
     '<div class="leg" style="margin-top:6px">'+ley+'</div>'+
     (_cerrado
-      ? '<p class="rnota" style="margin:9px 0 0;color:var(--warn)">El plazo cerró: esto es lo que '+
-        'quedó marcado y ya no se puede cambiar — el servidor no acepta respuestas fuera de plazo.</p>'
+      ? '<p class="rnota" style="margin:9px 0 0;color:var(--warn)">El plazo cerró: lo marcado '+
+        'ya no se puede cambiar.</p>'
       : '<div style="margin-top:9px;display:flex;gap:9px;align-items:center">'+
       '<button class="btn pri" data-midguardar="'+r.id+'"'+(sucio?'':' disabled')+'>Guardar mi disponibilidad</button>'+
       /* ⛔ EL MINIMO SE DICE ANTES DE PULSAR. El movil lo pone en su contador («cada toque
@@ -879,11 +879,25 @@ function _plazoReuE_(r){
   return { txt:_plazoTxt_(r && r.limite), chip:n+(abierta?' en riesgo':' sin cumplir'), cls:(n?'no':'ok') };
 }
 
+/* ⛔ LA REUNIÓN ELEGIDA SE GUARDA POR `id`, NO POR POSICIÓN. `REUS` se rehace en cada refresco (~90 s) y si la
+   lista cambia de orden el índice apunta a OTRA reunión: «Fijar», «Guardar orden del día» o los convocados se
+   escribían en la que no era. `RE_SEL_ID` lo pone el desplegable; `RE_SEL` (el índice) queda sólo de respaldo
+   para cuando nadie ha elegido. Si la elegida ya no está (la borraron), manda la primera: nunca otra por azar. */
+function _reuSelE_(){
+  var i, id=(typeof RE_SEL_ID!=='undefined') ? RE_SEL_ID : null;
+  if(id!=null){
+    for(i=0;i<REUS.length;i++){ if(REUS[i] && String(REUS[i].id)===String(id)) return REUS[i]; }
+    return REUS[0];
+  }
+  return REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0];
+}
+
 function _fijarPanel_(){
   if(!REUS.length) return '';
+  var _sel=_reuSelE_();
   var opts=REUS.map(function(r,i){
-    return '<option value="'+i+'">'+esc(r.tit||r.titulo||('Reunión '+r.id))+'</option>'; }).join('');
-  var r=REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0];
+    return '<option value="'+i+'"'+(r===_sel?' selected':'')+'>'+esc(r.tit||r.titulo||('Reunión '+r.id))+'</option>'; }).join('');
+  var r=_reuSelE_();
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   var dias=(r.dias||[]).map(function(d,i){ return '<option value="'+i+'">'+esc(d)+'</option>'; }).join('');
@@ -918,11 +932,11 @@ function _fijarPanel_(){
     '</div>'+
     (_pf ? '' : '<p class="mini" style="margin:-4px 0 12px;color:var(--ink3)">La fija quien la convocó'+
       (r.convocante ? ' (<b>'+esc(_pilaDeM_(r.convocante)||r.convocante)+'</b>)' : '')+
-      ' o la cuenta admin: el servidor no deja a nadie más.</p>')+
+      '.</p>')+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
       '<label style="flex:1;min-width:240px">'+lab('Orden del día · enlace o texto')+
         '<input id="reOrden" value="'+esc(r.ordenDia||'')+'" placeholder="https://… o los puntos a tratar" style="'+E+'"></label>'+
-      '<button class="btn" data-orden>Guardar orden del día</button>'+
+      '<button class="btn" data-orden'+(_pf?'':' disabled')+'>Guardar orden del día</button>'+
     '</div>'+
     _convocadosBoxE_(r)+
     _audioReuHTML_(r)+
@@ -1136,7 +1150,7 @@ async function _refrescarReuAbiertaE_(){
   /* ⛔ NO SE REPINTA MIENTRAS ALGUIEN ESCRIBE: aqui no hay modales, pero si formularios, y
      repintar le borra lo tecleado. Es la misma guardia que usa `_refrescoVivo_`. */
   if(typeof _escribiendoE_==='function' && _escribiendoE_()) return;
-  var r = REUS[Math.min(RE_SEL, REUS.length-1)] || REUS[0];
+  var r = _reuSelE_();
   if(!r || r.id==null) return;
   _REFREU_E_=true;
   try{

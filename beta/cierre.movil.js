@@ -122,8 +122,8 @@ function _decidirCierreHTML_(plan, nBloq, vuela){
   return '<button class="btn pri" '+((nBloq||vuela)?'disabled ':'')+'data-aplicarcierre style="width:100%;margin-top:14px">'+
       (vuela?'Aplicando… (en cola o escribiéndose)':nBloq?'Bloqueado · '+nBloq+' sin resolver':'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo)))+'</button>'+
     '<p class="rnota">Esto <b>sí escribe</b> en Notion, en '+((plan.totales&&plan.totales.personas)||
-      plan.personas||'?')+' fichas. Lo hace un script determinista que comprueba el «antes» de '+
-      'cada una y se planta si algo no cuadra.</p>';
+      plan.personas||'?')+' fichas. Si algo no cuadra, '+
+      'para sin escribir.</p>';
 }
 
 function _cierreHTML_(est, err, cargando){
@@ -132,8 +132,8 @@ function _cierreHTML_(est, err, cargando){
     '<p class="rnota" style="margin:0 0 12px">Cierra el corte que va desde el cierre anterior '+
     'hasta hoy. <b>No aplica nada</b>: encola el cálculo y el plan se revisa antes.</p>';
   if(cargando) return cab+'<p class="rnota">Preguntando al servidor en qué punto está…</p>';
-  if(err) return cab+'<p class="rnota" style="color:var(--warn)">No se pudo comprobar: '+
-    esc(String(err).replace(/\.\s*$/,''))+'. <b>No</b> quiere decir que esté todo listo.</p>';   // 🟡 13 (auditor 19): sin «..»
+  if(err) return cab+'<p class="rnota" style="color:var(--warn)">No se pudo comprobar el estado del cierre: '+
+    esc(String(err).replace(/\.\s*$/,''))+'. <b>No lo cierres</b> hasta verlo.</p>';   // 🟡 13 (auditor 19): sin «..»
   /* ⛔ 21/10 (auditor 9, 🟠 1/🟠 2): sólo el plan del mes que toca cerrar (`_planVigente_`). Con el de JULIO que trae hoy
      la ranura, esto pintaba «se paró a medias» y salía por el `if(plan)` de abajo SIN el botón «Calcular». */
   var bloq=(est&&est.bloqueos)||[], enc=(est&&est.encolado)||null, plan=_planVigente_((est&&est.plan)||null);
@@ -148,8 +148,8 @@ function _cierreHTML_(est, err, cargando){
   if(_ava) cab+='<p class="rnota" style="color:var(--warn)">'+esc(_ava)+'</p>';
   var _avf=_avisoFichajesCierre_(est);   /* 26/10 (triaje 5.2): quien sigue fichado, sin bloquear */
   if(_avf) cab+='<p class="rnota" style="color:var(--warn)">'+esc(_avf)+'</p>';
-  if(enc && plan) cab+='<p class="rnota">Hay un cálculo <b>nuevo</b> en cola: el plan de abajo es el anterior y se '+
-    'sustituye en la siguiente pasada (va cada 2 minutos).</p>';
+  if(enc && plan) cab+='<p class="rnota">Hay un cálculo <b>nuevo</b> en cola: '+
+    'sustituirá al plan de abajo en un par de minutos.</p>';
   var filas=bloq.map(function(b){
     return '<div class="rl"><span>'+esc(b.texto||b.que)+'</span>'+
       '<span class="ra" style="color:var(--warn)">bloquea</span></div>'; }).join('');

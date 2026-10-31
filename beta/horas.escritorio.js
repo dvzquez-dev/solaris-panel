@@ -72,7 +72,8 @@ function parteCard(p){
       (p.estado==='pend' && p.pedido?'<span class="chip">contestó a lo que se le pidió — «'+esc(p.pedido)+'»</span>':'')+
       /* 26/10 · «Sí, mientras no esté firmado»: las horas que vas a firmar las corrigió su autor — y de cuánto eran */
       (_txtCorreccion_(p.corr)?'<span class="chip wa">'+esc(_txtCorreccion_(p.corr))+'</span>':'')+'</div>'+
-    '<div class="ruta">'+(puede?'Puedes decidirlo.':'Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.')+'</div>'+
+    /* 31/10 (textos): si puedes decidir, los botones ya lo dicen; s\u00f3lo se avisa cuando NO es tuyo */
+    (puede?'':'<div class="ruta">Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.</div>')+
     (puede?'<textarea data-motivo placeholder="Motivo — obligatorio para rechazar o pedir detalle…"></textarea>'+
       '<div class="acts">'+
         '<button class="btn pri" data-parte="'+p.id+'" data-acc="si">Aprobar</button>'+
@@ -118,10 +119,8 @@ function bloquePanel(){
   }).join('');
   return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-    'Un traslado, un montaje, una feria a la que fue medio subsistema: en vez de otorgar uno a uno, '+
-    '<b>marca a quienes participaron</b> y ponles las mismas horas de una vez. Todos comparten concepto y '+
-    'cantidad, y no se otorga nada hasta que pulsas el botón. Entran como <b>otorgadas</b>, igual que '+
-    'las individuales.</p>'+
+    'Para un traslado, un montaje o una feria: <b>marca a quienes fueron</b> y ponles las mismas '+
+    'horas de una vez. No se otorga nada hasta que pulses el botón.</p>'+
     filtro+
     '<div class="chips" id="bloPool" style="margin-bottom:12px">'+chips+'</div>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
@@ -170,6 +169,10 @@ function normParte(p){
     periodo:p.periodo||null,   /* 20/10: el mes que grabó el servidor al aplicarlo */
     motivo:p.motivo||null, pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya contestada */
     corr:p.correcciones||null,   /* 26/10 («Sí, mientras no esté firmado»): las horas las corrigió su autor */
+    /* 31/10 («Lo tuyo»: tus partes que no cuentan y tu histórico): `iso` es la fecha del trabajo SIN voltear —la que
+       lee `_esDeMesPasado_` cuando no hay `periodo` ni `creado_at`—; `cat` reparte las horas por categoría (como `cat`
+       del móvil); `ret`/`revmot` dicen si un revertido lo retiraste tú y por qué se revirtió. */
+    iso:String(p.fecha||''), cat:p.categoria||null, ret:!!p.retirado_at, revmot:p.revertido_motivo||null,
     bloque:p.bloque||null, reunion_id:p.reunion_id==null?null:p.reunion_id, resumen:p.resumen||'',   /* 29/10: el parte de bloque */
     _real:true };
 }
@@ -627,14 +630,10 @@ function _fichaFalta_(){
 
 function _fichaPanel_(){
   if(!_fichaHayBack_()) return pan('Tu sesi\u00f3n de trabajo','sin conexi\u00f3n',
-    vacioSimple('El fichaje vive en el servidor','Sin sesi\u00f3n no se puede abrir ni cerrar un '+
-      'fichaje. No se ense\u00f1a un cron\u00f3metro local: un reloj que el servidor no conoce no son '+
-      'horas de nadie.'));
+    vacioSimple('Sin sesi\u00f3n no se puede fichar','Entra con tu cuenta.'));
   _fichaCargar_(typeof _repintarSuave_==='function'?_repintarSuave_:pintar);
   if(!FICHA_SRV.sabido && FICHA_SRV.estado==='error') return pan('Tu sesi\u00f3n de trabajo','sin datos',
-    vacioSimple('No se pudo preguntar al servidor','Se dice en vez de ofrecerte «fichar '+
-      'entrada»: si tuvieras una sesi\u00f3n abierta, esta pantalla estar\u00eda diciendo que no cuenta '+
-      'nada mientras el reloj corre.'));
+    vacioSimple('No se pudo comprobar si tienes un fichaje abierto','Recarga e int\u00e9ntalo otra vez.'));
 
   var sabido=FICHA_SRV.sabido, abierta=!!FICHA, pausa=_fichaEnPausa_();
   var min=_fichaMin_(), largo=min>=600;
@@ -721,10 +720,9 @@ function _fichaPanel_(){
         'style="'+CAMPO_CSS+';resize:vertical;font-size:12.5px">'+esc(FICHA_FORM.just)+'</textarea></label>'+
       '<p class="sc" id="fichaFalta" style="margin:8px 0 0;letter-spacing:.08em">'+
         esc(_fichaFalta_()||'Todo listo: al fichar salida se declara.')+'</p>'+
-      '<div class="nota" style="margin-top:11px">Al cerrar, la <b>duraci\u00f3n la calcula el servidor</b> '+
-        '(de la entrada al env\u00edo, menos pausas). Si dejas esto a medias, el parte queda '+
-        '<b>sin declarar</b>, caduca a los <b>7 d\u00edas</b> y lo declaras <b>aqu\u00ed abajo</b> '+
-        '(o desde el m\u00f3vil).'+
+      '<div class="nota" style="margin-top:11px">La <b>duraci\u00f3n</b> sale de la entrada al env\u00edo, menos pausas. '+
+        'Si lo dejas a medias, queda <b>sin declarar</b> y caduca a los <b>7 d\u00edas</b>; '+
+        'lo declaras <b>aqu\u00ed abajo</b> o desde el m\u00f3vil.'+
         (firmaP?' Lo firma <b>'+esc(firmaP)+'</b>.':'')+'</div>'+
     '</div>';
   }
@@ -1056,8 +1054,7 @@ function _bloqPanel_(){
      son horas de nadie, y en esta cara la semilla ya ha mentido antes. Misma regla que el
      reloj de al lado, dicha con las mismas palabras. */
   if(!_fichaHayBack_()) return pan('Declarar horas que no fichaste','sin conexi\u00f3n',
-    vacioSimple('El parte lo guarda el servidor','Sin sesi\u00f3n no se puede declarar nada. No se '+
-      'apunta en local: unas horas que el servidor no tiene no son horas de nadie.'));
+    vacioSimple('Sin sesi\u00f3n no se puede declarar','Entra con tu cuenta.'));
 
   var f=BLOQ_FORM, decl=_bloqDecl_(), pend=_bloqMios_();
   /* ⛔ `perf` SALE DE LA PUERTA (581.ª), no de `_bloqPerfil_()`: de aqui cuelgan el rotulo
@@ -1214,10 +1211,9 @@ function _bloqPanel_(){
      Lo que NO puede pasar es que eso se lea como cobertura. */
   var soloYo = !!(perf && _firmaDe_(perf, yo)===yo) && rangoNom(yo)<3;
   var avisoFirma = !soloYo ? '' :
-    '<div class="nota" style="margin-top:11px"><b>Con este perfil el firmante eres t\u00fa, y '+
-    'nadie firma lo suyo.</b> El parte se guarda y queda registrado, pero <b>hoy ning\u00fan '+
-    'revisor puede aprobarlo</b>: el servidor solo admite al coordinador de esa unidad o a '+
-    'rango 3. Si tienes otro perfil, decl\u00e1ralas con ese.</div>';
+    '<div class="nota" style="margin-top:11px"><b>Con este perfil el firmante ser\u00edas t\u00fa y '+
+    'nadie firma lo suyo</b>, as\u00ed que <b>nadie podr\u00e1 aprobar este parte</b>. '+
+    'Si tienes otro perfil, declara con ese.</div>';
 
   var form='<div class="pb" style="border-top:1px solid var(--line)">'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
@@ -1242,9 +1238,13 @@ function _bloqPanel_(){
       (firmaP?'<span class="sc">lo firma '+esc(firmaP)+'</span>':'')+
     '</div>'+
     avisoFirma+
-    '<div class="nota" style="margin-top:11px">Entra como <b>pendiente</b> y <b>no suma</b> hasta '+
-      'que la firme quien te corresponde. <b>Nadie firma lo suyo</b>: si declaras en concepto de '+
-      'coordinador de tu propia unidad, sube al Project Director.</div>'+
+    /* 31/10: la nota fija decia «Nadie firma lo suyo … sube al Project Director» TAMBIÉN al PD, que sí firma lo suyo
+       (cabecera de este fichero; `_firmaDe_` lo pone primero). A él se le dice lo que pasa de verdad. */
+    '<div class="nota" style="margin-top:11px">Queda <b>pendiente</b> y <b>no suma</b> hasta '+
+      'que la firme quien te corresponde. '+
+      (rangoNom(yo)>=3
+        ? '<b>Como Project Director, lo tuyo lo firmas t\u00fa</b>: no sube a nadie m\u00e1s.'
+        : 'Si declaras como coordinador de tu propia unidad, lo firma el <b>Project Director</b>.')+'</div>'+
   '</div>';
 
   return pan('Declarar horas que no fichaste',
@@ -1292,6 +1292,207 @@ function _misSinFirmarHTML_(){
         '<button class="btn mini" data-epret="'+p.id+'">Retirar</button></div>';
     }).join('')+'</div>'+
     '<div class="nota">Mientras nadie lo firme. Quien firma ve que lo corregiste («… corregidas por su autor»).</div>');
+}
+
+/* ═══ LO TUYO · LO QUE NO CUENTA, DE QUÉ SE COMPONEN TUS HORAS Y TODO TU HISTÓRICO (31/10) ══════════════
+   🗣️ Daniel: «llevar al escritorio todo lo que hay en el móvil ahora y completar las funciones que promete y no
+   tiene». Inventario `docs/inventario-paridad-2026-10-31.md` §A4, §A5 y §A7.
+
+   ⛔ A QUIEN LE RECHAZABAN UN PARTE EN EL ESCRITORIO NO LO VEÍA EN «LO TUYO»: sólo salían los pendientes y los de
+   detalle (`_misSinFirmarE_`). Los rechazados —con su MOTIVO— y los caducados sólo estaban en el «Histórico» de
+   Partes, mezclados con los de todos y sin decir cuáles eran tuyos.
+   ✅ Salen de `PARTES` (normalizado), no de `PART_BACK`: `normParte` ya lleva `motivo`, `decidido_*` y `periodo`, y así
+   la MAQUETA también los pinta (con `PART_BACK` a `null` la rama no se vería nunca).
+   ⚠️ Y SÓLO los estados que ningún otro panel de esta vista enseña ya: `pend`/`detalle` van en «Tus partes sin
+   firmar» (con sus botones) y `sindecl` en «Declarar horas que no fichaste», de TODOS los meses. Repetirlos aquí
+   sería pintar dos veces lo mismo — el móvil los junta porque es UNA lista; esta cara tiene un panel por acción.
+   ⛔ SÓLO LOS TUYOS, por `_fichaYo_` (la sesión, no «Ver como»), como el resto de «Lo tuyo». */
+var _ESTADOS_NO_CUENTAN_E_=['rechazado','cad','rev','raro'];
+
+/* TUS partes que no cuentan, partidos por mes: los de este mes y «De meses anteriores» (los plegados). Por la MISMA
+   puerta que el móvil (`_esDeMesPasado_` con `_periodoAbierto_`, que ya lee `periodo`, `creado_at` y `iso`). */
+function _misPartesNoCuentanE_(){
+  var yo=_fichaYo_(), per=_periodoAbierto_();
+  var l=(PARTES||[]).filter(function(p){
+    return p && yo && p.autor===yo && _ESTADOS_NO_CUENTAN_E_.indexOf(p.estado)>=0;
+  }).sort(function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); });
+  return { mias:l.filter(function(p){ return !_esDeMesPasado_(p, per); }),
+           viejas:l.filter(function(p){ return _esDeMesPasado_(p, per); }) };
+}
+
+/* Una fila de «lo que no cuenta»: qué pasó, y POR QUÉ cuando el servidor lo dijo. ⚠️ Un motivo que no consta NO se
+   inventa (`motivo` vacío → sin cita); un caducado no tiene motivo: lo dice la propia caducidad. */
+function _filaNoCuentaE_(p){
+  var et=p.estado==='rechazado' ? '<span class="chip no">rechazado</span>'
+        :p.estado==='cad' ? '<span class="chip no">caducado</span>'
+        :p.estado==='rev' ? '<span class="chip no">'+(p.ret?'retirado':'revertido')+'</span>'
+        :'<span class="chip">estado desconocido</span>';
+  var que=p.estado==='rechazado' ? 'decidido '+_firmaParte_(p)
+        :p.estado==='cad' ? 'caducó sin declararse a tiempo: no cuenta'
+        :p.estado==='rev' ? (p.ret ? 'lo retiraste tú: no se firma ni cuenta' : 'revertido: ya no cuenta')
+        :'el servidor lo manda con un estado que esta pantalla no conoce';
+  var mot=p.estado==='rechazado' ? p.motivo : (p.estado==='rev' && !p.ret ? p.revmot : null);
+  return '<div class="dec ltfila" style="cursor:default"><span class="tx"><b>'+esc(p.tarea||'Parte')+'</b><small>'+
+      esc(p.fecha||'')+' · '+esc(que)+'</small>'+
+      (mot?'<span class="ltmot"><span class="sc">'+(p.estado==='rechazado'?'motivo':'por qué')+'</span>'+
+        esc(mot)+'</span>':'')+
+    '</span><span class="der"><span class="mono">'+nf2(Number(p.horas)||0)+' h</span>'+et+'</span></div>';
+}
+
+function _misPartesNoCuentanHTML_(){
+  var r=_misPartesNoCuentanE_(), n=r.mias.length+r.viejas.length;
+  if(!n) return '';
+  var hV=r.viejas.reduce(function(t,x){ return t+(Number(x.horas)||0); },0);
+  return pan('Tus partes que no cuentan', n+(n===1?' parte':' partes')+' · rechazados, caducados y revertidos',
+    '<div class="pb" style="padding:0">'+
+      (r.mias.length ? r.mias.map(_filaNoCuentaE_).join('')
+        : '<div class="nota" style="border-top:0">Ninguno de este mes. Lo que hay es de meses anteriores, plegado debajo.</div>')+
+      (r.viejas.length
+        ? '<details class="ltplg"><summary><b>De meses anteriores</b><span class="sc">'+r.viejas.length+
+            (r.viejas.length===1?' parte':' partes')+' · '+nf2(hV)+' h</span></summary>'+
+          r.viejas.map(_filaNoCuentaE_).join('')+'</details>'
+        : '')+
+    '</div>'+
+    '<div class="nota">Estos partes <b>no suman horas</b>. Un rechazo se lee con su motivo; para volver a pedir esas horas, '+
+    'declara otro parte con lo que falte.</div>');
+}
+
+/* LO QUE TUS IMPUTACIONES SUMARON A CADA CATEGORÍA (gemela de `desgloseCat` del móvil, que pinta chips; aquí barras).
+   No es el total de la categoría en Notion —que además lleva reuniones automáticas, cursos…—: es la parte que puedes
+   verificar tú. Una categoría desconocida o sin categoría cae en «Compensaciones», como el motor (`aplicar_horas.py`). */
+function _sumaPorCatE_(ps){
+  var g={}, orden=['reunion','tareas','turno','compensacion'];
+  (ps||[]).forEach(function(p){
+    var k=(p.cat && (p.cat in CAT_ETI)) ? p.cat : 'compensacion';
+    g[k]=(g[k]||0)+(Number(p.horas)||0);
+  });
+  return orden.filter(function(k){ return g[k]; }).map(function(k){ return {k:k, eti:CAT_ETI[k], h:g[k]}; });
+}
+
+function _desgloseCatHTMLE_(ps){
+  var l=_sumaPorCatE_(ps);
+  if(!l.length) return '';
+  var tot=l.reduce(function(t,x){ return t+x.h; },0);
+  return '<div class="ltcat"><div class="sc">De qué se componen · lo que sumaron tus partes</div>'+
+    l.map(function(x){
+      var w=tot>0 ? (x.h/tot*100) : 0;
+      return '<div class="fila"><span class="k">'+esc(x.eti)+'</span>'+
+        '<span class="tr"><i style="width:'+w.toFixed(1)+'%"></i></span>'+
+        '<span class="v mono">'+nf2(x.h)+' h</span></div>';
+    }).join('')+'</div>';
+}
+
+/* TUS partes aprobados, de TODOS los meses: lo que cuenta de verdad (`aprobado` agrupa aprobada/otorgada/aplicada). */
+function _misAprobadosE_(){
+  var yo=_fichaYo_();
+  return (PARTES||[]).filter(function(p){ return p && yo && p.autor===yo && p.estado==='aprobado'; });
+}
+
+/* LOS GRUPOS DEL HISTÓRICO, ya ordenados (del más nuevo al más viejo; los sin fecha, al final). Gemela de la mitad de
+   datos de `_histHorasHTML_` (móvil): el grupo es el MES QUE GRABÓ EL SERVIDOR (`periodo`) y sin él, la fecha del
+   trabajo (20/10, auditoría: lo atrasado cuenta en el mes en que entró). `cDev` es la compensación base devengada a
+   día de hoy: va SOLO al mes abierto (`per`), se SUMA a su total y crea el grupo si no existe — el parte de verdad
+   nace al cerrar, y una fila sintética en un mes CERRADO saldría dos veces. */
+function _gruposHistE_(todos, per, cDev){
+  var g=[], idx={}, i, p, mp, d, k;
+  for(i=0;i<(todos||[]).length;i++){
+    p=todos[i]; mp=/^(\d{4})-(\d{2})$/.exec(String(p.periodo||''));
+    d=mp ? new Date(+mp[1], +mp[2]-1, 1) : _fechaDMY_(p.fecha);
+    k=d ? (d.getFullYear()+'-'+((d.getMonth()+1)<10?'0':'')+(d.getMonth()+1)) : '';
+    if(!(k in idx)){ idx[k]=g.length; g.push({k:k, d:d, items:[], h:0, comp:null}); }
+    g[idx[k]].items.push(p); g[idx[k]].h+=(Number(p.horas)||0);
+  }
+  var orden=function(a,b){ if(!a.d && !b.d) return 0; if(!a.d) return 1; if(!b.d) return -1; return b.d-a.d; };
+  if(per && cDev!=null && cDev>0){
+    if(!(per in idx)){ idx[per]=g.length; g.push({k:per, d:new Date(), items:[], h:0, comp:null}); }
+    g[idx[per]].comp=cDev; g[idx[per]].h+=cDev;
+  }
+  g.sort(orden);
+  return g;
+}
+
+function _histHorasHTMLE_(mi){
+  var todos=_misAprobadosE_();
+  if(!todos.length) return '';   /* como el móvil: sin movimientos no hay histórico (la compensación ya está en el mes de arriba) */
+  var per=_periodoAbierto_();
+  var cb=_compBase_(mi), cDev=null;
+  if(per && typeof cb==='number' && cb>0) cDev=_devengadoAHoy_(mi, cb, _fraccionDelMes_());
+  var g=_gruposHistE_(todos, per, cDev);
+  if(!g.length) return '';
+  var out='', tempPrev=null, j, i, gr, temp, tot=0;
+  for(j=0;j<g.length;j++){
+    gr=g[j]; temp=gr.d ? _temporadaDe_(gr.d) : null;
+    /* El salto de temporada va ANTES del grupo más viejo: lo de debajo de la línea es la temporada que cerró. */
+    if(temp && tempPrev && temp!==tempPrev) out+='<div class="ltsep">cierre de temporada '+esc(temp)+'</div>';
+    if(temp) tempPrev=temp;
+    out+='<div class="ltmes"><b>'+(gr.d ? esc(_mesLargo_(gr.d)) : 'Sin fecha')+'</b>'+
+      (gr.d ? '<span class="chip'+(per && gr.k===per?' wa">sin cerrar':'">cerrado')+'</span>' : '')+
+      '<span class="ln"></span><span class="mono">'+nf2(gr.h)+' h</span></div>';
+    /* ⚠️ La fila calculada va MARCADA como tal, no disfrazada de parte: cuando el cierre escriba el parte de verdad
+       vendrá del registro y se pintará como los demás. */
+    if(gr.comp!=null) out+='<div class="dec ltfila" style="cursor:default"><span class="tx"><b>Compensación base</b>'+
+      '<small>devengada a día de hoy · se cierra a fin de mes</small></span><span class="der">'+
+      '<span class="mono">'+nf2(gr.comp)+' h</span><span class="chip">calculada</span></span></div>';
+    for(i=0;i<gr.items.length;i++){
+      var p=gr.items[i];
+      out+='<div class="dec ltfila" style="cursor:default"><span class="tx"><b>'+esc(p.tarea||'Parte')+'</b><small>'+
+        esc(p.fecha||'')+(p.cat && (p.cat in CAT_ETI) ? ' · '+esc(CAT_ETI[p.cat]) : '')+
+        '</small></span><span class="der"><span class="mono">'+nf2(Number(p.horas)||0)+' h</span></span></div>';
+    }
+    tot+=gr.h;
+  }
+  return pan('Todo tu histórico', todos.length+(todos.length===1?' movimiento':' movimientos')+' · separados por cierres',
+    '<div class="pb" style="padding:0"><details class="ltplg" style="border-top:0"><summary><b>Ver mes a mes</b>'+
+      '<span class="sc">'+nf2(tot)+' h en total</span></summary>'+out+'</details></div>'+
+    '<div class="nota">El registro <b>no se borra nunca</b>: al cerrar el mes sus horas pasan aquí y empieza el siguiente.</div>');
+}
+
+/* TU RITMO FRENTE AL EQUIPO Y AL MES ANTERIOR (§A7). Gemela de la mitad de datos de `_compHorasHTML_` (móvil): se
+   compara el RITMO (h/día), no el total —el mes en curso va a medias y el anterior está entero—, sin la compensación
+   base (que no se trabaja) y con ella DEVENGADA en rampa, no descontada. Devuelve `null` si no hay nada que comparar:
+   antes que inventarse un número, no se dice nada.
+   ⚠️ «vs. equipo» sólo con la media que MANDA EL SERVIDOR (`equipo_mes.media`, con ≥3 personas): el respaldo local del
+   móvil (`_mediaEquipo_`) no se trae a esta cara — el servidor la manda también al escritorio. Y a quien acaba de
+   entrar no se le compara (`_recienLlegado_`): se le dice por qué. «vs. mes anterior» sólo si el dato ES del mes
+   anterior (`_antComparable_` con `mes` nulo = derivado del periodo); el respaldo con su propio mes no se trae. */
+function _ritmoHorasE_(mi){
+  var base=_hMesReal_(mi);
+  if(base==null) return null;
+  var d=_diasDelMes_(), dia=Math.max(1, d.dia);
+  var bt=_devengadoAHoy_(mi, base, _fraccionDelMes_());
+  var num=(bt==null ? base : bt), ritmo=num/dia, filas=[];
+  var ant=_antComparable_(mi);
+  if(ant!=null && ant.mes==null){
+    var bA=_devengadoAHoy_(mi, ant.h, 1);
+    var e0=DATA.equipo_mes, dAnt=_diasMesAnterior_(d.periodo, e0 ? e0.dias_ant : null);
+    var rAnt=(bA==null ? ant.h : bA)/dAnt;
+    var pm=/^(\d{4})-(\d{2})$/.exec(String(d.periodo||'')), nomA=pm ? MESES_L[(+pm[2]+10)%12] : 'el mes anterior';
+    filas.push({k:'vs. '+nomA, v:ritmo, ref:rAnt, txt:nf2(rAnt)+' h/día en '+nomA});
+  }
+  var e=DATA.equipo_mes, nuevo=_recienLlegado_(mi);
+  if(!nuevo && e && typeof e.media==='number' && (e.n||0)>=3 && e.media>0)
+    filas.push({k:'vs. equipo', v:ritmo, ref:e.media/dia, txt:nf2(e.media/dia)+' h/día de media'});
+  filas=filas.filter(function(f){ return typeof f.ref==='number' && isFinite(f.ref) && f.ref>0; });
+  if(!filas.length && !nuevo) return null;
+  return { ritmo:ritmo, num:num, dia:dia, conBase:(bt!=null), nuevo:nuevo, filas:filas };
+}
+
+function _ritmoHorasHTMLE_(mi){
+  var r=_ritmoHorasE_(mi);
+  if(!r) return '';
+  if(r.nuevo) return pan('Tu ritmo', 'este mes',
+    '<div class="nota" style="border-top:0">Es tu primer mes en el equipo: la comparación con el resto sale después de '+
+    'tu primer cierre (hoy se haría con días en los que aún no estabas).</div>');
+  return pan('Tu ritmo', nf2(r.ritmo)+' h/día',
+    '<div class="ltrit">'+r.filas.map(function(f){
+      var dl=(f.v-f.ref)/f.ref*100, w=Math.min(Math.abs(dl),80)/80*50, izq=dl>=0 ? 50 : 50-w;
+      return '<div class="ltdl '+(dl>=0?'pos':'neg')+'"><span class="k">'+esc(f.k)+'</span>'+
+        '<span class="tr"><i class="z"></i><b style="left:'+izq.toFixed(2)+'%;width:'+w.toFixed(2)+'%"></b></span>'+
+        '<span class="vv"><b>'+pc(dl)+'</b><small>'+esc(f.txt)+'</small></span></div>';
+    }).join('')+'</div>'+
+    '<div class="nota">Tu ritmo: <b>'+nf2(r.ritmo)+' h/día</b> ('+nf2(r.num)+' h en '+r.dia+' días'+
+    (r.conBase?', con la compensación base repartida hasta hoy':'')+'). Se compara el <b>ritmo</b>, no el total: '+
+    'el mes en curso va a medias y el anterior está entero.</div>');
 }
 
 function _engMisSinFirmarE_(){
@@ -1487,7 +1688,7 @@ function _bloqueColaPanelE_(lista){
 }
 function _bloqueReuPanelE_(){
   if(!(REUS||[]).length) return '';
-  var r=REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0];
+  var r=_reuSelE_();
   var puede=_puedeBloqueReu_(r, _actorSanc_(), (typeof esAdmin==='function' && esAdmin()));
   var abierto=!!(BLQ && BLQ.donde===vista);
   if(!puede && !abierto) return '';
@@ -1505,7 +1706,7 @@ function _bloqueManualPanelE_(){
 function _engBloqueE_(){
   _bloqueColaCablear_(_bloqueCbE_);
   if(BLQ && BLQ.donde===vista) _bloqueCablear_(_bloqueCbE_);
-  _bloqueReuCablear_(function(){ return REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0]; }, _bloqueCbE_);
+  _bloqueReuCablear_(_reuSelE_, _bloqueCbE_);
   $$('[data-bloqueman]').forEach(function(b){ b.onclick=function(){
     var h=new Date();
     _bloqueAbrir_({modo:'declarar', fecha:h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate()), parts:[]});

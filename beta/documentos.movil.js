@@ -285,20 +285,13 @@ function vDocs(){
   /* ⛔ 21/10 (auditor 11, 🟠 2): sin expedientes LLEGADOS no se dice «Nada por aquí»: no se sabe. */
   if(typeof ENT_LLEGO!=='undefined' && ENT_LLEGO===false)
     return h+'<div class="tarj">'+vacio('No se han podido leer los documentos',
-      'El servidor todavía no los ha mandado; se vuelven a pedir solos. Mientras tanto no se sabe si tienes algo que revisar.',
+      'Se reintenta solo.',
       '',false)+'</div>';
   if(!_docsRelevantes_()){
     return h+'<div class="tarj">'+vacio('Nada por aquí',
       /* 21/10 (auditor 11, 🟡 7): `esCoord()` incluye al SUBCOORDINADOR, y el reparto (`coordinadorDe`, y el servidor)
          sólo nombra a quien tiene `cargo:'Coordinador'`: a él no le llega nada, y se le prometía. */
-      ((typeof YO!=='undefined' && YO && YO.cargo!=='Coordinador' && YO.cargo!=='Project Director' && _subcoordDe_(YO.nombre))
-        ? 'No has enviado ningún documento y no tienes ninguno que revisar. Los archivos de tu unidad los firma '+
-          'su coordinador, no la subcoordinación.'
-        : esCoord()
-        ? 'No hay ningún documento esperando tu firma, y tú no has enviado ninguno. Cuando '+
-          'alguien de tu unidad envíe un archivo, te llegará aquí.'
-        : 'No has enviado ningún documento y no tienes ninguno que revisar: los tuyos los '+
-          'firma tu coordinador.'),
+      'No tienes nada que revisar ni has enviado nada.',
       '',false)+'</div>';
   }
   h+='<h2 class="sec">Pendiente de tu revisión<span class="ln"></span>'+pend.length+'</h2>';
@@ -311,7 +304,7 @@ function vDocs(){
        '<div class="tarj">'+
        (enCurso.length
          ? enCurso.map(function(e){return filaDoc(e,false);}).join('')+
-           '<p class="rnota">Todos los expedientes abiertos ahora mismo. El detalle por subsistema está en el escritorio.</p>'
+           ''
          : vacioMini('Ningún expediente del equipo está abierto.'))+
        '</div>';
   }
@@ -347,7 +340,7 @@ function _pasosSustituirM_(e){
   var ps = (typeof _pasosSustituirDoc_==='function')
     ? _pasosSustituirDoc_(e, yoNombre()) : [];
   if(!ps.length) return '';
-  return '<div class="avisolargo" style="margin-top:10px"><b>¿Hay una versión nueva de este documento?</b> No se sube encima: se manda como <b>sustitución</b>, y éste sigue publicado hasta que aprueben la nueva.</div>'+
+  return '<div class="avisolargo" style="margin-top:10px"><b>¿Versión nueva?</b> Se envía como <b>sustitución</b> por el formulario; hasta que la aprueben, sigue publicado este.</div>'+
     _pasosHTML_(ps, 8, 6);
 }
 
@@ -355,8 +348,7 @@ function _pasosCorregirM_(e){
   var ps = (typeof _pasosCorregirDoc_==='function') ? _pasosCorregirDoc_(e) : [];
   if(!ps.length) return '';
   return '<div class="avisolargo" style="margin-top:10px"><b>Para corregirlo son dos pasos, '+
-    'en este orden.</b> El botón de abajo <b>no sube nada</b>: sólo devuelve el expediente a '+
-    'la cola.</div>'+
+    'en este orden.</b></div>'+
     _pasosHTML_(ps, 8, 6);
 }
 
