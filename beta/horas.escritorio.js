@@ -1371,12 +1371,8 @@ function _misPartesNoCuentanHTML_(){
    No es el total de la categoría en Notion —que además lleva reuniones automáticas, cursos…—: es la parte que puedes
    verificar tú. Una categoría desconocida o sin categoría cae en «Compensaciones», como el motor (`aplicar_horas.py`). */
 function _sumaPorCatE_(ps){
-  var g={}, orden=['reunion','tareas','turno','compensacion'];
-  (ps||[]).forEach(function(p){
-    var k=(p.cat && (p.cat in CAT_ETI)) ? p.cat : 'compensacion';
-    g[k]=(g[k]||0)+(Number(p.horas)||0);
-  });
-  return orden.filter(function(k){ return g[k]; }).map(function(k){ return {k:k, eti:CAT_ETI[k], h:g[k]}; });
+  /* 31/10: las categorías y su color salen de `agruparDesglose` (comun.js), la misma puerta que el móvil. */
+  return agruparDesglose(ps).map(function(c){ return {k:c.k, eti:c.eti, h:c.h, color:c.color}; });
 }
 
 function _desgloseCatHTMLE_(ps){
@@ -1387,7 +1383,7 @@ function _desgloseCatHTMLE_(ps){
     l.map(function(x){
       var w=tot>0 ? (x.h/tot*100) : 0;
       return '<div class="fila"><span class="k">'+esc(x.eti)+'</span>'+
-        '<span class="tr"><i style="width:'+w.toFixed(1)+'%"></i></span>'+
+        '<span class="tr"><i style="width:'+w.toFixed(1)+'%;--cc:'+x.color+'"></i></span>'+
         '<span class="v mono">'+nf2(x.h)+' h</span></div>';
     }).join('')+'</div>';
 }

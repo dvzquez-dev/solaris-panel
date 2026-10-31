@@ -705,7 +705,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .ltcat .k{font-size:12px;color:var(--ink2)}
 .ltcat .v{text-align:right;font-size:12.5px}
 .ltcat .tr{height:6px;border-radius:3px;background:rgba(255,255,255,.06);overflow:hidden}
-.ltcat .tr i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--red3),var(--red2))}
+.ltcat .tr i{display:block;height:100%;border-radius:3px;background:var(--cc,linear-gradient(90deg,var(--red3),var(--red2)))}
 .ltrit{padding:6px 13px 2px}
 .ltdl{display:grid;grid-template-columns:132px 1fr 190px;align-items:center;gap:12px;padding:8px 0}
 .ltdl .k{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
@@ -751,3 +751,64 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .ftu .ftu-obj::before{content:"";position:absolute;left:2px;top:12px;width:5px;height:5px;border-radius:50%;background:var(--red2)}
 .ftu .ftu-nota{font-size:12.5px;line-height:1.6;color:var(--ink2);border-left:2px solid var(--red2);padding-left:11px}
 .ftu .ftu-vac{font-size:11.5px;color:var(--ink3);font-style:italic}
+
+/* ═══ EN DIRECTO (31/10) ═══ `directo.escritorio.js`. El mapa: el mini PC en el centro y las piezas alrededor; cada
+   evento es un pulso por su línea. Los colores de pieza llegan por `--c` desde el JS (una sola tabla, `_directoPiezas_`).
+   Con «reducir movimiento» no viaja nada ni late nada: sólo cambian los números. */
+.dir{display:flex;flex-direction:column;gap:14px}
+.dir-cab{display:flex;align-items:center;gap:26px;padding:2px 2px 0}
+.dir-vivo{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink2);margin-right:auto}
+.dir-vivo i{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 0 rgba(228,30,37,.6);
+  animation:dirRespira 2.2s var(--sal) infinite}
+.dir-vivo.maqueta i{background:var(--tel);animation:none}
+.dir-vivo.caido i{background:var(--ink3);animation:none}
+@keyframes dirRespira{0%{box-shadow:0 0 0 0 rgba(228,30,37,.55)}70%{box-shadow:0 0 0 9px rgba(228,30,37,0)}100%{box-shadow:0 0 0 0 rgba(228,30,37,0)}}
+.dir-cifra{display:flex;align-items:baseline;gap:7px}
+.dir-cifra b{font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+.dir-cifra small{font-size:11.5px;color:var(--ink3)}
+.dir-mapa{background:radial-gradient(circle at 50% 50%,rgba(228,30,37,.08),transparent 34%),var(--sur);
+  border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+.dir-svg{display:block;width:100%;height:auto;max-height:46vh}
+.dir-ln{fill:none;stroke:var(--line2);stroke-width:1.5;stroke-dasharray:2 7;stroke-linecap:round;
+  transition:stroke .5s var(--sal),opacity .5s var(--sal);opacity:.8}
+.dir-ln.activa{stroke:var(--c);opacity:.55;stroke-dasharray:none}
+.dir-pulso{filter:drop-shadow(0 0 5px currentColor)}
+.dir-pulso-cola{opacity:.22}
+.dir-nodo .dir-anillo{fill:var(--sur2);stroke:var(--c);stroke-width:1.5}
+.dir-nodo .dir-onda,.dir-centro .dir-onda{fill:none;stroke:var(--c,var(--red));stroke-width:2;opacity:0;transform-box:fill-box;transform-origin:center}
+.dir-centro{--c:var(--red)}
+.dir-centro .dir-halo{fill:rgba(228,30,37,.06);stroke:rgba(228,30,37,.18);stroke-width:1}
+.dir-centro .dir-nucleo{fill:var(--gris);stroke:var(--red);stroke-width:2}
+.dir-n{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:17px;font-weight:600;fill:var(--ink)}
+.dir-et{font-size:13px;font-weight:600;fill:var(--ink2);letter-spacing:.01em}
+.dir-et0{font-size:10px;letter-spacing:.14em;text-transform:uppercase;fill:var(--ink3)}
+.late .dir-onda{animation:dirOnda .7s var(--sal)}
+.late .dir-anillo,.late .dir-nucleo{animation:dirLate .45s var(--arco)}
+.dir-nodo .dir-anillo,.dir-centro .dir-nucleo{transform-box:fill-box;transform-origin:center}
+@keyframes dirOnda{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.9)}}
+@keyframes dirLate{0%{transform:scale(1)}40%{transform:scale(1.12)}100%{transform:scale(1)}}
+.dir-aviso{background:rgba(228,30,37,.08);border:1px solid rgba(228,30,37,.35);border-radius:var(--r2);padding:10px 13px;
+  font-size:12.5px;color:var(--ink)}
+.dir-reg{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);max-height:34vh;overflow:auto;
+  -webkit-mask-image:linear-gradient(#000 78%,transparent);mask-image:linear-gradient(#000 78%,transparent)}
+.dir-reg:empty::before{content:"Esperando al primer evento";display:block;padding:16px 14px;color:var(--ink3);font-size:12.5px}
+.dir-fila{display:grid;grid-template-columns:76px 118px 1fr;align-items:center;gap:12px;padding:8px 14px;
+  border-bottom:1px solid var(--line);font-size:12.5px;position:relative}
+.dir-fila::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--c);opacity:0}
+.dir-fila.nueva{animation:dirEntra .5s var(--sal)}
+.dir-fila.nueva::before{animation:dirMarca 2.4s var(--sal)}
+@keyframes dirEntra{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes dirMarca{0%{opacity:1}100%{opacity:0}}
+.dir-t{color:var(--ink3);font-size:11.5px}
+.dir-pz{display:inline-flex;align-items:center;gap:7px;color:var(--ink2);font-size:11.5px}
+.dir-pz i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.dir-tx{color:var(--ink2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dir-tx b{color:var(--ink);font-weight:600;margin-right:7px}
+.dir-tipo{display:inline-block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);
+  border:1px solid var(--line2);border-radius:5px;padding:0 5px;margin-right:8px;line-height:16px}
+.dir-fila.mal .dir-tipo{color:var(--red2);border-color:rgba(228,30,37,.5)}
+@media (prefers-reduced-motion: reduce){
+  .dir-vivo i,.late .dir-onda,.late .dir-anillo,.late .dir-nucleo,.dir-fila.nueva,.dir-fila.nueva::before{animation:none}
+  .dir-ln{transition:none}
+}

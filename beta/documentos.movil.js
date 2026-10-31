@@ -275,6 +275,18 @@ function _docsEnCursoM_(){
   });
 }
 
+/* ⛔⛔ EL HISTORIAL: lo que ya está CERRADO (`publicado`, `rechazado`) de los expedientes que NO son tuyos.
+   Daniel, 31/10: «una vez la rechazas, ya no te vuelve a aparecer nunca más». `ENT_REV` lo trae el servidor
+   (`getEntregables`: lo que revisas, sea del estado que sea) y «En curso» lo descarta A PROPÓSITO por `_docEnCurso_`,
+   así que un revisor que rechazaba (o publicaba) un expediente lo perdía de TODA la pantalla, con su «Deshacer»
+   dentro de la ficha. Lo tuyo no hace falta aquí: «Mis documentos» ya lo lista sea cual sea su estado.
+   ✅ Por `_docResuelto_` (comun.js), la misma puerta que usa el escritorio en «Resueltos»; sin lista propia. */
+function _docsResueltosM_(){
+  return (ENT_REV||[]).filter(function(e){ return _docResuelto_(e.estado); });
+}
+/* Plegado de serie: lo pendiente sigue arriba, sin mezclarse con lo cerrado. Un toque lo abre. */
+var DOC_HIST_ABIERTO=false;
+
 function vDocs(){
   var mios=ENTREGABLES;
   var pend=_docsPend_();
@@ -314,6 +326,16 @@ function vDocs(){
        ? mios.map(function(e){return filaDoc(e,true);}).join('')
        : vacioMini('Todavía no has enviado ninguno. Los que envíes aparecerán aquí con su estado.'))+
      '</div>';
+  var hist=_docsResueltosM_();
+  if(hist.length){
+    h+='<h2 class="sec">Historial<span class="ln"></span>'+hist.length+'</h2>'+
+       '<div class="tarj">'+
+       (DOC_HIST_ABIERTO
+         ? hist.map(function(e){return filaDoc(e,false);}).join('')
+         : '<p class="rnota" style="margin:0 0 10px">Rechazados y publicados. Abre uno para verlo o deshacer la decisión.</p>')+
+       '<button class="btn full" data-p data-dochist>'+(DOC_HIST_ABIERTO?'Ocultar historial':'Ver historial ('+hist.length+')')+'</button>'+
+       '</div>';
+  }
   return h;
 }
 

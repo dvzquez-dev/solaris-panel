@@ -1252,10 +1252,9 @@ function catEti(c){ return CAT_ETI[c]||CAT_ETI.compensacion; }
    Notion, que además lleva reuniones auto, cursos, etc.): es la parte que puedes verificar tú. */
 function desgloseCat(ps){
   if(!ps.length) return '';
-  var g={}, orden=['reunion','tareas','turno','compensacion'];
-  ps.forEach(function(p){ var k=(p.cat in CAT_ETI)?p.cat:'compensacion'; g[k]=(g[k]||0)+p.q; });
-  var chips=orden.filter(function(k){return g[k];}).map(function(k){
-    return '<span class="pil neu" style="margin:0 6px 6px 0">'+esc(CAT_ETI[k])+' <b class="mono">'+h1(g[k])+'</b></span>';
+  /* 31/10: las categorías y su color salen de `agruparDesglose` (comun.js), la misma puerta que la lista de abajo y que el escritorio. */
+  var chips=agruparDesglose(ps).map(function(c){
+    return '<span class="pil neu" style="margin:0 6px 6px 0"><i class="dgpt" style="background:'+c.color+'"></i>'+esc(c.eti)+' <b class="mono">'+h1(c.h)+'</b></span>';
   }).join('');
   return '<div style="display:flex;flex-wrap:wrap;margin:2px 0 4px">'+chips+'</div>';
 }
@@ -1460,8 +1459,8 @@ function _movHorasHTML_(confs, pends){
   /* LA EXTRA, EN SU PROPIA FILA. Ver `_compExtra_`: no es mas cantidad de lo mismo, es otra
      cosa — la base llega por el puesto y la extra la asigna el PD por trabajo de mas. */
   var _fx = !_cx ? '' :
-    '<div class="fila borde-ot"><div class="a"><b>Compensación extra</b>'+
-      '<small>'+(_cx>0?'te la ha asignado el Project Director por trabajo de más':
+    '<div class="fila borde-ot"><div class="a"><b>Otras contribuciones</b>'+
+      '<small>'+(_cx>0?'te las ha asignado el Project Director por trabajo de más':
                        'ajuste sobre la base de tu cargo')+' · solo de este mes</small></div>'+
       '<div class="d"><b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
   /* ⛔ LA COMPENSACION ES UN APUNTE, Y LA CABECERA NO LA CONTABA. Daniel (07/08):
@@ -1571,19 +1570,28 @@ function _desgloseMesHTML_(confs){
   var _hmD=_hMesReal_(YO), _notionD=(_hmD!=null);
   var total=_notionD ? _hmD : (r.suma+comp);
   var cargo=(YO&&YO.cargo)||'miembro', _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO);
-  var fila=
+  /* 31/10 · AGRUPADO POR CATEGORÍA, CADA UNA CON SU COLOR (Daniel: *«en vez de poner compensación extra más 12,25,
+     debería aparecer compensación por tu cargo y luego … todas estas contribuciones extras»*). La base y la extra no son
+     partes: entran en su grupo como filas FIJAS (`catDesglose`), y la extra va a «Otras contribuciones». Lo demás se
+     reparte por la tabla de comun.js. La suma de los subtotales es la de antes: ninguna fila se pierde ni se cuenta dos veces. */
+  var filaBase=
     '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
       '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha · vuelve a asignarse en el '+
       'cierre</small></div>'+
-    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>'+
-    /* La EXTRA va en su propia fila: es trabajo reconocido, no mas base. Sin el dato de Notion
-       (`_compExtra_` devuelve 0) esta fila no existe, en vez de ensenar un cero que no dice nada. */
-    (!_cx ? '' :
-    '<div class="fila borde-ot"><div class="a"><b>Compensación extra</b>'+
-      '<small>'+(_cx>0?'asignada por el Project Director por trabajo de más (turnos extra y demás)':
-                       'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
+    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>';
+  var filaExtra =
+    '<div class="fila borde-ot"><div class="a"><b>Asignada por el Project Director</b>'+
+      '<small>'+(_cx>0?'por trabajo de más (turnos extra y demás)':'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
       'la compensación vuelve a la base</small></div>'+
-    '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>');
+    '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
+  var fijas=[{catDesglose:'cargo', q:(_cr?_cb:comp), fila:filaBase}];
+  /* Sin el dato de Notion (`_compExtra_` devuelve 0) la extra no existe, en vez de ensenar un cero que no dice nada. */
+  if(_cx) fijas.push({catDesglose:'otras', q:_cx, fila:filaExtra});
+  var grupos=agruparDesglose(fijas.concat(r.todos)).map(function(c){
+    return '<div class="dgrp" style="border-left-color:'+c.color+'"><div class="dgh"><i class="dgpt" style="background:'+c.color+'"></i>'+
+      '<b>'+esc(c.eti)+'</b><span class="ln"></span><span class="mono">'+nf2(c.h)+' h</span></div>'+
+      c.items.map(function(p){ return p.fila || filaParte(p); }).join('')+'</div>';
+  }).join('');
   /* ⛔ EL TITULO, DEL PERIODO — NO DEL RELOJ DEL TELEFONO. El contenido de esta ventana va
      de CIERRE A CIERRE (`_ultimosMov_(…,'mes')` → `_deEsteMes_` → `_periodoAbierto_()`)
      y el titulo salia de `new Date()`. Julio se aplico el 04/08, asi que del 01 al 04 de
@@ -1601,9 +1609,9 @@ function _desgloseMesHTML_(confs){
     '<div class="tarj">'+
       '<div class="cifh"><span class="g mono">'+nf2(total)+'</span><span class="sc">h '+
         (_notionD?'este mes':'que cuentan')+'</span></div>'+
-      desgloseCat(r.todos)+
+      desgloseCat(fijas.concat(r.todos))+   /* 31/10: con la base y la extra, o el resumen no suma el total */
     '</div>'+
-    '<div class="tarj">'+fila+r.todos.map(filaParte).join('')+'</div>'+
+    '<div class="tarj">'+grupos+'</div>'+
     '<p class="rnota">'+(_cr
       ? 'La <b>base</b> depende de tu cargo (Project Director 7 h, Coordinador 3,5 h, miembro '+
         '2 h) y llega sola. La <b>extra</b> la pone el Project Director por trabajo de '+

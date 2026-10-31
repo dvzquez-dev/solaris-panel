@@ -21,7 +21,7 @@
      ⚠️ Si `--bg` cambia, esto cambia con él: lo vigila `probar_reunion_movil`. -->
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=489a385">
+<link rel="stylesheet" href="movil.css?v=2e24c5e">
 </head>
 <body>
 
@@ -113,16 +113,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=8fa24fd"></script>
+<script src="comun.js?v=389446c"></script>
 <script src="notis.movil.js?v=9a87f14"></script>
 <script src="cierre.movil.js?v=2c15573"></script>
 <script src="tareas.movil.js?v=139e6a5"></script>
 <script src="turnos.movil.js?v=d0db9ca"></script>
 <script src="buzon.movil.js?v=4a205c9"></script>
-<script src="documentos.movil.js?v=763d726"></script>
-<script src="sanciones.movil.js?v=fc5501f"></script>
+<script src="documentos.movil.js?v=82b4c65"></script>
+<script src="sanciones.movil.js?v=d26174c"></script>
 <script src="reuniones.movil.js?v=98af94a"></script>
-<script src="horas.movil.js?v=6e1af8a"></script>
+<script src="horas.movil.js?v=f60d20f"></script>
 <script src="equipo.movil.js?v=5fbb997"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -372,8 +372,7 @@ var api={
   /* 31/10: apelar una tarea (RRI Art. 34) y resolver la apelación; sólo el mini PC las tiene. */
   apelarTarea: function(t,c,m){ return api._post({action:"apelarTarea",tarea:t,clausula:c,motivo:m}); },
   resolverApelacion: function(d){ return api._post(Object.assign({action:"resolverApelacion"},d)); },
-  /* 31/10: alegar (antes de aplicarse) y apelar (ya aplicada) una sanción; TUS sanciones con lo que puedes hacer en cada una. */
-  alegarSancion: function(id,m,e){ return api._post({action:"alegarSancion",id:id,motivo:m,enlace:e||undefined}); },
+  /* 31/10: apelar una sanción (ya aplicada); TUS sanciones con lo que puedes hacer en cada una. */
   apelarSancion: function(id,m,e){ return api._post({action:"apelarSancion",id:id,motivo:m,enlace:e||undefined}); },
   getMisSanciones: function(){ return api._post({action:"getMisSanciones"}); },
   getConvocatoria: function(semana){ return api._post({action:"getConvocatoria",semana:semana||null}); },
@@ -1747,7 +1746,7 @@ function _abrirMenu_(v){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='4e9c546';
+var BUILD='cba46d9';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2167,10 +2166,8 @@ function _engMedidor_(){
      cuando tus puntos no han cambiado, tocarlo tampoco hacía nada: la animación que SÍ se
      ha pedido quedaba silenciada con la que no. */
   if(med) med.onclick=function(){ armarMedidor(false, true); };
-  $$('[data-msalegar]').forEach(function(b){ b.onclick=function(){
-    var s=_misSancLista_().filter(function(x){ return String(x.id) === b.dataset.msalegar; })[0]; if(s) _formSancion_(s, 'alegar'); }; });
   $$('[data-msapelar]').forEach(function(b){ b.onclick=function(){
-    var s=_misSancLista_().filter(function(x){ return String(x.id) === b.dataset.msapelar; })[0]; if(s) _formSancion_(s, 'apelar'); }; });
+    var s=_misSancLista_().filter(function(x){ return String(x.id) === b.dataset.msapelar; })[0]; if(s) _formSancion_(s); }; });
   var bl=$('#btnLibro');
   if(bl) bl.onclick=function(){
     ST.libro=!ST.libro;
@@ -2625,6 +2622,7 @@ function _engTurnosYDocs_(){
      sanciones, la misma del menu ⋮. Sin esta linea el boton se pinta y no hace nada, que es
      peor que la promesa a la que sustituye: aquella al menos no invitaba a pulsar. */
   $$('[data-abrirsanc]').forEach(function(b){ b.onclick=function(){ _abrirSanciones_(); }; });
+  $$('[data-dochist]').forEach(function(b){ b.onclick=function(){ DOC_HIST_ABIERTO=!DOC_HIST_ABIERTO; pintar(true); }; });
 }
 
 /* ⛔ ERA UNA SOLA FUNCIÓN DE 338 LÍNEAS, y es la que engancha TODA la cara. Ahora es la

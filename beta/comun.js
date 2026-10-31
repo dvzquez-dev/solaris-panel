@@ -55,6 +55,52 @@ function h1(v){ return nf2(Number(v)||0)+' h'; }
    Vivía en `movil.html`; se mudó aquí el 31/10 porque el escritorio (`_sumaPorCatE_`) la necesita igual. */
 var CAT_ETI={tareas:'Carga tareas',reunion:'Reuniones',turno:'Turnos fabric.',compensacion:'Compensaciones'};
 
+/* ⛔⛔ EL DESGLOSE DE HORAS, AGRUPADO POR CATEGORÍA Y CADA UNA CON SU COLOR (31/10). La tabla y la regla viven AQUÍ,
+   UNA vez; las dos caras (`desgloseCat`/`_desgloseMesHTML_` del móvil, `_sumaPorCatE_` del escritorio) las llaman.
+   🗣️ Daniel: *«Por cada categoría debería haber un color distinto y deberían de agruparse en esas categorías»* ·
+   *«en vez de poner compensación extra más 12,25, debería aparecer compensación por tu cargo y luego … todas estas
+   contribuciones extras»*. Hoy «Compensaciones» sumaba la base, el desplazamiento a Vigo y las entrevistas en UNA línea.
+   · `cat` (la de Notion: tareas/turno/…) es el campo bueno; `pal` son palabras del TEXTO del parte, y SOLO se miran
+     porque entrevistas, desplazamientos y la base llegan como `compensacion` con el motivo escrito. Se comparan sin
+     tildes ni mayúsculas, y se miran ANTES que `cat`: «desplazamiento a Vigo para las entrevistas» es un desplazamiento.
+   · Lo que no casa es «Otras contribuciones» (la extra del PD, reuniones de junta…): nunca se tira ni se inventa.
+   · Colores: los de la paleta (--tel, --ok, --warn, --ink2) + un violeta y un amarillo; el rojo Solaris NO se usa. */
+/* 31/10 (Daniel): «Tareas, la parte esa que está en verde, bien, y luego la azul, la de compensaciones»: tareas en VERDE y la
+   compensación por tu cargo en AZUL, como ya se veían; el resto, un color propio cada una. */
+var CATS_DESGLOSE=[
+  {k:'tareas',  eti:'Tareas',                    color:'var(--ok)',   cat:['tareas'], pal:[]},
+  {k:'cargo',   eti:'Compensación por tu cargo', color:'var(--tel)',  cat:[],         pal:['compensacion base']},
+  {k:'desplaz', eti:'Desplazamientos',           color:'var(--warn)', cat:[],         pal:['desplaz']},
+  {k:'entrev',  eti:'Entrevistas',               color:'#9B7FD1',     cat:[],         pal:['entrevista']},
+  {k:'turno',   eti:'Turnos',                    color:'#D9C24A',     cat:['turno'],  pal:[]},
+  {k:'otras',   eti:'Otras contribuciones',      color:'var(--ink2)', cat:[],         pal:[]}
+];
+
+/* La clave de categoría de una partida (parte normalizado de cualquiera de las dos caras, o una fila FIJA con `cat`). */
+function catDesglose(p){
+  if(!p) return 'otras';
+  var i, j, t=_sinTildes_([p.t,p.tarea,p.nota,p.motivo,p.just,p.justificacion,p.decidido_por].join(' '));
+  if(p.catDesglose) return p.catDesglose;
+  for(i=0;i<CATS_DESGLOSE.length;i++) for(j=0;j<CATS_DESGLOSE[i].pal.length;j++)
+    if(t.indexOf(CATS_DESGLOSE[i].pal[j])>=0) return CATS_DESGLOSE[i].k;
+  for(i=0;i<CATS_DESGLOSE.length;i++) if(CATS_DESGLOSE[i].cat.indexOf(p.cat)>=0) return CATS_DESGLOSE[i].k;
+  return 'otras';
+}
+
+/* Las partidas, en grupos `{k,eti,color,h,items}` por el orden de la tabla y SÓLO los que tienen algo. Una partida
+   que no es un parte (la base del mes en curso) viaja con `catDesglose` puesto y `q`. Cada partida entra en UN grupo. */
+function agruparDesglose(ps){
+  var g={};
+  (ps||[]).forEach(function(p){
+    var k=catDesglose(p);
+    (g[k]=g[k]||[]).push(p);
+  });
+  return CATS_DESGLOSE.filter(function(c){ return g[c.k]; }).map(function(c){
+    return {k:c.k, eti:c.eti, color:c.color, items:g[c.k],
+      h:g[c.k].reduce(function(t,p){ return t+(Number(p.q!=null?p.q:p.horas)||0); },0)};
+  });
+}
+
 function pc(v){return (v>=0?'+':'−')+nf(Math.abs(v),1)+' %';}
 
 /* El cuerpo de la justificacion de un parte, o cadena vacia si no aporta nada.
@@ -1226,15 +1272,12 @@ function _resolverApelacion_(ap, datos){
   return api.resolverApelacion(Object.assign({id:ap.id}, datos)).then(function(r){ return aplicar(r.apelacion); });
 }
 
-/* ══ ALEGAR Y APELAR SANCIONES (31/10, propuesta Art. 32 bis) ══════════════════════════════════════════
-   Antes de aplicarse se ALEGA; ya aplicada y a menos de 7 días de habérsete comunicado, se APELA. El servidor
-   (`alegarSancion` · `apelarSancion` · `getMisSanciones`) es quien manda; en la maqueta las mismas puertas viven en
-   `localStorage`, con la misma forma de dato, para verlo sin servidor. */
-var SANC_PLAZO_APEL=7, ALEG_DEMO_KEY='solaris_demo_alegaciones';
-function _alegDemoLeer_(){
-  try{ var m=JSON.parse(localStorage.getItem(ALEG_DEMO_KEY) || '{}'); return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {}; }catch(e){ return {}; }
-}
-function _alegDemoGuardar_(m){ try{ localStorage.setItem(ALEG_DEMO_KEY, JSON.stringify(m)); }catch(e){} }
+/* ══ APELAR SANCIONES (31/10, propuesta Art. 32 bis) ══════════════════════════════════════════════════
+   Sólo ves las ya APLICADAS, y las apelas dentro del plazo desde que se te comunicaron. El servidor
+   (`apelarSancion` · `getMisSanciones`) es quien manda y da el último día (`apelable_hasta`): las caras NO cuentan días. En la
+   maqueta las mismas puertas viven en `localStorage`, con la misma forma de dato; ahí, y SÓLO ahí, hace falta un plazo
+   (`SANC_PLAZO_APEL`, el mismo que `DIAS_APELAR_SANCION` del servidor). */
+var SANC_PLAZO_APEL=14;
 /* Cuatro sanciones de la maqueta, con las fechas contadas desde HOY para que el plazo salga siempre igual. */
 function _sancDemoSemilla_(){
   var h=new Date().toISOString().slice(0, 10), yo=_fichaYo_();
@@ -1243,7 +1286,7 @@ function _sancDemoSemilla_(){
     return {id:id, nombre:quien, fecha:c, motivo:motivo, articulo:'30', puntos:pts, estado:estado, origen:'motor', comunicada:c};
   }
   return [s('SD-1', yo, 'Retraso en el parte', -1, 'pendiente', 0), s('SD-2', yo, 'Falta a la reunión', -2, 'aplicada', 2),
-          s('SD-3', yo, 'Parte fuera de hora', -1, 'aplicada', 20), s('SD-4', 'Otra Persona', 'Sanción de otra persona', -1, 'pendiente', 0)];
+          s('SD-3', yo, 'Parte fuera de hora', -1, 'aplicada', 20), s('SD-4', 'Otra Persona', 'Sanción de otra persona', -1, 'aplicada', 1)];
 }
 /* La apelación de una sanción: la ABIERTA y, si no hay, la última resuelta. */
 function _apelDeSancion_(id, lista){
@@ -1258,19 +1301,18 @@ function _apelDeSancion_(id, lista){
 /* TUS sanciones en la forma de `getMisSanciones`: la del servidor (`MIS_SANC`) o, en la maqueta, la calculada aquí. */
 function _misSancLista_(){
   if(!_apelEsDemo_()) return (typeof MIS_SANC !== 'undefined' && MIS_SANC) || [];
-  var yo=_fichaYo_(), al=_alegDemoLeer_(), hoy=new Date().toISOString().slice(0, 10), ap=_apelDemoLeer_();
-  return _sancDemoSemilla_().filter(function(s){ return s.nombre === yo; }).map(function(s){
+  var yo=_fichaYo_(), hoy=new Date().toISOString().slice(0, 10), ap=_apelDemoLeer_();
+  return _sancDemoSemilla_().filter(function(s){ return s.nombre === yo && s.estado === 'aplicada'; }).map(function(s){
     var hasta=s.estado === 'aplicada' ? _isoMasDias_(s.comunicada, SANC_PLAZO_APEL) : null, a=_apelDeSancion_(s.id, ap);
     return {id:s.id, fecha:s.fecha, motivo:s.motivo, articulo:s.articulo, puntos:s.puntos, estado:s.estado, origen:s.origen,
-      comunicada:s.comunicada, alegacion:al[s.id] || null, alegable:s.estado === 'pendiente',
+      comunicada:s.comunicada,
       apelable:!!(hasta && hoy <= hasta && !a), apelable_hasta:hasta, no_apelable:null, apelacion:a || null};
   });
 }
-/* Lo que se pinta debajo de una sanción tuya: su alegación o la respuesta a su apelación. `[texto, color]` o `null`. */
+/* Lo que se pinta debajo de una sanción tuya: la respuesta a su apelación. `[texto, color]` o `null`. */
 function _sancEstadoM_(s){
   var a=s && s.apelacion;
   if(a) return [_apelSancTxt_(a), a.estado === 'desestimada' ? 'var(--red2)' : a.estado === 'abierta' ? 'var(--warn)' : 'var(--ok)'];
-  if(s && s.alegacion) return ['Alegación enviada', 'var(--ink3)'];
   return null;
 }
 /* Lo que dice la sanción de su apelación, en corto. */
@@ -1286,21 +1328,13 @@ function _enlaceWeb_(url){
   var u=String(url == null ? '' : url).trim();
   return /^https?:\/\//i.test(u) ? '<a href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" style="color:var(--tel);word-break:break-all">'+esc(u)+'</a>' : '';
 }
-/* Alegar: manda `{id, motivo, enlace}`. Promesa de la alegación. */
-function _alegarSancion_(s, motivo, enlace){
-  if(_apelEsDemo_()){
-    var m=_alegDemoLeer_(); m[s.id]={texto:motivo, enlace:enlace || null, por:_fichaYo_(), at:new Date().toISOString()};
-    _alegDemoGuardar_(m); return Promise.resolve(m[s.id]);
-  }
-  return api.alegarSancion(s.id, motivo, enlace || null).then(function(r){ return r && r.sancion; });
-}
 /* Apelar: manda `{id, motivo, enlace}` y deja la apelación en la lista. Promesa de la apelación. */
 function _apelarSancion_(s, motivo, enlace){
   if(_apelEsDemo_()){
     var L=_apelDemoLeer_(), mi=(typeof DATA !== 'undefined' && DATA.miembros || []).filter(function(x){ return x.nombre === _fichaYo_(); })[0],
       ap={id:'AP-demo' + (L.length + 1), clase:'sancion', sancion_id:s.id, titulo:s.motivo, autor:_fichaYo_(), unidad:(mi && mi.unidad) || null,
         motivo:motivo, enlace:enlace || null, motivo_sancion:s.motivo, articulo:s.articulo, puntos:s.puntos, fecha_sancion:s.fecha,
-        comunicada:s.comunicada, impuesta_por:[], alegacion:s.alegacion || null, plazo:_isoMasDias_(new Date().toISOString().slice(0, 10), 7),
+        comunicada:s.comunicada, impuesta_por:[], plazo:_isoMasDias_(new Date().toISOString().slice(0, 10), SANC_PLAZO_APEL),
         estado:'abierta', at:new Date().toISOString(), decidido_por:null, decidido_at:null, resolucion:null, instancia:'pd', resuelven:[]};
     L.unshift(ap); _apelDemoGuardar_(L);
     return Promise.resolve(ap);
@@ -6633,7 +6667,7 @@ function _novedades_(){
     { id:'2026-10-31-apelsanc', fecha:'2026-10-31',
       titulo:'Alegar y apelar una sanción',
       items:[
-        {cara:'movil', vista:'estado', txt:'Bajo el medidor, **Tus sanciones**: **Alegar** mientras está pendiente y **Apelar** (7 días desde que se te comunica) cuando ya está aplicada; y en qué quedó.'},
+        {cara:'movil', vista:'estado', txt:'Bajo el medidor, **Tus sanciones**: sólo las ya aplicadas, con **Apelar** (14 días desde que se te comunica) y en qué quedó. Si estimamos tu apelación se deshace todo: tus puntos y, si por esa sanción te quedaste sin el punto del mes, también ese.'},
         {cara:'escritorio', vista:'apela', txt:'**Apelaciones** junta tareas y sanciones. En una sanción: **Estimar**, **Rebajar a aviso** o **Desestimar**, con motivo. Si eres parte, te dice quién la resuelve.'}
       ] },
     { id:'2026-10-28-portada', fecha:'2026-10-28',

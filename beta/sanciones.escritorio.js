@@ -207,13 +207,6 @@ function _lcorrNota_(x){
     (x.pMot ? ' · '+esc(x.pMot) : '')+'</span>';
 }
 
-/* 31/10: lo que la persona alegó contra ESTA sanción, al lado de ella, para decidir el bloque con eso delante. '' si no alegó. */
-function _alegNota_(x){
-  var a=x && x.aleg; if(!a || !a.texto) return '';
-  var l=_enlaceWeb_(a.enlace);
-  return '<span class="lcorrn" style="color:var(--ink2)">Alega: «'+esc(a.texto)+'»'+(l ? ' · '+l : '')+'</span>';
-}
-
 function _lcorrForm_(x){
   if(LOTE_EDIT !== x.id || !_lcorrOfrece_(x)) return '';
   return '<div class="lcorrf" data-lcf="'+x.id+'">'+
@@ -827,7 +820,6 @@ function _loteReal_(){
     items:its.map(function(s){ return {id:s.id, n:s.nombre, pts:_ptsSanc_(s.puntos),
       /* 31/10 (B6): si el PD corrigió sus puntos, la fila dice de cuánto, quién y por qué */
       pAntes:_ptsSanc_(s.puntos_antes), pMot:s.puntos_motivo||null, pPor:s.puntos_corregidos_por||null,
-      aleg:s.alegacion||null,
       origen:s.origen||null, extra:s.extra||null,
       /* ⛔ `null`, NO `'aceptar'`. Aqui se fabricaba la decision de todo lo que nadie
          habia tocado, y el panel la pintaba como ELEGIDA: los 30 con el boton «Acepta»
@@ -845,7 +837,7 @@ function _loteReal_(){
    (`_apelPuedes_`); el servidor es quien manda. Sin `puedes_resolver` no hay botones: se enseña y se dice quién la resuelve. */
 /* La tarjeta de una SANCIÓN apelada: quién, qué sanción, qué dice, y las tres salidas (todas con motivo). Sin permiso, quién resuelve. */
 function _apelTarjetaSanc_(a){
-  var m = _m(a.autor), puedes = _apelPuedes_(a), al = a.alegacion, l = _enlaceWeb_(a.enlace);
+  var m = _m(a.autor), puedes = _apelPuedes_(a), l = _enlaceWeb_(a.enlace);
   return '<div class="parte" data-apid="' + esc(a.id) + '" data-apclase="sancion">' +
     '<div class="h"><b>' + esc((m && m.pila) || a.autor) + '</b>' +
       '<span class="u">' + esc(a.unidad || '—') + '</span><span class="u">sanción</span>' +
@@ -853,7 +845,6 @@ function _apelTarjetaSanc_(a){
     '<div class="ruta" style="margin-top:6px"><b>' + esc(a.motivo_sancion || a.titulo) + '</b> · ' + esc(_etSancFila_(a.puntos, null, null)) +
       ' · ' + esc(_isoADMY_(String(a.fecha_sancion || '').slice(0, 10)) || 'sin fecha') +
       ((a.impuesta_por || []).length ? ' · puesta por ' + esc(a.impuesta_por.join(', ')) : '') + '</div>' +
-    (al && al.texto ? '<div class="just"><span class="sc">Había alegado</span>' + esc(al.texto) + '</div>' : '') +
     '<div class="just"><span class="sc">Apela</span>' + esc(a.motivo) + (l ? '<br>' + l : '') + '</div>' +
     (puedes
       ? '<textarea data-apres placeholder="Tu respuesta — obligatoria en las tres salidas…"></textarea>' +

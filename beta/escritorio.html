@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=2c07b73">
+<link rel="stylesheet" href="escritorio.css?v=34eed0d">
 </head>
 <body>
 
@@ -113,16 +113,17 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=8fa24fd"></script>
+<script src="comun.js?v=389446c"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=471a14e"></script>
 <script src="turnos.escritorio.js?v=d63eb29"></script>
 <script src="buzon.escritorio.js?v=a3871ed"></script>
 <script src="documentos.escritorio.js?v=f1eb2c6"></script>
-<script src="sanciones.escritorio.js?v=58cfe3f"></script>
+<script src="sanciones.escritorio.js?v=44cc6f5"></script>
 <script src="reuniones.escritorio.js?v=65feb54"></script>
-<script src="horas.escritorio.js?v=d203b6a"></script>
+<script src="horas.escritorio.js?v=a937ed6"></script>
 <script src="equipo.escritorio.js?v=9c30d01"></script>
+<script src="directo.escritorio.js?v=d7ffec0"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -288,8 +289,7 @@ var api={
   /* 31/10: apelar una tarea (RRI Art. 34) y resolver la apelación; sólo el mini PC las tiene. */
   apelarTarea: function(t,c,m){ return api._post({action:"apelarTarea",tarea:t,clausula:c,motivo:m}); },
   resolverApelacion: function(d){ return api._post(Object.assign({action:"resolverApelacion"},d)); },
-  /* 31/10: alegar (antes de aplicarse) y apelar (ya aplicada) una sanción; TUS sanciones con lo que puedes hacer en cada una. */
-  alegarSancion: function(id,m,e){ return api._post({action:"alegarSancion",id:id,motivo:m,enlace:e||undefined}); },
+  /* 31/10: apelar una sanción (ya aplicada); TUS sanciones con lo que puedes hacer en cada una. */
   apelarSancion: function(id,m,e){ return api._post({action:"apelarSancion",id:id,motivo:m,enlace:e||undefined}); },
   crearTarea:  function(t){ return api._post({action:"crearTarea",tarea:t}); },
   estadoTurno: function(c){ return api._post({action:"estadoTurno",id:c.id,estado:c.estado,fueron:c.fueron,coche:c.coche}); },
@@ -422,6 +422,8 @@ var api={
   pausarFichaje:    function(){ return api._post({action:"pausarFichaje"}); },
   reanudarFichaje:  function(){ return api._post({action:"reanudarFichaje"}); },
   getFichajesAbiertos: function(){ return api._post({action:"getFichajesAbiertos"}); },
+  /* 31/10: «En directo» (`directo.escritorio.js`). Sólo el consejo: la puerta la pone el servidor. */
+  getEnDirecto: function(desde,n){ return api._post({action:"getEnDirecto",desde:desde||null,n:n||null}); },
   /* ⛔ LAS DOS DE DECLARAR, QUE TAMPOCO ESTABAN. Con las cinco de arriba esta cara ya
      ficha; sin estas no puede RECUPERAR unas horas que se te olvido fichar, que es el
      unico camino que hay para eso. `otorgarHoras`/`otorgarBloque` son lo contrario:
@@ -970,6 +972,13 @@ var BLOQ_FORM={fecha:HOY, ini:'09:00', fin:'11:00', cat:'tareas', tarea:'', deta
                just:'', perfil:null, declararId:null, clave:null};
 
 var V={};
+
+/* ── EN DIRECTO (31/10) ─────────────────────────────────────────────────
+   Todo lo que pasa en la app, animado: las funciones en `directo.escritorio.js`, el estado aquí (los módulos sólo
+   declaran funciones). `DIRECTO_MAX`: lo que se guarda y lo que corre en el registro. ─────── */
+var DIRECTO_MAX=60, DIRECTO_CADA_MS=5000;
+var DIRECTO={eventos:[], cursor:null, cuenta:{}, vistos:{}, reloj:null, demo:0, err:null, enVuelo:false};
+V.directo={g:'Operación',t:'En directo',f:function(){ return _puedeVerDirecto_() ? _directoHTML_() : '<div class="mtit">En directo</div><p class="rnota" data-est="nopuede">Solo para el director.</p>'; }};
 
 /* ── PANEL DE MANDO ──────────────────────────────────────────────────────
    Arriba del todo y SIN scroll previo: lo que requiere tu decisión. Cada fila
@@ -1941,7 +1950,7 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
         var _prev=_prevPuntosLote_(m, x);
         return '<div class="lrow"><span class="nm">'+esc(x.n)+
           (_prev?'<span class="sc" style="display:block;margin-top:3px">'+_prev+'</span>':'')+
-          _lcorrNota_(x)+_alegNota_(x)+'</span>'+
+          _lcorrNota_(x)+'</span>'+
           /* ⛔ EL ROTULO DICE QUE ES ANTES DE CUANTO: un premio con `puntos:0` se pintaba
              «aviso» --un apercibimiento-- a quien se le esta premiando, y su recompensa
              son HORAS (`extra.compensacion`), no puntos. */
@@ -3387,6 +3396,7 @@ function _arrancarRefrescoVivo_(){
   /* 20/10: y lo VIVO, cada segundo (`_arrancarVivo_`, comun.js). */
   _arrancarVivo_(function(c){
     if(_vivoToca_(c,'reuniones')) _refrescarReuAbiertaE_();
+    if(vista==='directo' && _puedeVerDirecto_()) _directoPedir_();            // 31/10: lo del almacén llega a «En directo» al segundo
     return _refrescoVivo_('vivo', c);
   });
 }
@@ -3760,7 +3770,7 @@ var _swReg=null;
    NAVEGACIÓN
    ═══════════════════════════════════════════════════════════════════════════ */
 var GRUPOS=[
-  ['Operación',['panel','turnos','tareas']],
+  ['Operación',['panel','directo','turnos','tareas']],
   ['Horas',['libros','partes','sindeclarar','curso','registro','cierre','temporada']],
   ['Documentos',['docdec','docurso','docpub']],
   ['Disciplina',['sanciones','apela']],
@@ -3782,6 +3792,7 @@ function pintarNav(){
       /* El cierre lo dispara SOLO el PD (o admin). Antes esta entrada la veia cualquiera que
          entrara al escritorio: el backend le decia que no, pero despues de haberselo ofrecido. */
       if(k==='cierre' && !_puedeCerrarMes_()) return;
+      if(k==='directo' && !_puedeVerDirecto_()) return;
       if(k==='novedades' && !_puedeVerNovedades_()) return;
       /* El de temporada, igual: de aqui salen la cuota y la renovacion de TODO el equipo. */
       if(k==='temporada' && !_puedeCerrarMes_()) return;
@@ -3819,7 +3830,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d8e7361';
+var BUILD='f4e16e1';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4302,6 +4313,7 @@ function pintar(){
   var _y=_scrollGuardar_(m, vista);
   _pinPie_(m);
   _pinHTML_(m);
+  _pinDirecto_();
   _pinSancSuelta_(m);
   _pinSancEditar_(m);
   _pinSancAgrupar_(m);
@@ -4325,6 +4337,7 @@ function ir(k,foco){
      no da ningún error: da un botón que falla en la cara de quien lo pulsa. */
   if((k==='cierre'||k==='partes') && CIERRE===null && !CIERRE_ERR) setTimeout(_cargarCierre_,60);
   if(k==='temporada' && TEMP===null && !TEMP_ERR) setTimeout(_cargarTemporada_,60);
+  if(k==='directo' && !_puedeVerDirecto_()) return;
   if(k===vista && !foco) return;
   vista=k;
   var m=$('#main');
