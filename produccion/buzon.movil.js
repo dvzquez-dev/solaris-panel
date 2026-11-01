@@ -196,8 +196,8 @@ function _abrirPintor_(fondoUrl, alTerminar){
   };
 
   function cerrar(){ caja.classList.remove('on'); caja.setAttribute('aria-hidden','true'); }
-  $('#pcancelar').onclick=function(){
-    if(trazos.length && !confirm('Vas a salir sin guardar lo que has pintado. ¿Seguro?')) return;
+  $('#pcancelar').onclick=async function(){
+    if(trazos.length && !(await dialogoSiNo('Vas a salir sin guardar lo que has pintado. ¿Seguro?'))) return;
     cerrar();
     /* ⛔ Y SE CONTESTA: cerrar la caja NO es contestar. Quien abrió el pintor puede
        estar esperando —en el escritorio lo está, dentro de un `await`—, y dejarlo
@@ -309,7 +309,8 @@ function buzonModal(tipo, prev){
      ⛔ Y su precio no es cosmético: `PESOS_COMP` paga **2,00 h** por un fallo que
      bloquea y **0,50 h** por uno que molesta, y esas horas entran en la cuota. Volvía a
      'Molesta' **repintada con cara de elegida**, así que no había forma de notarlo. */
-  var grav=_pv.grav||'Molesta';
+  /* ⛔ 01/11 (Daniel, artifact [c9bbaa6286]): «sin marcar hasta que toques un chip» — antes salía 'Molesta' ya puesta. */
+  var grav=_pv.grav||'';
   function _marcaG_(v){ return grav===v ? ' class="on"' : ''; }
   var pant=_NOMBRE_PANTALLA_[ST.vista]||ST.vista;
   abrirModal('<div class="mtit">'+(esBug?'Reportar un fallo':'Proponer una mejora')+'</div>'+
@@ -360,6 +361,7 @@ function buzonModal(tipo, prev){
     if(env.disabled) return;
     var tit=($('#bzTit').value||'').trim(), det=($('#bzDet').value||'').trim();
     if(!tit){ tost('Escribe al menos en una línea qué pasa.'); $('#bzTit').focus(); return; }
+    if(esBug && !grav){ tost('Marca cuánto molesta.'); return; }
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
       tost('Sin conexión con el servidor no se puede enviar. Vuelve a intentarlo.'); return; }
     /* LA VERSION ES LA DEL CODIGO, no la de los datos. Antes iba `DATA.generado` -cuando se
@@ -432,7 +434,7 @@ function buzonModal(tipo, prev){
         _av.style.cssText='margin-top:10px;border-color:rgba(232,145,46,.45);'+
           'background:rgba(232,145,46,.10);color:#f0cf9e';
         _av.innerHTML='<b style="color:var(--warn)">El texto se ha guardado · '+esc((r&&r.id)||'')+'</b><br>'+
-          'Pero <b>la foto no</b>: '+esc(_avisoSinFoto_(r))+'. Cuéntaselo a Daniel con este id.';
+          'Pero la foto no: '+esc(_avisoSinFoto_(r))+'. Cuéntaselo a Daniel con este id.';
         env.parentNode.insertBefore(_av, env.nextSibling);
         _av.scrollIntoView({block:'nearest'});
         return;

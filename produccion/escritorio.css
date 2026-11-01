@@ -26,9 +26,10 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 :root{
   --bg:#0C0B0B; --sur:#181616; --sur2:#221E1F; --gris:#231F20;
-  --line:#322C2E; --line2:#463E40; --ink3:#7C6E72; --ink2:#B2A8AB; --ink:#F4F3F3;
+  --line:#322C2E; --line2:#463E40; --ink3:#968A8E; --ink2:#B2A8AB; --ink:#F4F3F3;
   --red:#E41E25; --red2:#FF4A4F; --red3:#8E1418;
 
+/* 31/10 (feosesc #15): `--ink3` era #7C6E72 = 3,4:1 sobre `--sur2` a 9 px; #968A8E da 4,96:1 (≥ 4,5 en el peor fondo). Se toca el TOKEN, no cada sitio. */
 /* ⛔⛔ LO NATIVO TAMBIÉN ES LA APP: `color-scheme:dark` (13/10).
    🗣️ Daniel: *«hay desplegables que son de estos blancos, cutres, clásicos de
    Windows, básicos, en lugar de ser con la temática un poco de Solaris»*.
@@ -74,9 +75,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .cartel p b{color:var(--ink)}
 
 /* ═══ MARCO ══════════════════════════════════════════════════════════════ */
-.marco{position:relative;display:grid;grid-template-columns:238px 1fr;grid-template-rows:56px 1fr;
+.marco{position:relative;display:grid;grid-template-columns:238px minmax(0,1fr);grid-template-rows:56px 1fr;
   height:calc(100vh - 36px);min-height:660px;   /* 838.ª: 36 = el relleno del body; los 150 eran de un cartel que ya no existe */border:1px solid var(--line);border-radius:var(--r);
-  overflow:hidden;background:var(--bg);box-shadow:0 26px 60px rgba(0,0,0,.45)}
+  overflow:hidden;overflow:clip;   /* 01/11: `clip` y no sólo `hidden`: la marca de agua sobresale del marco y con `hidden` un foco o un clic lo desplazaba (barra lateral y cabecera cortadas) */
+  background:var(--bg);box-shadow:0 26px 60px rgba(0,0,0,.45)}
 
 /* lateral */
 aside{grid-row:1/3;border-right:1px solid var(--line);background:var(--sur);
@@ -267,6 +269,8 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 /* chips y pastillas */
 .chip{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
   padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--ink3);background:var(--sur2);white-space:nowrap}
+.pil{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid;white-space:nowrap}
+.pil.neu{color:var(--ink2);border-color:var(--line);background:var(--sur2)}   /* 01/11: la etiqueta del feedback del PD (comun.js); misma regla que el móvil */
 .chip.ok{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
 .chip.wa{color:var(--warn);border-color:rgba(232,145,46,.45);background:rgba(232,145,46,.09)}
 .chip.no{color:var(--red2);border-color:rgba(255,74,79,.45);background:rgba(228,30,37,.09)}
@@ -398,7 +402,8 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .lcorrf input[type=text]{flex:1;min-width:180px}
 .lcorrf .err{flex-basis:100%;font-size:11px;color:var(--red2)}
 .decs{display:inline-flex;border:1px solid var(--line);border-radius:var(--r2);overflow:hidden}
-.decs button{border-right:1px solid var(--line);padding:5px 10px;font-size:11px;font-weight:600;color:var(--ink3);white-space:nowrap}
+.decs button{border-right:1px solid var(--line);padding:5px 10px;font-size:11px;font-weight:600;color:var(--ink);background:var(--sur2);white-space:nowrap}
+.decs button:hover{background:var(--line)}
 .decs button:last-child{border-right:0}
 .decs button.on.a{background:var(--ok);color:#fff}
 .decs button.on.j{background:var(--ink2);color:#1a1616}
@@ -421,7 +426,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
   justify-content:center;pointer-events:none}
 .anillo .mid .n{font-family:var(--mono);font-size:34px;font-weight:600;letter-spacing:-.04em;line-height:1}
 .anillo .mid .n small{font-size:14px;color:var(--ink3)}
-.anillo .mid .u{font-family:var(--mono);font-size:8px;letter-spacing:.15em;color:var(--ink3);margin-top:5px}
+.anillo .mid .u{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:var(--ink3);margin-top:5px;max-width:74px;text-align:center;line-height:1.3}
 
 /* desplegable por reunión (disponibilidad y riesgo) */
 .acord{border:1px solid var(--line);border-radius:var(--r2);margin-bottom:9px;overflow:hidden;background:var(--sur)}
@@ -459,7 +464,9 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 /* etiqueta al LÍMITE izquierdo = hora de inicio (decisión cerrada) */
 .hc.rh span{position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}
 .cel{height:19px;border-radius:2px;display:grid;place-items:center;font-family:var(--mono);
-  font-size:8.5px;color:rgba(244,243,243,.9)}
+  font-size:8.5px;color:#fff;font-weight:600}
+/* 01/11 (esteticaesc): sobre la celda VERDE (reunión fijada) el blanco no llega a 3:1; ahí va el texto oscuro. */
+.cel[style*="53,199,89"]{color:#06130a}
 .cel.best{outline:1px solid var(--ink);outline-offset:-1px}
 
 /* fichajes en curso */
@@ -629,18 +636,6 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 /* ── Lista de personas para sancionar · GEMELA del movil ───────────────────────
    Un `<select>` de 40 nombres es una lista que hay que recorrer a ojo; aqui se escriben
    tres letras. En el escritorio, ademas, cabe al lado de los campos en vez de encima. */
-/* La lista de personas: alta y con scroll propio, para que el formulario no se vaya a
-   tres pantallas cuando el equipo tiene cuarenta. */
-.sanlista{max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r2);
-  margin:0 0 11px;-webkit-overflow-scrolling:touch}
-.sangrupo{position:sticky;top:0;background:var(--sur2);padding:5px 10px;font-family:var(--mono);
-  font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
-.sanper{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;
-  border:0;border-bottom:1px solid var(--line);padding:9px 10px;color:var(--ink);font:inherit;
-  font-size:12.5px;cursor:pointer}
-.sanper i{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--ink3);margin-left:auto}
-.sanper.on{background:rgba(228,30,37,.14);box-shadow:inset 3px 0 0 var(--red)}
-.sanper.on b{color:var(--red2)}
 /* Dos columnas: la lista a la izquierda, los campos a la derecha. Por debajo de 780 px
    se apila -el panel se usa tambien en portatiles con la ventana a medias-. */
 .sanwrap{display:grid;grid-template-columns:minmax(230px,300px) 1fr;gap:16px;align-items:start}
@@ -765,6 +760,7 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .dir-vivo.caido i{background:var(--ink3);animation:none}
 @keyframes dirRespira{0%{box-shadow:0 0 0 0 rgba(228,30,37,.55)}70%{box-shadow:0 0 0 9px rgba(228,30,37,0)}100%{box-shadow:0 0 0 0 rgba(228,30,37,0)}}
 .dir-cifra{display:flex;align-items:baseline;gap:7px}
+.dir-snd{margin-left:auto}
 .dir-cifra b{font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
 .dir-cifra small{font-size:11.5px;color:var(--ink3)}
 .dir-mapa{background:radial-gradient(circle at 50% 50%,rgba(228,30,37,.08),transparent 34%),var(--sur);
@@ -868,12 +864,6 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 /* 31/10 · «Nueva tarea»: unidad, responsables, plazo y urgencia como chips (`.pick`), calendario propio y el editor del
    cuerpo con su vista previa «así se verá en Notion» (`.nb-*`, pintada por `_bloquesAHTML_`). Sin controles nativos. */
 .nt-fila{display:flex;gap:7px;flex-wrap:wrap}
-.nt-gente{max-height:150px;overflow:auto;padding:2px}
-.nt-p{display:inline-flex;align-items:center;gap:7px;padding-left:5px}
-.nt-p .av{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:9px;background:var(--bg);border:1px solid var(--line);color:var(--ink2)}
-.nt-p.on::before{content:none}
-.nt-p.on .av{background:var(--red);border-color:var(--red);color:#fff}
-.nt-bus{margin-bottom:7px}
 .nt-cal{border:1px solid var(--line);border-radius:var(--r2);background:#0A0909;padding:10px;width:256px}
 .nt-calh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;text-transform:capitalize;font-size:12.5px}
 .nt-calg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
@@ -898,15 +888,60 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .nb-t{border-collapse:collapse;margin:6px 0;width:100%}
 .nb-t th,.nb-t td{border:1px solid var(--line);padding:5px 8px;text-align:left;font-size:12.5px}
 .nb-t th{background:rgba(255,255,255,.04);font-weight:700}
+.nb-foto{margin:6px 0}.nb-img{display:block;max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--line);background:var(--sur2);min-height:40px}
 
 /* 31/10 · Tareas: UNA lista con chips de filtro por unidad. Columnas de ANCHO FIJO (`table-layout:fixed`): sea cual sea
-   el filtro, las mismas columnas miden lo mismo; la de la tarea se lleva lo que sobra. */
+   el filtro, las mismas columnas miden lo mismo; la de la tarea se lleva lo que sobra (con 900 px de mínimo le quedaban 82 px; ahora 1000 → 182 y el título se partía letra a letra a 1024). */
 .tfil{align-items:center}
 .tfil .pick b{color:var(--ink);margin-left:3px}
 .tfil .tdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
-.tarl table{table-layout:fixed;min-width:900px}
+.tarl table{table-layout:fixed;min-width:1000px}
 .tarl th,.tarl td{overflow:hidden;text-overflow:ellipsis}
 .tarl th:nth-child(2){width:172px}.tarl th:nth-child(3){width:150px}.tarl th:nth-child(4){width:92px}
 .tarl th:nth-child(5){width:130px}.tarl th:nth-child(6){width:104px}.tarl th:nth-child(7){width:170px}
 .tarl td:first-child{white-space:normal;overflow-wrap:anywhere}
 .chip.tuni{white-space:nowrap}
+/* 31/10 · pasada de usuario (rotosesc): la leyenda de «Tu disponibilidad» (sin regla, salía pegada), la celda ofertada sin
+   marcar (se veía vacía), la fila que abre algo / la que no, y la frase que dice por qué un botón está apagado. */
+.leg{display:flex;flex-wrap:wrap;gap:5px 13px;font-size:10px;font-family:var(--mono);letter-spacing:.05em;color:var(--ink3)}
+.leg i{width:10px;height:7px;border-radius:2px;display:inline-block;vertical-align:-1px;margin-right:5px}
+.cel.mid:hover{outline:1px solid var(--ink3);outline-offset:-1px}
+tr.abre{cursor:pointer}
+tr.abre:hover td:first-child{color:var(--ink)}
+tr.fija:hover{background:transparent}
+.porque{font-size:11.5px;color:var(--ink2);align-self:center}
+/* 31/10 (nativos1) · controles propios de `comun.js` (`nxElige`, `nxHora`, `nxNum`, `nxFecha`): sustituyen a `<select>`,
+   `type=date|time|number|checkbox`. Chips `.pick`, pasos − / +, y el calendario de «Nueva tarea» como desplegable. */
+.nx{display:inline-flex;flex-direction:column;gap:6px;align-items:flex-start;position:relative;max-width:100%}
+.nx-hora,.nx-num{flex-direction:row;align-items:center;gap:5px}
+.nx-val{min-width:56px;text-align:center;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#0A0909;color:var(--ink)}
+.nx-val:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+.nx-num .nx-val{min-width:48px}
+.nx-fval{border:0;background:none;padding:0;text-align:left;color:var(--ink2);font-size:12px}
+.nx-cal{position:absolute;top:100%;left:0;z-index:40;margin-top:4px;box-shadow:0 10px 28px rgba(0,0,0,.6)}
+.nx-cal[hidden]{display:none}
+.nx-off{opacity:.45;pointer-events:none}
+.nx-elige{display:flex;width:100%}
+.nx-bus{width:100%;max-width:260px;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px}
+.nx .pick:focus-visible,.nx .btn:focus-visible,.nt-d:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+
+.nt-plegado{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.doc-edit{margin-top:11px}.doc-edit-c{display:none;margin-top:6px}.doc-edit.ab .doc-edit-c{display:block}
+
+/* La banda de «estás viendo como otra persona» (`_bandaOtraPersona_`, comun.js): fija arriba mientras dure, en las dos caras. */
+.bandaotro{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px;
+  background:rgba(228,30,37,.16);border-bottom:1px solid var(--red);color:var(--ink);font-size:13px;position:sticky;top:0;z-index:70}
+.bandaotro b{color:#fff}
+.bandaotro button{flex:none;white-space:nowrap;min-height:44px;padding:0 14px;border:1px solid var(--red);border-radius:10px;color:var(--ink);font-weight:600;cursor:pointer}
+
+/* 01/11 (esteticaesc, Daniel 31/10: «nada de listas cutres default de html»): NINGUNA lista lleva la viñeta del navegador.
+   Punto rojo Solaris (la lista) o numerito en chip (la ordenada), con la sangría de siempre. Una sola regla para todos los
+   sitios donde sale una `<ul>`/`<ol>`: avisos del cálculo, «no es aplicable», novedades, fichas de documento, comprobación. */
+.parte .obj,ul.obj,ol.obj,.novl,.nota ul,.mdoc ul,.mdoc ol,.novsec>ul,.pan ul:not([style*="list-style"]),.pan ol{list-style:none;padding-left:0}
+.parte .obj>li,ul.obj>li,.novl>li,.nota ul>li,.mdoc ul>li,.novsec>ul>li,.pan ul:not([style*="list-style"])>li{position:relative;padding-left:15px}
+.parte .obj>li::before,ul.obj>li::before,.novl>li::before,.nota ul>li::before,.mdoc ul>li::before,.novsec>ul>li::before,.pan ul:not([style*="list-style"])>li::before{
+  content:"";position:absolute;left:3px;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--red);opacity:.85}
+ol.obj,.mdoc ol,.pan ol{counter-reset:paso}
+ol.obj>li,.mdoc ol>li,.pan ol>li{position:relative;padding-left:26px;counter-increment:paso}
+ol.obj>li::before,.mdoc ol>li::before,.pan ol>li::before{content:counter(paso);position:absolute;left:0;top:.1em;width:18px;height:18px;
+  border-radius:50%;background:var(--sur2);border:1px solid var(--line2);color:var(--ink2);font:600 10px/16px var(--mono);text-align:center}

@@ -144,23 +144,23 @@ function _pinTemporada_(m){
        si la Junta la aprobo con 2/3 (Art. 29k); «todavia no se ha votado» NO es «se voto que
        no», y el plan lo distingue: sin decision registrada se declara NO aplicable en vez de
        calcular un ajuste que nadie ha aprobado. Cancelar aqui manda `null`, que es eso. */
-    var r=prompt('¿La Junta aprobó la prórroga con 2/3 (Art. 29k)?' + String.fromCharCode(10,10) +
+    var r=await dialogoTexto('¿La Junta aprobó la prórroga con 2/3 (Art. 29k)?' + String.fromCharCode(10,10) +
       'Escribe SI o NO. Si lo dejas en blanco o cancelas, se calcula como «todavía sin votar», '+
       'y entonces el plan saldrá NO APLICABLE — que es lo correcto: el Art. 29l empieza con un '+
-      '«si».', '');
+      '«si».');
     var pro = (r===null || !String(r).trim()) ? null
             : /^s/i.test(String(r).trim()) ? true : /^n/i.test(String(r).trim()) ? false : null;
     /* ⛔ 21/10 (auditor 9, 🟠 7): calcular otro SUSTITUYE en la app el plan ya aplicado (la ranura `temporada_plan`), y
        no avisaba — el mensual sí. La copia de Drive y `salidas/` se conservan. */
     var _tpa=(typeof TEMP!=='undefined' && TEMP && TEMP.plan && TEMP.plan.aplicado) ? TEMP.plan : null;
-    if(!confirm((_tpa ? '⚠️ Ya hay un cierre de temporada APLICADO (' + String(_tpa.temporada||'?') + '). Calcular otro lo '+
+    if(!(await dialogoSiNo((_tpa ? '⚠️ Ya hay un cierre de temporada APLICADO (' + String(_tpa.temporada||'?') + '). Calcular otro lo '+
       'SUSTITUYE en la app: la pantalla dejará de enseñarlo (la copia de Drive y salidas/ se conservan).' +
       String.fromCharCode(10,10) : '') + 'Calcular el cierre de TEMPORADA.' + String.fromCharCode(10,10) +
       'NO se aplica nada: la rutina saca el plan (a quién le sube los puntos al suelo de 5, la '+
       'cuota de cada uno y el ranking) y lo dejará aquí para que lo revises.' +
       String.fromCharCode(10,10) + 'Prórroga: ' +
       (pro===null?'SIN VOTAR (el plan saldrá no aplicable)':pro?'aprobada':'no aprobada') +
-      String.fromCharCode(10,10) + '¿Sigo?')) return;
+      String.fromCharCode(10,10) + '¿Sigo?'))) return;
     _ct.disabled=true; var prev=_ct.textContent; _ct.textContent='Encolando…';
     try{
       await api.calcularTemporada({prorrogado:pro});
@@ -180,13 +180,13 @@ function _pinTemporada_(m){
        Ofrecerlo seria mentir sobre lo que va a pasar. */
     if(!pl.aplicable){ tost('El plan no es aplicable todavía: mira los bloqueos.'); return; }
     var t=(pl.totales)||{};
-    if(!confirm('APLICAR el cierre de la temporada '+(pl.temporada||'')+'.' +
+    if(!(await dialogoSiNo('APLICAR el cierre de la temporada '+(pl.temporada||'')+'.' +
       String.fromCharCode(10,10) +
       'Esto SI escribe en Notion: sube a '+(t.suelo||5)+' puntos a '+(t.suben_a_suelo||0)+
       ' persona(s) (Art. 29l) y cierra la temporada. De aquí salen la cuota y la renovación.' +
       String.fromCharCode(10,10) +
       'Antes de tocar Notion se congela el plan y se sube el bloque a Drive; si eso falla, no '+
-      'se escribe nada.' + String.fromCharCode(10,10) + '¿Lo has revisado?')) return;
+      'se escribe nada.' + String.fromCharCode(10,10) + '¿Lo has revisado?'))) return;
     _at.disabled=true; var prev=_at.textContent; _at.textContent='Encolando…';
     try{
       await api.aplicarTemporada(pl.temporada);

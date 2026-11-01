@@ -368,18 +368,6 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .plgh b{font-size:12.5px}
 .plgh small{display:block;color:var(--ink3);font-family:var(--mono);font-size:10px;margin-top:2px}
 .plgc{padding-top:10px}
-/* La lista de personas: alta y con scroll propio, para que el formulario no se vaya a
-   tres pantallas cuando el equipo tiene cuarenta. */
-.sanlista{max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r2);
-  margin:0 0 11px;-webkit-overflow-scrolling:touch}
-.sangrupo{position:sticky;top:0;background:var(--sur2);padding:5px 10px;font-family:var(--mono);
-  font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
-.sanper{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;
-  border:0;border-bottom:1px solid var(--line);padding:9px 10px;color:var(--ink);font:inherit;
-  font-size:12.5px;cursor:pointer}
-.sanper i{font-style:normal;font-family:var(--mono);font-size:9.5px;color:var(--ink3);margin-left:auto}
-.sanper.on{background:rgba(228,30,37,.14);box-shadow:inset 3px 0 0 var(--red)}
-.sanper.on b{color:var(--red2)}
 .libro{overflow:hidden;height:0;transition:height .42s var(--sal)}
 .retf{display:flex;align-items:center;gap:11px;padding:9px 2px;border-top:1px solid var(--line);font-size:12px}
 .retf .pt{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--red2);flex:none;width:26px}
@@ -458,14 +446,6 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .cmixb{font-family:var(--mono);font-size:10.5px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);
   color:var(--ink2);background:var(--sur2)}
 .cmixb.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
-.cchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.cchip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:4px 6px 4px 10px;border-radius:20px;
-  border:1px solid var(--line);background:var(--sur2);color:var(--ink)}
-.cchip button{color:var(--ink3);font-size:14px;line-height:1;padding:0 2px}
-.csug{position:relative;border:1px solid var(--line);border-radius:9px;background:#0A0909;margin:-6px 0 10px;overflow:hidden}
-.csug div{padding:8px 11px;font-size:12.5px;border-top:1px solid var(--line)}
-.csug div:first-child{border-top:0}
-.csug small{color:var(--ink3);margin-left:6px}
 .cdias{display:flex;flex-direction:column;gap:6px;margin-bottom:11px}
 .drow{display:flex;align-items:center;gap:7px;font-size:12px}
 .drow span{flex:1;font-size:12px;color:var(--ink);text-transform:capitalize}
@@ -1121,3 +1101,66 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
   font-family:var(--mono);font-size:15px;padding:10px 11px}
 .asisIn:focus{border-color:var(--line2);outline:none}
 .asisOk{font-size:20px;color:var(--ok);font-weight:600;padding:2px 0 4px}
+
+/* 31/10 (nativos1) · controles propios de `comun.js` (`nxElige`, `nxHora`, `nxNum`, `nxFecha`) en el móvil: los mismos chips y
+   pasos que el escritorio, con el dedo en mente (36 px de alto). `.pick` aquí sólo existe para ellos. */
+.nt-fila{display:flex;gap:7px;flex-wrap:wrap}
+.pick{cursor:pointer;font-family:var(--mono);font-size:12px;letter-spacing:.03em;min-height:36px;padding:6px 13px;border-radius:20px;
+  border:1px solid var(--line);background:transparent;color:var(--ink2)}
+.pick.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
+.pick.on::before{content:'\2713 '}
+.pick[disabled]{opacity:.5;pointer-events:none}
+.nx{display:inline-flex;flex-direction:column;gap:6px;align-items:flex-start;position:relative;max-width:100%}
+.nx-hora,.nx-num{flex-direction:row;align-items:center;gap:5px}
+.nx-val{min-width:56px;text-align:center;font-size:14px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.nx-fval{border:0;background:none;padding:0;text-align:left;color:var(--ink2);font-size:12px}
+.nx-cal{position:absolute;top:100%;left:0;z-index:40;margin-top:4px;box-shadow:0 10px 28px rgba(0,0,0,.6)}
+.nx-cal[hidden]{display:none}
+.nx-off{opacity:.45;pointer-events:none}
+.nx-elige{display:flex;width:100%}
+.nx-bus{width:100%;max-width:260px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px}
+.nt-cal{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:10px;width:264px}
+.nt-calh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;text-transform:capitalize;font-size:13px}
+.nt-calg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.nt-dw{font-family:var(--mono);font-size:10px;color:var(--ink3);padding:2px 0}
+.nt-d{cursor:pointer;font-family:var(--mono);font-size:12px;padding:8px 0;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--ink2)}
+.nt-d.hoy{border-color:var(--line2)}
+.nt-d.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.28)}
+/* 01/11 (tareamovil) · «Nueva tarea» en el móvil: la barra del cuerpo, el editor, la vista previa «así se verá en Notion»
+   (`.nb-*`, la pinta `_bloquesAHTML_`) y las fotos. Una sola columna: el editor y la vista previa van uno bajo el otro. */
+.btn.sm{padding:7px 12px;font-size:12px;font-weight:500}
+.nota{font-size:11.5px;color:var(--ink3);line-height:1.5;padding:4px 0}
+.nt-barra{display:flex;gap:6px;flex-wrap:wrap}
+.nt-ia{border-color:var(--red)}
+.nt-ia:disabled{border-color:var(--line)}
+.nt-ed{display:flex;flex-direction:column;gap:10px}
+.nt-ed textarea{min-height:170px;font-family:var(--mono);font-size:13px}
+.nt-vp{border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:90px;background:var(--sur2)}
+.nt-prev{margin-top:8px;font-size:14px;line-height:1.5;color:var(--ink)}
+.nb-h{font-weight:700;margin:10px 0 4px}
+.nb-heading_1{font-size:19px}.nb-heading_2{font-size:16px}.nb-heading_3{font-size:14px}
+.nb-p{margin:3px 0}
+.nb-li{display:flex;gap:8px;margin:2px 0}.nb-m{color:var(--ink3);min-width:14px}
+.nb-cb{width:14px;height:14px;margin-top:3px;border:1.5px solid var(--ink3);border-radius:3px;flex:none}
+.nb-cb.on{background:var(--red);border-color:var(--red)}
+.nb-t{border-collapse:collapse;margin:6px 0;width:100%}
+.nb-t th,.nb-t td{border:1px solid var(--line);padding:5px 8px;text-align:left;font-size:12.5px}
+.nb-t th{background:rgba(255,255,255,.04);font-weight:700}
+.nb-foto{margin:6px 0}.nb-img{display:block;max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--line);background:var(--sur2);min-height:40px}
+
+/* La banda de «estás viendo como otra persona» (`_bandaOtraPersona_`, comun.js): fija arriba mientras dure, en las dos caras. */
+.bandaotro{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px;
+  background:rgba(228,30,37,.16);border-bottom:1px solid var(--red);color:var(--ink);font-size:13px;position:sticky;top:0;z-index:70}
+.bandaotro b{color:#fff}
+.bandaotro button{flex:none;white-space:nowrap;min-height:44px;padding:0 14px;border:1px solid var(--red);border-radius:10px;color:var(--ink);font-weight:600;cursor:pointer}
+
+/* ZONA TÁCTIL ≥44 px (01/11). 📏 Medido en 375 px, 8 pantallas: botones de 31–35 px (`.btn`, `.btn.mini`, los de `.modos`,
+   `.tpin`, `.pdb`), filas `summary` de 30, el ⋮ de 34 y las casillas de turnos de 30 de alto. El aspecto es el mismo: sube el
+   alto mínimo (no la letra) y el ⋮ amplía su zona con un `::after`. ⚠️ Las casillas de turnos ganan alto y NO ancho: son 7
+   columnas más la de horas en 315 px, así que 34 de ancho es el techo. Quedan fuera el mapa de calor de Reuniones (filas de
+   13 px que sólo enseñan un dato al tocar) y el conmutador de rol de la maqueta (`.rolsel button`, sólo con ?demo). */
+.btn,.btn.mini,.modos button,.tpin button,.pdb button,.pdm,.asisIn,.plgh{min-height:44px}
+.pdgrupo>summary,.pdpers>summary{min-height:44px}
+.kebab::after{content:"";position:absolute;inset:-5px}
+.tcel{height:44px}
+.rc[data-tdia]{min-height:44px}

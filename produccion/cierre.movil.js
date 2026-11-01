@@ -61,7 +61,7 @@ function _planHTML_(plan){
   var _estado = _parado ? '<b>Se paró a medias.</b> '+(_convivenFichas_(plan)?'Hay fichas nuevas y viejas conviviendo.'
                                                                 :'No llegó a escribir ninguna ficha.')
               : _inc   ? '<b>Aplicado a medias:</b> se escribieron '+_inc.hechas+
-                         (_inc.de?' de '+_inc.de:'')+'. <b>Faltan '+_inc.faltan+'.</b>'
+                         (_inc.de?' de '+_inc.de:'')+'. Faltan '+_inc.faltan+'.'
               : _hecho  ? '<b>Ya está aplicado.</b>'
                         : '<b>Todavía no se ha aplicado.</b>';
   return '<p class="rnota" style="margin:0 0 10px">Plan de <b>'+esc(_nomPeriodo_(plan.periodo))+'</b>'+
@@ -109,7 +109,7 @@ function _decidirCierreHTML_(plan, nBloq, vuela){
       '<p class="rnota">'+lin.join(' · ')+
       (r&&r.at?' · '+esc(_cuandoMadrid_(r.at)):'')+'</p>'+
       (plan.parado?'<p class="rnota" style="color:var(--warn)">Se paró a medias'+(_convivenFichas_(plan)?': hay fichas '+
-        'nuevas y viejas conviviendo':' sin escribir ninguna ficha')+'. <b>No lo vuelvas a lanzar sin mirarlo.</b></p>'
+        'nuevas y viejas conviviendo':' sin escribir ninguna ficha')+'. No lo vuelvas a lanzar sin mirarlo.</p>'
        :inc?'<p class="rnota" style="color:var(--warn)"><b>Faltan '+inc.faltan+'</b>'+
         (inc.de?' de '+inc.de:'')+': su carga del mes cerrado sigue puesta y el mes que viene '+
         'esas horas se cuentan dos veces.</p>'+
@@ -121,7 +121,7 @@ function _decidirCierreHTML_(plan, nBloq, vuela){
   /* 21/10 (auditor 9, 🟡 4): con bloqueos el servidor NO deja aplicar — no se ofrece un botón que acaba en error. */
   return '<button class="btn pri" '+((nBloq||vuela)?'disabled ':'')+'data-aplicarcierre style="width:100%;margin-top:14px">'+
       (vuela?'Aplicando… (en cola o escribiéndose)':nBloq?'Bloqueado · '+nBloq+' sin resolver':'Aplicar el cierre de '+esc(_nomPeriodo_(plan.periodo)))+'</button>'+
-    '<p class="rnota">Esto <b>sí escribe</b> en Notion, en '+((plan.totales&&plan.totales.personas)||
+    '<p class="rnota">Esto escribe en Notion, en '+((plan.totales&&plan.totales.personas)||
       plan.personas||'?')+' fichas. Si algo no cuadra, '+
       'para sin escribir.</p>';
 }
@@ -130,10 +130,10 @@ function _cierreHTML_(est, err, cargando){
   var cer=_mesACerrar_();
   var cab='<h3 style="margin:0 0 4px">Cierre de '+esc(cer.mes)+'</h3>'+
     '<p class="rnota" style="margin:0 0 12px">Cierra el corte que va desde el cierre anterior '+
-    'hasta hoy. <b>No aplica nada</b>: encola el cálculo y el plan se revisa antes.</p>';
+    'hasta hoy. No aplica nada: encola el cálculo y el plan se revisa antes.</p>';
   if(cargando) return cab+'<p class="rnota">Preguntando al servidor en qué punto está…</p>';
   if(err) return cab+'<p class="rnota" style="color:var(--warn)">No se pudo comprobar el estado del cierre: '+
-    esc(String(err).replace(/\.\s*$/,''))+'. <b>No lo cierres</b> hasta verlo.</p>';   // 🟡 13 (auditor 19): sin «..»
+    esc(String(err).replace(/\.\s*$/,''))+'. No lo cierres hasta verlo.</p>';   // 🟡 13 (auditor 19): sin «..»
   /* ⛔ 21/10 (auditor 9, 🟠 1/🟠 2): sólo el plan del mes que toca cerrar (`_planVigente_`). Con el de JULIO que trae hoy
      la ranura, esto pintaba «se paró a medias» y salía por el `if(plan)` de abajo SIN el botón «Calcular». */
   var bloq=(est&&est.bloqueos)||[], enc=(est&&est.encolado)||null, plan=_planVigente_((est&&est.plan)||null);
@@ -148,7 +148,7 @@ function _cierreHTML_(est, err, cargando){
   if(_ava) cab+='<p class="rnota" style="color:var(--warn)">'+esc(_ava)+'</p>';
   var _avf=_avisoFichajesCierre_(est);   /* 26/10 (triaje 5.2): quien sigue fichado, sin bloquear */
   if(_avf) cab+='<p class="rnota" style="color:var(--warn)">'+esc(_avf)+'</p>';
-  if(enc && plan) cab+='<p class="rnota">Hay un cálculo <b>nuevo</b> en cola: '+
+  if(enc && plan) cab+='<p class="rnota">Hay un cálculo nuevo en cola: '+
     'sustituirá al plan de abajo en un par de minutos.</p>';
   var filas=bloq.map(function(b){
     return '<div class="rl"><span>'+esc(b.texto||b.que)+'</span>'+
@@ -163,8 +163,8 @@ function _cierreHTML_(est, err, cargando){
      boton; el movil los escondia.
      ⚠️ Van ARRIBA del plan, no al final: leidos despues de decidir no sirven de nada. */
   if(plan) return cab+(filas ? '<div class="rec">'+filas+'</div>'+
-      '<p class="rnota" style="color:var(--warn)"><b>Esto entra en la cuenta y sigue sin '+
-      'resolver.</b> El servidor no deja aplicar el cierre hasta que se decida: lo que se decidiera después dejaría '+
+      '<p class="rnota" style="color:var(--warn)">Esto entra en la cuenta y sigue sin '+
+      'resolver. El servidor no deja aplicar el cierre hasta que se decida: lo que se decidiera después dejaría '+
       'mal la cuota de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan, bloq.length, _aplicandoVivo_(est));
   if(enc) return cab+'<p class="rnota">Encolado. La rutina lo recoge en la siguiente pasada '+
     '(va cada 2 minutos) y deja el plan.</p>';
@@ -189,10 +189,10 @@ function _abrirCierre_(){
     var ap=$('[data-aplicarcierre]');
     if(ap) ap.onclick=async function(){
       var pl=(est&&est.plan)||{}, n=((pl.totales&&pl.totales.personas)||pl.personas||'?');
-      if(!confirm('APLICAR el cierre de '+_nomPeriodo_(pl.periodo)+'.\n\nEsto ESCRIBE en Notion en '+n+
+      if(!(await dialogoSiNo('APLICAR el cierre de '+_nomPeriodo_(pl.periodo)+'.\n\nEsto ESCRIBE en Notion en '+n+
                   ' fichas: pone las cargas a cero, hace rodar los puntos y devuelve las '+
                   'compensaciones al defecto del cargo.\n\nDe aquí salen la cuota y la '+
-                  'renovación.\n\n¿Seguro?')) return;
+                  'renovación.\n\n¿Seguro?'))) return;
       ap.disabled=true; ap.textContent='Encolando…';
       try{ await api.aplicarCierre(pl.periodo||null);
            tost('Aplicación encolada. La rutina la recoge en la siguiente pasada.');
@@ -201,10 +201,10 @@ function _abrirCierre_(){
     };
     var b=$('[data-cerrarmes]'); if(!b) return;
     b.onclick=async function(){
-      if(!confirm('Calcular el cierre de '+_mesACerrar_().mes+'.\n\nNO se aplica nada: la '+
-                  'rutina saca el plan y lo deja para revisarlo.\n\n¿Sigo?')) return;
+      if(!(await dialogoSiNo('Calcular el cierre de '+_mesACerrar_().mes+'.\n\nNO se aplica nada: la '+
+                  'rutina saca el plan y lo deja para revisarlo.\n\n¿Sigo?'))) return;
       b.disabled=true; b.textContent='Encolando…';
-      try{ await api.calcularCierre(false, _mesACerrar_().p);
+      try{ await api.calcularCierre(_mesACerrar_().p);
            tost('Cierre encolado. La rutina lo recoge en la siguiente pasada.');
            pinta(await api.getCierre(), null); }
       catch(e){ b.disabled=false; tostErr('No se pudo encolar: ', e); }

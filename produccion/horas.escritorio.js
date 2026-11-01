@@ -47,6 +47,23 @@ function puedeDecidirParte(p,quien){
    globo y de «Horas en el aire», y caía en el Histórico como si estuviera decidido. */
 function pendientes(){return PARTES.filter(function(p){return p.estado==='pend' || p.estado==='detalle';});}
 
+/* 01/11 · Daniel (artifact «Horas en el aire»): *«Coordinador: solo lo que puede firmar; PD: el equipo entero»*. Los dos KPI
+   «Horas en el aire» (Panel de mando y Partes) suman ESTO: al PD, todo lo pendiente; al resto, lo que `puedeDecidirParte`
+   le deja firmar —la misma puerta de «Esperan tu decisión»; al PD (rango 3) se lo deja todo—, para que las dos cifras de la
+   fila hablen de lo mismo. */
+function enElAire(){return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);});}
+
+/* 01/11 · Daniel (artifact «Subcoordinador y horas»): *«Solo a su equipo, como cuando sanciona»*. A quién puede `quien`
+   OTORGAR horas (`m` = un miembro con `nombre` y `unidad`): lo que firma —el PD, o quien coordina esa unidad
+   (`puedeDecidirParte`, gemela de `_puede_otorgar_a` del servidor)— y, además, el subcoordinador a su equipo, por la
+   MISMA puerta que las sanciones (`puedeSancionarA`, que ya lo acota: no se copia el criterio). ⛔ Sólo otorga: firmar
+   los partes de ese equipo sigue siendo de `puedeDecidirParte`, que no lo abre. */
+function puedeOtorgarA(m,quien){
+  if(!m || m.nombre===quien) return false;
+  return puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, quien) ||
+    (rangoNom(quien)>=1 && !!_subcoordDe_(quien) && puedeSancionarA(quien, m.nombre));
+}
+
 /* 31/10 · Daniel: el parte del PD de una unidad que coordina OTRO se enruta a ese coordinador: al PD no le sale como «suyo por
    aprobar» (cola y globo) aunque siga pudiendo decidirlo. Misma regla que el móvil (`_cargarPartesDec_`); el servidor ya
    fijó en el parte la unidad de la TAREA. */
@@ -80,6 +97,8 @@ function parteCard(p){
       (_txtCorreccion_(p.corr)?'<span class="chip wa">'+esc(_txtCorreccion_(p.corr))+'</span>':'')+'</div>'+
     /* 31/10 (textos): si puedes decidir, los botones ya lo dicen; s\u00f3lo se avisa cuando NO es tuyo */
     (puede?'':'<div class="ruta">Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.</div>')+
+    /* 01/11 · Daniel: «Se queda así y la pantalla lo dice» — el parte del PD lo firma él mismo */
+    (_notaFirmaPropia_(p,ACTOR)?'<div class="ruta">'+esc(_notaFirmaPropia_(p,ACTOR))+'</div>':'')+
     (puede?'<textarea data-motivo placeholder="Motivo — obligatorio para rechazar o pedir detalle…"></textarea>'+
       '<div class="acts">'+
         '<button class="btn pri" data-parte="'+p.id+'" data-acc="si">Aprobar</button>'+
@@ -107,31 +126,27 @@ function bloquePanel(){
   /* ⛔ 21/10 (auditor 8, 🟠 3): A QUIEN EL SERVIDOR DEJA, por la misma puerta que decidir un parte (`puedeDecidirParte`
      = `_puede_sobre_parte`: el PD, o quien coordina ESA unidad). Con «misma unidad que el actor», al subcoordinador
      (rango 1, sin ser el coordinador) se le ofrecía su unidad entera —su propio coordinador incluido— y el servidor
-     rechazaba cada uno («sin potestad»). */
-  var pool=mandaEnTodo?reg:reg.filter(function(m){ return puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, ACTOR); });
+     rechazaba cada uno («sin potestad»). 01/11: `puedeOtorgarA` añade al subcoordinador, a SU equipo (Daniel). */
+  var pool=mandaEnTodo?reg:reg.filter(function(m){ return puedeOtorgarA(m, ACTOR); });   /* 01/11: + el subcoordinador, a su equipo */
   if(!pool.length) return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
     (coordinadorDe(unidad)===ACTOR ? 'No hay nadie de tu subsistema a quien otorgar horas en bloque.'
-      : 'Otorgar horas es del coordinador de la unidad y del Project Director: el servidor no lo deja a nadie más.')+
+      : (_subcoordDe_(ACTOR) ? 'No hay nadie en tu equipo a quien otorgar horas en bloque.'
+        : 'Otorgar horas es del coordinador de la unidad y del Project Director: el servidor no lo deja a nadie más.'))+
     '</p></div>');
-  var subs=[]; reg.forEach(function(m){ if(subs.indexOf(m.unidad)<0) subs.push(m.unidad); });
-  var filtro = mandaEnTodo
-    ? '<label style="display:block;margin-bottom:10px"><span class="sc" style="display:block;margin-bottom:5px">Subsistema</span>'+
-      '<select id="bloSub" style="width:100%;max-width:260px;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+
-      '<option value="">Todos</option>'+subs.map(function(u){ return '<option>'+esc(u)+'</option>'; }).join('')+'</select></label>'
-    : '<div class="chips" style="margin-bottom:10px"><span class="chip">'+esc(unidad)+'</span></div>';
-  var chips=pool.map(function(m){
-    return '<button type="button" class="pick" data-nom="'+esc(m.nombre)+'" data-unidad="'+esc(m.unidad)+'">'+esc(m.pila)+'</button>';
-  }).join('');
   return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-    'Para un traslado, un montaje o una feria: <b>marca a quienes fueron</b> y ponles las mismas '+
+    'Para un traslado, un montaje o una feria: marca a quienes fueron y ponles las mismas '+
     'horas de una vez. No se otorga nada hasta que pulses el botón.</p>'+
-    filtro+
-    '<div class="chips" id="bloPool" style="margin-bottom:12px">'+chips+'</div>'+
+    /* El selector de personas ÚNICO (comun.js); «Ver lista» las agrupa por unidad. Lo que se manda son los marcados. */
+    elegirPersonas('bloInv', {universo:pool.map(function(m){ return m.nombre; }), titulo:'A quién otorgar el bloque',
+      vacio:'Nadie marcado: escribe un nombre o pulsa «Ver lista».'})+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
-      '<label style="min-width:150px"><span class="sc" style="display:block;margin-bottom:5px">Categoría</span>'+'<select id="bloCat" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px">'+'<option value="reunion">Reunión</option><option value="tareas">Tarea</option>'+'<option value="turno">Turno</option><option value="compensacion" selected>Compensación</option></select></label>'+'<label style="width:120px"><span class="sc" style="display:block;margin-bottom:5px">Horas c/u</span>'+
-      '<input class="mono" id="bloH" value="2,0" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-family:var(--mono);font-size:12.5px"></label>'+
+      '<div><span class="sc" style="display:block;margin-bottom:5px">Categoría</span>'+
+        nxElige('bloCat', [['reunion','Reunión'],['tareas','Tarea'],['turno','Turno'],['compensacion','Compensación']], 'compensacion')+'</div>'+
+      '<div><span class="sc" style="display:block;margin-bottom:5px">Subcategoría (compensación)</span>'+
+        nxElige('bloSubc', [['','Sin elegir']].concat(SUBCATS_COMP), '')+'</div>'+   /* 01/11 (horasmes), con chips: nada de <select> */
+      '<div><span class="sc" style="display:block;margin-bottom:5px">Horas c/u</span>'+nxNum('bloH', 2, {min:0, paso:0.25, sufijo:'h'})+'</div>'+
       '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Concepto</span>'+
       '<input id="bloC" placeholder="p. ej. Traslado a campo de pruebas" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
       '<button class="btn pri" data-bloque>Otorgar el bloque</button>'+
@@ -181,6 +196,7 @@ function normParte(p){
        del móvil); `ret`/`revmot` dicen si un revertido lo retiraste tú y por qué se revirtió. */
     iso:String(p.fecha||''), cat:p.categoria||null, ret:!!p.retirado_at, revmot:p.revertido_motivo||null,
     bloque:p.bloque||null, reunion_id:p.reunion_id==null?null:p.reunion_id, resumen:p.resumen||'',   /* 29/10: el parte de bloque */
+    tareaparte:p.tareaparte||null, propuesto_por:p.propuesto_por||null,   /* 01/11: tarea entregada → parte propuesto */
     _real:true };
 }
 
@@ -308,7 +324,7 @@ function _escRevBloqueo_(p){
      horas directamente», con el concepto diciendo de dónde vienen. */
   if(p && p.origen==='reversion')
     return 'Es la contraparte de una reversión: no se revierte. Si te pasaste revirtiendo, '+
-      'vuelve a poner las horas con <b>Otorgar horas directamente</b>, aquí al lado.';
+      'vuelve a poner las horas con «Otorgar horas directamente», aquí al lado.';
   /* ⛔ MES CERRADO. Sus horas ya están en Notion y de ahí salió la cuota; la contraparte
      negativa se restaría del mes EN CURSO — horas de otro mes, a alguien que no ha hecho nada,
      y sin dar error. El servidor ya se planta (v68): esto es cortesía, para no ofrecer un
@@ -405,7 +421,7 @@ function _escRevCard_(p){
      escondería justo el que importa: que revertir RESTA de la ficha de una persona. */
   return cab+
     '<div class="ruta">'+(cuenta
-      ? 'Esas horas <b>ya cuentan</b>: revertir emite un apunte que le RESTA '+h1(p.horas)+
+      ? 'Esas horas ya cuentan: revertir emite un apunte que le RESTA '+h1(p.horas)+
         ' de su ficha.'
       : (p.estado==='otorgada'
         /* ⛔ 21/10 (auditor 8, 🟡 12): el servidor manda una `otorgada` a `anulada` (terminal), no a `pendiente`. */
@@ -435,9 +451,9 @@ function _escRevPanel_(){
   return pan('Ya firmaste', vivos+' aún revertibles · '+lista.length+' en total · '+nf2(h)+' h',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
     'Lo ya decidido en tu ámbito —también lo que otorgó el sistema—; lo de un mes ya cerrado sale, pero ya no se '+
-    'deshace. <b>Revertir exige un motivo</b>; si las '+
-    'horas ya contaban, se emite un apunte que se las resta de su ficha. <b>Nadie revierte lo '+
-    'suyo.</b></p></div>'+cuerpo);
+    'deshace. Revertir exige un motivo; si las '+
+    'horas ya contaban, se emite un apunte que se las resta de su ficha. Nadie revierte lo '+
+    'suyo.</p></div>'+cuerpo);
 }
 
 function _engPartesRev_(){
@@ -460,11 +476,11 @@ function _engPartesRev_(){
       for(i=0;i<PART_BACK.length;i++)
         if(String(PART_BACK[i].id)===String(caja.dataset.revid)) p=PART_BACK[i];
       if(!p){ tost('Ese parte ya no está en la cola: recarga la pantalla.'); return; }
-      if(!confirm('Revertir este parte.'+String.fromCharCode(10,10)+
+      if(!(await dialogoSiNo('Revertir este parte.'+String.fromCharCode(10,10)+
         (_escRevYaCuenta_(p)
           ? 'Las horas YA cuentan: se emite un apunte que le RESTA '+h1(p.horas)+' de su ficha.'
           : 'Todavía no contaban: la decisión se deshace y el parte vuelve a la cola.')+
-        String.fromCharCode(10,10)+'¿Sigo?')) return;
+        String.fromCharCode(10,10)+'¿Sigo?'))) return;
       b.disabled=true; var prev=b.textContent; b.textContent='Revirtiendo…';
       try{
         /* ⛔ EL `await` VA DENTRO DEL `try`. Un `try/catch` alrededor de una llamada `async`
@@ -639,6 +655,36 @@ function _fichaFalta_(){
   return null;
 }
 
+/* Las filas comunes del formulario de DECLARAR horas, en el escritorio: perfil, categoría, subcategoría, «Imputar a» (o el
+   concepto, según la categoría) y «Qué estuviste haciendo». Las dos entradas (`_fichaPanel_`, con la sesión abierta; y
+   `_bloqPanel_`, horas sin fichaje) lo pintaban igual dos veces; ahora lo único que cambia son los ids de los campos
+   (`ids`) y el ejemplo del concepto (`phDet`). `f` es el formulario (FICHA_FORM / BLOQ_FORM). */
+function _declaCamposHTML_(f, ids, perf, selPerfil, opts, phDet){
+  var etiDet = f.cat==='reunion' ? 'Nombre de la reuni\u00f3n'
+             : f.cat==='turno'   ? 'Qu\u00e9 turno' : 'Concepto';
+  var campoImput = f.cat==='tareas'
+    ? '<div style="flex:2;min-width:240px"><span class="sc" style="display:block;margin-bottom:5px">Imputar a</span>'+
+      nxElige(ids.tar, opts.concat([['Trabajo de subsistema','Trabajo de subsistema \u00b7 '+perf],
+        ['__otro__','Otro (lo escribo)']]), f.tarea||'')+'</div>'+
+      (f.tarea==='__otro__'
+        ? '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Cu\u00e1l</span>'+
+          '<input id="'+ids.det+'" value="'+esc(f.detalle)+'" placeholder="nombre de la tarea" style="'+CAMPO_CSS+'"></label>'
+        : '')
+    : '<label style="flex:2;min-width:240px"><span class="sc" style="display:block;margin-bottom:5px">'+etiDet+'</span>'+
+      '<input id="'+ids.det+'" value="'+esc(f.detalle)+'" placeholder="'+phDet+'" style="'+CAMPO_CSS+'"></label>';
+  return '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+      selPerfil+
+      '<div style="min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">Categor\u00eda</span>'+
+      nxElige(ids.cat, [['tareas','Tarea'],['reunion','Reuni\u00f3n no convocada'],['turno','Turno no convocado'],
+        ['compensacion','Compensaci\u00f3n']], f.cat)+'</div>'+
+      _subcatHTML_(ids.sub, f.subcat, f.cat)+
+      campoImput+
+    '</div>'+
+    '<label style="display:block"><span class="sc" style="display:block;margin-bottom:5px">Qu\u00e9 estuviste haciendo</span>'+
+    '<textarea id="'+ids.just+'" rows="3" placeholder="Qu\u00e9 hiciste, con qui\u00e9n y d\u00f3nde. M\u00ednimo 25 caracteres." '+
+      'style="'+CAMPO_CSS+';resize:vertical;font-size:12.5px">'+esc(f.just)+'</textarea></label>';
+}
+
 function _fichaPanel_(){
   if(!_fichaHayBack_()) return pan('Tu sesi\u00f3n de trabajo','sin conexi\u00f3n',
     vacioSimple('Sin sesi\u00f3n no se puede fichar','Entra con tu cuenta.'));
@@ -673,11 +719,11 @@ function _fichaPanel_(){
         '<div class="sc" id="fichaEst">'+linea+'</div>'+
         '<p style="margin:7px 0 0;font-size:11.5px;color:var(--ink3);line-height:1.6">'+
         (abierta
-          ? 'Corre en el <b>servidor</b>: puedes cerrar esta pesta\u00f1a. A las <b>14 h</b> se cierra sola '+
+          ? 'Corre en el servidor: puedes cerrar esta pesta\u00f1a. A las 14 h se cierra sola '+
             /* ⛔ 633.ª el barrido cierra en entrada + 14 h y graba eso menos las pausas: la
                «última actividad» no la mira nadie. 21/10 (auditor 8): y nace SIN DECLARAR, con 24 h de vida
                (decisión del 09/09); aquí no se decía. */
-            'con el tope: 14 h desde tu entrada, menos las pausas, y queda <b>sin declarar</b>: decl\u00e1ralo antes de '+
+            'con el tope: 14 h desde tu entrada, menos las pausas, y queda sin declarar: decl\u00e1ralo antes de '+
             _caducaAutocierreH_()+' h.'
           : 'Tus horas no cuentan hasta que las firma quien te corresponde.')+'</p>'+
       '</div>'+
@@ -687,54 +733,23 @@ function _fichaPanel_(){
   /* El formulario SOLO con sesion abierta: rellenarlo sin nada corriendo no declara nada. */
   var form='';
   if(abierta){
-    var opts=_fichaTareas_().map(function(t){
-      return '<option value="'+esc(t.n)+'"'+(FICHA_FORM.tarea===t.n?' selected':'')+'>'+esc(t.n)+'</option>';
-    }).join('');
+    var opts=_fichaTareas_().map(function(t){ return [t.n, t.n]; });
     var ps=_perfilesDe_(miembro(_fichaYo_()));
     var selPerfil = ps.length>1
-      ? '<label style="min-width:210px"><span class="sc" style="display:block;margin-bottom:5px">Fichas como</span>'+
-        '<select id="fichaPerfil" style="'+CAMPO_CSS+'">'+ps.map(function(p){
-          return '<option value="'+esc(p.unidad)+'"'+(p.unidad===perf?' selected':'')+'>'+esc(p.txt)+'</option>';
-        }).join('')+'</select></label>'
+      ? '<div style="min-width:210px"><span class="sc" style="display:block;margin-bottom:5px">Fichas como</span>'+
+        nxElige('fichaPerfil', ps.map(function(p){ return [p.unidad, p.txt]; }), perf)+'</div>'
       : '';
-    var etiDet = FICHA_FORM.cat==='reunion' ? 'Nombre de la reuni\u00f3n'
-               : FICHA_FORM.cat==='turno'   ? 'Qu\u00e9 turno' : 'Concepto';
-    var campoImput = FICHA_FORM.cat==='tareas'
-      ? '<label style="flex:2;min-width:240px"><span class="sc" style="display:block;margin-bottom:5px">Imputar a</span>'+
-        '<select id="fichaTarea" style="'+CAMPO_CSS+'">'+
-          '<option value="">\u2014 elige una de tus tareas \u2014</option>'+opts+
-          '<option value="Trabajo de subsistema"'+(FICHA_FORM.tarea==='Trabajo de subsistema'?' selected':'')+
-            '>Trabajo de subsistema \u00b7 '+esc(perf)+'</option>'+
-          '<option value="__otro__"'+(FICHA_FORM.tarea==='__otro__'?' selected':'')+'>Otro (lo escribo)</option>'+
-        '</select></label>'+
-        (FICHA_FORM.tarea==='__otro__'
-          ? '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Cu\u00e1l</span>'+
-            '<input id="fichaDet" value="'+esc(FICHA_FORM.detalle)+'" placeholder="nombre de la tarea" style="'+CAMPO_CSS+'"></label>'
-          : '')
-      : '<label style="flex:2;min-width:240px"><span class="sc" style="display:block;margin-bottom:5px">'+etiDet+'</span>'+
-        '<input id="fichaDet" value="'+esc(FICHA_FORM.detalle)+'" placeholder="p. ej. Integraci\u00f3n motor / estructura" style="'+CAMPO_CSS+'"></label>';
+    var formCampos = _declaCamposHTML_(FICHA_FORM, {cat:'fichaCat', sub:'fichaSubcat', tar:'fichaTarea', det:'fichaDet', just:'fichaJust'},
+      perf, selPerfil, opts, 'p. ej. Integraci\u00f3n motor / estructura');
 
     form='<div class="pb" style="border-top:1px solid var(--line)">'+
-      '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
-        selPerfil+
-        '<label style="min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">Categor\u00eda</span>'+
-        '<select id="fichaCat" style="'+CAMPO_CSS+'">'+
-          '<option value="tareas"'+(FICHA_FORM.cat==='tareas'?' selected':'')+'>Tarea</option>'+
-          '<option value="reunion"'+(FICHA_FORM.cat==='reunion'?' selected':'')+'>Reuni\u00f3n no convocada</option>'+
-          '<option value="turno"'+(FICHA_FORM.cat==='turno'?' selected':'')+'>Turno no convocado</option>'+
-          '<option value="compensacion"'+(FICHA_FORM.cat==='compensacion'?' selected':'')+'>Compensaci\u00f3n</option>'+
-        '</select></label>'+
-        campoImput+
-      '</div>'+
-      '<label style="display:block"><span class="sc" style="display:block;margin-bottom:5px">Qu\u00e9 estuviste haciendo</span>'+
-      '<textarea id="fichaJust" rows="3" placeholder="Qu\u00e9 hiciste, con qui\u00e9n y d\u00f3nde. M\u00ednimo 25 caracteres." '+
-        'style="'+CAMPO_CSS+';resize:vertical;font-size:12.5px">'+esc(FICHA_FORM.just)+'</textarea></label>'+
+      formCampos+
       '<p class="sc" id="fichaFalta" style="margin:8px 0 0;letter-spacing:.08em">'+
         esc(_fichaFalta_()||'Todo listo: al fichar salida se declara.')+'</p>'+
-      '<div class="nota" style="margin-top:11px">La <b>duraci\u00f3n</b> sale de la entrada al env\u00edo, menos pausas. '+
-        'Si lo cierras sin declarar, caduca a los <b>7 d\u00edas</b>; si se cierra solo al tope, a las <b>'+_caducaAutocierreH_()+' h</b>. '+
-        'Lo declaras <b>aqu\u00ed abajo</b> o desde el m\u00f3vil.'+
-        (firmaP?' Lo firma <b>'+esc(firmaP)+'</b>.':'')+'</div>'+
+      '<div class="nota" style="margin-top:11px">La duraci\u00f3n sale de la entrada al env\u00edo, menos pausas. '+
+        'Si lo cierras sin declarar, caduca a los 7 d\u00edas; si se cierra solo al tope, a las '+_caducaAutocierreH_()+' h. '+
+        'Lo declaras aqu\u00ed abajo o desde el m\u00f3vil.'+
+        (firmaP?' Lo firma '+esc(firmaP)+'.':'')+'</div>'+
     '</div>';
   }
 
@@ -813,10 +828,10 @@ function _engFicharE_(){
     /* ⛔ CERRAR SIN DECLARAR SE AVISA, Y CON LA CONSECUENCIA EXACTA. El parte queda «sin
        declarar», caduca a los 7 dias y hoy solo se declara desde el movil: cerrar y que se
        pierda en silencio es justo lo que esta pantalla viene a quitar. */
-    if(!declara && !confirm('Vas a cerrar la sesi\u00f3n SIN declararla.'+String.fromCharCode(10,10)+
+    if(!declara && !(await dialogoSiNo('Vas a cerrar la sesi\u00f3n SIN declararla.'+String.fromCharCode(10,10)+
         falta+'.'+String.fromCharCode(10)+'El parte quedar\u00e1 «sin declarar» y caduca '+_plazoSinDeclarar_(_fichaMin_())+'. '+
         'Lo declaras aqu\u00ed mismo, en el panel de abajo.'+String.fromCharCode(10,10)+
-        '\u00bfCerrar igualmente?')) return;
+        '\u00bfCerrar igualmente?'))) return;
     bf.disabled=true; var prev=bf.textContent; bf.textContent='Cerrando\u2026';
     /* ⛔ EL PERFIL SE CONGELA ANTES DE ENVIAR, y el firmante SALE DE EL. Calcularlo despues
        —que es como estaba— lo leia con `f.perfil` ya puesto a `null` por la limpieza del
@@ -830,14 +845,15 @@ function _engFicharE_(){
          justificacion en blanco meteria el parte en la cola del coordinador **sin nada que
          juzgar** — y de paso le quitaria al autor los 7 dias que tiene para justificarlo. */
       var r=await api.ficharSalida(declara?_imputacion_(f):'', declara?f.just.trim():'',
-                                   declara?f.cat:null, _perfEnvio);
+                                   declara?f.cat:null, _perfEnvio, declara?_subcatEnvio_(f):null,
+                                   declara?_imputacionUrl_(f,TAREAS,_fichaYo_()):null);
       /* La sesion queda cerrada pase lo que pase con la lista de partes: el parte ya existe en
          el servidor. Se mete en `PART_BACK` por la MISMA puerta que otorgar (`_partesReal_`,
          que es quien deriva `PARTES`), y si esa lista todavia no ha llegado NO se inventa
          nada — la trae el refresco de 90 s. */
       if(r && r.parte && Array.isArray(PART_BACK)){ PART_BACK.push(r.parte); _partesReal_(); }
       FICHA=null; FICHA_SRV.at=Date.now();
-      f.just=''; f.tarea=''; f.detalle=''; f.perfil=null;
+      f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null;
       /* ⚠️ `h = null` es «no lo se», y CERO seria un dato: sin las horas de vuelta se
          confirma el envio sin inventarse un numero. */
       var h=(r&&r.parte&&typeof r.parte.horas==='number')?r.parte.horas:null;
@@ -855,7 +871,9 @@ function _engFicharE_(){
      las otras dos diciendo lo de antes, que es peor que no decir nada. */
   if(fp) fp.onchange=function(){ FICHA_FORM.perfil=fp.value; pintar(); };
   var fc=document.getElementById('fichaCat');
-  if(fc) fc.onchange=function(){ FICHA_FORM.cat=fc.value; FICHA_FORM.tarea=''; FICHA_FORM.detalle=''; pintar(); };
+  if(fc) fc.onchange=function(){ FICHA_FORM.cat=fc.value; FICHA_FORM.tarea=''; FICHA_FORM.detalle=''; FICHA_FORM.subcat=''; pintar(); };
+  var fs=document.getElementById('fichaSubcat');
+  if(fs) fs.onchange=function(){ FICHA_FORM.subcat=fs.value; pintar(); };
   var ft=document.getElementById('fichaTarea');
   if(ft) ft.onchange=function(){ FICHA_FORM.tarea=ft.value;
     if(ft.value==='__otro__'){ FICHA_FORM.detalle=''; pintar(); } else _fichaAviso_(); };
@@ -942,9 +960,10 @@ function _bloqHoras_(){
 function _bloqMios_(){
   if(!Array.isArray(PART_BACK)) return [];
   var yo=_fichaYo_();
-  return PART_BACK.filter(function(p){
+  /* 01/11: del más reciente al más antiguo (fecha y hora) y sin los caducados: `_sinDeclararOrdenados_`, comun.js. */
+  return _sinDeclararOrdenados_(PART_BACK.filter(function(p){
     return p && p.autor===yo && (p.estado==='sin_declarar' || p.estado==='detalle');
-  });
+  }), Date.parse(_ahoraApp_()));
 }
 
 /* El parte que se esta declarando, o `null`. ⛔ Se busca DENTRO de `_bloqMios_()` y no en la
@@ -976,6 +995,8 @@ function _bloqFalta_(){
        puerta buena ya existía en `comun.js`: `_fechaDMY_` rechaza además las fechas
        imposibles, porque `new Date(2026,1,31)` **no falla, rueda al mes siguiente**. */
     if(!decl && !_fechaDMY_(f.fecha)) return 'La fecha va como DD/MM/AAAA y tiene que existir';
+    /* 01/11 (`huecosesc`): una fecha FUTURA pasaba esta puerta y la rechazaba después el servidor («no puede ser futura»). Mismo texto que el móvil. */
+    if(!decl && _fechaFutura_(f.fecha)) return 'Esa fecha todav\u00eda no ha llegado: declara horas que ya hiciste';
     /* 31/10: la entrada y la salida son campos de texto (los desplegables no admitían 17:43 de un fichaje): se exige el formato. */
     if((String(f.ini||'').trim() && !_horaHHMM_(f.ini)) || (String(f.fin||'').trim() && !_horaHHMM_(f.fin)))
       return 'La hora va como HH:MM (p. ej. 09:30)';
@@ -1051,10 +1072,8 @@ function _bloqPerfilCampo_(){
   var ps=_perfilesDe_(miembro(_fichaYo_()));
   if(ps.length<=1) return '';
   var perf=_bloqPerfil_();
-  return '<label style="min-width:210px"><span class="sc" style="display:block;margin-bottom:5px">'+
-    'Declaras como</span><select id="bqPerfil" style="'+CAMPO_CSS+'">'+ps.map(function(x){
-      return '<option value="'+esc(x.unidad)+'"'+(x.unidad===perf?' selected':'')+'>'+esc(x.txt)+'</option>';
-    }).join('')+'</select></label>';
+  return '<div style="min-width:210px"><span class="sc" style="display:block;margin-bottom:5px">'+
+    'Declaras como</span>'+nxElige('bqPerfil', ps.map(function(x){ return [x.unidad, x.txt]; }), perf)+'</div>';
 }
 /* ⛔⛔ UNA SOLA PUERTA PARA «EL SUBSISTEMA EFECTIVO DE ESTE BLOQUE» (581.ª). La condicion
    estaba a punto de quedar copiada en TRES sitios de esta misma pantalla — la firma, el
@@ -1103,8 +1122,8 @@ function _bloqAvisosHTML_(){
      se contabiliza de otra es como se firma una cosa creyendo otra. */
   var mes=(typeof _avisoMesDelBloque_==='function') ? _avisoMesDelBloque_(f.fecha, HOY) : '';
   var avisoMes = (decl || !mes) ? '' :
-    '<div class="nota" style="margin-top:11px">Es de <b>otro mes</b>: estas horas contar\u00e1n en '+
-    '<b>'+esc(_nomPeriodo_(mes))+'</b>, el mes de trabajo en curso. Las de un mes ya cerrado no se pueden mover.</div>';
+    '<div class="nota" style="margin-top:11px">Es de otro mes: estas horas contar\u00e1n en '+
+    esc(_nomPeriodo_(mes))+', el mes de trabajo en curso. Las de un mes ya cerrado no se pueden mover.</div>';
 
   /* ⛔ Y SI EL RANGO CRUZA MEDIANOCHE, SE DICE. `_bloqDur_` ya envuelve
      (`d<0?d+1440`) y no lo dice: quien se equivoca de casilla ve una duracion plausible
@@ -1114,16 +1133,16 @@ function _bloqAvisosHTML_(){
   var cruce=(typeof _cruceNoche_==='function') ? _cruceNoche_(f.ini, f.fin) : '';
   var avisoNoche = (decl || !cruce) ? '' : (
     cruce==='noche'
-      ? '<div class="nota" style="margin-top:11px">Cruza <b>medianoche</b>: se cuentan '+
-        '<b>'+h1(_bloqDur_())+'</b>.</div>'
+      ? '<div class="nota" style="margin-top:11px">Cruza medianoche: se cuentan '+
+        h1(_bloqDur_())+'.</div>'
       : cruce==='duda'
       ? '<div class="nota" style="margin-top:11px;color:var(--warn)"><b>¿Seguro?</b> '+
-        'La salida es anterior a la entrada. Si cruzó medianoche son <b>'+h1(_bloqDur_())+
-        '</b>; si te equivocaste de casilla, <b>'+h1(24-_bloqDur_())+'</b>. <b>Las dos '+
-        'caben en un parte</b>, así que esto no se decide solo: míralo antes de firmarlo.</div>'
+        'La salida es anterior a la entrada. Si cruzó medianoche son '+h1(_bloqDur_())+
+        '; si te equivocaste de casilla, '+h1(24-_bloqDur_())+'. Las dos '+
+        'caben en un parte, así que esto no se decide solo: míralo antes de firmarlo.</div>'
       : '<div class="nota" style="margin-top:11px;color:var(--warn)"><b>Parece del '+
-        'revés.</b> Así son <b>'+h1(_bloqDur_())+'</b>, más de lo que un parte admite; '+
-        'al revés serían <b>'+h1(24-_bloqDur_())+'</b>. Cambia entrada por salida si es eso.</div>');
+        'revés.</b> Así son '+h1(_bloqDur_())+', más de lo que un parte admite; '+
+        'al revés serían '+h1(24-_bloqDur_())+'. Cambia entrada por salida si es eso.</div>');
   return avisoMes+avisoNoche;
 }
 
@@ -1147,16 +1166,20 @@ function _bloqPanel_(){
   var lista = !pend.length ? '' :
     '<div class="pb" style="padding:0">'+pend.map(function(p){
       var det=(p.estado==='detalle'), sel=!!(decl && decl.id===p.id);
-      var cad=p.caduca_at ? ' \u00b7 caduca '+esc(_diaMadridDe_(p.caduca_at)) : '';
+      var cad=p.caduca_at ? ' \u00b7 '+esc(_caducaElTxt_(p.caduca_at)) : '';
       return '<div class="dec" style="cursor:default"><span class="tx"><b>'+
         h1(p.horas)+' \u00b7 '+esc(_isoADMY_(String(p.fecha||'')))+
         (p.ini&&p.fin?' \u00b7 '+esc(p.ini)+'\u2013'+esc(p.fin):'')+'</b><small>'+
         (det ? 'te piden: '+esc(p.motivo||'m\u00e1s detalle')
              /* ⛔ 633.ª Y un AUTOCIERRE se dice aquí, ANTES de elegirlo: misma puerta que el móvil. */
-             : (_avisoAutocierre_(p) ? 'autocerrado al tope de '+_maxHorasParte_()+' h' : 'fichaje cerrado sin justificar')+cad)+'</small></span>'+
+             : (_avisoAutocierre_(p) ? 'autocerrado al tope de '+_maxHorasParte_()+' h \u00b7 ya no valen' : 'fichaje cerrado sin justificar')+cad)+'</small></span>'+
         '<span class="der"><span class="chip wa">'+(det?'falta detalle':'sin declarar')+'</span>'+
-        '<button class="btn sm'+(sel?' pri':'')+'" data-bdecl="'+p.id+'">'+
-          (sel?'rellen\u00e1ndolo':(det?'Responder':'Declarar'))+'</button>'+
+        /* ⛔⛔ 01/11 · Daniel: «Prohibirlo: solo "Declarar un bloque"». Sobre un AUTOCIERRE no hay «Declarar» tal cual (el
+           servidor tampoco lo admite): sólo el bloque, que suelta cualquier parte elegido y abre el formulario de bloque. */
+        (!det && _avisoAutocierre_(p)
+          ? '<button class="btn sm" data-bdeclbloque>Declarar un bloque</button>'
+          : '<button class="btn sm'+(sel?' pri':'')+'" data-bdecl="'+p.id+'">'+
+              (sel?'rellen\u00e1ndolo':(det?'Responder':'Declarar'))+'</button>')+
         /* 31/10: «no puedo eliminar el parte sin declarar». `retirarParte` ya acepta un `sin_declarar`; faltaba el botón. */
         (det?'':' <button class="btn sm" data-bdesc="'+p.id+'">Descartar</button>')+'</span></div>';
     }).join('')+'</div>';
@@ -1168,7 +1191,7 @@ function _bloqPanel_(){
       '<div class="nota" style="border-top:0;padding:0"><b>'+h1(decl.horas)+'</b> del '+
         esc(_isoADMY_(String(decl.fecha||'')))+
         (decl.ini&&decl.fin?' ('+esc(decl.ini)+'\u2013'+esc(decl.fin)+')':'')+
-        ' \u00b7 son las horas del fichaje; si no son las que trabajaste, <b>cambia la entrada o la salida</b> y se recalculan. '+
+        ' \u00b7 son las horas del fichaje; si no son las que trabajaste, cambia la entrada o la salida y se recalculan. '+
         (decl.estado==='detalle'
           ? 'Te pidieron m\u00e1s detalle: corrige lo que ya mandaste, no empieces de cero.'
           : 'Solo falta decir a qu\u00e9 imputarlas y justificarlas.')+'</div>'+
@@ -1187,8 +1210,8 @@ function _bloqPanel_(){
        formulario apuntando a un `id` que el servidor va a rechazar con un mensaje que no
        explica nada. */
     cab='<div class="pb" style="border-top:1px solid var(--line)">'+
-      '<div class="nota" style="border-top:0;padding:0">El fichaje que ibas a declarar <b>ya no '+
-      'espera declaraci\u00f3n</b>: o se declar\u00f3 desde el m\u00f3vil, o caduc\u00f3. Nada de lo que '+
+      '<div class="nota" style="border-top:0;padding:0">El fichaje que ibas a declarar ya no '+
+      'espera declaraci\u00f3n: o se declar\u00f3 desde el m\u00f3vil, o caduc\u00f3. Nada de lo que '+
       'escribas aqu\u00ed ir\u00eda a ning\u00fan sitio.</div>'+
       '<div style="margin-top:10px"><button class="btn sm" data-bcancel>Declarar un bloque</button></div>'+
     '</div>';
@@ -1214,18 +1237,8 @@ function _bloqPanel_(){
      mirar si hay parte**, asi que al declarar uno que ya existe se ofrecia elegir algo que
      no decide nada. Y dentro de esta funcion no habia forma de ejecutarlo en el arnes. */
   var selPerfil=_bloqPerfilCampo_();
-  var etiDet = f.cat==='reunion' ? 'Nombre de la reuni\u00f3n'
-             : f.cat==='turno'   ? 'Qu\u00e9 turno' : 'Concepto';
-  var campoImput = f.cat==='tareas'
-    ? '<div style="flex:2;min-width:240px"><span class="sc" style="display:block;margin-bottom:5px">Imputar a</span>'+
-      _chipsElegir_('data-bqtar', f.tarea, opts.concat([['Trabajo de subsistema','Trabajo de subsistema \u00b7 '+perf],
-        ['__otro__','Otro (lo escribo)']]))+'</div>'+
-      (f.tarea==='__otro__'
-        ? '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Cu\u00e1l</span>'+
-          '<input id="bqDet" value="'+esc(f.detalle)+'" placeholder="nombre de la tarea" style="'+CAMPO_CSS+'"></label>'
-        : '')
-    : '<label style="flex:2;min-width:240px"><span class="sc" style="display:block;margin-bottom:5px">'+etiDet+'</span>'+
-      '<input id="bqDet" value="'+esc(f.detalle)+'" placeholder="p. ej. Turno de taller del 19/07" style="'+CAMPO_CSS+'"></label>';
+  var formCampos = _declaCamposHTML_(f, {cat:'bqCat', sub:'bqSubcat', tar:'bqTar', det:'bqDet', just:'bqJust'},
+    perf, selPerfil, opts, 'p. ej. Turno de taller del 19/07');
 
   /* ⛔ Y SI EL FIRMANTE ERES TU, SE DICE. `_firmaDe_` escala al PD cuando el coordinador de
      la unidad es el propio autor -- pero si el autor ES el PD, escala A SI MISMO, y ese parte
@@ -1256,20 +1269,11 @@ function _bloqPanel_(){
   var soloYo = !!(perf && _firmaDe_(perf, yo)===yo) && rangoNom(yo)<3;
   var avisoFirma = !soloYo ? '' :
     '<div class="nota" style="margin-top:11px"><b>Con este perfil el firmante ser\u00edas t\u00fa y '+
-    'nadie firma lo suyo</b>, as\u00ed que <b>nadie podr\u00e1 aprobar este parte</b>. '+
+    'nadie firma lo suyo</b>, as\u00ed que nadie podr\u00e1 aprobar este parte. '+
     'Si tienes otro perfil, declara con ese.</div>';
 
   var form='<div class="pb" style="border-top:1px solid var(--line)">'+
-    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
-      selPerfil+
-      '<div style="min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">Categor\u00eda</span>'+
-      _chipsElegir_('data-bqcat', f.cat, [['tareas','Tarea'],['reunion','Reuni\u00f3n no convocada'],
-        ['turno','Turno no convocado'],['compensacion','Compensaci\u00f3n']])+'</div>'+
-      campoImput+
-    '</div>'+
-    '<label style="display:block"><span class="sc" style="display:block;margin-bottom:5px">Qu\u00e9 estuviste haciendo</span>'+
-    '<textarea id="bqJust" rows="3" placeholder="Qu\u00e9 hiciste, con qui\u00e9n y d\u00f3nde. M\u00ednimo 25 caracteres." '+
-      'style="'+CAMPO_CSS+';resize:vertical;font-size:12.5px">'+esc(f.just)+'</textarea></label>'+
+    formCampos+
     '<p class="sc" id="bqFalta" style="margin:8px 0 0;letter-spacing:.08em">'+
       esc(falta||('Todo listo: se env\u00eda a '+(firmaP||'tu coordinador')+'.'))+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:11px">'+
@@ -1280,11 +1284,11 @@ function _bloqPanel_(){
     avisoFirma+
     /* 31/10: la nota fija decia «Nadie firma lo suyo … sube al Project Director» TAMBIÉN al PD, que sí firma lo suyo
        (cabecera de este fichero; `_firmaDe_` lo pone primero). A él se le dice lo que pasa de verdad. */
-    '<div class="nota" style="margin-top:11px">Queda <b>pendiente</b> y <b>no suma</b> hasta '+
+    '<div class="nota" style="margin-top:11px">Queda pendiente y no suma hasta '+
       'que la firme quien te corresponde. '+
       (rangoNom(yo)>=3
-        ? '<b>Como Project Director, lo tuyo lo firmas t\u00fa</b>: no sube a nadie m\u00e1s.'
-        : 'Si declaras como coordinador de tu propia unidad, lo firma el <b>Project Director</b>.')+'</div>'+
+        ? 'Como Project Director, lo tuyo lo firmas t\u00fa: no sube a nadie m\u00e1s.'
+        : 'Si declaras como coordinador de tu propia unidad, lo firma el Project Director.')+'</div>'+
   '</div>';
 
   return pan('Declarar horas que no fichaste',
@@ -1397,7 +1401,7 @@ function _misPartesNoCuentanHTML_(){
           r.viejas.map(_filaNoCuentaE_).join('')+'</details>'
         : '')+
     '</div>'+
-    '<div class="nota">Estos partes <b>no suman horas</b>. Un rechazo se lee con su motivo; para volver a pedir esas horas, '+
+    '<div class="nota">Estos partes no suman horas. Un rechazo se lee con su motivo; para volver a pedir esas horas, '+
     'declara otro parte con lo que falte.</div>');
 }
 
@@ -1484,7 +1488,7 @@ function _histHorasHTMLE_(mi){
   return pan('Todo tu histórico', todos.length+(todos.length===1?' movimiento':' movimientos')+' · separados por cierres',
     '<div class="pb" style="padding:0"><details class="ltplg" style="border-top:0"><summary><b>Ver mes a mes</b>'+
       '<span class="sc">'+nf2(tot)+' h en total</span></summary>'+out+'</details></div>'+
-    '<div class="nota">El registro <b>no se borra nunca</b>: al cerrar el mes sus horas pasan aquí y empieza el siguiente.</div>');
+    '<div class="nota">El registro no se borra nunca: al cerrar el mes sus horas pasan aquí y empieza el siguiente.</div>');
 }
 
 /* TU RITMO FRENTE AL EQUIPO Y AL MES ANTERIOR (§A7). Gemela de la mitad de datos de `_compHorasHTML_` (móvil): se
@@ -1531,7 +1535,7 @@ function _ritmoHorasHTMLE_(mi){
         '<span class="vv"><b>'+pc(dl)+'</b><small>'+esc(f.txt)+'</small></span></div>';
     }).join('')+'</div>'+
     '<div class="nota">Tu ritmo: <b>'+nf2(r.ritmo)+' h/día</b> ('+nf2(r.num)+' h en '+r.dia+' días'+
-    (r.conBase?', con la compensación base repartida hasta hoy':'')+'). Se compara el <b>ritmo</b>, no el total: '+
+    (r.conBase?', con la compensación base repartida hasta hoy':'')+'). Se compara el ritmo, no el total: '+
     'el mes en curso va a medias y el anterior está entero.</div>');
 }
 
@@ -1539,7 +1543,7 @@ function _engMisSinFirmarE_(){
   $$('[data-epret]').forEach(function(b){ b.onclick=async function(){
     if(b.disabled) return;
     var _id=+b.dataset.epret;
-    if(!confirm('Retirar este parte.\n\nNo llegará a firmarse ni contará. Se queda en tu lista como «retirada».\n\n¿Sigo?')) return;
+    if(!(await dialogoSiNo('Retirar este parte.\n\nNo llegará a firmarse ni contará. Se queda en tu lista como «retirada».\n\n¿Sigo?'))) return;
     b.disabled=true;
     try{ await api.retirarParte(_id); tost('Parte retirado.'); await _cargarPartes_(); pintar(); }
     catch(e){ tostErr('No se pudo: ', e); b.disabled=false; }
@@ -1549,7 +1553,7 @@ function _engMisSinFirmarE_(){
     var _id=+b.dataset.epcorr;
     var _p=_misSinFirmarE_().filter(function(x){ return x.id===_id; })[0];
     if(!_p){ tost('Ese parte ya no está sin firmar.'); pintar(); return; }
-    var _t=prompt('Horas de este parte (máximo '+_maxHorasParte_()+'):', String(_p.horas).replace('.', ','));
+    var _t=await dialogoTexto('Horas de este parte (máximo '+_maxHorasParte_()+'):', {valor:String(_p.horas).replace('.', ',')});
     if(_t==null) return;
     var _h=Number(String(_t).trim().replace(',', '.'));
     if(!(_h>0) || _h>_maxHorasParte_()){ tost('Pon unas horas entre 0 y '+_maxHorasParte_()+'.'); return; }
@@ -1562,7 +1566,7 @@ function _engMisSinFirmarE_(){
     var _id=+b.dataset.epdesc;
     var _p=_misSinFirmarE_().filter(function(x){ return x.id===_id; })[0];
     if(!_p){ tost('Ese parte ya no está sin firmar.'); pintar(); return; }
-    var _t=prompt('Descripción de este parte:', _p.tarea||'');
+    var _t=await dialogoTexto('Descripción de este parte:', {valor:_p.tarea||''});
     if(_t==null) return;
     _t=String(_t).trim();
     if(!_t){ tost('La descripción no puede quedar vacía.'); return; }
@@ -1580,7 +1584,7 @@ function _engBloqueDescE_(){
   $$('[data-bdesc]').forEach(function(b){ b.onclick=async function(){
     if(b.disabled) return;
     var id=+b.dataset.bdesc;
-    if(!confirm('Descartar este fichaje sin declarar.\n\nNo contar\u00e1 ni llegar\u00e1 a nadie para firmar.\n\n\u00bfSigo?')) return;
+    if(!(await dialogoSiNo('Descartar este fichaje sin declarar.\n\nNo contar\u00e1 ni llegar\u00e1 a nadie para firmar.\n\n\u00bfSigo?'))) return;
     b.disabled=true;
     try{
       await api.retirarParte(id);
@@ -1593,7 +1597,7 @@ function _engBloqueDescE_(){
 /* Suelta el parte que se estaba declarando y devuelve el formulario a su estado de partida: lo del fichaje (fecha, entrada, salida)
    no debe colarse en el siguiente bloque a posteriori. */
 function _bloqSoltar_(){
-  BLOQ_FORM.declararId=null; BLOQ_FORM.just=''; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle='';
+  BLOQ_FORM.declararId=null; BLOQ_FORM.just=''; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle=''; BLOQ_FORM.subcat='';
   BLOQ_FORM.fecha=HOY; BLOQ_FORM.ini='09:00'; BLOQ_FORM.fin='11:00';
 }
 
@@ -1609,6 +1613,7 @@ function _engBloqueE_(){
     var p=l[0], det=(p.estado==='detalle');
     BLOQ_FORM.declararId=id;
     BLOQ_FORM.cat = det ? (p.categoria||'tareas') : 'tareas';
+    BLOQ_FORM.subcat = det ? (p.subcat||'') : '';
     BLOQ_FORM.tarea='';
     BLOQ_FORM.detalle = det ? (p.tarea||'') : '';
     BLOQ_FORM.just = det ? (p.justificacion||'') : '';
@@ -1623,17 +1628,19 @@ function _engBloqueE_(){
 
   var bc=document.querySelector('[data-bcancel]');
   if(bc) bc.onclick=function(){ _bloqSoltar_(); pintar(); };
+  $$('[data-bdeclbloque]').forEach(function(b){ b.onclick=function(){ _bloqSoltar_(); pintar(); }; });   /* 01/11: autocierre → sólo el bloque */
 
   var bp=document.getElementById('bqPerfil');
   /* `pintar()` y no un repintado del select: al cambiar de perfil cambian TAMBIEN el rotulo de
      «Trabajo de subsistema» y la linea de quien firma. Repintar solo lo que se toco dejaria a
      las otras dos diciendo lo de antes, que es peor que no decir nada. */
   if(bp) bp.onchange=function(){ BLOQ_FORM.perfil=bp.value; pintar(); };
-  $$('[data-bqcat]').forEach(function(b){ b.onclick=function(){
-    BLOQ_FORM.cat=b.dataset.bqcat; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle=''; pintar(); }; });
-  $$('[data-bqtar]').forEach(function(b){ b.onclick=function(){
-    BLOQ_FORM.tarea=b.dataset.bqtar; if(b.dataset.bqtar==='__otro__') BLOQ_FORM.detalle='';
-    pintar(); }; });
+  var bcat=document.getElementById('bqCat');
+  if(bcat) bcat.onchange=function(){ BLOQ_FORM.cat=bcat.value; BLOQ_FORM.tarea=''; BLOQ_FORM.detalle=''; BLOQ_FORM.subcat=''; pintar(); };
+  var bsub=document.getElementById('bqSubcat');
+  if(bsub) bsub.onchange=function(){ BLOQ_FORM.subcat=bsub.value; pintar(); };
+  var btar=document.getElementById('bqTar');
+  if(btar) btar.onchange=function(){ BLOQ_FORM.tarea=btar.value; if(btar.value==='__otro__') BLOQ_FORM.detalle=''; pintar(); };
   var bd=document.getElementById('bqDet');
   if(bd) bd.oninput=function(){ BLOQ_FORM.detalle=bd.value; _bloqAviso_(); };
   var bj=document.getElementById('bqJust');
@@ -1648,6 +1655,8 @@ function _engBloqueE_(){
     var el=document.getElementById(x[0]); if(!el) return;
     el.oninput=function(){ BLOQ_FORM[x[1]]=el.value.trim(); _bloqAviso_(); };
     el.onchange=function(){ BLOQ_FORM[x[1]]=el.value.trim(); _bloqAviso_(); };
+    /* al salir del campo, «1730» pasa a «17:30» (el teclado numérico no trae los dos puntos), como en el móvil */
+    el.onblur=function(){ var h=_horaTecleada_(el.value); if(h===el.value) return; el.value=h; el.oninput(); };
   });
 
   var be=document.getElementById('bqEnviar');
@@ -1671,7 +1680,7 @@ function _engBloqueE_(){
            `detalle`) a `pendiente`. Su proteccion contra el envio repetido es el ESTADO -- el
            segundo sale con «este parte no admite declaracion (pendiente)»--, asi que aqui no
            viaja clave: meterle una seria una segunda regla para lo mismo. */
-        var upd=await api.declararParte(decl.id, imput, f.just.trim(), f.cat);
+        var upd=await api.declararParte(decl.id, imput, f.just.trim(), f.cat, _subcatEnvio_(f), _imputacionUrl_(f,TAREAS,_fichaYo_()));
         if(upd && upd.id!=null && Array.isArray(PART_BACK)){
           var i=-1, k;
           for(k=0;k<PART_BACK.length;k++){ if(PART_BACK[k] && PART_BACK[k].id===upd.id){ i=k; break; } }
@@ -1697,9 +1706,9 @@ function _engBloqueE_(){
            `_parteConClave_` devuelve el parte que ya hay en vez de crear un segundo. Es la
            unica proteccion que cubre el envio duplicado que NO es un doble clic. */
         if(!f.clave) f.clave=_claveUso_();
-        var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat,
+        var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, subcat:_subcatEnvio_(f),
           horas:teclea, ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true,
-          subsistema:perf, clave:f.clave });
+          subsistema:perf, clave:f.clave, tareaUrl:_imputacionUrl_(f,TAREAS,_fichaYo_()) });
         guardado=(rec && rec.partes && rec.partes[0]) ? rec.partes[0] : null;
         if(guardado && Array.isArray(PART_BACK)){ PART_BACK.push(guardado); _partesReal_(); }
         f.clave=null;
@@ -1710,7 +1719,7 @@ function _engBloqueE_(){
          puntual -- «esto fue como coordinador de X», «esto fue del 30/07»-- enrute y feche TODO
          lo siguiente igual, en silencio y sin volver a preguntar. Es el fallo exacto que ya
          mordio dos veces en el movil, campo a campo. */
-      f.just=''; f.tarea=''; f.detalle=''; f.perfil=null; f.fecha=HOY;
+      f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null; f.fecha=HOY;
       if(decl){ f.ini='09:00'; f.fin='11:00'; }   /* lo del fichaje no se arrastra al siguiente bloque */
       /* ⛔ SE CONFIRMA LO GUARDADO, NO LO TECLEADO. El backend recorta al tope y devuelve el
          parte: teclear 20 h guardaba 14 y esto habria cantado «20 declaradas», seis horas
@@ -1764,14 +1773,29 @@ function _bloqueColaPanelE_(lista){
     '<div class="pb">'+_bloqueColaHTML_(g, {decide:dec, horas:function(p){ return p.horas; },
       nombre:function(p){ return _m(p.autor).pila||p.autor; }, titulo:_bloqueTituloE_})+'</div>', 'destaca');
 }
+/* 01/11 · «Tareas entregadas»: los partes que abrió el «Entregada» de un miembro, UNA tarjeta por tarea (comun.js `_tareaParte*_`). */
+/* La cola «Requieren tu decisión» SIN lo que ya tiene su propio panel (los de bloque y los de tarea entregada). */
+function _miasSueltas_(lista){ return _tareaParteGrupos_(lista.filter(function(p){ return !p.bloque; })).sueltas; }
+var _tareaParteCbE_={ hecho:function(){ _cargarPartes_().then(pintar); } };
+function _tareaPartePanelE_(lista){
+  var g=_tareaParteGrupos_(lista).grupos;
+  if(!g.length) return '';
+  return pan('Tareas entregadas', g.length+(g.length===1?' tarea':' tareas'),
+    '<div class="pb">'+_tareaParteColaHTML_(g, {horas:function(p){ return p.horas; },
+      nombre:function(p){ return _m(p.autor).pila||p.autor; }, tarea:function(p){ return p.tarea; }})+'</div>', 'destaca');
+}
+function _engTareaParteE_(){ _tareaParteColaCablear_(_tareaParteCbE_); }
 function _bloqueReuPanelE_(){
   if(!(REUS||[]).length) return '';
   var r=_reuSelE_();
   var puede=_puedeBloqueReu_(r, _actorSanc_(), (typeof esAdmin==='function' && esAdmin()));
   var abierto=!!(BLQ && BLQ.donde===vista);
   if(!puede && !abierto) return '';
+  /* 31/10 (feosesc #23): sin nada que enseñar, el panel NO sale (salía un marco con un hueco vacío). */
+  var cuerpo=abierto?_bloqueFormHTML_():_bloqueReuHTML_(r, puede);
+  if(!String(cuerpo||'').replace(/<[^>]*>/g,'').trim()) return '';
   return pan('Parte de bloque', r.en_curso?'<span class="chip wa">en curso</span>':esc(r.titulo||r.tit||''),
-    '<div class="pb">'+(abierto?_bloqueFormHTML_():_bloqueReuHTML_(r, puede))+'</div>');
+    '<div class="pb">'+cuerpo+'</div>');
 }
 function _bloqueManualPanelE_(){
   if(rangoNom(ACTOR)<1) return '';

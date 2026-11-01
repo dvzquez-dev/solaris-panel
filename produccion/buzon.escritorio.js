@@ -198,8 +198,8 @@ function _abrirPintor_(fondoUrl, alTerminar){
   };
 
   function cerrar(){ caja.classList.remove('on'); caja.setAttribute('aria-hidden','true'); }
-  $('#pcancelar').onclick=function(){
-    if(trazos.length && !confirm('Vas a salir sin guardar lo que has pintado. ¿Seguro?')) return;
+  $('#pcancelar').onclick=async function(){
+    if(trazos.length && !(await dialogoSiNo('Vas a salir sin guardar lo que has pintado. ¿Seguro?'))) return;
     cerrar();
     /* ⛔ Y SE CONTESTA: cerrar la caja NO es contestar. Quien abrió el pintor puede
        estar esperando —en el escritorio lo está, dentro de un `await`—, y dejarlo
@@ -312,19 +312,18 @@ async function reportarModal(){
      borrador despues seria el mismo trabajo perdido con un paso mas. */
   var _b=_borradorBuzon_();
   if(_b && _b.datos){
-    if(confirm('Tienes un reporte SIN ENVIAR: «'+(_b.datos.titulo||'')+'».'+String.fromCharCode(10,10)+
-      'Aceptar = reintentar enviarlo tal cual (no hay que volver a escribirlo).'+String.fromCharCode(10)+
-      'Cancelar = descartarlo y empezar uno nuevo.')){
+    if(await dialogoSiNo('Tienes un reporte SIN ENVIAR: «'+(_b.datos.titulo||'')+'».'+String.fromCharCode(10,10)+
+      '«Reintentar» lo envía tal cual (no hay que volver a escribirlo).'+String.fromCharCode(10)+
+      '«Descartar» lo tira y empieza uno nuevo.', {si:'Reintentar', no:'Descartar'})){
       return _enviarReporte_(_b.datos, _b.esMejora);
     }
     /* Descartar es una decision, no un descuido: la frase de arriba lo dice antes. */
     _borradorBuzon_(null);
   }
-  var esMejora=confirm('¿Es una MEJORA?'+String.fromCharCode(10,10)+
-    'Aceptar = proponer una mejora.'+String.fromCharCode(10)+'Cancelar = reportar un fallo.');
-  var tit=(prompt(esMejora?'¿Qué mejorarías? (en una línea)':'¿Qué ha pasado? (en una línea)')||'').trim();
+  var esMejora=await dialogoSiNo('¿Es una MEJORA o un FALLO?', {si:'Una mejora', no:'Un fallo'});
+  var tit=String(await dialogoTexto(esMejora?'¿Qué mejorarías? (en una línea)':'¿Qué ha pasado? (en una línea)')||'').trim();
   if(!tit) return;
-  var det=(prompt(esMejora?'¿Por qué? ¿Qué te cuesta hoy? (el problema de fondo, no la solución)'
+  var det=String(await dialogoTexto(esMejora?'¿Por qué? ¿Qué te cuesta hoy? (el problema de fondo, no la solución)'
                          :'¿Qué esperabas que pasara?')||'').trim();
   var ua=navigator.userAgent||'';
   var nav=/Firefox/.test(ua)?'Firefox':/Edg/.test(ua)?'Edge':/Chrome/.test(ua)?'Chrome':/Safari/.test(ua)?'Safari':'otro';
@@ -338,17 +337,16 @@ async function reportarModal(){
     datos.esperaba=det; datos.paso=tit;
     /* ⛔ AQUI HABIA `datos.gravedad='Molesta'` CLAVADO. Se pregunta, y si no se reconoce la
        respuesta NO SE ESCRIBE EL CAMPO: el eje se queda sin medir y la ficha lo pide. */
-    var _g=_normGravedad_(prompt('\u00bfCu\u00e1nto molesta? Escribe una de las tres:'+
-      String.fromCharCode(10,10)+'Bloquea \u00b7 Molesta \u00b7 Cosm\u00e9tico'+
-      String.fromCharCode(10,10)+
-      '(Cancelar o dejarlo en blanco = sin medir; se ver\u00e1 como que falta)'));
-    if(_g) datos.gravedad=_g;
+    /* ⛔ 01/11 (Daniel, artifact [c9bbaa6286]): «tampoco que permita entregarlo sin marcar nada». Ya no se teclea ni se
+       puede dejar en blanco: son tres chips sin ninguno marcado, y cancelar la elección cancela el reporte. */
+    var _g=await dialogoElegir('\u00bfCu\u00e1nto molesta?', ['Bloquea','Molesta','Cosm\u00e9tico'], {si:'Seguir'});
+    if(!_g) return;
+    datos.gravedad=_g;
   }
   /* La captura se ofrece AL FINAL, cuando ya no hay `prompt` abierto. Y se ofrece, no se
      exige: hay reportes que no son de sitio y pedir una foto los frenaria. */
-  if(confirm('¿Quieres adjuntar una captura?'+String.fromCharCode(10,10)+
-    'Se abre para marcarla con el lápiz antes de enviarla.'+String.fromCharCode(10)+
-    'Cancelar = enviar sin foto.')){
+  if(await dialogoSiNo('¿Quieres adjuntar una captura?'+String.fromCharCode(10,10)+
+    'Se abre para marcarla con el lápiz antes de enviarla.', {si:'Adjuntar', no:'Enviar sin foto'})){
     var cap=await _pedirCaptura_();
     if(cap) datos.captura=cap;
   }
@@ -598,15 +596,13 @@ function _compHTML_(r){
     (no
       ? '<div class="ruta">No se puede otorgar: '+esc(no)+'.</div>'
       : '<div class="acts">'+
-          '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px">Horas'+
+          '<div style="display:flex;align-items:center;gap:7px;font-size:12.5px">Horas'+
           /* ⛔ EL TOPE SALE DE `_maxHorasParte_()`, NO CLAVADO. Ponia `max="8"` y el backend
          recorta a 14 (`Codigo.gs:3457`): un rotulo que contradice al guardia de al lado, y
          justo la averia del 12-vs-14 de la que nacio ese ayudante. Ademas el `max` de un
          `<input>` suelto NO valida nada; quien para de verdad es la guarda de
          `escritorio.html`, que pregunta a la MISMA funcion. */
-      '<input type="number" step="0.25" min="0" max="'+_maxHorasParte_()+'" value="'+p.horas+'" data-comph="'+ID+'" '+
-          'style="width:78px;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
-          'padding:7px 9px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
+      nxNum('', p.horas, {min:0, max:_maxHorasParte_(), paso:0.25, sufijo:'h', attrs:'data-comph="'+ID+'"'})+'</div>'+
           '<button class="btn pri" data-comp="'+ID+'">Otorgar a '+esc(_m(r.quien).pila)+'</button>'+
         '</div>')+
   '</div>';

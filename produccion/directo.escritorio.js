@@ -58,6 +58,7 @@ function _directoHTML_(){
       '<span class="dir-vivo"><i></i><span>Conectando</span></span>'+
       '<span class="dir-cifra"><b class="mono" id="dirHoy">0</b><small>eventos hoy</small></span>'+
       '<span class="dir-cifra"><b class="mono" id="dirRitmo">0</b><small>en los últimos 10 min</small></span>'+
+      '<button type="button" class="btn dir-snd" data-dirsnd title="Suena cada evento nuevo">🔊 Sonido</button>'+
     '</div>'+
     '<div class="dir-tabs" role="tablist">'+
       '<button type="button" class="dir-tab on" role="tab" data-dirv="mapa">Mapa</button>'+
@@ -78,15 +79,68 @@ function _directoHTML_(){
     '<div class="dir-vtodo">'+
       '<div class="dtd-ct" id="dtdCt"></div>'+
       '<div class="dtd-tim" id="dtdTim"></div>'+
-      '<div class="dtd-nota">Sin nombres, a propósito: el diario no guarda quién. «auto» = lo pide el propio servidor.</div>'+
+      '<div class="dtd-nota">El diario no guarda quién. «auto» es lo que pide el servidor solo.</div>'+
       '<div class="dir-reg dtd-reg" id="dtdReg" aria-live="polite"></div>'+
     '</div>'+
   '</section>';
 }
 
+function _directoMalTipo_(t){ return /^(error|fallo|crash|rendido|rechazada|rechazar|fallo_silenciado)$/.test(t||''); }
+
+/* ═══ SONIDOS (01/11) ═══════════════════════════════════════════════════════════════════════════════════════════════
+   🗣️ Daniel: *«molaría que hiciese ruido. El tema es que no sé por qué tiene como cooldown, porque no hace beep al mismo
+   tiempo que la app»*. Cada evento NUEVO suena en el momento de pintarse (sin cooldown ni lote), con los sonidos de
+   `comun.js` (`_sonar_`): uno por tipo. ⛔ Lo que NO suena: la primera lectura (es el histórico, no «está pasando») y lo
+   `auto` (lo que pide el servidor con su clave: sonaría sin parar). Dos interruptores: el general de Ajustes (`_sonidosOn_`)
+   y el 🔊 de la propia vista (`DIRECTO_SND_LS`, recordado por dispositivo). Tope: `DIRECTO_SONIDOS_S` por segundo, para que
+   una ráfaga no sea un ruido continuo (los que sobran callan; el pulso y la fila se pintan igual). */
+function _directoSonidoOn_(){
+  try{ return localStorage.getItem(DIRECTO_SND_LS)!=='0'; }catch(_){ return true; }
+}
+/* Qué suena para un evento del mapa (`pieza`) o una línea de «Todo» (`k`); `null` = silencio. */
+function _directoSonidoDe_(e){
+  if(!e || e.auto) return null;
+  if(_directoMalTipo_(e.tipo) || e.ok===false) return 'rechazar';
+  var t=String(e.tipo||'');
+  switch(e.k||e.pieza){
+    case 'horas':      return /entrada/.test(t) ? 'fichar' : /aprob/.test(t) ? 'aprobar' : 'hecho';
+    case 'turnos':     return 'turno';
+    case 'sanciones':  return 'sancion';
+    case 'documentos': return /aprob/.test(t) ? 'aprobar' : 'documento';
+    case 'avisos': case 'aviso': return 'aviso';
+    case 'reuniones':  return 'reunion';
+    case 'peticion':   return 'peticion';
+    case 'sistema':    return t==='peticion' ? 'peticion' : 'rutina';
+    case 'gate':       return 'rutina';
+  }
+  return null;
+}
+/* Suena `nombre` si los dos interruptores lo dejan y no se ha pasado del tope de este segundo. Devuelve si lo programó. */
+function _directoSuena_(nombre){
+  if(!nombre || !_directoSonidoOn_()) return false;
+  var t=Date.now();
+  DIRECTO.sonados=(DIRECTO.sonados||[]).filter(function(x){ return t-x<1000; });
+  if(DIRECTO.sonados.length>=DIRECTO_SONIDOS_S) return false;
+  var s=_sonar_(nombre);
+  if(s) DIRECTO.sonados.push(t);
+  return s;
+}
+/* El texto del 🔊 según su estado (la vista se pinta siempre igual: aquí se cambia sólo la etiqueta). */
+function _directoSonidoPinta_(){
+  var b=document.querySelector('[data-dirsnd]'); if(!b) return;
+  var on=_directoSonidoOn_();
+  b.textContent=on?'🔊 Sonido':'🔇 Mudo'; b.setAttribute('aria-pressed', on?'true':'false');
+}
+function _directoSonidoAlterna_(){
+  var on=!_directoSonidoOn_();
+  try{ localStorage.setItem(DIRECTO_SND_LS, on?'1':'0'); }catch(_){}
+  _directoSonidoPinta_();
+  if(on) _sonar_('hecho');          // al encenderlo suena, para comprobar que se oye
+}
+
 function _directoFilaHTML_(e){
   var p=_directoPieza_(e.pieza), d=new Date(e.at);
-  var mal=/^(error|fallo|crash|rendido|rechazada|rechazar|fallo_silenciado)$/.test(e.tipo||'');
+  var mal=_directoMalTipo_(e.tipo);
   var q=e.quien ? ((_m(e.quien)&&_m(e.quien).pila) || e.quien) : '';
   return '<div class="dir-fila'+(mal?' mal':'')+'" style="--c:'+p.c+'">'+
     '<span class="dir-t mono">'+(isNaN(d)?'—':_hhmmDe_(e.at)+':'+pad(d.getSeconds()))+'</span>'+
@@ -116,7 +170,11 @@ function _directoLlegan_(evs, animar){
       if(animar) reg.firstChild.classList.add('nueva');
       while(reg.children.length>DIRECTO_MAX) reg.removeChild(reg.lastChild);
     }
-    if(animar) setTimeout(function(){ _directoPulso_(e); }, i*260);
+    if(animar){
+      setTimeout(function(){ _directoPulso_(e); }, i*260);
+      /* En «Todo» los avisos y lo del sistema ya suenan por sus líneas (`_directoTodoLlegan_`): aquí no, o sonarían doble. */
+      if(!(DIRECTO.tab==='todo' && (e.pieza==='sistema' || e.pieza==='avisos'))) _directoSuena_(_directoSonidoDe_(e));
+    }
   });
   _directoCifras_(animar ? nuevos.map(function(e){ return e.pieza; }) : []);
   return nuevos.length;
@@ -231,6 +289,7 @@ function _pinDirecto_(){
     reg.innerHTML=DIRECTO.eventos.slice().reverse().map(_directoFilaHTML_).join('');
   _directoCifras_([]);
   _directoEstado_();
+  _directoSonidoPinta_();
   _directoVista_(DIRECTO.tab||'mapa');
   if(DIRECTO.reloj) return;
   var real=backendOK && SESION;
@@ -252,7 +311,7 @@ function _pinDirecto_(){
 function _directoReset_(){
   if(DIRECTO.reloj) clearInterval(DIRECTO.reloj);
   DIRECTO.eventos=[]; DIRECTO.cursor=null; DIRECTO.cuenta={}; DIRECTO.vistos={}; DIRECTO.reloj=null;
-  DIRECTO.demo=0; DIRECTO.err=null; DIRECTO.enVuelo=false;
+  DIRECTO.demo=0; DIRECTO.err=null; DIRECTO.enVuelo=false; DIRECTO.sonados=[];
   var reg=document.getElementById('dirReg'); if(reg) reg.innerHTML='';
   _directoTodoParar_();
   DIRECTO.tab='mapa'; DIRECTO.todo={lineas:[], vistos:{}, cursor:null, cont:null, timers:[], sesgo:0, err:null, enVuelo:false, reloj:null, n:0};
@@ -287,6 +346,8 @@ function _directoVista_(k){
   else _directoTodoParar_();
 }
 function _directoClic_(ev){
+  var s=ev.target&&ev.target.closest&&ev.target.closest('[data-dirsnd]');
+  if(s){ _directoSonidoAlterna_(); return; }
   var b=ev.target&&ev.target.closest&&ev.target.closest('.dir-tab');
   if(b && b.dataset.dirv) _directoVista_(b.dataset.dirv);
 }
@@ -352,6 +413,7 @@ function _directoTodoLlegan_(ls, animar){
       reg.insertAdjacentHTML('afterbegin', _directoTodoFilaHTML_(l));
       if(animar) reg.firstChild.classList.add('nueva');
     });
+    if(animar && vista==='directo') nuevas.forEach(function(l){ _directoSuena_(_directoSonidoDe_(l)); });
     while(reg.children.length>DIRECTO_TODO_MAX) reg.removeChild(reg.lastChild);
   }
   _directoTodoCifras_();
