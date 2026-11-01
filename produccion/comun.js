@@ -5371,6 +5371,20 @@ function _periodoAbierto_(){
   return null;
 }
 
+/* ⛔ 01/11 · EL MES QUE SE CIERRA, CON SUS DÍAS. Daniel, al cerrar octubre: «el periodo carece de sentido asi, deberia mostrar
+   los días concretos, no un mes». El mes de trabajo va de cierre a cierre (ARRANQUE §2b): empieza el día del ÚLTIMO cierre y
+   llega hasta `hasta` (ISO; por defecto hoy). `{desde, hasta, dias, txt}` con fechas DD/MM/AAAA, o `null` si no se sabe
+   cuándo fue el último cierre: «no lo sé» no se rellena con el calendario (que es lo que decía «terminó 31/10»). */
+function _tramoCierre_(hasta){
+  var uc = (typeof CIERRE_UC !== 'undefined' && CIERRE_UC) ? CIERRE_UC
+         : ((typeof CIERRE !== 'undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
+  var d = uc ? _diaMadridDe_(uc.at) : '', h = _diaMadridDe_(hasta || new Date().toISOString());
+  if(!d || !h) return null;
+  var dias = Math.round((Date.parse(_dmyAISO_(h) + 'T00:00:00Z') - Date.parse(_dmyAISO_(d) + 'T00:00:00Z')) / 86400000);
+  if(!(dias >= 0)) return null;
+  return {desde: d, hasta: h, dias: dias, txt: 'del ' + d + ' al ' + h};
+}
+
 function _deEsteMes_(d){
   if(!d) return false;
   /* ⛔ POR `_periodoAbierto_` (791.ª): `_diasDelMes_().periodo` sale de
@@ -6194,7 +6208,11 @@ function _avisoAplicarCierre_(est, hoy){
   /* «NO terminado» desde el 22/10 (refutador 22, 🟡 5); «NO aplicado» es la nota de antes, que puede seguir en la fila. */
   if(!ua || !/NO (terminado|aplicado)/.test(String(ua.nota || ''))) return '';
   var dia = _diaMadridDe_(ua.at);
-  return 'El último «Aplicar» NO terminó' + (dia ? ' (' + dia + ')' : '') + ': «' + String(ua.nota) + '». El aviso del ' +
+  /* 01/11 (Daniel cerró octubre solo y vio «salida 2 · el aviso del gate dice por qué»): desde entonces la nota trae el MOTIVO
+     en llano tras «: » (`aplicar_cierre.nota_aplicar`), y se enseña ése. Sin motivo (notas viejas), la frase de siempre. */
+  var nota = String(ua.nota), k = nota.indexOf('): ');
+  if(k >= 0) return 'El último «Aplicar» no terminó' + (dia ? ' (' + dia + ')' : '') + ': ' + nota.slice(k + 3) + '.';
+  return 'El último «Aplicar» NO terminó' + (dia ? ' (' + dia + ')' : '') + ': «' + nota + '». El aviso del ' +
          'gate dice por qué; míralo antes de volver a pulsar.';
 }
 

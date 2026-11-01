@@ -64,7 +64,10 @@ function _planHTML_(plan){
                          (_inc.de?' de '+_inc.de:'')+'. Faltan '+_inc.faltan+'.'
               : _hecho  ? '<b>Ya está aplicado.</b>'
                         : '<b>Todavía no se ha aplicado.</b>';
+  /* ⛔ 01/11 (Daniel): el mes de trabajo son DÍAS, de cierre a cierre; se dicen cuando se sabe el último cierre. */
+  var _tr = (plan.periodo===_periodoAbierto_()) ? _tramoCierre_(plan.calculado) : null;
   return '<p class="rnota" style="margin:0 0 10px">Plan de <b>'+esc(_nomPeriodo_(plan.periodo))+'</b>'+
+      (_tr?' ('+esc(_tr.txt)+')':'')+
       (cuando?', calculado el '+esc(cuando):'')+'. '+_estado+'</p>'+
     cab+avisos+
     '<p class="rnota" style="margin:12px 0 4px">Qué le cambia a cada uno · toca para abrir</p>'+
