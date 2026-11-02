@@ -126,7 +126,7 @@ async function _reusarConv_(cv, repinta){
   var res=await _traerSemanaAnterior_(cv); if(!res) return;
   var mias=_convMias_(cv);
   if(Object.keys(mias).length &&
-     !confirm('Se sustituye lo que llevas marcado esta semana por lo de la anterior. Luego lo puedes cambiar. \u00bfSeguir?')) return;
+     !(await dialogoSiNo('Se sustituye lo que llevas marcado esta semana por lo de la anterior. Luego lo puedes cambiar. \u00bfSeguir?'))) return;
   Object.keys(mias).forEach(function(k){ delete mias[k]; });
   Object.keys(res.mapa).forEach(function(k){ mias[k]=res.mapa[k]; });
   repinta();
@@ -825,6 +825,7 @@ function _progPintar_(){
 function progTurnoAbrir(){
   if(!(YO && _puedeProgramarTurno_(YO.nombre))) return;
   PROG_T = { sel:{}, cargos:{ turno:null, audiovisual:null, memoria:null } };
+  delete SOLP.pt;   /* hoja nueva: sin propuesta de SolarIA de la anterior */
   var lab = function(t){ return '<span class="sc" style="display:block;margin:12px 0 6px">'+t+'</span>'; };
   abrirModal('<div class="mtit">Programar turno</div>'+
     '<p class="rnota" style="margin:-4px 0 4px">Les llega a los convocados y queda en Notion. No se puede convocar más de un turno el mismo día.</p>'+
@@ -841,6 +842,7 @@ function progTurnoAbrir(){
         l.forEach(function(n){ if(!PROG_T.sel[n]) PROG_T.sel[n] = {rol:'', coche:false}; });
         _progPintar_(); }})+
     '<div id="ptReparto"></div>'+
+    _solIAHTML_('pt', _solTurnoCfg_('pt'))+
     '<label class="campo" style="margin-top:12px"><span class="sc">Objetivos principales · uno por línea</span><textarea id="ptObj1" rows="3"></textarea></label>'+
     '<label class="campo"><span class="sc">Objetivos secundarios · si sobra tiempo</span><textarea id="ptObj2" rows="2"></textarea></label>'+
     '<label class="campo"><span class="sc">Aviso para los convocados</span><input id="ptNota" placeholder="traed guantes y mascarilla"></label>'+

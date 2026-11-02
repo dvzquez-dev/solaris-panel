@@ -58,7 +58,7 @@ function _directoHTML_(){
       '<span class="dir-vivo"><i></i><span>Conectando</span></span>'+
       '<span class="dir-cifra"><b class="mono" id="dirHoy">0</b><small>eventos hoy</small></span>'+
       '<span class="dir-cifra"><b class="mono" id="dirRitmo">0</b><small>en los últimos 10 min</small></span>'+
-      '<button type="button" class="btn dir-snd" data-dirsnd title="Un sonido corto por cada evento nuevo">🔊 Sonido</button>'+
+      '<button type="button" class="btn dir-snd" data-dirsnd title="Suena cada evento nuevo">🔊 Sonido</button>'+
     '</div>'+
     '<div class="dir-tabs" role="tablist">'+
       '<button type="button" class="dir-tab on" role="tab" data-dirv="mapa">Mapa</button>'+
@@ -79,7 +79,7 @@ function _directoHTML_(){
     '<div class="dir-vtodo">'+
       '<div class="dtd-ct" id="dtdCt"></div>'+
       '<div class="dtd-tim" id="dtdTim"></div>'+
-      '<div class="dtd-nota">Sin nombres, a propósito: el diario no guarda quién. «auto» = lo pide el propio servidor.</div>'+
+      '<div class="dtd-nota">El diario no guarda quién. «auto» es lo que pide el servidor solo.</div>'+
       '<div class="dir-reg dtd-reg" id="dtdReg" aria-live="polite"></div>'+
     '</div>'+
   '</section>';

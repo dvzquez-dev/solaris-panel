@@ -26,7 +26,9 @@ function normReu(r){ r=r||{};
     total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null,
     creado:r.creado||null,
     ordenDia:r.ordenDia||"", vision:r.vision||"anonima",
+    minimoPct:(typeof r.minimoPct==='number') ? r.minimoPct : null,   /* 01/11: el mínimo que eligió quien convocó; sin él, el del periodo */
     en_curso:(r.en_curso && typeof r.en_curso==='object') ? r.en_curso : null,   /* 29/10: la pone `empezarReunion` */
+    bloque:r.bloque||null,   /* 01/11: el bloque que ya fichó la reunión; sin él «ya ha pasado: ficha el bloque» saldría siempre */
     /* 26/10 (triaje A4d): convocados con el plazo YA VENCIDO — el motor no les sanciona, y `_cobertura_` tampoco */
     invitados_tarde:Array.isArray(r.invitados_tarde) ? r.invitados_tarde.slice() : [],
     /* ⛔⛔ `agregado` SE TIRABA AQUI, y con el la unica señal de que el servidor NO ha
@@ -119,6 +121,15 @@ function _presetInvitados_(tipo){
   return out;
 }
 
+/* Convocatorias en pestañas (01/11, escm2): la lista, fijar fecha y orden del día, el parte de bloque y convocar. */
+function _convocPest_(lista){
+  return _pestanasE_('conv', [
+    ['lista', 'Reuniones', lista],
+    ['fijar', 'Fijar fecha', _fijarPanel_()],
+    ['bloque', 'Parte de bloque', _bloqueReuPanelE_()],
+    ['convocar', 'Convocar', convocarReunionPanel()]
+  ], 'lista');
+}
 function convocarReunionPanel(){
   /* ⛔ UN MIEMBRO RASO SÍ CONVOCA — reunión de trabajo, y nada más. Aquí ponía
      `if(rangoNom(ACTOR)<1) return ''` y el panel entero desaparecía, mientras el MÓVIL se
@@ -200,6 +211,8 @@ function convocarReunionPanel(){
     '</div>'+
     '<p class="nota" id="cvVisHint" style="border-top:0;margin-bottom:11px">'+
       'El equipo ve el mapa de calor con los totales, sin nombres.</p>'+
+    /* 01/11 (Daniel [c8bd27e9d3]): el mínimo lo elige quien convoca entre el del periodo y ±5; las de trabajo no lo llevan. */
+    '<div id="cvMin" hidden style="margin-bottom:4px"></div>'+
     '<div class="nota" id="cvPrev" style="border-top:0;margin-bottom:11px">—</div>'+
     '<button class="btn pri" data-convreu>Convocar la reunión</button>'+
     '</div>');
@@ -232,6 +245,8 @@ function _cablearConvocar_(){
     var u=_genUnion_(rangos(), sl);
     var nb=u.perDia.reduce(function(a,x){ return a+x.length; },0), nd=dias().length;
     var nS=_slotsMin_(du,sl);
+    _minimoConvPintar_($('#cvMin'), 'e', val('cvTipo'), val('cvLim'), upd);
+    var hz=_horarioConv_(u.perDia, rangos(), nS, sl, val('cvTipo'), _minimoConvPct_($('#cvMin'), val('cvLim')));
     var p=$('#cvPrev'); if(!p) return;
     /* La cuenta se dice ANTES de convocar: cuántas casillas salen, cuántas hay que juntar
        y a cuánta gente se le va a reclamar. Es lo que decide si el mapa sirve. */
@@ -241,7 +256,9 @@ function _cablearConvocar_(){
         '<b>'+nb+'</b> bloques en <b>'+nd+'</b> día'+(nd===1?'':'s')+' · '+
         'hay que juntar <b>'+nS+'</b> seguida'+(nS===1?'':'s')+' ('+_durTxt_(nS*sl)+') para que cuente · '+
         '<b>'+CONV_INV.size+'</b> convocados'+
-        (du%sl ? ' · la duración no es múltiplo de la casilla, se redondea hacia arriba' : '');
+        (du%sl ? ' · la duración no es múltiplo de la casilla, se redondea hacia arriba' : '') +
+        (hz.bloqueo ? '<br><b style="color:var(--red)">'+esc(hz.bloqueo)+' No se puede convocar así.</b>'
+          : hz.aviso ? '<br><b style="color:var(--warn)">'+esc(hz.aviso)+'</b>' : '');
   }
   /* La tabla de días se repinta cada vez que cambian las fechas: es la única forma de que
      no se quede hablando de días que ya no existen. Lo configurado se conserva por FECHA, no
@@ -365,7 +382,7 @@ function _cablearConvocar_(){
       var h=$('#cvVisHint'); if(h) h.textContent=_cvHints[b.dataset.cv]||'';
     };
   });
-  ['cvD0','cvD1','cvH0','cvH1','cvSlot','cvDura'].forEach(function(id){
+  ['cvD0','cvD1','cvH0','cvH1','cvSlot','cvDura','cvLim'].forEach(function(id){
     var e=$('#'+id); if(e) e.onchange=upd; });
   upd();
   var bt=$('[data-convreu]');
@@ -381,17 +398,11 @@ function _cablearConvocar_(){
     u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
     if(!u.F.length || !bloques.length){ tost('Con ese horario no sale ninguna casilla.'); return; }
     var nS=_slotsMin_(du,sl);
-    /* Si el horario no da para la reunión entera, NADIE podrá marcar y la reunión nace
-       muerta. Se avisa una vez y se deja convocar igual: puede ser a propósito. */
-    /* ⛔ 20/10: POR DÍA, con la misma regla que el móvil (`_diasCortosConv_`). Mirar la unión dejaba pasar un día corto
-       en cuanto otro día fuera largo. Y el «pulsa otra vez» se ata a la configuración: cambiarla vuelve a avisar. */
-    var cortos=_diasCortosConv_(u.perDia, rangos(), nS), firma=cortos+'|'+nS+'|'+bloques.length;
-    if(cortos && bt.dataset.avisado!==firma){
-      bt.dataset.avisado=firma;
-      tost('Ojo: '+cortos+' día'+(cortos===1?'':'s')+' no da'+(cortos===1?'':'n')+' para '+_durTxt_(nS*sl)+
-        ' seguidos, así que ahí nadie podrá marcar. Pulsa otra vez para convocarla igual.');
-      return;
-    }
+    /* ⛔ 01/11 (Daniel [4e2c13a995]): «si no se pudiese de verdad, obvio no se puede convocar». Ya NO se avisa y se deja
+       convocar igual: si con este horario nadie puede llegar al mínimo (o nadie puede marcar), no se convoca y se dice
+       con números. Los días cortos sueltos que NO impiden llegar sólo se avisan en la vista previa. */
+    var hz=_horarioConv_(u.perDia, rangos(), nS, sl, val('cvTipo'), _minimoConvPct_($('#cvMin'), val('cvLim')));
+    if(hz.bloqueo){ tost(hz.bloqueo+' Cambia el horario o el mínimo.'); return; }
     var reu={ titulo:(val('cvTit')||'').trim(),
       tipo:val('cvTipo')||'trabajo', modalidad:val('cvMod')||'hibrida',
       convocante:ACTOR||'', invitados:Array.from(CONV_INV),
@@ -401,6 +412,8 @@ function _cablearConvocar_(){
          hay que juntar seguido para que valga, no la duración cruda. Si aquí se mandara
          la cruda, el mínimo al cubrir saldría distinto en cada cara. */
       slot:sl, duracion:nS*sl,
+      /* 01/11: el mínimo elegido (null en las de trabajo, que no llevan chips). */
+      minimoPct:(function(){ var c=$('#cvMin'); return (c && !c.hidden && +c.dataset.sel>0) ? +c.dataset.sel : null; })(),
       /* ⛔ SE LEE LO ELEGIDO. El arreglo perezoso es pintar los tres botones y seguir
          mandando `'anonima'`: la pantalla quedaría perfecta y el servidor recibiría
          siempre lo mismo. El respaldo es `anonima` porque es el defecto que ya se
@@ -419,9 +432,9 @@ function _cablearConvocar_(){
     }
     if(!backendOK || !SESION){ tost('Sin conexión no se puede convocar.'); return; }
     /* 26/10 (auditor 33, 🟡 A2 — Daniel: «Sí, en nombre de X»): con «Ver como», el aviso lo dice delante. */
-    if(!confirm(_avisoEnNombreDe_(reu.convocante)+'Convocar «'+reu.titulo+'» a '+reu.invitados.length+' personas.'+
+    if(!(await dialogoSiNo(_avisoEnNombreDe_(reu.convocante)+'Convocar «'+reu.titulo+'» a '+reu.invitados.length+' personas.'+
       String.fromCharCode(10,10)+'Les tocará cubrir su disponibilidad, y de no cubrirla '+
-      'salen sanciones.')) return;
+      'salen sanciones.'))) return;
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Convocando…';
     try{
       await api.crear(reu);
@@ -812,6 +825,12 @@ function _borrarReuBoxE_(r){
       ' <b>No se puede deshacer.</b></div></div>';
 }
 
+/* 01/11 · TÍTULO Y FECHA LÍMITE: el botón (el diálogo y el flujo son de `comun.js`, `editarReunionFlow`). Sólo quien convoca o un admin. */
+function _editarReuBoxE_(r){
+  if(!r || !_puedeBorrarReuE_(r)) return '';
+  return '<div style="margin-top:14px"><button class="btn" data-editarreu>Editar título y plazo</button></div>';
+}
+
 /* ⭐ EDITAR LOS CONVOCADOS (818.a; el móvil es la 817.a). Mismas reglas, escritas en
    `docs/decisiones-app.md`: sólo quien convoca o un admin (`_puedeBorrarReuE_`), se parte de
    `r.invitados` TAL COMO LO SIRVE el backend, y sin esa lista no se ofrece — guardar desde una lista
@@ -847,6 +866,32 @@ function _cierraCeldaE_(limite){
   return _plazoAbierto_(s) ? {txt:f, cls:''} : {txt:'cerró el '+f, cls:'cerrado'};
 }
 
+/* «Disponibilidad y riesgo» (escm3, 02/11): la tarjeta que se abre sola es la PRIMERA con alguien sin cubrir o por
+   debajo del mínimo, para no obligar a un clic por reunión a ver lo único que importa. Las ocultas no cuentan: no
+   se sabe quién. ⛔ Tampoco las de plazo CERRADO (refutador, 02/11): ya no hay nada que hacer, sólo lo que va a sanción.
+   Devuelve el índice en `reus`, o -1. */
+function _reuAbiertaRiesgoE_(reus){
+  for(var i=0; i<(reus||[]).length; i++){
+    var c=_cobertura_(reus[i]);
+    if(!c.oculto && _plazoAbierto_(reus[i].limite) && ((reus[i].sinCubrir||c.sinCubrir||[]).length || (reus[i].bajoMin||c.bajoMin||[]).length)) return i;
+  }
+  return -1;
+}
+
+/* ⛔ LO QUE LA PERSONA ABRIÓ O CERRÓ EN «Disponibilidad y riesgo» SE RECUERDA POR `id` DE REUNIÓN (refutador, 02/11). La vista se
+   repinta en cada refresco (~90 s) y la auto-apertura volvía a la primera en riesgo, pisando lo que se estaba mirando.
+   `DISPO_AB[id]` es `true`/`false` sólo si la persona tocó esa tarjeta; sin tocar, manda `_reuAbiertaRiesgoE_`. Vive en
+   memoria de la página (no se guarda: recargar vuelve a la regla). */
+var DISPO_AB={};
+function _dispoAbierta_(r, esLaDeRiesgo){
+  var t=DISPO_AB[String(r.id)];
+  return t===undefined ? !!esLaDeRiesgo : !!t;
+}
+function _dispoRecordar_(cabecera){
+  var a=cabecera.parentNode, m=/^reu-(.+)$/.exec(a.id||'');
+  if(m) DISPO_AB[m[1]]=a.classList.contains('ab');
+}
+
 /* EL PLAZO DE UNA REUNIÓN EN UNA TARJETA DEL ESCRITORIO (928.ª): el texto (`_plazoTxt_`, el mismo de toda la
    app) y el chip. Abierta (o sin límite): «N en riesgo» — aún pueden cubrir. Cerrada: «N sin cumplir» — ya no
    pueden, y es lo que va a sanción. Cuenta los sin cubrir Y los de por debajo del mínimo, como antes. */
@@ -867,6 +912,23 @@ function _reuSelE_(){
     return REUS[0];
   }
   return REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0];
+}
+
+/* El hueco que la app recomienda para fijar `r` (el de `_ventanaFijar_`: el que pide su orden del día, si lo hay): `{di, f0, v}`,
+   o `{di:0, f0:'', v:0}` si nadie ha contestado todavía (entonces no se preelige nada). */
+function _fijarSugerido_(r){
+  var v=_ventanaFijar_(r, _slotsMin_(r.duracion, r.slot), null).vent;
+  return v && v.v>0 ? {di:v.d, f0:v.f0, v:v.v} : {di:0, f0:'', v:0};
+}
+
+/* «Elegido: jue 05/11 · 17:00–19:00 (2 franjas)» de empezar en la franja `f0` el día `di`, o por qué no se puede. */
+function _fijarElegidoE_(r, di, f0){
+  if(f0===''||f0==null||isNaN(+f0)) return 'Elige a qué hora empieza.';
+  var g=_fijarRango_(r, +f0);
+  if(!g) return 'La reunión dura '+_slotsMin_(r.duracion, r.slot)+' franjas y desde ahí no caben: elige una hora más temprana.';
+  var n=g.f1-g.f0+1;
+  return 'Elegido: '+(r.dias||[])[di]+' \u00b7 '+_hFranja_(r,g.f0)+'\u2013'+_hFinFranja_(r,g.f1)+' ('+n+(n===1?' franja':' franjas')+
+    (g.largo>g.min?' \u00b7 lo que pide tu orden del día':'')+')';
 }
 
 function _fijarPanel_(){
@@ -896,9 +958,10 @@ function _fijarPanel_(){
            '), así que no se puede fijar en menos.') : '')+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
       '<div style="flex-basis:100%">'+lab('Reunión')+nxElige('reSel', REUS.map(function(r,i){ return [i, r.tit||r.titulo||('Reunión '+r.id)]; }), REUS.indexOf(_sel))+'</div>'+
-      '<div style="flex-basis:100%">'+lab('Día')+nxElige('reDia', (r.dias||[]).map(function(d,i){ return [i, d]; }), 0)+'</div>'+
-      '<div style="flex-basis:100%">'+lab('Desde')+nxElige('reF0', (r.franjas||[]).map(function(f,i){ return [i, _iniF(f)]; }), 0, {buscar:false})+'</div>'+
-      '<div style="flex-basis:100%">'+lab('Hasta')+nxElige('reF1', (r.franjas||[]).map(function(f,i){ return [i, _hFinFranja_(r,i)]; }), 0, {buscar:false})+'</div>'+
+      '<div style="flex-basis:100%">'+lab('Día')+nxElige('reDia', (r.dias||[]).map(function(d,i){ return [i, d]; }), _fijarSugerido_(r).di)+'</div>'+
+      /* 01/11 (Daniel: «con una llega y sobra»): UNA lista, la de dónde EMPIEZA; el largo lo da la reunión (o su orden del día). */
+      '<div style="flex-basis:100%">'+lab('Empieza a las')+nxElige('reF0', (r.franjas||[]).map(function(f,i){ return [i, _iniF(f)]; }), _fijarSugerido_(r).f0, {buscar:false})+
+        '<span class="nota" id="reFSel" style="display:block;margin-top:6px"></span></div>'+
       '<button class="btn pri" data-fijar'+(_pf?'':' disabled')+'>Fijar</button>'+_porQueApagado_(_porFija)+
       (r.fijada?'<button class="btn" data-desfijar'+(_pf?'':' disabled')+' style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
     '</div>'+
@@ -907,6 +970,7 @@ function _fijarPanel_(){
         '<input id="reOrden" value="'+esc(r.ordenDia||'')+'" placeholder="https://… o los puntos a tratar" style="'+E+'"></label>'+
       '<button class="btn" data-orden'+(_pf?'':' disabled')+'>Guardar orden del día</button>'+_porQueApagado_(_porFija)+
     '</div>'+
+    _editarReuBoxE_(r)+
     _convocadosBoxE_(r)+
     _ordenDiaReuHTML_(r)+
     _audioReuHTML_(r)+
@@ -1257,14 +1321,16 @@ async function _asisRefrescarE_(){
 /* El cuadrito: `nuevo` sólo la PRIMERA vez que se ve verde (la animación es el gracejo; con `prefers-reduced-motion` el CSS la quita). */
 function _asisCuadroE_(n, v, A){
   var pres=(v.presentes||{})[n], vis=(v.vistos||{})[n];
-  var cl=pres ? 'ok' : (vis ? 'vis' : '');
+  var cl=pres ? 'ok' : (vis ? 'vis' : ''), tel=pres && _asisModo_(v, n)==='tel';
   if(pres && !A.hechos[n]){ A.hechos[n]=true; cl+=' nuevo'; }
-  return '<div class="asisC '+cl+'"><b>'+esc(n)+'</b><span>'+(pres?('✓ '+_hhmmDe_(pres)):(vis?'ha abierto la app':''))+'</span></div>';
+  /* 01/11: un toque lo marca o desmarca (`data-asisn`); el telemático sale en azul. */
+  return '<div class="asisC '+cl+(tel?' tel':'')+'" data-asisn="'+esc(n)+'"><b>'+esc(n)+'</b><span>'+
+    (pres?('✓ '+_hhmmDe_(pres)+(tel?' · telemático':'')):(vis?'ha abierto la app':''))+'</span></div>';
 }
 
 function _asisPintarE_(){
   var A=ASIS_E, v=A&&A.v, c=document.getElementById('asisCuerpo'); if(!c || !v) return;
-  var conv=v.convocados||[], np=conv.filter(function(n){ return (v.presentes||{})[n]; }).length;
+  var conv=v.convocados||[], cu=_asisCuenta_(v), np=cu.presentes;
   var cerrada=!v.abierta;
   if(!document.getElementById('asisGrid') || A.cerrada!==cerrada){
     A.cerrada=cerrada;
@@ -1273,17 +1339,29 @@ function _asisPintarE_(){
       (cerrada
         ? '<div class="asisPie"><button class="btn pri" id="asisCopiar">Copiar la lista</button>'+
           '<button class="btn" id="asisReabrir">Reabrir</button></div>'
-        : '<div class="asisPie"><input id="asisBuscar" list="asisDL" placeholder="Añadir a alguien en directo…" '+
-          'autocomplete="off" style="'+CAMPO_CSS+';flex:1;min-width:220px"><datalist id="asisDL"></datalist>'+
+        : '<div class="asisPie"><div style="flex:1;min-width:220px">'+
+          elegirPersonas('asisQuien', {universo:_activos_().map(function(m){ return m.nombre; }).filter(function(n){ return conv.indexOf(n)<0; }),
+            multi:false, titulo:'Añadir a alguien en directo', vacio:'Escribe un nombre (vale alguien que aún no está en el equipo) o pulsa «Ver lista».'})+'</div>'+
           '<button class="btn" id="asisAnadir">Añadir</button>'+
           '<button class="btn pri" id="asisCerrar">Cerrar asistencia</button></div>');
     var on=function(id, f){ var b=document.getElementById(id); if(b) b.onclick=async function(){ if(b.disabled) return; b.disabled=true;
       try{ await f(); }catch(e){ tostErr('No se pudo: ', e); } finally{ b.disabled=false; } }; };
+    var gr=document.getElementById('asisGrid');
+    if(gr) gr.onclick=async function(e){        // 01/11: un toque en un cuadrito lo marca o lo desmarca (llega de improviso, o se equivocó)
+      var q=e.target.closest ? e.target.closest('[data-asisn]') : null; if(!q || !A.v || !A.v.abierta) return;
+      var n=q.getAttribute('data-asisn');
+      try{ await api.marcarPresente(A.id, n, !(A.v.presentes||{})[n]); await _asisRefrescarE_(); }catch(er){ tostErr('No se pudo: ', er); }
+    };
     on('asisCerrar', async function(){ await api.cerrarAsistencia(A.id); await _asisRefrescarE_(); });
     on('asisReabrir', async function(){ await api.abrirAsistencia(A.id); await _asisRefrescarE_(); });
     on('asisAnadir', async function(){
-      var i=document.getElementById('asisBuscar'), n=(i.value||'').trim(); if(!n) return;
-      await api.anadirAsistente(A.id, n); i.value=''; await _asisRefrescarE_(); });
+      /* 01/11: lo elegido o, si no, lo ESCRITO: en una general están todos convocados, así que añadir en directo es
+         sobre todo a quien aún no está en el roster (con `universo:[]` y sin leer el campo no se podía añadir a nadie). */
+      var inp=document.querySelector('[data-psel-in="asisQuien"]');
+      var n=(elegirPersonasMarcadas('asisQuien')[0]||(inp?inp.value:'')).trim(); if(!n) return;
+      await api.anadirAsistente(A.id, n); if(inp) inp.value='';
+      elegirPersonasPoner('asisQuien', [], (PSEL.asisQuien?PSEL.asisQuien.universo:[]).filter(function(x){ return x!==n; }));
+      await _asisRefrescarE_(); });
     on('asisCopiar', async function(){
       var t=_asisListaTxt_(v);
       try{ await navigator.clipboard.writeText(t); tost('Lista copiada.'); }
@@ -1292,13 +1370,13 @@ function _asisPintarE_(){
     });
   }
   document.getElementById('asisCont').innerHTML=cerrada
-    ? '<b>'+np+'</b> presentes de '+conv.length+' · asistencia cerrada'
-    : '<b>'+np+'</b> de '+conv.length+' presentes';
+    ? '<b>'+np+'</b> presentes de '+conv.length+(cu.tel ? ' ('+cu.tel+' por telemático)' : '')+' · asistencia cerrada'
+    : '<b>'+np+'</b> de '+conv.length+' presentes'+(cu.tel ? ' · <span style="color:var(--tel)">'+cu.tel+' por telemático</span>' : '');
   var g=document.getElementById('asisGrid');
   g.innerHTML=cerrada
     ? '<pre class="asisLista">'+esc(_asisListaTxt_(v)||'Nadie marcó presente.')+'</pre>'
     : conv.map(function(n){ return _asisCuadroE_(n, v, A); }).join('');
-  var dl=document.getElementById('asisDL');
-  if(dl) dl.innerHTML=(DATA.miembros||[]).map(function(m){ return m.nombre; })
-    .filter(function(n){ return n && conv.indexOf(n)<0; }).map(function(n){ return '<option value="'+esc(n)+'">'; }).join('');
+  if(document.getElementById('psel-asisQuien'))
+    elegirPersonasPoner('asisQuien', elegirPersonasMarcadas('asisQuien'), (DATA.miembros||[]).map(function(m){ return m.nombre; })
+      .filter(function(n){ return n && conv.indexOf(n)<0; }));
 }

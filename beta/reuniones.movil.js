@@ -201,6 +201,7 @@ function _normReuM_(r){
     /* El backend lo manda (`_ex.ordenDia`) y aqui se tiraba, asi que el dialogo salia
        siempre vacio y no habia forma de corregir un enlace mal pegado. */
     ordenDia:r.ordenDia||'',
+    minimoPct:(typeof r.minimoPct==='number') ? r.minimoPct : null,   /* 01/11: el mínimo que eligió quien convocó; sin él, el del periodo */
     /* `slot` es la casilla que se pinta y `duracion` lo que hay que juntar seguido.
        Las reuniones de antes de este modelo no traen `duracion`: entonces el minimo es
        una casilla y todo se comporta como se comportaba. */
@@ -246,6 +247,7 @@ function _normReuM_(r){
     tarde: !!(YO && Array.isArray(r.invitados_tarde) && r.invitados_tarde.indexOf(YO.nombre)>=0),
     invitados_tarde: Array.isArray(r.invitados_tarde) ? r.invitados_tarde.slice() : [],   /* para re-hidratar */
     en_curso: (r.en_curso && typeof r.en_curso==='object') ? r.en_curso : null,   /* 29/10: la pone `empezarReunion`; la ficha enseña el cronómetro */
+    bloque: r.bloque||null,   /* 01/11: el bloque que ya fichó la reunión (apaga «ya ha pasado: ficha el bloque») */
     _real:true };
 }
 
@@ -295,6 +297,8 @@ function _fuenteReuM_(R, base, resp, ag){
        enuncio y no donde se citaba (§3c-19). Por eso la comprobacion de su banco es
        ESTRUCTURAL: compara lo que `_normReuM_` LEE con lo que esta ENTREGA. */
     ordenDia:R.ordenDia,
+    minimoPct:R.minimoPct,   /* 01/11: el mínimo que eligió quien convocó (la gemela de la lectura de `_normReuM_`) */
+    bloque:R.bloque,       /* 01/11: la gemela de `en_curso` en `_normReuM_` */
     en_curso:R.en_curso,   /* 29/10: sin esto el cronómetro de la ficha se perdía al rehidratar (lo cazó `probar_reunion_movil`) */
     dias:s.dias||R.dias, franjas:s.franjas||R.franjas, bloques:s.bloques||R.bloques,
     /* Del servidor viene el objeto `fijada` con sus indices; de lo nuestro, la etiqueta ya
@@ -448,8 +452,8 @@ function _titularHueco_(R, vent, nresp, pondOn){
       (vent.f1>vent.f0?('–'+_hFinFranja_(R,vent.f1)):'')+'</b> — '+vent.v+
       (vent.exacta ? (vent.v===1?' puede la reunión entera.':' pueden la reunión entera.')
                    : (pondOn?' puntos.':' pueden.'));
-  return nresp ? '<b>han contestado '+nresp+'</b>, y ninguno puede la reunión entera.'
-               : '<b>todavía no ha respondido nadie</b>.';
+  return nresp ? 'han contestado '+nresp+', y ninguno puede la reunión entera.'
+               : 'todavía no ha respondido nadie.';
 }
 
 /* ⛔ 20/10 — LAS REUNIONES SIN CONVOCAR, con su acta: fecha, la etiqueta y el expediente (pulsar abre `verDoc`, por
@@ -503,7 +507,20 @@ function vReu(){
   var _nresp=Object.keys(R.resp||{}).length;
   /* ⚠️ El cálculo se mudó a `_mejorVentana_` (`comun.js`) el 18/08: el escritorio
      recomendaba **la casilla suelta** con más gente y hacía falta lo mismo allí. */
-  var vent=_mejorVentana_(R, _minR, best);
+  /* 01/11: con orden del día de duración conocida, la ventana es de los bloques que ESE orden pide (`comun.js`). */
+  var _vf=_ventanaFijar_(R, _minR, best), vent=_vf.vent;
+  var _huecoM_=function(){ var f=_ventanaFijar_(R, _minR, best);
+    return '<b>'+_nConvM_(R)+'</b> convocados · mejor hueco '+_titularHueco_(R, f.vent, _nresp, pondOn)+_notaOrdenHTML_(f); };
+  _ordSt_(R.id).sugHTML=_huecoM_;
+  /* El orden del día llega por red DESPUÉS de pintar: con él cambia el hueco recomendado, y el mapa lo resalta de nuevo (la fijada no se toca). */
+  _ordSt_(R.id).sugMapa=function(){
+    var v=_ventanaFijar_(R, _minR, best).vent, id=String(R.id).replace(/"/g,'');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-qp^="'+id+'|"]'), function(c){
+      if(c.getAttribute('data-fij')) return;
+      var p=c.getAttribute('data-qp').split('|'), b=_esHuecoFijar_(v, +p[1], +p[2]);
+      c.style.outline=b?'1px solid var(--ink)':''; c.style.outlineOffset=b?'-1px':'';
+    });
+  };
   /* EJE DE TIEMPO, no de franjas. Con horarios distintos por dia la union mezcla :00 y
      :30; una columna por franja hacia que cada dia llenara una de cada dos casillas y el
      mapa pareciera un tablero. Ahora la columna es un instante y cada franja ocupa lo que
@@ -612,12 +629,12 @@ function vReu(){
         var v=M[di][fi], ini=_mm(R.franjas[fi]);
         var a=(0.12+0.88*(max?v/max:0)).toFixed(3);
         var _t0=eje[ix], _t1=(ix+k<eje.length? eje[ix+k] : ini+_du(R.franjas[fi]));
-        var esBest=(di===vent.d && fi>=vent.f0 && fi<=vent.f1 && vent.v>0), fij=_esFijada_(di,_t0,_t1);
-        var fondo = fij ? 'rgba(53,199,89,.85)' : 'rgba(228,30,37,'+a+')';
+        var esBest=_esHuecoFijar_(vent, di, fi), fij=_esFijada_(di,_t0,_t1);
+        var fondo = fij ? 'rgba(53,199,89,.85)' : _calorColor_(R.modalidad, a);
         var borde = fij ? ';outline:1px solid var(--ok);outline-offset:-1px'
                    : (esBest?';outline:1px solid var(--ink);outline-offset:-1px':'');
         /* 20/10 · «quién puede»: tocar la celda lo dice en la caja de debajo (`_cablearQuienPuede_`). */
-        g+='<div data-qp="'+esc(R.id)+'|'+di+'|'+fi+'" data-qpt="'+esc(d+' · '+_hhmm(ini)+'\u2013'+_hhmm(ini+_du(R.franjas[fi])))+'"'+
+        g+='<div data-qp="'+esc(R.id)+'|'+di+'|'+fi+'"'+(fij?' data-fij="1"':'')+' data-qpt="'+esc(d+' · '+_hhmm(ini)+'\u2013'+_hhmm(ini+_du(R.franjas[fi])))+'"'+
           ' title="'+_hhmm(ini)+'\u2013'+_hhmm(ini+_du(R.franjas[fi]))+' \u00b7 '+v+'" style="'+geo+';cursor:pointer;'+
           'display:grid;place-items:center;font-family:var(--mono);font-size:8.5px;color:#fff;'+
           'background:'+fondo+borde+'">'+v+'</div>';
@@ -694,7 +711,10 @@ function vReu(){
         (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
         '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
         '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
+        '<button class="btn mini" data-p id="btnEditarReu" style="flex:1">Título y plazo</button>'+
       '</div>':'')+
+    /* 01/11: la asistencia es del PD, no de quien convocó: su botón va aparte del de «Fijar/Convocados». */
+    (_asisBotonM_(R)?'<div style="margin-top:9px"><button class="btn mini full" data-p id="btnAsistencia">📋 Asistencia en directo</button></div>':'')+
     _ordenDiaReuHTML_(R)+
     _audioReuHTML_(R)+
     _bloqueReuHTML_(R, _puedeBloqueReu_(R, (typeof _actorSanc_==='function'?_actorSanc_():(YO&&YO.nombre)), (typeof esAdmin==='function' && esAdmin())))+
@@ -707,20 +727,18 @@ function vReu(){
        disponibilidad y ya esta». */
     (_sinAgregadoM_(R)
       ? '<div class="tarj"><p class="rnota" style="margin:0;padding:6px 0">Esta reunión es '+
-        '<b>oculta</b>: el mapa solo lo ve <b>quien la convoca</b>'+
+        'oculta: el mapa solo lo ve quien la convoca'+
         (R.convocante?' ('+esc(R.convocante)+')':'')+'. Tú solo marcas tu disponibilidad.'+
         '</p></div>'
       : '<div class="tarj">'+
       (hib?'<div class="modos" id="calModo" style="margin-bottom:10px">'+
         '<button data-pond="0" class="'+(pondOn?'':'on')+'" data-p>Personas</button>'+
         '<button data-pond="1" class="'+(pondOn?'on':'')+'" data-p>Ponderada</button></div>':'')+
-      '<p class="rnota" style="margin:0 0 10px"><b>'+_nConvM_(R)+'</b> convocados · mejor hueco '+
-      _titularHueco_(R, vent, _nresp, pondOn)+'</p>'+
+      '<p class="rnota" style="margin:0 0 10px" data-ordsug="'+esc(R.id)+'">'+_huecoM_()+'</p>'+
       g+
       '<p class="rnota" data-qpbox="'+esc(R.id)+'" style="margin:9px 0 0">Toca un hueco del mapa para ver quién puede.</p>'+
-      '<div class="leyh" style="margin-top:11px"><span>'+
-        (pondOn?'el número son PUNTOS: presencial+telemático 2 · solo telemático 1'
-               :'el número es cuánta gente puede')+'</span>'+
+      '<div class="leyh" style="margin-top:11px"><span><i style="background:'+_calorColor_(R.modalidad,.9)+'"></i>'+
+        _calorLeyenda_(R.modalidad, pondOn)+'</span>'+
         '<span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>fuera del horario de ese día</span></div>'+
     '</div>')+
     (_puedeBorrarReuM_(R)?'<button class="btn full" data-p id="btnBorrar" style="margin-top:6px;color:var(--red2);border-color:var(--red)">Eliminar reunión</button>':'')+
@@ -782,8 +800,8 @@ function cubrirModal(){
   });
   abrirModal('<div class="mtit">Marca tu disponibilidad</div>'+
     '<div class="msub">'+esc(YO.pila)+' · '+instr+'</div>'+
-    (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">Dura <b>'+_durTxt_(_minS*_slot)+
-      '</b>: cada toque marca <b>'+_minS+' casillas seguidas</b>. '+
+    (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">Dura '+_durTxt_(_minS*_slot)+
+      ': cada toque marca '+_minS+' casillas seguidas. '+
       'Arrastra para alargar.</p>':'')+
     /* 🗣️ «Y que lo ponga escrito en algún lugar» (14/10). **El mismo texto y la misma clase que
        en Turnos**: dos frases distintas para el mismo gesto en dos pantallas es como se aprende
@@ -1058,21 +1076,18 @@ function crearModal(){
   var tipos=[['general','General · todo el equipo',true],['junta','Junta Directiva · coordinación',true],
     ['consejo','Consejo · sus miembros',true],['subsistema','Subsistema · tu unidad',true],
     ['mixta','Mixta · varios subsistemas',true],['trabajo','Reunión de trabajo · invitas tú',false]];
-  var op=tipos.filter(function(t){return coord||!t[2];})
-    .map(function(t){return '<option value="'+t[0]+'">'+t[1]+'</option>';}).join('');
+  var op=tipos.filter(function(t){return coord||!t[2];}).map(function(t){return [t[0], t[1]];});
   var hoyISO=_dmyAISO_(HOY), mas=function(iso,n){ var d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n);
     return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
   var subs=(DATA.subsistemas||[]).map(function(sb){ return '<button type="button" class="cmixb" data-u="'+esc(sb.u||sb)+'" data-p>'+esc(sb.u||sb)+'</button>'; }).join('');
-  var plant=PLANTILLAS_M.length ? '<label class="campo"><span class="sc">Copiar distribución de</span><select id="ceCopiar">'+
-      '<option value="">— empezar en blanco —</option>'+PLANTILLAS_M.map(function(p,i){ return '<option value="'+i+'">'+esc(p.titulo)+'</option>'; }).join('')+'</select></label>' : '';
+  var plant=PLANTILLAS_M.length ? '<div class="campo"><span class="sc">Copiar distribución de</span>'+
+      nxElige('ceCopiar', [['','— empezar en blanco —']].concat(PLANTILLAS_M.map(function(p,i){ return [String(i), p.titulo]; })), '')+'</div>' : '';
   abrirModal('<div class="mtit">Nueva '+(coord?'reunión':'reunión de trabajo')+'</div>'+
-    '<label class="campo"><span class="sc">Tipo</span><select id="ceTipo">'+op+'</select></label>'+
+    '<div class="campo"><span class="sc">Tipo</span>'+nxElige('ceTipo', op, op[0][0])+'</div>'+
     _avisoGrabaHTML_('ceGraba')+
-    (coord?'':'<p class="rnota" style="margin:-4px 0 10px">Como miembro convocas <b>reuniones de trabajo</b> e invitas a quien quieras. Las generales, de junta o de subsistema las convoca coordinación.</p>')+
-    '<label class="campo"><span class="sc">Modalidad</span><select id="ceMod">'+
-      '<option value="hibrida">Híbrida (presencial + telemática)</option>'+
-      '<option value="presencial">Presencial</option>'+
-      '<option value="telematica">Telemática</option></select></label>'+
+    (coord?'':'<p class="rnota" style="margin:-4px 0 10px">Como miembro convocas reuniones de trabajo. Las generales, de junta o de subsistema las convoca coordinación.</p>')+
+    '<div class="campo"><span class="sc">Modalidad</span>'+
+      nxElige('ceMod', [['hibrida','Híbrida (presencial + telemática)'],['presencial','Presencial'],['telematica','Telemática']], 'hibrida')+'</div>'+
     '<div id="ceMixW" style="display:none"><span class="sc" style="display:block;margin-bottom:5px">Subsistemas que participan</span>'+
       '<div class="cmix" id="ceMix">'+subs+'</div></div>'+
     '<div id="ceInvW"><span class="sc" style="display:block;margin-bottom:5px">Invitar</span>'+
@@ -1081,29 +1096,26 @@ function crearModal(){
         titulo:'Invitados', alCambiar:function(l){ INV=new Set(l); upd(); }})+'</div>'+
     plant+
     '<label class="campo"><span class="sc">Título</span><input id="ceTit" placeholder="Reunión sin título"></label>'+
-    '<label class="campo"><span class="sc">Fechas por</span><select id="ceModo"><option value="rango">Desde / hasta</option><option value="dur">Desde + nº de días</option></select></label>'+
-    '<div class="dosc" id="ceRango"><label class="campo"><span class="sc">Desde</span><input class="mono" id="ceD0" type="date" value="'+hoyISO+'"></label>'+
-      '<label class="campo"><span class="sc">Hasta</span><input class="mono" id="ceD1" type="date" value="'+mas(hoyISO,6)+'"></label></div>'+
-    '<div class="dosc" id="ceDurW" style="display:none"><label class="campo"><span class="sc">Desde</span><input class="mono" id="ceFecha" type="date" value="'+hoyISO+'"></label>'+
-      '<label class="campo"><span class="sc">Días</span><input class="mono" id="ceND" type="number" value="7" min="1" max="62"></label></div>'+
-    '<div class="dosc"><label class="campo"><span class="sc">De</span><select id="ceH0">'+optHoras('16:00')+'</select></label>'+
-      '<label class="campo"><span class="sc">A</span><select id="ceH1">'+optHoras('23:00')+'</select></label></div>'+
-    '<label class="campo" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="cePerdia" style="width:auto"><span class="sc" style="margin:0">Horario distinto por día</span></label>'+
+    '<div class="campo"><span class="sc">Fechas por</span>'+nxElige('ceModo', [['rango','Desde / hasta'],['dur','Desde + nº de días']], 'rango')+'</div>'+
+    '<div id="ceRango"><div class="campo"><span class="sc">Desde</span>'+nxFecha('ceD0', hoyISO, {min:hoyISO})+'</div>'+
+      '<div class="campo"><span class="sc">Hasta</span>'+nxFecha('ceD1', mas(hoyISO,6), {min:hoyISO})+'</div></div>'+
+    '<div id="ceDurW" style="display:none"><div class="campo"><span class="sc">Desde</span>'+nxFecha('ceFecha', hoyISO, {min:hoyISO})+'</div>'+
+      '<div class="campo"><span class="sc">Días</span>'+nxNum('ceND', 7, {min:1, max:_topeDias_()})+'</div></div>'+
+    '<div class="campo"><span class="sc">De</span>'+nxHora('ceH0', '16:00')+'</div>'+
+    '<div class="campo"><span class="sc">A</span>'+nxHora('ceH1', '23:00')+'</div>'+
+    '<div class="campo"><span class="sc">Horario distinto por día</span>'+nxSiNo('cePerdia', false)+'</div>'+
     '<div class="cdias" id="ceDias" style="display:none"></div>'+
     /* Dos preguntas, no dos rarezas: la casilla que se pinta, y lo que dura la reunión.
        La «cadencia solapada» se retiró: era una forma retorcida de decir «slots de 15
        min» y dejaba el mapa ilegible. */
     '<div class="dosc">'+
-      '<label class="campo"><span class="sc">Tamaño de slot</span><select id="ceSlot">'+
-        '<option value="15">15 min</option><option value="30" selected>30 min</option>'+
-        '<option value="60">1 h</option></select></label>'+
-      '<label class="campo"><span class="sc">Dura la reunión</span><select id="ceDura">'+
-        '<option value="30">30 min</option><option value="60" selected>1 h</option>'+
-        '<option value="90">1 h 30 min</option><option value="120">2 h</option>'+
-        '<option value="180">3 h</option></select></label></div>'+
+      '<div class="campo"><span class="sc">Tamaño de slot</span>'+
+        nxElige('ceSlot', [['15','15 min'],['30','30 min'],['60','1 h']], '30')+'</div>'+
+      '<div class="campo"><span class="sc">Dura la reunión</span>'+
+        nxElige('ceDura', [['30','30 min'],['60','1 h'],['90','1 h 30 min'],['120','2 h'],['180','3 h']], '60')+'</div></div>'+
     '<p class="rnota" id="ceSlotHint"></p>'+
-    '<div class="dosc"><label class="campo"><span class="sc">Límite para responder</span><input class="mono" id="ceLim" type="date" min="'+hoyISO+'" value="'+mas(hoyISO,5)+'"></label>'+
-      '<label class="campo"><span class="sc">Hora (opcional)</span><input class="mono" id="ceLimH" type="time"></label></div>'+
+    '<div class="campo"><span class="sc">Límite para responder</span>'+nxFecha('ceLim', mas(hoyISO,5), {min:hoyISO})+'</div>'+
+      '<div class="campo"><span class="sc">Hora del límite</span>'+nxHora('ceLimH', '23:59')+'</div>'+
     '<label class="campo"><span class="sc">Orden del día (enlace a Drive, opcional)</span>'+
       '<input id="ceOrden" placeholder="https://drive.google.com/…"></label>'+
     '<span class="sc" style="display:block;margin-bottom:6px">Visión de disponibilidad</span>'+
@@ -1112,11 +1124,13 @@ function crearModal(){
       '<button data-v="anonima" class="on" data-p>Anónima</button>'+
       '<button data-v="oculta" data-p>Oculta</button></div>'+
     '<p class="rnota" id="ceHint">El equipo ve el mapa de calor con los totales, sin nombres.</p>'+
+    /* 01/11 (Daniel [c8bd27e9d3]): el mínimo lo elige quien convoca entre el del periodo y ±5; las de trabajo no lo llevan. */
+    '<div id="ceMin" hidden></div>'+
     '<p class="rnota" id="cePrev" style="color:var(--ink2)"></p>'+
     '<button class="btn pri full" style="margin-top:12px" data-p id="btnCrearOK">Crear encuesta</button>');
 
   var val=function(id){ var e=$('#'+id); return e?e.value:''; };
-  var per=function(){ var e=$('#cePerdia'); return !!(e&&e.checked); };
+  var per=function(){ return nxSi('cePerdia'); };
   var hNum=_horasHM_;                       // antes: parser propio; ademas fallaba con 'H:MM'
   var dias=function(){ return val('ceModo')==='rango' ? _diasEntre_(val('ceD0'),val('ceD1'))
     : _diasDesde_(val('ceFecha')||_dmyAISO_(HOY), Math.max(1,+val('ceND')||1)); };
@@ -1134,13 +1148,12 @@ function crearModal(){
     var prev=$$('#ceDias .drow').map(function(r){
       return {d:r.querySelector('span').textContent, off:r.classList.contains('off'), a:r.querySelector('.dr0').value, b:r.querySelector('.dr1').value}; });
     var prevDe=_horarioPrevPorDia_(prev, ds);
-    $('#ceDias').innerHTML=ds.map(function(d,i){
-      return '<div class="drow" data-d="'+i+'"><button type="button" class="dtog on" data-p aria-label="activar o desactivar el día"></button>'+
-        '<span>'+esc(d)+'</span><select class="dr0">'+optHoras(val('ceH0'))+'</select><select class="dr1">'+optHoras(val('ceH1'))+'</select></div>'; }).join('');
-    $$('#ceDias .drow').forEach(function(r,i){ var p=prevDe[i];
-      if(p){ if(p.off) r.classList.add('off'); r.querySelector('.dr0').value=p.a; r.querySelector('.dr1').value=p.b; }
+    $('#ceDias').innerHTML=ds.map(function(d,i){ var p=prevDe[i];
+      return '<div class="drow'+(p&&p.off?' off':'')+'" data-d="'+i+'"><button type="button" class="dtog on" data-p aria-label="activar o desactivar el día"></button>'+
+        '<span>'+esc(d)+'</span>'+nxHora('', p?p.a:val('ceH0'), {attrs:'class="dr0"'})+nxHora('', p?p.b:val('ceH1'), {attrs:'class="dr1"'})+'</div>'; }).join('');
+    $$('#ceDias .drow').forEach(function(r,i){
       var apl=function(){ var off=r.classList.contains('off');
-        r.querySelectorAll('select').forEach(function(sl){ sl.disabled=off; });
+        _nxOff_(r.querySelector('.dr0'), off); _nxOff_(r.querySelector('.dr1'), off);
         r.querySelector('.dtog').classList.toggle('on',!off); };
       apl();
       r.querySelector('.dtog').onclick=function(){ r.classList.toggle('off'); apl(); upd(); };
@@ -1155,8 +1168,10 @@ function crearModal(){
     var nb=u.perDia.reduce(function(a,x){ return a+x.length; },0), nd=dias().length;
     /* Que hay que juntar para que valga, dicho antes de convocar y con la cuenta hecha. */
     var nS=_slotsMin_(du,sl), h=$('#ceSlotHint');
-    if(h) h.innerHTML='Cada casilla es de <b>'+_durTxt_(sl)+'</b>; hay que marcar '+
-      '<b>'+nS+' seguida'+(nS===1?'':'s')+'</b> ('+_durTxt_(nS*sl)+') para que cuente.'+
+    _minimoConvPintar_($('#ceMin'), 'm', val('ceTipo'), val('ceLim'), upd);
+    var hz=_horarioConv_(u.perDia, rangos(), nS, sl, val('ceTipo'), _minimoConvPct_($('#ceMin'), val('ceLim')));
+    if(h) h.innerHTML='Cada casilla es de '+_durTxt_(sl)+'; hay que marcar '+
+      nS+' seguida'+(nS===1?'':'s')+' ('+_durTxt_(nS*sl)+') para que cuente.'+
       (du%sl ? ' Si no encaja, se redondea hacia arriba.' : '');
     /* ⛔⛔ EL RECORTE SE DICE. `nd` es `dias().length`, o sea el número **YA topado** por la
        función del tope: pidiendo 01/01→31/12 esto imprimía «… en **62 días**» y se quedaba
@@ -1173,7 +1188,9 @@ function crearModal(){
       : 'Revisa fechas u horario: no sale ninguna casilla.')+
       (_rec>0 ? '<br><b style="color:var(--warn)">Se piden '+_ped+' días y la app reparte '+
         'como mucho '+_topeDias_()+': se han recortado los '+_rec+' últimos.</b> Lo que se '+
-        'convoque será lo de arriba, no lo que marca la fecha de fin.' : '');
+        'convoque será lo de arriba, no lo que marca la fecha de fin.' : '')+
+      (hz.bloqueo ? '<br><b style="color:var(--red)">'+esc(hz.bloqueo)+' No se puede convocar así.</b>'
+        : hz.aviso ? '<br><b style="color:var(--warn)">'+esc(hz.aviso)+'</b>' : '');
   }
   var tipoUpd=function(){ var t=val('ceTipo');
     if($('#ceMixW')) $('#ceMixW').style.display=(t==='mixta')?'':'none';
@@ -1199,9 +1216,9 @@ function crearModal(){
   var cop=$('#ceCopiar');
   if(cop) cop.onchange=function(){ var v=cop.value; if(v==='') return; var c=PLANTILLAS_M[+v]; if(!c) return;
     if(c.titulo && $('#ceTit')) $('#ceTit').value=c.titulo;
-    ['ceModo','ceH0','ceH1','ceSlot','ceDura','ceND'].forEach(function(id){ if(c[id]!=null && $('#'+id)) $('#'+id).value=c[id]; });
-    if(c.modalidad && $('#ceMod')) $('#ceMod').value=c.modalidad;
-    $('#cePerdia').checked=!!c.perdia; if(per()) renderDias(); upd(); };
+    ['ceModo','ceH0','ceH1','ceSlot','ceDura','ceND'].forEach(function(id){ if(c[id]!=null && $('#'+id)) nxPon(id, c[id]); });
+    if(c.modalidad && $('#ceMod')) nxPon('ceMod', c.modalidad);
+    nxPon('cePerdia', c.perdia ? '1' : '0'); if(per()) renderDias(); upd(); };
   var hints={publica:'Cualquiera puede tocar un hueco y ver quién puede en esa franja.',
     anonima:'El equipo ve el mapa de calor con los totales, sin nombres.',
     oculta:'El equipo no ve el mapa; solo tú, para decidir.'};
@@ -1225,31 +1242,24 @@ function crearModal(){
     var u=_genUnion_(rangos(), _sl), bloques=[];
     u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
     if(!u.F.length || !bloques.length){ tost('Con ese horario no sale ninguna casilla.'); return; }
-    /* El aviso de «los días no empiezan a la misma hora, el mapa saldrá a huecos» se
-       retiró: con la rejilla única ya no puede pasar. Lo que sí hay que decir es si
-       algún día se queda demasiado corto para que quepa la reunión entera. */
+    /* ⛔ 01/11 (Daniel [4e2c13a995]): «si no se pudiese de verdad, obvio no se puede convocar». Antes se avisaba y se
+       dejaba convocar con «pulsa otra vez»; ahora, si con este horario nadie puede llegar al mínimo (o nadie puede marcar),
+       no se convoca y se dice con números. Los días cortos que NO impiden llegar sólo se avisan en la vista previa. */
     var _nS=_slotsMin_(_du,_sl);
-    var _cortos=_diasCortosConv_(u.perDia, rangos(), _nS);
-    /* ⛔ «Pulsa otra vez» se ata a ESTA configuración (en el botón), no a la sesión: con `window.__avisoCorto__` el aviso
-       se apagaba para siempre al primer uso y la segunda reunión con días cortos se creaba sin decir nada. */
-    var _firma=_cortos+'|'+_nS+'|'+bloques.length;
-    if(_cortos && bt.dataset.avisado!==_firma){
-      bt.dataset.avisado=_firma;
-      tost('Ojo: '+_cortos+' día'+(_cortos===1?'':'s')+' no da'+(_cortos===1?'':'n')+' para '+_durTxt_(_nS*_sl)+
-        ' seguidos, así que ahí nadie podrá marcar. Pulsa otra vez para crearla igual.');
-      bt.disabled=false; return;
-    }
+    var _hz=_horarioConv_(u.perDia, rangos(), _nS, _sl, val('ceTipo'), _minimoConvPct_($('#ceMin'), val('ceLim')));
+    if(_hz.bloqueo){ tost(_hz.bloqueo+' Cambia el horario o el mínimo.'); bt.disabled=false; return; }
     var lim=val('ceLim') ? (val('ceLim')+(val('ceLimH')?' '+val('ceLimH'):'')) : null;
     var reu={ titulo:(val('ceTit')||'').trim()||'Reunión sin título', tipo:val('ceTipo')||'trabajo',
       modalidad:val('ceMod')||'hibrida', convocante:(YO&&YO.nombre)||'', invitados:Array.from(INV),
       dias:ds, franjas:u.F, bloques:bloques, total:bloques.length, limite:lim,
       slot:_sl, duracion:_nS*_sl,          // lo que hay que juntar seguido para que valga
+      minimoPct:(function(){ var c=$('#ceMin'); return (c && !c.hidden && +c.dataset.sel>0) ? +c.dataset.sel : null; })(),   // 01/11
       ordenDia:(val('ceOrden')||'').trim(), vision:vision, resp:{} };
     PLANTILLAS_M.unshift({ titulo:reu.titulo, ceModo:val('ceModo'), ceH0:val('ceH0'), ceH1:val('ceH1'),
       ceSlot:val('ceSlot'), ceDura:val('ceDura'), ceND:val('ceND'), modalidad:reu.modalidad, perdia:per() });
     if(PLANTILLAS_M.length>8) PLANTILLAS_M.length=8;
     /* 26/10 (auditor 33, 🟡 A2 — Daniel: «Sí, en nombre de X»): con «Ver como», se dice y se confirma. */
-    var _enN=_avisoEnNombreDe_(reu.convocante); if(_enN && !confirm(_enN+'\u00bfConvocarla?')) return;
+    var _enN=_avisoEnNombreDe_(reu.convocante); if(_enN && !(await dialogoSiNo(_enN+'\u00bfConvocarla?'))) return;
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Creando…';
     if(typeof backendOK!=='undefined' && backendOK && SESION){
       try{ var d=await api.crearReunion(reu); if(d&&d.id) reu.id=d.id;
@@ -1274,11 +1284,11 @@ function crearModal(){
 function fijarModal(){
   var R=REUNION;
   abrirModal('<div class="mtit">Fijar la reunión</div>'+
-    '<div class="msub">Elige el <b>día</b> y toca donde <b>empieza</b>: se marcan solas las '+
-    ('<b>'+_slotsMin_(R.duracion,R.slot)+'</b> franjas que dura'+(R.duracion?' ('+_durTxt_(R.duracion)+')':'')+'. ')+
-    'Puedes estirar hacia la derecha, pero no dejarlo en menos. El resultado sale en verde en el mapa.</div>'+
-    '<label class="campo"><span class="sc">Día</span><select id="fjDia">'+
-      R.dias.map(function(d,i){return '<option value="'+i+'">'+esc(_diaTxtM_(d))+'</option>';}).join('')+'</select></label>'+
+    '<div class="msub">Elige el día y toca donde empieza: se marcan solas las '+
+    (_largoFijar_(R)+' franjas que dura'+(R.duracion?' ('+_durTxt_(R.duracion)+')':'')+(_largoFijar_(R)>_slotsMin_(R.duracion,R.slot)?', las que pide su orden del día':'')+'. ')+
+    'Puedes estirar hacia la derecha, no acortar. El resultado sale en verde en el mapa.</div>'+
+    '<div class="campo"><span class="sc">Día</span>'+
+      nxElige('fjDia', R.dias.map(function(d,i){return [String(i), _diaTxtM_(d)];}), '0')+'</div>'+
     '<span class="sc" style="display:block;margin-bottom:7px">Franjas de ese día</span>'+
     /* La hora de fin sale de la FRANJA, no de «la hora siguiente»: con slots de 15 o 30
        min, dar por hecho que cada franja dura una hora es sencillamente falso. */
@@ -1292,7 +1302,7 @@ function fijarModal(){
      TRES franjas, se este cubriendo o fijando: aqui se dejo el «toca la primera y la ultima»
      a pelo y se podia fijar en menos tiempo del que dura la reunion. (Daniel: «puse de 18:30
      a 20:00 y se marca como si fuera de 19:00 a 20:00».) */
-  var MIN=_slotsMin_(R.duracion, R.slot), NF=R.franjas.length;
+  var MIN=_slotsMin_(R.duracion, R.slot), NF=R.franjas.length, SPAN=_largoFijar_(R);
   var pintaSlots=function(){
     var lo=anchor<0?-1:Math.min(anchor,last), hi=anchor<0?-1:Math.max(anchor,last);
     $$('#fjSlots button').forEach(function(b,k){
@@ -1310,7 +1320,7 @@ function fijarModal(){
     b.onclick=function(){
       if(b.disabled) return;
       if(anchor<0 || anchor!==last){
-        anchor=k; last=Math.min(NF-1, k+MIN-1);      // un toque = el minimo, hacia la derecha
+        anchor=k; last=Math.min(NF-1, k+SPAN-1);     // un toque = lo que dura (la reunion o su orden del dia), hacia la derecha
       } else {
         /* estirar es libre, pero nunca por debajo del minimo */
         last = (k>=anchor) ? Math.max(k, anchor+MIN-1) : k;
@@ -1331,9 +1341,9 @@ function fijarModal(){
        «mejor franja», que significa otra cosa. */
     var bloques=[]; for(var f=lo; f<=hi; f++) bloques.push([di,f]);
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
-      tost('Sin conexión no se puede fijar: no llegaría a nadie más.'); return; }
+      tost('Sin conexión no se puede fijar.'); return; }
     /* 26/10 (auditor 33, 🟠 A1 — Daniel: «Avisar y confirmar»): con el plazo vivo, se avisa y se confirma. */
-    var _avF=_avisoFijarAntes_(R2); if(_avF && !confirm(_avF)) return;
+    var _avF=_avisoFijarAntes_(R2); if(_avF && !(await dialogoSiNo(_avF))) return;
     b.disabled=true; var prev=b.textContent; b.textContent='Fijando…';
     try{
       /* 21/10 (auditor 13, 🟡 11): al servidor, en índices ORIGINALES (como fija el escritorio); aquí, los de pantalla. */
@@ -1407,7 +1417,8 @@ function _asisCablearM_(){
     if(!i || !b) return;
     i.oninput=function(){ ASIS_M.txt[id]=i.value; };
     var enviar=async function(){
-      if(b.disabled || !i.value.trim()) return;
+      if(b.disabled) return;
+      if(!i.value.trim()){ if(m) m.textContent='Escribe la palabra que se proyecta.'; return; }   /* un botón que no contesta parece roto */
       b.disabled=true;
       try{
         var r=await api.estoyPresente(isNaN(+id)?id:+id, i.value);
@@ -1418,6 +1429,99 @@ function _asisCablearM_(){
     b.onclick=enviar;
     i.onkeydown=function(ev){ if(ev.key==='Enter') enviar(); };
   });
+}
+
+/* ══ 01/11 · LA ASISTENCIA, DESDE EL MÓVIL DEL PD ═══════════════════════════════════════════════════════════
+   🗣️ Daniel: *«que sea editable fácilmente desde el teléfono mientras en mi ordenador se ve esa pantallita ya que a veces la gente
+   resulta que puede venir de improviso»*. El escenario sigue siendo del escritorio (lo que se proyecta); aquí, el mando: abrir y
+   cerrar, ver la palabra, **tocar a alguien para marcarlo presente (o quitarlo)** y **añadir** a quien llega sin estar en la lista
+   — se añade y queda presente de un gesto. Una general, la abre el PD; también una telemática. El que vino por telemático sale en
+   azul (`modos`, del servidor). La lista se refresca cada 3 s mientras el panel está abierto. */
+var ASIS_PM=null;   // {id, v, timer, ocupado}
+
+function _asisSoyPDM_(){
+  var n=(typeof SESION!=='undefined' && SESION && SESION.nombre) || (typeof YO!=='undefined' && YO && YO.nombre) || '';
+  return rangoNom(n)>=3 || (typeof esAdmin==='function' && !!esAdmin());
+}
+/* ¿Sale el botón? Sólo en una general de verdad (con servidor, o en `?demo`) y a quien la abre. */
+function _asisBotonM_(R){
+  return !!R && R.tipo==='general' && R.id!=null && _asisSoyPDM_() && (_demoLocal_() || (typeof backendOK!=='undefined' && backendOK && !!R._real));
+}
+
+function _asisFilaM_(n, v){
+  var pres=(v.presentes||{})[n], vis=(v.vistos||{})[n], tel=pres && _asisModo_(v, n)==='tel';
+  var col=pres ? (tel?'var(--tel)':'var(--ok)') : (vis ? 'var(--warn)' : 'var(--line2)');
+  return '<button type="button" class="asisFM" data-asisn="'+esc(n)+'" data-p style="display:flex;width:100%;align-items:center;gap:10px;min-height:44px;'+
+    'margin:0 0 6px;padding:8px 12px;border-radius:12px;text-align:left;font:inherit;color:var(--ink);cursor:pointer;background:'+
+    (pres ? (tel?'rgba(63,158,214,.18)':'rgba(62,180,137,.18)') : 'var(--sur)')+';border:1px solid '+col+'">'+
+    '<b style="flex:1;font-weight:600">'+esc(n)+'</b><span class="mono" style="font-size:11px;color:'+col+'">'+
+    (pres ? ('✓ '+esc(_hhmmDe_(pres))+(tel?' · telemático':'')) : (vis?'ha abierto la app':'toca para marcar'))+'</span></button>';
+}
+
+function _asisPanelHTMLM_(){
+  var A=ASIS_PM, v=A&&A.v; if(!v) return '<p class="rnota">Cargando…</p>';
+  var cu=_asisCuenta_(v), conv=v.convocados||[];
+  if(!v.existe) return '<p class="rnota" style="margin:0 0 10px">Aún no se ha abierto la asistencia de esta reunión.</p>'+
+    '<button class="btn pri full" data-p data-asisabrirm>Abrir asistencia</button>';
+  var cab=v.abierta
+    ? '<div class="asisPalM" style="text-align:center;font-size:34px;font-weight:700;letter-spacing:.04em;margin:2px 0 4px">'+esc(v.palabra||'')+'</div>'
+    : '<p class="rnota" style="margin:0 0 6px">Asistencia cerrada: puedes corregir la lista.</p>';
+  return cab+'<p class="rnota" data-asiscuenta style="text-align:center;margin:0 0 10px"><b>'+cu.presentes+'</b> de '+cu.convocados+' presentes'+
+    (cu.tel?' · <span style="color:var(--tel)">'+cu.tel+' por telemático</span>':'')+'</p>'+
+    conv.map(function(n){ return _asisFilaM_(n, v); }).join('')+
+    '<div style="margin-top:10px">'+elegirPersonas('asisQuienM', {universo:_activos_().map(function(m){ return m.nombre; }).filter(function(n){ return conv.indexOf(n)<0; }),
+      multi:false, titulo:'Llega alguien que no está en la lista', vacio:'Escribe un nombre.'})+
+    '<button class="btn full" data-p data-asisanadirm style="margin-top:8px">Añadir y marcar presente</button></div>'+
+    '<div style="display:flex;gap:8px;margin-top:10px">'+
+    (v.abierta?'<button class="btn" data-p data-asiscerrarm style="flex:1">Cerrar asistencia</button>':'<button class="btn" data-p data-asisreabrirm style="flex:1">Reabrir</button>')+
+    '<button class="btn" data-p data-asiscopiarm style="flex:1">Copiar la lista</button></div>';
+}
+
+async function _asisRefrescarM_(){
+  var A=ASIS_PM; if(!A || A.ocupado) return;
+  var _pn=document.querySelector('[data-asispanelm]');
+  if(!_pn || !_pn.offsetParent){ _asisSalirM_(); return; }      // el panel se cerró (o se ocultó): se acaba el refresco
+  A.ocupado=true;
+  try{
+    var v=await api.getAsistencia(A.id, true); if(ASIS_PM!==A) return;
+    A.v=v; _asisPintarPanelM_();
+  }catch(e){ /* un fallo suelto no lo tumba: el siguiente ciclo lo recupera */ }
+  finally{ A.ocupado=false; }
+}
+function _asisSalirM_(){ if(ASIS_PM && ASIS_PM.timer) clearInterval(ASIS_PM.timer); ASIS_PM=null; }
+
+function _asisPintarPanelM_(){
+  var c=document.querySelector('[data-asispanelm]'), A=ASIS_PM; if(!c || !A) return;
+  var esc_=document.querySelector('[data-psel-in="asisQuienM"]'), tecleado=esc_?esc_.value:'', foco=document.activeElement===esc_;
+  c.innerHTML=_asisPanelHTMLM_();
+  var inp=document.querySelector('[data-psel-in="asisQuienM"]'); if(inp && tecleado){ inp.value=tecleado; if(foco) inp.focus(); }
+  var on=function(sel, f){ var b=c.querySelector(sel); if(b) b.onclick=async function(){ if(b.disabled) return; b.disabled=true;
+    try{ await f(); }catch(e){ tostErr('No se pudo: ', e); } finally{ b.disabled=false; } }; };
+  on('[data-asisabrirm]', async function(){ await api.abrirAsistencia(A.id); await _asisRefrescarM_(); });
+  on('[data-asiscerrarm]', async function(){ await api.cerrarAsistencia(A.id); await _asisRefrescarM_(); });
+  on('[data-asisreabrirm]', async function(){ await api.abrirAsistencia(A.id); await _asisRefrescarM_(); });
+  on('[data-asisanadirm]', async function(){
+    var i2=document.querySelector('[data-psel-in="asisQuienM"]');
+    var n=(elegirPersonasMarcadas('asisQuienM')[0]||(i2?i2.value:'')).trim(); if(!n) return;
+    if(i2) i2.value='';                      // ya está: el campo se vacía ANTES de refrescar (el refresco conserva lo tecleado)
+    await api.marcarPresente(A.id, n, true); await _asisRefrescarM_(); tost(n+': presente.'); });
+  on('[data-asiscopiarm]', async function(){
+    var t=_asisListaTxt_(A.v);
+    try{ await navigator.clipboard.writeText(t); tost('Lista copiada.'); }catch(_){ tost('No se pudo copiar.'); } });
+  Array.prototype.forEach.call(c.querySelectorAll('[data-asisn]'), function(b){
+    b.onclick=async function(){                // un toque: marca o quita (llega de improviso, o se equivocó)
+      var n=b.getAttribute('data-asisn'); if(b.disabled) return; b.disabled=true;
+      try{ await api.marcarPresente(A.id, n, !((A.v.presentes||{})[n])); await _asisRefrescarM_(); }
+      catch(e){ tostErr('No se pudo: ', e); } finally{ b.disabled=false; } };
+  });
+}
+
+function _asisAbrirPanelM_(R){
+  _asisSalirM_();
+  ASIS_PM={id:R.id, v:null, timer:null, ocupado:false};
+  abrirModal('<div class="mtit">Asistencia en directo</div><div class="msub">'+esc(R.titulo||'')+'</div><div data-asispanelm><p class="rnota">Cargando…</p></div>');
+  _asisRefrescarM_();
+  ASIS_PM.timer=setInterval(_asisRefrescarM_, 3000);
 }
 
 /* Repinta SÓLO las tarjetas (no la vista entera: perdería lo que estás tecleando). Si no había y ahora sí, o al revés, la

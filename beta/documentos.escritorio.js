@@ -25,7 +25,9 @@ function revisoresDe(d){
         : [PD_NOM];
   r=r.filter(function(n){return n!==d.autor;});
   if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n){return n!==d.autor;});
-  if(!r.length) r=[PD_NOM];
+  /* 01/11: SIN tercer peldaño. Antes acababa en `[PD_NOM]` sin volver a filtrar al autor: con `REV2_NOM === PD_NOM` y el PD
+     de autor, el expediente se asignaba a su propio autor y no podía firmar NADIE, sin un error. Ahora `[]` es «no hay
+     revisor asignable»: cada consumidor lo pinta («Sin revisor: avisa al Project Director») y nadie decide (`puedeDecidirDoc`). */
   return r;
 }
 
@@ -52,6 +54,8 @@ function _normDocE_(d, i){
     /* 28/10: lo que ajusta «con anotaciones» además del título (`sub` ya es el SUBSISTEMA en esta cara). */
     subtitulo:        d.subtitulo || '',
     confidencialidad: d.confidencialidad || '',
+    /* 01/11: la versión (la propone el autor, la cambia el revisor) y de qué documento es versión nueva. */
+    version: d.version || '', sustituyeA: d.sustituyeA || '',
     autor:   d.autor || '',
     /* 31/10: el rastro de `cambiarAutorDoc` (PD/José), con los mismos nombres que el servidor y el móvil. */
     autor_original: d.autor_original || null, autor_cambiado_por: d.autor_cambiado_por || null,
@@ -155,7 +159,9 @@ function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
    `analizado`. */
 function puedeDecidirDoc(d){
   if(!d || d.autor===ACTOR) return false;
+  if(_docYaPublicado_(d.est)) return false;      /* lo publicado no se mueve: el servidor no lo deja (comun.js) */
   var rev=revisoresDe(d), maxR=Math.max.apply(null,rev.map(rangoNom));
+  if(!rev.length) return false;      /* sin revisor asignable, ni mandando por rango (maxR sería -Infinity) */
   if(rev.indexOf(ACTOR)<0 && rangoNom(ACTOR)<=maxR) return false;
   /* ⛔ SOLO `revision` CORTA AQUI, igual que el movil (20/08, 133.a). Con
      `recibido` y `analizado` en esta lista, un expediente que YA TIENE `revisor`
@@ -179,7 +185,7 @@ function filaDoc(d){
   return '<div class="dec" id="doc-'+d.id+'" data-docsel="'+d.id+'">'+
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
     '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+esc(d.ref)+'</span> · '+
-      esc(_m(d.autor).pila)+' · '+ambDoc(d.amb)+' · firma '+esc(rev)+
+      esc(_m(d.autor).pila)+' · '+ambDoc(d.amb)+(rev ? ' · firma '+esc(rev) : ' · sin revisor')+
       (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+'</small></span>'+
     '<span class="der">'+
       (mio?'<span class="chip wa">te toca</span>':'')+
@@ -260,24 +266,9 @@ function _pasosSustituirE_(d){
    proposito: ahi «lo firma X» SI es verdad. */
 function _docAutorE_(d){
   if(!d || typeof ACTOR==='undefined' || d.autor!==ACTOR) return '';
-  var e={estado:d.est, nota:d.nota, decision:d.decision, decidedAt:d.decidedAt, revisor:d.revisor};
-  var firma=(typeof _firmaDocTxt_==='function') ? _firmaDocTxt_(e) : '';
-  var pie=firma ? '<br><span class="sc">'+esc(firma)+'</span>' : '';
-  if(e.estado==='rechazado')
-    return '<div class="ruta"><b>Te lo rechazaron.</b> '+esc(e.nota||'Sin motivo escrito.')+pie+'</div>';
-  if(e.estado==='publicando')
-    return '<div class="ruta"><b>Aprobado: se está publicando.</b> En cuanto termine, aquí tendrás el enlace y, si hace falta, cómo mandar una versión nueva.'+pie+'</div>';
-  if(e.estado==='aprobado'||e.estado==='anot'||e.estado==='publicado'){
-    var acc=(typeof _accionDocTxt_==='function')
-      ? (_accionDocTxt_(e.decision&&e.decision.accion)||'Aprobado') : 'Aprobado';
-    var aj=(typeof _ajustesDocTxt_==='function') ? _ajustesDocTxt_(e) : '';
-    var url=String(d.notion||'');
-    return '<div class="ruta"><b>'+esc(acc)+'.</b> '+(aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+
-      (url.indexOf('http')===0
-        ? '<br><a href="'+esc(url)+'" target="_blank" rel="noopener">Ver la página publicada</a>' : '')+
-      '</div>'+_pasosSustituirE_(d);
-  }
-  return '';
+  var m=_docAutorModelo_({estado:d.est, nota:d.nota, decision:d.decision, decidedAt:d.decidedAt, revisor:d.revisor, url:d.notion});
+  if(!m || m.tipo==='cambios') return '';   /* `cambios` tiene su rama propia en `verDoc` (los pasos para corregir) */
+  return '<div class="ruta">'+m.html+'</div>'+(m.tipo==='decidido' ? _pasosSustituirE_(d) : '');
 }
 
 function _pasosCorregirE_(d){
@@ -302,6 +293,7 @@ function _decDocLocalE_(d, acc, mot, tit, actor, at, aj){
     if(aj.etiquetas) d.etiquetas = aj.etiquetas;
     if(aj.subtitulo!=null) d.subtitulo = aj.subtitulo;
     if(aj.confidencialidad) d.confidencialidad = aj.confidencialidad;
+    if(aj.version) d.version = aj.version;
   }
   d.nota = (acc==='cambios' || acc==='rechazado') ? (mot||'') : '';
   d.revisor = actor || null;
@@ -312,6 +304,7 @@ function _decDocLocalE_(d, acc, mot, tit, actor, at, aj){
 var DOC_EDIT_AB = {};   /* 31/10 (feosesc #16): qué expedientes tienen abierto «Editar antes de decidir», para el repintado */
 function docCard(d){
   var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
+  var sinRev=!revs.length;
   var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';
   var lista=function(t,xs){ return (xs&&xs.length)
     ? '<div class="sub"><span class="sc">'+t+'</span><ul class="obj">'+
@@ -350,9 +343,10 @@ function docCard(d){
        Sigue en el DOM plegado (los campos se leen por id); lo abierto se recuerda en `DOC_EDIT_AB`. */
     var _abEd = (typeof DOC_EDIT_AB!=='undefined') && !!DOC_EDIT_AB[d.id];
     acc=((_yaAnalizado_(d) || _autorP) ? '<div class="doc-edit'+(_abEd?' ab':'')+'"><button type="button" class="btn sm" data-docedit="'+d.id+'">Editar antes de decidir</button>'+
-        '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS) : '')+'</div></div>' : '');
+        '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS, {todas:true}) : '')+'</div></div>' : '');
     arriba=
       '<textarea data-motivo placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
+      _solIAHTML_('dm'+d.id, _solMotivoCfg_(d, '#doc-'+d.id+' [data-motivo]'))+
       /* ⛔⛔ APROBAR = PUBLICAR, y no se publica lo que nadie ha analizado. Esta cara ve
          `recibido` y `analizado` a proposito -Daniel, 05/08: en el movil «no aparecen
          hasta que esten completamente analizados»; aqui se ve el pipeline entero-, pero
@@ -368,7 +362,7 @@ function docCard(d){
           : '<span class="sc" style="align-self:center">A\u00fan sin analizar: se puede parar, no publicar.</span>')+
         '<button class="btn" data-doc="'+d.id+'" data-acc="cambios">Solicitar cambios</button>'+
         '<button class="btn no" data-doc="'+d.id+'" data-acc="rechazado">Rechazar</button>'+
-        (d.est!=='revision'&&d.revisor?'<button class="btn" data-doc="'+d.id+'" data-acc="deshacer">Deshacer y devolver a revisión</button>':'')+
+        (_puedeDeshacerDoc_(d)?'<button class="btn" data-doc="'+d.id+'" data-acc="deshacer">Deshacer y devolver a revisión</button>':'')+
       '</div>';
   } else if(d.autor===ACTOR && d.est==='cambios'){
     /* ⛔ Mismo rotulo mentiroso que en el movil: el boton no sube nada.
@@ -384,12 +378,14 @@ function docCard(d){
        decididos. Lo decide `_docAutorE_`, gemela de `_docAutorHTML_` del movil. */
     acc=_aut;
   } else if(d.autor===ACTOR){
-    acc='<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>';
+    acc=sinRev ? '<div class="ruta">Es tuyo y no hay otro revisor: avisa al Project Director. Nadie decide lo suyo.</div>'
+               : '<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>';
   } else if(d.revisor){
     acc='<div class="ruta">Ya lo decidió <b>'+esc(d.revisor)+'</b>. Puedes consultarlo; para cambiar la '+
       'decisión hace falta más rango que quién la tomó.</div>';
   } else {
-    acc='<div class="ruta">Lo firma <b>'+esc(rev)+'</b>, no tú.</div>';
+    acc=sinRev ? '<div class="ruta">Sin revisor: avisa al Project Director.</div>'
+               : '<div class="ruta">Lo firma <b>'+esc(rev)+'</b>, no tú.</div>';
   }
   return '<div class="parte" id="doc-'+d.id+'">'+
     '<div class="h"><b>'+esc(d.tit)+'</b>'+
@@ -433,14 +429,15 @@ function docCard(d){
       (_etiquetasDe_(d).length
         ? '<span class="chip">'+esc(_etiquetasDe_(d).join(' · '))+'</span>' : '')+
     '</div>'+
-    _avisosDocE_(d)+arriba+
+    _avisosDocE_(d)+
+    /* 01/11 (escm1): se LEE antes de decidir — resumen y avisos de calidad ENCIMA del motivo y los botones. */
     '<div class="just"><span class="sc">Resumen ejecutivo</span>'+
       /* 21/10 (auditor 20, 🟡 2): «léelo abajo» sólo si abajo HAY archivo; si no, decía «léelo abajo» encima de «no trae
          enlace al archivo». */
       esc(d.resumen||(d.drive ? 'El expediente llegó sin resumen. Léelo abajo antes de firmar.'
                               : 'El expediente llegó sin resumen y sin enlace al archivo: no hay nada que leer antes de firmar.'))+'</div>'+
-    previa+secs+avisos+visor+
-    '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':'Firma: <b>'+esc(rev)+'</b>')+'</div>'+
+    avisos+arriba+previa+secs+visor+
+    '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':(sinRev?'Sin revisor: avisa al Project Director.':'Firma: <b>'+esc(rev)+'</b>'))+'</div>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
     _autorRastroHTML_(d)+
     (puede ? '' : _autorP)+   /* quien puede decidir lo lleva plegado dentro de `acc` */

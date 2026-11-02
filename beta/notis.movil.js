@@ -104,19 +104,19 @@ function _gateNotis_(motivo, seguir){
   _gateNotis_._seguir=seguir;
   var cuerpo, boton='';
   if(motivo==='ios'){
-    cuerpo='Para recibir los avisos en <b>iPhone</b> hay que abrir el panel desde la pantalla '+
+    cuerpo='Para recibir los avisos en iPhone hay que abrir el panel desde la pantalla '+
       'de inicio.<br><br>Pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>, y entra '+
       'desde ese icono.';
   } else if(motivo==='denegado'){
-    cuerpo='Has denegado las notificaciones y <b>el navegador ya no vuelve a preguntar</b>: '+
+    cuerpo='Has denegado las notificaciones y el navegador ya no vuelve a preguntar: '+
       'hay que activarlas a mano en el teléfono.<br><br>'+
-      '<b>Ajustes → Solaris</b> (o tu navegador) <b>→ Notificaciones → Permitir</b>.<br>'+
+      'Ajustes → Solaris (o tu navegador) → Notificaciones → Permitir.<br>'+
       'Vuelve aquí después: se comprueba solo.';
     boton='Ya las he activado';
   } else {
-    cuerpo='<b>Para entrar</b> tienes que activar las notificaciones.<br><br>Avisan de '+
+    cuerpo='Para entrar tienes que activar las notificaciones.<br><br>Avisan de '+
       'turnos, reuniones y decisiones sobre tus horas y documentos. '+
-      '<b>Sin ellas no se puede usar</b>: si no te enteras a tiempo puedes acabar con una falta.';
+      'Sin ellas no se puede usar: si no te enteras a tiempo puedes acabar con una falta.';
     boton='Activar notificaciones';
   }
   var g=_gate_(SPLASH+'<div style="max-width:330px;line-height:1.6">'+cuerpo+'</div>'+
@@ -154,7 +154,7 @@ function _notisHTML_(){
      cosa. Va arriba del todo: debajo de los interruptores no lo lee nadie. */
   var _fp=(typeof _pushFallo_==='function') ? _pushFallo_() : null;
   var _avisoFallo = _fp ? '<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">'+
-    '<b>No se pudo confirmar tu registro de avisos</b> la última vez que abriste el panel, '+
+    'No se pudo confirmar tu registro de avisos la última vez que abriste el panel, '+
     'así que puede que no te lleguen: '+esc(String(_fp))+'.<br>Cierra y vuelve a abrir; si '+
     'sigue, avisa.</p></div>' : '';
   /* ⛔⛔ MISMO ORDEN QUE `_faltanNotis_`, Y POR LO MISMO (761.a). Con el viejo, un iPhone
@@ -200,8 +200,8 @@ function _pintarNotisLista_(){
        que no ensenarlo: lo apagas, crees que lo apagaste, te llegan igual — y a partir de ahi
        no te fias tampoco de los dos que si funcionan. */
     filas+='<div class="fila"><div class="a"><b>'+e[0]+'</b><small>'+e[1]+
-      (fijo?' · <b>no se puede desactivar</b>':'')+
-      ((!fijo && !vivo)?' · <b>hoy no se manda ninguno de este tipo</b>':'')+'</small></div>'+
+      (fijo?' · no se puede desactivar':'')+
+      ((!fijo && !vivo)?' · hoy no se manda ninguno de este tipo':'')+'</small></div>'+
       '<div class="d">'+(fijo
         ? '<span class="pil otor">siempre</span>'
         : '<button class="btn" data-noti="'+k+'" data-p>'+(on?'Sí':'No')+'</button>')+
@@ -215,8 +215,8 @@ function _pintarNotisLista_(){
      distintas al mismo estado** segun por donde entrases. */
   if(!filas){ c.innerHTML='<p class="rnota" style="margin:0">El servidor no ha listado '+
     'ningún tipo de aviso.</p>'; return; }
-  c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0"><b>Turnos</b>, <b>reuniones</b> y '+
-    '<b>avisos y sanciones</b> no se pueden apagar aquí: llevan plazo y perderse uno '+
+  c.innerHTML=filas+'<p class="rnota" style="margin:10px 0 0">Turnos, reuniones y '+
+    'avisos y sanciones no se pueden apagar aquí: llevan plazo y perderse uno '+
     'puede acabar en sanción. Lo demás lo eliges tú.</p>';
   $$('[data-noti]',c).forEach(function(b){
     b.onclick=async function(){

@@ -25,7 +25,9 @@ function revisoresDe(e){
         : [PD_NOM];
   r=r.filter(function(n){return n!==e.autor;});          /* nadie revisa lo suyo */
   if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n){return n!==e.autor;});
-  if(!r.length) r=[PD_NOM];
+  /* 01/11: SIN tercer peldaño. Antes acababa en `[PD_NOM]` sin volver a filtrar al autor: con `REV2_NOM === PD_NOM` y el PD
+     de autor, el expediente se asignaba a su propio autor y no podía firmar NADIE, sin un error. Ahora `[]` es «no hay
+     revisor asignable»: cada consumidor lo pinta («Sin revisor: avisa al Project Director») y nadie decide (`puedeDecidirDoc`). */
   return r;
 }
 
@@ -46,19 +48,7 @@ function pilaDe(n){ return _pilaDeM_(n); }
    lo que significa «esto ya lo decidio alguien»; dejarlo con el nombre del que deshizo
    convierte un expediente devuelto a revision en uno decidido por otra persona.
    ⚠️ Es la unica accion, junto a `reenviar`, que NO firma. */
-/* CUANDO SE PUEDE DESHACER. Vivia como una condicion suelta dentro de la plantilla
-   HTML, y ahi NO se puede ejecutar: una mutacion que la apagaba (`false&&...`) salio CIEGA
-   porque la comprobacion leia el TEXTO del fichero -y `data-dec="deshacer"` sigue escrito
-   aunque el boton no se pinte nunca-. Con nombre se ejecuta, y entonces si se distingue
-   «esta escrito» de «se pinta» (ARRANQUE §3c: «existe» no es «se ejecuta»).
-
-   ⛔ DECIDIDO **Y** CON REVISOR, las dos cosas. Sin revisor no hay decision que deshacer y
-   el boton mandaria al backend una orden que no puede cumplir; sin mirar el estado se
-   ofreceria «deshacer» sobre un expediente que ya esta en revision. Misma condicion que el
-   escritorio, que es lo que hace que las dos caras ofrezcan lo mismo. */
-function _puedeDeshacerDoc_(e){
-  return !!(e && e.estado!=='revision' && e.revisor);
-}
+/* `_puedeDeshacerDoc_` vive en `comun.js` (02/11): la miran las DOS caras y tiene que saber lo que el servidor no deja deshacer. */
 
 
 /* Qué hacer con una decisión de documento SIN conexión. Puro, para que un banco lo ejecute (el listener no se puede).
@@ -94,7 +84,7 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq, aj){
        mismo `if` con dos significados distintos, que es justo lo que los confundio. */
     if(acc==='anot' && etq) e.etiquetas=etq;
     /* 28/10: subtítulo ('' = quitarlo) y confidencialidad, como el servidor. `aj` es el `extra` de `_anotExtra_`. */
-    if(acc==='anot' && aj){ if(aj.subtitulo!=null) e.subtitulo=aj.subtitulo; if(aj.confidencialidad) e.confidencialidad=aj.confidencialidad; }
+    if(acc==='anot' && aj){ if(aj.subtitulo!=null) e.subtitulo=aj.subtitulo; if(aj.confidencialidad) e.confidencialidad=aj.confidencialidad; if(aj.version) e.version=aj.version; }
     e.estado='aprobado';   /* 21/10 (auditor 11, 🔴 1): como el servidor — `publicado` lo pone quien publica */
   } else if(acc==='cambios'){ e.estado='cambios'; e.nota=mot; }
   else if(acc==='rechazado'){ e.estado='rechazado'; e.nota=mot; }
@@ -123,9 +113,11 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq, aj){
    `analizado`. */
 function puedeDecidirDoc(e){
   if(!e) return false;                                     /* como el escritorio: sin expediente, nadie decide */
+  if(_docYaPublicado_(e.estado)) return false;            /* lo publicado no se mueve: el servidor no lo deja (comun.js) */
   var yo=yoNombre();
   if(yo===e.autor) return false;                          /* ni mandando por rango */
   var rev=revisoresDe(e), maxR=Math.max.apply(null,rev.map(rangoNom));
+  if(!rev.length) return false;                           /* sin revisor asignable, ni mandando por rango (maxR sería -Infinity) */
   var habilitado = rev.indexOf(yo)>=0 || rangoNom(yo)>maxR;
   if(!habilitado) return false;
   if(e.estado==='revision') return true;                  /* sin decidir: cualquiera habilitado */
@@ -362,7 +354,7 @@ function _pasosSustituirM_(e){
   var ps = (typeof _pasosSustituirDoc_==='function')
     ? _pasosSustituirDoc_(e, yoNombre()) : [];
   if(!ps.length) return '';
-  return '<div class="avisolargo" style="margin-top:10px"><b>¿Versión nueva?</b> Se envía como <b>sustitución</b> por el formulario; hasta que la aprueben, sigue publicado este.</div>'+
+  return '<div class="avisolargo" style="margin-top:10px"><b>¿Versión nueva?</b> Se envía como sustitución por el formulario; hasta que la aprueben, sigue publicado este.</div>'+
     _pasosHTML_(ps, 8, 6);
 }
 
@@ -377,64 +369,18 @@ function _pasosCorregirM_(e){
 function _docAutorHTML_(e){
   if(!e || e.autor!==yoNombre()) return '';
   var est=e.estado;
-  var firma=(typeof _firmaDocTxt_==='function') ? _firmaDocTxt_(e) : '';
-  var pie=firma ? '<br><span class="sc">'+esc(firma)+'</span>' : '';
-  if(est==='cambios')
-    return '<div class="avisolargo" style="margin-top:14px"><b>Te pidieron cambios.</b> '+
-      esc(e.nota||'')+pie+'</div>'+
-      _pasosCorregirM_(e)+
-      /* ⛔ EL ROTULO DECIA «Reenviar corregido» Y NO REENVIA NADA: `Codigo.gs:965-967`
-         solo cambia el estado. Un boton que promete subir un archivo hace que quien lo
-         pulsa CREA que ya lo ha subido, y se queda esperando a un revisor que abriria el
-         archivo viejo. Ahora dice lo que hace. */
-      /* ⛔ 27/10: SIN el botón «Ya está corregido»: la corrección que llega por el formulario devuelve el
-         expediente a revisión sola (un envío nuevo = una ronda nueva, `servidor.e_push_entregable`). */
-      '';
-  /* ⛔ AQUI NO VAN LOS DOS PASOS, Y ES LA MITAD QUE SE ME ESCAPABA: `Codigo.gs:966` exige
-     `estado==='cambios'` para reenviar, asi que desde un RECHAZADO **no hay boton**.
-     Decirle a esta persona «vuelve y pulsa» la manda a buscar algo que no existe: lo suyo
-     es un envio NUEVO -referencia nueva- enlazado al original, que no se borra. */
-  if(est==='rechazado')
-    return '<div class="avisolargo" style="margin-top:14px"><b>Te lo rechazaron.</b> '+
-      esc(e.nota||'Sin motivo escrito.')+pie+
-      '<div style="margin-top:8px">Si lo rehaces, mándalo por el formulario como «Documento nuevo».</div></div>';
-  /* ⛔⛔ AQUI ESTABA PINCHADA LA RAMA MUERTA Y FALTABA LA VIVA. `cerrado` no existe
-     -- `_normEstado_` lo traduce a `publicado` --, mientras que `anot` SI llega: el mapa
-     lo produce (`'anot':'anot'`) y un push historico de Cowork lo trae. O sea que el
-     unico estado que de verdad podia caer aqui y no estaba contemplado era el que se
-     quedo fuera, y el autor de un expediente en `anot` no veia NI la accion NI el
-     enlace a Notion -- se caia por debajo de todas las ramas. */
-  /* ⛔ (631.ª) `publicando` TAMBIEN ES DEL AUTOR: caia al `else` de `verDoc` y leia «Este
-     expediente lo revisa X. Tu no decides aqui» sobre SU documento ya aprobado. */
-  if(est==='publicando')
-    return '<div class="avisolargo" style="margin-top:14px"><b>Aprobado: se está publicando.</b> En cuanto termine, aquí tendrás el enlace y, si hace falta, cómo mandar una versión nueva.'+pie+'</div>';
-  if(est==='aprobado'||est==='anot'||est==='publicado'){
-    /* ⛔ LA ACCION SALE DE `decision.accion`, NO DEL ESTADO: el backend deja `aprobado` y `anot`
-       en el MISMO `publicado`, asi que desde el estado no se puede saber si te lo aprobaron tal
-       cual o te lo aprobaron CAMBIANDOTE el titulo y las etiquetas. */
-    var acc=(typeof _accionDocTxt_==='function')
-      ? (_accionDocTxt_(e.decision&&e.decision.accion)||'Aprobado') : 'Aprobado';
-    var aj=(typeof _ajustesDocTxt_==='function') ? _ajustesDocTxt_(e) : '';
-    /* ⚠️ EL ENLACE SOLO SI ES UNO DE VERDAD. `Codigo.gs:993` pone `paginaNotion = ... || '#notion'`
-       —un marcador del prototipo—, y un enlace muerto con pinta de vivo es peor que ninguno:
-       manda a pulsarlo y a pensar que la app esta rota. */
-    var url=String(e.paginaNotion||'');
-    return '<div class="avisolargo" style="margin-top:14px"><b>'+esc(acc)+'.</b> '+
-      (aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+
-      (url.indexOf('http')===0
-        ? '<br><a href="'+esc(url)+'" target="_blank" rel="noopener">Ver la página publicada</a>'
-        : '')+
-      '</div>'+
-      /* ⛔ Y AQUI LOS PASOS DE SUSTITUIR, PEGADOS -no en una rama propia-. Escribi
-         primero un `if(est==='publicado')` DELANTE de este bloque y se COMIA lo que ya
-         pintaba: la accion real («Aprobado con anotaciones»), que te ajustaron, la firma
-         y el enlace a Notion. CUATRO comprobaciones de este banco se pusieron rojas a la
-         vez y tenian razon. Una rama nueva delante de otra que ya funciona no añade:
-         RESTA -- y el sintoma llega lejos del sitio, en comprobaciones que hablan de
-         acentos y de etiquetas. */
-      _pasosSustituirM_(e);
-  }
-  return '';
+  var m=_docAutorModelo_({estado:est, nota:e.nota, decision:e.decision, decidedAt:e.decidedAt, revisor:e.revisor, url:e.paginaNotion});
+  if(!m) return '';
+  var marco='<div class="avisolargo" style="margin-top:14px">';
+  /* ⛔ EL ROTULO DECIA «Reenviar corregido» Y NO REENVIA NADA: `Codigo.gs:965-967`
+     solo cambia el estado. Un boton que promete subir un archivo hace que quien lo
+     pulsa CREA que ya lo ha subido, y se queda esperando a un revisor que abriria el
+     archivo viejo. Ahora dice lo que hace. */
+  /* ⛔ 27/10: SIN el botón «Ya está corregido»: la corrección que llega por el formulario devuelve el
+     expediente a revisión sola (un envío nuevo = una ronda nueva, `servidor.e_push_entregable`). */
+  if(m.tipo==='cambios') return marco+m.html+'</div>'+_pasosCorregirM_(e);
+  /* Un RECHAZADO dice cómo rehacerlo desde el modelo común (`_docAutorModelo_`): las dos caras lo mismo. */
+  return marco+m.html+'</div>'+(m.tipo==='decidido' ? _pasosSustituirM_(e) : '');
 }
 
 /* ficha del expediente: análisis, calidad, visor y las 4 acciones reales */
@@ -494,6 +440,7 @@ function verDoc(id){
   if(!e) return;
   var puede=puedeDecidirDoc(e);
   var revs=revisoresDe(e).map(function(n){return n.split(' ')[0];}).join(' o ');
+  var sinRev=!revs;
   var sevTxt={baja:'alta',media:'media',alta:'baja'};
   var an=e.analisis, secs='';
   if(an){
@@ -522,6 +469,7 @@ function verDoc(id){
       (_yaAnalizado_(e) ? _anotPanelHTML_('d', _anotActualDe_(e), e.id, '') : '')+
       '<label class="campo"><span class="sc">Motivo <span class="req">*</span> si pides cambios o rechazas</span>'+
       '<textarea id="dMot" placeholder="lo leerá el autor…"></textarea></label>'+
+      _solIAHTML_('dm'+e.id, _solMotivoCfg_(e, '#dMot'))+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
         _botonesDecM_(e)+
         /* DESHACER. Lo tenia el escritorio y aqui NO, y esta es la cara en la que
@@ -543,7 +491,8 @@ function verDoc(id){
       ? _mioDoc
       : (revisoresDe(e).indexOf(yoNombre())>=0 && e.estado!=='revision'
           ? '<p class="rnota" style="margin-top:14px">🔒 Ya está decidido. Puedes consultarlo, pero solo alguien de más rango puede cambiar la decisión.</p>'
-          : '<p class="rnota" style="margin-top:14px">Este expediente lo revisa <b>'+revs+'</b>. Tú no decides aquí.</p>');
+          : (sinRev ? '<p class="rnota" style="margin-top:14px">Sin revisor: avisa al Project Director.</p>'
+                    : '<p class="rnota" style="margin-top:14px">Este expediente lo revisa <b>'+revs+'</b>. Tú no decides aquí.</p>'));
 
   abrirModal('<div class="mtit">'+esc(e.titulo)+'</div>'+
     '<div class="msub"><span class="mono">'+e.ref+'</span> · '+esc(e.autor)+' · '+esc(e.subsistema)+'</div>'+
@@ -604,11 +553,13 @@ function verDoc(id){
       /* 21/10 (auditor 19, 🟡 6): a quien lo SUBIÓ no se le manda a pedírselo a quien lo subió. */
       (_mioDoc ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
                : 'Pídeselo a quien lo subió antes de decidir.</div></div>'))+
-    '<p class="rnota" style="margin-top:10px">Revisa: <b>'+revs+'</b></p>'+
+    '<p class="rnota" style="margin-top:10px">'+(sinRev?'Sin revisor: avisa al Project Director.':'Revisa: <b>'+revs+'</b>')+'</p>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
     _autorRastroHTML_(e)+
     (_puedeCambiarAutor_(e.estado, yoNombre()) ? _autorPanelHTML_('dA', e.id, e.autor, '') : '')+
     (_mioDoc ? '' : _previaDocM_(e))+
+    /* 01/11: sólo el PD, y sólo enseña algo si el expediente está decidido (`comun.js`); para cualquier otro es ''. */
+    _fbpdRaiz_('ficha', e.id, 'btn mini')+
     acc);
   /* Se cablea DESPUES de abrir el modal: un iframe dentro de la cadena de strings no
      arranca hasta que esta en el DOM. */

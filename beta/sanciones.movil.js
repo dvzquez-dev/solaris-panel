@@ -26,11 +26,11 @@
    ⛔ Y SE TRADUCE `decision` -> `dec` EN LA FRONTERA, como hace el escritorio: el
    backend guarda el borrador en `s.decision` (`Codigo.gs:2062`) y esta cara lo lee en
    `x.dec`. Sin traducir, marcar 30 en el escritorio y abrir el movil decia «Faltan 30
-   por marcar». ⚠️ Aqui NO se pone `||'aceptar'` como el escritorio: esta cara usa
-   `!x.dec` para saber lo que falta por marcar, y un defecto lo dejaria todo «marcado». */
+   por marcar». ⛔ sustituida el 01/11 por Daniel (artifact [83777de2e0]): ahora SI se pone «aceptar» por
+   defecto (`_decDe_`, comun.js) y no existe «sin marcar»; antes esta cara lo dejaba sin decision a proposito. */
 async function _cargarSancionesM_(){
   try{ var a=await api.getSanciones({estado:'pendiente'});
-       if(Array.isArray(a)){ a.forEach(function(s){ if(!s.dec && s.decision) s.dec=s.decision; });
+       if(Array.isArray(a)){ a.forEach(function(s){ s.dec=_decDe_(s); });
                              SANC_M=a; SANC_FALLO=false; return true; } }
   catch(e){}
   /* ⛔ 21/10 (auditor de sanciones): el «no contestó» lo deja el CARGADOR, no sólo el modal — si no, el Panel del PD
@@ -90,86 +90,64 @@ function _sancionesHTML_(){
      falle es peor que no ofrecerlo: parece un fallo cuando es la norma. Y uno mismo SI esta,
      en los tres rangos, que es parte del modelo. */
   var nTotal=sancionablesPor(_actorSanc_()).length;
-  var esPlazo=(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg');
-  /* LAS TAREAS DEL SANCIONADO, no las mias -antes se ofrecian las propias y por eso no se
-     podia sancionar a nadie por un plazo-. `null` = todavia se estan pidiendo. Y solo las
-     VIVAS con enlace a Notion: sin `url` no se puede mover la fecha, y ofrecerla seria
-     prometer algo que va a fallar al guardar. */
-  /* ⛔ ASINCRONO Y SIN RECOGER: gemela exacta de la del escritorio. Lo tecleado entre que se
-     piden las tareas y que llegan se perdia, y volvia como `-1` con pinta de elegido. */
-  var _tt=esPlazo ? _tareasDe_(SANC_FORM.quien, function(){
-    if($('#modal').classList.contains('on')) _repintarSancM_();
-  }) : [];
-  /* ⛔⛔ IGUAL QUE EN LA CARA DE ESCRITORIO (567.ª), donde esta el parrafo entero: `null`
-     es «cargando» Y «no se pudo», asi que esta rama se tragaba el error y el aviso de
-     «No se pudieron leer» no se alcanzaba nunca. Se cura en las DOS a la vez porque lo
-     que se cura es la FORMA, no el fichero donde se vio. */
-  var cargandoT=(_tt===null) && !(SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien
-                                  && SANC_TAREAS.error);
-  var tareas=(_tt||[]).filter(function(t){
-    /* ⛔ LA MISMA PREGUNTA QUE «Mis tareas», y por eso la misma puerta: aquí se
-       eligen las tareas a las que se pueden imputar horas, y una tarea cerrada no
-       admite horas. Con el predicado copiado, cerrar una tarea dejaría de ocultarla
-       **en una pantalla y no en la otra** el día que Notion añada un estado. */
-    /* 26/10 («Sólo coordinador y tú»): y sólo las que TÚ puedes mover — el servidor rechaza el resto */
-    return t && t.url && !_tareaHecha_(t.e) && _puedeMoverPlazo_(t, _actorSanc_()); });
+  /* ⛔ ASINCRONO Y SIN RECOGER: el callback de tareas repinta por la puerta del modal (`_repintarSancM_`), si sigue abierto. */
+  var m=_sancTareasModelo_(function(){ if($('#modal').classList.contains('on')) _repintarSancM_(); });
+  _aseguraMotivosRri_(function(){ if($('#modal').classList.contains('on')) _repintarSancM_(); });   /* 01/11: el catálogo entero lo sirve el servidor */
+  var K={ campo:function(t,h){ return '<div class="campo"><span class="sc">'+t+'</span>'+h+'</div>'; },
+          nota:function(h,aviso){ return '<p class="rnota" style="margin:0 0 10px'+(aviso?';color:var(--warn)':'')+'">'+h+'</p>'; } };
   return '<div class="mtit">Sanciones</div>'+
     '<div class="msub">Ponerlas y decidirlas. El comunicado sigue saliendo del escritorio.</div>'+
     /* A cuánta gente puedes sancionar, como el `pan(...)` del escritorio (ficha del 20/08: `nTotal` se
        calculaba aquí y no se pintaba nunca). */
     '<h4>Poner una sanción <span class="sc">· '+nTotal+(nTotal===1?' persona':' personas')+' bajo tu jurisdicción</span></h4><div class="tarj">'+
-      /* El selector de personas ÚNICO: se escribe y salen los nombres; «Ver lista» enseña a todos los que alcanzas, por
-         unidad. El universo sale de la MISMA regla que el permiso (`personasDeAlcance`), no de otra copia. */
       '<span class="sc" style="display:block;margin-bottom:5px">A quién</span>'+
-      elegirPersonas('snQuien', {universo:personasDeAlcance(_actorSanc_()), multi:false, titulo:'A quién sancionar',
-        marcadas:SANC_FORM.quien?[SANC_FORM.quien]:[], vacio:nTotal ? 'Escribe un nombre o pulsa «Ver lista».' : 'No hay nadie bajo tu jurisdicción todavía.',
-        alCambiar:function(l){
-          SANC_FORM.quien=l[0]||'';
-          _quienCambiaSanc_();   /* 26/10 (A5b): con el 30g, los puntos son los del historial de ESTA persona */
-          var m=$('#snMsg'); if(m && SANC_FORM.quien){ m.textContent='A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'; m.style.color='var(--ink3)'; }
-          /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS, asi que hay que repintar. */
-          if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; _repintarSancM_(); }
-        }})+
-      '<label class="campo"><span class="sc">Motivo</span><select id="snMotivo">'+
-        '<option value="">— elige —</option>'+
-        RRI_MOTIVOS.map(function(r){ return '<option value="'+r[0]+'"'+(SANC_FORM.motivo===r[0]?' selected':'')+'>'+esc(r[1])+'</option>'; }).join('')+
-      '</select></label>'+
+      _sancQuienHTML_({repintar:_repintarSancM_, colorOk:'var(--ink3)',
+        alCambiar:function(){ var _es=$('#snEscala'); if(_es) _es.textContent=_escalaSancTxt_(); },   /* 26/10 (A5b) */
+        vacio:nTotal ? 'Escribe un nombre o pulsa «Ver lista».' : 'No hay nadie bajo tu jurisdicción todavía.'})+
+      '<div class="campo"><span class="sc">Motivo</span>'+
+        nxElige('snMotivo', RRI_MOTIVOS.map(function(r){ return [r[0], r[1]]; }), SANC_FORM.motivo||'')+'</div>'+
       (SANC_FORM.motivo==='libre'
         ? '<label class="campo"><span class="sc">Cuál</span><input id="snLibre" placeholder="Qué ha pasado" value="'+esc(SANC_FORM.libre||'')+'"></label>'+
           '<label class="campo"><span class="sc">Artículo del RRI</span><input id="snArt" value="'+esc(SANC_FORM.art||'libre')+'"></label>'
         : '')+
-      (esPlazo
-        ? (!SANC_FORM.quien
-            ? '<p class="rnota" style="margin:0 0 10px">Elige primero a quién sancionas: las tareas '+
-              'que se ofrecen son <b>las suyas</b>.</p>'
-          : cargandoT
-            ? '<p class="rnota" style="margin:0 0 10px">Buscando las tareas de '+
-              esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'…</p>'
-          : tareas.length
-            ? '<label class="campo"><span class="sc">Qué tarea</span><select id="snTarea">'+
-                '<option value="">— elige la tarea —</option>'+
-                tareas.map(function(t){ return '<option value="'+esc(t.url)+'"'+(SANC_FORM.tarea===t.url?' selected':'')+'>'+esc(t.n||t.nombre||'(sin título)')+
-                  (t.l?(_venciaTarea_(t.l)?' · venció el ':' · vence el ')+esc(_plazoDMY_(t.l)||_isoADMY_(t.l)):'')+'</option>'; }).join('')+   /* 20/10: «vencía» de lo que aún no vence */
-              '</select></label>'+
-              '<label class="campo"><span class="sc">Plazo nuevo</span><input type="date" id="snPlazo" value="'+esc(SANC_FORM.plazo||'')+'"></label>'+
-              '<p class="rnota" style="margin:0 0 10px">El plazo nuevo se guarda <b>en Notion</b>. '+
-              'Si falla, la sanción <b>no</b> se pone.</p>'
-          /* ⛔ «NO SE PUDO LEER» NO ES «NO TIENE». `SANC_TAREAS.error` lo guardaba la
-             puerta desde siempre y NO LO LEIA NADIE, asi que un corte de red se pintaba
-             como «elige otro motivo» y el expediente salia con el articulo equivocado. */
-          : (SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien && SANC_TAREAS.error)
-            ? '<p class="rnota" style="margin:0 0 10px;color:var(--warn)">No se pudieron cargar las tareas de '+
-              esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+': '+esc(String(SANC_TAREAS.error))+'.<br>'+
-              'Vuélvelo a elegir para reintentar.</p>'
-            : '<p class="rnota" style="margin:0 0 10px;color:var(--warn)">'+
-              esc(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+' no tiene ninguna tarea viva con enlace '+
-              'a Notion, así que no se puede mover ningún plazo. Elige otro motivo.</p>')
-        : '')+
-      '<label class="campo"><span class="sc">Puntos</span><input type="number" id="snPts" value="'+esc(_ptsPrefillSanc_())+'" step="1" min="-5" max="0"></label>'+
+      _sancPlazoHTML_(m, K)+
+      '<div class="campo"><span class="sc">Puntos</span>'+_ptsCampoSancHTML_()+'</div>'+
+      '<p class="rnota" id="snEscala" style="margin:-4px 0 10px">'+_escalaSancTxt_()+'</p>'+
       '<button class="btn pri full" data-p id="btnSanc">Poner la sanción</button>'+
       '<p class="rnota" id="snMsg" style="margin:8px 0 0"></p>'+
     '</div>'+
+    _vetoMovilHTML_()+
     '<h4>Pendientes de decidir</h4>'+_sancColaHTML_();
+}
+/* 31/10: «Procede veto» y sus dos tareas, encima de la cola (`_vetoFilas_`, en comun.js); sin nada que atender, no existe. */
+function _vetoMovilHTML_(){
+  var v=_vetoFilas_(SANC_M||[]);
+  return v.html ? '<div class="tarj"><h4 style="margin-top:0">Procede veto'+(v.n?' · '+v.n:'')+'</h4>'+v.html+'</div>' : '';
+}
+
+/* 01/11: con el 30g, la frase de la escala de ESA persona (la que ya rellena el campo de puntos): de dónde sale el número, y si
+   no consta —el backend recorta `antecedentes` a quien no es admin ni PD— que lo ponga a mano. Vacío con cualquier otro motivo. */
+function _escalaSancTxt_(){
+  if(SANC_FORM.motivo!=='30g' || !SANC_FORM.quien) return '';
+  return esc(_escalaSinCubrir_(SANC_FORM.quien).txt);
+}
+
+/* Las tarjetas de LOTE de la cola de sanciones, UNA vez para sus dos pintores (`_sancColaHTML_`, el modal con los botones, y
+   `panelPD`, el panel de sólo lectura): agrupa `SANC_M` por lote (las sin lote van a '(sueltas)'), pone la cabecera (rótulo +
+   de QUÉ reunión es) y deja a cada uno lo suyo: `filas(it, suelta)` pinta las filas y `pie(it, k, suelta)` lo que cuelga
+   debajo. Las dos tarjetas sacaban la cabecera de copias distintas de este bloque. */
+function _sancLotesHTML_(filas, pie){
+  var porLote={};
+  SANC_M.forEach(function(x){ var k=x.lote||'(sueltas)'; (porLote[k]=porLote[k]||[]).push(x); });
+  return Object.keys(porLote).map(function(k){
+    var it=porLote[k], suelta=(k==='(sueltas)');
+    var _tl=_tituloLote_(k, typeof REUNIONES_M!=='undefined' ? REUNIONES_M : []);   /* 🟡 8: de QUÉ reunión es */
+    return '<div class="tarj"><div class="lote"><div class="lote-h">'+
+      '<b>'+esc(_rotuloLote_(it))+'</b>'+
+      '<span class="mono" style="color:var(--red2)">'+esc(_tl ? _tl+' · '+k : k)+'</span></div>'+
+      filas(it, suelta)+pie(it, k, suelta)+
+    '</div></div>';
+  }).join('');
 }
 
 function _sancColaHTML_(){
@@ -180,15 +158,8 @@ function _sancColaHTML_(){
     ? vacio('No se pudo cargar','El servidor no contestó. <button class="btn mini" data-p data-sreint>Reintentar</button>','',false)
     : vacio('Cargando…','Buscando qué espera decisión.','',true))+'</div>';
   if(!SANC_M.length) return '<div class="tarj">'+vacio('Nada pendiente','Ninguna sanción espera decisión.','',false)+'</div>';
-  var porLote={};
-  SANC_M.forEach(function(x){ var k=x.lote||'(sueltas)'; (porLote[k]=porLote[k]||[]).push(x); });
-  return Object.keys(porLote).map(function(k){
-    var it=porLote[k], suelta=(k==='(sueltas)');
-    var _tl=_tituloLote_(k, typeof REUNIONES_M!=='undefined' ? REUNIONES_M : []);   /* 🟡 8: de QUÉ reunión es */
-    return '<div class="tarj"><div class="lote"><div class="lote-h">'+
-      '<b>'+esc(_rotuloLote_(it))+'</b>'+
-      '<span class="mono" style="color:var(--red2)">'+esc(_tl ? _tl+' · '+k : k)+'</span></div>'+
-      it.map(function(x){
+  return _sancLotesHTML_(function(it, suelta){
+    return it.map(function(x){
         return '<div class="lote-i" style="flex-wrap:wrap;gap:6px">'+
           '<span class="n">'+esc(_pilaDeM_(x.nombre)||x.nombre||'')+'</span>'+
           '<span class="mono" style="color:var(--ink3);font-size:10.5px;flex:1">'+esc(x.motivo||'')+
@@ -232,12 +203,12 @@ function _sancColaHTML_(){
               '<button class="btn mini'+(x.dec==='rechazar'?' on r':'')+'" data-smarc="'+esc(x.id)+
                 '" data-dec="rechazar" data-p>Rechaza</button>')+
         '</div>';
-      }).join('')+
-      (suelta ? ''
-        : '<p class="rnota">Se marca cada una y el bloque se cierra entero.</p>'+
-          '<button class="btn full" data-scerrar="'+esc(k)+'" data-p>Cerrar el bloque entero</button>')+
-    '</div></div>';
-  }).join('');
+    }).join('');
+  }, function(it, k, suelta){
+    return suelta ? ''
+      : '<p class="rnota">Todas van en «Acepta»; cambia las que no. El bloque se cierra entero.</p>'+
+        '<button class="btn full" data-scerrar="'+esc(k)+'" data-p>Cerrar el bloque entero</button>';
+  });
 }
 
 /* Abre la pantalla y la deja cableada. Se vuelve a llamar despues de cada accion en vez de
@@ -264,142 +235,37 @@ function _repintarSancM_(){
 }
 
 function _cablearSanciones_(){
-  var val=function(id){ var e=$('#'+id); return e?e.value:''; };
   var msg=function(t,mal){ var b=$('#snMsg'); if(b){ b.textContent=t; b.style.color=mal?'var(--warn)':'var(--ink3)'; } };
-
-  /* ⛔ CADA CAMPO SE GUARDA AL TECLEARLO, igual que en el escritorio. El `recoger()` de aqui
-     ya arreglaba el repintado por cambio de motivo -por eso decia «esto es exactamente lo que
-     faltaba»-, pero el repintado ASINCRONO del callback de tareas no pasaba por el. Atando los
-     campos, ningun repintado puede tirar lo escrito, venga de donde venga. */
-  _atarSancForm_();
-  /* ⛔ Y NO HAY `recoger`/`repintar` LOCALES: se llama a `_repintarSancM_` por su nombre en
-     cada sitio, que es lo unico que hace visible que la puerta es UNA. */
-
-  /* El motivo decide QUE MAS se pide, asi que al cambiarlo hay que repintar. Pero se recoge
-     todo antes, y `_sancionesHTML_` vuelve a pintar lo elegido. */
-  var mo=$('#snMotivo');
-  if(mo) mo.onchange=function(){ _motivoCambiaSanc_(); _repintarSancM_(); };
-  var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
+  /* Los campos se guardan al teclear y el motivo repinta (`_sancCablearCampos_`, comun.js, la misma que el escritorio).
+     Se llama a `_repintarSancM_` por su nombre en cada sitio: lo unico que hace visible que la puerta es UNA. */
+  _sancCablearCampos_(_repintarSancM_);
 
   var bt=$('#btnSanc');
   if(bt) bt.onclick=async function(){
-    /* ⛔ LOS PUNTOS, POR LA PUERTA: `parseInt` a pelo TRUNCA en vez de rechazar
-       (`-3.7` entraba como -3, en silencio) y `!(pts<=0)` deja pasar un -50, que no
-       para NINGUNA capa hasta Notion. Ver `_validaPuntosSanc_` en `comun.js`. */
-    var quien=SANC_FORM.quien, mot=val('snMotivo'), _vp=_validaPuntosSanc_(val('snPts'));
-    /* Propia del ENVIO: `esPlazo` es de la funcion que pinta y aqui no existe. */
-    var esDePlazo=(mot==='plazo'||mot==='plazoUrg');
-    if(!quien){ msg('Elige a quién: pulsa un nombre de la lista.', true); return; }
-    if(!mot){ msg('Elige el motivo.', true); return; }
-    if(!_vp.ok){ msg(_vp.msg, true); return; }
-    var pts=_vp.pts;
-    var art=mot, texto='';
-    RRI_MOTIVOS.forEach(function(r){ if(r[0]===mot) texto=r[1]; });
-    if(mot==='libre'){
-      texto=(val('snLibre')||'').trim(); art=(val('snArt')||'libre').trim();
-      if(!texto){ msg('Escribe qué ha pasado.', true); return; }
-    }
-    var urlTarea='', plazo='';
-    if(mot==='plazo'||mot==='plazoUrg'){
-      urlTarea=val('snTarea'); plazo=val('snPlazo');
-      if(!urlTarea){ msg('Elige la tarea cuyo plazo se incumplió.', true); return; }
-      if(!plazo){ msg('Pon el plazo nuevo.', true); return; }
-      /* De la lista DEL SANCIONADO -`SANC_TAREAS`-, no de `TAREAS`, que son las mias. Si se
-         busca aqui, el titulo no aparece y el motivo queda en «una tarea»: es lo que le paso a
-         la sancion de Jose del 28/07. Lo que se pinta y lo que se guarda tienen que salir del
-         MISMO sitio. */
-      var t=((SANC_TAREAS&&SANC_TAREAS.lista)||[]).filter(function(x){ return x.url===urlTarea; })[0];
-      texto='Incumplir el plazo de «'+((t&&(t.n||t.nombre))||'una tarea')+'»';
-      art=(mot==='plazoUrg') ? '30b' : '30c';   // el articulo REAL del RRI
-    }
-    if(typeof backendOK==='undefined' || !backendOK || !SESION){
-      msg('Sin conexión no se puede: esto escribe en la cola de verdad.', true); return; }
-    bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando…';
-    var _movido=false;
-    try{
-      /* EL ORDEN IMPORTA: primero Notion, luego la sancion. Si Notion falla no se sanciona;
-         al reves quedaria la sancion puesta y la tarea con la fecha vieja, que es la unica de
-         las dos combinaciones que no se ve mirando la cola. */
-      if(mot==='plazo'||mot==='plazoUrg'){
-        msg('Moviendo el plazo en Notion…');
-        await api.moverLimiteTarea(urlTarea, plazo);
-        _movido=true;
-      }
-      /* ⛔ LA RESPUESTA SE LEE. El backend ya no lanza cuando la persona no es tuya: la
-         SALTA y la devuelve en `rechazadas`. Sin mirarlo, el `tost` de abajo diria
-         «Sancion puesta a Fulano» sobre una sancion que no existe. Se relanza para caer
-         en el `catch` de siempre y que el mensaje sea el mismo de antes. */
-      /* ⛔ UNA CLAVE POR ENVÍO, Y NACE EN EL FORMULARIO. `api._post` hace tres
-         intentos contra un fallo de transporte, y si lo que se pierde es la RESPUESTA
-         el servidor ya escribió: sin clave, el reintento pone la sanción otra vez, y
-         cada copia son hasta -5 puntos sobre una persona real — y bloquea el cierre
-         del mes.
-         ⛔⛔ Y NO SE FABRICA EN LA LLAMADA, que es la forma que parece correcta: así
-         cubre los tres intentos automáticos pero NO el reintento A MANO — el usuario
-         ve el error, vuelve a pulsar, y esa segunda pulsación traería una clave nueva
-         sobre una sanción que el servidor SÍ guardó. Es exactamente el fallo que ya
-         se pagó en `horas.movil.js` y cuyo motivo está escrito en
-         `probar_clave_parte.py`: la clave vive en el formulario y se va con él.
-         ⛔⛔ PERO NO PUEDE SOBREVIVIR A UN CAMBIO DE LO QUE SE MANDA, y esto casi se me
-         escapa: `marcar()` cambia `SANC_FORM.quien` sin tocar la clave y el `catch` no
-         vacía el formulario — a propósito. Mando −1 a A, se pierde la RESPUESTA (el
-         servidor SÍ escribió), veo el error, me doy cuenta de que era B, pulso otra
-         vez: misma clave, el servidor la deduplica, y **la sanción a B no existe**.
-         ✅ Por eso la clave se ata a la HUELLA del envío y se renueva si cambia
-         cualquiera de sus cuatro campos. ⚠️ No es deduplicar por contenido —que sería
-         decidir por el usuario, y `probar_clave_parte.py` lo prohibe por escrito—:
-         el éxito vacía `SANC_FORM` entero, así que dos sanciones idénticas seguidas
-         llevan claves distintas. Lo único que comparte clave es el MISMO envío
-         repetido sin éxito en medio, que es la definición de un reintento. */
-      var _huellaSanc = quien+'|'+texto+'|'+art+'|'+pts;
-      if(SANC_FORM.claveDe !== _huellaSanc){
-        SANC_FORM.clave = _claveUso_(); SANC_FORM.claveDe = _huellaSanc; }
-      var r = await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual', clave:SANC_FORM.clave}]);
-      if(r && r.rechazadas && r.rechazadas.length)
-        throw new Error('no puedes sancionar a '+r.rechazadas.join(', ')+
-                        ': esta fuera de tu jurisdiccion');
-      /* ⛔ Y LA LISTA DE PUNTOS IMPOSIBLES, APARTE de `rechazadas`: son dos motivos
-         distintos y dan dos mensajes distintos. Desde esta cara no deberia saltar
-         nunca -- `_validaPuntosSanc_` corta antes --, y por eso mismo si salta hay que
-         verlo: significa que la cara y el servidor han dejado de decir lo mismo. */
-      if(r && r.invalidas && r.invalidas.length)
-        throw new Error('el servidor no acepta esos puntos ('+pts+'): el RRI va de -5 '+
-                        'a +2, enteros');
-      /* ⛔⛔ Y `duplicadas` TAMBIÉN SE LEE, que es la tercera lista y la que no tenía
-         consumidor. Significa «esto ya estaba puesto»: la fila es del envío anterior,
-         no de éste. Cantar «Sanción puesta a X» sobre ella es el mismo fallo que la
-         gemela del escritorio ya nombra —«SE CUENTA LO QUE ENTRÓ, NO LO QUE SE
-         MANDÓ»—, y aquí además tapa el caso en que la persona cambió el destinatario
-         tras un error. No es un error: se dice, y se sigue. */
-      var _yaEstaba = !!(r && r.duplicadas && r.duplicadas.length);
-      SANC_M=null; SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:''};
-      tost((_yaEstaba ? 'Esa sanción YA estaba puesta (era un reintento): a '
-                      : 'Sanción puesta a ')+(_pilaDeM_(quien)||quien)+'.'+(_yaEstaba ? '' : ' Se aplica en Notion y se avisa en Discord en unos minutos.')+(esDePlazo?' Plazo movido en Notion.':''));
-      _abrirSanciones_();
-    }catch(e){
-      bt.disabled=false; bt.textContent=prev;
-      /* 21/10 (auditor 12, 🟡 11): si el plazo YA se movió, se dice — y reintentar es seguro (misma fecha, misma clave). */
-      msg('No se pudo: '+((e&&e.message)||e)+(_movido ? ' — el plazo YA se movió en Notion; reintentar es seguro.' : ''), true);
-    }
+    var res=await _enviarSancionForm_({msg:msg, bt:bt});
+    if(!res.ok) return;
+    SANC_M=null;
+    _abrirSanciones_();
   };
 
   /* ⛔ EL BOTÓN DE REINTENTAR. Vuelve a `_abrirSanciones_`, que con `SANC_M===null` carga
      otra vez — o sea que el reintento usa **la misma puerta**, no una segunda copia de la
      carga. Se apaga `SANC_FALLO` antes de repintar para que se vea el «Cargando…» de
      verdad mientras va. */
+  _engVeto_(_repintarSancM_);
   $$('[data-sreint]').forEach(function(b){
     b.onclick=function(){ SANC_FALLO=false; _repintarSancM_(); _abrirSanciones_(); };
   });
   /* Sueltas: se deciden una a una. */
   /* 21/10 (auditor 12, 🟡 8): aprobar se CONFIRMA, como en el escritorio: levanta `aplicar_sanciones` y en dos minutos
      va a Notion y al comunicado. */
-  $$('[data-sok]').forEach(function(b){ b.onclick=function(){
-    if(!confirm('¿Aprobar? Esto se aplica ya, no es un borrador.')) return;
+  $$('[data-sok]').forEach(function(b){ b.onclick=async function(){
+    if(!(await dialogoSiNo('¿Aprobar? Esto se aplica ya, no es un borrador.'))) return;
     _decidirSancM_(b.dataset.sok,'aprobar',b); }; });
   $$('[data-sno]').forEach(function(b){ b.onclick=function(){ _decidirSancM_(b.dataset.sno,'rechazar',b); }; });
   /* 21/10: justificar pide el motivo, como el escritorio; sin motivo no se manda nada. */
-  $$('[data-sjust]').forEach(function(b){ b.onclick=function(){
-    var just=prompt('Motivo de la justificación:'); if(!just || !just.trim()) return;
+  $$('[data-sjust]').forEach(function(b){ b.onclick=async function(){
+    var just=await dialogoTexto('Motivo de la justificación:'); if(!just || !just.trim()) return;
     _decidirSancM_(b.dataset.sjust,'justificar',b,{justificacion:just.trim()}); }; });
   /* De lote: se MARCA, y el bloque se cierra entero. */
   $$('[data-smarc]').forEach(function(b){
@@ -486,11 +352,14 @@ function arcoSeg(i,r){
          ' A'+r+' '+r+' 0 0 1 '+(MC+r*Math.cos(a1)).toFixed(2)+' '+(MC+r*Math.sin(a1)).toFixed(2);
 }
 
-function estadoPts(p){return p<=2?'evaluacion':(p>=9?'elegible':'normal');}
+/* 01/11 (artifact [fb3a8f83b7], «sigue en evaluación con 3 y sale al superarlos»): la copia en JS de `disciplina.en_evaluacion`
+   (sin historia: con exactamente 3 se SIGUE; con 4 se sale). Se entra con 0–2, se pierde al SUPERAR los 3 (RRI Art. 32). */
+function estadoPts(p){return p<=3?'evaluacion':(p>=9?'elegible':'normal');}
 
 /* ⛔ EL NUMERO DE LA FRASE SALE DE LA REGLA, NO SE TECLEA. Hasta el 13/08 el medidor
    decia «por debajo de 2 puntos se abre expediente» y el expediente se abre **CON 2**
-   (RRI Art. 32, y `reglas/disciplina.py`: de 0 a 2 -> estado de evaluacion). O sea que a
+   (RRI Art. 32, y `reglas/disciplina.py`: de 0 a 2 -> estado de evaluacion; desde el 01/11 se SIGUE hasta los 3 y se sale al
+   superarlos, artifact [fb3a8f83b7]: el tope que dice la frase es ahora 3). O sea que a
    quien tiene exactamente 2 la MISMA caja le ponia «En evaluacion.» arriba y debajo que
    se abre por debajo de 2: las dos frases se contradicen, y la de abajo se lee como que
    todavia queda un punto de margen. Falla en la direccion que NO avisa.
@@ -510,7 +379,7 @@ function _topeEval_(){ var k=0,i; for(i=0;i<=10;i++){ if(estadoPts(i)==='evaluac
    es un caso especial. Los arcos son las curvas; los ticks, las rectas de fuera. */
 function _colorSeg_(i, p){
   var eleg = p>=9;
-  if(!eleg) return (i<3 && p<=3) ? 'url(#gWa)' : 'url(#gRed)';
+  if(!eleg) return _zonaCritica_(i,p) ? 'url(#gWa)' : 'url(#gRed)';
   /* Las DOS ULTIMAS curvas van VERDES; las del medio, azules. */
   return (i>=8) ? 'url(#gVer)' : 'url(#gAzu)';
 }
@@ -543,7 +412,7 @@ function medidorHTML(){
       'Todavía no tenemos tus puntos. Saldrán aquí en cuanto lleguen.</p></div>'+
       _libroPuntosHTML_()+_misSancHTML_();
   for(i=0;i<10;i++){
-    var lleno=i<p, crit=i<3;
+    var lleno=i<p, crit=_zonaCritica_(i,p);
     var col = lleno ? _colorSeg_(i,p) : '';
     segs+='<path class="seg '+(lleno?'on':'vac'+(crit?' zc':''))+'" '+
       (lleno?'stroke="'+col+'" ':'')+'d="'+arcoSeg(i,MR)+'"/>';
@@ -587,7 +456,7 @@ function medidorHTML(){
       (est==='elegible'?'<b>Elegible.</b>':est==='evaluacion'?'<b style="color:var(--red2)">En evaluación.</b>':'<b>Sin expediente.</b>')+
       (p>3
         ? ' Te quedan <b>'+(p-3)+'</b> punto'+((p-3)===1?'':'s')+' antes de la zona crítica.'
-        : ' Estás en <b>zona crítica</b>: con <b>'+_topeEval_()+'</b> puntos o menos se abre expediente.')+
+        : ' Estás en <b>zona crítica</b>: con <b>'+_topeEval_()+'</b> puntos o menos sigues en evaluación; sales al superarlos.')+
     '</div>'+
     '<button class="btn mini" data-p id="btnLibro" style="margin-top:11px">Desglose de puntos</button>'+
   '</div>'+
@@ -832,19 +701,14 @@ function panelPD(){
       : vacio('Cargando la cola…','Buscando qué sanciones esperan decisión.','',true))+'</div>';
   if(!SANC_M.length) return '<h2 class="sec">Panel del PD<span class="ln"></span>disciplina</h2>'+
     '<div class="tarj">'+vacio('Nada pendiente','Ninguna sanción espera decisión ahora mismo.','',false)+'</div>';
-  var porLote={};
-  SANC_M.forEach(function(x){ var k=x.lote||'(sueltas)'; (porLote[k]=porLote[k]||[]).push(x); });
   return '<h2 class="sec">Panel del PD<span class="ln"></span>disciplina</h2>'+
-    Object.keys(porLote).map(function(k){
-      var it=porLote[k], _tl=_tituloLote_(k, typeof REUNIONES_M!=='undefined' ? REUNIONES_M : []);
-      return '<div class="tarj"><div class="lote"><div class="lote-h">'+
-        '<b>'+esc(_rotuloLote_(it))+'</b>'+
-        '<span class="mono" style="color:var(--red2)">'+esc(_tl ? _tl+' · '+k : k)+'</span></div>'+
-        it.slice(0,8).map(function(x){
+    _sancLotesHTML_(function(it){
+      return it.slice(0,8).map(function(x){
           return '<div class="lote-i"><span class="n">'+esc(_pilaDeM_(x.nombre)||x.nombre||'')+'</span>'+
             '<span class="mono" style="color:var(--ink3);font-size:10.5px">'+esc(x.motivo||'')+'</span></div>';
-        }).join('')+
-        (it.length>8?'<div class="lote-m">y '+(it.length-8)+' más</div>':'')+
+        }).join('');
+    }, function(it){
+      return (it.length>8?'<div class="lote-m">y '+(it.length-8)+' más</div>':'')+
         /* ⛔ AQUI PONIA «Decide aqui mismo: acepta o rechaza cada una», Y ESTA TARJETA NO TIENE
            NI UN BOTON (642.ª). El comentario que lo justificaba era cierto —`_cablearSanciones_`
            cablea `data-sok`/`data-sno`/`data-smarc`/`data-scerrar`— pero DEL PINTOR DE AL LADO:
@@ -853,16 +717,16 @@ function panelPD(){
            0 `<button` y la promesa impresa dos veces, una por tarjeta.
            ⚠️ Lo que SI sigue siendo cierto es lo otro: el motivo y el articulo se eligen al
            CREAR el bloque, y eso es del escritorio. */
-        '<p class="rnota">Motivo y artículo son los del bloque (se fijan en el escritorio).</p></div></div>';
-    }).join('')+
+        '<p class="rnota">Motivo y artículo son los del bloque (se fijan en el escritorio).</p>';
+    })+
     /* ⛔ SE DECIDE A UN TOQUE, NO AQUI: el boton abre la MISMA pantalla que el menu ⋮
        (`_abrirSanciones_`), que es donde estan los botones de verdad. NO se copian aqui: una
        segunda cola de decidir sobre sanciones a personas es un segundo criterio que mantener,
        y sus manejadores reabren el modal de todos modos. Lo cablea `_engTurnosYDocs_`
        (`movil.html`), donde ya se engancha lo demas de esta tarjeta. Una vez y no por bloque:
        la pantalla que abre es la cola entera. */
-    '<div class="tarj"><p class="rnota" style="margin:0 0 10px">Se deciden en <b>Sanciones</b>, '+
-    'que también está en el menú ⋮: ahí apruebas o rechazas cada una, y los bloques se cierran '+
+    '<div class="tarj"><p class="rnota" style="margin:0 0 10px">Se deciden en Sanciones (menú ⋮): '+
+    'ahí apruebas o rechazas cada una, y los bloques se cierran '+
     'enteros.</p><button class="btn full" data-abrirsanc data-p>Abrir Sanciones</button></div>';
 }
 
@@ -924,13 +788,12 @@ function _panelPDmaqueta_(){
 function sancionarModal(){
   var motivos=RRI.restas.concat(RRI.sumas);
   abrirModal('<div class="mtit">🔨 Sancionar</div>'+
-    '<div class="msub">Queda <b>pendiente</b> hasta que la confirmes. '+
-    'Si sancionas a varios a la vez, van en un bloque con <b>un solo comunicado</b>.</div>'+
-    '<label class="campo"><span class="sc">A quién</span><select id="scPer">'+
-      _activos_().map(function(m){return '<option>'+esc(m.nombre)+'</option>';}).join('')+'</select></label>'+
-    '<label class="campo"><span class="sc">Motivo del RRI</span><select id="scMot">'+
-      motivos.map(function(m){return '<option value="'+m.id+'">Art. '+m.art+' — '+esc(m.texto)+'</option>';}).join('')+
-      '</select></label>'+
+    '<div class="msub">Queda pendiente hasta que la confirmes. '+
+    'Si sancionas a varios a la vez, van en un bloque con un solo comunicado.</div>'+
+    '<div class="campo"><span class="sc">A quién</span>'+
+      nxElige('scPer', _activos_().map(function(m){return [m.nombre, m.nombre];}), '')+'</div>'+
+    '<div class="campo"><span class="sc">Motivo del RRI</span>'+
+      nxElige('scMot', motivos.map(function(m){return [m.id, 'Art. '+m.art+' — '+m.texto];}), '')+'</div>'+
     '<label class="campo"><span class="sc">Puntos</span><input class="mono" id="scPts" value="-1"></label>'+
     '<button class="btn pri full" style="margin-top:8px" data-p id="btnScOK">Añadir a la cola</button>');
   $('#btnScOK').onclick=function(){ cerrarModal(); tost('Añadida a la cola (pendiente de confirmar).'); };

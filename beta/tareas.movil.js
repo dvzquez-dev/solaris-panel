@@ -90,10 +90,12 @@ function vTareas(){
          botón**: la decisión la toma `_tareaAccion_`, no un `if` escrito aquí otra vez. */
       (ac&&i>=0?'<button class="btn mini" data-tact="'+i+'">'+esc(ac.etiqueta)+'</button>':'')+
       (des&&i>=0?'<button class="btn mini no" data-tdes="'+i+'">Deshacer</button>':'')+
+      _tareaBotonHoras_(t, i)+
       '</div></div>';
   }
   return '<div class="h1">Mis tareas</div><p class="h1s">'+act.length+' activa'+(act.length===1?'':'s')+
     ' · ordenadas por urgencia y fecha límite.</p>'+
+    _nuevaTareaBotonHTML_()+
     '<div class="tarj">'+(act.length?act.map(fila).join(''):
       /* 957.ª: «cuando te asignen», no «cuando tu coordinador»: el PD y los coordinadores no tienen coordinador. */
       vacio('Sin tareas asignadas','Cuando te asignen una, saldrá aquí.','',false))+'</div>'+
@@ -130,6 +132,7 @@ function vTareas(){
    miembro raso. Está escrito en `docs/pendientes.md` con lo que falta exactamente. */
 function _engTareas_(){
   var c=document.getElementById('v-tareas'); if(!c) return;
+  _tareaHorasCablear_(c);
   $$('[data-tact]',c).forEach(function(b){
     b.onclick=function(){
       var t=TAREAS[+b.dataset.tact]; if(!t) return;
@@ -141,9 +144,17 @@ function _engTareas_(){
       /* ⛔ 20/10 — EL PASO SE GUARDA ANTES DE DARLO POR HECHO. Hasta hoy esto sólo cambiaba la memoria del móvil y el
          siguiente refresco lo deshacía en silencio, con el aviso prometiendo «puedes deshacerlo» (§3c-8: una escritura
          que no ocurre, contada como hecha). Daniel, 15/10: no se ocultan, se guardan. */
-      _guardarPasoTarea_(t, ac.a, b, function(){
-        t.e=ac.a; t.desde=(new Date()).getTime(); _anotarPasoTarea_(TAREA_PASOS, t);
-        pintar(); tost('«'+t.n+'»: '+ac.a+'. Puedes deshacerlo durante '+_minDeshacerTarea_()+' min.');
+      /* 01/11 (tareaparte): al «Entregada» se pregunta cuántas horas le dedicaste, y se le proponen al coordinador como parte */
+      if(b.disabled) return;   /* con la pregunta abierta un segundo toque no abre otra */
+      b.disabled=true;
+      _tareaPedirHorasEntrega_(t, ac).then(function(h){
+        b.disabled=false;
+        if(h===null) return;
+        _guardarPasoTarea_(t, ac.a, b, function(r){
+          t.e=ac.a; t.desde=(new Date()).getTime(); _anotarPasoTarea_(TAREA_PASOS, t);
+          pintar(); tost('«'+t.n+'»: '+ac.a+'. Puedes deshacerlo durante '+_minDeshacerTarea_()+' min.');
+          _tareaToastParte_(t, h, _tareaEnMaqueta_() ? null : (r || {}));
+        }, h);
       });
     };
   });
@@ -165,9 +176,9 @@ function _engTareas_(){
       if(a===null){ tost('No hay ningún paso que deshacer.'); return; }
       /* `desde` a `null` al deshacer: se vuelve al estado que vino del servidor, y sobre eso
          no se ofrece deshacer — deshacer un deshacer es avanzar, y para eso está el otro botón. */
-      _guardarPasoTarea_(t, a, b, function(){
+      _guardarPasoTarea_(t, a, b, function(r){
         t.e=a; t.desde=null; _anotarPasoTarea_(TAREA_PASOS, t);
-        pintar(); tost('Deshecho: «'+t.n+'» vuelve a '+a+'.');
+        pintar(); tost('Deshecho: «'+t.n+'» vuelve a '+a+'.'+_tareaToastRetirados_(r));
       });
     };
   });
@@ -176,11 +187,11 @@ function _engTareas_(){
 /* ⛔ 20/10 — UNA puerta para los dos botones: guarda el paso `t.e → a` en el servidor y sólo entonces llama a `hecho`.
    Si no se puede, el botón revive y se DICE por qué, con la tarea como estaba. En la maqueta (`DEMO`) no hay servidor:
    el paso se da en memoria, sin aviso propio (taparía el de «puedes deshacerlo», que es lo que se prueba ahí). */
-function _guardarPasoTarea_(t, a, b, hecho){
-  if(typeof DEMO!=='undefined' && DEMO){ hecho(); return; }
+function _guardarPasoTarea_(t, a, b, hecho, h){
+  if(_tareaEnMaqueta_()){ hecho(); return; }
   if(!t.url){ tost('Esa tarea no trae su ficha de Notion: no se puede guardar el paso.'); return; }
   if(b) b.disabled=true;
-  api.moverEstadoTarea(t.url, t.e, a).then(function(){ hecho(); }).catch(function(e){
+  api.moverEstadoTarea(t.url, t.e, a, h).then(function(r){ hecho(r); }).catch(function(e){
     if(b) b.disabled=false;
     tost('No se pudo guardar el paso de «'+t.n+'»: '+((e&&e.message)||e)+'. La tarea sigue como estaba.');
   });
@@ -208,10 +219,7 @@ function _apelReciente_(ap){
    El formulario: las cláusulas en una línea, una elegida, y el motivo OBLIGATORIO. «Enviar» no se enciende hasta que
    hay las dos cosas. Se vuelve a mirar al enviar (§ la tarea pudo cambiar con un refresco): el servidor manda. */
 function _formApelar_(t){
-  var cl='', op=APEL_CLAUSULAS.map(function(c){
-    return '<label class="fila clic" style="gap:10px"><input type="radio" name="apelCl" value="'+c.k+'" style="flex:none">'+
-      '<span class="a"><small style="font-size:12.5px;color:var(--ink)">'+esc(c.t)+'</small></span></label>';
-  }).join('');
+  var cl='', op=nxElige('apelCl', APEL_CLAUSULAS.map(function(c){ return [c.k, c.t]; }), '');
   abrirModal('<div class="h1" style="font-size:18px">Apelar «'+esc(t.n)+'»</div>'+
     '<p class="h1s">Es tu derecho (Art. 34 del RRI). Lo ve tu coordinador y el Project Director. Si no apelas y no la haces, resta 1 punto.</p>'+
     '<div class="tarj" style="padding:4px 12px">'+op+'</div>'+
@@ -221,10 +229,10 @@ function _formApelar_(t){
       '<button class="btn pri" id="apelSi" style="flex:1" disabled>Enviar apelación</button></div>');
   var si=$('#apelSi'), mo=$('#apelMotivo');
   function mira(){
-    cl=''; $$('input[name=apelCl]').forEach(function(r){ if(r.checked) cl=r.value; });
+    cl=$('#apelCl').value;
     si.disabled=!(cl && mo.value.trim());
   }
-  $$('input[name=apelCl]').forEach(function(r){ r.onchange=mira; });
+  $('#apelCl').onchange=mira;
   mo.oninput=mira;
   $('#apelNo').onclick=cerrarModal;
   si.onclick=function(){
@@ -236,4 +244,35 @@ function _formApelar_(t){
       si.disabled=false; tostErr('No se pudo enviar la apelación: ', e);
     });
   };
+}
+
+
+/* ═══ CREAR UNA TAREA DESDE EL MÓVIL (01/11/2026) ═══════════════════════════════════════════
+   🗣️ Daniel: «las tareas se crean en la app, y tiene que ser tan cómodo como Notion». Es la MISMA hoja que el panel del
+   escritorio: el estado (`NUEVA_TAREA`), los campos (`_nuevaTareaCampos_`), la IA, la vista previa, las fotos, el cableado y
+   lo que se manda (`_nuevaTareaArmar_`) son de `comun.js`. Aquí sólo hay: quién ve el botón (`_unidadesNuevaTarea_`, la
+   MISMA puerta que el escritorio: el PD en todas, un coordinador en las suyas, un miembro en ninguna), el envoltorio de la
+   hoja y qué pasa cuando el servidor ya la guardó. El servidor vuelve a mirar el permiso (`e_crear_tarea`). */
+function _nuevaTareaBotonHTML_(){
+  if(!_unidadesNuevaTarea_().length) return '';
+  return '<button class="btn pri full" data-nuevatarea data-p style="margin-bottom:12px">＋ Nueva tarea</button>';
+}
+function _nuevaTareaPanel_(){
+  var us=_unidadesNuevaTarea_();
+  if(!us.length) return '';
+  _nuevaTareaUnidadValida_(us);
+  return '<div id="ntPanel"><div class="mtit">Nueva tarea</div>'+
+    '<p class="rnota" style="margin:-4px 0 10px">En el tablero de '+esc(NUEVA_TAREA.u)+'. Les llega a los responsables y queda en Notion.</p>'+
+    _nuevaTareaCampos_(us)+'</div>';
+}
+function nuevaTareaAbrir(){
+  if(!_unidadesNuevaTarea_().length) return;
+  NUEVA_TAREA.ok='';
+  abrirModal(_nuevaTareaPanel_());
+  _cablearNuevaTarea_();
+}
+/* El servidor ya la guardó: la hoja se cierra, la lista se repinta con la tarea nueva y se dice. */
+function _nuevaTareaCreada_(){
+  var m=NUEVA_TAREA.ok;
+  cerrarModal(); pintar(); tost(m);
 }

@@ -187,6 +187,8 @@ function _coordinacionHTML_(){
     if(us.length) filas.push({nom:m.nombre,txt:'coordina '+us.join(' · ')});
     else if(m.cargo) filas.push({nom:m.nombre,txt:m.cargo});
   });
+  /* 01/11: las unidades que dejó una baja sin sucesor: «Propulsión — Sin coordinador desde el 03/11 · lo dejó Ana» */
+  _vacantesTxt_().forEach(function(x){ filas.push({nom:x.unidad,txt:x.txt}); });
   return '<div class="mtit">El equipo</div>'+
     '<div class="msub">Quién coordina cada unidad</div>'+
     '<div class="tarj" style="margin:0">'+(filas.length?filas.map(function(f){

@@ -49,6 +49,14 @@ function nf2(v){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,ma
    Ahora es `nf2`: una sola cifra para las horas en toda la app. */
 function h1(v){ return nf2(Number(v)||0)+' h'; }
 
+/* ⛔ 01/11 · EL OBJETIVO DEL MES, DICHO (Daniel, 31/10: *«Sí, que se vea el número bueno»*). La cifra es la que calcula `_umbral_()`
+   desde el `umbral` que sirve el panel (`flujos/umbral.py` ← `reglas/cuota.py`): aquí no hay ningún número escrito. UNA frase para
+   las dos caras; sin objetivo legible (`UMBRAL` no es un número > 0) NO se inventa un cero: se calla. */
+function _objetivoMesTxt_(){
+  var u = (typeof UMBRAL==='number') ? UMBRAL : NaN;
+  return (isFinite(u) && u>0) ? 'objetivo '+h1(u)+'/mes' : '';
+}
+
 /* Etiqueta de la CATEGORÍA de Notion a la que suma cada imputación (fichaje u otorgamiento).
    El miembro la ve para reconciliar: 'esta hora cayó en Reuniones', 'esta en Carga tareas'.
    null = cajón por defecto (Compensaciones), igual que hace el motor (aplicar_horas.py).
@@ -89,12 +97,12 @@ function _subcatClave_(v){
   for(var i=0;i<SUBCATS_COMP.length;i++) if(SUBCATS_COMP[i][0]===v) return SUBCATS_COMP[i][2];
   return null;
 }
-/* Los chips de la subcategoría de un formulario de «Declarar» (sólo con la categoría «Compensación»; con otra, ''). `attr` es
-   el atributo del botón; `sel`, la elegida (o ''); `clase`, la del botón de la cara. Tocar la elegida la suelta. */
-function _subcatHTML_(attr, sel, cat, clase){
+/* Los chips de la subcategoría de un formulario de «Declarar» (sólo con la categoría «Compensación»; con otra, ''). `id` es
+   el del campo (`nxElige`); `sel`, la elegida (o ''). «Sin elegir» la suelta. */
+function _subcatHTML_(id, sel, cat){
   if(cat!=='compensacion') return '';
   return '<div class="campo"><span class="sc" style="display:block;margin-bottom:5px">Subcategoría</span>'+
-    _chipsElegir_(attr, sel, SUBCATS_COMP.map(function(o){ return [o[0],o[1]]; }), clase)+'</div>';
+    nxElige(id, [['','Sin elegir']].concat(SUBCATS_COMP.map(function(o){ return [o[0],o[1]]; })), sel||'')+'</div>';
 }
 /* Lo que viaja al servidor: la subcategoría elegida si la categoría es la compensación; si no, nada. */
 function _subcatEnvio_(f){ return (f && f.cat==='compensacion' && _subcatClave_(f.subcat)) ? f.subcat : null; }
@@ -130,14 +138,28 @@ function agruparDesglose(ps){
    turno ni reunión suma en «Compensaciones». Esta puerta comprueba que esa cifra (`m.compensaciones`) vale la base del
    cargo + las partidas confirmadas del mes que Notion mete en ese cajón (`cat` ni tareas/turno/reunión, y no la base).
    · `partes`: los partes de ESA persona (o los de todos: se filtra por `m.nombre`). `periodo` 'AAAA-MM'; sin él, el abierto.
+   · `sanciones` (opcional): la cola de sanciones; los premios aplicados del mes suman (`_premiosCompH_`). `null` = sin cargar → `null`.
    · Devuelve `{ok, notion, cargo, resto, diferencia}` (diferencia = notion − (cargo+resto)) o `null` si FALTA un dato
      (sin cifra de Notion, sin lista de partes o sin periodo): «no lo sé» NUNCA es `ok:true` (§3c-24).
    · Margen: hasta 0,01 h cuadra (los redondeos al céntimo de hora). Sólo la ve el PD (rango ≥ 3), en el Registro del mes. */
 var MARGEN_COMP_H = 0.01;
-function cuadraCompensaciones(m, partes, periodo){
+/* ⛔ 01/11 · LOS PREMIOS TAMBIÉN SUMAN. Un premio por disponibilidad (`origen:'premio'`, ya `aplicada`) suma +N h en «Compensaciones»
+   de Notion (`aplicar.py`) y no es un parte: sin contarlo, sus 0,5 h salían como «Notion de más» (4 falsos avisos, 28/10). Cuenta el
+   del MES de `periodo` (el de `aplicado_at`, o si falta `decidido_at`/`creado_at`). `sanciones` null/ausente-no-array → null. */
+function _premiosCompH_(nombre, sanciones, per){
+  var t = 0;
+  sanciones.forEach(function(s){
+    if(!s || s.nombre!==nombre || s.estado!=='aplicada' || !_esPremioSanc_(s.origen, s.extra)) return;
+    if(String(s.aplicado_at || s.decidido_at || s.creado_at || '').slice(0,7)!==per) return;
+    t += Number((s.extra && s.extra.compensacion) || s.compensacion) || 0;
+  });
+  return t;
+}
+function cuadraCompensaciones(m, partes, periodo, sanciones){
   var per = periodo || ((typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null);
   if(!m || !_compEsReal_(m) || !partes || typeof partes.forEach!=='function' || !/^\d{4}-\d{2}$/.test(String(per||''))) return null;
-  var resto = 0;
+  if(sanciones===null || (sanciones!==undefined && typeof sanciones.forEach!=='function')) return null;
+  var resto = sanciones ? _premiosCompH_(m.nombre, sanciones, per) : 0;
   partes.forEach(function(p){
     if(!p || p.autor!==m.nombre || ['conf','otor','aprobado'].indexOf(p.estado)<0 || _esDeMesPasado_(p, per)) return;
     if(['tareas','turno','reunion'].indexOf(p.cat)>=0 || catDesglose(p)==='cargo') return;
@@ -636,6 +658,8 @@ function _red1_(x){
    vuelve a «arreglar» esto añadiéndolos, está metiendo a una persona sola como si fuera un
    subsistema de uno — y entonces encabeza o cierra el ranking por su propia cifra.
 
+   ⛔ 01/11: DESDE HOY LAS HORAS SON LAS DEL RITMO DE LA TEMPORADA (`_hMesDe_`), NO `_hMesReal_` — el párrafo de `_hMesReal_` de más
+   abajo es la historia del 04/10 —, y quien está en dos unidades cuenta ENTERO en las dos (`_unidadesDe_`). Ver `_subsEnVivo_`.
    ✅ LOS NOMBRES LOS DECIDE EL PANEL, LOS NÚMEROS SE CALCULAN AQUÍ. Quién compite es una regla
    de negocio cuyo dueno es `flujos/umbral.SUBSISTEMAS`, y la cara **no la reinventa**: coge los
    `u` del array. Lo que deja de leer son la `media` y el `n`, que es lo que envejece.
@@ -701,35 +725,32 @@ function _subsDelServidor_(){
 function _subsEnVivo_(){
   /* ⛔ 21/10 (auditor 6): con el panel en forma MIEMBRO no hay «gente delante» con la que calcular — el agregado. */
   if(typeof DATA !== 'undefined' && DATA._rol === 'miembro') return _subsDelServidor_();
-  var nom = [], i, j;
+  var nom = [], i, j, k;
   var lista = (typeof DATA !== 'undefined' && DATA.subsistemas) ? DATA.subsistemas : [];
   for(i = 0; i < lista.length; i++) nom.push((lista[i] && lista[i].u) || lista[i]);
   var por = {}, act = _activos_();
   for(i = 0; i < act.length; i++){
-    var m = act[i], u = m.unidad;
-    if(!u) continue;
-    var k = -1;
-    for(j = 0; j < nom.length; j++) if(nom[j] === u){ k = j; break; }
-    if(k < 0) continue;                      /* no compite: fuera del ranking, sin ruido */
-    /* ⛔⛔ DEVENGADA, NO ENTERA: la compensacion del MES EN CURSO se va sumando poco a
-       poco. Hasta el 07/10 esto leia `_hMesReal_`, que trae la base ENTERA, asi que el dia
-       del cierre **todo el equipo sumaba de golpe** su compensacion (2 h un raso, 3,5 un
-       coordinador, 7 el PD) y el ranking de unidades daba un ESCALON que no corresponde a
-       trabajo hecho. Daniel, 07/10: *«un step al inicio de mes que todo el mundo sume dos
-       horas. Eso no tiene sentido … que la compensacion del mes actual se vaya sumando poco
-       a poco»*.
-       ✅ Y SOLO EL MES EN CURSO: `_subsEnVivo_` lee unicamente el mes ABIERTO, asi que un
-       mes ya cerrado sigue aportando su compensacion **entera** y las pasadas **no se
-       devengan** — que es justo lo que pidio y lo que esta puerta ya hace.
-       ⚠️ `_hMesDevengado_` se declara MAS ABAJO (582) que esta linea: vale por el hoisting
-       de las `function` declaradas, no hay que moverla.
-       ⚠️ Devuelve `null` con las mismas entradas con las que `_hMesReal_` devolvia `null`,
-       asi que el `if` de debajo sigue siendo el que descarta a quien no tiene dato vivo:
-       un «no lo se» no entra como un cero (§3c-24). */
-    var h = _hMesDevengado_(m);
+    var m = act[i];
+    /* ⛔⛔ EL RITMO DE LA TEMPORADA, NO EL DEL MES (01/11). 🗣️ Daniel: *«Sí, temporada ponderada para el ranking de
+       subsistemas y para la cuota estimada»* — *«esta media no ha de ser la del mes actual… es la de la temporada
+       actual»*. Hasta hoy esto leía `_hMesDevengado_` (el mes abierto con la compensación devengada, encargo del
+       07/10): con el ritmo de temporada ya no hay escalón al abrir mes que devengar, porque el ritmo pondera los
+       meses (julio y agosto a la mitad) y el abierto entra por lo que lleva. La puerta es `_hMesDe_`, la MISMA que la
+       cuota y el umbral por persona: una regla, un sitio. Quien no tiene ritmo se cae de la muestra, no entra como un
+       cero (§3c-24). */
+    var h = _hMesDe_(m);
     if(typeof h !== 'number' || !isFinite(h)) continue;
-    if(!por[u]) por[u] = [];
-    por[u].push(h);
+    /* ⛔ ENTERA EN CADA UNIDAD EN LA QUE ESTÁ (01/11): el ranking mide la media horaria de LAS PERSONAS que están en
+       el subsistema, no las horas fichadas a él, así que quien está en dos entra con su ritmo ENTERO en las dos
+       medias. Repartirlo (la mitad a cada una) es justo el fallo que Daniel dijo que NO. */
+    var us = _unidadesDe_(m);
+    for(k = 0; k < us.length; k++){
+      var u = us[k], c = -1;
+      for(j = 0; j < nom.length; j++) if(nom[j] === u){ c = j; break; }
+      if(c < 0) continue;                    /* no compite: fuera del ranking, sin ruido */
+      if(!por[u]) por[u] = [];
+      por[u].push(h);
+    }
   }
   var out = [];
   for(i = 0; i < nom.length; i++){
@@ -891,7 +912,7 @@ function _diasDelMes_(ahora){
      ⚠️ Y si el backend es VIEJO y no manda `diaCont`, `cont` cae al entero: eso no apaga nada,
      deja el comportamiento de siempre. «No lo se» no es «cero» (§3c-24). */
   if(e && e.dia>0 && e.dias_mes>0) return {dia:e.dia, total:e.dias_mes,
-    cont:(typeof e.diaCont==='number' && e.diaCont>0) ? e.diaCont : e.dia,
+    cont:(typeof e.diaCont==='number' && e.diaCont>=0) ? e.diaCont : e.dia,       /* 01/11: 0 es un dato (el instante del cierre) */
     periodo:e.periodo||null};
   /* ⛔ 20/10 (auditoría): SIN `equipo_mes`, PERO CON EL ÚLTIMO CIERRE, SE CUENTA COMO EL SERVIDOR. Si no, el título
      (`_periodoAbierto_`, del cierre) y el divisor (el reloj) hablaban de meses distintos: el 2 de noviembre con octubre
@@ -903,8 +924,14 @@ function _diasDelMes_(ahora){
   var _at=(_uc && _uc.at) ? new Date(_uc.at) : null;
   if(_at && !isNaN(_at.getTime()) && /^\d{4}-\d{2}$/.test(String(_ab||''))){
     var _m0=new Date(_at.getFullYear(), _at.getMonth(), _at.getDate()).getTime();
-    var _c=Math.max(1, ((ahora||new Date()).getTime()-_m0)/86400000);
-    return {dia:Math.floor(_c), total:new Date(+_ab.slice(0,4), +_ab.slice(5,7), 0).getDate(), cont:_c, periodo:_ab};
+    var _h=(ahora||new Date()).getTime();
+    var _c=Math.max(1, (_h-_m0)/86400000);
+    /* ⛔ 01/11: `dia` se IMPRIME (entero >= 1, desde la medianoche + 1) y `cont` PESA: el tiempo desde el INSTANTE del cierre
+       (sin el +1) entre los dias REALES del mes -- del dia del cierre al ultimo del mes, un dia mas por dia de retraso--,
+       como `dias_transcurridos` / `dias_mes_real` del servidor. Daniel: «quedaran 30 dias, son 0,23 horas, ¿por que 0,41?» */
+    var _fin=new Date(+_ab.slice(0,4), +_ab.slice(5,7), 0).getTime();
+    var _tot=Math.max(Math.round((_fin-_m0)/86400000), Math.floor((_h-_m0)/86400000))+1-(_at.getTime()-_m0)/86400000;   /* 01/11 noche, Daniel: «desde […] cuando hice el cierre, hasta […] las 23:59 del 30»: el TRAMO desde el instante */
+    return {dia:Math.floor(_c), total:_tot, cont:Math.max(0, (_h-_at.getTime())/86400000), periodo:_ab};
   }
   var d=ahora||new Date();
   /* El respaldo del calendario tambien lleva su hora: mismo criterio que el servidor -- el
@@ -957,7 +984,7 @@ function _fraccionDelMes_(d){
        ⚠️ Y la guarda va INLINE y no con `_oNum_`: el arnes del banco extrae ESTAS DOS
        funciones sueltas, asi que llamar a una tercera lo revienta -- y un arnes roto no mide
        el producto, mide el arnes. */
-    if(e && e.total>0) return Math.max(0, Math.min(1, (e.cont>0 ? e.cont : e.dia)/e.total));
+    if(e && e.total>0) return Math.max(0, Math.min(1, (e.cont>=0 ? e.cont : e.dia)/e.total));
   }
   d=d||new Date();
   var dias=new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();   // dia 0 del siguiente
@@ -1207,7 +1234,8 @@ function _cuerpoABloques_(texto){
     if(linea.charAt(0) === '|'){ tabla.push(celdas(linea)); return; }
     if(tabla.length) cierraTabla();
     if(!linea) return;
-    if((m = /^(#{1,3})\s+(.+)$/.exec(linea))) bloques.push(bloque('heading_'+m[1].length, m[2]));
+    if((m = /^!\[[^\]]*\]\(foto:([A-Za-z0-9]{8,40})\)$/.exec(linea))) bloques.push({object:'block', type:'image', image:{type:'external', external:{url:'foto:'+m[1]}}});
+    else if((m = /^(#{1,3})\s+(.+)$/.exec(linea))) bloques.push(bloque('heading_'+m[1].length, m[2]));
     else if((m = /^(?:[-*]\s+)?\[([ xX])\]\s*(.*)$/.exec(linea))) bloques.push(bloque('to_do', m[2], {checked:m[1] !== ' '}));
     else if((m = /^[-*]\s+(.+)$/.exec(linea))) bloques.push(bloque('bulleted_list_item', m[1]));
     else if((m = /^[0-9]+[.)]\s+(.+)$/.exec(linea))) bloques.push(bloque('numbered_list_item', m[1]));
@@ -1215,6 +1243,7 @@ function _cuerpoABloques_(texto){
   });
   if(tabla.length) cierraTabla();
   if(bloques.length > CUERPO_TAREA_BLOQUES) throw new Error('el cuerpo tiene demasiados bloques (máximo '+CUERPO_TAREA_BLOQUES+')');
+  if(bloques.filter(function(b){ return b.type === 'image'; }).length > FOTO_TAREA_MAX) throw new Error('demasiadas fotos (máximo '+FOTO_TAREA_MAX+' por tarea)');
   return bloques;
 }
 /* La vista previa: pinta los BLOQUES (no el texto). Las listas numeradas se cuentan seguidas, como en Notion. */
@@ -1229,6 +1258,7 @@ function _bloquesAHTML_(bloques){
     if(b.type === 'bulleted_list_item') return '<div class="nb-li"><span class="nb-m">•</span><span>'+rt(d.rich_text)+'</span></div>';
     if(b.type === 'numbered_list_item') return '<div class="nb-li"><span class="nb-m">'+n+'.</span><span>'+rt(d.rich_text)+'</span></div>';
     if(b.type === 'to_do') return '<div class="nb-li"><span class="nb-cb'+(d.checked?' on':'')+'"></span><span>'+rt(d.rich_text)+'</span></div>';
+    if(b.type === 'image') return '<div class="nb-foto"><img class="nb-img" data-foto="'+esc(d.external.url.slice(5))+'" alt="Foto"></div>';
     if(b.type === 'table') return '<table class="nb-t">'+d.children.map(function(r, i){
       var th = d.has_column_header && i === 0;
       return '<tr>'+r.table_row.cells.map(function(c){ return '<'+(th?'th':'td')+'>'+rt(c)+'</'+(th?'th':'td')+'>'; }).join('')+'</tr>';
@@ -1239,6 +1269,7 @@ function _bloquesAHTML_(bloques){
 
 /* 31/10 · «NUEVA TAREA»: fecha y formato del cuerpo, funciones PURAS (el panel de `escritorio.html` sólo las pinta).
    El día de la semana sale de los días desde 1970-01-01 (jueves), como `_lunesDesde_`: sin `getDay`, sin reloj. */
+var TOPE_TITULO_TAREA = 150;   /* 02/11 (tareasatras): ⛔ espejo de `servidor.TOPE_TITULO_TAREA` (lo vigila `probar_crear_tarea.py`) */
 var UNIDADES_CON_PRIORIDAD_TAREA = ['Aviónica'];   /* ⛔ espejo de `servidor.UNIDADES_CON_PRIORIDAD` (lo vigila el banco) */
 function _diaSemanaISO_(iso){   /* 0 = lunes … 6 = domingo; -1 si no es fecha */
   var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso==null?'':iso));
@@ -1277,7 +1308,8 @@ function _semanasDelMes_(ym){
      nxElige(id, [[v,texto],…], val, {attrs, off, buscar})   chips `.pick`; con más de 8 opciones, buscador
      nxHora(id, 'HH:MM', {paso, attrs, off})                   − / + de `paso` minutos (15) y «‹‹ ››» de una hora
      nxNum(id, n, {min, max, paso, sufijo, attrs, off})         − / + con el valor en medio
-     nxFecha(id, iso, {min, max, vacio, attrs, off})            Hoy · Mañana · +1 semana · Otro día… (calendario propio) */
+     nxFecha(id, iso, {min, max, vacio, attrs, off})            Hoy · Mañana · +1 semana · Otro día… (calendario propio)
+     nxSiNo(id, on, {attrs, off})                               Sí / No (lo que era una casilla); se lee con `nxSi(id | elemento)` */
 var _MESES_NT_ = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 /* El calendario de un mes (`AAAA-MM`) con `valor` marcado. `a` = {dia, mes}: los atributos `data-…` de cada día y de
    las flechas, para que «Nueva tarea» y `nxFecha` pinten el MISMO calendario con sus propios manejadores. Lo que cae
@@ -1303,6 +1335,8 @@ function nxElige(id, ops, val, o){
     '<span class="nt-fila">'+ops.map(function(p){
       return '<button type="button" class="pick'+(String(p[0]) === val ? ' on' : '')+'" data-nxv="'+esc(p[0])+'"'+(o.off ? ' disabled' : '')+'>'+esc(p[1])+'</button>'; }).join('')+'</span>');
 }
+function nxSiNo(id, on, o){ return nxElige(id, [['1','Sí'],['0','No']], on ? '1' : '0', o); }
+function nxSi(x){ var e = typeof x === 'string' ? document.getElementById(x) : x; return !!e && e.value === '1'; }
 function _nxPasos_(tipo, o, medio){
   var b = function(d, t, aria){ return '<button type="button" class="btn sm" data-nxs="'+d+'" aria-label="'+aria+'"'+(o.off ? ' disabled' : '')+'>'+t+'</button>'; };
   return tipo === 'hora'
@@ -1330,6 +1364,9 @@ function nxFecha(id, iso, o){
   return c.innerHTML;
 }
 function _hoyNxISO_(){ return _dmyAISO_(typeof HOY === 'string' ? HOY : _hoyTxt_()); }
+/* ¿Esa fecha DD/MM/AAAA es posterior a hoy? El servidor rechaza un parte con fecha futura («no puede ser futura»); esto lo dice antes
+   de enviar. Una fecha que no existe no es futura: eso lo corta `_fechaDMY_`. */
+function _fechaFutura_(s){ return !!_fechaDMY_(s) && _dmyAISO_(s) > _hoyNxISO_(); }
 function _nxAtajos_(caja){
   var hoy = _hoyNxISO_(), min = caja.dataset.min || '';
   var a = [['Hoy', hoy], ['Mañana', _isoMasDias_(hoy, 1)], ['+1 semana', _isoMasDias_(hoy, 7)]].filter(function(p){ return !min || p[1] >= min; });
@@ -1351,6 +1388,12 @@ function nxPinta(caja){
     caja.querySelector('.nx-fval').textContent = v ? _isoADMY_(v) : 'Sin fecha';
     if(abierto) cal.innerHTML = _calendarioHtml_(caja.dataset.mes || (v || _hoyNxISO_()).slice(0, 7), v, _hoyNxISO_(), {dia:'data-nxf', mes:'data-nxm'}, caja.dataset.min, caja.dataset.max);
   }
+}
+/* Enciende o apaga una caja entera (sus botones) desde el valor oculto o el elemento. */
+function _nxOff_(x, off){
+  var inp = typeof x === 'string' ? document.getElementById(x) : x, caja = inp && inp.closest('.nx'); if(!caja) return;
+  caja.classList.toggle('nx-off', !!off);
+  [].forEach.call(caja.querySelectorAll('button'), function(b){ b.disabled = !!off; });
 }
 function nxPon(id, val){
   var inp = document.getElementById(id); if(!inp) return;
@@ -1403,9 +1446,14 @@ function _nxPaso_(caja, d){
 })();
 /* Insertar formato en el cuerpo: `tipo` = h · b · ul · ol · todo · tabla; `ini`/`fin` = la selección. Devuelve el texto y
    la selección nueva. Los de línea (h, ul, ol, todo, tabla) van al principio de la línea; la negrita envuelve lo marcado. */
-function _mdInsertar_(texto, ini, fin, tipo){
+function _mdInsertar_(texto, ini, fin, tipo, extra){
   texto=String(texto==null?'':texto); ini=Math.max(0, Math.min(+ini||0, texto.length)); fin=Math.max(ini, Math.min(+fin||0, texto.length));
-  var pre={h:'## ', ul:'- ', ol:'1. ', todo:'[ ] '}, ls, ins;
+  var pre={h:'## ', ul:'- ', ol:'1. ', todo:'[ ] '}, ls, ins, fe;
+  if(tipo==='foto'){   /* `extra` = el id de la foto: va en su propia línea, al final de la línea donde está el cursor */
+    fe=texto.indexOf('\n', ini); if(fe<0) fe=texto.length;
+    ins=(fe>0 && texto.charAt(fe-1)!=='\n' ? '\n' : '')+'![foto](foto:'+extra+')\n';
+    return {texto:texto.slice(0, fe)+ins+texto.slice(fe), ini:fe+ins.length, fin:fe+ins.length};
+  }
   if(tipo==='b'){
     ins=texto.slice(ini, fin) || 'negrita';
     return {texto:texto.slice(0, ini)+'**'+ins+'**'+texto.slice(fin), ini:ini+2, fin:ini+2+ins.length};
@@ -1417,6 +1465,233 @@ function _mdInsertar_(texto, ini, fin, tipo){
   }
   if(!pre[tipo]) return {texto:texto, ini:ini, fin:fin};
   return {texto:texto.slice(0, ls)+pre[tipo]+texto.slice(ls), ini:ini+pre[tipo].length, fin:fin+pre[tipo].length};
+}
+
+/* ⛔ 26/10 (triaje C2a): CREAR UNA TAREA DESDE LA APP. 🗣️ Daniel, 20/10: «la fuente de verdad es el propio minipc […]
+   notion pasa a ser una proyección», así que las tareas nuevas tienen que poder nacer aquí. El PD en cualquier unidad
+   con tablero; un coordinador, en las que coordina. El servidor vuelve a mirarlo todo (`e_crear_tarea`). */
+var NUEVA_TAREA = {u:'', n:'', l:'', r:{}, ok:'', c:'', p:'media', cal:'', b:'', ab:false};
+function _unidadesNuevaTarea_(){
+  var yo = (typeof _actorSanc_==='function') ? _actorSanc_() : null;
+  if(!yo) return [];
+  var todas = ((DATA && DATA.subsistemas) || []).map(function(s){ return s && s.u; }).filter(Boolean);
+  if(rangoNom(yo) >= 3) return todas;
+  return _perfilesDe_(miembro(yo)).filter(function(p){ return p.rol==='coordinador' && todas.indexOf(p.unidad) >= 0; })
+    .map(function(p){ return p.unidad; });
+}
+function _genteNuevaTarea_(u){
+  return ((DATA && DATA.miembros) || []).filter(function(m){
+    return m && !m.baja && _perfilesDe_(m).some(function(p){ return p.unidad === u; });
+  }).map(function(m){ return m.nombre; }).sort(function(a, b){ return a.localeCompare(b); });
+}
+/* El contador del título: «37/150». */
+function _ntContador_(t){ return String(t == null ? '' : t).length+'/'+TOPE_TITULO_TAREA; }
+function _nuevaTareaFalta_(){
+  if(!String(NUEVA_TAREA.n || '').trim()) return 'Escribe qué hay que hacer';
+  if(String(NUEVA_TAREA.n).trim().length > TOPE_TITULO_TAREA) return 'El título pasa de '+TOPE_TITULO_TAREA+' caracteres';
+  if(!Object.keys(NUEVA_TAREA.r).some(function(n){ return NUEVA_TAREA.r[n]; })) return 'Elige al menos un responsable';
+  return '';
+}
+/* 31/10 · «Nueva tarea» sin controles nativos (Daniel: «un fucking tick clásico de HTML. Cero customizado»): la unidad y
+   los responsables son `.pick` (el chip seleccionable de la app), el plazo son atajos + un calendario propio, la urgencia
+   son chips, y el cuerpo es un editor con formato ligero y la vista previa «así se verá en Notion» al lado. */
+function _hoyNuevaTarea_(){ return _hoyNxISO_(); }
+function _fechaNuevaTareaHtml_(hoy){
+  var l = NUEVA_TAREA.l, sel = NUEVA_TAREA.cal, atajos = _atajosFechaTarea_(hoy), h = '';
+  h += '<div class="chips" style="margin-bottom:6px">'+atajos.map(function(a){
+    return '<button type="button" class="pick'+(a.v===l && !(a.v==='' && sel) ? ' on' : '')+'" data-ntf="'+esc(a.v)+'">'+esc(a.t)+'</button>'; }).join('')+
+    '<button type="button" class="pick'+(sel ? ' on' : '')+'" data-ntcal="'+(sel ? 'x' : (l || hoy).slice(0, 7))+'">Otro día…</button></div>';
+  h += '<div class="nota" style="padding:2px 0 6px;border:0">'+(l ? 'Vence el '+esc(_isoADMY_(l)) : 'Sin fecha límite')+'</div>';
+  if(sel){
+    h += _calendarioHtml_(sel, l, hoy, {dia:'data-ntf', mes:'data-ntcal'});
+  }
+  return h;
+}
+/* «✨ Mejorar con SolarIA»: el estado vive en `SOLP.nt` (el mecanismo ÚNICO de `_solIAHTML_`; ver `_solNuevaTareaCfg_`). Mientras piensa o hay
+   propuesta el texto es de sólo lectura (si no, la propuesta sería de otro texto). La vista previa pinta la PROPUESTA hasta que se pulsa
+   «Usar esto» o «Deshacer»; el original se guarda para volver. */
+function _ntIaPensando_(){ return !!(SOLP.nt && SOLP.nt.fase === 'pensando'); }
+function _ntIaPropuesta_(){ return !!(SOLP.nt && SOLP.nt.fase === 'propuesta'); }
+function _ntIaOcupado_(){ return _ntIaPensando_() || _ntIaPropuesta_(); }
+function _solNuevaTareaCfg_(){
+  return {ta: '#ntC', boton: 'Mejorar con SolarIA', quita: 'Deshacer', nota0: 'Revísala antes de usarla.', sigue: 'Tu texto sigue como estaba.',
+    sinCaja: true, sinSesion: true, max: CUERPO_TAREA_MAX, noIgual: 'SolarIA no ve nada que mejorar.', repinta: _repintarNuevaTarea_,
+    valor: function(){ return NUEVA_TAREA.c; },
+    pedir: function(txt){ return api.mejorarTarea(NUEVA_TAREA.n, NUEVA_TAREA.u, txt); }};
+}
+/* La vista previa pinta los BLOQUES que mandará el servidor (`_cuerpoABloques_`), no una segunda traducción. */
+function _vistaNuevaTarea_(texto){
+  if(!String(texto || '').trim()) return '<div class="nota" style="border:0;padding:0">Aquí irá lo que escribas.</div>';
+  try{ return _bloquesAHTML_(_cuerpoABloques_(texto)); }
+  catch(e){ return '<div class="nota dn" style="border:0;padding:0">'+esc((e && e.message) || e)+'</div>'; }
+}
+/* Repinta SÓLO el panel (no la pantalla entera): lo escrito vive en `NUEVA_TAREA`, así que no se pierde nada. */
+function _repintarNuevaTarea_(){
+  var el = document.getElementById('ntPanel');
+  if(!el){ pintar(); return; }
+  el.outerHTML = _nuevaTareaPanel_();
+  _cablearNuevaTarea_();
+}
+/* El botón «Crear la tarea» dice lo que falta (sin repintar el panel). */
+function _ntVivo_(){
+  var b = document.getElementById('ntCrear'); if(!b) return;
+  var f = _nuevaTareaFalta_(); b.disabled = !!f; b.textContent = f || 'Crear la tarea';
+}
+function _cablearNuevaTarea_(){
+  _fotoTareaPintar_(document.getElementById('ntV'));
+  $$('[data-ntab]').forEach(function(el){ el.onclick = function(){
+    NUEVA_TAREA.ab = el.dataset.ntab === '1'; if(NUEVA_TAREA.ab) NUEVA_TAREA.ok = ''; _repintarNuevaTarea_(); }; });
+  var b = document.getElementById('ntCrear');
+  var vivo = _ntVivo_;
+  var n = document.getElementById('ntN');
+  /* sin repintar al teclear: se perdería el foco a cada letra; sólo el botón dice lo que falta */
+  if(n) n.oninput = function(){
+    NUEVA_TAREA.n = n.value; NUEVA_TAREA.ok = '';
+    var c = document.getElementById('ntCont'); if(c) c.textContent = _ntContador_(n.value);
+    vivo(); };
+  $$('[data-ntu]').forEach(function(el){ el.onclick = function(){
+    if(el.dataset.ntu === NUEVA_TAREA.u) return;
+    NUEVA_TAREA.u = el.dataset.ntu; NUEVA_TAREA.r = {}; NUEVA_TAREA.ok = ''; _repintarNuevaTarea_(); }; });
+  $$('[data-ntf]').forEach(function(el){ el.onclick = function(){
+    NUEVA_TAREA.l = el.dataset.ntf; if(!el.classList.contains('nt-d')) NUEVA_TAREA.cal = ''; _repintarNuevaTarea_(); }; });
+  $$('[data-ntcal]').forEach(function(el){ el.onclick = function(){
+    NUEVA_TAREA.cal = el.dataset.ntcal === 'x' ? '' : el.dataset.ntcal; _repintarNuevaTarea_(); }; });
+  $$('[data-ntp]').forEach(function(el){ el.onclick = function(){
+    NUEVA_TAREA.p = el.dataset.ntp; _repintarNuevaTarea_(); }; });
+  var c = document.getElementById('ntC'), v = document.getElementById('ntV');
+  var vista = function(){ if(v){ v.innerHTML = _vistaNuevaTarea_(NUEVA_TAREA.c); _fotoTareaPintar_(v); } };
+  if(c) c.oninput = function(){
+    NUEVA_TAREA.c = c.value; NUEVA_TAREA.ok = ''; vista();
+    /* editar a mano suelta el «Volver al original» / el aviso y enciende o apaga ✨ según haya texto: `_solInput_` (delegado) */ };
+  $$('[data-ntmd]').forEach(function(el){ el.onclick = function(){
+    if(!c) return;
+    var r = _mdInsertar_(c.value, c.selectionStart, c.selectionEnd, el.dataset.ntmd);
+    c.value = r.texto; NUEVA_TAREA.c = r.texto; c.focus(); c.setSelectionRange(r.ini, r.fin); vista(); }; });
+  var bF = document.getElementById('ntFotoBtn'), inF = document.getElementById('ntFoto');
+  if(bF && inF){
+    bF.onclick = function(){
+      if(_fotosDelCuerpo_(NUEVA_TAREA.c) >= FOTO_TAREA_MAX){ _ntFotoMsg_('Ya hay '+FOTO_TAREA_MAX+' fotos, el máximo.', true); return; }
+      inF.value = ''; inF.click(); };
+    inF.onchange = async function(){
+      var f = inF.files && inF.files[0];
+      if(!f) return;
+      bF.disabled = true; _ntFotoMsg_('Subiendo la foto…', false);
+      try{
+        var id = await _fotoTareaSubir_(f, NUEVA_TAREA.u), txt = String(NUEVA_TAREA.c || ''),
+            r = _mdInsertar_(txt, c ? c.selectionStart : txt.length, c ? c.selectionEnd : txt.length, 'foto', id);
+        if(r.texto.length > CUERPO_TAREA_MAX) throw new Error('el cuerpo se pasaría de '+CUERPO_TAREA_MAX+' caracteres');
+        NUEVA_TAREA.c = r.texto; NUEVA_TAREA.ok = ''; delete SOLP.nt;
+        if(c) c.value = r.texto;
+        _ntFotoMsg_('', false); vista();
+      }catch(e){ _ntFotoMsg_('No se pudo poner la foto: '+((e && e.message) || e), true); }
+      bF.disabled = false;
+    };
+  }
+  if(b) b.onclick = async function(){
+    var f = _nuevaTareaFalta_();
+    if(f){ b.textContent = f; return; }
+    var t = _nuevaTareaArmar_(), nom = t.nombre;
+    b.disabled = true; b.textContent = 'Creando…';
+    try{
+      var r = await api.crearTarea(t);
+      if(r && r.tarea) TAREAS.push(r.tarea);
+      var se = (r && r.sinEtiquetar) || [];
+      delete SOLP.nt;
+      NUEVA_TAREA = {u:NUEVA_TAREA.u, n:'', l:'', r:{}, c:'', p:'media', cal:'', b:'', ab:false, ok:'Tarea creada: «'+nom+'»'+
+        (se.length ? ' (sin usuario de Notion, no salen de responsables allí: '+se.join(', ')+')' : '')};
+      _nuevaTareaCreada_();
+    }catch(e){ b.disabled = false; b.textContent = 'No se pudo crear: ' + ((e && e.message) || e); }
+  };
+}
+
+
+/* 01/11 (tareamovil) · LA HOJA «NUEVA TAREA» ES UNA SOLA, de las dos caras. Daniel: «tiene que ser tan cómodo como Notion» y
+   «para crear tareas desde el teléfono». El escritorio la pinta en un panel plegable y el móvil en una hoja (`tareas.movil.js`);
+   los campos, la IA, la vista previa, las fotos y el cableado son éstos. Cada cara pone: `_nuevaTareaPanel_()` (el envoltorio)
+   y `_nuevaTareaCreada_()` (qué hacer cuando el servidor ya la guardó). */
+function _nuevaTareaUnidadValida_(us){
+  if(us.indexOf(NUEVA_TAREA.u) < 0){ NUEVA_TAREA.u = us[0]; NUEVA_TAREA.r = {}; }
+}
+function _nuevaTareaCampos_(us){
+  var gente = _genteNuevaTarea_(NUEVA_TAREA.u), falta = _nuevaTareaFalta_(), hoy = _hoyNuevaTarea_(),
+      conPrio = UNIDADES_CON_PRIORIDAD_TAREA.indexOf(NUEVA_TAREA.u) >= 0;
+  return '<label class="campo"><span class="sc">Qué hay que hacer</span><input id="ntN" maxlength="'+TOPE_TITULO_TAREA+'" value="'+
+      esc(NUEVA_TAREA.n)+'" placeholder="p. ej. Soldar la placa de potencia">'+
+      '<span id="ntCont" class="nota" style="text-align:right">'+_ntContador_(NUEVA_TAREA.n)+'</span></label>'+
+    '<div class="campo"><span class="sc">Unidad</span><div class="nt-fila">'+us.map(function(u){
+      return '<button type="button" class="pick'+(u===NUEVA_TAREA.u ? ' on' : '')+'" data-ntu="'+esc(u)+'">'+esc(u)+'</button>'; }).join('')+'</div></div>'+
+    '<div class="campo"><span class="sc">Responsable(s)</span>'+
+      /* El selector de personas ÚNICO (comun.js): la gente de la unidad, con buscador y «Ver lista». */
+      elegirPersonas('ntResp', {universo:gente, marcadas:Object.keys(NUEVA_TAREA.r).filter(function(n){ return NUEVA_TAREA.r[n]; }),
+        titulo:'Responsables · '+NUEVA_TAREA.u, vacio:gente.length ? 'Elige al menos uno: escribe un nombre o pulsa «Ver lista».' : 'Nadie activo en '+NUEVA_TAREA.u+'.',
+        alCambiar:function(l){ NUEVA_TAREA.r = {}; l.forEach(function(n){ NUEVA_TAREA.r[n] = true; }); NUEVA_TAREA.ok = ''; _ntVivo_(); }})+
+    '</div>'+
+    '<div class="campo"><span class="sc">Fecha límite</span>'+_fechaNuevaTareaHtml_(hoy)+'</div>'+
+    (conPrio ? '<div class="campo"><span class="sc">Urgencia</span><div class="nt-fila">'+['baja','media','alta'].map(function(p){
+      return '<button type="button" class="pick'+(NUEVA_TAREA.p===p ? ' on' : '')+'" data-ntp="'+p+'">'+p.charAt(0).toUpperCase()+p.slice(1)+'</button>'; }).join('')+'</div></div>' : '')+
+    '<div class="campo"><span class="sc">Instrucciones <span class="nota" style="padding:0;border:0">(opcional)</span></span>'+
+      '<div class="nt-barra">'+[['h','Título'],['b','Negrita'],['ul','• Lista'],['ol','1. Lista'],['todo','☐ Casilla'],['tabla','Tabla']].map(function(b){
+        return '<button type="button" class="btn sm" data-ntmd="'+b[0]+'">'+b[1]+'</button>'; }).join('')+
+        '<button type="button" class="btn sm" id="ntFotoBtn"'+(_ntIaOcupado_() ? ' disabled' : '')+'>📷 Foto</button>'+
+        '<input type="file" id="ntFoto" accept="image/*" style="display:none">'+
+        _solBotonHTML_('nt', _solNuevaTareaCfg_(), 'nt-ia', 'ntIA')+'</div>'+
+      '<div class="nota" id="ntFotoMsg" style="border:0;padding:2px 0"></div>'+
+      '<div class="nt-ed"><textarea id="ntC" rows="9" maxlength="'+CUERPO_TAREA_MAX+'"'+(_ntIaOcupado_() ? ' readonly' : '')+' placeholder="Qué hay que hacer. Arriba tienes títulos, listas, casillas y tablas.">'+
+        esc(NUEVA_TAREA.c)+'</textarea>'+
+      '<div class="nt-vp"><span class="sc">'+(_ntIaPropuesta_() ? 'Propuesta de SolarIA · así se verá en Notion' : 'Así se verá en Notion')+'</span>'+
+        '<div id="ntIAbar">'+_solZonaHTML_('nt')+'</div><div id="ntV" class="nt-prev">'+_vistaNuevaTarea_(_ntIaPropuesta_() ? SOLP.nt.prop : NUEVA_TAREA.c)+'</div></div></div></div>'+
+    '<button class="btn pri" id="ntCrear"'+(falta?' disabled':'')+' style="margin-top:9px">'+esc(falta || 'Crear la tarea')+'</button>';
+}
+/* Lo que se manda a `crearTarea`: lo MISMO desde las dos caras (`rutinas/probar_crear_tarea.py` y los bancos de cada cara lo miden). */
+function _nuevaTareaArmar_(){
+    var nom = String(NUEVA_TAREA.n).trim(), resp = Object.keys(NUEVA_TAREA.r).filter(function(x){ return NUEVA_TAREA.r[x]; }),
+        t = {nombre:nom, unidad:NUEVA_TAREA.u, responsables:resp, limite:NUEVA_TAREA.l || null};
+    if(String(NUEVA_TAREA.c || '').trim()) t.cuerpo = NUEVA_TAREA.c;
+    if(UNIDADES_CON_PRIORIDAD_TAREA.indexOf(NUEVA_TAREA.u) >= 0) t.prioridad = NUEVA_TAREA.p;
+    return t;
+}
+function _ntFotoMsg_(t, malo){
+  var e = document.getElementById('ntFotoMsg');
+  if(e){ e.textContent = t; e.className = 'nota' + (malo ? ' dn' : ''); }
+}
+
+/* 01/11 · FOTOS EN EL CUERPO DE UNA TAREA. En el texto es una línea `![foto](foto:ID)` (`cuerpo_notion.py` la lee como bloque
+   de imagen); la imagen vive en el mini PC (`subirFotoTarea` / `getFotoTarea`, `rutinas/fotos_tarea.py`) y aquí sólo viaja
+   el id. Se reduce ANTES de subir (`_leerImagen_`: lado mayor 1600, JPEG que cabe en la petición). Topes: 6 por tarea
+   (`cuerpo_notion.MAX_FOTOS`) y 800 KB por foto (`fotos_tarea.MAX_BYTES`). En `?demo` no hay servidor: se queda en la página. */
+var FOTO_TAREA_MAX = 6, FOTO_TAREA_KB = 800, FOTO_TAREA_CACHE = {};
+function _fotosDelCuerpo_(texto){
+  var m = String(texto == null ? '' : texto).match(/^[ \t]*!\[[^\]]*\]\(foto:[A-Za-z0-9]{8,40}\)[ \t]*$/gm);
+  return m ? m.length : 0;
+}
+function _fotoTareaSubir_(file, unidad){
+  return _leerImagen_(file).then(function(im){
+    if(_pesoKB_(im.url) > FOTO_TAREA_KB) throw new Error('la foto pesa demasiado (máximo '+FOTO_TAREA_KB+' KB)');
+    if(_demoLocal_()){
+      var id = 'demo' + new Date().getTime().toString(36) + Object.keys(FOTO_TAREA_CACHE).length;
+      FOTO_TAREA_CACHE[id] = im.url;
+      return id;
+    }
+    return api._post({action: 'subirFotoTarea', unidad: unidad, datos: im.url}).then(function(r){
+      FOTO_TAREA_CACHE[r.id] = im.url;
+      return r.id;
+    });
+  });
+}
+function _fotoTareaPedir_(id){
+  if(FOTO_TAREA_CACHE[id]) return Promise.resolve(FOTO_TAREA_CACHE[id]);
+  return api._post({action: 'getFotoTarea', id: id}).then(function(r){ return (FOTO_TAREA_CACHE[id] = r.foto); });
+}
+/* Rellena los `<img data-foto>` que hay dentro de `raiz` (la vista previa pinta bloques, no bytes). */
+function _fotoTareaPintar_(raiz){
+  if(!raiz) return;
+  var ims = raiz.querySelectorAll('img[data-foto]'), i;
+  for(i = 0; i < ims.length; i++){
+    (function(im){
+      _fotoTareaPedir_(im.getAttribute('data-foto')).then(function(u){ im.src = u; },
+        function(){ im.alt = 'No se pudo cargar la foto'; });
+    })(ims[i]);
+  }
 }
 
 function _tareaFlujo_(){ return ['Sin empezar', 'En desarrollo', 'Revisando']; }
@@ -1661,7 +1936,7 @@ async function _cargarMisSanciones_(){
 var APEL_SANC_TXT={
   tienes:function(hasta){ return 'Tienes hasta el ' + (_isoADMY_(hasta) || '') + '. Mientras se resuelve, la sanción sigue aplicada.'; },
   campo:'Qué pasó', ayuda:'Lo que quieres que se tenga en cuenta.', enlace:'Enlace o foto (si lo hay)',
-  vacio:'Escribe qué pasó: sin motivo no se envía.', enviada:'Apelación enviada. Te avisamos cuando respondan.'
+  vacio:'Cuenta qué pasó.', enviada:'Apelación enviada. Te avisamos cuando respondan.'
 };
 /* Apelar: manda `{id, motivo, enlace}` y deja la apelación en la lista. Promesa de la apelación. */
 function _apelarSancion_(s, motivo, enlace){
@@ -1678,6 +1953,74 @@ function _apelarSancion_(s, motivo, enlace){
     var ap=r && r.apelacion; if(ap){ APELACIONES.unshift(ap); }
     return ap;
   });
+}
+
+/* ══ «PROCEDE VETO» (Art. 32) CON SU RELOJ — 31/10 ═══════════════════════════════════════════════════════════════════════
+   🗣️ Daniel: *«Te avisa a ti con un "procede veto" bien visible y decides tú»* y *«que sea un coso que te diga que lo hagas
+   [escribirles], te lo trate como tu propia tarea y luego tengas que avisar al sistema cuando lo hayas hecho para que empiece
+   el reloj y te ponga otra tarea cuando haya que realmente decidir si se veta o no»*.
+   Tres cosas en la cola del PD: «Procede veto» (hay una sanción contra alguien con 0 puntos → tarea «Escríbele el aviso de
+   veto», botón «Hecho, ya se lo dije»), «Esperando» (el reloj corre) y «Decide si se veta» (venció el plazo). ⛔ El plazo y la
+   fase los calcula el SERVIDOR (`VETOS.entradas[].fase/vence`): la cara no cuenta días. ⛔ Nada veta solo: decidir sólo lo anota. */
+function _vetoCandidatas_(ss){
+  if(!VETOS) return [];
+  var hechas={}; (VETOS.entradas||[]).forEach(function(e){ hechas[String(e.sancion_id)]=1; });
+  return (ss||[]).filter(function(s){
+    if(hechas[String(s.id)] || (s.estado!=='pendiente' && s.estado!=='aprobada')) return false;
+    if(_esNoJustificable_(s.origen, s.extra) || !(+s.puntos<0)) return false;
+    var m=miembro(s.nombre);
+    return !!m && typeof m.puntos==='number' && m.puntos<=VETOS.en_puntos;
+  });
+}
+function _vetoDmy_(iso){ var p=String(iso||'').slice(0,10).split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : ''; }
+function _vetoPila_(n){ var m=miembro(n); return (m&&m.pila)||n; }
+/* Las filas (sin envoltorio: cada cara las mete en su panel/tarjeta) y cuántas hay que atender. */
+function _vetoFilas_(ss){
+  var out=[], n=0;
+  _vetoCandidatas_(ss).forEach(function(s){
+    n++;
+    out.push('<div class="veto" data-vsanc="'+esc(s.id)+'" style="padding:9px 0;border-top:1px solid var(--line)">'+
+      '<b style="color:var(--red2)">Procede veto</b> · '+esc(_vetoPila_(s.nombre))+
+      ' <span class="sc">tiene 0 puntos y recibe otra sanción (Art. 32)</span>'+
+      '<div class="sc" style="margin:5px 0">Avísale del veto: al marcarlo corre el plazo de '+esc(VETOS.plazo_dias)+' días.</div>'+
+      '<button class="btn sm" data-vavisar="'+esc(s.id)+'">Hecho, ya se lo dije</button> <span class="sc" data-verr></span></div>');
+  });
+  (VETOS&&VETOS.entradas||[]).forEach(function(e){
+    if(e.fase==='esperar'){
+      out.push('<div class="veto" style="padding:9px 0;border-top:1px solid var(--line)"><b>Veto de '+esc(_vetoPila_(e.nombre))+'</b> · '+
+        '<span class="sc">avisado; el plazo acaba el '+esc(_vetoDmy_(e.vence))+' y entonces te sale la tarea de decidir.</span></div>');
+    } else if(e.fase==='decidir'){
+      n++;
+      out.push('<div class="veto" data-vdsanc="'+esc(e.sancion_id)+'" style="padding:9px 0;border-top:1px solid var(--line)">'+
+        '<b style="color:var(--red2)">Decide si se veta</b> · '+esc(_vetoPila_(e.nombre))+
+        ' <span class="sc">se le avis\u00f3 el '+esc(_vetoDmy_(e.aviso_at))+'; el plazo venci\u00f3 el '+esc(_vetoDmy_(e.vence))+'.</span>'+
+        '<div style="margin:6px 0"><button class="btn sm" data-vdec="vetar" data-vid="'+esc(e.sancion_id)+'">Decido vetar</button> '+
+        '<button class="btn sm" data-vdec="no_vetar" data-vid="'+esc(e.sancion_id)+'">Decido no vetar</button> '+
+        '<span class="sc" data-verr></span></div>'+
+        '<div class="sc">Esto solo lo anota: el veto lo ejecuta la Junta.</div></div>');
+    }
+  });
+  return {html: out.join(''), n: n};
+}
+/* Engancha los botones de `_vetoFilas_` dentro de `raiz` (o el documento) y repinta con `despues`. */
+function _engVeto_(despues, raiz){
+  function sub(sel){ return Array.prototype.slice.call((raiz||document).querySelectorAll(sel)); }
+  function aplica(b, id, accion, txt){
+    var er=b.parentNode.querySelector('[data-verr]') || b.parentNode.parentNode.querySelector('[data-verr]');
+    b.disabled=true;
+    accion().then(function(r){
+      var v=r&&r.veto, L=VETOS.entradas, i;
+      for(i=0;i<L.length;i++) if(String(L[i].sancion_id)===String(id)){ L.splice(i,1); break; }
+      if(v) L.push(v);
+      despues(); tost(txt);
+    }).catch(function(e){ b.disabled=false; if(er) er.textContent=(e&&e.message)||String(e); });
+  }
+  sub('[data-vavisar]').forEach(function(b){ b.onclick=function(){
+    aplica(b, b.dataset.vavisar, function(){ return api.avisarVeto(b.dataset.vavisar); }, 'Anotado: el reloj del veto ya corre.');
+  }; });
+  sub('[data-vdec]').forEach(function(b){ b.onclick=function(){
+    aplica(b, b.dataset.vid, function(){ return api.cerrarVeto(b.dataset.vid, b.dataset.vdec); }, 'Decisi\u00f3n anotada.');
+  }; });
 }
 
 function _tareaAccion_(e){
@@ -1826,13 +2169,13 @@ function _cargaVista_(m){
    foto. La misma frase en las dos caras. */
 function _cargaDesgloseTxt_(d){
   return (d.vivo ? 'en vivo · de este mes ' : 'índice del panel del '+esc(_isoADMY_(DATA.generado||'—'))+' · de ese mes ')+
-    nf(d.aporta_mes_actual||0,1)+' · arrastre '+nf(d.arrastre||0,1);
+    nf2(d.aporta_mes_actual||0)+' · arrastre '+nf2(d.arrastre||0);   /* 01/11: horas en cuartos, como los partes (`nf2`, la de `h1`) */
 }
 function _cargaPrevistaTxt_(m){
   var p=m && m.carga_prevista;
   if(!p || typeof p.prevista!=='number') return '';
   return 'Prevista a fin de mes si sigues a tu ritmo '+(p.ritmo_de==='14d'?'de los últimos 14 días':'de este mes')+
-    ' ('+nf(p.ritmo_dia,1)+' h/día → '+nf(p.horas_previstas,1)+' h)'+
+    ' ('+nf(p.ritmo_dia,1)+' h/día → '+nf2(p.horas_previstas)+' h)'+
     /* ⛔ Desde `cargas_vivas_en` (20/10) `m.carga` es el índice DE HOY si el desglose es vivo: «del último cierre» se
        contradecía con el «en vivo» de debajo (auditoría del 20/10). */
     (typeof m.carga==='number'?' · índice '+(m.desglose && m.desglose.vivo?'de hoy':'del panel')+': '+nf(m.carga,0):'');
@@ -1974,24 +2317,9 @@ function _sinCierres_(m){
   return !!m && typeof m.cierres === 'number' && m.cierres <= 0;
 }
 
-/* ⛔ EL PRIMER MES NO LLEVA CUOTA. Daniel (15/08/2026), literal: *«el primer mes
-   como tal si que es cierto en septiembre o el primer mes que alguien no este en el
-   equipo que deberian no ponerle la cuota, porque no tiene mucho sentido»*. Gemela de
-   `reglas/cuota.py:exento_primer_mes`, y existe porque la cara NO la conocia: el
-   motor perdonaba y la pantalla cobraba.
-   🔁 Medido: el 1 de septiembre las 32 pasan a cero cierres a la vez, `_hMesDe_`
-   devuelve 0 h/mes -que es un dato, no un «no lo se»- y la curva clava **67,80 EUR**,
-   la cuota mas cara que existe. El motor, en cambio, archiva **0,00 EUR**. Eran
-   2.169,60 EUR en pantalla contra 0,00 reales, en tres sitios a la vez.
-   ⛔ TRES ESTADOS, como la del motor: `true`, `false` y **`null` = no se sabe**.
-   `cierres === 0` es un HECHO -ningun mes cerrado, o sea que sigue en el primero-;
-   el campo AUSENTE es que no se ha podido mirar el historico, y son cosas distintas:
-   tratar el ausente como exento **perdona dinero que se debe**.
-   ⚠️ El hecho no se reinventa: lo decide `_sinCierres_`, que es quien ya sabe que
-   el criterio es `cierres` y no `meses` (`meses:1` puede ser un cierre o cero cierres
-   con un mes en curso). Aqui solo se anade el brazo del «no lo se», porque las dos
-   preguntas son distintas: para el RANKING, ausente = no se echa a nadie; para el
-   DINERO, ausente = no se perdona nada. */
+/* ⛔⛔ 01/11 · NO HAY EXENTO «DEL PRIMER MES» (Daniel: *«No hay exentos el primer mes porque la cuota es anual»*). Exento es quien
+   NO renueva (baja) o a quien el descuento del coche le deja la cuota anual en 0 €: lo dice `reglas/cuota.py:exento_de_cuota`
+   y el motor lo archiva como `exento`. La cara no perdona nada por tener cero cierres: el importe es el de la curva menos el coche. */
 /* 22/10 (auditor 23, 🟠 10): quien ha ENTRADO A MITAD de temporada — sin cierres suyos cuando otros del equipo ya los
    tienen. En septiembre nadie tiene cierres y esto da `false` a todos (la comparativa sigue como siempre). Si el panel no
    trae `cierres` de los demás, también `false`: «no lo sé» deja la pantalla como estaba. */
@@ -2003,11 +2331,6 @@ function _recienLlegado_(m){
   var rk = (typeof DATA !== 'undefined' && DATA && DATA._ranking) || null;
   if(rk && +rk.total > 0) return true;
   return _activos_().some(function(x){ return typeof x.cierres === 'number' && x.cierres > 0; });
-}
-
-function _exentoPrimerMes_(m){
-  if(!m || typeof m.cierres !== 'number') return null;
-  return _sinCierres_(m);
 }
 
 /* h/mes de UNA persona. Gemela del respaldo de `reglas/cuota.py:ritmo` -> `horas_mes`.
@@ -2070,13 +2393,10 @@ function _ritmosEquipo_(){
   return L;
 }
 
-/* ⛔⛔ ESTE UMBRAL NO ES EL QUE ENSENA LA APP, Y CONFUNDIRLOS CUESTA DINERO. Este pondera
-   por **persona** (`reglas/cuota.py:umbral_dinamico`) y es el que usa la curva; `_umbral_()`
-   pondera por **mes** (`umbral_temporada`) y es el que Daniel definio el 27/07 para
-   **ensenar**. Sobre las 32 reales son **11,98 frente a 12,81**, y usar el que no toca mueve
-   **+27,23 EUR** tocando a **28 personas**. Las dos conviven a proposito: unificarlas cambia
-   lo que paga cada uno y **esa decision no esta tomada**.
-   ⚠️ Por eso se llama `_umbralCuota_` y no `_umbral2_`: el nombre dice para que sirve. */
+/* ⛔⛔ UN SOLO UMBRAL (Daniel, 01/11: «nunca hubo 2»). `_umbralCuota_` es el de la curva y `_umbral_()` el del color de horas:
+   los dos son la regla POR MES (`reglas/cuota.py:umbral_temporada`). Hasta el 01/11 el respaldo de aquí ponderaba por
+   **persona** (`umbral_dinamico`): sobre las 32 reales 11,98 frente a 12,81, +27,23 EUR a 28 personas. Con la curva del
+   motor delante manda ella (`DATA.cuota_curva`, calculada con `umbral_de`); sin ella, `_umbral_()`. */
 /* ⛔ 22/10 (auditor 30, 🟡 3): el UMBRAL y el TECHO de la curva que calculó el MOTOR (`DATA.cuota_curva`, de
    `reglas/cuota.curva_equipo` sobre el `hm` de `flujos/cuotas.calcular`), o `null`. El motor lleva a las BAJAS (ARRANQUE
    §2c: su trabajo cuenta) y el panel ya no las trae, así que con `_ritmosEquipo_` la cara calculaba OTRA curva (con
@@ -2088,7 +2408,7 @@ function _curvaMotor_(){
 function _umbralCuota_(){
   var _cc = _curvaMotor_();
   if(_cc) return _cc.umbral;                 /* el del motor primero; sin él, el de siempre */
-  var L = _ritmosEquipo_(), s = 0, i;
+  var L = _ritmosEquipo_();
   /* ⛔⛔ UNA PERSONA NO ES UN EQUIPO, y con `!L.length` esto se calculaba con UNA sola.
      A rango < 3 el backend sirve la forma MIEMBRO -tu ficha entera y las demas SOLO con
      identidad-, asi que `_ritmosEquipo_` se queda con **un** ritmo: el tuyo. Y entonces
@@ -2106,8 +2426,9 @@ function _umbralCuota_(){
      ⚠️ Y devolver `null` es lo correcto, no un apano: `_cuotaDe_` cae entonces a la
      cifra que sirvio el backend -calculada por el motor con las 32- y **lo dice**. */
   if(L.length < 2) return null;
-  for(i = 0; i < L.length; i++) s += L[i];
-  return Math.max(UMBRAL_LO, Math.min(UMBRAL_HI, UMBRAL_FRAC * (s / L.length)));
+  /* ⛔⛔ 01/11 · Daniel: «nunca hubo 2». Sin la curva del motor, el umbral de la cuota es EL DE LA APP (`_umbral_()`, por mes),
+     no un 2/3 de la media por persona: antes el color de horas y la cuota de la MISMA fila usaban dos números. */
+  return _umbral_();
 }
 
 /* El techo de la curva: el maximo h/mes del equipo (`reglas/cuota.py:cuotas`). */
@@ -2129,21 +2450,12 @@ function _cuotaViva_(m){
   return _truncarCentimo_(_curvaCuota_(h, _paramsCuota_().base, u, t));
 }
 
-/* Lo que PAGAS: la base, menos el descuento por conducir, y con la exencion del
-   primer mes por delante. Gemela de `flujos/cuotas.py`, que hace exactamente esto y
-   en este orden. Suelo 0 EUR -se puede llegar a pagar 0, nunca a cobrar-.
-   ⛔ LA EXENCION VA SOBRE `final` Y NO SOBRE `base`, igual que en el motor: la base
-   se conserva CON SU IMPORTE porque es lo que habria pagado, y es lo que hace que la
-   fila cuadre consigo misma cuando alguien la audite. Ponerla a 0 deja un importe que
-   no explica de donde sale el perdon.
-   ⛔ Y SE COMPARA CON `=== true` A PROPOSITO: `_exentoPrimerMes_` devuelve `null`
-   cuando no se sabe, y `null` NO exime -- es lo mismo que hace `flujos/cuotas.py` con
-   su `if ex:`, donde el `None` cae por falsy y se cobra. Perdonar sin saber es
-   regalar dinero del equipo; el que decide con criterio es el motor, no la pantalla. */
+/* Lo que PAGAS: la base, menos el descuento por conducir. Gemela de `flujos/cuotas.py`, que hace exactamente esto.
+   Suelo 0 EUR -se puede llegar a pagar 0, nunca a cobrar-. Desde el 01/11 (Daniel: «no hay exentos el primer mes porque la
+   cuota es anual») NO hay perdon por tener cero cierres: sin coche, `final` es la base. */
 function _cuotaVivaFinal_(m){
   var b = _cuotaViva_(m), n;
   if(b === null) return null;
-  if(_exentoPrimerMes_(m) === true) return 0;
   n = Number(m && m.coche) || 0;
   return _truncarCentimo_(Math.max(0, b - n * _descuentoCoche_()));
 }
@@ -2356,6 +2668,64 @@ function _llego_(clave, v){
   return _LLEGO[clave] === true;
 }
 
+/* Copia a `DATA` lo que el panel del backend trae (fecha, temporada, curva de la cuota, banda, consejo, subsistemas y
+   roster) y dice qué forma llegó: 'miembro' (con `yo`), 'admin' (roster sin `yo`) o null. UNA vez para las dos caras
+   (`_aplicarPanel_` de cada una): cada campo que alguien olvidaba copiar en UNA cara se quedaba en la semilla sin error
+   (`equipo_mes`, `banda_*`, `consejo`, y `_llego_('subs')` en el escritorio). Lo que cada cara hace con TU ficha es suyo. */
+function _copiarPanelEnDATA_(pnl){
+  if(!pnl) return null;
+  if(pnl.generado) DATA.generado=pnl.generado;
+  if(pnl.temporada) DATA.temporada=pnl.temporada;
+  /* Los ingredientes del umbral: medias mensuales de la temporada y la del mes
+     abierto. El peso del dia lo pone `_umbral_()` al calcular, no el backend. */
+  if(pnl.umbral) DATA.umbral=pnl.umbral;
+  /* ⛔ EL AGREGADO DEL MES, QUE LLEGABA Y SE CAIA AL SUELO. El backend lo calcula en sus
+     dos ramas y `horas.movil.js` lo lee en cuatro sitios, pero NADIE lo copiaba aqui:
+     `DATA.equipo_mes` era `undefined` SIEMPRE, asi que `_diasDelMes_` caia siempre a su
+     respaldo del calendario. O sea que el mes se volvia a medir del 1 al 31 EN LA CARA,
+     con el backend midiendolo bien desde el cierre — y sin dar ningun error. */
+  if(pnl.equipo_mes) DATA.equipo_mes=pnl.equipo_mes;
+  /* ⛔⛔ LA BANDA SANA, QUE LLEGABA Y SE CAÍA AL SUELO — Y EL COMENTARIO DECÍA QUE VIAJABA.
+     El 05/10 proyecté `banda_min`/`banda_max` en el panel (`Codigo.gs:875-876`) y escribí
+     en `_bandaSana_` que «el número ya viaja». **No viajaba**: nadie lo copiaba aquí, así
+     que `_bandaSana_` devolvía siempre `viva:false` y pintaba el **70–120 cableado**.
+     ⛔ Es §3c-28 exacto — *lo que no tiene banco es lo que está ENTRE dos que sí* — y la
+     misma avería que `equipo_mes` tres líneas más arriba: los dos extremos vigilados, el
+     cable del medio sin escribir. Lo cazó una auditoría, no un banco.
+     ⚠️ `typeof` y no `if(pnl.banda_min)`: un **0** es un número válido y `if` lo tiraría. */
+  if(typeof pnl.banda_min === 'number') DATA.banda_min = pnl.banda_min;
+  if(typeof pnl.banda_max === 'number') DATA.banda_max = pnl.banda_max;
+  /* ⛔ 22/10 (auditor 30, 🟡 3): la curva de la cuota del MOTOR (umbral y techo, con las bajas). Sin esta línea se
+     caería al suelo como `banda_min` (§3c-28) y la cara volvería a su curva SIN las bajas. */
+  /* (refutador 33, 🟡 3) y un `null` que LLEGA la borra: es el motor diciendo «no la uses» (otra temporada) */
+  if('cuota_curva' in pnl) DATA.cuota_curva = (pnl.cuota_curva && typeof pnl.cuota_curva === 'object') ? pnl.cuota_curva : null;
+  /* ⛔⛔ Y EL CONSEJO, IGUAL: lo manda `Codigo.gs:862` y no lo copiaba nadie, así que
+     `DATA.consejo` era `undefined` **siempre**. En pantalla eso es convocar un «Consejo»
+     que **no invita a nadie**, y un mapa de turnos que dice «nadie del consejo puede» en
+     **todas** las casillas — justo lo que sus comentarios daban por arreglado. */
+  if(Array.isArray(pnl.consejo)) DATA.consejo = pnl.consejo;
+  /* `horasMesReal` se dejo de usar: derivaba de un snapshot y le ganaba al dato vivo.
+     Si el backend lo sigue mandando, se ignora. */
+  if(pnl.reunion) DATA.reunion=pnl.reunion;
+  /* ⛔ Y SE APUNTA QUE LLEGÓ: la lista de `DATA` es de la MAQUETA y sólo se pisa si el panel trae una no vacía.
+     Esta línea sólo la tenía el móvil: en el escritorio «Horas por subsistema» decía SIEMPRE «sin datos»
+     (`_llego_('subs')` no se ponía nunca; el banco lo ponía a mano). Una vez, aquí, para las dos caras. */
+  if(Array.isArray(pnl.subsistemas)&&pnl.subsistemas.length){
+    DATA.subsistemas=pnl.subsistemas; _llego_('subs', true);
+  }
+  var forma=null;
+  if(pnl.yo){                                   // forma MIEMBRO
+    var pub=(pnl.miembros||[]).slice();
+    var ix=-1;
+    for(var i=0;i<pub.length;i++) if(pub[i].nombre===pnl.yo.nombre) ix=i;
+    if(ix>=0) pub[ix]=pnl.yo; else pub.push(pnl.yo);
+    DATA.miembros=pub; DATA._rol='miembro'; DATA._ranking=pnl.ranking||null; forma='miembro';
+  } else if(Array.isArray(pnl.miembros)&&pnl.miembros.length){   // forma ADMIN
+    DATA.miembros=pnl.miembros; DATA._rol='admin'; DATA._ranking=null; forma='admin';
+  }
+  return forma;
+}
+
 var RP_BASE = 3000;     /* la primera espera */
 var RP_TOPE = 60000;    /* y el techo, que no se pasa */
 
@@ -2469,6 +2839,54 @@ function _apiParse(txt, accion){
   /* Un «no» del backend SIN motivo. No se reintenta -- tiene criterio, repetirlo da lo
      mismo tres veces--, asi que se dice que fue un rechazo y no un fallo de linea. */
   throw new Error(err||"el backend rechazó la acción sin decir por qué");
+}
+
+/* ⛔ `api._post`, UNA VEZ PARA LAS DOS CARAS (01/11, `apitiempo`). Estaba calcado en `movil.html` y
+   `escritorio.html`; ahora cada `api._post` lo llama. El hallazgo: con un servidor que acepta la
+   conexión y no contesta, «Convocar» se quedaba en «Creando…» SIN FIN, porque `fetch` no tiene tiempo
+   máximo. TRES INTENTOS (Apps Script pierde el cuerpo del POST de vez en cuando: 302->404; misma regla
+   que `rutinas/llamar.py`), y ahora CADA intento con su tiempo máximo.
+   ⛔ LECTURA O ESCRITURA decide qué pasa al AGOTARSE el tiempo. Una lectura se repite como un fallo de
+   red. Una ESCRITURA NO: la petición puede haber llegado, y repetirla duplicaría un parte, una sanción
+   o una convocatoria; se lanza `sinRespuesta` con un mensaje que dice la verdad y el botón se suelta.
+   LECTURA = no cambia nada en el servidor y su nombre lo dice: `get*`, `listar*`, `bootstrap`,
+   `quienSoy`, `queHayNuevo`, `estadoAudioReunion`. Todo lo demás es escritura (ante la duda, la
+   prudente: no repetir). El 20 s sale de `salidas/servidor-peticiones.jsonl` (8.061 peticiones):
+   mediana 14 ms, p99 0,9 s, la más lenta 9,2 s; 20 s deja más del doble de margen sobre la peor.
+   Las que llaman a un modelo o suben ficheros tardan más a propósito: techo propio. */
+var API_ESPERA_MS = 20000;
+var API_ESPERA_LARGA_MS = 120000;
+var API_ACCIONES_LARGAS = /^(transcribirVoz|interpretarAnotacion|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|redactarTurno|redactarParte|resumirReunion|redactarMotivo)$/;
+var API_MSG_SIN_RESPUESTA = "El servidor no ha contestado. Puede que se haya guardado: recarga antes de repetirlo.";
+function _esLecturaApi_(accion){
+  return /^(get|listar)/.test(accion) || /^(bootstrap|quienSoy|queHayNuevo|estadoAudioReunion)$/.test(accion);
+}
+async function _apiPost_(body){
+  if(SESION&&SESION.token&&!body.token) body=Object.assign({},body,{token:SESION.token});
+  var accion=String(body.action||""), ultimo=null, lectura=_esLecturaApi_(accion);
+  var espera=API_ACCIONES_LARGAS.test(accion) ? API_ESPERA_LARGA_MS : API_ESPERA_MS;
+  for(var i=0;i<3;i++){
+    if(i) await new Promise(function(ok){ setTimeout(ok, 600+i*800); });
+    var ctl=new AbortController(), agotado=false;
+    var reloj=setTimeout(function(){ agotado=true; ctl.abort(); }, espera);
+    try{
+      var r=await fetch(BACKEND_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+        body:JSON.stringify(body), signal:ctl.signal});
+      var res=_apiParse(await r.text(), accion);
+      _sonarAccion_(body);   // 31/10: sólo si el servidor contestó bien (si no, `_apiParse` lanzó)
+      return res;
+    }catch(e){
+      if(agotado){
+        if(!lectura){ var sr=new Error(API_MSG_SIN_RESPUESTA); sr.sinRespuesta=true; throw sr; }
+        ultimo=new _ApiTransito("el servidor no contestó a tiempo");
+        continue;
+      }
+      /* Un «no» del backend no se reintenta; un fallo de red o de transito, si. */
+      if(e && !e.transito && !(e instanceof TypeError)) throw e;
+      ultimo=e;
+    }finally{ clearTimeout(reloj); }
+  }
+  throw ultimo || new Error("no se pudo hablar con el servidor");
 }
 
 /* Mapea un parte del BACKEND (subsistema/justificacion/estado 'pendiente'…) al modelo que
@@ -2648,7 +3066,8 @@ function _extraTope_(durH){
    dato real trae `'Posible · Coche'`. Con `===` el compuesto se escapa del filtro.
    ⛔ GEMELA de `reglas/turnos.py:es_firme` — misma pregunta, dos idiomas. Si divergen, la
    misma persona cuenta distinto segun el aparato. Lo contrasta `probar_extra_turno.py`. */
-function _rolesDudosos_(){ return ['posible', 'reserva']; }
+/* 01/11 (Daniel): `suplente` tambien — quien esta pendiente de si viene; el responsable lo añade al cerrar el turno. */
+function _rolesDudosos_(){ return ['posible', 'reserva', 'suplente']; }
 function _esFirmeRol_(rol){
   var r = String(rol == null ? '' : rol).toLowerCase(), d = _rolesDudosos_(), i;
   for(i = 0; i < d.length; i++){
@@ -2722,6 +3141,18 @@ function _puedeCerrarTurno_(t, nombre){
   if(!t || !nombre) return false;
   if(_responsableTurno_(t) === nombre) return true;
   return rangoNom(nombre) >= 3;
+}
+
+/* 01/11 (Daniel, suplente): las horas de un turno salen de CUANDO EMPEZO y CUANDO ACABO, contando el transporte.
+   Devuelve horas (cuartos de hora) o `null` si falta una de las dos o son iguales —«no lo se» no es 0 ni 24—.
+   Si el fin es anterior al inicio, cruza la medianoche. */
+function _durTurnoDeHoras_(iniHM, finHM){
+  var re = /^\d{1,2}:\d{2}$/;
+  if(!re.test(String(iniHM == null ? '' : iniHM)) || !re.test(String(finHM == null ? '' : finHM))) return null;
+  var m = _minHM_(finHM) - _minHM_(iniHM);
+  if(m === 0) return null;
+  if(m < 0) m += 1440;
+  return Math.round(m / 15) / 4;
 }
 
 /* Que falta o que esta mal en un cierre, o `null` si se puede mandar. `cierre` es
@@ -2850,6 +3281,17 @@ function _saltadasTxt_(n){
   if (n <= 0) return '';
   return ' \u00b7 ' + n + (n === 1 ? ' no la puedes decidir t\u00fa: sigue pendiente.'
                                     : ' no las puedes decidir t\u00fa: siguen pendientes.');
+}
+
+/* ⛔⛔ 01/11 (Daniel, artifact [83777de2e0]): «que no deje cerrar el bloque sin marcar todas, por default todas a
+   "aceptar"… quitaria la opcion de sin marcar directamente, carece de sentido y es confusa». «Sin marcar» YA NO
+   EXISTE como estado de la fila: la decision de una sancion del bloque es la que trae el servidor o, si nadie la
+   toco, «aceptar» — que es lo que el servidor aplica igualmente (`_confirmarLote_`: `s.decision || 'aceptar'`).
+   Las DOS caras la ponen en la frontera con esta funcion; `_faltanPorMarcar_` queda de red por si llega una
+   decision que no es ninguna de las tres. */
+function _decDe_(s){
+  var d = s && (s.dec || s.decision);
+  return (d === 'aceptar' || d === 'justificar' || d === 'rechazar') ? d : 'aceptar';
 }
 
 function _faltanPorMarcar_(items){
@@ -3039,6 +3481,206 @@ function _armarTurno_(f){
 function _porQueNoSeProgramaTurno_(f){
   if (!f.fecha) return 'Ponle fecha al turno.';
   return _porQueNoSeConvoca_(f.cargos, Object.keys(f.sel || {}).length, f.coches);
+}
+
+/* ═══ «REDACTAR CON SOLARIA» AL PROGRAMAR UN TURNO · LAS DOS CARAS (02/11/2026) ═══════════════
+   🗣️ Daniel (01/11): «en el turno hay que hacer tal, tal, tal y tal. Pues solaría coge exactamente el formato de otros
+   turnos incluso coge referencias de turnos anteriores». Se cuenta en pocas palabras qué hay que hacer (`dialogoTexto`);
+   `redactarTurno` devuelve los objetivos, el texto con el formato de los turnos del Discord y los turnos parecidos que
+   ha tenido delante. SÓLO PROPONE: los objetivos caen en SUS cajas (editables) y el texto en una caja editable debajo; si
+   ya había objetivos escritos se pregunta antes de pisarlos (`dialogoSiNo`). Lo escribe `rutinas/redactar_turno.py`; la cara
+   sólo pinta. `ids` = {obj1, obj2, fuera} (los ids de las cajas de cada cara; `fuera` es donde cae la propuesta). */
+function _redactarTurnoDemo_(d){
+  return {ok: true, texto: '**TURNO (maqueta)**\n**Objetivos principales:**\n- ' + d, principales: [d], secundarios: [],
+          nota: 'Maqueta: sin SolarIA real.', citados: [{fecha: '2026-02-12', titulo: 'TURNO JUEVES 12/02/2026'}], sinEjemplos: false};
+}
+function _redactarTurnoPost_(d){
+  if(!_demoLocal_()) return api._post({action: 'redactarTurno', descripcion: d});
+  return new Promise(function(ok){ setTimeout(function(){ ok(_redactarTurnoDemo_(d)); }, 500); });
+}
+/* La configuración de «✨ Redactar con SolarIA» del turno (`pre` = 'tu' en el escritorio, 'pt' en el móvil): el MECANISMO ÚNICO de `_solIAHTML_`.
+   Los objetivos caen en SUS cajas (`<pre>Obj1`, `<pre>Obj2`, las que viajan al convocar); «Usar esto» las rellena y «Volver al original» deja lo
+   que había. El texto con el formato del Discord es una VISTA PREVIA de sólo lectura (nadie lo lee: lo editable son los objetivos). */
+function _solTurnoCfg_(pre){
+  var q = function(x){ return document.querySelector('#'+pre+x); }, v = function(x){ var e = q(x); return e ? e.value : ''; };
+  return {ta: '#'+pre+'Obj1', boton: 'Redactar con SolarIA',
+    pregunta: function(){ return dialogoTexto('Cuenta en pocas palabras qué hay que hacer en el turno', {si: 'Redactar', no: 'Cancelar'}); },
+    pedir: function(d){ return api.redactarTurno(String(d).trim()); },
+    leer: function(){ return {p: v('Obj1'), s: v('Obj2')}; },
+    escribe: function(que, s){
+      var d = que === 'prop' ? {p: ((s.extra && s.extra.principales) || []).join('\n'), s: ((s.extra && s.extra.secundarios) || []).join('\n')} : s.orig;
+      if(q('Obj1')) q('Obj1').value = d.p;
+      if(q('Obj2')) q('Obj2').value = d.s;
+    },
+    pie: function(s){
+      var r = s.extra || {}, cit = (r.citados || []).map(function(c){ return '<b>'+esc(c.titulo || c.fecha || '')+'</b>'; });
+      return '<p class="rnota" data-solturno-citas style="margin:6px 0 0">'+
+        (r.sinEjemplos ? 'No hay turnos anteriores guardados: SolarIA ha escrito sin formato de referencia.'
+         : cit.length ? 'Se ha fijado en: '+cit.join(' · ')+'.'
+         : 'Ningún turno anterior se parece a lo que cuentas: ha seguido el formato de los últimos.')+'</p>';
+    }};
+}
+
+/* ═══ «REDACTAR CON SOLARIA» LA JUSTIFICACIÓN DEL PARTE · LAS DOS CARAS (02/11/2026) ═══════════
+   🗣️ Daniel (02/11): «muchos clics o mucho escribir […] que podría resumirse». La persona escribe notas sueltas en la MISMA caja
+   de la justificación («lijado tramo 2 con hugo, taller»); «✨ Redactar con SolarIA» (`redactarParte`, `rutinas/redactar_parte.py`)
+   devuelve una justificación SÓLO con lo que dijo, como PROPUESTA: se enseña debajo con «Usar esto» / «Descartar» y, ya usada,
+   «Volver al original». Nada se escribe hasta que se pulsa «Usar esto»; enviar el parte sigue siendo cosa de la persona.
+   Los tres caminos (fichar la salida, bloque declarado, fichaje sin declarar) comparten caja y por tanto esto. `pre` = el id del
+   textarea (`fJust` en el móvil; `fichaJust` y `bqJust` en el escritorio). La barra es SIN ESTADO PROPIO de validez: una propuesta
+   sólo se enseña mientras la caja diga lo mismo que cuando se pidió (si se edita, desaparece). */
+function _redactarParteDemo_(d){
+  var n = String(d.notas || '').trim();
+  return {ok: true, texto: n.charAt(0).toUpperCase() + n.slice(1).replace(/[.\s]*$/, '') + '. (maqueta)', nota: 'Maqueta: sin SolarIA real.'};
+}
+function _redactarPartePost_(d){
+  if(!_demoLocal_()) return api._post({action: 'redactarParte', notas: d.notas, tarea: d.tarea, tareaCuerpo: d.tareaCuerpo,
+    categoria: d.categoria, fecha: d.fecha, horas: d.horas, declararId: d.declararId});
+  return new Promise(function(ok){ setTimeout(function(){ ok(_redactarParteDemo_(d)); }, 500); });
+}
+/* El contexto que viaja con las notas: la tarea imputada (título y cuerpo si lo trae), categoría, fecha y horas del formulario. */
+function _parteCtxIA_(f, horas){
+  var t = f.cat === 'tareas' ? (f.tarea === '__otro__' ? f.detalle : f.tarea) : f.detalle, cuerpo = '', i;
+  if(f.cat === 'tareas' && f.tarea && f.tarea !== '__otro__' && typeof TAREAS !== 'undefined')
+    for(i = 0; i < TAREAS.length; i++) if(TAREAS[i] && TAREAS[i].n === f.tarea && TAREAS[i].cuerpo){ cuerpo = String(TAREAS[i].cuerpo).slice(0, 1500); break; }
+  return {notas: String(f.just || ''), tarea: String(t || ''), tareaCuerpo: cuerpo, categoria: f.cat || '', fecha: String(f.fecha || ''),
+          horas: horas > 0 ? horas : null, declararId: f.declararId == null ? null : f.declararId};
+}
+/* La configuración de «✨ Redactar con SolarIA» de la justificación (`pre` = el id de la caja; `f` = el formulario vivo; `horas()` = las del parte
+   en este camino). El MECANISMO ÚNICO de `_solIAHTML_`, con `valor`: una propuesta sólo vale mientras la caja diga lo mismo que cuando se pidió. */
+function _solParteCfg_(pre, f, horas){
+  return {ta: '#'+pre, boton: 'Redactar con SolarIA', sigue: 'Tu texto sigue como estaba.', valor: function(){ return f.just; },
+    pedir: function(notas){ var d = _parteCtxIA_(f, horas()); d.notas = notas; return api.redactarParte(d); }};
+}
+/* ═══ «RESUMIR CON SOLARIA» AL FINALIZAR UNA REUNIÓN y «REDACTAR CON SOLARIA» EL MOTIVO DE UN DOCUMENTO · LAS DOS CARAS (02/11/2026) ═══
+   🗣️ Daniel (02/11): «procesos que tomen muchos clics y que sean coñazo […] muchos clics o mucho escribir […] que podría
+   resumirse». Los dos escriben en una caja que YA existe (`#blqResumen`; `#dMot` en el móvil y `[data-motivo]` en el escritorio) y
+   comparten el mismo mecanismo: lo que la persona lleva escrito en la caja es lo que cuenta («lo de las aletas queda para el
+   jueves»; «portada y unidades de las tablas»), SolarIA devuelve una PROPUESTA y la barra deja usar / descartar / volver al
+   original. Nada se aplica solo. Lo escriben `rutinas/resumir_reunion.py` y `rutinas/redactar_motivo.py`; la
+   cara sólo pinta. `SOLP[clave]` = null · {fase:'pensando'} · {fase:'propuesta', prop, nota} · {fase:'usada', orig, prop, nota} ·
+   {fase:'error', msg}; `SOLCFG[clave]` = {ta (selector de la caja), boton, antes(texto) → aviso | '', pedir(texto) → promesa}.
+   Un solo `click` en el documento (`_solClic_`, enganchado por cada cara) vale para los dos y sobrevive a los repintados. */
+var SOLP = {}, SOLCFG = {}, _SOL_N_ = 0;
+/* Opciones de `cfg` (todas menos `ta` y `pedir` son opcionales; hay UN solo mecanismo y las cuatro «propuestas de SolarIA» de la app lo usan):
+   `quita` (rótulo de descartar; «Descartar»), `nota0` (nota si SolarIA no dice nada), `sigue` (cola del error), `sinCaja` (no enseña la propuesta
+   en su caja: la pinta la pantalla), `pie(s)` (html bajo la propuesta), `max` (tope del texto), `noIgual` (aviso si SolarIA devuelve lo mismo),
+   `sinSesion` (no exige sesión: la maqueta de `?demo` contesta, y fuera de ella la propia petición falla y se dice),
+   `repinta()` (repintar la pantalla entera en vez de sólo la barra), `pregunta()` → promesa de lo que se le pide (si no, lo escrito en la caja),
+   `leer()` / `escribe('prop'|'orig', s)` (cuando lo que se aplica son DOS cajas) y `valor()`: el texto vivo de la caja. Con `valor`, el botón
+   se apaga si no hay texto, una propuesta sólo vale mientras la caja diga lo mismo que cuando se pidió (si se edita, se va) y una respuesta que
+   llega con la caja ya cambiada se descarta. */
+function _solFresca_(s, v){ return s.fase === 'error' || String(v == null ? '' : v) === (s.fase === 'usada' ? s.prop : s.orig); }
+function _solBarraHTML_(k){
+  var s = SOLP[k], c = SOLCFG[k] || {}, bt = function(a, t, pri){ return '<button type="button" class="btn sm'+(pri ? ' pri' : '')+'" '+a+'="'+esc(k)+'">'+t+'</button>'; };
+  if(!s) return '';
+  if(s.fase !== 'pensando' && c.valor && !_solFresca_(s, c.valor())) return '';
+  if(s.fase === 'pensando') return '<div class="nota" style="border:0;padding:4px 0">SolarIA está escribiendo… (unos 20 s)</div>';
+  if(s.fase === 'propuesta')
+    return '<div class="nota" style="border:0;padding:4px 0">'+esc(s.nota || c.nota0 || 'Revísalo antes de usarlo.')+'</div>'+
+      (c.sinCaja ? '' : '<div data-solprop style="white-space:pre-wrap;margin:4px 0 8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#0A0909;color:var(--ink2);font-size:13px;line-height:1.5">'+esc(s.prop)+'</div>')+
+      (c.pie ? c.pie(s) : '')+
+      '<div class="nt-fila" style="margin-bottom:6px">'+bt('data-solusa', 'Usar esto', true)+bt('data-solquita', c.quita || 'Descartar')+'</div>';
+  if(s.fase === 'usada')
+    return '<div class="nota" style="border:0;padding:4px 0">Propuesta aplicada. '+bt('data-soldeshace', 'Volver al original')+'</div>';
+  return '<div class="nota dn" data-solerr style="border:0;padding:4px 0">'+esc(s.msg)+' '+(c.sigue || 'Lo tuyo sigue como estaba.')+'</div>';
+}
+function _solBotonTxt_(k){ var c = SOLCFG[k]; return (SOLP[k] && SOLP[k].fase === 'pensando') ? 'SolarIA está escribiendo…' : '✨ '+(c ? c.boton : ''); }
+function _solSinPedir_(k){ var c = SOLCFG[k]; return !!(SOLP[k] && SOLP[k].fase === 'pensando') || !!(c && c.valor && !String(c.valor() == null ? '' : c.valor()).trim()); }
+/* El botón y, aparte, su barra; los dos registran la configuración de la caja. `cfg` = {ta, boton, pedir, …}. `cls`/`id`: para la pantalla que
+   lo pone en su propia barra de herramientas (Nueva tarea). */
+function _solBotonHTML_(k, cfg, cls, id){
+  SOLCFG[k] = cfg;
+  return '<button type="button" class="btn sm'+(cls ? ' '+cls : '')+'"'+(id ? ' id="'+id+'"' : '')+' data-solpide="'+esc(k)+'"'+(_solSinPedir_(k) ? ' disabled' : '')+'>'+_solBotonTxt_(k)+'</button>';
+}
+function _solZonaHTML_(k){ return '<div data-solbarra="'+esc(k)+'">'+_solBarraHTML_(k)+'</div>'; }
+function _solIAHTML_(k, cfg){ return '<div class="sol-ia" style="margin:6px 0 10px">'+_solBotonHTML_(k, cfg)+_solZonaHTML_(k)+'</div>'; }
+/* `suave`: sólo la barra y el botón (al teclear no se repinta la pantalla: se perdería el foco). */
+function _solPintar_(k, suave){
+  var c = SOLCFG[k], b = document.querySelector('[data-solpide="'+k+'"]'), z = document.querySelector('[data-solbarra="'+k+'"]');
+  if(c && c.repinta && !suave){ c.repinta(); return; }
+  if(b){ b.disabled = _solSinPedir_(k); b.textContent = _solBotonTxt_(k); }
+  if(z) z.innerHTML = _solBarraHTML_(k);
+}
+function _solPone_(ta, v){ ta.value = v; ta.dispatchEvent(new Event('input', {bubbles: true})); }
+async function _solPedir_(k){
+  var c = SOLCFG[k], ta = c && document.querySelector(c.ta), s = SOLP[k];
+  if(!c || !ta || (s && s.fase === 'pensando')) return;
+  var base = c.valor ? String(c.valor() == null ? '' : c.valor()) : (s && s.fase === 'usada') ? s.orig : ta.value;   // con `valor`, lo que dice la caja; si no, ya aplicada: se vuelve a pedir sobre LO QUE ESCRIBIÓ la persona, no sobre el resumen
+  var aviso = c.antes ? c.antes(base) : '';
+  if(aviso){ tost(aviso); return; }
+  if(c.pregunta){ base = await c.pregunta(); if(!String(base == null ? '' : base).trim()) return; }
+  else if(c.valor && !String(base == null ? '' : base).trim()) return;
+  if(!c.sinSesion && (!backendOK || !SESION)){ tost('SolarIA necesita conexión con el servidor. Escríbelo a mano.'); return; }
+  var n = ++_SOL_N_, r, vigente = function(){ return SOLP[k] && SOLP[k].n === n; };
+  SOLP[k] = {fase: 'pensando', n: n}; _solPintar_(k);
+  try{ r = await c.pedir(base); }
+  catch(e){ if(vigente()){ SOLP[k] = {fase: 'error', msg: 'SolarIA no ha podido: '+((e && e.message) || e)+'.'}; _solPintar_(k); } return; }
+  if(!vigente()) return;
+  if(c.valor && String(c.valor() == null ? '' : c.valor()) !== base){ delete SOLP[k]; _solPintar_(k); return; }   // la caja cambió mientras pensaba
+  if(!r || r.ok === false || !r.texto) SOLP[k] = {fase: 'error', msg: 'SolarIA no ha podido'+(r && r.motivo ? ': '+r.motivo : '')+'.'};
+  else if(c.noIgual && String(r.texto).trim() === String(base).trim()) SOLP[k] = {fase: 'error', msg: c.noIgual};
+  else SOLP[k] = {fase: 'propuesta', prop: c.max ? String(r.texto).slice(0, c.max) : String(r.texto), nota: r.nota || '', orig: c.valor ? base : undefined, extra: r};
+  _solPintar_(k);
+}
+function _solClic_(ev){
+  var t = ev && ev.target && ev.target.closest ? ev.target : null, b = t && t.closest('[data-solpide],[data-solusa],[data-solquita],[data-soldeshace]');
+  if(!b) return;
+  var a = b.hasAttribute('data-solpide') ? 'solpide' : b.hasAttribute('data-solusa') ? 'solusa' : b.hasAttribute('data-solquita') ? 'solquita' : 'soldeshace';
+  var k = b.getAttribute('data-'+a), c = SOLCFG[k], ta = c && document.querySelector(c.ta), s = SOLP[k];
+  if(a === 'solpide'){ _solPedir_(k); return; }
+  if(a === 'solquita'){ delete SOLP[k]; _solPintar_(k); return; }
+  if(!ta || !s) return;
+  if(a === 'solusa' && s.fase === 'propuesta'){
+    SOLP[k] = {fase: 'usada', orig: c.leer ? c.leer() : ta.value, prop: s.prop, nota: s.nota, extra: s.extra};
+    if(c.escribe) c.escribe('prop', SOLP[k]); else _solPone_(ta, s.prop);
+    _solPintar_(k);
+  }
+  else if(a === 'soldeshace' && s.fase === 'usada'){ if(c.escribe) c.escribe('orig', s); else _solPone_(ta, s.orig); delete SOLP[k]; _solPintar_(k); }
+}
+/* Teclear en una caja con `valor`: suelta la propuesta / el aviso que ya no son de este texto y enciende o apaga el botón. UN `input` en el documento. */
+function _solInput_(ev){
+  var t = ev && ev.target, k, c, s;
+  if(!t || !t.matches) return;
+  for(k in SOLCFG){
+    c = SOLCFG[k];
+    if(!c.valor || !t.matches(c.ta)) continue;
+    s = SOLP[k];
+    if(s && s.fase !== 'pensando' && (s.fase === 'error' || !_solFresca_(s, t.value))) delete SOLP[k];
+    _solPintar_(k, true);
+  }
+}
+function _resumirReunionDemo_(frase){
+  return {ok: true, nota: 'Maqueta: sin SolarIA real.', texto: 'Reunión (maqueta). 2 participantes: Ana, Luis.\n'+
+    (String(frase || '').trim() ? '- Punto 1: '+String(frase).trim().slice(0, 80)+'\n' : '')+'Solo en el orden del día, sin nada anotado: Ruegos y preguntas.'};
+}
+function _resumirReunionPost_(id, frase, parts, dur){
+  if(!_demoLocal_()) return api._post({action: 'resumirReunion', id: id, frase: frase, participantes: parts, duracion: dur});
+  return new Promise(function(ok){ setTimeout(function(){ ok(_resumirReunionDemo_(frase)); }, 500); });
+}
+function _redactarMotivoDemo_(texto){
+  return {ok: true, nota: 'Maqueta: sin SolarIA real.',
+          texto: String(texto || '').split(/,| y /).map(function(x){ return x.trim(); }).filter(Boolean).map(function(x){ return '- Revisa: '+x; }).join('\n')};
+}
+function _redactarMotivoPost_(id, ref, texto){
+  if(!_demoLocal_()) return api._post({action: 'redactarMotivo', id: id, ref: ref || undefined, texto: texto});
+  return new Promise(function(ok){ setTimeout(function(){ ok(_redactarMotivoDemo_(texto)); }, 500); });
+}
+/* El resumen de la reunión (`#blqResumen` de `_bloqueFormHTML_`). Los minutos: el cronómetro si está en curso; si se declara, de
+   la hora de inicio a la de fin. Los participantes y el orden del día los cruza el servidor con su roster y su almacén. */
+function _solResumenCfg_(B){
+  return {ta: '#blqResumen', boton: 'Resumir con SolarIA', antes: null,
+    pedir: function(frase){
+      var min = B.en_curso ? Math.round((Date.now()-Date.parse(B.en_curso.ini))/60000)
+                           : (B.fecha && B.ini && B.fin ? Math.round(_bloqueDurH_(B.fecha, B.ini, B.fin)*60) : 0);
+      return api.resumirReunion(B.reunion_id, frase, B.parts.map(function(p){ return p.nombre; }), min > 0 ? min : undefined);
+    }};
+}
+/* El motivo de cambios / rechazo de un expediente. `ta` = el selector de SU caja (en el escritorio hay varias fichas a la vez). */
+function _solMotivoCfg_(e, ta){
+  return {ta: ta, boton: 'Redactar con SolarIA',
+    antes: function(v){ return String(v || '').trim() ? '' : 'Escribe en pocas palabras qué hay que cambiar y SolarIA lo redacta.'; },
+    pedir: function(texto){ return api.redactarMotivo(e.id, e.ref, texto); }};
 }
 
 function _periodoParte_(p){
@@ -3471,10 +4113,16 @@ function _cargoTxt_(m){
   return m.cargo || 'Miembro';
 }
 
-/* La subcoordinacion de alguien, o `null`. */
+/* La subcoordinacion de alguien, o `null`. 02/11: sale del ROSTER (`DATA.miembros`: `subcoordina` y `subequipo`), ya no de una
+   tabla escrita a mano en cada cara. Quien subcoordina y no esta de baja; su gente, los de su misma `unidad` con ese
+   `subequipo`. Gemela de `servidor.py:subcoord_de` y `_subcoordDeB_` (`Codigo.gs`). */
 function _subcoordDe_(n){
-  for (var i=0;i<SUBCOORD.length;i++) if (SUBCOORD[i].quien === String(n)) return SUBCOORD[i];
-  return null;
+  var ms = (typeof DATA !== 'undefined' && DATA && DATA.miembros) || [], m = null, i;
+  for (i=0;i<ms.length;i++) if (ms[i] && ms[i].nombre === String(n)) { m = ms[i]; break; }
+  if (!m || !m.subcoordina || m.baja) return null;
+  var gente = [m.nombre];
+  for (i=0;i<ms.length;i++) if (ms[i] && ms[i].nombre !== m.nombre && ms[i].unidad === m.unidad && ms[i].subequipo === m.subcoordina && !ms[i].subcoordina) gente.push(ms[i].nombre);
+  return { unidad:m.unidad, equipo:m.subcoordina, quien:m.nombre, gente:gente };
 }
 
 function rangoSanc(nombre){
@@ -3526,6 +4174,13 @@ function puedeSancionarA(actor, objetivo){
   var sc = _subcoordDe_(String(actor));
   if (sc) return sc.gente.indexOf(String(objetivo)) >= 0;
   return false;
+}
+
+/* 02/11 · Daniel (artifact «Breixo y la firma de horas»): *«Sí, solo de su equipo»*. ¿Es `quien` subcoordinador de `nombre`? Los
+   partes y las horas de ese equipo los puede firmar y otorgar, por la MISMA puerta que las sanciones (`puedeSancionarA`, que
+   ya lo acota a su equipo): no se escribe otro criterio. Gemela de `_puede_otorgar_a` del servidor. */
+function esSubcoordDe(quien, nombre){
+  return rangoNom(quien)>=1 && !!_subcoordDe_(quien) && puedeSancionarA(quien, nombre);
 }
 
 /* A quien puede sancionar, ya filtrado. Lo usan los dos formularios: que la lista salga de
@@ -3627,9 +4282,20 @@ function elegirPersonasPoner(id, marcadas, universo){
 
 function _pselCuerpo_(id){
   return '<div class="psel-fila" data-psel-marc="'+esc(id)+'">'+_pselMarcadasHTML_(id)+'</div>'+
-    '<div class="psel-campo"><input data-psel-in="'+esc(id)+'" placeholder="Escribe un nombre…" autocomplete="off">'+
-      '<button type="button" class="psel-ver" data-psel-ver="'+esc(id)+'" data-p>Ver lista</button></div>'+
-    '<div class="psel-fila" data-psel-sug="'+esc(id)+'" style="margin:7px 0 0"></div>';
+    '<div class="psel-campo"><input data-psel-in="'+esc(id)+'" list="psel-dl-'+esc(id)+'" placeholder="Escribe un nombre…" autocomplete="off">'+
+      '<datalist id="psel-dl-'+esc(id)+'" data-psel-dl="'+esc(id)+'">'+_pselOpciones_(id)+'</datalist>'+
+      '<button type="button" class="psel-ver" data-psel-ver="'+esc(id)+'" data-p>Ver lista</button></div>';
+}
+
+/* ⛔ LOS NOMBRES EN LA BARRA DEL TECLADO (01/11, ficha «nombresteclado»). Daniel: «te aparecen los nombres justo encima del
+   teclado»: la lista propia bajo el campo la tapaba el teclado del móvil. El `<datalist>` la saca el NAVEGADOR en la barra de
+   sugerencias (y como desplegable en el escritorio) y se acota al escribir. Es la ÚNICA excepción a «nada de controles
+   nativos» (`probar_sin_nativos_caras.py`). Las opciones: el universo menos lo ya marcado (en multi), con la unidad de rótulo. */
+function _pselOpciones_(id){
+  var S=PSEL[id]; if(!S) return '';
+  return S.universo.filter(function(n){ return !(S.multi && S.marcadas.indexOf(n)>=0); }).map(function(n){
+    var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0] || {};
+    return '<option value="'+esc(n)+'"'+(m.unidad?' label="'+esc(m.unidad)+'"':'')+'></option>'; }).join('');
 }
 
 function _pselMarcadasHTML_(id){
@@ -3654,13 +4320,11 @@ function _pselSugerencias_(id, q){
   return hits.slice(0,8);
 }
 
-/* Repinta los chips y las sugerencias SIN tocar el campo: repintarlo entero es lo que le quita el foco al teclear. */
+/* Repinta los chips y las opciones del datalist SIN tocar el campo: repintarlo entero es lo que le quita el foco al teclear. */
 function _pselPintar_(id){
   var S=PSEL[id], raiz=document.getElementById('psel-'+id); if(!S || !raiz) return;
   var f=raiz.querySelector('[data-psel-marc]'); if(f) f.innerHTML=_pselMarcadasHTML_(id);
-  var inp=raiz.querySelector('[data-psel-in]'), sg=raiz.querySelector('[data-psel-sug]');
-  if(sg){ sg.innerHTML=_pselSugerencias_(id, inp?inp.value:'').map(function(n){
-    return '<span class="psel-c" data-psel-s="'+esc(n)+'" data-p>'+esc(n)+'</span>'; }).join(''); }
+  var dl=raiz.querySelector('[data-psel-dl]'); if(dl) dl.innerHTML=_pselOpciones_(id);
 }
 
 /* Marca o desmarca una persona: la única puerta por donde cambia `marcadas`. */
@@ -3687,26 +4351,45 @@ function _pselAlternar_(id, n, forzar){
    del `.psel` más cercano: meter el HTML de `elegirPersonas` donde sea basta. */
 function _pselDeleg_(){
   if(window._pselListo) return; window._pselListo=true;
+  /* Esc cierra lo de encima (01/11, rompeesc): «Ver lista» y los diálogos sí/no/texto sólo se cerraban tocando fuera, y
+     con el teclado en la mano había que soltarlo para coger el ratón. Es el MISMO gesto que tocar fuera —`ov.onclick` con
+     `target===ov`—, así que cada uno cierra a su manera (el diálogo contesta «no»/`null`). Cierra sólo el último abierto.
+     Aquí y no a nivel superior: los oyentes de este fichero se cablean UNA vez, cuando ya puede haber un `.psel-ov`. */
+  document.addEventListener('keydown', function(e){
+    if(e.key!=='Escape') return;
+    var ovs=document.querySelectorAll('.psel-ov'); if(!ovs.length) return;
+    ovs[ovs.length-1].click();
+  });
   var idDe=function(el){ var r=el.closest('.psel'); return r ? r.id.slice(5) : null; };
   document.addEventListener('click', function(ev){
     var t=ev.target && ev.target.closest ? ev.target : null; if(!t) return;
-    var b=t.closest('[data-psel-s],[data-psel-q],[data-psel-ver]'); if(!b) return;
+    var b=t.closest('[data-psel-q],[data-psel-ver]'); if(!b) return;
     var id=idDe(b); if(!id || !PSEL[id]) return;
     if(b.hasAttribute('data-psel-ver')){ personasVerLista(id); return; }
-    var inp=b.closest('.psel').querySelector('[data-psel-in]');
-    if(b.hasAttribute('data-psel-s')){ if(inp) inp.value=''; _pselAlternar_(id, b.getAttribute('data-psel-s'), true); if(inp) inp.focus(); return; }
     _pselAlternar_(id, b.getAttribute('data-psel-q'), false);
   });
-  document.addEventListener('input', function(ev){
+  /* Elegir un nombre de la barra del teclado deja el nombre ENTERO en el campo (`insertReplacementText`): se añade como tarjeta
+     y el campo se vacía. Tecleándolo a mano (`insertText`) sólo si no es prefijo de OTRO («Ana García» de «Ana García López»,
+     que se añadiría la primera antes de acabar); ahí vale `change` (al salir del campo) o Enter. Borrar nunca añade. */
+  var alElegir=function(ev){
     var t=ev.target; if(!t || !t.hasAttribute || !t.hasAttribute('data-psel-in')) return;
-    var id=idDe(t); if(id && PSEL[id]) _pselPintar_(id);
-  });
+    var id=idDe(t); if(!id || !PSEL[id]) return;
+    var tipo=ev.type==='input' ? (ev.inputType||'') : '';
+    if(/^delete/.test(tipo)) return;
+    var v=t.value.trim(), S=PSEL[id], libre=function(n){ return !(S.multi && S.marcadas.indexOf(n)>=0); };
+    if(S.universo.indexOf(v)<0 || !libre(v)) return;
+    if(/^insert(Text|CompositionText|FromPaste)/.test(tipo) && S.universo.some(function(n){ return n!==v && libre(n) && n.indexOf(v)===0; })) return;
+    t.value=''; _pselAlternar_(id, v, true);
+  };
+  document.addEventListener('input', alElegir);
+  document.addEventListener('change', alElegir);
   /* Enter añade la primera sugerencia: escribir «ana» y Enter es lo más rápido que hay. */
   document.addEventListener('keydown', function(ev){
     var t=ev.target; if(ev.key!=='Enter' || !t || !t.hasAttribute || !t.hasAttribute('data-psel-in')) return;
     var id=idDe(t); if(!id || !PSEL[id]) return;
     ev.preventDefault();
-    var h=_pselSugerencias_(id, t.value);
+    var h=_pselSugerencias_(id, t.value), ex=h.indexOf(t.value.trim());
+    if(ex>0) h=[h[ex]];
     if(h.length){ t.value=''; _pselAlternar_(id, h[0], true); }
   });
 }
@@ -3739,23 +4422,117 @@ function personasVerLista(id){
   document.body.appendChild(ov);
 }
 
-/* Diálogo de sí/no PROPIO de la app (nada de `confirm()` nativo, que en el móvil es una ventana del navegador que no
-   se parece a nada). Devuelve una promesa de true/false. */
+/* Diálogo de sí/no PROPIO de la app (nada de `confirm()` ni `prompt()` nativos, que en el móvil son ventanas del navegador
+   que no se parecen a nada). Devuelve una promesa de true/false; con `o.campo`, del texto escrito o `null`. */
 function dialogoSiNo(texto, o){
   o=o||{}; _pselCss_();
   return new Promise(function(res){
     var ov=document.createElement('div'); ov.className='psel-ov'; ov.setAttribute('data-dlg','1');
-    ov.style.alignItems='center';
+    ov.style.alignItems='center'; ov.style.justifyContent='center';   /* 01/11: a ≥900 px `.psel-ov` es el cajón de la derecha; un sí/no va en medio */
     ov.innerHTML='<div class="psel-hoja" role="alertdialog" style="width:min(340px,92%);height:auto;max-height:none;border-radius:16px;border-width:1px">'+
-      '<p style="margin:0 0 14px;font-size:15px;line-height:1.45">'+esc(texto)+'</p>'+
+      '<p style="margin:0 0 14px;font-size:15px;line-height:1.45;white-space:pre-line">'+esc(texto)+'</p>'+
+      (o.campo ? '<input type="text"'+(o.modo ? ' inputmode="'+esc(o.modo)+'"' : '')+' data-dlg-txt style="width:100%;box-sizing:border-box;margin:-4px 0 14px;font-size:15px">' : '')+
       '<div style="display:flex;gap:8px"><button type="button" class="btn pri" data-dlg-si data-p style="flex:1">'+esc(o.si||'Sí')+'</button>'+
       '<button type="button" class="btn" data-dlg-no data-p style="flex:1">'+esc(o.no||'No')+'</button></div></div>';
+    /* con `campo` (dialogoTexto) el «sí» devuelve lo tecleado y el «no» `null`; sin él, true/false */
+    var inp=ov.querySelector('[data-dlg-txt]'), dice=function(){ return inp ? inp.value : true; }, nada=inp ? null : false;
     var fin=function(v){ ov.remove(); res(v); };
-    ov.onclick=function(e){ if(e.target===ov) fin(false); };
-    ov.querySelector('[data-dlg-si]').onclick=function(){ fin(true); };
-    ov.querySelector('[data-dlg-no]').onclick=function(){ fin(false); };
+    ov.onclick=function(e){ if(e.target===ov) fin(nada); };
+    ov.querySelector('[data-dlg-si]').onclick=function(){ fin(dice()); };
+    ov.querySelector('[data-dlg-no]').onclick=function(){ fin(nada); };
+    document.body.appendChild(ov);
+    if(inp){ inp.value=o.valor==null ? '' : String(o.valor);
+      inp.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); fin(dice()); } };
+      try{ inp.focus(); inp.select(); }catch(_){} }
+  });
+}
+
+/* Diálogo de PEDIR UN TEXTO (sustituye al `prompt()` nativo): el mismo `dialogoSiNo` con un campo. Promesa del texto tecleado,
+   o `null` si se cancela o se toca fuera (lo mismo que daba `prompt()`). `o`: `valor` (de partida), `si`/`no` (rótulos). */
+function dialogoTexto(texto, o){
+  return dialogoSiNo(texto, Object.assign({si:'Aceptar', no:'Cancelar', campo:true}, o||{}));
+}
+
+/* Diálogo de ELEGIR UNA entre varias, con chips (01/11, Daniel: «que no permita entregarlo sin marcar nada»). Nace
+   para la gravedad de un reporte en el escritorio, que la pedía tecleada. Sin nada marcado el botón no deja seguir
+   (`disabled`); promesa del valor elegido, o `null` si se cancela o se toca fuera. `opciones`: lista de textos. */
+function dialogoElegir(texto, opciones, o){
+  o=o||{}; _pselCss_();
+  return new Promise(function(res){
+    var ov=document.createElement('div'); ov.className='psel-ov'; ov.setAttribute('data-dlg','1');
+    ov.style.justifyContent='center'; ov.style.alignItems='center';
+    var sel=null;
+    ov.innerHTML='<div class="psel-hoja" role="alertdialog" style="width:min(340px,92%);height:auto;max-height:none;border-radius:16px;border-width:1px">'+
+      '<p style="margin:0 0 12px;white-space:pre-line;font-size:15px;line-height:1.45">'+esc(texto)+'</p>'+
+      '<div class="psel-fila" style="margin-bottom:14px">'+(opciones||[]).map(function(t,i){
+        return '<span class="psel-c" data-dlg-op="'+i+'" data-p>'+esc(t)+'</span>'; }).join('')+'</div>'+
+      '<div style="display:flex;gap:8px"><button type="button" class="btn pri" data-dlg-si data-p disabled style="flex:1">'+esc(o.si||'Aceptar')+'</button>'+
+      '<button type="button" class="btn" data-dlg-no data-p style="flex:1">'+esc(o.no||'Cancelar')+'</button></div></div>';
+    var fin=function(v){ ov.remove(); res(v); }, si=ov.querySelector('[data-dlg-si]');
+    Array.prototype.forEach.call(ov.querySelectorAll('[data-dlg-op]'), function(b){
+      b.onclick=function(){ sel=opciones[Number(b.getAttribute('data-dlg-op'))];
+        Array.prototype.forEach.call(ov.querySelectorAll('[data-dlg-op]'), function(x){ x.classList.remove('on'); });
+        b.classList.add('on'); si.disabled=false; }; });
+    ov.onclick=function(e){ if(e.target===ov) fin(null); };
+    si.onclick=function(){ if(sel!=null) fin(sel); };
+    ov.querySelector('[data-dlg-no]').onclick=function(){ fin(null); };
     document.body.appendChild(ov);
   });
+}
+
+/* ══ 01/11 · EDITAR UNA REUNIÓN: SÓLO TÍTULO Y FECHA LÍMITE ═════════════════════════════════════════════════
+   🗣️ Daniel: *«Sólo título y fecha límite»* y, de la fecha, *«solo avisa si el primer aviso de la reunión para marcar
+   disponibilidad tendría que haber saltado en el pasado y por culpa del cambio te lo has "saltado"; si no, no tiene nada por
+   qué avisar»*. ⛔ QUIÉN avisa es el SERVIDOR (`servidor.aviso_plazo_saltado`): esto sólo enseña lo que contesta (`aviso`) y no
+   lleva una segunda copia de la regla. Con la reunión YA fijada el plazo no se toca (la disponibilidad está cerrada).
+   `dialogoEditarReunion` devuelve `{titulo?, limite?}` con SÓLO lo que cambió, o `null` si se cancela o no hay cambios. */
+var REU_TITULO_MAX=120;   // = `servidor.TITULO_REUNION_MAX`
+function dialogoEditarReunion(r){
+  _pselCss_();
+  return new Promise(function(res){
+    var tit0=String((r && (r.titulo||r.tit)) || ''), lim0=_normLimite_((r && r.limite && r.limite!=='sin límite') ? r.limite : ''),
+        fijada=!!(r && r.fijada), hoy=_hoyNxISO_(), f0=lim0.slice(0,10), h0=lim0.slice(11,16)||'23:59';
+    var ov=document.createElement('div'); ov.className='psel-ov'; ov.setAttribute('data-dlg','1'); ov.setAttribute('data-editreu','1');
+    ov.style.cssText='align-items:center;justify-content:center';
+    ov.innerHTML='<div class="psel-hoja" role="dialog" style="width:min(380px,94%);height:auto;max-height:92%;border-radius:16px;border-width:1px">'+
+      '<h3>Editar la reunión</h3>'+
+      '<span class="sc" style="display:block;margin:10px 0 4px">Título</span>'+
+      '<input type="text" data-edr-tit maxlength="'+REU_TITULO_MAX+'" style="width:100%;box-sizing:border-box;font-size:15px">'+
+      '<span class="sc" style="display:block;margin:12px 0 4px">Fecha límite</span>'+
+      (fijada ? '<p class="rnota" data-edr-fijada style="margin:0">La reunión ya está fijada: el plazo de disponibilidad no se cambia.</p>'
+              : nxFecha('edrLim', f0, {min:hoy})+'<span class="sc" style="display:block;margin:8px 0 4px">Hora del límite</span>'+nxHora('edrLimH', h0))+
+      '<div style="display:flex;gap:8px;margin-top:16px"><button type="button" class="btn pri" data-edr-ok data-p style="flex:1">Guardar</button>'+
+      '<button type="button" class="btn" data-edr-no data-p style="flex:1">Cancelar</button></div></div>';
+    var fin=function(v){ ov.remove(); res(v); };
+    ov.onclick=function(e){ if(e.target===ov) fin(null); };
+    ov.querySelector('[data-edr-no]').onclick=function(){ fin(null); };
+    ov.querySelector('[data-edr-ok]').onclick=function(){
+      var t=ov.querySelector('[data-edr-tit]').value.trim(), out={};
+      if(!t){ tost('El título no puede quedar vacío.'); return; }
+      if(t!==tit0) out.titulo=t;
+      if(!fijada){
+        var f=(document.getElementById('edrLim')||{}).value||'', h=(document.getElementById('edrLimH')||{}).value||'23:59';
+        if(!f){ tost('Elige la fecha límite.'); return; }
+        if(f+'T'+h!==(lim0.length>=16?lim0.slice(0,16):f0+'T23:59')) out.limite=f+' '+h;
+      }
+      fin(Object.keys(out).length ? out : null);
+    };
+    document.body.appendChild(ov);
+    var ti=ov.querySelector('[data-edr-tit]'); ti.value=tit0; try{ ti.focus(); }catch(_){}
+  });
+}
+
+/* El flujo entero: diálogo → `api.editarReunion` → `alCambiar({titulo, limite})` para que la cara ponga lo nuevo en SU copia
+   de la reunión → el aviso del servidor, fijo, si el cambio se salta el primer recordatorio. */
+async function editarReunionFlow(r, alCambiar){
+  if(typeof backendOK==='undefined' || !backendOK || typeof SESION==='undefined' || !SESION){
+    tost('Sin conexión no se puede guardar.'); return; }
+  var c=await dialogoEditarReunion(r); if(!c) return;
+  try{
+    var res=await api.editarReunion(r.id, c);
+    alCambiar({titulo:(res&&res.titulo)||c.titulo||'', limite:(res&&res.limite)||c.limite||''});
+    if(res && res.aviso) tost(res.aviso, {fijo:true}); else tost('Reunión actualizada.');
+  }catch(e){ tostErr('No se pudo guardar: ', e); }
 }
 
 /* EL ORDEN DE LOS SUBSISTEMAS, deducido y no escrito a mano: es el orden en que vienen los
@@ -4003,7 +4780,7 @@ function _etSancFila_(pts, origen, extra){
   if (_esPremioSanc_(o, extra))
     /* ⚠️ `nf2`, a 40 líneas de aquí en este mismo fichero: formatea decimales en es-ES
        (`nf2(0.5)` → «0,5»). Iba a escribir un `_hh_` nuevo — §5b lo caza. */
-    return 'premio' + (comp ? ' · +' + nf2(comp) + ' h' : '');
+    return (extra && extra.deshace ? 'premio deshecho' : 'premio') + (comp ? ' · ' + (comp < 0 ? '\u2212' : '+') + nf2(Math.abs(comp)) + ' h' : '');
   if (o === 'revocacion') return 'revocación · ' + _etPtsSanc_(_ptsSanc_(pts));
   return _etPtsSanc_(_ptsSanc_(pts));
 }
@@ -4026,6 +4803,7 @@ function _etSancFila_(pts, origen, extra){
    ⚠️ La tercera mira OTRAS filas del array, asi que es la que se cae al «simplificar». */
 function _puedeRevocarSanc_(s, arr){
   if (!s || s.estado !== 'aplicada') return false;     // solo la que ya quito puntos
+  if (!_puedeDeshacerDecisionSanc_(s)) return false;   // 02/11: lo que decidió el PD sólo lo revoca el PD
   if (s.origen === 'revocacion') return false;         // una revocacion no se revoca
   /* 21/10 (auditor 15, 🔴 2): ni un PREMIO — revocarlo no quita sus horas, desmarca la casilla de otra sancion y borra
      una falta del gradiente. Hasta que Daniel diga si se revoca y que hace, no se ofrece (el servidor tampoco lo acepta). */
@@ -4041,6 +4819,35 @@ function _puedeRevocarSanc_(s, arr){
     if (x && x.origen === 'revocacion' && x.extra
         && String(x.extra.revoca) === String(s.id) && x.estado !== 'rechazada') return false;
   }
+  return true;
+}
+
+/* 02/11 (Daniel: *«No: lo del PD solo lo deshace el PD»*; rangoresto): ¿llega MI rango al de quien decidió esta sanción? Es la ÚNICA
+   pregunta de cara para revocar (y para cualquier gesto que deshaga una decisión de sanción); lo del admin (`(admin)`, `app`) cuenta como del PD.
+   ⛔ Es de CARA, no seguridad: el servidor manda (`puede_deshacer_decision`). Sin rango de sesión o sin `decidido_por`, se ofrece y que decida él. */
+function _puedeDeshacerDecisionSanc_(s){
+  var por = s && s.decidido_por;
+  if (!por || typeof SESION === 'undefined' || !SESION || SESION.rango == null) return true;
+  /* 02/11 (refutador2, 8): quien ya NO esta en el roster (el sistema, un archivado) cuenta como el PD, igual que `(admin)`/`app`. Gemela de
+     `servidor.rango_de_quien_decidio` y `_rangoDeQuienDecidio_` (`Codigo.gs`). */
+  var ms = (typeof DATA !== 'undefined' && DATA && DATA.miembros) || [], fuera = ms.length > 0, i;
+  for (i=0;i<ms.length;i++) if (ms[i] && ms[i].nombre === por) { fuera = false; break; }
+  return Number(SESION.rango) >= ((por === '(admin)' || por === 'app' || fuera) ? 3 : rangoSanc(por));
+}
+
+/* ══ DESHACER UN PREMIO DE HORAS (02/11) ══════════════════════════════════════════════════════════════════════════
+   Daniel: *«Sí, solo el PD, y se restan las horas»*. Un premio APLICADO ya sumó sus horas a «Compensaciones» de Notion; el servidor
+   (`deshacerPremio`, sólo PD) escribe otro premio de signo contrario (`extra.deshace` = id del original, clave
+   `deshacer-premio-<id>`) y `aplicar.py` lo resta. Esta es la ÚNICA pregunta de «¿se ofrece deshacerlo?»; el rango (PD) lo pone quien
+   pinta, y el servidor manda. ⛔ Ni un premio sin aplicar (se rechaza en su bloque), ni uno que ya es un deshacer, ni uno ya deshecho
+   (la fila `deshacer-premio-<id>` o la marca `deshecho_at` del original). */
+function _puedeDeshacerPremio_(s, arr){
+  if (!s || s.estado !== 'aplicada' || !_esPremioSanc_(s.origen, s.extra)) return false;
+  if (s.deshecho_at || (s.extra && s.extra.deshace)) return false;
+  if (!(Number(s.extra && s.extra.compensacion) > 0)) return false;
+  var L = arr || [], i;
+  for (i = 0; i < L.length; i++)
+    if (L[i] && String(L[i].clave) === 'deshacer-premio-' + s.id) return false;
   return true;
 }
 
@@ -4083,7 +4890,7 @@ function _filaRevocacion_(s, texto){
 /* 31/10 (feosesc #21): el campo enseña el menos TIPOGRÁFICO («−1», lo pinta `_nxTxtNum_`); `_ptsPlanoSanc_` lo vuelve
    al guion antes de validar o comparar, por si llega escrito así. */
 function _ptsPlanoSanc_(v){ return String(v === null || v === undefined ? '' : v).replace(/−/g, '-'); }
-function _validaPuntosSanc_(crudo){
+function _validaPuntosSanc_(crudo, mot){
   var t = _ptsPlanoSanc_(crudo).replace(/^\s+|\s+$/g, '');
   if (t === '')
     return { ok:false, msg:'Pon los puntos: el campo está vacío.' };
@@ -4094,7 +4901,83 @@ function _validaPuntosSanc_(crudo){
     return { ok:false, msg:'Una sanción resta: pon 0 (aviso) o un número negativo.' };
   if (n < -5)
     return { ok:false, msg:'Lo máximo que quita una sanción del RRI son 5 puntos, y has puesto '+n+'.' };
+  /* 01/11 (artifact [61b5bd6cca], «mentir: eliges tú el número, de 2 a 5»): con un motivo de OPCIONES (30b: −1 o −2;
+     mentir: −2 a −5), el número tiene que ser una de ellas. El 0 (aviso) tampoco vale en mentir: sus opciones no lo traen. */
+  var op = _opcionesDeMotivo_(mot);
+  if (op && op.indexOf(n) < 0)
+    return { ok:false, msg:'Este motivo se pone con '+op.join(', ').replace(/-/g, '−')+' puntos: elige uno.' };
   return { ok:true, pts:n };
+}
+
+/* ══ EL CATÁLOGO DEL RRI, ENTERO (01/11, artifact [fafd3398e1]: «todo el catálogo, leído de datos/rri_motivos.json») ══
+   Las caras llevaban una copia REDUCIDA (`RRI_MOTIVOS`: 6 motivos, un punto fijo cada uno). El catálogo de verdad lo sirve el
+   servidor (`api.getMotivosRri`, que lee `datos/rri_motivos.json`: las caras no pueden) y aquí se vuelve a esa misma forma
+   de fila, `[clave, texto, puntos, opciones, artículo]`, para que todo lo que ya lee `RRI_MOTIVOS[i][0..2]` siga igual:
+     · clave   lo que viaja como `art` (el artículo: `30i`); `plazoUrg`/`plazo` (30b/30c) y `libre` son claves propias porque
+               arrastran tarea y fecha o texto libre; `mentir` también (su artículo es «30 (párr. final)», fila[4]).
+     · puntos  el fijo, o `null` si hay opciones o es libre (que no haya un número puesto solo: se ELIGE).
+     · opciones los valores entre los que elige quien sanciona (30b: −1 o −2; mentir: −2 a −5, «según la gravedad»).
+   Las SUMAS (Art. 31) no entran: esta pantalla pone sanciones. `min` (el mínimo de disponibilidad) tampoco: lo propone el
+   motor, no una persona. El catálogo del RRI no trae «no rellenar un formulario» (su cajón es el 29i) pero es lo que
+   cuenta la familia `formulario`: se queda como lo único local, al final. Sin servidor (o con Apps Script, que no lo
+   sabe) manda el respaldo que embarca cada HTML. */
+var RRI_MOTIVOS_VIVO = false, _rriPidiendoAt_ = 0;
+function _motivosDeCatalogo_(cat){
+  var R = (cat && cat.restas) || [], out = [], i, m, k, txt;
+  for (i = 0; i < R.length; i++){
+    m = R[i];
+    if (!m || !m.id || m.id === 'min') continue;
+    k = m.id === 'art30b' ? 'plazoUrg' : m.id === 'art30c' ? 'plazo' : m.libre ? 'libre'
+      : String(m.id).replace(/^art/, '');
+    txt = m.libre ? 'Otro · lo escribo yo' : m.texto;
+    out.push([k, txt, typeof m.puntos === 'number' ? m.puntos : (m.libre ? -1 : null),
+              m.opciones && m.opciones.length ? m.opciones.slice(0) : null,
+              m.id === 'mentir' ? (m.art || '30 (párr. final)') : null]);
+  }
+  return out;
+}
+/* Cambia el contenido DE LA MISMA lista (no la reasigna): el HTML la declara con `var` y hay lectores que la guardaron. */
+function _aplicarMotivosRri_(resp){
+  var cat = resp && (resp.restas ? resp : resp.motivos), filas = _motivosDeCatalogo_(cat), i;
+  if (!filas.length) return false;
+  for (i = 0; i < filas.length && filas[i][0] !== 'libre'; i++);
+  filas.splice(i, 0, ['29i', 'No rellenar un formulario obligatorio', -1, null, null]);
+  RRI_MOTIVOS.length = 0;
+  for (i = 0; i < filas.length; i++) RRI_MOTIVOS.push(filas[i]);
+  RRI_MOTIVOS_VIVO = true;
+  return true;
+}
+/* Pide el catálogo UNA vez (y, si falla, no antes de un minuto otra vez: el formulario se repinta mucho). `repintar` se
+   llama sólo si cambió algo. Sin `api.getMotivosRri` (otra cara, un banco) no hace nada. */
+function _aseguraMotivosRri_(repintar){
+  if (RRI_MOTIVOS_VIVO || typeof api === 'undefined' || typeof api.getMotivosRri !== 'function') return;
+  var ahora = new Date().getTime();
+  if (_rriPidiendoAt_ && ahora - _rriPidiendoAt_ < 60000) return;
+  _rriPidiendoAt_ = ahora;
+  Promise.resolve().then(function(){ return api.getMotivosRri(); })
+    .then(function(r){ if (_aplicarMotivosRri_(r) && repintar) repintar(); }, function(){ /* queda el respaldo */ });
+}
+/* Los valores entre los que se elige para ese motivo, o `null` si no hay opciones (fijo o libre). */
+function _opcionesDeMotivo_(mot){
+  var L = (typeof RRI_MOTIVOS !== 'undefined' && RRI_MOTIVOS) || [], i;
+  for (i = 0; i < L.length; i++)
+    if (L[i] && L[i][0] === mot) return L[i][3] && L[i][3].length ? L[i][3] : null;
+  return null;
+}
+/* El artículo que viaja con ese motivo: el suyo propio si lo trae (mentir: «30 (párr. final)»), si no, la clave. */
+function _articuloDeMotivo_(mot){
+  var L = (typeof RRI_MOTIVOS !== 'undefined' && RRI_MOTIVOS) || [], i;
+  for (i = 0; i < L.length; i++)
+    if (L[i] && L[i][0] === mot && L[i][4]) return L[i][4];
+  return mot;
+}
+/* El campo de puntos de «Poner una sanción», UNO para las dos caras: con opciones, a elegir (sin ninguna puesta de
+   antemano —«eliges tú el número cada vez»—); si no, el contador de siempre. */
+function _ptsCampoSancHTML_(){
+  var op = _opcionesDeMotivo_(SANC_FORM.motivo), cur = _ptsPlanoSanc_(SANC_FORM.pts);
+  if (op) return nxElige('snPts', op.map(function(o){ return [String(o), String(o).replace('-', '−')]; }),
+                         op.indexOf(parseInt(cur, 10)) >= 0 ? cur : '');
+  return nxNum('snPts', _ptsPrefillSanc_(), {min:-5, max:0});
 }
 
 /* Los puntos que el catalogo le pone a un articulo. `null` = «no lo se» -no un `-1` fabricado-,
@@ -4145,7 +5028,10 @@ function _quienCambiaSanc_(){
 function _motivoCambiaSanc_(){
   var e = (typeof $ === 'function') ? $('#snPts') : null;
   var v = e ? e.value : SANC_FORM.pts;
-  if (SANC_FORM.ptsPropuesto != null && _ptsPlanoSanc_(v) === _ptsPlanoSanc_(SANC_FORM.ptsPropuesto)) {
+  /* 01/11: si el campo eran CHIPS (un motivo con opciones: mentir −2…−5), lo que hay es una opción del motivo ANTERIOR, no un
+     número que la persona haya tecleado: no se arrastra al nuevo con pinta de elegido (un −3 de «mentir» puesto en un 30i). */
+  var _eraChips = !!(e && e.closest && e.closest('.nx-elige'));
+  if (_eraChips || (SANC_FORM.ptsPropuesto != null && _ptsPlanoSanc_(v) === _ptsPlanoSanc_(SANC_FORM.ptsPropuesto))) {
     SANC_FORM.pts = '';
     if (e) nxPon('snPts', '');
   }
@@ -4180,6 +5066,140 @@ function _atarSancForm_(){
       e.addEventListener('input', guardar);
       e.addEventListener('change', guardar);
     })($('#'+id), M[id]); }
+}
+
+/* ══ EL FORMULARIO «PONER UNA SANCIÓN», UNA SOLA VEZ (01/11, ficha «sancpares») ══════════════
+   `_ponerSancCuerpo_`/`_cablearPonerSanc_` (escritorio) y `_sancionesHTML_`/`_cablearSanciones_` (móvil) eran dos copias
+   de la MISMA regla —qué tareas se ofrecen, qué se valida, qué se manda, qué se lee de la respuesta— y ya habían
+   divergido: textos distintos para el mismo aviso, y el «plazo nuevo» con dos redacciones. Aquí vive lo común; cada cara
+   se queda con su markup y con lo que hace al terminar. */
+
+/* Lo que sabe el formulario de las tareas del sancionado: quién es, si hay que pedirlas (motivo de plazo), si se están
+   pidiendo, si hubo error y las que se pueden ofrecer. `alLlegar` repinta (cada cara el suyo). */
+function _sancTareasModelo_(alLlegar){
+  var esPlazo=(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg');
+  var tt=esPlazo ? _tareasDe_(SANC_FORM.quien, alLlegar) : [];
+  var fallo=!!(SANC_TAREAS && SANC_TAREAS.quien===SANC_FORM.quien && SANC_TAREAS.error);
+  return { esPlazo:esPlazo, quien:SANC_FORM.quien, error:fallo ? String(SANC_TAREAS.error) : '',
+    /* ⛔ `null` es «cargando» Y «no se pudo» (567.ª): cargando es lo que queda cuando NO hay error. */
+    cargando:(tt===null) && !fallo,
+    /* Sólo las VIVAS con enlace a Notion (sin `url` no se mueve la fecha), la misma pregunta que «Mis tareas»
+       (`_tareaHecha_`), y sólo las que TÚ puedes mover — el servidor rechaza el resto (26/10). */
+    tareas:(tt||[]).filter(function(t){
+      return t && t.url && !_tareaHecha_(t.e) && _puedeMoverPlazo_(t, _actorSanc_()); }) };
+}
+
+/* El bloque del motivo de plazo (tarea + plazo nuevo, o el aviso que toque). `K` es lo que cambia por cara:
+   `K.campo(etiqueta, interior)` envuelve un campo y `K.nota(html, aviso)` pinta una nota (`aviso` = en ámbar). */
+function _sancPlazoHTML_(m, K){
+  if(!m.esPlazo) return '';
+  var pila=esc(_pilaDeM_(m.quien)||m.quien);
+  if(!m.quien) return K.nota('Elige primero a quién sancionas: se ofrecen las suyas.');
+  if(m.cargando) return K.nota('Buscando las tareas de '+pila+'…');
+  if(m.tareas.length)
+    return K.campo('Qué tarea', nxElige('snTarea', m.tareas.map(function(t){
+        return [t.url, (t.n||t.nombre||'(sin título)')+
+          (t.l?(_venciaTarea_(t.l)?' · venció el ':' · vence el ')+(_plazoDMY_(t.l)||_isoADMY_(t.l)):'')]; }), SANC_FORM.tarea||''))+
+      K.campo('Plazo nuevo', nxFecha('snPlazo', SANC_FORM.plazo||'', {min:_hoyNxISO_()}))+
+      K.nota('El plazo nuevo se escribe en Notion; si falla, la sanción no se pone.');
+  /* ⛔ «NO SE PUDO LEER» NO ES «NO TIENE»: un corte de red se pintaba como «elige otro motivo». */
+  if(m.error)
+    return K.nota('No se pudieron leer las tareas de '+pila+': '+esc(m.error)+'.<br>'+
+      'Sin esa lista no sabemos si tiene plazos que mover (no quiere decir que no los tenga). Elígele otra vez para reintentar.', true);
+  return K.nota(pila+' no tiene ninguna tarea viva con enlace a Notion, así que no hay plazo que mover. '+
+    'Elige otro motivo.', true);
+}
+
+/* El selector «A quién» del formulario, igual en las dos caras: el universo sale de la MISMA regla que el permiso
+   (`personasDeAlcance`). `o.repintar` es la puerta de la cara; `o.colorOk` el color de su mensaje de confirmación; `o.alCambiar` lo que la cara hace además al elegir persona. */
+function _sancQuienHTML_(o){
+  /* 01/11 (rompeesc): quien salió del alcance al cambiar de persona («Actúas como», o la sesión) no se queda elegido: el chip
+     seguía y «Poner la sanción» iba a por alguien sobre quien ya no se manda. */
+  var uni=personasDeAlcance(_actorSanc_());
+  if(SANC_FORM.quien && uni.indexOf(SANC_FORM.quien)<0) SANC_FORM.quien='';
+  return elegirPersonas('snQuien', {universo:uni, multi:false, titulo:'A quién sancionar',
+    marcadas:SANC_FORM.quien?[SANC_FORM.quien]:[], vacio:o.vacio||'Escribe un nombre o pulsa «Ver lista».',
+    alCambiar:function(l){
+      SANC_FORM.quien=l[0]||'';
+      _quienCambiaSanc_();   /* 26/10 (A5b): con el 30g, los puntos son los del historial de ESTA persona */
+      if(o.alCambiar) o.alCambiar();   /* 01/11: la cara pinta lo suyo (el móvil, la frase de la escala del 30g) */
+      var b=$('#snMsg'); if(b && SANC_FORM.quien){ b.textContent='A '+(_pilaDeM_(SANC_FORM.quien)||SANC_FORM.quien)+'.'; b.style.color=o.colorOk||''; }
+      /* Con el motivo de plazo, cambiar de persona cambia LA LISTA DE TAREAS: hay que repintar. */
+      if(SANC_FORM.motivo==='plazo'||SANC_FORM.motivo==='plazoUrg'){ SANC_FORM.tarea=''; o.repintar(); }
+    }});
+}
+
+/* El cableado común: los campos se guardan al teclear (lo PRIMERO, antes de los `on*`), el motivo repinta y el plazo se guarda. */
+function _sancCablearCampos_(repintar){
+  _atarSancForm_();
+  var mo=$('#snMotivo'); if(mo) mo.onchange=function(){ _motivoCambiaSanc_(); repintar(); };
+  var pl=$('#snPlazo'); if(pl) pl.onchange=function(){ SANC_FORM.plazo=pl.value; };
+}
+
+/* ENVIAR la sanción del formulario. Devuelve `{ok:true, r, quien, esDePlazo, yaEstaba}` o `{ok:false}` (el motivo ya está
+   en `o.msg`). Las caras sólo deciden QUÉ HACEN DESPUÉS (`alExito`) — y si falla, `o.bt` se rehabilita aquí. */
+async function _enviarSancionForm_(o){
+  var val=function(id){ var e=$('#'+id); return e?e.value:''; };
+  var msg=o.msg, bt=o.bt;
+  /* ⛔ LOS PUNTOS, POR LA PUERTA (`_validaPuntosSanc_`): `parseInt` a pelo TRUNCA y `!(pts<=0)` deja pasar un -50. */
+  var quien=SANC_FORM.quien, mot=val('snMotivo'), _vp=_validaPuntosSanc_(val('snPts'), mot);
+  var esDePlazo=(mot==='plazo'||mot==='plazoUrg');
+  if(!quien){ msg('Elige a quién: pulsa un nombre de la lista.', true); return {ok:false}; }
+  if(personasDeAlcance(_actorSanc_()).indexOf(quien)<0){ msg('No mandas sobre '+(_pilaDeM_(quien)||quien)+': elige a alguien de tu lista.', true); return {ok:false}; }
+  if(!mot){ msg('Elige el motivo.', true); return {ok:false}; }
+  if(!_vp.ok){ msg(_vp.msg, true); return {ok:false}; }
+  var pts=_vp.pts, art=_articuloDeMotivo_(mot), texto='';
+  RRI_MOTIVOS.forEach(function(r){ if(r[0]===mot) texto=r[1]; });
+  if(mot==='libre'){
+    texto=(val('snLibre')||'').trim(); art=(val('snArt')||'libre').trim();
+    if(!texto){ msg('Escribe qué ha pasado.', true); return {ok:false}; }
+  }
+  var urlTarea='', plazo='';
+  if(esDePlazo){
+    urlTarea=val('snTarea'); plazo=val('snPlazo');
+    if(!urlTarea){ msg('Elige la tarea cuyo plazo se incumplió.', true); return {ok:false}; }
+    if(!plazo){ msg('Falta el plazo nuevo.', true); return {ok:false}; }
+    /* De la lista DEL SANCIONADO (`SANC_TAREAS`), no de `TAREAS`, que son las mías: lo que se pinta y lo que se guarda
+       salen del MISMO sitio (la sanción de José del 28/07 quedó en «una tarea»). */
+    var t=((SANC_TAREAS&&SANC_TAREAS.lista)||[]).filter(function(x){ return x.url===urlTarea; })[0];
+    texto='Incumplir el plazo de «'+((t&&(t.n||t.nombre))||'una tarea')+'»';
+    art=(mot==='plazoUrg') ? '30b' : '30c';   // el artículo REAL del RRI
+  }
+  if(typeof backendOK==='undefined' || !backendOK || !SESION){
+    msg('Sin conexión no se puede: esto escribe en la cola de verdad.', true); return {ok:false}; }
+  bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando…';
+  var _movido=false;
+  try{
+    /* EL ORDEN IMPORTA: primero Notion, luego la sanción. Al revés quedaría la sanción puesta y la tarea con la fecha
+       vieja, la única de las dos combinaciones malas que NO se ve mirando la cola. */
+    if(esDePlazo){ msg('Moviendo el plazo en Notion…'); await api.moverLimiteTarea(urlTarea, plazo); _movido=true; }
+    /* ⛔ UNA CLAVE POR ENVÍO, QUE NACE EN EL FORMULARIO y se ata a la HUELLA de lo que se manda: `api._post` reintenta
+       tres veces y si se pierde la RESPUESTA el servidor ya escribió. Fabricarla en la llamada no cubre el reintento a
+       mano; no renovarla al cambiar el destinatario deja la sanción a B sin existir (`probar_clave_parte.py`). No
+       deduplica por contenido: el éxito vacía `SANC_FORM`, así que dos sanciones idénticas seguidas llevan claves
+       distintas. */
+    var _huellaSanc = quien+'|'+texto+'|'+art+'|'+pts;
+    if(SANC_FORM.claveDe !== _huellaSanc){
+      SANC_FORM.clave = _claveUso_(); SANC_FORM.claveDe = _huellaSanc; }
+    var r = await api.pushSancion([{nombre:quien, motivo:texto, articulo:art, puntos:pts, origen:'manual', clave:SANC_FORM.clave}]);
+    /* ⛔ LA RESPUESTA SE LEE, las tres listas. El backend SALTA a quien no es tuyo (`rechazadas`), rechaza puntos
+       imposibles (`invalidas`) y marca lo que ya estaba (`duplicadas`: no es un error, se dice). Sin mirarlas el `tost`
+       cantaría una sanción que no existe — «se cuenta lo que entró, no lo que se mandó». */
+    if(r && r.rechazadas && r.rechazadas.length)
+      throw new Error('no puedes sancionar a '+r.rechazadas.join(', ')+': está fuera de tu jurisdicción');
+    if(r && r.invalidas && r.invalidas.length)
+      throw new Error('el servidor no acepta esos puntos ('+pts+'): el RRI va de -5 a +2, enteros');
+    var _yaEstaba = !!(r && r.duplicadas && r.duplicadas.length);
+    SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:''};
+    tost((_yaEstaba ? 'Esa sanción YA estaba puesta (era un reintento): a ' : 'Sanción puesta a ')+(_pilaDeM_(quien)||quien)+'.'+
+         (_yaEstaba ? '' : ' Se aplica en Notion y se avisa en Discord en unos minutos.')+(esDePlazo?' Plazo movido en Notion.':''));
+    return {ok:true, r:r, quien:quien, esDePlazo:esDePlazo, yaEstaba:_yaEstaba};
+  }catch(e){
+    bt.disabled=false; bt.textContent=prev;
+    /* 21/10 (auditor 12, 🟡 11): si el plazo YA se movió, se dice — y reintentar es seguro (misma fecha, misma clave). */
+    msg('No se pudo: '+((e&&e.message)||e)+(_movido ? ' — el plazo YA se movió en Notion; reintentar es seguro.' : ''), true);
+    return {ok:false};
+  }
 }
 
 function _mdHTML_(md){
@@ -4277,7 +5297,7 @@ function _novedadesHTML_(){
     : '<p class="rnota">El changelog no se selló en esta build. Está en '+
       '<span class="mono">docs/changelog.md</span> del repositorio.</p>';
   return '<div class="mtit">Novedades</div>'+
-    '<div class="msub">Qué ha cambiado en cada versión. Estás en '+
+    '<div class="msub">Estás en '+
       esc(VERSION?('v'+VERSION):(CANAL==='beta'?'la beta':'una build sin publicar'))+
       ' · <span class="mono">'+esc(BUILD)+'</span></div>'+
     cuerpo;
@@ -4319,15 +5339,15 @@ function _pulsoGateCargar_(repintar){
     .then(function(){ F.vuelo=false; F.t=Date.now(); if(typeof repintar==='function') repintar(); });
 }
 function _pulsoGateHTML_(p){
-  if(p===undefined || p===null) return '<p class="rnota" data-pulso="cargando">Preguntando al servidor cuándo pasó el motor por última vez…</p>';
-  if(p.error) return '<p class="rnota" data-pulso="error">⚠ No se pudo comprobar cuándo pasó el motor por última vez ('+esc(p.error)+').</p>';
+  if(p===undefined || p===null) return '<p class="rnota" data-pulso="cargando">Mirando cuándo pasó el motor por última vez…</p>';
+  if(p.error) return '<p class="rnota" data-pulso="error">⚠ No se pudo ver cuándo pasó el motor por última vez ('+esc(p.error)+').</p>';
   var m=p.minutos, mu=(typeof p.muerto_min==='number') ? p.muerto_min : 10, ca=p.cadencia_min||2;
-  if(m===null || m===undefined) return '<p class="rnota" data-pulso="nolose" style="color:var(--rojo,#E41E25)">⛔ El motor '+
-    '<b>no ha dejado constancia de ninguna pasada</b> en el mini PC: o no ha corrido nunca, o su estado no se lee.</p>';
+  if(m===null || m===undefined) return '<p class="rnota" data-pulso="nolose" style="color:var(--rojo,#E41E25)">⛔ No consta ninguna '+
+    'pasada del motor en el mini PC: o no ha corrido nunca, o no se puede leer.</p>';
   var cuando=(m<1) ? 'hace menos de 1 min' : ('hace '+m+' min');
-  if(m>mu) return '<p class="rnota" data-pulso="parado" style="color:var(--rojo,#E41E25)">⛔ <b>El motor lleva '+m+
-    ' min sin pasar</b> (toca cada '+ca+'): nadie cierra fichajes, caduca partes ni manda avisos mientras tanto.</p>';
-  return '<p class="rnota" data-pulso="vivo">✅ El motor pasó <b>'+cuando+'</b> (toca cada '+ca+' min).</p>';
+  if(m>mu) return '<p class="rnota" data-pulso="parado" style="color:var(--rojo,#E41E25)">⛔ El motor lleva '+m+
+    ' min sin pasar (toca cada '+ca+'). Mientras tanto no se cierran fichajes, no caducan partes ni salen avisos.</p>';
+  return '<p class="rnota" data-pulso="vivo">✅ El motor pasó '+cuando+' (toca cada '+ca+' min).</p>';
 }
 function _automatismosHTML_(){
   var tit='<div class="mtit">Automatismos</div>';
@@ -4345,11 +5365,11 @@ function _automatismosHTML_(){
   var m=String(A.generado||'').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   var h=tit+pul+(m
     ? (A.calculado
-      ? '<div class="msub" data-est="foto">Comprobado el <b>'+
-        m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>, con «Comprobarlo ahora».</div>'
-      : '<div class="msub" data-est="foto">Estado al publicar: <b>'+
-      m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'</b>.</div>')
-    : '<div class="msub" data-est="sinfecha"><b>Sin fecha</b>: puede no estar al día.</div>');
+      ? '<div class="msub" data-est="foto">Comprobado el '+
+        m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+', con «Comprobarlo ahora».</div>'
+      : '<div class="msub" data-est="foto">Estado al publicar: '+
+      m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5]+'.</div>')
+    : '<div class="msub" data-est="sinfecha">Sin fecha: puede no estar al día.</div>');
   /* ⛔ EL BOTON DE COMPROBAR (765.a). Daniel (10/09): «darle a un boton y que checkee».
      ⛔⛔ NO COMPRUEBA LA APP, Y EL TEXTO LO DICE: el inventario se DERIVA del repo y el
      backend no tiene repo. Lo que hace el boton es levantar el flag `comprobar_automatismos`;
@@ -4359,10 +5379,18 @@ function _automatismosHTML_(){
      ⛔ 21/10 (auditor 7, 🟠 6): y por eso se pinta sólo donde existe su manejador; en el móvil era un botón muerto. */
   if(typeof _engComprobarAuto_==='function') h+='<p class="rnota" style="margin:10px 0 0">'+
     '<button class="btn sm" data-comprauto>Comprobarlo ahora</button> '+
-    '<span style="color:var(--ink3)">Se calcula en la siguiente pasada '+
-    '(<b>hasta 2 min</b>).</span></p>';
+    '<span style="color:var(--ink3)">Mira si cada automatismo sigue haciendo lo que promete. Tarda hasta 2 minutos.'+
+    '</span></p>';
   h+='<div class="mdoc"><h3>¿Hay algo desviado?</h3>';
   var c=A.comprobacion;
+  /* 01/11 (Daniel: «le di pero no sé qué hace»): el RESULTADO de la pasada en una línea, además de la lista. */
+  if(c instanceof Array && c.length){
+    var nd=0, nn=0;
+    for(var q=0;q<c.length;q++){ if(c[q].desviado===true) nd++; else if(c[q].desviado!==false) nn++; }
+    h+='<p data-est="resultado"><b>'+c.length+' comprobado'+(c.length===1?'':'s')+'</b> · '+
+      (nd ? '<b>'+nd+' desviado'+(nd===1?'':'s')+'</b>' : 'ninguno desviado')+
+      (nn ? ' · '+nn+' sin poder comprobar' : '')+'</p>';
+  }
   if(!(c instanceof Array) || !c.length){
     h+='<p data-est="sincomprobar">Al publicar no se corrió la comprobación: esta foto no dice si '+
        'hay algo desviado.</p>';
@@ -4384,7 +5412,7 @@ function _automatismosHTML_(){
     var fil=A[fams[k][0]];
     h+='<h3>'+fams[k][1]+'</h3>';
     if(!(fil instanceof Array)){
-      h+='<p data-fam="ilegible">⛔ <b>No se pudo leer.</b></p>';
+      h+='<p data-fam="ilegible">⛔ No se pudo leer.</p>';
       continue;
     }
     if(!fil.length){ h+='<p data-fam="vacia">(ninguno)</p>'; continue; }
@@ -4594,13 +5622,6 @@ function _sigueVisibleSinContar_(p, ahoraMs){
   }
   return true;
 }
-/* 31/10 (decisión «nada de desplegables nativos»): elegir entre pocas opciones = botones; la elegida, resaltada. Las dos caras de
-   «Declarar horas» (Categoría, Imputar a, Fichas como). `clase` es el botón de la cara ('btn sm' en el escritorio, 'btn mini' en el móvil). */
-function _chipsElegir_(attr, sel, ops, clase){
-  return '<span style="display:flex;gap:6px;flex-wrap:wrap">'+ops.map(function(o){
-    return '<button type="button" class="'+(clase||'btn sm')+(sel===o[0]?' pri':'')+'" '+attr+'="'+esc(o[0])+'">'+esc(o[1])+'</button>';
-  }).join('')+'</span>';
-}
 /* ⛔ 01/11 · LOS FICHAJES SIN DECLARAR, EN ORDEN Y SIN LOS CADUCADOS. 🗣️ Daniel: *«¿Por qué está el fichaje sin declarar más antiguo
    por encima del más reciente? […] no sé cuál es cuál […] no aparece para cuándo expiran, porque al mes deberían de desaparecer
    de aquí, porque si no es inútil»*. UNA regla para las dos caras (`lista` es la normalizada del móvil —`iso`, `caduca`, `e`— o la
@@ -4639,6 +5660,14 @@ function _fichajeEditado_(decl, f){
   return !!(decl && _horaHHMM_(decl.ini) && _horaHHMM_(decl.fin) && (f.ini!==decl.ini || f.fin!==decl.fin));
 }
 function _horaHHMM_(v){ return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v||'').trim()); }
+/* La hora TECLEADA, a HH:MM. El campo es `inputmode="numeric"` y ese teclado no tiene los dos puntos: «1730», «930», «9»,
+   «17.30» y «17h30» son lo que la gente escribe y daban 0 h sin decir por qué. Lo que no se entiende se devuelve tal cual. */
+function _horaTecleada_(v){
+  var t=String(v||'').trim(), m=/^(\d{1,2})(?:[:.,hH]?(\d{2}))?$/.exec(t)||/^(\d)(\d{2})$/.exec(t), h;
+  if(!m) return t;
+  h=(m[1].length<2?'0':'')+m[1]+':'+(m[2]||'00');
+  return _horaHHMM_(h) ? h : t;
+}
 
 /* ¿Sale en el «Histórico» de Partes del escritorio (todo el equipo)? Lo APROBADO no caduca nunca: es el registro. Lo que no
    contó (rechazado, caducado, revertido/retirado) se ve `DIAS_VISIBLE_SIN_CONTAR` días, como en «Tus partes que no cuentan». */
@@ -4714,6 +5743,28 @@ function _periodoAbierto_(){
   return null;
 }
 
+/* ⛔ 01/11 · EL MES QUE SE CIERRA, CON SUS DÍAS. Daniel, al cerrar octubre: «el periodo carece de sentido asi, deberia mostrar
+   los días concretos, no un mes». El mes de trabajo va de cierre a cierre (ARRANQUE §2b): empieza el día del ÚLTIMO cierre y
+   llega hasta `hasta` (ISO; por defecto hoy). `{desde, hasta, dias, txt}` con fechas DD/MM/AAAA, o `null` si no se sabe
+   cuándo fue el último cierre: «no lo sé» no se rellena con el calendario (que es lo que decía «terminó 31/10»). */
+/* 01/11 · BAJAR UN TEXTO COMO FICHERO (Daniel: «pásame el archivo donde guardas el histórico»). Un `<a download>` sobre un Blob; el
+   BOM va delante para que Excel lea las tildes del CSV. La URL se suelta al rato: revocarla ya puede cortar la descarga. */
+function _descargarTexto_(nombre, texto, tipo){
+  var u = URL.createObjectURL(new Blob(['\ufeff' + texto], {type: (tipo || 'text/plain') + ';charset=utf-8'}));
+  var a = document.createElement('a'); a.href = u; a.download = nombre; document.body.appendChild(a); a.click();
+  setTimeout(function(){ a.remove(); URL.revokeObjectURL(u); }, 4000);
+}
+
+function _tramoCierre_(hasta){
+  var uc = (typeof CIERRE_UC !== 'undefined' && CIERRE_UC) ? CIERRE_UC
+         : ((typeof CIERRE !== 'undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
+  var d = uc ? _diaMadridDe_(uc.at) : '', h = _diaMadridDe_(hasta || new Date().toISOString());
+  if(!d || !h) return null;
+  var dias = Math.round((Date.parse(_dmyAISO_(h) + 'T00:00:00Z') - Date.parse(_dmyAISO_(d) + 'T00:00:00Z')) / 86400000);
+  if(!(dias >= 0)) return null;
+  return {desde: d, hasta: h, dias: dias, txt: 'del ' + d + ' al ' + h};
+}
+
 function _deEsteMes_(d){
   if(!d) return false;
   /* ⛔ POR `_periodoAbierto_` (791.ª): `_diasDelMes_().periodo` sale de
@@ -4736,6 +5787,27 @@ function _deEsteMes_(d){
 }
 
 function _mesLargo_(d){ return MESES_L[d.getMonth()]+' '+d.getFullYear(); }
+
+/* ⛔ 01/11 · LOS MOVIMIENTOS POR MES DE TRABAJO (de cierre a cierre), UNA puerta para las dos caras. 🗣️ Daniel: *«agrúpalo por meses […]
+   los meses que puedas clicar, comprimidos; si están vacíos tampoco te tiene que aparecer»*. El mes de un apunte es el que GRABÓ el
+   servidor (`periodo`); lo que no es de un mes pasado (`_esDeMesPasado_`: un parte del 03/10 con septiembre aún abierto) es del ABIERTO
+   `per`, igual que en «este mes»; sin `periodo` ni `per`, el mes de la fecha. `leer(x)` adapta cada cara → `{periodo, creado_at, iso,
+   fecha (DD/MM/AAAA), horas}`. Devuelve `[{k:'AAAA-MM', items, h}]` del más nuevo al más viejo; los sin fecha (`k:''`) al final.
+   `conActual`: crea el grupo del mes abierto aunque no tenga apuntes (la compensación base vive ahí y no es un parte). */
+function _mesesDeTrabajo_(lista, per, leer, conActual){
+  var re=/^\d{4}-\d{2}$/, g=[], idx={};
+  var meter=function(k){ if(!(k in idx)){ idx[k]=g.length; g.push({k:k, items:[], h:0}); } return g[idx[k]]; };
+  (lista||[]).forEach(function(x){
+    var a=leer(x), k, d;
+    if(re.test(String(per||'')) && !_esDeMesPasado_({periodo:a.periodo, creado_at:a.creado_at, iso:a.iso}, per)) k=per;
+    else if(re.test(String(a.periodo||''))) k=a.periodo;
+    else { d=_fechaDMY_(a.fecha); k=d ? d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2) : ''; }
+    var gr=meter(k); gr.items.push(x); gr.h+=(Number(a.horas)||0);
+  });
+  if(conActual && re.test(String(per||''))) meter(per);
+  g.sort(function(a,b){ return a.k===b.k ? 0 : !a.k ? 1 : !b.k ? -1 : (a.k<b.k ? 1 : -1); });
+  return g;
+}
 
 function _compBase_(m){ var c=(m&&m.cargo)||null; return COMP_CARGO[c]!=null?COMP_CARGO[c]:2.0; }
 
@@ -4828,9 +5900,18 @@ function _ultimosMov_(lista, fecha, cuanto, ambito){
   var conD=[], sinD=[], suma=0;
   (lista||[]).forEach(function(x){
     var d=_fechaDMY_(fecha(x));
-    if(!d){ sinD.push(x); suma+=(cuanto?(+cuanto(x)||0):0); return; }
-    if(typeof _esDeMesPasado_==='function' && _rePer.test(String(_per||'')) && _rePer.test(String((x&&x.periodo)||''))){
-      if(_esDeMesPasado_({periodo:x.periodo}, _per)) return;
+    /* 02/11 (lista del 06/10, punto 3: *«siguen apareciendo las de mes anterior a pesar q pone de este mes»*): el mes de un
+       parte lo dice `periodo` o, sin él, CUÁNDO ENTRÓ (`creado_at`) — el criterio del sello «cuenta en septiembre» y de
+       `_mesesDeTrabajo_` (`_esDeMesPasado_`). Antes sólo mandaba `periodo`: lo trabajado el 02/10 y creado antes del cierre
+       salía bajo «este mes» por su fecha, y lo SIN fecha entraba siempre. Sin ninguno de los dos, la fecha, como siempre. */
+    var _mesProp = (typeof _esDeMesPasado_==='function' && _rePer.test(String(_per||'')) && x &&
+                    (_rePer.test(String(x.periodo||'')) || /^\d{4}-\d{2}-\d{2}T/.test(String(x.creado_at||''))));
+    if(!d){
+      if(_mesProp && _esDeMesPasado_(x, _per)) return;
+      sinD.push(x); suma+=(cuanto?(+cuanto(x)||0):0); return;
+    }
+    if(_mesProp){
+      if(_esDeMesPasado_(x, _per)) return;
     } else if(!dentro(d)) return;
     conD.push({x:x,d:d}); suma+=(cuanto?(+cuanto(x)||0):0);
   });
@@ -4866,9 +5947,9 @@ function _notaRegistro_(total, ambito, cuantos){
   var n = (typeof cuantos === 'number') ? cuantos : MOVS_N;
   var d = (ambito==='mes') ? 'de este mes' : 'de la temporada';
   return total>n
-    ? 'Se enseñan los <b>'+n+'</b> más recientes '+d+', de '+total+'. '+
-      'El registro completo <b>se conserva</b>: aquí solo se pinta menos.'
-    : 'Todo lo '+d+'. El registro completo <b>se conserva</b>.';
+    ? 'Los '+n+' más recientes '+d+', de '+total+'. '+
+      'El registro completo se conserva.'
+    : 'Todo lo '+d+'. El registro completo se conserva.';
 }
 
 /* ⛔ LA UNICA PUERTA DE ADMIN (20/08, 127.ª). Habia TRES copias y DOS
@@ -4881,6 +5962,28 @@ function _notaRegistro_(total, ambito, cuantos){
    en minusculas. Al reves --volver sensible el movil-- se cerraria la sesion de
    admin a quien hoy entra. */
 function _puedeImpersonar_(){ return !!(SESION && SESION.email && String(SESION.email).toLowerCase() === String(ADMIN_EMAIL).toLowerCase()); }
+
+/* LA BANDA DE «ESTÁS VIENDO COMO OTRA PERSONA» (01/11). Una puerta para las dos caras: `actual` es a quien se mira
+   (`YO.nombre` en el móvil, `ACTOR` en el escritorio) y `volver()` lo devuelve a la SESIÓN. Se compara con `SESION.nombre`
+   —quien entró—, no con nada que «ver como» reescriba. Si coinciden, o no hay sesión (la maqueta), la banda no existe:
+   se quita del DOM, no se esconde, para que ningún repintado la deje colgada. Devuelve si hay banda. */
+function _bandaOtraPersona_(actual, volver){
+  var b=document.getElementById('bandaOtro');
+  var ses=(typeof SESION!=='undefined' && SESION && SESION.nombre) ? String(SESION.nombre) : '';
+  if(!ses || !actual || String(actual)===ses){ if(b) b.remove(); return false; }
+  if(!b){
+    b=document.createElement('div'); b.id='bandaOtro'; b.className='bandaotro'; b.setAttribute('role','status');
+    document.body.insertBefore(b, document.body.firstChild);
+  }
+  b.innerHTML='<span>Estás viendo como '+esc(actual)+'</span><button type="button" id="bandaVolver">Volver a mí</button>';
+  document.getElementById('bandaVolver').onclick=function(){ if(typeof volver==='function') volver(); };
+  return true;
+}
+
+/* ZONA CRÍTICA DEL MEDIDOR: UNA regla para el arco y la barrita (antes `i<3 && p<=3` en el arco y `i<3` a secas en la
+   barrita: con 8 puntos, arcos rojos y barritas ámbar). Los tres primeros tramos sólo son «críticos» mientras te quedan
+   3 puntos o menos — el ámbar del anillo empieza en 3 (decisiones-app). */
+function _zonaCritica_(i, p){ return i<3 && p<=3; }
 
 /* ⛔ ¿PUEDE CERRAR EL MES? Una sola puerta, porque lo preguntan el nav, el menú ⋮ y la
    pantalla: si cada uno lo dedujera por su cuenta, un día uno diría que sí y otro que no.
@@ -4901,7 +6004,7 @@ function _puedeCerrarMes_(){
    se apunta en el `localStorage`. */
 var AVISO_TITULO_MAX=60, AVISO_TEXTO_MAX=300, AVISO_DEMO_KEY='solaris_demo_avisos';
 var AVISO=_avisoNuevo_();
-function _avisoNuevo_(){ return {titulo:'', texto:'', todo:false, unidades:[], personas:[], q:'', paso:'form', enviando:false, err:'', hecho:null}; }
+function _avisoNuevo_(){ return {titulo:'', texto:'', todo:false, unidades:[], personas:[], paso:'form', enviando:false, err:'', hecho:null}; }
 /* La puerta de cortesía = la del cierre (PD o quien lo suplanta); la frontera de verdad es `mandarAviso` en el servidor (rango 3). */
 function _puedeMandarAviso_(){ return _puedeCerrarMes_(); }
 /* Las unidades con gente activa y cuántas son, en el orden en que aparecen. */
@@ -4910,13 +6013,39 @@ function _avisoUnidades_(){
   _activos_().forEach(function(m){ if(!m.unidad) return; if(!n[m.unidad]){ n[m.unidad]=0; o.push(m.unidad); } n[m.unidad]++; });
   return o.map(function(u){ return [u, n[u]]; });
 }
-/* A quiénes llegaría: todo el equipo, o la unión de las unidades marcadas y las personas sueltas (sin repetir). */
+/* A quiénes llegaría: todo el equipo, o las personas de las tarjetas «A quién» (marcar una unidad ya las AGREGÓ ahí, y quitar
+   a una de ellas la saca: lo que se ve es lo que llega). */
 function _avisoNombres_(f){
   var s={}, out=[];
   _activos_().forEach(function(m){
-    if(f.todo || f.unidades.indexOf(m.unidad)>=0 || f.personas.indexOf(m.nombre)>=0){ if(!s[m.nombre]){ s[m.nombre]=1; out.push(m.nombre); } }
+    if(f.todo || f.personas.indexOf(m.nombre)>=0){ if(!s[m.nombre]){ s[m.nombre]=1; out.push(m.nombre); } }
   });
   return out;
+}
+/* Las tres reglas de «A quién», UNA vez (01/11, ficha «nombresteclado»): «Todo el equipo» es EXCLUSIVO —lo incluye todo—, las
+   unidades se combinan y su gente se agrega a las tarjetas, y marcar a una persona suelta apaga «Todo el equipo». */
+function _avisoGenteDe_(u){ return _activos_().filter(function(m){ return m.unidad===u; }).map(function(m){ return m.nombre; }); }
+function _avisoAlternarTodo_(f){
+  f.todo=!f.todo;
+  if(f.todo){ f.unidades=[]; f.personas=[]; }
+}
+function _avisoAlternarUnidad_(f, u){
+  var i=f.unidades.indexOf(u);
+  if(i>=0){
+    f.unidades.splice(i,1);
+    /* se va su gente, salvo la que sigue en otra unidad marcada */
+    var otra={}; f.unidades.forEach(function(x){ _avisoGenteDe_(x).forEach(function(n){ otra[n]=1; }); });
+    var suya=_avisoGenteDe_(u);
+    f.personas=f.personas.filter(function(n){ return suya.indexOf(n)<0 || otra[n]; });
+    return;
+  }
+  f.todo=false; f.unidades.push(u);
+  _avisoGenteDe_(u).forEach(function(n){ if(f.personas.indexOf(n)<0) f.personas.push(n); });
+}
+/* Lo que cambia el selector de personas (marcar, quitar una tarjeta): una persona marcada apaga «Todo el equipo». */
+function _avisoPonerPersonas_(f, lista){
+  f.personas=lista.slice();
+  if(f.personas.length) f.todo=false;
 }
 /* '' si se puede mandar; si no, el motivo en una frase. */
 function _avisoFalta_(f){
@@ -4946,14 +6075,10 @@ function _avisoHTML_(clase){
     var h=f.hecho, alc=(h.alcanzables==null)?'':(' · '+h.alcanzables+' con el móvil preparado');
     return '<div class="mtit">Mandar aviso</div><div class="tarj" data-aviso="hecho"><b>Aviso en cola</b>'+
       '<p class="rnota" style="margin:8px 0 12px">«'+esc(h.titulo)+'» llegará a '+h.n+' persona'+(h.n===1?'':'s')+alc+
-      '. Se manda en la siguiente pasada del emisor (unos minutos).</p>'+
+      '. Sale en unos minutos.</p>'+
       '<button type="button" class="'+cl+' pri" data-avnuevo data-p>Mandar otro</button></div>';
   }
   var unid=_avisoUnidades_().map(function(u){ return _avisoChip_('data-avuni', u[0], u[0]+' · '+u[1], f.unidades.indexOf(u[0])>=0, cl); }).join('');
-  var sel=f.personas.map(function(p){
-    var m=_activos_().filter(function(x){ return x.nombre===p; })[0];
-    return '<button type="button" class="'+cl+' pri" data-avquita="'+esc(p)+'" aria-label="Quitar a '+esc(p)+'" data-p>'+esc((m&&m.pila)||p)+' ×</button>';
-  }).join('');
   var vp=_avisoPrevHTML_();
   if(f.paso==='confirma'){
     return '<div class="mtit">Mandar aviso</div><div class="tarj" data-aviso="confirma"><b>Va a llegar a '+n+' persona'+(n===1?'':'s')+'</b>'+
@@ -4967,9 +6092,8 @@ function _avisoHTML_(clase){
     '<p class="rnota" style="margin:0 0 12px">Llega como notificación al móvil de quien elijas. No se puede deshacer.</p>'+
     '<h4>A quién</h4><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+
       _avisoChip_('data-avtodo','1','Todo el equipo · '+_activos_().length, f.todo, cl)+unid+'</div>'+
-    '<div id="avSel" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+sel+'</div>'+
-    '<label class="campo"><span class="sc">Buscar una persona</span><input id="avQ" type="text" autocomplete="off" placeholder="Nombre" value="'+esc(f.q)+'"></label>'+
-    '<div id="avSug"></div>'+
+    elegirPersonas('avQuien', {universo:_activos_().map(function(m){ return m.nombre; }), marcadas:f.personas, titulo:'A quién va el aviso',
+      vacio:f.todo ? 'Todo el equipo.' : 'Nadie todavía: marca una unidad, escribe un nombre o pulsa «Ver lista».'})+
     '<label class="campo"><span class="sc">Título · <i id="avCT">'+String(f.titulo||'').length+'</i>/'+AVISO_TITULO_MAX+'</span>'+
       '<input id="avTit" type="text" maxlength="'+AVISO_TITULO_MAX+'" placeholder="Corto: lo que se lee en la pantalla bloqueada" value="'+esc(f.titulo)+'"></label>'+
     '<label class="campo"><span class="sc">Texto · <i id="avCX">'+String(f.texto||'').length+'</i>/'+AVISO_TEXTO_MAX+'</span>'+
@@ -4991,23 +6115,14 @@ function _avisoEnganchar_(raiz, repintar){
     if(sg2) sg2.disabled=!!falta;
     if(pv) pv.innerHTML=_avisoPrevHTML_();
   };
-  var ti=q('#avTit'), tx=q('#avTxt'), qi=q('#avQ');
+  var ti=q('#avTit'), tx=q('#avTxt');
   if(ti) ti.oninput=function(){ AVISO.titulo=ti.value; vivo(); };
   if(tx) tx.oninput=function(){ AVISO.texto=tx.value; vivo(); };
-  var sug=function(){
-    var s=q('#avSug'); if(!s) return;
-    var t=_sinTildes_((AVISO.q||'').trim());
-    var hits=t?_activos_().filter(function(m){ return AVISO.personas.indexOf(m.nombre)<0 && _sinTildes_(m.nombre).indexOf(t)>=0; }).slice(0,6):[];
-    s.innerHTML=hits.map(function(m){ return '<button type="button" class="btn" style="display:block;width:100%;text-align:left;margin-bottom:4px" data-avper="'+esc(m.nombre)+'" data-p>'+
-      esc(m.nombre)+' <small>'+esc(m.cargo||m.unidad||'')+'</small></button>'; }).join('');
-    qq('[data-avper]').forEach(function(b){ b.onclick=function(){ AVISO.personas.push(b.dataset.avper); AVISO.q=''; repintar(); }; });
-  };
-  if(qi) qi.oninput=function(){ AVISO.q=qi.value; sug(); };
-  qq('[data-avtodo]').forEach(function(b){ b.onclick=function(){ AVISO.todo=!AVISO.todo; repintar(); }; });
-  qq('[data-avuni]').forEach(function(b){ b.onclick=function(){
-    var i=AVISO.unidades.indexOf(b.dataset.avuni); if(i>=0) AVISO.unidades.splice(i,1); else AVISO.unidades.push(b.dataset.avuni); repintar(); }; });
-  qq('[data-avquita]').forEach(function(b){ b.onclick=function(){
-    var i=AVISO.personas.indexOf(b.dataset.avquita); if(i>=0) AVISO.personas.splice(i,1); repintar(); }; });
+  /* Marcar o quitar a alguien cambia el recuento SIN repintar (se perdería el foco del campo); sólo si eso apaga «Todo el equipo»
+     se repinta, porque la pastilla ha de dejar de estar encendida. */
+  elegirPersonasAlCambiar('avQuien', function(l){ var tenia=AVISO.todo; _avisoPonerPersonas_(AVISO, l); if(tenia!==AVISO.todo) repintar(); else vivo(); });
+  qq('[data-avtodo]').forEach(function(b){ b.onclick=function(){ _avisoAlternarTodo_(AVISO); repintar(); }; });
+  qq('[data-avuni]').forEach(function(b){ b.onclick=function(){ _avisoAlternarUnidad_(AVISO, b.dataset.avuni); repintar(); }; });
   var sg=q('#avSigue'); if(sg) sg.onclick=function(){ if(_avisoFalta_(AVISO)) return; AVISO.paso='confirma'; AVISO.err=''; repintar(); };
   var vo=q('[data-avvolver]'); if(vo) vo.onclick=function(){ AVISO.paso='form'; AVISO.err=''; repintar(); };
   var nu=q('[data-avnuevo]'); if(nu) nu.onclick=function(){ AVISO=_avisoNuevo_(); repintar(); };
@@ -5021,11 +6136,10 @@ function _avisoEnganchar_(raiz, repintar){
       AVISO.enviando=false; AVISO.err=(e&&e.message?String(e.message).replace(/^Error:\s*/,''):'No se pudo mandar.'); repintar();
     });
   };
-  sug();
 }
 /* Manda (o, en la maqueta, apunta). Promesa de `{n, alcanzables, titulo}`. */
 function _avisoEnviar_(f){
-  var cuerpo={titulo:String(f.titulo).trim(), texto:String(f.texto||'').trim(), todo:!!f.todo, unidades:f.unidades.slice(), personas:f.personas.slice()};
+  var cuerpo={titulo:String(f.titulo).trim(), texto:String(f.texto||'').trim(), todo:!!f.todo, unidades:[], personas:f.todo ? [] : _avisoNombres_(f)};   /* las unidades ya están en las tarjetas: mandar también el nombre de la unidad devolvería a quien se quitó */
   var n=_avisoNombres_(f).length;
   if(_apelEsDemo_()){
     try{ var L=JSON.parse(localStorage.getItem(AVISO_DEMO_KEY)||'[]'); L.push(Object.assign({at:new Date().toISOString(), n:n}, cuerpo));
@@ -5037,6 +6151,142 @@ function _avisoEnviar_(f){
     return {n:(r&&r.n)||n, alcanzables:(r&&r.alcanzables!=null)?r.alcanzables:null, titulo:cuerpo.titulo};
   });
 }
+
+/* ═══ FEEDBACK A SOLARIA · SÓLO EL PD ══════════════════════════════════════════════════════════════════════
+   Daniel (01/11): «una cosa que solo me aparezca a mí […] me deje dar feedback sobre cómo ha ido el proceso […] un banco de
+   criterios que vaya mejorando el prompt de la Sonnet […] Pero que solo lo pueda ver yo. Que nadie más se dé cuenta».
+   Por cada expediente DECIDIDO, una tarea «¿Qué tal lo vio SolarIA?»: valoración (chips), texto y, si quiere, «Convertir
+   en criterio». UNA pieza para las dos caras: la cara sólo pone `_fbpdRaiz_()` donde quiere el bloque (escritorio: lista
+   plegada en Documentos · móvil: UNA tarea en la ficha del expediente) y los gestos son de aquí, delegados en `document`
+   (sobreviven a cualquier repintado). ⛔ Para quien no es el PD (rango 3) `_fbpdRaiz_` devuelve '' —ni contenedor, ni
+   contador, ni nada en el DOM—; la frontera de verdad es `getFeedbackPD`/`guardarFeedbackPD` en el servidor (rango 3).
+   En `?demo` nada sale: se apunta en el `localStorage`. */
+var FBPD_ESTADOS=['aprobado','publicado','cambios','rechazado'], FBPD_DEMO_KEY='solaris_demo_feedbackpd';
+var FBPD_VAL=[['bien','Bien'],['escapo','Se le escapó algo'],['demas','Avisó de más']];
+var FBPD_DEC={aprobado:'Aprobado',publicado:'Aprobado y publicado',cambios:'Pidió cambios',rechazado:'Rechazado'};
+var FBPD={pend:[], hist:[], huella:null, f:{}, err:{}, env:{}, abierto:false, histAb:false, fichaAb:false};
+function _fbpdPuede_(){ try{ return rangoNom(_actorSanc_())===3; }catch(_){ return false; } }
+/* Un expediente en la forma corta del escritorio (`tit`, `est`, `avisos`) o en la del servidor (`titulo`, `estado`, `issues`). */
+function _fbpdNorm_(d){
+  return {id:d.id, ref:d.ref||'', tit:d.tit||d.titulo||d.ref||'', est:d.est||d.estado||'', resumen:d.resumen||'',
+    avisos:Array.isArray(d.avisos)?d.avisos:(Array.isArray(d.issues)?d.issues:[]),
+    revisor:(d.revisor&&d.revisor.nombre)||(typeof d.revisor==='string'?d.revisor:''), nota:d.nota||''};
+}
+function _fbpdDocs_(){
+  if(typeof DOCS!=='undefined' && Array.isArray(DOCS)) return DOCS;
+  return (typeof ENTREGABLES!=='undefined' ? ENTREGABLES : []).concat(typeof ENT_REV!=='undefined' ? ENT_REV : []);
+}
+function _fbpdDemoHechos_(){ try{ var o=JSON.parse(localStorage.getItem(FBPD_DEMO_KEY)||'{}'); return (o&&typeof o==='object')?o:{}; }catch(_){ return {}; } }
+/* Lo mismo que `feedback_pd_estado` del servidor, sobre los expedientes que la cara ya tiene (sólo para la maqueta). */
+function _fbpdDemoEstado_(){
+  var h=_fbpdDemoHechos_(), docs=_fbpdDocs_().filter(function(d){ return FBPD_ESTADOS.indexOf(d.est||d.estado)>=0; });
+  return {pend:docs.filter(function(d){ return !h[d.id]; }).map(_fbpdNorm_),
+          hist:Object.keys(h).map(function(k){ return h[k]; }).sort(function(a,b){ return String(b.at).localeCompare(String(a.at)); })};
+}
+/* Pide (una vez por cambio en los decididos) lo pendiente al servidor; la maqueta lo saca de sus propios expedientes. */
+function _fbpdCarga_(){
+  var docs=_fbpdDocs_().filter(function(d){ return FBPD_ESTADOS.indexOf(d.est||d.estado)>=0; });
+  var huella=docs.map(function(d){ return d.id+':'+(d.est||d.estado); }).join('|');
+  if(huella===FBPD.huella) return;
+  FBPD.huella=huella;
+  if(_apelEsDemo_()){ var e=_fbpdDemoEstado_(); FBPD.pend=e.pend; FBPD.hist=e.hist; return; }
+  if(typeof api==='undefined' || typeof api.getFeedbackPD!=='function') return;
+  api.getFeedbackPD().then(function(r){
+    FBPD.pend=((r&&r.pendientes)||[]).map(_fbpdNorm_); FBPD.hist=(r&&r.historial)||[]; _fbpdRepintar_();
+  }, function(){ /* sin lectura no hay bloque: se vuelve a intentar cuando cambie algo */ FBPD.huella=null; });
+}
+function _fbpdForm_(id){ return FBPD.f[id]||(FBPD.f[id]={val:'', txt:'', crit:false, critx:''}); }
+function _fbpdTareaHTML_(t, cl){
+  var f=_fbpdForm_(t.id), vacio=!f.val, dec=(FBPD_DEC[t.est]||t.est)+(t.revisor?' · '+t.revisor:'');
+  return '<div class="tarj" data-fbpd-tarea="'+esc(t.id)+'" style="margin:8px 0">'+
+    '<b>'+esc(t.ref||t.tit)+'</b> <span class="pil neu">'+esc(dec)+'</span>'+
+    '<p class="rnota" style="margin:4px 0 0">'+esc(t.tit)+'</p>'+
+    (t.nota?'<p class="rnota" style="margin:4px 0 0">Motivo: '+esc(t.nota)+'</p>':'')+
+    '<p style="font-size:12.5px;color:var(--ink2);line-height:1.5;margin:8px 0 0">'+esc(t.resumen||'El análisis no dejó resumen.')+'</p>'+
+    (t.avisos.length?'<ul class="obj" style="margin:6px 0 0">'+t.avisos.slice(0,6).map(function(a){ return '<li>'+esc(a)+'</li>'; }).join('')+'</ul>'
+                    :'<p class="rnota" style="margin:6px 0 0">Sin avisos de calidad.</p>')+
+    '<h4>¿Qué tal lo vio SolarIA?</h4><div style="display:flex;gap:6px;flex-wrap:wrap">'+
+    FBPD_VAL.map(function(v){ return '<button type="button" class="pick'+(f.val===v[0]?' on':'')+'" data-fbval="'+v[0]+'" aria-pressed="'+(f.val===v[0])+'" data-p>'+v[1]+'</button>'; }).join('')+'</div>'+
+    '<label class="campo"><span class="sc">Qué fue bien o mal</span><textarea data-fbtxt maxlength="1000" placeholder="Opcional">'+esc(f.txt)+'</textarea></label>'+
+    '<div style="margin:6px 0"><button type="button" class="pick'+(f.crit?' on':'')+'" data-fbcrit aria-pressed="'+(!!f.crit)+'" data-p>Convertir en criterio</button></div>'+
+    (f.crit?'<label class="campo"><span class="sc">El criterio, en una frase</span><input type="text" data-fbcritx maxlength="300" value="'+esc(f.critx)+'" placeholder="Siempre «Viradiña MK II», nunca «MK2»"></label>':'')+
+    (FBPD.err[t.id]?'<p class="rnota" data-fberr style="color:var(--rojo,#E41E25)">'+esc(FBPD.err[t.id])+'</p>':'')+
+    '<button type="button" class="'+cl+' pri" data-fbguardar data-p'+((vacio||FBPD.env[t.id]||(f.crit&&!f.critx.trim()))?' disabled':'')+'>'+(FBPD.env[t.id]?'Guardando…':'Guardar')+'</button></div>';
+}
+function _fbpdHechoHTML_(h){
+  var v=(FBPD_VAL.filter(function(x){ return x[0]===h.valoracion; })[0]||[0,h.valoracion])[1];
+  return '<p class="rnota" style="margin:6px 0"><b>'+esc(h.ref||h.titulo||'')+'</b> · '+esc(v)+(h.texto?' — '+esc(h.texto):'')+
+    (h.criterio?'<br>Criterio: '+esc(h.criterio):'')+'</p>';
+}
+/* El contenedor que la cara pone donde quiere el bloque: `lista` (todas las pendientes, plegado) o `ficha` + el id del expediente
+   (sólo su tarea, o su opinión si ya la dio). '' para quien no es el PD y mientras no haya nada que enseñar. */
+function _fbpdRaiz_(modo, id, clase){
+  if(!_fbpdPuede_()) return '';
+  _fbpdCarga_();
+  return '<div data-fbpd-raiz="'+modo+'"'+(id==null?'':' data-fbpd-id="'+esc(id)+'"')+' data-fbpd-cl="'+esc(clase||'btn sm')+'">'+_fbpdInterior_(modo, id, clase||'btn sm')+'</div>';
+}
+function _fbpdInterior_(modo, id, cl){
+  var pend=FBPD.pend, hist=FBPD.hist;
+  if(modo==='ficha'){
+    var t=pend.filter(function(x){ return String(x.id)===String(id); })[0], h=hist.filter(function(x){ return String(x.id)===String(id); })[0];
+    if(t) return '<details data-fbpd-pleg="ficha" style="margin-top:12px"'+(FBPD.fichaAb?' open':'')+'><summary class="rnota" style="cursor:pointer">Para ti: revisar a SolarIA</summary>'+_fbpdTareaHTML_(t, cl)+'</details>';
+    return h?'<div style="margin-top:12px"><span class="rnota">Tu opinión sobre SolarIA</span>'+_fbpdHechoHTML_(h)+'</div>':'';
+  }
+  if(!pend.length && !hist.length) return '';
+  return '<details data-fbpd-pleg="lista" style="margin-top:14px"'+(FBPD.abierto?' open':'')+'><summary class="rnota" style="cursor:pointer">Para ti: revisar a SolarIA ('+pend.length+')</summary>'+
+    (pend.length?pend.map(function(t){ return _fbpdTareaHTML_(t, cl); }).join(''):'<p class="rnota">Nada pendiente.</p>')+
+    (hist.length?'<details data-fbpd-pleg="hist" style="margin-top:10px"'+(FBPD.histAb?' open':'')+'><summary class="rnota" style="cursor:pointer">Ya opinadas · '+hist.length+'</summary>'+hist.map(_fbpdHechoHTML_).join('')+'</details>':'')+
+    '</details>';
+}
+/* Repinta SOLO los contenedores del bloque (el texto de los campos vive en `FBPD.f`, no en el DOM). */
+function _fbpdRepintar_(){
+  [].forEach.call(document.querySelectorAll('[data-fbpd-raiz]'), function(r){
+    r.innerHTML=_fbpdPuede_() ? _fbpdInterior_(r.dataset.fbpdRaiz, r.dataset.fbpdId, r.dataset.fbpdCl) : '';
+  });
+}
+function _fbpdGuardar_(id){
+  var f=_fbpdForm_(id), c={id:id, valoracion:f.val, texto:f.txt.trim(), criterio:f.crit?f.critx.trim():''}, t=FBPD.pend.filter(function(x){ return String(x.id)===String(id); })[0];
+  if(!f.val || !t || FBPD.env[id]) return Promise.resolve(false);
+  FBPD.env[id]=true; FBPD.err[id]=''; _fbpdRepintar_();
+  var fin=function(){
+    FBPD.env[id]=false; delete FBPD.f[id];
+    FBPD.pend=FBPD.pend.filter(function(x){ return String(x.id)!==String(id); });
+    FBPD.hist.unshift({id:id, ref:t.ref, titulo:t.tit, estado:t.est, valoracion:c.valoracion, texto:c.texto, criterio:c.criterio, at:new Date().toISOString()});
+    _fbpdRepintar_(); return true;
+  };
+  if(_apelEsDemo_()){
+    try{ var h=_fbpdDemoHechos_(); h[id]={id:id, ref:t.ref, titulo:t.tit, estado:t.est, valoracion:c.valoracion, texto:c.texto, criterio:c.criterio, at:new Date().toISOString()};
+      localStorage.setItem(FBPD_DEMO_KEY, JSON.stringify(h)); }catch(_){}
+    return Promise.resolve(fin());
+  }
+  return api.guardarFeedbackPD(c).then(fin, function(e){
+    FBPD.env[id]=false; FBPD.err[id]=(e&&e.message?String(e.message).replace(/^Error:\s*/,''):'No se pudo guardar.'); _fbpdRepintar_(); return false;
+  });
+}
+(function(){
+  if(typeof document==='undefined' || document._fbpdPuesto) return;
+  document._fbpdPuesto=true;
+  var tarea=function(el){ var t=el.closest('[data-fbpd-tarea]'); return t?t.dataset.fbpdTarea:null; };
+  document.addEventListener('click', function(e){
+    var b=e.target.closest && e.target.closest('[data-fbval],[data-fbcrit],[data-fbguardar]'); if(!b) return;
+    var id=tarea(b); if(id==null || !_fbpdPuede_()) return;
+    var f=_fbpdForm_(id);
+    if(b.hasAttribute('data-fbval')){ f.val=(f.val===b.dataset.fbval)?'':b.dataset.fbval; _fbpdRepintar_(); }
+    else if(b.hasAttribute('data-fbcrit')){ f.crit=!f.crit; _fbpdRepintar_(); }
+    else _fbpdGuardar_(id);
+  });
+  document.addEventListener('input', function(e){
+    var el=e.target, id=el.closest && tarea(el); if(id==null) return;
+    var f=_fbpdForm_(id);
+    if(el.hasAttribute('data-fbtxt')) f.txt=el.value;
+    else if(el.hasAttribute('data-fbcritx')){ f.critx=el.value;
+      var g=el.closest('[data-fbpd-tarea]').querySelector('[data-fbguardar]'); if(g) g.disabled=!f.val || !f.critx.trim() || !!FBPD.env[id]; }
+  });
+  document.addEventListener('toggle', function(e){   /* `toggle` no burbujea: se oye en captura */
+    var d=e.target; if(!d.dataset || !d.dataset.fbpdPleg) return;
+    if(d.dataset.fbpdPleg==='lista') FBPD.abierto=d.open; else if(d.dataset.fbpdPleg==='ficha') FBPD.fichaAb=d.open; else if(d.dataset.fbpdPleg==='hist') FBPD.histAb=d.open;
+  }, true);
+})();
 
 /* ⛔⛔ ¿EL CIERRE ACABÓ CORTO? Devuelve null si no, o el desglose si sí.
    El aplicador NO se para con un `ausente` -- y hace bien: «si su página ya no está, esa
@@ -5101,6 +6351,11 @@ function _hFinFranja_(R,fi){ var f=(R.franjas||[])[fi];
    «la reunión entera». Es «no lo sé» dicho, no disimulado.
    ⚠️ Y sólo se miran ventanas cuyas casillas estén TODAS ofertadas: una que se salga del
    horario del día sería una hora en la que nadie pudo marcar. */
+/* ¿Las `n` casillas seguidas desde la franja `f` del día `di` están TODAS ofertadas (`of` = {'d_f':1})? */
+function _ofertadas_(of, di, f, n){
+  for(var i=0;i<n;i++) if(!of[di+'_'+(f+i)]) return false;
+  return true;
+}
 function _mejorVentana_(R, minSlots, best){
   var n = (+minSlots > 0) ? +minSlots : 1;
   var b = best || {d:0, f:0, v:0};
@@ -5119,9 +6374,7 @@ function _mejorVentana_(R, minSlots, best){
   var mejor = {d:0, f0:0, f1:0, v:-1};
   for(di=0; di<dias.length; di++){
     for(f=0; f+n<=fr.length; f++){
-      var vale = true;
-      for(i=0;i<n;i++) if(!of[di+'_'+(f+i)]){ vale = false; break; }
-      if(!vale) continue;
+      if(!_ofertadas_(of, di, f, n)) continue;
       var c = 0;
       for(k=0;k<quien.length;k++){
         var todos = true;
@@ -5133,6 +6386,105 @@ function _mejorVentana_(R, minSlots, best){
   }
   if(mejor.v < 0) return suelta;
   return {d:mejor.d, f0:mejor.f0, f1:mejor.f1, v:mejor.v, exacta:true};
+}
+
+/* ══ 01/11 · AL FIJAR, EL ORDEN DEL DÍA DICE CUÁNTOS BLOQUES HACEN FALTA ═══════════════════════════════════════════
+   🗣️ Daniel (01/11): *«si ya tienes la duración maquetada […] ya te puede sugerir a la hora de fijar la reunión los
+   bloques horarios que hacen falta […] si tu orden del día no resulta que quepa en dos bloques, pues que te lo intente
+   poner en tres»*. UNA función de la duración total, que vale hoy y mañana: el servidor ya la da hecha (`getOrdenDia` →
+   `total`, minutos, la suma de las `dur` en cascada: `orden_dia.total_min`); sin ella, la suma de las `dur`. ⛔ **No se
+   suma desde/hasta**: con solapes o huecos no es lo que dura, y lo guardado a la antigua llega ya migrado.
+   ⛔ **«No lo sé» es `null`, no 0**: un solo punto sin duración y el total entero es desconocido — sumar los que sí se saben
+   diría «dura 20 min» de una reunión de dos horas, y sugeriría un bloque. Sin orden del día (`filas` vacío o ausente) también
+   `null`: la reunión sigue como siempre. `o` = el orden del día (`{filas, total, pendientes}`) o sólo sus filas. */
+function _durOrdenDia_(o){
+  var filas = Array.isArray(o) ? o : (o && o.filas);
+  if(!Array.isArray(filas) || !filas.length) return null;
+  var tot = 0;
+  for(var i=0; i<filas.length; i++){
+    var d = filas[i] && filas[i].dur;
+    if(d == null || d === '' || !isFinite(+d) || +d <= 0) return null;
+    tot += +d;
+  }
+  return (!Array.isArray(o) && +o.total > 0 && !o.pendientes) ? +o.total : tot;
+}
+
+/* ¿Hay algún día con `n` casillas OFERTADAS seguidas? Si no, ese largo no cabe en el horario de ningún día. */
+function _cabeVentana_(R, n){
+  var of = {}, bl = R.bloques || [], i, di, f;
+  for(i=0;i<bl.length;i++) of[bl[i][0]+'_'+bl[i][1]] = 1;
+  for(di=0; di<(R.dias||[]).length; di++)
+    for(f=0; f+n<=(R.franjas||[]).length; f++)
+      if(_ofertadas_(of, di, f, n)) return true;
+  return false;
+}
+
+/* Cuántos bloques seguidos hacen falta y DÓNDE caben. `{min, n, slot, vent, corto, cabe}` o `null` (sin duración).
+   `vent` es la ventana a recomendar (`_mejorVentana_`); `corto` = bloques de la más larga que SÍ tiene gente cuando la de
+   `n` no (0 si no hace falta); `cabe` = false si `n` bloques no caben en el horario de ningún día (entonces `corto` es 0 y
+   `vent` la suelta). ⛔ Una ventana más corta que `n` NUNCA es `exacta`: «pueden la reunión entera» sería mentira.
+   ⛔ Sin respuestas cargadas no hay veredicto (ninguna ventana sale `exacta`): se queda el recuento y nada más — no se
+   inventa que «no hay hueco». */
+function _sugerirBloques_(R, o, best){
+  var min = _durOrdenDia_(o);
+  if(min == null || !R) return null;
+  var slot = +R.slot || ((R.franjas||[])[0] && +R.franjas[0].dur) || 60;
+  var n = _slotsMin_(min, slot);
+  var v = _mejorVentana_(R, n, best);
+  var out = {min:min, n:n, slot:slot, vent:v, corto:0, cabe:true};
+  if(!_cabeVentana_(R, n)){ out.cabe = false; return out; }
+  if(v.exacta && v.v > 0) return out;
+  for(var m=n-1; m>=1; m--){
+    var w = _mejorVentana_(R, m, best);
+    if(w.exacta && w.v > 0){
+      out.vent = {d:w.d, f0:w.f0, f1:w.f1, v:w.v, exacta:false}; out.corto = m; return out;
+    }
+  }
+  return out;
+}
+
+function _sugerirTxt_(s){
+  if(!s) return '';
+  var t = 'Tu orden del día dura ' + _durTxt_(s.min) + ': ' + (s.n===1 ? 'hace falta 1 bloque' : 'hacen falta ' + s.n + ' bloques') +
+    (s.slot!==60 ? ' de ' + _durTxt_(s.slot) : '') + '.';
+  if(s.cabe === false) t += ' No cabe en el horario de ningún día.';
+  else if(s.corto) t += ' No hay ningún hueco de ' + s.n + ' bloques seguidos en el que pueda alguien; el mejor más corto es de ' +
+    s.corto + (s.corto===1 ? ' bloque.' : ' bloques.');
+  return t;
+}
+
+/* La ventana a recomendar al fijar: la del orden del día si lo hay con duración, y si no la de siempre (`minR`).
+   `sinDur` = cuántos puntos del orden del día no tienen duración (entonces no hay sugerencia, y se dice).
+   Las dos caras pasan por aquí; el orden del día llega por red DESPUÉS de pintar, y `_ordenPintar_` rehace el titular
+   con `st.sugHTML` y el resalte del mapa con `st.sugMapa`. */
+function _ventanaFijar_(R, minR, best){
+  var st = _ordSt_(R.id), sug = _sugerirBloques_(R, st.e, best);
+  var fs = st.e && st.e.filas, sinDur = 0;
+  if(!sug && Array.isArray(fs)) fs.forEach(function(f){ if(!(f && +f.dur > 0)) sinDur++; });
+  return {sug:sug, sinDur:sinDur, vent: sug ? sug.vent : _mejorVentana_(R, minR, best)};
+}
+function _notaOrdenHTML_(f){
+  var txt = f && f.sug ? _sugerirTxt_(f.sug) : (f && f.sinDur ? 'Pon cuánto dura cada punto del orden del día y te digo cuántos bloques hacen falta.' : '');
+  return txt ? '<span class="rnota" style="display:block;margin-top:4px" data-ordsugtxt>' + esc(txt) + '</span>' : '';
+}
+/* ¿La casilla (día `di`, franja `fi`) es del hueco recomendado? Una sola regla para pintar el mapa y para repintarlo. */
+function _esHuecoFijar_(vent, di, fi){ return !!vent && di===vent.d && fi>=vent.f0 && fi<=vent.f1 && vent.v>0; }
+
+/* ══ 01/11 · FIJAR: LA DURACIÓN LA DA LA REUNIÓN (o su orden del día); SE ELIGE SÓLO DÓNDE EMPIEZA ═════════════════
+   🗣️ Daniel (01/11, el «Fijar» del escritorio): *«no necesitas dos listas de horas para fijar lol, con una llega y sobra»*.
+   El móvil ya lo hacía (un toque en el comienzo marca las franjas que dura). UNA regla para las dos caras: cuántas franjas
+   ocupa (`_largoFijar_`) y qué rango sale de empezar en una (`_fijarRango_`). */
+function _largoFijar_(R){
+  var min = _slotsMin_(R.duracion, R.slot), s = _sugerirBloques_(R, _ordSt_(R.id).e, null);
+  return (s && s.cabe) ? Math.max(min, s.n) : min;
+}
+/* `{f0, f1, min, largo}` de empezar en la franja `f0`, o `null` si desde ahí no caben las franjas MÍNIMAS que dura la reunión.
+   Si el orden del día pide más que ese mínimo y cabe, `f1` llega hasta ahí; si no cabe entero en lo que queda del día, se recorta
+   (nunca por debajo del mínimo). */
+function _fijarRango_(R, f0){
+  var nf = (R.franjas||[]).length, min = _slotsMin_(R.duracion, R.slot), largo = _largoFijar_(R);
+  if(!(f0 >= 0) || f0 + min > nf) return null;
+  return {f0:f0, f1:Math.min(nf-1, f0+largo-1), min:min, largo:largo};
 }
 
 /* «2026-07» es un identificador, no algo que se le lea a nadie. Daniel, viendo el boton:
@@ -5277,8 +6629,44 @@ function _avisoAplicarCierre_(est, hoy){
   /* «NO terminado» desde el 22/10 (refutador 22, 🟡 5); «NO aplicado» es la nota de antes, que puede seguir en la fila. */
   if(!ua || !/NO (terminado|aplicado)/.test(String(ua.nota || ''))) return '';
   var dia = _diaMadridDe_(ua.at);
-  return 'El último «Aplicar» NO terminó' + (dia ? ' (' + dia + ')' : '') + ': «' + String(ua.nota) + '». El aviso del ' +
+  /* 01/11 (Daniel cerró octubre solo y vio «salida 2 · el aviso del gate dice por qué»): desde entonces la nota trae el MOTIVO
+     en llano tras «: » (`aplicar_cierre.nota_aplicar`), y se enseña ése. Sin motivo (notas viejas), la frase de siempre. */
+  var nota = String(ua.nota), k = nota.indexOf('): ');
+  if(k >= 0) return 'El último «Aplicar» no terminó' + (dia ? ' (' + dia + ')' : '') + ': ' + nota.slice(k + 3) + '.';
+  return 'El último «Aplicar» NO terminó' + (dia ? ' (' + dia + ')' : '') + ': «' + nota + '». El aviso del ' +
          'gate dice por qué; míralo antes de volver a pulsar.';
+}
+
+/* 01/11 (Daniel: «se tiene que poder revertir, evidentemente»): el plan que se puede REVERTIR = el del ÚLTIMO cierre aplicado,
+   o `null`. Sale del plan que el servidor ya sirve (`aplicado`/`resultado`), no de un dato nuevo; y si hay un cierre sellado
+   MÁS NUEVO que ese plan, no es el último y no se ofrece (el servidor lo vuelve a comprobar). Tras revertir, `cierre_plan` queda
+   `aplicado:false` (`revertir_cierre._avisar_a_la_app`) y esto vuelve a `null`: no se ofrece revertir el mes de antes. */
+function _cierreRevertible_(est){
+  var pl = est && est.plan;
+  if(!pl || !(pl.aplicado || pl.resultado) || !pl.periodo) return null;
+  var uc = est.ultimo_cierre && est.ultimo_cierre.periodo;
+  return (uc && String(pl.periodo) < String(uc)) ? null : pl;
+}
+
+/* ¿Hay un «Revertir» en vuelo (flag arriba, reciente)? Gemela de `_aplicandoVivo_` con el mismo tope de 15 min. */
+function _revirtiendoVivo_(est, hoy){
+  if(!(est && est.revirtiendo)) return false;
+  var at = est.revirtiendo.at, t = at ? Date.parse(at) : NaN;
+  return isNaN(t) || Math.max(0, Math.floor(((hoy || new Date()).getTime() - t) / 60000)) < 15;
+}
+
+/* La línea de arriba de «Revertir»: en vuelo, o cómo acabó el último (la nota del flag, en llano, que trae mes y cuentas).
+   Si desde entonces se volvió a pulsar «Aplicar», la nota ya es vieja y no se dice. */
+function _avisoRevertirCierre_(est, hoy){
+  if(est && est.revirtiendo)
+    return _revirtiendoVivo_(est, hoy)
+      ? 'Revirtiendo el cierre: en cola o devolviendo las fichas; el motor pasa cada 2 minutos. No lo pulses otra vez.'
+      : 'El «Revertir» lleva más de 15 min en cola y el motor no lo ha recogido (pasa cada 2 minutos): puede que esté parado — míralo en Automatismos. Puedes volver a pulsarlo.';
+  var ur = est && est.ultimo_revertir, ua = est && est.ultimo_aplicar;
+  if(!ur || !ur.nota) return '';
+  if(ua && ua.at && ur.at && Date.parse(ua.at) > Date.parse(ur.at)) return '';
+  var dia = _diaMadridDe_(ur.at), n = String(ur.nota);
+  return n.charAt(0).toUpperCase() + n.slice(1) + (dia ? ' (' + dia + ')' : '') + '.';
 }
 
 function _avisoCalculoCierre_(est){
@@ -5687,8 +7075,8 @@ function _sonidosDesbloquear_(doc){
 }
 /* La fila del interruptor de Ajustes, igual en las dos caras; cada una la mete en su propio contenedor. */
 function _sonidosHTML_(){
-  return '<div class="fila"><div class="a"><b>Sonidos</b><small>Un pitido corto al fichar, al declarar un parte o tu disponibilidad, al aprobar o rechazar y al llegarte un aviso. '+
-    'Encendido de serie; vale sólo para este dispositivo.</small></div><div class="d">'+
+  return '<div class="fila"><div class="a"><b>Sonidos</b><small>Un pitido corto al fichar, declarar, aprobar o rechazar y al llegarte un aviso. '+
+    'Sólo en este dispositivo.</small></div><div class="d">'+
     '<button class="btn" data-sonidos data-p>'+(_sonidosOn_()?'Sí':'No')+'</button></div></div>';
 }
 /* Engancha el interruptor dentro de `raiz`. Al encenderlo suena el de aprobar, para comprobar que se oye. */
@@ -5890,6 +7278,19 @@ function estDoc(e){ return EST_DOC[e]||[String(e||'—'),'']; }
 var DOC_EN_CURSO=['recibido','analizado','revision','cambios','publicando','aprobado','anot'];
 var DOC_RESUELTO=['publicado','rechazado'];
 function _docEnCurso_(est){ return DOC_EN_CURSO.indexOf(String(est==null?'':est))>=0; }
+/* ⛔ 02/11 (contradmanana, 1): LO PUBLICADO NO SE MUEVE, UNA vez. Es `servidor.ESTADOS_YA_PUBLICADOS` (`publicando` ya tiene su página
+   de Notion; `publicado`/`cerrado` están en Notion y Drive): el servidor rechaza deshacer, aprobar, anotar, pedir cambios y rechazar
+   sobre ellos, y las dos caras ofrecían «Deshacer» y los botones igual. Las dos caras preguntan aquí; lo ata `probar_documentos_caras.py`
+   contra la lista del servidor. Sin `cerrado` A PROPÓSITO: `_normEstado_` lo traduce a `publicado` y la app no lo nombra nunca. */
+var DOC_YA_PUBLICADO=['publicando','publicado'];
+function _docYaPublicado_(est){ return DOC_YA_PUBLICADO.indexOf(String(est==null?'':est))>=0; }
+/* CUANDO SE PUEDE DESHACER (las dos caras: `e.estado` en el móvil, `d.est` en el escritorio). Con nombre se EJECUTA (una condición suelta
+   en la plantilla sólo se lee: apagarla con `false&&` salió CIEGA). DECIDIDO **Y** CON REVISOR —sin revisor no hay decisión que deshacer,
+   y en `revision` no hay nada que devolver— **Y NO PUBLICADO**: lo publicado no se retira de aquí. */
+function _puedeDeshacerDoc_(e){
+  var est = e && (e.estado || e.est);
+  return !!(e && est!=='revision' && e.revisor && !_docYaPublicado_(est));
+}
 /* ⛔⛔ APROBAR ES PUBLICAR, y no se publica lo que nadie ha analizado: es la regla del
    servidor (`_puedeDecidir_`, rama `aprobado`/`anot`). Vivia SOLO en
    `documentos.escritorio.js`, asi que el movil ofrecia «Aprobar» y «Con anotaciones»
@@ -6021,11 +7422,14 @@ function _slotsMin_(duracion, slot){
    ⛔ Y NO CONFUNDIR CON `_slotsMin_`, que sí es una restricción dura: una racha más corta que
    la reunión no sirve para ir a nada. Son dos mínimos distintos y se dicen distinto.
    Devuelve `{falta, exigido, txt}`; `falta` a 0 significa que no hay nada que advertir. */
-/* ⛔ 21/10 (auditor 13, 🟠 4): ¿esta reunión SANCIONA SOLA? Sólo general, junta y consejo — la regla del PD del
-   22/07 (`decisiones-app.md`, «Sanciones de reuniones») y `construir_reunion.TIPOS_AUTO`. En subsistema, trabajo o
-   mixta, no cubrir queda a potestad del coordinador: la cara no puede amenazar con un artículo que nadie aplica. */
+/* ⛔ 21/10 (auditor 13, 🟠 4): ¿esta reunión SANCIONA SOLA? Sólo la GENERAL — la reforma del RRI (aprobada el 20/07:
+   «solo cuentan las reuniones generales; las de junta y las demás no pueden generar falta»), confirmada por Daniel el
+   01/11 (artifact [334a41fb8e], «Manda la reforma: la Junta no genera falta») — y es la copia en JS de
+   `disciplina.sanciona_sola` (de ahí sale `construir_reunion.TIPOS_AUTO`). Junta, consejo, subsistema, trabajo o mixta:
+   no cubrir queda a potestad del coordinador, y la cara no puede amenazar con un artículo que nadie aplica.
+   Es la ÚNICA puerta de las caras: `sancionPor` y `_avisoMinimo_` la llaman. */
 function _sancionaSola_(tipo){
-  return ['general','junta','consejo'].indexOf(String(tipo == null ? '' : tipo).trim().toLowerCase()) >= 0;
+  return ['general'].indexOf(String(tipo == null ? '' : tipo).trim().toLowerCase()) >= 0;
 }
 
 function _avisoMinimo_(marcadas, exigido, tipo){
@@ -6304,7 +7708,94 @@ function _refMinimo_(r){
    marcar nada y el motor no exige ninguna. */
 function _minimoExigido_(r){
   var tot = (r && (r.total || (r.bloques||[]).length)) || 0;
+  /* 01/11 (Daniel [c8bd27e9d3]): el motor honra el % que ELIGIÓ quien convocó (`minimoPct`), si se ofrecía ese mes y el
+     tipo sanciona; la misma comprobación que `disciplina.minimo_pct_de_reunion`. Si no, el del periodo, como siempre. */
+  var el = r && r.minimoPct;
+  if(typeof el === 'number' && _sancionaAlguna_(r.tipo) && _minimosOfrecidos_(_refMinimo_(r)).indexOf(el) >= 0)
+    return Math.ceil(tot * el / 100);
   return Math.ceil(tot * _pctMinimo_(_refMinimo_(r)));
+}
+
+/* ══ EL MÍNIMO QUE ELIGE QUIEN CONVOCA, Y EL HORARIO QUE NO DA (01/11, Daniel [c8bd27e9d3] y [4e2c13a995]) ══════════
+   ⛔ ESPEJO de `reglas/disciplina.py` (`minimos_pct_ofrecidos`, `sanciona_alguna_vez`, `techo_marcable`): la regla vive
+   ALLÍ y el servidor la aplica (`_minimo_de_la_convocatoria`); esto sólo la PINTA para decirlo antes de convocar.
+   Se llama «máximo que se puede marcar», NO «alcanzable» (Daniel: «es tan ambiguo que ni puta idea»): es la cuenta de las
+   casillas ofertadas que están en una racha de al menos `nS` seguidas dentro de su día. */
+function _minimosOfrecidos_(iso){
+  var p = Math.round(_pctMinimo_(iso) * 100);
+  return [p - 5, p, p + 5];
+}
+/* «ESTAS NUNCA SANCIONAN»: una reunión de trabajo no tiene mínimo que elegir. Un tipo que no se sabe no se da por libre. */
+function _sancionaAlguna_(tipo){
+  return String(tipo == null ? '' : tipo).trim().toLowerCase() !== 'trabajo';
+}
+function _maxMarcable_(bloques, nS){
+  var n = Math.max(1, +nS || 1), dias = {}, util = 0, d, fr, i, j;
+  (bloques || []).forEach(function(b){ (dias[b[0]] = dias[b[0]] || []).push(b[1]); });
+  for(d in dias){
+    fr = dias[d].slice().sort(function(a, b){ return a - b; });
+    for(i = 0; i < fr.length; i = j + 1){
+      for(j = i; j + 1 < fr.length && fr[j + 1] === fr[j] + 1; j++){}
+      if(j - i + 1 >= n) util += j - i + 1;
+    }
+  }
+  return util;
+}
+/* ¿Se puede convocar con este horario? `{ok, txt}`; `txt` lleva los números y es el MISMO que el del servidor. */
+function _veredictoHorarioConv_(bloques, nS, tipo, pct){
+  var tot = (bloques || []).length;
+  if(!tot) return {ok: true, txt: ''};
+  var max = _maxMarcable_(bloques, nS);
+  if(!max) return {ok: false, txt: 'Con este horario nadie puede marcar: no hay ninguna racha de ' + nS +
+    ' casillas seguidas en un mismo día.'};
+  if(_sancionaSola_(tipo) && max < Math.ceil(tot * pct / 100))
+    return {ok: false, txt: 'Con este horario nadie puede llegar al ' + pct + ' %: como mucho se pueden marcar ' + max +
+      ' de ' + tot + ' casillas (un ' + Math.floor(max * 100 / tot) + ' %).'};
+  return {ok: true, txt: ''};
+}
+/* Lo que se le dice a quien convoca sobre su horario, en las DOS caras: `bloqueo` (no se puede convocar, con números) y
+   `aviso` (días que no dan para la reunión pero que no impiden llegar: sólo se avisa). Sustituye al «pulsa otra vez para
+   convocarla igual» (Daniel, 01/11 [4e2c13a995]). `perDia` = franjas de cada día; `rangos`: los de `_genUnion_`. */
+function _horarioConv_(perDia, rangos, nS, slot, tipo, pct){
+  var bl = [];
+  perDia.forEach(function(idxs, d){ idxs.forEach(function(fi){ bl.push([d, fi]); }); });
+  var v = _veredictoHorarioConv_(bl, nS, tipo, pct), cortos = _diasCortosConv_(perDia, rangos, nS);
+  return {bloqueo: v.ok ? '' : v.txt,
+    aviso: (cortos && v.ok) ? ('Ojo: ' + cortos + ' día' + (cortos === 1 ? '' : 's') + ' no da' + (cortos === 1 ? '' : 'n') +
+      ' para ' + _durTxt_(nS * slot) + ' seguidos, así que ahí nadie podrá marcar.') : ''};
+}
+/* Los chips del mínimo (20 · 25 · 30 en julio). `cont` es el contenedor; `cara` 'e' (escritorio) o 'm' (móvil) sólo
+   cambia el marcado. Se repinta cuando cambian el TIPO o el LÍMITE (de él sale el periodo), conservando lo elegido si
+   sigue ofreciéndose. Trabajo: oculto y sin valor. `alCambiar` repinta la vista previa. */
+function _minimoConvPintar_(cont, cara, tipo, limiteISO, alCambiar){
+  if(!cont) return;
+  if(!_sancionaAlguna_(tipo)){ cont.hidden = true; cont.dataset.sel = ''; cont.dataset.key = ''; return; }
+  var of = _minimosOfrecidos_(limiteISO), clave = of.join('-') + '|' + (cara || 'e');
+  cont.hidden = false;
+  if(cont.dataset.key === clave) return;
+  var sel = +cont.dataset.sel;
+  if(of.indexOf(sel) < 0) sel = of[1];
+  cont.dataset.key = clave; cont.dataset.sel = String(sel);
+  var chips = of.map(function(x){
+    return cara === 'm' ? '<button data-mp="' + x + '" data-p' + (x === sel ? ' class="on"' : '') + '>' + x + ' %</button>'
+      : '<button type="button" class="pick' + (x === sel ? ' on' : '') + '" data-mp="' + x + '">' + x + ' %</button>';
+  }).join('');
+  cont.innerHTML = '<span class="sc" style="display:block;margin-bottom:' + (cara === 'm' ? 6 : 5) + 'px">Mínimo de disponibilidad</span>' +
+    (cara === 'm' ? '<div class="modos">' + chips + '</div>' : '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:7px">' + chips + '</div>') +
+    '<p class="' + (cara === 'm' ? 'rnota' : 'nota') + '"' + (cara === 'm' ? '' : ' style="border-top:0;margin-bottom:11px"') + '>' +
+    'Lo mínimo que hay que marcar para no salir propuesto a sanción. El del periodo es el ' + of[1] + ' %.</p>';
+  Array.prototype.forEach.call(cont.querySelectorAll('[data-mp]'), function(b){
+    b.onclick = function(){
+      Array.prototype.forEach.call(cont.querySelectorAll('[data-mp]'), function(x){ x.classList.remove('on'); });
+      b.classList.add('on'); cont.dataset.sel = b.dataset.mp;
+      if(alCambiar) alCambiar();
+    };
+  });
+}
+/* El % con el que se va a juzgar: el chip marcado, o el del periodo si no hay chips (trabajo). */
+function _minimoConvPct_(cont, limiteISO){
+  var el = cont && !cont.hidden ? +cont.dataset.sel : 0;
+  return el > 0 ? el : _minimosOfrecidos_(limiteISO)[1];
 }
 
 /* ⛔⛔ LAS RACHAS QUE SE QUEDAN CORTAS — la regla que sólo tenía el teléfono.
@@ -6666,6 +8157,23 @@ function _calorDe_(r, pond){
   return cel;
 }
 
+/* 01/11 · EL COLOR DEL MAPA DE CALOR LO DICE LA MODALIDAD. 🗣️ Daniel: *«Azul en telemáticas; rojo en presenciales e híbridas»* y
+   *«en híbridas morado claro, como un magenta»*. Es la paleta de siempre: presencial = rojo Solaris `#E41E25`, telemático = azul
+   `#3f9ed6` (`--tel`), y la híbrida, un magenta claro (`--hib`, en las dos hojas de estilo; los tres números de aquí son esos
+   colores). `a` es la opacidad (la intensidad). Una sola puerta para las dos caras. ⛔ La opacidad TOPA en .75: con el azul a
+   plena intensidad el número blanco queda a 3:1 (medido: `probar_feosesc_escritorio` «ningún texto baja de 4,5:1»); a .75 el
+   azul da 4,6:1 y el magenta 5,5:1. */
+function _calorColor_(modalidad, a){
+  var m=String(modalidad==null?'':modalidad).toLowerCase();
+  return 'rgba('+(/brid/.test(m) ? '196,92,214' : (/tel/.test(m) ? '63,158,214' : '228,30,37'))+','+Math.min(+a, .75)+')';
+}
+
+/* La leyenda de lo que cuenta el número: personas, o —en la vista Ponderada de una híbrida— PESO. 🗣️ Daniel: *«tiene que avisar
+   que no son personas sino peso en las híbridas»*. Corta, y con su muestra de color. */
+function _calorLeyenda_(modalidad, pondOn){
+  return pondOn ? 'el número es PESO, no personas: presencial pesa 2 · telemático 1' : 'el número es cuánta gente puede';
+}
+
 /* ⛔ 20/10 — QUIÉN PUEDE EN UNA CELDA (día `di`, franja `fi`). 🗣️ Daniel: *«no aparecen los nombres de los que pueden
    cada día»* · *«en modo público debería haber una forma de verlo»*. El texto de crear lo promete en las dos caras
    («cualquiera puede tocar un hueco y ver quién puede») y ninguna pintaba un nombre. MISMA lectura que `_calorDe_`, de
@@ -6733,7 +8241,7 @@ function _quienPuedePanel_(r, di, fi, rotulo){
     var st='display:inline-block;margin:2px 4px 2px 0;padding:3px 9px;border-radius:999px;font-size:13px;line-height:1.25;';
     st+= cls==='p' ? 'background:rgba(62,180,137,.22);border:1px solid var(--ok);color:var(--ink);font-weight:600'
                    : 'border:1px solid var(--line2,#463E40);color:var(--ink2);';
-    return '<span style="'+st+'">'+esc(pila(x.n))+t+'</span>';
+    return '<span data-qpc style="'+st+'">'+esc(pila(x.n))+t+'</span>';
   }
   var tot=g.puede.length+g.anon+g.sinDetalle;
   var h='<div style="font-size:12px;color:var(--ink2);margin-bottom:5px"><b style="color:var(--ink)">'+esc(rotulo||'')+'</b></div>';
@@ -6755,10 +8263,21 @@ function _qpMostrar_(el, html){
     gl=document.createElement('div'); gl.id='qpGlobo'; gl.setAttribute('role','status');
     gl.style.cssText='position:fixed;z-index:9999;max-width:min(340px,calc(100vw - 16px));min-width:170px;padding:10px 12px;'+
       'border-radius:12px;background:var(--sur2,#221E1F);border:1px solid var(--line2,#463E40);color:var(--ink);'+
-      'box-shadow:0 10px 30px rgba(0,0,0,.6);pointer-events:none;display:none';
+      'box-shadow:0 10px 30px rgba(0,0,0,.6);pointer-events:none;display:none;max-height:calc(100vh - 16px);overflow:hidden';
     document.body.appendChild(gl);
   }
   gl.innerHTML=html; gl.style.display='block';
+  /* 01/11 (Daniel: «tendría que ver en móvil que no se salga de la pantalla»): con una lista larguísima el globo crecía más que
+     la ventana y se salía por abajo. Si no cabe, se quitan chips por el final (primero los «sin contestar», luego los «no pueden»)
+     y se dice cuántos faltan; el titular «Pueden N» sigue contando a todos. */
+  var cs=gl.querySelectorAll('[data-qpc]'), fuera=0, nota=null;
+  if(gl.scrollHeight>gl.clientHeight+1 && cs.length){
+    nota=document.createElement('div'); nota.style.cssText='font-size:12px;color:var(--ink2);margin-top:4px'; gl.appendChild(nota);
+    while(gl.scrollHeight>gl.clientHeight+1 && fuera<cs.length){
+      var ult=cs[cs.length-1-fuera]; ult.parentNode.removeChild(ult); fuera++;
+      nota.textContent='y '+fuera+' más (no caben)';
+    }
+  }
   var rc=el.getBoundingClientRect(), W=window.innerWidth, H=window.innerHeight, w=gl.offsetWidth, hh=gl.offsetHeight, x, y;
   if(rc.right+8+w<=W-8){ x=rc.right+8; y=rc.top+rc.height/2-hh/2; }                 // a la derecha de la celda
   else if(rc.left-8-w>=8){ x=rc.left-8-w; y=rc.top+rc.height/2-hh/2; }              // o a la izquierda
@@ -7138,6 +8657,32 @@ function _unidadesCoord_(v){
   return out;
 }
 
+/* 01/11 · En QUÉ unidades está una persona: la suya y las de `unidades` (multiunidad), sin repetir. NO incluye `coordina`:
+   coordinar una unidad no es estar en ella. 🗣️ Daniel: *«lo q mide el ranking … es la media horaria de las personas que
+   estan en x subsistema»* — el ranking cuenta a cada una ENTERA en todas las suyas. Gemela de `reglas/perfiles.unidades_de`. */
+function _unidadesDe_(m){
+  var out=[], us=_unidadesCoord_(m && m.unidades), u=_limpio_(m && m.unidad), i;
+  if(u) out.push(u);
+  for(i=0;i<us.length;i++) if(out.indexOf(us[i])<0) out.push(us[i]);
+  return out;
+}
+
+/* 01/11: las unidades que NADIE coordina porque su coordinador se dio de baja SIN sucesor: `[{unidad, txt}]`.
+   `DATA.vacantes` lo escribe `ensamblar` (de la ficha `vacant` de quien se fue) y el servidor lo deja pasar al miembro.
+   Calla lo que no sabe —sin fecha o sin nombre— y sin lista da []: una unidad sin coordinador ya cae al PD (`coordinadorDe`),
+   esto sólo dice POR QUÉ. Las dos caras lo pintan con esta misma regla. */
+function _vacantesTxt_(){
+  var v=DATA.vacantes, out=[], i, x, f, t;
+  if(!v || typeof v.length!=='number') return out;
+  for(i=0;i<v.length;i++){
+    x=v[i]; if(!x || !_limpio_(x.unidad)) continue;
+    f=String(x.desde||'').match(/^\d{4}-(\d{2})-(\d{2})/);
+    t='Sin coordinador'+(f?' desde el '+f[2]+'/'+f[1]:'')+(_limpio_(x.de)?' · lo dejó '+_limpio_(x.de):'');
+    out.push({unidad:_limpio_(x.unidad), txt:t});
+  }
+  return out;
+}
+
 /* Los perfiles de `m`, de mas peso a menos y luego por unidad. Lista VACIA si no se
    sabe nada de esa persona: eso es "no lo se", y quien llame tiene que poder
    distinguirlo de "tiene un perfil". Nunca se inventa uno. */
@@ -7275,6 +8820,7 @@ function _etiOrigenParte_(p){
   var o = p && p.origen;
   if(o === 'fichaje') return null;              // el caso normal no necesita rotulo
   if(o === 'otorgada') return { tono:'ok', txt:'otorgada por ' + ((p && p.decidido_por) || 'coordinación') };
+  if(o === 'tarea_acabada') return { tono:'ok', txt:'tarea entregada · horas propuestas' + ((p && p.propuesto_por) ? ' por ' + String(p.propuesto_por).split(' ')[0] : '') };
   if(o === 'reversion') return { tono:'ok', txt:'reversión del parte ' + ((p && p.revierte) || '?') };
   if(o === 'manual'){
     /* Con hora de entrada y salida escritas, «sin fichaje» se lee como «no dijo cuando», que es
@@ -7353,8 +8899,16 @@ function _tostAutocierre_(r){
 function _avisoAutocierre_(p){
   if(!p || !p.autocierre || p.sinFichaje) return '';
   var t=_maxHorasParte_();
-  return 'Se cerró sola a las '+t+' h: esas horas las puso el sistema, no tú. '+
-    'Declara lo que trabajaste en un bloque y no este, o se contarían dos veces.';
+  return 'Se cerró sola a las '+t+' h y esas horas ya no valen: las puso el sistema, no tú. '+
+    'Declara lo que trabajaste en un bloque.';
+}
+
+/* 01/11 · Daniel (artifact «Quién firma el parte del PD»): *«Lo puedo firmar yo mismo, se supone que tengo buena fé, cuando
+   haya Project Manager y Technical Leader se lo firman mutuamente.»* La lógica no cambia (el PD firma lo suyo, `aprobadorDe`
+   / `puedeDecidirParte`); lo que faltaba es que la pantalla lo DIJERA. Una línea, o '' si no toca. Las dos caras la pintan
+   donde el PD ve un parte suyo por firmar. El porqué (y lo de PM/TL, futuro) vive en `docs/decisiones-app.md`. */
+function _notaFirmaPropia_(p, quien){
+  return (p && quien && p.autor===quien && rangoNom(quien)>=3) ? 'Lo firmas tú: no hay nadie por encima.' : '';
 }
 
 /* ═══ EL AVISO DE CRUCE DE MEDIANOCHE · UNA PUERTA PARA LAS DOS CARAS ════════════
@@ -7500,6 +9054,16 @@ function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.
    Vive aqui desde el 14/08 porque el escritorio ficha con la misma regla. */
 function _imputacion_(f){ return f.cat==='tareas' ? (f.tarea==='__otro__' ? f.detalle.trim() : f.tarea) : f.detalle.trim(); }
 
+/* El `url` (page-id de Notion) de la tarea imputada, o `null` (01/11): el servidor casa por él la unidad del parte, y el
+   título queda de respaldo. Sólo si la imputación ES una de TUS tareas y su título no se repite entre ellas (si se
+   repite, la lista no distingue cuál elegiste y mandar una al azar enrutaría a la unidad equivocada). */
+function _imputacionUrl_(f, tareas, yo){
+  if(f.cat!=='tareas' || f.tarea==='__otro__' || !f.tarea) return null;
+  var L=_tareasResp_(tareas, yo), hit=[], i;
+  for(i=0;i<L.length;i++) if(L[i] && L[i].n===f.tarea) hit.push(L[i]);
+  return hit.length===1 && hit[0].url ? String(hit[0].url) : null;
+}
+
 function _novedades_(){
   /* Lo más nuevo primero. Al cerrar una pieza se añade su tanda AQUÍ, en ese momento.
 
@@ -7512,6 +9076,35 @@ function _novedades_(){
      El sitio donde SÍ va todo —también lo invisible— es `docs/tandas.md`. Dos lectores, dos
      documentos: aquí lo que se toca, allí lo que se hizo. */
   return [
+    { id:'2026-11-01-reuvista', fecha:'2026-11-01',
+      titulo:'Mapa por colores, asistencia desde el móvil y reuniones editables',
+      items:[
+        {cara:'movil', vista:'reu', txt:'El mapa de «Cuándo puede el equipo» se pinta según la reunión: **azul** si es telemática, **rojo** si es presencial y **magenta** si es híbrida. En una híbrida con la vista Ponderada la leyenda avisa de que el número es **peso, no personas** (presencial pesa 2).'},
+        {cara:'escritorio', vista:'convoc', txt:'Lo mismo en el escritorio: el color del mapa de calor lo dice la modalidad de la reunión.'},
+        {cara:'escritorio', vista:'convoc', txt:'**Asistencia en directo**: quien vino por **telemático** (porque marcó sólo telemático) sale en **azul** en su cuadrito y se cuenta aparte; un toque en un cuadrito lo marca o lo quita.'},
+        {cara:'movil', vista:'reu', txt:'El Project Director tiene en la reunión general **«Asistencia en directo»**: la palabra, la lista con un toque para marcar o quitar a alguien, y **añadir a quien llega de improviso** (queda presente de un gesto). Mientras, el ordenador sigue proyectando.'},
+        {cara:'movil', vista:'reu', txt:'**Título y plazo**: quien convoca puede cambiar el título y la fecha límite de su reunión. Si con el nuevo plazo el primer aviso de «marca tu disponibilidad» (24 h antes) ya no llega a salir, te lo dice; si no, no avisa de nada.'},
+        {cara:'escritorio', vista:'convoc', txt:'«Editar título y plazo» también en la ficha de la reunión del escritorio.'},
+        {cara:'movil', vista:'reu', txt:'El globo de «quién puede» no se sale de la pantalla del móvil, ni con una lista larguísima: los que no pueden o no han contestado se cortan y se cuenta cuántos más hay.'}
+      ] },
+    { id:'2026-11-01-tanda', fecha:'2026-11-01',
+      titulo:'Viendo como, procede veto, el objetivo del mes y sin ventanas del navegador',
+      items:[
+        {cara:'escritorio', vista:'panel', txt:'Cuando actúas como otra persona, una **banda** arriba lo dice todo el rato, con su nombre y cómo volver a ti.'},
+        {cara:'escritorio', vista:'sanciones', txt:'**Procede veto**: si alguien en evaluación con 0 puntos recibe otra sanción, te sale la tarea «escríbele»; al marcarla empieza el reloj, y al vencer, «decide si se veta».'},
+        {cara:'movil', vista:'estado', txt:'Lo mismo en el móvil, encima de **Pendientes de decidir**. Y al poner una sanción por no cubrir la disponibilidad (30g), bajo **Puntos** dice de dónde sale el número.'},
+        {cara:'movil', vista:'estado', txt:'En **Lo tuyo**, el **objetivo de horas del mes**, el mismo número con el que se calcula la cuota.'},
+        {cara:'escritorio', vista:'convoc', txt:'Una reunión que **ya ha pasado** y nadie fichó dice **«Ya ha pasado: ficha el bloque»** (y a quien convocó le llega un aviso). Con la grabación subida, el resumen ya no es obligatorio.'},
+        {cara:'escritorio', vista:'equipo', txt:'Si una unidad se queda **sin coordinador** por una baja, lo dice el panel y el cierre: desde cuándo y quién lo dejó.'},
+        {cara:'escritorio', vista:'docs', txt:'Un expediente que no tiene a nadie que lo pueda revisar dice **«Sin revisor: avisa al Project Director»**, en vez de dejarlo atascado.'},
+        {cara:'escritorio', vista:'horas', txt:'Ya no queda **ninguna ventana del navegador** (los «Aceptar / Cancelar» grises): todas las preguntas son las de la app, con botones que dicen lo que hacen.'},
+        {cara:'escritorio', vista:'panel', txt:'Las listas del escritorio sin las viñetas del navegador, y **todo el texto con contraste suficiente** para leerse bien.'},
+        {cara:'escritorio', vista:'convoc', txt:'**Asistencia en directo**: «Añadir a alguien» vuelve a funcionar — busca entre quien no está convocado, o escribe el nombre de alguien que aún no está en el equipo.'},
+        {cara:'escritorio', vista:'panel', txt:'**Esc** cierra «Ver lista» y cualquier pregunta de la app; y en una pantalla estrecha (1024 px) el escritorio ya no se sale del marco.'},
+        {cara:'escritorio', vista:'docs', txt:'A quien le **rechazan un documento** se le dice también en el escritorio cómo rehacerlo: por el formulario, como «Documento nuevo».'},
+        {cara:'escritorio', vista:'convoc', txt:'Si el servidor **no contesta**, ningún botón se queda «Convocando…» para siempre: vuelve y te dice que puede que se haya guardado y que recargues antes de repetirlo (en las dos caras).'},
+        {cara:'movil', vista:'fichar', txt:'Al declarar horas, una hora escrita sin los dos puntos (**1730**, **930**) se entiende sola, y una fecha que aún no ha llegado se avisa antes de enviar.'}
+      ] },
     { id:'2026-10-31-asistencia', fecha:'2026-10-31',
       titulo:'Asistencia en directo de las reuniones generales',
       items:[
@@ -7777,7 +9370,7 @@ function _novedades_(){
     { id:'2026-10-20-select-oscuro', fecha:'2026-10-20',
       titulo:'Las listas desplegables, por fin en oscuro',
       items:[
-        {cara:'escritorio', vista:'turnos', txt:'Abre cualquier desplegable (`<select>`): la lista sale **oscura**, con los colores de la app, no blanca. El arreglo del 13/10 no se aplicaba.'},
+        {cara:'escritorio', vista:'turnos', txt:'Abre cualquier desplegable: la lista sale **oscura**, con los colores de la app, no blanca. El arreglo del 13/10 no se aplicaba.'},
         {cara:'movil', vista:'fichar', txt:'Lo mismo en el móvil, donde el navegador dibuje la lista.'}
       ] },
     { id:'2026-10-20-registro-ant', fecha:'2026-10-20',
@@ -9516,10 +11109,10 @@ function _novHTML_(cara){
         d.hechas.map(function(t){ return tanda(t,true); }).join('')+'</details>'
       : '')+
     '<p class="novpie">'+(_novSrv_()
-      ? 'El «visto» queda <b>en el servidor</b>, con la fecha y quién lo marcó — así lo ve también quien programa.'
+      ? 'El «visto» queda en el servidor, con la fecha y quién lo marcó.'
       : (_novPuedeRegistro_()
-          ? 'El «visto» se guarda <b>en este navegador</b>; el registro del servidor no ha cargado (se reintenta al volver a entrar).'
-          : 'El «visto» se guarda <b>en este navegador</b>. El registro compartido es del director.'))+'</p>'+
+          ? 'El «visto» se guarda en este navegador; el registro del servidor no ha cargado (se reintenta al volver a entrar).'
+          : 'El «visto» se guarda en este navegador. El registro compartido es del director.'))+'</p>'+
   '</div>';
 }
 
@@ -9774,6 +11367,41 @@ function _avisosDoc_(e){
       reconstruir la decisión desde `e.estado` —que es lo que hacían las dos caras— **no puede**
       distinguir «te lo aprobaron» de «te lo aprobaron cambiándote el título y las etiquetas».
       Y eso segundo es justo lo que el autor necesita saber. */
+/* Lo que le toca decir al AUTOR de un expediente ya decidido, UNA vez para las dos caras (`_docAutorHTML_` del móvil,
+   `_docAutorE_` del escritorio): qué rama es y su texto. Cada cara pone su marco (`avisolargo` / `ruta`) y lo que cuelga
+   de él (los pasos de sustituir, la ayuda de «si lo rehaces»). `e` ya en los nombres CORTOS de esta puerta:
+   {estado, nota, decision, decidedAt, revisor, url}; la cara traduce antes de preguntar (el escritorio nombra `est`/`notion`).
+   Devuelve null para `revision` (ahí «lo firma X» SÍ es verdad). `tipo`: 'cambios' (los pasos para corregir cuelgan de
+   él en el móvil; el escritorio tiene su propia rama con ellos) | 'rechazado' | 'publicando' | 'decidido' (aprobado, anot, publicado: ahí caben los pasos
+   de sustituir). `html` es el contenido del marco, ya escapado. */
+function _docAutorModelo_(e){
+  if(!e) return null;
+  var firma=(typeof _firmaDocTxt_==='function') ? _firmaDocTxt_(e) : '';
+  var pie=firma ? '<br><span class="sc">'+esc(firma)+'</span>' : '';
+  if(e.estado==='cambios')
+    return {tipo:'cambios', html:'<b>Te pidieron cambios.</b> '+esc(e.nota||'')+pie};
+  /* Desde un rechazo no hay «reenviar» (`Codigo.gs` exige `cambios`): lo suyo es un envío NUEVO, enlazado al original,
+     que no se borra. Lo dicen las dos caras (hasta el 01/11 sólo el móvil). */
+  if(e.estado==='rechazado')
+    return {tipo:'rechazado', html:'<b>Te lo rechazaron.</b> '+esc(e.nota||'Sin motivo escrito.')+pie+
+      '<div style="margin-top:8px">Si lo rehaces, mándalo por el formulario como «Documento nuevo».</div>'};
+  if(e.estado==='publicando')
+    return {tipo:'publicando', html:'<b>Aprobado: se está publicando.</b> Cuando termine, aquí tendrás el enlace.'+pie};
+  if(e.estado==='aprobado'||e.estado==='anot'||e.estado==='publicado'){
+    /* La acción sale de `decision.accion`, no del estado: el backend deja `aprobado` y `anot` en el MISMO `publicado`. */
+    var acc=(typeof _accionDocTxt_==='function')
+      ? (_accionDocTxt_(e.decision&&e.decision.accion)||'Aprobado') : 'Aprobado';
+    var aj=(typeof _ajustesDocTxt_==='function') ? _ajustesDocTxt_(e) : '';
+    /* El enlace sólo si es uno de verdad: `Codigo.gs` pone `'#notion'` de marcador y un enlace muerto con pinta de vivo
+       es peor que ninguno. */
+    var url=String(e.url||'');
+    return {tipo:'decidido', html:'<b>'+esc(acc)+'.</b> '+(aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+
+      (url.indexOf('http')===0
+        ? '<br><a href="'+esc(url)+'" target="_blank" rel="noopener">Ver la página publicada</a>' : '')};
+  }
+  return null;
+}
+
 function _accionDocTxt_(a){
   return a==='aprobado'  ? 'Aprobado'
        : a==='anot'      ? 'Aprobado con anotaciones'
@@ -9829,6 +11457,7 @@ function _ajustesDocTxt_(e){
   /* 28/10: los dos campos nuevos de «con anotaciones». `''` en el subtítulo es QUITARLO, y se dice. */
   if(a.subtitulo!=null) p.push(a.subtitulo ? 'subtítulo → «'+a.subtitulo+'»' : 'sin subtítulo');
   if(a.confidencialidad) p.push('confidencialidad → '+a.confidencialidad);
+  if(a.version) p.push('versión → '+a.version);   /* 01/11: la propone el autor, la cambia el revisor */
   return p.length ? p.join(' · ') : '';
 }
 
@@ -9848,6 +11477,9 @@ function _anotActualDe_(e){
            subtitulo: String(e.subtitulo || ''),
            confidencialidad: (n === 'publico' || n === 'interno') ? n : '',
            etiquetas: _etiquetasDe_(e) };
+  /* 01/11 · LA VERSIÓN (Daniel, 31/10: *«El autor propone y el revisor puede cambiarlo»*): sólo se ofrece si el expediente ya la
+     trae (la propuso el autor en el Form) o sustituye a otro (es una versión nueva). Sin eso, ni la clave: no hay campo. */
+  if (e.version || e.sustituyeA){ a.conVersion = true; a.version = String(e.version || ''); }
   var sg = _anotSugerida_(e);
   if (sg) a.sugerida = sg;
   return a;
@@ -9868,6 +11500,7 @@ function _anotSugerida_(e){
 
 /* Qué campos de `campos` difieren de `act`. Un campo que NO llega (`null`/ausente) no cuenta como cambio: un input que
    no existe no puede borrar nada. El título vacío tampoco (no es un estado válido); el subtítulo vacío SÍ (es quitarlo). */
+function _versionDocOK_(v){ return /^\d{1,3}(\.\d{1,2})?$/.test(String(v == null ? '' : v).trim()); }
 function _anotCambios_(act, campos){
   act = act || {}; campos = campos || {};
   var c = [], t = campos.titulo, s = campos.subtitulo, n = campos.confidencialidad, q = campos.etiquetas;
@@ -9875,6 +11508,9 @@ function _anotCambios_(act, campos){
   if (s != null && String(s).trim() !== String(act.subtitulo || '')) c.push('subtitulo');
   if ((n === 'publico' || n === 'interno') && n !== act.confidencialidad) c.push('confidencialidad');
   if (Array.isArray(q) && JSON.stringify(q) !== JSON.stringify(act.etiquetas || [])) c.push('etiquetas');
+  /* 01/11: la versión, como la entiende el servidor (`2` o `2.1`); otra cosa no cuenta como cambio, y se dice al aprobar. */
+  var v = campos.version;
+  if (v != null && _versionDocOK_(v) && String(v).trim() !== String(act.version || '')) c.push('version');
   return c;
 }
 
@@ -9883,7 +11519,7 @@ function _anotCambios_(act, campos){
 /* ⛔⛔ 28/10: ¿HA EDITADO EL PANEL Y VA A PULSAR «APROBAR» A SECAS? Daniel cambió el subtítulo del 4102 («Almacenamiento seco
    para cargas CANDY»), pulsó «Aprobar» y se publicó con el sugerido: `aprobado` no lee el panel. La base es lo que el panel
    trae RELLENO (la portada sugerida, si la hay): aprobar la sugerencia sin tocarla sigue siendo «Aprobar». */
-var _AVISO_APROBAR_EDITADO_='Has cambiado campos de «Aprobar con anotaciones»: con «Aprobar» se perderían. Usa «Aprobar con anotaciones» (y «Comprobar portada»).';
+var _AVISO_APROBAR_EDITADO_='Has tocado campos de «Aprobar con anotaciones»: con «Aprobar» se perderían. Usa esa opción (y «Comprobar portada»).';
 function _anotEditadoSinAnot_(e, pre){
   var a = _anotActualDe_(e), base = {};
   for (var k in a) base[k] = a[k];
@@ -9896,15 +11532,16 @@ function _anotExtra_(act, form){
   var c = _anotCambios_(act, form);
   if (!c.length) return null;
   var x = {};
-  c.forEach(function(k){ x[k] = (k === 'titulo' || k === 'subtitulo') ? String(form[k]).trim() : form[k]; });
+  c.forEach(function(k){ x[k] = (k === 'titulo' || k === 'subtitulo' || k === 'version') ? String(form[k]).trim() : form[k]; });
   var ind = String(form.indicacion || '').trim();
   if (ind) x.indicacion = ind;
   return x;
 }
 
 /* El panel. `css` es el estilo de los campos de la cara (el escritorio pasa `CAMPO_CSS`; el móvil, nada). */
-function _anotPanelHTML_(pre, act, id, css){
-  act = act || {};
+function _anotPanelHTML_(pre, act, id, css, o){
+  act = act || {}; o = o || {};
+  if (typeof document !== 'undefined' && document.head) _pselCss_();   /* los chips de las etiquetas son los de `elegirPersonas` */
   var st = css ? ' style="' + css + '"' : '';
   var sg = act.sugerida || null;
   /* El contorno azul de «lo ha cambiado el bot», en el MISMO atributo style que el de la cara. */
@@ -9914,7 +11551,7 @@ function _anotPanelHTML_(pre, act, id, css){
   var bt = 'padding:5px 12px;font-size:12px';
   /* ⛔ 28/10: `data-anotdoc`, NO `data-doc`: el móvil le pone a todo `[data-doc]` un onclick que ABRE la ficha, y un toque
      dentro del panel la repintaba con lo escrito borrado (visto probando el check como usuario). */
-  return '<div id="' + pre + 'Anot" data-anot="' + pre + '" data-anotdoc="' + esc(String(id)) + '" data-modo="ia" style="margin-top:10px">' +
+  return '<div id="' + pre + 'Anot" data-anot="' + pre + '" data-anotdoc="' + esc(String(id)) + '" data-modo="ia" data-etqorig="' + esc(JSON.stringify(act.etiquetas || [])) + '" style="margin-top:10px">' +
     '<span class="sc" style="display:block;margin-bottom:6px">Con anotaciones · lo que se ajusta al aprobar</span>' +
     '<div style="display:flex;gap:6px">' +
       '<button type="button" class="btn pri" style="' + bt + '" data-anotmodo="ia" data-pre="' + pre + '">SolarIA</button>' +
@@ -9936,7 +11573,17 @@ function _anotPanelHTML_(pre, act, id, css){
       'Hace falta para aprobar con anotaciones: mete el título y el subtítulo en la portada de verdad.</p></div>' +
     '<div class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">Confidencialidad</span>' +
       nxElige(pre + 'Conf', (act.confidencialidad ? [] : [['', '— sin indicar —']]).concat([['publico', 'Público'], ['interno', 'Interno']]), act.confidencialidad || '') + '</div>' +
-    campo('Etiquetas · separadas por comas', '<input id="' + pre + 'Etq" value="' + esc((act.etiquetas || []).join(', ')) + '"' + st + '>') +
+    /* 02/11: las etiquetas desde el BANCO. `#Etq` (oculto) guarda la lista; se ve lo elegido, el buscador y, en el escritorio, «Ver todas». */
+    '<div class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">Etiquetas · del banco, o crea una</span>' +
+      '<input id="' + pre + 'Etq" style="display:none" tabindex="-1" value="' + esc((act.etiquetas || []).join(', ')) + '">' +
+      '<div class="psel-fila" id="' + pre + 'EtqSel">' + _etqSelHTML_(act.etiquetas || [], act.etiquetas || []) + '</div>' +
+      '<div class="psel-campo"><input id="' + pre + 'EtqQ" data-etqin="' + pre + '" placeholder="Busca o escribe una etiqueta…" autocomplete="off"' + st + '>' +
+        (o.todas ? '<button type="button" class="psel-ver" data-etqver="' + pre + '" data-p>Ver todas</button>' : '') + '</div>' +
+      '<div class="psel-fila" id="' + pre + 'EtqSug" style="margin-top:7px"></div>' +
+      (o.todas ? '<div id="' + pre + 'EtqTodas" style="display:none;margin-top:6px;max-height:320px;overflow-y:auto"></div>' : '') + '</div>' +
+    /* 01/11: la versión la propuso el autor; el revisor puede cambiarla. Texto con teclado numérico, no `type=number`. */
+    (act.conVersion ? campo('Versión · la propuso el autor; puedes cambiarla', '<input id="' + pre + 'Ver" inputmode="decimal" maxlength="6" ' +
+      'placeholder="2" value="' + esc(act.version || '') + '"' + st + '>') : '') +
   '</div>';
 }
 
@@ -9945,6 +11592,7 @@ function _anotLeer_(pre){
   var v = function(k){ var x = document.getElementById(pre + k); return x ? String(x.value || '') : null; };
   var t = v('Tit'), s = v('Sub'), q = v('Etq');
   return { titulo: t == null ? null : t.trim(), subtitulo: s == null ? null : s.trim(), confidencialidad: v('Conf') || '',
+           version: v('Ver'),
            etiquetas: q == null ? null : _etiquetasDeTexto_(q), indicacion: String(v('Ind') || '').trim() };
 }
 
@@ -9998,15 +11646,16 @@ function _anotModo_(pre, modo){
 
 /* El nombre de un campo, para decirlo en pantalla. */
 function _anotNombre_(k){
-  return ({titulo:'título', subtitulo:'subtítulo', confidencialidad:'confidencialidad', etiquetas:'etiquetas'})[k] || k;
+  return ({titulo:'título', subtitulo:'subtítulo', confidencialidad:'confidencialidad', etiquetas:'etiquetas', version:'versión'})[k] || k;
 }
 
 /* Pone en el panel lo que SolarIA propone, SÓLO en los campos que cambia, y los marca (azul Solaris). */
 function _anotRellenar_(pre, campos, cambios){
   (cambios || []).forEach(function(k){
-    var x = document.getElementById(pre + ({titulo:'Tit', subtitulo:'Sub', confidencialidad:'Conf', etiquetas:'Etq'})[k]);
+    var x = document.getElementById(pre + ({titulo:'Tit', subtitulo:'Sub', confidencialidad:'Conf', etiquetas:'Etq', version:'Ver'})[k]);
     if (!x) return;
     x.value = k === 'etiquetas' ? (campos.etiquetas || []).join(', ') : String(campos[k] == null ? '' : campos[k]);
+    if (k === 'etiquetas'){ _etqPintar_(pre); x = document.getElementById(pre + 'EtqSel') || x; }   /* el campo está oculto: se repintan las elegidas y el contorno va a ellas */
     var caja = x.type === 'hidden' ? x.closest('.nx') : null;   /* un campo propio (`nxElige`): se repinta y el contorno va a su caja */
     if (caja) nxPon(x.id, x.value);
     (caja || x).style.outline = '2px solid #3f9ed6';
@@ -10105,6 +11754,7 @@ function _anotInput_(ev){
   if (!c) return;
   var pre = c.getAttribute('data-anot');
   if (t.id === pre + 'Tit' || t.id === pre + 'Sub') _anotChkPintar_(pre);
+  if (t.id === pre + 'EtqQ'){ _etqCargar_(pre); _etqPintar_(pre); }
 }
 
 /* El botón «Comprobar portada»: el título y el subtítulo de la PANTALLA al servidor; el panel, bloqueado mientras. */
@@ -10132,10 +11782,228 @@ async function _anotComprobar_(pre, e){
   _anotChkPintar_(pre);
 }
 
+/* ══ 02/11 · LAS ETIQUETAS, DESDE EL BANCO (fase 3 de la ficha de las etiquetas) ═══════════════════════════════════
+   🗣️ Daniel: «un banco de etiquetas desde las que el pod pueda escoger […] las que cuando está el revisor en ello también
+   según escribe se le van autocompletando […] como en Notion […] si no hay ninguna que tenga exactamente ese nombre pues te
+   pone crear etiqueta sí, pues la creas, o sea, sin pantalla de confirmación […] Pero que te aparezca de algún modo que
+   seas consciente que la vas a crear» · «Ver todo» por secciones SÓLO en el ordenador; en el móvil, buscar.
+   El valor sigue en `#<pre>Etq` (ahora oculto, la misma coma de siempre: `_anotLeer_`, `_anotRellenar_` y el resto no cambian);
+   lo que se ve son las elegidas (rojo; las que no están en el banco ni venían con el documento, «nueva»), el buscador y sus
+   sugerencias, y —sólo en el escritorio— «Ver todas» por categorías. Elegir una VARIANTE añade su canónica. */
+var BANCO_NOPROP = [];                /* las de «No proponer» del banco (`noProponer` de `getBancoEtiquetas`): la app no ofrece crearlas */
+var BANCO_ETQ = null;                 /* null = sin pedir (o pedido y vacío / fallido: se reintenta al abrir OTRO expediente); si no, [{nombre, etiquetas:[{canonica, variantes, nota}]}] */
+
+/* ⛔ LA REGLA DE `base-documental/scripts/banco_etiquetas.py` (`_plano`, `_singular`, `clave`), PORTADA UNA VEZ: sin tildes, sin
+   mayúsculas y cada palabra en singular. Sólo para COMPARAR: lo que se guarda es la etiqueta, nunca su clave. Paridad contra
+   la de Python en `probar_etiquetas_clave.py`. */
+function _etqClave_(t){
+  /* Las dos expresiones que esta función NECESITA para dar lo que da Python (refutador 02/11): `unicodedata.combining(c)` quita toda marca con
+     clase de combinación ≠ 0 —no sólo U+0300-036F— y `str.split()` parte por SUS espacios (con \x1c-\x1f y \x85, sin el BOM), no por los de `\s`.
+     El rango sale de `unicodedata` (Unicode 15.1); `probar_etiquetas_clave.py` recorre TODOS los puntos de código contra Python y se pone rojo si
+     cambia la versión. */
+  var R = _etqClave_.R || (_etqClave_.R = {marcas: /[\u{300}-\u{34e}\u{350}-\u{36f}\u{483}-\u{487}\u{591}-\u{5bd}\u{5bf}\u{5c1}-\u{5c2}\u{5c4}-\u{5c5}\u{5c7}\u{610}-\u{61a}\u{64b}-\u{65f}\u{670}\u{6d6}-\u{6dc}\u{6df}-\u{6e4}\u{6e7}-\u{6e8}\u{6ea}-\u{6ed}\u{711}\u{730}-\u{74a}\u{7eb}-\u{7f3}\u{7fd}\u{816}-\u{819}\u{81b}-\u{823}\u{825}-\u{827}\u{829}-\u{82d}\u{859}-\u{85b}\u{898}-\u{89f}\u{8ca}-\u{8e1}\u{8e3}-\u{8ff}\u{93c}\u{94d}\u{951}-\u{954}\u{9bc}\u{9cd}\u{9fe}\u{a3c}\u{a4d}\u{abc}\u{acd}\u{b3c}\u{b4d}\u{bcd}\u{c3c}\u{c4d}\u{c55}-\u{c56}\u{cbc}\u{ccd}\u{d3b}-\u{d3c}\u{d4d}\u{dca}\u{e38}-\u{e3a}\u{e48}-\u{e4b}\u{eb8}-\u{eba}\u{ec8}-\u{ecb}\u{f18}-\u{f19}\u{f35}\u{f37}\u{f39}\u{f71}-\u{f72}\u{f74}\u{f7a}-\u{f7d}\u{f80}\u{f82}-\u{f84}\u{f86}-\u{f87}\u{fc6}\u{1037}\u{1039}-\u{103a}\u{108d}\u{135d}-\u{135f}\u{1714}-\u{1715}\u{1734}\u{17d2}\u{17dd}\u{18a9}\u{1939}-\u{193b}\u{1a17}-\u{1a18}\u{1a60}\u{1a75}-\u{1a7c}\u{1a7f}\u{1ab0}-\u{1abd}\u{1abf}-\u{1ace}\u{1b34}\u{1b44}\u{1b6b}-\u{1b73}\u{1baa}-\u{1bab}\u{1be6}\u{1bf2}-\u{1bf3}\u{1c37}\u{1cd0}-\u{1cd2}\u{1cd4}-\u{1ce0}\u{1ce2}-\u{1ce8}\u{1ced}\u{1cf4}\u{1cf8}-\u{1cf9}\u{1dc0}-\u{1dff}\u{20d0}-\u{20dc}\u{20e1}\u{20e5}-\u{20f0}\u{2cef}-\u{2cf1}\u{2d7f}\u{2de0}-\u{2dff}\u{302a}-\u{302f}\u{3099}-\u{309a}\u{a66f}\u{a674}-\u{a67d}\u{a69e}-\u{a69f}\u{a6f0}-\u{a6f1}\u{a806}\u{a82c}\u{a8c4}\u{a8e0}-\u{a8f1}\u{a92b}-\u{a92d}\u{a953}\u{a9b3}\u{a9c0}\u{aab0}\u{aab2}-\u{aab4}\u{aab7}-\u{aab8}\u{aabe}-\u{aabf}\u{aac1}\u{aaf6}\u{abed}\u{fb1e}\u{fe20}-\u{fe2f}\u{101fd}\u{102e0}\u{10376}-\u{1037a}\u{10a0d}\u{10a0f}\u{10a38}-\u{10a3a}\u{10a3f}\u{10ae5}-\u{10ae6}\u{10d24}-\u{10d27}\u{10eab}-\u{10eac}\u{10efd}-\u{10eff}\u{10f46}-\u{10f50}\u{10f82}-\u{10f85}\u{11046}\u{11070}\u{1107f}\u{110b9}-\u{110ba}\u{11100}-\u{11102}\u{11133}-\u{11134}\u{11173}\u{111c0}\u{111ca}\u{11235}-\u{11236}\u{112e9}-\u{112ea}\u{1133b}-\u{1133c}\u{1134d}\u{11366}-\u{1136c}\u{11370}-\u{11374}\u{11442}\u{11446}\u{1145e}\u{114c2}-\u{114c3}\u{115bf}-\u{115c0}\u{1163f}\u{116b6}-\u{116b7}\u{1172b}\u{11839}-\u{1183a}\u{1193d}-\u{1193e}\u{11943}\u{119e0}\u{11a34}\u{11a47}\u{11a99}\u{11c3f}\u{11d42}\u{11d44}-\u{11d45}\u{11d97}\u{11f41}-\u{11f42}\u{16af0}-\u{16af4}\u{16b30}-\u{16b36}\u{16ff0}-\u{16ff1}\u{1bc9e}\u{1d165}-\u{1d169}\u{1d16d}-\u{1d172}\u{1d17b}-\u{1d182}\u{1d185}-\u{1d18b}\u{1d1aa}-\u{1d1ad}\u{1d242}-\u{1d244}\u{1e000}-\u{1e006}\u{1e008}-\u{1e018}\u{1e01b}-\u{1e021}\u{1e023}-\u{1e024}\u{1e026}-\u{1e02a}\u{1e08f}\u{1e130}-\u{1e136}\u{1e2ae}\u{1e2ec}-\u{1e2ef}\u{1e4ec}-\u{1e4ef}\u{1e8d0}-\u{1e8d6}\u{1e944}-\u{1e94a}]/gu, espacio: /[\t\n\v\f\r\x1c-\x1f \x85\xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/});   /* una vez, y dentro: `jsfuente.funcion` la extrae sola */
+  var p = String(t == null ? '' : t).normalize('NFKD').replace(R.marcas, '').toLowerCase().split(R.espacio);
+  var out = [];
+  for (var i = 0; i < p.length; i++){
+    var cs = Array.from(p[i]), n = cs.length;      /* por PUNTOS DE CÓDIGO, como `len()` de Python: un emoji no es 2 */
+    if (!n) continue;
+    var w = p[i];
+    if (n > 4 && cs[n - 2] === 'e' && cs[n - 1] === 's' && 'rlndzj'.indexOf(cs[n - 3]) >= 0) w = cs.slice(0, n - 2).join('');
+    else if (n > 3 && cs[n - 1] === 's' && !(cs[n - 2] === 's') && !(cs[n - 2] === 'i')) w = cs.slice(0, n - 1).join('');
+    out.push(w);
+  }
+  return out.join(' ');
+}
+/* Todas las formas del banco (canónica y variantes) con su canónica y su categoría. */
+function _etqFormas_(){
+  var fs = [];
+  (BANCO_ETQ || []).forEach(function(c){
+    (c.etiquetas || []).forEach(function(e){
+      fs.push({ canon: e.canonica, forma: e.canonica, k: _etqClave_(e.canonica), cat: c.nombre });
+      (e.variantes || []).forEach(function(v){ fs.push({ canon: e.canonica, forma: v, k: _etqClave_(v), cat: c.nombre }); });
+    });
+  });
+  return fs;
+}
+
+/* La canónica de una etiqueta del banco (o de una de sus variantes); `''` si no está. */
+function _etqCanonica_(t){
+  var k = _etqClave_(t), fs = _etqFormas_();
+  for (var i = 0; i < fs.length; i++) if (fs[i].k === k) return fs[i].canon;
+  return '';
+}
+
+/* Lo que sugiere el buscador para `q`: las canónicas del banco (y las que ya traía el documento) cuya forma o variante contiene
+   lo escrito —las exactas y las que empiezan por ello, antes—, sin las ya elegidas; y `crear` = lo escrito, si NINGUNA tiene
+   exactamente ese nombre (comparando por clave: `aerofreno` = `Aerofrenos`). */
+function _etqSugerir_(q, sel, orig){
+  var kq = _etqClave_(q), res = { sugs: [], crear: null };
+  if (!kq) return res;
+  var selK = (sel || []).map(_etqClave_), vistas = {}, exacto = false, cand = [];
+  var fs = _etqFormas_();
+  (orig || []).forEach(function(o){ if (!_etqCanonica_(o)) fs.push({ canon: o, forma: o, k: _etqClave_(o), cat: '' }); });
+  fs.forEach(function(f, i){
+    if (f.k === kq) exacto = true;
+    var pos = f.k.indexOf(kq);
+    if (pos < 0) return;
+    var kc = _etqClave_(f.canon);
+    if (selK.indexOf(kc) >= 0) return;
+    var rango = f.k === kq ? 0 : pos === 0 ? 1 : 2;
+    if (vistas[kc] != null){ if (rango < cand[vistas[kc]].rango){ cand[vistas[kc]].rango = rango; cand[vistas[kc]].via = f.forma !== f.canon ? f.forma : ''; } return; }
+    vistas[kc] = cand.length;
+    cand.push({ canon: f.canon, via: f.forma !== f.canon ? f.forma : '', cat: f.cat, rango: rango, i: i });
+  });
+  cand.sort(function(a, b){ return a.rango - b.rango || a.i - b.i; });
+  res.sugs = cand.slice(0, 8);
+  var limpio = String(q).replace(/,/g, ' ').replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+  if (limpio && !exacto && selK.indexOf(kq) < 0){
+    /* ⛔ 02/11 (contradmanana, 2): una de «No proponer» NO se crea: el revisor la vería aceptada y `casar_etiquetas` la aparta al publicar,
+       así que Notion no la recibiría. Se enseña que no se usa (`noSeUsa`), sin diálogo. */
+    if ((BANCO_NOPROP || []).map(_etqClave_).indexOf(kq) >= 0) res.noSeUsa = limpio;
+    else res.crear = limpio;
+  }
+  return res;
+}
+
+/* Las elegidas de un panel (el campo oculto) y las que traía el documento (`data-etqorig`). */
+function _etqLista_(pre){
+  var x = document.getElementById(pre + 'Etq');
+  return x ? _etiquetasDeTexto_(x.value) : [];
+}
+function _etqOrig_(pre){
+  var c = document.getElementById(pre + 'Anot'), v = c ? c.getAttribute('data-etqorig') : '';
+  try { return v ? JSON.parse(v) : []; } catch (err) { return []; }
+}
+
+/* ¿Es NUEVA? No está en el banco ni venía con el documento. Sin banco cargado no se marca nada (no se sabe). */
+function _etqEsNueva_(t, orig){
+  if (!BANCO_ETQ || !BANCO_ETQ.length) return false;
+  var k = _etqClave_(t);
+  return !_etqCanonica_(t) && (orig || []).map(_etqClave_).indexOf(k) < 0;
+}
+
+/* Las elegidas, en rojo; tocar una la quita. Las nuevas llevan «nueva». */
+function _etqSelHTML_(lista, orig){
+  if (!lista.length) return '<p class="psel-vacio">Sin etiquetas. Escribe para buscar en el banco.</p>';
+  return lista.map(function(t, i){
+    return '<span class="psel-c on" data-etqq="' + i + '" data-p title="Quitar">' + esc(t) +
+      (_etqEsNueva_(t, orig) ? ' <b style="color:#3f9ed6;font-weight:600">· nueva</b>' : '') + '<i>×</i></span>';
+  }).join('');
+}
+
+/* «Ver todas» (sólo escritorio): las categorías del banco con todas sus canónicas; las elegidas, en rojo. */
+function _etqTodasHTML_(sel){
+  if (!BANCO_ETQ || !BANCO_ETQ.length) return '<p class="psel-vacio">El banco de etiquetas no está disponible ahora.</p>';
+  var selK = (sel || []).map(_etqClave_);
+  return BANCO_ETQ.map(function(c){
+    return '<div class="psel-g">' + esc(c.nombre) + '</div><div class="psel-fila">' + (c.etiquetas || []).map(function(e){
+      return '<span class="psel-c' + (selK.indexOf(_etqClave_(e.canonica)) >= 0 ? ' on' : '') + '" data-etqtog="' + esc(e.canonica) +
+        '" data-p' + (e.nota ? ' title="' + esc(e.nota) + '"' : '') + '>' + esc(e.canonica) + '</span>';
+    }).join('') + '</div>';
+  }).join('');
+}
+
+/* Repinta las elegidas, las sugerencias del buscador y (si está abierto) «Ver todas». NO toca el campo de búsqueda: repintarlo
+   le quita el foco al teclear. */
+function _etqPintar_(pre){
+  var sel = document.getElementById(pre + 'EtqSel');
+  if (!sel) return;
+  _pselCss_();
+  var lista = _etqLista_(pre), orig = _etqOrig_(pre);
+  sel.innerHTML = _etqSelHTML_(lista, orig);
+  var qx = document.getElementById(pre + 'EtqQ'), sg = document.getElementById(pre + 'EtqSug');
+  if (sg){
+    var r = _etqSugerir_(qx ? qx.value : '', lista, orig);
+    sg.innerHTML = r.sugs.map(function(s){
+      return '<span class="psel-c" data-etqpick="' + esc(s.canon) + '" data-p>' + esc(s.canon) +
+        (s.via ? ' <span style="color:var(--ink3)">← ' + esc(s.via) + '</span>' : '') + '</span>';
+    }).join('') + (r.crear
+      ? '<span class="psel-c" data-etqnew="' + esc(r.crear) + '" data-p style="border-style:dashed;border-color:var(--red);color:#fff">+ Crear etiqueta «' + esc(r.crear) + '»</span>' : '') +
+      (r.noSeUsa ? '<span class="psel-vacio" data-etqnousa="1">«' + esc(r.noSeUsa) + '» no se usa como etiqueta.</span>' : '');
+  }
+  var td = document.getElementById(pre + 'EtqTodas');
+  if (td && td.getAttribute('data-abierto') === '1') td.innerHTML = _etqTodasHTML_(lista);
+}
+
+/* Pide el banco una vez (lo necesita quien teclea o pulsa «Ver todas»). Sin él, la app sigue sin autocompletar; un fallo de red
+   no se queda fijado: ni un fallo ni un banco VACÍO (un primer hipo del servidor) se guardan para toda la sesión, se vuelve a pedir al
+   abrir otro expediente (refutador3, 6). Dentro del MISMO panel se pide una sola vez (`data-etqfallo`): no una petición por tecla. */
+async function _etqCargar_(pre){
+  if (BANCO_ETQ !== null || !(typeof backendOK !== 'undefined' && backendOK && typeof SESION !== 'undefined' && SESION)) return;
+  var c = document.getElementById(pre + 'Anot');
+  if (!c || c.getAttribute('data-etqpide') === '1' || c.getAttribute('data-etqfallo') === '1') return;
+  c.setAttribute('data-etqpide', '1');
+  try {
+    var r = await api.getBancoEtiquetas(c.getAttribute('data-anotdoc'));
+    BANCO_NOPROP = (r && r.noProponer && r.noProponer.length) ? r.noProponer : [];
+    BANCO_ETQ = (r && r.categorias && r.categorias.length) ? r.categorias : null;
+  } catch (err) { BANCO_ETQ = null; }
+  if (BANCO_ETQ === null) c.setAttribute('data-etqfallo', '1');
+  c.setAttribute('data-etqpide', '');
+  Array.prototype.forEach.call(document.querySelectorAll('[data-anot]'), function(p){ _etqPintar_(p.getAttribute('data-anot')); });
+}
+
+/* Añade una etiqueta (la canónica si es una variante del banco), sin repetir por clave. Sin diálogo: crear es añadir. */
+function _etqAnadir_(pre, texto){
+  if (_anotOcupado_(pre)) return;
+  var t = String(texto == null ? '' : texto).replace(/,/g, ' ').replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+  var x = document.getElementById(pre + 'Etq');
+  if (!t || !x) return;
+  t = _etqCanonica_(t) || t;
+  var lista = _etqLista_(pre);
+  if (lista.map(_etqClave_).indexOf(_etqClave_(t)) < 0) lista.push(t);
+  x.value = lista.join(', ');
+  var q = document.getElementById(pre + 'EtqQ'); if (q){ q.value = ''; if (q.focus) q.focus(); }
+  _etqPintar_(pre);
+}
+
+function _etqQuitar_(pre, clave){
+  if (_anotOcupado_(pre)) return;
+  var x = document.getElementById(pre + 'Etq'); if (!x) return;
+  x.value = _etqLista_(pre).filter(function(t){ return _etqClave_(t) !== clave; }).join(', ');
+  _etqPintar_(pre);
+}
+
+/* Los toques sobre las etiquetas de un panel. `b` es el elemento con el `data-etq…`. */
+function _etqClic_(b){
+  var c = b.closest('[data-anot]'); if (!c) return;
+  var pre = c.getAttribute('data-anot');
+  if (b.hasAttribute('data-etqpick')) { _etqAnadir_(pre, b.getAttribute('data-etqpick')); return; }
+  if (b.hasAttribute('data-etqnew')) { _etqAnadir_(pre, b.getAttribute('data-etqnew')); return; }
+  if (b.hasAttribute('data-etqq')) { var l = _etqLista_(pre)[+b.getAttribute('data-etqq')]; if (l != null) _etqQuitar_(pre, _etqClave_(l)); return; }
+  if (b.hasAttribute('data-etqtog')) {
+    var n = b.getAttribute('data-etqtog'), k = _etqClave_(n);
+    if (_etqLista_(pre).map(_etqClave_).indexOf(k) >= 0) _etqQuitar_(pre, k); else _etqAnadir_(pre, n);
+    return;
+  }
+  if (b.hasAttribute('data-etqver')) {
+    var td = document.getElementById(pre + 'EtqTodas'); if (!td) return;
+    var abre = td.getAttribute('data-abierto') !== '1';
+    td.setAttribute('data-abierto', abre ? '1' : '');
+    td.style.display = abre ? '' : 'none';
+    b.textContent = abre ? 'Ocultar' : 'Ver todas';
+    _etqCargar_(pre);
+    _etqPintar_(pre);
+  }
+}
+
+/* Enter en el buscador: la primera sugerencia, o crear lo escrito. */
+function _anotTecla_(ev){
+  var t = ev && ev.target;
+  if (!t || ev.key !== 'Enter' || !t.getAttribute || !t.getAttribute('data-etqin')) return;
+  ev.preventDefault();
+  var pre = t.getAttribute('data-etqin');
+  var r = _etqSugerir_(t.value, _etqLista_(pre), _etqOrig_(pre));
+  if (r.sugs.length) _etqAnadir_(pre, r.sugs[0].canon);
+  else if (r.crear) _etqAnadir_(pre, r.crear);
+}
+
 /* El manejador, delegado: cada cara lo engancha UNA vez a `document` con su forma de encontrar el expediente. */
 function _anotClic_(ev, buscar){
   var t = ev && ev.target && ev.target.closest ? ev.target : null;
   if (!t) return;
+  var eq = t.closest('[data-etqpick],[data-etqnew],[data-etqq],[data-etqtog],[data-etqver]');
+  if (eq){ _etqClic_(eq); return; }
   var m = t.closest('[data-anotmodo]');
   if (m){ _anotModo_(m.getAttribute('data-pre'), m.getAttribute('data-anotmodo')); return; }
   var k = t.closest('[data-anotchk]');
@@ -10291,8 +12159,20 @@ function _antecedentesDe_(nombre, familia){
    ⚠️ Y si se renombrara, esto devuelve `null` — «no consta» —, que es el lado seguro: la
    pantalla deja de decir una escala en vez de decir una equivocada. */
 function _vecesSinCubrir_(nombre){ return _antecedentesDe_(nombre, 'disponibilidad'); }
+
+/* La escala de puntos por no cubrir la disponibilidad (30g) de UNA persona, con su frase: la regla en un solo sitio, que
+   leen `sancionPor` (escritorio) y el formulario de sanciones del móvil (01/11). TRES respuestas, no dos: `p:0` (consta y
+   es la primera), `p>=1` (consta y reincide) y `p:null` (no consta — un hueco NO es «1.ª vez»). */
+function _escalaSinCubrir_(nombre){
+  var v=_vecesSinCubrir_(nombre);
+  if(v===null)
+    return {p:null,txt:'no consta su historial · la escala no se puede decir aquí'};
+  if(v===0) return {p:0,txt:'aviso · 1.ª vez, sin puntos'};
+  if(v===1) return {p:1,txt:'1 punto · 2.ª vez'};
+  return {p:2,txt:'2 puntos · 3.ª o más (tope 2)'};
+}
 function esUCT(u){
-  return /documentaci[o\u00f3]n\s+t[e\u00e9]cnica/i.test(String(u || '')) || /^\s*UCT\s*$/i.test(String(u || ''));
+  return /documentaci[o\u00f3]n\s+t[e\u00e9]cnica/i.test(String(u || '')) || /coordinaci[o\u00f3]n\s+t[e\u00e9]cnica/i.test(String(u || '')) || /^\s*UCT\s*$/i.test(String(u || ''));
 }
 
 /* ⛔ EL SEGUNDO REVISOR DOCUMENTAL SE DERIVA DEL CARGO, NO DE UN NOMBRE (05/08/2026).
@@ -10413,6 +12293,74 @@ function _firmaResp_(r){
 }
 
 
+/* ═══ VARIOS TRAMOS EN UN PARTE (01/11) — UNA SOLA PIEZA PARA LAS TRES PANTALLAS ═══════════════════════
+   🗣️ Daniel: *«Sí: varios tramos y cruce de medianoche»* (MEJ-M-2026-08-07-1: 16-18 y 20-22 del mismo día en UN parte).
+   El tramo PRINCIPAL sigue siendo `f.ini`/`f.fin` (lo de siempre); los demás viven en `f.tramos` [{ini,fin}]. Un tramo cuya
+   salida es menor que su entrada cruza la medianoche (`_minutosReales_`). Las horas son la suma de cada tramo a cuartos
+   (como `durForm`); la cuenta de verdad la hace el servidor (`_revisar_tramos`) y rechaza lo que se pisa.
+   ⛔ Está aquí y no en cada cara porque la lista, la suma y los avisos son los mismos en el móvil, en el escritorio y en el
+   bloque de grupo; cada una sólo aporta cómo se pinta un campo de hora (`campo(id, rótulo, valor)`). */
+function _tramosExtra_(f){ return (f && Array.isArray(f.tramos)) ? f.tramos : []; }
+/* Todos los tramos del formulario, el principal primero. */
+function _tramosTodos_(f){ return [{ini:f.ini, fin:f.fin}].concat(_tramosExtra_(f)); }
+/* Horas de los tramos EXTRA de `f` (a cuartos cada uno; un tramo a medias cuenta 0). */
+function _tramosExtraH_(f){
+  var h=0; _tramosExtra_(f).forEach(function(t){
+    if(_horaHHMM_(t.ini) && _horaHHMM_(t.fin)) h+=Math.round(_minutosReales_(f.fecha, t.ini, t.fin)/15)/4; });
+  return h;
+}
+/* '' si los tramos son válidos; si no, la frase: uno a medias, entrada = salida, o dos que se pisan (el mismo criterio que el
+   servidor: pegados por el borde NO se pisan, y los que cruzan medianoche cuentan hasta el día siguiente). */
+function _tramosError_(f){
+  var ex=_tramosExtra_(f); if(!ex.length) return '';
+  var l=_tramosTodos_(f), iv=[], i, j;
+  for(i=0;i<l.length;i++){
+    if(!_horaHHMM_(l[i].ini) || !_horaHHMM_(l[i].fin)) return 'Cada tramo necesita su entrada y su salida (HH:MM)';
+    var a=_minHM_(l[i].ini), b=_minHM_(l[i].fin);
+    if(a===b) return 'Un tramo no puede empezar y acabar a la misma hora ('+l[i].ini+')';
+    iv.push([a, b<=a ? b+1440 : b, l[i]]);
+  }
+  for(i=0;i<iv.length;i++) for(j=i+1;j<iv.length;j++)
+    if(iv[i][0]<iv[j][1] && iv[j][0]<iv[i][1])
+      return 'Los tramos '+iv[i][2].ini+'–'+iv[i][2].fin+' y '+iv[j][2].ini+'–'+iv[j][2].fin+' se pisan';
+  return '';
+}
+/* Lo que se manda al servidor: todos los tramos, o `undefined` si no hay más que el principal. */
+function _tramosEnvio_(f){
+  return _tramosExtra_(f).length ? _tramosTodos_(f).map(function(t){ return {ini:t.ini, fin:t.fin}; }) : undefined;
+}
+/* Las filas de los tramos extra, el aviso y el chip «Otro tramo». `campo(id, rótulo, valor)` es el campo de hora de la cara. */
+function _tramosHTML_(f, campo){
+  var ex=_tramosExtra_(f), err=_tramosError_(f);
+  return ex.map(function(t,i){
+    return '<div data-tramo="'+i+'" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-top:10px">'+
+      campo('trIni'+i,'Entrada '+(i+2),t.ini)+campo('trFin'+i,'Salida '+(i+2),t.fin)+
+      '<button type="button" class="btn mini" data-tr-del="'+i+'" data-p>Quitar</button></div>';
+  }).join('')+
+  '<p class="rnota" id="trAviso" style="margin:8px 0 0;color:var(--warn)'+(err?'':';display:none')+'">'+esc(err)+'</p>'+
+  '<div style="margin-top:10px"><button type="button" class="btn mini" data-tr-add data-p>+ Otro tramo</button></div>';
+}
+/* Engancha los campos y los chips. `cambio()` recalcula sin repintar (no se pierde el foco); `repintar()` al añadir o quitar. */
+function _tramosCablear_(f, cambio, repintar){
+  _tramosExtra_(f).forEach(function(t,i){
+    [['trIni'+i,'ini'],['trFin'+i,'fin']].forEach(function(x){
+      var e=document.getElementById(x[0]); if(!e) return;
+      e.oninput=e.onchange=function(){ t[x[1]]=e.value.trim(); var a=document.getElementById('trAviso');
+        if(a){ var m=_tramosError_(f); a.textContent=m; a.style.display=m?'':'none'; } cambio(); };
+      e.onblur=function(){ var h=_horaTecleada_(e.value); if(h===e.value) return; e.value=h; e.oninput(); };
+    });
+  });
+  var q=document.querySelectorAll('[data-tr-del]'), i;
+  for(i=0;i<q.length;i++) (function(b){ b.onclick=function(){ f.tramos.splice(+b.getAttribute('data-tr-del'),1); repintar(); }; })(q[i]);
+  var a=document.querySelector('[data-tr-add]');
+  if(a) a.onclick=function(){
+    if(!Array.isArray(f.tramos)) f.tramos=[];
+    var u=f.tramos.length ? f.tramos[f.tramos.length-1].fin : f.fin;      /* el siguiente empieza donde acabó el anterior, y dura 1 h */
+    var m=_horaHHMM_(u) ? _minHM_(u) : 0, h2=function(x){ x=(x%1440+1440)%1440; return (x<600?'0':'')+Math.floor(x/60)+':'+(x%60<10?'0':'')+x%60; };
+    f.tramos.push({ini:_horaHHMM_(u)?u:'', fin:_horaHHMM_(u)?h2(m+60):''}); repintar();
+  };
+}
+
 /* ═══ EL PARTE DE BLOQUE (29/10) — UNA SOLA PIEZA PARA LAS DOS CARAS ═══════════════════════════════
    🗣️ Daniel: *«una persona fiche por el resto (el organizador de la reunión) y que las horas le sumen a todos
    los que añada […] durante una reunión te debería dejar darle al botón de empezar y finalizar»*.
@@ -10455,9 +12403,49 @@ if(typeof document!=='undefined' && typeof setInterval==='function'){
   var _cronoT_=setInterval(_cronoTick_, 1000); if(_cronoT_ && _cronoT_.unref) _cronoT_.unref();
 }
 
-function _bloqueDurH_(fecha, ini, fin){
-  var a=Date.parse(fecha+'T'+ini+':00'), b=Date.parse(fecha+'T'+fin+':00');
-  return (a!==a || b!==b || b<=a) ? 0 : Math.round((b-a)/3600000*100)/100;
+/* Horas del bloque, a céntimos (el servidor no redondea a cuartos un bloque): 22:00 → 01:00 son 3 h (cruza medianoche, 01/11), y
+   `extra` son los demás tramos [{ini,fin}] del mismo día, que se suman. Un tramo ilegible o con entrada = salida cuenta 0. */
+function _bloqueDurH_(fecha, ini, fin, extra){
+  var m=0;
+  [{ini:ini, fin:fin}].concat(extra||[]).forEach(function(t){
+    if(_horaHHMM_(t.ini) && _horaHHMM_(t.fin)) m+=_minutosReales_(fecha, t.ini, t.fin); });
+  return Math.round(m/60*100)/100;
+}
+
+/* 01/11 · CON LA GRABACIÓN SUBIDA NO SE EXIGE EL RESUMEN (Daniel, 29/10: «que se adjunte la grabación […] y eso sea
+   suficiente justificación o de lo contrario se deba escribir un resumen»). Es lo que sabe la ficha por `estadoAudio`
+   (`AUDIO_EST`); la regla de verdad es del servidor (`_resumen_o_audio`), que además excluye a las de trabajo (sin acta). */
+function _bloqueConAudio_(B){
+  var c=B && B.reunion_id!=null && AUDIO_EST[B.reunion_id];
+  return !!(c && c.e && c.e.aplica && c.e.estado && c.e.estado!=='ninguno');
+}
+function _bloqueResLabel_(B){
+  return _bloqueConAudio_(B) ? 'Resumen de lo que se hizo · opcional, ya hay grabación'
+                             : 'Resumen de lo que se hizo · mínimo '+BLQ_MIN_RESUMEN+' caracteres';
+}
+
+/* 01/11 · «YA HA PASADO: FICHA EL BLOQUE». Cuándo ocurre una reunión FIJADA, en ms: el día de `dias[fijadaBl[0][0]]`
+   ('DD/MM', con el año de `_msDeDDMM_`: el en curso salvo que quede a más de medio año atrás), la hora de su franja y
+   su duración (`duracion` en minutos, o las casillas fijadas × `dur`, o 60). `null` si no se puede saber. La gemela del
+   servidor es `avisar_reunion._fin_de`: el empujón y este aviso tienen que salir a la vez. */
+function _horarioReuMs_(r){
+  var bl=(r && r.fijada && r.fijadaBl) || [];
+  if(!bl.length) return null;
+  var m=/^\s*(\d{1,2})\/(\d{1,2})/.exec(String((r.dias||[])[bl[0][0]]||'')), fr=(r.franjas||[])[bl[0][1]];
+  if(!m || !fr) return null;
+  var base=_hoyDateM_(), t=new Date(base.getFullYear(), (+m[2])-1, +m[1]).getTime();
+  if(t < base.getTime()-182*86400000) t=new Date(base.getFullYear()+1, (+m[2])-1, +m[1]).getTime();
+  var ini=t+_minHM_(fr)*60000, dur=(+r.duracion>0 ? +r.duracion : ((+fr.dur>0 ? +fr.dur : 60)*bl.length));
+  return {ini:ini, fin:ini+dur*60000};
+}
+var BLQ_VENTANA_FICHA_H = 48;                  // = `VENTANA_FICHA_H` de `avisar_reunion.py`: más viejas, ya no se piden
+function _fichaPendienteReu_(r, ahora){
+  var h=_horarioReuMs_(r), t=(ahora==null?Date.now():ahora);
+  return !!(h && r && !r.en_curso && !r.bloque && t>=h.fin && t-h.fin<=BLQ_VENTANA_FICHA_H*3600000);
+}
+function _msAFechaHora_(ms){
+  var d=new Date(ms);
+  return {fecha:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()), hora:pad(d.getHours())+':'+pad(d.getMinutes())};
 }
 
 /* Abre el formulario. `c.parts` = nombres de partida (los invitados). */
@@ -10465,12 +12453,18 @@ function _bloqueAbrir_(c){
   BLQ={modo:c.modo, reunion:c.reunion||null, reunion_id:c.reunion_id==null?null:c.reunion_id, titulo:c.titulo||'',
     fecha:c.fecha||'', ini:c.ini||'', fin:c.fin||'', en_curso:c.en_curso||null, resumen:'', res:null, env:false,
     parts:(c.parts||[]).map(function(n){ return {nombre:n, horas:''}; }), clave:_claveUso_()};
+  delete SOLP.blq;                                    // la propuesta de SolarIA es de ESTE formulario, no del anterior
+  /* ¿tiene grabación? Si no se sabe aún, se pregunta y se repinta SÓLO la etiqueta (el formulario no se toca) */
+  var id=BLQ.reunion_id, e=id!=null && AUDIO_EST[id];
+  if(id!=null && _graba_(BLQ.reunion && BLQ.reunion.tipo) && (!e || Date.now()-e.t>20000) && typeof _audioReuRefrescar_==='function')
+    _audioReuRefrescar_(id).then(function(){ var l=$('#blqResLab'); if(l && BLQ) l.textContent=_bloqueResLabel_(BLQ); });
 }
 
 /* El cuerpo que se manda, o un Error con lo que falta (el mismo mínimo que el servidor: no se gasta un viaje). */
 function _bloqueCuerpo_(B){
   var resumen=(B.resumen||'').trim();
-  if(resumen.length<BLQ_MIN_RESUMEN)
+  if(_bloqueConAudio_(B) && resumen.length<BLQ_MIN_RESUMEN) resumen='';   // la grabación lo justifica: lo corto no se manda
+  else if(resumen.length<BLQ_MIN_RESUMEN)
     throw new Error('Cuenta qué se hizo: el resumen necesita al menos '+BLQ_MIN_RESUMEN+' caracteres (llevas '+resumen.length+').');
   if(!B.parts.length) throw new Error('Añade al menos un participante.');
   var parts=B.parts.map(function(p){
@@ -10481,12 +12475,13 @@ function _bloqueCuerpo_(B){
     return {nombre:p.nombre, horas:h};
   });
   if(B.modo==='finalizar')
-    return {id:B.reunion_id, participantes:parts, resumen:resumen, clave:B.clave};
+    return {id:B.reunion_id, participantes:parts, resumen:resumen||undefined, clave:B.clave};
   if(!B.fecha || !B.ini || !B.fin) throw new Error('Pon la fecha y la hora de inicio y de fin.');
-  var d=_bloqueDurH_(B.fecha, B.ini, B.fin);
-  if(!(d>0)) throw new Error('La hora de fin tiene que ser posterior a la de inicio.');
+  var te=_tramosError_(B); if(te) throw new Error(te+'.');
+  var d=_bloqueDurH_(B.fecha, B.ini, B.fin, B.tramos);
+  if(!(d>0)) throw new Error('La entrada y la salida no pueden ser la misma hora.');
   if(d>_maxHorasParte_()) throw new Error('Un bloque no pasa de '+_maxHorasParte_()+' h.');
-  var o={fecha:B.fecha, ini:B.ini, fin:B.fin, participantes:parts, resumen:resumen, clave:B.clave};
+  var o={fecha:B.fecha, ini:B.ini, fin:B.fin, tramos:_tramosEnvio_(B), participantes:parts, resumen:resumen||undefined, clave:B.clave};
   if(B.reunion_id!=null){ o.reunion_id=B.reunion_id; o.tarea=B.titulo||undefined; }
   return o;
 }
@@ -10510,11 +12505,11 @@ function _bloqueResHTML_(resp){
    por persona sólo salen tras «Horas distintas» (01/10, Daniel: «aunque pone que es opcional, no está muy claro»). */
 function _bloqueHorasHTML_(){
   var B=BLQ, n=B.parts.length, fin=B.modo==='finalizar';
-  var d=fin ? 0 : _bloqueDurH_(B.fecha, B.ini, B.fin);
+  var d=fin ? 0 : _bloqueDurH_(B.fecha, B.ini, B.fin, B.tramos);
   var tot=fin ? 'La duración de la reunión' : (d>0 ? '<b>'+nf2(d)+' h</b>' : 'Las horas del bloque');
   var quien=n+(n===1?' persona':' personas');
   if(!B.distintas)
-    return '<p class="rnota" data-blqtot style="margin:0 0 8px">'+tot+' para estas <b>'+quien+'</b>, las mismas para todas.</p>'+
+    return '<p class="rnota" data-blqtot style="margin:0 0 8px">'+tot+' para estas '+quien+', igual para todas.</p>'+
       '<button type="button" class="btn mini" data-p data-blqdist>Horas distintas</button>';
   return '<p class="rnota" style="margin:0 0 8px">Horas de cada persona; en blanco, '+(fin?'lo que dure la reunión':(d>0?nf2(d)+' h':'las del bloque'))+'.</p>'+
     B.parts.map(function(p){
@@ -10536,15 +12531,15 @@ function _bloqueFormHTML_(){
   return '<div id="blqForm">'+
     '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 4px">'+(fin?'Finalizar la reunión':'Declarar parte de bloque')+'</div>'+
     '<p class="rnota" style="margin:0 0 12px">'+(fin
-      ? 'Se crea <b>un parte pendiente por participante</b> con lo que ha durado'+(B.en_curso?' (<b data-crono="'+esc(B.en_curso.ini)+'">'+esc(_cronoTxt_(B.en_curso.ini))+'</b> hasta ahora)':'')+
-        '. Lo decide el PD de una vez.'
-      : 'Varias personas, un mismo horario. Se crea <b>un parte pendiente por participante</b> y lo decide el PD de una vez.')+
+      ? 'Un parte pendiente por participante con lo que ha durado'+(B.en_curso?' (<b data-crono="'+esc(B.en_curso.ini)+'">'+esc(_cronoTxt_(B.en_curso.ini))+'</b> hasta ahora)':'')+
+        '; el PD los decide de una vez.'
+      : 'Un parte pendiente por participante; el PD los decide de una vez.')+
       (B.titulo?' <br><b>'+esc(B.titulo)+'</b>':'')+'</p>'+
     (fin ? '' :
-      '<div style="display:flex;gap:8px;margin:0 0 12px"><label style="flex:2">'+lab('Fecha')+
-        '<input id="blqFecha" type="date" value="'+esc(B.fecha)+'" style="'+_BLQ_INPUT_+'"></label>'+
-      '<label style="flex:1">'+lab('Desde')+'<input id="blqIni" type="time" value="'+esc(B.ini)+'" style="'+_BLQ_INPUT_+'"></label>'+
-      '<label style="flex:1">'+lab('Hasta')+'<input id="blqFin" type="time" value="'+esc(B.fin)+'" style="'+_BLQ_INPUT_+'"></label></div>')+
+      '<div style="margin:0 0 12px"><div style="margin:0 0 8px">'+lab('Fecha')+nxFecha('blqFecha', B.fecha)+'</div>'+
+      '<div style="display:flex;gap:12px;flex-wrap:wrap"><div>'+lab('Desde')+nxHora('blqIni', B.ini||'16:00')+'</div>'+
+      '<div>'+lab('Hasta')+nxHora('blqFin', B.fin||'17:00')+'</div></div>'+
+      _tramosHTML_(B, function(id, rot, v){ return '<div>'+lab(rot)+nxHora(id, v)+'</div>'; })+'</div>')+
     lab('Participantes')+
     elegirPersonas('blq', {universo:_activos_().map(function(m){ return m.nombre; }), marcadas:B.parts.map(function(p){ return p.nombre; }),
       titulo:'Participantes', vacio:'Nadie todavía: escribe un nombre o pulsa «Ver lista».', confirmarQuitar:true,
@@ -10553,9 +12548,10 @@ function _bloqueFormHTML_(){
         BLQ.parts=l.map(function(n){ return {nombre:n, horas:antes[n]||''}; });
         _bloqueHorasPintar_(); }})+
     '<div id="blqHoras" style="margin:0 0 12px">'+_bloqueHorasHTML_()+'</div>'+
-    '<label style="display:block;margin:0 0 12px">'+lab('Resumen de lo que se hizo · mínimo '+BLQ_MIN_RESUMEN+' caracteres')+
+    '<label style="display:block;margin:0 0 12px">'+lab('<span id="blqResLab">'+_bloqueResLabel_(B)+'</span>')+
       '<textarea id="blqResumen" rows="4" style="'+_BLQ_INPUT_+';resize:vertical" placeholder="Qué se trató o se hizo…">'+esc(B.resumen)+'</textarea>'+
       '<small id="blqCuenta" style="color:var(--ink3)">'+(B.resumen||'').trim().length+' / '+BLQ_MIN_RESUMEN+'</small></label>'+
+    (B.reunion_id!=null ? _solIAHTML_('blq', _solResumenCfg_(B)) : '')+
     '<div style="display:flex;gap:8px"><button class="btn pri" id="blqEnviar" data-p style="flex:1">'+(fin?'Finalizar y enviar':'Enviar parte')+'</button>'+
       '<button class="btn" data-blqcerrar data-p>Cancelar</button></div></div>';
 }
@@ -10577,8 +12573,11 @@ function _bloqueCablear_(cb){
   $$('[data-blqcerrar]').forEach(function(b){ b.onclick=function(){ BLQ=null; cb.cerrar(); }; });
   if(B.res) return;
   _bloqueHorasPintar_();
+  _tramosCablear_(B, _bloqueHorasPintar_, function(){ cb.refrescar(); });
   [['blqFecha','fecha'],['blqIni','ini'],['blqFin','fin']].forEach(function(x){
-    var e=$('#'+x[0]); if(e) e.oninput=function(){ BLQ[x[1]]=e.value; var t=$('[data-blqtot]'); if(t) _bloqueHorasPintar_(); }; });
+    var e=$('#'+x[0]); if(!e) return;
+    if(!BLQ[x[1]]) BLQ[x[1]]=e.value;    /* lo que enseña `nxHora` por defecto es lo que se manda */
+    e.oninput=e.onchange=function(){ BLQ[x[1]]=e.value; var t=$('[data-blqtot]'); if(t) _bloqueHorasPintar_(); }; });
   var rs=$('#blqResumen');
   if(rs) rs.oninput=function(){ BLQ.resumen=rs.value; var c=$('#blqCuenta'); if(c) c.textContent=rs.value.trim().length+' / '+BLQ_MIN_RESUMEN; };
   var env=$('#blqEnviar');
@@ -10591,6 +12590,7 @@ function _bloqueCablear_(cb){
       var resp=B.modo==='finalizar' ? await api.finalizarReunion(cuerpo) : await api.declararBloque(cuerpo);
       B.res=resp||{resultados:[]};
       if(B.modo==='finalizar' && B.reunion) B.reunion.en_curso=null;
+      if(B.reunion && B.res.bloque) B.reunion.bloque=B.res.bloque;      // fichada: el aviso «ya ha pasado» se va
       tost('Parte de bloque enviado: pendiente de aprobar.');
       if(cb.hecho) cb.hecho(B.res);
       cb.refrescar();
@@ -10604,17 +12604,18 @@ function _bloqueCablear_(cb){
 /* La ficha de la reunión: Empezar · (cronómetro + Finalizar + Cancelar) · Declarar a mano. `puede` = ¿te toca? */
 function _bloqueReuHTML_(r, puede){
   if(!r || !puede) return '';
-  var ec=r.en_curso;
+  var ec=r.en_curso, pend=_fichaPendienteReu_(r);
   return '<div id="reuBloque" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)">'+
+    (pend ? '<div id="reuFichaAviso" role="status" style="margin:0 0 10px;padding:9px 11px;border:1px solid var(--warn);border-radius:10px">'+
+      '<b>Ya ha pasado: ficha el bloque</b><br><span class="rnota">Las horas de todos quedan pendientes del PD.</span></div>' : '')+
     (ec
       ? '<div style="display:flex;gap:9px;align-items:center;margin:0 0 9px"><span style="color:var(--red2)">●</span>'+
         '<b>En curso</b><span class="mono" data-crono="'+esc(ec.ini)+'" style="font-size:18px">'+esc(_cronoTxt_(ec.ini))+'</span></div>'+
         '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-p id="btnFinalizar" style="flex:2">Finalizar</button>'+
         '<button class="btn" data-p id="btnCancelarCurso" style="flex:1">Cancelar</button></div>'
-      : '<button class="btn pri full" data-p id="btnEmpezar">Empezar la reunión</button>')+
-    '<button class="btn mini full" data-p id="btnDeclararBloque" style="margin-top:8px">Declarar parte de bloque</button>'+
-    '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan el tiempo como un fichaje de todos los participantes; '+
-    'el PD aprueba el parte de una vez.</p></div>';
+      : '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>')+
+    '<button class="btn '+(pend?'pri':'mini')+' full" data-p id="btnDeclararBloque" style="margin-top:8px">Declarar parte de bloque</button>'+
+    '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p></div>';
 }
 
 /* `getR()` da la reunión AHORA (la lista se rehace al refrescar); `abrir()` pinta el formulario. */
@@ -10624,7 +12625,11 @@ function _bloqueReuCablear_(getR, cb){
   var base=function(r, modo){
     var h=new Date(), f=h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate());
     var inv=(Array.isArray(r.invitados)?r.invitados:[]).filter(function(n){ return !!n; });
-    return {modo:modo, reunion:r, reunion_id:r.id, titulo:r.titulo||'', parts:inv, fecha:f, en_curso:r.en_curso};
+    var o={modo:modo, reunion:r, reunion_id:r.id, titulo:r.titulo||'', parts:inv, fecha:f, en_curso:r.en_curso};
+    /* ya pasó: el bloque se declara con SU horario, no con el de ahora */
+    var hr=(modo==='declarar' && _fichaPendienteReu_(r)) ? _horarioReuMs_(r) : null;
+    if(hr){ o.fecha=_msAFechaHora_(hr.ini).fecha; o.ini=_msAFechaHora_(hr.ini).hora; o.fin=_msAFechaHora_(hr.fin).hora; }
+    return o;
   };
   on('btnEmpezar', async function(){
     var r=getR(); if(!r) return;
@@ -10634,7 +12639,7 @@ function _bloqueReuCablear_(getR, cb){
   });
   on('btnCancelarCurso', async function(){
     var r=getR(); if(!r) return;
-    if(!confirm('Cancelar la reunión en curso.\n\nNo se crea ningún parte.\n\n¿Sigo?')) return;
+    if(!(await dialogoSiNo('Cancelar la reunión en curso.\n\nNo se crea ningún parte.\n\n¿Sigo?'))) return;
     await api.cancelarReunionEnCurso({id:r.id});
     r.en_curso=null; tost('Cancelada: no se ha creado nada.'); cb.refrescar();
   });
@@ -10693,7 +12698,7 @@ function _bloqueColaCablear_(cb){
       rech.push({id:i.getAttribute('data-bq-mot'), motivo:m});
     });
     if(falta){ tost('Pon un motivo (al menos 8 caracteres) a cada línea que rechazas.'); return; }
-    if(!confirm('Aprobar este bloque'+(rech.length?' (rechazando '+rech.length+')':'')+'.\n\nLas horas pasan a contar en el mes de cada participante.\n\n¿Sigo?')) return;
+    if(!(await dialogoSiNo('Aprobar este bloque'+(rech.length?' (rechazando '+rech.length+')':'')+'.\n\nLas horas pasan a contar en el mes de cada participante.\n\n¿Sigo?'))) return;
     b.disabled=true; var prev=b.textContent; b.textContent='…';
     try{
       var cuerpo={bloque:b.dataset.bqAprobar}; if(rech.length) cuerpo.rechazar=rech;
@@ -10702,6 +12707,199 @@ function _bloqueColaCablear_(cb){
       cb.hecho();
     }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo: ', e); }
   }; });
+}
+
+/* ══ 01/11 · TAREA ACABADA → PARTE PROPUESTO AL COORDINADOR (`tareaparte`) ═══════════════════════════════════════
+   🗣️ Daniel (01/11): *«cuando el miembro indique que la tarea ya se acabó (via app) que se le abra un parte con default de
+   las horas que puso el pero editable. Con un boton para seleccionar diferente segun personas si quiere (no por default)»*.
+   Dos mitades, UNA sola implementación para las dos caras:
+     · el MIEMBRO, al pulsar «Entregada», dice cuántas horas le dedicó (`_tareaPedirHorasEntrega_`) y la app las manda al
+       servidor (`proponerPartesTarea`): un parte `pendiente` por responsable de la tarea, con las MISMAS horas;
+     · el COORDINADOR de esa unidad los ve agrupados por tarea (`_tareaParteColaHTML_`), cambia las horas (las mismas para
+       todos o, con el botón «Horas distintas por persona» —apagado de partida—, una por persona) y firma por el camino de
+       siempre: `decidirParte` (que acepta `horas` sólo para estos partes).
+   ⛔ Quién lo ve y quién puede firmarlo lo decide el SERVIDOR (`_puede_sobre_parte`): la cola que llega ya viene filtrada. */
+function _horasEntrega_(txt){
+  /* '' o 0 = sin horas (0); un número que REDONDEADO a céntimo esté en (0, tope] = esas horas; cualquier otra cosa = `null`
+     (no vale, y no se adivina: 0,004 redondea a 0 y no es «sin parte», es un error de dedo). */
+  var s = String(txt == null ? '' : txt).replace(',', '.').replace(/\s*h$/i, '').replace(/^\s+|\s+$/g, '');
+  if (s === '') return 0;
+  var n = Number(s);
+  if (n === 0) return 0;
+  if (!(n > 0) || n > _maxHorasParte_()) return null;
+  n = Math.round(n * 100) / 100;
+  return n > 0 ? n : null;
+}
+function _tareaSoyResp_(t){
+  var yo = (typeof _actorSanc_ === 'function' ? _actorSanc_() : null) || (typeof YO !== 'undefined' && YO && YO.nombre) || '';
+  return _tareasResp_([t], yo).length > 0;
+}
+/* Quién firma MI parte: mi coordinador, o el PD si el responsable ES el coordinador (nadie firma lo suyo). */
+function _tareaFirmaTxt_(){
+  var yo = (typeof _actorSanc_ === 'function' ? _actorSanc_() : null) || (typeof YO !== 'undefined' && YO && YO.nombre) || '';
+  var m = ((typeof DATA !== 'undefined' && DATA.miembros) || []).filter(function(x){ return x && x.nombre === yo; })[0];
+  return m && m.cargo === 'Coordinador' ? 'al PD' : 'a tu coordinador';
+}
+/* La página de Notion de una tarea (32 hex del final de su URL), la clave con la que el servidor agrupa sus partes. */
+function _tareaPid_(t){
+  var m = /([0-9a-f]{32})\s*$/i.exec(String((t && t.url) || '').replace(/[?#].*$/, '').replace(/-/g, ''));
+  return m ? m[1].toLowerCase() : '';
+}
+/* ¿Hay ya un parte MÍO de esta tarea (de los que abre el «Entregada»)? Sólo mira `PARTES`, los míos; uno retirado no cuenta. */
+function _tareaTieneMiParte_(t){
+  var k = _tareaPid_(t);
+  return !!k && (typeof PARTES !== 'undefined' ? PARTES : []).some(function(p){
+    return p && String(p.tareaparte || '') === k && !p.ret && p.estado !== 'anulada'; });
+}
+/* ⛔ La maqueta (`?demo`, sin login): la MISMA condición para guardar el paso y para el reintento (B4). */
+function _tareaEnMaqueta_(){ return typeof DEMO !== 'undefined' ? !!DEMO : _demoLocal_(); }
+/* Promesa de las horas a proponer: 0 = ninguna (el paso no es «Entregada», no eres responsable, o lo dejaste vacío/0) y `null` =
+   se cancela (nada se mueve). ⛔ Sólo el paso que lleva a «Revisando»: es el mismo gesto «Entregada» que ya existía.
+   Unas horas que no valen NO cierran lo escrito: se vuelve a preguntar con ello y diciendo por qué. `ac.reintento`: el diálogo
+   de «Proponer mis horas» (la tarea ya está entregada). */
+function _tareaPedirHorasEntrega_(t, ac, valor, aviso){
+  if (!ac || ac.a !== 'Revisando' || !t || !_tareaSoyResp_(t)) return Promise.resolve(0);
+  return dialogoTexto((ac.reintento ? 'Horas de «' : 'Entregas «') + t.n + '».\n\n' + (aviso ? aviso + '\n\n' : '') +
+    '¿Cuántas horas le has dedicado? Se las propongo ' + _tareaFirmaTxt_() + ' como parte (puede cambiarlas). ' +
+    (ac.reintento ? '' : 'Déjalo vacío (o en 0) para entregarla sin parte.'),
+    {si: ac.reintento ? 'Proponer' : 'Entregar', no: 'Cancelar', valor: valor || '', modo: 'decimal'}).then(function(v){
+    if (v === null) return null;
+    var h = _horasEntrega_(v);
+    if (h === null) return _tareaPedirHorasEntrega_(t, ac, v, '«' + v + '» no vale: pon un número entre 0,01 y ' + _maxHorasParte_() + ' (con dos decimales como mucho).');
+    return h;
+  });
+}
+/* Lo que se le dice a quien entregó, leído de lo que CONTESTÓ el servidor (`partes_tarea`): creó, puso al día o ya estaba.
+   Sin respuesta (la maqueta) no hay servidor del que fiarse y se dice así. */
+function _tareaToastParte_(t, h, r){
+  if (!(h > 0)) return;
+  var pt = r && r.partes_tarea;
+  if (!r) { tost('«' + t.n + '»: parte propuesto ' + _tareaFirmaTxt_() + ' (maqueta).'); return; }
+  if (!pt) { tost('«' + t.n + '»: no se abrió ningún parte. Usa «Proponer mis horas».'); return; }
+  if (pt.creados > 0) tost('Parte propuesto ' + _tareaFirmaTxt_() + ': ' + nf2(h) + ' h' +
+    (pt.total > 1 ? ' (y lo mismo, marcado como tuyo, para las otras ' + (pt.total - 1) + ')' : '') + '.');
+  else if (pt.actualizados > 0) tost('Parte puesto al día: ' + nf2(h) + ' h.');
+  else tost('Ese parte ya estaba propuesto (o firmado): no cambia nada.');
+}
+/* Lo que se le dice al DESHACER una entrega: los partes sin firmar se retiran en la misma escritura. */
+function _tareaToastRetirados_(r){
+  var n = r && r.partes_tarea && r.partes_tarea.retirados;
+  return n ? ' ' + (n === 1 ? 'Se retiró el parte propuesto.' : 'Se retiraron los ' + n + ' partes propuestos.') : '';
+}
+/* REINTENTO (`proponerPartesTarea`): la tarea ya está entregada y no hay parte mío (falló, o la entregué sin horas). El camino
+   normal viaja con el paso (`moverEstadoTarea` con `horas`). El servidor sólo lo admite en la ventana de la entrega. */
+function _tareaProponerPartes_(t, h){
+  if (_tareaEnMaqueta_()) { _tareaToastParte_(t, h, null); return Promise.resolve(); }
+  return api.proponerPartesTarea(t.url, h).then(function(r){ _tareaToastParte_(t, h, {partes_tarea: r}); },
+    function(e){ tostErr('No se pudo abrir el parte de horas: ', e); });
+}
+/* «Proponer mis horas»: en una tarea mía en «Revisando» sin parte mío. Una puerta para las dos caras; `data-thoras` = índice en TAREAS. */
+function _tareaBotonHoras_(t, i, cls){
+  if (!t || t.e !== 'Revisando' || i < 0 || !t.url || !_tareaSoyResp_(t) || _tareaTieneMiParte_(t)) return '';
+  return '<button class="btn ' + (cls || 'mini') + '" data-thoras="' + i + '">Proponer mis horas</button>';
+}
+function _tareaHorasCablear_(raiz){
+  $$('[data-thoras]', raiz).forEach(function(b){ b.onclick = function(){
+    var t = TAREAS[+b.dataset.thoras]; if (!t || b.disabled) return;
+    b.disabled = true;
+    _tareaPedirHorasEntrega_(t, {a: 'Revisando', reintento: true}).then(function(h){
+      b.disabled = false;
+      if (!h) return;
+      b.disabled = true;
+      return _tareaProponerPartes_(t, h).then(function(){ b.disabled = false; });
+    });
+  }; });
+}
+
+/* La cola del coordinador: las líneas con el mismo `tareaparte` salen en UNA tarjeta. Lo demás queda en `sueltas`. */
+function _tareaParteGrupos_(lista){
+  var orden = [], por = {}, sueltas = [];
+  lista.forEach(function(p){
+    if (p.origen !== 'tarea_acabada' || p.tareaparte == null || p.tareaparte === '') { sueltas.push(p); return; }
+    var k = String(p.tareaparte);
+    if (!por[k]) { por[k] = {tp: k, lineas: []}; orden.push(k); }
+    por[k].lineas.push(p);
+  });
+  return {grupos: orden.map(function(k){ return por[k]; }), sueltas: sueltas};
+}
+/* o = {horas(p), nombre(p), tarea(p)} */
+function _tareaParteColaHTML_(grupos, o){
+  return grupos.map(function(g){
+    var tot = 0, h0 = o.horas(g.lineas[0]);
+    g.lineas.forEach(function(p){ tot += o.horas(p); });
+    /* M1: si las líneas NO traen todas las mismas horas (su autor corrigió las suyas) la tarjeta arranca en «distintas», con la
+       de cada una y el rastro de la corrección: firmar sin tocar nada no puede cambiar las horas de nadie. */
+    var dist = g.lineas.some(function(p){ return o.horas(p) !== h0; });
+    var ajenas = g.lineas.filter(function(p){ return p.propuesto_por && p.propuesto_por !== p.autor; });
+    return '<div data-tp-card="' + esc(g.tp) + '" data-tp-dist="' + (dist ? '1' : '0') + '" data-tp-ini="' + (dist ? '1' : '0') + '" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 10px">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px"><b>' + esc(o.tarea(g.lineas[0])) + '</b>' +
+        '<span class="mono">' + g.lineas.length + ' · ' + nf2(tot) + ' h</span></div>' +
+      '<p style="margin:6px 0 9px;font-size:12.5px;color:var(--ink2);line-height:1.5">Tarea entregada. ' +
+        (dist ? 'Cada persona trae sus horas (alguien corrigió las suyas). Míralas y firma.'
+              : 'Propuesta: ' + nf2(h0) + ' h para ' + (g.lineas.length === 1 ? 'la persona asignada' : 'cada una de las ' + g.lineas.length + ' asignadas') +
+                '. Cámbialas si no cuadran y firma.') +
+        (ajenas.length ? ' Propuestas por otra persona: ' + ajenas.map(function(p){ return o.nombre(p) + ' (por ' + String(p.propuesto_por).split(' ')[0] + ')'; }).join(', ') + '.' : '') +
+        '</p>' +
+      '<div data-tp-comun style="display:' + (dist ? 'none' : 'flex') + ';gap:8px;align-items:center;margin:0 0 8px"><span style="flex:1;font-size:13px">' +
+        (g.lineas.length === 1 ? 'Horas' : 'Horas para cada una') + '</span>' +
+        '<input data-tp-h inputmode="decimal" value="' + esc(String(h0).replace('.', ',')) + '" style="' + _BLQ_INPUT_ + ';width:84px;text-align:right"></div>' +
+      (g.lineas.length > 1 ? '<button type="button" class="btn mini' + (dist ? ' pri' : '') + '" data-p data-tp-distb aria-pressed="' + (dist ? 'true' : 'false') + '">Horas distintas por persona</button>' : '') +
+      '<div data-tp-pers style="display:' + (dist ? '' : 'none') + ';margin:8px 0 0">' + g.lineas.map(function(p){
+        var cr = _txtCorreccion_(p.corr);
+        return '<div data-tp-linea="' + esc(p.id) + '" style="display:flex;gap:8px;align-items:center;margin:0 0 ' + (cr ? '2' : '6') + 'px">' +
+          '<span style="flex:1;font-size:13px">' + esc(o.nombre(p)) + '</span>' +
+          '<input data-tp-hp="' + esc(p.id) + '" inputmode="decimal" value="' + esc(String(o.horas(p)).replace('.', ',')) +
+            '" style="' + _BLQ_INPUT_ + ';width:84px;text-align:right"></div>' +
+          (cr ? '<div data-tp-corr style="margin:0 0 6px;font-size:11.5px;color:var(--warn)">' + esc(cr) + '</div>' : '');
+      }).join('') + '</div>' +
+      '<input data-tp-mot placeholder="Motivo (8+ caracteres) — sólo para rechazar" style="' + _BLQ_INPUT_ + ';margin-top:8px;width:100%;box-sizing:border-box">' +
+      '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn pri" data-p data-tp-firmar style="flex:2">Firmar</button>' +
+        '<button class="btn" data-p data-tp-rech style="flex:1">Rechazar</button></div>' +
+      '</div>';
+  }).join('');
+}
+/* Lee la tarjeta y devuelve [{id, horas}] (o `null` si alguna hora no vale). Con «distintas por persona» cada línea trae la suya. */
+function _tareaParteLeer_(card){
+  var dist = card.getAttribute('data-tp-dist') === '1', out = [], mal = false, comun;
+  if (!dist) { comun = _horasEntrega_((card.querySelector('[data-tp-h]') || {}).value); if (!comun) mal = true; }
+  Array.prototype.slice.call(card.querySelectorAll('[data-tp-linea]')).forEach(function(l){
+    var id = l.getAttribute('data-tp-linea'), h = dist ? _horasEntrega_((l.querySelector('[data-tp-hp]') || {}).value) : comun;
+    if (!h) mal = true; else out.push({id: id, horas: h});
+  });
+  return mal ? null : out;
+}
+/* `cb.hecho()` recarga la cola. Los partes se deciden de UNO EN UNO por `decidirParte` (el camino de siempre): si uno falla se
+   dice cuál y por qué, y los demás no se pierden. */
+function _tareaParteColaCablear_(cb){
+  $$('[data-tp-distb]').forEach(function(b){ b.onclick = function(){
+    var card = b.closest('[data-tp-card]'), on = card.getAttribute('data-tp-dist') !== '1';
+    card.setAttribute('data-tp-dist', on ? '1' : '0'); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.classList.toggle('pri', on);
+    card.querySelector('[data-tp-pers]').style.display = on ? '' : 'none';
+    card.querySelector('[data-tp-comun]').style.display = on ? 'none' : 'flex';
+    /* al encender se copian las comunes a cada línea, SALVO que ya vinieran distintas: ahí son las de cada una y no se pisan */
+    if (on && card.getAttribute('data-tp-ini') !== '1') { var c = (card.querySelector('[data-tp-h]') || {}).value; card.querySelectorAll('[data-tp-hp]').forEach(function(i){ i.value = c; }); }
+  }; });
+  async function decidir(card, b, acc){
+    if (b.disabled) return;
+    var ls = _tareaParteLeer_(card), mot = ((card.querySelector('[data-tp-mot]') || {}).value || '').replace(/^\s+|\s+$/g, '');
+    if (acc === 'aprobar' && !ls) { tost('Pon las horas como un número mayor que 0 (hasta ' + _maxHorasParte_() + ').'); return; }
+    if (acc === 'rechazar' && mot.length < 8) { tost('Pon un motivo (al menos 8 caracteres) para rechazar.'); return; }
+    ls = ls || Array.prototype.slice.call(card.querySelectorAll('[data-tp-linea]')).map(function(l){ return {id: l.getAttribute('data-tp-linea')}; });
+    var tot = 0; ls.forEach(function(x){ tot += x.horas || 0; });
+    if (!(await dialogoSiNo(acc === 'aprobar' ? 'Firmar ' + ls.length + (ls.length === 1 ? ' parte' : ' partes') + ' (' + nf2(tot) + ' h en total).\n\nContarán en el mes de cada persona.\n\n¿Sigo?'
+                                              : 'Rechazar ' + ls.length + (ls.length === 1 ? ' parte' : ' partes') + ' de esta tarea.\n\n¿Sigo?'))) return;
+    card.querySelectorAll('button').forEach(function(x){ x.disabled = true; });
+    var fallos = [], i;
+    for (i = 0; i < ls.length; i++) {
+      try { await api.decidirParte(+ls[i].id, acc, acc === 'rechazar' ? mot : null, acc === 'aprobar' ? ls[i].horas : null); }
+      catch (e) { fallos.push(ls[i].id + ': ' + ((e && e.message) || e)); }
+    }
+    if (fallos.length) tost('No se pudo con ' + fallos.length + ' de ' + ls.length + ' (' + fallos.join(' · ') + ').');
+    else tost(acc === 'aprobar' ? 'Firmado: se suma a sus horas al aplicarse (en unos minutos).' : 'Rechazado.');
+    cb.hecho();
+  }
+  $$('[data-tp-firmar]').forEach(function(b){ b.onclick = function(){ decidir(b.closest('[data-tp-card]'), b, 'aprobar'); }; });
+  $$('[data-tp-rech]').forEach(function(b){ b.onclick = function(){ decidir(b.closest('[data-tp-card]'), b, 'rechazar'); }; });
 }
 
 /* ══ 29/10 · LA GRABACIÓN DE UNA REUNIÓN: AVISO AL CONVOCAR + «SUBIR GRABACIÓN» EN LA FICHA ══════════════════════
@@ -10717,9 +12915,9 @@ function _graba_(tipo){ return AUDIO_TIPOS_ACTA.indexOf(String(tipo||''))>=0; }
 
 /* El aviso al convocar. `_avisoGrabaPon_(selId, boxId)` lo enseña u oculta según el tipo elegido, y al cambiarlo. */
 function _avisoGrabaHTML_(boxId){
-  return '<p class="rnota" id="'+boxId+'" style="display:none;margin:2px 0 10px">🎙️ <b>Esta reunión se graba.</b> '+
-    'La grabación se guarda sólo en el servidor del equipo (12 meses) y con ella se redacta el acta. '+
-    'Avisa a los convocados. Las reuniones de trabajo no se graban.</p>';
+  return '<p class="rnota" id="'+boxId+'" style="display:none;margin:2px 0 10px">🎙️ Esta reunión se graba. '+
+    'La grabación se guarda 12 meses sólo en el servidor del equipo y con ella se redacta el acta. '+
+    'Las reuniones de trabajo no se graban.</p>';
 }
 function _avisoGrabaPon_(selId, boxId){
   var s=document.getElementById(selId), b=document.getElementById(boxId); if(!s||!b) return;
@@ -10737,7 +12935,7 @@ function _audioBoxHTML_(id, e){
     return (e && e.aplica && e.estado!=='ninguno') ? '<p class="rnota" style="margin:8px 0 0">🎙️ Grabación: '+esc(_audioTxt_(e))+'</p>' : '';
   }
   var cuerpo;
-  if(sub) cuerpo='<div class="rnota">Subiendo <b>'+esc(sub.nombre)+'</b>… '+sub.pct+' % <i>(no cierres esta pantalla)</i></div>'+
+  if(sub) cuerpo='<div class="rnota">Subiendo '+esc(sub.nombre)+'… '+sub.pct+' % <i>(no cierres esta pantalla)</i></div>'+
     '<div style="height:5px;background:var(--line);border-radius:3px;margin-top:6px"><div style="height:5px;width:'+sub.pct+'%;background:var(--red);border-radius:3px"></div></div>';
   else if(e.estado==='hecha') cuerpo='<div class="rnota">'+esc(_audioTxt_(e))+'.</div>';
   else if(e.estado==='procesando') cuerpo='<div class="rnota">'+esc(_audioTxt_(e))+'</div>';
@@ -10856,6 +13054,10 @@ function _asisDemo_(b, pd){
     case 'anadirAsistente':
       if(S.conv.indexOf(b.nombre)<0 && S.extra.indexOf(b.nombre)<0) S.extra.push(b.nombre);
       return {ok:true, id:S.id, nombre:b.nombre};
+    case 'marcarPresente':
+      if(S.conv.indexOf(b.nombre)<0 && S.extra.indexOf(b.nombre)<0) S.extra.push(b.nombre);
+      if(b.presente===false) delete S.presentes[b.nombre]; else { if(!S.vistos[b.nombre]) S.vistos[b.nombre]=ahora; if(!S.presentes[b.nombre]) S.presentes[b.nombre]=ahora; }
+      return {ok:true, id:S.id, nombre:b.nombre, presente:b.presente!==false};
     case 'marcarVisto': return {ok:true, id:S.id};
     case 'estoyPresente':
       if(!_asisClave_(b.palabra) || _asisClave_(b.palabra)!==_asisClave_(S.palabra)) throw new Error('esa no es la palabra: mira la pantalla de la sala');
@@ -10865,7 +13067,8 @@ function _asisDemo_(b, pd){
       if(!pd) abre();                       // el móvil de la maqueta: la asistencia ya está abierta, para ver la tarjeta
       _asisDemoAvanza_(S, pd ? '' : yo);
       if(pd) return {existe:!!S.abierta_at, abierta:!!S.abierta_at && !S.cerrada_at, palabra:S.palabra, abierta_at:S.abierta_at,
-        cerrada_at:S.cerrada_at, convocados:S.conv.concat(S.extra), vistos:S.vistos, presentes:S.presentes};
+        cerrada_at:S.cerrada_at, convocados:S.conv.concat(S.extra), vistos:S.vistos, presentes:S.presentes,
+        modos:S.conv.reduce(function(o,n,i){ if(i%4===3) o[n]='tel'; return o; }, {})};     // la maqueta: uno de cada cuatro marcó sólo telemático
       return S.cerrada_at ? {abierta:false} : {abierta:true, convocado:true, presente_at:S.presentes[yo]||null};
   }
   throw new Error('acción desconocida: '+b.action);
@@ -10878,21 +13081,57 @@ function _asisClave_(t){ return _sinTildes_(String(t==null?'':t)).replace(/\s+/g
 function _asisListaTxt_(v){
   var p=(v&&v.presentes)||{};
   var filas=Object.keys(p).sort(function(a,b){ return p[a]<p[b]?-1:(p[a]>p[b]?1:0); });
-  return filas.map(function(n){ return _hhmmDe_(p[n])+'  '+n; }).join('\n');
+  var m=(v&&v.modos)||{};
+  return filas.map(function(n){ return _hhmmDe_(p[n])+'  '+n+(m[n]==='tel'?'  (telemático)':''); }).join('\n');
+}
+
+/* 01/11 · QUIÉN VINO POR TELEMÁTICO sale en OTRO color (🗣️ Daniel: *«la gente q vino telemática (porque marcaron disponibilidad
+   telemática) que aparezcan en otro color»*). El servidor dice `modos[nombre]` (`asistencia.modo_de`); aquí sólo se traduce a la
+   clase del cuadrito/fila y al texto. `_asisCuenta_` es lo que dice el contador: presentes, y cuántos de ellos por telemático. */
+function _asisModo_(v, n){ var m=v && v.modos && v.modos[n]; return m==='tel' ? 'tel' : ''; }
+function _asisCuenta_(v){
+  var conv=(v&&v.convocados)||[], pres=(v&&v.presentes)||{}, np=0, nt=0;
+  conv.forEach(function(n){ if(pres[n]){ np++; if(_asisModo_(v,n)==='tel') nt++; } });
+  return {presentes:np, convocados:conv.length, tel:nt};
 }
 
 /* ══ 31/10 · EL ORDEN DEL DÍA DE UNA REUNIÓN, FASE 1: LA TABLA EDITABLE Y EL PDF (las dos caras) ═════════════════
    🗣️ Daniel (31/10): *«Si tienes un PDF de orden del día, que puedas subirlo y se incruste en la página de la reunión y
    listo»* · *«una tablita […] de tal hora a tal hora se va a hablar de esto […] quién introduce este punto»*.
-   Backend: `rutinas/orden_dia.py` (`getOrdenDia`, `guardarOrdenDia`, `getOrdenPdf`, `subirOrdenPdf`, `borrarOrdenPdf`).
+   Backend: `rutinas/orden_dia.py` (`getOrdenDia`, `guardarOrdenDia`, `getOrdenPdf`, `subirOrdenPdf`, `borrarOrdenPdf`, `generarOrdenPdf`).
+   01/11 · POR DURACIONES (Daniel: *«lo único que tienes que poner es la duración de ese tramo»*): cada punto es `{dur, tema,
+   quien}` y las horas NO se guardan, salen en cascada (`T0`, `T0+15`… sin reunión fijada; horas reales con ella). La regla
+   es de `orden_dia.horario`; el servidor la devuelve ya hecha (`horas`, `total_txt`, `inicio`) y `_ordHorario_` es su
+   gemela SÓLO para recalcular en vivo mientras se edita (el banco `probar_orden_dia_app.js` y `probar_orden_dia.py` cuentan
+   los mismos casos). Reordenar: arrastrar desde el asa (`_ordenArrastrar_`) o ▲/▼. Plantillas: `listarPlantillasOrden`…
    ⛔ Quién edita lo decide el SERVIDOR (`getOrdenDia` → `puede`): esto no copia la regla, la pregunta. Los topes de abajo
    son los de `orden_dia.py` (el servidor los vuelve a comprobar). Una sola implementación para las dos caras. */
 var ORD_TOPE_FILAS=40, ORD_TOPE_TEMA=200, ORD_TOPE_QUIEN=80;
 var ORD_PDF_MAX=8*1024*1024;              // = `orden_dia.PDF_MAX`
 var ORD={};                               // id -> {e:{filas,por,at,puede,pdf}, draft:[…]|null, visor:url|null, sub:{pct,nombre}|null, copia, ia, mic, base}
-function _ordSt_(id){ return ORD[id]||(ORD[id]={e:null,draft:null,visor:null,sub:null,copia:null,ia:{texto:'',fase:null},mic:null,base:null}); }
+function _ordSt_(id){ return ORD[id]||(ORD[id]={e:null,draft:null,visor:null,sub:null,gen:false,errGen:'',copia:null,plant:null,ia:{texto:'',fase:null},mic:null,base:null}); }
+var ORD_TOPE_DUR=600;                     // = `orden_dia.TOPE_DUR`
+/* La duración de una fila como entero >0 (0 = «sin poner»): lo tecleado puede ser '' o un texto. */
+function _ordDur_(f){ var d=Math.floor(+(f&&f.dur)); return d>0?Math.min(d,ORD_TOPE_DUR):0; }
+function _ordMarca_(min, ini){
+  if(ini==null) return min===0?'T0':'T0+'+min;
+  var t=(ini+min)%1440; return pad(Math.floor(t/60))+':'+pad(t%60);
+}
+/* Gemela de `orden_dia.horario` (la del servidor es la que manda; esta sólo repinta mientras se arrastra o se teclea). */
+function _ordHorario_(filas, inicio){
+  var m=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(inicio||'')), ini=m?(+m[1]*60+ +m[2]):null, t=0;
+  return (filas||[]).map(function(f){ var d=_ordDur_(f), r={desde:_ordMarca_(t,ini),hasta:_ordMarca_(t+d,ini)}; t+=d; return r; });
+}
+function _ordTotal_(filas){ return (filas||[]).reduce(function(a,f){ return a+_ordDur_(f); },0); }
+function _ordTextoDur_(m){ var h=Math.floor(m/60), r=m%60; return h?(r?h+' h '+pad(r)+' min':h+' h'):r+' min'; }
+/* La fila tal como vive en el borrador (`dur` '' si falta) y tal como viaja (`dur` entero o ausente → el servidor dice «falta la duración»). */
+function _ordFilaBorrador_(f){ return {dur:(f&&f.dur>0)?f.dur:'',tema:(f&&f.tema)||'',quien:(f&&f.quien)||''}; }
+function _ordFilaEnvio_(f){ var d=_ordDur_(f); return d?{dur:d,tema:f.tema,quien:f.quien}:{tema:f.tema,quien:f.quien}; }
+function _ordAplicarVista_(e, r){
+  ['filas','horas','total','total_txt','pendientes','inicio'].forEach(function(k){ if(r&&r[k]!==undefined) e[k]=r[k]; });
+}
 var ORD_VOZ_MAX_S=90;                     // un dictado: 90 s a 24 kbps son ~270 KB, bajo los 600 KB de `servidor.DICTADO_AUDIO_MAX`
-function _ordHoras_(f){ return f.desde ? (f.hasta ? f.desde+' – '+f.hasta : f.desde) : (f.hasta||''); }
+function _ordHoras_(h){ return h ? h.desde+' – '+h.hasta : ''; }
 function _ordKB_(n){ return n>=1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
 
 function _ordenDiaReuHTML_(r){
@@ -10904,14 +13143,19 @@ function _ordenDiaReuHTML_(r){
   setTimeout(function(){ if(!st.e) _ordenRefrescar_(r.id); else _ordenPintar_(r.id); },0);
   return '<div data-ordendia="'+esc(r.id)+'">'+(st.e?_ordenHTML_(r.id):'')+'</div>';
 }
-/* La tabla de sólo lectura: la del orden guardado y la de la PROPUESTA de SolarIA (una sola forma de pintar filas). */
-function _ordTablaHTML_(filas){
+/* La tabla de sólo lectura: la del orden guardado y la de la PROPUESTA de SolarIA (una sola forma de pintar filas). `horas` =
+   las del servidor; sin ellas (la propuesta) se calculan con la gemela desde `inicio`. Las filas sin duración se marcan. */
+function _ordTablaHTML_(filas, inicio, horas){
+  horas=horas&&horas.length===filas.length?horas:_ordHorario_(filas, inicio);
   return '<table style="width:100%;border-collapse:collapse;font-size:13px" data-ordtabla>'+
-    filas.map(function(f){
-      return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px 5px 0;white-space:nowrap;color:var(--ink3);vertical-align:top">'+esc(_ordHoras_(f))+'</td>'+
-        '<td style="padding:5px 8px 5px 0;vertical-align:top">'+esc(f.tema)+'</td>'+
-        '<td style="padding:5px 0;color:var(--ink3);vertical-align:top;text-align:right">'+esc(f.quien||'')+'</td></tr>';
-    }).join('')+'</table>';
+    filas.map(function(f,i){
+      var d=_ordDur_(f);
+      return '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 8px 5px 0;white-space:nowrap;color:var(--ink3);vertical-align:top">'+esc(_ordHoras_(horas[i]))+
+        '<br><span data-ordduracion'+(d?'':' style="color:var(--warn)"')+'>'+(d?d+' min':'sin duración')+'</span></td>'+
+        /* «quién» debajo del tema, no en su columna: con las horas en «T0+10 – T0+30» la tercera columna se salía del móvil */
+        '<td style="padding:5px 0;vertical-align:top;width:100%">'+esc(f.tema)+(f.quien?'<br><span style="color:var(--ink3)">'+esc(f.quien)+'</span>':'')+'</td></tr>';
+    }).join('')+'</table>'+
+    '<p class="rnota" style="margin:6px 0 0" data-ordtotal>Total: '+_ordTextoDur_(_ordTotal_(filas))+'</p>';
 }
 function _ordenHTML_(id){
   var st=_ordSt_(id), e=st.e; if(!e) return '';
@@ -10919,23 +13163,38 @@ function _ordenHTML_(id){
   if(st.draft){
     cuerpo=_ordenEditHTML_(st);
   } else {
-    if(e.filas&&e.filas.length) cuerpo=_ordTablaHTML_(e.filas)+(e.por?'<p class="rnota" style="margin:6px 0 0">Editado por '+esc(e.por)+'.</p>':'');
+    if(e.filas&&e.filas.length) cuerpo=_ordTablaHTML_(e.filas, e.inicio, e.horas)+(e.pendientes?'<p class="rnota" style="margin:6px 0 0;color:var(--warn)">'+e.pendientes+' punto'+(e.pendientes===1?'':'s')+' sin duración: edita la tabla para ponerla.</p>':'')+(e.por?'<p class="rnota" style="margin:6px 0 0">Editado por '+esc(e.por)+'.</p>':'');
     else if(!e.pdf) cuerpo='<div class="rnota">Todavía no hay orden del día.</div>';
-    if(e.puede) cuerpo+='<button class="btn mini" style="margin-top:7px" data-ordeditar>✏️ '+(e.filas&&e.filas.length?'Editar la tabla':'Escribir el orden del día')+'</button>';
+    if(e.puede) cuerpo+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px"><button class="btn mini" data-ordeditar>✏️ '+(e.filas&&e.filas.length?'Editar la tabla':'Escribir el orden del día')+'</button>'+
+      '<button class="btn mini" data-ordgenerar'+(st.gen?' disabled':'')+'>📄 '+(st.gen?'Generando el PDF…':'Generar PDF')+'</button></div>'+
+      (st.errGen?'<div class="rnota" data-ordgenerror style="margin-top:6px;color:var(--warn)">'+esc(st.errGen)+'</div>':'');
   }
   return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+cab+cuerpo+_ordenPdfHTML_(st)+'</div>';
 }
+/* Las horas y el total del borrador, repintados SIN tocar los campos (si no, teclear perdería el foco). */
+function _ordenHorasVivas_(el, st){
+  var hs=_ordHorario_(st.draft, st.e&&st.e.inicio);
+  Array.prototype.forEach.call(el.querySelectorAll('[data-ordhoras]'), function(c,i){ if(hs[i]) c.textContent=_ordHoras_(hs[i]); });
+  Array.prototype.forEach.call(el.querySelectorAll('[data-ordfila]'), function(c,i){
+    if(st.draft[i]) c.setAttribute('data-ordpend', _ordDur_(st.draft[i])?'0':'1');
+  });
+  var t=el.querySelector('[data-ordtotal]'); if(t) t.textContent='Total: '+_ordTextoDur_(_ordTotal_(st.draft));
+}
 function _ordenEditHTML_(st){
-  var inp='width:100%;box-sizing:border-box;min-width:0';
+  var inp='width:100%;box-sizing:border-box;min-width:0', hs=_ordHorario_(st.draft, st.e&&st.e.inicio);
   var filas=st.draft.map(function(f,i){
-    return '<div data-ordfila="'+i+'" style="border-top:1px solid var(--line);padding:7px 0">'+
+    var pend=!_ordDur_(f);
+    return '<div data-ordfila="'+i+'" data-ordpend="'+(pend?'1':'0')+'" style="border-top:1px solid var(--line);padding:7px 0">'+
       '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+
-        '<input type="time" data-ordcampo="desde" value="'+esc(f.desde)+'" aria-label="Desde" style="width:104px">'+
-        '<span>–</span><input type="time" data-ordcampo="hasta" value="'+esc(f.hasta)+'" aria-label="Hasta" style="width:104px">'+
+        /* El asa: el arrastre empieza SÓLO aquí (un dedo sobre la fila sigue deslizando la página). */
+        '<span data-ordasa="'+i+'" role="button" aria-label="Arrastrar para mover el punto" title="Arrastra para cambiar el orden" style="touch-action:none;cursor:grab;user-select:none;padding:6px 8px;font-size:18px;line-height:1;color:var(--ink3)">⠿</span>'+
+        '<span class="mono" data-ordhoras style="color:var(--ink3);white-space:nowrap">'+esc(_ordHoras_(hs[i]))+'</span>'+
+        nxNum('', f.dur, {min:0, max:ORD_TOPE_DUR, paso:5, sufijo:'min', attrs:'data-ordcampo="dur"'})+
         '<span style="display:flex;gap:6px;margin-left:auto">'+       // los tres botones envuelven JUNTOS, no uno a uno
         '<button type="button" class="btn mini" data-ordsubir="'+i+'" aria-label="Subir punto"'+(i?'':' disabled')+'>▲</button>'+
         '<button type="button" class="btn mini" data-ordbajar="'+i+'" aria-label="Bajar punto"'+(i<st.draft.length-1?'':' disabled')+'>▼</button>'+
         '<button type="button" class="btn mini" data-ordborrar="'+i+'" aria-label="Quitar punto" style="color:var(--warn);border-color:var(--warn)">✕</button></span></div>'+
+      (pend?'<div class="rnota" data-ordpendaviso style="margin:4px 0 0;color:var(--warn)">Pon cuánto dura este punto.</div>':'')+
       '<input data-ordcampo="tema" value="'+esc(f.tema)+'" maxlength="'+ORD_TOPE_TEMA+'" placeholder="De qué se habla" style="'+inp+';margin-top:6px">'+
       '<span class="sc" style="display:block;margin:7px 0 4px">Quién lo introduce</span>'+
       /* El selector de personas ÚNICO, de uno en uno y entre los convocados (antes: un campo libre con datalist). */
@@ -10947,12 +13206,67 @@ function _ordenEditHTML_(st){
   /* Con una propuesta delante la tabla de abajo no se toca (sería de otra tabla): se decide primero. */
   return (prop ? '<div class="rnota">Tabla actual: '+st.draft.length+' puntos. Abajo, la propuesta de SolarIA.</div>' :
       (filas||'<div class="rnota">Sin puntos. Añade el primero.</div>'))+
+    '<p class="rnota" style="margin:8px 0 0" data-ordtotal>Total: '+_ordTextoDur_(_ordTotal_(st.draft))+'</p>'+
+    (st.e&&st.e.inicio?'':'<p class="rnota" style="margin:2px 0 0">Aún sin fijar: las horas cuentan desde T0 y se ponen solas al fijarla.</p>')+
     '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'+
       '<button type="button" class="btn mini" data-ordanadir'+(prop||st.draft.length>=ORD_TOPE_FILAS?' disabled':'')+'>+ Añadir punto</button>'+
       '<button type="button" class="btn mini" data-ordcopiar'+(prop?' disabled':'')+'>📋 Copiar de otra reunión</button>'+
+      '<button type="button" class="btn mini" data-ordplantillas'+(prop?' disabled':'')+'>🗂 Usar una plantilla</button>'+
+      '<button type="button" class="btn mini" data-ordplantguardar'+(prop?' disabled':'')+'>💾 Guardar como plantilla</button>'+
       '<span style="flex:1"></span><button type="button" class="btn mini" data-ordcancelar>Cancelar</button>'+
       '<button type="button" class="btn mini pri" data-ordguardar'+(prop?' disabled':'')+'>Guardar</button></div>'+
-    _ordenCopiaHTML_(st)+_ordenSolariaHTML_(st);
+    _ordenCopiaHTML_(st)+_ordenPlantillasHTML_(st)+_ordenSolariaHTML_(st);
+}
+/* El AUTO-SCROLL del arrastre (01/11): el ancestro que desliza (o la ventana) y cuánto hay que moverlo por fotograma. A menos de
+   ORD_BORDE px del borde visible (el del ancestro, recortado a la pantalla) se mueve hacia ese lado, más rápido cuanto más cerca
+   (hasta ORD_VEL px por fotograma, en el borde mismo o más allá). Lejos de los bordes, 0. */
+var ORD_BORDE=40, ORD_VEL=18;
+function _ordScroller_(el){
+  for(var n=el.parentElement; n&&n!==document.body&&n!==document.documentElement; n=n.parentElement){
+    var o=getComputedStyle(n).overflowY;
+    if((o==='auto'||o==='scroll')&&n.scrollHeight>n.clientHeight+1) return n;
+  }
+  return null;
+}
+function _ordVelScroll_(y, arriba, abajo){
+  if(y<arriba+ORD_BORDE) return -Math.ceil(ORD_VEL*Math.min(1,(arriba+ORD_BORDE-y)/ORD_BORDE));
+  if(y>abajo-ORD_BORDE) return Math.ceil(ORD_VEL*Math.min(1,(y-(abajo-ORD_BORDE))/ORD_BORDE));
+  return 0;
+}
+/* El arrastre (pointer events, no HTML5 DnD: éste no existe en el dedo). Empieza en el asa; la fila bajo el puntero marca el
+   hueco (`data-ordsobre`); al soltar se mueve el punto y las horas se recalculan solas. `pointercancel` lo deja como estaba.
+   Cerca del borde de la lista o de la pantalla se desliza sola (`_ordVelScroll_`), también con el dedo QUIETO: el hueco se
+   recalcula en cada fotograma porque las filas se mueven bajo él. Soltar, cancelar o salir la para. */
+function _ordenArrastrar_(id, el, asa, ev){
+  var st=_ordSt_(id), de=+asa.getAttribute('data-ordasa'), filas=Array.prototype.slice.call(el.querySelectorAll('[data-ordfila]')), dest=de;
+  if(!st.draft||st.draft.length<2||(ev.button!=null&&ev.button>0)) return;
+  ev.preventDefault();
+  try{ asa.setPointerCapture(ev.pointerId); }catch(_){}
+  filas[de].style.opacity='.55';
+  var marca=function(){ filas.forEach(function(f,i){ f.setAttribute('data-ordsobre', i===dest&&dest!==de?(dest<de?'antes':'despues'):''); f.style.boxShadow=i===dest&&dest!==de?(dest<de?'0 -3px 0 var(--red)':'0 3px 0 var(--red)'):''; }); };
+  var y=ev.clientY, sc=_ordScroller_(el), raf=0;
+  var calcula=function(){
+    dest=filas.length-1;
+    for(var i=0;i<filas.length;i++){ var r=filas[i].getBoundingClientRect(); if(y<r.top+r.height/2){ dest=i; break; } }
+    marca();
+  };
+  var paso=function(){
+    raf=0;
+    var rc=sc?sc.getBoundingClientRect():{top:0,bottom:window.innerHeight};
+    var v=_ordVelScroll_(y, Math.max(0,rc.top), Math.min(window.innerHeight,rc.bottom));
+    if(!v) return;
+    if(sc) sc.scrollTop+=v; else window.scrollBy(0,v);
+    calcula(); raf=requestAnimationFrame(paso);
+  };
+  var mover=function(e){ y=e.clientY; calcula(); if(!raf) raf=requestAnimationFrame(paso); };
+  var fin=function(e){
+    if(raf){ cancelAnimationFrame(raf); raf=0; }
+    asa.removeEventListener('pointermove',mover); asa.removeEventListener('pointerup',fin); asa.removeEventListener('pointercancel',fin);
+    try{ asa.releasePointerCapture(ev.pointerId); }catch(_){}
+    if(e.type==='pointerup'&&dest!==de&&st.draft){ st.draft.splice(dest,0,st.draft.splice(de,1)[0]); }
+    _ordenPintar_(id);
+  };
+  asa.addEventListener('pointermove',mover); asa.addEventListener('pointerup',fin); asa.addEventListener('pointercancel',fin);
 }
 /* «Copiar de otra reunión»: buscador de las reuniones que ya tienen orden del día; su tabla entra como BASE (editable) y no
    se guarda nada hasta «Guardar». `st.copia` = null · {q, lista:null|[…]} ; `st.avisoCopia` = {titulo, antes} para deshacer. */
@@ -10980,6 +13294,18 @@ function _ordenCopiaHTML_(st){
     '<div style="text-align:right;margin-top:6px"><button type="button" class="btn mini" data-ordcopiacerrar>Cerrar</button></div></div>';
   return h;
 }
+/* Las PLANTILLAS: la lista (usar / borrar) vive en `st.plant` = null · {lista:null|[…]}. Guardar pide el nombre con `dialogoTexto`. */
+function _ordenPlantillasHTML_(st){
+  var p=st.plant; if(!p) return '';
+  var cuerpo=!p.lista?'<div class="rnota">Buscando plantillas…</div>':!p.lista.length?'<div class="rnota">Todavía no hay plantillas guardadas. Guarda una con «Guardar como plantilla».</div>':
+    p.lista.map(function(x){
+      return '<div style="display:flex;gap:6px;align-items:stretch;margin-top:5px"><button type="button" class="btn mini" data-ordplantusar="'+esc(x.id)+'" style="flex:1;text-align:left;white-space:normal">'+
+        esc(x.nombre)+' <span style="color:var(--ink3)">· '+x.n+' punto'+(x.n===1?'':'s')+' · '+esc(x.total_txt)+(x.por?' · '+esc(x.por):'')+'</span></button>'+
+        (x.puedeBorrar?'<button type="button" class="btn mini" data-ordplantborrar="'+esc(x.id)+'" aria-label="Borrar plantilla" style="color:var(--warn);border-color:var(--warn)">✕</button>':'')+'</div>';
+    }).join('');
+  return '<div data-ordplantpanel style="margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px">'+cuerpo+
+    '<div style="text-align:right;margin-top:6px"><button type="button" class="btn mini" data-ordplantcerrar>Cerrar</button></div></div>';
+}
 /* La caja de SolarIA + el micrófono. `st.ia` = {texto, fase: null·'pensando'·'propuesta'·'usada'·'error', prop, nota, orig, msg, id};
    `st.mic` = null · {fase:'grabando'|'transcribiendo', rec}. ⛔ La caja está BLOQUEADA mientras se graba, se transcribe o SolarIA
    piensa, y lo dictado se AÑADE al final de lo que hay: nunca lo pisa (`_ordenMicFin_`). */
@@ -10994,7 +13320,7 @@ function _ordenSolariaHTML_(st){
     '<span class="rnota" style="flex:1;margin:0">'+(mic&&mic.fase==='grabando'?'Grabando… habla y pulsa «Parar».':mic&&mic.fase==='transcribiendo'?'Transcribiendo…':ia.fase==='pensando'?'SolarIA está escribiendo… (unos 20 s)':'')+'</span>'+
     '<button type="button" class="btn mini pri" data-ordiaenviar'+(_ordenOcupado_(st)||!String(ia.texto||'').trim()?' disabled':'')+'>✨ Enviar a SolarIA</button></div>';
   if(ia.fase==='propuesta') h+='<div data-ordiaprop style="margin-top:8px"><span class="sc" style="display:block;margin-bottom:4px">Propuesta de SolarIA</span>'+
-    _ordTablaHTML_(ia.prop)+'<p class="rnota" style="margin:6px 0 0">'+esc(ia.nota||'Esta es la propuesta. Revísala antes de usarla.')+'</p>'+
+    _ordTablaHTML_(ia.prop, st.e&&st.e.inicio)+'<p class="rnota" style="margin:6px 0 0">'+esc(ia.nota||'Esta es la propuesta. Revísala antes de usarla.')+'</p>'+
     '<div style="display:flex;gap:8px;margin-top:6px"><button type="button" class="btn mini pri" data-ordiaok>Usar esto</button>'+
     '<button type="button" class="btn mini" data-ordiano>Deshacer</button></div></div>';
   if(ia.fase==='usada') h+='<div class="rnota" style="margin-top:8px">Propuesta aplicada a la tabla. <button type="button" class="btn mini" data-ordiaun>Volver a la anterior</button></div>';
@@ -11003,7 +13329,7 @@ function _ordenSolariaHTML_(st){
 }
 function _ordenPdfHTML_(st){
   var e=st.e, sub=st.sub, h='';
-  if(sub) return '<div style="margin-top:10px"><div class="rnota">Subiendo <b>'+esc(sub.nombre)+'</b>… '+sub.pct+' %</div>'+
+  if(sub) return '<div style="margin-top:10px"><div class="rnota">Subiendo '+esc(sub.nombre)+'… '+sub.pct+' %</div>'+
     '<div style="height:5px;background:var(--line);border-radius:3px;margin-top:6px"><div style="height:5px;width:'+sub.pct+'%;background:var(--red);border-radius:3px"></div></div></div>';
   if(e.pdf){
     h+='<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="rnota" style="flex:1;margin:0">📄 '+esc(e.pdf.nombre||'orden.pdf')+' · '+_ordKB_(e.pdf.bytes||0)+'</span>'+
@@ -11020,9 +13346,13 @@ function _ordenPintar_(id){
   Array.prototype.forEach.call(document.querySelectorAll('[data-ordendia="'+String(id).replace(/"/g,'')+'"]'), function(el){
     el.innerHTML=_ordenHTML_(id);
     el.onclick=function(ev){ _ordenClic_(id, ev); };
-    el.oninput=function(ev){
+    el.onpointerdown=function(ev){ var a=ev.target.closest&&ev.target.closest('[data-ordasa]'); if(a&&st.draft) _ordenArrastrar_(id, el, a, ev); };
+    el.onchange=el.oninput=function(ev){
       var c=ev.target.closest?ev.target.closest('[data-ordcampo]'):null, fi=c&&c.closest('[data-ordfila]');
-      if(c&&fi&&st.draft) st.draft[+fi.getAttribute('data-ordfila')][c.getAttribute('data-ordcampo')]=c.value;
+      if(c&&fi&&st.draft){
+        st.draft[+fi.getAttribute('data-ordfila')][c.getAttribute('data-ordcampo')]=c.value;
+        if(c.getAttribute('data-ordcampo')==='dur') _ordenHorasVivas_(el, st);      // las horas se recalculan solas, sin repintar los campos
+      }
       if(ev.target.matches&&ev.target.matches('[data-ordiatxt]')){
         st.ia.texto=ev.target.value; var b=el.querySelector('[data-ordiaenviar]');
         if(b) b.disabled=_ordenOcupado_(st)||!String(st.ia.texto).trim();
@@ -11034,17 +13364,30 @@ function _ordenPintar_(id){
     var f=el.querySelector('[data-ordpdffile]');
     if(f) f.onchange=function(){ if(f.files&&f.files[0]) _ordenSubirPdf_(id, f.files[0]); f.value=''; };
   });
+  /* 01/11: el titular de «mejor hueco» depende del orden del día (cuántos bloques hacen falta): al cambiar éste se rehace. */
+  if(typeof st.sugHTML==='function') Array.prototype.forEach.call(document.querySelectorAll('[data-ordsug="'+String(id).replace(/"/g,'')+'"]'), function(el){
+    el.innerHTML=st.sugHTML();
+  });
+  if(typeof st.sugMapa==='function') st.sugMapa();                // el mapa resalta el hueco del orden del día, no el viejo
+}
+/* Cargar el orden del día SIN la ficha (la sugerencia de bloques del mapa lo necesita aunque nadie abra la ficha): la misma puerta,
+   `_ordenRefrescar_`, una sola vez por reunión y sólo con sesión. */
+function _ordenCargar_(id){
+  var st=_ordSt_(id);
+  if(st.e || st.cargando || !(typeof backendOK!=='undefined' && backendOK && typeof SESION!=='undefined' && SESION)) return;
+  st.cargando=true;
+  _ordenRefrescar_(id).then(function(){ st.cargando=false; }, function(){ st.cargando=false; });
 }
 async function _ordenRefrescar_(id){
   var st=_ordSt_(id);
-  try{ st.e=await api.getOrdenDia(id); }catch(_){ st.e={filas:[],puede:false,pdf:null,por:null,at:null}; }
+  try{ st.e=await api.getOrdenDia(id); }catch(_){ st.e={filas:[],horas:[],puede:false,pdf:null,por:null,at:null}; }
   if(!st.e.filas) st.e.filas=[];
   _ordenPintar_(id);
 }
 /* Suelta lo de editar (borrador, copia, caja de SolarIA). ⛔ Una grabación en marcha se corta sin transcribir. */
 function _ordenSoltar_(st, draft){
   if(st.mic&&st.mic.rec){ st.mic.cancelada=true; try{ st.mic.rec.stop(); }catch(_){} }
-  st.draft=draft||null; st.copia=null; st.avisoCopia=null; st.base=null; st.mic=null;
+  st.draft=draft||null; st.copia=null; st.plant=null; st.avisoCopia=null; st.base=null; st.mic=null;
   st.ia={texto:'',fase:null,id:(st.ia&&st.ia.id)||0};            // el contador no vuelve a 0: una respuesta tardía no casa con la caja nueva
 }
 async function _ordenCopiaAbrir_(id){
@@ -11055,6 +13398,41 @@ async function _ordenCopiaAbrir_(id){
   catch(e){ st.copia=null; tostErr('No se pudieron buscar las reuniones: ', e); }
   _ordenPintar_(id);
 }
+async function _ordenPlantillasAbrir_(id){
+  var st=_ordSt_(id);
+  if(st.plant){ st.plant=null; return _ordenPintar_(id); }
+  st.plant={lista:null}; st.copia=null; _ordenPintar_(id);
+  try{ st.plant.lista=await api.listarPlantillasOrden(id); }
+  catch(e){ st.plant=null; tostErr('No se pudieron buscar las plantillas: ', e); }
+  _ordenPintar_(id);
+}
+async function _ordenPlantillaUsar_(id, pid){
+  var st=_ordSt_(id), x=st.plant&&(st.plant.lista||[]).filter(function(y){ return String(y.id)===String(pid); })[0], d;
+  if(!x||!st.draft) return;
+  try{ d=await api.getPlantillaOrden(id, pid); }catch(e){ tostErr('No se pudo usar la plantilla: ', e); return; }
+  if(!st.draft||!d||!d.filas||!d.filas.length){ tost('Esa plantilla ya no existe.'); return; }
+  st.avisoCopia={titulo:'la plantilla «'+(x.nombre||'')+'»', antes:st.draft};
+  st.draft=d.filas.map(_ordFilaBorrador_); st.base=null; st.plant=null; st.ia.fase=null;
+  _ordenPintar_(id);
+}
+async function _ordenPlantillaBorrar_(id, pid){
+  var st=_ordSt_(id), x=st.plant&&(st.plant.lista||[]).filter(function(y){ return String(y.id)===String(pid); })[0];
+  if(!x) return;
+  if(!(await dialogoSiNo('¿Borrar la plantilla «'+x.nombre+'»?'))) return;
+  try{ await api.borrarPlantillaOrden(pid); }catch(e){ tostErr('No se pudo borrar: ', e); return; }
+  if(st.plant&&st.plant.lista) st.plant.lista=st.plant.lista.filter(function(y){ return String(y.id)!==String(pid); });
+  tost('Plantilla borrada.'); _ordenPintar_(id);
+}
+async function _ordenPlantillaGuardar_(id){
+  var st=_ordSt_(id); if(!st.draft) return;
+  var filas=st.draft.filter(function(f){ return String(f.tema).trim()||String(f.quien).trim(); });
+  if(!filas.length){ tost('Escribe algún punto antes de guardarlo como plantilla.'); return; }
+  if(filas.some(function(f){ return !_ordDur_(f); })){ tost('Pon la duración de los puntos marcados.'); return _ordenPintar_(id); }
+  var nombre=await dialogoTexto('Nombre de la plantilla'); if(nombre==null) return;
+  try{ var r=await api.guardarPlantillaOrden(id, nombre, filas.map(_ordFilaEnvio_)); tost('Plantilla «'+((r&&r.nombre)||nombre)+'» guardada.'); st.plant=null; }
+  catch(e){ tostErr('No se pudo guardar la plantilla: ', e); return; }
+  _ordenPintar_(id);
+}
 async function _ordenCopiarDe_(id, otro){
   var st=_ordSt_(id), x=st.copia&&(st.copia.lista||[]).filter(function(y){ return String(y.id)===String(otro); })[0];
   if(!x||!st.draft) return;
@@ -11062,7 +13440,7 @@ async function _ordenCopiarDe_(id, otro){
   try{ d=await api.getOrdenDia(x.id); }catch(e){ tostErr('No se pudo copiar: ', e); return; }
   if(!st.draft||!d||!d.filas||!d.filas.length){ tost('Esa reunión ya no tiene orden del día.'); return; }
   st.avisoCopia={titulo:x.titulo||('Reunión '+x.id), antes:st.draft};
-  st.draft=d.filas.map(function(f){ return {desde:f.desde||'',hasta:f.hasta||'',tema:f.tema||'',quien:f.quien||''}; });
+  st.draft=d.filas.map(_ordFilaBorrador_);
   st.base=x.id; st.copia=null; st.ia.fase=null;
   _ordenPintar_(id);
 }
@@ -11070,7 +13448,7 @@ async function _ordenCopiarDe_(id, otro){
 async function _ordenSolaria_(id){
   var st=_ordSt_(id), ia=st.ia, texto=String(ia.texto||'').trim();
   if(!texto||_ordenOcupado_(st)||!st.draft) return;
-  var n=(ia.id||0)+1, filas=st.draft.filter(function(f){ return f.hasta||String(f.tema).trim()||String(f.quien).trim(); }), r;
+  var n=(ia.id||0)+1, filas=st.draft.filter(function(f){ return String(f.tema).trim()||String(f.quien).trim(); }).map(_ordFilaEnvio_), r;
   ia.id=n; ia.fase='pensando'; _ordenPintar_(id);
   var vigente=function(){ return st.ia===ia && ia.fase==='pensando' && ia.id===n; };
   try{ r=await api.proponerOrdenDia(id, filas, texto, st.base); }
@@ -11129,34 +13507,41 @@ function _ordenQuitarVisor_(st){ if(st.visor){ try{ URL.revokeObjectURL(st.visor
 async function _ordenClic_(id, ev){
   var st=_ordSt_(id), t=ev.target&&ev.target.closest?ev.target:null; if(!t||!st.e) return;
   var q=function(a){ return t.closest('['+a+']'); }, n=function(a){ return +q(a).getAttribute(a); };
-  if(q('data-ordeditar')){ st.draft=(st.e.filas||[]).map(function(f){ return {desde:f.desde||'',hasta:f.hasta||'',tema:f.tema||'',quien:f.quien||''}; });
-    if(!st.draft.length) st.draft.push({desde:'',hasta:'',tema:'',quien:''});
+  if(q('data-ordeditar')){ st.draft=(st.e.filas||[]).map(_ordFilaBorrador_);
+    if(!st.draft.length) st.draft.push({dur:10,tema:'',quien:''});
     _ordenSoltar_(st, st.draft); return _ordenPintar_(id); }
   if(q('data-ordcancelar')){ _ordenSoltar_(st); return _ordenPintar_(id); }
+  if(q('data-ordgenerar')) return _ordenGenerar_(id);
   if(q('data-ordcopiar')) return _ordenCopiaAbrir_(id);
   if(q('data-ordcopiacerrar')){ st.copia=null; return _ordenPintar_(id); }
   if(q('data-ordcopiarde')) return _ordenCopiarDe_(id, q('data-ordcopiarde').getAttribute('data-ordcopiarde'));
   if(q('data-ordcopiaundo') && st.avisoCopia){ st.draft=st.avisoCopia.antes; st.base=null; st.avisoCopia=null; return _ordenPintar_(id); }
   if(q('data-ordmic')) return _ordenMic_(id);
   if(q('data-ordiaenviar')) return _ordenSolaria_(id);
-  if(q('data-ordiaok') && st.ia.fase==='propuesta'){ st.ia.orig=st.draft; st.draft=st.ia.prop.map(function(f){ return {desde:f.desde||'',hasta:f.hasta||'',tema:f.tema||'',quien:f.quien||''}; });
+  if(q('data-ordiaok') && st.ia.fase==='propuesta'){ st.ia.orig=st.draft; st.draft=st.ia.prop.map(_ordFilaBorrador_);
     st.ia.fase='usada'; st.ia.prop=null; st.avisoCopia=null; return _ordenPintar_(id); }
   if(q('data-ordiano') && st.ia.fase==='propuesta'){ st.ia.fase=null; st.ia.prop=null; return _ordenPintar_(id); }
   if(q('data-ordiaun') && st.ia.fase==='usada'){ st.draft=st.ia.orig; st.ia.fase=null; st.ia.orig=null; return _ordenPintar_(id); }
   if(q('data-ordanadir') && st.draft && st.draft.length<ORD_TOPE_FILAS){
-    var ult=st.draft[st.draft.length-1];
-    st.draft.push({desde:ult?ult.hasta:'',hasta:'',tema:'',quien:''}); return _ordenPintar_(id); }
+    st.draft.push({dur:10,tema:'',quien:''}); return _ordenPintar_(id); }
   if(q('data-ordborrar') && st.draft){ st.draft.splice(n('data-ordborrar'),1); return _ordenPintar_(id); }
   if(q('data-ordsubir') && st.draft){ var i=n('data-ordsubir'); if(i>0){ st.draft.splice(i-1,0,st.draft.splice(i,1)[0]); } return _ordenPintar_(id); }
   if(q('data-ordbajar') && st.draft){ var j=n('data-ordbajar'); if(j<st.draft.length-1){ st.draft.splice(j+1,0,st.draft.splice(j,1)[0]); } return _ordenPintar_(id); }
+  if(q('data-ordplantillas')) return _ordenPlantillasAbrir_(id);
+  if(q('data-ordplantcerrar')){ st.plant=null; return _ordenPintar_(id); }
+  if(q('data-ordplantusar')) return _ordenPlantillaUsar_(id, q('data-ordplantusar').getAttribute('data-ordplantusar'));
+  if(q('data-ordplantborrar')) return _ordenPlantillaBorrar_(id, q('data-ordplantborrar').getAttribute('data-ordplantborrar'));
+  if(q('data-ordplantguardar')) return _ordenPlantillaGuardar_(id);
   if(q('data-ordguardar') && st.draft){
     var b=q('data-ordguardar'); if(b.disabled) return;
-    /* En blanco = sin tema, sin quién y sin hora de fin: la hora de inicio sola es la que `Añadir punto` ya pone. */
-    var filas=st.draft.filter(function(f){ return f.hasta||String(f.tema).trim()||String(f.quien).trim(); });
+    /* En blanco = sin tema y sin quién (la duración sola no hace un punto: `Añadir punto` ya la deja en 10). */
+    var filas=st.draft.filter(function(f){ return String(f.tema).trim()||String(f.quien).trim(); });
+    if(filas.some(function(f){ return !_ordDur_(f); })){ tost('Pon la duración de los puntos marcados.'); return _ordenPintar_(id); }
     b.disabled=true;
     try{
-      var r=await api.guardarOrdenDia(id, filas);
-      st.e.filas=r.filas||filas; st.e.por=(typeof YO!=='undefined'&&YO&&YO.nombre)||st.e.por; st.draft=null;
+      var r=await api.guardarOrdenDia(id, filas.map(_ordFilaEnvio_));
+      _ordAplicarVista_(st.e, r); if(!r||!r.filas) st.e.filas=filas.map(_ordFilaEnvio_);
+      st.e.por=(typeof YO!=='undefined'&&YO&&YO.nombre)||st.e.por; st.draft=null;
       _ordenSoltar_(st); tost('Orden del día guardado.');
     }catch(e){ b.disabled=false; tostErr('No se pudo guardar: ', e); return; }
     return _ordenPintar_(id);
@@ -11172,11 +13557,26 @@ async function _ordenClic_(id, ev){
     return _ordenPintar_(id);
   }
   if(q('data-ordquitarpdf')){
-    if(!window.confirm('¿Quitar el PDF del orden del día?')) return;
+    if(!(await dialogoSiNo('¿Quitar el PDF del orden del día?'))) return;
     try{ await api.borrarOrdenPdf(id); _ordenQuitarVisor_(st); tost('PDF quitado.'); }
     catch(e){ tostErr('No se pudo quitar: ', e); return; }
     return _ordenRefrescar_(id);
   }
+}
+/* «Generar PDF»: el servidor monta el PDF con la plantilla de Solaris a partir de la tabla GUARDADA (sin IA, sin inventar) y lo deja
+   donde el subido. Si ya hay uno (subido o generado) se pregunta antes, diciendo cuál se reemplaza. Un fallo se dice en la ficha. */
+async function _ordenGenerar_(id){
+  var st=_ordSt_(id); if(st.gen||!st.e) return;
+  if(!(st.e.filas&&st.e.filas.length)){ st.errGen='El orden del día no tiene puntos: escríbelo antes de generar el PDF.'; return _ordenPintar_(id); }
+  if(st.e.pdf){
+    var p=st.e.pdf, cual='«'+(p.nombre||'orden.pdf')+'»'+(p.generado?' (generado':' (subido')+(p.por?' por '+p.por:'')+')';
+    if(!(await dialogoSiNo('Ya hay un PDF del orden del día: '+cual+'.\n\nGenerar uno nuevo lo reemplaza.\n\n¿Sigo?'))) return;
+  }
+  st.gen=true; st.errGen=''; _ordenPintar_(id);
+  try{ await api.generarOrdenPdf(id); _ordenQuitarVisor_(st); tost('PDF generado.'); }
+  catch(e){ st.errGen='No se pudo generar el PDF: '+((e&&e.message)||e); }
+  st.gen=false;
+  _ordenRefrescar_(id);
 }
 async function _ordenSubirPdf_(id, file){
   var st=_ordSt_(id); if(st.sub) return;

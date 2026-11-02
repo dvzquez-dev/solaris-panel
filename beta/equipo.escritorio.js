@@ -249,8 +249,8 @@ function insightsHTML(){
   /* Tambien solo activos: «quien mas sube este mes» no puede ser alguien que se fue. */
   /* ⛔ DEL PANEL REAL, NO DE `hAnt`. Este era **el mismo fallo que Daniel reportó en el movil**
      («esta comparando con junio en lugar de con julio, se quedo congelado»), en la otra cara y sin
-     que nadie lo hubiera mirado: `hAnt` **no lo escribe ningun script** -cero apariciones en los
-     `.py`- y **no esta en `Codigo.gs`**; lo que hay es un valor fosil dentro del KV `panel`, de
+     que nadie lo hubiera mirado: `hAnt` **no lo escribia ningun script** el 07/08 (desde el 12/08 lo repone
+     `umbral.py --subir`, pero del ultimo mes CERRADO, no del anterior al de hoy) y **no esta en `Codigo.gs`**; lo que hay es un valor fosil dentro del KV `panel`, de
      cuando se subio por ultima vez. Medido el 07/08: `hAnt: 2` con `mesAnt: 'junio'`, estando en
      agosto. O sea que «quien mas sube este mes» se calculaba **contra junio**.
 
@@ -387,8 +387,16 @@ function _coordsActuar_(){
   return DATA.miembros.filter(function(x){ return x.nombre!==PD_NOM && x.nombre!==REV2_NOM && rangoNom(x.nombre)===1; }).slice(0,3);
 }
 
+/* La banda de `comun.js` devuelve a la SESIÓN: `ACTOR` vuelve a ser quien entró y se repinta todo. */
+function _volverAMiE_(){
+  if(!SESION || !SESION.nombre) return;
+  ACTOR=SESION.nombre;
+  if(typeof _loteDemoDelActor_==='function') _loteDemoDelActor_();
+  _pintarActua_(); pintar();
+}
 function _pintarActua_(){
   var caja=$('#actua'); if(!caja) return;
+  _bandaOtraPersona_(ACTOR, _volverAMiE_);
   var m=miembro(ACTOR);
   $('#yoN').textContent = m ? m.nombre.split(' ').slice(0,2).join(' ') : (SESION?SESION.nombre:'—');
   $('#yoR').textContent = _rolDe_(ACTOR);
@@ -420,6 +428,7 @@ function _pintarActua_(){
       if(!redu() && dx>2){ est.classList.remove('vuela'); void est.offsetWidth; est.classList.add('vuela');
         setTimeout(function(){est.classList.remove('vuela');},380); }
       /* 21/10 (auditor 19, 🟡 12): en la maqueta, el bloque de sanciones de ejemplo es el de SU jurisdicción. */
+      _bandaOtraPersona_(ACTOR, _volverAMiE_);
       if(typeof _loteDemoDelActor_==='function') _loteDemoDelActor_();
       pintar();
     };
