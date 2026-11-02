@@ -590,7 +590,7 @@ function _ponerSancCuerpo_(){
     '</div>'+
     '<div>'+
       '<div style="display:block;margin-bottom:9px">'+lab('Motivo')+
-        nxElige('snMotivo', RRI_MOTIVOS.map(function(r){ return [r[0], r[1]]; }), SANC_FORM.motivo||'')+'</div>'+
+        nxElige('snMotivo', RRI_MOTIVOS.map(function(r){ return [r[0], r[1], r[4]||'']; }), SANC_FORM.motivo||'', {max:5})+'</div>'+
       (SANC_FORM.motivo==='libre'
         ? '<label style="display:block;margin-bottom:9px">'+lab('Cu\u00e1l')+
             '<input id="snLibre" placeholder="Qu\u00e9 ha pasado" value="'+esc(SANC_FORM.libre||'')+'" style="'+E+'"></label>'+

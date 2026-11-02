@@ -1329,8 +1329,26 @@ function _nxCaja_(tipo, id, val, o, extra, cuerpo){
   return '<span class="nx nx-'+tipo+(o.off ? ' nx-off' : '')+'" data-nx="'+esc(id||'')+'" data-tipo="'+tipo+'"'+(extra||'')+'>'+
     '<input type="hidden"'+(id ? ' id="'+esc(id)+'"' : '')+' value="'+esc(val)+'"'+(o.attrs ? ' '+o.attrs : '')+'>'+cuerpo+'</span>';
 }
+/* Con `o.max` (y más opciones que `max`) la lista es COMPACTA (02/11, «si te aparecen todos aquí es un despropósito»): un buscador,
+   las `max` primeras y un chip «Ver todos». Escribir acota sobre TODAS (sin tildes ni mayúsculas, sobre el texto y la clave: `p[0]`
+   y, si viene, `p[2]`); lo elegido se ve siempre. UNA función para las dos caras: `_nxFiltra_`. */
+function _nxFiltra_(caja){
+  var bus = caja.querySelector('[data-nxbus]'), q = _sinTildes_(bus ? bus.value : '').trim(), max = +caja.dataset.max, todos = caja.dataset.todos === '1';
+  [].forEach.call(caja.querySelectorAll('[data-nxv]'), function(x, i){
+    var on = x.classList.contains('on'), dentro = q ? _sinTildes_(x.textContent+' '+(x.getAttribute('data-nxk') || '')).indexOf(q) >= 0 : (todos || i < max);
+    x.style.display = (dentro || on) ? '' : 'none'; });
+  var v = caja.querySelector('[data-nxall]');
+  if(v){ v.style.display = q ? 'none' : ''; v.textContent = todos ? 'Ver menos' : 'Ver todos los motivos'; }
+}
 function nxElige(id, ops, val, o){
   o = o || {}; val = String(val == null ? '' : val);
+  if(o.max && ops.length > o.max){
+    return _nxCaja_('elige', id, val, o, ' data-max="'+o.max+'"', '<input class="nt-bus nx-bus" data-nxbus placeholder="Buscar por palabra o artículo…" aria-label="Buscar">'+
+      '<span class="nt-fila">'+ops.map(function(p, i){
+        return '<button type="button" class="pick'+(String(p[0]) === val ? ' on' : '')+'" data-nxv="'+esc(p[0])+'" data-nxk="'+esc(p[0]+' '+(p[2] || ''))+'"'+
+          (o.off ? ' disabled' : '')+(i >= o.max && String(p[0]) !== val ? ' style="display:none"' : '')+'>'+esc(p[1])+'</button>'; }).join('')+
+        '<button type="button" class="pick" data-nxall="1"'+(o.off ? ' disabled' : '')+'>Ver todos los motivos</button></span>');
+  }
   return _nxCaja_('elige', id, val, o, '', (o.buscar !== false && ops.length > 8 ? '<input class="nt-bus nx-bus" data-nxbus placeholder="Buscar…" aria-label="Buscar">' : '')+
     '<span class="nt-fila">'+ops.map(function(p){
       return '<button type="button" class="pick'+(String(p[0]) === val ? ' on' : '')+'" data-nxv="'+esc(p[0])+'"'+(o.off ? ' disabled' : '')+'>'+esc(p[1])+'</button>'; }).join('')+'</span>');
@@ -1376,7 +1394,8 @@ function _nxAtajos_(caja){
 /* Repinta una caja desde su valor oculto. */
 function nxPinta(caja){
   var inp = caja.querySelector('input[type=hidden]'), v = inp.value, t = caja.dataset.tipo;
-  if(t === 'elige') [].forEach.call(caja.querySelectorAll('[data-nxv]'), function(b){ b.classList.toggle('on', b.dataset.nxv === v); });
+  if(t === 'elige'){ [].forEach.call(caja.querySelectorAll('[data-nxv]'), function(b){ b.classList.toggle('on', b.dataset.nxv === v); });
+    if(caja.dataset.max) _nxFiltra_(caja); }
   else if(t === 'hora') caja.querySelector('.nx-val').textContent = v;
   else if(t === 'num') caja.querySelector('.nx-val').textContent = _nxTxtNum_(v, caja.dataset.sufijo);
   else if(t === 'fecha'){
@@ -1425,7 +1444,8 @@ function _nxPaso_(caja, d){
       if(!caja || c.closest('.nx') !== caja){ c.hidden = true; nxPinta(c.closest('.nx')); } });
     var b = caja && t.closest('button');
     if(!b || b.disabled) return;
-    if(b.hasAttribute('data-nxv')) _nxCambio_(caja, b.dataset.nxv);
+    if(b.hasAttribute('data-nxall')){ caja.dataset.todos = caja.dataset.todos === '1' ? '' : '1'; _nxFiltra_(caja); }
+    else if(b.hasAttribute('data-nxv')) _nxCambio_(caja, b.dataset.nxv);
     else if(b.hasAttribute('data-nxs')) _nxPaso_(caja, +b.dataset.nxs);
     else if(b.hasAttribute('data-nxf')){ caja.querySelector('.nx-cal').hidden = true; caja.dataset.mes = ''; _nxCambio_(caja, b.dataset.nxf); nxPinta(caja); }
     else if(b.hasAttribute('data-nxo')){ var cal = caja.querySelector('.nx-cal'); cal.hidden = !cal.hidden; caja.dataset.mes = ''; nxPinta(caja); }
@@ -1433,6 +1453,7 @@ function _nxPaso_(caja, d){
   });
   document.addEventListener('input', function(e){
     var b = e.target; if(!b.hasAttribute || !b.hasAttribute('data-nxbus')) return;
+    if(b.closest('.nx').dataset.max) return _nxFiltra_(b.closest('.nx'));
     var q = b.value.toLowerCase();
     [].forEach.call(b.closest('.nx').querySelectorAll('[data-nxv]'), function(x){
       x.style.display = (q && x.textContent.toLowerCase().indexOf(q) < 0 && !x.classList.contains('on')) ? 'none' : ''; });
@@ -2856,7 +2877,7 @@ function _apiParse(txt, accion){
    Las que llaman a un modelo o suben ficheros tardan más a propósito: techo propio. */
 var API_ESPERA_MS = 20000;
 var API_ESPERA_LARGA_MS = 120000;
-var API_ACCIONES_LARGAS = /^(transcribirVoz|interpretarAnotacion|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|redactarTurno|redactarParte|resumirReunion|redactarMotivo)$/;
+var API_ACCIONES_LARGAS = /^(traerOrdenNotion|transcribirVoz|interpretarAnotacion|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|redactarTurno|redactarParte|resumirReunion|redactarMotivo)$/;
 var API_MSG_SIN_RESPUESTA = "El servidor no ha contestado. Puede que se haya guardado: recarga antes de repetirlo.";
 function _esLecturaApi_(accion){
   return /^(get|listar)/.test(accion) || /^(bootstrap|quienSoy|queHayNuevo|estadoAudioReunion)$/.test(accion);
@@ -8074,6 +8095,246 @@ function _bloqueDesde_(franjas, k, minimo){
   return t.slice(ini, ini+minimo);
 }
 
+/* ═══ EL MAPA DE DISPONIBILIDAD PARA TURNOS ═════════════════════════════════════════
+   La mitad de ADMINISTRADOR: ver cuándo puede la gente y elegir el hueco. La de miembro
+   —marcar— es del móvil.
+
+   ⛔ ESPEJO DE `reglas/turnos.py:agregado`, no una versión libre. Mismo modelo de celda
+   (ausente = no contestó · `{s:'no'}` = no puede · `{s:<sitio>|'ambos',c:bool}`) y **las
+   tres cestas NO son excluyentes**: quien es del consejo y además lleva coche sale en las
+   dos, porque esconder un coche detrás de un responsable deja turnos sin salir.
+   ⚠️ Y como es un espejo, PUEDE DIVERGIR: se contrasta contra el Python en el navegador con
+   las mismas fixtures que usa `probar_turnos.py`, y `probar_turnos.py` §14 vigila que este
+   fichero no cablee lo que aquí se decide (cestas excluyentes, consejo copiado, fechas). */
+
+function _dispClave_(dia, franja){ return dia+'|'+franja; }
+
+/* ¿Puede esta respuesta, y en ese sitio? `''` = da igual el sitio. */
+function _dispPuede_(v, sitio){
+  if(!v || !v.s || v.s==='no') return false;
+  if(!sitio) return true;
+  return v.s===sitio || v.s==='ambos';
+}
+
+/* ⛔⛔ «NADIE DEL CONSEJO PUEDE» NO ES «NO SÉ QUIÉN ES DEL CONSEJO». La cesta de
+   responsables sale de `cv.consejo`, y ese campo **solo lo escribe quien crea la
+   convocatoria**: `crearConvocatoria` guarda `Array.isArray(conv.consejo) ? … : null`
+   (`Codigo.gs:2935`) y en la app **no la llama nadie** — `api.crearConvocatoria` está
+   declarada en las dos caras y tiene CERO llamadas. Con el campo a `null`, el mapa decía
+   «nadie del consejo puede» en **todas** las casillas: es la pantalla desde la que se
+   elige quién lidera el turno, así que se reparten turnos sin responsable creyendo que
+   no hay ninguno disponible.
+   ✅ Y LA LISTA BUENA YA VIAJA: `DATA.consejo` es `CONSEJO_PUSH` (`Codigo.gs:745`), los
+   diez que definió Daniel el 22/07. El backend lo dice en su propio comentario — *«EL
+   CONSEJO VIAJA, NO SE COPIA … va por el panel, que es el canal que la cara ya lee»* —,
+   así que esto **no es una segunda copia de la regla**: es leer la única que hay.
+   ⛔ Y LA CONVOCATORIA MANDA sobre el panel: una junta ampliada puede traer su propia
+   lista, y pisarla con la general cambiaría quién puede liderar ESE turno.
+   ⛔ DEVUELVE `null` CUANDO NO LO SABE, nunca `[]` (§3c-24): un `[]` afirma que el consejo
+   está vacío, y quien lo lee tiene que poder decir «no lo sé» en vez de «nadie». */
+function _consejoDe_(cv){
+  if(cv && cv.consejo && cv.consejo.length) return cv.consejo;
+  var d=(typeof DATA!=='undefined' && DATA && DATA.consejo) || null;
+  return (d && d.length) ? d : null;
+}
+
+/* El agregado con su desglose, celda a celda. */
+function _calorTurnos_(cv, sitio){
+  /* Por la puerta única: con la convocatoria sin `consejo` esto se quedaba vacío y
+     el mapa decía «nadie del consejo puede» en todas las casillas. */
+  var consejo={}; (_consejoDe_(cv)||[]).forEach(function(n){ consejo[n]=1; });
+  var out={};
+  (cv.dias||[]).forEach(function(d){
+    (cv.franjas||[]).forEach(function(fr){
+      var k=_dispClave_(d,fr.k);
+      /* ⛔ Las claves se llaman IGUAL que en `reglas/turnos.py:agregado`, no en camelCase.
+         Esto es un espejo: el dia que el backend calcule el agregado y lo mande, la cara
+         tiene que poder consumirlo sin traducir. Renombrar en la frontera es donde se
+         pierde un campo sin que nadie de un error. */
+      var c={n:0, hay_coche:false, responsables:[], coches:[], normales:[], no_pueden:[]};
+      Object.keys(cv.resp||{}).sort().forEach(function(nom){
+        var v=(cv.resp[nom]||{})[k];
+        if(v && v.s==='no'){ c.no_pueden.push(nom); return; }
+        if(!_dispPuede_(v,sitio)) return;
+        c.n++;
+        var esResp=!!consejo[nom], lleva=!!v.c;
+        if(esResp) c.responsables.push(nom);
+        if(lleva){ c.coches.push(nom); c.hay_coche=true; }
+        if(!esResp && !lleva) c.normales.push(nom);
+      });
+      out[k]=c;
+    });
+  });
+  return out;
+}
+
+/* Las celdas con más gente, de más a menos; a igualdad, ANTES es mejor (la clave es ISO). */
+function _mejorTurno_(calor, minimo){
+  var out=[];
+  Object.keys(calor).forEach(function(k){ if(calor[k].n>=(minimo||1)) out.push(k); });
+  out.sort(function(a,b){ return (calor[b].n-calor[a].n) || (a<b?-1:a>b?1:0); });
+  return out;
+}
+
+function _dispPila_(nom){
+  var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===nom; })[0];
+  return (m&&m.pila)||nom;
+}
+
+/* El desglose de una celda. ⛔ Los NOMBRES solo para quien convoca turnos (rango ≥ 1):
+   §3.15 del plan — el consejo puede ser responsable pero NO ve el desglose. Liderar un
+   turno y verlo todo son dos permisos distintos. */
+function _dispDetalle_(cv, k, calor){
+  var c=calor[k];
+  if(!c) return '<div class="nadie">Toca o pasa el ratón por una casilla para ver quién puede.</div>';
+  var partes=String(k).split('|');
+  var fr=(cv.franjas||[]).filter(function(f){ return f.k===partes[1]; })[0];
+  var cab='<h5>'+esc(_isoADMY_(partes[0])||partes[0])+' · '+esc((fr&&fr.txt)||partes[1])+
+    ' — <b style="color:var(--ink)">'+c.n+'</b> pueden'+(c.hay_coche?' · \uD83D\uDE97 hay coche':'')+'</h5>';
+  if(_rangoMira_()<1){
+    return cab+'<div class="nadie">El desglose con nombres es de quien convoca turnos.</div>';
+  }
+  var cesta=function(tit, lista, vacia){
+    return '<div class="cesta"><b>'+tit+'</b> <span>'+
+      (lista.length ? lista.map(_dispPila_).map(esc).join(', ')
+                    : '<span class="nadie">'+vacia+'</span>')+'</span></div>';
+  };
+  return cab+
+    /* ⛔ El vacío de esta cesta significa DOS cosas y hay que separarlas: o nadie del
+       consejo puede ese rato —un dato—, o no se sabe quién es del consejo —un hueco—.
+       La primera se lee como «busca otro hueco»; la segunda, como «no preguntes
+       todavía». Decir la primera cuando es la segunda reparte turnos sin responsable. */
+    cesta('Pueden ser responsables', c.responsables,
+          _consejoDe_(cv) ? 'nadie del consejo puede'
+                          : 'No se sabe qui\u00e9n es del consejo') +
+    cesta('Con coche', c.coches, 'sin coche') +
+    cesta('Resto', c.normales, '\u2014') +
+    (c.no_pueden.length ? '<div class="cesta"><b>Han dicho que no</b> <span>'+
+        c.no_pueden.map(_dispPila_).map(esc).join(', ')+'</span></div>' : '');
+}
+
+/* ═══ PROGRAMAR UN TURNO SOBRE EL MAPA DE CALOR (02/11/2026) ═══════════════════════════
+   🗣️ Daniel, probándolo en el móvil: *«Lo de programar turno no sirve. […] La forma ideal de hacerlo sería con un mapa de
+   calor. Que aparezca en un mapa de calor las disponibilidades y así puedo escoger. Luego dando clic a cada slot puedo ver
+   quién está. […] Y es que no sé quién ha puesto qué.»* — igual que en Reuniones, donde ya le gusta.
+   ⛔ NO HAY AGREGADO NUEVO: el dato es `_calorTurnos_` (espejo de `reglas/turnos.py:agregado`) y el bloque, `_bloqueDesde_` con
+   `_minTurno_` — los mismos que usa quien CONTESTA la disponibilidad. Lo único nuevo es pintarlo y que un toque rellene el
+   formulario. El color sale de `_calorColor_` (la regla del mapa de Reuniones; turnos = presencial = rojo Solaris).
+   ⚠️ Sin `var` de módulo: lo elegido vive en el `data-` de la raíz, así que la misma función sirve a dos pantallas a la vez. */
+
+/* Del toque en una casilla (`día|franja`) al bloque que se programaría: `{dia, claves, hora, horas}`. `hora` es `HH:MM` y `horas`
+   cuántas dura, o `''`/`0` si las franjas no son horarias (una convocatoria de «mañana/tarde» no dice a qué hora empieza). */
+function _turnoBloque_(cv, k){
+  var p=_convDeClave_(k), F=(cv&&cv.franjas)||[], claves=_bloqueDesde_(F, p[1], _minTurno_(cv)), hora='', horas=0, i, f;
+  if(!claves.length) return {dia:p[0], claves:[], hora:'', horas:0};
+  for(i=0;i<F.length;i++) if(F[i].k===claves[0]) f=F[i];
+  if(f && /^\d{1,2}:\d{2}$/.test(String(f.txt))) hora=(String(f.txt).length<5?'0':'')+f.txt;
+  if(hora && claves.every(function(c){ return /^h\d\d$/.test(c); })) horas=claves.length;
+  return {dia:p[0], claves:claves, hora:hora, horas:horas};
+}
+
+/* Quién puede TODAS las horas del bloque (la intersección de sus casillas): una casilla suelta dice quién puede a las 16:00, pero
+   el turno dura cuatro horas y lo que se reparte es el bloque. Sólo cuenta a quien dijo que sí en cada una. */
+function _turnoBloqueQuien_(calor, dia, claves){
+  var comun=null;
+  claves.forEach(function(fr){
+    var c=calor[_dispClave_(dia,fr)], n=c ? c.responsables.concat(c.coches, c.normales) : [], vistos={}, ls=[];
+    n.forEach(function(x){ if(!vistos[x]){ vistos[x]=1; ls.push(x); } });
+    comun = comun===null ? ls : comun.filter(function(x){ return ls.indexOf(x)>=0; });
+  });
+  return (comun||[]).sort();
+}
+
+/* ⛔ Un turno SIEMPRE lleva a alguien del consejo (Daniel, 02/11: *«siempre tiene que haber una persona de consejo en un turno. Así que
+   cuando no haya ninguno disponible, directamente ese slot no vale. Porque no puede ser responsable de turno alguien que no sea de
+   consejo.»*). Quién del consejo aguanta TODAS las horas del bloque; vacío = el bloque no vale. Es la ÚNICA puerta de la regla. */
+function _turnoBloqueResp_(cv, calor, bloque){
+  var consejo=_consejoDe_(cv)||[];
+  return _turnoBloqueQuien_(calor, bloque.dia, bloque.claves).filter(function(n){ return consejo.indexOf(n)>=0; });
+}
+
+/* La caja de debajo del mapa al tocar un hueco: el desglose de `_dispDetalle_` (responsables · coche · resto · los que dijeron que no)
+   y, aparte, de QUÉ SITIO puede cada uno (`cv.resp[nom][k].s`, que `_calorTurnos_` no guarda) y quién aguanta el bloque entero.
+   ⛔ Los nombres son de quien convoca (rango ≥ 1): lo decide `_dispDetalle_`, no esto. */
+function _turnoDetalle_(cv, k, calor, bloque){
+  var h=_dispDetalle_(cv, k, calor), c=calor[k];
+  if(!c || _rangoMira_()<1) return h;
+  var por={};
+  Object.keys(cv.resp||{}).sort().forEach(function(nom){
+    var v=(cv.resp[nom]||{})[k];
+    if(v && v.s && v.s!=='no'){ (por[v.s]=por[v.s]||[]).push(_dispPila_(nom)); }
+  });
+  var sit=Object.keys(por).map(function(s){ return '<b>'+esc(_convEtiq_(s))+'</b> '+por[s].map(esc).join(', '); });
+  if(sit.length) h+='<div class="cesta"><b>Dónde</b> <span>'+sit.join(' · ')+'</span></div>';
+  if(bloque && bloque.claves.length>1){
+    var t=_turnoBloqueQuien_(calor, bloque.dia, bloque.claves);
+    h+='<div class="cesta" data-tcal-todo><b>Todo el bloque'+(bloque.hora?' desde las '+esc(bloque.hora):'')+'</b> <span>'+
+      (t.length ? t.map(_dispPila_).map(esc).join(', ') : '<span class="nadie">nadie aguanta las '+bloque.claves.length+' horas</span>')+'</span></div>';
+  }
+  if(bloque && bloque.claves.length && !_turnoBloqueResp_(cv, calor, bloque).length)
+    h+='<div class="cesta" data-tcal-novale style="color:var(--rojo,#E41E25)"><b>No vale</b> <span>nadie del consejo puede todo el bloque, y sin él no hay responsable</span></div>';
+  return h;
+}
+
+/* Quién mira, para el rango: `ACTOR` en el escritorio, `YO` en el móvil. */
+function _rangoMira_(){
+  var n=(typeof ACTOR!=='undefined' && ACTOR) || (typeof YO!=='undefined' && YO && YO.nombre) || '';
+  return rangoNom(n);
+}
+
+/* El mapa entero, días en columnas y horas en filas como el de Reuniones. Las casillas son `[data-tcal]`; la caja `[data-tcal-det]`. */
+function _turnoCalorHTML_(cv, calor, id){
+  var D=cv.dias||[], F=cv.franjas||[], maxN=0;
+  Object.keys(calor).forEach(function(k){ if(calor[k].n>maxN) maxN=calor[k].n; });
+  var cab='<div></div>'+D.map(function(d){
+    var p=String(_diaCorto_(d)).split(' ');
+    return '<div style="text-align:center;font-size:10px;color:var(--ink2);font-family:var(--mono);line-height:1.25">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
+  }).join('');
+  var filas=F.map(function(fr){
+    return '<div style="font-size:10px;color:var(--ink2);font-family:var(--mono);align-self:center;text-align:right;padding-right:2px">'+esc(fr.txt)+'</div>'+
+      D.map(function(d){
+        var k=_dispClave_(d,fr.k), c=calor[k], a=maxN ? (0.12+0.88*c.n/maxN) : 0, vale=c.responsables.length>0;
+        if(!vale) a=0;
+        return '<div data-tcal="'+esc(k)+'" data-n="'+c.n+'"'+(vale?'':' data-tcal-sinresp="1"')+' role="button" tabindex="0" style="cursor:pointer;min-height:30px;border-radius:3px;display:grid;place-items:center;'+
+          'font-family:var(--mono);font-size:11px;color:'+(c.n?'#fff':'var(--ink2)')+';border:1px solid transparent;'+
+          'background:'+(c.n && vale ? _calorColor_('presencial', a) : 'rgba(255,255,255,.045)')+'">'+
+          (c.n||'')+(c.hay_coche?'<span style="font-size:8px;line-height:1">🚗</span>':'')+'</div>';
+      }).join('');
+  }).join('');
+  return '<div id="'+esc(id)+'" data-tcal-raiz>'+
+    '<div style="display:grid;grid-template-columns:40px repeat('+D.length+',minmax(0,1fr));gap:2px">'+cab+filas+'</div>'+
+    '<div class="leyh" style="margin-top:9px;font-size:11.5px;color:var(--ink2)"><span><i style="background:'+_calorColor_('presencial',.9)+'"></i>'+_calorLeyenda_('presencial', false)+
+      ' · toca una casilla para ver quién puede y elegir el bloque · gris: nadie del consejo</span></div>'+
+    '<div data-tcal-det style="margin-top:8px;min-height:20px;font-size:13px;line-height:1.55">'+
+      '<div class="nadie">Toca una casilla: se rellenan el día y la hora, y ves quién puede.</div></div>'+
+    '</div>';
+}
+
+/* Cablea el mapa: tocar una casilla (1) marca el BLOQUE que se programaría —con el contorno blanco de lo elegido—, (2) cuenta quién
+   puede en la caja de debajo y (3) llama a `alElegir({dia, hora, horas, claves})` para que la pantalla rellene su formulario. */
+function _turnoCalorCablear_(raiz, cv, calor, alElegir){
+  if(!raiz) return;
+  var celdas=[].slice.call(raiz.querySelectorAll('[data-tcal]'));
+  var elige=function(el){
+    var k=el.dataset.tcal, b=_turnoBloque_(cv, k);
+    celdas.forEach(function(x){
+      var dentro=b.claves.some(function(fr){ return x.dataset.tcal===_dispClave_(b.dia,fr); });
+      x.style.outline = dentro ? '2px solid var(--ink)' : '';
+      x.style.outlineOffset = dentro ? '-2px' : '';
+      if(dentro) x.setAttribute('data-tcal-bloque','1'); else x.removeAttribute('data-tcal-bloque');
+    });
+    raiz.setAttribute('data-tcal-sel', k);
+    var det=raiz.querySelector('[data-tcal-det]');
+    if(det) det.innerHTML=_turnoDetalle_(cv, k, calor, b);
+    if(!b.claves.length || !_turnoBloqueResp_(cv, calor, b).length) return;
+    if(typeof alElegir==='function') alElegir(b);
+  };
+  celdas.forEach(function(el){
+    el.onclick=function(){ elige(el); };
+    el.onkeydown=function(e){ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); elige(el); } };
+  });
+}
+
 /* Quien FIRMA un parte enrutado a esa unidad, contando que nadie decide lo suyo.
    ⛔ Y de aqui sale sola la regla que pidio Daniel -«todos los fichajes que no esten routeados
    deberian recaer en mi»-: si fichas EN CONCEPTO DE COORDINADOR de tu propia unidad, el que
@@ -13204,7 +13465,7 @@ function _ordenEditHTML_(st){
   }).join('');
   var ia=st.ia, prop=ia.fase==='propuesta';
   /* Con una propuesta delante la tabla de abajo no se toca (sería de otra tabla): se decide primero. */
-  return (prop ? '<div class="rnota">Tabla actual: '+st.draft.length+' puntos. Abajo, la propuesta de SolarIA.</div>' :
+  return (prop ? '<div class="rnota">Tabla actual: '+st.draft.length+' puntos. Abajo, '+(ia.origen==='notion'?'lo traído de Notion':'la propuesta de SolarIA')+'.</div>' :
       (filas||'<div class="rnota">Sin puntos. Añade el primero.</div>'))+
     '<p class="rnota" style="margin:8px 0 0" data-ordtotal>Total: '+_ordTextoDur_(_ordTotal_(st.draft))+'</p>'+
     (st.e&&st.e.inicio?'':'<p class="rnota" style="margin:2px 0 0">Aún sin fijar: las horas cuentan desde T0 y se ponen solas al fijarla.</p>')+
@@ -13213,6 +13474,7 @@ function _ordenEditHTML_(st){
       '<button type="button" class="btn mini" data-ordcopiar'+(prop?' disabled':'')+'>📋 Copiar de otra reunión</button>'+
       '<button type="button" class="btn mini" data-ordplantillas'+(prop?' disabled':'')+'>🗂 Usar una plantilla</button>'+
       '<button type="button" class="btn mini" data-ordplantguardar'+(prop?' disabled':'')+'>💾 Guardar como plantilla</button>'+
+      '<button type="button" class="btn mini" data-ordnotion'+(_ordenOcupado_(st)?' disabled':'')+'>📥 Traer de Notion</button>'+
       '<span style="flex:1"></span><button type="button" class="btn mini" data-ordcancelar>Cancelar</button>'+
       '<button type="button" class="btn mini pri" data-ordguardar'+(prop?' disabled':'')+'>Guardar</button></div>'+
     _ordenCopiaHTML_(st)+_ordenPlantillasHTML_(st)+_ordenSolariaHTML_(st);
@@ -13317,14 +13579,14 @@ function _ordenSolariaHTML_(st){
   h+='<div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">'+
     '<button type="button" class="btn mini" data-ordmic aria-label="Dictar"'+((mic&&mic.fase==='transcribiendo')||ia.fase==='pensando'||ia.fase==='propuesta'?' disabled':'')+'>'+
       (mic&&mic.fase==='grabando'?'⏹ Parar':'🎙 Dictar')+'</button>'+
-    '<span class="rnota" style="flex:1;margin:0">'+(mic&&mic.fase==='grabando'?'Grabando… habla y pulsa «Parar».':mic&&mic.fase==='transcribiendo'?'Transcribiendo…':ia.fase==='pensando'?'SolarIA está escribiendo… (unos 20 s)':'')+'</span>'+
+    '<span class="rnota" style="flex:1;margin:0">'+(mic&&mic.fase==='grabando'?'Grabando… habla y pulsa «Parar».':mic&&mic.fase==='transcribiendo'?'Transcribiendo…':ia.fase==='pensando'?(ia.origen==='notion'?'Leyendo la página de Notion…':'SolarIA está escribiendo… (unos 20 s)'):'')+'</span>'+
     '<button type="button" class="btn mini pri" data-ordiaenviar'+(_ordenOcupado_(st)||!String(ia.texto||'').trim()?' disabled':'')+'>✨ Enviar a SolarIA</button></div>';
-  if(ia.fase==='propuesta') h+='<div data-ordiaprop style="margin-top:8px"><span class="sc" style="display:block;margin-bottom:4px">Propuesta de SolarIA</span>'+
+  if(ia.fase==='propuesta') h+='<div data-ordiaprop style="margin-top:8px"><span class="sc" style="display:block;margin-bottom:4px">'+(ia.origen==='notion'?'De la página de Notion':'Propuesta de SolarIA')+'</span>'+
     _ordTablaHTML_(ia.prop, st.e&&st.e.inicio)+'<p class="rnota" style="margin:6px 0 0">'+esc(ia.nota||'Esta es la propuesta. Revísala antes de usarla.')+'</p>'+
     '<div style="display:flex;gap:8px;margin-top:6px"><button type="button" class="btn mini pri" data-ordiaok>Usar esto</button>'+
     '<button type="button" class="btn mini" data-ordiano>Deshacer</button></div></div>';
-  if(ia.fase==='usada') h+='<div class="rnota" style="margin-top:8px">Propuesta aplicada a la tabla. <button type="button" class="btn mini" data-ordiaun>Volver a la anterior</button></div>';
-  if(ia.fase==='error') h+='<div class="rnota" style="margin-top:8px;color:var(--warn)">'+esc(ia.msg)+' Tu tabla sigue como estaba.</div>';
+  if(ia.fase==='usada') h+='<div class="rnota" style="margin-top:8px">'+(ia.origen==='notion'?'Tabla de Notion aplicada.':'Propuesta aplicada a la tabla.')+' <button type="button" class="btn mini" data-ordiaun>Volver a la anterior</button></div>';
+  if(ia.fase==='error') h+='<div class="rnota" data-ordiaerror style="margin-top:8px;color:var(--warn)">'+esc(ia.msg)+' Tu tabla sigue como estaba.</div>';
   return h+'</div>';
 }
 function _ordenPdfHTML_(st){
@@ -13449,12 +13711,28 @@ async function _ordenSolaria_(id){
   var st=_ordSt_(id), ia=st.ia, texto=String(ia.texto||'').trim();
   if(!texto||_ordenOcupado_(st)||!st.draft) return;
   var n=(ia.id||0)+1, filas=st.draft.filter(function(f){ return String(f.tema).trim()||String(f.quien).trim(); }).map(_ordFilaEnvio_), r;
-  ia.id=n; ia.fase='pensando'; _ordenPintar_(id);
+  ia.id=n; ia.fase='pensando'; ia.origen='solaria'; _ordenPintar_(id);
   var vigente=function(){ return st.ia===ia && ia.fase==='pensando' && ia.id===n; };
   try{ r=await api.proponerOrdenDia(id, filas, texto, st.base); }
   catch(e){ if(vigente()){ ia.fase='error'; ia.msg='SolarIA no ha podido: '+((e&&e.message)||e)+'.'; _ordenPintar_(id); } return; }
   if(!vigente()) return;
   if(!r||r.ok===false||!r.filas||!r.filas.length){ ia.fase='error'; ia.msg='SolarIA no ha podido'+(r&&r.motivo?': '+r.motivo:'')+'.'; }
+  else{ ia.fase='propuesta'; ia.prop=r.filas; ia.nota=r.nota||''; }
+  _ordenPintar_(id);
+}
+/* «Traer de Notion»: lee la PÁGINA de Notion de la reunión (`traerOrdenNotion`) y enseña lo que encontró como propuesta, igual que
+   SolarIA («Usar esto / Deshacer»). Sólo lee: lo que se guarda es `guardarOrdenDia` cuando la persona pulsa «Guardar». Reutiliza
+   `st.ia` (mismo contador de respuestas, mismo bloqueo mientras espera), con `origen:'notion'` para los textos. */
+async function _ordenNotion_(id){
+  var st=_ordSt_(id), ia=st.ia;
+  if(_ordenOcupado_(st)||!st.draft) return;
+  var n=(ia.id||0)+1, r;
+  ia.id=n; ia.fase='pensando'; ia.origen='notion'; _ordenPintar_(id);
+  var vigente=function(){ return st.ia===ia && ia.fase==='pensando' && ia.id===n; };
+  try{ r=await api.traerOrdenNotion(id); }
+  catch(e){ if(vigente()){ ia.fase='error'; ia.msg=String((e&&e.message)||e).replace(/^Error:\s*/,'')+'.'; _ordenPintar_(id); } return; }
+  if(!vigente()) return;
+  if(!r||r.ok===false||!r.filas||!r.filas.length){ ia.fase='error'; ia.msg='La página de Notion no trae ningún punto.'; }
   else{ ia.fase='propuesta'; ia.prop=r.filas; ia.nota=r.nota||''; }
   _ordenPintar_(id);
 }
@@ -13518,6 +13796,7 @@ async function _ordenClic_(id, ev){
   if(q('data-ordcopiaundo') && st.avisoCopia){ st.draft=st.avisoCopia.antes; st.base=null; st.avisoCopia=null; return _ordenPintar_(id); }
   if(q('data-ordmic')) return _ordenMic_(id);
   if(q('data-ordiaenviar')) return _ordenSolaria_(id);
+  if(q('data-ordnotion')) return _ordenNotion_(id);
   if(q('data-ordiaok') && st.ia.fase==='propuesta'){ st.ia.orig=st.draft; st.draft=st.ia.prop.map(_ordFilaBorrador_);
     st.ia.fase='usada'; st.ia.prop=null; st.avisoCopia=null; return _ordenPintar_(id); }
   if(q('data-ordiano') && st.ia.fase==='propuesta'){ st.ia.fase=null; st.ia.prop=null; return _ordenPintar_(id); }

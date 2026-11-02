@@ -822,6 +822,31 @@ function _progPintar_(){
   if(av) av.textContent = mot;
 }
 
+/* 02/11 · EL MAPA DE CALOR DE LA SEMANA, ENCIMA DEL FORMULARIO. 🗣️ Daniel: *«Lo de programar turno no sirve […] la forma ideal sería con un
+   mapa de calor. Que aparezca en un mapa de calor las disponibilidades y así puedo escoger. Luego dando clic a cada slot puedo ver quién
+   está»*. Pinta `_turnoCalorHTML_` (comun.js, el mismo que el escritorio) con la convocatoria vigente que da `getDisponibilidad` — la de
+   TODOS, no `CONVOCATORIAS`, que aquí sólo lleva TUS celdas — y un toque en un hueco rellena día, hora y duración del formulario de abajo.
+   ⛔ Sin mapa NO se bloquea nada: sin convocatoria, sin red o sin permiso se dice en una línea y el formulario funciona como siempre.
+   ⚠️ La respuesta llega con la hoja ya abierta: si la cerraron (o abrieron otra) en medio, no se pinta en el vacío. */
+function _progCalorCargar_(){
+  var caja = $('#ptCalor'); if(!caja) return;
+  var di = function(t){ var b = $('#ptCalor'); if(b && b === caja) b.textContent = t; };
+  if(typeof api === 'undefined' || !api.getDisponibilidad || !SESION){ di('Sin conexión no se ve la disponibilidad: elige el día y la hora a mano.'); return; }
+  api.getDisponibilidad().then(function(r){
+    if(!PROG_T || $('#ptCalor') !== caja) return;
+    if(!r || !r.convocatoria){ di('No hay convocatoria de disponibilidad abierta para esa semana: elige el día y la hora a mano.'); return; }
+    var cv = r.convocatoria; cv.resp = r.cv || {};
+    var calor = _calorTurnos_(cv, '');
+    caja.className = ''; caja.removeAttribute('style'); caja.innerHTML = _turnoCalorHTML_(cv, calor, 'ptMapa');
+    _turnoCalorCablear_($('#ptMapa'), cv, calor, function(b){
+      nxPon('ptFecha', b.dia);
+      if(b.hora) nxPon('ptHora', b.hora);
+      if(b.horas) nxPon('ptDur', b.horas);
+      _progPintar_();
+    });
+  }).catch(function(){ di('No se pudo leer la disponibilidad: elige el día y la hora a mano.'); });
+}
+
 function progTurnoAbrir(){
   if(!(YO && _puedeProgramarTurno_(YO.nombre))) return;
   PROG_T = { sel:{}, cargos:{ turno:null, audiovisual:null, memoria:null } };
@@ -829,6 +854,7 @@ function progTurnoAbrir(){
   var lab = function(t){ return '<span class="sc" style="display:block;margin:12px 0 6px">'+t+'</span>'; };
   abrirModal('<div class="mtit">Programar turno</div>'+
     '<p class="rnota" style="margin:-4px 0 4px">Les llega a los convocados y queda en Notion. No se puede convocar más de un turno el mismo día.</p>'+
+    lab('Cuándo pueden · toca un hueco')+'<div id="ptCalor" class="rnota" style="margin:0 0 4px">Mirando la disponibilidad…</div>'+
     lab('Día')+nxFecha('ptFecha', '', {min:_hoyNxISO_()})+
     lab('Hora de inicio')+nxHora('ptHora', '16:00')+
     lab('Duración')+nxNum('ptDur', 3, {paso:0.5, min:0.5, max:12, sufijo:'h'})+
@@ -866,4 +892,5 @@ function progTurnoAbrir(){
     }catch(e){ b.disabled = false; b.textContent = prev; tostErr('No se pudo convocar: ', e); }
   };
   _progPintar_();
+  _progCalorCargar_();
 }

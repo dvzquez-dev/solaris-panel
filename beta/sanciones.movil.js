@@ -105,7 +105,7 @@ function _sancionesHTML_(){
         alCambiar:function(){ var _es=$('#snEscala'); if(_es) _es.textContent=_escalaSancTxt_(); },   /* 26/10 (A5b) */
         vacio:nTotal ? 'Escribe un nombre o pulsa «Ver lista».' : 'No hay nadie bajo tu jurisdicción todavía.'})+
       '<div class="campo"><span class="sc">Motivo</span>'+
-        nxElige('snMotivo', RRI_MOTIVOS.map(function(r){ return [r[0], r[1]]; }), SANC_FORM.motivo||'')+'</div>'+
+        nxElige('snMotivo', RRI_MOTIVOS.map(function(r){ return [r[0], r[1], r[4]||'']; }), SANC_FORM.motivo||'', {max:5})+'</div>'+
       (SANC_FORM.motivo==='libre'
         ? '<label class="campo"><span class="sc">Cuál</span><input id="snLibre" placeholder="Qué ha pasado" value="'+esc(SANC_FORM.libre||'')+'"></label>'+
           '<label class="campo"><span class="sc">Artículo del RRI</span><input id="snArt" value="'+esc(SANC_FORM.art||'libre')+'"></label>'

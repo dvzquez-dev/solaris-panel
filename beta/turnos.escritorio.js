@@ -172,91 +172,13 @@ function cablearReparto(){
   });
 }
 
-/* ═══ EL MAPA DE DISPONIBILIDAD PARA TURNOS ═════════════════════════════════════════
-   La mitad de ADMINISTRADOR: ver cuándo puede la gente y elegir el hueco. La de miembro
-   —marcar— es del móvil.
-
-   ⛔ ESPEJO DE `reglas/turnos.py:agregado`, no una versión libre. Mismo modelo de celda
-   (ausente = no contestó · `{s:'no'}` = no puede · `{s:<sitio>|'ambos',c:bool}`) y **las
-   tres cestas NO son excluyentes**: quien es del consejo y además lleva coche sale en las
-   dos, porque esconder un coche detrás de un responsable deja turnos sin salir.
-   ⚠️ Y como es un espejo, PUEDE DIVERGIR: se contrasta contra el Python en el navegador con
-   las mismas fixtures que usa `probar_turnos.py`, y `probar_turnos.py` §14 vigila que este
-   fichero no cablee lo que aquí se decide (cestas excluyentes, consejo copiado, fechas). */
-
-function _dispClave_(dia, franja){ return dia+'|'+franja; }
+/* El mapa de calor de turnos (`_calorTurnos_`, `_consejoDe_`, `_dispDetalle_`…) vive en `comun.js` desde el 02/11: lo pintan
+   el escritorio (Disponibilidad y Convocar) y el móvil (Programar turno). Aquí quedan sólo las dos lecturas del panel. */
 
 /* La convocatoria que se está mirando. Sin filtrar por invitado: aquí manda quien convoca. */
 function _dispViva_(){
   var L=(typeof CONVOCATORIAS!=='undefined'?CONVOCATORIAS:[]);
   return L.length ? L[0] : null;
-}
-
-/* ¿Puede esta respuesta, y en ese sitio? `''` = da igual el sitio. */
-function _dispPuede_(v, sitio){
-  if(!v || !v.s || v.s==='no') return false;
-  if(!sitio) return true;
-  return v.s===sitio || v.s==='ambos';
-}
-
-/* ⛔⛔ «NADIE DEL CONSEJO PUEDE» NO ES «NO SÉ QUIÉN ES DEL CONSEJO». La cesta de
-   responsables sale de `cv.consejo`, y ese campo **solo lo escribe quien crea la
-   convocatoria**: `crearConvocatoria` guarda `Array.isArray(conv.consejo) ? … : null`
-   (`Codigo.gs:2935`) y en la app **no la llama nadie** — `api.crearConvocatoria` está
-   declarada en las dos caras y tiene CERO llamadas. Con el campo a `null`, el mapa decía
-   «nadie del consejo puede» en **todas** las casillas: es la pantalla desde la que se
-   elige quién lidera el turno, así que se reparten turnos sin responsable creyendo que
-   no hay ninguno disponible.
-   ✅ Y LA LISTA BUENA YA VIAJA: `DATA.consejo` es `CONSEJO_PUSH` (`Codigo.gs:745`), los
-   diez que definió Daniel el 22/07. El backend lo dice en su propio comentario — *«EL
-   CONSEJO VIAJA, NO SE COPIA … va por el panel, que es el canal que la cara ya lee»* —,
-   así que esto **no es una segunda copia de la regla**: es leer la única que hay.
-   ⛔ Y LA CONVOCATORIA MANDA sobre el panel: una junta ampliada puede traer su propia
-   lista, y pisarla con la general cambiaría quién puede liderar ESE turno.
-   ⛔ DEVUELVE `null` CUANDO NO LO SABE, nunca `[]` (§3c-24): un `[]` afirma que el consejo
-   está vacío, y quien lo lee tiene que poder decir «no lo sé» en vez de «nadie». */
-function _consejoDe_(cv){
-  if(cv && cv.consejo && cv.consejo.length) return cv.consejo;
-  var d=(typeof DATA!=='undefined' && DATA && DATA.consejo) || null;
-  return (d && d.length) ? d : null;
-}
-
-/* El agregado con su desglose, celda a celda. */
-function _calorTurnos_(cv, sitio){
-  /* Por la puerta única: con la convocatoria sin `consejo` esto se quedaba vacío y
-     el mapa decía «nadie del consejo puede» en todas las casillas. */
-  var consejo={}; (_consejoDe_(cv)||[]).forEach(function(n){ consejo[n]=1; });
-  var out={};
-  (cv.dias||[]).forEach(function(d){
-    (cv.franjas||[]).forEach(function(fr){
-      var k=_dispClave_(d,fr.k);
-      /* ⛔ Las claves se llaman IGUAL que en `reglas/turnos.py:agregado`, no en camelCase.
-         Esto es un espejo: el dia que el backend calcule el agregado y lo mande, la cara
-         tiene que poder consumirlo sin traducir. Renombrar en la frontera es donde se
-         pierde un campo sin que nadie de un error. */
-      var c={n:0, hay_coche:false, responsables:[], coches:[], normales:[], no_pueden:[]};
-      Object.keys(cv.resp||{}).sort().forEach(function(nom){
-        var v=(cv.resp[nom]||{})[k];
-        if(v && v.s==='no'){ c.no_pueden.push(nom); return; }
-        if(!_dispPuede_(v,sitio)) return;
-        c.n++;
-        var esResp=!!consejo[nom], lleva=!!v.c;
-        if(esResp) c.responsables.push(nom);
-        if(lleva){ c.coches.push(nom); c.hay_coche=true; }
-        if(!esResp && !lleva) c.normales.push(nom);
-      });
-      out[k]=c;
-    });
-  });
-  return out;
-}
-
-/* Las celdas con más gente, de más a menos; a igualdad, ANTES es mejor (la clave es ISO). */
-function _mejorTurno_(calor, minimo){
-  var out=[];
-  Object.keys(calor).forEach(function(k){ if(calor[k].n>=(minimo||1)) out.push(k); });
-  out.sort(function(a,b){ return (calor[b].n-calor[a].n) || (a<b?-1:a>b?1:0); });
-  return out;
 }
 
 /* Quién no ha contestado NADA. Es lo que el excel no podía decir. */
@@ -269,44 +191,6 @@ function _dispMudos_(cv){
   });
   return out.sort();
 }
-
-function _dispPila_(nom){
-  var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===nom; })[0];
-  return (m&&m.pila)||nom;
-}
-
-/* El desglose de una celda. ⛔ Los NOMBRES solo para quien convoca turnos (rango ≥ 1):
-   §3.15 del plan — el consejo puede ser responsable pero NO ve el desglose. Liderar un
-   turno y verlo todo son dos permisos distintos. */
-function _dispDetalle_(cv, k, calor){
-  var c=calor[k];
-  if(!c) return '<div class="nadie">Pasa el ratón por una casilla para ver quién puede.</div>';
-  var partes=String(k).split('|');
-  var fr=(cv.franjas||[]).filter(function(f){ return f.k===partes[1]; })[0];
-  var cab='<h5>'+esc(_isoADMY_(partes[0])||partes[0])+' · '+esc((fr&&fr.txt)||partes[1])+
-    ' — <b style="color:var(--ink)">'+c.n+'</b> pueden'+(c.hay_coche?' · \uD83D\uDE97 hay coche':'')+'</h5>';
-  if(rangoNom(ACTOR)<1){
-    return cab+'<div class="nadie">El desglose con nombres es de quien convoca turnos.</div>';
-  }
-  var cesta=function(tit, lista, vacia){
-    return '<div class="cesta"><b>'+tit+'</b> <span>'+
-      (lista.length ? lista.map(_dispPila_).map(esc).join(', ')
-                    : '<span class="nadie">'+vacia+'</span>')+'</span></div>';
-  };
-  return cab+
-    /* ⛔ El vacío de esta cesta significa DOS cosas y hay que separarlas: o nadie del
-       consejo puede ese rato —un dato—, o no se sabe quién es del consejo —un hueco—.
-       La primera se lee como «busca otro hueco»; la segunda, como «no preguntes
-       todavía». Decir la primera cuando es la segunda reparte turnos sin responsable. */
-    cesta('Pueden ser responsables', c.responsables,
-          _consejoDe_(cv) ? 'nadie del consejo puede'
-                          : 'No se sabe qui\u00e9n es del consejo') +
-    cesta('Con coche', c.coches, 'sin coche') +
-    cesta('Resto', c.normales, '\u2014') +
-    (c.no_pueden.length ? '<div class="cesta"><b>Han dicho que no</b> <span>'+
-        c.no_pueden.map(_dispPila_).map(esc).join(', ')+'</span></div>' : '');
-}
-
 
 /* ── CONTESTAR TU DISPONIBILIDAD DE TURNOS, DESDE EL ESCRITORIO ───────────────────
    ⛔ EL HUECO QUE CIERRA: `api.guardarDisponibilidad` estaba declarada en `escritorio.html`
@@ -1884,6 +1768,30 @@ function _cablearCierreTurno_(){
   };
 }
 
+/* 02/11 · EL MAPA DE CALOR, ENCIMA DEL FORMULARIO DE CONVOCAR (la misma pieza que «Programar turno» en el móvil: `_turnoCalorHTML_`
+   de `comun.js`). 🗣️ Daniel: *«La forma ideal sería con un mapa de calor […] dando clic a cada slot puedo ver quién está»*.
+   Lee la convocatoria que ya carga `_dispCargar_` para la pestaña Disponibilidad (`_dispViva_`, una sola carga).
+   ⛔ SÓLO CON EL ESTADO `ok`: con `'solo mio'` el calor saldría de UNA persona y con la semilla de demostración de nadie
+   — el mapa de mentira que `_dispPanel_` ya no pinta. En cualquier otro caso una línea que lo dice, y el formulario sigue igual. */
+function _convocarCalorHTML_(){
+  var st=_dispEstadoSrv_(), cv=(st==='ok') ? _dispViva_() : null, T='<span class="sc" style="display:block;margin-bottom:5px">Cu\u00e1ndo pueden \u00b7 toca un hueco</span>';
+  var nota=function(t){ return '<div style="margin:0 0 14px">'+T+'<div class="nadie" data-tcal-nota style="font-size:12.5px;color:var(--ink2)">'+t+'</div></div>'; };
+  if(st==='ok' && !cv) return nota('No hay convocatoria de disponibilidad abierta para esa semana: elige la fecha y la hora a mano.');
+  if(!cv) return nota(st==='sin pedir'||st==='pidiendo' ? 'Mirando la disponibilidad\u2026'
+    : 'No se ve la disponibilidad de la semana: elige la fecha y la hora a mano.');
+  return '<div style="margin:0 0 14px">'+T+_turnoCalorHTML_(cv, _calorTurnos_(cv, ''), 'tuMapa')+'</div>';
+}
+
+/* Cablea el mapa de arriba; lo que se elige cae en Fecha, Hora y Duración del formulario. Corre en cada `pintar()` (como `_pinDisp_`). */
+function _pinConvocarCalor_(){
+  var raiz=document.getElementById('tuMapa'), cv=_dispViva_(); if(!raiz || !cv) return;
+  _turnoCalorCablear_(raiz, cv, _calorTurnos_(cv, ''), function(b){
+    nxPon('tuFecha', b.dia);
+    if(b.hora) nxPon('tuHora', b.hora);
+    var d=document.getElementById('tuDur'); if(d && b.horas) d.value=_duracionTurnoTxt_(b.horas);
+  });
+}
+
 function convocarPanel(){
   if(!_puedeProgramarTurno_(ACTOR)) return '';           // solo coordinaci\u00f3n o superior
   delete SOLP.tu;   /* el panel se pinta de nuevo con las cajas vacías: sin propuesta de SolarIA de antes */
@@ -1901,6 +1809,7 @@ function convocarPanel(){
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
       'El turno les llega a los convocados y queda publicado en Notion. Marca qui\u00e9n va, ponle a cada uno '+
       'su papel y di qu\u00e9 hay que sacar. No se puede convocar m\u00e1s de un turno el mismo d\u00eda.</p>'+
+    _convocarCalorHTML_()+
 
     /* 01/11 (escm2): REJILLA, no una fila que se parte: cuándo (fecha · hora · duración · crucial) y dónde (se trabaja · se queda),
        cada pregunta sobre su control y todas con la misma etiqueta. */
