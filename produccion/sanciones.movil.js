@@ -92,6 +92,7 @@ function _sancionesHTML_(){
   var nTotal=sancionablesPor(_actorSanc_()).length;
   /* ⛔ ASINCRONO Y SIN RECOGER: el callback de tareas repinta por la puerta del modal (`_repintarSancM_`), si sigue abierto. */
   var m=_sancTareasModelo_(function(){ if($('#modal').classList.contains('on')) _repintarSancM_(); });
+  _aseguraMotivosRri_(function(){ if($('#modal').classList.contains('on')) _repintarSancM_(); });   /* 01/11: el catálogo entero lo sirve el servidor */
   var K={ campo:function(t,h){ return '<div class="campo"><span class="sc">'+t+'</span>'+h+'</div>'; },
           nota:function(h,aviso){ return '<p class="rnota" style="margin:0 0 10px'+(aviso?';color:var(--warn)':'')+'">'+h+'</p>'; } };
   return '<div class="mtit">Sanciones</div>'+
@@ -110,7 +111,7 @@ function _sancionesHTML_(){
           '<label class="campo"><span class="sc">Artículo del RRI</span><input id="snArt" value="'+esc(SANC_FORM.art||'libre')+'"></label>'
         : '')+
       _sancPlazoHTML_(m, K)+
-      '<div class="campo"><span class="sc">Puntos</span>'+nxNum('snPts', _ptsPrefillSanc_(), {min:-5, max:0})+'</div>'+
+      '<div class="campo"><span class="sc">Puntos</span>'+_ptsCampoSancHTML_()+'</div>'+
       '<p class="rnota" id="snEscala" style="margin:-4px 0 10px">'+_escalaSancTxt_()+'</p>'+
       '<button class="btn pri full" data-p id="btnSanc">Poner la sanción</button>'+
       '<p class="rnota" id="snMsg" style="margin:8px 0 0"></p>'+
@@ -351,11 +352,14 @@ function arcoSeg(i,r){
          ' A'+r+' '+r+' 0 0 1 '+(MC+r*Math.cos(a1)).toFixed(2)+' '+(MC+r*Math.sin(a1)).toFixed(2);
 }
 
-function estadoPts(p){return p<=2?'evaluacion':(p>=9?'elegible':'normal');}
+/* 01/11 (artifact [fb3a8f83b7], «sigue en evaluación con 3 y sale al superarlos»): la copia en JS de `disciplina.en_evaluacion`
+   (sin historia: con exactamente 3 se SIGUE; con 4 se sale). Se entra con 0–2, se pierde al SUPERAR los 3 (RRI Art. 32). */
+function estadoPts(p){return p<=3?'evaluacion':(p>=9?'elegible':'normal');}
 
 /* ⛔ EL NUMERO DE LA FRASE SALE DE LA REGLA, NO SE TECLEA. Hasta el 13/08 el medidor
    decia «por debajo de 2 puntos se abre expediente» y el expediente se abre **CON 2**
-   (RRI Art. 32, y `reglas/disciplina.py`: de 0 a 2 -> estado de evaluacion). O sea que a
+   (RRI Art. 32, y `reglas/disciplina.py`: de 0 a 2 -> estado de evaluacion; desde el 01/11 se SIGUE hasta los 3 y se sale al
+   superarlos, artifact [fb3a8f83b7]: el tope que dice la frase es ahora 3). O sea que a
    quien tiene exactamente 2 la MISMA caja le ponia «En evaluacion.» arriba y debajo que
    se abre por debajo de 2: las dos frases se contradicen, y la de abajo se lee como que
    todavia queda un punto de margen. Falla en la direccion que NO avisa.
@@ -452,7 +456,7 @@ function medidorHTML(){
       (est==='elegible'?'<b>Elegible.</b>':est==='evaluacion'?'<b style="color:var(--red2)">En evaluación.</b>':'<b>Sin expediente.</b>')+
       (p>3
         ? ' Te quedan <b>'+(p-3)+'</b> punto'+((p-3)===1?'':'s')+' antes de la zona crítica.'
-        : ' Estás en <b>zona crítica</b>: con <b>'+_topeEval_()+'</b> puntos o menos se abre expediente.')+
+        : ' Estás en <b>zona crítica</b>: con <b>'+_topeEval_()+'</b> puntos o menos sigues en evaluación; sales al superarlos.')+
     '</div>'+
     '<button class="btn mini" data-p id="btnLibro" style="margin-top:11px">Desglose de puntos</button>'+
   '</div>'+

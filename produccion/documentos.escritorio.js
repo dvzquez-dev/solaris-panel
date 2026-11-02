@@ -159,6 +159,7 @@ function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
    `analizado`. */
 function puedeDecidirDoc(d){
   if(!d || d.autor===ACTOR) return false;
+  if(_docYaPublicado_(d.est)) return false;      /* lo publicado no se mueve: el servidor no lo deja (comun.js) */
   var rev=revisoresDe(d), maxR=Math.max.apply(null,rev.map(rangoNom));
   if(!rev.length) return false;      /* sin revisor asignable, ni mandando por rango (maxR sería -Infinity) */
   if(rev.indexOf(ACTOR)<0 && rangoNom(ACTOR)<=maxR) return false;
@@ -342,9 +343,10 @@ function docCard(d){
        Sigue en el DOM plegado (los campos se leen por id); lo abierto se recuerda en `DOC_EDIT_AB`. */
     var _abEd = (typeof DOC_EDIT_AB!=='undefined') && !!DOC_EDIT_AB[d.id];
     acc=((_yaAnalizado_(d) || _autorP) ? '<div class="doc-edit'+(_abEd?' ab':'')+'"><button type="button" class="btn sm" data-docedit="'+d.id+'">Editar antes de decidir</button>'+
-        '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS) : '')+'</div></div>' : '');
+        '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS, {todas:true}) : '')+'</div></div>' : '');
     arriba=
       '<textarea data-motivo placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
+      _solIAHTML_('dm'+d.id, _solMotivoCfg_(d, '#doc-'+d.id+' [data-motivo]'))+
       /* ⛔⛔ APROBAR = PUBLICAR, y no se publica lo que nadie ha analizado. Esta cara ve
          `recibido` y `analizado` a proposito -Daniel, 05/08: en el movil «no aparecen
          hasta que esten completamente analizados»; aqui se ve el pipeline entero-, pero
@@ -360,7 +362,7 @@ function docCard(d){
           : '<span class="sc" style="align-self:center">A\u00fan sin analizar: se puede parar, no publicar.</span>')+
         '<button class="btn" data-doc="'+d.id+'" data-acc="cambios">Solicitar cambios</button>'+
         '<button class="btn no" data-doc="'+d.id+'" data-acc="rechazado">Rechazar</button>'+
-        (d.est!=='revision'&&d.revisor?'<button class="btn" data-doc="'+d.id+'" data-acc="deshacer">Deshacer y devolver a revisión</button>':'')+
+        (_puedeDeshacerDoc_(d)?'<button class="btn" data-doc="'+d.id+'" data-acc="deshacer">Deshacer y devolver a revisión</button>':'')+
       '</div>';
   } else if(d.autor===ACTOR && d.est==='cambios'){
     /* ⛔ Mismo rotulo mentiroso que en el movil: el boton no sube nada.
@@ -427,13 +429,14 @@ function docCard(d){
       (_etiquetasDe_(d).length
         ? '<span class="chip">'+esc(_etiquetasDe_(d).join(' · '))+'</span>' : '')+
     '</div>'+
-    _avisosDocE_(d)+arriba+
+    _avisosDocE_(d)+
+    /* 01/11 (escm1): se LEE antes de decidir — resumen y avisos de calidad ENCIMA del motivo y los botones. */
     '<div class="just"><span class="sc">Resumen ejecutivo</span>'+
       /* 21/10 (auditor 20, 🟡 2): «léelo abajo» sólo si abajo HAY archivo; si no, decía «léelo abajo» encima de «no trae
          enlace al archivo». */
       esc(d.resumen||(d.drive ? 'El expediente llegó sin resumen. Léelo abajo antes de firmar.'
                               : 'El expediente llegó sin resumen y sin enlace al archivo: no hay nada que leer antes de firmar.'))+'</div>'+
-    previa+secs+avisos+visor+
+    avisos+arriba+previa+secs+visor+
     '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':(sinRev?'Sin revisor: avisa al Project Director.':'Firma: <b>'+esc(rev)+'</b>'))+'</div>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
     _autorRastroHTML_(d)+

@@ -19,7 +19,7 @@ async function _cargarCierre_(){
   /* 22/10 (refutador 22, 🟠 2): `CIERRE` sólo se cargaba al abrir la pantalla o tras pulsar, así que «Aplicando…» se
      quedaba puesto aunque el aplicador acabara a los 2 minutos. Con un «Aplicar» en vuelo se vuelve a preguntar a los
      30 s — sólo si sigues en el cierre; al bajar el flag se deja de preguntar. */
-  if(CIERRE && _aplicandoVivo_(CIERRE))
+  if(CIERRE && (_aplicandoVivo_(CIERRE) || _revirtiendoVivo_(CIERRE)))
     setTimeout(function(){ if(vista==='cierre') _cargarCierre_(); }, 30000);
 }
 

@@ -39,7 +39,8 @@ function puedeDecidirParte(p,quien){
      coordina ESA unidad. Antes escalaba «por rango» (`rangoNom(quien)>maxR`), y eso sólo cambiaba algo para José
      (rango 2): le pintaba Aprobar/Rechazar en partes que el servidor le niega, y con «Actúas como José» el PD los veía
      y la llamada salía con SU token, firmada como suya. El rango 2 es documental; en horas no manda. */
-  return rangoNom(quien)>=3 || (rangoNom(quien)>=1 && coordinadorDe(p.unidad)===quien);
+  /* 02/11 · Daniel: el subcoordinador (Breixo) firma también los partes de SU equipo, y de nadie más (`esSubcoordDe`). */
+  return rangoNom(quien)>=3 || (rangoNom(quien)>=1 && coordinadorDe(p.unidad)===quien) || esSubcoordDe(quien, p.autor);
 }
 
 /* ⛔ 20/10 (auditor de partes): un parte en `detalle` es SIN DECIDIR — así lo cuenta el servidor (`bloqueos_cierre`,
@@ -56,12 +57,11 @@ function enElAire(){return pendientes().filter(function(p){return puedeDecidirPa
 /* 01/11 · Daniel (artifact «Subcoordinador y horas»): *«Solo a su equipo, como cuando sanciona»*. A quién puede `quien`
    OTORGAR horas (`m` = un miembro con `nombre` y `unidad`): lo que firma —el PD, o quien coordina esa unidad
    (`puedeDecidirParte`, gemela de `_puede_otorgar_a` del servidor)— y, además, el subcoordinador a su equipo, por la
-   MISMA puerta que las sanciones (`puedeSancionarA`, que ya lo acota: no se copia el criterio). ⛔ Sólo otorga: firmar
-   los partes de ese equipo sigue siendo de `puedeDecidirParte`, que no lo abre. */
+   MISMA puerta que las sanciones (`puedeSancionarA`, que ya lo acota: no se copia el criterio). 02/11: la misma que firma sus
+   partes, así que `puedeDecidirParte` ya lo incluye (`esSubcoordDe`). */
 function puedeOtorgarA(m,quien){
   if(!m || m.nombre===quien) return false;
-  return puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, quien) ||
-    (rangoNom(quien)>=1 && !!_subcoordDe_(quien) && puedeSancionarA(quien, m.nombre));
+  return puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, quien);
 }
 
 /* 31/10 · Daniel: el parte del PD de una unidad que coordina OTRO se enruta a ese coordinador: al PD no le sale como «suyo por
@@ -73,8 +73,11 @@ function porAprobar(){return pendientes().filter(function(p){
 function parteCard(p){
   var m=_m(p.autor), rev=revisoresDeParte(p), puede=puedeDecidirParte(p,ACTOR);
   var esc2=(coordinadorDe(p.unidad)===p.autor);
-  return '<div class="parte" id="parte-'+p.id+'">'+
-    '<div class="h"><b>'+esc(m.pila)+'</b><span class="u">'+esc(p.unidad)+'</span>'+
+  return '<div class="parte pp" id="parte-'+p.id+'">'+
+    '<div class="h"><b>'+esc(m.pila)+'</b>'+
+      /* 01/11 (escm1): Aprobar JUNTO AL NOMBRE, no al final de una fila de 1.500 px; el 90 % se aprueba sin motivo. */
+      (puede?'<button class="btn pri sm" data-parte="'+p.id+'" data-acc="si">Aprobar</button>':'')+
+      '<span class="u">'+esc(p.unidad)+'</span>'+
       '<span class="u">'+p.fecha+' · '+p.ini+'–'+p.fin+'</span>'+
       /* ⛔ `nf2`, NO `nf(...,1)`. Daniel, 18/08: «ya te dije bien claro que nada de
          redondeos a la decima». El fichaje redondea a CUARTOS (.25/.50/.75), asi que una
@@ -99,12 +102,12 @@ function parteCard(p){
     (puede?'':'<div class="ruta">Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.</div>')+
     /* 01/11 · Daniel: «Se queda así y la pantalla lo dice» — el parte del PD lo firma él mismo */
     (_notaFirmaPropia_(p,ACTOR)?'<div class="ruta">'+esc(_notaFirmaPropia_(p,ACTOR))+'</div>':'')+
-    (puede?'<textarea data-motivo placeholder="Motivo — obligatorio para rechazar o pedir detalle…"></textarea>'+
-      '<div class="acts">'+
-        '<button class="btn pri" data-parte="'+p.id+'" data-acc="si">Aprobar</button>'+
-        '<button class="btn" data-parte="'+p.id+'" data-acc="det">Pedir detalle</button>'+
-        '<button class="btn no" data-parte="'+p.id+'" data-acc="no">Rechazar</button>'+
-      '</div>':'')+
+    /* 01/11 (escm1): el motivo va PLEGADO; lo abre «Pedir detalle» o «Rechazar» (`_engPartes_`) y la elegida se enciende. */
+    (puede?'<div class="acts">'+
+        '<button class="btn sm" data-parte="'+p.id+'" data-acc="det">Pedir detalle</button>'+
+        '<button class="btn sm no" data-parte="'+p.id+'" data-acc="no">Rechazar</button>'+
+      '</div>'+
+      '<textarea data-motivo placeholder=""></textarea>':'')+
   '</div>';
 }
 
@@ -682,7 +685,8 @@ function _declaCamposHTML_(f, ids, perf, selPerfil, opts, phDet){
     '</div>'+
     '<label style="display:block"><span class="sc" style="display:block;margin-bottom:5px">Qu\u00e9 estuviste haciendo</span>'+
     '<textarea id="'+ids.just+'" rows="3" placeholder="Qu\u00e9 hiciste, con qui\u00e9n y d\u00f3nde. M\u00ednimo 25 caracteres." '+
-      'style="'+CAMPO_CSS+';resize:vertical;font-size:12.5px">'+esc(f.just)+'</textarea></label>';
+      'style="'+CAMPO_CSS+';resize:vertical;font-size:12.5px">'+esc(f.just)+'</textarea></label>'+
+    _solIAHTML_(ids.just, _solParteCfg_(ids.just, f, ids.just === 'bqJust' ? _bloqDurTotal_ : function(){ return 0; }));
 }
 
 function _fichaPanel_(){
@@ -927,6 +931,8 @@ function _bloqDur_(){
   var d=_minutosReales_(BLOQ_FORM.fecha, BLOQ_FORM.ini, BLOQ_FORM.fin);   // medianoche y cambio de hora (auditor 34)
   return Math.round(d/15)/4;                           // a cuartos de hora
 }
+/* 01/11: las horas del PARTE = el tramo principal (`_bloqDur_`, que `probar_minhm.py` ejecuta aislada: no se toca) + los demás tramos. */
+function _bloqDurTotal_(){ return _bloqDur_() + _tramosExtraH_(BLOQ_FORM); }
 
 /* ⛔ 31/10 (Daniel: «me está obligando a poner fecha de entrada, fecha de salida… no hay opción de que me ponga las horas
    automáticamente»): un parte que viene de un FICHAJE ya trae fecha, entrada y salida. Al declararlo el formulario las lleva
@@ -938,7 +944,7 @@ function _bloqEditado_(decl){
 /* Las horas que se van a declarar: las del fichaje mientras no toques la entrada/salida; las recalculadas si las tocas. */
 function _bloqHoras_(){
   var d=_bloqDecl_();
-  return (d && !_bloqEditado_(d)) ? (Number(d.horas)||0) : _bloqDur_();
+  return (d && !_bloqEditado_(d)) ? (Number(d.horas)||0) : _bloqDurTotal_();
 }
 
 /* Los TUYOS que esperan declaracion: un fichaje cerrado sin justificar (`sin_declarar`) o uno
@@ -1000,7 +1006,8 @@ function _bloqFalta_(){
     /* 31/10: la entrada y la salida son campos de texto (los desplegables no admitían 17:43 de un fichaje): se exige el formato. */
     if((String(f.ini||'').trim() && !_horaHHMM_(f.ini)) || (String(f.fin||'').trim() && !_horaHHMM_(f.fin)))
       return 'La hora va como HH:MM (p. ej. 09:30)';
-    var d=_bloqDur_(), tope=_maxHorasParte_();
+    var _te=_tramosError_(BLOQ_FORM); if(_te) return _te;     /* 01/11: varios tramos en un parte */
+    var d=_bloqDurTotal_(), tope=_maxHorasParte_();
     /* ⛔ CUATRO CAUSAS, CUATRO FRASES. Esto decia «La salida tiene que ser posterior a la
        entrada» para CUALQUIER duracion invalida, incluida la de pasarse del tope: quien lo
        leia se iba a mirar unas horas que estaban bien.
@@ -1131,18 +1138,19 @@ function _bloqAvisosHTML_(){
      ⚠️ Va aparte de `_bloqFalta_` A PROPOSITO: eso BLOQUEA el envio, y hay turno
      nocturno real en produccion. Un aviso informa; una validacion rompe un parte legitimo. */
   var cruce=(typeof _cruceNoche_==='function') ? _cruceNoche_(f.ini, f.fin) : '';
+  var dm=_bloqDur_();        /* el tramo principal solo: el aviso habla de su entrada y su salida */
   var avisoNoche = (decl || !cruce) ? '' : (
     cruce==='noche'
       ? '<div class="nota" style="margin-top:11px">Cruza medianoche: se cuentan '+
-        h1(_bloqDur_())+'.</div>'
+        h1(dm)+'.</div>'
       : cruce==='duda'
       ? '<div class="nota" style="margin-top:11px;color:var(--warn)"><b>¿Seguro?</b> '+
-        'La salida es anterior a la entrada. Si cruzó medianoche son '+h1(_bloqDur_())+
-        '; si te equivocaste de casilla, '+h1(24-_bloqDur_())+'. Las dos '+
+        'La salida es anterior a la entrada. Si cruzó medianoche son '+h1(dm)+
+        '; si te equivocaste de casilla, '+h1(24-dm)+'. Las dos '+
         'caben en un parte, así que esto no se decide solo: míralo antes de firmarlo.</div>'
       : '<div class="nota" style="margin-top:11px;color:var(--warn)"><b>Parece del '+
-        'revés.</b> Así son '+h1(_bloqDur_())+', más de lo que un parte admite; '+
-        'al revés serían '+h1(24-_bloqDur_())+'. Cambia entrada por salida si es eso.</div>');
+        'revés.</b> Así son '+h1(dm)+', más de lo que un parte admite; '+
+        'al revés serían '+h1(24-dm)+'. Cambia entrada por salida si es eso.</div>');
   return avisoMes+avisoNoche;
 }
 
@@ -1222,10 +1230,10 @@ function _bloqPanel_(){
           '<input class="mono" id="bqFecha" value="'+esc(f.fecha)+'" placeholder="DD/MM/AAAA" style="'+CAMPO_CSS+'"></label>'+
         _bloqHoraCampo_('bqIni','Entrada',f.ini)+_bloqHoraCampo_('bqFin','Salida',f.fin)+
         '<div style="flex:1;min-width:190px">'+
-          '<div class="mono" id="bqDur" style="font-size:24px;line-height:1;font-weight:600">'+h1(_bloqDur_())+'</div>'+
+          '<div class="mono" id="bqDur" style="font-size:24px;line-height:1;font-weight:600">'+h1(_bloqDurTotal_())+'</div>'+
           '<div class="sc" style="margin-top:5px">de trabajo declarado \u00b7 sin fichaje</div>'+
         '</div>'+
-      '</div><div id="bqAvisos">'+_bloqAvisosHTML_()+'</div>'+
+      '</div>'+_tramosHTML_(f, _bloqHoraCampo_)+'<div id="bqAvisos">'+_bloqAvisosHTML_()+'</div>'+
     '</div>';
   }
 
@@ -1278,7 +1286,7 @@ function _bloqPanel_(){
       esc(falta||('Todo listo: se env\u00eda a '+(firmaP||'tu coordinador')+'.'))+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:11px">'+
       '<button class="btn pri" id="bqEnviar"'+(falta?' disabled':'')+'>'+
-        (decl?('Declarar este fichaje \u00b7 '+h1(_bloqHoras_())):'Declarar '+h1(_bloqDur_()))+'</button>'+
+        (decl?('Declarar este fichaje \u00b7 '+h1(_bloqHoras_())):'Declarar '+h1(_bloqDurTotal_()))+'</button>'+
       (firmaP?'<span class="sc">lo firma '+esc(firmaP)+'</span>':'')+
     '</div>'+
     avisoFirma+
@@ -1309,7 +1317,7 @@ function _bloqAviso_(){
   if(d) d.textContent = h1(_bloqHoras_());
   var av=document.getElementById('bqAvisos'); if(av) av.innerHTML=_bloqAvisosHTML_();
   if(b){ b.disabled=!!falta;
-         b.textContent = decl ? ('Declarar este fichaje \u00b7 '+h1(_bloqHoras_())) : ('Declarar '+h1(_bloqDur_())); }
+         b.textContent = decl ? ('Declarar este fichaje \u00b7 '+h1(_bloqHoras_())) : ('Declarar '+h1(_bloqDurTotal_())); }
 }
 
 /* ⭐ 26/10 · Daniel: «Sí, mientras no esté firmado». TUS partes que nadie ha firmado (`pendiente` o con detalle pedido),
@@ -1432,63 +1440,51 @@ function _misAprobadosE_(){
   return (PARTES||[]).filter(function(p){ return p && yo && p.autor===yo && p.estado==='aprobado'; });
 }
 
-/* LOS GRUPOS DEL HISTÓRICO, ya ordenados (del más nuevo al más viejo; los sin fecha, al final). Gemela de la mitad de
-   datos de `_histHorasHTML_` (móvil): el grupo es el MES QUE GRABÓ EL SERVIDOR (`periodo`) y sin él, la fecha del
-   trabajo (20/10, auditoría: lo atrasado cuenta en el mes en que entró). `cDev` es la compensación base devengada a
-   día de hoy: va SOLO al mes abierto (`per`), se SUMA a su total y crea el grupo si no existe — el parte de verdad
-   nace al cerrar, y una fila sintética en un mes CERRADO saldría dos veces. */
-function _gruposHistE_(todos, per, cDev){
-  var g=[], idx={}, i, p, mp, d, k;
-  for(i=0;i<(todos||[]).length;i++){
-    p=todos[i]; mp=/^(\d{4})-(\d{2})$/.exec(String(p.periodo||''));
-    d=mp ? new Date(+mp[1], +mp[2]-1, 1) : _fechaDMY_(p.fecha);
-    k=d ? (d.getFullYear()+'-'+((d.getMonth()+1)<10?'0':'')+(d.getMonth()+1)) : '';
-    if(!(k in idx)){ idx[k]=g.length; g.push({k:k, d:d, items:[], h:0, comp:null}); }
-    g[idx[k]].items.push(p); g[idx[k]].h+=(Number(p.horas)||0);
-  }
-  var orden=function(a,b){ if(!a.d && !b.d) return 0; if(!a.d) return 1; if(!b.d) return -1; return b.d-a.d; };
-  if(per && cDev!=null && cDev>0){
-    if(!(per in idx)){ idx[per]=g.length; g.push({k:per, d:new Date(), items:[], h:0, comp:null}); }
-    g[idx[per]].comp=cDev; g[idx[per]].h+=cDev;
-  }
-  g.sort(orden);
-  return g;
+/* 01/11 · TUS MESES, PLEGADOS (Daniel: *«agrúpalo por meses […] comprimidos […] le das clic y te aparece como el desglose completo
+   de este mes»*; antes «Todo tu histórico», con todas las filas). Una tarjeta por mes de trabajo con apuntes —el abierto, siempre,
+   primero—, del más nuevo al más viejo (`_mesesDeTrabajo_`, comun.js: la misma agrupación que el móvil). Pulsar una tarjeta abre debajo
+   el desglose de ese mes (categorías con su color + las filas) y deja la tarjeta en rojo; otra vez, la pliega. Sin nativos. */
+function _leerParteE_(p){ return {periodo:p.periodo, creado_at:p.creado_at, iso:(typeof _dmyAISO_==='function' ? _dmyAISO_(p.fecha) : ''), fecha:p.fecha, horas:p.horas}; }
+
+function _filasMesE_(items){
+  return tabla([['Concepto'],['Horas',1]], (items||[]).slice().sort(function(a,b){
+    var da=_fechaDMY_(a.fecha), db=_fechaDMY_(b.fecha); return (db?db.getTime():0)-(da?da.getTime():0);
+  }).map(function(p){
+    return '<tr><td>'+esc(p.tarea||'Parte')+'<div class="sc">'+esc(p.fecha||'')+(p.unidad&&p.unidad!=='—'?' · '+esc(p.unidad):'')+
+      (p.cat && (p.cat in CAT_ETI) ? ' · '+esc(CAT_ETI[p.cat]) : '')+'</div></td><td class="r mono">'+nf2(Number(p.horas)||0)+' h</td></tr>';
+  }).join(''));
 }
 
 function _histHorasHTMLE_(mi){
-  var todos=_misAprobadosE_();
-  if(!todos.length) return '';   /* como el móvil: sin movimientos no hay histórico (la compensación ya está en el mes de arriba) */
-  var per=_periodoAbierto_();
-  var cb=_compBase_(mi), cDev=null;
-  if(per && typeof cb==='number' && cb>0) cDev=_devengadoAHoy_(mi, cb, _fraccionDelMes_());
-  var g=_gruposHistE_(todos, per, cDev);
+  var todos=_misAprobadosE_(), per=_periodoAbierto_();
+  var g=_mesesDeTrabajo_(todos, per, _leerParteE_, true);
   if(!g.length) return '';
-  var out='', tempPrev=null, j, i, gr, temp, tot=0;
-  for(j=0;j<g.length;j++){
-    gr=g[j]; temp=gr.d ? _temporadaDe_(gr.d) : null;
-    /* El salto de temporada va ANTES del grupo más viejo: lo de debajo de la línea es la temporada que cerró. */
-    if(temp && tempPrev && temp!==tempPrev) out+='<div class="ltsep">cierre de temporada '+esc(temp)+'</div>';
-    if(temp) tempPrev=temp;
-    out+='<div class="ltmes"><b>'+(gr.d ? esc(_mesLargo_(gr.d)) : 'Sin fecha')+'</b>'+
-      (gr.d ? '<span class="chip'+(per && gr.k===per?' wa">sin cerrar':'">cerrado')+'</span>' : '')+
-      '<span class="ln"></span><span class="mono">'+nf2(gr.h)+' h</span></div>';
-    /* ⚠️ La fila calculada va MARCADA como tal, no disfrazada de parte: cuando el cierre escriba el parte de verdad
-       vendrá del registro y se pintará como los demás. */
-    if(gr.comp!=null) out+='<div class="dec ltfila" style="cursor:default"><span class="tx"><b>Compensación base</b>'+
-      '<small>devengada a día de hoy · se cierra a fin de mes</small></span><span class="der">'+
-      '<span class="mono">'+nf2(gr.comp)+' h</span><span class="chip">calculada</span></span></div>';
-    for(i=0;i<gr.items.length;i++){
-      var p=gr.items[i];
-      out+='<div class="dec ltfila" style="cursor:default"><span class="tx"><b>'+esc(p.tarea||'Parte')+'</b><small>'+
-        esc(p.fecha||'')+(p.cat && (p.cat in CAT_ETI) ? ' · '+esc(CAT_ETI[p.cat]) : '')+
-        '</small></span><span class="der"><span class="mono">'+nf2(Number(p.horas)||0)+' h</span></span></div>';
-    }
-    tot+=gr.h;
-  }
-  return pan('Todo tu histórico', todos.length+(todos.length===1?' movimiento':' movimientos')+' · separados por cierres',
-    '<div class="pb" style="padding:0"><details class="ltplg" style="border-top:0"><summary><b>Ver mes a mes</b>'+
-      '<span class="sc">'+nf2(tot)+' h en total</span></summary>'+out+'</details></div>'+
+  var hm=_hMesReal_(mi), chips='';
+  g.forEach(function(m){
+    var abierto=(per && m.k===per), k=m.k||'sin';
+    var h=abierto ? (hm!=null ? hm : m.h+_compMensual_(mi)) : m.h;
+    chips+='<button type="button" class="mmesE" data-meses="'+k+'"><b>'+(m.k ? esc(_nomPeriodo_(m.k)) : 'Sin fecha')+'</b>'+
+      (m.k ? '<span class="chip'+(abierto?' wa">sin cerrar':'">cerrado')+'</span>' : '')+
+      '<span class="ln"></span><span class="mono">'+nf2(h)+' h</span></button>';
+    var base=abierto ? [{tarea:'Compensación por tu cargo', fecha:'', horas:_compBase_(mi), cat:null}] : [];
+    var extra=(abierto && _compExtra_(mi)) ? [{tarea:'Compensación extra', fecha:'', horas:_compExtra_(mi)}] : [];
+    chips+='<div class="ltmesdet" data-mesdet="'+k+'" hidden>'+_filasMesE_(base.concat(extra, m.items))+
+      _desgloseCatHTMLE_(m.items)+'</div>';   /* el desglose, JUSTO debajo de SU tarjeta */
+  });
+  return pan('Tus meses', g.length+(g.length===1?' mes':' meses')+' · pulsa uno para ver su desglose',
+    '<div class="ltmeses">'+chips+'</div>'+
     '<div class="nota">El registro no se borra nunca: al cerrar el mes sus horas pasan aquí y empieza el siguiente.</div>');
+}
+
+function _engMesesE_(){
+  $$('[data-meses]').forEach(function(b){
+    b.onclick=function(){
+      var d=document.querySelector('[data-mesdet="'+b.dataset.meses+'"]');
+      if(!d) return;
+      var abre=d.hidden;
+      d.hidden=!abre; b.classList.toggle('on', abre);
+    };
+  });
 }
 
 /* TU RITMO FRENTE AL EQUIPO Y AL MES ANTERIOR (§A7). Gemela de la mitad de datos de `_compHorasHTML_` (móvil): se
@@ -1659,6 +1655,7 @@ function _engBloqueE_(){
     el.onblur=function(){ var h=_horaTecleada_(el.value); if(h===el.value) return; el.value=h; el.oninput(); };
   });
 
+  _tramosCablear_(BLOQ_FORM, _bloqAviso_, pintar);   /* 01/11: los demás tramos del parte */
   var be=document.getElementById('bqEnviar');
   if(be) be.onclick=async function(){
     /* ⛔ EL CANDADO VA ANTES DEL `await`, y son DOS cosas distintas: la primera linea corta el
@@ -1707,7 +1704,7 @@ function _engBloqueE_(){
            unica proteccion que cubre el envio duplicado que NO es un doble clic. */
         if(!f.clave) f.clave=_claveUso_();
         var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, subcat:_subcatEnvio_(f),
-          horas:teclea, ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true,
+          horas:teclea, ini:f.ini, fin:f.fin, tramos:_tramosEnvio_(f), justificacion:f.just.trim(), sinFichaje:true,
           subsistema:perf, clave:f.clave, tareaUrl:_imputacionUrl_(f,TAREAS,_fichaYo_()) });
         guardado=(rec && rec.partes && rec.partes[0]) ? rec.partes[0] : null;
         if(guardado && Array.isArray(PART_BACK)){ PART_BACK.push(guardado); _partesReal_(); }
@@ -1719,7 +1716,7 @@ function _engBloqueE_(){
          puntual -- «esto fue como coordinador de X», «esto fue del 30/07»-- enrute y feche TODO
          lo siguiente igual, en silencio y sin volver a preguntar. Es el fallo exacto que ya
          mordio dos veces en el movil, campo a campo. */
-      f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null; f.fecha=HOY;
+      f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null; f.fecha=HOY; f.tramos=[];
       if(decl){ f.ini='09:00'; f.fin='11:00'; }   /* lo del fichaje no se arrastra al siguiente bloque */
       /* ⛔ SE CONFIRMA LO GUARDADO, NO LO TECLEADO. El backend recorta al tope y devuelve el
          parte: teclear 20 h guardaba 14 y esto habria cantado «20 declaradas», seis horas

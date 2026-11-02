@@ -630,7 +630,7 @@ function vReu(){
         var a=(0.12+0.88*(max?v/max:0)).toFixed(3);
         var _t0=eje[ix], _t1=(ix+k<eje.length? eje[ix+k] : ini+_du(R.franjas[fi]));
         var esBest=_esHuecoFijar_(vent, di, fi), fij=_esFijada_(di,_t0,_t1);
-        var fondo = fij ? 'rgba(53,199,89,.85)' : 'rgba(228,30,37,'+a+')';
+        var fondo = fij ? 'rgba(53,199,89,.85)' : _calorColor_(R.modalidad, a);
         var borde = fij ? ';outline:1px solid var(--ok);outline-offset:-1px'
                    : (esBest?';outline:1px solid var(--ink);outline-offset:-1px':'');
         /* 20/10 · «quién puede»: tocar la celda lo dice en la caja de debajo (`_cablearQuienPuede_`). */
@@ -711,7 +711,10 @@ function vReu(){
         (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
         '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
         '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
+        '<button class="btn mini" data-p id="btnEditarReu" style="flex:1">Título y plazo</button>'+
       '</div>':'')+
+    /* 01/11: la asistencia es del PD, no de quien convocó: su botón va aparte del de «Fijar/Convocados». */
+    (_asisBotonM_(R)?'<div style="margin-top:9px"><button class="btn mini full" data-p id="btnAsistencia">📋 Asistencia en directo</button></div>':'')+
     _ordenDiaReuHTML_(R)+
     _audioReuHTML_(R)+
     _bloqueReuHTML_(R, _puedeBloqueReu_(R, (typeof _actorSanc_==='function'?_actorSanc_():(YO&&YO.nombre)), (typeof esAdmin==='function' && esAdmin())))+
@@ -734,9 +737,8 @@ function vReu(){
       '<p class="rnota" style="margin:0 0 10px" data-ordsug="'+esc(R.id)+'">'+_huecoM_()+'</p>'+
       g+
       '<p class="rnota" data-qpbox="'+esc(R.id)+'" style="margin:9px 0 0">Toca un hueco del mapa para ver quién puede.</p>'+
-      '<div class="leyh" style="margin-top:11px"><span>'+
-        (pondOn?'el número son PUNTOS: presencial+telemático 2 · solo telemático 1'
-               :'el número es cuánta gente puede')+'</span>'+
+      '<div class="leyh" style="margin-top:11px"><span><i style="background:'+_calorColor_(R.modalidad,.9)+'"></i>'+
+        _calorLeyenda_(R.modalidad, pondOn)+'</span>'+
         '<span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>fuera del horario de ese día</span></div>'+
     '</div>')+
     (_puedeBorrarReuM_(R)?'<button class="btn full" data-p id="btnBorrar" style="margin-top:6px;color:var(--red2);border-color:var(--red)">Eliminar reunión</button>':'')+
@@ -1339,7 +1341,7 @@ function fijarModal(){
        «mejor franja», que significa otra cosa. */
     var bloques=[]; for(var f=lo; f<=hi; f++) bloques.push([di,f]);
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
-      tost('Sin conexión no se puede fijar: no llegaría a nadie más.'); return; }
+      tost('Sin conexión no se puede fijar.'); return; }
     /* 26/10 (auditor 33, 🟠 A1 — Daniel: «Avisar y confirmar»): con el plazo vivo, se avisa y se confirma. */
     var _avF=_avisoFijarAntes_(R2); if(_avF && !(await dialogoSiNo(_avF))) return;
     b.disabled=true; var prev=b.textContent; b.textContent='Fijando…';
@@ -1427,6 +1429,99 @@ function _asisCablearM_(){
     b.onclick=enviar;
     i.onkeydown=function(ev){ if(ev.key==='Enter') enviar(); };
   });
+}
+
+/* ══ 01/11 · LA ASISTENCIA, DESDE EL MÓVIL DEL PD ═══════════════════════════════════════════════════════════
+   🗣️ Daniel: *«que sea editable fácilmente desde el teléfono mientras en mi ordenador se ve esa pantallita ya que a veces la gente
+   resulta que puede venir de improviso»*. El escenario sigue siendo del escritorio (lo que se proyecta); aquí, el mando: abrir y
+   cerrar, ver la palabra, **tocar a alguien para marcarlo presente (o quitarlo)** y **añadir** a quien llega sin estar en la lista
+   — se añade y queda presente de un gesto. Una general, la abre el PD; también una telemática. El que vino por telemático sale en
+   azul (`modos`, del servidor). La lista se refresca cada 3 s mientras el panel está abierto. */
+var ASIS_PM=null;   // {id, v, timer, ocupado}
+
+function _asisSoyPDM_(){
+  var n=(typeof SESION!=='undefined' && SESION && SESION.nombre) || (typeof YO!=='undefined' && YO && YO.nombre) || '';
+  return rangoNom(n)>=3 || (typeof esAdmin==='function' && !!esAdmin());
+}
+/* ¿Sale el botón? Sólo en una general de verdad (con servidor, o en `?demo`) y a quien la abre. */
+function _asisBotonM_(R){
+  return !!R && R.tipo==='general' && R.id!=null && _asisSoyPDM_() && (_demoLocal_() || (typeof backendOK!=='undefined' && backendOK && !!R._real));
+}
+
+function _asisFilaM_(n, v){
+  var pres=(v.presentes||{})[n], vis=(v.vistos||{})[n], tel=pres && _asisModo_(v, n)==='tel';
+  var col=pres ? (tel?'var(--tel)':'var(--ok)') : (vis ? 'var(--warn)' : 'var(--line2)');
+  return '<button type="button" class="asisFM" data-asisn="'+esc(n)+'" data-p style="display:flex;width:100%;align-items:center;gap:10px;min-height:44px;'+
+    'margin:0 0 6px;padding:8px 12px;border-radius:12px;text-align:left;font:inherit;color:var(--ink);cursor:pointer;background:'+
+    (pres ? (tel?'rgba(63,158,214,.18)':'rgba(62,180,137,.18)') : 'var(--sur)')+';border:1px solid '+col+'">'+
+    '<b style="flex:1;font-weight:600">'+esc(n)+'</b><span class="mono" style="font-size:11px;color:'+col+'">'+
+    (pres ? ('✓ '+esc(_hhmmDe_(pres))+(tel?' · telemático':'')) : (vis?'ha abierto la app':'toca para marcar'))+'</span></button>';
+}
+
+function _asisPanelHTMLM_(){
+  var A=ASIS_PM, v=A&&A.v; if(!v) return '<p class="rnota">Cargando…</p>';
+  var cu=_asisCuenta_(v), conv=v.convocados||[];
+  if(!v.existe) return '<p class="rnota" style="margin:0 0 10px">Aún no se ha abierto la asistencia de esta reunión.</p>'+
+    '<button class="btn pri full" data-p data-asisabrirm>Abrir asistencia</button>';
+  var cab=v.abierta
+    ? '<div class="asisPalM" style="text-align:center;font-size:34px;font-weight:700;letter-spacing:.04em;margin:2px 0 4px">'+esc(v.palabra||'')+'</div>'
+    : '<p class="rnota" style="margin:0 0 6px">Asistencia cerrada: puedes corregir la lista.</p>';
+  return cab+'<p class="rnota" data-asiscuenta style="text-align:center;margin:0 0 10px"><b>'+cu.presentes+'</b> de '+cu.convocados+' presentes'+
+    (cu.tel?' · <span style="color:var(--tel)">'+cu.tel+' por telemático</span>':'')+'</p>'+
+    conv.map(function(n){ return _asisFilaM_(n, v); }).join('')+
+    '<div style="margin-top:10px">'+elegirPersonas('asisQuienM', {universo:_activos_().map(function(m){ return m.nombre; }).filter(function(n){ return conv.indexOf(n)<0; }),
+      multi:false, titulo:'Llega alguien que no está en la lista', vacio:'Escribe un nombre.'})+
+    '<button class="btn full" data-p data-asisanadirm style="margin-top:8px">Añadir y marcar presente</button></div>'+
+    '<div style="display:flex;gap:8px;margin-top:10px">'+
+    (v.abierta?'<button class="btn" data-p data-asiscerrarm style="flex:1">Cerrar asistencia</button>':'<button class="btn" data-p data-asisreabrirm style="flex:1">Reabrir</button>')+
+    '<button class="btn" data-p data-asiscopiarm style="flex:1">Copiar la lista</button></div>';
+}
+
+async function _asisRefrescarM_(){
+  var A=ASIS_PM; if(!A || A.ocupado) return;
+  var _pn=document.querySelector('[data-asispanelm]');
+  if(!_pn || !_pn.offsetParent){ _asisSalirM_(); return; }      // el panel se cerró (o se ocultó): se acaba el refresco
+  A.ocupado=true;
+  try{
+    var v=await api.getAsistencia(A.id, true); if(ASIS_PM!==A) return;
+    A.v=v; _asisPintarPanelM_();
+  }catch(e){ /* un fallo suelto no lo tumba: el siguiente ciclo lo recupera */ }
+  finally{ A.ocupado=false; }
+}
+function _asisSalirM_(){ if(ASIS_PM && ASIS_PM.timer) clearInterval(ASIS_PM.timer); ASIS_PM=null; }
+
+function _asisPintarPanelM_(){
+  var c=document.querySelector('[data-asispanelm]'), A=ASIS_PM; if(!c || !A) return;
+  var esc_=document.querySelector('[data-psel-in="asisQuienM"]'), tecleado=esc_?esc_.value:'', foco=document.activeElement===esc_;
+  c.innerHTML=_asisPanelHTMLM_();
+  var inp=document.querySelector('[data-psel-in="asisQuienM"]'); if(inp && tecleado){ inp.value=tecleado; if(foco) inp.focus(); }
+  var on=function(sel, f){ var b=c.querySelector(sel); if(b) b.onclick=async function(){ if(b.disabled) return; b.disabled=true;
+    try{ await f(); }catch(e){ tostErr('No se pudo: ', e); } finally{ b.disabled=false; } }; };
+  on('[data-asisabrirm]', async function(){ await api.abrirAsistencia(A.id); await _asisRefrescarM_(); });
+  on('[data-asiscerrarm]', async function(){ await api.cerrarAsistencia(A.id); await _asisRefrescarM_(); });
+  on('[data-asisreabrirm]', async function(){ await api.abrirAsistencia(A.id); await _asisRefrescarM_(); });
+  on('[data-asisanadirm]', async function(){
+    var i2=document.querySelector('[data-psel-in="asisQuienM"]');
+    var n=(elegirPersonasMarcadas('asisQuienM')[0]||(i2?i2.value:'')).trim(); if(!n) return;
+    if(i2) i2.value='';                      // ya está: el campo se vacía ANTES de refrescar (el refresco conserva lo tecleado)
+    await api.marcarPresente(A.id, n, true); await _asisRefrescarM_(); tost(n+': presente.'); });
+  on('[data-asiscopiarm]', async function(){
+    var t=_asisListaTxt_(A.v);
+    try{ await navigator.clipboard.writeText(t); tost('Lista copiada.'); }catch(_){ tost('No se pudo copiar.'); } });
+  Array.prototype.forEach.call(c.querySelectorAll('[data-asisn]'), function(b){
+    b.onclick=async function(){                // un toque: marca o quita (llega de improviso, o se equivocó)
+      var n=b.getAttribute('data-asisn'); if(b.disabled) return; b.disabled=true;
+      try{ await api.marcarPresente(A.id, n, !((A.v.presentes||{})[n])); await _asisRefrescarM_(); }
+      catch(e){ tostErr('No se pudo: ', e); } finally{ b.disabled=false; } };
+  });
+}
+
+function _asisAbrirPanelM_(R){
+  _asisSalirM_();
+  ASIS_PM={id:R.id, v:null, timer:null, ocupado:false};
+  abrirModal('<div class="mtit">Asistencia en directo</div><div class="msub">'+esc(R.titulo||'')+'</div><div data-asispanelm><p class="rnota">Cargando…</p></div>');
+  _asisRefrescarM_();
+  ASIS_PM.timer=setInterval(_asisRefrescarM_, 3000);
 }
 
 /* Repinta SÓLO las tarjetas (no la vista entera: perdería lo que estás tecleando). Si no había y ahora sí, o al revés, la

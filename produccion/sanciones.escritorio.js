@@ -17,8 +17,8 @@
 function _mSanc_(n){ return _m(n); }
 
 function sancionPor(tipo,nombre){
-  if(tipo!=='general'&&tipo!=='junta'&&tipo!=='consejo') return {p:0,txt:'sin sanción automática · potestad del coordinador'};
-  if(tipo==='junta'||tipo==='consejo') return {p:1,txt:'1 punto · escala plana'};
+  /* 01/11 (artifact [334a41fb8e]): la reforma manda, la junta no genera falta — una sola puerta, `_sancionaSola_`. */
+  if(!_sancionaSola_(tipo)) return {p:0,txt:'sin sanción automática · potestad del coordinador'};
   /* ⛔⛔ «NO CONSTA» NO ES «CERO», Y AQUI DECIDE PUNTOS DE DISCIPLINA (565.ª).
      `VECES` es una tabla de **SEIS NOMBRES DE DEMO** (`escritorio.html`), y los nombres
      que llegan aqui son **REALES**: salen de `r.sinCubrir`, que viene de `_cobertura_`.
@@ -461,6 +461,64 @@ async function _engRevocarSanc_(){
   });
 }
 
+/* ══ DESHACER UN PREMIO DE HORAS (02/11, Daniel: «Sí, solo el PD, y se restan las horas») ═══════════════════════════
+   Los premios ya APLICADOS (`_puedeDeshacerPremio_`), para el PD. ⛔ Es de CARA, no seguridad: el servidor manda (`deshacerPremio`
+   es sólo del PD) y aquí se enseña su mensaje tal cual. Lo elegido va en rojo y confirma `dialogoSiNo`; sin casillas ni desplegables. */
+function _soyPDSanc_(){ return typeof SESION !== 'undefined' && !!SESION && Number(SESION.rango) >= 3; }
+
+function _premiosDeshacer_(){
+  if (!_soyPDSanc_() || !Array.isArray(SANC_BACK)) return [];
+  return SANC_BACK.filter(function(s){ return _puedeDeshacerPremio_(s, SANC_BACK); });
+}
+
+function _panelDeshacerPremio_(){
+  var lista = _premiosDeshacer_(), i, cuerpo = '', s, m;
+  if (!lista.length) return '';        /* sin nada que deshacer no existe el panel: no anuncia trabajo que no hay */
+  for (i = 0; i < lista.length; i++){
+    s = lista[i]; m = _m(s.nombre);
+    cuerpo += '<div class="parte" data-dpid="' + esc(s.id) + '">' +
+      '<div class="h"><b>' + esc((m && m.pila) || s.nombre) + '</b>' +
+        '<span class="u">' + esc(s.lote || 'suelto') + '</span>' +
+        '<span class="q">' + esc(_etSancFila_(s.puntos, s.origen, s.extra)) + '</span></div>' +
+      '<div class="just"><span class="sc">' + esc(s.motivo || '\u2014') + '</span></div>' +
+      '<div class="ruta">Al deshacerlo se <b>resta ' + esc(nf2(s.extra.compensacion)) + ' h</b> de su Compensaciones al aplicar; ' +
+        'el premio original queda en el historial.</div>' +
+      '<div class="acts"><button class="btn no" data-dp="' + esc(s.id) + '">Deshacer premio</button></div>' +
+    '</div>';
+  }
+  return pan('Premios que se pueden deshacer', lista.length + '', cuerpo);
+}
+
+async function _engDeshacerPremio_(){
+  $$('[data-dp]').forEach(function(b){
+    b.onclick = async function(){
+      if (b.disabled) return;
+      if (typeof backendOK === 'undefined' || !backendOK || !SESION || !Array.isArray(SANC_BACK)){
+        tost('Sin conexi\u00f3n: no se ha deshecho nada.'); return; }
+      /* se relee de `SANC_BACK` por su id y se vuelve a preguntar al predicado: entre pintar y pulsar hay un refresco */
+      var s = null, i;
+      for (i = 0; i < SANC_BACK.length; i++)
+        if (String(SANC_BACK[i].id) === String(b.dataset.dp)) s = SANC_BACK[i];
+      if (!s || !_puedeDeshacerPremio_(s, SANC_BACK)){
+        tost('Ese premio ya no se puede deshacer: puede que ya lo hayas deshecho.'); pintar(); return; }
+      var h = nf2(s.extra.compensacion);
+      if (!(await dialogoSiNo('Deshacer este premio.' + String.fromCharCode(10, 10) +
+        'A ' + s.nombre + ' se le restan ' + h + ' h de Compensaciones.' + String.fromCharCode(10, 10) +
+        'Se resta al aplicar. \u00bfSigo?'))) return;
+      b.disabled = true; var prev = b.textContent; b.textContent = 'Deshaciendo\u2026';
+      try{
+        var r = await api.deshacerPremio(s.id);
+        /* `repetida`: ya estaba deshecho (un reintento de red); no se resta dos veces y se dice */
+        tost(r && r.repetida ? 'Ese premio ya estaba deshecho: no se ha restado otra vez.'
+                             : 'Premio deshecho: se restan ' + h + ' h al aplicar.');
+        await _cargarSancionesCon_(r);
+        pintar();
+      }catch(e){ tostErr('No se pudo deshacer el premio', e); }
+      finally{ b.disabled = false; b.textContent = prev || 'Deshacer premio'; }
+    };
+  });
+}
+
 function _panelHistSanc_(){
   var hs=_sancHist_();
   /* ⛔ Y SU GEMELA (§3c-31): curar sólo el panel de arriba dejaría este afirmando
@@ -507,9 +565,14 @@ function _ponerSancionHTML_(){
      sin tocar un documento, y estar en el consejo no da rango por si solo. */
   if(rangoSanc(_actorSanc_())<1) return '';
   var n=sancionablesPor(_actorSanc_()).length;
-  return pan('Poner una sanci\u00f3n', n+(n===1?' persona':' personas')+' bajo tu jurisdicci\u00f3n',
-    '<div class="pb" id="ponerSanc">'+_ponerSancCuerpo_()+'</div>');
+  /* 01/11 (escm1): PLEGADO y detrás del bloque a decidir. Poner una sanción es raro (430 px arriba) y decidir el bloque es
+     lo urgente. Sigue en el DOM plegado (`#ponerSanc` lo repinta `_repintarPonerSanc_`); lo abierto se recuerda. */
+  return '<div class="acord libre'+(SANC_PON_AB?' ab':'')+'" id="ponsanc"><div class="hh" data-ponsanc>'+
+      '<span class="tx"><b>Poner una sanci\u00f3n</b><small>'+n+(n===1?' persona':' personas')+' bajo tu jurisdicci\u00f3n</small></span>'+
+      '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+    '<div class="bb"><div class="pb" id="ponerSanc">'+_ponerSancCuerpo_()+'</div></div></div>';
 }
+var SANC_PON_AB=false;
 
 function _ponerSancCuerpo_(){
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
@@ -517,6 +580,7 @@ function _ponerSancCuerpo_(){
   /* ⛔ El callback de tareas es ASINCRONO y repinta el panel ENTERO: pasa por la MISMA puerta que el resto de repintados
      (`_repintarPonerSanc_`), que recoge antes lo tecleado. El modelo (qué tareas, cargando, error) es de `comun.js`. */
   var m=_sancTareasModelo_(_repintarPonerSanc_);
+  _aseguraMotivosRri_(_repintarPonerSanc_);   /* 01/11: el catálogo entero lo sirve el servidor (`getMotivosRri`) */
   var K={ campo:function(t,h){ return '<div style="display:block;margin-bottom:9px">'+lab(t)+h+'</div>'; },
           nota:function(h,aviso){ return '<div class="nota" style="margin:0 0 9px'+(aviso?';color:var(--warn)':'')+'">'+h+'</div>'; } };
   return '<div class="sanwrap">'+
@@ -535,7 +599,7 @@ function _ponerSancCuerpo_(){
         : '')+
       _sancPlazoHTML_(m, K)+
       '<div style="display:block;margin-bottom:11px">'+lab('Puntos')+
-        nxNum('snPts', _ptsPrefillSanc_(), {min:-5, max:0})+'</div>'+
+        _ptsCampoSancHTML_()+'</div>'+
       '<button class="btn pri" id="btnSanc">Poner la sanci\u00f3n</button>'+
       '<div class="nota" id="snMsg" style="margin:9px 0 0">La sanci\u00f3n entra <b>pendiente</b>: se decide '+
       'abajo, y el comunicado sale despu\u00e9s.</div>'+
@@ -555,6 +619,7 @@ function _repintarPonerSanc_(){
 }
 
 function _cablearPonerSanc_(){
+  $$('[data-ponsanc]').forEach(function(h){ h.onclick=function(){ SANC_PON_AB=h.parentNode.classList.toggle('ab'); }; });
   var msg=function(t,mal){ var b=$('#snMsg'); if(b){ b.textContent=t; b.style.color=mal?'var(--warn)':''; } };
   /* Los campos se guardan al teclear y el motivo repinta: `_sancCablearCampos_` (comun.js). Se llama a
      `_repintarPonerSanc_` por su nombre, sin alias local: lo unico que hace visible que la puerta es UNA. */
@@ -738,7 +803,7 @@ function _vApela_(){
   ab.sort(function(x, y){ return String(x.at).localeCompare(String(y.at)); });      // la que más lleva esperando, arriba
   return pan('Apelaciones abiertas', ab.length + '',
       ab.length ? ab.map(_apelTarjeta_).join('')
-        : vacioSimple('No hay apelaciones abiertas', 'Cuando alguien apele una tarea o una sanción desde el móvil, aparece aquí.')) +
+        : vacioSimple('No hay apelaciones abiertas', 'Cuando alguien apele, aparecerá aquí.')) +
     (re.length ? pan('Resueltas · últimos ' + APEL_DIAS_VISTA + ' días', re.length + '', re.map(_apelResuelta_).join('')) : '') +
     '<div class="nota">Una tarea estimada cambia su plazo, o se la quita a quien apeló, y se le avisa. ' +
     'Una sanción estimada devuelve los puntos; «Rebajar a aviso» los devuelve y deja un aviso.</div>';

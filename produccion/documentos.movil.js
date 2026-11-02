@@ -48,19 +48,7 @@ function pilaDe(n){ return _pilaDeM_(n); }
    lo que significa «esto ya lo decidio alguien»; dejarlo con el nombre del que deshizo
    convierte un expediente devuelto a revision en uno decidido por otra persona.
    ⚠️ Es la unica accion, junto a `reenviar`, que NO firma. */
-/* CUANDO SE PUEDE DESHACER. Vivia como una condicion suelta dentro de la plantilla
-   HTML, y ahi NO se puede ejecutar: una mutacion que la apagaba (`false&&...`) salio CIEGA
-   porque la comprobacion leia el TEXTO del fichero -y `data-dec="deshacer"` sigue escrito
-   aunque el boton no se pinte nunca-. Con nombre se ejecuta, y entonces si se distingue
-   «esta escrito» de «se pinta» (ARRANQUE §3c: «existe» no es «se ejecuta»).
-
-   ⛔ DECIDIDO **Y** CON REVISOR, las dos cosas. Sin revisor no hay decision que deshacer y
-   el boton mandaria al backend una orden que no puede cumplir; sin mirar el estado se
-   ofreceria «deshacer» sobre un expediente que ya esta en revision. Misma condicion que el
-   escritorio, que es lo que hace que las dos caras ofrezcan lo mismo. */
-function _puedeDeshacerDoc_(e){
-  return !!(e && e.estado!=='revision' && e.revisor);
-}
+/* `_puedeDeshacerDoc_` vive en `comun.js` (02/11): la miran las DOS caras y tiene que saber lo que el servidor no deja deshacer. */
 
 
 /* Qué hacer con una decisión de documento SIN conexión. Puro, para que un banco lo ejecute (el listener no se puede).
@@ -125,6 +113,7 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq, aj){
    `analizado`. */
 function puedeDecidirDoc(e){
   if(!e) return false;                                     /* como el escritorio: sin expediente, nadie decide */
+  if(_docYaPublicado_(e.estado)) return false;            /* lo publicado no se mueve: el servidor no lo deja (comun.js) */
   var yo=yoNombre();
   if(yo===e.autor) return false;                          /* ni mandando por rango */
   var rev=revisoresDe(e), maxR=Math.max.apply(null,rev.map(rangoNom));
@@ -480,6 +469,7 @@ function verDoc(id){
       (_yaAnalizado_(e) ? _anotPanelHTML_('d', _anotActualDe_(e), e.id, '') : '')+
       '<label class="campo"><span class="sc">Motivo <span class="req">*</span> si pides cambios o rechazas</span>'+
       '<textarea id="dMot" placeholder="lo leerá el autor…"></textarea></label>'+
+      _solIAHTML_('dm'+e.id, _solMotivoCfg_(e, '#dMot'))+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
         _botonesDecM_(e)+
         /* DESHACER. Lo tenia el escritorio y aqui NO, y esta es la cara en la que

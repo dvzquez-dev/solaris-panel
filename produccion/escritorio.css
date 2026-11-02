@@ -44,7 +44,7 @@
      "normal". O sea que el arreglo del 13/10 NUNCA se aplicó, y Daniel lo volvió a ver el 20/10: *«en el puto
      ordenador aparece un desplegable blanco sin nada de la estética del móvil»*. */
   color-scheme:dark;
-  --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6;
+  --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6; --hib:#C45CD6;
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,monospace;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --r:10px; --r2:8px;
@@ -124,7 +124,7 @@ main{z-index:1}
   filter:drop-shadow(0 0 7px rgba(255,74,79,.75))}
 .viajev.vuela svg{animation:arcoX .38s var(--arco)}
 @keyframes arcoX{50%{transform:translateX(var(--comba,16px)) scale(1.5) rotate(120deg)}}
-.pielat{flex:none;border-top:1px solid var(--line);padding:9px 13px;display:flex;gap:9px;align-items:center}
+.pielat{flex:none;border-top:1px solid var(--line);padding:9px 13px;display:flex;flex-wrap:wrap;gap:4px 9px;align-items:center}   /* la conexión baja a su línea en vez de partir la versión en 3 */
 
 /* barra superior */
 .top{grid-column:2;border-bottom:1px solid var(--line);background:var(--sur);
@@ -241,8 +241,7 @@ main.entrando>*:nth-child(4){animation-delay:.15s}
 .pan>.rnota{padding:0 13px 10px}
 
 /* KPIs */
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:13px}
-@media(max-width:1150px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:13px}   /* auto-fit: con 3 tarjetas rellenan la fila, no dejan un hueco a la derecha */
 .kpi{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px 11px;
   position:relative;overflow:hidden;transition:border-color .2s linear}
 .kpi:hover{border-color:var(--line2)}
@@ -277,7 +276,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .chip.tel{color:var(--tel);border-color:rgba(63,158,214,.45);background:rgba(63,158,214,.09)}
 .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
 /* chip seleccionable de miembro (bloque de horas) */
-.pick{cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.03em;padding:5px 11px;border-radius:20px;
+.pick{cursor:pointer;font-family:var(--sans);font-size:12.5px;padding:6px 12px;border-radius:20px;
   border:1px solid var(--line);color:var(--ink2);background:var(--sur2);white-space:nowrap;transition:border-color .12s,color .12s,background .12s}
 .pick:hover{border-color:var(--ink3);color:var(--ink)}
 .pick.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
@@ -293,6 +292,26 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .mini:hover{border-color:var(--ink3);color:var(--ink)}
 .mini.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
 .mini.x:hover{border-color:var(--red);color:var(--red2)}
+/* 01/11 · COCHES del turno: una tarjeta por coche (Daniel: «esta estetica es horripilante»). Texto normal, no mono, que los
+   lugares son frases; ida y vuelta en fila de dos; la pregunta y su Sí/No juntos. */
+.coche{border:1px solid var(--line);border-radius:var(--r2);background:rgba(255,255,255,.02);padding:14px 16px;margin-bottom:12px}
+.coche-cab{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.coche-cab b{font-size:14px}
+.coche-cab .mini{margin-left:auto}
+.coche-par{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin-bottom:12px}
+.coche-c{min-width:0;margin-bottom:12px}
+.coche-par>.coche-c{margin-bottom:0}
+.coche-r{display:block;font-size:12px;color:var(--ink3);margin-bottom:6px}
+.coche .pick,.coche .psel-c{font-family:inherit;font-size:12.5px;letter-spacing:0}
+.coche-pre{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:13px;color:var(--ink2)}
+.coche-pre .nx-elige{width:auto}
+.coche .psel-campo{max-width:460px}
+.coche-gente{border-top:1px solid var(--line);padding-top:12px;margin-top:2px}
+.coche-gente .coche-c:last-child{margin-bottom:0}
+.coche-pas{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-height:30px;padding:4px 8px;border:1px dashed var(--line);border-radius:8px}
+.coche-pas .chip{font-family:inherit;font-size:12px;letter-spacing:0;text-transform:none}
+.coche-vacio{font-size:12.5px;color:var(--ink3)}
+@media(max-width:900px){.coche-par{grid-template-columns:1fr}}
 
 /* ── ZONA FIJA «REQUIERE TU DECISIÓN» ────────────────────────────────────
    De la 02b, con lo que Daniel pidió encima: cada fila LLEVA al sitio exacto
@@ -349,6 +368,10 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .parte .ruta{margin-top:9px;font-size:11.5px;color:var(--ink3);line-height:1.5}
 .parte .ruta b{color:var(--ink2)}
 .parte .acts{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.parte .h .btn{align-self:center}
+.parte.pp>textarea[data-motivo]{display:none}
+.parte.pp.mot>textarea[data-motivo]{display:block}
+.parte .acts .btn.on{background:var(--red);border-color:var(--red);color:#fff}
 .parte textarea{width:100%;background:#0A0909;border:1px solid var(--line);border-radius:var(--r2);
   color:var(--ink);font-family:var(--sans);font-size:12.5px;padding:8px 10px;outline:0;resize:vertical;
   min-height:52px;margin-top:8px}
@@ -389,7 +412,10 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .lote-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:14px}
 .lote-m{font-size:12px;color:var(--ink2);margin-top:5px;line-height:1.5}
 .lrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(50,44,46,.8);flex-wrap:wrap}
-.lrow .nm{flex:1;min-width:130px;font-size:12.5px;font-weight:600}
+.lrow .nm{flex:0 1 260px;min-width:130px;font-size:12.5px;font-weight:600}
+.lote-t{display:flex;gap:7px;margin-top:10px}
+.acord.libre.ab>.bb{max-height:none}
+.acord.libre>.bb>.pb{padding-top:4px}
 .lrow .vl{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--red2);min-width:84px;white-space:nowrap;text-align:right}
 .lrow .vl.tach{opacity:.38;text-decoration:line-through}
 .lcorr{font-size:11px;font-weight:600;color:var(--ink3);padding:4px 2px;border-bottom:1px dashed var(--line)}
@@ -496,8 +522,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .nota{font-size:11.5px;color:var(--ink3);line-height:1.6;padding:11px 13px;border-top:1px solid var(--line)}
 .nota b{color:var(--ink2)}
 .vac{padding:26px 14px;text-align:center;color:var(--ink3);font-size:12.5px;line-height:1.6}
-.vac>b:first-child{display:block;color:var(--ink2);font-family:var(--mono);font-size:11px;letter-spacing:.12em;
-  text-transform:uppercase;margin-bottom:6px}
+.vac>b:first-child{display:block;color:var(--ink2);font-family:var(--sans);font-size:13px;font-weight:600;margin-bottom:5px}
 /* El distintivo de BETA. Va en la cabecera y no en Ajustes: tiene que verse SIN buscarlo,
    o acabas reportando contra la versión equivocada. Ámbar, que es el color de «ojo» en
    esta paleta, y no rojo: rojo aquí significa Solaris, no aviso. */
@@ -691,6 +716,16 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .ltmes b{font-size:12.5px;text-transform:capitalize}
 .ltmes .ln{flex:1;height:1px;background:var(--line)}
 .ltmes .mono{font-size:12.5px}
+.ltmeses{display:flex;flex-direction:column}
+.mmesE{display:flex;align-items:center;gap:10px;padding:11px 13px;background:none;border:0;border-top:1px solid var(--line);
+  color:var(--ink);font:inherit;text-align:left;cursor:pointer;width:100%}
+.mmesE:first-child{border-top:0}
+.mmesE b{font-size:12.5px;display:inline-block}
+.mmesE b::first-letter{text-transform:uppercase}
+.mmesE .ln{flex:1;height:1px;background:var(--line)}
+.mmesE:hover{background:rgba(255,255,255,.03)}
+.mmesE.on{background:rgba(228,30,37,.14);box-shadow:inset 3px 0 0 var(--red,#E41E25)}
+.ltmesdet{border-top:1px solid var(--line)}
 .ltsep{display:flex;align-items:center;gap:10px;padding:9px 13px;font-family:var(--mono);font-size:9px;
   letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);border-top:1px solid var(--line)}
 .ltsep::before,.ltsep::after{content:'';flex:1;height:1px;background:var(--line2)}
@@ -854,6 +889,8 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .asisC.vis{border-color:var(--warn);background:rgba(232,145,46,.13);color:var(--warn)}
 .asisC.ok{border-color:var(--ok);background:rgba(62,180,137,.2);color:var(--ok)}
 .asisC.ok b{color:#fff}
+.asisC{cursor:pointer}
+.asisC.ok.tel{border-color:var(--tel);background:rgba(63,158,214,.2);color:var(--tel)}   /* 01/11: vino por telemático (marcó sólo telemático) */
 .asisC.nuevo{animation:asisPop .7s var(--arco)}
 @keyframes asisPop{0%{transform:scale(.8);box-shadow:0 0 0 0 rgba(62,180,137,.8)}55%{transform:scale(1.07)}
   100%{transform:scale(1);box-shadow:0 0 0 18px rgba(62,180,137,0)}}
@@ -901,6 +938,17 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .tarl th:nth-child(5){width:130px}.tarl th:nth-child(6){width:104px}.tarl th:nth-child(7){width:170px}
 .tarl td:first-child{white-space:normal;overflow-wrap:anywhere}
 .chip.tuni{white-space:nowrap}
+/* 02/11 (tareasatras): a menos de 1320 px la tabla (1000 mín.) no cabe y estado y fecha quedaban tras el scroll. Daniel: «ocultar
+   columnas en pantallas estrechas: la unidad como punto de color». Se van Responsable y Urgencia (el responsable pasa bajo el título)
+   y la unidad es un punto con su nombre en `title`/`aria-label`. */
+.tarl .tresp{display:none}
+@media (max-width:1319px){
+  .tarl table{min-width:0}
+  .tarl th:nth-child(3),.tarl td:nth-child(3),.tarl th:nth-child(4),.tarl td:nth-child(4){display:none}
+  .tarl th:nth-child(2){width:40px}
+  .tarl .tresp{display:block;color:var(--ink2);font-size:12px;margin-top:3px}
+  .chip.tuni{font-size:0;width:12px;height:12px;padding:0;border-radius:50%;display:inline-block;background:currentColor !important;border:0 !important;vertical-align:middle}
+}
 /* 31/10 · pasada de usuario (rotosesc): la leyenda de «Tu disponibilidad» (sin regla, salía pegada), la celda ofertada sin
    marcar (se veía vacía), la fila que abre algo / la que no, y la frase que dice por qué un botón está apagado. */
 .leg{display:flex;flex-wrap:wrap;gap:5px 13px;font-size:10px;font-family:var(--mono);letter-spacing:.05em;color:var(--ink3)}
@@ -945,3 +993,12 @@ ol.obj,.mdoc ol,.pan ol{counter-reset:paso}
 ol.obj>li,.mdoc ol>li,.pan ol>li{position:relative;padding-left:26px;counter-increment:paso}
 ol.obj>li::before,.mdoc ol>li::before,.pan ol>li::before{content:counter(paso);position:absolute;left:0;top:.1em;width:18px;height:18px;
   border-radius:50%;background:var(--sur2);border:1px solid var(--line2);color:var(--ink2);font:600 10px/16px var(--mono);text-align:center}
+
+/* 01/11 (escm2) · PESTAÑAS (`_pestanasE_`) y CONVOCAR TURNO en rejilla. Las pestañas son chips `.pick`: lo activo, en rojo y sin tick. */
+.chips.pest{margin:0 0 13px}
+.rejf{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px 18px;align-items:start;margin-bottom:13px}
+.rejf.rejf2{grid-template-columns:minmax(220px,1fr) minmax(260px,2fr)}
+.rejf>*{min-width:0}
+.rejf .nx-fval{font-weight:400;font-family:var(--sans);font-size:12.5px;color:var(--ink3)}
+/* TOPE DE ANCHO: a 1920 px una tabla de 6 columnas se estiraba a 1.600 px con el dato a 1.500 px del nombre. Las tablas no pasan de 1.280. */
+main>.pan:has(.tw),main>div>.pan:has(.tw){max-width:1280px}

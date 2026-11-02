@@ -60,7 +60,7 @@
      "normal". O sea que el arreglo del 13/10 NUNCA se aplicó, y Daniel lo volvió a ver el 20/10: *«en el puto
      ordenador aparece un desplegable blanco sin nada de la estética del móvil»*. */
   color-scheme:dark;
-  --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6;
+  --ok:#3EB489; --warn:#E8912E; --tel:#3f9ed6; --hib:#C45CD6;
 
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,monospace;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -409,6 +409,13 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
   padding:3px 8px;border-radius:20px;border:1px solid;white-space:nowrap}
 .pil.pend{color:var(--warn);border-color:rgba(232,145,46,.45);background:rgba(232,145,46,.09)}
 /* 31/10 · desglose agrupado por categoría: cada grupo lleva su color (la tabla `CATS_DESGLOSE` de comun.js) */
+.mmeses{display:flex;flex-direction:column;gap:7px}
+.mmes{display:flex;align-items:baseline;gap:9px;width:100%;padding:12px 13px;border-radius:12px;background:var(--bg2,rgba(255,255,255,.04));
+  border:1px solid var(--line);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.mmes b{font-size:13.5px;display:inline-block}
+.mmes b::first-letter{text-transform:uppercase}
+.mmes .sc{flex:1}
+.mmes:active{background:rgba(228,30,37,.16);border-color:var(--red,#E41E25)}
 .dgrp{border-left:3px solid var(--line2);margin:0 0 10px;padding-left:9px}
 /* 31/10: dentro de un grupo manda el color del GRUPO; el borde de estado de cada fila (azul de «otorgada»…) lo contradecía */
 .dgrp .borde-ok,.dgrp .borde-ot,.dgrp .borde-no,.dgrp .borde-pe{border-left:0;margin-left:0;padding-left:0}
@@ -1108,7 +1115,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .pick{cursor:pointer;font-family:var(--mono);font-size:12px;letter-spacing:.03em;min-height:36px;padding:6px 13px;border-radius:20px;
   border:1px solid var(--line);background:transparent;color:var(--ink2)}
 .pick.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
-.pick.on::before{content:'\2713 '}
+/* 01/11 (Daniel): lo elegido se ilumina en rojo y ya; sin «✓» delante del texto (como el escritorio). */
 .pick[disabled]{opacity:.5;pointer-events:none}
 .nx{display:inline-flex;flex-direction:column;gap:6px;align-items:flex-start;position:relative;max-width:100%}
 .nx-hora,.nx-num{flex-direction:row;align-items:center;gap:5px}

@@ -696,6 +696,8 @@ function durForm(){
   var d=_minutosReales_(ST.form.fecha, ST.form.ini, ST.form.fin);   // cruza medianoche y el cambio de hora (auditor 34)
   return Math.round(d/15)/4;             // a cuartos de hora
 }
+/* 01/11: las horas del PARTE = el tramo principal (`durForm`, que `probar_minhm.py` ejecuta aislada: no se toca) + los demás tramos. */
+function durTotalForm(){ return durForm() + _tramosExtraH_(ST.form); }
 
 /* QUIÉN FIRMA, EN UNA FRASE (948.ª). Fichar le decía a un COORDINADOR que lo firmaba «su» coordinador —y él es el
    coordinador—, mientras Estado ya decía bien «Las firma Lois, Project Director». Se sale del MISMO `rt` que la tarjeta
@@ -809,7 +811,9 @@ function vFichar(){
         '<button data-add="15" data-p>+15 min</button><button data-add="30" data-p>+30 min</button>'+
         '<button data-add="60" data-p>+1 h</button><button data-add="-60" data-p>−1 h</button>'+
       '</div>'+
-      '<div class="durb"><span class="q mono" id="fDurQ" style="white-space:nowrap">'+nf2(durForm())+' h</span>'+
+      /* 01/11: varios tramos en UN parte (16-18 y 20-22); las horas de abajo son la suma. */
+      _tramosHTML_(ST.form, _horaCampoM_)+
+      '<div class="durb"><span class="q mono" id="fDurQ" style="white-space:nowrap">'+nf2(durTotalForm())+' h</span>'+
         '<span class="t">de trabajo declarado.<br><span style="color:var(--ink3)">Sin cronómetro: '+
         'quien lo firme verá que <b>no hay fichaje</b>.</span></span></div>'+
     '</div>';
@@ -857,6 +861,7 @@ function vFichar(){
             '"></label>')+
       '<label class="campo" style="margin-bottom:6px"><span class="sc">Qué estuviste haciendo <span class="req">*</span></span>'+
         '<textarea id="fJust" placeholder="Qué hiciste, con quién y dónde. Mínimo 25 caracteres.">'+esc(ST.form.just)+'</textarea></label>'+
+      _solIAHTML_('fJust', _solParteCfg_('fJust', ST.form, _parteHorasIA_))+
       '<div class="justfila">'+
         '<div class="aroJ" id="aroJ"><svg viewBox="0 0 40 40"><circle class="f" cx="20" cy="20" r="16"/>'+
           '<circle class="p" cx="20" cy="20" r="16" pathLength="100"/></svg>'+
@@ -930,12 +935,12 @@ function validarFichaje(){
   var f=ST.form;
   var declP = _declVivo_(f);
   var haySes = !!declP || ST.modo!=='vivo' || minSes()>0 || !!ST.ses.cloudIni;   /* declarar: ya hay sesión cerrada */
-  var dur = declP ? _durMostradaM_() : (ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durForm());
+  var dur = declP ? _durMostradaM_() : (ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durTotalForm());
   /* ⛔ EL TOPE SALE DE `_maxHorasParte_()`, no de un 12 escrito aqui: el servidor topa
      en 14 y con el 12 de aqui un parte de 13 h quedaba bloqueado POR PANTALLA aunque
      fuera legal. Los dos numeros nacieron con un dia de diferencia y este se quedo. */
   var _topeH = _maxHorasParte_();
-  var n1 = (declP && !_declEditadoM_(declP)) ? true : (haySes && dur>0 && dur<=_topeH);
+  var n1 = (declP && !_declEditadoM_(declP)) ? true : (haySes && dur>0 && dur<=_topeH && !_tramosError_(f));
   /* la regla de qué es "la imputación" vive en _imputacion_(): un solo sitio, para que si
      cambia no haya que acordarse de tocar aquí Y en enviarFichaje (antes no daba error, solo
      desincronizaba silenciosamente lo que se valida de lo que se envía). */
@@ -1023,7 +1028,7 @@ function validarFichaje(){
           : (_pgM==='cero' ? 'La salida tiene que ser posterior a la entrada'
                            : 'Falta la duración');
     if(l) l.textContent = todo ? ('Enviar '+nf2(dur)+' h a aprobación')
-      : (!n1?_faltaDur:(!n2?'Falta a qué imputarlas':'Falta la justificación'));
+      : (!n1?(_tramosError_(f)||_faltaDur):(!n2?'Falta a qué imputarlas':'Falta la justificación'));
   }
   return todo;
 }
@@ -1206,7 +1211,7 @@ async function enviarFichaje(){
         var r=await api.ficharSalida(imput, f.just.trim(), f.cat, _perfilElegido_(), _subcatEnvio_(f), _imputacionUrl_(f,TAREAS,_fichaYo_()));   // la nube cierra, calcula y guarda la categoría
         if(r && r.parte){ nuevo=normPMovil(r.parte); h=r.parte.horas; }
       } else {
-        var dur=durForm();
+        var dur=durTotalForm();
         /* ⛔ La clave se genera AQUI, fuera de `api.pushParte`, porque `api._post` reintenta
            hasta tres veces: si naciera dentro, cada reintento seria un envio distinto.
            ⛔ Y AHORA SOBREVIVE AL FALLO, que es el otro envío duplicado —el que el candado
@@ -1218,7 +1223,7 @@ async function enviarFichaje(){
            se construye FUERA del `for`, `movil.html:272`): eso no era el agujero. */
         if(!f.clave) f.clave=_claveUso_();
         var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, subcat:_subcatEnvio_(f), horas:dur,
-          ini:f.ini, fin:f.fin, justificacion:f.just.trim(), sinFichaje:true,
+          ini:f.ini, fin:f.fin, tramos:_tramosEnvio_(f), justificacion:f.just.trim(), sinFichaje:true,
           subsistema:_perfilElegido_(), clave:f.clave, tareaUrl:_imputacionUrl_(f,TAREAS,_fichaYo_()) });
         /* ⛔ 20/10 (auditor de partes): las horas que GUARDÓ el servidor, no las tecleadas — recorta al tope y redondea
            al CÉNTIMO (los cuartos los pone esta cara, `durForm`; 25/10, auditor 33 🟡 B3: aquí ponía que los ponía él);
@@ -1239,7 +1244,7 @@ async function enviarFichaje(){
          esa sesion salen con el 30/07, en silencio y sin volver a preguntar. Vuelve a
          HOY, que es el caso normal. */
       var _cola=_colaTxtM_();
-      ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null;
+      ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null; f.tramos=[];
       f.fecha=HOY;
       /* ⚠️ Y el aviso lo DICE en vez de inventarse un número: sin las horas de vuelta,
          se confirma el envío y se manda a mirar la lista, que es donde estarán. */
@@ -1260,7 +1265,7 @@ async function enviarFichaje(){
     }
     return;
   }
-  var durd = ST.modo==='vivo' ? horasSesion() : durForm();   // demo local (sin backend)
+  var durd = ST.modo==='vivo' ? horasSesion() : durTotalForm();   // demo local (sin backend)
   PARTES.unshift({id:++SEQ, f:f.fecha, t:imput, cat:f.cat, q:durd, e:'pend',
     ini:f.ini, fin:f.fin, just:f.just.trim(),
     sinFichaje: ST.modo==='bloque'});
@@ -1367,114 +1372,7 @@ function filaParte(p){
    argumento en vez de releer `PARTES` aquí dentro: quién decide qué es «de este mes» ya lo
    decidió el llamador con `_perAhora`, y preguntarlo dos veces es como se acaba teniendo dos
    respuestas. ⚠️ Opcional a propósito: el banco saca esta función suelta al arnés. */
-/* ⛔⛔ TODO EL HISTÓRICO DE MOVIMIENTOS DE HORAS, SEPARADO POR CIERRES (07/10/2026).
-   🗣️ Daniel: *«ahí debajo de «Ultimos movimientos» debería aparecer … toda la lista de todos
-   los movimientos de horas de este expediente. Obviamente teniendo en cuenta cierres de mes,
-   cierres mensuales y cierres de temporada. Pero debería aparecer todo el histórico de todo.
-   Obviamente eso, separados unos de otros, pero todo en una lista, pero por los cierres»*.
-
-   📏 **Y el dato ya estaba**: `_getPartes_` del backend **no filtra por mes** -- sirve todo lo
-   que esa persona puede ver --, y `confs` en `vHoras` tampoco. El recorte al mes vive sólo dentro
-   de `_ultimosMov_(…, 'mes')`. O sea que esto no pide un dato nuevo: pide **dejar de tirarlo**.
-
-   ⚠️ LOS SIN FECHA VAN AL FINAL, no al principio. `_ultimosMov_` los ponía los primeros
-   (`sinD.concat(conD)`); aquí, en una lista ordenada por tiempo, «no sé cuándo» no puede ir
-   delante de «hoy», y lleva su propio rótulo.
-
-   ⚠️ EL MES ABIERTO SE ROTULA «sin cerrar». Un mes sin cerrar y uno cerrado no son la misma
-   cosa -- el abierto aún puede cambiar --, y pintarlos iguales es lo que hace que un total viejo
-   se lea como definitivo. El periodo abierto sale de `_periodoAbierto_()`, que es el mes
-   siguiente al último cierre; si no se sabe, no se rotula ninguno (no se inventa). */
-function _histHorasHTML_(todos){
-  if(!todos || !todos.length) return '';
-  var g=[], idx={}, i, j;
-  for(i=0;i<todos.length;i++){
-    /* ⛔ 20/10 (auditoría): el grupo es el MES QUE GRABÓ EL SERVIDOR (`periodo`), como la cifra; sin él, la fecha.
-       Si no, lo atrasado salía en el mes de su fecha y la base del mes cerrado en el mes siguiente. */
-    var p=todos[i], _mp=/^(\d{4})-(\d{2})$/.exec(String(p.periodo||''));
-    var d = _mp ? new Date(+_mp[1], +_mp[2]-1, 1) : ((typeof _fechaDMY_==='function') ? _fechaDMY_(p.f) : null);
-    var k = d ? (d.getFullYear()+'-'+((d.getMonth()+1)<10?'0':'')+(d.getMonth()+1)) : '';
-    if(!(k in idx)){ idx[k]=g.length; g.push({k:k, d:d, items:[], h:0}); }
-    g[idx[k]].items.push(p); g[idx[k]].h += (Number(p.q)||0);
-  }
-  /* Del más nuevo al más viejo, y los sin fecha al final. */
-  g.sort(function(a,b){
-    if(!a.d && !b.d) return 0;
-    if(!a.d) return 1;
-    if(!b.d) return -1;
-    return b.d - a.d;
-  });
-  var per = (typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
-  /* ⛔⛔ LA COMPENSACIÓN DEVENGADA A DÍA DE HOY, COMO MOVIMIENTO DEL MES EN CURSO (07/10).
-     🗣️ Daniel: *«en octubre 2026 debería aparecer lo que llevo de compensación devengada a
-     día de hoy»*.
-     ⛔ **SÓLO el mes en curso.** Su diseño dice que **el parte nace al cerrar**, así que una
-     fila sintética en un mes CERRADO saldría **dos veces** el día que el despliegue escriba
-     los partes de verdad — y las dos serían correctas por separado, que es lo que hace que
-     nadie lo vea venir.
-     ⛔ **Se SUMA al total del grupo**: la cabecera imprime la suma de sus filas, y una fila
-     que no suma deja la división impresa sin dar el número impreso (el fallo del 13/08).
-     ⛔ **Y el grupo se CREA si no existe**: quien sólo tiene la compensación no tiene ningún
-     apunte en el registro, o sea ningún grupo — y entonces esto sería invisible justo para
-     el caso que lo motivó. */
-  var _cDev = null;
-  if(per && typeof _compBase_==='function' && typeof _devengadoAHoy_==='function' &&
-     typeof _fraccionDelMes_==='function' && typeof YO!=='undefined' && YO){
-    var _cb0 = _compBase_(YO);
-    /* `_devengadoAHoy_(m, base, frac)` con la BASE como horas devuelve `base × frac`, o sea
-       lo devengado. Es la MISMA puerta que usan la cifra y el ritmo: no se reinventa la
-       rampa aquí, que es como se acaban teniendo dos números para lo mismo. */
-    if(typeof _cb0==='number' && _cb0>0) _cDev = _devengadoAHoy_(YO, _cb0, _fraccionDelMes_());
-  }
-  if(_cDev!=null && _cDev>0){
-    var _gi = idx[per];
-    if(_gi==null){
-      /* Sin apuntes este mes no hay grupo: se crea con la fecha de hoy para que caiga en su
-         sitio al ordenar. */
-      var _hoy = new Date();
-      idx[per] = g.length; _gi = g.length;
-      g.push({k:per, d:_hoy, items:[], h:0});
-      g.sort(function(a,b){
-        if(!a.d && !b.d) return 0;
-        if(!a.d) return 1;
-        if(!b.d) return -1;
-        return b.d - a.d;
-      });
-      /* ⛔ Al reordenar, `idx` apunta a posiciones VIEJAS: se reconstruye o la fila se
-         cuelga del mes equivocado — y un apunte en el mes que no es se lee como un dato. */
-      idx = {}; for(var _q=0;_q<g.length;_q++) idx[g[_q].k]=_q;
-      _gi = idx[per];
-    }
-    g[_gi].comp = _cDev;
-    g[_gi].h += _cDev;
-  }
-  var out='', tempPrev=null;
-  for(j=0;j<g.length;j++){
-    var gr=g[j], temp = gr.d ? _temporadaDe_(gr.d) : null;
-    /* El salto de temporada va ANTES del grupo más viejo: lo que hay debajo de la línea es la
-       temporada que cerró. */
-    if(temp && tempPrev && temp!==tempPrev){
-      out += '<div class="rnota" style="margin:10px 0 4px;text-align:center;opacity:.85">'+
-        '— cierre de temporada '+esc(temp)+' —</div>';
-    }
-    if(temp) tempPrev=temp;
-    var rot = gr.d ? esc(_mesLargo_(gr.d)) : 'Sin fecha';
-    var est = !gr.d ? '' : (per && gr.k===per ? ' · sin cerrar' : ' · cerrado');
-    out += '<div class="rnota" style="margin:9px 0 3px;display:flex;gap:8px;align-items:baseline">'+
-      '<b style="text-transform:capitalize">'+rot+'</b><span class="sc">'+est.replace(' · ','')+
-      '</span><span class="ln" style="flex:1"></span><span class="mono">'+h1(gr.h)+'</span></div>';
-    /* ⛔ LA FILA VA MARCADA COMO CALCULADA, no disfrazada de parte. Cuando el cierre
-       escriba el parte de verdad, ése vendrá del registro y se pintará con `filaParte` como
-       todos: si esta se pareciera a un parte, nadie distinguiría la una de la otra. */
-    if(gr.comp!=null){
-      out += '<div class="rnota" style="margin:3px 0;display:flex;gap:8px;align-items:baseline">'+
-        '<span style="flex:1">Compensación base · <span class="sc">a día de hoy</span></span>'+
-        '<span class="mono">'+h1(gr.comp)+'</span></div>';
-    }
-    for(i=0;i<gr.items.length;i++) out += filaParte(gr.items[i]);
-  }
-  return out;
-}
+/* 01/11: «Todo el histórico» (`_histHorasHTML_`, 07/10) se fue: ahora son los meses plegados de `_mesesHorasHTML_`, más abajo. */
 
 function _movHorasHTML_(confs, pends){
   var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
@@ -1504,7 +1402,7 @@ function _movHorasHTML_(confs, pends){
       /* ⛔ Y LOS QUE NO TIENEN FECHA LEGIBLE, DICHOS. `_ultimosMov_` los deja en la lista
          a proposito (esconder una hora seria peor) pero **no puede saber de que mes son**,
          y hasta hoy iban dentro del «este mes» sin mas. Ver `sinFecha` en `comun.js`. */
-      '<b>Últimos movimientos</b><small>'+_ap+' apunte'+(_ap===1?'':'s')+' este mes'+
+      '<b style="white-space:nowrap">Este mes</b><small>'+_ap+' apunte'+(_ap===1?'':'s')+' este mes'+
         (r.sinFecha?(' · '+r.sinFecha+' sin fecha'):'')+
         (_ef.n?(' · '+_ef.n+' esperando firma'):'')+' · '+
         'de qué se componen estas horas</small>'+
@@ -1561,19 +1459,28 @@ function _movHorasHTML_(confs, pends){
       '<button class="btn mini" data-desgmes data-p style="margin-top:9px">'+
         'Ver el desglose completo de este mes</button>'+
     '</div></div>'+
-    /* ⛔ Y DEBAJO, TODO EL HISTÓRICO. Va en su propio desplegable y no dentro del de
-       arriba: aquel responde «de qué se componen las horas DE ESTE MES» y éste «qué he
-       hecho desde que entré». Meterlo dentro obligaría a abrir el del mes para ver el
-       histórico, que es justo lo contrario de lo que se pidió. */
-    (confs.length
-      ? '<div class="plg" style="margin-top:9px"><div class="plgh" data-plg data-p>'+
-          '<b>Todo tu histórico</b><small>'+confs.length+' movimiento'+
-          (confs.length===1?'':'s')+' de horas · separados por cierres</small>'+
-          '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;'+
-          'fill:none;stroke:currentColor;stroke-width:2.4;transition:transform .3s">'+
-          '<path d="M6 9l6 6 6-6"/></svg></div>'+
-        '<div class="plgc" hidden>'+_histHorasHTML_(confs)+'</div></div>'
-      : '');
+    /* 01/11 · DEBAJO, LOS MESES (Daniel: *«agrúpalo por meses […] comprimidos […] y le das clic y te aparece como el desglose
+       completo de este mes»*). Antes era «Todo tu histórico», un desplegable con TODAS las filas; ahora son tarjetas por mes
+       de trabajo —el abierto primero— que abren su desglose en ventana. El registro no se borra: sólo se pliega. */
+    _mesesHorasHTML_(confs);
+}
+
+/* LOS MESES DE TUS HORAS, plegados: una tarjeta pulsable por mes de trabajo con apuntes (el abierto, siempre: lleva la
+   compensación), del más nuevo al más viejo. Los vacíos no salen. `data-mesdesg` abre ese mes con `_desgloseMesHTML_`. */
+function _leerParteM_(p){ return {periodo:p.periodo, creado_at:p.creado_at, iso:p.iso, fecha:p.f, horas:p.q}; }
+function _mesesHorasHTML_(confs){
+  var per=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  var g=_mesesDeTrabajo_(confs, per, _leerParteM_, true);
+  if(!g.length) return '';
+  var _hm=_hMesReal_(YO);
+  return '<div class="plg" style="margin-top:9px"><div class="mmeses">'+g.map(function(m){
+    var abierto=(per && m.k===per);
+    var h=abierto ? (_hm!=null ? _hm : m.h+_compMensual_(YO)) : m.h;
+    return '<button type="button" class="mmes" data-p data-mesdesg="'+(m.k||'sin')+'">'+
+      '<b>'+(m.k ? esc(_nomPeriodo_(m.k)) : 'Sin fecha')+'</b>'+
+      '<span class="sc">'+(!m.k ? '' : abierto ? 'sin cerrar' : 'cerrado')+'</span>'+
+      '<span class="mono">'+nf2(h)+' h</span></button>';
+  }).join('')+'</div></div>';
 }
 
 /* LAS PARTIDAS FIJAS DEL MES (la base del cargo y la extra del PD), que no son partes: entran al desglose con `catDesglose`
@@ -1597,7 +1504,11 @@ function _fijasDesglose_(){
   return fijas;
 }
 
-function _desgloseMesHTML_(confs){
+/* `clave` ('AAAA-MM', o 'sin') abre OTRO mes de trabajo con el mismo formato (01/11, las tarjetas de `_mesesHorasHTML_`): sus
+   apuntes por `_mesesDeTrabajo_`, sin la compensación fija ni la cifra de Notion, que son del mes abierto. Sin `clave`, el abierto. */
+function _desgloseMesHTML_(confs, clave){
+  var _perA=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
+  if(clave!=null && clave!==_perA) return _desgloseOtroMesHTML_(confs, clave==='sin' ? '' : clave, _perA);
   var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
   var comp=_compMensual_(YO);
   /* ⛔ EL TOTAL SALE DE LA PUERTA, NO DE UNA SUMA. Daniel, 02/08: «las horas del mes se
@@ -1618,11 +1529,7 @@ function _desgloseMesHTML_(confs){
      partes: entran en su grupo como filas FIJAS (`catDesglose`), y la extra va a «Otras contribuciones». Lo demás se
      reparte por la tabla de comun.js. La suma de los subtotales es la de antes: ninguna fila se pierde ni se cuenta dos veces. */
   var fijas=_fijasDesglose_();
-  var grupos=agruparDesglose(fijas.concat(r.todos)).map(function(c){
-    return '<div class="dgrp" style="border-left-color:'+c.color+'"><div class="dgh"><i class="dgpt" style="background:'+c.color+'"></i>'+
-      '<b>'+esc(c.eti)+'</b><span class="ln"></span><span class="mono">'+nf2(c.h)+' h</span></div>'+
-      c.items.map(function(p){ return p.fila || filaParte(p); }).join('')+'</div>';
-  }).join('');
+  var grupos=_gruposDesgloseHTML_(fijas.concat(r.todos));
   /* ⛔ EL TITULO, DEL PERIODO — NO DEL RELOJ DEL TELEFONO. El contenido de esta ventana va
      de CIERRE A CIERRE (`_ultimosMov_(…,'mes')` → `_deEsteMes_` → `_periodoAbierto_()`)
      y el titulo salia de `new Date()`. Julio se aplico el 04/08, asi que del 01 al 04 de
@@ -1649,6 +1556,29 @@ function _desgloseMesHTML_(confs){
         'más y <b>no pasa al mes siguiente</b>.'
       : 'Aquí sale la <b>base</b> de tu cargo (Project Director 7 h, Coordinador 3,5 h, '+
         'miembro 2 h). Si tienes extras, <b>todavía no los vemos</b>.')+'</p>';
+}
+
+/* Los grupos por categoría, con su color y sus filas (la mitad de abajo del desglose, compartida por el mes abierto y los demás). */
+function _gruposDesgloseHTML_(ps){
+  return agruparDesglose(ps).map(function(c){
+    return '<div class="dgrp" style="border-left-color:'+c.color+'"><div class="dgh"><i class="dgpt" style="background:'+c.color+'"></i>'+
+      '<b>'+esc(c.eti)+'</b><span class="ln"></span><span class="mono">'+nf2(c.h)+' h</span></div>'+
+      c.items.map(function(p){ return p.fila || filaParte(p); }).join('')+'</div>';
+  }).join('');
+}
+
+function _desgloseOtroMesHTML_(confs, k, per){
+  var g=_mesesDeTrabajo_(confs, per, _leerParteM_).filter(function(m){ return m.k===k; })[0];
+  var its=(g?g.items:[]).slice().sort(function(a,b){
+    var da=_fechaDMY_(a.f), db=_fechaDMY_(b.f);
+    return (db?db.getTime():0)-(da?da.getTime():0);
+  });
+  return '<div class="mtit">Desglose de '+(k ? esc(_nomPeriodo_(k)) : 'lo que no tiene fecha')+'</div>'+
+    '<div class="tarj"><div class="cifh"><span class="g mono">'+nf2(g?g.h:0)+'</span><span class="sc">h en ese mes</span></div>'+
+      desgloseCat(its)+'</div>'+
+    '<div class="tarj">'+_gruposDesgloseHTML_(its)+'</div>'+
+    '<p class="rnota">Lo que contaron tus partes aprobados en ese mes. '+
+      'El registro <b>no se borra</b>.</p>';
 }
 
 function _cuotaHTML_(){
@@ -1679,29 +1609,11 @@ function _cuotaHTML_(){
         '<div class="cifh"><span class="g mono">\u2014</span><span class="sc">\u20ac al a\u00f1o</span></div>'+
         '<p class="rnota">Tu cuota a\u00fan no est\u00e1 calculada. Sale de tus horas de la '+
         'temporada y se cierra en agosto.</p></div>';
-  /* ⛔ EL PRIMER MES NO LLEVA CUOTA, Y SE DICE. Gemela de la del escritorio y por el
-     mismo motivo: aquí el descuento se pinta como `_q.base - _q.final`, así que a un
-     exento CON coche se le atribuía al coche la exención entera. Y a uno SIN coche le
-     salía «Aún sin descuentos» sobre un importe de 0,00 €, que no explica nada.
-     ⚠️ La base puede no estar (el respaldo servido no siempre la trae), y un importe
-     que no se sabe no se pinta: por eso la línea del importe va condicionada. */
-  /* ⛔ SE ENSEÑA CUANDO EL CERO ESTÁ AHÍ, no cuando «tocaría». Con `viva:false` el importe
-     que se enseña lo calculó el
-     motor, que **ya aplicó la exención si tocaba**: volver a restarla aquí deja un recibo que
-     no cuadra consigo mismo.
-     🔁 Medido: con `{cuota_base:30, cuota:22, coche:2, cierres:0}` salía «Cuota por tus horas
-     30,00 · Tu primer mes −30,00 · Estimación 22,00» — 30 − 30 = 0 ≠ 22 — y la línea
-     del coche desaparecía. Y es alcanzable: `flujos/umbral.py --subir` escribe `cierres`
-     **solo**, mientras `cuota`/`cuota_base` los empuja otro comando, así que un panel puede
-     traer el `cierres` nuevo con la cuota vieja. */
-  var _exeM=(_exentoPrimerMes_(YO)===true && _q.final === 0);
+  /* ⛔⛔ 01/11 · Sin «primer mes»: el descuento se pinta como `_q.base - _q.final`, y con el coche a 0 € ES del coche (exento por
+     eso). La base puede no estar (el respaldo servido no siempre la trae), y un importe que no se sabe no se pinta: por eso
+     la línea del importe va condicionada. */
   var _bM=(typeof _q.base==='number' && isFinite(_q.base));
-  var recibo = _exeM
-    ? (_bM ? '<div class="rl"><span>Cuota por tus horas</span><span class="ra">'+eur(_q.base)+'</span></div>'+
-        '<div class="rl desc"><span>Tu primer mes · aún sin ningún mes cerrado</span>'+
-        '<span class="ra">−'+eur(_q.base)+'</span></div>' : '')+
-      '<p class="rnota">Tu primer mes no lleva cuota: todavía no has cerrado ningún mes.</p>'
-    : YO.coche
+  var recibo = YO.coche
     /* ⛔ Y LA RAMA DEL COCHE VA IGUAL DE PROTEGIDA. `_bM` vivía solo en la de exento, dos líneas
        arriba, con el comentario que ya explica por qué hace falta: «un importe que no se sabe no
        se pinta». Sin `cuota_base` —que el respaldo servido no siempre trae, y entonces
@@ -2053,7 +1965,7 @@ function _engBloqueM_(){
    del PD y la lista ofrecía revertir partes de otras unidades a quien no puede. `p` es el parte CRUDO (`subsistema`). */
 function _pdPuedeRevertir_(p, quien){
   var r = (typeof rangoNom==='function') ? rangoNom(quien) : 0;
-  return r >= 3 || (r >= 1 && coordinadorDe(p.subsistema||'—') === quien);
+  return r >= 3 || (r >= 1 && coordinadorDe(p.subsistema||'—') === quien) || esSubcoordDe(quien, p.autor);   /* 02/11: + el subcoordinador, a su equipo */
 }
 
 function _pdRevertible_(p){
@@ -2539,3 +2451,9 @@ function _rankSubsHTML_(){
     : vacio('Sin datos de subsistemas','La media por unidad la calcula el motor al cerrar el mes, y el servidor todavía no la ha mandado.','',false))+'</div>';
 }
 
+/* 02/11: las horas del parte para «✨ Redactar con SolarIA» (los tres caminos comparten la caja de la justificación), como en `validarFichaje`. */
+function _parteHorasIA_(){
+  var declP=_declVivo_(ST.form), h=0;
+  try{ h = declP ? _durMostradaM_() : (ST.modo==='vivo' ? ((minSes()>0||ST.ses.cloudIni)?horasSesion():0) : durTotalForm()); }catch(e){ h=0; }
+  return h;
+}

@@ -121,6 +121,15 @@ function _presetInvitados_(tipo){
   return out;
 }
 
+/* Convocatorias en pestañas (01/11, escm2): la lista, fijar fecha y orden del día, el parte de bloque y convocar. */
+function _convocPest_(lista){
+  return _pestanasE_('conv', [
+    ['lista', 'Reuniones', lista],
+    ['fijar', 'Fijar fecha', _fijarPanel_()],
+    ['bloque', 'Parte de bloque', _bloqueReuPanelE_()],
+    ['convocar', 'Convocar', convocarReunionPanel()]
+  ], 'lista');
+}
 function convocarReunionPanel(){
   /* ⛔ UN MIEMBRO RASO SÍ CONVOCA — reunión de trabajo, y nada más. Aquí ponía
      `if(rangoNom(ACTOR)<1) return ''` y el panel entero desaparecía, mientras el MÓVIL se
@@ -816,6 +825,12 @@ function _borrarReuBoxE_(r){
       ' <b>No se puede deshacer.</b></div></div>';
 }
 
+/* 01/11 · TÍTULO Y FECHA LÍMITE: el botón (el diálogo y el flujo son de `comun.js`, `editarReunionFlow`). Sólo quien convoca o un admin. */
+function _editarReuBoxE_(r){
+  if(!r || !_puedeBorrarReuE_(r)) return '';
+  return '<div style="margin-top:14px"><button class="btn" data-editarreu>Editar título y plazo</button></div>';
+}
+
 /* ⭐ EDITAR LOS CONVOCADOS (818.a; el móvil es la 817.a). Mismas reglas, escritas en
    `docs/decisiones-app.md`: sólo quien convoca o un admin (`_puedeBorrarReuE_`), se parte de
    `r.invitados` TAL COMO LO SIRVE el backend, y sin esa lista no se ofrece — guardar desde una lista
@@ -849,6 +864,32 @@ function _cierraCeldaE_(limite){
   if(!s || s==='\u2014') return {txt:'\u2014', cls:''};
   var f=_isoADMY_(_dmyAISO_(s).slice(0,10));
   return _plazoAbierto_(s) ? {txt:f, cls:''} : {txt:'cerró el '+f, cls:'cerrado'};
+}
+
+/* «Disponibilidad y riesgo» (escm3, 02/11): la tarjeta que se abre sola es la PRIMERA con alguien sin cubrir o por
+   debajo del mínimo, para no obligar a un clic por reunión a ver lo único que importa. Las ocultas no cuentan: no
+   se sabe quién. ⛔ Tampoco las de plazo CERRADO (refutador, 02/11): ya no hay nada que hacer, sólo lo que va a sanción.
+   Devuelve el índice en `reus`, o -1. */
+function _reuAbiertaRiesgoE_(reus){
+  for(var i=0; i<(reus||[]).length; i++){
+    var c=_cobertura_(reus[i]);
+    if(!c.oculto && _plazoAbierto_(reus[i].limite) && ((reus[i].sinCubrir||c.sinCubrir||[]).length || (reus[i].bajoMin||c.bajoMin||[]).length)) return i;
+  }
+  return -1;
+}
+
+/* ⛔ LO QUE LA PERSONA ABRIÓ O CERRÓ EN «Disponibilidad y riesgo» SE RECUERDA POR `id` DE REUNIÓN (refutador, 02/11). La vista se
+   repinta en cada refresco (~90 s) y la auto-apertura volvía a la primera en riesgo, pisando lo que se estaba mirando.
+   `DISPO_AB[id]` es `true`/`false` sólo si la persona tocó esa tarjeta; sin tocar, manda `_reuAbiertaRiesgoE_`. Vive en
+   memoria de la página (no se guarda: recargar vuelve a la regla). */
+var DISPO_AB={};
+function _dispoAbierta_(r, esLaDeRiesgo){
+  var t=DISPO_AB[String(r.id)];
+  return t===undefined ? !!esLaDeRiesgo : !!t;
+}
+function _dispoRecordar_(cabecera){
+  var a=cabecera.parentNode, m=/^reu-(.+)$/.exec(a.id||'');
+  if(m) DISPO_AB[m[1]]=a.classList.contains('ab');
 }
 
 /* EL PLAZO DE UNA REUNIÓN EN UNA TARJETA DEL ESCRITORIO (928.ª): el texto (`_plazoTxt_`, el mismo de toda la
@@ -929,6 +970,7 @@ function _fijarPanel_(){
         '<input id="reOrden" value="'+esc(r.ordenDia||'')+'" placeholder="https://… o los puntos a tratar" style="'+E+'"></label>'+
       '<button class="btn" data-orden'+(_pf?'':' disabled')+'>Guardar orden del día</button>'+_porQueApagado_(_porFija)+
     '</div>'+
+    _editarReuBoxE_(r)+
     _convocadosBoxE_(r)+
     _ordenDiaReuHTML_(r)+
     _audioReuHTML_(r)+
@@ -1279,14 +1321,16 @@ async function _asisRefrescarE_(){
 /* El cuadrito: `nuevo` sólo la PRIMERA vez que se ve verde (la animación es el gracejo; con `prefers-reduced-motion` el CSS la quita). */
 function _asisCuadroE_(n, v, A){
   var pres=(v.presentes||{})[n], vis=(v.vistos||{})[n];
-  var cl=pres ? 'ok' : (vis ? 'vis' : '');
+  var cl=pres ? 'ok' : (vis ? 'vis' : ''), tel=pres && _asisModo_(v, n)==='tel';
   if(pres && !A.hechos[n]){ A.hechos[n]=true; cl+=' nuevo'; }
-  return '<div class="asisC '+cl+'"><b>'+esc(n)+'</b><span>'+(pres?('✓ '+_hhmmDe_(pres)):(vis?'ha abierto la app':''))+'</span></div>';
+  /* 01/11: un toque lo marca o desmarca (`data-asisn`); el telemático sale en azul. */
+  return '<div class="asisC '+cl+(tel?' tel':'')+'" data-asisn="'+esc(n)+'"><b>'+esc(n)+'</b><span>'+
+    (pres?('✓ '+_hhmmDe_(pres)+(tel?' · telemático':'')):(vis?'ha abierto la app':''))+'</span></div>';
 }
 
 function _asisPintarE_(){
   var A=ASIS_E, v=A&&A.v, c=document.getElementById('asisCuerpo'); if(!c || !v) return;
-  var conv=v.convocados||[], np=conv.filter(function(n){ return (v.presentes||{})[n]; }).length;
+  var conv=v.convocados||[], cu=_asisCuenta_(v), np=cu.presentes;
   var cerrada=!v.abierta;
   if(!document.getElementById('asisGrid') || A.cerrada!==cerrada){
     A.cerrada=cerrada;
@@ -1302,6 +1346,12 @@ function _asisPintarE_(){
           '<button class="btn pri" id="asisCerrar">Cerrar asistencia</button></div>');
     var on=function(id, f){ var b=document.getElementById(id); if(b) b.onclick=async function(){ if(b.disabled) return; b.disabled=true;
       try{ await f(); }catch(e){ tostErr('No se pudo: ', e); } finally{ b.disabled=false; } }; };
+    var gr=document.getElementById('asisGrid');
+    if(gr) gr.onclick=async function(e){        // 01/11: un toque en un cuadrito lo marca o lo desmarca (llega de improviso, o se equivocó)
+      var q=e.target.closest ? e.target.closest('[data-asisn]') : null; if(!q || !A.v || !A.v.abierta) return;
+      var n=q.getAttribute('data-asisn');
+      try{ await api.marcarPresente(A.id, n, !(A.v.presentes||{})[n]); await _asisRefrescarE_(); }catch(er){ tostErr('No se pudo: ', er); }
+    };
     on('asisCerrar', async function(){ await api.cerrarAsistencia(A.id); await _asisRefrescarE_(); });
     on('asisReabrir', async function(){ await api.abrirAsistencia(A.id); await _asisRefrescarE_(); });
     on('asisAnadir', async function(){
@@ -1320,8 +1370,8 @@ function _asisPintarE_(){
     });
   }
   document.getElementById('asisCont').innerHTML=cerrada
-    ? '<b>'+np+'</b> presentes de '+conv.length+' · asistencia cerrada'
-    : '<b>'+np+'</b> de '+conv.length+' presentes';
+    ? '<b>'+np+'</b> presentes de '+conv.length+(cu.tel ? ' ('+cu.tel+' por telemático)' : '')+' · asistencia cerrada'
+    : '<b>'+np+'</b> de '+conv.length+' presentes'+(cu.tel ? ' · <span style="color:var(--tel)">'+cu.tel+' por telemático</span>' : '');
   var g=document.getElementById('asisGrid');
   g.innerHTML=cerrada
     ? '<pre class="asisLista">'+esc(_asisListaTxt_(v)||'Nadie marcó presente.')+'</pre>'

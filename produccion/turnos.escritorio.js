@@ -16,6 +16,56 @@
    Dos copias de esto acaban siendo dos reglas distintas en cuanto alguien añada un
    cuarto cargo: una lo limpiaria y la otra no, y quedaria un cargo asignado a alguien
    que ya no esta en el turno. */
+/* ═══ PESTAÑAS DEL ESCRITORIO (01/11, escm2) ════════════════════════════════════════
+   🗣️ Daniel: «el escritorio […] muy mal optimizado y poco ergonomico». Turnos apilaba 6 paneles (~2.000 px) y Convocatorias 4:
+   lo frecuente (cerrar un turno, convocar) quedaba al final. Ahora cada grupo es una fila de chips (`.pick`, lo elegido en rojo,
+   sin tick) y un cuerpo por pestaña.
+   ⛔ LOS CUERPOS SE PINTAN TODOS y los inactivos van con `hidden`: cambiar de pestaña NO repinta la página (`pintar()` la
+   reescribe entera), así que lo que llevas escrito en «Convocar» sobrevive a mirar «Cerrar». Y todos los `id` existen, que
+   es lo que el cableado de cada panel busca. `PEST` (escritorio.html) guarda la elegida por grupo. */
+function _pestanaActiva_(lista, quiere, defecto){
+  var ks = lista.map(function(p){ return p[0]; });
+  if(ks.indexOf(quiere) >= 0) return quiere;
+  return ks.indexOf(defecto) >= 0 ? defecto : (ks[0] || '');
+}
+/* `lista` = [[clave, rótulo, htmlDelCuerpo]]. Un cuerpo vacío no tiene pestaña: no se enseña un chip que lleva a nada. */
+function _pestanasE_(grupo, lista, defecto){
+  lista = lista.filter(function(p){ return p[2]; });
+  if(!lista.length) return '';
+  var act = _pestanaActiva_(lista, PEST[grupo], defecto);
+  if(lista.length === 1) return lista[0][2];
+  return '<div class="chips pest" role="tablist">'+lista.map(function(p){
+      return '<button type="button" role="tab" class="pick'+(p[0]===act?' on':'')+'" data-pest="'+grupo+'" data-pk="'+p[0]+'">'+esc(p[1])+'</button>';
+    }).join('')+'</div>'+
+    lista.map(function(p){
+      return '<div data-pestc="'+grupo+'" data-pk="'+p[0]+'"'+(p[0]===act ? '' : ' hidden')+'>'+p[2]+'</div>';
+    }).join('');
+}
+/* Las dos pantallas con pestañas: qué panel va en cuál. Un panel que hoy no se pinta (sin rango) devuelve '' y se queda sin chip. */
+function _turnosPest_(tabla){
+  var mio = _miTurnoPanel_();
+  return _pestanasE_('tur', [
+    ['turnos', 'Turnos', tabla],
+    ['disp', 'Disponibilidad', _convocarDispPanel_()+mio+_dispPanel_()],
+    ['convocar', 'Convocar', convocarPanel()],
+    ['cerrar', 'Cerrar un turno', _cierreTurnoPanel_()]
+  ], mio ? 'disp' : 'turnos');   /* ⛔ lo tuyo va antes: si tienes que contestar, se abre ahí */
+}
+function _abrirPestana_(grupo, clave){
+  var b = document.querySelector('[data-pest="'+grupo+'"][data-pk="'+clave+'"]');
+  if(b) b.click();
+}
+function _cablearPestanas_(){
+  $$('[data-pest]').forEach(function(b){
+    b.onclick=function(){
+      var g=b.dataset.pest;
+      PEST[g]=b.dataset.pk;
+      $$('[data-pest="'+g+'"]').forEach(function(x){ x.classList.toggle('on', x===b); });
+      $$('[data-pestc="'+g+'"]').forEach(function(c){ c.hidden = (c.dataset.pk!==b.dataset.pk); });
+    };
+  });
+}
+
 function _quitarDeCargos_(n){
   var k; for(k in TUR_CARGOS){ if(TUR_CARGOS[k] === n) TUR_CARGOS[k] = null; }
 }
@@ -980,7 +1030,7 @@ function _borradorDispPanel_(){
     ? 'El plazo ya cerró y no se puede lanzar. Si todavía hace falta, convócala a mano más abajo.'
     : st.tipo==='abierta'
       ? 'Ya pasó la hora de apertura: se abre en cuanto la lances y el plazo no se mueve: quedan '+_quedaTxt_(st.horas)+' para contestar.'
-      : 'Para todo el equipo. Se abre a su hora, con '+_quedaTxt_(st.horas)+' de plazo. Hasta que no la lances, nadie la ve.';
+      : 'Para todo el equipo. Se abre a su hora, con '+_quedaTxt_(st.horas)+' de plazo. Nadie la ve hasta que la lances.';
   return pan('Disponibilidad de la semana del '+sem,'espera tu visto bueno',
     '<div class="pb" data-dispborr="'+esc(b.semana_ini)+'">'+
       '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px">'+
@@ -1095,8 +1145,8 @@ function _colaDispPanel_(){
   }).join('');
   return pan('Semanas por adelantado','se piden solas',
     '<div class="pb" data-dispcola-panel>'+
-      '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">Marca las semanas que quieres que se pidan sin esperar a tu visto bueno. '+
-      'Mientras no haya salido, puedes quitarla.</p>'+
+      '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">Las semanas que marques se piden solas, sin esperar tu visto bueno. '+
+      'Puedes quitarlas hasta que salgan.</p>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+chips+'</div>'+
       (lineas || '<div style="font-size:12.5px;color:var(--ink3)">Ninguna marcada: cada semana te espera como borrador.</div>')+
     '</div>');
@@ -1150,22 +1200,27 @@ function _convocarDispPanel_(){
      ⛔ ORDEN: esta cara sólo puede llegar a producción **después** de desplegar el backend. Al
      revés, el botón sale y el servidor lo rechaza, que es el defecto de partida del revés. */
   var E=CAMPO_CSS;
-  var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
+  /* 01/11 (escergo): un texto que empieza por «?» es una pregunta Sí/No: en legible (sans, sin mayúsculas) y en rejilla, cada una sobre su Sí/No, no una fila de
+     etiquetas mono a lo largo de 1.500 px con la más larga empujando a las demás. */
+  var lab=function(t){ return t.charAt(0)==='?' ? '<span style="display:block;margin-bottom:6px;color:var(--ink2);font-size:12.5px">'+t.slice(1)+'</span>'
+    : '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   return _borradorDispPanel_()+_colaDispPanel_()+pan('Convocar disponibilidad','abre el plazo · solo dirección',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      'Elige un día de la semana que quieras preguntar (se pregunta de lunes a domingo). '+
-      'El plazo lo calcula el servidor. No toca Notion ni el Excel de Aerotech.</p>'+
-    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+      'Elige cualquier día de la semana que quieras preguntar: se pregunta de lunes a domingo. '+
+      'El plazo se calcula solo.</p>'+
+    '<div style="margin-bottom:14px">'+
       '<div>'+lab('Semana (cualquier día)')+nxFecha('cdSemana', '')+'</div>'+
-      '<div style="font-size:12.5px">'+lab('CUVI')+nxSiNo('cdCuvi', true)+'</div>'+
-      '<div style="font-size:12.5px">'+lab('CITI')+nxSiNo('cdCiti', true)+'</div>'+
-      '<div style="font-size:12.5px">'+lab('La tarde va partida (16:00 / 18:00)')+nxSiNo('cdTarde', false)+'</div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px 24px;align-items:start;margin-bottom:13px">'+
+      '<div style="font-size:12.5px">'+lab('?CUVI')+nxSiNo('cdCuvi', true)+'</div>'+
+      '<div style="font-size:12.5px">'+lab('?CITI')+nxSiNo('cdCiti', true)+'</div>'+
+      '<div style="font-size:12.5px">'+lab('?La tarde va partida (16:00 / 18:00)')+nxSiNo('cdTarde', false)+'</div>'+
       /* ⛔ EL MODO LO ELIGE QUIEN CONVOCA, no quien programa. Era `horaria=False` en la
          firma de `montar`: una constante en Python, o sea que preguntar por horas
          dependia de que alguien tocara el codigo. La etiqueta dice lo que CAMBIA
          -«un toque marca 4 h»- y no el nombre del modo, que no le dice nada a nadie. */
-      '<div style="font-size:12.5px">'+lab('Preguntar POR HORAS (09:00–14:00 y 16:00–23:00); un toque marca el turno de 4 h')+
+      '<div style="font-size:12.5px">'+lab('?Preguntar por horas (09:00–14:00 y 16:00–23:00); un toque marca el turno de 4 h')+
         nxSiNo('cdHoraria', true)+'</div>'+
     '</div>'+
     '<button class="btn" data-convdisp>Convocar disponibilidad</button>'+
@@ -1263,8 +1318,17 @@ function _pinConvDisp_(m){
    ⚠️ La casilla de la vuelta sale APAGADA por defecto y eso no es un detalle: un interruptor
    encendido de fabrica se acaba dejando puesto, y entonces la mitad de los turnos tendrian una
    vuelta inventada. Solo cuando se enciende aparecen sus dos campos. */
+/* Nombre corto para el chip: «Enfrente del Politécnico (parada de autobús)» ocupaba dos filas. El catálogo
+   (`PUNTOS_TURNO`) no se toca: son tres copias idénticas (navegador, Python, servidor) y esto es sólo de la pantalla. */
+var _PUNTO_CORTO_ = {'poli-ou':'Politécnico (parada)'};
 function _opcionesPunto_(sel){
-  return PUNTOS_TURNO.map(function(p){ return [p.id, p.nombre+' · '+p.ciudad]; });
+  return PUNTOS_TURNO.map(function(p){ return [p.id, (_PUNTO_CORTO_[p.id] || p.nombre)+' · '+p.ciudad]; });
+}
+
+/* Un lugar del trayecto: su rótulo y sus chips, en una columna de la fila de dos. */
+function _cocheLugar_(rotulo, attr, i, val){
+  return '<div class="coche-c"><span class="coche-r">'+rotulo+'</span>'+
+    nxElige('', _opcionesPunto_(), val||'', {attrs:attr+'="'+i+'"'})+'</div>';
 }
 
 function pintarCoches(){
@@ -1281,28 +1345,25 @@ function pintarCoches(){
        «contempla el trayecto Ourense-Vigo». */
     var cruza = _trayectoCruzaCiudad_(co.origen, co.destino);
     var nota = (cruza === false)
-      ? '<span class="chip" style="margin-left:6px">mismo municipio</span>' : '';
-    return '<div class="dec" data-coche-i="'+i+'" style="display:block;padding:8px 0">'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+      ? '<span class="chip">mismo municipio</span>' : '';
+    /* 01/11 (Daniel: «esta estetica es horripilante»): cada coche es UNA TARJETA con su cabecera; ida y vuelta en
+       fila de dos; y la pregunta lleva su Sí/No pegado. ⛔ «Igual que la ida» = Sí por defecto: sólo si dice No
+       aparecen «Vuelve desde / Vuelve a» (el dato guardado sigue siendo `vueltaDistinta`). */
+    return '<div class="coche" data-coche-i="'+i+'">'+
+      '<div class="coche-cab">'+
         '<b>'+esc(_etiquetaCoche_(i))+'</b>'+nota+
-        '<button type="button" class="mini" data-quitacoche="'+i+'" '+
-          'style="margin-left:auto">quitar</button>'+
+        '<button type="button" class="mini" data-quitacoche="'+i+'">quitar</button>'+
       '</div>'+
-      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-        '<div style="flex:1;min-width:190px"><span class="sc">Sale de</span>'+
-          nxElige('', _opcionesPunto_(), co.origen||'', {attrs:'data-co-org="'+i+'"'})+'</div>'+
-        '<div style="flex:1;min-width:190px"><span class="sc">Va a</span>'+
-          nxElige('', _opcionesPunto_(), co.destino||'', {attrs:'data-co-dst="'+i+'"'})+'</div>'+
+      '<div class="coche-par">'+
+        _cocheLugar_('Sale de', 'data-co-org', i, co.origen)+
+        _cocheLugar_('Va a', 'data-co-dst', i, co.destino)+
       '</div>'+
-      '<div style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px">'+
-        nxSiNo('', co.vueltaDistinta, {attrs:'data-co-vd="'+i+'"'})+
-        'La vuelta no es la misma que la ida</div>'+
+      '<div class="coche-pre"><span>¿La vuelta es igual que la ida?</span>'+
+        nxSiNo('', !co.vueltaDistinta, {attrs:'data-co-vd="'+i+'"'})+'</div>'+
       (co.vueltaDistinta
-        ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">'+
-            '<div style="flex:1;min-width:190px"><span class="sc">Vuelve desde</span>'+
-              nxElige('', _opcionesPunto_(), co.vueltaOrigen||'', {attrs:'data-co-vorg="'+i+'"'})+'</div>'+
-            '<div style="flex:1;min-width:190px"><span class="sc">Vuelve a</span>'+
-              nxElige('', _opcionesPunto_(), co.vueltaDestino||'', {attrs:'data-co-vdst="'+i+'"'})+'</div>'+
+        ? '<div class="coche-par">'+
+            _cocheLugar_('Vuelve desde', 'data-co-vorg', i, co.vueltaOrigen)+
+            _cocheLugar_('Vuelve a', 'data-co-vdst', i, co.vueltaDestino)+
           '</div>'
         : '')+
       _gentePorCoche_(co, i)+
@@ -1351,9 +1412,10 @@ function _gentePorCoche_(co, i){
     if(_enOtroCoche_(nn[n], i)) continue;
     libres.push(nn[n]);
   }
-  var ops = [['', '— nadie —']];
+  /* 01/11: «Lo lleva» es el selector de personas de la casa (el de «Convocados», con «Ver lista»): uno solo, y vacío
+     es «Sin conductor todavía» en gris. ⛔ Nunca un chip «– nadie –» marcado, que parecía una opción elegida. */
   var cand = co.dueno ? [co.dueno].concat(libres) : libres;
-  for(n = 0; n < cand.length; n++) ops.push([cand[n], cand[n]]);
+  var idSel = 'cochedue'+i;
 
   /* ⚠️ Cada pasajero es `draggable` Y lleva su botón de quitar: arrastrar es el ATAJO, no el
      único camino. En un móvil o con el teclado no hay arrastre, y una función que sólo se
@@ -1365,7 +1427,7 @@ function _gentePorCoche_(co, i){
              'data-pas-quien="'+esc(ps[n])+'" style="cursor:grab">'+esc(ps[n])+
              ' <button type="button" class="mini" data-quitapas="'+i+'" '+
              'data-quien="'+esc(ps[n])+'">×</button></span>';
-  if(!ps.length) chips = '<span style="font-size:12px;color:var(--ink3)">nadie todavía</span>';
+  if(!ps.length) chips = '<span class="coche-vacio">nadie todavía</span>';
 
   var sobran = [];
   for(n = 0; n < libres.length; n++) sobran.push([libres[n], libres[n]]);
@@ -1373,18 +1435,27 @@ function _gentePorCoche_(co, i){
   /* Sin clase propia: `cochegente` no existe en `escritorio.css` y una clase que llega
      sin regla no da error -- el elemento sale, ocupa sitio y no se parece a nada. Lo
      canto `probar_clases_escritorio.py`. El gancho es `data-coche-caja`, que ya esta. */
-  return '<div data-coche-caja="'+i+'" style="margin-top:8px">'+
-    '<div style="display:block;margin-bottom:6px"><span class="sc">Lo lleva</span>'+
-      nxElige('', ops, co.dueno||'', {attrs:'data-coche-due="'+i+'"'})+'</div>'+
-    '<div class="sc" style="margin-bottom:4px">Van con él</div>'+
-    '<div data-coche-pas="'+i+'" style="display:flex;gap:6px;flex-wrap:wrap;'+
-      'min-height:28px;align-items:center;padding:4px;border:1px dashed var(--bor);'+
-      'border-radius:6px">'+chips+'</div>'+
+  return '<div data-coche-caja="'+i+'" class="coche-gente">'+
+    '<div class="coche-c" data-coche-due="'+i+'"><span class="coche-r">Lo lleva</span>'+
+      elegirPersonas(idSel, {universo:cand, marcadas:co.dueno ? [co.dueno] : [], multi:false, titulo:'Quién lleva el coche',
+        vacio:'Sin conductor todavía', alCambiar:function(m){ _cocheDuenoPoner_(i, m[0]); }})+'</div>'+
+    '<div class="coche-c"><span class="coche-r">Van con él</span>'+
+      '<div data-coche-pas="'+i+'" class="coche-pas">'+chips+'</div></div>'+
     (libres.length
-      ? '<div style="margin-top:6px"><span class="sc">+ añadir quien va</span>'+nxElige('', sobran, '', {attrs:'data-coche-add="'+i+'"'})+'</div>'
+      ? '<div class="coche-c"><span class="coche-r">Añadir a alguien</span>'+nxElige('', sobran, '', {attrs:'data-coche-add="'+i+'"'})+'</div>'
       : '')+
   '</div>';
 }
+/* Quien lleva el coche cambió (el selector de personas avisa): se guarda y se repinta, que los demás coches recalculan
+   a quién ofrecen. ⛔ Si el nuevo dueño iba de pasajero en SU PROPIO coche, se le quita de la lista: el servidor lo filtra
+   igual, y dejarlo aquí enseñaría a alguien dos veces en el mismo coche hasta convocar. */
+function _cocheDuenoPoner_(i, quien){
+  var co = TUR_COCHES[i]; if(!co) return;
+  co.dueno = quien || null;
+  if(co.dueno) co.pasajeros = (co.pasajeros || []).filter(function(p){ return p !== co.dueno; });
+  pintarCoches();
+}
+
 function cablearCoches(){
   $$('#tuCoches [data-co-org]').forEach(function(el){
     el.onchange = function(){ TUR_COCHES[+el.dataset.coOrg].origen = el.value; pintarCoches(); }; });
@@ -1397,7 +1468,7 @@ function cablearCoches(){
   $$('#tuCoches [data-co-vd]').forEach(function(el){
     el.onchange = function(){
       var co = TUR_COCHES[+el.dataset.coVd];
-      co.vueltaDistinta = nxSi(el);
+      co.vueltaDistinta = !nxSi(el);       /* la pregunta es «¿igual que la ida?»: Sí = no distinta */
       /* ⚠️ Al APAGARLA se borran sus campos: dejarlos puestos manda una vuelta que la
          casilla dice que no existe, y el backend no sabria cual de las dos creer. */
       if(!co.vueltaDistinta){ co.vueltaOrigen = null; co.vueltaDestino = null; }
@@ -1407,17 +1478,6 @@ function cablearCoches(){
      ⚠️ Todo repinta al final: `pintarCoches` recalcula quién queda libre en CADA coche, y
      sin repintar los desplegables de los demás seguirían ofreciendo a alguien que acaba de
      subirse a otro. */
-  $$('#tuCoches [data-coche-due]').forEach(function(el){
-    el.onchange = function(){
-      var co = TUR_COCHES[+el.dataset.cocheDue];
-      co.dueno = el.value || null;
-      /* ⛔ Si el nuevo dueño iba de pasajero en SU PROPIO coche, se le quita de la lista: el
-         servidor lo filtra igual, y dejarlo aquí enseñaría a alguien dos veces en el mismo
-         coche hasta convocar. */
-      if(co.dueno) co.pasajeros = (co.pasajeros || []).filter(function(p){
-        return p !== co.dueno; });
-      pintarCoches();
-    }; });
   $$('#tuCoches [data-coche-add]').forEach(function(el){
     el.onchange = function(){
       if(!el.value) return;
@@ -1571,9 +1631,17 @@ function _cierreTurMapa_(){
   _asistentesTurno_(t).concat(_dudososTurno_(t)).forEach(function(n){
     if(!CIERRE_TUR.quien[n]) return;
     var v = CIERRE_TUR.extra[n];
+    /* 01/11 (Daniel): las horas distintas por persona son una opcion APAGADA por defecto; apagada, todos los que
+       fueron llevan el tope (de ahi sale `extra`). `=== false` a proposito: sin el campo es el comportamiento de antes. */
+    if(CIERRE_TUR.pers === false) v = tope;
     out[n] = (typeof v === 'number' && isFinite(v)) ? v : (esDud[n] ? 0 : tope);
   });
   return out;
+}
+
+/* 01/11 (Daniel, suplente): ¿figura ese miembro en el turno como suplente? Es el rotulo de la fila de cierre. */
+function _esSuplenteTurno_(t, n){
+  return ((t && t.roles) || []).some(function(r){ return r && r.miembro === n && /suplente/i.test(String(r.rol || '')); });
 }
 
 /* 26/10 (triaje C4b): ¿llevó coche, según el reparto? Es lo que se PROPONE marcado; lo que cuenta es lo que confirme
@@ -1623,6 +1691,7 @@ function _cierreTurnoPanel_(){
     asis.forEach(function(n){ CIERRE_TUR.coche[n] = _llevaCocheTurno_(t, n); });
   }
 
+  var ini0 = CIERRE_TUR.ini || String((t && t.hora) || '').slice(0,5);   /* el turno suele salir a su hora: de ahi se parte */
   var mapa = _cierreTurMapa_(), sinDur = _cierreTurSinDur_(),
       falta = sinDur ? 'Di cu\u00e1nto dur\u00f3 el turno' : _cierreTurnoFalta_(mapa, tope);
 
@@ -1643,16 +1712,20 @@ function _cierreTurnoPanel_(){
        extra a mano. Al reves habria que acordarse de bajarlo. Es la regla que
        `_cierreTurnoInicial_` dejo escrita el 17/08 y que nadie ejecutaba. */
     var val = (typeof v === 'number' && isFinite(v)) ? v : (esDud[n] ? 0 : tope);
+    if(!CIERRE_TUR.pers) val = tope;   /* 01/11: horas por persona apagadas = todos los que fueron llevan lo mismo */
     return '<tr'+(on?'':' style="opacity:.45"')+'>'+
       '<td><div style="display:flex;align-items:center;gap:7px">'+
         nxSiNo('', on, {attrs:'data-ct-fue="'+esc(n)+'"'})+
         esc((miembro(n)||{}).pila || n)+
-        (n===resp?' <span class="chip">responsable</span>':'')+'</div>'+
+        (n===resp?' <span class="chip">responsable</span>':'')+
+        (_esSuplenteTurno_(t, n)?' <span class="chip">suplente</span>':'')+'</div>'+
         /* 26/10 (C4b): «llevó coche» va al ACTA (Notion `Coche`, almacén `coche_confirmado`). ⚠️ La cuota aún cuenta el
            coche del REPARTO (espejo): que cuente sólo el confirmado es la 2.ª mitad de C4b, ficha abierta. */
         ' <div style="display:flex;align-items:center;gap:6px;font-size:12px;opacity:.85">'+
         nxSiNo('', CIERRE_TUR.coche[n], {attrs:'data-ct-coche="'+esc(n)+'"', off:!on})+' llev\u00f3 coche</div></td>'+
-      '<td class="r">'+nxNum('', val, {min:0, max:tope, paso:0.25, sufijo:'h', attrs:'data-ct-extra="'+esc(n)+'"', off:!on})+'</td></tr>';
+      '<td class="r">'+(CIERRE_TUR.pers
+        ? nxNum('', val, {min:0, max:tope, paso:0.25, sufijo:'h', attrs:'data-ct-extra="'+esc(n)+'"', off:!on})
+        : '<span class="mono">'+(on ? h1(val) : '—')+'</span>')+'</td></tr>';
   }).join('');
 
   var aviso = sinDur
@@ -1676,9 +1749,16 @@ function _cierreTurnoPanel_(){
     listo+
     '<div class="campo"><span class="sc">Qu\u00e9 turno</span>'+
       nxElige('ctSel', opciones, CIERRE_TUR.k||'')+'</div>'+
+    /* 01/11 (Daniel, suplente): las horas salen de cuando empezo y cuando acabo, CONTANDO EL TRANSPORTE */
+    '<div class="campo"><span class="sc">Cu\u00e1ndo empez\u00f3 (saliendo de casa)</span>'+
+      nxHora('ctIni', ini0)+'</div>'+
+    '<div class="campo"><span class="sc">Cu\u00e1ndo acab\u00f3 (ya de vuelta)</span>'+
+      nxHora('ctFin', CIERRE_TUR.fin || ini0)+'</div>'+
     '<div class="campo"><span class="sc">Cu\u00e1nto dur\u00f3 de verdad (horas)</span>'+
       nxNum('ctDur', CIERRE_TUR.dur, {min:0, paso:0.25, sufijo:'h'})+'</div>'+
     aviso+
+    '<div class="campo"><span class="sc">Horas distintas por persona</span>'+
+      nxSiNo('ctPers', CIERRE_TUR.pers)+'</div>'+
     (asis.length
       ? '<table class="tb" style="margin-top:9px"><thead><tr><th>Qui\u00e9n fue de verdad</th>'+
         '<th class="r">Extra</th></tr></thead><tbody>'+filas+'</tbody></table>'
@@ -1719,8 +1799,28 @@ function _cablearCierreTurno_(){
        cara de haber sido tecleadas ahi. */
     /* ⚠️ SIN `+`: el valor es una CLAVE, no un numero. Con `+` daba `NaN` y el panel
        se quedaba sin turno elegido. */
-    CIERRE_TUR.k = sel.value; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {};
+    CIERRE_TUR.k = sel.value; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {}; CIERRE_TUR.ini = ''; CIERRE_TUR.fin = ''; CIERRE_TUR.pers = false;
     CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
+  };
+  /* 01/11: inicio/fin -> duracion. Si falta una o son iguales (`null`) no se toca la duracion: «no lo se» no es 0. */
+  var ci = document.getElementById('ctIni'), cf = document.getElementById('ctFin');
+  var porHoras = function(){
+    CIERRE_TUR.ini = ci.value; CIERRE_TUR.fin = cf.value;
+    var d = _durTurnoDeHoras_(ci.value, cf.value);
+    if(d != null) CIERRE_TUR.dur = String(d);
+    var tope = _cierreTurTope_();
+    Object.keys(CIERRE_TUR.extra).forEach(function(n){
+      if(CIERRE_TUR.extra[n] > tope) CIERRE_TUR.extra[n] = tope; });
+    CIERRE_TUR.hecho = null; pintar();
+  };
+  if(ci && cf){ ci.onchange = porHoras; cf.onchange = porHoras; }
+  var cp = document.getElementById('ctPers');
+  if(cp) cp.onchange = function(){
+    CIERRE_TUR.pers = nxSi(cp);
+    /* Al encenderlo se parte de lo que ya llevaban (el tope), no de los ceros de los dudosos. */
+    if(CIERRE_TUR.pers){ var tp = _cierreTurTope_();
+      Object.keys(CIERRE_TUR.quien).forEach(function(n){ if(CIERRE_TUR.extra[n] == null) CIERRE_TUR.extra[n] = tp; }); }
+    CIERRE_TUR.hecho = null; pintar();
   };
   var dur = document.getElementById('ctDur');
   if(dur) dur.onchange = function(){
@@ -1764,7 +1864,7 @@ function _cablearCierreTurno_(){
       var se = (r && r.sinEtiquetar) || [];
       CIERRE_TUR.listo = {titulo:'Turno cerrado: queda «Realizado». Propuesta para Compensaciones (la aplica Daniel):', txt:txt,
         aviso: se.length ? ('Sin usuario de Notion, no entran en Asistentes: ' + se.join(', ')) : ''};
-      CIERRE_TUR.k = null; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {};
+      CIERRE_TUR.k = null; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {}; CIERRE_TUR.ini = ''; CIERRE_TUR.fin = ''; CIERRE_TUR.pers = false;
       CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
     }catch(e){ b.disabled = false; b.textContent = 'No se pudo cerrar: ' + ((e && e.message) || e); }
   };
@@ -1778,7 +1878,7 @@ function _cablearCierreTurno_(){
       await api.estadoTurno({id:t.id, estado:'Cancelado'});
       t.estado = 'Cancelado';
       CIERRE_TUR.listo = {titulo:'Turno del ' + f + ' cancelado: no cuenta como turno ni su coche.', txt:'', aviso:''};
-      CIERRE_TUR.k = null; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {};
+      CIERRE_TUR.k = null; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {}; CIERRE_TUR.ini = ''; CIERRE_TUR.fin = ''; CIERRE_TUR.pers = false;
       CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
     }catch(e){ bc.disabled = false; bc.textContent = 'No se pudo cancelar: ' + ((e && e.message) || e); }
   };
@@ -1786,6 +1886,7 @@ function _cablearCierreTurno_(){
 
 function convocarPanel(){
   if(!_puedeProgramarTurno_(ACTOR)) return '';           // solo coordinaci\u00f3n o superior
+  delete SOLP.tu;   /* el panel se pinta de nuevo con las cajas vacías: sin propuesta de SolarIA de antes */
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   /* las bajas no se convocan: siguen en el roster por su historia, no para turnos nuevos */
@@ -1801,18 +1902,22 @@ function convocarPanel(){
       'El turno les llega a los convocados y queda publicado en Notion. Marca qui\u00e9n va, ponle a cada uno '+
       'su papel y di qu\u00e9 hay que sacar. No se puede convocar m\u00e1s de un turno el mismo d\u00eda.</p>'+
 
-    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+    /* 01/11 (escm2): REJILLA, no una fila que se parte: cuándo (fecha · hora · duración · crucial) y dónde (se trabaja · se queda),
+       cada pregunta sobre su control y todas con la misma etiqueta. */
+    '<div class="rejf">'+
       '<div>'+lab('Fecha')+nxFecha('tuFecha', '', {min:_hoyNxISO_()})+'</div>'+
       '<div>'+lab('Hora')+nxHora('tuHora', '16:00')+'</div>'+
-      '<label style="width:135px">'+lab('Duraci\u00f3n')+
+      '<label>'+lab('Duraci\u00f3n')+
         '<input id="tuDur" placeholder="~ 3 horas" style="'+E+'"></label>'+
+      '<div>'+lab('Crucial')+nxSiNo('tuCrucial', false)+'</div>'+
+    '</div>'+
+    '<div class="rejf rejf2">'+
       '<div>'+lab('D\u00f3nde se trabaja')+
         /* 22/10 (auditor 25, 🟡 9): SIN elegir por defecto — antes todo turno salía «CITI» aunque nadie lo dijera, y
            de este campo saldría el descuento de Vigo. Vacío = no se escribe en Notion (`_verdad(lugar)`). */
         nxElige('tuLugar', [['','Sin decir'],['CITI','CITI'],['Vigo','Vigo'],['Coasa','Coasa'],['Otro','Otro']], '')+'</div>'+
-      '<label style="flex:1;min-width:190px">'+lab('D\u00f3nde se queda')+
+      '<label>'+lab('D\u00f3nde se queda')+
         '<input id="tuPunto" placeholder="enfrente del polit\u00e9cnico" style="'+E+'"></label>'+
-      '<div>'+lab('Crucial')+nxSiNo('tuCrucial', false)+'</div>'+
     '</div>'+
 
     lab('Qui\u00e9n va')+
@@ -1828,6 +1933,7 @@ function convocarPanel(){
       '<button type="button" class="btn mini" data-addcoche>+ añadir coche</button>'+
     '</div>'+
 
+    _solIAHTML_('tu', _solTurnoCfg_('tu'))+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:11px">'+
       '<label style="flex:1;min-width:230px">'+lab('Objetivos principales \u00b7 uno por l\u00ednea')+
         '<textarea id="tuObj1" rows="3" placeholder="Lijado del tramo 2&#10;Pegado de aletas" '+

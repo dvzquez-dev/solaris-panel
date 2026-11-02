@@ -90,6 +90,7 @@ function vTareas(){
          botón**: la decisión la toma `_tareaAccion_`, no un `if` escrito aquí otra vez. */
       (ac&&i>=0?'<button class="btn mini" data-tact="'+i+'">'+esc(ac.etiqueta)+'</button>':'')+
       (des&&i>=0?'<button class="btn mini no" data-tdes="'+i+'">Deshacer</button>':'')+
+      _tareaBotonHoras_(t, i)+
       '</div></div>';
   }
   return '<div class="h1">Mis tareas</div><p class="h1s">'+act.length+' activa'+(act.length===1?'':'s')+
@@ -131,6 +132,7 @@ function vTareas(){
    miembro raso. Está escrito en `docs/pendientes.md` con lo que falta exactamente. */
 function _engTareas_(){
   var c=document.getElementById('v-tareas'); if(!c) return;
+  _tareaHorasCablear_(c);
   $$('[data-tact]',c).forEach(function(b){
     b.onclick=function(){
       var t=TAREAS[+b.dataset.tact]; if(!t) return;
@@ -148,11 +150,11 @@ function _engTareas_(){
       _tareaPedirHorasEntrega_(t, ac).then(function(h){
         b.disabled=false;
         if(h===null) return;
-        _guardarPasoTarea_(t, ac.a, b, function(){
+        _guardarPasoTarea_(t, ac.a, b, function(r){
           t.e=ac.a; t.desde=(new Date()).getTime(); _anotarPasoTarea_(TAREA_PASOS, t);
           pintar(); tost('«'+t.n+'»: '+ac.a+'. Puedes deshacerlo durante '+_minDeshacerTarea_()+' min.');
-          _tareaProponerPartes_(t, h);
-        });
+          _tareaToastParte_(t, h, _tareaEnMaqueta_() ? null : (r || {}));
+        }, h);
       });
     };
   });
@@ -174,9 +176,9 @@ function _engTareas_(){
       if(a===null){ tost('No hay ningún paso que deshacer.'); return; }
       /* `desde` a `null` al deshacer: se vuelve al estado que vino del servidor, y sobre eso
          no se ofrece deshacer — deshacer un deshacer es avanzar, y para eso está el otro botón. */
-      _guardarPasoTarea_(t, a, b, function(){
+      _guardarPasoTarea_(t, a, b, function(r){
         t.e=a; t.desde=null; _anotarPasoTarea_(TAREA_PASOS, t);
-        pintar(); tost('Deshecho: «'+t.n+'» vuelve a '+a+'.');
+        pintar(); tost('Deshecho: «'+t.n+'» vuelve a '+a+'.'+_tareaToastRetirados_(r));
       });
     };
   });
@@ -185,11 +187,11 @@ function _engTareas_(){
 /* ⛔ 20/10 — UNA puerta para los dos botones: guarda el paso `t.e → a` en el servidor y sólo entonces llama a `hecho`.
    Si no se puede, el botón revive y se DICE por qué, con la tarea como estaba. En la maqueta (`DEMO`) no hay servidor:
    el paso se da en memoria, sin aviso propio (taparía el de «puedes deshacerlo», que es lo que se prueba ahí). */
-function _guardarPasoTarea_(t, a, b, hecho){
-  if(typeof DEMO!=='undefined' && DEMO){ hecho(); return; }
+function _guardarPasoTarea_(t, a, b, hecho, h){
+  if(_tareaEnMaqueta_()){ hecho(); return; }
   if(!t.url){ tost('Esa tarea no trae su ficha de Notion: no se puede guardar el paso.'); return; }
   if(b) b.disabled=true;
-  api.moverEstadoTarea(t.url, t.e, a).then(function(){ hecho(); }).catch(function(e){
+  api.moverEstadoTarea(t.url, t.e, a, h).then(function(r){ hecho(r); }).catch(function(e){
     if(b) b.disabled=false;
     tost('No se pudo guardar el paso de «'+t.n+'»: '+((e&&e.message)||e)+'. La tarea sigue como estaba.');
   });
