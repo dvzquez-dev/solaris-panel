@@ -1437,7 +1437,7 @@ function _desgloseCatHTMLE_(ps){
 /* TUS partes aprobados, de TODOS los meses: lo que cuenta de verdad (`aprobado` agrupa aprobada/otorgada/aplicada). */
 function _misAprobadosE_(){
   var yo=_fichaYo_();
-  return (PARTES||[]).filter(function(p){ return p && yo && p.autor===yo && p.estado==='aprobado'; });
+  return (PARTES||[]).filter(function(p){ return p && yo && p.autor===yo && p.estado==='aprobado' && !_contraparteQueNetea_(p, PARTES); });   /* 02/11: sin la resta de un revertido */
 }
 
 /* 01/11 · TUS MESES, PLEGADOS (Daniel: *«agrúpalo por meses […] comprimidos […] le das clic y te aparece como el desglose completo
@@ -1464,7 +1464,7 @@ function _histHorasHTMLE_(mi){
     var abierto=(per && m.k===per), k=m.k||'sin';
     var h=abierto ? (hm!=null ? hm : m.h+_compMensual_(mi)) : m.h;
     chips+='<button type="button" class="mmesE" data-meses="'+k+'"><b>'+(m.k ? esc(_nomPeriodo_(m.k)) : 'Sin fecha')+'</b>'+
-      (m.k ? '<span class="chip'+(abierto?' wa">sin cerrar':'">cerrado')+'</span>' : '')+
+      (m.k ? (function(e){ return '<span class="chip'+(e.cls?' '+e.cls:'')+'">'+e.txt+'</span>'; })(_estadoMes_(m.k, per)) : '')+
       '<span class="ln"></span><span class="mono">'+nf2(h)+' h</span></button>';
     var base=abierto ? [{tarea:'Compensación por tu cargo', fecha:'', horas:_compBase_(mi), cat:null}] : [];
     var extra=(abierto && _compExtra_(mi)) ? [{tarea:'Compensación extra', fecha:'', horas:_compExtra_(mi)}] : [];

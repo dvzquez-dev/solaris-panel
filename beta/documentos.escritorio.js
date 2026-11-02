@@ -343,7 +343,7 @@ function docCard(d){
        Sigue en el DOM plegado (los campos se leen por id); lo abierto se recuerda en `DOC_EDIT_AB`. */
     var _abEd = (typeof DOC_EDIT_AB!=='undefined') && !!DOC_EDIT_AB[d.id];
     acc=((_yaAnalizado_(d) || _autorP) ? '<div class="doc-edit'+(_abEd?' ab':'')+'"><button type="button" class="btn sm" data-docedit="'+d.id+'">Editar antes de decidir</button>'+
-        '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS, {todas:true}) : '')+'</div></div>' : '');
+        '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS, {verTodas:true}) : '')+'</div></div>' : '');
     arriba=
       '<textarea data-motivo placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
       _solIAHTML_('dm'+d.id, _solMotivoCfg_(d, '#doc-'+d.id+' [data-motivo]'))+
@@ -439,7 +439,7 @@ function docCard(d){
     avisos+arriba+previa+secs+visor+
     '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':(sinRev?'Sin revisor: avisa al Project Director.':'Firma: <b>'+esc(rev)+'</b>'))+'</div>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
-    _autorRastroHTML_(d)+
+    _autorRastroHTML_(d)+_autoresDocHTML_(d)+
     (puede ? '' : _autorP)+   /* quien puede decidir lo lleva plegado dentro de `acc` */
     acc+
   '</div>';

@@ -129,6 +129,19 @@ function _decidirCierreHTML_(plan, nBloq, vuela){
       'para sin escribir.</p>';
 }
 
+/* 02/11 (cierremovil; Daniel, 01/11: «se tiene que poder revertir, evidentemente»): «Revertir el cierre» en el móvil, como en el
+   escritorio (`cierre.escritorio` / `escritorio.html`) y por la MISMA puerta: `_cierreRevertible_` decide si hay algo que revertir
+   y `_revertirCierre_` (comun.js) es el gesto. Lo elegido va sin tick; el botón no es `pri`: no es la acción de siempre. */
+function _revertirCierreHTML_(est){
+  var rv=_cierreRevertible_(est), vr=_revirtiendoVivo_(est), av=_avisoRevertirCierre_(est);
+  if(!rv && !av) return '';
+  return (av?'<p class="rnota" style="margin-top:14px'+(vr?';color:var(--warn)':'')+'">'+esc(av)+'</p>':'')+
+    (rv?'<button class="btn" '+((vr||_aplicandoVivo_(est))?'disabled ':'')+'data-revertircierre style="width:100%;margin-top:'+(av?'10':'18')+'px">'+
+        (vr?'Revirtiendo… (en cola o devolviendo las fichas)':'Revertir el cierre de '+esc(_nomPeriodo_(rv.periodo)))+'</button>'+
+      '<p class="rnota">Devuelve las fichas de Notion a como estaban antes de este cierre. Si alguien ha tocado una ficha después, '+
+      'se para ahí y lo dice. El bloque del mes en el Registro no se deshace: revísalo.</p>':'');
+}
+
 function _cierreHTML_(est, err, cargando){
   var cer=_mesACerrar_();
   var cab='<h3 style="margin:0 0 4px">Cierre de '+esc(cer.mes)+'</h3>'+
@@ -168,9 +181,9 @@ function _cierreHTML_(est, err, cargando){
   if(plan) return cab+(filas ? '<div class="rec">'+filas+'</div>'+
       '<p class="rnota" style="color:var(--warn)">Esto entra en la cuenta y sigue sin '+
       'resolver. El servidor no deja aplicar el cierre hasta que se decida: lo que se decidiera después dejaría '+
-      'mal la cuota de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan, bloq.length, _aplicandoVivo_(est));
+      'mal la cuota de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan, bloq.length, _aplicandoVivo_(est))+_revertirCierreHTML_(est);
   if(enc) return cab+'<p class="rnota">Encolado. La rutina lo recoge en la siguiente pasada '+
-    '(va cada 2 minutos) y deja el plan.</p>';
+    '(va cada 2 minutos) y deja el plan.</p>'+_revertirCierreHTML_(est);
   return cab+(filas ? '<div class="rec">'+filas+'</div>'+
       '<p class="rnota">Estas bloquean porque entran en la cuenta: unas horas que se decidan '+
       'después del cierre dejan mal la cuota de alguien.</p>' : '')+
@@ -181,7 +194,7 @@ function _cierreHTML_(est, err, cargando){
       ' style="width:100%;margin-top:10px">'+
       (cer.curso?'Aún no ha terminado'
        :bloq.length?'Bloqueado · '+bloq.length+' sin resolver'
-                  :'Calcular el cierre de '+esc(cer.mes))+'</button>';
+                  :'Calcular el cierre de '+esc(cer.mes))+'</button>'+_revertirCierreHTML_(est);
 }
 
 function _abrirCierre_(){
@@ -201,6 +214,14 @@ function _abrirCierre_(){
            tost('Aplicación encolada. La rutina la recoge en la siguiente pasada.');
            pinta(await api.getCierre(), null); }
       catch(e){ ap.disabled=false; tostErr('No se pudo encolar: ', e); }
+    };
+    var rv=$('[data-revertircierre]');
+    if(rv) rv.onclick=async function(){
+      if(rv.disabled) return;
+      var pl=_cierreRevertible_(est); if(!pl) return;
+      rv.disabled=true; var prev=rv.textContent; rv.textContent='Encolando…';
+      if(await _revertirCierre_(pl)) pinta(await api.getCierre(), null);   /* el gesto es de comun.js: el escritorio llama el MISMO */
+      else{ rv.disabled=false; rv.textContent=prev; }
     };
     var b=$('[data-cerrarmes]'); if(!b) return;
     b.onclick=async function(){

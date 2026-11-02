@@ -58,7 +58,7 @@ function _directoHTML_(){
       '<span class="dir-vivo"><i></i><span>Conectando</span></span>'+
       '<span class="dir-cifra"><b class="mono" id="dirHoy">0</b><small>eventos hoy</small></span>'+
       '<span class="dir-cifra"><b class="mono" id="dirRitmo">0</b><small>en los últimos 10 min</small></span>'+
-      '<button type="button" class="btn dir-snd" data-dirsnd title="Suena cada evento nuevo">🔊 Sonido</button>'+
+      '<button type="button" class="btn dir-snd" data-dirsnd title="Suena cada evento nuevo">'+ico('altavoz')+' Sonido</button>'+
     '</div>'+
     '<div class="dir-tabs" role="tablist">'+
       '<button type="button" class="dir-tab on" role="tab" data-dirv="mapa">Mapa</button>'+
@@ -129,7 +129,7 @@ function _directoSuena_(nombre){
 function _directoSonidoPinta_(){
   var b=document.querySelector('[data-dirsnd]'); if(!b) return;
   var on=_directoSonidoOn_();
-  b.textContent=on?'🔊 Sonido':'🔇 Mudo'; b.setAttribute('aria-pressed', on?'true':'false');
+  b.innerHTML=on?ico('altavoz')+' Sonido':ico('mudo')+' Mudo'; b.setAttribute('aria-pressed', on?'true':'false');
 }
 function _directoSonidoAlterna_(){
   var on=!_directoSonidoOn_();

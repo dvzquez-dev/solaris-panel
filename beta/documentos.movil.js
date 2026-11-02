@@ -490,7 +490,7 @@ function verDoc(id){
     : _mioDoc
       ? _mioDoc
       : (revisoresDe(e).indexOf(yoNombre())>=0 && e.estado!=='revision'
-          ? '<p class="rnota" style="margin-top:14px">🔒 Ya está decidido. Puedes consultarlo, pero solo alguien de más rango puede cambiar la decisión.</p>'
+          ? '<p class="rnota" style="margin-top:14px">'+ico('candado')+' Ya está decidido. Puedes consultarlo, pero solo alguien de más rango puede cambiar la decisión.</p>'
           : (sinRev ? '<p class="rnota" style="margin-top:14px">Sin revisor: avisa al Project Director.</p>'
                     : '<p class="rnota" style="margin-top:14px">Este expediente lo revisa <b>'+revs+'</b>. Tú no decides aquí.</p>'));
 
@@ -555,7 +555,7 @@ function verDoc(id){
                : 'Pídeselo a quien lo subió antes de decidir.</div></div>'))+
     '<p class="rnota" style="margin-top:10px">'+(sinRev?'Sin revisor: avisa al Project Director.':'Revisa: <b>'+revs+'</b>')+'</p>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
-    _autorRastroHTML_(e)+
+    _autorRastroHTML_(e)+_autoresDocHTML_(e)+
     (_puedeCambiarAutor_(e.estado, yoNombre()) ? _autorPanelHTML_('dA', e.id, e.autor, '') : '')+
     (_mioDoc ? '' : _previaDocM_(e))+
     /* 01/11: sólo el PD, y sólo enseña algo si el expediente está decidido (`comun.js`); para cualquier otro es ''. */

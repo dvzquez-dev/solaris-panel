@@ -714,7 +714,7 @@ function vReu(){
         '<button class="btn mini" data-p id="btnEditarReu" style="flex:1">Título y plazo</button>'+
       '</div>':'')+
     /* 01/11: la asistencia es del PD, no de quien convocó: su botón va aparte del de «Fijar/Convocados». */
-    (_asisBotonM_(R)?'<div style="margin-top:9px"><button class="btn mini full" data-p id="btnAsistencia">📋 Asistencia en directo</button></div>':'')+
+    (_asisBotonM_(R)?'<div style="margin-top:9px"><button class="btn mini full" data-p id="btnAsistencia">'+ico('portapapeles')+' Asistencia en directo</button></div>':'')+
     _ordenDiaReuHTML_(R)+
     _audioReuHTML_(R)+
     _bloqueReuHTML_(R, _puedeBloqueReu_(R, (typeof _actorSanc_==='function'?_actorSanc_():(YO&&YO.nombre)), (typeof esAdmin==='function' && esAdmin())))+
@@ -1394,7 +1394,7 @@ function _asisTarjetaHTML_(id, e){
   return '<div class="tarj acc" data-asisreu="'+esc(id)+'"><div class="tt"><span class="sc">Asistencia en directo</span></div>'+
     '<b style="display:block;margin-bottom:6px">Estás en la general: '+(hecho?'ya constas presente':'escribe la palabra que se proyecta')+'</b>'+
     (hecho
-      ? '<div class="asisOk">✓ Presente ('+esc(_hhmmDe_(hecho))+')</div>'
+      ? '<div class="asisOk">'+ico('tick')+' Presente ('+esc(_hhmmDe_(hecho))+')</div>'
       : '<div style="display:flex;gap:8px"><input class="asisIn" data-asispal autocomplete="off" autocapitalize="none" '+
         'placeholder="la palabra" value="'+esc(ASIS_M.txt[id]||'')+'">'+
         '<button class="btn pri" data-p data-asisok>Estoy presente</button></div>')+
@@ -1455,7 +1455,7 @@ function _asisFilaM_(n, v){
     'margin:0 0 6px;padding:8px 12px;border-radius:12px;text-align:left;font:inherit;color:var(--ink);cursor:pointer;background:'+
     (pres ? (tel?'rgba(63,158,214,.18)':'rgba(62,180,137,.18)') : 'var(--sur)')+';border:1px solid '+col+'">'+
     '<b style="flex:1;font-weight:600">'+esc(n)+'</b><span class="mono" style="font-size:11px;color:'+col+'">'+
-    (pres ? ('✓ '+esc(_hhmmDe_(pres))+(tel?' · telemático':'')) : (vis?'ha abierto la app':'toca para marcar'))+'</span></button>';
+    (pres ? (ico('tick')+' '+esc(_hhmmDe_(pres))+(tel?' · telemático':'')) : (vis?'ha abierto la app':'toca para marcar'))+'</span></button>';
 }
 
 function _asisPanelHTMLM_(){

@@ -953,6 +953,10 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
    marcar (se veía vacía), la fila que abre algo / la que no, y la frase que dice por qué un botón está apagado. */
 .leg{display:flex;flex-wrap:wrap;gap:5px 13px;font-size:10px;font-family:var(--mono);letter-spacing:.05em;color:var(--ink3)}
 .leg i{width:10px;height:7px;border-radius:2px;display:inline-block;vertical-align:-1px;margin-right:5px}
+/* 02/11: la leyenda del mapa de calor de turnos (`_turnoCalorHTML_`, comun.js) se emite en las DOS caras con `.leyh`, que sólo tenía el móvil: sin
+   regla el cuadrito de color (`<i>` vacío) no se veía y el texto salía sin su tipografía. Misma regla que `.leg` (el tamaño lo pone la leyenda en línea). */
+.leyh{display:flex;flex-wrap:wrap;gap:5px 13px;font-size:10px;font-family:var(--mono);letter-spacing:.05em;color:var(--ink3)}
+.leyh i{width:10px;height:7px;border-radius:2px;display:inline-block;vertical-align:-1px;margin-right:5px}
 .cel.mid:hover{outline:1px solid var(--ink3);outline-offset:-1px}
 tr.abre{cursor:pointer}
 tr.abre:hover td:first-child{color:var(--ink)}
@@ -1002,3 +1006,4 @@ ol.obj>li::before,.mdoc ol>li::before,.pan ol>li::before{content:counter(paso);p
 .rejf .nx-fval{font-weight:400;font-family:var(--sans);font-size:12.5px;color:var(--ink3)}
 /* TOPE DE ANCHO: a 1920 px una tabla de 6 columnas se estiraba a 1.600 px con el dato a 1.500 px del nombre. Las tablas no pasan de 1.280. */
 main>.pan:has(.tw),main>div>.pan:has(.tw){max-width:1280px}
+.tfalta{font-size:12.5px;color:var(--red2);line-height:1.5}

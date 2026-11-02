@@ -1279,7 +1279,7 @@ function _asisBoxE_(r){
   },0);
   return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+
     '<span class="sc" style="display:block;margin-bottom:4px">Asistencia en directo</span>'+
-    '<button class="btn" data-asisabrir="'+esc(r.id)+'">📋 Abrir asistencia</button>'+
+    '<button class="btn" data-asisabrir="'+esc(r.id)+'">'+ico('portapapeles')+' Abrir asistencia</button>'+
     '<div class="nota" style="border-top:0;padding:8px 0 0">Un cuadrito por convocado que se pone verde cuando escribe en el '+
     'móvil la palabra que proyectas. Vale también para una general telemática.</div></div>';
 }
@@ -1325,7 +1325,7 @@ function _asisCuadroE_(n, v, A){
   if(pres && !A.hechos[n]){ A.hechos[n]=true; cl+=' nuevo'; }
   /* 01/11: un toque lo marca o desmarca (`data-asisn`); el telemático sale en azul. */
   return '<div class="asisC '+cl+(tel?' tel':'')+'" data-asisn="'+esc(n)+'"><b>'+esc(n)+'</b><span>'+
-    (pres?('✓ '+_hhmmDe_(pres)+(tel?' · telemático':'')):(vis?'ha abierto la app':''))+'</span></div>';
+    (pres?(ico('tick')+' '+_hhmmDe_(pres)+(tel?' · telemático':'')):(vis?'ha abierto la app':''))+'</span></div>';
 }
 
 function _asisPintarE_(){

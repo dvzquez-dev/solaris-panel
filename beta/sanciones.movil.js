@@ -105,7 +105,7 @@ function _sancionesHTML_(){
         alCambiar:function(){ var _es=$('#snEscala'); if(_es) _es.textContent=_escalaSancTxt_(); },   /* 26/10 (A5b) */
         vacio:nTotal ? 'Escribe un nombre o pulsa «Ver lista».' : 'No hay nadie bajo tu jurisdicción todavía.'})+
       '<div class="campo"><span class="sc">Motivo</span>'+
-        nxElige('snMotivo', RRI_MOTIVOS.map(function(r){ return [r[0], r[1], r[4]||'']; }), SANC_FORM.motivo||'', {max:5})+'</div>'+
+        nxElige('snMotivo', _motivosParaBuscar_(), SANC_FORM.motivo||'', {max:5})+'</div>'+
       (SANC_FORM.motivo==='libre'
         ? '<label class="campo"><span class="sc">Cuál</span><input id="snLibre" placeholder="Qué ha pasado" value="'+esc(SANC_FORM.libre||'')+'"></label>'+
           '<label class="campo"><span class="sc">Artículo del RRI</span><input id="snArt" value="'+esc(SANC_FORM.art||'libre')+'"></label>'
@@ -141,10 +141,11 @@ function _sancLotesHTML_(filas, pie){
   SANC_M.forEach(function(x){ var k=x.lote||'(sueltas)'; (porLote[k]=porLote[k]||[]).push(x); });
   return Object.keys(porLote).map(function(k){
     var it=porLote[k], suelta=(k==='(sueltas)');
-    var _tl=_tituloLote_(k, typeof REUNIONES_M!=='undefined' ? REUNIONES_M : []);   /* 🟡 8: de QUÉ reunión es */
+    /* 🟡 8: de QUÉ reunión es; 02/11: nunca el id crudo (`_nombreLote_`) */
+    var _nl=_nombreLote_(suelta ? '' : k, typeof REUNIONES_M!=='undefined' ? REUNIONES_M : [], it[0] && it[0].creado_at);
     return '<div class="tarj"><div class="lote"><div class="lote-h">'+
       '<b>'+esc(_rotuloLote_(it))+'</b>'+
-      '<span class="mono" style="color:var(--red2)">'+esc(_tl ? _tl+' · '+k : k)+'</span></div>'+
+      '<span class="mono" style="color:var(--red2)">'+esc(_nl)+'</span></div>'+
       filas(it, suelta)+pie(it, k, suelta)+
     '</div></div>';
   }).join('');
@@ -162,11 +163,11 @@ function _sancColaHTML_(){
     return it.map(function(x){
         return '<div class="lote-i" style="flex-wrap:wrap;gap:6px">'+
           '<span class="n">'+esc(_pilaDeM_(x.nombre)||x.nombre||'')+'</span>'+
-          '<span class="mono" style="color:var(--ink3);font-size:10.5px;flex:1">'+esc(x.motivo||'')+
+          '<span class="mono" style="color:var(--ink3);font-size:10.5px;flex:1">'+(_esPremioSanc_(x.origen, x.extra) ? esc(_premioEnPalabras_(x.extra, x.motivo)) : esc(x.motivo||'')+
             /* ⛔ `_etPtsSanc_`, no `(+x.puntos||0)`: esto pintaba **0** para un hueco, y
                en esta pantalla el 0 se lee «aviso». Y es el MISMO rotulo que el
                escritorio: dos textos para el mismo dato es la leccion de la gemela. */
-            ' · '+esc(_etSancFila_(x.puntos, x.origen, x.extra))+'</span>'+
+            ' · '+esc(_etSancFila_(x.puntos, x.origen, x.extra)))+'</span>'+
           (suelta
             ? '<button class="btn mini" data-sok="'+esc(x.id)+'" data-p>Aprobar</button>'+
               /* ⛔ 21/10 (auditor de sanciones): «Justificar» también en una suelta, como el escritorio — y con su mismo
@@ -787,7 +788,7 @@ function _panelPDmaqueta_(){
    `api.*` antes — la sanción de verdad sale de `_sancionesHTML_`. */
 function sancionarModal(){
   var motivos=RRI.restas.concat(RRI.sumas);
-  abrirModal('<div class="mtit">🔨 Sancionar</div>'+
+  abrirModal('<div class="mtit">'+ico('martillo')+' Sancionar</div>'+
     '<div class="msub">Queda pendiente hasta que la confirmes. '+
     'Si sancionas a varios a la vez, van en un bloque con un solo comunicado.</div>'+
     '<div class="campo"><span class="sc">A quién</span>'+

@@ -80,8 +80,10 @@ function _pintarBotonConvocar_(){
   if(!b) return '';
   /* ⛔ Y LOS COCHES TAMBIEN: `_pegasDelCoche_` llevaba desde el 11/08 escrita, con banco y
      sin llamador, asi que se podia convocar con un «Coche 1» a medias. */
-  var motivo = (typeof _porQueNoSeConvoca_==='function')
-    ? _porQueNoSeConvoca_(TUR_CARGOS, Object.keys(TUR_SEL).length, TUR_COCHES) : '';
+  var v=function(id){ return (document.getElementById(id)||{}).value||''; };
+  /* refuta6: la regla del consejo con lo escrito a mano manda sobre lo demás (la misma frase y el mismo orden que `_porQueNoSeProgramaTurno_`). */
+  var motivo = _porQueSinConsejo_(_convocarCv_(), v('tuFecha'), v('tuHora'), v('tuDur')) || ((typeof _porQueNoSeConvoca_==='function')
+    ? _porQueNoSeConvoca_(TUR_CARGOS, Object.keys(TUR_SEL).length, TUR_COCHES) : '');
   b.disabled = !!motivo;
   b.textContent = motivo ? motivo : 'Convocar el turno';
   b.title = motivo || '';
@@ -422,7 +424,10 @@ function _miTurnoPanel_(){
     '<div style="margin-top:11px;display:flex;gap:9px;align-items:center">'+
       '<button class="btn pri" data-mtguardar'+(sucio?'':' disabled')+'>Guardar mi disponibilidad</button>'+
       '<small style="color:var(--ink2)">'+(sucio?'tienes cambios sin guardar':'sin cambios')+'</small>'+
-    '</div></div>');
+    '</div>'+
+    /* 02/11: contestar A MEDIAS no cuenta (`_convFalta_`, comun.js); lo mismo se pregunta al guardar. */
+    (_convFaltaTxt_(cv, mias) ? '<div class="tfalta" style="margin-top:8px">'+esc(_convFaltaTxt_(cv, mias))+'</div>' : '')+
+    '</div>');
 }
 
 /* ⭐ REUTILIZAR LA SEMANA ANTERIOR, TAMBIÉN AQUÍ (949.ª). La petición de Daniel (14/10) no nombró cara y el móvil
@@ -487,6 +492,9 @@ function _cablearMiTurno_(){
         return;
       }
       var mias=_misCeldas_(cv);
+      /* 02/11: A MEDIAS NO CUENTA. Se dice antes de enviar, y se puede seguir rellenando o guardar igual (`_convFalta_`). */
+      var _fl=_convFaltaTxt_(cv, mias);
+      if(_fl && !(await dialogoSiNo(_fl, {si:'Guardar igual', no:'Seguir rellenando'}))) return;
       b.disabled=true; var t=b.textContent; b.textContent='Guardando\u2026';
       try{
         await api.guardarDisponibilidad(cv.id, mias);
@@ -586,8 +594,10 @@ function _dispPanel_(){
       /* El color es la INTENSIDAD del rojo Solaris según cuánta gente puede: el mapa se lee
          de un vistazo y el número exacto está dentro. Con nadie, la celda se queda apagada. */
       var op=maxN? (c.n/maxN) : 0;
-      var st=c.n? ('background:rgba(228,30,37,'+(0.18+0.72*op).toFixed(2)+')') : '';
-      return '<div class="dcel'+(c.n?'':' v0')+(top[0]===k?' dmejor':'')+'" data-dk="'+k+'" style="'+st+'">'+
+      /* ⛔ La casilla sin nadie del consejo (o sin consejo para todo el bloque) se marca IGUAL que en el mapa de Convocar: una sola regla
+         (`_turnoCasillaEstado_`, comun.js), no una copia. */
+      var pt=_turnoCasillaPintura_(_turnoCasillaEstado_(cv, calor, k), c.n? 'rgba(228,30,37,'+(0.18+0.72*op).toFixed(2)+')' : '');
+      return '<div class="dcel'+(c.n?'':' v0')+(top[0]===k?' dmejor':'')+'" data-dk="'+k+'"'+pt.attr+' style="'+pt.css+'">'+
         c.n+(c.hay_coche?'<span class="dch">\uD83D\uDE97</span>':'')+'</div>';
     }).join('');
   }).join('');
@@ -603,6 +613,7 @@ function _dispPanel_(){
     '<div class="dsit">'+sit('','Los dos sitios')+sit('cuvi','Solo CUVI')+sit('citi','Solo CITI')+'</div>'+
     '<div class="dmapa" id="dMapa" style="grid-template-columns:104px repeat('+D.length+',minmax(44px,1fr))">'+
       cab+filas+'</div>'+
+    '<div style="margin:7px 0 0;font-size:11.5px;color:var(--ink2)">'+_turnoLeyendaCasillas_()+'</div>'+
     '<div class="ddet" id="dDet">'+_dispDetalle_(cv, DISP_SEL||top[0], calor)+'</div>'+
     '<div class="nota">'+
       (nInv ? (nInv-mudos.length)+' de '+nInv+' han contestado'+
@@ -1121,7 +1132,7 @@ function _convocarDispPanel_(){
     '<div style="font-size:12.5px"><b style="display:block;margin-bottom:5px">Mandar los avisos al móvil</b>'+
       nxSiNo('cdAvisos', AVISOS_ON, {off:_ae!=='ok'})+'</div>'+
     /* 22/10 (auditor 26, 🟡 11): sin saber lo que hay guardado, la casilla no se toca y se dice por qué. */
-    (_ae==='error' ? '<div class="nota" data-avisosest="error">⚠️ No se pudo leer si están encendidos: '+
+    (_ae==='error' ? '<div class="nota" data-avisosest="error">'+ico('aviso')+' No se pudo leer si están encendidos: '+
        'la casilla vacía no quiere decir que estén apagados. Recarga para volver a mirar.</div>' :
      _ae==='sinsesion' ? '<div class="nota" data-avisosest="sinsesion">Sin sesión no se puede saber si están encendidos.</div>' :
      _ae==='leyendo' ? '<div class="nota" data-avisosest="leyendo">Leyendo si están encendidos…</div>' : '')+
@@ -1783,18 +1794,27 @@ function _convocarCalorHTML_(){
 }
 
 /* Cablea el mapa de arriba; lo que se elige cae en Fecha, Hora y Duración del formulario. Corre en cada `pintar()` (como `_pinDisp_`). */
+/* La convocatoria con las respuestas de TODOS que el formulario puede usar para la regla del consejo, o `null` (no se sabe: no bloquea). */
+function _convocarCv_(){ return _dispEstadoSrv_()==='ok' ? _dispViva_() : null; }
+
 function _pinConvocarCalor_(){
+  ['tuFecha','tuHora','tuDur'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.addEventListener('change', _pintarBotonConvocar_);
+    if(e && id==='tuDur') e.addEventListener('input', _pintarBotonConvocar_);
+  });
+  _pintarBotonConvocar_();
   var raiz=document.getElementById('tuMapa'), cv=_dispViva_(); if(!raiz || !cv) return;
   _turnoCalorCablear_(raiz, cv, _calorTurnos_(cv, ''), function(b){
     nxPon('tuFecha', b.dia);
     if(b.hora) nxPon('tuHora', b.hora);
     var d=document.getElementById('tuDur'); if(d && b.horas) d.value=_duracionTurnoTxt_(b.horas);
+    _pintarBotonConvocar_();
   });
 }
 
 function convocarPanel(){
   if(!_puedeProgramarTurno_(ACTOR)) return '';           // solo coordinaci\u00f3n o superior
-  delete SOLP.tu;   /* el panel se pinta de nuevo con las cajas vacías: sin propuesta de SolarIA de antes */
+  delete SOLP.tu; delete SOLTXT.tu;   /* el panel se pinta de nuevo con las cajas vacías: sin propuesta de SolarIA de antes */
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   /* las bajas no se convocan: siguen en el roster por su historia, no para turnos nuevos */
@@ -1904,7 +1924,7 @@ function _fichaTurnoE_(t){
     : vac('Nadie apuntado todavía');
   var cl = _cochesTurnoLineas_(t.coches);
   var coches = cl.length ? cl.map(function(l){
-    return '<div class="ftu-coche"><b>🚗 Coche '+l.n+' · '+esc(l.conduce||'sin conductor')+'</b>'+
+    return '<div class="ftu-coche"><b>'+ico('coche')+' Coche '+l.n+' · '+esc(l.conduce||'sin conductor')+'</b>'+
       '<span>'+esc(l.ida)+(l.vuelta ? ' · vuelta: '+esc(l.vuelta) : '')+'</span>'+
       '<span class="ftu-van">'+(l.pasajeros.length ? 'Van: '+esc(l.pasajeros.join(', ')) : 'Sin pasajeros')+'</span></div>';
   }).join('') : vac('Sin coches organizados');
