@@ -1300,10 +1300,14 @@ function _bloqPanel_(){
         : 'Si declaras como coordinador de tu propia unidad, lo firma el Project Director.')+'</div>'+
   '</div>';
 
+  /* 03/11 \u00b7 \u00abPara m\u00e1s gente\u00bb: el MISMO formulario del bloque, dentro de este panel y en lugar del parte propio. S\u00f3lo PD o coordinador. */
+  var puedeV=!decl && _puedeVarios_(ACTOR), varios=puedeV && _variosActivo_() && BLQ.donde===vista;
   return pan('Declarar horas que no fichaste',
+    varios ? 'para varias personas, un mismo horario' :
     decl ? 'declarando un fichaje sin justificar'
          : (pend.length ? pend.length+' esperando declaraci\u00f3n' : 'un bloque a posteriori'),
-    lista+cab+form, pend.length?'destaca':'');
+    varios ? '<div class="pb">'+_variosChipHTML_(true)+_bloqueFormHTML_()+'</div>'
+           : lista+(puedeV?'<div class="pb" style="padding-bottom:0">'+_variosChipHTML_(false)+'</div>':'')+cab+form, pend.length?'destaca':'');
 }
 
 /* Actualiza SOLO los rotulos y el candado del boton, sin repintar. ⛔ Igual que `_fichaAviso_`:
@@ -1795,14 +1799,7 @@ function _bloqueReuPanelE_(){
   return pan('Parte de bloque', r.en_curso?'<span class="chip wa">en curso</span>':esc(r.titulo||r.tit||''),
     '<div class="pb">'+cuerpo+'</div>');
 }
-function _bloqueManualPanelE_(){
-  if(rangoNom(ACTOR)<1) return '';
-  var abierto=!!(BLQ && BLQ.donde===vista);
-  return pan('Declarar parte de bloque','varias personas, un mismo horario',
-    '<div class="pb">'+(abierto?_bloqueFormHTML_():
-      '<button class="btn pri" data-bloqueman>Declarar parte de bloque</button>'+
-      '<p class="mini" style="margin:8px 0 0;color:var(--ink3)">Se crea un parte pendiente por participante; lo decide el PD de una vez.</p>')+'</div>');
-}
+/* 03/11: el parte de bloque SIN reunión ya no tiene panel propio en «Horas»: vive en Fichar, tras el chip «Para más gente» (`_bloqPanel_`). */
 /* ⛔⛔ 31/10 (Daniel: «Le doy clic a declarar. Y no hace nada»): ESTA SE LLAMABA `_engBloqueE_`, IGUAL QUE LA DE «Declarar
    horas que no fichaste» (arriba). En JS la segunda `function` con el mismo nombre PISA a la primera, así que NINGÚN
    manejador del formulario se cableaba: ni «Declarar», ni el desplegable de imputar, ni las horas. Pintado y sin cable
@@ -1811,8 +1808,8 @@ function _engBloqueParteE_(){
   _bloqueColaCablear_(_bloqueCbE_);
   if(BLQ && BLQ.donde===vista) _bloqueCablear_(_bloqueCbE_);
   _bloqueReuCablear_(_reuSelE_, _bloqueCbE_);
-  $$('[data-bloqueman]').forEach(function(b){ b.onclick=function(){
-    var h=new Date();
-    _bloqueAbrir_({modo:'declarar', fecha:h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate()), parts:[]});
-    _bloqueCbE_.abrir(); }; });
+  $$('[data-varios]').forEach(function(b){ b.onclick=function(){      /* 03/11: «Para más gente» en Fichar */
+    var on=!_variosActivo_(); _variosAlternar_(on);
+    if(on) BLQ.donde=vista;
+    pintar(); }; });
 }
