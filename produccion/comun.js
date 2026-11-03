@@ -3851,6 +3851,16 @@ function _solResumenCfg_(B){
       return api.resumirReunion(B.reunion_id, frase, B.parts.map(function(p){ return p.nombre; }), min > 0 ? min : undefined);
     }};
 }
+/* 03/11 · SolarIA en el parte para VARIAS personas SIN reunión (Daniel: «no tiene nada de SolarIA por aquí»): no hay acta que resumir,
+   así que redacta las notas sueltas como en el parte propio (`redactarParte`, el mismo contrato), con el título y las horas del bloque. */
+function _solBloqueCfg_(B){
+  return {ta: '#blqResumen', boton: 'Redactar con SolarIA', sigue: 'Tu texto sigue como estaba.', valor: function(){ return B.resumen; },
+    sitio: 'parte', exige: 'Escribe tus notas sueltas y SolarIA las redacta.',
+    pedir: function(notas){
+      var h = _bloqueDurH_(B.fecha, B.ini, B.fin, B.tramos);
+      return api.redactarParte({notas: notas, tarea: B.titulo || '', categoria: '', fecha: B.fecha || '', horas: h > 0 ? h : null, declararId: null});
+    }};
+}
 /* El motivo de cambios / rechazo de un expediente. `ta` = el selector de SU caja (en el escritorio hay varias fichas a la vez). */
 function _solMotivoCfg_(e, ta){
   return {ta: ta, boton: 'Redactar con SolarIA', sitio: 'motivo',
@@ -11525,7 +11535,7 @@ function _bloqueFormHTML_(){
       _bloqueResHTML_(B.res)+'<button class="btn pri" data-blqcerrar data-p>Cerrar</button>';
   var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
   return '<div id="blqForm">'+
-    '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 4px">'+(fin?'Finalizar la reunión':'Declarar parte de bloque')+'</div>'+
+    '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 4px">'+(fin?'Finalizar la reunión':(B.reunion_id!=null?'Declarar parte de bloque':'Parte para varias personas'))+'</div>'+
     '<p class="rnota" style="margin:0 0 12px">'+(fin
       ? 'Un parte pendiente por participante con lo que ha durado'+(B.en_curso?' (<b data-crono="'+esc(B.en_curso.ini)+'">'+esc(_cronoTxt_(B.en_curso.ini))+'</b> hasta ahora)':'')+
         '; el PD los decide de una vez.'
@@ -11547,7 +11557,7 @@ function _bloqueFormHTML_(){
     '<label style="display:block;margin:0 0 12px">'+lab('<span id="blqResLab">'+_bloqueResLabel_(B)+'</span>')+
       '<textarea id="blqResumen" rows="4" style="'+_BLQ_INPUT_+';resize:vertical" placeholder="Qué se trató o se hizo…">'+esc(B.resumen)+'</textarea>'+
       '<small id="blqCuenta" style="color:var(--ink3)">'+(B.resumen||'').trim().length+' / '+BLQ_MIN_RESUMEN+'</small></label>'+
-    (B.reunion_id!=null ? _solIAHTML_('blq', _solResumenCfg_(B)) : '')+
+    _solIAHTML_('blq', B.reunion_id!=null ? _solResumenCfg_(B) : _solBloqueCfg_(B))+
     '<div style="display:flex;gap:8px"><button class="btn pri" id="blqEnviar" data-p style="flex:1">'+(fin?'Finalizar y enviar':'Enviar parte')+'</button>'+
       '<button class="btn" data-blqcerrar data-p>Cancelar</button></div></div>';
 }
@@ -11596,6 +11606,24 @@ function _bloqueCablear_(cb){
     }
   };
 }
+
+/* ═══ «PARA MÁS GENTE» DENTRO DE FICHAR (03/11) ═══════════════════════════════════════════════════════
+   🗣️ Daniel: «los partes en fichar debería de estar ahí también lo de declarar parte de bloque […] es bastante confuso […] la opción de
+   que sea para más gente debería ser un tick». Un solo sitio —Fichar— y un solo formulario: el chip «Para más gente» cambia el
+   parte propio por el formulario del bloque (el de siempre, con su estética y SolarIA). Antes vivía suelto en «Horas».
+   Quién puede: el mismo rango que el servidor deja para declarar un bloque sin reunión (PD o coordinador). */
+function _puedeVarios_(nombre){ return rangoNom(nombre) >= 1; }
+function _variosChipHTML_(on){
+  return '<div class="varios" style="margin:0 0 10px"><button type="button" class="pick'+(on?' on':'')+'" data-varios aria-pressed="'+(on?'true':'false')+'">Para más gente</button>'+
+    '<span class="rnota" style="margin-left:9px">'+(on?'':'Marca para declarar el mismo horario a varias personas.')+'</span></div>';
+}
+/* Enciende o apaga el formulario del bloque (sin reunión). `cb` = lo de la cara: repintar. */
+function _variosAlternar_(on){
+  if(!on){ BLQ=null; return; }
+  var h=new Date();
+  _bloqueAbrir_({modo:'declarar', fecha:h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate()), parts:[]});
+}
+function _variosActivo_(){ return !!(BLQ && BLQ.modo==='declarar' && BLQ.reunion_id==null); }
 
 /* La ficha de la reunión: Empezar · (cronómetro + Finalizar + Cancelar) · Declarar a mano. `puede` = ¿te toca? */
 function _bloqueReuHTML_(r, puede){

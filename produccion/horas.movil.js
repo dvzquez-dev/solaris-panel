@@ -820,6 +820,13 @@ function vFichar(){
 
   var decl = _declVivo_(ST.form), _perdido = !!ST.form._declPerdido;
   ST.form._declPerdido = false;
+  /* 03/11 · «Para más gente»: el MISMO formulario del bloque (comun.js `_bloque*_`), en línea en Fichar, y nada más (sin justificación
+     propia ni «Quién lo firma»: es de otros). Sólo en «Declarar horas», sin un fichaje por declarar, y para PD/coordinador. */
+  var _yoV = (typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
+  var _puedeV = !decl && ST.modo==='bloque' && _puedeVarios_(_yoV), _varios = _puedeV && _variosActivo_();
+  if(_varios) return '<div class="h1">Fichar</div><p class="h1s">'+HOY+' · horas de varias personas, un mismo horario.</p>'+
+    '<div class="modos" id="modos"><button data-mo="vivo" data-p>Sesión en vivo</button><button data-mo="bloque" class="on" data-p>Declarar horas</button></div>'+
+    '<div class="tarj">'+_variosChipHTML_(true)+'<div id="blqInline">'+_bloqueFormHTML_()+'</div></div>';
   return '<div class="h1">Fichar</div><p class="h1s">'+HOY+' · tus horas '+_firmaTxtM_(rt)+'.</p>'+
     (_perdido ? '<div class="nota">Ese parte <b>ya no está</b> (se cerró o caducó). Puedes declarar uno nuevo aquí.</div>' : '')+
     (decl
@@ -837,8 +844,9 @@ function vFichar(){
         (_avisoAutocierre_(decl) ? '<p class="rnota" style="margin:8px 0 0;color:var(--warn)">'+esc(_avisoAutocierre_(decl))+'</p>' : '')+'</div>'
       : ('<div class="modos" id="modos">'+
           '<button data-mo="vivo" class="'+(ST.modo==='vivo'?'on':'')+'" data-p>Sesión en vivo</button>'+
-          '<button data-mo="bloque" class="'+(ST.modo==='bloque'?'on':'')+'" data-p>Declarar bloque</button>'+
+          '<button data-mo="bloque" class="'+(ST.modo==='bloque'?'on':'')+'" data-p>Declarar horas</button>'+
         '</div>'+
+        (_puedeV ? '<div class="tarj">'+_variosChipHTML_(false)+'</div>' : '')+
         (ST.modo==='vivo'?vivo:bloque)))+
 
     '<div class="tarj">'+cab('Justificación','obligatoria')+
@@ -1934,13 +1942,6 @@ function _tareaParteTarjetaM_(grupos){
 }
 var _tareaParteCbM_={ hecho:function(){ _cargarPartesDec_().then(pintar); } };
 function _engTareaParteM_(){ _tareaParteColaCablear_(_tareaParteCbM_); }
-/* Declarar un bloque SIN reunión: PD o coordinador (lo que el servidor deja). */
-function _bloqueManualM_(){
-  var yo=(typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
-  if(rangoNom(yo)<1) return '';
-  return '<div class="tarj" id="pbloqman"><button class="btn full" data-p id="btnBloqueManual">Declarar parte de bloque</button>'+
-    '<p class="rnota" style="margin:7px 0 0">Varias personas, un mismo horario: un parte pendiente por cada una.</p></div>';
-}
 var _bloqueCbM_={
   abrir:function(){ abrirModal(_bloqueFormHTML_()); _bloqueCablear_(_bloqueCbM_); },
   refrescar:function(){ if(BLQ && $('#modal').classList.contains('on')){ $('#modal-body').innerHTML=_bloqueFormHTML_(); _bloqueCablear_(_bloqueCbM_); } pintar(); },
@@ -1950,12 +1951,18 @@ var _bloqueCbM_={
 };
 function _engBloqueM_(){
   _bloqueColaCablear_(_bloqueCbM_);
-  var b=$('#btnBloqueManual');
-  if(b) b.onclick=function(){
-    var h=new Date();
-    _bloqueAbrir_({modo:'declarar', fecha:h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate()), parts:[]});
-    _bloqueCbM_.abrir();
-  };
+}
+/* 03/11 · el bloque en línea dentro de Fichar (`vFichar`): repinta SÓLO el formulario (la pantalla entera borraría lo escrito). */
+var _bloqueFichaCbM_={
+  abrir:function(){},
+  refrescar:function(){ var c=$('#blqInline'); if(c && BLQ){ c.innerHTML=_bloqueFormHTML_(); _bloqueCablear_(_bloqueFichaCbM_); } },
+  cerrar:function(){ pintar(); },
+  hecho:function(){ _cargarPartesDec_(); }
+};
+function _engVariosM_(){
+  var v=$('[data-varios]');
+  if(v) v.onclick=function(){ _variosAlternar_(!_variosActivo_()); pintar(); };
+  if($('#blqInline') && BLQ) _bloqueCablear_(_bloqueFichaCbM_);
 }
 
 /* ⛔ QUE SE PUEDE REVERTIR, EN UN SOLO SITIO. La lista de estados vive aqui y no repartida
@@ -2276,7 +2283,6 @@ function vHoras(){
      despues. En medio quedaba empujando tus propias horas media pantalla abajo. */
   return '<div class="h1">Horas</div><p class="h1s">Lo que ya cuenta este mes y lo que sigue pendiente de firma.</p>'+
     _partesDecHTML_()+
-    _bloqueManualM_()+
     '<div class="tarj">'+cab('Horas del mes', notion?'base al día':'aprobadas · otorgadas · pendientes')+
       '<div class="cifh"><span class="g mono" id="gHoras">'+nf2(cuentan)+'</span><span class="sc">h '+(notion?'este mes':'que cuentan')+'</span></div>'+
       '<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+
