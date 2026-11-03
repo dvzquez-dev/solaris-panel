@@ -62,6 +62,7 @@ function _origenParte_(p){
    decida. Normalizar es tirar lo que no nombras, y aquí se estaba tirando la fecha de verdad. */
 function normPMovil(p){
   return { id:p.id, f:_isoADMY_(p.fecha), iso:String(p.fecha||''), t:p.tarea||'', q:Number(p.horas)||0,
+    bloque:p.bloque||null,   /* 03/11: el icono «en bloque» de `filaParte` */
     e:_E_MOVIL_[p.estado]||'raro', ini:p.ini||'',   /* 20/10: lo que no conocemos NO es «en cola» (§3c-24) */ fin:p.fin||'', cat:p.categoria||null, subcat:p.subcat||null,
     /* ⛔ LA PUERTA VA DENTRO DEL `||`, NO ENVOLVIENDOLO, y no es estilo: `nota` mezcla
        DOS cosas distintas --el motivo de una decision y la justificacion del autor-- y
@@ -1373,7 +1374,7 @@ function filaParte(p){
         (p.e==='pend' ? '<button class="btn mini" data-pdesc="'+p.id+'" data-p>Corregir descripción</button>' : '')+
         '<button class="btn mini" data-pret="'+p.id+'" data-p>Retirar</button></div>'
     : '';
-  return '<div class="fila '+cls+'"><div class="a"><b>'+esc(p.t||'Fichaje sin declarar')+'</b><small>'+sub+catTxt+
+  return '<div class="fila '+cls+'"><div class="a"><b>'+_icoBloque_(p)+esc(p.t||'Fichaje sin declarar')+'</b><small>'+sub+catTxt+
     _origenParte_(p)+'</small>'+_accs+'</div>'+
     '<div class="d">'+accion+pil+' <b class="mono">'+h1(p.q)+'</b></div></div>';
 }
@@ -1820,7 +1821,7 @@ function _pdFichaHTML_(p){
         '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
           '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(p.ini)+'–'+esc(p.fin)+'</small></div>'+
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
-        '<div class="pdt">'+esc(p.t)+'</div>'+
+        '<div class="pdt">'+_icoBloque_(p)+esc(p.t)+'</div>'+
         /* ⛔⛔ `p.t`, NO `p.tarea`: `_normPDec_` RENOMBRA el campo al normalizar, y una
            copia literal de la linea del escritorio compara contra `undefined` -- nunca
            coincide, asi que el duplicado vuelve SIN DAR ERROR. Medido ejecutando las
@@ -2021,7 +2022,7 @@ function _pdRevFichaHTML_(p){
         '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
           '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(PD_EST[p.estado]||p.estado)+'</small></div>'+
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
-        '<div class="pdt">'+esc(p.t)+'</div>';
+        '<div class="pdt">'+_icoBloque_(p)+esc(p.t)+'</div>';
   /* ⛔ MES CERRADO: ni botón ni caja de motivo, y **se dice por qué**. Sus horas ya están
      en Notion y de ahí salió la cuota; la contraparte negativa se restaría del mes EN
      CURSO — horas de otro mes, a alguien que no ha hecho nada, y sin dar error. */

@@ -87,7 +87,7 @@ function parteCard(p){
       '<span class="q">'+nf2(p.horas)+'<small> h</small></span></div>'+
     /* ⛔ La caja SOLO si aporta algo: `_justUtil_` devuelve '' cuando la justificacion
        repite la tarea o esta vacia -- los dos casos que Daniel senalo el 18/08. */
-    (function(_j){ return '<div class="just"><span class="sc">'+esc(p.tarea)+'</span>'+
+    (function(_j){ return '<div class="just"><span class="sc">'+_icoBloque_(p)+esc(p.tarea)+'</span>'+
       (_j?esc(_j):'')+'</div>'; })(_justUtil_(p.tarea, p.just))+
     '<div class="fl">'+(p.flags||[]).map(function(f){   /* 20/10: un parte sin avisos (la semilla, un `detalle`) no revienta la cola */
       return '<span class="chip '+(f[0]==='ok'?'ok':'wa')+'">'+esc(f[1])+'</span>';}).join('')+
@@ -224,7 +224,7 @@ function _escHistFilaHTML_(p, per, uc){
   var dec=p.estado==='aprobado' ? _selloAprobado_(p, per, uc)
         : (p.estado==='rechazado' || p.estado==='detalle') ? 'decidido '+_firmaParte_(p) : '';
   return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+
-    h1(p.horas)+' · '+esc(p.tarea)+'</b><small>'+p.fecha+(dec?' · '+esc(dec):'')+
+    h1(p.horas)+' · '+_icoBloque_(p)+esc(p.tarea)+'</b><small>'+p.fecha+(dec?' · '+esc(dec):'')+
     (p.motivo?' · «'+esc(p.motivo)+'»':'')+'</small></span><span class="der">'+et+'</span></div>';
 }
 
@@ -415,7 +415,7 @@ function _escRevCard_(p){
       '<span class="q">'+nf2(Number(p.horas)||0)+'<small> h</small></span></div>'+
     /* Misma regla que `parteCard`. Aqui el campo se llama `justificacion`: el mismo parte
        se ve por las dos tarjetas, asi que arreglar una sola deja el duplicado a la vista. */
-    (function(_j){ return '<div class="just"><span class="sc">'+esc(p.tarea||'')+'</span>'+
+    (function(_j){ return '<div class="just"><span class="sc">'+_icoBloque_(p)+esc(p.tarea||'')+'</span>'+
       (_j?esc(_j):'')+'</div>'; })(_justUtil_(p.tarea, p.justificacion))+
     (eti?'<div class="fl"><span class="chip '+(eti.tono==='ok'?'ok':'wa')+'">'+
       esc(eti.txt)+'</span></div>':'');
@@ -1341,7 +1341,7 @@ function _misSinFirmarHTML_(){
   return pan('Tus partes sin firmar', l.length+(l.length===1?' parte':' partes')+' · los puedes retirar o corregir',
     '<div class="pb" style="padding:0">'+l.map(function(p){
       var _ctc=_txtCorreccion_(p.correcciones);
-      return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(p.tarea||'Parte')+'</b><small>'+
+      return '<div class="dec" style="cursor:default"><span class="tx"><b>'+_icoBloque_(p)+esc(p.tarea||'Parte')+'</b><small>'+
         esc(_isoADMY_(p.fecha)||'')+' · '+nf2(Number(p.horas)||0)+' h'+(p.estado==='detalle'?' · te piden detalle':'')+
         (_ctc?' · '+esc(_ctc):'')+'</small></span>'+
         '<button class="btn mini" data-epcorr="'+p.id+'">Corregir horas</button> '+
@@ -1393,7 +1393,7 @@ function _filaNoCuentaE_(p){
         :p.estado==='rev' ? (p.ret ? 'lo retiraste tú: no se firma ni cuenta' : 'revertido: ya no cuenta')
         :'el servidor lo manda con un estado que esta pantalla no conoce';
   var mot=p.estado==='rechazado' ? p.motivo : (p.estado==='rev' && !p.ret ? p.revmot : null);
-  return '<div class="dec ltfila" style="cursor:default"><span class="tx"><b>'+esc(p.tarea||'Parte')+'</b><small>'+
+  return '<div class="dec ltfila" style="cursor:default"><span class="tx"><b>'+_icoBloque_(p)+esc(p.tarea||'Parte')+'</b><small>'+
       esc(p.fecha||'')+' · '+esc(que)+'</small>'+
       (mot?'<span class="ltmot"><span class="sc">'+(p.estado==='rechazado'?'motivo':'por qué')+'</span>'+
         esc(mot)+'</span>':'')+
@@ -1455,7 +1455,7 @@ function _filasMesE_(items){
   return tabla([['Concepto'],['Horas',1]], (items||[]).slice().sort(function(a,b){
     var da=_fechaDMY_(a.fecha), db=_fechaDMY_(b.fecha); return (db?db.getTime():0)-(da?da.getTime():0);
   }).map(function(p){
-    return '<tr><td>'+esc(p.tarea||'Parte')+'<div class="sc">'+esc(p.fecha||'')+(p.unidad&&p.unidad!=='—'?' · '+esc(p.unidad):'')+
+    return '<tr><td>'+_icoBloque_(p)+esc(p.tarea||'Parte')+'<div class="sc">'+esc(p.fecha||'')+(p.unidad&&p.unidad!=='—'?' · '+esc(p.unidad):'')+
       (p.cat && (p.cat in CAT_ETI) ? ' · '+esc(CAT_ETI[p.cat]) : '')+'</div></td><td class="r mono">'+nf2(Number(p.horas)||0)+' h</td></tr>';
   }).join(''));
 }
