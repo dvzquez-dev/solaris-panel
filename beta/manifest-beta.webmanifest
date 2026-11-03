@@ -1,5 +1,5 @@
 {
-  "name": "UVigo Aerotech · Solaris β",
+  "name": "UVigo Aerotech: Solaris β",
   "short_name": "Solaris β",
   "description": "Versión de PRUEBAS del panel Solaris. Escribe en los datos de verdad; no es la app del equipo.",
   "start_url": "./index.html", "scope": "./", "display": "standalone", "orientation": "portrait",
