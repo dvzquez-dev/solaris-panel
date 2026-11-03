@@ -849,8 +849,15 @@ function _progCalorCargar_(){
       if(b.horas) nxPon('ptDur', b.horas);
       _progPintar_();
     });
+    _progMarcarMapa_();
     _progPintar_();
   }).catch(function(){ di('No se pudo leer la disponibilidad: elige el día y la hora a mano.'); });
+}
+
+/* 03/11: el camino de VUELTA, del formulario al mapa (los botones +/− de la hora y la duración marcan ese bloque; antes no movían nada). */
+function _progMarcarMapa_(){
+  var m = $('#ptMapa'), v = function(id){ var e = $('#'+id); return e ? e.value : ''; };
+  if(m && m._tcalMarca) m._tcalMarca(v('ptFecha'), v('ptHora'), v('ptDur'));
 }
 
 function progTurnoAbrir(){
@@ -882,7 +889,7 @@ function progTurnoAbrir(){
     '<button class="btn pri full" data-p id="ptOK" disabled>Convocar el turno</button>');
   /* el selector (`ptQuien`) dice quién va; el reparto con cargos vive en PROG_T.sel */
   $('#ptCrucial').onclick = function(){ this.classList.toggle('on'); };
-  ['ptFecha','ptHora','ptDur','ptLugar'].forEach(function(id){ $('#'+id).addEventListener('change', _progPintar_); });
+  ['ptFecha','ptHora','ptDur','ptLugar'].forEach(function(id){ $('#'+id).addEventListener('change', function(){ _progMarcarMapa_(); _progPintar_(); }); });
   $('#ptOK').onclick = async function(){
     var b = this, f = _progRecoger_(), mot = _porQueNoSeProgramaTurno_(f);
     if(mot){ tost(mot); return; }
