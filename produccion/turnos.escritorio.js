@@ -45,11 +45,11 @@ function _pestanasE_(grupo, lista, defecto){
 function _turnosPest_(tabla){
   var mio = _miTurnoPanel_();
   return _pestanasE_('tur', [
-    ['turnos', 'Turnos', tabla],
+    ['convocar', 'Convocar turno', convocarPanel()],
     ['disp', 'Disponibilidad', _convocarDispPanel_()+mio+_dispPanel_()],
-    ['convocar', 'Convocar', convocarPanel()],
-    ['cerrar', 'Cerrar un turno', _cierreTurnoPanel_()]
-  ], mio ? 'disp' : 'turnos');   /* ⛔ lo tuyo va antes: si tienes que contestar, se abre ahí */
+    ['cerrar', 'Cerrar un turno', _cierreTurnoPanel_()],
+    ['turnos', 'Historial de turnos', tabla]
+  ], mio ? 'disp' : 'convocar');   /* 03/11 (Daniel): el historial NO es lo primero; lo importante es convocar */   /* ⛔ lo tuyo va antes: si tienes que contestar, se abre ahí */
 }
 function _abrirPestana_(grupo, clave){
   var b = document.querySelector('[data-pest="'+grupo+'"][data-pk="'+clave+'"]');
@@ -343,6 +343,11 @@ function _mitPlazoTxt_(cv, ahora){
    Sólo una HORA (`HH:MM`) se sube a la línea: un rótulo que no es una hora («Mañana») nombra la
    franja entera y se queda centrado en ella. Una puerta y no tres copias: la rejilla sale en tres
    pantallas (antes de abrir, la tuya y la del coordinador). */
+/* El hueco de la comida en las rejillas `.dmapa` (la tuya y la de espera): una fila de ancho completo donde la convocatoria no ofrece horas. */
+function _huecoFilaE_(a, b){
+  var h = _huecoEntreFranjas_(a, b);
+  return h ? _huecoHTML_(h) : '';
+}
 function _rotFranjaE_(txt){
   var t = String(txt == null ? '' : txt);
   return /^\d{1,2}:\d{2}$/.test(t)
@@ -361,8 +366,8 @@ function _miTurnoPreHTML_(cv){
     var p=String(_diaCorto_(d)).split(' ');
     return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
   }).join('');
-  var filas=F.map(function(fr){
-    return _rotFranjaE_(fr.txt)+
+  var filas=F.map(function(fr, i){
+    return (i ? _huecoFilaE_(F[i-1], fr) : '')+_rotFranjaE_(_rotuloTramo_(fr))+
       D.map(function(){ return '<div class="dcel off"></div>'; }).join('');
   }).join('');
   return pan('Tu disponibilidad', 'se abre el '+esc(abD)+' a las '+esc(abH),
@@ -398,8 +403,8 @@ function _miTurnoPanel_(){
     return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
   }).join('');
   var COL={cuvi:'rgba(228,30,37,.78)', citi:'rgba(63,158,214,.78)', ambos:'rgba(53,199,89,.78)'};
-  var filas=F.map(function(fr){
-    return _rotFranjaE_(fr.txt)+D.map(function(d){
+  var filas=F.map(function(fr, i){
+    return (i ? _huecoFilaE_(F[i-1], fr) : '')+_rotFranjaE_(_rotuloTramo_(fr))+D.map(function(d){
       var k=_dispClave_(d,fr.k), v=mias[k];
       var st = (v && v.s && v.s!=='no') ? ('background:'+(COL[v.s]||'rgba(228,30,37,.78)')) : '';
       return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" '+
@@ -576,45 +581,24 @@ function _dispPanel_(){
       'Tu disponibilidad sí la puedes contestar, aquí debajo.'));
   var cv=_dispViva_(); if(!cv) return '';
   var calor=_calorTurnos_(cv, DISP_SITIO);
-  var top=_mejorTurno_(calor);
   var mudos=_dispMudos_(cv);
   var nInv=(cv.invitados||[]).length;
-  var D=cv.dias||[], F=cv.franjas||[];
-  var maxN=0; Object.keys(calor).forEach(function(k){ if(calor[k].n>maxN) maxN=calor[k].n; });
+  var D=cv.dias||[];
   var sit=function(k,txt){
     return '<button data-dsit="'+k+'" class="'+(DISP_SITIO===k?'on':'')+'">'+txt+'</button>';
   };
-  var cab='<div class="dmc dml"></div>'+D.map(function(d){
-    var p=String(_diaCorto_(d)).split(' ');
-    return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
-  }).join('');
-  var filas=F.map(function(fr){
-    return _rotFranjaE_(fr.txt)+D.map(function(d){
-      var k=_dispClave_(d,fr.k), c=calor[k];
-      /* El color es la INTENSIDAD del rojo Solaris según cuánta gente puede: el mapa se lee
-         de un vistazo y el número exacto está dentro. Con nadie, la celda se queda apagada. */
-      var op=maxN? (c.n/maxN) : 0;
-      /* ⛔ La casilla sin nadie del consejo (o sin consejo para todo el bloque) se marca IGUAL que en el mapa de Convocar: una sola regla
-         (`_turnoCasillaEstado_`, comun.js), no una copia. */
-      var pt=_turnoCasillaPintura_(_turnoCasillaEstado_(cv, calor, k), c.n? 'rgba(228,30,37,'+(0.18+0.72*op).toFixed(2)+')' : '');
-      return '<div class="dcel'+(c.n?'':' v0')+(top[0]===k?' dmejor':'')+'" data-dk="'+k+'"'+pt.attr+' style="'+pt.css+'">'+
-        c.n+(c.hay_coche?'<span class="dch">\uD83D\uDE97</span>':'')+'</div>';
-    }).join('');
-  }).join('');
   return pan('Disponibilidad para turnos','semana del '+esc(_isoADMY_(D[0])||D[0]),
     '<div class="pb">'+
     '<p style="margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-      'Cuánta gente puede en cada hueco. Pasa el ratón por una casilla para ver quién. '+
+      'Cuánta gente puede en cada hueco. Toca una casilla para ver quién. '+
       /* ⛔ POR `_normLimite_` (465.ª), igual que su gemela del móvil: con un `limite`
          **pelado** —lo que manda un `<input type="date">`— esto rotulaba *«vence el
          14/09/2026 a las .»*. Curar una cara y no la otra es el error caro de aquí. */
       'El plazo vence el '+esc(_isoADMY_(_normLimite_(cv.limite).slice(0,10))||'')+
       ' a las '+esc(_normLimite_(cv.limite).slice(11,16))+'.</p>'+
     '<div class="dsit">'+sit('','Los dos sitios')+sit('cuvi','Solo CUVI')+sit('citi','Solo CITI')+'</div>'+
-    '<div class="dmapa" id="dMapa" style="grid-template-columns:104px repeat('+D.length+',minmax(44px,1fr))">'+
-      cab+filas+'</div>'+
-    '<div style="margin:7px 0 0;font-size:11.5px;color:var(--ink2)">'+_turnoLeyendaCasillas_()+'</div>'+
-    '<div class="ddet" id="dDet">'+_dispDetalle_(cv, DISP_SEL||top[0], calor)+'</div>'+
+    /* 03/11: EL MISMO MAPA QUE CONVOCAR (`_turnoCalorHTML_`), no un segundo diseño (Daniel: «en disponibilidad sigue la cosa vieja»). */
+    _turnoCalorHTML_(cv, calor, 'dMapa')+
     '<div class="nota">'+
       (nInv ? (nInv-mudos.length)+' de '+nInv+' han contestado'+
               (mudos.length ? ' · sin contestar: '+mudos.map(_dispPila_).map(esc).join(', ') : '')
@@ -795,20 +779,9 @@ function _pinDisp_(){
   var cv=_dispViva_(); if(!cv) return;
   var mapa=document.getElementById('dMapa'); if(!mapa) return;
   var calor=_calorTurnos_(cv, DISP_SITIO);
-  var det=document.getElementById('dDet');
-  var pinta=function(k){
-    if(!det) return;
-    det.innerHTML=_dispDetalle_(cv, k, calor);
-    var ant=mapa.querySelector('.dcel.dsel'); if(ant) ant.classList.remove('dsel');
-    var el=mapa.querySelector('[data-dk="'+k+'"]'); if(el) el.classList.add('dsel');
-  };
-  $$('#dMapa [data-dk]').forEach(function(el){
-    /* El desglose va a una CAJA FIJA debajo, no a un tooltip flotante: tres cestas de nombres
-       no caben en un globo sobre una celda de 44 px, y un tooltip sobre el borde del panel se
-       sale. Además así se puede leer con calma y funciona igual con clic (táctil). */
-    el.onmouseenter=function(){ DISP_SEL=el.dataset.dk; pinta(DISP_SEL); };
-    el.onclick=function(){ DISP_SEL=el.dataset.dk; pinta(DISP_SEL); };
-  });
+  /* 03/11: el MISMO cableado que Convocar (`_turnoCalorCablear_`), sin formulario al que rellenar: tocar una casilla la marca y cuenta
+     quién puede en la caja de debajo (una caja fija, no un globo: tres cestas de nombres no caben sobre una casilla). */
+  _turnoCalorCablear_(mapa, cv, calor, null);
   $$('.dsit [data-dsit]').forEach(function(b){
     b.onclick=function(){ DISP_SITIO=b.dataset.dsit; DISP_SEL=''; pintar(); };
   });
@@ -1779,37 +1752,149 @@ function _cablearCierreTurno_(){
   };
 }
 
-/* 02/11 · EL MAPA DE CALOR, ENCIMA DEL FORMULARIO DE CONVOCAR (la misma pieza que «Programar turno» en el móvil: `_turnoCalorHTML_`
-   de `comun.js`). 🗣️ Daniel: *«La forma ideal sería con un mapa de calor […] dando clic a cada slot puedo ver quién está»*.
-   Lee la convocatoria que ya carga `_dispCargar_` para la pestaña Disponibilidad (`_dispViva_`, una sola carga).
-   ⛔ SÓLO CON EL ESTADO `ok`: con `'solo mio'` el calor saldría de UNA persona y con la semilla de demostración de nadie
-   — el mapa de mentira que `_dispPanel_` ya no pinta. En cualquier otro caso una línea que lo dice, y el formulario sigue igual. */
+/* ═══ CONVOCAR TURNO: EL MAPA, LA CONVOCATORIA QUE SE ELIGE Y QUIÉN VA (03/11/2026) ═══════════════════════════════════════════
+   🗣️ Daniel: *«debería dejar convocar turnos para todas las convocatorias que estén abiertas y cerradas […] siempre va a ser
+   seguramente de sábado en adelante poder convocarlos de la semana que viene»* · *«aquí pone quién va al turno. Y debería aparecer los
+   que pueden. Y los que no pueden. Y yo poder seleccionar igual a los que no puedan a la fuerza […] porque igual me han dicho que sí
+   después»* · *«los botones + y − no hacen nada»*.
+   ⛔ El mapa es `_turnoCalorHTML_` (comun.js, el mismo que Disponibilidad y el móvil). Lo que el formulario escribe (fecha, hora,
+   duración) se lee DE VUELTA (`_convocarSync_`): marca el bloque en el mapa y reparte a la gente en «pueden» / «no pueden». Los botones
+   +/− de la hora disparan `change` sobre el campo oculto, y antes SÓLO el botón de convocar los oía.
+   ⛔ La zona `#tuZona` se repinta SOLA (no con `pintar()`, que borraría lo escrito en el formulario).
+   Las globales (`CONV_LISTA`, `CONV_ELEGIDA`, `CONV_CV`) son de `escritorio.html`. */
+
+/* La convocatoria con las respuestas de TODOS que el formulario usa: la ELEGIDA en los chips o, si no hay, la vigente que carga
+   `_dispCargar_`. `null` = no se sabe (no bloquea). SÓLO con el estado `ok`: con `'solo mio'` el calor saldría de UNA persona. */
+function _convocarCvElegida_(){
+  if(CONV_ELEGIDA){ return (CONV_CV && String(CONV_CV.id)===String(CONV_ELEGIDA) && !CONV_CV.fallo) ? CONV_CV : null; }
+  return _dispEstadoSrv_()==='ok' ? _dispViva_() : null;
+}
+/* La convocatoria con las respuestas de TODOS que el formulario puede usar para la regla del consejo, o `null` (no se sabe: no bloquea). */
+function _convocarCv_(){ return _convocarCvElegida_(); }
+
+/* Los chips para ELEGIR de qué convocatoria sale el mapa (abiertas Y cerradas) y, para quien puede, empezar una nueva. */
+function _convocarEligeHTML_(){
+  var L=CONV_LISTA||[], cv=_convocarCvElegida_(), act=cv ? String(cv.id) : '', est={abierta:'abierta', cerrada:'cerrada', sin_abrir:'sin abrir'};
+  var chips=L.map(function(c){
+    var f=_isoADMY_(String(c.semana_ini||'').slice(0,10))||String(c.semana_ini||'');
+    return '<button type="button" class="pick'+(String(c.id)===act?' on':'')+'" data-convsel="'+esc(c.id)+'">Semana del '+esc(f.slice(0,5))+' · '+esc(est[c.estado]||c.estado||'')+'</button>';
+  }).join('');
+  if(_puedeConvocarDisp_()) chips+='<button type="button" class="pick" data-convnueva="1">Pedir disponibilidad nueva</button>';
+  return chips ? '<span class="sc" style="display:block;margin-bottom:5px">De qué convocatoria</span><div class="chips" data-conv-lista style="margin:0 0 12px">'+chips+'</div>' : '';
+}
+
 function _convocarCalorHTML_(){
-  var st=_dispEstadoSrv_(), cv=(st==='ok') ? _dispViva_() : null, T='<span class="sc" style="display:block;margin-bottom:5px">Cu\u00e1ndo pueden \u00b7 toca un hueco</span>';
+  var st=_dispEstadoSrv_(), cv=_convocarCvElegida_(), T='<span class="sc" style="display:block;margin-bottom:5px">Cuándo pueden · toca un hueco</span>';
   var nota=function(t){ return '<div style="margin:0 0 14px">'+T+'<div class="nadie" data-tcal-nota style="font-size:12.5px;color:var(--ink2)">'+t+'</div></div>'; };
-  if(st==='ok' && !cv) return nota('No hay convocatoria de disponibilidad abierta para esa semana: elige la fecha y la hora a mano.');
-  if(!cv) return nota(st==='sin pedir'||st==='pidiendo' ? 'Mirando la disponibilidad\u2026'
+  if(CONV_ELEGIDA && !cv) return nota(CONV_CV && CONV_CV.fallo && String(CONV_CV.id)===String(CONV_ELEGIDA) ? 'No se pudo leer esa convocatoria: elige otra, o la fecha y la hora a mano.' : 'Mirando la disponibilidad…');
+  if(!CONV_ELEGIDA && st==='ok' && !cv) return nota('No hay convocatoria de disponibilidad abierta para esa semana: elige la fecha y la hora a mano.');
+  if(!cv) return nota(st==='sin pedir'||st==='pidiendo' ? 'Mirando la disponibilidad…'
     : 'No se ve la disponibilidad de la semana: elige la fecha y la hora a mano.');
   return '<div style="margin:0 0 14px">'+T+_turnoCalorHTML_(cv, _calorTurnos_(cv, ''), 'tuMapa')+'</div>';
 }
 
-/* Cablea el mapa de arriba; lo que se elige cae en Fecha, Hora y Duración del formulario. Corre en cada `pintar()` (como `_pinDisp_`). */
-/* La convocatoria con las respuestas de TODOS que el formulario puede usar para la regla del consejo, o `null` (no se sabe: no bloquea). */
-function _convocarCv_(){ return _dispEstadoSrv_()==='ok' ? _dispViva_() : null; }
+function _convocarZonaHTML_(){ return _convocarEligeHTML_()+_convocarCalorHTML_(); }
 
-function _pinConvocarCalor_(){
-  ['tuFecha','tuHora','tuDur'].forEach(function(id){
-    var e=document.getElementById(id); if(e) e.addEventListener('change', _pintarBotonConvocar_);
-    if(e && id==='tuDur') e.addEventListener('input', _pintarBotonConvocar_);
+/* «Quién va»: con un bloque en el mapa, DOS grupos —los que pueden TODAS sus horas y los que no— y los dos se pueden marcar (quien
+   «no puede» puede haber dicho que sí después). Sin bloque, una lista. ⛔ La regla del consejo sigue contando sólo con los que pueden
+   (`_turnoConsejoAguanta_` lee las respuestas, no a quién se marca aquí). */
+function _convocarPoolHTML_(b){
+  var cv=_convocarCvElegida_(), pool=_activos_().slice().sort(function(a,c){ return String(a.pila).localeCompare(String(c.pila)); });
+  var chip=function(m, no){
+    return '<button type="button" class="pick'+(TUR_SEL[m.nombre]?' on':'')+'" data-tu="'+esc(m.nombre)+'"'+
+      (no?' title="No ha dicho que pueda: se añade igual" style="opacity:.78"':'')+'>'+esc(m.pila)+'</button>';
+  };
+  if(!cv || !b || !b.claves || !b.claves.length) return pool.map(function(m){ return chip(m, false); }).join('');
+  var pueden=_turnoBloqueQuien_(_calorTurnos_(cv, ''), b.dia, b.claves), si=[], no=[];
+  pool.forEach(function(m){ (pueden.indexOf(m.nombre)>=0 ? si : no).push(m); });
+  var grupo=function(k, tit, l){
+    return '<div data-tu-grupo="'+k+'" style="width:100%;margin:0 0 6px"><span class="sc" style="display:block;margin-bottom:4px">'+tit+' ('+l.length+')</span>'+
+      '<div class="chips">'+(l.length ? l.map(function(m){ return chip(m, k==='no'); }).join('') : '<span class="nadie">nadie</span>')+'</div></div>';
+  };
+  return grupo('si', 'Pueden', si)+grupo('no', 'No pueden · márcalos si han dicho que sí', no);
+}
+/* Los chips de «Quién va» responden al clic: marcan / quitan a la persona y repintan el reparto. Corre cada vez que se repinta `#tuPool`. */
+function _cablearPoolTu_(){
+  $$('#tuPool .pick').forEach(function(c){
+    c.onclick=function(){
+      var n=c.dataset.tu;
+      if(TUR_SEL[n]){ delete TUR_SEL[n]; _quitarDeCargos_(n); c.classList.remove('on'); }
+      else { TUR_SEL[n]={rol:'',coche:false}; c.classList.add('on'); }
+      pintarReparto();
+    };
   });
+}
+
+/* Lee el formulario (fecha, hora, duración) y lo lleva al mapa, al botón y a «Quién va». Es el camino de VUELTA del mapa. */
+function _convocarSync_(){
+  var v=function(id){ return (document.getElementById(id)||{}).value||''; }, raiz=document.getElementById('tuMapa'), cv=_convocarCvElegida_(), b=null;
+  if(raiz && raiz._tcalMarca) raiz._tcalMarca(v('tuFecha'), v('tuHora'), v('tuDur'));
+  if(cv && (cv.dias||[]).indexOf(v('tuFecha'))>=0){
+    var cl=_clavesDeHoras_(cv, v('tuHora'), v('tuDur'), 1);
+    if(cl.length) b={dia:v('tuFecha'), claves:cl};
+  }
+  _convocarPoolPinta_(b);
   _pintarBotonConvocar_();
-  var raiz=document.getElementById('tuMapa'), cv=_dispViva_(); if(!raiz || !cv) return;
+}
+function _convocarPoolPinta_(b){
+  var pool=document.getElementById('tuPool'); if(!pool) return;
+  pool.innerHTML=_convocarPoolHTML_(b);
+  _cablearPoolTu_();
+}
+
+/* Pide UNA VEZ la lista de convocatorias (abiertas y cerradas); cuando llega, repinta sólo la zona. */
+function _convocarListar_(){
+  if(CONV_LISTA!==null) return;
+  if(typeof api==='undefined' || !api.listarConvocatorias || typeof SESION==='undefined' || !SESION) return;
+  CONV_LISTA=[];
+  api.listarConvocatorias().then(function(r){
+    CONV_LISTA=(r && r.lista) || [];
+    _convocarRepintarZona_();
+  }).catch(function(){ /* sin lista: queda el mapa de la vigente, como antes */ });
+}
+function _convocarRepintarZona_(){
+  var z=document.getElementById('tuZona'); if(!z) return;
+  z.innerHTML=_convocarZonaHTML_();
+  _convocarCablear_();
+  _convocarSync_();
+}
+function _convocarElige_(id){
+  CONV_ELEGIDA=String(id);
+  if(typeof api==='undefined' || !api.getDisponibilidad) return;
+  _convocarRepintarZona_();
+  api.getDisponibilidad(id).then(function(r){
+    if(String(CONV_ELEGIDA)!==String(id)) return;     /* mientras tanto eligió otra */
+    var cv=r && r.convocatoria; if(!cv) throw new Error('vacía');
+    cv.resp=r.cv||{}; CONV_CV=cv; _convocarRepintarZona_();
+  }).catch(function(){
+    if(String(CONV_ELEGIDA)!==String(id)) return;
+    CONV_CV={id:id, fallo:true}; _convocarRepintarZona_();
+  });
+}
+
+/* Cablea la zona de arriba: los chips de convocatoria y el mapa; lo que se elige cae en Fecha, Hora y Duración del formulario. */
+function _convocarCablear_(){
+  $$('#tuZona [data-convsel]').forEach(function(b){ b.onclick=function(){ _convocarElige_(b.dataset.convsel); }; });
+  $$('#tuZona [data-convnueva]').forEach(function(b){ b.onclick=function(){ _abrirPestana_('tur', 'disp'); }; });
+  var raiz=document.getElementById('tuMapa'), cv=_convocarCvElegida_(); if(!raiz || !cv) return;
   _turnoCalorCablear_(raiz, cv, _calorTurnos_(cv, ''), function(b){
     nxPon('tuFecha', b.dia);
     if(b.hora) nxPon('tuHora', b.hora);
     var d=document.getElementById('tuDur'); if(d && b.horas) d.value=_duracionTurnoTxt_(b.horas);
+    _convocarPoolPinta_(b);
     _pintarBotonConvocar_();
   });
+}
+
+/* Corre en cada `pintar()` (como `_pinDisp_`). */
+function _pinConvocarCalor_(){
+  ['tuFecha','tuHora','tuDur'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.addEventListener('change', _convocarSync_);
+    if(e && id==='tuDur') e.addEventListener('input', _convocarSync_);
+  });
+  _convocarListar_();
+  _convocarCablear_();
+  _convocarSync_();
 }
 
 function convocarPanel(){
@@ -1817,19 +1902,14 @@ function convocarPanel(){
   delete SOLP.tu; delete SOLTXT.tu;   /* el panel se pinta de nuevo con las cajas vacías: sin propuesta de SolarIA de antes */
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
-  /* las bajas no se convocan: siguen en el roster por su historia, no para turnos nuevos */
-  var pool=_activos_()
-    .slice().sort(function(a,b){ return String(a.pila).localeCompare(String(b.pila)); });
-  var chips=pool.map(function(m){
-    return '<button type="button" class="pick'+(TUR_SEL[m.nombre]?' on':'')+'" data-tu="'+esc(m.nombre)+'">'+
-      esc(m.pila)+'</button>';
-  }).join('');
+  /* las bajas no se convocan: siguen en el roster por su historia, no para turnos nuevos (`_convocarPoolHTML_` las deja fuera) */
+  var chips=_convocarPoolHTML_(null);
   return pan('Convocar turno','queda escrito en Notion',
     '<div class="pb">'+
     '<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
       'El turno les llega a los convocados y queda publicado en Notion. Marca qui\u00e9n va, ponle a cada uno '+
       'su papel y di qu\u00e9 hay que sacar. No se puede convocar m\u00e1s de un turno el mismo d\u00eda.</p>'+
-    _convocarCalorHTML_()+
+    '<div id="tuZona">'+_convocarZonaHTML_()+'</div>'+
 
     /* 01/11 (escm2): REJILLA, no una fila que se parte: cuándo (fecha · hora · duración · crucial) y dónde (se trabaja · se queda),
        cada pregunta sobre su control y todas con la misma etiqueta. */

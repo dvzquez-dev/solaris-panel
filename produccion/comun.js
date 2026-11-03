@@ -1423,7 +1423,7 @@ function _nxPasos_(tipo, o, medio){
 function nxHora(id, val, o){
   o = o || {}; o.paso = o.paso || 15; val = String(val || '16:00');
   return _nxCaja_('hora', id, val, o, ' data-paso="'+o.paso+'"', _nxPasos_('hora', o,
-    '<b class="mono nx-val" tabindex="0" role="spinbutton" aria-label="Hora">'+esc(val)+'</b>'));
+    '<b class="mono nx-val" tabindex="0" role="spinbutton" aria-label="Hora" contenteditable="true" inputmode="numeric" spellcheck="false">'+esc(val)+'</b>'));
 }
 function _nxTxtNum_(v, suf){ return v === '' ? '—' : String(v).replace('-', '−').replace('.', ',')+(suf ? ' '+suf : ''); }
 function nxNum(id, val, o){
@@ -1500,6 +1500,13 @@ function _nxCambio_(caja, val){
   inp.value = val; nxPinta(caja);
   inp.dispatchEvent(new Event('change', {bubbles:true}));
 }
+/* «17», «1730», «17:30», «9.15», «9h30» → `HH:MM`; '' si no es una hora. */
+function _horaEscrita_(txt){
+  var m = /^\s*(\d{1,2})(?:\s*[:.hH]?\s*(\d{2}))?\s*$/.exec(String(txt == null ? '' : txt)), hh, mm;
+  if(!m){ m = /^\s*(\d{1,2})(\d{2})\s*$/.exec(String(txt == null ? '' : txt)); if(!m) return ''; }
+  hh = +m[1]; mm = m[2] == null ? 0 : +m[2];
+  return (hh > 23 || mm > 59) ? '' : pad(hh)+':'+pad(mm);
+}
 function _nxPaso_(caja, d){
   var v = caja.querySelector('input[type=hidden]').value;
   if(caja.dataset.tipo === 'hora'){
@@ -1538,6 +1545,15 @@ function _nxPaso_(caja, d){
     var caja = v.closest('.nx'), p = +caja.dataset.paso || 1, k = e.key, g = caja.dataset.tipo === 'hora' ? 60 : p*10;
     var d = k === 'ArrowUp' || k === 'ArrowRight' ? p : k === 'ArrowDown' || k === 'ArrowLeft' ? -p : k === 'PageUp' ? g : k === 'PageDown' ? -g : 0;
     if(d){ e.preventDefault(); _nxPaso_(caja, d); }
+    else if(k === 'Enter' && caja.dataset.tipo === 'hora'){ e.preventDefault(); v.blur(); }
+  });
+  /* 03/11 (Daniel: «siempre debería dejar ponerme la hora forzada como yo quiera»): la hora también se ESCRIBE («17», «1730», «17:30»,
+     «9.15»); al salir del valor se normaliza, y si no es una hora se vuelve a la de antes. */
+  document.addEventListener('focusout', function(e){
+    var v = e.target; if(!v.classList || !v.classList.contains('nx-val')) return;
+    var caja = v.closest('.nx'); if(!caja || caja.dataset.tipo !== 'hora') return;
+    var h = _horaEscrita_(v.textContent);
+    if(h) _nxCambio_(caja, h); nxPinta(caja);
   });
 })();
 /* Insertar formato en el cuerpo: `tipo` = h · b · ul · ol · todo · tabla; `ini`/`fin` = la selección. Devuelve el texto y
@@ -1735,7 +1751,7 @@ function _nuevaTareaCampos_(us){
       '<div class="nota" id="ntFotoMsg" style="border:0;padding:2px 0"></div>'+
       '<div class="nt-ed"><textarea id="ntC" rows="9" maxlength="'+CUERPO_TAREA_MAX+'"'+(_ntIaOcupado_() ? ' readonly' : '')+' placeholder="Qué hay que hacer. Arriba tienes títulos, listas, casillas y tablas.">'+
         esc(NUEVA_TAREA.c)+'</textarea>'+
-      '<div class="nt-vp"><span class="sc">'+(_ntIaPropuesta_() ? 'Propuesta de SolarIA · así se verá en Notion' : 'Así se verá en Notion')+'</span>'+
+      '<div class="nt-vp"><span class="sc">'+(_ntIaPropuesta_() ? ico('chispa')+' Propuesta de SolarIA · así se verá en Notion' : 'Así se verá en Notion')+'</span>'+
         '<div id="ntIAbar">'+_solZonaHTML_('nt')+'</div><div id="ntV" class="nt-prev">'+_vistaNuevaTarea_(_ntIaPropuesta_() ? SOLP.nt.prop : NUEVA_TAREA.c)+'</div></div></div></div>'+
     '<button class="btn pri" id="ntCrear"'+(falta?' disabled':'')+' style="margin-top:9px">'+esc(falta || 'Crear la tarea')+'</button>';
 }
@@ -3690,10 +3706,10 @@ function _solErrorTxt_(motivo){ return 'SolarIA no está disponible ahora'+(moti
 function _solBtnHTML_(attrs, texto, o){
   o = o || {};
   return '<button type="button" class="btn sm sol-btn'+(o.cls ? ' '+o.cls : '')+'"'+(o.id ? ' id="'+o.id+'"' : '')+' '+attrs+(o.off ? ' disabled' : '')+'>'+
-    (o.pensando ? SOL_PENSANDO : ico('chispa')+' '+esc(texto))+'</button>';
+    ico('chispa')+' '+(o.pensando ? SOL_PENSANDO : esc(texto))+'</button>';
 }
 /* La nota de «pensando» y la de error, iguales en todos (`attr` = el data-* con el que cada pantalla las encuentra). */
-function _solPensandoHTML_(txt, attr){ return '<div class="nota" '+(attr || 'data-solpensando')+' style="border:0;padding:4px 0">'+esc(txt || SOL_PENSANDO)+' (unos 20 s)</div>'; }
+function _solPensandoHTML_(txt, attr){ return '<div class="nota" '+(attr || 'data-solpensando')+' style="border:0;padding:4px 0">'+ico('chispa')+' '+esc(txt || SOL_PENSANDO)+' (unos 20 s)</div>'; }
 function _solErrorHTML_(msg, cola, attr){ return '<div class="nota dn" '+(attr || 'data-solerr')+' style="border:0;padding:4px 0">'+esc(msg)+' '+esc(cola || 'Lo tuyo sigue como estaba.')+'</div>'; }
 /* Las acciones de la barra, con el mismo estilo (Usar esto en rojo). `a` = [[atributo, texto, primario], …]. */
 function _solAccionesHTML_(a){
@@ -3702,7 +3718,12 @@ function _solAccionesHTML_(a){
 /* El marco de texto propio de un punto cuyo resultado cae en OTRAS cajas (turno, anotaciones): siempre a la vista, con lo escrito conservado
    entre repintados (`SOLTXT`). `e` = {id, rot, ph, rows, css}. */
 function _solMarcoHTML_(k, e){
-  return '<label class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">'+esc(e.rot)+'</span>'+
+  /* 03/11: `e.bloque` = el marco como bloque de documentos (`_anotCampoHTML_`), con `e.ayuda` debajo del rótulo. */
+  var rot=(/SolarIA/.test(e.rot) ? ico('chispa')+' ' : '')+esc(e.rot);
+  if (e.bloque && typeof _anotCampoHTML_ === 'function' && typeof document !== 'undefined' && document.head) _anotCss_();
+  if (e.bloque) return _anotCampoHTML_(rot, esc(e.ayuda || ''),
+    '<textarea id="'+e.id+'" data-solent="'+esc(k)+'" rows="'+(e.rows || 3)+'" maxlength="2000" placeholder="'+esc(e.ph || '')+'"'+(e.css ? ' style="'+e.css+'"' : '')+'>'+esc(SOLTXT[k] || '')+'</textarea>');
+  return '<label class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">'+rot+'</span>'+
     '<textarea id="'+e.id+'" data-solent="'+esc(k)+'" rows="'+(e.rows || 3)+'" maxlength="2000" placeholder="'+esc(e.ph || '')+'"'+(e.css ? ' style="'+e.css+'"' : '')+'>'+esc(SOLTXT[k] || '')+'</textarea></label>';
 }
 /* Pulsado sin texto: el foco va al marco y se dice qué escribir (nunca un botón muerto ni un toast sin marco). */
@@ -3751,7 +3772,7 @@ function _solIAHTML_(k, cfg){
 function _solPintar_(k, suave){
   var c = SOLCFG[k], b = document.querySelector('[data-solpide="'+k+'"]'), z = document.querySelector('[data-solbarra="'+k+'"]');
   if(c && c.repinta && !suave){ c.repinta(); return; }
-  if(b){ b.disabled = _solSinPedir_(k); b.innerHTML = _solSinPedir_(k) ? SOL_PENSANDO : ico('chispa')+' '+esc(c ? c.boton : ''); }
+  if(b){ b.disabled = _solSinPedir_(k); b.innerHTML = ico('chispa')+' '+(_solSinPedir_(k) ? SOL_PENSANDO : esc(c ? c.boton : '')); }
   if(z) z.innerHTML = _solBarraHTML_(k);
 }
 function _solPone_(ta, v){ ta.value = v; ta.dispatchEvent(new Event('input', {bubbles: true})); }
@@ -6436,7 +6457,7 @@ function _fbpdTareaHTML_(t, cl){
     '<p style="font-size:12.5px;color:var(--ink2);line-height:1.5;margin:8px 0 0">'+esc(t.resumen||'El análisis no dejó resumen.')+'</p>'+
     (t.avisos.length?'<ul class="obj" style="margin:6px 0 0">'+t.avisos.slice(0,6).map(function(a){ return '<li>'+esc(a)+'</li>'; }).join('')+'</ul>'
                     :'<p class="rnota" style="margin:6px 0 0">Sin avisos de calidad.</p>')+
-    '<h4>¿Qué tal lo vio SolarIA?</h4><div style="display:flex;gap:6px;flex-wrap:wrap">'+
+    '<h4>'+ico('chispa')+' ¿Qué tal lo vio SolarIA?</h4><div style="display:flex;gap:6px;flex-wrap:wrap">'+
     FBPD_VAL.map(function(v){ return '<button type="button" class="pick'+(f.val===v[0]?' on':'')+'" data-fbval="'+v[0]+'" aria-pressed="'+(f.val===v[0])+'" data-p>'+v[1]+'</button>'; }).join('')+'</div>'+
     '<label class="campo"><span class="sc">Qué fue bien o mal</span><textarea data-fbtxt maxlength="1000" placeholder="Opcional">'+esc(f.txt)+'</textarea></label>'+
     '<div style="margin:6px 0"><button type="button" class="pick'+(f.crit?' on':'')+'" data-fbcrit aria-pressed="'+(!!f.crit)+'" data-p>Convertir en criterio</button></div>'+
@@ -6460,11 +6481,11 @@ function _fbpdInterior_(modo, id, cl){
   var pend=FBPD.pend, hist=FBPD.hist;
   if(modo==='ficha'){
     var t=pend.filter(function(x){ return String(x.id)===String(id); })[0], h=hist.filter(function(x){ return String(x.id)===String(id); })[0];
-    if(t) return '<details data-fbpd-pleg="ficha" style="margin-top:12px"'+(FBPD.fichaAb?' open':'')+'><summary class="rnota" style="cursor:pointer">Para ti: revisar a SolarIA</summary>'+_fbpdTareaHTML_(t, cl)+'</details>';
-    return h?'<div style="margin-top:12px"><span class="rnota">Tu opinión sobre SolarIA</span>'+_fbpdHechoHTML_(h)+'</div>':'';
+    if(t) return '<details data-fbpd-pleg="ficha" style="margin-top:12px"'+(FBPD.fichaAb?' open':'')+'><summary class="rnota" style="cursor:pointer">'+ico('chispa')+' Para ti: revisar a SolarIA</summary>'+_fbpdTareaHTML_(t, cl)+'</details>';
+    return h?'<div style="margin-top:12px"><span class="rnota">'+ico('chispa')+' Tu opinión sobre SolarIA</span>'+_fbpdHechoHTML_(h)+'</div>':'';
   }
   if(!pend.length && !hist.length) return '';
-  return '<details data-fbpd-pleg="lista" style="margin-top:14px"'+(FBPD.abierto?' open':'')+'><summary class="rnota" style="cursor:pointer">Para ti: revisar a SolarIA ('+pend.length+')</summary>'+
+  return '<details data-fbpd-pleg="lista" style="margin-top:14px"'+(FBPD.abierto?' open':'')+'><summary class="rnota" style="cursor:pointer">'+ico('chispa')+' Para ti: revisar a SolarIA ('+pend.length+')</summary>'+
     (pend.length?pend.map(function(t){ return _fbpdTareaHTML_(t, cl); }).join(''):'<p class="rnota">Nada pendiente.</p>')+
     (hist.length?'<details data-fbpd-pleg="hist" style="margin-top:10px"'+(FBPD.histAb?' open':'')+'><summary class="rnota" style="cursor:pointer">Ya opinadas · '+hist.length+'</summary>'+hist.map(_fbpdHechoHTML_).join('')+'</details>':'')+
     '</details>';
@@ -8562,6 +8583,21 @@ function _horasDeDuracion_(txt, def){
   return n > 0 ? n : def;
 }
 
+/* Las claves de franja (`h16`…) que cubre un turno que empieza a las `hora` (HH:MM) y dura `duracion` (texto: «3 horas», «2,5»), SÓLO las que
+   la convocatoria ofrece. Vacío = hora que no es HH:MM o fuera de las franjas. ES3 (lo corre `probar_turnos.py` con JScript). Es la lectura
+   del formulario que comparten la regla del consejo y la marca del mapa. */
+function _clavesDeHoras_(cv, hora, duracion, def){
+  var m = /^(\d{1,2}):(\d{2})$/.exec(String(hora || '')), out = [], claves = {}, h, k;
+  if (!m || !cv) return out;
+  var horas = _horasDeDuracion_(duracion, def || 1), ini = parseInt(m[1], 10) + parseInt(m[2], 10) / 60;
+  (cv.franjas || []).forEach(function(f){ claves[f && typeof f === 'object' ? f.k : f] = 1; });
+  for (h = Math.floor(ini); h < Math.ceil(ini + horas - 1e-9); h++) {
+    k = 'h' + (h < 10 ? '0' : '') + h;
+    if (claves[k]) out.push(k);
+  }
+  return out;
+}
+
 /* ⛔ GEMELA de `reglas/turnos.py:consejo_aguanta` (la compara `probar_turnos.py` §19): ¿alguien del consejo puede TODAS las
    horas de un turno que empieza `fecha` a las `hora` y dura `duracion`? `true`/`false`, o `null` = no se sabe (sin ese día en la
    convocatoria, sin respuestas, sin consejo, hora que no es HH:MM): `null` NO bloquea. Es la regla de Daniel (02/11) para el
@@ -8570,12 +8606,7 @@ function _turnoConsejoAguanta_(cv, fecha, hora, duracion){
   var cons = _consejoDe_(cv) || [], resp = (cv && cv.resp) || {}, m = /^(\d{1,2}):(\d{2})$/.exec(String(hora || '')), hay = false, n, i;
   for (n in resp) if (resp.hasOwnProperty(n) && resp[n] && Object.keys(resp[n]).length) hay = true;
   if (!cons.length || !hay || !m || !cv || (cv.dias || []).indexOf(fecha) < 0) return null;
-  var horas = _horasDeDuracion_(duracion, _minTurno_(cv)), ini = parseInt(m[1], 10) + parseInt(m[2], 10) / 60, claves = {}, pedidas = [], h;
-  (cv.franjas || []).forEach(function(f){ claves[f && typeof f === 'object' ? f.k : f] = 1; });
-  for (h = Math.floor(ini); h < Math.ceil(ini + horas - 1e-9); h++) {
-    var k = 'h' + (h < 10 ? '0' : '') + h;
-    if (claves[k]) pedidas.push(k);
-  }
+  var pedidas = _clavesDeHoras_(cv, hora, duracion, _minTurno_(cv));
   if (!pedidas.length) return null;
   for (i = 0; i < cons.length; i++) {
     var v = (resp[cons[i]] || {}), todas = pedidas.every(function(k){ return _dispPuede_(v[_dispClave_(fecha, k)]); });
@@ -8613,7 +8644,40 @@ function _rangoMira_(){
   return rangoNom(n);
 }
 
-/* El mapa entero, días en columnas y horas en filas como el de Reuniones. Las casillas son `[data-tcal]`; la caja `[data-tcal-det]`. */
+/* ═══ EL MAPA DE TURNOS, UNO SOLO (03/11/2026) ═══════════════════════════════════════════════════════════════════════
+   🗣️ Daniel, probando el escritorio: *«estos son slots. No es a las 9, es el del 9-10, de 10 a 11… Estos huecos están en el medio.
+   Aquí lo tienes marcado como si fuesen horas puntuales»* · *«Entre las 13 y las 16, literalmente, no hay un puto hueco»* ·
+   *«en disponibilidad sigue la cosa vieja, pero en convocar está la cosa nueva»* · *«duración pone 4 horas»*.
+   ✅ Lo pintan Convocar, Disponibilidad (escritorio) y Programar turno (móvil): una sola función. Cada fila es un TRAMO («9–10»), y donde
+   la convocatoria no ofrece horas (la comida) se ve un hueco, no dos filas pegadas. ⛔ SUSTITUYE la decisión de «etiquetas al límite»
+   (`docs/decisiones-app.md`). Tocar una casilla elige UNA hora; tocar otra más tarde del mismo día y tramo la AMPLÍA (y tocar dentro
+   o antes empieza de nuevo): la duración sale de lo marcado, no de un 4 fijo. */
+
+/* «9–10» para la franja `h09`; una franja que no es horaria («Mañana») se rotula con su texto. */
+function _rotuloTramo_(fr){
+  var m = /^h(\d\d)$/.exec(String((fr && fr.k) || ''));
+  return m ? (+m[1]) + '–' + ((+m[1]) + 1) : String((fr && fr.txt) || '');
+}
+/* Cuántas horas faltan ENTRE dos franjas horarias seguidas de la lista (0 = pegadas, o alguna no es horaria). */
+function _huecoEntreFranjas_(a, b){
+  var ma = /^h(\d\d)$/.exec(String((a && a.k) || '')), mb = /^h(\d\d)$/.exec(String((b && b.k) || ''));
+  return (ma && mb && (+mb[1]) - (+ma[1]) > 1) ? (+mb[1]) - (+ma[1]) - 1 : 0;
+}
+/* La fila-separador del hueco (ocupa todo el ancho de la rejilla). `h` = cuántas horas faltan. */
+function _huecoHTML_(h){
+  return '<div data-tcal-hueco="'+h+'" aria-hidden="true" style="grid-column:1/-1;height:'+(10+4*Math.min(h,4))+'px;border-radius:3px;'+
+    'background:repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 6px,transparent 6px 12px);opacity:.8"></div>';
+}
+
+/* El bloque `{dia, claves, hora, horas}` de las franjas `i0..i1` (índices de `cv.franjas`) de un día. `hora` = HH:MM de la primera, o ''. */
+function _turnoBloqueRango_(cv, dia, i0, i1){
+  var F = (cv && cv.franjas) || [], claves = [], i, f = F[i0], hora = '';
+  for (i = i0; i <= i1; i++) if (F[i]) claves.push(F[i].k);
+  if (f && /^\d{1,2}:\d{2}$/.test(String(f.txt))) hora = (String(f.txt).length < 5 ? '0' : '') + f.txt;
+  return {dia: dia, claves: claves, hora: hora, horas: (hora && claves.every(function(c){ return /^h\d\d$/.test(c); })) ? claves.length : 0};
+}
+
+/* El mapa entero, días en columnas y TRAMOS en filas. Las casillas son `[data-tcal]`; la caja `[data-tcal-det]`. */
 function _turnoCalorHTML_(cv, calor, id){
   var D=cv.dias||[], F=cv.franjas||[], maxN=0;
   Object.keys(calor).forEach(function(k){ if(calor[k].n>maxN) maxN=calor[k].n; });
@@ -8621,51 +8685,75 @@ function _turnoCalorHTML_(cv, calor, id){
     var p=String(_diaCorto_(d)).split(' ');
     return '<div style="text-align:center;font-size:10px;color:var(--ink2);font-family:var(--mono);line-height:1.25">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
   }).join('');
-  var filas=F.map(function(fr){
-    return '<div style="font-size:10px;color:var(--ink2);font-family:var(--mono);align-self:center;text-align:right;padding-right:2px">'+esc(fr.txt)+'</div>'+
+  var filas=F.map(function(fr, i){
+    var hu = i ? _huecoEntreFranjas_(F[i-1], fr) : 0;
+    return (hu ? _huecoHTML_(hu) : '')+
+      '<div data-tcal-rot style="font-size:11px;color:var(--ink2);font-family:var(--mono);align-self:center;text-align:right;padding-right:3px;white-space:nowrap">'+esc(_rotuloTramo_(fr))+'</div>'+
       D.map(function(d){
         var k=_dispClave_(d,fr.k), c=calor[k], a=maxN ? (0.12+0.88*c.n/maxN) : 0, est=_turnoCasillaEstado_(cv, calor, k);
         var pt=_turnoCasillaPintura_(est, c.n ? _calorColor_('presencial', a) : 'rgba(255,255,255,.045)');
-        return '<div data-tcal="'+esc(k)+'" data-n="'+c.n+'"'+pt.attr+' role="button" tabindex="0" style="cursor:pointer;min-height:30px;border-radius:3px;display:grid;place-items:center;'+
+        return '<div data-tcal="'+esc(k)+'" data-n="'+c.n+'"'+pt.attr+' role="button" tabindex="0" style="cursor:pointer;min-height:34px;border-radius:3px;display:grid;place-items:center;'+
           'font-family:var(--mono);font-size:11px;color:'+(c.n?'#fff':'var(--ink2)')+';border:1px solid transparent;'+pt.css+'">'+
           (c.n||'')+(c.hay_coche?'<span style="font-size:8px;line-height:1">'+ico('coche')+'</span>':'')+'</div>';
       }).join('');
   }).join('');
   return '<div id="'+esc(id)+'" data-tcal-raiz>'+
-    '<div style="display:grid;grid-template-columns:40px repeat('+D.length+',minmax(0,1fr));gap:2px">'+cab+filas+'</div>'+
+    '<div style="display:grid;grid-template-columns:44px repeat('+D.length+',minmax(0,1fr));gap:2px">'+cab+filas+'</div>'+
     '<div class="leyh" style="margin-top:9px;font-size:11.5px;color:var(--ink2)"><span><i style="background:'+_calorColor_('presencial',.9)+'"></i>'+_calorLeyenda_('presencial', false)+
-      ' · toca una casilla para ver quién puede y elegir el bloque</span></div>'+
+      ' · toca una casilla para ver quién puede; otra más tarde, para alargar</span></div>'+
     '<div style="margin-top:5px;font-size:11.5px;color:var(--ink2)">'+_turnoLeyendaCasillas_()+'</div>'+
     '<div data-tcal-det style="margin-top:8px;min-height:20px;font-size:13px;line-height:1.55">'+
       '<div class="nadie">Toca una casilla: se rellenan el día y la hora, y ves quién puede.</div></div>'+
     '</div>';
 }
 
-/* Cablea el mapa: tocar una casilla (1) marca el BLOQUE que se programaría —con el contorno blanco de lo elegido—, (2) cuenta quién
-   puede en la caja de debajo y (3) llama a `alElegir({dia, hora, horas, claves})` para que la pantalla rellene su formulario. */
+/* Cablea el mapa: tocar una casilla (1) marca el BLOQUE (una hora, o hasta la que toques si es más tarde del mismo día y tramo) con el
+   contorno blanco de lo elegido, (2) cuenta quién puede en la caja de debajo y (3) llama a `alElegir({dia, hora, horas, claves})` para
+   que la pantalla rellene su formulario (`alElegir` puede ser `null`: Disponibilidad sólo mira).
+   ⛔ La raíz queda con `_tcalMarca(fecha, hora, duracion)`: el camino de VUELTA, de lo escrito en el formulario al mapa (03/11, «los
+   botones + y − no hacen nada, no se mueve arriba nada»). Marca ese bloque y repinta la caja SIN llamar a `alElegir` (no hay bucle). */
 function _turnoCalorCablear_(raiz, cv, calor, alElegir){
   if(!raiz) return;
-  var celdas=[].slice.call(raiz.querySelectorAll('[data-tcal]'));
-  var elige=function(el){
-    var k=el.dataset.tcal, b=_turnoBloque_(cv, k), vale=b.claves.length && _turnoBloqueResp_(cv, calor, b).length;
-    var det=raiz.querySelector('[data-tcal-det]');
-    /* ⛔ Un bloque que no vale NO mueve la marca: el contorno y el formulario son lo mismo (lo que se ve elegido es lo que se convoca).
-       Sólo se dice, abajo, por qué no vale. */
-    if(!vale){ if(det) det.innerHTML=_turnoDetalle_(cv, k, calor, b); return; }
+  var celdas=[].slice.call(raiz.querySelectorAll('[data-tcal]')), F=(cv&&cv.franjas)||[], sel=null;
+  var idx=function(k){ var i; for(i=0;i<F.length;i++) if(F[i].k===k) return i; return -1; };
+  var tramo=function(a, b){   /* ¿las dos franjas son del mismo tramo contiguo (sin el hueco de la comida por medio)? */
+    var t=_tramosFranja_(F.map(function(f){ return f.k; })), i;
+    for(i=0;i<t.length;i++) if(t[i].indexOf(F[a].k)>=0) return t[i].indexOf(F[b].k)>=0;
+    return false;
+  };
+  var det=raiz.querySelector('[data-tcal-det]');
+  var marca=function(b, k){
     celdas.forEach(function(x){
-      var dentro=b.claves.some(function(fr){ return x.dataset.tcal===_dispClave_(b.dia,fr); });
+      var dentro=b ? b.claves.some(function(fr){ return x.dataset.tcal===_dispClave_(b.dia,fr); }) : false;
       x.style.outline = dentro ? '2px solid var(--ink)' : '';
       x.style.outlineOffset = dentro ? '-2px' : '';
       if(dentro) x.setAttribute('data-tcal-bloque','1'); else x.removeAttribute('data-tcal-bloque');
     });
-    raiz.setAttribute('data-tcal-sel', k);
-    if(det) det.innerHTML=_turnoDetalle_(cv, k, calor, b);
+    if(b) raiz.setAttribute('data-tcal-sel', k); else raiz.removeAttribute('data-tcal-sel');
+    if(det && b) det.innerHTML=_turnoDetalle_(cv, k, calor, b);
+  };
+  var elige=function(el){
+    var k=el.dataset.tcal, p=_convDeClave_(k), i=idx(p[1]);
+    if(i<0) return;
+    var nuevo=(sel && sel.dia===p[0] && i>sel.fin && tramo(sel.ini, i)) ? {dia:p[0], ini:sel.ini, fin:i} : {dia:p[0], ini:i, fin:i};
+    var b=_turnoBloqueRango_(cv, nuevo.dia, nuevo.ini, nuevo.fin), vale=b.claves.length && _turnoBloqueResp_(cv, calor, b).length;
+    /* ⛔ Un bloque que no vale NO mueve la marca: el contorno y el formulario son lo mismo (lo que se ve elegido es lo que se convoca).
+       Sólo se dice, abajo, por qué no vale. */
+    if(!vale){ if(det) det.innerHTML=_turnoDetalle_(cv, k, calor, b); return; }
+    sel=nuevo; marca(b, k);
     if(typeof alElegir==='function') alElegir(b);
   };
   celdas.forEach(function(el){
     el.onclick=function(){ elige(el); };
     el.onkeydown=function(e){ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); elige(el); } };
   });
+  raiz._tcalMarca=function(fecha, hora, duracion){
+    var claves=((cv.dias||[]).indexOf(fecha)>=0) ? _clavesDeHoras_(cv, hora, duracion, 1) : [];
+    if(!claves.length){ sel=null; marca(null); return; }
+    var i0=idx(claves[0]), i1=idx(claves[claves.length-1]);
+    sel={dia:fecha, ini:i0, fin:i1};
+    marca(_turnoBloqueRango_(cv, fecha, i0, i1), _dispClave_(fecha, claves[0]));
+  };
 }
 
 /* Quien FIRMA un parte enrutado a esa unidad, contando que nadie decide lo suyo.
@@ -10349,16 +10437,36 @@ function _anotExtra_(act, form){
   return x;
 }
 
+/* 03/11 (Daniel: «José rellenó el subtítulo creyendo que era el título»): CADA campo del panel es UN BLOQUE con marco —rótulo
+   en claro y en minúscula, su ayuda debajo y la caja pegada— y los bloques se separan entre sí más que el rótulo de su caja.
+   Antes el rótulo era un `.sc` de 9,5 px, gris y en mayúsculas, con la ayuda DENTRO, y no se sabía a qué caja iba. Una sola regla para las
+   dos caras (`.anot-c`); el placeholder va en cursiva para que no parezca un valor ya escrito. */
+function _anotCss_(){
+  if (document.getElementById('anotCss')) return;
+  var s = document.createElement('style'); s.id = 'anotCss';
+  s.textContent =
+    '.anot-c{display:block;gap:0;margin:12px 0 0;padding:10px 11px 11px;border:1px solid var(--line);border-radius:12px;background:var(--sur)}' +
+    '.anot-r{display:block;font-size:13px;font-weight:600;color:var(--ink);line-height:1.25}' +
+    '.anot-h{display:block;margin:2px 0 7px;font-size:11.5px;color:var(--ink2);line-height:1.35}' +
+    '.anot-c input::placeholder,.anot-c textarea::placeholder{color:var(--ink2);font-style:italic;opacity:.75}';
+  document.head.appendChild(s);
+}
+/* El bloque: `rot` es el rótulo, `ayuda` la frase corta debajo (puede ir vacía) y `html` la caja. Es un <label>: tocar el rótulo enfoca SU caja. */
+function _anotCampoHTML_(rot, ayuda, html, tag){
+  tag = tag || 'label';
+  return '<' + tag + ' class="campo anot-c"><span class="anot-r">' + rot + '</span>' +
+    (ayuda ? '<span class="anot-h">' + ayuda + '</span>' : '<span class="anot-h" style="margin:0 0 7px"></span>') + html + '</' + tag + '>';
+}
+
 /* El panel. `css` es el estilo de los campos de la cara (el escritorio pasa `CAMPO_CSS`; el móvil, nada). */
 function _anotPanelHTML_(pre, act, id, css, o){
   act = act || {}; o = o || {};
-  if (typeof document !== 'undefined' && document.head) _pselCss_();   /* los chips de las etiquetas son los de `elegirPersonas` */
+  if (typeof document !== 'undefined' && document.head) { _pselCss_(); _anotCss_(); }   /* los chips de las etiquetas son los de `elegirPersonas` */
   var st = css ? ' style="' + css + '"' : '';
   var sg = act.sugerida || null;
   /* El contorno azul de «lo ha cambiado el bot», en el MISMO atributo style que el de la cara. */
   var stS = sg ? ' style="' + (css ? css + ';' : '') + 'outline:2px solid #3f9ed6"' : st;
-  var campo = function(rot, html){ return '<label class="campo" style="display:block;margin-top:9px">' +
-    '<span class="sc" style="display:block;margin-bottom:5px">' + rot + '</span>' + html + '</label>'; };
+  var campo = function(rot, ayuda, html){ return _anotCampoHTML_(rot, ayuda, html); };
   if (_solAnDoc_['an' + pre] !== String(id)){ delete SOLP['an' + pre]; delete SOLTXT['an' + pre]; _solAnDoc_['an' + pre] = String(id); }   /* otro expediente: nada de la propuesta del anterior */
   /* ⛔ 28/10: `data-anotdoc`, NO `data-doc`: el móvil le pone a todo `[data-doc]` un onclick que ABRE la ficha, y un toque
      dentro del panel la repintaba con lo escrito borrado (visto probando el check como usuario). */
@@ -10371,22 +10479,21 @@ function _anotPanelHTML_(pre, act, id, css, o){
     /* 28/10: con la portada SUGERIDA al llegar, título y subtítulo salen ya editados (en azul) y se dice por qué. */
     (sg ? '<p class="rnota" id="' + pre + 'Sug" style="margin:9px 0 0;color:#3f9ed6">'+ico('lapiz')+' Título editado al llegar: ' +
       esc(sg.motivo) + ' (era «' + esc(sg.original) + '»). Revísalo; puedes cambiarlo.</p>' : '') +
-    campo('Título · una línea en la portada', '<input id="' + pre + 'Tit" value="' + esc(sg ? sg.titulo : (act.titulo || '')) + '"' + stS + '>') +
-    campo('Subtítulo · hasta dos líneas; vacío = sin subtítulo', '<input id="' + pre + 'Sub" value="' + esc(sg ? sg.subtitulo : (act.subtitulo || '')) + '"' + stS + '>') +
+    campo('Título', 'Una línea en la portada', '<input id="' + pre + 'Tit" value="' + esc(sg ? sg.titulo : (act.titulo || '')) + '"' + stS + '>') +
+    campo('Subtítulo', 'Hasta dos líneas. Vacío = sin subtítulo', '<input id="' + pre + 'Sub" value="' + esc(sg ? sg.subtitulo : (act.subtitulo || '')) + '" placeholder="Sin subtítulo"' + stS + '>') +
     /* 28/10: el CHECK — «un tick […] que cada vez que editen algo se desactive» (ver `_anotComprobar_`). */
     '<div style="margin-top:9px"><button type="button" class="btn" style="width:100%" id="' + pre + 'Chk" data-anotchk="' + pre +
       '">Comprobar portada</button><p class="rnota" id="' + pre + 'ChkEst" style="margin:6px 0 0">' +
       'Hace falta para aprobar con anotaciones: mete el título y el subtítulo en la portada de verdad.</p></div>' +
-    '<div class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">Confidencialidad</span>' +
-      nxElige(pre + 'Conf', (act.confidencialidad ? [] : [['', '— sin indicar —']]).concat([['publico', 'Público'], ['interno', 'Interno']]), act.confidencialidad || '') + '</div>' +
+    _anotCampoHTML_('Confidencialidad', '', nxElige(pre + 'Conf', (act.confidencialidad ? [] : [['', '— sin indicar —']]).concat([['publico', 'Público'], ['interno', 'Interno']]), act.confidencialidad || ''), 'div') +
     /* 02/11 · AUTORES, con el selector de personas ÚNICO (chips; lo elegido en rojo, sin tick). Cambiarlos es un arreglo DISTINTO del que
        ya hace la portada sola: por eso vive aquí, en «con anotaciones», y no en «Aprobar». */
-    (act.autores ? '<div class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">Autores · así saldrán en la portada</span>' +
+    (act.autores ? _anotCampoHTML_('Autores', 'Así saldrán en la portada',
       elegirPersonas(pre + 'Autores', {universo: _activos_().map(function(m){ return m.nombre; }).filter(function(n){ return n !== o.excluir; }),
         marcadas: act.autores, multi: true, titulo: 'Autores', vacio: 'Escribe un nombre o pulsa «Ver lista».'}) +
-      '<p class="rnota" style="margin:6px 0 0">Si el documento ya trae sus autores, la portada los pone sin que hagas nada. Cámbialos sólo si no son esos.</p></div>' : '') +
+      '<p class="rnota" style="margin:6px 0 0">Si el documento ya trae sus autores, la portada los pone sin que hagas nada. Cámbialos sólo si no son esos.</p>', 'div') : '') +
     /* 02/11: las etiquetas desde el BANCO. `#Etq` (oculto) guarda la lista; se ve lo elegido, el buscador y «Ver todas» (las dos caras). */
-    '<div class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">Etiquetas · del banco, o crea una</span>' +
+    _anotCampoHTML_('Etiquetas', 'Del banco, o crea una',
       '<input id="' + pre + 'Etq" style="display:none" tabindex="-1" value="' + esc((act.etiquetas || []).join(', ')) + '">' +
       '<div class="psel-fila" id="' + pre + 'EtqSel">' + _etqSelHTML_(act.etiquetas || [], act.etiquetas || []) + '</div>' +
       '<div id="' + pre + 'EtqSgd" style="margin-top:7px">' + _etqSgdHTML_(act.etqSugeridas || [], act.etiquetas || []) + '</div>' +
@@ -10395,9 +10502,9 @@ function _anotPanelHTML_(pre, act, id, css, o){
         (o.verTodas ? '<button type="button" class="psel-ver" data-etqver="' + pre + '" data-p>Ver todas</button>' : '') + '</div>' +
       '<div class="psel-fila" id="' + pre + 'EtqSug" style="margin-top:7px"></div>' +
       '<p class="rnota" id="' + pre + 'EtqAviso" style="margin:6px 0 0"></p>' +
-      (o.verTodas ? '<div id="' + pre + 'EtqTodas" style="display:none;margin-top:6px;max-height:320px;overflow-y:auto"></div>' : '') + '</div>' +
+      (o.verTodas ? '<div id="' + pre + 'EtqTodas" style="display:none;margin-top:6px;max-height:320px;overflow-y:auto"></div>' : ''), 'div') +
     /* 01/11: la versión la propuso el autor; el revisor puede cambiarla. Texto con teclado numérico, no `type=number`. */
-    (act.conVersion ? campo('Versión · la propuso el autor; puedes cambiarla', '<input id="' + pre + 'Ver" inputmode="decimal" maxlength="6" ' +
+    (act.conVersion ? campo('Versión', 'La propuso el autor; puedes cambiarla', '<input id="' + pre + 'Ver" inputmode="decimal" maxlength="6" ' +
       'placeholder="2" value="' + esc(act.version || '') + '"' + st + '>') : '') +
   '</div>';
 }
@@ -10476,7 +10583,7 @@ var _solAnDoc_ = {}, _ANOT_BUSCAR_ = null;
 function _solAnotCfg_(pre, id, css){
   var expediente = function(){ var c = document.getElementById(pre + 'Anot'); return c && _ANOT_BUSCAR_ ? _ANOT_BUSCAR_(c.getAttribute('data-anotdoc')) : null; };
   return {ta: '#' + pre + 'Ind', boton: 'Proponer con SolarIA', sitio: 'anotaciones', sinCaja: true, sigue: 'Los campos siguen como estaban.',
-    entrada: {id: pre + 'Ind', rot: 'Qué cambiar · SolarIA rellena los campos de abajo', rows: 3, css: css,
+    entrada: {id: pre + 'Ind', rot: 'Qué cambiar', ayuda: 'SolarIA rellena los campos de abajo', bloque: true, rows: 3, css: css,
               ph: '«acorta el título», «ponle de subtítulo…», «es interno», «añade la etiqueta…»'},
     antes: function(v){ return String(v || '').trim() ? '' : 'Escribe qué quieres que cambie y SolarIA rellena los campos.'; },
     bloquea: function(on){ _anotBloquear_(pre, on); },
@@ -10903,12 +11010,13 @@ function _autorCandidatos_(actual){
     .filter(function(n){ return n !== PD_NOM && n !== REV2_NOM && n !== actual; });
 }
 function _autorPanelHTML_(pre, id, actual, css){
+  if (typeof document !== 'undefined' && document.head) _anotCss_();
   var st = css ? ' style="' + css + '"' : '';
   return '<div id="' + pre + 'Autor" data-autor="' + pre + '" data-autordoc="' + esc(String(id)) + '" style="margin-top:10px">' +
-    '<span class="sc" style="display:block;margin-bottom:5px">Autor · ahora ' + esc(actual || '—') + '</span>' +
     /* El selector de personas ÚNICO, de uno en uno (antes: `<input list>` + `<datalist>`). */
-    elegirPersonas(pre + 'Autor', {universo:_autorCandidatos_(actual), multi:false, titulo:'Autor', vacio:'Escribe un nombre o pulsa «Ver lista».'}) +
-    '<button type="button" class="btn" style="margin-top:8px;width:100%" data-autorcambiar="' + pre + '">Cambiar autor</button></div>';
+    _anotCampoHTML_('Autor', 'Ahora: ' + esc(actual || '—'),
+      elegirPersonas(pre + 'Autor', {universo:_autorCandidatos_(actual), multi:false, titulo:'Autor', vacio:'Escribe un nombre o pulsa «Ver lista».'}) +
+      '<button type="button" class="btn" style="margin-top:8px;width:100%" data-autorcambiar="' + pre + '">Cambiar autor</button>', 'div') + '</div>';
 }
 /* «Autor cambiado por X (antes: Y)»: lo ve cualquiera que abra la ficha. Vacío si nadie lo cambió. */
 function _autorRastroHTML_(e){
@@ -12202,7 +12310,7 @@ function _ordenOcupado_(st){ return !!((st.mic&&st.mic.fase) || st.ia.fase==='pe
 function _ordenSolariaHTML_(st){
   if(!_solSitio_('orden')) return '';
   var ia=st.ia, mic=st.mic, h='<div data-ordia style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+
-    '<span class="sc" style="display:block;margin-bottom:4px">Dile a SolarIA qué quieres</span>';
+    '<span class="sc" style="display:block;margin-bottom:4px">'+ico('chispa')+' Dile a SolarIA qué quieres</span>';
   h+='<textarea data-ordiatxt rows="3" maxlength="2000"'+(_ordenOcupado_(st)?' readonly':'')+' placeholder="Por ejemplo: basándote en la última reunión, mantén «Inclusión de puntos» y «Ruegos y preguntas», y añade puntos para el presupuesto y el test de motor." style="width:100%;box-sizing:border-box">'+esc(ia.texto)+'</textarea>';
   h+='<div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">'+
     '<button type="button" class="btn mini" data-ordmic aria-label="Dictar"'+((mic&&mic.fase==='transcribiendo')||ia.fase==='pensando'||ia.fase==='propuesta'?' disabled':'')+'>'+
@@ -12210,7 +12318,7 @@ function _ordenSolariaHTML_(st){
     '<span class="rnota" style="flex:1;margin:0">'+(mic&&mic.fase==='grabando'?'Grabando… habla y pulsa «Parar».':mic&&mic.fase==='transcribiendo'?'Transcribiendo…':ia.fase==='pensando'&&ia.origen==='notion'?'Leyendo la página de Notion…':'')+'</span>'+
     _solBtnHTML_('data-ordiaenviar', 'Proponer con SolarIA', {off: _ordenOcupado_(st), pensando: ia.fase==='pensando'&&ia.origen!=='notion'})+'</div>';
   if(ia.fase==='pensando'&&ia.origen!=='notion') h+=_solPensandoHTML_();
-  if(ia.fase==='propuesta') h+='<div data-ordiaprop style="margin-top:8px"><span class="sc" style="display:block;margin-bottom:4px">'+(ia.origen==='notion'?'De la página de Notion':'Propuesta de SolarIA')+'</span>'+
+  if(ia.fase==='propuesta') h+='<div data-ordiaprop style="margin-top:8px"><span class="sc" style="display:block;margin-bottom:4px">'+(ia.origen==='notion'?'De la página de Notion':ico('chispa')+' Propuesta de SolarIA')+'</span>'+
     _ordTablaHTML_(ia.prop, st.e&&st.e.inicio)+'<p class="rnota" style="margin:6px 0 0">'+esc(ia.nota||'Esta es la propuesta. Revísala antes de usarla.')+'</p>'+
     _solAccionesHTML_([['data-ordiaok', 'Usar esto', true], ['data-ordiano', 'Descartar']])+'</div>';
   if(ia.fase==='usada') h+='<div class="nota" style="border:0;padding:4px 0">'+(ia.origen==='notion'?'Tabla de Notion aplicada.':'Propuesta aplicada a la tabla.')+' <button type="button" class="btn sm" data-ordiaun>Volver al original</button></div>';
