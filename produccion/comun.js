@@ -9780,7 +9780,7 @@ function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.
 /* Que es «la imputacion» de un parte: UN solo sitio, para que lo que se VALIDA y lo que se
    ENVIA no puedan desincronizarse en silencio (que es como estuvieron un tiempo en el movil).
    Vive aqui desde el 14/08 porque el escritorio ficha con la misma regla. */
-function _imputacion_(f){ return f.cat==='tareas' ? (f.tarea==='__otro__' ? f.detalle.trim() : f.tarea) : f.detalle.trim(); }
+function _imputacion_(f){ return f.cat==='tareas' ? (f.tarea==='__otro__' ? String(f.detalle||'').trim() : f.tarea) : String(f.detalle||'').trim(); }   /* 04/11: sin `detalle` → '' (y el «Di a qué se imputa»), no un TypeError */
 
 /* El `url` (page-id de Notion) de la tarea imputada, o `null` (01/11): el servidor casa por él la unidad del parte, y el
    título queda de respaldo. Sólo si la imputación ES una de TUS tareas y su título no se repite entre ellas (si se
@@ -11345,29 +11345,33 @@ function _tramosEnvio_(f){
   return _tramosExtra_(f).length ? _tramosTodos_(f).map(function(t){ return {ini:t.ini, fin:t.fin}; }) : undefined;
 }
 /* Las filas de los tramos extra, el aviso y el chip «Otro tramo». `campo(id, rótulo, valor)` es el campo de hora de la cara. */
-function _tramosHTML_(f, campo){
+/* `pre` (04/11): el prefijo de ESTE formulario ('' tu parte, 'blq' el de bloque). Dos formularios con tramos en la misma página no
+   pueden compartir nombres: `_tramosCablear_` engancha por ellos, y con los mismos el clic se lo quedaba el último en engancharse. */
+function _tramosHTML_(f, campo, pre){
+  pre=pre||'';
   var ex=_tramosExtra_(f), err=_tramosError_(f);
   return ex.map(function(t,i){
-    return '<div data-tramo="'+i+'" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-top:10px">'+
-      campo('trIni'+i,'Entrada '+(i+2),t.ini)+campo('trFin'+i,'Salida '+(i+2),t.fin)+
-      '<button type="button" class="btn mini" data-tr-del="'+i+'" data-p>Quitar</button></div>';
+    return '<div data-tramo="'+i+'" data-tr-pre="'+pre+'" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-top:10px">'+
+      campo(pre+'trIni'+i,'Entrada '+(i+2),t.ini)+campo(pre+'trFin'+i,'Salida '+(i+2),t.fin)+
+      '<button type="button" class="btn mini" data-tr-del="'+i+'" data-tr-pre="'+pre+'" data-p>Quitar</button></div>';
   }).join('')+
-  '<p class="rnota" id="trAviso" style="margin:8px 0 0;color:var(--warn)'+(err?'':';display:none')+'">'+esc(err)+'</p>'+
-  '<div style="margin-top:10px"><button type="button" class="btn mini" data-tr-add data-p>+ Otro tramo</button></div>';
+  '<p class="rnota" id="'+pre+'trAviso" style="margin:8px 0 0;color:var(--warn)'+(err?'':';display:none')+'">'+esc(err)+'</p>'+
+  '<div style="margin-top:10px"><button type="button" class="btn mini" data-tr-add="'+pre+'" data-p>+ Otro tramo</button></div>';
 }
 /* Engancha los campos y los chips. `cambio()` recalcula sin repintar (no se pierde el foco); `repintar()` al añadir o quitar. */
-function _tramosCablear_(f, cambio, repintar){
+function _tramosCablear_(f, cambio, repintar, pre){
+  pre=pre||'';
   _tramosExtra_(f).forEach(function(t,i){
-    [['trIni'+i,'ini'],['trFin'+i,'fin']].forEach(function(x){
+    [[pre+'trIni'+i,'ini'],[pre+'trFin'+i,'fin']].forEach(function(x){
       var e=document.getElementById(x[0]); if(!e) return;
-      e.oninput=e.onchange=function(){ t[x[1]]=e.value.trim(); var a=document.getElementById('trAviso');
+      e.oninput=e.onchange=function(){ t[x[1]]=e.value.trim(); var a=document.getElementById(pre+'trAviso');
         if(a){ var m=_tramosError_(f); a.textContent=m; a.style.display=m?'':'none'; } cambio(); };
       e.onblur=function(){ var h=_horaTecleada_(e.value); if(h===e.value) return; e.value=h; e.oninput(); };
     });
   });
-  var q=document.querySelectorAll('[data-tr-del]'), i;
+  var q=document.querySelectorAll('[data-tr-del][data-tr-pre="'+pre+'"]'), i;
   for(i=0;i<q.length;i++) (function(b){ b.onclick=function(){ f.tramos.splice(+b.getAttribute('data-tr-del'),1); repintar(); }; })(q[i]);
-  var a=document.querySelector('[data-tr-add]');
+  var a=document.querySelector('[data-tr-add="'+pre+'"]');
   if(a) a.onclick=function(){
     if(!Array.isArray(f.tramos)) f.tramos=[];
     var u=f.tramos.length ? f.tramos[f.tramos.length-1].fin : f.fin;      /* el siguiente empieza donde acabó el anterior, y dura 1 h */
@@ -11588,7 +11592,7 @@ function _bloqueFormHTML_(){
       '<div style="margin:0 0 12px"><div style="margin:0 0 8px">'+lab('Fecha')+nxFecha('blqFecha', B.fecha, {max:_hoyNxISO_()})+'</div>'+
       '<div style="display:flex;gap:12px;flex-wrap:wrap"><div>'+lab('Desde')+nxHora('blqIni', B.ini||'16:00')+'</div>'+
       '<div>'+lab('Hasta')+nxHora('blqFin', B.fin||'17:00')+'</div></div>'+
-      _tramosHTML_(B, function(id, rot, v){ return '<div>'+lab(rot)+nxHora(id, v)+'</div>'; })+'</div>')+
+      _tramosHTML_(B, function(id, rot, v){ return '<div>'+lab(rot)+nxHora(id, v)+'</div>'; }, 'blq')+'</div>')+
     lab('Participantes')+
     elegirPersonas('blq', {universo:_activos_().map(function(m){ return m.nombre; }), marcadas:B.parts.map(function(p){ return p.nombre; }),
       titulo:'Participantes', vacio:'Nadie todavía: escribe un nombre o pulsa «Ver lista».', confirmarQuitar:true,
@@ -11624,7 +11628,10 @@ function _bloqueCablear_(cb){
   if(B.res) return;
   _bloqueHorasPintar_();
   _bloqueClasPintar_();
-  _tramosCablear_(B, _bloqueHorasPintar_, function(){ cb.refrescar(); });
+  /* ⛔ 04/11 (Daniel: «era un parte de bloque de otras personas […] y no iba. En el móvil»): los tramos del bloque llevan su
+     PROPIO prefijo ('blq'). Con los mismos nombres que los de tu parte, cada formulario enganchaba «el primer» «+ Otro tramo» del
+     documento y el último en engancharse se quedaba el clic — en el móvil, tu parte, oculto: el tramo caía donde no se ve. */
+  _tramosCablear_(B, _bloqueHorasPintar_, function(){ cb.refrescar(); }, 'blq');
   [['blqFecha','fecha'],['blqIni','ini'],['blqFin','fin']].forEach(function(x){
     var e=$('#'+x[0]); if(!e) return;
     if(!BLQ[x[1]]) BLQ[x[1]]=e.value;    /* lo que enseña `nxHora` por defecto es lo que se manda */
