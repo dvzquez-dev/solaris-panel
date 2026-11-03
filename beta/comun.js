@@ -261,6 +261,7 @@ var ICO = {
   escritorio:'<path d="M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3.2l.7 3H17v1.5H7V19h.5l.7-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM5 6.2h14V14H5z"/>',
   ajustes:'<path d="M12 5.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13zM12 9.4a2.6 2.6 0 1 0 0 5.2a2.6 2.6 0 1 0 0-5.2z"/><path d="M10.6 2h2.8v4.5h-2.8zM10.6 17.5h2.8V22h-2.8zM2 10.6h4.5v2.8H2zM17.5 10.6H22v2.8h-4.5z"/><path d="M16.88 14.9L14.9 16.88l2.83 2.83 1.98-1.98zM7.12 14.9L9.1 16.88l-2.83 2.83-1.98-1.98zM16.88 9.1L14.9 7.12l2.83-2.83 1.98 1.98zM7.12 9.1L9.1 7.12 6.27 4.29 4.29 6.27z"/>',
   llave:'<path d="M14.5 3.5a5 5 0 0 0-4.9 6.4L3.9 15.6a2.4 2.4 0 0 0 3.4 3.4l5.7-5.7a5 5 0 0 0 6.4-4.9l-3.1 3.1-2.6-.7-.7-2.6 3.1-3.1a5 5 0 0 0-2.6-.6zM5.1 17.4a.8.8 0 1 0 1.6 0a.8.8 0 1 0-1.6 0z"/>',
+  bloque:'<path d="M9 11.2a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.8 19.2a6.2 6.2 0 0 1 12.4 0v.8H2.8zM16.6 10.6a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM16.9 13.1a5.2 5.2 0 0 1 4.3 5.1V20h-4.4v-1.3c0-2-.7-4-1.9-5.5.5-.1 1.1-.2 1.5-.2z"/>',
   enlace:'<path d="M3 12a4 4 0 0 1 4-4h4v2H7a2 2 0 0 0 0 4h4v2H7a4 4 0 0 1-4-4z"/><path d="M21 12a4 4 0 0 1-4 4h-4v-2h4a2 2 0 0 0 0-4h-4V8h4a4 4 0 0 1 4 4z"/><path d="M8.5 11h7v2h-7z"/>'
 };
 /* Emoji -> icono, para `icoTexto`. Sin 📌 (se queda). Una variante con selector (️) o sin él es la misma clave. */
@@ -281,6 +282,15 @@ function icoTexto(html){
     var n = ICO_DE_EMOJI[m.replace(/️/g,'')];
     return n ? ico(n) : '';
   });
+}
+
+/* 03/11 (Daniel: «algún simbolito de que fue en bloque, de que no fue individual»): el icono de un parte que vino de un parte de bloque
+   (`p.bloque`, el id del lote; en los normalizados de las dos caras y en el crudo). '' si no lo es. Sin texto en la fila: el `title` y el
+   `aria-label` lo dicen. UNA función para todas las listas de partes de las dos caras. */
+function _icoBloque_(p){
+  if(!p || p.bloque==null || p.bloque==='') return '';
+  return '<span class="eb" role="img" aria-label="Parte en bloque" title="Parte en bloque: declarado junto a otras personas" '+
+    'style="color:var(--ink3);margin-right:.4em;display:inline-block">'+ico('bloque')+'</span>';
 }
 
 function pad(n){return String(n).padStart(2,'0');}
@@ -13313,7 +13323,8 @@ function _msAFechaHora_(ms){
 function _bloqueAbrir_(c){
   BLQ={modo:c.modo, reunion:c.reunion||null, reunion_id:c.reunion_id==null?null:c.reunion_id, titulo:c.titulo||'',
     fecha:c.fecha||'', ini:c.ini||'', fin:c.fin||'', en_curso:c.en_curso||null, resumen:'', res:null, env:false,
-    parts:(c.parts||[]).map(function(n){ return {nombre:n, horas:''}; }), clave:_claveUso_()};
+    parts:(c.parts||[]).map(function(n){ return {nombre:n, horas:''}; }), clave:_claveUso_(),
+    cat:'tareas', subcat:'', tarea:'', detalle:''};     /* 03/11: se clasifica como un parte normal (`_imputacion_` lee estos cuatro) */
   delete SOLP.blq;                                    // la propuesta de SolarIA es de ESTE formulario, no del anterior
   /* ¿tiene grabación? Si no se sabe aún, se pregunta y se repinta SÓLO la etiqueta (el formulario no se toca) */
   var id=BLQ.reunion_id, e=id!=null && AUDIO_EST[id];
@@ -13345,6 +13356,11 @@ function _bloqueCuerpo_(B){
   if(d>_maxHorasParte_()) throw new Error('Un bloque no pasa de '+_maxHorasParte_()+' h.');
   var o={fecha:B.fecha, ini:B.ini, fin:B.fin, tramos:_tramosEnvio_(B), participantes:parts, resumen:resumen||undefined, clave:B.clave};
   if(B.reunion_id!=null){ o.reunion_id=B.reunion_id; o.tarea=B.titulo||undefined; }
+  else{                                                    /* sin reunión: lo mismo que clasifica un parte normal */
+    var im=_imputacion_(B); if(!im) throw new Error('Di a qué se imputa: elige la tarea o escribe el concepto.');
+    o.categoria=B.cat; o.subcat=_subcatEnvio_(B)||undefined; o.tarea=im;
+    o.tareaUrl=_imputacionUrl_(B, TAREAS, _fichaYo_())||undefined;
+  }
   return o;
 }
 
@@ -13383,6 +13399,33 @@ function _bloqueHorasHTML_(){
     '<button type="button" class="btn mini" data-p data-blqiguales>Horas iguales para todos</button>';
 }
 
+/* La clasificación del parte de bloque (sin reunión): categoría · subcategoría · imputación, los MISMOS campos del parte normal
+   (`fCat`/`fSubcat`/`fTar`/`fDetalle` de Fichar). Se repinta ella sola en `#blqClas` (el resto del formulario no se toca). */
+function _bloqueClasHTML_(B){
+  var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
+  var tareas=_tareasResp_(TAREAS, _fichaYo_()).map(function(t){ return [t.n, t.n]; });
+  return '<div class="campo" style="margin:0 0 10px">'+lab('Categoría <span class="req">*</span>')+
+      nxElige('blqCat', [['tareas','Tarea'],['reunion','Reunión no convocada'],['turno','Turno no convocado'],['compensacion','Compensación']], B.cat)+'</div>'+
+    _subcatHTML_('blqSub', B.subcat, B.cat)+
+    (B.cat==='tareas'
+      ? '<div class="campo" style="margin:0 0 10px">'+lab('Imputar a <span class="req">*</span>')+
+          nxElige('blqTar', tareas.concat([['__otro__','Otro (lo escribo)']]), B.tarea)+'</div>'+
+        (B.tarea==='__otro__' ? '<label class="campo" style="display:block;margin:0 0 10px">'+lab('Cuál <span class="req">*</span>')+
+          '<input id="blqDet" style="'+_BLQ_INPUT_+'" value="'+esc(B.detalle)+'" placeholder="nombre de la tarea"></label>' : '')
+      : '<label class="campo" style="display:block;margin:0 0 10px">'+lab((B.cat==='reunion'?'Nombre de la reunión':B.cat==='turno'?'Qué turno':'Concepto')+' <span class="req">*</span>')+
+          '<input id="blqDet" style="'+_BLQ_INPUT_+'" value="'+esc(B.detalle)+'" placeholder="'+
+          (B.cat==='reunion'?'p. ej. Integración motor / estructura':B.cat==='turno'?'p. ej. Turno de taller':'tiempo real que el sistema no refleja')+'"></label>');
+}
+/* Repinta SOLO la clasificación y la engancha (cambiar de categoría cambia los campos que siguen). */
+function _bloqueClasPintar_(){
+  var c=$('#blqClas'); if(!c || !BLQ) return;
+  c.innerHTML=_bloqueClasHTML_(BLQ);
+  [['blqCat','cat'],['blqSub','subcat'],['blqTar','tarea']].forEach(function(x){
+    var e=$('#'+x[0]); if(!e) return;
+    e.onchange=function(){ BLQ[x[1]]=e.value; if(x[1]==='cat') BLQ.subcat=''; if(x[1]!=='subcat') _bloqueClasPintar_(); }; });
+  var d=$('#blqDet'); if(d) d.oninput=function(){ BLQ.detalle=d.value; };
+}
+
 function _bloqueFormHTML_(){
   var B=BLQ; if(!B) return '';
   var fin=B.modo==='finalizar';
@@ -13410,6 +13453,7 @@ function _bloqueFormHTML_(){
         BLQ.parts=l.map(function(n){ return {nombre:n, horas:antes[n]||''}; });
         _bloqueHorasPintar_(); }})+
     '<div id="blqHoras" style="margin:0 0 12px">'+_bloqueHorasHTML_()+'</div>'+
+    (B.reunion_id==null && !fin ? '<div id="blqClas" style="margin:0 0 12px">'+_bloqueClasHTML_(B)+'</div>' : '')+
     '<label style="display:block;margin:0 0 12px">'+lab('<span id="blqResLab">'+_bloqueResLabel_(B)+'</span>')+
       '<textarea id="blqResumen" rows="4" style="'+_BLQ_INPUT_+';resize:vertical" placeholder="Qué se trató o se hizo…">'+esc(B.resumen)+'</textarea>'+
       '<small id="blqCuenta" style="color:var(--ink3)">'+(B.resumen||'').trim().length+' / '+BLQ_MIN_RESUMEN+'</small></label>'+
@@ -13435,6 +13479,7 @@ function _bloqueCablear_(cb){
   $$('[data-blqcerrar]').forEach(function(b){ b.onclick=function(){ BLQ=null; cb.cerrar(); }; });
   if(B.res) return;
   _bloqueHorasPintar_();
+  _bloqueClasPintar_();
   _tramosCablear_(B, _bloqueHorasPintar_, function(){ cb.refrescar(); });
   [['blqFecha','fecha'],['blqIni','ini'],['blqFin','fin']].forEach(function(x){
     var e=$('#'+x[0]); if(!e) return;
@@ -13545,7 +13590,7 @@ function _bloqueColaHTML_(grupos, o){
     var tot=0; g.lineas.forEach(function(p){ tot+=o.horas(p); });
     var tit=(g.reunion_id!=null && o.titulo(g.reunion_id)) || 'Bloque';
     return '<div data-bloque-card="'+esc(g.bloque)+'" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 10px">'+
-      '<div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(tit)+'</b>'+
+      '<div style="display:flex;justify-content:space-between;gap:8px"><b>'+_icoBloque_(g.lineas[0])+esc(tit)+'</b>'+
         '<span class="mono">'+g.lineas.length+' · '+nf2(tot)+' h</span></div>'+
       '<p style="margin:6px 0 9px;font-size:12.5px;color:var(--ink2);line-height:1.5">'+esc(g.resumen||'(sin resumen)')+'</p>'+
       g.lineas.map(function(p){
