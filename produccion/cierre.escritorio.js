@@ -153,7 +153,7 @@ function _pinTemporada_(m){
     /* ⛔ 21/10 (auditor 9, 🟠 7): calcular otro SUSTITUYE en la app el plan ya aplicado (la ranura `temporada_plan`), y
        no avisaba — el mensual sí. La copia de Drive y `salidas/` se conservan. */
     var _tpa=(typeof TEMP!=='undefined' && TEMP && TEMP.plan && TEMP.plan.aplicado) ? TEMP.plan : null;
-    if(!(await dialogoSiNo((_tpa ? '⚠️ Ya hay un cierre de temporada APLICADO (' + String(_tpa.temporada||'?') + '). Calcular otro lo '+
+    if(!(await dialogoSiNo((_tpa ? 'Ya hay un cierre de temporada APLICADO (' + String(_tpa.temporada||'?') + '). Calcular otro lo '+
       'SUSTITUYE en la app: la pantalla dejará de enseñarlo (la copia de Drive y salidas/ se conservan).' +
       String.fromCharCode(10,10) : '') + 'Calcular el cierre de TEMPORADA.' + String.fromCharCode(10,10) +
       'NO se aplica nada: la rutina saca el plan (a quién le sube los puntos al suelo de 5, la '+

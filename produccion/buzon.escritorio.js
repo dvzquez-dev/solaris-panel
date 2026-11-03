@@ -292,7 +292,7 @@ async function _enviarReporte_(datos, esMejora){
        subido a Drive. Callarse seria dejar creer que la marcaste para nada. */
     var sinFoto = datos.captura && !_capturaGuardada_(r);
     tost((esMejora?'Mejora enviada':'Fallo reportado')+' · '+((r&&r.id)||'')+'.'+
-      (sinFoto?' ⚠️ La foto NO se ha guardado: '+_avisoSinFoto_(r)+'.':''));
+      (sinFoto?' La foto NO se ha guardado: '+_avisoSinFoto_(r)+'.':''));
     if(vista==='buzon') _cargarBuzon_();
   }catch(e){
     /* ⛔ AQUI SE PERDIA TODO. Ahora se guarda el envio entero y se dice que se ha

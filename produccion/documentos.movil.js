@@ -23,8 +23,10 @@ function revisoresDe(e){
   var r = e.ambito==='archivo' ? [coordinadorDe(e.subsistema)]
         : e.ambito==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
-  r=r.filter(function(n){return n!==e.autor;});          /* nadie revisa lo suyo */
-  if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n){return n!==e.autor;});
+  /* nadie revisa lo suyo — 02/11: TODOS los autores (el que lo sube, los que nombra el documento y los ajustados), no sólo `autor`. */
+  var au=_autoresDe_(e), noAutor=function(n){return au.indexOf(n)<0;};
+  r=r.filter(noAutor);
+  if(!r.length) r=[PD_NOM,REV2_NOM].filter(noAutor);
   /* 01/11: SIN tercer peldaño. Antes acababa en `[PD_NOM]` sin volver a filtrar al autor: con `REV2_NOM === PD_NOM` y el PD
      de autor, el expediente se asignaba a su propio autor y no podía firmar NADIE, sin un error. Ahora `[]` es «no hay
      revisor asignable»: cada consumidor lo pinta («Sin revisor: avisa al Project Director») y nadie decide (`puedeDecidirDoc`). */
@@ -89,6 +91,7 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq, aj){
   } else if(acc==='cambios'){ e.estado='cambios'; e.nota=mot; }
   else if(acc==='rechazado'){ e.estado='rechazado'; e.nota=mot; }
   else return null;                       /* desconocida: no se toca NADA */
+  if(acc==='anot' && aj && aj.autores) e.decision={accion:acc, ajustes:{autores:aj.autores}};   /* 02/11: como el servidor, para que ninguno de ellos revise lo suyo */
   e.revisor=pilaDe(yoNombre());           /* constancia de quien decidio */
   return e;
 }
@@ -466,7 +469,7 @@ function verDoc(id){
          decían «al aprobar con anotaciones». Asimetría entre caras Y dentro de una cara. */
       /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el escritorio (`comun.js` `_anotPanelHTML_`):
          título, subtítulo, confidencialidad (desplegable público/interno) y etiquetas. Sólo donde se puede aprobar. */
-      (_yaAnalizado_(e) ? _anotPanelHTML_('d', _anotActualDe_(e), e.id, '') : '')+
+      (_yaAnalizado_(e) ? _anotPanelHTML_('d', _anotActualDe_(e), e.id, '', {excluir:yoNombre()}) : '')+
       '<label class="campo"><span class="sc">Motivo <span class="req">*</span> si pides cambios o rechazas</span>'+
       '<textarea id="dMot" placeholder="lo leerá el autor…"></textarea></label>'+
       _solIAHTML_('dm'+e.id, _solMotivoCfg_(e, '#dMot'))+
@@ -490,7 +493,7 @@ function verDoc(id){
     : _mioDoc
       ? _mioDoc
       : (revisoresDe(e).indexOf(yoNombre())>=0 && e.estado!=='revision'
-          ? '<p class="rnota" style="margin-top:14px">🔒 Ya está decidido. Puedes consultarlo, pero solo alguien de más rango puede cambiar la decisión.</p>'
+          ? '<p class="rnota" style="margin-top:14px">'+ico('candado')+' Ya está decidido. Puedes consultarlo, pero solo alguien de más rango puede cambiar la decisión.</p>'
           : (sinRev ? '<p class="rnota" style="margin-top:14px">Sin revisor: avisa al Project Director.</p>'
                     : '<p class="rnota" style="margin-top:14px">Este expediente lo revisa <b>'+revs+'</b>. Tú no decides aquí.</p>'));
 
@@ -555,7 +558,7 @@ function verDoc(id){
                : 'Pídeselo a quien lo subió antes de decidir.</div></div>'))+
     '<p class="rnota" style="margin-top:10px">'+(sinRev?'Sin revisor: avisa al Project Director.':'Revisa: <b>'+revs+'</b>')+'</p>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
-    _autorRastroHTML_(e)+
+    _autorRastroHTML_(e)+_autoresDocHTML_(e)+
     (_puedeCambiarAutor_(e.estado, yoNombre()) ? _autorPanelHTML_('dA', e.id, e.autor, '') : '')+
     (_mioDoc ? '' : _previaDocM_(e))+
     /* 01/11: sólo el PD, y sólo enseña algo si el expediente está decidido (`comun.js`); para cualquier otro es ''. */

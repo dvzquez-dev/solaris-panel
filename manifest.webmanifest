@@ -1,5 +1,5 @@
 {
-  "name": "UVigo Aerotech · Solaris",
+  "name": "UVigo Aerotech: Solaris",
   "short_name": "Solaris",
   "description": "El panel se ha mudado a produccion/. Este manifiesto solo existe para que las PWA ya instaladas en la raiz no se queden sin el.",
   "start_url": "./produccion/index.html", "scope": "./", "display": "standalone", "orientation": "portrait",

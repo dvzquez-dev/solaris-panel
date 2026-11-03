@@ -403,7 +403,7 @@ function sumaEMes(e){ return sumaSiMes(function(p){ return p.e===e; }); }
    decidia el CONTADOR DEL MES y la BARRA, que son los dos numeros que la persona mira
    primero. Anadir un estado a la puerta los dejaba fuera **sin que nada se enterase** --
    que es exactamente lo que ya paso una vez al separar `aprobada` de `otorgada`. */
-function sumaCuentanMes(){ return sumaSiMes(function(p){ return _cuentaYa_(p.e); }); }
+function sumaCuentanMes(){ return sumaSiMes(function(p){ return _cuentaYaNeto_(p, PARTES); }); }   /* 02/11: sin la resta de un revertido */
 
 function wBar(h){ return 100*(1-Math.exp(-Math.max(0,h)/K_BAR)); }
 
@@ -1158,6 +1158,8 @@ async function enviarFichaje(){
      nada que soltar. Soltarlo igual sería un segundo mecanismo para lo mismo. */
   if(!_fechaDMY_(ST.form.fecha)){ tost('La fecha va como DD/MM/AAAA y tiene que existir.'); return; }
   if(_fechaFutura_(ST.form.fecha)){ tost('Esa fecha todavía no ha llegado: declara horas que ya hiciste.'); return; }
+  /* 03/11: ni lo que ACABA en el futuro (hoy, con la salida después de la hora actual). Sólo lo tecleado a mano: un fichaje en vivo acaba ahora. */
+  if(ST.modo!=='vivo' || ST.form.declararId!=null){ var _fu=_finEnFuturoTxt_(ST.form.fecha, _tramosTodos_(ST.form)); if(_fu){ tost(_fu+'.'); return; } }
   /* ⛔ 20/10: si el parte a declarar ya no existe, NO se manda nada — ni por `declararParte` (lo rechazaría) ni como
      fichaje normal (no es lo que se pidió): se avisa y se vuelve a pintar el formulario. Y va ANTES del
      candado, como la fecha de arriba: escrito después, había que soltarlo y era un tercer `disabled=false`
@@ -1478,7 +1480,7 @@ function _mesesHorasHTML_(confs){
     var h=abierto ? (_hm!=null ? _hm : m.h+_compMensual_(YO)) : m.h;
     return '<button type="button" class="mmes" data-p data-mesdesg="'+(m.k||'sin')+'">'+
       '<b>'+(m.k ? esc(_nomPeriodo_(m.k)) : 'Sin fecha')+'</b>'+
-      '<span class="sc">'+(!m.k ? '' : abierto ? 'sin cerrar' : 'cerrado')+'</span>'+
+      (function(e){ return '<span class="sc"'+(e.cls?' style="color:var(--'+(e.cls==='ok'?'ok':'warn')+')"':'')+'>'+e.txt+'</span>'; })(_estadoMes_(m.k, per))+
       '<span class="mono">'+nf2(h)+' h</span></button>';
   }).join('')+'</div></div>';
 }
@@ -2168,7 +2170,7 @@ function vHoras(){
   /* ⛔ 20/10 (auditor de partes): con Notion la cifra es la de tu FICHA, y lo aprobado/otorgado que la rutina aún no ha
      aplicado no salía en ninguna parte (la píldora sólo suma lo pendiente). Se dice APARTE: sumarlo a la cifra
      arriesgaría contarlo dos veces en la ventana en que ya está en Notion y el parte aún no se ha marcado. */
-  var sinFicha=notion ? sumaSiMes(function(x){ return _cuentaYa_(x.e) && x.enFicha===false; }) : 0;
+  var sinFicha=notion ? sumaSiMes(function(x){ return _cuentaYaNeto_(x, PARTES) && x.enFicha===false; }) : 0;
   /* ⛔ ORDENADOS POR FECHA, lo más nuevo primero. No había **ni un solo `sort`** en toda la
      pantalla: los partes salían en el orden en que los mandara el servidor, así que los de un
      mes viejo podían aparecer por delante de los de hoy. Daniel: *«¿por qué siguen
@@ -2183,7 +2185,7 @@ function vHoras(){
   /* 01/11: lo más reciente arriba POR FECHA Y HORA y sin los sin declarar ya caducados (`_sinDeclararOrdenados_`, comun.js). */
   _todasMias=_sinDeclararOrdenados_(_todasMias, Date.parse(_ahoraApp_()));
   _todasMias=_todasMias.filter(function(x){ return !(x.e==='rech'||x.e==='cad'||x.e==='rev') || _sigueVisibleSinContar_(x, _ahoraMs); });   // en cola / con detalle pedido / rechazados / sin declarar / caducados
-  var confs=PARTES.filter(function(x){return _cuentaYa_(x.e);}).sort(_porFecha);   // aprobadas + otorgadas
+  var confs=PARTES.filter(function(x){return _cuentaYaNeto_(x, PARTES);}).sort(_porFecha);   // aprobadas + otorgadas
   /* ⛔ LOS DE MESES PASADOS, APARTE. Ordenarlos los mandaba al fondo, pero seguían **en la
      misma lista** — y la queja de Daniel era que **aparecen**, no que aparezcan arriba. */
   /* ⚠️ El periodo se pide AQUI. La primera version usaba `d.periodo` copiado de

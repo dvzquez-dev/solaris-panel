@@ -23,8 +23,10 @@ function revisoresDe(d){
   var r = d.amb==='archivo' ? [coordinadorDe(d.sub)]
         : d.amb==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
-  r=r.filter(function(n){return n!==d.autor;});
-  if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n){return n!==d.autor;});
+  /* 02/11: TODOS los autores (el que lo sube, los que nombra el documento y los ajustados), no sólo `autor`. */
+  var au=_autoresDe_(d), noAutor=function(n){return au.indexOf(n)<0;};
+  r=r.filter(noAutor);
+  if(!r.length) r=[PD_NOM,REV2_NOM].filter(noAutor);
   /* 01/11: SIN tercer peldaño. Antes acababa en `[PD_NOM]` sin volver a filtrar al autor: con `REV2_NOM === PD_NOM` y el PD
      de autor, el expediente se asignaba a su propio autor y no podía firmar NADIE, sin un error. Ahora `[]` es «no hay
      revisor asignable»: cada consumidor lo pinta («Sin revisor: avisa al Project Director») y nadie decide (`puedeDecidirDoc`). */
@@ -298,6 +300,7 @@ function _decDocLocalE_(d, acc, mot, tit, actor, at, aj){
   d.nota = (acc==='cambios' || acc==='rechazado') ? (mot||'') : '';
   d.revisor = actor || null;
   d.decision = {accion:acc, revisor:actor || null, at:at || null};
+  if(acc==='anot' && aj && aj.autores) d.decision.ajustes = {autores:aj.autores};   /* 02/11: como el servidor, para que ninguno de ellos revise lo suyo */
   return d;
 }
 
@@ -343,7 +346,7 @@ function docCard(d){
        Sigue en el DOM plegado (los campos se leen por id); lo abierto se recuerda en `DOC_EDIT_AB`. */
     var _abEd = (typeof DOC_EDIT_AB!=='undefined') && !!DOC_EDIT_AB[d.id];
     acc=((_yaAnalizado_(d) || _autorP) ? '<div class="doc-edit'+(_abEd?' ab':'')+'"><button type="button" class="btn sm" data-docedit="'+d.id+'">Editar antes de decidir</button>'+
-        '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS, {todas:true}) : '')+'</div></div>' : '');
+        '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS, {verTodas:true, excluir:ACTOR}) : '')+'</div></div>' : '');
     arriba=
       '<textarea data-motivo placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
       _solIAHTML_('dm'+d.id, _solMotivoCfg_(d, '#doc-'+d.id+' [data-motivo]'))+
@@ -439,7 +442,7 @@ function docCard(d){
     avisos+arriba+previa+secs+visor+
     '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':(sinRev?'Sin revisor: avisa al Project Director.':'Firma: <b>'+esc(rev)+'</b>'))+'</div>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
-    _autorRastroHTML_(d)+
+    _autorRastroHTML_(d)+_autoresDocHTML_(d)+
     (puede ? '' : _autorP)+   /* quien puede decidir lo lleva plegado dentro de `acc` */
     acc+
   '</div>';

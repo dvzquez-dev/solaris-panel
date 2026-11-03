@@ -180,7 +180,7 @@ function _selectorLotes_(){
   if(LOTES_PEND.length<2) return '';
   return '<div class="pb" style="padding-bottom:0"><div style="display:block">'+
     '<span class="sc" style="display:block;margin-bottom:5px">Hay '+LOTES_PEND.length+' bloques pendientes</span>'+
-    nxElige('loteSel', LOTES_PEND.map(function(l,i){ return [i, l]; }), _loteIdx_())+
+    nxElige('loteSel', LOTES_PEND.map(function(l,i){ return [i, _nombreLoteEsc_(l)]; }), _loteIdx_())+
     '</div></div>';
 }
 
@@ -359,12 +359,20 @@ function _revocablesSanc_(){
   return SANC_BACK.filter(function(s){ return _puedeRevocarSanc_(s, SANC_BACK); });
 }
 
+/* 02/11: el nombre de un lote en el escritorio (`_nombreLote_`, comun.js), con las reuniones del SERVIDOR (`_srv`: los ids de la
+   semilla son ids reales) y la fecha de su primera fila. Nunca el id crudo. */
+function _nombreLoteEsc_(lote){
+  var f = null;
+  (Array.isArray(SANC_BACK) ? SANC_BACK : []).some(function(x){ if (x && x.lote === lote){ f = x.creado_at; return true; } return false; });
+  return _nombreLote_(lote, (typeof REUS !== 'undefined' && Array.isArray(REUS) ? REUS : []).filter(function(r){ return r && r._srv; }), f);
+}
+
 function _revocarSancCard_(s){
   var m = _m(s.nombre), pts = _ptsSanc_(s.puntos);
   return '<div class="parte" data-rvsid="' + esc(s.id) + '">' +
     '<div class="h"><b>' + esc((m && m.pila) || s.nombre) + '</b>' +
       '<span class="u">' + esc(s.articulo ? ('Art. ' + s.articulo) : '\u2014') + '</span>' +
-      '<span class="u">' + esc(s.lote || 'suelta') + '</span>' +
+      '<span class="u">' + esc(_nombreLoteEsc_(s.lote)) + '</span>' +
       '<span class="q">' + esc(_etSancFila_(s.puntos, s.origen, s.extra)) + '</span></div>' +
     '<div class="just"><span class="sc">' + esc(s.motivo || '\u2014') + '</span></div>' +
     /* ⛔ EL AVISO CAMBIA SEGUN SI DEVUELVE PUNTOS O NO. Un solo texto esconderia justo el
@@ -478,8 +486,9 @@ function _panelDeshacerPremio_(){
     s = lista[i]; m = _m(s.nombre);
     cuerpo += '<div class="parte" data-dpid="' + esc(s.id) + '">' +
       '<div class="h"><b>' + esc((m && m.pila) || s.nombre) + '</b>' +
-        '<span class="u">' + esc(s.lote || 'suelto') + '</span>' +
-        '<span class="q">' + esc(_etSancFila_(s.puntos, s.origen, s.extra)) + '</span></div>' +
+        '<span class="u">' + esc(_nombreLoteEsc_(s.lote)) + '</span>' +
+        /* 02/11 (Daniel: «pone premio más 0,5»): el premio en PALABRAS, no el rótulo corto de la fila */
+        '<span class="q">' + esc(_premioEnPalabras_(s.extra, null)) + '</span></div>' +
       '<div class="just"><span class="sc">' + esc(s.motivo || '\u2014') + '</span></div>' +
       '<div class="ruta">Al deshacerlo se <b>resta ' + esc(nf2(s.extra.compensacion)) + ' h</b> de su Compensaciones al aplicar; ' +
         'el premio original queda en el historial.</div>' +
@@ -590,7 +599,7 @@ function _ponerSancCuerpo_(){
     '</div>'+
     '<div>'+
       '<div style="display:block;margin-bottom:9px">'+lab('Motivo')+
-        nxElige('snMotivo', RRI_MOTIVOS.map(function(r){ return [r[0], r[1]]; }), SANC_FORM.motivo||'')+'</div>'+
+        nxElige('snMotivo', _motivosParaBuscar_(), SANC_FORM.motivo||'', {max:5})+'</div>'+
       (SANC_FORM.motivo==='libre'
         ? '<label style="display:block;margin-bottom:9px">'+lab('Cu\u00e1l')+
             '<input id="snLibre" placeholder="Qu\u00e9 ha pasado" value="'+esc(SANC_FORM.libre||'')+'" style="'+E+'"></label>'+
@@ -716,8 +725,7 @@ function _loteReal_(){
   var its=pend.filter(function(s){ return s.lote===lote; });
   /* 22/10 (ensayo de la reunión #3, 🟡 8): el bloque dice de QUÉ reunión es, no sólo su código */
   /* (refutador 29, 🟡 4) sólo reuniones del SERVIDOR (`_srv`): los ids de la semilla son ids reales */
-  var _tl=_tituloLote_(lote, (typeof REUS!=='undefined' && Array.isArray(REUS) ? REUS : []).filter(function(r){ return r && r._srv; }));
-  LOTE={ real:true, lote:lote, nombre:_tl ? _tl+' · '+lote : lote, cerrado:false,
+  LOTE={ real:true, lote:lote, nombre:_nombreLoteEsc_(lote), cerrado:false,
     motivo:its[0].motivo||'—', art:its[0].articulo||'libre',
     /* ⛔ `_ptsSanc_`, NO `Number(s.puntos)||0` (758.a bis). Aqui es donde el «no llego»
        se convertia en un **0**, y a partir de este punto ya no hay forma de distinguirlo
@@ -729,7 +737,7 @@ function _loteReal_(){
     items:its.map(function(s){ return {id:s.id, n:s.nombre, pts:_ptsSanc_(s.puntos),
       /* 31/10 (B6): si el PD corrigió sus puntos, la fila dice de cuánto, quién y por qué */
       pAntes:_ptsSanc_(s.puntos_antes), pMot:s.puntos_motivo||null, pPor:s.puntos_corregidos_por||null,
-      origen:s.origen||null, extra:s.extra||null,
+      origen:s.origen||null, extra:s.extra||null, motivo:s.motivo||null,
       /* ⛔ sustituida el 01/11 por Daniel (artifact [83777de2e0]: «por default todas a aceptar… quitaria la opcion de
          sin marcar»): ahora SI es `'aceptar'` por defecto (`_decDe_`, comun.js). Lo que sigue es la historia:
          ⛔ `null`, NO `'aceptar'`. Aqui se fabricaba la decision de todo lo que nadie

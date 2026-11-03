@@ -714,7 +714,7 @@ function vReu(){
         '<button class="btn mini" data-p id="btnEditarReu" style="flex:1">Título y plazo</button>'+
       '</div>':'')+
     /* 01/11: la asistencia es del PD, no de quien convocó: su botón va aparte del de «Fijar/Convocados». */
-    (_asisBotonM_(R)?'<div style="margin-top:9px"><button class="btn mini full" data-p id="btnAsistencia">📋 Asistencia en directo</button></div>':'')+
+    (_asisBotonM_(R)?'<div style="margin-top:9px"><button class="btn mini full" data-p id="btnAsistencia">'+ico('portapapeles')+' Asistencia en directo</button></div>':'')+
     _ordenDiaReuHTML_(R)+
     _audioReuHTML_(R)+
     _bloqueReuHTML_(R, _puedeBloqueReu_(R, (typeof _actorSanc_==='function'?_actorSanc_():(YO&&YO.nombre)), (typeof esAdmin==='function' && esAdmin())))+
@@ -1366,7 +1366,7 @@ function fijarModal(){
    general tuya tiene la asistencia abierta, sale ARRIBA de Estado «Estás en la general: escribe la palabra que se proyecta»;
    al abrir la app con ella abierta se avisa UNA vez (`marcarVisto`: así se ilumina tu cuadrito en el escenario del PD).
    El servidor decide si estás convocado y nunca manda la palabra: aquí sólo se teclea. */
-var ASIS_M={est:{}, visto:{}, txt:{}, demo:false};   // est[id] = {titulo, v}
+var ASIS_M={est:{}, visto:{}, txt:{}, msg:{}, demo:false};   // est[id] = {titulo, v}; msg[id] = el último aviso (sobrevive al repintado)
 
 /* De la lista cruda de `listarReuniones`: las que traen `asistencia_abierta`. Las que ya no, se quitan. */
 function _asisDeListaM_(arr){
@@ -1394,11 +1394,11 @@ function _asisTarjetaHTML_(id, e){
   return '<div class="tarj acc" data-asisreu="'+esc(id)+'"><div class="tt"><span class="sc">Asistencia en directo</span></div>'+
     '<b style="display:block;margin-bottom:6px">Estás en la general: '+(hecho?'ya constas presente':'escribe la palabra que se proyecta')+'</b>'+
     (hecho
-      ? '<div class="asisOk">✓ Presente ('+esc(_hhmmDe_(hecho))+')</div>'
+      ? '<div class="asisOk">'+ico('tick')+' Presente ('+esc(_hhmmDe_(hecho))+')</div>'
       : '<div style="display:flex;gap:8px"><input class="asisIn" data-asispal autocomplete="off" autocapitalize="none" '+
         'placeholder="la palabra" value="'+esc(ASIS_M.txt[id]||'')+'">'+
         '<button class="btn pri" data-p data-asisok>Estoy presente</button></div>')+
-    '<div class="rnota" data-asismsg style="margin:6px 0 0;min-height:1em"></div></div>';
+    '<div class="rnota" data-asismsg style="margin:6px 0 0;min-height:1em">'+esc(ASIS_M.msg[id]||'')+'</div></div>';
 }
 
 /* El HTML de las tarjetas abiertas (o ''). Se cablea tras insertarse, con el truco de `_audioReuHTML_`. */
@@ -1416,15 +1416,18 @@ function _asisCablearM_(){
         m=t.querySelector('[data-asismsg]');
     if(!i || !b) return;
     i.oninput=function(){ ASIS_M.txt[id]=i.value; };
+    /* 03/11: el aviso se guarda en ASIS_M.msg y lo vuelve a pintar `_asisTarjetaHTML_`: un refresco de Estado rehacía la
+       tarjeta y lo borraba a los pocos milisegundos (lo cazó `probar_asistencia_app` saliendo rojo a ratos). */
+    var aviso=function(t){ ASIS_M.msg[id]=t; if(m) m.textContent=t; };
     var enviar=async function(){
       if(b.disabled) return;
-      if(!i.value.trim()){ if(m) m.textContent='Escribe la palabra que se proyecta.'; return; }   /* un botón que no contesta parece roto */
+      if(!i.value.trim()){ aviso('Escribe la palabra que se proyecta.'); return; }   /* un botón que no contesta parece roto */
       b.disabled=true;
       try{
         var r=await api.estoyPresente(isNaN(+id)?id:+id, i.value);
-        ASIS_M.est[id].v.presente_at=(r&&r.presente_at)||new Date().toISOString();
+        ASIS_M.est[id].v.presente_at=(r&&r.presente_at)||new Date().toISOString(); delete ASIS_M.msg[id];
         _asisPintarM_(); tost('Presente: apuntado.');
-      }catch(e){ if(m) m.textContent=String((e&&e.message)||e).replace(/^Error:\s*/,''); b.disabled=false; }
+      }catch(e){ aviso(String((e&&e.message)||e).replace(/^Error:\s*/,'')); b.disabled=false; }
     };
     b.onclick=enviar;
     i.onkeydown=function(ev){ if(ev.key==='Enter') enviar(); };
@@ -1455,7 +1458,7 @@ function _asisFilaM_(n, v){
     'margin:0 0 6px;padding:8px 12px;border-radius:12px;text-align:left;font:inherit;color:var(--ink);cursor:pointer;background:'+
     (pres ? (tel?'rgba(63,158,214,.18)':'rgba(62,180,137,.18)') : 'var(--sur)')+';border:1px solid '+col+'">'+
     '<b style="flex:1;font-weight:600">'+esc(n)+'</b><span class="mono" style="font-size:11px;color:'+col+'">'+
-    (pres ? ('✓ '+esc(_hhmmDe_(pres))+(tel?' · telemático':'')) : (vis?'ha abierto la app':'toca para marcar'))+'</span></button>';
+    (pres ? (ico('tick')+' '+esc(_hhmmDe_(pres))+(tel?' · telemático':'')) : (vis?'ha abierto la app':'toca para marcar'))+'</span></button>';
 }
 
 function _asisPanelHTMLM_(){

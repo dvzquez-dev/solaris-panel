@@ -420,7 +420,7 @@ function buzonModal(tipo, prev){
          ya ha contestado — anunciar el envío antes de confirmarlo sería mentir bonito.
          Si la foto no entró, el modal NO se cierra solo: eso hay que leerlo, no verlo de
          refilón en un aviso que se va. */
-      env.textContent='Enviado ✓';
+      env.innerHTML='Enviado '+ico('tick');
       env.classList.remove('pri'); env.classList.add('ok');
       env.disabled=true;
       if(sinFoto){

@@ -152,7 +152,7 @@ function _convCuenta_(cv){
 function _convCelHTML_(cv, dia, franja){
   var v=_convMias_(cv)[_convClave_(dia,franja)]||null;
   var cls=(v&&v.s)?(' '+v.s):'';
-  var cch=(v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">🚗</span>':'';
+  var cch=(v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">'+ico('coche')+'</span>':'';
   var txt=(v&&v.s==='no')?'\u2013':'';
   return '<div class="tcel'+cls+'" data-tk="'+_convClave_(dia,franja)+'" data-p>'+txt+cch+'</div>';
 }
@@ -284,7 +284,7 @@ function _convHTML_(cv){
   return '<div class="tarj" id="convC">'+
     _convCabHTML_(cv)+
     '<div class="tpin">'+clases.map(function(k){ return pin(k, esc(_convEtiq_(k))); }).join('')+
-      '<button data-pin-coche class="coche '+(CONV_COCHE?'on':'')+'" data-p>🚗 con coche</button>'+
+      '<button data-pin-coche class="coche '+(CONV_COCHE?'on':'')+'" data-p>'+ico('coche')+' con coche</button>'+
     '</div>'+
     /* 🗣️ «Y que lo ponga escrito en algún lugar» (14/10). Va **encima** de la rejilla y pegado
        a ella: una instrucción de gesto escrita **debajo** de doce filas la lee quien ya se ha
@@ -305,8 +305,11 @@ function _convHTML_(cv){
     '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+
       D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
     '<div class="tplazo'+(urge?' urge':'')+'" id="convPie">'+_convPieHTML_(cv)+'</div>'+
+    /* 02/11: contestar A MEDIAS no cuenta (`_convFalta_`, comun.js). Aquí se guarda al soltar el dedo, sin botón de enviar: se dice
+       EN VIVO lo que falta, y se repinta con el pie (`#convFalta`). */
+    '<div class="tfalta" id="convFalta">'+esc(_convFaltaTxt_(cv, _convMias_(cv)))+'</div>'+
     '<p class="rnota" style="margin-top:10px">Plazo hasta el <b>'+esc(lim)+'</b> a las '+esc(hora)+
-      '. Una casilla en blanco cuenta como que no has contestado.</p>'+
+      '.</p>'+
   '</div>';
 }
 
@@ -621,10 +624,11 @@ function _engConv_(){
         _convClases_(cv).forEach(function(c){ el.classList.remove(c); });
         if(v&&v.s) el.classList.add(v.s);
         el.innerHTML=((v&&v.s==='no')?'\u2013':'')+
-          ((v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">🚗</span>':'');
+          ((v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">'+ico('coche')+'</span>':'');
       });
     });
     var pie=$('#convPie'); if(pie) pie.innerHTML=_convPieHTML_(cv);
+    var falta=$('#convFalta'); if(falta) falta.textContent=_convFaltaTxt_(cv, _convMias_(cv));
   };
   $$('#convC [data-pin]').forEach(function(b){
     b.onclick=function(){
@@ -791,7 +795,7 @@ function _progRecoger_(){
   var cr = $('#ptCrucial');
   return { fecha:v('ptFecha'), hora:v('ptHora'), duracion:_duracionTurnoTxt_(v('ptDur')), lugar:v('ptLugar'),
     punto:v('ptPunto'), crucial:!!(cr && cr.classList.contains('on')), nota:v('ptNota'),
-    principales:lin('ptObj1'), secundarios:lin('ptObj2'), sel:PROG_T.sel, cargos:PROG_T.cargos, coches:[] };
+    principales:lin('ptObj1'), secundarios:lin('ptObj2'), sel:PROG_T.sel, cargos:PROG_T.cargos, coches:[], cv:PROG_T.cv || null };
 }
 
 /* Un cargo lo lleva UNA persona (asignarlo a otra se lo quita a la anterior); quien deja el turno pierde los suyos. */
@@ -822,13 +826,41 @@ function _progPintar_(){
   if(av) av.textContent = mot;
 }
 
+/* 02/11 · EL MAPA DE CALOR DE LA SEMANA, ENCIMA DEL FORMULARIO. 🗣️ Daniel: *«Lo de programar turno no sirve […] la forma ideal sería con un
+   mapa de calor. Que aparezca en un mapa de calor las disponibilidades y así puedo escoger. Luego dando clic a cada slot puedo ver quién
+   está»*. Pinta `_turnoCalorHTML_` (comun.js, el mismo que el escritorio) con la convocatoria vigente que da `getDisponibilidad` — la de
+   TODOS, no `CONVOCATORIAS`, que aquí sólo lleva TUS celdas — y un toque en un hueco rellena día, hora y duración del formulario de abajo.
+   ⛔ Sin mapa NO se bloquea nada: sin convocatoria, sin red o sin permiso se dice en una línea y el formulario funciona como siempre.
+   ⚠️ La respuesta llega con la hoja ya abierta: si la cerraron (o abrieron otra) en medio, no se pinta en el vacío. */
+function _progCalorCargar_(){
+  var caja = $('#ptCalor'); if(!caja) return;
+  var di = function(t){ var b = $('#ptCalor'); if(b && b === caja) b.textContent = t; };
+  if(typeof api === 'undefined' || !api.getDisponibilidad || !SESION){ di('Sin conexión no se ve la disponibilidad: elige el día y la hora a mano.'); return; }
+  api.getDisponibilidad().then(function(r){
+    if(!PROG_T || $('#ptCalor') !== caja) return;
+    if(!r || !r.convocatoria){ di('No hay convocatoria de disponibilidad abierta para esa semana: elige el día y la hora a mano.'); return; }
+    var cv = r.convocatoria; cv.resp = r.cv || {};
+    PROG_T.cv = cv;   /* la regla del consejo con lo escrito a mano usa la MISMA convocatoria que el mapa */
+    var calor = _calorTurnos_(cv, '');
+    caja.className = ''; caja.removeAttribute('style'); caja.innerHTML = _turnoCalorHTML_(cv, calor, 'ptMapa');
+    _turnoCalorCablear_($('#ptMapa'), cv, calor, function(b){
+      nxPon('ptFecha', b.dia);
+      if(b.hora) nxPon('ptHora', b.hora);
+      if(b.horas) nxPon('ptDur', b.horas);
+      _progPintar_();
+    });
+    _progPintar_();
+  }).catch(function(){ di('No se pudo leer la disponibilidad: elige el día y la hora a mano.'); });
+}
+
 function progTurnoAbrir(){
   if(!(YO && _puedeProgramarTurno_(YO.nombre))) return;
   PROG_T = { sel:{}, cargos:{ turno:null, audiovisual:null, memoria:null } };
-  delete SOLP.pt;   /* hoja nueva: sin propuesta de SolarIA de la anterior */
+  delete SOLP.pt; delete SOLTXT.pt;   /* hoja nueva: sin propuesta de SolarIA de la anterior */
   var lab = function(t){ return '<span class="sc" style="display:block;margin:12px 0 6px">'+t+'</span>'; };
   abrirModal('<div class="mtit">Programar turno</div>'+
     '<p class="rnota" style="margin:-4px 0 4px">Les llega a los convocados y queda en Notion. No se puede convocar más de un turno el mismo día.</p>'+
+    lab('Cuándo pueden · toca un hueco')+'<div id="ptCalor" class="rnota" style="margin:0 0 4px">Mirando la disponibilidad…</div>'+
     lab('Día')+nxFecha('ptFecha', '', {min:_hoyNxISO_()})+
     lab('Hora de inicio')+nxHora('ptHora', '16:00')+
     lab('Duración')+nxNum('ptDur', 3, {paso:0.5, min:0.5, max:12, sufijo:'h'})+
@@ -866,4 +898,5 @@ function progTurnoAbrir(){
     }catch(e){ b.disabled = false; b.textContent = prev; tostErr('No se pudo convocar: ', e); }
   };
   _progPintar_();
+  _progCalorCargar_();
 }
