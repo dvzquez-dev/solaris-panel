@@ -8396,10 +8396,13 @@ function _dispPuede_(v, sitio){
    lista, y pisarla con la general cambiaría quién puede liderar ESE turno.
    ⛔ DEVUELVE `null` CUANDO NO LO SABE, nunca `[]` (§3c-24): un `[]` afirma que el consejo
    está vacío, y quien lo lee tiene que poder decir «no lo sé» en vez de «nadie». */
+/* ⛔ 03/11 (Daniel: «ahora que Víctor está en el consejo […] dice que estos slots no valen porque no hay nadie del consejo. Y sí
+   que puede Víctor»): la lista de la convocatoria se CONGELA al crearla, y quien entra después en el consejo no contaba. Se
+   SUMAN las dos: la de la convocatoria (una junta ampliada conserva a sus extras) y la de ahora. Gemela: `reglas/turnos.py:consejo_aguanta`. */
 function _consejoDe_(cv){
-  if(cv && cv.consejo && cv.consejo.length) return cv.consejo;
-  var d=(typeof DATA!=='undefined' && DATA && DATA.consejo) || null;
-  return (d && d.length) ? d : null;
+  var d=(typeof DATA!=='undefined' && DATA && DATA.consejo) || [], out=[];
+  ((cv && cv.consejo) || []).concat(d).forEach(function(n){ if(n && out.indexOf(n)<0) out.push(n); });
+  return out.length ? out : null;
 }
 
 /* El agregado con su desglose, celda a celda. */
