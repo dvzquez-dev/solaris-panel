@@ -1007,6 +1007,7 @@ function _bloqFalta_(){
     if((String(f.ini||'').trim() && !_horaHHMM_(f.ini)) || (String(f.fin||'').trim() && !_horaHHMM_(f.fin)))
       return 'La hora va como HH:MM (p. ej. 09:30)';
     var _te=_tramosError_(BLOQ_FORM); if(_te) return _te;     /* 01/11: varios tramos en un parte */
+    if(!decl){ var _fu=_finEnFuturoTxt_(f.fecha, _tramosTodos_(f)); if(_fu) return _fu; }   /* 03/11: ni lo que ACABA en el futuro (fecha de hoy, fin posterior a ahora) */
     var d=_bloqDurTotal_(), tope=_maxHorasParte_();
     /* ⛔ CUATRO CAUSAS, CUATRO FRASES. Esto decia «La salida tiene que ser posterior a la
        entrada» para CUALQUIER duracion invalida, incluida la de pasarse del tope: quien lo

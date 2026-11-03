@@ -1444,9 +1444,25 @@ function _hoyNxISO_(){ return _dmyAISO_(typeof HOY === 'string' ? HOY : _hoyTxt_
 /* ¿Esa fecha DD/MM/AAAA es posterior a hoy? El servidor rechaza un parte con fecha futura («no puede ser futura»); esto lo dice antes
    de enviar. Una fecha que no existe no es futura: eso lo corta `_fechaDMY_`. */
 function _fechaFutura_(s){ return !!_fechaDMY_(s) && _dmyAISO_(s) > _hoyNxISO_(); }
+/* 03/11 (Daniel: «el 3 no me debería dejar declarar nada que ACABE en el futuro»): '' si el parte/bloque de `fecha` (DD/MM/AAAA o ISO) con
+   esos `tramos` [{ini,fin}] ya ha acabado; si no, la frase (a qué hora acaba). El fin es el MÁS tardío de los tramos y un tramo con fin ≤ inicio
+   acaba al día siguiente. Lo ilegible no tiene fin que comparar ('' — lo juzgan las otras puertas). Gemela de `_rechazar_si_acaba_en_futuro`
+   (servidor, la puerta que manda). `ahoraISO` (AAAA-MM-DDTHH:MM, hora de Madrid) sólo se inyecta en el banco. */
+function _finEnFuturoTxt_(fecha, tramos, ahoraISO){
+  var dia=_dmyAISO_(fecha), fin='', hh='';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(dia||''))) return '';
+  (tramos||[]).forEach(function(t){
+    if(!t || !_horaHHMM_(t.ini) || !_horaHHMM_(t.fin)) return;
+    var d=(String(t.fin)<=String(t.ini)) ? _isoMasDias_(dia, 1) : dia, k=d+'T'+String(t.fin).trim();
+    if(!fin || k>fin) fin=k;
+  });
+  if(!fin || fin<=(ahoraISO||_ahoraLocalISO_())) return '';
+  hh=fin.slice(11);
+  return 'Acaba a las '+hh+(fin.slice(0,10)===dia ? '' : ' del '+_isoADMY_(fin.slice(0,10)))+', que todavía no ha llegado: declara lo que ya terminó';
+}
 function _nxAtajos_(caja){
-  var hoy = _hoyNxISO_(), min = caja.dataset.min || '';
-  var a = [['Hoy', hoy], ['Mañana', _isoMasDias_(hoy, 1)], ['+1 semana', _isoMasDias_(hoy, 7)]].filter(function(p){ return !min || p[1] >= min; });
+  var hoy = _hoyNxISO_(), min = caja.dataset.min || '', max = caja.dataset.max || '';
+  var a = [['Hoy', hoy], ['Mañana', _isoMasDias_(hoy, 1)], ['+1 semana', _isoMasDias_(hoy, 7)]].filter(function(p){ return (!min || p[1] >= min) && (!max || p[1] <= max); });   /* 03/11: con `max` no se ofrece lo que lo pasa */
   if(caja.dataset.vacio) a.push(['Sin fecha', '']);
   return a;
 }
@@ -6014,7 +6030,14 @@ function _mesesDeTrabajo_(lista, per, leer, conActual){
   return g;
 }
 
-function _compBase_(m){ var c=(m&&m.cargo)||null; return COMP_CARGO[c]!=null?COMP_CARGO[c]:2.0; }
+/* 03/11 (Daniel: *«Los tres a 3,5 h»*): quien COORDINA una unidad (`coordina` no vacío) cobra la base de coordinador aunque su
+   cargo sea null (Víctor, Bruno, Marta). Gemela de `reglas/compensacion_base.base_de_miembro`. El PD no baja por coordinar.
+   ⛔ NO se les pone cargo 'Coordinador' (los haría coordinadores de su subsistema): se decide por lo que hacen. */
+function _compBase_(m){
+  var c=(m&&m.cargo)||null;
+  if(c!=='Project Director' && _unidadesCoord_(m&&m.coordina).length>0) return COMP_CARGO['Coordinador']!=null?COMP_CARGO['Coordinador']:3.5;
+  return COMP_CARGO[c]!=null?COMP_CARGO[c]:2.0;
+}
 
 function _compEsReal_(m){ var v=m&&m.compensaciones; return typeof v==='number' && isFinite(v); }
 
@@ -12048,6 +12071,7 @@ function _ajustesDocTxt_(e){
   /* 28/10: los dos campos nuevos de «con anotaciones». `''` en el subtítulo es QUITARLO, y se dice. */
   if(a.subtitulo!=null) p.push(a.subtitulo ? 'subtítulo → «'+a.subtitulo+'»' : 'sin subtítulo');
   if(a.confidencialidad) p.push('confidencialidad → '+a.confidencialidad);
+  if(a.autores&&a.autores.join&&a.autores.length) p.push('autores → '+a.autores.join(', '));   /* 02/11 */
   if(a.version) p.push('versión → '+a.version);   /* 01/11: la propone el autor, la cambia el revisor */
   return p.length ? p.join(' · ') : '';
 }
@@ -12063,6 +12087,7 @@ function _ajustesDocTxt_(e){
 /* Lo que el expediente tiene AHORA en los cuatro campos. El título es `titulo` en el móvil y `tit` en el escritorio. */
 function _anotActualDe_(e){
   e = e || {};
+  var au = _autoresActualesDe_(e);
   var n = e.confidencialidad;
   var a = { titulo: String(e.titulo != null ? e.titulo : (e.tit || '')),
            subtitulo: String(e.subtitulo || ''),
@@ -12071,10 +12096,36 @@ function _anotActualDe_(e){
   /* 01/11 · LA VERSIÓN (Daniel, 31/10: *«El autor propone y el revisor puede cambiarlo»*): sólo se ofrece si el expediente ya la
      trae (la propuso el autor en el Form) o sustituye a otro (es una versión nueva). Sin eso, ni la clave: no hay campo. */
   if (e.version || e.sustituyeA){ a.conVersion = true; a.version = String(e.version || ''); }
+  if (au.length) a.autores = au;   /* 02/11: sin autores conocidos, ni la clave: no hay campo */
   var sg = _anotSugerida_(e);
   if (sg) a.sugerida = sg;
   a.etqSugeridas = _etqSugeridasDe_(e);
   return a;
+}
+
+/* 02/11 · AUTORES — UNA sola regla de quién cuenta como autor (`autoresDe`) y otra de lo que se ve en el panel (`autoresActualesDe`).
+   `_autoresActualesDe_`: los que la portada llevará HOY, en orden: los del documento casados con el equipo y los que no están
+   (`analisis.autores`), o si no hay, el autor del expediente. Sin nada, `[]`. */
+function _autoresActualesDe_(e){
+  var a = e && e.analisis && e.analisis.autores, l = [];
+  if (a && typeof a === 'object')
+    l = (Array.isArray(a.casados) ? a.casados : []).concat(Array.isArray(a.sin_casar) ? a.sin_casar : []);
+  if (!l.length && e && e.autor) l = [e.autor];
+  var vistos = {};
+  return l.map(function(n){ return String(n == null ? '' : n).trim(); }).filter(function(n){
+    if (!n || vistos[n]) return false; vistos[n] = 1; return true; });
+}
+/* ⛔ «Ningún autor revisa lo suyo»: TODOS los que cuentan como autor del documento — el que lo subió (`autor`), los que nombra
+   (`analisis.autores`) y los que el revisor dejó al aprobar con anotaciones (`decision.ajustes.autores`). Lo usa `revisoresDe` de las
+   dos caras; el servidor tiene su gemela (`autores_de_doc`). */
+function _autoresDe_(e){
+  var l = [], vistos = {};
+  var a = e && e.decision && e.decision.ajustes && e.decision.ajustes.autores;
+  [e && e.autor].concat(_autoresActualesDe_(e), Array.isArray(a) ? a : []).forEach(function(n){
+    n = String(n == null ? '' : n).trim();
+    if (n && !vistos[n]){ vistos[n] = 1; l.push(n); }
+  });
+  return l;
 }
 
 /* 02/11 — LAS ETIQUETAS QUE SUGIERE LA IA, APARTE DE LAS DEL AUTOR (`analisis.etiquetas_sugeridas`: extra del banco que el autor no
@@ -12115,6 +12166,9 @@ function _anotCambios_(act, campos){
   if ((n === 'publico' || n === 'interno') && n !== act.confidencialidad) c.push('confidencialidad');
   if (Array.isArray(q) && JSON.stringify(q) !== JSON.stringify(act.etiquetas || [])) c.push('etiquetas');
   /* 01/11: la versión, como la entiende el servidor (`2` o `2.1`); otra cosa no cuenta como cambio, y se dice al aprobar. */
+  /* 02/11: los autores, en el mismo orden (importa en la portada). Lista vacía = no es un estado válido, como el título vacío. */
+  var au = campos.autores;
+  if (Array.isArray(au) && au.length && Array.isArray(act.autores) && JSON.stringify(au) !== JSON.stringify(act.autores)) c.push('autores');
   var v = campos.version;
   if (v != null && _versionDocOK_(v) && String(v).trim() !== String(act.version || '')) c.push('version');
   return c;
@@ -12138,7 +12192,8 @@ function _anotExtra_(act, form){
   var c = _anotCambios_(act, form);
   if (!c.length) return null;
   var x = {};
-  c.forEach(function(k){ x[k] = (k === 'titulo' || k === 'subtitulo' || k === 'version') ? String(form[k]).trim() : form[k]; });
+  c.forEach(function(k){ x[k] = (k === 'titulo' || k === 'subtitulo' || k === 'version') ? String(form[k]).trim()
+                              : (k === 'autores' ? form[k].slice() : form[k]); });
   var ind = String(form.indicacion || '').trim();
   if (ind) x.indicacion = ind;
   return x;
@@ -12157,7 +12212,8 @@ function _anotPanelHTML_(pre, act, id, css, o){
   if (_solAnDoc_['an' + pre] !== String(id)){ delete SOLP['an' + pre]; delete SOLTXT['an' + pre]; _solAnDoc_['an' + pre] = String(id); }   /* otro expediente: nada de la propuesta del anterior */
   /* ⛔ 28/10: `data-anotdoc`, NO `data-doc`: el móvil le pone a todo `[data-doc]` un onclick que ABRE la ficha, y un toque
      dentro del panel la repintaba con lo escrito borrado (visto probando el check como usuario). */
-  return '<div id="' + pre + 'Anot" data-anot="' + pre + '" data-anotdoc="' + esc(String(id)) + '" data-etqorig="' + esc(JSON.stringify(act.etiquetas || [])) + '" data-etqsgd="' + esc(JSON.stringify(act.etqSugeridas || [])) + '" style="margin-top:10px">' +
+  return '<div id="' + pre + 'Anot" data-anot="' + pre + '" data-anotdoc="' + esc(String(id)) + '" data-etqorig="' + esc(JSON.stringify(act.etiquetas || [])) + '" data-etqsgd="' + esc(JSON.stringify(act.etqSugeridas || [])) + '"' +
+    (act.autores ? ' data-autoresorig="' + esc(JSON.stringify(act.autores)) + '"' : '') + ' style="margin-top:10px">' +
     '<span class="sc" style="display:block;margin-bottom:6px">Con anotaciones · lo que se ajusta al aprobar</span>' +
     /* 02/11: SIN conmutador «SolarIA / A mano» (la caja se escondía en «A mano»): el marco de lo que se pide está SIEMPRE a la vista y
        el botón y la barra son los comunes (`_solIAHTML_`); los campos de abajo se editan a mano igual, haya o no propuesta. */
@@ -12173,6 +12229,12 @@ function _anotPanelHTML_(pre, act, id, css, o){
       'Hace falta para aprobar con anotaciones: mete el título y el subtítulo en la portada de verdad.</p></div>' +
     '<div class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">Confidencialidad</span>' +
       nxElige(pre + 'Conf', (act.confidencialidad ? [] : [['', '— sin indicar —']]).concat([['publico', 'Público'], ['interno', 'Interno']]), act.confidencialidad || '') + '</div>' +
+    /* 02/11 · AUTORES, con el selector de personas ÚNICO (chips; lo elegido en rojo, sin tick). Cambiarlos es un arreglo DISTINTO del que
+       ya hace la portada sola: por eso vive aquí, en «con anotaciones», y no en «Aprobar». */
+    (act.autores ? '<div class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">Autores · así saldrán en la portada</span>' +
+      elegirPersonas(pre + 'Autores', {universo: _activos_().map(function(m){ return m.nombre; }).filter(function(n){ return n !== o.excluir; }),
+        marcadas: act.autores, multi: true, titulo: 'Autores', vacio: 'Escribe un nombre o pulsa «Ver lista».'}) +
+      '<p class="rnota" style="margin:6px 0 0">Si el documento ya trae sus autores, la portada los pone sin que hagas nada. Cámbialos sólo si no son esos.</p></div>' : '') +
     /* 02/11: las etiquetas desde el BANCO. `#Etq` (oculto) guarda la lista; se ve lo elegido, el buscador y «Ver todas» (las dos caras). */
     '<div class="campo" style="display:block;margin-top:9px"><span class="sc" style="display:block;margin-bottom:5px">Etiquetas · del banco, o crea una</span>' +
       '<input id="' + pre + 'Etq" style="display:none" tabindex="-1" value="' + esc((act.etiquetas || []).join(', ')) + '">' +
@@ -12196,6 +12258,7 @@ function _anotLeer_(pre){
   var t = v('Tit'), s = v('Sub'), q = v('Etq');
   return { titulo: t == null ? null : t.trim(), subtitulo: s == null ? null : s.trim(), confidencialidad: v('Conf') || '',
            version: v('Ver'),
+           autores: (typeof PSEL !== 'undefined' && PSEL[pre + 'Autores']) ? elegirPersonasMarcadas(pre + 'Autores') : null,
            etiquetas: q == null ? null : _etiquetasDeTexto_(q), indicacion: String(v('Ind') || '').trim() };
 }
 
@@ -12212,6 +12275,7 @@ function _anotAMedias_(){
   for (var i = 0; i < cs.length; i++){
     if (cs[i].getAttribute('data-ocupado') === '1') return true;
     if (cs[i].hasAttribute('data-autor') && elegirPersonasMarcadas(cs[i].getAttribute('data-autor') + 'Autor').length) return true;   /* alguien ya elegido */
+    if (cs[i].hasAttribute('data-autoresorig') && JSON.stringify(elegirPersonasMarcadas(cs[i].getAttribute('data-anot') + 'Autores')) !== cs[i].getAttribute('data-autoresorig')) return true;   /* 02/11: autores tocados */
     var xs = cs[i].querySelectorAll('input,textarea,select');
     for (var j = 0; j < xs.length; j++){
       var x = xs[j];
@@ -12238,7 +12302,7 @@ function _anotEstado_(pre, txt){
 
 /* El nombre de un campo, para decirlo en pantalla. */
 function _anotNombre_(k){
-  return ({titulo:'título', subtitulo:'subtítulo', confidencialidad:'confidencialidad', etiquetas:'etiquetas', version:'versión'})[k] || k;
+  return ({titulo:'título', subtitulo:'subtítulo', confidencialidad:'confidencialidad', etiquetas:'etiquetas', version:'versión', autores:'autores'})[k] || k;
 }
 
 /* Pone en el panel lo que SolarIA propone, SÓLO en los campos que cambia, y los marca (azul Solaris). */
@@ -13151,6 +13215,7 @@ function _bloqueCuerpo_(B){
     return {id:B.reunion_id, participantes:parts, resumen:resumen||undefined, clave:B.clave};
   if(!B.fecha || !B.ini || !B.fin) throw new Error('Pon la fecha y la hora de inicio y de fin.');
   var te=_tramosError_(B); if(te) throw new Error(te+'.');
+  var fu=_finEnFuturoTxt_(B.fecha, _tramosTodos_(B)); if(fu) throw new Error(fu+'.');   /* 03/11: lo que acaba en el futuro no se declara */
   var d=_bloqueDurH_(B.fecha, B.ini, B.fin, B.tramos);
   if(!(d>0)) throw new Error('La entrada y la salida no pueden ser la misma hora.');
   if(d>_maxHorasParte_()) throw new Error('Un bloque no pasa de '+_maxHorasParte_()+' h.');
@@ -13209,7 +13274,7 @@ function _bloqueFormHTML_(){
       : 'Un parte pendiente por participante; el PD los decide de una vez.')+
       (B.titulo?' <br><b>'+esc(B.titulo)+'</b>':'')+'</p>'+
     (fin ? '' :
-      '<div style="margin:0 0 12px"><div style="margin:0 0 8px">'+lab('Fecha')+nxFecha('blqFecha', B.fecha)+'</div>'+
+      '<div style="margin:0 0 12px"><div style="margin:0 0 8px">'+lab('Fecha')+nxFecha('blqFecha', B.fecha, {max:_hoyNxISO_()})+'</div>'+
       '<div style="display:flex;gap:12px;flex-wrap:wrap"><div>'+lab('Desde')+nxHora('blqIni', B.ini||'16:00')+'</div>'+
       '<div>'+lab('Hasta')+nxHora('blqFin', B.fin||'17:00')+'</div></div>'+
       _tramosHTML_(B, function(id, rot, v){ return '<div>'+lab(rot)+nxHora(id, v)+'</div>'; })+'</div>')+

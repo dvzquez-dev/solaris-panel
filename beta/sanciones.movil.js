@@ -53,13 +53,15 @@ async function _cargarSancionesM_(){
    ⚠️ Y la bandera CAE con la lista, en la misma linea: dejarla puesta de una carga
    anterior haria que un refresco fallido vaciara `MOVS` y el libro dijera «Sin
    movimientos» sobre unos puntos que SI existen. */
-async function _cargarMovimientosM_(){
+async function _cargarMovimientosM_(refresco){
   if(typeof MOVS==='undefined') return true;     // esta cara no tiene libro: nada que reintentar
-  MOVS.length=0;                                  // fuera la semilla, pase lo que pase
-  _llego_('movs', false);
+  /* 03/11: `refresco` (el de cada 90 s de `_refrescoVivo_`) NO vacía antes de tener la nueva: un corte de red a mitad dejaría
+     el libro en «Sin movimientos» con la bandera arriba. La primera carga (al entrar) sí, como siempre: fuera la semilla. */
+  if(!refresco){ MOVS.length=0; _llego_('movs', false); }
   try{
     var a=await api.getMisMovimientos();
     if(!Array.isArray(a)) return false;
+    if(refresco) MOVS.length=0;
     a.forEach(function(s){ MOVS.push(_movDeSancion_(s)); });
     _llego_('movs', true);
     return true;
@@ -509,8 +511,9 @@ function _formSancion_(s){
 function _libroPuntosHTML_(){
   /* ÁMBITO TEMPORADA: los puntos se reinician con ella (RRI Art. 29), no con el mes. */
   var r=_ultimosMov_(MOVS, function(m){ return m.f; }, null, 'temporada');
+  /* 03/11 (Daniel): TODOS los movimientos de la temporada, del más reciente al más antiguo — no los 5 últimos. */
   return '<div class="libro" id="libro"><div id="libroIn" style="padding-top:6px">'+
-    (r.ultimos.length ? r.ultimos.map(function(m){
+    (r.todos.length ? r.todos.map(function(m){
       /* El 0 no lleva signo: «−0» obliga a leerlo dos veces para acabar sabiendo que no te
          quitaron nada. Es el caso de una justificada. */
       /* ⛔ Y el HUECO no se pinta como un 0. Con `m.p === null` las dos comparaciones de
@@ -526,7 +529,7 @@ function _libroPuntosHTML_(){
          arreglar el dato sin arreglar lo que se PINTA deja el bug intacto. */
       ? '<div class="retf" style="opacity:.7"><span class="mo"><b>Cargando tus movimientos…</b></span></div>'
       : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b></span></div>'))+
-    (r.ultimos.length ? '<p class="rnota" style="margin:8px 0 0">'+_notaRegistro_(r.total,'temporada')+'</p>' : '')+
+    (r.todos.length ? '<p class="rnota" style="margin:8px 0 0">'+_notaRegistro_(r.total,'temporada',r.total)+'</p>' : '')+
   '</div></div>';
 }
 

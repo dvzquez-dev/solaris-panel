@@ -113,16 +113,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=114cc53"></script>
+<script src="comun.js?v=001b94e"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=b5ef61b"></script>
 <script src="turnos.movil.js?v=77f9518"></script>
 <script src="buzon.movil.js?v=3179853"></script>
-<script src="documentos.movil.js?v=0a127a4"></script>
-<script src="sanciones.movil.js?v=138cd26"></script>
+<script src="documentos.movil.js?v=6134cb3"></script>
+<script src="sanciones.movil.js?v=989472b"></script>
 <script src="reuniones.movil.js?v=c6bb152"></script>
-<script src="horas.movil.js?v=fa84211"></script>
+<script src="horas.movil.js?v=094cf1c"></script>
 <script src="equipo.movil.js?v=b89c0bc"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -666,12 +666,16 @@ async function _refrescoVivo_(motivo, que){
        ⚠️ Va por LA PUERTA que ya existe -- dos puertas para el mismo dato acaban siendo
        dos funciones distintas, que es lo que mordio en el escritorio. */
     var snc=(_vivoToca_(que,'sanciones') ? _cargarSancionesM_() : Promise.resolve()).catch(function(){});
+    /* 03/11 (Daniel: «el +1 que me acaban de dar» no salía): TUS MOVIMIENTOS también — se traían una vez, al entrar. `true` = sin
+       vaciar la lista hasta tener la nueva. Como el escritorio (`_cargarMovimientosE_` en su refresco). */
+    var mvs=(_vivoToca_(que,'resto') && !_sesionMuerta_()) ? _cargarMovimientosM_(true).catch(function(){}) : Promise.resolve();
     /* 25/10 (auditor 33, 🟡 D5): y TUS PARTES — con el móvil abierto, tu coordinador te aprobaba uno y «Tus partes» seguía en
        «pendiente» mientras la cifra del panel ya lo contaba. Sólo la lista de los tuyos: el fichaje y la cola a decidir NO
        se recargan solos a propósito (`horas.movil.js`: resucitarían un fichaje cerrado o un parte ya firmado). */
     var mps=(_vivoToca_(que,'resto') && !_sesionMuerta_() && typeof _recargarPartesVivo_==='function')
       ? _recargarPartesVivo_().catch(function(){}) : Promise.resolve();   /* con «Ver como», los de quien se ve (refutador 36) */
     await Promise.all([t,q,r,pnl,dcs,snc,mps]);
+    await mvs;                    /* 03/11: ya corría (arriba) — sólo se espera aquí; su `catch` no tumba el refresco */
     /* ⛔ SI LA SESION MURIO, ESTE REFRESCO NO HA TRAÍDO NADA. `_pide_` devuelve `null`
        por diseño —para que un dato que falta no tumbe a los demás— y el repintado deja
        la pantalla igual: se sigue viendo lo de hace horas, sin un solo error. */
@@ -1747,7 +1751,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7af706f';
+var BUILD='2e71d14';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2718,7 +2722,7 @@ document.addEventListener('click',async function(ev){
     }
     _anotX=_anotExtra_(_anotActualDe_(e), _af);
     if(!_anotX){
-      var _sinC='Con anotaciones hay que cambiar algo: título, subtítulo, confidencialidad o etiquetas. Pídeselo a SolarIA o cámbialo a mano.';
+      var _sinC='Con anotaciones hay que cambiar algo: título, subtítulo, confidencialidad, autores o etiquetas. Pídeselo a SolarIA o cámbialo a mano.';
       tost(_sinC, _tostLargo_(_sinC));
       return;
     }

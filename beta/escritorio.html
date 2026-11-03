@@ -113,15 +113,15 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=114cc53"></script>
+<script src="comun.js?v=001b94e"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=8da27b2"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
-<script src="documentos.escritorio.js?v=b6c781b"></script>
+<script src="documentos.escritorio.js?v=cd4120f"></script>
 <script src="sanciones.escritorio.js?v=cb14cbe"></script>
 <script src="reuniones.escritorio.js?v=693e7a1"></script>
-<script src="horas.escritorio.js?v=649e250"></script>
+<script src="horas.escritorio.js?v=179350f"></script>
 <script src="equipo.escritorio.js?v=e271f68"></script>
 <script src="tareas.escritorio.js?v=d3ebd8c"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
@@ -2988,7 +2988,7 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
   /* LOS PUNTOS, por TEMPORADA (Art. 29), no por mes: es el otro ambito de `_ultimosMov_`. */
   var rp=_ultimosMov_(MOVS_E, function(x){ return x.f; }, function(x){ return x.p; }, 'temporada');
   var libroP = rp.total
-    ? tabla([['Motivo'],['Puntos',1]], rp.ultimos.map(function(x){
+    ? tabla([['Motivo'],['Puntos',1]], rp.todos.map(function(x){   /* 03/11 (Daniel): todos los de la temporada, no los 5 últimos */
         return '<tr><td>'+esc(x.t)+'<div class="sc">'+esc(x.f)+
           (x.art?' · '+esc(x.art):'')+' · '+x.vv.replace(/<br>/g,' ')+'</div></td>'+
           /* ⛔⛔ CON `x.p === null` ESTO PINTABA LA PALABRA «null» en la columna de puntos de
@@ -2997,7 +2997,7 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
              `_etPtsSanc_` es el rótulo de los tres casos y ya existe desde aquélla. */
           '<td class="r mono">'+((x.p===null||x.p===undefined) ? _etPtsSanc_(null)
              : (x.p>0?'+':'')+x.p)+'</td></tr>'; }).join(''))+
-      '<p class="rnota">'+_notaRegistro_(rp.total,'temporada')+'</p>'
+      '<p class="rnota">'+_notaRegistro_(rp.total,'temporada',rp.total)+'</p>'
     /* ⛔ Y AQUI SE DECIDIA POR LA LISTA VACIA, que no dice POR QUE esta vacia. La
        frase de abajo culpaba a la version del servidor de lo que muchas veces era la
        RED, y en los dos casos afirmaba «no tienes» sin saberlo. */
@@ -3746,7 +3746,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='591ead4';
+var BUILD='bc9d3fb';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4644,7 +4644,7 @@ function _engDocsDecidir_(){
         if(_anotOcupado_(_pre)){ tost('Espera a que SolarIA termine.'); return; }
         if(_af.titulo!==null && !_af.titulo){ tost('El título no puede quedar vacío.'); return; }
         extra=_anotExtra_(_anotActualDe_(d), _af);
-        if(!extra){ tost('Con anotaciones hay que cambiar algo: título, subtítulo, confidencialidad o etiquetas. '+
+        if(!extra){ tost('Con anotaciones hay que cambiar algo: título, subtítulo, confidencialidad, autores o etiquetas. '+
           'Pídeselo a SolarIA o cámbialo a mano.'); return; }
         /* ⛔ 28/10: sin el tick de la portada (para ESTE título y subtítulo) no se aprueba con anotaciones. */
         if(!_anotChkOK_(_pre)){ tost('Antes de aprobar con anotaciones, comprueba la portada: «Comprobar portada».');

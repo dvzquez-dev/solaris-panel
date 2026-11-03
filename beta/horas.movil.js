@@ -1158,6 +1158,8 @@ async function enviarFichaje(){
      nada que soltar. Soltarlo igual sería un segundo mecanismo para lo mismo. */
   if(!_fechaDMY_(ST.form.fecha)){ tost('La fecha va como DD/MM/AAAA y tiene que existir.'); return; }
   if(_fechaFutura_(ST.form.fecha)){ tost('Esa fecha todavía no ha llegado: declara horas que ya hiciste.'); return; }
+  /* 03/11: ni lo que ACABA en el futuro (hoy, con la salida después de la hora actual). Sólo lo tecleado a mano: un fichaje en vivo acaba ahora. */
+  if(ST.modo!=='vivo' || ST.form.declararId!=null){ var _fu=_finEnFuturoTxt_(ST.form.fecha, _tramosTodos_(ST.form)); if(_fu){ tost(_fu+'.'); return; } }
   /* ⛔ 20/10: si el parte a declarar ya no existe, NO se manda nada — ni por `declararParte` (lo rechazaría) ni como
      fichaje normal (no es lo que se pidió): se avisa y se vuelve a pintar el formulario. Y va ANTES del
      candado, como la fecha de arriba: escrito después, había que soltarlo y era un tercer `disabled=false`
