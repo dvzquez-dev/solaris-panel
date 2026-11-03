@@ -1366,7 +1366,7 @@ function fijarModal(){
    general tuya tiene la asistencia abierta, sale ARRIBA de Estado «Estás en la general: escribe la palabra que se proyecta»;
    al abrir la app con ella abierta se avisa UNA vez (`marcarVisto`: así se ilumina tu cuadrito en el escenario del PD).
    El servidor decide si estás convocado y nunca manda la palabra: aquí sólo se teclea. */
-var ASIS_M={est:{}, visto:{}, txt:{}, demo:false};   // est[id] = {titulo, v}
+var ASIS_M={est:{}, visto:{}, txt:{}, msg:{}, demo:false};   // est[id] = {titulo, v}; msg[id] = el último aviso (sobrevive al repintado)
 
 /* De la lista cruda de `listarReuniones`: las que traen `asistencia_abierta`. Las que ya no, se quitan. */
 function _asisDeListaM_(arr){
@@ -1398,7 +1398,7 @@ function _asisTarjetaHTML_(id, e){
       : '<div style="display:flex;gap:8px"><input class="asisIn" data-asispal autocomplete="off" autocapitalize="none" '+
         'placeholder="la palabra" value="'+esc(ASIS_M.txt[id]||'')+'">'+
         '<button class="btn pri" data-p data-asisok>Estoy presente</button></div>')+
-    '<div class="rnota" data-asismsg style="margin:6px 0 0;min-height:1em"></div></div>';
+    '<div class="rnota" data-asismsg style="margin:6px 0 0;min-height:1em">'+esc(ASIS_M.msg[id]||'')+'</div></div>';
 }
 
 /* El HTML de las tarjetas abiertas (o ''). Se cablea tras insertarse, con el truco de `_audioReuHTML_`. */
@@ -1416,15 +1416,18 @@ function _asisCablearM_(){
         m=t.querySelector('[data-asismsg]');
     if(!i || !b) return;
     i.oninput=function(){ ASIS_M.txt[id]=i.value; };
+    /* 03/11: el aviso se guarda en ASIS_M.msg y lo vuelve a pintar `_asisTarjetaHTML_`: un refresco de Estado rehacía la
+       tarjeta y lo borraba a los pocos milisegundos (lo cazó `probar_asistencia_app` saliendo rojo a ratos). */
+    var aviso=function(t){ ASIS_M.msg[id]=t; if(m) m.textContent=t; };
     var enviar=async function(){
       if(b.disabled) return;
-      if(!i.value.trim()){ if(m) m.textContent='Escribe la palabra que se proyecta.'; return; }   /* un botón que no contesta parece roto */
+      if(!i.value.trim()){ aviso('Escribe la palabra que se proyecta.'); return; }   /* un botón que no contesta parece roto */
       b.disabled=true;
       try{
         var r=await api.estoyPresente(isNaN(+id)?id:+id, i.value);
-        ASIS_M.est[id].v.presente_at=(r&&r.presente_at)||new Date().toISOString();
+        ASIS_M.est[id].v.presente_at=(r&&r.presente_at)||new Date().toISOString(); delete ASIS_M.msg[id];
         _asisPintarM_(); tost('Presente: apuntado.');
-      }catch(e){ if(m) m.textContent=String((e&&e.message)||e).replace(/^Error:\s*/,''); b.disabled=false; }
+      }catch(e){ aviso(String((e&&e.message)||e).replace(/^Error:\s*/,'')); b.disabled=false; }
     };
     b.onclick=enviar;
     i.onkeydown=function(ev){ if(ev.key==='Enter') enviar(); };

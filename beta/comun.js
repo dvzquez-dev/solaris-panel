@@ -4205,6 +4205,7 @@ function _movDeSancion_(s){
        sino «aviso, no me costó nada». Se reutiliza `_ptsSanc_` en vez de reescribir la regla.
        ⚠️ El 0 de una **justificada** se queda: ése es deliberado y está explicado. */
     p: just ? 0 : _ptsSanc_(s.puntos),
+    /* 03/11 (Daniel: las SUMAS no salían): el punto mensual del cierre llega del servidor como un movimiento más (`origen:'mensual'`). */
     /* Los puntos SE REINICIAN CADA TEMPORADA (RRI Art. 29), no caducan sanción a sanción. Se
        dice así, con palabras, en vez de inventarse una fecha exacta que el RRI no fija. */
     /* ⛔ 21/10 (auditor 12, 🟠 5 y 🟡 12): una REVOCADA se devolvió, una REVOCACIÓN devuelve y un PREMIO no resta.
@@ -4213,6 +4214,7 @@ function _movDeSancion_(s){
       : (s.estado === 'revocada') ? 'revocada<br>se devolvió'
       : (s.origen === 'revocacion') ? 'devuelve<br>una sanción'
       : (s.origen === 'premio') ? 'premio<br>no resta'
+      : (s.origen === 'mensual') ? 'punto mensual<br>sin infracción'
       : 'hasta el fin<br>de temporada'
   };
 }
@@ -5044,7 +5046,8 @@ function _puedeDeshacerDecisionSanc_(s){
   /* 02/11 (refutador2, 8): quien ya NO esta en el roster (el sistema, un archivado) cuenta como el PD, igual que `(admin)`/`app`. Gemela de
      `servidor.rango_de_quien_decidio` y `_rangoDeQuienDecidio_` (`Codigo.gs`). */
   var ms = (typeof DATA !== 'undefined' && DATA && DATA.miembros) || [], fuera = ms.length > 0, i;
-  for (i=0;i<ms.length;i++) if (ms[i] && ms[i].nombre === por) { fuera = false; break; }
+  /* 03/11 (Daniel: *«Sólo el PD, igual que si ya no estuviera»*): quien está DE BAJA (`baja`) tampoco cuenta con su rango. */
+  for (i=0;i<ms.length;i++) if (ms[i] && ms[i].nombre === por) { fuera = !!ms[i].baja; break; }
   return Number(SESION.rango) >= ((por === '(admin)' || por === 'app' || fuera) ? 3 : rangoSanc(por));
 }
 
