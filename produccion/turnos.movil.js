@@ -154,7 +154,8 @@ function _convCelHTML_(cv, dia, franja){
   var cls=(v&&v.s)?(' '+v.s):'';
   var cch=(v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">'+ico('coche')+'</span>':'';
   var txt=(v&&v.s==='no')?'\u2013':'';
-  return '<div class="tcel'+cls+'" data-tk="'+_convClave_(dia,franja)+'" data-p>'+txt+cch+'</div>';
+  var fondo=_celdaFondo_(v);        /* 04/11: el color de su pincel (con/sin coche, partido si son dos sitios) */
+  return '<div class="tcel'+cls+'" data-tk="'+_convClave_(dia,franja)+'" data-p'+(fondo?' style="background:'+fondo+'"':'')+'>'+txt+cch+'</div>';
 }
 
 /* La tarjeta entera. Va la PRIMERA de la pantalla de turnos: lo que caduca manda sobre lo
@@ -263,9 +264,6 @@ function _convHTML_(cv){
      venía con un sitio inexistente marcado y el primer trazo escribía `{s:'cuvi'}`. */
   var clases=_convClases_(cv);
   if(clases.indexOf(CONV_PINCEL)<0) CONV_PINCEL=clases[0]||'no';
-  var pin=function(k,txt){
-    return '<button data-pin="'+k+'" class="'+(CONV_PINCEL===k?'on':'')+'" data-p>'+txt+'</button>';
-  };
   /* `_diaTxtM_` espera DD/MM, no ISO: pasarle la fecha ISO devuelve la propia cadena sin
      inventarse un día —hace bien—, así que se convierte antes. Sale «lun 10/08»: el primer
      trozo es el día de la semana y el segundo el número. */
@@ -283,9 +281,7 @@ function _convHTML_(cv){
   }).join('');
   return '<div class="tarj" id="convC">'+
     _convCabHTML_(cv)+
-    '<div class="tpin">'+clases.map(function(k){ return pin(k, esc(_convEtiq_(k))); }).join('')+
-      '<button data-pin-coche class="coche '+(CONV_COCHE?'on':'')+'" data-p>'+ico('coche')+' con coche</button>'+
-    '</div>'+
+    '<div class="tpin" data-pinceles>'+_pincelChipsHTML_(cv, _pincelSelDe_(CONV_PINCEL, CONV_COCHE, CONV_CC), 'data-pin2')+'</div>'+
     /* 🗣️ «Y que lo ponga escrito en algún lugar» (14/10). Va **encima** de la rejilla y pegado
        a ella: una instrucción de gesto escrita **debajo** de doce filas la lee quien ya se ha
        rendido. Y dice las dos mitades, porque la de pintar también hay que descubrirla. */
@@ -431,10 +427,12 @@ function _convPieHTML_(cv){
 
 /* Pintar una celda con el pincel activo. Volver a pintar lo mismo la BORRA: sin eso no habría
    forma de deshacer una marca, y dejar «no puedo» puesto por error es peor que no marcar. */
+/* Lo que escribe el pincel de AHORA (los 4 pinceles, 04/11): la selección vive en `CONV_PINCEL`/`CONV_COCHE`/`CONV_CC`. */
+function _convQuiere_(){ return _pincelValor_(CONV_PINCEL, CONV_COCHE, CONV_CC); }
 function _convPintar_(cv, k){
   var mias=_convMias_(cv), v=mias[k]||null;
-  var quiere = CONV_PINCEL==='no' ? {s:'no'} : {s:CONV_PINCEL, c:!!CONV_COCHE};
-  var igual = v && v.s===quiere.s && (quiere.s==='no' || !!v.c===!!quiere.c);
+  var quiere = _convQuiere_();
+  var igual = _celdaIgual_(v, quiere);
   /* ⛔ SE PINTA EL TURNO ENTERO, no la casilla. Con franjas de una hora, marcar a mano las
      cuatro de un turno son cuatro toques y tres ocasiones de dejarse una — y una hora suelta
      marcada no es disponibilidad para nada. El día que la convocatoria venga con dos franjas
@@ -475,14 +473,11 @@ function _convClavesAtajo_(cv, dia, fk){
 function _convAtajo_(cv, claves){
   if(!claves || !claves.length) return null;
   var mias=_convMias_(cv);
-  var no = CONV_PINCEL==='no';
-  var todas = claves.every(function(k){
-    var v=mias[k];
-    return !!v && v.s===CONV_PINCEL && (no || !!v.c===!!CONV_COCHE);
-  });
+  var quiere = _convQuiere_();
+  var todas = claves.every(function(k){ return _celdaIgual_(mias[k], quiere); });
   claves.forEach(function(k){
     if(todas) delete mias[k];
-    else mias[k] = no ? {s:'no'} : {s:CONV_PINCEL, c:!!CONV_COCHE};
+    else mias[k] = _convQuiere_();
   });
   return todas ? 'borra' : 'marca';
 }
@@ -623,6 +618,7 @@ function _engConv_(){
            tercer sitio, esto sigue limpiando bien. */
         _convClases_(cv).forEach(function(c){ el.classList.remove(c); });
         if(v&&v.s) el.classList.add(v.s);
+        el.style.background = (v&&v.s&&v.s!=='no') ? _celdaFondo_(v) : '';
         el.innerHTML=((v&&v.s==='no')?'\u2013':'')+
           ((v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">'+ico('coche')+'</span>':'');
       });
@@ -630,14 +626,19 @@ function _engConv_(){
     var pie=$('#convPie'); if(pie) pie.innerHTML=_convPieHTML_(cv);
     var falta=$('#convFalta'); if(falta) falta.textContent=_convFaltaTxt_(cv, _convMias_(cv));
   };
-  $$('#convC [data-pin]').forEach(function(b){
-    b.onclick=function(){
-      CONV_PINCEL=b.dataset.pin;
-      $$('#convC [data-pin]').forEach(function(x){ x.classList.toggle('on', x===b); });
-    };
-  });
-  var bc=$('#convC [data-pin-coche]');
-  if(bc) bc.onclick=function(){ CONV_COCHE=!CONV_COCHE; bc.classList.toggle('on', CONV_COCHE); };
+  /* Los 4 pinceles: varios a la vez, mínimo uno (`_pincelToggle_`). Se repinta la fila entera de chips y se vuelve a cablear. */
+  var cablearPinceles=function(){
+    $$('#convC [data-pin2]').forEach(function(b){
+      b.onclick=function(){
+        var d=_pincelDe_(_pincelToggle_(_pincelSelDe_(CONV_PINCEL, CONV_COCHE, CONV_CC), b.dataset.pin2));
+        CONV_PINCEL=d.pincel; CONV_COCHE=d.coche; CONV_CC=d.cc;
+        var caja=$('#convC [data-pinceles]');
+        if(caja) caja.innerHTML=_pincelChipsHTML_(cv, _pincelSelDe_(CONV_PINCEL, CONV_COCHE, CONV_CC), 'data-pin2');
+        cablearPinceles();
+      };
+    });
+  };
+  cablearPinceles();
   var br=$('#convC [data-reusar]');
   if(br) br.onclick=function(){ _reusarConv_(cv, repinta); };
   /* Pintar a dedo y de arrastre, como en reuniones. ⚠️ `setPointerCapture` LANZA si el puntero
@@ -707,8 +708,9 @@ function _engConv_(){
     if(dd.deslizando() || !pintando) return;
     var el=document.elementFromPoint(e.clientX, e.clientY);
     el=el&&el.closest?el.closest('[data-tk]'):null;
-    if(!el||el._ult===CONV_PINCEL+CONV_COCHE) return;
-    el._ult=CONV_PINCEL+CONV_COCHE;
+    var _huella=JSON.stringify(_convQuiere_());       /* el pincel entero: cambiar sólo el coche de un sitio cuenta */
+    if(!el||el._ult===_huella) return;
+    el._ult=_huella;
     _convPintar_(cv, el.dataset.tk); repinta();
   });
   var fin=function(){

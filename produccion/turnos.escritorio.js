@@ -209,6 +209,7 @@ function _dispMudos_(cv){
    algo sin guardar, y por eso el boton lo dice. */
 var MIT_PIN = null;        /* el pincel elegido; null = todavia no ha tocado nada */
 var MIT_COCHE = false;
+var MIT_CC = null;         /* 04/11 (los 4 pinceles): el coche POR SITIO ({cuvi:bool,citi:bool}); null = el unico MIT_COCHE. Misma terna que CONV_* del movil. */
 var MIT_CELDAS = null;     /* lo marcado sin guardar; null = no ha tocado nada */
 
 /* La convocatoria que TE toca contestar: abierta y con tu nombre dentro. ⚠️ `_dispViva_` no
@@ -256,7 +257,7 @@ function _misCeldas_(cv){
 /* Lo que pinta el pincel de ahora. Copiado del movil (`turnos.movil.js`): el «no puedo» va
    SIN `c`, porque un no-puedo con coche no significa nada y Python lo lee por `s`. */
 function _mitQuiere_(){
-  return MIT_PIN==='no' ? {s:'no'} : {s:MIT_PIN, c:!!MIT_COCHE};
+  return _pincelValor_(MIT_PIN, MIT_COCHE, MIT_CC);
 }
 
 /* Marcar una celda, o DESMARCARLA si ya llevaba justo lo mismo. ⚠️ Va aparte del
@@ -265,7 +266,7 @@ function _mitQuiere_(){
    eso compara tambien el coche: cambiar solo el coche es un cambio, no un deshacer. */
 function _mitToggle_(cv, mias, k, q){
   var v = mias[k];
-  var igual = v && v.s===q.s && (q.s==='no' || !!v.c===!!q.c);
+  var igual = _celdaIgual_(v, q);
   /* ⛔ SE MARCA EL TURNO ENTERO, NO LA CASILLA — y esto es lo que la cabecera de arriba ya
      prometía («MISMO CONTRATO QUE EL MÓVIL, a propósito») sin cumplirlo. El móvil lo hace en
      `_convPintar_` con `_bloqueDesde_` y `_minTurno_`, que viven en `comun.js` porque las
@@ -393,20 +394,15 @@ function _miTurnoPanel_(){
      que se fue `_convClases_`: la lista y su etiqueta son LA MISMA decision, y tenerlas
      separadas es como la cara del movil acabo sacando la lista de los datos y tecleando
      el rotulo. Esta copia era la buena de las dos, y aun asi sobraba. */
-  var clases=_convClases_(cv);
-  if(MIT_PIN===null) MIT_PIN=clases[0]||'no';
-  var pin=clases.map(function(k){
-    return '<button data-mtpin="'+k+'" class="'+(MIT_PIN===k?'on':'')+'">'+esc(_convEtiq_(k))+'</button>';
-  }).join('');
+  if(MIT_PIN===null) MIT_PIN=(_pincelesDe_(cv)[0]||{sitio:'no'}).sitio;
   var cab='<div class="dmc dml"></div>'+D.map(function(d){
     var p=String(_diaCorto_(d)).split(' ');
     return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
   }).join('');
-  var COL={cuvi:'rgba(228,30,37,.78)', citi:'rgba(63,158,214,.78)', ambos:'rgba(53,199,89,.78)'};
   var filas=F.map(function(fr, i){
     return (i ? _huecoFilaE_(F[i-1], fr) : '')+_rotFranjaE_(_rotuloTramo_(fr))+D.map(function(d){
       var k=_dispClave_(d,fr.k), v=mias[k];
-      var st = (v && v.s && v.s!=='no') ? ('background:'+(COL[v.s]||'rgba(228,30,37,.78)')) : '';
+      var st = (v && v.s && v.s!=='no') ? ('background:'+_celdaFondo_(v)) : '';
       return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" '+
         'style="cursor:pointer;'+st+'">'+
         ((v&&v.s==='no')?'\u2013':((v&&v.c)?'\uD83D\uDE97':''))+'</div>';
@@ -420,12 +416,11 @@ function _miTurnoPanel_(){
       'Marca d\u00f3nde puedes. Si no contestas, te pueden poner un turno '+
       'cuando no puedes.</p>'+
     '<button class="btn" data-mtreusar style="display:block;margin:0 0 12px">↺ Reutilizar la disponibilidad del turno anterior</button>'+
-    '<div class="dsit">'+pin+'</div>'+
-    '<div class="campo" style="margin:9px 0;display:flex;gap:7px;align-items:center">'+
-      nxSiNo('', MIT_COCHE, {attrs:'data-mtcoche'})+
-      '<span class="sc" style="margin:0">Puedo llevar coche en lo que marque</span></div>'+
+    /* 04/11 (los 4 pinceles): CUVI/CITI × con/sin coche, varios a la vez, mínimo uno. Cada combinación, su color (la leyenda es la de abajo). */
+    '<div class="chips" data-mtpinceles style="margin:0 0 9px">'+_pincelChipsHTML_(cv, _pincelSelDe_(MIT_PIN, MIT_COCHE, MIT_CC), 'data-mtpin2')+'</div>'+
     '<div class="dmapa" style="grid-template-columns:104px repeat('+D.length+',minmax(44px,1fr))">'+
       cab+filas+'</div>'+
+    '<div data-mtley style="margin-top:8px;font-size:11.5px;color:var(--ink2)">'+_pincelLeyendaHTML_(cv)+'</div>'+
     '<div style="margin-top:11px;display:flex;gap:9px;align-items:center">'+
       '<button class="btn pri" data-mtguardar'+(sucio?'':' disabled')+'>Guardar mi disponibilidad</button>'+
       '<small style="color:var(--ink2)">'+(sucio?'tienes cambios sin guardar':'sin cambios')+'</small>'+
@@ -459,11 +454,11 @@ function _cablearMiTurno_(){
   $$('[data-mtreusar]').forEach(function(b){
     b.onclick=function(){ _reusarMiTurno_(_miTurnoCv_()); };
   });
-  $$('[data-mtpin]').forEach(function(b){
-    b.onclick=function(){ MIT_PIN=b.dataset.mtpin; pintar(); };
-  });
-  $$('[data-mtcoche]').forEach(function(c){
-    c.onchange=function(){ MIT_COCHE=nxSi(c); };
+  $$('[data-mtpin2]').forEach(function(b){
+    b.onclick=function(){
+      var d=_pincelDe_(_pincelToggle_(_pincelSelDe_(MIT_PIN, MIT_COCHE, MIT_CC), b.dataset.mtpin2));
+      MIT_PIN=d.pincel; MIT_COCHE=d.coche; MIT_CC=d.cc; pintar();
+    };
   });
   $$('[data-mtk]').forEach(function(c){
     c.onclick=function(){
@@ -565,6 +560,7 @@ function _dispAviso_(titulo){
   return '';
 }
 
+
 function _dispPanel_(){
   /* ⚠️ ANTES de `_dispViva_()`: si se pone despues, el `return ''` de abajo se lleva el
      aviso por delante y el panel vuelve a quedarse mudo. */
@@ -580,7 +576,7 @@ function _dispPanel_(){
     vacioSimple('El mapa de todo el equipo es para quien reparte los turnos',
       'Tu disponibilidad sí la puedes contestar, aquí debajo.'));
   var cv=_dispViva_(); if(!cv) return '';
-  var calor=_calorTurnos_(cv, DISP_SITIO);
+  var calor=_calorTurnos_(cv, DISP_SITIO, DISP_COCHE);
   var mudos=_dispMudos_(cv);
   var nInv=(cv.invitados||[]).length;
   var D=cv.dias||[];
@@ -597,6 +593,7 @@ function _dispPanel_(){
       'El plazo vence el '+esc(_isoADMY_(_normLimite_(cv.limite).slice(0,10))||'')+
       ' a las '+esc(_normLimite_(cv.limite).slice(11,16))+'.</p>'+
     '<div class="dsit">'+sit('','Los dos sitios')+sit('cuvi','Solo CUVI')+sit('citi','Solo CITI')+'</div>'+
+    '<div class="chips" data-d-filtro style="margin:0 0 8px">'+_turnoFiltroCocheChips_(DISP_COCHE, 'd')+'</div>'+
     /* 03/11: EL MISMO MAPA QUE CONVOCAR (`_turnoCalorHTML_`), no un segundo diseño (Daniel: «en disponibilidad sigue la cosa vieja»). */
     _turnoCalorHTML_(cv, calor, 'dMapa')+
     '<div class="nota">'+
@@ -778,7 +775,8 @@ function _pinDisp_(){
   });
   var cv=_dispViva_(); if(!cv) return;
   var mapa=document.getElementById('dMapa'); if(!mapa) return;
-  var calor=_calorTurnos_(cv, DISP_SITIO);
+  var calor=_calorTurnos_(cv, DISP_SITIO, DISP_COCHE);
+  $$('[data-d-coche]').forEach(function(b){ b.onclick=function(){ DISP_COCHE=_cocheDeFiltro_(b.dataset.dCoche); DISP_SEL=''; pintar(); }; });
   /* 03/11: el MISMO cableado que Convocar (`_turnoCalorCablear_`), sin formulario al que rellenar: tocar una casilla la marca y cuenta
      quién puede en la caja de debajo (una caja fija, no un globo: tres cestas de nombres no caben sobre una casilla). */
   _turnoCalorCablear_(mapa, cv, calor, null);
@@ -1783,6 +1781,37 @@ function _convocarEligeHTML_(){
   return chips ? '<span class="sc" style="display:block;margin-bottom:5px">De qué convocatoria</span><div class="chips" data-conv-lista style="margin:0 0 12px">'+chips+'</div>' : '';
 }
 
+/* 04/11 (los 4 pinceles): el FILTRO del mapa de Convocar y la persona a la que se mira, de esta cara. */
+var CONV_FIL = {sitio:'', coche:null};
+var CONV_PERS = '';
+
+/* La disponibilidad de UNA persona con sus pinceles: la misma rejilla que contesta, sólo lectura. `''` si no hay nada que enseñar. */
+function _convocarPersonaHTML_(cv, nombre){
+  var r = (cv && cv.resp && nombre) ? cv.resp[nombre] : null; if(!r) return '';
+  var D=cv.dias||[], F=cv.franjas||[];
+  var cab='<div class="dmc dml"></div>'+D.map(function(d){
+    var p=String(_diaCorto_(d)).split(' ');
+    return '<div class="dmc">'+esc(p[0]||'')+'<br>'+esc(p[1]||String(d).slice(8,10))+'</div>';
+  }).join('');
+  var filas=F.map(function(fr, i){
+    return (i ? _huecoFilaE_(F[i-1], fr) : '')+_rotFranjaE_(_rotuloTramo_(fr))+D.map(function(d){
+      var v=r[_dispClave_(d,fr.k)], pue=(v && v.s && v.s!=='no');
+      return '<div class="dcel'+(pue?'':' v0')+'" data-pers-k="'+esc(_dispClave_(d,fr.k))+'"'+(pue?' style="background:'+_celdaFondo_(v)+'"':'')+'>'+
+        ((v&&v.s==='no')?'\u2013':(pue&&_celdaCoche_(v)?ico('coche'):''))+'</div>';
+    }).join('');
+  }).join('');
+  return '<div data-conv-persona style="margin:10px 0 0"><span class="sc" style="display:block;margin-bottom:5px">'+esc(_dispPila_(nombre))+' \u00b7 sus pinceles</span>'+
+    '<div class="dmapa" style="grid-template-columns:104px repeat('+D.length+',minmax(44px,1fr))">'+cab+filas+'</div></div>';
+}
+/* Los chips para elegir a quién mirar: quien ha contestado algo. Pulsar al elegido lo suelta. */
+function _convocarPersonasHTML_(cv){
+  var quienes = Object.keys((cv && cv.resp) || {}).filter(function(n){ return Object.keys(cv.resp[n]||{}).length; }).sort();
+  if(!quienes.length) return '';
+  return '<span class="sc" style="display:block;margin:10px 0 5px">Ver a una persona</span><div class="chips" data-conv-personas>'+
+    quienes.map(function(n){ return '<button type="button" class="pick'+(n===CONV_PERS?' on':'')+'" data-convpers="'+esc(n)+'">'+esc(_dispPila_(n))+'</button>'; }).join('')+'</div>'+
+    (CONV_PERS && quienes.indexOf(CONV_PERS)>=0 ? _convocarPersonaHTML_(cv, CONV_PERS) : '');
+}
+
 function _convocarCalorHTML_(){
   var st=_dispEstadoSrv_(), cv=_convocarCvElegida_(), T='<span class="sc" style="display:block;margin-bottom:5px">Cuándo pueden · toca un hueco</span>';
   var nota=function(t){ return '<div style="margin:0 0 14px">'+T+'<div class="nadie" data-tcal-nota style="font-size:12.5px;color:var(--ink2)">'+t+'</div></div>'; };
@@ -1790,7 +1819,10 @@ function _convocarCalorHTML_(){
   if(!CONV_ELEGIDA && st==='ok' && !cv) return nota('No hay convocatoria de disponibilidad abierta para esa semana: elige la fecha y la hora a mano.');
   if(!cv) return nota(st==='sin pedir'||st==='pidiendo' ? 'Mirando la disponibilidad…'
     : 'No se ve la disponibilidad de la semana: elige la fecha y la hora a mano.');
-  return '<div style="margin:0 0 14px">'+T+_turnoCalorHTML_(cv, _calorTurnos_(cv, ''), 'tuMapa')+'</div>';
+  return '<div style="margin:0 0 14px">'+T+_turnoFiltroHTML_(cv, CONV_FIL, 'convf')+
+    _turnoCalorHTML_(cv, _calorTurnos_(cv, CONV_FIL.sitio, CONV_FIL.coche), 'tuMapa')+
+    '<div data-conv-ley style="margin-top:5px;font-size:11.5px;color:var(--ink2)">'+_pincelLeyendaHTML_(cv)+'</div>'+
+    _convocarPersonasHTML_(cv)+'</div>';
 }
 
 function _convocarZonaHTML_(){ return _convocarEligeHTML_()+_convocarCalorHTML_(); }
@@ -1876,8 +1908,11 @@ function _convocarElige_(id){
 function _convocarCablear_(){
   $$('#tuZona [data-convsel]').forEach(function(b){ b.onclick=function(){ _convocarElige_(b.dataset.convsel); }; });
   $$('#tuZona [data-convnueva]').forEach(function(b){ b.onclick=function(){ _abrirPestana_('tur', 'disp'); }; });
+  $$('#tuZona [data-convf-sitio]').forEach(function(b){ b.onclick=function(){ CONV_FIL.sitio=b.dataset.convfSitio; _convocarRepintarZona_(); }; });
+  $$('#tuZona [data-convf-coche]').forEach(function(b){ b.onclick=function(){ CONV_FIL.coche=_cocheDeFiltro_(b.dataset.convfCoche); _convocarRepintarZona_(); }; });
+  $$('#tuZona [data-convpers]').forEach(function(b){ b.onclick=function(){ CONV_PERS=(CONV_PERS===b.dataset.convpers)?'':b.dataset.convpers; _convocarRepintarZona_(); }; });
   var raiz=document.getElementById('tuMapa'), cv=_convocarCvElegida_(); if(!raiz || !cv) return;
-  _turnoCalorCablear_(raiz, cv, _calorTurnos_(cv, ''), function(b){
+  _turnoCalorCablear_(raiz, cv, _calorTurnos_(cv, CONV_FIL.sitio, CONV_FIL.coche), function(b){
     nxPon('tuFecha', b.dia);
     if(b.hora) nxPon('tuHora', b.hora);
     var d=document.getElementById('tuDur'); if(d && b.horas) d.value=_duracionTurnoTxt_(b.horas);

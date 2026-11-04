@@ -869,7 +869,8 @@ function _engMisSanc_(){
    llega a la persona. Dice QUÉ se decide y SOBRE QUIÉN. `datos` es lo que se manda (`decision`, `quitar`, `plazo`). */
 function _avisoApelE_(ap, datos){
   var quien = ((_m(ap.autor) && _m(ap.autor).pila) || ap.autor || 'esta persona'), NL = String.fromCharCode(10);
-  var que = datos.quitar ? 'Estimar la apelación de ' + quien + ' y quitarle la tarea.'
+  var que = datos.quitar ? 'Estimar la apelación de ' + quien + ' y quitarle la tarea.' +
+      (ap && ap.dejaria_vacia ? NL + NL + 'Es su único responsable: la tarea se queda VACÍA y se avisa a quien coordina para que la reasigne.' : '')
     : datos.decision === 'parcial' ? 'Rebajar a aviso la sanción de ' + quien + ': se le devuelven los puntos.'
     : datos.decision === 'desestimada' ? 'Desestimar la apelación de ' + quien + ': todo se queda como está.'
     : datos.plazo ? 'Estimar la apelación de ' + quien + ' con el nuevo plazo (' + datos.plazo + ').'
@@ -912,7 +913,9 @@ function _engApela_(){
       b.onclick = function(){
         var q = b.dataset.apest === 'quitar';
         if (!q && !(pl && pl.value)){ if (pl) pl.focus(); tost('Pon el nuevo plazo, o usa «Estimar y quitarle la tarea».'); return; }
-        resolver(b, {decision: 'estimada', resolucion: ta ? ta.value.trim() : '', plazo: q ? undefined : pl.value, quitar: q || undefined});
+        if (!q && pl.value < _hoyNxISO_()){ pl.focus(); tost('El nuevo plazo no puede ser anterior a hoy.'); return; }
+        resolver(b, {decision: 'estimada', resolucion: ta ? ta.value.trim() : '', plazo: q ? undefined : pl.value, quitar: q || undefined,
+          confirmar_vacia: (q && ap && ap.dejaria_vacia) ? true : undefined});
       };
     });
     $$('[data-apdes]', caja).forEach(function(b){

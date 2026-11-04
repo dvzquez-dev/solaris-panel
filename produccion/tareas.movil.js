@@ -81,6 +81,8 @@ function vTareas(){
         (ap.estado==='desestimada'?'var(--red2)':ap.estado==='estimada'?'var(--ok)':'var(--warn)')+'">'+esc(_apelEstadoTxt_(ap))+'</small>':'')+
       /* el botón va DEBAJO del texto, no en la columna de la derecha: con «Entregada» y el estado al lado, el título se quedaba en 8 renglones */
       (apelar&&i>=0?'<button class="btn mini" style="margin-top:7px;align-self:flex-start" data-tapel="'+i+'">Apelar</button>':'')+
+      /* 04/11: pasados 3 días desde que te la asignan ya no se apela: se dice, con el día en que caducó */
+      (!apelar&&!ap&&_apelFueraDePlazo_(t)&&_tareasResp_([t],_fichaYo_()).length&&!_tareaHecha_(t.e)&&!_esVoluntaria_(t)?'<small style="color:var(--ink3)">Ya no se puede apelar: caducó el '+_isoADMY_(_apelHastaTarea_(t))+'</small>':'')+
       '</div>'+
       '<div class="d"><span class="pil '+(t.e==='Revisando'?'conf':t.e==='En desarrollo'?'pend':'neu')+'">'+esc(t.e)+'</span>'+
       /* ⛔ Los dos marcadores son DISTINTOS (`data-tact` / `data-tdes`): con uno solo, el

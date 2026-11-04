@@ -66,6 +66,7 @@ function _pendientesCubrirM_(){
     /* ⛔ 20/10 (auditoría): Y CON EL PLAZO ABIERTO. Sin fijar y con el plazo ya cerrado, la ficha dice «Ya no se puede
        cubrir» y esto la seguía contando —la primera del aviso y el globo en rojo hasta que alguien la fijara—. */
     return r && (!r.cubierta || r.bajoMin) && !r.exento && !r.fijada &&   // fijada = el plazo ya se cerro; bajoMin: 🔴 1 (auditor 21)
+      !_reuFinalizada_(r) &&      // 04/11: lo celebrado ya no pende
       !(typeof _plazoAbierto_==='function' && !_plazoAbierto_(r.limite));
   }).sort(function(a,b){ return _limMsM_(a)-_limMsM_(b); });
 }
@@ -108,7 +109,8 @@ function _puedeBorrarReuM_(r){
 }
 
 function _proximaReuM_(){
-  var L=REUNIONES_M||[]; if(!L.length) return null;
+  /* 04/11: una FINALIZADA no es «la próxima» ni «la última»: Estado no enseña lo que su convocante ya dio por celebrado. */
+  var L=(REUNIONES_M||[]).filter(function(r){ return !_reuFinalizada_(r); }); if(!L.length) return null;
   var hoy=_hoyDateM_().getTime();
   var con=L.map(function(r){ var c=_cuandoReuM_(r);
     return { r:r, ms:c.ms, fij:c.fijada, pasada:(c.ms<hoy) }; });
@@ -248,6 +250,7 @@ function _normReuM_(r){
     invitados_tarde: Array.isArray(r.invitados_tarde) ? r.invitados_tarde.slice() : [],   /* para re-hidratar */
     en_curso: (r.en_curso && typeof r.en_curso==='object') ? r.en_curso : null,   /* 29/10: la pone `empezarReunion`; la ficha enseña el cronómetro */
     bloque: r.bloque||null,   /* 01/11: el bloque que ya fichó la reunión (apaga «ya ha pasado: ficha el bloque») */
+    finalizada_at: r.finalizada_at||null, celebrada: !!r.celebrada,   /* 04/11: la dio por celebrada su convocante (sale de Estado; al mes, al Archivo) · no se borra */
     _real:true };
 }
 
@@ -299,6 +302,7 @@ function _fuenteReuM_(R, base, resp, ag){
     ordenDia:R.ordenDia,
     minimoPct:R.minimoPct,   /* 01/11: el mínimo que eligió quien convocó (la gemela de la lectura de `_normReuM_`) */
     bloque:R.bloque,       /* 01/11: la gemela de `en_curso` en `_normReuM_` */
+    finalizada_at:R.finalizada_at, celebrada:R.celebrada,   /* 04/11: la gemela de la lectura de `_normReuM_` */
     en_curso:R.en_curso,   /* 29/10: sin esto el cronómetro de la ficha se perdía al rehidratar (lo cazó `probar_reunion_movil`) */
     dias:s.dias||R.dias, franjas:s.franjas||R.franjas, bloques:s.bloques||R.bloques,
     /* Del servidor viene el objeto `fijada` con sus indices; de lo nuestro, la etiqueta ya
@@ -469,6 +473,27 @@ function _sinConvocarHTMLM_(){
         '<small>'+(/^\d{4}-\d{2}-\d{2}/.test(f)?esc(_isoADMY_(f.slice(0,10)))+' · ':'')+'reunión sin convocar · ver su acta</small></div>'+
         '<div class="d"><span class="pil '+_pilEstDoc_(d.estado)+'">'+esc(estDoc(d.estado)[0])+'</span> <span class="chev">›</span></div></div>';
     }).join('')+'</div>';
+}
+
+/* 04/11 · «MIS REUNIONES»: las que se ven (sin finalizar, o finalizadas hace menos de un mes) y, debajo, el cajón plegable «Archivo» con
+   las finalizadas de hace más (`_reuPartir_`, `comun.js`). `data-reu` lleva el índice en `REUNIONES_M`, no en esta mitad. Si la que
+   miras está en el archivo, el cajón sale abierto: no se esconde lo que tienes delante. */
+function _listaReusM_(R){
+  var par=_reuPartir_(REUNIONES_M);
+  var fila=function(x){
+          var sel=(x.id===R.id), i=REUNIONES_M.indexOf(x);
+          return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
+            '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
+            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+_nConvM_(x)+' convocados'+
+            _duraTxtM_(x)+'</small></div>'+
+            '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':(_reuFinalizada_(x)?'<span class="pil">finalizada</span>':'<span class="chev">›</span>'))+'</div></div>'; };
+  var abierto=par.archivo.indexOf(R)>=0;
+  return (par.vivas.length ? '<div class="tarj">'+par.vivas.map(fila).join('')+'</div>' : '')+
+    (par.archivo.length
+      ? '<div class="cajon'+(abierto?' ab':'')+'" data-caj data-p><span>Archivo <b>· '+par.archivo.length+'</b></span>'+
+        '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+        '<div class="cajsec'+(abierto?' on':'')+'"><div class="tarj">'+par.archivo.map(fila).join('')+'</div></div>'
+      : '');
 }
 
 function vReu(){
@@ -646,15 +671,9 @@ function vReu(){
 
   return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
     '<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar '+(esCoord()?'reunión':'reunión de trabajo')+'</button>'+
-    '<h2 class="sec">Mis reuniones<span class="ln"></span>'+(REUNIONES_M.length||1)+'</h2>'+
+    '<h2 class="sec">Mis reuniones<span class="ln"></span>'+(_reuPartir_(REUNIONES_M).vivas.length||1)+'</h2>'+
     (REUNIONES_M.length>1
-      ? '<div class="tarj">'+REUNIONES_M.map(function(x,i){
-          var sel=(x.id===R.id);
-          return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
-            '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
-            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+_nConvM_(x)+' convocados'+
-            _duraTxtM_(x)+'</small></div>'+
-            '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':'<span class="chev">›</span>')+'</div></div>'; }).join('')+'</div>'
+      ? _listaReusM_(R)
       : '')+
     '<div class="tarj">'+cab(R.tipo||'General', _modalidadTxt_(R.modalidad))+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
@@ -714,7 +733,11 @@ function vReu(){
         '<button class="btn mini" data-p id="btnEditarReu" style="flex:1">Título y plazo</button>'+
       '</div>':'')+
     /* 01/11: la asistencia es del PD, no de quien convocó: su botón va aparte del de «Fijar/Convocados». */
-    (_asisBotonM_(R)?'<div style="margin-top:9px"><button class="btn mini full" data-p id="btnAsistencia">'+ico('portapapeles')+' Asistencia en directo</button></div>':'')+
+    /* 04/11: la asistencia es de quien convoca (y del PD); y «Finalizar» también: la da por celebrada, la saca de Estado y cierra la palabra. */
+    (_asisBotonM_(R)?'<div style="margin-top:9px"><button class="btn mini full" data-p id="btnAsistencia">'+ico('portapapeles')+' Palabra de asistencia</button></div>':'')+
+    (_reuPuedeFinalizar_(R, _asisYoM_(), (typeof esAdmin==='function' && esAdmin())) && (_demoLocal_() || (typeof backendOK!=='undefined' && backendOK && !!R._real))
+      ? '<div style="margin-top:9px"><button class="btn mini full" data-p id="btnFinalizarReu">Finalizar reunión</button></div>'
+      : (_reuFinalizada_(R) ? '<p class="rnota" style="margin:9px 0 0">Finalizada el '+esc(_isoADMY_(String(R.finalizada_at).slice(0,10)))+'.</p>' : ''))+
     _ordenDiaReuHTML_(R)+
     _audioReuHTML_(R)+
     _bloqueReuHTML_(R, _puedeBloqueReu_(R, (typeof _actorSanc_==='function'?_actorSanc_():(YO&&YO.nombre)), (typeof esAdmin==='function' && esAdmin())))+
@@ -741,7 +764,7 @@ function vReu(){
         _calorLeyenda_(R.modalidad, pondOn)+'</span>'+
         '<span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>fuera del horario de ese día</span></div>'+
     '</div>')+
-    (_puedeBorrarReuM_(R)?'<button class="btn full" data-p id="btnBorrar" style="margin-top:6px;color:var(--red2);border-color:var(--red)">Eliminar reunión</button>':'')+
+    (_puedeBorrarReuM_(R) && _reuSePuedeBorrar_(R)?'<button class="btn full" data-p id="btnBorrar" style="margin-top:6px;color:var(--red2);border-color:var(--red)">Eliminar reunión</button>':'')+
     /* ⛔ 20/10: «Sin convocar» va AL FINAL. Estaba entre el rótulo «Mis reuniones» y la tarjeta de la reunión, y con
        una sola reunión (la lista no se pinta) el rótulo quedaba vacío y la reunión parecía «sin convocar». Visto en
        la maqueta al darle un acta sin convocar; ningún banco miraba el ORDEN. */
@@ -1063,20 +1086,22 @@ function _presetInvitados_(tipo){
   ms.forEach(function(m){
     if(m.nombre===yo) return;
     var meto = tipo==='general' ? true
-             : tipo==='subsistema' ? (m.unidad===(YO&&YO.unidad))
+             : (tipo==='subsistema' || tipo==='mixta') ? (m.unidad===(YO&&YO.unidad))   // 04/11: la mixta nace con SU subsistema ya dentro
              : tipo==='junta' ? (m.cargo==='Coordinador'||m.cargo==='Project Director')
-             : false;                              // mixta/trabajo: a mano
+             : false;                              // trabajo: a mano
     if(meto) out.push(m.nombre);
   });
   return out;
 }
 
 function crearModal(){
-  var coord=esCoord();
-  var tipos=[['general','General · todo el equipo',true],['junta','Junta Directiva · coordinación',true],
-    ['consejo','Consejo · sus miembros',true],['subsistema','Subsistema · tu unidad',true],
-    ['mixta','Mixta · varios subsistemas',true],['trabajo','Reunión de trabajo · invitas tú',false]];
-  var op=tipos.filter(function(t){return coord||!t[2];}).map(function(t){return [t[0], t[1]];});
+  var coord=_tiposConvocables_(YO&&YO.nombre).length>1;    // 04/11: más que `trabajo`
+  /* 04/11 (Daniel): los tipos que se ofrecen salen de `_tiposConvocables_` (espejo de `disciplina.puede_convocar`). */
+  var tipos=[['general','General · todo el equipo'],['junta','Junta Directiva · coordinación'],
+    ['consejo','Consejo · sus miembros'],['subsistema','Subsistema · tu unidad'],
+    ['mixta','Mixta · tu subsistema y 1-2 más'],['trabajo','Reunión de trabajo · invitas tú']];
+  var _tp=_tiposConvocables_(YO&&YO.nombre);
+  var op=tipos.filter(function(t){return _tp.indexOf(t[0])>=0;});
   var hoyISO=_dmyAISO_(HOY), mas=function(iso,n){ var d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n);
     return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
   var subs=(DATA.subsistemas||[]).map(function(sb){ return '<button type="button" class="cmixb" data-u="'+esc(sb.u||sb)+'" data-p>'+esc(sb.u||sb)+'</button>'; }).join('');
@@ -1085,7 +1110,7 @@ function crearModal(){
   abrirModal('<div class="mtit">Nueva '+(coord?'reunión':'reunión de trabajo')+'</div>'+
     '<div class="campo"><span class="sc">Tipo</span>'+nxElige('ceTipo', op, op[0][0])+'</div>'+
     _avisoGrabaHTML_('ceGraba')+
-    (coord?'':'<p class="rnota" style="margin:-4px 0 10px">Como miembro convocas reuniones de trabajo. Las generales, de junta o de subsistema las convoca coordinación.</p>')+
+    (coord?'':'<p class="rnota" style="margin:-4px 0 10px">Como miembro convocas reuniones de trabajo. Las demás las convocan quienes tienen potestad para ello.</p>')+
     '<div class="campo"><span class="sc">Modalidad</span>'+
       nxElige('ceMod', [['hibrida','Híbrida (presencial + telemática)'],['presencial','Presencial'],['telematica','Telemática']], 'hibrida')+'</div>'+
     '<div id="ceMixW" style="display:none"><span class="sc" style="display:block;margin-bottom:5px">Subsistemas que participan</span>'+
@@ -1203,6 +1228,7 @@ function crearModal(){
        ⚠️ El ESCRITORIO nunca lo escondio: era una asimetria de una sola cara. */
     if($('#ceInvW')) $('#ceInvW').style.display='';
     $$('#ceMix .cmixb').forEach(function(b){ b.classList.remove('on'); });
+    if(t==='mixta') $$('#ceMix .cmixb').forEach(function(b){ if(YO && b.dataset.u===YO.unidad) b.classList.add('on'); });   // 04/11: SU subsistema, preseleccionado
     INV=new Set(_presetInvitados_(t)); invRender(); upd(); };
   $('#ceTipo').onchange=tipoUpd;
   _avisoGrabaPon_('ceTipo','ceGraba');
@@ -1237,6 +1263,7 @@ function crearModal(){
        trabajo» tiene el preset vacío a propósito. El escritorio lo impide desde siempre;
        esta cara no, y el servidor tampoco lo mira. */
     if(!INV.size){ tost('No has convocado a nadie.'); return; }
+    if(val('ceTipo')==='mixta'){ var _mb=_mixtaBloqueo_(Array.from(INV), YO&&YO.unidad); if(_mb){ tost(_mb); return; } }   // 04/11
     var ds=dias(); if(!ds.length){ tost('Revisa las fechas: no hay días.'); return; }
     var _sl=+val('ceSlot')||30, _du=+val('ceDura')||60;
     var u=_genUnion_(rangos(), _sl), bloques=[];
@@ -1371,7 +1398,7 @@ var ASIS_M={est:{}, visto:{}, txt:{}, msg:{}, demo:false};   // est[id] = {titul
 /* De la lista cruda de `listarReuniones`: las que traen `asistencia_abierta`. Las que ya no, se quitan. */
 function _asisDeListaM_(arr){
   var abiertas={};
-  (arr||[]).forEach(function(r){ if(r && r.id!=null && r.asistencia_abierta && r.tipo==='general') abiertas[r.id]=r; });
+  (arr||[]).forEach(function(r){ if(r && r.id!=null && r.asistencia_abierta) abiertas[r.id]=r; });
   Object.keys(ASIS_M.est).forEach(function(id){ if(!abiertas[id]) delete ASIS_M.est[id]; });
   Object.keys(abiertas).forEach(function(id){ _asisChequearM_(abiertas[id]); });
   if(!Object.keys(abiertas).length) _asisPintarM_();
@@ -1382,7 +1409,7 @@ async function _asisChequearM_(r){
   try{
     var v=await api.getAsistencia(id, false);
     if(v && v.abierta && v.convocado){
-      ASIS_M.est[id]={titulo:r.titulo||'la reunión general', v:v};
+      ASIS_M.est[id]={titulo:r.titulo||'la reunión', v:v};
       if(!ASIS_M.visto[id]){ ASIS_M.visto[id]=true; api.marcarVisto(id).catch(function(){}); }
     } else delete ASIS_M.est[id];
   }catch(e){ /* sin red o sin sesión: la tarjeta simplemente no sale */ }
@@ -1392,7 +1419,7 @@ async function _asisChequearM_(r){
 function _asisTarjetaHTML_(id, e){
   var v=e.v, hecho=v.presente_at;
   return '<div class="tarj acc" data-asisreu="'+esc(id)+'"><div class="tt"><span class="sc">Asistencia en directo</span></div>'+
-    '<b style="display:block;margin-bottom:6px">Estás en la general: '+(hecho?'ya constas presente':'escribe la palabra que se proyecta')+'</b>'+
+    '<b style="display:block;margin-bottom:6px">Estás en «'+esc(e.titulo||'la reunión')+'»: '+(hecho?'ya constas presente':'escribe la palabra de tu modalidad')+'</b>'+
     (hecho
       ? '<div class="asisOk">'+ico('tick')+' Presente ('+esc(_hhmmDe_(hecho))+')</div>'
       : '<div style="display:flex;gap:8px"><input class="asisIn" data-asispal autocomplete="off" autocapitalize="none" '+
@@ -1421,7 +1448,7 @@ function _asisCablearM_(){
     var aviso=function(t){ ASIS_M.msg[id]=t; if(m) m.textContent=t; };
     var enviar=async function(){
       if(b.disabled) return;
-      if(!i.value.trim()){ aviso('Escribe la palabra que se proyecta.'); return; }   /* un botón que no contesta parece roto */
+      if(!i.value.trim()){ aviso('Escribe la palabra (la presencial, en el encerado; la telemática, por voz o por chat).'); return; }   /* un botón que no contesta parece roto */
       b.disabled=true;
       try{
         var r=await api.estoyPresente(isNaN(+id)?id:+id, i.value);
@@ -1442,13 +1469,15 @@ function _asisCablearM_(){
    azul (`modos`, del servidor). La lista se refresca cada 3 s mientras el panel está abierto. */
 var ASIS_PM=null;   // {id, v, timer, ocupado}
 
-function _asisSoyPDM_(){
-  var n=(typeof SESION!=='undefined' && SESION && SESION.nombre) || (typeof YO!=='undefined' && YO && YO.nombre) || '';
-  return rangoNom(n)>=3 || (typeof esAdmin==='function' && !!esAdmin());
+/* Quién soy para abrir/cerrar la asistencia y finalizar: la SESIÓN (el servidor gatea por token), o `YO` en la maqueta. */
+function _asisYoM_(){
+  return (typeof SESION!=='undefined' && SESION && SESION.nombre) || (typeof YO!=='undefined' && YO && YO.nombre) || '';
 }
-/* ¿Sale el botón? Sólo en una general de verdad (con servidor, o en `?demo`) y a quien la abre. */
+/* ¿Sale el botón? En cualquier reunión de verdad (con servidor, o en `?demo`) y a quien la gestiona: su convocante, el PD o el admin
+   (`_puedeBloqueReu_`, la regla del servidor). 04/11: ya no es sólo de las generales ni sólo del PD. */
 function _asisBotonM_(R){
-  return !!R && R.tipo==='general' && R.id!=null && _asisSoyPDM_() && (_demoLocal_() || (typeof backendOK!=='undefined' && backendOK && !!R._real));
+  return !!R && R.id!=null && _puedeBloqueReu_(R, _asisYoM_(), (typeof esAdmin==='function' && !!esAdmin())) &&
+    (_demoLocal_() || (typeof backendOK!=='undefined' && backendOK && !!R._real));
 }
 
 function _asisFilaM_(n, v){
@@ -1465,9 +1494,13 @@ function _asisPanelHTMLM_(){
   var A=ASIS_PM, v=A&&A.v; if(!v) return '<p class="rnota">Cargando…</p>';
   var cu=_asisCuenta_(v), conv=v.convocados||[];
   if(!v.existe) return '<p class="rnota" style="margin:0 0 10px">Aún no se ha abierto la asistencia de esta reunión.</p>'+
-    '<button class="btn pri full" data-p data-asisabrirm>Abrir asistencia</button>';
+    (A.fin ? '<p class="rnota">La reunión está finalizada: ya no se abre.</p>' : '<button class="btn pri full" data-p data-asisabrirm>Mostrar la palabra</button>');
+  /* 04/11: una palabra por modalidad — la presencial, para el encerado; la telemática, por voz o por chat (👤 Daniel). */
   var cab=v.abierta
-    ? '<div class="asisPalM" style="text-align:center;font-size:34px;font-weight:700;letter-spacing:.04em;margin:2px 0 4px">'+esc(v.palabra||'')+'</div>'
+    ? _asisPalabras_(v).map(function(w){
+        return '<div style="text-align:center;margin:2px 0 8px">'+(w.rot?'<div class="rnota" style="margin:0 0 2px;color:'+(w.modo==='tel'?'var(--tel)':'var(--ink2)')+'">'+esc(w.rot)+
+          (w.modo==='tel'?' · díctala o ponla en el chat':' · al encerado')+'</div>':'')+
+          '<div class="asisPalM" data-asispal="'+esc(w.modo)+'" style="font-size:34px;font-weight:700;letter-spacing:.04em">'+esc(w.pal||'')+'</div></div>'; }).join('')
     : '<p class="rnota" style="margin:0 0 6px">Asistencia cerrada: puedes corregir la lista.</p>';
   return cab+'<p class="rnota" data-asiscuenta style="text-align:center;margin:0 0 10px"><b>'+cu.presentes+'</b> de '+cu.convocados+' presentes'+
     (cu.tel?' · <span style="color:var(--tel)">'+cu.tel+' por telemático</span>':'')+'</p>'+
@@ -1476,7 +1509,7 @@ function _asisPanelHTMLM_(){
       multi:false, titulo:'Llega alguien que no está en la lista', vacio:'Escribe un nombre.'})+
     '<button class="btn full" data-p data-asisanadirm style="margin-top:8px">Añadir y marcar presente</button></div>'+
     '<div style="display:flex;gap:8px;margin-top:10px">'+
-    (v.abierta?'<button class="btn" data-p data-asiscerrarm style="flex:1">Cerrar asistencia</button>':'<button class="btn" data-p data-asisreabrirm style="flex:1">Reabrir</button>')+
+    (v.abierta?'<button class="btn" data-p data-asiscerrarm style="flex:1">Cerrar asistencia</button>':(A.fin?'':'<button class="btn" data-p data-asisreabrirm style="flex:1">Reabrir</button>'))+
     '<button class="btn" data-p data-asiscopiarm style="flex:1">Copiar la lista</button></div>';
 }
 
@@ -1521,7 +1554,7 @@ function _asisPintarPanelM_(){
 
 function _asisAbrirPanelM_(R){
   _asisSalirM_();
-  ASIS_PM={id:R.id, v:null, timer:null, ocupado:false};
+  ASIS_PM={id:R.id, v:null, timer:null, ocupado:false, fin:_reuFinalizada_(R)};
   abrirModal('<div class="mtit">Asistencia en directo</div><div class="msub">'+esc(R.titulo||'')+'</div><div data-asispanelm><p class="rnota">Cargando…</p></div>');
   _asisRefrescarM_();
   ASIS_PM.timer=setInterval(_asisRefrescarM_, 3000);

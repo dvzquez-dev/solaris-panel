@@ -1612,6 +1612,7 @@ function _nuevaTareaFalta_(){
   if(!String(NUEVA_TAREA.n || '').trim()) return 'Escribe qué hay que hacer';
   if(String(NUEVA_TAREA.n).trim().length > TOPE_TITULO_TAREA) return 'El título pasa de '+TOPE_TITULO_TAREA+' caracteres';
   if(!Object.keys(NUEVA_TAREA.r).some(function(n){ return NUEVA_TAREA.r[n]; })) return 'Elige al menos un responsable';
+  if(NUEVA_TAREA.l && String(NUEVA_TAREA.l).slice(0, 10) < _hoyNxISO_()) return 'La fecha límite ya pasó';   /* 04/11: el servidor también lo rechaza */
   return '';
 }
 /* 31/10 · «Nueva tarea» sin controles nativos (Daniel: «un fucking tick clásico de HTML. Cero customizado»): la unidad y
@@ -1912,11 +1913,18 @@ function _apelDeTarea_(t, lista){
   }
   return ult;
 }
-/* ¿Se OFRECE «Apelar»? Su responsable, tarea no hecha, no voluntaria y sin apelación abierta. */
+/* 04/11 (Daniel): apelar una tarea sólo vale 3 días desde que te la asignan. La cara NO cuenta días: el servidor manda el último
+   (`apelable_hasta`, ISO) en cada tarea (`servidor.con_apelable_hasta`); `null`/ausente = no consta cuándo se asignó (no se bloquea). */
+function _apelHastaTarea_(t){
+  var h=t && t.apelable_hasta;
+  return /^\d{4}-\d{2}-\d{2}$/.test(h || '') ? h : null;
+}
+function _apelFueraDePlazo_(t){ var h=_apelHastaTarea_(t); return !!h && _hoyNxISO_() > h; }
+/* ¿Se OFRECE «Apelar»? Su responsable, tarea no hecha, no voluntaria, en plazo y sin apelación abierta. */
 function _puedeApelarTarea_(actor, t, lista){
   var a;
   if(!t || !actor || !_tareasResp_([t], actor).length) return false;
-  if(_tareaHecha_(t.e) || _esVoluntaria_(t)) return false;
+  if(_tareaHecha_(t.e) || _esVoluntaria_(t) || _apelFueraDePlazo_(t)) return false;
   a=_apelDeTarea_(t, lista);
   return !(a && a.estado === 'abierta');
 }
@@ -2991,7 +2999,7 @@ function _apiParse(txt, accion){
    Las que llaman a un modelo o suben ficheros tardan más a propósito: techo propio. */
 var API_ESPERA_MS = 20000;
 var API_ESPERA_LARGA_MS = 120000;
-var API_ACCIONES_LARGAS = /^(traerOrdenNotion|transcribirVoz|interpretarAnotacion|contrastarEtiqueta|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|redactarTurno|redactarParte|resumirReunion|redactarMotivo)$/;
+var API_ACCIONES_LARGAS = /^(proponerTareaParte|traerOrdenNotion|transcribirVoz|interpretarAnotacion|contrastarEtiqueta|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|redactarTurno|redactarParte|resumirReunion)$/;
 var API_MSG_SIN_RESPUESTA = "El servidor no ha contestado. Puede que se haya guardado: recarga antes de repetirlo.";
 function _esLecturaApi_(accion){
   return /^(get|listar)/.test(accion) || /^(bootstrap|quienSoy|queHayNuevo|estadoAudioReunion)$/.test(accion);
@@ -3817,12 +3825,49 @@ function _solParteCfg_(pre, f, horas){
     sitio: 'parte', exige: 'Escribe tus notas sueltas en la justificación y SolarIA las redacta.',
     pedir: function(notas){ var d = _parteCtxIA_(f, horas()); d.notas = notas; return api.redactarParte(d); }};
 }
+/* ═══ «¿ES LA TAREA X?» EN EL PARTE · LAS DOS CARAS (04/11/2026, B1 de `docs/solaria-inventario.md`) ═══════════════════════════════════
+   🗣️ Daniel (04/11, «¿Dónde poner SolarIA ahora?» → «La tarea del parte»): con las notas escritas, SolarIA CLASIFICA cuál de SUS tareas es
+   (`proponerTareaParte`, `rutinas/proponer_tarea_parte.py`; no redacta nada). Un botón (no se llama al modelo al teclear) → UNA pregunta
+   «¿Es «<tarea>»?» con «Esa» / «Otra»; «Esa» pone categoría «Tarea» y la tarea en el formulario, «Otra» la suelta y se elige a mano.
+   Sin propuesta clara sólo sale un aviso. Una tarea que no esté en TU lista del desplegable se descarta también aquí (el servidor ya la filtró).
+   Interruptor: `SOLARIA_SITIOS.tareaparte`. Mismo mecanismo único (`_solIAHTML_`) que la redacción de las notas, justo debajo de ella. */
+function _tareasParteIA_(){ return (typeof TAREAS !== 'undefined' && typeof _fichaYo_ === 'function') ? _tareasResp_(TAREAS, _fichaYo_()) : []; }
+function _proponerTareaParteDemo_(d){
+  var ps = String(d.notas || '').toLowerCase().split(/[^a-záéíóúñ0-9]+/).filter(function(w){ return w.length > 3; }), t = _tareasParteIA_(), i, j, n;
+  for(i = 0; i < t.length; i++){ n = String(t[i].n || '').toLowerCase(); for(j = 0; j < ps.length; j++) if(n.indexOf(ps[j]) >= 0) return {ok: true, tarea: t[i].n, id: 'k'+(i+1)}; }
+  return {ok: true, tarea: '', id: ''};
+}
+function _proponerTareaPartePost_(d){
+  if(!_demoLocal_()) return api._post({action: 'proponerTareaParte', notas: d.notas});
+  return new Promise(function(ok){ setTimeout(function(){ ok(_proponerTareaParteDemo_(d)); }, 500); });
+}
+/* `pre` = el id de la caja de las notas; `f` = el formulario vivo. */
+function _solTareaCfg_(pre, f){
+  return {ta: '#'+pre, boton: 'Proponer la tarea', sitio: 'tareaparte', sigue: 'Tu elección sigue como estaba.', acepta: 'Esa', quita: 'Otra', calla: true,
+    exige: 'Escribe tus notas sueltas en la justificación y SolarIA propone la tarea.', valor: function(){ return f.just; },
+    antes: function(n){ return String(n).trim().length < 10 ? 'Cuenta un poco más de lo que hiciste (unas 10 letras) y SolarIA propone la tarea.' : ''; },
+    pedir: function(notas){ return api.proponerTareaParte({notas: notas}); },
+    adapta: function(r){
+      var t = r && r.ok !== false && r.tarea ? String(r.tarea) : '', mia = t && _tareasParteIA_().some(function(x){ return x.n === t; });
+      if(r && r.ok === false) return r;
+      return mia ? {ok: true, texto: t, nota: '¿Es «'+t+'»?'} : {ok: true, vacio: 'SolarIA no ve clara cuál de tus tareas es: elígela tú.'};
+    },
+    sinCaja: true,
+    leer: function(){ return {cat: f.cat, tarea: f.tarea, detalle: f.detalle, subcat: f.subcat}; },
+    escribe: function(w, s){
+      var o = w === 'prop' ? {cat: 'tareas', tarea: s.prop, detalle: '', subcat: ''} : s.orig;
+      f.cat = o.cat; f.tarea = o.tarea; f.detalle = o.detalle; f.subcat = o.subcat;
+      if(w === 'prop') tost('Tarea: '+s.prop);
+      if(typeof pintar === 'function') pintar();
+    }};
+}
+function _solTareaHTML_(pre, f){ return _tareasParteIA_().length ? _solIAHTML_('tp:'+pre, _solTareaCfg_(pre, f)) : ''; }
 /* ═══ «RESUMIR CON SOLARIA» AL FINALIZAR UNA REUNIÓN y «REDACTAR CON SOLARIA» EL MOTIVO DE UN DOCUMENTO · LAS DOS CARAS (02/11/2026) ═══
    🗣️ Daniel (02/11): «procesos que tomen muchos clics y que sean coñazo […] muchos clics o mucho escribir […] que podría
    resumirse». Los dos escriben en una caja que YA existe (`#blqResumen`; `#dMot` en el móvil y `[data-motivo]` en el escritorio) y
    comparten el mismo mecanismo: lo que la persona lleva escrito en la caja es lo que cuenta («lo de las aletas queda para el
    jueves»; «portada y unidades de las tablas»), SolarIA devuelve una PROPUESTA y la barra deja usar / descartar / volver al
-   original. Nada se aplica solo. Lo escriben `rutinas/resumir_reunion.py` y `rutinas/redactar_motivo.py`; la
+   original. Nada se aplica solo. Lo escribe `rutinas/resumir_reunion.py` (el motivo se retiró el 04/11); la
    cara sólo pinta. `SOLP[clave]` = null · {fase:'pensando'} · {fase:'propuesta', prop, nota} · {fase:'usada', orig, prop, nota} ·
    {fase:'error', msg}; `SOLCFG[clave]` = {ta (selector de la caja), boton, antes(texto) → aviso | '', pedir(texto) → promesa}.
    Un solo `click` en el documento (`_solClic_`, enganchado por cada cara) vale para los dos y sobrevive a los repintados. */
@@ -3835,8 +3880,8 @@ var SOLP = {}, SOLCFG = {}, SOLTXT = {}, _SOL_N_ = 0;
    Volver al original). «Pensando» y el error del modelo se dicen igual en todos (`SOL_PENSANDO`, `_solErrorTxt_`). Ningún botón se
    apaga por tener la caja vacía: pulsado sin texto lleva el foco al marco y dice qué escribir (`_solAviso_`).
    LISTA DE CONTROL `SOLARIA_SITIOS`: un punto en `false` desaparece de las dos caras (Daniel decide con un toque cuáles quedan).
-   `motivo` está APAGADO por propuesta: quien pide cambios ya escribe el motivo y SolarIA lo devuelve en viñetas, hay que reescribirlo igual. */
-var SOLARIA_SITIOS = {turno: true, parte: true, resumen: true, motivo: false, nuevatarea: true, anotaciones: true, orden: true};
+   El motivo de un documento NO está (04/11, Daniel: «Sí, retíralo»): quien pide cambios ya escribe el motivo. */
+var SOLARIA_SITIOS = {turno: true, parte: true, resumen: true, nuevatarea: true, anotaciones: true, orden: true, tareaparte: true};
 function _solSitio_(k){ return SOLARIA_SITIOS[k] !== false; }
 var SOL_PENSANDO = 'SolarIA está escribiendo…';
 /* El error del modelo, dicho igual en todos los puntos: no disponible (+ el motivo si lo hay); lo manual sigue intacto. */
@@ -3880,7 +3925,7 @@ function _solAviso_(k, aviso){
   tost(aviso);
 }
 /* Opciones de `cfg` (todas menos `ta` y `pedir` son opcionales; hay UN solo mecanismo y las cuatro «propuestas de SolarIA» de la app lo usan):
-   `quita` (rótulo de descartar; «Descartar»), `nota0` (nota si SolarIA no dice nada), `sigue` (cola del error), `sinCaja` (no enseña la propuesta
+   `quita` (rótulo de descartar; «Descartar»), `acepta` («Usar esto»), `calla` (sin propuesta clara: sólo un aviso, ninguna barra), `nota0` (nota si SolarIA no dice nada), `sigue` (cola del error), `sinCaja` (no enseña la propuesta
    en su caja: la pinta la pantalla), `pie(s)` (html bajo la propuesta), `max` (tope del texto), `noIgual` (aviso si SolarIA devuelve lo mismo),
    `sinSesion` (no exige sesión: la maqueta de `?demo` contesta, y fuera de ella la propia petición falla y se dice),
    `repinta()` (repintar la pantalla entera en vez de sólo la barra), `pregunta()` → promesa de lo que se le pide (si no, lo escrito en la caja),
@@ -3897,7 +3942,7 @@ function _solBarraHTML_(k){
     return '<div class="nota" style="border:0;padding:4px 0">'+esc(s.nota || c.nota0 || 'Revísalo antes de usarlo.')+'</div>'+
       (c.sinCaja ? '' : '<div data-solprop style="white-space:pre-wrap;margin:4px 0 8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#0A0909;color:var(--ink2);font-size:13px;line-height:1.5">'+esc(s.prop)+'</div>')+
       (c.pie ? c.pie(s) : '')+
-      '<div class="nt-fila" style="margin-bottom:6px">'+bt('data-solusa', 'Usar esto', true)+bt('data-solquita', c.quita || 'Descartar')+'</div>';
+      '<div class="nt-fila" style="margin-bottom:6px">'+bt('data-solusa', c.acepta || 'Usar esto', true)+bt('data-solquita', c.quita || 'Descartar')+'</div>';
   if(s.fase === 'usada')
     return '<div class="nota" style="border:0;padding:4px 0">Propuesta aplicada. '+bt('data-soldeshace', 'Volver al original')+'</div>';
   return _solErrorHTML_(s.msg, c.sigue);
@@ -3938,6 +3983,7 @@ async function _solPedir_(k){
   suelta();
   if(!vigente()) return;
   if(c.valor && String(c.valor() == null ? '' : c.valor()) !== base){ delete SOLP[k]; _solPintar_(k); return; }   // la caja cambió mientras pensaba
+  if(r && r.vacio && c.calla){ delete SOLP[k]; _solPintar_(k); tost(r.vacio); return; }   // `calla`: sin propuesta clara no se enseña barra, sólo un aviso que se va solo
   if(r && r.vacio) SOLP[k] = {fase: 'error', msg: r.vacio};   // el modelo contestó, pero no hay nada que proponer
   else if(!r || r.ok === false || !r.texto) SOLP[k] = {fase: 'error', msg: _solErrorTxt_(r && r.motivo)};
   else if(c.noIgual && String(r.texto).trim() === String(base).trim()) SOLP[k] = {fase: 'error', msg: c.noIgual};
@@ -3980,14 +4026,6 @@ function _resumirReunionPost_(id, frase, parts, dur){
   if(!_demoLocal_()) return api._post({action: 'resumirReunion', id: id, frase: frase, participantes: parts, duracion: dur});
   return new Promise(function(ok){ setTimeout(function(){ ok(_resumirReunionDemo_(frase)); }, 500); });
 }
-function _redactarMotivoDemo_(texto){
-  return {ok: true, nota: 'Maqueta: sin SolarIA real.',
-          texto: String(texto || '').split(/,| y /).map(function(x){ return x.trim(); }).filter(Boolean).map(function(x){ return '- Revisa: '+x; }).join('\n')};
-}
-function _redactarMotivoPost_(id, ref, texto){
-  if(!_demoLocal_()) return api._post({action: 'redactarMotivo', id: id, ref: ref || undefined, texto: texto});
-  return new Promise(function(ok){ setTimeout(function(){ ok(_redactarMotivoDemo_(texto)); }, 500); });
-}
 /* El resumen de la reunión (`#blqResumen` de `_bloqueFormHTML_`). Los minutos: el cronómetro si está en curso; si se declara, de
    la hora de inicio a la de fin. Los participantes y el orden del día los cruza el servidor con su roster y su almacén. */
 function _solResumenCfg_(B){
@@ -4008,13 +4046,6 @@ function _solBloqueCfg_(B){
       return api.redactarParte({notas: notas, tarea: B.titulo || '', categoria: '', fecha: B.fecha || '', horas: h > 0 ? h : null, declararId: null});
     }};
 }
-/* El motivo de cambios / rechazo de un expediente. `ta` = el selector de SU caja (en el escritorio hay varias fichas a la vez). */
-function _solMotivoCfg_(e, ta){
-  return {ta: ta, boton: 'Redactar con SolarIA', sitio: 'motivo',
-    antes: function(v){ return String(v || '').trim() ? '' : 'Escribe en pocas palabras qué hay que cambiar y SolarIA lo redacta.'; },
-    pedir: function(texto){ return api.redactarMotivo(e.id, e.ref, texto); }};
-}
-
 function _periodoParte_(p){
   var c = [p && p.fin, p && p.ini, p && p.creado_at], i, s;
   for (i = 0; i < c.length; i++){
@@ -5615,6 +5646,7 @@ async function _enviarSancionForm_(o){
     urlTarea=val('snTarea'); plazo=val('snPlazo');
     if(!urlTarea){ msg('Elige la tarea cuyo plazo se incumplió.', true); return {ok:false}; }
     if(!plazo){ msg('Falta el plazo nuevo.', true); return {ok:false}; }
+    if(plazo < _hoyNxISO_()){ msg('El plazo nuevo no puede ser anterior a hoy.', true); return {ok:false}; }
     /* De la lista DEL SANCIONADO (`SANC_TAREAS`), no de `TAREAS`, que son las mías: lo que se pinta y lo que se guarda
        salen del MISMO sitio (la sanción de José del 28/07 quedó en «una tarea»). */
     var t=((SANC_TAREAS&&SANC_TAREAS.lista)||[]).filter(function(x){ return x.url===urlTarea; })[0];
@@ -8254,6 +8286,27 @@ function _minimosOfrecidos_(iso){
 function _sancionaAlguna_(tipo){
   return String(tipo == null ? '' : tipo).trim().toLowerCase() !== 'trabajo';
 }
+/* 04/11 (Daniel): QUIÉN CONVOCA QUÉ TIPO. ⛔ ESPEJO de `reglas/disciplina.py` (`puede_convocar`, `EXTRAS_MIXTA`): la regla vive
+   ALLÍ y el servidor la aplica (`e_crear_reunion`); esto sólo decide qué tipos OFRECER, para no ofrecer lo que se va a rechazar.
+   general → sólo el PD; junta → coordinación (rango ≥ 1); consejo → los de `DATA.consejo`; subsistema y mixta → coordinación con subsistema
+   propio; trabajo → cualquiera. Devuelve los valores en el orden del catálogo. */
+var EXTRAS_MIXTA_ = [1, 2];
+function _tiposConvocables_(nombre){
+  var m = miembro(nombre) || {}, r = rangoNom(nombre), cons = (typeof DATA !== 'undefined' && DATA && DATA.consejo) || [];
+  var esConsejo = cons.some(function(c){ return String(c) === String(nombre); });
+  return ['general', 'junta', 'consejo', 'subsistema', 'mixta', 'trabajo'].filter(function(t){
+    return t === 'general' ? r >= 3 : t === 'junta' ? r >= 1 : t === 'consejo' ? esConsejo
+         : (t === 'subsistema' || t === 'mixta') ? (r >= 1 && !!m.unidad) : true;
+  });
+}
+/* 04/11: los subsistemas AJENOS al suyo que cubren los convocados de una mixta (ESPEJO de `servidor._mixta_valida`: vale 1 o 2,
+   `EXTRAS_MIXTA_`). Devuelve la frase que impide convocar, o '' si vale. */
+function _mixtaBloqueo_(invitados, unidad){
+  var u = {}, n = 0;
+  (invitados || []).forEach(function(nom){ var m = miembro(nom); if(m && m.unidad && m.unidad !== unidad && !u[m.unidad]){ u[m.unidad] = 1; n++; } });
+  return (n >= EXTRAS_MIXTA_[0] && n <= EXTRAS_MIXTA_[1]) ? ''
+    : 'Una mixta lleva tu subsistema y de ' + EXTRAS_MIXTA_[0] + ' a ' + EXTRAS_MIXTA_[1] + ' más (ahora ' + n + '); con más sería una general.';
+}
 function _maxMarcable_(bloques, nS){
   var n = Math.max(1, +nS || 1), dias = {}, util = 0, d, fr, i, j;
   (bloques || []).forEach(function(b){ (dias[b[0]] = dias[b[0]] || []).push(b[1]); });
@@ -8646,7 +8699,7 @@ function _consejoDe_(cv){
 }
 
 /* El agregado con su desglose, celda a celda. */
-function _calorTurnos_(cv, sitio){
+function _calorTurnos_(cv, sitio, coche){
   /* Por la puerta única: con la convocatoria sin `consejo` esto se quedaba vacío y
      el mapa decía «nadie del consejo puede» en todas las casillas. */
   var consejo={}; (_consejoDe_(cv)||[]).forEach(function(n){ consejo[n]=1; });
@@ -8663,8 +8716,10 @@ function _calorTurnos_(cv, sitio){
         var v=(cv.resp[nom]||{})[k];
         if(v && v.s==='no'){ c.no_pueden.push(nom); return; }
         if(!_dispPuede_(v,sitio)) return;
+        var lleva=_celdaCoche_(v, sitio);        /* 04/11: el coche es POR SITIO; `coche` filtra (null = todos) como `agregado` */
+        if(coche===true && !lleva) return;      /* 04/11: «uno engloba al otro» (Daniel): sólo «con coche» estrecha */
         c.n++;
-        var esResp=!!consejo[nom], lleva=!!v.c;
+        var esResp=!!consejo[nom];
         if(esResp) c.responsables.push(nom);
         if(lleva){ c.coches.push(nom); c.hay_coche=true; }
         if(!esResp && !lleva) c.normales.push(nom);
@@ -9525,7 +9580,7 @@ function _reusarDispo_(cv, previas, salto){
   Object.keys(previas||{}).forEach(function(k){
     var p=_convDeClave_(k), v=previas[k], d=_isoMasDias_(p[0], sd);
     if(!v || !v.s || !d || dias.indexOf(d)<0 || !fr[p[1]] || !cl[v.s]){ fuera++; return; }
-    out[_convClave_(d, p[1])] = (v.s==='no') ? {s:'no'} : {s:v.s, c:!!v.c};
+    out[_convClave_(d, p[1])] = (v.s==='no') ? {s:'no'} : _pincelValor_(v.s, v.c, v.cc);
     n++;
   });
   return {mapa:out, n:n, fuera:fuera};
@@ -9575,6 +9630,145 @@ function _convEtiq_(k){
   var t = Object.prototype.hasOwnProperty.call(CONV_ETIQ, k) ? CONV_ETIQ[k] : null;
   return t || String(k == null ? '' : k);
 }
+/* ═══ LOS PINCELES DE LA DISPONIBILIDAD (2 chips que ciclan, 04/11 tarde) DE TURNOS (04/11/2026) ═══════════════════════════════════════════════════════
+   🗣️ Daniel: *«para marcar disponibilidad es como una reunión, simplemente q te debería dejar usar varios pinceles (CUVI +
+   Coche) (CUVI + Sin coche) (CITI + Coche) (CITI + Sin coche) […] Y también puedes marcar que tienes ambas disponibilidades a
+   la vez. Pero como mínimo tienes q seleccionar una. Cada una de las combinaciones con colores distintos […] en Ourense sin
+   coche y en Vigo con coche a la vez»*. CUVI = Ourense, CITI = Vigo.
+   ⛔ LA CELDA: `{s:'cuvi'|'citi'|'ambos', c:bool, cc:{cuvi?:bool, citi?:bool}}`. `cc` es el coche POR SITIO y lleva
+   exactamente los sitios que marcaste; `c` = «lleva en alguno» (lo que lee quien no conoce `cc`: Python viejo, otra cara). Una
+   celda vieja (sin `cc`) tiene UN `c` para todos sus sitios: `_celdaCoche_` la lee igual. Gemela de `reglas/turnos.py:con_coche`
+   y de `rutinas/servidor.py:_coche_por_sitio` (la valida). UNA sola declaración de colores, de pincel y de celda: las dos caras
+   LLAMAN a esto, no lo escriben. La selección es `{<sitio>: true|false}` (con coche / sin coche) o `{no:true}`; cada sitio
+   es UN chip que cicla apagado → voy → con coche → apagado, y sale de la selección sólo si queda otro (mínimo uno).
+   🗣️ Daniel 04/11: *«si alguien marca cubi con coche, obviamente también está marcado cubi sin coche […] uno engloba al otro»*. */
+var PINCEL_COL = {cuvi:'#E41E25', citi:'#3f9ed6'};   /* UN color por sitio: el coche lo dice el icono, no el tono */
+var PINCEL_COL_OTRO = '#35c759';                      /* un sitio que no es CUVI/CITI */
+function _pincelColor_(sitio){
+  return Object.prototype.hasOwnProperty.call(PINCEL_COL, sitio) ? PINCEL_COL[sitio] : PINCEL_COL_OTRO;
+}
+/* Los pinceles de ESTA convocatoria: UNO por sitio (`k` = el sitio). Cada toque cicla apagado → voy → voy con coche → apagado. */
+function _pincelesDe_(cv){
+  return (cv && cv.sitios && cv.sitios.length ? cv.sitios : ['cuvi','citi']).map(function(s){
+    return {k:s, sitio:s, etiq:_convEtiq_(s)};
+  });
+}
+/* Pulsar un chip sobre la selección. Devuelve la selección NUEVA (no toca la vieja). `k` = un sitio o `no`. Un sitio cicla
+   apagado → sin coche (`false`) → con coche (`true`) → apagado; si apagarlo deja la selección vacía, se queda como estaba
+   (como MÍNIMO uno). «No puedo» es excluyente con los sitios. */
+function _pincelToggle_(sel, k){
+  if(k==='no') return {no:true};
+  var base = {}, n;
+  if(!sel || !sel.no) for(n in (sel||{})) if(Object.prototype.hasOwnProperty.call(sel,n)) base[n]=sel[n];
+  if(!Object.prototype.hasOwnProperty.call(base,k)) base[k]=false;
+  else if(base[k]===false) base[k]=true;
+  else {
+    delete base[k];
+    if(!Object.keys(base).length) return sel;          /* como mínimo UNO */
+  }
+  return base;
+}
+/* La selección → lo que entiende el pintor: `{pincel:'no'|<sitio>|'ambos', coche, cc}` (`cc` null en «no puedo»). */
+function _pincelDe_(sel){
+  if(!sel || sel.no) return {pincel:'no', coche:false, cc:null};
+  var sitios = Object.keys(sel).sort(), cc = {}, algun = false;
+  sitios.forEach(function(s){ cc[s]=!!sel[s]; if(sel[s]) algun=true; });
+  return {pincel: sitios.length>1 ? 'ambos' : sitios[0], coche:algun, cc:cc};
+}
+/* Y a la inversa: la selección que da un pincel viejo (`CONV_PINCEL`/`CONV_COCHE`). */
+function _pincelSelDe_(pincel, coche, cc){
+  if(pincel==='no') return {no:true};
+  var out = {}, sitios = pincel==='ambos' ? ['cuvi','citi'] : [pincel];
+  sitios.forEach(function(s){ out[s] = (cc && Object.prototype.hasOwnProperty.call(cc,s)) ? !!cc[s] : !!coche; });
+  return out;
+}
+/* El valor de celda que escribe un pincel. «No puedo» va SIN `c` ni `cc` (un no-puedo con coche no significa nada). */
+function _pincelValor_(pincel, coche, cc){
+  if(pincel==='no') return {s:'no'};
+  if(!cc) return {s:pincel, c:!!coche};
+  var out = {}, algun = false;
+  Object.keys(cc).forEach(function(s){ out[s]=!!cc[s]; if(cc[s]) algun=true; });
+  return {s:pincel, c:algun, cc:out};
+}
+/* Los sitios en que una celda dice «puedo». */
+function _celdaSitios_(v){
+  if(!v || !v.s || v.s==='no') return [];
+  if(v.cc && typeof v.cc==='object' && Object.keys(v.cc).length) return Object.keys(v.cc).sort();
+  return v.s==='ambos' ? ['cuvi','citi'] : [v.s];
+}
+/* ¿Lleva coche ahí? Espejo de `con_coche`: con `cc`, el de ese sitio (sin sitio: en alguno); sin `cc`, el único `c`. */
+function _celdaCoche_(v, sitio){
+  if(!v || !v.s || v.s==='no') return false;
+  var cc = v.cc;
+  if(cc && typeof cc==='object' && Object.keys(cc).length){
+    if(!sitio) return Object.keys(cc).some(function(s){ return !!cc[s]; });
+    return !!cc[sitio];
+  }
+  if(sitio && v.s!=='ambos' && v.s!==sitio) return false;
+  return !!v.c;
+}
+/* ¿Dicen lo mismo dos celdas? (pintar lo mismo la BORRA; cambiar sólo el coche de un sitio es un cambio). */
+function _celdaIgual_(v, q){
+  if(!v || !q || v.s!==q.s) return false;
+  if(q.s==='no') return true;
+  return _celdaSitios_(q).every(function(s){ return _celdaCoche_(v,s)===_celdaCoche_(q,s); }) &&
+         _celdaSitios_(v).length===_celdaSitios_(q).length;
+}
+/* El fondo de una celda: el color de su sitio; con dos sitios, partida en diagonal (CUVI a un lado, CITI al otro). El coche NO
+   cambia el tono: lo dice el icono de la esquina (`_celdaCoche_(v)`). */
+function _celdaFondo_(v){
+  var cs = _celdaSitios_(v).map(function(s){ return _pincelColor_(s); });
+  if(!cs.length) return '';
+  return cs.length>1 ? 'linear-gradient(135deg,'+cs[0]+' 50%,'+cs[1]+' 50%)' : cs[0];
+}
+/* La leyenda: un cuadro por sitio, el partido de «los dos sitios» y el icono del coche. `data-pincel-ley` en cada uno. */
+function _pincelLeyendaHTML_(cv){
+  var sw = 'display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-2px;margin-right:5px;';
+  var ps = _pincelesDe_(cv);
+  var l = ps.map(function(p){
+    return '<span data-pincel-ley="'+esc(p.k)+'" style="margin-right:12px;white-space:nowrap"><i style="'+sw+'background:'+_pincelColor_(p.sitio)+'"></i>'+esc(p.etiq)+'</span>';
+  });
+  if(ps.length>1) l.push('<span data-pincel-ley="dos" style="margin-right:12px;white-space:nowrap"><i style="'+sw+'background:linear-gradient(135deg,'+_pincelColor_(ps[0].sitio)+' 50%,'+_pincelColor_(ps[1].sitio)+' 50%)"></i>los dos</span>');
+  l.push('<span data-pincel-ley="coche" style="white-space:nowrap">'+ico('coche')+' con coche</span>');
+  return l.join('');
+}
+/* El FILTRO del mapa de calor (04/11): campus × coche. `fil` = {sitio:''|<sitio>, coche:null|true|false}; `attr` = prefijo de los
+   `data-` (`data-<attr>-sitio`, `data-<attr>-coche`). Lo que filtra es `_calorTurnos_(cv, fil.sitio, fil.coche)`. */
+function _turnoFiltroCocheChips_(coche, attr){
+  var chip = function(val, txt, on){
+    return '<button type="button" class="pick'+(on?' on':'')+'" data-'+attr+'-coche="'+val+'">'+txt+'</button>';
+  };
+  return chip('', 'Con o sin coche', coche!==true)+chip('1', 'Con coche', coche===true);   /* 04/11: «sin coche» ya es «todos» */
+}
+function _turnoFiltroHTML_(cv, fil, attr){
+  var chip = function(a, val, txt, on){
+    return '<button type="button" class="pick'+(on?' on':'')+'" data-'+attr+'-'+a+'="'+esc(val)+'">'+esc(txt)+'</button>';
+  };
+  var sitios = (cv && cv.sitios && cv.sitios.length ? cv.sitios : ['cuvi','citi']).map(function(s){
+    return chip('sitio', s, 'Solo '+_convEtiq_(s), fil.sitio===s);
+  }).join('');
+  return '<div class="chips" data-'+attr+'-filtro style="margin:0 0 8px">'+
+    chip('sitio', '', 'Los dos sitios', !fil.sitio)+sitios+
+    _turnoFiltroCocheChips_(fil.coche, attr)+'</div>';
+}
+/* Lo que el chip de coche (`''`|`'1'`|`'0'`) quiere decir. */
+function _cocheDeFiltro_(v){ return v==='1' ? true : (v==='0' ? false : null); }
+
+/* Los chips de pinceles (los mismos en móvil y escritorio): UN chip por sitio + «No puedo». `attr` = el atributo `data-` que
+   cablea el clic (`data-pin2`, `data-mtpin2`…). Apagado = borde del color del sitio; «voy» = relleno; «con coche» = relleno +
+   icono del coche. Lo elegido, en color; sin tick. */
+function _pincelChipsHTML_(cv, sel, attr){
+  var chip = function(k, txt, col, on, coche){
+    var oscuro = /^#(E41E25|3f9ed6)$/i.test(col);
+    return '<button type="button" '+attr+'="'+esc(k)+'" class="pincel-chip'+(on?' on':'')+'" data-p style="'+
+      (on ? 'background:'+col+';border-color:'+col+';color:'+(oscuro?'#fff':'#1a1616') : 'border-color:'+col)+'">'+esc(txt)+(coche?' '+ico('coche'):'')+'</button>';
+  };
+  return _pincelesDe_(cv).map(function(p){
+    var on = !!sel && !sel.no && Object.prototype.hasOwnProperty.call(sel, p.sitio);
+    return chip(p.k, p.etiq, _pincelColor_(p.sitio), on, on && !!sel[p.sitio]);
+  }).join('')+chip('no', _convEtiq_('no'), '#8a8280', !!sel && !!sel.no, false);
+}
+
 function _unidadesCoord_(v){
   if(!v) return [];
   if(typeof v==='string') v=[v];
@@ -11604,6 +11798,48 @@ function _puedeBloqueReu_(r, yo, admin){
   return rangoNom(yo)>=3 || (!!r.convocante && String(yo)===String(r.convocante));
 }
 
+/* ══ 04/11 · REUNIONES FINALIZADAS Y ARCHIVO (las dos caras) ═══════════════════════════════════════════════
+   🗣️ Daniel: *«las viejas no se pueden borrar, solo las que nunca se celebraron […] siempre debería haber una forma de checkear las
+   ya acabadas para que queden archivadas (dentro de un desplegable). Aun así te siguen apareciendo un mes desde que se celebraron.
+   Luego pasan al archivo […] En la pantalla principal tampoco tiene sentido que aparezca una reunión ya pasada […] al hacer ese
+   check de finalizada (que debe dar el convocante)»*. El servidor manda `finalizada_at` (la dio por celebrada su convocante) y
+   `celebrada` (finalizada, con asistencia abierta alguna vez o con bloque fichado: no se borra); la regla de borrar es SUYA, esto
+   sólo no ofrece el botón. Quien puede finalizarla es quien puede empezarla (`_puedeBloqueReu_`: convocante, PD o admin). */
+var REU_ARCHIVO_DIAS = 30;                     // un mes desde que se celebró en la lista; luego, el «Archivo»
+function _reuFinalizada_(r){ return !!(r && r.finalizada_at); }
+/* ¿Pasa al «Archivo»? Finalizada y con más de un mes desde su fecha. La fecha es la de su franja fijada (`_horarioReuMs_`) o,
+   si no se puede saber —o cae en el futuro por el año que se le supone—, la de finalizarla: lo que ocurra antes. */
+function _reuArchivada_(r, ahora){
+  if(!_reuFinalizada_(r)) return false;
+  var f=Date.parse(r.finalizada_at), h=_horarioReuMs_(r), ref=(h && h.fin===h.fin) ? (f===f ? Math.min(h.fin, f) : h.fin) : f;
+  if(ref!==ref) return false;
+  return (ahora==null ? Date.now() : ahora) > ref + REU_ARCHIVO_DIAS*86400000;
+}
+/* La lista en dos: las que se ven (sin finalizar, o finalizadas hace menos de un mes) y el Archivo. El orden de cada una se conserva. */
+function _reuPartir_(lista, ahora){
+  var vivas=[], archivo=[];
+  (lista||[]).forEach(function(r){ (_reuArchivada_(r, ahora) ? archivo : vivas).push(r); });
+  return {vivas:vivas, archivo:archivo};
+}
+/* ¿Sale el botón «Finalizar reunión»? No en una ya finalizada, ni en una «en curso» (esa se acaba con su «Finalizar» del parte). */
+/* 04/11: y sólo si ya se celebró o llegó su hora fijada — una encuesta abierta no se finaliza (el servidor lo vuelve a decidir). */
+function _reuPuedeFinalizar_(r, yo, admin, ahora){
+  if(!r || _reuFinalizada_(r) || r.en_curso || !_puedeBloqueReu_(r, yo, admin)) return false;
+  var h=_horarioReuMs_(r);
+  return !!r.celebrada || !!(h && h.ini <= (ahora==null ? Date.now() : ahora));
+}
+/* ¿Se ofrece «Eliminar»? Sólo si nunca se celebró (el servidor lo vuelve a decidir). */
+function _reuSePuedeBorrar_(r){ return !!r && !r.celebrada && !_reuFinalizada_(r); }
+/* Las palabras de asistencia que enseña el gestor: [{modo, rot, pal}] — presencial y/o telemática según la modalidad (`v.palabras`),
+   o la única de una asistencia de antes del 04/11 (`v.palabra`). Texto plano. */
+function _asisPalabras_(v){
+  var p=(v && v.palabras) || {}, out=[];
+  if(p.pres) out.push({modo:'pres', rot:'Presencial', pal:p.pres});
+  if(p.tel) out.push({modo:'tel', rot:'Telemática', pal:p.tel});
+  if(!out.length && v && v.palabra) out.push({modo:'', rot:'', pal:v.palabra});
+  return out;
+}
+
 /* Tiempo corriendo desde `iso`: m:ss, o h:mm:ss pasada la hora. */
 function _cronoTxt_(iso, ahora){
   var t=Date.parse(iso); if(t!==t) return '--:--';
@@ -12306,7 +12542,7 @@ function _asisDemoEstado_(){
   ['Lucía Pérez Rey','Martín Souto Lois','Carla Vidal Núñez','Hugo Ferro Casal','Noa Rivas Mella','Iván Cortés Vaz',
    'Sara Lage Pardo','Pablo Otero Gil','Alba Mosquera Ron','Dani Seoane Cid','Eva Torres Brea','Rubén Lema Pita']
     .forEach(function(n){ if(nom.length<14 && nom.indexOf(n)<0) nom.push(n); });
-  return (ASIS_DEMO={id:9001, palabra:'cohete', abierta_at:null, cerrada_at:null, conv:nom, vistos:{}, presentes:{}, extra:[], t0:0});
+  return (ASIS_DEMO={id:9001, palabra:'cohete', palabras:{pres:'cohete', tel:'brisa'}, modos:{}, finalizada_at:null, abierta_at:null, cerrada_at:null, conv:nom, vistos:{}, presentes:{}, extra:[], t0:0});
 }
 
 /* Los cuadritos avanzan solos: cada 1,4 s se ilumina uno más y, dos después, se pone verde (uno de cada cinco se queda en
@@ -12325,8 +12561,14 @@ function _asisDemo_(b, pd){
   var S=_asisDemoEstado_(), yo=(typeof YO!=='undefined' && YO && YO.nombre) || '', ahora=new Date().toISOString();
   var abre=function(){ if(!S.abierta_at){ S.t0=Date.now(); S.abierta_at=ahora; } S.cerrada_at=null; };
   switch(b.action){
-    case 'abrirAsistencia': abre(); return {ok:true, id:S.id};
+    case 'abrirAsistencia':
+      if(S.finalizada_at) throw new Error('la reunión ya está finalizada: la asistencia no se abre ni se marca');
+      abre(); return {ok:true, id:S.id};
     case 'cerrarAsistencia': S.cerrada_at=ahora; return {ok:true, id:S.id};
+    case 'marcarFinalizada':
+      if(S.finalizada_at) throw new Error('esta reunión ya está finalizada');
+      S.finalizada_at=ahora; if(S.abierta_at && !S.cerrada_at) S.cerrada_at=ahora;
+      return {ok:true, id:b.id, finalizada_at:ahora};
     case 'anadirAsistente':
       if(S.conv.indexOf(b.nombre)<0 && S.extra.indexOf(b.nombre)<0) S.extra.push(b.nombre);
       return {ok:true, id:S.id, nombre:b.nombre};
@@ -12336,15 +12578,17 @@ function _asisDemo_(b, pd){
       return {ok:true, id:S.id, nombre:b.nombre, presente:b.presente!==false};
     case 'marcarVisto': return {ok:true, id:S.id};
     case 'estoyPresente':
-      if(!_asisClave_(b.palabra) || _asisClave_(b.palabra)!==_asisClave_(S.palabra)) throw new Error('esa no es la palabra: mira la pantalla de la sala');
-      if(!S.presentes[yo]) S.presentes[yo]=ahora;
+      var modoP=['pres','tel'].filter(function(m){ return _asisClave_(b.palabra) && _asisClave_(b.palabra)===_asisClave_(S.palabras[m]); })[0];
+      if(!modoP) throw new Error('esa no es la palabra: mira la pantalla de la sala');
+      if(S.finalizada_at) throw new Error('la reunión ya está finalizada: la asistencia no se abre ni se marca');
+      if(!S.presentes[yo]){ S.presentes[yo]=ahora; S.modos[yo]=modoP; }
       return {ok:true, id:S.id, presente_at:S.presentes[yo]};
     case 'getAsistencia':
       if(!pd) abre();                       // el móvil de la maqueta: la asistencia ya está abierta, para ver la tarjeta
       _asisDemoAvanza_(S, pd ? '' : yo);
       if(pd) return {existe:!!S.abierta_at, abierta:!!S.abierta_at && !S.cerrada_at, palabra:S.palabra, abierta_at:S.abierta_at,
-        cerrada_at:S.cerrada_at, convocados:S.conv.concat(S.extra), vistos:S.vistos, presentes:S.presentes,
-        modos:S.conv.reduce(function(o,n,i){ if(i%4===3) o[n]='tel'; return o; }, {})};     // la maqueta: uno de cada cuatro marcó sólo telemático
+        cerrada_at:S.cerrada_at, convocados:S.conv.concat(S.extra), vistos:S.vistos, presentes:S.presentes, palabras:S.palabras,
+        modos:S.conv.reduce(function(o,n,i){ if(i%4===3) o[n]='tel'; return o; }, Object.assign({}, S.modos))};     // la maqueta: uno de cada cuatro marcó sólo telemático
       return S.cerrada_at ? {abierta:false} : {abierta:true, convocado:true, presente_at:S.presentes[yo]||null};
   }
   throw new Error('acción desconocida: '+b.action);
