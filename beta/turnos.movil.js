@@ -813,7 +813,7 @@ function _progPintar_(){
   c.innerHTML = nn.map(function(n){
     var m = miembro(n);
     return '<div class="fila" style="flex-wrap:wrap;gap:6px"><div class="a" style="flex:1 1 100%"><b>'+esc((m && m.pila) || n)+'</b></div>'+
-      CARGOS_TURNO.map(function(cg){
+      CARGOS_TURNO.filter(function(cg){ return _cargoOfrecidoA_(cg.k, n); }).map(function(cg){
         return '<button type="button" class="pick'+(PROG_T.cargos[cg.k] === n ? ' on' : '')+'" data-ptcargo="'+cg.k+'" data-ptq="'+esc(n)+
           '" title="'+esc(cg.et)+'">'+esc(cg.corto)+'</button>'; }).join('')+
       '<button type="button" class="pick'+(PROG_T.sel[n].coche ? ' on' : '')+'" data-ptcoche="'+esc(n)+'">coche</button></div>';

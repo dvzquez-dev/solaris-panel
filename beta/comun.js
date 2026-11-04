@@ -3491,6 +3491,28 @@ function _cargosQueFaltan_(cargos){
   return faltan;
 }
 
+/* ⛔ EL RESPONSABLE DE TURNO TIENE QUE SER DEL CONSEJO (Daniel, 02/11: «no puede ser responsable de turno alguien que no sea de
+   consejo»; 04/11 en las caras). UNA regla, tres llamadores: el botón de «turno» de cada persona (`_cargoOfrecidoA_`: a quien no es
+   del consejo no se le ofrece), la frase de por qué no se convoca (`_porQueRespNoEsConsejo_`, dentro de `_porQueNoSeConvoca_`) y,
+   por detrás, `_validar_reparto_turno` del servidor. La lista es `DATA.consejo` (= `CONSEJO_PUSH`) por `_consejoDe_`.
+   ⛔ Sin lista (`null`: el panel aún no la trajo) NO se sabe quién es del consejo y no se bloquea a nadie (§3c-24: «no lo sé» no es «nadie»). */
+function _esDelConsejo_(nombre){
+  var cs = _consejoDe_(null);
+  return !cs || cs.indexOf(nombre) >= 0;
+}
+/* ¿Se le ofrece a `nombre` el cargo `k`? Sólo «turno» se restringe: audiovisual y memoria los puede llevar cualquiera del reparto. */
+function _cargoOfrecidoA_(k, nombre){ return k !== 'turno' || _esDelConsejo_(nombre); }
+/* Por qué el reparto `nombres` no tiene un responsable de turno válido, o '' si se puede (o no se sabe). Dos casos: en el reparto no
+   hay nadie del consejo (hay que añadirlo), o el marcado como responsable no lo es (no debería pasar con los botones: es el cinturón). */
+function _porQueRespNoEsConsejo_(cargos, nombres){
+  var L = nombres || [], r = (cargos || {}).turno, i, hay = false;
+  if(!_consejoDe_(null) || !L.length) return '';
+  for(i=0;i<L.length;i++) if(_esDelConsejo_(L[i])) hay = true;
+  if(!hay) return 'En el reparto no hay nadie del consejo: a\u00f1ade a alguien del consejo para que sea el responsable de turno.';
+  if(r && !_esDelConsejo_(r)) return r + ' no es del consejo, y el responsable de turno tiene que serlo.';
+  return '';
+}
+
 /* ⛔ Y EL COCHE ES OPCIONAL, PERO SI SE PONE TIENE QUE ESTAR ENTERO.
    Daniel: «el coche tiene q tener un campo pa poner de donde sale y a donde va» y «que haya
    una casilla para cuando el trayecto de ida no sea el mismo que el de vuelta y que
@@ -3615,15 +3637,18 @@ function _pegaCocheTxt_(k){
   return k;
 }
 
-function _porQueNoSeConvoca_(cargos, cuantos, coches){
+function _porQueNoSeConvoca_(cargos, cuantos, coches, reparto){
   if(!cuantos) return 'Marca al menos a una persona.';
-  var faltan = _cargosQueFaltan_(cargos), nombres = [], i, j;
+  /* `reparto` (los nombres de quien va) es OPCIONAL: sin él no se mira el consejo. Con él, la frase del consejo ocupa el sitio del
+     «Falta el Responsable de turno», que diría lo mismo con menos información. */
+  var sc = _porQueRespNoEsConsejo_(cargos, reparto);
+  var faltan = _cargosQueFaltan_(cargos).filter(function(k){ return !(sc && k === 'turno'); }), nombres = [], i, j;
   for(i=0;i<faltan.length;i++){
     for(j=0;j<CARGOS_TURNO.length;j++){
       if(CARGOS_TURNO[j].k === faltan[i]) nombres.push(CARGOS_TURNO[j].et);
     }
   }
-  var partes = [];
+  var partes = sc ? [sc] : [];
   /* ⚠️ El nombre LARGO, no la abreviatura de los botones: un «falta AV» no le dice nada a
      quien convoca por primera vez. */
   /* Y EL VERBO CONCUERDA. Con dos cargos, «Falta los ...» esta mal escrito, y esto lo lee el
@@ -3744,7 +3769,7 @@ function _porQueNoSeProgramaTurno_(f){
      cara tenga a mano (o nada: entonces no se sabe y no se bloquea). */
   var sc = _porQueSinConsejo_(f.cv, f.fecha, f.hora, f.duracion);
   if (sc) return sc;
-  return _porQueNoSeConvoca_(f.cargos, Object.keys(f.sel || {}).length, f.coches);
+  return _porQueNoSeConvoca_(f.cargos, Object.keys(f.sel || {}).length, f.coches, Object.keys(f.sel || {}));
 }
 
 /* La frase de la regla del consejo, o '' si se puede (o no se sabe). La comparten `_porQueNoSeProgramaTurno_` y el botón del
