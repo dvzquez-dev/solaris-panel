@@ -5744,7 +5744,7 @@ async function _enviarSancionForm_(o){
     if(r && r.rechazadas && r.rechazadas.length)
       throw new Error('no puedes sancionar a '+r.rechazadas.join(', ')+': está fuera de tu jurisdicción');
     if(r && r.invalidas && r.invalidas.length)
-      throw new Error('el servidor no acepta esos puntos ('+pts+'): el RRI va de -5 a +2, enteros');
+      throw new Error('el servidor no acepta esos puntos ('+pts+'): el RRI va de -5 a +1, enteros');
     var _yaEstaba = !!(r && r.duplicadas && r.duplicadas.length);
     SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:''};
     tost((_yaEstaba ? 'Esa sanción YA estaba puesta (era un reintento): a ' : 'Sanción puesta a ')+(_pilaDeM_(quien)||quien)+'.'+
