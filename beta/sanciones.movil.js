@@ -488,7 +488,7 @@ function _formSancion_(s){
   abrirModal('<div class="h1" style="font-size:18px">Apelar «'+esc(s.motivo || 'Sanción')+'»</div>'+
     '<p class="h1s">'+esc(APEL_SANC_TXT.tienes(s.apelable_hasta))+'</p>'+
     '<label class="campo"><span class="sc">'+APEL_SANC_TXT.campo+' <span class="req">*</span></span>'+
-      '<textarea id="msMotivo" placeholder="'+esc(APEL_SANC_TXT.ayuda)+'"></textarea></label>'+
+      '<textarea id="msMotivo" data-borr="apel-sancion-'+esc(s.id)+'" placeholder="'+esc(APEL_SANC_TXT.ayuda)+'"></textarea></label>'+
     '<label class="campo"><span class="sc">'+APEL_SANC_TXT.enlace+'</span>'+
       '<input id="msEnlace" type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label>'+
     '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="msNo" style="flex:1">Cancelar</button>'+

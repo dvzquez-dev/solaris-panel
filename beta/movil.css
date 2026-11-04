@@ -40,7 +40,7 @@
   --gris:#231F20;      /* L 12,9 % — EL gris de la insignia */
   --line:#322C2E;      /* L 18,5 % */
   --line2:#463E40;     /* L 26,0 % */
-  --ink3:#7C6E72;      /* L 46,0 % */
+  --ink3:#968A8E;      /* L 56 % — 4,96:1 sobre --sur2 (era #7C6E72 = 3,4:1; 04/11 accesibilidad, igual que escritorio.css) */
   --ink2:#B2A8AB;      /* L 68,0 % */
   --ink:#F4F3F3;       /* L 95,5 % */
 
@@ -928,7 +928,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .pdb{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
 .pdb button{flex:1;min-width:88px;border:1px solid var(--line);border-radius:8px;padding:8px 6px;
   font-size:12px;font-weight:600;color:var(--ink);background:var(--sur2)}
-.pdb button[data-pdacc="aprobar"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.pdb button[data-pdacc="aprobar"]{background:var(--ok);border-color:var(--ok);color:var(--bg)}
 .pdb button.no{color:var(--red2)}
 .pdb button:disabled{opacity:.5}
 
@@ -948,7 +948,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .novb{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px}
 .novb button{border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:12px;
   font-weight:600;color:var(--ink2);background:transparent}
-.novb button.si{background:var(--ok);border-color:var(--ok);color:#fff}
+.novb button.si{background:var(--ok);border-color:var(--ok);color:var(--bg)}
 .novv{font-size:11.5px;color:var(--ink3)}
 .novnada{font-size:12.5px;color:var(--ink3);margin:0 0 6px}
 /* Los desplegables de horas. Mismo gesto que `.novhist`, pero la cabecera lleva su cuenta
@@ -985,7 +985,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .tpin button.on[data-pin="ambos"]{background:linear-gradient(135deg,var(--red) 50%,var(--tel) 50%);
   border-color:var(--ink3)}
 .tpin button.on[data-pin="no"]{background:var(--ink2);color:#1a1616;border-color:var(--ink2)}
-.tpin button.coche.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.tpin button.coche.on{background:var(--ok);border-color:var(--ok);color:var(--bg)}
 .tcel{height:30px;border-radius:3px;background:var(--sur2);cursor:pointer;position:relative;
   display:grid;place-items:center;font-family:var(--mono);font-size:9px;color:#fff}
 /* ⛔ LA MISMA DECLARACIÓN QUE `.ecel.off`, no una nueva (456.ª): esa es la celda «fuera
@@ -1019,7 +1019,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .decs button{border-right:1px solid var(--line);padding:6px 10px;font-size:11.5px;font-weight:600;
   color:var(--ink3);white-space:nowrap}
 .decs button:last-child{border-right:0}
-.decs button.on.a{background:var(--ok);color:#fff}
+.decs button.on.a{background:var(--ok);color:var(--bg)}
 .decs button.on.j{background:var(--ink2);color:#1a1616}
 .decs button.on.r{background:var(--red2);color:#fff}
 /* ⛔ EL LOTE TAMBIEN MARCA, y hasta el 11/08 no lo hacia. Faltaba la regla — y aunque no
@@ -1042,7 +1042,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .lote-i .n{font-size:13px;font-weight:600}
 .lote-i .mono{min-width:0;flex:1 1 100%;line-height:1.45}
 .lote-i button{white-space:nowrap}
-.lote-i button.on.a{background:var(--ok);color:#fff;border-color:var(--ok)}
+.lote-i button.on.a{background:var(--ok);color:var(--bg);border-color:var(--ok)}
 /* ⛔ Y `j` DESDE EL 30/09, con el lote del movil: sin esta regla la clase llega y no pinta,
    que es exactamente la segunda causa de muerte que tuvo `a` el 11/08. El color sale de
    `.decs button.on.j`, treinta lineas mas arriba: no se inventa paleta. */
@@ -1113,7 +1113,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 /* 31/10 (nativos1) · controles propios de `comun.js` (`nxElige`, `nxHora`, `nxNum`, `nxFecha`) en el móvil: los mismos chips y
    pasos que el escritorio, con el dedo en mente (36 px de alto). `.pick` aquí sólo existe para ellos. */
 .nt-fila{display:flex;gap:7px;flex-wrap:wrap}
-.pick{cursor:pointer;font-family:var(--mono);font-size:12px;letter-spacing:.03em;min-height:36px;padding:6px 13px;border-radius:20px;
+.pick{cursor:pointer;font-family:var(--mono);font-size:12px;letter-spacing:.03em;min-height:44px;padding:6px 13px;border-radius:20px;
   border:1px solid var(--line);background:transparent;color:var(--ink2)}
 .pick.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}
 /* 01/11 (Daniel): lo elegido se ilumina en rojo y ya; sin «✓» delante del texto (como el escritorio). */
@@ -1169,6 +1169,6 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
    13 px que sólo enseñan un dato al tocar) y el conmutador de rol de la maqueta (`.rolsel button`, sólo con ?demo). */
 .btn,.btn.mini,.modos button,.tpin button,.pdb button,.pdm,.asisIn,.plgh{min-height:44px}
 .pdgrupo>summary,.pdpers>summary{min-height:44px}
-.kebab::after{content:"";position:absolute;inset:-5px}
+.kebab::after{content:"";position:absolute;inset:-6px}
 .tcel{height:44px}
 .rc[data-tdia]{min-height:44px}

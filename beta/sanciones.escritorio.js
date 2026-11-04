@@ -383,7 +383,7 @@ function _revocarSancCard_(s){
         '</b>. Entra en la cola como pendiente y se confirma con su bloque.'
       : 'Era un <b>aviso</b>: no devuelve puntos, retira el <b>registro</b> y su reincidencia. '+
         'Entra en la cola como pendiente y se confirma con su bloque.') + '</div>' +
-    '<textarea data-rvsmot placeholder="Motivo de la revocaci\u00f3n \u2014 obligatorio, al menos 8 caracteres\u2026"></textarea>' +
+    '<textarea data-rvsmot data-borr="sancion-revocar-' + esc(s.id) + '" placeholder="Motivo de la revocaci\u00f3n \u2014 obligatorio, al menos 8 caracteres\u2026"></textarea>' +
     '<div class="acts"><button class="btn no" data-rvs="' + esc(s.id) + '">Revocar</button></div>' +
   '</div>';
 }
@@ -766,7 +766,7 @@ function _apelTarjetaSanc_(a){
       ((a.impuesta_por || []).length ? ' · puesta por ' + esc(a.impuesta_por.join(', ')) : '') + '</div>' +
     '<div class="just"><span class="sc">Apela</span>' + esc(a.motivo) + (l ? '<br>' + l : '') + '</div>' +
     (puedes
-      ? '<textarea data-apres placeholder="Tu respuesta — obligatoria en las tres salidas…"></textarea>' +
+      ? '<textarea data-apres data-borr="apelacion-resp-' + esc(a.id) + '" placeholder="Tu respuesta — obligatoria en las tres salidas…"></textarea>' +
         '<div class="acts"><button class="btn ok" data-apdec="estimada">Estimar</button>' +
         '<button class="btn ok" data-apdec="parcial">Rebajar a aviso</button>' +
         '<button class="btn no" data-apdec="desestimada">Desestimar</button>' +
@@ -786,7 +786,7 @@ function _apelTarjeta_(a){
     '<div class="ruta" style="margin-top:6px"><b>' + esc(a.titulo) + '</b> · plazo ' + esc(_plazoDMY_(a.plazo) || 'sin fecha') + '</div>' +
     '<div class="just"><span class="sc">' + esc(_apelClausulaTxt_(a.clausula)) + '</span>' + esc(a.motivo) + '</div>' +
     (puedes
-      ? '<textarea data-apres placeholder="Tu respuesta — obligatoria si desestimas…"></textarea>' +
+      ? '<textarea data-apres data-borr="apelacion-resp-' + esc(a.id) + '" placeholder="Tu respuesta — obligatoria si desestimas…"></textarea>' +
         '<div class="acts"><span class="sc">Nuevo plazo</span>' + nxFecha('', '', {min: _hoyNxISO_(), attrs: 'data-appl'}) +
         '<button class="btn ok" data-apest="plazo">Estimar con ese plazo</button>' +
         '<button class="btn ok" data-apest="quitar">Estimar y quitarle la tarea</button>' +
@@ -845,7 +845,7 @@ function _engMisSanc_(){
       var f = document.createElement('div'); f.setAttribute('data-msform', '1'); f.style.marginTop = '10px';
       f.innerHTML = '<p class="ruta">' + esc(APEL_SANC_TXT.tienes(s.apelable_hasta)) + '</p>' +
         '<label class="campo"><span class="sc">' + APEL_SANC_TXT.campo + ' <span class="req">*</span></span>' +
-          '<textarea data-msmotivo placeholder="' + esc(APEL_SANC_TXT.ayuda) + '"></textarea></label>' +
+          '<textarea data-msmotivo data-borr="apel-sancion-' + esc(s.id) + '" placeholder="' + esc(APEL_SANC_TXT.ayuda) + '"></textarea></label>' +
         '<label class="campo"><span class="sc">' + APEL_SANC_TXT.enlace + '</span>' +
           '<input data-msenlace type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label>' +
         '<div class="acts"><button class="btn" data-msno>Cancelar</button><button class="btn ok" data-msenviar>Enviar</button>' +
