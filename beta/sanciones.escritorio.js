@@ -332,8 +332,6 @@ function _panelSueltas_(){
             +esc(_etSancFila_(s.puntos, s.origen, s.extra))+'</td>'+
           '<td class="r"><span class="decs" data-sid="'+s.id+'">'+
             '<button data-sdec="aprobar">Aplica</button>'+
-            /* ⛔ 21/10: una revocación o un premio suelto no se justifica — el servidor lo rechaza. */
-            (_esNoJustificable_(s.origen, s.extra) ? '' : '<button data-sdec="justificar">Justifica</button>')+
             '<button data-sdec="rechazar">Rechaza</button>'+
           '</span> <button class="btn sm" data-seditar="'+s.id+'">Editar</button></td></tr>';
       }).join(''))+

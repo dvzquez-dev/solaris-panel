@@ -3573,7 +3573,8 @@ function _saltadasTxt_(n){
    decision que no es ninguna de las tres. */
 function _decDe_(s){
   var d = s && (s.dec || s.decision);
-  return (d === 'aceptar' || d === 'justificar' || d === 'rechazar') ? d : 'aceptar';
+  if (d === 'justificar') d = 'rechazar';      /* 04/11 noche: «Justificar y rechazar es lo mismo»; un borrador guardado con el verbo viejo se lee así */
+  return (d === 'aceptar' || d === 'rechazar') ? d : 'aceptar';
 }
 
 function _faltanPorMarcar_(items){
@@ -3607,8 +3608,8 @@ function _porQueNoSeCierra_(items, fresca){
   if (!L.length) return 'Ese bloque ya no est\u00e1 pendiente: lo habr\u00e1 cerrado otro.';
   var n = _faltanPorMarcar_(L);
   if (n) return 'Faltan ' + n + ' por marcar: el bloque se cierra entero.';
-  var t = _sinTextoJustificar_(L);
-  if (t) return t + (t === 1 ? ' justificada sin su texto' : ' justificadas sin su texto') + ': justificar exige escribir por qu\u00e9.';
+  var t = _sinTextoRechazar_(L);
+  if (t) return t + (t === 1 ? ' rechazada sin su texto' : ' rechazadas sin su texto') + ': rechazar exige escribir por qu\u00e9.';
   return '';
 }
 
@@ -5131,36 +5132,30 @@ function _esNoJustificable_(origen, extra){
   return !!(extra && extra.compensacion);
 }
 
-/* ⛔ 04/11 (Daniel, conflictos del RRI): «en lugar de rechazar, justificar y que te obligue a escribir porque no vas a aplicar la
-   sancion». Una PROPUESTA DE REUNIÓN no se rechaza (el servidor lo planta: `servidor._no_se_rechaza`): se JUSTIFICA, con texto.
-   Un premio, una revocación o una manual conservan «Rechaza». UNA puerta para las dos caras. */
-function _esNoRechazable_(origen){
-  return String(origen == null ? '' : origen) === 'reunion';
-}
-
 /* El mínimo del texto de una justificación: el MISMO que el servidor (`servidor.MIN_JUSTIFICACION`, 8) y que «Revertir»/«Revocar». */
 var MIN_JUSTIFICACION = 8;
 function _justificacionValida_(t){
   return String(t == null ? '' : t).trim().length >= MIN_JUSTIFICACION;
 }
 
-/* Cuántas del bloque están marcadas «justificar» SIN su texto (o con uno corto). Cerrar el bloque así las dejaría pendientes
-   (el servidor no las da por decididas sin su porqué): se corta ANTES, con la frase de `_porQueNoSeCierra_`. */
-function _sinTextoJustificar_(items){
+/* 04/11 noche (Daniel: «Justificar y rechazar es lo mismo»): RECHAZAR lleva SIEMPRE su texto, en toda sanción o propuesta. Cuántas del
+   bloque están marcadas «rechaza» SIN su texto (o con uno corto). Cerrar el bloque así las dejaría pendientes (el servidor no las
+   da por decididas sin su porqué): se corta ANTES, con la frase de `_porQueNoSeCierra_`. */
+function _sinTextoRechazar_(items){
   var n = 0, i, L = items || [], x;
   for (i = 0; i < L.length; i++){ x = L[i];
-    if (x && _decDe_(x) === 'justificar' && !_justificacionValida_(x.justificacion || x.just)) n++; }
+    if (x && _decDe_(x) === 'rechazar' && !_justificacionValida_(x.justificacion || x.just)) n++; }
   return n;
 }
 
-/* Pide el texto de una justificación con el diálogo de la app (nada nativo). Devuelve el texto recortado, o `null` si se
-   cancela o no llega al mínimo (en ese caso lo dice). `que`: lo que se justifica ("la sanción de Ana", "el bloque entero"). */
+/* Pide el texto con que se RECHAZA (= justifica) con el diálogo de la app (nada nativo). Devuelve el texto recortado, o `null` si se
+   cancela o no llega al mínimo (en ese caso lo dice). `que`: lo que se rechaza ("la sanción de Ana", "el bloque entero"). */
 async function _pedirJustificacion_(que){
-  var t = await dialogoTexto('Justificar ' + que + '.' + String.fromCharCode(10, 10) +
+  var t = await dialogoTexto('Rechazar ' + que + '.' + String.fromCharCode(10, 10) +
     'Escribe por qué no se aplica (obligatorio, al menos ' + MIN_JUSTIFICACION + ' caracteres).');
   if (t === null || t === undefined) return null;
   t = String(t).trim();
-  if (!_justificacionValida_(t)){ tost('Justificar exige un texto de al menos ' + MIN_JUSTIFICACION + ' caracteres.'); return null; }
+  if (!_justificacionValida_(t)){ tost('Rechazar exige un texto de al menos ' + MIN_JUSTIFICACION + ' caracteres.'); return null; }
   return t;
 }
 
@@ -5299,27 +5294,26 @@ function _avisoAprobarDoc_(titulo, acc){
 }
 
 /* 04/11 (acciones graves, Daniel: «lo más grave que existe»): LA PREGUNTA ANTES DE DECIDIR UNA SANCIÓN SUELTA, UNA vez para las dos
-   caras — QUÉ (aplicar/rechazar/justificar), A QUIÉN y CUÁNTO (`_etSancFila_`, el mismo rótulo que la fila). Antes el móvil decía
+   caras — QUÉ (aplicar/rechazar), A QUIÉN y CUÁNTO (`_etSancFila_`, el mismo rótulo que la fila). Antes el móvil decía
    «¿Aprobar? Esto se aplica ya» sin nombre ni puntos (y rechazar no preguntaba nada), y el escritorio ponía el nombre pero no los
    puntos. `s` es la sanción tal como llega del servidor. */
 function _avisoDecidirSanc_(s, acc){
   s = s || {};
   var quien = _pilaDeM_(s.nombre) || s.nombre || 'esta persona', NL = String.fromCharCode(10);
-  var que = {aprobar:'Aplicar', rechazar:'Rechazar', justificar:'Justificar'}[acc] || acc;
+  var que = {aprobar:'Aplicar', rechazar:'Rechazar'}[acc] || acc;
   var cola = {aprobar:'Se aplica ya (Notion y comunicado): no es un borrador.',
-              rechazar:'Se descarta: no resta puntos y no vuelve a la cola.',
-              justificar:'Consta como decidida y no resta puntos.'}[acc] || '';
+              rechazar:'Se descarta con su porqué: no resta puntos y no vuelve a la cola.'}[acc] || '';
   return '¿' + que + ' la sanción de ' + quien + '?' + NL + (s.motivo || '') + ' · ' + _etSancFila_(s.puntos, s.origen, s.extra) +
     NL + NL + cola;
 }
 
 /* 04/11: LA PREGUNTA ANTES DE CERRAR UN BLOQUE (el disparo: Notion + comunicado), UNA vez para las dos caras. `items` lleva la
-   decisión de cada fila en `dec` (`_decDe_`); se cuenta cuántas se aplican, se rechazan y se justifican. */
+   decisión de cada fila en `dec` (`_decDe_`); se cuenta cuántas se aplican y se rechazan. */
 function _avisoCerrarBloque_(nombre, items){
-  var c = {aceptar:0, rechazar:0, justificar:0}, NL = String.fromCharCode(10);
+  var c = {aceptar:0, rechazar:0}, NL = String.fromCharCode(10);
   (items || []).forEach(function(x){ c[_decDe_(x)]++; });
   return 'Vas a cerrar el bloque «' + nombre + '».' + NL + NL + c.aceptar + ' se aplican' +
-    (c.rechazar ? ' · ' + c.rechazar + ' se rechazan' : '') + (c.justificar ? ' · ' + c.justificar + ' se justifican' : '') + '.' +
+    (c.rechazar ? ' · ' + c.rechazar + ' se rechazan' : '') + '.' +
     NL + NL + 'Esto aplica las sanciones aceptadas en Notion y manda el comunicado. ¿Seguimos?';
 }
 
