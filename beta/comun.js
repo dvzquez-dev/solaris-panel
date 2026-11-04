@@ -3607,6 +3607,8 @@ function _porQueNoSeCierra_(items, fresca){
   if (!L.length) return 'Ese bloque ya no est\u00e1 pendiente: lo habr\u00e1 cerrado otro.';
   var n = _faltanPorMarcar_(L);
   if (n) return 'Faltan ' + n + ' por marcar: el bloque se cierra entero.';
+  var t = _sinTextoJustificar_(L);
+  if (t) return t + (t === 1 ? ' justificada sin su texto' : ' justificadas sin su texto') + ': justificar exige escribir por qu\u00e9.';
   return '';
 }
 
@@ -5127,6 +5129,39 @@ function _esNoJustificable_(origen, extra){
   var o = String(origen == null ? '' : origen);
   if (o === 'premio' || o === 'revocacion') return true;
   return !!(extra && extra.compensacion);
+}
+
+/* ⛔ 04/11 (Daniel, conflictos del RRI): «en lugar de rechazar, justificar y que te obligue a escribir porque no vas a aplicar la
+   sancion». Una PROPUESTA DE REUNIÓN no se rechaza (el servidor lo planta: `servidor._no_se_rechaza`): se JUSTIFICA, con texto.
+   Un premio, una revocación o una manual conservan «Rechaza». UNA puerta para las dos caras. */
+function _esNoRechazable_(origen){
+  return String(origen == null ? '' : origen) === 'reunion';
+}
+
+/* El mínimo del texto de una justificación: el MISMO que el servidor (`servidor.MIN_JUSTIFICACION`, 8) y que «Revertir»/«Revocar». */
+var MIN_JUSTIFICACION = 8;
+function _justificacionValida_(t){
+  return String(t == null ? '' : t).trim().length >= MIN_JUSTIFICACION;
+}
+
+/* Cuántas del bloque están marcadas «justificar» SIN su texto (o con uno corto). Cerrar el bloque así las dejaría pendientes
+   (el servidor no las da por decididas sin su porqué): se corta ANTES, con la frase de `_porQueNoSeCierra_`. */
+function _sinTextoJustificar_(items){
+  var n = 0, i, L = items || [], x;
+  for (i = 0; i < L.length; i++){ x = L[i];
+    if (x && _decDe_(x) === 'justificar' && !_justificacionValida_(x.justificacion || x.just)) n++; }
+  return n;
+}
+
+/* Pide el texto de una justificación con el diálogo de la app (nada nativo). Devuelve el texto recortado, o `null` si se
+   cancela o no llega al mínimo (en ese caso lo dice). `que`: lo que se justifica ("la sanción de Ana", "el bloque entero"). */
+async function _pedirJustificacion_(que){
+  var t = await dialogoTexto('Justificar ' + que + '.' + String.fromCharCode(10, 10) +
+    'Escribe por qué no se aplica (obligatorio, al menos ' + MIN_JUSTIFICACION + ' caracteres).');
+  if (t === null || t === undefined) return null;
+  t = String(t).trim();
+  if (!_justificacionValida_(t)){ tost('Justificar exige un texto de al menos ' + MIN_JUSTIFICACION + ' caracteres.'); return null; }
+  return t;
 }
 
 /* El rotulo de una fila de la cola: dice QUE ES antes de decir cuanto. ⛔ `_etPtsSanc_` solo
@@ -8004,14 +8039,13 @@ function _slotsMin_(duracion, slot){
    ⛔ Y NO CONFUNDIR CON `_slotsMin_`, que sí es una restricción dura: una racha más corta que
    la reunión no sirve para ir a nada. Son dos mínimos distintos y se dicen distinto.
    Devuelve `{falta, exigido, txt}`; `falta` a 0 significa que no hay nada que advertir. */
-/* ⛔ 21/10 (auditor 13, 🟠 4): ¿esta reunión SANCIONA SOLA? Sólo la GENERAL — la reforma del RRI (aprobada el 20/07:
-   «solo cuentan las reuniones generales; las de junta y las demás no pueden generar falta»), confirmada por Daniel el
-   01/11 (artifact [334a41fb8e], «Manda la reforma: la Junta no genera falta») — y es la copia en JS de
-   `disciplina.sanciona_sola` (de ahí sale `construir_reunion.TIPOS_AUTO`). Junta, consejo, subsistema, trabajo o mixta:
-   no cubrir queda a potestad del coordinador, y la cara no puede amenazar con un artículo que nadie aplica.
-   Es la ÚNICA puerta de las caras: `sancionPor` y `_avisoMinimo_` la llaman. */
+/* ⛔ 21/10 (auditor 13, 🟠 4): ¿esta reunión GENERA PROPUESTA de falta? 04/11 (Daniel, conflictos del RRI): «Siempre
+   propone la app y decide quien coordina» — todas menos la de TRABAJO (general, junta, consejo, subsistema, mixta).
+   Nada se aplica sola: la propuesta va a su bloque y la decide quien la convocó o el PD. Es la copia en JS de
+   `disciplina.sanciona_sola` (de ahí sale `construir_reunion.TIPOS_AUTO`). Es la ÚNICA puerta de las caras:
+   `sancionPor` y `_avisoMinimo_` la llaman. */
 function _sancionaSola_(tipo){
-  return ['general'].indexOf(String(tipo == null ? '' : tipo).trim().toLowerCase()) >= 0;
+  return ['general','junta','consejo','subsistema','mixta'].indexOf(String(tipo == null ? '' : tipo).trim().toLowerCase()) >= 0;
 }
 
 function _avisoMinimo_(marcadas, exigido, tipo){

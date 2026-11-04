@@ -176,7 +176,9 @@ function _sancColaHTML_(){
                  gate: una revocación o un premio no se justifica. */
               (_esNoJustificable_(x.origen, x.extra) ? '' :
               '<button class="btn mini" data-sjust="'+esc(x.id)+'" data-p>Justificar</button>')+
-              '<button class="btn mini" data-sno="'+esc(x.id)+'" data-p style="color:var(--warn);border-color:var(--warn)">Rechazar</button>'
+              /* 04/11 (Daniel): una propuesta de reunión no se rechaza: se justifica, con texto. */
+              (_esNoRechazable_(x.origen) ? '' :
+              '<button class="btn mini" data-sno="'+esc(x.id)+'" data-p style="color:var(--warn);border-color:var(--warn)">Rechazar</button>')
             /* ⛔ UN SOLO ATRIBUTO `class`, CON EL TERNARIO DENTRO. Hasta el 11/08 el boton
                abria con `class="btn mini"` y el ternario anadia un SEGUNDO `class`: el parser
                de HTML **descarta el duplicado y se queda con el primero**, asi que `on` no
@@ -203,13 +205,16 @@ function _sancColaHTML_(){
               (_esNoJustificable_(x.origen, x.extra) ? '' :
               '<button class="btn mini'+(x.dec==='justificar'?' on j':'')+'" data-smarc="'+esc(x.id)+
                 '" data-dec="justificar" data-p>Justifica</button>')+
+              (_esNoRechazable_(x.origen) ? '' :
               '<button class="btn mini'+(x.dec==='rechazar'?' on r':'')+'" data-smarc="'+esc(x.id)+
-                '" data-dec="rechazar" data-p>Rechaza</button>')+
+                '" data-dec="rechazar" data-p>Rechaza</button>'))+
         '</div>';
     }).join('');
   }, function(it, k, suelta){
     return suelta ? ''
-      : '<p class="rnota">Todas van en «Acepta»; cambia las que no. El bloque se cierra entero.</p>'+
+      : '<p class="rnota">Todas van en «Acepta»; cambia las que no (justificar pide el porqué). El bloque se cierra entero.</p>'+
+        /* 04/11 (Daniel): «justificar en bloque» — UN texto y no se aplica ninguna. */
+        '<button class="btn full" data-sjbloque="'+esc(k)+'" data-p>Justificar el bloque entero</button>'+
         '<button class="btn full" data-scerrar="'+esc(k)+'" data-p>Cerrar el bloque entero</button>';
   });
 }
@@ -271,20 +276,43 @@ function _cablearSanciones_(){
     _decidirSancM_(b.dataset.sno,'rechazar',b); }; });
   /* 21/10: justificar pide el motivo, como el escritorio; sin motivo no se manda nada. */
   $$('[data-sjust]').forEach(function(b){ b.onclick=async function(){
-    var just=await dialogoTexto('Motivo de la justificación:'); if(!just || !just.trim()) return;
-    _decidirSancM_(b.dataset.sjust,'justificar',b,{justificacion:just.trim()}); }; });
+    var just=await _pedirJustificacion_('esta sanción'); if(just===null) return;   /* 04/11: con el mínimo de texto */
+    _decidirSancM_(b.dataset.sjust,'justificar',b,{justificacion:just}); }; });
   /* De lote: se MARCA, y el bloque se cierra entero. */
   $$('[data-smarc]').forEach(function(b){
     b.onclick=async function(){
+      /* 04/11 (Daniel): justificar OBLIGA a escribir por qué no se aplica; sin texto no se marca. */
+      var texto=null;
+      if(b.dataset.dec==='justificar'){
+        var _x=_sancMDe_(b.dataset.smarc);
+        texto=await _pedirJustificacion_('la sanción de '+((_x&&(_pilaDeM_(_x.nombre)||_x.nombre))||'esta persona')); if(texto===null) return;
+      }
       b.disabled=true;
-      try{ await api.decidirSancion(b.dataset.smarc,'marcar',{decision:b.dataset.dec});
-        (SANC_M||[]).forEach(function(x){ if(String(x.id)===b.dataset.smarc) x.dec=b.dataset.dec; });
+      try{ await api.decidirSancion(b.dataset.smarc,'marcar',texto===null?{decision:b.dataset.dec}:{decision:b.dataset.dec,justificacion:texto});
+        (SANC_M||[]).forEach(function(x){ if(String(x.id)===b.dataset.smarc){ x.dec=b.dataset.dec; x.justificacion=texto; } });
         /* ⛔ POR LA PUERTA: marcar una sancion del bloque va al backend y luego repinta el modal
            ENTERO -cola y formulario-, asi que se llevaba por delante lo escrito arriba. La cola
            y el formulario comparten pantalla en el movil; en el escritorio no, y por eso esta
            forma no tiene gemela alli. */
         _repintarSancM_();
       }catch(e){ b.disabled=false; tostErr('No se pudo marcar: ', e); }
+    };
+  });
+  /* 04/11 (Daniel, conflictos del RRI): «justificar en bloque (una reunión falsa o un error)» — UN texto, no se aplica ninguna.
+     El servidor lo cierra entero (`justificarBloque`) y devuelve la cola. */
+  $$('[data-sjbloque]').forEach(function(b){
+    b.onclick=async function(){
+      var lote=b.dataset.sjbloque;
+      var it=(SANC_M||[]).filter(function(x){ return (x.lote||'(sueltas)')===lote; });
+      var _nl=_nombreLote_(lote==='(sueltas)' ? '' : lote, typeof REUNIONES_M!=='undefined' ? REUNIONES_M : [], it[0] && it[0].creado_at);
+      var texto=await _pedirJustificacion_('el bloque entero «'+_nl+'» ('+it.length+'): no se aplicará ninguna'); if(texto===null) return;
+      b.disabled=true; var _txt=b.textContent; b.textContent='Justificando…';
+      try{
+        var r=await api.justificarBloque(lote, texto);
+        SANC_M=null;
+        tost('Bloque justificado: no se ha aplicado ninguna.'+_saltadasTxt_(r&&r.sinPermiso));
+        _abrirSanciones_();
+      }catch(e){ b.disabled=false; b.textContent=_txt; tostErr('No se pudo justificar el bloque: ', e); }
     };
   });
   $$('[data-scerrar]').forEach(function(b){

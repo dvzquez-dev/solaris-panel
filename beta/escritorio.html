@@ -113,13 +113,13 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=8ce76f0"></script>
+<script src="comun.js?v=839c1e0"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=2396be6"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
 <script src="documentos.escritorio.js?v=3483928"></script>
-<script src="sanciones.escritorio.js?v=489e611"></script>
+<script src="sanciones.escritorio.js?v=4768558"></script>
 <script src="reuniones.escritorio.js?v=a36ddea"></script>
 <script src="horas.escritorio.js?v=1f9558d"></script>
 <script src="equipo.escritorio.js?v=31a8864"></script>
@@ -366,6 +366,8 @@ var api={
   decidirSancion: function(id,a,o){ return api._post(Object.assign({action:"decidirSancion",id:id,accion:a},o||{})); },
   agruparSanciones: function(ids,l){ return api._post({action:"agruparSanciones",ids:ids,lote:l,devolverCola:true}); },
   confirmarLote: function(l){ return api._post({action:"confirmarLote",lote:l}); },
+  /* 04/11 (Daniel): «Justificar el bloque entero» con UN texto — no se aplica ninguna (sólo el mini PC) → {…,cola}. */
+  justificarBloque: function(l,t){ return api._post({action:"justificarBloque",lote:l,justificacion:t,devolverCola:true}); },
   marcarLote:  function(l,d){ return api._post({action:"marcarLote",lote:l,decision:d,devolverCola:true}); },
   /* 31/10 (B6): los puntos de UNA persona del bloque, sin sacarla de él (sólo el mini PC); motivo obligatorio → {…,cola}. */
   corregirPuntosLote: function(id,p,m){ return api._post({action:"corregirPuntosLote",id:id,puntos:p,motivo:m,devolverCola:true}); },
@@ -2038,8 +2040,11 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
     : '<div class="pb"><div class="lote" id="lote">'+
       '<div class="lote-h"><b>'+LOTE.items.length+' personas</b><span class="mono" style="color:var(--red2)">'+rangoLote()+'</span></div>'+
       '<div class="lote-m">'+esc(LOTE.motivo)+' · <b>Art. '+LOTE.art+'</b></div>'+
+      /* 04/11 (Daniel): una propuesta de reunión NO se rechaza: se justifica, con texto. Con alguna en el bloque, en lugar de
+         «Rechazan todas» va «Justificar el bloque entero» (UN texto: no se aplica ninguna). */
       '<div class="lote-t"><button class="btn sm" data-todas="aceptar">Aceptan todas</button>'+
-        '<button class="btn sm" data-todas="rechazar">Rechazan todas</button></div>'+
+        (LOTE.items.some(function(x){ return _esNoRechazable_(x.origen); }) ? '' : '<button class="btn sm" data-todas="rechazar">Rechazan todas</button>')+
+        '<button class="btn sm" data-jbloque>Justificar el bloque entero</button></div>'+
       LOTE.items.map(function(x){
         /* ⛔ TACHADO SOLO SI SE HA DECIDIDO QUE NO. Sin marcar no es «rechazada»: con
            `x.dec` a `null` el `!=='aceptar'` tachaba los 30, que es la mentira opuesta. */
@@ -2066,7 +2071,7 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
                una sola causa desde aqui y su texto deja de mentir sin tocarlo. */
             (_esNoJustificable_(x.origen, x.extra) ? ''
               : '<button class="'+(x.dec==='justificar'?'on j':'')+'" data-dec="justificar">Justifica</button>')+
-            '<button class="'+(x.dec==='rechazar'?'on r':'')+'" data-dec="rechazar">Rechaza</button>'+
+            (_esNoRechazable_(x.origen) ? '' : '<button class="'+(x.dec==='rechazar'?'on r':'')+'" data-dec="rechazar">Rechaza</button>')+
           '</span>'+_lcorrForm_(x)+'</div>';
       }).join('')+
       /* ⛔ Y SE DICE CUANTAS FALTAN. Sin esto, «0 se aplican» sobre un bloque de 30 se lee
@@ -2355,10 +2360,10 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
       return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(m?m.nombre:n)+'</b>'+
         '<small>cubrió por debajo del mínimo exigido · '+_etiquetaMinimo_(r)+'</small></span>'+
         /* ⛔ 21/10 (auditor 10, 🟠 4): el chip sale de la MISMA regla por tipo que la de «no ha cubierto»
-           (`sancionPor`): en subsistema, mixta o de trabajo, no cubrir no sanciona, y cubrir poco tampoco puede
+           (`sancionPor`): 04/11: sólo la de trabajo no sanciona (`_sancionaSola_`, UNA puerta: aquí había una lista a mano), y cubrir poco tampoco puede
            sancionar MÁS. En las demás, el motor la gradúa (Art. 29i): no es un −1 fijo. */
-        '<span class="der"><span class="chip wa">'+(sancionPor(r.tipo,n).p===0 && ['general','junta','consejo'].indexOf(r.tipo)<0
-          ? 'sin sanción automática · potestad del coordinador' : 'sanción graduada · Art. 29i')+'</span></span></div>';
+        '<span class="der"><span class="chip wa">'+(!_sancionaSola_(r.tipo)
+          ? 'las reuniones de trabajo no sancionan' : 'sanción graduada · Art. 29i')+'</span></span></div>';
     }).join('');
     /* ⛔ 928.ª: el plazo y el chip por `_plazoReuE_`. Aquí iba «cierra el '+r.limite» a pelo: pasado el plazo
        seguía diciendo «cierra el 14/10/2026 · 1 en riesgo», cuando esa persona ya NO cumplió. */
@@ -3759,7 +3764,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='8a42a92';
+var BUILD='ee23b83';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3817,7 +3822,7 @@ function _pinSancSuelta_(m){
       var aviso=_avisoDecidirSanc_(s, acc);   /* 04/11: la MISMA pregunta que el móvil (qué, a quién, cuánto) */
       if(!(await dialogoSiNo(aviso))) return;
       var just=null;
-      if(acc==='justificar'){ just=await dialogoTexto('Motivo de la justificación:'); if(!just) return; }
+      if(acc==='justificar'){ just=await _pedirJustificacion_('esta sanción'); if(just===null) return; }   /* 04/11: con el mínimo de texto */
       b.disabled=true;
       try{
         await api.decidirSancion(id, acc, just?{justificacion:just}:{});
@@ -4698,13 +4703,16 @@ function _engSancMarcar_(){
     b.onclick=async function(){
       var id=+b.parentNode.dataset.lid, dec=b.dataset.dec;
       var it=LOTE.items.filter(function(x){ return x.id===id; })[0]; if(!it) return;
+      /* 04/11 (Daniel): justificar OBLIGA a escribir por qué no se aplica. Sin texto, no se marca. */
+      var texto=null;
+      if(dec==='justificar'){ texto=await _pedirJustificacion_('la sanción de '+it.n); if(texto===null) return; }
       if(LOTE.real && backendOK && SESION){
-        var prev=it.dec; it.dec=dec; pintar();                 // optimista
-        try{ await api.decidirSancion(id,'marcar',{decision:dec}); }
-        catch(e){ it.dec=prev; pintar(); tostErr('No se pudo marcar: ', e); }
+        var prev=it.dec, prevJ=it.justificacion; it.justificacion=texto; it.dec=dec; pintar();                 // optimista
+        try{ await api.decidirSancion(id,'marcar',texto===null?{decision:dec}:{decision:dec,justificacion:texto}); }
+        catch(e){ it.dec=prev; it.justificacion=prevJ; pintar(); tostErr('No se pudo marcar: ', e); }
         return;
       }
-      it.dec=dec; pintar();                                    // semilla local
+      it.justificacion=texto; it.dec=dec; pintar();                                    // semilla local
     };
   });
 }
@@ -4764,6 +4772,24 @@ function _engSancTodas_(){
   });
 }
 
+function _engSancJustBloque_(){
+  /* 04/11 (Daniel, conflictos del RRI): «justificar en bloque (una reunión falsa o algo que sea un error que no pierdas 20 años
+     justificando uno a uno)». UN texto y NO se aplica ninguna: el servidor lo cierra entero (`justificarBloque`). */
+  $$('[data-jbloque]').forEach(function(b){
+    b.onclick=async function(){
+      if(b.disabled) return;
+      var texto=await _pedirJustificacion_('el bloque entero ('+LOTE.items.length+' personas): no se aplicará ninguna'); if(texto===null) return;
+      if(!LOTE.real || !backendOK || !SESION){ tost('Sin conexión con el backend: el bloque NO se ha justificado.'); return; }   /* la semilla no afirma nada */
+      b.disabled=true; var prev=b.textContent; b.textContent='Justificando…';
+      try{
+        var r=await api.justificarBloque(LOTE.lote, texto);
+        await _cargarSancionesCon_(r);
+        tost('Bloque justificado: no se ha aplicado ninguna.'+_saltadasTxt_(r&&r.sinPermiso)); pintar();
+      }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo justificar el bloque: ', e); }
+    };
+  });
+}
+
 function _engSancCerrar_(){
   /* cerrar el bloque: es el DISPARO. Con bloque real, api.confirmarLote lo cierra entero
      bajo lock y levanta aplicar_sanciones=true (una vez) para que el motor lo escriba en
@@ -4779,6 +4805,8 @@ function _engSancCerrar_(){
          regla es como se acaba dudando de cual de los dos es el bueno. */
       var _faltan=_faltanPorMarcar_(LOTE.items);
       if(_faltan){ tost('Faltan '+_faltan+' por marcar: el bloque se cierra entero.'); return; }
+      var _sinT=_porQueNoSeCierra_(LOTE.items, true);
+      if(_sinT){ tost(_sinT); return; }      /* 04/11: justificar sin su texto no se cierra */
       var c=0; LOTE.items.forEach(function(x){ if(x.dec==='aceptar') c++; });
       if(!(await dialogoSiNo(_avisoCerrarBloque_(LOTE.nombre, LOTE.items)))) return;   /* 04/11: la MISMA pregunta que el móvil */
       if(LOTE.real && backendOK && SESION){
@@ -4960,6 +4988,7 @@ function enganchar(){
   _engSancMarcar_();
   _engSancCorregir_();
   _engSancTodas_();
+  _engSancJustBloque_();
   _engSancCerrar_();
   /* ⛔⛔ ESTA LÍNEA ES LA PIEZA (763.ª). La versión anterior de Apelaciones tenía los botones
      «Denegar» y «Estimar» pintados y **sin enganchar a nada**: pulsarlos no hacía absolutamente

@@ -113,14 +113,14 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=8ce76f0"></script>
+<script src="comun.js?v=839c1e0"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=561a9dd"></script>
 <script src="turnos.movil.js?v=50c2272"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=2adac07"></script>
-<script src="sanciones.movil.js?v=98f8097"></script>
+<script src="sanciones.movil.js?v=6e5ce6d"></script>
 <script src="reuniones.movil.js?v=118e718"></script>
 <script src="horas.movil.js?v=e41c36d"></script>
 <script src="equipo.movil.js?v=b89c0bc"></script>
@@ -365,6 +365,8 @@ var api={
      con un bucle de `decidirSancion`, y cada `aprobar` levanta el flag `aplicar_sanciones`:
      la rutina entra cada 2 min y puede aplicar MEDIO BLOQUE. El escritorio ya la usaba. */
   confirmarLote: function(l){ return api._post({action:"confirmarLote",lote:l}); },
+  /* 04/11 (Daniel): «Justificar el bloque entero» con UN texto — no se aplica ninguna (sólo el mini PC) → {…,cola}. */
+  justificarBloque: function(l,t){ return api._post({action:"justificarBloque",lote:l,justificacion:t,devolverCola:true}); },
   moverLimiteTarea: function(u,f){ return api._post({action:"moverLimiteTarea",url:u,fecha:f}); },
   /* 20/10: el paso de los botones de Tareas, en Notion (sólo el mini PC la tiene). */
   moverEstadoTarea: function(u,de,a,h){ var c={action:"moverEstadoTarea",url:u,de:de,a:a}; if(h>0) c.horas=h; return api._post(c); },   /* 01/11: «Entregada» con horas = el parte, en la misma escritura */
@@ -1753,7 +1755,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='aace902';
+var BUILD='8684dfa';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

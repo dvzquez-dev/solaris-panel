@@ -17,8 +17,8 @@
 function _mSanc_(n){ return _m(n); }
 
 function sancionPor(tipo,nombre){
-  /* 01/11 (artifact [334a41fb8e]): la reforma manda, la junta no genera falta — una sola puerta, `_sancionaSola_`. */
-  if(!_sancionaSola_(tipo)) return {p:0,txt:'sin sanción automática · potestad del coordinador'};
+  /* 04/11 (Daniel): proponen todas menos la de trabajo — una sola puerta, `_sancionaSola_`. */
+  if(!_sancionaSola_(tipo)) return {p:0,txt:'las reuniones de trabajo no sancionan'};
   /* ⛔⛔ «NO CONSTA» NO ES «CERO», Y AQUI DECIDE PUNTOS DE DISCIPLINA (565.ª).
      `VECES` es una tabla de **SEIS NOMBRES DE DEMO** (`escritorio.html`), y los nombres
      que llegan aqui son **REALES**: salen de `r.sinCubrir`, que viene de `_cobertura_`.
@@ -746,7 +746,7 @@ function _loteReal_(){
          «Aprobar el bloque · 30 sanciones». Un clic escribe en Notion y manda el
          comunicado con los 30 nombres.
          ⚠️ Y borraba lo marcado desde el movil: `s.decision` viene del servidor. */
-      dec:_decDe_(s)}; }) };
+      dec:_decDe_(s), justificacion:s.justificacion||null}; }) };
 }
 
 
