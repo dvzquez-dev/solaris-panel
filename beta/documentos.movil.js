@@ -472,7 +472,6 @@ function verDoc(id){
       (_yaAnalizado_(e) ? _anotPanelHTML_('d', _anotActualDe_(e), e.id, '', {excluir:yoNombre()}) : '')+
       '<label class="campo"><span class="sc">Motivo <span class="req">*</span> si pides cambios o rechazas</span>'+
       '<textarea id="dMot" data-borr="doc-motivo-'+esc(e.id)+'" placeholder="lo leerá el autor…"></textarea></label>'+
-      _solIAHTML_('dm'+e.id, _solMotivoCfg_(e, '#dMot'))+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
         _botonesDecM_(e)+
         /* DESHACER. Lo tenia el escritorio y aqui NO, y esta es la cara en la que

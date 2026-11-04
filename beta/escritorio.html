@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=cc7ce9c">
+<link rel="stylesheet" href="escritorio.css?v=6253623">
 </head>
 <body>
 
@@ -113,16 +113,16 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=7e2f829"></script>
+<script src="comun.js?v=38c877b"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
-<script src="turnos.escritorio.js?v=1500699"></script>
+<script src="turnos.escritorio.js?v=ab19f5d"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
-<script src="documentos.escritorio.js?v=d30e853"></script>
-<script src="sanciones.escritorio.js?v=d6e3a62"></script>
-<script src="reuniones.escritorio.js?v=693e7a1"></script>
+<script src="documentos.escritorio.js?v=3483928"></script>
+<script src="sanciones.escritorio.js?v=489e611"></script>
+<script src="reuniones.escritorio.js?v=a36ddea"></script>
 <script src="horas.escritorio.js?v=977441e"></script>
-<script src="equipo.escritorio.js?v=e271f68"></script>
+<script src="equipo.escritorio.js?v=31a8864"></script>
 <script src="tareas.escritorio.js?v=d3ebd8c"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
 <script>
@@ -334,7 +334,6 @@ var api={
   redactarTurno: function(d){ return _redactarTurnoPost_(d); },
   redactarParte: function(d){ return _redactarPartePost_(d); },
   resumirReunion: function(id,f,p,d){ return _resumirReunionPost_(id,f,p,d); },
-  redactarMotivo: function(id,r,t){ return _redactarMotivoPost_(id,r,t); },
   proponerOrdenDia: function(id,filas,texto,base){ return api._post({action:"proponerOrdenDia",id:id,filas:filas,texto:texto,base:base||undefined}); },
   transcribirVoz:   function(id,ext,datos){ return api._post({action:"transcribirVoz",id:id,ext:ext,datos:datos}); },
   borrarOrdenPdf:   function(id){ return api._post({action:"borrarOrdenPdf",id:id}); },
@@ -384,6 +383,7 @@ var api={
   getAsistencia:    function(id, pd){ return _asisPost_({action:"getAsistencia",id:id,_demoPd:!!pd}); },
   abrirAsistencia:  function(id){ return _asisPost_({action:"abrirAsistencia",id:id,_demoPd:true}); },
   cerrarAsistencia: function(id){ return _asisPost_({action:"cerrarAsistencia",id:id,_demoPd:true}); },
+  marcarFinalizada: function(id){ return _asisPost_({action:"marcarFinalizada",id:id,_demoPd:true}); },   /* 04/11: el convocante da la reunión por celebrada */
   anadirAsistente:  function(id, nombre){ return _asisPost_({action:"anadirAsistente",id:id,nombre:nombre,_demoPd:true}); },
   marcarPresente:   function(id, nombre, presente){ return _asisPost_({action:"marcarPresente",id:id,nombre:nombre,presente:presente!==false,_demoPd:true}); },
   editarReunion:    function(id,campos){ return api._post({action:"actualizarReunion",id:id,campos:campos}); },   /* 01/11: sólo título y fecha límite */
@@ -908,7 +908,7 @@ var CONVOCATORIAS = (typeof _semanaDemo_ !== 'function') ? [] : [Object.assign(_
   consejo:['Daniel Vázquez Piñeiro','José Manuel Torres Rodríguez','Bruno Araújo González'],
   invitados:[], resp:{}
 })];
-var DISP_SITIO='', DISP_SEL='';
+var DISP_SITIO='', DISP_SEL='', DISP_COCHE=null;   /* 04/11: DISP_COCHE = filtro con/sin coche del mapa (null = todos) */
 /* 03/11 · Convocar turno: la lista de convocatorias (`null` = sin pedir), la que se ha elegido para el mapa ('' = la vigente) y su
    contenido con las respuestas de todos (`fallo:true` si no se pudo leer). Un módulo sólo lleva `function`: el estado vive aquí. */
 var CONV_LISTA=null, CONV_ELEGIDA='', CONV_CV=null;
@@ -2105,6 +2105,7 @@ V.apela={g:'Disciplina',t:'Apelaciones',f:function(){ return _vApela_(); }};
    guarda casa con lo que pinta el mapa y se puede resaltar en verde el hueco elegido.
    Quien puede lo decide el backend; aqui solo se ofrece. */
 
+var REU_ARCHIVO_AB=false;   // 04/11: el cajón «Archivo» de Convocatorias, abierto o plegado
 var RE_SEL=0, RE_SEL_ID=null;   // la elegida: por id (`_reuSelE_`); el índice es sólo respaldo
 var RE_INV=null, RE_INV_ID=null;   // 818.a: los convocados que se están editando, y de qué reunión
 V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
@@ -2113,9 +2114,9 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
   if(!REUS.length) return _convocPest_(pan('Reuniones','ninguna',
     vacioSimple('No hay ninguna reunión convocada','Convoca una para que el equipo cubra su disponibilidad.')+
     '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>'));
-  return _convocPest_(pan('Reuniones',_nReusAbiertas_()+(_nReusAbiertas_()===1?' abierta':' abiertas')+' · '+REUS.length+' en total',
-    tabla([['Reunión'],['Tipo'],['Modalidad'],['Convocados',1],['Han cubierto',1],['Cierra',1],['Estado',1]],
-      REUS.map(function(r0){
+  /* 04/11: las que se ven (sin finalizar, o finalizadas hace menos de un mes) y, plegado debajo, el «Archivo» (`_reuPartir_`). */
+  var _par=_reuPartir_(REUS), _COLS=[['Reunión'],['Tipo'],['Modalidad'],['Convocados',1],['Han cubierto',1],['Cierra',1],['Estado',1]];
+  var _fila=function(r0){
         var cob=_cobertura_(r0);
         var _ci=_cierraCeldaE_(r0.limite);
         var r=Object.assign({}, r0, {tit:r0.tit||r0.titulo, mod:r0.mod||r0.modalidad,
@@ -2130,8 +2131,15 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
           '<td class="r mono">'+_cifraCob_(r.conv)+'</td>'+
           '<td class="r mono '+_claseCob_(r.cubren, r.conv)+'">'+_cifraCob_(r.cubren)+'</td>'+
           '<td class="r mono '+_ci.cls+'">'+esc(_ci.txt)+'</td>'+
-          '<td class="r">'+(r.fijada?'<span class="chip ok">📌 '+esc(r.fijada)+'</span>':'<span class="chip wa">sin fijar</span>')+'</td></tr>';
-      }).join(''))+
+          '<td class="r">'+(r.finalizada_at?'<span class="chip">finalizada</span>':r.fijada?'<span class="chip ok">📌 '+esc(r.fijada)+'</span>':'<span class="chip wa">sin fijar</span>')+'</td></tr>';
+  };
+  var _arch=_par.archivo.length
+    ? '<div class="acord'+(REU_ARCHIVO_AB?' ab':'')+'"><div class="hh" data-reuarch><span class="tx"><b>Archivo <span style="color:var(--ink3)">· '+
+      _par.archivo.length+'</span></b><small>finalizadas hace más de un mes</small></span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+      '<div class="bb tarl">'+tabla(_COLS, _par.archivo.map(_fila).join(''))+'</div></div>'
+    : '';
+  return _convocPest_(pan('Reuniones',_nReusAbiertas_()+(_nReusAbiertas_()===1?' abierta':' abiertas')+' · '+_par.vivas.length+' en total',
+    tabla(_COLS, _par.vivas.map(_fila).join(''))+_arch+
     '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>'));
 }};
 /* Disponibilidad y riesgo: por reunión, un desplegable con quién no ha cubierto
@@ -3750,7 +3758,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='fb43802';
+var BUILD='ed57aaf';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4845,6 +4853,7 @@ function _engSancCerrar_(){
      No se sustituye por nada: el manejador bueno ya existe, solo estaba tapado. */
   /* El botón «Convocar reunión» era un `tost` descriptivo. Ahora lleva al panel de verdad,
      que vive en esta misma vista, y le da el foco. */
+  $$('[data-reuarch]').forEach(function(h){ h.onclick=function(){ REU_ARCHIVO_AB=h.parentNode.classList.toggle('ab'); }; });   // 04/11: el Archivo de Convocatorias
   $$('[data-nueva]').forEach(function(b){ b.onclick=function(){
     _abrirPestana_('conv','convocar');   /* 01/11 (escm2): «Convocar» es una pestaña; hay que abrirla antes de buscar el selector */
     var p=$('#cvTipo'); p=p&&p.closest('.nx'); if(p){ p.scrollIntoView({block:'center'}); var q=p.querySelector('button.on')||p.querySelector('button'); if(q) q.focus(); }

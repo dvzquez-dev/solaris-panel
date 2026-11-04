@@ -28,6 +28,7 @@ function normReu(r){ r=r||{};
     ordenDia:r.ordenDia||"", vision:r.vision||"anonima",
     minimoPct:(typeof r.minimoPct==='number') ? r.minimoPct : null,   /* 01/11: el mínimo que eligió quien convocó; sin él, el del periodo */
     en_curso:(r.en_curso && typeof r.en_curso==='object') ? r.en_curso : null,   /* 29/10: la pone `empezarReunion` */
+    finalizada_at:r.finalizada_at||null, celebrada:!!r.celebrada,   /* 04/11: la dio por celebrada su convocante (sale de Estado; al mes, al Archivo) · no se borra */
     bloque:r.bloque||null,   /* 01/11: el bloque que ya fichó la reunión; sin él «ya ha pasado: ficha el bloque» saldría siempre */
     /* 26/10 (triaje A4d): convocados con el plazo YA VENCIDO — el motor no les sanciona, y `_cobertura_` tampoco */
     invitados_tarde:Array.isArray(r.invitados_tarde) ? r.invitados_tarde.slice() : [],
@@ -113,7 +114,7 @@ function _presetInvitados_(tipo){
   _activos_().forEach(function(m){
     if(m.nombre===yo) return;
     var meto = tipo==='general' ? true
-             : tipo==='subsistema' ? (m.unidad===((_m(yo)||{}).unidad))
+             : (tipo==='subsistema' || tipo==='mixta') ? (m.unidad===((_m(yo)||{}).unidad))   /* 04/11: la mixta nace con SU subsistema ya dentro */
              : tipo==='junta' ? (m.cargo==='Coordinador'||m.cargo==='Project Director')
              : false;
     if(meto) out.push(m.nombre);
@@ -139,12 +140,14 @@ function convocarReunionPanel(){
      elegiría «General», el servidor se lo cambiaría a `trabajo` **en silencio**, y eso es
      peor que no ofrecerlo — se convoca creyendo que va todo el equipo. Se le ofrece
      **solo lo que el servidor le va a conceder**. */
-  var _coord = rangoNom(ACTOR) >= 1;
+  /* 04/11 (Daniel): los tipos que se ofrecen salen de `_tiposConvocables_` (espejo de `disciplina.puede_convocar`): una
+     coordinación ya no ofrece «General» (sólo el PD), y «Subsistema» y «Mixta» sólo con subsistema propio. */
+  var _tp = _tiposConvocables_(ACTOR), _coord = _tp.length > 1;
   var E=CAMPO_CSS;
   var lab=function(t){ return '<span class="sc" style="display:block;margin-bottom:5px">'+t+'</span>'; };
   /* ⚠️ Y el preset arranca por el tipo que ESA persona puede convocar: con `'general'`
      fijo, un raso abría el panel con las 32 marcadas para una reunión de trabajo. */
-  if(CONV_INV===null) CONV_INV=new Set(_presetInvitados_(_coord ? 'general' : 'trabajo'));
+  if(CONV_INV===null) CONV_INV=new Set(_presetInvitados_(_tp[0]));
   var hoy=new Date(String(_ahoraApp_()).slice(0,10)+'T12:00:00'), iso=function(d){   /* 🟡 5 (auditor 20): reloj de la app */ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
   var mas=function(d,n){ var x=new Date(d); x.setDate(x.getDate()+n); return iso(x); };
   var subs={}; _activos_().forEach(function(m){ if(m.unidad) subs[m.unidad]=1; });
@@ -156,9 +159,8 @@ function convocarReunionPanel(){
       'A los convocados les toca <b>cubrir su disponibilidad</b>, y de no cubrirla salen '+
       'sanciones. Elige bien a quién metes.</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
-      '<div>'+lab('Tipo')+nxElige('cvTipo', (_coord ? [['general','General · todo el equipo'],['junta','Junta Directiva · coordinación'],
-        ['consejo','Consejo'],['subsistema','Subsistema · tu unidad'],['mixta','Mixta · varios subsistemas']] : []).concat([['trabajo','Reunión de trabajo']]),
-        _coord ? 'general' : 'trabajo')+'</div>'+
+      '<div>'+lab('Tipo')+nxElige('cvTipo', _tp.map(function(k){ return [k, {general:'General · todo el equipo', junta:'Junta Directiva · coordinación',
+        consejo:'Consejo', subsistema:'Subsistema · tu unidad', mixta:'Mixta · tu subsistema y 1-2 más', trabajo:'Reunión de trabajo'}[k]]; }), _tp[0])+'</div>'+
       '<div>'+lab('Modalidad')+nxElige('cvMod', [['hibrida','Híbrida'],['presencial','Presencial'],['telematica','Telemática']], 'hibrida')+'</div>'+
       '<label style="flex:1;min-width:220px">'+lab('Título')+
         '<input id="cvTit" placeholder="Título de la reunión" style="'+E+'"></label>'+
@@ -355,6 +357,7 @@ function _cablearConvocar_(){
        tiene preset** (los diez de `DATA.consejo`, ver `reuniones.movil.js`); los que
        siguen sin él son mixta y trabajo. Los tipos sin preset (
        mixta, trabajo) la dejan VACÍA a propósito, para que se elija a mano. */
+    $$('[data-csub]').forEach(function(b){ b.classList.toggle('on', t.value==='mixta' && b.dataset.csub===(_m(ACTOR)||{}).unidad); });   // 04/11: la mixta lleva SU subsistema
     CONV_INV=new Set(_presetInvitados_(t.value)); pintaChips(); upd();
   };
   $$('[data-csub]').forEach(function(b){
@@ -397,6 +400,7 @@ function _cablearConvocar_(){
     var u=_genUnion_(rangos(), sl), bloques=[];
     u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
     if(!u.F.length || !bloques.length){ tost('Con ese horario no sale ninguna casilla.'); return; }
+    if(val('cvTipo')==='mixta'){ var _mb=_mixtaBloqueo_(Array.from(CONV_INV), (_m(ACTOR)||{}).unidad); if(_mb){ tost(_mb); return; } }   // 04/11
     var nS=_slotsMin_(du,sl);
     /* ⛔ 01/11 (Daniel [4e2c13a995]): «si no se pudiese de verdad, obvio no se puede convocar». Ya NO se avisa y se deja
        convocar igual: si con este horario nadie puede llegar al mínimo (o nadie puede marcar), no se convoca y se dice
@@ -814,6 +818,7 @@ function _puedeBorrarReuE_(r){
 /* La caja del botón. Devuelve '' si no te toca: el botón no se pinta gris, no se pinta. */
 function _borrarReuBoxE_(r){
   if(!_puedeBorrarReuE_(r)) return '';
+  if(!_reuSePuedeBorrar_(r)) return '';      // 04/11: lo celebrado no se borra (queda en el archivo)
   var n=_nRespReu_(r);
   return '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:13px">'+
     '<button class="btn" data-borrarreu="'+esc(r.id)+'" style="color:var(--red2);'+
@@ -1266,22 +1271,44 @@ async function _hidratarReus_(){
    por `getAsistencia` (sin canal nuevo). Quien decide abrirla es el PD, también en una telemática. */
 var ASIS_E=null;   // {id, titulo, v, timer, ocupado, hechos:{nombre:true}}
 
-function _asisSoyPD_(){
-  return _demoLocal_() || !!(typeof SESION!=='undefined' && SESION && SESION.rango!=null && SESION.rango>=3);
+/* ¿Gestiona ESTA reunión? Su convocante, el PD o el admin (`_puedeBloqueReu_`, la regla del servidor). 04/11: ya no sólo el PD. */
+function _asisSoyPD_(r){
+  return _demoLocal_() || _puedeBloqueReu_(r, (typeof _actorSanc_==='function' ? _actorSanc_() : null), (typeof esAdmin==='function' && !!esAdmin()));
 }
 
 /* La caja de la ficha: un botón. Se cablea con el truco de `_audioReuHTML_` (el HTML no lleva manejadores). */
 function _asisBoxE_(r){
-  if(!r || r.tipo!=='general' || r.id==null || !_asisSoyPD_() || (!_demoLocal_() && !r._srv)) return '';
+  if(!r || r.id==null || !_asisSoyPD_(r) || (!_demoLocal_() && !r._srv)) return '';
+  var rid=String(r.id).replace(/"/g,'');
   setTimeout(function(){
-    var b=document.querySelector('[data-asisabrir="'+String(r.id).replace(/"/g,'')+'"]');
+    var b=document.querySelector('[data-asisabrir="'+rid+'"]');
     if(b) b.onclick=function(){ _asisEscenarioE_(r); };
+    var f=document.querySelector('[data-reufin="'+rid+'"]');
+    if(f) f.onclick=function(){ _reuFinalizarE_(r, f); };
   },0);
+  var fin=_reuFinalizada_(r), puedeFin=_reuPuedeFinalizar_(r, (typeof _actorSanc_==='function' ? _actorSanc_() : null), (typeof esAdmin==='function' && !!esAdmin())) || (_demoLocal_() && !fin && !r.en_curso);
   return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+
     '<span class="sc" style="display:block;margin-bottom:4px">Asistencia en directo</span>'+
-    '<button class="btn" data-asisabrir="'+esc(r.id)+'">'+ico('portapapeles')+' Abrir asistencia</button>'+
-    '<div class="nota" style="border-top:0;padding:8px 0 0">Un cuadrito por convocado que se pone verde cuando escribe en el '+
-    'móvil la palabra que proyectas. Vale también para una general telemática.</div></div>';
+    '<button class="btn" data-asisabrir="'+esc(r.id)+'">'+ico('portapapeles')+(fin ? ' Ver la lista' : ' Mostrar la palabra')+'</button>'+
+    (puedeFin ? ' <button class="btn" data-reufin="'+esc(r.id)+'">Finalizar reunión</button>' : '')+
+    '<div class="nota" style="border-top:0;padding:8px 0 0">'+(fin
+      ? 'Reunión finalizada el <b>'+esc(_isoADMY_(String(r.finalizada_at).slice(0,10)))+'</b>: la asistencia está cerrada.'
+      : 'Una palabra por modalidad: la <b>presencial</b>, en el encerado; la <b>telemática</b>, por voz o por chat. Un cuadrito por convocado '+
+        'que se pone verde al escribirla. <b>Finalizar</b> la da por celebrada y bloquea la palabra.')+'</div></div>';
+}
+
+/* 04/11: el convocante da la reunión por celebrada. Sale de Estado, al mes pasa al Archivo y ya no se borra. */
+async function _reuFinalizarE_(r, b){
+  if(b && b.disabled) return;
+  if(!(await dialogoSiNo('Dar por finalizada «'+(r.titulo||r.tit||('Reunión '+r.id))+'».'+String.fromCharCode(10,10)+
+    'Se cierra la palabra de asistencia y ya no se podrá eliminar. ¿Seguro?'))) return;
+  if(b) b.disabled=true;
+  try{
+    var x=await api.marcarFinalizada(r.id);
+    r.finalizada_at=(x&&x.finalizada_at)||new Date().toISOString(); r.celebrada=true;
+    if(ASIS_E && String(ASIS_E.id)===String(r.id)) await _asisRefrescarE_();
+    tost('Reunión finalizada.'); pintar();
+  }catch(e){ if(b) b.disabled=false; tostErr('No se pudo finalizar: ', e); }
 }
 
 async function _asisEscenarioE_(r){
@@ -1291,11 +1318,11 @@ async function _asisEscenarioE_(r){
     '<button class="btn mini" id="asisSalir">Salir</button></div>'+
     '<div id="asisCuerpo" class="asisCuerpo"><p class="nota">Cargando…</p></div>';
   document.body.appendChild(el);
-  ASIS_E={id:r.id, titulo:r.titulo||r.tit||'', v:null, timer:null, ocupado:false, hechos:{}};
+  ASIS_E={id:r.id, reu:r, titulo:r.titulo||r.tit||'', v:null, timer:null, ocupado:false, hechos:{}};
   $('#asisSalir').onclick=_asisSalirE_;
   try{
     var v=await api.getAsistencia(r.id, true);
-    if(!v.existe) await api.abrirAsistencia(r.id);        // la primera vez se abre sola: el PD ya dijo «Abrir asistencia»
+    if(!v.existe && !_reuFinalizada_(r)) await api.abrirAsistencia(r.id);        // la primera vez se abre sola: quien convoca ya dijo «Mostrar la palabra»
   }catch(e){ tostErr('No se pudo abrir la asistencia: ', e); _asisSalirE_(); return; }
   await _asisRefrescarE_();
   if(ASIS_E) ASIS_E.timer=setInterval(_asisRefrescarE_, 3000);
@@ -1334,16 +1361,27 @@ function _asisPintarE_(){
   var cerrada=!v.abierta;
   if(!document.getElementById('asisGrid') || A.cerrada!==cerrada){
     A.cerrada=cerrada;
-    c.innerHTML=(cerrada ? '' : '<div class="asisPal" title="La palabra que tienen que escribir">'+esc(v.palabra||'')+'</div>')+
+    var pals=_asisPalabras_(v), hib=pals.length>1;
+    /* 04/11: en una híbrida, la presencial en grande (para el encerado) y la telemática aparte, tapada hasta que se pide verla: se dice
+       por voz o por chat, y no hace falta que la lea toda la sala. En una sola modalidad, su palabra, grande. */
+    A.palTel=(pals.filter(function(w){ return w.modo==='tel'; })[0]||{}).pal||''; A.verTel=false;
+    c.innerHTML=(cerrada ? '' : pals.map(function(w){
+        if(hib && w.modo==='tel')
+          return '<div class="asisPalTel"><span>Telemática · dila o ponla en el chat</span><b id="asisPalTelV">••••••</b>'+
+            '<button class="btn mini" id="asisVerTel">Ver</button></div>';
+        return (w.rot ? '<div class="asisPalRot">'+esc(w.rot)+(w.modo==='tel' ? ' · dila o ponla en el chat' : ' · en el encerado')+'</div>' : '')+
+          '<div class="asisPal" title="La palabra que tienen que escribir">'+esc(w.pal||'')+'</div>'; }).join(''))+
       '<div class="asisCont" id="asisCont"></div><div id="asisGrid" class="asisGrid"></div>'+
       (cerrada
         ? '<div class="asisPie"><button class="btn pri" id="asisCopiar">Copiar la lista</button>'+
-          '<button class="btn" id="asisReabrir">Reabrir</button></div>'
+          (_reuFinalizada_(A.reu) ? '' : '<button class="btn" id="asisReabrir">Reabrir</button>')+'</div>'
         : '<div class="asisPie"><div style="flex:1;min-width:220px">'+
           elegirPersonas('asisQuien', {universo:_activos_().map(function(m){ return m.nombre; }).filter(function(n){ return conv.indexOf(n)<0; }),
             multi:false, titulo:'Añadir a alguien en directo', vacio:'Escribe un nombre (vale alguien que aún no está en el equipo) o pulsa «Ver lista».'})+'</div>'+
           '<button class="btn" id="asisAnadir">Añadir</button>'+
-          '<button class="btn pri" id="asisCerrar">Cerrar asistencia</button></div>');
+          '<button class="btn" id="asisCerrar">Cerrar asistencia</button>'+
+          (_reuPuedeFinalizar_(A.reu, (typeof _actorSanc_==='function' ? _actorSanc_() : null), (typeof esAdmin==='function' && !!esAdmin())) || (_demoLocal_() && !_reuFinalizada_(A.reu))
+            ? '<button class="btn pri" id="asisFin">Finalizar reunión</button>' : '')+'</div>');
     var on=function(id, f){ var b=document.getElementById(id); if(b) b.onclick=async function(){ if(b.disabled) return; b.disabled=true;
       try{ await f(); }catch(e){ tostErr('No se pudo: ', e); } finally{ b.disabled=false; } }; };
     var gr=document.getElementById('asisGrid');
@@ -1353,6 +1391,11 @@ function _asisPintarE_(){
       try{ await api.marcarPresente(A.id, n, !(A.v.presentes||{})[n]); await _asisRefrescarE_(); }catch(er){ tostErr('No se pudo: ', er); }
     };
     on('asisCerrar', async function(){ await api.cerrarAsistencia(A.id); await _asisRefrescarE_(); });
+    on('asisFin', async function(){ await _reuFinalizarE_(A.reu); });
+    on('asisVerTel', async function(){
+      A.verTel=!A.verTel;
+      var t=document.getElementById('asisPalTelV'), vb=document.getElementById('asisVerTel');
+      if(t) t.textContent=A.verTel ? A.palTel : '\u2022\u2022\u2022\u2022\u2022\u2022'; if(vb) vb.textContent=A.verTel ? 'Ocultar' : 'Ver'; });
     on('asisReabrir', async function(){ await api.abrirAsistencia(A.id); await _asisRefrescarE_(); });
     on('asisAnadir', async function(){
       /* 01/11: lo elegido o, si no, lo ESCRITO: en una general están todos convocados, así que añadir en directo es

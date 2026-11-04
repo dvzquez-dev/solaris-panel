@@ -823,7 +823,7 @@ function vFichar(){
   ST.form._declPerdido = false;
   /* 03/11 · «Para más gente»: el MISMO formulario del bloque (comun.js `_bloque*_`), en línea en Fichar, y nada más (sin justificación
      propia ni «Quién lo firma»: es de otros). Sólo en «Declarar horas», sin un fichaje por declarar, y para PD/coordinador. */
-  var _yoV = (typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
+  var _yoV = _fichaYo_();   /* la SESIÓN, por la puerta única (ver `_fichaYo_`) */
   var _puedeV = !decl && ST.modo==='bloque' && _puedeVarios_(_yoV), _varios = _puedeV && _variosActivo_();
   if(_varios) return '<div class="h1">Fichar</div><p class="h1s">'+HOY+' · horas de varias personas, un mismo horario.</p>'+
     '<div class="modos" id="modos"><button data-mo="vivo" data-p>Sesión en vivo</button><button data-mo="bloque" class="on" data-p>Declarar horas</button></div>'+

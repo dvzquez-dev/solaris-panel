@@ -21,7 +21,7 @@
      ⚠️ Si `--bg` cambia, esto cambia con él: lo vigila `probar_reunion_movil`. -->
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=b52c0c2">
+<link rel="stylesheet" href="movil.css?v=c445b36">
 </head>
 <body>
 
@@ -113,16 +113,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=7e2f829"></script>
+<script src="comun.js?v=38c877b"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
-<script src="tareas.movil.js?v=01c4610"></script>
-<script src="turnos.movil.js?v=45ecdbb"></script>
+<script src="tareas.movil.js?v=561a9dd"></script>
+<script src="turnos.movil.js?v=f267852"></script>
 <script src="buzon.movil.js?v=3179853"></script>
-<script src="documentos.movil.js?v=7c8c2db"></script>
+<script src="documentos.movil.js?v=2adac07"></script>
 <script src="sanciones.movil.js?v=98f8097"></script>
-<script src="reuniones.movil.js?v=02ea951"></script>
-<script src="horas.movil.js?v=e7782af"></script>
+<script src="reuniones.movil.js?v=118e718"></script>
+<script src="horas.movil.js?v=41b0355"></script>
 <script src="equipo.movil.js?v=b89c0bc"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -339,6 +339,7 @@ var api={
   getAsistencia:    function(id, pd){ return _asisPost_({action:"getAsistencia",id:id,_demoPd:!!pd}); },
   abrirAsistencia:  function(id){ return _asisPost_({action:"abrirAsistencia",id:id,_demoPd:true}); },
   cerrarAsistencia: function(id){ return _asisPost_({action:"cerrarAsistencia",id:id,_demoPd:true}); },
+  marcarFinalizada: function(id){ return _asisPost_({action:"marcarFinalizada",id:id,_demoPd:true}); },   /* 04/11: el convocante da la reunión por celebrada */
   anadirAsistente:  function(id, nombre){ return _asisPost_({action:"anadirAsistente",id:id,nombre:nombre,_demoPd:true}); },
   marcarPresente:   function(id, nombre, presente){ return _asisPost_({action:"marcarPresente",id:id,nombre:nombre,presente:presente!==false,_demoPd:true}); },
   editarReunion:    function(id,campos){ return api._post({action:"actualizarReunion",id:id,campos:campos}); },   /* 01/11: sólo título y fecha límite */
@@ -448,7 +449,6 @@ var api={
   redactarTurno: function(d){ return _redactarTurnoPost_(d); },
   redactarParte: function(d){ return _redactarPartePost_(d); },
   resumirReunion: function(id,f,p,d){ return _resumirReunionPost_(id,f,p,d); },
-  redactarMotivo: function(id,r,t){ return _redactarMotivoPost_(id,r,t); },
   proponerOrdenDia: function(id,filas,texto,base){ return api._post({action:"proponerOrdenDia",id:id,filas:filas,texto:texto,base:base||undefined}); },
   transcribirVoz:   function(id,ext,datos){ return api._post({action:"transcribirVoz",id:id,ext:ext,datos:datos}); },
   borrarOrdenPdf:   function(id){ return api._post({action:"borrarOrdenPdf",id:id}); },
@@ -1752,7 +1752,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b59019e';
+var BUILD='8793956';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -1886,7 +1886,7 @@ var CONVOCATORIAS = (typeof _semanaDemo_ !== 'function') ? [] : [Object.assign(_
 })];
 /* El pincel: se elige arriba y se pinta abajo. Con cinco estados por celda (vacío, CUVI, CITI,
    los dos, no puedo) un ciclo por toque obligaría a dar hasta cuatro toques para corregirse. */
-var CONV_PINCEL='cuvi', CONV_COCHE=false;
+var CONV_PINCEL='cuvi', CONV_COCHE=false, CONV_CC=null;   /* 04/11: CONV_CC = el coche POR SITIO ({cuvi:bool,citi:bool}); null = el unico CONV_COCHE */
 
 var VISTAS={estado:vEstado,fichar:vFichar,horas:vHoras,tareas:vTareas,turnos:vTurnos,
             docs:vDocs,reu:vReu};
@@ -2422,6 +2422,22 @@ function _engReuniones_(){
       [R2].concat((REUNIONES_M||[]).filter(function(x){ return x.id===R2.id && x!==R2; })).forEach(function(x){
         if(n.titulo) x.titulo=n.titulo; if(n.limite) x.limite=n.limite; });
       pintar(); });
+  };
+  /* 04/11: «Finalizar reunión» (convocante/PD/admin): sale de Estado, al mes pasa al Archivo, deja de poder borrarse y se cierra su palabra. */
+  var bfin=$('#btnFinalizarReu');
+  if(bfin) bfin.onclick=async function(){
+    if(bfin.disabled) return;
+    var R2=REUNION; if(!R2) return;
+    if(!(await dialogoSiNo('Dar por finalizada «'+R2.titulo+'».'+String.fromCharCode(10,10)+
+      'Sale de Estado, se cierra la palabra de asistencia y ya no se podrá eliminar. ¿Seguro?'))) return;
+    bfin.disabled=true;
+    try{
+      var r=await api.marcarFinalizada(R2.id);
+      [R2].concat((REUNIONES_M||[]).filter(function(x){ return x.id===R2.id && x!==R2; })).forEach(function(x){
+        x.finalizada_at=(r&&r.finalizada_at)||new Date().toISOString(); x.celebrada=true; });
+      if(typeof ASIS_M!=='undefined'){ delete ASIS_M.est[R2.id]; }
+      tost('Reunión finalizada.'); pintar();
+    }catch(e){ bfin.disabled=false; tostErr('No se pudo finalizar: ', e); }
   };
   var basis=$('#btnAsistencia');
   if(basis) basis.onclick=function(){ if(REUNION) _asisAbrirPanelM_(REUNION); };

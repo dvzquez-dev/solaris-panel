@@ -119,6 +119,7 @@ function colaDecision(){
   });
   REUS.forEach(function(r0){
     /* 950.ª: sólo si te toca a ti fijarla (el convocante, o el PD con la cuenta admin) — ver `_fijarEsMio_`. */
+    if(_reuFinalizada_(r0)) return;      // 04/11: una finalizada no pide nada
     if(r0.fijada || !_fijarEsMio_(r0)) return;
     var cob=_cobertura_(r0);
     /* ⛔ REUNION OCULTA: no se sabe cuantos han cubierto, asi que no hay tarjeta. Sin
@@ -151,7 +152,7 @@ function colaDecision(){
 function _tuyoReusE_(){
   var yo=_fichaYo_(); if(!yo) return [];
   return (REUS||[]).filter(function(r){
-    if(!r || r.fijada || r.convocante===yo || !_puedoCubrir_(r)) return false;
+    if(!r || r.fijada || _reuFinalizada_(r) || r.convocante===yo || !_puedoCubrir_(r)) return false;
     if(!_plazoAbierto_(String(r.limite==null?'':r.limite))) return false;
     if(Array.isArray(r.invitados_tarde) && r.invitados_tarde.indexOf(yo)>=0) return false;   // convocado con el plazo vencido: el motor no le sanciona
     var fila=r.resp && r.resp[yo];
@@ -193,7 +194,7 @@ function _proxReuE_(){
     return t < base-182*86400000 ? new Date(h.getFullYear()+1, (+m[2])-1, +m[1]).getTime() : t;
   }
   (REUS||[]).forEach(function(r){
-    if(!r || !(r.convocante===yo || _puedoCubrir_(r))) return;
+    if(!r || _reuFinalizada_(r) || !(r.convocante===yo || _puedoCubrir_(r))) return;      // 04/11: la finalizada no sale en lo próximo
     var dias=r.dias||[], t=null;
     if(r.fijada && (r.fijadaBl||[]).length) t=msDe(dias[r.fijadaBl[0][0]]);
     if(t==null){
@@ -307,6 +308,7 @@ function insightsHTML(){
   if(enAire>0) xs.push(['wa',h1(enAire)+' están sin firmar. Mientras sigan ahí, el umbral del mes y el '+
     'ranking se calculan con datos incompletos.']);
   var sinCubrir=REUS.reduce(function(a,r){
+    if(_reuFinalizada_(r)) return a;                          // 04/11: lo celebrado ya no pende
     /* ⛔ Y una reunion OCULTA no suma: `_cobertura_` devuelve `null` y aqui se cuenta 0.
        No es «nadie sin cubrir», es «no lo se» — pero el aviso solo se imprime `if
        (sinCubrir)`, asi que un 0 calla en vez de afirmar. Lo que NO puede pasar es que
