@@ -725,6 +725,19 @@ function _engConv_(){
   rej.addEventListener('pointercancel', fin);
 }
 
+/* 04/11 · «TU TURNO DE HOY» EN EL INICIO, con el botón de hacer fotos (Daniel: «le aparece directamente en la pared principal un
+   botoncillo de hacer fotos»). Sólo mientras dura tu turno (`_ftEnCurso_`, comun.js) y si vas en él. La tarjeta nace OCULTA y la
+   enseña `_ftPintar_` cuando el servidor dice que hay algo que enseñar a esta persona: ni tarjeta vacía ni texto chapa. */
+function _ftInicioM_(){
+  var ahora = new Date();
+  var t = (typeof TURNOS !== 'undefined' ? TURNOS : []).filter(function(x){
+    return _mioTurno_(x) && x.estado !== 'Cancelado' && _ftEnCurso_(x, ahora); })[0];
+  if(!t) return '';
+  return '<div class="tarj" data-ftwrap style="display:none">'+cab('Tu turno de hoy', t.hora)+
+    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b><small>'+esc(t.hora)+' · '+esc(t.dur)+'</small></div></div>'+
+    '<div style="padding:0 14px 12px">'+_ftHTML_(t)+'</div></div>';
+}
+
 function vTurnos(){
   /* Por defecto SOLO LOS TUYOS -decision de Daniel-, con un conmutador para ver los del
      equipo. Los de otros se pintan igual pero sin poder tocarlos: ver quien va a que sirve

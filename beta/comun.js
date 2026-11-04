@@ -2999,7 +2999,7 @@ function _apiParse(txt, accion){
    Las que llaman a un modelo o suben ficheros tardan más a propósito: techo propio. */
 var API_ESPERA_MS = 20000;
 var API_ESPERA_LARGA_MS = 120000;
-var API_ACCIONES_LARGAS = /^(proponerTareaParte|traerOrdenNotion|transcribirVoz|interpretarAnotacion|contrastarEtiqueta|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|redactarTurno|redactarParte|resumirReunion)$/;
+var API_ACCIONES_LARGAS = /^(proponerTareaParte|traerOrdenNotion|transcribirVoz|interpretarAnotacion|contrastarEtiqueta|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|subirFotoTurno|getFotoTurno|getZipTurno|entregarFotosTurno|redactarTurno|redactarParte|resumirReunion)$/;
 var API_MSG_SIN_RESPUESTA = "El servidor no ha contestado. Puede que se haya guardado: recarga antes de repetirlo.";
 function _esLecturaApi_(accion){
   return /^(get|listar)/.test(accion) || /^(bootstrap|quienSoy|queHayNuevo|estadoAudioReunion)$/.test(accion);
@@ -14321,6 +14321,319 @@ function _tareaParteColaCablear_(cb){
   }
   $$('[data-tp-firmar]').forEach(function(b){ b.onclick = function(){ decidir(b.closest('[data-tp-card]'), b, 'aprobar'); }; });
   $$('[data-tp-rech]').forEach(function(b){ b.onclick = function(){ decidir(b.closest('[data-tp-card]'), b, 'rechazar'); }; });
+}
+
+/* ══ 04/11 · LAS FOTOS DE UN TURNO: LA CÁMARA DEL MÓVIL AL MINI PC, SIN RECOMPRIMIR ═══════════════════════════════
+   🗣️ Daniel (04/11, audio a Marta): *«el responsable audiovisual abre la app, le da al turno y le aparece un botoncillo de hacer
+   fotos […] se guarda directamente el archivo en la app sin siquiera pasar por la memoria de la persona […] el resto de gente en
+   ese turno le puede dar al botón y sumar al bote; luego el responsable audiovisual la revisa y borra algunas, le da un botón y te
+   llegan a ti»* · *«no hay ningún tipo de compresión: te abre la cámara para que la saques […] título opcional»*.
+   Backend: `rutinas/fotos_turno.py` (`listarFotosTurno`, `subirFotoTurno`, `getFotoTurno`, `borrarFotoTurno`, `entregarFotosTurno`,
+   `getZipTurno`, `configurarEntregaFotos`). UNA implementación para las dos caras: la ficha del turno (modal del móvil, ficha del
+   escritorio) y la tarjeta «tu turno de hoy» del inicio del móvil sólo ponen un hueco `_ftHTML_(t)` y llaman a `_ftEnganchar_`.
+   ⛔ QUIÉN PUEDE QUÉ lo decide el SERVIDOR y lo dice en `listarFotosTurno` (`puedeVer`, `puedeSubir`, `puedeGestionar`,
+   `puedeConfigurar`): aquí no se copia la regla, se pregunta. El hueco se queda vacío (nada de texto chapa) si el servidor dice que
+   no hay nada que enseñar a esta persona en ese turno.
+   ⛔ EL FICHERO VA TAL CUAL: se lee `File.slice()` en trozos de 512 KB y se manda en base64; nada de canvas ni de redimensionar. */
+var FT_ = {est: {}, turno: {}, sub: {}, reloj: null};   /* est[clave] = {t, r:respuesta}; sub[clave] = la cola de subida */
+function _ftIdTurno_(t){ var id = t && t.id != null ? String(t.id) : ''; return /^T·/.test(id) ? '' : id; }
+function _ftHora_(t){ var h = String((t && t.hora) || ''); return /^\d{1,2}:\d{2}/.test(h) ? h.slice(0, 5) : ''; }
+function _ftFecha_(t){ return String((t && (t.iso || t.fecha || _dmyAISO_(t.f))) || '').slice(0, 10); }
+function _ftClave_(t){ return _ftFecha_(t) + '|' + _ftHora_(t) + '|' + _ftIdTurno_(t); }
+/* El cuerpo con que se nombra el turno al servidor: su id de Notion o, sin él, la fecha y la hora. */
+function _ftCuerpo_(t){ return {turno: _ftIdTurno_(t), fecha: _ftFecha_(t), hora: _ftHora_(t)}; }
+/* ¿Está el turno `t` en curso a las `ahora` (Date)? Desde 1 h antes de la hora hasta 2 h después de acabar (la duración escrita,
+   «3 horas»; sin ella, 4). Sin hora legible, todo el día. Es lo que decide si el INICIO del móvil ofrece las fotos; el servidor
+   decide de verdad (sólo el día del turno). */
+function _ftEnCurso_(t, ahora){
+  var f = _ftFecha_(t), a = ahora || new Date();
+  if(f !== a.getFullYear() + '-' + pad(a.getMonth() + 1) + '-' + pad(a.getDate())) return false;
+  var h = _ftHora_(t);
+  if(!h) return true;
+  var mm = /^(\d{1,2}):(\d{2})/.exec(h), ini = parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10);
+  var dur = _horasDeDuracion_(t.dur || t.duracion, 4) * 60, ya = a.getHours() * 60 + a.getMinutes();
+  return ya >= ini - 60 && ya <= ini + dur + 120;
+}
+function _ftBytesTxt_(n){ return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+function _ftCss_(){
+  if(document.getElementById('ftCss')) return;
+  var s = document.createElement('style'); s.id = 'ftCss';
+  s.textContent =
+    '.ftf{margin:14px 0 4px}.ftf-h{display:flex;align-items:baseline;gap:8px;margin:0 0 8px}.ftf-h .sc{flex:1}'+
+    '.ftf-fila{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 9px}'+
+    '.ftf-cam{position:relative;display:inline-flex;align-items:center;gap:8px;cursor:pointer;min-height:44px;padding:0 18px;border-radius:22px;'+
+      'background:var(--red);color:#fff;font-weight:600;font-size:14px}'+
+    '.ftf-cam input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}'+
+    '.ftf-tit{flex:1;min-width:130px;background:var(--sur2);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 11px;font-size:14px}'+
+    '.ftf-c{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:12px;min-height:32px;padding:5px 12px;'+
+      'border-radius:20px;border:1px solid var(--line);background:var(--sur2);color:var(--ink2);white-space:nowrap}'+
+    '.ftf-c:hover{border-color:var(--ink3);color:var(--ink)}.ftf-c.pri{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}'+
+    '.ftf-nota{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.ftf-err{margin:0 0 8px;font-size:13px;color:var(--red)}'+
+    '.ftf-barra{height:4px;border-radius:2px;background:var(--line);overflow:hidden;margin:0 0 9px}.ftf-barra i{display:block;height:100%;background:var(--red)}'+
+    '.ftf-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin:0 0 10px}'+
+    '.ftf-f{position:relative;cursor:pointer;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--sur2);min-height:96px}'+
+    '.ftf-f img{display:block;width:100%;height:96px;object-fit:cover}'+
+    '.ftf-f .ftf-sin{display:flex;align-items:center;justify-content:center;height:96px;font-family:var(--mono);font-size:12px;color:var(--ink3)}'+
+    '.ftf-f small{display:block;padding:4px 6px;font-size:10.5px;line-height:1.3;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'+
+    '.ftf-f .ftf-e{position:absolute;top:4px;right:4px;font-family:var(--mono);font-size:9.5px;padding:2px 6px;border-radius:9px;background:rgba(0,0,0,.66);color:#fff}'+
+    '.ftf-vis img{display:block;max-width:100%;max-height:60vh;margin:0 auto 10px;border-radius:8px}';
+  document.head.appendChild(s);
+}
+/* El hueco. Vacío hasta que el servidor diga que hay algo que enseñar. */
+function _ftHTML_(t){
+  _ftCss_();
+  var k = _ftClave_(t); FT_.turno[k] = t;
+  return '<div class="ftf" data-ftur="' + esc(k) + '" hidden></div>';
+}
+function _ftDeserv_(accion, t, extra){ return api._post(Object.assign({action: accion}, _ftCuerpo_(t), extra || {})); }
+function _ftRefrescar_(t, forzar){
+  var k = _ftClave_(t), e = FT_.est[k];
+  if(!forzar && e && e.pidiendo) return e.pidiendo;
+  var p = _ftDeserv_('listarFotosTurno', t).then(function(r){ FT_.est[k] = {t: Date.now(), r: r}; _ftPintar_(k); return r; },
+    function(){ if(!FT_.est[k]) FT_.est[k] = {t: Date.now(), r: {puedeVer: false, fotos: []}}; _ftPintar_(k); return null; });
+  FT_.est[k] = Object.assign({}, e || {}, {pidiendo: p});
+  p.then(function(){ if(FT_.est[k]) delete FT_.est[k].pidiendo; });
+  return p;
+}
+function _ftAutorPila_(n){ var m = (typeof DATA !== 'undefined' && DATA.miembros || []).filter(function(x){ return x.nombre === n; })[0]; return (m && m.pila) || String(n || '').split(' ')[0]; }
+function _ftHoraDe_(at){ return String(at || '').slice(11, 16); }
+function _ftDinHTML_(k){
+  var e = FT_.est[k], r = e && e.r, S = FT_.sub[k] || {}, h = '', i;
+  if(S.activo || (S.cola && S.cola.length)){
+    h += '<p class="ftf-nota" data-ftprog>Subiendo ' + Math.min(S.total, (S.hechas || 0) + 1) + ' de ' + S.total + ' · ' + (S.pct || 0) + ' %</p>'+
+         '<div class="ftf-barra"><i style="width:' + (S.pct || 0) + '%"></i></div>';
+  }
+  if(S.rechazos && S.rechazos.length){
+    h += S.rechazos.map(function(m){ return '<p class="ftf-err" data-ftrech>' + esc(m) + '</p>'; }).join('')+
+         '<div class="ftf-fila"><span class="ftf-c" data-ftentendido data-p>Entendido</span></div>';
+  }
+  if(S.fallidas && S.fallidas.length){
+    h += '<p class="ftf-err" data-fterr>' + esc(S.msg || ('No se subieron ' + S.fallidas.length + ' fotos')) + '</p>'+
+         '<div class="ftf-fila"><span class="ftf-c pri" data-ftreint data-p>Reintentar ' + S.fallidas.length + '</span>'+
+         '<span class="ftf-c" data-ftdesc data-p>Descartar</span></div>';
+  }
+  if(r.fotos.length){
+    h += '<div class="ftf-g">' + r.fotos.map(function(f){
+      return '<div class="ftf-f" data-ftf="' + esc(f.id) + '" data-p>' +
+        (f.mini ? '<img src="' + esc(f.mini) + '" alt="Foto de ' + esc(f.autor) + '">' : '<div class="ftf-sin">' + esc(String(f.ext).toUpperCase()) + '</div>') +
+        (f.entregada ? '<span class="ftf-e">entregada</span>' : '') +
+        '<small>' + esc(_ftAutorPila_(f.autor)) + ' · ' + esc(_ftHoraDe_(f.at)) + (f.titulo ? ' · ' + esc(f.titulo) : '') + '</small></div>';
+    }).join('') + '</div>';
+  }
+  if(r.puedeGestionar && r.fotos.length){
+    var pend = r.fotos.filter(function(f){ return !f.entregada; }).length;
+    h += '<div class="ftf-fila"><span class="ftf-c pri" data-ftentregar data-p>Entregar ' + r.fotos.length + (pend < r.fotos.length ? ' (' + pend + ' nuevas)' : '') + '</span>'+
+         '<span class="ftf-c" data-ftzip data-p>Descargar ZIP</span>' +
+         (r.puedeConfigurar ? '<span class="ftf-c" data-ftdest data-p>Destino: ' + (r.destino === 'zip' ? 'ZIP' : 'Drive') + '</span>' : '') + '</div>';
+    if(r.ultimaEntrega) h += '<p class="ftf-nota" data-ftult>Entregadas el ' + esc(_isoADMY_(String(r.ultimaEntrega.at).slice(0, 10))) + ' a las ' + esc(_ftHoraDe_(r.ultimaEntrega.at)) +
+      ' por ' + esc(_ftAutorPila_(r.ultimaEntrega.por)) + (r.ultimaEntrega.destino === 'zip' ? ' (ZIP)' : ' (Drive)') + '.</p>';
+  }
+  return h;
+}
+/* Repinta cada hueco de esa clave. La parte de arriba (cámara + título) sólo se rehace si cambia `puedeSubir`: reescribirla con el
+   dedo en el campo del título le quitaría el foco. */
+function _ftPintar_(k){
+  var e = FT_.est[k], r = e && e.r, t = FT_.turno[k];
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ftur]'), function(c){
+    if(c.getAttribute('data-ftur') !== k) return;
+    var hay = !!(r && r.puedeVer && (r.fotos.length || r.puedeSubir || (FT_.sub[k] && (FT_.sub[k].total || FT_.sub[k].rechazos.length))));
+    c.hidden = !hay;
+    var env = c.closest ? c.closest('[data-ftwrap]') : null;
+    if(env) env.style.display = hay ? '' : 'none';
+    if(!hay){ c.innerHTML = ''; c.removeAttribute('data-sig'); return; }
+    var sig = r.puedeSubir ? 'sube' : 'no';
+    if(c.getAttribute('data-sig') !== sig || !c.querySelector('[data-ftdin]')){
+      c.setAttribute('data-sig', sig);
+      c.innerHTML = '<div class="ftf-h"><span class="sc">Fotos del turno</span></div>'+
+        (r.puedeSubir ? '<div class="ftf-fila"><label class="ftf-cam" data-p>' + ico('camara') + ' Hacer fotos'+
+          '<input type="file" accept="image/*" capture="environment" multiple data-ftfile aria-label="Hacer fotos"></label>'+
+          '<input type="text" class="ftf-tit" data-fttit maxlength="80" placeholder="Título (opcional)" aria-label="Título de las fotos"></div>' : '')+
+        '<div data-ftdin></div>';
+    }
+    c.querySelector('[data-ftdin]').innerHTML = _ftDinHTML_(k);
+  });
+}
+/* Engancha los huecos que haya dentro de `raiz` (o del documento): pinta lo que ya se sabe, pregunta si está viejo y cablea UNA vez. */
+function _ftEnganchar_(raiz){
+  var base = raiz || document;
+  Array.prototype.forEach.call(base.querySelectorAll('[data-ftur]'), function(c){
+    var k = c.getAttribute('data-ftur'), t = FT_.turno[k];
+    if(!t) return;
+    if(!c.getAttribute('data-ftok')){
+      c.setAttribute('data-ftok', '1');
+      c.addEventListener('change', function(ev){
+        var inp = ev.target;
+        if(inp && inp.hasAttribute && inp.hasAttribute('data-ftfile')){
+          var tt = c.querySelector('[data-fttit]'), titulo = tt ? tt.value : '';
+          var fs = Array.prototype.slice.call(inp.files || []);
+          inp.value = ''; if(tt) tt.value = '';
+          _ftSubir_(t, fs, titulo);
+        }
+      });
+      c.addEventListener('click', function(ev){ _ftClic_(t, k, ev); });
+    }
+    if(FT_.est[k] && FT_.est[k].r) _ftPintar_(k);
+    if(!FT_.est[k] || !FT_.est[k].r || Date.now() - FT_.est[k].t > 8000) _ftRefrescar_(t);
+  });
+  if(!FT_.reloj){
+    FT_.reloj = setInterval(function(){
+      Object.keys(FT_.turno).forEach(function(k){
+        var vivo = document.querySelector('[data-ftur="' + k.replace(/"/g, '') + '"]');
+        if(vivo && !(FT_.sub[k] && FT_.sub[k].activo)) _ftRefrescar_(FT_.turno[k], true);
+      });
+    }, 25000);
+  }
+}
+function _ftClic_(t, k, ev){
+  var x = ev.target && ev.target.closest ? ev.target : null; if(!x) return;
+  var q = function(s){ return x.closest(s); }, r = FT_.est[k] && FT_.est[k].r;
+  if(q('[data-ftreint]')){ _ftReintentar_(t); return; }
+  if(q('[data-ftentendido]')){ FT_.sub[k].rechazos = []; _ftPintar_(k); return; }
+  if(q('[data-ftdesc]')){ FT_.sub[k].fallidas = []; FT_.sub[k].msg = ''; FT_.sub[k].total = FT_.sub[k].hechas = 0; _ftPintar_(k); return; }
+  var f = q('[data-ftf]'); if(f){ _ftVisor_(t, k, f.getAttribute('data-ftf')); return; }
+  if(q('[data-ftentregar]')) _ftEntregar_(t, k);
+  else if(q('[data-ftzip]')) _ftZip_(t, k);
+  else if(q('[data-ftdest]')) _ftDestino_(t, k);
+}
+function _ftEsperar_(ms){ return new Promise(function(ok){ setTimeout(ok, ms); }); }
+function _ftDeRed_(e){ return !!(e && (e.sinRed || e.sinRespuesta || e.transito)); }
+/* La cola de una persona en un turno: UNA a UNA, con progreso, y una que falla NO tira las ya subidas. Un fallo de RED para la cola
+   (el resto espera a «Reintentar»); un «no» del servidor (formato, tope, día) sólo descarta esa foto. */
+function _ftSubir_(t, files, titulo){
+  var k = _ftClave_(t), S = FT_.sub[k] = FT_.sub[k] || {cola: [], fallidas: [], rechazos: [], total: 0, hechas: 0, pct: 0, activo: false, msg: ''};
+  var r = FT_.est[k] && FT_.est[k].r, max = (r && r.maxBytes) || 26214400;
+  files.forEach(function(f){
+    if(!f || !f.size){ return; }
+    if(f.size > max){ S.rechazos.push('«' + f.name + '» pesa ' + _ftBytesTxt_(f.size) + ' (máximo ' + _ftBytesTxt_(max) + ').'); return; }
+    S.cola.push({file: f, titulo: String(titulo || '').trim()}); S.total++;
+  });
+  _ftPintar_(k);
+  return _ftVaciar_(t, k);
+}
+async function _ftVaciar_(t, k){
+  var S = FT_.sub[k];
+  if(S.activo) return S.activo;
+  S.activo = true;
+  while(S.cola.length){
+    var it = S.cola[0];
+    try{
+      await _ftSubirUna_(t, k, it);
+      S.cola.shift(); S.hechas++;
+    }catch(e){
+      if(_ftDeRed_(e)){
+        S.msg = 'Sin conexión: quedan ' + S.cola.length + ' fotos por subir. Las ya subidas están a salvo.';
+        S.fallidas = S.fallidas.concat(S.cola.splice(0).map(function(x){ return {file: x.file, titulo: x.titulo}; }));
+      }else{
+        S.cola.shift(); S.hechas++;
+        S.rechazos.push('«' + it.file.name + '» no se subió: ' + String((e && e.message) || e).replace(/^Error:\s*/, ''));
+      }
+    }
+    _ftPintar_(k);
+  }
+  S.activo = false; S.pct = 0;
+  if(S.hechas >= S.total && !S.fallidas.length){ S.total = S.hechas = 0; S.msg = ''; }
+  await _ftRefrescar_(t, true);
+  _ftPintar_(k);
+}
+function _ftReintentar_(t){
+  var k = _ftClave_(t), S = FT_.sub[k]; if(!S) return;
+  var otra = S.fallidas; S.fallidas = []; S.msg = '';
+  otra.forEach(function(x){ S.cola.push({file: x.file, titulo: x.titulo}); });
+  _ftPintar_(k);
+  return _ftVaciar_(t, k);
+}
+/* Una foto: el fichero ORIGINAL en trozos. Cada trozo se reintenta si falla la red (el servidor reescribe un trozo repetido). */
+async function _ftSubirUna_(t, k, it){
+  var S = FT_.sub[k], f = it.file, r = FT_.est[k] && FT_.est[k].r, trozo = (r && r.trozo) || 524288;
+  var partes = Math.max(1, Math.ceil(f.size / trozo)), ses = '', i, n, res = null;
+  for(i = 0; i < 20; i++) ses += 'abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random() * 36));
+  for(i = 0; i < partes; i++){
+    var datos = await _audioB64_(f.slice(i * trozo, Math.min(f.size, (i + 1) * trozo)));
+    for(n = 0; ; n++){
+      try{
+        res = await api._post(Object.assign({action: 'subirFotoTurno'}, _ftCuerpo_(t), {sesion: ses, parte: i, partes: partes, nombre: f.name, titulo: it.titulo, datos: datos}));
+        break;
+      }catch(e){ if(!_ftDeRed_(e) || n >= 3) throw e; await _ftEsperar_(1200 * (n + 1)); }
+    }
+    S.pct = Math.floor((i + 1) * 100 / partes); _ftPintar_(k);
+  }
+  if(!(res && res.completo)) throw new Error('no pude confirmar la subida de «' + f.name + '»: mira la galería antes de repetirla');
+  return res.foto;
+}
+/* ── ver una foto, descargar el original, borrar ── */
+function _ftB64Bytes_(b64){ var s = atob(b64), u = new Uint8Array(s.length), i; for(i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+function _ftGuardar_(nombre, partes, tipo){
+  var u = URL.createObjectURL(new Blob(partes, {type: tipo || 'application/octet-stream'}));
+  var a = document.createElement('a'); a.href = u; a.download = nombre; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(u); a.remove(); }, 4000);
+}
+async function _ftBajar_(accion, t, extra){
+  var trozos = [], p = 0, partes = 1, ult = null;
+  while(p < partes){
+    ult = await _ftDeserv_(accion, t, Object.assign({parte: p}, extra || {}));
+    partes = ult.partes; trozos.push(_ftB64Bytes_(ult.datos)); p++;
+  }
+  return {trozos: trozos, nombre: ult.nombre, ext: ult.ext};
+}
+function _ftVisor_(t, k, id){
+  var r = FT_.est[k] && FT_.est[k].r, f = r && r.fotos.filter(function(x){ return x.id === id; })[0]; if(!f) return;
+  _pselCss_(); _ftCss_();
+  if(document.querySelector('[data-ftvisor]')) return;
+  var puedeQuitar = !!(r.puedeGestionar || (f.mia && !f.entregada));
+  var ov = document.createElement('div'); ov.className = 'psel-ov'; ov.setAttribute('data-ftvisor', '1');
+  ov.style.cssText = 'align-items:center;justify-content:center';
+  ov.innerHTML = '<div class="psel-hoja ftf-vis" role="dialog" style="width:min(420px,94%);height:auto;max-height:92%;border-radius:16px;border-width:1px">'+
+    (f.mini ? '<img data-ftimg src="' + esc(f.mini) + '" alt="">' : '<p class="ftf-nota">Sin vista previa (' + esc(String(f.ext).toUpperCase()) + '). Descarga el original.</p>')+
+    '<p class="ftf-nota">' + esc(f.autor) + ' · ' + esc(_ftHoraDe_(f.at)) + ' · ' + esc(_ftBytesTxt_(f.tam)) + (f.titulo ? ' · ' + esc(f.titulo) : '') + (f.entregada ? ' · entregada' : '') + '</p>'+
+    '<div class="ftf-fila">' + (f.ext !== 'heic' ? '<span class="ftf-c" data-ftorig data-p>Ver original</span>' : '') +
+    '<span class="ftf-c pri" data-ftdesc1 data-p>Descargar original</span>' +
+    (puedeQuitar ? '<span class="ftf-c" data-ftquitar data-p>Quitar</span>' : '') + '<span class="ftf-c" data-ftcerrar data-p>Cerrar</span></div></div>';
+  ov.onclick = function(e){ if(e.target === ov) ov.remove(); };
+  ov.querySelector('[data-ftcerrar]').onclick = function(){ ov.remove(); };
+  var bajar = function(){ return _ftBajar_('getFotoTurno', t, {id: id}); };
+  var vo = ov.querySelector('[data-ftorig]');
+  if(vo) vo.onclick = function(){
+    vo.textContent = 'Cargando…';
+    bajar().then(function(d){ var u = URL.createObjectURL(new Blob(d.trozos, {type: f.ext === 'png' ? 'image/png' : 'image/jpeg'}));
+      var im = ov.querySelector('[data-ftimg]'); if(im) im.src = u; vo.remove(); }, function(e){ vo.textContent = 'Ver original'; tostErr('No se pudo cargar: ', e); });
+  };
+  ov.querySelector('[data-ftdesc1]').onclick = function(){
+    bajar().then(function(d){ _ftGuardar_(d.nombre || ('foto.' + f.ext), d.trozos, f.ext === 'png' ? 'image/png' : f.ext === 'heic' ? 'image/heic' : 'image/jpeg'); },
+      function(e){ tostErr('No se pudo descargar: ', e); });
+  };
+  var qu = ov.querySelector('[data-ftquitar]');
+  if(qu) qu.onclick = async function(){
+    if(!(await dialogoSiNo('¿Quitar esta foto del turno? Se borra del servidor.', {si: 'Quitar'}))) return;
+    try{ await _ftDeserv_('borrarFotoTurno', t, {id: id}); ov.remove(); tost('Foto quitada.'); await _ftRefrescar_(t, true); }
+    catch(e){ tostErr('No se pudo quitar: ', e); }
+  };
+  document.body.appendChild(ov);
+}
+/* ── entregar, ZIP, destino ── */
+async function _ftEntregar_(t, k){
+  var r = FT_.est[k] && FT_.est[k].r; if(!r) return;
+  var donde = r.destino === 'zip' ? 'Se marcan como entregadas y te queda el ZIP para mandarlo.' : 'Se copian a la carpeta de Drive configurada (subcarpeta «' + r.carpeta + '»).';
+  if(!(await dialogoSiNo('¿Entregar las ' + r.fotos.length + ' fotos del turno? ' + donde, {si: 'Entregar'}))) return;
+  try{
+    var o = await _ftDeserv_('entregarFotosTurno', t);
+    tost(o.destino === 'zip' ? 'Marcadas como entregadas. Descarga el ZIP para mandarlo.' : o.n + ' fotos entregadas en «' + o.carpeta + '».');
+  }catch(e){ tostErr('No se pudo entregar: ', e); }
+  await _ftRefrescar_(t, true);
+}
+async function _ftZip_(t, k){
+  try{
+    tost('Preparando el ZIP…');
+    var d = await _ftBajar_('getZipTurno', t);
+    _ftGuardar_(d.nombre || 'fotos-turno.zip', d.trozos, 'application/zip');
+  }catch(e){ tostErr('No se pudo preparar el ZIP: ', e); }
+}
+async function _ftDestino_(t, k){
+  var r = FT_.est[k] && FT_.est[k].r; if(!r) return;
+  var v = await dialogoTexto('Dónde se entregan las fotos: pega el enlace de una carpeta de Drive (o un «remoto:ruta» de rclone). Vacío = descargar un ZIP.', {valor: r.destinoTexto || ''});
+  if(v == null) return;
+  try{ await api._post({action: 'configurarEntregaFotos', destino: v}); tost(String(v).trim() ? 'Destino guardado.' : 'Sin destino: se entregará por ZIP.'); }
+  catch(e){ tostErr('No se pudo guardar el destino: ', e); }
+  await _ftRefrescar_(t, true);
 }
 
 /* ══ 29/10 · LA GRABACIÓN DE UNA REUNIÓN: AVISO AL CONVOCAR + «SUBIR GRABACIÓN» EN LA FICHA ══════════════════════
