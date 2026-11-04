@@ -263,9 +263,12 @@ function _cablearSanciones_(){
   /* 21/10 (auditor 12, 🟡 8): aprobar se CONFIRMA, como en el escritorio: levanta `aplicar_sanciones` y en dos minutos
      va a Notion y al comunicado. */
   $$('[data-sok]').forEach(function(b){ b.onclick=async function(){
-    if(!(await dialogoSiNo('¿Aprobar? Esto se aplica ya, no es un borrador.'))) return;
+    if(!(await dialogoSiNo(_avisoDecidirSanc_(_sancMDe_(b.dataset.sok),'aprobar')))) return;
     _decidirSancM_(b.dataset.sok,'aprobar',b); }; });
-  $$('[data-sno]').forEach(function(b){ b.onclick=function(){ _decidirSancM_(b.dataset.sno,'rechazar',b); }; });
+  /* 04/11: rechazar también se pregunta (a quién y cuánto): no tiene vuelta atrás desde la app y quita la sanción de la cola. */
+  $$('[data-sno]').forEach(function(b){ b.onclick=async function(){
+    if(!(await dialogoSiNo(_avisoDecidirSanc_(_sancMDe_(b.dataset.sno),'rechazar')))) return;
+    _decidirSancM_(b.dataset.sno,'rechazar',b); }; });
   /* 21/10: justificar pide el motivo, como el escritorio; sin motivo no se manda nada. */
   $$('[data-sjust]').forEach(function(b){ b.onclick=async function(){
     var just=await dialogoTexto('Motivo de la justificación:'); if(!just || !just.trim()) return;
@@ -311,6 +314,10 @@ function _cablearSanciones_(){
         if(_fresca) _repintarSancM_(); else { b.disabled=false; b.textContent=_txt; }
         return;
       }
+      /* 04/11 (acciones graves): CERRAR EL BLOQUE ES EL DISPARO (Notion + comunicado) Y AQUÍ NO PREGUNTABA NADA; el escritorio sí.
+         Se pregunta con la cola FRESCA y ya comprobada, para que la cuenta sea la verdad. Con «no», el botón vuelve a estar vivo. */
+      var _nl=_nombreLote_(lote==='(sueltas)' ? '' : lote, typeof REUNIONES_M!=='undefined' ? REUNIONES_M : [], it[0] && it[0].creado_at);
+      if(!(await dialogoSiNo(_avisoCerrarBloque_(_nl, it)))){ b.disabled=false; b.textContent=_txt; return; }
       b.textContent='Cerrando…';
       /* ⛔ UNA SOLA LLAMADA, Y NO ES POR VELOCIDAD. Aqui habia un bucle de
          `decidirSancion(…,'aprobar')`, uno por sancion — y **cada `aprobar` levanta el
@@ -340,6 +347,8 @@ function _cablearSanciones_(){
     };
   });
 }
+
+function _sancMDe_(id){ return (SANC_M||[]).filter(function(x){ return String(x.id)===String(id); })[0]; }
 
 async function _decidirSancM_(id, accion, b, opts){
   b.disabled=true;
@@ -488,7 +497,7 @@ function _formSancion_(s){
   abrirModal('<div class="h1" style="font-size:18px">Apelar «'+esc(s.motivo || 'Sanción')+'»</div>'+
     '<p class="h1s">'+esc(APEL_SANC_TXT.tienes(s.apelable_hasta))+'</p>'+
     '<label class="campo"><span class="sc">'+APEL_SANC_TXT.campo+' <span class="req">*</span></span>'+
-      '<textarea id="msMotivo" placeholder="'+esc(APEL_SANC_TXT.ayuda)+'"></textarea></label>'+
+      '<textarea id="msMotivo" data-borr="apel-sancion-'+esc(s.id)+'" placeholder="'+esc(APEL_SANC_TXT.ayuda)+'"></textarea></label>'+
     '<label class="campo"><span class="sc">'+APEL_SANC_TXT.enlace+'</span>'+
       '<input id="msEnlace" type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label>'+
     '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="msNo" style="flex:1">Cancelar</button>'+

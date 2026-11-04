@@ -2106,7 +2106,7 @@ function _vetoFilas_(ss){
       '<b style="color:var(--red2)">Procede veto</b> · '+esc(_vetoPila_(s.nombre))+
       ' <span class="sc">tiene 0 puntos y recibe otra sanción (Art. 32)</span>'+
       '<div class="sc" style="margin:5px 0">Avísale del veto: al marcarlo corre el plazo de '+esc(VETOS.plazo_dias)+' días.</div>'+
-      '<button class="btn sm" data-vavisar="'+esc(s.id)+'">Hecho, ya se lo dije</button> <span class="sc" data-verr></span></div>');
+      '<button class="btn sm" data-vavisar="'+esc(s.id)+'" data-vnom="'+esc(_vetoPila_(s.nombre))+'">Hecho, ya se lo dije</button> <span class="sc" data-verr></span></div>');
   });
   (VETOS&&VETOS.entradas||[]).forEach(function(e){
     if(e.fase==='esperar'){
@@ -2117,8 +2117,8 @@ function _vetoFilas_(ss){
       out.push('<div class="veto" data-vdsanc="'+esc(e.sancion_id)+'" style="padding:9px 0;border-top:1px solid var(--line)">'+
         '<b style="color:var(--red2)">Decide si se veta</b> · '+esc(_vetoPila_(e.nombre))+
         ' <span class="sc">se le avis\u00f3 el '+esc(_vetoDmy_(e.aviso_at))+'; el plazo venci\u00f3 el '+esc(_vetoDmy_(e.vence))+'.</span>'+
-        '<div style="margin:6px 0"><button class="btn sm" data-vdec="vetar" data-vid="'+esc(e.sancion_id)+'">Decido vetar</button> '+
-        '<button class="btn sm" data-vdec="no_vetar" data-vid="'+esc(e.sancion_id)+'">Decido no vetar</button> '+
+        '<div style="margin:6px 0"><button class="btn sm" data-vdec="vetar" data-vid="'+esc(e.sancion_id)+'" data-vnom="'+esc(_vetoPila_(e.nombre))+'">Decido vetar</button> '+
+        '<button class="btn sm" data-vdec="no_vetar" data-vid="'+esc(e.sancion_id)+'" data-vnom="'+esc(_vetoPila_(e.nombre))+'">Decido no vetar</button> '+
         '<span class="sc" data-verr></span></div>'+
         '<div class="sc">Esto solo lo anota: el veto lo ejecuta la Junta.</div></div>');
     }
@@ -2128,21 +2128,33 @@ function _vetoFilas_(ss){
 /* Engancha los botones de `_vetoFilas_` dentro de `raiz` (o el documento) y repinta con `despues`. */
 function _engVeto_(despues, raiz){
   function sub(sel){ return Array.prototype.slice.call((raiz||document).querySelectorAll(sel)); }
-  function aplica(b, id, accion, txt){
+  /* 04/11 (acciones graves): el veto es una decisión sobre una persona, así que (1) SE PREGUNTA antes, con a quién y qué queda
+     anotado, y (2) mientras una vuelve del servidor se apagan TODOS los botones de la fila: «Decido vetar» y «Decido no vetar» a
+     la vez mandaban las dos, y el servidor se quedaba con la última. Con el fallo, todos vuelven a estar vivos. */
+  async function aplica(b, id, accion, txt, pregunta){
+    if(b.disabled) return;
+    if(!(await dialogoSiNo(pregunta))) return;
     var er=b.parentNode.querySelector('[data-verr]') || b.parentNode.parentNode.querySelector('[data-verr]');
-    b.disabled=true;
-    accion().then(function(r){
+    var fila=b.closest('.veto') || b.parentNode, hermanos=Array.prototype.slice.call(fila.querySelectorAll('button'));
+    hermanos.forEach(function(x){ x.disabled=true; });
+    try{
+      var r=await accion();
       var v=r&&r.veto, L=VETOS.entradas, i;
       for(i=0;i<L.length;i++) if(String(L[i].sancion_id)===String(id)){ L.splice(i,1); break; }
       if(v) L.push(v);
       despues(); tost(txt);
-    }).catch(function(e){ b.disabled=false; if(er) er.textContent=(e&&e.message)||String(e); });
+    }catch(e){ hermanos.forEach(function(x){ x.disabled=false; }); if(er) er.textContent=(e&&e.message)||String(e); }
   }
   sub('[data-vavisar]').forEach(function(b){ b.onclick=function(){
-    aplica(b, b.dataset.vavisar, function(){ return api.avisarVeto(b.dataset.vavisar); }, 'Anotado: el reloj del veto ya corre.');
+    aplica(b, b.dataset.vavisar, function(){ return api.avisarVeto(b.dataset.vavisar); }, 'Anotado: el reloj del veto ya corre.',
+      'Anotar que ya le has avisado del veto a '+(b.dataset.vnom||'esta persona')+'.'+String.fromCharCode(10,10)+
+      'Desde ese momento corre el plazo de '+VETOS.plazo_dias+' días y no se puede quitar. ¿Ya se lo has dicho?');
   }; });
   sub('[data-vdec]').forEach(function(b){ b.onclick=function(){
-    aplica(b, b.dataset.vid, function(){ return api.cerrarVeto(b.dataset.vid, b.dataset.vdec); }, 'Decisi\u00f3n anotada.');
+    var vetar=b.dataset.vdec==='vetar', quien=b.dataset.vnom||'esta persona';
+    aplica(b, b.dataset.vid, function(){ return api.cerrarVeto(b.dataset.vid, b.dataset.vdec); }, 'Decisi\u00f3n anotada.',
+      (vetar ? 'Decides VETAR a '+quien+'.' : 'Decides NO vetar a '+quien+'.')+String.fromCharCode(10,10)+
+      (vetar ? 'Queda anotado para la Junta, que es quien ejecuta el veto.' : 'Queda anotado y el caso se cierra.')+' ¿Seguro?');
   }; });
 }
 
@@ -2984,10 +2996,36 @@ var API_MSG_SIN_RESPUESTA = "El servidor no ha contestado. Puede que se haya gua
 function _esLecturaApi_(accion){
   return /^(get|listar)/.test(accion) || /^(bootstrap|quienSoy|queHayNuevo|estadoAudioReunion)$/.test(accion);
 }
+/* ⛔ ROBUSTEZ DE LA APP (04/11, `robustapp`). Daniel: «sobre todo las partes que puedan acarrear sanciones o pérdida documental».
+   Tres cosas, las tres AQUÍ y no en cada pantalla:
+   1) UNA ESCRITURA IDÉNTICA EN VUELO SE FUSIONA: el doble toque en «Enviar»/«Aprobar»/«Convocar» (o el botón que nadie bloqueó)
+      no manda dos peticiones; el segundo toque recibe la promesa del primero. Se compara la acción + el cuerpo entero: dos
+      escrituras DISTINTAS (otro parte, otra clave) siguen siendo dos. Las lecturas no se fusionan (no hace falta).
+   2) EL ERROR DICE LA VERDAD: sin red, un `TypeError: Failed to fetch` en inglés; con HTML en vez de JSON, «se reintentó»
+      sin decir si se guardó. Ahora: «sin conexión… lo más probable es que no se haya guardado» / «respuesta no válida… puede
+      que se haya guardado: recarga antes de repetirlo». Sin red (`navigator.onLine===false`) una escritura ni lo intenta
+      tres veces con esperas: avisa a la primera.
+   3) UNA SESIÓN CADUCADA A MITAD DE UNA ESCRITURA reabre la entrada (`_avisarSesionMuerta_`); lo escrito sigue en su campo y, si
+      lleva `data-borr`, en su borrador (ver `_borrArrancar_`). */
+var API_MSG_SIN_RED = "Sin conexión con el servidor: lo más probable es que NO se haya guardado. Revisa tu red y repítelo (lo que escribiste sigue ahí).";
+var API_MSG_RESP_RARA = "El servidor no ha dado una respuesta válida. Puede que se haya guardado: recarga antes de repetirlo.";
 async function _apiPost_(body){
+  /* La fusión vive DENTRO de `_apiPost_` (y su registro en la propia función) para que quien extrae esta función a un banco
+     la lleve entera. */
+  var accion0=String((body&&body.action)||""), kv=null;
+  if(!_esLecturaApi_(accion0)){
+    try{ kv=JSON.stringify(body); }catch(_){}
+    if(kv && kv.length>20000) kv=null;
+  }
+  var vuelo=(_apiPost_.vuelo=_apiPost_.vuelo||{});
+  if(kv && vuelo[kv]) return vuelo[kv];
+  var pr=(async function(){
   if(SESION&&SESION.token&&!body.token) body=Object.assign({},body,{token:SESION.token});
   var accion=String(body.action||""), ultimo=null, lectura=_esLecturaApi_(accion);
   var espera=API_ACCIONES_LARGAS.test(accion) ? API_ESPERA_LARGA_MS : API_ESPERA_MS;
+  if(!lectura && typeof navigator!=='undefined' && navigator.onLine===false){
+    var sn=new Error(API_MSG_SIN_RED); sn.sinRed=true; throw sn;
+  }
   for(var i=0;i<3;i++){
     if(i) await new Promise(function(ok){ setTimeout(ok, 600+i*800); });
     var ctl=new AbortController(), agotado=false;
@@ -2997,6 +3035,7 @@ async function _apiPost_(body){
         body:JSON.stringify(body), signal:ctl.signal});
       var res=_apiParse(await r.text(), accion);
       _sonarAccion_(body);   // 31/10: sólo si el servidor contestó bien (si no, `_apiParse` lanzó)
+      if(!lectura){ try{ _borrLimpiarEnviado_(body); }catch(_){} }
       return res;
     }catch(e){
       if(agotado){
@@ -3005,11 +3044,101 @@ async function _apiPost_(body){
         continue;
       }
       /* Un «no» del backend no se reintenta; un fallo de red o de transito, si. */
+      /* Sólo si HABÍA sesión: «sin token» de quien aún no ha entrado (la demo, el arranque) no es una sesión que caduca. */
+      if(e && e.sesion){ if(SESION&&SESION.token){ try{ _sesionMuerta_(true); _avisarSesionMuerta_(); }catch(_){} } throw e; }
       if(e && !e.transito && !(e instanceof TypeError)) throw e;
       ultimo=e;
     }finally{ clearTimeout(reloj); }
   }
+  if(ultimo instanceof TypeError){ var sr2=new Error(API_MSG_SIN_RED); sr2.sinRed=true; throw sr2; }
+  if(!lectura && ultimo && ultimo.transito){ var sr3=new Error(API_MSG_RESP_RARA); sr3.sinRespuesta=true; throw sr3; }
   throw ultimo || new Error("no se pudo hablar con el servidor");
+  })();
+  if(kv){
+    vuelo[kv]=pr;
+    var suelta=function(){ if(vuelo[kv]===pr) delete vuelo[kv]; };
+    pr.then(suelta, suelta);
+  }
+  return pr;
+}
+
+/* ═══ BORRADORES: LO ESCRITO NO SE PIERDE (04/11, `robustapp`) ═══════════════════════════════════════════════
+   Una justificación de parte, el motivo de una sanción/documento, una apelación… se teclean despacio. Si el envío falla, la
+   sesión caduca, se recarga o se cierra la pestaña, el texto se perdía. Ahora todo `<textarea data-borr="<formulario>">`:
+     · se guarda en `localStorage` mientras se teclea (clave por PERSONA + formulario; con try/catch: un `localStorage`
+       bloqueado o lleno no rompe nada, sólo no hay borrador);
+     · se recupera solo cuando el campo aparece vacío (cualquier pantalla que lo pinte, por la vía que sea);
+     · se borra SOLO cuando una escritura se envió BIEN y su cuerpo contiene ese texto (`_borrLimpiarEnviado_`, llamado desde
+       `_apiPostUno_`): quien envía no tiene que acordarse de borrar nada, y si el servidor dice que no, el texto se queda;
+     · caduca a los 7 días.
+   `data-borr` lleva el formulario Y el elemento al que se refiere (`parte`, `sancion-<id>`, `doc-<id>`): dos tarjetas abiertas
+   no comparten borrador. */
+var BORR_PREFIJO = 'sol_borr:';
+var BORR_VIDA_MS = 7*24*3600*1000;
+function _borrClave_(f){
+  var quien=''; try{ quien=(typeof SESION!=='undefined' && SESION && (SESION.email||SESION.nombre)) || localStorage.getItem('sol_last_email') || ''; }catch(_){}
+  return BORR_PREFIJO + String(quien).toLowerCase() + '|' + f;
+}
+function _borrGuardar_(f, v){
+  try{
+    var k=_borrClave_(f);
+    if(!String(v||'').replace(/\s+/g,'')) localStorage.removeItem(k);
+    else localStorage.setItem(k, JSON.stringify({v:String(v), t:Date.now()}));
+  }catch(_){}
+}
+function _borrLeer_(f){
+  try{
+    var o=JSON.parse(localStorage.getItem(_borrClave_(f))||'null');
+    if(!o || typeof o.v!=='string' || !(Date.now()-o.t < BORR_VIDA_MS)) return '';
+    return o.v;
+  }catch(_){ return ''; }
+}
+function _borrBorrar_(f){ try{ localStorage.removeItem(_borrClave_(f)); }catch(_){} }
+function _borrNorm_(t){ return String(t==null?'':t).replace(/\s+/g,' ').trim(); }
+/* Los campos con borrador dentro de `raiz` (o ella misma) que están vacíos reciben su texto. Dispara `input` para que la
+   pantalla recalcule contadores/botones como si lo hubiera tecleado la persona. */
+function _borrRestaurar_(raiz){
+  if(!raiz || raiz.nodeType!==1) return;
+  var lista=[]; if(raiz.matches && raiz.matches('[data-borr]')) lista.push(raiz);
+  if(raiz.querySelectorAll) lista=lista.concat([].slice.call(raiz.querySelectorAll('[data-borr]')));
+  lista.forEach(function(el){
+    if(el.getAttribute('data-borr-hecho') || el.readOnly || el.disabled) return;
+    el.setAttribute('data-borr-hecho','1');
+    if(el.value) return;
+    var d=_borrLeer_(el.getAttribute('data-borr'));
+    if(!d) return;
+    el.value=d; el.setAttribute('data-borr-recuperado','1');
+    try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(_){}
+  });
+}
+/* Tras una escritura BIEN enviada: fuera los borradores cuyo texto viajaba en el cuerpo. */
+function _borrLimpiarEnviado_(body){
+  var hojas=[];
+  (function rec(x,n){ if(n>6||x==null) return; if(typeof x==='string') hojas.push(_borrNorm_(x));
+    else if(typeof x==='object') Object.keys(x).forEach(function(k){ if(k!=='token') rec(x[k],n+1); }); })(body,0);
+  if(!hojas.length) return;
+  var borrar=[];
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i); if(!k || k.indexOf(BORR_PREFIJO)!==0) continue;
+      var o=null; try{ o=JSON.parse(localStorage.getItem(k)); }catch(_){}
+      var t=_borrNorm_(o&&o.v); if(!t){ borrar.push(k); continue; }
+      if(hojas.some(function(h){ return h.indexOf(t)>=0; })) borrar.push(k);
+    }
+    borrar.forEach(function(k){ localStorage.removeItem(k); });
+  }catch(_){}
+}
+function _borrArrancar_(){
+  if(window.__BORR_ARRANCADO || typeof document==='undefined') return;
+  window.__BORR_ARRANCADO=true;
+  document.addEventListener('input', function(e){
+    var el=e.target; if(el && el.getAttribute && el.getAttribute('data-borr')) _borrGuardar_(el.getAttribute('data-borr'), el.value);
+  }, true);
+  try{
+    new MutationObserver(function(ms){ ms.forEach(function(m){ [].forEach.call(m.addedNodes, _borrRestaurar_); }); })
+      .observe(document.documentElement, {childList:true, subtree:true});
+  }catch(_){}
+  _borrRestaurar_(document.body);
 }
 
 /* Mapea un parte del BACKEND (subsistema/justificacion/estado 'pendiente'…) al modelo que
@@ -3711,7 +3840,15 @@ var SOLARIA_SITIOS = {turno: true, parte: true, resumen: true, motivo: false, nu
 function _solSitio_(k){ return SOLARIA_SITIOS[k] !== false; }
 var SOL_PENSANDO = 'SolarIA está escribiendo…';
 /* El error del modelo, dicho igual en todos los puntos: no disponible (+ el motivo si lo hay); lo manual sigue intacto. */
-function _solErrorTxt_(motivo){ return 'SolarIA no está disponible ahora'+(motivo ? ': '+String(motivo).replace(/[.\s]+$/, '') : '')+'.'; }
+/* 04/11 (Daniel: «dice que no está disponible» cuando el modelo SÍ contestó, pero con el campo vacío): si el motivo es que la IA contestó y no
+   sirvió (sin texto/puntos, añadió cosas, no se apoya en lo dicho…) se dice la verdad —«no ha sabido redactarlo»—; «no está disponible» queda para
+   cuando de verdad no hay conexión, sesión, cuota o tiempo. */
+var _SOL_NO_SUPO_ = /la IA (no devolvi|no contest|devolvi)|ning[uú]n (texto|punto)|a[nñ]adido cosas|no se apoy|demasiado larg|no pas[oó] la comprobaci/i;
+function _solErrorTxt_(motivo){
+  var m = motivo ? String(motivo).replace(/^SolarIA no ha (podido|sabido)( redactarlo)?:\s*/i, '').replace(/[.\s]+$/, '') : '';
+  if(m && _SOL_NO_SUPO_.test(m)) return 'SolarIA no ha sabido redactarlo: '+m+'.';
+  return 'SolarIA no está disponible ahora'+(m ? ': '+m : '')+'.';
+}
 /* El botón de SolarIA, el MISMO en todos los puntos. `attrs` = los data-* de cada pantalla; `o` = {cls, id, pensando, off}. */
 function _solBtnHTML_(attrs, texto, o){
   o = o || {};
@@ -4623,6 +4760,10 @@ function personasVerLista(id){
    que no se parecen a nada). Devuelve una promesa de true/false; con `o.campo`, del texto escrito o `null`. */
 function dialogoSiNo(texto, o){
   o=o||{}; _pselCss_();
+  /* 04/11 (acciones graves): UN diálogo a la vez. Un doble toque sobre un botón que pregunta abría DOS preguntas y, con dos «sí»,
+     mandaba la acción DOS veces (aprobar una sanción, rechazar un documento…). La segunda pregunta, mientras hay otra abierta,
+     no se abre y contesta «no» (o `null` si pedía un texto): la acción del segundo toque no se hace. */
+  if(document.querySelector('[data-dlg]')) return Promise.resolve(o.campo ? null : false);
   return new Promise(function(res){
     var ov=document.createElement('div'); ov.className='psel-ov'; ov.setAttribute('data-dlg','1');
     ov.style.alignItems='center'; ov.style.justifyContent='center';   /* 01/11: a ≥900 px `.psel-ov` es el cajón de la derecha; un sí/no va en medio */
@@ -4655,6 +4796,7 @@ function dialogoTexto(texto, o){
    (`disabled`); promesa del valor elegido, o `null` si se cancela o se toca fuera. `opciones`: lista de textos. */
 function dialogoElegir(texto, opciones, o){
   o=o||{}; _pselCss_();
+  if(document.querySelector('[data-dlg]')) return Promise.resolve(null);   /* 04/11: UN diálogo a la vez (ver `dialogoSiNo`) */
   return new Promise(function(res){
     var ov=document.createElement('div'); ov.className='psel-ov'; ov.setAttribute('data-dlg','1');
     ov.style.justifyContent='center'; ov.style.alignItems='center';
@@ -5039,6 +5181,55 @@ function _etSancFila_(pts, origen, extra){
     return (extra && extra.deshace ? 'premio deshecho' : 'premio') + (comp ? ' · ' + comp + ' h' : '');
   if (o === 'revocacion') return 'revocación · ' + _etPtsSanc_(_ptsSanc_(pts));
   return _etPtsSanc_(_ptsSanc_(pts));
+}
+
+/* 04/11 (acciones graves): UN CERROJO POR CLAVE. Mientras una acción de esa clave está en marcha (preguntando, o esperando al
+   servidor) cualquier otro toque sobre la MISMA clave no hace nada. Es lo que impide que «Aprobar» y «Rechazar» de un mismo documento
+   se manden a la vez —cada botón se apagaba a sí mismo, no al contrario—. `clave` es un texto o una función de los argumentos del
+   manejador (si da `null`, ese toque no es de los vigilados y pasa sin cerrojo). Devuelve el manejador, que devuelve una promesa. */
+var CERROJOS = {};
+function _conCerrojo_(clave, fn){
+  return function(){
+    var self = this, args = arguments, k = typeof clave === 'function' ? clave.apply(self, args) : clave;
+    if(k == null) return fn.apply(self, args);
+    if(CERROJOS[k]) return Promise.resolve();
+    CERROJOS[k] = true;
+    var libera = function(){ delete CERROJOS[k]; };
+    var p; try{ p = Promise.resolve(fn.apply(self, args)); }catch(e){ libera(); throw e; }
+    return p.then(function(r){ libera(); return r; }, function(e){ libera(); throw e; });
+  };
+}
+
+/* 04/11: LA PREGUNTA ANTES DE APROBAR UN DOCUMENTO (aprobar lo PUBLICA en Notion y en el Libro de Datos), para las dos caras. */
+function _avisoAprobarDoc_(titulo, acc){
+  var NL = String.fromCharCode(10);
+  return 'Aprobar «' + titulo + '»' + (acc === 'anot' ? ' con tus anotaciones' : '') + '.' + NL + NL +
+    'Se publica en Notion y en el Libro de Datos en un par de minutos. ¿Seguro?';
+}
+
+/* 04/11 (acciones graves, Daniel: «lo más grave que existe»): LA PREGUNTA ANTES DE DECIDIR UNA SANCIÓN SUELTA, UNA vez para las dos
+   caras — QUÉ (aplicar/rechazar/justificar), A QUIÉN y CUÁNTO (`_etSancFila_`, el mismo rótulo que la fila). Antes el móvil decía
+   «¿Aprobar? Esto se aplica ya» sin nombre ni puntos (y rechazar no preguntaba nada), y el escritorio ponía el nombre pero no los
+   puntos. `s` es la sanción tal como llega del servidor. */
+function _avisoDecidirSanc_(s, acc){
+  s = s || {};
+  var quien = _pilaDeM_(s.nombre) || s.nombre || 'esta persona', NL = String.fromCharCode(10);
+  var que = {aprobar:'Aplicar', rechazar:'Rechazar', justificar:'Justificar'}[acc] || acc;
+  var cola = {aprobar:'Se aplica ya (Notion y comunicado): no es un borrador.',
+              rechazar:'Se descarta: no resta puntos y no vuelve a la cola.',
+              justificar:'Consta como decidida y no resta puntos.'}[acc] || '';
+  return '¿' + que + ' la sanción de ' + quien + '?' + NL + (s.motivo || '') + ' · ' + _etSancFila_(s.puntos, s.origen, s.extra) +
+    NL + NL + cola;
+}
+
+/* 04/11: LA PREGUNTA ANTES DE CERRAR UN BLOQUE (el disparo: Notion + comunicado), UNA vez para las dos caras. `items` lleva la
+   decisión de cada fila en `dec` (`_decDe_`); se cuenta cuántas se aplican, se rechazan y se justifican. */
+function _avisoCerrarBloque_(nombre, items){
+  var c = {aceptar:0, rechazar:0, justificar:0}, NL = String.fromCharCode(10);
+  (items || []).forEach(function(x){ c[_decDe_(x)]++; });
+  return 'Vas a cerrar el bloque «' + nombre + '».' + NL + NL + c.aceptar + ' se aplican' +
+    (c.rechazar ? ' · ' + c.rechazar + ' se rechazan' : '') + (c.justificar ? ' · ' + c.justificar + ' se justifican' : '') + '.' +
+    NL + NL + 'Esto aplica las sanciones aceptadas en Notion y manda el comunicado. ¿Seguimos?';
 }
 
 /* ══ REVOCAR UNA SANCION = LA VIA DE APELACION DEL RRI ══════════════════════
@@ -5432,6 +5623,14 @@ async function _enviarSancionForm_(o){
   }
   if(typeof backendOK==='undefined' || !backendOK || !SESION){
     msg('Sin conexión no se puede: esto escribe en la cola de verdad.', true); return {ok:false}; }
+  /* 04/11 (acciones graves): PONER UNA SANCIÓN SE PREGUNTA (a quién, cuánto, por qué) y un segundo toque mientras se pregunta no
+     hace nada. Va a la cola de verdad, a Notion y a Discord en minutos; el único modo de quitarla es una revocación a mano. */
+  if(bt.disabled) return {ok:false};
+  var NL = String.fromCharCode(10);
+  if(!(await dialogoSiNo('Poner a '+(_pilaDeM_(quien)||quien)+' '+_etSancFila_(pts, 'manual')+'.'+NL+texto+NL+NL+
+      'Se aplica en Notion y se avisa en Discord en unos minutos'+(esDePlazo ? '; antes se mueve el plazo de la tarea' : '')+
+      '. Quitarla después exige una revocación. ¿Seguro?'))) return {ok:false};
+  if(bt.disabled) return {ok:false};
   bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando…';
   var _movido=false;
   try{
@@ -11603,7 +11802,7 @@ function _bloqueFormHTML_(){
     '<div id="blqHoras" style="margin:0 0 12px">'+_bloqueHorasHTML_()+'</div>'+
     (B.reunion_id==null && !fin ? '<div id="blqClas" style="margin:0 0 12px">'+_bloqueClasHTML_(B)+'</div>' : '')+
     '<label style="display:block;margin:0 0 12px">'+lab('<span id="blqResLab">'+_bloqueResLabel_(B)+'</span>')+
-      '<textarea id="blqResumen" rows="4" style="'+_BLQ_INPUT_+';resize:vertical" placeholder="Qué se trató o se hizo…">'+esc(B.resumen)+'</textarea>'+
+      '<textarea id="blqResumen" data-borr="bloque-resumen" rows="4" style="'+_BLQ_INPUT_+';resize:vertical" placeholder="Qué se trató o se hizo…">'+esc(B.resumen)+'</textarea>'+
       '<small id="blqCuenta" style="color:var(--ink3)">'+(B.resumen||'').trim().length+' / '+BLQ_MIN_RESUMEN+'</small></label>'+
     _solIAHTML_('blq', B.reunion_id!=null ? _solResumenCfg_(B) : _solBloqueCfg_(B))+
     '<div style="display:flex;gap:8px"><button class="btn pri" id="blqEnviar" data-p style="flex:1">'+(fin?'Finalizar y enviar':'Enviar parte')+'</button>'+
@@ -11647,6 +11846,7 @@ function _bloqueCablear_(cb){
     try{
       var resp=B.modo==='finalizar' ? await api.finalizarReunion(cuerpo) : await api.declararBloque(cuerpo);
       B.res=resp||{resultados:[]};
+      _borrBorrar_('bloque-resumen');   /* 04/11: enviado bien → fuera el borrador (el cuerpo puede llevar el resumen recortado) */
       if(B.modo==='finalizar' && B.reunion) B.reunion.en_curso=null;
       if(B.reunion && B.res.bloque) B.reunion.bloque=B.res.bloque;      // fichada: el aviso «ya ha pasado» se va
       tost('Parte de bloque enviado: pendiente de aprobar.');
@@ -12694,3 +12894,73 @@ async function _ordenSubirPdf_(id, file){
   st.sub=null;
   _ordenRefrescar_(id);
 }
+
+
+/* ═══ ACCESIBILIDAD COMÚN A LAS DOS CARAS (04/11/2026, delegar/accesib) ═══════════════════════════════════════════════════
+   Una declaración y las dos caras la llaman (no copias por cara). Medido con `rutinas/probar_accesibilidad_app.js` (la tabla de
+   antes/después está en `docs/accesibilidad.md`): decenas de `<div data-p>` / `.fila.clic` / `.dec` / `tr.abre` que SOLO responden al ratón
+   o al dedo —ni rol, ni Tab, ni Enter—, campos sin nombre, anillos de foco apagados y animaciones infinitas con `prefers-reduced-motion`.
+   · `_a11yMarcar_(raiz)`: a lo clicable que no es nativo le pone `role="button"` + `tabindex="0"` (una `<tr>` sólo `tabindex`, para no
+     romper la tabla); al campo sin `<label>` le da `aria-label` con su `placeholder`/`title`; a los iconos decorativos, `aria-hidden`.
+   · Enter / Espacio sobre algo con `role="button"` que no es un `<button>` hace `click()` (lo que el ratón ya cablea).
+   · Se re-aplica sola a lo que las pantallas repintan (MutationObserver, un cuadro de animación después).
+   · Esc cierra el modal del móvil; al cerrar un modal o una hoja, el foco VUELVE a lo que lo abrió.
+   ⛔ Las CELDAS que se pintan arrastrando (`.tcel`, `.rc` del móvil: pinceles de la convocatoria) quedan fuera: son un gesto, no un
+   botón por celda; poner 90 paradas de Tab ahí es peor que ninguna. Está dicho en `docs/accesibilidad.md`. */
+var A11Y_CLIC='[data-p]:not(button):not(a):not(input):not(select):not(textarea),.fila.clic,.dec,.hh,tr.abre,.cel.mid,.plgh,.tu-f';
+var A11Y_GESTO='.tcel,.rc,[data-tk],[data-tdia],[data-tfr],[data-qp]';   // celdas que se pintan arrastrando
+function _a11yMarcar_(raiz){
+  var r=raiz && raiz.querySelectorAll ? raiz : document;
+  Array.prototype.forEach.call(r.querySelectorAll(A11Y_CLIC), function(e){
+    if(e.matches(A11Y_GESTO) || e.hasAttribute('data-a11y')) return;
+    e.setAttribute('data-a11y','1');
+    if(e.tagName!=='TR' && !e.getAttribute('role')) e.setAttribute('role','button');
+    if(!e.hasAttribute('tabindex')) e.setAttribute('tabindex','0');
+  });
+  Array.prototype.forEach.call(r.querySelectorAll('input:not([type=hidden]),textarea,select'), function(e){
+    if(e.getAttribute('aria-label') || e.getAttribute('aria-labelledby') || (e.id && document.querySelector('label[for="'+e.id+'"]')) || e.closest('label')) return;
+    var t=e.getAttribute('placeholder') || e.getAttribute('title'); if(t) e.setAttribute('aria-label', t);
+  });
+  Array.prototype.forEach.call(r.querySelectorAll('svg:not([aria-hidden]):not([role]),.ic:not([aria-hidden]),.chev:not([aria-hidden])'), function(e){
+    if(e.closest('[aria-label],[title]') && e.tagName==='svg' && !e.closest('button,a,[role=button]')) return;
+    if(e.tagName==='svg' && e.querySelector('title')) return;
+    e.setAttribute('aria-hidden','true');
+  });
+}
+function _a11yCablear_(){
+  if(_a11yCablear_.hecho || !document.body) return; _a11yCablear_.hecho=true;
+  var s=document.createElement('style'); s.id='a11yCss';
+  s.textContent=
+    /* anillo de foco visible EN TODO (sólo con teclado: `:focus-visible`); `!important` porque varios campos lo tenían `outline:none` */
+    'button:focus-visible,a:focus-visible,summary:focus-visible,[role=button]:focus-visible,[tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--red2,#FF4A4F)!important;outline-offset:2px!important}'+
+    /* menos movimiento: lo infinito se para y lo largo se acorta (el evento `animationend` sigue saltando) */
+    '@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important;transition-delay:0s!important;scroll-behavior:auto!important}}';
+  document.head.appendChild(s);
+  document.addEventListener('keydown', function(e){
+    var t=e.target;
+    if((e.key==='Enter' || e.key===' ') && t && t.getAttribute && t.getAttribute('role')==='button' && !/^(BUTTON|A|INPUT|TEXTAREA|SELECT)$/.test(t.tagName)){
+      e.preventDefault(); t.click(); return;
+    }
+    if(e.key==='Enter' && t && t.tagName==='TR' && t.hasAttribute('data-a11y')){ e.preventDefault(); t.click(); return; }
+    if(e.key==='Escape'){
+      var m=document.querySelector('#modal.on');
+      if(m && !document.querySelector('.psel-ov')){ var x=m.querySelector('[data-cerrar]'); if(x) x.click(); else m.classList.remove('on'); }
+    }
+  });
+  /* el foco vuelve a quien abrió el modal / la hoja: se recuerda el último foco FUERA de ellos y se devuelve al cerrarse */
+  var antes=null, pend=false;
+  document.addEventListener('focusin', function(e){ if(!e.target.closest || !e.target.closest('#modal,.psel-ov')) antes=e.target; });
+  var estaba=false;
+  new MutationObserver(function(){
+    if(pend) return; pend=true;
+    requestAnimationFrame(function(){
+      pend=false; _a11yMarcar_(document);
+      var ahora=!!document.querySelector('#modal.on,.psel-ov');
+      if(estaba && !ahora && antes && antes.isConnected && antes.focus) antes.focus();
+      if(!estaba && ahora){ var d=document.querySelector('.psel-ov .psel-hoja,#modal.on .card'); var f=d && d.querySelector('input,button,[tabindex="0"]'); if(f && f.focus) try{ f.focus({preventScroll:true}); }catch(_){} }
+      estaba=ahora;
+    });
+  }).observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class']});
+  _a11yMarcar_(document);
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', _a11yCablear_); else _a11yCablear_();

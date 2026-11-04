@@ -107,7 +107,7 @@ function parteCard(p){
         '<button class="btn sm" data-parte="'+p.id+'" data-acc="det">Pedir detalle</button>'+
         '<button class="btn sm no" data-parte="'+p.id+'" data-acc="no">Rechazar</button>'+
       '</div>'+
-      '<textarea data-motivo placeholder=""></textarea>':'')+
+      '<textarea data-motivo data-borr="parte-motivo-'+esc(p.id)+'" placeholder=""></textarea>':'')+
   '</div>';
 }
 
@@ -430,7 +430,7 @@ function _escRevCard_(p){
         /* ⛔ 21/10 (auditor 8, 🟡 12): el servidor manda una `otorgada` a `anulada` (terminal), no a `pendiente`. */
         ? 'Todavía no cuentan: revertir ANULA estas horas otorgadas (no vuelven a ninguna cola).'
         : 'Todavía no cuentan: revertir deshace la decisión y el parte vuelve a la cola.'))+'</div>'+
-    '<textarea data-revmot placeholder="Motivo — obligatorio, al menos 8 caracteres…"></textarea>'+
+    '<textarea data-revmot data-borr="parte-revertir-'+esc(p.id)+'" placeholder="Motivo — obligatorio, al menos 8 caracteres…"></textarea>'+
     '<div class="acts"><button class="btn no" data-rev="'+esc(p.id)+'">Revertir</button></div>'+
   '</div>';
 }

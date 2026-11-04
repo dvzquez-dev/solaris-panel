@@ -383,7 +383,7 @@ function _revocarSancCard_(s){
         '</b>. Entra en la cola como pendiente y se confirma con su bloque.'
       : 'Era un <b>aviso</b>: no devuelve puntos, retira el <b>registro</b> y su reincidencia. '+
         'Entra en la cola como pendiente y se confirma con su bloque.') + '</div>' +
-    '<textarea data-rvsmot placeholder="Motivo de la revocaci\u00f3n \u2014 obligatorio, al menos 8 caracteres\u2026"></textarea>' +
+    '<textarea data-rvsmot data-borr="sancion-revocar-' + esc(s.id) + '" placeholder="Motivo de la revocaci\u00f3n \u2014 obligatorio, al menos 8 caracteres\u2026"></textarea>' +
     '<div class="acts"><button class="btn no" data-rvs="' + esc(s.id) + '">Revocar</button></div>' +
   '</div>';
 }
@@ -766,7 +766,7 @@ function _apelTarjetaSanc_(a){
       ((a.impuesta_por || []).length ? ' · puesta por ' + esc(a.impuesta_por.join(', ')) : '') + '</div>' +
     '<div class="just"><span class="sc">Apela</span>' + esc(a.motivo) + (l ? '<br>' + l : '') + '</div>' +
     (puedes
-      ? '<textarea data-apres placeholder="Tu respuesta — obligatoria en las tres salidas…"></textarea>' +
+      ? '<textarea data-apres data-borr="apelacion-resp-' + esc(a.id) + '" placeholder="Tu respuesta — obligatoria en las tres salidas…"></textarea>' +
         '<div class="acts"><button class="btn ok" data-apdec="estimada">Estimar</button>' +
         '<button class="btn ok" data-apdec="parcial">Rebajar a aviso</button>' +
         '<button class="btn no" data-apdec="desestimada">Desestimar</button>' +
@@ -786,7 +786,7 @@ function _apelTarjeta_(a){
     '<div class="ruta" style="margin-top:6px"><b>' + esc(a.titulo) + '</b> · plazo ' + esc(_plazoDMY_(a.plazo) || 'sin fecha') + '</div>' +
     '<div class="just"><span class="sc">' + esc(_apelClausulaTxt_(a.clausula)) + '</span>' + esc(a.motivo) + '</div>' +
     (puedes
-      ? '<textarea data-apres placeholder="Tu respuesta — obligatoria si desestimas…"></textarea>' +
+      ? '<textarea data-apres data-borr="apelacion-resp-' + esc(a.id) + '" placeholder="Tu respuesta — obligatoria si desestimas…"></textarea>' +
         '<div class="acts"><span class="sc">Nuevo plazo</span>' + nxFecha('', '', {min: _hoyNxISO_(), attrs: 'data-appl'}) +
         '<button class="btn ok" data-apest="plazo">Estimar con ese plazo</button>' +
         '<button class="btn ok" data-apest="quitar">Estimar y quitarle la tarea</button>' +
@@ -845,7 +845,7 @@ function _engMisSanc_(){
       var f = document.createElement('div'); f.setAttribute('data-msform', '1'); f.style.marginTop = '10px';
       f.innerHTML = '<p class="ruta">' + esc(APEL_SANC_TXT.tienes(s.apelable_hasta)) + '</p>' +
         '<label class="campo"><span class="sc">' + APEL_SANC_TXT.campo + ' <span class="req">*</span></span>' +
-          '<textarea data-msmotivo placeholder="' + esc(APEL_SANC_TXT.ayuda) + '"></textarea></label>' +
+          '<textarea data-msmotivo data-borr="apel-sancion-' + esc(s.id) + '" placeholder="' + esc(APEL_SANC_TXT.ayuda) + '"></textarea></label>' +
         '<label class="campo"><span class="sc">' + APEL_SANC_TXT.enlace + '</span>' +
           '<input data-msenlace type="url" inputmode="url" placeholder="https://…" autocomplete="off"></label>' +
         '<div class="acts"><button class="btn" data-msno>Cancelar</button><button class="btn ok" data-msenviar>Enviar</button>' +
@@ -865,12 +865,25 @@ function _engMisSanc_(){
     };
   });
 }
+/* 04/11 (acciones graves): LA PREGUNTA ANTES DE RESOLVER UNA APELACIÓN — estimar devuelve puntos o quita la tarea, y la respuesta le
+   llega a la persona. Dice QUÉ se decide y SOBRE QUIÉN. `datos` es lo que se manda (`decision`, `quitar`, `plazo`). */
+function _avisoApelE_(ap, datos){
+  var quien = ((_m(ap.autor) && _m(ap.autor).pila) || ap.autor || 'esta persona'), NL = String.fromCharCode(10);
+  var que = datos.quitar ? 'Estimar la apelación de ' + quien + ' y quitarle la tarea.'
+    : datos.decision === 'parcial' ? 'Rebajar a aviso la sanción de ' + quien + ': se le devuelven los puntos.'
+    : datos.decision === 'desestimada' ? 'Desestimar la apelación de ' + quien + ': todo se queda como está.'
+    : datos.plazo ? 'Estimar la apelación de ' + quien + ' con el nuevo plazo (' + datos.plazo + ').'
+    : 'Estimar la apelación de ' + quien + ': se le devuelven los puntos de la sanción.';
+  return que + NL + NL + 'Se le avisa y la respuesta queda con tu nombre. ¿Seguro?';
+}
 function _engApela_(){
   $$('[data-apid]').forEach(function(caja){
     var ap = null, i, L = _apelLista_();
     for (i = 0; i < L.length; i++) if (L[i].id === caja.dataset.apid) ap = L[i];
-    function resolver(b, datos){
+    async function resolver(b, datos){
       if (!ap || ap.estado !== 'abierta'){ tost('Esa apelación ya no está abierta: recarga la pantalla.'); pintar(); return; }
+      if (b.disabled) return;
+      if (!(await dialogoSiNo(_avisoApelE_(ap, datos)))) return;
       b.disabled = true;
       _resolverApelacion_(ap, datos).then(function(r){
         pintar(); tost('Apelación ' + (r && r.estado === 'estimada' ? 'estimada' : 'desestimada') + '. Se le avisa a ' +
@@ -879,10 +892,12 @@ function _engApela_(){
     }
     var ta = caja.querySelector('[data-apres]'), pl = caja.querySelector('[data-appl]');
     $$('[data-apdec]', caja).forEach(function(b){
-      b.onclick = function(){
+      b.onclick = async function(){
         var er = caja.querySelector('[data-aperr]'), txt = ta ? ta.value.trim() : '', bs = $$('[data-apdec]', caja);
+        if (b.disabled) return;
         if (!txt){ if (er) er.textContent = 'Escribe el motivo: queda con tu nombre.'; if (ta) ta.focus(); return; }
         if (!ap || ap.estado !== 'abierta'){ tost('Esa apelación ya no está abierta: recarga la pantalla.'); pintar(); return; }
+        if (!(await dialogoSiNo(_avisoApelE_(ap, {decision: b.dataset.apdec})))) return;
         if (er) er.textContent = '';
         bs.forEach(function(x){ x.disabled = true; });
         _resolverApelacion_(ap, {decision: b.dataset.apdec, resolucion: txt}).then(function(){

@@ -823,7 +823,7 @@ function vFichar(){
   ST.form._declPerdido = false;
   /* 03/11 · «Para más gente»: el MISMO formulario del bloque (comun.js `_bloque*_`), en línea en Fichar, y nada más (sin justificación
      propia ni «Quién lo firma»: es de otros). Sólo en «Declarar horas», sin un fichaje por declarar, y para PD/coordinador. */
-  var _yoV = (typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
+  var _yoV = _fichaYo_();   /* la SESIÓN, por la puerta única (ver `_fichaYo_`) */
   var _puedeV = !decl && ST.modo==='bloque' && _puedeVarios_(_yoV), _varios = _puedeV && _variosActivo_();
   if(_varios) return '<div class="h1">Fichar</div><p class="h1s">'+HOY+' · horas de varias personas, un mismo horario.</p>'+
     '<div class="modos" id="modos"><button data-mo="vivo" data-p>Sesión en vivo</button><button data-mo="bloque" class="on" data-p>Declarar horas</button></div>'+
@@ -869,7 +869,7 @@ function vFichar(){
             (ST.form.cat==='reunion'?'p. ej. Integración motor / estructura del 20/07':ST.form.cat==='turno'?'p. ej. Turno de taller del 19/07':'tiempo real que el sistema no refleja')+
             '"></label>')+
       '<label class="campo" style="margin-bottom:6px"><span class="sc">Qué estuviste haciendo <span class="req">*</span></span>'+
-        '<textarea id="fJust" placeholder="Qué hiciste, con quién y dónde. Mínimo 25 caracteres.">'+esc(ST.form.just)+'</textarea></label>'+
+        '<textarea id="fJust" data-borr="parte-just'+(ST.form.declararId!=null?'-'+ST.form.declararId:'')+'" placeholder="Qué hiciste, con quién y dónde. Mínimo 25 caracteres.">'+esc(ST.form.just)+'</textarea></label>'+
       _solIAHTML_('fJust', _solParteCfg_('fJust', ST.form, _parteHorasIA_))+
       '<div class="justfila">'+
         '<div class="aroJ" id="aroJ"><svg viewBox="0 0 40 40"><circle class="f" cx="20" cy="20" r="16"/>'+

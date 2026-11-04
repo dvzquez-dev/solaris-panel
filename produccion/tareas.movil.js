@@ -224,7 +224,7 @@ function _formApelar_(t){
     '<p class="h1s">Es tu derecho (Art. 34 del RRI). Lo ve tu coordinador y el Project Director. Si no apelas y no la haces, resta 1 punto.</p>'+
     '<div class="tarj" style="padding:4px 12px">'+op+'</div>'+
     '<label class="campo" style="margin-top:12px"><span class="sc">Cuéntanos qué pasa <span class="req">*</span></span>'+
-      '<textarea id="apelMotivo" placeholder="Qué te lo impide o por qué no te corresponde."></textarea></label>'+
+      '<textarea id="apelMotivo" data-borr="apel-tarea-'+esc(t.url||t.titulo||'')+'" placeholder="Qué te lo impide o por qué no te corresponde."></textarea></label>'+
     '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="apelNo" style="flex:1">Cancelar</button>'+
       '<button class="btn pri" id="apelSi" style="flex:1" disabled>Enviar apelación</button></div>');
   var si=$('#apelSi'), mo=$('#apelMotivo');

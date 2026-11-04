@@ -489,7 +489,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .hc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
 /* etiqueta al LÍMITE izquierdo = hora de inicio (decisión cerrada) */
 .hc.rh span{position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}
-.cel{height:19px;border-radius:2px;display:grid;place-items:center;font-family:var(--mono);
+.cel{cursor:default;height:19px;border-radius:2px;display:grid;place-items:center;font-family:var(--mono);
   font-size:8.5px;color:#fff;font-weight:600}
 /* 01/11 (esteticaesc): sobre la celda VERDE (reunión fijada) el blanco no llega a 3:1; ahí va el texto oscuro. */
 .cel[style*="53,199,89"]{color:#06130a}
@@ -957,6 +957,7 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
    regla el cuadrito de color (`<i>` vacío) no se veía y el texto salía sin su tipografía. Misma regla que `.leg` (el tamaño lo pone la leyenda en línea). */
 .leyh{display:flex;flex-wrap:wrap;gap:5px 13px;font-size:10px;font-family:var(--mono);letter-spacing:.05em;color:var(--ink3)}
 .leyh i{width:10px;height:7px;border-radius:2px;display:inline-block;vertical-align:-1px;margin-right:5px}
+.cel.mid{cursor:pointer}
 .cel.mid:hover{outline:1px solid var(--ink3);outline-offset:-1px}
 tr.abre{cursor:pointer}
 tr.abre:hover td:first-child{color:var(--ink)}

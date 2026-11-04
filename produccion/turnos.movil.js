@@ -882,8 +882,8 @@ function progTurnoAbrir(){
         _progPintar_(); }})+
     '<div id="ptReparto"></div>'+
     _solIAHTML_('pt', _solTurnoCfg_('pt'))+
-    '<label class="campo" style="margin-top:12px"><span class="sc">Objetivos principales · uno por línea</span><textarea id="ptObj1" rows="3"></textarea></label>'+
-    '<label class="campo"><span class="sc">Objetivos secundarios · si sobra tiempo</span><textarea id="ptObj2" rows="2"></textarea></label>'+
+    '<label class="campo" style="margin-top:12px"><span class="sc">Objetivos principales · uno por línea</span><textarea id="ptObj1" data-borr="turno-obj1" rows="3"></textarea></label>'+
+    '<label class="campo"><span class="sc">Objetivos secundarios · si sobra tiempo</span><textarea id="ptObj2" data-borr="turno-obj2" rows="2"></textarea></label>'+
     '<label class="campo"><span class="sc">Aviso para los convocados</span><input id="ptNota" placeholder="traed guantes y mascarilla"></label>'+
     '<p class="rnota" id="ptMotivo" style="color:var(--ink2)"></p>'+
     '<button class="btn pri full" data-p id="ptOK" disabled>Convocar el turno</button>');
