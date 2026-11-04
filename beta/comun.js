@@ -9630,7 +9630,7 @@ function _convEtiq_(k){
   var t = Object.prototype.hasOwnProperty.call(CONV_ETIQ, k) ? CONV_ETIQ[k] : null;
   return t || String(k == null ? '' : k);
 }
-/* ═══ LOS 4 PINCELES DE LA DISPONIBILIDAD DE TURNOS (04/11/2026) ═══════════════════════════════════════════════════════
+/* ═══ LOS PINCELES DE LA DISPONIBILIDAD (2 chips que ciclan, 04/11 tarde) DE TURNOS (04/11/2026) ═══════════════════════════════════════════════════════
    🗣️ Daniel: *«para marcar disponibilidad es como una reunión, simplemente q te debería dejar usar varios pinceles (CUVI +
    Coche) (CUVI + Sin coche) (CITI + Coche) (CITI + Sin coche) […] Y también puedes marcar que tienes ambas disponibilidades a
    la vez. Pero como mínimo tienes q seleccionar una. Cada una de las combinaciones con colores distintos […] en Ourense sin
@@ -9639,32 +9639,33 @@ function _convEtiq_(k){
    exactamente los sitios que marcaste; `c` = «lleva en alguno» (lo que lee quien no conoce `cc`: Python viejo, otra cara). Una
    celda vieja (sin `cc`) tiene UN `c` para todos sus sitios: `_celdaCoche_` la lee igual. Gemela de `reglas/turnos.py:con_coche`
    y de `rutinas/servidor.py:_coche_por_sitio` (la valida). UNA sola declaración de colores, de pincel y de celda: las dos caras
-   LLAMAN a esto, no lo escriben. La selección es `{<sitio>: true|false}` (con coche / sin coche) o `{no:true}`; dentro de un
-   sitio «con» y «sin» se excluyen, y sale de la selección sólo si queda otro pincel (mínimo uno). */
-var PINCEL_COL = {'cuvi+':'#E41E25', 'cuvi-':'#f4a3a6', 'citi+':'#3f9ed6', 'citi-':'#a6d3ee'};   /* sitio + (con|sin) coche */
-var PINCEL_COL_OTRO = {'+':'#35c759', '-':'#a9e5b8'};                                               /* un sitio que no es CUVI/CITI */
-function _pincelColor_(sitio, coche){
-  var k = sitio + (coche ? '+' : '-');
-  return Object.prototype.hasOwnProperty.call(PINCEL_COL, k) ? PINCEL_COL[k] : PINCEL_COL_OTRO[coche ? '+' : '-'];
+   LLAMAN a esto, no lo escriben. La selección es `{<sitio>: true|false}` (con coche / sin coche) o `{no:true}`; cada sitio
+   es UN chip que cicla apagado → voy → con coche → apagado, y sale de la selección sólo si queda otro (mínimo uno).
+   🗣️ Daniel 04/11: *«si alguien marca cubi con coche, obviamente también está marcado cubi sin coche […] uno engloba al otro»*. */
+var PINCEL_COL = {cuvi:'#E41E25', citi:'#3f9ed6'};   /* UN color por sitio: el coche lo dice el icono, no el tono */
+var PINCEL_COL_OTRO = '#35c759';                      /* un sitio que no es CUVI/CITI */
+function _pincelColor_(sitio){
+  return Object.prototype.hasOwnProperty.call(PINCEL_COL, sitio) ? PINCEL_COL[sitio] : PINCEL_COL_OTRO;
 }
-/* Los pinceles de ESTA convocatoria: dos por sitio (con / sin coche). `k` = «<sitio>+» o «<sitio>-». */
+/* Los pinceles de ESTA convocatoria: UNO por sitio (`k` = el sitio). Cada toque cicla apagado → voy → voy con coche → apagado. */
 function _pincelesDe_(cv){
-  var out = [];
-  (cv && cv.sitios && cv.sitios.length ? cv.sitios : ['cuvi','citi']).forEach(function(s){
-    out.push({k:s+'+', sitio:s, coche:true,  etiq:_convEtiq_(s)+' \u00b7 con coche'});
-    out.push({k:s+'-', sitio:s, coche:false, etiq:_convEtiq_(s)+' \u00b7 sin coche'});
+  return (cv && cv.sitios && cv.sitios.length ? cv.sitios : ['cuvi','citi']).map(function(s){
+    return {k:s, sitio:s, etiq:_convEtiq_(s)};
   });
-  return out;
 }
-/* Pulsar un pincel sobre la selección. Devuelve la selección NUEVA (no toca la vieja). «No puedo» es excluyente con los demás. */
+/* Pulsar un chip sobre la selección. Devuelve la selección NUEVA (no toca la vieja). `k` = un sitio o `no`. Un sitio cicla
+   apagado → sin coche (`false`) → con coche (`true`) → apagado; si apagarlo deja la selección vacía, se queda como estaba
+   (como MÍNIMO uno). «No puedo» es excluyente con los sitios. */
 function _pincelToggle_(sel, k){
   if(k==='no') return {no:true};
-  var sitio = String(k).slice(0,-1), coche = String(k).slice(-1)==='+', base = {}, n;
+  var base = {}, n;
   if(!sel || !sel.no) for(n in (sel||{})) if(Object.prototype.hasOwnProperty.call(sel,n)) base[n]=sel[n];
-  if(base[sitio]===coche){
-    delete base[sitio];
+  if(!Object.prototype.hasOwnProperty.call(base,k)) base[k]=false;
+  else if(base[k]===false) base[k]=true;
+  else {
+    delete base[k];
     if(!Object.keys(base).length) return sel;          /* como mínimo UNO */
-  } else base[sitio]=coche;
+  }
   return base;
 }
 /* La selección → lo que entiende el pintor: `{pincel:'no'|<sitio>|'ambos', coche, cc}` (`cc` null en «no puedo»). */
@@ -9713,19 +9714,22 @@ function _celdaIgual_(v, q){
   return _celdaSitios_(q).every(function(s){ return _celdaCoche_(v,s)===_celdaCoche_(q,s); }) &&
          _celdaSitios_(v).length===_celdaSitios_(q).length;
 }
-/* El fondo de una celda: el color de su pincel; con dos sitios, partida en diagonal (CUVI a un lado, CITI al otro). */
+/* El fondo de una celda: el color de su sitio; con dos sitios, partida en diagonal (CUVI a un lado, CITI al otro). El coche NO
+   cambia el tono: lo dice el icono de la esquina (`_celdaCoche_(v)`). */
 function _celdaFondo_(v){
-  var cs = _celdaSitios_(v).map(function(s){ return _pincelColor_(s, _celdaCoche_(v,s)); });
+  var cs = _celdaSitios_(v).map(function(s){ return _pincelColor_(s); });
   if(!cs.length) return '';
   return cs.length>1 ? 'linear-gradient(135deg,'+cs[0]+' 50%,'+cs[1]+' 50%)' : cs[0];
 }
-/* La leyenda de colores: un cuadro por pincel y uno partido para «los dos sitios». `data-pincel-ley` en cada uno. */
+/* La leyenda: un cuadro por sitio, el partido de «los dos sitios» y el icono del coche. `data-pincel-ley` en cada uno. */
 function _pincelLeyendaHTML_(cv){
   var sw = 'display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-2px;margin-right:5px;';
-  var l = _pincelesDe_(cv).map(function(p){
-    return '<span data-pincel-ley="'+esc(p.k)+'" style="margin-right:12px;white-space:nowrap"><i style="'+sw+'background:'+_pincelColor_(p.sitio,p.coche)+'"></i>'+esc(p.etiq)+'</span>';
+  var ps = _pincelesDe_(cv);
+  var l = ps.map(function(p){
+    return '<span data-pincel-ley="'+esc(p.k)+'" style="margin-right:12px;white-space:nowrap"><i style="'+sw+'background:'+_pincelColor_(p.sitio)+'"></i>'+esc(p.etiq)+'</span>';
   });
-  if(_pincelesDe_(cv).length>2) l.push('<span data-pincel-ley="dos" style="white-space:nowrap"><i style="'+sw+'background:linear-gradient(135deg,'+_pincelColor_('cuvi',true)+' 50%,'+_pincelColor_('citi',true)+' 50%)"></i>partido: los dos sitios (cada mitad, su coche)</span>');
+  if(ps.length>1) l.push('<span data-pincel-ley="dos" style="margin-right:12px;white-space:nowrap"><i style="'+sw+'background:linear-gradient(135deg,'+_pincelColor_(ps[0].sitio)+' 50%,'+_pincelColor_(ps[1].sitio)+' 50%)"></i>los dos</span>');
+  l.push('<span data-pincel-ley="coche" style="white-space:nowrap">'+ico('coche')+' con coche</span>');
   return l.join('');
 }
 /* El FILTRO del mapa de calor (04/11): campus × coche. `fil` = {sitio:''|<sitio>, coche:null|true|false}; `attr` = prefijo de los
@@ -9750,17 +9754,19 @@ function _turnoFiltroHTML_(cv, fil, attr){
 /* Lo que el chip de coche (`''`|`'1'`|`'0'`) quiere decir. */
 function _cocheDeFiltro_(v){ return v==='1' ? true : (v==='0' ? false : null); }
 
-/* Los chips de pinceles (los mismos en móvil y escritorio): un chip por pincel + «No puedo». `attr` = el atributo `data-` que
-   cablea el clic (`data-pin2`, `data-mtpin2`…). Lo elegido, con su color; sin tick. */
+/* Los chips de pinceles (los mismos en móvil y escritorio): UN chip por sitio + «No puedo». `attr` = el atributo `data-` que
+   cablea el clic (`data-pin2`, `data-mtpin2`…). Apagado = borde del color del sitio; «voy» = relleno; «con coche» = relleno +
+   icono del coche. Lo elegido, en color; sin tick. */
 function _pincelChipsHTML_(cv, sel, attr){
-  var chip = function(k, txt, col, on){
+  var chip = function(k, txt, col, on, coche){
     var oscuro = /^#(E41E25|3f9ed6)$/i.test(col);
     return '<button type="button" '+attr+'="'+esc(k)+'" class="pincel-chip'+(on?' on':'')+'" data-p style="'+
-      (on ? 'background:'+col+';border-color:'+col+';color:'+(oscuro?'#fff':'#1a1616') : 'border-color:'+col)+'">'+esc(txt)+'</button>';
+      (on ? 'background:'+col+';border-color:'+col+';color:'+(oscuro?'#fff':'#1a1616') : 'border-color:'+col)+'">'+esc(txt)+(coche?' '+ico('coche'):'')+'</button>';
   };
   return _pincelesDe_(cv).map(function(p){
-    return chip(p.k, p.etiq, _pincelColor_(p.sitio,p.coche), !!sel && !sel.no && sel[p.sitio]===p.coche);
-  }).join('')+chip('no', _convEtiq_('no'), '#8a8280', !!sel && !!sel.no);
+    var on = !!sel && !sel.no && Object.prototype.hasOwnProperty.call(sel, p.sitio);
+    return chip(p.k, p.etiq, _pincelColor_(p.sitio), on, on && !!sel[p.sitio]);
+  }).join('')+chip('no', _convEtiq_('no'), '#8a8280', !!sel && !!sel.no, false);
 }
 
 function _unidadesCoord_(v){
