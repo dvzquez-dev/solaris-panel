@@ -13634,7 +13634,12 @@ function _reuPartir_(lista, ahora){
   return {vivas:vivas, archivo:archivo};
 }
 /* ¿Sale el botón «Finalizar reunión»? No en una ya finalizada, ni en una «en curso» (esa se acaba con su «Finalizar» del parte). */
-function _reuPuedeFinalizar_(r, yo, admin){ return !!r && !_reuFinalizada_(r) && !r.en_curso && _puedeBloqueReu_(r, yo, admin); }
+/* 04/11: y sólo si ya se celebró o llegó su hora fijada — una encuesta abierta no se finaliza (el servidor lo vuelve a decidir). */
+function _reuPuedeFinalizar_(r, yo, admin, ahora){
+  if(!r || _reuFinalizada_(r) || r.en_curso || !_puedeBloqueReu_(r, yo, admin)) return false;
+  var h=_horarioReuMs_(r);
+  return !!r.celebrada || !!(h && h.ini <= (ahora==null ? Date.now() : ahora));
+}
 /* ¿Se ofrece «Eliminar»? Sólo si nunca se celebró (el servidor lo vuelve a decidir). */
 function _reuSePuedeBorrar_(r){ return !!r && !r.celebrada && !_reuFinalizada_(r); }
 /* Las palabras de asistencia que enseña el gestor: [{modo, rot, pal}] — presencial y/o telemática según la modalidad (`v.palabras`),
