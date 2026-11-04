@@ -2999,7 +2999,7 @@ function _apiParse(txt, accion){
    Las que llaman a un modelo o suben ficheros tardan más a propósito: techo propio. */
 var API_ESPERA_MS = 20000;
 var API_ESPERA_LARGA_MS = 120000;
-var API_ACCIONES_LARGAS = /^(traerOrdenNotion|transcribirVoz|interpretarAnotacion|contrastarEtiqueta|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|redactarTurno|redactarParte|resumirReunion)$/;
+var API_ACCIONES_LARGAS = /^(proponerTareaParte|traerOrdenNotion|transcribirVoz|interpretarAnotacion|contrastarEtiqueta|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|redactarTurno|redactarParte|resumirReunion)$/;
 var API_MSG_SIN_RESPUESTA = "El servidor no ha contestado. Puede que se haya guardado: recarga antes de repetirlo.";
 function _esLecturaApi_(accion){
   return /^(get|listar)/.test(accion) || /^(bootstrap|quienSoy|queHayNuevo|estadoAudioReunion)$/.test(accion);
@@ -3825,6 +3825,43 @@ function _solParteCfg_(pre, f, horas){
     sitio: 'parte', exige: 'Escribe tus notas sueltas en la justificación y SolarIA las redacta.',
     pedir: function(notas){ var d = _parteCtxIA_(f, horas()); d.notas = notas; return api.redactarParte(d); }};
 }
+/* ═══ «¿ES LA TAREA X?» EN EL PARTE · LAS DOS CARAS (04/11/2026, B1 de `docs/solaria-inventario.md`) ═══════════════════════════════════
+   🗣️ Daniel (04/11, «¿Dónde poner SolarIA ahora?» → «La tarea del parte»): con las notas escritas, SolarIA CLASIFICA cuál de SUS tareas es
+   (`proponerTareaParte`, `rutinas/proponer_tarea_parte.py`; no redacta nada). Un botón (no se llama al modelo al teclear) → UNA pregunta
+   «¿Es «<tarea>»?» con «Esa» / «Otra»; «Esa» pone categoría «Tarea» y la tarea en el formulario, «Otra» la suelta y se elige a mano.
+   Sin propuesta clara sólo sale un aviso. Una tarea que no esté en TU lista del desplegable se descarta también aquí (el servidor ya la filtró).
+   Interruptor: `SOLARIA_SITIOS.tareaparte`. Mismo mecanismo único (`_solIAHTML_`) que la redacción de las notas, justo debajo de ella. */
+function _tareasParteIA_(){ return (typeof TAREAS !== 'undefined' && typeof _fichaYo_ === 'function') ? _tareasResp_(TAREAS, _fichaYo_()) : []; }
+function _proponerTareaParteDemo_(d){
+  var ps = String(d.notas || '').toLowerCase().split(/[^a-záéíóúñ0-9]+/).filter(function(w){ return w.length > 3; }), t = _tareasParteIA_(), i, j, n;
+  for(i = 0; i < t.length; i++){ n = String(t[i].n || '').toLowerCase(); for(j = 0; j < ps.length; j++) if(n.indexOf(ps[j]) >= 0) return {ok: true, tarea: t[i].n, id: 'k'+(i+1)}; }
+  return {ok: true, tarea: '', id: ''};
+}
+function _proponerTareaPartePost_(d){
+  if(!_demoLocal_()) return api._post({action: 'proponerTareaParte', notas: d.notas});
+  return new Promise(function(ok){ setTimeout(function(){ ok(_proponerTareaParteDemo_(d)); }, 500); });
+}
+/* `pre` = el id de la caja de las notas; `f` = el formulario vivo. */
+function _solTareaCfg_(pre, f){
+  return {ta: '#'+pre, boton: 'Proponer la tarea', sitio: 'tareaparte', sigue: 'Tu elección sigue como estaba.', acepta: 'Esa', quita: 'Otra', calla: true,
+    exige: 'Escribe tus notas sueltas en la justificación y SolarIA propone la tarea.', valor: function(){ return f.just; },
+    antes: function(n){ return String(n).trim().length < 10 ? 'Cuenta un poco más de lo que hiciste (unas 10 letras) y SolarIA propone la tarea.' : ''; },
+    pedir: function(notas){ return api.proponerTareaParte({notas: notas}); },
+    adapta: function(r){
+      var t = r && r.ok !== false && r.tarea ? String(r.tarea) : '', mia = t && _tareasParteIA_().some(function(x){ return x.n === t; });
+      if(r && r.ok === false) return r;
+      return mia ? {ok: true, texto: t, nota: '¿Es «'+t+'»?'} : {ok: true, vacio: 'SolarIA no ve clara cuál de tus tareas es: elígela tú.'};
+    },
+    sinCaja: true,
+    leer: function(){ return {cat: f.cat, tarea: f.tarea, detalle: f.detalle, subcat: f.subcat}; },
+    escribe: function(w, s){
+      var o = w === 'prop' ? {cat: 'tareas', tarea: s.prop, detalle: '', subcat: ''} : s.orig;
+      f.cat = o.cat; f.tarea = o.tarea; f.detalle = o.detalle; f.subcat = o.subcat;
+      if(w === 'prop') tost('Tarea: '+s.prop);
+      if(typeof pintar === 'function') pintar();
+    }};
+}
+function _solTareaHTML_(pre, f){ return _tareasParteIA_().length ? _solIAHTML_('tp:'+pre, _solTareaCfg_(pre, f)) : ''; }
 /* ═══ «RESUMIR CON SOLARIA» AL FINALIZAR UNA REUNIÓN y «REDACTAR CON SOLARIA» EL MOTIVO DE UN DOCUMENTO · LAS DOS CARAS (02/11/2026) ═══
    🗣️ Daniel (02/11): «procesos que tomen muchos clics y que sean coñazo […] muchos clics o mucho escribir […] que podría
    resumirse». Los dos escriben en una caja que YA existe (`#blqResumen`; `#dMot` en el móvil y `[data-motivo]` en el escritorio) y
@@ -3844,7 +3881,7 @@ var SOLP = {}, SOLCFG = {}, SOLTXT = {}, _SOL_N_ = 0;
    apaga por tener la caja vacía: pulsado sin texto lleva el foco al marco y dice qué escribir (`_solAviso_`).
    LISTA DE CONTROL `SOLARIA_SITIOS`: un punto en `false` desaparece de las dos caras (Daniel decide con un toque cuáles quedan).
    El motivo de un documento NO está (04/11, Daniel: «Sí, retíralo»): quien pide cambios ya escribe el motivo. */
-var SOLARIA_SITIOS = {turno: true, parte: true, resumen: true, nuevatarea: true, anotaciones: true, orden: true};
+var SOLARIA_SITIOS = {turno: true, parte: true, resumen: true, nuevatarea: true, anotaciones: true, orden: true, tareaparte: true};
 function _solSitio_(k){ return SOLARIA_SITIOS[k] !== false; }
 var SOL_PENSANDO = 'SolarIA está escribiendo…';
 /* El error del modelo, dicho igual en todos los puntos: no disponible (+ el motivo si lo hay); lo manual sigue intacto. */
@@ -3888,7 +3925,7 @@ function _solAviso_(k, aviso){
   tost(aviso);
 }
 /* Opciones de `cfg` (todas menos `ta` y `pedir` son opcionales; hay UN solo mecanismo y las cuatro «propuestas de SolarIA» de la app lo usan):
-   `quita` (rótulo de descartar; «Descartar»), `nota0` (nota si SolarIA no dice nada), `sigue` (cola del error), `sinCaja` (no enseña la propuesta
+   `quita` (rótulo de descartar; «Descartar»), `acepta` («Usar esto»), `calla` (sin propuesta clara: sólo un aviso, ninguna barra), `nota0` (nota si SolarIA no dice nada), `sigue` (cola del error), `sinCaja` (no enseña la propuesta
    en su caja: la pinta la pantalla), `pie(s)` (html bajo la propuesta), `max` (tope del texto), `noIgual` (aviso si SolarIA devuelve lo mismo),
    `sinSesion` (no exige sesión: la maqueta de `?demo` contesta, y fuera de ella la propia petición falla y se dice),
    `repinta()` (repintar la pantalla entera en vez de sólo la barra), `pregunta()` → promesa de lo que se le pide (si no, lo escrito en la caja),
@@ -3905,7 +3942,7 @@ function _solBarraHTML_(k){
     return '<div class="nota" style="border:0;padding:4px 0">'+esc(s.nota || c.nota0 || 'Revísalo antes de usarlo.')+'</div>'+
       (c.sinCaja ? '' : '<div data-solprop style="white-space:pre-wrap;margin:4px 0 8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#0A0909;color:var(--ink2);font-size:13px;line-height:1.5">'+esc(s.prop)+'</div>')+
       (c.pie ? c.pie(s) : '')+
-      '<div class="nt-fila" style="margin-bottom:6px">'+bt('data-solusa', 'Usar esto', true)+bt('data-solquita', c.quita || 'Descartar')+'</div>';
+      '<div class="nt-fila" style="margin-bottom:6px">'+bt('data-solusa', c.acepta || 'Usar esto', true)+bt('data-solquita', c.quita || 'Descartar')+'</div>';
   if(s.fase === 'usada')
     return '<div class="nota" style="border:0;padding:4px 0">Propuesta aplicada. '+bt('data-soldeshace', 'Volver al original')+'</div>';
   return _solErrorHTML_(s.msg, c.sigue);
@@ -3946,6 +3983,7 @@ async function _solPedir_(k){
   suelta();
   if(!vigente()) return;
   if(c.valor && String(c.valor() == null ? '' : c.valor()) !== base){ delete SOLP[k]; _solPintar_(k); return; }   // la caja cambió mientras pensaba
+  if(r && r.vacio && c.calla){ delete SOLP[k]; _solPintar_(k); tost(r.vacio); return; }   // `calla`: sin propuesta clara no se enseña barra, sólo un aviso que se va solo
   if(r && r.vacio) SOLP[k] = {fase: 'error', msg: r.vacio};   // el modelo contestó, pero no hay nada que proponer
   else if(!r || r.ok === false || !r.texto) SOLP[k] = {fase: 'error', msg: _solErrorTxt_(r && r.motivo)};
   else if(c.noIgual && String(r.texto).trim() === String(base).trim()) SOLP[k] = {fase: 'error', msg: c.noIgual};
@@ -8679,7 +8717,7 @@ function _calorTurnos_(cv, sitio, coche){
         if(v && v.s==='no'){ c.no_pueden.push(nom); return; }
         if(!_dispPuede_(v,sitio)) return;
         var lleva=_celdaCoche_(v, sitio);        /* 04/11: el coche es POR SITIO; `coche` filtra (null = todos) como `agregado` */
-        if(coche!=null && lleva!==!!coche) return;
+        if(coche===true && !lleva) return;      /* 04/11: «uno engloba al otro» (Daniel): sólo «con coche» estrecha */
         c.n++;
         var esResp=!!consejo[nom];
         if(esResp) c.responsables.push(nom);
@@ -9696,7 +9734,7 @@ function _turnoFiltroCocheChips_(coche, attr){
   var chip = function(val, txt, on){
     return '<button type="button" class="pick'+(on?' on':'')+'" data-'+attr+'-coche="'+val+'">'+txt+'</button>';
   };
-  return chip('', 'Con o sin coche', coche==null)+chip('1', 'Con coche', coche===true)+chip('0', 'Sin coche', coche===false);
+  return chip('', 'Con o sin coche', coche!==true)+chip('1', 'Con coche', coche===true);   /* 04/11: «sin coche» ya es «todos» */
 }
 function _turnoFiltroHTML_(cv, fil, attr){
   var chip = function(a, val, txt, on){

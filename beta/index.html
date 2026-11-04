@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=655452d"></script>
+<script src="comun.js?v=205e997"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=561a9dd"></script>
@@ -122,7 +122,7 @@
 <script src="documentos.movil.js?v=2adac07"></script>
 <script src="sanciones.movil.js?v=98f8097"></script>
 <script src="reuniones.movil.js?v=118e718"></script>
-<script src="horas.movil.js?v=41b0355"></script>
+<script src="horas.movil.js?v=e41c36d"></script>
 <script src="equipo.movil.js?v=b89c0bc"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -448,6 +448,7 @@ var api={
   borrarPlantillaOrden: function(plantilla){ return api._post({action:"borrarPlantillaOrden",plantilla:plantilla}); },
   redactarTurno: function(d){ return _redactarTurnoPost_(d); },
   redactarParte: function(d){ return _redactarPartePost_(d); },
+  proponerTareaParte: function(d){ return _proponerTareaPartePost_(d); },
   resumirReunion: function(id,f,p,d){ return _resumirReunionPost_(id,f,p,d); },
   proponerOrdenDia: function(id,filas,texto,base){ return api._post({action:"proponerOrdenDia",id:id,filas:filas,texto:texto,base:base||undefined}); },
   transcribirVoz:   function(id,ext,datos){ return api._post({action:"transcribirVoz",id:id,ext:ext,datos:datos}); },
@@ -1752,7 +1753,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='8793956';
+var BUILD='b1a4707';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

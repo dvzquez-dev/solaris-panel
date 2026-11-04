@@ -871,6 +871,7 @@ function vFichar(){
       '<label class="campo" style="margin-bottom:6px"><span class="sc">Qué estuviste haciendo <span class="req">*</span></span>'+
         '<textarea id="fJust" data-borr="parte-just'+(ST.form.declararId!=null?'-'+ST.form.declararId:'')+'" placeholder="Qué hiciste, con quién y dónde. Mínimo 25 caracteres.">'+esc(ST.form.just)+'</textarea></label>'+
       _solIAHTML_('fJust', _solParteCfg_('fJust', ST.form, _parteHorasIA_))+
+      _solTareaHTML_('fJust', ST.form)+
       '<div class="justfila">'+
         '<div class="aroJ" id="aroJ"><svg viewBox="0 0 40 40"><circle class="f" cx="20" cy="20" r="16"/>'+
           '<circle class="p" cx="20" cy="20" r="16" pathLength="100"/></svg>'+

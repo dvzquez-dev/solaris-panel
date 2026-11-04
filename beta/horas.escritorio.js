@@ -675,7 +675,7 @@ function _declaCamposHTML_(f, ids, perf, selPerfil, opts, phDet){
         : '')
     : '<label style="flex:2;min-width:240px"><span class="sc" style="display:block;margin-bottom:5px">'+etiDet+'</span>'+
       '<input id="'+ids.det+'" value="'+esc(f.detalle)+'" placeholder="'+phDet+'" style="'+CAMPO_CSS+'"></label>';
-  return '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
+  var html = '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
       selPerfil+
       '<div style="min-width:170px"><span class="sc" style="display:block;margin-bottom:5px">Categor\u00eda</span>'+
       nxElige(ids.cat, [['tareas','Tarea'],['reunion','Reuni\u00f3n no convocada'],['turno','Turno no convocado'],
@@ -687,6 +687,7 @@ function _declaCamposHTML_(f, ids, perf, selPerfil, opts, phDet){
     '<textarea id="'+ids.just+'" rows="3" placeholder="Qu\u00e9 hiciste, con qui\u00e9n y d\u00f3nde. M\u00ednimo 25 caracteres." '+
       'style="'+CAMPO_CSS+';resize:vertical;font-size:12.5px">'+esc(f.just)+'</textarea></label>'+
     _solIAHTML_(ids.just, _solParteCfg_(ids.just, f, ids.just === 'bqJust' ? _bloqDurTotal_ : function(){ return 0; }));
+  return html+_solTareaHTML_(ids.just, f);   // 04/11 (B1): «¿Es la tarea X?» justo debajo de «Redactar con SolarIA»
 }
 
 function _fichaPanel_(){
