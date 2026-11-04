@@ -20,13 +20,17 @@ function revisoresDe(d){
      supiera por que.
      ⚠️ Y `archivo` pasa a ser EXPLICITO: un `else` que reparte autoridad es como se
      cuela un ambito nuevo en el reparto equivocado sin que nadie lo decida. */
+  /* 04/11: con REVISORES PROPUESTOS válidos en el documento va directo al PD (gemela de `revisores_de` del servidor). */
+  if(_revisoresPropuestosValidos_(d).length) return [PD_NOM];
   var r = d.amb==='archivo' ? [coordinadorDe(d.sub)]
         : d.amb==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
   /* 02/11: TODOS los autores (el que lo sube, los que nombra el documento y los ajustados), no sólo `autor`. */
   var au=_autoresDe_(d), noAutor=function(n){return au.indexOf(n)<0;};
   r=r.filter(noAutor);
-  if(!r.length) r=[PD_NOM,REV2_NOM].filter(noAutor);
+  /* 04/11: el PD es la excepción a «nadie revisa lo suyo» cuando es el último peldaño: si también es autor, le llega igual (no hay nadie
+     por encima). Sin duplicar si `REV2_NOM === PD_NOM`. */
+  if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n,i,a){ return a.indexOf(n)===i && (n===PD_NOM || noAutor(n)); });
   /* 01/11: SIN tercer peldaño. Antes acababa en `[PD_NOM]` sin volver a filtrar al autor: con `REV2_NOM === PD_NOM` y el PD
      de autor, el expediente se asignaba a su propio autor y no podía firmar NADIE, sin un error. Ahora `[]` es «no hay
      revisor asignable»: cada consumidor lo pinta («Sin revisor: avisa al Project Director») y nadie decide (`puedeDecidirDoc`). */
@@ -62,6 +66,7 @@ function _normDocE_(d, i){
     /* 31/10: el rastro de `cambiarAutorDoc` (PD/José), con los mismos nombres que el servidor y el móvil. */
     autor_original: d.autor_original || null, autor_cambiado_por: d.autor_cambiado_por || null,
     autor_cambiado_at: d.autor_cambiado_at || null,
+    autores_manual: Array.isArray(d.autores_manual) ? d.autores_manual : null,   /* 04/11: varios autores puestos a mano */
     sub:     d.subsistema || d.sub || '',
     tipo:    d.tipo || '',
     amb:     d.ambito || d.amb || '',
@@ -160,9 +165,10 @@ function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
    su pantalla: «En curso», la que ven el PD y el segundo revisor, ensena tambien `recibido` y
    `analizado`. */
 function puedeDecidirDoc(d){
-  if(!d || d.autor===ACTOR) return false;
+  if(!d) return false;
   if(_docYaPublicado_(d.est)) return false;      /* lo publicado no se mueve: el servidor no lo deja (comun.js) */
   var rev=revisoresDe(d), maxR=Math.max.apply(null,rev.map(rangoNom));
+  if(_autorQueNoDecide_(d,ACTOR,rev)) return false;      /* ni mandando por rango; 04/11: sólo el PD, si `revisoresDe` se lo da, decide lo suyo */
   if(!rev.length) return false;      /* sin revisor asignable, ni mandando por rango (maxR sería -Infinity) */
   if(rev.indexOf(ACTOR)<0 && rangoNom(ACTOR)<=maxR) return false;
   /* ⛔ SOLO `revision` CORTA AQUI, igual que el movil (20/08, 133.a). Con
@@ -229,7 +235,8 @@ function _previaDocE_(d, st){
   return '<div class="just" style="border-left-color:var(--warn)"><span class="sc">'+
     (fir?('decidió '+esc(fir)):'última decisión')+' · '+esc(acc||rot)+'</span>'+
     (d.nota ? esc(d.nota) : (acc==='Aprobado' ? 'Aprobado sin anotaciones.' : ''))+
-    (aju?'<br><span class="sc">Ajustó: '+esc(aju)+'</span>':'')+'</div>';
+    (aju?'<br><span class="sc">Ajustó: '+esc(aju)+'</span>':'')+
+    ((typeof _revisadoPorTxt_==='function' && _revisadoPorTxt_(d))?'<br><span class="sc">'+esc(_revisadoPorTxt_(d))+'</span>':'')+'</div>';
 }
 
 /* Los mismos avisos con la marca del escritorio. Mismo motivo que en el móvil para que
@@ -300,6 +307,9 @@ function _decDocLocalE_(d, acc, mot, tit, actor, at, aj){
   d.nota = (acc==='cambios' || acc==='rechazado') ? (mot||'') : '';
   d.revisor = actor || null;
   d.decision = {accion:acc, revisor:actor || null, at:at || null};
+  /* 04/11: como el servidor —aprobar con los revisores propuestos—: constan ellos de revisores y quien aprueba de quien valida. */
+  var _rp = ((acc==='aprobado' || acc==='anot') && typeof _revisoresPropuestosValidos_==='function') ? _revisoresPropuestosValidos_(d) : [];
+  if(_rp.length){ d.decision.revisadoPor = _rp; d.decision.validadoPor = actor || null; }
   if(acc==='anot' && aj && aj.autores) d.decision.ajustes = {autores:aj.autores};   /* 02/11: como el servidor, para que ninguno de ellos revise lo suyo */
   return d;
 }
@@ -337,7 +347,7 @@ function docCard(d){
     /* 21/10 (auditor 19, 🟡 6): la gemela del móvil — a quien lo SUBIÓ, qué hacer él. */
     ((typeof ACTOR!=='undefined' && d.autor===ACTOR) ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
       : 'Pídeselo a quien lo subió antes de decidir.</div></div>'));
-  var acc, _aut, arriba='', _autorP=_puedeCambiarAutor_(d.est, ACTOR) ? _autorPanelHTML_('a'+d.id+'-', d.id, d.autor, CAMPO_CSS) : '';
+  var acc, _aut, arriba='', _autorP=_puedeCambiarAutor_(d.est, ACTOR) ? _autorPanelHTML_('a'+d.id+'-', d.id, _autoresActualesDe_(d), CAMPO_CSS) : '';
   if(puede){
     /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el móvil (`comun.js` `_anotPanelHTML_`), con
        prefijo `d<id>-`: aquí se pintan varias fichas a la vez. Sólo donde se puede aprobar. */
@@ -347,7 +357,7 @@ function docCard(d){
     var _abEd = (typeof DOC_EDIT_AB!=='undefined') && !!DOC_EDIT_AB[d.id];
     acc=((_yaAnalizado_(d) || _autorP) ? '<div class="doc-edit'+(_abEd?' ab':'')+'"><button type="button" class="btn sm" data-docedit="'+d.id+'">Editar antes de decidir</button>'+
         '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS, {verTodas:true, excluir:ACTOR}) : '')+'</div></div>' : '');
-    arriba=
+    arriba=_revisionPropuestaHTML_(d, ACTOR)+
       '<textarea data-motivo data-borr="doc-motivo-'+esc(d.id)+'" placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
       /* ⛔⛔ APROBAR = PUBLICAR, y no se publica lo que nadie ha analizado. Esta cara ve
          `recibido` y `analizado` a proposito -Daniel, 05/08: en el movil «no aparecen
@@ -359,7 +369,7 @@ function docCard(d){
          algo que viene mal, y ninguno de los dos publica nada. */
       '<div class="acts">'+
         (_yaAnalizado_(d)
-          ? '<button class="btn pri" data-doc="'+d.id+'" data-acc="aprobado">Aprobar</button>'+
+          ? '<button class="btn pri" data-doc="'+d.id+'" data-acc="aprobado">'+_rotuloAprobarDoc_(d)+'</button>'+
             '<button class="btn" data-doc="'+d.id+'" data-acc="anot">Aprobar con anotaciones</button>'
           : '<span class="sc" style="align-self:center">A\u00fan sin analizar: se puede parar, no publicar.</span>')+
         '<button class="btn" data-doc="'+d.id+'" data-acc="cambios">Solicitar cambios</button>'+

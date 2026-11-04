@@ -20,13 +20,18 @@ function revisoresDe(e){
      supiera por que.
      ⚠️ Y `archivo` pasa a ser EXPLICITO: un `else` que reparte autoridad es como se
      cuela un ambito nuevo en el reparto equivocado sin que nadie lo decida. */
+  /* 04/11 (Daniel, `Manual_S-9001_27`): con REVISORES PROPUESTOS válidos en el documento va directo al PD, que aprueba «esos son los
+     revisores». Gemela de `revisores_de` del servidor (`probar_revisor_autor_doc.py`). */
+  if(_revisoresPropuestosValidos_(e).length) return [PD_NOM];
   var r = e.ambito==='archivo' ? [coordinadorDe(e.subsistema)]
         : e.ambito==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
   /* nadie revisa lo suyo — 02/11: TODOS los autores (el que lo sube, los que nombra el documento y los ajustados), no sólo `autor`. */
   var au=_autoresDe_(e), noAutor=function(n){return au.indexOf(n)<0;};
   r=r.filter(noAutor);
-  if(!r.length) r=[PD_NOM,REV2_NOM].filter(noAutor);
+  /* 04/11: el PD es la excepción a «nadie revisa lo suyo» cuando es el último peldaño: si también es autor, le llega igual (no hay nadie
+     por encima). Sin duplicar si `REV2_NOM === PD_NOM`. */
+  if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n,i,a){ return a.indexOf(n)===i && (n===PD_NOM || noAutor(n)); });
   /* 01/11: SIN tercer peldaño. Antes acababa en `[PD_NOM]` sin volver a filtrar al autor: con `REV2_NOM === PD_NOM` y el PD
      de autor, el expediente se asignaba a su propio autor y no podía firmar NADIE, sin un error. Ahora `[]` es «no hay
      revisor asignable»: cada consumidor lo pinta («Sin revisor: avisa al Project Director») y nadie decide (`puedeDecidirDoc`). */
@@ -92,6 +97,9 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq, aj){
   else if(acc==='rechazado'){ e.estado='rechazado'; e.nota=mot; }
   else return null;                       /* desconocida: no se toca NADA */
   if(acc==='anot' && aj && aj.autores) e.decision={accion:acc, ajustes:{autores:aj.autores}};   /* 02/11: como el servidor, para que ninguno de ellos revise lo suyo */
+  /* 04/11: como el servidor —aprobar con los revisores propuestos—, para que la ficha los enseñe antes del próximo refresco. */
+  var _rp=((acc==='aprobado'||acc==='anot') && typeof _revisoresPropuestosValidos_==='function') ? _revisoresPropuestosValidos_(e) : [];
+  if(_rp.length){ e.decision=Object.assign({accion:acc, revisor:yoNombre()}, e.decision||{}, {revisadoPor:_rp, validadoPor:yoNombre()}); }
   e.revisor=pilaDe(yoNombre());           /* constancia de quien decidio */
   return e;
 }
@@ -118,8 +126,8 @@ function puedeDecidirDoc(e){
   if(!e) return false;                                     /* como el escritorio: sin expediente, nadie decide */
   if(_docYaPublicado_(e.estado)) return false;            /* lo publicado no se mueve: el servidor no lo deja (comun.js) */
   var yo=yoNombre();
-  if(yo===e.autor) return false;                          /* ni mandando por rango */
   var rev=revisoresDe(e), maxR=Math.max.apply(null,rev.map(rangoNom));
+  if(_autorQueNoDecide_(e,yo,rev)) return false;          /* ni mandando por rango; 04/11: sólo el PD, si `revisoresDe` se lo da, decide lo suyo */
   if(!rev.length) return false;                           /* sin revisor asignable, ni mandando por rango (maxR sería -Infinity) */
   var habilitado = rev.indexOf(yo)>=0 || rangoNom(yo)>maxR;
   if(!habilitado) return false;
@@ -415,7 +423,7 @@ function _botonesDecM_(e){
      ha pasado el analisis -- son justo la forma de pararlo--; `aprobado` y `anot`
      publican, y el servidor los rechaza. Quitar los cuatro seria el fallo contrario. */
   return (_yaAnalizado_(e)
-      ? '<button class="btn pri" style="flex:1 1 46%" data-p data-dec="aprobado" data-id="'+e.id+'">Aprobar</button>'+
+      ? '<button class="btn pri" style="flex:1 1 46%" data-p data-dec="aprobado" data-id="'+e.id+'">'+_rotuloAprobarDoc_(e)+'</button>'+
         '<button class="btn" style="flex:1 1 46%" data-p data-dec="anot" data-id="'+e.id+'">Con anotaciones</button>'
       : '<p class="rnota" style="flex:1 1 100%;margin:0">A\u00fan sin analizar: se puede parar, no publicar.</p>')+
     '<button class="btn" style="flex:1 1 46%" data-p data-dec="cambios" data-id="'+e.id+'">Solicitar cambios</button>'+
@@ -435,7 +443,8 @@ function _previaDocM_(e){
   return '<div class="avisolargo" style="margin:10px 0"><b>'+
     (fir?('Decidió '+esc(fir)):'Última decisión')+(acc?' · '+esc(acc):'')+'</b> '+
     (e.nota ? esc(e.nota) : (acc==='Aprobado' ? 'Aprobado sin anotaciones.' : ''))+
-    (aju?'<br>Ajustó: '+esc(aju):'')+'</div>';
+    (aju?'<br>Ajustó: '+esc(aju):'')+
+    ((typeof _revisadoPorTxt_==='function' && _revisadoPorTxt_(e))?'<br>'+esc(_revisadoPorTxt_(e)):'')+'</div>';
 }
 
 function verDoc(id){
@@ -458,7 +467,7 @@ function verDoc(id){
   }
   var _mioDoc = _docAutorHTML_(e);
   var acc = puede
-    ? '<h4>Tu decisión</h4>'+
+    ? '<h4>Tu decisión</h4>'+_revisionPropuestaHTML_(e, yoNombre())+
       /* ⛔ «CON ANOTACIONES» NO ES UN ADORNO: el título corregido SÓLO VIAJA en esa rama
          (`movil.html` construye `extra` únicamente ahí). Sin esas dos palabras, quien
          corrige el título y pulsa **Aprobar** lo publica con el VIEJO y sin un solo aviso:
@@ -558,7 +567,7 @@ function verDoc(id){
     '<p class="rnota" style="margin-top:10px">'+(sinRev?'Sin revisor: avisa al Project Director.':'Revisa: <b>'+revs+'</b>')+'</p>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
     _autorRastroHTML_(e)+_autoresDocHTML_(e)+
-    (_puedeCambiarAutor_(e.estado, yoNombre()) ? _autorPanelHTML_('dA', e.id, e.autor, '') : '')+
+    (_puedeCambiarAutor_(e.estado, yoNombre()) ? _autorPanelHTML_('dA', e.id, _autoresActualesDe_(e), '') : '')+
     (_mioDoc ? '' : _previaDocM_(e))+
     /* 01/11: sólo el PD, y sólo enseña algo si el expediente está decidido (`comun.js`); para cualquier otro es ''. */
     _fbpdRaiz_('ficha', e.id, 'btn mini')+

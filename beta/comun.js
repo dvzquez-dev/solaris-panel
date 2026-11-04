@@ -12569,7 +12569,8 @@ function _docAutorModelo_(e){
     /* El enlace sólo si es uno de verdad: `Codigo.gs` pone `'#notion'` de marcador y un enlace muerto con pinta de vivo
        es peor que ninguno. */
     var url=String(e.url||'');
-    return {tipo:'decidido', html:'<b>'+esc(acc)+'.</b> '+(aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+
+    var rv=(typeof _revisadoPorTxt_==='function') ? _revisadoPorTxt_(e) : '';   /* 04/11: quién lo revisó y quién lo validó, si los propuestos */
+    return {tipo:'decidido', html:'<b>'+esc(acc)+'.</b> '+(aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+(rv?'<br><span class="sc">'+esc(rv)+'</span>':'')+
       (url.indexOf('http')===0
         ? '<br><a href="'+esc(url)+'" target="_blank" rel="noopener">Ver la página publicada</a>' : '')};
   }
@@ -12668,7 +12669,9 @@ function _anotActualDe_(e){
    (`analisis.autores`), o si no hay, el autor del expediente. Sin nada, `[]`. */
 function _autoresActualesDe_(e){
   var a = e && e.analisis && e.analisis.autores, l = [];
-  if (a && typeof a === 'object')
+  /* 04/11: la lista que PD/José pusieron a mano (`autores_manual`, varios autores) manda sobre la del documento. */
+  if (e && Array.isArray(e.autores_manual) && e.autores_manual.length) l = e.autores_manual;
+  else if (a && typeof a === 'object')
     l = (Array.isArray(a.casados) ? a.casados : []).concat(Array.isArray(a.sin_casar) ? a.sin_casar : []);
   if (!l.length && e && e.autor) l = [e.autor];
   var vistos = {};
@@ -12686,6 +12689,46 @@ function _autoresDe_(e){
     if (n && !vistos[n]){ vistos[n] = 1; l.push(n); }
   });
   return l;
+}
+
+/* 04/11 · REVISORES PROPUESTOS por el documento (`analisis.revisores.casados`, de sus pies y cabeceras; Daniel, `Manual_S-9001_27`:
+   «que aparezcan los revisores propuestos, que venga a mí directamente y que yo le pueda aprobar que esos son los revisores»).
+   `_revisoresPropuestosDe_`: los casados con el equipo, sin repetir. `_revisoresPropuestosValidos_`: los que CUENTAN como revisión —
+   `[]` si alguno es autor del documento (revisaría lo suyo: entonces el reparto es el de siempre). Gemelas de
+   `revisores_propuestos_de_doc` / `revisores_propuestos_validos` del servidor. */
+function _revisoresPropuestosDe_(e){
+  var r = e && e.analisis && e.analisis.revisores, l = r && Array.isArray(r.casados) ? r.casados : [], vistos = {};
+  return l.map(function(n){ return String(n == null ? '' : n).trim(); }).filter(function(n){
+    if (!n || vistos[n]) return false; vistos[n] = 1; return true; });
+}
+function _revisoresPropuestosValidos_(e){
+  var p = _revisoresPropuestosDe_(e), au = _autoresDe_(e);
+  return p.length && !p.some(function(n){ return au.indexOf(n) >= 0; }) ? p : [];
+}
+/* 04/11 · ¿`yo` es autor y por tanto NO decide lo suyo? Sólo el PD es la excepción, y sólo si `revisoresDe` se lo da (no hay nadie
+   por encima). Lo usan `puedeDecidirDoc` de las dos caras; el servidor tiene la suya en `puede_decidir`. */
+function _autorQueNoDecide_(e, yo, rev){
+  return _autoresDe_(e).indexOf(yo) >= 0 && !(yo === PD_NOM && rev.indexOf(yo) >= 0);
+}
+/* 04/11 · LA NOTA de «Tu decisión» cuando el documento trae revisores propuestos o el que decide es su autor (`''` si no hay nada que
+   decir). Con propuestos válidos: «Apruebas que lo revisaron X e Y» (al aprobar constan ellos de revisores y tú de quien valida). Autor
+   que decide lo suyo (el PD, sin nadie por encima): «Eres autor de este documento». `yo` = quien mira. */
+function _revisionPropuestaHTML_(e, yo){
+  var p = _revisoresPropuestosValidos_(e), esAutor = _autoresDe_(e).indexOf(yo) >= 0, h = '';
+  if (esAutor) h += '<p class="rnota" style="margin:6px 0 0"><b>Eres autor de este documento.</b>' +
+    (p.length ? '' : ' Te llega a ti porque no hay nadie por encima que pueda revisarlo.') + '</p>';
+  if (p.length) h += '<p class="rnota" style="margin:6px 0 0">El documento lo han revisado <b>' + p.map(esc).join(' y ') +
+    '</b>. Al aprobar constan ellos como revisores y tú como quien lo valida.</p>';
+  return h;
+}
+/* 04/11 · el rótulo del botón de aprobar: «Aprobar», o «Aprobar con los revisores propuestos» si el documento los trae. */
+function _rotuloAprobarDoc_(e){ return _revisoresPropuestosValidos_(e).length ? 'Aprobar con los revisores propuestos' : 'Aprobar'; }
+
+/* 04/11 · el texto de «Revisado por …» de una decisión con revisores propuestos: `''` si la decisión no los lleva. */
+function _revisadoPorTxt_(e){
+  var d = e && e.decision, r = d && Array.isArray(d.revisadoPor) ? d.revisadoPor : [];
+  if (!r.length) return '';
+  return 'Revisado por ' + r.join(', ') + (d.validadoPor ? ' · validado por ' + d.validadoPor : '');
 }
 
 /* 02/11 — LAS ETIQUETAS QUE SUGIERE LA IA, APARTE DE LAS DEL AUTOR (`analisis.etiquetas_sugeridas`: extra del banco que el autor no
@@ -12853,7 +12896,8 @@ function _anotAMedias_(){
   var cs = document.querySelectorAll('[data-anot],[data-autor]');   /* 31/10: y el buscador de autor, con un nombre a medias */
   for (var i = 0; i < cs.length; i++){
     if (cs[i].getAttribute('data-ocupado') === '1') return true;
-    if (cs[i].hasAttribute('data-autor') && elegirPersonasMarcadas(cs[i].getAttribute('data-autor') + 'Autor').length) return true;   /* alguien ya elegido */
+    /* 04/11: el panel de autores nace con los de ahora marcados (varios autores): "a medias" es que lo marcado difiera de lo de partida. */
+    if (cs[i].hasAttribute('data-autor') && JSON.stringify(elegirPersonasMarcadas(cs[i].getAttribute('data-autor') + 'Autor')) !== (cs[i].getAttribute('data-autorinicial') || '[]')) return true;
     if (cs[i].hasAttribute('data-autoresorig') && JSON.stringify(elegirPersonasMarcadas(cs[i].getAttribute('data-anot') + 'Autores')) !== cs[i].getAttribute('data-autoresorig')) return true;   /* 02/11: autores tocados */
     var xs = cs[i].querySelectorAll('input,textarea,select');
     for (var j = 0; j < xs.length; j++){
@@ -13326,19 +13370,22 @@ function _anotClic_(ev, buscar){
 function _puedeCambiarAutor_(estado, yo){
   return ['recibido','analizado','revision','cambios'].indexOf(estado) >= 0 && !!yo && (yo === PD_NOM || yo === REV2_NOM);
 }
-/* El roster activo MENOS el PD, José y el autor de ahora: ninguno de los dos revisores puede quedar de autor. */
-function _autorCandidatos_(actual){
-  return _activos_().map(function(m){ return m.nombre; })
-    .filter(function(n){ return n !== PD_NOM && n !== REV2_NOM && n !== actual; });
+/* El roster activo. 04/11: ya SIN quitar al PD ni a José (Daniel, `Manual_S-9001_27`: él es autor y le llega igual; `revisoresDe` sabe a quién
+   subir) ni al autor de ahora (con varios autores, los de ahora van marcados y se quitan con la ×). */
+function _autorCandidatos_(){
+  return _activos_().map(function(m){ return m.nombre; });
 }
-function _autorPanelHTML_(pre, id, actual, css){
+/* `actuales`: la LISTA de autores de ahora (`_autoresActualesDe_`), marcada de partida. 04/11 (Daniel: «que me deje poner más de un
+   autor»): el selector de personas en modo VARIOS —chips con autocompletado y «Ver lista», se añade y se quita—; el botón guarda la lista. */
+function _autorPanelHTML_(pre, id, actuales, css){
   if (typeof document !== 'undefined' && document.head) _anotCss_();
   var st = css ? ' style="' + css + '"' : '';
-  return '<div id="' + pre + 'Autor" data-autor="' + pre + '" data-autordoc="' + esc(String(id)) + '" style="margin-top:10px">' +
-    /* El selector de personas ÚNICO, de uno en uno (antes: `<input list>` + `<datalist>`). */
-    _anotCampoHTML_('Autor', 'Ahora: ' + esc(actual || '—'),
-      elegirPersonas(pre + 'Autor', {universo:_autorCandidatos_(actual), multi:false, titulo:'Autor', vacio:'Escribe un nombre o pulsa «Ver lista».'}) +
-      '<button type="button" class="btn" style="margin-top:8px;width:100%" data-autorcambiar="' + pre + '">Cambiar autor</button>', 'div') + '</div>';
+  var l = Array.isArray(actuales) ? actuales : (actuales ? [actuales] : []);
+  return '<div id="' + pre + 'Autor" data-autor="' + pre + '" data-autordoc="' + esc(String(id)) + '" data-autorinicial="' + esc(JSON.stringify(l)) +
+    '" style="margin-top:10px">' +
+    _anotCampoHTML_('Autores', 'Ahora: ' + esc(l.join(', ') || '—'),
+      elegirPersonas(pre + 'Autor', {universo:_autorCandidatos_(), marcadas:l, multi:true, titulo:'Autores', vacio:'Escribe un nombre o pulsa «Ver lista».'}) +
+      '<button type="button" class="btn" style="margin-top:8px;width:100%" data-autorcambiar="' + pre + '">Guardar autores</button>', 'div') + '</div>';
 }
 /* «Autor cambiado por X (antes: Y)»: lo ve cualquiera que abra la ficha. Vacío si nadie lo cambió. */
 function _autorRastroHTML_(e){
@@ -13351,13 +13398,20 @@ function _autorRastroHTML_(e){
    bien claras en la app». La portada con esos autores la pone el publicador; «con anotaciones» es sólo para otro arreglo. Con un solo
    autor casado no hay nada que explicar (ya sale como autor del expediente). `''` si no hay. */
 function _autoresDocHTML_(e){
-  var a = e && e.analisis && e.analisis.autores;
-  if (!a || typeof a !== 'object') return '';
-  var ok = Array.isArray(a.casados) ? a.casados : [], sin = Array.isArray(a.sin_casar) ? a.sin_casar : [];
-  if (ok.length + sin.length < 2 && !sin.length) return '';
-  return '<p class="rnota" style="margin:8px 0 0">Autores del documento: ' + ok.map(esc).join(', ') +
-    (sin.length ? (ok.length ? ', ' : '') + sin.map(function(n){ return esc(n) + ' (no está en el equipo)'; }).join(', ') : '') +
-    '. La portada saldrá así sin hacer nada; «con anotaciones» sirve sólo para ajustar otra cosa.</p>';
+  /* 04/11: SIEMPRE todos los autores (Daniel: «que aparezca si hay varios autores»): los de la lista a mano, los del documento o, si no hay,
+     el de la cuenta que lo subió. Los que el documento nombra y no están en el equipo salen marcados. */
+  var l = _autoresActualesDe_(e), a = e && e.analisis && e.analisis.autores;
+  var sin = !(e && Array.isArray(e.autores_manual) && e.autores_manual.length) && a && Array.isArray(a.sin_casar) ? a.sin_casar : [];
+  var rv = _revisoresPropuestosDe_(e), rvs = e && e.analisis && e.analisis.revisores && Array.isArray(e.analisis.revisores.sin_casar) ? e.analisis.revisores.sin_casar : [];
+  var h = '';
+  if (l.length) h += '<p class="rnota" style="margin:8px 0 0">' + (l.length > 1 ? 'Autores' : 'Autor') + ': ' +
+    l.map(function(n){ return esc(n) + (sin.indexOf(n) >= 0 ? ' (no está en el equipo)' : ''); }).join(', ') +
+    (l.length > 1 && !(e && e.autores_manual) ? '. La portada saldrá así sin hacer nada; «con anotaciones» sirve sólo para ajustar otra cosa' : '') + '.</p>';
+  var fir = _revisadoPorTxt_(e);   /* ya aprobado con los propuestos: lo que consta (revisores y quien validó) manda sobre lo que proponía el documento */
+  if (fir) h += '<p class="rnota" style="margin:8px 0 0">' + esc(fir) + '.</p>';
+  else if (rv.length || rvs.length) h += '<p class="rnota" style="margin:8px 0 0">Revisado por: ' +
+    rv.map(esc).concat(rvs.map(function(n){ return esc(n) + ' (no está en el equipo)'; })).join(', ') + ' <span style="color:var(--ink3)">(según el documento)</span>.</p>';
+  return h;
 }
 /* El delegado de «Cambiar autor». `buscar(id)` da el expediente de la cara; `alCambiar(e, upd)` repinta. */
 async function _autorClic_(ev, buscar, alCambiar){
@@ -13366,14 +13420,15 @@ async function _autorClic_(ev, buscar, alCambiar){
   var pre = b.getAttribute('data-autorcambiar'), c = document.getElementById(pre + 'Autor');
   var e = c ? buscar(c.getAttribute('data-autordoc')) : null;
   if (!e) return;
-  var nuevo = _autorCandidatos_(e.autor).filter(function(n){ return n === elegirPersonasMarcadas(pre + 'Autor')[0]; })[0];
-  if (!nuevo){ tost('Elige a alguien de la lista (no puede ser Daniel ni José).'); return; }
+  var nuevo = elegirPersonasMarcadas(pre + 'Autor');
+  if (!nuevo.length){ tost('Elige al menos un autor.'); return; }
+  if (nuevo.join('|') === _autoresActualesDe_(e).join('|')){ tost('Esos ya son los autores: no hay nada que cambiar.'); return; }
   if (typeof backendOK === 'undefined' || !backendOK || typeof SESION === 'undefined' || !SESION){
     tost('Sin conexión con el backend: el autor NO se ha cambiado.'); return; }
   b.disabled = true;
   try {
     var upd = await api.cambiarAutorDoc(e.id, nuevo, e.ref);
-    tost('Autor cambiado a ' + nuevo + '.');
+    tost((nuevo.length > 1 ? 'Autores cambiados a ' : 'Autor cambiado a ') + nuevo.join(', ') + '.');
     alCambiar(e, upd);
   } catch (err) {
     b.disabled = false;
