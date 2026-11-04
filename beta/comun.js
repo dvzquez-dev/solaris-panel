@@ -2106,7 +2106,7 @@ function _vetoFilas_(ss){
       '<b style="color:var(--red2)">Procede veto</b> · '+esc(_vetoPila_(s.nombre))+
       ' <span class="sc">tiene 0 puntos y recibe otra sanción (Art. 32)</span>'+
       '<div class="sc" style="margin:5px 0">Avísale del veto: al marcarlo corre el plazo de '+esc(VETOS.plazo_dias)+' días.</div>'+
-      '<button class="btn sm" data-vavisar="'+esc(s.id)+'">Hecho, ya se lo dije</button> <span class="sc" data-verr></span></div>');
+      '<button class="btn sm" data-vavisar="'+esc(s.id)+'" data-vnom="'+esc(_vetoPila_(s.nombre))+'">Hecho, ya se lo dije</button> <span class="sc" data-verr></span></div>');
   });
   (VETOS&&VETOS.entradas||[]).forEach(function(e){
     if(e.fase==='esperar'){
@@ -2117,8 +2117,8 @@ function _vetoFilas_(ss){
       out.push('<div class="veto" data-vdsanc="'+esc(e.sancion_id)+'" style="padding:9px 0;border-top:1px solid var(--line)">'+
         '<b style="color:var(--red2)">Decide si se veta</b> · '+esc(_vetoPila_(e.nombre))+
         ' <span class="sc">se le avis\u00f3 el '+esc(_vetoDmy_(e.aviso_at))+'; el plazo venci\u00f3 el '+esc(_vetoDmy_(e.vence))+'.</span>'+
-        '<div style="margin:6px 0"><button class="btn sm" data-vdec="vetar" data-vid="'+esc(e.sancion_id)+'">Decido vetar</button> '+
-        '<button class="btn sm" data-vdec="no_vetar" data-vid="'+esc(e.sancion_id)+'">Decido no vetar</button> '+
+        '<div style="margin:6px 0"><button class="btn sm" data-vdec="vetar" data-vid="'+esc(e.sancion_id)+'" data-vnom="'+esc(_vetoPila_(e.nombre))+'">Decido vetar</button> '+
+        '<button class="btn sm" data-vdec="no_vetar" data-vid="'+esc(e.sancion_id)+'" data-vnom="'+esc(_vetoPila_(e.nombre))+'">Decido no vetar</button> '+
         '<span class="sc" data-verr></span></div>'+
         '<div class="sc">Esto solo lo anota: el veto lo ejecuta la Junta.</div></div>');
     }
@@ -2128,21 +2128,33 @@ function _vetoFilas_(ss){
 /* Engancha los botones de `_vetoFilas_` dentro de `raiz` (o el documento) y repinta con `despues`. */
 function _engVeto_(despues, raiz){
   function sub(sel){ return Array.prototype.slice.call((raiz||document).querySelectorAll(sel)); }
-  function aplica(b, id, accion, txt){
+  /* 04/11 (acciones graves): el veto es una decisión sobre una persona, así que (1) SE PREGUNTA antes, con a quién y qué queda
+     anotado, y (2) mientras una vuelve del servidor se apagan TODOS los botones de la fila: «Decido vetar» y «Decido no vetar» a
+     la vez mandaban las dos, y el servidor se quedaba con la última. Con el fallo, todos vuelven a estar vivos. */
+  async function aplica(b, id, accion, txt, pregunta){
+    if(b.disabled) return;
+    if(!(await dialogoSiNo(pregunta))) return;
     var er=b.parentNode.querySelector('[data-verr]') || b.parentNode.parentNode.querySelector('[data-verr]');
-    b.disabled=true;
-    accion().then(function(r){
+    var fila=b.closest('.veto') || b.parentNode, hermanos=Array.prototype.slice.call(fila.querySelectorAll('button'));
+    hermanos.forEach(function(x){ x.disabled=true; });
+    try{
+      var r=await accion();
       var v=r&&r.veto, L=VETOS.entradas, i;
       for(i=0;i<L.length;i++) if(String(L[i].sancion_id)===String(id)){ L.splice(i,1); break; }
       if(v) L.push(v);
       despues(); tost(txt);
-    }).catch(function(e){ b.disabled=false; if(er) er.textContent=(e&&e.message)||String(e); });
+    }catch(e){ hermanos.forEach(function(x){ x.disabled=false; }); if(er) er.textContent=(e&&e.message)||String(e); }
   }
   sub('[data-vavisar]').forEach(function(b){ b.onclick=function(){
-    aplica(b, b.dataset.vavisar, function(){ return api.avisarVeto(b.dataset.vavisar); }, 'Anotado: el reloj del veto ya corre.');
+    aplica(b, b.dataset.vavisar, function(){ return api.avisarVeto(b.dataset.vavisar); }, 'Anotado: el reloj del veto ya corre.',
+      'Anotar que ya le has avisado del veto a '+(b.dataset.vnom||'esta persona')+'.'+String.fromCharCode(10,10)+
+      'Desde ese momento corre el plazo de '+VETOS.plazo_dias+' días y no se puede quitar. ¿Ya se lo has dicho?');
   }; });
   sub('[data-vdec]').forEach(function(b){ b.onclick=function(){
-    aplica(b, b.dataset.vid, function(){ return api.cerrarVeto(b.dataset.vid, b.dataset.vdec); }, 'Decisi\u00f3n anotada.');
+    var vetar=b.dataset.vdec==='vetar', quien=b.dataset.vnom||'esta persona';
+    aplica(b, b.dataset.vid, function(){ return api.cerrarVeto(b.dataset.vid, b.dataset.vdec); }, 'Decisi\u00f3n anotada.',
+      (vetar ? 'Decides VETAR a '+quien+'.' : 'Decides NO vetar a '+quien+'.')+String.fromCharCode(10,10)+
+      (vetar ? 'Queda anotado para la Junta, que es quien ejecuta el veto.' : 'Queda anotado y el caso se cierra.')+' ¿Seguro?');
   }; });
 }
 
@@ -4748,6 +4760,10 @@ function personasVerLista(id){
    que no se parecen a nada). Devuelve una promesa de true/false; con `o.campo`, del texto escrito o `null`. */
 function dialogoSiNo(texto, o){
   o=o||{}; _pselCss_();
+  /* 04/11 (acciones graves): UN diálogo a la vez. Un doble toque sobre un botón que pregunta abría DOS preguntas y, con dos «sí»,
+     mandaba la acción DOS veces (aprobar una sanción, rechazar un documento…). La segunda pregunta, mientras hay otra abierta,
+     no se abre y contesta «no» (o `null` si pedía un texto): la acción del segundo toque no se hace. */
+  if(document.querySelector('[data-dlg]')) return Promise.resolve(o.campo ? null : false);
   return new Promise(function(res){
     var ov=document.createElement('div'); ov.className='psel-ov'; ov.setAttribute('data-dlg','1');
     ov.style.alignItems='center'; ov.style.justifyContent='center';   /* 01/11: a ≥900 px `.psel-ov` es el cajón de la derecha; un sí/no va en medio */
@@ -4780,6 +4796,7 @@ function dialogoTexto(texto, o){
    (`disabled`); promesa del valor elegido, o `null` si se cancela o se toca fuera. `opciones`: lista de textos. */
 function dialogoElegir(texto, opciones, o){
   o=o||{}; _pselCss_();
+  if(document.querySelector('[data-dlg]')) return Promise.resolve(null);   /* 04/11: UN diálogo a la vez (ver `dialogoSiNo`) */
   return new Promise(function(res){
     var ov=document.createElement('div'); ov.className='psel-ov'; ov.setAttribute('data-dlg','1');
     ov.style.justifyContent='center'; ov.style.alignItems='center';
@@ -5164,6 +5181,55 @@ function _etSancFila_(pts, origen, extra){
     return (extra && extra.deshace ? 'premio deshecho' : 'premio') + (comp ? ' · ' + comp + ' h' : '');
   if (o === 'revocacion') return 'revocación · ' + _etPtsSanc_(_ptsSanc_(pts));
   return _etPtsSanc_(_ptsSanc_(pts));
+}
+
+/* 04/11 (acciones graves): UN CERROJO POR CLAVE. Mientras una acción de esa clave está en marcha (preguntando, o esperando al
+   servidor) cualquier otro toque sobre la MISMA clave no hace nada. Es lo que impide que «Aprobar» y «Rechazar» de un mismo documento
+   se manden a la vez —cada botón se apagaba a sí mismo, no al contrario—. `clave` es un texto o una función de los argumentos del
+   manejador (si da `null`, ese toque no es de los vigilados y pasa sin cerrojo). Devuelve el manejador, que devuelve una promesa. */
+var CERROJOS = {};
+function _conCerrojo_(clave, fn){
+  return function(){
+    var self = this, args = arguments, k = typeof clave === 'function' ? clave.apply(self, args) : clave;
+    if(k == null) return fn.apply(self, args);
+    if(CERROJOS[k]) return Promise.resolve();
+    CERROJOS[k] = true;
+    var libera = function(){ delete CERROJOS[k]; };
+    var p; try{ p = Promise.resolve(fn.apply(self, args)); }catch(e){ libera(); throw e; }
+    return p.then(function(r){ libera(); return r; }, function(e){ libera(); throw e; });
+  };
+}
+
+/* 04/11: LA PREGUNTA ANTES DE APROBAR UN DOCUMENTO (aprobar lo PUBLICA en Notion y en el Libro de Datos), para las dos caras. */
+function _avisoAprobarDoc_(titulo, acc){
+  var NL = String.fromCharCode(10);
+  return 'Aprobar «' + titulo + '»' + (acc === 'anot' ? ' con tus anotaciones' : '') + '.' + NL + NL +
+    'Se publica en Notion y en el Libro de Datos en un par de minutos. ¿Seguro?';
+}
+
+/* 04/11 (acciones graves, Daniel: «lo más grave que existe»): LA PREGUNTA ANTES DE DECIDIR UNA SANCIÓN SUELTA, UNA vez para las dos
+   caras — QUÉ (aplicar/rechazar/justificar), A QUIÉN y CUÁNTO (`_etSancFila_`, el mismo rótulo que la fila). Antes el móvil decía
+   «¿Aprobar? Esto se aplica ya» sin nombre ni puntos (y rechazar no preguntaba nada), y el escritorio ponía el nombre pero no los
+   puntos. `s` es la sanción tal como llega del servidor. */
+function _avisoDecidirSanc_(s, acc){
+  s = s || {};
+  var quien = _pilaDeM_(s.nombre) || s.nombre || 'esta persona', NL = String.fromCharCode(10);
+  var que = {aprobar:'Aplicar', rechazar:'Rechazar', justificar:'Justificar'}[acc] || acc;
+  var cola = {aprobar:'Se aplica ya (Notion y comunicado): no es un borrador.',
+              rechazar:'Se descarta: no resta puntos y no vuelve a la cola.',
+              justificar:'Consta como decidida y no resta puntos.'}[acc] || '';
+  return '¿' + que + ' la sanción de ' + quien + '?' + NL + (s.motivo || '') + ' · ' + _etSancFila_(s.puntos, s.origen, s.extra) +
+    NL + NL + cola;
+}
+
+/* 04/11: LA PREGUNTA ANTES DE CERRAR UN BLOQUE (el disparo: Notion + comunicado), UNA vez para las dos caras. `items` lleva la
+   decisión de cada fila en `dec` (`_decDe_`); se cuenta cuántas se aplican, se rechazan y se justifican. */
+function _avisoCerrarBloque_(nombre, items){
+  var c = {aceptar:0, rechazar:0, justificar:0}, NL = String.fromCharCode(10);
+  (items || []).forEach(function(x){ c[_decDe_(x)]++; });
+  return 'Vas a cerrar el bloque «' + nombre + '».' + NL + NL + c.aceptar + ' se aplican' +
+    (c.rechazar ? ' · ' + c.rechazar + ' se rechazan' : '') + (c.justificar ? ' · ' + c.justificar + ' se justifican' : '') + '.' +
+    NL + NL + 'Esto aplica las sanciones aceptadas en Notion y manda el comunicado. ¿Seguimos?';
 }
 
 /* ══ REVOCAR UNA SANCION = LA VIA DE APELACION DEL RRI ══════════════════════
@@ -5557,6 +5623,14 @@ async function _enviarSancionForm_(o){
   }
   if(typeof backendOK==='undefined' || !backendOK || !SESION){
     msg('Sin conexión no se puede: esto escribe en la cola de verdad.', true); return {ok:false}; }
+  /* 04/11 (acciones graves): PONER UNA SANCIÓN SE PREGUNTA (a quién, cuánto, por qué) y un segundo toque mientras se pregunta no
+     hace nada. Va a la cola de verdad, a Notion y a Discord en minutos; el único modo de quitarla es una revocación a mano. */
+  if(bt.disabled) return {ok:false};
+  var NL = String.fromCharCode(10);
+  if(!(await dialogoSiNo('Poner a '+(_pilaDeM_(quien)||quien)+' '+_etSancFila_(pts, 'manual')+'.'+NL+texto+NL+NL+
+      'Se aplica en Notion y se avisa en Discord en unos minutos'+(esDePlazo ? '; antes se mueve el plazo de la tarea' : '')+
+      '. Quitarla después exige una revocación. ¿Seguro?'))) return {ok:false};
+  if(bt.disabled) return {ok:false};
   bt.disabled=true; var prev=bt.textContent; bt.textContent='Guardando…';
   var _movido=false;
   try{

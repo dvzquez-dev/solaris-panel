@@ -865,12 +865,25 @@ function _engMisSanc_(){
     };
   });
 }
+/* 04/11 (acciones graves): LA PREGUNTA ANTES DE RESOLVER UNA APELACIÓN — estimar devuelve puntos o quita la tarea, y la respuesta le
+   llega a la persona. Dice QUÉ se decide y SOBRE QUIÉN. `datos` es lo que se manda (`decision`, `quitar`, `plazo`). */
+function _avisoApelE_(ap, datos){
+  var quien = ((_m(ap.autor) && _m(ap.autor).pila) || ap.autor || 'esta persona'), NL = String.fromCharCode(10);
+  var que = datos.quitar ? 'Estimar la apelación de ' + quien + ' y quitarle la tarea.'
+    : datos.decision === 'parcial' ? 'Rebajar a aviso la sanción de ' + quien + ': se le devuelven los puntos.'
+    : datos.decision === 'desestimada' ? 'Desestimar la apelación de ' + quien + ': todo se queda como está.'
+    : datos.plazo ? 'Estimar la apelación de ' + quien + ' con el nuevo plazo (' + datos.plazo + ').'
+    : 'Estimar la apelación de ' + quien + ': se le devuelven los puntos de la sanción.';
+  return que + NL + NL + 'Se le avisa y la respuesta queda con tu nombre. ¿Seguro?';
+}
 function _engApela_(){
   $$('[data-apid]').forEach(function(caja){
     var ap = null, i, L = _apelLista_();
     for (i = 0; i < L.length; i++) if (L[i].id === caja.dataset.apid) ap = L[i];
-    function resolver(b, datos){
+    async function resolver(b, datos){
       if (!ap || ap.estado !== 'abierta'){ tost('Esa apelación ya no está abierta: recarga la pantalla.'); pintar(); return; }
+      if (b.disabled) return;
+      if (!(await dialogoSiNo(_avisoApelE_(ap, datos)))) return;
       b.disabled = true;
       _resolverApelacion_(ap, datos).then(function(r){
         pintar(); tost('Apelación ' + (r && r.estado === 'estimada' ? 'estimada' : 'desestimada') + '. Se le avisa a ' +
@@ -879,10 +892,12 @@ function _engApela_(){
     }
     var ta = caja.querySelector('[data-apres]'), pl = caja.querySelector('[data-appl]');
     $$('[data-apdec]', caja).forEach(function(b){
-      b.onclick = function(){
+      b.onclick = async function(){
         var er = caja.querySelector('[data-aperr]'), txt = ta ? ta.value.trim() : '', bs = $$('[data-apdec]', caja);
+        if (b.disabled) return;
         if (!txt){ if (er) er.textContent = 'Escribe el motivo: queda con tu nombre.'; if (ta) ta.focus(); return; }
         if (!ap || ap.estado !== 'abierta'){ tost('Esa apelación ya no está abierta: recarga la pantalla.'); pintar(); return; }
+        if (!(await dialogoSiNo(_avisoApelE_(ap, {decision: b.dataset.apdec})))) return;
         if (er) er.textContent = '';
         bs.forEach(function(x){ x.disabled = true; });
         _resolverApelacion_(ap, {decision: b.dataset.apdec, resolucion: txt}).then(function(){
