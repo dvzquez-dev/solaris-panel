@@ -13436,6 +13436,114 @@ async function _autorClic_(ev, buscar, alCambiar){
   }
 }
 
+/* ══ 05/11 · `pedirrev`: EL PD PIDE LA REVISIÓN A QUIEN ÉL ELIJA, Y ESAS PERSONAS LA CONFIRMAN (las dos caras) ═════════════
+   🗣️ Daniel (PD), `Manual_S-9001_27`: «siendo PD […] debería poder poner la revisión a nombre de otro» · «mandé una solicitud a los
+   revisores que yo puse para que ambos le den ahí el check, sí lo he revisado […] es su palabra también».
+   El rastro vive en `e.peticionesRev` (lista; nada se borra): `{id, por, at, revisores[], estado, confirmaciones[{quien, ok, motivo?, at}]}`
+   con `estado` pendiente · completa · caida · cancelada · sustituida. El expediente sigue en `revision`: «pendiente de confirmaciones» es
+   la petición pendiente. Lo decide el SERVIDOR (`e_pedir_revision`, `e_confirmar_revision`, `e_cancelar_peticion_rev`); esto sólo no
+   ofrece lo que sabe que va a rechazar. Gemela de `peticion_rev_activa`. */
+function _peticionesRevDe_(e){ return e && Array.isArray(e.peticionesRev) ? e.peticionesRev.filter(function(p){ return p && typeof p === 'object'; }) : []; }
+function _peticionRevActiva_(e){
+  var l = _peticionesRevDe_(e);
+  for (var i = l.length - 1; i >= 0; i--) if (l[i].estado === 'pendiente') return l[i];
+  return null;
+}
+/* ¿`yo` puede abrir la petición? Sólo el PD, también en lo suyo, y sólo con el expediente en `revision`. */
+function _puedePedirRev_(e, yo){
+  return !!e && !!yo && yo === PD_NOM && (e.estado || e.est) === 'revision';
+}
+/* El panel del PD: a quién se pide (chips; ni autores ni él) y, en el mismo paso, los autores (el editor de chips de siempre). `pre` es
+   único por ficha. */
+function _pedirRevPanelHTML_(pre, e){
+  if (typeof document !== 'undefined' && document.head) _anotCss_();
+  var au = _autoresDe_(e), act = _autoresActualesDe_(e);
+  var cand = _activos_().map(function(m){ return m.nombre; }).filter(function(n){ return n !== PD_NOM && au.indexOf(n) < 0; });
+  return '<div id="' + pre + 'PedirRev" data-prdoc="' + esc(String(e.id)) + '" data-prpre="' + pre + '" data-prautinicial="' + esc(JSON.stringify(act)) +
+    '" style="margin-top:10px">' +
+    _anotCampoHTML_('Pedir la revisión a…', 'Dices que lo han revisado: cada uno lo confirma en su cola de Documentos y, con todos, queda aprobado a tu nombre.',
+      elegirPersonas(pre + 'RevP', {universo:cand, marcadas:[], multi:true, titulo:'Revisan', vacio:'Escribe un nombre o pulsa «Ver lista».'}), 'div') +
+    _anotCampoHTML_('Autores', 'Ahora: ' + esc(act.join(', ') || '—') + '. Corrígelos aquí si el documento los nombra mal.',
+      elegirPersonas(pre + 'AutP', {universo:_autorCandidatos_(), marcadas:act, multi:true, titulo:'Autores', vacio:'Escribe un nombre o pulsa «Ver lista».'}), 'div') +
+    '<button type="button" class="btn pri" style="margin-top:8px;width:100%" data-prpedir="' + pre + '">Pedir revisión</button></div>';
+}
+/* Lo que consta de una petición: quién la pidió, a quién, y cada respuesta con su momento (o su motivo). */
+function _peticionRevLineaHTML_(p){
+  var estTxt = {pendiente:'pendiente de confirmaciones', completa:'confirmada por todos', caida:'no la dieron por buena', cancelada:'cancelada', sustituida:'sustituida por otra'};
+  var h = '<p class="rnota" style="margin:8px 0 0"><b>' + esc(p.por || 'El PD') + '</b> pidió la revisión a ' + (p.revisores || []).map(esc).join(', ') +
+    (p.at ? ' (' + esc(_novCuando_(p.at)) + ')' : '') + ' · <b>' + esc(estTxt[p.estado] || p.estado || '') + '</b>';
+  (p.confirmaciones || []).forEach(function(c){
+    h += '<br>' + (c.ok ? '✓ ' : '✗ ') + esc(c.quien) + (c.ok ? ' lo ha revisado' : ' no lo da por bueno: «' + esc(c.motivo || '') + '»') + (c.at ? ' · ' + esc(_novCuando_(c.at)) : '');
+  });
+  if (p.estado === 'pendiente'){
+    var falta = (p.revisores || []).filter(function(n){ return !(p.confirmaciones || []).some(function(c){ return c.quien === n; }); });
+    if (falta.length) h += '<br>Falta: ' + falta.map(esc).join(', ');
+  }
+  if (p.estado === 'cancelada' && p.cerradaPor) h += '<br>Cancelada por ' + esc(p.cerradaPor) + (p.cerradaAt ? ' · ' + esc(_novCuando_(p.cerradaAt)) : '');
+  return h + '</p>';
+}
+/* Todo lo de la ficha: el rastro (lo ve cualquiera), la cola de quien confirma, «cancelar» del PD y, si toca, el panel para pedirla. `pre`
+   único por ficha; `yo` = quien mira. `''` si no hay nada que decir. */
+function _peticionRevHTML_(e, yo, pre){
+  if (!e) return '';
+  var act = _peticionRevActiva_(e), h = _peticionesRevDe_(e).map(_peticionRevLineaHTML_).join('');
+  if (act && yo && (act.revisores || []).indexOf(yo) >= 0 && !(act.confirmaciones || []).some(function(c){ return c.quien === yo; })){
+    h += '<div id="' + pre + 'ConfRev" data-prdoc="' + esc(String(e.id)) + '" data-prpre="' + pre + '" style="margin-top:10px">' +
+      '<h4>Confirma la revisión</h4><p class="rnota" style="margin:0 0 8px"><b>' + esc(act.por || 'El PD') + '</b> dice que has revisado este documento. ' +
+      'Si es así, confírmalo: consta tu nombre como revisor. Si no, di por qué.</p>' +
+      '<textarea id="' + pre + 'ConfMot" data-borr="pedirrev-motivo-' + esc(String(e.id)) + '" placeholder="Motivo — sólo si no lo das por bueno…" style="width:100%;min-height:60px"></textarea>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+      '<button type="button" class="btn pri" style="flex:1 1 46%" data-prsi="' + pre + '">Lo he revisado</button>' +
+      '<button type="button" class="btn no" style="flex:1 1 46%" data-prno="' + pre + '">No lo doy por bueno</button></div></div>';
+  }
+  if (act && yo === PD_NOM)
+    h += '<div data-prdoc="' + esc(String(e.id)) + '" data-prpre="' + pre + '" style="margin-top:8px"><button type="button" class="btn" style="width:100%" data-prcancel="' + pre + '">Cancelar la petición</button></div>';
+  else if (!act && _puedePedirRev_(e, yo)) h += _pedirRevPanelHTML_(pre, e);
+  return h;
+}
+/* El delegado de las tres acciones. `buscar(id)` da el expediente de la cara; `alCambiar(e, upd)` repinta con lo que devolvió el servidor. */
+async function _pedirRevClic_(ev, buscar, alCambiar){
+  var b = ev && ev.target && ev.target.closest ? ev.target.closest('[data-prpedir],[data-prsi],[data-prno],[data-prcancel]') : null;
+  if (!b || b.disabled) return;
+  var c = b.closest('[data-prdoc]'), e = c ? buscar(c.getAttribute('data-prdoc')) : null, pre = c ? c.getAttribute('data-prpre') : '';
+  if (!e) return;
+  if (typeof backendOK === 'undefined' || !backendOK || typeof SESION === 'undefined' || !SESION){
+    tost('Sin conexión con el backend: no se ha guardado nada.'); return; }
+  var llamada, ok;
+  if (b.hasAttribute('data-prpedir')){
+    var revs = elegirPersonasMarcadas(pre + 'RevP'), aut = elegirPersonasMarcadas(pre + 'AutP'), act = _autoresActualesDe_(e);
+    if (!revs.length){ tost('Elige a quién se pide la revisión.'); return; }
+    if (!aut.length){ tost('Deja al menos un autor.'); return; }
+    var mal = revs.filter(function(n){ return aut.indexOf(n) >= 0; });
+    if (mal.length){ tost(mal.join(', ') + (mal.length > 1 ? ' son autores' : ' es autor') + ' del documento: no puede' + (mal.length > 1 ? 'n' : '') + ' revisarlo.'); return; }
+    llamada = function(){ return api.pedirRevision(e.id, revs, aut.join('|') === act.join('|') ? undefined : aut, e.ref); };
+    ok = 'Revisión pedida a ' + revs.join(', ') + '.';
+  } else if (b.hasAttribute('data-prcancel')){
+    llamada = function(){ return api.cancelarPeticionRev(e.id, e.ref); };
+    ok = 'Petición cancelada.';
+  } else {
+    var si = b.hasAttribute('data-prsi'), mot = '';
+    if (!si){
+      var ta = document.getElementById(pre + 'ConfMot'); mot = ((ta && ta.value) || '').trim();
+      if (mot.length < (typeof MIN_JUSTIFICACION !== 'undefined' ? MIN_JUSTIFICACION : 8)){
+        if (ta){ ta.focus(); ta.style.borderColor = 'var(--red)'; }
+        tost('Di por qué no lo das por bueno.'); return; }
+    }
+    llamada = function(){ return api.confirmarRevision(e.id, si, mot, e.ref); };
+    ok = si ? 'Confirmado.' : 'Queda dicho: la petición vuelve al PD con tu motivo.';
+  }
+  b.disabled = true;
+  try {
+    var upd = await llamada();
+    var fin = upd && (upd.estado === 'aprobado' || upd.estado === 'publicado');
+    tost(fin && b.hasAttribute('data-prsi') ? 'Confirmado por todos: aprobado.' : ok);
+    alCambiar(e, upd);
+  } catch (err) {
+    b.disabled = false;
+    tost('No se pudo: ' + ((err && err.message) || err));
+  }
+}
+
 /* `2026-08-06T19:12:00.000Z` → `06/08/2026, 21:12`. Formato, no calendario. */
 /* ⛔ 20/10 (ficha «`decidido_at` se pinta en UTC recortando la cadena»): aquí la FECHA salía de la cadena UTC
    (`s.slice(0,10)`) y la HORA del reloj local — mezcladas, a partir de las 22:00 en verano decía el día ANTERIOR con la
