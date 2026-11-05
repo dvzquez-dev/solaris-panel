@@ -12705,6 +12705,12 @@ function _revisoresPropuestosValidos_(e){
   var p = _revisoresPropuestosDe_(e), au = _autoresDe_(e);
   return p.length && !p.some(function(n){ return au.indexOf(n) >= 0; }) ? p : [];
 }
+/* 05/11 (`conflictojose`, Daniel): a quién va un expediente en CONFLICTO de revisión (el revisor de siempre es autor, o el documento trae
+   revisores propuestos válidos): a José, que valida sin firmar. Si José es autor, es el PD o no hay José, al PD. Gemela de
+   `destino_conflicto_doc` del servidor. */
+function _destinoConflictoDoc_(e){
+  return (REV2_NOM && REV2_NOM !== PD_NOM && _autoresDe_(e).indexOf(REV2_NOM) < 0) ? [REV2_NOM] : [PD_NOM];
+}
 /* 04/11 · ¿`yo` es autor y por tanto NO decide lo suyo? Sólo el PD es la excepción, y sólo si `revisoresDe` se lo da (no hay nadie
    por encima). Lo usan `puedeDecidirDoc` de las dos caras; el servidor tiene la suya en `puede_decidir`. */
 function _autorQueNoDecide_(e, yo, rev){
@@ -12722,7 +12728,11 @@ function _revisionPropuestaHTML_(e, yo){
   return h;
 }
 /* 04/11 · el rótulo del botón de aprobar: «Aprobar», o «Aprobar con los revisores propuestos» si el documento los trae. */
-function _rotuloAprobarDoc_(e){ return _revisoresPropuestosValidos_(e).length ? 'Aprobar con los revisores propuestos' : 'Aprobar'; }
+/* 05/11: a José (quien valida sin firmar) le dice «Validar: lo que pone es correcto»; `yo` = quien mira. */
+function _rotuloAprobarDoc_(e, yo){
+  if (!_revisoresPropuestosValidos_(e).length) return 'Aprobar';
+  return (yo && yo === REV2_NOM && yo !== PD_NOM) ? 'Validar: lo que pone es correcto' : 'Aprobar con los revisores propuestos';
+}
 
 /* 04/11 · el texto de «Revisado por …» de una decisión con revisores propuestos: `''` si la decisión no los lleva. */
 function _revisadoPorTxt_(e){

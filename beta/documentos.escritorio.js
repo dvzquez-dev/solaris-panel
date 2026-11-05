@@ -23,7 +23,7 @@ function revisoresDe(d){
   /* 04/11: con REVISORES PROPUESTOS válidos en el documento va directo al PD (gemela de `revisores_de` del servidor). */
   /* 05/11 (`pedirrev`): con una PETICIÓN de revisión pendiente del PD, los revisores son los PEDIDOS. Gemela de `revisores_de`. */
   var _pet=_peticionRevActiva_(d); if(_pet) return (_pet.revisores||[]).slice();
-  if(_revisoresPropuestosValidos_(d).length) return [PD_NOM];
+  if(_revisoresPropuestosValidos_(d).length) return _destinoConflictoDoc_(d);   /* 05/11 (`conflictojose`): a José, que valida sin firmar */
   var r = d.amb==='archivo' ? [coordinadorDe(d.sub)]
         : d.amb==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
@@ -32,7 +32,7 @@ function revisoresDe(d){
   r=r.filter(noAutor);
   /* 04/11: el PD es la excepción a «nadie revisa lo suyo» cuando es el último peldaño: si también es autor, le llega igual (no hay nadie
      por encima). Sin duplicar si `REV2_NOM === PD_NOM`. */
-  if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n,i,a){ return a.indexOf(n)===i && (n===PD_NOM || noAutor(n)); });
+  if(!r.length) r=_destinoConflictoDoc_(d);   /* 05/11 (`conflictojose`): antes PD y José; ahora José valida, y si no puede, el PD */
   /* 01/11: SIN tercer peldaño. Antes acababa en `[PD_NOM]` sin volver a filtrar al autor: con `REV2_NOM === PD_NOM` y el PD
      de autor, el expediente se asignaba a su propio autor y no podía firmar NADIE, sin un error. Ahora `[]` es «no hay
      revisor asignable»: cada consumidor lo pinta («Sin revisor: avisa al Project Director») y nadie decide (`puedeDecidirDoc`). */
@@ -375,7 +375,7 @@ function docCard(d){
          algo que viene mal, y ninguno de los dos publica nada. */
       '<div class="acts">'+
         (_yaAnalizado_(d)
-          ? '<button class="btn pri" data-doc="'+d.id+'" data-acc="aprobado">'+_rotuloAprobarDoc_(d)+'</button>'+
+          ? '<button class="btn pri" data-doc="'+d.id+'" data-acc="aprobado">'+_rotuloAprobarDoc_(d, ACTOR)+'</button>'+
             '<button class="btn" data-doc="'+d.id+'" data-acc="anot">Aprobar con anotaciones</button>'
           : '<span class="sc" style="align-self:center">A\u00fan sin analizar: se puede parar, no publicar.</span>')+
         '<button class="btn" data-doc="'+d.id+'" data-acc="cambios">Solicitar cambios</button>'+

@@ -24,7 +24,7 @@ function revisoresDe(e){
      revisores». Gemela de `revisores_de` del servidor (`probar_revisor_autor_doc.py`). */
   /* 05/11 (`pedirrev`): con una PETICIÓN de revisión pendiente del PD, los revisores son los PEDIDOS. Gemela de `revisores_de`. */
   var _pet=_peticionRevActiva_(e); if(_pet) return (_pet.revisores||[]).slice();
-  if(_revisoresPropuestosValidos_(e).length) return [PD_NOM];
+  if(_revisoresPropuestosValidos_(e).length) return _destinoConflictoDoc_(e);   /* 05/11 (`conflictojose`): a José, que valida sin firmar */
   var r = e.ambito==='archivo' ? [coordinadorDe(e.subsistema)]
         : e.ambito==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
@@ -33,7 +33,7 @@ function revisoresDe(e){
   r=r.filter(noAutor);
   /* 04/11: el PD es la excepción a «nadie revisa lo suyo» cuando es el último peldaño: si también es autor, le llega igual (no hay nadie
      por encima). Sin duplicar si `REV2_NOM === PD_NOM`. */
-  if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n,i,a){ return a.indexOf(n)===i && (n===PD_NOM || noAutor(n)); });
+  if(!r.length) r=_destinoConflictoDoc_(e);   /* 05/11 (`conflictojose`): antes PD y José; ahora José valida, y si no puede, el PD */
   /* 01/11: SIN tercer peldaño. Antes acababa en `[PD_NOM]` sin volver a filtrar al autor: con `REV2_NOM === PD_NOM` y el PD
      de autor, el expediente se asignaba a su propio autor y no podía firmar NADIE, sin un error. Ahora `[]` es «no hay
      revisor asignable»: cada consumidor lo pinta («Sin revisor: avisa al Project Director») y nadie decide (`puedeDecidirDoc`). */
@@ -427,7 +427,7 @@ function _botonesDecM_(e){
      ha pasado el analisis -- son justo la forma de pararlo--; `aprobado` y `anot`
      publican, y el servidor los rechaza. Quitar los cuatro seria el fallo contrario. */
   return (_yaAnalizado_(e)
-      ? '<button class="btn pri" style="flex:1 1 46%" data-p data-dec="aprobado" data-id="'+e.id+'">'+_rotuloAprobarDoc_(e)+'</button>'+
+      ? '<button class="btn pri" style="flex:1 1 46%" data-p data-dec="aprobado" data-id="'+e.id+'">'+_rotuloAprobarDoc_(e, yoNombre())+'</button>'+
         '<button class="btn" style="flex:1 1 46%" data-p data-dec="anot" data-id="'+e.id+'">Con anotaciones</button>'
       : '<p class="rnota" style="flex:1 1 100%;margin:0">A\u00fan sin analizar: se puede parar, no publicar.</p>')+
     '<button class="btn" style="flex:1 1 46%" data-p data-dec="cambios" data-id="'+e.id+'">Solicitar cambios</button>'+
