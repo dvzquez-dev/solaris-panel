@@ -17,8 +17,8 @@
 function _mSanc_(n){ return _m(n); }
 
 function sancionPor(tipo,nombre){
-  /* 01/11 (artifact [334a41fb8e]): la reforma manda, la junta no genera falta — una sola puerta, `_sancionaSola_`. */
-  if(!_sancionaSola_(tipo)) return {p:0,txt:'sin sanción automática · potestad del coordinador'};
+  /* 04/11 (Daniel): proponen todas menos la de trabajo — una sola puerta, `_sancionaSola_`. */
+  if(!_sancionaSola_(tipo)) return {p:0,txt:'las reuniones de trabajo no sancionan'};
   /* ⛔⛔ «NO CONSTA» NO ES «CERO», Y AQUI DECIDE PUNTOS DE DISCIPLINA (565.ª).
      `VECES` es una tabla de **SEIS NOMBRES DE DEMO** (`escritorio.html`), y los nombres
      que llegan aqui son **REALES**: salen de `r.sinCubrir`, que viene de `_cobertura_`.
@@ -332,8 +332,6 @@ function _panelSueltas_(){
             +esc(_etSancFila_(s.puntos, s.origen, s.extra))+'</td>'+
           '<td class="r"><span class="decs" data-sid="'+s.id+'">'+
             '<button data-sdec="aprobar">Aplica</button>'+
-            /* ⛔ 21/10: una revocación o un premio suelto no se justifica — el servidor lo rechaza. */
-            (_esNoJustificable_(s.origen, s.extra) ? '' : '<button data-sdec="justificar">Justifica</button>')+
             '<button data-sdec="rechazar">Rechaza</button>'+
           '</span> <button class="btn sm" data-seditar="'+s.id+'">Editar</button></td></tr>';
       }).join(''))+
@@ -746,7 +744,7 @@ function _loteReal_(){
          «Aprobar el bloque · 30 sanciones». Un clic escribe en Notion y manda el
          comunicado con los 30 nombres.
          ⚠️ Y borraba lo marcado desde el movil: `s.decision` viene del servidor. */
-      dec:_decDe_(s)}; }) };
+      dec:_decDe_(s), justificacion:s.justificacion||null}; }) };
 }
 
 

@@ -2999,7 +2999,7 @@ function _apiParse(txt, accion){
    Las que llaman a un modelo o suben ficheros tardan más a propósito: techo propio. */
 var API_ESPERA_MS = 20000;
 var API_ESPERA_LARGA_MS = 120000;
-var API_ACCIONES_LARGAS = /^(proponerTareaParte|traerOrdenNotion|transcribirVoz|interpretarAnotacion|contrastarEtiqueta|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|redactarTurno|redactarParte|resumirReunion)$/;
+var API_ACCIONES_LARGAS = /^(proponerTareaParte|traerOrdenNotion|transcribirVoz|interpretarAnotacion|contrastarEtiqueta|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|subirFotoTurno|getFotoTurno|getZipTurno|entregarFotosTurno|redactarTurno|redactarParte|resumirReunion)$/;
 var API_MSG_SIN_RESPUESTA = "El servidor no ha contestado. Puede que se haya guardado: recarga antes de repetirlo.";
 function _esLecturaApi_(accion){
   return /^(get|listar)/.test(accion) || /^(bootstrap|quienSoy|queHayNuevo|estadoAudioReunion)$/.test(accion);
@@ -3491,6 +3491,28 @@ function _cargosQueFaltan_(cargos){
   return faltan;
 }
 
+/* ⛔ EL RESPONSABLE DE TURNO TIENE QUE SER DEL CONSEJO (Daniel, 02/11: «no puede ser responsable de turno alguien que no sea de
+   consejo»; 04/11 en las caras). UNA regla, tres llamadores: el botón de «turno» de cada persona (`_cargoOfrecidoA_`: a quien no es
+   del consejo no se le ofrece), la frase de por qué no se convoca (`_porQueRespNoEsConsejo_`, dentro de `_porQueNoSeConvoca_`) y,
+   por detrás, `_validar_reparto_turno` del servidor. La lista es `DATA.consejo` (= `CONSEJO_PUSH`) por `_consejoDe_`.
+   ⛔ Sin lista (`null`: el panel aún no la trajo) NO se sabe quién es del consejo y no se bloquea a nadie (§3c-24: «no lo sé» no es «nadie»). */
+function _esDelConsejo_(nombre){
+  var cs = _consejoDe_(null);
+  return !cs || cs.indexOf(nombre) >= 0;
+}
+/* ¿Se le ofrece a `nombre` el cargo `k`? Sólo «turno» se restringe: audiovisual y memoria los puede llevar cualquiera del reparto. */
+function _cargoOfrecidoA_(k, nombre){ return k !== 'turno' || _esDelConsejo_(nombre); }
+/* Por qué el reparto `nombres` no tiene un responsable de turno válido, o '' si se puede (o no se sabe). Dos casos: en el reparto no
+   hay nadie del consejo (hay que añadirlo), o el marcado como responsable no lo es (no debería pasar con los botones: es el cinturón). */
+function _porQueRespNoEsConsejo_(cargos, nombres){
+  var L = nombres || [], r = (cargos || {}).turno, i, hay = false;
+  if(!_consejoDe_(null) || !L.length) return '';
+  for(i=0;i<L.length;i++) if(_esDelConsejo_(L[i])) hay = true;
+  if(!hay) return 'En el reparto no hay nadie del consejo: a\u00f1ade a alguien del consejo para que sea el responsable de turno.';
+  if(r && !_esDelConsejo_(r)) return r + ' no es del consejo, y el responsable de turno tiene que serlo.';
+  return '';
+}
+
 /* ⛔ Y EL COCHE ES OPCIONAL, PERO SI SE PONE TIENE QUE ESTAR ENTERO.
    Daniel: «el coche tiene q tener un campo pa poner de donde sale y a donde va» y «que haya
    una casilla para cuando el trayecto de ida no sea el mismo que el de vuelta y que
@@ -3551,7 +3573,8 @@ function _saltadasTxt_(n){
    decision que no es ninguna de las tres. */
 function _decDe_(s){
   var d = s && (s.dec || s.decision);
-  return (d === 'aceptar' || d === 'justificar' || d === 'rechazar') ? d : 'aceptar';
+  if (d === 'justificar') d = 'rechazar';      /* 04/11 noche: «Justificar y rechazar es lo mismo»; un borrador guardado con el verbo viejo se lee así */
+  return (d === 'aceptar' || d === 'rechazar') ? d : 'aceptar';
 }
 
 function _faltanPorMarcar_(items){
@@ -3585,6 +3608,8 @@ function _porQueNoSeCierra_(items, fresca){
   if (!L.length) return 'Ese bloque ya no est\u00e1 pendiente: lo habr\u00e1 cerrado otro.';
   var n = _faltanPorMarcar_(L);
   if (n) return 'Faltan ' + n + ' por marcar: el bloque se cierra entero.';
+  var t = _sinTextoRechazar_(L);
+  if (t) return t + (t === 1 ? ' rechazada sin su texto' : ' rechazadas sin su texto') + ': rechazar exige escribir por qu\u00e9.';
   return '';
 }
 
@@ -3615,15 +3640,18 @@ function _pegaCocheTxt_(k){
   return k;
 }
 
-function _porQueNoSeConvoca_(cargos, cuantos, coches){
+function _porQueNoSeConvoca_(cargos, cuantos, coches, reparto){
   if(!cuantos) return 'Marca al menos a una persona.';
-  var faltan = _cargosQueFaltan_(cargos), nombres = [], i, j;
+  /* `reparto` (los nombres de quien va) es OPCIONAL: sin él no se mira el consejo. Con él, la frase del consejo ocupa el sitio del
+     «Falta el Responsable de turno», que diría lo mismo con menos información. */
+  var sc = _porQueRespNoEsConsejo_(cargos, reparto);
+  var faltan = _cargosQueFaltan_(cargos).filter(function(k){ return !(sc && k === 'turno'); }), nombres = [], i, j;
   for(i=0;i<faltan.length;i++){
     for(j=0;j<CARGOS_TURNO.length;j++){
       if(CARGOS_TURNO[j].k === faltan[i]) nombres.push(CARGOS_TURNO[j].et);
     }
   }
-  var partes = [];
+  var partes = sc ? [sc] : [];
   /* ⚠️ El nombre LARGO, no la abreviatura de los botones: un «falta AV» no le dice nada a
      quien convoca por primera vez. */
   /* Y EL VERBO CONCUERDA. Con dos cargos, «Falta los ...» esta mal escrito, y esto lo lee el
@@ -3744,7 +3772,7 @@ function _porQueNoSeProgramaTurno_(f){
      cara tenga a mano (o nada: entonces no se sabe y no se bloquea). */
   var sc = _porQueSinConsejo_(f.cv, f.fecha, f.hora, f.duracion);
   if (sc) return sc;
-  return _porQueNoSeConvoca_(f.cargos, Object.keys(f.sel || {}).length, f.coches);
+  return _porQueNoSeConvoca_(f.cargos, Object.keys(f.sel || {}).length, f.coches, Object.keys(f.sel || {}));
 }
 
 /* La frase de la regla del consejo, o '' si se puede (o no se sabe). La comparten `_porQueNoSeProgramaTurno_` y el botón del
@@ -5104,6 +5132,33 @@ function _esNoJustificable_(origen, extra){
   return !!(extra && extra.compensacion);
 }
 
+/* El mínimo del texto de una justificación: el MISMO que el servidor (`servidor.MIN_JUSTIFICACION`, 8) y que «Revertir»/«Revocar». */
+var MIN_JUSTIFICACION = 8;
+function _justificacionValida_(t){
+  return String(t == null ? '' : t).trim().length >= MIN_JUSTIFICACION;
+}
+
+/* 04/11 noche (Daniel: «Justificar y rechazar es lo mismo»): RECHAZAR lleva SIEMPRE su texto, en toda sanción o propuesta. Cuántas del
+   bloque están marcadas «rechaza» SIN su texto (o con uno corto). Cerrar el bloque así las dejaría pendientes (el servidor no las
+   da por decididas sin su porqué): se corta ANTES, con la frase de `_porQueNoSeCierra_`. */
+function _sinTextoRechazar_(items){
+  var n = 0, i, L = items || [], x;
+  for (i = 0; i < L.length; i++){ x = L[i];
+    if (x && _decDe_(x) === 'rechazar' && !_justificacionValida_(x.justificacion || x.just)) n++; }
+  return n;
+}
+
+/* Pide el texto con que se RECHAZA (= justifica) con el diálogo de la app (nada nativo). Devuelve el texto recortado, o `null` si se
+   cancela o no llega al mínimo (en ese caso lo dice). `que`: lo que se rechaza ("la sanción de Ana", "el bloque entero"). */
+async function _pedirJustificacion_(que){
+  var t = await dialogoTexto('Rechazar ' + que + '.' + String.fromCharCode(10, 10) +
+    'Escribe por qué no se aplica (obligatorio, al menos ' + MIN_JUSTIFICACION + ' caracteres).');
+  if (t === null || t === undefined) return null;
+  t = String(t).trim();
+  if (!_justificacionValida_(t)){ tost('Rechazar exige un texto de al menos ' + MIN_JUSTIFICACION + ' caracteres.'); return null; }
+  return t;
+}
+
 /* El rotulo de una fila de la cola: dice QUE ES antes de decir cuanto. ⛔ `_etPtsSanc_` solo
    sabe de puntos, y la recompensa de un premio **no son puntos**: son horas
    (`extra.compensacion`). Pintar su `puntos:0` como «aviso» era decir lo contrario de lo que es. */
@@ -5239,27 +5294,26 @@ function _avisoAprobarDoc_(titulo, acc){
 }
 
 /* 04/11 (acciones graves, Daniel: «lo más grave que existe»): LA PREGUNTA ANTES DE DECIDIR UNA SANCIÓN SUELTA, UNA vez para las dos
-   caras — QUÉ (aplicar/rechazar/justificar), A QUIÉN y CUÁNTO (`_etSancFila_`, el mismo rótulo que la fila). Antes el móvil decía
+   caras — QUÉ (aplicar/rechazar), A QUIÉN y CUÁNTO (`_etSancFila_`, el mismo rótulo que la fila). Antes el móvil decía
    «¿Aprobar? Esto se aplica ya» sin nombre ni puntos (y rechazar no preguntaba nada), y el escritorio ponía el nombre pero no los
    puntos. `s` es la sanción tal como llega del servidor. */
 function _avisoDecidirSanc_(s, acc){
   s = s || {};
   var quien = _pilaDeM_(s.nombre) || s.nombre || 'esta persona', NL = String.fromCharCode(10);
-  var que = {aprobar:'Aplicar', rechazar:'Rechazar', justificar:'Justificar'}[acc] || acc;
+  var que = {aprobar:'Aplicar', rechazar:'Rechazar'}[acc] || acc;
   var cola = {aprobar:'Se aplica ya (Notion y comunicado): no es un borrador.',
-              rechazar:'Se descarta: no resta puntos y no vuelve a la cola.',
-              justificar:'Consta como decidida y no resta puntos.'}[acc] || '';
+              rechazar:'Se descarta con su porqué: no resta puntos y no vuelve a la cola.'}[acc] || '';
   return '¿' + que + ' la sanción de ' + quien + '?' + NL + (s.motivo || '') + ' · ' + _etSancFila_(s.puntos, s.origen, s.extra) +
     NL + NL + cola;
 }
 
 /* 04/11: LA PREGUNTA ANTES DE CERRAR UN BLOQUE (el disparo: Notion + comunicado), UNA vez para las dos caras. `items` lleva la
-   decisión de cada fila en `dec` (`_decDe_`); se cuenta cuántas se aplican, se rechazan y se justifican. */
+   decisión de cada fila en `dec` (`_decDe_`); se cuenta cuántas se aplican y se rechazan. */
 function _avisoCerrarBloque_(nombre, items){
-  var c = {aceptar:0, rechazar:0, justificar:0}, NL = String.fromCharCode(10);
+  var c = {aceptar:0, rechazar:0}, NL = String.fromCharCode(10);
   (items || []).forEach(function(x){ c[_decDe_(x)]++; });
   return 'Vas a cerrar el bloque «' + nombre + '».' + NL + NL + c.aceptar + ' se aplican' +
-    (c.rechazar ? ' · ' + c.rechazar + ' se rechazan' : '') + (c.justificar ? ' · ' + c.justificar + ' se justifican' : '') + '.' +
+    (c.rechazar ? ' · ' + c.rechazar + ' se rechazan' : '') + '.' +
     NL + NL + 'Esto aplica las sanciones aceptadas en Notion y manda el comunicado. ¿Seguimos?';
 }
 
@@ -5684,7 +5738,7 @@ async function _enviarSancionForm_(o){
     if(r && r.rechazadas && r.rechazadas.length)
       throw new Error('no puedes sancionar a '+r.rechazadas.join(', ')+': está fuera de tu jurisdicción');
     if(r && r.invalidas && r.invalidas.length)
-      throw new Error('el servidor no acepta esos puntos ('+pts+'): el RRI va de -5 a +2, enteros');
+      throw new Error('el servidor no acepta esos puntos ('+pts+'): el RRI va de -5 a +1, enteros');
     var _yaEstaba = !!(r && r.duplicadas && r.duplicadas.length);
     SANC_FORM={quien:'', motivo:'', libre:'', art:'', tarea:'', plazo:'', pts:''};
     tost((_yaEstaba ? 'Esa sanción YA estaba puesta (era un reintento): a ' : 'Sanción puesta a ')+(_pilaDeM_(quien)||quien)+'.'+
@@ -7979,14 +8033,13 @@ function _slotsMin_(duracion, slot){
    ⛔ Y NO CONFUNDIR CON `_slotsMin_`, que sí es una restricción dura: una racha más corta que
    la reunión no sirve para ir a nada. Son dos mínimos distintos y se dicen distinto.
    Devuelve `{falta, exigido, txt}`; `falta` a 0 significa que no hay nada que advertir. */
-/* ⛔ 21/10 (auditor 13, 🟠 4): ¿esta reunión SANCIONA SOLA? Sólo la GENERAL — la reforma del RRI (aprobada el 20/07:
-   «solo cuentan las reuniones generales; las de junta y las demás no pueden generar falta»), confirmada por Daniel el
-   01/11 (artifact [334a41fb8e], «Manda la reforma: la Junta no genera falta») — y es la copia en JS de
-   `disciplina.sanciona_sola` (de ahí sale `construir_reunion.TIPOS_AUTO`). Junta, consejo, subsistema, trabajo o mixta:
-   no cubrir queda a potestad del coordinador, y la cara no puede amenazar con un artículo que nadie aplica.
-   Es la ÚNICA puerta de las caras: `sancionPor` y `_avisoMinimo_` la llaman. */
+/* ⛔ 21/10 (auditor 13, 🟠 4): ¿esta reunión GENERA PROPUESTA de falta? 04/11 (Daniel, conflictos del RRI): «Siempre
+   propone la app y decide quien coordina» — todas menos la de TRABAJO (general, junta, consejo, subsistema, mixta).
+   Nada se aplica sola: la propuesta va a su bloque y la decide quien la convocó o el PD. Es la copia en JS de
+   `disciplina.sanciona_sola` (de ahí sale `construir_reunion.TIPOS_AUTO`). Es la ÚNICA puerta de las caras:
+   `sancionPor` y `_avisoMinimo_` la llaman. */
 function _sancionaSola_(tipo){
-  return ['general'].indexOf(String(tipo == null ? '' : tipo).trim().toLowerCase()) >= 0;
+  return ['general','junta','consejo','subsistema','mixta'].indexOf(String(tipo == null ? '' : tipo).trim().toLowerCase()) >= 0;
 }
 
 function _avisoMinimo_(marcadas, exigido, tipo){
@@ -10660,7 +10713,8 @@ function _docAutorModelo_(e){
     /* El enlace sólo si es uno de verdad: `Codigo.gs` pone `'#notion'` de marcador y un enlace muerto con pinta de vivo
        es peor que ninguno. */
     var url=String(e.url||'');
-    return {tipo:'decidido', html:'<b>'+esc(acc)+'.</b> '+(aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+
+    var rv=(typeof _revisadoPorTxt_==='function') ? _revisadoPorTxt_(e) : '';   /* 04/11: quién lo revisó y quién lo validó, si los propuestos */
+    return {tipo:'decidido', html:'<b>'+esc(acc)+'.</b> '+(aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+(rv?'<br><span class="sc">'+esc(rv)+'</span>':'')+
       (url.indexOf('http')===0
         ? '<br><a href="'+esc(url)+'" target="_blank" rel="noopener">Ver la página publicada</a>' : '')};
   }
@@ -10759,7 +10813,9 @@ function _anotActualDe_(e){
    (`analisis.autores`), o si no hay, el autor del expediente. Sin nada, `[]`. */
 function _autoresActualesDe_(e){
   var a = e && e.analisis && e.analisis.autores, l = [];
-  if (a && typeof a === 'object')
+  /* 04/11: la lista que PD/José pusieron a mano (`autores_manual`, varios autores) manda sobre la del documento. */
+  if (e && Array.isArray(e.autores_manual) && e.autores_manual.length) l = e.autores_manual;
+  else if (a && typeof a === 'object')
     l = (Array.isArray(a.casados) ? a.casados : []).concat(Array.isArray(a.sin_casar) ? a.sin_casar : []);
   if (!l.length && e && e.autor) l = [e.autor];
   var vistos = {};
@@ -10777,6 +10833,46 @@ function _autoresDe_(e){
     if (n && !vistos[n]){ vistos[n] = 1; l.push(n); }
   });
   return l;
+}
+
+/* 04/11 · REVISORES PROPUESTOS por el documento (`analisis.revisores.casados`, de sus pies y cabeceras; Daniel, `Manual_S-9001_27`:
+   «que aparezcan los revisores propuestos, que venga a mí directamente y que yo le pueda aprobar que esos son los revisores»).
+   `_revisoresPropuestosDe_`: los casados con el equipo, sin repetir. `_revisoresPropuestosValidos_`: los que CUENTAN como revisión —
+   `[]` si alguno es autor del documento (revisaría lo suyo: entonces el reparto es el de siempre). Gemelas de
+   `revisores_propuestos_de_doc` / `revisores_propuestos_validos` del servidor. */
+function _revisoresPropuestosDe_(e){
+  var r = e && e.analisis && e.analisis.revisores, l = r && Array.isArray(r.casados) ? r.casados : [], vistos = {};
+  return l.map(function(n){ return String(n == null ? '' : n).trim(); }).filter(function(n){
+    if (!n || vistos[n]) return false; vistos[n] = 1; return true; });
+}
+function _revisoresPropuestosValidos_(e){
+  var p = _revisoresPropuestosDe_(e), au = _autoresDe_(e);
+  return p.length && !p.some(function(n){ return au.indexOf(n) >= 0; }) ? p : [];
+}
+/* 04/11 · ¿`yo` es autor y por tanto NO decide lo suyo? Sólo el PD es la excepción, y sólo si `revisoresDe` se lo da (no hay nadie
+   por encima). Lo usan `puedeDecidirDoc` de las dos caras; el servidor tiene la suya en `puede_decidir`. */
+function _autorQueNoDecide_(e, yo, rev){
+  return _autoresDe_(e).indexOf(yo) >= 0 && !(yo === PD_NOM && rev.indexOf(yo) >= 0);
+}
+/* 04/11 · LA NOTA de «Tu decisión» cuando el documento trae revisores propuestos o el que decide es su autor (`''` si no hay nada que
+   decir). Con propuestos válidos: «Apruebas que lo revisaron X e Y» (al aprobar constan ellos de revisores y tú de quien valida). Autor
+   que decide lo suyo (el PD, sin nadie por encima): «Eres autor de este documento». `yo` = quien mira. */
+function _revisionPropuestaHTML_(e, yo){
+  var p = _revisoresPropuestosValidos_(e), esAutor = _autoresDe_(e).indexOf(yo) >= 0, h = '';
+  if (esAutor) h += '<p class="rnota" style="margin:6px 0 0"><b>Eres autor de este documento.</b>' +
+    (p.length ? '' : ' Te llega a ti porque no hay nadie por encima que pueda revisarlo.') + '</p>';
+  if (p.length) h += '<p class="rnota" style="margin:6px 0 0">El documento lo han revisado <b>' + p.map(esc).join(' y ') +
+    '</b>. Al aprobar constan ellos como revisores y tú como quien lo valida.</p>';
+  return h;
+}
+/* 04/11 · el rótulo del botón de aprobar: «Aprobar», o «Aprobar con los revisores propuestos» si el documento los trae. */
+function _rotuloAprobarDoc_(e){ return _revisoresPropuestosValidos_(e).length ? 'Aprobar con los revisores propuestos' : 'Aprobar'; }
+
+/* 04/11 · el texto de «Revisado por …» de una decisión con revisores propuestos: `''` si la decisión no los lleva. */
+function _revisadoPorTxt_(e){
+  var d = e && e.decision, r = d && Array.isArray(d.revisadoPor) ? d.revisadoPor : [];
+  if (!r.length) return '';
+  return 'Revisado por ' + r.join(', ') + (d.validadoPor ? ' · validado por ' + d.validadoPor : '');
 }
 
 /* 02/11 — LAS ETIQUETAS QUE SUGIERE LA IA, APARTE DE LAS DEL AUTOR (`analisis.etiquetas_sugeridas`: extra del banco que el autor no
@@ -10944,7 +11040,8 @@ function _anotAMedias_(){
   var cs = document.querySelectorAll('[data-anot],[data-autor]');   /* 31/10: y el buscador de autor, con un nombre a medias */
   for (var i = 0; i < cs.length; i++){
     if (cs[i].getAttribute('data-ocupado') === '1') return true;
-    if (cs[i].hasAttribute('data-autor') && elegirPersonasMarcadas(cs[i].getAttribute('data-autor') + 'Autor').length) return true;   /* alguien ya elegido */
+    /* 04/11: el panel de autores nace con los de ahora marcados (varios autores): "a medias" es que lo marcado difiera de lo de partida. */
+    if (cs[i].hasAttribute('data-autor') && JSON.stringify(elegirPersonasMarcadas(cs[i].getAttribute('data-autor') + 'Autor')) !== (cs[i].getAttribute('data-autorinicial') || '[]')) return true;
     if (cs[i].hasAttribute('data-autoresorig') && JSON.stringify(elegirPersonasMarcadas(cs[i].getAttribute('data-anot') + 'Autores')) !== cs[i].getAttribute('data-autoresorig')) return true;   /* 02/11: autores tocados */
     var xs = cs[i].querySelectorAll('input,textarea,select');
     for (var j = 0; j < xs.length; j++){
@@ -11417,19 +11514,22 @@ function _anotClic_(ev, buscar){
 function _puedeCambiarAutor_(estado, yo){
   return ['recibido','analizado','revision','cambios'].indexOf(estado) >= 0 && !!yo && (yo === PD_NOM || yo === REV2_NOM);
 }
-/* El roster activo MENOS el PD, José y el autor de ahora: ninguno de los dos revisores puede quedar de autor. */
-function _autorCandidatos_(actual){
-  return _activos_().map(function(m){ return m.nombre; })
-    .filter(function(n){ return n !== PD_NOM && n !== REV2_NOM && n !== actual; });
+/* El roster activo. 04/11: ya SIN quitar al PD ni a José (Daniel, `Manual_S-9001_27`: él es autor y le llega igual; `revisoresDe` sabe a quién
+   subir) ni al autor de ahora (con varios autores, los de ahora van marcados y se quitan con la ×). */
+function _autorCandidatos_(){
+  return _activos_().map(function(m){ return m.nombre; });
 }
-function _autorPanelHTML_(pre, id, actual, css){
+/* `actuales`: la LISTA de autores de ahora (`_autoresActualesDe_`), marcada de partida. 04/11 (Daniel: «que me deje poner más de un
+   autor»): el selector de personas en modo VARIOS —chips con autocompletado y «Ver lista», se añade y se quita—; el botón guarda la lista. */
+function _autorPanelHTML_(pre, id, actuales, css){
   if (typeof document !== 'undefined' && document.head) _anotCss_();
   var st = css ? ' style="' + css + '"' : '';
-  return '<div id="' + pre + 'Autor" data-autor="' + pre + '" data-autordoc="' + esc(String(id)) + '" style="margin-top:10px">' +
-    /* El selector de personas ÚNICO, de uno en uno (antes: `<input list>` + `<datalist>`). */
-    _anotCampoHTML_('Autor', 'Ahora: ' + esc(actual || '—'),
-      elegirPersonas(pre + 'Autor', {universo:_autorCandidatos_(actual), multi:false, titulo:'Autor', vacio:'Escribe un nombre o pulsa «Ver lista».'}) +
-      '<button type="button" class="btn" style="margin-top:8px;width:100%" data-autorcambiar="' + pre + '">Cambiar autor</button>', 'div') + '</div>';
+  var l = Array.isArray(actuales) ? actuales : (actuales ? [actuales] : []);
+  return '<div id="' + pre + 'Autor" data-autor="' + pre + '" data-autordoc="' + esc(String(id)) + '" data-autorinicial="' + esc(JSON.stringify(l)) +
+    '" style="margin-top:10px">' +
+    _anotCampoHTML_('Autores', 'Ahora: ' + esc(l.join(', ') || '—'),
+      elegirPersonas(pre + 'Autor', {universo:_autorCandidatos_(), marcadas:l, multi:true, titulo:'Autores', vacio:'Escribe un nombre o pulsa «Ver lista».'}) +
+      '<button type="button" class="btn" style="margin-top:8px;width:100%" data-autorcambiar="' + pre + '">Guardar autores</button>', 'div') + '</div>';
 }
 /* «Autor cambiado por X (antes: Y)»: lo ve cualquiera que abra la ficha. Vacío si nadie lo cambió. */
 function _autorRastroHTML_(e){
@@ -11442,13 +11542,20 @@ function _autorRastroHTML_(e){
    bien claras en la app». La portada con esos autores la pone el publicador; «con anotaciones» es sólo para otro arreglo. Con un solo
    autor casado no hay nada que explicar (ya sale como autor del expediente). `''` si no hay. */
 function _autoresDocHTML_(e){
-  var a = e && e.analisis && e.analisis.autores;
-  if (!a || typeof a !== 'object') return '';
-  var ok = Array.isArray(a.casados) ? a.casados : [], sin = Array.isArray(a.sin_casar) ? a.sin_casar : [];
-  if (ok.length + sin.length < 2 && !sin.length) return '';
-  return '<p class="rnota" style="margin:8px 0 0">Autores del documento: ' + ok.map(esc).join(', ') +
-    (sin.length ? (ok.length ? ', ' : '') + sin.map(function(n){ return esc(n) + ' (no está en el equipo)'; }).join(', ') : '') +
-    '. La portada saldrá así sin hacer nada; «con anotaciones» sirve sólo para ajustar otra cosa.</p>';
+  /* 04/11: SIEMPRE todos los autores (Daniel: «que aparezca si hay varios autores»): los de la lista a mano, los del documento o, si no hay,
+     el de la cuenta que lo subió. Los que el documento nombra y no están en el equipo salen marcados. */
+  var l = _autoresActualesDe_(e), a = e && e.analisis && e.analisis.autores;
+  var sin = !(e && Array.isArray(e.autores_manual) && e.autores_manual.length) && a && Array.isArray(a.sin_casar) ? a.sin_casar : [];
+  var rv = _revisoresPropuestosDe_(e), rvs = e && e.analisis && e.analisis.revisores && Array.isArray(e.analisis.revisores.sin_casar) ? e.analisis.revisores.sin_casar : [];
+  var h = '';
+  if (l.length) h += '<p class="rnota" style="margin:8px 0 0">' + (l.length > 1 ? 'Autores' : 'Autor') + ': ' +
+    l.map(function(n){ return esc(n) + (sin.indexOf(n) >= 0 ? ' (no está en el equipo)' : ''); }).join(', ') +
+    (l.length > 1 && !(e && e.autores_manual) ? '. La portada saldrá así sin hacer nada; «con anotaciones» sirve sólo para ajustar otra cosa' : '') + '.</p>';
+  var fir = _revisadoPorTxt_(e);   /* ya aprobado con los propuestos: lo que consta (revisores y quien validó) manda sobre lo que proponía el documento */
+  if (fir) h += '<p class="rnota" style="margin:8px 0 0">' + esc(fir) + '.</p>';
+  else if (rv.length || rvs.length) h += '<p class="rnota" style="margin:8px 0 0">Revisado por: ' +
+    rv.map(esc).concat(rvs.map(function(n){ return esc(n) + ' (no está en el equipo)'; })).join(', ') + ' <span style="color:var(--ink3)">(según el documento)</span>.</p>';
+  return h;
 }
 /* El delegado de «Cambiar autor». `buscar(id)` da el expediente de la cara; `alCambiar(e, upd)` repinta. */
 async function _autorClic_(ev, buscar, alCambiar){
@@ -11457,14 +11564,15 @@ async function _autorClic_(ev, buscar, alCambiar){
   var pre = b.getAttribute('data-autorcambiar'), c = document.getElementById(pre + 'Autor');
   var e = c ? buscar(c.getAttribute('data-autordoc')) : null;
   if (!e) return;
-  var nuevo = _autorCandidatos_(e.autor).filter(function(n){ return n === elegirPersonasMarcadas(pre + 'Autor')[0]; })[0];
-  if (!nuevo){ tost('Elige a alguien de la lista (no puede ser Daniel ni José).'); return; }
+  var nuevo = elegirPersonasMarcadas(pre + 'Autor');
+  if (!nuevo.length){ tost('Elige al menos un autor.'); return; }
+  if (nuevo.join('|') === _autoresActualesDe_(e).join('|')){ tost('Esos ya son los autores: no hay nada que cambiar.'); return; }
   if (typeof backendOK === 'undefined' || !backendOK || typeof SESION === 'undefined' || !SESION){
     tost('Sin conexión con el backend: el autor NO se ha cambiado.'); return; }
   b.disabled = true;
   try {
     var upd = await api.cambiarAutorDoc(e.id, nuevo, e.ref);
-    tost('Autor cambiado a ' + nuevo + '.');
+    tost((nuevo.length > 1 ? 'Autores cambiados a ' : 'Autor cambiado a ') + nuevo.join(', ') + '.');
     alCambiar(e, upd);
   } catch (err) {
     b.disabled = false;
@@ -12412,6 +12520,319 @@ function _tareaParteColaCablear_(cb){
   }
   $$('[data-tp-firmar]').forEach(function(b){ b.onclick = function(){ decidir(b.closest('[data-tp-card]'), b, 'aprobar'); }; });
   $$('[data-tp-rech]').forEach(function(b){ b.onclick = function(){ decidir(b.closest('[data-tp-card]'), b, 'rechazar'); }; });
+}
+
+/* ══ 04/11 · LAS FOTOS DE UN TURNO: LA CÁMARA DEL MÓVIL AL MINI PC, SIN RECOMPRIMIR ═══════════════════════════════
+   🗣️ Daniel (04/11, audio a Marta): *«el responsable audiovisual abre la app, le da al turno y le aparece un botoncillo de hacer
+   fotos […] se guarda directamente el archivo en la app sin siquiera pasar por la memoria de la persona […] el resto de gente en
+   ese turno le puede dar al botón y sumar al bote; luego el responsable audiovisual la revisa y borra algunas, le da un botón y te
+   llegan a ti»* · *«no hay ningún tipo de compresión: te abre la cámara para que la saques […] título opcional»*.
+   Backend: `rutinas/fotos_turno.py` (`listarFotosTurno`, `subirFotoTurno`, `getFotoTurno`, `borrarFotoTurno`, `entregarFotosTurno`,
+   `getZipTurno`, `configurarEntregaFotos`). UNA implementación para las dos caras: la ficha del turno (modal del móvil, ficha del
+   escritorio) y la tarjeta «tu turno de hoy» del inicio del móvil sólo ponen un hueco `_ftHTML_(t)` y llaman a `_ftEnganchar_`.
+   ⛔ QUIÉN PUEDE QUÉ lo decide el SERVIDOR y lo dice en `listarFotosTurno` (`puedeVer`, `puedeSubir`, `puedeGestionar`,
+   `puedeConfigurar`): aquí no se copia la regla, se pregunta. El hueco se queda vacío (nada de texto chapa) si el servidor dice que
+   no hay nada que enseñar a esta persona en ese turno.
+   ⛔ EL FICHERO VA TAL CUAL: se lee `File.slice()` en trozos de 512 KB y se manda en base64; nada de canvas ni de redimensionar. */
+var FT_ = {est: {}, turno: {}, sub: {}, reloj: null};   /* est[clave] = {t, r:respuesta}; sub[clave] = la cola de subida */
+function _ftIdTurno_(t){ var id = t && t.id != null ? String(t.id) : ''; return /^T·/.test(id) ? '' : id; }
+function _ftHora_(t){ var h = String((t && t.hora) || ''); return /^\d{1,2}:\d{2}/.test(h) ? h.slice(0, 5) : ''; }
+function _ftFecha_(t){ return String((t && (t.iso || t.fecha || _dmyAISO_(t.f))) || '').slice(0, 10); }
+function _ftClave_(t){ return _ftFecha_(t) + '|' + _ftHora_(t) + '|' + _ftIdTurno_(t); }
+/* El cuerpo con que se nombra el turno al servidor: su id de Notion o, sin él, la fecha y la hora. */
+function _ftCuerpo_(t){ return {turno: _ftIdTurno_(t), fecha: _ftFecha_(t), hora: _ftHora_(t)}; }
+/* ¿Está el turno `t` en curso a las `ahora` (Date)? Desde 1 h antes de la hora hasta 2 h después de acabar (la duración escrita,
+   «3 horas»; sin ella, 4). Sin hora legible, todo el día. Es lo que decide si el INICIO del móvil ofrece las fotos; el servidor
+   decide de verdad (sólo el día del turno). */
+function _ftEnCurso_(t, ahora){
+  var f = _ftFecha_(t), a = ahora || new Date();
+  if(f !== a.getFullYear() + '-' + pad(a.getMonth() + 1) + '-' + pad(a.getDate())) return false;
+  var h = _ftHora_(t);
+  if(!h) return true;
+  var mm = /^(\d{1,2}):(\d{2})/.exec(h), ini = parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10);
+  var dur = _horasDeDuracion_(t.dur || t.duracion, 4) * 60, ya = a.getHours() * 60 + a.getMinutes();
+  return ya >= ini - 60 && ya <= ini + dur + 120;
+}
+function _ftBytesTxt_(n){ return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+function _ftCss_(){
+  if(document.getElementById('ftCss')) return;
+  var s = document.createElement('style'); s.id = 'ftCss';
+  s.textContent =
+    '.ftf{margin:14px 0 4px}.ftf-h{display:flex;align-items:baseline;gap:8px;margin:0 0 8px}.ftf-h .sc{flex:1}'+
+    '.ftf-fila{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 9px}'+
+    '.ftf-cam{position:relative;display:inline-flex;align-items:center;gap:8px;cursor:pointer;min-height:44px;padding:0 18px;border-radius:22px;'+
+      'background:var(--red);color:#fff;font-weight:600;font-size:14px}'+
+    '.ftf-cam input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}'+
+    '.ftf-tit{flex:1;min-width:130px;background:var(--sur2);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 11px;font-size:14px}'+
+    '.ftf-c{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:12px;min-height:32px;padding:5px 12px;'+
+      'border-radius:20px;border:1px solid var(--line);background:var(--sur2);color:var(--ink2);white-space:nowrap}'+
+    '.ftf-c:hover{border-color:var(--ink3);color:var(--ink)}.ftf-c.pri{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}'+
+    '.ftf-nota{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.ftf-err{margin:0 0 8px;font-size:13px;color:var(--red)}'+
+    '.ftf-barra{height:4px;border-radius:2px;background:var(--line);overflow:hidden;margin:0 0 9px}.ftf-barra i{display:block;height:100%;background:var(--red)}'+
+    '.ftf-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin:0 0 10px}'+
+    '.ftf-f{position:relative;cursor:pointer;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--sur2);min-height:96px}'+
+    '.ftf-f img{display:block;width:100%;height:96px;object-fit:cover}'+
+    '.ftf-f .ftf-sin{display:flex;align-items:center;justify-content:center;height:96px;font-family:var(--mono);font-size:12px;color:var(--ink3)}'+
+    '.ftf-f small{display:block;padding:4px 6px;font-size:10.5px;line-height:1.3;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'+
+    '.ftf-f .ftf-e{position:absolute;top:4px;right:4px;font-family:var(--mono);font-size:9.5px;padding:2px 6px;border-radius:9px;background:rgba(0,0,0,.66);color:#fff}'+
+    '.ftf-vis img{display:block;max-width:100%;max-height:60vh;margin:0 auto 10px;border-radius:8px}';
+  document.head.appendChild(s);
+}
+/* El hueco. Vacío hasta que el servidor diga que hay algo que enseñar. */
+function _ftHTML_(t){
+  _ftCss_();
+  var k = _ftClave_(t); FT_.turno[k] = t;
+  return '<div class="ftf" data-ftur="' + esc(k) + '" hidden></div>';
+}
+function _ftDeserv_(accion, t, extra){ return api._post(Object.assign({action: accion}, _ftCuerpo_(t), extra || {})); }
+function _ftRefrescar_(t, forzar){
+  var k = _ftClave_(t), e = FT_.est[k];
+  if(!forzar && e && e.pidiendo) return e.pidiendo;
+  var p = _ftDeserv_('listarFotosTurno', t).then(function(r){ FT_.est[k] = {t: Date.now(), r: r}; _ftPintar_(k); return r; },
+    function(){ if(!FT_.est[k]) FT_.est[k] = {t: Date.now(), r: {puedeVer: false, fotos: []}}; _ftPintar_(k); return null; });
+  FT_.est[k] = Object.assign({}, e || {}, {pidiendo: p});
+  p.then(function(){ if(FT_.est[k]) delete FT_.est[k].pidiendo; });
+  return p;
+}
+function _ftAutorPila_(n){ var m = (typeof DATA !== 'undefined' && DATA.miembros || []).filter(function(x){ return x.nombre === n; })[0]; return (m && m.pila) || String(n || '').split(' ')[0]; }
+function _ftHoraDe_(at){ return String(at || '').slice(11, 16); }
+function _ftDinHTML_(k){
+  var e = FT_.est[k], r = e && e.r, S = FT_.sub[k] || {}, h = '', i;
+  if(S.activo || (S.cola && S.cola.length)){
+    h += '<p class="ftf-nota" data-ftprog>Subiendo ' + Math.min(S.total, (S.hechas || 0) + 1) + ' de ' + S.total + ' · ' + (S.pct || 0) + ' %</p>'+
+         '<div class="ftf-barra"><i style="width:' + (S.pct || 0) + '%"></i></div>';
+  }
+  if(S.rechazos && S.rechazos.length){
+    h += S.rechazos.map(function(m){ return '<p class="ftf-err" data-ftrech>' + esc(m) + '</p>'; }).join('')+
+         '<div class="ftf-fila"><span class="ftf-c" data-ftentendido data-p>Entendido</span></div>';
+  }
+  if(S.fallidas && S.fallidas.length){
+    h += '<p class="ftf-err" data-fterr>' + esc(S.msg || ('No se subieron ' + S.fallidas.length + ' fotos')) + '</p>'+
+         '<div class="ftf-fila"><span class="ftf-c pri" data-ftreint data-p>Reintentar ' + S.fallidas.length + '</span>'+
+         '<span class="ftf-c" data-ftdesc data-p>Descartar</span></div>';
+  }
+  if(r.fotos.length){
+    h += '<div class="ftf-g">' + r.fotos.map(function(f){
+      return '<div class="ftf-f" data-ftf="' + esc(f.id) + '" data-p>' +
+        (f.mini ? '<img src="' + esc(f.mini) + '" alt="Foto de ' + esc(f.autor) + '">' : '<div class="ftf-sin">' + esc(String(f.ext).toUpperCase()) + '</div>') +
+        (f.entregada ? '<span class="ftf-e">entregada</span>' : '') +
+        '<small>' + esc(_ftAutorPila_(f.autor)) + ' · ' + esc(_ftHoraDe_(f.at)) + (f.titulo ? ' · ' + esc(f.titulo) : '') + '</small></div>';
+    }).join('') + '</div>';
+  }
+  if(r.puedeGestionar && r.fotos.length){
+    var pend = r.fotos.filter(function(f){ return !f.entregada; }).length;
+    h += '<div class="ftf-fila"><span class="ftf-c pri" data-ftentregar data-p>Entregar ' + r.fotos.length + (pend < r.fotos.length ? ' (' + pend + ' nuevas)' : '') + '</span>'+
+         '<span class="ftf-c" data-ftzip data-p>Descargar ZIP</span>' +
+         (r.puedeConfigurar ? '<span class="ftf-c" data-ftdest data-p>Destino: ' + (r.destino === 'zip' ? 'ZIP' : 'Drive') + '</span>' : '') + '</div>';
+    if(r.ultimaEntrega) h += '<p class="ftf-nota" data-ftult>Entregadas el ' + esc(_isoADMY_(String(r.ultimaEntrega.at).slice(0, 10))) + ' a las ' + esc(_ftHoraDe_(r.ultimaEntrega.at)) +
+      ' por ' + esc(_ftAutorPila_(r.ultimaEntrega.por)) + (r.ultimaEntrega.destino === 'zip' ? ' (ZIP)' : ' (Drive)') + '.</p>';
+  }
+  return h;
+}
+/* Repinta cada hueco de esa clave. La parte de arriba (cámara + título) sólo se rehace si cambia `puedeSubir`: reescribirla con el
+   dedo en el campo del título le quitaría el foco. */
+function _ftPintar_(k){
+  var e = FT_.est[k], r = e && e.r, t = FT_.turno[k];
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ftur]'), function(c){
+    if(c.getAttribute('data-ftur') !== k) return;
+    var hay = !!(r && r.puedeVer && (r.fotos.length || r.puedeSubir || (FT_.sub[k] && (FT_.sub[k].total || FT_.sub[k].rechazos.length))));
+    c.hidden = !hay;
+    var env = c.closest ? c.closest('[data-ftwrap]') : null;
+    if(env) env.style.display = hay ? '' : 'none';
+    if(!hay){ c.innerHTML = ''; c.removeAttribute('data-sig'); return; }
+    var sig = r.puedeSubir ? 'sube' : 'no';
+    if(c.getAttribute('data-sig') !== sig || !c.querySelector('[data-ftdin]')){
+      c.setAttribute('data-sig', sig);
+      c.innerHTML = '<div class="ftf-h"><span class="sc">Fotos del turno</span></div>'+
+        (r.puedeSubir ? '<div class="ftf-fila"><label class="ftf-cam" data-p>' + ico('camara') + ' Hacer fotos'+
+          '<input type="file" accept="image/*" capture="environment" multiple data-ftfile aria-label="Hacer fotos"></label>'+
+          '<input type="text" class="ftf-tit" data-fttit maxlength="80" placeholder="Título (opcional)" aria-label="Título de las fotos"></div>' : '')+
+        '<div data-ftdin></div>';
+    }
+    c.querySelector('[data-ftdin]').innerHTML = _ftDinHTML_(k);
+  });
+}
+/* Engancha los huecos que haya dentro de `raiz` (o del documento): pinta lo que ya se sabe, pregunta si está viejo y cablea UNA vez. */
+function _ftEnganchar_(raiz){
+  var base = raiz || document;
+  Array.prototype.forEach.call(base.querySelectorAll('[data-ftur]'), function(c){
+    var k = c.getAttribute('data-ftur'), t = FT_.turno[k];
+    if(!t) return;
+    if(!c.getAttribute('data-ftok')){
+      c.setAttribute('data-ftok', '1');
+      c.addEventListener('change', function(ev){
+        var inp = ev.target;
+        if(inp && inp.hasAttribute && inp.hasAttribute('data-ftfile')){
+          var tt = c.querySelector('[data-fttit]'), titulo = tt ? tt.value : '';
+          var fs = Array.prototype.slice.call(inp.files || []);
+          inp.value = ''; if(tt) tt.value = '';
+          _ftSubir_(t, fs, titulo);
+        }
+      });
+      c.addEventListener('click', function(ev){ _ftClic_(t, k, ev); });
+    }
+    if(FT_.est[k] && FT_.est[k].r) _ftPintar_(k);
+    if(!FT_.est[k] || !FT_.est[k].r || Date.now() - FT_.est[k].t > 8000) _ftRefrescar_(t);
+  });
+  if(!FT_.reloj){
+    FT_.reloj = setInterval(function(){
+      Object.keys(FT_.turno).forEach(function(k){
+        var vivo = document.querySelector('[data-ftur="' + k.replace(/"/g, '') + '"]');
+        if(vivo && !(FT_.sub[k] && FT_.sub[k].activo)) _ftRefrescar_(FT_.turno[k], true);
+      });
+    }, 25000);
+  }
+}
+function _ftClic_(t, k, ev){
+  var x = ev.target && ev.target.closest ? ev.target : null; if(!x) return;
+  var q = function(s){ return x.closest(s); }, r = FT_.est[k] && FT_.est[k].r;
+  if(q('[data-ftreint]')){ _ftReintentar_(t); return; }
+  if(q('[data-ftentendido]')){ FT_.sub[k].rechazos = []; _ftPintar_(k); return; }
+  if(q('[data-ftdesc]')){ FT_.sub[k].fallidas = []; FT_.sub[k].msg = ''; FT_.sub[k].total = FT_.sub[k].hechas = 0; _ftPintar_(k); return; }
+  var f = q('[data-ftf]'); if(f){ _ftVisor_(t, k, f.getAttribute('data-ftf')); return; }
+  if(q('[data-ftentregar]')) _ftEntregar_(t, k);
+  else if(q('[data-ftzip]')) _ftZip_(t, k);
+  else if(q('[data-ftdest]')) _ftDestino_(t, k);
+}
+function _ftEsperar_(ms){ return new Promise(function(ok){ setTimeout(ok, ms); }); }
+function _ftDeRed_(e){ return !!(e && (e.sinRed || e.sinRespuesta || e.transito)); }
+/* La cola de una persona en un turno: UNA a UNA, con progreso, y una que falla NO tira las ya subidas. Un fallo de RED para la cola
+   (el resto espera a «Reintentar»); un «no» del servidor (formato, tope, día) sólo descarta esa foto. */
+function _ftSubir_(t, files, titulo){
+  var k = _ftClave_(t), S = FT_.sub[k] = FT_.sub[k] || {cola: [], fallidas: [], rechazos: [], total: 0, hechas: 0, pct: 0, activo: false, msg: ''};
+  var r = FT_.est[k] && FT_.est[k].r, max = (r && r.maxBytes) || 26214400;
+  files.forEach(function(f){
+    if(!f || !f.size){ return; }
+    if(f.size > max){ S.rechazos.push('«' + f.name + '» pesa ' + _ftBytesTxt_(f.size) + ' (máximo ' + _ftBytesTxt_(max) + ').'); return; }
+    S.cola.push({file: f, titulo: String(titulo || '').trim()}); S.total++;
+  });
+  _ftPintar_(k);
+  return _ftVaciar_(t, k);
+}
+async function _ftVaciar_(t, k){
+  var S = FT_.sub[k];
+  if(S.activo) return S.activo;
+  S.activo = true;
+  while(S.cola.length){
+    var it = S.cola[0];
+    try{
+      await _ftSubirUna_(t, k, it);
+      S.cola.shift(); S.hechas++;
+    }catch(e){
+      if(_ftDeRed_(e)){
+        S.msg = 'Sin conexión: quedan ' + S.cola.length + ' fotos por subir. Las ya subidas están a salvo.';
+        S.fallidas = S.fallidas.concat(S.cola.splice(0).map(function(x){ return {file: x.file, titulo: x.titulo}; }));
+      }else{
+        S.cola.shift(); S.hechas++;
+        S.rechazos.push('«' + it.file.name + '» no se subió: ' + String((e && e.message) || e).replace(/^Error:\s*/, ''));
+      }
+    }
+    _ftPintar_(k);
+  }
+  S.activo = false; S.pct = 0;
+  if(S.hechas >= S.total && !S.fallidas.length){ S.total = S.hechas = 0; S.msg = ''; }
+  await _ftRefrescar_(t, true);
+  _ftPintar_(k);
+}
+function _ftReintentar_(t){
+  var k = _ftClave_(t), S = FT_.sub[k]; if(!S) return;
+  var otra = S.fallidas; S.fallidas = []; S.msg = '';
+  otra.forEach(function(x){ S.cola.push({file: x.file, titulo: x.titulo}); });
+  _ftPintar_(k);
+  return _ftVaciar_(t, k);
+}
+/* Una foto: el fichero ORIGINAL en trozos. Cada trozo se reintenta si falla la red (el servidor reescribe un trozo repetido). */
+async function _ftSubirUna_(t, k, it){
+  var S = FT_.sub[k], f = it.file, r = FT_.est[k] && FT_.est[k].r, trozo = (r && r.trozo) || 524288;
+  var partes = Math.max(1, Math.ceil(f.size / trozo)), ses = '', i, n, res = null;
+  for(i = 0; i < 20; i++) ses += 'abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random() * 36));
+  for(i = 0; i < partes; i++){
+    var datos = await _audioB64_(f.slice(i * trozo, Math.min(f.size, (i + 1) * trozo)));
+    for(n = 0; ; n++){
+      try{
+        res = await api._post(Object.assign({action: 'subirFotoTurno'}, _ftCuerpo_(t), {sesion: ses, parte: i, partes: partes, nombre: f.name, titulo: it.titulo, datos: datos}));
+        break;
+      }catch(e){ if(!_ftDeRed_(e) || n >= 3) throw e; await _ftEsperar_(1200 * (n + 1)); }
+    }
+    S.pct = Math.floor((i + 1) * 100 / partes); _ftPintar_(k);
+  }
+  if(!(res && res.completo)) throw new Error('no pude confirmar la subida de «' + f.name + '»: mira la galería antes de repetirla');
+  return res.foto;
+}
+/* ── ver una foto, descargar el original, borrar ── */
+function _ftB64Bytes_(b64){ var s = atob(b64), u = new Uint8Array(s.length), i; for(i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+function _ftGuardar_(nombre, partes, tipo){
+  var u = URL.createObjectURL(new Blob(partes, {type: tipo || 'application/octet-stream'}));
+  var a = document.createElement('a'); a.href = u; a.download = nombre; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(u); a.remove(); }, 4000);
+}
+async function _ftBajar_(accion, t, extra){
+  var trozos = [], p = 0, partes = 1, ult = null;
+  while(p < partes){
+    ult = await _ftDeserv_(accion, t, Object.assign({parte: p}, extra || {}));
+    partes = ult.partes; trozos.push(_ftB64Bytes_(ult.datos)); p++;
+  }
+  return {trozos: trozos, nombre: ult.nombre, ext: ult.ext};
+}
+function _ftVisor_(t, k, id){
+  var r = FT_.est[k] && FT_.est[k].r, f = r && r.fotos.filter(function(x){ return x.id === id; })[0]; if(!f) return;
+  _pselCss_(); _ftCss_();
+  if(document.querySelector('[data-ftvisor]')) return;
+  var puedeQuitar = !!(r.puedeGestionar || (f.mia && !f.entregada));
+  var ov = document.createElement('div'); ov.className = 'psel-ov'; ov.setAttribute('data-ftvisor', '1');
+  ov.style.cssText = 'align-items:center;justify-content:center';
+  ov.innerHTML = '<div class="psel-hoja ftf-vis" role="dialog" style="width:min(420px,94%);height:auto;max-height:92%;border-radius:16px;border-width:1px">'+
+    (f.mini ? '<img data-ftimg src="' + esc(f.mini) + '" alt="">' : '<p class="ftf-nota">Sin vista previa (' + esc(String(f.ext).toUpperCase()) + '). Descarga el original.</p>')+
+    '<p class="ftf-nota">' + esc(f.autor) + ' · ' + esc(_ftHoraDe_(f.at)) + ' · ' + esc(_ftBytesTxt_(f.tam)) + (f.titulo ? ' · ' + esc(f.titulo) : '') + (f.entregada ? ' · entregada' : '') + '</p>'+
+    '<div class="ftf-fila">' + (f.ext !== 'heic' ? '<span class="ftf-c" data-ftorig data-p>Ver original</span>' : '') +
+    '<span class="ftf-c pri" data-ftdesc1 data-p>Descargar original</span>' +
+    (puedeQuitar ? '<span class="ftf-c" data-ftquitar data-p>Quitar</span>' : '') + '<span class="ftf-c" data-ftcerrar data-p>Cerrar</span></div></div>';
+  ov.onclick = function(e){ if(e.target === ov) ov.remove(); };
+  ov.querySelector('[data-ftcerrar]').onclick = function(){ ov.remove(); };
+  var bajar = function(){ return _ftBajar_('getFotoTurno', t, {id: id}); };
+  var vo = ov.querySelector('[data-ftorig]');
+  if(vo) vo.onclick = function(){
+    vo.textContent = 'Cargando…';
+    bajar().then(function(d){ var u = URL.createObjectURL(new Blob(d.trozos, {type: f.ext === 'png' ? 'image/png' : 'image/jpeg'}));
+      var im = ov.querySelector('[data-ftimg]'); if(im) im.src = u; vo.remove(); }, function(e){ vo.textContent = 'Ver original'; tostErr('No se pudo cargar: ', e); });
+  };
+  ov.querySelector('[data-ftdesc1]').onclick = function(){
+    bajar().then(function(d){ _ftGuardar_(d.nombre || ('foto.' + f.ext), d.trozos, f.ext === 'png' ? 'image/png' : f.ext === 'heic' ? 'image/heic' : 'image/jpeg'); },
+      function(e){ tostErr('No se pudo descargar: ', e); });
+  };
+  var qu = ov.querySelector('[data-ftquitar]');
+  if(qu) qu.onclick = async function(){
+    if(!(await dialogoSiNo('¿Quitar esta foto del turno? Se borra del servidor.', {si: 'Quitar'}))) return;
+    try{ await _ftDeserv_('borrarFotoTurno', t, {id: id}); ov.remove(); tost('Foto quitada.'); await _ftRefrescar_(t, true); }
+    catch(e){ tostErr('No se pudo quitar: ', e); }
+  };
+  document.body.appendChild(ov);
+}
+/* ── entregar, ZIP, destino ── */
+async function _ftEntregar_(t, k){
+  var r = FT_.est[k] && FT_.est[k].r; if(!r) return;
+  var donde = r.destino === 'zip' ? 'Se marcan como entregadas y te queda el ZIP para mandarlo.' : 'Se copian a la carpeta de Drive configurada (subcarpeta «' + r.carpeta + '»).';
+  if(!(await dialogoSiNo('¿Entregar las ' + r.fotos.length + ' fotos del turno? ' + donde, {si: 'Entregar'}))) return;
+  try{
+    var o = await _ftDeserv_('entregarFotosTurno', t);
+    tost(o.destino === 'zip' ? 'Marcadas como entregadas. Descarga el ZIP para mandarlo.' : o.n + ' fotos entregadas en «' + o.carpeta + '».');
+  }catch(e){ tostErr('No se pudo entregar: ', e); }
+  await _ftRefrescar_(t, true);
+}
+async function _ftZip_(t, k){
+  try{
+    tost('Preparando el ZIP…');
+    var d = await _ftBajar_('getZipTurno', t);
+    _ftGuardar_(d.nombre || 'fotos-turno.zip', d.trozos, 'application/zip');
+  }catch(e){ tostErr('No se pudo preparar el ZIP: ', e); }
+}
+async function _ftDestino_(t, k){
+  var r = FT_.est[k] && FT_.est[k].r; if(!r) return;
+  var v = await dialogoTexto('Dónde se entregan las fotos: pega el enlace de una carpeta de Drive (o un «remoto:ruta» de rclone). Vacío = descargar un ZIP.', {valor: r.destinoTexto || ''});
+  if(v == null) return;
+  try{ await api._post({action: 'configurarEntregaFotos', destino: v}); tost(String(v).trim() ? 'Destino guardado.' : 'Sin destino: se entregará por ZIP.'); }
+  catch(e){ tostErr('No se pudo guardar el destino: ', e); }
+  await _ftRefrescar_(t, true);
 }
 
 /* ══ 29/10 · LA GRABACIÓN DE UNA REUNIÓN: AVISO AL CONVOCAR + «SUBIR GRABACIÓN» EN LA FICHA ══════════════════════

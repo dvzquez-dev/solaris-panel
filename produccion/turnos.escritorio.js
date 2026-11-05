@@ -83,7 +83,7 @@ function _pintarBotonConvocar_(){
   var v=function(id){ return (document.getElementById(id)||{}).value||''; };
   /* refuta6: la regla del consejo con lo escrito a mano manda sobre lo demás (la misma frase y el mismo orden que `_porQueNoSeProgramaTurno_`). */
   var motivo = _porQueSinConsejo_(_convocarCv_(), v('tuFecha'), v('tuHora'), v('tuDur')) || ((typeof _porQueNoSeConvoca_==='function')
-    ? _porQueNoSeConvoca_(TUR_CARGOS, Object.keys(TUR_SEL).length, TUR_COCHES) : '');
+    ? _porQueNoSeConvoca_(TUR_CARGOS, Object.keys(TUR_SEL).length, TUR_COCHES, Object.keys(TUR_SEL)) : '');
   b.disabled = !!motivo;
   b.textContent = motivo ? motivo : 'Convocar el turno';
   b.title = motivo || '';
@@ -133,7 +133,7 @@ function pintarReparto(){
          ✅ Y una misma persona PUEDE llevar dos: si se prohibiera, un turno de tres
          personas no se podria convocar -hay tres cargos- y la pantalla se plantaria.
          Se avisa, no se impide. */
-      CARGOS_TURNO.map(function(cg){
+      CARGOS_TURNO.filter(function(cg){ return _cargoOfrecidoA_(cg.k, n); }).map(function(cg){
         return '<button type="button" class="mini'+(TUR_CARGOS[cg.k]===n?' on':'')+
           '" data-cargo="'+cg.k+'" data-quien="'+esc(n)+'" title="'+esc(cg.et)+
           '">'+esc(cg.corto)+'</button>'; }).join('')+
@@ -2057,6 +2057,7 @@ function _fichaTurnoE_(t){
       sec('Objetivos secundarios', obj(t.secundarios, 'Sin objetivos secundarios'))+
     '</div>'+
     sec('Nota', t.nota ? '<div class="ftu-nota">'+esc(t.nota)+'</div>' : vac('Sin nota'))+
+    _ftHTML_(t)+   /* 04/11: las fotos del turno (hueco: vacío hasta que el servidor diga que hay algo que enseñar) */
     /* la memoria se incrusta como DOCUMENTO (igual que en el movil), no como un enlace suelto */
     sec('Memoria', t.memoria ? _memoriaHTML_(t) : vac('Memoria del turno · aún no subida'))+'</div>',
     'ftu destaca')+'</div>';
@@ -2073,4 +2074,5 @@ function _engFichaTurno_(){
     };
   });
   _cablearMemoria_();
+  _ftEnganchar_(document);   /* 04/11: las fotos del turno */
 }

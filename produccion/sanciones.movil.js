@@ -172,10 +172,7 @@ function _sancColaHTML_(){
             ' · '+esc(_etSancFila_(x.puntos, x.origen, x.extra)))+'</span>'+
           (suelta
             ? '<button class="btn mini" data-sok="'+esc(x.id)+'" data-p>Aprobar</button>'+
-              /* ⛔ 21/10 (auditor de sanciones): «Justificar» también en una suelta, como el escritorio — y con su mismo
-                 gate: una revocación o un premio no se justifica. */
-              (_esNoJustificable_(x.origen, x.extra) ? '' :
-              '<button class="btn mini" data-sjust="'+esc(x.id)+'" data-p>Justificar</button>')+
+              /* 04/11 noche (Daniel): «Justificar y rechazar es lo mismo»: UN gesto, «Rechazar», que siempre pide el porqué. */
               '<button class="btn mini" data-sno="'+esc(x.id)+'" data-p style="color:var(--warn);border-color:var(--warn)">Rechazar</button>'
             /* ⛔ UN SOLO ATRIBUTO `class`, CON EL TERNARIO DENTRO. Hasta el 11/08 el boton
                abria con `class="btn mini"` y el ternario anadia un SEGUNDO `class`: el parser
@@ -183,33 +180,21 @@ function _sancColaHTML_(){
                llegaba nunca. Se marcaba sancion por sancion y la pantalla quedaba IGUAL.
                ✅ Es la forma que `escritorio.html` ya usaba bien. Y el «No» no tenia ternario
                siquiera: no podia verse marcado ni arreglando lo otro. */
-            /* ⛔⛔ TRES DECISIONES, NO DOS. Aqui habia solo Si/No, asi que un PD trabajando
-               desde el telefono **no podia JUSTIFICAR** una sancion de un lote: o la aceptaba
-               o la rechazaba, y son tres cosas distintas -- `justificada` no resta puntos y
-               consta como decidida. El escritorio ofrecia las tres desde siempre
-               (`escritorio.html:1478`) y el backend acepta las tres en `marcar`
-               (`Codigo.gs:3444`), asi que no faltaba servidor: faltaba el boton.
-               ⚠️ Y EL AVISO DE CIERRE YA CONTABA `justificadas`, lo que hacia parecer que el
-               rotulo mentia. No mentia: esa cifra es alcanzable si alguien marco desde el
-               ordenador. Lo que no habia era como producirla desde aqui.
-               ⚠️ LAS PALABRAS SON LAS DEL ESCRITORIO, no Si/No. Con dos opciones un si/no se
-               entiende; con tres deja de ser una pregunta, y dos vocabularios para el mismo
-               dato en la misma app es como se acaba dudando de cual manda. */
+            /* 04/11 noche (Daniel: «Justificar y rechazar es lo mismo»): DOS decisiones, Acepta y Rechaza — rechazar pide siempre
+               el porqué y deja la sanción `rechazada` (no resta puntos). Antes eran tres (Acepta · Justifica · Rechaza).
+               ⚠️ LAS PALABRAS SON LAS DEL ESCRITORIO: dos vocabularios para el mismo dato en la misma app es como se acaba
+               dudando de cual manda. */
             : '<button class="btn mini'+(x.dec==='aceptar'?' on a':'')+'" data-smarc="'+esc(x.id)+
                 '" data-dec="aceptar" data-p>Acepta</button>'+
-              /* ⛔ 21/10 (auditor de sanciones): una REVOCACIÓN o un PREMIO no se justifica — como en el escritorio.
-                 Aquí se ofrecía, el servidor lo aceptaba por `marcar` y al cerrar el bloque quedaba `justificada`: la
-                 revocación no devolvía los puntos y ya no se podía volver a revocar. */
-              (_esNoJustificable_(x.origen, x.extra) ? '' :
-              '<button class="btn mini'+(x.dec==='justificar'?' on j':'')+'" data-smarc="'+esc(x.id)+
-                '" data-dec="justificar" data-p>Justifica</button>')+
               '<button class="btn mini'+(x.dec==='rechazar'?' on r':'')+'" data-smarc="'+esc(x.id)+
                 '" data-dec="rechazar" data-p>Rechaza</button>')+
         '</div>';
     }).join('');
   }, function(it, k, suelta){
     return suelta ? ''
-      : '<p class="rnota">Todas van en «Acepta»; cambia las que no. El bloque se cierra entero.</p>'+
+      : '<p class="rnota">Todas van en «Acepta»; cambia las que no (rechazar pide el porqué). El bloque se cierra entero.</p>'+
+        /* 04/11 (Daniel): «rechazar el bloque entero» — UN texto y no se aplica ninguna. */
+        '<button class="btn full" data-sjbloque="'+esc(k)+'" data-p>Rechazar el bloque entero</button>'+
         '<button class="btn full" data-scerrar="'+esc(k)+'" data-p>Cerrar el bloque entero</button>';
   });
 }
@@ -268,23 +253,43 @@ function _cablearSanciones_(){
   /* 04/11: rechazar también se pregunta (a quién y cuánto): no tiene vuelta atrás desde la app y quita la sanción de la cola. */
   $$('[data-sno]').forEach(function(b){ b.onclick=async function(){
     if(!(await dialogoSiNo(_avisoDecidirSanc_(_sancMDe_(b.dataset.sno),'rechazar')))) return;
-    _decidirSancM_(b.dataset.sno,'rechazar',b); }; });
-  /* 21/10: justificar pide el motivo, como el escritorio; sin motivo no se manda nada. */
-  $$('[data-sjust]').forEach(function(b){ b.onclick=async function(){
-    var just=await dialogoTexto('Motivo de la justificación:'); if(!just || !just.trim()) return;
-    _decidirSancM_(b.dataset.sjust,'justificar',b,{justificacion:just.trim()}); }; });
+    var just=await _pedirJustificacion_('esta sanción'); if(just===null) return;   /* 04/11 noche: rechazar = justificar, con el mínimo de texto */
+    _decidirSancM_(b.dataset.sno,'rechazar',b,{justificacion:just}); }; });
   /* De lote: se MARCA, y el bloque se cierra entero. */
   $$('[data-smarc]').forEach(function(b){
     b.onclick=async function(){
+      /* 04/11 (Daniel): rechazar (= justificar) OBLIGA a escribir por qué no se aplica; sin texto no se marca. */
+      var texto=null;
+      if(b.dataset.dec==='rechazar'){
+        var _x=_sancMDe_(b.dataset.smarc);
+        texto=await _pedirJustificacion_('la sanción de '+((_x&&(_pilaDeM_(_x.nombre)||_x.nombre))||'esta persona')); if(texto===null) return;
+      }
       b.disabled=true;
-      try{ await api.decidirSancion(b.dataset.smarc,'marcar',{decision:b.dataset.dec});
-        (SANC_M||[]).forEach(function(x){ if(String(x.id)===b.dataset.smarc) x.dec=b.dataset.dec; });
+      try{ await api.decidirSancion(b.dataset.smarc,'marcar',texto===null?{decision:b.dataset.dec}:{decision:b.dataset.dec,justificacion:texto});
+        (SANC_M||[]).forEach(function(x){ if(String(x.id)===b.dataset.smarc){ x.dec=b.dataset.dec; x.justificacion=texto; } });
         /* ⛔ POR LA PUERTA: marcar una sancion del bloque va al backend y luego repinta el modal
            ENTERO -cola y formulario-, asi que se llevaba por delante lo escrito arriba. La cola
            y el formulario comparten pantalla en el movil; en el escritorio no, y por eso esta
            forma no tiene gemela alli. */
         _repintarSancM_();
       }catch(e){ b.disabled=false; tostErr('No se pudo marcar: ', e); }
+    };
+  });
+  /* 04/11 (Daniel, conflictos del RRI): «rechazar el bloque entero (una reunión falsa o un error)» — UN texto, no se aplica ninguna.
+     El servidor lo cierra entero (`rechazarBloque`) y devuelve la cola. */
+  $$('[data-sjbloque]').forEach(function(b){
+    b.onclick=async function(){
+      var lote=b.dataset.sjbloque;
+      var it=(SANC_M||[]).filter(function(x){ return (x.lote||'(sueltas)')===lote; });
+      var _nl=_nombreLote_(lote==='(sueltas)' ? '' : lote, typeof REUNIONES_M!=='undefined' ? REUNIONES_M : [], it[0] && it[0].creado_at);
+      var texto=await _pedirJustificacion_('el bloque entero «'+_nl+'» ('+it.length+'): no se aplicará ninguna'); if(texto===null) return;
+      b.disabled=true; var _txt=b.textContent; b.textContent='Rechazando…';
+      try{
+        var r=await api.rechazarBloque(lote, texto);
+        SANC_M=null;
+        tost('Bloque rechazado: no se ha aplicado ninguna.'+_saltadasTxt_(r&&r.sinPermiso));
+        _abrirSanciones_();
+      }catch(e){ b.disabled=false; b.textContent=_txt; tostErr('No se pudo rechazar el bloque: ', e); }
     };
   });
   $$('[data-scerrar]').forEach(function(b){
@@ -335,12 +340,11 @@ function _cablearSanciones_(){
            (`sinPermiso`) no se tira. Esas se quedan **pendientes**, y sin decirlo el
            bloque se da por cerrado entero. */
         var ap=(r&&r.aprobadas!=null)?r.aprobadas:it.length, re=(r&&r.rechazadas)||0;
-        var ju=(r&&r.justificadas)||0, sp=(r&&r.sinPermiso)||0;
+        var sp=(r&&r.sinPermiso)||0;
         var yr=(r&&r.yaRevocadas)||0;   /* 25/10 (auditor 33, 🟡 C2): las que se quedan pendientes por otra vía */
         SANC_M=null;
         tost(((sp || yr)?'Bloque cerrado A MEDIAS · ':'Bloque cerrado · ')+
-          ap+' aprobadas'+(re?' · '+re+' rechazadas':'')+
-          (ju?' · '+ju+' justificadas':'')+_saltadasTxt_(sp)+_yaRevTxt_(yr));
+          ap+' aprobadas'+(re?' · '+re+' rechazadas':'')+_saltadasTxt_(sp)+_yaRevTxt_(yr));
         _abrirSanciones_();
       }catch(e){ b.disabled=false; b.textContent='Cerrar el bloque entero';
         tostErr('No se pudo cerrar el bloque: ', e); }
@@ -353,7 +357,7 @@ function _sancMDe_(id){ return (SANC_M||[]).filter(function(x){ return String(x.
 async function _decidirSancM_(id, accion, b, opts){
   b.disabled=true;
   try{ await api.decidirSancion(id, accion, opts||{});
-    SANC_M=null; tost({aprobar:'Aprobada: se aplica ya.', justificar:'Sanción justificada: no resta puntos.'}[accion]||'Rechazada.');
+    SANC_M=null; tost({aprobar:'Aprobada: se aplica ya.'}[accion]||'Rechazada: no resta puntos.');
     _abrirSanciones_();
   }catch(e){ b.disabled=false; tostErr('No se pudo: ', e); }
 }
@@ -747,7 +751,7 @@ function panelPD(){
    dia que se decida sancionar desde el movil. Borrarla seria perder el diseño; dejarla viva
    era mentir. */
 function _panelPDmaqueta_(){
-  var c={aceptar:0,justificar:0,rechazar:0};
+  var c={aceptar:0,rechazar:0};
   LOTE.items.forEach(function(x){c[x.dec]++;});
   var lote = !LOTE.items.length
     ? '<div class="lote">'+vacio('Sin bloques pendientes','No hay sanciones pendientes.','',false)+'</div>'
@@ -765,12 +769,11 @@ function _panelPDmaqueta_(){
           '<span class="vl'+t+'">'+(x.puntos===0?'aviso':x.puntos)+'</span>'+
           '<span class="decs" data-lid="'+x.id+'">'+
             '<button class="'+(x.dec==='aceptar'?'on a':'')+'" data-dec="aceptar" data-p>Acepta</button>'+
-            '<button class="'+(x.dec==='justificar'?'on j':'')+'" data-dec="justificar" data-p>Justifica</button>'+
             '<button class="'+(x.dec==='rechazar'?'on r':'')+'" data-dec="rechazar" data-p>Rechaza</button>'+
           '</span></div>';
       }).join('')+
       '<div class="cierre"><div class="tx"><b style="color:var(--ok)">'+c.aceptar+'</b> se aplican · '+
-        '<b>'+c.justificar+'</b> justificadas · <b style="color:var(--red2)">'+c.rechazar+'</b> rechazadas'+
+        '<b style="color:var(--red2)">'+c.rechazar+'</b> rechazadas'+
         '<em>No se sanciona a nadie hasta que cierres el bloque.</em></div>'+
         '<button class="btn pri full" style="margin-top:9px" data-p id="btnLote">Aprobar el bloque · '+c.aceptar+' sanciones</button>'+
       '</div></div>';
@@ -782,7 +785,6 @@ function _panelPDmaqueta_(){
       '<div style="display:flex;gap:7px;margin:2px 0 10px;flex-wrap:wrap">'+
         '<button class="btn mini ok" data-p>Aprobar</button>'+
         '<button class="btn mini" data-p>Modificar</button>'+
-        '<button class="btn mini" data-p>Justificar</button>'+
         '<button class="btn mini no" data-p>Rechazar</button></div>';
   }).join('');
 
