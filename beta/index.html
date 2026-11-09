@@ -1759,7 +1759,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='58a4e19';
+var BUILD='ae0e7f2';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -1776,7 +1776,7 @@ function _ajustesHTML_(){
       OCULTABLES.map(function(o){
         return '<div class="fila"><div class="a">'+
           '<b>Esconder '+o[1]+' cuando no tengas nada</b><small>Se oculta de la barra '+o[2]+
-          ' mientras no haya nada y vuelve sola cuando lo haya.</small></div><div class="d">'+
+          '. Vuelve sola cuando lo haya.</small></div><div class="d">'+
           '<button class="btn" data-ocultar="'+o[0]+'" data-p>'+(_seOculta_(o[0])?'Sí':'No')+
           '</button></div></div>';
       }).join('')+'</div>'+
