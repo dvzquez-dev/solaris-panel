@@ -15552,6 +15552,8 @@ function _a11yMarcar_(raiz){
   var r=raiz && raiz.querySelectorAll ? raiz : document;
   Array.prototype.forEach.call(r.querySelectorAll(A11Y_CLIC), function(e){
     if(e.matches(A11Y_GESTO) || e.hasAttribute('data-a11y')) return;
+    /* 10/11 (refutar2): una fila que se declara `cursor:default` es informativa (no tiene manejador): ni «botón» ni parada de Tab. */
+    if(e.style.cursor==='default') return;
     e.setAttribute('data-a11y','1');
     if(e.tagName!=='TR' && !e.getAttribute('role')) e.setAttribute('role','button');
     if(!e.hasAttribute('tabindex')) e.setAttribute('tabindex','0');

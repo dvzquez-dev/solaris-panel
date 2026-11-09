@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=6253623">
+<link rel="stylesheet" href="escritorio.css?v=76b80a2">
 </head>
 <body>
 
@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=d05d7e4"></script>
+<script src="comun.js?v=87490ad"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=c60c5f4"></script>
@@ -1251,7 +1251,9 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
     (_miasSueltas_(mias).length||!_tareaParteGrupos_(mias).grupos.length?pan('Requieren tu decisión',_miasSueltas_(mias).length+(_miasSueltas_(mias).length===1?' parte':' partes'),   /* 🟡 3 (auditor 20) */
       _miasSueltas_(mias).length?_miasSueltas_(mias).map(parteCard).join(''):vacioSimple('La cola está limpia',
         'Cuando alguien de tu unidad declare horas, aparecerá aquí con su justificación a la vista.'),'destaca'):'')+
-    pan('Otorgar horas directamente','sin que nadie las pida',
+    /* 10/11 (refutar2): sin a quién otorgar (un miembro raso: `puedeOtorgarA` no le deja a nadie) el formulario era un «A quién» vacío que
+       no se podía rellenar y un botón que el servidor iba a negar. Sale sólo si hay pool (la misma puerta que el «A quién»). */
+    (!_activos_().some(function(m){ return m.nombre!==ACTOR && puedeOtorgarA(m, ACTOR); }) ? '' : pan('Otorgar horas directamente','sin que nadie las pida',
       '<div class="pb"><p style="margin:0 0 11px;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
       'A veces las horas las pone el coordinador (una feria, un traslado, un turno sin fichar). '+
       'Cuentan igual y a la persona le salen como otorgadas, en compensaciones y con tu motivo («+3,5 h por …»).</p>'+
@@ -1269,7 +1271,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
         '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Motivo</span>'+
         '<input id="otConcepto" placeholder="p. ej. Feria de divulgación · montaje" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
         '<button class="btn pri" data-otorgar>Otorgar</button>'+
-      '</div></div>')+
+      '</div></div>'))+
     bloquePanel()+
     (otras.length?pan('En la cola de otros',otras.length+' partes · los ves, no los decides',
       otras.map(parteCard).join('')):'')+
@@ -3764,7 +3766,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='c320412';
+var BUILD='787abbf';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
