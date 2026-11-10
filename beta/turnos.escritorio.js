@@ -1158,7 +1158,7 @@ function _pinConvDisp_(m){
        conexión» tapaba que no habías puesto fecha. */
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
       tost('Sin conexión no se puede convocar.'); return; }
-    if(!(await dialogoSiNo('¿Abrir la disponibilidad de la semana del '+sem+'?'))) return;
+    if(!(await dialogoSiNo('¿Abrir la disponibilidad de la semana del '+_isoADMY_(sem)+'?'))) return;   /* refutar5: prosa en DD/MM/AAAA */
     b.disabled=true; var prev=b.textContent; b.textContent='Encolando…';
     try{
       await _encolarConvDisp_({semana:sem, tarde_partida:nxSi('cdTarde'),
@@ -1169,7 +1169,7 @@ function _pinConvDisp_(m){
         horaria:nxSi('cdHoraria'), sitios:sitios});
       tost('Encolado. La rutina lo recoge en la siguiente pasada.');
       var n=document.getElementById('cdNota');
-      if(n) n.innerHTML='Encolado para la semana del '+esc(sem)+'. El plazo lo calcula '+
+      if(n) n.innerHTML='Encolado para la semana del '+esc(_isoADMY_(sem))+'. El plazo lo calcula '+
         'el servidor; cuando lo procese, la convocatoria aparece arriba.';
     }catch(e){
       tostErr('No se pudo encolar: ', e);       // 🟠 2 (auditor 19)
