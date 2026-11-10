@@ -3030,6 +3030,12 @@ async function _apiPost_(body){
   var pr=(async function(){
   if(SESION&&SESION.token&&!body.token) body=Object.assign({},body,{token:SESION.token});
   var accion=String(body.action||""), ultimo=null, lectura=_esLecturaApi_(accion);
+  /* ⛔ 10/11 (refutar4): UNA `idem` POR LLAMADA, LA MISMA EN LOS TRES INTENTOS. El bucle de abajo reintenta las escrituras cuando el
+     `fetch` falla, y falla igual si la petición no llegó que si llegó, se GUARDÓ y se perdió la respuesta (mala cobertura): `crearReunion`
+     salía tres veces —tres reuniones y tres avisos— y `apelarTarea` guardaba a la primera y el reintento le decía a quien acababa de apelar
+     «ya tiene una apelación abierta». El servidor (`servidor._una_vez`) contesta la respuesta del primer intento a los demás. Se pone
+     AQUÍ, fuera del bucle: dentro, cada intento traería una distinta y no serviría de nada (la misma razón que la clave de envío de los partes). Las lecturas no la llevan. */
+  if(!lectura && !body.idem) body=Object.assign({},body,{idem:_idemEnvio_()});
   var espera=API_ACCIONES_LARGAS.test(accion) ? API_ESPERA_LARGA_MS : API_ESPERA_MS;
   if(!lectura && typeof navigator!=='undefined' && navigator.onLine===false){
     var sn=new Error(API_MSG_SIN_RED); sn.sinRed=true; throw sn;
@@ -8535,6 +8541,11 @@ function miembro(n){
 function _claveUso_(){
   return 'c' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
+/* La `idem` de UNA llamada de escritura al servidor (la pone `_apiPost_`, una vez, fuera del bucle de reintentos). NO es la clave del
+   envío de arriba: aquélla la fija quien envía (el parte, el bloque) y viaja DENTRO de lo que se guarda; ésta sólo dice «este intento es
+   el mismo que aquél» y el servidor la olvida a los 10 minutos. Un nombre aparte para que `probar_clave_parte` siga vigilando que el
+   transporte no fabrique la clave de dominio. */
+function _idemEnvio_(){ return _claveUso_(); }
 
 /* ═══ EL BLOQUE MÍNIMO DE UN TURNO ═════════════════════════════════════════════════
    Espejo de `reglas/turnos.py:bloque_desde`. Daniel (07/08/2026): franjas por horas, *«que te

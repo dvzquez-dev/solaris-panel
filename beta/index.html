@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=0e63421"></script>
+<script src="comun.js?v=1ff1f81"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=561a9dd"></script>
@@ -1024,11 +1024,19 @@ async function _onCredencial_(resp,_silente){
     _seguir_();
   }catch(e){
 
-    if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
+    /* ⛔ 10/11 (refutar4): ABRIR LA APP SIN SERVIDOR NO PUEDE DEJAR «Verificando…» PARA SIEMPRE. 📏 Medido con el móvil contra un servidor
+       inalcanzable: a los 2 minutos seguía igual. Con la sesión guardada, `SESION` ya vale (el token provisional de arriba), y
+       `_arrancarGis_` empieza con `if(SESION) return;`: no hacía NADA, ni mensaje ni botón. Dos casos, y no son el mismo:
+       · el servidor NO CONTESTA (sin cobertura, caído, túnel): la sesión sigue siendo buena, así que se CONSERVA y se ofrece reintentar
+         la misma entrada, sin pasar por Google (`_ftDeRed_`: la que ya usa la cara para distinguir «no llegó» de «no»);
+       · cualquier otra cosa (token caducado, cuenta fuera del equipo…): se suelta la sesión y SE QUITA `SESION` —si no, el arranque de
+         Google tampoco corre— para que salga el botón de entrar. */
+    var _red=_silente && _ftDeRed_(e);
+    if(_silente && !_red){ try{ localStorage.removeItem('sol_sess'); }catch(_){} SESION=null; _arrancarGis_(); return; }
     _gate_(SPLASH+'<div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+
-      ((e&&e.message)||e)+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
+      (_red ? 'no hay conexi\u00f3n con el servidor. Revisa tu red y vuelve a intentarlo.' : ((e&&e.message)||e))+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
       'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>');
-    var b=document.getElementById('reGis'); if(b) b.onclick=_pintarLogin_;
+    var b=document.getElementById('reGis'); if(b) b.onclick=_red ? function(){ _onCredencial_(resp,true); } : _pintarLogin_;
   }
 }
 function _pintarLogin_(){
@@ -1759,7 +1767,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='9798601';
+var BUILD='b112026';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=0e63421"></script>
+<script src="comun.js?v=1ff1f81"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=12db580"></script>
@@ -3581,11 +3581,14 @@ async function _onCredencial_(resp,_silente){
       .then(function(){ _repintarSuave_(); });
     _arrancarRefrescoVivo_();                       // a partir de aqui se alimenta sola
   }catch(e){
-    if(_silente){ try{ localStorage.removeItem('sol_sess'); }catch(_){} _arrancarGis_(); return; }
+    /* ⛔ 10/11 (refutar4): misma razón y mismo arreglo que en `movil.html`: con la sesión guardada y el servidor sin contestar, `SESION` ya
+       vale y `_arrancarGis_` no hacía nada: «Verificando…» para siempre. Sin respuesta se conserva la sesión y se reintenta la misma entrada. */
+    var _red=_silente && _ftDeRed_(e);
+    if(_silente && !_red){ try{ localStorage.removeItem('sol_sess'); }catch(_){} SESION=null; _arrancarGis_(); return; }
     _gate_(_insigniaHTML_()+'<div style="color:#ffb3b0;max-width:360px">No se pudo entrar: '+
-      ((e&&e.message)||e)+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
+      (_red ? 'no hay conexi\u00f3n con el servidor. Revisa tu red y vuelve a intentarlo.' : ((e&&e.message)||e))+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
       'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>');
-    var b=document.getElementById('reGis'); if(b) b.onclick=_pintarLogin_;
+    var b=document.getElementById('reGis'); if(b) b.onclick=_red ? function(){ _onCredencial_(resp,true); } : _pintarLogin_;
   }
 }
 function _pintarLogin_(){
@@ -3766,7 +3769,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='787abbf';
+var BUILD='b17aa42';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
