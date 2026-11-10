@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=87490ad"></script>
+<script src="comun.js?v=0e63421"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=561a9dd"></script>
@@ -1759,7 +1759,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='ae0e7f2';
+var BUILD='9798601';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2542,6 +2542,7 @@ function _engTurnosYDocs_(){
         lista(t.principales,'Objetivos principales')+lista(t.secundarios,'Objetivos secundarios')+
         (t.nota?'<p class="rnota" style="margin-top:10px"><b>Nota:</b> '+esc(t.nota)+'</p>':'')+
         _ftHTML_(t)+   /* 04/11: las fotos del turno (hueco: vacío hasta que el servidor diga que hay algo que enseñar) */
+        _mtHTML_(t)+   /* 09/11: la memoria del turno, escrita desde la app (hueco: sólo lo ve quien puede escribirla) */
         /* la memoria se incrusta como DOCUMENTO (igual que un orden del día), no como
            un enlace suelto: se ve que hay un papel detrás y se abre desde ahí. */
         (t.memoria ? _memoriaHTML_(t)
@@ -2549,6 +2550,7 @@ function _engTurnosYDocs_(){
             'Memoria del turno · <span style="color:var(--ink3)">aún no subida</span></p>'));
       _cablearMemoria_();
       _ftEnganchar_($('#modal-body'));
+      _mtEnganchar_($('#modal-body'));
     };
   });
   _ftEnganchar_(document);   /* 04/11: la tarjeta «tu turno de hoy» del inicio */

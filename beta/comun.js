@@ -13483,7 +13483,7 @@ function _peticionRevLineaHTML_(p){
   var h = '<p class="rnota" style="margin:8px 0 0"><b>' + esc(p.por || 'El PD') + '</b> pidió la revisión a ' + (p.revisores || []).map(esc).join(', ') +
     (p.at ? ' (' + esc(_novCuando_(p.at)) + ')' : '') + ' · <b>' + esc(estTxt[p.estado] || p.estado || '') + '</b>';
   (p.confirmaciones || []).forEach(function(c){
-    h += '<br>' + (c.ok ? '✓ ' : '✗ ') + esc(c.quien) + (c.ok ? ' lo ha revisado' : ' no lo da por bueno: «' + esc(c.motivo || '') + '»') + (c.at ? ' · ' + esc(_novCuando_(c.at)) : '');
+    h += '<br>' + (c.ok ? ico('ok') : ico('cerrar')) + ' ' + esc(c.quien) + (c.ok ? ' lo ha revisado' : ' no lo da por bueno: «' + esc(c.motivo || '') + '»') + (c.at ? ' · ' + esc(_novCuando_(c.at)) : '');
   });
   if (p.estado === 'pendiente'){
     var falta = (p.revisores || []).filter(function(n){ return !(p.confirmaciones || []).some(function(c){ return c.quien === n; }); });
@@ -14807,6 +14807,297 @@ async function _ftDestino_(t, k){
   try{ await api._post({action: 'configurarEntregaFotos', destino: v}); tost(String(v).trim() ? 'Destino guardado.' : 'Sin destino: se entregará por ZIP.'); }
   catch(e){ tostErr('No se pudo guardar el destino: ', e); }
   await _ftRefrescar_(t, true);
+}
+
+/* ══ 09/11 · LA MEMORIA DE FABRICACIÓN DE UN TURNO, DESDE LA APP ═════════════════════════════════════════════════════
+   🗣️ Daniel (09/11): *«generarla enteramente desde el móvil […] darle el botón de enviar a revisar y que se genere […] sin
+   siquiera subirlo al formulario»*. Backend: `rutinas/memoria_turno.py` (`getMemoriaTurno`, `guardarMemoriaTurno`,
+   `enviarMemoriaTurno`, `reabrirMemoriaTurno`). UNA implementación para las dos caras: la ficha del turno pone el hueco
+   `_mtHTML_(t)` y llama a `_mtEnganchar_`; el editor se abre DENTRO del hueco (no necesita modal).
+   ⛔ QUIÉN PUEDE lo decide el SERVIDOR (`puede`, `celebrado`, `puedeReabrir`): aquí no se copia la regla, se pregunta. Quien no puede,
+   no ve nada. El borrador vive en el servidor: se guarda solo (1,5 s tras dejar de teclear) y desde otra cara está todo.
+   Lo elegido (conseguido / no conseguido) va en ROJO y sin tick; nada de casillas ni desplegables nativos: chips. */
+var MT_ = {est: {}, turno: {}, ed: {}, abierto: {}};
+function _mtCss_(){
+  if(document.getElementById('mtCss')) return;
+  var s = document.createElement('style'); s.id = 'mtCss';
+  s.textContent =
+    '.mtf{margin:14px 0 4px}.mtf-h{display:flex;align-items:baseline;gap:8px;margin:0 0 8px}.mtf-h .sc{flex:1}'+
+    '.mtf-fila{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 9px}'+
+    '.mtf-c{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:12px;min-height:36px;padding:6px 13px;'+
+      'border-radius:20px;border:1px solid var(--line);background:var(--sur2);color:var(--ink2);white-space:nowrap;user-select:none}'+
+    '.mtf-c:hover{border-color:var(--ink3);color:var(--ink)}.mtf-c.on,.mtf-c.pri{color:#fff;border-color:var(--red);background:rgba(228,30,37,.2)}'+
+    '.mtf-c.mini{min-height:30px;padding:3px 10px;font-size:11.5px}.mtf-c[disabled]{opacity:.5;pointer-events:none}'+
+    '.mtf-in{flex:1;min-width:120px;box-sizing:border-box;background:var(--sur2);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 11px;font-size:14px;font-family:inherit}'+
+    'textarea.mtf-in{width:100%;min-height:110px;resize:vertical;line-height:1.45}.mtf-in:focus{outline:none;border-color:var(--red)}'+
+    '.mtf-sec{margin:16px 0 6px;font-weight:600;font-size:14px;color:var(--ink)}.mtf-sub{margin:12px 0 4px;font-size:12.5px;color:var(--ink2)}'+
+    '.mtf-card{border:1px solid var(--line);border-radius:12px;background:var(--sur);padding:9px 10px;margin:0 0 8px}'+
+    '.mtf-card .mtf-fila{margin:0 0 6px}.mtf-nota{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.mtf-err{margin:0 0 8px;font-size:13px;color:var(--red)}'+
+    '.mtf-sug{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.mtf-sug:empty{display:none}'+
+    '.mtf-obj{display:flex;flex-direction:column;gap:6px}.mtf-obj .mtf-fila{margin:0}'+
+    '.mtf-pie{position:sticky;bottom:0;background:var(--bg);padding:10px 0 4px;border-top:1px solid var(--line);margin-top:14px}';
+  document.head.appendChild(s);
+}
+function _mtHTML_(t){
+  _mtCss_();
+  var k = _ftClave_(t); MT_.turno[k] = t;
+  return '<div class="mtf" data-mtur="' + esc(k) + '" hidden></div>';
+}
+function _mtRefrescar_(t, forzar){
+  var k = _ftClave_(t), e = MT_.est[k];
+  if(!forzar && e && e.pidiendo) return e.pidiendo;
+  var p = _ftDeserv_('getMemoriaTurno', t).then(function(r){
+    MT_.est[k] = {t: Date.now(), r: r};
+    /* El editor abierto manda sobre lo que diga el servidor (lo que se está tecleando no se pisa); sólo se actualiza su `rev` si no hay cambios sin guardar. */
+    var ed = MT_.ed[k];
+    if(ed && !ed.sucio && !ed.guardando && r.puede && r.estado === 'borrador'){ ed.m = JSON.parse(JSON.stringify(r.memoria)); ed.rev = r.rev; }
+    _mtPintar_(k); return r;
+  }, function(){ if(!MT_.est[k]) MT_.est[k] = {t: Date.now(), r: {puede: false}}; _mtPintar_(k); return null; });
+  MT_.est[k] = Object.assign({}, e || {}, {pidiendo: p});
+  p.then(function(){ if(MT_.est[k]) delete MT_.est[k].pidiendo; });
+  return p;
+}
+var MT_GRUPOS_ = [['principales', 'Objetivos principales'], ['secundarios', 'Objetivos secundarios'], ['extraordinarios', 'Objetivos extraordinarios']];
+function _mtNombres_(){ return ((typeof DATA !== 'undefined' && DATA.miembros) || []).map(function(m){ return m.nombre; }).filter(Boolean); }
+/* Las sugerencias (chips) para el campo `valor` entre `lista`: las que lo contienen y no son ya lo escrito. ⛔ Siempre pintadas (sin
+   depender del foco): si salieran al enfocar, tocar un botón de más abajo quitaría el foco, encogería la tarjeta y el botón se movería
+   debajo del dedo antes de soltar — el toque se perdía. */
+function _mtSugHTML_(lista, valor, campo){
+  var v = String(valor || '').trim().toLowerCase();
+  var cand = lista.filter(function(x){ var y = x.toLowerCase(); return y !== v && (!v || y.indexOf(v) >= 0); }).slice(0, 6);
+  return cand.map(function(x){ return '<span class="mtf-c mini" data-mtsug="' + esc(campo) + '" data-v="' + esc(x) + '">' + esc(x) + '</span>'; }).join('');
+}
+function _mtInp_(ruta, valor, ph, extra){
+  return '<input type="text" class="mtf-in" data-mtin="' + ruta + '" value="' + esc(valor || '') + '" placeholder="' + esc(ph) + '" ' + (extra || '') + '>';
+}
+function _mtEditorHTML_(k){
+  var ed = MT_.ed[k], m = ed.m, r = MT_.est[k].r, h = '', i, g;
+  var sitios = r.sitios || [];
+  h += '<div class="mtf-fila"><span class="mtf-nota" style="flex:1;margin:0">' + esc(r.subtitulo || '') + '</span>'+
+       '<span class="mtf-c mini" data-mtcerrar>Cerrar</span></div>';
+  h += '<div class="mtf-fila">' + nxFecha('mtFecha', m.fecha || '', {max: _hoyNxISO_()}) +    /* la fecha: el selector propio, no el nativo */
+       _mtInp_('sitio', m.sitio, 'Sitio (CITI, CUVI…)', 'aria-label="Sitio"') + '</div>';
+  /* 1. Integrantes */
+  h += '<div class="mtf-sec">1. Integrantes y responsabilidades</div>';
+  m.integrantes.forEach(function(p, i){
+    h += '<div class="mtf-card"><div class="mtf-fila"><b style="flex:1;font-size:14px">' + esc(p.nombre) + '</b>'+
+         '<span class="mtf-c mini" data-mtquitar="integrantes:' + i + '">Quitar</span></div>'+
+         '<div class="mtf-fila">' + _mtInp_('integrantes.' + i + '.roles', (p.roles || []).join(', '), 'Roles (Responsable de turno, Coche…)') +
+         _mtInp_('integrantes.' + i + '.dia', p.dia, 'Solo un día (Miércoles)', 'style="max-width:150px"') + '</div></div>';
+  });
+  var ya = {}; m.integrantes.forEach(function(p){ ya[p.nombre] = 1; });
+  h += '<div class="mtf-add"><div class="mtf-fila">' + _mtInp_('nuevo.integrante', ed.nuevo || '', 'Añadir a alguien que también fue', 'data-mtnuevo="integrante"') + '</div>'+
+       '<div class="mtf-sug" data-mtsugbox="integrante">' + (ed.nuevo ? _mtSugHTML_(_mtNombres_().filter(function(n){ return !ya[n]; }), ed.nuevo, 'integrante') : '') + '</div></div>';
+  /* 2. Movimientos */
+  h += '<div class="mtf-sec">2. Movimientos</div>';
+  m.movimientos.forEach(function(f, i){
+    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('movimientos.' + i + '.material', f.material, 'Material') +
+         '<span class="mtf-c mini" data-mtquitar="movimientos:' + i + '">Quitar</span></div>'+
+         '<div class="mtf-fila">' + _mtInp_('movimientos.' + i + '.de', f.de, 'De (Zulo…)', 'data-mtsugde="' + i + '"') +
+         '<span class="mtf-nota" style="margin:0">→</span>' + _mtInp_('movimientos.' + i + '.a', f.a, 'A (CITI…)', 'data-mtsuga="' + i + '"') + '</div>'+
+         '<div class="mtf-sug" data-mtsugbox="mov:' + i + '">' + _mtSugHTML_(sitios, f.a, 'mov:' + i) + '</div></div>';
+  });
+  m.notasMov.forEach(function(n, i){
+    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('notasMov.' + i, n, 'Nota (Cordel de Kevlar ya estaba en el CITI)') +
+         '<span class="mtf-c mini" data-mtquitar="notasMov:' + i + '">Quitar</span></div></div>';
+  });
+  h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="movimientos">Añadir movimiento</span><span class="mtf-c" data-mtadd="notasMov">Añadir nota</span></div>';
+  /* 3. Objetivos */
+  h += '<div class="mtf-sec">3. Objetivos</div>';
+  MT_GRUPOS_.forEach(function(gr, gi){
+    g = gr[0];
+    h += '<div class="mtf-sub">3.' + (gi + 1) + '. ' + gr[1] + '</div><div class="mtf-obj">';
+    (m.objetivos[g] || []).forEach(function(o, i){
+      h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('objetivos.' + g + '.' + i + '.texto', o.texto, 'Objetivo') +
+           '<span class="mtf-c mini" data-mtquitar="obj:' + g + ':' + i + '">Quitar</span></div>'+
+           '<div class="mtf-fila"><span class="mtf-c' + (o.logrado === true ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':1" role="button" aria-pressed="' + (o.logrado === true) + '">Conseguido</span>'+
+           '<span class="mtf-c' + (o.logrado === false ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':0" role="button" aria-pressed="' + (o.logrado === false) + '">No conseguido</span></div></div>';
+    });
+    h += '</div><div class="mtf-fila"><span class="mtf-c" data-mtadd="obj:' + g + '">Añadir objetivo</span></div>';
+  });
+  /* 4. Comentarios */
+  h += '<div class="mtf-sec">4. Comentarios y detalles</div>';
+  m.comentarios.forEach(function(c, i){
+    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('comentarios.' + i + '.titulo', c.titulo, 'Título del apartado (opcional)') +
+         '<span class="mtf-c mini" data-mtquitar="comentarios:' + i + '">Quitar</span></div>'+
+         '<textarea class="mtf-in" data-mtin="comentarios.' + i + '.texto" placeholder="Qué se hizo, qué pasó, qué quedó pendiente…">' + esc(c.texto || '') + '</textarea></div>';
+  });
+  h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="comentarios">Añadir apartado</span></div>';
+  /* Pie */
+  h += '<div class="mtf-pie">' + (ed.error ? '<p class="mtf-err" data-mterr>' + esc(ed.error) + '</p>' : '') +
+       '<div class="mtf-fila"><span class="mtf-nota" style="flex:1;margin:0" data-mtestado>' + _mtEstadoTxt_(ed) + '</span>'+
+       '<span class="mtf-c" data-mtguardar' + (ed.guardando ? ' disabled' : '') + '>Guardar borrador</span>'+
+       '<span class="mtf-c pri" data-mtenviar' + (ed.guardando || ed.enviando ? ' disabled' : '') + '>Enviar a revisar</span></div></div>';
+  return h;
+}
+function _mtEstadoTxt_(ed){ return ed.enviando ? 'Enviando…' : ed.guardando ? 'Guardando…' : ed.sucio ? 'Cambios sin guardar' : 'Borrador guardado'; }
+/* Repinta el hueco. Con el editor abierto lo rehace entero (acciones de estructura); teclear NO pasa por aquí. */
+function _mtPintar_(k){
+  var e = MT_.est[k], r = e && e.r;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-mtur]'), function(c){
+    if(c.getAttribute('data-mtur') !== k) return;
+    var vista = !!(r && r.puede && (r.celebrado || r.guardada));
+    c.hidden = !vista;
+    var env = c.closest ? c.closest('[data-mtwrap]') : null;
+    if(env) env.style.display = vista ? '' : 'none';
+    if(!vista){ c.innerHTML = ''; return; }
+    var ed = MT_.ed[k];
+    if(ed && MT_.abierto[k]){
+      var y = c.querySelector('textarea:focus,input:focus'), pos = y ? y.getAttribute('data-mtin') : null;
+      c.innerHTML = '<div class="mtf-h"><span class="sc">Memoria de fabricación</span></div>' + _mtEditorHTML_(k);
+      if(pos){ var z = c.querySelector('[data-mtin="' + pos + '"]'); if(z){ z.focus(); try{ z.setSelectionRange(z.value.length, z.value.length); }catch(_){} } }
+      return;
+    }
+    var h = '<div class="mtf-h"><span class="sc">Memoria de fabricación</span></div>';
+    if(r.estado === 'enviada'){
+      h += '<p class="mtf-nota" data-mtenviada>Memoria enviada a revisión' + (r.envio ? ' el ' + esc(_isoADMY_(String(r.envio.enviadoEn).slice(0, 10))) + ' por ' + esc(_ftAutorPila_(r.envio.enviadoPor)) : '') + '. Ya no se puede cambiar.</p>'+
+           (r.puedeReabrir ? '<div class="mtf-fila"><span class="mtf-c" data-mtreabrir>Reabrir (piden cambios)</span></div>' : '');
+    }else{
+      h += (r.reabierta ? '<p class="mtf-nota">Reabierta: la revisión pidió cambios.</p>' : '')+
+           '<p class="mtf-nota">' + (r.guardada ? 'Borrador guardado' + (r.editores && r.editores.length ? ' · ' + r.editores.map(_ftAutorPila_).join(', ') : '') + '.' : 'Rellena la fecha, los integrantes y los objetivos del turno y lo demás; se genera el documento y entra en revisión.') + '</p>'+
+           '<div class="mtf-fila"><span class="mtf-c pri" data-mtabrir>' + (r.guardada ? 'Seguir con la memoria' : 'Escribir la memoria') + '</span></div>';
+    }
+    c.innerHTML = h;
+  });
+}
+/* Dentro de la ruta 'a.b.0.c' del editor: lee/escribe sobre `m`. */
+function _mtSet_(m, ruta, v){
+  var p = ruta.split('.'), o = m, i;
+  for(i = 0; i < p.length - 1; i++) o = o[p[i]];
+  var u = p[p.length - 1];
+  o[u] = v;
+}
+function _mtGuardarDif_(t, k){
+  var ed = MT_.ed[k]; if(!ed) return Promise.resolve();
+  clearTimeout(ed.reloj); ed.reloj = null;
+  if(ed.guardando) return ed.guardando;
+  ed.guardando = _ftDeserv_('guardarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev}).then(function(o){
+    ed.rev = o.rev; ed.sucio = false; ed.error = ''; ed.guardando = null;
+    if(MT_.est[k] && MT_.est[k].r){ MT_.est[k].r.rev = o.rev; MT_.est[k].r.guardada = true; }
+    var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtestado]'); if(el) el.textContent = _mtEstadoTxt_(ed);
+    if(ed.sucio2){ ed.sucio2 = false; ed.sucio = true; return _mtGuardarDif_(t, k); }
+  }, function(e){
+    ed.guardando = null; ed.error = 'No se pudo guardar: ' + ((e && e.message) || e); _mtPintar_(k); throw e;
+  });
+  return ed.guardando;
+}
+function _mtProgramar_(t, k){
+  var ed = MT_.ed[k]; if(!ed) return;
+  if(ed.guardando) ed.sucio2 = true;
+  ed.sucio = true; clearTimeout(ed.reloj);
+  ed.reloj = setTimeout(function(){ _mtGuardarDif_(t, k).catch(function(){}); }, 1500);
+  var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtestado]'); if(el) el.textContent = _mtEstadoTxt_(ed);
+}
+async function _mtEnviar_(t, k){
+  var ed = MT_.ed[k]; if(!ed || ed.enviando) return;
+  if(!(await dialogoSiNo('¿Enviar la memoria a revisar? Se genera el documento y entra en revisión; no podrás cambiarla después.', {si: 'Enviar'}))) return;
+  ed.enviando = true; ed.error = ''; _mtPintar_(k);
+  try{
+    try{ await _mtGuardarDif_(t, k); }catch(_){ /* si no se pudo guardar, el envío lleva la memoria entera igualmente */ }
+    await _ftDeserv_('enviarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev});
+    tost('Memoria enviada a revisión.');
+  }catch(e){
+    /* `api._post` reintenta: si se perdió la RESPUESTA, el servidor ya la tiene enviada y el segundo intento dice «ya está enviada». */
+    var r = await _mtRefrescar_(t, true).catch(function(){ return null; });
+    if(!(r && r.estado === 'enviada')){ ed.enviando = false; ed.error = (e && e.message) || String(e); _mtPintar_(k); return; }
+  }
+  delete MT_.ed[k]; delete MT_.abierto[k];
+  await _mtRefrescar_(t, true);
+}
+async function _mtAbrir_(t, k){
+  var r = await _mtRefrescar_(t, true); if(!r || !r.puede) return;
+  MT_.ed[k] = {m: JSON.parse(JSON.stringify(r.memoria)), rev: r.rev, sucio: false, nuevo: '', error: ''};
+  MT_.abierto[k] = true; _mtPintar_(k);
+}
+async function _mtReabrir_(t, k){
+  var mot = await dialogoTexto('¿Qué cambios pide la revisión? (queda apuntado)', {valor: ''});
+  if(mot == null) return;
+  try{ await _ftDeserv_('reabrirMemoriaTurno', t, {motivo: mot}); tost('Memoria reabierta: se puede volver a editar.'); }
+  catch(e){ tostErr('No se pudo reabrir: ', e); }
+  await _mtRefrescar_(t, true);
+}
+function _mtClic_(t, k, ev){
+  var x = ev.target && ev.target.closest ? ev.target : null; if(!x) return;
+  var q = function(s){ return x.closest(s); }, ed = MT_.ed[k], m = ed && ed.m, a;
+  if(q('[data-mtabrir]')){ _mtAbrir_(t, k); return; }
+  if(q('[data-mtreabrir]')){ _mtReabrir_(t, k); return; }
+  if(!ed) return;
+  if(q('[data-mtcerrar]')){
+    _mtGuardarDif_(t, k).catch(function(){}).then(function(){ delete MT_.abierto[k]; _mtRefrescar_(t, true); }); return; }
+  if(q('[data-mtguardar]')){ _mtGuardarDif_(t, k).then(function(){ tost('Borrador guardado.'); }, function(){}); return; }
+  if(q('[data-mtenviar]')){ _mtEnviar_(t, k); return; }
+  if((a = q('[data-mtsug]'))){
+    var campo = a.getAttribute('data-mtsug'), v = a.getAttribute('data-v');
+    if(campo === 'integrante'){ if(m.integrantes.every(function(p){ return p.nombre !== v; })) m.integrantes.push({nombre: v, roles: [], dia: ''}); ed.nuevo = ''; }
+    else if(campo.indexOf('mov:') === 0){
+      var f = m.movimientos[+campo.slice(4)], cur = ed.foco === 'de' ? 'de' : 'a'; if(f) f[cur] = v;
+    }
+    _mtProgramar_(t, k); _mtPintar_(k); return;
+  }
+  if((a = q('[data-mtquitar]'))){
+    var pq = a.getAttribute('data-mtquitar').split(':');
+    if(pq[0] === 'obj') m.objetivos[pq[1]].splice(+pq[2], 1); else m[pq[0]].splice(+pq[1], 1);
+    _mtProgramar_(t, k); _mtPintar_(k); return;
+  }
+  if((a = q('[data-mtadd]'))){
+    var w = a.getAttribute('data-mtadd');
+    if(w === 'movimientos') m.movimientos.push({material: '', de: '', a: ''});
+    else if(w === 'notasMov') m.notasMov.push('');
+    else if(w === 'comentarios') m.comentarios.push({titulo: '', texto: ''});
+    else if(w.indexOf('obj:') === 0) m.objetivos[w.slice(4)].push({texto: '', logrado: null});
+    ed.sucio = true; _mtPintar_(k);
+    /* el cursor al campo nuevo: el último de su grupo */
+    var cand = w === 'movimientos' ? 'movimientos.' + (m.movimientos.length - 1) + '.material' : w === 'notasMov' ? 'notasMov.' + (m.notasMov.length - 1)
+      : w === 'comentarios' ? 'comentarios.' + (m.comentarios.length - 1) + '.titulo' : 'objetivos.' + w.slice(4) + '.' + (m.objetivos[w.slice(4)].length - 1) + '.texto';
+    var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtin="' + cand + '"]'); if(el) el.focus();
+    return;
+  }
+  if((a = q('[data-mtlog]'))){
+    var pl = a.getAttribute('data-mtlog').split(':'), o = m.objetivos[pl[0]][+pl[1]];
+    if(o){ o.logrado = pl[2] === '1'; _mtProgramar_(t, k); _mtPintar_(k); }
+  }
+}
+function _mtInput_(t, k, ev){
+  var el = ev.target, ed = MT_.ed[k]; if(!ed || !el || !el.getAttribute) return;
+  var ruta = el.getAttribute('data-mtin'); if(!ruta) return;
+  if(ruta === 'nuevo.integrante'){
+    ed.nuevo = el.value;
+    var box = el.closest('.mtf-add').querySelector('[data-mtsugbox]'), ya = {}; ed.m.integrantes.forEach(function(p){ ya[p.nombre] = 1; });
+    box.innerHTML = el.value ? _mtSugHTML_(_mtNombres_().filter(function(n){ return !ya[n]; }), el.value, 'integrante') : ''; return;
+  }
+  if(ruta === 'sitio') _mtSet_(ed.m, ruta, el.value);
+  else if(/^integrantes\.\d+\.roles$/.test(ruta)) _mtSet_(ed.m, ruta, el.value.split(',').map(function(s){ return s.trim(); }).filter(Boolean));
+  else _mtSet_(ed.m, ruta, el.value);
+  var mm = /^movimientos\.(\d+)\.(de|a)$/.exec(ruta);
+  if(mm){
+    ed.foco = mm[2];
+    var cx = el.closest('.mtf-card').querySelector('[data-mtsugbox]'); cx.innerHTML = _mtSugHTML_((MT_.est[k].r.sitios || []), el.value, 'mov:' + mm[1]);
+  }
+  _mtProgramar_(t, k);
+}
+/* Engancha los huecos que haya dentro de `raiz` (o del documento): pregunta al servidor si está viejo y cablea UNA vez. */
+function _mtEnganchar_(raiz){
+  var base = raiz || document;
+  Array.prototype.forEach.call(base.querySelectorAll('[data-mtur]'), function(c){
+    var k = c.getAttribute('data-mtur'), t = MT_.turno[k];
+    if(!t) return;
+    if(!c.getAttribute('data-mtok')){
+      c.setAttribute('data-mtok', '1');
+      c.addEventListener('click', function(ev){ _mtClic_(t, k, ev); });
+      c.addEventListener('input', function(ev){ _mtInput_(t, k, ev); });
+      c.addEventListener('change', function(ev){    /* el selector de fecha (`nxFecha`) avisa con `change` en su campo oculto */
+        var el = ev.target, ed = MT_.ed[k];
+        if(ed && el && el.id === 'mtFecha'){ ed.m.fecha = el.value; _mtProgramar_(t, k); }
+      });
+      c.addEventListener('focusin', function(ev){
+        var f = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-mtin'), mm = f && /^movimientos\.\d+\.(de|a)$/.exec(f);
+        if(mm && MT_.ed[k]) MT_.ed[k].foco = mm[1];
+      });
+      c.addEventListener('mousedown', function(ev){ if(ev.target.closest && ev.target.closest('[data-mtsug]')) ev.preventDefault(); });  /* el chip no roba el foco al campo */
+    }
+    if(MT_.est[k] && MT_.est[k].r) _mtPintar_(k);
+    if(!MT_.est[k] || !MT_.est[k].r || (Date.now() - MT_.est[k].t > 8000 && !MT_.abierto[k])) _mtRefrescar_(t);
+  });
 }
 
 /* ══ 29/10 · LA GRABACIÓN DE UNA REUNIÓN: AVISO AL CONVOCAR + «SUBIR GRABACIÓN» EN LA FICHA ══════════════════════

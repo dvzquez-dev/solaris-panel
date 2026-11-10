@@ -2058,6 +2058,7 @@ function _fichaTurnoE_(t){
     '</div>'+
     sec('Nota', t.nota ? '<div class="ftu-nota">'+esc(t.nota)+'</div>' : vac('Sin nota'))+
     _ftHTML_(t)+   /* 04/11: las fotos del turno (hueco: vacío hasta que el servidor diga que hay algo que enseñar) */
+    _mtHTML_(t)+   /* 09/11: la memoria del turno, escrita desde la app (hueco: sólo lo ve quien puede escribirla) */
     /* la memoria se incrusta como DOCUMENTO (igual que en el movil), no como un enlace suelto */
     sec('Memoria', t.memoria ? _memoriaHTML_(t) : vac('Memoria del turno · aún no subida'))+'</div>',
     'ftu destaca')+'</div>';
@@ -2075,4 +2076,5 @@ function _engFichaTurno_(){
   });
   _cablearMemoria_();
   _ftEnganchar_(document);   /* 04/11: las fotos del turno */
+  _mtEnganchar_(document);   /* 09/11: la memoria del turno */
 }
