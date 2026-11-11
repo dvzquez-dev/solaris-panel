@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=d337a69"></script>
+<script src="comun.js?v=e828af6"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=6b4e10c"></script>
@@ -122,7 +122,7 @@
 <script src="sanciones.escritorio.js?v=2126087"></script>
 <script src="reuniones.escritorio.js?v=a36ddea"></script>
 <script src="horas.escritorio.js?v=5e9b3f1"></script>
-<script src="equipo.escritorio.js?v=31a8864"></script>
+<script src="equipo.escritorio.js?v=b37290d"></script>
 <script src="tareas.escritorio.js?v=d3ebd8c"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
 <script>
@@ -2118,7 +2118,7 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
   if(!REUS.length) return _convocPest_(pan('Reuniones','ninguna',
     vacioSimple('No hay ninguna reunión convocada','Convoca una para que el equipo cubra su disponibilidad.')+
     '<div class="pb" style="border-top:1px solid var(--line)"><button class="btn pri" data-nueva>Convocar reunión</button></div>'));
-  /* 04/11: las que se ven (sin finalizar, o finalizadas hace menos de un mes) y, plegado debajo, el «Archivo» (`_reuPartir_`). */
+  /* 04/11: las que se ven (vivas) y, plegado debajo, las «Pasadas» (11/11: finalizadas o celebradas) (`_reuPartir_`). */
   var _par=_reuPartir_(REUS), _COLS=[['Reunión'],['Tipo'],['Modalidad'],['Convocados',1],['Han cubierto',1],['Cierra',1],['Estado',1]];
   var _fila=function(r0){
         var cob=_cobertura_(r0);
@@ -2138,8 +2138,8 @@ V.convoc={g:'Reuniones',t:'Convocatorias',f:function(){
           '<td class="r">'+(r.finalizada_at?'<span class="chip">finalizada</span>':r.fijada?'<span class="chip ok">📌 '+esc(r.fijada)+'</span>':'<span class="chip wa">sin fijar</span>')+'</td></tr>';
   };
   var _arch=_par.archivo.length
-    ? '<div class="acord'+(REU_ARCHIVO_AB?' ab':'')+'"><div class="hh" data-reuarch><span class="tx"><b>Archivo <span style="color:var(--ink3)">· '+
-      _par.archivo.length+'</span></b><small>finalizadas hace más de un mes</small></span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+    ? '<div class="acord'+(REU_ARCHIVO_AB?' ab':'')+'"><div class="hh" data-reuarch><span class="tx"><b>Pasadas <span style="color:var(--ink3)">· '+
+      _par.archivo.length+'</span></b><small>finalizadas o ya celebradas</small></span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
       '<div class="bb tarl">'+tabla(_COLS, _par.archivo.map(_fila).join(''))+'</div></div>'
     : '';
   return _convocPest_(pan('Reuniones',_nReusAbiertas_()+(_nReusAbiertas_()===1?' abierta':' abiertas')+' · '+_par.vivas.length+' en total',
@@ -3734,6 +3734,7 @@ function pintarNav(){
       /* El cierre lo dispara SOLO el PD (o admin). Antes esta entrada la veia cualquiera que
          entrara al escritorio: el backend le decia que no, pero despues de haberselo ofrecido. */
       if(k==='cierre' && !_puedeCerrarMes_()) return;
+      if(!_puedeVerVista_(k)) return;      // 11/11: quien no puede usar una vista de gestión no la ve en la barra
       if(k==='directo' && !_puedeVerDirecto_()) return;
       if(k==='aviso' && !_puedeMandarAviso_()) return;
       if(k==='novedades' && !_puedeVerNovedades_()) return;
@@ -3773,7 +3774,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='6b85631';
+var BUILD='d261480';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

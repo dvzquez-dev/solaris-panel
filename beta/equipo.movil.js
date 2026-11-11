@@ -94,7 +94,11 @@ function _avisosQueTeTocanM_(){
   }
   return _tuyoItems_({pdec:pdec, rev:rev, conv:conv,
     sindecl:mios.filter(function(p){ return p.e==='sindecl'; }).length,
-    det:mios.filter(function(p){ return p.e==='det'; }).length}).map(_tuyoFilaM_).join('');
+    det:mios.filter(function(p){ return p.e==='det'; }).length,
+    /* 11/11: el parte RECHAZADO, con su motivo (`nota`), mientras `_sigueVisibleSinContar_` lo deje ver. */
+    rech:mios.filter(function(p){ return p.e==='rech' && _sigueVisibleSinContar_(p, Date.now()); })
+      .sort(function(a,b){ return (b.iso>a.iso)-(b.iso<a.iso) || (Number(b.id)||0)-(Number(a.id)||0); })      // el más reciente primero: es el que se nombra
+      .map(function(p){ return {tarea:p.t, motivo:p.nota}; })}).map(_tuyoFilaM_).join('');
 }
 
 function vEstado(){

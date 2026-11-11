@@ -6573,6 +6573,21 @@ function _zonaCritica_(i, p){ return i<3 && p<=3; }
 function _puedeCerrarMes_(){
   try{ return !!(_puedeImpersonar_() || rangoNom(_actorSanc_())>=3); }catch(_){ return false; }
 }
+/* 11/11 (🗣️ Daniel): *«quien no puede usarlas no las ve»* — las vistas de GESTIÓN de la barra del escritorio. `pintarNav` pregunta aquí;
+   el servidor sigue siendo la cerradura (devuelve vacío o rechaza a quien no puede), esto es la puerta. El admin lo ve todo. Un error al
+   preguntar NO esconde (no saber no es «no puedes»): se enseña. Docs: revisor (rango documental ≥ 1) · Cola de sanciones: rango de sanciones ≥ 1
+   · Convocatorias/Disponibilidad: coordinación o consejo (`_consejoDe_`) · Reclutar: el PD. */
+function _puedeVerVista_(k){
+  try{
+    if(_puedeImpersonar_()) return true;
+    var a=_actorSanc_();
+    if(k==='docdec') return rangoNom(a)>=1;
+    if(k==='sanciones') return rangoSanc(a)>=1;
+    if(k==='reclutar') return rangoNom(a)>=3;
+    if(k==='convoc' || k==='dispo') return rangoNom(a)>=1 || (_consejoDe_(null)||[]).indexOf(a)>=0;
+  }catch(_){}
+  return true;
+}
 
 /* ═══ MANDAR UN AVISO (push) DESDE LA APP · SÓLO EL PD ═══════════════════════════════════════════════════
    Daniel (01/11): «¿Cómo coño mando yo una notificación? […] Debería dejarme». El servidor ya tenía `enviarPush`, pero ninguna
@@ -9575,6 +9590,12 @@ function _tuyoItems_(c){
     'Hasta que lo des no se firma.', false);
   if(c.rev) add('rev', 'docs', c.rev === 1 ? 'Un documento espera tu revisión' : (c.rev + ' documentos esperan tu revisión'),
     c.rev === 1 ? 'Léelo y decide en Docs.' : 'Léelos y decide en Docs.', false);
+  /* 11/11 (🗣️ Daniel): un parte tuyo RECHAZADO sale en Estado con su motivo, como los documentos con cambios pedidos; antes sólo se
+     veía plegado en «Horas → Tus partes». `c.rech`: [{tarea, motivo}] (los que aún se ven: `_sigueVisibleSinContar_`). */
+  var rc = c.rech || [];
+  if(rc.length) add('rech', 'horas', rc.length === 1 ? 'Te han rechazado un parte' : ('Te han rechazado ' + rc.length + ' partes'),
+    (rc[0].tarea ? '«' + esc(rc[0].tarea) + '»' : 'El último') + (rc[0].motivo ? ' — ' + esc(rc[0].motivo) : '') +
+      (rc.length > 1 ? (', y ' + (rc.length - 1) + ' más') : '') + '.', true);
   if(c.conv) add('conv', 'turnos', 'Di tu disponibilidad para los turnos', 'Si no dices nada, se reparte sin contar contigo.', true);
   return out;
 }
@@ -13916,15 +13937,17 @@ function _puedeBloqueReu_(r, yo, admin){
    sólo no ofrece el botón. Quien puede finalizarla es quien puede empezarla (`_puedeBloqueReu_`: convocante, PD o admin). */
 var REU_ARCHIVO_DIAS = 30;                     // un mes desde que se celebró en la lista; luego, el «Archivo»
 function _reuFinalizada_(r){ return !!(r && r.finalizada_at); }
-/* ¿Pasa al «Archivo»? Finalizada y con más de un mes desde su fecha. La fecha es la de su franja fijada (`_horarioReuMs_`) o,
-   si no se puede saber —o cae en el futuro por el año que se le supone—, la de finalizarla: lo que ocurra antes. */
+/* ¿Es PASADA (va al cajón plegable «Pasadas», como «Ver el desglose» de las horas)? 11/11, 🗣️ Daniel: *«las que son así reuniones
+   pasadas, que se oculten […] también para las reuniones»*. Pasada = finalizada por su convocante, o con la franja FIJADA ya acabada
+   (`_horarioReuMs_`: una que se queda sin finalizar no vuelve a la lista por olvido). Sin fijar y sin finalizar, sigue viva. Sustituye
+   al «Archivo» de un mes (04/11): ya no hay que esperar 30 días a que se pliegue. */
 function _reuArchivada_(r, ahora){
-  if(!_reuFinalizada_(r)) return false;
-  var f=Date.parse(r.finalizada_at), h=_horarioReuMs_(r), ref=(h && h.fin===h.fin) ? (f===f ? Math.min(h.fin, f) : h.fin) : f;
-  if(ref!==ref) return false;
-  return (ahora==null ? Date.now() : ahora) > ref + REU_ARCHIVO_DIAS*86400000;
+  if(!r) return false;
+  if(_reuFinalizada_(r)) return true;
+  var h=_horarioReuMs_(r);
+  return !!(h && h.fin===h.fin && (ahora==null ? Date.now() : ahora) > h.fin);
 }
-/* La lista en dos: las que se ven (sin finalizar, o finalizadas hace menos de un mes) y el Archivo. El orden de cada una se conserva. */
+/* La lista en dos: las vivas y las pasadas (`archivo`, el nombre de siempre). El orden de cada una se conserva. */
 function _reuPartir_(lista, ahora){
   var vivas=[], archivo=[];
   (lista||[]).forEach(function(r){ (_reuArchivada_(r, ahora) ? archivo : vivas).push(r); });

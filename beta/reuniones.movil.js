@@ -110,7 +110,8 @@ function _puedeBorrarReuM_(r){
 
 function _proximaReuM_(){
   /* 04/11: una FINALIZADA no es «la próxima» ni «la última»: Estado no enseña lo que su convocante ya dio por celebrado. */
-  var L=(REUNIONES_M||[]).filter(function(r){ return !_reuFinalizada_(r); }); if(!L.length) return null;
+  /* 11/11: ni una PASADA (franja fijada ya acabada, aunque nadie la finalizara): va al cajón «Pasadas» y no es lo que se elige al abrir. */
+  var L=(REUNIONES_M||[]).filter(function(r){ return !_reuArchivada_(r); }); if(!L.length) return null;
   var hoy=_hoyDateM_().getTime();
   var con=L.map(function(r){ var c=_cuandoReuM_(r);
     return { r:r, ms:c.ms, fij:c.fijada, pasada:(c.ms<hoy) }; });
@@ -475,8 +476,8 @@ function _sinConvocarHTMLM_(){
     }).join('')+'</div>';
 }
 
-/* 04/11 · «MIS REUNIONES»: las que se ven (sin finalizar, o finalizadas hace menos de un mes) y, debajo, el cajón plegable «Archivo» con
-   las finalizadas de hace más (`_reuPartir_`, `comun.js`). `data-reu` lleva el índice en `REUNIONES_M`, no en esta mitad. Si la que
+/* 04/11 · «MIS REUNIONES»: las vivas y, debajo, el cajón plegable «Pasadas» (11/11: finalizadas o ya celebradas; antes, «Archivo» al mes) con
+   las que ya pasaron (`_reuPartir_`, `comun.js`). `data-reu` lleva el índice en `REUNIONES_M`, no en esta mitad. Si la que
    miras está en el archivo, el cajón sale abierto: no se esconde lo que tienes delante. */
 function _listaReusM_(R){
   var par=_reuPartir_(REUNIONES_M);
@@ -490,7 +491,7 @@ function _listaReusM_(R){
   var abierto=par.archivo.indexOf(R)>=0;
   return (par.vivas.length ? '<div class="tarj">'+par.vivas.map(fila).join('')+'</div>' : '')+
     (par.archivo.length
-      ? '<div class="cajon'+(abierto?' ab':'')+'" data-caj data-p><span>Archivo <b>· '+par.archivo.length+'</b></span>'+
+      ? '<div class="cajon'+(abierto?' ab':'')+'" data-caj data-p><span>Pasadas <b>· '+par.archivo.length+'</b></span>'+
         '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
         '<div class="cajsec'+(abierto?' on':'')+'"><div class="tarj">'+par.archivo.map(fila).join('')+'</div></div>'
       : '');
