@@ -1524,7 +1524,7 @@ function _ritmoHorasE_(mi){
     filas.push({k:'vs. '+nomA, v:ritmo, ref:rAnt, txt:nf2(rAnt)+' h/día en '+nomA});
   }
   var e=DATA.equipo_mes, nuevo=_recienLlegado_(mi);
-  if(!nuevo && e && typeof e.media==='number' && (e.n||0)>=3 && e.media>0)
+  if(!nuevo && base>0 && e && typeof e.media==='number' && (e.n||0)>=3 && e.media>0)
     filas.push({k:'vs. equipo', v:ritmo, ref:e.media/dia, txt:nf2(e.media/dia)+' h/día de media'});
   filas=filas.filter(function(f){ return typeof f.ref==='number' && isFinite(f.ref) && f.ref>0; });
   if(!filas.length && !nuevo) return null;
@@ -1545,7 +1545,7 @@ function _ritmoHorasHTMLE_(mi){
         '<span class="vv"><b>'+pc(dl)+'</b><small>'+esc(f.txt)+'</small></span></div>';
     }).join('')+'</div>'+
     '<div class="nota">Tu ritmo: <b>'+nf2(r.ritmo)+' h/día</b> ('+nf2(r.num)+' h en '+r.dia+' días'+
-    (r.conBase?', con la compensación base repartida hasta hoy':'')+'). Se compara el ritmo, no el total: '+
+    (r.conBase?', con las horas por gestión de tu cargo repartidas hasta hoy':'')+'). Se compara el ritmo, no el total: '+
     'el mes en curso va a medias y el anterior está entero.</div>');
 }
 

@@ -121,7 +121,7 @@
 <script src="documentos.escritorio.js?v=a6e1059"></script>
 <script src="sanciones.escritorio.js?v=2126087"></script>
 <script src="reuniones.escritorio.js?v=a36ddea"></script>
-<script src="horas.escritorio.js?v=f4d76b4"></script>
+<script src="horas.escritorio.js?v=6ddba50"></script>
 <script src="equipo.escritorio.js?v=b37290d"></script>
 <script src="tareas.escritorio.js?v=d3ebd8c"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
@@ -3088,11 +3088,11 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
 function _cargaPanelE_(mi){
   var bs = _bandaSana_();
   var barra = _cargaBarraHTML_(_cargaVista_(mi));
-  if(!barra) return pan('Tu índice de carga', '',
+  if(!barra) return pan('Indicador de nivel de trabajo', '',
     vacioSimple('Sin dato de carga','Tu carga de trabajo la calcula el motor al cerrar el mes. '+
       'Todavía no ha llegado.'));
   var hm = _hMesDevengado_(mi);   /* devengada, como la cifra de «Horas este mes» (07/10) */
-  return pan('Tu índice de carga', 'banda sana ' + bs.lo + '–' + bs.hi,
+  return pan('Indicador de nivel de trabajo', 'banda sana ' + bs.lo + '–' + bs.hi,
     /* `.pb` es el cuerpo con relleno del panel: sin él la barra y el texto iban pegados al borde. */
     '<div class="pb">'+barra+
     '<p class="rnota"><b>'+(_cargaPrevistaTxt_(mi)?'Carga prevista ':'Carga ')+nf(_cargaVista_(mi),0)+'</b>'+
@@ -3780,7 +3780,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='bc07ae2';
+var BUILD='7111b56';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

@@ -497,7 +497,8 @@ function _compHorasHTML_(base, crudo){
      los suyos: «VS. EQUIPO −100 %» en rojo el primer día. La app no sabe su día de alta, así que no se finge un
      prorrateo (eso lo decide Daniel): se dice por qué no hay comparación. */
   var _nuevo=_recienLlegado_(YO);
-  if(me>0 && !_nuevo) f+=deltaHTML('vs. equipo', ritmo, me/dia, nf2(me/dia)+' h/día de media');
+  /* textos3 (Daniel 11/11): «mientras no haya ninguna hora, se quita» — con 0 h el ritmo es 0 y salía «−100 %» */
+  if(me>0 && !_nuevo && base>0) f+=deltaHTML('vs. equipo', ritmo, me/dia, nf2(me/dia)+' h/día de media');
   if(_nuevo) return '<div class="comph"><p class="rnota" style="margin:0">Es tu primer mes: la comparación '+
     'con el equipo sale después de tu primer cierre.</p></div>';
   if(!f) return '';
@@ -505,7 +506,7 @@ function _compHorasHTML_(base, crudo){
      distingue de «+12 %» respecto a un total, y son cosas distintas. */
   return '<div class="comph">'+f+
     '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(_num)+
-    ' h en '+dia+' días'+(_bt==null?'':', con la compensación base repartida hasta hoy')+   /* 🟡 4 (refutador): también la tiene quien no tiene cargo */   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
+    ' h en '+dia+' días'+(_bt==null?'':', con las horas por gestión de tu cargo repartidas hasta hoy')+   /* 🟡 4 (refutador): también la tiene quien no tiene cargo */   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
     '). Se compara el ritmo y no el total porque el mes en curso va a medias.</p></div>';
 }
 
@@ -2386,7 +2387,7 @@ function vHoras(){
        ahí el rango explica el dibujo; en el título era un número suelto.
        ⚠️ Y la banda sigue saliendo de `_bandaSana_`, que es lo que se curó el 05/10 — esto
        quita una copia del RÓTULO, no la derivación. */
-    '<h2 class="sec">Mi índice de carga<span class="ln"></span></h2>'+
+    '<h2 class="sec">Indicador de nivel de trabajo<span class="ln"></span></h2>'+
     '<div class="tarj">'+
       (_cargaVista_(YO)!=null
         /* ⛔⛔ EL DIBUJO SE DERIVA DE LA BANDA (06/10) y desde el 19/10 vive en `comun.js`
