@@ -15090,7 +15090,7 @@ function _mtEditorHTML_(k){
        _mtInp_('sitio', m.sitio, 'Sitio (CITI, CUVI…)', 'aria-label="Sitio"') + '</div>';
   /* 1. Integrantes */
   h += '<div class="mtf-sec">1. Integrantes y responsabilidades</div>'+
-       '<p class="mtf-ayuda">Quien fue y con qué papel: responsable de turno, coche, audiovisual, memoria. Si alguien vino sólo un día, ponlo.</p>';
+       '<p class="mtf-ayuda">Nombre Apellidos (papel): responsable de turno, coche, responsable audiovisual, responsable de memoria. Si alguien vino sólo un día, ponlo.</p>';
   m.integrantes.forEach(function(p, i){
     h += '<div class="mtf-card"><div class="mtf-fila"><b style="flex:1;font-size:14px">' + esc(p.nombre) + '</b>'+
          '<span class="mtf-c mini" data-mtquitar="integrantes:' + i + '">Quitar</span></div>'+
@@ -15102,7 +15102,7 @@ function _mtEditorHTML_(k){
        '<div class="mtf-sug" data-mtsugbox="integrante">' + (ed.nuevo ? _mtSugHTML_(_mtNombres_().filter(function(n){ return !ya[n]; }), ed.nuevo, 'integrante') : '') + '</div></div>';
   /* 2. Movimientos */
   h += '<div class="mtf-sec">2. Movimientos</div>'+
-       '<p class="mtf-ayuda">Lo que se lleva de un sitio a otro. Si no se movió nada, déjalo vacío.</p>';
+       '<p class="mtf-ayuda">Qué se movió y de dónde a dónde (Zulo → CITI…). Si no se movió nada, déjalo vacío.</p>';
   m.movimientos.forEach(function(f, i){
     h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('movimientos.' + i + '.material', f.material, 'Material') +
          '<span class="mtf-c mini" data-mtquitar="movimientos:' + i + '">Quitar</span></div>'+
@@ -15117,7 +15117,7 @@ function _mtEditorHTML_(k){
   h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="movimientos">Añadir movimiento</span><span class="mtf-c" data-mtadd="notasMov">Añadir nota</span></div>';
   /* 3. Objetivos */
   h += '<div class="mtf-sec">3. Objetivos</div>'+
-       '<p class="mtf-ayuda">Lo que se quería hacer y si se consiguió. Los secundarios y extraordinarios, sólo si los había.</p>';
+       '<p class="mtf-ayuda">Los del Discord que pone el Project Director, más los que surjan de improviso. Marca si se cumplieron. Secundarios y extraordinarios (los imprevistos del turno): si no hay, se omiten.</p>';
   MT_GRUPOS_.forEach(function(gr, gi){
     g = gr[0];
     h += '<div class="mtf-sub">3.' + (gi + 1) + '. ' + gr[1] + '</div><div class="mtf-obj">';
@@ -15131,7 +15131,7 @@ function _mtEditorHTML_(k){
   });
   /* 4. Comentarios */
   h += '<div class="mtf-sec">4. Comentarios y detalles</div>'+
-       '<p class="mtf-ayuda">Un apartado por trabajo: qué se hizo y cómo, qué salió mal, qué queda para el siguiente turno. Listas: una línea por paso con «1. » o «- ».</p>';
+       '<p class="mtf-ayuda">Imprevistos e incidencias del turno. Un método de fabricación no convencional, por muy “gitano” que sea, para que no se pierda. Y el porqué de cada objetivo no cumplido.</p>';
   m.comentarios.forEach(function(c, i){
     var fotos = c.fotos || [];
     h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('comentarios.' + i + '.titulo', c.titulo, 'Título del apartado (Aletas, Lijado…)') +
