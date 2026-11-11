@@ -215,6 +215,9 @@ function _proxReuE_(){
 var _TUYO_E_={
   sindecl:{ir:'sindeclarar', ic:'i-reloj', acc:'Declarar'},
   det:    {ir:'libros',      ic:'i-reloj', acc:'Dar detalle'},
+  /* 11/11 (refutar8): `_tuyoItemsE_` ya mandaba `rech` (un parte tuyo rechazado) y esta tabla no lo tenía: `m` salía undefined y a quien le
+     rechazaban un parte se le caía el Panel entero («Cannot read properties of undefined (reading 'ic')»). Va a «Lo tuyo», donde está con su motivo. */
+  rech:   {ir:'libros',      ic:'i-reloj', acc:'Ver el motivo'},
   cambios:{ir:'docurso',     ic:'i-doc',   acc:'Corregir'},
   reu:    {ir:'dispo',       ic:'i-cal',   acc:'Cubrir'},
   conv:   {ir:'turnos',      ic:'i-cal',   acc:'Contestar'}

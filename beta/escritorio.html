@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=76b80a2">
+<link rel="stylesheet" href="escritorio.css?v=7b9d545">
 </head>
 <body>
 
@@ -113,16 +113,16 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=5dc63e9"></script>
+<script src="comun.js?v=240da05"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
-<script src="turnos.escritorio.js?v=6b4e10c"></script>
+<script src="turnos.escritorio.js?v=9d1197a"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
 <script src="documentos.escritorio.js?v=a6e1059"></script>
 <script src="sanciones.escritorio.js?v=2126087"></script>
-<script src="reuniones.escritorio.js?v=a36ddea"></script>
+<script src="reuniones.escritorio.js?v=828d9c8"></script>
 <script src="horas.escritorio.js?v=6ddba50"></script>
-<script src="equipo.escritorio.js?v=b37290d"></script>
+<script src="equipo.escritorio.js?v=f3c2100"></script>
 <script src="tareas.escritorio.js?v=d3ebd8c"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
 <script>
@@ -1091,7 +1091,7 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
   return ((typeof _novHTML_==='function')?_novHTML_('escritorio'):'')+
     /* 31/10: LO TUYO va arriba de lo de gobierno — ver `_tuyoHTMLE_` (`equipo.escritorio.js`). */
     _tuyoHTMLE_()+
-    pan('Requiere tu decisión',cola.length+' asuntos',lista,'destaca')+
+    pan('Requiere tu decisión',cola.length+(cola.length===1?' asunto':' asuntos'),lista,'destaca')+
     /* 11/11 (horascoord): darle horas a tu gente era un panel al fondo de «Partes», sin acceso desde ningún sitio (el 01-02/11 un coordinador las
        metió a mano en Notion). Un toque lleva al bloque, con tu unidad ya marcada. Sale sólo a quien tiene a quién dárselas. */
     (_otorgablesDe_(ACTOR).length ? '<div class="dec" data-ir="partes" data-foco="psel-bloInv">'+
@@ -1350,6 +1350,10 @@ function _cursoCargar_(repintar){
      vuelve a pedir al pintar si lo último tiene más de un minuto. «vedado» no cambia. Sin dos peticiones a la vez: `t`
      se apunta ANTES de pedir, así que el mismo tope las frena (una marca «en vuelo» aparte era redundante). */
   if(CURSO_SRV==='pidiendo' || CURSO_SRV==='vedado') return;
+  /* 11/11 (refutar8): SIN SESIÓN NO SE PREGUNTA. El primer pintado del Panel (`insightsHTML`) llega antes que la sesión, la petición salía sin
+     `token`, volvía «sin token» y la lista quedaba 60 s diciéndole a una coordinadora que su sesión de Google había caducado. Sin pedir,
+     el estado sigue en «sin pedir» y el siguiente pintado (ya con sesión) lo pide. */
+  if(typeof SESION==='undefined' || !SESION || !SESION.token) return;
   if(CURSO_SRV!=='sin pedir' && (Date.now() - (_cursoCargar_.t||0)) < 60000) return;
   if(typeof api==='undefined' || !api.getFichajesAbiertos) return;
   if(CURSO_SRV==='sin pedir') CURSO_SRV='pidiendo';
@@ -3780,7 +3784,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7111b56';
+var BUILD='2585bb8';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

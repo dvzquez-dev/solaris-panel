@@ -14109,7 +14109,7 @@ function _bloqueHorasHTML_(){
   var tot=fin ? 'La duración de la reunión' : (d>0 ? '<b>'+nf2(d)+' h</b>' : 'Las horas del bloque');
   var quien=n+(n===1?' persona':' personas');
   if(!B.distintas)
-    return '<p class="rnota" data-blqtot style="margin:0 0 8px">'+tot+' para estas '+quien+', igual para todas.</p>'+
+    return '<p class="rnota" data-blqtot style="margin:0 0 8px">'+tot+(n===1 ? ' para esta persona.' : ' para estas '+quien+', igual para todas.')+'</p>'+
       '<button type="button" class="btn mini" data-p data-blqdist>Horas distintas</button>';
   return '<p class="rnota" style="margin:0 0 8px">Horas de cada persona; en blanco, '+(fin?'lo que dure la reunión':(d>0?nf2(d)+' h':'las del bloque'))+'.</p>'+
     B.parts.map(function(p){

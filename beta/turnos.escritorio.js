@@ -550,6 +550,11 @@ function _dispAviso_(titulo){
      ⚠️ Ofrece Reintentar igual que el de `'error'`: la sesion puede llegar tarde (el
      login es asincrono), y entonces ese boton es lo unico que vuelve a abrir la puerta --
      `_dispCargar_` es de un solo disparo y `_refrescoVivo_` no lo toca. */
+  /* 11/11 (refutar8): SIN CONVOCATORIA NO ES UNA AVERÍA. Entre una semana y otra el servidor contesta «no hay ninguna convocatoria» a la
+     puerta del mapa y `null` (con éxito) a la de `getConvocatoria`; esto último se pintaba «No se pudo cargar el mapa» + Reintentar. */
+  if(e === 'sin convocatoria') return pan(titulo, 'sin convocatoria',
+    vacioSimple('No hay ninguna disponibilidad convocada',
+      'La abre el Project Director cuando toca repartir los turnos.'));
   if(e === 'sin accion') return pan(titulo, 'sin datos',
     vacioSimple('Esta versi\u00f3n no puede consultar la disponibilidad',
       'Recarga la p\u00e1gina y, si sigue igual, av\u00edsalo desde el buz\u00f3n.'));
@@ -734,7 +739,7 @@ function _dispCargar_(repintar){
           _dispEstadoSrv_('solo mio');
         } else {
           if(typeof CONVOCATORIAS!=='undefined') CONVOCATORIAS.length=0;
-          _dispEstadoSrv_('error');
+          _dispEstadoSrv_(r===null ? 'sin convocatoria' : 'error');       // `null` con éxito = no hay ninguna (refutar8)
         }
         if(typeof repintar==='function') repintar();
       })['catch'](function(){

@@ -669,7 +669,9 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
    tres letras. En el escritorio, ademas, cabe al lado de los campos en vez de encima. */
 /* Dos columnas: la lista a la izquierda, los campos a la derecha. Por debajo de 780 px
    se apila -el panel se usa tambien en portatiles con la ventana a medias-. */
-.sanwrap{display:grid;grid-template-columns:minmax(230px,300px) 1fr;gap:16px;align-items:start}
+.sanwrap{display:grid;grid-template-columns:minmax(230px,300px) minmax(0,1fr);gap:16px;align-items:start}
+/* 11/11 (refutar8 integrado): un motivo largo del RRI elegido no puede ensanchar la columna más allá de la ventana a 1024 px */
+.sanwrap>div{min-width:0}
 /* Los campos NO se estiran a todo el ancho: un desplegable de 1000 px para un texto de 40
    caracteres deja los tres campos desperdigados. Un formulario mejora cuando el ojo va de
    uno al siguiente sin viajar, no por ser mas ancho. */
@@ -910,6 +912,9 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 /* 31/10 · «Nueva tarea»: unidad, responsables, plazo y urgencia como chips (`.pick`), calendario propio y el editor del
    cuerpo con su vista previa «así se verá en Notion» (`.nb-*`, pintada por `_bloquesAHTML_`). Sin controles nativos. */
 .nt-fila{display:flex;gap:7px;flex-wrap:wrap}
+/* 11/11: un chip con texto largo (un motivo del RRI) parte en líneas en vez de salirse de su columna */
+.nt-fila{min-width:0;max-width:100%}
+.nt-fila .pick{max-width:100%;white-space:normal;text-align:left}
 .nt-cal{border:1px solid var(--line);border-radius:var(--r2);background:#0A0909;padding:10px;width:256px}
 .nt-calh{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;text-transform:capitalize;font-size:12.5px}
 .nt-calg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}

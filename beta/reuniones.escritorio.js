@@ -858,7 +858,9 @@ function _convocadosBoxE_(r){
 /* Las reuniones con el plazo AÚN ABIERTO, por la misma regla que la celda «Cierra» (`_plazoAbierto_`). 21/10 (auditor 10,
    🟡 11): el título y el globo de Convocatorias contaban también las cerradas. */
 function _nReusAbiertas_(){
-  return (REUS||[]).filter(function(r){ return _plazoAbierto_(String(r && r.limite==null ? '' : r.limite)); }).length;
+  /* 11/11 (refutar8): sólo entre las VIVAS. La tabla pliega las «Pasadas» y el título decía «2 abiertas · 1 en total»; el globo del nav
+     contaba también una reunión ya celebrada cuyo plazo seguía abierto. */
+  return _reuPartir_(REUS||[]).vivas.filter(function(r){ return _plazoAbierto_(String(r && r.limite==null ? '' : r.limite)); }).length;
 }
 
 /* LA CELDA «CIERRA» DE CONVOCATORIAS (939.ª). Pintaba el límite crudo: el 15/10 decía «14/10/2026» de un plazo ya
