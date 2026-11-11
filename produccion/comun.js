@@ -3030,6 +3030,12 @@ async function _apiPost_(body){
   var pr=(async function(){
   if(SESION&&SESION.token&&!body.token) body=Object.assign({},body,{token:SESION.token});
   var accion=String(body.action||""), ultimo=null, lectura=_esLecturaApi_(accion);
+  /* ⛔ 10/11 (refutar4): UNA `idem` POR LLAMADA, LA MISMA EN LOS TRES INTENTOS. El bucle de abajo reintenta las escrituras cuando el
+     `fetch` falla, y falla igual si la petición no llegó que si llegó, se GUARDÓ y se perdió la respuesta (mala cobertura): `crearReunion`
+     salía tres veces —tres reuniones y tres avisos— y `apelarTarea` guardaba a la primera y el reintento le decía a quien acababa de apelar
+     «ya tiene una apelación abierta». El servidor (`servidor._una_vez`) contesta la respuesta del primer intento a los demás. Se pone
+     AQUÍ, fuera del bucle: dentro, cada intento traería una distinta y no serviría de nada (la misma razón que la clave de envío de los partes). Las lecturas no la llevan. */
+  if(!lectura && !body.idem) body=Object.assign({},body,{idem:_idemEnvio_()});
   var espera=API_ACCIONES_LARGAS.test(accion) ? API_ESPERA_LARGA_MS : API_ESPERA_MS;
   if(!lectura && typeof navigator!=='undefined' && navigator.onLine===false){
     var sn=new Error(API_MSG_SIN_RED); sn.sinRed=true; throw sn;
@@ -8535,6 +8541,11 @@ function miembro(n){
 function _claveUso_(){
   return 'c' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
+/* La `idem` de UNA llamada de escritura al servidor (la pone `_apiPost_`, una vez, fuera del bucle de reintentos). NO es la clave del
+   envío de arriba: aquélla la fija quien envía (el parte, el bloque) y viaja DENTRO de lo que se guarda; ésta sólo dice «este intento es
+   el mismo que aquél» y el servidor la olvida a los 10 minutos. Un nombre aparte para que `probar_clave_parte` siga vigilando que el
+   transporte no fabrique la clave de dominio. */
+function _idemEnvio_(){ return _claveUso_(); }
 
 /* ═══ EL BLOQUE MÍNIMO DE UN TURNO ═════════════════════════════════════════════════
    Espejo de `reglas/turnos.py:bloque_desde`. Daniel (07/08/2026): franjas por horas, *«que te
@@ -10849,6 +10860,12 @@ function _revisoresPropuestosValidos_(e){
   var p = _revisoresPropuestosDe_(e), au = _autoresDe_(e);
   return p.length && !p.some(function(n){ return au.indexOf(n) >= 0; }) ? p : [];
 }
+/* 05/11 (`conflictojose`, Daniel): a quién va un expediente en CONFLICTO de revisión (el revisor de siempre es autor, o el documento trae
+   revisores propuestos válidos): a José, que valida sin firmar. Si José es autor, es el PD o no hay José, al PD. Gemela de
+   `destino_conflicto_doc` del servidor. */
+function _destinoConflictoDoc_(e){
+  return (REV2_NOM && REV2_NOM !== PD_NOM && _autoresDe_(e).indexOf(REV2_NOM) < 0) ? [REV2_NOM] : [PD_NOM];
+}
 /* 04/11 · ¿`yo` es autor y por tanto NO decide lo suyo? Sólo el PD es la excepción, y sólo si `revisoresDe` se lo da (no hay nadie
    por encima). Lo usan `puedeDecidirDoc` de las dos caras; el servidor tiene la suya en `puede_decidir`. */
 function _autorQueNoDecide_(e, yo, rev){
@@ -10866,7 +10883,11 @@ function _revisionPropuestaHTML_(e, yo){
   return h;
 }
 /* 04/11 · el rótulo del botón de aprobar: «Aprobar», o «Aprobar con los revisores propuestos» si el documento los trae. */
-function _rotuloAprobarDoc_(e){ return _revisoresPropuestosValidos_(e).length ? 'Aprobar con los revisores propuestos' : 'Aprobar'; }
+/* 05/11: a José (quien valida sin firmar) le dice «Validar: lo que pone es correcto»; `yo` = quien mira. */
+function _rotuloAprobarDoc_(e, yo){
+  if (!_revisoresPropuestosValidos_(e).length) return 'Aprobar';
+  return (yo && yo === REV2_NOM && yo !== PD_NOM) ? 'Validar: lo que pone es correcto' : 'Aprobar con los revisores propuestos';
+}
 
 /* 04/11 · el texto de «Revisado por …» de una decisión con revisores propuestos: `''` si la decisión no los lleva. */
 function _revisadoPorTxt_(e){
@@ -11577,6 +11598,114 @@ async function _autorClic_(ev, buscar, alCambiar){
   } catch (err) {
     b.disabled = false;
     tost('No se pudo cambiar el autor: ' + ((err && err.message) || err));
+  }
+}
+
+/* ══ 05/11 · `pedirrev`: EL PD PIDE LA REVISIÓN A QUIEN ÉL ELIJA, Y ESAS PERSONAS LA CONFIRMAN (las dos caras) ═════════════
+   🗣️ Daniel (PD), `Manual_S-9001_27`: «siendo PD […] debería poder poner la revisión a nombre de otro» · «mandé una solicitud a los
+   revisores que yo puse para que ambos le den ahí el check, sí lo he revisado […] es su palabra también».
+   El rastro vive en `e.peticionesRev` (lista; nada se borra): `{id, por, at, revisores[], estado, confirmaciones[{quien, ok, motivo?, at}]}`
+   con `estado` pendiente · completa · caida · cancelada · sustituida. El expediente sigue en `revision`: «pendiente de confirmaciones» es
+   la petición pendiente. Lo decide el SERVIDOR (`e_pedir_revision`, `e_confirmar_revision`, `e_cancelar_peticion_rev`); esto sólo no
+   ofrece lo que sabe que va a rechazar. Gemela de `peticion_rev_activa`. */
+function _peticionesRevDe_(e){ return e && Array.isArray(e.peticionesRev) ? e.peticionesRev.filter(function(p){ return p && typeof p === 'object'; }) : []; }
+function _peticionRevActiva_(e){
+  var l = _peticionesRevDe_(e);
+  for (var i = l.length - 1; i >= 0; i--) if (l[i].estado === 'pendiente') return l[i];
+  return null;
+}
+/* ¿`yo` puede abrir la petición? Sólo el PD, también en lo suyo, y sólo con el expediente en `revision`. */
+function _puedePedirRev_(e, yo){
+  return !!e && !!yo && yo === PD_NOM && (e.estado || e.est) === 'revision';
+}
+/* El panel del PD: a quién se pide (chips; ni autores ni él) y, en el mismo paso, los autores (el editor de chips de siempre). `pre` es
+   único por ficha. */
+function _pedirRevPanelHTML_(pre, e){
+  if (typeof document !== 'undefined' && document.head) _anotCss_();
+  var au = _autoresDe_(e), act = _autoresActualesDe_(e);
+  var cand = _activos_().map(function(m){ return m.nombre; }).filter(function(n){ return n !== PD_NOM && au.indexOf(n) < 0; });
+  return '<div id="' + pre + 'PedirRev" data-prdoc="' + esc(String(e.id)) + '" data-prpre="' + pre + '" data-prautinicial="' + esc(JSON.stringify(act)) +
+    '" style="margin-top:10px">' +
+    _anotCampoHTML_('Pedir la revisión a…', 'Dices que lo han revisado: cada uno lo confirma en su cola de Documentos y, con todos, queda aprobado a tu nombre.',
+      elegirPersonas(pre + 'RevP', {universo:cand, marcadas:[], multi:true, titulo:'Revisan', vacio:'Escribe un nombre o pulsa «Ver lista».'}), 'div') +
+    _anotCampoHTML_('Autores', 'Ahora: ' + esc(act.join(', ') || '—') + '. Corrígelos aquí si el documento los nombra mal.',
+      elegirPersonas(pre + 'AutP', {universo:_autorCandidatos_(), marcadas:act, multi:true, titulo:'Autores', vacio:'Escribe un nombre o pulsa «Ver lista».'}), 'div') +
+    '<button type="button" class="btn pri" style="margin-top:8px;width:100%" data-prpedir="' + pre + '">Pedir revisión</button></div>';
+}
+/* Lo que consta de una petición: quién la pidió, a quién, y cada respuesta con su momento (o su motivo). */
+function _peticionRevLineaHTML_(p){
+  var estTxt = {pendiente:'pendiente de confirmaciones', completa:'confirmada por todos', caida:'no la dieron por buena', cancelada:'cancelada', sustituida:'sustituida por otra'};
+  var h = '<p class="rnota" style="margin:8px 0 0"><b>' + esc(p.por || 'El PD') + '</b> pidió la revisión a ' + (p.revisores || []).map(esc).join(', ') +
+    (p.at ? ' (' + esc(_novCuando_(p.at)) + ')' : '') + ' · <b>' + esc(estTxt[p.estado] || p.estado || '') + '</b>';
+  (p.confirmaciones || []).forEach(function(c){
+    h += '<br>' + (c.ok ? ico('ok') : ico('cerrar')) + ' ' + esc(c.quien) + (c.ok ? ' lo ha revisado' : ' no lo da por bueno: «' + esc(c.motivo || '') + '»') + (c.at ? ' · ' + esc(_novCuando_(c.at)) : '');
+  });
+  if (p.estado === 'pendiente'){
+    var falta = (p.revisores || []).filter(function(n){ return !(p.confirmaciones || []).some(function(c){ return c.quien === n; }); });
+    if (falta.length) h += '<br>Falta: ' + falta.map(esc).join(', ');
+  }
+  if (p.estado === 'cancelada' && p.cerradaPor) h += '<br>Cancelada por ' + esc(p.cerradaPor) + (p.cerradaAt ? ' · ' + esc(_novCuando_(p.cerradaAt)) : '');
+  return h + '</p>';
+}
+/* Todo lo de la ficha: el rastro (lo ve cualquiera), la cola de quien confirma, «cancelar» del PD y, si toca, el panel para pedirla. `pre`
+   único por ficha; `yo` = quien mira. `''` si no hay nada que decir. */
+function _peticionRevHTML_(e, yo, pre){
+  if (!e) return '';
+  var act = _peticionRevActiva_(e), h = _peticionesRevDe_(e).map(_peticionRevLineaHTML_).join('');
+  if (act && yo && (act.revisores || []).indexOf(yo) >= 0 && !(act.confirmaciones || []).some(function(c){ return c.quien === yo; })){
+    h += '<div id="' + pre + 'ConfRev" data-prdoc="' + esc(String(e.id)) + '" data-prpre="' + pre + '" style="margin-top:10px">' +
+      '<h4>Confirma la revisión</h4><p class="rnota" style="margin:0 0 8px"><b>' + esc(act.por || 'El PD') + '</b> dice que has revisado este documento. ' +
+      'Si es así, confírmalo: consta tu nombre como revisor. Si no, di por qué.</p>' +
+      '<textarea id="' + pre + 'ConfMot" data-borr="pedirrev-motivo-' + esc(String(e.id)) + '" placeholder="Motivo — sólo si no lo das por bueno…" style="width:100%;min-height:60px"></textarea>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+      '<button type="button" class="btn pri" style="flex:1 1 46%" data-prsi="' + pre + '">Lo he revisado</button>' +
+      '<button type="button" class="btn no" style="flex:1 1 46%" data-prno="' + pre + '">No lo doy por bueno</button></div></div>';
+  }
+  if (act && yo === PD_NOM)
+    h += '<div data-prdoc="' + esc(String(e.id)) + '" data-prpre="' + pre + '" style="margin-top:8px"><button type="button" class="btn" style="width:100%" data-prcancel="' + pre + '">Cancelar la petición</button></div>';
+  else if (!act && _puedePedirRev_(e, yo)) h += _pedirRevPanelHTML_(pre, e);
+  return h;
+}
+/* El delegado de las tres acciones. `buscar(id)` da el expediente de la cara; `alCambiar(e, upd)` repinta con lo que devolvió el servidor. */
+async function _pedirRevClic_(ev, buscar, alCambiar){
+  var b = ev && ev.target && ev.target.closest ? ev.target.closest('[data-prpedir],[data-prsi],[data-prno],[data-prcancel]') : null;
+  if (!b || b.disabled) return;
+  var c = b.closest('[data-prdoc]'), e = c ? buscar(c.getAttribute('data-prdoc')) : null, pre = c ? c.getAttribute('data-prpre') : '';
+  if (!e) return;
+  if (typeof backendOK === 'undefined' || !backendOK || typeof SESION === 'undefined' || !SESION){
+    tost('Sin conexión con el backend: no se ha guardado nada.'); return; }
+  var llamada, ok;
+  if (b.hasAttribute('data-prpedir')){
+    var revs = elegirPersonasMarcadas(pre + 'RevP'), aut = elegirPersonasMarcadas(pre + 'AutP'), act = _autoresActualesDe_(e);
+    if (!revs.length){ tost('Elige a quién se pide la revisión.'); return; }
+    if (!aut.length){ tost('Deja al menos un autor.'); return; }
+    var mal = revs.filter(function(n){ return aut.indexOf(n) >= 0; });
+    if (mal.length){ tost(mal.join(', ') + (mal.length > 1 ? ' son autores' : ' es autor') + ' del documento: no puede' + (mal.length > 1 ? 'n' : '') + ' revisarlo.'); return; }
+    llamada = function(){ return api.pedirRevision(e.id, revs, aut.join('|') === act.join('|') ? undefined : aut, e.ref); };
+    ok = 'Revisión pedida a ' + revs.join(', ') + '.';
+  } else if (b.hasAttribute('data-prcancel')){
+    llamada = function(){ return api.cancelarPeticionRev(e.id, e.ref); };
+    ok = 'Petición cancelada.';
+  } else {
+    var si = b.hasAttribute('data-prsi'), mot = '';
+    if (!si){
+      var ta = document.getElementById(pre + 'ConfMot'); mot = ((ta && ta.value) || '').trim();
+      if (mot.length < (typeof MIN_JUSTIFICACION !== 'undefined' ? MIN_JUSTIFICACION : 8)){
+        if (ta){ ta.focus(); ta.style.borderColor = 'var(--red)'; }
+        tost('Di por qué no lo das por bueno.'); return; }
+    }
+    llamada = function(){ return api.confirmarRevision(e.id, si, mot, e.ref); };
+    ok = si ? 'Confirmado.' : 'Queda dicho: la petición vuelve al PD con tu motivo.';
+  }
+  b.disabled = true;
+  try {
+    var upd = await llamada();
+    var fin = upd && (upd.estado === 'aprobado' || upd.estado === 'publicado');
+    tost(fin && b.hasAttribute('data-prsi') ? 'Confirmado por todos: aprobado.' : ok);
+    alCambiar(e, upd);
+  } catch (err) {
+    b.disabled = false;
+    tost('No se pudo: ' + ((err && err.message) || err));
   }
 }
 
@@ -12835,6 +12964,297 @@ async function _ftDestino_(t, k){
   await _ftRefrescar_(t, true);
 }
 
+/* ══ 09/11 · LA MEMORIA DE FABRICACIÓN DE UN TURNO, DESDE LA APP ═════════════════════════════════════════════════════
+   🗣️ Daniel (09/11): *«generarla enteramente desde el móvil […] darle el botón de enviar a revisar y que se genere […] sin
+   siquiera subirlo al formulario»*. Backend: `rutinas/memoria_turno.py` (`getMemoriaTurno`, `guardarMemoriaTurno`,
+   `enviarMemoriaTurno`, `reabrirMemoriaTurno`). UNA implementación para las dos caras: la ficha del turno pone el hueco
+   `_mtHTML_(t)` y llama a `_mtEnganchar_`; el editor se abre DENTRO del hueco (no necesita modal).
+   ⛔ QUIÉN PUEDE lo decide el SERVIDOR (`puede`, `celebrado`, `puedeReabrir`): aquí no se copia la regla, se pregunta. Quien no puede,
+   no ve nada. El borrador vive en el servidor: se guarda solo (1,5 s tras dejar de teclear) y desde otra cara está todo.
+   Lo elegido (conseguido / no conseguido) va en ROJO y sin tick; nada de casillas ni desplegables nativos: chips. */
+var MT_ = {est: {}, turno: {}, ed: {}, abierto: {}};
+function _mtCss_(){
+  if(document.getElementById('mtCss')) return;
+  var s = document.createElement('style'); s.id = 'mtCss';
+  s.textContent =
+    '.mtf{margin:14px 0 4px}.mtf-h{display:flex;align-items:baseline;gap:8px;margin:0 0 8px}.mtf-h .sc{flex:1}'+
+    '.mtf-fila{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 9px}'+
+    '.mtf-c{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:12px;min-height:36px;padding:6px 13px;'+
+      'border-radius:20px;border:1px solid var(--line);background:var(--sur2);color:var(--ink2);white-space:nowrap;user-select:none}'+
+    '.mtf-c:hover{border-color:var(--ink3);color:var(--ink)}.mtf-c.on,.mtf-c.pri{color:#fff;border-color:var(--red);background:rgba(228,30,37,.2)}'+
+    '.mtf-c.mini{min-height:30px;padding:3px 10px;font-size:11.5px}.mtf-c[disabled]{opacity:.5;pointer-events:none}'+
+    '.mtf-in{flex:1;min-width:120px;box-sizing:border-box;background:var(--sur2);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 11px;font-size:14px;font-family:inherit}'+
+    'textarea.mtf-in{width:100%;min-height:110px;resize:vertical;line-height:1.45}.mtf-in:focus{outline:none;border-color:var(--red)}'+
+    '.mtf-sec{margin:16px 0 6px;font-weight:600;font-size:14px;color:var(--ink)}.mtf-sub{margin:12px 0 4px;font-size:12.5px;color:var(--ink2)}'+
+    '.mtf-card{border:1px solid var(--line);border-radius:12px;background:var(--sur);padding:9px 10px;margin:0 0 8px}'+
+    '.mtf-card .mtf-fila{margin:0 0 6px}.mtf-nota{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.mtf-err{margin:0 0 8px;font-size:13px;color:var(--red)}'+
+    '.mtf-sug{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.mtf-sug:empty{display:none}'+
+    '.mtf-obj{display:flex;flex-direction:column;gap:6px}.mtf-obj .mtf-fila{margin:0}'+
+    '.mtf-pie{position:sticky;bottom:0;background:var(--bg);padding:10px 0 4px;border-top:1px solid var(--line);margin-top:14px}';
+  document.head.appendChild(s);
+}
+function _mtHTML_(t){
+  _mtCss_();
+  var k = _ftClave_(t); MT_.turno[k] = t;
+  return '<div class="mtf" data-mtur="' + esc(k) + '" hidden></div>';
+}
+function _mtRefrescar_(t, forzar){
+  var k = _ftClave_(t), e = MT_.est[k];
+  if(!forzar && e && e.pidiendo) return e.pidiendo;
+  var p = _ftDeserv_('getMemoriaTurno', t).then(function(r){
+    MT_.est[k] = {t: Date.now(), r: r};
+    /* El editor abierto manda sobre lo que diga el servidor (lo que se está tecleando no se pisa); sólo se actualiza su `rev` si no hay cambios sin guardar. */
+    var ed = MT_.ed[k];
+    if(ed && !ed.sucio && !ed.guardando && r.puede && r.estado === 'borrador'){ ed.m = JSON.parse(JSON.stringify(r.memoria)); ed.rev = r.rev; }
+    _mtPintar_(k); return r;
+  }, function(){ if(!MT_.est[k]) MT_.est[k] = {t: Date.now(), r: {puede: false}}; _mtPintar_(k); return null; });
+  MT_.est[k] = Object.assign({}, e || {}, {pidiendo: p});
+  p.then(function(){ if(MT_.est[k]) delete MT_.est[k].pidiendo; });
+  return p;
+}
+var MT_GRUPOS_ = [['principales', 'Objetivos principales'], ['secundarios', 'Objetivos secundarios'], ['extraordinarios', 'Objetivos extraordinarios']];
+function _mtNombres_(){ return ((typeof DATA !== 'undefined' && DATA.miembros) || []).map(function(m){ return m.nombre; }).filter(Boolean); }
+/* Las sugerencias (chips) para el campo `valor` entre `lista`: las que lo contienen y no son ya lo escrito. ⛔ Siempre pintadas (sin
+   depender del foco): si salieran al enfocar, tocar un botón de más abajo quitaría el foco, encogería la tarjeta y el botón se movería
+   debajo del dedo antes de soltar — el toque se perdía. */
+function _mtSugHTML_(lista, valor, campo){
+  var v = String(valor || '').trim().toLowerCase();
+  var cand = lista.filter(function(x){ var y = x.toLowerCase(); return y !== v && (!v || y.indexOf(v) >= 0); }).slice(0, 6);
+  return cand.map(function(x){ return '<span class="mtf-c mini" data-mtsug="' + esc(campo) + '" data-v="' + esc(x) + '">' + esc(x) + '</span>'; }).join('');
+}
+function _mtInp_(ruta, valor, ph, extra){
+  return '<input type="text" class="mtf-in" data-mtin="' + ruta + '" value="' + esc(valor || '') + '" placeholder="' + esc(ph) + '" ' + (extra || '') + '>';
+}
+function _mtEditorHTML_(k){
+  var ed = MT_.ed[k], m = ed.m, r = MT_.est[k].r, h = '', i, g;
+  var sitios = r.sitios || [];
+  h += '<div class="mtf-fila"><span class="mtf-nota" style="flex:1;margin:0">' + esc(r.subtitulo || '') + '</span>'+
+       '<span class="mtf-c mini" data-mtcerrar>Cerrar</span></div>';
+  h += '<div class="mtf-fila">' + nxFecha('mtFecha', m.fecha || '', {max: _hoyNxISO_()}) +    /* la fecha: el selector propio, no el nativo */
+       _mtInp_('sitio', m.sitio, 'Sitio (CITI, CUVI…)', 'aria-label="Sitio"') + '</div>';
+  /* 1. Integrantes */
+  h += '<div class="mtf-sec">1. Integrantes y responsabilidades</div>';
+  m.integrantes.forEach(function(p, i){
+    h += '<div class="mtf-card"><div class="mtf-fila"><b style="flex:1;font-size:14px">' + esc(p.nombre) + '</b>'+
+         '<span class="mtf-c mini" data-mtquitar="integrantes:' + i + '">Quitar</span></div>'+
+         '<div class="mtf-fila">' + _mtInp_('integrantes.' + i + '.roles', (p.roles || []).join(', '), 'Roles (Responsable de turno, Coche…)') +
+         _mtInp_('integrantes.' + i + '.dia', p.dia, 'Solo un día (Miércoles)', 'style="max-width:150px"') + '</div></div>';
+  });
+  var ya = {}; m.integrantes.forEach(function(p){ ya[p.nombre] = 1; });
+  h += '<div class="mtf-add"><div class="mtf-fila">' + _mtInp_('nuevo.integrante', ed.nuevo || '', 'Añadir a alguien que también fue', 'data-mtnuevo="integrante"') + '</div>'+
+       '<div class="mtf-sug" data-mtsugbox="integrante">' + (ed.nuevo ? _mtSugHTML_(_mtNombres_().filter(function(n){ return !ya[n]; }), ed.nuevo, 'integrante') : '') + '</div></div>';
+  /* 2. Movimientos */
+  h += '<div class="mtf-sec">2. Movimientos</div>';
+  m.movimientos.forEach(function(f, i){
+    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('movimientos.' + i + '.material', f.material, 'Material') +
+         '<span class="mtf-c mini" data-mtquitar="movimientos:' + i + '">Quitar</span></div>'+
+         '<div class="mtf-fila">' + _mtInp_('movimientos.' + i + '.de', f.de, 'De (Zulo…)', 'data-mtsugde="' + i + '"') +
+         '<span class="mtf-nota" style="margin:0">→</span>' + _mtInp_('movimientos.' + i + '.a', f.a, 'A (CITI…)', 'data-mtsuga="' + i + '"') + '</div>'+
+         '<div class="mtf-sug" data-mtsugbox="mov:' + i + '">' + _mtSugHTML_(sitios, f.a, 'mov:' + i) + '</div></div>';
+  });
+  m.notasMov.forEach(function(n, i){
+    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('notasMov.' + i, n, 'Nota (Cordel de Kevlar ya estaba en el CITI)') +
+         '<span class="mtf-c mini" data-mtquitar="notasMov:' + i + '">Quitar</span></div></div>';
+  });
+  h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="movimientos">Añadir movimiento</span><span class="mtf-c" data-mtadd="notasMov">Añadir nota</span></div>';
+  /* 3. Objetivos */
+  h += '<div class="mtf-sec">3. Objetivos</div>';
+  MT_GRUPOS_.forEach(function(gr, gi){
+    g = gr[0];
+    h += '<div class="mtf-sub">3.' + (gi + 1) + '. ' + gr[1] + '</div><div class="mtf-obj">';
+    (m.objetivos[g] || []).forEach(function(o, i){
+      h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('objetivos.' + g + '.' + i + '.texto', o.texto, 'Objetivo') +
+           '<span class="mtf-c mini" data-mtquitar="obj:' + g + ':' + i + '">Quitar</span></div>'+
+           '<div class="mtf-fila"><span class="mtf-c' + (o.logrado === true ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':1" role="button" aria-pressed="' + (o.logrado === true) + '">Conseguido</span>'+
+           '<span class="mtf-c' + (o.logrado === false ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':0" role="button" aria-pressed="' + (o.logrado === false) + '">No conseguido</span></div></div>';
+    });
+    h += '</div><div class="mtf-fila"><span class="mtf-c" data-mtadd="obj:' + g + '">Añadir objetivo</span></div>';
+  });
+  /* 4. Comentarios */
+  h += '<div class="mtf-sec">4. Comentarios y detalles</div>';
+  m.comentarios.forEach(function(c, i){
+    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('comentarios.' + i + '.titulo', c.titulo, 'Título del apartado (opcional)') +
+         '<span class="mtf-c mini" data-mtquitar="comentarios:' + i + '">Quitar</span></div>'+
+         '<textarea class="mtf-in" data-mtin="comentarios.' + i + '.texto" placeholder="Qué se hizo, qué pasó, qué quedó pendiente…">' + esc(c.texto || '') + '</textarea></div>';
+  });
+  h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="comentarios">Añadir apartado</span></div>';
+  /* Pie */
+  h += '<div class="mtf-pie">' + (ed.error ? '<p class="mtf-err" data-mterr>' + esc(ed.error) + '</p>' : '') +
+       '<div class="mtf-fila"><span class="mtf-nota" style="flex:1;margin:0" data-mtestado>' + _mtEstadoTxt_(ed) + '</span>'+
+       '<span class="mtf-c" data-mtguardar' + (ed.guardando ? ' disabled' : '') + '>Guardar borrador</span>'+
+       '<span class="mtf-c pri" data-mtenviar' + (ed.guardando || ed.enviando ? ' disabled' : '') + '>Enviar a revisar</span></div></div>';
+  return h;
+}
+function _mtEstadoTxt_(ed){ return ed.enviando ? 'Enviando…' : ed.guardando ? 'Guardando…' : ed.sucio ? 'Cambios sin guardar' : 'Borrador guardado'; }
+/* Repinta el hueco. Con el editor abierto lo rehace entero (acciones de estructura); teclear NO pasa por aquí. */
+function _mtPintar_(k){
+  var e = MT_.est[k], r = e && e.r;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-mtur]'), function(c){
+    if(c.getAttribute('data-mtur') !== k) return;
+    var vista = !!(r && r.puede && (r.celebrado || r.guardada));
+    c.hidden = !vista;
+    var env = c.closest ? c.closest('[data-mtwrap]') : null;
+    if(env) env.style.display = vista ? '' : 'none';
+    if(!vista){ c.innerHTML = ''; return; }
+    var ed = MT_.ed[k];
+    if(ed && MT_.abierto[k]){
+      var y = c.querySelector('textarea:focus,input:focus'), pos = y ? y.getAttribute('data-mtin') : null;
+      c.innerHTML = '<div class="mtf-h"><span class="sc">Memoria de fabricación</span></div>' + _mtEditorHTML_(k);
+      if(pos){ var z = c.querySelector('[data-mtin="' + pos + '"]'); if(z){ z.focus(); try{ z.setSelectionRange(z.value.length, z.value.length); }catch(_){} } }
+      return;
+    }
+    var h = '<div class="mtf-h"><span class="sc">Memoria de fabricación</span></div>';
+    if(r.estado === 'enviada'){
+      h += '<p class="mtf-nota" data-mtenviada>Memoria enviada a revisión' + (r.envio ? ' el ' + esc(_isoADMY_(String(r.envio.enviadoEn).slice(0, 10))) + ' por ' + esc(_ftAutorPila_(r.envio.enviadoPor)) : '') + '. Ya no se puede cambiar.</p>'+
+           (r.puedeReabrir ? '<div class="mtf-fila"><span class="mtf-c" data-mtreabrir>Reabrir (piden cambios)</span></div>' : '');
+    }else{
+      h += (r.reabierta ? '<p class="mtf-nota">Reabierta: la revisión pidió cambios.</p>' : '')+
+           '<p class="mtf-nota">' + (r.guardada ? 'Borrador guardado' + (r.editores && r.editores.length ? ' · ' + r.editores.map(_ftAutorPila_).join(', ') : '') + '.' : 'Rellena la fecha, los integrantes y los objetivos del turno y lo demás; se genera el documento y entra en revisión.') + '</p>'+
+           '<div class="mtf-fila"><span class="mtf-c pri" data-mtabrir>' + (r.guardada ? 'Seguir con la memoria' : 'Escribir la memoria') + '</span></div>';
+    }
+    c.innerHTML = h;
+  });
+}
+/* Dentro de la ruta 'a.b.0.c' del editor: lee/escribe sobre `m`. */
+function _mtSet_(m, ruta, v){
+  var p = ruta.split('.'), o = m, i;
+  for(i = 0; i < p.length - 1; i++) o = o[p[i]];
+  var u = p[p.length - 1];
+  o[u] = v;
+}
+function _mtGuardarDif_(t, k){
+  var ed = MT_.ed[k]; if(!ed) return Promise.resolve();
+  clearTimeout(ed.reloj); ed.reloj = null;
+  if(ed.guardando) return ed.guardando;
+  ed.guardando = _ftDeserv_('guardarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev}).then(function(o){
+    ed.rev = o.rev; ed.sucio = false; ed.error = ''; ed.guardando = null;
+    if(MT_.est[k] && MT_.est[k].r){ MT_.est[k].r.rev = o.rev; MT_.est[k].r.guardada = true; }
+    var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtestado]'); if(el) el.textContent = _mtEstadoTxt_(ed);
+    if(ed.sucio2){ ed.sucio2 = false; ed.sucio = true; return _mtGuardarDif_(t, k); }
+  }, function(e){
+    ed.guardando = null; ed.error = 'No se pudo guardar: ' + ((e && e.message) || e); _mtPintar_(k); throw e;
+  });
+  return ed.guardando;
+}
+function _mtProgramar_(t, k){
+  var ed = MT_.ed[k]; if(!ed) return;
+  if(ed.guardando) ed.sucio2 = true;
+  ed.sucio = true; clearTimeout(ed.reloj);
+  ed.reloj = setTimeout(function(){ _mtGuardarDif_(t, k).catch(function(){}); }, 1500);
+  var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtestado]'); if(el) el.textContent = _mtEstadoTxt_(ed);
+}
+async function _mtEnviar_(t, k){
+  var ed = MT_.ed[k]; if(!ed || ed.enviando) return;
+  if(!(await dialogoSiNo('¿Enviar la memoria a revisar? Se genera el documento y entra en revisión; no podrás cambiarla después.', {si: 'Enviar'}))) return;
+  ed.enviando = true; ed.error = ''; _mtPintar_(k);
+  try{
+    try{ await _mtGuardarDif_(t, k); }catch(_){ /* si no se pudo guardar, el envío lleva la memoria entera igualmente */ }
+    await _ftDeserv_('enviarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev});
+    tost('Memoria enviada a revisión.');
+  }catch(e){
+    /* `api._post` reintenta: si se perdió la RESPUESTA, el servidor ya la tiene enviada y el segundo intento dice «ya está enviada». */
+    var r = await _mtRefrescar_(t, true).catch(function(){ return null; });
+    if(!(r && r.estado === 'enviada')){ ed.enviando = false; ed.error = (e && e.message) || String(e); _mtPintar_(k); return; }
+  }
+  delete MT_.ed[k]; delete MT_.abierto[k];
+  await _mtRefrescar_(t, true);
+}
+async function _mtAbrir_(t, k){
+  var r = await _mtRefrescar_(t, true); if(!r || !r.puede) return;
+  MT_.ed[k] = {m: JSON.parse(JSON.stringify(r.memoria)), rev: r.rev, sucio: false, nuevo: '', error: ''};
+  MT_.abierto[k] = true; _mtPintar_(k);
+}
+async function _mtReabrir_(t, k){
+  var mot = await dialogoTexto('¿Qué cambios pide la revisión? (queda apuntado)', {valor: ''});
+  if(mot == null) return;
+  try{ await _ftDeserv_('reabrirMemoriaTurno', t, {motivo: mot}); tost('Memoria reabierta: se puede volver a editar.'); }
+  catch(e){ tostErr('No se pudo reabrir: ', e); }
+  await _mtRefrescar_(t, true);
+}
+function _mtClic_(t, k, ev){
+  var x = ev.target && ev.target.closest ? ev.target : null; if(!x) return;
+  var q = function(s){ return x.closest(s); }, ed = MT_.ed[k], m = ed && ed.m, a;
+  if(q('[data-mtabrir]')){ _mtAbrir_(t, k); return; }
+  if(q('[data-mtreabrir]')){ _mtReabrir_(t, k); return; }
+  if(!ed) return;
+  if(q('[data-mtcerrar]')){
+    _mtGuardarDif_(t, k).catch(function(){}).then(function(){ delete MT_.abierto[k]; _mtRefrescar_(t, true); }); return; }
+  if(q('[data-mtguardar]')){ _mtGuardarDif_(t, k).then(function(){ tost('Borrador guardado.'); }, function(){}); return; }
+  if(q('[data-mtenviar]')){ _mtEnviar_(t, k); return; }
+  if((a = q('[data-mtsug]'))){
+    var campo = a.getAttribute('data-mtsug'), v = a.getAttribute('data-v');
+    if(campo === 'integrante'){ if(m.integrantes.every(function(p){ return p.nombre !== v; })) m.integrantes.push({nombre: v, roles: [], dia: ''}); ed.nuevo = ''; }
+    else if(campo.indexOf('mov:') === 0){
+      var f = m.movimientos[+campo.slice(4)], cur = ed.foco === 'de' ? 'de' : 'a'; if(f) f[cur] = v;
+    }
+    _mtProgramar_(t, k); _mtPintar_(k); return;
+  }
+  if((a = q('[data-mtquitar]'))){
+    var pq = a.getAttribute('data-mtquitar').split(':');
+    if(pq[0] === 'obj') m.objetivos[pq[1]].splice(+pq[2], 1); else m[pq[0]].splice(+pq[1], 1);
+    _mtProgramar_(t, k); _mtPintar_(k); return;
+  }
+  if((a = q('[data-mtadd]'))){
+    var w = a.getAttribute('data-mtadd');
+    if(w === 'movimientos') m.movimientos.push({material: '', de: '', a: ''});
+    else if(w === 'notasMov') m.notasMov.push('');
+    else if(w === 'comentarios') m.comentarios.push({titulo: '', texto: ''});
+    else if(w.indexOf('obj:') === 0) m.objetivos[w.slice(4)].push({texto: '', logrado: null});
+    ed.sucio = true; _mtPintar_(k);
+    /* el cursor al campo nuevo: el último de su grupo */
+    var cand = w === 'movimientos' ? 'movimientos.' + (m.movimientos.length - 1) + '.material' : w === 'notasMov' ? 'notasMov.' + (m.notasMov.length - 1)
+      : w === 'comentarios' ? 'comentarios.' + (m.comentarios.length - 1) + '.titulo' : 'objetivos.' + w.slice(4) + '.' + (m.objetivos[w.slice(4)].length - 1) + '.texto';
+    var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtin="' + cand + '"]'); if(el) el.focus();
+    return;
+  }
+  if((a = q('[data-mtlog]'))){
+    var pl = a.getAttribute('data-mtlog').split(':'), o = m.objetivos[pl[0]][+pl[1]];
+    if(o){ o.logrado = pl[2] === '1'; _mtProgramar_(t, k); _mtPintar_(k); }
+  }
+}
+function _mtInput_(t, k, ev){
+  var el = ev.target, ed = MT_.ed[k]; if(!ed || !el || !el.getAttribute) return;
+  var ruta = el.getAttribute('data-mtin'); if(!ruta) return;
+  if(ruta === 'nuevo.integrante'){
+    ed.nuevo = el.value;
+    var box = el.closest('.mtf-add').querySelector('[data-mtsugbox]'), ya = {}; ed.m.integrantes.forEach(function(p){ ya[p.nombre] = 1; });
+    box.innerHTML = el.value ? _mtSugHTML_(_mtNombres_().filter(function(n){ return !ya[n]; }), el.value, 'integrante') : ''; return;
+  }
+  if(ruta === 'sitio') _mtSet_(ed.m, ruta, el.value);
+  else if(/^integrantes\.\d+\.roles$/.test(ruta)) _mtSet_(ed.m, ruta, el.value.split(',').map(function(s){ return s.trim(); }).filter(Boolean));
+  else _mtSet_(ed.m, ruta, el.value);
+  var mm = /^movimientos\.(\d+)\.(de|a)$/.exec(ruta);
+  if(mm){
+    ed.foco = mm[2];
+    var cx = el.closest('.mtf-card').querySelector('[data-mtsugbox]'); cx.innerHTML = _mtSugHTML_((MT_.est[k].r.sitios || []), el.value, 'mov:' + mm[1]);
+  }
+  _mtProgramar_(t, k);
+}
+/* Engancha los huecos que haya dentro de `raiz` (o del documento): pregunta al servidor si está viejo y cablea UNA vez. */
+function _mtEnganchar_(raiz){
+  var base = raiz || document;
+  Array.prototype.forEach.call(base.querySelectorAll('[data-mtur]'), function(c){
+    var k = c.getAttribute('data-mtur'), t = MT_.turno[k];
+    if(!t) return;
+    if(!c.getAttribute('data-mtok')){
+      c.setAttribute('data-mtok', '1');
+      c.addEventListener('click', function(ev){ _mtClic_(t, k, ev); });
+      c.addEventListener('input', function(ev){ _mtInput_(t, k, ev); });
+      c.addEventListener('change', function(ev){    /* el selector de fecha (`nxFecha`) avisa con `change` en su campo oculto */
+        var el = ev.target, ed = MT_.ed[k];
+        if(ed && el && el.id === 'mtFecha'){ ed.m.fecha = el.value; _mtProgramar_(t, k); }
+      });
+      c.addEventListener('focusin', function(ev){
+        var f = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-mtin'), mm = f && /^movimientos\.\d+\.(de|a)$/.exec(f);
+        if(mm && MT_.ed[k]) MT_.ed[k].foco = mm[1];
+      });
+      c.addEventListener('mousedown', function(ev){ if(ev.target.closest && ev.target.closest('[data-mtsug]')) ev.preventDefault(); });  /* el chip no roba el foco al campo */
+    }
+    if(MT_.est[k] && MT_.est[k].r) _mtPintar_(k);
+    if(!MT_.est[k] || !MT_.est[k].r || (Date.now() - MT_.est[k].t > 8000 && !MT_.abierto[k])) _mtRefrescar_(t);
+  });
+}
+
 /* ══ 29/10 · LA GRABACIÓN DE UNA REUNIÓN: AVISO AL CONVOCAR + «SUBIR GRABACIÓN» EN LA FICHA ══════════════════════
    🗣️ Daniel (29/10): *«se suba un audio de una reunión y a partir de ahí se genere una acta con IA»*. El audio vive SÓLO en
    el mini PC (se borra a los 12 meses) y NO va a Drive ni a las copias. Backend: `rutinas/audio_reunion.py`.
@@ -13578,6 +13998,8 @@ function _a11yMarcar_(raiz){
   var r=raiz && raiz.querySelectorAll ? raiz : document;
   Array.prototype.forEach.call(r.querySelectorAll(A11Y_CLIC), function(e){
     if(e.matches(A11Y_GESTO) || e.hasAttribute('data-a11y')) return;
+    /* 10/11 (refutar2): una fila que se declara `cursor:default` es informativa (no tiene manejador): ni «botón» ni parada de Tab. */
+    if(e.style.cursor==='default') return;
     e.setAttribute('data-a11y','1');
     if(e.tagName!=='TR' && !e.getAttribute('role')) e.setAttribute('role','button');
     if(!e.hasAttribute('tabindex')) e.setAttribute('tabindex','0');

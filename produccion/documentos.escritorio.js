@@ -21,7 +21,9 @@ function revisoresDe(d){
      ⚠️ Y `archivo` pasa a ser EXPLICITO: un `else` que reparte autoridad es como se
      cuela un ambito nuevo en el reparto equivocado sin que nadie lo decida. */
   /* 04/11: con REVISORES PROPUESTOS válidos en el documento va directo al PD (gemela de `revisores_de` del servidor). */
-  if(_revisoresPropuestosValidos_(d).length) return [PD_NOM];
+  /* 05/11 (`pedirrev`): con una PETICIÓN de revisión pendiente del PD, los revisores son los PEDIDOS. Gemela de `revisores_de`. */
+  var _pet=_peticionRevActiva_(d); if(_pet) return (_pet.revisores||[]).slice();
+  if(_revisoresPropuestosValidos_(d).length) return _destinoConflictoDoc_(d);   /* 05/11 (`conflictojose`): a José, que valida sin firmar */
   var r = d.amb==='archivo' ? [coordinadorDe(d.sub)]
         : d.amb==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
@@ -30,7 +32,7 @@ function revisoresDe(d){
   r=r.filter(noAutor);
   /* 04/11: el PD es la excepción a «nadie revisa lo suyo» cuando es el último peldaño: si también es autor, le llega igual (no hay nadie
      por encima). Sin duplicar si `REV2_NOM === PD_NOM`. */
-  if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n,i,a){ return a.indexOf(n)===i && (n===PD_NOM || noAutor(n)); });
+  if(!r.length) r=_destinoConflictoDoc_(d);   /* 05/11 (`conflictojose`): antes PD y José; ahora José valida, y si no puede, el PD */
   /* 01/11: SIN tercer peldaño. Antes acababa en `[PD_NOM]` sin volver a filtrar al autor: con `REV2_NOM === PD_NOM` y el PD
      de autor, el expediente se asignaba a su propio autor y no podía firmar NADIE, sin un error. Ahora `[]` es «no hay
      revisor asignable»: cada consumidor lo pinta («Sin revisor: avisa al Project Director») y nadie decide (`puedeDecidirDoc`). */
@@ -67,6 +69,7 @@ function _normDocE_(d, i){
     autor_original: d.autor_original || null, autor_cambiado_por: d.autor_cambiado_por || null,
     autor_cambiado_at: d.autor_cambiado_at || null,
     autores_manual: Array.isArray(d.autores_manual) ? d.autores_manual : null,   /* 04/11: varios autores puestos a mano */
+    peticionesRev: Array.isArray(d.peticionesRev) ? d.peticionesRev : null,       /* 05/11 (`pedirrev`): el rastro de las peticiones de revisión */
     sub:     d.subsistema || d.sub || '',
     tipo:    d.tipo || '',
     amb:     d.ambito || d.amb || '',
@@ -167,6 +170,7 @@ function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
 function puedeDecidirDoc(d){
   if(!d) return false;
   if(_docYaPublicado_(d.est)) return false;      /* lo publicado no se mueve: el servidor no lo deja (comun.js) */
+  if(_peticionRevActiva_(d)) return false;       /* 05/11: con la petición viva no decide nadie; confirman los pedidos o la cancela el PD */
   var rev=revisoresDe(d), maxR=Math.max.apply(null,rev.map(rangoNom));
   if(_autorQueNoDecide_(d,ACTOR,rev)) return false;      /* ni mandando por rango; 04/11: sólo el PD, si `revisoresDe` se lo da, decide lo suyo */
   if(!rev.length) return false;      /* sin revisor asignable, ni mandando por rango (maxR sería -Infinity) */
@@ -190,6 +194,7 @@ function filaDoc(d){
   /* `mio` sale de `_meTocaDoc_`, LA puerta: aqui preguntaba por `puedeDecidirDoc`, que
      contesta «puedo pisar por rango» y no «me toca» — 2 de 12 combinaciones divergian. */
   var st=estDoc(d.est), mio=_meTocaDoc_(d);
+  if(_peticionRevActiva_(d)) st=['pendiente de confirmaciones','wa'];   /* 05/11 (`pedirrev`) */
   return '<div class="dec" id="doc-'+d.id+'" data-docsel="'+d.id+'">'+
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
     '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+esc(d.ref)+'</span> · '+
@@ -319,6 +324,7 @@ function docCard(d){
   var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
   var sinRev=!revs.length;
   var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';
+  if(_peticionRevActiva_(d)) st=['pendiente de confirmaciones','wa'];   /* 05/11 (`pedirrev`) */
   var lista=function(t,xs){ return (xs&&xs.length)
     ? '<div class="sub"><span class="sc">'+t+'</span><ul class="obj">'+
       xs.map(function(v){return '<li>'+esc(v)+'</li>';}).join('')+'</ul></div>' : ''; };
@@ -347,7 +353,7 @@ function docCard(d){
     /* 21/10 (auditor 19, 🟡 6): la gemela del móvil — a quien lo SUBIÓ, qué hacer él. */
     ((typeof ACTOR!=='undefined' && d.autor===ACTOR) ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
       : 'Pídeselo a quien lo subió antes de decidir.</div></div>'));
-  var acc, _aut, arriba='', _autorP=_puedeCambiarAutor_(d.est, ACTOR) ? _autorPanelHTML_('a'+d.id+'-', d.id, _autoresActualesDe_(d), CAMPO_CSS) : '';
+  var acc, _aut, arriba='', _autorP=_puedeCambiarAutor_(d.est, ACTOR) && !_peticionRevActiva_(d) ? _autorPanelHTML_('a'+d.id+'-', d.id, _autoresActualesDe_(d), CAMPO_CSS) : '';
   if(puede){
     /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el móvil (`comun.js` `_anotPanelHTML_`), con
        prefijo `d<id>-`: aquí se pintan varias fichas a la vez. Sólo donde se puede aprobar. */
@@ -369,7 +375,7 @@ function docCard(d){
          algo que viene mal, y ninguno de los dos publica nada. */
       '<div class="acts">'+
         (_yaAnalizado_(d)
-          ? '<button class="btn pri" data-doc="'+d.id+'" data-acc="aprobado">'+_rotuloAprobarDoc_(d)+'</button>'+
+          ? '<button class="btn pri" data-doc="'+d.id+'" data-acc="aprobado">'+_rotuloAprobarDoc_(d, ACTOR)+'</button>'+
             '<button class="btn" data-doc="'+d.id+'" data-acc="anot">Aprobar con anotaciones</button>'
           : '<span class="sc" style="align-self:center">A\u00fan sin analizar: se puede parar, no publicar.</span>')+
         '<button class="btn" data-doc="'+d.id+'" data-acc="cambios">Solicitar cambios</button>'+
@@ -395,6 +401,8 @@ function docCard(d){
   } else if(d.revisor){
     acc='<div class="ruta">Ya lo decidió <b>'+esc(d.revisor)+'</b>. Puedes consultarlo; para cambiar la '+
       'decisión hace falta más rango que quién la tomó.</div>';
+  } else if(_peticionRevActiva_(d)){
+    acc='';      /* 05/11 (`pedirrev`): lo que toca (confirmar, cancelar) lo dice `_peticionRevHTML_` */
   } else {
     acc=sinRev ? '<div class="ruta">Sin revisor: avisa al Project Director.</div>'
                : '<div class="ruta">Lo firma <b>'+esc(rev)+'</b>, no tú.</div>';
@@ -452,6 +460,7 @@ function docCard(d){
     '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':(sinRev?'Sin revisor: avisa al Project Director.':'Firma: <b>'+esc(rev)+'</b>'))+'</div>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
     _autorRastroHTML_(d)+_autoresDocHTML_(d)+
+    _peticionRevHTML_(d, ACTOR, 'p'+d.id+'-')+   /* 05/11 (`pedirrev`): el rastro, la cola de quien confirma y el panel del PD */
     (puede ? '' : _autorP)+   /* quien puede decidir lo lleva plegado dentro de `acc` */
     acc+
   '</div>';

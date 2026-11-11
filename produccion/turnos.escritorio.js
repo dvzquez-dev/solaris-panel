@@ -1158,7 +1158,7 @@ function _pinConvDisp_(m){
        conexión» tapaba que no habías puesto fecha. */
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
       tost('Sin conexión no se puede convocar.'); return; }
-    if(!(await dialogoSiNo('¿Abrir la disponibilidad de la semana del '+sem+'?'))) return;
+    if(!(await dialogoSiNo('¿Abrir la disponibilidad de la semana del '+_isoADMY_(sem)+'?'))) return;   /* refutar5: prosa en DD/MM/AAAA */
     b.disabled=true; var prev=b.textContent; b.textContent='Encolando…';
     try{
       await _encolarConvDisp_({semana:sem, tarde_partida:nxSi('cdTarde'),
@@ -1169,7 +1169,7 @@ function _pinConvDisp_(m){
         horaria:nxSi('cdHoraria'), sitios:sitios});
       tost('Encolado. La rutina lo recoge en la siguiente pasada.');
       var n=document.getElementById('cdNota');
-      if(n) n.innerHTML='Encolado para la semana del '+esc(sem)+'. El plazo lo calcula '+
+      if(n) n.innerHTML='Encolado para la semana del '+esc(_isoADMY_(sem))+'. El plazo lo calcula '+
         'el servidor; cuando lo procese, la convocatoria aparece arriba.';
     }catch(e){
       tostErr('No se pudo encolar: ', e);       // 🟠 2 (auditor 19)
@@ -2058,6 +2058,7 @@ function _fichaTurnoE_(t){
     '</div>'+
     sec('Nota', t.nota ? '<div class="ftu-nota">'+esc(t.nota)+'</div>' : vac('Sin nota'))+
     _ftHTML_(t)+   /* 04/11: las fotos del turno (hueco: vacío hasta que el servidor diga que hay algo que enseñar) */
+    _mtHTML_(t)+   /* 09/11: la memoria del turno, escrita desde la app (hueco: sólo lo ve quien puede escribirla) */
     /* la memoria se incrusta como DOCUMENTO (igual que en el movil), no como un enlace suelto */
     sec('Memoria', t.memoria ? _memoriaHTML_(t) : vac('Memoria del turno · aún no subida'))+'</div>',
     'ftu destaca')+'</div>';
@@ -2075,4 +2076,5 @@ function _engFichaTurno_(){
   });
   _cablearMemoria_();
   _ftEnganchar_(document);   /* 04/11: las fotos del turno */
+  _mtEnganchar_(document);   /* 09/11: la memoria del turno */
 }

@@ -22,7 +22,9 @@ function revisoresDe(e){
      cuela un ambito nuevo en el reparto equivocado sin que nadie lo decida. */
   /* 04/11 (Daniel, `Manual_S-9001_27`): con REVISORES PROPUESTOS válidos en el documento va directo al PD, que aprueba «esos son los
      revisores». Gemela de `revisores_de` del servidor (`probar_revisor_autor_doc.py`). */
-  if(_revisoresPropuestosValidos_(e).length) return [PD_NOM];
+  /* 05/11 (`pedirrev`): con una PETICIÓN de revisión pendiente del PD, los revisores son los PEDIDOS. Gemela de `revisores_de`. */
+  var _pet=_peticionRevActiva_(e); if(_pet) return (_pet.revisores||[]).slice();
+  if(_revisoresPropuestosValidos_(e).length) return _destinoConflictoDoc_(e);   /* 05/11 (`conflictojose`): a José, que valida sin firmar */
   var r = e.ambito==='archivo' ? [coordinadorDe(e.subsistema)]
         : e.ambito==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
@@ -31,7 +33,7 @@ function revisoresDe(e){
   r=r.filter(noAutor);
   /* 04/11: el PD es la excepción a «nadie revisa lo suyo» cuando es el último peldaño: si también es autor, le llega igual (no hay nadie
      por encima). Sin duplicar si `REV2_NOM === PD_NOM`. */
-  if(!r.length) r=[PD_NOM,REV2_NOM].filter(function(n,i,a){ return a.indexOf(n)===i && (n===PD_NOM || noAutor(n)); });
+  if(!r.length) r=_destinoConflictoDoc_(e);   /* 05/11 (`conflictojose`): antes PD y José; ahora José valida, y si no puede, el PD */
   /* 01/11: SIN tercer peldaño. Antes acababa en `[PD_NOM]` sin volver a filtrar al autor: con `REV2_NOM === PD_NOM` y el PD
      de autor, el expediente se asignaba a su propio autor y no podía firmar NADIE, sin un error. Ahora `[]` es «no hay
      revisor asignable»: cada consumidor lo pinta («Sin revisor: avisa al Project Director») y nadie decide (`puedeDecidirDoc`). */
@@ -125,6 +127,7 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq, aj){
 function puedeDecidirDoc(e){
   if(!e) return false;                                     /* como el escritorio: sin expediente, nadie decide */
   if(_docYaPublicado_(e.estado)) return false;            /* lo publicado no se mueve: el servidor no lo deja (comun.js) */
+  if(_peticionRevActiva_(e)) return false;                /* 05/11: con la petición viva no decide nadie; confirman los pedidos o la cancela el PD */
   var yo=yoNombre();
   var rev=revisoresDe(e), maxR=Math.max.apply(null,rev.map(rangoNom));
   if(_autorQueNoDecide_(e,yo,rev)) return false;          /* ni mandando por rango; 04/11: sólo el PD, si `revisoresDe` se lo da, decide lo suyo */
@@ -158,6 +161,7 @@ function filaDoc(e,esAutor){
      hecho: `EST_DOC` nacio con el comentario «el movil pintaba `e.estado` en crudo y el
      miembro leia «revision» o «anot»». Esta se quedo fuera. */
   var st=[estDoc(e.estado)[0], _pilEstDoc_(e.estado)];
+  if(_peticionRevActiva_(e)) st=['pendiente de confirmaciones','pend'];   /* 05/11 (`pedirrev`) */
   /* ⛔ EL BORDE SE DECIDE POR SI SIGUE EN CURSO, no por descarte. Aquí sólo `cambios`
      escapaba del ámbar de «pendiente», así que **`publicado` y `rechazado` — que
      `comun.js` declara RESUELTOS en `DOC_RESUELTO` — llevaban borde de atención**: la
@@ -423,7 +427,7 @@ function _botonesDecM_(e){
      ha pasado el analisis -- son justo la forma de pararlo--; `aprobado` y `anot`
      publican, y el servidor los rechaza. Quitar los cuatro seria el fallo contrario. */
   return (_yaAnalizado_(e)
-      ? '<button class="btn pri" style="flex:1 1 46%" data-p data-dec="aprobado" data-id="'+e.id+'">'+_rotuloAprobarDoc_(e)+'</button>'+
+      ? '<button class="btn pri" style="flex:1 1 46%" data-p data-dec="aprobado" data-id="'+e.id+'">'+_rotuloAprobarDoc_(e, yoNombre())+'</button>'+
         '<button class="btn" style="flex:1 1 46%" data-p data-dec="anot" data-id="'+e.id+'">Con anotaciones</button>'
       : '<p class="rnota" style="flex:1 1 100%;margin:0">A\u00fan sin analizar: se puede parar, no publicar.</p>')+
     '<button class="btn" style="flex:1 1 46%" data-p data-dec="cambios" data-id="'+e.id+'">Solicitar cambios</button>'+
@@ -512,6 +516,7 @@ function verDoc(id){
       /* ⛔ La clase sale de `EST_DOC`, no de un ternario a mano: el `else` era `conf` y
          pintaba **«rechazado» en VERDE** al autor que abre su propio expediente. */
       '<span class="pil '+_pilEstDoc_(e.estado)+'">'+esc(estDoc(e.estado)[0])+'</span>'+
+      (_peticionRevActiva_(e) ? '<span class="pil pend">pendiente de confirmaciones</span>' : '')+   /* 05/11 (`pedirrev`) */
       /* ⛔ EL `else` ERA `conf` -VERDE-: cualquier severidad que no fuera `alta` ni
          `media` se pintaba con el color de «salio bien», y el texto salia literalmente
          «calidad undefined», porque `sevTxt` solo tiene baja/media/alta. Un `"high"`
@@ -567,7 +572,8 @@ function verDoc(id){
     '<p class="rnota" style="margin-top:10px">'+(sinRev?'Sin revisor: avisa al Project Director.':'Revisa: <b>'+revs+'</b>')+'</p>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
     _autorRastroHTML_(e)+_autoresDocHTML_(e)+
-    (_puedeCambiarAutor_(e.estado, yoNombre()) ? _autorPanelHTML_('dA', e.id, _autoresActualesDe_(e), '') : '')+
+    (_puedeCambiarAutor_(e.estado, yoNombre()) && !_peticionRevActiva_(e) ? _autorPanelHTML_('dA', e.id, _autoresActualesDe_(e), '') : '')+
+    _peticionRevHTML_(e, yoNombre(), 'pR')+   /* 05/11 (`pedirrev`): el rastro, la cola de quien confirma y el panel del PD */
     (_mioDoc ? '' : _previaDocM_(e))+
     /* 01/11: sólo el PD, y sólo enseña algo si el expediente está decidido (`comun.js`); para cualquier otro es ''. */
     _fbpdRaiz_('ficha', e.id, 'btn mini')+
