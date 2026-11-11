@@ -163,6 +163,7 @@ function vEstado(){
     /* OJO: aquí NO va `REUNION`. Ese es el puntero de la pantalla de Reuniones y cambia
        al navegar por la lista, así que esta tarjeta acababa mostrando «la última que
        abriste» con el rótulo de «la próxima». */
+    _darHorasTarjetaHTML_()+
     _proxReuHTML_();
 }
 

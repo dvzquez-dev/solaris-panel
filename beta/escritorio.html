@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=e828af6"></script>
+<script src="comun.js?v=ab6ee81"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=6b4e10c"></script>
@@ -121,7 +121,7 @@
 <script src="documentos.escritorio.js?v=a6e1059"></script>
 <script src="sanciones.escritorio.js?v=2126087"></script>
 <script src="reuniones.escritorio.js?v=a36ddea"></script>
-<script src="horas.escritorio.js?v=5e9b3f1"></script>
+<script src="horas.escritorio.js?v=6e4bcd6"></script>
 <script src="equipo.escritorio.js?v=b37290d"></script>
 <script src="tareas.escritorio.js?v=d3ebd8c"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
@@ -1092,6 +1092,12 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
     /* 31/10: LO TUYO va arriba de lo de gobierno — ver `_tuyoHTMLE_` (`equipo.escritorio.js`). */
     _tuyoHTMLE_()+
     pan('Requiere tu decisión',cola.length+' asuntos',lista,'destaca')+
+    /* 11/11 (horascoord): darle horas a tu gente era un panel al fondo de «Partes», sin acceso desde ningún sitio (el 01-02/11 un coordinador las
+       metió a mano en Notion). Un toque lleva al bloque, con tu unidad ya marcada. Sale sólo a quien tiene a quién dárselas. */
+    (_otorgablesDe_(ACTOR).length ? '<div class="dec" data-ir="partes" data-foco="psel-bloInv">'+
+      '<span class="ic"><svg><use href="#i-reloj"/></svg></span>'+
+      '<span class="tx"><b>Dar horas a tu gente</b><small>una feria, un traslado, un turno sin fichar: cuentan al momento</small></span>'+
+      '<span class="der"><span class="chev">›</span></span></div>' : '')+
     '<div class="kpis">'+
       kpi('Horas en el aire',nf2(enAire)+'<small> h</small>','no cuentan hasta que se firmen','wa')+
       kpi('Expedientes esperándote',docsMios().length,'los firmas tú',docsMios().length?'wa':'up')+
@@ -3774,7 +3780,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d261480';
+var BUILD='a913706';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

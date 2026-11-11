@@ -143,6 +143,8 @@ function bloquePanel(){
     'horas de una vez. No se otorga nada hasta que pulses el botón.</p>'+
     /* El selector de personas ÚNICO (comun.js); «Ver lista» las agrupa por unidad. Lo que se manda son los marcados. */
     elegirPersonas('bloInv', {universo:pool.map(function(m){ return m.nombre; }), titulo:'A quién otorgar el bloque',
+      /* 11/11 (horascoord): el coordinador nace con SU gente marcada (quitar a uno cuesta menos que marcar a diez); el PD, con nadie */
+      marcadas:mandaEnTodo?[]:pool.map(function(m){ return m.nombre; }),
       vacio:'Nadie marcado: escribe un nombre o pulsa «Ver lista».'})+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
       '<div><span class="sc" style="display:block;margin-bottom:5px">Categoría</span>'+

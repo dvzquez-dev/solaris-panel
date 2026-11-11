@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=e828af6"></script>
+<script src="comun.js?v=ab6ee81"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=561a9dd"></script>
@@ -122,8 +122,8 @@
 <script src="documentos.movil.js?v=11e461e"></script>
 <script src="sanciones.movil.js?v=66604c4"></script>
 <script src="reuniones.movil.js?v=3955972"></script>
-<script src="horas.movil.js?v=e0f3517"></script>
-<script src="equipo.movil.js?v=4ae7148"></script>
+<script src="horas.movil.js?v=c349904"></script>
+<script src="equipo.movil.js?v=f98797a"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -331,6 +331,7 @@ var api={
   revertirParte: function(id,m){ return api._post({action:"revertirParte",id:id,motivo:m}); },
   /* 29/10 · el parte de bloque de una reunión (sólo el mini PC): una línea pendiente por participante */
   declararBloque: function(b){ b.action="declararBloque"; return api._post(b); },
+  otorgarBloque:    function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria,subcat:b.subcat||null,clave:b.clave}); },   /* 11/11: dar horas desde el móvil */
   decidirBloque: function(b){ b.action="decidirBloque"; return api._post(b); },
   empezarReunion: function(b){ b.action="empezarReunion"; return api._post(b); },
   finalizarReunion: function(b){ b.action="finalizarReunion"; return api._post(b); },
@@ -1767,7 +1768,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='64da741';
+var BUILD='2cb0fa8';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2702,6 +2703,7 @@ function enganchar(){
   _engConv_();
   _engPartesDec_();
   _engBloqueM_();
+  _engDarHorasM_();
   _engTareaParteM_();   /* 01/11: las tareas entregadas, firmadas por tarea */
   _engPartesRev_();
   /* ⛔ Los botones de Mis tareas viven dentro de la vista, que `_pintar_` reescribe

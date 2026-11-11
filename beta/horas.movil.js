@@ -1951,6 +1951,15 @@ var _bloqueCbM_={
   hecho:function(){ _cargarPartesDec_().then(pintar); },
   decidido:function(bq){ PARTES_DEC=PARTES_DEC.filter(function(x){ return String(x.bloque)!==String(bq); }); pintar(); _cargarPartesDec_().then(pintar); }
 };
+/* 11/11 (horascoord) · «Dar horas» a tu gente: el botón de Estado abre el formulario en la hoja; al acabar se repinta. */
+var _darHorasCbM_={
+  cerrar:function(){ cerrarModal(); },
+  hecho:function(){ _cargarPartesDec_().then(pintar); pintar(); }
+};
+function _engDarHorasM_(){
+  $$('[data-darhoras]').forEach(function(b){ b.onclick=function(){
+    _darHorasAbrir_(); abrirModal(_darHorasFormHTML_()); _darHorasCablear_(_darHorasCbM_); }; });
+}
 function _engBloqueM_(){
   _bloqueColaCablear_(_bloqueCbM_);
 }

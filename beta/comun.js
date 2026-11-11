@@ -14029,6 +14029,12 @@ function _fichaPendienteReu_(r, ahora){
   var h=_horarioReuMs_(r), t=(ahora==null?Date.now():ahora);
   return !!(h && r && !r.en_curso && !r.bloque && t>=h.fin && t-h.fin<=BLQ_VENTANA_FICHA_H*3600000);
 }
+/* 11/11 (horascoord) · ¿YA SE CELEBRÓ y nadie ha fichado su bloque? Su horario fijado ya acabó (sin el tope de 48 h de `_fichaPendienteReu_`, que sólo
+   decide el AVISO: el bloque de una reunión de hace una semana se declara igual, y con SU horario, no con «hoy a las 16:00»). */
+function _reuTerminada_(r, ahora){
+  var h=_horarioReuMs_(r);
+  return !!(h && r && !r.en_curso && !r.bloque && (ahora==null?Date.now():ahora)>=h.fin);
+}
 function _msAFechaHora_(ms){
   var d=new Date(ms);
   return {fecha:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()), hora:pad(d.getHours())+':'+pad(d.getMinutes())};
@@ -14258,7 +14264,7 @@ function _bloqueReuHTML_(r, puede){
         '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-p id="btnFinalizar" style="flex:2">Finalizar</button>'+
         '<button class="btn" data-p id="btnCancelarCurso" style="flex:1">Cancelar</button></div>'
       : '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>')+
-    '<button class="btn '+(pend?'pri':'mini')+' full" data-p id="btnDeclararBloque" style="margin-top:8px">Declarar parte de bloque</button>'+
+    '<button class="btn '+(pend?'pri':'mini')+' full" data-p id="btnDeclararBloque" style="margin-top:8px">'+(_reuTerminada_(r) ? 'Dar las horas a los asistentes' : 'Declarar parte de bloque')+'</button>'+
     '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p></div>';
 }
 
@@ -14270,8 +14276,8 @@ function _bloqueReuCablear_(getR, cb){
     var h=new Date(), f=h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate());
     var inv=(Array.isArray(r.invitados)?r.invitados:[]).filter(function(n){ return !!n; });
     var o={modo:modo, reunion:r, reunion_id:r.id, titulo:r.titulo||'', parts:inv, fecha:f, en_curso:r.en_curso};
-    /* ya pasó: el bloque se declara con SU horario, no con el de ahora */
-    var hr=(modo==='declarar' && _fichaPendienteReu_(r)) ? _horarioReuMs_(r) : null;
+    /* ya pasó: el bloque se declara con SU horario, no con el de ahora (11/11: haga lo que haga que pasara, no sólo en las 48 h del aviso) */
+    var hr=(modo==='declarar' && _reuTerminada_(r)) ? _horarioReuMs_(r) : null;
     if(hr){ o.fecha=_msAFechaHora_(hr.ini).fecha; o.ini=_msAFechaHora_(hr.ini).hora; o.fin=_msAFechaHora_(hr.fin).hora; }
     return o;
   };
@@ -14288,7 +14294,106 @@ function _bloqueReuCablear_(getR, cb){
     r.en_curso=null; tost('Cancelada: no se ha creado nada.'); cb.refrescar();
   });
   on('btnFinalizar', async function(){ var r=getR(); if(!r) return; _bloqueAbrir_(base(r,'finalizar')); cb.abrir(); });
-  on('btnDeclararBloque', async function(){ var r=getR(); if(!r) return; _bloqueAbrir_(base(r,'declarar')); cb.abrir(); });
+  /* 11/11 (horascoord): los participantes son quienes ASISTIERON (la lista de la asistencia), no todos los convocados; sin asistencia
+     o sin poder leerla, los convocados de siempre. Los marcados se quitan o se añaden a mano en el formulario. */
+  on('btnDeclararBloque', async function(){
+    var r=getR(); if(!r) return;
+    var o=base(r,'declarar');
+    if(typeof api!=='undefined' && api.getAsistencia && !_demoLocal_()){     // la maqueta `?demo` inventa presentes que no son de esta reunión
+      try{
+        var v=await api.getAsistencia(r.id, true), pres=Object.keys((v && v.presentes) || {});
+        if(pres.length) o.parts=pres;
+      }catch(e){ /* sin asistencia legible: los convocados */ }
+    }
+    _bloqueAbrir_(o); cb.abrir();
+  });
+}
+
+/* ══ 11/11 · «DAR HORAS» A TU GENTE (horascoord) ═══════════════════════════════════════════════════════════════════
+   🗣️ Daniel: *«Revisa lo fácil que es para un coordinador ponerle horas a sus miembros […] Todo tiene que ser sencillito.»* Motivo medido:
+   el 01-02/11 un coordinador metió horas a mano en Notion porque en el MÓVIL no había dónde darlas (`otorgarBloque` sólo tenía el
+   formulario del escritorio). Es lo mismo que «Otorgar el bloque» de allí: sin firma de nadie (la persona ve «otorgada»), a quien tu
+   cargo deja (`_otorgablesDe_`, la misma puerta que `puedeDecidirParte`: PD → todos; coordinador → su unidad; subcoordinador → su
+   equipo; nunca uno mismo), con tu motivo. Nace con tu unidad marcada (un toque menos) y con atajos de horas (no 14 pulsaciones de +). */
+function _actorHoras_(){ return (typeof _actorSanc_==='function' ? _actorSanc_() : null) || (typeof YO!=='undefined' && YO && YO.nombre) || ''; }
+function _otorgablesDe_(quien){
+  var r=quien ? rangoNom(quien) : 0;
+  return _activos_().filter(function(m){
+    return !!m && m.nombre!==quien && (r>=3 || (r>=1 && coordinadorDe(m.unidad)===quien) || (!!quien && esSubcoordDe(quien, m.nombre)));
+  }).map(function(m){ return m.nombre; });
+}
+var DH=null;                                 // {env, pool, marcadas, horas, motivo, clave}: el formulario abierto
+var DH_ATAJOS=[0.5,1,2,3,4];
+function _darHorasAbrir_(pre){
+  pre=pre||{};
+  var yo=_actorHoras_(), pool=_otorgablesDe_(yo);
+  DH={env:false, pool:pool, marcadas:pre.nombres ? pre.nombres.filter(function(n){ return pool.indexOf(n)>=0; }) : (rangoNom(yo)>=3 ? [] : pool.slice()),
+      horas:pre.horas||'', motivo:pre.motivo||'', clave:_claveUso_()};
+  return DH;
+}
+function _darHorasTarjetaHTML_(){
+  if(!_otorgablesDe_(_actorHoras_()).length) return '';
+  return '<div class="tarj">'+cab('Dar horas','a tu gente')+
+    '<p class="rnota" style="margin:0 0 10px">Para una feria, un traslado, un turno sin fichar…: cuentan al momento, sin que nadie las firme.</p>'+
+    '<button class="btn pri full" data-p data-darhoras>Dar horas</button></div>';
+}
+function _darHorasTxt_(){
+  var n=elegirPersonasMarcadas('dh').length, h=parseFloat(String(($('#dhH')||{}).value||'').replace(',','.'))||0;
+  return h>0 ? ('Dar '+nf2(h)+' h a '+n+(n===1?' persona':' personas')) : 'Dar horas';
+}
+function _darHorasFormHTML_(){
+  var D=DH; if(!D) return '';
+  var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
+  return '<div id="dhForm">'+
+    '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 4px">Dar horas a tu gente</div>'+
+    '<p class="rnota" style="margin:0 0 12px">Cuentan al momento y a cada uno le salen como otorgadas, con tu motivo. Las mismas horas para todos los marcados.</p>'+
+    lab('A quién')+
+    elegirPersonas('dh', {universo:D.pool, marcadas:D.marcadas, titulo:'A quién dar horas', vacio:'Nadie todavía: escribe un nombre o pulsa «Ver lista».',
+      alCambiar:function(){ var b=$('#dhEnviar'); if(b) b.textContent=_darHorasTxt_(); }})+
+    '<div style="margin:12px 0">'+lab('Horas para cada uno')+
+      '<div class="nt-fila" style="margin:0 0 8px">'+DH_ATAJOS.map(function(h){
+        return '<button type="button" class="pick" data-dhq="'+h+'">'+nf2(h)+' h</button>'; }).join('')+'</div>'+
+      nxNum('dhH', D.horas, {min:0, paso:0.25, sufijo:'h'})+'</div>'+
+    '<label style="display:block;margin:0 0 12px">'+lab('Motivo <span class="req">*</span>')+
+      '<input id="dhC" style="'+_BLQ_INPUT_+'" placeholder="p. ej. Feria de divulgación · montaje" value="'+esc(D.motivo)+'"></label>'+
+    '<div style="display:flex;gap:8px"><button class="btn pri" id="dhEnviar" data-p style="flex:1">'+_darHorasTxt_()+'</button>'+
+      '<button class="btn" data-dhcerrar data-p>Cancelar</button></div></div>';
+}
+/* El cuerpo de `otorgarBloque`, o un Error con lo que falta (el tope, ANTES de mandar: el servidor recorta y la cara afirmaría lo pedido). */
+function _darHorasCuerpo_(D){
+  var nombres=elegirPersonasMarcadas('dh');
+  var horas=parseFloat(String(($('#dhH')||{}).value||'').replace(',','.'))||0;
+  var motivo=String(($('#dhC')||{}).value||'').trim();
+  if(!nombres.length) throw new Error('Marca al menos a una persona.');
+  if(!(horas>0)) throw new Error('Pon las horas de cada uno.');
+  if(horas>_maxHorasParte_()) throw new Error('No se ha dado nada: el máximo por persona son '+h1(_maxHorasParte_())+'.');
+  if(!motivo) throw new Error('Escribe el motivo: es lo que le sale a cada uno.');
+  return {nombres:nombres, horas:horas, tarea:motivo, categoria:'compensacion', subcat:null, clave:D.clave};
+}
+/* Lo que PASÓ, no lo que se pidió: 0 → nada; parcial → a cuántos sí y a cuántos no; todas → ya cuentan. */
+function _darHorasAviso_(r, n, horas){
+  var ok=(r && r.otorgados)||0;
+  return !r ? 'El servidor no ha confirmado: mira sus horas antes de repetirlo, que puede estar dado.'
+    : !ok ? '0 de '+n+': no se ha dado nada (sin permiso o con error).'
+    : ok<n ? h1(horas)+' a '+ok+' de '+n+'. A '+(n-ok)+' no se les ha dado (sin permiso o con error).'
+    : h1(horas)+' a '+ok+(ok===1?' persona':' personas')+'. Ya cuentan en sus horas del mes.';
+}
+function _darHorasCablear_(cb){
+  var D=DH; if(!D) return;
+  $$('[data-dhcerrar]').forEach(function(b){ b.onclick=function(){ DH=null; cb.cerrar(); }; });
+  $$('[data-dhq]').forEach(function(b){ b.onclick=function(){ nxPon('dhH', b.dataset.dhq); var e=$('#dhEnviar'); if(e) e.textContent=_darHorasTxt_(); }; });
+  var h=$('#dhH'); if(h) h.addEventListener('change', function(){ var e=$('#dhEnviar'); if(e) e.textContent=_darHorasTxt_(); });
+  var env=$('#dhEnviar');
+  if(env) env.onclick=async function(){
+    if(env.disabled || D.env) return;
+    var cuerpo; try{ cuerpo=_darHorasCuerpo_(D); }catch(e){ tost(e.message); return; }
+    D.env=true; env.disabled=true; var prev=env.textContent; env.textContent='…';
+    try{
+      var r=await api.otorgarBloque(cuerpo);
+      tost(_darHorasAviso_(r, cuerpo.nombres.length, ((r && r.resultados || []).filter(function(x){ return x && x.id; })[0] || {horas:cuerpo.horas}).horas));
+      DH=null; cb.cerrar(); if(cb.hecho) cb.hecho(r);
+    }catch(e){ D.env=false; env.disabled=false; env.textContent=prev; tostErr('No se pudo dar las horas: ', e); }
+  };
 }
 
 /* ── La cola del PD: las líneas con el mismo `bloque` salen en UNA tarjeta ─────────────────────────── */
