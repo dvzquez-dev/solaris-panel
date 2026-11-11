@@ -13944,6 +13944,7 @@ function _reuFinalizada_(r){ return !!(r && r.finalizada_at); }
 function _reuArchivada_(r, ahora){
   if(!r) return false;
   if(_reuFinalizada_(r)) return true;
+  if(r.en_curso) return false;      // 11/11 (refutar6): la que se está celebrando NO se pliega aunque pase de su hora (se alarga): ahí está «Finalizar»
   var h=_horarioReuMs_(r);
   return !!(h && h.fin===h.fin && (ahora==null ? Date.now() : ahora) > h.fin);
 }
@@ -14422,11 +14423,19 @@ function _darHorasCuerpo_(D){
   return cuerpo;
 }
 /* Lo que PASÓ, no lo que se pidió: 0 → nada; parcial → a cuántos sí y a cuántos no; todas → ya cuentan. */
+/* 11/11 (refutar6): a quien se quedó sin las horas se le NOMBRA, con lo que dijo el servidor (el tramo ya ocupado, la baja…); «con error» a secas no dice a quién. */
+function _darHorasFallos_(r){
+  var f=((r && r.resultados) || []).filter(function(x){ return x && x.error; });
+  if(!f.length) return '';
+  var t=f.slice(0,2).map(function(x){ var e=String(x.error), nb=String(x.nombre||'');
+    return (nb && e.indexOf(nb)<0 ? nb+': ' : '')+e; }).join(' · ');
+  return ' '+t+(f.length>2 ? ' · y '+(f.length-2)+' más' : '');
+}
 function _darHorasAviso_(r, n, horas){
-  var ok=(r && r.otorgados)||0;
+  var ok=(r && r.otorgados)||0, fa=_darHorasFallos_(r);
   return !r ? 'El servidor no ha confirmado: mira sus horas antes de repetirlo, que puede estar dado.'
-    : !ok ? '0 de '+n+': no se ha dado nada (sin permiso o con error).'
-    : ok<n ? h1(horas)+' a '+ok+' de '+n+'. A '+(n-ok)+' no se les ha dado (sin permiso o con error).'
+    : !ok ? '0 de '+n+': no se ha dado nada'+(fa ? '.'+fa : ' (sin permiso o con error).')
+    : ok<n ? h1(horas)+' a '+ok+' de '+n+'.'+(fa ? fa : ' A '+(n-ok)+' no se les ha dado (sin permiso o con error).')
     : h1(horas)+' a '+ok+(ok===1?' persona':' personas')+'. Ya cuentan en sus horas del mes.';
 }
 function _darHorasCablear_(cb){
@@ -15041,6 +15050,7 @@ function _mtCss_(){
     '.mtf-card{border:1px solid var(--line);border-radius:12px;background:var(--sur);padding:9px 10px;margin:0 0 8px}'+
     '.mtf-card .mtf-fila{margin:0 0 6px}.mtf-nota{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.mtf-err{margin:0 0 8px;font-size:13px;color:var(--red)}'+
     '.mtf-sug{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.mtf-sug:empty{display:none}'+
+    '.mtf-subo{margin:0 0 6px 14px;padding-left:10px;border-left:2px solid var(--line)}'+
     '.mtf-obj{display:flex;flex-direction:column;gap:6px}.mtf-obj .mtf-fila{margin:0}'+
     '.mtf-ayuda{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.mtf-foto{display:flex;gap:9px;align-items:center;margin:0 0 6px}'+
     '.mtf-foto img,.mtf-gal img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:none}'+
@@ -15132,7 +15142,16 @@ function _mtEditorHTML_(k){
       h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('objetivos.' + g + '.' + i + '.texto', o.texto, 'Objetivo') +
            '<span class="mtf-c mini" data-mtquitar="obj:' + g + ':' + i + '">Quitar</span></div>'+
            '<div class="mtf-fila"><span class="mtf-c' + (o.logrado === true ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':1" role="button" aria-pressed="' + (o.logrado === true) + '">Conseguido</span>'+
-           '<span class="mtf-c' + (o.logrado === false ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':0" role="button" aria-pressed="' + (o.logrado === false) + '">No conseguido</span></div></div>';
+           '<span class="mtf-c' + (o.logrado === false ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':0" role="button" aria-pressed="' + (o.logrado === false) + '">No conseguido</span></div>'+
+           /* subobjetivos (11/11): segundo nivel, con los mismos chips; si los hay, el padre no tiene que marcarse (lo dice `faltas`) */
+           (o.sub || []).map(function(q, j){
+             var ro = 'objetivos.' + g + '.' + i + '.sub.' + j, sc = g + ':' + i + ':' + j;
+             return '<div class="mtf-subo"><div class="mtf-fila">' + _mtInp_(ro + '.texto', q.texto, 'Subobjetivo') +
+               '<span class="mtf-c mini" data-mtquitar="sub:' + g + ':' + i + ':' + j + '">Quitar</span></div>'+
+               '<div class="mtf-fila"><span class="mtf-c' + (q.logrado === true ? ' on' : '') + '" data-mtslog="' + sc + ':1" role="button" aria-pressed="' + (q.logrado === true) + '">Conseguido</span>'+
+               '<span class="mtf-c' + (q.logrado === false ? ' on' : '') + '" data-mtslog="' + sc + ':0" role="button" aria-pressed="' + (q.logrado === false) + '">No conseguido</span></div></div>';
+           }).join('') +
+           '<div class="mtf-fila"><span class="mtf-c mini" data-mtadd="sub:' + g + ':' + i + '">+ subobjetivo</span></div></div>';
     });
     h += '</div><div class="mtf-fila"><span class="mtf-c" data-mtadd="obj:' + g + '">Añadir objetivo</span></div>';
   });
@@ -15283,6 +15302,7 @@ function _mtClic_(t, k, ev){
   if((a = q('[data-mtquitar]'))){
     var pq = a.getAttribute('data-mtquitar').split(':');
     if(pq[0] === 'obj') m.objetivos[pq[1]].splice(+pq[2], 1);
+    else if(pq[0] === 'sub'){ var os = m.objetivos[pq[1]][+pq[2]]; os.sub.splice(+pq[3], 1); }
     else if(pq[0] === 'foto') m.comentarios[+pq[1]].fotos.splice(+pq[2], 1);
     else m[pq[0]].splice(+pq[1], 1);
     _mtProgramar_(t, k); _mtPintar_(k); return;
@@ -15293,9 +15313,11 @@ function _mtClic_(t, k, ev){
     else if(w === 'notasMov') m.notasMov.push('');
     else if(w.indexOf('comentarios') === 0) m.comentarios.push({titulo: w.slice(12), texto: '', fotos: []});
     else if(w.indexOf('obj:') === 0) m.objetivos[w.slice(4)].push({texto: '', logrado: null});
+    else if(w.indexOf('sub:') === 0){ var ws = w.split(':'), op = m.objetivos[ws[1]][+ws[2]]; op.sub = op.sub || []; op.sub.push({texto: '', logrado: null}); }
     ed.sucio = true; _mtPintar_(k);
     /* el cursor al campo nuevo: el último de su grupo */
     var cand = w === 'movimientos' ? 'movimientos.' + (m.movimientos.length - 1) + '.material' : w === 'notasMov' ? 'notasMov.' + (m.notasMov.length - 1)
+      : w.indexOf('sub:') === 0 ? 'objetivos.' + w.split(':')[1] + '.' + w.split(':')[2] + '.sub.' + (m.objetivos[w.split(':')[1]][+w.split(':')[2]].sub.length - 1) + '.texto'
       : w.indexOf('comentarios') === 0 ? 'comentarios.' + (m.comentarios.length - 1) + (w.length > 11 ? '.texto' : '.titulo') : 'objetivos.' + w.slice(4) + '.' + (m.objetivos[w.slice(4)].length - 1) + '.texto';
     var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtin="' + cand + '"]'); if(el) el.focus();
     return;
@@ -15309,6 +15331,11 @@ function _mtClic_(t, k, ev){
       cm.fotos = cm.fotos || []; cm.fotos.push({id: pf[1], pie: ''}); ed.galeria = -1; _mtProgramar_(t, k); _mtPintar_(k);
       var ip = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtin="comentarios.' + pf[0] + '.fotos.' + (cm.fotos.length - 1) + '.pie"]'); if(ip) ip.focus();
     }
+    return;
+  }
+  if((a = q('[data-mtslog]'))){
+    var ps = a.getAttribute('data-mtslog').split(':'), qs = ((m.objetivos[ps[0]][+ps[1]] || {}).sub || [])[+ps[2]];
+    if(qs){ qs.logrado = ps[3] === '1'; _mtProgramar_(t, k); _mtPintar_(k); }
     return;
   }
   if((a = q('[data-mtlog]'))){
