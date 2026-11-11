@@ -108,6 +108,14 @@ function parteCard(p){
   '</div>';
 }
 
+/* 11/11 (bloquehorario; Daniel: «de qué hora a qué hora es la contribución concreta»): el horario OPCIONAL del bloque. Sin él, el bloque es el de siempre. */
+var BLO_HOR={conHor:false, fecha:'', ini:'16:00', fin:'18:00'};
+function _bloHorarioHTML_(){
+  if(!BLO_HOR.fecha) BLO_HOR.fecha=_hoyNxISO_();
+  return '<div class="campo" style="margin:0 0 10px"><span class="sc" style="display:block;margin:0 0 5px">Horario</span>'+
+      nxElige('bloHor', [['','Sin horario'],['si','De qué hora a qué hora']], BLO_HOR.conHor?'si':'')+'</div>'+
+    (BLO_HOR.conHor ? _darHorasTramoHTML_(BLO_HOR, 'blo') : '');
+}
 function bloquePanel(){
   if(rangoNom(ACTOR)<1) return '';
   /* ⛔⛔ `>=3`, NO `>=2`. Esto decia `esPD = rangoNom(ACTOR)>=2`, y con eso el SEGUNDO
@@ -143,6 +151,7 @@ function bloquePanel(){
       /* 11/11 (horascoord): el coordinador nace con SU gente marcada (quitar a uno cuesta menos que marcar a diez); el PD, con nadie */
       marcadas:mandaEnTodo?[]:pool.map(function(m){ return m.nombre; }),
       vacio:'Nadie marcado: escribe un nombre o pulsa «Ver lista».'})+
+    '<div id="bloHorario" style="margin:0 0 4px">'+_bloHorarioHTML_()+'</div>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
       '<div><span class="sc" style="display:block;margin-bottom:5px">Categoría</span>'+
         nxElige('bloCat', [['reunion','Reunión'],['tareas','Tarea'],['turno','Turno'],['compensacion','Compensación']], 'compensacion')+'</div>'+
@@ -223,7 +232,7 @@ function _escHistFilaHTML_(p, per, uc){
   var dec=p.estado==='aprobado' ? _selloAprobado_(p, per, uc)
         : (p.estado==='rechazado' || p.estado==='detalle') ? 'decidido '+_firmaParte_(p) : '';
   return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+
-    h1(p.horas)+' · '+_icoBloque_(p)+esc(p.tarea)+'</b><small>'+p.fecha+(dec?' · '+esc(dec):'')+
+    h1(p.horas)+' · '+_icoBloque_(p)+esc(p.tarea)+'</b><small>'+p.fecha+(p.ini!=='—' && p.fin!=='—' ? ' · '+esc(p.ini)+'–'+esc(p.fin) : '')+(dec?' · '+esc(dec):'')+
     (p.motivo?' · «'+esc(p.motivo)+'»':'')+'</small></span><span class="der">'+et+'</span></div>';
 }
 

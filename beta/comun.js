@@ -14362,8 +14362,21 @@ function _darHorasClasHTML_(D){
   return '<div class="campo" style="margin:0 0 10px">'+lab('Categoría')+nxElige('dhCat', DH_CATS, D.cat)+'</div>'+
     _subcatHTML_('dhSub', D.subcat, D.cat)+
     '<div class="campo" style="margin:0 0 10px">'+lab('Horario')+nxElige('dhHor', [['','Sin horario'],['si','De qué hora a qué hora']], D.conHor?'si':'')+'</div>'+
-    (D.conHor ? '<div style="margin:0 0 12px"><div style="margin:0 0 8px">'+lab('Día')+nxFecha('dhFecha', D.fecha, {max:_hoyNxISO_()})+'</div>'+
-      '<div style="display:flex;gap:12px;flex-wrap:wrap"><div>'+lab('Desde')+nxHora('dhIni', D.ini)+'</div><div>'+lab('Hasta')+nxHora('dhFin', D.fin)+'</div></div></div>' : '');
+    (D.conHor ? _darHorasTramoHTML_(D, 'dh') : '');
+}
+/* 11/11 (bloquehorario): el Día + Desde + Hasta, UNO para las dos caras (el móvil con prefijo `dh`, el bloque del escritorio con `blo`). */
+function _darHorasTramoHTML_(D, pre){
+  var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
+  return '<div style="margin:0 0 12px"><div style="margin:0 0 8px">'+lab('Día')+nxFecha(pre+'Fecha', D.fecha, {max:_hoyNxISO_()})+'</div>'+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap"><div>'+lab('Desde')+nxHora(pre+'Ini', D.ini)+'</div><div>'+lab('Hasta')+nxHora(pre+'Fin', D.fin)+'</div></div></div>';
+}
+/* El tramo de `D` ({fecha, ini, fin}) para el cuerpo de `otorgarBloque`, o un Error con lo que falla: lo mismo que cortará el servidor, antes de mandar. */
+function _darHorasTramo_(D, horas){
+  if(!_horaHHMM_(D.ini) || !_horaHHMM_(D.fin) || D.ini===D.fin) throw new Error('Pon de qué hora a qué hora (HH:MM, distintas).');
+  var fut=_finEnFuturoTxt_(D.fecha, [{ini:D.ini, fin:D.fin}]); if(fut) throw new Error(fut);
+  var dur=_bloqueDurH_(D.fecha, D.ini, D.fin);
+  if(horas>dur+1e-9) throw new Error('Las horas ('+nf2(horas)+') no pueden pasar de lo que dura el horario ('+nf2(dur)+' h).');
+  return {fecha:D.fecha, ini:D.ini, fin:D.fin};
 }
 function _darHorasClasPintar_(){
   var c=$('#dhClas'); if(!c || !DH) return;
@@ -14405,13 +14418,7 @@ function _darHorasCuerpo_(D){
   if(horas>_maxHorasParte_()) throw new Error('No se ha dado nada: el máximo por persona son '+h1(_maxHorasParte_())+'.');
   if(!_justificacionValida_(motivo)) throw new Error('Cuenta qué se hizo y dónde: el motivo necesita al menos '+MIN_JUSTIFICACION+' caracteres.');
   var cuerpo={nombres:nombres, horas:horas, tarea:motivo, categoria:D.cat, subcat:_subcatEnvio_(D), clave:D.clave};
-  if(D.conHor){                                       // el tramo, como el de un parte: lo mismo que cortará el servidor, antes de mandar
-    if(!_horaHHMM_(D.ini) || !_horaHHMM_(D.fin) || D.ini===D.fin) throw new Error('Pon de qué hora a qué hora (HH:MM, distintas).');
-    var fut=_finEnFuturoTxt_(D.fecha, [{ini:D.ini, fin:D.fin}]); if(fut) throw new Error(fut);
-    var dur=_bloqueDurH_(D.fecha, D.ini, D.fin);
-    if(horas>dur+1e-9) throw new Error('Las horas ('+nf2(horas)+') no pueden pasar de lo que dura el horario ('+nf2(dur)+' h).');
-    cuerpo.fecha=D.fecha; cuerpo.ini=D.ini; cuerpo.fin=D.fin;
-  }
+  if(D.conHor){ var t=_darHorasTramo_(D, horas); cuerpo.fecha=t.fecha; cuerpo.ini=t.ini; cuerpo.fin=t.fin; }   // el tramo, como el de un parte
   return cuerpo;
 }
 /* Lo que PASÓ, no lo que se pidió: 0 → nada; parcial → a cuántos sí y a cuántos no; todas → ya cuentan. */
