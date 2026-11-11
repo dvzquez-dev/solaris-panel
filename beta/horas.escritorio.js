@@ -40,7 +40,7 @@ function puedeDecidirParte(p,quien){
      (rango 2): le pintaba Aprobar/Rechazar en partes que el servidor le niega, y con «Actúas como José» el PD los veía
      y la llamada salía con SU token, firmada como suya. El rango 2 es documental; en horas no manda. */
   /* 02/11 · Daniel: el subcoordinador (Breixo) firma también los partes de SU equipo, y de nadie más (`esSubcoordDe`). */
-  return rangoNom(quien)>=3 || (rangoNom(quien)>=1 && coordinadorDe(p.unidad)===quien) || esSubcoordDe(quien, p.autor);
+  return _potestadSobre_(quien, p.autor, p.unidad);      /* 11/11: la regla vive UNA vez, en comun.js */
 }
 
 /* ⛔ 20/10 (auditor de partes): un parte en `detalle` es SIN DECIDIR — así lo cuenta el servidor (`bloqueos_cierre`,
@@ -59,10 +59,7 @@ function enElAire(){return pendientes().filter(function(p){return puedeDecidirPa
    (`puedeDecidirParte`, gemela de `_puede_otorgar_a` del servidor)— y, además, el subcoordinador a su equipo, por la
    MISMA puerta que las sanciones (`puedeSancionarA`, que ya lo acota: no se copia el criterio). 02/11: la misma que firma sus
    partes, así que `puedeDecidirParte` ya lo incluye (`esSubcoordDe`). */
-function puedeOtorgarA(m,quien){
-  if(!m || m.nombre===quien) return false;
-  return puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, quien);
-}
+function puedeOtorgarA(m,quien){ return _puedeOtorgarA_(m, quien); }   /* 11/11: la regla vive UNA vez, en comun.js */
 
 /* 31/10 · Daniel: el parte del PD de una unidad que coordina OTRO se enruta a ese coordinador: al PD no le sale como «suyo por
    aprobar» (cola y globo) aunque siga pudiendo decidirlo. Misma regla que el móvil (`_cargarPartesDec_`); el servidor ya

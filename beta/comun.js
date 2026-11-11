@@ -14316,19 +14316,29 @@ function _bloqueReuCablear_(getR, cb){
    cargo deja (`_otorgablesDe_`, la misma puerta que `puedeDecidirParte`: PD → todos; coordinador → su unidad; subcoordinador → su
    equipo; nunca uno mismo), con tu motivo. Nace con tu unidad marcada (un toque menos) y con atajos de horas (no 14 pulsaciones de +). */
 function _actorHoras_(){ return (typeof _actorSanc_==='function' ? _actorSanc_() : null) || (typeof YO!=='undefined' && YO && YO.nombre) || ''; }
-function _otorgablesDe_(quien){
-  var r=quien ? rangoNom(quien) : 0;
-  return _activos_().filter(function(m){
-    return !!m && m.nombre!==quien && (r>=3 || (r>=1 && coordinadorDe(m.unidad)===quien) || (!!quien && esSubcoordDe(quien, m.nombre)));
-  }).map(function(m){ return m.nombre; });
+/* 11/11 (horascoord2) · LA POTESTAD SOBRE LA GENTE, declarada UNA vez (gemela de `_puede_sobre_parte` + `esSubcoordDe` del servidor): el PD (rango 3),
+   quien coordina ESA unidad (rango >= 1) o, a su equipo, el subcoordinador. La llaman `puedeDecidirParte` (horas.escritorio.js: decidir un parte),
+   `puedeOtorgarA` (otorgar) y `_otorgablesDe_`: antes cada una llevaba su copia. NO incluye «nunca uno mismo»: eso lo pone quien la llama. */
+function _potestadSobre_(quien, autor, unidad){
+  return rangoNom(quien)>=3 || (rangoNom(quien)>=1 && coordinadorDe(unidad)===quien) || esSubcoordDe(quien, autor);
 }
-var DH=null;                                 // {env, pool, marcadas, horas, motivo, clave}: el formulario abierto
+/* ¿Puede `quien` OTORGAR horas a la ficha `m` ({nombre, unidad})? Nunca a sí mismo. */
+function _puedeOtorgarA_(m, quien){
+  return !!m && !!quien && m.nombre!==quien && _potestadSobre_(quien, m.nombre, m.unidad);
+}
+function _otorgablesDe_(quien){
+  return _activos_().filter(function(m){ return _puedeOtorgarA_(m, quien); }).map(function(m){ return m.nombre; });
+}
+var DH=null;          // {env, pool, marcadas, horas, motivo, clave, cat, subcat, conHor, fecha, ini, fin}: el formulario abierto
 var DH_ATAJOS=[0.5,1,2,3,4];
+/* 11/11 (horascoord2; Daniel: *«¿Por qué aparecen otras contribuciones si es una reunión?»*): las categorías de siempre, en el orden de «Declarar». */
+var DH_CATS=[['tareas','Tareas'],['reunion','Reunión'],['turno','Turno'],['compensacion','Compensación']];
 function _darHorasAbrir_(pre){
   pre=pre||{};
   var yo=_actorHoras_(), pool=_otorgablesDe_(yo);
   DH={env:false, pool:pool, marcadas:pre.nombres ? pre.nombres.filter(function(n){ return pool.indexOf(n)>=0; }) : (rangoNom(yo)>=3 ? [] : pool.slice()),
-      horas:pre.horas||'', motivo:pre.motivo||'', clave:_claveUso_()};
+      horas:pre.horas||'', motivo:pre.motivo||'', clave:_claveUso_(),
+      cat:pre.cat||'compensacion', subcat:pre.subcat||'', conHor:!!pre.conHor, fecha:pre.fecha||_hoyNxISO_(), ini:pre.ini||'16:00', fin:pre.fin||'18:00'};
   return DH;
 }
 function _darHorasTarjetaHTML_(){
@@ -14337,9 +14347,33 @@ function _darHorasTarjetaHTML_(){
     '<p class="rnota" style="margin:0 0 10px">Para una feria, un traslado, un turno sin fichar…: cuentan al momento, sin que nadie las firme.</p>'+
     '<button class="btn pri full" data-p data-darhoras>Dar horas</button></div>';
 }
+/* Las horas de cada uno: las que escribe; en blanco y con horario, lo que dura el tramo (el servidor lo calcula igual). */
+function _darHorasHoras_(){
+  var h=parseFloat(String(($('#dhH')||{}).value||'').replace(',','.'))||0;
+  return (h>0 || !DH || !DH.conHor) ? h : _bloqueDurH_(DH.fecha, DH.ini, DH.fin);
+}
 function _darHorasTxt_(){
-  var n=elegirPersonasMarcadas('dh').length, h=parseFloat(String(($('#dhH')||{}).value||'').replace(',','.'))||0;
+  var n=elegirPersonasMarcadas('dh').length, h=_darHorasHoras_();
   return h>0 ? ('Dar '+nf2(h)+' h a '+n+(n===1?' persona':' personas')) : 'Dar horas';
+}
+/* Categoría + subcategoría (sólo con la compensación) + horario opcional: se repinta ella sola en `#dhClas` (el resto no se toca). */
+function _darHorasClasHTML_(D){
+  var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
+  return '<div class="campo" style="margin:0 0 10px">'+lab('Categoría')+nxElige('dhCat', DH_CATS, D.cat)+'</div>'+
+    _subcatHTML_('dhSub', D.subcat, D.cat)+
+    '<div class="campo" style="margin:0 0 10px">'+lab('Horario')+nxElige('dhHor', [['','Sin horario'],['si','De qué hora a qué hora']], D.conHor?'si':'')+'</div>'+
+    (D.conHor ? '<div style="margin:0 0 12px"><div style="margin:0 0 8px">'+lab('Día')+nxFecha('dhFecha', D.fecha, {max:_hoyNxISO_()})+'</div>'+
+      '<div style="display:flex;gap:12px;flex-wrap:wrap"><div>'+lab('Desde')+nxHora('dhIni', D.ini)+'</div><div>'+lab('Hasta')+nxHora('dhFin', D.fin)+'</div></div></div>' : '');
+}
+function _darHorasClasPintar_(){
+  var c=$('#dhClas'); if(!c || !DH) return;
+  c.innerHTML=_darHorasClasHTML_(DH);
+  [['dhCat','cat'],['dhSub','subcat'],['dhFecha','fecha'],['dhIni','ini'],['dhFin','fin']].forEach(function(x){
+    var e=$('#'+x[0]); if(!e) return;
+    e.onchange=function(){ DH[x[1]]=e.value; if(x[1]==='cat'){ DH.subcat=''; _darHorasClasPintar_(); }
+      var b=$('#dhEnviar'); if(b) b.textContent=_darHorasTxt_(); }; });
+  var h=$('#dhHor');
+  if(h) h.onchange=function(){ DH.conHor=h.value==='si'; _darHorasClasPintar_(); var b=$('#dhEnviar'); if(b) b.textContent=_darHorasTxt_(); };
 }
 function _darHorasFormHTML_(){
   var D=DH; if(!D) return '';
@@ -14350,25 +14384,35 @@ function _darHorasFormHTML_(){
     lab('A quién')+
     elegirPersonas('dh', {universo:D.pool, marcadas:D.marcadas, titulo:'A quién dar horas', vacio:'Nadie todavía: escribe un nombre o pulsa «Ver lista».',
       alCambiar:function(){ var b=$('#dhEnviar'); if(b) b.textContent=_darHorasTxt_(); }})+
+    '<div id="dhClas" style="margin:12px 0 0">'+_darHorasClasHTML_(D)+'</div>'+
     '<div style="margin:12px 0">'+lab('Horas para cada uno')+
       '<div class="nt-fila" style="margin:0 0 8px">'+DH_ATAJOS.map(function(h){
         return '<button type="button" class="pick" data-dhq="'+h+'">'+nf2(h)+' h</button>'; }).join('')+'</div>'+
       nxNum('dhH', D.horas, {min:0, paso:0.25, sufijo:'h'})+'</div>'+
-    '<label style="display:block;margin:0 0 12px">'+lab('Motivo <span class="req">*</span>')+
-      '<input id="dhC" style="'+_BLQ_INPUT_+'" placeholder="p. ej. Feria de divulgación · montaje" value="'+esc(D.motivo)+'"></label>'+
+    '<label style="display:block;margin:0 0 12px">'+lab('Qué se hizo y dónde <span class="req">*</span>')+
+      '<input id="dhC" style="'+_BLQ_INPUT_+'" placeholder="p. ej. Montaje del stand en la feria de Ourense" value="'+esc(D.motivo)+'">'+
+      '<span class="rnota" style="display:block;margin:4px 0 0">El motivo concreto de esta actividad (mínimo '+MIN_JUSTIFICACION+' caracteres): es lo que le sale a cada uno.</span></label>'+
     '<div style="display:flex;gap:8px"><button class="btn pri" id="dhEnviar" data-p style="flex:1">'+_darHorasTxt_()+'</button>'+
       '<button class="btn" data-dhcerrar data-p>Cancelar</button></div></div>';
 }
 /* El cuerpo de `otorgarBloque`, o un Error con lo que falta (el tope, ANTES de mandar: el servidor recorta y la cara afirmaría lo pedido). */
 function _darHorasCuerpo_(D){
   var nombres=elegirPersonasMarcadas('dh');
-  var horas=parseFloat(String(($('#dhH')||{}).value||'').replace(',','.'))||0;
+  var horas=_darHorasHoras_();
   var motivo=String(($('#dhC')||{}).value||'').trim();
   if(!nombres.length) throw new Error('Marca al menos a una persona.');
   if(!(horas>0)) throw new Error('Pon las horas de cada uno.');
   if(horas>_maxHorasParte_()) throw new Error('No se ha dado nada: el máximo por persona son '+h1(_maxHorasParte_())+'.');
-  if(!motivo) throw new Error('Escribe el motivo: es lo que le sale a cada uno.');
-  return {nombres:nombres, horas:horas, tarea:motivo, categoria:'compensacion', subcat:null, clave:D.clave};
+  if(!_justificacionValida_(motivo)) throw new Error('Cuenta qué se hizo y dónde: el motivo necesita al menos '+MIN_JUSTIFICACION+' caracteres.');
+  var cuerpo={nombres:nombres, horas:horas, tarea:motivo, categoria:D.cat, subcat:_subcatEnvio_(D), clave:D.clave};
+  if(D.conHor){                                       // el tramo, como el de un parte: lo mismo que cortará el servidor, antes de mandar
+    if(!_horaHHMM_(D.ini) || !_horaHHMM_(D.fin) || D.ini===D.fin) throw new Error('Pon de qué hora a qué hora (HH:MM, distintas).');
+    var fut=_finEnFuturoTxt_(D.fecha, [{ini:D.ini, fin:D.fin}]); if(fut) throw new Error(fut);
+    var dur=_bloqueDurH_(D.fecha, D.ini, D.fin);
+    if(horas>dur+1e-9) throw new Error('Las horas ('+nf2(horas)+') no pueden pasar de lo que dura el horario ('+nf2(dur)+' h).');
+    cuerpo.fecha=D.fecha; cuerpo.ini=D.ini; cuerpo.fin=D.fin;
+  }
+  return cuerpo;
 }
 /* Lo que PASÓ, no lo que se pidió: 0 → nada; parcial → a cuántos sí y a cuántos no; todas → ya cuentan. */
 function _darHorasAviso_(r, n, horas){
@@ -14381,6 +14425,7 @@ function _darHorasAviso_(r, n, horas){
 function _darHorasCablear_(cb){
   var D=DH; if(!D) return;
   $$('[data-dhcerrar]').forEach(function(b){ b.onclick=function(){ DH=null; cb.cerrar(); }; });
+  _darHorasClasPintar_();
   $$('[data-dhq]').forEach(function(b){ b.onclick=function(){ nxPon('dhH', b.dataset.dhq); var e=$('#dhEnviar'); if(e) e.textContent=_darHorasTxt_(); }; });
   var h=$('#dhH'); if(h) h.addEventListener('change', function(){ var e=$('#dhEnviar'); if(e) e.textContent=_darHorasTxt_(); });
   var env=$('#dhEnviar');

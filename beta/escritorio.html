@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=b753094"></script>
+<script src="comun.js?v=e887153"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=6b4e10c"></script>
@@ -121,7 +121,7 @@
 <script src="documentos.escritorio.js?v=a6e1059"></script>
 <script src="sanciones.escritorio.js?v=2126087"></script>
 <script src="reuniones.escritorio.js?v=a36ddea"></script>
-<script src="horas.escritorio.js?v=6e4bcd6"></script>
+<script src="horas.escritorio.js?v=55a9bbe"></script>
 <script src="equipo.escritorio.js?v=b37290d"></script>
 <script src="tareas.escritorio.js?v=d3ebd8c"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
@@ -408,7 +408,7 @@ var api={
      veces, y una clave nacida dentro seria distinta en cada intento -- o sea, ninguna
      proteccion justo cuando hace falta. */
   otorgarHoras:function(p){ return api._post({action:"otorgarHoras",parte:p}); },
-  otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria,subcat:b.subcat||null,clave:b.clave}); },
+  otorgarBloque:function(b){ return api._post({action:"otorgarBloque",nombres:b.nombres,horas:b.horas,tarea:b.tarea,categoria:b.categoria,subcat:b.subcat||null,clave:b.clave,fecha:b.fecha,ini:b.ini,fin:b.fin}); },
   /* 01/11: el feedback del PD a SolarIA; `getFeedbackPD`/`guardarFeedbackPD` en el servidor, puerta de rango 3 y sólo con token. */
   getFeedbackPD: function(){ return api._post({action:"getFeedbackPD"}); },
   guardarFeedbackPD: function(c){ return api._post({action:"guardarFeedbackPD",id:c.id,valoracion:c.valoracion,texto:c.texto,criterio:c.criterio}); },
@@ -3780,7 +3780,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='a913706';
+var BUILD='3697dd0';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

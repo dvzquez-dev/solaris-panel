@@ -1318,7 +1318,7 @@ function filaParte(p){
      nada avisara. Aquí se enseña lo que importa de un parte trabajado —cuándo y cuánto— y
      la nota DETRÁS, como ya hacen `rech` y `rev`. */
   var sub = p.e==='conf' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.nota?' · '+esc(p.nota):''))
-          : p.e==='otor' ? (p.nota?esc(p.nota):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
+          : p.e==='otor' ? (p.nota?esc(p.nota)+(p.ini?' · '+p.ini+'–'+p.fin:''):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
           : p.e==='pend' ? 'esperando aprobación'
           /* ⛔ SE ENSEÑA LA PREGUNTA, NO QUE HAY UNA. «Te piden más detalle» no dice QUÉ
              falta, así que el miembro tiene que adivinar o preguntar por Discord — y el
