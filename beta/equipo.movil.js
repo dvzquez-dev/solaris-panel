@@ -50,7 +50,9 @@ function _rederivarPD_(){
    aquí lo único que cambia es **dejar de mentirle sobre su propio cargo**. */
 function aprobadorDe(autor,unidad){
   var c=coordinadorDe(unidad);
-  if(c!==autor) return {nom:c,escalado:false,propio:false};
+  /* 11/11 (refutar7): `coordinadorDe` también devuelve al PD cuando la unidad NO tiene coordinador (una unidad nueva). Entonces lo firma
+     el Project Director y se dice así: «Pedro, coordinador de tu unidad» era falso para quien entra el primer día. */
+  if(c!==autor) return {nom:c,escalado:(c===PD_NOM),propio:false};
   return {nom:PD_NOM,escalado:true,propio:(PD_NOM===autor)};
 }
 

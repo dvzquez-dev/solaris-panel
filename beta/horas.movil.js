@@ -2467,7 +2467,7 @@ function _rankSubsHTML_(){
         'background:'+(mio?'var(--red)':'var(--ink3)')+'"></i></div></div>'+
         '<div class="d">'+h1(s.media)+'</div></div>';
     }).join('')
-    : vacio('Sin datos de subsistemas','La media por unidad la calcula el motor al cerrar el mes, y el servidor todavía no la ha mandado.','',false))+'</div>';
+    : vacio('Sin datos de subsistemas','La media de cada unidad aparece al cerrar el mes.','',false))+'</div>';
 }
 
 /* 02/11: las horas del parte para «✨ Redactar con SolarIA» (los tres caminos comparten la caja de la justificación), como en `validarFichaje`. */

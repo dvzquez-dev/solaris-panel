@@ -29,7 +29,7 @@ function _normTurnoM_(t, ix){
   var yo=(YO&&YO.nombre)||'', mio=null;
   (t.roles||[]).forEach(function(r){ if(!Array.isArray(r) && (r.miembro===yo)) mio=r.rol||'te toca'; });
   var hoyISO=_dmyAISO_(HOY);
-  var dur=t.duracion || '—';   /* 31/10: el rótulo tarde/mañana no lo sirve `_turnoDeNotion_` (era del espejo, `flujos/turno.py`) */
+  var dur=t.duracion || '';   /* 11/11 (refutar7): sin duración, nada detrás de la hora — «18:00 · —» no dice nada */   /* 31/10: el rótulo tarde/mañana no lo sirve `_turnoDeNotion_` (era del espejo, `flujos/turno.py`) */
   /* `hecho` manda sobre la fecha: lo que decide si un turno sale suelto o al cajon es
      su ESTADO en Notion, no que la fecha haya pasado (un turno de ayer sin cerrar sigue vivo). */
   var est=t.estado||'';
@@ -734,7 +734,7 @@ function _ftInicioM_(){
     return _mioTurno_(x) && x.estado !== 'Cancelado' && _ftEnCurso_(x, ahora); })[0];
   if(!t) return '';
   return '<div class="tarj" data-ftwrap style="display:none">'+cab('Tu turno de hoy', t.hora)+
-    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b><small>'+esc(t.hora)+' · '+esc(t.dur)+'</small></div></div>'+
+    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b><small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+'</small></div></div>'+
     '<div style="padding:0 14px 12px">'+_ftHTML_(t)+'</div></div>';
 }
 
@@ -751,7 +751,7 @@ function vTurnos(){
     return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+
       cab(t.f+(t.crucial?' · crucial':'')+(t.estado==='Cancelado'?' · cancelado':''), t.hora)+   /* 20/10: se dice */
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b>'+
-      '<small>'+esc(t.hora)+' · '+esc(t.dur)+(t.lugar?' · '+esc(t.lugar):'')+'</small></div>'+
+      '<small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+(t.lugar?' · '+esc(t.lugar):'')+'</small></div>'+
       '<div class="d"><span class="chev">›</span></div></div>'+
       t.roles.map(function(r){
         return '<div class="fila'+(r[2]?' yo':'')+'"><div class="a"><b>'+esc(r[0])+'</b>'+
