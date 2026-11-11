@@ -213,6 +213,11 @@ async function _abrirSanciones_(){
     var _okS = await _cargarSancionesM_();
     SANC_FALLO = (_okS === false);
     if($('#modal').classList.contains('on')){ _repintarSancM_(); } }
+  /* 11/11 (refutar9): con la cola YA leída (la del arranque) se enseñaba ESA al abrir: una sanción que llegó después no salía hasta recargar
+     la app, y una coordinadora que la tiene abierta toda la semana decidía sobre una lista vieja. Se re-lee al abrir y sólo se repinta si
+     cambió el conjunto (las marcas Acepta/Rechaza viven en el servidor y vuelven con la lectura). */
+  else{ var _ya=SANC_M.map(function(x){ return x.id; }).join(',');
+    if(await _cargarSancionesM_() && SANC_M.map(function(x){ return x.id; }).join(',')!==_ya && $('#modal').classList.contains('on')) _repintarSancM_(); }
 }
 
 /* ⛔ LA UNICA PUERTA PARA REPINTAR EL MODAL DE SANCIONES. Gemela de `_repintarPonerSanc_`

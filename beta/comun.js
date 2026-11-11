@@ -3467,6 +3467,157 @@ function _cierreTurnoInicial_(t, durH){
   return out;
 }
 
+/* ═══ CERRAR UN TURNO: LA REGLA, UNA VEZ PARA LAS DOS CARAS (11/11/2026, turnomovil) ═══════════════════════════════════════
+   🗣️ Daniel: *«mira que esté bien programado lo de cuando inicio un turno, que el responsable pueda estar fichándolo y lo cierre al acabar»*.
+   El escritorio (`turnos.escritorio.js`) y el móvil (`turnos.movil.js`) cierran el turno con el MISMO estado `st` (`_cierreVacio_`:
+   quién fue, quién llevó coche, el tramo, la duración, el reparto) y las mismas reglas; lo que cada cara pone es sólo el dibujo y
+   el cable. Quién puede, cuándo es cerrable, el tope del extra, el tramo que viaja y la llamada al servidor viven AQUÍ. */
+function _cierreVacio_(){ return {k:null, dur:'', quien:{}, extra:{}, hecho:null, coche:{}, listo:null, ini:'', fin:'', pers:false}; }
+
+/* ⛔ 20/10 (ficha del 20/08): ¿se puede CERRAR este turno hoy? No si Notion ya lo da por `Realizado` o `Cancelado`
+   —cerrar un cancelado acredita «+1 turno» (×4 h) a gente que no fue— y no si es FUTURO. El estado manda sobre la
+   fecha, igual que `_normTurnoM_` en el móvil. Sin fecha legible no se esconde: «no lo sé» no es «no se puede». */
+function _turnoCerrable_(t, hoy){
+  if(!t) return false;
+  var est = t.estado || '';
+  if(est==='Realizado' || est==='Cancelado') return false;
+  var iso = _dmyAISO_(t.f || t.fecha || '');
+  if(/^\d{4}-\d{2}-\d{2}$/.test(iso) && hoy && iso > hoy) return false;
+  return true;
+}
+
+/* 01/11 (Daniel, suplente): ¿figura ese miembro en el turno como suplente? Es el rotulo de la fila de cierre. */
+function _esSuplenteTurno_(t, n){
+  return ((t && t.roles) || []).some(function(r){ return r && r.miembro === n && /suplente/i.test(String(r.rol || '')); });
+}
+
+/* 26/10 (triaje C4b): ¿llevó coche, según el reparto? Es lo que se PROPONE marcado; lo que cuenta es lo que confirme
+   quien cierra (Daniel, 11/08: «si tenía lo de coche también se le añade eso ahí… antes no»). */
+function _llevaCocheTurno_(t, n){
+  return ((t && t.roles) || []).some(function(r){ return r && r.miembro === n && /coche/i.test(String(r.rol || '')); });
+}
+
+/* La duración tecleada o salida del reloj, o NaN. `dur` es texto libre del campo: puede no ser un número. */
+function _cierreDurNum_(st){ return parseFloat(String(st.dur == null ? '' : st.dur).replace(',', '.')); }
+
+/* El techo del extra: `_extraTope_` ya trata el no-numero como 0, que es el lado seguro (sin duracion no se declara ningun extra). */
+function _cierreTope_(st){
+  var d = _cierreDurNum_(st);
+  return _extraTope_(isFinite(d) ? d : 0);
+}
+
+/* ⛔ 20/10: ¿falta la duración? El 0 de arriba es el lado seguro para el NUMERO, pero la pantalla lo convertía en una AFIRMACIÓN
+   —«no ha pasado de las 4 h»— sin que nadie hubiera tecleado nada. Un 0 escrito a mano SI es una duración; vacío o no-número, no. */
+function _cierreSinDur_(st){ return !isFinite(_cierreDurNum_(st)); }
+
+/* 11/11 (turnoextra): el TRAMO REAL que viaja al servidor: el inicio de la pantalla y un fin = inicio + duración, así el tramo y la
+   duración (de la que salió el tope del extra) no se contradicen aunque se haya tecleado una sola. `null` si falta el inicio o la
+   duración (el servidor cierra igual, sin exceso). Cruza la medianoche si hace falta. */
+function _cierreTramo_(st, t){
+  var ini = st.ini || String((t && t.hora) || '').slice(0,5);
+  var d = _cierreDurNum_(st);
+  if(!/^\d{1,2}:\d{2}$/.test(ini) || !isFinite(d) || d <= 0 || d >= 24) return null;
+  var m = (_minHM_(ini) + Math.round(d * 60)) % 1440;
+  return {ini: ini, fin: pad(Math.floor(m / 60)) + ':' + pad(m % 60)};
+}
+
+/* Lo que se mandaría: SOLO los confirmados.
+   ⛔ Quien no fue no lleva fila, en vez de llevar una con 0: son dos afirmaciones distintas —«estuvo y no le toca extra» frente a
+   «no estuvo»— y el turno tambien cuenta un turno en el contador. Colar un 0 por un ausente le sumaria el turno a quien no fue.
+   ⛔ CON LOS DUDOSOS DENTRO: si el responsable marca a alguien que figuraba como `Posible` y al final fue, tiene que VIAJAR. */
+function _cierreMapa_(t, st){
+  var out = {}, tope = _cierreTope_(st), esDud = {};
+  _dudososTurno_(t).forEach(function(n){ esDud[n] = 1; });
+  _asistentesTurno_(t).concat(_dudososTurno_(t)).forEach(function(n){
+    if(!st.quien[n]) return;
+    var v = st.extra[n];
+    /* 01/11 (Daniel): las horas distintas por persona son una opcion APAGADA por defecto; apagada, todos los que fueron llevan el
+       tope (de ahi sale `extra`). `=== false` a proposito: sin el campo es el comportamiento de antes. */
+    if(st.pers === false) v = tope;
+    out[n] = (typeof v === 'number' && isFinite(v)) ? v : (esDud[n] ? 0 : tope);
+  });
+  return out;
+}
+
+/* Siembra el estado la PRIMERA vez que se mira un turno: los firmes se dan por idos; los dudosos NO (marcarlos por defecto le sumaría
+   un turno a quien quizá no fue; dejarlos sin marcar sólo cuesta un clic a quien sabe la respuesta). El coche del reparto se
+   propone. Y con el turno EMPEZADO (`empezado_at`, del servidor) el tramo parte de ese instante hasta `ahoraISO`: se puede corregir
+   a mano antes de cerrar. Idempotente: no pisa lo ya tecleado. */
+function _cierreSembrar_(t, st, ahoraISO){
+  var firmes = _asistentesTurno_(t), dud = _dudososTurno_(t);
+  if(!Object.keys(st.quien).length){
+    firmes.forEach(function(n){ st.quien[n] = true; });
+    dud.forEach(function(n){ st.quien[n] = false; });
+    firmes.concat(dud).forEach(function(n){ st.coche[n] = _llevaCocheTurno_(t, n); });
+  }
+  if(t && t.empezado_at && !st.ini && !st.fin){
+    st.ini = _hhmmDe_(t.empezado_at); st.fin = _hhmmDe_(ahoraISO);
+    var dr = _durTurnoDeHoras_(st.ini, st.fin);
+    if(dr != null && st.dur === '') st.dur = String(dr);
+  }
+}
+
+/* El techo baja (cambia el tramo o la duración): lo que ya estuviera por encima se recorta, o el botón quedaría bloqueado por un
+   número que la persona no puede ver de dónde sale. */
+function _cierreRecortar_(st){
+  var tope = _cierreTope_(st);
+  Object.keys(st.extra).forEach(function(n){ if(st.extra[n] > tope) st.extra[n] = tope; });
+}
+
+/* Cambia inicio/fin: la duración sale de ahí. Si falta una o son iguales (`null`) no se toca la duración: «no lo sé» no es 0. */
+function _cierrePonHoras_(st, ini, fin){
+  st.ini = ini; st.fin = fin;
+  var d = _durTurnoDeHoras_(ini, fin);
+  if(d != null) st.dur = String(d);
+  _cierreRecortar_(st);
+}
+
+/* «4 h de turno + 1 h de compensación por persona»: lo que da el turno, dicho en horas. Sin duración, no se inventa nada. */
+function _cierreResumenHoras_(st){
+  if(_cierreSinDur_(st)) return '';
+  var tope = _cierreTope_(st), base = _horasTurnoBase_();
+  return tope > 0
+    ? h1(base)+' de turno + '+h1(tope)+' de compensaci\u00f3n por persona'
+    : 'Cuenta como un turno de '+h1(base)+'. Sin compensaci\u00f3n';
+}
+
+/* «en curso 1 h 12 min»: el reloj del turno empezado. Menos de una hora, sólo minutos; un reloj en el futuro se queda en 0. */
+function _cierreRelojTexto_(empezadoISO, ahoraMs){
+  var m = Math.max(0, Math.floor((ahoraMs - new Date(empezadoISO).getTime()) / 60000));
+  if(!isFinite(m)) return '';
+  return 'en curso '+(m >= 60 ? Math.floor(m / 60)+' h '+pad(m % 60)+' min' : m+' min');
+}
+
+/* La propuesta, en texto, de lo que se cierra (la ve quien cierra). */
+function _cierreTextoPropuesta_(t, mapa, st){
+  return 'Turno ' + ((t && (t.fecha_txt || t.fecha || t.f)) || '?') +
+    ' \u00b7 ' + Object.keys(mapa).length + ' persona(s), +1 turno cada una\n' +
+    Object.keys(mapa).map(function(n){
+      return '  ' + n + ' \u2192 ' + (mapa[n] ? ('+' + mapa[n] + ' h a Compensaciones') : 'sin extra') + (st.coche[n] ? ' \u00b7 llev\u00f3 coche' : ''); }).join('\n');
+}
+
+/* «Cerrar el turno», UNA vez: valida, manda el tramo REAL y el reparto, y deja el turno «Realizado». El servidor crea, por asistente,
+   el parte de compensación del exceso sobre 4 h (con 4 h o menos, ninguno). Sin tramo (un turno sin hora) se cierra como antes.
+   → `{r, txt, sinId}`; lanza si la API falla (quien llama pinta el motivo). Sin `id` (un turno del espejo de Discord) no hay a qué
+   página ir: devuelve `sinId` y la propuesta, sin llamar. */
+async function _cierreEnviar_(t, st){
+  var mapa = _cierreMapa_(t, st), falta = _cierreTurnoFalta_(mapa, _cierreTope_(st));
+  if(falta) throw new Error(falta);
+  var txt = _cierreTextoPropuesta_(t, mapa, st);
+  if(!t || !t.id) return {r:null, txt:txt, sinId:true};
+  var fueron = Object.keys(mapa), coche = fueron.filter(function(n){ return !!st.coche[n]; }), tr = _cierreTramo_(st, t);
+  var r = await api.estadoTurno({id:t.id, estado:'Realizado', fueron:fueron, coche:coche, ini:tr ? tr.ini : undefined, fin:tr ? tr.fin : undefined, extra:tr ? mapa : undefined});
+  t.estado = 'Realizado';
+  return {r:r, txt:txt, sinId:false};
+}
+
+/* «Empezar turno»: pone en marcha el reloj en el servidor y lo pega al turno. */
+async function _cierreEmpezar_(t){
+  var re = await api.empezarTurno({id:t.id});
+  t.empezado_at = (re && re.empezado_at) || new Date(_ahoraApp_()).toISOString();
+  return t.empezado_at;
+}
+
 /* ⛔ LOS TRES CARGOS QUE NO SE PUEDEN DEJAR EN BLANCO.
    Daniel: «para convocar un turno es obligatorio q se cubran los cargos importantes,
    responsable de turno, responsable audiovisual, responsable de memoria y coche (opcional)».
@@ -3843,7 +3994,7 @@ function _redactarParteDemo_(d){
 }
 function _redactarPartePost_(d){
   if(!_demoLocal_()) return api._post({action: 'redactarParte', notas: d.notas, tarea: d.tarea, tareaCuerpo: d.tareaCuerpo,
-    categoria: d.categoria, fecha: d.fecha, horas: d.horas, declararId: d.declararId});
+    categoria: d.categoria, subcat: d.subcat || undefined, fecha: d.fecha, horas: d.horas, declararId: d.declararId});
   return new Promise(function(ok){ setTimeout(function(){ ok(_redactarParteDemo_(d)); }, 500); });
 }
 /* El contexto que viaja con las notas: la tarea imputada (título y cuerpo si lo trae), categoría, fecha y horas del formulario. */
@@ -3851,7 +4002,7 @@ function _parteCtxIA_(f, horas){
   var t = f.cat === 'tareas' ? (f.tarea === '__otro__' ? f.detalle : f.tarea) : f.detalle, cuerpo = '', i;
   if(f.cat === 'tareas' && f.tarea && f.tarea !== '__otro__' && typeof TAREAS !== 'undefined')
     for(i = 0; i < TAREAS.length; i++) if(TAREAS[i] && TAREAS[i].n === f.tarea && TAREAS[i].cuerpo){ cuerpo = String(TAREAS[i].cuerpo).slice(0, 1500); break; }
-  return {notas: String(f.just || ''), tarea: String(t || ''), tareaCuerpo: cuerpo, categoria: f.cat || '', fecha: String(f.fecha || ''),
+  return {notas: String(f.just || ''), tarea: String(t || ''), tareaCuerpo: cuerpo, categoria: f.cat || '', subcat: _subcatEnvio_(f) || '', fecha: String(f.fecha || ''),
           horas: horas > 0 ? horas : null, declararId: f.declararId == null ? null : f.declararId};
 }
 /* La configuración de «✨ Redactar con SolarIA» de la justificación (`pre` = el id de la caja; `f` = el formulario vivo; `horas()` = las del parte
@@ -6449,6 +6600,33 @@ function _devengadoAHoy_(m, h, frac){
    (desplazamientos, congresos, entrevistas…: la regla de `cuadraCompensaciones`). Restando sólo la base, las 42,25 h de la L1
    salían DOS veces: en su grupo y como «Asignada por el Project Director». Con `items` (los apuntes del mes) se restan
    también; lo que queda es lo que ningún parte explica. Sin `items`, como antes. */
+/* ══ 11/11 (turnoextra) · EL TURNO DE MÁS DE 4 H: UN PARTE DE D HORAS QUE SUMA EN DOS CELDAS ═══════════════════════════════
+   🗣️ Daniel: *«En la app aparecen 5 horas pero realmente es un turno más la hora extra. Entonces es un mismo parte y suma en 2
+   celdas distintas»* y *«esta regla solo suma por encima, no por debajo»*. El servidor (`estadoTurno`) deja, por asistente, UN
+   parte de compensación con `horas` = el exceso (D−4), el tramo ENTERO del turno en `ini`/`fin` y `turno_h` = 4 (lo que ya
+   cuenta como turno). Aquí se ENSEÑA como D horas (`_horasVistaParte_`); las SUMAS (`_compPartesH_`, el desglose, la cuadratura)
+   siguen leyendo `horas`/`q` —el exceso—, y por eso no se cuenta dos veces. ⛔ Quien sume para MOSTRAR un parte usa la vista;
+   quien sume para CUADRAR, no. Gemelas de `ajuste_horas_turno`/`clave_extra_turno` (servidor.py). */
+var TURNO_AJUSTE_POR_DEBAJO = false;     /* espejo del servidor: apagado = sólo suma por encima; encendido, un turno corto resta (D−4) */
+function _claveExtraTurno_(fecha, nombre){ return 'turno-'+fecha+'-extra-'+nombre; }
+function _ajusteHorasTurno_(dur, porDebajo){
+  var d = Math.round((Number(dur) - _horasTurnoBase_()) * 100) / 100;
+  if(!isFinite(d)) return 0;
+  if(d > 0) return d;
+  return (d < 0 && (porDebajo === undefined ? TURNO_AJUSTE_POR_DEBAJO : porDebajo)) ? d : 0;
+}
+/* Las horas que ese parte YA cuenta como turno (4 en el exceso de un turno; 0 en cualquier otro). Reconoce el campo del
+   servidor y, para el que se cargó a mano (T-2026-11-05), la clave `turno-<fecha>-extra-<nombre>`. */
+function _turnoBaseDeParte_(p){
+  if(!p) return 0;
+  if(Number(p.turno_h) > 0) return Number(p.turno_h);
+  return /^turno-\d{4}-\d{2}-\d{2}-extra-/.test(String(p.clave || '')) ? _horasTurnoBase_() : 0;
+}
+function _horasVistaParte_(p){
+  if(!p) return 0;
+  return Math.round(((Number(p.q != null ? p.q : p.horas) || 0) + _turnoBaseDeParte_(p)) * 100) / 100;
+}
+
 function _compPartesH_(items){
   var t=0;
   (items||[]).forEach(function(p){
@@ -14156,7 +14334,7 @@ function _bloqueFormHTML_(){
       _bloqueResHTML_(B.res)+'<button class="btn pri" data-blqcerrar data-p>Cerrar</button>';
   var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
   return '<div id="blqForm">'+
-    '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 4px">'+(fin?'Finalizar la reunión':(B.reunion_id!=null?'Declarar parte de bloque':'Parte para varias personas'))+'</div>'+
+    '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 4px">'+(fin?'Finalizar la reunión':(B.reunion_id!=null?'Declarar horas de varias personas':'Parte para varias personas'))+'</div>'+
     '<p class="rnota" style="margin:0 0 12px">'+(fin
       ? 'Un parte pendiente por participante con lo que ha durado'+(B.en_curso?' (<b data-crono="'+esc(B.en_curso.ini)+'">'+esc(_cronoTxt_(B.en_curso.ini))+'</b> hasta ahora)':'')+
         '; el PD los decide de una vez.'
@@ -14265,7 +14443,7 @@ function _bloqueReuHTML_(r, puede){
         '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-p id="btnFinalizar" style="flex:2">Finalizar</button>'+
         '<button class="btn" data-p id="btnCancelarCurso" style="flex:1">Cancelar</button></div>'
       : '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>')+
-    '<button class="btn '+(pend?'pri':'mini')+' full" data-p id="btnDeclararBloque" style="margin-top:8px">'+(_reuTerminada_(r) ? 'Dar las horas a los asistentes' : 'Declarar parte de bloque')+'</button>'+
+    '<button class="btn '+(pend?'pri':'mini')+' full" data-p id="btnDeclararBloque" style="margin-top:8px">'+(_reuTerminada_(r) ? 'Dar las horas a los asistentes' : 'Declarar horas de varias personas')+'</button>'+
     '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p></div>';
 }
 

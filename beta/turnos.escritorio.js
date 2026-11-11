@@ -1410,18 +1410,6 @@ function cablearCoches(){
    Un solo campo por turno reparte a partes iguales, que es justo lo que ese ejemplo descarta.
    ⚠️ NO ESCRIBE EN NOTION. Deja la propuesta a la vista para aplicarla: escribir en Notion
    exige el visto bueno de Daniel **cada vez**, y son los puntos de personas reales. */
-/* ⛔ 20/10 (ficha del 20/08): ¿se puede CERRAR este turno hoy? No si Notion ya lo da por `Realizado` o `Cancelado`
-   —cerrar un cancelado acredita «+1 turno» (×4 h) a gente que no fue— y no si es FUTURO. El estado manda sobre la
-   fecha, igual que `_normTurnoM_` en el móvil. Sin fecha legible no se esconde: «no lo sé» no es «no se puede». */
-function _turnoCerrable_(t, hoy){
-  if(!t) return false;
-  var est = t.estado || '';
-  if(est==='Realizado' || est==='Cancelado') return false;
-  var iso = _dmyAISO_(t.f || t.fecha || '');
-  if(/^\d{4}-\d{2}-\d{2}$/.test(iso) && hoy && iso > hoy) return false;
-  return true;
-}
-
 /* 26/10 (refutador 37, 🟡 4): la misma puerta que `e_estado_turno` para «Cancelado»: el PD siempre; el resto, sólo un
    turno de hoy (los de la lista ya no son futuros). Sin fecha legible, no: el servidor tampoco lo sabría. */
 function _puedeCancelarTurno_(t){
@@ -1470,56 +1458,12 @@ function _cierreTurSel_(){
   return null;
 }
 
-/* El techo de esta pantalla. `dur` es texto libre del campo, asi que puede no ser un numero:
-   `_extraTope_` ya trata el no-numero como 0, que es el lado seguro (sin duracion no se
-   declara ningun extra). */
-function _cierreTurTope_(){
-  var d = parseFloat(String(CIERRE_TUR.dur).replace(',', '.'));
-  return _extraTope_(isFinite(d) ? d : 0);
-}
+/* El techo, el tramo y el «falta la duración» son de `comun.js` (`_cierreTope_`, `_cierreSinDur_`; el tramo, `_cierreTramo_`, lo manda `_cierreEnviar_`): el móvil cierra con las mismas. */
+function _cierreTurTope_(){ return _cierreTope_(CIERRE_TUR); }
+function _cierreTurSinDur_(){ return _cierreSinDur_(CIERRE_TUR); }
 
-/* ⛔ 20/10 (ficha del 20/08): ¿falta la duracion? El 0 de arriba es el lado seguro para el NUMERO, pero el panel
-   lo convertia en una AFIRMACION —«el turno no ha pasado de las 4 h de base»— en la primera pintada, sin que nadie
-   hubiera tecleado nada, y dejaba «Cerrar el turno» suelto: +1 turno a cada uno, sin extra, sin decir cuanto duro.
-   Un 0 escrito a mano SI es una duracion (quien lo pone lo dice); vacio o no-numero, no. */
-function _cierreTurSinDur_(){
-  var d = parseFloat(String(CIERRE_TUR.dur == null ? '' : CIERRE_TUR.dur).replace(',', '.'));
-  return !isFinite(d);
-}
-
-/* Lo que se mandaria: SOLO los confirmados.
-   ⛔ Quien no fue no lleva fila, en vez de llevar una con 0: son dos afirmaciones distintas
-   —«estuvo y no le toca extra» frente a «no estuvo»— y el turno tambien cuenta un turno en el
-   contador. Colar un 0 por un ausente le sumaria el turno a quien no fue. */
-function _cierreTurMapa_(){
-  var out = {}, t = _cierreTurSel_(), tope = _cierreTurTope_();
-  /* ⛔ CON LOS DUDOSOS DENTRO: si el responsable marca a alguien que figuraba como
-     `Posible` y al final fue, tiene que VIAJAR. Recorrer solo `_asistentesTurno_` hacia
-     que marcarlo en la pantalla no sirviera de nada — el clic entraba y la propuesta
-     salia sin el. */
-  var esDud = {};
-  _dudososTurno_(t).forEach(function(n){ esDud[n] = 1; });
-  _asistentesTurno_(t).concat(_dudososTurno_(t)).forEach(function(n){
-    if(!CIERRE_TUR.quien[n]) return;
-    var v = CIERRE_TUR.extra[n];
-    /* 01/11 (Daniel): las horas distintas por persona son una opcion APAGADA por defecto; apagada, todos los que
-       fueron llevan el tope (de ahi sale `extra`). `=== false` a proposito: sin el campo es el comportamiento de antes. */
-    if(CIERRE_TUR.pers === false) v = tope;
-    out[n] = (typeof v === 'number' && isFinite(v)) ? v : (esDud[n] ? 0 : tope);
-  });
-  return out;
-}
-
-/* 01/11 (Daniel, suplente): ¿figura ese miembro en el turno como suplente? Es el rotulo de la fila de cierre. */
-function _esSuplenteTurno_(t, n){
-  return ((t && t.roles) || []).some(function(r){ return r && r.miembro === n && /suplente/i.test(String(r.rol || '')); });
-}
-
-/* 26/10 (triaje C4b): ¿llevó coche, según el reparto? Es lo que se PROPONE marcado; lo que cuenta es lo que confirme
-   quien cierra (Daniel, 11/08: «si tenía lo de coche también se le añade eso ahí… antes no»). */
-function _llevaCocheTurno_(t, n){
-  return ((t && t.roles) || []).some(function(r){ return r && r.miembro === n && /coche/i.test(String(r.rol || '')); });
-}
+/* Lo que se mandaría: `_cierreMapa_` (comun.js), con el estado de esta pantalla. */
+function _cierreTurMapa_(){ return _cierreMapa_(_cierreTurSel_(), CIERRE_TUR); }
 
 /* 26/10 (triaje C4a/C4b): lo que queda a la vista tras cerrar o cancelar — el turno ya NO es cerrable y saldría de la
    lista, pero la propuesta para Compensaciones es lo que se aplica: no puede desaparecer con él. */
@@ -1555,13 +1499,9 @@ function _cierreTurnoPanel_(){
      ⛔ Y la direccion importa: marcarlos por defecto le sumaria **un turno** a quien quiza
      no fue —lo dice el comentario de `_cierreTurMapa_` dos funciones mas arriba—, mientras
      que dejarlos sin marcar solo cuesta un clic a quien sabe la respuesta. */
-  if(!Object.keys(CIERRE_TUR.quien).length){
-    firmes.forEach(function(n){ CIERRE_TUR.quien[n] = true; });
-    dud.forEach(function(n){ CIERRE_TUR.quien[n] = false; });
-    /* 26/10 (C4b): el coche del reparto, propuesto; se confirma aquí */
-    asis.forEach(function(n){ CIERRE_TUR.coche[n] = _llevaCocheTurno_(t, n); });
-  }
-
+  /* La siembra (firmes sí, dudosos no, coche del reparto, y el reloj si el turno está empezado) es de `comun.js`: el móvil la comparte. */
+  _cierreSembrar_(t, CIERRE_TUR, new Date(_ahoraApp_()).toISOString());
+  tope = _cierreTurTope_();
   var ini0 = CIERRE_TUR.ini || String((t && t.hora) || '').slice(0,5);   /* el turno suele salir a su hora: de ahi se parte */
   var mapa = _cierreTurMapa_(), sinDur = _cierreTurSinDur_(),
       falta = sinDur ? 'Di cu\u00e1nto dur\u00f3 el turno' : _cierreTurnoFalta_(mapa, tope);
@@ -1620,6 +1560,9 @@ function _cierreTurnoPanel_(){
     listo+
     '<div class="campo"><span class="sc">Qu\u00e9 turno</span>'+
       nxElige('ctSel', opciones, CIERRE_TUR.k||'')+'</div>'+
+    (t && t.empezado_at
+      ? '<div class="nota" id="ctReloj">En curso desde las '+esc(_hhmmDe_(t.empezado_at))+'. Al acabar, \u00abCerrar el turno\u00bb toma de ah\u00ed el inicio y ahora como fin; c\u00e1mbialos si no fue as\u00ed.</div>'
+      : (t && t.id ? '<button class="btn" id="ctEmpezar" style="margin:0 0 11px">Empezar turno</button>' : ''))+
     /* 01/11 (Daniel, suplente): las horas salen de cuando empezo y cuando acabo, CONTANDO EL TRANSPORTE */
     '<div class="campo"><span class="sc">Cu\u00e1ndo empez\u00f3 (saliendo de casa)</span>'+
       nxHora('ctIni', ini0)+'</div>'+
@@ -1676,12 +1619,7 @@ function _cablearCierreTurno_(){
   /* 01/11: inicio/fin -> duracion. Si falta una o son iguales (`null`) no se toca la duracion: «no lo se» no es 0. */
   var ci = document.getElementById('ctIni'), cf = document.getElementById('ctFin');
   var porHoras = function(){
-    CIERRE_TUR.ini = ci.value; CIERRE_TUR.fin = cf.value;
-    var d = _durTurnoDeHoras_(ci.value, cf.value);
-    if(d != null) CIERRE_TUR.dur = String(d);
-    var tope = _cierreTurTope_();
-    Object.keys(CIERRE_TUR.extra).forEach(function(n){
-      if(CIERRE_TUR.extra[n] > tope) CIERRE_TUR.extra[n] = tope; });
+    _cierrePonHoras_(CIERRE_TUR, ci.value, cf.value);
     CIERRE_TUR.hecho = null; pintar();
   };
   if(ci && cf){ ci.onchange = porHoras; cf.onchange = porHoras; }
@@ -1696,11 +1634,7 @@ function _cablearCierreTurno_(){
   var dur = document.getElementById('ctDur');
   if(dur) dur.onchange = function(){
     CIERRE_TUR.dur = dur.value;
-    /* El techo baja: lo que ya estuviera por encima se recorta, o el boton quedaria
-       bloqueado por un numero que la persona no puede ver de donde sale. */
-    var tope = _cierreTurTope_();
-    Object.keys(CIERRE_TUR.extra).forEach(function(n){
-      if(CIERRE_TUR.extra[n] > tope) CIERRE_TUR.extra[n] = tope; });
+    _cierreRecortar_(CIERRE_TUR);
     CIERRE_TUR.hecho = null; pintar();
   };
   $$('[data-ct-fue]').forEach(function(el){
@@ -1715,29 +1649,33 @@ function _cablearCierreTurno_(){
     }; });
   var b = document.getElementById('ctEnviar');
   if(b) b.onclick = async function(){
-    var mapa = _cierreTurMapa_(), tope = _cierreTurTope_();
-    var falta = _cierreTurnoFalta_(mapa, tope);
+    var falta = _cierreTurnoFalta_(_cierreTurMapa_(), _cierreTurTope_());
     if(falta){ b.textContent = falta; return; }
     var t = _cierreTurSel_();
-    var txt = 'Turno ' + ((t && (t.fecha_txt || t.fecha || t.f)) || '?') +
-      ' \u00b7 ' + Object.keys(mapa).length + ' persona(s), +1 turno cada una\n' +
-      Object.keys(mapa).map(function(n){
-        return '  ' + n + ' \u2192 ' + (mapa[n] ? ('+' + mapa[n] + ' h a Compensaciones')
-                                                : 'sin extra') + (CIERRE_TUR.coche[n] ? ' \u00b7 llev\u00f3 coche' : ''); }).join('\n');
     /* ⛔ 26/10 (triaje C4a/C4b): y el turno queda «Realizado», con el acta — quién fue y, de ellos, quién llevó coche.
-       Sin `id` (un turno del espejo de Discord) no hay a qué página ir: la propuesta sale igual y se dice. */
-    if(!t || !t.id){ CIERRE_TUR.hecho = txt + '\n(Este turno no trae su ID de Notion: márcalo «Realizado» a mano.)'; pintar(); return; }
-    var fueron = Object.keys(mapa), coche = fueron.filter(function(n){ return !!CIERRE_TUR.coche[n]; });
+       La llamada (tramo real + reparto del extra) es `_cierreEnviar_` de `comun.js`, la misma del móvil. Sin `id` (un turno del
+       espejo de Discord) no hay a qué página ir: la propuesta sale igual y se dice. */
     b.disabled = true; b.textContent = 'Cerrando\u2026';
     try{
-      var r = await api.estadoTurno({id:t.id, estado:'Realizado', fueron:fueron, coche:coche});
-      t.estado = 'Realizado';
+      var en = await _cierreEnviar_(t, CIERRE_TUR), txt = en.txt, r = en.r;
+      if(en.sinId){ b.disabled = false; b.textContent = 'Cerrar el turno'; CIERRE_TUR.hecho = txt + '\n(Este turno no trae su ID de Notion: m\u00e1rcalo \u00abRealizado\u00bb a mano.)'; pintar(); return; }
       var se = (r && r.sinEtiquetar) || [];
-      CIERRE_TUR.listo = {titulo:'Turno cerrado: queda «Realizado». Propuesta para Compensaciones (la aplica Daniel):', txt:txt,
+      var nx = (r && r.extras) || [];
+      CIERRE_TUR.listo = {titulo:'Turno cerrado: queda «Realizado». ' + (nx.length ? 'El tiempo extra ya está en sus partes de compensación:' : 'Sin tiempo extra que repartir:'), txt:txt,
         aviso: se.length ? ('Sin usuario de Notion, no entran en Asistentes: ' + se.join(', ')) : ''};
       CIERRE_TUR.k = null; CIERRE_TUR.quien = {}; CIERRE_TUR.extra = {}; CIERRE_TUR.coche = {}; CIERRE_TUR.ini = ''; CIERRE_TUR.fin = ''; CIERRE_TUR.pers = false;
       CIERRE_TUR.dur = ''; CIERRE_TUR.hecho = null; pintar();
     }catch(e){ b.disabled = false; b.textContent = 'No se pudo cerrar: ' + ((e && e.message) || e); }
+  };
+  var be = document.getElementById('ctEmpezar');
+  if(be) be.onclick = async function(){
+    var te = _cierreTurSel_();
+    if(!te || !te.id) return;
+    be.disabled = true; be.textContent = 'Empezando\u2026';
+    try{
+      await _cierreEmpezar_(te);
+      pintar();
+    }catch(e){ be.disabled = false; be.textContent = 'No se pudo empezar: ' + ((e && e.message) || e); }
   };
   var bc = document.getElementById('ctCancelar');
   if(bc) bc.onclick = async function(){

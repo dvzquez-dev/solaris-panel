@@ -549,7 +549,7 @@ function vReu(){
   /* 01/11: con orden del día de duración conocida, la ventana es de los bloques que ESE orden pide (`comun.js`). */
   var _vf=_ventanaFijar_(R, _minR, best), vent=_vf.vent;
   var _huecoM_=function(){ var f=_ventanaFijar_(R, _minR, best);
-    return '<b>'+_nConvM_(R)+'</b> convocados · mejor hueco '+_titularHueco_(R, f.vent, _nresp, pondOn)+_notaOrdenHTML_(f); };
+    return '<b>'+_nConvM_(R)+'</b> convocados · '+(f.vent.v>0?'mejor hueco ':'')+_titularHueco_(R, f.vent, _nresp, pondOn)+_notaOrdenHTML_(f); };
   _ordSt_(R.id).sugHTML=_huecoM_;
   /* El orden del día llega por red DESPUÉS de pintar: con él cambia el hueco recomendado, y el mapa lo resalta de nuevo (la fijada no se toca). */
   _ordSt_(R.id).sugMapa=function(){
@@ -1171,7 +1171,7 @@ function crearModal(){
     /* 01/11 (Daniel [c8bd27e9d3]): el mínimo lo elige quien convoca entre el del periodo y ±5; las de trabajo no lo llevan. */
     '<div id="ceMin" hidden></div>'+
     '<p class="rnota" id="cePrev" style="color:var(--ink2)"></p>'+
-    '<button class="btn pri full" style="margin-top:12px" data-p id="btnCrearOK">Crear encuesta</button>');
+    '<button class="btn pri full" style="margin-top:12px" data-p id="btnCrearOK">Convocar la reunión</button>');
 
   var val=function(id){ var e=$('#'+id); return e?e.value:''; };
   var per=function(){ return nxSi('cePerdia'); };
@@ -1306,7 +1306,7 @@ function crearModal(){
     if(PLANTILLAS_M.length>8) PLANTILLAS_M.length=8;
     /* 26/10 (auditor 33, 🟡 A2 — Daniel: «Sí, en nombre de X»): con «Ver como», se dice y se confirma. */
     var _enN=_avisoEnNombreDe_(reu.convocante); if(_enN && !(await dialogoSiNo(_enN+'\u00bfConvocarla?'))) return;
-    bt.disabled=true; var prev=bt.textContent; bt.textContent='Creando…';
+    bt.disabled=true; var prev=bt.textContent; bt.textContent='Convocando…';
     if(typeof backendOK!=='undefined' && backendOK && SESION){
       try{ var d=await api.crearReunion(reu); if(d&&d.id) reu.id=d.id;
         cerrarModal();

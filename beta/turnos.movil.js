@@ -39,6 +39,8 @@ function _normTurnoM_(t, ix){
     principales:t.principales||[], secundarios:t.secundarios||[],
     nota:t.nota||null, crucial:!!t.crucial, memoria:t.memoria||null,
     coches: Array.isArray(t.coches) ? t.coches : [],   /* 22/10 (auditor 25, 🟠 3): se tiraban aquí */
+    /* 11/11 (turnomovil): lo que el CIERRE necesita y `roles` (que aquí son [pila, rol, esYo]) no lleva: quiénes son (nombre entero) y el reloj. */
+    rolesM: (t.roles||[]).filter(function(r){ return r && !Array.isArray(r); }), empezado_at: t.empezado_at || null,
     _real:true };
 }
 
@@ -921,4 +923,129 @@ function progTurnoAbrir(){
   };
   _progPintar_();
   _progCalorCargar_();
+}
+
+
+/* ═══ EMPEZAR Y CERRAR UN TURNO DESDE EL MÓVIL (11/11/2026, turnomovil) ═══════════════════════════════════════════════════
+   🗣️ Daniel: *«mira que esté bien programado lo de cuando inicio un turno, que el responsable pueda estar fichándolo y lo cierre al acabar»*.
+   El responsable está en el taller con el móvil. En la ficha de SU turno (el responsable o el PD; nadie más ve nada de esto):
+   «Empezar turno» pone en marcha el reloj y lo enseña («en curso 1 h 12 min»); al acabar, «Cerrar el turno» pide quién fue, quién
+   llevó coche y el tramo (prellenado del reloj, editable), y dice lo que da en horas («4 h de turno + 1 h de compensación por persona»).
+   ⛔ NO HAY LÓGICA PROPIA: quién puede (`_puedeCerrarTurno_`), cuándo es cerrable (`_turnoCerrable_`), el tope, el tramo, la llamada
+   al servidor y el reloj son de `comun.js` (`_cierre*_`); el escritorio llama a las mismas. Aquí sólo el dibujo y el cable.
+   ⛔ Las horas distintas por persona NO están en el móvil: todos los que fueron llevan lo mismo (el tope), que es el defecto del escritorio.
+   ⚠️ El turno del móvil trae `roles` como [pila, rol, esYo]; las reglas de `comun.js` leen `{miembro, rol}` → `_ctMVista_`. */
+function _ctMVista_(t){
+  if(!t || !YO) return null;
+  var v = {id:t.id, estado:t.estado, fecha:t.iso, f:t.f, hora:t.hora, punto:t.punto, roles:t.rolesM || [], empezado_at:t.empezado_at || null};
+  return _puedeCerrarTurno_(v, YO.nombre) ? v : null;
+}
+/* Lo que la vista cambió (estado, reloj) vuelve al turno de verdad. */
+function _ctMDevolver_(t, v){
+  t.estado = v.estado; t.empezado_at = v.empezado_at;
+  t.hecho = (t.estado === 'Realizado' || t.estado === 'Cancelado');
+}
+function _ctMReloj_(t){
+  return t.empezado_at ? _cierreRelojTexto_(t.empezado_at, new Date(_ahoraApp_()).getTime()) : '';
+}
+function _ctMHTML_(t){
+  var v = _ctMVista_(t);
+  if(!v) return '';
+  if(!CIERRE_M || CIERRE_M.k !== t.id){ CIERRE_M = _cierreVacio_(); CIERRE_M.k = t.id; CIERRE_M.abierto = false; }
+  var st = CIERRE_M, hoy = String(_ahoraApp_()).slice(0,10);
+  var lab = function(x){ return '<span class="sc" style="display:block;margin:12px 0 6px">'+x+'</span>'; };
+  if(st.listo)
+    return '<div id="ctM" class="rnota" style="margin-top:14px;border-top:1px solid var(--line);padding-top:11px"><b>'+esc(st.listo.titulo)+'</b>'+
+      (st.listo.aviso ? '<br>'+esc(st.listo.aviso) : '')+'</div>';
+  if(!_turnoCerrable_(v, hoy)) return '';
+  var cab = '<div id="ctM" style="margin-top:14px;border-top:1px solid var(--line);padding-top:11px">';
+  if(!st.abierto){
+    var rel = _ctMReloj_(t);
+    return cab+
+      (rel
+        ? '<p class="rnota" id="ctMReloj" style="margin:0 0 10px"><b>'+esc(rel.charAt(0).toUpperCase()+rel.slice(1))+'</b> · desde las '+esc(_hhmmDe_(t.empezado_at))+'</p>'
+        : (v.fecha === hoy
+            ? '<button class="btn pri full" data-p id="ctMEmp">Empezar turno</button>'+
+              '<p class="rnota" style="margin:8px 0 10px">Pone en marcha el reloj. Al acabar, lo cierras desde aquí.</p>'
+            : ''))+
+      '<button class="btn'+(rel ? ' pri' : '')+' full" data-p id="ctMAbrir">Cerrar el turno</button></div>';
+  }
+  /* El formulario del cierre */
+  var tope0 = _cierreTope_(st);
+  _cierreSembrar_(v, st, new Date(_ahoraApp_()).toISOString());
+  if(!st.ini && !st.fin){   /* sin reloj: se parte de la hora del turno hasta ahora, si cuadra (un turno no dura más de 12 h) */
+    var i0 = String(v.hora || '').slice(0,5), f0 = _hhmmDe_(new Date(_ahoraApp_()).toISOString()), d0 = _durTurnoDeHoras_(i0, f0);
+    if(d0 != null && d0 <= 12){ st.ini = i0; st.fin = f0; st.dur = String(d0); }
+  }
+  var asis = _asistentesTurno_(v).concat(_dudososTurno_(v)), resp = _responsableTurno_(v);
+  var fila = function(n){
+    var on = !!st.quien[n];
+    return '<div class="fila" style="display:block;padding:9px 0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>'+esc((miembro(n)||{}).pila || n)+'</b>'+
+      (n === resp ? '<span class="chip">responsable</span>' : '')+(_esSuplenteTurno_(v, n) ? '<span class="chip">suplente</span>' : '')+'</div>'+
+      '<div style="display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin-top:6px">'+
+        '<span class="sc">Fue</span>'+nxSiNo('', on, {attrs:'data-ctm-fue="'+esc(n)+'"'})+
+        '<span class="sc">Coche</span>'+nxSiNo('', st.coche[n], {attrs:'data-ctm-coche="'+esc(n)+'"', off:!on})+'</div></div>';
+  };
+  var mapa = _cierreMapa_(v, st), sinDur = _cierreSinDur_(st), tope = _cierreTope_(st),
+      falta = sinDur ? 'Pon cu\u00e1ndo empez\u00f3 y cu\u00e1ndo acab\u00f3' : _cierreTurnoFalta_(mapa, tope),
+      ini0 = st.ini || String(v.hora || '').slice(0,5);
+  return cab+'<div class="mtit" style="font-size:16px;margin:0 0 4px">Cerrar el turno</div>'+
+    lab('Qui\u00e9n fue')+(asis.length ? '<div class="tarj" style="margin:0;padding:0 12px">'+asis.map(fila).join('')+'</div>'
+      : '<p class="rnota">Este turno no tiene a nadie resuelto en el reparto.</p>')+
+    lab('Cu\u00e1ndo empez\u00f3 (saliendo de casa)')+nxHora('ctMIni', ini0)+
+    lab('Cu\u00e1ndo acab\u00f3 (ya de vuelta)')+nxHora('ctMFin', st.fin || ini0)+
+    '<p class="rnota" id="ctMRes" style="margin:12px 0 0"><b>'+esc(_cierreResumenHoras_(st))+'</b></p>'+
+    '<p class="rnota" id="ctMFalta" style="margin:6px 0 0;color:var(--ink2)">'+esc(falta || '')+'</p>'+
+    '<button class="btn pri full" data-p id="ctMOK" style="margin-top:10px"'+(falta ? ' disabled' : '')+'>Cerrar el turno</button></div>';
+}
+/* Pinta el bloque en su sitio y le pone el cable. */
+function _ctMPintar_(t){
+  var caja = document.getElementById('ctM'); if(!caja) return;
+  var nueva = document.createElement('div'); nueva.innerHTML = _ctMHTML_(t);
+  var nv = nueva.firstElementChild;
+  if(nv) caja.replaceWith(nv); else caja.remove();
+  _ctMEnganchar_(t);
+}
+function _ctMEnganchar_(t){
+  var caja = document.getElementById('ctM'); if(!caja) return;
+  var st = CIERRE_M, v = _ctMVista_(t);
+  if(CIERRE_M_RELOJ){ clearInterval(CIERRE_M_RELOJ); CIERRE_M_RELOJ = null; }
+  if(document.getElementById('ctMReloj'))
+    CIERRE_M_RELOJ = setInterval(function(){
+      var el = document.getElementById('ctMReloj');
+      if(!el){ clearInterval(CIERRE_M_RELOJ); CIERRE_M_RELOJ = null; return; }
+      var rel = _ctMReloj_(t); el.innerHTML = '<b>'+esc(rel.charAt(0).toUpperCase()+rel.slice(1))+'</b> \u00b7 desde las '+esc(_hhmmDe_(t.empezado_at));
+    }, 20000);
+  var emp = document.getElementById('ctMEmp');
+  if(emp) emp.onclick = async function(){
+    if(emp.disabled) return;
+    if(!backendOK || !SESION){ tost('Sin conexi\u00f3n no se empieza el turno: el reloj lo guarda el servidor.'); return; }
+    emp.disabled = true; var prev = emp.textContent; emp.textContent = 'Empezando\u2026';
+    try{ await _cierreEmpezar_(v); _ctMDevolver_(t, v); _ctMPintar_(t); }
+    catch(e){ emp.disabled = false; emp.textContent = prev; tostErr('No se pudo empezar: ', e); }
+  };
+  var ab = document.getElementById('ctMAbrir');
+  if(ab) ab.onclick = function(){ st.abierto = true; _ctMPintar_(t); };
+  [].forEach.call(caja.querySelectorAll('[data-ctm-fue]'), function(el){
+    el.onchange = function(){ st.quien[el.dataset.ctmFue] = nxSi(el); _ctMPintar_(t); }; });
+  [].forEach.call(caja.querySelectorAll('[data-ctm-coche]'), function(el){
+    el.onchange = function(){ st.coche[el.dataset.ctmCoche] = nxSi(el); }; });
+  var ci = document.getElementById('ctMIni'), cf = document.getElementById('ctMFin');
+  var porHoras = function(){ _cierrePonHoras_(st, ci.value, cf.value); _ctMPintar_(t); };
+  if(ci && cf){ ci.onchange = porHoras; cf.onchange = porHoras; }
+  var ok = document.getElementById('ctMOK');
+  if(ok) ok.onclick = async function(){
+    if(ok.disabled) return;
+    if(!backendOK || !SESION){ tost('Sin conexi\u00f3n no se cierra el turno: se escribe en Notion.'); return; }
+    ok.disabled = true; var prev = ok.textContent; ok.textContent = 'Cerrando\u2026';
+    try{
+      var en = await _cierreEnviar_(v, st), r = en.r || {}, nx = r.extras || [], se = r.sinEtiquetar || [];
+      if(en.sinId){ ok.disabled = false; ok.textContent = prev; tost('Este turno no trae su ID de Notion: m\u00e1rcalo \u00abRealizado\u00bb a mano.'); return; }
+      _ctMDevolver_(t, v);
+      st.listo = {titulo:'Turno cerrado. '+(nx.length ? 'El tiempo extra ya est\u00e1 en sus partes de compensaci\u00f3n.' : 'Sin tiempo extra que repartir.'),
+        aviso: se.length ? 'Sin usuario de Notion, no entran en Asistentes: '+se.join(', ') : ''};
+      _ctMPintar_(t);
+      try{ pintar(); }catch(_){}
+    }catch(e){ ok.disabled = false; ok.textContent = prev; tostErr('No se pudo cerrar: ', e); }
+  };
 }

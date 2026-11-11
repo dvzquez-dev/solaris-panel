@@ -174,6 +174,7 @@ function normParte(p){
   if(_eo) fl.push([_eo.tono==='ok'?'ok':'wa', _eo.txt]);
   return { id:p.id, autor:p.autor, unidad:p.subsistema||'—', fecha:_isoADMY_(p.fecha),
     ini:p.ini||'—', fin:p.fin||'—', horas:Number(p.horas)||0, tarea:p.tarea||'',
+    turno_h:p.turno_h||0, clave:p.clave||'',   /* 11/11 (turnoextra): `_horasVistaParte_` los lee */
     /* ⛔ EL ORIGEN SE PASA TAL CUAL, sin traducirlo a `bloque`/`turno`. Ese par era un
        TERCER vocabulario para el mismo hecho, y ademas mentia: llamaba «bloque» a lo que
        alguien declaraba a mano y a lo que otorgaba la coordinacion.
@@ -232,7 +233,7 @@ function _escHistFilaHTML_(p, per, uc){
   var dec=p.estado==='aprobado' ? _selloAprobado_(p, per, uc)
         : (p.estado==='rechazado' || p.estado==='detalle') ? 'decidido '+_firmaParte_(p) : '';
   return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+
-    h1(p.horas)+' · '+_icoBloque_(p)+esc(p.tarea)+'</b><small>'+p.fecha+(p.ini!=='—' && p.fin!=='—' ? ' · '+esc(p.ini)+'–'+esc(p.fin) : '')+(dec?' · '+esc(dec):'')+
+    h1(_horasVistaParte_(p))+' · '+_icoBloque_(p)+esc(p.tarea)+'</b><small>'+p.fecha+(p.ini!=='—' && p.fin!=='—' ? ' · '+esc(p.ini)+'–'+esc(p.fin) : '')+(dec?' · '+esc(dec):'')+
     (p.motivo?' · «'+esc(p.motivo)+'»':'')+'</small></span><span class="der">'+et+'</span></div>';
 }
 
@@ -1465,7 +1466,7 @@ function _filasMesE_(items){
     var da=_fechaDMY_(a.fecha), db=_fechaDMY_(b.fecha); return (db?db.getTime():0)-(da?da.getTime():0);
   }).map(function(p){
     return '<tr><td>'+_icoBloque_(p)+esc(p.tarea||'Parte')+'<div class="sc">'+esc(p.fecha||'')+(p.unidad&&p.unidad!=='—'?' · '+esc(p.unidad):'')+
-      (p.cat && (p.cat in CAT_ETI) ? ' · '+esc(CAT_ETI[p.cat]) : '')+'</div></td><td class="r mono">'+nf2(Number(p.horas)||0)+' h</td></tr>';
+      (p.cat && (p.cat in CAT_ETI) ? ' · '+esc(CAT_ETI[p.cat]) : '')+'</div></td><td class="r mono">'+nf2(_horasVistaParte_(p))+' h</td></tr>';
   }).join(''));
 }
 

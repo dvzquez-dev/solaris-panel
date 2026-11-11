@@ -63,6 +63,7 @@ function _origenParte_(p){
 function normPMovil(p){
   return { id:p.id, f:_isoADMY_(p.fecha), iso:String(p.fecha||''), t:p.tarea||'', q:Number(p.horas)||0,
     bloque:p.bloque||null,   /* 03/11: el icono «en bloque» de `filaParte` */
+    turno_h:p.turno_h||0, clave:p.clave||'',   /* 11/11 (turnoextra): `_horasVistaParte_` los lee */
     e:_E_MOVIL_[p.estado]||'raro', ini:p.ini||'',   /* 20/10: lo que no conocemos NO es «en cola» (§3c-24) */ fin:p.fin||'', cat:p.categoria||null, subcat:p.subcat||null,
     /* ⛔ LA PUERTA VA DENTRO DEL `||`, NO ENVOLVIENDOLO, y no es estilo: `nota` mezcla
        DOS cosas distintas --el motivo de una decision y la justificacion del autor-- y
@@ -1378,7 +1379,7 @@ function filaParte(p){
     : '';
   return '<div class="fila '+cls+'"><div class="a"><b>'+_icoBloque_(p)+esc(p.t||'Fichaje sin declarar')+'</b><small>'+sub+catTxt+
     _origenParte_(p)+'</small>'+_accs+'</div>'+
-    '<div class="d">'+accion+pil+' <b class="mono">'+h1(p.q)+'</b></div></div>';
+    '<div class="d">'+accion+pil+' <b class="mono">'+h1(_horasVistaParte_(p))+'</b></div></div>';   /* 11/11: un turno largo y su exceso = UN parte de D h */
 }
 
 /* ⛔ `pends` SON LOS DE ESTE MES QUE NO CUENTAN TODAVÍA (793.ª, 05/10), y llegan por
@@ -2333,7 +2334,7 @@ function vHoras(){
            número y las HORAS —, que es lo que el título no tiene. */
         ? '<details class="pdgrupo"><summary><span class="pdnum">'+
             mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
-            nf2(mias.reduce(function(t,x){ return t+(Number(x.q)||0); },0))+' h</span></summary>'+
+            nf2(mias.reduce(function(t,x){ return t+_horasVistaParte_(x); },0))+' h</span></summary>'+
           mias.map(filaParte).join('')+'</details>'
         : (viejas.length
             ? vacio('Ningún parte de este mes',
