@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Diagramas Solaris</title>
+<!--
+  DIAGRAMAS SOLARIS — prototipo (26/10/2026). Encargo: docs/encargo-diagramas.md.
+  App APARTE del panel (URL propia, mismo login cuando se cablee): diagramas de FLUJO y GANTT con piezas y
+  estética fijas, descargables como HTML autocontenido. Hoy guarda en ESTE navegador (localStorage); el almacén
+  del mini PC, el login y la puerta (PD + coordinadores + subcoordinadores) vienen después de que Daniel lo vea.
+  Paleta: la de la insignia (docs/identidad-visual.md §4 y §4-ter), sin colores elegibles por el usuario.
+-->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Cpath fill=%27%23E41E25%27 d=%27M12 1Q13.4 10.6 23 12 13.4 13.4 12 23 10.6 13.4 1 12 10.6 10.6 12 1Z%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="diagramas.css?v=0063a67">
+</head>
+<body>
+<header class="top">
+  <button class="ico solo-estrecho" id="b-menu" title="Mis diagramas" aria-label="Mis diagramas">☰</button>
+  <div class="marca">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#E41E25" d="M12 1Q13.4 10.6 23 12 13.4 13.4 12 23 10.6 13.4 1 12 10.6 10.6 12 1Z"/></svg>
+    <span class="sc">Solaris</span><b>Diagramas</b>
+  </div>
+  <input id="titulo" class="titulo" spellcheck="false" aria-label="Título del diagrama">
+  <span class="chip" id="tipo-chip"></span>
+  <span class="estado" id="estado"></span>
+  <span class="sellos" id="sellos"></span>
+  <div class="acciones">
+    <button class="ico" id="b-deshacer" title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button>
+    <button class="ico" id="b-rehacer" title="Rehacer (Ctrl+Shift+Z)" aria-label="Rehacer">↷</button>
+    <button class="btn" id="b-ver">Vista previa</button>
+    <button class="btn rojo" id="b-bajar">Descargar<span class="larga"> HTML</span></button>
+  </div>
+</header>
+
+<div class="cuerpo">
+  <aside class="lateral" id="lateral">
+    <!-- Daniel, 26/10: «quiero que haya una parte de workflows, de procesos […] Y a otra parte de gestión de proyectos
+         en cuanto a Gantt […] Que haya varias secciones. Pero recuerda mantenerlo lo más simple posible.» -->
+    <section class="seccion">
+      <div class="sec-cab"><span class="sc">Procesos</span><button class="mas" id="b-nuevo-flujo" title="Nuevo proceso" aria-label="Nuevo proceso">+ Nuevo</button></div>
+      <ul class="lista" id="lista-flujo"></ul>
+    </section>
+    <section class="seccion">
+      <div class="sec-cab"><span class="sc">Proyectos</span><button class="mas" id="b-nuevo-gantt" title="Nuevo proyecto" aria-label="Nuevo proyecto">+ Nuevo</button></div>
+      <ul class="lista" id="lista-gantt"></ul>
+    </section>
+    <label class="abrir">Abrir un HTML descargado…<input type="file" id="f-abrir" accept=".html,.htm,.json"></label>
+  </aside>
+
+  <main class="centro">
+    <div class="barra" id="barra"></div>
+    <div class="lienzo" id="lienzo" tabindex="0" aria-label="Lienzo"></div>
+  </main>
+
+  <aside class="inspector" id="inspector"></aside>
+</div>
+
+<!-- La dirección del servidor: vacía = sólo este navegador. La publicación la sustituye por la del canal (beta). -->
+<script>var BACKEND_URL="https://solaris-dev.tail2ff941.ts.net/";</script>
+<script src="diagramas.js?v=68ca072"></script>
+<script src="nube.js?v=4f66595"></script>
+<script src="proyecto.js?v=073340a"></script>
+</body>
+</html>

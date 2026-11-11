@@ -1,0 +1,190 @@
+/* ═══ DIAGRAMAS SOLARIS — estilos del EDITOR ═════════════════════════════════════════════════════════════
+   Los estilos del DIBUJO (piezas, barras, flechas) NO viven aquí: están en `DIAG_CSS` de diagramas.js, porque
+   viajan también dentro del HTML descargado y tienen que ser los mismos bytes en los dos sitios.
+   Paleta medida en la insignia (docs/identidad-visual.md): #231F20 · #FFFFFF · #E41E25; la rampa de grises
+   conserva H=345° y S=6,1 %. Mismos tokens que el escritorio del panel (escritorio.css).
+   ═════════════════════════════════════════════════════════════════════════════════════════════════════════ */
+:root{
+  color-scheme:dark;
+  --bg:#0C0B0B; --sur:#181616; --sur2:#221E1F; --gris:#231F20;
+  --line:#322C2E; --line2:#463E40; --ink3:#958689; --ink2:#B2A8AB; --ink:#F4F3F3;
+  --red:#E41E25; --red2:#FF4A4F; --red3:#8E1418;
+  --ok:#3EB489; --warn:#E8912E;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --r:10px; --r2:8px;
+}
+*{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}   /* sin esto Windows las pinta blancas */
+html,body{margin:0;height:100%}
+/* selector de unidad propio (proyecto.js · selectorUnidad) */
+.enlace{color:var(--red2);text-decoration:underline;background:none;border:0;padding:0;font:inherit;cursor:pointer}
+.selu{position:relative;min-width:0}.campo{min-width:0}   /* sin esto, un texto largo empuja la caja fuera del inspector */
+.selu-b{display:flex;align-items:center;gap:8px;width:100%;background:var(--sur2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;text-align:left}
+.selu-b:hover,.selu.abierto .selu-b{border-color:var(--ink3)}
+.selu-b span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.selu-b span.vacio{color:var(--ink3)}
+.selu-b b{color:var(--ink3);font-weight:400;font-size:11px}
+.selu i{width:9px;height:9px;border-radius:2px;flex:none;border:1px solid var(--line2)}
+.selu-l{display:none;position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);max-height:260px;overflow:auto;
+  background:var(--sur);border:1px solid var(--line2);border-radius:var(--r2);padding:4px;box-shadow:0 10px 28px #000a}
+.selu.abierto .selu-l{display:block}
+.selu-l button{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border-radius:5px;text-align:left;font-size:13px;color:var(--ink2)}
+.selu-l button:hover{background:var(--sur2);color:var(--ink)}
+.selu-l button.on{color:var(--ink);background:var(--line)}
+body{background:var(--bg);color:var(--ink);font:13.5px/1.45 var(--sans);-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--sur2);border:1px solid var(--line);
+  border-radius:6px;padding:6px 8px;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--red)}
+/* Daniel, 26/10: «no uses las casillas nativas de html». Se dibujan aquí; por dentro siguen siendo <input>, así que el
+   teclado (espacio) y el lector de pantalla no cambian. */
+input[type=checkbox]{appearance:none;-webkit-appearance:none;width:20px!important;height:20px;flex:none;margin:0;padding:0;
+  border:1.5px solid var(--line2);border-radius:4px;background:var(--sur2);cursor:pointer;display:inline-grid;place-content:center;
+  transition:background .12s,border-color .12s}
+input[type=checkbox]:hover{border-color:var(--ink3)}
+input[type=checkbox]:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+input[type=checkbox]:checked{background:var(--red);border-color:var(--red)}
+input[type=checkbox]:checked::after{content:"";width:11px;height:6px;border:solid #fff;border-width:0 0 2px 2px;transform:translateY(-1px) rotate(-45deg)}
+textarea{resize:vertical;min-height:64px}
+.sc{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);line-height:1}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* cabecera */
+.top{display:flex;align-items:center;gap:12px;padding:0 14px;height:52px;flex:none;
+  border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--sur2),var(--sur))}
+.marca{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.marca b{font-weight:600;letter-spacing:.01em}
+.titulo{flex:1 1 auto;min-width:80px;max-width:440px;background:transparent;border-color:transparent;font-size:15px;font-weight:600}
+.titulo:hover{border-color:var(--line)}
+.chip{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);
+  border:1px solid var(--line2);border-radius:99px;padding:3px 8px;white-space:nowrap}
+.estado{font-size:12px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acciones{margin-left:auto;display:flex;gap:6px;align-items:center}
+.btn{border:1px solid var(--line2);border-radius:var(--r2);padding:6px 12px;white-space:nowrap;background:var(--sur2)}
+.btn:hover{border-color:var(--ink3)}
+.btn.rojo{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+.btn.rojo:hover{background:var(--red2);border-color:var(--red2)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.ico{width:32px;height:32px;border-radius:var(--r2);border:1px solid transparent;font-size:17px;line-height:1}
+.ico:hover{border-color:var(--line2);background:var(--sur2)}
+.ico:disabled{opacity:.35;cursor:default;background:none;border-color:transparent}
+.solo-estrecho{display:none}
+
+/* cuerpo: lateral | centro | inspector */
+.cuerpo{flex:1;display:grid;grid-template-columns:232px minmax(0,1fr) 292px;min-height:0}
+.lateral{border-right:1px solid var(--line);padding:14px 12px;overflow:hidden auto;display:flex;flex-direction:column;gap:10px;background:var(--sur)}
+.seccion{display:grid;gap:6px}
+.sec-cab{display:flex;align-items:center;justify-content:space-between}
+.sec-cab .sc{font-size:10px;color:var(--ink2)}
+.mas{font-size:12px;color:var(--red2);border:1px solid var(--line2);border-radius:6px;padding:2px 8px}
+.mas:hover{border-color:var(--red)}
+.sec-que{margin:-2px 0 2px;font-size:11.5px;color:var(--ink3)}
+.lista li.vacia{color:var(--ink3);cursor:default;font-size:12px}
+.nuevo{display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px dashed var(--line2);border-radius:var(--r2);text-align:left}
+.nuevo:hover{border-color:var(--red);border-style:solid}
+.nuevo svg{width:18px;height:18px;fill:none;stroke:var(--red);stroke-width:1.6;flex:none}
+.lista{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:2px}
+.lista li{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--r2);cursor:pointer;border:1px solid transparent}
+.lista li:hover{background:var(--sur2)}
+.lista li.activo{background:var(--sur2);border-color:var(--line2)}
+.lista li.activo .nom{color:var(--ink)}
+.lista .k{font-family:var(--mono);font-size:9px;color:var(--ink3);border:1px solid var(--line2);border-radius:4px;padding:1px 4px;flex:none}
+.lista .nom{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2)}
+.lista .x{opacity:0;color:var(--ink3);padding:0 4px;font-size:14px}
+.lista li:hover .x,.lista li:focus-within .x{opacity:1}
+.lista .x{min-width:24px;min-height:24px}   /* HIG: control ≥ 20×20 */
+.lista li:focus-visible,.lienzo:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
+.lista .x:hover{color:var(--red2)}
+.abrir{font-size:12px;color:var(--ink2);cursor:pointer;text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+.abrir input{display:none}
+.nota-proto{margin-top:auto;font-size:11.5px;color:var(--ink3);border-left:2px solid var(--red3);padding-left:9px}
+.nota-proto b{color:var(--ink2)}
+
+.centro{display:flex;flex-direction:column;min-width:0;min-height:0}
+.barra{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;min-height:50px}
+.barra .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+.pieza{display:flex;align-items:center;gap:7px;padding:5px 9px 5px 6px;border:1px solid var(--line);border-radius:var(--r2);
+  background:var(--sur);cursor:grab;user-select:none;touch-action:none;font-size:12.5px}
+.pieza:hover{border-color:var(--ink3)}
+.pieza svg{width:30px;height:20px;flex:none}
+.pieza:active{cursor:grabbing}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:var(--r2);overflow:hidden}
+.seg button{padding:5px 10px;font-size:12px;color:var(--ink2)}
+.seg button.on{background:var(--line2);color:var(--ink)}
+.miga{font-weight:600;font-size:13px;white-space:nowrap}
+.barra .pista{margin-left:auto;font-size:11.5px;color:var(--ink3)}
+.lienzo{flex:1;position:relative;overflow:hidden;min-height:0;
+  background-color:var(--bg);
+  background-image:radial-gradient(circle,var(--line) 1px,transparent 1.2px);background-size:20px 20px}
+.lienzo.gantt{overflow:auto;background-image:none}
+.lienzo > svg.dg.edit{position:absolute;inset:0;width:100%;height:100%;touch-action:none;user-select:none}
+.zoom{position:absolute;right:12px;bottom:12px;display:flex;gap:4px;background:var(--sur);border:1px solid var(--line);border-radius:var(--r2);padding:3px}
+.zoom button{width:28px;height:28px;border-radius:6px;color:var(--ink2)}
+.zoom button:hover{background:var(--sur2);color:var(--ink)}
+.zoom .pct{font-family:var(--mono);font-size:11px;color:var(--ink3);align-self:center;min-width:40px;text-align:center}
+.editor-texto{position:absolute;z-index:5;border:1.5px solid var(--red);background:var(--sur2);color:var(--ink);
+  text-align:center;resize:none;padding:4px;border-radius:4px;line-height:17px;min-height:0;overflow:hidden}
+.fantasma{position:fixed;pointer-events:none;z-index:50;opacity:.85}
+.tostada{position:fixed;top:62px;left:50%;transform:translate(-50%,-12px);opacity:0;pointer-events:none;z-index:60;max-width:560px;
+  background:var(--sur2);border:1px solid var(--red);border-left-width:4px;border-radius:var(--r2);padding:10px 14px;font-size:13px;
+  box-shadow:0 10px 28px #000a;transition:opacity .15s,transform .15s}
+.tostada.ver{opacity:1;transform:translate(-50%,0)}
+.tostada.pide{pointer-events:auto}
+.tostada-bot{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.capa-vista{position:fixed;inset:0;z-index:70;background:var(--bg);display:flex;flex-direction:column}
+.capa-vista[hidden]{display:none}
+.capa-cab{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.capa-cab span{color:var(--ink3);font-size:12px;flex:1}
+.capa-vista iframe{flex:1;border:0;width:100%;background:#fff}
+.tostada b{color:var(--red2)}
+.ok-txt{color:var(--ok)!important}
+/* los dos sellos (Daniel, 31/10): Coherente lo da la app; Validado, el Project Director */
+.sellos{display:flex;gap:6px;flex:none}
+.sello{border:1px solid var(--line2);border-radius:999px;padding:4px 10px;font-size:12px;background:var(--sur2);color:var(--ink2);white-space:nowrap;min-height:28px}
+.sello:hover:not(:disabled){border-color:var(--ink3);color:var(--ink)}
+.sello.ok{border-color:color-mix(in srgb,var(--ok) 55%,transparent);color:var(--ok)}
+.sello.mal{border-color:color-mix(in srgb,var(--red) 60%,transparent);color:var(--red2)}
+.sello:disabled{opacity:.5;cursor:not-allowed}
+
+/* gantt en el editor: tabla fija a la izquierda, línea de tiempo que se desplaza */
+.gwrap{display:flex;min-width:max-content;min-height:100%}
+.gwrap > svg.gtabla{position:sticky;left:0;z-index:2;background:var(--bg);box-shadow:1px 0 0 var(--line2)}
+.gvacio{padding:40px;color:var(--ink3);max-width:460px}
+
+/* inspector */
+.inspector{border-left:1px solid var(--line);padding:14px;overflow:auto;background:var(--sur);display:flex;flex-direction:column;gap:12px}
+.inspector h3{margin:0;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.campo{display:grid;gap:5px}
+.campo > span{font-size:11.5px;color:var(--ink2)}
+.fila2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.botones{display:flex;gap:6px;flex-wrap:wrap}
+.botones .btn{padding:5px 10px;font-size:12.5px}
+.btn.peligro:hover{border-color:var(--red);color:var(--red2)}
+.ayuda{font-size:12px;color:var(--ink3);margin:0;padding-left:16px}
+.ayuda li{margin:3px 0}
+.ayuda kbd,.kbd{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:var(--ink2)}
+.deps{display:grid;gap:3px;max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:6px}
+.deps label{display:flex;gap:7px;align-items:center;font-size:12.5px;color:var(--ink2)}
+.deps input{width:auto}
+.aviso{font-size:12px;color:var(--warn);border-left:2px solid var(--warn);padding-left:8px}
+.leyenda-mini{display:grid;gap:6px}
+.leyenda-mini div{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2)}
+.leyenda-mini svg{width:34px;height:20px;flex:none}
+.rapidas{display:flex;gap:4px}
+.rapidas button{border:1px solid var(--line2);border-radius:6px;padding:3px 9px;font-size:12px}
+.rapidas button:hover{border-color:var(--ink3)}
+
+@media (max-width:1100px){ .cuerpo{grid-template-columns:200px minmax(0,1fr) 250px} .estado{display:none} }
+@media (max-width:860px){
+  .solo-estrecho{display:inline-block}
+  .cuerpo{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  .lateral{position:fixed;top:52px;left:0;bottom:0;width:260px;z-index:20;transform:translateX(-100%);transition:transform .2s}
+  .lateral.abierto{transform:none;box-shadow:8px 0 24px #000a}
+  .inspector{border-left:0;border-top:1px solid var(--line);max-height:38vh}
+  .marca .sc,.marca b,.chip,#b-ver,.larga{display:none}
+  .titulo{min-width:0}
+  .btn.rojo{padding:6px 10px}
+  .top{gap:8px;padding:0 8px}
+  .sello{padding:4px 8px}
+}
