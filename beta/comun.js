@@ -83,6 +83,8 @@ var CATS_DESGLOSE=[
   {k:'desplaz', eti:'Desplazamientos',           color:'var(--warn)', cat:[],         pal:['desplaz']},
   {k:'entrev',  eti:'Entrevistas',               color:'#9B7FD1',     cat:[],         pal:['entrevista']},
   {k:'turno',   eti:'Turnos',                    color:'#D9C24A',     cat:['turno'],  pal:[]},
+  /* 11/11 (Daniel: *«¿Por qué aparecen otras contribuciones si es una reunión?»*): la categoría `reunion` no tenía grupo. */
+  {k:'reunion', eti:'Reuniones',                 color:'#C77DBA',     cat:['reunion'],pal:[]},
   {k:'congreso',eti:'Congresos y competiciones', color:'#4FB8A5',     cat:[],         pal:[]},
   {k:'otras',   eti:'Otras contribuciones',      color:'var(--ink2)', cat:[],         pal:[]}
 ];
@@ -6443,9 +6445,23 @@ function _devengadoAHoy_(m, h, frac){
   return Math.max(0, Math.round((h - _compBase_(m) * (1 - Math.min(1, frac))) * 100) / 100);
 }
 
-function _compExtra_(m){
+/* ⛔ 11/11 (Daniel: *«¿por qué aparece duplicado?»*): «Compensaciones» de Notion = base + los partes que suman en ese cajón
+   (desplazamientos, congresos, entrevistas…: la regla de `cuadraCompensaciones`). Restando sólo la base, las 42,25 h de la L1
+   salían DOS veces: en su grupo y como «Asignada por el Project Director». Con `items` (los apuntes del mes) se restan
+   también; lo que queda es lo que ningún parte explica. Sin `items`, como antes. */
+function _compPartesH_(items){
+  var t=0;
+  (items||[]).forEach(function(p){
+    if(!p || ['conf','otor','aprobado'].indexOf(p.estado)<0) return;
+    if(_contraparteQueNetea_(p, items)) return;
+    if(catDesglose(p)==='cargo' || ['tareas','turno','reunion'].indexOf(p.cat)>=0) return;
+    t += Number(p.q!=null ? p.q : p.horas) || 0;
+  });
+  return t;
+}
+function _compExtra_(m, items){
   if(!_compEsReal_(m)) return 0;                 // sin el dato de Notion no se puede saber
-  return Math.round((m.compensaciones-_compBase_(m))*100)/100;
+  return Math.round((m.compensaciones-_compBase_(m)-(items ? _compPartesH_(items) : 0))*100)/100;
 }
 
 /* Devuelve `{total, ultimos, suma}` de ESTA temporada. `fecha` saca el `DD/MM/AAAA` de cada

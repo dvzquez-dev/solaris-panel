@@ -1388,7 +1388,7 @@ function filaParte(p){
 
 function _movHorasHTML_(confs, pends){
   var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
-  var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO), comp=_compMensual_(YO);
+  var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO, r.todos), comp=_compMensual_(YO);
   /* El rotulo dice lo que SE SABE. Sin el dato de Notion no se puede afirmar que sea el tuyo:
      es el defecto del cargo y se dice asi. Llamar «tuyo» a un numero deducido es la clase de
      mentira pequena que hace que nadie se fie del resto de la pantalla. */
@@ -1427,7 +1427,7 @@ function _movHorasHTML_(confs, pends){
         '<small>'+esc(_cet)+'</small></div>'+
         '<div class="d"><b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>'+
       /* 01/11: SIN «Otras contribuciones» aparte; el mismo desglose por categorías que «Ver el desglose completo». */
-      desgloseCat(_fijasDesglose_().concat(r.todos))+
+      desgloseCat(_fijasDesglose_(r.todos).concat(r.todos))+
       '<p class="rnota" style="margin:8px 0 10px">'+
         (r.total
           ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes. '+
@@ -1498,8 +1498,8 @@ function _mesesHorasHTML_(confs){
 /* LAS PARTIDAS FIJAS DEL MES (la base del cargo y la extra del PD), que no son partes: entran al desglose con `catDesglose`
    puesto. UNA vez, y la llaman la tarjeta del mes (`_movHorasHTML_`) y «Ver el desglose completo» (`_desgloseMesHTML_`):
    01/11, Daniel: *«quitaría otras contribuciones y pondría lo mismo que sale cuando le das a ver desglose completo»*. */
-function _fijasDesglose_(){
-  var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO), comp=_compMensual_(YO), cargo=(YO&&YO.cargo)||'miembro';
+function _fijasDesglose_(items){
+  var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO, items), comp=_compMensual_(YO), cargo=(YO&&YO.cargo)||'miembro';
   var filaBase=
     '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
       '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha · vuelve a asignarse en el '+
@@ -1535,12 +1535,12 @@ function _desgloseMesHTML_(confs, clave){
      rotulo es lo que hace dudar del dato en vez de usarlo. */
   var _hmD=_hMesReal_(YO), _notionD=(_hmD!=null);
   var total=_notionD ? _hmD : (r.suma+comp);
-  var cargo=(YO&&YO.cargo)||'miembro', _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO);
+  var cargo=(YO&&YO.cargo)||'miembro', _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO, r.todos);
   /* 31/10 · AGRUPADO POR CATEGORÍA, CADA UNA CON SU COLOR (Daniel: *«en vez de poner compensación extra más 12,25,
      debería aparecer compensación por tu cargo y luego … todas estas contribuciones extras»*). La base y la extra no son
      partes: entran en su grupo como filas FIJAS (`catDesglose`), y la extra va a «Otras contribuciones». Lo demás se
      reparte por la tabla de comun.js. La suma de los subtotales es la de antes: ninguna fila se pierde ni se cuenta dos veces. */
-  var fijas=_fijasDesglose_();
+  var fijas=_fijasDesglose_(r.todos);
   var grupos=_gruposDesgloseHTML_(fijas.concat(r.todos));
   /* ⛔ EL TITULO, DEL PERIODO — NO DEL RELOJ DEL TELEFONO. El contenido de esta ventana va
      de CIERRE A CIERRE (`_ultimosMov_(…,'mes')` → `_deEsteMes_` → `_periodoAbierto_()`)

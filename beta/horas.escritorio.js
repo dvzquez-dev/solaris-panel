@@ -1473,7 +1473,7 @@ function _histHorasHTMLE_(mi){
       (m.k ? (function(e){ return '<span class="chip'+(e.cls?' '+e.cls:'')+'">'+e.txt+'</span>'; })(_estadoMes_(m.k, per)) : '')+
       '<span class="ln"></span><span class="mono">'+nf2(h)+' h</span></button>';
     var base=abierto ? [{tarea:'Compensación por tu cargo', fecha:'', horas:_compBase_(mi), cat:null}] : [];
-    var extra=(abierto && _compExtra_(mi)) ? [{tarea:'Compensación extra', fecha:'', horas:_compExtra_(mi)}] : [];
+    var extra=(abierto && _compExtra_(mi, m.items)) ? [{tarea:'Compensación extra', fecha:'', horas:_compExtra_(mi, m.items)}] : [];
     chips+='<div class="ltmesdet" data-mesdet="'+k+'" hidden>'+_filasMesE_(base.concat(extra, m.items))+
       _desgloseCatHTMLE_(m.items)+'</div>';   /* el desglose, JUSTO debajo de SU tarjeta */
   });
