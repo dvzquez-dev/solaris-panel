@@ -1275,7 +1275,7 @@ async function enviarFichaje(){
       /* ⛔ Y aquí también se suelta el candado: si no, tras un fallo de red el botón se
          queda muerto y el fichaje sólo se puede reintentar recargando la app. */
       if(_be) _be.disabled=false;
-      tost('No se pudo enviar: '+((e&&e.message)||e), (e && e.sesion) ? {fijo:true} : null);
+      tostErr('No se pudo enviar: ', e);
     }
     return;
   }
@@ -1302,6 +1302,13 @@ function desgloseCat(ps){
   return '<div style="display:flex;flex-wrap:wrap;margin:2px 0 4px">'+chips+'</div>';
 }
 
+/* refutar17 (12/11): el DÍA (y el horario) de un parte que aún no cuenta. Los aprobados ya lo decían; los de la cola, los rechazados y los
+   «falta detalle» sólo decían «esperando aprobación» bajo el mismo rótulo («Trabajo de subsistema»): con tres declarados esta semana
+   no había forma de saber cuál era el del día equivocado. Termina en « · » para colgarle detrás el estado; vacío si el parte no trae fecha. */
+function _cuandoParte_(p){
+  return p.f ? p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+' · ' : '';
+}
+
 function filaParte(p){
   /* ⛔ `rev` va con los terminales: un parte revertido NO esta esperando nada. */
   var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='rech'||p.e==='cad'||p.e==='rev')?'borde-no':'borde-pe';
@@ -1321,13 +1328,13 @@ function filaParte(p){
      la nota DETRÁS, como ya hacen `rech` y `rev`. */
   var sub = p.e==='conf' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.nota?' · '+esc(p.nota):''))
           : p.e==='otor' ? (p.nota?esc(p.nota)+(p.ini?' · '+p.ini+'–'+p.fin:''):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
-          : p.e==='pend' ? 'esperando aprobación'
+          : p.e==='pend' ? _cuandoParte_(p)+'esperando aprobación'
           /* ⛔ SE ENSEÑA LA PREGUNTA, NO QUE HAY UNA. «Te piden más detalle» no dice QUÉ
              falta, así que el miembro tiene que adivinar o preguntar por Discord — y el
              motivo lo escribió el coordinador precisamente para eso. Es obligatorio en el
              servidor (mínimo 8 caracteres), así que aquí siempre hay algo que enseñar. */
-          : p.e==='det'  ? (p.nota ? 'te piden: '+esc(p.nota) : 'te piden más detalle')
-          : p.e==='rech' ? 'rechazada'+(p.nota?' · '+esc(p.nota):'')
+          : p.e==='det'  ? _cuandoParte_(p)+(p.nota ? 'te piden: '+esc(p.nota) : 'te piden más detalle')
+          : p.e==='rech' ? _cuandoParte_(p)+'rechazada'+(p.nota?' · '+esc(p.nota):'')
           /* ⚠️ Se dice que se DESHIZO, no que se rechazo: son cosas distintas y a esa
              persona le importan de forma distinta. */
           : (p.e==='rev' && p.ret) ? 'la retiraste: no se firma ni cuenta'
@@ -2355,7 +2362,7 @@ function vHoras(){
            número y las HORAS —, que es lo que el título no tiene. */
         ? '<details class="pdgrupo"><summary><span class="pdnum">'+
             mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
-            nf2(mias.reduce(function(t,x){ return t+_horasVistaParte_(x); },0))+' h</span></summary>'+
+            nf2(mias.reduce(function(t,x){ return t+(x.e==='pend' ? _horasVistaParte_(x) : 0); },0))+' h en cola</span></summary>'+
           mias.map(filaParte).join('')+'</details>'
         : (viejas.length
             ? vacio('Ningún parte de este mes',

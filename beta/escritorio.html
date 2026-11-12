@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=4f32bea"></script>
+<script src="comun.js?v=d348af7"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=8389541"></script>
@@ -121,8 +121,8 @@
 <script src="documentos.escritorio.js?v=a6e1059"></script>
 <script src="sanciones.escritorio.js?v=2126087"></script>
 <script src="reuniones.escritorio.js?v=828d9c8"></script>
-<script src="horas.escritorio.js?v=a6dece4"></script>
-<script src="equipo.escritorio.js?v=d101c01"></script>
+<script src="horas.escritorio.js?v=f835719"></script>
+<script src="equipo.escritorio.js?v=812c280"></script>
 <script src="tareas.escritorio.js?v=d3ebd8c"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
 <script>
@@ -1231,7 +1231,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
   var _perH=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null, _ucH=(typeof CIERRE!=='undefined' && CIERRE && CIERRE.ultimo_cierre)||null;
   var totH=enElAire().reduce(function(a,p){return a+p.horas;},0);   /* 01/11: la misma cifra que el Panel de mando */
   return '<div class="kpis">'+
-      kpi('Esperan tu decisión',mias.length,mias.length?'los firmas tú':'nada tuyo en cola',mias.length?'wa':'up')+
+      kpi('Esperan tu decisión',mias.filter(_firmaMia_).length,mias.filter(_firmaMia_).length?'los firmas tú':'nada tuyo en cola',mias.filter(_firmaMia_).length?'wa':'up')+   /* 12/11 (refutar15): sin los de bloque, que son del PD */
       kpi('Horas en el aire',nf2(totH)+'<small> h</small>','no cuentan hasta aprobarse','wa')+
       /* ⛔ «COLA COMPLETA» FUERA (782.ª, 06/10): era `mias.length` + `otras.length`, y
          **los dos están impresos** — el primero en el KPI de arriba y el segundo en el
@@ -3787,7 +3787,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d2799b8';
+var BUILD='6c4029f';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3989,7 +3989,7 @@ function _pinReunionFijar_(m){
         r.fijada=etiqueta; r.fijadaBl=bloques;
         tost('Reuni\u00f3n fijada: '+etiqueta+'. La disponibilidad queda cerrada.'+
           (_estirada ? ' Se ha estirado a las '+_estirada+' franjas que pide su orden del d\u00eda.' : ''));
-        pintar();
+        pintar(); if(typeof _ordenRefrescar_==='function') _ordenRefrescar_(r.id);   // refutar15: sus horas de reloj salen de la fijada
       }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo fijar: ', e); }
     };
   });
@@ -4000,7 +4000,7 @@ function _pinReunionFijar_(m){
       if(!backendOK||!SESION){ tost('Sin conexi\u00f3n no se puede cancelar el fijado.'); return; }
       b.disabled=true;
       try{ await api.fijar(r.id, null); r.fijada=''; r.fijadaBl=[];
-        tost('Fijado cancelado: se reabre la disponibilidad.'); pintar();
+        tost('Fijado cancelado: se reabre la disponibilidad.'); pintar(); if(typeof _ordenRefrescar_==='function') _ordenRefrescar_(r.id);   // refutar15: el orden vuelve a «T0»
       }catch(e){ b.disabled=false; tostErr('No se pudo cancelar: ', e); }
     };
   });

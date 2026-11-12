@@ -2760,7 +2760,8 @@ function tost(m, o){
 function _tostLargo_(m){ return String(m == null ? '' : m).length > 110 ? {fijo:true} : null; }
 
 function tostErr(prefijo, e){
-  tost(String(prefijo || '') + ((e && e.message) || e), (e && e.sesion) ? {fijo:true} : null);
+  /* refutar17: Apps Script contesta `String(err)`: sin quitar el «Error: » el aviso era «No se pudo enviar: Error: Ber Gnc ya tiene…». */
+  tost(String(prefijo || '') + String((e && e.message) || e).replace(/^Error:\s*/, ''), (e && e.sesion) ? {fijo:true} : null);
 }
 
 /* ⛔ LA CLAVE DE UN ENVIO, PARA QUE UN REINTENTO NO LO DUPLIQUE. `api._post` hace TRES
@@ -4081,7 +4082,8 @@ var SOL_PENSANDO = 'SolarIA está escribiendo…';
    cuando de verdad no hay conexión, sesión, cuota o tiempo. */
 var _SOL_NO_SUPO_ = /la IA (no devolvi|no contest|devolvi)|ning[uú]n (texto|punto)|a[nñ]adido cosas|no se apoy|demasiado larg|no pas[oó] la comprobaci/i;
 function _solErrorTxt_(motivo){
-  var m = motivo ? String(motivo).replace(/^SolarIA no ha (podido|sabido)( redactarlo)?:\s*/i, '').replace(/[.\s]+$/, '') : '';
+  var m = motivo ? String(motivo).replace(/^(Error:\s*)+/i, '').replace(/^SolarIA no ha (podido|sabido)( redactarlo)?:\s*/i, '')   // refutar15: el «Error: » con que el servidor contesta (como `String(err)`) no es para quien lee
+    .replace(/[.\s]+$/, '') : '';
   if(m && _SOL_NO_SUPO_.test(m)) return 'SolarIA no ha sabido redactarlo: '+m+'.';
   return 'SolarIA no está disponible ahora'+(m ? ': '+m : '')+'.';
 }
@@ -13329,9 +13331,12 @@ async function _anotComprobar_(pre, e){
     if (c) c.setAttribute('data-chk', (r && r.ok !== false && r.cabe === true) ? clave : '');
     di(_anotChkTexto_(r));
   } catch (err) {
+    /* 12/11 (refutar18): un fallo de la máquina (`[Errno 2] … /secretos/…json`) no se le enseña a quien revisa: se dice que no se pudo y a quién avisar. */
+    var _m = String((err && err.message) || err);
+    if (/Errno|Traceback|\.py\b|\.json\b|\/home\/|secretos/.test(_m)) _m = 'la comprobación no está disponible ahora; inténtalo más tarde o avisa al Project Director';
     _anotBloquear_(pre, false);
     if (c) c.setAttribute('data-chk', '');
-    di('No se pudo comprobar: ' + ((err && err.message) || err) + '.');
+    di('No se pudo comprobar: ' + _m + '.');
   }
   _anotChkPintar_(pre);
 }
@@ -14474,7 +14479,7 @@ function _bloqueReuHTML_(r, puede){
   var ec=r.en_curso, pend=_fichaPendienteReu_(r);
   /* 12/11 (refutar13): la FINALIZADA con su bloque ya enviado no se puede «Empezar» otra vez ni declarar de nuevo (duplicaba las horas de todos);
      la finalizada sin bloque sólo ofrece dar las horas a los asistentes, sin «Empezar». */
-  if(_reuFinalizada_(r) && r.bloque)
+  if(r.bloque)                                                    // 12/11 (refutar15): también la declarada a posteriori, que no está «finalizada»
     return '<div id="reuBloque" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)"><p class="rnota" style="margin:0">Las horas de quienes asistieron ya están enviadas: las decide el PD.</p></div>';
   return '<div id="reuBloque" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)">'+
     (pend ? '<div id="reuFichaAviso" role="status" style="margin:0 0 10px;padding:9px 11px;border:1px solid var(--warn);border-radius:10px">'+
@@ -15844,6 +15849,11 @@ function _ordHorario_(filas, inicio){
   return (filas||[]).map(function(f){ var d=_ordDur_(f), r={desde:_ordMarca_(t,ini),hasta:_ordMarca_(t+d,ini)}; t+=d; return r; });
 }
 function _ordTotal_(filas){ return (filas||[]).reduce(function(a,f){ return a+_ordDur_(f); },0); }
+/* refutar15: «Tabla actual: 1 puntos» salía con la fila en blanco de una orden vacía. Se cuentan los puntos con tema, y en singular cuando es uno. */
+function _ordTablaActual_(draft){
+  var n=0, i; for(i=0;i<(draft||[]).length;i++) if(String(draft[i]&&draft[i].tema||'').replace(/\s+/g,'')) n++;
+  return n ? 'Tabla actual: '+n+(n===1?' punto.':' puntos.') : 'La tabla está vacía.';
+}
 function _ordTextoDur_(m){ var h=Math.floor(m/60), r=m%60; return h?(r?h+' h '+pad(r)+' min':h+' h'):r+' min'; }
 /* La fila tal como vive en el borrador (`dur` '' si falta) y tal como viaja (`dur` entero o ausente → el servidor dice «falta la duración»). */
 function _ordFilaBorrador_(f){ return {dur:(f&&f.dur>0)?f.dur:'',tema:(f&&f.tema)||'',quien:(f&&f.quien)||''}; }
@@ -15925,7 +15935,7 @@ function _ordenEditHTML_(st){
   }).join('');
   var ia=st.ia, prop=ia.fase==='propuesta';
   /* Con una propuesta delante la tabla de abajo no se toca (sería de otra tabla): se decide primero. */
-  return (prop ? '<div class="rnota">Tabla actual: '+st.draft.length+' puntos. Abajo, '+(ia.origen==='notion'?'lo traído de Notion':'la propuesta de SolarIA')+'.</div>' :
+  return (prop ? '<div class="rnota">'+_ordTablaActual_(st.draft)+' Abajo, '+(ia.origen==='notion'?'lo traído de Notion':'la propuesta de SolarIA')+'.</div>' :
       (filas||'<div class="rnota">Sin puntos. Añade el primero.</div>'))+
     '<p class="rnota" style="margin:8px 0 0" data-ordtotal>Total: '+_ordTextoDur_(_ordTotal_(st.draft))+'</p>'+
     (st.e&&st.e.inicio?'':'<p class="rnota" style="margin:2px 0 0">Aún sin fijar: las horas cuentan desde T0 y se ponen solas al fijarla.</p>')+

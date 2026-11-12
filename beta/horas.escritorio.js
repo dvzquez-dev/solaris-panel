@@ -52,7 +52,10 @@ function pendientes(){return PARTES.filter(function(p){return p.estado==='pend' 
    «Horas en el aire» (Panel de mando y Partes) suman ESTO: al PD, todo lo pendiente; al resto, lo que `puedeDecidirParte`
    le deja firmar —la misma puerta de «Esperan tu decisión»; al PD (rango 3) se lo deja todo—, para que las dos cifras de la
    fila hablen de lo mismo. */
-function enElAire(){return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);});}
+/* 12/11 (refutar15): ¿ESTE parte lo firmo YO? Los de BLOQUE (reuniones) los decide sólo el PD: el coordinador los VE (su panel «Partes de bloque»), pero ni su KPI
+   «Esperan tu decisión», ni «Horas en el aire», ni la insignia del menú pueden contarlos como suyos (decía «3 · los firmas tú» con la cola vacía). */
+function _firmaMia_(p){ return puedeDecidirParte(p,ACTOR) && (!p.bloque || _bloquePuedeDecidirE_()); }
+function enElAire(){return pendientes().filter(_firmaMia_);}
 
 /* 01/11 · Daniel (artifact «Subcoordinador y horas»): *«Solo a su equipo, como cuando sanciona»*. A quién puede `quien`
    OTORGAR horas (`m` = un miembro con `nombre` y `unidad`): lo que firma —el PD, o quien coordina esa unidad
@@ -65,7 +68,7 @@ function puedeOtorgarA(m,quien){ return _puedeOtorgarA_(m, quien); }   /* 11/11:
    aprobar» (cola y globo) aunque siga pudiendo decidirlo. Misma regla que el móvil (`_cargarPartesDec_`); el servidor ya
    fijó en el parte la unidad de la TAREA. */
 function porAprobar(){return pendientes().filter(function(p){
-  return puedeDecidirParte(p,ACTOR) && !(p.autor===ACTOR && coordinadorDe(p.unidad)!==ACTOR);});}
+  return _firmaMia_(p) && !(p.autor===ACTOR && coordinadorDe(p.unidad)!==ACTOR);});}
 
 function parteCard(p){
   var m=_m(p.autor), rev=revisoresDeParte(p), puede=puedeDecidirParte(p,ACTOR);

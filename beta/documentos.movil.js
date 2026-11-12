@@ -206,7 +206,8 @@ function _repartirEntregablesM_(lista){
     /* El backend manda `enlaceDrive` y aqui se quedaba sin recoger: el visor no tenia que
        enseñar. Normalizar es tirar lo que no nombras. */
     if(!d.drive && d.enlaceDrive) d.drive=d.enlaceDrive;
-    (d.autor===_yoDoc ? ENTREGABLES : ENT_REV).push(d);
+    /* 12/11 (refutar18): `_autoresDe_` (comun.js), no `d.autor`: quien firma con otro (`analisis.autores`) también tiene el documento como SUYO. */
+    (_autoresDe_(d).indexOf(_yoDoc)>=0 ? ENTREGABLES : ENT_REV).push(d);
   }
   return ENTREGABLES.length + ENT_REV.length;
 }
@@ -382,7 +383,7 @@ function _pasosCorregirM_(e){
 }
 
 function _docAutorHTML_(e){
-  if(!e || e.autor!==yoNombre()) return '';
+  if(!e || _autoresDe_(e).indexOf(yoNombre())<0) return '';   /* 12/11 (refutar18): también quien lo firma con otro */
   var est=e.estado;
   var m=_docAutorModelo_({estado:est, nota:e.nota, decision:e.decision, decidedAt:e.decidedAt, revisor:e.revisor, url:e.paginaNotion});
   if(!m) return '';
@@ -504,7 +505,10 @@ function verDoc(id){
        trabajo y, el día que lleve estado dentro, daría dos respuestas distintas. */
     : _mioDoc
       ? _mioDoc
-      : (revisoresDe(e).indexOf(yoNombre())>=0 && e.estado!=='revision'
+      /* 12/11 (refutar18): a quien le PIDEN confirmar la revisión (es su revisor mientras la petición vive) no se le dice «lo revisa <él>. Tú no
+         decides aquí»: lo que le toca lo dice `_peticionRevHTML_` justo debajo (como en el escritorio, que aquí pone ''). */
+      : (_peticionRevActiva_(e) && revisoresDe(e).indexOf(yoNombre())>=0 ? ''
+        : revisoresDe(e).indexOf(yoNombre())>=0 && e.estado!=='revision'
           ? '<p class="rnota" style="margin-top:14px">'+ico('candado')+' Ya está decidido. Puedes consultarlo, pero solo alguien de más rango puede cambiar la decisión.</p>'
           : (sinRev ? '<p class="rnota" style="margin-top:14px">Sin revisor: avisa al Project Director.</p>'
                     : '<p class="rnota" style="margin-top:14px">Este expediente lo revisa <b>'+revs+'</b>. Tú no decides aquí.</p>'));

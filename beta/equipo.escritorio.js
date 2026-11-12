@@ -182,7 +182,7 @@ function _tuyoItemsE_(){
       return p && p.autor===yo && p.estado==='rechazada' && _sigueVisibleSinContar_(p, Date.parse(_ahoraApp_())); })
       .sort(function(a,b){ var fa=String(a.decidido_at||a.fecha||''), fb=String(b.decidido_at||b.fecha||''); return (fb>fa)-(fb<fa) || (Number(b.id)||0)-(Number(a.id)||0); })
       .map(function(p){ return {tarea:p.tarea, motivo:p.motivo}; }),
-    cambios:DOCS.filter(function(d){ return d.est==='cambios' && d.autor===yo; }).map(function(d){ return d.ref; }),
+    cambios:DOCS.filter(function(d){ return d.est==='cambios' && _autoresDe_(d).indexOf(yo)>=0; })   /* 12/11 (refutar18): también el que firmas con otro */.map(function(d){ return d.ref; }),
     reus:{lista:reus.map(function(r){ return {id:r.id, titulo:r.tit||r.titulo, bajoMin:Array.isArray(r.resp&&r.resp[yo])}; }),
           plazo:reus.length ? _plazoTxt_(reus[0].limite) : ''},
     conv:_tuyoConvE_()});

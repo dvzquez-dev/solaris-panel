@@ -1399,7 +1399,7 @@ function fijarModal(){
       R2.fijada=etiqueta; R2.fijadaBl=bloques;
       cerrarModal();
       tost('Reunión fijada: '+etiqueta+'. La disponibilidad queda cerrada.');
-      pintar();
+      pintar(); if(typeof _ordenRefrescar_==='function') _ordenRefrescar_(R2.id);   // refutar15: sus horas de reloj salen de la fijada
     }catch(e){ b.disabled=false; b.textContent=prev;
       tostErr('No se pudo fijar: ', e); }
   };
