@@ -206,6 +206,7 @@ function _normReuM_(r){
     /* El backend lo manda (`_ex.ordenDia`) y aqui se tiraba, asi que el dialogo salia
        siempre vacio y no habia forma de corregir un enlace mal pegado. */
     ordenDia:r.ordenDia||'',
+    controlAsistencia:(typeof r.controlAsistencia==='boolean') ? r.controlAsistencia : undefined,   /* 12/11: sin la clave, la de antes de la opción */
     minimoPct:(typeof r.minimoPct==='number') ? r.minimoPct : null,   /* 01/11: el mínimo que eligió quien convocó; sin él, el del periodo */
     /* `slot` es la casilla que se pinta y `duracion` lo que hay que juntar seguido.
        Las reuniones de antes de este modelo no traen `duracion`: entonces el minimo es
@@ -303,6 +304,7 @@ function _fuenteReuM_(R, base, resp, ag){
        enuncio y no donde se citaba (§3c-19). Por eso la comprobacion de su banco es
        ESTRUCTURAL: compara lo que `_normReuM_` LEE con lo que esta ENTREGA. */
     ordenDia:R.ordenDia,
+    controlAsistencia:R.controlAsistencia,   /* 12/11: la gemela de la lectura de `_normReuM_` */
     minimoPct:R.minimoPct,   /* 01/11: el mínimo que eligió quien convocó (la gemela de la lectura de `_normReuM_`) */
     bloque:R.bloque,       /* 01/11: la gemela de `en_curso` en `_normReuM_` */
     finalizada_at:R.finalizada_at, celebrada:R.celebrada,   /* 04/11: la gemela de la lectura de `_normReuM_` */
@@ -1170,6 +1172,7 @@ function crearModal(){
     '<p class="rnota" id="ceHint">El equipo ve el mapa de calor con los totales, sin nombres.</p>'+
     /* 01/11 (Daniel [c8bd27e9d3]): el mínimo lo elige quien convoca entre el del periodo y ±5; las de trabajo no lo llevan. */
     '<div id="ceMin" hidden></div>'+
+    _controlAsisCampoHTML_('ceControl')+
     '<p class="rnota" id="cePrev" style="color:var(--ink2)"></p>'+
     '<button class="btn pri full" style="margin-top:12px" data-p id="btnCrearOK">Convocar la reunión</button>');
 
@@ -1213,6 +1216,7 @@ function crearModal(){
     /* Que hay que juntar para que valga, dicho antes de convocar y con la cuenta hecha. */
     var nS=_slotsMin_(du,sl), h=$('#ceSlotHint');
     _minimoConvPintar_($('#ceMin'), 'm', val('ceTipo'), val('ceLim'), upd);
+    _controlAsisCampoPintar_('ceControl', val('ceTipo'));
     var hz=_horarioConv_(u.perDia, rangos(), nS, sl, val('ceTipo'), _minimoConvPct_($('#ceMin'), val('ceLim')));
     if(h) h.innerHTML='Cada casilla es de '+_durTxt_(sl)+'; hay que marcar '+
       nS+' seguida'+(nS===1?'':'s')+' ('+_durTxt_(nS*sl)+') para que cuente.'+
@@ -1300,7 +1304,7 @@ function crearModal(){
       dias:ds, franjas:u.F, bloques:bloques, total:bloques.length, limite:lim,
       slot:_sl, duracion:_nS*_sl,          // lo que hay que juntar seguido para que valga
       minimoPct:(function(){ var c=$('#ceMin'); return (c && !c.hidden && +c.dataset.sel>0) ? +c.dataset.sel : null; })(),   // 01/11
-      ordenDia:(val('ceOrden')||'').trim(), vision:vision, resp:{} };
+      ordenDia:(val('ceOrden')||'').trim(), vision:vision, controlAsistencia:_controlAsisDeForm_('ceControl', val('ceTipo')), resp:{} };
     PLANTILLAS_M.unshift({ titulo:reu.titulo, ceModo:val('ceModo'), ceH0:val('ceH0'), ceH1:val('ceH1'),
       ceSlot:val('ceSlot'), ceDura:val('ceDura'), ceND:val('ceND'), modalidad:reu.modalidad, perdia:per() });
     if(PLANTILLAS_M.length>8) PLANTILLAS_M.length=8;
@@ -1495,7 +1499,7 @@ function _asisYoM_(){
 /* ¿Sale el botón? En cualquier reunión de verdad (con servidor, o en `?demo`) y a quien la gestiona: su convocante, el PD o el admin
    (`_puedeBloqueReu_`, la regla del servidor). 04/11: ya no es sólo de las generales ni sólo del PD. */
 function _asisBotonM_(R){
-  return !!R && R.id!=null && _puedeBloqueReu_(R, _asisYoM_(), (typeof esAdmin==='function' && !!esAdmin())) &&
+  return !!R && R.id!=null && _controlAsistencia_(R) && _puedeBloqueReu_(R, _asisYoM_(), (typeof esAdmin==='function' && !!esAdmin())) &&
     (_demoLocal_() || (typeof backendOK!=='undefined' && backendOK && !!R._real));
 }
 

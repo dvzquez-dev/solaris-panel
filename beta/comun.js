@@ -8651,6 +8651,19 @@ function _horarioConv_(perDia, rangos, nS, slot, tipo, pct){
 /* Los chips del mínimo (20 · 25 · 30 en julio). `cont` es el contenedor; `cara` 'e' (escritorio) o 'm' (móvil) sólo
    cambia el marcado. Se repinta cuando cambian el TIPO o el LÍMITE (de él sale el periodo), conservando lo elegido si
    sigue ofreciéndose. Trabajo: oculto y sin valor. `alCambiar` repinta la vista previa. */
+/* ══ 12/11 · «CONTROL DE ASISTENCIA» (reuniones-1) ═══════════════════════════════════════════════════════════════════
+   🗣️ Daniel: *«la idea esq haya una opcion lalmada "control de asistencia" que si la marcas sale la paranoyada de la palabra y si no
+   no. (esto para todas las reuniones salvo las de trabajo)»*. UNA regla, aquí (gemela de `control_de`, rutinas/asistencia.py): las de
+   TRABAJO nunca; el resto, lo que marcó quien convocó; una de antes de la opción (sin `controlAsistencia`) conserva el control que tenía.
+   Sin control no hay palabra ni fichaje y «Finalizar»/«Declarar» dan las horas a los convocados. */
+function _controlAsistencia_(r){ return !!r && r.tipo!=='trabajo' && r.controlAsistencia!==false; }
+/* El campo del formulario de convocar (las dos caras): Sí/No, por defecto No. Las de trabajo no lo enseñan. */
+function _controlAsisCampoHTML_(id){
+  return '<div class="campo" id="'+id+'Campo"><span class="sc">Control de asistencia</span>'+nxSiNo(id, false)+
+    '<p class="rnota" style="margin:4px 0 0">Con «Sí», se proyecta una palabra y cada persona confirma que está.</p></div>';
+}
+function _controlAsisCampoPintar_(id, tipo){ var c=document.getElementById(id+'Campo'); if(c) c.style.display=(tipo==='trabajo') ? 'none' : ''; }
+function _controlAsisDeForm_(id, tipo){ return tipo!=='trabajo' && nxSi(id); }
 function _minimoConvPintar_(cont, cara, tipo, limiteISO, alCambiar){
   if(!cont) return;
   if(!_sancionaAlguna_(tipo)){ cont.hidden = true; cont.dataset.sel = ''; cont.dataset.key = ''; return; }
@@ -14546,6 +14559,7 @@ function _bloqueReuCablear_(getR, cb){
   /* 12/11 (refutar13): FINALIZAR también reparte horas a quienes ASISTIERON, no a todos los convocados (antes sólo lo hacía «Declarar»: en una
      general con 5 convocados y 4 presentes, el quinto —que no vino— recibía las horas de la reunión). La misma lectura para los dos. */
   var presentesDe=async function(r){
+    if(!_controlAsistencia_(r)) return null;       // 12/11: sin control de asistencia no hay lista de presentes: los convocados
     if(typeof api!=='undefined' && api.getAsistencia && !_demoLocal_()){     // la maqueta `?demo` inventa presentes que no son de esta reunión
       try{ var v=await api.getAsistencia(r.id, true), pres=Object.keys((v && v.presentes) || {}); if(pres.length) return pres; }
       catch(e){ /* sin asistencia legible: los convocados */ }

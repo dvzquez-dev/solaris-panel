@@ -26,6 +26,7 @@ function normReu(r){ r=r||{};
     total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null,
     creado:r.creado||null,
     ordenDia:r.ordenDia||"", vision:r.vision||"anonima",
+    controlAsistencia:(typeof r.controlAsistencia==='boolean') ? r.controlAsistencia : undefined,   /* 12/11: sin la clave, la de antes de la opción */
     minimoPct:(typeof r.minimoPct==='number') ? r.minimoPct : null,   /* 01/11: el mínimo que eligió quien convocó; sin él, el del periodo */
     en_curso:(r.en_curso && typeof r.en_curso==='object') ? r.en_curso : null,   /* 29/10: la pone `empezarReunion` */
     finalizada_at:r.finalizada_at||null, celebrada:!!r.celebrada,   /* 04/11: la dio por celebrada su convocante (sale de Estado; al mes, al Archivo) · no se borra */
@@ -215,6 +216,7 @@ function convocarReunionPanel(){
       'El equipo ve el mapa de calor con los totales, sin nombres.</p>'+
     /* 01/11 (Daniel [c8bd27e9d3]): el mínimo lo elige quien convoca entre el del periodo y ±5; las de trabajo no lo llevan. */
     '<div id="cvMin" hidden style="margin-bottom:4px"></div>'+
+    _controlAsisCampoHTML_('cvControl')+
     '<div class="nota" id="cvPrev" style="border-top:0;margin-bottom:11px">—</div>'+
     '<button class="btn pri" data-convreu>Convocar la reunión</button>'+
     '</div>');
@@ -248,6 +250,7 @@ function _cablearConvocar_(){
     var nb=u.perDia.reduce(function(a,x){ return a+x.length; },0), nd=dias().length;
     var nS=_slotsMin_(du,sl);
     _minimoConvPintar_($('#cvMin'), 'e', val('cvTipo'), val('cvLim'), upd);
+    _controlAsisCampoPintar_('cvControl', val('cvTipo'));
     var hz=_horarioConv_(u.perDia, rangos(), nS, sl, val('cvTipo'), _minimoConvPct_($('#cvMin'), val('cvLim')));
     var p=$('#cvPrev'); if(!p) return;
     /* La cuenta se dice ANTES de convocar: cuántas casillas salen, cuántas hay que juntar
@@ -423,6 +426,7 @@ function _cablearConvocar_(){
          siempre lo mismo. El respaldo es `anonima` porque es el defecto que ya se
          pintaba, no un valor nuevo. */
       ordenDia:(val('cvOrden')||'').trim(),
+      controlAsistencia:_controlAsisDeForm_('cvControl', val('cvTipo')),
       vision:(function(){ var v=$('#cvVision [data-cv].on'); return (v&&v.dataset.cv)||'anonima'; })(), resp:{} };
     /* 21/10 (auditor 20, 🟡 8): en la MAQUETA local se convoca en memoria (como decide partes), diciendo que no avisa a
        nadie; fuera de ella, sin conexión no se convoca. */
@@ -918,7 +922,14 @@ function _reuSelE_(){
     for(i=0;i<REUS.length;i++){ if(REUS[i] && String(REUS[i].id)===String(id)) return REUS[i]; }
     return REUS[0];
   }
-  return REUS[Math.min(RE_SEL, REUS.length-1)]||REUS[0];
+  /* 12/11 (reuniones2-1): sin nadie que haya elegido, la PRÓXIMA VIVA (la primera de `_reuPartir_().vivas`), no la primera de la hoja (la más
+     antigua, que suele estar ya celebrada). Tocar una fila de la lista, o el desplegable, fija `RE_SEL_ID` y manda eso. */
+  return _reuPartir_(REUS).vivas[0]||REUS[0];
+}
+/* 12/11 (reuniones2-1): el desplegable de «Reunión» saca primero las vivas; el VALOR de cada opción sigue siendo el índice real en `REUS`. */
+function _reuOpcionesSelE_(){
+  var par=_reuPartir_(REUS), ops=function(l){ return l.map(function(r){ return [REUS.indexOf(r), r.tit||r.titulo||('Reunión '+r.id)]; }); };
+  return ops(par.vivas).concat(ops(par.archivo));
 }
 
 /* El hueco que la app recomienda para fijar `r` (el de `_ventanaFijar_`: el que pide su orden del día, si lo hay): `{di, f0, v}`,
@@ -964,7 +975,7 @@ function _fijarPanel_(){
         ? (' Dura <b>'+_slotsMin_(r.duracion, r.slot)+' franjas</b> ('+_durTxt_(r.duracion)+
            '), así que no se puede fijar en menos.') : '')+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
-      '<div style="flex-basis:100%">'+lab('Reunión')+nxElige('reSel', REUS.map(function(r,i){ return [i, r.tit||r.titulo||('Reunión '+r.id)]; }), REUS.indexOf(_sel))+'</div>'+
+      '<div style="flex-basis:100%">'+lab('Reunión')+nxElige('reSel', _reuOpcionesSelE_(), REUS.indexOf(_sel))+'</div>'+
       '<div style="flex-basis:100%">'+lab('Día')+nxElige('reDia', (r.dias||[]).map(function(d,i){ return [i, d]; }), _fijarSugerido_(r).di)+'</div>'+
       /* 01/11 (Daniel: «con una llega y sobra»): UNA lista, la de dónde EMPIEZA; el largo lo da la reunión (o su orden del día). */
       '<div style="flex-basis:100%">'+lab('Empieza a las')+nxElige('reF0', (r.franjas||[]).map(function(f,i){ return [i, _iniF(f)]; }), _fijarSugerido_(r).f0, {buscar:false})+
@@ -1231,11 +1242,17 @@ async function _refrescarReuAbiertaE_(){
   finally{ _REFREU_E_=false; }
 }
 
+/* 12/11 (reuniones2-3): las respuestas de TODAS las reuniones se piden a la vez (antes una, esperar, la siguiente: la espera crecía en línea recta
+   con la hoja y no se repintaba hasta la última). Cada una con su `try/catch` —una que falla no tumba el resto— y UN solo repintado al final, y sólo si
+   nadie está escribiendo (la guarda de `_refrescoVivo_`: repintar encima borra lo tecleado). Se repinta en cualquier vista: Equipo y Estado también leen estas respuestas. */
 async function _hidratarReus_(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
-  for(var i=0;i<REUS.length;i++){
-    var r=REUS[i];
-    if(r.resp && Object.keys(r.resp).length) continue;
+  await Promise.all(REUS.map(_hidratarReuE_));
+  if(!_escribiendoE_()){ try{ pintar(); }catch(_){} }
+}
+/* Las respuestas de UNA reunión (el cuerpo de lo que hacía el bucle). Sin ellas, o si ya las trae, no hace nada. */
+async function _hidratarReuE_(r){
+    if(r.resp && Object.keys(r.resp).length) return;
     try{
       var d=await api.get(r.id);
       /* ⛔⛔ LA SEGUNDA, Y ES LA QUE DE VERDAD LLENA LA PANTALLA. Mismo fallo que arriba:
@@ -1259,8 +1276,6 @@ async function _hidratarReus_(){
          `undefined` es «no lo se», no «no» (§3c-24). Misma forma que `_normReuM_`. */
       if(d && d.agregado != null) r.agregado = d.agregado !== false;
     }catch(_){ /* una reunion que no se puede leer no debe tumbar el resto */ }
-  }
-  try{ pintar(); }catch(_){}
 }
 
 
@@ -1281,6 +1296,7 @@ function _asisSoyPD_(r){
 /* La caja de la ficha: un botón. Se cablea con el truco de `_audioReuHTML_` (el HTML no lleva manejadores). */
 function _asisBoxE_(r){
   if(!r || r.id==null || !_asisSoyPD_(r) || (!_demoLocal_() && !r._srv)) return '';
+  var ctrl=_controlAsistencia_(r);       // 12/11: sin «control de asistencia» (o de trabajo) no hay palabra: queda sólo «Finalizar»
   var rid=String(r.id).replace(/"/g,'');
   setTimeout(function(){
     var b=document.querySelector('[data-asisabrir="'+rid+'"]');
@@ -1289,6 +1305,9 @@ function _asisBoxE_(r){
     if(f) f.onclick=function(){ _reuFinalizarE_(r, f); };
   },0);
   var fin=_reuFinalizada_(r), puedeFin=_reuPuedeFinalizar_(r, (typeof _actorSanc_==='function' ? _actorSanc_() : null), (typeof esAdmin==='function' && !!esAdmin())) || (_demoLocal_() && !fin && !r.en_curso);
+  if(!ctrl && !puedeFin) return '';
+  if(!ctrl) return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+
+    '<button class="btn" data-reufin="'+esc(r.id)+'">Finalizar reunión</button></div>';
   return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+
     '<span class="sc" style="display:block;margin-bottom:4px">Asistencia en directo</span>'+
     '<button class="btn" data-asisabrir="'+esc(r.id)+'">'+ico('portapapeles')+(fin ? ' Ver la lista' : ' Mostrar la palabra')+'</button>'+
