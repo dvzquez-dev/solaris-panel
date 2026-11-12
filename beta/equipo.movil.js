@@ -95,7 +95,9 @@ function _avisosQueTeTocanM_(){
     var r=cv.resp && cv.resp[ac];
     conv=!(r && typeof r==='object' && Object.keys(r).length);
   }
-  return _tuyoItems_({pdec:pdec, rev:rev, conv:conv,
+  var apel=(typeof _apelPendientesTuyas_==='function') ? _apelPendientesTuyas_().map(function(a){
+    return {autor:String(a.autor||'').split(' ')[0], clase:a.clase}; }) : [];
+  return _tuyoItems_({pdec:pdec, rev:rev, conv:conv, apel:apel,
     sindecl:mios.filter(function(p){ return p.e==='sindecl'; }).length,
     det:mios.filter(function(p){ return p.e==='det'; }).length,
     /* 11/11: el parte RECHAZADO, con su motivo (`nota`), mientras `_sigueVisibleSinContar_` lo deje ver. */

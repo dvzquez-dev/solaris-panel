@@ -1926,7 +1926,8 @@ function _apelFueraDePlazo_(t){ var h=_apelHastaTarea_(t); return !!h && _hoyNxI
 function _puedeApelarTarea_(actor, t, lista){
   var a;
   if(!t || !actor || !_tareasResp_([t], actor).length) return false;
-  if(_tareaHecha_(t.e) || _esVoluntaria_(t) || _apelFueraDePlazo_(t)) return false;
+  /* «Revisando» = ya entregada (`TAREA_FLUJO`): no queda nada que apelar. Si la deshace, vuelve a poder. */
+  if(_tareaHecha_(t.e) || t.e === 'Revisando' || _esVoluntaria_(t) || _apelFueraDePlazo_(t)) return false;
   a=_apelDeTarea_(t, lista);
   return !(a && a.estado === 'abierta');
 }
@@ -9790,6 +9791,16 @@ function _tuyoItems_(c){
     'Hasta que lo des no se firma.', false);
   if(c.rev) add('rev', 'docs', c.rev === 1 ? 'Un documento espera tu revisión' : (c.rev + ' documentos esperan tu revisión'),
     c.rev === 1 ? 'Léelo y decide en Docs.' : 'Léelos y decide en Docs.', false);
+  /* 12/11 (refutar16): las apelaciones que TÚ puedes resolver. El aviso al móvil dice «Mírala en Apelaciones» y esa pantalla es del
+     ESCRITORIO (🗣️ Daniel, 31/10: «Móvil es para todos, escritorio es para el consejo»): en el móvil, ni cola, ni menú, ni aviso, y la
+     persona no sabía ni que tenía una esperando. `c.apel` = [{autor (nombre de pila), clase}]; sólo lo pasa el móvil. */
+  var ap = c.apel || [];
+  if(ap.length){
+    var ap0 = ap.slice(0, 2).map(function(a){ return esc(a.autor) + ' (' + (a.clase === 'sancion' ? 'sanción' : 'tarea') + ')'; }),
+        apTxt = ap.length > 2 ? (ap0.join(', ') + ' y ' + (ap.length - 2) + ' más') : ap0.join(' y ');
+    add('apel', 'estado', ap.length === 1 ? 'Una apelación espera tu respuesta' : (ap.length + ' apelaciones esperan tu respuesta'),
+      'De ' + apTxt + '. Se responden desde el escritorio, en Apelaciones.', false);
+  }
   /* 11/11 (🗣️ Daniel): un parte tuyo RECHAZADO sale en Estado con su motivo, como los documentos con cambios pedidos; antes sólo se
      veía plegado en «Horas → Tus partes». `c.rech`: [{tarea, motivo}] (los que aún se ven: `_sigueVisibleSinContar_`). */
   var rc = c.rech || [];

@@ -660,7 +660,8 @@ function _engConv_(){
      plazo que el pintor, y se guarda igual que al soltar el dedo. */
   $$('#convRej [data-tdia], #convRej [data-tfr]').forEach(function(h){
     h.onclick=function(){
-      if(dd.deslizando() || _convEstado_(cv)!=='abierta') return;
+      if(dd.deslizando()) return;
+      if(_convEstado_(cv)!=='abierta'){ _convVencida_(); return; }
       if(!_convAtajo_(cv, _convClavesAtajo_(cv, h.dataset.tdia||'', h.dataset.tfr||''))) return;
       repinta(); _convGuardar_(cv);
     };
@@ -695,7 +696,7 @@ function _engConv_(){
          de que a nadie se le pregunte, y **el plazo deja de tener principio**.
        ⛔ Abrir esto es la «cura» que va a intentar el siguiente. Antes de tocarlo hay que
        cerrar `Codigo.gs:_guardarDisponibilidad_`, no al revés. Ficha en `pendientes.md`. */
-    if(_convEstado_(cv)!=='abierta') return;
+    if(_convEstado_(cv)!=='abierta'){ _convVencida_(); return; }
     pintando=true;
     /* ⚠️ LA COPIA SE SACA ANTES DE PINTAR, que es la única forma de poder deshacerla. Es
        **plana** porque `_convPintar_` asigna y borra entradas enteras. */
@@ -740,6 +741,20 @@ function _ftInicioM_(){
     '<div style="padding:0 14px 12px">'+_ftHTML_(t)+'</div></div>';
 }
 
+/* refutar14 (12/11): el plazo venció con la pestaña abierta (la tarjeta se pintó abierta, con sus manejadores). Tocar la rejilla no hacía
+   NADA —ni aviso ni cambio—, y la tarjeta seguía diciendo «Quedan 0 min». Se dice y se repinta: la tarjeta pasa a «cerrada». */
+function _convVencida_(){
+  if(typeof tost==='function') tost('El plazo de esta disponibilidad ya ha cerrado: tu rejilla queda como la dejaste.');
+  if(typeof pintar==='function') pintar();
+}
+
+/* refutar14 (12/11): el orden de «tus turnos» lo ponía la fuente (con turnos sembrados a mano salía el 18/11 detrás del 08/11 y el 12/11 antes
+   que el 09/11): por fecha y, el mismo día, por hora. Copia: no toca la lista de TURNOS. */
+function _proxPorFecha_(l){
+  return (l||[]).slice().sort(function(a,b){
+    return String(a.iso||'').localeCompare(String(b.iso||'')) || String(a.hora||'').localeCompare(String(b.hora||'')); });
+}
+
 function vTurnos(){
   /* Por defecto SOLO LOS TUYOS -decision de Daniel-, con un conmutador para ver los del
      equipo. Los de otros se pintan igual pero sin poder tocarlos: ver quien va a que sirve
@@ -747,6 +762,7 @@ function vTurnos(){
   var base=TURNOS_TODOS ? TURNOS.slice() : TURNOS.filter(_mioTurno_);
   var mios=base;
   var prox=mios.filter(function(t){ return !t.hecho; });
+  prox=_proxPorFecha_(prox);
   var pas=mios.filter(function(t){ return t.hecho; });
   var nTodos=TURNOS.length, nMios=TURNOS.filter(_mioTurno_).length;
   function tarjeta(t){

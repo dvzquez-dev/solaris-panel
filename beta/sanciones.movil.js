@@ -489,7 +489,11 @@ function medidorHTML(){
    El servidor dice qué se puede (`apelable`, `apelable_hasta`); la cara no cuenta plazos. */
 function _misSancHTML_(){
   var L=_misSancLista_().filter(function(s){ return s && (s.apelable || s.apelacion); });
-  if(!L.length) return '';
+  /* 12/11 (refutar16): la que se te pasó de plazo no sale en la lista y no decía por qué: sin botón y sin una palabra. El escritorio sí lo
+     dice (`no_apelable`); aquí una línea, sin contar días (el plazo lo pone el servidor). */
+  var tarde=_misSancLista_().filter(function(s){ return s && !s.apelable && !s.apelacion && /^fuera de plazo/.test(s.no_apelable||''); }).length;
+  var nota=tarde ? '<small style="display:block;color:var(--ink3);margin-top:8px">'+(tarde === 1 ? 'Una sanción tuya ya no se puede apelar: pasó el plazo.' : tarde+' sanciones tuyas ya no se pueden apelar: pasó el plazo.')+'</small>' : '';
+  if(!L.length && !nota) return '';
   return '<div class="msanc"><div class="sc" style="margin:14px 0 2px">Tus sanciones</div>'+L.map(function(s){
     var est=_sancEstadoM_(s), p=(s.puntos === null || s.puntos === undefined) ? _etPtsSanc_(null) : (s.puntos < 0 ? '−' + Math.abs(s.puntos) : String(s.puntos));
     return '<div class="fila" data-msfila="'+esc(s.id)+'"><div class="a"><b>'+esc(s.motivo || 'Sanción')+'</b>'+
@@ -498,7 +502,7 @@ function _misSancHTML_(){
       (s.apelable ? '<small>Puedes apelar hasta el '+esc(_isoADMY_(s.apelable_hasta) || '')+'</small>'+
         '<button class="btn mini" style="margin-top:7px;align-self:flex-start" data-msapelar="'+esc(s.id)+'">Apelar</button>' : '')+
       '</div></div>';
-  }).join('')+'</div>';
+  }).join('')+nota+'</div>';
 }
 
 /* El formulario de apelar. Motivo obligatorio, enlace opcional. */
