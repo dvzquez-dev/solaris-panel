@@ -1817,7 +1817,9 @@ function _cargarPartesDec_(){
      ⛔ Y el «yo» sale de `_actorSanc_()`, no de `YO.nombre`: con la identidad prestada del
      selector, `YO` es la persona real y no a quien estás mirando, así que la cola se filtraba
      por el de siempre. Es el mismo fallo que ya se cerró en `_puedeBorrarReuM_`. */
-  return _cargarCierrePlan_().then(function(){ return api.getPartes({}); }).then(function(arr){
+  /* 12/11 (rendimiento-1): el plan del cierre y los partes se piden A LA VEZ; el `then` espera a LAS DOS, así
+     que la primera pintada sigue teniendo el plan. `_cargarCierrePlan_` se traga sus errores (devuelve null). */
+  return Promise.all([_cargarCierrePlan_(), api.getPartes({})]).then(function(r){ var arr = r[1];
     /* ⛔ LA BANDERA DEL FALLO (19/10). El `catch` de abajo era MUDO: un corte al entrar dejaba
        `PARTES_DEC=[]` y la tarjeta «Esperan tu decisión» DESAPARECÍA — un coordinador leía «no
        tengo nada que firmar» y las horas de su gente se quedaban sin contar. Es el mismo arreglo
@@ -1957,6 +1959,12 @@ function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
   /* Con UN solo miembro el segundo nivel no separa nada de nada: se abre solo. Un pliegue que
      no agrupa es un clic regalado. */
   var unico = orden.length===1;
+  /* 12/11 (general-2, Daniel aceptó): «Esperan tu decisión» nace ABIERTA y con la 1.ª persona abierta (quien viene del aviso «Un parte espera tu firma»
+     ve ya Aprobar/Rechazar). Sólo si nadie ha decidido todavía (`undefined`): lo que el PD pliega a mano queda en `false` y el repintado no lo reabre. */
+  if(id==='pdec'){
+    if(PD_ABIERTO_[id]===undefined) PD_ABIERTO_[id]=true;
+    if(PD_ABIERTO_[id+'|'+orden[0]]===undefined) PD_ABIERTO_[id+'|'+orden[0]]=true;
+  }
   return '<div class="tarj" id="'+id+'">'+
     '<details class="pdgrupo" data-pdk="'+id+'"'+(PD_ABIERTO_[id]?' open':'')+'>'+
       '<summary><b>'+titulo+'</b>'+
@@ -2202,16 +2210,13 @@ function _engPartesDec_(){
          pantalla que te hace perder el rato. El mínimo es el mismo que el suyo (8). */
       if(acc!=='aprobar' && mot.length<8){
         tost('Pon un motivo (al menos 8 caracteres).'); return; }
-      /* ⛔ ESTE AVISO DECIA «ya no se pueden deshacer desde aquí» Y HOY ES FALSO: desde que
-         existe «Ya decidiste», sí se puede. Un aviso que exagera se aprende a ignorar, y el día
-         que diga algo de verdad grave nadie lo leerá. */
-      if(acc==='aprobar' && !(await dialogoSiNo('¿Aprobar estas horas?\n\nContarán en el mes de quien '+
-        'las declaró. Puedes deshacerlo en «Ya decidiste».'))) return;
+      /* 12/11 (horas-1, Daniel aceptó): aprobar es UN toque, sin «¿Aprobar estas horas?», como en el escritorio.
+         Se deshace en «Ya decidiste»; rechazar y pedir detalle siguen exigiendo su motivo (arriba). */
       $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=true; });
       var prev=b.textContent; b.textContent='…';
       try{
         var upd=await api.decidirParte(id, acc, mot||null);
-        tost(acc==='aprobar'?'Aprobado: se suma a sus horas al aplicarse (en unos minutos).':(acc==='rechazar'?'Rechazado.':'Detalle pedido.'));
+        tost(acc==='aprobar'?'Aprobado: se suma a sus horas al aplicarse (en unos minutos). Se deshace en «Ya decidiste».':(acc==='rechazar'?'Rechazado.':'Detalle pedido.'));
         /* ⛔ SE QUITA DE LA LISTA CON LA RESPUESTA QUE YA TENEMOS, sin volver a preguntar.
            `decidirParte` DEVUELVE el parte decidido: pedirlo otra vez era, además de un
            viaje de más, una carrera — la lectura salía antes de que el Sheet confirmase la
@@ -2423,9 +2428,9 @@ function vHoras(){
                     'Vuelve a entrar en Horas para reintentarlo.', '', false)
                 : vacio('No se han podido cargar sus partes',
                   'Vuelve a entrar en su ficha para reintentarlo.', '', false))
-              : vacio('Ningún parte en cola',
-                'No tienes horas esperando firma. Las que envíes aparecerán aquí con su estado '+
-                'hasta que se firmen.','ficha desde la pestaña Fichar', false))))+
+              /* 12/11 (movilraso-1): una línea, no ~500 px de radar; el rótulo en negrita se pierde, el texto no. */
+              : vacioMini('Ningún parte en cola. No tienes horas esperando firma. Las que envíes aparecerán aquí '+
+                'con su estado hasta que se firmen.'))))+
       /* ⛔ CERRADO POR DEFECTO (sin `open`): es justo lo que estorbaba. Pero **sigue estando**,
          porque son horas suyas y esconderlas del todo es perder información — plegar se puede
          deshacer con un dedo, borrar el bloque no. */
@@ -2539,7 +2544,7 @@ function _rankSubsHTML_(){
         'background:'+(mio?'var(--red)':'var(--ink3)')+'"></i></div></div>'+
         '<div class="d">'+h1(s.media)+'</div></div>';
     }).join('')
-    : vacio('Sin datos de subsistemas','La media de cada unidad aparece al cerrar el mes.','',false))+'</div>';
+    : vacioMini('Sin datos de subsistemas. La media de cada unidad aparece al cerrar el mes.'))+'</div>';   /* 12/11 (movilraso-1) */
 }
 
 /* 02/11: las horas del parte para «✨ Redactar con SolarIA» (los tres caminos comparten la caja de la justificación), como en `validarFichaje`. */

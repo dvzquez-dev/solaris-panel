@@ -9819,6 +9819,10 @@ function _tuyoItems_(c){
     'Hasta que lo des no se firma.', false);
   if(c.rev) add('rev', 'docs', c.rev === 1 ? 'Un documento espera tu revisión' : (c.rev + ' documentos esperan tu revisión'),
     c.rev === 1 ? 'Léelo y decide en Docs.' : 'Léelos y decide en Docs.', false);
+  /* 12/11 (general-1 + gestion-1, Daniel aceptó): las sanciones que esperan la decisión del PD. `c.sanc` = cuántas; SIN dato (cola sin leer)
+     la cara NO lo pasa: «no lo sé» no se avisa como «0». Sólo lo pasa el móvil (el escritorio ya las lleva en `colaDecision`). */
+  if(c.sanc) add('sanc', 'sanciones', c.sanc === 1 ? 'Una sanción espera tu decisión' : (c.sanc + ' sanciones esperan tu decisión'),
+    'Nada se aplica hasta que se cierre su bloque.', false);
   /* 12/11 (refutar16): las apelaciones que TÚ puedes resolver. El aviso al móvil dice «Mírala en Apelaciones» y esa pantalla es del
      ESCRITORIO (🗣️ Daniel, 31/10: «Móvil es para todos, escritorio es para el consejo»): en el móvil, ni cola, ni menú, ni aviso, y la
      persona no sabía ni que tenía una esperando. `c.apel` = [{autor (nombre de pila), clase}]; sólo lo pasa el móvil. */

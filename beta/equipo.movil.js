@@ -97,7 +97,9 @@ function _avisosQueTeTocanM_(){
   }
   var apel=(typeof _apelPendientesTuyas_==='function') ? _apelPendientesTuyas_().map(function(a){
     return {autor:String(a.autor||'').split(' ')[0], clase:a.clase}; }) : [];
-  return _tuyoItems_({pdec:pdec, rev:rev, conv:conv, apel:apel,
+  /* 12/11 (general-1 + gestion-1): sólo el PD (rango 3, como el escritorio y el servidor) y sólo con la cola LEÍDA: `SANC_M===null` es «no lo sé». */
+  var sanc=(typeof SANC_M!=='undefined' && Array.isArray(SANC_M) && rangoNom((typeof _actorSanc_==='function') ? _actorSanc_() : yo)>=3) ? SANC_M.length : 0;
+  return _tuyoItems_({pdec:pdec, rev:rev, conv:conv, apel:apel, sanc:sanc,
     sindecl:mios.filter(function(p){ return p.e==='sindecl'; }).length,
     det:mios.filter(function(p){ return p.e==='det'; }).length,
     /* 11/11: el parte RECHAZADO, con su motivo (`nota`), mientras `_sigueVisibleSinContar_` lo deje ver. */
