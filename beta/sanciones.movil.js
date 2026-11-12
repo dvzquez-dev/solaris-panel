@@ -170,7 +170,9 @@ function _sancColaHTML_(){
                en esta pantalla el 0 se lee «aviso». Y es el MISMO rotulo que el
                escritorio: dos textos para el mismo dato es la leccion de la gemela. */
             ' · '+esc(_etSancFila_(x.puntos, x.origen, x.extra)))+'</span>'+
-          (suelta
+          (suelta && !_puedeDecidirSancion_(x)
+            ? '<span class="mono" style="color:var(--ink3);font-size:10.5px">Lo decide el PD</span>'
+            : suelta
             ? '<button class="btn mini" data-sok="'+esc(x.id)+'" data-p>Aprobar</button>'+
               /* 04/11 noche (Daniel): «Justificar y rechazar es lo mismo»: UN gesto, «Rechazar», que siempre pide el porqué. */
               '<button class="btn mini" data-sno="'+esc(x.id)+'" data-p style="color:var(--warn);border-color:var(--warn)">Rechazar</button>'

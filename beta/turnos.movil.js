@@ -548,6 +548,7 @@ function _convCargar_(repintar){
       var cv=r.convocatoria,
           yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
       cv.resp={}; cv.resp[yo]=r.mias||{};
+      cv._okMias=JSON.parse(JSON.stringify(cv.resp[yo]));   /* refutar25: lo último que el servidor TIENE de ti (`_convGuardar_` vuelve a esto si no puede guardar) */
       /* ⛔⛔ Y EL VEREDICTO DEL PLAZO SE COPIA (308.ª). `getConvocatoria` lo manda en
          `r.abierta` —`Codigo.gs:2923`— y aquí se **tiraba**: se copiaba `resp` y nada
          más, así que esta cara —la que usan los 32 para contestar— decidía el plazo con
@@ -590,8 +591,26 @@ function _convGuardar_(cv){
     return;
   }
   if(typeof api==='undefined' || !api.guardarDisponibilidad) return;
-  api.guardarDisponibilidad(cv.id, _convMias_(cv)).catch(function(e){
-    if(typeof tost==='function') tostErr('No se pudo guardar tu disponibilidad: ', e);
+  /* refutar25 (12/11): SIN RED, LA CELDA SE QUEDABA PINTADA. Cada toque se pinta y se manda; si no llegaba, el aviso caducaba a los 2,4 s y la
+     rejilla seguía diciendo «marcadas 3» con 1 en el servidor: quien se fiaba de la pantalla se quedaba sin contestar lo que creía contestado
+     («si no dices nada, se reparte sin contar contigo»). Ahora, si el ÚLTIMO envío falla, la rejilla VUELVE a lo último que el servidor tiene
+     (`cv._okMias`) y el aviso se queda hasta que lo tocas. Un envío viejo que falla con otro más nuevo en vuelo se ignora: el nuevo lleva la
+     rejilla entera. Cada envío manda la rejilla ENTERA, así que lo guardado es siempre una rejilla completa. */
+  var enviada=JSON.parse(JSON.stringify(_convMias_(cv))), n=(cv._gseq=(cv._gseq||0)+1);
+  api.guardarDisponibilidad(cv.id, _convMias_(cv)).then(function(){
+    cv._okMias=enviada;
+  }).catch(function(e){
+    var vuelve=(cv._gseq===n && cv._okMias);
+    if(typeof tost==='function'){
+      var m=String((e&&e.message)||e).replace(/^Error:\s*/,'');
+      tost('No se pudo guardar tu disponibilidad'+(e&&e.sinRed ? ': sin conexión, tu último toque NO se guardó.' : ': '+m)+
+        (vuelve ? ' La rejilla vuelve a lo que ya tenías guardado: repítelo cuando haya red.' : ''), {fijo:true});
+    }
+    if(vuelve){
+      var yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
+      cv.resp[yo]=JSON.parse(JSON.stringify(cv._okMias));
+      if(typeof pintar==='function') pintar();
+    }
   });
 }
 

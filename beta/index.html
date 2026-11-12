@@ -113,16 +113,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=02e344d"></script>
+<script src="comun.js?v=f340c6d"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=561a9dd"></script>
-<script src="turnos.movil.js?v=a53f772"></script>
+<script src="turnos.movil.js?v=288e575"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=a18c74a"></script>
-<script src="sanciones.movil.js?v=b0382ae"></script>
+<script src="sanciones.movil.js?v=240719e"></script>
 <script src="reuniones.movil.js?v=4332176"></script>
-<script src="horas.movil.js?v=21d74c5"></script>
+<script src="horas.movil.js?v=4283a96"></script>
 <script src="equipo.movil.js?v=2866280"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -663,6 +663,7 @@ async function _refrescoVivo_(motivo, que){
        mes, tus puntos y tu cuota se quedaban con el valor de cuando entraste — y esas son
        justo las cifras que uno vuelve a mirar para ver si ha entrado lo que acaba de
        fichar. Va en el mismo `Promise.all`: no cuesta una vuelta mas de reloj. */
+    var fch=(!que && typeof _resincFichaje_==='function') ? _resincFichaje_() : Promise.resolve(false);   /* refutar25: vuelta/reloj (no el «vivo» de cada segundo) */
     var pnl=_pideSi_(que,'resto','getPanel').then(function(x){ if(x){ _refrescarPanelM_(x); return _alinearCierre_(); } }).catch(function(){});   /* refutar21: y si el cierre cambió, el mes de trabajo con él */
     /* ⛔ Y LA COLA DE SANCIONES (733.ª). Se cargaba UNA sola vez, en el arranque
        (`movil.html:815`), y aqui no estaba: quien deja el telefono abierto veia **el lote
@@ -686,6 +687,7 @@ async function _refrescoVivo_(motivo, que){
     var mps=(_vivoToca_(que,'resto') && !_sesionMuerta_() && typeof _recargarPartesVivo_==='function')
       ? _recargarPartesVivo_().catch(function(){}) : Promise.resolve();   /* con «Ver como», los de quien se ve (refutador 36) */
     await Promise.all([t,q,r,pnl,dcs,snc,mps]);
+    await fch;                    /* refutar25: la sesión de fichaje (sólo vuelta/reloj) */
     await mvs;                    /* 03/11: ya corría (arriba) — sólo se espera aquí; su `catch` no tumba el refresco */
     /* ⛔ SI LA SESION MURIO, ESTE REFRESCO NO HA TRAÍDO NADA. `_pide_` devuelve `null`
        por diseño —para que un dato que falta no tumbe a los demás— y el repintado deja
@@ -1770,7 +1772,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='fa87538';
+var BUILD='85ac599';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2272,7 +2274,11 @@ function _engFichar_(){
         var _ac=_tostAutocierre_(r);
         if(_ac) tost(_ac); else tost(declara?'Fichaje declarado · '+_cola+'.':'Cerrado sin declarar. Decláralo desde «Tus partes».');
         irA('horas');
-      }catch(e){ bf.disabled=false; tostErr('No se pudo cerrar: ', e); }
+      }catch(e){
+        bf.disabled=false; tostErr('No se pudo cerrar: ', e);
+        /* refutar25: «no tienes ningún fichaje abierto» = se cerró desde otra pestaña/aparato: se dice y la pantalla se pone al día (si no, seguía «EN CURSO»). */
+        if(/ning[úu]n fichaje abierto/i.test(String((e&&e.message)||e))){ try{ await _resincFichaje_(); }catch(_){} pintar(); }
+      }
       return;
     }
     var min=minSes();   // demo local: congela el reloj y abre la justificación

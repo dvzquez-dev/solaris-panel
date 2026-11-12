@@ -5337,6 +5337,14 @@ function _esPremioSanc_(origen, extra){
   return o === 'premio' || !!(extra && extra.compensacion && o !== 'revocacion');
 }
 
+/* 12/11 (refutar24): ¿puedo DECIDIR esta propuesta de la cola? Gemela de `servidor.puede_decidir_sancion`: una fila que SUBE puntos
+   (un +1 del Art. 31 propuesto por quien coordina) sólo la decide el PD; no lo son una revocación ni un premio de horas. Sin esto la
+   coordinadora veía «Aprobar» en el +1 de su propia gente y, tras el «Sí», el servidor contestaba que no era suya. */
+function _puedeDecidirSancion_(s){
+  if(!s || !(_ptsSanc_(s.puntos) > 0) || String(s.origen) === 'revocacion' || _esPremioSanc_(s.origen, s.extra)) return true;
+  return rangoSanc(_actorSanc_()) >= 3;
+}
+
 /* ⛔ 20/10 (ficha «un PREMIO se pinta como sanción»): la cabecera del lote en el móvil era `it.length+' sanciones'`, y
    los bloques de reunión traen premiados en el MISMO lote — «2 sanciones» sobre una sanción y un premio. El escritorio
    dice «N personas», que no miente; aquí se separa, que es lo que el PD necesita leer antes de decidir. */
@@ -5854,6 +5862,9 @@ async function _enviarSancionForm_(o){
   var quien=SANC_FORM.quien, mot=val('snMotivo'), _vp=_validaPuntosSanc_(val('snPts'), mot);
   var esDePlazo=(mot==='plazo'||mot==='plazoUrg');
   if(!quien){ msg('Elige a quién: pulsa un nombre de la lista.', true); return {ok:false}; }
+  /* 12/11 (refutar24): a uno MISMO la lista lo ofrece (decisión vieja, «Uno mismo cuenta siempre») pero el servidor lo salta (03/11:
+     una manual nace aprobada y sería decidir lo suyo); tras el «¿Seguro?» salía «fuera de tu jurisdicción», que no es lo que pasa. */
+  if(quien===_actorSanc_()){ msg('No puedes ponerte una sanción a ti: la decidirías tú. Que la ponga el PD.', true); return {ok:false}; }
   if(personasDeAlcance(_actorSanc_()).indexOf(quien)<0){ msg('No mandas sobre '+(_pilaDeM_(quien)||quien)+': elige a alguien de tu lista.', true); return {ok:false}; }
   if(!mot){ msg('Elige el motivo.', true); return {ok:false}; }
   if(!_vp.ok){ msg(_vp.msg, true); return {ok:false}; }
@@ -7803,8 +7814,8 @@ function _recargarVersionNueva_(volviendo){
 function _vistaDeAviso_(destino, cara){
   var d=String(destino||'').replace(/^#/,'');
   var M=(cara==='escritorio')
-    ? {estado:'panel', horas:'libros', reuniones:'convoc', turnos:'turnos', docs:'docdec'}
-    : {estado:'estado', horas:'horas', reuniones:'reu', turnos:'turnos', docs:'docs'};
+    ? {estado:'panel', horas:'libros', reuniones:'convoc', turnos:'turnos', docs:'docdec', apela:'apela', tareas:'tareas'}
+    : {estado:'estado', horas:'horas', reuniones:'reu', turnos:'turnos', docs:'docs', apela:'estado', tareas:'tareas'};
   return Object.prototype.hasOwnProperty.call(M,d) ? M[d] : null;
 }
 function _irDesdeAviso_(destino){

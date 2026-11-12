@@ -180,6 +180,28 @@ async function _cargarFichajeAbierto_(){
   catch(e){ return false; }
 }
 
+/* refutar25 (12/11): DOS PESTAÑAS (o móvil y escritorio) — fichas en una y miras la otra. `ST.ses` se trae UNA vez, al entrar, y de ahí
+   en adelante sólo lo mueven los botones de ESTA pestaña: cerrar en una dejaba la otra en «EN CURSO» con el reloj corriendo para siempre
+   (y «Fichar salida» contestaba «no tienes ningún fichaje abierto» sin cambiar nada), y abrir en una la dejaba la otra en «PARADA».
+   ⛔ NO ES `_cargarFichajeAbierto_` (que resucita una sesión cerrada, ver arriba): aquí la respuesta se descarta si `ST.ses` ya no es el
+   MISMO objeto que había al preguntar — `ficharEntrada`/`ficharSalida` ponen uno nuevo —, así que una respuesta rancia que llega después
+   de pulsar nada no pisa lo que acaba de hacer esta pestaña. Sólo toca `ST.ses`: el formulario (`ST.form`) se queda como estaba.
+   Devuelve si cambió algo (para que quien llama repinte). */
+async function _resincFichaje_(){
+  var s0=ST.ses, e0=s0.estado;
+  try{
+    var f=await api.getFichajeAbierto();
+    if(ST.ses!==s0 || s0.estado!==e0) return false;                  // esta pestaña ya movió la sesión (otra, o pausa/reanudar) mientras se preguntaba
+    if(f && f.ini){
+      var n=_sesDeFichaje_(f);
+      if(s0.cloudIni===n.cloudIni && s0.estado===n.estado) return false;
+      ST.ses=n; return true;
+    }
+    if(s0.cloudIni){ ST.ses={estado:'parada'}; return true; }          // en la nube ya no hay: se cerró desde otro sitio
+  }catch(e){ /* sin red: se queda lo que había; el refresco lo reintenta */ }
+  return false;
+}
+
 /* ⛔ REARMA LAS CARGAS QUE NO LLEGARON — la regla de Daniel del 11/08 puesta a trabajar:
    «que lo reintente por detras sin decirtelo constantemente».
 
