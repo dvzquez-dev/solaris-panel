@@ -6612,7 +6612,11 @@ function _devengadoAHoy_(m, h, frac){
    siguen leyendo `horas`/`q` —el exceso—, y por eso no se cuenta dos veces. ⛔ Quien sume para MOSTRAR un parte usa la vista;
    quien sume para CUADRAR, no. Gemelas de `ajuste_horas_turno`/`clave_extra_turno` (servidor.py). */
 var TURNO_AJUSTE_POR_DEBAJO = false;     /* espejo del servidor: apagado = sólo suma por encima; encendido, un turno corto resta (D−4) */
-function _claveExtraTurno_(fecha, nombre){ return 'turno-'+fecha+'-extra-'+nombre; }
+/* 12/11 (turnoclave): el primer turno del día (`T-<fecha>`) conserva la clave de siempre; los demás llevan su id detrás (gemela de `clave_extra_turno`). */
+function _claveExtraTurno_(fecha, nombre, tid){
+  var b = 'turno-'+fecha+'-extra-'+nombre;
+  return (!tid || tid === 'T-'+fecha) ? b : b+'-'+tid;
+}
 function _ajusteHorasTurno_(dur, porDebajo){
   var d = Math.round((Number(dur) - _horasTurnoBase_()) * 100) / 100;
   if(!isFinite(d)) return 0;
@@ -14457,6 +14461,10 @@ function _variosActivo_(){ return !!(BLQ && BLQ.modo==='declarar' && BLQ.reunion
 function _bloqueReuHTML_(r, puede){
   if(!r || !puede) return '';
   var ec=r.en_curso, pend=_fichaPendienteReu_(r);
+  /* 12/11 (refutar13): la FINALIZADA con su bloque ya enviado no se puede «Empezar» otra vez ni declarar de nuevo (duplicaba las horas de todos);
+     la finalizada sin bloque sólo ofrece dar las horas a los asistentes, sin «Empezar». */
+  if(_reuFinalizada_(r) && r.bloque)
+    return '<div id="reuBloque" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)"><p class="rnota" style="margin:0">Las horas de quienes asistieron ya están enviadas: las decide el PD.</p></div>';
   return '<div id="reuBloque" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)">'+
     (pend ? '<div id="reuFichaAviso" role="status" style="margin:0 0 10px;padding:9px 11px;border:1px solid var(--warn);border-radius:10px">'+
       '<b>Ya ha pasado: ficha el bloque</b><br><span class="rnota">Las horas de todos quedan pendientes del PD.</span></div>' : '')+
@@ -14465,9 +14473,9 @@ function _bloqueReuHTML_(r, puede){
         '<b>En curso</b><span class="mono" data-crono="'+esc(ec.ini)+'" style="font-size:18px">'+esc(_cronoTxt_(ec.ini))+'</span></div>'+
         '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-p id="btnFinalizar" style="flex:2">Finalizar</button>'+
         '<button class="btn" data-p id="btnCancelarCurso" style="flex:1">Cancelar</button></div>'
-      : '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>')+
+      : (_reuFinalizada_(r) ? '' : '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>'))+
     '<button class="btn '+(pend?'pri':'mini')+' full" data-p id="btnDeclararBloque" style="margin-top:8px">'+(_reuTerminada_(r) ? 'Dar las horas a los asistentes' : 'Declarar horas de varias personas')+'</button>'+
-    '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p></div>';
+    (_reuFinalizada_(r) ? '' : '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p>')+'</div>';
 }
 
 /* `getR()` da la reunión AHORA (la lista se rehace al refrescar); `abrir()` pinta el formulario. */
@@ -14495,18 +14503,27 @@ function _bloqueReuCablear_(getR, cb){
     await api.cancelarReunionEnCurso({id:r.id});
     r.en_curso=null; tost('Cancelada: no se ha creado nada.'); cb.refrescar();
   });
-  on('btnFinalizar', async function(){ var r=getR(); if(!r) return; _bloqueAbrir_(base(r,'finalizar')); cb.abrir(); });
+  /* 12/11 (refutar13): FINALIZAR también reparte horas a quienes ASISTIERON, no a todos los convocados (antes sólo lo hacía «Declarar»: en una
+     general con 5 convocados y 4 presentes, el quinto —que no vino— recibía las horas de la reunión). La misma lectura para los dos. */
+  var presentesDe=async function(r){
+    if(typeof api!=='undefined' && api.getAsistencia && !_demoLocal_()){     // la maqueta `?demo` inventa presentes que no son de esta reunión
+      try{ var v=await api.getAsistencia(r.id, true), pres=Object.keys((v && v.presentes) || {}); if(pres.length) return pres; }
+      catch(e){ /* sin asistencia legible: los convocados */ }
+    }
+    return null;
+  };
+  on('btnFinalizar', async function(){
+    var r=getR(); if(!r) return;
+    var o=base(r,'finalizar'), pres=await presentesDe(r);
+    if(pres) o.parts=pres;
+    _bloqueAbrir_(o); cb.abrir();
+  });
   /* 11/11 (horascoord): los participantes son quienes ASISTIERON (la lista de la asistencia), no todos los convocados; sin asistencia
      o sin poder leerla, los convocados de siempre. Los marcados se quitan o se añaden a mano en el formulario. */
   on('btnDeclararBloque', async function(){
     var r=getR(); if(!r) return;
-    var o=base(r,'declarar');
-    if(typeof api!=='undefined' && api.getAsistencia && !_demoLocal_()){     // la maqueta `?demo` inventa presentes que no son de esta reunión
-      try{
-        var v=await api.getAsistencia(r.id, true), pres=Object.keys((v && v.presentes) || {});
-        if(pres.length) o.parts=pres;
-      }catch(e){ /* sin asistencia legible: los convocados */ }
-    }
+    var o=base(r,'declarar'), pres=await presentesDe(r);
+    if(pres) o.parts=pres;
     _bloqueAbrir_(o); cb.abrir();
   });
 }

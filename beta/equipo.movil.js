@@ -84,7 +84,8 @@ function _tuyoFilaM_(it){
 
 function _avisosQueTeTocanM_(){
   var yo=(typeof _fichaYo_==='function') ? _fichaYo_() : '';
-  var pdec=(typeof PARTES_DEC!=='undefined' && Array.isArray(PARTES_DEC)) ? PARTES_DEC.length : 0;
+  /* 12/11 (refutar13): los partes de BLOQUE (reuniones) los decide sólo el PD; a un coordinador no le tocan, y «2 partes esperan tu firma» era falso. */
+  var pdec=(typeof PARTES_DEC!=='undefined' && Array.isArray(PARTES_DEC)) ? PARTES_DEC.filter(function(p){ return !p.bloque || rangoNom(yo)>=3; }).length : 0;
   var mios=(typeof PARTES!=='undefined' && Array.isArray(PARTES)) ? PARTES.filter(function(p){
     return p && (!p.autor || p.autor===yo); }) : [];
   var rev=(typeof _docsPend_==='function') ? (_docsPend_()||[]).length : 0;
@@ -126,6 +127,11 @@ function vEstado(){
        aviso por perfil es el arreglo entero, y toca un fichero que no es éste. */
     var _unPerfil=!_hayQuePreguntarPerfil_(YO);
     var rt=_unPerfil?aprobadorDe(YO.nombre,YO.unidad):null;
+    /* 12/11 (refutar13): si TODO lo que espera es de reuniones (`bloque`), lo firma el PD y no tu coordinador: el servidor lo exige
+       («los partes de bloque (reuniones) los decide sólo el PD»). Decía «Las firma Cris, coordinador de tu unidad» a quien sólo tenía el de una general. */
+    var _pendL=(typeof PARTES!=='undefined' && Array.isArray(PARTES)) ? PARTES.filter(function(p){ return p.e==='pend'; }) : [];
+    if(rt && _pendL.length && _pendL.every(function(p){ return !!p.bloque; }))
+      rt={nom:PD_NOM,escalado:true,propio:(PD_NOM===YO.nombre)};
     /* ⛔ 929.ª: y al PROPIO PD no se le nombra a sí mismo — `rt.propio`, como ya hacía Fichar. Le decía
        «Las firma Lois, Project Director» siendo él Lois. */
     cPend={tit:h1(pend)+' esperando aprobación', txt:'Todavía no cuentan. '+(rt
