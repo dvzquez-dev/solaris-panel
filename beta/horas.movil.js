@@ -119,7 +119,11 @@ function normPMovil(p){
     enFicha:(typeof _yaCuentaEnSuMes_==='function') ? _yaCuentaEnSuMes_(p) : null,   /* 20/10: `aplicada` y `aprobada` caen los dos en 'conf'; esto los distingue */
     origen:p.origen||null, caduca:p.caduca_at||null,
     /* 26/10 · «Sí, mientras no esté firmado»: retirado por ti (es `anulada` con `retirado_at`) y las horas corregidas */
-    ret:!!p.retirado_at, corr:p.correcciones||null }; }
+    ret:!!p.retirado_at, corr:p.correcciones||null,
+    /* ⛔ refutar26: `tareaparte` (la página de la tarea de cuyo «Entregada» nace este parte) también ha de viajar por AQUÍ, el normalizador de los
+       partes MÍOS (`PARTES`): `_tareaTieneMiParte_` lo lee, y sin él «Proponer mis horas» seguía en una tarea con su parte ya propuesto (y al
+       pulsarlo contestaba «ya estaba propuesto»). Lo llevaba sólo `normPDec`, el de la cola de quien firma. */
+    tareaparte:p.tareaparte||null }; }
 
 /* ⚠️ MISMO DEFECTO QUE EL DE ABAJO, y se arregla igual aunque HOY no haga daño:
    `CARGA.partes` no lo lee nadie todavia (medido: una sola aparicion, la escritura).
@@ -2023,6 +2027,9 @@ function _tareaParteTarjetaM_(grupos){
       tarea:function(p){ return p.t; }})+'</div>';
 }
 var _tareaParteCbM_={ hecho:function(){ _cargarPartesDec_().then(pintar); } };
+/* refutar26: tras «Entregada» con horas (o «Proponer mis horas») el servidor ya tiene MI parte: se recargan los míos y se repinta, para que Horas lo cuente y la tarea
+   deje de ofrecer proponerlo otra vez. `_recargarPartesVivo_` es la puerta de lo vivo (la que también respeta «Ver como»). */
+function _tareaPartesCambiaron_(){ if(_tareaEnMaqueta_()) return; _recargarPartesVivo_().then(function(){ pintar(); }); }
 function _engTareaParteM_(){ _tareaParteColaCablear_(_tareaParteCbM_); }
 var _bloqueCbM_={
   abrir:function(){ abrirModal(_bloqueFormHTML_()); _bloqueCablear_(_bloqueCbM_); },

@@ -68,11 +68,12 @@ function vTareas(){
   function iDe(t){ var k; for(k=0;k<TAREAS.length;k++){ if(TAREAS[k]===t) return k; } return -1; }
   function fila(t){
     /* ⛔ 20/10 (auditoría): una tarea HECHA no «venció»: se dice su plazo, neutro (salía en rojo «venció hace 49 días»). */
-    var v=_tareaHecha_(t&&t.e) ? [_plazoDMY_(t.l) ? 'plazo '+_plazoDMY_(t.l) : 'sin fecha límite', false] : vence(t.l),
+    var v=(_tareaHecha_(t&&t.e)||(t&&t.e==='Revisando')) ? [_plazoDMY_(t.l) ? 'plazo '+_plazoDMY_(t.l) : 'sin fecha límite', false] : vence(t.l),
         i=iDe(t), ac=_tareaAccion_(t.e), des=_puedeDeshacerTarea_(t),
         ap=_apelDeTarea_(t), apelar=_puedeApelarTarea_(_fichaYo_(), t);
     return '<div class="fila"><div class="a"><b>'+esc(t.n)+'</b>'+
-      '<small>'+esc(t.s)+' · '+esc(t.pr)+' · <span style="color:'+(v[1]?'var(--red2)':'var(--ink3)')+'">'+v[0]+'</span></small>'+
+      /* refutar26: una tarea creada desde la app NO trae proyecto (`pr: null`): «GNC · · vence…» con un punto huérfano. Sólo se unen las partes que hay. */
+      '<small>'+[esc(t.s), esc(t.pr)].filter(Boolean).join(' · ')+' · <span style="color:'+(v[1]?'var(--red2)':'var(--ink3)')+'">'+v[0]+'</span></small>'+
       /* ⚠️ El aviso del plazo sale de la PUERTA, no de un número escrito aquí: con el número
          repetido, cambiarlo dejaría la pantalla prometiendo el viejo. */
       (des?'<small style="color:var(--ink3)">puedes deshacerlo durante '+_minDeshacerTarea_()+' min</small>':'')+
@@ -179,7 +180,7 @@ function _engTareas_(){
    el paso se da en memoria, sin aviso propio (taparía el de «puedes deshacerlo», que es lo que se prueba ahí). */
 function _guardarPasoTarea_(t, a, b, hecho, h){
   if(_tareaEnMaqueta_()){ hecho(); return; }
-  if(!t.url){ tost('Esa tarea no trae su ficha de Notion: no se puede guardar el paso.'); return; }
+  if(!t.url){ tost('Esa tarea acaba de crearse y aún se está preparando: prueba otra vez en unos minutos.'); return; }
   if(b) b.disabled=true;
   api.moverEstadoTarea(t.url, t.e, a, h).then(function(r){ hecho(r); }).catch(function(e){
     if(b) b.disabled=false;

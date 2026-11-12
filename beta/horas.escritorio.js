@@ -1792,6 +1792,8 @@ function _bloqueColaPanelE_(lista){
 /* La cola «Requieren tu decisión» SIN lo que ya tiene su propio panel (los de bloque y los de tarea entregada). */
 function _miasSueltas_(lista){ return _tareaParteGrupos_(lista.filter(function(p){ return !p.bloque; })).sueltas; }
 var _tareaParteCbE_={ hecho:function(){ _cargarPartes_().then(pintar); } };
+/* refutar26: igual que en el móvil: tras abrir mi parte desde la tarea, se recargan los partes y se repinta. */
+function _tareaPartesCambiaron_(){ if(_tareaEnMaqueta_()) return; _cargarPartes_().then(function(){ pintar(); }); }
 function _tareaPartePanelE_(lista){
   var g=_tareaParteGrupos_(lista).grupos;
   if(!g.length) return '';

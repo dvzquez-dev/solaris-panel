@@ -14860,6 +14860,9 @@ function _tareaPedirHorasEntrega_(t, ac, valor, aviso){
 function _tareaToastParte_(t, h, r){
   if (!(h > 0)) return;
   var pt = r && r.partes_tarea;
+  /* refutar26: el servidor acaba de abrir (o poner al día) un parte MÍO y la cara seguía con su lista vieja: «Horas» decía «ningún parte en cola»
+     y la tarea seguía ofreciendo «Proponer mis horas». Cada cara recarga SUS partes (`_tareaPartesCambiaron_`); en la maqueta no hay nada que recargar. */
+  if (pt && (pt.creados > 0 || pt.actualizados > 0) && typeof _tareaPartesCambiaron_ === 'function') _tareaPartesCambiaron_();
   if (!r) { tost('«' + t.n + '»: parte propuesto ' + _tareaFirmaTxt_() + ' (maqueta).'); return; }
   if (!pt) { tost('«' + t.n + '»: no se abrió ningún parte. Usa «Proponer mis horas».'); return; }
   if (pt.creados > 0) tost('Parte propuesto ' + _tareaFirmaTxt_() + ': ' + nf2(h) + ' h' +
