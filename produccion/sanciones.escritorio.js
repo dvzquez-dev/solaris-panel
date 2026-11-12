@@ -330,10 +330,12 @@ function _panelSueltas_(){
              revocación de +2 salía «2» y un premio «0», que en esta columna se lee «aviso». */
           '<td class="r mono '+(_ptsSanc_(s.puntos)<0?'dn':'')+'">'
             +esc(_etSancFila_(s.puntos, s.origen, s.extra))+'</td>'+
-          '<td class="r"><span class="decs" data-sid="'+s.id+'">'+
-            '<button data-sdec="aprobar">Aplica</button>'+
-            '<button data-sdec="rechazar">Rechaza</button>'+
-          '</span> <button class="btn sm" data-seditar="'+s.id+'">Editar</button></td></tr>';
+          (_puedeDecidirSancion_(s)
+            ? '<td class="r"><span class="decs" data-sid="'+s.id+'">'+
+              '<button data-sdec="aprobar">Aplica</button>'+
+              '<button data-sdec="rechazar">Rechaza</button>'+
+              '</span> <button class="btn sm" data-seditar="'+s.id+'">Editar</button></td></tr>'
+            : '<td class="r sc">Lo decide el PD</td></tr>');
       }).join(''))+
     '<div class="pb" style="padding-top:0"><button class="btn sm" data-agrupar>Agrupar en un paquete</button>'+
       '<span class="sc" style="margin-left:9px">un solo comunicado para todas</span></div>'+

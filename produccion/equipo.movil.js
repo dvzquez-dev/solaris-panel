@@ -50,7 +50,9 @@ function _rederivarPD_(){
    aquí lo único que cambia es **dejar de mentirle sobre su propio cargo**. */
 function aprobadorDe(autor,unidad){
   var c=coordinadorDe(unidad);
-  if(c!==autor) return {nom:c,escalado:false,propio:false};
+  /* 11/11 (refutar7): `coordinadorDe` también devuelve al PD cuando la unidad NO tiene coordinador (una unidad nueva). Entonces lo firma
+     el Project Director y se dice así: «Pedro, coordinador de tu unidad» era falso para quien entra el primer día. */
+  if(c!==autor) return {nom:c,escalado:(c===PD_NOM),propio:false};
   return {nom:PD_NOM,escalado:true,propio:(PD_NOM===autor)};
 }
 
@@ -82,7 +84,8 @@ function _tuyoFilaM_(it){
 
 function _avisosQueTeTocanM_(){
   var yo=(typeof _fichaYo_==='function') ? _fichaYo_() : '';
-  var pdec=(typeof PARTES_DEC!=='undefined' && Array.isArray(PARTES_DEC)) ? PARTES_DEC.length : 0;
+  /* 12/11 (refutar13): los partes de BLOQUE (reuniones) los decide sólo el PD; a un coordinador no le tocan, y «2 partes esperan tu firma» era falso. */
+  var pdec=_partesDecTuyos_().length;
   var mios=(typeof PARTES!=='undefined' && Array.isArray(PARTES)) ? PARTES.filter(function(p){
     return p && (!p.autor || p.autor===yo); }) : [];
   var rev=(typeof _docsPend_==='function') ? (_docsPend_()||[]).length : 0;
@@ -92,9 +95,17 @@ function _avisosQueTeTocanM_(){
     var r=cv.resp && cv.resp[ac];
     conv=!(r && typeof r==='object' && Object.keys(r).length);
   }
-  return _tuyoItems_({pdec:pdec, rev:rev, conv:conv,
+  var apel=(typeof _apelPendientesTuyas_==='function') ? _apelPendientesTuyas_().map(function(a){
+    return {autor:String(a.autor||'').split(' ')[0], clase:a.clase}; }) : [];
+  /* 12/11 (general-1 + gestion-1): sólo el PD (rango 3, como el escritorio y el servidor) y sólo con la cola LEÍDA: `SANC_M===null` es «no lo sé». */
+  var sanc=(typeof SANC_M!=='undefined' && Array.isArray(SANC_M) && rangoNom((typeof _actorSanc_==='function') ? _actorSanc_() : yo)>=3) ? SANC_M.length : 0;
+  return _tuyoItems_({pdec:pdec, rev:rev, conv:conv, apel:apel, sanc:sanc,
     sindecl:mios.filter(function(p){ return p.e==='sindecl'; }).length,
-    det:mios.filter(function(p){ return p.e==='det'; }).length}).map(_tuyoFilaM_).join('');
+    det:mios.filter(function(p){ return p.e==='det'; }).length,
+    /* 11/11: el parte RECHAZADO, con su motivo (`nota`), mientras `_sigueVisibleSinContar_` lo deje ver. */
+    rech:mios.filter(function(p){ return p.e==='rech' && _sigueVisibleSinContar_(p, Date.now()); })
+      .sort(function(a,b){ return (b.iso>a.iso)-(b.iso<a.iso) || (Number(b.id)||0)-(Number(a.id)||0); })      // el más reciente primero: es el que se nombra
+      .map(function(p){ return {tarea:p.t, motivo:p.nota}; })}).map(_tuyoFilaM_).join('');
 }
 
 function vEstado(){
@@ -120,6 +131,11 @@ function vEstado(){
        aviso por perfil es el arreglo entero, y toca un fichero que no es éste. */
     var _unPerfil=!_hayQuePreguntarPerfil_(YO);
     var rt=_unPerfil?aprobadorDe(YO.nombre,YO.unidad):null;
+    /* 12/11 (refutar13): si TODO lo que espera es de reuniones (`bloque`), lo firma el PD y no tu coordinador: el servidor lo exige
+       («los partes de bloque (reuniones) los decide sólo el PD»). Decía «Las firma Cris, coordinador de tu unidad» a quien sólo tenía el de una general. */
+    var _pendL=(typeof PARTES!=='undefined' && Array.isArray(PARTES)) ? PARTES.filter(function(p){ return p.e==='pend'; }) : [];
+    if(rt && _pendL.length && _pendL.every(function(p){ return !!p.bloque; }))
+      rt={nom:PD_NOM,escalado:true,propio:(PD_NOM===YO.nombre)};
     /* ⛔ 929.ª: y al PROPIO PD no se le nombra a sí mismo — `rt.propio`, como ya hacía Fichar. Le decía
        «Las firma Lois, Project Director» siendo él Lois. */
     cPend={tit:h1(pend)+' esperando aprobación', txt:'Todavía no cuentan. '+(rt
@@ -159,6 +175,7 @@ function vEstado(){
     /* OJO: aquí NO va `REUNION`. Ese es el puntero de la pantalla de Reuniones y cambia
        al navegar por la lista, así que esta tarjeta acababa mostrando «la última que
        abriste» con el rótulo de «la próxima». */
+    _darHorasTarjetaHTML_()+
     _proxReuHTML_();
 }
 

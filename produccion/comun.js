@@ -83,6 +83,8 @@ var CATS_DESGLOSE=[
   {k:'desplaz', eti:'Desplazamientos',           color:'var(--warn)', cat:[],         pal:['desplaz']},
   {k:'entrev',  eti:'Entrevistas',               color:'#9B7FD1',     cat:[],         pal:['entrevista']},
   {k:'turno',   eti:'Turnos',                    color:'#D9C24A',     cat:['turno'],  pal:[]},
+  /* 11/11 (Daniel: *«¿Por qué aparecen otras contribuciones si es una reunión?»*): la categoría `reunion` no tenía grupo. */
+  {k:'reunion', eti:'Reuniones',                 color:'#C77DBA',     cat:['reunion'],pal:[]},
   {k:'congreso',eti:'Congresos y competiciones', color:'#4FB8A5',     cat:[],         pal:[]},
   {k:'otras',   eti:'Otras contribuciones',      color:'var(--ink2)', cat:[],         pal:[]}
 ];
@@ -1924,7 +1926,8 @@ function _apelFueraDePlazo_(t){ var h=_apelHastaTarea_(t); return !!h && _hoyNxI
 function _puedeApelarTarea_(actor, t, lista){
   var a;
   if(!t || !actor || !_tareasResp_([t], actor).length) return false;
-  if(_tareaHecha_(t.e) || _esVoluntaria_(t) || _apelFueraDePlazo_(t)) return false;
+  /* «Revisando» = ya entregada (`TAREA_FLUJO`): no queda nada que apelar. Si la deshace, vuelve a poder. */
+  if(_tareaHecha_(t.e) || t.e === 'Revisando' || _esVoluntaria_(t) || _apelFueraDePlazo_(t)) return false;
   a=_apelDeTarea_(t, lista);
   return !(a && a.estado === 'abierta');
 }
@@ -2757,7 +2760,8 @@ function tost(m, o){
 function _tostLargo_(m){ return String(m == null ? '' : m).length > 110 ? {fijo:true} : null; }
 
 function tostErr(prefijo, e){
-  tost(String(prefijo || '') + ((e && e.message) || e), (e && e.sesion) ? {fijo:true} : null);
+  /* refutar17: Apps Script contesta `String(err)`: sin quitar el «Error: » el aviso era «No se pudo enviar: Error: Ber Gnc ya tiene…». */
+  tost(String(prefijo || '') + String((e && e.message) || e).replace(/^Error:\s*/, ''), (e && e.sesion) ? {fijo:true} : null);
 }
 
 /* ⛔ LA CLAVE DE UN ENVIO, PARA QUE UN REINTENTO NO LO DUPLIQUE. `api._post` hace TRES
@@ -2981,7 +2985,9 @@ function _apiParse(txt, accion){
                          "con tu cuenta y repite la acci\u00f3n \u2014 no se ha guardado nada.");
   /* Un «no» del backend SIN motivo. No se reintenta -- tiene criterio, repetirlo da lo
      mismo tres veces--, asi que se dice que fue un rechazo y no un fallo de linea. */
-  throw new Error(err||"el backend rechazó la acción sin decir por qué");
+  /* refutar21 (12/11): el servidor antepone «Error: » a cada rechazo (como Apps Script) y los avisos lo enseñaban tal cual
+     («No se pudo enviar: Error: Ana Gnc ya tiene el parte…»). Siete sitios ya lo quitaban cada uno por su cuenta; aquí, una vez. */
+  throw new Error(err.replace(/^Error:\s*/,"")||"el backend rechazó la acción sin decir por qué");
 }
 
 /* ⛔ `api._post`, UNA VEZ PARA LAS DOS CARAS (01/11, `apitiempo`). Estaba calcado en `movil.html` y
@@ -3465,6 +3471,160 @@ function _cierreTurnoInicial_(t, durH){
   return out;
 }
 
+/* ═══ CERRAR UN TURNO: LA REGLA, UNA VEZ PARA LAS DOS CARAS (11/11/2026, turnomovil) ═══════════════════════════════════════
+   🗣️ Daniel: *«mira que esté bien programado lo de cuando inicio un turno, que el responsable pueda estar fichándolo y lo cierre al acabar»*.
+   El escritorio (`turnos.escritorio.js`) y el móvil (`turnos.movil.js`) cierran el turno con el MISMO estado `st` (`_cierreVacio_`:
+   quién fue, quién llevó coche, el tramo, la duración, el reparto) y las mismas reglas; lo que cada cara pone es sólo el dibujo y
+   el cable. Quién puede, cuándo es cerrable, el tope del extra, el tramo que viaja y la llamada al servidor viven AQUÍ. */
+function _cierreVacio_(){ return {k:null, dur:'', quien:{}, extra:{}, hecho:null, coche:{}, listo:null, ini:'', fin:'', pers:false}; }
+
+/* ⛔ 20/10 (ficha del 20/08): ¿se puede CERRAR este turno hoy? No si Notion ya lo da por `Realizado` o `Cancelado`
+   —cerrar un cancelado acredita «+1 turno» (×4 h) a gente que no fue— y no si es FUTURO. El estado manda sobre la
+   fecha, igual que `_normTurnoM_` en el móvil. Sin fecha legible no se esconde: «no lo sé» no es «no se puede». */
+function _turnoCerrable_(t, hoy){
+  if(!t) return false;
+  var est = t.estado || '';
+  if(est==='Realizado' || est==='Cancelado') return false;
+  var iso = _dmyAISO_(t.f || t.fecha || '');
+  if(/^\d{4}-\d{2}-\d{2}$/.test(iso) && hoy && iso > hoy) return false;
+  return true;
+}
+
+/* 01/11 (Daniel, suplente): ¿figura ese miembro en el turno como suplente? Es el rotulo de la fila de cierre. */
+function _esSuplenteTurno_(t, n){
+  return ((t && t.roles) || []).some(function(r){ return r && r.miembro === n && /suplente/i.test(String(r.rol || '')); });
+}
+
+/* 26/10 (triaje C4b): ¿llevó coche, según el reparto? Es lo que se PROPONE marcado; lo que cuenta es lo que confirme
+   quien cierra (Daniel, 11/08: «si tenía lo de coche también se le añade eso ahí… antes no»). */
+function _llevaCocheTurno_(t, n){
+  return ((t && t.roles) || []).some(function(r){ return r && r.miembro === n && /coche/i.test(String(r.rol || '')); });
+}
+
+/* La duración tecleada o salida del reloj, o NaN. `dur` es texto libre del campo: puede no ser un número. */
+function _cierreDurNum_(st){ return parseFloat(String(st.dur == null ? '' : st.dur).replace(',', '.')); }
+
+/* El techo del extra: `_extraTope_` ya trata el no-numero como 0, que es el lado seguro (sin duracion no se declara ningun extra). */
+function _cierreTope_(st){
+  var d = _cierreDurNum_(st);
+  return _extraTope_(isFinite(d) ? d : 0);
+}
+
+/* ⛔ 20/10: ¿falta la duración? El 0 de arriba es el lado seguro para el NUMERO, pero la pantalla lo convertía en una AFIRMACIÓN
+   —«no ha pasado de las 4 h»— sin que nadie hubiera tecleado nada. Un 0 escrito a mano SI es una duración; vacío o no-número, no. */
+function _cierreSinDur_(st){ return !isFinite(_cierreDurNum_(st)); }
+
+/* 11/11 (turnoextra): el TRAMO REAL que viaja al servidor: el inicio de la pantalla y un fin = inicio + duración, así el tramo y la
+   duración (de la que salió el tope del extra) no se contradicen aunque se haya tecleado una sola. `null` si falta el inicio o la
+   duración (el servidor cierra igual, sin exceso). Cruza la medianoche si hace falta. */
+function _cierreTramo_(st, t){
+  var ini = st.ini || String((t && t.hora) || '').slice(0,5);
+  var d = _cierreDurNum_(st);
+  if(!/^\d{1,2}:\d{2}$/.test(ini) || !isFinite(d) || d <= 0 || d >= 24) return null;
+  var m = (_minHM_(ini) + Math.round(d * 60)) % 1440;
+  return {ini: ini, fin: pad(Math.floor(m / 60)) + ':' + pad(m % 60)};
+}
+
+/* Lo que se mandaría: SOLO los confirmados.
+   ⛔ Quien no fue no lleva fila, en vez de llevar una con 0: son dos afirmaciones distintas —«estuvo y no le toca extra» frente a
+   «no estuvo»— y el turno tambien cuenta un turno en el contador. Colar un 0 por un ausente le sumaria el turno a quien no fue.
+   ⛔ CON LOS DUDOSOS DENTRO: si el responsable marca a alguien que figuraba como `Posible` y al final fue, tiene que VIAJAR. */
+function _cierreMapa_(t, st){
+  var out = {}, tope = _cierreTope_(st), esDud = {};
+  _dudososTurno_(t).forEach(function(n){ esDud[n] = 1; });
+  _asistentesTurno_(t).concat(_dudososTurno_(t)).forEach(function(n){
+    if(!st.quien[n]) return;
+    var v = st.extra[n];
+    /* 01/11 (Daniel): las horas distintas por persona son una opcion APAGADA por defecto; apagada, todos los que fueron llevan el
+       tope (de ahi sale `extra`). `=== false` a proposito: sin el campo es el comportamiento de antes. */
+    if(st.pers === false) v = tope;
+    out[n] = (typeof v === 'number' && isFinite(v)) ? v : (esDud[n] ? 0 : tope);
+  });
+  return out;
+}
+
+/* Siembra el estado la PRIMERA vez que se mira un turno: los firmes se dan por idos; los dudosos NO (marcarlos por defecto le sumaría
+   un turno a quien quizá no fue; dejarlos sin marcar sólo cuesta un clic a quien sabe la respuesta). El coche del reparto se
+   propone. Y con el turno EMPEZADO (`empezado_at`, del servidor) el tramo parte de ese instante hasta `ahoraISO`: se puede corregir
+   a mano antes de cerrar. Idempotente: no pisa lo ya tecleado. */
+function _cierreSembrar_(t, st, ahoraISO){
+  var firmes = _asistentesTurno_(t), dud = _dudososTurno_(t);
+  if(!Object.keys(st.quien).length){
+    firmes.forEach(function(n){ st.quien[n] = true; });
+    dud.forEach(function(n){ st.quien[n] = false; });
+    firmes.concat(dud).forEach(function(n){ st.coche[n] = _llevaCocheTurno_(t, n); });
+  }
+  if(t && t.empezado_at && !st.ini && !st.fin){
+    st.ini = _hhmmDe_(t.empezado_at); st.fin = _hhmmDe_(ahoraISO);
+    var dr = _durTurnoDeHoras_(st.ini, st.fin);
+    if(dr != null && st.dur === '') st.dur = String(dr);
+  }
+}
+
+/* El techo baja (cambia el tramo o la duración): lo que ya estuviera por encima se recorta, o el botón quedaría bloqueado por un
+   número que la persona no puede ver de dónde sale. */
+function _cierreRecortar_(st){
+  var tope = _cierreTope_(st);
+  Object.keys(st.extra).forEach(function(n){ if(st.extra[n] > tope) st.extra[n] = tope; });
+}
+
+/* Cambia inicio/fin: la duración sale de ahí. Si falta una o son iguales (`null`) no se toca la duración: «no lo sé» no es 0. */
+function _cierrePonHoras_(st, ini, fin){
+  st.ini = ini; st.fin = fin;
+  var d = _durTurnoDeHoras_(ini, fin);
+  if(d != null) st.dur = String(d);
+  _cierreRecortar_(st);
+}
+
+/* «4 h de turno + 1 h de compensación por persona»: lo que da el turno, dicho en horas. Sin duración, no se inventa nada. */
+function _cierreResumenHoras_(st){
+  if(_cierreSinDur_(st)) return '';
+  var tope = _cierreTope_(st), base = _horasTurnoBase_();
+  return tope > 0
+    ? h1(base)+' de turno + '+h1(tope)+' de compensaci\u00f3n por persona'
+    : 'Cuenta como un turno de '+h1(base)+'. Sin compensaci\u00f3n';
+}
+
+/* «en curso 1 h 12 min»: el reloj del turno empezado. Menos de una hora, sólo minutos; un reloj en el futuro se queda en 0. */
+function _cierreRelojTexto_(empezadoISO, ahoraMs){
+  var m = Math.max(0, Math.floor((ahoraMs - new Date(empezadoISO).getTime()) / 60000));
+  if(!isFinite(m)) return '';
+  return 'en curso '+(m >= 60 ? Math.floor(m / 60)+' h '+pad(m % 60)+' min' : m+' min');
+}
+
+/* La propuesta, en texto, de lo que se cierra (la ve quien cierra). */
+function _cierreTextoPropuesta_(t, mapa, st){
+  /* 12/11 (refutar12): la prosa va con la fecha DD/MM/AAAA (`_isoADMY_`; un `fecha_txt` ya legible pasa igual), «N personas» y la COMA decimal
+     (`nf2`): salía «Turno 2026-11-09 · 3 persona(s)… +0.5 h» en el aviso que lee quien cierra un turno largo. */
+  var n = Object.keys(mapa).length;
+  return 'Turno ' + _isoADMY_((t && (t.fecha_txt || t.fecha || t.f)) || '?') +
+    ' \u00b7 ' + n + (n === 1 ? ' persona' : ' personas') + ', +1 turno cada una\n' +
+    Object.keys(mapa).map(function(n){
+      return '  ' + n + ' \u2192 ' + (mapa[n] ? ('+' + nf2(mapa[n]) + ' h a Compensaciones') : 'sin extra') + (st.coche[n] ? ' \u00b7 llev\u00f3 coche' : ''); }).join('\n');
+}
+
+/* «Cerrar el turno», UNA vez: valida, manda el tramo REAL y el reparto, y deja el turno «Realizado». El servidor crea, por asistente,
+   el parte de compensación del exceso sobre 4 h (con 4 h o menos, ninguno). Sin tramo (un turno sin hora) se cierra como antes.
+   → `{r, txt, sinId}`; lanza si la API falla (quien llama pinta el motivo). Sin `id` (un turno del espejo de Discord) no hay a qué
+   página ir: devuelve `sinId` y la propuesta, sin llamar. */
+async function _cierreEnviar_(t, st){
+  var mapa = _cierreMapa_(t, st), falta = _cierreTurnoFalta_(mapa, _cierreTope_(st));
+  if(falta) throw new Error(falta);
+  var txt = _cierreTextoPropuesta_(t, mapa, st);
+  if(!t || !t.id) return {r:null, txt:txt, sinId:true};
+  var fueron = Object.keys(mapa), coche = fueron.filter(function(n){ return !!st.coche[n]; }), tr = _cierreTramo_(st, t);
+  var r = await api.estadoTurno({id:t.id, estado:'Realizado', fueron:fueron, coche:coche, ini:tr ? tr.ini : undefined, fin:tr ? tr.fin : undefined, extra:tr ? mapa : undefined});
+  t.estado = 'Realizado';
+  return {r:r, txt:txt, sinId:false};
+}
+
+/* «Empezar turno»: pone en marcha el reloj en el servidor y lo pega al turno. */
+async function _cierreEmpezar_(t){
+  var re = await api.empezarTurno({id:t.id});
+  t.empezado_at = (re && re.empezado_at) || new Date(_ahoraApp_()).toISOString();
+  return t.empezado_at;
+}
+
 /* ⛔ LOS TRES CARGOS QUE NO SE PUEDEN DEJAR EN BLANCO.
    Daniel: «para convocar un turno es obligatorio q se cubran los cargos importantes,
    responsable de turno, responsable audiovisual, responsable de memoria y coche (opcional)».
@@ -3841,7 +4001,7 @@ function _redactarParteDemo_(d){
 }
 function _redactarPartePost_(d){
   if(!_demoLocal_()) return api._post({action: 'redactarParte', notas: d.notas, tarea: d.tarea, tareaCuerpo: d.tareaCuerpo,
-    categoria: d.categoria, fecha: d.fecha, horas: d.horas, declararId: d.declararId});
+    categoria: d.categoria, subcat: d.subcat || undefined, fecha: d.fecha, horas: d.horas, declararId: d.declararId});
   return new Promise(function(ok){ setTimeout(function(){ ok(_redactarParteDemo_(d)); }, 500); });
 }
 /* El contexto que viaja con las notas: la tarea imputada (título y cuerpo si lo trae), categoría, fecha y horas del formulario. */
@@ -3849,7 +4009,7 @@ function _parteCtxIA_(f, horas){
   var t = f.cat === 'tareas' ? (f.tarea === '__otro__' ? f.detalle : f.tarea) : f.detalle, cuerpo = '', i;
   if(f.cat === 'tareas' && f.tarea && f.tarea !== '__otro__' && typeof TAREAS !== 'undefined')
     for(i = 0; i < TAREAS.length; i++) if(TAREAS[i] && TAREAS[i].n === f.tarea && TAREAS[i].cuerpo){ cuerpo = String(TAREAS[i].cuerpo).slice(0, 1500); break; }
-  return {notas: String(f.just || ''), tarea: String(t || ''), tareaCuerpo: cuerpo, categoria: f.cat || '', fecha: String(f.fecha || ''),
+  return {notas: String(f.just || ''), tarea: String(t || ''), tareaCuerpo: cuerpo, categoria: f.cat || '', subcat: _subcatEnvio_(f) || '', fecha: String(f.fecha || ''),
           horas: horas > 0 ? horas : null, declararId: f.declararId == null ? null : f.declararId};
 }
 /* La configuración de «✨ Redactar con SolarIA» de la justificación (`pre` = el id de la caja; `f` = el formulario vivo; `horas()` = las del parte
@@ -3924,7 +4084,8 @@ var SOL_PENSANDO = 'SolarIA está escribiendo…';
    cuando de verdad no hay conexión, sesión, cuota o tiempo. */
 var _SOL_NO_SUPO_ = /la IA (no devolvi|no contest|devolvi)|ning[uú]n (texto|punto)|a[nñ]adido cosas|no se apoy|demasiado larg|no pas[oó] la comprobaci/i;
 function _solErrorTxt_(motivo){
-  var m = motivo ? String(motivo).replace(/^SolarIA no ha (podido|sabido)( redactarlo)?:\s*/i, '').replace(/[.\s]+$/, '') : '';
+  var m = motivo ? String(motivo).replace(/^(Error:\s*)+/i, '').replace(/^SolarIA no ha (podido|sabido)( redactarlo)?:\s*/i, '')   // refutar15: el «Error: » con que el servidor contesta (como `String(err)`) no es para quien lee
+    .replace(/[.\s]+$/, '') : '';
   if(m && _SOL_NO_SUPO_.test(m)) return 'SolarIA no ha sabido redactarlo: '+m+'.';
   return 'SolarIA no está disponible ahora'+(m ? ': '+m : '')+'.';
 }
@@ -4175,7 +4336,8 @@ function _firmaParte_(p){
     var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)));
     el = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
   } else if (/^\d{4}-\d{2}-\d{2}/.test(at)) el = _isoADMY_(at.slice(0, 10));
-  var quien = por ? ((typeof _pilaDeM_ === 'function' && _pilaDeM_(por)) || por) : null;
+  /* refutar11: «el sistema (cierre de turno)» NO es una persona: su «pila» era «el» y salía «otorgado el 12/11/2026 por el ·». */
+  var quien = /^el sistema\b/i.test(por) ? 'el sistema' : (por ? ((typeof _pilaDeM_ === 'function' && _pilaDeM_(por)) || por) : null);
   if (!el && !quien) return '(no consta cuándo ni quién)';
   return (el ? 'el ' + el : '(no consta cuándo)') + ' ' + (quien ? 'por ' + quien : '(no consta quién)');
 }
@@ -5175,6 +5337,14 @@ function _esPremioSanc_(origen, extra){
   return o === 'premio' || !!(extra && extra.compensacion && o !== 'revocacion');
 }
 
+/* 12/11 (refutar24): ¿puedo DECIDIR esta propuesta de la cola? Gemela de `servidor.puede_decidir_sancion`: una fila que SUBE puntos
+   (un +1 del Art. 31 propuesto por quien coordina) sólo la decide el PD; no lo son una revocación ni un premio de horas. Sin esto la
+   coordinadora veía «Aprobar» en el +1 de su propia gente y, tras el «Sí», el servidor contestaba que no era suya. */
+function _puedeDecidirSancion_(s){
+  if(!s || !(_ptsSanc_(s.puntos) > 0) || String(s.origen) === 'revocacion' || _esPremioSanc_(s.origen, s.extra)) return true;
+  return rangoSanc(_actorSanc_()) >= 3;
+}
+
 /* ⛔ 20/10 (ficha «un PREMIO se pinta como sanción»): la cabecera del lote en el móvil era `it.length+' sanciones'`, y
    los bloques de reunión traen premiados en el MISMO lote — «2 sanciones» sobre una sanción y un premio. El escritorio
    dice «N personas», que no miente; aquí se separa, que es lo que el PD necesita leer antes de decidir. */
@@ -5692,6 +5862,9 @@ async function _enviarSancionForm_(o){
   var quien=SANC_FORM.quien, mot=val('snMotivo'), _vp=_validaPuntosSanc_(val('snPts'), mot);
   var esDePlazo=(mot==='plazo'||mot==='plazoUrg');
   if(!quien){ msg('Elige a quién: pulsa un nombre de la lista.', true); return {ok:false}; }
+  /* 12/11 (refutar24): a uno MISMO la lista lo ofrece (decisión vieja, «Uno mismo cuenta siempre») pero el servidor lo salta (03/11:
+     una manual nace aprobada y sería decidir lo suyo); tras el «¿Seguro?» salía «fuera de tu jurisdicción», que no es lo que pasa. */
+  if(quien===_actorSanc_()){ msg('No puedes ponerte una sanción a ti: la decidirías tú. Que la ponga el PD.', true); return {ok:false}; }
   if(personasDeAlcance(_actorSanc_()).indexOf(quien)<0){ msg('No mandas sobre '+(_pilaDeM_(quien)||quien)+': elige a alguien de tu lista.', true); return {ok:false}; }
   if(!mot){ msg('Elige el motivo.', true); return {ok:false}; }
   if(!_vp.ok){ msg(_vp.msg, true); return {ok:false}; }
@@ -6443,9 +6616,68 @@ function _devengadoAHoy_(m, h, frac){
   return Math.max(0, Math.round((h - _compBase_(m) * (1 - Math.min(1, frac))) * 100) / 100);
 }
 
-function _compExtra_(m){
+/* ⛔ 11/11 (Daniel: *«¿por qué aparece duplicado?»*): «Compensaciones» de Notion = base + los partes que suman en ese cajón
+   (desplazamientos, congresos, entrevistas…: la regla de `cuadraCompensaciones`). Restando sólo la base, las 42,25 h de la L1
+   salían DOS veces: en su grupo y como «Asignada por el Project Director». Con `items` (los apuntes del mes) se restan
+   también; lo que queda es lo que ningún parte explica. Sin `items`, como antes. */
+/* ══ 11/11 (turnoextra) · EL TURNO DE MÁS DE 4 H: UN PARTE DE D HORAS QUE SUMA EN DOS CELDAS ═══════════════════════════════
+   🗣️ Daniel: *«En la app aparecen 5 horas pero realmente es un turno más la hora extra. Entonces es un mismo parte y suma en 2
+   celdas distintas»* y *«esta regla solo suma por encima, no por debajo»*. El servidor (`estadoTurno`) deja, por asistente, UN
+   parte de compensación con `horas` = el exceso (D−4), el tramo ENTERO del turno en `ini`/`fin` y `turno_h` = 4 (lo que ya
+   cuenta como turno). Aquí se ENSEÑA como D horas (`_horasVistaParte_`); las SUMAS (`_compPartesH_`, el desglose, la cuadratura)
+   siguen leyendo `horas`/`q` —el exceso—, y por eso no se cuenta dos veces. ⛔ Quien sume para MOSTRAR un parte usa la vista;
+   quien sume para CUADRAR, no. Gemelas de `ajuste_horas_turno`/`clave_extra_turno` (servidor.py). */
+var TURNO_AJUSTE_POR_DEBAJO = false;     /* espejo del servidor: apagado = sólo suma por encima; encendido, un turno corto resta (D−4) */
+/* 12/11 (turnoclave): el primer turno del día (`T-<fecha>`) conserva la clave de siempre; los demás llevan su id detrás (gemela de `clave_extra_turno`). */
+function _claveExtraTurno_(fecha, nombre, tid){
+  var b = 'turno-'+fecha+'-extra-'+nombre;
+  return (!tid || tid === 'T-'+fecha) ? b : b+'-'+tid;
+}
+function _ajusteHorasTurno_(dur, porDebajo){
+  var d = Math.round((Number(dur) - _horasTurnoBase_()) * 100) / 100;
+  if(!isFinite(d)) return 0;
+  if(d > 0) return d;
+  return (d < 0 && (porDebajo === undefined ? TURNO_AJUSTE_POR_DEBAJO : porDebajo)) ? d : 0;
+}
+/* Las horas que ese parte YA cuenta como turno (4 en el exceso de un turno; 0 en cualquier otro). Reconoce el campo del
+   servidor y, para el que se cargó a mano (T-2026-11-05), la clave `turno-<fecha>-extra-<nombre>`. */
+function _turnoBaseDeParte_(p){
+  if(!p) return 0;
+  if(Number(p.turno_h) > 0) return Number(p.turno_h);
+  return /^turno-\d{4}-\d{2}-\d{2}-extra-/.test(String(p.clave || '')) ? _horasTurnoBase_() : 0;
+}
+/* refutar11 (12/11): un MURO (sin permiso, beta, sin datos) no se quita nunca: lo de detrás —la semilla ficticia de la cara, con su
+   menú— no puede recibir el foco del teclado ni leerlo un lector de pantalla. `inert` lo apaga. El gate de «Verificando…» NO usa esto:
+   ése se quita al entrar y lo de detrás tiene que seguir vivo. */
+function _muro_(html){
+  var g=_gate_(html);
+  [].forEach.call(document.body.children,function(e){ if(e!==g) e.setAttribute('inert',''); });
+  return g;
+}
+/* El texto de un parte de turno largo lo escribe el servidor con el decimal en PUNTO («4.75 h (4 h de turno + 0.75 h…)»; es la gemela
+   de Apps Script y no se toca) y la app escribe en coma. Sólo se retoca ese texto, no cualquier tarea con un punto entre cifras. */
+function _tareaVista_(t){
+  t = String(t == null ? '' : t);
+  return /^Turno del [^:]*: [\d.]+ h \(/.test(t) ? t.replace(/(\d)\.(\d)/g, '$1,$2') : t;
+}
+function _horasVistaParte_(p){
+  if(!p) return 0;
+  return Math.round(((Number(p.q != null ? p.q : p.horas) || 0) + _turnoBaseDeParte_(p)) * 100) / 100;
+}
+
+function _compPartesH_(items){
+  var t=0;
+  (items||[]).forEach(function(p){
+    if(!p || ['conf','otor','aprobado'].indexOf(p.estado)<0) return;
+    if(_contraparteQueNetea_(p, items)) return;
+    if(catDesglose(p)==='cargo' || ['tareas','turno','reunion'].indexOf(p.cat)>=0) return;
+    t += Number(p.q!=null ? p.q : p.horas) || 0;
+  });
+  return t;
+}
+function _compExtra_(m, items){
   if(!_compEsReal_(m)) return 0;                 // sin el dato de Notion no se puede saber
-  return Math.round((m.compensaciones-_compBase_(m))*100)/100;
+  return Math.round((m.compensaciones-_compBase_(m)-(items ? _compPartesH_(items) : 0))*100)/100;
 }
 
 /* Devuelve `{total, ultimos, suma}` de ESTA temporada. `fecha` saca el `DD/MM/AAAA` de cada
@@ -6556,6 +6788,21 @@ function _zonaCritica_(i, p){ return i<3 && p<=3; }
    exige rango >= 3. Aquí solo se evita ofrecer un botón que al pulsarlo dice que no. */
 function _puedeCerrarMes_(){
   try{ return !!(_puedeImpersonar_() || rangoNom(_actorSanc_())>=3); }catch(_){ return false; }
+}
+/* 11/11 (🗣️ Daniel): *«quien no puede usarlas no las ve»* — las vistas de GESTIÓN de la barra del escritorio. `pintarNav` pregunta aquí;
+   el servidor sigue siendo la cerradura (devuelve vacío o rechaza a quien no puede), esto es la puerta. El admin lo ve todo. Un error al
+   preguntar NO esconde (no saber no es «no puedes»): se enseña. Docs: revisor (rango documental ≥ 1) · Cola de sanciones: rango de sanciones ≥ 1
+   · Convocatorias/Disponibilidad: coordinación o consejo (`_consejoDe_`) · Reclutar: el PD. */
+function _puedeVerVista_(k){
+  try{
+    if(_puedeImpersonar_()) return true;
+    var a=_actorSanc_();
+    if(k==='docdec') return rangoNom(a)>=1;
+    if(k==='sanciones') return rangoSanc(a)>=1;
+    if(k==='reclutar') return rangoNom(a)>=3;
+    if(k==='convoc' || k==='dispo') return rangoNom(a)>=1 || (_consejoDe_(null)||[]).indexOf(a)>=0;
+  }catch(_){}
+  return true;
 }
 
 /* ═══ MANDAR UN AVISO (push) DESDE LA APP · SÓLO EL PD ═══════════════════════════════════════════════════
@@ -7567,8 +7814,8 @@ function _recargarVersionNueva_(volviendo){
 function _vistaDeAviso_(destino, cara){
   var d=String(destino||'').replace(/^#/,'');
   var M=(cara==='escritorio')
-    ? {estado:'panel', horas:'libros', reuniones:'convoc', turnos:'turnos', docs:'docdec'}
-    : {estado:'estado', horas:'horas', reuniones:'reu', turnos:'turnos', docs:'docs'};
+    ? {estado:'panel', horas:'libros', reuniones:'convoc', turnos:'turnos', docs:'docdec', apela:'apela', tareas:'tareas'}
+    : {estado:'estado', horas:'horas', reuniones:'reu', turnos:'turnos', docs:'docs', apela:'estado', tareas:'tareas'};
   return Object.prototype.hasOwnProperty.call(M,d) ? M[d] : null;
 }
 function _irDesdeAviso_(destino){
@@ -8404,6 +8651,19 @@ function _horarioConv_(perDia, rangos, nS, slot, tipo, pct){
 /* Los chips del mínimo (20 · 25 · 30 en julio). `cont` es el contenedor; `cara` 'e' (escritorio) o 'm' (móvil) sólo
    cambia el marcado. Se repinta cuando cambian el TIPO o el LÍMITE (de él sale el periodo), conservando lo elegido si
    sigue ofreciéndose. Trabajo: oculto y sin valor. `alCambiar` repinta la vista previa. */
+/* ══ 12/11 · «CONTROL DE ASISTENCIA» (reuniones-1) ═══════════════════════════════════════════════════════════════════
+   🗣️ Daniel: *«la idea esq haya una opcion lalmada "control de asistencia" que si la marcas sale la paranoyada de la palabra y si no
+   no. (esto para todas las reuniones salvo las de trabajo)»*. UNA regla, aquí (gemela de `control_de`, rutinas/asistencia.py): las de
+   TRABAJO nunca; el resto, lo que marcó quien convocó; una de antes de la opción (sin `controlAsistencia`) conserva el control que tenía.
+   Sin control no hay palabra ni fichaje y «Finalizar»/«Declarar» dan las horas a los convocados. */
+function _controlAsistencia_(r){ return !!r && r.tipo!=='trabajo' && r.controlAsistencia!==false; }
+/* El campo del formulario de convocar (las dos caras): Sí/No, por defecto No. Las de trabajo no lo enseñan. */
+function _controlAsisCampoHTML_(id){
+  return '<div class="campo" id="'+id+'Campo"><span class="sc">Control de asistencia</span>'+nxSiNo(id, false)+
+    '<p class="rnota" style="margin:4px 0 0">Con «Sí», se proyecta una palabra y cada persona confirma que está.</p></div>';
+}
+function _controlAsisCampoPintar_(id, tipo){ var c=document.getElementById(id+'Campo'); if(c) c.style.display=(tipo==='trabajo') ? 'none' : ''; }
+function _controlAsisDeForm_(id, tipo){ return tipo!=='trabajo' && nxSi(id); }
 function _minimoConvPintar_(cont, cara, tipo, limiteISO, alCambiar){
   if(!cont) return;
   if(!_sancionaAlguna_(tipo)){ cont.hidden = true; cont.dataset.sel = ''; cont.dataset.key = ''; return; }
@@ -9559,6 +9819,26 @@ function _tuyoItems_(c){
     'Hasta que lo des no se firma.', false);
   if(c.rev) add('rev', 'docs', c.rev === 1 ? 'Un documento espera tu revisión' : (c.rev + ' documentos esperan tu revisión'),
     c.rev === 1 ? 'Léelo y decide en Docs.' : 'Léelos y decide en Docs.', false);
+  /* 12/11 (general-1 + gestion-1, Daniel aceptó): las sanciones que esperan la decisión del PD. `c.sanc` = cuántas; SIN dato (cola sin leer)
+     la cara NO lo pasa: «no lo sé» no se avisa como «0». Sólo lo pasa el móvil (el escritorio ya las lleva en `colaDecision`). */
+  if(c.sanc) add('sanc', 'sanciones', c.sanc === 1 ? 'Una sanción espera tu decisión' : (c.sanc + ' sanciones esperan tu decisión'),
+    'Nada se aplica hasta que se cierre su bloque.', false);
+  /* 12/11 (refutar16): las apelaciones que TÚ puedes resolver. El aviso al móvil dice «Mírala en Apelaciones» y esa pantalla es del
+     ESCRITORIO (🗣️ Daniel, 31/10: «Móvil es para todos, escritorio es para el consejo»): en el móvil, ni cola, ni menú, ni aviso, y la
+     persona no sabía ni que tenía una esperando. `c.apel` = [{autor (nombre de pila), clase}]; sólo lo pasa el móvil. */
+  var ap = c.apel || [];
+  if(ap.length){
+    var ap0 = ap.slice(0, 2).map(function(a){ return esc(a.autor) + ' (' + (a.clase === 'sancion' ? 'sanción' : 'tarea') + ')'; }),
+        apTxt = ap.length > 2 ? (ap0.join(', ') + ' y ' + (ap.length - 2) + ' más') : ap0.join(' y ');
+    add('apel', 'estado', ap.length === 1 ? 'Una apelación espera tu respuesta' : (ap.length + ' apelaciones esperan tu respuesta'),
+      'De ' + apTxt + '. Se responden desde el escritorio, en Apelaciones.', false);
+  }
+  /* 11/11 (🗣️ Daniel): un parte tuyo RECHAZADO sale en Estado con su motivo, como los documentos con cambios pedidos; antes sólo se
+     veía plegado en «Horas → Tus partes». `c.rech`: [{tarea, motivo}] (los que aún se ven: `_sigueVisibleSinContar_`). */
+  var rc = c.rech || [];
+  if(rc.length) add('rech', 'horas', rc.length === 1 ? 'Te han rechazado un parte' : ('Te han rechazado ' + rc.length + ' partes'),
+    (rc[0].tarea ? '«' + esc(rc[0].tarea) + '»' : 'El último') + (rc[0].motivo ? ' — ' + esc(rc[0].motivo) : '') +
+      (rc.length > 1 ? (', y ' + (rc.length - 1) + ' más') : '') + '.', true);
   if(c.conv) add('conv', 'turnos', 'Di tu disponibilidad para los turnos', 'Si no dices nada, se reparte sin contar contigo.', true);
   return out;
 }
@@ -10237,6 +10517,17 @@ function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.
 /* Que es «la imputacion» de un parte: UN solo sitio, para que lo que se VALIDA y lo que se
    ENVIA no puedan desincronizarse en silencio (que es como estuvieron un tiempo en el movil).
    Vive aqui desde el 14/08 porque el escritorio ficha con la misma regla. */
+
+/* refutar20 (12/11): lo que falta en el paso «imputación» de «Antes de enviar» DEPENDE de la categoría: con «Tarea» es la tarea a la que imputar las horas, pero con
+   «Reunión no convocada» / «Turno no convocado» / «Compensación» el campo se llama «Nombre de la reunión» / «Qué turno» / «Concepto» y la lista seguía diciendo
+   «Falta a qué imputarlas»: un miembro nuevo no sabía qué campo faltaba. Los rótulos son los del campo (`_formHTML_` del móvil, `_declaCamposHTML_` del escritorio). */
+function _faltaImputar_(cat){
+  return cat==='reunion' ? 'Falta el nombre de la reunión'
+       : cat==='turno' ? 'Falta qué turno'
+       : cat==='compensacion' ? 'Falta el concepto'
+       : 'Falta a qué imputarlas';
+}
+
 function _imputacion_(f){ return f.cat==='tareas' ? (f.tarea==='__otro__' ? String(f.detalle||'').trim() : f.tarea) : String(f.detalle||'').trim(); }   /* 04/11: sin `detalle` → '' (y el «Di a qué se imputa»), no un TypeError */
 
 /* El `url` (page-id de Notion) de la tarea imputada, o `null` (01/11): el servidor casa por él la unidad del parte, y el
@@ -11225,9 +11516,12 @@ async function _anotComprobar_(pre, e){
     if (c) c.setAttribute('data-chk', (r && r.ok !== false && r.cabe === true) ? clave : '');
     di(_anotChkTexto_(r));
   } catch (err) {
+    /* 12/11 (refutar18): un fallo de la máquina (`[Errno 2] … /secretos/…json`) no se le enseña a quien revisa: se dice que no se pudo y a quién avisar. */
+    var _m = String((err && err.message) || err);
+    if (/Errno|Traceback|\.py\b|\.json\b|\/home\/|secretos/.test(_m)) _m = 'la comprobación no está disponible ahora; inténtalo más tarde o avisa al Project Director';
     _anotBloquear_(pre, false);
     if (c) c.setAttribute('data-chk', '');
-    di('No se pudo comprobar: ' + ((err && err.message) || err) + '.');
+    di('No se pudo comprobar: ' + _m + '.');
   }
   _anotChkPintar_(pre);
 }
@@ -12044,15 +12338,18 @@ function _puedeBloqueReu_(r, yo, admin){
    sólo no ofrece el botón. Quien puede finalizarla es quien puede empezarla (`_puedeBloqueReu_`: convocante, PD o admin). */
 var REU_ARCHIVO_DIAS = 30;                     // un mes desde que se celebró en la lista; luego, el «Archivo»
 function _reuFinalizada_(r){ return !!(r && r.finalizada_at); }
-/* ¿Pasa al «Archivo»? Finalizada y con más de un mes desde su fecha. La fecha es la de su franja fijada (`_horarioReuMs_`) o,
-   si no se puede saber —o cae en el futuro por el año que se le supone—, la de finalizarla: lo que ocurra antes. */
+/* ¿Es PASADA (va al cajón plegable «Pasadas», como «Ver el desglose» de las horas)? 11/11, 🗣️ Daniel: *«las que son así reuniones
+   pasadas, que se oculten […] también para las reuniones»*. Pasada = finalizada por su convocante, o con la franja FIJADA ya acabada
+   (`_horarioReuMs_`: una que se queda sin finalizar no vuelve a la lista por olvido). Sin fijar y sin finalizar, sigue viva. Sustituye
+   al «Archivo» de un mes (04/11): ya no hay que esperar 30 días a que se pliegue. */
 function _reuArchivada_(r, ahora){
-  if(!_reuFinalizada_(r)) return false;
-  var f=Date.parse(r.finalizada_at), h=_horarioReuMs_(r), ref=(h && h.fin===h.fin) ? (f===f ? Math.min(h.fin, f) : h.fin) : f;
-  if(ref!==ref) return false;
-  return (ahora==null ? Date.now() : ahora) > ref + REU_ARCHIVO_DIAS*86400000;
+  if(!r) return false;
+  if(_reuFinalizada_(r)) return true;
+  if(r.en_curso) return false;      // 11/11 (refutar6): la que se está celebrando NO se pliega aunque pase de su hora (se alarga): ahí está «Finalizar»
+  var h=_horarioReuMs_(r);
+  return !!(h && h.fin===h.fin && (ahora==null ? Date.now() : ahora) > h.fin);
 }
-/* La lista en dos: las que se ven (sin finalizar, o finalizadas hace menos de un mes) y el Archivo. El orden de cada una se conserva. */
+/* La lista en dos: las vivas y las pasadas (`archivo`, el nombre de siempre). El orden de cada una se conserva. */
 function _reuPartir_(lista, ahora){
   var vivas=[], archivo=[];
   (lista||[]).forEach(function(r){ (_reuArchivada_(r, ahora) ? archivo : vivas).push(r); });
@@ -12134,6 +12431,12 @@ function _fichaPendienteReu_(r, ahora){
   var h=_horarioReuMs_(r), t=(ahora==null?Date.now():ahora);
   return !!(h && r && !r.en_curso && !r.bloque && t>=h.fin && t-h.fin<=BLQ_VENTANA_FICHA_H*3600000);
 }
+/* 11/11 (horascoord) · ¿YA SE CELEBRÓ y nadie ha fichado su bloque? Su horario fijado ya acabó (sin el tope de 48 h de `_fichaPendienteReu_`, que sólo
+   decide el AVISO: el bloque de una reunión de hace una semana se declara igual, y con SU horario, no con «hoy a las 16:00»). */
+function _reuTerminada_(r, ahora){
+  var h=_horarioReuMs_(r);
+  return !!(h && r && !r.en_curso && !r.bloque && (ahora==null?Date.now():ahora)>=h.fin);
+}
 function _msAFechaHora_(ms){
   var d=new Date(ms);
   return {fecha:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()), hora:pad(d.getHours())+':'+pad(d.getMinutes())};
@@ -12185,6 +12488,11 @@ function _bloqueCuerpo_(B){
 }
 
 /* Lo que contestó el servidor, persona a persona: las líneas que NO nacieron (solape, horas de más) se dicen. */
+/* 12/11 (refutar12): cuántas líneas del bloque se crearon de verdad. Con un horario que se solapa con otro parte salían «0 de 5» bajo el título y el
+   aviso «Parte de bloque enviado: pendiente de aprobar», que dice lo contrario de lo que pasó. */
+function _bloqueCreados_(resp){
+  return ((resp && resp.resultados) || []).filter(function(x){ return !x.error; }).length;
+}
 function _bloqueResHTML_(resp){
   var l=(resp && resp.resultados) || [], ok=0;
   var filas=l.map(function(x){
@@ -12194,8 +12502,8 @@ function _bloqueResHTML_(resp){
       (bien ? ico('tick')+' <b>'+esc(x.nombre||'')+'</b>'+(x.repetido?' · ya estaba':(x.parte&&x.parte.horas!=null?' · '+nf2(x.parte.horas)+' h':''))
             : ico('aviso')+' '+esc(x.error))+'</li>';
   }).join('');
-  return '<div id="blqRes"><p style="margin:0 0 8px;font-size:13px"><b>'+ok+' de '+l.length+'</b> líneas creadas, pendientes del PD'+
-    (resp && resp.autocierre ? ' (se cerró solo al tope de horas)' : '')+'.</p>'+
+  return '<div id="blqRes"><p style="margin:0 0 8px;font-size:13px">'+(ok ? '<b>'+ok+' de '+l.length+'</b> líneas creadas, pendientes del PD'+
+    (resp && resp.autocierre ? ' (se cerró solo al tope de horas)' : '')+'.' : '<b>No se creó ninguna línea</b> (0 de '+l.length+'). Mira los avisos de abajo.')+'</p>'+
     '<ul style="margin:0 0 12px;padding-left:2px;list-style:none;font-size:12.5px;line-height:1.5">'+filas+'</ul></div>';
 }
 
@@ -12207,7 +12515,7 @@ function _bloqueHorasHTML_(){
   var tot=fin ? 'La duración de la reunión' : (d>0 ? '<b>'+nf2(d)+' h</b>' : 'Las horas del bloque');
   var quien=n+(n===1?' persona':' personas');
   if(!B.distintas)
-    return '<p class="rnota" data-blqtot style="margin:0 0 8px">'+tot+' para estas '+quien+', igual para todas.</p>'+
+    return '<p class="rnota" data-blqtot style="margin:0 0 8px">'+tot+(n===1 ? ' para esta persona.' : ' para estas '+quien+', igual para todas.')+'</p>'+
       '<button type="button" class="btn mini" data-p data-blqdist>Horas distintas</button>';
   return '<p class="rnota" style="margin:0 0 8px">Horas de cada persona; en blanco, '+(fin?'lo que dure la reunión':(d>0?nf2(d)+' h':'las del bloque'))+'.</p>'+
     B.parts.map(function(p){
@@ -12250,11 +12558,11 @@ function _bloqueFormHTML_(){
   var B=BLQ; if(!B) return '';
   var fin=B.modo==='finalizar';
   if(B.res)
-    return '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 10px">Parte de bloque enviado</div>'+
+    return '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 10px">'+(_bloqueCreados_(B.res)||!(B.res.resultados||[]).length ? 'Parte de bloque enviado' : 'No se creó ningún parte')+'</div>'+
       _bloqueResHTML_(B.res)+'<button class="btn pri" data-blqcerrar data-p>Cerrar</button>';
   var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
   return '<div id="blqForm">'+
-    '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 4px">'+(fin?'Finalizar la reunión':(B.reunion_id!=null?'Declarar parte de bloque':'Parte para varias personas'))+'</div>'+
+    '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 4px">'+(fin?'Finalizar la reunión':(B.reunion_id!=null?'Declarar horas de varias personas':'Parte para varias personas'))+'</div>'+
     '<p class="rnota" style="margin:0 0 12px">'+(fin
       ? 'Un parte pendiente por participante con lo que ha durado'+(B.en_curso?' (<b data-crono="'+esc(B.en_curso.ini)+'">'+esc(_cronoTxt_(B.en_curso.ini))+'</b> hasta ahora)':'')+
         '; el PD los decide de una vez.'
@@ -12322,7 +12630,7 @@ function _bloqueCablear_(cb){
       _borrBorrar_('bloque-resumen');   /* 04/11: enviado bien → fuera el borrador (el cuerpo puede llevar el resumen recortado) */
       if(B.modo==='finalizar' && B.reunion) B.reunion.en_curso=null;
       if(B.reunion && B.res.bloque) B.reunion.bloque=B.res.bloque;      // fichada: el aviso «ya ha pasado» se va
-      tost('Parte de bloque enviado: pendiente de aprobar.');
+      tost(_bloqueCreados_(B.res)||!(B.res.resultados||[]).length ? 'Parte de bloque enviado: pendiente de aprobar.' : 'No se creó ningún parte: mira los avisos.');
       if(cb.hecho) cb.hecho(B.res);
       cb.refrescar();
     }catch(e){
@@ -12354,6 +12662,10 @@ function _variosActivo_(){ return !!(BLQ && BLQ.modo==='declarar' && BLQ.reunion
 function _bloqueReuHTML_(r, puede){
   if(!r || !puede) return '';
   var ec=r.en_curso, pend=_fichaPendienteReu_(r);
+  /* 12/11 (refutar13): la FINALIZADA con su bloque ya enviado no se puede «Empezar» otra vez ni declarar de nuevo (duplicaba las horas de todos);
+     la finalizada sin bloque sólo ofrece dar las horas a los asistentes, sin «Empezar». */
+  if(r.bloque)                                                    // 12/11 (refutar15): también la declarada a posteriori, que no está «finalizada»
+    return '<div id="reuBloque" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)"><p class="rnota" style="margin:0">Las horas de quienes asistieron ya están enviadas: las decide el PD.</p></div>';
   return '<div id="reuBloque" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)">'+
     (pend ? '<div id="reuFichaAviso" role="status" style="margin:0 0 10px;padding:9px 11px;border:1px solid var(--warn);border-radius:10px">'+
       '<b>Ya ha pasado: ficha el bloque</b><br><span class="rnota">Las horas de todos quedan pendientes del PD.</span></div>' : '')+
@@ -12362,9 +12674,9 @@ function _bloqueReuHTML_(r, puede){
         '<b>En curso</b><span class="mono" data-crono="'+esc(ec.ini)+'" style="font-size:18px">'+esc(_cronoTxt_(ec.ini))+'</span></div>'+
         '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-p id="btnFinalizar" style="flex:2">Finalizar</button>'+
         '<button class="btn" data-p id="btnCancelarCurso" style="flex:1">Cancelar</button></div>'
-      : '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>')+
-    '<button class="btn '+(pend?'pri':'mini')+' full" data-p id="btnDeclararBloque" style="margin-top:8px">Declarar parte de bloque</button>'+
-    '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p></div>';
+      : (_reuFinalizada_(r) ? '' : '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>'))+
+    '<button class="btn '+(pend?'pri':'mini')+' full" data-p id="btnDeclararBloque" style="margin-top:8px">'+(_reuTerminada_(r) ? 'Dar las horas a los asistentes' : 'Declarar horas de varias personas')+'</button>'+
+    (_reuFinalizada_(r) ? '' : '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p>')+'</div>';
 }
 
 /* `getR()` da la reunión AHORA (la lista se rehace al refrescar); `abrir()` pinta el formulario. */
@@ -12375,8 +12687,8 @@ function _bloqueReuCablear_(getR, cb){
     var h=new Date(), f=h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate());
     var inv=(Array.isArray(r.invitados)?r.invitados:[]).filter(function(n){ return !!n; });
     var o={modo:modo, reunion:r, reunion_id:r.id, titulo:r.titulo||'', parts:inv, fecha:f, en_curso:r.en_curso};
-    /* ya pasó: el bloque se declara con SU horario, no con el de ahora */
-    var hr=(modo==='declarar' && _fichaPendienteReu_(r)) ? _horarioReuMs_(r) : null;
+    /* ya pasó: el bloque se declara con SU horario, no con el de ahora (11/11: haga lo que haga que pasara, no sólo en las 48 h del aviso) */
+    var hr=(modo==='declarar' && _reuTerminada_(r)) ? _horarioReuMs_(r) : null;
     if(hr){ o.fecha=_msAFechaHora_(hr.ini).fecha; o.ini=_msAFechaHora_(hr.ini).hora; o.fin=_msAFechaHora_(hr.fin).hora; }
     return o;
   };
@@ -12392,8 +12704,177 @@ function _bloqueReuCablear_(getR, cb){
     await api.cancelarReunionEnCurso({id:r.id});
     r.en_curso=null; tost('Cancelada: no se ha creado nada.'); cb.refrescar();
   });
-  on('btnFinalizar', async function(){ var r=getR(); if(!r) return; _bloqueAbrir_(base(r,'finalizar')); cb.abrir(); });
-  on('btnDeclararBloque', async function(){ var r=getR(); if(!r) return; _bloqueAbrir_(base(r,'declarar')); cb.abrir(); });
+  /* 12/11 (refutar13): FINALIZAR también reparte horas a quienes ASISTIERON, no a todos los convocados (antes sólo lo hacía «Declarar»: en una
+     general con 5 convocados y 4 presentes, el quinto —que no vino— recibía las horas de la reunión). La misma lectura para los dos. */
+  var presentesDe=async function(r){
+    if(!_controlAsistencia_(r)) return null;       // 12/11: sin control de asistencia no hay lista de presentes: los convocados
+    if(typeof api!=='undefined' && api.getAsistencia && !_demoLocal_()){     // la maqueta `?demo` inventa presentes que no son de esta reunión
+      try{ var v=await api.getAsistencia(r.id, true), pres=Object.keys((v && v.presentes) || {}); if(pres.length) return pres; }
+      catch(e){ /* sin asistencia legible: los convocados */ }
+    }
+    return null;
+  };
+  on('btnFinalizar', async function(){
+    var r=getR(); if(!r) return;
+    var o=base(r,'finalizar'), pres=await presentesDe(r);
+    if(pres) o.parts=pres;
+    _bloqueAbrir_(o); cb.abrir();
+  });
+  /* 11/11 (horascoord): los participantes son quienes ASISTIERON (la lista de la asistencia), no todos los convocados; sin asistencia
+     o sin poder leerla, los convocados de siempre. Los marcados se quitan o se añaden a mano en el formulario. */
+  on('btnDeclararBloque', async function(){
+    var r=getR(); if(!r) return;
+    var o=base(r,'declarar'), pres=await presentesDe(r);
+    if(pres) o.parts=pres;
+    _bloqueAbrir_(o); cb.abrir();
+  });
+}
+
+/* ══ 11/11 · «DAR HORAS» A TU GENTE (horascoord) ═══════════════════════════════════════════════════════════════════
+   🗣️ Daniel: *«Revisa lo fácil que es para un coordinador ponerle horas a sus miembros […] Todo tiene que ser sencillito.»* Motivo medido:
+   el 01-02/11 un coordinador metió horas a mano en Notion porque en el MÓVIL no había dónde darlas (`otorgarBloque` sólo tenía el
+   formulario del escritorio). Es lo mismo que «Otorgar el bloque» de allí: sin firma de nadie (la persona ve «otorgada»), a quien tu
+   cargo deja (`_otorgablesDe_`, la misma puerta que `puedeDecidirParte`: PD → todos; coordinador → su unidad; subcoordinador → su
+   equipo; nunca uno mismo), con tu motivo. Nace con tu unidad marcada (un toque menos) y con atajos de horas (no 14 pulsaciones de +). */
+function _actorHoras_(){ return (typeof _actorSanc_==='function' ? _actorSanc_() : null) || (typeof YO!=='undefined' && YO && YO.nombre) || ''; }
+/* 11/11 (horascoord2) · LA POTESTAD SOBRE LA GENTE, declarada UNA vez (gemela de `_puede_sobre_parte` + `esSubcoordDe` del servidor): el PD (rango 3),
+   quien coordina ESA unidad (rango >= 1) o, a su equipo, el subcoordinador. La llaman `puedeDecidirParte` (horas.escritorio.js: decidir un parte),
+   `puedeOtorgarA` (otorgar) y `_otorgablesDe_`: antes cada una llevaba su copia. NO incluye «nunca uno mismo»: eso lo pone quien la llama. */
+function _potestadSobre_(quien, autor, unidad){
+  return rangoNom(quien)>=3 || (rangoNom(quien)>=1 && coordinadorDe(unidad)===quien) || esSubcoordDe(quien, autor);
+}
+/* ¿Puede `quien` OTORGAR horas a la ficha `m` ({nombre, unidad})? Nunca a sí mismo. */
+function _puedeOtorgarA_(m, quien){
+  return !!m && !!quien && m.nombre!==quien && _potestadSobre_(quien, m.nombre, m.unidad);
+}
+function _otorgablesDe_(quien){
+  return _activos_().filter(function(m){ return _puedeOtorgarA_(m, quien); }).map(function(m){ return m.nombre; });
+}
+var DH=null;          // {env, pool, marcadas, horas, motivo, clave, cat, subcat, conHor, fecha, ini, fin}: el formulario abierto
+var DH_ATAJOS=[0.5,1,2,3,4];
+/* 11/11 (horascoord2; Daniel: *«¿Por qué aparecen otras contribuciones si es una reunión?»*): las categorías de siempre, en el orden de «Declarar». */
+var DH_CATS=[['tareas','Tareas'],['reunion','Reunión'],['turno','Turno'],['compensacion','Compensación']];
+function _darHorasAbrir_(pre){
+  pre=pre||{};
+  var yo=_actorHoras_(), pool=_otorgablesDe_(yo);
+  DH={env:false, pool:pool, marcadas:pre.nombres ? pre.nombres.filter(function(n){ return pool.indexOf(n)>=0; }) : (rangoNom(yo)>=3 ? [] : pool.slice()),
+      horas:pre.horas||'', motivo:pre.motivo||'', clave:_claveUso_(),
+      cat:pre.cat||'compensacion', subcat:pre.subcat||'', conHor:!!pre.conHor, fecha:pre.fecha||_hoyNxISO_(), ini:pre.ini||'16:00', fin:pre.fin||'18:00'};
+  return DH;
+}
+function _darHorasTarjetaHTML_(){
+  if(!_otorgablesDe_(_actorHoras_()).length) return '';
+  return '<div class="tarj">'+cab('Dar horas','a tu gente')+
+    '<p class="rnota" style="margin:0 0 10px">Para una feria, un traslado, un turno sin fichar…: cuentan al momento, sin que nadie las firme.</p>'+
+    '<button class="btn pri full" data-p data-darhoras>Dar horas</button></div>';
+}
+/* Las horas de cada uno: las que escribe; en blanco y con horario, lo que dura el tramo (el servidor lo calcula igual). */
+function _darHorasHoras_(){
+  var h=parseFloat(String(($('#dhH')||{}).value||'').replace(',','.'))||0;
+  return (h>0 || !DH || !DH.conHor) ? h : _bloqueDurH_(DH.fecha, DH.ini, DH.fin);
+}
+function _darHorasTxt_(){
+  var n=elegirPersonasMarcadas('dh').length, h=_darHorasHoras_();
+  return h>0 ? ('Dar '+nf2(h)+' h a '+n+(n===1?' persona':' personas')) : 'Dar horas';
+}
+/* Categoría + subcategoría (sólo con la compensación) + horario opcional: se repinta ella sola en `#dhClas` (el resto no se toca). */
+function _darHorasClasHTML_(D){
+  var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
+  return '<div class="campo" style="margin:0 0 10px">'+lab('Categoría')+nxElige('dhCat', DH_CATS, D.cat)+'</div>'+
+    _subcatHTML_('dhSub', D.subcat, D.cat)+
+    '<div class="campo" style="margin:0 0 10px">'+lab('Horario')+nxElige('dhHor', [['','Sin horario'],['si','De qué hora a qué hora']], D.conHor?'si':'')+'</div>'+
+    (D.conHor ? _darHorasTramoHTML_(D, 'dh') : '');
+}
+/* 11/11 (bloquehorario): el Día + Desde + Hasta, UNO para las dos caras (el móvil con prefijo `dh`, el bloque del escritorio con `blo`). */
+function _darHorasTramoHTML_(D, pre){
+  var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
+  return '<div style="margin:0 0 12px"><div style="margin:0 0 8px">'+lab('Día')+nxFecha(pre+'Fecha', D.fecha, {max:_hoyNxISO_()})+'</div>'+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap"><div>'+lab('Desde')+nxHora(pre+'Ini', D.ini)+'</div><div>'+lab('Hasta')+nxHora(pre+'Fin', D.fin)+'</div></div></div>';
+}
+/* El tramo de `D` ({fecha, ini, fin}) para el cuerpo de `otorgarBloque`, o un Error con lo que falla: lo mismo que cortará el servidor, antes de mandar. */
+function _darHorasTramo_(D, horas){
+  if(!_horaHHMM_(D.ini) || !_horaHHMM_(D.fin) || D.ini===D.fin) throw new Error('Pon de qué hora a qué hora (HH:MM, distintas).');
+  var fut=_finEnFuturoTxt_(D.fecha, [{ini:D.ini, fin:D.fin}]); if(fut) throw new Error(fut);
+  var dur=_bloqueDurH_(D.fecha, D.ini, D.fin);
+  if(horas>dur+1e-9) throw new Error('Las horas ('+nf2(horas)+') no pueden pasar de lo que dura el horario ('+nf2(dur)+' h).');
+  return {fecha:D.fecha, ini:D.ini, fin:D.fin};
+}
+function _darHorasClasPintar_(){
+  var c=$('#dhClas'); if(!c || !DH) return;
+  c.innerHTML=_darHorasClasHTML_(DH);
+  [['dhCat','cat'],['dhSub','subcat'],['dhFecha','fecha'],['dhIni','ini'],['dhFin','fin']].forEach(function(x){
+    var e=$('#'+x[0]); if(!e) return;
+    e.onchange=function(){ DH[x[1]]=e.value; if(x[1]==='cat'){ DH.subcat=''; _darHorasClasPintar_(); }
+      var b=$('#dhEnviar'); if(b) b.textContent=_darHorasTxt_(); }; });
+  var h=$('#dhHor');
+  if(h) h.onchange=function(){ DH.conHor=h.value==='si'; _darHorasClasPintar_(); var b=$('#dhEnviar'); if(b) b.textContent=_darHorasTxt_(); };
+}
+function _darHorasFormHTML_(){
+  var D=DH; if(!D) return '';
+  var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
+  return '<div id="dhForm">'+
+    '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 4px">Dar horas a tu gente</div>'+
+    '<p class="rnota" style="margin:0 0 12px">Cuentan al momento y a cada uno le salen como otorgadas, con tu motivo. Las mismas horas para todos los marcados.</p>'+
+    lab('A quién')+
+    elegirPersonas('dh', {universo:D.pool, marcadas:D.marcadas, titulo:'A quién dar horas', vacio:'Nadie todavía: escribe un nombre o pulsa «Ver lista».',
+      alCambiar:function(){ var b=$('#dhEnviar'); if(b) b.textContent=_darHorasTxt_(); }})+
+    '<div id="dhClas" style="margin:12px 0 0">'+_darHorasClasHTML_(D)+'</div>'+
+    '<div style="margin:12px 0">'+lab('Horas para cada uno')+
+      '<div class="nt-fila" style="margin:0 0 8px">'+DH_ATAJOS.map(function(h){
+        return '<button type="button" class="pick" data-dhq="'+h+'">'+nf2(h)+' h</button>'; }).join('')+'</div>'+
+      nxNum('dhH', D.horas, {min:0, paso:0.25, sufijo:'h'})+'</div>'+
+    '<label style="display:block;margin:0 0 12px">'+lab('Qué se hizo y dónde <span class="req">*</span>')+
+      '<input id="dhC" style="'+_BLQ_INPUT_+'" placeholder="p. ej. Montaje del stand en la feria de Ourense" value="'+esc(D.motivo)+'">'+
+      '<span class="rnota" style="display:block;margin:4px 0 0">El motivo concreto de esta actividad (mínimo '+MIN_JUSTIFICACION+' caracteres): es lo que le sale a cada uno.</span></label>'+
+    '<div style="display:flex;gap:8px"><button class="btn pri" id="dhEnviar" data-p style="flex:1">'+_darHorasTxt_()+'</button>'+
+      '<button class="btn" data-dhcerrar data-p>Cancelar</button></div></div>';
+}
+/* El cuerpo de `otorgarBloque`, o un Error con lo que falta (el tope, ANTES de mandar: el servidor recorta y la cara afirmaría lo pedido). */
+function _darHorasCuerpo_(D){
+  var nombres=elegirPersonasMarcadas('dh');
+  var horas=_darHorasHoras_();
+  var motivo=String(($('#dhC')||{}).value||'').trim();
+  if(!nombres.length) throw new Error('Marca al menos a una persona.');
+  if(!(horas>0)) throw new Error('Pon las horas de cada uno.');
+  if(horas>_maxHorasParte_()) throw new Error('No se ha dado nada: el máximo por persona son '+h1(_maxHorasParte_())+'.');
+  if(!_justificacionValida_(motivo)) throw new Error('Cuenta qué se hizo y dónde: el motivo necesita al menos '+MIN_JUSTIFICACION+' caracteres.');
+  var cuerpo={nombres:nombres, horas:horas, tarea:motivo, categoria:D.cat, subcat:_subcatEnvio_(D), clave:D.clave};
+  if(D.conHor){ var t=_darHorasTramo_(D, horas); cuerpo.fecha=t.fecha; cuerpo.ini=t.ini; cuerpo.fin=t.fin; }   // el tramo, como el de un parte
+  return cuerpo;
+}
+/* Lo que PASÓ, no lo que se pidió: 0 → nada; parcial → a cuántos sí y a cuántos no; todas → ya cuentan. */
+/* 11/11 (refutar6): a quien se quedó sin las horas se le NOMBRA, con lo que dijo el servidor (el tramo ya ocupado, la baja…); «con error» a secas no dice a quién. */
+function _darHorasFallos_(r){
+  var f=((r && r.resultados) || []).filter(function(x){ return x && x.error; });
+  if(!f.length) return '';
+  var t=f.slice(0,2).map(function(x){ var e=String(x.error), nb=String(x.nombre||'');
+    return (nb && e.indexOf(nb)<0 ? nb+': ' : '')+e; }).join(' · ');
+  return ' '+t+(f.length>2 ? ' · y '+(f.length-2)+' más' : '');
+}
+function _darHorasAviso_(r, n, horas){
+  var ok=(r && r.otorgados)||0, fa=_darHorasFallos_(r);
+  return !r ? 'El servidor no ha confirmado: mira sus horas antes de repetirlo, que puede estar dado.'
+    : !ok ? '0 de '+n+': no se ha dado nada'+(fa ? '.'+fa : ' (sin permiso o con error).')
+    : ok<n ? h1(horas)+' a '+ok+' de '+n+'.'+(fa ? fa : ' A '+(n-ok)+' no se les ha dado (sin permiso o con error).')
+    : h1(horas)+' a '+ok+(ok===1?' persona':' personas')+'. Ya cuentan en sus horas del mes.';
+}
+function _darHorasCablear_(cb){
+  var D=DH; if(!D) return;
+  $$('[data-dhcerrar]').forEach(function(b){ b.onclick=function(){ DH=null; cb.cerrar(); }; });
+  _darHorasClasPintar_();
+  $$('[data-dhq]').forEach(function(b){ b.onclick=function(){ nxPon('dhH', b.dataset.dhq); var e=$('#dhEnviar'); if(e) e.textContent=_darHorasTxt_(); }; });
+  var h=$('#dhH'); if(h) h.addEventListener('change', function(){ var e=$('#dhEnviar'); if(e) e.textContent=_darHorasTxt_(); });
+  var env=$('#dhEnviar');
+  if(env) env.onclick=async function(){
+    if(env.disabled || D.env) return;
+    var cuerpo; try{ cuerpo=_darHorasCuerpo_(D); }catch(e){ tost(e.message); return; }
+    D.env=true; env.disabled=true; var prev=env.textContent; env.textContent='…';
+    try{
+      var r=await api.otorgarBloque(cuerpo);
+      tost(_darHorasAviso_(r, cuerpo.nombres.length, ((r && r.resultados || []).filter(function(x){ return x && x.id; })[0] || {horas:cuerpo.horas}).horas));
+      DH=null; cb.cerrar(); if(cb.hecho) cb.hecho(r);
+    }catch(e){ D.env=false; env.disabled=false; env.textContent=prev; tostErr('No se pudo dar las horas: ', e); }
+  };
 }
 
 /* ── La cola del PD: las líneas con el mismo `bloque` salen en UNA tarjeta ─────────────────────────── */
@@ -12989,7 +13470,12 @@ function _mtCss_(){
     '.mtf-card{border:1px solid var(--line);border-radius:12px;background:var(--sur);padding:9px 10px;margin:0 0 8px}'+
     '.mtf-card .mtf-fila{margin:0 0 6px}.mtf-nota{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.mtf-err{margin:0 0 8px;font-size:13px;color:var(--red)}'+
     '.mtf-sug{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.mtf-sug:empty{display:none}'+
+    '.mtf-subo{margin:0 0 6px 14px;padding-left:10px;border-left:2px solid var(--line)}'+
     '.mtf-obj{display:flex;flex-direction:column;gap:6px}.mtf-obj .mtf-fila{margin:0}'+
+    '.mtf-ayuda{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.mtf-foto{display:flex;gap:9px;align-items:center;margin:0 0 6px}'+
+    '.mtf-foto img,.mtf-gal img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:none}'+
+    '.mtf-gal{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}.mtf-gal img{cursor:pointer}.mtf-gal img:hover{border-color:var(--red)}'+
+    '.mtf-rev{margin:0 0 8px;font-size:12.5px;line-height:1.4}.mtf-rev:empty{display:none}.mtf-rev b{color:var(--red);font-weight:600}.mtf-rev span{color:var(--ink3)}'+
     '.mtf-pie{position:sticky;bottom:0;background:var(--bg);padding:10px 0 4px;border-top:1px solid var(--line);margin-top:14px}';
   document.head.appendChild(s);
 }
@@ -13005,12 +13491,19 @@ function _mtRefrescar_(t, forzar){
     MT_.est[k] = {t: Date.now(), r: r};
     /* El editor abierto manda sobre lo que diga el servidor (lo que se está tecleando no se pisa); sólo se actualiza su `rev` si no hay cambios sin guardar. */
     var ed = MT_.ed[k];
-    if(ed && !ed.sucio && !ed.guardando && r.puede && r.estado === 'borrador'){ ed.m = JSON.parse(JSON.stringify(r.memoria)); ed.rev = r.rev; }
+    if(ed && !ed.sucio && !ed.guardando && r.puede && r.estado === 'borrador'){ ed.m = JSON.parse(JSON.stringify(r.memoria)); ed.rev = r.rev; ed.faltas = r.faltas || []; ed.avisos = r.avisos || []; }
     _mtPintar_(k); return r;
   }, function(){ if(!MT_.est[k]) MT_.est[k] = {t: Date.now(), r: {puede: false}}; _mtPintar_(k); return null; });
   MT_.est[k] = Object.assign({}, e || {}, {pidiendo: p});
   p.then(function(){ if(MT_.est[k]) delete MT_.est[k].pidiendo; });
   return p;
+}
+var MT_APARTADOS_ = ['Procedimiento', 'Incidencias', 'Resultados', 'Pendiente para el siguiente turno'];   /* los que se repiten en las memorias reales (6104, 6106…) */
+function _mtFotoDe_(ed, id){ return (ed.pool || []).filter(function(f){ return f.id === id; })[0]; }
+function _mtRevisionHTML_(ed){
+  var f = ed.faltas || [], a = ed.avisos || [];
+  return (f.length ? '<b>Para enviar falta:</b> ' + f.map(esc).join(' · ') : '') + (f.length && a.length ? '<br>' : '') +
+         (a.length ? '<span>Conviene: ' + a.map(esc).join(' · ') + '</span>' : '');
 }
 var MT_GRUPOS_ = [['principales', 'Objetivos principales'], ['secundarios', 'Objetivos secundarios'], ['extraordinarios', 'Objetivos extraordinarios']];
 function _mtNombres_(){ return ((typeof DATA !== 'undefined' && DATA.miembros) || []).map(function(m){ return m.nombre; }).filter(Boolean); }
@@ -13033,7 +13526,8 @@ function _mtEditorHTML_(k){
   h += '<div class="mtf-fila">' + nxFecha('mtFecha', m.fecha || '', {max: _hoyNxISO_()}) +    /* la fecha: el selector propio, no el nativo */
        _mtInp_('sitio', m.sitio, 'Sitio (CITI, CUVI…)', 'aria-label="Sitio"') + '</div>';
   /* 1. Integrantes */
-  h += '<div class="mtf-sec">1. Integrantes y responsabilidades</div>';
+  h += '<div class="mtf-sec">1. Integrantes y responsabilidades</div>'+
+       '<p class="mtf-ayuda">Nombre Apellidos (papel): responsable de turno, coche, responsable audiovisual, responsable de memoria. Si alguien vino sólo un día, ponlo.</p>';
   m.integrantes.forEach(function(p, i){
     h += '<div class="mtf-card"><div class="mtf-fila"><b style="flex:1;font-size:14px">' + esc(p.nombre) + '</b>'+
          '<span class="mtf-c mini" data-mtquitar="integrantes:' + i + '">Quitar</span></div>'+
@@ -13044,7 +13538,8 @@ function _mtEditorHTML_(k){
   h += '<div class="mtf-add"><div class="mtf-fila">' + _mtInp_('nuevo.integrante', ed.nuevo || '', 'Añadir a alguien que también fue', 'data-mtnuevo="integrante"') + '</div>'+
        '<div class="mtf-sug" data-mtsugbox="integrante">' + (ed.nuevo ? _mtSugHTML_(_mtNombres_().filter(function(n){ return !ya[n]; }), ed.nuevo, 'integrante') : '') + '</div></div>';
   /* 2. Movimientos */
-  h += '<div class="mtf-sec">2. Movimientos</div>';
+  h += '<div class="mtf-sec">2. Movimientos</div>'+
+       '<p class="mtf-ayuda">Qué se movió y de dónde a dónde (Zulo → CITI…). Si no se movió nada, déjalo vacío.</p>';
   m.movimientos.forEach(function(f, i){
     h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('movimientos.' + i + '.material', f.material, 'Material') +
          '<span class="mtf-c mini" data-mtquitar="movimientos:' + i + '">Quitar</span></div>'+
@@ -13058,7 +13553,8 @@ function _mtEditorHTML_(k){
   });
   h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="movimientos">Añadir movimiento</span><span class="mtf-c" data-mtadd="notasMov">Añadir nota</span></div>';
   /* 3. Objetivos */
-  h += '<div class="mtf-sec">3. Objetivos</div>';
+  h += '<div class="mtf-sec">3. Objetivos</div>'+
+       '<p class="mtf-ayuda">Los del Discord que pone el Project Director, más los que surjan de improviso. Marca si se cumplieron. Secundarios y extraordinarios (los imprevistos del turno): si no hay, se omiten.</p>';
   MT_GRUPOS_.forEach(function(gr, gi){
     g = gr[0];
     h += '<div class="mtf-sub">3.' + (gi + 1) + '. ' + gr[1] + '</div><div class="mtf-obj">';
@@ -13066,20 +13562,48 @@ function _mtEditorHTML_(k){
       h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('objetivos.' + g + '.' + i + '.texto', o.texto, 'Objetivo') +
            '<span class="mtf-c mini" data-mtquitar="obj:' + g + ':' + i + '">Quitar</span></div>'+
            '<div class="mtf-fila"><span class="mtf-c' + (o.logrado === true ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':1" role="button" aria-pressed="' + (o.logrado === true) + '">Conseguido</span>'+
-           '<span class="mtf-c' + (o.logrado === false ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':0" role="button" aria-pressed="' + (o.logrado === false) + '">No conseguido</span></div></div>';
+           '<span class="mtf-c' + (o.logrado === false ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':0" role="button" aria-pressed="' + (o.logrado === false) + '">No conseguido</span></div>'+
+           /* subobjetivos (11/11): segundo nivel, con los mismos chips; si los hay, el padre no tiene que marcarse (lo dice `faltas`) */
+           (o.sub || []).map(function(q, j){
+             var ro = 'objetivos.' + g + '.' + i + '.sub.' + j, sc = g + ':' + i + ':' + j;
+             return '<div class="mtf-subo"><div class="mtf-fila">' + _mtInp_(ro + '.texto', q.texto, 'Subobjetivo') +
+               '<span class="mtf-c mini" data-mtquitar="sub:' + g + ':' + i + ':' + j + '">Quitar</span></div>'+
+               '<div class="mtf-fila"><span class="mtf-c' + (q.logrado === true ? ' on' : '') + '" data-mtslog="' + sc + ':1" role="button" aria-pressed="' + (q.logrado === true) + '">Conseguido</span>'+
+               '<span class="mtf-c' + (q.logrado === false ? ' on' : '') + '" data-mtslog="' + sc + ':0" role="button" aria-pressed="' + (q.logrado === false) + '">No conseguido</span></div></div>';
+           }).join('') +
+           '<div class="mtf-fila"><span class="mtf-c mini" data-mtadd="sub:' + g + ':' + i + '">+ subobjetivo</span></div></div>';
     });
     h += '</div><div class="mtf-fila"><span class="mtf-c" data-mtadd="obj:' + g + '">Añadir objetivo</span></div>';
   });
   /* 4. Comentarios */
-  h += '<div class="mtf-sec">4. Comentarios y detalles</div>';
+  h += '<div class="mtf-sec">4. Comentarios y detalles</div>'+
+       '<p class="mtf-ayuda">Imprevistos e incidencias del turno. Un método de fabricación no convencional, por muy “gitano” que sea, para que no se pierda. Y el porqué de cada objetivo no cumplido.</p>';
   m.comentarios.forEach(function(c, i){
-    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('comentarios.' + i + '.titulo', c.titulo, 'Título del apartado (opcional)') +
+    var fotos = c.fotos || [];
+    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('comentarios.' + i + '.titulo', c.titulo, 'Título del apartado (Aletas, Lijado…)') +
          '<span class="mtf-c mini" data-mtquitar="comentarios:' + i + '">Quitar</span></div>'+
-         '<textarea class="mtf-in" data-mtin="comentarios.' + i + '.texto" placeholder="Qué se hizo, qué pasó, qué quedó pendiente…">' + esc(c.texto || '') + '</textarea></div>';
+         '<textarea class="mtf-in" data-mtin="comentarios.' + i + '.texto" placeholder="Qué se hizo, cómo, qué pasó y qué queda pendiente">' + esc(c.texto || '') + '</textarea>';
+    fotos.forEach(function(f, j){
+      var fp = _mtFotoDe_(ed, f.id);
+      h += '<div class="mtf-foto">' + (fp && fp.mini ? '<img src="' + esc(fp.mini) + '" alt="">' : '') +
+           _mtInp_('comentarios.' + i + '.fotos.' + j + '.pie', f.pie, 'Pie de la foto (qué se ve)') +
+           '<span class="mtf-c mini" data-mtquitar="foto:' + i + ':' + j + '">Quitar</span></div>';
+    });
+    if(ed.galeria === i){
+      var usadas = {}; fotos.forEach(function(f){ usadas[f.id] = 1; });
+      var libres = (ed.pool || []).filter(function(f){ return !usadas[f.id]; });
+      h += libres.length ? '<div class="mtf-gal">' + libres.map(function(f){
+             return f.mini ? '<img src="' + esc(f.mini) + '" data-mtfoto="' + i + ':' + esc(f.id) + '" alt="Foto del turno">'
+                           : '<span class="mtf-c mini" data-mtfoto="' + i + ':' + esc(f.id) + '">' + esc(f.titulo || f.nombre || 'foto') + '</span>'; }).join('') + '</div>'
+         : '<p class="mtf-nota">' + ((ed.pool || []).length ? 'Ya has puesto todas las fotos del turno.' : 'El turno no tiene fotos subidas.') + '</p>';
+    }
+    h += '<div class="mtf-fila"><span class="mtf-c mini" data-mtfotos="' + i + '">' + (ed.galeria === i ? 'Cerrar fotos' : 'Añadir foto') + '</span></div></div>';
   });
-  h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="comentarios">Añadir apartado</span></div>';
+  var usados = {}; m.comentarios.forEach(function(c){ usados[(c.titulo || '').trim().toLowerCase()] = 1; });
+  h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="comentarios">Añadir apartado</span>'+
+       MT_APARTADOS_.filter(function(x){ return !usados[x.toLowerCase()]; }).map(function(x){ return '<span class="mtf-c mini" data-mtadd="comentarios:' + esc(x) + '">' + esc(x) + '</span>'; }).join('') + '</div>';
   /* Pie */
-  h += '<div class="mtf-pie">' + (ed.error ? '<p class="mtf-err" data-mterr>' + esc(ed.error) + '</p>' : '') +
+  h += '<div class="mtf-pie"><p class="mtf-rev" data-mtfaltas>' + _mtRevisionHTML_(ed) + '</p>' + (ed.error ? '<p class="mtf-err" data-mterr>' + esc(ed.error) + '</p>' : '') +
        '<div class="mtf-fila"><span class="mtf-nota" style="flex:1;margin:0" data-mtestado>' + _mtEstadoTxt_(ed) + '</span>'+
        '<span class="mtf-c" data-mtguardar' + (ed.guardando ? ' disabled' : '') + '>Guardar borrador</span>'+
        '<span class="mtf-c pri" data-mtenviar' + (ed.guardando || ed.enviando ? ' disabled' : '') + '>Enviar a revisar</span></div></div>';
@@ -13127,7 +13651,8 @@ function _mtGuardarDif_(t, k){
   clearTimeout(ed.reloj); ed.reloj = null;
   if(ed.guardando) return ed.guardando;
   ed.guardando = _ftDeserv_('guardarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev}).then(function(o){
-    ed.rev = o.rev; ed.sucio = false; ed.error = ''; ed.guardando = null;
+    ed.rev = o.rev; ed.sucio = false; ed.error = ''; ed.guardando = null; ed.faltas = o.faltas || []; ed.avisos = o.avisos || [];
+    var fb = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtfaltas]'); if(fb) fb.innerHTML = _mtRevisionHTML_(ed);
     if(MT_.est[k] && MT_.est[k].r){ MT_.est[k].r.rev = o.rev; MT_.est[k].r.guardada = true; }
     var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtestado]'); if(el) el.textContent = _mtEstadoTxt_(ed);
     if(ed.sucio2){ ed.sucio2 = false; ed.sucio = true; return _mtGuardarDif_(t, k); }
@@ -13145,10 +13670,11 @@ function _mtProgramar_(t, k){
 }
 async function _mtEnviar_(t, k){
   var ed = MT_.ed[k]; if(!ed || ed.enviando) return;
+  try{ await _mtGuardarDif_(t, k); }catch(_){ /* si no se pudo guardar, el envío lleva la memoria entera igualmente */ }
+  if(ed.faltas && ed.faltas.length){ ed.error = 'Todavía no se puede enviar: ' + ed.faltas.join('; ') + '.'; _mtPintar_(k); return; }
   if(!(await dialogoSiNo('¿Enviar la memoria a revisar? Se genera el documento y entra en revisión; no podrás cambiarla después.', {si: 'Enviar'}))) return;
   ed.enviando = true; ed.error = ''; _mtPintar_(k);
   try{
-    try{ await _mtGuardarDif_(t, k); }catch(_){ /* si no se pudo guardar, el envío lleva la memoria entera igualmente */ }
     await _ftDeserv_('enviarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev});
     tost('Memoria enviada a revisión.');
   }catch(e){
@@ -13161,8 +13687,12 @@ async function _mtEnviar_(t, k){
 }
 async function _mtAbrir_(t, k){
   var r = await _mtRefrescar_(t, true); if(!r || !r.puede) return;
-  MT_.ed[k] = {m: JSON.parse(JSON.stringify(r.memoria)), rev: r.rev, sucio: false, nuevo: '', error: ''};
+  MT_.ed[k] = {m: JSON.parse(JSON.stringify(r.memoria)), rev: r.rev, sucio: false, nuevo: '', error: '', faltas: r.faltas || [], avisos: r.avisos || [], pool: [], galeria: -1};
   MT_.abierto[k] = true; _mtPintar_(k);
+  /* las fotos del turno para ponerlas en la memoria (sólo si el servidor deja verlas); sin ellas la memoria se escribe igual */
+  _ftDeserv_('listarFotosTurno', t).then(function(f){
+    if(MT_.ed[k] && f && f.puedeVer){ MT_.ed[k].pool = f.fotos || []; _mtPintar_(k); }
+  }, function(){});
 }
 async function _mtReabrir_(t, k){
   var mot = await dialogoTexto('¿Qué cambios pide la revisión? (queda apuntado)', {valor: ''});
@@ -13191,20 +13721,41 @@ function _mtClic_(t, k, ev){
   }
   if((a = q('[data-mtquitar]'))){
     var pq = a.getAttribute('data-mtquitar').split(':');
-    if(pq[0] === 'obj') m.objetivos[pq[1]].splice(+pq[2], 1); else m[pq[0]].splice(+pq[1], 1);
+    if(pq[0] === 'obj') m.objetivos[pq[1]].splice(+pq[2], 1);
+    else if(pq[0] === 'sub'){ var os = m.objetivos[pq[1]][+pq[2]]; os.sub.splice(+pq[3], 1); }
+    else if(pq[0] === 'foto') m.comentarios[+pq[1]].fotos.splice(+pq[2], 1);
+    else m[pq[0]].splice(+pq[1], 1);
     _mtProgramar_(t, k); _mtPintar_(k); return;
   }
   if((a = q('[data-mtadd]'))){
     var w = a.getAttribute('data-mtadd');
     if(w === 'movimientos') m.movimientos.push({material: '', de: '', a: ''});
     else if(w === 'notasMov') m.notasMov.push('');
-    else if(w === 'comentarios') m.comentarios.push({titulo: '', texto: ''});
+    else if(w.indexOf('comentarios') === 0) m.comentarios.push({titulo: w.slice(12), texto: '', fotos: []});
     else if(w.indexOf('obj:') === 0) m.objetivos[w.slice(4)].push({texto: '', logrado: null});
+    else if(w.indexOf('sub:') === 0){ var ws = w.split(':'), op = m.objetivos[ws[1]][+ws[2]]; op.sub = op.sub || []; op.sub.push({texto: '', logrado: null}); }
     ed.sucio = true; _mtPintar_(k);
     /* el cursor al campo nuevo: el último de su grupo */
     var cand = w === 'movimientos' ? 'movimientos.' + (m.movimientos.length - 1) + '.material' : w === 'notasMov' ? 'notasMov.' + (m.notasMov.length - 1)
-      : w === 'comentarios' ? 'comentarios.' + (m.comentarios.length - 1) + '.titulo' : 'objetivos.' + w.slice(4) + '.' + (m.objetivos[w.slice(4)].length - 1) + '.texto';
+      : w.indexOf('sub:') === 0 ? 'objetivos.' + w.split(':')[1] + '.' + w.split(':')[2] + '.sub.' + (m.objetivos[w.split(':')[1]][+w.split(':')[2]].sub.length - 1) + '.texto'
+      : w.indexOf('comentarios') === 0 ? 'comentarios.' + (m.comentarios.length - 1) + (w.length > 11 ? '.texto' : '.titulo') : 'objetivos.' + w.slice(4) + '.' + (m.objetivos[w.slice(4)].length - 1) + '.texto';
     var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtin="' + cand + '"]'); if(el) el.focus();
+    return;
+  }
+  if((a = q('[data-mtfotos]'))){
+    var gi = +a.getAttribute('data-mtfotos'); ed.galeria = ed.galeria === gi ? -1 : gi; _mtPintar_(k); return;
+  }
+  if((a = q('[data-mtfoto]'))){
+    var pf = a.getAttribute('data-mtfoto').split(':'), cm = m.comentarios[+pf[0]];
+    if(cm){
+      cm.fotos = cm.fotos || []; cm.fotos.push({id: pf[1], pie: ''}); ed.galeria = -1; _mtProgramar_(t, k); _mtPintar_(k);
+      var ip = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtin="comentarios.' + pf[0] + '.fotos.' + (cm.fotos.length - 1) + '.pie"]'); if(ip) ip.focus();
+    }
+    return;
+  }
+  if((a = q('[data-mtslog]'))){
+    var ps = a.getAttribute('data-mtslog').split(':'), qs = ((m.objetivos[ps[0]][+ps[1]] || {}).sub || [])[+ps[2]];
+    if(qs){ qs.logrado = ps[3] === '1'; _mtProgramar_(t, k); _mtPintar_(k); }
     return;
   }
   if((a = q('[data-mtlog]'))){
@@ -13484,6 +14035,11 @@ function _ordHorario_(filas, inicio){
   return (filas||[]).map(function(f){ var d=_ordDur_(f), r={desde:_ordMarca_(t,ini),hasta:_ordMarca_(t+d,ini)}; t+=d; return r; });
 }
 function _ordTotal_(filas){ return (filas||[]).reduce(function(a,f){ return a+_ordDur_(f); },0); }
+/* refutar15: «Tabla actual: 1 puntos» salía con la fila en blanco de una orden vacía. Se cuentan los puntos con tema, y en singular cuando es uno. */
+function _ordTablaActual_(draft){
+  var n=0, i; for(i=0;i<(draft||[]).length;i++) if(String(draft[i]&&draft[i].tema||'').replace(/\s+/g,'')) n++;
+  return n ? 'Tabla actual: '+n+(n===1?' punto.':' puntos.') : 'La tabla está vacía.';
+}
 function _ordTextoDur_(m){ var h=Math.floor(m/60), r=m%60; return h?(r?h+' h '+pad(r)+' min':h+' h'):r+' min'; }
 /* La fila tal como vive en el borrador (`dur` '' si falta) y tal como viaja (`dur` entero o ausente → el servidor dice «falta la duración»). */
 function _ordFilaBorrador_(f){ return {dur:(f&&f.dur>0)?f.dur:'',tema:(f&&f.tema)||'',quien:(f&&f.quien)||''}; }
@@ -13565,7 +14121,7 @@ function _ordenEditHTML_(st){
   }).join('');
   var ia=st.ia, prop=ia.fase==='propuesta';
   /* Con una propuesta delante la tabla de abajo no se toca (sería de otra tabla): se decide primero. */
-  return (prop ? '<div class="rnota">Tabla actual: '+st.draft.length+' puntos. Abajo, '+(ia.origen==='notion'?'lo traído de Notion':'la propuesta de SolarIA')+'.</div>' :
+  return (prop ? '<div class="rnota">'+_ordTablaActual_(st.draft)+' Abajo, '+(ia.origen==='notion'?'lo traído de Notion':'la propuesta de SolarIA')+'.</div>' :
       (filas||'<div class="rnota">Sin puntos. Añade el primero.</div>'))+
     '<p class="rnota" style="margin:8px 0 0" data-ordtotal>Total: '+_ordTextoDur_(_ordTotal_(st.draft))+'</p>'+
     (st.e&&st.e.inicio?'':'<p class="rnota" style="margin:2px 0 0">Aún sin fijar: las horas cuentan desde T0 y se ponen solas al fijarla.</p>')+

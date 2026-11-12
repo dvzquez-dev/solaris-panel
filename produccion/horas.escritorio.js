@@ -40,7 +40,7 @@ function puedeDecidirParte(p,quien){
      (rango 2): le pintaba Aprobar/Rechazar en partes que el servidor le niega, y con «Actúas como José» el PD los veía
      y la llamada salía con SU token, firmada como suya. El rango 2 es documental; en horas no manda. */
   /* 02/11 · Daniel: el subcoordinador (Breixo) firma también los partes de SU equipo, y de nadie más (`esSubcoordDe`). */
-  return rangoNom(quien)>=3 || (rangoNom(quien)>=1 && coordinadorDe(p.unidad)===quien) || esSubcoordDe(quien, p.autor);
+  return _potestadSobre_(quien, p.autor, p.unidad);      /* 11/11: la regla vive UNA vez, en comun.js */
 }
 
 /* ⛔ 20/10 (auditor de partes): un parte en `detalle` es SIN DECIDIR — así lo cuenta el servidor (`bloqueos_cierre`,
@@ -52,23 +52,23 @@ function pendientes(){return PARTES.filter(function(p){return p.estado==='pend' 
    «Horas en el aire» (Panel de mando y Partes) suman ESTO: al PD, todo lo pendiente; al resto, lo que `puedeDecidirParte`
    le deja firmar —la misma puerta de «Esperan tu decisión»; al PD (rango 3) se lo deja todo—, para que las dos cifras de la
    fila hablen de lo mismo. */
-function enElAire(){return pendientes().filter(function(p){return puedeDecidirParte(p,ACTOR);});}
+/* 12/11 (refutar15): ¿ESTE parte lo firmo YO? Los de BLOQUE (reuniones) los decide sólo el PD: el coordinador los VE (su panel «Partes de bloque»), pero ni su KPI
+   «Esperan tu decisión», ni «Horas en el aire», ni la insignia del menú pueden contarlos como suyos (decía «3 · los firmas tú» con la cola vacía). */
+function _firmaMia_(p){ return puedeDecidirParte(p,ACTOR) && (!p.bloque || _bloquePuedeDecidirE_()); }
+function enElAire(){return pendientes().filter(_firmaMia_);}
 
 /* 01/11 · Daniel (artifact «Subcoordinador y horas»): *«Solo a su equipo, como cuando sanciona»*. A quién puede `quien`
    OTORGAR horas (`m` = un miembro con `nombre` y `unidad`): lo que firma —el PD, o quien coordina esa unidad
    (`puedeDecidirParte`, gemela de `_puede_otorgar_a` del servidor)— y, además, el subcoordinador a su equipo, por la
    MISMA puerta que las sanciones (`puedeSancionarA`, que ya lo acota: no se copia el criterio). 02/11: la misma que firma sus
    partes, así que `puedeDecidirParte` ya lo incluye (`esSubcoordDe`). */
-function puedeOtorgarA(m,quien){
-  if(!m || m.nombre===quien) return false;
-  return puedeDecidirParte({autor:m.nombre, unidad:m.unidad}, quien);
-}
+function puedeOtorgarA(m,quien){ return _puedeOtorgarA_(m, quien); }   /* 11/11: la regla vive UNA vez, en comun.js */
 
 /* 31/10 · Daniel: el parte del PD de una unidad que coordina OTRO se enruta a ese coordinador: al PD no le sale como «suyo por
    aprobar» (cola y globo) aunque siga pudiendo decidirlo. Misma regla que el móvil (`_cargarPartesDec_`); el servidor ya
    fijó en el parte la unidad de la TAREA. */
 function porAprobar(){return pendientes().filter(function(p){
-  return puedeDecidirParte(p,ACTOR) && !(p.autor===ACTOR && coordinadorDe(p.unidad)!==ACTOR);});}
+  return _firmaMia_(p) && !(p.autor===ACTOR && coordinadorDe(p.unidad)!==ACTOR);});}
 
 function parteCard(p){
   var m=_m(p.autor), rev=revisoresDeParte(p), puede=puedeDecidirParte(p,ACTOR);
@@ -111,6 +111,14 @@ function parteCard(p){
   '</div>';
 }
 
+/* 11/11 (bloquehorario; Daniel: «de qué hora a qué hora es la contribución concreta»): el horario OPCIONAL del bloque. Sin él, el bloque es el de siempre. */
+var BLO_HOR={conHor:false, fecha:'', ini:'16:00', fin:'18:00'};
+function _bloHorarioHTML_(){
+  if(!BLO_HOR.fecha) BLO_HOR.fecha=_hoyNxISO_();
+  return '<div class="campo" style="margin:0 0 10px"><span class="sc" style="display:block;margin:0 0 5px">Horario</span>'+
+      nxElige('bloHor', [['','Sin horario'],['si','De qué hora a qué hora']], BLO_HOR.conHor?'si':'')+'</div>'+
+    (BLO_HOR.conHor ? _darHorasTramoHTML_(BLO_HOR, 'blo') : '');
+}
 function bloquePanel(){
   if(rangoNom(ACTOR)<1) return '';
   /* ⛔⛔ `>=3`, NO `>=2`. Esto decia `esPD = rangoNom(ACTOR)>=2`, y con eso el SEGUNDO
@@ -143,7 +151,10 @@ function bloquePanel(){
     'horas de una vez. No se otorga nada hasta que pulses el botón.</p>'+
     /* El selector de personas ÚNICO (comun.js); «Ver lista» las agrupa por unidad. Lo que se manda son los marcados. */
     elegirPersonas('bloInv', {universo:pool.map(function(m){ return m.nombre; }), titulo:'A quién otorgar el bloque',
+      /* 11/11 (horascoord): el coordinador nace con SU gente marcada (quitar a uno cuesta menos que marcar a diez); el PD, con nadie */
+      marcadas:mandaEnTodo?[]:pool.map(function(m){ return m.nombre; }),
       vacio:'Nadie marcado: escribe un nombre o pulsa «Ver lista».'})+
+    '<div id="bloHorario" style="margin:0 0 4px">'+_bloHorarioHTML_()+'</div>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
       '<div><span class="sc" style="display:block;margin-bottom:5px">Categoría</span>'+
         nxElige('bloCat', [['reunion','Reunión'],['tareas','Tarea'],['turno','Turno'],['compensacion','Compensación']], 'compensacion')+'</div>'+
@@ -165,7 +176,8 @@ function normParte(p){
   var _eo=_etiOrigenParte_(p);
   if(_eo) fl.push([_eo.tono==='ok'?'ok':'wa', _eo.txt]);
   return { id:p.id, autor:p.autor, unidad:p.subsistema||'—', fecha:_isoADMY_(p.fecha),
-    ini:p.ini||'—', fin:p.fin||'—', horas:Number(p.horas)||0, tarea:p.tarea||'',
+    ini:p.ini||'—', fin:p.fin||'—', horas:Number(p.horas)||0, tarea:_tareaVista_(p.tarea),
+    turno_h:p.turno_h||0, clave:p.clave||'',   /* 11/11 (turnoextra): `_horasVistaParte_` los lee */
     /* ⛔ EL ORIGEN SE PASA TAL CUAL, sin traducirlo a `bloque`/`turno`. Ese par era un
        TERCER vocabulario para el mismo hecho, y ademas mentia: llamaba «bloque» a lo que
        alguien declaraba a mano y a lo que otorgaba la coordinacion.
@@ -224,7 +236,7 @@ function _escHistFilaHTML_(p, per, uc){
   var dec=p.estado==='aprobado' ? _selloAprobado_(p, per, uc)
         : (p.estado==='rechazado' || p.estado==='detalle') ? 'decidido '+_firmaParte_(p) : '';
   return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+
-    h1(p.horas)+' · '+_icoBloque_(p)+esc(p.tarea)+'</b><small>'+p.fecha+(dec?' · '+esc(dec):'')+
+    h1(_horasVistaParte_(p))+' · '+_icoBloque_(p)+esc(p.tarea)+'</b><small>'+p.fecha+(p.ini!=='—' && p.fin!=='—' ? ' · '+esc(p.ini)+'–'+esc(p.fin) : '')+(dec?' · '+esc(dec):'')+
     (p.motivo?' · «'+esc(p.motivo)+'»':'')+'</small></span><span class="der">'+et+'</span></div>';
 }
 
@@ -652,7 +664,7 @@ function _fichaTareas_(){
    regla, y la segunda copia siempre acaba diciendo otra cosa. */
 function _fichaFalta_(){
   var f=FICHA_FORM;
-  if(!_imputacion_(f)) return 'Falta a que imputarlas';
+  if(!_imputacion_(f)) return _faltaImputar_(f.cat);
   var n=f.just.trim().length;
   if(n<25) return 'Falta la justificacion ('+n+'/25 caracteres)';
   return null;
@@ -1036,7 +1048,7 @@ function _bloqFalta_(){
     if(_pg==='cero')  return 'La salida tiene que ser posterior a la entrada';
     if(_pg==='sin')   return 'Pon la entrada y la salida';
   }
-  if(!_imputacion_(f)) return 'Falta a qu\u00e9 imputarlas';
+  if(!_imputacion_(f)) return _faltaImputar_(f.cat);
   var n=f.just.trim().length;
   if(n<25) return 'Falta la justificaci\u00f3n ('+n+'/25 caracteres)';
   return null;
@@ -1457,7 +1469,7 @@ function _filasMesE_(items){
     var da=_fechaDMY_(a.fecha), db=_fechaDMY_(b.fecha); return (db?db.getTime():0)-(da?da.getTime():0);
   }).map(function(p){
     return '<tr><td>'+_icoBloque_(p)+esc(p.tarea||'Parte')+'<div class="sc">'+esc(p.fecha||'')+(p.unidad&&p.unidad!=='—'?' · '+esc(p.unidad):'')+
-      (p.cat && (p.cat in CAT_ETI) ? ' · '+esc(CAT_ETI[p.cat]) : '')+'</div></td><td class="r mono">'+nf2(Number(p.horas)||0)+' h</td></tr>';
+      (p.cat && (p.cat in CAT_ETI) ? ' · '+esc(CAT_ETI[p.cat]) : '')+'</div></td><td class="r mono">'+nf2(_horasVistaParte_(p))+' h</td></tr>';
   }).join(''));
 }
 
@@ -1473,7 +1485,7 @@ function _histHorasHTMLE_(mi){
       (m.k ? (function(e){ return '<span class="chip'+(e.cls?' '+e.cls:'')+'">'+e.txt+'</span>'; })(_estadoMes_(m.k, per)) : '')+
       '<span class="ln"></span><span class="mono">'+nf2(h)+' h</span></button>';
     var base=abierto ? [{tarea:'Compensación por tu cargo', fecha:'', horas:_compBase_(mi), cat:null}] : [];
-    var extra=(abierto && _compExtra_(mi)) ? [{tarea:'Compensación extra', fecha:'', horas:_compExtra_(mi)}] : [];
+    var extra=(abierto && _compExtra_(mi, m.items)) ? [{tarea:'Compensación extra', fecha:'', horas:_compExtra_(mi, m.items)}] : [];
     chips+='<div class="ltmesdet" data-mesdet="'+k+'" hidden>'+_filasMesE_(base.concat(extra, m.items))+
       _desgloseCatHTMLE_(m.items)+'</div>';   /* el desglose, JUSTO debajo de SU tarjeta */
   });
@@ -1516,7 +1528,7 @@ function _ritmoHorasE_(mi){
     filas.push({k:'vs. '+nomA, v:ritmo, ref:rAnt, txt:nf2(rAnt)+' h/día en '+nomA});
   }
   var e=DATA.equipo_mes, nuevo=_recienLlegado_(mi);
-  if(!nuevo && e && typeof e.media==='number' && (e.n||0)>=3 && e.media>0)
+  if(!nuevo && base>0 && e && typeof e.media==='number' && (e.n||0)>=3 && e.media>0)
     filas.push({k:'vs. equipo', v:ritmo, ref:e.media/dia, txt:nf2(e.media/dia)+' h/día de media'});
   filas=filas.filter(function(f){ return typeof f.ref==='number' && isFinite(f.ref) && f.ref>0; });
   if(!filas.length && !nuevo) return null;
@@ -1537,7 +1549,7 @@ function _ritmoHorasHTMLE_(mi){
         '<span class="vv"><b>'+pc(dl)+'</b><small>'+esc(f.txt)+'</small></span></div>';
     }).join('')+'</div>'+
     '<div class="nota">Tu ritmo: <b>'+nf2(r.ritmo)+' h/día</b> ('+nf2(r.num)+' h en '+r.dia+' días'+
-    (r.conBase?', con la compensación base repartida hasta hoy':'')+'). Se compara el ritmo, no el total: '+
+    (r.conBase?', con las horas por gestión de tu cargo repartidas hasta hoy':'')+'). Se compara el ritmo, no el total: '+
     'el mes en curso va a medias y el anterior está entero.</div>');
 }
 

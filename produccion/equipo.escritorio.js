@@ -109,6 +109,16 @@ function colaDecision(){
     out.push({ic:'i-gavel',b:'Sanciones por decidir',
       s:_sp+(_sp===1?' pendiente':' pendientes')+' · nada se aplica hasta cerrar su bloque',
       chip:'<span class="chip no">por decidir</span>',ir:'sanciones',foco:'lote'});
+  /* 12/11 (refutar23): las APELACIONES que TÚ puedes resolver. El menú ya las contaba (globo de «Apelaciones») y el móvil las avisa en Estado,
+     pero «Requiere tu decisión» no las nombraba: el PD con 2 apelaciones abiertas leía «Nada pendiente» en el Panel y 13 asuntos sin ellas.
+     Una fila con quién y de qué, por la MISMA puerta que el globo (`_apelPendientesTuyas_`). */
+  var _ap=(typeof _apelPendientesTuyas_==='function')?_apelPendientesTuyas_():[];
+  if(_ap.length){
+    var _apN=_ap.slice(0,2).map(function(a){ var m=_m(a.autor); return esc((m&&m.pila)||a.autor)+' ('+(a.clase==='sancion'?'sanción':'tarea')+')'; });
+    out.push({ic:'i-gavel',b:_ap.length===1?'Una apelación por resolver':_ap.length+' apelaciones por resolver',
+      s:_apN.join(', ')+(_ap.length>2?' y '+(_ap.length-2)+' más':'')+' · la respuesta es obligatoria',
+      chip:'<span class="chip no">por decidir</span>',ir:'apela',foco:''});
+  }
   /* ⛔ 26/10 — Daniel (25/10): un coordinador puede mover el plazo de una tarea SUYA, *«pero me notifica en algun lugar
      del escritorio (app)»*. Aquí: una fila por plazo movido así en los últimos 14 días (los sirve el bootstrap, sólo al PD). */
   if(rangoNom(ACTOR)>=3) ((typeof PLAZOS_PROPIOS!=='undefined' && PLAZOS_PROPIOS)||[]).forEach(function(x){
@@ -178,7 +188,11 @@ function _tuyoItemsE_(){
   return _tuyoItems_({
     sindecl:mios.filter(function(p){ return p.estado==='sin_declarar'; }).length,
     det:mios.filter(function(p){ return p.estado==='detalle'; }).length,
-    cambios:DOCS.filter(function(d){ return d.est==='cambios' && d.autor===yo; }).map(function(d){ return d.ref; }),
+    rech:(Array.isArray(PART_BACK) ? PART_BACK : []).filter(function(p){      // 11/11: tu parte RECHAZADO, con su motivo
+      return p && p.autor===yo && p.estado==='rechazada' && _sigueVisibleSinContar_(p, Date.parse(_ahoraApp_())); })
+      .sort(function(a,b){ var fa=String(a.decidido_at||a.fecha||''), fb=String(b.decidido_at||b.fecha||''); return (fb>fa)-(fb<fa) || (Number(b.id)||0)-(Number(a.id)||0); })
+      .map(function(p){ return {tarea:p.tarea, motivo:p.motivo}; }),
+    cambios:DOCS.filter(function(d){ return d.est==='cambios' && _autoresDe_(d).indexOf(yo)>=0; })   /* 12/11 (refutar18): también el que firmas con otro */.map(function(d){ return d.ref; }),
     reus:{lista:reus.map(function(r){ return {id:r.id, titulo:r.tit||r.titulo, bajoMin:Array.isArray(r.resp&&r.resp[yo])}; }),
           plazo:reus.length ? _plazoTxt_(reus[0].limite) : ''},
     conv:_tuyoConvE_()});
@@ -211,6 +225,9 @@ function _proxReuE_(){
 var _TUYO_E_={
   sindecl:{ir:'sindeclarar', ic:'i-reloj', acc:'Declarar'},
   det:    {ir:'libros',      ic:'i-reloj', acc:'Dar detalle'},
+  /* 11/11 (refutar8): `_tuyoItemsE_` ya mandaba `rech` (un parte tuyo rechazado) y esta tabla no lo tenía: `m` salía undefined y a quien le
+     rechazaban un parte se le caía el Panel entero («Cannot read properties of undefined (reading 'ic')»). Va a «Lo tuyo», donde está con su motivo. */
+  rech:   {ir:'libros',      ic:'i-reloj', acc:'Ver el motivo'},
   cambios:{ir:'docurso',     ic:'i-doc',   acc:'Corregir'},
   reu:    {ir:'dispo',       ic:'i-cal',   acc:'Cubrir'},
   conv:   {ir:'turnos',      ic:'i-cal',   acc:'Contestar'}
@@ -236,7 +253,9 @@ function _tuyoHTMLE_(){
         (R.fijada ? '' : (R.convocante===yo ? ' · la organizas tú' : (pend ? ' · te falta cubrirla' : ' · ya la cubriste'))),
       'Ver', 'dispo', 'reu-'+R.id));
   }
-  if(!its.length) return '<div class="tu-nada"><span class="pt"></span>Nada pendiente por tu parte</div>'+
+  /* 12/11 (refutar12): «Nada pendiente por tu parte» encima de «Requiere tu decisión · 9 asuntos» se leía como una contradicción en el Panel del PD y de los
+     coordinadores. Esto habla de lo PROPIO (partes sin declarar, tareas, reuniones por cubrir): se dice así, con el nombre de «Lo tuyo». */
+  if(!its.length) return '<div class="tu-nada"><span class="pt"></span>Lo tuyo está al día</div>'+
     (filas.length ? '<div class="tu-g">'+filas.join('')+'</div>' : '');
   return pan('Lo que te toca a ti', its.length+(its.length===1?' asunto':' asuntos'),
     '<div class="pb"><div class="tu-g">'+filas.join('')+'</div></div>');

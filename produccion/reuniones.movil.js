@@ -66,6 +66,7 @@ function _pendientesCubrirM_(){
     /* ⛔ 20/10 (auditoría): Y CON EL PLAZO ABIERTO. Sin fijar y con el plazo ya cerrado, la ficha dice «Ya no se puede
        cubrir» y esto la seguía contando —la primera del aviso y el globo en rojo hasta que alguien la fijara—. */
     return r && (!r.cubierta || r.bajoMin) && !r.exento && !r.fijada &&   // fijada = el plazo ya se cerro; bajoMin: 🔴 1 (auditor 21)
+      r.invitado!==false &&       // 11/11 (reumovil): sin convocatoria, no se te reclama
       !_reuFinalizada_(r) &&      // 04/11: lo celebrado ya no pende
       !(typeof _plazoAbierto_==='function' && !_plazoAbierto_(r.limite));
   }).sort(function(a,b){ return _limMsM_(a)-_limMsM_(b); });
@@ -110,7 +111,9 @@ function _puedeBorrarReuM_(r){
 
 function _proximaReuM_(){
   /* 04/11: una FINALIZADA no es «la próxima» ni «la última»: Estado no enseña lo que su convocante ya dio por celebrado. */
-  var L=(REUNIONES_M||[]).filter(function(r){ return !_reuFinalizada_(r); }); if(!L.length) return null;
+  /* 11/11: ni una PASADA (franja fijada ya acabada, aunque nadie la finalizara): va al cajón «Pasadas» y no es lo que se elige al abrir. */
+  /* 11/11 (reumovil): «tu próxima» es de las tuyas, no de las que sólo ves. `!==false`: sin el campo (maquetas), cuenta como tuya. */
+  var L=(REUNIONES_M||[]).filter(function(r){ return r.invitado!==false && !_reuArchivada_(r); }); if(!L.length) return null;
   var hoy=_hoyDateM_().getTime();
   var con=L.map(function(r){ var c=_cuandoReuM_(r);
     return { r:r, ms:c.ms, fij:c.fijada, pasada:(c.ms<hoy) }; });
@@ -203,6 +206,7 @@ function _normReuM_(r){
     /* El backend lo manda (`_ex.ordenDia`) y aqui se tiraba, asi que el dialogo salia
        siempre vacio y no habia forma de corregir un enlace mal pegado. */
     ordenDia:r.ordenDia||'',
+    controlAsistencia:(typeof r.controlAsistencia==='boolean') ? r.controlAsistencia : undefined,   /* 12/11: sin la clave, la de antes de la opción */
     minimoPct:(typeof r.minimoPct==='number') ? r.minimoPct : null,   /* 01/11: el mínimo que eligió quien convocó; sin él, el del periodo */
     /* `slot` es la casilla que se pinta y `duracion` lo que hay que juntar seguido.
        Las reuniones de antes de este modelo no traen `duracion`: entonces el minimo es
@@ -300,6 +304,7 @@ function _fuenteReuM_(R, base, resp, ag){
        enuncio y no donde se citaba (§3c-19). Por eso la comprobacion de su banco es
        ESTRUCTURAL: compara lo que `_normReuM_` LEE con lo que esta ENTREGA. */
     ordenDia:R.ordenDia,
+    controlAsistencia:R.controlAsistencia,   /* 12/11: la gemela de la lectura de `_normReuM_` */
     minimoPct:R.minimoPct,   /* 01/11: el mínimo que eligió quien convocó (la gemela de la lectura de `_normReuM_`) */
     bloque:R.bloque,       /* 01/11: la gemela de `en_curso` en `_normReuM_` */
     finalizada_at:R.finalizada_at, celebrada:R.celebrada,   /* 04/11: la gemela de la lectura de `_normReuM_` */
@@ -356,8 +361,11 @@ async function _cargarReunionesM_(yaPedidas){
       /* Se filtra AQUI y no en cada pantalla: la lista, el globo del nav, «lo que caduca
          antes» y «tu proxima reunion» leen todos de `REUNIONES_M`, asi que repetir la
          condicion en cuatro sitios es garantizar que un dia se desincronicen.
-         En el ESCRITORIO no se filtra: alli se ven todas a proposito. */
-      REUNIONES_M=arr.map(_normReuM_).filter(function(r){ return r.invitado; });
+         En el ESCRITORIO no se filtra: alli se ven todas a proposito.
+         11/11 (reumovil): y AQUI tampoco se filtra por `invitado`. Quien decide que ves es el SERVIDOR (`puede_ver_reunion`: tu
+         subsistema, la junta…): lo que llega es lo que estas autorizado a ver. `invitado` solo separa «Mis reuniones» de «Otras que
+         puedes ver» y decide si se te pide cubrir (`_pendientesCubrirM_`, `_proximaReuM_`, la ficha). */
+      REUNIONES_M=arr.map(_normReuM_);
       var mia=null;
       if(_antes!=null) mia=REUNIONES_M.filter(function(x){ return x.id===_antes; })[0]||null;
       /* Antes: la primera SIN FIJAR en orden de creacion. Ni miraba fechas, ni tenia
@@ -475,11 +483,14 @@ function _sinConvocarHTMLM_(){
     }).join('')+'</div>';
 }
 
-/* 04/11 · «MIS REUNIONES»: las que se ven (sin finalizar, o finalizadas hace menos de un mes) y, debajo, el cajón plegable «Archivo» con
-   las finalizadas de hace más (`_reuPartir_`, `comun.js`). `data-reu` lleva el índice en `REUNIONES_M`, no en esta mitad. Si la que
+/* 04/11 · «MIS REUNIONES»: las vivas y, debajo, el cajón plegable «Pasadas» (11/11: finalizadas o ya celebradas; antes, «Archivo» al mes) con
+   las que ya pasaron (`_reuPartir_`, `comun.js`). `data-reu` lleva el índice en `REUNIONES_M`, no en esta mitad. Si la que
    miras está en el archivo, el cajón sale abierto: no se esconde lo que tienes delante. */
 function _listaReusM_(R){
   var par=_reuPartir_(REUNIONES_M);
+  /* 11/11 (reumovil): las vivas se parten en las TUYAS (convocado o convocante) y «Otras que puedes ver» (las de tu nivel sin
+     estar convocado): plegado por defecto, como «Pasadas». Las pasadas siguen todas en su cajón. */
+  var mias=par.vivas.filter(function(x){ return x.invitado!==false; }), otras=par.vivas.filter(function(x){ return x.invitado===false; });
   var fila=function(x){
           var sel=(x.id===R.id), i=REUNIONES_M.indexOf(x);
           return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
@@ -487,10 +498,15 @@ function _listaReusM_(R){
             (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+_nConvM_(x)+' convocados'+
             _duraTxtM_(x)+'</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':(_reuFinalizada_(x)?'<span class="pil">finalizada</span>':'<span class="chev">›</span>'))+'</div></div>'; };
-  var abierto=par.archivo.indexOf(R)>=0;
-  return (par.vivas.length ? '<div class="tarj">'+par.vivas.map(fila).join('')+'</div>' : '')+
+  var abierto=par.archivo.indexOf(R)>=0, abiertoO=otras.indexOf(R)>=0;
+  return (mias.length ? '<div class="tarj">'+mias.map(fila).join('')+'</div>' : '')+
+    (otras.length
+      ? '<div class="cajon'+(abiertoO?' ab':'')+'" data-caj data-p><span>Otras que puedes ver <b>· '+otras.length+'</b></span>'+
+        '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+        '<div class="cajsec'+(abiertoO?' on':'')+'"><div class="tarj">'+otras.map(fila).join('')+'</div></div>'
+      : '')+
     (par.archivo.length
-      ? '<div class="cajon'+(abierto?' ab':'')+'" data-caj data-p><span>Archivo <b>· '+par.archivo.length+'</b></span>'+
+      ? '<div class="cajon'+(abierto?' ab':'')+'" data-caj data-p><span>Pasadas <b>· '+par.archivo.length+'</b></span>'+
         '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
         '<div class="cajsec'+(abierto?' on':'')+'"><div class="tarj">'+par.archivo.map(fila).join('')+'</div></div>'
       : '');
@@ -535,7 +551,7 @@ function vReu(){
   /* 01/11: con orden del día de duración conocida, la ventana es de los bloques que ESE orden pide (`comun.js`). */
   var _vf=_ventanaFijar_(R, _minR, best), vent=_vf.vent;
   var _huecoM_=function(){ var f=_ventanaFijar_(R, _minR, best);
-    return '<b>'+_nConvM_(R)+'</b> convocados · mejor hueco '+_titularHueco_(R, f.vent, _nresp, pondOn)+_notaOrdenHTML_(f); };
+    return '<b>'+_nConvM_(R)+'</b> convocados · '+(f.vent.v>0?'mejor hueco ':'')+_titularHueco_(R, f.vent, _nresp, pondOn)+_notaOrdenHTML_(f); };
   _ordSt_(R.id).sugHTML=_huecoM_;
   /* El orden del día llega por red DESPUÉS de pintar: con él cambia el hueco recomendado, y el mapa lo resalta de nuevo (la fijada no se toca). */
   _ordSt_(R.id).sugMapa=function(){
@@ -671,20 +687,25 @@ function vReu(){
 
   return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
     '<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar '+(esCoord()?'reunión':'reunión de trabajo')+'</button>'+
-    '<h2 class="sec">Mis reuniones<span class="ln"></span>'+(_reuPartir_(REUNIONES_M).vivas.length||1)+'</h2>'+
-    (REUNIONES_M.length>1
+    '<h2 class="sec">Mis reuniones<span class="ln"></span>'+(_reuPartir_(REUNIONES_M).vivas.filter(function(x){ return x.invitado!==false; }).length||1)+'</h2>'+
+    (REUNIONES_M.length>1 || R.invitado===false
       ? _listaReusM_(R)
       : '')+
     '<div class="tarj">'+cab(R.tipo||'General', _modalidadTxt_(R.modalidad))+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
       '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+_nConvM_(R)+' convocados'+
       _duraTxtM_(R)+'</small></div>'+
-      '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento||R.tarde)?'conf':'no')+'">'+
-        (R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div>'+
+      '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento||R.tarde)?'conf':(R.invitado===false?'conf':'no'))+'">'+
+        (R.invitado===false?'solo lectura':(R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta')))))+'</span></div></div>'+
+      /* 11/11 (reumovil): la ves por tu nivel, no porque te hayan convocado: sin rejilla, sin «te falta» (cubrir y responder son de convocados) */
+      (R.invitado===false && !R.fijada
+        ? '<p class="rnota" style="margin:2px 0 10px">No estás convocado a esta reunión: puedes verla, no marcar disponibilidad.</p>'
+        : '')+
       (R.fijada
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
           '<b style="color:var(--ok)">Reunión fijada · '+esc(R.fijada)+'</b><br>Disponibilidad cerrada.</div>'
-        : (R.exento
+        : (R.invitado===false ? ''
+          : R.exento
             /* 🗣️ Daniel (14/10): *«que permita, por favor, al que organiza la reunión
                poner su disponibilidad. Si le apetece. En plan, opcional. Pero básicamente
                así es más fácil de debuguear»*.
@@ -1151,8 +1172,9 @@ function crearModal(){
     '<p class="rnota" id="ceHint">El equipo ve el mapa de calor con los totales, sin nombres.</p>'+
     /* 01/11 (Daniel [c8bd27e9d3]): el mínimo lo elige quien convoca entre el del periodo y ±5; las de trabajo no lo llevan. */
     '<div id="ceMin" hidden></div>'+
+    _controlAsisCampoHTML_('ceControl')+
     '<p class="rnota" id="cePrev" style="color:var(--ink2)"></p>'+
-    '<button class="btn pri full" style="margin-top:12px" data-p id="btnCrearOK">Crear encuesta</button>');
+    '<button class="btn pri full" style="margin-top:12px" data-p id="btnCrearOK">Convocar la reunión</button>');
 
   var val=function(id){ var e=$('#'+id); return e?e.value:''; };
   var per=function(){ return nxSi('cePerdia'); };
@@ -1194,6 +1216,7 @@ function crearModal(){
     /* Que hay que juntar para que valga, dicho antes de convocar y con la cuenta hecha. */
     var nS=_slotsMin_(du,sl), h=$('#ceSlotHint');
     _minimoConvPintar_($('#ceMin'), 'm', val('ceTipo'), val('ceLim'), upd);
+    _controlAsisCampoPintar_('ceControl', val('ceTipo'));
     var hz=_horarioConv_(u.perDia, rangos(), nS, sl, val('ceTipo'), _minimoConvPct_($('#ceMin'), val('ceLim')));
     if(h) h.innerHTML='Cada casilla es de '+_durTxt_(sl)+'; hay que marcar '+
       nS+' seguida'+(nS===1?'':'s')+' ('+_durTxt_(nS*sl)+') para que cuente.'+
@@ -1281,13 +1304,13 @@ function crearModal(){
       dias:ds, franjas:u.F, bloques:bloques, total:bloques.length, limite:lim,
       slot:_sl, duracion:_nS*_sl,          // lo que hay que juntar seguido para que valga
       minimoPct:(function(){ var c=$('#ceMin'); return (c && !c.hidden && +c.dataset.sel>0) ? +c.dataset.sel : null; })(),   // 01/11
-      ordenDia:(val('ceOrden')||'').trim(), vision:vision, resp:{} };
+      ordenDia:(val('ceOrden')||'').trim(), vision:vision, controlAsistencia:_controlAsisDeForm_('ceControl', val('ceTipo')), resp:{} };
     PLANTILLAS_M.unshift({ titulo:reu.titulo, ceModo:val('ceModo'), ceH0:val('ceH0'), ceH1:val('ceH1'),
       ceSlot:val('ceSlot'), ceDura:val('ceDura'), ceND:val('ceND'), modalidad:reu.modalidad, perdia:per() });
     if(PLANTILLAS_M.length>8) PLANTILLAS_M.length=8;
     /* 26/10 (auditor 33, 🟡 A2 — Daniel: «Sí, en nombre de X»): con «Ver como», se dice y se confirma. */
     var _enN=_avisoEnNombreDe_(reu.convocante); if(_enN && !(await dialogoSiNo(_enN+'\u00bfConvocarla?'))) return;
-    bt.disabled=true; var prev=bt.textContent; bt.textContent='Creando…';
+    bt.disabled=true; var prev=bt.textContent; bt.textContent='Convocando…';
     if(typeof backendOK!=='undefined' && backendOK && SESION){
       try{ var d=await api.crearReunion(reu); if(d&&d.id) reu.id=d.id;
         cerrarModal();
@@ -1380,7 +1403,7 @@ function fijarModal(){
       R2.fijada=etiqueta; R2.fijadaBl=bloques;
       cerrarModal();
       tost('Reunión fijada: '+etiqueta+'. La disponibilidad queda cerrada.');
-      pintar();
+      pintar(); if(typeof _ordenRefrescar_==='function') _ordenRefrescar_(R2.id);   // refutar15: sus horas de reloj salen de la fijada
     }catch(e){ b.disabled=false; b.textContent=prev;
       tostErr('No se pudo fijar: ', e); }
   };
@@ -1476,7 +1499,7 @@ function _asisYoM_(){
 /* ¿Sale el botón? En cualquier reunión de verdad (con servidor, o en `?demo`) y a quien la gestiona: su convocante, el PD o el admin
    (`_puedeBloqueReu_`, la regla del servidor). 04/11: ya no es sólo de las generales ni sólo del PD. */
 function _asisBotonM_(R){
-  return !!R && R.id!=null && _puedeBloqueReu_(R, _asisYoM_(), (typeof esAdmin==='function' && !!esAdmin())) &&
+  return !!R && R.id!=null && _controlAsistencia_(R) && _puedeBloqueReu_(R, _asisYoM_(), (typeof esAdmin==='function' && !!esAdmin())) &&
     (_demoLocal_() || (typeof backendOK!=='undefined' && backendOK && !!R._real));
 }
 

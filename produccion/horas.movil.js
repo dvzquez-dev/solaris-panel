@@ -61,8 +61,9 @@ function _origenParte_(p){
    maneras de tratar los de meses cerrados (ocultar, marcar o plegar), decida Daniel la que
    decida. Normalizar es tirar lo que no nombras, y aquí se estaba tirando la fecha de verdad. */
 function normPMovil(p){
-  return { id:p.id, f:_isoADMY_(p.fecha), iso:String(p.fecha||''), t:p.tarea||'', q:Number(p.horas)||0,
+  return { id:p.id, f:_isoADMY_(p.fecha), iso:String(p.fecha||''), t:_tareaVista_(p.tarea), q:Number(p.horas)||0,
     bloque:p.bloque||null,   /* 03/11: el icono «en bloque» de `filaParte` */
+    turno_h:p.turno_h||0, clave:p.clave||'',   /* 11/11 (turnoextra): `_horasVistaParte_` los lee */
     e:_E_MOVIL_[p.estado]||'raro', ini:p.ini||'',   /* 20/10: lo que no conocemos NO es «en cola» (§3c-24) */ fin:p.fin||'', cat:p.categoria||null, subcat:p.subcat||null,
     /* ⛔ LA PUERTA VA DENTRO DEL `||`, NO ENVOLVIENDOLO, y no es estilo: `nota` mezcla
        DOS cosas distintas --el motivo de una decision y la justificacion del autor-- y
@@ -177,6 +178,28 @@ async function _cargarFichajeAbierto_(){
     if(f && f.ini) ST.ses=_sesDeFichaje_(f);
     CARGA.fichaje=true; return true; }
   catch(e){ return false; }
+}
+
+/* refutar25 (12/11): DOS PESTAÑAS (o móvil y escritorio) — fichas en una y miras la otra. `ST.ses` se trae UNA vez, al entrar, y de ahí
+   en adelante sólo lo mueven los botones de ESTA pestaña: cerrar en una dejaba la otra en «EN CURSO» con el reloj corriendo para siempre
+   (y «Fichar salida» contestaba «no tienes ningún fichaje abierto» sin cambiar nada), y abrir en una la dejaba la otra en «PARADA».
+   ⛔ NO ES `_cargarFichajeAbierto_` (que resucita una sesión cerrada, ver arriba): aquí la respuesta se descarta si `ST.ses` ya no es el
+   MISMO objeto que había al preguntar — `ficharEntrada`/`ficharSalida` ponen uno nuevo —, así que una respuesta rancia que llega después
+   de pulsar nada no pisa lo que acaba de hacer esta pestaña. Sólo toca `ST.ses`: el formulario (`ST.form`) se queda como estaba.
+   Devuelve si cambió algo (para que quien llama repinte). */
+async function _resincFichaje_(){
+  var s0=ST.ses, e0=s0.estado;
+  try{
+    var f=await api.getFichajeAbierto();
+    if(ST.ses!==s0 || s0.estado!==e0) return false;                  // esta pestaña ya movió la sesión (otra, o pausa/reanudar) mientras se preguntaba
+    if(f && f.ini){
+      var n=_sesDeFichaje_(f);
+      if(s0.cloudIni===n.cloudIni && s0.estado===n.estado) return false;
+      ST.ses=n; return true;
+    }
+    if(s0.cloudIni){ ST.ses={estado:'parada'}; return true; }          // en la nube ya no hay: se cerró desde otro sitio
+  }catch(e){ /* sin red: se queda lo que había; el refresco lo reintenta */ }
+  return false;
 }
 
 /* ⛔ REARMA LAS CARGAS QUE NO LLEGARON — la regla de Daniel del 11/08 puesta a trabajar:
@@ -497,7 +520,8 @@ function _compHorasHTML_(base, crudo){
      los suyos: «VS. EQUIPO −100 %» en rojo el primer día. La app no sabe su día de alta, así que no se finge un
      prorrateo (eso lo decide Daniel): se dice por qué no hay comparación. */
   var _nuevo=_recienLlegado_(YO);
-  if(me>0 && !_nuevo) f+=deltaHTML('vs. equipo', ritmo, me/dia, nf2(me/dia)+' h/día de media');
+  /* textos3 (Daniel 11/11): «mientras no haya ninguna hora, se quita» — con 0 h el ritmo es 0 y salía «−100 %» */
+  if(me>0 && !_nuevo && base>0) f+=deltaHTML('vs. equipo', ritmo, me/dia, nf2(me/dia)+' h/día de media');
   if(_nuevo) return '<div class="comph"><p class="rnota" style="margin:0">Es tu primer mes: la comparación '+
     'con el equipo sale después de tu primer cierre.</p></div>';
   if(!f) return '';
@@ -505,7 +529,7 @@ function _compHorasHTML_(base, crudo){
      distingue de «+12 %» respecto a un total, y son cosas distintas. */
   return '<div class="comph">'+f+
     '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(_num)+
-    ' h en '+dia+' días'+(_bt==null?'':', con la compensación base repartida hasta hoy')+   /* 🟡 4 (refutador): también la tiene quien no tiene cargo */   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
+    ' h en '+dia+' días'+(_bt==null?'':', con las horas por gestión de tu cargo repartidas hasta hoy')+   /* 🟡 4 (refutador): también la tiene quien no tiene cargo */   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
     '). Se compara el ritmo y no el total porque el mes en curso va a medias.</p></div>';
 }
 
@@ -1038,7 +1062,7 @@ function validarFichaje(){
           : (_pgM==='cero' ? 'La salida tiene que ser posterior a la entrada'
                            : 'Falta la duración');
     if(l) l.textContent = todo ? ('Enviar '+nf2(dur)+' h a aprobación')
-      : (!n1?(_tramosError_(f)||_faltaDur):(!n2?'Falta a qué imputarlas':'Falta la justificación'));
+      : (!n1?(_tramosError_(f)||_faltaDur):(!n2?_faltaImputar_(ST.form.cat):'Falta la justificación'));
   }
   return todo;
 }
@@ -1273,7 +1297,7 @@ async function enviarFichaje(){
       /* ⛔ Y aquí también se suelta el candado: si no, tras un fallo de red el botón se
          queda muerto y el fichaje sólo se puede reintentar recargando la app. */
       if(_be) _be.disabled=false;
-      tost('No se pudo enviar: '+((e&&e.message)||e), (e && e.sesion) ? {fijo:true} : null);
+      tostErr('No se pudo enviar: ', e);
     }
     return;
   }
@@ -1300,6 +1324,13 @@ function desgloseCat(ps){
   return '<div style="display:flex;flex-wrap:wrap;margin:2px 0 4px">'+chips+'</div>';
 }
 
+/* refutar17 (12/11): el DÍA (y el horario) de un parte que aún no cuenta. Los aprobados ya lo decían; los de la cola, los rechazados y los
+   «falta detalle» sólo decían «esperando aprobación» bajo el mismo rótulo («Trabajo de subsistema»): con tres declarados esta semana
+   no había forma de saber cuál era el del día equivocado. Termina en « · » para colgarle detrás el estado; vacío si el parte no trae fecha. */
+function _cuandoParte_(p){
+  return p.f ? p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+' · ' : '';
+}
+
 function filaParte(p){
   /* ⛔ `rev` va con los terminales: un parte revertido NO esta esperando nada. */
   var cls = p.e==='conf'?'borde-ok':p.e==='otor'?'borde-ot':(p.e==='rech'||p.e==='cad'||p.e==='rev')?'borde-no':'borde-pe';
@@ -1318,14 +1349,14 @@ function filaParte(p){
      nada avisara. Aquí se enseña lo que importa de un parte trabajado —cuándo y cuánto— y
      la nota DETRÁS, como ya hacen `rech` y `rev`. */
   var sub = p.e==='conf' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.nota?' · '+esc(p.nota):''))
-          : p.e==='otor' ? (p.nota?esc(p.nota):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
-          : p.e==='pend' ? 'esperando aprobación'
+          : p.e==='otor' ? (p.nota?esc(p.nota)+(p.ini?' · '+p.ini+'–'+p.fin:''):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
+          : p.e==='pend' ? _cuandoParte_(p)+'esperando aprobación'
           /* ⛔ SE ENSEÑA LA PREGUNTA, NO QUE HAY UNA. «Te piden más detalle» no dice QUÉ
              falta, así que el miembro tiene que adivinar o preguntar por Discord — y el
              motivo lo escribió el coordinador precisamente para eso. Es obligatorio en el
              servidor (mínimo 8 caracteres), así que aquí siempre hay algo que enseñar. */
-          : p.e==='det'  ? (p.nota ? 'te piden: '+esc(p.nota) : 'te piden más detalle')
-          : p.e==='rech' ? 'rechazada'+(p.nota?' · '+esc(p.nota):'')
+          : p.e==='det'  ? _cuandoParte_(p)+(p.nota ? 'te piden: '+esc(p.nota) : 'te piden más detalle')
+          : p.e==='rech' ? _cuandoParte_(p)+'rechazada'+(p.nota?' · '+esc(p.nota):'')
           /* ⚠️ Se dice que se DESHIZO, no que se rechazo: son cosas distintas y a esa
              persona le importan de forma distinta. */
           : (p.e==='rev' && p.ret) ? 'la retiraste: no se firma ni cuenta'
@@ -1377,7 +1408,7 @@ function filaParte(p){
     : '';
   return '<div class="fila '+cls+'"><div class="a"><b>'+_icoBloque_(p)+esc(p.t||'Fichaje sin declarar')+'</b><small>'+sub+catTxt+
     _origenParte_(p)+'</small>'+_accs+'</div>'+
-    '<div class="d">'+accion+pil+' <b class="mono">'+h1(p.q)+'</b></div></div>';
+    '<div class="d">'+accion+pil+' <b class="mono">'+h1(_horasVistaParte_(p))+'</b></div></div>';   /* 11/11: un turno largo y su exceso = UN parte de D h */
 }
 
 /* ⛔ `pends` SON LOS DE ESTE MES QUE NO CUENTAN TODAVÍA (793.ª, 05/10), y llegan por
@@ -1388,7 +1419,7 @@ function filaParte(p){
 
 function _movHorasHTML_(confs, pends){
   var r=_ultimosMov_(confs, function(p){ return p.f; }, function(p){ return p.q; }, 'mes');
-  var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO), comp=_compMensual_(YO);
+  var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO, r.todos), comp=_compMensual_(YO);
   /* El rotulo dice lo que SE SABE. Sin el dato de Notion no se puede afirmar que sea el tuyo:
      es el defecto del cargo y se dice asi. Llamar «tuyo» a un numero deducido es la clase de
      mentira pequena que hace que nadie se fie del resto de la pantalla. */
@@ -1427,7 +1458,7 @@ function _movHorasHTML_(confs, pends){
         '<small>'+esc(_cet)+'</small></div>'+
         '<div class="d"><b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>'+
       /* 01/11: SIN «Otras contribuciones» aparte; el mismo desglose por categorías que «Ver el desglose completo». */
-      desgloseCat(_fijasDesglose_().concat(r.todos))+
+      desgloseCat(_fijasDesglose_(r.todos).concat(r.todos))+
       '<p class="rnota" style="margin:8px 0 10px">'+
         (r.total
           ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes. '+
@@ -1498,8 +1529,8 @@ function _mesesHorasHTML_(confs){
 /* LAS PARTIDAS FIJAS DEL MES (la base del cargo y la extra del PD), que no son partes: entran al desglose con `catDesglose`
    puesto. UNA vez, y la llaman la tarjeta del mes (`_movHorasHTML_`) y «Ver el desglose completo» (`_desgloseMesHTML_`):
    01/11, Daniel: *«quitaría otras contribuciones y pondría lo mismo que sale cuando le das a ver desglose completo»*. */
-function _fijasDesglose_(){
-  var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO), comp=_compMensual_(YO), cargo=(YO&&YO.cargo)||'miembro';
+function _fijasDesglose_(items){
+  var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO, items), comp=_compMensual_(YO), cargo=(YO&&YO.cargo)||'miembro';
   var filaBase=
     '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
       '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha · vuelve a asignarse en el '+
@@ -1535,13 +1566,18 @@ function _desgloseMesHTML_(confs, clave){
      rotulo es lo que hace dudar del dato en vez de usarlo. */
   var _hmD=_hMesReal_(YO), _notionD=(_hmD!=null);
   var total=_notionD ? _hmD : (r.suma+comp);
-  var cargo=(YO&&YO.cargo)||'miembro', _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO);
+  var cargo=(YO&&YO.cargo)||'miembro', _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO, r.todos);
   /* 31/10 · AGRUPADO POR CATEGORÍA, CADA UNA CON SU COLOR (Daniel: *«en vez de poner compensación extra más 12,25,
      debería aparecer compensación por tu cargo y luego … todas estas contribuciones extras»*). La base y la extra no son
      partes: entran en su grupo como filas FIJAS (`catDesglose`), y la extra va a «Otras contribuciones». Lo demás se
      reparte por la tabla de comun.js. La suma de los subtotales es la de antes: ninguna fila se pierde ni se cuenta dos veces. */
-  var fijas=_fijasDesglose_();
-  var grupos=_gruposDesgloseHTML_(fijas.concat(r.todos));
+  /* ⛔ 11/11 (refutar10): con la cifra de Notion, lo aprobado u otorgado que aún no ha llegado a tu ficha NO puede sumar en los
+     grupos: la cabecera decía 5,5 h y los grupos 2 + 2,5 + 2,5 = 7 (la hora otorgada de la reunión dentro de «Reuniones»).
+     Va APARTE, con su suma, igual que la píldora de «Horas»: las dos pantallas dicen lo mismo con la misma regla (`enFicha`). */
+  var _fuera=_notionD ? r.todos.filter(function(x){ return x.enFicha===false; }) : [];
+  var _dentro=_fuera.length ? r.todos.filter(function(x){ return x.enFicha!==false; }) : r.todos;
+  var fijas=_fijasDesglose_(_dentro);
+  var grupos=_gruposDesgloseHTML_(fijas.concat(_dentro))+_fueraDeFichaHTML_(_fuera);
   /* ⛔ EL TITULO, DEL PERIODO — NO DEL RELOJ DEL TELEFONO. El contenido de esta ventana va
      de CIERRE A CIERRE (`_ultimosMov_(…,'mes')` → `_deEsteMes_` → `_periodoAbierto_()`)
      y el titulo salia de `new Date()`. Julio se aplico el 04/08, asi que del 01 al 04 de
@@ -1559,7 +1595,7 @@ function _desgloseMesHTML_(confs, clave){
     '<div class="tarj">'+
       '<div class="cifh"><span class="g mono">'+nf2(total)+'</span><span class="sc">h '+
         (_notionD?'este mes':'que cuentan')+'</span></div>'+
-      desgloseCat(fijas.concat(r.todos))+   /* 31/10: con la base y la extra, o el resumen no suma el total */
+      desgloseCat(fijas.concat(_dentro))+   /* 31/10: con la base y la extra, o el resumen no suma el total */
     '</div>'+
     '<div class="tarj">'+grupos+'</div>'+
     '<p class="rnota">'+(_cr
@@ -1568,6 +1604,16 @@ function _desgloseMesHTML_(confs, clave){
         'más y <b>no pasa al mes siguiente</b>.'
       : 'Aquí sale la <b>base</b> de tu cargo (Project Director 7 h, Coordinador 3,5 h, '+
         'miembro 2 h). Si tienes extras, <b>todavía no los vemos</b>.')+'</p>';
+}
+
+/* Lo aprobado u otorgado que aún no está en la ficha (refutar10): un bloque aparte, con su suma, debajo de los grupos que sí suman en la cifra. */
+function _fueraDeFichaHTML_(ps){
+  if(!ps.length) return '';
+  var h=ps.reduce(function(t,p){ return t+(Number(p.q!=null?p.q:p.horas)||0); },0);
+  return '<div class="dgrp fuera" style="border-left-color:var(--line)"><div class="dgh"><b>Aún no en tu ficha</b><span class="ln"></span>'+
+    '<span class="mono">+'+nf2(h)+' h</span></div>'+
+    '<p class="rnota" style="margin:2px 0 6px">Aprobadas, pero todavía no suman en el total de arriba. Entran cuando se aplican.</p>'+
+    ps.map(function(p){ return filaParte(p); }).join('')+'</div>';
 }
 
 /* Los grupos por categoría, con su color y sus filas (la mitad de abajo del desglose, compartida por el mes abierto y los demás). */
@@ -1742,6 +1788,26 @@ function _cargarCierrePlan_(){
   }).catch(function(){ return null; });   /* ⛔ un fallo NO se lee como «mes abierto» */
 }
 
+/* 12/11 (refutar22): LOS PARTES QUE TE TOCAN a ti de `PARTES_DEC`. Los de BLOQUE (reuniones) los decide sólo el PD: la cola los ENSEÑA a la
+   coordinadora (sin botones), pero ni el globo de Horas ni el aviso de Estado los cuentan como suyos (el globo decía 4 y Estado «2 partes
+   esperan tu firma»). UNA regla, aquí; la llaman `badges` (movil.html) y `_avisosQueTeTocanM_` (equipo.movil.js). */
+function _partesDecTuyos_(){
+  var yo=(typeof _fichaYo_==='function') ? _fichaYo_() : '';
+  return (typeof PARTES_DEC!=='undefined' && Array.isArray(PARTES_DEC)) ? PARTES_DEC.filter(function(p){ return !p.bloque || rangoNom(yo)>=3; }) : [];
+}
+
+/* ⛔ EL CAMBIO DE MES CON LA APP ABIERTA (refutar21, 12/11). `CIERRE_UC` se lee UNA vez, al entrar, y `_periodoAbierto_` lo prefiere a
+   `equipo_mes.periodo` —que sí llega fresco cada 90 s con el panel—: el PD aplica el cierre de noviembre a las 00:45 y quien tenía la
+   app abierta seguía leyendo «Noviembre» con las cifras de diciembre (la tarjeta «Noviembre · sin cerrar» enseñaba 2 h: las de diciembre)
+   hasta recargar. Si el panel dice un mes y el último cierre conocido otro, se vuelve a preguntar por el cierre (UNA llamada, y sólo
+   entonces). Sin `equipo_mes` (Notion caído) no hay con qué comparar y no se pregunta nada. */
+function _alinearCierre_(){
+  var e=(typeof DATA!=='undefined' && DATA) ? DATA.equipo_mes : null;
+  if(!e || !/^\d{4}-\d{2}$/.test(String(e.periodo||''))) return Promise.resolve(null);
+  if(_periodoAbierto_()===e.periodo) return Promise.resolve(null);
+  return _cargarCierrePlan_();
+}
+
 function _cargarPartesDec_(){
   /* Los que esperan decisión, **sin** los tuyos: el backend ya te sirve solo lo que te toca.
 
@@ -1751,7 +1817,9 @@ function _cargarPartesDec_(){
      ⛔ Y el «yo» sale de `_actorSanc_()`, no de `YO.nombre`: con la identidad prestada del
      selector, `YO` es la persona real y no a quien estás mirando, así que la cola se filtraba
      por el de siempre. Es el mismo fallo que ya se cerró en `_puedeBorrarReuM_`. */
-  return _cargarCierrePlan_().then(function(){ return api.getPartes({}); }).then(function(arr){
+  /* 12/11 (rendimiento-1): el plan del cierre y los partes se piden A LA VEZ; el `then` espera a LAS DOS, así
+     que la primera pintada sigue teniendo el plan. `_cargarCierrePlan_` se traga sus errores (devuelve null). */
+  return Promise.all([_cargarCierrePlan_(), api.getPartes({})]).then(function(r){ var arr = r[1];
     /* ⛔ LA BANDERA DEL FALLO (19/10). El `catch` de abajo era MUDO: un corte al entrar dejaba
        `PARTES_DEC=[]` y la tarjeta «Esperan tu decisión» DESAPARECÍA — un coordinador leía «no
        tengo nada que firmar» y las horas de su gente se quedaban sin contar. Es el mismo arreglo
@@ -1873,6 +1941,11 @@ function _pdFichaHTML_(p){
    dias cazando pasaron a decir «ANCLA NO UNICA (2)» en cuanto la segunda copia entro. Es la
    forma mas barata que tiene esta casa de enterarse de que algo se ha escrito dos veces —
    arreglar el orden en una copia y dejar la otra alfabetica no habria dado ningun error. */
+/* 12/11 (refutar12): «Esperan tu decisión» se REPINTA tras cada decisión y los desplegables nacían cerrados: con cinco partes de cuatro personas, el PD
+   tenía que volver a abrir su grupo después de CADA firma. Se recuerda qué está abierto (por id de tarjeta y, en el de persona, por autor). */
+var PD_ABIERTO_={};
+document.addEventListener('toggle', function(ev){ var d=ev.target;
+  if(d && d.dataset && d.dataset.pdk) PD_ABIERTO_[d.dataset.pdk]=d.open; }, true);
 function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
   if(!lista.length) return '';
   var horas=0; lista.forEach(function(p){ horas+=p.q; });
@@ -1886,15 +1959,22 @@ function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
   /* Con UN solo miembro el segundo nivel no separa nada de nada: se abre solo. Un pliegue que
      no agrupa es un clic regalado. */
   var unico = orden.length===1;
+  /* 12/11 (general-2, Daniel aceptó): «Esperan tu decisión» nace ABIERTA y con la 1.ª persona abierta (quien viene del aviso «Un parte espera tu firma»
+     ve ya Aprobar/Rechazar). Sólo si nadie ha decidido todavía (`undefined`): lo que el PD pliega a mano queda en `false` y el repintado no lo reabre. */
+  if(id==='pdec'){
+    if(PD_ABIERTO_[id]===undefined) PD_ABIERTO_[id]=true;
+    if(PD_ABIERTO_[id+'|'+orden[0]]===undefined) PD_ABIERTO_[id+'|'+orden[0]]=true;
+  }
   return '<div class="tarj" id="'+id+'">'+
-    '<details class="pdgrupo">'+
+    '<details class="pdgrupo" data-pdk="'+id+'"'+(PD_ABIERTO_[id]?' open':'')+'>'+
       '<summary><b>'+titulo+'</b>'+
         '<span class="pdnum">'+lista.length+' '+(lista.length===1?'parte':'partes')+
         ' · '+nf2(horas)+' h</span></summary>'+
       '<p class="rnota" style="margin:8px 0 10px">'+nota+'</p>'+
       orden.map(function(a){
         var ps=por[a], h=0; ps.forEach(function(x){ h+=x.q; });
-        return '<details class="pdpers"'+(unico?' open':'')+'>'+
+        var k=id+'|'+a;
+        return '<details class="pdpers" data-pdk="'+esc(k)+'"'+((unico||PD_ABIERTO_[k])?' open':'')+'>'+
           '<summary><b>'+esc(ps[0].pila)+'</b>'+
             '<span class="pdnum">'+ps.length+' · '+nf2(h)+' h</span></summary>'+
           ps.map(ficha).join('')+
@@ -1951,6 +2031,15 @@ var _bloqueCbM_={
   hecho:function(){ _cargarPartesDec_().then(pintar); },
   decidido:function(bq){ PARTES_DEC=PARTES_DEC.filter(function(x){ return String(x.bloque)!==String(bq); }); pintar(); _cargarPartesDec_().then(pintar); }
 };
+/* 11/11 (horascoord) · «Dar horas» a tu gente: el botón de Estado abre el formulario en la hoja; al acabar se repinta. */
+var _darHorasCbM_={
+  cerrar:function(){ cerrarModal(); },
+  hecho:function(){ _cargarPartesDec_().then(pintar); pintar(); }
+};
+function _engDarHorasM_(){
+  $$('[data-darhoras]').forEach(function(b){ b.onclick=function(){
+    _darHorasAbrir_(); abrirModal(_darHorasFormHTML_()); _darHorasCablear_(_darHorasCbM_); }; });
+}
 function _engBloqueM_(){
   _bloqueColaCablear_(_bloqueCbM_);
 }
@@ -2121,16 +2210,13 @@ function _engPartesDec_(){
          pantalla que te hace perder el rato. El mínimo es el mismo que el suyo (8). */
       if(acc!=='aprobar' && mot.length<8){
         tost('Pon un motivo (al menos 8 caracteres).'); return; }
-      /* ⛔ ESTE AVISO DECIA «ya no se pueden deshacer desde aquí» Y HOY ES FALSO: desde que
-         existe «Ya decidiste», sí se puede. Un aviso que exagera se aprende a ignorar, y el día
-         que diga algo de verdad grave nadie lo leerá. */
-      if(acc==='aprobar' && !(await dialogoSiNo('¿Aprobar estas horas?\n\nContarán en el mes de quien '+
-        'las declaró. Puedes deshacerlo en «Ya decidiste».'))) return;
+      /* 12/11 (horas-1, Daniel aceptó): aprobar es UN toque, sin «¿Aprobar estas horas?», como en el escritorio.
+         Se deshace en «Ya decidiste»; rechazar y pedir detalle siguen exigiendo su motivo (arriba). */
       $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=true; });
       var prev=b.textContent; b.textContent='…';
       try{
         var upd=await api.decidirParte(id, acc, mot||null);
-        tost(acc==='aprobar'?'Aprobado: se suma a sus horas al aplicarse (en unos minutos).':(acc==='rechazar'?'Rechazado.':'Detalle pedido.'));
+        tost(acc==='aprobar'?'Aprobado: se suma a sus horas al aplicarse (en unos minutos). Se deshace en «Ya decidiste».':(acc==='rechazar'?'Rechazado.':'Detalle pedido.'));
         /* ⛔ SE QUITA DE LA LISTA CON LA RESPUESTA QUE YA TENEMOS, sin volver a preguntar.
            `decidirParte` DEVUELVE el parte decidido: pedirlo otra vez era, además de un
            viaje de más, una carrera — la lectura salía antes de que el Sheet confirmase la
@@ -2323,7 +2409,7 @@ function vHoras(){
            número y las HORAS —, que es lo que el título no tiene. */
         ? '<details class="pdgrupo"><summary><span class="pdnum">'+
             mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
-            nf2(mias.reduce(function(t,x){ return t+(Number(x.q)||0); },0))+' h</span></summary>'+
+            nf2(mias.reduce(function(t,x){ return t+(x.e==='pend' ? _horasVistaParte_(x) : 0); },0))+' h en cola</span></summary>'+
           mias.map(filaParte).join('')+'</details>'
         : (viejas.length
             ? vacio('Ningún parte de este mes',
@@ -2342,9 +2428,9 @@ function vHoras(){
                     'Vuelve a entrar en Horas para reintentarlo.', '', false)
                 : vacio('No se han podido cargar sus partes',
                   'Vuelve a entrar en su ficha para reintentarlo.', '', false))
-              : vacio('Ningún parte en cola',
-                'No tienes horas esperando firma. Las que envíes aparecerán aquí con su estado '+
-                'hasta que se firmen.','ficha desde la pestaña Fichar', false))))+
+              /* 12/11 (movilraso-1): una línea, no ~500 px de radar; el rótulo en negrita se pierde, el texto no. */
+              : vacioMini('Ningún parte en cola. No tienes horas esperando firma. Las que envíes aparecerán aquí '+
+                'con su estado hasta que se firmen.'))))+
       /* ⛔ CERRADO POR DEFECTO (sin `open`): es justo lo que estorbaba. Pero **sigue estando**,
          porque son horas suyas y esconderlas del todo es perder información — plegar se puede
          deshacer con un dedo, borrar el bloque no. */
@@ -2377,7 +2463,7 @@ function vHoras(){
        ahí el rango explica el dibujo; en el título era un número suelto.
        ⚠️ Y la banda sigue saliendo de `_bandaSana_`, que es lo que se curó el 05/10 — esto
        quita una copia del RÓTULO, no la derivación. */
-    '<h2 class="sec">Mi índice de carga<span class="ln"></span></h2>'+
+    '<h2 class="sec">Indicador de nivel de trabajo<span class="ln"></span></h2>'+
     '<div class="tarj">'+
       (_cargaVista_(YO)!=null
         /* ⛔⛔ EL DIBUJO SE DERIVA DE LA BANDA (06/10) y desde el 19/10 vive en `comun.js`
@@ -2458,7 +2544,7 @@ function _rankSubsHTML_(){
         'background:'+(mio?'var(--red)':'var(--ink3)')+'"></i></div></div>'+
         '<div class="d">'+h1(s.media)+'</div></div>';
     }).join('')
-    : vacio('Sin datos de subsistemas','La media por unidad la calcula el motor al cerrar el mes, y el servidor todavía no la ha mandado.','',false))+'</div>';
+    : vacioMini('Sin datos de subsistemas. La media de cada unidad aparece al cerrar el mes.'))+'</div>';   /* 12/11 (movilraso-1) */
 }
 
 /* 02/11: las horas del parte para «✨ Redactar con SolarIA» (los tres caminos comparten la caja de la justificación), como en `validarFichaje`. */

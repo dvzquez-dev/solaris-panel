@@ -170,7 +170,9 @@ function _sancColaHTML_(){
                en esta pantalla el 0 se lee «aviso». Y es el MISMO rotulo que el
                escritorio: dos textos para el mismo dato es la leccion de la gemela. */
             ' · '+esc(_etSancFila_(x.puntos, x.origen, x.extra)))+'</span>'+
-          (suelta
+          (suelta && !_puedeDecidirSancion_(x)
+            ? '<span class="mono" style="color:var(--ink3);font-size:10.5px">Lo decide el PD</span>'
+            : suelta
             ? '<button class="btn mini" data-sok="'+esc(x.id)+'" data-p>Aprobar</button>'+
               /* 04/11 noche (Daniel): «Justificar y rechazar es lo mismo»: UN gesto, «Rechazar», que siempre pide el porqué. */
               '<button class="btn mini" data-sno="'+esc(x.id)+'" data-p style="color:var(--warn);border-color:var(--warn)">Rechazar</button>'
@@ -213,6 +215,11 @@ async function _abrirSanciones_(){
     var _okS = await _cargarSancionesM_();
     SANC_FALLO = (_okS === false);
     if($('#modal').classList.contains('on')){ _repintarSancM_(); } }
+  /* 11/11 (refutar9): con la cola YA leída (la del arranque) se enseñaba ESA al abrir: una sanción que llegó después no salía hasta recargar
+     la app, y una coordinadora que la tiene abierta toda la semana decidía sobre una lista vieja. Se re-lee al abrir y sólo se repinta si
+     cambió el conjunto (las marcas Acepta/Rechaza viven en el servidor y vuelven con la lectura). */
+  else{ var _ya=SANC_M.map(function(x){ return x.id; }).join(',');
+    if(await _cargarSancionesM_() && SANC_M.map(function(x){ return x.id; }).join(',')!==_ya && $('#modal').classList.contains('on')) _repintarSancM_(); }
 }
 
 /* ⛔ LA UNICA PUERTA PARA REPINTAR EL MODAL DE SANCIONES. Gemela de `_repintarPonerSanc_`
@@ -484,7 +491,11 @@ function medidorHTML(){
    El servidor dice qué se puede (`apelable`, `apelable_hasta`); la cara no cuenta plazos. */
 function _misSancHTML_(){
   var L=_misSancLista_().filter(function(s){ return s && (s.apelable || s.apelacion); });
-  if(!L.length) return '';
+  /* 12/11 (refutar16): la que se te pasó de plazo no sale en la lista y no decía por qué: sin botón y sin una palabra. El escritorio sí lo
+     dice (`no_apelable`); aquí una línea, sin contar días (el plazo lo pone el servidor). */
+  var tarde=_misSancLista_().filter(function(s){ return s && !s.apelable && !s.apelacion && /^fuera de plazo/.test(s.no_apelable||''); }).length;
+  var nota=tarde ? '<small style="display:block;color:var(--ink3);margin-top:8px">'+(tarde === 1 ? 'Una sanción tuya ya no se puede apelar: pasó el plazo.' : tarde+' sanciones tuyas ya no se pueden apelar: pasó el plazo.')+'</small>' : '';
+  if(!L.length && !nota) return '';
   return '<div class="msanc"><div class="sc" style="margin:14px 0 2px">Tus sanciones</div>'+L.map(function(s){
     var est=_sancEstadoM_(s), p=(s.puntos === null || s.puntos === undefined) ? _etPtsSanc_(null) : (s.puntos < 0 ? '−' + Math.abs(s.puntos) : String(s.puntos));
     return '<div class="fila" data-msfila="'+esc(s.id)+'"><div class="a"><b>'+esc(s.motivo || 'Sanción')+'</b>'+
@@ -493,7 +504,7 @@ function _misSancHTML_(){
       (s.apelable ? '<small>Puedes apelar hasta el '+esc(_isoADMY_(s.apelable_hasta) || '')+'</small>'+
         '<button class="btn mini" style="margin-top:7px;align-self:flex-start" data-msapelar="'+esc(s.id)+'">Apelar</button>' : '')+
       '</div></div>';
-  }).join('')+'</div>';
+  }).join('')+nota+'</div>';
 }
 
 /* El formulario de apelar. Motivo obligatorio, enlace opcional. */
