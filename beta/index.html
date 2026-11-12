@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=fc47667"></script>
+<script src="comun.js?v=9aa57eb"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=4ced707"></script>
@@ -121,7 +121,7 @@
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=9d4aee0"></script>
 <script src="sanciones.movil.js?v=fee9b5d"></script>
-<script src="reuniones.movil.js?v=9677b7d"></script>
+<script src="reuniones.movil.js?v=f857881"></script>
 <script src="horas.movil.js?v=59c2185"></script>
 <script src="equipo.movil.js?v=d4e7001"></script>
 <script>
@@ -442,7 +442,6 @@ var api={
   /* 29/10: la grabación de una reunión (`_audioReuHTML_`, `comun.js`): estado y subida por trozos. */
   estadoAudio:      function(id){ return api._post({action:"estadoAudioReunion",id:id}); },
   subirAudio:       function(id,sesion,parte,partes,nombre,datos){ return api._post({action:"subirAudioReunion",id:id,sesion:sesion,parte:parte,partes:partes,nombre:nombre,datos:datos}); },
-  setOrdenDia:      function(id,u){ return api._post({action:"actualizarReunion",id:id,campos:{ordenDia:u}}); },
   /* 31/10: el orden del día (`_ordenDiaReuHTML_`, `comun.js`; backend `rutinas/orden_dia.py`): la tabla y el PDF. */
   getOrdenDia:      function(id){ return api._post({action:"getOrdenDia",id:id}); },
   guardarOrdenDia:  function(id,filas){ return api._post({action:"guardarOrdenDia",id:id,filas:filas}); },
@@ -1772,7 +1771,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7df47ef';
+var BUILD='399af36';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2400,42 +2399,11 @@ function _engReuniones_(){
       'Se reabre la disponibilidad para todo el equipo. ¿Seguro?'))) return;
     bdf.disabled=true;
     try{ await api.fijar(R2.id, null); R2.fijada=null; R2.fijadaBl=[];
-      tost('Fijado cancelado: se reabre la disponibilidad.'); pintar(); if(typeof _ordenRefrescar_==='function') _ordenRefrescar_(R2.id);   // refutar15: el orden vuelve a «T0»
+      tost('Fijado cancelado: se reabre la disponibilidad.'); pintar(); if(typeof _ordenTrasFijar_==='function') _ordenTrasFijar_(R2.id);   // refutar15: el orden vuelve a «T0»
     }catch(e){ bdf.disabled=false; tostErr('No se pudo cancelar: ', e); }
   };
-  /* GUARDA DE VERDAD. El boton llevaba `data-cerrar` y nada mas: pegabas el enlace, dabas a
-     Guardar y no pasaba nada. `api.setOrdenDia` llevaba declarada desde la v12 SIN QUE NADIE
-     LA LLAMARA -el mismo patron que `api.getTurnos`, que estuvo meses sin existir-. */
-  var bod=$('#btnOrden');
-  if(bod) bod.onclick=function(){
-    var R2=REUNION; if(!R2) return;
-    abrirModal('<div class="mtit">Orden del día</div>'+
-      '<div class="msub">Pega el enlace del PDF o del documento de Drive. Basta con compartirlo con el dominio '+
-      'uvigoaerotech.com: no hace falta que sea público.</div>'+
-      '<label class="campo"><span class="sc">Enlace</span><input id="odIn" placeholder="https://drive.google.com/…" value="'+esc(R2.ordenDia||'')+'"></label>'+
-      '<button class="btn pri full" data-p id="btnODok">Guardar</button>'+
-      (R2.ordenDia?'<button class="btn mini full" data-p id="btnODquita" style="margin-top:8px">Quitar el enlace</button>':''));
-    var guardar=async function(u){
-      if(typeof backendOK==='undefined' || !backendOK || !SESION){
-        tost('Sin conexión no se puede guardar.'); return; }
-      var b=$('#btnODok'); if(b){ b.disabled=true; b.textContent='Guardando…'; }
-      try{
-        await api.setOrdenDia(R2.id, u);
-        R2.ordenDia=u;
-        var m=(REUNIONES_M||[]).filter(function(x){ return x.id===R2.id; })[0]; if(m) m.ordenDia=u;
-        cerrarModal(); tost(u?'Orden del día guardado.':'Enlace quitado.'); pintar();
-      }catch(e){ if(b){ b.disabled=false; b.textContent='Guardar'; }
-        tostErr('No se pudo guardar: ', e); }
-    };
-    $('#btnODok').onclick=function(){
-      var u=(($('#odIn')||{}).value||'').trim();
-      /* Se comprueba que parezca un enlace: esto acaba en un boton que la gente pulsa, y un
-         boton que lleva a ninguna parte es peor que no tenerlo. */
-      if(u && !/^https?:\/\/\S+$/i.test(u)){ tost('Eso no parece un enlace. Debe empezar por https://'); return; }
-      guardar(u);
-    };
-    var bq=$('#btnODquita'); if(bq) bq.onclick=function(){ guardar(''); };
-  };
+  /* ordendia-1 (12/11): aquí vivía el botón «Orden del día» (enlace a Drive) que nadie veía en ninguna ficha. Ahora el orden del día es la tabla
+     de `_ordenDiaReuHTML_` y su PDF. */
   /* ⭐ EDITAR LOS CONVOCADOS (817.a). Daniel, 12/10: «Pon en pendientes lo de que las reuniones sean
      editables» -- ese dia hubo que tocar `Reuniones!F3` a mano. El backend ya lo tenia.
      ⛔ La lista de partida es la que SIRVE el backend (`R.invitados`, ya superpuesta), nunca una

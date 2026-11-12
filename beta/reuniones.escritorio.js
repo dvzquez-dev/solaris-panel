@@ -184,10 +184,6 @@ function convocarReunionPanel(){
       '<div>'+lab('Tamaño de casilla')+nxElige('cvSlot', [['15','15 min'],['30','30 min'],['60','1 h']], '30')+'</div>'+
       '<div>'+lab('Dura la reunión')+nxElige('cvDura', [['30','30 min'],['60','1 h'],['90','1 h 30 min'],['120','2 h']], '60')+'</div>'+
     '</div>'+
-    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:11px">'+
-      '<label style="flex:1;min-width:220px">'+lab('Orden del día · enlace')+
-        '<input id="cvOrden" placeholder="https://drive.google.com/…" style="'+E+'"></label>'+
-    '</div>'+
     /* HORARIO POR DÍA. Se pinta al vuelo (`#cvDias`) porque depende de las fechas, que
        cambian mientras rellenas. Un día apagado NO es un día con horario vacío: es un día
        que no se ofrece, y eso se ve. */
@@ -425,7 +421,6 @@ function _cablearConvocar_(){
          mandando `'anonima'`: la pantalla quedaría perfecta y el servidor recibiría
          siempre lo mismo. El respaldo es `anonima` porque es el defecto que ya se
          pintaba, no un valor nuevo. */
-      ordenDia:(val('cvOrden')||'').trim(),
       controlAsistencia:_controlAsisDeForm_('cvControl', val('cvTipo')),
       vision:(function(){ var v=$('#cvVision [data-cv].on'); return (v&&v.dataset.cv)||'anonima'; })(), resp:{} };
     /* 21/10 (auditor 20, 🟡 8): en la MAQUETA local se convoca en memoria (como decide partes), diciendo que no avisa a
@@ -982,11 +977,6 @@ function _fijarPanel_(){
         '<span class="nota" id="reFSel" style="display:block;margin-top:6px"></span></div>'+
       '<button class="btn pri" data-fijar'+(_pf?'':' disabled')+'>Fijar</button>'+_porQueApagado_(_porFija)+
       (r.fijada?'<button class="btn" data-desfijar'+(_pf?'':' disabled')+' style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
-    '</div>'+
-    '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">'+
-      '<label style="flex:1;min-width:240px">'+lab('Orden del día · enlace o texto')+
-        '<input id="reOrden" value="'+esc(r.ordenDia||'')+'" placeholder="https://… o los puntos a tratar" style="'+E+'"></label>'+
-      '<button class="btn" data-orden'+(_pf?'':' disabled')+'>Guardar orden del día</button>'+_porQueApagado_(_porFija)+
     '</div>'+
     _editarReuBoxE_(r)+
     _convocadosBoxE_(r)+

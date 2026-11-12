@@ -15913,7 +15913,12 @@ function _ordenDiaReuHTML_(r){
   var st=_ordSt_(r.id);
   /* A quién se puede poner de «quién introduce»: los convocados de ESTA reunión (y quien la convoca). */
   st.conv=(Array.isArray(r.invitados)?r.invitados:[]).filter(function(n){ return !!n; }).concat(r.convocante?[r.convocante]:[]);
-  setTimeout(function(){ if(!st.e) _ordenRefrescar_(r.id); else _ordenPintar_(r.id); },0);
+  /* ordendia-3: lo que se bajó una vez NO vale para siempre (el convocante pudo cambiarlo después del aviso). Se enseña lo que hay al
+     instante y se vuelve a pedir si hace más de ORD_REFRESCO_MS, salvo mientras se edita/graba/pregunta a SolarIA o se genera/sube. */
+  setTimeout(function(){
+    if(!st.e) _ordenRefrescar_(r.id);
+    else{ _ordenPintar_(r.id); if(_ordenToca_(st)) _ordenRefrescar_(r.id); }
+  },0);
   return '<div data-ordendia="'+esc(r.id)+'">'+(st.e?_ordenHTML_(r.id):'')+'</div>';
 }
 /* La tabla de sólo lectura: la del orden guardado y la de la PROPUESTA de SolarIA (una sola forma de pintar filas). `horas` =
@@ -15936,8 +15941,12 @@ function _ordenHTML_(id){
   if(st.draft){
     cuerpo=_ordenEditHTML_(st);
   } else {
-    if(e.filas&&e.filas.length) cuerpo=_ordTablaHTML_(e.filas, e.inicio, e.horas)+(e.pendientes?'<p class="rnota" style="margin:6px 0 0;color:var(--warn)">'+e.pendientes+' punto'+(e.pendientes===1?'':'s')+' sin duración: edita la tabla para ponerla.</p>':'')+(e.por?'<p class="rnota" style="margin:6px 0 0">Editado por '+esc(e.por)+'.</p>':'');
+    /* ordendia-1 (12/11, Daniel: «el convocante construyese el orden del día en la app y con eso le saliese plasmado en un pdf que es lo
+       que ve la gente […] No que se vea el orden del dia en la app como tal»): la TABLA es la herramienta de quien edita; el resto ve el PDF. */
+    if(!e.puede) cuerpo=e.pdf?'':'<div class="rnota" data-ordsinpdf>'+((e.filas&&e.filas.length)?'El PDF del orden del día aún no está listo.':'Todavía no hay orden del día.')+'</div>';
+    else if(e.filas&&e.filas.length) cuerpo=_ordTablaHTML_(e.filas, e.inicio, e.horas)+(e.pendientes?'<p class="rnota" style="margin:6px 0 0;color:var(--warn)">'+e.pendientes+' punto'+(e.pendientes===1?'':'s')+' sin duración: edita la tabla para ponerla.</p>':'')+(e.por?'<p class="rnota" style="margin:6px 0 0">Editado por '+esc(e.por)+'.</p>':'');
     else if(!e.pdf) cuerpo='<div class="rnota">Todavía no hay orden del día.</div>';
+    if(e.puede&&e.filas&&e.filas.length&&!e.pdf) cuerpo+='<p class="rnota" data-ordsinpdfaviso style="margin:6px 0 0">Los convocados ven el PDF, no esta tabla: genéralo para que lo vean.</p>';
     if(e.puede) cuerpo+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px"><button class="btn mini" data-ordeditar>'+ico('lapiz')+' '+(e.filas&&e.filas.length?'Editar la tabla':'Escribir el orden del día')+'</button>'+
       '<button class="btn mini" data-ordgenerar'+(st.gen?' disabled':'')+'>'+ico('documento')+' '+(st.gen?'Generando el PDF…':'Generar PDF')+'</button></div>'+
       (st.errGen?'<div class="rnota" data-ordgenerror style="margin-top:6px;color:var(--warn)">'+esc(st.errGen)+'</div>':'');
@@ -16109,12 +16118,21 @@ function _ordenPdfHTML_(st){
   if(e.pdf){
     h+='<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="rnota" style="flex:1;margin:0">'+ico('documento')+' '+esc(e.pdf.nombre||'orden.pdf')+' · '+_ordKB_(e.pdf.bytes||0)+'</span>'+
       '<button type="button" class="btn mini" data-ordver>'+(st.visor?'Ocultar':'Ver PDF')+'</button>'+
+      '<button type="button" class="btn mini" data-orddescargar>Descargar</button>'+
+      '<button type="button" class="btn mini" data-ordimprimir>Imprimir</button>'+
       (e.puede?'<button type="button" class="btn mini" data-ordquitarpdf style="color:var(--warn);border-color:var(--warn)">Quitar</button>':'')+'</div>';
     if(st.visor) h+='<iframe src="'+esc(st.visor)+'" title="Orden del día (PDF)" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:6px;margin-top:8px;background:#fff"></iframe>';
   }
   if(e.puede) h+='<label class="btn mini" style="display:inline-block;margin-top:8px;cursor:pointer">'+ico('documento')+' '+(e.pdf?'Subir otro PDF':'Subir PDF del orden del día')+
     '<input type="file" accept="application/pdf,.pdf" data-ordpdffile style="display:none"></label>';
   return h;
+}
+/* El PDF del orden del día como URL de un blob (verlo, descargarlo, imprimirlo: una sola forma de pedirlo). `null` si ya no hay. */
+async function _ordenPdfUrl_(id){
+  var d=await api.getOrdenPdf(id);
+  if(!d||!d.datos){ tost('Ya no hay PDF.'); return null; }
+  var bin=atob(d.datos), u8=new Uint8Array(bin.length); for(var k=0;k<bin.length;k++) u8[k]=bin.charCodeAt(k);
+  return URL.createObjectURL(new Blob([u8],{type:'application/pdf'}));
 }
 function _ordenPintar_(id){
   var st=_ordSt_(id);
@@ -16153,11 +16171,26 @@ function _ordenCargar_(id){
   st.cargando=true;
   _ordenRefrescar_(id).then(function(){ st.cargando=false; }, function(){ st.cargando=false; });
 }
+var ORD_REFRESCO_MS=20000;
+/* ¿Toca volver a pedir el orden del día al abrir la ficha? Sí si hace más de ORD_REFRESCO_MS de la última vez y nadie lo está tocando. */
+function _ordenToca_(st){
+  if(st.draft||st.mic||st.gen||st.sub||st.cargando||(st.ia&&st.ia.fase)||st.copia||st.plant) return false;
+  return !st.refAt || Date.now()-st.refAt>ORD_REFRESCO_MS;
+}
 async function _ordenRefrescar_(id){
-  var st=_ordSt_(id);
-  try{ st.e=await api.getOrdenDia(id); }catch(_){ st.e={filas:[],horas:[],puede:false,pdf:null,por:null,at:null}; }
+  var st=_ordSt_(id), previo=st.e; st.refAt=Date.now();
+  try{ st.e=await api.getOrdenDia(id); }
+  /* ordendia-3: un refresco que falla CONSERVA lo que había (vaciar la tabla ya cargada por un corte de red sería peor que enseñarla vieja). */
+  catch(_){ st.e=previo||{filas:[],horas:[],puede:false,pdf:null,por:null,at:null}; }
   if(!st.e.filas) st.e.filas=[];
   _ordenPintar_(id);
+}
+/* Tras FIJAR o CANCELAR el fijado (ordendia-2): las horas de la tabla pasan de «T0+10» a las reales (o al revés), así que se vuelve a
+   pedir y, si el PDF vigente es de los GENERADOS, se rehace solo. Uno subido a mano no se toca nunca. */
+async function _ordenTrasFijar_(id){
+  await _ordenRefrescar_(id);
+  var st=_ordSt_(id);
+  if(st.e&&st.e.puede&&st.e.pdf&&st.e.pdf.generado) return _ordenGenerar_(id, true);
 }
 /* Suelta lo de editar (borrador, copia, caja de SolarIA). ⛔ Una grabación en marcha se corta sin transcribir. */
 function _ordenSoltar_(st, draft){
@@ -16337,17 +16370,32 @@ async function _ordenClic_(id, ev){
       st.e.por=(typeof YO!=='undefined'&&YO&&YO.nombre)||st.e.por; st.draft=null;
       _ordenSoltar_(st); tost('Orden del día guardado.');
     }catch(e){ b.disabled=false; tostErr('No se pudo guardar: ', e); return; }
-    return _ordenPintar_(id);
+    _ordenPintar_(id);
+    /* ordendia-2: el PDF generado se rehace con la tabla nueva; un fallo suyo NO deshace el guardado (queda en `errGen`). */
+    if(st.e.pdf&&st.e.pdf.generado) _ordenGenerar_(id, true);
+    return;
   }
   if(q('data-ordver')){
     if(st.visor){ _ordenQuitarVisor_(st); return _ordenPintar_(id); }
-    try{
-      var d=await api.getOrdenPdf(id);
-      if(!d||!d.datos){ tost('Ya no hay PDF.'); return _ordenRefrescar_(id); }
-      var bin=atob(d.datos), u8=new Uint8Array(bin.length); for(var k=0;k<bin.length;k++) u8[k]=bin.charCodeAt(k);
-      st.visor=URL.createObjectURL(new Blob([u8],{type:'application/pdf'}));
-    }catch(e){ tostErr('No se pudo abrir el PDF: ', e); return; }
+    try{ st.visor=await _ordenPdfUrl_(id); }catch(e){ tostErr('No se pudo abrir el PDF: ', e); return; }
+    if(!st.visor) return _ordenRefrescar_(id);
     return _ordenPintar_(id);
+  }
+  if(q('data-orddescargar')){
+    var url, nom=(st.e.pdf&&st.e.pdf.nombre)||'orden-del-dia.pdf';
+    try{ url=await _ordenPdfUrl_(id); }catch(e){ tostErr('No se pudo descargar el PDF: ', e); return; }
+    if(!url) return _ordenRefrescar_(id);
+    var a=document.createElement('a'); a.href=url; a.download=nom; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); },4000);
+    return;
+  }
+  if(q('data-ordimprimir')){
+    if(!st.visor){ try{ st.visor=await _ordenPdfUrl_(id); }catch(e){ tostErr('No se pudo abrir el PDF: ', e); return; }
+      if(!st.visor) return _ordenRefrescar_(id);
+      _ordenPintar_(id); await new Promise(function(r){ setTimeout(r,500); }); }
+    var fr=document.querySelector('[data-ordendia="'+String(id).replace(/"/g,'')+'"] iframe');
+    try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(_){ window.open(st.visor,'_blank'); }
+    return;
   }
   if(q('data-ordquitarpdf')){
     if(!(await dialogoSiNo('¿Quitar el PDF del orden del día?'))) return;
@@ -16358,16 +16406,20 @@ async function _ordenClic_(id, ev){
 }
 /* «Generar PDF»: el servidor monta el PDF con la plantilla de Solaris a partir de la tabla GUARDADA (sin IA, sin inventar) y lo deja
    donde el subido. Si ya hay uno (subido o generado) se pregunta antes, diciendo cuál se reemplaza. Un fallo se dice en la ficha. */
-async function _ordenGenerar_(id){
+async function _ordenGenerar_(id, auto){
   var st=_ordSt_(id); if(st.gen||!st.e) return;
-  if(!(st.e.filas&&st.e.filas.length)){ st.errGen='El orden del día no tiene puntos: escríbelo antes de generar el PDF.'; return _ordenPintar_(id); }
-  if(st.e.pdf){
-    var p=st.e.pdf, cual='«'+(p.nombre||'orden.pdf')+'»'+(p.generado?' (generado':' (subido')+(p.por?' por '+p.por:'')+')';
+  if(!(st.e.filas&&st.e.filas.length)){
+    if(auto) return;                                  // el PDF se rehace solo sólo con puntos; vaciar la tabla no lo toca
+    st.errGen='El orden del día no tiene puntos: escríbelo antes de generar el PDF.'; return _ordenPintar_(id); }
+  /* ordendia-2: reemplazar un PDF GENERADO no pregunta (es una foto de la tabla, se rehace igual); sólo uno SUBIDO a mano. */
+  if(st.e.pdf && !st.e.pdf.generado){
+    if(auto) return;                                  // y sola nunca pisa uno subido
+    var p=st.e.pdf, cual='«'+(p.nombre||'orden.pdf')+'» (subido'+(p.por?' por '+p.por:'')+')';
     if(!(await dialogoSiNo('Ya hay un PDF del orden del día: '+cual+'.\n\nGenerar uno nuevo lo reemplaza.\n\n¿Sigo?'))) return;
   }
   st.gen=true; st.errGen=''; _ordenPintar_(id);
-  try{ await api.generarOrdenPdf(id); _ordenQuitarVisor_(st); tost('PDF generado.'); }
-  catch(e){ st.errGen='No se pudo generar el PDF: '+((e&&e.message)||e); }
+  try{ await api.generarOrdenPdf(id); _ordenQuitarVisor_(st); if(!auto) tost('PDF generado.'); }
+  catch(e){ st.errGen=(auto?'La tabla está guardada, pero no se pudo rehacer el PDF: ':'No se pudo generar el PDF: ')+((e&&e.message)||e); }
   st.gen=false;
   _ordenRefrescar_(id);
 }

@@ -749,7 +749,6 @@ function vReu(){
       (_puedeBorrarReuM_(R)?'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">'+
         '<button class="btn mini" data-p id="btnFijar" style="flex:1">'+(R.fijada?'Cambiar fecha/hora':'📌 Fijar fecha')+'</button>'+
         (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
-        '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
         '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
         '<button class="btn mini" data-p id="btnEditarReu" style="flex:1">Título y plazo</button>'+
       '</div>':'')+
@@ -1162,8 +1161,6 @@ function crearModal(){
     '<p class="rnota" id="ceSlotHint"></p>'+
     '<div class="campo"><span class="sc">Límite para responder</span>'+nxFecha('ceLim', mas(hoyISO,5), {min:hoyISO})+'</div>'+
       '<div class="campo"><span class="sc">Hora del límite</span>'+nxHora('ceLimH', '23:59')+'</div>'+
-    '<label class="campo"><span class="sc">Orden del día (enlace a Drive, opcional)</span>'+
-      '<input id="ceOrden" placeholder="https://drive.google.com/…"></label>'+
     '<span class="sc" style="display:block;margin-bottom:6px">Visión de disponibilidad</span>'+
     '<div class="modos" id="ceVision">'+
       '<button data-v="publica" data-p>Pública</button>'+
@@ -1304,7 +1301,7 @@ function crearModal(){
       dias:ds, franjas:u.F, bloques:bloques, total:bloques.length, limite:lim,
       slot:_sl, duracion:_nS*_sl,          // lo que hay que juntar seguido para que valga
       minimoPct:(function(){ var c=$('#ceMin'); return (c && !c.hidden && +c.dataset.sel>0) ? +c.dataset.sel : null; })(),   // 01/11
-      ordenDia:(val('ceOrden')||'').trim(), vision:vision, controlAsistencia:_controlAsisDeForm_('ceControl', val('ceTipo')), resp:{} };
+      vision:vision, controlAsistencia:_controlAsisDeForm_('ceControl', val('ceTipo')), resp:{} };
     PLANTILLAS_M.unshift({ titulo:reu.titulo, ceModo:val('ceModo'), ceH0:val('ceH0'), ceH1:val('ceH1'),
       ceSlot:val('ceSlot'), ceDura:val('ceDura'), ceND:val('ceND'), modalidad:reu.modalidad, perdia:per() });
     if(PLANTILLAS_M.length>8) PLANTILLAS_M.length=8;
@@ -1403,7 +1400,7 @@ function fijarModal(){
       R2.fijada=etiqueta; R2.fijadaBl=bloques;
       cerrarModal();
       tost('Reunión fijada: '+etiqueta+'. La disponibilidad queda cerrada.');
-      pintar(); if(typeof _ordenRefrescar_==='function') _ordenRefrescar_(R2.id);   // refutar15: sus horas de reloj salen de la fijada
+      pintar(); if(typeof _ordenTrasFijar_==='function') _ordenTrasFijar_(R2.id);   // refutar15: sus horas de reloj salen de la fijada
     }catch(e){ b.disabled=false; b.textContent=prev;
       tostErr('No se pudo fijar: ', e); }
   };
