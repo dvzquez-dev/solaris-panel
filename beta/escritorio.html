@@ -122,7 +122,7 @@
 <script src="sanciones.escritorio.js?v=f1fbc19"></script>
 <script src="reuniones.escritorio.js?v=828d9c8"></script>
 <script src="horas.escritorio.js?v=27f4b91"></script>
-<script src="equipo.escritorio.js?v=812c280"></script>
+<script src="equipo.escritorio.js?v=c6839d7"></script>
 <script src="tareas.escritorio.js?v=d3ebd8c"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
 <script>
@@ -3787,7 +3787,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='6c4029f';
+var BUILD='86e50a4';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4879,6 +4879,10 @@ function _engSancCerrar_(){
         b.textContent='Cerrando…';
         try{
           var r=await api.confirmarLote(LOTE.lote);
+          /* 12/11 (refutar23): la cola con que contesta el servidor se ADOPTA antes de pintar. Sin ello `SANC_BACK` seguía con las pendientes de
+             antes y el Panel («Sanciones por decidir · 2 pendientes») y el globo del menú decían 2 con el bloque ya cerrado, hasta el refresco
+             de 90 s. `LOTE.cerrado` se fija DESPUÉS: `_loteReal_` (dentro) reconstruye el bloque. */
+          try{ await _cargarSancionesCon_(r); }catch(e){ /* sin cola nueva, el refresco de siempre */ }
           /* ⛔⛔ EL BLOQUE PUEDE CERRARSE A MEDIAS, Y EL SERVIDOR LO DICE.
              `_confirmarLote_` salta las que no pasan `_puedeSobreSancion_` y las cuenta
              en `sinPermiso`; esas **se quedan pendientes**. Sin leerlo, esta pantalla

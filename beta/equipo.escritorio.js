@@ -109,6 +109,16 @@ function colaDecision(){
     out.push({ic:'i-gavel',b:'Sanciones por decidir',
       s:_sp+(_sp===1?' pendiente':' pendientes')+' · nada se aplica hasta cerrar su bloque',
       chip:'<span class="chip no">por decidir</span>',ir:'sanciones',foco:'lote'});
+  /* 12/11 (refutar23): las APELACIONES que TÚ puedes resolver. El menú ya las contaba (globo de «Apelaciones») y el móvil las avisa en Estado,
+     pero «Requiere tu decisión» no las nombraba: el PD con 2 apelaciones abiertas leía «Nada pendiente» en el Panel y 13 asuntos sin ellas.
+     Una fila con quién y de qué, por la MISMA puerta que el globo (`_apelPendientesTuyas_`). */
+  var _ap=(typeof _apelPendientesTuyas_==='function')?_apelPendientesTuyas_():[];
+  if(_ap.length){
+    var _apN=_ap.slice(0,2).map(function(a){ var m=_m(a.autor); return esc((m&&m.pila)||a.autor)+' ('+(a.clase==='sancion'?'sanción':'tarea')+')'; });
+    out.push({ic:'i-gavel',b:_ap.length===1?'Una apelación por resolver':_ap.length+' apelaciones por resolver',
+      s:_apN.join(', ')+(_ap.length>2?' y '+(_ap.length-2)+' más':'')+' · la respuesta es obligatoria',
+      chip:'<span class="chip no">por decidir</span>',ir:'apela',foco:''});
+  }
   /* ⛔ 26/10 — Daniel (25/10): un coordinador puede mover el plazo de una tarea SUYA, *«pero me notifica en algun lugar
      del escritorio (app)»*. Aquí: una fila por plazo movido así en los últimos 14 días (los sirve el bootstrap, sólo al PD). */
   if(rangoNom(ACTOR)>=3) ((typeof PLAZOS_PROPIOS!=='undefined' && PLAZOS_PROPIOS)||[]).forEach(function(x){
