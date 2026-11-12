@@ -664,7 +664,7 @@ function _fichaTareas_(){
    regla, y la segunda copia siempre acaba diciendo otra cosa. */
 function _fichaFalta_(){
   var f=FICHA_FORM;
-  if(!_imputacion_(f)) return 'Falta a que imputarlas';
+  if(!_imputacion_(f)) return _faltaImputar_(f.cat);
   var n=f.just.trim().length;
   if(n<25) return 'Falta la justificacion ('+n+'/25 caracteres)';
   return null;
@@ -1048,7 +1048,7 @@ function _bloqFalta_(){
     if(_pg==='cero')  return 'La salida tiene que ser posterior a la entrada';
     if(_pg==='sin')   return 'Pon la entrada y la salida';
   }
-  if(!_imputacion_(f)) return 'Falta a qu\u00e9 imputarlas';
+  if(!_imputacion_(f)) return _faltaImputar_(f.cat);
   var n=f.just.trim().length;
   if(n<25) return 'Falta la justificaci\u00f3n ('+n+'/25 caracteres)';
   return null;

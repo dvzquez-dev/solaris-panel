@@ -85,7 +85,7 @@ function _tuyoFilaM_(it){
 function _avisosQueTeTocanM_(){
   var yo=(typeof _fichaYo_==='function') ? _fichaYo_() : '';
   /* 12/11 (refutar13): los partes de BLOQUE (reuniones) los decide sólo el PD; a un coordinador no le tocan, y «2 partes esperan tu firma» era falso. */
-  var pdec=(typeof PARTES_DEC!=='undefined' && Array.isArray(PARTES_DEC)) ? PARTES_DEC.filter(function(p){ return !p.bloque || rangoNom(yo)>=3; }).length : 0;
+  var pdec=_partesDecTuyos_().length;
   var mios=(typeof PARTES!=='undefined' && Array.isArray(PARTES)) ? PARTES.filter(function(p){
     return p && (!p.autor || p.autor===yo); }) : [];
   var rev=(typeof _docsPend_==='function') ? (_docsPend_()||[]).length : 0;

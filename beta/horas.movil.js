@@ -1040,7 +1040,7 @@ function validarFichaje(){
           : (_pgM==='cero' ? 'La salida tiene que ser posterior a la entrada'
                            : 'Falta la duración');
     if(l) l.textContent = todo ? ('Enviar '+nf2(dur)+' h a aprobación')
-      : (!n1?(_tramosError_(f)||_faltaDur):(!n2?'Falta a qué imputarlas':'Falta la justificación'));
+      : (!n1?(_tramosError_(f)||_faltaDur):(!n2?_faltaImputar_(ST.form.cat):'Falta la justificación'));
   }
   return todo;
 }
@@ -1764,6 +1764,26 @@ function _cargarCierrePlan_(){
     CIERRE_UC = (c && c.ultimo_cierre) || null;
     CIERRE_PLAN = (c && c.plan) || null; return CIERRE_PLAN;
   }).catch(function(){ return null; });   /* ⛔ un fallo NO se lee como «mes abierto» */
+}
+
+/* 12/11 (refutar22): LOS PARTES QUE TE TOCAN a ti de `PARTES_DEC`. Los de BLOQUE (reuniones) los decide sólo el PD: la cola los ENSEÑA a la
+   coordinadora (sin botones), pero ni el globo de Horas ni el aviso de Estado los cuentan como suyos (el globo decía 4 y Estado «2 partes
+   esperan tu firma»). UNA regla, aquí; la llaman `badges` (movil.html) y `_avisosQueTeTocanM_` (equipo.movil.js). */
+function _partesDecTuyos_(){
+  var yo=(typeof _fichaYo_==='function') ? _fichaYo_() : '';
+  return (typeof PARTES_DEC!=='undefined' && Array.isArray(PARTES_DEC)) ? PARTES_DEC.filter(function(p){ return !p.bloque || rangoNom(yo)>=3; }) : [];
+}
+
+/* ⛔ EL CAMBIO DE MES CON LA APP ABIERTA (refutar21, 12/11). `CIERRE_UC` se lee UNA vez, al entrar, y `_periodoAbierto_` lo prefiere a
+   `equipo_mes.periodo` —que sí llega fresco cada 90 s con el panel—: el PD aplica el cierre de noviembre a las 00:45 y quien tenía la
+   app abierta seguía leyendo «Noviembre» con las cifras de diciembre (la tarjeta «Noviembre · sin cerrar» enseñaba 2 h: las de diciembre)
+   hasta recargar. Si el panel dice un mes y el último cierre conocido otro, se vuelve a preguntar por el cierre (UNA llamada, y sólo
+   entonces). Sin `equipo_mes` (Notion caído) no hay con qué comparar y no se pregunta nada. */
+function _alinearCierre_(){
+  var e=(typeof DATA!=='undefined' && DATA) ? DATA.equipo_mes : null;
+  if(!e || !/^\d{4}-\d{2}$/.test(String(e.periodo||''))) return Promise.resolve(null);
+  if(_periodoAbierto_()===e.periodo) return Promise.resolve(null);
+  return _cargarCierrePlan_();
 }
 
 function _cargarPartesDec_(){

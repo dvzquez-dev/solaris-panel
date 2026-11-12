@@ -2985,7 +2985,9 @@ function _apiParse(txt, accion){
                          "con tu cuenta y repite la acci\u00f3n \u2014 no se ha guardado nada.");
   /* Un «no» del backend SIN motivo. No se reintenta -- tiene criterio, repetirlo da lo
      mismo tres veces--, asi que se dice que fue un rechazo y no un fallo de linea. */
-  throw new Error(err||"el backend rechazó la acción sin decir por qué");
+  /* refutar21 (12/11): el servidor antepone «Error: » a cada rechazo (como Apps Script) y los avisos lo enseñaban tal cual
+     («No se pudo enviar: Error: Ana Gnc ya tiene el parte…»). Siete sitios ya lo quitaban cada uno por su cuenta; aquí, una vez. */
+  throw new Error(err.replace(/^Error:\s*/,"")||"el backend rechazó la acción sin decir por qué");
 }
 
 /* ⛔ `api._post`, UNA VEZ PARA LAS DOS CARAS (01/11, `apitiempo`). Estaba calcado en `movil.html` y
@@ -10487,6 +10489,17 @@ function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.
 /* Que es «la imputacion» de un parte: UN solo sitio, para que lo que se VALIDA y lo que se
    ENVIA no puedan desincronizarse en silencio (que es como estuvieron un tiempo en el movil).
    Vive aqui desde el 14/08 porque el escritorio ficha con la misma regla. */
+
+/* refutar20 (12/11): lo que falta en el paso «imputación» de «Antes de enviar» DEPENDE de la categoría: con «Tarea» es la tarea a la que imputar las horas, pero con
+   «Reunión no convocada» / «Turno no convocado» / «Compensación» el campo se llama «Nombre de la reunión» / «Qué turno» / «Concepto» y la lista seguía diciendo
+   «Falta a qué imputarlas»: un miembro nuevo no sabía qué campo faltaba. Los rótulos son los del campo (`_formHTML_` del móvil, `_declaCamposHTML_` del escritorio). */
+function _faltaImputar_(cat){
+  return cat==='reunion' ? 'Falta el nombre de la reunión'
+       : cat==='turno' ? 'Falta qué turno'
+       : cat==='compensacion' ? 'Falta el concepto'
+       : 'Falta a qué imputarlas';
+}
+
 function _imputacion_(f){ return f.cat==='tareas' ? (f.tarea==='__otro__' ? String(f.detalle||'').trim() : f.tarea) : String(f.detalle||'').trim(); }   /* 04/11: sin `detalle` → '' (y el «Di a qué se imputa»), no un TypeError */
 
 /* El `url` (page-id de Notion) de la tarea imputada, o `null` (01/11): el servidor casa por él la unidad del parte, y el
