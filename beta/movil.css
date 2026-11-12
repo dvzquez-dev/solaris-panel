@@ -1174,3 +1174,6 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .kebab::after{content:"";position:absolute;inset:-6px}
 .tcel{height:44px}
 .rc[data-tdia]{min-height:44px}
+
+/* documentos-1 (12/11): «Editar antes de decidir» plegado en la ficha del expediente (como .doc-edit del escritorio) */
+.doc-edit{margin-top:11px}.doc-edit-c{display:none;margin-top:6px}.doc-edit.ab .doc-edit-c{display:block}

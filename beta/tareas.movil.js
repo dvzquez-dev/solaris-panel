@@ -101,20 +101,8 @@ function vTareas(){
     '<div class="tarj">'+(act.length?act.map(fila).join(''):
       /* 957.ª: «cuando te asignen», no «cuando tu coordinador»: el PD y los coordinadores no tienen coordinador. */
       vacio('Sin tareas asignadas','Cuando te asignen una, saldrá aquí.','',false))+'</div>'+
-    (act.length?'<div class="tarj" style="background:rgba(63,158,214,.05);border-color:rgba(63,158,214,.3)">'+
-      '<p class="rnota" style="margin:0">Al fichar puedes imputar tus horas a cualquiera de estas tareas. '+
-      /* ⛔ Y DICE DÓNDE SE APELA (762.ª, 02/10). Aquí ponía «puedes apelarla (Art. 34)» a
-         secas, y la app NO tramita apelaciones en ninguna capa — medido: `apelac` sale 0
-         veces en `Codigo.gs`, no hay `api.apelar*` ni `data-apel*` ni pantalla. O sea que
-         la frase mandaba a buscar un botón que no existe, sobre disciplina.
-         ⚠️ El derecho NO se borra: es del RRI y existe. Lo que se añade es el destino, y no
-         me lo invento: es el que ya decía `navegador/app.html:1534` («en privado al Project
-         Director»), que es la app que el equipo venía usando.
-         ⛔ Y NO se inventa el PLAZO: el texto del Art. 34 no está en el repo, y un «tienes
-         N días» escrito a ojo suena oficial — que es peor que no decirlo. */
-      /* 31/10: YA SE APELA DESDE LA APP (`Apelar`, Art. 34). Antes ponía que se hablaba en privado con el PD. */
-      'Si no puedes con una, o no te corresponde, pulsa <b>Apelar</b> (Art. 34 del RRI): la ven tu coordinador y el Project Director. '+
-      'Las voluntarias no se apelan.</p></div>':'')+
+    /* tareas-1 (12/11): aquí había una tarjeta azul fija con 3 frases (fichar puedes imputar · Apelar Art. 34 · las voluntarias no se apelan). Fuera: cada tarea trae su botón
+       «Apelar» (la voluntaria no lo trae) y el formulario (`_formApelar_`) ya dice el Art. 34 y a quién le llega; imputar horas lo enseña el desplegable de tareas de Fichar. */
     /* mismo cajon que en Turnos: cuenta y la ultima, para que las dos pantallas se lean igual */
     (fin.length?'<div class="cajon" data-caj data-p><span>Tareas pasadas <b>· '+fin.length+'</b>'+
         (fin[0]&&_plazoDMY_(fin[0].l)?' <span style="color:var(--ink3)">· la última, '+_plazoDMY_(fin[0].l)+'</span>':'')+'</span>'+

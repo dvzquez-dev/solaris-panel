@@ -101,7 +101,12 @@ function _sancionesHTML_(){
     '<div class="msub">Ponerlas y decidirlas. El comunicado sigue saliendo del escritorio.</div>'+
     /* A cuánta gente puedes sancionar, como el `pan(...)` del escritorio (ficha del 20/08: `nTotal` se
        calculaba aquí y no se pintaba nunca). */
-    '<h4>Poner una sanción <span class="sc">· '+nTotal+(nTotal===1?' persona':' personas')+' bajo tu jurisdicción</span></h4><div class="tarj">'+
+    /* sanciones-1 (12/11): con sanciones esperando, lo PENDIENTE va primero y «Poner una sanción» queda en UNA barra pegada al título (siempre a la vista,
+       sin bajar) que despliega el formulario en su sitio; sin cola, o con el formulario a medias, sale abierto como antes (escritorio: igual desde el 01/11). */
+    (_sancHayCola_()
+      ? '<button type="button" class="btn full" data-sponer style="text-align:left;margin-bottom:6px">Poner una sanción <span class="sc">· '+nTotal+(nTotal===1?' persona':' personas')+' bajo tu jurisdicción</span></button>'
+      : '<h4>Poner una sanción <span class="sc">· '+nTotal+(nTotal===1?' persona':' personas')+' bajo tu jurisdicción</span></h4>')+
+    '<div class="doc-edit'+(_sancFormAbierto_()?' ab':'')+'" data-sponer-caja><div class="doc-edit-c"><div class="tarj">'+
       '<span class="sc" style="display:block;margin-bottom:5px">A quién</span>'+
       _sancQuienHTML_({repintar:_repintarSancM_, colorOk:'var(--ink3)',
         alCambiar:function(){ var _es=$('#snEscala'); if(_es) _es.textContent=_escalaSancTxt_(); },   /* 26/10 (A5b) */
@@ -117,9 +122,19 @@ function _sancionesHTML_(){
       '<p class="rnota" id="snEscala" style="margin:-4px 0 10px">'+_escalaSancTxt_()+'</p>'+
       '<button class="btn pri full" data-p id="btnSanc">Poner la sanción</button>'+
       '<p class="rnota" id="snMsg" style="margin:8px 0 0"></p>'+
-    '</div>'+
+    '</div></div></div>'+
     _vetoMovilHTML_()+
     '<h4>Pendientes de decidir</h4>'+_sancColaHTML_();
+}
+/* sanciones-1: ¿hay sanciones esperando decisión? (con la cola sin leer o vacía, el formulario va primero y abierto, como antes) */
+function _sancHayCola_(){ return !!(SANC_M && SANC_M.length); }
+/* ¿El formulario va desplegado? Sin cola: siempre. Con cola: lo que el usuario dejó (`SANC_PON_M`), o abierto si ya lleva algo tecleado
+   (una cola que llega tarde no puede plegar y esconder lo que se estaba escribiendo). */
+var SANC_PON_M = null;
+function _sancFormAbierto_(){
+  if(!_sancHayCola_()) return true;
+  if(SANC_PON_M !== null) return SANC_PON_M;
+  return !!(SANC_FORM.quien || SANC_FORM.motivo || SANC_FORM.libre || SANC_FORM.tarea || SANC_FORM.pts);
 }
 /* 31/10: «Procede veto» y sus dos tareas, encima de la cola (`_vetoFilas_`, en comun.js); sin nada que atender, no existe. */
 function _vetoMovilHTML_(){
@@ -234,6 +249,8 @@ function _cablearSanciones_(){
   /* Los campos se guardan al teclear y el motivo repinta (`_sancCablearCampos_`, comun.js, la misma que el escritorio).
      Se llama a `_repintarSancM_` por su nombre en cada sitio: lo unico que hace visible que la puerta es UNA. */
   _sancCablearCampos_(_repintarSancM_);
+  $$('[data-sponer]').forEach(function(b){ b.onclick=function(){
+    var c=document.querySelector('[data-sponer-caja]'); if(c) SANC_PON_M=c.classList.toggle('ab'); }; });
 
   var bt=$('#btnSanc');
   if(bt) bt.onclick=async function(){
