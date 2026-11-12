@@ -4328,7 +4328,8 @@ function _firmaParte_(p){
     var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)));
     el = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
   } else if (/^\d{4}-\d{2}-\d{2}/.test(at)) el = _isoADMY_(at.slice(0, 10));
-  var quien = por ? ((typeof _pilaDeM_ === 'function' && _pilaDeM_(por)) || por) : null;
+  /* refutar11: «el sistema (cierre de turno)» NO es una persona: su «pila» era «el» y salía «otorgado el 12/11/2026 por el ·». */
+  var quien = /^el sistema\b/i.test(por) ? 'el sistema' : (por ? ((typeof _pilaDeM_ === 'function' && _pilaDeM_(por)) || por) : null);
   if (!el && !quien) return '(no consta cuándo ni quién)';
   return (el ? 'el ' + el : '(no consta cuándo)') + ' ' + (quien ? 'por ' + quien : '(no consta quién)');
 }
@@ -6621,6 +6622,20 @@ function _turnoBaseDeParte_(p){
   if(!p) return 0;
   if(Number(p.turno_h) > 0) return Number(p.turno_h);
   return /^turno-\d{4}-\d{2}-\d{2}-extra-/.test(String(p.clave || '')) ? _horasTurnoBase_() : 0;
+}
+/* refutar11 (12/11): un MURO (sin permiso, beta, sin datos) no se quita nunca: lo de detrás —la semilla ficticia de la cara, con su
+   menú— no puede recibir el foco del teclado ni leerlo un lector de pantalla. `inert` lo apaga. El gate de «Verificando…» NO usa esto:
+   ése se quita al entrar y lo de detrás tiene que seguir vivo. */
+function _muro_(html){
+  var g=_gate_(html);
+  [].forEach.call(document.body.children,function(e){ if(e!==g) e.setAttribute('inert',''); });
+  return g;
+}
+/* El texto de un parte de turno largo lo escribe el servidor con el decimal en PUNTO («4.75 h (4 h de turno + 0.75 h…)»; es la gemela
+   de Apps Script y no se toca) y la app escribe en coma. Sólo se retoca ese texto, no cualquier tarea con un punto entre cifras. */
+function _tareaVista_(t){
+  t = String(t == null ? '' : t);
+  return /^Turno del [^:]*: [\d.]+ h \(/.test(t) ? t.replace(/(\d)\.(\d)/g, '$1,$2') : t;
 }
 function _horasVistaParte_(p){
   if(!p) return 0;

@@ -61,7 +61,7 @@ function _origenParte_(p){
    maneras de tratar los de meses cerrados (ocultar, marcar o plegar), decida Daniel la que
    decida. Normalizar es tirar lo que no nombras, y aquí se estaba tirando la fecha de verdad. */
 function normPMovil(p){
-  return { id:p.id, f:_isoADMY_(p.fecha), iso:String(p.fecha||''), t:p.tarea||'', q:Number(p.horas)||0,
+  return { id:p.id, f:_isoADMY_(p.fecha), iso:String(p.fecha||''), t:_tareaVista_(p.tarea), q:Number(p.horas)||0,
     bloque:p.bloque||null,   /* 03/11: el icono «en bloque» de `filaParte` */
     turno_h:p.turno_h||0, clave:p.clave||'',   /* 11/11 (turnoextra): `_horasVistaParte_` los lee */
     e:_E_MOVIL_[p.estado]||'raro', ini:p.ini||'',   /* 20/10: lo que no conocemos NO es «en cola» (§3c-24) */ fin:p.fin||'', cat:p.categoria||null, subcat:p.subcat||null,

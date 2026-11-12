@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=a2bd4cf"></script>
+<script src="comun.js?v=155048f"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=561a9dd"></script>
@@ -122,7 +122,7 @@
 <script src="documentos.movil.js?v=11e461e"></script>
 <script src="sanciones.movil.js?v=867dca2"></script>
 <script src="reuniones.movil.js?v=149f3c9"></script>
-<script src="horas.movil.js?v=036b1b2"></script>
+<script src="horas.movil.js?v=d6105c5"></script>
 <script src="equipo.movil.js?v=3e5c499"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -956,7 +956,7 @@ async function _onCredencial_(resp,_silente){
        llega a notar. Cerrar por «me falta algo» en vez de por «me falta ESTO» habria dejado a
        todo el equipo fuera de la app, que es mucho peor que el fallo que veniamos a arreglar. */
     if(!_YO_REAL_){
-      _gate_(SPLASH+'<div style="max-width:330px;line-height:1.6">'+
+      _muro_(SPLASH+'<div style="max-width:330px;line-height:1.6">'+
         '<b>Has entrado, pero no encontramos tus datos.</b><br><br>'+
         '<span style="opacity:.75">Tu cuenta es '+esc(SESION.email||'\u2014')+
         '. Si acabas de unirte al equipo, puede que a\u00fan '+
@@ -1001,7 +1001,7 @@ async function _onCredencial_(resp,_silente){
        de quitar el gate: si no pasa, la app no llega a arrancar. Se le manda a la de
        verdad con un botón, que es lo único útil que se le puede decir. */
     if(!_puedeBeta_()){
-      _gate_(SPLASH+'<div style="max-width:320px;line-height:1.6">Esta es la versión de '+
+      _muro_(SPLASH+'<div style="max-width:320px;line-height:1.6">Esta es la versión de '+
         'pruebas.<br><br>'+
         'La normal está aquí:</div>'+
         '<a href="../produccion/index.html" style="border:1px solid #463E40;background:none;color:#F4F3F3;'+
@@ -1770,7 +1770,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='ce367a7';
+var BUILD='31b20fb';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

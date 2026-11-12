@@ -173,7 +173,7 @@ function normParte(p){
   var _eo=_etiOrigenParte_(p);
   if(_eo) fl.push([_eo.tono==='ok'?'ok':'wa', _eo.txt]);
   return { id:p.id, autor:p.autor, unidad:p.subsistema||'—', fecha:_isoADMY_(p.fecha),
-    ini:p.ini||'—', fin:p.fin||'—', horas:Number(p.horas)||0, tarea:p.tarea||'',
+    ini:p.ini||'—', fin:p.fin||'—', horas:Number(p.horas)||0, tarea:_tareaVista_(p.tarea),
     turno_h:p.turno_h||0, clave:p.clave||'',   /* 11/11 (turnoextra): `_horasVistaParte_` los lee */
     /* ⛔ EL ORIGEN SE PASA TAL CUAL, sin traducirlo a `bloque`/`turno`. Ese par era un
        TERCER vocabulario para el mismo hecho, y ademas mentia: llamaba «bloque» a lo que
