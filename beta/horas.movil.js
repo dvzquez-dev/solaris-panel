@@ -1542,8 +1542,13 @@ function _desgloseMesHTML_(confs, clave){
      debería aparecer compensación por tu cargo y luego … todas estas contribuciones extras»*). La base y la extra no son
      partes: entran en su grupo como filas FIJAS (`catDesglose`), y la extra va a «Otras contribuciones». Lo demás se
      reparte por la tabla de comun.js. La suma de los subtotales es la de antes: ninguna fila se pierde ni se cuenta dos veces. */
-  var fijas=_fijasDesglose_(r.todos);
-  var grupos=_gruposDesgloseHTML_(fijas.concat(r.todos));
+  /* ⛔ 11/11 (refutar10): con la cifra de Notion, lo aprobado u otorgado que aún no ha llegado a tu ficha NO puede sumar en los
+     grupos: la cabecera decía 5,5 h y los grupos 2 + 2,5 + 2,5 = 7 (la hora otorgada de la reunión dentro de «Reuniones»).
+     Va APARTE, con su suma, igual que la píldora de «Horas»: las dos pantallas dicen lo mismo con la misma regla (`enFicha`). */
+  var _fuera=_notionD ? r.todos.filter(function(x){ return x.enFicha===false; }) : [];
+  var _dentro=_fuera.length ? r.todos.filter(function(x){ return x.enFicha!==false; }) : r.todos;
+  var fijas=_fijasDesglose_(_dentro);
+  var grupos=_gruposDesgloseHTML_(fijas.concat(_dentro))+_fueraDeFichaHTML_(_fuera);
   /* ⛔ EL TITULO, DEL PERIODO — NO DEL RELOJ DEL TELEFONO. El contenido de esta ventana va
      de CIERRE A CIERRE (`_ultimosMov_(…,'mes')` → `_deEsteMes_` → `_periodoAbierto_()`)
      y el titulo salia de `new Date()`. Julio se aplico el 04/08, asi que del 01 al 04 de
@@ -1561,7 +1566,7 @@ function _desgloseMesHTML_(confs, clave){
     '<div class="tarj">'+
       '<div class="cifh"><span class="g mono">'+nf2(total)+'</span><span class="sc">h '+
         (_notionD?'este mes':'que cuentan')+'</span></div>'+
-      desgloseCat(fijas.concat(r.todos))+   /* 31/10: con la base y la extra, o el resumen no suma el total */
+      desgloseCat(fijas.concat(_dentro))+   /* 31/10: con la base y la extra, o el resumen no suma el total */
     '</div>'+
     '<div class="tarj">'+grupos+'</div>'+
     '<p class="rnota">'+(_cr
@@ -1570,6 +1575,16 @@ function _desgloseMesHTML_(confs, clave){
         'más y <b>no pasa al mes siguiente</b>.'
       : 'Aquí sale la <b>base</b> de tu cargo (Project Director 7 h, Coordinador 3,5 h, '+
         'miembro 2 h). Si tienes extras, <b>todavía no los vemos</b>.')+'</p>';
+}
+
+/* Lo aprobado u otorgado que aún no está en la ficha (refutar10): un bloque aparte, con su suma, debajo de los grupos que sí suman en la cifra. */
+function _fueraDeFichaHTML_(ps){
+  if(!ps.length) return '';
+  var h=ps.reduce(function(t,p){ return t+(Number(p.q!=null?p.q:p.horas)||0); },0);
+  return '<div class="dgrp fuera" style="border-left-color:var(--line)"><div class="dgh"><b>Aún no en tu ficha</b><span class="ln"></span>'+
+    '<span class="mono">+'+nf2(h)+' h</span></div>'+
+    '<p class="rnota" style="margin:2px 0 6px">Aprobadas, pero todavía no suman en el total de arriba. Entran cuando se aplican.</p>'+
+    ps.map(function(p){ return filaParte(p); }).join('')+'</div>';
 }
 
 /* Los grupos por categoría, con su color y sus filas (la mitad de abajo del desglose, compartida por el mes abierto y los demás). */
