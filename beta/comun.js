@@ -3590,10 +3590,13 @@ function _cierreRelojTexto_(empezadoISO, ahoraMs){
 
 /* La propuesta, en texto, de lo que se cierra (la ve quien cierra). */
 function _cierreTextoPropuesta_(t, mapa, st){
-  return 'Turno ' + ((t && (t.fecha_txt || t.fecha || t.f)) || '?') +
-    ' \u00b7 ' + Object.keys(mapa).length + ' persona(s), +1 turno cada una\n' +
+  /* 12/11 (refutar12): la prosa va con la fecha DD/MM/AAAA (`_isoADMY_`; un `fecha_txt` ya legible pasa igual), «N personas» y la COMA decimal
+     (`nf2`): salía «Turno 2026-11-09 · 3 persona(s)… +0.5 h» en el aviso que lee quien cierra un turno largo. */
+  var n = Object.keys(mapa).length;
+  return 'Turno ' + _isoADMY_((t && (t.fecha_txt || t.fecha || t.f)) || '?') +
+    ' \u00b7 ' + n + (n === 1 ? ' persona' : ' personas') + ', +1 turno cada una\n' +
     Object.keys(mapa).map(function(n){
-      return '  ' + n + ' \u2192 ' + (mapa[n] ? ('+' + mapa[n] + ' h a Compensaciones') : 'sin extra') + (st.coche[n] ? ' \u00b7 llev\u00f3 coche' : ''); }).join('\n');
+      return '  ' + n + ' \u2192 ' + (mapa[n] ? ('+' + nf2(mapa[n]) + ' h a Compensaciones') : 'sin extra') + (st.coche[n] ? ' \u00b7 llev\u00f3 coche' : ''); }).join('\n');
 }
 
 /* «Cerrar el turno», UNA vez: valida, manda el tramo REAL y el reparto, y deja el turno «Realizado». El servidor crea, por asistente,
@@ -14280,6 +14283,11 @@ function _bloqueCuerpo_(B){
 }
 
 /* Lo que contestó el servidor, persona a persona: las líneas que NO nacieron (solape, horas de más) se dicen. */
+/* 12/11 (refutar12): cuántas líneas del bloque se crearon de verdad. Con un horario que se solapa con otro parte salían «0 de 5» bajo el título y el
+   aviso «Parte de bloque enviado: pendiente de aprobar», que dice lo contrario de lo que pasó. */
+function _bloqueCreados_(resp){
+  return ((resp && resp.resultados) || []).filter(function(x){ return !x.error; }).length;
+}
 function _bloqueResHTML_(resp){
   var l=(resp && resp.resultados) || [], ok=0;
   var filas=l.map(function(x){
@@ -14289,8 +14297,8 @@ function _bloqueResHTML_(resp){
       (bien ? ico('tick')+' <b>'+esc(x.nombre||'')+'</b>'+(x.repetido?' · ya estaba':(x.parte&&x.parte.horas!=null?' · '+nf2(x.parte.horas)+' h':''))
             : ico('aviso')+' '+esc(x.error))+'</li>';
   }).join('');
-  return '<div id="blqRes"><p style="margin:0 0 8px;font-size:13px"><b>'+ok+' de '+l.length+'</b> líneas creadas, pendientes del PD'+
-    (resp && resp.autocierre ? ' (se cerró solo al tope de horas)' : '')+'.</p>'+
+  return '<div id="blqRes"><p style="margin:0 0 8px;font-size:13px">'+(ok ? '<b>'+ok+' de '+l.length+'</b> líneas creadas, pendientes del PD'+
+    (resp && resp.autocierre ? ' (se cerró solo al tope de horas)' : '')+'.' : '<b>No se creó ninguna línea</b> (0 de '+l.length+'). Mira los avisos de abajo.')+'</p>'+
     '<ul style="margin:0 0 12px;padding-left:2px;list-style:none;font-size:12.5px;line-height:1.5">'+filas+'</ul></div>';
 }
 
@@ -14345,7 +14353,7 @@ function _bloqueFormHTML_(){
   var B=BLQ; if(!B) return '';
   var fin=B.modo==='finalizar';
   if(B.res)
-    return '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 10px">Parte de bloque enviado</div>'+
+    return '<div class="mtit" style="font-weight:600;font-size:16px;margin:0 0 10px">'+(_bloqueCreados_(B.res)||!(B.res.resultados||[]).length ? 'Parte de bloque enviado' : 'No se creó ningún parte')+'</div>'+
       _bloqueResHTML_(B.res)+'<button class="btn pri" data-blqcerrar data-p>Cerrar</button>';
   var lab=function(t){ return '<span class="sc" style="display:block;margin:0 0 5px">'+t+'</span>'; };
   return '<div id="blqForm">'+
@@ -14417,7 +14425,7 @@ function _bloqueCablear_(cb){
       _borrBorrar_('bloque-resumen');   /* 04/11: enviado bien → fuera el borrador (el cuerpo puede llevar el resumen recortado) */
       if(B.modo==='finalizar' && B.reunion) B.reunion.en_curso=null;
       if(B.reunion && B.res.bloque) B.reunion.bloque=B.res.bloque;      // fichada: el aviso «ya ha pasado» se va
-      tost('Parte de bloque enviado: pendiente de aprobar.');
+      tost(_bloqueCreados_(B.res)||!(B.res.resultados||[]).length ? 'Parte de bloque enviado: pendiente de aprobar.' : 'No se creó ningún parte: mira los avisos.');
       if(cb.hecho) cb.hecho(B.res);
       cb.refrescar();
     }catch(e){

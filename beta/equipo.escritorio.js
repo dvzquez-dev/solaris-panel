@@ -243,7 +243,9 @@ function _tuyoHTMLE_(){
         (R.fijada ? '' : (R.convocante===yo ? ' · la organizas tú' : (pend ? ' · te falta cubrirla' : ' · ya la cubriste'))),
       'Ver', 'dispo', 'reu-'+R.id));
   }
-  if(!its.length) return '<div class="tu-nada"><span class="pt"></span>Nada pendiente por tu parte</div>'+
+  /* 12/11 (refutar12): «Nada pendiente por tu parte» encima de «Requiere tu decisión · 9 asuntos» se leía como una contradicción en el Panel del PD y de los
+     coordinadores. Esto habla de lo PROPIO (partes sin declarar, tareas, reuniones por cubrir): se dice así, con el nombre de «Lo tuyo». */
+  if(!its.length) return '<div class="tu-nada"><span class="pt"></span>Lo tuyo está al día</div>'+
     (filas.length ? '<div class="tu-g">'+filas.join('')+'</div>' : '');
   return pan('Lo que te toca a ti', its.length+(its.length===1?' asunto':' asuntos'),
     '<div class="pb"><div class="tu-g">'+filas.join('')+'</div></div>');

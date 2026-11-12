@@ -1890,6 +1890,11 @@ function _pdFichaHTML_(p){
    dias cazando pasaron a decir «ANCLA NO UNICA (2)» en cuanto la segunda copia entro. Es la
    forma mas barata que tiene esta casa de enterarse de que algo se ha escrito dos veces —
    arreglar el orden en una copia y dejar la otra alfabetica no habria dado ningun error. */
+/* 12/11 (refutar12): «Esperan tu decisión» se REPINTA tras cada decisión y los desplegables nacían cerrados: con cinco partes de cuatro personas, el PD
+   tenía que volver a abrir su grupo después de CADA firma. Se recuerda qué está abierto (por id de tarjeta y, en el de persona, por autor). */
+var PD_ABIERTO_={};
+document.addEventListener('toggle', function(ev){ var d=ev.target;
+  if(d && d.dataset && d.dataset.pdk) PD_ABIERTO_[d.dataset.pdk]=d.open; }, true);
 function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
   if(!lista.length) return '';
   var horas=0; lista.forEach(function(p){ horas+=p.q; });
@@ -1904,14 +1909,15 @@ function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
      no agrupa es un clic regalado. */
   var unico = orden.length===1;
   return '<div class="tarj" id="'+id+'">'+
-    '<details class="pdgrupo">'+
+    '<details class="pdgrupo" data-pdk="'+id+'"'+(PD_ABIERTO_[id]?' open':'')+'>'+
       '<summary><b>'+titulo+'</b>'+
         '<span class="pdnum">'+lista.length+' '+(lista.length===1?'parte':'partes')+
         ' · '+nf2(horas)+' h</span></summary>'+
       '<p class="rnota" style="margin:8px 0 10px">'+nota+'</p>'+
       orden.map(function(a){
         var ps=por[a], h=0; ps.forEach(function(x){ h+=x.q; });
-        return '<details class="pdpers"'+(unico?' open':'')+'>'+
+        var k=id+'|'+a;
+        return '<details class="pdpers" data-pdk="'+esc(k)+'"'+((unico||PD_ABIERTO_[k])?' open':'')+'>'+
           '<summary><b>'+esc(ps[0].pila)+'</b>'+
             '<span class="pdnum">'+ps.length+' · '+nf2(h)+' h</span></summary>'+
           ps.map(ficha).join('')+
