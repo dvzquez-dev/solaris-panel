@@ -8385,7 +8385,7 @@ function _ahoraLocalISO_(d){
 function _franjasDemo_(){
   var out=[], h, p=function(n){ return (n<10?'0':'')+n; };
   for(h=9;h<23;h++){
-    if(h>=14 && h<16) continue;
+    if(h>=14 && h<15) continue;   /* 13/11: la tarde empieza a las 15:00; espejo de `HUECO_COMIDA` */
     out.push({k:'h'+p(h), txt:p(h)+':00'});
   }
   return out;
