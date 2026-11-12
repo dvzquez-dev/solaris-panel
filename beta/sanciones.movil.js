@@ -514,7 +514,8 @@ function _misSancHTML_(){
   var nota=tarde ? '<small style="display:block;color:var(--ink3);margin-top:8px">'+(tarde === 1 ? 'Una sanción tuya ya no se puede apelar: pasó el plazo.' : tarde+' sanciones tuyas ya no se pueden apelar: pasó el plazo.')+'</small>' : '';
   if(!L.length && !nota) return '';
   return '<div class="msanc"><div class="sc" style="margin:14px 0 2px">Tus sanciones</div>'+L.map(function(s){
-    var est=_sancEstadoM_(s), p=(s.puntos === null || s.puntos === undefined) ? _etPtsSanc_(null) : (s.puntos < 0 ? '−' + Math.abs(s.puntos) : String(s.puntos));
+    /* 12/11 (refutar27): «−1 punto» / «+1 punto», como el escritorio (`_etPtsSanc_`): antes «−1» a secas y «1» (sin signo) para uno que suma. */
+    var est=_sancEstadoM_(s), p=_etPtsSanc_((s.puntos === null || s.puntos === undefined) ? null : Number(s.puntos));
     return '<div class="fila" data-msfila="'+esc(s.id)+'"><div class="a"><b>'+esc(s.motivo || 'Sanción')+'</b>'+
       '<small>'+esc(p)+' · '+esc(_isoADMY_(String(s.fecha || '').slice(0, 10)) || '')+'</small>'+
       (est ? '<small class="msest" style="color:'+est[1]+'">'+esc(est[0])+'</small>' : '')+

@@ -47,7 +47,8 @@ function nf2(v){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,ma
    ⛔ 963.ª: y SIN CEROS DE COLA, que es la regla escrita (decisiones-app: «86,25, no 86,3 ni 86,00»). Aquí se
    elegían 0 ó 2 decimales, así que 15,5 salía «15,50 h» y en el panel del PD convivía con el «15,5» de `nf2`.
    Ahora es `nf2`: una sola cifra para las horas en toda la app. */
-function h1(v){ return nf2(Number(v)||0)+' h'; }
+/* 12/11 (refutar27): el NEGATIVO con el signo menos de verdad (U+2212), como el resto de la app («−1», «−2 puntos»): `Intl` da el guion corto («-2 h»). */
+function h1(v){ var n=Number(v)||0; return (n<0?'−':'')+nf2(Math.abs(n))+' h'; }
 
 /* ⛔ 01/11 · EL OBJETIVO DEL MES, DICHO (Daniel, 31/10: *«Sí, que se vea el número bueno»*). La cifra es la que calcula `_umbral_()`
    desde el `umbral` que sirve el panel (`flujos/umbral.py` ← `reglas/cuota.py`): aquí no hay ningún número escrito. UNA frase para
@@ -4617,6 +4618,9 @@ function _movDeSancion_(s){
        Con el rótulo de siempre, «−1 hasta el fin de temporada» al lado de su «+1» se leía como dos cosas vivas. */
     vv: just ? 'justificada<br>no restó'
       : (s.estado === 'revocada') ? 'revocada<br>se devolvió'
+      /* 12/11 (refutar27): APROBADA no es APLICADA. Los puntos del medidor son los de Notion y la rutina de aplicar los pasa después: mientras
+         tanto la fila ya está en el desglose pero el medidor no se ha movido, y no decirlo hace parecer que el medidor está mal. */
+      : (s.estado === 'aprobada' && s.puntos) ? 'aprobada<br>aún no '+(s.puntos > 0 ? 'suma' : 'resta')
       : (s.origen === 'revocacion') ? 'devuelve<br>una sanción'
       : (s.origen === 'premio') ? 'premio<br>no resta'
       : (s.origen === 'mensual') ? 'punto mensual<br>sin infracción'

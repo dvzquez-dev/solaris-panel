@@ -1378,7 +1378,8 @@ function filaParte(p){
     var _perS=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;   /* ⛔ por la puerta (791.ª) */
     sub += ' · '+esc(_selloAprobado_(p, _perS, (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null));
   }
-  var catTxt = _cuentaYa_(p.e) ? ' · sumó a '+catEti(p.cat)
+  /* 12/11 (refutar27): aprobado y aún NO en la ficha (`enFicha===false`: Notion lo aplica después) no «sumó»: SUMARÁ. La píldora de arriba ya lo decía. */
+  var catTxt = _cuentaYa_(p.e) ? (p.enFicha===false ? ' · aún no en tu ficha: sumará a ' : ' · sumó a ')+catEti(p.cat)
              : p.e==='pend' ? ' · irá a '+catEti(p.cat) : '';
   /* ⛔ Y EL BOTON TAMBIEN EN 'det'. Sin el, la linea de arriba prometia «vuelve a enviarla»
      sobre una ficha sin nada que pulsar: la promesa estaba escrita desde el primer dia y no
@@ -2365,7 +2366,7 @@ function vHoras(){
         /* ⛔ A UNA DECIMAL, como el escritorio (19/10): la ponderada es un COCIENTE, no horas
            fichadas, y la regla de la centésima es para las fichadas (951.ª). «18,55 h» aquí y
            «18,6» allí era el mismo número dicho de dos formas. */
-        '<span class="h mono">'+(_hmPond==null?'—':nf(_hmPond,1)+' h')+'</span></div>'
+        '<span class="h mono">'+(_hmPond==null?'—':nf(_hmPond,1)+' h/mes')+'</span></div>'
       : '<div class="r"><span class="p mono">'+i+'</span><span class="cens"></span></div>';
   }
 
