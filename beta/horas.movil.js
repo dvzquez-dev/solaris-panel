@@ -741,6 +741,7 @@ function _firmaTxtM_(rt){
 }
 
 function vFichar(){
+  _formParteRecuperar_(ST.form);
   var s=ST.ses, min=minSes(), largo=min>=600, corre=s.estado==='corriendo';
   var nube=(typeof backendOK!=='undefined' && backendOK && SESION);   // sesión respaldada por la nube
   /* ⛔ EL PERFIL ELEGIDO, no `YO.unidad`. Esta pantalla dice QUIEN FIRMA en DOS sitios —la
@@ -1263,6 +1264,7 @@ async function enviarFichaje(){
            ⚠️ Los tres reintentos internos de `api._post` ya mandaban la misma clave (`body`
            se construye FUERA del `for`, `movil.html:272`): eso no era el agujero. */
         if(!f.clave) f.clave=_claveUso_();
+        _formParteGuardar_(f);   /* refutar37: la clave sobrevive a una app cerrada entre el envío y su respuesta */
         var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, subcat:_subcatEnvio_(f), horas:dur,
           ini:f.ini, fin:f.fin, tramos:_tramosEnvio_(f), justificacion:f.just.trim(), sinFichaje:true,
           subsistema:_perfilElegido_(), clave:f.clave, tareaUrl:_imputacionUrl_(f,TAREAS,_fichaYo_()) });
@@ -1286,7 +1288,7 @@ async function enviarFichaje(){
          HOY, que es el caso normal. */
       var _cola=_colaTxtM_();
       ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null; f.tramos=[];
-      f.fecha=HOY;
+      f.fecha=HOY; f.clave=null; _formParteBorrar_();
       /* ⚠️ Y el aviso lo DICE en vez de inventarse un número: sin las horas de vuelta,
          se confirma el envío y se manda a mirar la lista, que es donde estarán. */
       tost(h==null

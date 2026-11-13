@@ -114,16 +114,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=3fb35a9"></script>
+<script src="comun.js?v=71dc39d"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
-<script src="tareas.movil.js?v=fedfca9"></script>
+<script src="tareas.movil.js?v=4f42fdf"></script>
 <script src="turnos.movil.js?v=9f03236"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=16564e6"></script>
 <script src="sanciones.movil.js?v=7f75222"></script>
 <script src="reuniones.movil.js?v=bdb5535"></script>
-<script src="horas.movil.js?v=ffc1104"></script>
+<script src="horas.movil.js?v=7587902"></script>
 <script src="equipo.movil.js?v=d4e7001"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -622,6 +622,21 @@ function _modalAbierto_(){
   var m=document.getElementById('modal');
   return !!(m && m.classList.contains('on'));
 }
+/* refutar37 (13/11, el taller): al volver de un rato fuera SIN cobertura el refresco falla en silencio (cada dato lleva su `.catch(function(){})` para que uno no
+   tumbe a los demás) y la pantalla enseña lo de hace media hora como si fuera de ahora: quien decide con ello no sabe que es viejo. Sólo en `vuelta`/`reloj`
+   (el «vivo» de cada segundo no cuenta: un fallo suelto no es «sin cobertura»). La franja es fija, no toca #main (que se repinta) y se quita sola al llegar el siguiente panel. */
+var _DESFASE_OK_=Date.now();
+function _avisoDesfase_(llego){
+  var el=document.getElementById('desfase');
+  if(llego){ _DESFASE_OK_=Date.now(); if(el) el.remove(); return; }
+  if(typeof _sesionMuerta_==='function' && _sesionMuerta_()) return;   // ese caso ya lo dice `_avisarSesionMuerta_`
+  var min=Math.max(1, Math.round((Date.now()-_DESFASE_OK_)/60000));
+  var txt='Sin conexión: lo que ves es de hace '+(min>=60 ? Math.floor(min/60)+' h' : min+' min')+'. Se pondrá al día solo al volver la cobertura.';
+  if(!el){ el=document.createElement('div'); el.id='desfase'; el.setAttribute('role','status');
+    el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:60;padding:6px 12px;font-size:12px;text-align:center;background:var(--warn,#c9a227);color:#111';
+    document.body.appendChild(el); }
+  el.textContent=txt;
+}
 async function _refrescoVivo_(motivo, que){
   var _hoy0=HOY; HOY=_hoyTxt_();   // 841.ª: ANTES de las salidas — la fecha cambia aunque no se pida nada al servidor
   /* 842.ª: el formulario de declarar bloque tomó `fecha:HOY` AL CARGAR; si el día cambió y nadie tocó esa
@@ -665,7 +680,7 @@ async function _refrescoVivo_(motivo, que){
        justo las cifras que uno vuelve a mirar para ver si ha entrado lo que acaba de
        fichar. Va en el mismo `Promise.all`: no cuesta una vuelta mas de reloj. */
     var fch=(!que && typeof _resincFichaje_==='function') ? _resincFichaje_() : Promise.resolve(false);   /* refutar25: vuelta/reloj (no el «vivo» de cada segundo) */
-    var pnl=_pideSi_(que,'resto','getPanel').then(function(x){ if(x){ _refrescarPanelM_(x); return _alinearCierre_(); } }).catch(function(){});   /* refutar21: y si el cierre cambió, el mes de trabajo con él */
+    var pnl=_pideSi_(que,'resto','getPanel').then(function(x){ if(!que) _avisoDesfase_(!!x); if(x){ _refrescarPanelM_(x); return _alinearCierre_(); } }).catch(function(){});   /* refutar21: y si el cierre cambió, el mes de trabajo con él */
     /* ⛔ Y LA COLA DE SANCIONES (733.ª). Se cargaba UNA sola vez, en el arranque
        (`movil.html:815`), y aqui no estaba: quien deja el telefono abierto veia **el lote
        de cuando entro** toda la sesion, y el panel del PD de la pantalla de Estado pinta
@@ -1851,7 +1866,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='05afd18';
+var BUILD='a3ec7c7';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2378,19 +2393,19 @@ function _engFichar_(){
      el rotulo de «Trabajo de subsistema» y la linea de quien firma. Repintar solo lo que se
      toco dejaria las otras dos diciendo lo de antes, que es peor que no decir nada. */
   var _fp=$('#fPerfil'); if(_fp) _fp.onchange=function(){ ST.form.perfil=_fp.value; pintar(); };
-  var _fc=$('#fCat'); if(_fc) _fc.onchange=function(){ ST.form.cat=_fc.value; ST.form.tarea=''; ST.form.detalle=''; ST.form.subcat=''; pintar(); };
-  var _fs=$('#fSubcat'); if(_fs) _fs.onchange=function(){ ST.form.subcat=_fs.value; pintar(); };
-  var _ft=$('#fTar'); if(_ft) _ft.onchange=function(){ ST.form.tarea=_ft.value; ST.form.detalle=''; pintar(); };
+  var _fc=$('#fCat'); if(_fc) _fc.onchange=function(){ ST.form.cat=_fc.value; ST.form.tarea=''; ST.form.detalle=''; ST.form.subcat=''; _formParteGuardar_(ST.form); pintar(); };
+  var _fs=$('#fSubcat'); if(_fs) _fs.onchange=function(){ ST.form.subcat=_fs.value; _formParteGuardar_(ST.form); pintar(); };
+  var _ft=$('#fTar'); if(_ft) _ft.onchange=function(){ ST.form.tarea=_ft.value; ST.form.detalle=''; _formParteGuardar_(ST.form); pintar(); };
   var fd=$('#fDetalle');
-  if(fd) fd.oninput=function(){ ST.form.detalle=fd.value; validarFichaje(); };
+  if(fd) fd.oninput=function(){ ST.form.detalle=fd.value; _formParteGuardar_(ST.form); validarFichaje(); };
   var fj=$('#fJust');
   if(fj) fj.oninput=function(){ ST.form.just=fj.value; validarFichaje(); };
   var ff=$('#fFecha');
-  if(ff) ff.oninput=function(){ ST.form.fecha=ff.value; };
+  if(ff) ff.oninput=function(){ ST.form.fecha=ff.value; _formParteGuardar_(ST.form); };
   ['fIni','fFin'].forEach(function(id){
     var e=$('#'+id);
     /* `oninput` recalcula al teclear (la hora ya es texto, no un desplegable); `validarFichaje` rotula las horas en #fDurQ. */
-    if(e) e.oninput=e.onchange=function(){ ST.form[id==='fIni'?'ini':'fin']=e.value.trim(); validarFichaje(); };
+    if(e) e.oninput=e.onchange=function(){ ST.form[id==='fIni'?'ini':'fin']=e.value.trim(); _formParteGuardar_(ST.form); validarFichaje(); };
     /* al salir del campo, «1730» pasa a «17:30» (el teclado numérico no trae los dos puntos) */
     if(e) e.onblur=function(){ var h=_horaTecleada_(e.value); if(h===e.value) return; e.value=h; e.oninput(); setTimeout(function(){ e.value=h; }, 0); };   /* el 2.º por si el navegador devuelve lo tecleado al confirmar el cambio */
   });
@@ -2400,7 +2415,7 @@ function _engFichar_(){
       var add=+b.dataset.add;
       if(!_horaHHMM_(ST.form.fin)) return;
       var p=ST.form.fin.split(':'); var m=(+p[0]*60 + +p[1] + add + 1440)%1440;
-      ST.form.fin=pad(Math.floor(m/60))+':'+pad(m%60);
+      ST.form.fin=pad(Math.floor(m/60))+':'+pad(m%60); _formParteGuardar_(ST.form);
       var s=$('#fFin'); if(s) s.value=ST.form.fin;
       validarFichaje();
     };

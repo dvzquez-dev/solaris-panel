@@ -3258,6 +3258,28 @@ function _borrLeer_(f){
   }catch(_){ return ''; }
 }
 function _borrBorrar_(f){ try{ localStorage.removeItem(_borrClave_(f)); }catch(_){} }
+/* ⛔ refutar37 (13/11, el taller): el borrador de un bloque DECLARADO no es sólo el texto. Con la app muerta por el sistema (segundo plano, sin red), al
+   reabrir volvía la justificación pero con la fecha de HOY, las horas por defecto (17:00-20:30) y sin la imputación: un texto de un bloque pegado a las
+   horas de otro, y nadie lo avisa. Y la `clave` de envío vivía sólo en memoria: si el servidor GUARDÓ y la respuesta se perdió, reabrir y reenviar mandaba
+   otra clave y el parte ya guardado chocaba consigo mismo («ya tiene el parte 804 … que se solapa»). Se guarda TODO junto, `clave` incluida, y el reenvío
+   recibe el parte que ya hay. Sólo del bloque a mano (`declararId==null`): los de «responder/declarar» nacen del parte que ya existe. */
+var FORM_PARTE_CAMPOS = ['fecha','ini','fin','cat','subcat','tarea','detalle','clave'];
+function _formParteGuardar_(f){
+  if(!f || f.declararId!=null) return;
+  var o={}; FORM_PARTE_CAMPOS.forEach(function(k){ if(f[k]!=null && f[k]!=='') o[k]=f[k]; });
+  _borrGuardar_('parte-forma', JSON.stringify(o));
+}
+/* Una vez por carga, y sólo si hay justificación recuperable (sin ella, lo demás no es «lo que escribías»). */
+function _formParteRecuperar_(f){
+  if(!f || f.declararId!=null || _formParteRecuperar_.hecho) return false;
+  _formParteRecuperar_.hecho=true;
+  if(!_borrLeer_('parte-just')) return false;
+  var o=null; try{ o=JSON.parse(_borrLeer_('parte-forma')||'null'); }catch(_){}
+  if(!o || typeof o!=='object') return false;
+  FORM_PARTE_CAMPOS.forEach(function(k){ if(typeof o[k]==='string' && o[k]) f[k]=o[k]; });
+  return true;
+}
+function _formParteBorrar_(){ _borrBorrar_('parte-forma'); }
 function _borrNorm_(t){ return String(t==null?'':t).replace(/\s+/g,' ').trim(); }
 /* Los campos con borrador dentro de `raiz` (o ella misma) que están vacíos reciben su texto. Dispara `input` para que la
    pantalla recalcule contadores/botones como si lo hubiera tecleado la persona. */
@@ -4677,6 +4699,7 @@ function _arrancarVivo_(refrescar){
     try{
       var r=await _pide_('queHayNuevo');
       if(!r || !r.sellos) return;
+      if(typeof _avisoDesfase_==='function') _avisoDesfase_(true);   /* refutar37: el servidor contesta → lo que se ve ya no es «de hace un rato» (si cambió algo, `refrescar` lo trae ahora) */
       if(!sellos){ sellos=r.sellos; return; }                 // la primera vuelta sólo toma la foto
       var c=_vivoCambios_(sellos, r.sellos);
       if(!c.length) return;
