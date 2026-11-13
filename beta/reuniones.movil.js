@@ -619,7 +619,7 @@ function vReu(){
   g+='<div style="grid-column:1;grid-row:1"></div>';
   R.dias.forEach(function(d,di){
     g+='<div style="grid-column:'+(di+2)+';grid-row:1;font-family:var(--mono);'+
-      'font-size:9px;color:var(--ink2);text-align:center;padding-bottom:3px">'+esc(d)+'</div>';
+      'font-size:9px;color:var(--ink2);text-align:center;padding-bottom:3px;line-height:1.15">'+esc(d).replace('/','/<wbr>')+'</div>';   /* 13/11 (refutar31): con la letra del sistema al 160 % «13/11» no cabe en su columna: parte tras la barra sólo si hace falta */
   });
   /* ⛔ 19/10: y A CABALLO de ese límite, no debajo (Daniel, 14/10: «justo en el medio de dos slots»):
      media línea más medio `gap` (2 px) hacia arriba, con `transform` para no tocar la caja del grid.
@@ -821,7 +821,7 @@ function cubrirModal(){
      horarios … no tiene mucho que ver con lo que es la pantalla de un teléfono»*. */
   var hd='<div class="rc"></div>';
   R.dias.forEach(function(d){
-    hd+='<div class="rc rh rhd">'+esc(d)+'</div>';
+    hd+='<div class="rc rh rhd" style="flex-wrap:wrap;line-height:1.1">'+esc(d).replace(/^(\d+)\/(\d+)$/,'$1<wbr><span style="font-size:.82em">/$2</span>')+'</div>';   // refutar31: con letra grande parte tras la barra (ver el mapa de calor)
   });
   /* Las casillas NO OFERTADAS ya no se pueden pintar. Antes se pintaban igual, se veian
      marcadas, y al guardar se caian sin decir nada: `vals` se arma recorriendo `bloques`,
@@ -851,7 +851,9 @@ function cubrirModal(){
        que la app es incoherente. Y va **encima** de la rejilla: debajo lo lee quien ya se ha
        rendido. */
     '<div class="rgesto">Un dedo <b>pinta</b> · dos dedos <b>deslizan</b></div>'+
-    '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nD+',minmax(44px,1fr))">'+hd+rows+'</div></div>'+
+  /* 13/11 (refutar31): `minmax(0,1fr)`, no 44 px fijos: con 7 días y la letra del sistema al 160 % la rejilla se salía de la pantalla, y `.rej` es
+     `touch-action:none` (pintar), así que `.rejw` no se puede desplazar con el dedo: lo que no cabe no se alcanza. */
+    '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nD+',minmax(0,1fr))">'+hd+rows+'</div></div>'+
     /* 🟡 4 (auditor 19): la leyenda explica la casilla rayada, igual que la del mapa de calor — sólo si la hay. */
     '<div class="leyh" style="margin-top:10px">'+ley+(_hayOff?'<span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>fuera del horario de ese día</span>':'')+'</div>'+
     '<div class="sc" id="ecount" style="margin:12px 0 10px"></div>'+
