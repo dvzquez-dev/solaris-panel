@@ -1444,6 +1444,7 @@ function _movHorasHTML_(confs, pends){
   var _ef = (typeof _esperanFirma_==='function') ? _esperanFirma_(pends)
                                                  : {n:0, horas:0, lista:[]};
   var _ap = _apuntesMes_(r.total, _cr?_cb:comp, _cx);
+  var _pf = _partirEnFicha_(r.todos, _hMesReal_(YO)!=null);   /* refutar36: las categorías suman la cifra de arriba, no lo aprobado sin aplicar */
   return '<div class="plg" style="margin-top:11px"><div class="plgh" data-plg data-p>'+
       /* ⚠️ EL CONTADOR SIGUE SIENDO EL DE LOS QUE CUENTAN. `_apuntesMes_` anuncia lo que
          YA suma --su contrato lo vigila su banco--, y lo que espera firma se dice APARTE
@@ -1464,7 +1465,8 @@ function _movHorasHTML_(confs, pends){
         '<small>'+esc(_cet)+'</small></div>'+
         '<div class="d"><b class="mono">'+nf2(_compBaseAHoy_(YO))+' h</b></div></div>'+   /* 13/11: devengada, como la cifra del mes */
       /* 01/11: SIN «Otras contribuciones» aparte; el mismo desglose por categorías que «Ver el desglose completo». */
-      desgloseCat(_fijasDesglose_(r.todos).concat(r.todos))+
+      desgloseCat(_fijasDesglose_(_pf.dentro).concat(_pf.dentro))+
+      (_pf.fuera.length ? '<p class="rnota" style="margin:0 0 6px">+'+nf2(_pf.fuera.reduce(function(t,p){ return t+(Number(p.q!=null?p.q:p.horas)||0); },0))+' h aprobadas aún no suman: entran cuando se aplican.</p>' : '')+
       '<p class="rnota" style="margin:8px 0 10px">'+
         (r.total
           ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes. '+
@@ -1581,8 +1583,7 @@ function _desgloseMesHTML_(confs, clave){
   /* ⛔ 11/11 (refutar10): con la cifra de Notion, lo aprobado u otorgado que aún no ha llegado a tu ficha NO puede sumar en los
      grupos: la cabecera decía 5,5 h y los grupos 2 + 2,5 + 2,5 = 7 (la hora otorgada de la reunión dentro de «Reuniones»).
      Va APARTE, con su suma, igual que la píldora de «Horas»: las dos pantallas dicen lo mismo con la misma regla (`enFicha`). */
-  var _fuera=_notionD ? r.todos.filter(function(x){ return x.enFicha===false; }) : [];
-  var _dentro=_fuera.length ? r.todos.filter(function(x){ return x.enFicha!==false; }) : r.todos;
+  var _pf=_partirEnFicha_(r.todos, _notionD), _fuera=_pf.fuera, _dentro=_pf.dentro;
   var fijas=_fijasDesglose_(_dentro);
   var grupos=_gruposDesgloseHTML_(fijas.concat(_dentro))+_fueraDeFichaHTML_(_fuera);
   /* ⛔ EL TITULO, DEL PERIODO — NO DEL RELOJ DEL TELEFONO. El contenido de esta ventana va
@@ -1614,6 +1615,13 @@ function _desgloseMesHTML_(confs, clave){
 }
 
 /* Lo aprobado u otorgado que aún no está en la ficha (refutar10): un bloque aparte, con su suma, debajo de los grupos que sí suman en la cifra. */
+/* refutar36 (13/11): LA REGLA DE «AÚN NO EN TU FICHA», UNA VEZ. Con la cifra de Notion, lo aprobado que aún no se ha aplicado (`enFicha===false`) no suma en los
+   grupos ni en el resumen de categorías: va aparte. La usan «Ver el desglose completo» y el desplegable «Este mes» (que no la aplicaba: con un parte de 1,5 h aprobado y sin
+   aplicar, «Horas del mes» decía 1,36 h y las categorías sumaban 2,86). Sin la cifra de Notion (`conNotion` falso) todo cuenta, como siempre. */
+function _partirEnFicha_(todos, conNotion){
+  var fuera=conNotion ? todos.filter(function(x){ return x.enFicha===false; }) : [];
+  return {fuera:fuera, dentro:fuera.length ? todos.filter(function(x){ return x.enFicha!==false; }) : todos};
+}
 function _fueraDeFichaHTML_(ps){
   if(!ps.length) return '';
   var h=ps.reduce(function(t,p){ return t+(Number(p.q!=null?p.q:p.horas)||0); },0);
