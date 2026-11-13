@@ -789,7 +789,7 @@ function _engConv_(){
    botoncillo de hacer fotos»). Sólo mientras dura tu turno (`_ftEnCurso_`, comun.js) y si vas en él. La tarjeta nace OCULTA y la
    enseña `_ftPintar_` cuando el servidor dice que hay algo que enseñar a esta persona: ni tarjeta vacía ni texto chapa. */
 function _ftInicioM_(){
-  var ahora = new Date();
+  var ahora = _ahoraMadridDate_();           /* 13/11: «hoy» y la hora son las de Madrid, donde está el taller */
   var t = (typeof TURNOS !== 'undefined' ? TURNOS : []).filter(function(x){
     return _mioTurno_(x) && x.estado !== 'Cancelado' && _ftEnCurso_(x, ahora); })[0];
   if(!t) return '';
@@ -972,7 +972,7 @@ function _progConvElige_(id, caja){
   api.getDisponibilidad(id == null ? undefined : id).then(function(r){
     if(!PROG_T || $('#ptCalor') !== caja || PROG_T.elegida !== id) return;
     if(!r || !r.convocatoria){ di('No hay convocatoria de disponibilidad abierta para esa semana: elige el día y la hora a mano.'); return; }
-    var cv = r.convocatoria; cv.resp = r.cv || {};
+    var cv = _convSinBajas_(r.convocatoria, r.cv);
     PROG_T.cv = cv;   /* la regla del consejo con lo escrito a mano usa la MISMA convocatoria que el mapa */
     if(id == null){ PROG_T.elegida = cv.id; _progConvPintar_(); }   /* la vigente también se marca en los chips */
     var calor = _calorTurnos_(cv, '');
@@ -1068,7 +1068,7 @@ function _ctMDevolver_(t, v){
   t.hecho = (t.estado === 'Realizado' || t.estado === 'Cancelado');
 }
 function _ctMReloj_(t){
-  return t.empezado_at ? _cierreRelojTexto_(t.empezado_at, new Date(_ahoraApp_()).getTime()) : '';
+  return t.empezado_at ? _cierreRelojTexto_(t.empezado_at, _ahoraInstante_()) : '';
 }
 function _ctMHTML_(t){
   var v = _ctMVista_(t);
@@ -1094,9 +1094,9 @@ function _ctMHTML_(t){
   }
   /* El formulario del cierre */
   var tope0 = _cierreTope_(st);
-  _cierreSembrar_(v, st, new Date(_ahoraApp_()).toISOString());
+  _cierreSembrar_(v, st, new Date(_ahoraInstante_()).toISOString());
   if(!st.ini && !st.fin){   /* sin reloj: se parte de la hora del turno hasta ahora, si cuadra (un turno no dura más de 12 h) */
-    var i0 = String(v.hora || '').slice(0,5), f0 = _hhmmDe_(new Date(_ahoraApp_()).toISOString()), d0 = _durTurnoDeHoras_(i0, f0);
+    var i0 = String(v.hora || '').slice(0,5), f0 = _hhmmDe_(new Date(_ahoraInstante_()).toISOString()), d0 = _durTurnoDeHoras_(i0, f0);
     if(d0 != null && d0 <= 12){ st.ini = i0; st.fin = f0; st.dur = String(d0); }
   }
   var asis = _asistentesTurno_(v).concat(_dudososTurno_(v)), resp = _responsableTurno_(v);

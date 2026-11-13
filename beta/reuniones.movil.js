@@ -166,7 +166,7 @@ function _reunionesCargando_(){ return !!(typeof backendOK!=='undefined' && back
 
 
 function _normReuM_(r){
-  var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};
+  var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], _sb=_respDeActivos_(r.resp), resp=_sb.resp;      // refutar41: sin lo que contestó quien ya se fue
   /* null = bloque NO OFERTADO (con horario por día no todas las franjas existen todos los
      días). app.html lo resolvía con un Set `oferta`; aquí la matriz nace a null y solo los
      bloques realmente ofertados pasan a 0. Así un hueco muerto no se pinta como «nadie puede».
@@ -222,7 +222,7 @@ function _normReuM_(r){
     /* nResp = la cuenta del SERVIDOR (`_listar_`). `_nRespReu_` la necesita para no decir
        'nadie' sobre una reunion sin hidratar justo antes de BORRARLA. Lista blanca: lo que
        no se nombra aqui, se pierde (640.ª). */
-    nResp: +r.nResp || 0,
+    nResp: Math.max(0, (+r.nResp || 0) - _sb.quitadas),
     /* ¿ES TUYA? Antes solo se guardaba CUANTOS invitados hay, y sin los nombres nadie podia
        preguntarse «¿estoy yo?»: se le reclamaba cubrir a todo el equipo una reunion de un
        invitado. Y de no cubrir salen sanciones, asi que no es un aviso cosmetico.

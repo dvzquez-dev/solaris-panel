@@ -675,8 +675,7 @@ function _dispCargar_(repintar){
        mentira es peor que un hueco, porque se reparte gente con el. */
     CONVOCATORIAS.length=0;
     if(r && r.convocatoria){
-      var cv=r.convocatoria;
-      cv.resp = r.cv || {};
+      var cv=_convSinBajas_(r.convocatoria, r.cv);
       /* ⛔⛔ SIN `!!` (447.ª, 05/09). El guardia que lo lee tiene escrito su porque:
          `_convEstado_` usa `cv.abierta === false` y NO `!cv.abierta` porque *«una
          convocatoria vieja sin el campo es «no lo se», y cerrarla seria inventar»*.
@@ -1495,7 +1494,7 @@ function _cierreTurnoPanel_(){
      no fue —lo dice el comentario de `_cierreTurMapa_` dos funciones mas arriba—, mientras
      que dejarlos sin marcar solo cuesta un clic a quien sabe la respuesta. */
   /* La siembra (firmes sí, dudosos no, coche del reparto, y el reloj si el turno está empezado) es de `comun.js`: el móvil la comparte. */
-  _cierreSembrar_(t, CIERRE_TUR, new Date(_ahoraApp_()).toISOString());
+  _cierreSembrar_(t, CIERRE_TUR, new Date(_ahoraInstante_()).toISOString());
   tope = _cierreTurTope_();
   var ini0 = CIERRE_TUR.ini || String((t && t.hora) || '').slice(0,5);   /* el turno suele salir a su hora: de ahi se parte */
   var mapa = _cierreTurMapa_(), sinDur = _cierreTurSinDur_(),
@@ -1834,7 +1833,7 @@ function _convocarElige_(id){
   api.getDisponibilidad(id).then(function(r){
     if(String(CONV_ELEGIDA)!==String(id)) return;     /* mientras tanto eligió otra */
     var cv=r && r.convocatoria; if(!cv) throw new Error('vacía');
-    cv.resp=r.cv||{}; CONV_CV=cv; _convocarRepintarZona_();
+    _convSinBajas_(cv, r.cv); CONV_CV=cv; _convocarRepintarZona_();
   }).catch(function(){
     if(String(CONV_ELEGIDA)!==String(id)) return;
     CONV_CV={id:id, fallo:true}; _convocarRepintarZona_();

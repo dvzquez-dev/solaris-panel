@@ -695,6 +695,28 @@ function _scrollRestaurar_(m, y){
 }
 
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
+
+/* ⛔ refutar41 (13/11) · LO QUE CONTESTÓ QUIEN YA SE FUE NO CUENTA. `quitarDeConvocados` saca a una baja de los invitados, pero su FILA de
+   respuestas se queda (el histórico no se toca) y el servidor la sigue sirviendo: el mapa de calor de la reunión y el de «Programar turno»
+   contaban a Eli («1 puede» con 2 convocados que no habían contestado) y se le ofrecía para un turno. Cada miembro del panel trae `baja`
+   (el de un raso también): aquí se tira la fila al LEER, no al guardar. `{resp, quitadas}`: `quitadas` = filas con respuesta que se tiran,
+   para que quien lleve la cuenta del servidor (`nResp`) no cuente de más. Una puerta para las dos caras. */
+function _esBaja_(nombre){ var m=miembro(nombre); return !!(m && m.baja); }      // `miembro`: la ficha o `null` (quien no está no consta «de baja»: no se le toca)
+function _respDeActivos_(resp){
+  var out={}, quitadas=0, k;
+  resp=resp||{};
+  for(k in resp){
+    if(!Object.prototype.hasOwnProperty.call(resp,k)) continue;
+    if(_esBaja_(k)){ if(Array.isArray(resp[k]) || (resp[k] && typeof resp[k]==='object')) quitadas++; continue; }
+    out[k]=resp[k];
+  }
+  return {resp:out, quitadas:quitadas};
+}
+/* La convocatoria de turnos tal como la sirve el servidor (`resp` = `r.cv`), sin las filas de las bajas. El servidor no manda `invitados` en la convocatoria: no hay lista que limpiar. */
+function _convSinBajas_(cv, resp){
+  cv.resp=_respDeActivos_(resp||{}).resp;
+  return cv;
+}
 /* 22/10 (auditor 23, 🟠 8): los convocados que SIGUEN en el equipo, como el motor (`universo_convocado` sobre vivos).
    Si el censo no se conoce (menos de 2 activos: maqueta sin panel), la lista tal cual -- «no lo sé» no vacía a nadie. */
 function _invitadosVivos_(lista){
@@ -3383,7 +3405,7 @@ function _avisoMesDelBloque_(fechaDMY, hoyDMY, uc){
   var at = (uc && uc.at) ? new Date(uc.at) : null;
   if(ab && at && !isNaN(at.getTime())){
     var _2 = function(n){ return (n < 10 ? '0' : '') + n; };
-    var corte = at.getFullYear() + '-' + _2(at.getMonth() + 1) + '-' + _2(at.getDate());
+    var corte = _ahoraLocalISO_(at).slice(0, 10);            /* 13/11: el día de Madrid del cierre (a las 23:50 de Madrid en Helsinki ya es el 1) */
     if(f.slice(0,10) < corte) return ab;
     return f.slice(0,7) > h.slice(0,7) ? ab : '';
   }
@@ -3800,7 +3822,7 @@ async function _cierreEnviar_(t, st){
 /* «Empezar turno»: pone en marcha el reloj en el servidor y lo pega al turno. */
 async function _cierreEmpezar_(t){
   var re = await api.empezarTurno({id:t.id});
-  t.empezado_at = (re && re.empezado_at) || new Date(_ahoraApp_()).toISOString();
+  t.empezado_at = (re && re.empezado_at) || new Date(_ahoraInstante_()).toISOString();
   return t.empezado_at;
 }
 
@@ -7599,7 +7621,7 @@ function _nomMesAbierto_(corto){
    el que importa es el SALTO DE AÑO, que solo pasa en enero. Produccion la sigue llamando sin
    argumento y no cambia nada de lo que se ve. */
 function _mesACerrar_(hoy){
-  var h=hoy||new Date(), a=h.getFullYear(), m=h.getMonth();  /* getMonth() es 0-11 */
+  var h=hoy||_ahoraMadridDate_(), a=h.getFullYear(), m=h.getMonth();  /* getMonth() es 0-11 · 13/11: el mes de Madrid */
   if(m===0){ a-=1; m=11; } else { m-=1; }
   var mm=m+1, p=a+'-'+(mm<10?'0':'')+mm;
   /* ⛔ 20/10 (auditoría): SI EL MES ABIERTO ES MÁS VIEJO QUE «EL ANTERIOR AL DEL RELOJ», SE CIERRA ÉSE. Un mes no se
@@ -10808,7 +10830,18 @@ function _minSesion_(ini, pausas){
    ⛔ Y NO `iso.slice(11,16)`: el backend sella los fichajes con `toISOString()`, o sea UTC,
    asi que recortar la cadena ensena la hora de Greenwich — en verano espanol, DOS HORAS
    ANTES de la real. Ese era el fallo vivo de «Fichajes en curso» (ver el paso E). */
-function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes()); }
+function _hhmmDe_(iso){ return _ahoraLocalISO_(new Date(iso)).slice(11,16); }
+/* ⛔ 13/11 (refutar43): AHORA LA HORA ES LA DE **MADRID**, no la de la pared de quien mira. Con `getHours()` un miembro de Erasmus en Lisboa (−1 h) leía
+   «CONTANDO DESDE LAS 22:10» de un fichaje que el servidor guarda a las 23:10, y otro en Helsinki (+1 h) «00:10»: la cara decía una hora y el parte otra.
+   Es la misma que `_ahoraLocalISO_` (Intl, Europe/Madrid) y que `_hoyTxt_`: una sola hora para toda la app. Un instante ilegible da lo de siempre («NaN:NaN»). */
+/* La pared de Madrid como un `Date` LOCAL (sus getFullYear/getMonth/getDate/getHours dicen lo de Madrid): para las cuentas de «hoy» y «ahora» que leen esos campos. */
+function _ahoraMadridDate_(d){
+  var a = _ahoraLocalISO_(d);
+  return new Date(+a.slice(0,4), +a.slice(5,7)-1, +a.slice(8,10), +a.slice(11,13), +a.slice(14,16));
+}
+/* El INSTANTE de «ahora» (ms) para comparar con instantes del servidor (`empezado_at`, `ini`…). Fuera de la maqueta es el reloj tal cual: la pared de Madrid
+   leída como si fuera la local (`new Date(_ahoraApp_())`) desfasaba la cuenta lo que el móvil se aparte de Madrid (el reloj de un turno en curso). */
+function _ahoraInstante_(){ return _demoLocal_() ? new Date(_ahoraApp_()).getTime() : Date.now(); }
 
 /* Que es «la imputacion» de un parte: UN solo sitio, para que lo que se VALIDA y lo que se
    ENVIA no puedan desincronizarse en silencio (que es como estuvieron un tiempo en el movil).
@@ -14714,7 +14747,8 @@ function _reuTerminada_(r, ahora){
 }
 function _msAFechaHora_(ms){
   var d=new Date(ms);
-  return {fecha:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()), hora:pad(d.getHours())+':'+pad(d.getMinutes())};
+  var m=_ahoraLocalISO_(d);                    /* 13/11: la pared de Madrid, no la del móvil (ver `_hhmmDe_`) */
+  return {fecha:m.slice(0,10), hora:m.slice(11,16)};
 }
 
 /* Abre el formulario. `c.parts` = nombres de partida (los invitados). */
@@ -14928,8 +14962,7 @@ function _variosChipHTML_(on){
 /* Enciende o apaga el formulario del bloque (sin reunión). `cb` = lo de la cara: repintar. */
 function _variosAlternar_(on){
   if(!on){ BLQ=null; return; }
-  var h=new Date();
-  _bloqueAbrir_({modo:'declarar', fecha:h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate()), parts:[]});
+  _bloqueAbrir_({modo:'declarar', fecha:_ahoraApp_().slice(0,10), parts:[]});     /* 13/11: el día de Madrid (de 23:00 a 00:00 en Helsinki ya es mañana) */
 }
 function _variosActivo_(){ return !!(BLQ && BLQ.modo==='declarar' && BLQ.reunion_id==null); }
 
@@ -14959,7 +14992,7 @@ function _bloqueReuCablear_(getR, cb){
   var on=function(id, f){ var e=$('#'+id); if(e) e.onclick=async function(){ if(e.disabled) return; e.disabled=true;
     try{ await f(); }catch(x){ tostErr('No se pudo: ', x); } finally{ e.disabled=false; } }; };
   var base=function(r, modo){
-    var h=new Date(), f=h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate());
+    var f=_ahoraApp_().slice(0,10);                /* 13/11: el día de Madrid, no el del móvil */
     var inv=(Array.isArray(r.invitados)?r.invitados:[]).filter(function(n){ return !!n; });
     var o={modo:modo, reunion:r, reunion_id:r.id, titulo:r.titulo||'', parts:inv, fecha:f, en_curso:r.en_curso};
     /* ya pasó: el bloque se declara con SU horario, no con el de ahora (11/11: haga lo que haga que pasara, no sólo en las 48 h del aviso) */
