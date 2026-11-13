@@ -274,8 +274,12 @@ function _convHTML_(cv){
      están ni para arriba ni para abajo»* (Daniel, 14/10). Por eso la hora va en un **span**: sin
      un elemento no hay nada que anclar a la línea, y empujar la celda entera arrastraría su
      fondo `sticky` y su borde. Reuniones ya lo hacía así. El anclaje está en `movil.css`. */
-  var filas=F.map(function(fr){
-    return '<div class="rc rd" data-tfr="'+esc(fr.k)+'" data-p><span>'+esc(fr.txt)+'</span></div>'+
+  /* refutar33 (13/11): LA COMIDA TAMBIÉN SE VE AQUÍ. Con las franjas de hoy (9–13 y 15–23) la rejilla pegaba «12:00» y «15:00» como filas
+     vecinas, y como las etiquetas van al límite de arriba la fila de las 12 se leía «de 12 a 15». El mapa de quien reparte ya dibuja el
+     hueco (`_huecoHTML_`); quien CONTESTA veía otra cosa. Una banda de ancho completo, sin casillas: nadie contesta lo que no se ofrece. */
+  var filas=F.map(function(fr, i){
+    var hu=i ? _huecoEntreFranjas_(F[i-1], fr) : 0;
+    return (hu ? _huecoHTML_(hu) : '')+'<div class="rc rd" data-tfr="'+esc(fr.k)+'" data-p><span>'+esc(fr.txt)+'</span></div>'+
       D.map(function(d){ return _convCelHTML_(cv,d,fr.k); }).join('');
   }).join('');
   return '<div class="tarj" id="convC">'+
@@ -428,10 +432,13 @@ function _convPieHTML_(cv){
    forma de deshacer una marca, y dejar «no puedo» puesto por error es peor que no marcar. */
 /* Lo que escribe el pincel de AHORA (los 4 pinceles, 04/11): la selección vive en `CONV_PINCEL`/`CONV_COCHE`/`CONV_CC`. */
 function _convQuiere_(){ return _pincelValor_(CONV_PINCEL, CONV_COCHE, CONV_CC); }
-function _convPintar_(cv, k){
+function _convPintar_(cv, k, modo){
   var mias=_convMias_(cv), v=mias[k]||null;
   var quiere = _convQuiere_();
-  var igual = _celdaIgual_(v, quiere);
+  /* refutar33 (13/11): `modo` ('marca'|'borra') lo fija el PRIMER toque de un trazo. Sin él cada celda por la que pasa el dedo se alternaba
+     sola: el menor temblor dentro de la celda donde se empezó —o bajar a la hora de al lado, que es del MISMO bloque— la volvía a quitar, y
+     un arrastre que acababa de pintar dejaba la rejilla en blanco. Sin `modo` (un toque suelto) se alterna, como siempre. */
+  var igual = modo ? modo==='borra' : _celdaIgual_(v, quiere);
   /* ⛔ SE PINTA EL TURNO ENTERO, no la casilla. Con franjas de una hora, marcar a mano las
      cuatro de un turno son cuatro toques y tres ocasiones de dejarse una — y una hora suelta
      marcada no es disponibilidad para nada. El día que la convocatoria venga con dos franjas
@@ -594,9 +601,12 @@ function _convGuardar_(cv){
      (`cv._okMias`) y el aviso se queda hasta que lo tocas. Un envío viejo que falla con otro más nuevo en vuelo se ignora: el nuevo lleva la
      rejilla entera. Cada envío manda la rejilla ENTERA, así que lo guardado es siempre una rejilla completa. */
   var enviada=JSON.parse(JSON.stringify(_convMias_(cv))), n=(cv._gseq=(cv._gseq||0)+1);
+  cv._vuelo=(cv._vuelo||0)+1;        /* refutar33: mientras hay un envío en vuelo no se relee la rejilla (`_convRefrescar_`) */
   api.guardarDisponibilidad(cv.id, _convMias_(cv)).then(function(){
+    cv._vuelo--;
     cv._okMias=enviada;
   }).catch(function(e){
+    cv._vuelo--;
     var vuelve=(cv._gseq===n && cv._okMias);
     if(typeof tost==='function'){
       var m=String((e&&e.message)||e).replace(/^Error:\s*/,'');
@@ -606,9 +616,29 @@ function _convGuardar_(cv){
     if(vuelve){
       var yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
       cv.resp[yo]=JSON.parse(JSON.stringify(cv._okMias));
+      /* refutar33 (13/11): LA PANTALLA NO VOLVÍA. `pintar` no reconstruye si el HTML que sale es el mismo que ya recuerda el nodo
+         (`_pintarSiCambia_`), y aquí el HTML «de antes» ES el recuerdo: lo que se vio de más lo puso `repinta` sobre el DOM, no el
+         HTML. Sin olvidar el recuerdo, el aviso decía «vuelve a lo que ya tenías» y la rejilla seguía con la celda que no se guardó. */
+      var nodo=$('#v-turnos'); if(nodo) nodo._pintado=null;
       if(typeof pintar==='function') pintar();
     }
   });
+}
+
+/* refutar33 (13/11): DOS PESTAÑAS (o el móvil y el ordenador). Cada envío manda la rejilla ENTERA, así que la pestaña que se quedó atrás
+   pisaba en silencio lo que se marcó en la otra. Al volver a la app (y en el refresco de 90 s) se relee TU rejilla del servidor — sobre el
+   mismo objeto, para que los manejadores ya enganchados no se queden con uno viejo — salvo que haya un envío en vuelo. */
+function _convRefrescar_(){
+  var cv=_convAbierta_();
+  if(!cv || cv._vuelo || typeof api==='undefined' || !api.getConvocatoria || typeof SESION==='undefined' || !SESION) return Promise.resolve();
+  return api.getConvocatoria().then(function(r){
+    if(cv._vuelo || !r || !r.convocatoria || String(r.convocatoria.id)!==String(cv.id)) return;
+    var yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
+    if(!cv.resp) cv.resp={};
+    var igual=JSON.stringify(cv.resp[yo]||{})===JSON.stringify(r.mias||{});
+    cv.resp[yo]=r.mias||{}; cv._okMias=JSON.parse(JSON.stringify(cv.resp[yo])); cv.abierta=r.abierta;
+    if(!igual && typeof pintar==='function') pintar(true);
+  }).catch(function(){});
 }
 
 function _engConv_(){
@@ -661,17 +691,23 @@ function _engConv_(){
   if(br) br.onclick=function(){ _reusarConv_(cv, repinta); };
   /* Pintar a dedo y de arrastre, como en reuniones. ⚠️ `setPointerCapture` LANZA si el puntero
      no es suyo, y al lanzar aborta el resto del manejador: va envuelto (ya pasó en el pintor). */
-  var pintando=false, antes=null;
+  var pintando=false, antes=null, modoTrazo=null;
+  /* refutar33 (13/11): LOS ESCUCHAS DEL TRAZO SE PONEN UNA VEZ POR NODO. `pintar()` ya no reconstruye si no hay nada nuevo (`_pintarSiCambia_`),
+     pero `enganchar()` corre igual y esto hacía `addEventListener` otra vez sobre la MISMA rejilla: tras dos repintados sin cambios un toque
+     disparaba tres pintores seguidos —cada uno alternaba la casilla— y la marca no se ponía (o se ponía, según lo impar). Los escuchas leen
+     el `cv` y el `repinta` de la última pasada (`rej._cv`, `rej._repinta`), no los de la que los puso. */
+  rej._cv=cv; rej._repinta=repinta;
   /* ⛔⛔ EL GESTO VA ENGANCHADO **ANTES** QUE EL PINTOR, y no es un detalle de orden: los dos
      escuchan en el MISMO elemento, así que corren en el orden en que se registran. Si el
      pintor fuera primero, el `pointerdown` del segundo dedo **pintaría una celda** antes de que
      nadie supiera que vienen dos dedos — y el usuario vería una marca por querer deslizar.
      ✅ `alAbortar` deshace lo que el PRIMER dedo ya había pintado: `_convPintar_` escribe en el
      `pointerdown`, no al soltar, así que sin esto el trazo abortado se queda puesto. */
-  var dd=_dosDedos_(rej, function(){
+  var dd=rej._dd||(rej._dd=_dosDedos_(rej, function(){
+    var cv=rej._cv, repinta=rej._repinta;
     if(antes) _restaurarCeldas_(_convMias_(cv), antes);
     antes=null; pintando=false; repinta();
-  });
+  }));
   /* Los atajos (935.ª) van por `onclick`: es un TOQUE, y el navegador no lo dispara tras arrastrar. Mismo guardia de
      plazo que el pintor, y se guarda igual que al soltar el dedo. */
   $$('#convRej [data-tdia], #convRej [data-tfr]').forEach(function(h){
@@ -682,7 +718,10 @@ function _engConv_(){
       repinta(); _convGuardar_(cv);
     };
   });
+  if(rej._engPuesto) return;
+  rej._engPuesto=true;
   rej.addEventListener('pointerdown', function(e){
+    var cv=rej._cv, repinta=rej._repinta;
     if(dd.deslizando()) return;
     var el=e.target.closest('[data-tk]'); if(!el) return;
     /* ⛔ ESTE GUARDIA ES LA TERCERA CAPA, NO LA PRIMERA (456.ª — corregido MIDIENDO).
@@ -721,23 +760,25 @@ function _engConv_(){
        entrega al elemento capturado igual, pero los `pointermove` del segundo **dejan de
        llegar** en algunos navegadores y el centroide se queda quieto. El pintor ya no la
        necesita: `pointermove` resuelve la celda con `elementFromPoint`. */
-    _convPintar_(cv, el.dataset.tk); repinta();
+    modoTrazo = _convPintar_(cv, el.dataset.tk) ? 'marca' : 'borra'; repinta();
   });
   rej.addEventListener('pointermove', function(e){
+    var cv=rej._cv, repinta=rej._repinta;
     if(dd.deslizando() || !pintando) return;
     var el=document.elementFromPoint(e.clientX, e.clientY);
     el=el&&el.closest?el.closest('[data-tk]'):null;
     var _huella=JSON.stringify(_convQuiere_());       /* el pincel entero: cambiar sólo el coche de un sitio cuenta */
     if(!el||el._ult===_huella) return;
     el._ult=_huella;
-    _convPintar_(cv, el.dataset.tk); repinta();
+    _convPintar_(cv, el.dataset.tk, modoTrazo); repinta();
   });
   var fin=function(){
+    var cv=rej._cv;
     /* ⛔ El guardado va AQUI y no en cada celda: el trazo es la unidad de decisión, y una
        fila entera son 14 celdas. `pintando` lo vigila para no guardar en un `pointerup`
        que no venía de pintar nada. */
     if(pintando) _convGuardar_(cv);
-    pintando=false; antes=null;
+    pintando=false; antes=null; modoTrazo=null;
     $$('#convC [data-tk]').forEach(function(x){ x._ult=null; });
   };
   rej.addEventListener('pointerup', fin);
@@ -906,7 +947,12 @@ function _progCalorCargar_(){
     var cv = r.convocatoria; cv.resp = r.cv || {};
     PROG_T.cv = cv;   /* la regla del consejo con lo escrito a mano usa la MISMA convocatoria que el mapa */
     var calor = _calorTurnos_(cv, '');
-    caja.className = ''; caja.removeAttribute('style'); caja.innerHTML = _turnoCalorHTML_(cv, calor, 'ptMapa');
+    var mud=_dispMudos_(cv), nInv=(cv.invitados||[]).length;
+    /* refutar33 (13/11): QUIÉN FALTA, también desde el móvil. El escritorio ya lo decía bajo su mapa («N de M han contestado · sin contestar:
+       …»); aquí el mapa se leía sin saber si era de 3 personas o de 30. Misma regla (`_dispMudos_`), misma frase. */
+    var nota=nInv ? '<div class="rnota" data-ptcontestaron style="margin-top:6px">'+(nInv-mud.length)+' de '+nInv+' han contestado'+
+      (mud.length ? ' · sin contestar: '+mud.map(_dispPila_).map(esc).join(', ') : '')+'.</div>' : '';
+    caja.className = ''; caja.removeAttribute('style'); caja.innerHTML = _turnoCalorHTML_(cv, calor, 'ptMapa')+nota;
     _turnoCalorCablear_($('#ptMapa'), cv, calor, function(b){
       nxPon('ptFecha', b.dia);
       if(b.hora) nxPon('ptHora', b.hora);

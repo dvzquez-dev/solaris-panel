@@ -9384,6 +9384,17 @@ function _turnoConsejoAguanta_(cv, fecha, hora, duracion){
   return false;
 }
 
+/* Quién no ha contestado NADA. Es lo que el excel no podía decir. */
+function _dispMudos_(cv){
+  var out=[];
+  (cv.invitados||[]).forEach(function(n){
+    var r=cv.resp&&cv.resp[n];
+    var vacio=true; if(r) for(var k in r){ if(Object.prototype.hasOwnProperty.call(r,k)) vacio=false; }
+    if(vacio) out.push(n);
+  });
+  return out.sort();
+}
+
 /* La caja de debajo del mapa al tocar un hueco: el desglose de `_dispDetalle_` (responsables · coche · resto · los que dijeron que no)
    y, aparte, de QUÉ SITIO puede cada uno (`cv.resp[nom][k].s`, que `_calorTurnos_` no guarda) y quién aguanta el bloque entero.
    ⛔ Los nombres son de quien convoca (rango ≥ 1): lo decide `_dispDetalle_`, no esto. */

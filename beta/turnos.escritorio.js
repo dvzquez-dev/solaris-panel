@@ -183,16 +183,7 @@ function _dispViva_(){
   return L.length ? L[0] : null;
 }
 
-/* Quién no ha contestado NADA. Es lo que el excel no podía decir. */
-function _dispMudos_(cv){
-  var out=[];
-  (cv.invitados||[]).forEach(function(n){
-    var r=cv.resp&&cv.resp[n];
-    var vacio=true; if(r) for(var k in r){ if(Object.prototype.hasOwnProperty.call(r,k)) vacio=false; }
-    if(vacio) out.push(n);
-  });
-  return out.sort();
-}
+/* (`_dispMudos_` vive en `comun.js` desde refutar33: el móvil también dice quién falta por contestar.) */
 
 /* ── CONTESTAR TU DISPONIBILIDAD DE TURNOS, DESDE EL ESCRITORIO ───────────────────
    ⛔ EL HUECO QUE CIERRA: `api.guardarDisponibilidad` estaba declarada en `escritorio.html`
