@@ -1771,7 +1771,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f9bce11';
+var BUILD='b74039b';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2221,14 +2221,16 @@ function _engFichar_(){
   var bi=$('#btnIni');
   if(bi) bi.onclick=async function(){
     if(typeof backendOK!=='undefined' && backendOK && SESION){
-      bi.disabled=true;
+      /* 12/11 (refutar28): con el servidor tardando (el primer día, todo el equipo dentro) el botón se quedaba gris y mudo 6-10 s: se
+         pulsaba otra vez, o se salía. Como los demás botones que esperan (`Guardando…`, `Convocando…`): dice lo que hace. */
+      bi.disabled=true; var _prevIni=bi.textContent; bi.textContent='Fichando…';
       try{
         var rec=await api.ficharEntrada(_perfilElegido_());
         ST.ses=_sesDeFichaje_(rec);      /* 25/10 (auditor 33, 🟡 B4): la que DIGA el servidor, con sus pausas */
         tost(ST.ses.estado==='pausada' ? 'Ya tenías una sesión abierta, y está en pausa.'
              : 'Fichando. Sigue contando aunque cierres la app.');
         pintar();
-      }catch(e){ bi.disabled=false; tostErr('No se pudo fichar entrada: ', e); }
+      }catch(e){ bi.disabled=false; bi.textContent=_prevIni; tostErr('No se pudo fichar entrada: ', e); }
       return;
     }
     var d=new Date();   // demo local (sin backend)
