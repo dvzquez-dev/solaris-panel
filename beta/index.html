@@ -114,13 +114,13 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=896833c"></script>
+<script src="comun.js?v=3fb35a9"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=fedfca9"></script>
 <script src="turnos.movil.js?v=9f03236"></script>
 <script src="buzon.movil.js?v=3179853"></script>
-<script src="documentos.movil.js?v=6b9a5cc"></script>
+<script src="documentos.movil.js?v=16564e6"></script>
 <script src="sanciones.movil.js?v=7f75222"></script>
 <script src="reuniones.movil.js?v=bdb5535"></script>
 <script src="horas.movil.js?v=03ed7b9"></script>
@@ -1851,7 +1851,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d9a8015';
+var BUILD='05afd18';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2917,6 +2917,10 @@ document.addEventListener('click',_conCerrojo_(function(ev){
          alcanzaba nunca. (Tras deshacer o reenviar no hace falta: vuelve a la lista de pendientes.) */
       /* 21/10 (auditor 19, 🟡 7): el aviso al reenviar son ~190 caracteres — en 2,6 s no se leen. Largo → fijo. */
       var _tav=_avisoDocTxt_(_aviso, upd);
+      /* ⛔ refutar35 (13/11): el panel que se abrió para decidir SE CIERRA con la decisión. `DEC_SEL` (comun.js) recuerda por expediente qué panel
+         estaba abierto y la ficha se reabre con él: tras «Aprobar» se veia «¿Seguro que quieres aprobar? · Sí, aprobar» sobre un expediente YA
+         aprobado, justo el boton que manda a decidir lo ya decidido. */
+      if(typeof DEC_SEL!=='undefined') DEC_SEL[String(e.id)]='';
       cerrarModal(); tost(_tav, _tostLargo_(_tav)); pintar(); if(acc!=='deshacer' && acc!=='reenviar') verDoc(e.id);
     }).catch(function(err){
       b.disabled=false;

@@ -7841,17 +7841,34 @@ function _cargarVisor_(cuerpo, id){
   car.className='dcar'; car.textContent='Cargando '+que+'…';
   cuerpo.appendChild(car);
   var f=document.createElement('iframe');
-  f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
+  f.className='dv'; f.setAttribute('allow','autoplay');
   /* ⛔ 28/10: CON LA CUENTA DE LA SESIÓN. Sin `authuser` Drive abre con la cuenta POR DEFECTO del navegador (la /u/0/),
      y la de Aerotech de Daniel es la /u/2/: con permiso sólo para el dominio, el visor no enseñaba el PDF de revisión. */
   var _em=''; try{ _em=(typeof SESION!=='undefined' && SESION && SESION.email) || localStorage.getItem('sol_last_email') || ''; }catch(_){}
-  f.src='https://drive.google.com/file/d/'+id+'/preview'+(_em ? '?authuser='+encodeURIComponent(_em) : '');
-  var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
-    cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
-  f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo);
+  var url='https://drive.google.com/file/d/'+id+'/preview'+(_em ? '?authuser='+encodeURIComponent(_em) : '');
+  /* ⛔⛔ EL TEMPORIZADOR ARRANCA CUANDO EL VISOR SE ACERCA A LA PANTALLA, NO AL CREAR EL IFRAME (refutar35, 13/11).
+     📏 Medido en el escritorio con 8 pendientes del PD (Drive de pega que contesta al instante): a los 8 s, **0 peticiones
+     a Drive** y los 4 visores de abajo en «No se pudo incrustar el visor». Con `loading=lazy` el navegador no pide el
+     iframe hasta que está cerca, y los 6 s corrían igual: vencian, **BORRABAN el iframe** y al bajar ya no habia nada
+     que cargar. Quien revisa la cola entera veia roto todo lo que no cabia en la primera pantalla.
+     ✅ Ahora el iframe NO lleva `loading=lazy`: es esta funcion la que decide cuando pedirlo (IntersectionObserver con
+     margen de 600 px) y el `fallo` de 6 s cuenta desde ese momento. Sin IntersectionObserver se pide ya, como antes. */
+  var fallo=null;
+  function pedir(){
+    f.src=url;
+    fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
+      cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
+  }
+  f.onload=function(){ cuerpo.dataset.ok='1'; if(fallo) clearTimeout(fallo);
     /* ✅ AQUI, y no antes: es el unico momento en que se sabe que hay algo que mirar. */
     if(car && car.parentNode) car.parentNode.removeChild(car); };
   cuerpo.appendChild(f);
+  if(typeof IntersectionObserver==='undefined'){ pedir(); return; }
+  var io=new IntersectionObserver(function(es){
+    if(!es.some(function(e){ return e.isIntersecting; })) return;
+    io.disconnect(); pedir();
+  }, {rootMargin:'600px 0px'});
+  io.observe(cuerpo);
 }
 
 function _cablearVisor_(raiz){
