@@ -113,13 +113,13 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=c9e49bd"></script>
+<script src="comun.js?v=5c27866"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=fedfca9"></script>
 <script src="turnos.movil.js?v=c9a23f5"></script>
 <script src="buzon.movil.js?v=3179853"></script>
-<script src="documentos.movil.js?v=9d4aee0"></script>
+<script src="documentos.movil.js?v=6b9a5cc"></script>
 <script src="sanciones.movil.js?v=ac50e23"></script>
 <script src="reuniones.movil.js?v=f857881"></script>
 <script src="horas.movil.js?v=1b4ead9"></script>
@@ -1771,7 +1771,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='399af36';
+var BUILD='f9bce11';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2726,9 +2726,11 @@ document.addEventListener('click',_conCerrojo_(function(ev){
   var acc=b.dataset.dec, id=+b.dataset.id;
   var e=ENTREGABLES.concat(ENT_REV).filter(function(x){return x.id===id;})[0];
   if(!e) return;
-  var mot=($('#dMot')&&$('#dMot').value||'').trim();
+  /* 13/11 (docdecidir): cada acción tiene SU caja de motivo, dentro de su panel (`comun.js` `_decPanelesHTML_`). */
+  var _tm=document.querySelector('[data-decp="'+acc+'"] [data-motivo]');
+  var mot=((_tm&&_tm.value)||'').trim();
   if((acc==='cambios'||acc==='rechazado') && !mot){
-    if($('#dMot')){ $('#dMot').focus(); $('#dMot').style.borderColor='var(--red)'; }
+    if(_tm){ _tm.focus(); _tm.style.borderColor='var(--red)'; }
     tost('Cambios y rechazo exigen motivo.');
     return;
   }
@@ -2750,21 +2752,21 @@ document.addEventListener('click',_conCerrojo_(function(ev){
     if(_anotOcupado_('d')){ tost('Espera a que SolarIA termine.'); return; }
     var _af=_anotLeer_('d');
     if(_af.titulo!==null && !_af.titulo){
-      _abrirEditarDoc_(e.id);   /* documentos-1: los campos van plegados; focus sobre un nodo oculto no hace nada */
+      _decSeleccionar_(e.id,'anot',true);   /* los campos viven en el panel de «con anotaciones»: focus sobre un nodo oculto no hace nada */
       if($('#dTit')){ $('#dTit').focus(); $('#dTit').style.borderColor='var(--red)'; }
       tost('El título no puede quedar vacío.');
       return;
     }
     _anotX=_anotExtra_(_anotActualDe_(e), _af);
     if(!_anotX){
-      _abrirEditarDoc_(e.id);
+      _decSeleccionar_(e.id,'anot',true);
       var _sinC='Con anotaciones hay que cambiar algo: título, subtítulo, confidencialidad, autores o etiquetas. Pídeselo a SolarIA o cámbialo a mano.';
       tost(_sinC, _tostLargo_(_sinC));
       return;
     }
     /* ⛔ 28/10: sin el tick de la portada (para ESTE título y subtítulo) no se aprueba con anotaciones. */
     if(!_anotChkOK_('d')){
-      _abrirEditarDoc_(e.id);
+      _decSeleccionar_(e.id,'anot',true);
       if($('#dChk')) $('#dChk').focus();
       var _sinK='Antes de aprobar con anotaciones, comprueba la portada: «Comprobar portada».';
       tost(_sinK, _tostLargo_(_sinK));
@@ -2777,7 +2779,7 @@ document.addEventListener('click',_conCerrojo_(function(ev){
      cierre que no es tal: se puede deshacer desde la ficha. */
   var _sinA=_avisoSinArchivo_(e, acc); if(_sinA && !(await dialogoSiNo(_sinA))) return;   /* 31/10: sin archivo, se pregunta */
   /* 04/11: APROBAR PUBLICA — se pregunta (el aviso de «sin archivo» de arriba ya es esa pregunta, no se hacen dos). */
-  if(!_sinA && (acc==='aprobado'||acc==='anot') && !(await dialogoSiNo(_avisoAprobarDoc_(e.titulo, acc)))) return;
+  /* 13/11 (docdecidir): la pregunta ya se hizo EN el panel («¿Seguro que quieres aprobar?» + el resumen): no se repite en un diálogo. */
   if(acc==='rechazado' && !(await dialogoSiNo('Rechazar «'+e.titulo+'». El autor recibe el motivo; la decisión se puede '+
     'deshacer desde la ficha. ¿Seguro?'))) return;
   /* DESHACER BORRA LA DECISION DE OTRA PERSONA: se pregunta, como en el escritorio. */

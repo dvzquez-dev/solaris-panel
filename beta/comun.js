@@ -13748,7 +13748,7 @@ function _autorPanelHTML_(pre, id, actuales, css){
   var l = Array.isArray(actuales) ? actuales : (actuales ? [actuales] : []);
   return '<div id="' + pre + 'Autor" data-autor="' + pre + '" data-autordoc="' + esc(String(id)) + '" data-autorinicial="' + esc(JSON.stringify(l)) +
     '" style="margin-top:10px">' +
-    _anotCampoHTML_('Autores', 'Ahora: ' + esc(l.join(', ') || '—'),
+    _anotCampoHTML_('Cambiar autores', 'Quita con la × o añade',
       elegirPersonas(pre + 'Autor', {universo:_autorCandidatos_(), marcadas:l, multi:true, titulo:'Autores', vacio:'Escribe un nombre o pulsa «Ver lista».'}) +
       '<button type="button" class="btn" style="margin-top:8px;width:100%" data-autorcambiar="' + pre + '">Guardar autores</button>', 'div') + '</div>';
 }
@@ -13778,6 +13778,126 @@ function _autoresDocHTML_(e){
     rv.map(esc).concat(rvs.map(function(n){ return esc(n) + ' (no está en el equipo)'; })).join(', ') + ' <span style="color:var(--ink3)">(según el documento)</span>.</p>';
   return h;
 }
+/* ══ 13/11 · LA DECISIÓN DE UN DOCUMENTO: CADA ACCIÓN ENSEÑA SU PANEL (`docdecidir`), EN LAS DOS CARAS ═══════════════════════
+   🗣️ Daniel, 13/11, mirando «tarea compartida, motores EuRoC»: «aparece autores, autores, en plan tengo como 3 cosas distintas […] en
+   vez de aparecer según seleccionas una cosa u otra, en plan decisión, y pones aprobar con anotaciones, solicitar cambios o rechazar.
+   Si le das a solicitar cambios debería aparecer el menú de solicitar cambios. Si le das a con anotaciones, te debería aparecer todo
+   lo que tiene que ver con anotaciones. Si le das a aprobar, también te debería aparecer. ¿Seguro que quieres aprobar? Sí, no […]
+   todas las stats: qué revisores va a aparecer, es decir, tú más los que ya hayan en el documento, qué autores va a quedar, qué
+   etiquetas va a tener y qué versión va a ser, qué confidencialidad».
+   Los botones de decidir (`boton`, de cada cara) viven DENTRO del panel de su acción y son los que ya existían: el cableado de
+   decidir no cambia. Aquí sólo se elige cuál panel se ve (`DEC_SEL`, por expediente; sobrevive al repintado) y se pinta el RESUMEN. */
+var DEC_SEL = {};
+function _decCss_(){
+  if (document.getElementById('decCss')) return;
+  var s = document.createElement('style'); s.id = 'decCss';
+  s.textContent =
+    '.dec-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.dec-chips .btn{flex:1 1 46%}' +
+    '.dec-chips .btn.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}' +
+    '.dec-p{display:none;margin-top:10px}.dec-p.ab{display:block}' +
+    '.dec-res{margin:8px 0 0;padding:9px 11px;border:1px solid var(--line);border-radius:12px;background:var(--sur)}' +
+    '.dec-res div{display:flex;gap:8px;padding:3px 0;font-size:12.5px;line-height:1.4}.dec-res b{flex:none;width:118px;color:var(--ink2);font-weight:600}' +
+    '.dec-res span{min-width:0;overflow-wrap:anywhere;color:var(--ink)}' +
+    '.dec-fila{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.dec-fila .btn{flex:1 1 46%}';
+  document.head.appendChild(s);
+}
+/* Los acciones que se ofrecen: sin analizar, sólo las que PARAN (cambios, rechazo); aprobar publica y el servidor lo rechaza. */
+function _decAcciones_(e){
+  var a = _yaAnalizado_(e) ? [['aprobado', ''], ['anot', 'Aprobar con anotaciones']] : [];
+  return a.concat([['cambios', 'Solicitar cambios'], ['rechazado', 'Rechazar']]);
+}
+/* Lo que el expediente lleva HOY (la base del resumen, serializable para que el refresco en vivo no necesite buscar el expediente). */
+function _decBase_(e, yo, pre){
+  var rv = [yo], rp = _revisoresPropuestosDe_(e), rs = e && e.analisis && e.analisis.revisores && Array.isArray(e.analisis.revisores.sin_casar) ? e.analisis.revisores.sin_casar : [];
+  var revisores = [];
+  rv.concat(rp, rs).forEach(function(n){ n = String(n == null ? '' : n).trim(); if (n && revisores.indexOf(n) < 0) revisores.push(n); });
+  var a = _anotActualDe_(e);
+  return { pre: pre || '', titulo: a.titulo, revisores: revisores, autores: _autoresActualesDe_(e), etiquetas: a.etiquetas,
+           version: String((e && e.version) || ''), confidencialidad: a.confidencialidad, tipo: String((e && e.tipo) || ''), ref: String((e && e.ref) || '') };
+}
+/* Las filas del resumen: la base con lo que se ha tecleado encima (`form` = `_anotLeer_`; `null` = sin ediciones). PURA. */
+function _decFilas_(base, form){
+  base = base || {}; form = form || {};
+  var tit = form.titulo != null && form.titulo !== '' ? form.titulo : base.titulo;
+  var au = Array.isArray(form.autores) && form.autores.length ? form.autores : base.autores;
+  var et = form.etiquetas != null ? form.etiquetas : base.etiquetas;
+  var ver = form.version != null && String(form.version).trim() !== '' ? String(form.version).trim() : base.version;
+  var cf = form.confidencialidad || base.confidencialidad;
+  var rotCf = ({publico: 'Público', interno: 'Interno'})[cf] || 'sin indicar';
+  var lista = function(l, vacio){ return l && l.length ? l.join(', ') : vacio; };
+  return [['Título', tit || '—'], ['Revisores', lista(base.revisores, '—')], ['Autores', lista(au, 'sin autores')],
+          ['Etiquetas', lista(et, 'sin etiquetas')], ['Versión', ver || 'sin indicar'], ['Confidencialidad', rotCf],
+          ['Tipo', base.tipo || '—'], ['Referencia', base.ref || '—']];
+}
+function _decResumenHTML_(base, form){
+  return '<div class="dec-res" data-decres="' + esc(JSON.stringify(base)) + '">' + _decFilas_(base, form).map(function(f){
+    return '<div><b>' + esc(f[0]) + '</b><span>' + esc(f[1]) + '</span></div>'; }).join('') + '</div>';
+}
+/* El bloque entero: chips + un panel por acción (+ «deshacer» si procede). `o`: `yo`, `pre` (prefijo del panel de anotaciones),
+   `anotHTML`, `boton(acc, rótulo, clase)` → el botón de la cara, `deshacerHTML`, `motivoPh`. */
+function _decPanelesHTML_(e, o){
+  o = o || {};
+  if (typeof document !== 'undefined' && document.head) { _decCss_(); _pselCss_(); }
+  var id = String(e.id), sel = DEC_SEL[id] || '', acs = _decAcciones_(e);
+  var pedir = !!(o.prePedir && !_peticionRevActiva_(e) && _puedePedirRev_(e, o.yo));   /* el PD puede además PEDIR la revisión: es otra acción, con su panel (y sus autores) */
+  if (o.autorHTML) acs.push(['autores', 'Cambiar autores']);   /* PD y José: guardar los autores SIN decidir (`_autorClic_`); también una acción del bloque, no un panel suelto */
+  if (pedir) acs.push(['pedirrev', 'Pedir revisión']);
+  var base = _decBase_(e, o.yo, o.pre);
+  var rotulo = { aprobado: _rotuloAprobarDoc_(e, o.yo), anot: 'Aprobar con anotaciones', cambios: 'Solicitar cambios', rechazado: 'Rechazar', pedirrev: 'Pedir revisión', autores: 'Cambiar autores' };
+  var mot = function(acc, txt){
+    return '<label class="campo"><span class="sc">' + txt + ' <span class="req">*</span></span><textarea data-motivo data-borr="doc-motivo-' + esc(id) + '-' + acc +
+      '" placeholder="' + esc(o.motivoPh || 'lo leerá el autor…') + '"></textarea></label>';
+  };
+  var panel = function(acc){
+    var h = '';
+    if (acc === 'aprobado') h = '<p style="margin:0 0 8px;font-size:14px;font-weight:600">¿Seguro que quieres aprobar?</p>' + _decResumenHTML_(base, null) +
+      '<div class="dec-fila">' + o.boton('aprobado', 'Sí, aprobar', 'pri') + '<button type="button" class="btn" data-p data-decsel="' + esc(id) + '" data-decacc="">No</button></div>';
+    else if (acc === 'anot') h = (o.anotHTML || '') + '<p class="sc" style="margin:12px 0 0">Así quedará publicado</p>' + _decResumenHTML_(base, null) +
+      '<div class="dec-fila">' + o.boton('anot', 'Aprobar con anotaciones', 'pri') + '</div>';
+    else if (acc === 'autores') h = o.autorHTML;
+    else if (acc === 'pedirrev') h = _pedirRevPanelHTML_(o.prePedir, e);
+    else if (acc === 'cambios') h = mot('cambios', 'Qué hay que cambiar') + '<div class="dec-fila">' + o.boton('cambios', 'Enviar al autor', 'pri') + '</div>';
+    else h = mot('rechazado', 'Motivo del rechazo') + '<div class="dec-fila">' + o.boton('rechazado', 'Rechazar', 'no') + '</div>';
+    return '<div class="dec-p' + (sel === acc ? ' ab' : '') + '" data-decp="' + acc + '">' + h + '</div>';
+  };
+  return '<div data-decwrap="' + esc(id) + '"' + (o.pre ? ' data-decpre="' + esc(o.pre) + '"' : '') + '><div class="dec-chips">' +
+    acs.map(function(a){ return '<button type="button" class="btn' + (a[0] === 'rechazado' ? ' no' : '') + (sel === a[0] ? ' on' : '') + '" data-p data-decsel="' + esc(id) +
+      '" data-decacc="' + a[0] + '">' + esc(rotulo[a[0]]) + '</button>'; }).join('') + '</div>' +
+    (!_yaAnalizado_(e) ? '<p class="rnota" style="margin:8px 0 0">Aún sin analizar: se puede parar, no publicar.</p>' : '') +
+    acs.map(function(a){ return panel(a[0]); }).join('') + (o.deshacerHTML || '') + '</div>';
+}
+/* Elige (o, con la ya elegida o `''`, cierra; `abrir` = no cierra nunca) el panel de una acción del expediente `id`: sólo UNO abierto; lo tecleado en los demás sigue en el DOM. */
+function _decSeleccionar_(id, acc, abrir){
+  id = String(id);
+  DEC_SEL[id] = (acc && (abrir || DEC_SEL[id] !== acc)) ? acc : '';
+  Array.prototype.forEach.call(document.querySelectorAll('[data-decwrap]'), function(w){
+    if (w.getAttribute('data-decwrap') !== id) return;
+    Array.prototype.forEach.call(w.querySelectorAll('[data-decsel][data-decacc]'), function(b){
+      if (b.getAttribute('data-decacc')) b.classList.toggle('on', b.getAttribute('data-decacc') === DEC_SEL[id]); });
+    Array.prototype.forEach.call(w.querySelectorAll('[data-decp]'), function(p){
+      p.classList.toggle('ab', p.getAttribute('data-decp') === DEC_SEL[id]); });
+  });
+}
+/* El resumen de «con anotaciones» se rehace mientras se teclea: lo que ves es lo que se publica. */
+function _decRefrescar_(wrap){
+  var r = wrap && wrap.querySelector('[data-decp="anot"] [data-decres]'), pre = wrap && wrap.getAttribute('data-decpre');
+  if (!r || !pre) return;
+  var base; try { base = JSON.parse(r.getAttribute('data-decres')); } catch (x) { return; }
+  r.innerHTML = _decFilas_(base, _anotLeer_(pre)).map(function(f){ return '<div><b>' + esc(f[0]) + '</b><span>' + esc(f[1]) + '</span></div>'; }).join('');
+}
+if (typeof document !== 'undefined' && document.addEventListener){
+  document.addEventListener('click', function(ev){
+    var b = ev.target && ev.target.closest ? ev.target.closest('[data-decsel]') : null;
+    if (b){ _decSeleccionar_(b.getAttribute('data-decsel'), b.getAttribute('data-decacc')); return; }
+    var w = ev.target && ev.target.closest ? ev.target.closest('[data-decp="anot"]') : null;
+    if (w) setTimeout(function(){ _decRefrescar_(w.closest('[data-decwrap]')); }, 0);
+  });
+  document.addEventListener('input', function(ev){
+    var w = ev.target && ev.target.closest ? ev.target.closest('[data-decp="anot"]') : null;
+    if (w) _decRefrescar_(w.closest('[data-decwrap]'));
+  });
+}
+
 /* El delegado de «Cambiar autor». `buscar(id)` da el expediente de la cara; `alCambiar(e, upd)` repinta. */
 async function _autorClic_(ev, buscar, alCambiar){
   var b = ev && ev.target && ev.target.closest ? ev.target.closest('[data-autorcambiar]') : null;
@@ -13849,7 +13969,7 @@ function _peticionRevLineaHTML_(p){
 }
 /* Todo lo de la ficha: el rastro (lo ve cualquiera), la cola de quien confirma, «cancelar» del PD y, si toca, el panel para pedirla. `pre`
    único por ficha; `yo` = quien mira. `''` si no hay nada que decir. */
-function _peticionRevHTML_(e, yo, pre){
+function _peticionRevHTML_(e, yo, pre, enDecision){
   if (!e) return '';
   var act = _peticionRevActiva_(e), h = _peticionesRevDe_(e).map(_peticionRevLineaHTML_).join('');
   if (act && yo && (act.revisores || []).indexOf(yo) >= 0 && !(act.confirmaciones || []).some(function(c){ return c.quien === yo; })){
@@ -13863,7 +13983,7 @@ function _peticionRevHTML_(e, yo, pre){
   }
   if (act && yo === PD_NOM)
     h += '<div data-prdoc="' + esc(String(e.id)) + '" data-prpre="' + pre + '" style="margin-top:8px"><button type="button" class="btn" style="width:100%" data-prcancel="' + pre + '">Cancelar la petición</button></div>';
-  else if (!act && _puedePedirRev_(e, yo)) h += _pedirRevPanelHTML_(pre, e);
+  else if (!act && !enDecision && _puedePedirRev_(e, yo)) h += _pedirRevPanelHTML_(pre, e);   /* 13/11: con la decisión a la vista (`enDecision`) el panel es una acción más de `_decPanelesHTML_` */
   return h;
 }
 /* El delegado de las tres acciones. `buscar(id)` da el expediente de la cara; `alCambiar(e, upd)` repinta con lo que devolvió el servidor. */

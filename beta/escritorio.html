@@ -113,12 +113,12 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=c9e49bd"></script>
+<script src="comun.js?v=5c27866"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=3d67e0d"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
-<script src="documentos.escritorio.js?v=a6e1059"></script>
+<script src="documentos.escritorio.js?v=428fbab"></script>
 <script src="sanciones.escritorio.js?v=f1fbc19"></script>
 <script src="reuniones.escritorio.js?v=4055ad2"></script>
 <script src="horas.escritorio.js?v=4be139d"></script>
@@ -3786,7 +3786,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='09c5cc9';
+var BUILD='2671403';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4653,16 +4653,14 @@ function _engDocsDecidir_(){
     deshacer:'Decisión deshecha: vuelve a revisión.',
     /* ⛔ Mismo aviso falso que en el movil: pulsar no sube nada. */
     reenviar:'Devuelto a revisión. Si todavía no has subido el archivo corregido por el formulario, el revisor abrirá la versión anterior.'};
-  $$('[data-docedit]').forEach(function(b){ b.onclick=function(){
-    var ab=b.parentNode.classList.toggle('ab'); DOC_EDIT_AB[b.dataset.docedit]=ab; }; });
-  $$('.acts [data-doc]').forEach(function(b){
+  $$('[data-decwrap] [data-doc][data-acc]').forEach(function(b){
     /* 04/11 (acciones graves): CON CERROJO por documento (`_conCerrojo_`): mientras se pregunta o se espera al servidor, ningún
        otro botón de decisión del MISMO documento hace nada (antes «Aprobar» y «Rechazar» a la vez mandaban las dos). */
     b.onclick=_conCerrojo_(function(){ return 'doc'+b.dataset.doc; }, async function(){
       if(b.disabled) return;
       var d=DOCS.filter(function(x){return x.id===+b.dataset.doc;})[0]; if(!d) return;
       var accion=b.dataset.acc, ficha=document.getElementById('doc-'+d.id);
-      var ta=ficha&&ficha.querySelector('[data-motivo]');
+      var ta=ficha&&ficha.querySelector('[data-decp="'+accion+'"] [data-motivo]');   /* 13/11: cada acción, su caja */
       var motivo=(ta&&ta.value||'').trim();
       /* 28/10: el panel de «con anotaciones» (`comun.js`), con prefijo `d<id>-`. */
       var _pre='d'+d.id+'-', _af=_anotLeer_(_pre), titulo=_af.titulo||'';
@@ -4685,7 +4683,7 @@ function _engDocsDecidir_(){
       }
       var _sinA=_avisoSinArchivo_(d, accion); if(_sinA && !(await dialogoSiNo(_sinA))) return;   /* 31/10: sin archivo, se pregunta */
       /* 04/11: APROBAR PUBLICA — se pregunta (el aviso de «sin archivo» de arriba ya es esa pregunta, no se hacen dos). */
-      if(!_sinA && (accion==='aprobado'||accion==='anot') && !(await dialogoSiNo(_avisoAprobarDoc_(d.tit, accion)))) return;
+      /* 13/11 (docdecidir): la pregunta ya se hizo EN el panel («¿Seguro que quieres aprobar?» + el resumen). */
       /* 21/10 (auditor 11, 🟡 13): sin prometer lo no decidido (cómo reenvía un rechazado es pregunta de Daniel) ni un
          cierre que no es tal: se puede deshacer desde la ficha. */
       if(accion==='rechazado' && !(await dialogoSiNo('Rechazar «'+d.tit+'». El autor recibe el motivo; la decisión se puede '+
