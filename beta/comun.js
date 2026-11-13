@@ -3008,6 +3008,17 @@ var API_ESPERA_MS = 20000;
 var API_ESPERA_LARGA_MS = 120000;
 var API_ACCIONES_LARGAS = /^(proponerTareaParte|traerOrdenNotion|transcribirVoz|interpretarAnotacion|contrastarEtiqueta|mejorarTarea|proponerOrdenDia|generarOrdenPdf|subirAudioReunion|subirOrdenPdf|subirFotoTarea|subirFotoTurno|getFotoTurno|getZipTurno|entregarFotosTurno|redactarTurno|redactarParte|resumirReunion)$/;
 var API_MSG_SIN_RESPUESTA = "El servidor no ha contestado. Puede que se haya guardado: recarga antes de repetirlo.";
+/* ⛔ 12/11 (`solaria10`): las acciones de SolarIA NO guardan nada —sólo piensan y proponen—, así que NO son «escrituras» a efectos de lo que se le
+   dice a la persona ni de reintentar: «lo más probable es que NO se haya guardado… recarga» era mentira (no había nada que guardar) y la red
+   caída mandaba el MISMO encargo hasta TRES veces al modelo (uso semanal de todos; `MODELO_A_LA_VEZ` = 3 en el servidor). Un solo intento, y el
+   aviso va marcado `modelo` para que `_solErrorTxt_` lo enseñe tal cual. Siguen fusionándose los dos toques idénticos en vuelo. */
+var API_ACCIONES_MODELO = /^(resumirReunion|mejorarTarea|redactarParte|proponerOrdenDia|redactarTurno|interpretarAnotacion|transcribirVoz|proponerTareaParte)$/;
+var API_MSG_MODELO_SIN_RED = "Sin conexión con el servidor: revisa tu red y vuelve a pulsar.";
+var API_MSG_MODELO_LENTO = "SolarIA no ha contestado a tiempo: vuelve a pulsar en un rato.";
+var API_MSG_MODELO_RARA = "El servidor no ha dado una respuesta válida: vuelve a pulsar en un rato.";
+function _apiErrModelo_(msg, sinRed){
+  var e = new Error(msg); e.modelo = true; if(sinRed) e.sinRed = true; else e.sinRespuesta = true; return e;
+}
 function _esLecturaApi_(accion){
   return /^(get|listar)/.test(accion) || /^(bootstrap|quienSoy|queHayNuevo|estadoAudioReunion)$/.test(accion);
 }
@@ -3044,7 +3055,9 @@ async function _apiPost_(body){
      AQUÍ, fuera del bucle: dentro, cada intento traería una distinta y no serviría de nada (la misma razón que la clave de envío de los partes). Las lecturas no la llevan. */
   if(!lectura && !body.idem) body=Object.assign({},body,{idem:_idemEnvio_()});
   var espera=API_ACCIONES_LARGAS.test(accion) ? API_ESPERA_LARGA_MS : API_ESPERA_MS;
+  var modelo=API_ACCIONES_MODELO.test(accion);
   if(!lectura && typeof navigator!=='undefined' && navigator.onLine===false){
+    if(modelo) throw _apiErrModelo_(API_MSG_MODELO_SIN_RED, true);
     var sn=new Error(API_MSG_SIN_RED); sn.sinRed=true; throw sn;
   }
   for(var i=0;i<3;i++){
@@ -3060,6 +3073,7 @@ async function _apiPost_(body){
       return res;
     }catch(e){
       if(agotado){
+        if(modelo) throw _apiErrModelo_(API_MSG_MODELO_LENTO);
         if(!lectura){ var sr=new Error(API_MSG_SIN_RESPUESTA); sr.sinRespuesta=true; throw sr; }
         ultimo=new _ApiTransito("el servidor no contestó a tiempo");
         continue;
@@ -3069,8 +3083,11 @@ async function _apiPost_(body){
       if(e && e.sesion){ if(SESION&&SESION.token){ try{ _sesionMuerta_(true); _avisarSesionMuerta_(); }catch(_){} } throw e; }
       if(e && !e.transito && !(e instanceof TypeError)) throw e;
       ultimo=e;
+      if(modelo) break;   // `solaria10`: un solo intento al modelo
     }finally{ clearTimeout(reloj); }
   }
+  if(modelo && ultimo instanceof TypeError) throw _apiErrModelo_(API_MSG_MODELO_SIN_RED, true);
+  if(modelo && ultimo && ultimo.transito) throw _apiErrModelo_(API_MSG_MODELO_RARA);
   if(ultimo instanceof TypeError){ var sr2=new Error(API_MSG_SIN_RED); sr2.sinRed=true; throw sr2; }
   if(!lectura && ultimo && ultimo.transito){ var sr3=new Error(API_MSG_RESP_RARA); sr3.sinRespuesta=true; throw sr3; }
   throw ultimo || new Error("no se pudo hablar con el servidor");
@@ -4079,14 +4096,20 @@ var SOLP = {}, SOLCFG = {}, SOLTXT = {}, _SOL_N_ = 0;
 var SOLARIA_SITIOS = {turno: true, parte: true, resumen: true, nuevatarea: true, anotaciones: true, orden: true, tareaparte: true};
 function _solSitio_(k){ return SOLARIA_SITIOS[k] !== false; }
 var SOL_PENSANDO = 'SolarIA está escribiendo…';
+var SOL_LENTO_MS = 25000;   // `solaria10`: pasado este tiempo esperando, la nota deja de decir «unos 20 s» y ofrece «Dejarlo» (el servidor corta a los 150 s, la app a los 120)
 /* El error del modelo, dicho igual en todos los puntos: no disponible (+ el motivo si lo hay); lo manual sigue intacto. */
 /* 04/11 (Daniel: «dice que no está disponible» cuando el modelo SÍ contestó, pero con el campo vacío): si el motivo es que la IA contestó y no
    sirvió (sin texto/puntos, añadió cosas, no se apoya en lo dicho…) se dice la verdad —«no ha sabido redactarlo»—; «no está disponible» queda para
    cuando de verdad no hay conexión, sesión, cuota o tiempo. */
 var _SOL_NO_SUPO_ = /la IA (no devolvi|no contest|devolvi)|ning[uú]n (texto|punto)|a[nñ]adido cosas|no se apoy|demasiado larg|no pas[oó] la comprobaci/i;
+var _SOL_CUOTA_ = /usage limit|rate.?limit|quota|overloaded|l[ií]mite de uso|\b(429|529)\b/i;
 function _solErrorTxt_(motivo){
+  if(motivo && motivo.modelo) return String(motivo.message).replace(/[.\s]+$/, '')+'.';   // `solaria10`: la capa de red ya lo dijo en persona
+  if(motivo && typeof motivo === 'object') motivo = motivo.message || String(motivo);
   var m = motivo ? String(motivo).replace(/^(Error:\s*)+/i, '').replace(/^SolarIA no ha (podido|sabido)( redactarlo)?:\s*/i, '')   // refutar15: el «Error: » con que el servidor contesta (como `String(err)`) no es para quien lee
-    .replace(/[.\s]+$/, '') : '';
+    .replace(/\s*\((c[oó]digo|code) \d+\)/i, '').replace(/[.\s]+$/, '') : '';   // `solaria10`: «(código 1)» no es para quien lee
+  if(m && _SOL_CUOTA_.test(m)) return 'SolarIA ha llegado a su límite de uso por ahora: prueba más tarde o sigue a mano.';
+  if(m && /^SolarIA /.test(m)) return m+'.';   // ya viene dicho en persona («SolarIA está atendiendo otras peticiones…»): sin «no está disponible ahora:» encima
   if(m && _SOL_NO_SUPO_.test(m)) return 'SolarIA no ha sabido redactarlo: '+m+'.';
   return 'SolarIA no está disponible ahora'+(m ? ': '+m : '')+'.';
 }
@@ -4097,7 +4120,11 @@ function _solBtnHTML_(attrs, texto, o){
     ico('chispa')+' '+(o.pensando ? SOL_PENSANDO : esc(texto))+'</button>';
 }
 /* La nota de «pensando» y la de error, iguales en todos (`attr` = el data-* con el que cada pantalla las encuentra). */
-function _solPensandoHTML_(txt, attr){ return '<div class="nota" '+(attr || 'data-solpensando')+' style="border:0;padding:4px 0">'+ico('chispa')+' '+esc(txt || SOL_PENSANDO)+' (unos 20 s)</div>'; }
+function _solPensandoHTML_(txt, attr, cancela){
+  if(cancela) return '<div class="nota" '+(attr || 'data-solpensando')+' style="border:0;padding:4px 0">'+ico('chispa')+' Tarda más de lo normal. Puedes seguir sin SolarIA. '+
+    '<button type="button" class="btn sm" '+cancela+'>Dejarlo</button></div>';
+  return '<div class="nota" '+(attr || 'data-solpensando')+' style="border:0;padding:4px 0">'+ico('chispa')+' '+esc(txt || SOL_PENSANDO)+' (unos 20 s)</div>';
+}
 function _solErrorHTML_(msg, cola, attr){ return '<div class="nota dn" '+(attr || 'data-solerr')+' style="border:0;padding:4px 0">'+esc(msg)+' '+esc(cola || 'Lo tuyo sigue como estaba.')+'</div>'; }
 /* Las acciones de la barra, con el mismo estilo (Usar esto en rojo). `a` = [[atributo, texto, primario], …]. */
 function _solAccionesHTML_(a){
@@ -4133,6 +4160,7 @@ function _solBarraHTML_(k){
   var s = SOLP[k], c = SOLCFG[k] || {}, bt = function(a, t, pri){ return '<button type="button" class="btn sm'+(pri ? ' pri' : '')+'" '+a+'="'+esc(k)+'">'+t+'</button>'; };
   if(!s) return '';
   if(s.fase !== 'pensando' && c.valor && !_solFresca_(s, c.valor())) return '';
+  if(s.fase === 'pensando' && s.lento) return _solPensandoHTML_(null, null, 'data-solcancela="'+esc(k)+'"');   // `solaria10`: tarda → «Dejarlo»
   if(s.fase === 'pensando') return _solPensandoHTML_();
   if(s.fase === 'propuesta')
     return '<div class="nota" style="border:0;padding:4px 0">'+esc(s.nota || c.nota0 || 'Revísalo antes de usarlo.')+'</div>'+
@@ -4172,26 +4200,29 @@ async function _solPedir_(k){
   if(!aviso && c.exige && !String(base == null ? '' : base).trim()) aviso = c.exige;
   if(aviso){ _solAviso_(k, aviso); return; }
   if(!c.sinSesion && (!backendOK || !SESION)){ SOLP[k] = {fase: 'error', msg: _solErrorTxt_('sin conexión con el servidor')}; _solPintar_(k); return; }
-  var n = ++_SOL_N_, r, vigente = function(){ return SOLP[k] && SOLP[k].n === n; }, suelta = function(){ if(c.bloquea) c.bloquea(false); };
+  var n = ++_SOL_N_, r, vigente = function(){ return SOLP[k] && SOLP[k].n === n; }, suelta = function(){ if(c.bloquea && SOLP[k] && SOLP[k].n === n) c.bloquea(false); },   // sólo la petición VIGENTE suelta el bloqueo: «Dejarlo» ya lo soltó y la ficha vuelta a abrir tiene el suyo
+    reloj = setTimeout(function(){ if(vigente()){ SOLP[k].lento = true; _solPintar_(k, true); } }, SOL_LENTO_MS);
   SOLP[k] = {fase: 'pensando', n: n}; if(c.bloquea) c.bloquea(true); _solPintar_(k);
   try{ r = await c.pedir(base); if(c.adapta && r && r.ok !== false) r = c.adapta(r, base); }
-  catch(e){ suelta(); if(vigente()){ SOLP[k] = {fase: 'error', msg: _solErrorTxt_((e && e.message) || e)}; _solPintar_(k); } return; }
-  suelta();
+  catch(e){ clearTimeout(reloj); suelta(); if(vigente()){ SOLP[k] = {fase: 'error', msg: _solErrorTxt_(e)}; _solPintar_(k); } return; }
+  clearTimeout(reloj); suelta();
   if(!vigente()) return;
   if(c.valor && String(c.valor() == null ? '' : c.valor()) !== base){ delete SOLP[k]; _solPintar_(k); return; }   // la caja cambió mientras pensaba
   if(r && r.vacio && c.calla){ delete SOLP[k]; _solPintar_(k); tost(r.vacio); return; }   // `calla`: sin propuesta clara no se enseña barra, sólo un aviso que se va solo
   if(r && r.vacio) SOLP[k] = {fase: 'error', msg: r.vacio};   // el modelo contestó, pero no hay nada que proponer
+  else if(r && r.ok !== false && !r.texto) SOLP[k] = {fase: 'error', msg: 'SolarIA no ha devuelto nada: prueba otra vez o hazlo a mano.'};   // el modelo SÍ contestó: no es «no está disponible»
   else if(!r || r.ok === false || !r.texto) SOLP[k] = {fase: 'error', msg: _solErrorTxt_(r && r.motivo)};
   else if(c.noIgual && String(r.texto).trim() === String(base).trim()) SOLP[k] = {fase: 'error', msg: c.noIgual};
   else SOLP[k] = {fase: 'propuesta', prop: c.max ? String(r.texto).slice(0, c.max) : String(r.texto), nota: r.nota || '', orig: c.valor ? base : undefined, extra: r};
   _solPintar_(k);
 }
 function _solClic_(ev){
-  var t = ev && ev.target && ev.target.closest ? ev.target : null, b = t && t.closest('[data-solpide],[data-solusa],[data-solquita],[data-soldeshace]');
+  var t = ev && ev.target && ev.target.closest ? ev.target : null, b = t && t.closest('[data-solpide],[data-solusa],[data-solquita],[data-soldeshace],[data-solcancela]');
   if(!b) return;
-  var a = b.hasAttribute('data-solpide') ? 'solpide' : b.hasAttribute('data-solusa') ? 'solusa' : b.hasAttribute('data-solquita') ? 'solquita' : 'soldeshace';
+  var a = b.hasAttribute('data-solcancela') ? 'solcancela' : b.hasAttribute('data-solpide') ? 'solpide' : b.hasAttribute('data-solusa') ? 'solusa' : b.hasAttribute('data-solquita') ? 'solquita' : 'soldeshace';
   var k = b.getAttribute('data-'+a), c = SOLCFG[k], ta = c && document.querySelector(c.ta), s = SOLP[k];
   if(a === 'solpide'){ _solPedir_(k); return; }
+  if(a === 'solcancela'){ delete SOLP[k]; if(c && c.bloquea) c.bloquea(false); _solPintar_(k); return; }   // «Dejarlo»: la respuesta que llegue tarde ya no es vigente y se ignora
   if(a === 'solquita'){ delete SOLP[k]; _solPintar_(k); return; }
   if(!ta || !s) return;
   if(a === 'solusa' && s.fase === 'propuesta'){
@@ -16110,7 +16141,7 @@ function _ordenSolariaHTML_(st){
       (mic&&mic.fase==='grabando'?'<span style="color:var(--rojo,#E41E25)">'+ico('punto')+'</span> Parar':ico('micro')+' Dictar')+'</button>'+
     '<span class="rnota" style="flex:1;margin:0">'+(mic&&mic.fase==='grabando'?'Grabando… habla y pulsa «Parar».':mic&&mic.fase==='transcribiendo'?'Transcribiendo…':ia.fase==='pensando'&&ia.origen==='notion'?'Leyendo la página de Notion…':'')+'</span>'+
     _solBtnHTML_('data-ordiaenviar', 'Proponer con SolarIA', {off: _ordenOcupado_(st), pensando: ia.fase==='pensando'&&ia.origen!=='notion'})+'</div>';
-  if(ia.fase==='pensando'&&ia.origen!=='notion') h+=_solPensandoHTML_();
+  if(ia.fase==='pensando'&&ia.origen!=='notion') h+=_solPensandoHTML_(null, null, ia.lento ? 'data-ordiacancela' : '');
   if(ia.fase==='propuesta') h+='<div data-ordiaprop style="margin-top:8px"><span class="sc" style="display:block;margin-bottom:4px">'+(ia.origen==='notion'?'De la página de Notion':ico('chispa')+' Propuesta de SolarIA')+'</span>'+
     _ordTablaHTML_(ia.prop, st.e&&st.e.inicio)+'<p class="rnota" style="margin:6px 0 0">'+esc(ia.nota||'Esta es la propuesta. Revísala antes de usarla.')+'</p>'+
     _solAccionesHTML_([['data-ordiaok', 'Usar esto', true], ['data-ordiano', 'Descartar']])+'</div>';
@@ -16265,10 +16296,12 @@ async function _ordenSolaria_(id){
   if(_ordenOcupado_(st)||!st.draft) return;
   if(!texto){ var tb=document.querySelector('[data-ordendia="'+String(id).replace(/"/g,'')+'"] [data-ordiatxt]'); if(tb) tb.focus(); tost('Dile a SolarIA qué quieres (o dicta) y propone la tabla.'); return; }
   var n=(ia.id||0)+1, filas=st.draft.filter(function(f){ return String(f.tema).trim()||String(f.quien).trim(); }).map(_ordFilaEnvio_), r;
-  ia.id=n; ia.fase='pensando'; ia.origen='solaria'; _ordenPintar_(id);
+  ia.id=n; ia.fase='pensando'; ia.origen='solaria'; ia.lento=false; _ordenPintar_(id);
   var vigente=function(){ return st.ia===ia && ia.fase==='pensando' && ia.id===n; };
+  var reloj=setTimeout(function(){ if(vigente()){ ia.lento=true; _ordenPintar_(id); } }, SOL_LENTO_MS);   // `solaria10`: lento → «Dejarlo»
   try{ r=await api.proponerOrdenDia(id, filas, texto, st.base); }
-  catch(e){ if(vigente()){ ia.fase='error'; ia.msg=_solErrorTxt_((e&&e.message)||e); _ordenPintar_(id); } return; }
+  catch(e){ clearTimeout(reloj); if(vigente()){ ia.fase='error'; ia.msg=_solErrorTxt_(e); _ordenPintar_(id); } return; }
+  clearTimeout(reloj);
   if(!vigente()) return;
   if(!r||r.ok===false||!r.filas||!r.filas.length){ ia.fase='error'; ia.msg=_solErrorTxt_(r&&r.motivo); }
   else{ ia.fase='propuesta'; ia.prop=r.filas; ia.nota=r.nota||''; }
@@ -16349,6 +16382,7 @@ async function _ordenClic_(id, ev){
   if(q('data-ordcopiarde')) return _ordenCopiarDe_(id, q('data-ordcopiarde').getAttribute('data-ordcopiarde'));
   if(q('data-ordcopiaundo') && st.avisoCopia){ st.draft=st.avisoCopia.antes; st.base=null; st.avisoCopia=null; return _ordenPintar_(id); }
   if(q('data-ordmic')) return _ordenMic_(id);
+  if(q('data-ordiacancela')&&st.ia.fase==='pensando'){ st.ia.fase=null; st.ia.lento=false; return _ordenPintar_(id); }   // «Dejarlo»: `vigente()` ya no se cumple y la respuesta tardía se ignora
   if(q('data-ordiaenviar')) return _ordenSolaria_(id);
   if(q('data-ordnotion')) return _ordenNotion_(id);
   if(q('data-ordiaok') && st.ia.fase==='propuesta'){ st.ia.orig=st.draft; st.draft=st.ia.prop.map(_ordFilaBorrador_);
