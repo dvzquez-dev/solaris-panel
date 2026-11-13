@@ -138,7 +138,7 @@ function rangoLote(){
 /* Los dos envoltorios que hacen que el bloque de arriba pueda ser IDENTICO al del movil:
    alli `_pilaDeM_` busca en el roster y `yoNombre()` sale de `YO`. Aqui ya existen `_m` y
    `ACTOR`, asi que se envuelven en vez de duplicar la busqueda. */
-function _pilaDeM_(n){ var m=_m(n); return (m&&m.pila)||''; }
+function _pilaDeM_(n){ var m=_m(n); return m&&m.pila ? nombreCorto(n) : ''; }     /* refutar39: con dos «Pablo», «Pablo F.» y «Pablo M.» */
 
 function _actorSanc_(){
   if (typeof backendOK !== 'undefined' && backendOK && SESION && SESION.nombre) return SESION.nombre;

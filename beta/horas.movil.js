@@ -1768,7 +1768,7 @@ function _cuotaHTML_(){
    la respuesta de `decidirParte` no podía reutilizarlo y había que re-preguntar al
    servidor solo para volver a formatear lo mismo. */
 function _normPDec_(p){
-  return { id:p.id, autor:p.autor, pila:_pilaDeM_(p.autor), unidad:p.subsistema||'—',
+  return { id:p.id, autor:p.autor, pila:_pilaDeM_(p.autor), /* (refutar39: el rótulo que se PINTA se calcula al pintar, con el roster ya cargado; esta pila es la del momento de leer) */ unidad:p.subsistema||'—',
     f:_isoADMY_(p.fecha), ini:p.ini||'—', fin:p.fin||'—', q:Number(p.horas)||0,
     t:p.tarea||'', just:p.justificacion||'', sinFichaje:!!p.sinFichaje,
     /* ⛔ `ini`/`fin`/`decidido_por`/`revierte` viajan porque `_etiOrigenParte_` los MIRA:
@@ -1908,7 +1908,7 @@ function _pdRango_(p){
 }
 function _pdFichaHTML_(p){
   return '<div class="pdi" data-pd="'+p.id+'">'+
-        '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
+        '<div class="fila"><div class="a"><b>'+esc(_pilaDeM_(p.autor))+'</b>'+
           '<small>'+esc(p.unidad)+' · '+esc(p.f)+_pdRango_(p)+'</small></div>'+
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
         '<div class="pdt">'+_icoBloque_(p)+esc(p.t)+'</div>'+
@@ -1998,7 +1998,7 @@ function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
         /* movil13-3: con UNA persona no hay cabecera (repetía el nombre y las horas de la ficha); el grupo de arriba sigue plegándose. */
         if(unico) return ps.map(ficha).join('');
         return '<details class="pdpers" data-pdk="'+esc(k)+'"'+(PD_ABIERTO_[k]?' open':'')+'>'+
-          '<summary><b>'+esc(ps[0].pila)+'</b>'+
+          '<summary><b>'+esc(_pilaDeM_(ps[0].autor))+'</b>'+
             '<span class="pdnum">'+ps.length+' · '+nf2(h)+' h</span></summary>'+
           ps.map(ficha).join('')+
         '</details>';
@@ -2035,14 +2035,14 @@ function _bloqueTarjetaM_(grupos){
   if(!grupos.length) return '';
   var dec=_bloquePuedeDecidirM_();
   return '<div class="tarj" id="pbloq">'+cab('Partes de bloque', grupos.length+(grupos.length===1?' bloque':' bloques'))+
-    _bloqueColaHTML_(grupos, {decide:dec, horas:function(p){ return p.q; }, nombre:function(p){ return p.pila||p.autor; },
+    _bloqueColaHTML_(grupos, {decide:dec, horas:function(p){ return p.q; }, nombre:function(p){ return _pilaDeM_(p.autor)||p.autor; },
       titulo:function(id){ var r=(REUNIONES_M||[]).filter(function(x){ return String(x.id)===String(id); })[0]; return r&&r.titulo; }})+'</div>';
 }
 /* 01/11 · «Tareas entregadas»: los partes que abrió el «Entregada» de un miembro, UNA tarjeta por tarea (comun.js `_tareaParte*_`). */
 function _tareaParteTarjetaM_(grupos){
   if(!grupos.length) return '';
   return '<div class="tarj" id="ptar">'+cab('Tareas entregadas', grupos.length+(grupos.length===1?' tarea':' tareas'))+
-    _tareaParteColaHTML_(grupos, {horas:function(p){ return p.q; }, nombre:function(p){ return p.pila||p.autor; },
+    _tareaParteColaHTML_(grupos, {horas:function(p){ return p.q; }, nombre:function(p){ return _pilaDeM_(p.autor)||p.autor; },
       tarea:function(p){ return p.t; }})+'</div>';
 }
 var _tareaParteCbM_={ hecho:function(){ _cargarPartesDec_().then(pintar); } };
@@ -2135,7 +2135,7 @@ function _pdRevFichaHTML_(p){
      **un ancla de mutación apuntando a dos sitios**: la protección queda afirmada y sin
      verificar, porque una mutación que no sabe dónde ir NO SE HACE. */
   var cab = '<div class="pdi" data-pdr="'+p.id+'">'+
-        '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
+        '<div class="fila"><div class="a"><b>'+esc(_pilaDeM_(p.autor))+'</b>'+
           '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(PD_EST[p.estado]||p.estado)+'</small></div>'+
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
         '<div class="pdt">'+_icoBloque_(p)+esc(p.t)+'</div>';

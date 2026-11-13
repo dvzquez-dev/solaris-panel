@@ -74,7 +74,7 @@ function parteCard(p){
   var m=_m(p.autor), rev=revisoresDeParte(p), puede=puedeDecidirParte(p,ACTOR);
   var esc2=(coordinadorDe(p.unidad)===p.autor);
   return '<div class="parte pp" id="parte-'+p.id+'">'+
-    '<div class="h"><b>'+esc(m.pila)+'</b>'+
+    '<div class="h"><b>'+esc(_pilaDeM_(p.autor)||m.pila)+'</b>'+
       /* 01/11 (escm1): Aprobar JUNTO AL NOMBRE, no al final de una fila de 1.500 px; el 90 % se aprueba sin motivo. */
       (puede?'<button class="btn pri sm" data-parte="'+p.id+'" data-acc="si">Aprobar</button>':'')+
       '<span class="u">'+esc(p.unidad)+'</span>'+
@@ -235,7 +235,7 @@ function _escHistFilaHTML_(p, per, uc){
         :'<span class="chip wa">devuelto · falta detalle</span>';
   var dec=p.estado==='aprobado' ? _selloAprobado_(p, per, uc)
         : (p.estado==='rechazado' || p.estado==='detalle') ? 'decidido '+_firmaParte_(p) : '';
-  return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_m(p.autor).pila)+' · '+
+  return '<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(_pilaDeM_(p.autor)||_m(p.autor).pila)+' · '+
     h1(_horasVistaParte_(p))+' · '+_icoBloque_(p)+esc(p.tarea)+'</b><small>'+p.fecha+(p.ini!=='—' && p.fin!=='—' ? ' · '+esc(p.ini)+'–'+esc(p.fin) : '')+(dec?' · '+esc(dec):'')+
     (p.motivo?' · «'+esc(p.motivo)+'»':'')+'</small></span><span class="der">'+et+'</span></div>';
 }
@@ -418,7 +418,7 @@ function _escRevCard_(p){
   var m=_m(p.autor), bloq=_escRevBloqueo_(p), cuenta=_escRevYaCuenta_(p);
   var eti=_etiOrigenParte_(p);
   var cab='<div class="parte" data-revid="'+esc(p.id)+'">'+
-    '<div class="h"><b>'+esc((m&&m.pila)||p.autor)+'</b>'+
+    '<div class="h"><b>'+esc(_pilaDeM_(p.autor)||(m&&m.pila)||p.autor)+'</b>'+
       '<span class="u">'+esc(p.subsistema||'—')+'</span>'+
       '<span class="u">'+esc(_isoADMY_(String(p.fecha||'').slice(0,10)))+' · '+
         esc(_escEstParte_(p.estado))+'</span>'+
@@ -1786,7 +1786,7 @@ function _bloqueColaPanelE_(lista){
   var dec=_bloquePuedeDecidirE_();
   return pan('Partes de bloque', g.length+(g.length===1?' bloque':' bloques'),
     '<div class="pb">'+_bloqueColaHTML_(g, {decide:dec, horas:function(p){ return p.horas; },
-      nombre:function(p){ return _m(p.autor).pila||p.autor; }, titulo:_bloqueTituloE_})+'</div>', 'destaca');
+      nombre:function(p){ return _pilaDeM_(p.autor)||p.autor; }, titulo:_bloqueTituloE_})+'</div>', 'destaca');
 }
 /* 01/11 · «Tareas entregadas»: los partes que abrió el «Entregada» de un miembro, UNA tarjeta por tarea (comun.js `_tareaParte*_`). */
 /* La cola «Requieren tu decisión» SIN lo que ya tiene su propio panel (los de bloque y los de tarea entregada). */
@@ -1799,7 +1799,7 @@ function _tareaPartePanelE_(lista){
   if(!g.length) return '';
   return pan('Tareas entregadas', g.length+(g.length===1?' tarea':' tareas'),
     '<div class="pb">'+_tareaParteColaHTML_(g, {horas:function(p){ return p.horas; },
-      nombre:function(p){ return _m(p.autor).pila||p.autor; }, tarea:function(p){ return p.tarea; }})+'</div>', 'destaca');
+      nombre:function(p){ return _pilaDeM_(p.autor)||p.autor; }, tarea:function(p){ return p.tarea; }})+'</div>', 'destaca');
 }
 function _engTareaParteE_(){ _tareaParteColaCablear_(_tareaParteCbE_); }
 function _bloqueReuPanelE_(){

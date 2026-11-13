@@ -126,7 +126,7 @@ function pintarReparto(){
   c.innerHTML=_cajaCargosPend_()+nn.map(function(n){
     var e=TUR_SEL[n], m=_m(n);
     return '<div class="repf">'+
-      '<b>'+esc((m&&m.pila)||n)+'</b>'+
+      '<b>'+esc(_pilaDeM_(n)||(m&&m.pila)||n)+'</b>'+
       '<input data-rol="'+esc(n)+'" value="'+esc(e.rol||'')+'" placeholder="su papel (opcional)">'+
       /* ⛔ UN BOTON POR CARGO. Antes habia uno solo -«responsable»- y los otros dos se
          escribian a mano en el texto libre, donde nadie los podia exigir ni leer.
@@ -1522,7 +1522,7 @@ function _cierreTurnoPanel_(){
     return '<tr'+(on?'':' style="opacity:.45"')+'>'+
       '<td><div style="display:flex;align-items:center;gap:7px">'+
         nxSiNo('', on, {attrs:'data-ct-fue="'+esc(n)+'"'})+
-        esc((miembro(n)||{}).pila || n)+
+        esc(_pilaDeM_(n)||(miembro(n)||{}).pila || n)+
         (n===resp?' <span class="chip">responsable</span>':'')+
         (_esSuplenteTurno_(t, n)?' <span class="chip">suplente</span>':'')+'</div>'+
         /* 26/10 (C4b): «llevó coche» va al ACTA (Notion `Coche`, almacén `coche_confirmado`). ⚠️ La cuota aún cuenta el
@@ -1771,7 +1771,7 @@ function _convocarPoolHTML_(b){
   var cv=_convocarCvElegida_(), pool=_activos_().slice().sort(function(a,c){ return String(a.pila).localeCompare(String(c.pila)); });
   var chip=function(m, no){
     return '<button type="button" class="pick'+(TUR_SEL[m.nombre]?' on':'')+'" data-tu="'+esc(m.nombre)+'"'+
-      (no?' title="No ha dicho que pueda: se añade igual" style="opacity:.78"':'')+'>'+esc(m.pila)+'</button>';
+      (no?' title="No ha dicho que pueda: se añade igual" style="opacity:.78"':'')+'>'+esc(_pilaDeM_(m.nombre)||m.pila)+'</button>';
   };
   if(!cv || !b || !b.claves || !b.claves.length) return pool.map(function(m){ return chip(m, false); }).join('');
   var pueden=_turnoBloqueQuien_(_calorTurnos_(cv, ''), b.dia, b.claves), si=[], no=[];

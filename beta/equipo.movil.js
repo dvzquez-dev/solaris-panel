@@ -15,7 +15,7 @@
    esta, con el bueno: si el nombre no esta en el roster, el nombre de pila. */
 function _pilaDeM_(n){
   var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
-  return (m && m.pila) || String(n||'').split(' ')[0];
+  return m ? nombreCorto(n) : String(n||'').split(' ')[0];       /* refutar39: con dos «Pablo», «Pablo F.» y «Pablo M.» */
 }
 
 /* Se rederivaban SOLO el PD, asi que REV2_NOM se quedaba en el nombre de la semilla y el

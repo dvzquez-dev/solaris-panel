@@ -9028,6 +9028,39 @@ function miembro(n){
   return buscaMiembro(function(m){ return m.nombre===n; });
 }
 
+/* ⛔ DOS «PABLO» NO SE DISTINGUEN POR LA PILA (refutar39, 13/11). Con el equipo por encima de 40 es cuestión de tiempo que dos personas compartan
+   nombre de pila, y en la cola de partes («Pablo · Aprobar») o en los convocados («Pablo ×») el rótulo es lo ÚNICO que dice a quién se está
+   aprobando o quitando. `nombreCorto(n)` es la pila si es única entre los activos; si no, la pila con lo MÍNIMO del apellido que las separa:
+   «Pablo F.», «Pablo M.»; y si comparten hasta la inicial, «Pablo Méndez Quintel.»… El apellido es el primero que no es una partícula
+   («María del Carmen Souto» → «María S.», no «María d.»). Sólo cambia lo que ya salía repetido: con pilas distintas devuelve la pila de siempre. */
+function _esParticulaApe_(t){ return /^(de|del|la|las|lo|los|da|das|do|dos|di|du|y|e|van|von|san)$/i.test(t); }
+function _apellidosDe_(x){
+  var nom=String(x.nombre||''), pila=x.pila||nom.split(/\s+/)[0];
+  var resto=nom.indexOf(pila+' ')===0 ? nom.slice(pila.length+1) : nom.split(/\s+/).slice(1).join(' ');
+  return resto.split(/\s+/).filter(function(t){ return t && !_esParticulaApe_(t); });
+}
+function _etiquetaNivel_(pila, ap, i){      /* nivel i: i letras del 1.er apellido; pasado éste, entero + letras del 2.º */
+  var a=ap[0]||'', b=ap[1]||'';
+  if(!a) return pila;
+  if(i<=a.length) return pila+' '+a.slice(0,i)+(i<a.length?'.':'');
+  var k=Math.min(i-a.length, b.length);
+  return pila+' '+a+(b ? ' '+b.slice(0,k)+(k<b.length?'.':'') : '');
+}
+function nombreCorto(nom){
+  var m=miembro(nom), pila=(m&&m.pila)||String(nom||'').split(/\s+/)[0];
+  if(!m || !pila) return pila||nom;
+  var clave=function(t){ return _sinTildes_(String(t||'')).toLowerCase(); };
+  var otros=(DATA.miembros||[]).filter(function(x){
+    return x!==m && x.nombre!==nom && !x.baja && clave(x.pila||String(x.nombre||'').split(/\s+/)[0])===clave(pila); });
+  if(!otros.length) return pila;
+  var ap=_apellidosDe_(m), aps=otros.map(_apellidosDe_), tope=(ap[0]||'').length+(ap[1]||'').length;
+  for(var i=1;i<=tope;i++){
+    var et=_etiquetaNivel_(pila, ap, i);
+    if(!aps.some(function(o){ return _etiquetaNivel_(o.pila||pila, o, i)===et; })) return et;
+  }
+  return nom;
+}
+
 /* Una clave de un solo uso para un envío. ⛔ Se genera UNA VEZ por envío y se reutiliza en
    los reintentos: si se generara dentro del reintento, cada intento traería una clave distinta
    y el servidor los vería como envíos distintos — que es justo el fallo que esto evita.
@@ -9298,8 +9331,7 @@ function _mejorTurno_(calor, minimo){
 }
 
 function _dispPila_(nom){
-  var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===nom; })[0];
-  return (m&&m.pila)||nom;
+  return miembro(nom) ? nombreCorto(nom) : nom;
 }
 
 /* Un grupo del desglose: rótulo pequeño encima y, debajo, lo suyo (chips de personas o una frase). `attr` va en el contenedor. */
@@ -9759,9 +9791,9 @@ function _quienPuedeGrupos_(r, di, fi){
 }
 
 function _quienPuedePanel_(r, di, fi, rotulo){
-  var g=_quienPuedeGrupos_(r, di, fi), cnt={}, tag=/brid/i.test(String((r && (r.modalidad||r.mod))||''));
-  [g.puede, g.no, g.sin].forEach(function(l){ l.forEach(function(x){ var k=x.n.split(/\s+/)[0]; cnt[k]=(cnt[k]||0)+1; }); });
-  function pila(n){ var t=n.split(/\s+/), k=t[0]; return (cnt[k]>1 && t[1]) ? k+' '+t[1].charAt(0)+'.' : k; }
+  var g=_quienPuedeGrupos_(r, di, fi), tag=/brid/i.test(String((r && (r.modalidad||r.mod))||''));
+  /* refutar39: antes «pila + inicial del 2.º TOKEN» sólo entre los de este hueco: «María d.» (de «del») y dos «Pablo M.» seguían iguales. */
+  function pila(n){ return miembro(n) ? nombreCorto(n) : String(n).split(/\s+/)[0]; }
   function chip(x, cls){
     var t=(cls==='p' && tag) ? ' <i style="font-style:normal;font-size:10px;opacity:.8">'+(x.v===2?'presencial':'telemático')+'</i>' : '';
     var st='display:inline-block;margin:2px 4px 2px 0;padding:3px 9px;border-radius:999px;font-size:13px;line-height:1.25;';

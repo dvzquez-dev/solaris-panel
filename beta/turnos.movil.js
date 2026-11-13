@@ -24,7 +24,7 @@ function _normTurnoM_(t, ix){
     if(Array.isArray(r)) return [r[0], r[1]||'', false];
     var nom=r.miembro||r.nombre||'— libre';
     var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===nom; })[0];
-    return [ (m&&m.pila)||nom, r.rol||'', nom===_yo ];
+    return [ _pilaDeM_(nom)||(m&&m.pila)||nom, r.rol||'', nom===_yo ];
   });
   var yo=(YO&&YO.nombre)||'', mio=null;
   (t.roles||[]).forEach(function(r){ if(!Array.isArray(r) && (r.miembro===yo)) mio=r.rol||'te toca'; });
@@ -915,7 +915,7 @@ function _progPintar_(){
   if(!c) return;
   c.innerHTML = nn.map(function(n){
     var m = miembro(n);
-    return '<div class="fila" style="flex-wrap:wrap;gap:6px"><div class="a" style="flex:1 1 100%"><b>'+esc((m && m.pila) || n)+'</b></div>'+
+    return '<div class="fila" style="flex-wrap:wrap;gap:6px"><div class="a" style="flex:1 1 100%"><b>'+esc(_pilaDeM_(n) || (m && m.pila) || n)+'</b></div>'+
       CARGOS_TURNO.filter(function(cg){ return _cargoOfrecidoA_(cg.k, n); }).map(function(cg){
         return '<button type="button" class="pick'+(PROG_T.cargos[cg.k] === n ? ' on' : '')+'" data-ptcargo="'+cg.k+'" data-ptq="'+esc(n)+
           '" title="'+esc(cg.et)+'">'+esc(cg.corto)+'</button>'; }).join('')+
@@ -1102,7 +1102,7 @@ function _ctMHTML_(t){
   var asis = _asistentesTurno_(v).concat(_dudososTurno_(v)), resp = _responsableTurno_(v);
   var fila = function(n){
     var on = !!st.quien[n];
-    return '<div class="fila" style="display:block;padding:9px 0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>'+esc((miembro(n)||{}).pila || n)+'</b>'+
+    return '<div class="fila" style="display:block;padding:9px 0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>'+esc(_pilaDeM_(n) || (miembro(n)||{}).pila || n)+'</b>'+
       (n === resp ? '<span class="chip">responsable</span>' : '')+(_esSuplenteTurno_(v, n) ? '<span class="chip">suplente</span>' : '')+'</div>'+
       '<div style="display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin-top:6px">'+
         '<span class="sc">Fue</span>'+nxSiNo('', on, {attrs:'data-ctm-fue="'+esc(n)+'"'})+
