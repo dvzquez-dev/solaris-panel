@@ -14818,9 +14818,9 @@ function _bloqueReuHTML_(r, puede){
         '<b>En curso</b><span class="mono" data-crono="'+esc(ec.ini)+'" style="font-size:18px">'+esc(_cronoTxt_(ec.ini))+'</span></div>'+
         '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-p id="btnFinalizar" style="flex:2">Finalizar</button>'+
         '<button class="btn" data-p id="btnCancelarCurso" style="flex:1">Cancelar</button></div>'
-      : (_reuFinalizada_(r) ? '' : '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>'))+
+      : (_reuFinalizada_(r) || _reuTerminada_(r) ? '' : '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>'))+
     '<button class="btn '+(pend?'pri':'mini')+' full" data-p id="btnDeclararBloque" style="margin-top:8px">'+(_reuTerminada_(r) ? 'Dar las horas a los asistentes' : 'Declarar horas de varias personas')+'</button>'+
-    (_reuFinalizada_(r) ? '' : '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p>')+'</div>';
+    (_reuFinalizada_(r) || _reuTerminada_(r) ? '' : '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p>')+'</div>';
 }
 
 /* `getR()` da la reunión AHORA (la lista se rehace al refrescar); `abrir()` pinta el formulario. */
@@ -16387,11 +16387,12 @@ function _ordenHTML_(id){
     else if(!e.pdf) cuerpo='<div class="rnota">Todavía no hay orden del día.</div>';
     if(e.puede&&e.filas&&e.filas.length&&!e.pdf) cuerpo+='<p class="rnota" data-ordsinpdfaviso style="margin:6px 0 0">Los convocados ven el PDF, no esta tabla: genéralo para que lo vean.</p>';
     if(e.puede) cuerpo+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px"><button class="btn mini" data-ordeditar>'+ico('lapiz')+' '+(e.filas&&e.filas.length?'Editar la tabla':'Escribir el orden del día')+'</button>'+
-      '<button class="btn mini" data-ordgenerar'+(st.gen?' disabled':'')+'>'+ico('documento')+' '+(st.gen?'Generando el PDF…':'Generar PDF')+'</button></div>'+
+      /* 13/11 (refutar32, «aparecen como a destiempo»): «Generar PDF» e «Índice» sólo con algún punto escrito; sin ninguno no hay nada que generar */
+      (e.filas&&e.filas.length?'<button class="btn mini" data-ordgenerar'+(st.gen?' disabled':'')+'>'+ico('documento')+' '+(st.gen?'Generando el PDF…':'Generar PDF')+'</button>':'')+'</div>'+
       /* 13/11 (Daniel: «poner o no poner índice con alguna especie de tick»): un chip como «Horas distintas por persona» (rojo = sí). Va en su fila,
          con aire sobre los botones; se recuerda en el PDF generado (`pdf.indice`) y vale para el próximo «Generar PDF» y para el que se rehace solo. */
-      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px" data-ordindicefila><button type="button" class="btn mini'+(_ordIndice_(st)?' pri':'')+'" style="min-height:36px;padding-left:16px;padding-right:16px" data-ordindice aria-pressed="'+_ordIndice_(st)+'"'+(st.gen?' disabled':'')+'>Índice</button>'+
-      '<span class="rnota" style="margin:0;flex:1;min-width:170px" data-ordindicenota>'+(_ordIndice_(st)?'El PDF lleva índice, con enlaces a cada apartado.':'El PDF no lleva índice.')+'</span></div>'+
+      (e.filas&&e.filas.length?'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px" data-ordindicefila><button type="button" class="btn mini'+(_ordIndice_(st)?' pri':'')+'" style="min-height:36px;padding-left:16px;padding-right:16px" data-ordindice aria-pressed="'+_ordIndice_(st)+'"'+(st.gen?' disabled':'')+'>Índice</button>'+
+      '<span class="rnota" style="margin:0;flex:1;min-width:170px" data-ordindicenota>'+(_ordIndice_(st)?'El PDF lleva índice, con enlaces a cada apartado.':'El PDF no lleva índice.')+'</span></div>':'')+
       (st.errGen?'<div class="rnota" data-ordgenerror style="margin-top:6px;color:var(--warn)">'+esc(st.errGen)+'</div>':'');
   }
   return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+cab+cuerpo+_ordenPdfHTML_(st)+'</div>';
