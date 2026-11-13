@@ -1710,10 +1710,9 @@ function _convocarCv_(){ return _convocarCvElegida_(); }
 
 /* Los chips para ELEGIR de qué convocatoria sale el mapa (abiertas Y cerradas) y, para quien puede, empezar una nueva. */
 function _convocarEligeHTML_(){
-  var L=CONV_LISTA||[], cv=_convocarCvElegida_(), act=cv ? String(cv.id) : '', est={abierta:'abierta', cerrada:'cerrada', sin_abrir:'sin abrir'};
+  var L=CONV_LISTA||[], cv=_convocarCvElegida_(), act=cv ? String(cv.id) : '';
   var chips=L.map(function(c){
-    var f=_isoADMY_(String(c.semana_ini||'').slice(0,10))||String(c.semana_ini||'');
-    return '<button type="button" class="pick'+(String(c.id)===act?' on':'')+'" data-convsel="'+esc(c.id)+'">Semana del '+esc(f.slice(0,5))+' · '+esc(est[c.estado]||c.estado||'')+'</button>';
+    return '<button type="button" class="pick'+(String(c.id)===act?' on':'')+'" data-convsel="'+esc(c.id)+'">'+esc(_convEtiqueta_(c))+'</button>';
   }).join('');
   if(_puedeConvocarDisp_()) chips+='<button type="button" class="pick" data-convnueva="1">Pedir disponibilidad nueva</button>';
   return chips ? '<span class="sc" style="display:block;margin-bottom:5px">De qué convocatoria</span><div class="chips" data-conv-lista style="margin:0 0 12px">'+chips+'</div>' : '';

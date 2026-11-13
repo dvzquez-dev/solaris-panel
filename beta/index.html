@@ -114,11 +114,11 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=fcdbf29"></script>
+<script src="comun.js?v=896833c"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=fedfca9"></script>
-<script src="turnos.movil.js?v=1028de6"></script>
+<script src="turnos.movil.js?v=9f03236"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=6b9a5cc"></script>
 <script src="sanciones.movil.js?v=7f75222"></script>
@@ -392,6 +392,7 @@ var api={
   guardarDisponibilidad: function(conv,celdas){ return api._post({action:"guardarDisponibilidad",convocatoria:conv,celdas:celdas}); },
   crearConvocatoria: function(c){ return api._post({action:"crearConvocatoria",convocatoria:c}); },
   getDisponibilidad: function(conv){ return api._post({action:"getDisponibilidad",convocatoria:conv}); },
+  listarConvocatorias: function(){ return api._post({action:"listarConvocatorias"}); },   /* 13/11 (progconv): Programar turno elige entre TODAS, como el escritorio */
   getNovedadesVistas: function(){ return api._post({action:"getNovedadesVistas"}); },
   marcarNovedadVista: function(id,visto){ return api._post({action:"marcarNovedadVista",id:id,visto:!!visto}); },
   pushParte: function(p){ return api._post({action:"pushParte",parte:p}); },
@@ -1850,7 +1851,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='33a275a';
+var BUILD='d9a8015';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

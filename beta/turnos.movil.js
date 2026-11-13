@@ -941,11 +941,40 @@ function _progCalorCargar_(){
   var caja = $('#ptCalor'); if(!caja) return;
   var di = function(t){ var b = $('#ptCalor'); if(b && b === caja) b.textContent = t; };
   if(typeof api === 'undefined' || !api.getDisponibilidad || !SESION){ di('Sin conexión no se ve la disponibilidad: elige el día y la hora a mano.'); return; }
-  api.getDisponibilidad().then(function(r){
+  /* 13/11 (progconv): primero la LISTA (abiertas y cerradas, como el escritorio); por defecto la que se REPARTE (`_convParaRepartir_`) y, si no
+     hay, la vigente (sin id). Sin lista (sin permiso, sin red) queda el mapa de la vigente de siempre. */
+  var pedirLista = api.listarConvocatorias ? api.listarConvocatorias().then(function(r){ return (r && r.lista) || []; }).catch(function(){ return []; }) : Promise.resolve([]);
+  pedirLista.then(function(L){
     if(!PROG_T || $('#ptCalor') !== caja) return;
+    PROG_T.lista = L;
+    var c = _convParaRepartir_(L, (typeof TURNOS !== 'undefined' ? TURNOS : []).map(function(t){ return t.iso; }), _hoyNxISO_());
+    _progConvElige_(c ? c.id : null, caja);
+  });
+}
+
+/* Los chips de «De qué convocatoria»: sólo si hay MÁS DE UNA (con una no hay nada que elegir). Lo elegido en rojo (`.on`), sin tick. */
+function _progConvPintar_(){
+  var z = $('#ptConv'); if(!z || !PROG_T) return;
+  var L = PROG_T.lista || [];
+  if(L.length < 2){ z.innerHTML = ''; return; }
+  z.innerHTML = '<span class="sc" style="display:block;margin:0 0 6px">De qué convocatoria</span><div class="chips" style="margin:0 0 10px">'+
+    L.map(function(c){ return '<button type="button" class="pick'+(String(c.id) === String(PROG_T.elegida) ? ' on' : '')+'" data-ptconv="'+esc(c.id)+'">'+esc(_convEtiqueta_(c))+'</button>'; }).join('')+'</div>';
+  $$('#ptConv [data-ptconv]').forEach(function(b){ b.onclick = function(){
+    var caja = $('#ptCalor'); if(!caja) return;
+    caja.className = 'rnota'; caja.style.margin = '0 0 4px'; caja.textContent = 'Mirando la disponibilidad…';
+    _progConvElige_(b.dataset.ptconv, caja); }; });
+}
+
+/* Pide el detalle de la convocatoria `id` (`null` = la vigente) y pinta el mapa. Si mientras tanto eligieron otra, esta respuesta se tira. */
+function _progConvElige_(id, caja){
+  var di = function(t){ var b = $('#ptCalor'); if(b && b === caja) b.textContent = t; };
+  if(PROG_T){ PROG_T.elegida = id; PROG_T.cv = null; _progConvPintar_(); }
+  api.getDisponibilidad(id == null ? undefined : id).then(function(r){
+    if(!PROG_T || $('#ptCalor') !== caja || PROG_T.elegida !== id) return;
     if(!r || !r.convocatoria){ di('No hay convocatoria de disponibilidad abierta para esa semana: elige el día y la hora a mano.'); return; }
     var cv = r.convocatoria; cv.resp = r.cv || {};
     PROG_T.cv = cv;   /* la regla del consejo con lo escrito a mano usa la MISMA convocatoria que el mapa */
+    if(id == null){ PROG_T.elegida = cv.id; _progConvPintar_(); }   /* la vigente también se marca en los chips */
     var calor = _calorTurnos_(cv, '');
     var mud=_dispMudos_(cv), nInv=(cv.invitados||[]).length;
     /* refutar33 (13/11): QUIÉN FALTA, también desde el móvil. El escritorio ya lo decía bajo su mapa («N de M han contestado · sin contestar:
@@ -961,7 +990,7 @@ function _progCalorCargar_(){
     });
     _progMarcarMapa_();
     _progPintar_();
-  }).catch(function(){ di('No se pudo leer la disponibilidad: elige el día y la hora a mano.'); });
+  }).catch(function(){ if(PROG_T && PROG_T.elegida === id) PROG_T.cv = null; di('No se pudo leer la disponibilidad: elige el día y la hora a mano.'); });
 }
 
 /* 03/11: el camino de VUELTA, del formulario al mapa (los botones +/− de la hora y la duración marcan ese bloque; antes no movían nada). */
@@ -977,7 +1006,7 @@ function progTurnoAbrir(){
   var lab = function(t){ return '<span class="sc" style="display:block;margin:12px 0 6px">'+t+'</span>'; };
   abrirModal('<div class="mtit">Programar turno</div>'+
     '<p class="rnota" style="margin:-4px 0 4px">Les llega a los convocados y queda en Notion. No se puede convocar más de un turno el mismo día.</p>'+
-    lab('Cuándo pueden · toca un hueco')+'<div id="ptCalor" class="rnota" style="margin:0 0 4px">Mirando la disponibilidad…</div>'+
+    lab('Cuándo pueden · toca un hueco')+'<div id="ptConv"></div><div id="ptCalor" class="rnota" style="margin:0 0 4px">Mirando la disponibilidad…</div>'+
     lab('Día')+nxFecha('ptFecha', '', {min:_hoyNxISO_()})+
     lab('Hora de inicio')+nxHora('ptHora', '16:00')+
     lab('Duración')+nxNum('ptDur', 3, {paso:0.5, min:0.5, max:12, sufijo:'h'})+

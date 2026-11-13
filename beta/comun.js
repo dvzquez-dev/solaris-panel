@@ -4047,6 +4047,30 @@ function _rolDeTurno_(escrito, marcas){
    `ACTOR`, el móvil `YO.nombre`. */
 function _puedeProgramarTurno_(nombre){ return rangoNom(nombre) >= 1; }
 
+/* 13/11 (progconv) · DE QUÉ CONVOCATORIA SALE EL MAPA AL PROGRAMAR UN TURNO. 🗣️ Daniel (03/11): «debería dejar convocar turnos para todas las
+   convocatorias, abiertas y cerradas». La que se REPARTE es la más reciente que ya cerró y aún no tiene turnos en sus días (cerrar el plazo y
+   repartir es lo que se hace); `null` = ninguna así, y entonces vale la vigente que da el servidor sin id. `lista` es la de `listarConvocatorias`;
+   `fechas`, las de los turnos ya convocados (ISO); `hoy` (ISO), para no ofrecer una semana que ya pasó entera (sus turnos ya no se
+   convocan: una cerrada vieja sin turnos tendría el mapa para siempre). Las dos caras llaman a ésta y a `_convEtiqueta_`. */
+function _convParaRepartir_(lista, fechas, hoy){
+  var fs = (fechas || []).map(function(x){ return String(x || '').slice(0, 10); }).filter(Boolean);
+  var c = (lista || []).filter(function(c){
+    if (!c || c.estado !== 'cerrada') return false;
+    var a = String(c.semana_ini || '').slice(0, 10), z = String(c.semana_fin || '').slice(0, 10);
+    if (!z && a) z = new Date(new Date(a + 'T12:00:00Z').getTime() + 6 * 86400000).toISOString().slice(0, 10);   /* sin fin: lunes + 6 */
+    if (hoy && z < String(hoy).slice(0, 10)) return false;
+    return !fs.some(function(d){ return d >= a && d <= z; });
+  });
+  c.sort(function(x, y){ return String(y.semana_ini).localeCompare(String(x.semana_ini)); });
+  return c[0] || null;
+}
+/* El rótulo del chip de una convocatoria: «Semana del 23/11 · cerrada». */
+function _convEtiqueta_(c){
+  var est = {abierta:'abierta', cerrada:'cerrada', sin_abrir:'sin abrir'};
+  var f = _isoADMY_(String(c.semana_ini || '').slice(0, 10)) || String(c.semana_ini || '');
+  return 'Semana del ' + f.slice(0, 5) + ' \u00b7 ' + (est[c.estado] || c.estado || '');
+}
+
 /* Las horas de la duración, dichas como en los turnos reales («3 horas», «1 hora», «2,5 horas»). */
 function _duracionTurnoTxt_(h){
   var n = Number(h);
