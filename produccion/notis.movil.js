@@ -140,7 +140,11 @@ function _gateNotis_(motivo, seguir){
         if(!await _asegurarPush_(msg)){ b.disabled=false; b.textContent=boton; return; }
         seguir(); return;
       }
-      if(msg) msg.textContent='Sigue sin permiso. Hay que darlo en los ajustes del móvil.';
+      /* 12/11 (refutar29): lo que se dice depende de LO QUE PASÓ. Denegado: el navegador ya no vuelve a preguntar, así que la puerta pasa a la pantalla
+         de «actívalas a mano» (la que ya existe) en vez de seguir ofreciendo un botón que no hace nada. Aviso cerrado sin elegir (`default`): se
+         puede volver a pedir, y mandar a los ajustes del móvil sería mandar a arreglar algo que no está roto. */
+      if(Notification.permission==='denied'){ _gateNotis_('denegado', seguir); return; }
+      if(msg) msg.textContent='No has elegido. Pulsa otra vez y elige «Permitir» en el aviso del navegador.';
     }catch(e){ if(msg) msg.textContent='No se pudo: '+((e&&e.message)||e); }
     b.disabled=false; b.textContent=boton;
   };

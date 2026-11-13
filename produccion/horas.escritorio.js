@@ -162,7 +162,7 @@ function bloquePanel(){
         nxElige('bloSubc', [['','Sin elegir']].concat(SUBCATS_COMP), '')+'</div>'+   /* 01/11 (horasmes), con chips: nada de <select> */
       '<div><span class="sc" style="display:block;margin-bottom:5px">Horas c/u</span>'+nxNum('bloH', 2, {min:0, paso:0.25, sufijo:'h'})+'</div>'+
       '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Concepto</span>'+
-      '<input id="bloC" placeholder="p. ej. Traslado a campo de pruebas" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
+      '<input id="bloC" placeholder="p. ej. Traslado a campo de pruebas" style="width:100%"></label>'+
       '<button class="btn pri" data-bloque>Otorgar el bloque</button>'+
     '</div></div>');
 }
@@ -1480,11 +1480,11 @@ function _histHorasHTMLE_(mi){
   var hm=_hMesReal_(mi), chips='';
   g.forEach(function(m){
     var abierto=(per && m.k===per), k=m.k||'sin';
-    var h=abierto ? (hm!=null ? hm : m.h+_compMensual_(mi)) : m.h;
+    var h=abierto ? (hm!=null ? _hMesDevengado_(mi) : m.h+_compMensual_(mi)) : m.h;   /* 13/11 (horasprorrata): devengada, como la cifra de arriba */
     chips+='<button type="button" class="mmesE" data-meses="'+k+'"><b>'+(m.k ? esc(_nomPeriodo_(m.k)) : 'Sin fecha')+'</b>'+
       (m.k ? (function(e){ return '<span class="chip'+(e.cls?' '+e.cls:'')+'">'+e.txt+'</span>'; })(_estadoMes_(m.k, per)) : '')+
       '<span class="ln"></span><span class="mono">'+nf2(h)+' h</span></button>';
-    var base=abierto ? [{tarea:'Compensación por tu cargo', fecha:'', horas:_compBase_(mi), cat:null}] : [];
+    var base=abierto ? [{tarea:'Compensación por tu cargo', fecha:'', horas:_compBaseAHoy_(mi), cat:null}] : [];
     var extra=(abierto && _compExtra_(mi, m.items)) ? [{tarea:'Compensación extra', fecha:'', horas:_compExtra_(mi, m.items)}] : [];
     chips+='<div class="ltmesdet" data-mesdet="'+k+'" hidden>'+_filasMesE_(base.concat(extra, m.items))+
       _desgloseCatHTMLE_(m.items)+'</div>';   /* el desglose, JUSTO debajo de SU tarjeta */
@@ -1792,6 +1792,8 @@ function _bloqueColaPanelE_(lista){
 /* La cola «Requieren tu decisión» SIN lo que ya tiene su propio panel (los de bloque y los de tarea entregada). */
 function _miasSueltas_(lista){ return _tareaParteGrupos_(lista.filter(function(p){ return !p.bloque; })).sueltas; }
 var _tareaParteCbE_={ hecho:function(){ _cargarPartes_().then(pintar); } };
+/* refutar26: igual que en el móvil: tras abrir mi parte desde la tarea, se recargan los partes y se repinta. */
+function _tareaPartesCambiaron_(){ if(_tareaEnMaqueta_()) return; _cargarPartes_().then(function(){ pintar(); }); }
 function _tareaPartePanelE_(lista){
   var g=_tareaParteGrupos_(lista).grupos;
   if(!g.length) return '';

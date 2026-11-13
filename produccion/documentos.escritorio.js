@@ -319,7 +319,6 @@ function _decDocLocalE_(d, acc, mot, tit, actor, at, aj){
   return d;
 }
 
-var DOC_EDIT_AB = {};   /* 31/10 (feosesc #16): qué expedientes tienen abierto «Editar antes de decidir», para el repintado */
 function docCard(d){
   var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
   var sinRev=!revs.length;
@@ -357,31 +356,19 @@ function docCard(d){
   if(puede){
     /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el móvil (`comun.js` `_anotPanelHTML_`), con
        prefijo `d<id>-`: aquí se pintan varias fichas a la vez. Sólo donde se puede aprobar. */
-/* 31/10 (feosesc #16): los botones de decidir ARRIBA (`arriba`, tras los chips) y el formulario de edición PLEGADO bajo
-       «Editar antes de decidir» (`acc`, al fondo): con dos expedientes había que bajar >2 pantallas para decidir el segundo.
-       Sigue en el DOM plegado (los campos se leen por id); lo abierto se recuerda en `DOC_EDIT_AB`. */
-    var _abEd = (typeof DOC_EDIT_AB!=='undefined') && !!DOC_EDIT_AB[d.id];
-    acc=((_yaAnalizado_(d) || _autorP) ? '<div class="doc-edit'+(_abEd?' ab':'')+'"><button type="button" class="btn sm" data-docedit="'+d.id+'">Editar antes de decidir</button>'+
-        '<div class="doc-edit-c">'+_autorP+(_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS, {verTodas:true, excluir:ACTOR}) : '')+'</div></div>' : '');
+/* 13/11 (docdecidir): chips de acción y, debajo, SÓLO el panel de la elegida (`comun.js` `_decPanelesHTML_`); el formulario de «con anotaciones»
+       (antes plegado bajo «Editar antes de decidir») es el panel de esa acción. Sigue en el DOM aunque no se vea (los campos se leen por id). */
+    acc='';
     arriba=_revisionPropuestaHTML_(d, ACTOR)+
-      '<textarea data-motivo data-borr="doc-motivo-'+esc(d.id)+'" placeholder="Motivo — obligatorio para pedir cambios o rechazar. Lo lee el autor…"></textarea>'+
-      /* ⛔⛔ APROBAR = PUBLICAR, y no se publica lo que nadie ha analizado. Esta cara ve
-         `recibido` y `analizado` a proposito -Daniel, 05/08: en el movil «no aparecen
-         hasta que esten completamente analizados»; aqui se ve el pipeline entero-, pero
-         VER no es APROBAR: eso ultimo era una deduccion que nadie tomo, y el servidor la
-         aceptaba. Se publicaba un expediente sin analizar y, muchas veces, **sin fichero
-         que leer** -lo dice la propia ficha dos lineas mas arriba-.
-         ⚠️ «Solicitar cambios» y «Rechazar» siguen ahi: son la forma legitima de parar
-         algo que viene mal, y ninguno de los dos publica nada. */
-      '<div class="acts">'+
-        (_yaAnalizado_(d)
-          ? '<button class="btn pri" data-doc="'+d.id+'" data-acc="aprobado">'+_rotuloAprobarDoc_(d, ACTOR)+'</button>'+
-            '<button class="btn" data-doc="'+d.id+'" data-acc="anot">Aprobar con anotaciones</button>'
-          : '<span class="sc" style="align-self:center">A\u00fan sin analizar: se puede parar, no publicar.</span>')+
-        '<button class="btn" data-doc="'+d.id+'" data-acc="cambios">Solicitar cambios</button>'+
-        '<button class="btn no" data-doc="'+d.id+'" data-acc="rechazado">Rechazar</button>'+
-        (_puedeDeshacerDoc_(d)?'<button class="btn" data-doc="'+d.id+'" data-acc="deshacer">Deshacer y devolver a revisión</button>':'')+
-      '</div>';
+      /* ⛔⛔ APROBAR = PUBLICAR, y no se publica lo que nadie ha analizado (`_decAcciones_` quita aprobar y «con anotaciones» hasta entonces).
+         Esta cara ve `recibido` y `analizado` a proposito -Daniel, 05/08: en el movil «no aparecen
+         hasta que esten completamente analizados»; aqui se ve el pipeline entero-, pero VER no es APROBAR.
+         ⚠️ «Solicitar cambios» y «Rechazar» siguen ahi: son la forma legitima de parar algo que viene mal. */
+      _decPanelesHTML_(d, {yo:ACTOR, pre:'d'+d.id+'-', prePedir:'p'+d.id+'-', autorHTML:_autorP,
+        anotHTML:_yaAnalizado_(d) ? _anotPanelHTML_('d'+d.id+'-', _anotActualDe_(d), d.id, CAMPO_CSS, {verTodas:true, excluir:ACTOR}) : '',
+        motivoPh:'Lo lee el autor…',
+        boton:function(a, rot, cls){ return '<button class="btn '+cls+'" data-doc="'+d.id+'" data-acc="'+a+'">'+esc(rot)+'</button>'; },
+        deshacerHTML:_puedeDeshacerDoc_(d)?'<div class="dec-fila"><button class="btn" data-doc="'+d.id+'" data-acc="deshacer">Deshacer y devolver a revisión</button></div>':''});
   } else if(d.autor===ACTOR && d.est==='cambios'){
     /* ⛔ Mismo rotulo mentiroso que en el movil: el boton no sube nada.
        ⚠️ Y el escritorio nombra el estado `est`, no `estado`: por eso `_pasosCorregirE_`
@@ -460,8 +447,8 @@ function docCard(d){
     '<div class="ruta" style="margin-top:11px">'+(puede?'Lo firmas tú.':(sinRev?'Sin revisor: avisa al Project Director.':'Firma: <b>'+esc(rev)+'</b>'))+'</div>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
     _autorRastroHTML_(d)+_autoresDocHTML_(d)+
-    _peticionRevHTML_(d, ACTOR, 'p'+d.id+'-')+   /* 05/11 (`pedirrev`): el rastro, la cola de quien confirma y el panel del PD */
-    (puede ? '' : _autorP)+   /* quien puede decidir lo lleva plegado dentro de `acc` */
+    _peticionRevHTML_(d, ACTOR, 'p'+d.id+'-', puede)+   /* 05/11 (`pedirrev`): el rastro, la cola de quien confirma y el panel del PD */
+    (puede ? '' : _autorP)+   /* quien puede decidir lo lleva como una acción más de `_decPanelesHTML_` (13/11) */
     acc+
   '</div>';
 }

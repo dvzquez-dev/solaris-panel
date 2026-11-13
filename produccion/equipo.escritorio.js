@@ -223,7 +223,7 @@ function _proxReuE_(){
 
 /* Cómo se pinta cada aviso en el escritorio: a qué pantalla lleva, con qué icono, y el verbo de la derecha. */
 var _TUYO_E_={
-  sindecl:{ir:'sindeclarar', ic:'i-reloj', acc:'Declarar'},
+  sindecl:{ir:'libros',      ic:'i-reloj', acc:'Declarar'},   /* horas2-1 (12/11): a «Lo tuyo», donde está el panel «Declarar horas que no fichaste»; antes a «Sin declarar», una lista de sólo lectura */
   det:    {ir:'libros',      ic:'i-reloj', acc:'Dar detalle'},
   /* 11/11 (refutar8): `_tuyoItemsE_` ya mandaba `rech` (un parte tuyo rechazado) y esta tabla no lo tenía: `m` salía undefined y a quien le
      rechazaban un parte se le caía el Panel entero («Cannot read properties of undefined (reading 'ic')»). Va a «Lo tuyo», donde está con su motivo. */

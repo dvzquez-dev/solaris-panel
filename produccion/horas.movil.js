@@ -119,7 +119,11 @@ function normPMovil(p){
     enFicha:(typeof _yaCuentaEnSuMes_==='function') ? _yaCuentaEnSuMes_(p) : null,   /* 20/10: `aplicada` y `aprobada` caen los dos en 'conf'; esto los distingue */
     origen:p.origen||null, caduca:p.caduca_at||null,
     /* 26/10 · «Sí, mientras no esté firmado»: retirado por ti (es `anulada` con `retirado_at`) y las horas corregidas */
-    ret:!!p.retirado_at, corr:p.correcciones||null }; }
+    ret:!!p.retirado_at, corr:p.correcciones||null,
+    /* ⛔ refutar26: `tareaparte` (la página de la tarea de cuyo «Entregada» nace este parte) también ha de viajar por AQUÍ, el normalizador de los
+       partes MÍOS (`PARTES`): `_tareaTieneMiParte_` lo lee, y sin él «Proponer mis horas» seguía en una tarea con su parte ya propuesto (y al
+       pulsarlo contestaba «ya estaba propuesto»). Lo llevaba sólo `normPDec`, el de la cola de quien firma. */
+    tareaparte:p.tareaparte||null }; }
 
 /* ⚠️ MISMO DEFECTO QUE EL DE ABAJO, y se arregla igual aunque HOY no haga daño:
    `CARGA.partes` no lo lee nadie todavia (medido: una sola aparicion, la escritura).
@@ -686,7 +690,8 @@ function animarDeltas(root, silencioso){
        que ya seguían `armarMedidor` y `animarBarras` y que esta se saltaba. Pasar por
        cero es justo lo que se ve como un parpadeo. */
     if(silencioso){ fin(); return; }
-    f.style.width='0'; f.style.left='50%'; m.style.left='50%';
+    /* 13/11: si el repintado ya trajo el ancho de ANTES (`_vivoReponer_`), se mueve desde ahí; a cero sólo la primera vez. */
+    if(f.style.width===''){ f.style.width='0'; f.style.left='50%'; m.style.left='50%'; }
     setTimeout(fin, redu()?0:80);
   });
 }
@@ -1374,7 +1379,8 @@ function filaParte(p){
     var _perS=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;   /* ⛔ por la puerta (791.ª) */
     sub += ' · '+esc(_selloAprobado_(p, _perS, (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null));
   }
-  var catTxt = _cuentaYa_(p.e) ? ' · sumó a '+catEti(p.cat)
+  /* 12/11 (refutar27): aprobado y aún NO en la ficha (`enFicha===false`: Notion lo aplica después) no «sumó»: SUMARÁ. La píldora de arriba ya lo decía. */
+  var catTxt = _cuentaYa_(p.e) ? (p.enFicha===false ? ' · aún no en tu ficha: sumará a ' : ' · sumó a ')+catEti(p.cat)
              : p.e==='pend' ? ' · irá a '+catEti(p.cat) : '';
   /* ⛔ Y EL BOTON TAMBIEN EN 'det'. Sin el, la linea de arriba prometia «vuelve a enviarla»
      sobre una ficha sin nada que pulsar: la promesa estaba escrita desde el primer dia y no
@@ -1456,7 +1462,7 @@ function _movHorasHTML_(confs, pends){
          fichas, te la dan- y la que hace que la cuenta cuadre con el Panel de Rendimientos. */
       '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
         '<small>'+esc(_cet)+'</small></div>'+
-        '<div class="d"><b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>'+
+        '<div class="d"><b class="mono">'+nf2(_compBaseAHoy_(YO))+' h</b></div></div>'+   /* 13/11: devengada, como la cifra del mes */
       /* 01/11: SIN «Otras contribuciones» aparte; el mismo desglose por categorías que «Ver el desglose completo». */
       desgloseCat(_fijasDesglose_(r.todos).concat(r.todos))+
       '<p class="rnota" style="margin:8px 0 10px">'+
@@ -1518,7 +1524,7 @@ function _mesesHorasHTML_(confs){
   var _hm=_hMesReal_(YO);
   return '<div class="plg" style="margin-top:9px"><div class="mmeses">'+g.map(function(m){
     var abierto=(per && m.k===per);
-    var h=abierto ? (_hm!=null ? _hm : m.h+_compMensual_(YO)) : m.h;
+    var h=abierto ? (_hm!=null ? _hMesDevengado_(YO) : m.h+_compMensual_(YO)) : m.h;   /* 13/11: devengada */
     return '<button type="button" class="mmes" data-p data-mesdesg="'+(m.k||'sin')+'">'+
       '<b>'+(m.k ? esc(_nomPeriodo_(m.k)) : 'Sin fecha')+'</b>'+
       (function(e){ return '<span class="sc"'+(e.cls?' style="color:var(--'+(e.cls==='ok'?'ok':'warn')+')"':'')+'>'+e.txt+'</span>'; })(_estadoMes_(m.k, per))+
@@ -1531,17 +1537,18 @@ function _mesesHorasHTML_(confs){
    01/11, Daniel: *«quitaría otras contribuciones y pondría lo mismo que sale cuando le das a ver desglose completo»*. */
 function _fijasDesglose_(items){
   var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO, items), comp=_compMensual_(YO), cargo=(YO&&YO.cargo)||'miembro';
+  /* 13/11 (horasprorrata): la base del mes ABIERTO va devengada, como la cifra de arriba (`_compBaseAHoy_`); al cierre, entera. */
+  var _bh=_compBaseAHoy_(YO), _llega=(_bh<_cb-0.005 ? ' · hoy lleva '+nf2(_bh)+' de '+nf2(_cb)+' h' : '');
   var filaBase=
     '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
-      '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha · vuelve a asignarse en el '+
-      'cierre</small></div>'+
-    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>';
+      '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha'+(_llega ? '' : ' · vuelve a asignarse en el cierre')+_llega+'</small></div>'+
+    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_bh)+' h</b></div></div>';
   var filaExtra =
     '<div class="fila borde-ot"><div class="a"><b>Asignada por el Project Director</b>'+
       '<small>'+(_cx>0?'por trabajo de más (turnos extra y demás)':'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
       'la compensación vuelve a la base</small></div>'+
     '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
-  var fijas=[{catDesglose:'cargo', q:(_cr?_cb:comp), fila:filaBase}];
+  var fijas=[{catDesglose:'cargo', q:_bh, fila:filaBase}];
   /* Sin el dato de Notion (`_compExtra_` devuelve 0) la extra no existe, en vez de ensenar un cero que no dice nada. */
   if(_cx) fijas.push({catDesglose:'otras', q:_cx, fila:filaExtra});
   return fijas;
@@ -1565,7 +1572,7 @@ function _desgloseMesHTML_(confs, clave){
      que en `vHoras`: «que cuentan» en vez de «este mes». Un numero distinto con el mismo
      rotulo es lo que hace dudar del dato en vez de usarlo. */
   var _hmD=_hMesReal_(YO), _notionD=(_hmD!=null);
-  var total=_notionD ? _hmD : (r.suma+comp);
+  var total=_notionD ? _hMesDevengado_(YO) : (r.suma+comp);   /* 13/11 (horasprorrata): la base devengada, como la cifra de arriba */
   var cargo=(YO&&YO.cargo)||'miembro', _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO, r.todos);
   /* 31/10 · AGRUPADO POR CATEGORÍA, CADA UNA CON SU COLOR (Daniel: *«en vez de poner compensación extra más 12,25,
      debería aparecer compensación por tu cargo y luego … todas estas contribuciones extras»*). La base y la extra no son
@@ -2023,6 +2030,9 @@ function _tareaParteTarjetaM_(grupos){
       tarea:function(p){ return p.t; }})+'</div>';
 }
 var _tareaParteCbM_={ hecho:function(){ _cargarPartesDec_().then(pintar); } };
+/* refutar26: tras «Entregada» con horas (o «Proponer mis horas») el servidor ya tiene MI parte: se recargan los míos y se repinta, para que Horas lo cuente y la tarea
+   deje de ofrecer proponerlo otra vez. `_recargarPartesVivo_` es la puerta de lo vivo (la que también respeta «Ver como»). */
+function _tareaPartesCambiaron_(){ if(_tareaEnMaqueta_()) return; _recargarPartesVivo_().then(function(){ pintar(); }); }
 function _engTareaParteM_(){ _tareaParteColaCablear_(_tareaParteCbM_); }
 var _bloqueCbM_={
   abrir:function(){ abrirModal(_bloqueFormHTML_()); _bloqueCablear_(_bloqueCbM_); },
@@ -2358,7 +2368,7 @@ function vHoras(){
         /* ⛔ A UNA DECIMAL, como el escritorio (19/10): la ponderada es un COCIENTE, no horas
            fichadas, y la regla de la centésima es para las fichadas (951.ª). «18,55 h» aquí y
            «18,6» allí era el mismo número dicho de dos formas. */
-        '<span class="h mono">'+(_hmPond==null?'—':nf(_hmPond,1)+' h')+'</span></div>'
+        '<span class="h mono">'+(_hmPond==null?'—':nf(_hmPond,1)+' h/mes')+'</span></div>'
       : '<div class="r"><span class="p mono">'+i+'</span><span class="cens"></span></div>';
   }
 

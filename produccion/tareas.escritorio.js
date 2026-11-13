@@ -90,9 +90,11 @@ function _filaTareaE_(t, yo){
     '<td><span class="chip '+(t.u==='alta'?'no':t.u==='media'?'wa':'')+'">'+t.u+'</span></td>'+
     /* ⛔ 20/10 (auditoría): el plazo en DD/MM/AAAA y, sin plazo, «—» (salía el ISO crudo y la palabra «null»).
        En rojo si ya venció. */
-    '<td style="color:var(--ink3)">'+esc(t.e)+'</td><td class="r mono'+(_venciaTarea_(t.l)?' dn':'')+'">'+
+    '<td style="color:var(--ink3)">'+esc(t.e)+'</td><td class="r mono'+(_venciaTarea_(t.l)&&t.e!=='Revisando'?' dn':'')+'">'+
       (_plazoDMY_(t.l)||'—')+'</td>'+
-    '<td class="r" style="white-space:nowrap">'+(i < 0 ? '' :
+    /* refutar26: SIN `white-space:nowrap`: tras «Empezar» la celda lleva «Deshacer» y «Entregada», no caben en los 170 px de la columna y `.tarl td{overflow:hidden}` se comía
+       «Entregada» (sólo se veía «Deshacer» y «…»): el botón que sigue era inalcanzable. Si no caben, bajan de renglón. */
+    '<td class="r">'+(i < 0 ? '' :
       (of.des ? '<button class="btn" data-tdes="'+i+'" title="Puedes deshacerlo durante '+_minDeshacerTarea_()+' min">Deshacer</button> ' : '')+
       (of.ac ? '<button class="btn pri" data-tpaso="'+i+'">'+esc(of.ac.etiqueta)+'</button>' : ''))+'</td></tr>';
 }

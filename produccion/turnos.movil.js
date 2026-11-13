@@ -230,13 +230,10 @@ function _convHTML_(cv){
      ninguna semana convocada» sobre un servidor que no ha contestado. Es la misma nota
      que tiene `_dispPanel_` en el escritorio, y por la misma razon. */
   if(!cv){ var _av=_convAviso_(); if(_av) return _av; }
-  if(!cv) return '<div class="tarj" style="opacity:.85">'+
-    '<div class="cab"><span>Disponibilidad para turnos</span></div>'+
-    '<p style="margin:6px 0 0;line-height:1.55;font-size:13px">'+
-    '<b>No hay ninguna semana convocada.</b> Cuando se abra un plazo, saldrá aquí la rejilla.'+
-    (_puedeConvocarT_() ? '<br><br><span style="opacity:.75">Se convoca desde el '+
-      '<b>escritorio</b>, en Turnos.</span>' : '')+
-    '</p></div>';
+  /* turnos-6 (12/11): entre semanas —casi todo el año— esto eran 4 líneas que empujaban los turnos media
+     pantalla. Ahora UNA línea apagada; a quien convoca, la mitad que le dice dónde. */
+  if(!cv) return '<p class="rnota">Sin semana de disponibilidad abierta'+
+    (_puedeConvocarT_() ? ' · se convoca desde el <b>escritorio</b>, en Turnos' : '')+'.</p>';
   /* ⛔ EL ESTADO SE PREGUNTA UNA VEZ Y ARRIBA. `_convAbierta_` ya deja pasar `sin_abrir`,
      así que aquí llega una convocatoria de verdad a la que **todavía no se puede
      contestar**. Se saca a `_convPreHTML_` en vez de sembrar `if`s por el cuerpo: metida
@@ -774,6 +771,24 @@ function _proxPorFecha_(l){
     return String(a.iso||'').localeCompare(String(b.iso||'')) || String(a.hora||'').localeCompare(String(b.hora||'')); });
 }
 
+/* turnos2-1 (12/11): la tarjeta de la lista ya no pinta una fila por persona. `t.roles` = [pila, rol, esYo]. Devuelve TU cargo resaltado (si vas)
+   y UNA línea con quién más va —el responsable de turno primero—, «A, B, C y N más». El reparto entero con todos los cargos sigue en la
+   ficha (`data-turno`, movil.html). Con 4 o menos se nombran todos; con más, tres y «y N más». */
+function _quienVaHTML_(t){
+  var roles=(t&&t.roles)||[], yo=[], otros=[];
+  roles.forEach(function(r){ (r[2] ? yo : otros).push(r); });
+  var resp=function(r){ return String(r[1]||'').toLowerCase().indexOf('responsable de turno')>=0 ? 0 : 1; };
+  otros=otros.map(function(r,i){ return [resp(r), i, r]; }).sort(function(a,b){ return a[0]-b[0] || a[1]-b[1]; })
+    .map(function(x){ return x[2]; });
+  var n=otros.length, pilas=otros.map(function(r){ return esc(r[0]); }), txt='';
+  if(n>4) txt=pilas.slice(0,3).join(', ')+' y '+(n-3)+' más';
+  else if(n>1) txt=pilas.slice(0,-1).join(', ')+' y '+pilas[n-1];
+  else if(n===1) txt=pilas[0];
+  return yo.map(function(r){
+      return '<div class="fila yo"><div class="a"><b>'+esc(r[0])+'</b><small>'+esc(r[1])+'</small></div></div>'; }).join('')+
+    (txt ? '<div class="fila"><div class="a"><small>'+(yo.length?'Con ':'Va ')+txt+'</small></div></div>' : '');
+}
+
 function vTurnos(){
   /* Por defecto SOLO LOS TUYOS -decision de Daniel-, con un conmutador para ver los del
      equipo. Los de otros se pintan igual pero sin poder tocarlos: ver quien va a que sirve
@@ -790,10 +805,7 @@ function vTurnos(){
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b>'+
       '<small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+(t.lugar?' · '+esc(t.lugar):'')+'</small></div>'+
       '<div class="d"><span class="chev">›</span></div></div>'+
-      t.roles.map(function(r){
-        return '<div class="fila'+(r[2]?' yo':'')+'"><div class="a"><b>'+esc(r[0])+'</b>'+
-          '<small>'+esc(r[1])+'</small></div></div>';
-      }).join('')+'</div>';
+      _quienVaHTML_(t)+'</div>';
   }
   /* los pasados van en CAJÓN plegable, como en app.html: no estorban pero están */
   pas.sort(function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); });

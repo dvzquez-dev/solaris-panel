@@ -423,16 +423,20 @@ function _avisosDocM_(e){
    `verDoc`, que necesita media docena de globals para correr: por eso NINGUN banco podia
    ejecutarlos, y por eso el hueco de `_yaAnalizado_` vivio aqui sin que nadie lo viera.
    Sacarlo no es estetica: es lo que lo hace medible. */
+/* El panel de «Cambiar autores» (PD y José, sin decidir): '' si no toca. Una sola puerta para la ficha y para `_botonesDecM_`. */
+function _autorPDoc_(e){
+  return (_puedeCambiarAutor_(e.estado, yoNombre()) && !_peticionRevActiva_(e)) ? _autorPanelHTML_('dA', e.id, _autoresActualesDe_(e), '') : '';
+}
 function _botonesDecM_(e){
   /* ✅ PARAR SI, PUBLICAR NO. `cambios` y `rechazado` son legitimos sobre algo que aun no
      ha pasado el analisis -- son justo la forma de pararlo--; `aprobado` y `anot`
-     publican, y el servidor los rechaza. Quitar los cuatro seria el fallo contrario. */
-  return (_yaAnalizado_(e)
-      ? '<button class="btn pri" style="flex:1 1 46%" data-p data-dec="aprobado" data-id="'+e.id+'">'+_rotuloAprobarDoc_(e, yoNombre())+'</button>'+
-        '<button class="btn" style="flex:1 1 46%" data-p data-dec="anot" data-id="'+e.id+'">Con anotaciones</button>'
-      : '<p class="rnota" style="flex:1 1 100%;margin:0">A\u00fan sin analizar: se puede parar, no publicar.</p>')+
-    '<button class="btn" style="flex:1 1 46%" data-p data-dec="cambios" data-id="'+e.id+'">Solicitar cambios</button>'+
-    '<button class="btn no" style="flex:1 1 46%" data-p data-dec="rechazado" data-id="'+e.id+'">Rechazar</button>';
+     publican, y el servidor los rechaza (`_decAcciones_` lo decide, en `comun.js`).
+     13/11 (docdecidir): cada accion enseña SU panel y el boton que decide vive dentro. */
+  return _decPanelesHTML_(e, {yo: yoNombre(), pre: 'd', prePedir: 'pR', autorHTML: _autorPDoc_(e),
+    anotHTML: _yaAnalizado_(e) ? _anotPanelHTML_('d', _anotActualDe_(e), e.id, '', {excluir:yoNombre()}) : '',
+    boton: function(acc, rot, cls){ return '<button class="btn ' + cls + '" data-p data-dec="' + acc + '" data-id="' + e.id + '">' + esc(rot) + '</button>'; },
+    deshacerHTML: _puedeDeshacerDoc_(e)
+      ? '<div class="dec-fila"><button class="btn" style="flex:1 1 100%" data-p data-dec="deshacer" data-id="'+e.id+'">Deshacer y devolver a revisión</button></div>' : ''});
 }
 
 /* ⛔ QUÉ ESTÁS PISANDO (ficha del 20/08). La decisión anterior —quién, cuándo, qué y por qué— sólo la
@@ -471,6 +475,7 @@ function verDoc(id){
     if(_cnt) secs+='<p class="rnota" style="margin:8px 0 0">'+esc(_cnt)+'</p>';
   }
   var _mioDoc = _docAutorHTML_(e);
+  var _autorP = _autorPDoc_(e);
   var acc = puede
     ? '<h4>Tu decisión</h4>'+_revisionPropuestaHTML_(e, yoNombre())+
       /* ⛔ «CON ANOTACIONES» NO ES UN ADORNO: el título corregido SÓLO VIAJA en esa rama
@@ -483,19 +488,7 @@ function verDoc(id){
          decían «al aprobar con anotaciones». Asimetría entre caras Y dentro de una cara. */
       /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el escritorio (`comun.js` `_anotPanelHTML_`):
          título, subtítulo, confidencialidad (desplegable público/interno) y etiquetas. Sólo donde se puede aprobar. */
-      (_yaAnalizado_(e) ? _anotPanelHTML_('d', _anotActualDe_(e), e.id, '', {excluir:yoNombre()}) : '')+
-      '<label class="campo"><span class="sc">Motivo <span class="req">*</span> si pides cambios o rechazas</span>'+
-      '<textarea id="dMot" data-borr="doc-motivo-'+esc(e.id)+'" placeholder="lo leerá el autor…"></textarea></label>'+
-      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-        _botonesDecM_(e)+
-        /* DESHACER. Lo tenia el escritorio y aqui NO, y esta es la cara en la que
-           Daniel revisa: quien se equivocaba de boton desde el telefono se quedaba
-           mirando un candado que dice «solo alguien de mas rango puede cambiarlo».
-           Misma condicion que el escritorio -decidido y con revisor- y misma orden al
-           backend (`api.decidir(..., 'deshacer', ...)`, aceptada desde v28). */
-        (_puedeDeshacerDoc_(e)
-          ? '<button class="btn" style="flex:1 1 100%" data-p data-dec="deshacer" data-id="'+e.id+'">Deshacer y devolver a revisión</button>' : '')+
-      '</div>'
+      _botonesDecM_(e)
     /* ⛔ LA RAMA DEL AUTOR SALE DE `_docAutorHTML_`, y no de un `estado==='cambios'` aquí
        dentro. Aquí había UNA sola rama y todo lo demás caía al `else` de abajo, así que al
        autor de un expediente RECHAZADO se le decía «Este expediente lo revisa X. Tú no
@@ -576,8 +569,8 @@ function verDoc(id){
     '<p class="rnota" style="margin-top:10px">'+(sinRev?'Sin revisor: avisa al Project Director.':'Revisa: <b>'+revs+'</b>')+'</p>'+
     /* 31/10: el rastro lo ve cualquiera; el campo para cambiar el autor, sólo el PD y José y sin decidir (`comun.js`). */
     _autorRastroHTML_(e)+_autoresDocHTML_(e)+
-    (_puedeCambiarAutor_(e.estado, yoNombre()) && !_peticionRevActiva_(e) ? _autorPanelHTML_('dA', e.id, _autoresActualesDe_(e), '') : '')+
-    _peticionRevHTML_(e, yoNombre(), 'pR')+   /* 05/11 (`pedirrev`): el rastro, la cola de quien confirma y el panel del PD */
+    (puede ? '' : _autorP)+   /* con la decisión a la vista, «Cambiar autores» es una acción más de `_botonesDecM_` (13/11) */
+    _peticionRevHTML_(e, yoNombre(), 'pR', puede)+   /* 05/11 (`pedirrev`): el rastro, la cola de quien confirma y el panel del PD */
     (_mioDoc ? '' : _previaDocM_(e))+
     /* 01/11: sólo el PD, y sólo enseña algo si el expediente está decidido (`comun.js`); para cualquier otro es ''. */
     _fbpdRaiz_('ficha', e.id, 'btn mini')+

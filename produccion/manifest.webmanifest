@@ -1,5 +1,5 @@
 {
-  "name": "UVigo Aerotech \u00b7 Solaris",
+  "name": "UVigo Aerotech: Solaris",
   "short_name": "Solaris",
   "description": "Panel del equipo Solaris: turnos, tareas, reuniones y documentos.",
   "start_url": "./", "scope": "./", "display": "standalone", "orientation": "portrait",

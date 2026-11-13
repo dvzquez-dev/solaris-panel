@@ -101,7 +101,12 @@ function _sancionesHTML_(){
     '<div class="msub">Ponerlas y decidirlas. El comunicado sigue saliendo del escritorio.</div>'+
     /* A cuánta gente puedes sancionar, como el `pan(...)` del escritorio (ficha del 20/08: `nTotal` se
        calculaba aquí y no se pintaba nunca). */
-    '<h4>Poner una sanción <span class="sc">· '+nTotal+(nTotal===1?' persona':' personas')+' bajo tu jurisdicción</span></h4><div class="tarj">'+
+    /* sanciones-1 (12/11): con sanciones esperando, lo PENDIENTE va primero y «Poner una sanción» queda en UNA barra pegada al título (siempre a la vista,
+       sin bajar) que despliega el formulario en su sitio; sin cola, o con el formulario a medias, sale abierto como antes (escritorio: igual desde el 01/11). */
+    (_sancHayCola_()
+      ? '<button type="button" class="btn full" data-sponer style="text-align:left;margin-bottom:6px">Poner una sanción <span class="sc">· '+nTotal+(nTotal===1?' persona':' personas')+' bajo tu jurisdicción</span></button>'
+      : '<h4>Poner una sanción <span class="sc">· '+nTotal+(nTotal===1?' persona':' personas')+' bajo tu jurisdicción</span></h4>')+
+    '<div class="doc-edit'+(_sancFormAbierto_()?' ab':'')+'" data-sponer-caja><div class="doc-edit-c"><div class="tarj">'+
       '<span class="sc" style="display:block;margin-bottom:5px">A quién</span>'+
       _sancQuienHTML_({repintar:_repintarSancM_, colorOk:'var(--ink3)',
         alCambiar:function(){ var _es=$('#snEscala'); if(_es) _es.textContent=_escalaSancTxt_(); },   /* 26/10 (A5b) */
@@ -117,9 +122,19 @@ function _sancionesHTML_(){
       '<p class="rnota" id="snEscala" style="margin:-4px 0 10px">'+_escalaSancTxt_()+'</p>'+
       '<button class="btn pri full" data-p id="btnSanc">Poner la sanción</button>'+
       '<p class="rnota" id="snMsg" style="margin:8px 0 0"></p>'+
-    '</div>'+
+    '</div></div></div>'+
     _vetoMovilHTML_()+
     '<h4>Pendientes de decidir</h4>'+_sancColaHTML_();
+}
+/* sanciones-1: ¿hay sanciones esperando decisión? (con la cola sin leer o vacía, el formulario va primero y abierto, como antes) */
+function _sancHayCola_(){ return !!(SANC_M && SANC_M.length); }
+/* ¿El formulario va desplegado? Sin cola: siempre. Con cola: lo que el usuario dejó (`SANC_PON_M`), o abierto si ya lleva algo tecleado
+   (una cola que llega tarde no puede plegar y esconder lo que se estaba escribiendo). */
+var SANC_PON_M = null;
+function _sancFormAbierto_(){
+  if(!_sancHayCola_()) return true;
+  if(SANC_PON_M !== null) return SANC_PON_M;
+  return !!(SANC_FORM.quien || SANC_FORM.motivo || SANC_FORM.libre || SANC_FORM.tarea || SANC_FORM.pts);
 }
 /* 31/10: «Procede veto» y sus dos tareas, encima de la cola (`_vetoFilas_`, en comun.js); sin nada que atender, no existe. */
 function _vetoMovilHTML_(){
@@ -234,6 +249,8 @@ function _cablearSanciones_(){
   /* Los campos se guardan al teclear y el motivo repinta (`_sancCablearCampos_`, comun.js, la misma que el escritorio).
      Se llama a `_repintarSancM_` por su nombre en cada sitio: lo unico que hace visible que la puerta es UNA. */
   _sancCablearCampos_(_repintarSancM_);
+  $$('[data-sponer]').forEach(function(b){ b.onclick=function(){
+    var c=document.querySelector('[data-sponer-caja]'); if(c) SANC_PON_M=c.classList.toggle('ab'); }; });
 
   var bt=$('#btnSanc');
   if(bt) bt.onclick=async function(){
@@ -497,7 +514,8 @@ function _misSancHTML_(){
   var nota=tarde ? '<small style="display:block;color:var(--ink3);margin-top:8px">'+(tarde === 1 ? 'Una sanción tuya ya no se puede apelar: pasó el plazo.' : tarde+' sanciones tuyas ya no se pueden apelar: pasó el plazo.')+'</small>' : '';
   if(!L.length && !nota) return '';
   return '<div class="msanc"><div class="sc" style="margin:14px 0 2px">Tus sanciones</div>'+L.map(function(s){
-    var est=_sancEstadoM_(s), p=(s.puntos === null || s.puntos === undefined) ? _etPtsSanc_(null) : (s.puntos < 0 ? '−' + Math.abs(s.puntos) : String(s.puntos));
+    /* 12/11 (refutar27): «−1 punto» / «+1 punto», como el escritorio (`_etPtsSanc_`): antes «−1» a secas y «1» (sin signo) para uno que suma. */
+    var est=_sancEstadoM_(s), p=_etPtsSanc_((s.puntos === null || s.puntos === undefined) ? null : Number(s.puntos));
     return '<div class="fila" data-msfila="'+esc(s.id)+'"><div class="a"><b>'+esc(s.motivo || 'Sanción')+'</b>'+
       '<small>'+esc(p)+' · '+esc(_isoADMY_(String(s.fecha || '').slice(0, 10)) || '')+'</small>'+
       (est ? '<small class="msest" style="color:'+est[1]+'">'+esc(est[0])+'</small>' : '')+
@@ -595,6 +613,15 @@ function armarMedidor(silencioso, forzar){
      animacion que no informa de nada. */
   var _pv=_medPrev_();
   _medGuardar_(p);
+  /* 13/11 (transiciones): si el repintado conservó el medidor YA ARMADO (`_vivoReponer_` le devolvió `arm`, los tramos y el
+     puntero de antes), no hay nada que rebobinar: el CSS ya mueve el anillo y el puntero hacia los puntos nuevos; sólo
+     falta CONTAR el número. Con `forzar` (la primera vez, un toque) sí se arma desde cero. */
+  if(!forzar && med.classList.contains('arm')){
+    medTimers.forEach(clearTimeout); medTimers=[];
+    if(tip) tip.style.transform='rotate('+giro+'deg)';
+    if(num) _contarHasta_(num, String(p));
+    return;
+  }
   if(!forzar && _pv===p) silencioso=true;
 
   /* CALLADO = APARECER LLENO, sin pasar por vacio.

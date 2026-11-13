@@ -46,7 +46,7 @@ function _turnosPest_(tabla){
   var mio = _miTurnoPanel_();
   return _pestanasE_('tur', [
     ['convocar', 'Convocar turno', convocarPanel()],
-    ['disp', 'Disponibilidad', _convocarDispPanel_()+mio+_dispPanel_()],
+    ['disp', 'Disponibilidad', _convocarDispPanel_()+mio+_dispPanel_(mio)],
     ['cerrar', 'Cerrar un turno', _cierreTurnoPanel_()],
     ['turnos', 'Historial de turnos', tabla]
   ], mio ? 'disp' : 'convocar');   /* 03/11 (Daniel): el historial NO es lo primero; lo importante es convocar */   /* ⛔ lo tuyo va antes: si tienes que contestar, se abre ahí */
@@ -566,10 +566,14 @@ function _dispAviso_(titulo){
 }
 
 
-function _dispPanel_(){
+function _dispPanel_(yaHablo){
   /* ⚠️ ANTES de `_dispViva_()`: si se pone despues, el `return ''` de abajo se lleva el
      aviso por delante y el panel vuelve a quedarse mudo. */
-  var av=_dispAviso_('Disponibilidad para turnos'); if(av) return av;
+  var av=_dispAviso_('Disponibilidad para turnos');
+  /* turnos-1 (12/11): «sin convocatoria» lo dice ya «Tu disponibilidad» (`yaHablo` = su HTML, que no está vacío): decirlo dos veces seguidas
+     es ruido. Sólo ese estado — en `error` y `sin sesion` cada panel lleva su propio Reintentar y duplicarlo sí tiene sentido. */
+  if(av && yaHablo && _dispEstadoSrv_()==='sin convocatoria') return '';
+  if(av) return av;
   /* ⛔⛔ CON `'solo mio'` NO SE PINTA EL MAPA (466.ª). Por esa puerta llega la
      convocatoria y **solo las respuestas de quien mira**, asi que el calor saldria de
      UNA persona y se leeria como el del equipo -- que es exactamente el «mapa de

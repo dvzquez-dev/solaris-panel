@@ -495,7 +495,7 @@ function _listaReusM_(R){
           var sel=(x.id===R.id), i=REUNIONES_M.indexOf(x);
           return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
             '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
-            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+_nConvM_(x)+' convocados'+
+            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+_convocadosTxt_(_nConvM_(x))+
             _duraTxtM_(x)+'</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':(_reuFinalizada_(x)?'<span class="pil">finalizada</span>':'<span class="chev">›</span>'))+'</div></div>'; };
   var abierto=par.archivo.indexOf(R)>=0, abiertoO=otras.indexOf(R)>=0;
@@ -551,7 +551,7 @@ function vReu(){
   /* 01/11: con orden del día de duración conocida, la ventana es de los bloques que ESE orden pide (`comun.js`). */
   var _vf=_ventanaFijar_(R, _minR, best), vent=_vf.vent;
   var _huecoM_=function(){ var f=_ventanaFijar_(R, _minR, best);
-    return '<b>'+_nConvM_(R)+'</b> convocados · '+(f.vent.v>0?'mejor hueco ':'')+_titularHueco_(R, f.vent, _nresp, pondOn)+_notaOrdenHTML_(f); };
+    var _nc=_nConvM_(R); return '<b>'+_nc+'</b> convocado'+(+_nc===1?'':'s')+' · '+(f.vent.v>0?'mejor hueco ':'')+_titularHueco_(R, f.vent, _nresp, pondOn)+_notaOrdenHTML_(f); };
   _ordSt_(R.id).sugHTML=_huecoM_;
   /* El orden del día llega por red DESPUÉS de pintar: con él cambia el hueco recomendado, y el mapa lo resalta de nuevo (la fijada no se toca). */
   _ordSt_(R.id).sugMapa=function(){
@@ -619,7 +619,7 @@ function vReu(){
   g+='<div style="grid-column:1;grid-row:1"></div>';
   R.dias.forEach(function(d,di){
     g+='<div style="grid-column:'+(di+2)+';grid-row:1;font-family:var(--mono);'+
-      'font-size:9px;color:var(--ink2);text-align:center;padding-bottom:3px">'+esc(d)+'</div>';
+      'font-size:9px;color:var(--ink2);text-align:center;padding-bottom:3px;line-height:1.15">'+esc(d).replace('/','/<wbr>')+'</div>';   /* 13/11 (refutar31): con la letra del sistema al 160 % «13/11» no cabe en su columna: parte tras la barra sólo si hace falta */
   });
   /* ⛔ 19/10: y A CABALLO de ese límite, no debajo (Daniel, 14/10: «justo en el medio de dos slots»):
      media línea más medio `gap` (2 px) hacia arriba, con `transform` para no tocar la caja del grid.
@@ -693,7 +693,7 @@ function vReu(){
       : '')+
     '<div class="tarj">'+cab(R.tipo||'General', _modalidadTxt_(R.modalidad))+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
-      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+_nConvM_(R)+' convocados'+
+      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+_convocadosTxt_(_nConvM_(R))+
       _duraTxtM_(R)+'</small></div>'+
       '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento||R.tarde)?'conf':(R.invitado===false?'conf':'no'))+'">'+
         (R.invitado===false?'solo lectura':(R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta')))))+'</span></div></div>'+
@@ -749,7 +749,6 @@ function vReu(){
       (_puedeBorrarReuM_(R)?'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">'+
         '<button class="btn mini" data-p id="btnFijar" style="flex:1">'+(R.fijada?'Cambiar fecha/hora':'📌 Fijar fecha')+'</button>'+
         (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
-        '<button class="btn mini" data-p id="btnOrden" style="flex:1">Orden del día</button>'+
         '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
         '<button class="btn mini" data-p id="btnEditarReu" style="flex:1">Título y plazo</button>'+
       '</div>':'')+
@@ -822,7 +821,7 @@ function cubrirModal(){
      horarios … no tiene mucho que ver con lo que es la pantalla de un teléfono»*. */
   var hd='<div class="rc"></div>';
   R.dias.forEach(function(d){
-    hd+='<div class="rc rh rhd">'+esc(d)+'</div>';
+    hd+='<div class="rc rh rhd" style="flex-wrap:wrap;line-height:1.1">'+esc(d).replace(/^(\d+)\/(\d+)$/,'$1<wbr><span style="font-size:.82em">/$2</span>')+'</div>';   // refutar31: con letra grande parte tras la barra (ver el mapa de calor)
   });
   /* Las casillas NO OFERTADAS ya no se pueden pintar. Antes se pintaban igual, se veian
      marcadas, y al guardar se caian sin decir nada: `vals` se arma recorriendo `bloques`,
@@ -852,7 +851,9 @@ function cubrirModal(){
        que la app es incoherente. Y va **encima** de la rejilla: debajo lo lee quien ya se ha
        rendido. */
     '<div class="rgesto">Un dedo <b>pinta</b> · dos dedos <b>deslizan</b></div>'+
-    '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nD+',minmax(44px,1fr))">'+hd+rows+'</div></div>'+
+  /* 13/11 (refutar31): `minmax(0,1fr)`, no 44 px fijos: con 7 días y la letra del sistema al 160 % la rejilla se salía de la pantalla, y `.rej` es
+     `touch-action:none` (pintar), así que `.rejw` no se puede desplazar con el dedo: lo que no cabe no se alcanza. */
+    '<div class="rejw"><div class="rej" id="rejC" style="grid-template-columns:auto repeat('+nD+',minmax(0,1fr))">'+hd+rows+'</div></div>'+
     /* 🟡 4 (auditor 19): la leyenda explica la casilla rayada, igual que la del mapa de calor — sólo si la hay. */
     '<div class="leyh" style="margin-top:10px">'+ley+(_hayOff?'<span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>fuera del horario de ese día</span>':'')+'</div>'+
     '<div class="sc" id="ecount" style="margin:12px 0 10px"></div>'+
@@ -1108,7 +1109,7 @@ function _presetInvitados_(tipo){
     if(m.nombre===yo) return;
     var meto = tipo==='general' ? true
              : (tipo==='subsistema' || tipo==='mixta') ? (m.unidad===(YO&&YO.unidad))   // 04/11: la mixta nace con SU subsistema ya dentro
-             : tipo==='junta' ? (m.cargo==='Coordinador'||m.cargo==='Project Director')
+             : tipo==='junta' ? rangoNom(m.nombre)>=1       /* refutar30: la junta es la coordinación del SERVIDOR (`puede_ver_reunion`: rango >= 1) — también el subcoordinador y José, que el cargo a secas no ve */
              : false;                              // trabajo: a mano
     if(meto) out.push(m.nombre);
   });
@@ -1162,8 +1163,6 @@ function crearModal(){
     '<p class="rnota" id="ceSlotHint"></p>'+
     '<div class="campo"><span class="sc">Límite para responder</span>'+nxFecha('ceLim', mas(hoyISO,5), {min:hoyISO})+'</div>'+
       '<div class="campo"><span class="sc">Hora del límite</span>'+nxHora('ceLimH', '23:59')+'</div>'+
-    '<label class="campo"><span class="sc">Orden del día (enlace a Drive, opcional)</span>'+
-      '<input id="ceOrden" placeholder="https://drive.google.com/…"></label>'+
     '<span class="sc" style="display:block;margin-bottom:6px">Visión de disponibilidad</span>'+
     '<div class="modos" id="ceVision">'+
       '<button data-v="publica" data-p>Pública</button>'+
@@ -1304,7 +1303,7 @@ function crearModal(){
       dias:ds, franjas:u.F, bloques:bloques, total:bloques.length, limite:lim,
       slot:_sl, duracion:_nS*_sl,          // lo que hay que juntar seguido para que valga
       minimoPct:(function(){ var c=$('#ceMin'); return (c && !c.hidden && +c.dataset.sel>0) ? +c.dataset.sel : null; })(),   // 01/11
-      ordenDia:(val('ceOrden')||'').trim(), vision:vision, controlAsistencia:_controlAsisDeForm_('ceControl', val('ceTipo')), resp:{} };
+      vision:vision, controlAsistencia:_controlAsisDeForm_('ceControl', val('ceTipo')), resp:{} };
     PLANTILLAS_M.unshift({ titulo:reu.titulo, ceModo:val('ceModo'), ceH0:val('ceH0'), ceH1:val('ceH1'),
       ceSlot:val('ceSlot'), ceDura:val('ceDura'), ceND:val('ceND'), modalidad:reu.modalidad, perdia:per() });
     if(PLANTILLAS_M.length>8) PLANTILLAS_M.length=8;
@@ -1314,7 +1313,7 @@ function crearModal(){
     if(typeof backendOK!=='undefined' && backendOK && SESION){
       try{ var d=await api.crearReunion(reu); if(d&&d.id) reu.id=d.id;
         cerrarModal();
-        tost('Reunión convocada · '+reu.invitados.length+' convocados, '+bloques.length+' bloques.');
+        tost('Reunión convocada · '+_convocadosTxt_(reu.invitados.length)+', '+bloques.length+' bloques.');
         /* Se RECARGA la lista del servidor. Antes se llamaba a `pintar()` sin haber metido
            la reunion nueva en `REUNIONES_M`: se repintaba lo mismo de antes y parecia que
            no se habia creado. Y se recarga en vez de fabricar una copia local, que es como
@@ -1403,7 +1402,7 @@ function fijarModal(){
       R2.fijada=etiqueta; R2.fijadaBl=bloques;
       cerrarModal();
       tost('Reunión fijada: '+etiqueta+'. La disponibilidad queda cerrada.');
-      pintar(); if(typeof _ordenRefrescar_==='function') _ordenRefrescar_(R2.id);   // refutar15: sus horas de reloj salen de la fijada
+      pintar(); if(typeof _ordenTrasFijar_==='function') _ordenTrasFijar_(R2.id);   // refutar15: sus horas de reloj salen de la fijada
     }catch(e){ b.disabled=false; b.textContent=prev;
       tostErr('No se pudo fijar: ', e); }
   };
