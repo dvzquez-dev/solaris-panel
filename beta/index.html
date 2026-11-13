@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Solaris · Instrumento — la app del miembro (ronda 3)</title>
+<title>UVigo Aerotech: Solaris</title>
 <!-- ICONO Y MANIFEST · lo pone el publicador segun el canal (ver `flujos/publicar_web.py`).
      Se declaran AQUI y no se dejan a la convencion de la raiz del sitio: produccion y beta
      viven en el mismo dominio, asi que heredando `/apple-touch-icon.png` las dos salian con
@@ -114,8 +114,8 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=c6df863"></script>
-<script src="notis.movil.js?v=bf30cae"></script>
+<script src="comun.js?v=f824308"></script>
+<script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=fedfca9"></script>
 <script src="turnos.movil.js?v=c9a23f5"></script>
@@ -964,9 +964,15 @@ async function _onCredencial_(resp,_silente){
         '. Si acabas de unirte al equipo, puede que a\u00fan '+
         'no est\u00e9s en el listado: d\u00edselo al Project Director.</span></div>'+
         '<button id="reYo" style="border:1px solid #463E40;background:none;color:#F4F3F3;'+
-        'border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>');
+        'border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>'+
+        /* 12/11 (refutar29): «Reintentar» repite el MISMO token, así que quien entró con la cuenta equivocada (la personal en vez de la del equipo)
+           no podía salir de aquí: la sesión ya estaba guardada y Google le ofrecía la misma. `cerrarSesion` la suelta y vuelve a pedir cuenta. */
+        '<button id="reOtra" style="border:1px solid #463E40;background:none;color:#F4F3F3;'+
+        'border-radius:9px;padding:10px 16px;cursor:pointer">Entrar con otra cuenta</button>');
       var _byo=document.getElementById('reYo');
       if(_byo) _byo.onclick=function(){ _onCredencial_(resp); };
+      var _bot=document.getElementById('reOtra');
+      if(_bot) _bot.onclick=function(){ cerrarSesion(); };
       return;
     }
     /* 26/10 (refutador 36, 🟡 1): con tu ficha ya aquí, la sesión vuelve a estar viva — lo vivo sigue solo. */
@@ -1843,7 +1849,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='43223ee';
+var BUILD='fc6f818';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -1867,7 +1873,7 @@ function _ajustesHTML_(){
     '<h4>Notificaciones</h4>'+_notisHTML_()+
     '<h4>Sonidos</h4><div class="tarj">'+_sonidosHTML_()+'</div>'+
     '<h4>Sesión</h4><div class="tarj"><div class="fila"><div class="a"><b>'+quien+'</b>'+
-      '<small>'+v+_viendo+'</small></div></div></div>'+
+      '<small>'+v+_viendo+'</small></div><div class="d"><button class="btn" data-ajsalir data-p>Cerrar sesión</button></div></div></div>'+
     /* QUE VERSION ES. Lo primero que hay que poder responder cuando alguien dice «sigue
        fallando»: Pages cachea el HTML 10 min, asi que dos personas pueden estar mirando
        codigo distinto sin saberlo. Pasó el 27/07, dos veces. */
@@ -2698,6 +2704,7 @@ function _engTurnosYDocs_(){
             else { c.setAttribute('hidden',''); sv.style.transform=''; }
           };
         });
+        $$('[data-ajsalir]').forEach(function(bs2){ bs2.onclick=function(){ cerrarSesion(); }; });   /* 12/11 (refutar29): salir también desde la tarjeta «Sesión» */
         $$('#ajEscala [data-esc]').forEach(function(be){
           be.onclick=function(){
             PREF.escala=be.dataset.esc; _guardarPref_(); _aplicarEscala_();

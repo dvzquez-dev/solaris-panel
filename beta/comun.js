@@ -8204,11 +8204,19 @@ async function _pushInit_(){
            «activadas» en verde, `_faltanNotis_()` devolvia `null` --o sea que el gate se
            franquea-- y no llegaba ni un aviso. **Verde en las dos caras, cero avisos**, en
            una app que declara las notificaciones obligatorias.
-           ⚠️ Y NO se re-suscribe desde aqui a proposito: esto corre a los 800 ms del
-           arranque, sin gesto de nadie, y `subscribe()` sin gesto no es fiable en todos
-           los navegadores. Quien SI se suscribe es `_asegurarPush_`, la puerta unica del
+           ⚠️ A los 800 ms del arranque NO se re-suscribe (sin sesion no hay a quien guardarla, y
+           `subscribe()` sin gesto no es fiable en todos los navegadores); SI se hace con sesion
+           (12/11, refutar29: mas abajo). Quien SI se suscribe es `_asegurarPush_`, la puerta unica del
            gate (357.a). Lo que faltaba aqui era **decirlo**. */
-        _pushFallo_('el permiso est\u00e1 dado pero no hay suscripci\u00f3n: no te '+
+        /* 12/11 (refutar29): EL CASO REAL ES EL PRIMER DÍA CON LA BETA YA PROBADA. El permiso es del SITIO (beta y producción comparten dominio) y la
+           suscripción es de cada app: quien aceptó los avisos en una y abre la otra por primera vez trae permiso dado y CERO suscripciones, y el
+           gate lo deja pasar (no falta permiso). Sólo se decía en Ajustes, donde no mira nadie el primer día. Con el permiso YA dado y con sesión,
+           `subscribe()` no pide nada: se intenta aquí, por la misma puerta única. Si el navegador no la deja (iOS pide un gesto), queda el aviso. */
+        var _ya=false;
+        if(typeof SESION!=='undefined' && SESION && typeof _asegurarPush_==='function'){
+          try{ _ya=await _asegurarPush_(null); }catch(_){ _ya=false; }
+        }
+        _pushFallo_(_ya ? null : 'el permiso est\u00e1 dado pero no hay suscripci\u00f3n: no te '+
           'llegar\u00eda ning\u00fan aviso. Vuelve a entrar para reactivarlos.');
       }
     }
