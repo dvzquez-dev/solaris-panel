@@ -1086,7 +1086,7 @@ function _convocarDispPanel_(){
          firma de `montar`: una constante en Python, o sea que preguntar por horas
          dependia de que alguien tocara el codigo. La etiqueta dice lo que CAMBIA
          -«un toque marca 4 h»- y no el nombre del modo, que no le dice nada a nadie. */
-      '<div style="font-size:12.5px">'+lab('?Preguntar por horas (09:00–14:00 y 16:00–23:00); un toque marca el turno de 4 h')+
+      '<div style="font-size:12.5px">'+lab('?Preguntar por horas (09:00–14:00 y 15:00–23:00); un toque marca el turno de 4 h')+
         nxSiNo('cdHoraria', true)+'</div>'+
     '</div>'+
     '<button class="btn" data-convdisp>Convocar disponibilidad</button>'+
