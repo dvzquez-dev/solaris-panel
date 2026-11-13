@@ -16534,6 +16534,10 @@ function _ordenSolariaHTML_(st){
     _ordTablaHTML_(ia.prop, st.e&&st.e.inicio)+'<p class="rnota" style="margin:6px 0 0">'+esc(ia.nota||'Esta es la propuesta. Revísala antes de usarla.')+'</p>'+
     _solAccionesHTML_([['data-ordiaok', 'Usar esto', true], ['data-ordiano', 'Descartar']])+'</div>';
   if(ia.fase==='usada') h+='<div class="nota" style="border:0;padding:4px 0">'+(ia.origen==='notion'?'Tabla de Notion aplicada.':'Propuesta aplicada a la tabla.')+' <button type="button" class="btn sm" data-ordiaun>Volver al original</button></div>';
+  if(ia.fase==='candidatas') h+='<div data-ordnotcands style="margin-top:8px"><span class="sc" style="display:block;margin-bottom:4px">¿Cuál es la página de esta reunión?</span>'+
+    '<p class="rnota" style="margin:0 0 6px">No hay ninguna con el nombre exacto. Estas se le parecen:</p>'+
+    (ia.cands||[]).map(function(c){ return '<button type="button" class="btn" data-ordnotcand="'+esc(c.id)+'" style="display:block;width:100%;text-align:left;margin-bottom:6px">'+esc(c.titulo)+(c.fecha&&String(c.titulo).indexOf(c.fecha)<0?' <span class="rnota">'+esc(c.fecha)+'</span>':'')+'</button>'; }).join('')+
+    _solAccionesHTML_([['data-ordnotno', 'Ninguna de estas']])+'</div>';
   if(ia.fase==='error') h+=_solErrorHTML_(ia.msg, 'Tu tabla sigue como estaba.', 'data-ordiaerror data-solerr');
   return h+'</div>';
 }
@@ -16698,15 +16702,17 @@ async function _ordenSolaria_(id){
 /* «Traer de Notion»: lee la PÁGINA de Notion de la reunión (`traerOrdenNotion`) y enseña lo que encontró como propuesta, igual que
    SolarIA («Usar esto / Deshacer»). Sólo lee: lo que se guarda es `guardarOrdenDia` cuando la persona pulsa «Guardar». Reutiliza
    `st.ia` (mismo contador de respuestas, mismo bloqueo mientras espera), con `origen:'notion'` para los textos. */
-async function _ordenNotion_(id){
+async function _ordenNotion_(id, pagina){
   var st=_ordSt_(id), ia=st.ia;
   if(_ordenOcupado_(st)||!st.draft) return;
   var n=(ia.id||0)+1, r;
   ia.id=n; ia.fase='pensando'; ia.origen='notion'; _ordenPintar_(id);
   var vigente=function(){ return st.ia===ia && ia.fase==='pensando' && ia.id===n; };
-  try{ r=await api.traerOrdenNotion(id); }
-  catch(e){ if(vigente()){ ia.fase='error'; ia.msg=String((e&&e.message)||e).replace(/^Error:\s*/,'')+'.'; _ordenPintar_(id); } return; }
+  try{ r=await api.traerOrdenNotion(id, pagina); }
+  catch(e){ if(vigente()){ ia.fase='error'; ia.msg=String((e&&e.message)||e).replace(/^Error:\s*/,'').replace(/^./,function(c){ return c.toUpperCase(); })+'.'; _ordenPintar_(id); } return; }
   if(!vigente()) return;
+  /* 13/11 (ordennotion5): páginas PARECIDAS y ninguna segura → se enseñan (título y fecha) para elegir; elegir vuelve a leer con `pagina`. */
+  if(r&&r.ok===false&&r.candidatas&&r.candidatas.length){ ia.fase='candidatas'; ia.cands=r.candidatas; _ordenPintar_(id); return; }
   if(!r||r.ok===false||!r.filas||!r.filas.length){ ia.fase='error'; ia.msg='La página de Notion no trae ningún punto.'; }
   else{ ia.fase='propuesta'; ia.prop=r.filas; ia.nota=r.nota||''; }
   _ordenPintar_(id);
@@ -16774,6 +16780,8 @@ async function _ordenClic_(id, ev){
   if(q('data-ordiacancela')&&st.ia.fase==='pensando'){ st.ia.fase=null; st.ia.lento=false; return _ordenPintar_(id); }   // «Dejarlo»: `vigente()` ya no se cumple y la respuesta tardía se ignora
   if(q('data-ordiaenviar')) return _ordenSolaria_(id);
   if(q('data-ordnotion')) return _ordenNotion_(id);
+  if(q('data-ordnotcand') && st.ia.fase==='candidatas') return _ordenNotion_(id, q('data-ordnotcand').getAttribute('data-ordnotcand'));
+  if(q('data-ordnotno') && st.ia.fase==='candidatas'){ st.ia.fase=null; st.ia.cands=null; return _ordenPintar_(id); }
   if(q('data-ordiaok') && st.ia.fase==='propuesta'){ st.ia.orig=st.draft; st.draft=st.ia.prop.map(_ordFilaBorrador_);
     st.ia.fase='usada'; st.ia.prop=null; st.avisoCopia=null; return _ordenPintar_(id); }
   if(q('data-ordiano') && st.ia.fase==='propuesta'){ st.ia.fase=null; st.ia.prop=null; return _ordenPintar_(id); }

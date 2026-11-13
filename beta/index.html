@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=1aefe69"></script>
+<script src="comun.js?v=f400c66"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=fedfca9"></script>
@@ -449,7 +449,7 @@ var api={
   /* 01/11: copiar el orden de otra reunión, pedírselo a SolarIA y dictarlo (`servidor.py`; ninguna guarda nada). */
   listarOrdenesDia: function(id){ return api._post({action:"listarOrdenesDia",id:id}); },
   /* 02/11: la tabla desde la PÁGINA de Notion de la reunión (sólo lee; se enseña como propuesta). */
-  traerOrdenNotion: function(id){ return api._post({action:"traerOrdenNotion",id:id}); },
+  traerOrdenNotion: function(id,pagina){ var b={action:"traerOrdenNotion",id:id}; if(pagina) b.pagina=pagina; return api._post(b); },
   listarPlantillasOrden: function(id){ return api._post({action:"listarPlantillasOrden",id:id}); },
   getPlantillaOrden: function(id,plantilla){ return api._post({action:"getPlantillaOrden",id:id,plantilla:plantilla}); },
   guardarPlantillaOrden: function(id,nombre,filas){ return api._post({action:"guardarPlantillaOrden",id:id,nombre:nombre,filas:filas}); },
@@ -1771,7 +1771,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7228038';
+var BUILD='9eea2c4';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
