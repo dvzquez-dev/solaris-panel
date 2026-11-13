@@ -15487,24 +15487,36 @@ function _mtCss_(){
   var s = document.createElement('style'); s.id = 'mtCss';
   s.textContent =
     '.mtf{margin:14px 0 4px}.mtf-h{display:flex;align-items:baseline;gap:8px;margin:0 0 8px}.mtf-h .sc{flex:1}'+
-    '.mtf-fila{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 9px}'+
-    '.mtf-c{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:12px;min-height:36px;padding:6px 13px;'+
-      'border-radius:20px;border:1px solid var(--line);background:var(--sur2);color:var(--ink2);white-space:nowrap;user-select:none}'+
+    '.mtf-fila{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 12px}'+
+    '.mtf-c{display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:13px;min-height:44px;padding:8px 15px;'+
+      'border-radius:22px;border:1px solid var(--line);background:var(--sur2);color:var(--ink2);user-select:none;-webkit-tap-highlight-color:transparent;text-align:center}'+
     '.mtf-c:hover{border-color:var(--ink3);color:var(--ink)}.mtf-c.on,.mtf-c.pri{color:#fff;border-color:var(--red);background:rgba(228,30,37,.2)}'+
-    '.mtf-c.mini{min-height:30px;padding:3px 10px;font-size:11.5px}.mtf-c[disabled]{opacity:.5;pointer-events:none}'+
-    '.mtf-in{flex:1;min-width:120px}'+
-    'textarea.mtf-in{min-height:110px}'+
-    '.mtf-sec{margin:16px 0 6px;font-weight:600;font-size:14px;color:var(--ink)}.mtf-sub{margin:12px 0 4px;font-size:12.5px;color:var(--ink2)}'+
-    '.mtf-card{border:1px solid var(--line);border-radius:12px;background:var(--sur);padding:9px 10px;margin:0 0 8px}'+
-    '.mtf-card .mtf-fila{margin:0 0 6px}.mtf-nota{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.mtf-err{margin:0 0 8px;font-size:13px;color:var(--red)}'+
-    '.mtf-sug{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}.mtf-sug:empty{display:none}'+
-    '.mtf-subo{margin:0 0 6px 14px;padding-left:10px;border-left:2px solid var(--line)}'+
-    '.mtf-obj{display:flex;flex-direction:column;gap:6px}.mtf-obj .mtf-fila{margin:0}'+
-    '.mtf-ayuda{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.mtf-foto{display:flex;gap:9px;align-items:center;margin:0 0 6px}'+
+    '.mtf-c.mini{min-height:38px;padding:5px 13px;font-size:12.5px}.mtf-c[disabled]{opacity:.5;pointer-events:none}'+
+    '.mtf-in{display:block;width:100%;box-sizing:border-box;min-height:46px}'+
+    'textarea.mtf-in{min-height:120px}textarea.mtf-t{min-height:62px;overflow:hidden}'+
+    '.mtf-campo{margin:0 0 12px}.mtf-lab{display:block;margin:0 0 5px;font-size:12px;color:var(--ink3);font-family:var(--mono)}'+
+    '.mtf-dosc{display:flex;gap:10px}.mtf-dosc .mtf-campo{flex:1;min-width:0}'+
+    '.mtf-sec{margin:22px 0 6px;font-weight:600;font-size:15px;color:var(--ink)}.mtf-sub{margin:16px 0 8px;font-size:13px;color:var(--ink2)}'+
+    '.mtf-card{border:1px solid var(--line);border-radius:14px;background:var(--sur);padding:12px;margin:0 0 12px}'+
+    '.mtf-rot{margin:0 0 8px;font-size:12px;color:var(--ink3);font-family:var(--mono)}'+
+    '.mtf-acc{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin:12px 0 0}'+
+    '.mtf-bin{flex-wrap:nowrap;margin:10px 0 0}.mtf-bin .mtf-c{flex:1 1 0;min-width:0;white-space:normal}'+
+    '.mtf-nota{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.mtf-err{margin:0 0 8px;font-size:13px;color:var(--red);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}'+
+    '.mtf-sug{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 4px}.mtf-sug:empty{display:none}.mtf-add{margin:6px 0 0}'+
+    '.mtf-subo .mtf-log{font-size:12px;padding:5px 4px}.mtf-subo{margin:12px 0 0 8px;padding-left:10px;border-left:2px solid var(--line)}'+
+    '.mtf-obj{display:flex;flex-direction:column}'+
+    '.mtf-ayuda{margin:0 0 12px;font-size:12.5px;color:var(--ink3);line-height:1.4}.mtf-foto{display:flex;gap:10px;align-items:flex-end;margin:12px 0 0}'+
     '.mtf-foto img,.mtf-gal img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:none}'+
-    '.mtf-gal{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}.mtf-gal img{cursor:pointer}.mtf-gal img:hover{border-color:var(--red)}'+
-    '.mtf-rev{margin:0 0 8px;font-size:12.5px;line-height:1.4}.mtf-rev:empty{display:none}.mtf-rev b{color:var(--red);font-weight:600}.mtf-rev span{color:var(--ink3)}'+
-    '.mtf-pie{position:sticky;bottom:0;background:var(--bg);padding:10px 0 4px;border-top:1px solid var(--line);margin-top:14px}';
+    '.mtf-gal{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}.mtf-gal img{cursor:pointer}.mtf-gal img:hover{border-color:var(--red)}'+
+    '.mtf-integ{position:relative}.mtf-bandeja{position:sticky;top:0;z-index:3;background:var(--bg);padding:8px 0 2px;margin:0 0 6px;border-bottom:1px solid var(--line)}'+
+    '.mtf-bandeja .mtf-fila{margin:0 0 6px}.mtf-carg{touch-action:none;cursor:grab}'+
+    '.mtf-per{cursor:pointer}.mtf-per.sel{border-color:var(--red);background:rgba(228,30,37,.08)}.mtf-per.dnd{border-color:var(--red);box-shadow:0 0 0 2px rgba(228,30,37,.45)}'+
+    '.mtf-cab{flex-wrap:nowrap;justify-content:space-between;margin:0 0 8px}.mtf-nom{font-size:15px;min-width:0}.mtf-huecos{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:38px}.mtf-vacio{font-size:12.5px;color:var(--ink3)}'+
+    '.mtf-dias{margin:10px 0 0;gap:8px}.mtf-dias .mtf-c{flex:1 1 0;min-width:0;padding:5px 2px}'+
+    '.mtf-fant{position:fixed;z-index:9999;pointer-events:none;transform:translate(-50%,-120%);opacity:.95;box-shadow:0 6px 18px rgba(0,0,0,.5)}'+
+    '.mtf-rev{margin:14px 0 8px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--sur);font-size:13px;line-height:1.45}.mtf-rev[hidden],.mtf-rev:empty{display:none}'+
+    '.mtf-rev .mtf-rh{margin:0 0 4px;font-weight:600;color:var(--red)}.mtf-rev .mtf-rh+ul+.mtf-rh{margin-top:8px;color:var(--ink2)}.mtf-rev ul{margin:0;padding-left:18px;color:var(--ink2)}.mtf-rev li{margin:0 0 3px}'+
+    '.mtf-pie{position:sticky;bottom:0;background:var(--bg);padding:10px 0 6px;border-top:1px solid var(--line);margin-top:14px}.mtf-estado{margin:0 0 8px;flex-wrap:nowrap}.mtf-pie .mtf-bin{margin:0}';
   document.head.appendChild(s);
 }
 function _mtHTML_(t){
@@ -15529,9 +15541,20 @@ function _mtRefrescar_(t, forzar){
 var MT_APARTADOS_ = ['Procedimiento', 'Incidencias', 'Resultados', 'Pendiente para el siguiente turno'];   /* los que se repiten en las memorias reales (6104, 6106…) */
 function _mtFotoDe_(ed, id){ return (ed.pool || []).filter(function(f){ return f.id === id; })[0]; }
 function _mtRevisionHTML_(ed){
-  var f = ed.faltas || [], a = ed.avisos || [];
-  return (f.length ? '<b>Para enviar falta:</b> ' + f.map(esc).join(' · ') : '') + (f.length && a.length ? '<br>' : '') +
-         (a.length ? '<span>Conviene: ' + a.map(esc).join(' · ') + '</span>' : '');
+  var f = ed.faltas || [], a = ed.avisos || [], li = function(x){ return '<li>' + esc(x) + '</li>'; };
+  return (f.length ? '<p class="mtf-rh">Falta para enviar</p><ul>' + f.map(li).join('') + '</ul>' : '') +
+         (a.length ? '<p class="mtf-rh">Conviene</p><ul>' + a.map(li).join('') + '</ul>' : '');
+}
+/* La ficha del pie: UNA, compacta; su lista sale en el flujo (`[data-mtfaltas]`), nunca tapando la pantalla. */
+function _mtFichaFaltas_(ed){
+  var f = (ed.faltas || []).length, a = (ed.avisos || []).length;
+  var txt = f ? 'Faltan ' + f : a ? 'Listo · ' + a + (a === 1 ? ' consejo' : ' consejos') : '';
+  return '<span data-mtficha>' + (txt ? '<span class="mtf-c mini' + (ed.verFaltas ? ' on' : '') + '" data-mtfaltasver role="button" aria-pressed="' + !!ed.verFaltas + '">' + txt + '</span>' : '<span class="mtf-nota" style="margin:0">Todo listo</span>') + '</span>';
+}
+function _mtRevisionPintar_(k){
+  var ed = MT_.ed[k], c = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"]'); if(!ed || !c) return;
+  var fb = c.querySelector('[data-mtfaltas]'); if(fb){ fb.innerHTML = _mtRevisionHTML_(ed); fb.hidden = !ed.verFaltas; }
+  var fi = c.querySelector('[data-mtficha]'); if(fi) fi.outerHTML = _mtFichaFaltas_(ed);
 }
 var MT_GRUPOS_ = [['principales', 'Objetivos principales'], ['secundarios', 'Objetivos secundarios'], ['extraordinarios', 'Objetivos extraordinarios']];
 function _mtNombres_(){ return ((typeof DATA !== 'undefined' && DATA.miembros) || []).map(function(m){ return m.nombre; }).filter(Boolean); }
@@ -15540,44 +15563,88 @@ function _mtNombres_(){ return ((typeof DATA !== 'undefined' && DATA.miembros) |
    debajo del dedo antes de soltar — el toque se perdía. */
 function _mtSugHTML_(lista, valor, campo){
   var v = String(valor || '').trim().toLowerCase();
-  var cand = lista.filter(function(x){ var y = x.toLowerCase(); return y !== v && (!v || y.indexOf(v) >= 0); }).slice(0, 6);
+  var vistos = {};
+  var cand = lista.filter(function(x){ var y = x.trim().toLowerCase(); if(!y || vistos[y]) return false; vistos[y] = 1; return y !== v && (!v || y.indexOf(v) >= 0); }).slice(0, 6);   /* sin repetir ninguna */
   return cand.map(function(x){ return '<span class="mtf-c mini" data-mtsug="' + esc(campo) + '" data-v="' + esc(x) + '">' + esc(x) + '</span>'; }).join('');
 }
 function _mtInp_(ruta, valor, ph, extra){
   return '<input type="text" class="mtf-in" data-mtin="' + ruta + '" value="' + esc(valor || '') + '" placeholder="' + esc(ph) + '" ' + (extra || '') + '>';
 }
+/* 13/11 (memoriaui) · EL EDITOR PARA EL DEDO. 🗣️ Daniel (13/11): *«arrastrar los cargos a cada slot de persona sería lo suyo […] te aparece en toda la pantalla
+   un coso para enviar falta […] no se ven los objetivos bien. Porque la línea es muy pequeña […] que en un menú no aparezca 800 veces la misma cosa […] que
+   los botones no estén pegados a los cuadros de texto»*. Reglas de este editor: (1) ningún botón comparte fila con un cuadro de texto (las acciones de cada
+   tarjeta van en su propia fila, abajo); (2) los objetivos son cuadros de DOS líneas que crecen, con «Conseguido / No conseguido» a todo el ancho; (3) los
+   cargos son fichas que se ARRASTRAN a la persona o se asignan tocando persona → cargo (el arrastre solo no basta en el móvil); (4) lo que falta para enviar
+   es UNA ficha («Faltan 3») en el pie y su lista sale en el flujo, nunca encima; (5) las sugerencias de sitio sólo salen en el movimiento que se está tocando. */
+var MT_CARGOS_ = ['Responsable de turno', 'Responsable de memoria', 'Responsable audiovisual', 'Coche'];   /* "Coche" lo pueden llevar varios; los demás, UNA persona */
+var MT_CARGO_CORTO_ = {'Responsable de turno': 'Resp. de turno', 'Responsable de memoria': 'Resp. de memoria', 'Responsable audiovisual': 'Audiovisual', 'Coche': 'Coche'};   /* lo que se LEE en la ficha; el dato guarda el nombre entero */
+var MT_DIAS_ = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+function _mtEsCargo_(rol, cargo){ return String(rol || '').toLowerCase().indexOf(cargo.toLowerCase()) === 0; }
+function _mtTiene_(p, cargo){ return !!p && (p.roles || []).some(function(r){ return _mtEsCargo_(r, cargo); }); }
+/* Pone (o, con `alternar`, quita si ya lo tenía) el cargo a la persona `i`. Un cargo único se lo quita a quien lo llevara. */
+function _mtCargo_(m, i, cargo, alternar){
+  var p = m.integrantes[i]; if(!p) return;
+  if(_mtTiene_(p, cargo)){
+    if(alternar) p.roles = p.roles.filter(function(r){ return !_mtEsCargo_(r, cargo); });
+    return;
+  }
+  if(cargo !== 'Coche') m.integrantes.forEach(function(o){ o.roles = (o.roles || []).filter(function(r){ return !_mtEsCargo_(r, cargo); }); });
+  p.roles = (p.roles || []).concat([cargo]);
+}
+/* Un objetivo (o subobjetivo): su rótulo, el texto en DOS líneas y «Conseguido / No conseguido» a todo el ancho. `clave` = «grupo:i» o «grupo:i:j». */
+function _mtObjHTML_(o, ruta, rotulo, atributo, clave){
+  var logr = function(v){ var on = o.logrado === (v === 1);
+    return '<span class="mtf-c mtf-log' + (on ? ' on' : '') + '" data-' + atributo + '="' + clave + ':' + v + '" role="button" aria-pressed="' + on + '">' + (v ? 'Conseguido' : 'No conseguido') + '</span>'; };
+  return '<div class="mtf-rot">' + rotulo + '</div>' + _mtTxt_(ruta + '.texto', o.texto, 'Escribe el objetivo') + '<div class="mtf-fila mtf-bin">' + logr(1) + logr(0) + '</div>';
+}
+/* Cuadro de texto de DOS líneas que crece al escribir (Enter no hace salto: cierra el teclado). */
+function _mtTxt_(ruta, valor, ph){
+  return '<textarea class="mtf-in mtf-t" rows="2" data-mtauto data-mtin="' + ruta + '" placeholder="' + esc(ph) + '">' + esc(valor || '') + '</textarea>';
+}
+function _mtAcc_(){ return '<div class="mtf-acc">' + Array.prototype.join.call(arguments, '') + '</div>'; }
 function _mtEditorHTML_(k){
   var ed = MT_.ed[k], m = ed.m, r = MT_.est[k].r, h = '', i, g;
   var sitios = r.sitios || [];
   h += '<div class="mtf-fila"><span class="mtf-nota" style="flex:1;margin:0">' + esc(r.subtitulo || '') + '</span>'+
        '<span class="mtf-c mini" data-mtcerrar>Cerrar</span></div>';
-  h += '<div class="mtf-fila">' + nxFecha('mtFecha', m.fecha || '', {max: _hoyNxISO_()}) +    /* la fecha: el selector propio, no el nativo */
-       _mtInp_('sitio', m.sitio, 'Sitio (CITI, CUVI…)', 'aria-label="Sitio"') + '</div>';
-  /* 1. Integrantes */
+  h += '<div class="mtf-campo"><label class="mtf-lab">Fecha</label>' + nxFecha('mtFecha', m.fecha || '', {max: _hoyNxISO_()}) + '</div>'+
+       '<div class="mtf-campo"><label class="mtf-lab" for="mtSitio">Sitio</label>' + _mtInp_('sitio', m.sitio, 'CITI, CUVI…', 'id="mtSitio"') + '</div>';
+  /* 1. Integrantes: la bandeja de cargos (se queda arriba mientras se baja por las personas) y una tarjeta por persona */
+  var sel = m.integrantes[ed.persona];
   h += '<div class="mtf-sec">1. Integrantes y responsabilidades</div>'+
-       '<p class="mtf-ayuda">Nombre Apellidos (papel): responsable de turno, coche, responsable audiovisual, responsable de memoria. Si alguien vino sólo un día, ponlo.</p>';
+       '<p class="mtf-ayuda">Nombre Apellidos (papel): responsable de turno, coche, responsable audiovisual, responsable de memoria. Si alguien vino sólo un día, ponlo.</p>'+
+       '<div class="mtf-integ"><div class="mtf-bandeja" data-mtbandeja><div class="mtf-fila">' + MT_CARGOS_.map(function(c){
+         var on = _mtTiene_(sel, c);
+         return '<span class="mtf-c mini mtf-carg' + (on ? ' on' : '') + '" data-mtcargo="' + esc(c) + '" role="button" aria-pressed="' + on + '" aria-label="' + esc(c) + '">' + esc(MT_CARGO_CORTO_[c] || c) + '</span>'; }).join('') + '</div>'+
+       '<p class="mtf-nota">' + (sel ? 'Elegido: ' + esc(sel.nombre) + '. Pulsa un cargo para ponérselo o quitárselo.' : 'Arrastra un cargo hasta una persona, o toca a la persona y luego el cargo.') + '</p></div>';
   m.integrantes.forEach(function(p, i){
-    h += '<div class="mtf-card"><div class="mtf-fila"><b style="flex:1;font-size:14px">' + esc(p.nombre) + '</b>'+
-         '<span class="mtf-c mini" data-mtquitar="integrantes:' + i + '">Quitar</span></div>'+
-         '<div class="mtf-fila">' + _mtInp_('integrantes.' + i + '.roles', (p.roles || []).join(', '), 'Roles (Responsable de turno, Coche…)') +
-         _mtInp_('integrantes.' + i + '.dia', p.dia, 'Solo un día (Miércoles)', 'style="max-width:150px"') + '</div></div>';
+    var puesto = i === ed.persona;
+    h += '<div class="mtf-card mtf-per' + (puesto ? ' sel' : '') + '" data-mtper="' + i + '" role="button" aria-pressed="' + puesto + '">'+
+         '<div class="mtf-fila mtf-cab"><b class="mtf-nom">' + esc(p.nombre) + '</b><span class="mtf-c mini" data-mtquitar="integrantes:' + i + '">Quitar</span></div>'+
+         '<div class="mtf-huecos">' + ((p.roles || []).length ? p.roles.map(function(rl, j){
+             return '<span class="mtf-c mini on" data-mtqcargo="' + i + ':' + j + '" aria-label="Quitar ' + esc(rl) + '">' + esc(MT_CARGO_CORTO_[rl] || rl) + ' ×</span>'; }).join('') : '<span class="mtf-vacio">Sin cargo</span>') +
+           (p.dia ? '<span class="mtf-c mini on" data-mtdia="' + i + '">Solo el ' + esc(p.dia.toLowerCase()) + '</span>' : '<span class="mtf-c mini" data-mtdia="' + i + '">Solo un día</span>') + '</div>'+
+         (ed.diaAbierto === i ? '<div class="mtf-fila mtf-dias">' + MT_DIAS_.map(function(d){
+             return '<span class="mtf-c mini' + (p.dia === d ? ' on' : '') + '" data-mtdiaset="' + i + ':' + d + '">' + d.slice(0, 3) + '</span>'; }).join('') + '</div>' : '') + '</div>';
   });
+  h += '</div>';
   var ya = {}; m.integrantes.forEach(function(p){ ya[p.nombre] = 1; });
-  h += '<div class="mtf-add"><div class="mtf-fila">' + _mtInp_('nuevo.integrante', ed.nuevo || '', 'Añadir a alguien que también fue', 'data-mtnuevo="integrante"') + '</div>'+
+  h += '<div class="mtf-add"><div class="mtf-campo"><label class="mtf-lab" for="mtNuevo">Añadir a alguien que también fue</label>' + _mtInp_('nuevo.integrante', ed.nuevo || '', 'Escribe un nombre', 'id="mtNuevo" data-mtnuevo="integrante"') + '</div>'+
        '<div class="mtf-sug" data-mtsugbox="integrante">' + (ed.nuevo ? _mtSugHTML_(_mtNombres_().filter(function(n){ return !ya[n]; }), ed.nuevo, 'integrante') : '') + '</div></div>';
-  /* 2. Movimientos */
+  /* 2. Movimientos: una tarjeta por movimiento; los sitios se ofrecen sólo en el que se está tocando */
   h += '<div class="mtf-sec">2. Movimientos</div>'+
        '<p class="mtf-ayuda">Qué se movió y de dónde a dónde (Zulo → CITI…). Si no se movió nada, déjalo vacío.</p>';
   m.movimientos.forEach(function(f, i){
-    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('movimientos.' + i + '.material', f.material, 'Material') +
-         '<span class="mtf-c mini" data-mtquitar="movimientos:' + i + '">Quitar</span></div>'+
-         '<div class="mtf-fila">' + _mtInp_('movimientos.' + i + '.de', f.de, 'De (Zulo…)', 'data-mtsugde="' + i + '"') +
-         '<span class="mtf-nota" style="margin:0">→</span>' + _mtInp_('movimientos.' + i + '.a', f.a, 'A (CITI…)', 'data-mtsuga="' + i + '"') + '</div>'+
-         '<div class="mtf-sug" data-mtsugbox="mov:' + i + '">' + _mtSugHTML_(sitios, f.a, 'mov:' + i) + '</div></div>';
+    h += '<div class="mtf-card"><div class="mtf-rot">Movimiento ' + (i + 1) + '</div>'+
+         '<div class="mtf-campo"><label class="mtf-lab">Qué se movió</label>' + _mtInp_('movimientos.' + i + '.material', f.material, 'Material') + '</div>'+
+         '<div class="mtf-dosc"><div class="mtf-campo"><label class="mtf-lab">De dónde</label>' + _mtInp_('movimientos.' + i + '.de', f.de, 'Zulo…', 'data-mtsugde="' + i + '"') + '</div>'+
+         '<div class="mtf-campo"><label class="mtf-lab">A dónde</label>' + _mtInp_('movimientos.' + i + '.a', f.a, 'CITI…', 'data-mtsuga="' + i + '"') + '</div></div>'+
+         '<div class="mtf-sug" data-mtsugbox="mov:' + i + '">' + (ed.movAct === i ? _mtSugHTML_(sitios, ed.foco === 'de' ? f.de : f.a, 'mov:' + i) : '') + '</div>'+
+         _mtAcc_('<span class="mtf-c mini" data-mtquitar="movimientos:' + i + '">Quitar</span>') + '</div>';
   });
   m.notasMov.forEach(function(n, i){
-    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('notasMov.' + i, n, 'Nota (Cordel de Kevlar ya estaba en el CITI)') +
-         '<span class="mtf-c mini" data-mtquitar="notasMov:' + i + '">Quitar</span></div></div>';
+    h += '<div class="mtf-card"><div class="mtf-rot">Nota ' + (i + 1) + '</div>' + _mtTxt_('notasMov.' + i, n, 'Cordel de Kevlar ya estaba en el CITI') +
+         _mtAcc_('<span class="mtf-c mini" data-mtquitar="notasMov:' + i + '">Quitar</span>') + '</div>';
   });
   h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="movimientos">Añadir movimiento</span><span class="mtf-c" data-mtadd="notasMov">Añadir nota</span></div>';
   /* 3. Objetivos */
@@ -15585,21 +15652,16 @@ function _mtEditorHTML_(k){
        '<p class="mtf-ayuda">Los del Discord que pone el Project Director, más los que surjan de improviso. Marca si se cumplieron. Secundarios y extraordinarios (los imprevistos del turno): si no hay, se omiten.</p>';
   MT_GRUPOS_.forEach(function(gr, gi){
     g = gr[0];
+    var lista = m.objetivos[g] || [];
     h += '<div class="mtf-sub">3.' + (gi + 1) + '. ' + gr[1] + '</div><div class="mtf-obj">';
-    (m.objetivos[g] || []).forEach(function(o, i){
-      h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('objetivos.' + g + '.' + i + '.texto', o.texto, 'Objetivo') +
-           '<span class="mtf-c mini" data-mtquitar="obj:' + g + ':' + i + '">Quitar</span></div>'+
-           '<div class="mtf-fila"><span class="mtf-c' + (o.logrado === true ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':1" role="button" aria-pressed="' + (o.logrado === true) + '">Conseguido</span>'+
-           '<span class="mtf-c' + (o.logrado === false ? ' on' : '') + '" data-mtlog="' + g + ':' + i + ':0" role="button" aria-pressed="' + (o.logrado === false) + '">No conseguido</span></div>'+
+    lista.forEach(function(o, i){
+      h += '<div class="mtf-card">' + _mtObjHTML_(o, 'objetivos.' + g + '.' + i, 'Objetivo ' + (i + 1), 'mtlog', g + ':' + i) +
            /* subobjetivos (11/11): segundo nivel, con los mismos chips; si los hay, el padre no tiene que marcarse (lo dice `faltas`) */
            (o.sub || []).map(function(q, j){
-             var ro = 'objetivos.' + g + '.' + i + '.sub.' + j, sc = g + ':' + i + ':' + j;
-             return '<div class="mtf-subo"><div class="mtf-fila">' + _mtInp_(ro + '.texto', q.texto, 'Subobjetivo') +
-               '<span class="mtf-c mini" data-mtquitar="sub:' + g + ':' + i + ':' + j + '">Quitar</span></div>'+
-               '<div class="mtf-fila"><span class="mtf-c' + (q.logrado === true ? ' on' : '') + '" data-mtslog="' + sc + ':1" role="button" aria-pressed="' + (q.logrado === true) + '">Conseguido</span>'+
-               '<span class="mtf-c' + (q.logrado === false ? ' on' : '') + '" data-mtslog="' + sc + ':0" role="button" aria-pressed="' + (q.logrado === false) + '">No conseguido</span></div></div>';
+             return '<div class="mtf-subo">' + _mtObjHTML_(q, 'objetivos.' + g + '.' + i + '.sub.' + j, 'Subobjetivo ' + (j + 1), 'mtslog', g + ':' + i + ':' + j) +
+               _mtAcc_('<span class="mtf-c mini" data-mtquitar="sub:' + g + ':' + i + ':' + j + '">Quitar subobjetivo</span>') + '</div>';
            }).join('') +
-           '<div class="mtf-fila"><span class="mtf-c mini" data-mtadd="sub:' + g + ':' + i + '">+ subobjetivo</span></div></div>';
+           _mtAcc_('<span class="mtf-c mini" data-mtadd="sub:' + g + ':' + i + '">+ subobjetivo</span>', '<span class="mtf-c mini" data-mtquitar="obj:' + g + ':' + i + '">Quitar objetivo</span>') + '</div>';
     });
     h += '</div><div class="mtf-fila"><span class="mtf-c" data-mtadd="obj:' + g + '">Añadir objetivo</span></div>';
   });
@@ -15608,14 +15670,13 @@ function _mtEditorHTML_(k){
        '<p class="mtf-ayuda">Imprevistos e incidencias del turno. Un método de fabricación no convencional, por muy “gitano” que sea, para que no se pierda. Y el porqué de cada objetivo no cumplido.</p>';
   m.comentarios.forEach(function(c, i){
     var fotos = c.fotos || [];
-    h += '<div class="mtf-card"><div class="mtf-fila">' + _mtInp_('comentarios.' + i + '.titulo', c.titulo, 'Título del apartado (Aletas, Lijado…)') +
-         '<span class="mtf-c mini" data-mtquitar="comentarios:' + i + '">Quitar</span></div>'+
+    h += '<div class="mtf-card"><div class="mtf-campo"><label class="mtf-lab">Título del apartado</label>' + _mtInp_('comentarios.' + i + '.titulo', c.titulo, 'Aletas, Lijado…') + '</div>'+
          '<textarea class="mtf-in" data-mtin="comentarios.' + i + '.texto" placeholder="Qué se hizo, cómo, qué pasó y qué queda pendiente">' + esc(c.texto || '') + '</textarea>';
     fotos.forEach(function(f, j){
       var fp = _mtFotoDe_(ed, f.id);
       h += '<div class="mtf-foto">' + (fp && fp.mini ? '<img src="' + esc(fp.mini) + '" alt="">' : '') +
-           _mtInp_('comentarios.' + i + '.fotos.' + j + '.pie', f.pie, 'Pie de la foto (qué se ve)') +
-           '<span class="mtf-c mini" data-mtquitar="foto:' + i + ':' + j + '">Quitar</span></div>';
+           '<div class="mtf-campo" style="flex:1;margin:0"><label class="mtf-lab">Pie de la foto</label>' + _mtInp_('comentarios.' + i + '.fotos.' + j + '.pie', f.pie, 'Qué se ve') + '</div></div>'+
+           _mtAcc_('<span class="mtf-c mini" data-mtquitar="foto:' + i + ':' + j + '">Quitar foto</span>');
     });
     if(ed.galeria === i){
       var usadas = {}; fotos.forEach(function(f){ usadas[f.id] = 1; });
@@ -15625,15 +15686,16 @@ function _mtEditorHTML_(k){
                            : '<span class="mtf-c mini" data-mtfoto="' + i + ':' + esc(f.id) + '">' + esc(f.titulo || f.nombre || 'foto') + '</span>'; }).join('') + '</div>'
          : '<p class="mtf-nota">' + ((ed.pool || []).length ? 'Ya has puesto todas las fotos del turno.' : 'El turno no tiene fotos subidas.') + '</p>';
     }
-    h += '<div class="mtf-fila"><span class="mtf-c mini" data-mtfotos="' + i + '">' + (ed.galeria === i ? 'Cerrar fotos' : 'Añadir foto') + '</span></div></div>';
+    h += _mtAcc_('<span class="mtf-c mini" data-mtfotos="' + i + '">' + (ed.galeria === i ? 'Cerrar fotos' : 'Añadir foto') + '</span>', '<span class="mtf-c mini" data-mtquitar="comentarios:' + i + '">Quitar apartado</span>') + '</div>';
   });
   var usados = {}; m.comentarios.forEach(function(c){ usados[(c.titulo || '').trim().toLowerCase()] = 1; });
   h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="comentarios">Añadir apartado</span>'+
        MT_APARTADOS_.filter(function(x){ return !usados[x.toLowerCase()]; }).map(function(x){ return '<span class="mtf-c mini" data-mtadd="comentarios:' + esc(x) + '">' + esc(x) + '</span>'; }).join('') + '</div>';
-  /* Pie */
-  h += '<div class="mtf-pie"><p class="mtf-rev" data-mtfaltas>' + _mtRevisionHTML_(ed) + '</p>' + (ed.error ? '<p class="mtf-err" data-mterr>' + esc(ed.error) + '</p>' : '') +
-       '<div class="mtf-fila"><span class="mtf-nota" style="flex:1;margin:0" data-mtestado>' + _mtEstadoTxt_(ed) + '</span>'+
-       '<span class="mtf-c" data-mtguardar' + (ed.guardando ? ' disabled' : '') + '>Guardar borrador</span>'+
+  /* Lo que falta, en el flujo (nunca encima) y el pie, que es una fila: estado + ficha «Faltan N» y los dos botones */
+  h += '<div class="mtf-rev" data-mtfaltas' + (ed.verFaltas ? '' : ' hidden') + '>' + _mtRevisionHTML_(ed) + '</div>';
+  h += '<div class="mtf-pie">' + (ed.error ? '<p class="mtf-err" data-mterr>' + esc(ed.error) + '</p>' : '') +
+       '<div class="mtf-fila mtf-estado"><span class="mtf-nota" style="flex:1;margin:0" data-mtestado>' + _mtEstadoTxt_(ed) + '</span>' + _mtFichaFaltas_(ed) + '</div>'+
+       '<div class="mtf-fila mtf-bin"><span class="mtf-c" data-mtguardar' + (ed.guardando ? ' disabled' : '') + '>Guardar borrador</span>'+
        '<span class="mtf-c pri" data-mtenviar' + (ed.guardando || ed.enviando ? ' disabled' : '') + '>Enviar a revisar</span></div></div>';
   return h;
 }
@@ -15652,6 +15714,7 @@ function _mtPintar_(k){
     if(ed && MT_.abierto[k]){
       var y = c.querySelector('textarea:focus,input:focus'), pos = y ? y.getAttribute('data-mtin') : null;
       c.innerHTML = '<div class="mtf-h"><span class="sc">Memoria de fabricación</span></div>' + _mtEditorHTML_(k);
+      _mtAutoalto_(c);
       if(pos){ var z = c.querySelector('[data-mtin="' + pos + '"]'); if(z){ z.focus(); try{ z.setSelectionRange(z.value.length, z.value.length); }catch(_){} } }
       return;
     }
@@ -15667,6 +15730,46 @@ function _mtPintar_(k){
     c.innerHTML = h;
   });
 }
+/* Los cuadros de dos líneas crecen con lo escrito (nunca una línea cortada). */
+function _mtAutoalto_(raiz){
+  Array.prototype.forEach.call(raiz.querySelectorAll('textarea[data-mtauto]'), function(t){ t.style.height = 'auto'; t.style.height = Math.max(t.scrollHeight + 2, 62) + 'px'; });
+}
+/* Las sugerencias de sitio de TODOS los movimientos: sólo el que se está tocando las lleva (antes cada tarjeta repetía la misma lista). */
+function _mtSugMov_(k){
+  var ed = MT_.ed[k], c = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"]'); if(!ed || !c) return;
+  var sitios = (MT_.est[k] && MT_.est[k].r && MT_.est[k].r.sitios) || [];
+  Array.prototype.forEach.call(c.querySelectorAll('[data-mtsugbox^="mov:"]'), function(b){
+    var i = +b.getAttribute('data-mtsugbox').slice(4), f = ed.m.movimientos[i];
+    b.innerHTML = (f && i === ed.movAct) ? _mtSugHTML_(sitios, ed.foco === 'de' ? f.de : f.a, 'mov:' + i) : '';
+  });
+}
+/* Arrastrar un cargo de la bandeja hasta la tarjeta de una persona (ratón o dedo). Un toque sin mover sigue siendo un toque. */
+function _mtArrastre_(t, k, ev){
+  var ed = MT_.ed[k], ch = ev.target && ev.target.closest ? ev.target.closest('[data-mtcargo]') : null;
+  if(!ed || !ch || (ev.button && ev.button !== 0)) return;
+  var cargo = ch.getAttribute('data-mtcargo'), x0 = ev.clientX, y0 = ev.clientY, fant = null, sobre = null;
+  var bajo = function(x, y){ var e = document.elementFromPoint(x, y); return e && e.closest ? e.closest('[data-mtper]') : null; };
+  var mover = function(e){
+    if(!fant){
+      if(Math.abs(e.clientX - x0) + Math.abs(e.clientY - y0) < 8) return;
+      fant = ch.cloneNode(true); fant.removeAttribute('data-mtcargo'); fant.className += ' mtf-fant'; document.body.appendChild(fant);
+    }
+    fant.style.left = e.clientX + 'px'; fant.style.top = e.clientY + 'px';
+    var p = bajo(e.clientX, e.clientY);
+    if(p !== sobre){ if(sobre) sobre.classList.remove('dnd'); if(p) p.classList.add('dnd'); sobre = p; }
+    if(e.cancelable) e.preventDefault();
+  };
+  var soltar = function(e){
+    document.removeEventListener('pointermove', mover); document.removeEventListener('pointerup', soltar); document.removeEventListener('pointercancel', soltar);
+    if(!fant) return;
+    fant.parentNode.removeChild(fant); if(sobre) sobre.classList.remove('dnd');
+    MT_.arrastrado = true; setTimeout(function(){ MT_.arrastrado = false; }, 60);     /* el `click` que sigue a soltar no es un toque en la ficha (llega en el acto: 60 ms bastan) */
+    if(e.type === 'pointerup' && sobre && ed.m.integrantes[+sobre.getAttribute('data-mtper')]){
+      ed.persona = +sobre.getAttribute('data-mtper'); _mtCargo_(ed.m, ed.persona, cargo, false); _mtProgramar_(t, k); _mtPintar_(k);
+    }
+  };
+  document.addEventListener('pointermove', mover, {passive: false}); document.addEventListener('pointerup', soltar); document.addEventListener('pointercancel', soltar);
+}
 /* Dentro de la ruta 'a.b.0.c' del editor: lee/escribe sobre `m`. */
 function _mtSet_(m, ruta, v){
   var p = ruta.split('.'), o = m, i;
@@ -15680,7 +15783,7 @@ function _mtGuardarDif_(t, k){
   if(ed.guardando) return ed.guardando;
   ed.guardando = _ftDeserv_('guardarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev}).then(function(o){
     ed.rev = o.rev; ed.sucio = false; ed.error = ''; ed.guardando = null; ed.faltas = o.faltas || []; ed.avisos = o.avisos || [];
-    var fb = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtfaltas]'); if(fb) fb.innerHTML = _mtRevisionHTML_(ed);
+    _mtRevisionPintar_(k);
     if(MT_.est[k] && MT_.est[k].r){ MT_.est[k].r.rev = o.rev; MT_.est[k].r.guardada = true; }
     var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtestado]'); if(el) el.textContent = _mtEstadoTxt_(ed);
     if(ed.sucio2){ ed.sucio2 = false; ed.sucio = true; return _mtGuardarDif_(t, k); }
@@ -15699,7 +15802,8 @@ function _mtProgramar_(t, k){
 async function _mtEnviar_(t, k){
   var ed = MT_.ed[k]; if(!ed || ed.enviando) return;
   try{ await _mtGuardarDif_(t, k); }catch(_){ /* si no se pudo guardar, el envío lleva la memoria entera igualmente */ }
-  if(ed.faltas && ed.faltas.length){ ed.error = 'Todavía no se puede enviar: ' + ed.faltas.join('; ') + '.'; _mtPintar_(k); return; }
+  if(ed.faltas && ed.faltas.length){ ed.error = 'Todavía no se puede enviar: ' + (ed.faltas.length === 1 ? 'falta 1 cosa' : 'faltan ' + ed.faltas.length + ' cosas') + ' (la lista está sobre los botones).'; ed.verFaltas = true; _mtPintar_(k);
+    var lf = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtfaltas]'); if(lf && lf.scrollIntoView) lf.scrollIntoView({block: 'center'}); return; }
   if(!(await dialogoSiNo('¿Enviar la memoria a revisar? Se genera el documento y entra en revisión; no podrás cambiarla después.', {si: 'Enviar'}))) return;
   ed.enviando = true; ed.error = ''; _mtPintar_(k);
   try{
@@ -15715,7 +15819,7 @@ async function _mtEnviar_(t, k){
 }
 async function _mtAbrir_(t, k){
   var r = await _mtRefrescar_(t, true); if(!r || !r.puede) return;
-  MT_.ed[k] = {m: JSON.parse(JSON.stringify(r.memoria)), rev: r.rev, sucio: false, nuevo: '', error: '', faltas: r.faltas || [], avisos: r.avisos || [], pool: [], galeria: -1};
+  MT_.ed[k] = {m: JSON.parse(JSON.stringify(r.memoria)), rev: r.rev, sucio: false, nuevo: '', error: '', faltas: r.faltas || [], avisos: r.avisos || [], pool: [], galeria: -1, persona: -1, diaAbierto: -1, movAct: -1, foco: 'de', verFaltas: false};
   MT_.abierto[k] = true; _mtPintar_(k);
   /* las fotos del turno para ponerlas en la memoria (sólo si el servidor deja verlas); sin ellas la memoria se escribe igual */
   _ftDeserv_('listarFotosTurno', t).then(function(f){
@@ -15732,6 +15836,7 @@ async function _mtReabrir_(t, k){
 function _mtClic_(t, k, ev){
   var x = ev.target && ev.target.closest ? ev.target : null; if(!x) return;
   var q = function(s){ return x.closest(s); }, ed = MT_.ed[k], m = ed && ed.m, a;
+  if(MT_.arrastrado) return;
   if(q('[data-mtabrir]')){ _mtAbrir_(t, k); return; }
   if(q('[data-mtreabrir]')){ _mtReabrir_(t, k); return; }
   if(!ed) return;
@@ -15739,9 +15844,29 @@ function _mtClic_(t, k, ev){
     _mtGuardarDif_(t, k).catch(function(){}).then(function(){ delete MT_.abierto[k]; _mtRefrescar_(t, true); }); return; }
   if(q('[data-mtguardar]')){ _mtGuardarDif_(t, k).then(function(){ tost('Borrador guardado.'); }, function(){}); return; }
   if(q('[data-mtenviar]')){ _mtEnviar_(t, k); return; }
+  if(q('[data-mtfaltasver]')){
+    ed.verFaltas = !ed.verFaltas; _mtRevisionPintar_(k);
+    var lf = ed.verFaltas && document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtfaltas]'); if(lf && lf.scrollIntoView) lf.scrollIntoView({block: 'center'});
+    return;
+  }
+  if((a = q('[data-mtqcargo]'))){
+    var pc = a.getAttribute('data-mtqcargo').split(':'), pp = m.integrantes[+pc[0]];
+    if(pp){ pp.roles.splice(+pc[1], 1); _mtProgramar_(t, k); _mtPintar_(k); }
+    return;
+  }
+  if((a = q('[data-mtcargo]'))){
+    if(!m.integrantes[ed.persona]){ tost('Toca primero a la persona (o arrastra el cargo hasta ella).'); return; }
+    _mtCargo_(m, ed.persona, a.getAttribute('data-mtcargo'), true); _mtProgramar_(t, k); _mtPintar_(k); return;
+  }
+  if((a = q('[data-mtdiaset]'))){
+    var pd = a.getAttribute('data-mtdiaset').split(':'), pe = m.integrantes[+pd[0]];
+    if(pe){ pe.dia = pe.dia === pd[1] ? '' : pd[1]; ed.diaAbierto = -1; _mtProgramar_(t, k); _mtPintar_(k); }
+    return;
+  }
+  if((a = q('[data-mtdia]'))){ var di = +a.getAttribute('data-mtdia'); ed.diaAbierto = ed.diaAbierto === di ? -1 : di; _mtPintar_(k); return; }
   if((a = q('[data-mtsug]'))){
     var campo = a.getAttribute('data-mtsug'), v = a.getAttribute('data-v');
-    if(campo === 'integrante'){ if(m.integrantes.every(function(p){ return p.nombre !== v; })) m.integrantes.push({nombre: v, roles: [], dia: ''}); ed.nuevo = ''; }
+    if(campo === 'integrante'){ if(m.integrantes.every(function(p){ return p.nombre !== v; })) m.integrantes.push({nombre: v, roles: [], dia: ''}); ed.nuevo = ''; ed.persona = m.integrantes.length - 1; }
     else if(campo.indexOf('mov:') === 0){
       var f = m.movimientos[+campo.slice(4)], cur = ed.foco === 'de' ? 'de' : 'a'; if(f) f[cur] = v;
     }
@@ -15753,11 +15878,13 @@ function _mtClic_(t, k, ev){
     else if(pq[0] === 'sub'){ var os = m.objetivos[pq[1]][+pq[2]]; os.sub.splice(+pq[3], 1); }
     else if(pq[0] === 'foto') m.comentarios[+pq[1]].fotos.splice(+pq[2], 1);
     else m[pq[0]].splice(+pq[1], 1);
+    if(pq[0] === 'integrantes'){ ed.persona = -1; ed.diaAbierto = -1; }
+    if(pq[0] === 'movimientos') ed.movAct = -1;
     _mtProgramar_(t, k); _mtPintar_(k); return;
   }
   if((a = q('[data-mtadd]'))){
     var w = a.getAttribute('data-mtadd');
-    if(w === 'movimientos') m.movimientos.push({material: '', de: '', a: ''});
+    if(w === 'movimientos'){ m.movimientos.push({material: '', de: '', a: ''}); ed.movAct = m.movimientos.length - 1; ed.foco = 'de'; }
     else if(w === 'notasMov') m.notasMov.push('');
     else if(w.indexOf('comentarios') === 0) m.comentarios.push({titulo: w.slice(12), texto: '', fotos: []});
     else if(w.indexOf('obj:') === 0) m.objetivos[w.slice(4)].push({texto: '', logrado: null});
@@ -15789,7 +15916,9 @@ function _mtClic_(t, k, ev){
   if((a = q('[data-mtlog]'))){
     var pl = a.getAttribute('data-mtlog').split(':'), o = m.objetivos[pl[0]][+pl[1]];
     if(o){ o.logrado = pl[2] === '1'; _mtProgramar_(t, k); _mtPintar_(k); }
+    return;
   }
+  if((a = q('[data-mtper]'))){ var pi = +a.getAttribute('data-mtper'); ed.persona = ed.persona === pi ? -1 : pi; ed.diaAbierto = -1; _mtPintar_(k); }
 }
 function _mtInput_(t, k, ev){
   var el = ev.target, ed = MT_.ed[k]; if(!ed || !el || !el.getAttribute) return;
@@ -15799,15 +15928,15 @@ function _mtInput_(t, k, ev){
     var box = el.closest('.mtf-add').querySelector('[data-mtsugbox]'), ya = {}; ed.m.integrantes.forEach(function(p){ ya[p.nombre] = 1; });
     box.innerHTML = el.value ? _mtSugHTML_(_mtNombres_().filter(function(n){ return !ya[n]; }), el.value, 'integrante') : ''; return;
   }
+  if(el.hasAttribute('data-mtauto')) _mtAutoalto_(el.parentNode);
   if(ruta === 'sitio') _mtSet_(ed.m, ruta, el.value);
-  else if(/^integrantes\.\d+\.roles$/.test(ruta)) _mtSet_(ed.m, ruta, el.value.split(',').map(function(s){ return s.trim(); }).filter(Boolean));
   else _mtSet_(ed.m, ruta, el.value);
   var mm = /^movimientos\.(\d+)\.(de|a)$/.exec(ruta);
   if(mm){
-    ed.foco = mm[2];
-    var cx = el.closest('.mtf-card').querySelector('[data-mtsugbox]'); cx.innerHTML = _mtSugHTML_((MT_.est[k].r.sitios || []), el.value, 'mov:' + mm[1]);
+    ed.foco = mm[2]; ed.movAct = +mm[1];
   }
   _mtProgramar_(t, k);
+  if(mm) _mtSugMov_(k);
 }
 /* Engancha los huecos que haya dentro de `raiz` (o del documento): pregunta al servidor si está viejo y cablea UNA vez. */
 function _mtEnganchar_(raiz){
@@ -15824,9 +15953,11 @@ function _mtEnganchar_(raiz){
         if(ed && el && el.id === 'mtFecha'){ ed.m.fecha = el.value; _mtProgramar_(t, k); }
       });
       c.addEventListener('focusin', function(ev){
-        var f = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-mtin'), mm = f && /^movimientos\.\d+\.(de|a)$/.exec(f);
-        if(mm && MT_.ed[k]) MT_.ed[k].foco = mm[1];
+        var f = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-mtin'), mm = f && /^movimientos\.(\d+)\.(de|a|material)$/.exec(f);
+        if(mm && MT_.ed[k]){ MT_.ed[k].foco = mm[2] === 'a' ? 'a' : 'de'; MT_.ed[k].movAct = +mm[1]; _mtSugMov_(k); }
       });
+      c.addEventListener('pointerdown', function(ev){ _mtArrastre_(t, k, ev); });
+      c.addEventListener('keydown', function(ev){ if(ev.key === 'Enter' && ev.target && ev.target.hasAttribute && ev.target.hasAttribute('data-mtauto')){ ev.preventDefault(); ev.target.blur(); } });
       c.addEventListener('mousedown', function(ev){ if(ev.target.closest && ev.target.closest('[data-mtsug]')) ev.preventDefault(); });  /* el chip no roba el foco al campo */
     }
     if(MT_.est[k] && MT_.est[k].r) _mtPintar_(k);
