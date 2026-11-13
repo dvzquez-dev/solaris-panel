@@ -4853,7 +4853,7 @@ function _pselCss_(){
     '.psel-c.on{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}'+
     '.psel-c.on b{font-weight:600}.psel-c i{font-style:normal;font-size:15px;line-height:1;color:var(--ink3)}'+
     '.psel-campo{display:flex;gap:8px;align-items:stretch}'+
-    '.psel-campo input{flex:1;min-width:0;background:var(--sur2);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 11px;font-size:14px}'+
+    '.psel-campo input{flex:1;min-width:0}'+
     '.psel-ver{flex:none;cursor:pointer;font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;padding:0 13px;border-radius:10px;'+
       'border:1px solid var(--line);background:var(--sur2);color:var(--ink2)}'+
     '.psel-ver:hover{border-color:var(--ink3);color:var(--ink)}'+
@@ -14343,8 +14343,7 @@ function _tramosCablear_(f, cambio, repintar, pre){
 var BLQ_MIN_RESUMEN = 20;                      // el mismo mínimo que `MIN_RESUMEN_BLOQUE` del servidor
 var BLQ = null;                                // {modo:'finalizar'|'declarar', reunion, reunion_id, titulo, fecha, ini, fin,
                                                //  en_curso, resumen, parts:[{nombre,horas}], res, env, clave}
-var _BLQ_INPUT_ = 'background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;'+
-                  'color:var(--ink);font:inherit;font-size:13px;width:100%;box-sizing:border-box';
+var _BLQ_INPUT_ = 'width:100%;box-sizing:border-box';          // el aspecto es el de LA caja (`_cajaCablear_`); aquí sólo el ancho
 
 /* ¿Puede esta persona empezar/finalizar/declarar el bloque de ESTA reunión? La regla del servidor
    (`_puerta_reunion_bloque`): su convocante, el PD o el admin. */
@@ -15493,8 +15492,8 @@ function _mtCss_(){
       'border-radius:20px;border:1px solid var(--line);background:var(--sur2);color:var(--ink2);white-space:nowrap;user-select:none}'+
     '.mtf-c:hover{border-color:var(--ink3);color:var(--ink)}.mtf-c.on,.mtf-c.pri{color:#fff;border-color:var(--red);background:rgba(228,30,37,.2)}'+
     '.mtf-c.mini{min-height:30px;padding:3px 10px;font-size:11.5px}.mtf-c[disabled]{opacity:.5;pointer-events:none}'+
-    '.mtf-in{flex:1;min-width:120px;box-sizing:border-box;background:var(--sur2);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 11px;font-size:14px;font-family:inherit}'+
-    'textarea.mtf-in{width:100%;min-height:110px;resize:vertical;line-height:1.45}.mtf-in:focus{outline:none;border-color:var(--red)}'+
+    '.mtf-in{flex:1;min-width:120px}'+
+    'textarea.mtf-in{min-height:110px}'+
     '.mtf-sec{margin:16px 0 6px;font-weight:600;font-size:14px;color:var(--ink)}.mtf-sub{margin:12px 0 4px;font-size:12.5px;color:var(--ink2)}'+
     '.mtf-card{border:1px solid var(--line);border-radius:12px;background:var(--sur);padding:9px 10px;margin:0 0 8px}'+
     '.mtf-card .mtf-fila{margin:0 0 6px}.mtf-nota{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.mtf-err{margin:0 0 8px;font-size:13px;color:var(--red)}'+
@@ -16146,8 +16145,9 @@ function _ordenEditHTML_(st){
         '<span class="mono" data-ordhoras style="color:var(--ink3);white-space:nowrap">'+esc(_ordHoras_(hs[i]))+'</span>'+
         nxNum('', f.dur, {min:0, max:ORD_TOPE_DUR, paso:5, sufijo:'min', attrs:'data-ordcampo="dur"'})+
         '<span style="display:flex;gap:6px;margin-left:auto">'+       // los tres botones envuelven JUNTOS, no uno a uno
-        '<button type="button" class="btn mini" data-ordsubir="'+i+'" aria-label="Subir punto"'+(i?'':' disabled')+'>▲</button>'+
-        '<button type="button" class="btn mini" data-ordbajar="'+i+'" aria-label="Bajar punto"'+(i<st.draft.length-1?'':' disabled')+'>▼</button>'+
+        /* 13/11 cajastexto («aparecen como a destiempo»): ▲/▼ sólo con 2 o más puntos; con uno van los dos apagados y no sirven de nada */
+        (st.draft.length>1?'<button type="button" class="btn mini" data-ordsubir="'+i+'" aria-label="Subir punto"'+(i?'':' disabled')+'>▲</button>'+
+        '<button type="button" class="btn mini" data-ordbajar="'+i+'" aria-label="Bajar punto"'+(i<st.draft.length-1?'':' disabled')+'>▼</button>':'')+
         '<button type="button" class="btn mini" data-ordborrar="'+i+'" aria-label="Quitar punto" style="color:var(--warn);border-color:var(--warn)">'+ico('cerrar')+'</button></span></div>'+
       (pend?'<div class="rnota" data-ordpendaviso style="margin:4px 0 0;color:var(--warn)">Pon cuánto dura este punto.</div>':'')+
       '<input data-ordcampo="tema" value="'+esc(f.tema)+'" maxlength="'+ORD_TOPE_TEMA+'" placeholder="De qué se habla" style="'+inp+';margin-top:6px">'+
@@ -16654,6 +16654,53 @@ function _a11yMarcar_(raiz){
     e.setAttribute('aria-hidden','true');
   });
 }
+/* ═══ UNA SOLA CAJA DE TEXTO (13/11, `cajastexto`) ═══════════════════════════════════════════════════════════════════════════
+   Daniel: «no me chista nada que las cajas de texto sean distintas en la app […] hay algunos recuadros de texto que tienen como un
+   fondo raro gris y otros que están bien integrados […] ¿De qué se habla? […] feísimo […] Dile a SolarIA qué quieres […]
+   bugueadísimo». LA CAUSA, medida: el estilo de la caja vivía en `.campo input|textarea` (la de «¿Qué estuviste haciendo?», la
+   «buena»); toda caja FUERA de `.campo` (el orden del día, SolarIA, el motivo…) caía al estilo del navegador: gris 59·59·59, borde
+   de 2 px, radio 0. Y NINGUNA caja crecía: la de SolarIA enseñaba 2 líneas de 6 tecleadas.
+   AHORA: una regla BASE con `:where()` (especificidad 0: cualquier regla de clase de una pantalla —ancho, flex, mono…— sigue mandando
+   en lo suyo, pero el ASPECTO es uno) para todo `<input>` de texto y todo `<textarea>`; y toda `<textarea>` CRECE con lo escrito hasta
+   un tope de media pantalla (después, barra interior: nunca tapa la pantalla). El foco: el mismo borde y el mismo halo rojo tenue.
+   ⛔ Una caja NUEVA no lleva aquí ni un estilo propio de fondo, borde, radio ni color: sale con el de todas. Si una pantalla necesita
+   otro tamaño o ancho, lo pone ella con una regla de clase; el aspecto no se toca. */
+var CAJA_TOPE_ALTO = 0.5;                       // fracción del alto de la pantalla a la que una caja deja de crecer
+function _cajaCrecer_(t){
+  if(!t || t.tagName!=='TEXTAREA' || !t.offsetParent) return;      // oculta: no se puede medir
+  var tope=Math.max(120, Math.round(window.innerHeight*CAJA_TOPE_ALTO));
+  t.style.height='auto';
+  var sh=t.scrollHeight+(t.offsetHeight-t.clientHeight);           // contenido + bordes
+  t.style.height=Math.min(sh, tope)+'px';
+  t.style.overflowY=sh>tope ? 'auto' : 'hidden';
+}
+function _cajaCrecerTodas_(raiz){
+  Array.prototype.forEach.call((raiz||document).querySelectorAll('textarea'), _cajaCrecer_);
+}
+function _cajaCablear_(){
+  if(_cajaCablear_.hecho || !document.head) return; _cajaCablear_.hecho=true;
+  var s=document.createElement('style'); s.id='cajaCss';
+  s.textContent=
+    ':where(input:not([type]),input[type=text],input[type=url],input[type=search],input[type=email],input[type=tel],textarea){'+
+      'box-sizing:border-box;background:#0A0909;border:1px solid var(--line);border-radius:var(--r2,9px);color:var(--ink);'+
+      'font-family:var(--sans);font-size:13.5px;line-height:1.4;padding:10px 11px;outline:0;max-width:100%;'+
+      'transition:border-color .18s linear,box-shadow .18s linear}'+
+    ':where(textarea){display:block;width:100%;min-height:74px;line-height:1.5;resize:none;overflow-y:hidden}'+
+    ':where(input:not([type]),input[type=text],input[type=url],input[type=search],input[type=email],input[type=tel],textarea):focus{'+
+      'border-color:var(--line2);box-shadow:0 0 0 3px rgba(228,30,37,.11)}'+
+    ':where(input,textarea)::placeholder{color:var(--ink3)}'+
+    ':where(textarea):read-only{opacity:.7}';
+  document.head.appendChild(s);
+  document.addEventListener('input', function(e){ if(e.target && e.target.tagName==='TEXTAREA') _cajaCrecer_(e.target); }, true);
+  document.addEventListener('focusin', function(e){ if(e.target && e.target.tagName==='TEXTAREA') _cajaCrecer_(e.target); }, true);
+  var pend=false;      // lo que se PINTA ya escrito (borrador recuperado, valor puesto por código) también se mide, una vez por cuadro
+  new MutationObserver(function(){ if(pend) return; pend=true; requestAnimationFrame(function(){ pend=false; _cajaCrecerTodas_(); }); })
+    .observe(document.body||document.documentElement, {childList:true, subtree:true});
+  window.addEventListener('resize', function(){ _cajaCrecerTodas_(); });
+  _cajaCrecerTodas_();
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', _cajaCablear_); else _cajaCablear_();
+
 function _a11yCablear_(){
   if(_a11yCablear_.hecho || !document.body) return; _a11yCablear_.hecho=true;
   var s=document.createElement('style'); s.id='a11yCss';

@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=7b9d545">
+<link rel="stylesheet" href="escritorio.css?v=d5b2b69">
 </head>
 <body>
 
@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=5c27866"></script>
+<script src="comun.js?v=6b7dd38"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=3d67e0d"></script>
@@ -121,7 +121,7 @@
 <script src="documentos.escritorio.js?v=428fbab"></script>
 <script src="sanciones.escritorio.js?v=f1fbc19"></script>
 <script src="reuniones.escritorio.js?v=4055ad2"></script>
-<script src="horas.escritorio.js?v=4be139d"></script>
+<script src="horas.escritorio.js?v=c66c310"></script>
 <script src="equipo.escritorio.js?v=6b38f97"></script>
 <script src="tareas.escritorio.js?v=d6e1088"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
@@ -795,8 +795,7 @@ var CANDID=[
    ═══════════════════════════════════════════════════════════════════════════ */
 /* Un solo estilo de campo para toda la cara: estaba copiado en dos sitios como `var E`. */
 /* (el CSS de la lista de personas se inyecta abajo, junto al resto de estilos) */
-var CAMPO_CSS='width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;'+
-  'padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px';
+var CAMPO_CSS='width:100%';      // 13/11 cajastexto: el aspecto de TODA caja de texto es uno (`_cajaCablear_`, comun.js); aquí sólo el ancho
 function pan(cab,der,cuerpo,cls){
   return '<div class="pan'+(cls?' '+cls:'')+'"><div class="ph"><span class="sc">'+cab+'</span>'+
     '<span class="ln"></span>'+(der?'<span class="sc">'+der+'</span>':'')+'</div>'+cuerpo+'</div>';
@@ -1275,7 +1274,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
         '<div style="flex-basis:100%"><span class="sc" style="display:block;margin-bottom:5px">Subcategoría (compensación)</span>'+
         nxElige('otSubc', [['','Sin elegir']].concat(SUBCATS_COMP), '')+'</div>'+   /* 01/11: como el bloque, con chips */
         '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Motivo</span>'+
-        '<input id="otConcepto" placeholder="p. ej. Feria de divulgación · montaje" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
+        '<input id="otConcepto" placeholder="p. ej. Feria de divulgación · montaje" style="width:100%"></label>'+
         '<button class="btn pri" data-otorgar>Otorgar</button>'+
       '</div></div>'))+
     bloquePanel()+
@@ -3786,7 +3785,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='2671403';
+var BUILD='f01e7d0';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

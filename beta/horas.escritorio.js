@@ -162,7 +162,7 @@ function bloquePanel(){
         nxElige('bloSubc', [['','Sin elegir']].concat(SUBCATS_COMP), '')+'</div>'+   /* 01/11 (horasmes), con chips: nada de <select> */
       '<div><span class="sc" style="display:block;margin-bottom:5px">Horas c/u</span>'+nxNum('bloH', 2, {min:0, paso:0.25, sufijo:'h'})+'</div>'+
       '<label style="flex:2;min-width:200px"><span class="sc" style="display:block;margin-bottom:5px">Concepto</span>'+
-      '<input id="bloC" placeholder="p. ej. Traslado a campo de pruebas" style="width:100%;background:#0A0909;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font:inherit;font-size:12.5px"></label>'+
+      '<input id="bloC" placeholder="p. ej. Traslado a campo de pruebas" style="width:100%"></label>'+
       '<button class="btn pri" data-bloque>Otorgar el bloque</button>'+
     '</div></div>');
 }
