@@ -15313,16 +15313,20 @@ function _ftCss_(){
       'background:var(--red);color:#fff;font-weight:600;font-size:14px}'+
     '.ftf-cam input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}'+
     '.ftf-tit{flex:1;min-width:130px;background:var(--sur2);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 11px;font-size:14px}'+
-    '.ftf-c{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:12px;min-height:32px;padding:5px 12px;'+
+    '.ftf-c{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:12.5px;min-height:44px;padding:6px 16px;text-decoration:none;'+
       'border-radius:20px;border:1px solid var(--line);background:var(--sur2);color:var(--ink2);white-space:nowrap}'+
     '.ftf-c:hover{border-color:var(--ink3);color:var(--ink)}.ftf-c.pri{color:#fff;border-color:var(--red);background:rgba(228,30,37,.18)}'+
+    '@media (pointer:fine){.ftf-c{min-height:34px;padding:5px 13px}}'+
+    '.ftf-fila.ftf-abajo{margin-top:12px}.ftf-ok{margin:0 0 9px;font-family:var(--mono);font-size:12.5px;color:var(--ink2)}'+
     '.ftf-nota{margin:0 0 8px;font-size:12.5px;color:var(--ink3)}.ftf-err{margin:0 0 8px;font-size:13px;color:var(--red)}'+
     '.ftf-barra{height:4px;border-radius:2px;background:var(--line);overflow:hidden;margin:0 0 9px}.ftf-barra i{display:block;height:100%;background:var(--red)}'+
-    '.ftf-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin:0 0 10px}'+
+    '.ftf-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin:0 0 10px}'+
     '.ftf-f{position:relative;cursor:pointer;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--sur2);min-height:96px}'+
     '.ftf-f img{display:block;width:100%;height:96px;object-fit:cover}'+
     '.ftf-f .ftf-sin{display:flex;align-items:center;justify-content:center;height:96px;font-family:var(--mono);font-size:12px;color:var(--ink3)}'+
-    '.ftf-f small{display:block;padding:4px 6px;font-size:10.5px;line-height:1.3;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'+
+    '.ftf-f small{display:block;padding:5px 7px 6px;font-size:11.5px;line-height:1.3;color:var(--ink2)}'+
+    '.ftf-f small b{display:block;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'+
+    '.ftf-f small i{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-style:normal;word-break:break-word}'+
     '.ftf-f .ftf-e{position:absolute;top:4px;right:4px;font-family:var(--mono);font-size:9.5px;padding:2px 6px;border-radius:9px;background:rgba(0,0,0,.66);color:#fff}'+
     '.ftf-vis img{display:block;max-width:100%;max-height:60vh;margin:0 auto 10px;border-radius:8px}';
   document.head.appendChild(s);
@@ -15365,12 +15369,17 @@ function _ftDinHTML_(k){
       return '<div class="ftf-f" data-ftf="' + esc(f.id) + '" data-p>' +
         (f.mini ? '<img src="' + esc(f.mini) + '" alt="Foto de ' + esc(f.autor) + '">' : '<div class="ftf-sin">' + esc(String(f.ext).toUpperCase()) + '</div>') +
         (f.entregada ? '<span class="ftf-e">entregada</span>' : '') +
-        '<small>' + esc(_ftAutorPila_(f.autor)) + ' · ' + esc(_ftHoraDe_(f.at)) + (f.titulo ? ' · ' + esc(f.titulo) : '') + '</small></div>';
+        '<small><b>' + esc(_ftAutorPila_(f.autor)) + ' · ' + esc(_ftHoraDe_(f.at)) + '</b>' + (f.titulo ? '<i>' + esc(f.titulo) + '</i>' : '') + '</small></div>';
     }).join('') + '</div>';
+  }
+  if(r.driveUrl && r.fotos.some(function(f){ return f.entregada; })){
+    h += '<div class="ftf-fila"><a class="ftf-c" data-ftdrive href="' + esc(r.driveUrl) + '" target="_blank" rel="noopener" data-p>Ver en Drive</a></div>';
   }
   if(r.puedeGestionar && r.fotos.length){
     var pend = r.fotos.filter(function(f){ return !f.entregada; }).length;
-    h += '<div class="ftf-fila"><span class="ftf-c pri" data-ftentregar data-p>Entregar ' + r.fotos.length + (pend < r.fotos.length ? ' (' + pend + ' nuevas)' : '') + '</span>'+
+    /* Entregar cuenta (y manda) sólo las PENDIENTES; con todo entregado el botón no sale (13/11: «Entregar 7 (0 nuevas)» no hacía nada). */
+    if(!pend) h += '<p class="ftf-ok" data-ftdone>Todo entregado.</p>';
+    h += '<div class="ftf-fila ftf-abajo">' + (pend ? '<span class="ftf-c pri" data-ftentregar data-p>Entregar ' + pend + (pend === 1 ? ' nueva' : ' nuevas') + '</span>' : '') +
          '<span class="ftf-c" data-ftzip data-p>Descargar ZIP</span>' +
          (r.puedeConfigurar ? '<span class="ftf-c" data-ftdest data-p>Destino: ' + (r.destino === 'zip' ? 'ZIP' : 'Drive') + '</span>' : '') + '</div>';
     if(r.ultimaEntrega) h += '<p class="ftf-nota" data-ftult>Entregadas el ' + esc(_isoADMY_(String(r.ultimaEntrega.at).slice(0, 10))) + ' a las ' + esc(_ftHoraDe_(r.ultimaEntrega.at)) +
@@ -15561,7 +15570,8 @@ function _ftVisor_(t, k, id){
 async function _ftEntregar_(t, k){
   var r = FT_.est[k] && FT_.est[k].r; if(!r) return;
   var donde = r.destino === 'zip' ? 'Se marcan como entregadas y te queda el ZIP para mandarlo.' : 'Se copian a la carpeta de Drive configurada (subcarpeta «' + r.carpeta + '»).';
-  if(!(await dialogoSiNo('¿Entregar las ' + r.fotos.length + ' fotos del turno? ' + donde, {si: 'Entregar'}))) return;
+  var pend = r.fotos.filter(function(f){ return !f.entregada; }).length;
+  if(!(await dialogoSiNo('¿Entregar las ' + pend + ' fotos nuevas del turno? ' + donde, {si: 'Entregar'}))) return;
   try{
     var o = await _ftDeserv_('entregarFotosTurno', t);
     tost(o.destino === 'zip' ? 'Marcadas como entregadas. Descarga el ZIP para mandarlo.' : o.n + ' fotos entregadas en «' + o.carpeta + '».');
