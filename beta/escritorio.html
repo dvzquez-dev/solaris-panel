@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=a85ba64"></script>
+<script src="comun.js?v=f21cc6b"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=3d67e0d"></script>
@@ -338,7 +338,7 @@ var api={
   proponerOrdenDia: function(id,filas,texto,base){ return api._post({action:"proponerOrdenDia",id:id,filas:filas,texto:texto,base:base||undefined}); },
   transcribirVoz:   function(id,ext,datos){ return api._post({action:"transcribirVoz",id:id,ext:ext,datos:datos}); },
   borrarOrdenPdf:   function(id){ return api._post({action:"borrarOrdenPdf",id:id}); },
-  generarOrdenPdf:  function(id){ return api._post({action:"generarOrdenPdf",id:id}); },   // 01/11: el PDF desde la tabla, con la plantilla de Solaris
+  generarOrdenPdf:  function(id,indice){ return api._post({action:"generarOrdenPdf",id:id,indice:indice===true}); },   // 01/11: el PDF desde la tabla, con la plantilla de Solaris
   subirOrdenPdf:    function(id,sesion,parte,partes,nombre,datos){ return api._post({action:"subirOrdenPdf",id:id,sesion:sesion,parte:parte,partes:partes,nombre:nombre,datos:datos}); },
   /* 818.a: GEMELA de la del movil (817.a). Nunca vacia: `extra.invitados` vacio no pisa la columna. */
   setInvitados: function(id,l){ return api._post({action:"actualizarReunion",id:id,campos:{invitados:l}}); },
@@ -3785,7 +3785,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f01e7d0';
+var BUILD='eaabe8e';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

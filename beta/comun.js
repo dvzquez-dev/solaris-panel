@@ -15691,6 +15691,10 @@ function _mtEditorHTML_(k){
   var usados = {}; m.comentarios.forEach(function(c){ usados[(c.titulo || '').trim().toLowerCase()] = 1; });
   h += '<div class="mtf-fila"><span class="mtf-c" data-mtadd="comentarios">Añadir apartado</span>'+
        MT_APARTADOS_.filter(function(x){ return !usados[x.toLowerCase()]; }).map(function(x){ return '<span class="mtf-c mini" data-mtadd="comentarios:' + esc(x) + '">' + esc(x) + '</span>'; }).join('') + '</div>';
+  /* 13/11 (Daniel: «tiene que tener la opción de poner o no poner índice con alguna especie de tick»): un chip, no casilla; en rojo = lleva índice.
+     Fuera del pie fijo (que ya ocupa bastante pantalla) y con aire respecto al botón de abajo. */
+  h += '<div class="mtf-fila" style="margin:16px 0 4px" data-mtindicefila><span class="mtf-c' + (m.indice === true ? ' on' : '') + '" data-mtindice role="button" aria-pressed="' + (m.indice === true) + '">Índice</span>'+
+       '<span class="mtf-nota" style="flex:1;min-width:180px;margin:0">' + (m.indice === true ? 'El documento lleva índice, con enlaces a cada apartado.' : 'El documento no lleva índice.') + '</span></div>';
   /* Lo que falta, en el flujo (nunca encima) y el pie, que es una fila: estado + ficha «Faltan N» y los dos botones */
   h += '<div class="mtf-rev" data-mtfaltas' + (ed.verFaltas ? '' : ' hidden') + '>' + _mtRevisionHTML_(ed) + '</div>';
   h += '<div class="mtf-pie">' + (ed.error ? '<p class="mtf-err" data-mterr>' + esc(ed.error) + '</p>' : '') +
@@ -15908,6 +15912,7 @@ function _mtClic_(t, k, ev){
     }
     return;
   }
+  if(q('[data-mtindice]')){ m.indice = m.indice === true ? false : true; if(!m.indice) delete m.indice; ed.sucio = true; _mtProgramar_(t, k); _mtPintar_(k); return; }
   if((a = q('[data-mtslog]'))){
     var ps = a.getAttribute('data-mtslog').split(':'), qs = ((m.objetivos[ps[0]][+ps[1]] || {}).sub || [])[+ps[2]];
     if(qs){ qs.logrado = ps[3] === '1'; _mtProgramar_(t, k); _mtPintar_(k); }
@@ -16238,6 +16243,8 @@ function _ordTablaHTML_(filas, inicio, horas){
     }).join('')+'</table>'+
     '<p class="rnota" style="margin:6px 0 0" data-ordtotal>Total: '+_ordTextoDur_(_ordTotal_(filas))+'</p>';
 }
+/* ¿El próximo PDF lleva índice? Lo que se eligió en esta sesión, o si no lo que tiene el PDF generado (así «se recuerda por documento»). */
+function _ordIndice_(st){ return st.indice!==undefined ? !!st.indice : !!(st.e&&st.e.pdf&&st.e.pdf.indice); }
 function _ordenHTML_(id){
   var st=_ordSt_(id), e=st.e; if(!e) return '';
   var cab='<span class="sc" style="display:block;margin-bottom:4px">Orden del día</span>', cuerpo='';
@@ -16252,6 +16259,10 @@ function _ordenHTML_(id){
     if(e.puede&&e.filas&&e.filas.length&&!e.pdf) cuerpo+='<p class="rnota" data-ordsinpdfaviso style="margin:6px 0 0">Los convocados ven el PDF, no esta tabla: genéralo para que lo vean.</p>';
     if(e.puede) cuerpo+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px"><button class="btn mini" data-ordeditar>'+ico('lapiz')+' '+(e.filas&&e.filas.length?'Editar la tabla':'Escribir el orden del día')+'</button>'+
       '<button class="btn mini" data-ordgenerar'+(st.gen?' disabled':'')+'>'+ico('documento')+' '+(st.gen?'Generando el PDF…':'Generar PDF')+'</button></div>'+
+      /* 13/11 (Daniel: «poner o no poner índice con alguna especie de tick»): un chip como «Horas distintas por persona» (rojo = sí). Va en su fila,
+         con aire sobre los botones; se recuerda en el PDF generado (`pdf.indice`) y vale para el próximo «Generar PDF» y para el que se rehace solo. */
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px" data-ordindicefila><button type="button" class="btn mini'+(_ordIndice_(st)?' pri':'')+'" style="min-height:36px;padding-left:16px;padding-right:16px" data-ordindice aria-pressed="'+_ordIndice_(st)+'"'+(st.gen?' disabled':'')+'>Índice</button>'+
+      '<span class="rnota" style="margin:0;flex:1;min-width:170px" data-ordindicenota>'+(_ordIndice_(st)?'El PDF lleva índice, con enlaces a cada apartado.':'El PDF no lleva índice.')+'</span></div>'+
       (st.errGen?'<div class="rnota" data-ordgenerror style="margin-top:6px;color:var(--warn)">'+esc(st.errGen)+'</div>':'');
   }
   return '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+cab+cuerpo+_ordenPdfHTML_(st)+'</div>';
@@ -16643,6 +16654,7 @@ async function _ordenClic_(id, ev){
     _ordenSoltar_(st, st.draft); return _ordenPintar_(id); }
   if(q('data-ordcancelar')){ _ordenSoltar_(st); return _ordenPintar_(id); }
   if(q('data-ordgenerar')) return _ordenGenerar_(id);
+  if(q('data-ordindice')){ st.indice=!_ordIndice_(st); return _ordenPintar_(id); }
   if(q('data-ordcopiar')) return _ordenCopiaAbrir_(id);
   if(q('data-ordcopiacerrar')){ st.copia=null; return _ordenPintar_(id); }
   if(q('data-ordcopiarde')) return _ordenCopiarDe_(id, q('data-ordcopiarde').getAttribute('data-ordcopiarde'));
@@ -16725,7 +16737,7 @@ async function _ordenGenerar_(id, auto){
     if(!(await dialogoSiNo('Ya hay un PDF del orden del día: '+cual+'.\n\nGenerar uno nuevo lo reemplaza.\n\n¿Sigo?'))) return;
   }
   st.gen=true; st.errGen=''; _ordenPintar_(id);
-  try{ await api.generarOrdenPdf(id); _ordenQuitarVisor_(st); if(!auto) tost('PDF generado.'); }
+  try{ await api.generarOrdenPdf(id, _ordIndice_(st)); _ordenQuitarVisor_(st); if(!auto) tost('PDF generado.'); }
   catch(e){ st.errGen=(auto?'La tabla está guardada, pero no se pudo rehacer el PDF: ':'No se pudo generar el PDF: ')+((e&&e.message)||e); }
   st.gen=false;
   _ordenRefrescar_(id);

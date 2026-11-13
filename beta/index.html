@@ -113,7 +113,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=a85ba64"></script>
+<script src="comun.js?v=f21cc6b"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=fedfca9"></script>
@@ -461,7 +461,7 @@ var api={
   proponerOrdenDia: function(id,filas,texto,base){ return api._post({action:"proponerOrdenDia",id:id,filas:filas,texto:texto,base:base||undefined}); },
   transcribirVoz:   function(id,ext,datos){ return api._post({action:"transcribirVoz",id:id,ext:ext,datos:datos}); },
   borrarOrdenPdf:   function(id){ return api._post({action:"borrarOrdenPdf",id:id}); },
-  generarOrdenPdf:  function(id){ return api._post({action:"generarOrdenPdf",id:id}); },   // 01/11: el PDF desde la tabla, con la plantilla de Solaris
+  generarOrdenPdf:  function(id,indice){ return api._post({action:"generarOrdenPdf",id:id,indice:indice===true}); },   // 01/11: el PDF desde la tabla, con la plantilla de Solaris
   subirOrdenPdf:    function(id,sesion,parte,partes,nombre,datos){ return api._post({action:"subirOrdenPdf",id:id,sesion:sesion,parte:parte,partes:partes,nombre:nombre,datos:datos}); },
   /* 817.a: la misma accion, desplegada desde el 24/07. `extra.invitados` lo SUPERPONE el lector a la
      columna `invitados` (`_reuFromRow_`), y solo si trae algo: por eso aqui nunca se manda vacia. */
@@ -1771,7 +1771,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b74039b';
+var BUILD='8986018';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
