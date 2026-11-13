@@ -114,16 +114,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=f6a9419"></script>
+<script src="comun.js?v=2627049"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=4f42fdf"></script>
-<script src="turnos.movil.js?v=e860b21"></script>
+<script src="turnos.movil.js?v=b17a8a4"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=16564e6"></script>
 <script src="sanciones.movil.js?v=7f75222"></script>
 <script src="reuniones.movil.js?v=bdb5535"></script>
-<script src="horas.movil.js?v=1228ead"></script>
+<script src="horas.movil.js?v=32e0f67"></script>
 <script src="equipo.movil.js?v=cec764e"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -1007,6 +1007,7 @@ async function _onCredencial_(resp,_silente){
        El ancho total sigue siendo una ida y vuelta, no dos. */
     _gate_(SPLASH+'<div style="opacity:.8">Cargando tus datos…</div>');
     await Promise.all([pPartes, pDecidir, pFichaje, pSanc, pMovs, pMisSanc, _cargarReunionesM_(pReuniones)]);
+    _repartirPartesDecSiEspera_();   // refutar38: `getPartes` pudo volver antes que la identidad; ya está puesta
     /* ⛔ Y LO QUE NO LLEGO SE SIGUE INTENTANDO POR DETRAS (Daniel, 11/08). Aqui es
        donde se sabe QUE FALTA: las cinco salieron en paralelo y se acaban de
        esperar juntas. Sin esto, una carga que fallara se quedaba rendida para
@@ -1866,7 +1867,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='a3ec7c7';
+var BUILD='7cfc9fa';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

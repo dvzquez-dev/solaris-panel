@@ -3410,6 +3410,19 @@ var PUNTOS_TURNO = [
   { id:'citi-ou', nombre:'CITI',                                          ciudad:'Ourense' }
 ];
 
+/* refutar40 (13/11): la CIUDAD de un sitio por su nombre («CITI» → Ourense, «CUVI» → Vigo), de la MISMA lista de arriba (`PUNTOS_TURNO`, la de Daniel del 11/08).
+   '' = «no lo sé» (un punto de texto libre como «Taller»): nunca se inventa una ciudad. Un raso que vive en Vigo no tiene por qué saber que el CITI es Ourense. */
+function _ciudadDeSitio_(txt){
+  var k=String(txt==null?'':txt).trim().toLowerCase();
+  for (var i=0;i<PUNTOS_TURNO.length;i++) if (PUNTOS_TURNO[i].nombre.toLowerCase()===k) return PUNTOS_TURNO[i].ciudad;
+  return '';
+}
+/* «CITI» → «CITI · Ourense»; lo que no es un sitio conocido se queda como está. */
+function _sitioConCiudad_(txt){
+  var c=_ciudadDeSitio_(txt);
+  return c ? String(txt)+' · '+c : String(txt==null?'':txt);
+}
+
 function _puntoTurno_(id){
   for (var i=0;i<PUNTOS_TURNO.length;i++) if (PUNTOS_TURNO[i].id === id) return PUNTOS_TURNO[i];
   return null;                    /* ⛔ `null` = «no lo sé», nunca un punto inventado */
@@ -10256,7 +10269,7 @@ function _convEtiq_(k){
    🗣️ Daniel: *«para marcar disponibilidad es como una reunión, simplemente q te debería dejar usar varios pinceles (CUVI +
    Coche) (CUVI + Sin coche) (CITI + Coche) (CITI + Sin coche) […] Y también puedes marcar que tienes ambas disponibilidades a
    la vez. Pero como mínimo tienes q seleccionar una. Cada una de las combinaciones con colores distintos […] en Ourense sin
-   coche y en Vigo con coche a la vez»*. CUVI = Ourense, CITI = Vigo.
+   coche y en Vigo con coche a la vez»*. ⛔ CUVI = **Vigo**, CITI = **Ourense** (la lista de Daniel del 11/08, `PUNTOS_TURNO`): aquí ponía al revés (refutar40).
    ⛔ LA CELDA: `{s:'cuvi'|'citi'|'ambos', c:bool, cc:{cuvi?:bool, citi?:bool}}`. `cc` es el coche POR SITIO y lleva
    exactamente los sitios que marcaste; `c` = «lleva en alguno» (lo que lee quien no conoce `cc`: Python viejo, otra cara). Una
    celda vieja (sin `cc`) tiene UN `c` para todos sus sitios: `_celdaCoche_` la lee igual. Gemela de `reglas/turnos.py:con_coche`
@@ -10383,7 +10396,7 @@ function _pincelChipsHTML_(cv, sel, attr){
   var chip = function(k, txt, col, on, coche){
     var oscuro = /^#(E41E25|3f9ed6)$/i.test(col);
     return '<button type="button" '+attr+'="'+esc(k)+'" class="pincel-chip'+(on?' on':'')+'" data-p style="'+
-      (on ? 'background:'+col+';border-color:'+col+';color:'+(oscuro?'#fff':'#1a1616') : 'border-color:'+col)+'">'+esc(txt)+(coche?' '+ico('coche'):'')+'</button>';
+      (on ? 'background:'+col+';border-color:'+col+';color:'+(oscuro?'#fff':'#1a1616') : 'border-color:'+col)+'">'+esc(_sitioConCiudad_(txt))+(coche?' '+ico('coche'):'')+'</button>';
   };
   return _pincelesDe_(cv).map(function(p){
     var on = !!sel && !sel.no && Object.prototype.hasOwnProperty.call(sel, p.sitio);

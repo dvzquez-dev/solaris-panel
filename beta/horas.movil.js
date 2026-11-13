@@ -943,7 +943,10 @@ function vFichar(){
          (lo dice la frase de arriba). */
       (rt.propio
         ?''
-        :(rt.escalado?'<span class="esc">Coordinas '+esc(_perf)+', así que lo firma el Project Director.</span>':''))+'</p></div></div>'+
+        :(rt.escalado?'<span class="esc">'+(coordinadorDe(_perf)===PD_NOM
+            /* refutar38: «Coordinas X» es de quien coordina X y escala SU parte; a un raso de una unidad sin coordinador se le atribuía una coordinación que no tiene */
+            ? esc(_perf)+' no tiene coordinador, así que lo firma el Project Director.'
+            : 'Coordinas '+esc(_perf)+', así que lo firma el Project Director.')+'</span>':''))+'</p></div></div>'+
 
     '<button class="btn pri full" data-p id="btnEnviar" disabled style="margin-top:13px">'+
       '<span id="lblEnviar">Faltan datos para enviar</span></button>'+
@@ -1710,10 +1713,10 @@ function _cuotaHTML_(){
         '<span class="ra">−'+eur(_q.base-_q.final)+'</span></div>'
         : '')
       : '<div class="rl"><span>Cuota por tus horas</span><span class="ra">—</span></div>'+
-        '<p class="rnota">Llevas el coche en '+YO.coche+' turno'+(YO.coche===1?'':'s')+' fuera de '+
-        'Vigo, pero el servidor aún no ha servido tu cuota <b>sin</b> descuentos: no se puede '+
+        '<p class="rnota">Llevas el coche en '+YO.coche+' turno'+(YO.coche===1?'':'s')+' entre '+
+        'Ourense y Vigo, pero el servidor aún no ha servido tu cuota <b>sin</b> descuentos: no se puede '+
         'decir cuánto te resta.</p>')
-    : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta '+nf2(_descuentoCoche_())+' € por turno.</p>';
+    : '<p class="rnota">Aún sin descuentos · llevar el coche en un turno entre Ourense y Vigo resta '+nf2(_descuentoCoche_())+' € por turno.</p>';
   /* ⛔⛔ ES UNA ESTIMACIÓN, Y LA CIFRA GRANDE TIENE QUE DECIRLO. Daniel, 15/08, literal:
      *«No se paga mes a mes, animal. **La cuota es anual**, dios. Lo que te aparece en la
      persona es una **estimacion**. ¿Como no puedes tener eso en cuenta? ¿Te has leido
@@ -1845,6 +1848,19 @@ function _cargarPartesDec_(){
        que ya firmaste (medido por un agente el 11/08). Reintenta quien pulsa. */
     PDEC_FALLO = !Array.isArray(arr);
     if(!Array.isArray(arr)) return;
+    /* ⛔ refutar38 (13/11): ESTA RESPUESTA PUEDE LLEGAR ANTES QUE LA IDENTIDAD. En el arranque `getPartes` sale a la vez que `bootstrap` (ver `_onCredencial_`)
+       y, si vuelve primero, `YO` es todavía el de la maqueta (rango 1): el filtro de abajo dejaba pasar los partes PROPIOS de un raso —que el servidor sí le
+       sirve— como «cola por firmar», y se pintaban «Esperan tu decisión» con su nombre y un botón «Aprobar» que el servidor niega («no puedes decidir tu propio
+       parte»), más un globo falso en Horas. Hasta saber quién eres no se reparte: se guarda lo crudo y `_repartirPartesDecSiEspera_` lo hace con la identidad ya puesta. */
+    _PDEC_CRUDO_ = arr;
+    if(typeof SESION!=='undefined' && SESION && SESION.token && !SESION.nombre){ PARTES_DEC = []; PARTES_REV = []; _PDEC_ESPERA_ = true; return; }
+    _PDEC_ESPERA_ = false;
+    _repartirPartesDec_(arr);
+  }).catch(function(){ PDEC_FALLO = true; });
+}
+
+/* Lo de `getPartes` ya con la identidad conocida: de ahí salen la cola «Esperan tu decisión» (`PARTES_DEC`) y «Ya decidiste» (`PARTES_REV`). */
+function _repartirPartesDec_(arr){
     var yo=(typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
     var _rg = (typeof rangoNom==='function' ? rangoNom(yo) : 0);
     var _mando = _rg >= 3;
@@ -1885,7 +1901,14 @@ function _cargarPartesDec_(){
       n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN, CIERRE_UC, true);   /* 26/10: para revertir */
       return n;
     });
-  }).catch(function(){ PDEC_FALLO = true; });
+}
+
+/* Lo que `_cargarPartesDec_` dejó guardado por no saber todavía quién eres, repartido ya con la identidad puesta (la llama el arranque, `_onCredencial_`). */
+var _PDEC_CRUDO_ = null, _PDEC_ESPERA_ = false;
+function _repartirPartesDecSiEspera_(){
+  if(!_PDEC_ESPERA_) return;
+  _PDEC_ESPERA_ = false;
+  try{ _repartirPartesDec_(_PDEC_CRUDO_); }catch(_){ PDEC_FALLO = true; }
 }
 
 /* El rótulo de procedencia en la ficha de decisión: mismo texto que en «Tus partes», otro

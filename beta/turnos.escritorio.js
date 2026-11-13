@@ -1985,7 +1985,7 @@ function _fichaTurnoE_(t){
   };
   var sec = function(tit, cuerpo){ return '<section class="ftu-sec"><h5>'+tit+'</h5>'+cuerpo+'</section>'; };
   return '<div id="ficha-turno">'+pan('Ficha del turno · '+esc(_refTurno_(t)), '<button class="btn sm" data-tursel="'+esc(k)+'">Cerrar</button>',
-    '<div class="pb"><div class="ftu-cab"><b>'+esc(t.punto||'—')+'</b>'+
+    '<div class="pb"><div class="ftu-cab"><b>'+esc(_sitioConCiudad_(t.punto||'—'))+'</b>'+
       (t.estado==='Cancelado' ? '<span class="chip no">cancelado</span>' : '')+
       '<span class="mono">'+esc(f)+' · '+esc(t.hora||'—')+' · '+esc(t.duracion||t.dur||'—')+'</span></div>'+
     '<div class="ftu-rej">'+

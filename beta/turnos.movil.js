@@ -794,7 +794,7 @@ function _ftInicioM_(){
     return _mioTurno_(x) && x.estado !== 'Cancelado' && _ftEnCurso_(x, ahora); })[0];
   if(!t) return '';
   return '<div class="tarj" data-ftwrap style="display:none">'+cab('Tu turno de hoy', t.hora)+
-    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b><small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+'</small></div></div>'+
+    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(_sitioConCiudad_(t.punto))+'</b><small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+'</small></div></div>'+
     '<div style="padding:0 14px 12px">'+_ftHTML_(t)+'</div></div>';
 }
 
@@ -843,7 +843,7 @@ function vTurnos(){
   function tarjeta(t){
     return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+
       cab(t.f+(t.crucial?' · crucial':'')+(t.estado==='Cancelado'?' · cancelado':''), t.hora)+   /* 20/10: se dice */
-      '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b>'+
+      '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(_sitioConCiudad_(t.punto))+'</b>'+
       '<small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+(t.lugar?' · '+esc(t.lugar):'')+'</small></div>'+
       '<div class="d"><span class="chev">›</span></div></div>'+
       _quienVaHTML_(t)+'</div>';
