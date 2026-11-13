@@ -495,7 +495,7 @@ function _listaReusM_(R){
           var sel=(x.id===R.id), i=REUNIONES_M.indexOf(x);
           return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
             '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
-            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+_nConvM_(x)+' convocados'+
+            (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+_convocadosTxt_(_nConvM_(x))+
             _duraTxtM_(x)+'</small></div>'+
             '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':(_reuFinalizada_(x)?'<span class="pil">finalizada</span>':'<span class="chev">›</span>'))+'</div></div>'; };
   var abierto=par.archivo.indexOf(R)>=0, abiertoO=otras.indexOf(R)>=0;
@@ -551,7 +551,7 @@ function vReu(){
   /* 01/11: con orden del día de duración conocida, la ventana es de los bloques que ESE orden pide (`comun.js`). */
   var _vf=_ventanaFijar_(R, _minR, best), vent=_vf.vent;
   var _huecoM_=function(){ var f=_ventanaFijar_(R, _minR, best);
-    return '<b>'+_nConvM_(R)+'</b> convocados · '+(f.vent.v>0?'mejor hueco ':'')+_titularHueco_(R, f.vent, _nresp, pondOn)+_notaOrdenHTML_(f); };
+    var _nc=_nConvM_(R); return '<b>'+_nc+'</b> convocado'+(+_nc===1?'':'s')+' · '+(f.vent.v>0?'mejor hueco ':'')+_titularHueco_(R, f.vent, _nresp, pondOn)+_notaOrdenHTML_(f); };
   _ordSt_(R.id).sugHTML=_huecoM_;
   /* El orden del día llega por red DESPUÉS de pintar: con él cambia el hueco recomendado, y el mapa lo resalta de nuevo (la fijada no se toca). */
   _ordSt_(R.id).sugMapa=function(){
@@ -693,7 +693,7 @@ function vReu(){
       : '')+
     '<div class="tarj">'+cab(R.tipo||'General', _modalidadTxt_(R.modalidad))+
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
-      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+_nConvM_(R)+' convocados'+
+      '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+_convocadosTxt_(_nConvM_(R))+
       _duraTxtM_(R)+'</small></div>'+
       '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento||R.tarde)?'conf':(R.invitado===false?'conf':'no'))+'">'+
         (R.invitado===false?'solo lectura':(R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta')))))+'</span></div></div>'+
@@ -1107,7 +1107,7 @@ function _presetInvitados_(tipo){
     if(m.nombre===yo) return;
     var meto = tipo==='general' ? true
              : (tipo==='subsistema' || tipo==='mixta') ? (m.unidad===(YO&&YO.unidad))   // 04/11: la mixta nace con SU subsistema ya dentro
-             : tipo==='junta' ? (m.cargo==='Coordinador'||m.cargo==='Project Director')
+             : tipo==='junta' ? rangoNom(m.nombre)>=1       /* refutar30: la junta es la coordinación del SERVIDOR (`puede_ver_reunion`: rango >= 1) — también el subcoordinador y José, que el cargo a secas no ve */
              : false;                              // trabajo: a mano
     if(meto) out.push(m.nombre);
   });
@@ -1311,7 +1311,7 @@ function crearModal(){
     if(typeof backendOK!=='undefined' && backendOK && SESION){
       try{ var d=await api.crearReunion(reu); if(d&&d.id) reu.id=d.id;
         cerrarModal();
-        tost('Reunión convocada · '+reu.invitados.length+' convocados, '+bloques.length+' bloques.');
+        tost('Reunión convocada · '+_convocadosTxt_(reu.invitados.length)+', '+bloques.length+' bloques.');
         /* Se RECARGA la lista del servidor. Antes se llamaba a `pintar()` sin haber metido
            la reunion nueva en `REUNIONES_M`: se repintaba lo mismo de antes y parecia que
            no se habia creado. Y se recarga en vez de fabricar una copia local, que es como

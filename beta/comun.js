@@ -8660,8 +8660,8 @@ function _avisoFijarAntes_(r, ahora){
   var conv = (r.invitados || []).filter(function(n){ return n && n !== r.convocante; }).length;
   var han = _nRespReu_(r);
   var cuenta = conv
-    ? (conv > han ? ('Faltan por contestar ' + (conv - han) + ' de ' + conv + ' convocados.')
-                  : ('Han contestado los ' + conv + ' convocados.'))
+    ? (conv > han ? ('Faltan por contestar ' + (conv - han) + ' de ' + _convocadosTxt_(conv) + '.')
+                  : (conv === 1 ? 'Ha contestado el convocado.' : 'Han contestado los ' + conv + ' convocados.'))
     : ('Han contestado ' + han + '.');
   return 'El plazo para contestar sigue ABIERTO: cierra el ' + _isoADMY_(lim.slice(0, 10)) + ' a las ' + lim.slice(11, 16) +
     '.\n' + cuenta + '\n\nSi la fijas ahora, el plazo se cierra para todos YA y se preparan las propuestas de sanci\u00f3n ' +
@@ -8914,6 +8914,8 @@ function _avisoCorto_(nCortas, minSlots, slot){
                  : ('Se han quitado ' + n + ' huecos que quedaban por debajo de ' + d + '.');
 }
 
+/* refutar30: «1 convocado» / «N convocados» — la reunión de un solo convocado (el consejo de Fer con Dora) decía «1 convocados». */
+function _convocadosTxt_(n){ n = +n || 0; return n + (n === 1 ? ' convocado' : ' convocados'); }
 function _durTxt_(min){
   min=Math.max(0, Math.round(+min||0));
   var h=Math.floor(min/60), m=min%60;

@@ -116,7 +116,7 @@ function _presetInvitados_(tipo){
     if(m.nombre===yo) return;
     var meto = tipo==='general' ? true
              : (tipo==='subsistema' || tipo==='mixta') ? (m.unidad===((_m(yo)||{}).unidad))   /* 04/11: la mixta nace con SU subsistema ya dentro */
-             : tipo==='junta' ? (m.cargo==='Coordinador'||m.cargo==='Project Director')
+             : tipo==='junta' ? rangoNom(m.nombre)>=1       /* refutar30: la junta es la coordinación del SERVIDOR (`puede_ver_reunion`: rango >= 1) — también el subcoordinador y José, que el cargo a secas no ve */
              : false;
     if(meto) out.push(m.nombre);
   });
@@ -256,7 +256,7 @@ function _cablearConvocar_(){
       : '<b>'+u.F.length+'</b> casilla'+(u.F.length===1?'':'s')+' de <b>'+_durTxt_(sl)+'</b> · '+
         '<b>'+nb+'</b> bloques en <b>'+nd+'</b> día'+(nd===1?'':'s')+' · '+
         'hay que juntar <b>'+nS+'</b> seguida'+(nS===1?'':'s')+' ('+_durTxt_(nS*sl)+') para que cuente · '+
-        '<b>'+CONV_INV.size+'</b> convocados'+
+        '<b>'+CONV_INV.size+'</b> convocado'+(CONV_INV.size===1?'':'s')+
         (du%sl ? ' · la duración no es múltiplo de la casilla, se redondea hacia arriba' : '') +
         (hz.bloqueo ? '<br><b style="color:var(--red)">'+esc(hz.bloqueo)+' No se puede convocar así.</b>'
           : hz.aviso ? '<br><b style="color:var(--warn)">'+esc(hz.aviso)+'</b>' : '');
@@ -429,7 +429,7 @@ function _cablearConvocar_(){
       reu.id = REUS.reduce(function(m,x){ return Math.max(m, +(x&&x.id)||0); }, 0)+1;
       reu.creado = _ahoraApp_();
       REUS.unshift(normReu(reu)); CONV_INV=null; CONV_HOR={};
-      tost('Convocada en la maqueta · '+reu.invitados.length+' convocados, '+bloques.length+
+      tost('Convocada en la maqueta · '+_convocadosTxt_(reu.invitados.length)+', '+bloques.length+
         ' bloques (sólo en este navegador: no se ha avisado a nadie).');
       pintar(); return;
     }
@@ -442,7 +442,7 @@ function _cablearConvocar_(){
     try{
       await api.crear(reu);
       CONV_INV=null; CONV_HOR={};                     // la siguiente empieza limpia
-      tost('Reunión convocada · '+reu.invitados.length+' convocados, '+bloques.length+' bloques.');
+      tost('Reunión convocada · '+_convocadosTxt_(reu.invitados.length)+', '+bloques.length+' bloques.');
       /* Se RECARGA del servidor en vez de fabricar una copia local: así no se enseña algo
          que en la nube no está. Se conservan las respuestas ya hidratadas —la lista NO las
          trae, viven en su propia hoja— o los mapas de calor se quedarían a cero. */
