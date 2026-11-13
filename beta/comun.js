@@ -14007,7 +14007,11 @@ function _decSeleccionar_(id, acc, abrir){
     Array.prototype.forEach.call(w.querySelectorAll('[data-decsel][data-decacc]'), function(b){
       if (b.getAttribute('data-decacc')) b.classList.toggle('on', b.getAttribute('data-decacc') === DEC_SEL[id]); });
     Array.prototype.forEach.call(w.querySelectorAll('[data-decp]'), function(p){
-      p.classList.toggle('ab', p.getAttribute('data-decp') === DEC_SEL[id]); });
+      var abre = p.getAttribute('data-decp') === DEC_SEL[id];
+      p.classList.toggle('ab', abre);
+      /* docdecidir-1 (Daniel aceptó 13/11): el panel que se abre queda por debajo de lo que se ve; se lleva a la vista lo justo (`nearest`), salvo «con anotaciones», más alto que la pantalla: su principio. Cerrar no mueve nada. El CSS no anima el desplazamiento (no hay `scroll-behavior`), así que con `prefers-reduced-motion` tampoco. */
+      if (abre && DEC_SEL[id] && p.scrollIntoView) p.scrollIntoView({block: DEC_SEL[id] === 'anot' ? 'start' : 'nearest'});
+    });
   });
 }
 /* El resumen de «con anotaciones» se rehace mientras se teclea: lo que ves es lo que se publica. */
@@ -16049,7 +16053,9 @@ function _mtClic_(t, k, ev){
   if((a = q('[data-mtfoto]'))){
     var pf = a.getAttribute('data-mtfoto').split(':'), cm = m.comentarios[+pf[0]];
     if(cm){
-      cm.fotos = cm.fotos || []; cm.fotos.push({id: pf[1], pie: ''}); ed.galeria = -1; _mtProgramar_(t, k); _mtPintar_(k);
+      cm.fotos = cm.fotos || [];
+      /* memoriafotos-3 (Daniel aceptó 13/11): el pie nace con el título que se le dio al subir la foto («Aleta»); sin título, vacío. Se corrige en el campo, que recibe el foco. */
+      var ft = _mtFotoDe_(ed, pf[1]); cm.fotos.push({id: pf[1], pie: String((ft && ft.titulo) || '').slice(0, 120)}); ed.galeria = -1; _mtProgramar_(t, k); _mtPintar_(k);
       var ip = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtin="comentarios.' + pf[0] + '.fotos.' + (cm.fotos.length - 1) + '.pie"]'); if(ip) ip.focus();
     }
     return;

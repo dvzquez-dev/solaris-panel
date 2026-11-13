@@ -1892,10 +1892,14 @@ function _pdOrigenHTML_(p){
 
 /* Una ficha de parte, dentro de la lista de decisión. Se saca aparte porque ahora vive dentro
    de DOS desplegables y el HTML de la ficha no tiene por qué enterarse de eso. */
+/* movil13-3 (Daniel aceptó 13/11): el rango «09:00–11:00» sólo sale si las dos son horas. `_normPDec_` pone '—' a un parte declarado a mano y salía «—–—». */
+function _pdRango_(p){
+  return /^\d/.test(p.ini||'') && /^\d/.test(p.fin||'') ? ' · '+esc(p.ini)+'–'+esc(p.fin) : '';
+}
 function _pdFichaHTML_(p){
   return '<div class="pdi" data-pd="'+p.id+'">'+
         '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
-          '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(p.ini)+'–'+esc(p.fin)+'</small></div>'+
+          '<small>'+esc(p.unidad)+' · '+esc(p.f)+_pdRango_(p)+'</small></div>'+
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
         '<div class="pdt">'+_icoBloque_(p)+esc(p.t)+'</div>'+
         /* ⛔⛔ `p.t`, NO `p.tarea`: `_normPDec_` RENOMBRA el campo al normalizar, y una
@@ -1981,7 +1985,9 @@ function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
       orden.map(function(a){
         var ps=por[a], h=0; ps.forEach(function(x){ h+=x.q; });
         var k=id+'|'+a;
-        return '<details class="pdpers" data-pdk="'+esc(k)+'"'+((unico||PD_ABIERTO_[k])?' open':'')+'>'+
+        /* movil13-3: con UNA persona no hay cabecera (repetía el nombre y las horas de la ficha); el grupo de arriba sigue plegándose. */
+        if(unico) return ps.map(ficha).join('');
+        return '<details class="pdpers" data-pdk="'+esc(k)+'"'+(PD_ABIERTO_[k]?' open':'')+'>'+
           '<summary><b>'+esc(ps[0].pila)+'</b>'+
             '<span class="pdnum">'+ps.length+' · '+nf2(h)+' h</span></summary>'+
           ps.map(ficha).join('')+
