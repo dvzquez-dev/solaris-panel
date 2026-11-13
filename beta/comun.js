@@ -918,6 +918,21 @@ function _hMesDevCara_(m){
   var d = (typeof _fraccionDelMes_==='function') ? _devengadoAHoy_(m, m.hMes, _fraccionDelMes_()) : null;
   return (d == null) ? m.hMes : d;
 }
+/* 13/11 (horasprorrata) · LA BASE DEL CARGO QUE LLEVAS A HOY, para ENSEÑARLA en el desglose del mes abierto.
+   🗣️ Daniel: *«aparece prorrateada tu suma de horas de mes […] pero en noviembre de 2026, abajo, en el desglose, me marca que ya
+   tengo las 7 horas de mi cargo. Entonces me pone 54,25 horas, cuando a día de hoy solo he farmeado un poco menos de la mitad»*.
+   La cifra de arriba (`_hMesDevengado_`) devenga la base en rampa y el desglose la sumaba ENTERA: dos cifras del mismo mes. Es la
+   MISMA rampa (`_fraccionDelMes_`, tope 1), vista como la parte de la base: base × fracción. Sin el dato vivo del mes
+   (`_hMesReal_` null) el total del desglose es la suma cruda y la base va entera; sin fracción calculable, entera
+   (inventar un devengado es peor que enseñar el cargo). Sólo el mes ABIERTO: los cerrados llevan su base entera.
+   ⚠️ No toca la cuota ni lo que se cierra a fin de mes: es lo que se MUESTRA. */
+function _compBaseAHoy_(m){
+  var b=_compBase_(m);
+  if(_hMesReal_(m)==null) return b;
+  var f=_fraccionDelMes_();
+  if(typeof f!=='number' || !isFinite(f) || f<0) return b;
+  return Math.round(b*Math.min(1,f)*100)/100;
+}
 function _hMesReal_(m){
   m = m || {};
   /* Las horas de ESTE MES, o `null` si no han llegado. `horasMes` es el campo que el

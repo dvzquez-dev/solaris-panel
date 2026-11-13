@@ -1480,11 +1480,11 @@ function _histHorasHTMLE_(mi){
   var hm=_hMesReal_(mi), chips='';
   g.forEach(function(m){
     var abierto=(per && m.k===per), k=m.k||'sin';
-    var h=abierto ? (hm!=null ? hm : m.h+_compMensual_(mi)) : m.h;
+    var h=abierto ? (hm!=null ? _hMesDevengado_(mi) : m.h+_compMensual_(mi)) : m.h;   /* 13/11 (horasprorrata): devengada, como la cifra de arriba */
     chips+='<button type="button" class="mmesE" data-meses="'+k+'"><b>'+(m.k ? esc(_nomPeriodo_(m.k)) : 'Sin fecha')+'</b>'+
       (m.k ? (function(e){ return '<span class="chip'+(e.cls?' '+e.cls:'')+'">'+e.txt+'</span>'; })(_estadoMes_(m.k, per)) : '')+
       '<span class="ln"></span><span class="mono">'+nf2(h)+' h</span></button>';
-    var base=abierto ? [{tarea:'Compensación por tu cargo', fecha:'', horas:_compBase_(mi), cat:null}] : [];
+    var base=abierto ? [{tarea:'Compensación por tu cargo', fecha:'', horas:_compBaseAHoy_(mi), cat:null}] : [];
     var extra=(abierto && _compExtra_(mi, m.items)) ? [{tarea:'Compensación extra', fecha:'', horas:_compExtra_(mi, m.items)}] : [];
     chips+='<div class="ltmesdet" data-mesdet="'+k+'" hidden>'+_filasMesE_(base.concat(extra, m.items))+
       _desgloseCatHTMLE_(m.items)+'</div>';   /* el desglose, JUSTO debajo de SU tarjeta */

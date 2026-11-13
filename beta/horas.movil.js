@@ -1461,7 +1461,7 @@ function _movHorasHTML_(confs, pends){
          fichas, te la dan- y la que hace que la cuenta cuadre con el Panel de Rendimientos. */
       '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
         '<small>'+esc(_cet)+'</small></div>'+
-        '<div class="d"><b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>'+
+        '<div class="d"><b class="mono">'+nf2(_compBaseAHoy_(YO))+' h</b></div></div>'+   /* 13/11: devengada, como la cifra del mes */
       /* 01/11: SIN «Otras contribuciones» aparte; el mismo desglose por categorías que «Ver el desglose completo». */
       desgloseCat(_fijasDesglose_(r.todos).concat(r.todos))+
       '<p class="rnota" style="margin:8px 0 10px">'+
@@ -1523,7 +1523,7 @@ function _mesesHorasHTML_(confs){
   var _hm=_hMesReal_(YO);
   return '<div class="plg" style="margin-top:9px"><div class="mmeses">'+g.map(function(m){
     var abierto=(per && m.k===per);
-    var h=abierto ? (_hm!=null ? _hm : m.h+_compMensual_(YO)) : m.h;
+    var h=abierto ? (_hm!=null ? _hMesDevengado_(YO) : m.h+_compMensual_(YO)) : m.h;   /* 13/11: devengada */
     return '<button type="button" class="mmes" data-p data-mesdesg="'+(m.k||'sin')+'">'+
       '<b>'+(m.k ? esc(_nomPeriodo_(m.k)) : 'Sin fecha')+'</b>'+
       (function(e){ return '<span class="sc"'+(e.cls?' style="color:var(--'+(e.cls==='ok'?'ok':'warn')+')"':'')+'>'+e.txt+'</span>'; })(_estadoMes_(m.k, per))+
@@ -1536,17 +1536,18 @@ function _mesesHorasHTML_(confs){
    01/11, Daniel: *«quitaría otras contribuciones y pondría lo mismo que sale cuando le das a ver desglose completo»*. */
 function _fijasDesglose_(items){
   var _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO, items), comp=_compMensual_(YO), cargo=(YO&&YO.cargo)||'miembro';
+  /* 13/11 (horasprorrata): la base del mes ABIERTO va devengada, como la cifra de arriba (`_compBaseAHoy_`); al cierre, entera. */
+  var _bh=_compBaseAHoy_(YO), _llega=(_bh<_cb-0.005 ? ' · hoy lleva '+nf2(_bh)+' de '+nf2(_cb)+' h' : '');
   var filaBase=
     '<div class="fila borde-ot"><div class="a"><b>Compensación'+(_cr?' por tu cargo':' mensual por cargo')+'</b>'+
-      '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha · vuelve a asignarse en el '+
-      'cierre</small></div>'+
-    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_cr?_cb:comp)+' h</b></div></div>';
+      '<small>'+esc(cargo)+' · se te asigna cada mes, no se ficha'+(_llega ? '' : ' · vuelve a asignarse en el cierre')+_llega+'</small></div>'+
+    '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_bh)+' h</b></div></div>';
   var filaExtra =
     '<div class="fila borde-ot"><div class="a"><b>Asignada por el Project Director</b>'+
       '<small>'+(_cx>0?'por trabajo de más (turnos extra y demás)':'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
       'la compensación vuelve a la base</small></div>'+
     '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
-  var fijas=[{catDesglose:'cargo', q:(_cr?_cb:comp), fila:filaBase}];
+  var fijas=[{catDesglose:'cargo', q:_bh, fila:filaBase}];
   /* Sin el dato de Notion (`_compExtra_` devuelve 0) la extra no existe, en vez de ensenar un cero que no dice nada. */
   if(_cx) fijas.push({catDesglose:'otras', q:_cx, fila:filaExtra});
   return fijas;
@@ -1570,7 +1571,7 @@ function _desgloseMesHTML_(confs, clave){
      que en `vHoras`: «que cuentan» en vez de «este mes». Un numero distinto con el mismo
      rotulo es lo que hace dudar del dato en vez de usarlo. */
   var _hmD=_hMesReal_(YO), _notionD=(_hmD!=null);
-  var total=_notionD ? _hmD : (r.suma+comp);
+  var total=_notionD ? _hMesDevengado_(YO) : (r.suma+comp);   /* 13/11 (horasprorrata): la base devengada, como la cifra de arriba */
   var cargo=(YO&&YO.cargo)||'miembro', _cr=_compEsReal_(YO), _cb=_compBase_(YO), _cx=_compExtra_(YO, r.todos);
   /* 31/10 · AGRUPADO POR CATEGORÍA, CADA UNA CON SU COLOR (Daniel: *«en vez de poner compensación extra más 12,25,
      debería aparecer compensación por tu cargo y luego … todas estas contribuciones extras»*). La base y la extra no son
