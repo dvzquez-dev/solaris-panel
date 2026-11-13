@@ -21,7 +21,7 @@
      ⚠️ Si `--bg` cambia, esto cambia con él: lo vigila `probar_reunion_movil`. -->
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=97ea9f6">
+<link rel="stylesheet" href="movil.css?v=23627b8">
 </head>
 <body>
 
@@ -71,6 +71,7 @@
         <button data-mnu="salir" data-p>Cerrar sesión</button>
       </div>
     </div>
+    <div id="tirar" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><circle id="tirarAro" cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="0 56.5" transform="rotate(-90 12 12)"/></svg></div>
     <main id="main">
       <section class="vis on" id="v-estado"></section>
       <section class="vis" id="v-fichar"></section>
@@ -1445,6 +1446,77 @@ window.addEventListener('popstate',function(e){
   else if(_modalAbierto_()) _fondoDelModal_();
   else irA('estado');
 });
+/* ═══════════════════════════════════════════════════════════════════════════
+   TIRAR PARA ACTUALIZAR — el gesto es de la app, no del navegador (13/11, pullrefresh).
+   Daniel: «molaría poder desactivar esta opción y inventar una que sea la app recargando, pidiendo los datos y repintando pero sin
+   tener que recargar la página». El de Chrome está apagado en `movil.css` (`overscroll-behavior`). Este pide lo MISMO que el refresco
+   de cada 90 s (`_refrescoVivo_`) y repinta con `_repintarSuave_`: la pantalla, el scroll y lo escrito se quedan donde estaban.
+   Sólo arranca arriba del todo, con UN dedo, en vertical y sin hoja ni diálogo abiertos; si ya se está refrescando no lanza otro.
+   ═══════════════════════════════════════════════════════════════════════════ */
+var _TIRAR_={umbral:52, tope:84, t0:null, vivo:false, d:0, ocupado:false};
+function _tirarPinta_(d, listo, clase){
+  var el=document.getElementById('tirar'), m=document.getElementById('main'), aro=document.getElementById('tirarAro');
+  if(!el||!m) return;
+  el.style.top=m.offsetTop+'px';
+  el.className=clase||'';
+  if(listo) el.classList.add('listo');
+  el.style.opacity=Math.min(1, d/(_TIRAR_.umbral*0.7)).toFixed(2);
+  el.style.transform='translateY('+(d-46).toFixed(0)+'px)';
+  if(aro) aro.setAttribute('stroke-dasharray', Math.min(56.5, 56.5*d/_TIRAR_.umbral).toFixed(1)+' 56.5');
+}
+function _tirarSoltar_(){
+  var el=document.getElementById('tirar'); if(!el) return;
+  el.className='vuelve'; el.style.opacity='0'; el.style.transform='translateY(-48px)';
+  _TIRAR_.vivo=false; _TIRAR_.d=0;
+}
+async function _tirarRefrescar_(){
+  _TIRAR_.ocupado=true;   /* quien llama (`touchstart`) ya ha comprobado que no hay otro en marcha */
+  _tirarPinta_(_TIRAR_.umbral, true, 'vuelve gira');
+  var ini=Date.now(), hecho=false;
+  try{
+    if(typeof navigator!=='undefined' && navigator.onLine===false){ tost('Sin conexión: no se han podido pedir los datos'); }
+    else hecho=await _refrescoVivo_('tirar');
+  }catch(e){ /* un fallo del refresco no tumba el gesto */ }
+  var resto=500-(Date.now()-ini);   /* que el giro se vea aunque el servidor conteste al instante */
+  if(resto>0) await new Promise(function(r){ setTimeout(r, resto); });
+  _TIRAR_.ocupado=false;
+  _tirarSoltar_();
+  return hecho;
+}
+function _tirarArmar_(){
+  document.addEventListener('touchstart',function(e){
+    _TIRAR_.t0=null; _TIRAR_.vivo=false;
+    if(e.touches.length!==1 || _TIRAR_.ocupado || _REFRESCANDO_) return;
+    var m=document.getElementById('main'), t=e.target;
+    if(!m || !t || !t.closest || !m.contains(t)) return;
+    /* una hoja o un diálogo abiertos cubren la pantalla: su toque no cae en `main`, y el `contains` de arriba ya lo deja fuera */
+    if(t.closest('input,textarea,select,.rej,.rejw')) return;   /* escribir, pintar y desplazar de lado no son tirar */
+    _TIRAR_.t0={x:e.touches[0].clientX, y:e.touches[0].clientY};
+  },{passive:true});
+  document.addEventListener('touchmove',function(e){
+    var t0=_TIRAR_.t0; if(!t0) return;
+    var dy=e.touches[0].clientY-t0.y, dx=e.touches[0].clientX-t0.x;
+    var m=document.getElementById('main');
+    if(!_TIRAR_.vivo){   /* sin `scrollTop` en el arranque: se mira en cada paso, y así un gesto que EMPIEZA desplazado nunca vale aunque llegue a 0 */
+      if(dy<-6 || (Math.abs(dx)>6 && Math.abs(dx)>dy) || (m && m.scrollTop>0)){ _TIRAR_.t0=null; return; }
+      if(dy<8) return;
+      _TIRAR_.vivo=true;
+    }
+    if(e.cancelable) e.preventDefault();
+    var d=Math.min(_TIRAR_.tope, dy*0.6);   /* resistencia: el dedo corre más que el indicador */
+    _TIRAR_.d=d;
+    _tirarPinta_(d, d>=_TIRAR_.umbral);
+  },{passive:false});
+  var fin=function(){
+    var vivo=_TIRAR_.vivo, d=_TIRAR_.d;
+    _TIRAR_.t0=null;
+    if(!vivo) return;
+    if(d>=_TIRAR_.umbral) _tirarRefrescar_(); else _tirarSoltar_();
+  };
+  document.addEventListener('touchend',fin);
+  document.addEventListener('touchcancel',function(){ if(_TIRAR_.vivo) _tirarSoltar_(); _TIRAR_.t0=null; });
+}
+_tirarArmar_();
 document.addEventListener('click',function(e){
   if(!e.target||!e.target.closest) return;
   if(e.target.id==='modal') _fondoDelModal_();
@@ -1771,7 +1843,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='9eea2c4';
+var BUILD='43223ee';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
