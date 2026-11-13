@@ -113,16 +113,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=f21cc6b"></script>
+<script src="comun.js?v=1aefe69"></script>
 <script src="notis.movil.js?v=bf30cae"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=fedfca9"></script>
 <script src="turnos.movil.js?v=c9a23f5"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=6b9a5cc"></script>
-<script src="sanciones.movil.js?v=ac50e23"></script>
+<script src="sanciones.movil.js?v=7f75222"></script>
 <script src="reuniones.movil.js?v=f857881"></script>
-<script src="horas.movil.js?v=1b4ead9"></script>
+<script src="horas.movil.js?v=c51d623"></script>
 <script src="equipo.movil.js?v=d4e7001"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -1771,7 +1771,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='8986018';
+var BUILD='7228038';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2057,8 +2057,11 @@ function _pintar_(silencioso){
      Daniel: *«si no cambia nada no se repinta»*. */
   var cambio=false;
   if(f&&el){
+    /* 13/11 (transiciones): si la vista YA estaba en pantalla y con contenido, esto es un dato que se MUEVE, no una pantalla
+       que entra: sin el fundido de `.entra` (que es lo que se ve como «se repinta entera»). */
+    var _estaba=el.classList.contains('on') && !!el.innerHTML;
     cambio=_pintarSiCambia_(el, ST.vista, f());
-    if(cambio && !silencioso){ el.classList.add('entra'); setTimeout(function(){el.classList.remove('entra');},360); }
+    if(cambio && !silencioso && !_estaba){ el.classList.add('entra'); setTimeout(function(){el.classList.remove('entra');},360); }
   }
   $$('.vis').forEach(function(s){s.classList.toggle('on', s.id==='v-'+ST.vista);});
   pintarNav();

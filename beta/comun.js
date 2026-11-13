@@ -552,8 +552,119 @@ function _pintarSiCambia_(el, clave, html){
      y ya no decide nada: con un nodo por vista, recordar por nodo ES recordar por vista. */
   if (el._pintado === html && el.innerHTML) return false;
   el._pintado = html;
+  /* ⛔ 13/11 (transiciones): *«cada vez que cambia el número […] se reflushea entera la página y empiezan las barras a
+     cero»* (Daniel). Reemplazar el `innerHTML` es inevitable (los manejadores se cablean sobre nodos nuevos), pero lo que
+     el ojo ve NO tiene que ser un nodo nuevo: antes de tirar el DOM se hace una FOTO de lo que importa (estilos en línea,
+     números, `<details>` abiertos, scroll interior) y tras escribir el nuevo se REPONE el estado viejo y se pasa al nuevo
+     DESPUÉS de un reflow, así que el CSS (`transition`) mueve la barra desde donde estaba y `_contarHasta_` cuenta el
+     número. Sólo si es la MISMA vista que la última pintada en este nodo (el escritorio reutiliza `#main`). */
+  var foto = (el._pintadoClave === clave && el.innerHTML) ? _vivoFoto_(el) : null;
+  var ae = document.activeElement, foco = null;
+  if (ae && ae.id && el.contains && el.contains(ae))
+    foco = { id: ae.id, a: ae.selectionStart, b: ae.selectionEnd };
+  el._pintadoClave = clave;
   el.innerHTML = html;
+  if (foto) _vivoReponer_(el, foto);
+  if (foco) {                                  // el foco sobrevive al repintado (teclado del móvil abierto, etc.)
+    var f = document.getElementById(foco.id);
+    if (f && f !== document.activeElement && f.focus) {
+      try { f.focus({ preventScroll: true }); if (foco.a != null && f.setSelectionRange) f.setSelectionRange(foco.a, foco.b); } catch (_) {}
+    }
+  }
   return true;
+}
+
+/* Recorre los descendientes ELEMENTO de `raiz` con su «camino» (`/DIV1/SPAN2`: etiqueta + posición entre hermanas de la
+   misma etiqueta). El camino es la identidad con la que se empareja el nodo viejo con el nuevo: no hay claves en el HTML. */
+function _vivoRecorrer_(raiz, fn){
+  (function ir(n, ruta){
+    var cont = {};
+    for (var c = n.firstElementChild; c; c = c.nextElementSibling) {
+      var t = c.tagName; cont[t] = (cont[t] || 0) + 1;
+      var r = ruta + '/' + t + cont[t];
+      fn(c, r);
+      ir(c, r);
+    }
+  })(raiz, '');
+}
+
+/* La FOTO de antes de repintar: por camino, el estilo en línea, la clase, el texto (si es hoja), `open` y el scroll. */
+function _vivoFoto_(raiz){
+  var m = {};
+  _vivoRecorrer_(raiz, function(c, r){
+    m[r] = { t: c.tagName, s: c.getAttribute('style'), k: c.getAttribute('class'),
+             x: c.firstElementChild ? null : c.textContent,
+             o: c.tagName === 'DETAILS' ? c.open : null, sy: c.scrollTop, sx: c.scrollLeft };
+  });
+  return m;
+}
+
+/* Nodos cuyo estilo en línea lo escribe el JS DESPUÉS de pintar (barras, medidor): si el HTML nuevo no lo trae, se queda
+   el viejo — el animador pondrá el nuevo y el CSS lo transicionará desde donde estaba, no desde 0. */
+function _vivoJsSel_(){ return '.barh i,.barh .mk,.barhet span,.dlt .f,.dlt .m,#medTip,.med .seg,.med .tk'; }
+
+/* REPONE el estado viejo sobre el DOM recién escrito y pasa al nuevo tras UN reflow: las transiciones CSS hacen el resto. */
+function _vivoReponer_(raiz, foto){
+  var cola = [], cuentas = [], scrolls = [];
+  _vivoRecorrer_(raiz, function(c, r){
+    var v = foto[r];
+    if (!v || v.t !== c.tagName) return;
+    var s = c.getAttribute('style');
+    if (v.s !== s && v.s != null) {
+      var js = c.matches && c.matches(_vivoJsSel_());
+      if (s != null) { c.setAttribute('style', v.s); cola.push([c, 'style', s]); }
+      else if (js) c.setAttribute('style', v.s);
+    }
+    var k = c.getAttribute('class');
+    if (v.k !== k && v.k != null && c.matches && c.matches('.med .seg')) { c.setAttribute('class', v.k); cola.push([c, 'class', k]); }
+    if (c.id === 'med' && /(^|\s)arm(\s|$)/.test(v.k || '')) c.classList.add('arm');   // el medidor ya estaba armado: no se rebobina
+    if (v.o != null) c.open = v.o;
+    if (v.x != null && !c.firstElementChild && v.x !== c.textContent) {
+      if (c.id === 'medN') c.textContent = v.x;                       // lo cuenta `armarMedidor`
+      else if (!/^(SCRIPT|STYLE|TEXTAREA|OPTION|TITLE)$/.test(c.tagName)) { cuentas.push([c, c.textContent]); c.textContent = v.x; }
+    }
+    if (v.sy || v.sx) scrolls.push([c, v.sy, v.sx]);
+  });
+  void raiz.offsetWidth;                                              // el reflow que CONFIRMA el estado viejo
+  cola.forEach(function(q){ if (q[2] == null) q[0].removeAttribute(q[1]); else q[0].setAttribute(q[1], q[2]); });
+  cuentas.forEach(function(q){ _contarHasta_(q[0], q[1]); });
+  scrolls.forEach(function(q){ q[0].scrollTop = q[1]; q[0].scrollLeft = q[2]; });
+}
+
+/* «3,5 h» → [todo, prefijo, número, sufijo]; sólo si el texto lleva EXACTAMENTE un número (una hora «10:30» o una fecha no
+   se cuentan) y no es un millar con punto (`1.234`, ambiguo). */
+function _numTok_(t){
+  var m = /^(\D*?)(\d+(?:[.,]\d+)?)(\D*)$/.exec(String(t == null ? '' : t));
+  return (m && !/\.\d{3}$/.test(m[2])) ? m : null;
+}
+
+/* Cambia el texto de `el` al `nuevo`: si los dos son «lo mismo con otro número», el número CUENTA del viejo al nuevo
+   (650 ms, frena al llegar); si no, lo pone y ya. Termina SIEMPRE en el texto exacto (hay un temporizador de respaldo:
+   `requestAnimationFrame` no corre en una pestaña de fondo). Respeta `prefers-reduced-motion` y `data-num="no"`. */
+function _contarHasta_(el, nuevo){
+  var a = _numTok_(el.textContent), b = _numTok_(nuevo);
+  el._cuenta = null;                                                  // una cuenta nueva cancela la anterior
+  if (!a || !b || a[1] !== b[1] || a[3] !== b[3] || a[2] === b[2] || redu() ||
+      typeof requestAnimationFrame !== 'function' || (el.closest && el.closest('[data-num="no"]'))) {
+    el.textContent = nuevo; return;
+  }
+  var va = parseFloat(a[2].replace(',', '.')), vb = parseFloat(b[2].replace(',', '.'));
+  var dec = Math.max((a[2].split(/[.,]/)[1] || '').length, (b[2].split(/[.,]/)[1] || '').length);
+  var coma = a[2].indexOf(',') >= 0 || b[2].indexOf(',') >= 0;
+  var t0 = null, dur = 650, id = {};
+  el._cuenta = id;
+  function paso(now){
+    if (el._cuenta !== id) return;
+    if (t0 == null) t0 = now;
+    var f = Math.min(1, (now - t0) / dur);
+    if (f >= 1) { el.textContent = nuevo; el._cuenta = null; return; }
+    f = 1 - Math.pow(1 - f, 3);
+    var x = (va + (vb - va) * f).toFixed(dec);
+    el.textContent = b[1] + (coma ? x.replace('.', ',') : x) + b[3];
+    requestAnimationFrame(paso);
+  }
+  requestAnimationFrame(paso);
+  setTimeout(function(){ if (el._cuenta === id) { el._cuenta = null; el.textContent = nuevo; } }, dur + 250);
 }
 
 

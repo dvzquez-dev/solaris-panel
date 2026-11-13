@@ -690,7 +690,8 @@ function animarDeltas(root, silencioso){
        que ya seguían `armarMedidor` y `animarBarras` y que esta se saltaba. Pasar por
        cero es justo lo que se ve como un parpadeo. */
     if(silencioso){ fin(); return; }
-    f.style.width='0'; f.style.left='50%'; m.style.left='50%';
+    /* 13/11: si el repintado ya trajo el ancho de ANTES (`_vivoReponer_`), se mueve desde ahí; a cero sólo la primera vez. */
+    if(f.style.width===''){ f.style.width='0'; f.style.left='50%'; m.style.left='50%'; }
     setTimeout(fin, redu()?0:80);
   });
 }

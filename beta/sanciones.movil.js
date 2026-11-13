@@ -613,6 +613,15 @@ function armarMedidor(silencioso, forzar){
      animacion que no informa de nada. */
   var _pv=_medPrev_();
   _medGuardar_(p);
+  /* 13/11 (transiciones): si el repintado conservó el medidor YA ARMADO (`_vivoReponer_` le devolvió `arm`, los tramos y el
+     puntero de antes), no hay nada que rebobinar: el CSS ya mueve el anillo y el puntero hacia los puntos nuevos; sólo
+     falta CONTAR el número. Con `forzar` (la primera vez, un toque) sí se arma desde cero. */
+  if(!forzar && med.classList.contains('arm')){
+    medTimers.forEach(clearTimeout); medTimers=[];
+    if(tip) tip.style.transform='rotate('+giro+'deg)';
+    if(num) _contarHasta_(num, String(p));
+    return;
+  }
   if(!forzar && _pv===p) silencioso=true;
 
   /* CALLADO = APARECER LLENO, sin pasar por vacio.
