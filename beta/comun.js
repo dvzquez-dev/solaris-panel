@@ -4712,7 +4712,8 @@ function _arrancarVivo_(refrescar){
     try{
       var r=await _pide_('queHayNuevo');
       if(!r || !r.sellos) return;
-      if(typeof _avisoDesfase_==='function') _avisoDesfase_(true);   /* refutar37: el servidor contesta → lo que se ve ya no es «de hace un rato» (si cambió algo, `refrescar` lo trae ahora) */
+      var _desf=(typeof _avisoDesfase_==='function') ? _avisoDesfase_ : null;   /* sólo el móvil la declara (movil.html): el escritorio no tiene aviso de desfase — por referencia, como `_asegurarPush_` (rojosbateria2) */
+      if(_desf) _desf(true);   /* refutar37: el servidor contesta → lo que se ve ya no es «de hace un rato» (si cambió algo, `refrescar` lo trae ahora) */
       if(!sellos){ sellos=r.sellos; return; }                 // la primera vuelta sólo toma la foto
       var c=_vivoCambios_(sellos, r.sellos);
       if(!c.length) return;
@@ -8290,8 +8291,12 @@ async function _pushInit_(){
            gate lo deja pasar (no falta permiso). Sólo se decía en Ajustes, donde no mira nadie el primer día. Con el permiso YA dado y con sesión,
            `subscribe()` no pide nada: se intenta aquí, por la misma puerta única. Si el navegador no la deja (iOS pide un gesto), queda el aviso. */
         var _ya=false;
-        if(typeof SESION!=='undefined' && SESION && typeof _asegurarPush_==='function'){
-          try{ _ya=await _asegurarPush_(null); }catch(_){ _ya=false; }
+        /* 13/11 (rojosbateria2): `_asegurarPush_` vive SÓLO en `notis.movil.js`; el escritorio no la declara y aquí se llamaba por su nombre
+           (`probar_bundle_caras`: «llama a una función de OTRO bundle»). Se toma por `typeof` y se llama por la variable: en el móvil igual;
+           en el escritorio sigue sin intentarse (queda el aviso de abajo) — su `activarNotis` es quien suscribe allí. */
+        var _asegurar=(typeof _asegurarPush_==='function') ? _asegurarPush_ : null;
+        if(typeof SESION!=='undefined' && SESION && _asegurar){
+          try{ _ya=await _asegurar(null); }catch(_){ _ya=false; }
         }
         _pushFallo_(_ya ? null : 'el permiso est\u00e1 dado pero no hay suscripci\u00f3n: no te '+
           'llegar\u00eda ning\u00fan aviso. Vuelve a entrar para reactivarlos.');
@@ -15031,12 +15036,6 @@ function _darHorasAbrir_(pre){
       horas:pre.horas||'', motivo:pre.motivo||'', clave:_claveUso_(),
       cat:pre.cat||'compensacion', subcat:pre.subcat||'', conHor:!!pre.conHor, fecha:pre.fecha||_hoyNxISO_(), ini:pre.ini||'16:00', fin:pre.fin||'18:00'};
   return DH;
-}
-function _darHorasTarjetaHTML_(){
-  if(!_otorgablesDe_(_actorHoras_()).length) return '';
-  return '<div class="tarj">'+cab('Dar horas','a tu gente')+
-    '<p class="rnota" style="margin:0 0 10px">Para una feria, un traslado, un turno sin fichar…: cuentan al momento, sin que nadie las firme.</p>'+
-    '<button class="btn pri full" data-p data-darhoras>Dar horas</button></div>';
 }
 /* Las horas de cada uno: las que escribe; en blanco y con horario, lo que dura el tramo (el servidor lo calcula igual). */
 function _darHorasHoras_(){

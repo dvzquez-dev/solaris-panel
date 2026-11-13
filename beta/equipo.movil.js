@@ -13,6 +13,13 @@
 
 /* Habia dos en este mismo fichero (`_pilaDeM_` y `pilaDe`) con distinto fallback. Queda
    esta, con el bueno: si el nombre no esta en el roster, el nombre de pila. */
+/* 13/11 (rojosbateria2, `probar_libres_js`): la tarjeta «Dar horas» vivía en comun.js pero usa `cab`, que es del móvil, y la llama sólo el Estado del móvil: aquí, donde se llama. Su lógica (`_darHorasAbrir_`...) sigue en comun.js. */
+function _darHorasTarjetaHTML_(){
+  if(!_otorgablesDe_(_actorHoras_()).length) return '';
+  return '<div class="tarj">'+cab('Dar horas','a tu gente')+
+    '<p class="rnota" style="margin:0 0 10px">Para una feria, un traslado, un turno sin fichar…: cuentan al momento, sin que nadie las firme.</p>'+
+    '<button class="btn pri full" data-p data-darhoras>Dar horas</button></div>';
+}
 function _pilaDeM_(n){
   var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
   return m ? nombreCorto(n) : String(n||'').split(' ')[0];       /* refutar39: con dos «Pablo», «Pablo F.» y «Pablo M.» */
