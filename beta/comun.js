@@ -3301,6 +3301,28 @@ function _borrLeer_(f){
   }catch(_){ return ''; }
 }
 function _borrBorrar_(f){ try{ localStorage.removeItem(_borrClave_(f)); }catch(_){} }
+/* ⛔ refutar47 (14/11): LA DISPONIBILIDAD PINTADA EN UNA REUNIÓN SE PERDÍA CON LA APP. La rejilla vive en memoria (`ST.sel`) hasta pulsar «Guardar disponibilidad»; con
+   el sistema matando la app (una llamada, la cámara, copiar algo en otra app) quien volvía se encontraba la rejilla en blanco, sin una palabra — y lo que no se contesta
+   a tiempo es lo que acaba en «te falta cubrir» y en una propuesta de puntos. Ahora cada toque deja en `localStorage` lo pintado (`s`) junto con lo que el servidor tenía
+   entonces (`b`): al volver se recupera SÓLO si el servidor sigue como estaba (si contestaste desde el ordenador mientras tanto, manda lo guardado). Sale en cuanto se
+   guarda bien o cuando lo pintado vuelve a ser lo guardado. Las listas van ordenadas [clave, valor]. */
+function _dispBorrLista_(m){ var a=[]; m.forEach(function(v,k){ if(v) a.push([k,v]); }); return a.sort(function(x,y){ return x[0]<y[0]?-1:x[0]>y[0]?1:0; }); }
+function _dispBorrClave_(id){ return 'disp-reu-'+id; }
+function _dispBorrGuardar_(id, sel, base){
+  var s=_dispBorrLista_(sel), b=_dispBorrLista_(base);
+  if(JSON.stringify(s)===JSON.stringify(b)) _borrBorrar_(_dispBorrClave_(id));
+  else _borrGuardar_(_dispBorrClave_(id), 'disp:'+JSON.stringify({s:s, b:b}));
+}
+/* Lo pintado y sin guardar que dejó una app muerta, como `Map` (o `null` si no hay, no es de esta base o no queda nada ofertado). `ofer` = {clave:1} de lo que se puede pintar. */
+function _dispBorrLeer_(id, base, ofer){
+  try{
+    var t=_borrLeer_(_dispBorrClave_(id)); if(t.indexOf('disp:')!==0) return null;
+    var o=JSON.parse(t.slice(5));
+    if(!o || JSON.stringify(o.b)!==JSON.stringify(_dispBorrLista_(base)) || !Array.isArray(o.s)) return null;
+    var m=new Map(); o.s.forEach(function(p){ if(ofer[p[0]] && (p[1]===1 || p[1]===2)) m.set(p[0], p[1]); });
+    return m;
+  }catch(_){ return null; }
+}
 /* ⛔ refutar37 (13/11, el taller): el borrador de un bloque DECLARADO no es sólo el texto. Con la app muerta por el sistema (segundo plano, sin red), al
    reabrir volvía la justificación pero con la fecha de HOY, las horas por defecto (17:00-20:30) y sin la imputación: un texto de un bloque pegado a las
    horas de otro, y nadie lo avisa. Y la `clave` de envío vivía sólo en memoria: si el servidor GUARDÓ y la respuesta se perdió, reabrir y reenviar mandaba
@@ -16100,6 +16122,19 @@ function _mtSet_(m, ruta, v){
   var u = p[p.length - 1];
   o[u] = v;
 }
+/* ⛔ refutar47 (14/11): LO ÚLTIMO QUE SE ESCRIBÍA EN LA MEMORIA SE PERDÍA CON LA APP. El borrador va al servidor 1,5 s DESPUÉS de dejar de teclear; si el sistema mata la app
+   en ese hueco (una llamada, la cámara para la foto del turno), el párrafo en curso no existía en ningún sitio y al volver la ficha decía «Borrador guardado» sin una
+   palabra. Ahora cada cambio deja en `localStorage` la memoria entera junto con la `rev` del servidor sobre la que se escribió; al abrir el editor se recupera SÓLO si el
+   servidor sigue en esa `rev` (si se siguió desde el ordenador, manda lo guardado). Sale en cuanto el servidor lo tiene, o al enviar. */
+function _mtRespaldo_(k){ return 'memoria-turno-' + k; }
+function _mtRespaldar_(k){ var ed = MT_.ed[k]; if(ed) _borrGuardar_(_mtRespaldo_(k), 'mt:' + JSON.stringify({rev: ed.rev, m: ed.m})); }
+function _mtRespaldoLeer_(k, rev){
+  try{
+    var tx = _borrLeer_(_mtRespaldo_(k)); if(tx.indexOf('mt:') !== 0) return null;
+    var o = JSON.parse(tx.slice(3));
+    return (o && o.rev === rev && o.m && typeof o.m === 'object') ? o.m : null;
+  }catch(_){ return null; }
+}
 function _mtGuardarDif_(t, k){
   var ed = MT_.ed[k]; if(!ed) return Promise.resolve();
   clearTimeout(ed.reloj); ed.reloj = null;
@@ -16107,6 +16142,7 @@ function _mtGuardarDif_(t, k){
   ed.guardando = _ftDeserv_('guardarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev}).then(function(o){
     ed.rev = o.rev; ed.sucio = false; ed.error = ''; ed.guardando = null; ed.faltas = o.faltas || []; ed.avisos = o.avisos || [];
     _mtRevisionPintar_(k);
+    if(!ed.sucio2) _borrBorrar_(_mtRespaldo_(k));      /* refutar47: el servidor ya lo tiene (con `sucio2`, hay algo más reciente que aún no) */
     if(MT_.est[k] && MT_.est[k].r){ MT_.est[k].r.rev = o.rev; MT_.est[k].r.guardada = true; }
     var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtestado]'); if(el) el.textContent = _mtEstadoTxt_(ed);
     if(ed.sucio2){ ed.sucio2 = false; ed.sucio = true; return _mtGuardarDif_(t, k); }
@@ -16118,7 +16154,7 @@ function _mtGuardarDif_(t, k){
 function _mtProgramar_(t, k){
   var ed = MT_.ed[k]; if(!ed) return;
   if(ed.guardando) ed.sucio2 = true;
-  ed.sucio = true; clearTimeout(ed.reloj);
+  ed.sucio = true; clearTimeout(ed.reloj); _mtRespaldar_(k);
   ed.reloj = setTimeout(function(){ _mtGuardarDif_(t, k).catch(function(){}); }, 1500);
   var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtestado]'); if(el) el.textContent = _mtEstadoTxt_(ed);
 }
@@ -16131,7 +16167,7 @@ async function _mtEnviar_(t, k){
   ed.enviando = true; ed.error = ''; _mtPintar_(k);
   try{
     await _ftDeserv_('enviarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev});
-    tost('Memoria enviada a revisión.');
+    tost('Memoria enviada a revisión.'); _borrBorrar_(_mtRespaldo_(k));
   }catch(e){
     /* `api._post` reintenta: si se perdió la RESPUESTA, el servidor ya la tiene enviada y el segundo intento dice «ya está enviada». */
     var r = await _mtRefrescar_(t, true).catch(function(){ return null; });
@@ -16143,7 +16179,13 @@ async function _mtEnviar_(t, k){
 async function _mtAbrir_(t, k){
   var r = await _mtRefrescar_(t, true); if(!r || !r.puede) return;
   MT_.ed[k] = {m: JSON.parse(JSON.stringify(r.memoria)), rev: r.rev, sucio: false, nuevo: '', error: '', faltas: r.faltas || [], avisos: r.avisos || [], pool: [], galeria: -1, persona: -1, diaAbierto: -1, movAct: -1, foco: 'de', verFaltas: false};
-  MT_.abierto[k] = true; _mtPintar_(k);
+  MT_.abierto[k] = true;
+  var rs = _mtRespaldoLeer_(k, r.rev);
+  if(rs && JSON.stringify(rs) !== JSON.stringify(r.memoria)){
+    MT_.ed[k].m = rs; _mtProgramar_(t, k);        /* lo que había escrito y no llegó a guardarse: vuelve, y se guarda ya */
+    tost('Recuperé lo último que escribías antes de que se cerrara la app.');
+  }else _borrBorrar_(_mtRespaldo_(k));
+  _mtPintar_(k);
   /* las fotos del turno para ponerlas en la memoria (sólo si el servidor deja verlas); sin ellas la memoria se escribe igual */
   _ftDeserv_('listarFotosTurno', t).then(function(f){
     if(MT_.ed[k] && f && f.puedeVer){ MT_.ed[k].pool = f.fotos || []; _mtPintar_(k); }
