@@ -289,8 +289,15 @@ function _docsEnCursoM_(){
    así que un revisor que rechazaba (o publicaba) un expediente lo perdía de TODA la pantalla, con su «Deshacer»
    dentro de la ficha. Lo tuyo no hace falta aquí: «Mis documentos» ya lo lista sea cual sea su estado.
    ✅ Por `_docResuelto_` (comun.js), la misma puerta que usa el escritorio en «Resueltos»; sin lista propia. */
+/* ⛔ refutar35 (13/11): Y LO QUE DECIDISTE Y TODAVÍA NO SE HA PUBLICADO (`aprobado`, `anot`, `cambios`), para quien NO ve «En curso» (una coordinadora).
+   Sólo `publicado`/`rechazado` salían aquí: al cerrar la ficha de un expediente recién aprobado, Cris no lo tenía en NINGUNA lista —ni pendiente,
+   ni en curso, ni historial— y el «Deshacer» del error de dedo (que existe justo para eso) se perdia en cuanto cerraba la ficha, durante los minutos
+   hasta que se publica (y hoy `aprobado` puede quedarse, ver `project_documentos_sin_publicador`). El PD y José ya los tienen en «En curso». */
 function _docsResueltosM_(){
-  return (ENT_REV||[]).filter(function(e){ return _docResuelto_(e.estado); });
+  var enCurso=_veEnCurso_();
+  return (ENT_REV||[]).filter(function(e){
+    return _docResuelto_(e.estado) || (!enCurso && (e.estado==='aprobado' || e.estado==='anot' || e.estado==='cambios'));
+  });
 }
 /* Plegado de serie: lo pendiente sigue arriba, sin mezclarse con lo cerrado. Un toque lo abre. */
 var DOC_HIST_ABIERTO=false;
@@ -331,7 +338,9 @@ function vDocs(){
   h+='<h2 class="sec">Mis documentos<span class="ln"></span>'+mios.length+'</h2>'+
      '<div class="tarj">'+
      (mios.length
-       ? mios.map(function(e){return filaDoc(e,true);}).join('')
+       /* 14/11 (refutar46): «tu documento tiene cambios» llega aquí, y lo que pide algo de ti va PRIMERO (el orden sigue siendo el de llegada
+          dentro de cada grupo: `sort` es estable). */
+       ? mios.slice().sort(function(a,b){ return (b.estado==='cambios')-(a.estado==='cambios'); }).map(function(e){return filaDoc(e,true);}).join('')
        : vacioMini('Todavía no has enviado ninguno. Los que envíes aparecerán aquí con su estado.'))+
      '</div>';
   var hist=_docsResueltosM_();
@@ -340,7 +349,7 @@ function vDocs(){
        '<div class="tarj">'+
        (DOC_HIST_ABIERTO
          ? hist.map(function(e){return filaDoc(e,false);}).join('')
-         : '<p class="rnota" style="margin:0 0 10px">Rechazados y publicados. Abre uno para verlo o deshacer la decisión.</p>')+
+         : '<p class="rnota" style="margin:0 0 10px">Lo que ya está decidido, por ti o por alguien de más rango. Abre uno para verlo o, si lo decidiste tú, deshacerlo.</p>')+
        '<button class="btn full" data-p data-dochist>'+(DOC_HIST_ABIERTO?'Ocultar historial':'Ver historial ('+hist.length+')')+'</button>'+
        '</div>';
   }

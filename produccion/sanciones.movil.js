@@ -515,9 +515,10 @@ function _misSancHTML_(){
   if(!L.length && !nota) return '';
   return '<div class="msanc"><div class="sc" style="margin:14px 0 2px">Tus sanciones</div>'+L.map(function(s){
     /* 12/11 (refutar27): «−1 punto» / «+1 punto», como el escritorio (`_etPtsSanc_`): antes «−1» a secas y «1» (sin signo) para uno que suma. */
+    /* 14/11 (refutar45): la fecha es el día de MADRID del sello (`_diaMadridDe_`), como el desglose de arriba: el recorte UTC daba el día anterior a lo puesto pasada la medianoche y las dos listas de la misma pantalla no coincidían. */
     var est=_sancEstadoM_(s), p=_etPtsSanc_((s.puntos === null || s.puntos === undefined) ? null : Number(s.puntos));
     return '<div class="fila" data-msfila="'+esc(s.id)+'"><div class="a"><b>'+esc(s.motivo || 'Sanción')+'</b>'+
-      '<small>'+esc(p)+' · '+esc(_isoADMY_(String(s.fecha || '').slice(0, 10)) || '')+'</small>'+
+      '<small>'+esc(p)+' · '+esc(_diaMadridDe_(s.fecha) || '')+'</small>'+
       (est ? '<small class="msest" style="color:'+est[1]+'">'+esc(est[0])+'</small>' : '')+
       (s.apelable ? '<small>Puedes apelar hasta el '+esc(_isoADMY_(s.apelable_hasta) || '')+'</small>'+
         '<button class="btn mini" style="margin-top:7px;align-self:flex-start" data-msapelar="'+esc(s.id)+'">Apelar</button>' : '')+

@@ -166,7 +166,7 @@ function _reunionesCargando_(){ return !!(typeof backendOK!=='undefined' && back
 
 
 function _normReuM_(r){
-  var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], resp=r.resp||{};
+  var dias=r.dias||[], F=r.franjas||[], bl=r.bloques||[], _sb=_respDeActivos_(r.resp), resp=_sb.resp;      // refutar41: sin lo que contestó quien ya se fue
   /* null = bloque NO OFERTADO (con horario por día no todas las franjas existen todos los
      días). app.html lo resolvía con un Set `oferta`; aquí la matriz nace a null y solo los
      bloques realmente ofertados pasan a 0. Así un hueco muerto no se pinta como «nadie puede».
@@ -222,7 +222,7 @@ function _normReuM_(r){
     /* nResp = la cuenta del SERVIDOR (`_listar_`). `_nRespReu_` la necesita para no decir
        'nadie' sobre una reunion sin hidratar justo antes de BORRARLA. Lista blanca: lo que
        no se nombra aqui, se pierde (640.ª). */
-    nResp: +r.nResp || 0,
+    nResp: Math.max(0, (+r.nResp || 0) - _sb.quitadas),
     /* ¿ES TUYA? Antes solo se guardaba CUANTOS invitados hay, y sin los nombres nadie podia
        preguntarse «¿estoy yo?»: se le reclamaba cubrir a todo el equipo una reunion de un
        invitado. Y de no cubrir salen sanciones, asi que no es un aviso cosmetico.
@@ -491,13 +491,16 @@ function _listaReusM_(R){
   /* 11/11 (reumovil): las vivas se parten en las TUYAS (convocado o convocante) y «Otras que puedes ver» (las de tu nivel sin
      estar convocado): plegado por defecto, como «Pasadas». Las pasadas siguen todas en su cajón. */
   var mias=par.vivas.filter(function(x){ return x.invitado!==false; }), otras=par.vivas.filter(function(x){ return x.invitado===false; });
+  /* 14/11 (refutar46): quien llega desde «te han convocado» cae en la PRÓXIMA por fecha, que puede ser una que ya contestó: las filas dicen
+     cuáles te FALTAN (las mismas que cuenta el globo del nav), sin abrir cada una. */
+  var _falta=_pendientesCubrirM_();
   var fila=function(x){
           var sel=(x.id===R.id), i=REUNIONES_M.indexOf(x);
           return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
             '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
             (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+_convocadosTxt_(_nConvM_(x))+
             _duraTxtM_(x)+'</small></div>'+
-            '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':(_reuFinalizada_(x)?'<span class="pil">finalizada</span>':'<span class="chev">›</span>'))+'</div></div>'; };
+            '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':(_reuFinalizada_(x)?'<span class="pil">finalizada</span>':(_falta.indexOf(x)>=0?'<span class="pil pend">te falta</span> ':'')+'<span class="chev">›</span>'))+'</div></div>'; };
   var abierto=par.archivo.indexOf(R)>=0, abiertoO=otras.indexOf(R)>=0;
   return (mias.length ? '<div class="tarj">'+mias.map(fila).join('')+'</div>' : '')+
     (otras.length
@@ -813,6 +816,11 @@ function cubrirModal(){
     (R.bloques||[]).forEach(function(b,i){
       var v=+_mio[i]||0; if(v>0) ST.sel.set(b[0]+'_'+b[1], v);
     });
+    /* refutar47: lo que el servidor tiene (`_selBase`) y, si la app murió con la rejilla a medias, lo que había pintado (ver `_dispBorrGuardar_`). */
+    ST._selBase=new Map(ST.sel); ST._recup=false;
+    var _of0={}; (R.bloques||[]).forEach(function(b){ _of0[b[0]+'_'+b[1]]=1; });
+    var _dr=_dispBorrLeer_(R.id, ST._selBase, _of0);
+    if(_dr){ ST.sel=_dr; ST._recup=true; }
   }
   /* ⛔⛔ UN DÍA = UNA COLUMNA, UNA FRANJA = UNA FILA (13/10). Estaba al revés y por
      eso no cabía en un teléfono: las franjas son MUCHAS y los días POCOS, así que el
@@ -843,6 +851,7 @@ function cubrirModal(){
   });
   abrirModal('<div class="mtit">Marca tu disponibilidad</div>'+
     '<div class="msub">'+esc(YO.pila)+' · '+instr+'</div>'+
+    (ST._recup?'<p class="rnota" style="margin:-4px 0 10px;color:var(--warn)">Recuperé lo que ibas marcando: todavía NO está guardado. Pulsa «Guardar disponibilidad» para que cuente.</p>':'')+
     (_minS>1?'<p class="rnota" style="margin:-4px 0 10px">Dura '+_durTxt_(_minS*_slot)+
       ': cada toque marca '+_minS+' casillas seguidas. '+
       'Arrastra para alargar.</p>':'')+
@@ -954,6 +963,7 @@ function engancharRejilla(){
     barrer(function(k){ if(target===0) ST.sel.delete(k); else ST.sel.set(k,target); });
     var q=sanear();
     limpia(); repinta(); cont();
+    _dispBorrGuardar_(R.id, ST.sel, ST._selBase||new Map());     /* refutar47: lo pintado sobrevive a que maten la app */
     /* El texto tambien es compartido: si una cara avisa y la otra calla, la que calla
        parece que lo guardo. */
     var _av=_avisoCorto_(q, minS, slot); if(_av) tost(_av);
@@ -1030,7 +1040,7 @@ function engancharRejilla(){
         var re=_normReuM_(R2); REUNION=re;                    // recalcula el mapa con lo tuyo dentro
         var ix=REUNIONES_M.findIndex(function(x){ return x.id===re.id; });
         if(ix>=0) REUNIONES_M[ix]=re;
-        ST._selDe=null;
+        ST._selDe=null; _borrBorrar_(_dispBorrClave_(R2.id));
         /* ⛔ 21/10 (auditor 19, 🟠 1): O el aviso del Art. 29i O «guardada», nunca los dos: el segundo `tost` pisaba al
            primero en el mismo tick y la persona sólo leía «Disponibilidad guardada.» (el escritorio ya lo hacía así). */
         cerrarModal();
@@ -1039,6 +1049,10 @@ function engancharRejilla(){
         pintar();
       }catch(e){
         g.disabled=false; g.textContent=prev;
+        /* refutar44: si alguien cambió la reunión mientras la contestabas (la borró, te quitó de los convocados, fijó la fecha), reintentar NO sirve:
+           se dice qué pasó, se cierra la rejilla y se vuelve a leer la lista. */
+        var _ch=(typeof _choque_==='function') ? _choque_(e) : '';
+        if(_ch){ cerrarModal(); tost(_ch, _tostLargo_(_ch)); _cargarReunionesM_().then(function(){ pintar(); }); return; }
         tost('No se pudo guardar: '+((e&&e.message)||e)+'. Vuelve a intentarlo.');
       }
       return;

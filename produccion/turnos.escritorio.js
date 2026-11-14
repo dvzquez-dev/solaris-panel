@@ -115,6 +115,7 @@ function _cajaCargosPend_(cargos){
 
 function pintarReparto(){
   var c=document.getElementById('tuLista'); if(!c) return;
+  var foco=_focoFirma_(c);      // refutar42: cada botón (turno, AV, memoria, coche, quitar) repinta la lista y el foco caía a <body>
   var nn=Object.keys(TUR_SEL);
   if(!nn.length){
     c.innerHTML='<p style="margin:0;font-size:12px;color:var(--ink3)">Nadie marcado todav\u00eda. '+
@@ -126,7 +127,7 @@ function pintarReparto(){
   c.innerHTML=_cajaCargosPend_()+nn.map(function(n){
     var e=TUR_SEL[n], m=_m(n);
     return '<div class="repf">'+
-      '<b>'+esc((m&&m.pila)||n)+'</b>'+
+      '<b>'+esc(_pilaDeM_(n)||(m&&m.pila)||n)+'</b>'+
       '<input data-rol="'+esc(n)+'" value="'+esc(e.rol||'')+'" placeholder="su papel (opcional)">'+
       /* ⛔ UN BOTON POR CARGO. Antes habia uno solo -«responsable»- y los otros dos se
          escribian a mano en el texto libre, donde nadie los podia exigir ni leer.
@@ -142,6 +143,7 @@ function pintarReparto(){
     '</div>';
   }).join('');
   cablearReparto();
+  _focoReponer_(c, foco);
 }
 
 /* ⚠️ Se llama DESPUES de cablear, no antes: `cablearReparto()` corre justo detras de
@@ -183,16 +185,7 @@ function _dispViva_(){
   return L.length ? L[0] : null;
 }
 
-/* Quién no ha contestado NADA. Es lo que el excel no podía decir. */
-function _dispMudos_(cv){
-  var out=[];
-  (cv.invitados||[]).forEach(function(n){
-    var r=cv.resp&&cv.resp[n];
-    var vacio=true; if(r) for(var k in r){ if(Object.prototype.hasOwnProperty.call(r,k)) vacio=false; }
-    if(vacio) out.push(n);
-  });
-  return out.sort();
-}
+/* (`_dispMudos_` vive en `comun.js` desde refutar33: el móvil también dice quién falta por contestar.) */
 
 /* ── CONTESTAR TU DISPONIBILIDAD DE TURNOS, DESDE EL ESCRITORIO ───────────────────
    ⛔ EL HUECO QUE CIERRA: `api.guardarDisponibilidad` estaba declarada en `escritorio.html`
@@ -403,7 +396,9 @@ function _miTurnoPanel_(){
     return (i ? _huecoFilaE_(F[i-1], fr) : '')+_rotFranjaE_(_rotuloTramo_(fr))+D.map(function(d){
       var k=_dispClave_(d,fr.k), v=mias[k];
       var st = (v && v.s && v.s!=='no') ? ('background:'+_celdaFondo_(v)) : '';
-      return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" '+
+      /* refutar42: la casilla se puede usar con el teclado (`_rejillaFlechas_` en `_cablearMiTurno_`) y dice qué es y qué tiene marcado */
+      var _et=_diaCorto_(d)+' · '+_rotuloTramo_(fr)+' · '+((v&&v.s==='no')?'no puedo':((v&&v.s)?'puedo en '+v.s+(v.c?', con coche':''):'sin marcar'));
+      return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" role="button" tabindex="-1" aria-label="'+esc(_et)+'" '+
         'style="cursor:pointer;'+st+'">'+
         ((v&&v.s==='no')?'\u2013':((v&&v.c)?'\uD83D\uDE97':''))+'</div>';
     }).join('');
@@ -460,6 +455,7 @@ function _cablearMiTurno_(){
       MIT_PIN=d.pincel; MIT_COCHE=d.coche; MIT_CC=d.cc; pintar();
     };
   });
+  _rejillaFlechas_($$('[data-mtk]'), ((_miTurnoCv_()||{}).dias||[]).length);
   $$('[data-mtk]').forEach(function(c){
     c.onclick=function(){
       var cv=_miTurnoCv_(); if(!cv) return;
@@ -506,6 +502,8 @@ function _cablearMiTurno_(){
         cv.resp[yo]=mias;
         MIT_CELDAS=null;                       /* ya no queda nada pendiente */
         tost('Disponibilidad guardada.'); pintar();
+        /* refutar42: «Guardar» queda apagado («sin cambios») y no puede tener el foco: vuelve a la rejilla, que es lo que se sigue tocando */
+        if(document.activeElement===document.body || document.activeElement.disabled){ var _c0=document.querySelector('[data-mtk][tabindex="0"]'); if(_c0) _c0.focus(); }
       }catch(e){
         /* ⛔ UNA DISPONIBILIDAD QUE SE PIERDE EN SILENCIO es la que luego hace que te pongan
            un turno cuando no puedes. Se avisa, se deja el boton vivo y `MIT_CELDAS` NO se
@@ -684,8 +682,7 @@ function _dispCargar_(repintar){
        mentira es peor que un hueco, porque se reparte gente con el. */
     CONVOCATORIAS.length=0;
     if(r && r.convocatoria){
-      var cv=r.convocatoria;
-      cv.resp = r.cv || {};
+      var cv=_convSinBajas_(r.convocatoria, r.cv);
       /* ⛔⛔ SIN `!!` (447.ª, 05/09). El guardia que lo lee tiene escrito su porque:
          `_convEstado_` usa `cv.abierta === false` y NO `!cv.abierta` porque *«una
          convocatoria vieja sin el campo es «no lo se», y cerrarla seria inventar»*.
@@ -1095,7 +1092,7 @@ function _convocarDispPanel_(){
          firma de `montar`: una constante en Python, o sea que preguntar por horas
          dependia de que alguien tocara el codigo. La etiqueta dice lo que CAMBIA
          -«un toque marca 4 h»- y no el nombre del modo, que no le dice nada a nadie. */
-      '<div style="font-size:12.5px">'+lab('?Preguntar por horas (09:00–14:00 y 16:00–23:00); un toque marca el turno de 4 h')+
+      '<div style="font-size:12.5px">'+lab('?Preguntar por horas (09:00–14:00 y 15:00–23:00); un toque marca el turno de 4 h')+
         nxSiNo('cdHoraria', true)+'</div>'+
     '</div>'+
     '<button class="btn" data-convdisp>Convocar disponibilidad</button>'+
@@ -1504,7 +1501,7 @@ function _cierreTurnoPanel_(){
      no fue —lo dice el comentario de `_cierreTurMapa_` dos funciones mas arriba—, mientras
      que dejarlos sin marcar solo cuesta un clic a quien sabe la respuesta. */
   /* La siembra (firmes sí, dudosos no, coche del reparto, y el reloj si el turno está empezado) es de `comun.js`: el móvil la comparte. */
-  _cierreSembrar_(t, CIERRE_TUR, new Date(_ahoraApp_()).toISOString());
+  _cierreSembrar_(t, CIERRE_TUR, new Date(_ahoraInstante_()).toISOString());
   tope = _cierreTurTope_();
   var ini0 = CIERRE_TUR.ini || String((t && t.hora) || '').slice(0,5);   /* el turno suele salir a su hora: de ahi se parte */
   var mapa = _cierreTurMapa_(), sinDur = _cierreTurSinDur_(),
@@ -1531,7 +1528,7 @@ function _cierreTurnoPanel_(){
     return '<tr'+(on?'':' style="opacity:.45"')+'>'+
       '<td><div style="display:flex;align-items:center;gap:7px">'+
         nxSiNo('', on, {attrs:'data-ct-fue="'+esc(n)+'"'})+
-        esc((miembro(n)||{}).pila || n)+
+        esc(_pilaDeM_(n)||(miembro(n)||{}).pila || n)+
         (n===resp?' <span class="chip">responsable</span>':'')+
         (_esSuplenteTurno_(t, n)?' <span class="chip">suplente</span>':'')+'</div>'+
         /* 26/10 (C4b): «llevó coche» va al ACTA (Notion `Coche`, almacén `coche_confirmado`). ⚠️ La cuota aún cuenta el
@@ -1719,10 +1716,9 @@ function _convocarCv_(){ return _convocarCvElegida_(); }
 
 /* Los chips para ELEGIR de qué convocatoria sale el mapa (abiertas Y cerradas) y, para quien puede, empezar una nueva. */
 function _convocarEligeHTML_(){
-  var L=CONV_LISTA||[], cv=_convocarCvElegida_(), act=cv ? String(cv.id) : '', est={abierta:'abierta', cerrada:'cerrada', sin_abrir:'sin abrir'};
+  var L=CONV_LISTA||[], cv=_convocarCvElegida_(), act=cv ? String(cv.id) : '';
   var chips=L.map(function(c){
-    var f=_isoADMY_(String(c.semana_ini||'').slice(0,10))||String(c.semana_ini||'');
-    return '<button type="button" class="pick'+(String(c.id)===act?' on':'')+'" data-convsel="'+esc(c.id)+'">Semana del '+esc(f.slice(0,5))+' · '+esc(est[c.estado]||c.estado||'')+'</button>';
+    return '<button type="button" class="pick'+(String(c.id)===act?' on':'')+'" data-convsel="'+esc(c.id)+'">'+esc(_convEtiqueta_(c))+'</button>';
   }).join('');
   if(_puedeConvocarDisp_()) chips+='<button type="button" class="pick" data-convnueva="1">Pedir disponibilidad nueva</button>';
   return chips ? '<span class="sc" style="display:block;margin-bottom:5px">De qué convocatoria</span><div class="chips" data-conv-lista style="margin:0 0 12px">'+chips+'</div>' : '';
@@ -1781,7 +1777,7 @@ function _convocarPoolHTML_(b){
   var cv=_convocarCvElegida_(), pool=_activos_().slice().sort(function(a,c){ return String(a.pila).localeCompare(String(c.pila)); });
   var chip=function(m, no){
     return '<button type="button" class="pick'+(TUR_SEL[m.nombre]?' on':'')+'" data-tu="'+esc(m.nombre)+'"'+
-      (no?' title="No ha dicho que pueda: se añade igual" style="opacity:.78"':'')+'>'+esc(m.pila)+'</button>';
+      (no?' title="No ha dicho que pueda: se añade igual" style="opacity:.78"':'')+'>'+esc(_pilaDeM_(m.nombre)||m.pila)+'</button>';
   };
   if(!cv || !b || !b.claves || !b.claves.length) return pool.map(function(m){ return chip(m, false); }).join('');
   var pueden=_turnoBloqueQuien_(_calorTurnos_(cv, ''), b.dia, b.claves), si=[], no=[];
@@ -1833,9 +1829,11 @@ function _convocarListar_(){
 }
 function _convocarRepintarZona_(){
   var z=document.getElementById('tuZona'); if(!z) return;
+  var foco=_focoFirma_(z);      // refutar42: elegir la semana o un filtro repinta la zona y el foco caía a <body>
   z.innerHTML=_convocarZonaHTML_();
   _convocarCablear_();
   _convocarSync_();
+  _focoReponer_(z, foco);
 }
 function _convocarElige_(id){
   CONV_ELEGIDA=String(id);
@@ -1844,7 +1842,7 @@ function _convocarElige_(id){
   api.getDisponibilidad(id).then(function(r){
     if(String(CONV_ELEGIDA)!==String(id)) return;     /* mientras tanto eligió otra */
     var cv=r && r.convocatoria; if(!cv) throw new Error('vacía');
-    cv.resp=r.cv||{}; CONV_CV=cv; _convocarRepintarZona_();
+    _convSinBajas_(cv, r.cv); CONV_CV=cv; _convocarRepintarZona_();
   }).catch(function(){
     if(String(CONV_ELEGIDA)!==String(id)) return;
     CONV_CV={id:id, fallo:true}; _convocarRepintarZona_();
@@ -1995,7 +1993,7 @@ function _fichaTurnoE_(t){
   };
   var sec = function(tit, cuerpo){ return '<section class="ftu-sec"><h5>'+tit+'</h5>'+cuerpo+'</section>'; };
   return '<div id="ficha-turno">'+pan('Ficha del turno · '+esc(_refTurno_(t)), '<button class="btn sm" data-tursel="'+esc(k)+'">Cerrar</button>',
-    '<div class="pb"><div class="ftu-cab"><b>'+esc(t.punto||'—')+'</b>'+
+    '<div class="pb"><div class="ftu-cab"><b>'+esc(_sitioConCiudad_(t.punto||'—'))+'</b>'+
       (t.estado==='Cancelado' ? '<span class="chip no">cancelado</span>' : '')+
       '<span class="mono">'+esc(f)+' · '+esc(t.hora||'—')+' · '+esc(t.duracion||t.dur||'—')+'</span></div>'+
     '<div class="ftu-rej">'+

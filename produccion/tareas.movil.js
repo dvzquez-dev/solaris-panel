@@ -184,7 +184,10 @@ function _guardarPasoTarea_(t, a, b, hecho, h){
   if(b) b.disabled=true;
   api.moverEstadoTarea(t.url, t.e, a, h).then(function(r){ hecho(r); }).catch(function(e){
     if(b) b.disabled=false;
-    tost('No se pudo guardar el paso de «'+t.n+'»: '+((e&&e.message)||e)+'. La tarea sigue como estaba.');
+    /* refutar37: con mala cobertura el aviso ya dice si se guardó o no («NO se haya guardado» / «puede que se haya guardado: recarga»): añadirle «La tarea sigue
+       como estaba» lo contradecía cuando el servidor SÍ lo guardó y sólo se perdió la respuesta, y dejaba «)..» con dos puntos. */
+    var m=String((e&&e.message)||e).replace(/^Error:\s*/,'').replace(/[.\s]+$/,'');
+    tost('No se pudo guardar el paso de «'+t.n+'»: '+m+'.'+((e&&(e.sinRed||e.sinRespuesta))?'':' La tarea sigue como estaba.'));
   });
 }
 

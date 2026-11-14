@@ -4,7 +4,12 @@
 /* 01/11 (tareamovil): el estado, los campos, la IA, la vista previa y el cableado de «Nueva tarea» viven en `comun.js`
    (`NUEVA_TAREA`, `_nuevaTareaCampos_`, `_cablearNuevaTarea_`…): el móvil abre la MISMA hoja. Aquí sólo queda el envoltorio
    del escritorio (plegado + panel) y qué hacer al crearla. */
-function _nuevaTareaCreada_(){ pintar(); }
+function _nuevaTareaCreada_(){
+  pintar();
+  /* refutar42: «Crear la tarea» se apaga y se va con el panel (queda plegado): el foco caía a <body>. Vuelve a «+ Nueva tarea», que es lo que
+     se pulsa para la siguiente (sólo si se perdió: quien ya está en otro sitio no se mueve). */
+  if(document.activeElement===document.body){ var b=document.querySelector('[data-ntab="1"]'); if(b) b.focus(); }
+}
 function _nuevaTareaPanel_(){
   var us = _unidadesNuevaTarea_();
   if(!us.length) return '';

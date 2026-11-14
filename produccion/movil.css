@@ -610,6 +610,7 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
   align-items:flex-start;border:1px solid rgba(232,145,46,.34);background:rgba(232,145,46,.07);
   cursor:pointer}
 .aviso.mal{border-color:rgba(255,74,79,.34);background:rgba(228,30,37,.075)}
+.aviso > :not(.ic){min-width:0;overflow-wrap:break-word;hyphens:auto}   /* 13/11 (refutar31 tras refutar33): con la letra al 200 % «disponibilidades» no cabía a 320 px */
 .aviso .ic{flex:none;margin-top:1px;color:var(--warn)} .aviso.mal .ic{color:var(--red2)}
 .aviso .ic svg{width:15px;height:15px;display:block}
 .aviso b{display:block;font-size:12.5px;margin-bottom:2px}

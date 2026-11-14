@@ -13,6 +13,7 @@
 
 /* normaliza una reunión del backend a la forma que pintan las vistas */
 function normReu(r){ r=r||{};
+  var _sb=_respDeActivos_(r.resp);      // refutar41: sin lo que contestó quien ya se fue
   return {id:r.id, titulo:r.titulo, tipo:r.tipo||"general", modalidad:r.modalidad||"hibrida",
     convocante:r.convocante||"", invitados:Array.isArray(r.invitados)?r.invitados:[],
     limite:r.limite||null, dias:Array.isArray(r.dias)?r.dias:[],
@@ -23,7 +24,7 @@ function normReu(r){ r=r||{};
        motor -- y con 8 casillas, errar el mes mueve el minimo tanto como erraba el redondeo.
        ⚠️ `fecha` se queda aunque HOY no llegue nunca: el motor tambien la prueba primero, y
        dos cadenas identicas es justo lo que se persigue. */
-    total:r.total||0, resp:r.resp||{}, nResp:r.nResp||0, fecha:r.fecha||null,
+    total:r.total||0, resp:_sb.resp, nResp:Math.max(0,(+r.nResp||0)-_sb.quitadas), fecha:r.fecha||null,
     creado:r.creado||null,
     ordenDia:r.ordenDia||"", vision:r.vision||"anonima",
     controlAsistencia:(typeof r.controlAsistencia==='boolean') ? r.controlAsistencia : undefined,   /* 12/11: sin la clave, la de antes de la opción */
@@ -438,6 +439,7 @@ function _cablearConvocar_(){
     if(!(await dialogoSiNo(_avisoEnNombreDe_(reu.convocante)+'Convocar «'+reu.titulo+'» a '+reu.invitados.length+' personas.'+
       String.fromCharCode(10,10)+'Les tocará cubrir su disponibilidad, y de no cubrirla '+
       'salen sanciones.'))) return;
+    var _fc=_focoFirma_($('#main'), bt);      // refutar42: al desactivar el botón el foco caía a <body> y `pintar()` no podía devolverlo
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Convocando…';
     try{
       await api.crear(reu);
@@ -452,7 +454,7 @@ function _cablearConvocar_(){
         REUS.length=0;
         lista.map(normReu).forEach(function(r){ if(prevResp[r.id]){ r.resp=prevResp[r.id]; r.calor=null; } REUS.push(r); });
       }
-      pintar();
+      pintar(); _focoReponer_($('#main'), _fc);
     }catch(e){ bt.disabled=false; bt.textContent=prev;
       tostErr('No se pudo convocar: ', e); }
   };
@@ -749,6 +751,9 @@ function _cablearMiDispo_(){
            se deja el boton vivo, y `MIDISP` NO se borra -- lo marcado sigue en pantalla para
            poder reintentar sin volver a pintarlo entero. */
         b.disabled=false; b.textContent=t;
+        /* refutar44: si alguien cambió la reunión mientras la contestabas, se dice qué pasó (reintentar no sirve); la lista se relee en el refresco de la cara. */
+        var _ch=(typeof _choque_==='function') ? _choque_(e) : '';
+        if(_ch){ tost(_ch, _tostLargo_(_ch)); return; }
         tost('No se pudo guardar: '+((e&&e.message)||e)+'. Vuelve a intentarlo.');
       }
     };
@@ -1218,6 +1223,7 @@ async function _refrescarReuAbiertaE_(){
     if(d && d.agregado != null) r.agregado = d.agregado !== false;
     if(!resp) return;
     var antes=_firmaResp_(r);
+    resp=_respDeActivos_(resp).resp;       // refutar41: sin lo que contestó quien ya se fue
     var copia={resp:resp};
     /* Si nadie ha contestado nada nuevo NO se repinta: reconstruir la pantalla cada 20 s para
        dejarla igual se nota, y en un panel que vive abierto toda la tarde, molesta. */
@@ -1254,7 +1260,7 @@ async function _hidratarReuE_(r){
          ⚠️ SON DOS LINEAS Y HAY QUE ARREGLAR LAS DOS: con solo la de arriba, el refresco
          leeria el dato nuevo y no habria nada que refrescar, porque la lista sigue vacia. */
       var _rp = d && (d.respuestas || (d.reunion && d.reunion.resp));
-      if(_rp){ r.resp=_rp; r.calor=null; }   // calor null: se recalcula con las respuestas
+      if(_rp){ r.resp=_respDeActivos_(_rp).resp; r.calor=null; }   // refutar41: sin las bajas; calor null: se recalcula con las respuestas
       /* ⛔⛔ Y `agregado`, QUE ES UN DEFECTO SEPARADO: arreglar solo `resp` lo deja en pie.
          La guarda `if(r.agregado === false)` de `_cobertura_` se escribio el 15/08 para NO
          fabricar la lista nominal cuando el servidor manda **solo tu fila** -- y no podia

@@ -741,6 +741,7 @@ function _firmaTxtM_(rt){
 }
 
 function vFichar(){
+  _formParteRecuperar_(ST.form);
   var s=ST.ses, min=minSes(), largo=min>=600, corre=s.estado==='corriendo';
   var nube=(typeof backendOK!=='undefined' && backendOK && SESION);   // sesión respaldada por la nube
   /* ⛔ EL PERFIL ELEGIDO, no `YO.unidad`. Esta pantalla dice QUIEN FIRMA en DOS sitios —la
@@ -942,7 +943,10 @@ function vFichar(){
          (lo dice la frase de arriba). */
       (rt.propio
         ?''
-        :(rt.escalado?'<span class="esc">Coordinas '+esc(_perf)+', así que lo firma el Project Director.</span>':''))+'</p></div></div>'+
+        :(rt.escalado?'<span class="esc">'+(coordinadorDe(_perf)===PD_NOM
+            /* refutar38: «Coordinas X» es de quien coordina X y escala SU parte; a un raso de una unidad sin coordinador se le atribuía una coordinación que no tiene */
+            ? esc(_perf)+' no tiene coordinador, así que lo firma el Project Director.'
+            : 'Coordinas '+esc(_perf)+', así que lo firma el Project Director.')+'</span>':''))+'</p></div></div>'+
 
     '<button class="btn pri full" data-p id="btnEnviar" disabled style="margin-top:13px">'+
       '<span id="lblEnviar">Faltan datos para enviar</span></button>'+
@@ -1263,6 +1267,7 @@ async function enviarFichaje(){
            ⚠️ Los tres reintentos internos de `api._post` ya mandaban la misma clave (`body`
            se construye FUERA del `for`, `movil.html:272`): eso no era el agujero. */
         if(!f.clave) f.clave=_claveUso_();
+        _formParteGuardar_(f);   /* refutar37: la clave sobrevive a una app cerrada entre el envío y su respuesta */
         var rec=await api.pushParte({ fecha:_dmyAISO_(f.fecha), tarea:imput, categoria:f.cat, subcat:_subcatEnvio_(f), horas:dur,
           ini:f.ini, fin:f.fin, tramos:_tramosEnvio_(f), justificacion:f.just.trim(), sinFichaje:true,
           subsistema:_perfilElegido_(), clave:f.clave, tareaUrl:_imputacionUrl_(f,TAREAS,_fichaYo_()) });
@@ -1286,7 +1291,7 @@ async function enviarFichaje(){
          HOY, que es el caso normal. */
       var _cola=_colaTxtM_();
       ST.ses={estado:'parada'}; f.just=''; f.tarea=''; f.detalle=''; f.subcat=''; f.perfil=null; f.tramos=[];
-      f.fecha=HOY;
+      f.fecha=HOY; f.clave=null; _formParteBorrar_();
       /* ⚠️ Y el aviso lo DICE en vez de inventarse un número: sin las horas de vuelta,
          se confirma el envío y se manda a mirar la lista, que es donde estarán. */
       tost(h==null
@@ -1444,6 +1449,7 @@ function _movHorasHTML_(confs, pends){
   var _ef = (typeof _esperanFirma_==='function') ? _esperanFirma_(pends)
                                                  : {n:0, horas:0, lista:[]};
   var _ap = _apuntesMes_(r.total, _cr?_cb:comp, _cx);
+  var _pf = _partirEnFicha_(r.todos, _hMesReal_(YO)!=null);   /* refutar36: las categorías suman la cifra de arriba, no lo aprobado sin aplicar */
   return '<div class="plg" style="margin-top:11px"><div class="plgh" data-plg data-p>'+
       /* ⚠️ EL CONTADOR SIGUE SIENDO EL DE LOS QUE CUENTAN. `_apuntesMes_` anuncia lo que
          YA suma --su contrato lo vigila su banco--, y lo que espera firma se dice APARTE
@@ -1464,7 +1470,8 @@ function _movHorasHTML_(confs, pends){
         '<small>'+esc(_cet)+'</small></div>'+
         '<div class="d"><b class="mono">'+nf2(_compBaseAHoy_(YO))+' h</b></div></div>'+   /* 13/11: devengada, como la cifra del mes */
       /* 01/11: SIN «Otras contribuciones» aparte; el mismo desglose por categorías que «Ver el desglose completo». */
-      desgloseCat(_fijasDesglose_(r.todos).concat(r.todos))+
+      desgloseCat(_fijasDesglose_(_pf.dentro).concat(_pf.dentro))+
+      (_pf.fuera.length ? '<p class="rnota" style="margin:0 0 6px">+'+nf2(_pf.fuera.reduce(function(t,p){ return t+(Number(p.q!=null?p.q:p.horas)||0); },0))+' h aprobadas aún no suman: entran cuando se aplican.</p>' : '')+
       '<p class="rnota" style="margin:8px 0 10px">'+
         (r.total
           ? 'A qué categoría del Panel de Rendimientos sumó cada una de tus horas de este mes. '+
@@ -1581,8 +1588,7 @@ function _desgloseMesHTML_(confs, clave){
   /* ⛔ 11/11 (refutar10): con la cifra de Notion, lo aprobado u otorgado que aún no ha llegado a tu ficha NO puede sumar en los
      grupos: la cabecera decía 5,5 h y los grupos 2 + 2,5 + 2,5 = 7 (la hora otorgada de la reunión dentro de «Reuniones»).
      Va APARTE, con su suma, igual que la píldora de «Horas»: las dos pantallas dicen lo mismo con la misma regla (`enFicha`). */
-  var _fuera=_notionD ? r.todos.filter(function(x){ return x.enFicha===false; }) : [];
-  var _dentro=_fuera.length ? r.todos.filter(function(x){ return x.enFicha!==false; }) : r.todos;
+  var _pf=_partirEnFicha_(r.todos, _notionD), _fuera=_pf.fuera, _dentro=_pf.dentro;
   var fijas=_fijasDesglose_(_dentro);
   var grupos=_gruposDesgloseHTML_(fijas.concat(_dentro))+_fueraDeFichaHTML_(_fuera);
   /* ⛔ EL TITULO, DEL PERIODO — NO DEL RELOJ DEL TELEFONO. El contenido de esta ventana va
@@ -1614,6 +1620,13 @@ function _desgloseMesHTML_(confs, clave){
 }
 
 /* Lo aprobado u otorgado que aún no está en la ficha (refutar10): un bloque aparte, con su suma, debajo de los grupos que sí suman en la cifra. */
+/* refutar36 (13/11): LA REGLA DE «AÚN NO EN TU FICHA», UNA VEZ. Con la cifra de Notion, lo aprobado que aún no se ha aplicado (`enFicha===false`) no suma en los
+   grupos ni en el resumen de categorías: va aparte. La usan «Ver el desglose completo» y el desplegable «Este mes» (que no la aplicaba: con un parte de 1,5 h aprobado y sin
+   aplicar, «Horas del mes» decía 1,36 h y las categorías sumaban 2,86). Sin la cifra de Notion (`conNotion` falso) todo cuenta, como siempre. */
+function _partirEnFicha_(todos, conNotion){
+  var fuera=conNotion ? todos.filter(function(x){ return x.enFicha===false; }) : [];
+  return {fuera:fuera, dentro:fuera.length ? todos.filter(function(x){ return x.enFicha!==false; }) : todos};
+}
 function _fueraDeFichaHTML_(ps){
   if(!ps.length) return '';
   var h=ps.reduce(function(t,p){ return t+(Number(p.q!=null?p.q:p.horas)||0); },0);
@@ -1700,10 +1713,10 @@ function _cuotaHTML_(){
         '<span class="ra">−'+eur(_q.base-_q.final)+'</span></div>'
         : '')
       : '<div class="rl"><span>Cuota por tus horas</span><span class="ra">—</span></div>'+
-        '<p class="rnota">Llevas el coche en '+YO.coche+' turno'+(YO.coche===1?'':'s')+' fuera de '+
-        'Vigo, pero el servidor aún no ha servido tu cuota <b>sin</b> descuentos: no se puede '+
+        '<p class="rnota">Llevas el coche en '+YO.coche+' turno'+(YO.coche===1?'':'s')+' entre '+
+        'Ourense y Vigo, pero el servidor aún no ha servido tu cuota <b>sin</b> descuentos: no se puede '+
         'decir cuánto te resta.</p>')
-    : '<p class="rnota">Aún sin descuentos · poner el coche para ir al CITI resta '+nf2(_descuentoCoche_())+' € por turno.</p>';
+    : '<p class="rnota">Aún sin descuentos · llevar el coche en un turno entre Ourense y Vigo resta '+nf2(_descuentoCoche_())+' € por turno.</p>';
   /* ⛔⛔ ES UNA ESTIMACIÓN, Y LA CIFRA GRANDE TIENE QUE DECIRLO. Daniel, 15/08, literal:
      *«No se paga mes a mes, animal. **La cuota es anual**, dios. Lo que te aparece en la
      persona es una **estimacion**. ¿Como no puedes tener eso en cuenta? ¿Te has leido
@@ -1758,7 +1771,7 @@ function _cuotaHTML_(){
    la respuesta de `decidirParte` no podía reutilizarlo y había que re-preguntar al
    servidor solo para volver a formatear lo mismo. */
 function _normPDec_(p){
-  return { id:p.id, autor:p.autor, pila:_pilaDeM_(p.autor), unidad:p.subsistema||'—',
+  return { id:p.id, autor:p.autor, pila:_pilaDeM_(p.autor), /* (refutar39: el rótulo que se PINTA se calcula al pintar, con el roster ya cargado; esta pila es la del momento de leer) */ unidad:p.subsistema||'—',
     f:_isoADMY_(p.fecha), ini:p.ini||'—', fin:p.fin||'—', q:Number(p.horas)||0,
     t:p.tarea||'', just:p.justificacion||'', sinFichaje:!!p.sinFichaje,
     /* ⛔ `ini`/`fin`/`decidido_por`/`revierte` viajan porque `_etiOrigenParte_` los MIRA:
@@ -1835,6 +1848,19 @@ function _cargarPartesDec_(){
        que ya firmaste (medido por un agente el 11/08). Reintenta quien pulsa. */
     PDEC_FALLO = !Array.isArray(arr);
     if(!Array.isArray(arr)) return;
+    /* ⛔ refutar38 (13/11): ESTA RESPUESTA PUEDE LLEGAR ANTES QUE LA IDENTIDAD. En el arranque `getPartes` sale a la vez que `bootstrap` (ver `_onCredencial_`)
+       y, si vuelve primero, `YO` es todavía el de la maqueta (rango 1): el filtro de abajo dejaba pasar los partes PROPIOS de un raso —que el servidor sí le
+       sirve— como «cola por firmar», y se pintaban «Esperan tu decisión» con su nombre y un botón «Aprobar» que el servidor niega («no puedes decidir tu propio
+       parte»), más un globo falso en Horas. Hasta saber quién eres no se reparte: se guarda lo crudo y `_repartirPartesDecSiEspera_` lo hace con la identidad ya puesta. */
+    _PDEC_CRUDO_ = arr;
+    if(typeof SESION!=='undefined' && SESION && SESION.token && !SESION.nombre){ PARTES_DEC = []; PARTES_REV = []; _PDEC_ESPERA_ = true; return; }
+    _PDEC_ESPERA_ = false;
+    _repartirPartesDec_(arr);
+  }).catch(function(){ PDEC_FALLO = true; });
+}
+
+/* Lo de `getPartes` ya con la identidad conocida: de ahí salen la cola «Esperan tu decisión» (`PARTES_DEC`) y «Ya decidiste» (`PARTES_REV`). */
+function _repartirPartesDec_(arr){
     var yo=(typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '';
     var _rg = (typeof rangoNom==='function' ? rangoNom(yo) : 0);
     var _mando = _rg >= 3;
@@ -1875,7 +1901,14 @@ function _cargarPartesDec_(){
       n.cerrado = _mesCerradoParte_(p, CIERRE_PLAN, CIERRE_UC, true);   /* 26/10: para revertir */
       return n;
     });
-  }).catch(function(){ PDEC_FALLO = true; });
+}
+
+/* Lo que `_cargarPartesDec_` dejó guardado por no saber todavía quién eres, repartido ya con la identidad puesta (la llama el arranque, `_onCredencial_`). */
+var _PDEC_CRUDO_ = null, _PDEC_ESPERA_ = false;
+function _repartirPartesDecSiEspera_(){
+  if(!_PDEC_ESPERA_) return;
+  _PDEC_ESPERA_ = false;
+  try{ _repartirPartesDec_(_PDEC_CRUDO_); }catch(_){ PDEC_FALLO = true; }
 }
 
 /* El rótulo de procedencia en la ficha de decisión: mismo texto que en «Tus partes», otro
@@ -1892,10 +1925,14 @@ function _pdOrigenHTML_(p){
 
 /* Una ficha de parte, dentro de la lista de decisión. Se saca aparte porque ahora vive dentro
    de DOS desplegables y el HTML de la ficha no tiene por qué enterarse de eso. */
+/* movil13-3 (Daniel aceptó 13/11): el rango «09:00–11:00» sólo sale si las dos son horas. `_normPDec_` pone '—' a un parte declarado a mano y salía «—–—». */
+function _pdRango_(p){
+  return /^\d/.test(p.ini||'') && /^\d/.test(p.fin||'') ? ' · '+esc(p.ini)+'–'+esc(p.fin) : '';
+}
 function _pdFichaHTML_(p){
   return '<div class="pdi" data-pd="'+p.id+'">'+
-        '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
-          '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(p.ini)+'–'+esc(p.fin)+'</small></div>'+
+        '<div class="fila"><div class="a"><b>'+esc(_pilaDeM_(p.autor))+'</b>'+
+          '<small>'+esc(p.unidad)+' · '+esc(p.f)+_pdRango_(p)+'</small></div>'+
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
         '<div class="pdt">'+_icoBloque_(p)+esc(p.t)+'</div>'+
         /* ⛔⛔ `p.t`, NO `p.tarea`: `_normPDec_` RENOMBRA el campo al normalizar, y una
@@ -1981,8 +2018,10 @@ function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
       orden.map(function(a){
         var ps=por[a], h=0; ps.forEach(function(x){ h+=x.q; });
         var k=id+'|'+a;
-        return '<details class="pdpers" data-pdk="'+esc(k)+'"'+((unico||PD_ABIERTO_[k])?' open':'')+'>'+
-          '<summary><b>'+esc(ps[0].pila)+'</b>'+
+        /* movil13-3: con UNA persona no hay cabecera (repetía el nombre y las horas de la ficha); el grupo de arriba sigue plegándose. */
+        if(unico) return ps.map(ficha).join('');
+        return '<details class="pdpers" data-pdk="'+esc(k)+'"'+(PD_ABIERTO_[k]?' open':'')+'>'+
+          '<summary><b>'+esc(_pilaDeM_(ps[0].autor))+'</b>'+
             '<span class="pdnum">'+ps.length+' · '+nf2(h)+' h</span></summary>'+
           ps.map(ficha).join('')+
         '</details>';
@@ -2019,14 +2058,14 @@ function _bloqueTarjetaM_(grupos){
   if(!grupos.length) return '';
   var dec=_bloquePuedeDecidirM_();
   return '<div class="tarj" id="pbloq">'+cab('Partes de bloque', grupos.length+(grupos.length===1?' bloque':' bloques'))+
-    _bloqueColaHTML_(grupos, {decide:dec, horas:function(p){ return p.q; }, nombre:function(p){ return p.pila||p.autor; },
+    _bloqueColaHTML_(grupos, {decide:dec, horas:function(p){ return p.q; }, nombre:function(p){ return _pilaDeM_(p.autor)||p.autor; },
       titulo:function(id){ var r=(REUNIONES_M||[]).filter(function(x){ return String(x.id)===String(id); })[0]; return r&&r.titulo; }})+'</div>';
 }
 /* 01/11 · «Tareas entregadas»: los partes que abrió el «Entregada» de un miembro, UNA tarjeta por tarea (comun.js `_tareaParte*_`). */
 function _tareaParteTarjetaM_(grupos){
   if(!grupos.length) return '';
   return '<div class="tarj" id="ptar">'+cab('Tareas entregadas', grupos.length+(grupos.length===1?' tarea':' tareas'))+
-    _tareaParteColaHTML_(grupos, {horas:function(p){ return p.q; }, nombre:function(p){ return p.pila||p.autor; },
+    _tareaParteColaHTML_(grupos, {horas:function(p){ return p.q; }, nombre:function(p){ return _pilaDeM_(p.autor)||p.autor; },
       tarea:function(p){ return p.t; }})+'</div>';
 }
 var _tareaParteCbM_={ hecho:function(){ _cargarPartesDec_().then(pintar); } };
@@ -2119,7 +2158,7 @@ function _pdRevFichaHTML_(p){
      **un ancla de mutación apuntando a dos sitios**: la protección queda afirmada y sin
      verificar, porque una mutación que no sabe dónde ir NO SE HACE. */
   var cab = '<div class="pdi" data-pdr="'+p.id+'">'+
-        '<div class="fila"><div class="a"><b>'+esc(p.pila)+'</b>'+
+        '<div class="fila"><div class="a"><b>'+esc(_pilaDeM_(p.autor))+'</b>'+
           '<small>'+esc(p.unidad)+' · '+esc(p.f)+' · '+esc(PD_EST[p.estado]||p.estado)+'</small></div>'+
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
         '<div class="pdt">'+_icoBloque_(p)+esc(p.t)+'</div>';
@@ -2244,11 +2283,19 @@ function _engPartesDec_(){
         tostErr('No se pudo: ', e);       // 🟠 2 (auditor 19)
         $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=false; });
         b.textContent=prev;
+        /* refutar44: si otra persona se adelantó, la lista está VIEJA —sigue ofreciendo «Aprobar» sobre un parte ya decidido—: se vuelve a leer. */
+        if(_choque_(e)) _cargarPartesDec_().then(pintar);
       }
     };
   });
 }
 
+/* 14/11 (refutar46): «tu parte fue rechazado» llega a Horas con «Tus partes» CERRADO (nace cerrado, 07/08): la cabecera dice cuántos están
+   rechazados («1 rechazada · »), que es para lo que está (el total sin abrir). `''` si ninguno. */
+function _rechazadasTxt_(mias){
+  var nr=(mias||[]).filter(function(x){ return x.e==='rech'; }).length;
+  return nr ? nr+' '+(nr===1?'rechazada':'rechazadas')+' · ' : '';
+}
 function vHoras(){
   /* ⛔ LA BANDA SANA SE PIDE UNA VEZ, ARRIBA: la pintan DOS rotulos de esta misma vista
      (la cabecera y el pie del anillo), y hasta el 05/10 la llevaban **teclada los dos**.
@@ -2419,6 +2466,7 @@ function vHoras(){
            número y las HORAS —, que es lo que el título no tiene. */
         ? '<details class="pdgrupo"><summary><span class="pdnum">'+
             mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
+            _rechazadasTxt_(mias)+
             nf2(mias.reduce(function(t,x){ return t+(x.e==='pend' ? _horasVistaParte_(x) : 0); },0))+' h en cola</span></summary>'+
           mias.map(filaParte).join('')+'</details>'
         : (viejas.length

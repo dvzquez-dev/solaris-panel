@@ -543,6 +543,52 @@ function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre)
    otro camino se quedaria vacio **para siempre**: el recuerdo seguiria diciendo «ya esta
    pintado» y no se volveria a escribir nunca. Es un «no lo se» leido como un dato.
 */
+/* ═══ EL FOCO SOBREVIVE AL REPINTADO (refutar42, 13/11) ═══════════════════════════════════════════════════════════════════
+   Una coordinadora sólo con teclado (Tab, Enter, Esc): casi todo lo que se pulsa REPINTA su panel con `innerHTML`/`outerHTML`, y
+   el botón que tenía el foco desaparece: el foco cae a `<body>` y el siguiente Tab EMPIEZA POR LA CABECERA (21 paradas del menú
+   hasta volver a lo suyo). Medido: cada chip de «Nueva tarea», el menú lateral y «Convocar la reunión» la dejaban en `<body>`.
+   `_focoFirma_(raiz)` anota quién tiene el foco DENTRO de `raiz` (por `id`, o por etiqueta + atributos `data-*`, y cuál de los que
+   comparten esa firma) y `_focoReponer_(raiz, firma)` se lo devuelve al repintado. Si el elemento ya no existe (el parte que
+   acabas de aprobar), un BOTÓN pasa al que hace lo MISMO (misma firma sin los números de id): el siguiente «Aprobar». */
+var FOCO_VOLATIL=['data-a11y','data-n','data-borr-hecho','data-tcal-bloque','data-tcal-nobloque'];
+function _focoSel_(e, soloLetras){
+  if(e.id && !soloLetras) return '#'+(window.CSS && CSS.escape ? CSS.escape(e.id) : e.id.replace(/[^\w-]/g,'\\$&'));
+  var h=e.tagName.toLowerCase(), hay=false;
+  Array.prototype.forEach.call(e.attributes, function(a){
+    if(a.name.indexOf('data-')!==0 || FOCO_VOLATIL.indexOf(a.name)>=0) return;
+    hay=true;
+    if(soloLetras && /^\d+$/.test(a.value)) h+='['+a.name+']'; else h+='['+a.name+'="'+a.value.replace(/["\\]/g,'\\$&')+'"]';
+  });
+  return hay ? h : null;
+}
+function _focoFirma_(raiz, el){
+  var ae=el || document.activeElement;      // `el`: el elemento que se acaba de PULSAR (Ctrl+Enter lo pulsa desde otro campo)
+  if(!raiz || !raiz.contains || ae===raiz || !ae || ae===document.body || !raiz.contains(ae)) return null;
+  var f={sel:_focoSel_(ae,false), fb:null, i:0, j:0, a:null, b:null}, l, i;
+  if(!f.sel) return null;
+  try{
+    l=raiz.querySelectorAll(f.sel); for(i=0;i<l.length;i++) if(l[i]===ae) f.i=i;
+    if(/^(BUTTON|A)$/.test(ae.tagName) || ae.getAttribute('role')==='button'){
+      f.fb=_focoSel_(ae,true);
+      if(f.fb){ l=raiz.querySelectorAll(f.fb); for(i=0;i<l.length;i++) if(l[i]===ae) f.j=i; }
+    }
+  }catch(_){ return null; }
+  if(ae.selectionStart!=null){ f.a=ae.selectionStart; f.b=ae.selectionEnd; }
+  return f;
+}
+function _focoReponer_(raiz, f){
+  if(!f || !raiz) return false;
+  var ae=document.activeElement;
+  if(ae && ae!==document.body && raiz.contains(ae)) return false;      // otro código ya lo puso donde quería
+  var e=null, l;
+  try{
+    l=raiz.querySelectorAll(f.sel); if(l.length) e=l[Math.min(f.i,l.length-1)];
+    if(!e && f.fb){ l=raiz.querySelectorAll(f.fb); if(l.length) e=l[Math.min(f.j,l.length-1)]; }
+  }catch(_){ return false; }
+  if(!e || !e.focus) return false;
+  try{ e.focus({preventScroll:true}); if(f.a!=null && e.setSelectionRange) e.setSelectionRange(f.a, f.b); }catch(_){}
+  return true;
+}
 function _pintarSiCambia_(el, clave, html){
   if (!el) return false;
   /* ⛔⛔ 21/10 (auditor 20, 🔴): EL RECUERDO ES LO QUE ESTE NODO TIENE PUESTO, no lo último que se pintó para esa VISTA.
@@ -559,18 +605,11 @@ function _pintarSiCambia_(el, clave, html){
      DESPUÉS de un reflow, así que el CSS (`transition`) mueve la barra desde donde estaba y `_contarHasta_` cuenta el
      número. Sólo si es la MISMA vista que la última pintada en este nodo (el escritorio reutiliza `#main`). */
   var foto = (el._pintadoClave === clave && el.innerHTML) ? _vivoFoto_(el) : null;
-  var ae = document.activeElement, foco = null;
-  if (ae && ae.id && el.contains && el.contains(ae))
-    foco = { id: ae.id, a: ae.selectionStart, b: ae.selectionEnd };
+  var foco = (el._pintadoClave === clave) ? _focoFirma_(el) : null;     // refutar42: por `id` O por sus `data-*` (antes sólo con `id`)
   el._pintadoClave = clave;
   el.innerHTML = html;
   if (foto) _vivoReponer_(el, foto);
-  if (foco) {                                  // el foco sobrevive al repintado (teclado del móvil abierto, etc.)
-    var f = document.getElementById(foco.id);
-    if (f && f !== document.activeElement && f.focus) {
-      try { f.focus({ preventScroll: true }); if (foco.a != null && f.setSelectionRange) f.setSelectionRange(foco.a, foco.b); } catch (_) {}
-    }
-  }
+  if (foco) _focoReponer_(el, foco);           // el foco sobrevive al repintado (teclado del móvil abierto, Tab de escritorio…)
   return true;
 }
 
@@ -695,6 +734,28 @@ function _scrollRestaurar_(m, y){
 }
 
 function _activos_(){ return (DATA.miembros||[]).filter(function(m){ return !m.baja; }); }
+
+/* ⛔ refutar41 (13/11) · LO QUE CONTESTÓ QUIEN YA SE FUE NO CUENTA. `quitarDeConvocados` saca a una baja de los invitados, pero su FILA de
+   respuestas se queda (el histórico no se toca) y el servidor la sigue sirviendo: el mapa de calor de la reunión y el de «Programar turno»
+   contaban a Eli («1 puede» con 2 convocados que no habían contestado) y se le ofrecía para un turno. Cada miembro del panel trae `baja`
+   (el de un raso también): aquí se tira la fila al LEER, no al guardar. `{resp, quitadas}`: `quitadas` = filas con respuesta que se tiran,
+   para que quien lleve la cuenta del servidor (`nResp`) no cuente de más. Una puerta para las dos caras. */
+function _esBaja_(nombre){ var m=miembro(nombre); return !!(m && m.baja); }      // `miembro`: la ficha o `null` (quien no está no consta «de baja»: no se le toca)
+function _respDeActivos_(resp){
+  var out={}, quitadas=0, k;
+  resp=resp||{};
+  for(k in resp){
+    if(!Object.prototype.hasOwnProperty.call(resp,k)) continue;
+    if(_esBaja_(k)){ if(Array.isArray(resp[k]) || (resp[k] && typeof resp[k]==='object')) quitadas++; continue; }
+    out[k]=resp[k];
+  }
+  return {resp:out, quitadas:quitadas};
+}
+/* La convocatoria de turnos tal como la sirve el servidor (`resp` = `r.cv`), sin las filas de las bajas. El servidor no manda `invitados` en la convocatoria: no hay lista que limpiar. */
+function _convSinBajas_(cv, resp){
+  cv.resp=_respDeActivos_(resp||{}).resp;
+  return cv;
+}
 /* 22/10 (auditor 23, 🟠 8): los convocados que SIGUEN en el equipo, como el motor (`universo_convocado` sobre vivos).
    Si el censo no se conoce (menos de 2 activos: maqueta sin panel), la lista tal cual -- «no lo sé» no vacía a nadie. */
 function _invitadosVivos_(lista){
@@ -1782,8 +1843,10 @@ function _vistaNuevaTarea_(texto){
 function _repintarNuevaTarea_(){
   var el = document.getElementById('ntPanel');
   if(!el){ pintar(); return; }
+  var foco = _focoFirma_(el);              // refutar42: cada chip repintaba el panel y mandaba el foco a <body>
   el.outerHTML = _nuevaTareaPanel_();
   _cablearNuevaTarea_();
+  _focoReponer_(document.getElementById('ntPanel'), foco);
 }
 /* El botón «Crear la tarea» dice lo que falta (sin repintar el panel). */
 function _ntVivo_(){
@@ -1793,7 +1856,8 @@ function _ntVivo_(){
 function _cablearNuevaTarea_(){
   _fotoTareaPintar_(document.getElementById('ntV'));
   $$('[data-ntab]').forEach(function(el){ el.onclick = function(){
-    NUEVA_TAREA.ab = el.dataset.ntab === '1'; if(NUEVA_TAREA.ab) NUEVA_TAREA.ok = ''; _repintarNuevaTarea_(); }; });
+    NUEVA_TAREA.ab = el.dataset.ntab === '1'; if(NUEVA_TAREA.ab) NUEVA_TAREA.ok = ''; _repintarNuevaTarea_();
+    var n0 = NUEVA_TAREA.ab && document.getElementById('ntN'); if(n0) n0.focus(); }; });   // al abrirla, el cursor ya está en «Qué hay que hacer»
   var b = document.getElementById('ntCrear');
   var vivo = _ntVivo_;
   var n = document.getElementById('ntN');
@@ -1857,6 +1921,14 @@ function _cablearNuevaTarea_(){
   };
 }
 
+
+/* refutar42 · Ctrl/⌘+Enter dentro de «Nueva tarea» la CREA (como «Aprobar»): de «Crear la tarea» te separaban ~15 Tab (la barra de formato, SolarIA y
+   las instrucciones). Delegado UNA vez en `document`: el panel se repinta entero y un `onkeydown` por campo se perdería. Enter a secas no hace nada. */
+if(typeof document !== 'undefined' && document.addEventListener) document.addEventListener('keydown', function(e){
+  if(e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return;
+  var t = e.target, b = t && t.closest && t.closest('#ntPanel') ? document.getElementById('ntCrear') : null;
+  if(b && !b.disabled){ e.preventDefault(); b.click(); }
+});
 
 /* 01/11 (tareamovil) · LA HOJA «NUEVA TAREA» ES UNA SOLA, de las dos caras. Daniel: «tiene que ser tan cómodo como Notion» y
    «para crear tareas desde el teléfono». El escritorio la pinta en un panel plegable y el móvil en una hoja (`tareas.movil.js`);
@@ -2888,7 +2960,28 @@ function _tostLargo_(m){ return String(m == null ? '' : m).length > 110 ? {fijo:
 
 function tostErr(prefijo, e){
   /* refutar17: Apps Script contesta `String(err)`: sin quitar el «Error: » el aviso era «No se pudo enviar: Error: Ber Gnc ya tiene…». */
+  /* refutar44: si el servidor dice que ALGUIEN SE ADELANTÓ, se cuenta eso (y no «No se pudo: este parte no admite decisión (aprobada)»). */
+  var ch=_choque_(e);
+  if(ch){ tost(ch, _tostLargo_(ch)); return; }
   tost(String(prefijo || '') + String((e && e.message) || e).replace(/^Error:\s*/, ''), (e && e.sesion) ? {fijo:true} : null);
+}
+
+/* refutar44 (14/11): DOS PERSONAS A LA VEZ. Cada una tiene su pantalla cargada y la del que llega segundo está VIEJA: el servidor dice que no con una frase
+   escrita para el programa («reunión 6 no encontrada», «este parte no admite decisión (aprobada)»), y la app la pegaba tal cual detrás de «No se pudo»
+   y, peor, de «Vuelve a intentarlo» —reintentar no sirve—. Esta es la puerta que traduce esas frases a lo que ha pasado, para las dos caras.
+   → el texto para quien lo lee, o `''` si el error no es de este tipo (entonces se pinta el de siempre). Quien la llama, además, REFRESCA su pantalla.
+   ⛔ «sin permiso para decidir» NO está aquí: en otras pantallas es «no eres tú» de verdad; sólo la ficha de un documento sabe que es «otro se adelantó». */
+function _choque_(e){
+  var m=String((e && e.message) || e || '').replace(/^Error:\s*/, ''), x;
+  if((x=m.match(/este parte no admite decisi[oó]n \((\w+)\)/)))
+    return 'Otra persona ya lo ha decidido: el parte está «'+x[1]+'». Tu lista se ha puesto al día.';
+  if(/reuni[oó]n \d+ no encontrada/.test(m))
+    return 'Esa reunión ya no existe o ya no estás convocado a ella. Tu lista se ha puesto al día.';
+  if(/la reuni[oó]n ya tiene fecha fijada/.test(m))
+    return 'Ya se ha fijado la fecha de esta reunión: la disponibilidad está cerrada y lo que marcaste no se ha guardado.';
+  if(/el plazo ya venci[oó]/.test(m))
+    return 'El plazo ya ha terminado: lo último que marcaste no se ha guardado.';
+  return '';
 }
 
 /* ⛔ LA CLAVE DE UN ENVIO, PARA QUE UN REINTENTO NO LO DUPLIQUE. `api._post` hace TRES
@@ -3258,6 +3351,50 @@ function _borrLeer_(f){
   }catch(_){ return ''; }
 }
 function _borrBorrar_(f){ try{ localStorage.removeItem(_borrClave_(f)); }catch(_){} }
+/* ⛔ refutar47 (14/11): LA DISPONIBILIDAD PINTADA EN UNA REUNIÓN SE PERDÍA CON LA APP. La rejilla vive en memoria (`ST.sel`) hasta pulsar «Guardar disponibilidad»; con
+   el sistema matando la app (una llamada, la cámara, copiar algo en otra app) quien volvía se encontraba la rejilla en blanco, sin una palabra — y lo que no se contesta
+   a tiempo es lo que acaba en «te falta cubrir» y en una propuesta de puntos. Ahora cada toque deja en `localStorage` lo pintado (`s`) junto con lo que el servidor tenía
+   entonces (`b`): al volver se recupera SÓLO si el servidor sigue como estaba (si contestaste desde el ordenador mientras tanto, manda lo guardado). Sale en cuanto se
+   guarda bien o cuando lo pintado vuelve a ser lo guardado. Las listas van ordenadas [clave, valor]. */
+function _dispBorrLista_(m){ var a=[]; m.forEach(function(v,k){ if(v) a.push([k,v]); }); return a.sort(function(x,y){ return x[0]<y[0]?-1:x[0]>y[0]?1:0; }); }
+function _dispBorrClave_(id){ return 'disp-reu-'+id; }
+function _dispBorrGuardar_(id, sel, base){
+  var s=_dispBorrLista_(sel), b=_dispBorrLista_(base);
+  if(JSON.stringify(s)===JSON.stringify(b)) _borrBorrar_(_dispBorrClave_(id));
+  else _borrGuardar_(_dispBorrClave_(id), 'disp:'+JSON.stringify({s:s, b:b}));
+}
+/* Lo pintado y sin guardar que dejó una app muerta, como `Map` (o `null` si no hay, no es de esta base o no queda nada ofertado). `ofer` = {clave:1} de lo que se puede pintar. */
+function _dispBorrLeer_(id, base, ofer){
+  try{
+    var t=_borrLeer_(_dispBorrClave_(id)); if(t.indexOf('disp:')!==0) return null;
+    var o=JSON.parse(t.slice(5));
+    if(!o || JSON.stringify(o.b)!==JSON.stringify(_dispBorrLista_(base)) || !Array.isArray(o.s)) return null;
+    var m=new Map(); o.s.forEach(function(p){ if(ofer[p[0]] && (p[1]===1 || p[1]===2)) m.set(p[0], p[1]); });
+    return m;
+  }catch(_){ return null; }
+}
+/* ⛔ refutar37 (13/11, el taller): el borrador de un bloque DECLARADO no es sólo el texto. Con la app muerta por el sistema (segundo plano, sin red), al
+   reabrir volvía la justificación pero con la fecha de HOY, las horas por defecto (17:00-20:30) y sin la imputación: un texto de un bloque pegado a las
+   horas de otro, y nadie lo avisa. Y la `clave` de envío vivía sólo en memoria: si el servidor GUARDÓ y la respuesta se perdió, reabrir y reenviar mandaba
+   otra clave y el parte ya guardado chocaba consigo mismo («ya tiene el parte 804 … que se solapa»). Se guarda TODO junto, `clave` incluida, y el reenvío
+   recibe el parte que ya hay. Sólo del bloque a mano (`declararId==null`): los de «responder/declarar» nacen del parte que ya existe. */
+var FORM_PARTE_CAMPOS = ['fecha','ini','fin','cat','subcat','tarea','detalle','clave'];
+function _formParteGuardar_(f){
+  if(!f || f.declararId!=null) return;
+  var o={}; FORM_PARTE_CAMPOS.forEach(function(k){ if(f[k]!=null && f[k]!=='') o[k]=f[k]; });
+  _borrGuardar_('parte-forma', JSON.stringify(o));
+}
+/* Una vez por carga, y sólo si hay justificación recuperable (sin ella, lo demás no es «lo que escribías»). */
+function _formParteRecuperar_(f){
+  if(!f || f.declararId!=null || _formParteRecuperar_.hecho) return false;
+  _formParteRecuperar_.hecho=true;
+  if(!_borrLeer_('parte-just')) return false;
+  var o=null; try{ o=JSON.parse(_borrLeer_('parte-forma')||'null'); }catch(_){}
+  if(!o || typeof o!=='object') return false;
+  FORM_PARTE_CAMPOS.forEach(function(k){ if(typeof o[k]==='string' && o[k]) f[k]=o[k]; });
+  return true;
+}
+function _formParteBorrar_(){ _borrBorrar_('parte-forma'); }
 function _borrNorm_(t){ return String(t==null?'':t).replace(/\s+/g,' ').trim(); }
 /* Los campos con borrador dentro de `raiz` (o ella misma) que están vacíos reciben su texto. Dispara `input` para que la
    pantalla recalcule contadores/botones como si lo hubiera tecleado la persona. */
@@ -3361,7 +3498,7 @@ function _avisoMesDelBloque_(fechaDMY, hoyDMY, uc){
   var at = (uc && uc.at) ? new Date(uc.at) : null;
   if(ab && at && !isNaN(at.getTime())){
     var _2 = function(n){ return (n < 10 ? '0' : '') + n; };
-    var corte = at.getFullYear() + '-' + _2(at.getMonth() + 1) + '-' + _2(at.getDate());
+    var corte = _ahoraLocalISO_(at).slice(0, 10);            /* 13/11: el día de Madrid del cierre (a las 23:50 de Madrid en Helsinki ya es el 1) */
     if(f.slice(0,10) < corte) return ab;
     return f.slice(0,7) > h.slice(0,7) ? ab : '';
   }
@@ -3387,6 +3524,19 @@ var PUNTOS_TURNO = [
   { id:'cuvi-vi', nombre:'CUVI',                                          ciudad:'Vigo'    },
   { id:'citi-ou', nombre:'CITI',                                          ciudad:'Ourense' }
 ];
+
+/* refutar40 (13/11): la CIUDAD de un sitio por su nombre («CITI» → Ourense, «CUVI» → Vigo), de la MISMA lista de arriba (`PUNTOS_TURNO`, la de Daniel del 11/08).
+   '' = «no lo sé» (un punto de texto libre como «Taller»): nunca se inventa una ciudad. Un raso que vive en Vigo no tiene por qué saber que el CITI es Ourense. */
+function _ciudadDeSitio_(txt){
+  var k=String(txt==null?'':txt).trim().toLowerCase();
+  for (var i=0;i<PUNTOS_TURNO.length;i++) if (PUNTOS_TURNO[i].nombre.toLowerCase()===k) return PUNTOS_TURNO[i].ciudad;
+  return '';
+}
+/* «CITI» → «CITI · Ourense»; lo que no es un sitio conocido se queda como está. */
+function _sitioConCiudad_(txt){
+  var c=_ciudadDeSitio_(txt);
+  return c ? String(txt)+' · '+c : String(txt==null?'':txt);
+}
 
 function _puntoTurno_(id){
   for (var i=0;i<PUNTOS_TURNO.length;i++) if (PUNTOS_TURNO[i].id === id) return PUNTOS_TURNO[i];
@@ -3765,7 +3915,7 @@ async function _cierreEnviar_(t, st){
 /* «Empezar turno»: pone en marcha el reloj en el servidor y lo pega al turno. */
 async function _cierreEmpezar_(t){
   var re = await api.empezarTurno({id:t.id});
-  t.empezado_at = (re && re.empezado_at) || new Date(_ahoraApp_()).toISOString();
+  t.empezado_at = (re && re.empezado_at) || new Date(_ahoraInstante_()).toISOString();
   return t.empezado_at;
 }
 
@@ -4046,6 +4196,30 @@ function _rolDeTurno_(escrito, marcas){
    ⛔ LA PUERTA es la del servidor (`case 'crearTurno'`: `_rangoNom_ >= 1`), por nombre: el escritorio le pasa
    `ACTOR`, el móvil `YO.nombre`. */
 function _puedeProgramarTurno_(nombre){ return rangoNom(nombre) >= 1; }
+
+/* 13/11 (progconv) · DE QUÉ CONVOCATORIA SALE EL MAPA AL PROGRAMAR UN TURNO. 🗣️ Daniel (03/11): «debería dejar convocar turnos para todas las
+   convocatorias, abiertas y cerradas». La que se REPARTE es la más reciente que ya cerró y aún no tiene turnos en sus días (cerrar el plazo y
+   repartir es lo que se hace); `null` = ninguna así, y entonces vale la vigente que da el servidor sin id. `lista` es la de `listarConvocatorias`;
+   `fechas`, las de los turnos ya convocados (ISO); `hoy` (ISO), para no ofrecer una semana que ya pasó entera (sus turnos ya no se
+   convocan: una cerrada vieja sin turnos tendría el mapa para siempre). Las dos caras llaman a ésta y a `_convEtiqueta_`. */
+function _convParaRepartir_(lista, fechas, hoy){
+  var fs = (fechas || []).map(function(x){ return String(x || '').slice(0, 10); }).filter(Boolean);
+  var c = (lista || []).filter(function(c){
+    if (!c || c.estado !== 'cerrada') return false;
+    var a = String(c.semana_ini || '').slice(0, 10), z = String(c.semana_fin || '').slice(0, 10);
+    if (!z && a) z = new Date(new Date(a + 'T12:00:00Z').getTime() + 6 * 86400000).toISOString().slice(0, 10);   /* sin fin: lunes + 6 */
+    if (hoy && z < String(hoy).slice(0, 10)) return false;
+    return !fs.some(function(d){ return d >= a && d <= z; });
+  });
+  c.sort(function(x, y){ return String(y.semana_ini).localeCompare(String(x.semana_ini)); });
+  return c[0] || null;
+}
+/* El rótulo del chip de una convocatoria: «Semana del 23/11 · cerrada». */
+function _convEtiqueta_(c){
+  var est = {abierta:'abierta', cerrada:'cerrada', sin_abrir:'sin abrir'};
+  var f = _isoADMY_(String(c.semana_ini || '').slice(0, 10)) || String(c.semana_ini || '');
+  return 'Semana del ' + f.slice(0, 5) + ' \u00b7 ' + (est[c.estado] || c.estado || '');
+}
 
 /* Las horas de la duración, dichas como en los turnos reales («3 horas», «1 hora», «2,5 horas»). */
 function _duracionTurnoTxt_(h){
@@ -4371,6 +4545,17 @@ function _solInput_(ev){
     _solPintar_(k, true);
   }
 }
+/* 14/11 (solaria16): quien pega una transcripción de 2 h en una caja de SolarIA (tope `maxlength`) la veía CORTADA POR EL FINAL —donde está lo decidido— sin
+   aviso: el navegador recorta el pegado en silencio. Se avisa en el momento (cuánto se pegó, cuánto cabe) y se dice qué hacer. Un `paste` delegado, en las dos caras. */
+function _solPegado_(ev){
+  var t = ev && ev.target, k, mx, txt, sobra;
+  if(!t || !t.matches || t.tagName !== 'TEXTAREA') return;
+  mx = +t.getAttribute('maxlength') || 0;
+  if(!mx || !(t.hasAttribute('data-solent') || t.hasAttribute('data-ordiatxt') || Object.keys(SOLCFG).some(function(c){ return SOLCFG[c].ta && t.matches(SOLCFG[c].ta); }))) return;
+  txt = (ev.clipboardData && ev.clipboardData.getData('text')) || '';
+  sobra = (t.value || '').length - Math.max(0, (t.selectionEnd || 0) - (t.selectionStart || 0)) + txt.length - mx;
+  if(sobra > 0) tost('Has pegado '+txt.length+' caracteres y caben '+mx+': se corta el final ('+sobra+' de más). Pega sólo lo importante: lo decidido y lo que queda por hacer.');
+}
 function _resumirReunionDemo_(frase){
   return {ok: true, nota: 'Maqueta: sin SolarIA real.', texto: 'Reunión (maqueta). 2 participantes: Ana, Luis.\n'+
     (String(frase || '').trim() ? '- Punto 1: '+String(frase).trim().slice(0, 80)+'\n' : '')+'Solo en el orden del día, sin nada anotado: Ruegos y preguntas.'};
@@ -4653,6 +4838,8 @@ function _arrancarVivo_(refrescar){
     try{
       var r=await _pide_('queHayNuevo');
       if(!r || !r.sellos) return;
+      var _desf=(typeof _avisoDesfase_==='function') ? _avisoDesfase_ : null;   /* sólo el móvil la declara (movil.html): el escritorio no tiene aviso de desfase — por referencia, como `_asegurarPush_` (rojosbateria2) */
+      if(_desf) _desf(true);   /* refutar37: el servidor contesta → lo que se ve ya no es «de hace un rato» (si cambió algo, `refrescar` lo trae ahora) */
       if(!sellos){ sellos=r.sellos; return; }                 // la primera vuelta sólo toma la foto
       var c=_vivoCambios_(sellos, r.sellos);
       if(!c.length) return;
@@ -7538,7 +7725,7 @@ function _nomMesAbierto_(corto){
    el que importa es el SALTO DE AÑO, que solo pasa en enero. Produccion la sigue llamando sin
    argumento y no cambia nada de lo que se ve. */
 function _mesACerrar_(hoy){
-  var h=hoy||new Date(), a=h.getFullYear(), m=h.getMonth();  /* getMonth() es 0-11 */
+  var h=hoy||_ahoraMadridDate_(), a=h.getFullYear(), m=h.getMonth();  /* getMonth() es 0-11 · 13/11: el mes de Madrid */
   if(m===0){ a-=1; m=11; } else { m-=1; }
   var mm=m+1, p=a+'-'+(mm<10?'0':'')+mm;
   /* ⛔ 20/10 (auditoría): SI EL MES ABIERTO ES MÁS VIEJO QUE «EL ANTERIOR AL DEL RELOJ», SE CIERRA ÉSE. Un mes no se
@@ -7817,17 +8004,34 @@ function _cargarVisor_(cuerpo, id){
   car.className='dcar'; car.textContent='Cargando '+que+'…';
   cuerpo.appendChild(car);
   var f=document.createElement('iframe');
-  f.className='dv'; f.setAttribute('loading','lazy'); f.setAttribute('allow','autoplay');
+  f.className='dv'; f.setAttribute('allow','autoplay');
   /* ⛔ 28/10: CON LA CUENTA DE LA SESIÓN. Sin `authuser` Drive abre con la cuenta POR DEFECTO del navegador (la /u/0/),
      y la de Aerotech de Daniel es la /u/2/: con permiso sólo para el dominio, el visor no enseñaba el PDF de revisión. */
   var _em=''; try{ _em=(typeof SESION!=='undefined' && SESION && SESION.email) || localStorage.getItem('sol_last_email') || ''; }catch(_){}
-  f.src='https://drive.google.com/file/d/'+id+'/preview'+(_em ? '?authuser='+encodeURIComponent(_em) : '');
-  var fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
-    cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
-  f.onload=function(){ cuerpo.dataset.ok='1'; clearTimeout(fallo);
+  var url='https://drive.google.com/file/d/'+id+'/preview'+(_em ? '?authuser='+encodeURIComponent(_em) : '');
+  /* ⛔⛔ EL TEMPORIZADOR ARRANCA CUANDO EL VISOR SE ACERCA A LA PANTALLA, NO AL CREAR EL IFRAME (refutar35, 13/11).
+     📏 Medido en el escritorio con 8 pendientes del PD (Drive de pega que contesta al instante): a los 8 s, **0 peticiones
+     a Drive** y los 4 visores de abajo en «No se pudo incrustar el visor». Con `loading=lazy` el navegador no pide el
+     iframe hasta que está cerca, y los 6 s corrían igual: vencian, **BORRABAN el iframe** y al bajar ya no habia nada
+     que cargar. Quien revisa la cola entera veia roto todo lo que no cabia en la primera pantalla.
+     ✅ Ahora el iframe NO lleva `loading=lazy`: es esta funcion la que decide cuando pedirlo (IntersectionObserver con
+     margen de 600 px) y el `fallo` de 6 s cuenta desde ese momento. Sin IntersectionObserver se pide ya, como antes. */
+  var fallo=null;
+  function pedir(){
+    f.src=url;
+    fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
+      cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
+  }
+  f.onload=function(){ cuerpo.dataset.ok='1'; if(fallo) clearTimeout(fallo);
     /* ✅ AQUI, y no antes: es el unico momento en que se sabe que hay algo que mirar. */
     if(car && car.parentNode) car.parentNode.removeChild(car); };
   cuerpo.appendChild(f);
+  if(typeof IntersectionObserver==='undefined'){ pedir(); return; }
+  var io=new IntersectionObserver(function(es){
+    if(!es.some(function(e){ return e.isIntersecting; })) return;
+    io.disconnect(); pedir();
+  }, {rootMargin:'600px 0px'});
+  io.observe(cuerpo);
 }
 
 function _cablearVisor_(raiz){
@@ -8213,8 +8417,12 @@ async function _pushInit_(){
            gate lo deja pasar (no falta permiso). Sólo se decía en Ajustes, donde no mira nadie el primer día. Con el permiso YA dado y con sesión,
            `subscribe()` no pide nada: se intenta aquí, por la misma puerta única. Si el navegador no la deja (iOS pide un gesto), queda el aviso. */
         var _ya=false;
-        if(typeof SESION!=='undefined' && SESION && typeof _asegurarPush_==='function'){
-          try{ _ya=await _asegurarPush_(null); }catch(_){ _ya=false; }
+        /* 13/11 (rojosbateria2): `_asegurarPush_` vive SÓLO en `notis.movil.js`; el escritorio no la declara y aquí se llamaba por su nombre
+           (`probar_bundle_caras`: «llama a una función de OTRO bundle»). Se toma por `typeof` y se llama por la variable: en el móvil igual;
+           en el escritorio sigue sin intentarse (queda el aviso de abajo) — su `activarNotis` es quien suscribe allí. */
+        var _asegurar=(typeof _asegurarPush_==='function') ? _asegurarPush_ : null;
+        if(typeof SESION!=='undefined' && SESION && _asegurar){
+          try{ _ya=await _asegurar(null); }catch(_){ _ya=false; }
         }
         _pushFallo_(_ya ? null : 'el permiso est\u00e1 dado pero no hay suscripci\u00f3n: no te '+
           'llegar\u00eda ning\u00fan aviso. Vuelve a entrar para reactivarlos.');
@@ -8964,6 +9172,39 @@ function miembro(n){
   return buscaMiembro(function(m){ return m.nombre===n; });
 }
 
+/* ⛔ DOS «PABLO» NO SE DISTINGUEN POR LA PILA (refutar39, 13/11). Con el equipo por encima de 40 es cuestión de tiempo que dos personas compartan
+   nombre de pila, y en la cola de partes («Pablo · Aprobar») o en los convocados («Pablo ×») el rótulo es lo ÚNICO que dice a quién se está
+   aprobando o quitando. `nombreCorto(n)` es la pila si es única entre los activos; si no, la pila con lo MÍNIMO del apellido que las separa:
+   «Pablo F.», «Pablo M.»; y si comparten hasta la inicial, «Pablo Méndez Quintel.»… El apellido es el primero que no es una partícula
+   («María del Carmen Souto» → «María S.», no «María d.»). Sólo cambia lo que ya salía repetido: con pilas distintas devuelve la pila de siempre. */
+function _esParticulaApe_(t){ return /^(de|del|la|las|lo|los|da|das|do|dos|di|du|y|e|van|von|san)$/i.test(t); }
+function _apellidosDe_(x){
+  var nom=String(x.nombre||''), pila=x.pila||nom.split(/\s+/)[0];
+  var resto=nom.indexOf(pila+' ')===0 ? nom.slice(pila.length+1) : nom.split(/\s+/).slice(1).join(' ');
+  return resto.split(/\s+/).filter(function(t){ return t && !_esParticulaApe_(t); });
+}
+function _etiquetaNivel_(pila, ap, i){      /* nivel i: i letras del 1.er apellido; pasado éste, entero + letras del 2.º */
+  var a=ap[0]||'', b=ap[1]||'';
+  if(!a) return pila;
+  if(i<=a.length) return pila+' '+a.slice(0,i)+(i<a.length?'.':'');
+  var k=Math.min(i-a.length, b.length);
+  return pila+' '+a+(b ? ' '+b.slice(0,k)+(k<b.length?'.':'') : '');
+}
+function nombreCorto(nom){
+  var m=miembro(nom), pila=(m&&m.pila)||String(nom||'').split(/\s+/)[0];
+  if(!m || !pila) return pila||nom;
+  var clave=function(t){ return _sinTildes_(String(t||'')).toLowerCase(); };
+  var otros=(DATA.miembros||[]).filter(function(x){
+    return x!==m && x.nombre!==nom && !x.baja && clave(x.pila||String(x.nombre||'').split(/\s+/)[0])===clave(pila); });
+  if(!otros.length) return pila;
+  var ap=_apellidosDe_(m), aps=otros.map(_apellidosDe_), tope=(ap[0]||'').length+(ap[1]||'').length;
+  for(var i=1;i<=tope;i++){
+    var et=_etiquetaNivel_(pila, ap, i);
+    if(!aps.some(function(o){ return _etiquetaNivel_(o.pila||pila, o, i)===et; })) return et;
+  }
+  return nom;
+}
+
 /* Una clave de un solo uso para un envío. ⛔ Se genera UNA VEZ por envío y se reutiliza en
    los reintentos: si se generara dentro del reintento, cada intento traería una clave distinta
    y el servidor los vería como envíos distintos — que es justo el fallo que esto evita.
@@ -9234,8 +9475,7 @@ function _mejorTurno_(calor, minimo){
 }
 
 function _dispPila_(nom){
-  var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===nom; })[0];
-  return (m&&m.pila)||nom;
+  return miembro(nom) ? nombreCorto(nom) : nom;
 }
 
 /* Un grupo del desglose: rótulo pequeño encima y, debajo, lo suyo (chips de personas o una frase). `attr` va en el contenedor. */
@@ -9384,6 +9624,17 @@ function _turnoConsejoAguanta_(cv, fecha, hora, duracion){
   return false;
 }
 
+/* Quién no ha contestado NADA. Es lo que el excel no podía decir. */
+function _dispMudos_(cv){
+  var out=[];
+  (cv.invitados||[]).forEach(function(n){
+    var r=cv.resp&&cv.resp[n];
+    var vacio=true; if(r) for(var k in r){ if(Object.prototype.hasOwnProperty.call(r,k)) vacio=false; }
+    if(vacio) out.push(n);
+  });
+  return out.sort();
+}
+
 /* La caja de debajo del mapa al tocar un hueco: el desglose de `_dispDetalle_` (responsables · coche · resto · los que dijeron que no)
    y, aparte, de QUÉ SITIO puede cada uno (`cv.resp[nom][k].s`, que `_calorTurnos_` no guarda) y quién aguanta el bloque entero.
    ⛔ Los nombres son de quien convoca (rango ≥ 1): lo decide `_dispDetalle_`, no esto. */
@@ -9446,6 +9697,25 @@ function _turnoBloqueRango_(cv, dia, i0, i1){
   return {dia: dia, claves: claves, hora: hora, horas: (hora && claves.every(function(c){ return /^h\d\d$/.test(c); })) ? claves.length : 0};
 }
 
+/* refutar42 · UNA rejilla de casillas = UN control de teclado: una sola parada de Tab (la casilla con el foco lleva `tabindex=0`, el resto -1) y las flechas
+   mueven por ella (Inicio/Fin: principio y fin de la fila). Sin esto, 60 casillas son 60 Tab para pasarlas y ni una flecha. `celdas` van en orden de lectura
+   (fila a fila) y `cols` = cuántas hay por fila (los días). Lo llaman el mapa de calor de turnos y la rejilla de «Tu disponibilidad»; Enter/Espacio los pone
+   cada una (el mapa elige, la rejilla pinta). */
+function _rejillaFlechas_(celdas, cols){
+  cols = cols || 1;
+  var rov=function(a){ celdas.forEach(function(x){ x.setAttribute('tabindex', x===a ? '0' : '-1'); }); };
+  if(celdas.length) rov(celdas[0]);
+  celdas.forEach(function(el, n){
+    el.addEventListener('focus', function(){ rov(el); });
+    el.addEventListener('keydown', function(e){
+      var d={ArrowRight:1, ArrowLeft:-1, ArrowDown:cols, ArrowUp:-cols, Home:-(n%cols), End:cols-1-(n%cols)}[e.key];
+      if(d===undefined || e.altKey || e.ctrlKey || e.metaKey) return;
+      e.preventDefault();
+      if((e.key==='ArrowRight' && n%cols===cols-1) || (e.key==='ArrowLeft' && n%cols===0)) return;
+      var sig=celdas[n+d]; if(sig){ rov(sig); sig.focus(); }
+    });
+  });
+}
 /* El mapa entero, días en columnas y TRAMOS en filas. Las casillas son `[data-tcal]`; la caja `[data-tcal-det]`. */
 function _turnoCalorHTML_(cv, calor, id){
   var D=cv.dias||[], F=cv.franjas||[], maxN=0;
@@ -9461,7 +9731,7 @@ function _turnoCalorHTML_(cv, calor, id){
       D.map(function(d){
         var k=_dispClave_(d,fr.k), c=calor[k], a=maxN ? (0.12+0.88*c.n/maxN) : 0, est=_turnoCasillaEstado_(cv, calor, k);
         var pt=_turnoCasillaPintura_(est, c.n ? _calorColor_('presencial', a) : 'rgba(255,255,255,.045)');
-        return '<div data-tcal="'+esc(k)+'" data-n="'+c.n+'"'+pt.attr+' role="button" tabindex="0" style="cursor:pointer;min-height:34px;border-radius:3px;display:grid;place-items:center;'+
+        return '<div data-tcal="'+esc(k)+'" data-n="'+c.n+'"'+pt.attr+' role="button" tabindex="0" aria-label="'+esc(_diaCorto_(d)+' · '+_rotuloTramo_(fr)+' · '+(c.n ? c.n+(c.n===1 ? ' persona puede' : ' personas pueden') : 'nadie puede'))+'" style="cursor:pointer;min-height:34px;border-radius:3px;display:grid;place-items:center;'+
           'font-family:var(--mono);font-size:11px;color:'+(c.n?'#fff':'var(--ink2)')+';border:1px solid transparent;'+pt.css+'">'+
           (c.n||'')+(c.hay_coche?'<span style="font-size:8px;line-height:1">'+ico('coche')+'</span>':'')+'</div>';
       }).join('');
@@ -9512,6 +9782,8 @@ function _turnoCalorCablear_(raiz, cv, calor, alElegir){
     sel=nuevo; marca(b, k);
     if(typeof alElegir==='function') alElegir(b);
   };
+  /* refutar42: una parada de Tab para todo el mapa y flechas dentro (`_rejillaFlechas_`); Enter/Espacio elige la casilla. */
+  _rejillaFlechas_(celdas, ((cv&&cv.dias)||[]).length);
   celdas.forEach(function(el){
     el.onclick=function(){ elige(el); };
     el.onkeydown=function(e){ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); elige(el); } };
@@ -9684,9 +9956,9 @@ function _quienPuedeGrupos_(r, di, fi){
 }
 
 function _quienPuedePanel_(r, di, fi, rotulo){
-  var g=_quienPuedeGrupos_(r, di, fi), cnt={}, tag=/brid/i.test(String((r && (r.modalidad||r.mod))||''));
-  [g.puede, g.no, g.sin].forEach(function(l){ l.forEach(function(x){ var k=x.n.split(/\s+/)[0]; cnt[k]=(cnt[k]||0)+1; }); });
-  function pila(n){ var t=n.split(/\s+/), k=t[0]; return (cnt[k]>1 && t[1]) ? k+' '+t[1].charAt(0)+'.' : k; }
+  var g=_quienPuedeGrupos_(r, di, fi), tag=/brid/i.test(String((r && (r.modalidad||r.mod))||''));
+  /* refutar39: antes «pila + inicial del 2.º TOKEN» sólo entre los de este hueco: «María d.» (de «del») y dos «Pablo M.» seguían iguales. */
+  function pila(n){ return miembro(n) ? nombreCorto(n) : String(n).split(/\s+/)[0]; }
   function chip(x, cls){
     var t=(cls==='p' && tag) ? ' <i style="font-style:normal;font-size:10px;opacity:.8">'+(x.v===2?'presencial':'telemático')+'</i>' : '';
     var st='display:inline-block;margin:2px 4px 2px 0;padding:3px 9px;border-radius:999px;font-size:13px;line-height:1.25;';
@@ -10149,7 +10421,7 @@ function _convEtiq_(k){
    🗣️ Daniel: *«para marcar disponibilidad es como una reunión, simplemente q te debería dejar usar varios pinceles (CUVI +
    Coche) (CUVI + Sin coche) (CITI + Coche) (CITI + Sin coche) […] Y también puedes marcar que tienes ambas disponibilidades a
    la vez. Pero como mínimo tienes q seleccionar una. Cada una de las combinaciones con colores distintos […] en Ourense sin
-   coche y en Vigo con coche a la vez»*. CUVI = Ourense, CITI = Vigo.
+   coche y en Vigo con coche a la vez»*. ⛔ CUVI = **Vigo**, CITI = **Ourense** (la lista de Daniel del 11/08, `PUNTOS_TURNO`): aquí ponía al revés (refutar40).
    ⛔ LA CELDA: `{s:'cuvi'|'citi'|'ambos', c:bool, cc:{cuvi?:bool, citi?:bool}}`. `cc` es el coche POR SITIO y lleva
    exactamente los sitios que marcaste; `c` = «lleva en alguno» (lo que lee quien no conoce `cc`: Python viejo, otra cara). Una
    celda vieja (sin `cc`) tiene UN `c` para todos sus sitios: `_celdaCoche_` la lee igual. Gemela de `reglas/turnos.py:con_coche`
@@ -10276,7 +10548,7 @@ function _pincelChipsHTML_(cv, sel, attr){
   var chip = function(k, txt, col, on, coche){
     var oscuro = /^#(E41E25|3f9ed6)$/i.test(col);
     return '<button type="button" '+attr+'="'+esc(k)+'" class="pincel-chip'+(on?' on':'')+'" data-p style="'+
-      (on ? 'background:'+col+';border-color:'+col+';color:'+(oscuro?'#fff':'#1a1616') : 'border-color:'+col)+'">'+esc(txt)+(coche?' '+ico('coche'):'')+'</button>';
+      (on ? 'background:'+col+';border-color:'+col+';color:'+(oscuro?'#fff':'#1a1616') : 'border-color:'+col)+'">'+esc(_sitioConCiudad_(txt))+(coche?' '+ico('coche'):'')+'</button>';
   };
   return _pincelesDe_(cv).map(function(p){
     var on = !!sel && !sel.no && Object.prototype.hasOwnProperty.call(sel, p.sitio);
@@ -10683,7 +10955,18 @@ function _minSesion_(ini, pausas){
    ⛔ Y NO `iso.slice(11,16)`: el backend sella los fichajes con `toISOString()`, o sea UTC,
    asi que recortar la cadena ensena la hora de Greenwich — en verano espanol, DOS HORAS
    ANTES de la real. Ese era el fallo vivo de «Fichajes en curso» (ver el paso E). */
-function _hhmmDe_(iso){ var d=new Date(iso); return pad(d.getHours())+':'+pad(d.getMinutes()); }
+function _hhmmDe_(iso){ return _ahoraLocalISO_(new Date(iso)).slice(11,16); }
+/* ⛔ 13/11 (refutar43): AHORA LA HORA ES LA DE **MADRID**, no la de la pared de quien mira. Con `getHours()` un miembro de Erasmus en Lisboa (−1 h) leía
+   «CONTANDO DESDE LAS 22:10» de un fichaje que el servidor guarda a las 23:10, y otro en Helsinki (+1 h) «00:10»: la cara decía una hora y el parte otra.
+   Es la misma que `_ahoraLocalISO_` (Intl, Europe/Madrid) y que `_hoyTxt_`: una sola hora para toda la app. Un instante ilegible da lo de siempre («NaN:NaN»). */
+/* La pared de Madrid como un `Date` LOCAL (sus getFullYear/getMonth/getDate/getHours dicen lo de Madrid): para las cuentas de «hoy» y «ahora» que leen esos campos. */
+function _ahoraMadridDate_(d){
+  var a = _ahoraLocalISO_(d);
+  return new Date(+a.slice(0,4), +a.slice(5,7)-1, +a.slice(8,10), +a.slice(11,13), +a.slice(14,16));
+}
+/* El INSTANTE de «ahora» (ms) para comparar con instantes del servidor (`empezado_at`, `ini`…). Fuera de la maqueta es el reloj tal cual: la pared de Madrid
+   leída como si fuera la local (`new Date(_ahoraApp_())`) desfasaba la cuenta lo que el móvil se aparte de Madrid (el reloj de un turno en curso). */
+function _ahoraInstante_(){ return _demoLocal_() ? new Date(_ahoraApp_()).getTime() : Date.now(); }
 
 /* Que es «la imputacion» de un parte: UN solo sitio, para que lo que se VALIDA y lo que se
    ENVIA no puedan desincronizarse en silencio (que es como estuvieron un tiempo en el movil).
@@ -12132,15 +12415,26 @@ function _decPanelesHTML_(e, o){
     acs.map(function(a){ return panel(a[0]); }).join('') + (o.deshacerHTML || '') + '</div>';
 }
 /* Elige (o, con la ya elegida o `''`, cierra; `abrir` = no cierra nunca) el panel de una acción del expediente `id`: sólo UNO abierto; lo tecleado en los demás sigue en el DOM. */
-function _decSeleccionar_(id, acc, abrir){
+function _decSeleccionar_(id, acc, abrir, desdeTeclado){
   id = String(id);
+  var antes = DEC_SEL[id] || '';
   DEC_SEL[id] = (acc && (abrir || DEC_SEL[id] !== acc)) ? acc : '';
   Array.prototype.forEach.call(document.querySelectorAll('[data-decwrap]'), function(w){
     if (w.getAttribute('data-decwrap') !== id) return;
     Array.prototype.forEach.call(w.querySelectorAll('[data-decsel][data-decacc]'), function(b){
       if (b.getAttribute('data-decacc')) b.classList.toggle('on', b.getAttribute('data-decacc') === DEC_SEL[id]); });
     Array.prototype.forEach.call(w.querySelectorAll('[data-decp]'), function(p){
-      p.classList.toggle('ab', p.getAttribute('data-decp') === DEC_SEL[id]); });
+      var abre = p.getAttribute('data-decp') === DEC_SEL[id];
+      p.classList.toggle('ab', abre);
+      /* docdecidir-1 (Daniel aceptó 13/11): el panel que se abre queda por debajo de lo que se ve; se lleva a la vista lo justo (`nearest`), salvo «con anotaciones», más alto que la pantalla: su principio. Cerrar no mueve nada. El CSS no anima el desplazamiento (no hay `scroll-behavior`), así que con `prefers-reduced-motion` tampoco. */
+      if (abre && DEC_SEL[id] && p.scrollIntoView) p.scrollIntoView({block: DEC_SEL[id] === 'anot' ? 'start' : 'nearest'});
+    });
+    /* refutar42: con el TECLADO el foco sigue a lo que se abre (el motivo, el «Sí, aprobar»…) y, al cerrarlo, vuelve a la acción que lo
+       abrió: antes se quedaba en el chip y el motivo era «otro Tab», o —al cerrar con «No»— caía a <body> porque el botón se ocultaba. */
+    if (!desdeTeclado) return;
+    var dentro = DEC_SEL[id] ? w.querySelector('[data-decp="' + DEC_SEL[id] + '"]') : null,
+        el = dentro ? dentro.querySelector('textarea,input:not([type=hidden]),select,button') : (antes ? w.querySelector('[data-decsel][data-decacc="' + antes + '"]') : null);
+    if (el && el.focus) el.focus({preventScroll: true});
   });
 }
 /* El resumen de «con anotaciones» se rehace mientras se teclea: lo que ves es lo que se publica. */
@@ -12153,13 +12447,29 @@ function _decRefrescar_(wrap){
 if (typeof document !== 'undefined' && document.addEventListener){
   document.addEventListener('click', function(ev){
     var b = ev.target && ev.target.closest ? ev.target.closest('[data-decsel]') : null;
-    if (b){ _decSeleccionar_(b.getAttribute('data-decsel'), b.getAttribute('data-decacc')); return; }
+    if (b){ _decSeleccionar_(b.getAttribute('data-decsel'), b.getAttribute('data-decacc'), false, ev.detail === 0); return; }
     var w = ev.target && ev.target.closest ? ev.target.closest('[data-decp="anot"]') : null;
     if (w) setTimeout(function(){ _decRefrescar_(w.closest('[data-decwrap]')); }, 0);
   });
   document.addEventListener('input', function(ev){
     var w = ev.target && ev.target.closest ? ev.target.closest('[data-decp="anot"]') : null;
     if (w) _decRefrescar_(w.closest('[data-decwrap]'));
+  });
+  /* refutar42 · el motivo de «Solicitar cambios» / «Rechazar» con el teclado: Esc lo CIERRA (sin enviar, el foco vuelve a su botón) y
+     Ctrl/⌘+Enter lo ENVÍA. Enter a secas es un salto de línea. */
+  document.addEventListener('keydown', function(ev){
+    var t = ev.target, p = t && t.closest && t.tagName === 'TEXTAREA' ? t.closest('[data-decp]') : null, acc = p && p.getAttribute('data-decp');
+    if (!p || (acc !== 'cambios' && acc !== 'rechazado')) return;
+    var w = p.closest('[data-decwrap]');
+    if (ev.key === 'Escape' && w){
+      ev.preventDefault(); ev.stopImmediatePropagation();
+      var chip = w.querySelector('[data-decsel][data-decacc="' + acc + '"]');
+      _decSeleccionar_(w.getAttribute('data-decwrap'), '', false, false);
+      if (chip) chip.focus({preventScroll: true});
+    } else if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)){
+      var go = p.querySelector('[data-doc][data-acc]');
+      if (go){ ev.preventDefault(); go.click(); }
+    }
   });
 }
 
@@ -12729,7 +13039,8 @@ function _reuTerminada_(r, ahora){
 }
 function _msAFechaHora_(ms){
   var d=new Date(ms);
-  return {fecha:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()), hora:pad(d.getHours())+':'+pad(d.getMinutes())};
+  var m=_ahoraLocalISO_(d);                    /* 13/11: la pared de Madrid, no la del móvil (ver `_hhmmDe_`) */
+  return {fecha:m.slice(0,10), hora:m.slice(11,16)};
 }
 
 /* Abre el formulario. `c.parts` = nombres de partida (los invitados). */
@@ -12943,8 +13254,7 @@ function _variosChipHTML_(on){
 /* Enciende o apaga el formulario del bloque (sin reunión). `cb` = lo de la cara: repintar. */
 function _variosAlternar_(on){
   if(!on){ BLQ=null; return; }
-  var h=new Date();
-  _bloqueAbrir_({modo:'declarar', fecha:h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate()), parts:[]});
+  _bloqueAbrir_({modo:'declarar', fecha:_ahoraApp_().slice(0,10), parts:[]});     /* 13/11: el día de Madrid (de 23:00 a 00:00 en Helsinki ya es mañana) */
 }
 function _variosActivo_(){ return !!(BLQ && BLQ.modo==='declarar' && BLQ.reunion_id==null); }
 
@@ -12974,7 +13284,7 @@ function _bloqueReuCablear_(getR, cb){
   var on=function(id, f){ var e=$('#'+id); if(e) e.onclick=async function(){ if(e.disabled) return; e.disabled=true;
     try{ await f(); }catch(x){ tostErr('No se pudo: ', x); } finally{ e.disabled=false; } }; };
   var base=function(r, modo){
-    var h=new Date(), f=h.getFullYear()+'-'+pad(h.getMonth()+1)+'-'+pad(h.getDate());
+    var f=_ahoraApp_().slice(0,10);                /* 13/11: el día de Madrid, no el del móvil */
     var inv=(Array.isArray(r.invitados)?r.invitados:[]).filter(function(n){ return !!n; });
     var o={modo:modo, reunion:r, reunion_id:r.id, titulo:r.titulo||'', parts:inv, fecha:f, en_curso:r.en_curso};
     /* ya pasó: el bloque se declara con SU horario, no con el de ahora (11/11: haga lo que haga que pasara, no sólo en las 48 h del aviso) */
@@ -13051,12 +13361,6 @@ function _darHorasAbrir_(pre){
       horas:pre.horas||'', motivo:pre.motivo||'', clave:_claveUso_(),
       cat:pre.cat||'compensacion', subcat:pre.subcat||'', conHor:!!pre.conHor, fecha:pre.fecha||_hoyNxISO_(), ini:pre.ini||'16:00', fin:pre.fin||'18:00'};
   return DH;
-}
-function _darHorasTarjetaHTML_(){
-  if(!_otorgablesDe_(_actorHoras_()).length) return '';
-  return '<div class="tarj">'+cab('Dar horas','a tu gente')+
-    '<p class="rnota" style="margin:0 0 10px">Para una feria, un traslado, un turno sin fichar…: cuentan al momento, sin que nadie las firme.</p>'+
-    '<button class="btn pri full" data-p data-darhoras>Dar horas</button></div>';
 }
 /* Las horas de cada uno: las que escribe; en blanco y con horario, lo que dura el tramo (el servidor lo calcula igual). */
 function _darHorasHoras_(){
@@ -14056,6 +14360,19 @@ function _mtSet_(m, ruta, v){
   var u = p[p.length - 1];
   o[u] = v;
 }
+/* ⛔ refutar47 (14/11): LO ÚLTIMO QUE SE ESCRIBÍA EN LA MEMORIA SE PERDÍA CON LA APP. El borrador va al servidor 1,5 s DESPUÉS de dejar de teclear; si el sistema mata la app
+   en ese hueco (una llamada, la cámara para la foto del turno), el párrafo en curso no existía en ningún sitio y al volver la ficha decía «Borrador guardado» sin una
+   palabra. Ahora cada cambio deja en `localStorage` la memoria entera junto con la `rev` del servidor sobre la que se escribió; al abrir el editor se recupera SÓLO si el
+   servidor sigue en esa `rev` (si se siguió desde el ordenador, manda lo guardado). Sale en cuanto el servidor lo tiene, o al enviar. */
+function _mtRespaldo_(k){ return 'memoria-turno-' + k; }
+function _mtRespaldar_(k){ var ed = MT_.ed[k]; if(ed) _borrGuardar_(_mtRespaldo_(k), 'mt:' + JSON.stringify({rev: ed.rev, m: ed.m})); }
+function _mtRespaldoLeer_(k, rev){
+  try{
+    var tx = _borrLeer_(_mtRespaldo_(k)); if(tx.indexOf('mt:') !== 0) return null;
+    var o = JSON.parse(tx.slice(3));
+    return (o && o.rev === rev && o.m && typeof o.m === 'object') ? o.m : null;
+  }catch(_){ return null; }
+}
 function _mtGuardarDif_(t, k){
   var ed = MT_.ed[k]; if(!ed) return Promise.resolve();
   clearTimeout(ed.reloj); ed.reloj = null;
@@ -14063,6 +14380,7 @@ function _mtGuardarDif_(t, k){
   ed.guardando = _ftDeserv_('guardarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev}).then(function(o){
     ed.rev = o.rev; ed.sucio = false; ed.error = ''; ed.guardando = null; ed.faltas = o.faltas || []; ed.avisos = o.avisos || [];
     _mtRevisionPintar_(k);
+    if(!ed.sucio2) _borrBorrar_(_mtRespaldo_(k));      /* refutar47: el servidor ya lo tiene (con `sucio2`, hay algo más reciente que aún no) */
     if(MT_.est[k] && MT_.est[k].r){ MT_.est[k].r.rev = o.rev; MT_.est[k].r.guardada = true; }
     var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtestado]'); if(el) el.textContent = _mtEstadoTxt_(ed);
     if(ed.sucio2){ ed.sucio2 = false; ed.sucio = true; return _mtGuardarDif_(t, k); }
@@ -14074,7 +14392,7 @@ function _mtGuardarDif_(t, k){
 function _mtProgramar_(t, k){
   var ed = MT_.ed[k]; if(!ed) return;
   if(ed.guardando) ed.sucio2 = true;
-  ed.sucio = true; clearTimeout(ed.reloj);
+  ed.sucio = true; clearTimeout(ed.reloj); _mtRespaldar_(k);
   ed.reloj = setTimeout(function(){ _mtGuardarDif_(t, k).catch(function(){}); }, 1500);
   var el = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtestado]'); if(el) el.textContent = _mtEstadoTxt_(ed);
 }
@@ -14087,7 +14405,7 @@ async function _mtEnviar_(t, k){
   ed.enviando = true; ed.error = ''; _mtPintar_(k);
   try{
     await _ftDeserv_('enviarMemoriaTurno', t, {memoria: ed.m, rev: ed.rev});
-    tost('Memoria enviada a revisión.');
+    tost('Memoria enviada a revisión.'); _borrBorrar_(_mtRespaldo_(k));
   }catch(e){
     /* `api._post` reintenta: si se perdió la RESPUESTA, el servidor ya la tiene enviada y el segundo intento dice «ya está enviada». */
     var r = await _mtRefrescar_(t, true).catch(function(){ return null; });
@@ -14099,7 +14417,13 @@ async function _mtEnviar_(t, k){
 async function _mtAbrir_(t, k){
   var r = await _mtRefrescar_(t, true); if(!r || !r.puede) return;
   MT_.ed[k] = {m: JSON.parse(JSON.stringify(r.memoria)), rev: r.rev, sucio: false, nuevo: '', error: '', faltas: r.faltas || [], avisos: r.avisos || [], pool: [], galeria: -1, persona: -1, diaAbierto: -1, movAct: -1, foco: 'de', verFaltas: false};
-  MT_.abierto[k] = true; _mtPintar_(k);
+  MT_.abierto[k] = true;
+  var rs = _mtRespaldoLeer_(k, r.rev);
+  if(rs && JSON.stringify(rs) !== JSON.stringify(r.memoria)){
+    MT_.ed[k].m = rs; _mtProgramar_(t, k);        /* lo que había escrito y no llegó a guardarse: vuelve, y se guarda ya */
+    tost('Recuperé lo último que escribías antes de que se cerrara la app.');
+  }else _borrBorrar_(_mtRespaldo_(k));
+  _mtPintar_(k);
   /* las fotos del turno para ponerlas en la memoria (sólo si el servidor deja verlas); sin ellas la memoria se escribe igual */
   _ftDeserv_('listarFotosTurno', t).then(function(f){
     if(MT_.ed[k] && f && f.puedeVer){ MT_.ed[k].pool = f.fotos || []; _mtPintar_(k); }
@@ -14182,7 +14506,9 @@ function _mtClic_(t, k, ev){
   if((a = q('[data-mtfoto]'))){
     var pf = a.getAttribute('data-mtfoto').split(':'), cm = m.comentarios[+pf[0]];
     if(cm){
-      cm.fotos = cm.fotos || []; cm.fotos.push({id: pf[1], pie: ''}); ed.galeria = -1; _mtProgramar_(t, k); _mtPintar_(k);
+      cm.fotos = cm.fotos || [];
+      /* memoriafotos-3 (Daniel aceptó 13/11): el pie nace con el título que se le dio al subir la foto («Aleta»); sin título, vacío. Se corrige en el campo, que recibe el foco. */
+      var ft = _mtFotoDe_(ed, pf[1]); cm.fotos.push({id: pf[1], pie: String((ft && ft.titulo) || '').slice(0, 120)}); ed.galeria = -1; _mtProgramar_(t, k); _mtPintar_(k);
       var ip = document.querySelector('[data-mtur="' + k.replace(/"/g, '') + '"] [data-mtin="comentarios.' + pf[0] + '.fotos.' + (cm.fotos.length - 1) + '.pie"]'); if(ip) ip.focus();
     }
     return;
@@ -15133,6 +15459,7 @@ function _a11yCablear_(){
   var s=document.createElement('style'); s.id='a11yCss';
   s.textContent=
     /* anillo de foco visible EN TODO (sólo con teclado: `:focus-visible`); `!important` porque varios campos lo tenían `outline:none` */
+    '#main[tabindex="-1"]:focus,#main[tabindex="-1"]:focus-visible{outline:none!important}'+      /* refutar42: el foco que se le da a la vista al cambiarla con el teclado no se pinta */
     'button:focus-visible,a:focus-visible,summary:focus-visible,[role=button]:focus-visible,[tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--red2,#FF4A4F)!important;outline-offset:2px!important}'+
     /* menos movimiento: lo infinito se para y lo largo se acorta (el evento `animationend` sigue saltando) */
     '@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important;transition-delay:0s!important;scroll-behavior:auto!important}}';

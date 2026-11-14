@@ -24,7 +24,7 @@ function _normTurnoM_(t, ix){
     if(Array.isArray(r)) return [r[0], r[1]||'', false];
     var nom=r.miembro||r.nombre||'— libre';
     var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===nom; })[0];
-    return [ (m&&m.pila)||nom, r.rol||'', nom===_yo ];
+    return [ _pilaDeM_(nom)||(m&&m.pila)||nom, r.rol||'', nom===_yo ];
   });
   var yo=(YO&&YO.nombre)||'', mio=null;
   (t.roles||[]).forEach(function(r){ if(!Array.isArray(r) && (r.miembro===yo)) mio=r.rol||'te toca'; });
@@ -274,8 +274,12 @@ function _convHTML_(cv){
      están ni para arriba ni para abajo»* (Daniel, 14/10). Por eso la hora va en un **span**: sin
      un elemento no hay nada que anclar a la línea, y empujar la celda entera arrastraría su
      fondo `sticky` y su borde. Reuniones ya lo hacía así. El anclaje está en `movil.css`. */
-  var filas=F.map(function(fr){
-    return '<div class="rc rd" data-tfr="'+esc(fr.k)+'" data-p><span>'+esc(fr.txt)+'</span></div>'+
+  /* refutar33 (13/11): LA COMIDA TAMBIÉN SE VE AQUÍ. Con las franjas de hoy (9–13 y 15–23) la rejilla pegaba «12:00» y «15:00» como filas
+     vecinas, y como las etiquetas van al límite de arriba la fila de las 12 se leía «de 12 a 15». El mapa de quien reparte ya dibuja el
+     hueco (`_huecoHTML_`); quien CONTESTA veía otra cosa. Una banda de ancho completo, sin casillas: nadie contesta lo que no se ofrece. */
+  var filas=F.map(function(fr, i){
+    var hu=i ? _huecoEntreFranjas_(F[i-1], fr) : 0;
+    return (hu ? _huecoHTML_(hu) : '')+'<div class="rc rd" data-tfr="'+esc(fr.k)+'" data-p><span>'+esc(fr.txt)+'</span></div>'+
       D.map(function(d){ return _convCelHTML_(cv,d,fr.k); }).join('');
   }).join('');
   return '<div class="tarj" id="convC">'+
@@ -428,10 +432,13 @@ function _convPieHTML_(cv){
    forma de deshacer una marca, y dejar «no puedo» puesto por error es peor que no marcar. */
 /* Lo que escribe el pincel de AHORA (los 4 pinceles, 04/11): la selección vive en `CONV_PINCEL`/`CONV_COCHE`/`CONV_CC`. */
 function _convQuiere_(){ return _pincelValor_(CONV_PINCEL, CONV_COCHE, CONV_CC); }
-function _convPintar_(cv, k){
+function _convPintar_(cv, k, modo){
   var mias=_convMias_(cv), v=mias[k]||null;
   var quiere = _convQuiere_();
-  var igual = _celdaIgual_(v, quiere);
+  /* refutar33 (13/11): `modo` ('marca'|'borra') lo fija el PRIMER toque de un trazo. Sin él cada celda por la que pasa el dedo se alternaba
+     sola: el menor temblor dentro de la celda donde se empezó —o bajar a la hora de al lado, que es del MISMO bloque— la volvía a quitar, y
+     un arrastre que acababa de pintar dejaba la rejilla en blanco. Sin `modo` (un toque suelto) se alterna, como siempre. */
+  var igual = modo ? modo==='borra' : _celdaIgual_(v, quiere);
   /* ⛔ SE PINTA EL TURNO ENTERO, no la casilla. Con franjas de una hora, marcar a mano las
      cuatro de un turno son cuatro toques y tres ocasiones de dejarse una — y una hora suelta
      marcada no es disponibilidad para nada. El día que la convocatoria venga con dos franjas
@@ -594,21 +601,46 @@ function _convGuardar_(cv){
      (`cv._okMias`) y el aviso se queda hasta que lo tocas. Un envío viejo que falla con otro más nuevo en vuelo se ignora: el nuevo lleva la
      rejilla entera. Cada envío manda la rejilla ENTERA, así que lo guardado es siempre una rejilla completa. */
   var enviada=JSON.parse(JSON.stringify(_convMias_(cv))), n=(cv._gseq=(cv._gseq||0)+1);
+  cv._vuelo=(cv._vuelo||0)+1;        /* refutar33: mientras hay un envío en vuelo no se relee la rejilla (`_convRefrescar_`) */
   api.guardarDisponibilidad(cv.id, _convMias_(cv)).then(function(){
+    cv._vuelo--;
     cv._okMias=enviada;
   }).catch(function(e){
+    cv._vuelo--;
     var vuelve=(cv._gseq===n && cv._okMias);
     if(typeof tost==='function'){
       var m=String((e&&e.message)||e).replace(/^Error:\s*/,'');
-      tost('No se pudo guardar tu disponibilidad'+(e&&e.sinRed ? ': sin conexión, tu último toque NO se guardó.' : ': '+m)+
+      var _ch=(typeof _choque_==='function' && !(e&&e.sinRed)) ? _choque_(e) : '';   /* refutar44: «el plazo ya venció» se dice con palabras, y no se manda a repetirlo «cuando haya red» */
+      tost(_ch ? _ch+(vuelve ? ' La rejilla vuelve a lo que ya tenías guardado.' : '') :
+        'No se pudo guardar tu disponibilidad'+(e&&e.sinRed ? ': sin conexión, tu último toque NO se guardó.' : ': '+m)+
         (vuelve ? ' La rejilla vuelve a lo que ya tenías guardado: repítelo cuando haya red.' : ''), {fijo:true});
     }
     if(vuelve){
       var yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
       cv.resp[yo]=JSON.parse(JSON.stringify(cv._okMias));
+      /* refutar33 (13/11): LA PANTALLA NO VOLVÍA. `pintar` no reconstruye si el HTML que sale es el mismo que ya recuerda el nodo
+         (`_pintarSiCambia_`), y aquí el HTML «de antes» ES el recuerdo: lo que se vio de más lo puso `repinta` sobre el DOM, no el
+         HTML. Sin olvidar el recuerdo, el aviso decía «vuelve a lo que ya tenías» y la rejilla seguía con la celda que no se guardó. */
+      var nodo=$('#v-turnos'); if(nodo) nodo._pintado=null;
       if(typeof pintar==='function') pintar();
     }
   });
+}
+
+/* refutar33 (13/11): DOS PESTAÑAS (o el móvil y el ordenador). Cada envío manda la rejilla ENTERA, así que la pestaña que se quedó atrás
+   pisaba en silencio lo que se marcó en la otra. Al volver a la app (y en el refresco de 90 s) se relee TU rejilla del servidor — sobre el
+   mismo objeto, para que los manejadores ya enganchados no se queden con uno viejo — salvo que haya un envío en vuelo. */
+function _convRefrescar_(){
+  var cv=_convAbierta_();
+  if(!cv || cv._vuelo || typeof api==='undefined' || !api.getConvocatoria || typeof SESION==='undefined' || !SESION) return Promise.resolve();
+  return api.getConvocatoria().then(function(r){
+    if(cv._vuelo || !r || !r.convocatoria || String(r.convocatoria.id)!==String(cv.id)) return;
+    var yo=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
+    if(!cv.resp) cv.resp={};
+    var igual=JSON.stringify(cv.resp[yo]||{})===JSON.stringify(r.mias||{});
+    cv.resp[yo]=r.mias||{}; cv._okMias=JSON.parse(JSON.stringify(cv.resp[yo])); cv.abierta=r.abierta;
+    if(!igual && typeof pintar==='function') pintar(true);
+  }).catch(function(){});
 }
 
 function _engConv_(){
@@ -661,17 +693,23 @@ function _engConv_(){
   if(br) br.onclick=function(){ _reusarConv_(cv, repinta); };
   /* Pintar a dedo y de arrastre, como en reuniones. ⚠️ `setPointerCapture` LANZA si el puntero
      no es suyo, y al lanzar aborta el resto del manejador: va envuelto (ya pasó en el pintor). */
-  var pintando=false, antes=null;
+  var pintando=false, antes=null, modoTrazo=null;
+  /* refutar33 (13/11): LOS ESCUCHAS DEL TRAZO SE PONEN UNA VEZ POR NODO. `pintar()` ya no reconstruye si no hay nada nuevo (`_pintarSiCambia_`),
+     pero `enganchar()` corre igual y esto hacía `addEventListener` otra vez sobre la MISMA rejilla: tras dos repintados sin cambios un toque
+     disparaba tres pintores seguidos —cada uno alternaba la casilla— y la marca no se ponía (o se ponía, según lo impar). Los escuchas leen
+     el `cv` y el `repinta` de la última pasada (`rej._cv`, `rej._repinta`), no los de la que los puso. */
+  rej._cv=cv; rej._repinta=repinta;
   /* ⛔⛔ EL GESTO VA ENGANCHADO **ANTES** QUE EL PINTOR, y no es un detalle de orden: los dos
      escuchan en el MISMO elemento, así que corren en el orden en que se registran. Si el
      pintor fuera primero, el `pointerdown` del segundo dedo **pintaría una celda** antes de que
      nadie supiera que vienen dos dedos — y el usuario vería una marca por querer deslizar.
      ✅ `alAbortar` deshace lo que el PRIMER dedo ya había pintado: `_convPintar_` escribe en el
      `pointerdown`, no al soltar, así que sin esto el trazo abortado se queda puesto. */
-  var dd=_dosDedos_(rej, function(){
+  var dd=rej._dd||(rej._dd=_dosDedos_(rej, function(){
+    var cv=rej._cv, repinta=rej._repinta;
     if(antes) _restaurarCeldas_(_convMias_(cv), antes);
     antes=null; pintando=false; repinta();
-  });
+  }));
   /* Los atajos (935.ª) van por `onclick`: es un TOQUE, y el navegador no lo dispara tras arrastrar. Mismo guardia de
      plazo que el pintor, y se guarda igual que al soltar el dedo. */
   $$('#convRej [data-tdia], #convRej [data-tfr]').forEach(function(h){
@@ -682,7 +720,10 @@ function _engConv_(){
       repinta(); _convGuardar_(cv);
     };
   });
+  if(rej._engPuesto) return;
+  rej._engPuesto=true;
   rej.addEventListener('pointerdown', function(e){
+    var cv=rej._cv, repinta=rej._repinta;
     if(dd.deslizando()) return;
     var el=e.target.closest('[data-tk]'); if(!el) return;
     /* ⛔ ESTE GUARDIA ES LA TERCERA CAPA, NO LA PRIMERA (456.ª — corregido MIDIENDO).
@@ -721,23 +762,25 @@ function _engConv_(){
        entrega al elemento capturado igual, pero los `pointermove` del segundo **dejan de
        llegar** en algunos navegadores y el centroide se queda quieto. El pintor ya no la
        necesita: `pointermove` resuelve la celda con `elementFromPoint`. */
-    _convPintar_(cv, el.dataset.tk); repinta();
+    modoTrazo = _convPintar_(cv, el.dataset.tk) ? 'marca' : 'borra'; repinta();
   });
   rej.addEventListener('pointermove', function(e){
+    var cv=rej._cv, repinta=rej._repinta;
     if(dd.deslizando() || !pintando) return;
     var el=document.elementFromPoint(e.clientX, e.clientY);
     el=el&&el.closest?el.closest('[data-tk]'):null;
     var _huella=JSON.stringify(_convQuiere_());       /* el pincel entero: cambiar sólo el coche de un sitio cuenta */
     if(!el||el._ult===_huella) return;
     el._ult=_huella;
-    _convPintar_(cv, el.dataset.tk); repinta();
+    _convPintar_(cv, el.dataset.tk, modoTrazo); repinta();
   });
   var fin=function(){
+    var cv=rej._cv;
     /* ⛔ El guardado va AQUI y no en cada celda: el trazo es la unidad de decisión, y una
        fila entera son 14 celdas. `pintando` lo vigila para no guardar en un `pointerup`
        que no venía de pintar nada. */
     if(pintando) _convGuardar_(cv);
-    pintando=false; antes=null;
+    pintando=false; antes=null; modoTrazo=null;
     $$('#convC [data-tk]').forEach(function(x){ x._ult=null; });
   };
   rej.addEventListener('pointerup', fin);
@@ -748,12 +791,12 @@ function _engConv_(){
    botoncillo de hacer fotos»). Sólo mientras dura tu turno (`_ftEnCurso_`, comun.js) y si vas en él. La tarjeta nace OCULTA y la
    enseña `_ftPintar_` cuando el servidor dice que hay algo que enseñar a esta persona: ni tarjeta vacía ni texto chapa. */
 function _ftInicioM_(){
-  var ahora = new Date();
+  var ahora = _ahoraMadridDate_();           /* 13/11: «hoy» y la hora son las de Madrid, donde está el taller */
   var t = (typeof TURNOS !== 'undefined' ? TURNOS : []).filter(function(x){
     return _mioTurno_(x) && x.estado !== 'Cancelado' && _ftEnCurso_(x, ahora); })[0];
   if(!t) return '';
   return '<div class="tarj" data-ftwrap style="display:none">'+cab('Tu turno de hoy', t.hora)+
-    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b><small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+'</small></div></div>'+
+    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(_sitioConCiudad_(t.punto))+'</b><small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+'</small></div></div>'+
     '<div style="padding:0 14px 12px">'+_ftHTML_(t)+'</div></div>';
 }
 
@@ -802,7 +845,7 @@ function vTurnos(){
   function tarjeta(t){
     return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+
       cab(t.f+(t.crucial?' · crucial':'')+(t.estado==='Cancelado'?' · cancelado':''), t.hora)+   /* 20/10: se dice */
-      '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(t.punto)+'</b>'+
+      '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(_sitioConCiudad_(t.punto))+'</b>'+
       '<small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+(t.lugar?' · '+esc(t.lugar):'')+'</small></div>'+
       '<div class="d"><span class="chev">›</span></div></div>'+
       _quienVaHTML_(t)+'</div>';
@@ -874,7 +917,7 @@ function _progPintar_(){
   if(!c) return;
   c.innerHTML = nn.map(function(n){
     var m = miembro(n);
-    return '<div class="fila" style="flex-wrap:wrap;gap:6px"><div class="a" style="flex:1 1 100%"><b>'+esc((m && m.pila) || n)+'</b></div>'+
+    return '<div class="fila" style="flex-wrap:wrap;gap:6px"><div class="a" style="flex:1 1 100%"><b>'+esc(_pilaDeM_(n) || (m && m.pila) || n)+'</b></div>'+
       CARGOS_TURNO.filter(function(cg){ return _cargoOfrecidoA_(cg.k, n); }).map(function(cg){
         return '<button type="button" class="pick'+(PROG_T.cargos[cg.k] === n ? ' on' : '')+'" data-ptcargo="'+cg.k+'" data-ptq="'+esc(n)+
           '" title="'+esc(cg.et)+'">'+esc(cg.corto)+'</button>'; }).join('')+
@@ -900,13 +943,47 @@ function _progCalorCargar_(){
   var caja = $('#ptCalor'); if(!caja) return;
   var di = function(t){ var b = $('#ptCalor'); if(b && b === caja) b.textContent = t; };
   if(typeof api === 'undefined' || !api.getDisponibilidad || !SESION){ di('Sin conexión no se ve la disponibilidad: elige el día y la hora a mano.'); return; }
-  api.getDisponibilidad().then(function(r){
+  /* 13/11 (progconv): primero la LISTA (abiertas y cerradas, como el escritorio); por defecto la que se REPARTE (`_convParaRepartir_`) y, si no
+     hay, la vigente (sin id). Sin lista (sin permiso, sin red) queda el mapa de la vigente de siempre. */
+  var pedirLista = api.listarConvocatorias ? api.listarConvocatorias().then(function(r){ return (r && r.lista) || []; }).catch(function(){ return []; }) : Promise.resolve([]);
+  pedirLista.then(function(L){
     if(!PROG_T || $('#ptCalor') !== caja) return;
+    PROG_T.lista = L;
+    var c = _convParaRepartir_(L, (typeof TURNOS !== 'undefined' ? TURNOS : []).map(function(t){ return t.iso; }), _hoyNxISO_());
+    _progConvElige_(c ? c.id : null, caja);
+  });
+}
+
+/* Los chips de «De qué convocatoria»: sólo si hay MÁS DE UNA (con una no hay nada que elegir). Lo elegido en rojo (`.on`), sin tick. */
+function _progConvPintar_(){
+  var z = $('#ptConv'); if(!z || !PROG_T) return;
+  var L = PROG_T.lista || [];
+  if(L.length < 2){ z.innerHTML = ''; return; }
+  z.innerHTML = '<span class="sc" style="display:block;margin:0 0 6px">De qué convocatoria</span><div class="chips" style="margin:0 0 10px">'+
+    L.map(function(c){ return '<button type="button" class="pick'+(String(c.id) === String(PROG_T.elegida) ? ' on' : '')+'" data-ptconv="'+esc(c.id)+'">'+esc(_convEtiqueta_(c))+'</button>'; }).join('')+'</div>';
+  $$('#ptConv [data-ptconv]').forEach(function(b){ b.onclick = function(){
+    var caja = $('#ptCalor'); if(!caja) return;
+    caja.className = 'rnota'; caja.style.margin = '0 0 4px'; caja.textContent = 'Mirando la disponibilidad…';
+    _progConvElige_(b.dataset.ptconv, caja); }; });
+}
+
+/* Pide el detalle de la convocatoria `id` (`null` = la vigente) y pinta el mapa. Si mientras tanto eligieron otra, esta respuesta se tira. */
+function _progConvElige_(id, caja){
+  var di = function(t){ var b = $('#ptCalor'); if(b && b === caja) b.textContent = t; };
+  if(PROG_T){ PROG_T.elegida = id; PROG_T.cv = null; _progConvPintar_(); }
+  api.getDisponibilidad(id == null ? undefined : id).then(function(r){
+    if(!PROG_T || $('#ptCalor') !== caja || PROG_T.elegida !== id) return;
     if(!r || !r.convocatoria){ di('No hay convocatoria de disponibilidad abierta para esa semana: elige el día y la hora a mano.'); return; }
-    var cv = r.convocatoria; cv.resp = r.cv || {};
+    var cv = _convSinBajas_(r.convocatoria, r.cv);
     PROG_T.cv = cv;   /* la regla del consejo con lo escrito a mano usa la MISMA convocatoria que el mapa */
+    if(id == null){ PROG_T.elegida = cv.id; _progConvPintar_(); }   /* la vigente también se marca en los chips */
     var calor = _calorTurnos_(cv, '');
-    caja.className = ''; caja.removeAttribute('style'); caja.innerHTML = _turnoCalorHTML_(cv, calor, 'ptMapa');
+    var mud=_dispMudos_(cv), nInv=(cv.invitados||[]).length;
+    /* refutar33 (13/11): QUIÉN FALTA, también desde el móvil. El escritorio ya lo decía bajo su mapa («N de M han contestado · sin contestar:
+       …»); aquí el mapa se leía sin saber si era de 3 personas o de 30. Misma regla (`_dispMudos_`), misma frase. */
+    var nota=nInv ? '<div class="rnota" data-ptcontestaron style="margin-top:6px">'+(nInv-mud.length)+' de '+nInv+' han contestado'+
+      (mud.length ? ' · sin contestar: '+mud.map(_dispPila_).map(esc).join(', ') : '')+'.</div>' : '';
+    caja.className = ''; caja.removeAttribute('style'); caja.innerHTML = _turnoCalorHTML_(cv, calor, 'ptMapa')+nota;
     _turnoCalorCablear_($('#ptMapa'), cv, calor, function(b){
       nxPon('ptFecha', b.dia);
       if(b.hora) nxPon('ptHora', b.hora);
@@ -915,7 +992,7 @@ function _progCalorCargar_(){
     });
     _progMarcarMapa_();
     _progPintar_();
-  }).catch(function(){ di('No se pudo leer la disponibilidad: elige el día y la hora a mano.'); });
+  }).catch(function(){ if(PROG_T && PROG_T.elegida === id) PROG_T.cv = null; di('No se pudo leer la disponibilidad: elige el día y la hora a mano.'); });
 }
 
 /* 03/11: el camino de VUELTA, del formulario al mapa (los botones +/− de la hora y la duración marcan ese bloque; antes no movían nada). */
@@ -931,7 +1008,7 @@ function progTurnoAbrir(){
   var lab = function(t){ return '<span class="sc" style="display:block;margin:12px 0 6px">'+t+'</span>'; };
   abrirModal('<div class="mtit">Programar turno</div>'+
     '<p class="rnota" style="margin:-4px 0 4px">Les llega a los convocados y queda en Notion. No se puede convocar más de un turno el mismo día.</p>'+
-    lab('Cuándo pueden · toca un hueco')+'<div id="ptCalor" class="rnota" style="margin:0 0 4px">Mirando la disponibilidad…</div>'+
+    lab('Cuándo pueden · toca un hueco')+'<div id="ptConv"></div><div id="ptCalor" class="rnota" style="margin:0 0 4px">Mirando la disponibilidad…</div>'+
     lab('Día')+nxFecha('ptFecha', '', {min:_hoyNxISO_()})+
     lab('Hora de inicio')+nxHora('ptHora', '16:00')+
     lab('Duración')+nxNum('ptDur', 3, {paso:0.5, min:0.5, max:12, sufijo:'h'})+
@@ -993,7 +1070,7 @@ function _ctMDevolver_(t, v){
   t.hecho = (t.estado === 'Realizado' || t.estado === 'Cancelado');
 }
 function _ctMReloj_(t){
-  return t.empezado_at ? _cierreRelojTexto_(t.empezado_at, new Date(_ahoraApp_()).getTime()) : '';
+  return t.empezado_at ? _cierreRelojTexto_(t.empezado_at, _ahoraInstante_()) : '';
 }
 function _ctMHTML_(t){
   var v = _ctMVista_(t);
@@ -1019,15 +1096,15 @@ function _ctMHTML_(t){
   }
   /* El formulario del cierre */
   var tope0 = _cierreTope_(st);
-  _cierreSembrar_(v, st, new Date(_ahoraApp_()).toISOString());
+  _cierreSembrar_(v, st, new Date(_ahoraInstante_()).toISOString());
   if(!st.ini && !st.fin){   /* sin reloj: se parte de la hora del turno hasta ahora, si cuadra (un turno no dura más de 12 h) */
-    var i0 = String(v.hora || '').slice(0,5), f0 = _hhmmDe_(new Date(_ahoraApp_()).toISOString()), d0 = _durTurnoDeHoras_(i0, f0);
+    var i0 = String(v.hora || '').slice(0,5), f0 = _hhmmDe_(new Date(_ahoraInstante_()).toISOString()), d0 = _durTurnoDeHoras_(i0, f0);
     if(d0 != null && d0 <= 12){ st.ini = i0; st.fin = f0; st.dur = String(d0); }
   }
   var asis = _asistentesTurno_(v).concat(_dudososTurno_(v)), resp = _responsableTurno_(v);
   var fila = function(n){
     var on = !!st.quien[n];
-    return '<div class="fila" style="display:block;padding:9px 0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>'+esc((miembro(n)||{}).pila || n)+'</b>'+
+    return '<div class="fila" style="display:block;padding:9px 0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>'+esc(_pilaDeM_(n) || (miembro(n)||{}).pila || n)+'</b>'+
       (n === resp ? '<span class="chip">responsable</span>' : '')+(_esSuplenteTurno_(v, n) ? '<span class="chip">suplente</span>' : '')+'</div>'+
       '<div style="display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin-top:6px">'+
         '<span class="sc">Fue</span>'+nxSiNo('', on, {attrs:'data-ctm-fue="'+esc(n)+'"'})+

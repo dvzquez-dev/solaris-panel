@@ -138,7 +138,7 @@ function rangoLote(){
 /* Los dos envoltorios que hacen que el bloque de arriba pueda ser IDENTICO al del movil:
    alli `_pilaDeM_` busca en el roster y `yoNombre()` sale de `YO`. Aqui ya existen `_m` y
    `ACTOR`, asi que se envuelven en vez de duplicar la busqueda. */
-function _pilaDeM_(n){ var m=_m(n); return (m&&m.pila)||''; }
+function _pilaDeM_(n){ var m=_m(n); return m&&m.pila ? nombreCorto(n) : ''; }     /* refutar39: con dos «Pablo», «Pablo F.» y «Pablo M.» */
 
 function _actorSanc_(){
   if (typeof backendOK !== 'undefined' && backendOK && SESION && SESION.nombre) return SESION.nombre;
@@ -827,7 +827,7 @@ function _misSancPanelE_(mi){
   var cuerpo = L.length ? L.map(function(s){
     var est = _sancEstadoM_(s), pts = _etSancFila_(s.puntos, null, null);
     return '<div class="parte" data-msfila="' + esc(s.id) + '"><div class="h"><b>' + esc(s.motivo || 'Sanción') + '</b>' +
-        '<span class="u">' + esc(pts) + ' · ' + esc(_isoADMY_(String(s.fecha || '').slice(0, 10)) || '') + '</span></div>' +
+        '<span class="u">' + esc(pts) + ' · ' + esc(_diaMadridDe_(s.fecha) || '') + '</span></div>' +
       (est ? '<div class="ruta msest" style="color:' + est[1] + '">' + esc(est[0]) + '</div>' : '') +
       (s.apelable
         ? '<div class="acts"><button class="btn" data-msapelar="' + esc(s.id) + '">Apelar hasta ' + esc(_isoADMY_(s.apelable_hasta) || '') + '</button></div>'
