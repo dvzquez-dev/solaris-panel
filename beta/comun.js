@@ -4473,6 +4473,17 @@ function _solInput_(ev){
     _solPintar_(k, true);
   }
 }
+/* 14/11 (solaria16): quien pega una transcripción de 2 h en una caja de SolarIA (tope `maxlength`) la veía CORTADA POR EL FINAL —donde está lo decidido— sin
+   aviso: el navegador recorta el pegado en silencio. Se avisa en el momento (cuánto se pegó, cuánto cabe) y se dice qué hacer. Un `paste` delegado, en las dos caras. */
+function _solPegado_(ev){
+  var t = ev && ev.target, k, mx, txt, sobra;
+  if(!t || !t.matches || t.tagName !== 'TEXTAREA') return;
+  mx = +t.getAttribute('maxlength') || 0;
+  if(!mx || !(t.hasAttribute('data-solent') || t.hasAttribute('data-ordiatxt') || Object.keys(SOLCFG).some(function(c){ return SOLCFG[c].ta && t.matches(SOLCFG[c].ta); }))) return;
+  txt = (ev.clipboardData && ev.clipboardData.getData('text')) || '';
+  sobra = (t.value || '').length - Math.max(0, (t.selectionEnd || 0) - (t.selectionStart || 0)) + txt.length - mx;
+  if(sobra > 0) tost('Has pegado '+txt.length+' caracteres y caben '+mx+': se corta el final ('+sobra+' de más). Pega sólo lo importante: lo decidido y lo que queda por hacer.');
+}
 function _resumirReunionDemo_(frase){
   return {ok: true, nota: 'Maqueta: sin SolarIA real.', texto: 'Reunión (maqueta). 2 participantes: Ana, Luis.\n'+
     (String(frase || '').trim() ? '- Punto 1: '+String(frase).trim().slice(0, 80)+'\n' : '')+'Solo en el orden del día, sin nada anotado: Ruegos y preguntas.'};

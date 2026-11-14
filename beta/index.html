@@ -114,7 +114,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=4d5f904"></script>
+<script src="comun.js?v=7409226"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=4f42fdf"></script>
@@ -1867,7 +1867,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='d00775c';
+var BUILD='11304a7';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2797,7 +2797,7 @@ function enganchar(){
 /* 28/10: el panel de «con anotaciones» (SolarIA / a mano), el mismo en las dos caras (`comun.js` `_anotClic_`). */
 document.addEventListener('click',function(ev){ _anotClic_(ev, function(id){
   return ENTREGABLES.concat(ENT_REV).filter(function(x){ return String(x.id)===String(id); })[0]; }); });
-document.addEventListener('click',_solClic_); document.addEventListener('input',_solInput_);   /* 02/11: «Resumir / Redactar con SolarIA» (`comun.js` `_solClic_`) */
+document.addEventListener('click',_solClic_); document.addEventListener('input',_solInput_); document.addEventListener('paste', _solPegado_, true);   /* 02/11: «Resumir / Redactar con SolarIA» (`comun.js` `_solClic_`) */
 document.addEventListener('input',_anotInput_);
 document.addEventListener('keydown',_anotTecla_);   /* 02/11: Enter en el buscador de etiquetas */
 /* 31/10: PD y José cambian el autor de un expediente en revisión (`comun.js` `_autorClic_`). Cambia de lista (mío/ajeno). */
