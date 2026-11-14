@@ -338,7 +338,9 @@ function vDocs(){
   h+='<h2 class="sec">Mis documentos<span class="ln"></span>'+mios.length+'</h2>'+
      '<div class="tarj">'+
      (mios.length
-       ? mios.map(function(e){return filaDoc(e,true);}).join('')
+       /* 14/11 (refutar46): «tu documento tiene cambios» llega aquí, y lo que pide algo de ti va PRIMERO (el orden sigue siendo el de llegada
+          dentro de cada grupo: `sort` es estable). */
+       ? mios.slice().sort(function(a,b){ return (b.estado==='cambios')-(a.estado==='cambios'); }).map(function(e){return filaDoc(e,true);}).join('')
        : vacioMini('Todavía no has enviado ninguno. Los que envíes aparecerán aquí con su estado.'))+
      '</div>';
   var hist=_docsResueltosM_();
@@ -347,7 +349,7 @@ function vDocs(){
        '<div class="tarj">'+
        (DOC_HIST_ABIERTO
          ? hist.map(function(e){return filaDoc(e,false);}).join('')
-         : '<p class="rnota" style="margin:0 0 10px">Lo que ya decidiste. Abre uno para verlo o deshacer la decisión.</p>')+
+         : '<p class="rnota" style="margin:0 0 10px">Lo que ya está decidido, por ti o por alguien de más rango. Abre uno para verlo o, si lo decidiste tú, deshacerlo.</p>')+
        '<button class="btn full" data-p data-dochist>'+(DOC_HIST_ABIERTO?'Ocultar historial':'Ver historial ('+hist.length+')')+'</button>'+
        '</div>';
   }

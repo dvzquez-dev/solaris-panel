@@ -2290,6 +2290,12 @@ function _engPartesDec_(){
   });
 }
 
+/* 14/11 (refutar46): «tu parte fue rechazado» llega a Horas con «Tus partes» CERRADO (nace cerrado, 07/08): la cabecera dice cuántos están
+   rechazados («1 rechazada · »), que es para lo que está (el total sin abrir). `''` si ninguno. */
+function _rechazadasTxt_(mias){
+  var nr=(mias||[]).filter(function(x){ return x.e==='rech'; }).length;
+  return nr ? nr+' '+(nr===1?'rechazada':'rechazadas')+' · ' : '';
+}
 function vHoras(){
   /* ⛔ LA BANDA SANA SE PIDE UNA VEZ, ARRIBA: la pintan DOS rotulos de esta misma vista
      (la cabecera y el pie del anillo), y hasta el 05/10 la llevaban **teclada los dos**.
@@ -2460,6 +2466,7 @@ function vHoras(){
            número y las HORAS —, que es lo que el título no tiene. */
         ? '<details class="pdgrupo"><summary><span class="pdnum">'+
             mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
+            _rechazadasTxt_(mias)+
             nf2(mias.reduce(function(t,x){ return t+(x.e==='pend' ? _horasVistaParte_(x) : 0); },0))+' h en cola</span></summary>'+
           mias.map(filaParte).join('')+'</details>'
         : (viejas.length

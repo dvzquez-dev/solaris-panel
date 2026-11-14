@@ -491,13 +491,16 @@ function _listaReusM_(R){
   /* 11/11 (reumovil): las vivas se parten en las TUYAS (convocado o convocante) y «Otras que puedes ver» (las de tu nivel sin
      estar convocado): plegado por defecto, como «Pasadas». Las pasadas siguen todas en su cajón. */
   var mias=par.vivas.filter(function(x){ return x.invitado!==false; }), otras=par.vivas.filter(function(x){ return x.invitado===false; });
+  /* 14/11 (refutar46): quien llega desde «te han convocado» cae en la PRÓXIMA por fecha, que puede ser una que ya contestó: las filas dicen
+     cuáles te FALTAN (las mismas que cuenta el globo del nav), sin abrir cada una. */
+  var _falta=_pendientesCubrirM_();
   var fila=function(x){
           var sel=(x.id===R.id), i=REUNIONES_M.indexOf(x);
           return '<div class="fila clic" data-reu="'+i+'" data-p'+(sel?' style="background:rgba(228,30,37,.07)"':'')+'>'+
             '<div class="a"><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo)+' · '+
             (x.fijada?'📌 '+esc(_fijadaTxtM_(x.fijada)):esc(_plazoTxtM_(x)))+' · '+_convocadosTxt_(_nConvM_(x))+
             _duraTxtM_(x)+'</small></div>'+
-            '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':(_reuFinalizada_(x)?'<span class="pil">finalizada</span>':'<span class="chev">›</span>'))+'</div></div>'; };
+            '<div class="d">'+(sel?'<span class="pil conf">viendo</span>':(_reuFinalizada_(x)?'<span class="pil">finalizada</span>':(_falta.indexOf(x)>=0?'<span class="pil pend">te falta</span> ':'')+'<span class="chev">›</span>'))+'</div></div>'; };
   var abierto=par.archivo.indexOf(R)>=0, abiertoO=otras.indexOf(R)>=0;
   return (mias.length ? '<div class="tarj">'+mias.map(fila).join('')+'</div>' : '')+
     (otras.length
