@@ -2910,7 +2910,28 @@ function _tostLargo_(m){ return String(m == null ? '' : m).length > 110 ? {fijo:
 
 function tostErr(prefijo, e){
   /* refutar17: Apps Script contesta `String(err)`: sin quitar el «Error: » el aviso era «No se pudo enviar: Error: Ber Gnc ya tiene…». */
+  /* refutar44: si el servidor dice que ALGUIEN SE ADELANTÓ, se cuenta eso (y no «No se pudo: este parte no admite decisión (aprobada)»). */
+  var ch=_choque_(e);
+  if(ch){ tost(ch, _tostLargo_(ch)); return; }
   tost(String(prefijo || '') + String((e && e.message) || e).replace(/^Error:\s*/, ''), (e && e.sesion) ? {fijo:true} : null);
+}
+
+/* refutar44 (14/11): DOS PERSONAS A LA VEZ. Cada una tiene su pantalla cargada y la del que llega segundo está VIEJA: el servidor dice que no con una frase
+   escrita para el programa («reunión 6 no encontrada», «este parte no admite decisión (aprobada)»), y la app la pegaba tal cual detrás de «No se pudo»
+   y, peor, de «Vuelve a intentarlo» —reintentar no sirve—. Esta es la puerta que traduce esas frases a lo que ha pasado, para las dos caras.
+   → el texto para quien lo lee, o `''` si el error no es de este tipo (entonces se pinta el de siempre). Quien la llama, además, REFRESCA su pantalla.
+   ⛔ «sin permiso para decidir» NO está aquí: en otras pantallas es «no eres tú» de verdad; sólo la ficha de un documento sabe que es «otro se adelantó». */
+function _choque_(e){
+  var m=String((e && e.message) || e || '').replace(/^Error:\s*/, ''), x;
+  if((x=m.match(/este parte no admite decisi[oó]n \((\w+)\)/)))
+    return 'Otra persona ya lo ha decidido: el parte está «'+x[1]+'». Tu lista se ha puesto al día.';
+  if(/reuni[oó]n \d+ no encontrada/.test(m))
+    return 'Esa reunión ya no existe o ya no estás convocado a ella. Tu lista se ha puesto al día.';
+  if(/la reuni[oó]n ya tiene fecha fijada/.test(m))
+    return 'Ya se ha fijado la fecha de esta reunión: la disponibilidad está cerrada y lo que marcaste no se ha guardado.';
+  if(/el plazo ya venci[oó]/.test(m))
+    return 'El plazo ya ha terminado: lo último que marcaste no se ha guardado.';
+  return '';
 }
 
 /* ⛔ LA CLAVE DE UN ENVIO, PARA QUE UN REINTENTO NO LO DUPLIQUE. `api._post` hace TRES

@@ -1039,6 +1039,10 @@ function engancharRejilla(){
         pintar();
       }catch(e){
         g.disabled=false; g.textContent=prev;
+        /* refutar44: si alguien cambió la reunión mientras la contestabas (la borró, te quitó de los convocados, fijó la fecha), reintentar NO sirve:
+           se dice qué pasó, se cierra la rejilla y se vuelve a leer la lista. */
+        var _ch=(typeof _choque_==='function') ? _choque_(e) : '';
+        if(_ch){ cerrarModal(); tost(_ch, _tostLargo_(_ch)); _cargarReunionesM_().then(function(){ pintar(); }); return; }
         tost('No se pudo guardar: '+((e&&e.message)||e)+'. Vuelve a intentarlo.');
       }
       return;

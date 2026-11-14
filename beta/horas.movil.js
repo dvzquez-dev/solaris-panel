@@ -2283,6 +2283,8 @@ function _engPartesDec_(){
         tostErr('No se pudo: ', e);       // 🟠 2 (auditor 19)
         $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=false; });
         b.textContent=prev;
+        /* refutar44: si otra persona se adelantó, la lista está VIEJA —sigue ofreciendo «Aprobar» sobre un parte ya decidido—: se vuelve a leer. */
+        if(_choque_(e)) _cargarPartesDec_().then(pintar);
       }
     };
   });

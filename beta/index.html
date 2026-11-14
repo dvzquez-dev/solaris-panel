@@ -114,16 +114,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=15dff2c"></script>
+<script src="comun.js?v=4d5f904"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=4f42fdf"></script>
-<script src="turnos.movil.js?v=c3e00eb"></script>
+<script src="turnos.movil.js?v=f28ae33"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=16564e6"></script>
-<script src="sanciones.movil.js?v=7f75222"></script>
-<script src="reuniones.movil.js?v=bbdf66d"></script>
-<script src="horas.movil.js?v=32e0f67"></script>
+<script src="sanciones.movil.js?v=8831fbd"></script>
+<script src="reuniones.movil.js?v=2fce944"></script>
+<script src="horas.movil.js?v=9285bc9"></script>
 <script src="equipo.movil.js?v=28e54e2"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -1867,7 +1867,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='7cfc9fa';
+var BUILD='d00775c';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2940,6 +2940,20 @@ document.addEventListener('click',_conCerrojo_(function(ev){
       cerrarModal(); tost(_tav, _tostLargo_(_tav)); pintar(); if(acc!=='deshacer' && acc!=='reenviar') verDoc(e.id);
     }).catch(function(err){
       b.disabled=false;
+      /* refutar44: «sin permiso para decidir» sobre un documento que SÍ podías decidir hace un rato es que otra persona de más rango se adelantó
+         (el bloqueo mutuo: sólo decide de nuevo quien decidió o alguien de más rango). Se dice eso, y la ficha se vuelve a leer: seguía enseñando
+         «Aprobar» y «Revisa: tú» sobre un expediente que ya tiene decisión. */
+      if(/sin permiso para decidir/.test(String((err&&err.message)||err))){
+        var _ys='Otra persona de más rango ya ha decidido este documento y tu decisión no lo cambia. La ficha se ha puesto al día.';
+        tost(_ys, _tostLargo_(_ys));
+        if(typeof DEC_SEL!=='undefined') delete DEC_SEL[String(e.id)];   /* sin panel de decisión abierto al reabrir la ficha */
+        api.getEntregables().then(function(x){
+          if(Array.isArray(x)) _repartirEntregablesM_(x);
+          cerrarModal(); pintar();
+          if(ENTREGABLES.concat(ENT_REV).some(function(y){ return y.id===e.id; })) verDoc(e.id);
+        }).catch(function(){});
+        return;
+      }
       tost('No se pudo registrar la decisión: '+((err&&err.message)||err));
     });
   }

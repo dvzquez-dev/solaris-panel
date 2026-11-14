@@ -750,6 +750,9 @@ function _cablearMiDispo_(){
            se deja el boton vivo, y `MIDISP` NO se borra -- lo marcado sigue en pantalla para
            poder reintentar sin volver a pintarlo entero. */
         b.disabled=false; b.textContent=t;
+        /* refutar44: si alguien cambió la reunión mientras la contestabas, se dice qué pasó (reintentar no sirve); la lista se relee en el refresco de la cara. */
+        var _ch=(typeof _choque_==='function') ? _choque_(e) : '';
+        if(_ch){ tost(_ch, _tostLargo_(_ch)); return; }
         tost('No se pudo guardar: '+((e&&e.message)||e)+'. Vuelve a intentarlo.');
       }
     };

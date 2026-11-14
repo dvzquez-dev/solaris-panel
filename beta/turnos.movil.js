@@ -610,7 +610,9 @@ function _convGuardar_(cv){
     var vuelve=(cv._gseq===n && cv._okMias);
     if(typeof tost==='function'){
       var m=String((e&&e.message)||e).replace(/^Error:\s*/,'');
-      tost('No se pudo guardar tu disponibilidad'+(e&&e.sinRed ? ': sin conexión, tu último toque NO se guardó.' : ': '+m)+
+      var _ch=(typeof _choque_==='function' && !(e&&e.sinRed)) ? _choque_(e) : '';   /* refutar44: «el plazo ya venció» se dice con palabras, y no se manda a repetirlo «cuando haya red» */
+      tost(_ch ? _ch+(vuelve ? ' La rejilla vuelve a lo que ya tenías guardado.' : '') :
+        'No se pudo guardar tu disponibilidad'+(e&&e.sinRed ? ': sin conexión, tu último toque NO se guardó.' : ': '+m)+
         (vuelve ? ' La rejilla vuelve a lo que ya tenías guardado: repítelo cuando haya red.' : ''), {fijo:true});
     }
     if(vuelve){
