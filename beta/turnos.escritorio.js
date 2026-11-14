@@ -115,6 +115,7 @@ function _cajaCargosPend_(cargos){
 
 function pintarReparto(){
   var c=document.getElementById('tuLista'); if(!c) return;
+  var foco=_focoFirma_(c);      // refutar42: cada botón (turno, AV, memoria, coche, quitar) repinta la lista y el foco caía a <body>
   var nn=Object.keys(TUR_SEL);
   if(!nn.length){
     c.innerHTML='<p style="margin:0;font-size:12px;color:var(--ink3)">Nadie marcado todav\u00eda. '+
@@ -142,6 +143,7 @@ function pintarReparto(){
     '</div>';
   }).join('');
   cablearReparto();
+  _focoReponer_(c, foco);
 }
 
 /* ⚠️ Se llama DESPUES de cablear, no antes: `cablearReparto()` corre justo detras de
@@ -394,7 +396,9 @@ function _miTurnoPanel_(){
     return (i ? _huecoFilaE_(F[i-1], fr) : '')+_rotFranjaE_(_rotuloTramo_(fr))+D.map(function(d){
       var k=_dispClave_(d,fr.k), v=mias[k];
       var st = (v && v.s && v.s!=='no') ? ('background:'+_celdaFondo_(v)) : '';
-      return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" '+
+      /* refutar42: la casilla se puede usar con el teclado (`_rejillaFlechas_` en `_cablearMiTurno_`) y dice qué es y qué tiene marcado */
+      var _et=_diaCorto_(d)+' · '+_rotuloTramo_(fr)+' · '+((v&&v.s==='no')?'no puedo':((v&&v.s)?'puedo en '+v.s+(v.c?', con coche':''):'sin marcar'));
+      return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" role="button" tabindex="-1" aria-label="'+esc(_et)+'" '+
         'style="cursor:pointer;'+st+'">'+
         ((v&&v.s==='no')?'\u2013':((v&&v.c)?'\uD83D\uDE97':''))+'</div>';
     }).join('');
@@ -451,6 +455,7 @@ function _cablearMiTurno_(){
       MIT_PIN=d.pincel; MIT_COCHE=d.coche; MIT_CC=d.cc; pintar();
     };
   });
+  _rejillaFlechas_($$('[data-mtk]'), ((_miTurnoCv_()||{}).dias||[]).length);
   $$('[data-mtk]').forEach(function(c){
     c.onclick=function(){
       var cv=_miTurnoCv_(); if(!cv) return;
@@ -497,6 +502,8 @@ function _cablearMiTurno_(){
         cv.resp[yo]=mias;
         MIT_CELDAS=null;                       /* ya no queda nada pendiente */
         tost('Disponibilidad guardada.'); pintar();
+        /* refutar42: «Guardar» queda apagado («sin cambios») y no puede tener el foco: vuelve a la rejilla, que es lo que se sigue tocando */
+        if(document.activeElement===document.body || document.activeElement.disabled){ var _c0=document.querySelector('[data-mtk][tabindex="0"]'); if(_c0) _c0.focus(); }
       }catch(e){
         /* ⛔ UNA DISPONIBILIDAD QUE SE PIERDE EN SILENCIO es la que luego hace que te pongan
            un turno cuando no puedes. Se avisa, se deja el boton vivo y `MIT_CELDAS` NO se
@@ -1822,9 +1829,11 @@ function _convocarListar_(){
 }
 function _convocarRepintarZona_(){
   var z=document.getElementById('tuZona'); if(!z) return;
+  var foco=_focoFirma_(z);      // refutar42: elegir la semana o un filtro repinta la zona y el foco caía a <body>
   z.innerHTML=_convocarZonaHTML_();
   _convocarCablear_();
   _convocarSync_();
+  _focoReponer_(z, foco);
 }
 function _convocarElige_(id){
   CONV_ELEGIDA=String(id);

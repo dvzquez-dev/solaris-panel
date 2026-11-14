@@ -543,6 +543,52 @@ function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre)
    otro camino se quedaria vacio **para siempre**: el recuerdo seguiria diciendo «ya esta
    pintado» y no se volveria a escribir nunca. Es un «no lo se» leido como un dato.
 */
+/* ═══ EL FOCO SOBREVIVE AL REPINTADO (refutar42, 13/11) ═══════════════════════════════════════════════════════════════════
+   Una coordinadora sólo con teclado (Tab, Enter, Esc): casi todo lo que se pulsa REPINTA su panel con `innerHTML`/`outerHTML`, y
+   el botón que tenía el foco desaparece: el foco cae a `<body>` y el siguiente Tab EMPIEZA POR LA CABECERA (21 paradas del menú
+   hasta volver a lo suyo). Medido: cada chip de «Nueva tarea», el menú lateral y «Convocar la reunión» la dejaban en `<body>`.
+   `_focoFirma_(raiz)` anota quién tiene el foco DENTRO de `raiz` (por `id`, o por etiqueta + atributos `data-*`, y cuál de los que
+   comparten esa firma) y `_focoReponer_(raiz, firma)` se lo devuelve al repintado. Si el elemento ya no existe (el parte que
+   acabas de aprobar), un BOTÓN pasa al que hace lo MISMO (misma firma sin los números de id): el siguiente «Aprobar». */
+var FOCO_VOLATIL=['data-a11y','data-n','data-borr-hecho','data-tcal-bloque','data-tcal-nobloque'];
+function _focoSel_(e, soloLetras){
+  if(e.id && !soloLetras) return '#'+(window.CSS && CSS.escape ? CSS.escape(e.id) : e.id.replace(/[^\w-]/g,'\\$&'));
+  var h=e.tagName.toLowerCase(), hay=false;
+  Array.prototype.forEach.call(e.attributes, function(a){
+    if(a.name.indexOf('data-')!==0 || FOCO_VOLATIL.indexOf(a.name)>=0) return;
+    hay=true;
+    if(soloLetras && /^\d+$/.test(a.value)) h+='['+a.name+']'; else h+='['+a.name+'="'+a.value.replace(/["\\]/g,'\\$&')+'"]';
+  });
+  return hay ? h : null;
+}
+function _focoFirma_(raiz, el){
+  var ae=el || document.activeElement;      // `el`: el elemento que se acaba de PULSAR (Ctrl+Enter lo pulsa desde otro campo)
+  if(!raiz || !raiz.contains || ae===raiz || !ae || ae===document.body || !raiz.contains(ae)) return null;
+  var f={sel:_focoSel_(ae,false), fb:null, i:0, j:0, a:null, b:null}, l, i;
+  if(!f.sel) return null;
+  try{
+    l=raiz.querySelectorAll(f.sel); for(i=0;i<l.length;i++) if(l[i]===ae) f.i=i;
+    if(/^(BUTTON|A)$/.test(ae.tagName) || ae.getAttribute('role')==='button'){
+      f.fb=_focoSel_(ae,true);
+      if(f.fb){ l=raiz.querySelectorAll(f.fb); for(i=0;i<l.length;i++) if(l[i]===ae) f.j=i; }
+    }
+  }catch(_){ return null; }
+  if(ae.selectionStart!=null){ f.a=ae.selectionStart; f.b=ae.selectionEnd; }
+  return f;
+}
+function _focoReponer_(raiz, f){
+  if(!f || !raiz) return false;
+  var ae=document.activeElement;
+  if(ae && ae!==document.body && raiz.contains(ae)) return false;      // otro código ya lo puso donde quería
+  var e=null, l;
+  try{
+    l=raiz.querySelectorAll(f.sel); if(l.length) e=l[Math.min(f.i,l.length-1)];
+    if(!e && f.fb){ l=raiz.querySelectorAll(f.fb); if(l.length) e=l[Math.min(f.j,l.length-1)]; }
+  }catch(_){ return false; }
+  if(!e || !e.focus) return false;
+  try{ e.focus({preventScroll:true}); if(f.a!=null && e.setSelectionRange) e.setSelectionRange(f.a, f.b); }catch(_){}
+  return true;
+}
 function _pintarSiCambia_(el, clave, html){
   if (!el) return false;
   /* ⛔⛔ 21/10 (auditor 20, 🔴): EL RECUERDO ES LO QUE ESTE NODO TIENE PUESTO, no lo último que se pintó para esa VISTA.
@@ -559,18 +605,11 @@ function _pintarSiCambia_(el, clave, html){
      DESPUÉS de un reflow, así que el CSS (`transition`) mueve la barra desde donde estaba y `_contarHasta_` cuenta el
      número. Sólo si es la MISMA vista que la última pintada en este nodo (el escritorio reutiliza `#main`). */
   var foto = (el._pintadoClave === clave && el.innerHTML) ? _vivoFoto_(el) : null;
-  var ae = document.activeElement, foco = null;
-  if (ae && ae.id && el.contains && el.contains(ae))
-    foco = { id: ae.id, a: ae.selectionStart, b: ae.selectionEnd };
+  var foco = (el._pintadoClave === clave) ? _focoFirma_(el) : null;     // refutar42: por `id` O por sus `data-*` (antes sólo con `id`)
   el._pintadoClave = clave;
   el.innerHTML = html;
   if (foto) _vivoReponer_(el, foto);
-  if (foco) {                                  // el foco sobrevive al repintado (teclado del móvil abierto, etc.)
-    var f = document.getElementById(foco.id);
-    if (f && f !== document.activeElement && f.focus) {
-      try { f.focus({ preventScroll: true }); if (foco.a != null && f.setSelectionRange) f.setSelectionRange(foco.a, foco.b); } catch (_) {}
-    }
-  }
+  if (foco) _focoReponer_(el, foco);           // el foco sobrevive al repintado (teclado del móvil abierto, Tab de escritorio…)
   return true;
 }
 
@@ -1804,8 +1843,10 @@ function _vistaNuevaTarea_(texto){
 function _repintarNuevaTarea_(){
   var el = document.getElementById('ntPanel');
   if(!el){ pintar(); return; }
+  var foco = _focoFirma_(el);              // refutar42: cada chip repintaba el panel y mandaba el foco a <body>
   el.outerHTML = _nuevaTareaPanel_();
   _cablearNuevaTarea_();
+  _focoReponer_(document.getElementById('ntPanel'), foco);
 }
 /* El botón «Crear la tarea» dice lo que falta (sin repintar el panel). */
 function _ntVivo_(){
@@ -1815,7 +1856,8 @@ function _ntVivo_(){
 function _cablearNuevaTarea_(){
   _fotoTareaPintar_(document.getElementById('ntV'));
   $$('[data-ntab]').forEach(function(el){ el.onclick = function(){
-    NUEVA_TAREA.ab = el.dataset.ntab === '1'; if(NUEVA_TAREA.ab) NUEVA_TAREA.ok = ''; _repintarNuevaTarea_(); }; });
+    NUEVA_TAREA.ab = el.dataset.ntab === '1'; if(NUEVA_TAREA.ab) NUEVA_TAREA.ok = ''; _repintarNuevaTarea_();
+    var n0 = NUEVA_TAREA.ab && document.getElementById('ntN'); if(n0) n0.focus(); }; });   // al abrirla, el cursor ya está en «Qué hay que hacer»
   var b = document.getElementById('ntCrear');
   var vivo = _ntVivo_;
   var n = document.getElementById('ntN');
@@ -1879,6 +1921,14 @@ function _cablearNuevaTarea_(){
   };
 }
 
+
+/* refutar42 · Ctrl/⌘+Enter dentro de «Nueva tarea» la CREA (como «Aprobar»): de «Crear la tarea» te separaban ~15 Tab (la barra de formato, SolarIA y
+   las instrucciones). Delegado UNA vez en `document`: el panel se repinta entero y un `onkeydown` por campo se perdería. Enter a secas no hace nada. */
+if(typeof document !== 'undefined' && document.addEventListener) document.addEventListener('keydown', function(e){
+  if(e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return;
+  var t = e.target, b = t && t.closest && t.closest('#ntPanel') ? document.getElementById('ntCrear') : null;
+  if(b && !b.disabled){ e.preventDefault(); b.click(); }
+});
 
 /* 01/11 (tareamovil) · LA HOJA «NUEVA TAREA» ES UNA SOLA, de las dos caras. Daniel: «tiene que ser tan cómodo como Notion» y
    «para crear tareas desde el teléfono». El escritorio la pinta en un panel plegable y el móvil en una hoja (`tareas.movil.js`);
@@ -9647,6 +9697,25 @@ function _turnoBloqueRango_(cv, dia, i0, i1){
   return {dia: dia, claves: claves, hora: hora, horas: (hora && claves.every(function(c){ return /^h\d\d$/.test(c); })) ? claves.length : 0};
 }
 
+/* refutar42 · UNA rejilla de casillas = UN control de teclado: una sola parada de Tab (la casilla con el foco lleva `tabindex=0`, el resto -1) y las flechas
+   mueven por ella (Inicio/Fin: principio y fin de la fila). Sin esto, 60 casillas son 60 Tab para pasarlas y ni una flecha. `celdas` van en orden de lectura
+   (fila a fila) y `cols` = cuántas hay por fila (los días). Lo llaman el mapa de calor de turnos y la rejilla de «Tu disponibilidad»; Enter/Espacio los pone
+   cada una (el mapa elige, la rejilla pinta). */
+function _rejillaFlechas_(celdas, cols){
+  cols = cols || 1;
+  var rov=function(a){ celdas.forEach(function(x){ x.setAttribute('tabindex', x===a ? '0' : '-1'); }); };
+  if(celdas.length) rov(celdas[0]);
+  celdas.forEach(function(el, n){
+    el.addEventListener('focus', function(){ rov(el); });
+    el.addEventListener('keydown', function(e){
+      var d={ArrowRight:1, ArrowLeft:-1, ArrowDown:cols, ArrowUp:-cols, Home:-(n%cols), End:cols-1-(n%cols)}[e.key];
+      if(d===undefined || e.altKey || e.ctrlKey || e.metaKey) return;
+      e.preventDefault();
+      if((e.key==='ArrowRight' && n%cols===cols-1) || (e.key==='ArrowLeft' && n%cols===0)) return;
+      var sig=celdas[n+d]; if(sig){ rov(sig); sig.focus(); }
+    });
+  });
+}
 /* El mapa entero, días en columnas y TRAMOS en filas. Las casillas son `[data-tcal]`; la caja `[data-tcal-det]`. */
 function _turnoCalorHTML_(cv, calor, id){
   var D=cv.dias||[], F=cv.franjas||[], maxN=0;
@@ -9662,7 +9731,7 @@ function _turnoCalorHTML_(cv, calor, id){
       D.map(function(d){
         var k=_dispClave_(d,fr.k), c=calor[k], a=maxN ? (0.12+0.88*c.n/maxN) : 0, est=_turnoCasillaEstado_(cv, calor, k);
         var pt=_turnoCasillaPintura_(est, c.n ? _calorColor_('presencial', a) : 'rgba(255,255,255,.045)');
-        return '<div data-tcal="'+esc(k)+'" data-n="'+c.n+'"'+pt.attr+' role="button" tabindex="0" style="cursor:pointer;min-height:34px;border-radius:3px;display:grid;place-items:center;'+
+        return '<div data-tcal="'+esc(k)+'" data-n="'+c.n+'"'+pt.attr+' role="button" tabindex="0" aria-label="'+esc(_diaCorto_(d)+' · '+_rotuloTramo_(fr)+' · '+(c.n ? c.n+(c.n===1 ? ' persona puede' : ' personas pueden') : 'nadie puede'))+'" style="cursor:pointer;min-height:34px;border-radius:3px;display:grid;place-items:center;'+
           'font-family:var(--mono);font-size:11px;color:'+(c.n?'#fff':'var(--ink2)')+';border:1px solid transparent;'+pt.css+'">'+
           (c.n||'')+(c.hay_coche?'<span style="font-size:8px;line-height:1">'+ico('coche')+'</span>':'')+'</div>';
       }).join('');
@@ -9713,6 +9782,8 @@ function _turnoCalorCablear_(raiz, cv, calor, alElegir){
     sel=nuevo; marca(b, k);
     if(typeof alElegir==='function') alElegir(b);
   };
+  /* refutar42: una parada de Tab para todo el mapa y flechas dentro (`_rejillaFlechas_`); Enter/Espacio elige la casilla. */
+  _rejillaFlechas_(celdas, ((cv&&cv.dias)||[]).length);
   celdas.forEach(function(el){
     el.onclick=function(){ elige(el); };
     el.onkeydown=function(e){ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); elige(el); } };
@@ -14200,8 +14271,9 @@ function _decPanelesHTML_(e, o){
     acs.map(function(a){ return panel(a[0]); }).join('') + (o.deshacerHTML || '') + '</div>';
 }
 /* Elige (o, con la ya elegida o `''`, cierra; `abrir` = no cierra nunca) el panel de una acción del expediente `id`: sólo UNO abierto; lo tecleado en los demás sigue en el DOM. */
-function _decSeleccionar_(id, acc, abrir){
+function _decSeleccionar_(id, acc, abrir, desdeTeclado){
   id = String(id);
+  var antes = DEC_SEL[id] || '';
   DEC_SEL[id] = (acc && (abrir || DEC_SEL[id] !== acc)) ? acc : '';
   Array.prototype.forEach.call(document.querySelectorAll('[data-decwrap]'), function(w){
     if (w.getAttribute('data-decwrap') !== id) return;
@@ -14213,6 +14285,12 @@ function _decSeleccionar_(id, acc, abrir){
       /* docdecidir-1 (Daniel aceptó 13/11): el panel que se abre queda por debajo de lo que se ve; se lleva a la vista lo justo (`nearest`), salvo «con anotaciones», más alto que la pantalla: su principio. Cerrar no mueve nada. El CSS no anima el desplazamiento (no hay `scroll-behavior`), así que con `prefers-reduced-motion` tampoco. */
       if (abre && DEC_SEL[id] && p.scrollIntoView) p.scrollIntoView({block: DEC_SEL[id] === 'anot' ? 'start' : 'nearest'});
     });
+    /* refutar42: con el TECLADO el foco sigue a lo que se abre (el motivo, el «Sí, aprobar»…) y, al cerrarlo, vuelve a la acción que lo
+       abrió: antes se quedaba en el chip y el motivo era «otro Tab», o —al cerrar con «No»— caía a <body> porque el botón se ocultaba. */
+    if (!desdeTeclado) return;
+    var dentro = DEC_SEL[id] ? w.querySelector('[data-decp="' + DEC_SEL[id] + '"]') : null,
+        el = dentro ? dentro.querySelector('textarea,input:not([type=hidden]),select,button') : (antes ? w.querySelector('[data-decsel][data-decacc="' + antes + '"]') : null);
+    if (el && el.focus) el.focus({preventScroll: true});
   });
 }
 /* El resumen de «con anotaciones» se rehace mientras se teclea: lo que ves es lo que se publica. */
@@ -14225,13 +14303,29 @@ function _decRefrescar_(wrap){
 if (typeof document !== 'undefined' && document.addEventListener){
   document.addEventListener('click', function(ev){
     var b = ev.target && ev.target.closest ? ev.target.closest('[data-decsel]') : null;
-    if (b){ _decSeleccionar_(b.getAttribute('data-decsel'), b.getAttribute('data-decacc')); return; }
+    if (b){ _decSeleccionar_(b.getAttribute('data-decsel'), b.getAttribute('data-decacc'), false, ev.detail === 0); return; }
     var w = ev.target && ev.target.closest ? ev.target.closest('[data-decp="anot"]') : null;
     if (w) setTimeout(function(){ _decRefrescar_(w.closest('[data-decwrap]')); }, 0);
   });
   document.addEventListener('input', function(ev){
     var w = ev.target && ev.target.closest ? ev.target.closest('[data-decp="anot"]') : null;
     if (w) _decRefrescar_(w.closest('[data-decwrap]'));
+  });
+  /* refutar42 · el motivo de «Solicitar cambios» / «Rechazar» con el teclado: Esc lo CIERRA (sin enviar, el foco vuelve a su botón) y
+     Ctrl/⌘+Enter lo ENVÍA. Enter a secas es un salto de línea. */
+  document.addEventListener('keydown', function(ev){
+    var t = ev.target, p = t && t.closest && t.tagName === 'TEXTAREA' ? t.closest('[data-decp]') : null, acc = p && p.getAttribute('data-decp');
+    if (!p || (acc !== 'cambios' && acc !== 'rechazado')) return;
+    var w = p.closest('[data-decwrap]');
+    if (ev.key === 'Escape' && w){
+      ev.preventDefault(); ev.stopImmediatePropagation();
+      var chip = w.querySelector('[data-decsel][data-decacc="' + acc + '"]');
+      _decSeleccionar_(w.getAttribute('data-decwrap'), '', false, false);
+      if (chip) chip.focus({preventScroll: true});
+    } else if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)){
+      var go = p.querySelector('[data-doc][data-acc]');
+      if (go){ ev.preventDefault(); go.click(); }
+    }
   });
 }
 
@@ -17221,6 +17315,7 @@ function _a11yCablear_(){
   var s=document.createElement('style'); s.id='a11yCss';
   s.textContent=
     /* anillo de foco visible EN TODO (sólo con teclado: `:focus-visible`); `!important` porque varios campos lo tenían `outline:none` */
+    '#main[tabindex="-1"]:focus,#main[tabindex="-1"]:focus-visible{outline:none!important}'+      /* refutar42: el foco que se le da a la vista al cambiarla con el teclado no se pinta */
     'button:focus-visible,a:focus-visible,summary:focus-visible,[role=button]:focus-visible,[tabindex]:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--red2,#FF4A4F)!important;outline-offset:2px!important}'+
     /* menos movimiento: lo infinito se para y lo largo se acorta (el evento `animationend` sigue saltando) */
     '@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important;transition-delay:0s!important;scroll-behavior:auto!important}}';

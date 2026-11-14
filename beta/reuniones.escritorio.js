@@ -439,6 +439,7 @@ function _cablearConvocar_(){
     if(!(await dialogoSiNo(_avisoEnNombreDe_(reu.convocante)+'Convocar «'+reu.titulo+'» a '+reu.invitados.length+' personas.'+
       String.fromCharCode(10,10)+'Les tocará cubrir su disponibilidad, y de no cubrirla '+
       'salen sanciones.'))) return;
+    var _fc=_focoFirma_($('#main'), bt);      // refutar42: al desactivar el botón el foco caía a <body> y `pintar()` no podía devolverlo
     bt.disabled=true; var prev=bt.textContent; bt.textContent='Convocando…';
     try{
       await api.crear(reu);
@@ -453,7 +454,7 @@ function _cablearConvocar_(){
         REUS.length=0;
         lista.map(normReu).forEach(function(r){ if(prevResp[r.id]){ r.resp=prevResp[r.id]; r.calor=null; } REUS.push(r); });
       }
-      pintar();
+      pintar(); _focoReponer_($('#main'), _fc);
     }catch(e){ bt.disabled=false; bt.textContent=prev;
       tostErr('No se pudo convocar: ', e); }
   };
