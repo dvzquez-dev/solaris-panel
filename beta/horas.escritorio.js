@@ -715,7 +715,7 @@ function _fichaPanel_(){
   var perf=_fichaPerfil_(), yo=_fichaYo_();
   var firma=perf?_firmaDe_(perf,yo):null, firmaP=firma?((miembro(firma)||{}).pila||firma):null;
 
-  var linea = estado==='corriendo' ? (largo?'M\u00c1S DE 10 H ABIERTA \u00b7 CI\u00c9RRALA':('CONTANDO DESDE LAS '+esc(_hhmmDe_(FICHA.ini))))
+  var linea = estado==='corriendo' ? (largo?'M\u00c1S DE 10 H ABIERTA \u00b7 CI\u00c9RRALA':('CONTANDO DESDE LAS '+esc(_hhmmDe_(FICHA.ini))+(_zonaNoMadrid_()?' (HORA DE MADRID)':'')))
             : estado==='pausada'   ? 'EN PAUSA \u00b7 EL RELOJ EST\u00c1 PARADO'
             : sabido               ? 'SIN SESI\u00d3N ABIERTA'
             : 'COMPROBANDO SI YA TIENES UN FICHAJE ABIERTO\u2026';

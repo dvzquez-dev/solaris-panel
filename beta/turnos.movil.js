@@ -796,7 +796,7 @@ function _ftInicioM_(){
     return _mioTurno_(x) && x.estado !== 'Cancelado' && _ftEnCurso_(x, ahora); })[0];
   if(!t) return '';
   return '<div class="tarj" data-ftwrap style="display:none">'+cab('Tu turno de hoy', t.hora)+
-    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(_sitioConCiudad_(t.punto))+'</b><small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+'</small></div></div>'+
+    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(_sitioConCiudad_(t.punto))+'</b><small>'+esc(t.hora)+(_zonaNoMadrid_()?' (hora de Madrid)':'')+(t.dur?' · '+esc(t.dur):'')+'</small></div></div>'+
     '<div style="padding:0 14px 12px">'+_ftHTML_(t)+'</div></div>';
 }
 

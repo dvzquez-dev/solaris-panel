@@ -3253,6 +3253,20 @@ function _esLecturaApi_(accion){
    3) UNA SESIÓN CADUCADA A MITAD DE UNA ESCRITURA reabre la entrada (`_avisarSesionMuerta_`); lo escrito sigue en su campo y, si
       lleva `data-borr`, en su borrador (ver `_borrArrancar_`). */
 var API_MSG_SIN_RED = "Sin conexión con el servidor: lo más probable es que NO se haya guardado. Revisa tu red y repítelo (lo que escribiste sigue ahí).";
+/* 14/11 (Daniel: «si estás de baja, que ponga algo de que se te ha revocado el acceso a la aplicación Solaris»). El servidor contesta
+   «cuenta dada de baja en el equipo» (`_verificarIdentidad_`) y la entrada lo enseñaba con un «Reintentar», que es de un fallo de red. */
+var API_MSG_BAJA = "Se te ha revocado el acceso a la aplicación Solaris porque constas de baja en el equipo. Si es un error, habla con tu coordinador o con el Project Director.";
+function _esErrBaja_(e){ return /cuenta dada de baja en el equipo/.test(String((e && e.message) || e || "")); }
+/* La puerta de quien consta de baja, en las dos caras: suelta la sesión (no se vuelve a probar sola), para lo vivo y tapa la app.
+   Sin «Reintentar» (da lo mismo cada vez); sí «Entrar con otra cuenta». */
+function _revocarAcceso_(){
+  try{ localStorage.removeItem('sol_sess'); }catch(_){}
+  SESION=null; _sesionMuerta_(true); window.__SESION_MUERTA_DICHA=true;
+  var cab=(typeof SPLASH==='string') ? SPLASH : ((typeof _insigniaHTML_==='function') ? _insigniaHTML_() : '');
+  _gate_(cab+'<div id="gateBaja" style="color:#ffb3b0;max-width:340px">'+API_MSG_BAJA+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
+    'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Entrar con otra cuenta</button>');
+  var b=document.getElementById('reGis'); if(b) b.onclick=_pintarLogin_;
+}
 var API_MSG_RESP_RARA = "El servidor no ha dado una respuesta válida. Puede que se haya guardado: recarga antes de repetirlo.";
 async function _apiPost_(body){
   /* La fusión vive DENTRO de `_apiPost_` (y su registro en la propia función) para que quien extrae esta función a un banco
@@ -3300,6 +3314,7 @@ async function _apiPost_(body){
       /* Un «no» del backend no se reintenta; un fallo de red o de transito, si. */
       /* Sólo si HABÍA sesión: «sin token» de quien aún no ha entrado (la demo, el arranque) no es una sesión que caduca. */
       if(e && e.sesion){ if(SESION&&SESION.token){ try{ _sesionMuerta_(true); _avisarSesionMuerta_(); }catch(_){} } throw e; }
+      if(e && _esErrBaja_(e)){ if(SESION&&SESION.token){ try{ _revocarAcceso_(); }catch(_){} } throw e; }   /* 14/11: la baja, con la app abierta */
       if(e && !e.transito && !(e instanceof TypeError)) throw e;
       ultimo=e;
       if(modelo) break;   // `solaria10`: un solo intento al modelo
@@ -4843,7 +4858,7 @@ function _arrancarVivo_(refrescar){
       if(!sellos){ sellos=r.sellos; return; }                 // la primera vuelta sólo toma la foto
       var c=_vivoCambios_(sellos, r.sellos);
       if(!c.length) return;
-      if((await refrescar(c))!==false) sellos=r.sellos;
+      if((await refrescar(c, r.sellos))!==false) sellos=r.sellos;   /* 14/11: los sellos, para quien relee algo abierto (`_refrescarDocAbierto_`) */
     }catch(_){} finally{ en=false; }
   }, VIVO_CADA_MS);
   return true;
@@ -10967,6 +10982,11 @@ function _ahoraMadridDate_(d){
 /* El INSTANTE de «ahora» (ms) para comparar con instantes del servidor (`empezado_at`, `ini`…). Fuera de la maqueta es el reloj tal cual: la pared de Madrid
    leída como si fuera la local (`new Date(_ahoraApp_())`) desfasaba la cuenta lo que el móvil se aparte de Madrid (el reloj de un turno en curso). */
 function _ahoraInstante_(){ return _demoLocal_() ? new Date(_ahoraApp_()).getTime() : Date.now(); }
+/* 14/11 (Daniel: «Si está en otra zona horaria, que lo diga»): ¿la pared de ESTE móvil no es la de Madrid ahora mismo? Las horas de la app son las de Madrid
+   (arriba); quien está fuera las lee como suyas si no se le dice. Se compara la hora, no el nombre de la zona: Lisboa da distinta, Ceuta igual. */
+function _zonaNoMadrid_(d){
+  try{ d=d||new Date(); return _ahoraLocalISO_(d).slice(11,16)!==(('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)); }catch(_){ return false; }
+}
 
 /* Que es «la imputacion» de un parte: UN solo sitio, para que lo que se VALIDA y lo que se
    ENVIA no puedan desincronizarse en silencio (que es como estuvieron un tiempo en el movil).

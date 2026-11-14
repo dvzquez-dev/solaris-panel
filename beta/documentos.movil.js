@@ -468,6 +468,7 @@ function _previaDocM_(e){
 function verDoc(id){
   var e=ENTREGABLES.concat(ENT_REV).filter(function(x){return x.id===id;})[0];
   if(!e) return;
+  _DOC_ABIERTO_=id;   /* 14/11: la que relee `_refrescarDocAbierto_` */
   var puede=puedeDecidirDoc(e);
   var revs=revisoresDe(e).map(function(n){return n.split(' ')[0];}).join(' o ');
   var sinRev=!revs;
@@ -589,3 +590,33 @@ function verDoc(id){
   _cablearVisor_();
 }
 
+/* 14/11 — LA FICHA ABIERTA TAMBIÉN SE PONE AL DÍA. Daniel: «que en documentos el PD no tenga la pantalla desactualizada. Por diseño eso no debería ser
+   así. Se supone que se actualiza cada segundo». Lo de cada segundo ya existía (`_arrancarVivo_`), pero con un modal abierto `_refrescoVivo_` no toca
+   nada, y la ficha de un documento ES un modal: quien la leía cinco minutos decidía sobre el estado de cuando la abrió, y el PD podía pisar sin saberlo
+   lo que una coordinadora acababa de decidir (refutar44). Aquí se relee SÓLO esa ficha y SÓLO si el sello de los documentos cambió (no es un
+   `getEntregables` por segundo). Con algo escrito en la ficha no se repinta, que se perdería: se avisa encima. */
+var _DOC_ABIERTO_=null, _DOC_SELLO_=null, _REFDOC_=false;
+function _firmaDocM_(e){ return e ? [e.estado, e.revisor||'', (e.decision&&e.decision.accion)||'', e.nota||'', _peticionRevActiva_(e)?1:0].join('|') : ''; }
+async function _refrescarDocAbierto_(sellos){
+  if(_DOC_ABIERTO_==null) return;
+  if(!_modalAbierto_()){ _DOC_ABIERTO_=null; return; }
+  var se=sellos ? [sellos['entregables'], sellos['kv/entregables']].join('|') : null;
+  if(se!==null && se===_DOC_SELLO_) return;
+  if(_REFDOC_ || typeof api==='undefined' || typeof api.getEntregables!=='function') return;
+  _REFDOC_=true;
+  try{
+    var id=_DOC_ABIERTO_, antes=ENTREGABLES.concat(ENT_REV).filter(function(x){return x.id===id;})[0];
+    var L=await api.getEntregables(); if(!Array.isArray(L)) return;
+    _DOC_SELLO_=se;
+    var ahora=L.filter(function(x){return x && x.id===id;})[0];
+    _repartirEntregablesM_(L);
+    if(!ahora || _firmaDocM_(ahora)===_firmaDocM_(antes) || _DOC_ABIERTO_!==id || !_modalAbierto_()) return;
+    var fir=(ahora.decision&&ahora.decision.revisor)||ahora.revisor||'', acc=_accionDocTxt_(ahora.decision&&ahora.decision.accion)||_accionDocTxt_(ahora.estado);
+    var txt=(fir?fir+' acaba de decidirlo':'Acaba de cambiar')+(acc?': '+acc:'')+'.';
+    if(!_MODAL_TOCADO_){ var sc=$('#modal .card').scrollTop; verDoc(id); $('#modal .card').scrollTop=sc; txt+=' Lo que ves ya está al día.'; }
+    else txt+=' Lo de abajo aún es de antes (lo que escribiste sigue ahí): revísalo antes de decidir.';
+    var b=document.getElementById('docCambio');
+    if(!b){ b=document.createElement('div'); b.id='docCambio'; b.className='avisolargo'; b.style.margin='0 0 10px'; var mb=$('#modal-body'); mb.insertBefore(b, mb.firstChild); }
+    b.textContent=txt;
+  }catch(_){ } finally { _REFDOC_=false; }
+}

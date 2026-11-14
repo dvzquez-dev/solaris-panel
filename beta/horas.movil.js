@@ -765,7 +765,7 @@ function vFichar(){
       '<div class="sesion'+(corre?' corre':'')+(s.estado==='pausada'?' pausada':'')+(largo?' larga':'')+'" id="sesion">'+
         '<div class="rel mono" id="relSes">'+fmtHM(min)+'</div>'+
         '<div class="est"><span class="d"></span><span id="estSes">'+
-          (corre?'CONTANDO DESDE LAS '+s.desde:(s.estado==='pausada'?'EN PAUSA · EL RELOJ ESTÁ PARADO':'SIN SESIÓN ABIERTA'))+
+          (corre?'CONTANDO DESDE LAS '+s.desde+(_zonaNoMadrid_()?' (HORA DE MADRID)':''):(s.estado==='pausada'?'EN PAUSA · EL RELOJ ESTÁ PARADO':'SIN SESIÓN ABIERTA'))+
         '</span></div>'+
       '</div>'+
       (s.estado!=='parada' && !nube
