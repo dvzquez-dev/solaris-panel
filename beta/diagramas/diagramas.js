@@ -22,6 +22,33 @@ function sumaDias(iso, n){ const d = deISO(iso); d.setDate(d.getDate() + n); ret
 function diasEntre(a, b){ return Math.round((deISO(b) - deISO(a)) / 864e5); }   // round: un cambio de hora no resta un día
 function dmy(iso){ return iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : ''; }
 function hoyISO(){ return isoDe(new Date()); }
+// ── Fechas SIN el selector nativo (refutación 13/11: «nada de controles nativos», y en un Chrome en inglés salía
+//    11/13/2026). Un campo de texto DD/MM/AAAA; ↑/↓ mueven un día. Por dentro los manejadores siguen recibiendo ISO en
+//    `change`: el campo se hace pasar por `type=date` mientras dura el evento (fechaAlCambiar).
+function deDMY(txt){
+  const iso = String(txt || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);   // pegado en ISO también vale
+  if (iso) return deDMY(iso[3] + '/' + iso[2] + '/' + iso[1]);
+  const m = String(txt || '').trim().match(/^(\d{1,2})[\/.\-\s]?(\d{1,2})[\/.\-\s]?(\d{2}|\d{4})$/);
+  if (!m) return String(txt || '').trim() ? null : '';
+  const a = m[3].length === 2 ? 2000 + +m[3] : +m[3], f = new Date(Date.UTC(a, +m[2] - 1, +m[1]));
+  return f.getUTCDate() === +m[1] && f.getUTCMonth() === +m[2] - 1 ? f.toISOString().slice(0, 10) : null;
+}
+function campoFecha(attrs, iso){ return `<input type="text" class="fecha" data-fecha inputmode="numeric" autocomplete="off" placeholder="DD/MM/AAAA" ${attrs} value="${dmy(iso || '')}">`; }
+function fechaAlCambiar(t){
+  const iso = deDMY(t.value);
+  t.classList.toggle('mal', iso === null);
+  if (iso === null) return false;
+  t.type = 'date'; t.value = iso;
+  setTimeout(() => { if (t.isConnected) { t.type = 'text'; t.value = dmy(iso); } }, 0);
+  return true;
+}
+document.addEventListener('input', ev => { if (ev.target.matches && ev.target.matches('input[data-fecha]')) ev.stopImmediatePropagation(); }, true);
+document.addEventListener('change', ev => { const t = ev.target; if (t.matches && t.matches('input[data-fecha]') && t.type === 'text' && !fechaAlCambiar(t)) ev.stopImmediatePropagation(); }, true);
+document.addEventListener('keydown', ev => {
+  const t = ev.target; if (!(t.matches && t.matches('input[data-fecha]')) || (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown')) return;
+  const iso = deDMY(t.value) || hoyISO(); ev.preventDefault();
+  t.value = dmy(sumaDias(iso, ev.key === 'ArrowUp' ? 1 : -1)); t.dispatchEvent(new Event('change', { bubbles: true }));
+}, true);
 function semanaISO(iso){   // nº de semana ISO-8601 (la que se usa en España)
   const d = deISO(iso); d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
   const s1 = new Date(d.getFullYear(), 0, 4);
@@ -112,7 +139,9 @@ function geoNodo(n){
   const P = PIEZAS[n.t] || PIEZAS.proceso;
   const lineas = partir(n.txt, P.tw, P.peso);
   let h = P.h;
-  const necesita = lineas.length * LH + (n.t === 'decision' ? 54 : 22);
+  // Daniel, 15/11: «si pones más texto […] que automáticamente pegue los enters y […] se haga más grande la tarjeta».
+  // `cab`/`pie`: las franjas de arriba y abajo que la pieza usa para lo suyo (STRL y área; días y pasos): el texto no las pisa.
+  const necesita = lineas.length * LH + (P.cab || 0) + (P.pie || 0) + (P.pad != null ? P.pad : n.t === 'decision' ? 54 : 22);
   if (necesita > h) h = Math.ceil(necesita / REJILLA) * REJILLA;
   return { x: n.x, y: n.y, w: P.w, h, lineas };
 }
@@ -144,8 +173,11 @@ function ruta(a, sa, b, sb, carril){
   const a1 = [a[0] + DIR[sa][0] * S, a[1] + DIR[sa][1] * S], b1 = [b[0] + DIR[sb][0] * S, b[1] + DIR[sb][1] * S];
   const va = sa === 'n' || sa === 's', vb = sb === 'n' || sb === 's';
   let medio;
-  if (va && vb) { const my = (a1[1] + b1[1]) / 2 + carril; medio = [[a1[0], my], [b1[0], my]]; }
-  else if (!va && !vb) { const mx = (a1[0] + b1[0]) / 2 + carril; medio = [[mx, a1[1]], [mx, b1[1]]]; }
+  // mismo lado en las dos puntas (derecha→derecha…): el tramo de en medio va POR FUERA de las dos, no entre ellas,
+  // que lo metería dentro de una pieza
+  const fuera = (s, u, v) => s === 'e' || s === 's' ? Math.max(u, v) : Math.min(u, v);
+  if (va && vb) { const my = (sa === sb ? fuera(sa, a1[1], b1[1]) : (a1[1] + b1[1]) / 2) + carril; medio = [[a1[0], my], [b1[0], my]]; }
+  else if (!va && !vb) { const mx = (sa === sb ? fuera(sa, a1[0], b1[0]) : (a1[0] + b1[0]) / 2) + carril; medio = [[mx, a1[1]], [mx, b1[1]]]; }
   else if (va) medio = [[a1[0], b1[1]]];
   else medio = [[b1[0], a1[1]]];
   const pts = [a, a1].concat(medio, [b1, b]);
@@ -177,7 +209,11 @@ function trazo(pts, radio){   // polilínea con esquinas redondeadas
 function ladosConector(c, geos){
   const ga = geos[c.de], gb = geos[c.a];
   if (!ga || !gb) return null;
-  const sa = c.ld || ladoHacia(ga, [gb.x + gb.w / 2, gb.y + gb.h / 2]);
+  let sa = c.ld || ladoHacia(ga, [gb.x + gb.w / 2, gb.y + gb.h / 2]);
+  // Con hueco de lado entre las dos piezas (≥ 2 cuadros) sale por el LADO, no por arriba o abajo: en una COLUMNA de pasos
+  // que van a uno de la derecha, mirar sólo la proporción la sacaba por arriba, atravesando al vecino (MkI, 15/11).
+  const hx = Math.max(gb.x - (ga.x + ga.w), ga.x - (gb.x + gb.w));
+  if (!c.ld && hx >= 2 * REJILLA && (sa === 'n' || sa === 's')) sa = gb.x > ga.x ? 'e' : 'w';
   return { sa, sb: c.la || ladoHacia(gb, puerto(ga, sa)) };
 }
 // Daniel, 26/10: «que automaticamente intente evitar la fusion de flechas, aunq si hay demasiadas no lo haga».
@@ -205,14 +241,14 @@ function repartoPuertos(datos, geos){
   });
   return { lados, off };
 }
-function geoConector(c, geos, rep){
+function geoConector(c, geos, rep, conCarril){
   const ga = geos[c.de], gb = geos[c.a];
   if (!ga || !gb) return null;
   const l = (rep && rep.lados[c.id]) || ladosConector(c, geos), o = (rep && rep.off[c.id]) || { a: 0, b: 0 };
   const sa = l.sa, sb = l.sb;
   const mover = (p, lado, d) => (lado === 'n' || lado === 's') ? [p[0] + d, p[1]] : [p[0], p[1] + d];
   const pa = mover(puerto(ga, sa), sa, o.a), pb = mover(puerto(gb, sb), sb, o.b);
-  const pts = ruta(pa, sa, pb, sb, (o.a + o.b) * 0.5);
+  const pts = ruta(pa, sa, pb, sb, (Number(c.m) || 0) + (conCarril === false ? 0 : (o.a + o.b) * 0.5));
   let mejor = 0, mi = 0;   // la etiqueta, en el tramo más largo
   for (let i = 0; i < pts.length - 1; i++) {
     const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
@@ -222,6 +258,25 @@ function geoConector(c, geos, rep){
   return { pts, et, largo: mejor };
 }
 
+// Los conectores con algún tramo interior (no el de salida ni el de llegada) sobre la misma recta que el de otro y
+// solapándose más de un pelo. Por cubos de coordenada: con 600 tarjetas no se compara todo con todo.
+function tramosQueSePisan(geos){
+  const cubos = {}, out = new Set();
+  Object.keys(geos).forEach(id => {
+    const p = geos[id].pts;
+    for (let i = 1; i < p.length - 2; i++) {
+      const v = Math.abs(p[i][0] - p[i + 1][0]) < .5;
+      const k = (v ? 'v' : 'h') + Math.round(v ? p[i][0] : p[i][1]);
+      const a = v ? p[i][1] : p[i][0], b = v ? p[i + 1][1] : p[i + 1][0];
+      (cubos[k] = cubos[k] || []).push([id, Math.min(a, b), Math.max(a, b)]);
+    }
+  });
+  Object.values(cubos).forEach(l => {
+    for (let i = 0; i < l.length; i++) for (let j = i + 1; j < l.length; j++)
+      if (l[i][0] !== l[j][0] && Math.min(l[i][2], l[j][2]) - Math.max(l[i][1], l[j][1]) > 1) { out.add(l[i][0]); out.add(l[j][0]); }
+  });
+  return out;
+}
 // Dibuja el flujo entero. `ed`: añade asas, selección y zonas de clic (sólo en el editor).
 function flujoSVG(datos, opc){
   const ed = !!(opc && opc.ed), sel = opc && opc.sel;
@@ -229,8 +284,12 @@ function flujoSVG(datos, opc){
   datos.nodos.forEach(n => { geos[n.id] = geoNodo(n); });
   let cs = '';
   const rep = repartoPuertos(datos, geos);
+  // Daniel, 15/11: «una más adelantada que la otra». El carril separa dos flechas cuyos tramos de en medio se
+  // PISARÍAN (misma recta, rangos que se solapan); si no se pisan, codos a la misma altura.
+  const pre = {}; datos.conectores.forEach(c => { const g = geoConector(c, geos, rep, false); if (g) pre[c.id] = g; });
+  const pisan = tramosQueSePisan(pre);
   datos.conectores.forEach(c => {
-    const g = geoConector(c, geos, rep); if (!g) return;
+    const g = pisan.has(c.id) ? geoConector(c, geos, rep) : pre[c.id]; if (!g) return;
     const d = trazo(g.pts, 8);
     const es = sel && sel.k === 'c' && sel.id === c.id;
     let lb = '';
@@ -258,7 +317,8 @@ function flujoSVG(datos, opc){
   datos.nodos.forEach(n => {
     const g = geos[n.id];
     const es = sel && sel.k === 'n' && sel.id === n.id;
-    const y0 = g.h / 2 - (g.lineas.length - 1) * LH / 2 + (n.t === 'documento' ? -4 : 0) + ((PIEZAS[n.t] || {}).dy || 0);
+    const Pz = PIEZAS[n.t] || {}, cab = Pz.cab || 0, pie = Pz.pie || 0;   // centrado en el hueco entre las dos franjas
+    const y0 = cab + (g.h - cab - pie) / 2 - (g.lineas.length - 1) * LH / 2 + (n.t === 'documento' ? -4 : 0) + (Pz.dy || 0);
     const txt = g.lineas.map((l, i) => `<text x="${g.w / 2}" y="${y0 + i * LH}" text-anchor="middle" dominant-baseline="central">${esc(l)}</text>`).join('');
     const asas = ed ? ['n', 's', 'e', 'w'].map(l => { const p = puerto({ x: 0, y: 0, w: g.w, h: g.h }, l); return `<circle class="port" data-port="${l}" cx="${p[0]}" cy="${p[1]}" r="6"/>`; }).join('') : '';
     const marco = es ? `<rect class="marco" x="-5" y="-5" width="${g.w + 10}" height="${g.h + 10}" rx="6"/>` : '';
@@ -490,6 +550,51 @@ function nombreFichero(doc){
   return (doc.tipo === 'flujo' ? 'process' : 'project') + '_' + slug + '_' + hoyISO() + '.html';
 }
 // Lee un HTML descargado (o un .json) y devuelve el documento que lleva dentro, o null si no es nuestro.
+// ══ LO QUE ENTRA DE FUERA SE LIMPIA (refutación, 12/11) ═══════════════════════════════════════════════════════
+// Los TEXTOS se escapan al pintar, pero los ids, el tipo de pieza, las fechas y los números van DENTRO de atributos
+// (`data-n="…"`, `class="n-…"`, `value="…"`): un HTML importado o un documento de la nube con un id trampa ejecutaba
+// código en quien lo abriera (medido: 114 ejecuciones en la app y 10 en el documento descargado). Todo lo que entra
+// —fichero importado, lo guardado en este navegador, lo que llega del servidor— pasa por aquí y lo que no tiene la
+// forma esperada se QUITA. El servidor hace lo mismo y además lo rechaza (`diagramas_srv.revisar_datos`).
+const ID_OK = /^[A-Za-z0-9_-]{1,40}$/, FECHA_OK = /^\d{4}-\d\d-\d\d$/, LADOS = { n: 1, s: 1, e: 1, w: 1 };
+const PIEZAS_OK = { inicio: 1, proceso: 1, decision: 1, documento: 1, datos: 1, subproceso: 1, nota: 1, componente: 1, paso: 1, hito: 1, o: 1 };
+function _num(o, k){ if (o[k] == null) return; const v = Number(o[k]); if (isFinite(v)) o[k] = v; else delete o[k]; }
+function _fecha(o, k){ if (o[k] != null && !(typeof o[k] === 'string' && FECHA_OK.test(o[k]))) delete o[k]; }
+function _texto(o, k){ if (o[k] != null && typeof o[k] !== 'string') o[k] = String(o[k]); }
+function _lista(o, k){ if (o[k] == null) return; if (!Array.isArray(o[k])) { delete o[k]; return; } o[k] = o[k].filter(x => x && typeof x === 'object' && ID_OK.test(x.id)).map(x => ({ id: x.id, txt: String(x.txt == null ? '' : x.txt) })); }
+function sanear(d){
+  if (!d || typeof d !== 'object' || !d.datos || typeof d.datos !== 'object') return null;
+  ['titulo', 'unidad', 'autor'].forEach(k => _texto(d, k));
+  const D = d.datos;
+  _fecha(D, 'inicio'); if (D.escala != null && !ESCALAS[D.escala]) delete D.escala;
+  if (Array.isArray(D.filas)) {   // el Gantt dibujado a mano (prototipo del 26/10)
+    D.filas = D.filas.filter(f => f && ID_OK.test(f.id) && (f.t === 'fase' || f.t === 'tarea' || f.t === 'hito'));
+    D.filas.forEach(f => { _fecha(f, 'ini'); _fecha(f, 'fin'); _texto(f, 'nombre'); _texto(f, 'resp'); f.deps = Array.isArray(f.deps) ? f.deps.filter(x => ID_OK.test(x)) : []; });
+  }
+  if (!Array.isArray(D.nodos) || !Array.isArray(D.conectores)) return D.filas ? d : null;
+  const vistos = new Set(), unaVez = x => !vistos.has(x.id) && vistos.add(x.id);   // un id repetido: se queda el primero
+  D.nodos = D.nodos.filter(n => n && typeof n === 'object' && ID_OK.test(n.id) && PIEZAS_OK[n.t] && unaVez(n));
+  const ids = new Set(D.nodos.map(n => n.id));
+  D.nodos.forEach(n => {
+    if (n.padre != null && !(ID_OK.test(n.padre) && ids.has(n.padre))) n.padre = null;
+    ['x', 'y', 'dur', 'presupuesto', 'strl', 'strlFin', 'subeA'].forEach(k => _num(n, k));
+    if (typeof n.x !== 'number') n.x = 0; if (typeof n.y !== 'number') n.y = 0;
+    ['fija', 'dl', 'ns'].forEach(k => _fecha(n, k));
+    ['txt', 'resp', 'area', 'unidad'].forEach(k => _texto(n, k));
+    if (n.unidades != null) n.unidades = Array.isArray(n.unidades) ? n.unidades.map(String) : [];
+    _lista(n, 'produce'); _lista(n, 'pide');
+    if (n.herencia != null) { if (typeof n.herencia !== 'object') delete n.herencia; else { _num(n.herencia, 'nivel'); _texto(n.herencia, 'de'); _texto(n.herencia, 'porque'); n.herencia.aprobada = !!n.herencia.aprobada; } }
+  });
+  D.conectores = D.conectores.filter(c => c && typeof c === 'object' && ID_OK.test(c.id) && ids.has(c.de) && ids.has(c.a) && unaVez(c));
+  D.conectores.forEach(c => {
+    _texto(c, 'txt');
+    if (c.ld != null && !LADOS[c.ld]) delete c.ld; if (c.la != null && !LADOS[c.la]) delete c.la;
+    _num(c, 'm');   // el codo movido a mano (va dentro del dibujo: sólo un número)
+    if (c.items != null) c.items = Array.isArray(c.items) ? c.items.filter(x => ID_OK.test(x)) : [];
+  });
+  return d;
+}
+
 function leerDescargado(texto){
   let j = null;
   try { j = JSON.parse(texto); } catch (_) {
@@ -502,19 +607,43 @@ function leerDescargado(texto){
   if (d.tipo === 'gantt' && !Array.isArray(d.datos.filas)) return null;
   if (d.tipo === 'proyecto' && !(Array.isArray(d.datos.nodos) && Array.isArray(d.datos.conectores))) return null;
   if (d.tipo !== 'flujo' && d.tipo !== 'gantt' && d.tipo !== 'proyecto') return null;
-  return d;
+  return sanear(d);
 }
 
 // ══ BIBLIOTECA (prototipo: este navegador) ═════════════════════════════════════════════════════════════════
 const CLAVE = 'solaris-diagramas-v1';
 let BIB = { docs: [], actual: null }, persistente = true;
 function cargarBib(){
-  try { const s = localStorage.getItem(CLAVE); if (s) { const b = JSON.parse(s); if (b && Array.isArray(b.docs)) BIB = b; } }
+  try { const s = localStorage.getItem(CLAVE); if (s) { const b = JSON.parse(s); if (b && Array.isArray(b.docs)) { b.docs = b.docs.map(sanear).filter(Boolean); BIB = b; } } }
+  catch (_) { persistente = false; }
+}
+// Varias pestañas del mismo navegador comparten CLAVE (refutación 13/11): antes se escribía la biblioteca ENTERA y ganaba
+// la última, borrando lo creado en la otra. Ahora se funde diagrama a diagrama (gana el editado más reciente) y lo borrado
+// se apunta para que la otra pestaña no lo resucite.
+function borradoAqui(id){ BIB.borrados = (BIB.borrados || []).filter(x => x !== id).concat(id).slice(-500); }
+function fundirBib(o){
+  if (!o || !Array.isArray(o.docs)) return false;
+  const borr = new Set((BIB.borrados || []).concat(o.borrados || []));
+  BIB.borrados = [...borr].slice(-500);
+  let cambio = false;
+  o.docs.forEach(x => {
+    if (borr.has(x.id)) return;
+    const i = BIB.docs.findIndex(d => d.id === x.id);
+    if (i < 0) { const s = sanear(x); if (s) { BIB.docs.push(s); cambio = true; } }
+    else if ((x.editado || 0) > (BIB.docs[i].editado || 0)) { const s = sanear(x); if (s) { BIB.docs[i] = s; cambio = true; } }
+  });
+  const antes = BIB.docs.length;
+  BIB.docs = BIB.docs.filter(d => !borr.has(d.id));
+  if (BIB.docs.length !== antes) { cambio = true; if (!docActual()) BIB.actual = BIB.docs[0] ? BIB.docs[0].id : null; }
+  return cambio;
+}
+function escribirBib(){   // fundir con lo de otras pestañas y escribir; sin subir a la nube
+  try { fundirBib(JSON.parse(localStorage.getItem(CLAVE) || 'null')); } catch (_) {}
+  try { localStorage.setItem(CLAVE, JSON.stringify(BIB)); persistente = true; }
   catch (_) { persistente = false; }
 }
 function guardarBib(){
-  try { localStorage.setItem(CLAVE, JSON.stringify(BIB)); persistente = true; }
-  catch (_) { persistente = false; }
+  escribirBib();
   if (typeof nubeTrasCambio === 'function') nubeTrasCambio(docActual());   // en la nube, además, se sube lo cambiado (nube.js)
   pintarEstado();
 }
@@ -550,6 +679,7 @@ function ejemplos(){
 let SEL = null;                       // {k:'n'|'c'|'f', id}
 let VISTA = { x: 40, y: 20, k: 1 };   // sólo flujo
 const HIST = { atras: [], adelante: [] };
+const HIST_TOPE = 8e6;   // caracteres guardados para deshacer (~16 MB)
 let _guardaT = null;
 function confirmar(){   // tras cada cambio con significado: deshacer, guardar y repintar
   const d = docActual(); if (!d) return;
@@ -562,6 +692,9 @@ function confirmar(){   // tras cada cambio con significado: deshacer, guardar y
 function instantanea(){   // ANTES de cambiar algo
   const d = docActual(); if (!d) return;
   HIST.atras.push(JSON.stringify(d.datos)); if (HIST.atras.length > 120) HIST.atras.shift();
+  // Y por TAMAÑO (refutación 13/11): 120 fotos de un diagrama de 1 MB eran ~240 MB de memoria en el móvil.
+  let tam = HIST.atras.reduce((t, f) => t + f.length, 0);
+  while (HIST.atras.length > 1 && tam > HIST_TOPE) tam -= HIST.atras.shift().length;
   HIST.adelante.length = 0; pintarHist();
 }
 let _deshaciendo = false;
@@ -758,6 +891,15 @@ function nuevoConector(d, de, a, lado){
   return c;
 }
 let ARR = null;   // arrastre en curso
+// Por qué eje se mueve el tramo de en medio de una flecha: 'x' si sale y llega por lados verticales (e/w), 'y' si por
+// n/s; null si dobla una sola vez (no tiene tramo de en medio).
+function ejeCodo(d, c){
+  const vis = d.tipo === 'proyecto' ? planVisible(d) : d.datos, geos = {};
+  vis.nodos.forEach(n => { geos[n.id] = geoNodo(n); });
+  const l = ladosConector(c, geos); if (!l) return null;
+  const va = l.sa === 'n' || l.sa === 's', vb = l.sb === 'n' || l.sb === 's';
+  return va && vb ? 'y' : !va && !vb ? 'x' : null;
+}
 // Pinchar el lienzo no quita el foco hasta DESPUÉS del pointerdown; sin esto el inspector se cree que alguien escribe
 // y se queda con la pieza anterior. El `change` que dispara el blur guarda lo escrito, que es lo que se quiere.
 function soltarFoco(){ const a = document.activeElement; if (a && a !== document.body && a.matches('input,textarea,select')) a.blur(); }
@@ -783,9 +925,14 @@ function engancharFlujo(svg){
     } else if (gc) {
       const doble = _toque && _toque.id === gc.dataset.c && Date.now() - _toque.t < 380;
       _toque = { id: gc.dataset.c, t: Date.now() };
-      SEL = { k: 'c', id: gc.dataset.c }; ARR = null; pintar();
+      SEL = { k: 'c', id: gc.dataset.c };
+      // Daniel, 15/11: «que las [flechas] también se puedan mover». Arrastrar una flecha mueve su tramo de en medio
+      // (y la etiqueta con él), como en draw.io; sólo las que tienen ese tramo (salen y llegan por lados paralelos).
+      const c = d.datos.conectores.find(x => x.id === gc.dataset.c), eje = c && ejeCodo(d, c);
+      ARR = eje ? { tipo: 'codo', c, eje, p0: p, m0: Number(c.m) || 0, movido: false } : null;
+      pintar();
       if (doble) { const i = $('#i-etq'); if (i) { i.focus(); i.select(); } }
-      return;
+      if (!ARR) return;
     } else {
       if (SEL) { SEL = null; pintar(); }
       ARR = { tipo: 'pan', sx: ev.clientX, sy: ev.clientY, vx: VISTA.x, vy: VISTA.y };
@@ -801,10 +948,34 @@ function engancharFlujo(svg){
       const t = `translate(${VISTA.x},${VISTA.y}) scale(${VISTA.k})`;
       svg.querySelector('#vp').setAttribute('transform', t); svg.querySelector('#tmp').setAttribute('transform', t);
     } else if (ARR.tipo === 'mover') {
-      const gm = geoNodo(ARR.n), nx = ajustarC(p[0] - ARR.dx, gm.w), ny = ajustarC(p[1] - ARR.dy, gm.h);
+      // el centro va a la rejilla, salvo que caiga cerca de donde estaba (siempre se puede devolver) o en línea con
+      // el centro de otra pieza visible: entonces se imanta ahí, aunque esa esté fuera de la rejilla
+      const gm = geoNodo(ARR.n), lx = p[0] - ARR.dx, ly = p[1] - ARR.dy;
+      const casa = Math.abs(lx - ARR.x0) < REJILLA / 2 && Math.abs(ly - ARR.y0) < REJILLA / 2;
+      let nx = casa ? ARR.x0 : ajustarC(lx, gm.w), ny = casa ? ARR.y0 : ajustarC(ly, gm.h);
+      if (!casa) {
+        if (!ARR.centros) {   // una vez por arrastre, no en cada movimiento: con 600 tarjetas se notaría
+          const d0 = docActual(), vis = d0.tipo === 'proyecto' ? planVisible(d0).nodos : d0.datos.nodos;
+          ARR.centros = vis.filter(o => o.id !== ARR.n.id).map(o => { const go = geoNodo(o); return [o.x + go.w / 2, o.y + go.h / 2]; });
+        }
+        let bx = REJILLA / 2, by = REJILLA / 2;
+        ARR.centros.forEach(([ox, oy]) => {
+          const cx = ox - gm.w / 2, cy = oy - gm.h / 2;
+          if (Math.abs(lx - cx) < bx) { bx = Math.abs(lx - cx); nx = cx; }
+          if (Math.abs(ly - cy) < by) { by = Math.abs(ly - cy); ny = cy; }
+        });
+      }
       if (nx !== ARR.n.x || ny !== ARR.n.y) {
         if (!ARR.movido) { ARR.movido = true; ARR.n.x = ARR.x0; ARR.n.y = ARR.y0; instantanea(); }
         ARR.n.x = nx; ARR.n.y = ny; pintarFlujo(docActual());
+      }
+    } else if (ARR.tipo === 'codo') {
+      const dl = ARR.eje === 'x' ? p[0] - ARR.p0[0] : p[1] - ARR.p0[1];
+      const m = Math.round((ARR.m0 + dl) / (REJILLA / 2)) * (REJILLA / 2);
+      if (m !== (Number(ARR.c.m) || 0)) {
+        if (!ARR.movido) { ARR.movido = true; instantanea(); }
+        if (m) ARR.c.m = m; else delete ARR.c.m;
+        pintarFlujo(docActual());
       }
     } else if (ARR.tipo === 'enlace') {
       const d = docActual();
@@ -820,17 +991,21 @@ function engancharFlujo(svg){
     if (!ARR) return;
     const a = ARR; ARR = null; svg.style.cursor = '';
     svg.querySelector('#tmp').innerHTML = '';
-    if (a.tipo === 'mover' && a.movido) confirmar();
+    if ((a.tipo === 'mover' || a.tipo === 'codo') && a.movido) confirmar();
     if (a.tipo === 'enlace') {
       const d = docActual(); const p = aMundo(svg, ev);
       const bajo = nodoBajo(ev);
       if (bajo && bajo !== a.de) {
-        if (!d.datos.conectores.some(c => c.de === a.de && c.a === bajo)) {
-          instantanea();
-          if (d.tipo === 'proyecto') { const c = enlazarPlan(d, a.de, bajo, a.lado); if (c) SEL = { k: 'c', id: c.id }; }
-          else { const c = nuevoConector(d, a.de, bajo, a.lado); d.datos.conectores.push(c); SEL = { k: 'c', id: c.id }; }
-          confirmar();
-        }
+        // Daniel, 15/11: «en vez de conectarse del lado derecho […] se pone desde la izquierda». Se llega por el lado
+        // donde se suelta, y si la flecha ya existía (en cualquier sentido) se le cambian los lados en vez de no hacer nada.
+        const llega = ladoHacia(geoNodo(d.datos.nodos.find(n => n.id === bajo)), p);
+        const yaDe = d.datos.conectores.find(c => c.de === a.de && c.a === bajo), yaA = d.datos.conectores.find(c => c.de === bajo && c.a === a.de);
+        instantanea();
+        if (yaDe) { yaDe.ld = a.lado; yaDe.la = llega; delete yaDe.m; SEL = { k: 'c', id: yaDe.id }; }
+        else if (yaA) { yaA.la = a.lado; yaA.ld = llega; delete yaA.m; SEL = { k: 'c', id: yaA.id }; }
+        else if (d.tipo === 'proyecto') { const c = enlazarPlan(d, a.de, bajo, a.lado); if (c) { if (c.de === a.de) { c.ld = a.lado; c.la = llega; } else { c.la = a.lado; c.ld = llega; } SEL = { k: 'c', id: c.id }; } }
+        else { const c = nuevoConector(d, a.de, bajo, a.lado); c.la = llega; d.datos.conectores.push(c); SEL = { k: 'c', id: c.id }; }
+        confirmar();
       } else if (!bajo && Math.hypot(p[0] - a.p0[0], p[1] - a.p0[1]) > 30) {
         // soltar en vacío crea un PROCESO ahí, ya conectado: el gesto más rápido para seguir el flujo
         instantanea();
@@ -1076,8 +1251,8 @@ function pintarInspector(d){
       h = `<h3>${iconoGantt(f.t === 'fase' ? 'fase' : f.t === 'hito' ? 'hito' : 'tarea')}${f.t === 'fase' ? 'Fase' : f.t === 'hito' ? 'Hito' : 'Tarea'} <span class="mono" style="color:var(--ink3);font-weight:400">#${o.i + 1}</span></h3>
         ${campo('Nombre', `<input type="text" id="i-nombre" value="${esc(f.nombre || '')}">`)}
         ${f.t !== 'fase' ? campo('Responsable', `<input type="text" id="i-resp" value="${esc(f.resp || '')}" placeholder="Quién lo lleva">`) : ''}
-        ${f.t === 'hito' ? campo('Fecha', `<input type="date" id="i-ini" value="${o.ini}">`)
-          : `<div class="fila2">${campo('Inicio', `<input type="date" id="i-ini" value="${o.ini}"${calcFase ? ' disabled' : ''}>`)}${campo('Fin', `<input type="date" id="i-fin" value="${o.fin}"${calcFase ? ' disabled' : ''}>`)}</div>
+        ${f.t === 'hito' ? campo('Fecha', campoFecha('id="i-ini"', o.ini))
+          : `<div class="fila2">${campo('Inicio', campoFecha('id="i-ini"' + (calcFase ? ' disabled' : ''), o.ini))}${campo('Fin', campoFecha('id="i-fin"' + (calcFase ? ' disabled' : ''), o.fin))}</div>
              <p class="ayuda" style="padding:0">${diasEntre(o.ini, o.fin) + 1} días${calcFase ? ' · las fechas de la fase salen de sus tareas' : ''}</p>`}
         ${f.t !== 'fase' ? campo('Depende de', `<div class="deps">${cand.length ? cand.map(x => `<label><input type="checkbox" data-dep="${x.f.id}"${(f.deps || []).includes(x.f.id) ? ' checked' : ''}><span class="mono" style="color:var(--ink3)">${x.i + 1}</span> ${esc(x.f.nombre || '')}</label>`).join('') : '<span class="ayuda" style="padding:0">No hay otras tareas</span>'}</div>`) : ''}
         ${malas.length ? `<div class="aviso">Empieza antes de que acabe ${malas.map(p => '«' + esc(p.f.nombre) + '»').join(', ')}. <button class="btn" id="i-encajar" style="margin-top:6px">Moverla detrás</button></div>` : ''}
@@ -1130,7 +1305,7 @@ function engancharInspector(){
     if (b.id === 'i-borrar') borrarSel();
     if (b.id === 'i-dup') duplicarSel();
     if (b.dataset.etq != null && SEL && SEL.k === 'c') { instantanea(); d.datos.conectores.find(c => c.id === SEL.id).txt = b.dataset.etq; confirmar(); }
-    if (b.id === 'i-invertir') { instantanea(); const c = d.datos.conectores.find(x => x.id === SEL.id); [c.de, c.a] = [c.a, c.de]; delete c.ld; delete c.la; confirmar(); }
+    if (b.id === 'i-invertir') { instantanea(); const c = d.datos.conectores.find(x => x.id === SEL.id); [c.de, c.a] = [c.a, c.de]; delete c.ld; delete c.la; delete c.m; confirmar(); }
     if (b.id === 'i-subir' || b.id === 'i-bajar') {
       const fs = d.datos.filas, i = fs.findIndex(f => f.id === SEL.id), j = i + (b.id === 'i-subir' ? -1 : 1);
       if (j < 0 || j >= fs.length) return;
@@ -1234,7 +1409,7 @@ function iniciar(){
       const d = BIB.docs.find(y => y.id === x.dataset.borrar);
       if (d) pedirSi(`<b>¿Borrar «${esc(d.titulo)}»?</b> Si no lo has descargado, se pierde.`, 'Borrar', () => {
         if (typeof nubeBorrar === 'function') nubeBorrar(d);
-        BIB.docs = BIB.docs.filter(y => y.id !== d.id);
+        BIB.docs = BIB.docs.filter(y => y.id !== d.id); borradoAqui(d.id);
         if (BIB.actual === d.id) BIB.actual = BIB.docs[0] ? BIB.docs[0].id : null;
         abrirDoc(BIB.actual);
       });
@@ -1253,6 +1428,7 @@ function iniciar(){
       if (!d) { mensaje('<b>Ese fichero no es un diagrama de esta app.</b> Elige un .html descargado con «Descargar HTML».'); return; }
       const nd = nuevoDoc(d.tipo, d.titulo, d.datos); nd.unidad = d.unidad || ''; nd.autor = d.autor || ''; if (d.validado) nd.validado = d.validado;
       if (typeof ordenarSiFalta === 'function') ordenarSiFalta(nd);
+      if (typeof nubeCrear === 'function' && nd.tipo !== 'gantt') nubeCrear(nd);   // abrir un fichero lo sube solo (15/11)
       abrirDoc(nd.id);
     });
     ev.target.value = '';
@@ -1285,6 +1461,13 @@ function iniciar(){
   pintarHist(); pintarLista(); pintar(); pintarEstado();
   if (docActual() && docActual().tipo !== 'gantt') requestAnimationFrame(encajar);
   else { $('#lienzo')._irA = hoyISO(); pintar(); }
+  // Lo que guarda OTRA pestaña aparece aquí sin recargar (y lo que borra, desaparece).
+  window.addEventListener('storage', e => {
+    if (e.key !== CLAVE) return;
+    const antes = docActual();
+    try { if (!fundirBib(JSON.parse(e.newValue || 'null'))) return; } catch (_) { return; }
+    pintarLista(); if (docActual() !== antes) { SEL = null; if (BIB.actual) abrirDoc(BIB.actual); }
+  });
   if (typeof nubeIniciar === 'function') nubeIniciar();
 }
 // arranca proyecto.js, que va detrás y amplía las piezas

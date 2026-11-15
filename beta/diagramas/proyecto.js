@@ -142,9 +142,9 @@ function avisosVisibles(d, calc){ const c = capasDe(d); return (calc || calcular
 
 // ══ Piezas del plan ═════════════════════════════════════════════════════════════════════════════════════════════
 Object.assign(PIEZAS, {
-  componente: { nombre: 'Tarjeta', w: 200, h: 80, tw: 168, peso: 600, def: 'Tarjeta', dy: -4 },
-  paso:       { nombre: 'Paso', w: 160, h: 60, tw: 136, def: 'Paso', dy: -6 },
-  hito:       { nombre: 'Hito', w: 160, h: 48, tw: 120, peso: 600, def: 'Hito', dy: -5 },
+  componente: { nombre: 'Tarjeta', w: 200, h: 80, tw: 168, peso: 600, def: 'Tarjeta', cab: 24, pie: 20, pad: 2 },
+  paso:       { nombre: 'Paso', w: 160, h: 60, tw: 136, def: 'Paso', pie: 18, pad: 4 },
+  hito:       { nombre: 'Hito', w: 160, h: 48, tw: 120, peso: 600, def: 'Hito', pie: 16, pad: 6 },
   o:          { nombre: 'O', w: 44, h: 40, tw: 30, def: 'O' },
 });
 const PALETA_ARRIBA = ['componente', 'hito', 'o'];
@@ -517,8 +517,9 @@ function kpisHTML(calc){
 // ══ PINTAR ══════════════════════════════════════════════════════════════════════════════════════════════════════
 function barraProyecto(d){
   const cp = capasDe(d);
-  const pest = (cp.fechas ? `<span class="seg"><button data-pest="plan" class="${PEST === 'plan' ? 'on' : ''}">Plan</button><button data-pest="calendario" class="${PEST === 'calendario' ? 'on' : ''}">Calendario</button></span><span class="sep"></span>` : '')
-    + `<span class="seg capas" role="group" aria-label="Capas">${[['fechas', 'Fechas'], ['strl', 'STRL']].map(([k, t]) => `<button type="button" data-capa="${k}" class="${cp[k] ? 'on' : ''}" aria-pressed="${!!cp[k]}">${t}</button>`).join('')}</span><span class="sep"></span>`;
+  // Capas a la IZQUIERDA (Daniel, 12/11): si fueran detrás de Plan/Calendario, al apagar Fechas saltarían de sitio.
+  const pest = `<span class="seg capas" role="group" aria-label="Capas">${[['fechas', 'Fechas'], ['strl', 'STRL']].map(([k, t]) => `<button type="button" data-capa="${k}" class="${cp[k] ? 'on' : ''}" aria-pressed="${!!cp[k]}">${t}</button>`).join('')}</span><span class="sep"></span>`
+    + (cp.fechas ? `<span class="seg"><button data-pest="plan" class="${PEST === 'plan' ? 'on' : ''}">Plan</button><button data-pest="calendario" class="${PEST === 'calendario' ? 'on' : ''}">Calendario</button></span><span class="sep"></span>` : '');
   if (PEST === 'calendario') {
     return pest + `<span class="seg">${[[1, 'Pasos'], [2, 'Tarjetas'], [3, 'Hitos']].map(([k, t]) => `<button data-nivel="${k}" class="${NIVEL === k ? 'on' : ''}">${k} · ${t}</button>`).join('')}</span>
       <span class="sep"></span><span class="seg">${Object.keys(ESCALAS).map(k => `<button data-escala-p="${k}" class="${(d.datos.escala || 'semana') === k ? 'on' : ''}">${ESCALAS[k].nombre}</button>`).join('')}</span>` + filtroArea(d);
@@ -569,14 +570,14 @@ function inspectorProyecto(d){
       h += campo('Responsable', `<input type="text" data-p="resp" value="${esc(n.resp || '')}">`);
       if (cp.fechas) {
         h += campo('Duración (días)', `<input type="number" min="0" step="1" data-p="dur" value="${n.dur || ''}" placeholder="—">`) + candado(n, 'su duración') + fechas(n, x);
-        h += `<div class="fila2">${campo('No antes de', `<input type="date" data-p="ns" value="${n.ns || ''}">`)}${campo('Plazo', `<input type="date" data-p="dl" value="${n.dl || ''}">`)}</div>`;
+        h += `<div class="fila2">${campo('No antes de', campoFecha('data-p="ns"', n.ns))}${campo('Plazo', campoFecha('data-p="dl"', n.dl))}</div>`;
         if (x && x.pasado) h += `<div class="aviso">Se pasa de su plazo por ${x.pasado} días.</div>`;
       }
       h += necesitaDeFuera(d, n);
       if (comp && cp.strl) h += campoSel(`Lleva «${esc(comp.txt)}» a`, selector([['', '— no cambia su STRL —']].concat(STRL.slice(1).map((t, i) => [String(i + 1), `STRL ${i + 1} · ${t}`])), n.subeA ? String(n.subeA) : '', 'data-p="subeA"'));
     }
     if (n.t === 'hito' && cp.fechas) {
-      h += campo('Fecha fija', `<input type="date" data-p="fija" value="${n.fija || ''}">`) + fechas(n, x);
+      h += campo('Fecha fija', campoFecha('data-p="fija"', n.fija)) + fechas(n, x);
       if (x && x.tarde) h += `<div class="aviso">No llega por ${x.tarde} días.</div>`;
       if (n.fija) h += `<button class="btn" data-repartir-hito="1">Repartir el tiempo hasta aquí</button>`;
     }
@@ -613,7 +614,7 @@ function inspectorProyecto(d){
   }
   // nada seleccionado: el proyecto
   return `<h3>Proyecto</h3>
-    <div class="fila2">${uni(d.unidad, 'doc')}${campo('Empieza', `<input type="date" data-p="doc.inicio" value="${d.datos.inicio || hoyISO()}">`)}</div>
+    <div class="fila2">${uni(d.unidad, 'doc')}${campo('Empieza', campoFecha('data-p="doc.inicio"', d.datos.inicio || hoyISO()))}</div>
     <div class="sc">Coherencia</div>${avisosVisibles(d, calc).length ? avisosVisibles(d, calc).map(a => `<div class="aviso" data-ir="${a.id}" style="cursor:pointer">${esc(a.txt)}</div>`).join('') : '<p class="ayuda ok-txt" style="padding:0">✓ Coherente</p>'}`;
 }
 function unidadesHTML(n){
@@ -770,7 +771,7 @@ function trasCambio(d){
   d.datos.nodos.filter(n => n.t === 'componente' && !n.padre).forEach(n => {
     const us = unidadesDe(n); if (!us.length || (quien && us.some(u => quien.includes(u)))) return;
     const a = k0.r[n.id], b = k1.r[n.id], cosas = [];
-    if (a && b && b.ef > a.ef) { cosas.push(`${b.ef - a.ef} d más tarde`); if (typeof NUBE !== 'undefined') NUBE.retrasos[n.id] = Math.max(NUBE.retrasos[n.id] || 0, b.ef - a.ef); }
+    if (a && b && b.ef > a.ef) { cosas.push(`${b.ef - a.ef} d más tarde`); if (typeof NUBE !== 'undefined') NUBE.retrasos[n.id] = Math.min(3650, Math.max(NUBE.retrasos[n.id] || 0, Math.round(b.ef - a.ef))); }   // entero y ≤ 3650: el servidor rechaza otra cosa (revisar_retrasos)
     const r0 = recibeDe(antes.datos, n.id), r1 = recibeDe(d.datos, n.id), sin = [...r0].filter(x => !r1.has(x));
     if (sin.length) cosas.push('sin «' + sin.join('», «') + '»');
     if (cosas.length) lineas.push(`«${esc(n.txt)}» · ${esc(us.join(', '))}${n.resp ? ' · ' + esc(n.resp) : ''}: ${esc(cosas.join(', '))}`);
@@ -801,12 +802,12 @@ function ejemploProyecto(){
     { id: 'c1', t: 'componente', padre: null, x: 60, y: 60, txt: 'Diseño del aerofreno', area: 'Aerofrenos', unidades: ['Aeroestructuras'], presupuesto: 25, strl: 1, produce: [{ id: 'i1', txt: 'Geometría' }, { id: 'i4', txt: 'Masa' }] },
     { id: 'c2', t: 'componente', padre: null, x: 60, y: 220, txt: 'Electrónica del servo', area: 'Aviónica', unidades: ['Aviónica'], presupuesto: 20, produce: [{ id: 'i2', txt: 'Servo y driver' }] },
     { id: 'c3', t: 'componente', padre: null, x: 360, y: 140, txt: 'Control de aerofrenos', area: 'Software de vuelo', unidades: ['GNC', 'Aviónica'], presupuesto: 15, produce: [{ id: 'i3', txt: 'Ley de control' }] },
-    { id: 'h1', t: 'hito', padre: null, x: 680, y: 156, txt: 'Ensayo en banco', fija: sumaDias(h, 49) },
-    { id: 'p1', t: 'paso', padre: 'c1', x: 40, y: 60, txt: 'Requisitos', dur: 5 },
-    { id: 'p2', t: 'paso', padre: 'c1', x: 260, y: 60, txt: 'CAD', dur: 10 },
-    { id: 'p3', t: 'paso', padre: 'c1', x: 480, y: 0, txt: 'Maqueta impresa en 3D', dur: 4, subeA: 2 },
-    { id: 'p4', t: 'paso', padre: 'c1', x: 480, y: 120, txt: 'Cálculo de cargas', dur: 6 },
-    { id: 'p5', t: 'paso', padre: 'c1', x: 700, y: 60, txt: 'Revisión de encaje', dur: 2 },
+    { id: 'h1', t: 'hito', padre: null, x: 680, y: 150, txt: 'Ensayo en banco', fija: sumaDias(h, 49) },
+    { id: 'p1', t: 'paso', padre: 'c1', x: 40, y: 70, txt: 'Requisitos', dur: 5 },
+    { id: 'p2', t: 'paso', padre: 'c1', x: 260, y: 70, txt: 'CAD', dur: 10 },
+    { id: 'p3', t: 'paso', padre: 'c1', x: 480, y: 10, txt: 'Maqueta impresa en 3D', dur: 4, subeA: 2 },
+    { id: 'p4', t: 'paso', padre: 'c1', x: 480, y: 130, txt: 'Cálculo de cargas', dur: 6 },
+    { id: 'p5', t: 'paso', padre: 'c1', x: 700, y: 70, txt: 'Revisión de encaje', dur: 2 },
   ], conectores: [
     { id: 'k1', de: 'c1', a: 'c3', items: ['i1'] }, { id: 'k2', de: 'c2', a: 'c3', items: ['i2'] }, { id: 'k3', de: 'c3', a: 'h1', items: ['i3'] },
     { id: 'k4', de: 'p1', a: 'p2' }, { id: 'k5', de: 'p2', a: 'p3' }, { id: 'k6', de: 'p2', a: 'p4' }, { id: 'k7', de: 'p3', a: 'p5' }, { id: 'k8', de: 'p4', a: 'p5' },

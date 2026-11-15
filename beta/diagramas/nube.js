@@ -37,9 +37,21 @@ async function nubeLlamar(action, cuerpo, escribe){
   }
   throw ultimo || new Error('sin red');
 }
+// Daniel, 15/11: «a esta herramienta solo puedo tener yo acceso por ahora». Con servidor y sin sesión, o si el servidor
+// dice que no hay permiso, la app no se enseña (lo que protege es el servidor; esto es para no dejar una app a medias).
+function nubeCerrojo(){
+  NUBE.activa = false; clearInterval(NUBE.sondeo); clearInterval(NUBE.lista);
+  document.body.classList.add('cerrada');
+  if (document.getElementById('cerrojo')) return;
+  const c = document.createElement('div'); c.id = 'cerrojo';
+  c.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="#E41E25" d="M12 1Q13.4 10.6 23 12 13.4 13.4 12 23 10.6 13.4 1 12 10.6 10.6 12 1Z"/></svg>'
+    + '<b>Diagramas</b><span>Sólo Project Director</span><a class="btn rojo" href="../">Entrar</a>';
+  document.body.appendChild(c);
+}
 function nubeFallo(e){
+  if (/sin permiso/i.test(String(e && e.message))) return nubeCerrojo();
   if (esErrorSesion(e)) {
-    NUBE.activa = false; clearInterval(NUBE.sondeo);
+    NUBE.activa = false; clearInterval(NUBE.sondeo); clearInterval(NUBE.lista);
     pintarEstadoNube('sesion');
   } else pintarEstadoNube('sinred');
 }
@@ -47,6 +59,9 @@ function nubeFallo(e){
 // ── la foto de lo último que se vio del servidor, y la diferencia con lo que hay aquí ─────────────────────────────
 function nubeFoto(d){ return JSON.stringify({ titulo: d.titulo, unidad: d.unidad || '', datos: d.datos }); }
 function nubeCambios(d){
+  // Sin base (de la nube, aún sin abrir aquí) no hay nada de aquí que subir. Antes reventaba y tumbaba el arranque
+  // entero: ni subía lo pendiente ni arrancaba el sondeo, en cuanto otro tocaba un diagrama que tú no habías abierto.
+  if (!d.nube || !d.nube.base) return null;
   const base = JSON.parse(d.nube.base), c = { nodos: {}, conectores: {}, doc: {} };
   let n = 0;
   ['nodos', 'conectores'].forEach(k => {
@@ -63,6 +78,7 @@ function nubeCambios(d){
 function nubeFundir(d, srv){
   const base = JSON.parse(d.nube.base);
   let cambio = false;
+  const deFuera = { nodos: new Map(), conectores: new Map() };   // lo que cambió OTRO (id → pieza, o null si la borró)
   ['nodos', 'conectores'].forEach(k => {
     const B = new Map((base.datos[k] || []).map(x => [x.id, JSON.stringify(x)]));
     const L = new Map((d.datos[k] || []).map(x => [x.id, x]));
@@ -70,25 +86,47 @@ function nubeFundir(d, srv){
     S.forEach(s => {
       const l = L.get(s.id), mio = l ? JSON.stringify(l) !== B.get(s.id) : B.has(s.id);   // cambiado o borrado aquí
       if (mio) { if (l) fuera.push(l); }
-      else { fuera.push(s); if (!l || JSON.stringify(l) !== JSON.stringify(s)) cambio = true; }
+      else { fuera.push(s); if (!l || JSON.stringify(l) !== JSON.stringify(s)) cambio = true; if (JSON.stringify(s) !== B.get(s.id)) deFuera[k].set(s.id, s); }
       L.delete(s.id);
     });
-    L.forEach((l, id) => { if (!B.has(id)) fuera.push(l); else cambio = true; });   // nuevo aquí: se queda; borrado allí: se va
+    L.forEach((l, id) => { if (!B.has(id)) fuera.push(l); else { cambio = true; deFuera[k].set(id, null); } });   // nuevo aquí: se queda; borrado allí: se va
     d.datos[k] = fuera;
   });
   [['titulo', 'd'], ['unidad', 'd'], ['inicio', 'x'], ['escala', 'x']].forEach(([k, donde]) => {
     const aqui = donde === 'd' ? d[k] : d.datos[k], b = donde === 'd' ? base[k] : base.datos[k], s = donde === 'd' ? srv[k] : srv.datos[k];
     if ((aqui || '') === (b || '') && (s || '') !== (aqui || '')) { if (donde === 'd') d[k] = s; else d.datos[k] = s; cambio = true; }
   });
+  if (d === docActual()) nubeRebasarHist(deFuera);
   d.nube.base = JSON.stringify({ titulo: srv.titulo, unidad: srv.unidad || '', datos: srv.datos });
   d.nube.rev = srv.rev; d.nube.validado = srv.validado || null;
   return cambio;
 }
 
+// Lo de OTRO entra también en las fotos del deshacer: si no, deshacer lo tuyo traía su versión vieja y se subía como
+// tuya (refutación 13/11: Ana deshacía su tarjeta y pisaba el cambio que Brais acababa de hacer en otra).
+function nubeRebasarHist(deFuera){
+  if (!deFuera.nodos.size && !deFuera.conectores.size) return;
+  const rebasar = f => {
+    const x = JSON.parse(f);
+    ['nodos', 'conectores'].forEach(k => {
+      const M = deFuera[k]; if (!M.size) return;
+      const vistos = new Set(), lista = [];
+      (x[k] || []).forEach(p => { if (!M.has(p.id)) lista.push(p); else { vistos.add(p.id); if (M.get(p.id)) lista.push(M.get(p.id)); } });
+      M.forEach((p, id) => { if (p && !vistos.has(id)) lista.push(p); });
+      x[k] = lista;
+    });
+    return JSON.stringify(x);
+  };
+  HIST.atras = HIST.atras.map(rebasar); HIST.adelante = HIST.adelante.map(rebasar);
+}
+
 // ── guardar ─────────────────────────────────────────────────────────────────────────────────────────────────────
 let _nubeT = null;
 function nubeTrasCambio(d){
-  if (!d || !d.nube || !NUBE.activa) return;
+  if (!d || !NUBE.activa) return;
+  // Daniel, 15/11: «se debería de guardar automáticamente». Lo que sólo estaba en este navegador (un ejemplo, uno de
+  // antes de haber nube) se sube solo en cuanto se CAMBIA algo; abrirlo sin tocar no lo sube.
+  if (!d.nube) { if (d.tipo !== 'gantt' && d.editado > d.creado) nubeCrear(d); return; }
   clearTimeout(_nubeT); _nubeT = setTimeout(() => { _nubeT = null; nubeGuardar(d.id); }, 500);
 }
 async function nubeGuardar(id){
@@ -115,7 +153,7 @@ async function nubeGuardar(id){
     }
     d.nube.base = JSON.stringify(enviado);
     pintarEstadoNube('ok');
-    try { localStorage.setItem(CLAVE, JSON.stringify(BIB)); } catch (_) {}
+    escribirBib();
   } catch (e) { NUBE.retrasos = Object.assign(retrasos, NUBE.retrasos); nubeFallo(e); }
   finally {
     NUBE.enviando = false;
@@ -129,7 +167,7 @@ async function nubeSondear(){
   if (!NUBE.activa || !d || !d.nube || !d.nube.base || NUBE.enviando || _nubeT || document.hidden) return;
   try {
     const r = await nubeLlamar('diagLeer', { id: d.id, rev: d.nube.rev });
-    if (r.igual || NUBE.enviando || _nubeT || docActual() !== d) return;
+    if (r.igual || NUBE.enviando || _nubeT || docActual() !== d || !sanear(r.doc)) return;
     const editando = (typeof _edTexto !== 'undefined' && _edTexto) || (document.activeElement && document.activeElement.matches('#inspector input,#inspector textarea,#titulo'));
     if (nubeFundir(d, r.doc) && !editando) { pintarLista(); pintar(); }
     pintarEstadoNube('ok');
@@ -143,7 +181,7 @@ function nubeAlAbrir(id){
   if (!NUBE.activa || !d || !d.nube || d.nube.base) return false;
   pintarEstadoNube('guardando');
   nubeLlamar('diagLeer', { id }).then(r => {
-    const s = r.doc;
+    const s = sanear(r.doc); if (!s) throw new Error('el diagrama que llega del servidor no tiene la forma esperada');
     Object.assign(d, { tipo: s.tipo, titulo: s.titulo, unidad: s.unidad || '', autor: s.autor || '', datos: s.datos });
     d.nube = { rev: s.rev, base: JSON.stringify({ titulo: s.titulo, unidad: s.unidad || '', datos: s.datos }), validado: s.validado || null };
     d.datos = JSON.parse(JSON.stringify(s.datos));
@@ -169,10 +207,21 @@ async function nubeListar(){
     vistos.add(s.id);
     let d = BIB.docs.find(x => x.id === s.id);
     if (!d) { d = { id: s.id, tipo: s.tipo, titulo: s.titulo, unidad: s.unidad || '', autor: s.autor || '', creado: Date.now(), editado: Date.now(), datos: { nodos: [], conectores: [] }, nube: { rev: 0, base: null } }; BIB.docs.push(d); }
-    else if (d.nube && d.nube.rev !== s.rev && !nubeCambios(d)) d.nube.base = null;   // cambió fuera y aquí no hay nada pendiente: se rebaja al abrir
-    if (d.nube) d.titulo = s.titulo;
+    // El ABIERTO lo lleva el sondeo (pieza a pieza); quitarle la base lo dejaría sin sondear.
+    else if (d !== docActual() && d.nube && d.nube.rev !== s.rev && !nubeCambios(d)) d.nube.base = null;   // cambió fuera y aquí no hay nada pendiente: se rebaja al abrir
+    if (d.nube && d !== docActual()) d.titulo = s.titulo;
   });
   BIB.docs = BIB.docs.filter(d => !d.nube || vistos.has(d.id) || d.nube.rev === 0);   // borrado por otro: fuera (lo recién creado aquí, no)
+}
+// La LISTA también se refresca (comprobación de varias personas, 13/11): sólo se pedía al arrancar, así que un diagrama
+// que otro creaba, borraba o renombraba no aparecía hasta recargar.
+const NUBE_LISTA_MS = 15000;
+async function nubeRefrescarLista(){
+  if (!NUBE.activa || document.hidden) return;
+  const antes = docActual(), ids = BIB.docs.map(d => d.id + d.titulo).join();
+  try { await nubeListar(); } catch (e) { return nubeFallo(e); }
+  if (antes && !docActual()) { mensaje('<b>Otra persona ha borrado este diagrama.</b>', 6000); BIB.actual = BIB.docs[0] ? BIB.docs[0].id : null; abrirDoc(BIB.actual); return; }
+  if (BIB.docs.map(d => d.id + d.titulo).join() !== ids) { escribirBib(); pintarLista(); }
 }
 
 // ── el sello de validación, en la nube lo pone el servidor ──────────────────────────────────────────────────────
@@ -199,14 +248,18 @@ function pintarEstadoNube(que){
 }
 
 function nubeIniciar(){
-  if (!NUBE.url || !nubeToken()) return;
+  if (!NUBE.url) return;
+  if (!nubeToken()) return nubeCerrojo();
   NUBE.activa = true;
   document.addEventListener('click', ev => { if (ev.target.closest('[data-subir-nube]')) nubeSubir(docActual()); });
   nubeListar().then(() => {
     pintarLista();
     const d = docActual();
     if (d && d.nube && !d.nube.base) nubeAlAbrir(d.id); else pintarEstadoNube('ok');
+    // Lo que se quedó sin subir (sesión caducada, sin red, pestaña cerrada a medias) sube ahora: no se pierde en silencio.
+    BIB.docs.forEach(x => { if (x.nube && x.nube.base && nubeCambios(x)) nubeGuardar(x.id); });
     NUBE.sondeo = setInterval(nubeSondear, NUBE_SONDEO_MS);
+    NUBE.lista = setInterval(nubeRefrescarLista, NUBE_LISTA_MS);
     window.addEventListener('online', () => { const x = docActual(); if (x) nubeTrasCambio(x); });
   }).catch(nubeFallo);
 }
