@@ -1369,13 +1369,13 @@ function crearModal(){
 }
 
 function fijarModal(){
-  var R=REUNION;
+  var R=REUNION, _fj=_fijadaRango_(R);   // 17/11 (`refijar`): ya fijada → se abre con lo fijado marcado
   abrirModal('<div class="mtit">Fijar la reunión</div>'+
     '<div class="msub">Elige el día y toca donde empieza: se marcan solas las '+
     (_largoFijar_(R)+' franjas que dura'+(R.duracion?' ('+_durTxt_(R.duracion)+')':'')+(_largoFijar_(R)>_slotsMin_(R.duracion,R.slot)?', las que pide su orden del día':'')+'. ')+
     'Si quieres otra duración, toca después donde acaba: más larga o más corta. El resultado sale en verde en el mapa.</div>'+
     '<div class="campo"><span class="sc">Día</span>'+
-      nxElige('fjDia', R.dias.map(function(d,i){return [String(i), _diaTxtM_(d)];}), '0')+'</div>'+
+      nxElige('fjDia', R.dias.map(function(d,i){return [String(i), _diaTxtM_(d)];}), _fj?String(_fj.di):'0')+'</div>'+
     '<span class="sc" style="display:block;margin-bottom:7px">Franjas de ese día</span>'+
     /* La hora de fin sale de la FRANJA, no de «la hora siguiente»: con slots de 15 o 30
        min, dar por hecho que cada franja dura una hora es sencillamente falso. */
@@ -1388,7 +1388,7 @@ function fijarModal(){
      lo que dura la reunión (el atajo de siempre). Segundo toque = FIN, a la derecha (o en el propio inicio): la duración que se quiera, más
      larga o más corta (lo corto se AVISA, no se bloquea). Un toque antes del inicio, o un tercero, empieza de nuevo. `fase`: 0 nada · 1 inicio
      puesto, falta el fin · 2 fin puesto. Antes el segundo toque «estiraba» sólo si el primero había marcado UNA franja: con más, volvía a empezar. */
-  var anchor=-1,last=-1,fase=0;
+  var anchor=_fj?_fj.f0:-1, last=_fj?_fj.f1:-1, fase=_fj?1:0;   /* fase 1: el inicio está puesto y falta «el fin»: un toque a su derecha cambia SÓLO el fin (con 2 reiniciaría) */
   var pintaSlots=function(){
     var lo=anchor<0?-1:Math.min(anchor,last), hi=anchor<0?-1:Math.max(anchor,last);
     $$('#fjSlots button').forEach(function(b,k){
@@ -1400,6 +1400,7 @@ function fijarModal(){
     var corta=lo<0 ? '' : _fijarCortaTxt_(REUNION,lo,hi);
     if(s) s.textContent = lo<0 ? '' : ('Elegido: '+_hFranja_(REUNION,lo)+'–'+_hFinFranja_(REUNION,hi)+(corta ? '. '+corta+'.' : ''));
   };
+  pintaSlots();
   $$('#fjSlots button').forEach(function(b,k){
     b.onclick=function(){
       var n=_fijarToque_(REUNION, {anchor:anchor, last:last, fase:fase}, k);   // 1.º toque = inicio y lo que dura; 2.º = el fin que se quiera

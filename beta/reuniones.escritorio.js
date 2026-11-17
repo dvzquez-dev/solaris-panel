@@ -963,6 +963,8 @@ function _reuOpcionesSelE_(){
 /* El hueco que la app recomienda para fijar `r` (el de `_ventanaFijar_`: el que pide su orden del día, si lo hay): `{di, f0, v}`,
    o `{di:0, f0:'', v:0}` si nadie ha contestado todavía (entonces no se preelige nada). */
 function _fijarSugerido_(r){
+  var fj=_fijadaRango_(r);   // 17/11 (`refijar`): ya fijada → se parte de lo fijado (día, inicio y fin)
+  if(fj) return {di:fj.di, f0:fj.f0, f1:fj.f1, v:1};
   var v=_ventanaFijar_(r, _slotsMin_(r.duracion, r.slot), null).vent;
   return v && v.v>0 ? {di:v.d, f0:v.f0, v:v.v} : {di:0, f0:'', v:0};
 }
@@ -1009,7 +1011,7 @@ function _fijarPanel_(){
         '</div>'+
       /* 17/11 (`fijarlibre`): dónde ACABA, a elección. Al elegir el inicio se pone solo el fin de lo que dura la reunión; se puede cambiar. */
       '<div style="flex-basis:100%">'+lab('Acaba a las')+nxElige('reF1', (r.franjas||[]).map(function(f,i){ return [i, _hFinFranja_(r,i)]; }),
-          _fijarSugerido_(r).f0==='' ? '' : _fijarRango_(r, +_fijarSugerido_(r).f0).f1, {buscar:false})+
+          _fijarSugerido_(r).f0==='' ? '' : _fijarRango_(r, +_fijarSugerido_(r).f0, _fijarSugerido_(r).f1).f1, {buscar:false})+
         '<span class="nota" id="reFSel" style="display:block;margin-top:6px"></span></div>'+
       '<button class="btn pri" data-fijar'+(_pf?'':' disabled')+'>Fijar</button>'+_porQueApagado_(_porFija)+
       (r.fijada?'<button class="btn" data-desfijar'+(_pf?'':' disabled')+' style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+

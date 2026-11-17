@@ -7714,6 +7714,18 @@ function _fijarRango_(R, f0, f1){
   var fin = (f1 == null || f1 === '' || isNaN(+f1)) ? Math.min(nf-1, f0+largo-1) : Math.max(f0, Math.min(nf-1, +f1));
   return {f0:f0, f1:fin, min:min, largo:largo};
 }
+/* 17/11 (`refijar`): lo YA fijado de la reunión como `{di, f0, f1}` (el día y las franjas de sus bloques fijados), o `null` si no está fijada o sus
+   bloques ya no caben en las franjas. Abrir «Fijar» sobre una fijada parte de aquí (corregir sólo el fin no obliga a rehacerlo todo). Pura. */
+function _fijadaRango_(R){
+  var bl = (R && R.fijada && R.fijadaBl) || [], nf = ((R && R.franjas) || []).length, di = null, f0 = null, f1 = null;
+  for(var i=0; i<bl.length; i++){
+    var b = bl[i]; if(!Array.isArray(b) || isNaN(+b[0]) || isNaN(+b[1])) continue;
+    if(di === null) di = +b[0]; if(+b[0] !== di) continue;
+    f0 = f0 === null ? +b[1] : Math.min(f0, +b[1]); f1 = f1 === null ? +b[1] : Math.max(f1, +b[1]);
+  }
+  if(di === null || f0 < 0 || f1 >= nf || di >= ((R.dias||[]).length || 1)) return null;
+  return {di:di, f0:f0, f1:f1};
+}
 /* El TOQUE sobre una franja en el modal de fijar del móvil: `st={anchor,last,fase}` → el estado nuevo. `fase` 0 nada · 1 inicio puesto (y con él lo que dura
    la reunión) · 2 fin puesto. Un toque a la derecha del inicio (o sobre él) cuando sólo hay inicio es el FIN; cualquier otro toque (antes del inicio, o
    con el fin ya puesto) empieza de nuevo. Pura, para poder medirla sin DOM. */
