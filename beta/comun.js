@@ -17712,6 +17712,7 @@ function _votPreguntaHTML_(v, q, cerrada){
   var pie='';
   if(q.anonima && q.yaVote) pie='<p class="rnota">Tu voto anónimo ya está registrado: no se puede cambiar.</p>';
   else if(!q.anonima && q.yaVote && !bloq) pie='<p class="rnota">Ya votaste: puedes cambiarlo hasta que se cierre.</p>';
+  if(!r && !cerrada && v.resultadosVisibles) pie+='<p class="rnota">El recuento de esta pregunta anónima se verá al cerrar.</p>';   /* refutar58: el gestor ve las demás, y esta no (cruzada con «faltan» delataría a cada votante) */
   if(ver && cerrada){
     pie+='<p class="vgana">'+(r.resultado==='ganadora' ? 'Gana «'+esc(q.opciones[r.ganadoras[0]])+'»'
         : r.resultado==='empate' ? 'Empate entre '+r.ganadoras.map(function(i){ return '«'+esc(q.opciones[i])+'»'; }).join(' y ')
@@ -17724,7 +17725,7 @@ function votVerHTML(){
   if(!v) return '<p class="rnota">Cargando la votación…</p>';
   var cerrada=v.estado==='cerrada', c=v.cuorum;
   var pap=VOT.pap[v.id]||{}, hay=v.preguntas.some(function(q){ return pap[q.id] && pap[q.id].length && !(q.anonima && q.yaVote); });
-  var estado=cerrada ? (c.hay ? '<div class="vcuo ok">Hubo cuórum: '+esc(_votCuorumTxt_(c))+'</div>'
+  var estado=cerrada ? (c.hay ? (c.minimo ? '<div class="vcuo ok">Hubo cuórum: '+esc(_votCuorumTxt_(c))+'</div>' : '<div class="vcuo ok">Votaron '+c.n+' de '+c.de+' · no se exigía cuórum</div>')
                               : '<div class="vcuo no">Sin cuórum: votaron '+c.n+' de '+c.de+' y hacían falta '+c.minimo+'. El resultado no es vinculante.</div>')
                     : '<div class="vcuo'+(c.hay ? ' ok' : '')+'">Participación '+esc(_votCuorumTxt_(c))+'</div>';
   var cab='<div class="vtit">'+esc(v.titulo)+'</div><p class="rnota" style="margin:2px 0 8px">'+
