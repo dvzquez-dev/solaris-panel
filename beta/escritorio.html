@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=890a1c1">
+<link rel="stylesheet" href="escritorio.css?v=045495c">
 </head>
 <body>
 
@@ -113,14 +113,14 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=4a68779"></script>
+<script src="comun.js?v=69c61ee"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=3cc0796"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
 <script src="documentos.escritorio.js?v=428fbab"></script>
 <script src="sanciones.escritorio.js?v=5d4597f"></script>
-<script src="reuniones.escritorio.js?v=92964da"></script>
+<script src="reuniones.escritorio.js?v=b7e594b"></script>
 <script src="horas.escritorio.js?v=52fbc5e"></script>
 <script src="equipo.escritorio.js?v=6b38f97"></script>
 <script src="tareas.escritorio.js?v=d9b0344"></script>
@@ -816,8 +816,10 @@ function pan(cab,der,cuerpo,cls){
    cuando la cola empieza a ser un problema. Daniel, 05/10: *«y no pongas stats INÚTILES»*.
    ✅ `w` es para RATIOS DE VERDAD, como los de «Bajo el umbral»/«En infracción», que sí
    dividen entre el total del equipo. Si no hay denominador, **no hay barra**. */
-function kpi(t,v,d,tono,w){
-  return '<div class="kpi"><div class="sc">'+t+'</div><div class="val mono'+(tono?' '+tono:'')+'">'+v+'</div>'+
+function kpi(t,v,d,tono,w,ir){
+  /* refutar63 (17/11): `ir` = la vista a la que lleva la tarjeta (`data-ir`, el mismo enganche que las filas «Requiere tu decisión»): el PD ve «11 bajo el umbral»
+     y quiere saber QUIÉN sin bajar el menú entero hasta «Ranking». Es un botón para el teclado (Enter/Espacio los activa el manejador global de `role=button` de comun.js). */
+  return '<div class="kpi'+(ir?' ir':'')+'"'+(ir?' data-ir="'+ir+'" role="button" tabindex="0"':'')+'><div class="sc">'+t+'</div><div class="val mono'+(tono?' '+tono:'')+'">'+v+'</div>'+
     '<div class="d">'+d+'</div>'+(w?'<div class="bar"><i data-w="'+w+'"></i></div>':'')+'</div>';
 }
 function tabla(cols,filas){
@@ -1106,8 +1108,8 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
       '<span class="tx"><b>Dar horas a tu gente</b><small>una feria, un traslado, un turno sin fichar: cuentan al momento</small></span>'+
       '<span class="der"><span class="chev">›</span></span></div>' : '')+
     '<div class="kpis">'+
-      kpi('Horas en el aire',nf2(enAire)+'<small> h</small>','no cuentan hasta que se firmen','wa')+
-      kpi('Expedientes esperándote',docsMios().length,'los firmas tú',docsMios().length?'wa':'up')+
+      kpi('Horas en el aire',nf2(enAire)+'<small> h</small>','no cuentan hasta que se firmen','wa',null,'partes')+
+      kpi('Expedientes esperándote',docsMios().length,'los firmas tú',docsMios().length?'wa':'up',null,'docdec')+
       /* Se compara la MEDIA de la temporada, no lo que lleve este mes: el umbral tambien
          es una media por mes, y contrastar un mes a medias contra un listón de mes
          entero marcaría a todo el equipo cada día 2. La etiqueta lo dice. */
@@ -1116,13 +1118,13 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
          conjuntos distintos — y saldría por encima del 100 % en cuanto alguien tenga
          ritmo y no haya fichado este mes. */
       (conR.length<2   /* 22/10 (auditor 21, 🟠 3): «0 de 1» era tu propia fila, no el equipo */
-        ? kpi('Bajo el umbral','—',(EQUIPO.length>=2 ? 'nadie ha cerrado ningún mes todavía' : 'tu cuenta no ve las horas del resto del equipo'),'','')   /* 17/11 (refutar56): el PD ve al equipo; lo que falta es el ritmo */
-        : kpi('Bajo el umbral',bajo,'de '+conR.length+' · media de temporada bajo '+nf2(UMBRAL)+' h/mes','wa',(conR.length?(bajo/conR.length*100).toFixed(0):0)+'%'))+
+        ? kpi('Bajo el umbral','—',(_veHorasDelEquipo_() ? 'nadie ha cerrado ningún mes todavía' : 'tu cuenta no ve las horas del resto del equipo'),'','',_veHorasDelEquipo_()?'ranking':null)   /* 17/11 (refutar56): el PD ve al equipo; lo que falta es el ritmo */
+        : kpi('Bajo el umbral',bajo,'de '+conR.length+' · media de temporada bajo '+nf2(UMBRAL)+' h/mes','wa',(conR.length?(bajo/conR.length*100).toFixed(0):0)+'%','ranking'))+
       /* 22/10 (refutador, 🟠 2): a quien no es PD no le llega `infraccion` del resto; «0» en verde era afirmar sobre lo
          que no ve. Con menos de dos fichas con el dato, «—» y por qué. */
       (EQUIPO.filter(function(m){ return typeof m.infraccion==='boolean'; }).length<2
         ? kpi('En infracción este mes','—','tu cuenta no ve las infracciones del resto','','')
-        : kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(EQUIPO.length?(infra/EQUIPO.length*100).toFixed(0):0)+'%'))+
+        : kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(EQUIPO.length?(infra/EQUIPO.length*100).toFixed(0):0)+'%','miembros'))+
     '</div>'+
     '<div style="display:grid;grid-template-columns:300px 1fr;gap:13px;align-items:stretch">'+
       pan('Conducta del equipo', media==null?'sin datos':('media de '+conPts.length),
@@ -1262,8 +1264,10 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
     _tareaPartePanelE_(mias)+
     /* 01/11: con SÓLO partes de tareas entregadas esperando, «La cola está limpia» contradice la tarjeta de arriba: no sale */
     (_miasSueltas_(mias).length||!_tareaParteGrupos_(mias).grupos.length?pan('Requieren tu decisión',_miasSueltas_(mias).length+(_miasSueltas_(mias).length===1?' parte':' partes'),   /* 🟡 3 (auditor 20) */
-      _miasSueltas_(mias).length?_miasSueltas_(mias).map(parteCard).join(''):vacioSimple('La cola está limpia',
-        'Cuando alguien de tu unidad declare horas, aparecerá aquí con su justificación a la vista.'),'destaca'):'')+
+      _miasSueltas_(mias).length?_miasSueltas_(mias).map(parteCard).join(''):
+        /* refutar63: «limpia» y «no ha llegado» no se pintan igual (como las sanciones sueltas): con sesión y sin la cola real, decir «limpia» es afirmar lo que no se sabe */
+        (SESION && !Array.isArray(PART_BACK) ? vacioSimple('Todavía no han llegado los partes','Se reintenta cada 90 s; si sigue igual, recarga la página.')
+          : vacioSimple('La cola está limpia','Cuando alguien de tu unidad declare horas, aparecerá aquí con su justificación a la vista.')),'destaca'):'')+
     /* 10/11 (refutar2): sin a quién otorgar (un miembro raso: `puedeOtorgarA` no le deja a nadie) el formulario era un «A quién» vacío que
        no se podía rellenar y un botón que el servidor iba a negar. Sale sólo si hay pool (la misma puerta que el «A quién»). */
     (!_activos_().some(function(m){ return m.nombre!==ACTOR && puedeOtorgarA(m, ACTOR); }) ? '' : pan('Otorgar horas directamente','sin que nadie las pida',
@@ -1432,6 +1436,12 @@ function _avisoCompE_(lista){
     }).join('')))+(nota ? '<div class="chips">'+nota+'</div>' : '');
 }
 
+/* refutar61 (17/11): ¿esta cuenta VE las horas del resto? Sólo el PD (rango 3): un coordinador recibe del equipo nombre, unidad y cargo, y su cuenta no
+   puede saber si «nadie ha cerrado ningún mes». Separa «aún no hay ritmo» (el PD lo ve vacío) de «tu cuenta no lo ve». */
+function _veHorasDelEquipo_(){
+  var yo=(typeof _actorSanc_==='function') ? _actorSanc_() : null;
+  return !!yo && rangoNom(yo) >= 3;
+}
 V.registro={g:'Horas',t:'Registro del mes',f:function(){
   /* solo entran los ACTIVOS que traen horas: con la forma MIEMBRO el backend no sirve
      las ajenas, y una tabla de filas vacias no es un registro, es ruido. */
@@ -2624,7 +2634,7 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
       'el ranking completo, pídeselo al Project Director.'));
   /* 17/11 (refutar56): el PD VE al equipo entero pero aún no hay ritmo de nadie (1 de septiembre, panel sin la temporada nueva): eso no es «tu cuenta
      solo ve las tuyas», es que todavía no hay clasificación. */
-  if(VIS.length < 2 && _activos_().length >= 2) return pan('Ranking','nadie ha cerrado ningún mes todavía',
+  if(VIS.length < 2 && _activos_().length >= 2 && _veHorasDelEquipo_()) return pan('Ranking','nadie ha cerrado ningún mes todavía',
     vacioSimple('Todavía no hay clasificación','Empieza cuando se cierre el primer mes de la temporada.'));
   if(VIS.length < 2) return pan('Ranking','sin datos',
     vacioSimple('Sin horas del equipo','El ranking se calcula con las horas de temporada de cada uno y tu cuenta solo '+
@@ -3273,6 +3283,8 @@ function _gate_(html){
     document.body.appendChild(g); }
   g.innerHTML=html; return g;
 }
+/* La insignia de la puerta que `comun.js` pide sin saber de qué cara es (`_revocarAcceso_`): cada cara declara la suya. */
+function _insigniaCara_(){ return _insigniaHTML_(); }
 function _insigniaHTML_(){
   var i=document.querySelector('.marca .ins img');
   return i ? '<img src="'+i.src+'" alt="Solaris" style="width:96px;height:96px;object-fit:contain">' : '';
@@ -3500,6 +3512,10 @@ async function _onCredencial_(resp,_silente){
   try{
     var boot=null; try{ boot=await api.bootstrap(resp.credential); }catch(_){ boot=null; }
     DOCS.length=0; DOCS_LLEGO=false;   /* 21/10 (🟠 2): con sesión real, la semilla fuera — hasta que lleguen, «sin leer» */
+    /* refutar63 (17/11): LO MISMO PARA LO QUE LLEGA DESPUÉS DEL BOOTSTRAP. El bootstrap contesta primero y los partes, las sanciones y las convocatorias van en su propia
+       ráfaga (con mala cobertura, segundos): hasta que llegaban, el Panel del PD enseñaba la maqueta —«3,5 h de Iago», «Sanciones por decidir · 5 pendientes», globos 4 y 5—
+       como si fueran del equipo, y con sus botones. Con sesión real la semilla no se pinta nunca. */
+    PARTES.length=0; LOTE.items.length=0; CONVOCATORIAS.length=0;
     if(boot && boot.identidad){
       SESION={token:resp.credential,email:boot.identidad.email,nombre:boot.identidad.nombre,rango:boot.identidad.rango};
       _aplicarBootstrap_(boot);
@@ -3814,7 +3830,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f91bbb9';
+var BUILD='5aeb8d5';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4660,10 +4676,11 @@ function _engConvocarTurno_(){
         TUR_SEL={}; TUR_CARGOS={ turno:null, audiovisual:null, memoria:null };
         TUR_COCHES.length=0;
         try{ var tt=await api.getTurnos(); if(Array.isArray(tt)){ TURNOS.length=0; tt.forEach(function(x){TURNOS.push(x);}); } }catch(_){}
-        tost('Turno '+(r&&r.id||'')+' convocado en Notion'+
-          (sin.length?' \u00b7 no se pudo etiquetar a: '+sin.join(', '):'')+
+        var _msgT='Turno '+(r&&r.id||'')+' convocado en Notion'+
+          (sin.length?' \u00b7 no se pudo etiquetar a: '+sin.join(', '):'')+_choquesTurnoTxt_(r&&r.choques)+
           (_coMal?' \u00b7 \u26a0\ufe0f el TRAYECTO de los coches no se guard\u00f3: '+
-                  'vu\u00e9lvelo a convocar o ap\u00fantalo aparte':'')+'.');
+                  'vu\u00e9lvelo a convocar o ap\u00fantalo aparte':'')+'.';
+        tost(_msgT, _tostLargo_(_msgT));      /* refutar65: con un choque son >110 caracteres: se queda hasta que se toque (en 2,6 s no se lee) */
         pintar(); _focoReponer_($('#main'), _fc);
         /* el formulario vuelve a vacío y «Convocar el turno» queda apagado («Marca al menos a una persona»): un botón apagado no
            puede tener el foco. Lo siguiente que se hace es elegir OTRA casilla del mapa, y ahí se va (si no hay mapa, a la zona). */

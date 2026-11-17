@@ -415,8 +415,8 @@ function _convUnid_(n, min){
 function _convPieHTML_(cv){
   var q=_convQuedan_(cv), c=_convCuenta_(cv);
   var t = q<=0 ? 'Plazo cerrado'
-        : q<1  ? 'Quedan <b>'+Math.round(q*60)+' min</b>'
-               : 'Quedan <b>'+Math.round(q)+' h</b>';
+        : q<1  ? 'Quedan <b>'+Math.round(q*60)+' min</b> de plazo'
+               : 'Quedan <b>'+Math.round(q)+' h</b> de plazo';     /* 17/11 (refutar62): «Quedan 71 h · marcadas 0» lo leía un novato como 71 h de trabajo por hacer */
   /* ⛔ CON FRANJAS DE UNA HORA, EL NÚMERO SON HORAS, NO RESPUESTAS. Desde que un toque marca
      el turno entero, «marcadas 4» después de UN gesto se lee como si hubieras contestado cuatro
      veces — cuando has dicho una sola cosa. Se dice en horas, y se añaden los turnos, que es la
@@ -1053,7 +1053,8 @@ function progTurnoAbrir(){
       var sin = (r && r.sinEtiquetar) || [];
       try{ var tt = await api.getTurnos(); if(Array.isArray(tt) && tt.length){ TURNOS.length = 0; tt.forEach(function(y, i){ TURNOS.push(_normTurnoM_(y, i)); }); } }catch(_){}
       cerrarModal(); PROG_T = null;
-      tost('Turno '+((r && r.id) || '')+' convocado en Notion'+(sin.length ? ' · no se pudo etiquetar a: '+sin.join(', ') : '')+'.');
+      var _msgT = 'Turno '+((r && r.id) || '')+' convocado en Notion'+(sin.length ? ' · no se pudo etiquetar a: '+sin.join(', ') : '')+_choquesTurnoTxt_(r && r.choques)+'.';
+      tost(_msgT, _tostLargo_(_msgT));      /* refutar65: con un choque son >110 caracteres: se queda hasta que se toque (en 2,6 s no se lee) */
       pintar();
     }catch(e){ b.disabled = false; b.textContent = prev; tostErr('No se pudo convocar: ', e); }
   };

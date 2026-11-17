@@ -249,6 +249,9 @@ main.entrando>*:nth-child(4){animation-delay:.15s}
 .kpi{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px 11px;
   position:relative;overflow:hidden;transition:border-color .2s linear}
 .kpi:hover{border-color:var(--line2)}
+.kpi.ir{cursor:pointer}   /* refutar63: la tarjeta que lleva a su pantalla */
+.kpi.ir:hover{border-color:var(--red3)}
+.kpi.ir:focus-visible{outline:2px solid var(--red2);outline-offset:2px}
 .kpi .val{font-family:var(--mono);font-size:29px;font-weight:600;letter-spacing:-.035em;line-height:1.1;margin:9px 0 3px}
 .kpi .val small{font-size:13px;color:var(--ink3);font-weight:400;letter-spacing:0}
 .kpi .d{font-size:11px;color:var(--ink3)}

@@ -1001,7 +1001,8 @@ function _fijarPanel_(){
       /* Se DICE el minimo antes de intentarlo: un aviso al pulsar llega tarde y se lee
          como un fallo de la app. Con reuniones de antes del modelo (`duracion` 0) el
          minimo es 1 y no se dice nada, que es como se comportaba siempre. */
-      (r.duracion>0
+      /* refutar57: ya FIJADA (con `fijarlibre` puede durar más que lo convocado: 4 h 30 sobre 3 h), «Dura 3 h» es la convocatoria y contradice a «fijada · 15:00–19:30» de arriba. */
+      (r.duracion>0 && !r.fijada
         ? (' Dura <b>'+_durTxt_(r.duracion)+'</b>: al elegir dónde empieza se marca eso; puedes cambiar dónde acaba, más largo o más corto.') : '')+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
       '<div style="flex-basis:100%">'+lab('Reunión')+nxElige('reSel', _reuOpcionesSelE_(), REUS.indexOf(_sel))+'</div>'+

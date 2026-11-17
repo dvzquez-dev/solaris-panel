@@ -392,6 +392,11 @@ async function _cargarReunionesM_(yaPedidas){
   return false;
 }
 
+/* 17/11 (refutar62): lo que dice la pastilla de una reunión. Una que ya está EN MARCHA se llama «en curso»: con «fijada» (lo de antes) un novato que acaba de entrar en su primera
+   reunión no veía en ninguna tarjeta que estaba empezada, y la de «Próxima reunión» de Estado seguía diciendo «fijada» con él dentro, contando su tiempo. */
+function _pilReuM_(R){
+  return R.en_curso ? 'en curso' : (R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))));
+}
 function _proxReuHTML_(){
   var R=_proximaReuM_();
   if(_reunionesCargando_())
@@ -413,8 +418,8 @@ function _proxReuHTML_(){
     '<div class="tarj clic" data-ir="reu" data-reuid="'+esc(String(R.id))+'" data-p>'+
     '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(R.titulo)+'</b>'+
     '<small>'+cuando+' · '+esc(_modalidadTxt_(R.modalidad).toUpperCase())+'</small></div>'+
-    '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento||R.tarde)?'conf':'pend')+'">'+
-      (R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))))+'</span></div></div></div>';
+    '<div class="d"><span class="pil '+((R.en_curso||R.fijada||(R.cubierta&&!R.bajoMin)||R.exento||R.tarde)?'conf':'pend')+'">'+
+      _pilReuM_(R)+'</span></div></div></div>';
 }
 
 /* ⛔ CUANTO DURA LA REUNION, EN UNA SOLA FORMA. Hasta el 09/08 el dato existia (`duracion`)
@@ -571,6 +576,9 @@ function vReu(){
   /* 01/11: con orden del día de duración conocida, la ventana es de los bloques que ESE orden pide (`comun.js`). */
   var _vf=_ventanaFijar_(R, _minR, best), vent=_vf.vent;
   var _huecoM_=function(){ var f=_ventanaFijar_(R, _minR, best);
+    /* refutar57 (17/11): «Tu orden del día dura 4 h 30 min: hacen falta 9 bloques» es el consejo de quien FIJA; a un convocado (que no escribió ese orden) y
+       con la reunión ya fijada —el viernes, a media reunión, en el móvil de los 7— no le dice nada y suena a que el orden es suyo. */
+    if(R.fijada || !_puedeBloqueReu_(R, _asisYoM_(), (typeof esAdmin==='function' && !!esAdmin()))) f={vent:f.vent, sug:null, sinDur:0};
     var _nc=_nConvM_(R); return '<b>'+_nc+'</b> convocado'+(+_nc===1?'':'s')+' · '+(f.vent.v>0?'mejor hueco ':'')+_titularHueco_(R, f.vent, _nresp, pondOn)+_notaOrdenHTML_(f); };
   _ordSt_(R.id).sugHTML=_huecoM_;
   /* El orden del día llega por red DESPUÉS de pintar: con él cambia el hueco recomendado, y el mapa lo resalta de nuevo (la fijada no se toca). */
@@ -715,7 +723,7 @@ function vReu(){
       '<small>'+(R.convocante?'Convoca '+esc((_pilaDeM_(R.convocante)||R.convocante))+' · ':'')+(R.fijada?'📌 '+esc(_fijadaTxtM_(R.fijada)):esc(_plazoTxtM_(R)))+' · '+_convocadosTxt_(_nConvM_(R))+
       _duraTxtM_(R)+'</small></div>'+
       '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento||R.tarde)?'conf':(R.invitado===false?'conf':'no'))+'">'+
-        (R.invitado===false?'solo lectura':(R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta')))))+'</span></div></div>'+
+        (R.invitado===false?'solo lectura':_pilReuM_(R))+'</span></div></div>'+
       _votTarjM_(R.id)+
       /* 11/11 (reumovil): la ves por tu nivel, no porque te hayan convocado: sin rejilla, sin «te falta» (cubrir y responder son de convocados) */
       (R.invitado===false && !R.fijada
@@ -723,7 +731,7 @@ function vReu(){
         : '')+
       (R.fijada
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
-          '<b style="color:var(--ok)">Reunión fijada · '+esc(R.fijada)+'</b><br>Disponibilidad cerrada.</div>'
+          '<b style="color:var(--ok)">'+(R.en_curso?'Reunión en curso · ':'Reunión fijada · ')+esc(R.fijada)+'</b><br>Disponibilidad cerrada.</div>'
         : (R.invitado===false ? ''
           : R.exento
             /* 🗣️ Daniel (14/10): *«que permita, por favor, al que organiza la reunión
@@ -1471,17 +1479,25 @@ async function _asisChequearM_(r){
   try{
     var v=await api.getAsistencia(id, false);
     if(v && v.abierta && v.convocado){
-      ASIS_M.est[id]={titulo:r.titulo||'la reunión', v:v};
+      ASIS_M.est[id]={titulo:r.titulo||'la reunión', v:v, mod:r.modalidad};
       if(!ASIS_M.visto[id]){ ASIS_M.visto[id]=true; api.marcarVisto(id).catch(function(){}); }
     } else delete ASIS_M.est[id];
   }catch(e){ /* sin red o sin sesión: la tarjeta simplemente no sale */ }
   _asisPintarM_();
 }
 
+/* 17/11 (refutar62): DE DÓNDE SALE la palabra, según cómo se celebre. «Escribe la palabra de tu modalidad» no se lo explicaba a quien llega nuevo: ni qué palabra ni qué modalidad. */
+function _asisPistaM_(mod){
+  var m=String(mod||'').toLowerCase();
+  return m.indexOf('tele')===0 ? 'la que se dice por voz o se escribe en el chat de la llamada'
+    : m.indexOf('pres')===0 ? 'la que se proyecta en la sala'
+    : 'la que se proyecta en la sala (si vas en persona) o la que se dice por voz o en el chat (si vas por videollamada)';
+}
 function _asisTarjetaHTML_(id, e){
   var v=e.v, hecho=v.presente_at;
   return '<div class="tarj acc" data-asisreu="'+esc(id)+'"><div class="tt"><span class="sc">Asistencia en directo</span></div>'+
-    '<b style="display:block;margin-bottom:6px">Estás en «'+esc(e.titulo||'la reunión')+'»: '+(hecho?'ya constas presente':'escribe la palabra de tu modalidad')+'</b>'+
+    '<b style="display:block;margin-bottom:6px">Estás en «'+esc(e.titulo||'la reunión')+'»: '+(hecho?'ya constas presente':'escribe la palabra para constar presente')+'</b>'+
+    (hecho?'':'<div class="rnota" style="margin:0 0 8px">Es '+_asisPistaM_(e.mod)+'.</div>')+
     (hecho
       ? '<div class="asisOk">'+ico('tick')+' Presente ('+esc(_hhmmDe_(hecho))+')</div>'
       : '<div style="display:flex;gap:8px"><input class="asisIn" data-asispal autocomplete="off" autocapitalize="none" '+
@@ -1516,7 +1532,9 @@ function _asisCablearM_(){
         var r=await api.estoyPresente(isNaN(+id)?id:+id, i.value);
         ASIS_M.est[id].v.presente_at=(r&&r.presente_at)||new Date().toISOString(); delete ASIS_M.msg[id];
         _asisPintarM_(); tost('Presente: apuntado.');
-      }catch(e){ aviso(String((e&&e.message)||e).replace(/^Error:\s*/,'')); b.disabled=false; }
+      }catch(e){ var tx=String((e&&e.message)||e).replace(/^Error:\s*/,'');
+        /* 17/11 (refutar62): el servidor dice «mira la pantalla de la sala» también al que va por videollamada: aquí se dice cuál es la suya */
+        aviso(/no es la palabra/i.test(tx) ? 'Esa no es la palabra: es '+_asisPistaM_((ASIS_M.est[id]||{}).mod)+'.' : tx); b.disabled=false; }
     };
     b.onclick=enviar;
     i.onkeydown=function(ev){ if(ev.key==='Enter') enviar(); };

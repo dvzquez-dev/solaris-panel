@@ -114,15 +114,15 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=4a68779"></script>
+<script src="comun.js?v=69c61ee"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=4f42fdf"></script>
-<script src="turnos.movil.js?v=4d7f6e6"></script>
+<script src="turnos.movil.js?v=aaa3f3c"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=9549b24"></script>
 <script src="sanciones.movil.js?v=8831fbd"></script>
-<script src="reuniones.movil.js?v=8aada26"></script>
+<script src="reuniones.movil.js?v=1b53a53"></script>
 <script src="horas.movil.js?v=1f211fb"></script>
 <script src="equipo.movil.js?v=cee4f98"></script>
 <script>
@@ -903,6 +903,8 @@ var SANC_FALLO=false;  // true = se intento y el servidor no contesto
 var DEMO = window.__SIN_LOGIN__ === true || _demoLocal_();
 /* Splash de marca REAL, calcado de app.html: la insignia + el banner «UVigo Aerotech
    Solaris». Son ficheros del repo publicado; con onerror degradan a texto en local. */
+/* La insignia de la puerta que `comun.js` pide sin saber de qué cara es (`_revocarAcceso_`): cada cara declara la suya. */
+function _insigniaCara_(){ return SPLASH; }
 var SPLASH = '<img src="../recursos/insignia.png" alt="Solaris" style="display:block;margin:0 auto 10px;width:104px;height:auto" onerror="this.style.display=\'none\'">'+
   '<img src="../recursos/banner-solaris.png" alt="UVigo Aerotech Solaris" style="display:block;margin:0 auto 4px;width:min(240px,60vw);height:auto" onerror="this.style.display=\'none\'">';
 function _gate_(html){
@@ -1873,7 +1875,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='1dfc7a8';
+var BUILD='8d15d32';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2108,15 +2110,22 @@ function pintarNav(){
 /* refutar55 (17/11): con la letra del sistema al 130 % las siete pestañas YA no cabían: «Docs» y «Reunión» se salían de la pantalla (y no se podían tocar), y a
    200 % los rótulos se pisaban. Si algún rótulo no cabe en su pestaña la barra se queda en SÓLO ICONOS (el nombre sigue en el `aria-label` y la pantalla lleva su
    título): mejor un icono que un rótulo cortado. Se mide de nuevo al girar o cambiar el tamaño. */
-function _ajustarNav_(){
+var _NAV_MEDIDA_=null;
+function _ajustarNav_(forzar){
   var nav=document.getElementById('nav'); if(!nav) return;
+  /* 17/11 (rapidez): medir es APAGAR `ico`, leer el ancho de cada rótulo (= una maquetación completa de la página) y volver a decidir, y `pintarNav` lo hacía en cada
+     pintada. Medido en un móvil malo (CPU ×4): ~0,4-1,4 s del arranque y ~1,2 s al pasear por las pestañas, para llegar siempre a la misma respuesta. Sólo cambia
+     si cambia lo que se mide: el ancho de la pantalla o la letra (giro / zoom → `resize`, que llega aquí con `forzar`) o lo que dicen los rótulos y sus globos. */
+  var clave=nav.textContent;                  /* (NO `innerWidth`: leerlo ya fuerza la maquetación que se quiere ahorrar; el ancho lo cubre `resize`) */
+  if(!forzar && clave===_NAV_MEDIDA_) return;
+  _NAV_MEDIDA_=clave;
   nav.classList.toggle('ico',false);
   var cab=$$('.tab',nav).some(function(t){
     var l=t.querySelector('.tl'); return l && l.getBoundingClientRect().width>t.clientWidth-1;
   });
   nav.classList.toggle('ico',cab);
 }
-window.addEventListener('resize',function(){ _ajustarNav_(); });
+window.addEventListener('resize',function(){ _ajustarNav_(true); });
 /* Repintar SIN que se note: `pintar()` reconstruye `#main`, asi que el navegador manda el
    scroll a cero y parece que la app se ha recargado. Cuando el repintado no lo ha pedido el
    usuario -llega un dato de fondo- hay que devolverlo a donde estaba. */

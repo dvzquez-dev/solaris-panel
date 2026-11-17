@@ -36,9 +36,12 @@ var CUOTAS_ACTIVAS = false;   /* ⛔ APAGADA por decision de Daniel (30/09): *«
 
 function redu(){return RM.matches;}
 
-function nf(v,d){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}).format(v);}
+/* 17/11 (rapidez): UN `Intl.NumberFormat` por forma, no uno por cifra. Construirlo cuesta ~0,1 ms en un móvil normal y ~0,5 ms en uno malo: la pantalla
+   Horas del PD llama a `nf2` miles de veces y se llevaba 2 s de CPU sólo en construir el MISMO formateador. Mismo resultado, formateador cacheado.
+   ⚠️ La caché vive COMO PROPIEDAD de la propia función (`nf._c`, `nf2._f`) y no en una variable suelta: una veintena de bancos extraen `nf`/`nf2` del fuente y las evalúan solas. */
+function nf(v,d){ var c=nf._c||(nf._c={}), k=d||0; return (c[k]||(c[k]=new Intl.NumberFormat('es-ES',{minimumFractionDigits:k,maximumFractionDigits:k}))).format(v); }
 
-function nf2(v){return new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,maximumFractionDigits:2}).format(v);}
+function nf2(v){ return (nf2._f||(nf2._f=new Intl.NumberFormat('es-ES',{minimumFractionDigits:0,maximumFractionDigits:2}))).format(v); }
 
 /* Las horas van con los decimales que TENGAN, no con uno fijo. Con `nf(v,1)` un cuarto de
    hora -0,25- se pintaba «0,3 h», que ademas no es ningun escalon de la escala de
@@ -3266,7 +3269,7 @@ function _esErrBaja_(e){ return /cuenta dada de baja en el equipo/.test(String((
 function _revocarAcceso_(){
   try{ localStorage.removeItem('sol_sess'); }catch(_){}
   SESION=null; _sesionMuerta_(true); window.__SESION_MUERTA_DICHA=true;
-  var cab=(typeof SPLASH==='string') ? SPLASH : ((typeof _insigniaHTML_==='function') ? _insigniaHTML_() : '');
+  var cab=_insigniaCara_();
   _gate_(cab+'<div id="gateBaja" style="color:#ffb3b0;max-width:340px">'+API_MSG_BAJA+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
     'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Entrar con otra cuenta</button>');
   var b=document.getElementById('reGis'); if(b) b.onclick=_pintarLogin_;
@@ -4265,6 +4268,14 @@ function _armarTurno_(f){
     reparto: nn.map(function(n){ return {nombre: n,
       rol: _rolDeTurno_(sel[n].rol, {responsable: (n === cargos.turno), audiovisual: (n === cargos.audiovisual),
                                      memoria: (n === cargos.memoria), coche: !!sel[n].coche})}; }) };
+}
+
+/* refutar65 (17/11) · lo que dice el aviso tras convocar si alguien del reparto tiene una REUNIÓN FIJADA que se pisa con el turno
+   (`choques` de `crearTurno`: [{nombre, reunion, desde, hasta}]). SÓLO AVISA (el turno ya está creado; mover una u otra no es de la app). '' si no hay. Lo comparten las dos caras. */
+function _choquesTurnoTxt_(ch){
+  var l = (ch || []).filter(function(c){ return c && c.nombre; }).map(function(c){
+    return c.nombre + ' tiene \u00ab' + (c.reunion || 'una reuni\u00f3n') + '\u00bb de ' + c.desde + ' a ' + c.hasta; });
+  return l.length ? ' \u00b7 \u26a0\ufe0f se pisa con una reuni\u00f3n fijada: ' + l.join('; ') : '';
 }
 
 /* Por qué NO se programa este turno, o '' si se puede. Primero la fecha, luego lo del reparto
@@ -8802,12 +8813,23 @@ function _ahoraLocalISO_(d){
   /* ⛔ 21/10 (auditor de reuniones): LA HORA DE MADRID, no la del aparato — la del servidor. Con el teléfono en otra
      zona la cara decía «abierta» de un plazo ya cerrado (o al revés), y no cubrir a tiempo sanciona. Si `Intl` no puede
      (sin soporte, o un doble de `Date`), el reloj local como hasta hoy. */
+  /* 17/11 (rapidez): el resultado es una función PURA del minuto: una pintada lo pide cientos de veces (la hora de cada parte, de cada turno…) y `formatToParts`
+     con zona cuesta 0,35 ms en un PC y ~1,4 ms en un móvil malo (medido: 1.000 llamadas = 351 ms → 8 ms). Se recuerdan los últimos minutos pedidos (tope
+     de 600: una hora de más o de menos no importa, la memoria sí); un doble de `Date` sin `getTime` pasa por el camino de siempre. */
+  var _mk = (typeof x.getTime === 'function') ? Math.floor(x.getTime() / 60000) : null;
+  var _c = _ahoraLocalISO_._c || (_ahoraLocalISO_._c = {});     /* en propiedades de la función: los bancos la extraen SOLA del fuente */
+  if(_mk !== null && _c[_mk]) return _c[_mk];
   try{
-    var o = {}, ps = new Intl.DateTimeFormat('en-GB', {timeZone:'Europe/Madrid', year:'numeric', month:'2-digit',
-      day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23'}).formatToParts(x), i;
+    /* 17/11 (rapidez): el formateador se construye UNA vez (cuesta ~0,5 ms en un móvil malo y esto se llama en cada pintada y cada reloj). */
+    var o = {}, ps = (_ahoraLocalISO_._d || (_ahoraLocalISO_._d = new Intl.DateTimeFormat('en-GB', {timeZone:'Europe/Madrid', year:'numeric', month:'2-digit',
+      day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23'}))).formatToParts(x), i;
     for(i = 0; i < ps.length; i++) o[ps[i].type] = ps[i].value;
     if(o.year && o.month && o.day && o.hour && o.minute)
-      return o.year + '-' + o.month + '-' + o.day + 'T' + (o.hour === '24' ? '00' : o.hour) + ':' + o.minute;
+    {
+      var _v = o.year + '-' + o.month + '-' + o.day + 'T' + (o.hour === '24' ? '00' : o.hour) + ':' + o.minute;
+      if(_mk !== null && _mk === _mk){ if((_ahoraLocalISO_._n = (_ahoraLocalISO_._n || 0) + 1) > 600){ _c = _ahoraLocalISO_._c = {}; _ahoraLocalISO_._n = 1; } _c[_mk] = _v; }
+      return _v;
+    }
   }catch(_){ }
   return x.getFullYear() + '-' + p(x.getMonth() + 1) + '-' + p(x.getDate()) +
          'T' + p(x.getHours()) + ':' + p(x.getMinutes());
@@ -14991,9 +15013,9 @@ function _endirMs_(ec, n, ahora){
   return s;
 }
 function _endirTxt_(ms){ return _cronoTxt_(new Date(Date.now()-ms).toISOString()); }
-/* Quienes tienen tramos, en el orden en que llegaron. `conTiempo`: sólo los que llegaron a estar algo (el que entró y salió al instante no). */
+/* Quienes tienen tramos, en el orden en que llegaron. `conTiempo`: sólo los que llegaron a estar algo (el que entró y salió al instante, o en menos de un segundo, no). */
 function _endirNombres_(ec, conTiempo){
-  var nom=Object.keys((ec && ec.tramos) || {}).filter(function(n){ return !conTiempo || _endirMs_(ec, n)>=1000; });
+  var nom=Object.keys((ec && ec.tramos) || {}).filter(function(n){ return !conTiempo || _endirTramosFin_(ec, n).length>0; });
   var ini=function(n){ var t=_endirTramos_(ec, n)[0]; return t ? Date.parse(t.ini) : 0; };
   return nom.sort(function(a,b){ return ini(a)-ini(b) || String(a).localeCompare(String(b),'es'); });
 }
@@ -15002,12 +15024,25 @@ function _endirHoras_(ms, durMs){
   var h=Math.max(0.25, Math.round(ms/3600000*4)/4);
   return durMs>0 ? Math.min(h, Math.max(0.25, Math.round(durMs/3600000*4)/4)) : h;
 }
-/* «15:00–16:30 · 17:30–19:30»: los tramos de `n` en hora de Madrid (el abierto, «desde las 15:00»). */
+/* Los tramos de `n` COMO LOS VA A CONTAR EL SERVIDOR al finalizar (`AS.tramos_ms` + el tope de `e_finalizar_reunion`), en ms [[ini, fin]]: el abierto acaba al finalizar,
+   todo se recorta a [inicio de la reunión, inicio + tope de horas] y los de 0 min no cuentan. Una reunión que se quedó abierta toda la noche paga 14 h, no las 19 del reloj (refutar59). */
+var _ENDIR_MIN_MS_=1000;                     /* gemela de `AS.MIN_TRAMO_MS`: menos de un segundo no es estar, y un hueco de menos de un segundo no parte el tramo */
+function _endirTramosFin_(ec, n, ahora){
+  var now=ahora==null ? Date.now() : ahora, ini=Date.parse(ec && ec.ini);
+  var fin=ini===ini ? Math.min(now, ini+_maxHorasParte_()*3600000) : now, out=[];
+  _endirTramos_(ec, n).forEach(function(x){
+    var a=Date.parse(x.ini), b=x.fin ? Date.parse(x.fin) : fin;
+    if(a!==a || b!==b) return;
+    a=Math.max(a, ini===ini ? ini : a); b=Math.min(b, fin);
+    if(b<=a) return;
+    if(out.length && a-out[out.length-1][1]<_ENDIR_MIN_MS_) out[out.length-1][1]=Math.max(b, out[out.length-1][1]); else out.push([a, b]); });
+  return out.filter(function(x){ return x[1]-x[0]>=_ENDIR_MIN_MS_; });
+}
+/* «15:00–16:30 · 17:30–19:30»: los tramos de `n` en hora de Madrid (el abierto, «desde las 15:00»); al finalizar, los que contará el servidor (`_endirTramosFin_`). */
 function _endirTramosTxt_(ec, n, alFinalizar){
+  if(alFinalizar) return _endirTramosFin_(ec, n).map(function(x){ return _hhmmDe_(new Date(x[0]).toISOString())+'–'+_hhmmDe_(new Date(x[1]).toISOString()); }).join(' · ');
   return _endirTramos_(ec, n).map(function(x){
-    return x.fin ? _hhmmDe_(x.ini)+'–'+_hhmmDe_(x.fin)
-      : alFinalizar ? _hhmmDe_(x.ini)+'–'+_hhmmDe_(new Date().toISOString())      /* el abierto acaba al finalizar */
-      : 'desde las '+_hhmmDe_(x.ini); }).join(' · ');
+    return x.fin ? _hhmmDe_(x.ini)+'–'+_hhmmDe_(x.fin) : 'desde las '+_hhmmDe_(x.ini); }).join(' · ');
 }
 /* El `en_curso` de ESTE MOMENTO, del servidor: quien lleva la reunión también marca presentes desde el panel de asistencia, y lo vivo tarda un segundo;
    el formulario de «Finalizar» reparte horas con lo que hay ahora, no con la foto de la ficha. Sin red o en la maqueta, la foto de siempre. */
@@ -15047,11 +15082,11 @@ function _endirTick_(){
 }
 /* La propuesta del «Finalizar»: a cada participante SU tiempo y sus tramos (los que no llevaron cuenta, la duración entera). */
 function _endirPropuestaHTML_(B){
-  var ec=B.en_curso, dur=ec ? Date.now()-Date.parse(ec.ini) : 0;
+  var ec=B.en_curso, dur=ec ? Math.min(Date.now(), Date.parse(ec.ini)+_maxHorasParte_()*3600000)-Date.parse(ec.ini) : 0;
   return '<ul data-endir-prop style="margin:0 0 8px;padding:0;list-style:none;font-size:13px">'+B.parts.map(function(p){
-    var ms=_endirMs_(ec, p.nombre), sigue=_endirTramos_(ec, p.nombre).length>0;
+    var ms=_endirTramosFin_(ec, p.nombre).reduce(function(t, x){ return t+x[1]-x[0]; }, 0), sigue=_endirTramos_(ec, p.nombre).length>0;
     return '<li data-endir-p="'+esc(p.nombre)+'" style="margin:0 0 4px"><b>'+esc(_pilaDeM_(p.nombre)||p.nombre)+'</b> · '+
-      (sigue ? (ms>=1000 ? nf2(_endirHoras_(ms, dur))+' h <span class="rnota">· '+esc(_endirTramosTxt_(ec, p.nombre, true))+'</span>'
+      (sigue ? (ms>0 ? nf2(_endirHoras_(ms, dur))+' h <span class="rnota">· '+esc(_endirTramosTxt_(ec, p.nombre, true))+'</span>'
                          : '<span style="color:var(--warn)">no llegó a estar: sin horas</span>')
              : '<span class="rnota">la duración de la reunión</span>')+'</li>'; }).join('')+'</ul>';
 }
@@ -15387,7 +15422,11 @@ function _bloqueReuCablear_(getR, cb){
   /* 17/11: quitar / volver a meter a alguien, y añadir con el selector de personas (el servidor apunta la hora de cada gesto). */
   var _endirIr=async function(nombre, dentro){
     var r=getR(); if(!r) return;
-    var resp=await (dentro ? api.entrarEnReunion({id:r.id, nombre:nombre}) : api.salirDeReunion({id:r.id, nombre:nombre}));
+    var resp;
+    try{ resp=await (dentro ? api.entrarEnReunion({id:r.id, nombre:nombre}) : api.salirDeReunion({id:r.id, nombre:nombre})); }
+    catch(x){      /* refutar59: otro dispositivo la finalizó: esta ficha vieja deja de ofrecer quitar y añadir (el aviso lo pone quien llama) */
+      if(/ya est[aá] finalizada/.test(String((x && x.message) || x))){ r.en_curso=null; r.finalizada_at=r.finalizada_at || new Date().toISOString(); cb.refrescar(); }
+      throw x; }
     if(resp && resp.en_curso) r.en_curso=resp.en_curso;
     cb.refrescar();
   };
@@ -17500,7 +17539,7 @@ function _a11yMarcar_(raiz){
     if(e.tagName!=='TR' && !e.getAttribute('role')) e.setAttribute('role','button');
     if(!e.hasAttribute('tabindex')) e.setAttribute('tabindex','0');
   });
-  /* refutar55 (17/11): el título de cada pantalla («Fichar», «Horas»…) es un `<div class="h1">`: con un lector no había ningún encabezado de nivel 1 al que saltar. */
+  /* refutar55 (17/11): el título de cada pantalla («Fichar», «Horas»…) es un div de clase `h1` (sólo el móvil la emite): con un lector no había ningún encabezado de nivel 1 al que saltar. */
   Array.prototype.forEach.call(r.querySelectorAll('.h1:not([role])'), function(e){ e.setAttribute('role','heading'); e.setAttribute('aria-level','1'); });
   /* refutar55: lo ELEGIDO (categoría, imputación, «Los míos»/«Todos», «Sesión en vivo»/«Declarar horas»…) sólo se enseñaba con la clase `on` (el rojo): un lector lo
      leía como botones iguales. Un botón de un grupo con algún hermano `on` (o un `.pick`) dice `aria-pressed`; lo que ya trae su propio estado (pestañas, desplegables) se deja. */
@@ -17598,7 +17637,13 @@ function _a11yCablear_(){
   var antes=null, pend=false;
   document.addEventListener('focusin', function(e){ if(!e.target.closest || !e.target.closest('#modal,.psel-ov')) antes=e.target; });
   var estaba=false;
-  new MutationObserver(function(){
+  new MutationObserver(function(recs){
+    /* 17/11 (rapidez): la estrella que viaja por la barra (`#viaje`, `#sombra`, `#chispas`) cambia de CLASE en cuatro momentos de cada cambio de pantalla (0, 300, 460 y 820 ms)
+       y cada uno despertaba un barrido de TODO el documento (8 selectores sobre ~5.000 nodos: ~25 ms en un PC, ~100 ms en un móvil malo) para no marcar nada: es
+       decoración y no lleva nada que un lector deba leer. Medido: 5 barridos por cambio de pantalla → 2. */
+    var util=false, i, t;
+    for(i=0;i<recs.length && !util;i++){ t=recs[i].target; util=!(recs[i].type==='attributes' && t && t.closest && t.closest('#viaje,#sombra,#chispas')); }
+    if(!util) return;
     if(pend) return; pend=true;
     requestAnimationFrame(function(){
       pend=false; _a11yMarcar_(document);
