@@ -940,13 +940,13 @@ function _fijarSugerido_(r){
 }
 
 /* «Elegido: jue 05/11 · 17:00–19:00 (2 franjas)» de empezar en la franja `f0` el día `di`, o por qué no se puede. */
-function _fijarElegidoE_(r, di, f0){
+function _fijarElegidoE_(r, di, f0, f1){
   if(f0===''||f0==null||isNaN(+f0)) return 'Elige a qué hora empieza.';
-  var g=_fijarRango_(r, +f0);
-  if(!g) return 'La reunión dura '+_slotsMin_(r.duracion, r.slot)+' franjas y desde ahí no caben: elige una hora más temprana.';
-  var n=g.f1-g.f0+1;
+  var g=_fijarRango_(r, +f0, f1);          // 17/11 (`fijarlibre`): el fin lo elige quien fija; sin él, lo que dura la reunión
+  if(!g) return 'Esa hora no es de este día: elige otra.';
+  var n=g.f1-g.f0+1, corta=_fijarCortaTxt_(r, g.f0, g.f1);
   return 'Elegido: '+(r.dias||[])[di]+' \u00b7 '+_hFranja_(r,g.f0)+'\u2013'+_hFinFranja_(r,g.f1)+' ('+n+(n===1?' franja':' franjas')+
-    (g.largo>g.min?' \u00b7 lo que pide tu orden del día':'')+')';
+    (g.largo>g.min && n===g.largo?' \u00b7 lo que pide tu orden del día':'')+')'+(corta ? '. '+corta+'.' : '');
 }
 
 function _fijarPanel_(){
@@ -971,14 +971,17 @@ function _fijarPanel_(){
       /* Se DICE el minimo antes de intentarlo: un aviso al pulsar llega tarde y se lee
          como un fallo de la app. Con reuniones de antes del modelo (`duracion` 0) el
          minimo es 1 y no se dice nada, que es como se comportaba siempre. */
-      (_slotsMin_(r.duracion, r.slot)>1
-        ? (' Dura <b>'+_slotsMin_(r.duracion, r.slot)+' franjas</b> ('+_durTxt_(r.duracion)+
-           '), así que no se puede fijar en menos.') : '')+'</p>'+
+      (r.duracion>0
+        ? (' Dura <b>'+_durTxt_(r.duracion)+'</b>: al elegir dónde empieza se marca eso; puedes cambiar dónde acaba, más largo o más corto.') : '')+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
       '<div style="flex-basis:100%">'+lab('Reunión')+nxElige('reSel', _reuOpcionesSelE_(), REUS.indexOf(_sel))+'</div>'+
       '<div style="flex-basis:100%">'+lab('Día')+nxElige('reDia', (r.dias||[]).map(function(d,i){ return [i, d]; }), _fijarSugerido_(r).di)+'</div>'+
       /* 01/11 (Daniel: «con una llega y sobra»): UNA lista, la de dónde EMPIEZA; el largo lo da la reunión (o su orden del día). */
       '<div style="flex-basis:100%">'+lab('Empieza a las')+nxElige('reF0', (r.franjas||[]).map(function(f,i){ return [i, _iniF(f)]; }), _fijarSugerido_(r).f0, {buscar:false})+
+        '</div>'+
+      /* 17/11 (`fijarlibre`): dónde ACABA, a elección. Al elegir el inicio se pone solo el fin de lo que dura la reunión; se puede cambiar. */
+      '<div style="flex-basis:100%">'+lab('Acaba a las')+nxElige('reF1', (r.franjas||[]).map(function(f,i){ return [i, _hFinFranja_(r,i)]; }),
+          _fijarSugerido_(r).f0==='' ? '' : _fijarRango_(r, +_fijarSugerido_(r).f0).f1, {buscar:false})+
         '<span class="nota" id="reFSel" style="display:block;margin-top:6px"></span></div>'+
       '<button class="btn pri" data-fijar'+(_pf?'':' disabled')+'>Fijar</button>'+_porQueApagado_(_porFija)+
       (r.fijada?'<button class="btn" data-desfijar'+(_pf?'':' disabled')+' style="color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+

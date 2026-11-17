@@ -113,14 +113,14 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=2837d73"></script>
+<script src="comun.js?v=0b8344f"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=12a29c8"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
 <script src="documentos.escritorio.js?v=428fbab"></script>
 <script src="sanciones.escritorio.js?v=5d4597f"></script>
-<script src="reuniones.escritorio.js?v=eed0d1c"></script>
+<script src="reuniones.escritorio.js?v=5900c50"></script>
 <script src="horas.escritorio.js?v=6b7a253"></script>
 <script src="equipo.escritorio.js?v=6b38f97"></script>
 <script src="tareas.escritorio.js?v=d9b0344"></script>
@@ -3798,7 +3798,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='52dbf62';
+var BUILD='ed83671';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -3955,17 +3955,26 @@ function _pinReunionFijar_(m){
   if(_rs) _rs.onchange=function(){ RE_SEL=+_rs.value||0; var _q=REUS[RE_SEL]; RE_SEL_ID=_q ? _q.id : null; pintar(); };
   var _reuSel=_reuSelE_;
   /* 01/11: una sola lista (dónde empieza); la línea de debajo dice qué queda elegido y las horas desde las que no cabe la reunión se apagan. */
+  /* 17/11 (`fijarlibre`, Daniel: «no permites poner una duración de reunión customizada»): al cambiar el INICIO, el fin se recoloca en lo que dura
+     la reunión (el atajo de siempre); al cambiar el FIN, se respeta. Las horas de fin anteriores al inicio se apagan. */
+  var _fjFin=function(r, v){ var f1=$('#reF1'); if(!f1) return; var g=(v===''||v==null)?null:_fijarRango_(r, +v);
+    f1.value=g ? String(g.f1) : ''; if(typeof nxPinta==='function') nxPinta(f1.closest('.nx')); };
   var _fjAct=function(){
     var r=_reuSel(), t=$('#reFSel'); if(!r||!t) return;
-    var di=+($('#reDia')||{}).value||0, v=($('#reF0')||{}).value, g=(v===''||v==null)?null:_fijarRango_(r, +v);
-    t.textContent=_fijarElegidoE_(r, di, v); t.style.color=g?'var(--ok)':'';
+    var di=+($('#reDia')||{}).value||0, v=($('#reF0')||{}).value, v1=($('#reF1')||{}).value;
+    var g=(v===''||v==null)?null:_fijarRango_(r, +v, v1);
+    t.textContent=_fijarElegidoE_(r, di, v, v1); t.style.color=g?'var(--ok)':'';
     $$('[data-nx="reF0"] [data-nxv]').forEach(function(b){
-      var k=+b.getAttribute('data-nxv'), cabe=!!_fijarRango_(r, k), dentro=!!g && k>=g.f0 && k<=g.f1;
-      b.disabled=!cabe; b.style.opacity=cabe?'':'.35'; b.title=cabe?'':'No caben '+_slotsMin_(r.duracion, r.slot)+' franjas seguidas desde aquí';
+      var k=+b.getAttribute('data-nxv'), dentro=!!g && k>=g.f0 && k<=g.f1;
       b.style.boxShadow=dentro?'inset 0 0 0 1px var(--ok)':'';
     });
+    $$('[data-nx="reF1"] [data-nxv]').forEach(function(b){
+      var k=+b.getAttribute('data-nxv'), antes=!!g && k<g.f0;
+      b.disabled=antes; b.style.opacity=antes?'.35':''; b.title=antes?'Antes de que empiece':'';
+    });
   };
-  ['reDia','reF0'].forEach(function(id){ var e=$('#'+id); if(e) e.addEventListener('change', _fjAct); });
+  var _e0=$('#reF0'); if(_e0) _e0.addEventListener('change', function(){ _fjFin(_reuSel(), _e0.value); _fjAct(); });
+  ['reDia','reF1'].forEach(function(id){ var e=$('#'+id); if(e) e.addEventListener('change', _fjAct); });
   _fjAct();
   $$('[data-fijar]').forEach(function(b){
     b.onclick=async function(){
@@ -3974,19 +3983,12 @@ function _pinReunionFijar_(m){
       var di=+($('#reDia')||{}).value||0, _v0=($('#reF0')||{}).value;
       if(_v0===''||_v0==null){ tost('Elige a qué hora empieza la reunión.'); return; }
       var f0=+_v0, f1;
-      /* ⛔ EL MINIMO ES EL MISMO QUE AL CUBRIR, Y QUE EN EL MOVIL. Una reunion de 1 h 30 con
-         slots de 30 min ocupa TRES franjas, se este cubriendo o fijando. Aqui no se exigia
-         NADA: dos desplegables sueltos dejaban fijarla en media hora sin un aviso. Es el
-         mismo fallo que Daniel reporto en el movil («puse de 18:30 a 20:00 y se marca como
-         si fuera de 19:00 a 20:00»), vivo en la cara donde de verdad se fija.
-         Se ESTIRA y se dice, en vez de rechazar: es lo que hace el movil con un solo toque
-         (marca las que dura). Rechazar mandaria a pelearse con un desplegable. */
-      var _g=_fijarRango_(r, f0), _min=_slotsMin_(r.duracion, r.slot);
-      if(!_g){
-        tost('La reunión dura '+_min+' franjas y desde ahí no caben: elige una hora más temprana.');
-        return;
-      }
-      f1=_g.f1; var _estirada=_g.largo>_g.min ? f1-f0+1 : 0;     // 01/11: el largo lo da la reunión o su orden del día
+      /* 17/11 (`fijarlibre`, Daniel: «no permites poner una duración de reunión customizada, eso es un error»): el FIN lo elige quien fija
+         (`reF1`, que al elegir el inicio se pone solo en lo que dura la reunión o su orden del día). Más corta que lo previsto se PERMITE y se
+         dice junto a «Elegido» (`_fijarCortaTxt_`): ni bloqueo ni diálogo. Antes se estiraba a las franjas mínimas y no había forma de elegir el fin. */
+      var _g=_fijarRango_(r, f0, ($('#reF1')||{}).value);
+      if(!_g){ tost('Esa hora no es de este día: elige otra.'); return; }
+      f1=_g.f1;
       var bloques=[]; for(var f=f0;f<=f1;f++) bloques.push([di,f]);
       var fin=_iniF((r.franjas||[])[f1]);
       var finM=_minHM_(fin)+((r.franjas||[])[f1]&&+r.franjas[f1].dur||60);
@@ -3998,8 +4000,7 @@ function _pinReunionFijar_(m){
       try{
         await api.fijar(r.id, {label:etiqueta, bloques:bloques, franjas:[f0,f1]});
         r.fijada=etiqueta; r.fijadaBl=bloques;
-        tost('Reuni\u00f3n fijada: '+etiqueta+'. La disponibilidad queda cerrada.'+
-          (_estirada ? ' Se ha estirado a las '+_estirada+' franjas que pide su orden del d\u00eda.' : ''));
+        tost('Reuni\u00f3n fijada: '+etiqueta+'. La disponibilidad queda cerrada.');
         pintar(); if(typeof _ordenTrasFijar_==='function') _ordenTrasFijar_(r.id);   // refutar15: sus horas de reloj salen de la fijada
       }catch(e){ b.disabled=false; b.textContent=prev; tostErr('No se pudo fijar: ', e); }
     };

@@ -1349,7 +1349,7 @@ function fijarModal(){
   abrirModal('<div class="mtit">Fijar la reunión</div>'+
     '<div class="msub">Elige el día y toca donde empieza: se marcan solas las '+
     (_largoFijar_(R)+' franjas que dura'+(R.duracion?' ('+_durTxt_(R.duracion)+')':'')+(_largoFijar_(R)>_slotsMin_(R.duracion,R.slot)?', las que pide su orden del día':'')+'. ')+
-    'Puedes estirar hacia la derecha, no acortar. El resultado sale en verde en el mapa.</div>'+
+    'Si quieres otra duración, toca después donde acaba: más larga o más corta. El resultado sale en verde en el mapa.</div>'+
     '<div class="campo"><span class="sc">Día</span>'+
       nxElige('fjDia', R.dias.map(function(d,i){return [String(i), _diaTxtM_(d)];}), '0')+'</div>'+
     '<span class="sc" style="display:block;margin-bottom:7px">Franjas de ese día</span>'+
@@ -1360,12 +1360,11 @@ function fijarModal(){
     }).join('')+'</div>'+
     '<div class="sc" id="fjSel" style="margin:11px 0 0;color:var(--ok);font-size:12px"></div>'+
     '<button class="btn pri full" style="margin-top:13px" data-p id="btnFijarOK">Confirmar</button>');
-  var anchor=-1,last=-1;
-  /* EL MINIMO ES EL MISMO QUE AL CUBRIR. Una reunion de 1 h 30 con slots de 30 min ocupa
-     TRES franjas, se este cubriendo o fijando: aqui se dejo el «toca la primera y la ultima»
-     a pelo y se podia fijar en menos tiempo del que dura la reunion. (Daniel: «puse de 18:30
-     a 20:00 y se marca como si fuera de 19:00 a 20:00».) */
-  var MIN=_slotsMin_(R.duracion, R.slot), NF=R.franjas.length, SPAN=_largoFijar_(R);
+  /* 17/11 (`fijarlibre`, Daniel: «no permites poner una duración de reunión customizada, eso es un error»). Primer toque = INICIO, y se marca
+     lo que dura la reunión (el atajo de siempre). Segundo toque = FIN, a la derecha (o en el propio inicio): la duración que se quiera, más
+     larga o más corta (lo corto se AVISA, no se bloquea). Un toque antes del inicio, o un tercero, empieza de nuevo. `fase`: 0 nada · 1 inicio
+     puesto, falta el fin · 2 fin puesto. Antes el segundo toque «estiraba» sólo si el primero había marcado UNA franja: con más, volvía a empezar. */
+  var anchor=-1,last=-1,fase=0;
   var pintaSlots=function(){
     var lo=anchor<0?-1:Math.min(anchor,last), hi=anchor<0?-1:Math.max(anchor,last);
     $$('#fjSlots button').forEach(function(b,k){
@@ -1374,29 +1373,19 @@ function fijarModal(){
       b.style.color=on?'var(--ok)':''; b.style.fontWeight=on?'700':'';
     });
     var s=$('#fjSel');
-    if(s) s.textContent = lo<0 ? '' : ('Elegido: '+_hFranja_(REUNION,lo)+'–'+_hFinFranja_(REUNION,hi));
+    var corta=lo<0 ? '' : _fijarCortaTxt_(REUNION,lo,hi);
+    if(s) s.textContent = lo<0 ? '' : ('Elegido: '+_hFranja_(REUNION,lo)+'–'+_hFinFranja_(REUNION,hi)+(corta ? '. '+corta+'.' : ''));
   };
   $$('#fjSlots button').forEach(function(b,k){
-    /* Si desde aqui no caben las franjas que dura, no se puede empezar aqui. Se apaga en vez
-       de dejar tocar y corregir despues: lo mismo que hace la rejilla de cubrir. */
-    if(k+MIN>NF){ b.disabled=true; b.style.opacity='.35'; b.title='No caben '+MIN+' franjas seguidas desde aquí'; }
     b.onclick=function(){
-      if(b.disabled) return;
-      if(anchor<0 || anchor!==last){
-        anchor=k; last=Math.min(NF-1, k+SPAN-1);     // un toque = lo que dura (la reunion o su orden del dia), hacia la derecha
-      } else {
-        /* estirar es libre, pero nunca por debajo del minimo */
-        last = (k>=anchor) ? Math.max(k, anchor+MIN-1) : k;
-        if(k<anchor){ anchor=k; last=Math.max(last, k+MIN-1); }
-        if(last>NF-1) last=NF-1;
-      }
+      var n=_fijarToque_(REUNION, {anchor:anchor, last:last, fase:fase}, k);   // 1.º toque = inicio y lo que dura; 2.º = el fin que se quiera
+      anchor=n.anchor; last=n.last; fase=n.fase;
       pintaSlots();
     };
   });
   $('#btnFijarOK').onclick=async function(){
     var b=$('#btnFijarOK'); if(b.disabled) return;
     if(anchor<0){ tost('Toca dónde empieza la reunión.'); return; }
-    if(Math.abs(last-anchor)+1 < MIN){ tost('La reunión dura '+MIN+' franjas: no se puede fijar en menos.'); return; }
     var R2=REUNION, di=+$('#fjDia').value;
     var lo=Math.min(anchor,last), hi=Math.max(anchor,last);
     var etiqueta=_diaTxtM_(R2.dias[di])+' · '+_hFranja_(R2,lo)+'–'+_hFinFranja_(R2,hi);

@@ -7674,13 +7674,34 @@ function _largoFijar_(R){
   var min = _slotsMin_(R.duracion, R.slot), s = _sugerirBloques_(R, _ordSt_(R.id).e, null);
   return (s && s.cabe) ? Math.max(min, s.n) : min;
 }
-/* `{f0, f1, min, largo}` de empezar en la franja `f0`, o `null` si desde ahí no caben las franjas MÍNIMAS que dura la reunión.
-   Si el orden del día pide más que ese mínimo y cabe, `f1` llega hasta ahí; si no cabe entero en lo que queda del día, se recorta
-   (nunca por debajo del mínimo). */
-function _fijarRango_(R, f0){
+/* `{f0, f1, min, largo}` de empezar en la franja `f0`, o `null` si `f0` no es una franja del día.
+   🗣️ Daniel (17/11, `fijarlibre`): *«no permites poner una duración de reunión customizada, eso es un error»*. Sin `f1`, es el atajo de
+   siempre: lo que dura la reunión (o su orden del día), recortado al final del día. Con `f1`, el FIN lo pone quien fija: cualquiera
+   entre `f0` y la última franja, más largo o MÁS CORTO que lo previsto (eso lo dice `_fijarCortaTxt_`; ni bloquea ni pregunta). */
+function _fijarRango_(R, f0, f1){
   var nf = (R.franjas||[]).length, min = _slotsMin_(R.duracion, R.slot), largo = _largoFijar_(R);
-  if(!(f0 >= 0) || f0 + min > nf) return null;
-  return {f0:f0, f1:Math.min(nf-1, f0+largo-1), min:min, largo:largo};
+  if(!(f0 >= 0) || f0 >= nf) return null;
+  var fin = (f1 == null || f1 === '' || isNaN(+f1)) ? Math.min(nf-1, f0+largo-1) : Math.max(f0, Math.min(nf-1, +f1));
+  return {f0:f0, f1:fin, min:min, largo:largo};
+}
+/* El TOQUE sobre una franja en el modal de fijar del móvil: `st={anchor,last,fase}` → el estado nuevo. `fase` 0 nada · 1 inicio puesto (y con él lo que dura
+   la reunión) · 2 fin puesto. Un toque a la derecha del inicio (o sobre él) cuando sólo hay inicio es el FIN; cualquier otro toque (antes del inicio, o
+   con el fin ya puesto) empieza de nuevo. Pura, para poder medirla sin DOM. */
+function _fijarToque_(R, st, k){
+  if(st.fase === 1 && k >= st.anchor) return {anchor:st.anchor, last:k, fase:2};
+  return {anchor:k, last:_fijarRango_(R, k).f1, fase:1};
+}
+/* Minutos que ocupan las franjas `a..b` (la `dur` de cada una; 60 si es una cadena de la semilla). */
+function _minFranjas_(R, a, b){
+  var m = 0; for(var i=a; i<=b; i++){ var f=(R.franjas||[])[i]; m += (f && +f.dur>0) ? +f.dur : 60; }
+  return m;
+}
+/* «Más corta que las 3 h previstas» si lo fijado `f0..f1` dura menos que lo previsto (los minutos de la convocatoria, o lo que pide su
+   orden del día); '' si no. Lo previsto se mide desde `_fijarRango_` sin fin, que es lo que el atajo habría marcado. */
+function _fijarCortaTxt_(R, f0, f1){
+  var g = _fijarRango_(R, f0), largo = g ? g.largo : 0;
+  var prev = (+R.duracion>0 && largo<=g.min) ? +R.duracion : _minFranjas_(R, f0, f0+largo-1);
+  return (g && _minFranjas_(R, f0, f1) < prev) ? 'Más corta que las '+_durTxt_(prev)+' previstas' : '';
 }
 
 /* «2026-07» es un identificador, no algo que se le lea a nadie. Daniel, viendo el boton:
@@ -14899,7 +14920,9 @@ function _horarioReuMs_(r){
   if(!m || !fr) return null;
   var base=_hoyDateM_(), t=new Date(base.getFullYear(), (+m[2])-1, +m[1]).getTime();
   if(t < base.getTime()-182*86400000) t=new Date(base.getFullYear()+1, (+m[2])-1, +m[1]).getTime();
-  var ini=t+_minHM_(fr)*60000, dur=(+r.duracion>0 ? +r.duracion : ((+fr.dur>0 ? +fr.dur : 60)*bl.length));
+  /* 17/11 (`fijarlibre`): la duración es la de lo FIJADO (se puede fijar más largo o más corto que `duracion`); `duracion` sólo si no hay franjas que sumar. */
+  var ini=t+_minHM_(fr)*60000, dur=_minFranjas_(r, bl[0][1], bl[bl.length-1][1]);
+  if(!(dur>0)) dur=(+r.duracion>0 ? +r.duracion : 60);
   return {ini:ini, fin:ini+dur*60000};
 }
 var BLQ_VENTANA_FICHA_H = 48;                  // = `VENTANA_FICHA_H` de `avisar_reunion.py`: más viejas, ya no se piden
