@@ -114,7 +114,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=25d4e71"></script>
+<script src="comun.js?v=3ac51a3"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=4f42fdf"></script>
@@ -339,6 +339,8 @@ var api={
   empezarReunion: function(b){ b.action="empezarReunion"; return api._post(b); },
   finalizarReunion: function(b){ b.action="finalizarReunion"; return api._post(b); },
   cancelarReunionEnCurso: function(b){ b.action="cancelarReunionEnCurso"; return api._post(b); },
+  entrarEnReunion: function(b){ b.action="entrarEnReunion"; return api._post(b); },      /* 17/11: el tiempo de cada uno en directo */
+  salirDeReunion: function(b){ b.action="salirDeReunion"; return api._post(b); },
   /* 31/10 · la asistencia en directo de las generales: todas por `_asisPost_` (comun.js), que en ?demo habla con la maqueta */
   getAsistencia:    function(id, pd){ return _asisPost_({action:"getAsistencia",id:id,_demoPd:!!pd}); },
   abrirAsistencia:  function(id){ return _asisPost_({action:"abrirAsistencia",id:id,_demoPd:true}); },
@@ -1871,7 +1873,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='99543d8';
+var BUILD='1dfc7a8';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

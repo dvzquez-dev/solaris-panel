@@ -14970,6 +14970,90 @@ function _cronoTick_(){
   if(typeof document==='undefined') return;
   var els=document.querySelectorAll('[data-crono]');
   for(var i=0;i<els.length;i++) els[i].textContent=_cronoTxt_(els[i].getAttribute('data-crono'));
+  _endirTick_();
+}
+
+/* ══ 17/11 · EN DIRECTO: QUIÉN ESTÁ EN LA REUNIÓN Y CUÁNTO LLEVA (delegación `asistviva`; las dos caras, UNA pieza) ═══════════════════
+   🗣️ Daniel: *«cuando le doy a empezar, toda la gente que puso que podía debería de añadirse automáticamente […] y a partir de ahí puedo
+   añadir a gente y quitarla en directo. Y debería contarles el tiempo que estuviesen metidos.»*
+   El servidor guarda en `en_curso.tramos = {nombre: [{ini, fin|null}]}` cada entrada y salida (`entrarEnReunion`/`salirDeReunion`; al
+   empezar entran solos los convocados que marcaron en lo FIJADO). El tiempo de cada uno es la suma de SUS tramos. Al finalizar,
+   cada uno cobra el suyo (`_tiempos_en_directo` del servidor); aquí se ve la propuesta y «Horas distintas» sigue para corregir. */
+var _ENDIR_EC_ = null;                        // el `en_curso` que se está pintando: lo lee el reloj para el tiempo de cada uno
+function _endirTramos_(ec, n){ return (ec && ec.tramos && ec.tramos[n]) || []; }
+function _endirDentro_(ec, n){ var t=_endirTramos_(ec, n); return t.length>0 && !t[t.length-1].fin; }
+/* Cuánto lleva `n`, en ms: la suma de SUS tramos (el abierto cuenta hasta `ahora`). Gemela de `AS.tiempo_ms` (asistencia.py). */
+function _endirMs_(ec, n, ahora){
+  var now=ahora==null ? Date.now() : ahora, s=0;
+  _endirTramos_(ec, n).forEach(function(x){
+    var a=Date.parse(x.ini), b=x.fin ? Date.parse(x.fin) : now;
+    if(a===a && b===b && b>a) s+=b-a; });
+  return s;
+}
+function _endirTxt_(ms){ return _cronoTxt_(new Date(Date.now()-ms).toISOString()); }
+/* Quienes tienen tramos, en el orden en que llegaron. `conTiempo`: sólo los que llegaron a estar algo (el que entró y salió al instante no). */
+function _endirNombres_(ec, conTiempo){
+  var nom=Object.keys((ec && ec.tramos) || {}).filter(function(n){ return !conTiempo || _endirMs_(ec, n)>=1000; });
+  var ini=function(n){ var t=_endirTramos_(ec, n)[0]; return t ? Date.parse(t.ini) : 0; };
+  return nom.sort(function(a,b){ return ini(a)-ini(b) || String(a).localeCompare(String(b),'es'); });
+}
+/* Las horas que le tocan por ese tiempo: a cuartos como el bloque entero (mínimo 15 min), sin pasar de lo que dura la reunión (`_tiempos_en_directo`). */
+function _endirHoras_(ms, durMs){
+  var h=Math.max(0.25, Math.round(ms/3600000*4)/4);
+  return durMs>0 ? Math.min(h, Math.max(0.25, Math.round(durMs/3600000*4)/4)) : h;
+}
+/* «15:00–16:30 · 17:30–19:30»: los tramos de `n` en hora de Madrid (el abierto, «desde las 15:00»). */
+function _endirTramosTxt_(ec, n, alFinalizar){
+  return _endirTramos_(ec, n).map(function(x){
+    return x.fin ? _hhmmDe_(x.ini)+'–'+_hhmmDe_(x.fin)
+      : alFinalizar ? _hhmmDe_(x.ini)+'–'+_hhmmDe_(new Date().toISOString())      /* el abierto acaba al finalizar */
+      : 'desde las '+_hhmmDe_(x.ini); }).join(' · ');
+}
+/* El `en_curso` de ESTE MOMENTO, del servidor: quien lleva la reunión también marca presentes desde el panel de asistencia, y lo vivo tarda un segundo;
+   el formulario de «Finalizar» reparte horas con lo que hay ahora, no con la foto de la ficha. Sin red o en la maqueta, la foto de siempre. */
+async function _endirRefrescar_(r){
+  var f=typeof api!=='undefined' && (api.listarReuniones || api.listar);
+  if(typeof f!=='function' || (typeof _demoLocal_==='function' && _demoLocal_())) return;
+  try{
+    var l=await f.call(api), x=(Array.isArray(l) ? l : ((l && l.reuniones) || [])).filter(function(y){ return String(y.id)===String(r.id); })[0];
+    if(x && x.en_curso) r.en_curso=x.en_curso;
+  }catch(e){ /* la foto de siempre */ }
+}
+/* El panel de la ficha: una fila por persona con su tiempo ahora mismo; `puede` = quien lleva la reunión (quita, vuelve y añade). */
+function _endirHTML_(r, puede){
+  var ec=r && r.en_curso; if(!ec) return '';
+  _ENDIR_EC_=ec;
+  var nom=_endirNombres_(ec), dentro=nom.filter(function(n){ return _endirDentro_(ec, n); });
+  var filas=nom.map(function(n){
+    var d=_endirDentro_(ec, n);
+    return '<div data-endir-f="'+esc(n)+'" style="display:flex;gap:8px;align-items:center;min-height:44px;border-bottom:1px solid var(--line)">'+
+      '<span style="color:'+(d?'var(--red2)':'var(--ink3)')+'" aria-hidden="true">●</span>'+
+      '<span style="flex:1;min-width:0;font-size:13px"><b>'+esc(_pilaDeM_(n)||n)+'</b>'+
+        (d?'':' <span class="rnota">· salió a las '+esc(_hhmmDe_(_endirTramos_(ec, n).slice(-1)[0].fin))+'</span>')+'</span>'+
+      '<span class="mono" '+(d?'data-endir="'+esc(n)+'" ':'')+'style="font-size:14px;'+(d?'':'color:var(--ink3)')+'">'+esc(_endirTxt_(_endirMs_(ec, n)))+'</span>'+
+      (puede?'<button type="button" class="btn mini" data-p data-endir-b="'+esc(n)+'" data-endir-dentro="'+(d?'0':'1')+'" style="min-height:44px">'+(d?'Quitar':'Volver')+'</button>':'')+'</div>';
+  }).join('');
+  return '<div id="endir" style="margin:0 0 12px"><span class="sc" style="display:block;margin:0 0 5px">En la reunión · '+dentro.length+
+    (dentro.length===1?' persona':' personas')+'</span>'+
+    (filas || '<p class="rnota" style="margin:0 0 8px">Nadie dentro todavía.</p>')+
+    (puede ? '<div style="margin-top:9px">'+elegirPersonas('endir', {universo:_activos_().map(function(m){ return m.nombre; })
+        .filter(function(n){ return !_endirDentro_(ec, n); }), marcadas:[], titulo:'Añadir a la reunión',
+        vacio:'Añadir a alguien: escribe un nombre o pulsa «Ver lista».'})+'</div>' : '')+'</div>';
+}
+/* El reloj (`_cronoTick_`) pone el tiempo de cada uno al segundo, sin repintar. */
+function _endirTick_(){
+  var els=document.querySelectorAll('[data-endir]');
+  for(var i=0;i<els.length;i++) els[i].textContent=_endirTxt_(_endirMs_(_ENDIR_EC_, els[i].getAttribute('data-endir')));
+}
+/* La propuesta del «Finalizar»: a cada participante SU tiempo y sus tramos (los que no llevaron cuenta, la duración entera). */
+function _endirPropuestaHTML_(B){
+  var ec=B.en_curso, dur=ec ? Date.now()-Date.parse(ec.ini) : 0;
+  return '<ul data-endir-prop style="margin:0 0 8px;padding:0;list-style:none;font-size:13px">'+B.parts.map(function(p){
+    var ms=_endirMs_(ec, p.nombre), sigue=_endirTramos_(ec, p.nombre).length>0;
+    return '<li data-endir-p="'+esc(p.nombre)+'" style="margin:0 0 4px"><b>'+esc(_pilaDeM_(p.nombre)||p.nombre)+'</b> · '+
+      (sigue ? (ms>=1000 ? nf2(_endirHoras_(ms, dur))+' h <span class="rnota">· '+esc(_endirTramosTxt_(ec, p.nombre, true))+'</span>'
+                         : '<span style="color:var(--warn)">no llegó a estar: sin horas</span>')
+             : '<span class="rnota">la duración de la reunión</span>')+'</li>'; }).join('')+'</ul>';
 }
 if(typeof document!=='undefined' && typeof setInterval==='function'){
   var _cronoT_=setInterval(_cronoTick_, 1000); if(_cronoT_ && _cronoT_.unref) _cronoT_.unref();
@@ -15107,10 +15191,14 @@ function _bloqueHorasHTML_(){
   var d=fin ? 0 : _bloqueDurH_(B.fecha, B.ini, B.fin, B.tramos);
   var tot=fin ? 'La duración de la reunión' : (d>0 ? '<b>'+nf2(d)+' h</b>' : 'Las horas del bloque');
   var quien=n+(n===1?' persona':' personas');
+  var cuenta=fin && B.en_curso && B.en_curso.tramos && Object.keys(B.en_curso.tramos).length;    // 17/11: se llevó la cuenta en directo
+  if(!B.distintas && cuenta)
+    return '<p class="rnota" data-blqtot style="margin:0 0 6px">A cada uno, el tiempo que estuvo:</p>'+_endirPropuestaHTML_(B)+
+      '<button type="button" class="btn mini" data-p data-blqdist>Horas distintas</button>';
   if(!B.distintas)
     return '<p class="rnota" data-blqtot style="margin:0 0 8px">'+tot+(n===1 ? ' para esta persona.' : ' para estas '+quien+', igual para todas.')+'</p>'+
       '<button type="button" class="btn mini" data-p data-blqdist>Horas distintas</button>';
-  return '<p class="rnota" style="margin:0 0 8px">Horas de cada persona; en blanco, '+(fin?'lo que dure la reunión':(d>0?nf2(d)+' h':'las del bloque'))+'.</p>'+
+  return '<p class="rnota" style="margin:0 0 8px">Horas de cada persona; en blanco, '+(fin?(cuenta?'el tiempo que estuvo':'lo que dure la reunión'):(d>0?nf2(d)+' h':'las del bloque'))+'.</p>'+
     B.parts.map(function(p){
       return '<div data-blqp="'+esc(p.nombre)+'" style="display:flex;gap:7px;align-items:center;margin:0 0 6px">'+
         '<span style="flex:1;font-size:13px"><b>'+esc(_pilaDeM_(p.nombre)||p.nombre)+'</b></span>'+
@@ -15252,6 +15340,8 @@ function _variosActivo_(){ return !!(BLQ && BLQ.modo==='declarar' && BLQ.reunion
 
 /* La ficha de la reunión: Empezar · (cronómetro + Finalizar + Cancelar) · Declarar a mano. `puede` = ¿te toca? */
 function _bloqueReuHTML_(r, puede){
+  if(r && !puede && r.en_curso)      // 17/11: quien no la lleva también VE quién está dentro y cuánto lleva (al segundo, por lo vivo)
+    return '<div id="reuBloque" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line)">'+_endirHTML_(r, false)+'</div>';
   if(!r || !puede) return '';
   var ec=r.en_curso, pend=_fichaPendienteReu_(r);
   /* 12/11 (refutar13): la FINALIZADA con su bloque ya enviado no se puede «Empezar» otra vez ni declarar de nuevo (duplicaba las horas de todos);
@@ -15264,6 +15354,7 @@ function _bloqueReuHTML_(r, puede){
     (ec
       ? '<div style="display:flex;gap:9px;align-items:center;margin:0 0 9px"><span style="color:var(--red2)">●</span>'+
         '<b>En curso</b><span class="mono" data-crono="'+esc(ec.ini)+'" style="font-size:18px">'+esc(_cronoTxt_(ec.ini))+'</span></div>'+
+        _endirHTML_(r, true)+
         '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-p id="btnFinalizar" style="flex:2">Finalizar</button>'+
         '<button class="btn" data-p id="btnCancelarCurso" style="flex:1">Cancelar</button></div>'
       : (_reuFinalizada_(r) || _reuTerminada_(r) ? '' : (r.fijada
@@ -15293,6 +15384,21 @@ function _bloqueReuCablear_(getR, cb){
     r.en_curso=(resp && resp.en_curso) || {ini:new Date().toISOString()};
     tost('Reunión en marcha: el tiempo cuenta.'); cb.refrescar();
   });
+  /* 17/11: quitar / volver a meter a alguien, y añadir con el selector de personas (el servidor apunta la hora de cada gesto). */
+  var _endirIr=async function(nombre, dentro){
+    var r=getR(); if(!r) return;
+    var resp=await (dentro ? api.entrarEnReunion({id:r.id, nombre:nombre}) : api.salirDeReunion({id:r.id, nombre:nombre}));
+    if(resp && resp.en_curso) r.en_curso=resp.en_curso;
+    cb.refrescar();
+  };
+  $$('[data-endir-b]').forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return; b.disabled=true;
+    try{ await _endirIr(b.getAttribute('data-endir-b'), b.getAttribute('data-endir-dentro')==='1'); }
+    catch(x){ b.disabled=false; tostErr('No se pudo: ', x); } }; });
+  elegirPersonasAlCambiar('endir', async function(l){
+    var n=l[l.length-1]; if(!n) return;
+    try{ await _endirIr(n, true); }catch(x){ tostErr('No se pudo: ', x); elegirPersonasPoner('endir', []); }
+  });
   on('btnCancelarCurso', async function(){
     var r=getR(); if(!r) return;
     if(!(await dialogoSiNo('Cancelar la reunión en curso.\n\nNo se crea ningún parte.\n\n¿Sigo?'))) return;
@@ -15311,8 +15417,10 @@ function _bloqueReuCablear_(getR, cb){
   };
   on('btnFinalizar', async function(){
     var r=getR(); if(!r) return;
-    var o=base(r,'finalizar'), pres=await presentesDe(r);
-    if(pres) o.parts=pres;
+    await _endirRefrescar_(r);
+    var o=base(r,'finalizar'), pres=await presentesDe(r), cuenta=_endirNombres_(r.en_curso, true);
+    if(cuenta.length) o.parts=cuenta;          // 17/11: quienes estuvieron (también los que se fueron antes): cada uno con SU tiempo
+    else if(pres) o.parts=pres;
     _bloqueAbrir_(o); cb.abrir();
   });
   /* 11/11 (horascoord): los participantes son quienes ASISTIERON (la lista de la asistencia), no todos los convocados; sin asistencia

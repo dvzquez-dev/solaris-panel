@@ -1807,7 +1807,7 @@ function _bloqueReuPanelE_(){
   var r=_reuSelE_();
   var puede=_puedeBloqueReu_(r, _actorSanc_(), (typeof esAdmin==='function' && esAdmin()));
   var abierto=!!(BLQ && BLQ.donde===vista);
-  if(!puede && !abierto) return '';
+  if(!puede && !abierto && !(r && r.en_curso)) return '';     /* 17/11: quien no la lleva ve quién está dentro */
   /* 31/10 (feosesc #23): sin nada que enseñar, el panel NO sale (salía un marco con un hueco vacío). */
   var cuerpo=abierto?_bloqueFormHTML_():_bloqueReuHTML_(r, puede);
   if(!String(cuerpo||'').replace(/<[^>]*>/g,'').trim()) return '';
