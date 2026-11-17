@@ -9189,6 +9189,14 @@ function _avisoCorto_(nCortas, minSlots, slot){
 }
 
 /* refutar30: «1 convocado» / «N convocados» — la reunión de un solo convocado (el consejo de Fer con Dora) decía «1 convocados». */
+/* pulir48 (17/11): lo que se dice al convocar, sin «bloques» (jerga de la rejilla): cuántos convocados y cuántos días para elegir hueco. */
+function _convocadaTxt_(nInv, nDias){ nDias = +nDias || 0; return 'Reunión convocada · ' + _convocadosTxt_(nInv) + ', ' + nDias + (nDias === 1 ? ' día' : ' días') + ' para elegir hueco.'; }
+/* pulir48 (17/11): de HOY no se ofrecen las franjas que ya empezaron (se podría convocar con huecos en el pasado). `perDia[d]` = índices de franja
+   del día `d`; `ds[d]` = su 'dd/mm'. Devuelve otro `perDia` (no toca el que recibe). El reloj es el de la app (`_ahoraApp_`, la pared de Madrid). */
+function _sinFranjasPasadas_(perDia, F, ds, ahoraISO){
+  var ah = ahoraISO || _ahoraApp_(), hoy = ah.slice(8, 10) + '/' + ah.slice(5, 7), hm = ah.slice(11, 16);
+  return perDia.map(function(idxs, d){ return ds[d] === hoy ? idxs.filter(function(fi){ return F[fi].ini > hm; }) : idxs; });
+}
 function _convocadosTxt_(n){ n = +n || 0; return n + (n === 1 ? ' convocado' : ' convocados'); }
 function _durTxt_(min){
   min=Math.max(0, Math.round(+min||0));
@@ -10690,6 +10698,13 @@ function _perfilesDe_(m){
     return d ? d : (a.unidad<b.unidad?-1:a.unidad>b.unidad?1:0);
   });
   return out;
+}
+
+/* 17/11 (refutar52): ¿`a` y `b` comparten ALGUNA unidad (la suya, las de `unidades` o las que coordina)? Para convocar «tu unidad»: quien coordina
+   Propulsión Y la UCT (José) convoca a la gente de LAS DOS, y no sólo a la de su `unidad` (que es una). */
+function _comparteUnidad_(a,b){
+  var ua=_perfilesDe_(a).map(function(p){ return p.unidad; });
+  return _perfilesDe_(b).some(function(p){ return ua.indexOf(p.unidad)>=0; });
 }
 
 /* Con uno solo NO se pregunta: un desplegable de una opcion es un paso que no
@@ -15203,9 +15218,12 @@ function _bloqueReuHTML_(r, puede){
         '<b>En curso</b><span class="mono" data-crono="'+esc(ec.ini)+'" style="font-size:18px">'+esc(_cronoTxt_(ec.ini))+'</span></div>'+
         '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" data-p id="btnFinalizar" style="flex:2">Finalizar</button>'+
         '<button class="btn" data-p id="btnCancelarCurso" style="flex:1">Cancelar</button></div>'
-      : (_reuFinalizada_(r) || _reuTerminada_(r) ? '' : '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>'))+
+      : (_reuFinalizada_(r) || _reuTerminada_(r) ? '' : (r.fijada
+          ? '<button class="btn pri full" data-p id="btnEmpezar" style="margin-right:8px">Empezar la reunión</button>'
+          /* pulir48 (17/11): sin fecha fijada no hay reunión que empezar (el reloj contaría sobre un horario que no existe): se dice qué falta. */
+          : '<p class="rnota" id="reuSinFijar" style="margin:0 0 8px">Fija la fecha para poder empezarla.</p>')))+
     '<button class="btn '+(pend?'pri':'mini')+' full" data-p id="btnDeclararBloque" style="margin-top:8px">'+(_reuTerminada_(r) ? 'Dar las horas a los asistentes' : 'Declarar horas de varias personas')+'</button>'+
-    (_reuFinalizada_(r) || _reuTerminada_(r) ? '' : '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p>')+'</div>';
+    (_reuFinalizada_(r) || _reuTerminada_(r) || (!r.fijada && !ec) ? '' : '<p class="rnota" style="margin:7px 0 0">Empezar y finalizar cuentan como un fichaje de todos los participantes.</p>')+'</div>';
 }
 
 /* `getR()` da la reunión AHORA (la lista se rehace al refrescar); `abrir()` pinta el formulario. */

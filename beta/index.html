@@ -114,16 +114,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=fd998d8"></script>
+<script src="comun.js?v=dde2512"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=4f42fdf"></script>
 <script src="turnos.movil.js?v=564fabd"></script>
 <script src="buzon.movil.js?v=3179853"></script>
-<script src="documentos.movil.js?v=92b3dd4"></script>
+<script src="documentos.movil.js?v=9549b24"></script>
 <script src="sanciones.movil.js?v=8831fbd"></script>
-<script src="reuniones.movil.js?v=943c3fd"></script>
-<script src="horas.movil.js?v=dfc2096"></script>
+<script src="reuniones.movil.js?v=63ed37a"></script>
+<script src="horas.movil.js?v=b8983eb"></script>
 <script src="equipo.movil.js?v=28e54e2"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -568,7 +568,11 @@ function _pintarCabecera_(){
        salían «MIEMBRO». Con cargo, como siempre («Coordinador de» SU unidad: la cabecera no cabe una lista). */
     var u=YO.unidad||'', c=YO.cargo||_cargoTxt_(YO), txt;
     if(!u || u===c) txt=c;
-    else if(c==='Coordinador') txt='Coordinador de '+u;
+    else if(c==='Coordinador'){
+      /* 17/11 (refutar52): quien coordina DOS (José: Propulsión y la UCT) lo dice — antes la cabecera callaba la segunda */
+      var _otras=_unidadesCoord_(YO.coordina).filter(function(x){ return x!==u; }).length;
+      txt='Coordinador de '+u+(_otras>0?' y '+_otras+' más':'');
+    }
     /* 956.ª: espacio DURO antes del «·»: a 375 px el punto se quedaba solo en su línea. */
     else txt=u+'\u00a0· '+c;
     hr.textContent=txt.toUpperCase();
@@ -1881,7 +1885,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='bdfe2ae';
+var BUILD='83fa3b0';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

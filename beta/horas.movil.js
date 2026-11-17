@@ -1961,7 +1961,7 @@ function _pdFichaHTML_(p){
         (p.estado==='pendiente' && p.pedido?'<span class="pdw">contestó a lo que se le pidió — «'+esc(p.pedido)+'»</span>':'')+
         /* 26/10 · «Sí, mientras no esté firmado»: las horas que tienes delante las corrigió su autor — y de cuánto eran */
         (_txtCorreccion_(p.corr)?'<span class="pdw">'+esc(_txtCorreccion_(p.corr))+'</span>':'')+
-        '<input class="pdm" type="text" placeholder="Motivo — obligatorio para rechazar o pedir detalle">'+
+        '<input class="pdm" type="text" placeholder="Motivo (si rechazas o pides detalle)">'+
         '<div class="pdb">'+
           '<button data-pdacc="aprobar" data-p>Aprobar</button>'+
           '<button data-pdacc="detalle" data-p>Pedir detalle</button>'+
@@ -2467,7 +2467,7 @@ function vHoras(){
         /* ⛔ EL RÓTULO, UNA VEZ (782.ª): el `<h2>` de la línea de arriba ya dice «Tus
            partes» y se ve a la vez que esto. El desplegable se queda con lo que añade — el
            número y las HORAS —, que es lo que el título no tiene. */
-        ? '<details class="pdgrupo"><summary><span class="pdnum">'+
+        ? '<details class="pdgrupo"'+(mias.some(function(x){ return x.e==='det'; })?' open':'')+'><summary><span class="pdnum">'+
             mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
             _rechazadasTxt_(mias)+
             nf2(mias.reduce(function(t,x){ return t+(x.e==='pend' ? _horasVistaParte_(x) : 0); },0))+' h en cola</span></summary>'+

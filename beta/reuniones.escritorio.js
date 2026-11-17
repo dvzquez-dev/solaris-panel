@@ -116,7 +116,7 @@ function _presetInvitados_(tipo){
   _activos_().forEach(function(m){
     if(m.nombre===yo) return;
     var meto = tipo==='general' ? true
-             : (tipo==='subsistema' || tipo==='mixta') ? (m.unidad===((_m(yo)||{}).unidad))   /* 04/11: la mixta nace con SU subsistema ya dentro */
+             : (tipo==='subsistema' || tipo==='mixta') ? _comparteUnidad_(_m(yo),m)   /* 04/11: la mixta nace con SU subsistema ya dentro */
              : tipo==='junta' ? rangoNom(m.nombre)>=1       /* refutar30: la junta es la coordinación del SERVIDOR (`puede_ver_reunion`: rango >= 1) — también el subcoordinador y José, que el cargo a secas no ve */
              : false;
     if(meto) out.push(m.nombre);
@@ -268,7 +268,7 @@ function _cablearConvocar_(){
   }
   function upd(){
     var sl=+val('cvSlot')||30, du=+val('cvDura')||60;
-    var u=_genUnion_(rangos(), sl);
+    var u=_genUnion_(rangos(), sl); u.perDia=_sinFranjasPasadas_(u.perDia, u.F, dias());   // pulir48: lo de hoy que ya empezó no se ofrece
     var nb=u.perDia.reduce(function(a,x){ return a+x.length; },0), nd=dias().length;
     var nS=_slotsMin_(du,sl);
     _minimoConvPintar_($('#cvMin'), 'e', val('cvTipo'), val('cvLim'), upd);
@@ -422,9 +422,10 @@ function _cablearConvocar_(){
     var ds=dias(); if(!ds.length){ tost('Revisa las fechas: no hay días.'); return; }
     if(!CONV_INV.size){ tost('No has convocado a nadie.'); return; }
     var sl=+val('cvSlot')||30, du=+val('cvDura')||60;
-    var u=_genUnion_(rangos(), sl), bloques=[];
+    var u=_genUnion_(rangos(), sl), bloques=[], _antes=u.perDia.reduce(function(a,x){ return a+x.length; },0);
+    u.perDia=_sinFranjasPasadas_(u.perDia, u.F, ds);      // pulir48 (17/11): de hoy sólo lo que está por venir
     u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
-    if(!u.F.length || !bloques.length){ tost('Con ese horario no sale ninguna casilla.'); return; }
+    if(!u.F.length || !bloques.length){ tost(_antes ? 'Ese horario de hoy ya ha pasado: elige otra hora u otro día.' : 'Con ese horario no sale ninguna casilla.'); return; }
     if(val('cvTipo')==='mixta'){ var _mb=_mixtaBloqueo_(Array.from(CONV_INV), (_m(ACTOR)||{}).unidad); if(_mb){ tost(_mb); return; } }   // 04/11
     var nS=_slotsMin_(du,sl);
     /* ⛔ 01/11 (Daniel [4e2c13a995]): «si no se pudiese de verdad, obvio no se puede convocar». Ya NO se avisa y se deja
@@ -455,8 +456,8 @@ function _cablearConvocar_(){
       reu.id = REUS.reduce(function(m,x){ return Math.max(m, +(x&&x.id)||0); }, 0)+1;
       reu.creado = _ahoraApp_();
       REUS.unshift(normReu(reu)); CONV_INV=null; CONV_HOR={};
-      tost('Convocada en la maqueta · '+_convocadosTxt_(reu.invitados.length)+', '+bloques.length+
-        ' bloques (sólo en este navegador: no se ha avisado a nadie).');
+      tost('Convocada en la maqueta · '+_convocadosTxt_(reu.invitados.length)+', '+ds.length+(ds.length===1?' día':' días')+
+        ' para elegir hueco (sólo en este navegador: no se ha avisado a nadie).');
       pintar(); return;
     }
     if(!backendOK || !SESION){ tost('Sin conexión no se puede convocar.'); return; }
@@ -469,7 +470,7 @@ function _cablearConvocar_(){
     try{
       await api.crear(reu);
       CONV_INV=null; CONV_HOR={};                     // la siguiente empieza limpia
-      tost('Reunión convocada · '+_convocadosTxt_(reu.invitados.length)+', '+bloques.length+' bloques.');
+      tost(_convocadaTxt_(reu.invitados.length, ds.length));
       /* Se RECARGA del servidor en vez de fabricar una copia local: así no se enseña algo
          que en la nube no está. Se conservan las respuestas ya hidratadas —la lista NO las
          trae, viven en su propia hoja— o los mapas de calor se quedarían a cero. */

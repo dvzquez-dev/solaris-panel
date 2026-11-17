@@ -1141,7 +1141,7 @@ function _presetInvitados_(tipo){
   ms.forEach(function(m){
     if(m.nombre===yo) return;
     var meto = tipo==='general' ? true
-             : (tipo==='subsistema' || tipo==='mixta') ? (m.unidad===(YO&&YO.unidad))   // 04/11: la mixta nace con SU subsistema ya dentro
+             : (tipo==='subsistema' || tipo==='mixta') ? _comparteUnidad_(YO,m)   // 04/11: la mixta nace con SU subsistema ya dentro
              : tipo==='junta' ? rangoNom(m.nombre)>=1       /* refutar30: la junta es la coordinación del SERVIDOR (`puede_ver_reunion`: rango >= 1) — también el subcoordinador y José, que el cargo a secas no ve */
              : false;                              // trabajo: a mano
     if(meto) out.push(m.nombre);
@@ -1243,7 +1243,7 @@ function crearModal(){
     if($('#ceDurW'))  $('#ceDurW').style.display=rg?'none':'';
     if($('#ceDias'))  $('#ceDias').style.display=per()?'':'none';
     var sl=+val('ceSlot')||30, du=+val('ceDura')||60;
-    var u=_genUnion_(rangos(), sl);
+    var u=_genUnion_(rangos(), sl); u.perDia=_sinFranjasPasadas_(u.perDia, u.F, dias());   // pulir48: lo de hoy que ya empezó no se ofrece
     var nb=u.perDia.reduce(function(a,x){ return a+x.length; },0), nd=dias().length;
     /* Que hay que juntar para que valga, dicho antes de convocar y con la cuenta hecha. */
     var nS=_slotsMin_(du,sl), h=$('#ceSlotHint');
@@ -1325,9 +1325,10 @@ function crearModal(){
     if(val('ceTipo')==='mixta'){ var _mb=_mixtaBloqueo_(Array.from(INV), YO&&YO.unidad); if(_mb){ tost(_mb); return; } }   // 04/11
     var ds=dias(); if(!ds.length){ tost('Revisa las fechas: no hay días.'); return; }
     var _sl=+val('ceSlot')||30, _du=+val('ceDura')||60;
-    var u=_genUnion_(rangos(), _sl), bloques=[];
+    var u=_genUnion_(rangos(), _sl), bloques=[], _antes=u.perDia.reduce(function(a,x){ return a+x.length; },0);
+    u.perDia=_sinFranjasPasadas_(u.perDia, u.F, ds);      // pulir48 (17/11): de hoy sólo lo que está por venir
     u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
-    if(!u.F.length || !bloques.length){ tost('Con ese horario no sale ninguna casilla.'); return; }
+    if(!u.F.length || !bloques.length){ tost(_antes ? 'Ese horario de hoy ya ha pasado: elige otra hora u otro día.' : 'Con ese horario no sale ninguna casilla.'); return; }
     /* ⛔ 01/11 (Daniel [4e2c13a995]): «si no se pudiese de verdad, obvio no se puede convocar». Antes se avisaba y se
        dejaba convocar con «pulsa otra vez»; ahora, si con este horario nadie puede llegar al mínimo (o nadie puede marcar),
        no se convoca y se dice con números. Los días cortos que NO impiden llegar sólo se avisan en la vista previa. */
@@ -1350,7 +1351,7 @@ function crearModal(){
     if(typeof backendOK!=='undefined' && backendOK && SESION){
       try{ var d=await api.crearReunion(reu); if(d&&d.id) reu.id=d.id;
         cerrarModal();
-        tost('Reunión convocada · '+_convocadosTxt_(reu.invitados.length)+', '+bloques.length+' bloques.');
+        tost(_convocadaTxt_(reu.invitados.length, ds.length));
         /* Se RECARGA la lista del servidor. Antes se llamaba a `pintar()` sin haber metido
            la reunion nueva en `REUNIONES_M`: se repintaba lo mismo de antes y parecia que
            no se habia creado. Y se recarga en vez de fabricar una copia local, que es como

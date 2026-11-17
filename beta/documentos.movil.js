@@ -171,9 +171,11 @@ function filaDoc(e,esAutor){
      nueva: el día que se añada un estado, esto lo hereda en vez de quedarse viejo — que
      es exactamente cómo nació este fallo. */
   var _pend = _docEnCurso_(e.estado) && e.estado!=='cambios';
+  /* 17/11 (refutar52): quien revisa de varias unidades (José coordina Propulsión y la UCT; el PD y José revisan los informes de todas) ve de QUÉ unidad es cada uno */
+  var _uni = (!esAutor && e.subsistema && (rangoNom(yoNombre())>=2 || _perfilesDe_(miembro(yoNombre())).length>1)) ? ' · '+esc(e.subsistema) : '';
   return '<div class="fila clic '+(esAutor?(e.estado==='cambios'?'borde-no':(_pend?'borde-pe':''))+'':'')+'" data-doc="'+e.id+'" data-p>'+
     '<div class="a"><b>'+esc(e.titulo)+'</b><small><span class="mono">'+e.ref+'</span> · '+
-    esc(e.autor.split(' ')[0])+' · '+ambDocM(e.ambito)+'</small></div>'+
+    esc(e.autor.split(' ')[0])+' · '+ambDocM(e.ambito)+_uni+'</small></div>'+
     '<div class="d"><span class="pil '+st[1]+'">'+st[0]+'</span> <span class="chev">›</span></div></div>';
 }
 
