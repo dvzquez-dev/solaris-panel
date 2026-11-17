@@ -2713,6 +2713,10 @@ function _hMesDe_(m){
      ✅ La cura es guardar el ritmo ANTES de pisarlo (`hRitmo`, en `_aplicarPanel_`) y
      preferirlo aqui. El movil no pisa nada, asi que alli `hRitmo` no existe y se cae a
      `hMes`, que es el ritmo: las dos caras vuelven a contestar lo mismo. */
+  /* ⛔ 17/11 (refutar56) · `hRitmo === null` es el escritorio diciendo «aquí NO HAY ritmo» (`_aplicarPanel_` lo deja así cuando la puerta
+     no pudo calcularlo): su `hMes` ya es el del MES, y leerlo como ritmo daba 0 h/mes — el 1 de septiembre, con el panel aún sin la
+     temporada nueva, el Ranking pintaba 11 filas «0,0 · NaN» y «Bajo el umbral» decía 11 de 11. Sin ritmo, `null`: no es un cero. */
+  if(m.hRitmo === null) return null;
   var r = m.hRitmo;
   if(typeof r !== 'number' || !isFinite(r)) r = m.hMes;   /* ⛔ el ritmo primero; si no lo
                                                              hay, `hMes` — que en el MÓVIL

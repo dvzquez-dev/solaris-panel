@@ -1548,7 +1548,7 @@ function _ritmoHorasHTMLE_(mi){
         '<span class="tr"><i class="z"></i><b style="left:'+izq.toFixed(2)+'%;width:'+w.toFixed(2)+'%"></b></span>'+
         '<span class="vv"><b>'+pc(dl)+'</b><small>'+esc(f.txt)+'</small></span></div>';
     }).join('')+'</div>'+
-    '<div class="nota">Tu ritmo: <b>'+nf2(r.ritmo)+' h/día</b> ('+nf2(r.num)+' h en '+r.dia+' días'+
+    '<div class="nota">Tu ritmo: <b>'+nf2(r.ritmo)+' h/día</b> ('+nf2(r.num)+' h en '+r.dia+(r.dia===1?' día':' días')+
     (r.conBase?', con las horas por gestión de tu cargo repartidas hasta hoy':'')+'). Se compara el ritmo, no el total: '+
     'el mes en curso va a medias y el anterior está entero.</div>');
 }

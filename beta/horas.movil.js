@@ -533,7 +533,7 @@ function _compHorasHTML_(base, crudo){
      distingue de «+12 %» respecto a un total, y son cosas distintas. */
   return '<div class="comph">'+f+
     '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(_num)+
-    ' h en '+dia+' días'+(_bt==null?'':', con las horas por gestión de tu cargo repartidas hasta hoy')+   /* 🟡 4 (refutador): también la tiene quien no tiene cargo */   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
+    ' h en '+dia+(dia===1?' día':' días')+(_bt==null?'':', con las horas por gestión de tu cargo repartidas hasta hoy')+   /* 🟡 4 (refutador): también la tiene quien no tiene cargo */   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
     '). Se compara el ritmo y no el total porque el mes en curso va a medias.</p></div>';
 }
 

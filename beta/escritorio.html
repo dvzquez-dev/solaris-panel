@@ -113,7 +113,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=3164749"></script>
+<script src="comun.js?v=25d4e71"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=3cc0796"></script>
@@ -121,7 +121,7 @@
 <script src="documentos.escritorio.js?v=428fbab"></script>
 <script src="sanciones.escritorio.js?v=5d4597f"></script>
 <script src="reuniones.escritorio.js?v=92964da"></script>
-<script src="horas.escritorio.js?v=6b7a253"></script>
+<script src="horas.escritorio.js?v=a3e7eea"></script>
 <script src="equipo.escritorio.js?v=6b38f97"></script>
 <script src="tareas.escritorio.js?v=d9b0344"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
@@ -1114,7 +1114,7 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
          conjuntos distintos — y saldría por encima del 100 % en cuanto alguien tenga
          ritmo y no haya fichado este mes. */
       (conR.length<2   /* 22/10 (auditor 21, 🟠 3): «0 de 1» era tu propia fila, no el equipo */
-        ? kpi('Bajo el umbral','—','tu cuenta no ve las horas del resto del equipo','','')
+        ? kpi('Bajo el umbral','—',(EQUIPO.length>=2 ? 'nadie ha cerrado ningún mes todavía' : 'tu cuenta no ve las horas del resto del equipo'),'','')   /* 17/11 (refutar56): el PD ve al equipo; lo que falta es el ritmo */
         : kpi('Bajo el umbral',bajo,'de '+conR.length+' · media de temporada bajo '+nf2(UMBRAL)+' h/mes','wa',(conR.length?(bajo/conR.length*100).toFixed(0):0)+'%'))+
       /* 22/10 (refutador, 🟠 2): a quien no es PD no le llega `infraccion` del resto; «0» en verde era afirmar sobre lo
          que no ve. Con menos de dos fichas con el dato, «—» y por qué. */
@@ -2620,6 +2620,10 @@ V.ranking={g:'Equipo',t:'Ranking',f:function(){
     vacioSimple('Vas '+_rkM.puesto+'.º'+(typeof _rkM.total === 'number' ? ' de '+_rkM.total : ''),
       'En el ranking de la temporada (horas por mes en el equipo). Tu cuenta solo ve tus horas y tu puesto; si necesitas '+
       'el ranking completo, pídeselo al Project Director.'));
+  /* 17/11 (refutar56): el PD VE al equipo entero pero aún no hay ritmo de nadie (1 de septiembre, panel sin la temporada nueva): eso no es «tu cuenta
+     solo ve las tuyas», es que todavía no hay clasificación. */
+  if(VIS.length < 2 && _activos_().length >= 2) return pan('Ranking','nadie ha cerrado ningún mes todavía',
+    vacioSimple('Todavía no hay clasificación','Empieza cuando se cierre el primer mes de la temporada.'));
   if(VIS.length < 2) return pan('Ranking','sin datos',
     vacioSimple('Sin horas del equipo','El ranking se calcula con las horas de temporada de cada uno y tu cuenta solo '+
       've las tuyas. Si necesitas el ranking completo, pídeselo al Project Director.'));
@@ -3434,7 +3438,7 @@ function _aplicarPanel_(pnl){
        daba 22,44 (`horasTemp/meses`) — para el ranking y para la cuota. Preguntándole a
        `_hMesDe_` ANTES de pisar, las dos caras caen al mismo respaldo. El `delete` va primero
        para que un `hRitmo` de otra pasada no conteste por ella. */
-    delete m.hRitmo; var _r=_hMesDe_(m); if(_r!=null) m.hRitmo=_r;
+    delete m.hRitmo; var _r=_hMesDe_(m); m.hRitmo=(_r!=null)?_r:null;   /* `null` = «sin ritmo»: ver `_hMesDe_` (refutar56) */
     var _h=_hMesReal_(m); if(_h!=null) m.hMes=_h; else delete m.hMes;
   });
   _rederivarCargos_();
@@ -3808,7 +3812,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='80d9fd2';
+var BUILD='0051c15';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
