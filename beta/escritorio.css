@@ -482,7 +482,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 /* la hora al limite SUPERIOR de su fila y pegada a la derecha de su columna estrecha: es la
    misma decision que en horizontal (al limite izquierdo), girada 90 grados. */
 .hg.vert .hc.rh{min-height:0;align-items:flex-start;justify-content:flex-end}
-.hg.vert .hc.rh span{position:static;transform:translateY(calc(-50% - 1px));left:auto;top:auto;padding-right:4px;line-height:1}
+.hg.vert .hc.rh span{position:static;left:auto;top:auto;padding-right:4px;line-height:1}   /* 17/11: el `transform` lo pone `.hlin` (comun.js), UNA regla para todas las rejillas */
 /* ⛔ 19/10: la hora EN LA RAYA entre dos franjas, no arriba DENTRO de la suya (Daniel, 14/10: «justo en el medio
    de dos slots … ni para arriba ni para abajo»): media línea más medio `gap` (2 px). Con `transform`, que no
    cambia la caja que el grid mide. Vale para las DOS copias del mapa (las dos llevan `hg vert`). */
@@ -491,7 +491,8 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .hc.rd{justify-content:flex-end;padding-right:7px;white-space:nowrap;font-size:9.5px;color:var(--ink2)}
 .hc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
 /* etiqueta al LÍMITE izquierdo = hora de inicio (decisión cerrada) */
-.hc.rh span{position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}
+.hc.rh span:not(.hlin){position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}   /* `.hlin` (la hora en la línea, comun.js) lleva su propio transform */
+.hc.rh span.hlin{font-size:8.5px}
 .cel{cursor:default;height:19px;border-radius:2px;display:grid;place-items:center;font-family:var(--mono);
   font-size:8.5px;color:#fff;font-weight:600}
 /* 01/11 (esteticaesc): sobre la celda VERDE (reunión fijada) el blanco no llega a 3:1; ahí va el texto oscuro. */
@@ -1019,3 +1020,41 @@ ol.obj>li::before,.mdoc ol>li::before,.pan ol>li::before{content:counter(paso);p
 /* TOPE DE ANCHO: a 1920 px una tabla de 6 columnas se estiraba a 1.600 px con el dato a 1.500 px del nombre. Las tablas no pasan de 1.280. */
 main>.pan:has(.tw),main>div>.pan:has(.tw){max-width:1280px}
 .tfalta{font-size:12.5px;color:var(--red2);line-height:1.5}
+
+/* 17/11 · VOTACIONES (`comun.js`, bloque «VOTACIONES CON CÓRUM»): tarjetas grandes al dedo, lo elegido en rojo y SIN tick (decisiones-app), la barra del recuento detrás. */
+.votl{margin-bottom:12px}
+.vfila{display:flex;flex-wrap:wrap;align-items:center;gap:6px 11px;padding:11px 0;cursor:pointer;border-top:1px solid var(--line)}
+.vfila:first-child{border-top:0}
+.vfila .a{flex:1;min-width:0}.vfila .a b{display:block}.vfila small{display:block;color:var(--ink3);font-size:11.5px;margin-top:2px}
+.vfila .vres{color:var(--ink2)}
+.vsep{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:12px 0 2px;border-top:1px solid var(--line)}
+.vpil{display:inline-block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+.vpil.pend{color:var(--warn);border-color:rgba(232,145,46,.45);background:rgba(232,145,46,.09)}
+.vpil.ok{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
+.vpil.no{color:var(--red);border-color:rgba(228,30,37,.42);background:rgba(228,30,37,.09)}
+.vback{background:none;border:0;color:var(--ink2);padding:6px 0 10px;cursor:pointer;font:inherit}
+.vtit{font-size:19px;font-weight:600;margin:0 0 4px}
+.vcuo{border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:8px 0 12px;font-size:13px;color:var(--ink2)}
+.vcuo.ok{border-color:rgba(62,180,137,.42);color:var(--ok)}.vcuo.no{border-color:rgba(228,30,37,.42);color:var(--red)}
+.vpreg{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--sur)}
+.vpreg .vh{font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+.vnotas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.vops{display:flex;flex-direction:column;gap:8px}
+.vopc{position:relative;overflow:hidden;text-align:left;min-height:52px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;font:inherit;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px}
+.vopc .vt{flex:1;min-width:40%;position:relative;z-index:1}
+.vopc .vn{position:relative;z-index:1;color:var(--ink2);font-size:12px}
+.vopc .vq{position:relative;z-index:1;flex-basis:100%;color:var(--ink3);font-size:11.5px}
+.vopc .vbar{position:absolute;left:0;top:0;bottom:0;right:0;pointer-events:none}
+.vopc .vbar i{display:block;height:100%;background:rgba(255,255,255,.07)}
+.vopc.on{border-color:var(--red);background:rgba(228,30,37,.18);color:#fff}
+.vopc.on .vbar i{background:rgba(228,30,37,.28)}
+.vopc.gana{border-color:var(--ok)}
+.vopc[disabled]{cursor:default}.vopc[disabled]:not(.on){opacity:.85}
+.vgana{margin:9px 0 0;font-size:13px;color:var(--ink2)}
+.vnew .vin,.votl .vin,.vin{width:100%;box-sizing:border-box;font:inherit;color:var(--ink);background:var(--sur2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-height:44px}
+.vorow{display:flex;gap:6px;margin-top:6px;align-items:center}
+.vx{background:none;border:0;color:var(--ink3);cursor:pointer;font:inherit;padding:8px;min-height:36px}
+.vplan{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.vsws{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.vsw{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0}
+.vfal summary{cursor:pointer;color:var(--ink2);font-size:12.5px;margin:6px 0}

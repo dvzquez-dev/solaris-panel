@@ -650,8 +650,11 @@ function animarBarras(root, silencioso){
   });
   _guardarAnchos_();
   /* Y el rotulo, que lleva `translateX(-50%)`: sin guarda se va medio fuera. */
-  $$('.barhet span',root||document).forEach(function(s){ var l=parseFloat(s.dataset.l);
-    s.style.left=(isFinite(l)?l:0)+'%'; });
+  /* ⛔ 17/11 (refutar49): y el rótulo NO puede salirse de la tarjeta. Con el marcador cerca del final (el objetivo de un mes que empieza, con 0 h hechas:
+     98 %) el rótulo centrado sobresalía 30 px por la derecha y «objetivo 15 h» se cortaba contra el borde del móvil. En los extremos se ALINEA al borde
+     en vez de centrarse (sin medir: un rótulo oculto no mide nada, y esto vale lo mismo pintado que no). */
+  $$('.barhet span',root||document).forEach(function(s){ var l=parseFloat(s.dataset.l); l=isFinite(l)?l:0;
+    s.style.left=l+'%'; s.style.transform = l>85 ? 'translateX(-100%)' : (l<15 ? 'none' : ''); });
 }
 
 /* ⛔ SIN REFERENCIA NO HAY PORCENTAJE, Y SE DICE CALLANDO LA FILA — no pintándola a

@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=d5b2b69">
+<link rel="stylesheet" href="escritorio.css?v=890a1c1">
 </head>
 <body>
 
@@ -113,14 +113,14 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=0b8344f"></script>
+<script src="comun.js?v=fd998d8"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=12a29c8"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
 <script src="documentos.escritorio.js?v=428fbab"></script>
 <script src="sanciones.escritorio.js?v=5d4597f"></script>
-<script src="reuniones.escritorio.js?v=5900c50"></script>
+<script src="reuniones.escritorio.js?v=c0a06c6"></script>
 <script src="horas.escritorio.js?v=6b7a253"></script>
 <script src="equipo.escritorio.js?v=6b38f97"></script>
 <script src="tareas.escritorio.js?v=d9b0344"></script>
@@ -272,6 +272,12 @@ var api={
   getEntregables: function(){ return api._post({action:"getEntregables"}); },
   /* por POST, para que lleven el token como el resto: por GET iban sin identidad */
   listar:      function(){ return api._post({action:"listarReuniones"}); },
+  /* 17/11: votaciones con cuórum (`comun.js`, bloque «VOTACIONES»; servidor `votaciones_srv.py`, sólo mini PC). */
+  listarVotaciones:   function(){ return api._post({action:"listarVotaciones"}); },
+  getVotacion:     function(id){ return api._post({action:"getVotacion",id:id}); },
+  votCrear:    function(v){ return api._post(Object.assign({action:"votCrear"},v)); },
+  votVotar:    function(id,r){ return api._post({action:"votVotar",id:id,respuestas:r}); },
+  votCerrar:   function(id){ return api._post({action:"votCerrar",id:id}); },
   get:         function(id){ return api._post({action:"getReunion",id:id}); },
   crear:       function(r){ return api._post({action:"crearReunion",reunion:r}); },
   /* Buzones. `quien` lo pone el servidor desde el token: si lo mandara el cliente,
@@ -2309,9 +2315,10 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
        misma decision cerrada que habia para el eje horizontal, girada 90 grados. */
     _eje.forEach(function(t,ix){
       if(t%60!==0) return;
-      g+='<div class="hc rh" style="grid-column:1;grid-row:'+(ix+2)+'"><span>'+
-        pad(Math.floor(t/60)%24)+'</span></div>';
+      g+='<div class="hc rh" style="grid-column:1;grid-row:'+(ix+2)+'">'+
+        _horaLineaHTML_(pad(Math.floor(t/60)%24))+'</div>';
     });
+    if(_t1%60===0) g+='<div class="hc rh" style="grid-column:1;grid-row:'+(_eje.length+2)+'">'+_horaLineaHTML_(pad(Math.floor(_t1/60)%24))+'</div>';   /* 17/11 (alinhoras): la hora de FIN, en su línea */
     r.dias.forEach(function(d,di){
       var ix=0;
       while(ix<_eje.length){
@@ -3361,7 +3368,8 @@ async function _refrescoVivo_(motivo, que){
        repintado de abajo corre ANTES de que lleguen los movimientos y el libro se pinta
        con lo de la pasada anterior -- que es media cura, y de las que se leen como
        enteras. */
-    await Promise.all([_t,_q,_p,_s,_r,_d,_u,_mv,_ms]);
+    var _vt=(_vivoToca_(que,'votaciones') && !_sesionMuerta_()) ? votCargarLista().catch(function(){}) : Promise.resolve();   /* 17/11: la lista de votaciones */
+    await Promise.all([_t,_q,_p,_s,_r,_d,_u,_mv,_ms,_vt]);
     /* ⛔ SI LA SESION MURIO, ESTE REFRESCO NO HA TRAÍDO NADA — y sin esto no se nota:
        `_pide_` devuelve `null` por diseño y el repintado deja la pantalla igual. */
     _avisarSesionMuerta_();
@@ -3382,6 +3390,7 @@ function _arrancarRefrescoVivo_(){
   /* 20/10: y lo VIVO, cada segundo (`_arrancarVivo_`, comun.js). */
   _arrancarVivo_(function(c){
     if(_vivoToca_(c,'reuniones')) _refrescarReuAbiertaE_();
+    if(_vivoToca_(c,'votaciones')){ if(typeof votVivo==='function') return votVivo().then(function(){ return _refrescoVivo_('vivo', c); }); }   /* 17/11: la pestaña «Votaciones» */
     if(vista==='directo' && _puedeVerDirecto_()) _directoPedir_();            // 31/10: lo del almacén llega a «En directo» al segundo
     return _refrescoVivo_('vivo', c);
   });
@@ -3594,6 +3603,7 @@ async function _onCredencial_(resp,_silente){
        repintado pierde el scroll, asi que tres seguidos se ven como una recarga sola. */
     Promise.all([_cargarSanciones_(), _cargarPartes_()])
       .then(function(){ _repintarSuave_(); });
+    votCargarLista().then(function(h){ if(h) _repintarSuave_(); }).catch(function(){});   /* 17/11: las votaciones */
     _arrancarRefrescoVivo_();                       // a partir de aqui se alimenta sola
   }catch(e){
     /* ⛔ 10/11 (refutar4): misma razón y mismo arreglo que en `movil.html`: con la sesión guardada y el servidor sin contestar, `SESION` ya
@@ -3798,7 +3808,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='ed83671';
+var BUILD='00fe48a';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4968,6 +4978,7 @@ function _engSancCerrar_(){
   }; });
   _cablearConvocar_();
   _cablearPestanas_();
+  _votCablearE_();                     /* 17/11: votaciones */
   /* acuse de pulsación: <120 ms, en la propia pieza, nunca bajo el cursor */
   $$('.btn').forEach(function(b){
     b.addEventListener('pointerdown',function(){

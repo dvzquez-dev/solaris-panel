@@ -21,7 +21,7 @@
      ⚠️ Si `--bg` cambia, esto cambia con él: lo vigila `probar_reunion_movil`. -->
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=a6afb90">
+<link rel="stylesheet" href="movil.css?v=c8d74fb">
 </head>
 <body>
 
@@ -114,16 +114,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=0b8344f"></script>
+<script src="comun.js?v=fd998d8"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=4f42fdf"></script>
-<script src="turnos.movil.js?v=b5d8b90"></script>
+<script src="turnos.movil.js?v=564fabd"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=92b3dd4"></script>
 <script src="sanciones.movil.js?v=8831fbd"></script>
-<script src="reuniones.movil.js?v=80dadcb"></script>
-<script src="horas.movil.js?v=115927e"></script>
+<script src="reuniones.movil.js?v=943c3fd"></script>
+<script src="horas.movil.js?v=dfc2096"></script>
 <script src="equipo.movil.js?v=28e54e2"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -417,6 +417,12 @@ var api={
   reportarBug:      function(d){ return api._post({action:"reportarBug",datos:d}); },
   reportarMejora:   function(d){ return api._post({action:"reportarMejora",datos:d}); },
   listarReuniones:  function(){ return api._post({action:"listarReuniones"}); },
+  /* 17/11: votaciones con cuórum (`comun.js`, bloque «VOTACIONES»; servidor `votaciones_srv.py`, sólo mini PC). */
+  listarVotaciones:   function(){ return api._post({action:"listarVotaciones"}); },
+  getVotacion:     function(id){ return api._post({action:"getVotacion",id:id}); },
+  votCrear:    function(v){ return api._post(Object.assign({action:"votCrear"},v)); },
+  votVotar:    function(id,r){ return api._post({action:"votVotar",id:id,respuestas:r}); },
+  votCerrar:   function(id){ return api._post({action:"votCerrar",id:id}); },
   /* El backend gatea: solo el convocante o el admin. Aqui se replica el gate para no
      ofrecer un boton que va a fallar, pero la frontera de verdad esta alli. */
   borrarReunion:    function(id){ return api._post({action:"borrarReunion",id:id}); },
@@ -703,7 +709,9 @@ async function _refrescoVivo_(motivo, que){
     var mps=(_vivoToca_(que,'resto') && !_sesionMuerta_() && typeof _recargarPartesVivo_==='function')
       ? _recargarPartesVivo_().catch(function(){}) : Promise.resolve();   /* con «Ver como», los de quien se ve (refutador 36) */
     if(!que && typeof _convRefrescar_==='function') _convRefrescar_();   /* refutar33: tu rejilla de turnos, por si la tocaste en otro sitio (no se espera: se repinta sola) */
+    var vts=(_vivoToca_(que,'votaciones') && !_sesionMuerta_()) ? votCargarLista().catch(function(){}) : Promise.resolve();   /* 17/11: la lista de votaciones (la ficha abierta la lleva `votVivo`) */
     await Promise.all([t,q,r,pnl,dcs,snc,mps]);
+    await vts;
     await fch;                    /* refutar25: la sesión de fichaje (sólo vuelta/reloj) */
     await mvs;                    /* 03/11: ya corría (arriba) — sólo se espera aquí; su `catch` no tumba el refresco */
     /* ⛔ SI LA SESION MURIO, ESTE REFRESCO NO HA TRAÍDO NADA. `_pide_` devuelve `null`
@@ -747,6 +755,9 @@ function _arrancarRefrescoVivo_(){
      y con un modal abierto el refresco general no corre. */
   _arrancarVivo_(function(c, s){
     if(_vivoToca_(c,'reuniones')) _refrescarReuAbierta_();
+    if(_vivoToca_(c,'votaciones')){   /* 17/11: la votación abierta (en el modal) y la lista; si SÓLO cambió eso y hay un modal de votación, ya está atendido */
+      return votVivo().then(function(){ return (_votSoloVotaciones_(c) && VOT.host && VOT.host.isConnected) ? true : _refrescoVivo_('vivo', c); });
+    }
     if(_vivoToca_(c,'getEntregables')) _refrescarDocAbierto_(s);   /* 14/11: la ficha de un documento es un modal, y con un modal abierto lo de abajo no corre */
     return _refrescoVivo_('vivo', c);
   });
@@ -1045,6 +1056,7 @@ async function _onCredencial_(resp,_silente){
       pintar();                                            // LA UNICA pintada del arranque
       var g=document.getElementById('loginGate'); if(g) g.remove();   // y ahora se enseña
       var bs=$('#btnSalir'); if(bs) bs.style.display='';   // sí hay salir/cambiar de cuenta
+      votCargarLista().then(function(h){ if(h) _repintarSuave_(); }).catch(function(){});   /* 17/11: las votaciones (sin servidor de votaciones, no sale nada) */
       _arrancarRefrescoVivo_();                            // a partir de aqui se alimenta sola
     };
     /* El gate de notificaciones ya no esta aqui: corre ANTES del login (ver el arranque,
@@ -1869,7 +1881,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='c92d6e3';
+var BUILD='bdfe2ae';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2042,6 +2054,7 @@ function badges(){
      es la misma media verdad que el singular que se corrigio al lado. */
   b.reu   = _reunionesCargando_() ? 0
           : ((typeof _pendientesCubrirM_==='function') ? _pendientesCubrirM_().length : 0);
+  if(typeof votPendientes==='function') b.reu += votPendientes();   /* 17/11: + las votaciones que te faltan */
   return b;
 }
 /* Lo que se ENSEÑA en la barra, que no es lo que existe. Siete rotulos en 390 px dejan
@@ -2485,6 +2498,7 @@ function _engReuniones_(){
   /* reuniones */
   var bc=$('#btnCubrir'); if(bc) bc.onclick=cubrirModal;
   var bcr=$('#btnCrear'); if(bcr) bcr.onclick=crearModal;
+  _votCablearM_();   /* 17/11: votaciones */
   $$('[data-reu]').forEach(function(el){ el.onclick=async function(){ var x=REUNIONES_M[+el.dataset.reu]; if(x){ REUNION=x; pintar(); await _hidratarReuM_(x); pintar(); } }; });
   $$('#calModo button').forEach(function(b){ b.onclick=function(){ ST.pond=(b.dataset.pond==='1'); pintar(); }; });
   _cablearQuienPuede_(function(id){ return (REUNION && String(REUNION.id)===id) ? REUNION : null; });

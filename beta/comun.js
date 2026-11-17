@@ -4818,7 +4818,8 @@ var VIVO_GRUPOS = {
   getTareas:      ['tareas','kv/tareas'],
   getEntregables: ['entregables','kv/entregables'],
   reuniones:      ['reuniones','respuestas','avisos-reunion','kv/convocatorias','kv/reu_max_id'],
-  sanciones:      ['sanciones','kv/sanciones']
+  sanciones:      ['sanciones','kv/sanciones'],
+  votaciones:     ['votaciones']                                                          // 17/11: `<almacén>/votaciones/` (la carpeta sella sola)
 };
 /* Las fuentes cuyo sello difiere (o aparece/desaparece) entre dos lecturas. */
 function _vivoCambios_(viejo, nuevo){
@@ -7536,6 +7537,35 @@ function _hFranja_(R,fi){ var f=(R.franjas||[])[fi]; return f ? _hmMin_(_minHM_(
 function _hFinFranja_(R,fi){ var f=(R.franjas||[])[fi];
   return f ? _hmMin_(_minHM_(f) + (+f.dur>0 ? +f.dur : 60)) : '—'; }
 
+/* ⛔⛔ LA HORA VA EN LA LÍNEA ENTRE DOS FRANJAS (17/11, `alinhoras`) — UNA regla para todas las rejillas con horas.
+   🗣️ Daniel (14/10 y 17/11): *«justo en el medio de dos slots»* · *«no está completamente alineado el número de la hora con el
+   espacio entre franjas»*. Había CUATRO copias de la regla (cubrir y turnos del móvil, el resumen del móvil, los dos mapas del
+   escritorio) y cada una la hacía a su manera: −3 px en el resumen (subía media celda de 13 px, no medio texto), +0,6 en cubrir
+   (sin el medio `gap`), −0,75 en el escritorio, y ninguna rotulaba el FINAL del día salvo el resumen del móvil.
+   ✅ Ahora todas pintan `_horaLineaHTML_(txt)` y la clase `.hlin` la define UNA vez `_horaLineaCablear_` (abajo): el texto sube su
+   media altura (`-50%`) más medio `gap` (`--hgap`, 1 px de los 2 que separan las filas). Con `transform`, que no cambia la caja
+   que el grid mide: `position:absolute` colapsaba la columna `auto` de Reuniones (ver `movil.css`, `.rc.rd`).
+   ⚠️ El span ha de ser el PRIMER elemento de su celda y la celda empezar en la línea (`align-items:flex-start` o bloque): lo que
+   se sube es el texto, no la celda. `_finDelEje_` da la hora de FIN del último hueco, que va en la línea de abajo de la última fila. */
+function _horaLineaHTML_(txt){ return '<span class="hlin">'+esc(txt)+'</span>'; }
+function _finDelEje_(franjas){
+  var m=0; (franjas||[]).forEach(function(f){ var z=_minHM_(f)+((f && +f.dur>0) ? +f.dur : 60); if(z>m) m=z; });
+  return m;
+}
+/* La celda de la hora de FIN de una rejilla de TURNOS (franjas `{k,txt}` de una hora, rotuladas «16:00»): la línea de abajo de la
+   última fila. Sólo si las etiquetas son horas en punto: con otro rótulo («Tarde/noche», «16-17») no se inventa una hora. */
+function _horaFinFilaHTML_(F){
+  var u=(F||[])[(F||[]).length-1], m=u && /^(\d\d):00$/.exec(String(u.txt||''));
+  return m ? '<div class="rc rd" aria-hidden="true">'+_horaLineaHTML_(pad((+m[1]+1)%24)+':00')+'</div>' : '';
+}
+function _horaLineaCablear_(){
+  if(_horaLineaCablear_.hecho || !document.head) return; _horaLineaCablear_.hecho=true;
+  var s=document.createElement('style'); s.id='hlinCss';
+  s.textContent='.hlin{display:block;line-height:1;white-space:nowrap;transform:translateY(calc(-50% - var(--hgap,1px) + .06em))}';
+  document.head.appendChild(s);
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', _horaLineaCablear_); else _horaLineaCablear_();
+
 /* ⛔⛔ LA MEJOR HORA ES UNA VENTANA, NO UNA CASILLA — y esto vive aquí porque el escritorio
    lo hacía mal: recomendaba la **casilla suelta** con más gente. Con casillas de 30 min y
    una reunión de 1 h eso no responde a nada: si a las 18:00 pueden 12 y a las 18:30 sólo 2,
@@ -7940,7 +7970,7 @@ function _notaPlanViejo_(v){
       (n!==null ? ' ('+n+' ficha'+(n===1?'':'s')+' escrita'+(n===1?'':'s')+' en Notion'+
         (inc ? '; '+inc.ausentes+' ya no tiene'+(inc.ausentes===1?'':'n')+' ficha' : '')+')' : '')+'.';
   }
-  return 'La última ranura del servidor trae el plan de '+mes+', de un mes ya cerrado: no es el cierre de ahora y no cuenta.';
+  return 'El último plan guardado es el de '+mes+', de un mes ya cerrado: no es el cierre de ahora y no cuenta.';  /* 17/11 (refutar49): sin «ranura del servidor» */
 }
 
 function _planVigente_(plan, hoy){
@@ -17391,3 +17421,292 @@ function _a11yCablear_(){
   _a11yMarcar_(document);
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', _a11yCablear_); else _a11yCablear_();
+
+/* ══ 17/11 · VOTACIONES CON CÓRUM — UNA pieza para las dos caras (servidor: `rutinas/votaciones_srv.py`) ════════════════════
+   🗣️ Daniel: «Votaciones con cuórum […] como las de Notion […] lo más ameno posible de responder, con posibilidad de ver en
+   directo las respuestas, opción de anonimato (ciertas preguntas anónimas otras no)». El que manda es el SERVIDOR (electorado,
+   doble voto, quién ve el recuento, cuórum); esto sólo pinta y manda.
+   · Se monta en un HOST (`votMontar(host, vista, id)`): el móvil lo mete en su modal, el escritorio en la pestaña «Votaciones».
+     El estado vive en `VOT` y no en el DOM, así que un repintado de la pantalla (lo vivo cada segundo) no pierde lo que se
+     estaba eligiendo ni lo que se estaba escribiendo en «Nueva votación» (`votLeerForm`, antes de cada repintado).
+   · ⛔ Una respuesta ANÓNIMA ya emitida no se cambia (el servidor no guarda qué eligió cada uno: no hay qué restar); una no
+     anónima sí, hasta que se cierre. La cara lo dice en la propia pregunta, no en un manual.
+   · Lo elegido, en rojo y sin tick; tarjetas grandes; nada de casillas ni radios nativos (decisiones-app). */
+var VOT = {lista:null, cargando:false, host:null, vista:'lista', id:null, det:null, pap:{}, nuevo:null, enviando:false, reunion:null};
+var VOT_CUORUMS = [['0','Sin cuórum'],['50','Más de la mitad'],['75','Tres cuartos'],['100','Todos']];
+var VOT_PLANTILLAS = [['A favor · En contra · Abstención', ['A favor','En contra','Abstención']], ['Sí · No', ['Sí','No']]];
+
+function _votYo_(){ return (typeof ACTOR!=='undefined' && ACTOR) || (typeof YO!=='undefined' && YO && YO.nombre) || ''; }
+function _votReus_(){ return (typeof REUNIONES_M!=='undefined' && REUNIONES_M) || (typeof REUS!=='undefined' && REUS) || []; }
+/* Las reuniones en las que PUEDO abrir una votación: las vivas que convoco yo (el PD, todas). Espejo de lo que el servidor acepta. */
+function _votReusMias_(){
+  var yo=_votYo_(), pd=(typeof rangoNom==='function' && rangoNom(yo)>=3);
+  return _votReus_().filter(function(r){
+    return (pd || r.convocante===yo) && !r.finalizada_at && (r.invitados||[]).length;
+  });
+}
+/* ¿Puedo abrir una votación SUELTA? La coordinación, el consejo y el PD (el servidor: `perfil[1] or perfil[2]`). */
+function _votPuedoSuelta_(){
+  var yo=_votYo_();
+  return (typeof rangoNom==='function' && rangoNom(yo)>=1) || (typeof DATA!=='undefined' && DATA && (DATA.consejo||[]).indexOf(yo)>=0);
+}
+function votPuedoAbrir(){ return _votPuedoSuelta_() || _votReusMias_().length>0; }
+function votPendientes(){ return (VOT.lista||[]).filter(function(v){ return v.pendiente; }).length; }
+
+async function votCargarLista(){
+  if(typeof backendOK==='undefined' || !backendOK || !SESION) return false;
+  var r=await _pide_('listarVotaciones');
+  if(r && Array.isArray(r.votaciones)){ VOT.lista=r.votaciones; return true; }
+  return false;
+}
+async function votCargarDet(id){
+  var r=await _pide_('getVotacion', id);
+  if(r && r.votacion){ _votAdoptar_(r.votacion); return true; }
+  return false;
+}
+function _votAdoptar_(v){
+  VOT.det=v;
+  /* La papeleta arranca con lo que YA votaste (las no anónimas); si la tocas, se queda lo tuyo hasta votar. */
+  var p=VOT.pap[v.id]||(VOT.pap[v.id]={});
+  v.preguntas.forEach(function(q){ if(!(q.id in p) && q.mio) p[q.id]=q.mio.slice(); });
+  if(VOT.lista){ var i=VOT.lista.map(function(x){ return x.id; }).indexOf(v.id); if(i>=0){ VOT.lista[i].yaVote=v.yaVote; VOT.lista[i].pendiente=(v.estado==='abierta' && v.soyVotante && !v.yaVote); VOT.lista[i].estado=v.estado; VOT.lista[i].cuorum=v.cuorum; } }
+}
+
+function _votCuorumTxt_(c){
+  return c.n+' de '+c.de+(c.minimo ? ' · cuórum '+c.minimo+(c.hay ? ' ✓' : '') : ' · sin cuórum');
+}
+function _votPlazoTxt_(v){
+  if(v.estado==='cerrada') return 'cerrada'+(v.cerrada && v.cerrada.como==='plazo' ? ' por plazo' : '');
+  return v.cierra ? 'cierra '+_isoADMY_(String(v.cierra).slice(0,10))+(String(v.cierra).length>10 ? ' '+String(v.cierra).slice(11,16) : '') : 'sin plazo';
+}
+function _votFilaHTML_(v){
+  var etq = v.estado==='abierta' ? (v.pendiente ? '<span class="vpil pend">te falta</span>' : (v.yaVote ? '<span class="vpil ok">votada</span>' : '<span class="vpil">abierta</span>'))
+                                 : '<span class="vpil '+(v.cuorum.hay ? 'ok' : 'no')+'">'+(v.cuorum.hay ? 'cerrada' : 'sin cuórum')+'</span>';
+  var res = (v.estado==='cerrada' && v.lineas) ? '<small class="vres">'+v.lineas.map(function(l){
+    return l.resultado==='ganadora' ? esc(l.gana[0]) : (l.resultado==='empate' ? 'empate' : (l.resultado==='sin_mayoria' ? 'sin mayoría' : 'sin votos')); }).join(' · ')+'</small>' : '';
+  return '<div class="vfila" data-vact="ver" data-vid="'+esc(v.id)+'" tabindex="0" role="button">'+
+    '<div class="a"><b>'+esc(v.titulo)+'</b><small>'+esc(_votCuorumTxt_(v.cuorum))+' · '+esc(_votPlazoTxt_(v))+' · '+v.nPreguntas+' pregunta'+(v.nPreguntas===1?'':'s')+'</small>'+res+'</div>'+
+    '<div class="d">'+etq+'</div></div>';
+}
+/* La tarjeta de la lista. `o.reunion` = sólo las de esa reunión (su ficha). Sin lista cargada (servidor sin votaciones) no se pinta. */
+function votListaHTML(o){
+  o=o||{};
+  if(VOT.lista===null) return '';
+  var l=VOT.lista.filter(function(v){ return o.reunion==null || String(v.reunion)===String(o.reunion); });
+  var abiertas=l.filter(function(v){ return v.estado==='abierta'; }), cerr=l.filter(function(v){ return v.estado!=='abierta'; });
+  var nuevo=(votPuedoAbrir() && o.reunion==null) ? '<button type="button" class="btn full" data-vact="nueva" style="margin-bottom:9px">Nueva votación</button>' : '';
+  if(!l.length && !nuevo) return '';
+  return '<div class="votl">'+nuevo+(l.length
+    ? '<div'+(o.plano ? '' : ' class="tarj"')+'>'+abiertas.map(_votFilaHTML_).join('')+(cerr.length ? '<div class="vsep">Cerradas</div>'+cerr.map(_votFilaHTML_).join('') : '')+'</div>'
+    : '<div class="tarj"><p class="rnota" style="margin:0">Ninguna votación todavía.</p></div>')+'</div>';
+}
+
+/* ── La ficha: cabecera, participación y cuórum, y una pregunta debajo de otra ── */
+function _votBarra_(n, total, cls){ var p=total ? Math.round(100*n/total) : 0; return '<span class="vbar"><i class="'+(cls||'')+'" style="width:'+p+'%"></i></span>'; }
+function _votPreguntaHTML_(v, q, cerrada){
+  var pap=VOT.pap[v.id]||{}, sel=pap[q.id]||[], bloq=cerrada || !v.soyVotante || (q.anonima && q.yaVote);
+  var r=q.resultado, ver=v.resultadosVisibles && r;
+  var notas=(q.anonima ? '<span class="vpil">anónima</span> ' : '<span class="vpil">se ve quién vota</span> ')+(q.multiple ? '<span class="vpil">varias respuestas</span>' : '');
+  var ops=q.opciones.map(function(o,i){
+    var on=sel.indexOf(i)>=0, n=ver ? r.conteo[i] : 0, gana=ver && cerrada && r.ganadoras.indexOf(i)>=0 && r.resultado==='ganadora';
+    var quien=(ver && q.quien) ? Object.keys(q.quien).filter(function(k){ return q.quien[k].indexOf(i)>=0; }) : [];
+    return '<button type="button" class="vopc'+(on ? ' on' : '')+(gana ? ' gana' : '')+'" data-vact="op" data-vq="'+esc(q.id)+'" data-vi="'+i+'"'+(bloq ? ' disabled' : '')+'>'+
+      '<span class="vt">'+esc(o)+'</span>'+
+      (ver ? '<span class="vn">'+n+(r.total ? ' · '+Math.round(100*n/r.total)+' %' : '')+'</span>'+_votBarra_(n, r.total) : '')+
+      (quien.length ? '<span class="vq">'+esc(quien.join(', '))+'</span>' : '')+'</button>';
+  }).join('');
+  var pie='';
+  if(q.anonima && q.yaVote) pie='<p class="rnota">Tu voto anónimo ya está registrado: no se puede cambiar.</p>';
+  else if(!q.anonima && q.yaVote && !bloq) pie='<p class="rnota">Ya votaste: puedes cambiarlo hasta que se cierre.</p>';
+  if(ver && cerrada){
+    pie+='<p class="vgana">'+(r.resultado==='ganadora' ? 'Gana «'+esc(q.opciones[r.ganadoras[0]])+'»'
+        : r.resultado==='empate' ? 'Empate entre '+r.ganadoras.map(function(i){ return '«'+esc(q.opciones[i])+'»'; }).join(' y ')
+        : r.resultado==='sin_mayoria' ? 'Nadie alcanza la mayoría absoluta' : 'Nadie la contestó')+(r.total ? ' · contestaron '+r.total : '')+'</p>';
+  }
+  return '<div class="vpreg"><div class="vh">'+esc(q.texto)+'</div><div class="vnotas">'+notas+'</div><div class="vops">'+ops+'</div>'+pie+'</div>';
+}
+function votVerHTML(){
+  var v=VOT.det;
+  if(!v) return '<p class="rnota">Cargando la votación…</p>';
+  var cerrada=v.estado==='cerrada', c=v.cuorum;
+  var pap=VOT.pap[v.id]||{}, hay=v.preguntas.some(function(q){ return pap[q.id] && pap[q.id].length && !(q.anonima && q.yaVote); });
+  var estado=cerrada ? (c.hay ? '<div class="vcuo ok">Hubo cuórum: '+esc(_votCuorumTxt_(c))+'</div>'
+                              : '<div class="vcuo no">Sin cuórum: votaron '+c.n+' de '+c.de+' y hacían falta '+c.minimo+'. El resultado no es vinculante.</div>')
+                    : '<div class="vcuo'+(c.hay ? ' ok' : '')+'">Participación '+esc(_votCuorumTxt_(c))+'</div>';
+  var cab='<div class="vtit">'+esc(v.titulo)+'</div><p class="rnota" style="margin:2px 0 8px">'+
+    (v.reunion ? 'En la reunión «'+esc(v.reunionTitulo||v.reunion)+'» · ' : '')+'Abierta por '+esc(v.creador||'—')+' · '+esc(_votPlazoTxt_(v))+
+    ' · mayoría '+(v.mayoria==='absoluta' ? 'absoluta' : 'simple')+(v.verEnDirecto ? ' · recuento en directo' : (v.gestor ? ' · los votantes ven el recuento al cerrar' : ''))+'</p>';
+  var nota=(!v.soyVotante && !cerrada) ? '<p class="rnota">No estás convocado a votar: lo ves como gestor.</p>'
+          : (!v.resultadosVisibles && !cerrada) ? '<p class="rnota">El recuento se verá al cerrar.</p>' : '';
+  var faltan=(v.gestor && !cerrada && v.faltan && v.faltan.length) ? '<details class="vfal"><summary>Faltan por votar · '+v.faltan.length+'</summary><p class="rnota">'+esc(v.faltan.join(', '))+'</p></details>' : '';
+  var pie='';
+  if(!cerrada && v.soyVotante){
+    var todoAnon=v.preguntas.every(function(q){ return q.anonima && q.yaVote; });
+    pie+=todoAnon ? '<p class="rnota">Ya has votado.</p>'
+      : '<button type="button" class="btn pri full" data-vact="votar"'+((hay && !VOT.enviando) ? '' : ' disabled')+'>'+(v.yaVote ? 'Cambiar mi voto' : 'Votar')+'</button>';
+  }
+  if(!cerrada && v.gestor) pie+='<button type="button" class="btn full" data-vact="cerrar" style="margin-top:8px">Cerrar la votación</button>';
+  return '<button type="button" class="vback" data-vact="lista">‹ Votaciones</button>'+cab+estado+nota+faltan+
+    v.preguntas.map(function(q){ return _votPreguntaHTML_(v, q, cerrada); }).join('')+pie;
+}
+
+/* ── Nueva votación: pregunta y opciones en línea, sin pantallas de más ── */
+function _votNuevoBase_(reunion){
+  return {titulo:'', reunion:reunion||'', preguntas:[_votPreguntaBase_()], cuorumPct:'50', mayoria:'simple', verEnDirecto:false, cierra:'', cierraH:'23:59', electorado:[]};
+}
+function _votPreguntaBase_(){ return {texto:'', opciones:['A favor','En contra','Abstención'], multiple:false, anonima:false}; }
+function _votSiNoHTML_(id, on, tit){ return '<div class="vsw"><span>'+esc(tit)+'</span>'+nxSiNo(id, on)+'</div>'; }
+function votNuevaHTML(){
+  var n=VOT.nuevo, mias=_votReusMias_(), suelta=_votPuedoSuelta_();
+  var reusOps=(suelta ? [['','Ninguna · votación suelta']] : []).concat(mias.map(function(r){ return [String(r.id), (r.titulo||('Reunión '+r.id))]; }));
+  if(!suelta && !n.reunion && mias.length) n.reunion=String(mias[0].id);
+  var hoy=_hoyNxISO_();
+  var preg=n.preguntas.map(function(q,qi){
+    return '<div class="vpreg vnew" data-vqi="'+qi+'"><div class="vh">Pregunta '+(qi+1)+
+      (n.preguntas.length>1 ? ' <button type="button" class="vx" data-vact="quitarp" data-vqi="'+qi+'" aria-label="Quitar la pregunta">Quitar</button>' : '')+'</div>'+
+      '<input class="vin" data-vf="texto" data-vqi="'+qi+'" placeholder="Escribe la pregunta" value="'+esc(q.texto)+'" maxlength="300">'+
+      '<div class="vplan"><span class="sc">Plantilla</span>'+VOT_PLANTILLAS.map(function(p,pi){
+        return '<button type="button" class="pick" data-vact="plantilla" data-vqi="'+qi+'" data-vp="'+pi+'">'+esc(p[0])+'</button>'; }).join('')+'</div>'+
+      q.opciones.map(function(o,oi){
+        return '<div class="vorow"><input class="vin" data-vf="op" data-vqi="'+qi+'" data-voi="'+oi+'" placeholder="Opción '+(oi+1)+'" value="'+esc(o)+'" maxlength="120">'+
+          (q.opciones.length>2 ? '<button type="button" class="vx" data-vact="quitaro" data-vqi="'+qi+'" data-voi="'+oi+'" aria-label="Quitar la opción">✕</button>' : '')+'</div>'; }).join('')+
+      (q.opciones.length<12 ? '<button type="button" class="btn sm" data-vact="masop" data-vqi="'+qi+'">+ Opción</button>' : '')+
+      '<div class="vsws">'+_votSiNoHTML_('votMul'+qi, q.multiple, 'Se pueden elegir varias')+_votSiNoHTML_('votAno'+qi, q.anonima, 'Anónima')+'</div></div>';
+  }).join('');
+  var elec = n.reunion
+    ? '<p class="rnota">Votan los convocados de esa reunión, y tú.</p>'
+    : '<div class="vplan"><span class="sc">Convocar a</span><button type="button" class="pick" data-vact="preset" data-vk="general">Todo el equipo</button>'+
+      '<button type="button" class="pick" data-vact="preset" data-vk="junta">Coordinación</button><button type="button" class="pick" data-vact="preset" data-vk="subsistema">Mi subsistema</button></div>'+
+      elegirPersonas('votInv', {universo:_activos_().map(function(m){ return m.nombre; }).filter(function(x){ return x!==_votYo_(); }), marcadas:n.electorado, titulo:'Votantes',
+        alCambiar:function(l){ if(VOT.nuevo) VOT.nuevo.electorado=l.slice(); }});
+  return '<button type="button" class="vback" data-vact="lista">‹ Votaciones</button><div class="vtit">Nueva votación</div>'+
+    '<label class="campo"><span class="sc">Título</span><input class="vin" id="votTit" data-vf="titulo" placeholder="Qué se vota" value="'+esc(n.titulo)+'" maxlength="200"></label>'+
+    (reusOps.length>1 || (reusOps.length===1 && !suelta) ? '<div class="campo"><span class="sc">En la reunión</span>'+nxElige('votReu', reusOps, n.reunion)+'</div>' : '')+
+    preg+'<button type="button" class="btn full" data-vact="maspreg" style="margin-bottom:10px">+ Otra pregunta</button>'+
+    elec+
+    '<div class="campo"><span class="sc">Cuórum · mínimo de participación</span>'+nxElige('votCuo', VOT_CUORUMS, n.cuorumPct)+'</div>'+
+    '<div class="campo"><span class="sc">Mayoría</span>'+nxElige('votMay', [['simple','Simple · gana la que más votos tiene'],['absoluta','Absoluta · más de la mitad']], n.mayoria)+'</div>'+
+    _votSiNoHTML_('votVivo', n.verEnDirecto, 'Los votantes ven el recuento mientras votan')+
+    '<div class="campo"><span class="sc">Plazo para votar (opcional)</span>'+nxFecha('votLim', n.cierra, {min:hoy, vacio:true})+
+      '<div style="margin-top:6px">'+nxHora('votLimH', n.cierraH)+'</div></div>'+
+    '<button type="button" class="btn pri full" data-vact="crear"'+(VOT.enviando ? ' disabled' : '')+'>Abrir la votación</button>';
+}
+/* Vuelca lo escrito (y lo elegido en los controles) a `VOT.nuevo` ANTES de repintar o enviar: el DOM es sólo la vista. */
+function votLeerForm(){
+  var n=VOT.nuevo, h=VOT.host; if(!n || !h) return;
+  var v=function(id){ var e=h.querySelector('#'+id); return e ? e.value : null; };
+  var t=h.querySelector('[data-vf="titulo"]'); if(t) n.titulo=t.value;
+  [].forEach.call(h.querySelectorAll('[data-vf="texto"]'), function(e){ var q=n.preguntas[+e.dataset.vqi]; if(q) q.texto=e.value; });
+  [].forEach.call(h.querySelectorAll('[data-vf="op"]'), function(e){ var q=n.preguntas[+e.dataset.vqi]; if(q) q.opciones[+e.dataset.voi]=e.value; });
+  n.preguntas.forEach(function(q,qi){ var m=v('votMul'+qi), a=v('votAno'+qi); if(m!==null) q.multiple=(m==='1'); if(a!==null) q.anonima=(a==='1'); });
+  var x;
+  if((x=v('votReu'))!==null) n.reunion=x;
+  if((x=v('votCuo'))!==null) n.cuorumPct=x;
+  if((x=v('votMay'))!==null) n.mayoria=x;
+  if((x=v('votVivo'))!==null) n.verEnDirecto=(x==='1');
+  if((x=v('votLim'))!==null) n.cierra=x;
+  if((x=v('votLimH'))!==null) n.cierraH=x;
+}
+function votCuerpoNuevo(){
+  var n=VOT.nuevo, c={titulo:String(n.titulo||'').trim(), cuorumPct:+n.cuorumPct, mayoria:n.mayoria, verEnDirecto:!!n.verEnDirecto,
+    preguntas:n.preguntas.map(function(q){ return {texto:String(q.texto||'').trim(), opciones:q.opciones.map(function(o){ return String(o||'').trim(); }).filter(Boolean), multiple:!!q.multiple, anonima:!!q.anonima}; })};
+  if(n.reunion) c.reunion=+n.reunion; else c.electorado=n.electorado.slice();
+  if(n.cierra) c.cierra=String(n.cierra).slice(0,10)+'T'+(n.cierraH||'23:59');
+  return c;
+}
+/* Lo que se puede decir sin preguntar al servidor ('' si está bien): el servidor repite estas mismas comprobaciones. */
+function votFaltaNuevo(){
+  var c=votCuerpoNuevo();
+  if(!c.titulo) return 'Pon un título.';
+  for(var i=0;i<c.preguntas.length;i++){
+    if(!c.preguntas[i].texto) return 'Escribe la pregunta '+(i+1)+'.';
+    if(c.preguntas[i].opciones.length<2) return 'La pregunta '+(i+1)+' necesita al menos 2 opciones.';
+  }
+  if(!c.reunion && !(c.electorado||[]).length) return 'Elige a quién convocas a votar.';
+  return '';
+}
+
+/* ── El montaje ── */
+function _votHTML_(){ return VOT.vista==='nueva' ? votNuevaHTML() : VOT.vista==='ver' ? votVerHTML() : (votListaHTML() || '<p class="rnota">No hay votaciones.</p>'); }
+function votPintar(){
+  var h=VOT.host; if(!h || !h.isConnected) return false;
+  /* ⛔ NO se lee el formulario aquí: quien cambia el estado (plantilla, quitar una opción…) ya lo leyó ANTES de cambiarlo, y volver a
+     leer el DOM —que aún enseña lo viejo— deshacía el cambio. Quien repinta SIN haber cambiado nada lo lee antes (`votVivo`, `votRemontar`). */
+  h.innerHTML=_votHTML_();
+  h.onclick=_votClic_; h.onchange=votAlCambiar; h.onkeydown=function(e){ if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.vfila')){ e.preventDefault(); _votClic_(e); } };
+  return true;
+}
+/* Lo mismo que `votMontar` pero sin pedir nada: el escritorio repinta su pantalla entera y el estado ya está en `VOT`. */
+function votRemontar(host){
+  if(VOT.vista==='nueva' && VOT.host && VOT.host.isConnected && VOT.host!==host) votLeerForm();   /* lo escrito en el host que se va, antes de cambiarlo */
+  VOT.host=host; votPintar();
+}
+function votMontar(host, vista, id, reunion){
+  VOT.host=host; VOT.vista=vista||'lista'; VOT.id=id||null;
+  if(VOT.vista==='nueva' && !VOT.nuevo) VOT.nuevo=_votNuevoBase_(reunion);
+  if(VOT.vista==='ver' && (!VOT.det || VOT.det.id!==id)) VOT.det=null;
+  votPintar();
+  if(VOT.vista==='ver') votCargarDet(id).then(votPintar);
+  if(VOT.vista==='lista') votCargarLista().then(votPintar);
+}
+/* Lo vivo: una fuente nueva en `votaciones` (el servidor la sella sola). Repinta la lista y la ficha abierta, salvo «Nueva» (se escribe ahí). */
+async function votVivo(){
+  if(VOT.enviando) return false;
+  if(VOT.vista==='nueva') votLeerForm();
+  await votCargarLista();
+  if(VOT.host && VOT.host.isConnected){
+    if(VOT.vista==='ver' && VOT.id) await votCargarDet(VOT.id);
+    if(VOT.vista!=='nueva') votPintar();
+  }
+  if(typeof _votAvisarGlobo_==='function') _votAvisarGlobo_();
+  return true;
+}
+async function _votClic_(e){
+  var b=e.target.closest ? e.target.closest('[data-vact]') : null; if(!b || b.disabled || !VOT.host || !VOT.host.contains(b)) return;
+  var a=b.dataset.vact, n=VOT.nuevo, qi=+b.dataset.vqi, f=function(){ votPintar(); };
+  if(a==='ver'){ VOT.vista='ver'; VOT.id=b.dataset.vid; VOT.det=null; f(); await votCargarDet(VOT.id); return f(); }
+  if(a==='lista'){ VOT.vista='lista'; VOT.id=null; f(); await votCargarLista(); return f(); }
+  if(a==='nueva'){ VOT.nuevo=VOT.nuevo||_votNuevoBase_(VOT.reunion); VOT.vista='nueva'; return f(); }
+  if(a==='op'){
+    var v=VOT.det, q=v.preguntas.filter(function(x){ return x.id===b.dataset.vq; })[0], i=+b.dataset.vi, p=VOT.pap[v.id]||(VOT.pap[v.id]={}), s=p[q.id]||[];
+    p[q.id]=q.multiple ? (s.indexOf(i)>=0 ? s.filter(function(x){ return x!==i; }) : s.concat([i]).sort()) : [i];
+    return f();
+  }
+  if(a==='votar'){
+    var v=VOT.det, resp={}, p=VOT.pap[v.id]||{};
+    v.preguntas.forEach(function(q){ if(p[q.id] && p[q.id].length && !(q.anonima && q.yaVote)) resp[q.id]=p[q.id]; });
+    VOT.enviando=true; f();
+    try{ var r=await api.votVotar(v.id, resp); if(r && r.votacion){ _votAdoptar_(r.votacion); tost('Voto registrado.'); } }
+    catch(er){ tostErr('No se pudo votar: ', er); await votCargarDet(v.id); }
+    VOT.enviando=false; return f();
+  }
+  if(a==='cerrar'){
+    var v=VOT.det;
+    if(!(await dialogoSiNo('¿Cerrar «'+v.titulo+'»? Ya no se podrá votar.'+(v.cuorum.hay ? '' : ' Todavía no hay cuórum ('+v.cuorum.n+' de '+v.cuorum.minimo+').'), {si:'Cerrar', no:'Seguir abierta'}))) return;
+    try{ var r2=await api.votCerrar(v.id); if(r2 && r2.votacion){ _votAdoptar_(r2.votacion); tost('Votación cerrada.'); } }
+    catch(er){ tostErr('No se pudo cerrar: ', er); }
+    return f();
+  }
+  /* — creación — */
+  if(!n) return;
+  votLeerForm();
+  if(a==='maspreg'){ n.preguntas.push(_votPreguntaBase_()); return f(); }
+  if(a==='quitarp'){ n.preguntas.splice(qi,1); return f(); }
+  if(a==='masop'){ n.preguntas[qi].opciones.push(''); f(); var ins=VOT.host.querySelectorAll('[data-vf="op"][data-vqi="'+qi+'"]'); if(ins.length) ins[ins.length-1].focus(); return; }
+  if(a==='quitaro'){ n.preguntas[qi].opciones.splice(+b.dataset.voi,1); return f(); }
+  if(a==='plantilla'){ n.preguntas[qi].opciones=VOT_PLANTILLAS[+b.dataset.vp][1].slice(); return f(); }
+  if(a==='preset'){ n.electorado=(typeof _presetInvitados_==='function' ? _presetInvitados_(b.dataset.vk) : []).slice(); return f(); }
+  if(a==='crear'){
+    var falta=votFaltaNuevo(); if(falta){ tost(falta); return; }
+    VOT.enviando=true; f();
+    try{
+      var r3=await api.votCrear(votCuerpoNuevo());
+      if(r3 && r3.votacion){ VOT.nuevo=null; _votAdoptar_(r3.votacion); await votCargarLista(); VOT.vista='ver'; VOT.id=r3.votacion.id; tost('Votación abierta: se ha avisado a los convocados.'); }
+    }catch(er){ tostErr('No se pudo abrir la votación: ', er); }
+    VOT.enviando=false; return f();
+  }
+}
+/* En el selector «En la reunión» el cambio recalcula el bloque de votantes: el servidor usa los de la reunión. */
+/* ¿Lo único que cambió son votaciones? (con la ficha abierta en un modal, no hay nada más que refrescar por debajo). */
+function _votSoloVotaciones_(c){ return !!c && c.length>0 && c.every(function(x){ return VIVO_GRUPOS.votaciones.indexOf(x)>=0; }); }
+function votAlCambiar(e){ if(VOT.vista==='nueva' && e && e.target && e.target.id==='votReu'){ votLeerForm(); votPintar(); } }

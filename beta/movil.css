@@ -913,7 +913,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
    ⚠️ Y tampoco con márgenes negativos: arrastran el fondo `sticky` y el borde de la celda.
    ⛔ Las dos rejillas comparten `.rc.rd`, así que **una regla escrita mirando una sola cara
    toca las dos** — que es como se rompe la pantalla de al lado sin enterarse. */
-.rc.rd span{display:block;transform:translateY(-50%)}
+.rc.rd span{display:block}   /* 17/11: el `transform` ya no va aquí: lo pone `.hlin` (`_horaLineaCablear_`, comun.js), la misma regla para toda rejilla */
 .rc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
 /* ⛔ LA CABECERA YA NO ES UNA HORA, ES UN DÍA: un rótulo de columna, y los rótulos de
    columna SÍ van centrados — lo que la decisión del 05/08 manda poner «al límite» es la
@@ -1193,3 +1193,41 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 
 /* documentos-1 (12/11): «Editar antes de decidir» plegado en la ficha del expediente (como .doc-edit del escritorio) */
 .doc-edit{margin-top:11px}.doc-edit-c{display:none;margin-top:6px}.doc-edit.ab .doc-edit-c{display:block}
+
+/* 17/11 · VOTACIONES (`comun.js`, bloque «VOTACIONES CON CÓRUM»): tarjetas grandes al dedo, lo elegido en rojo y SIN tick (decisiones-app), la barra del recuento detrás. */
+.votl{margin-bottom:12px}
+.vfila{display:flex;flex-wrap:wrap;align-items:center;gap:6px 11px;padding:11px 0;cursor:pointer;border-top:1px solid var(--line)}
+.vfila:first-child{border-top:0}
+.vfila .a{flex:1;min-width:0}.vfila .a b{display:block}.vfila small{display:block;color:var(--ink3);font-size:11.5px;margin-top:2px}
+.vfila .vres{color:var(--ink2)}
+.vsep{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:12px 0 2px;border-top:1px solid var(--line)}
+.vpil{display:inline-block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+.vpil.pend{color:var(--warn);border-color:rgba(232,145,46,.45);background:rgba(232,145,46,.09)}
+.vpil.ok{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
+.vpil.no{color:var(--red);border-color:rgba(228,30,37,.42);background:rgba(228,30,37,.09)}
+.vback{background:none;border:0;color:var(--ink2);padding:6px 0 10px;cursor:pointer;font:inherit}
+.vtit{font-size:19px;font-weight:600;margin:0 0 4px}
+.vcuo{border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:8px 0 12px;font-size:13px;color:var(--ink2)}
+.vcuo.ok{border-color:rgba(62,180,137,.42);color:var(--ok)}.vcuo.no{border-color:rgba(228,30,37,.42);color:var(--red)}
+.vpreg{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--sur)}
+.vpreg .vh{font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+.vnotas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.vops{display:flex;flex-direction:column;gap:8px}
+.vopc{position:relative;overflow:hidden;text-align:left;min-height:52px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;font:inherit;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px}
+.vopc .vt{flex:1;min-width:40%;position:relative;z-index:1}
+.vopc .vn{position:relative;z-index:1;color:var(--ink2);font-size:12px}
+.vopc .vq{position:relative;z-index:1;flex-basis:100%;color:var(--ink3);font-size:11.5px}
+.vopc .vbar{position:absolute;left:0;top:0;bottom:0;right:0;pointer-events:none}
+.vopc .vbar i{display:block;height:100%;background:rgba(255,255,255,.07)}
+.vopc.on{border-color:var(--red);background:rgba(228,30,37,.18);color:#fff}
+.vopc.on .vbar i{background:rgba(228,30,37,.28)}
+.vopc.gana{border-color:var(--ok)}
+.vopc[disabled]{cursor:default}.vopc[disabled]:not(.on){opacity:.85}
+.vgana{margin:9px 0 0;font-size:13px;color:var(--ink2)}
+.vnew .vin,.votl .vin,.vin{width:100%;box-sizing:border-box;font:inherit;color:var(--ink);background:var(--sur2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-height:44px}
+.vorow{display:flex;gap:6px;margin-top:6px;align-items:center}
+.vx{background:none;border:0;color:var(--ink3);cursor:pointer;font:inherit;padding:8px;min-height:36px}
+.vplan{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.vsws{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.vsw{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0}
+.vfal summary{cursor:pointer;color:var(--ink2);font-size:12.5px;margin:6px 0}

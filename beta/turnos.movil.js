@@ -279,9 +279,9 @@ function _convHTML_(cv){
      hueco (`_huecoHTML_`); quien CONTESTA veía otra cosa. Una banda de ancho completo, sin casillas: nadie contesta lo que no se ofrece. */
   var filas=F.map(function(fr, i){
     var hu=i ? _huecoEntreFranjas_(F[i-1], fr) : 0;
-    return (hu ? _huecoHTML_(hu) : '')+'<div class="rc rd" data-tfr="'+esc(fr.k)+'" data-p><span>'+esc(fr.txt)+'</span></div>'+
+    return (hu ? _huecoHTML_(hu) : '')+'<div class="rc rd" data-tfr="'+esc(fr.k)+'" data-p>'+_horaLineaHTML_(fr.txt)+'</div>'+
       D.map(function(d){ return _convCelHTML_(cv,d,fr.k); }).join('');
-  }).join('');
+  }).join('')+_horaFinFilaHTML_(F);
   return '<div class="tarj" id="convC">'+
     _convCabHTML_(cv)+
     '<div class="tpin" data-pinceles>'+_pincelChipsHTML_(cv, _pincelSelDe_(CONV_PINCEL, CONV_COCHE, CONV_CC), 'data-pin2')+'</div>'+
@@ -370,9 +370,9 @@ function _convPreHTML_(cv){
   /* ⚠️ Y aquí igual, que es la misma rejilla antes de abrir: dos formas de pintar la misma
      etiqueta es como una de las dos se queda vieja. */
   var filas=F.map(function(fr){
-    return '<div class="rc rd"><span>'+esc(fr.txt)+'</span></div>'+
+    return '<div class="rc rd">'+_horaLineaHTML_(fr.txt)+'</div>'+
       D.map(function(){ return '<div class="tcel off"></div>'; }).join('');
-  }).join('');
+  }).join('')+_horaFinFilaHTML_(F);
   return '<div class="tarj" id="convC" data-abre="'+esc(ab)+'">'+
     _convCabHTML_(cv)+
     '<div class="rejw"><div class="rej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+

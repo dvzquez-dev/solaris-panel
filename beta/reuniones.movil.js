@@ -515,6 +515,23 @@ function _listaReusM_(R){
       : '');
 }
 
+/* 17/11 · VOTACIONES en el móvil (la pieza es de `comun.js`): la lista va dentro de la pantalla; abrir una, o «Nueva», va en el modal. */
+function _votTarjM_(reuId){
+  var h=votListaHTML(reuId==null ? {} : {reunion:reuId, plano:true});
+  if(!h) return '';
+  return reuId==null
+    ? '<h2 class="sec">Votaciones<span class="ln"></span>'+(votPendientes()||'')+'</h2><div data-votl>'+h+'</div>'
+    : '<div data-votl style="margin-top:10px"><span class="sc" style="display:block;margin-bottom:2px">Votaciones de esta reunión</span>'+h+'</div>';   /* dentro de la tarjeta de la reunión */
+}
+function _votModalM_(vista, id, reunion){
+  VOT.nuevo=(vista==='nueva') ? null : VOT.nuevo;
+  abrirModal('<div id="votMod"></div>');
+  votMontar($('#votMod'), vista, id, reunion);
+}
+function _votCablearM_(){
+  $$('[data-votl] [data-vact]').forEach(function(b){ b.onclick=function(){ _votModalM_(b.dataset.vact==='ver' ? 'ver' : 'nueva', b.dataset.vid, null); }; });
+  $$('[data-votl] .vfila').forEach(function(b){ b.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); b.click(); } }; });
+}
 function vReu(){
   if(_reunionesCargando_())
     return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
@@ -523,7 +540,7 @@ function vReu(){
     return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
       '<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar '+(esCoord()?'reunión':'reunión de trabajo')+'</button>'+
       _sinConvocarHTMLM_()+
-      '<div class="tarj">'+vacio('Ninguna reunión convocada','Cuando te convoquen a una, saldrá aquí.','',false)+'</div>';
+      '<div class="tarj">'+vacio('Ninguna reunión convocada','Cuando te convoquen a una, saldrá aquí.','',false)+'</div>'+_votTarjM_();
   var R=REUNION, nF=R.franjas.length;
   /* Vista PONDERADA (solo tiene sentido en híbridas): presencial+telemático vale 2 y
      telemático 1, así que la ponderación es literalmente la suma de los valores. En
@@ -634,14 +651,12 @@ function vReu(){
   eje.forEach(function(t,ix){
     if(t%60!==0) return;
     g+='<div style="grid-column:1;grid-row:'+(ix+2)+';font-family:var(--mono);'+
-      'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px;'+
-      'line-height:1;transform:translateY(calc(-50% - 1px))">'+pad(Math.floor(t/60)%24)+'</div>';
+      'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px">'+_horaLineaHTML_(pad(Math.floor(t/60)%24))+'</div>';
   });
   /* y la hora de FIN, al pie de la ultima fila: cierra el eje igual que antes lo cerraba
      por la derecha. Sin esto el mapa no dice hasta que hora llega. */
   g+='<div style="grid-column:1;grid-row:'+(eje.length+2)+';font-family:var(--mono);'+
-    'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px;line-height:1;'+
-    'transform:translateY(calc(-50% - 1px))">'+_hhmm(t1).replace(':00','')+'</div>';
+    'font-size:8.5px;color:var(--ink3);text-align:right;padding-right:4px">'+_horaLineaHTML_(_hhmm(t1).replace(':00',''))+'</div>';
   R.dias.forEach(function(d,di){
     /* UNA CELDA POR FRANJA, ancha lo que la franja dura. Antes se pintaba una celda por
        INSTANTE del eje y el numero solo en la que arrancaba: con paso de 30 min y franjas
@@ -690,6 +705,7 @@ function vReu(){
 
   return '<div class="h1">Reuniones</div><p class="h1s">Tus reuniones y encuestas de disponibilidad.</p>'+
     '<button class="btn pri full" data-p id="btnCrear" style="margin-bottom:11px">Convocar '+(esCoord()?'reunión':'reunión de trabajo')+'</button>'+
+    _votTarjM_()+
     '<h2 class="sec">Mis reuniones<span class="ln"></span>'+(_reuPartir_(REUNIONES_M).vivas.filter(function(x){ return x.invitado!==false; }).length||1)+'</h2>'+
     (REUNIONES_M.length>1 || R.invitado===false
       ? _listaReusM_(R)
@@ -700,6 +716,7 @@ function vReu(){
       _duraTxtM_(R)+'</small></div>'+
       '<div class="d"><span class="pil '+((R.fijada||(R.cubierta&&!R.bajoMin)||R.exento||R.tarde)?'conf':(R.invitado===false?'conf':'no'))+'">'+
         (R.invitado===false?'solo lectura':(R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta')))))+'</span></div></div>'+
+      _votTarjM_(R.id)+
       /* 11/11 (reumovil): la ves por tu nivel, no porque te hayan convocado: sin rejilla, sin «te falta» (cubrir y responder son de convocados) */
       (R.invitado===false && !R.fijada
         ? '<p class="rnota" style="margin:2px 0 10px">No estás convocado a esta reunión: puedes verla, no marcar disponibilidad.</p>'
@@ -841,7 +858,7 @@ function cubrirModal(){
      ✅ Y la etiqueta de la hora es además **el asa para deslizar**: ver `.rc.rd` en el CSS. */
   var rows='', _hayOff=false;
   R.franjas.forEach(function(f,fi){
-    rows+='<div class="rc rd" aria-hidden="true"><span>'+f.ini.replace(':00','')+'</span></div>';
+    rows+='<div class="rc rd" aria-hidden="true">'+_horaLineaHTML_(f.ini.replace(':00',''))+'</div>';
     for(var di=0;di<nD;di++){
       var k=di+'_'+fi;
       if(!_ofer[k]){ _hayOff=true; rows+='<div class="ecel off" title="fuera del horario de ese día"></div>'; continue; }
@@ -849,6 +866,8 @@ function cubrirModal(){
       rows+='<div class="ecel '+(v===2?'on2':v===1?'on1':'')+'" data-k="'+k+'"></div>';
     }
   });
+  /* 17/11 (alinhoras): la hora de FIN del último hueco, en su línea (antes la rejilla no decía hasta cuándo se ofrece). */
+  rows+='<div class="rc rd" aria-hidden="true">'+_horaLineaHTML_(_hmMin_(_finDelEje_(R.franjas)).replace(':00',''))+'</div>';
   abrirModal('<div class="mtit">Marca tu disponibilidad</div>'+
     '<div class="msub">'+esc(YO.pila)+' · '+instr+'</div>'+
     (ST._recup?'<p class="rnota" style="margin:-4px 0 10px;color:var(--warn)">Recuperé lo que ibas marcando: todavía NO está guardado. Pulsa «Guardar disponibilidad» para que cuente.</p>':'')+
@@ -1156,7 +1175,7 @@ function crearModal(){
       elegirPersonas('ceInv', {universo:_activos_().map(function(m){ return m.nombre; }).filter(function(n){ return n!==(YO&&YO.nombre); }),
         titulo:'Invitados', alCambiar:function(l){ INV=new Set(l); upd(); }})+'</div>'+
     plant+
-    '<label class="campo"><span class="sc">Título</span><input id="ceTit" placeholder="Reunión sin título"></label>'+
+    '<label class="campo"><span class="sc">Título</span><input id="ceTit" maxlength="'+REU_TITULO_MAX+'" placeholder="Reunión sin título"></label>'+
     '<div class="campo"><span class="sc">Fechas por</span>'+nxElige('ceModo', [['rango','Desde / hasta'],['dur','Desde + nº de días']], 'rango')+'</div>'+
     '<div id="ceRango"><div class="campo"><span class="sc">Desde</span>'+nxFecha('ceD0', hoyISO, {min:hoyISO})+'</div>'+
       '<div class="campo"><span class="sc">Hasta</span>'+nxFecha('ceD1', mas(hoyISO,6), {min:hoyISO})+'</div></div>'+
@@ -1292,6 +1311,10 @@ function crearModal(){
   /* crear: construye la reunión y la PERSISTE (api.crearReunion). Sin backend, queda local. */
   $('#btnCrearOK').onclick=async function(){
     var bt=$('#btnCrearOK'); if(bt.disabled) return;
+    /* refutar48 (17/11): sin título no se convoca. El escritorio lo impide desde el 31/10 (feosesc #23: «creaba «Reunión sin título»»); esta cara lo seguía
+       mandando a todos los convocados con ese nombre (el «Reunión sin título» del campo es un placeholder: aquí se pide el de verdad). */
+    var _tit=$('#ceTit');
+    if(_tit && !_tit.value.trim()){ _tit.focus(); _tit.style.borderColor='rgba(232,145,46,.6)'; tost('Ponle un título a la reunión.'); return; }
     /* ⛔⛔ SIN ESTO SE CREABA UNA REUNION CON CERO INVITADOS, y una reunión sin lista la
        app se la enseña **a todo el equipo** con «te falta cubrir» — que es literalmente el
        daño que motivó el campo `invitado`: «se le reclamaba cubrir a todo el equipo una

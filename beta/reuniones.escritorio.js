@@ -130,8 +130,33 @@ function _convocPest_(lista){
     ['lista', 'Reuniones', lista],
     ['fijar', 'Fijar fecha', _fijarPanel_()],
     ['bloque', 'Parte de bloque', _bloqueReuPanelE_()],
-    ['convocar', 'Convocar', convocarReunionPanel()]
+    ['convocar', 'Convocar', convocarReunionPanel()],
+    ['votar', 'Votaciones', _votPanelE_()]
   ], 'lista');
+}
+/* 17/11 · VOTACIONES en el escritorio (la pieza es de `comun.js`): una pestaña con su propio host; el estado vive en `VOT`, así que un repintado la remonta igual. */
+function _votPanelE_(){
+  if(VOT.lista===null) return '';       /* sin servidor de votaciones (Apps Script) o aún sin cargar: sin pestaña */
+  return pan('Votaciones', votPendientes() ? votPendientes()+' por votar' : 'con cuórum', '<div class="pb"><div id="votH"></div></div>');
+}
+/* Las votaciones de ESTA reunión, en su ficha (pestaña «Fijar fecha»), y «Nueva votación» ya colgada de ella. Abrir una lleva a la pestaña «Votaciones». */
+function _votFichaE_(r){
+  if(!r || VOT.lista===null) return '';
+  var h=votListaHTML({reunion:r.id, plano:true});
+  var puedo=_votReusMias_().some(function(x){ return String(x.id)===String(r.id); });
+  if(!h && !puedo) return '';
+  return '<div data-votfe style="margin-top:14px"><span class="sc" style="display:block;margin-bottom:4px">Votaciones de esta reunión</span>'+h+
+    (puedo ? '<button type="button" class="btn" data-vact="nueva" data-vreu="'+esc(r.id)+'" style="margin-top:8px">Nueva votación en esta reunión</button>' : '')+'</div>';
+}
+function _votCablearE_(){
+  $$('[data-votfe] [data-vact]').forEach(function(b){ b.onclick=function(){
+    _abrirPestana_('conv','votar');
+    var h=$('#votH'); if(!h) return;
+    if(b.dataset.vact==='ver') votMontar(h,'ver',b.dataset.vid,null);
+    else{ VOT.nuevo=null; votMontar(h,'nueva',null,b.dataset.vreu); }
+  }; });
+  var h=$('#votH'); if(!h) return;
+  votRemontar(h);
 }
 function convocarReunionPanel(){
   /* ⛔ UN MIEMBRO RASO SÍ CONVOCA — reunión de trabajo, y nada más. Aquí ponía
@@ -165,7 +190,7 @@ function convocarReunionPanel(){
         consejo:'Consejo', subsistema:'Subsistema · tu unidad', mixta:'Mixta · tu subsistema y 1-2 más', trabajo:'Reunión de trabajo'}[k]]; }), _tp[0])+'</div>'+
       '<div>'+lab('Modalidad')+nxElige('cvMod', [['hibrida','Híbrida'],['presencial','Presencial'],['telematica','Telemática']], 'hibrida')+'</div>'+
       '<label style="flex:1;min-width:220px">'+lab('Título')+
-        '<input id="cvTit" placeholder="Título de la reunión" style="'+E+'"></label>'+
+        '<input id="cvTit" maxlength="'+REU_TITULO_MAX+'" placeholder="Título de la reunión" style="'+E+'"></label>'+
     '</div>'+
     _avisoGrabaHTML_('cvGraba')+
     lab('Subsistemas · marca uno y entra su gente')+
@@ -614,9 +639,11 @@ function _miDispoPanel_(r){
      para el eje horizontal (al limite izquierdo = hora de inicio), girado. */
   _eje.forEach(function(t,ix){
     if(t%60!==0) return;
-    g+='<div class="hc rh" style="grid-column:1;grid-row:'+(ix+2)+'"><span>'+
-      pad(Math.floor(t/60)%24)+'</span></div>';
+    g+='<div class="hc rh" style="grid-column:1;grid-row:'+(ix+2)+'">'+
+      _horaLineaHTML_(pad(Math.floor(t/60)%24))+'</div>';
   });
+  /* 17/11 (alinhoras): y la hora de FIN, en la línea de abajo de la última fila (antes el eje no decía dónde acababa el día). */
+  if(_t1%60===0) g+='<div class="hc rh" style="grid-column:1;grid-row:'+(_eje.length+2)+'">'+_horaLineaHTML_(pad(Math.floor(_t1/60)%24))+'</div>';
   r.dias.forEach(function(d,di){
     var ix=0;
     while(ix<_eje.length){
@@ -988,6 +1015,7 @@ function _fijarPanel_(){
     '</div>'+
     _editarReuBoxE_(r)+
     _convocadosBoxE_(r)+
+    _votFichaE_(r)+
     _ordenDiaReuHTML_(r)+
     _audioReuHTML_(r)+
     _asisBoxE_(r)+
