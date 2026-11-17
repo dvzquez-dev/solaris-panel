@@ -14970,6 +14970,12 @@ function _horarioReuMs_(r){
   if(!(dur>0)) dur=(+r.duracion>0 ? +r.duracion : 60);
   return {ini:ini, fin:ini+dur*60000};
 }
+/* 17/11 (refutar51): cuánto DURA la reunión, en minutos: lo FIJADO si está fijada (se puede fijar de 15:00 a 19:30 una reunión convocada de 3 h: `fijarlibre`) y,
+   si no, la `duracion` de la convocatoria. Es lo que enseñan las tarjetas («dura 4 h 30 min»): con `duracion` a secas decían «15:00–19:30 · dura 3 h». */
+function _duraReuMin_(r){
+  var h=_horarioReuMs_(r);
+  return h ? Math.round((h.fin-h.ini)/60000) : (+(r && r.duracion)||0);
+}
 var BLQ_VENTANA_FICHA_H = 48;                  // = `VENTANA_FICHA_H` de `avisar_reunion.py`: más viejas, ya no se piden
 function _fichaPendienteReu_(r, ahora){
   var h=_horarioReuMs_(r), t=(ahora==null?Date.now():ahora);
@@ -17459,8 +17465,12 @@ function _votReus_(){ return (typeof REUNIONES_M!=='undefined' && REUNIONES_M) |
 /* Las reuniones en las que PUEDO abrir una votación: las vivas que convoco yo (el PD, todas). Espejo de lo que el servidor acepta. */
 function _votReusMias_(){
   var yo=_votYo_(), pd=(typeof rangoNom==='function' && rangoNom(yo)>=3);
+  var tipos=(typeof _tiposConvocables_==='function') ? _tiposConvocables_(yo) : null;
   return _votReus_().filter(function(r){
-    return (pd || r.convocante===yo) && !r.finalizada_at && (r.invitados||[]).length;
+    /* 17/11 (refutar51): el servidor (`votaciones_srv._electorado`) exige además `puede_convocar(tipo)`: el PD que no es del consejo no abre votaciones en un consejo
+       (le contestaba «no puedes convocar una reunión consejo»). Mismo criterio aquí, o el botón se ofrece para fallar. */
+    var tipo=String(r.tipo||'trabajo').toLowerCase().replace(/\s+/g,' ');
+    return (pd || r.convocante===yo) && !r.finalizada_at && (r.invitados||[]).length && (!tipos || tipos.indexOf(tipo)>=0);
   });
 }
 /* ¿Puedo abrir una votación SUELTA? La coordinación, el consejo y el PD (el servidor: `perfil[1] or perfil[2]`). */

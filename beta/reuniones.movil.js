@@ -443,7 +443,7 @@ function _nConvM_(x){
   return _invitadosVivos_(l).length;
 }
 function _duraTxtM_(r){
-  var d = +(r && r.duracion) || 0;
+  var d = _duraReuMin_(r);     // 17/11 (refutar51): lo fijado, no las 3 h con que se convocó
   return d > 0 ? ' \u00b7 dura ' + _durTxt_(d) : '';
 }
 

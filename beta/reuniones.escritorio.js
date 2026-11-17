@@ -1185,7 +1185,10 @@ function _cobertura_(r){
      que quién lo puso —quien convoca o la regla— **no se podía saber desde fuera**, y el
      rótulo se lo atribuía a una persona. Va aquí y no en el llamador: es esta función la
      única que ve el `r` ORIGINAL antes de rellenar el hueco. */
-  return {cubren:cubren.length, conv:universo.length, sinCubrir:sin, bajoMin:bajo, minimo:minimo, minFijado:(r.minimo!=null)};
+  /* 17/11 (refutar51): `cubren` cuenta sólo a los del universo. Quien convoca está exento (fuera de `universo`) pero puede contestar su propia encuesta: sin esto la
+     fila decía «Convocados 7 · Han cubierto 8» y en ámbar, con todos los convocados al día. */
+  var cubrenU=cubren.filter(function(n){ return universo.indexOf(n)>=0; }).length;
+  return {cubren:cubrenU, conv:universo.length, sinCubrir:sin, bajoMin:bajo, minimo:minimo, minFijado:(r.minimo!=null)};
 }
 
 /* REFRESCO EN VIVO DE LA REUNION QUE TIENES DELANTE (08/08).
