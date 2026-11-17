@@ -173,7 +173,8 @@ function vEstado(){
      secas, una semilla sin temporada pinta literalmente **«ciclo null»**; y con un
      `||''` quedaría **«ciclo »** colgando. `cab(t,d)` ya omite su `<span>` cuando `d`
      es vacío, así que la cura es la que ya existía ahí dentro. */
-  return _asisTarjetaM_()+_nov+_ftInicioM_()+'<div class="tarj">'+cab('Conducta',_temporadaVigente_()?('ciclo '+_temporadaVigente_()):'')+medidorHTML()+'</div>'+
+  /* refutar55: Estado no lleva título visible (abre con la tarjeta de Conducta) y el lector se quedaba sin encabezado de nivel 1: uno SÓLO para él */
+  return '<div class="h1 sr">Estado</div>'+_asisTarjetaM_()+_nov+_ftInicioM_()+'<div class="tarj">'+cab('Conducta',_temporadaVigente_()?('ciclo '+_temporadaVigente_()):'')+medidorHTML()+'</div>'+
     av+
     /* LAS HORAS SALIERON DE AQUI (Daniel, 28/07: «quitaria las horas de estado y las
        dejaria solo en horas»). Estaban en dos pantallas con la misma cifra y la misma barra.

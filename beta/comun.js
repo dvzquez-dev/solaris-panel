@@ -4813,6 +4813,7 @@ function _mcd_(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; }
    ⛔ Si el refresco no pudo correr (modal abierto, escribiendo, otro en vuelo) devuelve `false` y los sellos NO se
       dan por vistos: al segundo siguiente se vuelve a intentar, y el cambio no se pierde. */
 var VIVO_CADA_MS = 1000;
+var VIVO_SIN_RESPUESTA_AVISO = 3;   /* refutar54: tres «¿hay algo nuevo?» seguidos sin respuesta (≈ 10 s: cada uno ya reintenta 3 veces) y se avisa de que lo que se ve puede ser viejo */
 var VIVO_GRUPOS = {
   getTurnos:      ['turnos','kv/turnos','kv/turnos_coches','kv/turnos_convocado_at'],   // la última: refutador 25, 🟡 9
   getTareas:      ['tareas','kv/tareas'],
@@ -4841,9 +4842,25 @@ function _vivoToca_(que, grupo){
 function _pideSi_(que, grupo, accion, arg){
   return _vivoToca_(que, grupo) ? _pide_(accion, arg) : Promise.resolve(null);
 }
+/* refutar37 (13/11, el taller): al volver de un rato fuera SIN cobertura el refresco falla en silencio (cada dato lleva su `.catch(function(){})` para que uno no
+   tumbe a los demás) y la pantalla enseña lo de hace media hora como si fuera de ahora: quien decide con ello no sabe que es viejo. Sólo en `vuelta`/`reloj`
+   (el «vivo» de cada segundo no cuenta por un fallo suelto: sí cuando `VIVO_SIN_RESPUESTA_AVISO` seguidos se quedan sin respuesta — refutar54, 17/11: el escritorio, que vive abierto
+   toda la tarde, no avisaba nunca). La franja es fija, no toca #main (que se repinta) y se quita sola al llegar el siguiente panel. */
+function _avisoDesfase_(llego){
+  var el=document.getElementById('desfase');
+  if(llego || !window.__DESFASE_OK){ window.__DESFASE_OK=Date.now(); if(el) el.remove(); if(llego) return; }   /* en `window`: `comun.js` no lleva sentencias de nivel superior */
+  if(typeof _sesionMuerta_==='function' && _sesionMuerta_()) return;   // ese caso ya lo dice `_avisarSesionMuerta_`
+  var min=Math.max(1, Math.round((Date.now()-window.__DESFASE_OK)/60000));
+  var txt='Sin conexión: lo que ves es de hace '+(min>=60 ? Math.floor(min/60)+' h' : min+' min')+'. Se pondrá al día solo al volver la cobertura.';
+  if(!el){ el=document.createElement('div'); el.id='desfase'; el.setAttribute('role','status');
+    el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:60;padding:6px 12px;font-size:12px;text-align:center;background:var(--warn,#c9a227);color:#111';
+    document.body.appendChild(el); }
+  el.textContent=txt;
+}
+
 function _arrancarVivo_(refrescar){
   if(typeof BACKEND_URL==='string' && BACKEND_URL.indexOf('script.google.com')>=0) return false;
-  var sellos=null, en=false;
+  var sellos=null, en=false, sinRespuesta=0;
   setInterval(async function(){
     if(en || document.hidden) return;
     if(typeof backendOK==='undefined' || !backendOK || !SESION) return;
@@ -4853,8 +4870,9 @@ function _arrancarVivo_(refrescar){
     en=true;
     try{
       var r=await _pide_('queHayNuevo');
-      if(!r || !r.sellos) return;
-      var _desf=(typeof _avisoDesfase_==='function') ? _avisoDesfase_ : null;   /* sólo el móvil la declara (movil.html): el escritorio no tiene aviso de desfase — por referencia, como `_asegurarPush_` (rojosbateria2) */
+      var _desf=(typeof _avisoDesfase_==='function') ? _avisoDesfase_ : null;   /* por referencia, como `_asegurarPush_` (rojosbateria2); 17/11: ya la declaran las dos caras (`comun.js`) */
+      if(!r || !r.sellos){ if(_desf && ++sinRespuesta>=VIVO_SIN_RESPUESTA_AVISO) _desf(false); return; }   /* refutar54: sin red, la pantalla lo dice (antes sólo el móvil, y sólo cada 90 s) */
+      sinRespuesta=0;
       if(_desf) _desf(true);   /* refutar37: el servidor contesta → lo que se ve ya no es «de hace un rato» (si cambió algo, `refrescar` lo trae ahora) */
       if(!sellos){ sellos=r.sellos; return; }                 // la primera vuelta sólo toma la foto
       var c=_vivoCambios_(sellos, r.sellos);
@@ -9783,6 +9801,14 @@ function _turnoBloqueRango_(cv, dia, i0, i1){
   return {dia: dia, claves: claves, hora: hora, horas: (hora && claves.every(function(c){ return /^h\d\d$/.test(c); })) ? claves.length : 0};
 }
 
+/* refutar55 (17/11): lo que dice el LECTOR de una casilla de la rejilla (antes un `<div>` mudo, sólo con color): el día, la franja y lo que tiene marcado. Una sola regla para las dos caras. */
+function _convCelEtiqueta_(dia, franja, v){
+  return _diaCorto_(dia)+' · '+_rotuloTramo_(franja)+' · '+((v&&v.s==='no')?'no puedo':((v&&v.s)?'puedo en '+v.s+(v.c?', con coche':''):'sin marcar'));
+}
+/* refutar55: lo que lee el lector de una casilla de la disponibilidad de una reunión: día, hora y lo marcado (0 · 1 telemático · 2 presencial). */
+function _ecelEtiqueta_(dia, hora, v, modo){
+  return dia+' · '+hora+' · '+(v===2 ? 'presencial' : v===1 ? (modo==='hibrida' ? 'telemática' : 'puedo') : 'sin marcar');
+}
 /* refutar42 · UNA rejilla de casillas = UN control de teclado: una sola parada de Tab (la casilla con el foco lleva `tabindex=0`, el resto -1) y las flechas
    mueven por ella (Inicio/Fin: principio y fin de la fila). Sin esto, 60 casillas son 60 Tab para pasarlas y ni una flecha. `celdas` van en orden de lectura
    (fila a fila) y `cols` = cuántas hay por fila (los días). Lo llaman el mapa de calor de turnos y la rejilla de «Tu disponibilidad»; Enter/Espacio los pone
@@ -17362,6 +17388,22 @@ function _a11yMarcar_(raiz){
     if(e.tagName!=='TR' && !e.getAttribute('role')) e.setAttribute('role','button');
     if(!e.hasAttribute('tabindex')) e.setAttribute('tabindex','0');
   });
+  /* refutar55 (17/11): el título de cada pantalla («Fichar», «Horas»…) es un `<div class="h1">`: con un lector no había ningún encabezado de nivel 1 al que saltar. */
+  Array.prototype.forEach.call(r.querySelectorAll('.h1:not([role])'), function(e){ e.setAttribute('role','heading'); e.setAttribute('aria-level','1'); });
+  /* refutar55: lo ELEGIDO (categoría, imputación, «Los míos»/«Todos», «Sesión en vivo»/«Declarar horas»…) sólo se enseñaba con la clase `on` (el rojo): un lector lo
+     leía como botones iguales. Un botón de un grupo con algún hermano `on` (o un `.pick`) dice `aria-pressed`; lo que ya trae su propio estado (pestañas, desplegables) se deja. */
+  Array.prototype.forEach.call(r.querySelectorAll('button,[role=button]'), function(e){
+    var p=e.parentElement; if(!p || e.classList.contains('tab') || e.hasAttribute('aria-expanded') || e.hasAttribute('aria-current') || e.hasAttribute('aria-selected')) return;
+    if(e.hasAttribute('aria-pressed') && !e.hasAttribute('data-a11y-p')) return;                 // lo puso la pantalla: suyo es
+    var on=e.classList.contains('on');
+    if(on || e.hasAttribute('data-a11y-p') || e.classList.contains('pick') || p.querySelector(':scope > button.on,:scope > [role=button].on')){
+      e.setAttribute('data-a11y-p','1'); e.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  });
+  Array.prototype.forEach.call(r.querySelectorAll('.vpreg:not([role])'), function(e){      // cada pregunta de una votación: sus opciones se leen DENTRO de ella
+    var h=e.querySelector('.vh'); e.setAttribute('role','group'); if(h && h.textContent.trim()) e.setAttribute('aria-label',h.textContent.trim());
+  });
+  Array.prototype.forEach.call(r.querySelectorAll('.tt:not([role])'), function(e){ e.setAttribute('role','heading'); e.setAttribute('aria-level','2'); });   // la cabecera de cada tarjeta/sección
   Array.prototype.forEach.call(r.querySelectorAll('input:not([type=hidden]),textarea,select'), function(e){
     if(e.getAttribute('aria-label') || e.getAttribute('aria-labelledby') || (e.id && document.querySelector('label[for="'+e.id+'"]')) || e.closest('label')) return;
     var t=e.getAttribute('placeholder') || e.getAttribute('title'); if(t) e.setAttribute('aria-label', t);
@@ -17672,7 +17714,9 @@ function votPintar(){
   var h=VOT.host; if(!h || !h.isConnected) return false;
   /* ⛔ NO se lee el formulario aquí: quien cambia el estado (plantilla, quitar una opción…) ya lo leyó ANTES de cambiarlo, y volver a
      leer el DOM —que aún enseña lo viejo— deshacía el cambio. Quien repinta SIN haber cambiado nada lo lee antes (`votVivo`, `votRemontar`). */
+  var _f=_focoFirma_(h);            // refutar55: elegir una opción repinta TODO el host; con teclado o lector el foco caía al <body> y se perdía el sitio
   h.innerHTML=_votHTML_();
+  _focoReponer_(h,_f);
   h.onclick=_votClic_; h.onchange=votAlCambiar; h.onkeydown=function(e){ if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.vfila')){ e.preventDefault(); _votClic_(e); } };
   return true;
 }

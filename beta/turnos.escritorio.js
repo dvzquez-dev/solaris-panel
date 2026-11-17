@@ -397,7 +397,7 @@ function _miTurnoPanel_(){
       var k=_dispClave_(d,fr.k), v=mias[k];
       var st = (v && v.s && v.s!=='no') ? ('background:'+_celdaFondo_(v)) : '';
       /* refutar42: la casilla se puede usar con el teclado (`_rejillaFlechas_` en `_cablearMiTurno_`) y dice qué es y qué tiene marcado */
-      var _et=_diaCorto_(d)+' · '+_rotuloTramo_(fr)+' · '+((v&&v.s==='no')?'no puedo':((v&&v.s)?'puedo en '+v.s+(v.c?', con coche':''):'sin marcar'));
+      var _et=_convCelEtiqueta_(d, fr, v);
       return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" role="button" tabindex="-1" aria-label="'+esc(_et)+'" '+
         'style="cursor:pointer;'+st+'">'+
         ((v&&v.s==='no')?'\u2013':((v&&v.c)?'\uD83D\uDE97':''))+'</div>';

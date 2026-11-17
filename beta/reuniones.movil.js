@@ -861,9 +861,9 @@ function cubrirModal(){
     rows+='<div class="rc rd" aria-hidden="true">'+_horaLineaHTML_(f.ini.replace(':00',''))+'</div>';
     for(var di=0;di<nD;di++){
       var k=di+'_'+fi;
-      if(!_ofer[k]){ _hayOff=true; rows+='<div class="ecel off" title="fuera del horario de ese día"></div>'; continue; }
+      if(!_ofer[k]){ _hayOff=true; rows+='<div class="ecel off" title="fuera del horario de ese día" role="button" aria-disabled="true" tabindex="-1" aria-label="'+esc(R.dias[di]+' · '+f.ini+' · fuera del horario')+'"></div>'; continue; }
       var v=ST.sel.get(k)||0;
-      rows+='<div class="ecel '+(v===2?'on2':v===1?'on1':'')+'" data-k="'+k+'"></div>';
+      rows+='<div class="ecel '+(v===2?'on2':v===1?'on1':'')+'" data-k="'+k+'" role="button" tabindex="-1" aria-label="'+esc(_ecelEtiqueta_(R.dias[di],f.ini,v,modo))+'"></div>';
     }
   });
   /* 17/11 (alinhoras): la hora de FIN del último hueco, en su línea (antes la rejilla no decía hasta cuándo se ofrece). */
@@ -976,6 +976,7 @@ function engancharRejilla(){
       var v=ST.sel.get(c.dataset.k)||0;
       c.classList.remove('on1','on2');
       if(v===1) c.classList.add('on1'); else if(v===2) c.classList.add('on2');
+      var _p=c.dataset.k.split('_'); c.setAttribute('aria-label', _ecelEtiqueta_(R.dias[+_p[0]], R.franjas[+_p[1]].ini, v, modo));
     });
   };
   var commit=function(){
@@ -1018,6 +1019,17 @@ function engancharRejilla(){
      **no corre**: deslizar no confirma nada. La guarda ya estaba y por eso no hay que tocarla;
      va dicho porque es la línea que decide si lo previsualizado se escribe. */
   grid.addEventListener('pointerup',function(){ if(ancla){ commit(); ancla=null; ultimo=null; } });
+  /* refutar55 (17/11): la rejilla se contesta SIN arrastrar: una parada de Tab, flechas para moverse y Enter/Espacio hace lo que un toque (mismo ciclo, mismo aviso si no cabe). */
+  _rejillaFlechas_($$('.ecel',grid), R.dias.length);
+  grid.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter' && ev.key!==' ') return;
+    var el=ev.target.closest ? ev.target.closest('.ecel') : null; if(!el || !el.dataset.k) return;
+    ev.preventDefault();
+    var A=kk(el.dataset.k);
+    target=sig(ST.sel.get(el.dataset.k)||0); borra=(target===0);
+    if(!borra && !cabe(A[0],A[1])){ tost('Ahí no entra la reunión entera ('+_durTxt_(minS*slot)+'): el horario de ese día acaba antes.'); return; }
+    ancla=el.dataset.k; ultimo=ancla; commit(); ancla=null; ultimo=null;
+  });
   var g=$('#btnGuardarDisp');
   /* GUARDA EN EL SERVIDOR. Antes solo ponia una marca local y decia «guardada»: en el
      servidor no quedaba nada, y de ahi come el pipeline de sanciones. `valores` va

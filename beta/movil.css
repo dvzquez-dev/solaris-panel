@@ -698,10 +698,14 @@ nav{flex:none;position:relative;height:calc(70px + env(safe-area-inset-bottom,0p
 /* `--tabN` lo pone `pintarNav` con cuantas pestañas hay. Con siete el ancho da para 7,5 px
    de rotulo; con menos sobra sitio y crecen. Daniel: «que se autoajuste el espacio de
    abajo»; Adrian, en el reporte: «poder ver las letras de las demas a mayor tamaño». */
-.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+.tab{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   padding:12px 0 9px;font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase;
   font-size:clamp(7.5px, calc(7.5px + (7 - var(--tabN,7)) * .5px), 9.5px);
   color:var(--ink3);position:relative;transition:color .18s linear,font-size .18s linear}
+/* refutar55: el rótulo mide lo que mide (una línea) para saber si cabe; sin sitio, la barra se queda en iconos (`_ajustarNav_`). */
+.tab .tl{white-space:nowrap}
+#nav.ico .tab .tl{display:none}
+#nav.ico .tab{padding:15px 0 14px}
 .tab svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;
   stroke-linecap:round;stroke-linejoin:round}
 .tab.on{color:var(--ink)} .tab.on svg{stroke:var(--red2)}
@@ -1198,7 +1202,8 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .votl{margin-bottom:12px}
 .vfila{display:flex;flex-wrap:wrap;align-items:center;gap:6px 11px;padding:11px 0;cursor:pointer;border-top:1px solid var(--line)}
 .vfila:first-child{border-top:0}
-.vfila .a{flex:1;min-width:0}.vfila .a b{display:block}.vfila small{display:block;color:var(--ink3);font-size:11.5px;margin-top:2px}
+/* refutar55: con la letra al 200 % el titular de una votación (30 px) no cabía en lo que le dejaba el estado a su derecha: ahora pide el 60 % de la fila (si no cabe junto, el estado baja) y una palabra larga parte en vez de salirse */
+.vfila .a{flex:1 1 60%;min-width:0;overflow-wrap:anywhere}.vfila .a b{display:block}.vfila small{display:block;color:var(--ink3);font-size:11.5px;margin-top:2px}
 .vfila .vres{color:var(--ink2)}
 .vsep{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:12px 0 2px;border-top:1px solid var(--line)}
 .vpil{display:inline-block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
@@ -1231,3 +1236,6 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 .vsws{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 .vsw{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0}
 .vfal summary{cursor:pointer;color:var(--ink2);font-size:12.5px;margin:6px 0}
+
+/* refutar55 (17/11): texto sólo para el lector de pantalla (el título de nivel 1 de Estado, que no lleva título a la vista). */
+.sr{position:absolute!important;width:1px!important;height:1px!important;margin:-1px!important;padding:0!important;border:0!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important}

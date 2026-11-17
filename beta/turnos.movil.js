@@ -157,7 +157,8 @@ function _convCelHTML_(cv, dia, franja){
   var cch=(v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">'+ico('coche')+'</span>':'';
   var txt=(v&&v.s==='no')?'\u2013':'';
   var fondo=_celdaFondo_(v);        /* 04/11: el color de su pincel (con/sin coche, partido si son dos sitios) */
-  return '<div class="tcel'+cls+'" data-tk="'+_convClave_(dia,franja)+'" data-p'+(fondo?' style="background:'+fondo+'"':'')+'>'+txt+cch+'</div>';
+  return '<div class="tcel'+cls+'" data-tk="'+_convClave_(dia,franja)+'" data-p role="button" tabindex="-1" aria-label="'+esc(_convCelEtiqueta_(dia,(cv.franjas||[]).filter(function(x){ return x.k===franja; })[0]||{k:franja},v))+'"'+
+    (fondo?' style="background:'+fondo+'"':'')+'>'+txt+cch+'</div>';
 }
 
 /* La tarjeta entera. Va la PRIMERA de la pantalla de turnos: lo que caduca manda sobre lo
@@ -301,7 +302,7 @@ function _convHTML_(cv){
        siendo cierto y por eso la función devuelve 78 cuando la etiqueta es larga: con `nowrap` +
        `flex-end` + `sticky` se sale por la izquierda y se corta, y eso **no lo caza ninguna prueba
        de DOM** —el `textContent` está entero—, sino mirar la pantalla. */
-    '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+
+    '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:minmax('+_carrilFranjas_(F)+'px,max-content) repeat('+
       D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
     '<div class="tplazo'+(urge?' urge':'')+'" id="convPie">'+_convPieHTML_(cv)+'</div>'+
     /* 02/11: contestar A MEDIAS no cuenta (`_convFalta_`, comun.js). Aquí se guarda al soltar el dedo, sin botón de enviar: se dice
@@ -375,7 +376,7 @@ function _convPreHTML_(cv){
   }).join('')+_horaFinFilaHTML_(F);
   return '<div class="tarj" id="convC" data-abre="'+esc(ab)+'">'+
     _convCabHTML_(cv)+
-    '<div class="rejw"><div class="rej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+
+    '<div class="rejw"><div class="rej" style="grid-template-columns:minmax('+_carrilFranjas_(F)+'px,max-content) repeat('+
       D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
     '<div class="tplazo">Se abre el <b>'+esc(abD)+'</b> a las '+esc(abH)+
       '. Entonces podr\u00e1s pintar tus ratos.</div>'+
@@ -669,6 +670,7 @@ function _engConv_(){
         _convClases_(cv).forEach(function(c){ el.classList.remove(c); });
         if(v&&v.s) el.classList.add(v.s);
         el.style.background = (v&&v.s&&v.s!=='no') ? _celdaFondo_(v) : '';
+        el.setAttribute('aria-label', _convCelEtiqueta_(d, fr, v));
         el.innerHTML=((v&&v.s==='no')?'\u2013':'')+
           ((v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">'+ico('coche')+'</span>':'');
       });
@@ -722,6 +724,16 @@ function _engConv_(){
   });
   if(rej._engPuesto) return;
   rej._engPuesto=true;
+  /* refutar55: la rejilla se contesta SIN dedo: una parada de Tab, flechas para moverse y Enter/Espacio pinta la casilla con el pincel elegido (lo mismo que tocarla). */
+  _rejillaFlechas_($$('#convRej [data-tk]'), (cv.dias||[]).length);
+  rej.addEventListener('keydown', function(e){
+    if(e.key!=='Enter' && e.key!==' ') return;
+    var el=e.target.closest ? e.target.closest('[data-tk]') : null; if(!el) return;
+    e.preventDefault();
+    var cv=rej._cv;
+    if(_convEstado_(cv)!=='abierta'){ _convVencida_(); return; }
+    _convPintar_(cv, el.getAttribute('data-tk')); rej._repinta(); _convGuardar_(cv);
+  });
   rej.addEventListener('pointerdown', function(e){
     var cv=rej._cv, repinta=rej._repinta;
     if(dd.deslizando()) return;

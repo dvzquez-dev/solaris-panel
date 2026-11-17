@@ -21,7 +21,7 @@
      ⚠️ Si `--bg` cambia, esto cambia con él: lo vigila `probar_reunion_movil`. -->
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
-<link rel="stylesheet" href="movil.css?v=c8d74fb">
+<link rel="stylesheet" href="movil.css?v=7dbc78f">
 </head>
 <body>
 
@@ -114,17 +114,17 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=521c391"></script>
+<script src="comun.js?v=3164749"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=4f42fdf"></script>
-<script src="turnos.movil.js?v=564fabd"></script>
+<script src="turnos.movil.js?v=4d7f6e6"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=9549b24"></script>
 <script src="sanciones.movil.js?v=8831fbd"></script>
-<script src="reuniones.movil.js?v=4e08c87"></script>
+<script src="reuniones.movil.js?v=8aada26"></script>
 <script src="horas.movil.js?v=b8983eb"></script>
-<script src="equipo.movil.js?v=28e54e2"></script>
+<script src="equipo.movil.js?v=cee4f98"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -632,21 +632,7 @@ function _modalAbierto_(){
   var m=document.getElementById('modal');
   return !!(m && m.classList.contains('on'));
 }
-/* refutar37 (13/11, el taller): al volver de un rato fuera SIN cobertura el refresco falla en silencio (cada dato lleva su `.catch(function(){})` para que uno no
-   tumbe a los demás) y la pantalla enseña lo de hace media hora como si fuera de ahora: quien decide con ello no sabe que es viejo. Sólo en `vuelta`/`reloj`
-   (el «vivo» de cada segundo no cuenta: un fallo suelto no es «sin cobertura»). La franja es fija, no toca #main (que se repinta) y se quita sola al llegar el siguiente panel. */
-var _DESFASE_OK_=Date.now();
-function _avisoDesfase_(llego){
-  var el=document.getElementById('desfase');
-  if(llego){ _DESFASE_OK_=Date.now(); if(el) el.remove(); return; }
-  if(typeof _sesionMuerta_==='function' && _sesionMuerta_()) return;   // ese caso ya lo dice `_avisarSesionMuerta_`
-  var min=Math.max(1, Math.round((Date.now()-_DESFASE_OK_)/60000));
-  var txt='Sin conexión: lo que ves es de hace '+(min>=60 ? Math.floor(min/60)+' h' : min+' min')+'. Se pondrá al día solo al volver la cobertura.';
-  if(!el){ el=document.createElement('div'); el.id='desfase'; el.setAttribute('role','status');
-    el.style.cssText='position:fixed;left:0;right:0;top:0;z-index:60;padding:6px 12px;font-size:12px;text-align:center;background:var(--warn,#c9a227);color:#111';
-    document.body.appendChild(el); }
-  el.textContent=txt;
-}
+/* refutar37 (13/11, el taller) → refutar54 (17/11): el aviso «Sin conexión: lo que ves es de hace N min» (`_avisoDesfase_`) vive en `comun.js`, para las dos caras. */
 async function _refrescoVivo_(motivo, que){
   var _hoy0=HOY; HOY=_hoyTxt_();   // 841.ª: ANTES de las salidas — la fecha cambia aunque no se pida nada al servidor
   /* 842.ª: el formulario de declarar bloque tomó `fecha:HOY` AL CARGAR; si el día cambió y nadie tocó esa
@@ -1885,7 +1871,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='83fa3b0';
+var BUILD='99543d8';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2108,11 +2094,27 @@ function pintarNav(){
     var bt=document.createElement('button');
     bt.className='tab'+(d[0]===ST.vista?' on':'');
     bt.dataset.d=d[0]; bt.setAttribute('data-p','');
-    bt.innerHTML=(n?'<span class="nb'+(d[0]==='horas'?' wa':'')+'">'+n+'</span>':'')+
-      '<svg><use href="#'+d[2]+'"/></svg>'+d[1];
+    /* refutar55 (17/11): el LECTOR dice «Docs, 1 pendiente» (y no «1 Docs») y cuál es la pestaña en la que estás; el globo y el icono no se leen aparte. */
+    bt.setAttribute('aria-label',d[1]+(n?', '+n+(n===1?' pendiente':' pendientes'):''));
+    if(d[0]===ST.vista) bt.setAttribute('aria-current','page');
+    bt.innerHTML=(n?'<span class="nb'+(d[0]==='horas'?' wa':'')+'" aria-hidden="true">'+n+'</span>':'')+
+      '<svg aria-hidden="true"><use href="#'+d[2]+'"/></svg><span class="tl">'+d[1]+'</span>';
     nav.appendChild(bt);
   });
+  if(typeof _ajustarNav_==='function') _ajustarNav_();      // (los bancos que corren `pintarNav` suelta, con un DOM de mentira, no la traen)
 }
+/* refutar55 (17/11): con la letra del sistema al 130 % las siete pestañas YA no cabían: «Docs» y «Reunión» se salían de la pantalla (y no se podían tocar), y a
+   200 % los rótulos se pisaban. Si algún rótulo no cabe en su pestaña la barra se queda en SÓLO ICONOS (el nombre sigue en el `aria-label` y la pantalla lleva su
+   título): mejor un icono que un rótulo cortado. Se mide de nuevo al girar o cambiar el tamaño. */
+function _ajustarNav_(){
+  var nav=document.getElementById('nav'); if(!nav) return;
+  nav.classList.toggle('ico',false);
+  var cab=$$('.tab',nav).some(function(t){
+    var l=t.querySelector('.tl'); return l && l.getBoundingClientRect().width>t.clientWidth-1;
+  });
+  nav.classList.toggle('ico',cab);
+}
+window.addEventListener('resize',function(){ _ajustarNav_(); });
 /* Repintar SIN que se note: `pintar()` reconstruye `#main`, asi que el navegador manda el
    scroll a cero y parece que la app se ha recargado. Cuando el repintado no lo ha pedido el
    usuario -llega un dato de fondo- hay que devolverlo a donde estaba. */
