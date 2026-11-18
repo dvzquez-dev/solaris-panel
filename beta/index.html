@@ -114,14 +114,14 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=f517e89"></script>
+<script src="comun.js?v=078da26"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=a87b011"></script>
 <script src="turnos.movil.js?v=cd4b1db"></script>
 <script src="buzon.movil.js?v=3179853"></script>
-<script src="documentos.movil.js?v=19b24ed"></script>
-<script src="sanciones.movil.js?v=89b61bb"></script>
+<script src="documentos.movil.js?v=c1b59ab"></script>
+<script src="sanciones.movil.js?v=94c4140"></script>
 <script src="reuniones.movil.js?v=e17510f"></script>
 <script src="horas.movil.js?v=c7e7f49"></script>
 <script src="equipo.movil.js?v=5112265"></script>
@@ -1885,7 +1885,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='bd2b2b1';
+var BUILD='3bbb185';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2539,8 +2539,7 @@ function _engReuniones_(){
     var R2=REUNION; if(!R2) return;
     if(typeof backendOK==='undefined' || !backendOK || !SESION){
       tost('Sin conexión no se puede cancelar el fijado.'); return; }
-    if(!(await dialogoSiNo('Cancelar la fecha fijada de «'+R2.titulo+'».'+String.fromCharCode(10,10)+
-      'Se reabre la disponibilidad para todo el equipo. ¿Seguro?'))) return;
+    if(!(await dialogoSiNo(_avisoDesfijar_(R2)))) return;   // refutar118: el texto es de comun.js, el mismo en las dos caras
     bdf.disabled=true;
     try{ await api.fijar(R2.id, null); R2.fijada=null; R2.fijadaBl=[];
       tost('Fijado cancelado: se reabre la disponibilidad.'); pintar(); if(typeof _ordenTrasFijar_==='function') _ordenTrasFijar_(R2.id);   // refutar15: el orden vuelve a «T0»

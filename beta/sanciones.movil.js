@@ -575,7 +575,8 @@ function _libroPuntosHTML_(){
       /* ⛔ VACIO Y «TODAVIA NO SE SABE» NO SE PINTAN IGUAL. Es la mitad que faltaba:
          arreglar el dato sin arreglar lo que se PINTA deja el bug intacto. */
       ? '<div class="retf" style="opacity:.7"><span class="mo"><b>Cargando tus movimientos…</b></span></div>'
-      : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b></span></div>'))+
+      /* refutar120: el desglose de quien aún no tiene nada era un botón que se abre a una línea; dice qué saldrá aquí */
+      : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b><small>Aquí saldrá cada sanción o compensación que suba o baje tus puntos.</small></span></div>'))+
     (r.todos.length ? '<p class="rnota" style="margin:8px 0 0">'+_notaRegistro_(r.total,'temporada',r.total)+'</p>' : '')+
   '</div></div>';
 }

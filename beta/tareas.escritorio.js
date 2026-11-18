@@ -87,7 +87,8 @@ function _chipsFiltroTareasE_(vivas, yo, conMias){
 }
 /* La fila de una tarea (viva o pasada): los botones van en la última celda, sólo para quien puede moverla. */
 function _filaTareaE_(t, yo){
-  var resp = Array.isArray(t.r) ? t.r.map(function(x){return pilaClara(x)||String(x).split(' ')[0];}).join(', ') : (t.r||'—'),
+  /* refutar121: quien ya no está sale «Ber (de baja)»: una tarea vencida «de Ber» parecía llevada, y nadie la hacía. */
+  var resp = Array.isArray(t.r) ? t.r.map(function(x){return pilaClara(x)||String(x).split(' ')[0];}).map(function(pila, k){ return pila+(_esBaja_(t.r[k])?' (de baja)':''); }).join(', ') : (t.r||'—'),
       of = _tareaOfertaPaso_(t, yo), i = TAREAS.indexOf(t);
   /* 01/11: «Proponer mis horas» va DEBAJO del título: la celda de los botones es estrecha y lo recortaba con «…» */
   var bh = _tareaBotonHoras_(t, i, '');

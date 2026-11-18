@@ -9434,6 +9434,17 @@ function _avisoFijarAntes_(r, ahora){
     'de quien no haya contestado.\n\n\u00bfFijarla igualmente?';
 }
 
+/* ⛔ 18/11 (refutar118) — CANCELAR EL FIJADO SE CONFIRMA EN LAS DOS CARAS, y dice lo que de verdad pasa. El móvil lo preguntaba y el escritorio
+   lo hacía al primer toque (un dedo mal puesto reabría la disponibilidad de todo el equipo). Y «se reabre la disponibilidad» sólo es verdad con
+   el plazo ABIERTO: con el plazo ya cerrado nadie puede contestar (`e_responder`: «el plazo venció»), y prometerlo era falso. Una sola puerta. */
+function _avisoDesfijar_(r, ahora){
+  var t = String((r && (r.titulo || r.tit)) || 'la reuni\u00f3n');
+  var abierto = !!r && (!_normLimite_(r.limite) || _plazoAbierto_(r.limite, ahora));
+  return 'Cancelar la fecha fijada de \u00ab' + t + '\u00bb.\n\n' + (abierto
+    ? 'Se reabre la disponibilidad para todo el equipo. \u00bfSeguro?'
+    : 'La reuni\u00f3n queda sin fecha. El plazo para contestar ya cerr\u00f3: nadie podr\u00e1 marcar disponibilidad. \u00bfSeguro?');
+}
+
 /* ⛔⛔ EL «AHORA» DE LA APP — el mismo día que `HOY` (858.ª).
    En la maqueta local `HOY` es el 24/07/2026 (`_hoyTxt_`), y `_plazoTxt_` cuenta desde él: la tarjeta
    decía «cierra en 2 días»… y debajo «El plazo cerró · 26/07/2026», porque `_plazoAbierto_` miraba el
@@ -13723,6 +13734,18 @@ function _novHTML_(cara){
       encenderlo es cambiar ESTA línea y nada más. Por eso la pieza entera no está bloqueada. */
 function _urlFormDocs_(){ return 'https://docs.google.com/forms/d/e/1FAIpQLScxZPPouMyDop0cxQ82zqLxC4ifzCJVwS46vKZNpAxemlhUGQ/viewform'; }
 
+/* refutar120 (18/11): LA PRIMERA VEZ NADIE SABE POR DÓNDE SE ENVÍA UN DOCUMENTO. Con la pantalla vacía decía «no has enviado nada»
+   y ya: el único sitio donde la app nombra el formulario eran los pasos de corregir/sustituir, que sólo salen con un expediente
+   delante. Se dice aquí, una frase, con el enlace que ya existe (`_urlFormDocs_`, la misma puerta que esos pasos; sin URL, pide el
+   enlace al Project Director en vez de pintar uno muerto). */
+function _docsComoEnviar_(){
+  var u=(typeof _urlFormDocs_==='function') ? _urlFormDocs_() : '';
+  return ' Los documentos se envían por '+
+    ((u && u.indexOf('http')===0) ? '<a href="'+esc(u)+'" target="_blank" rel="noopener">el formulario</a>.'
+                                  : 'el formulario (pide el enlace al Project Director).')+
+    ' Aquí verás en qué punto está cada uno.';
+}
+
 /* LOS DOS PASOS PARA CORREGIR un expediente al que le han pedido cambios, en ESTE orden.
    `[]` si el expediente no está en `cambios`: es el único estado en que esto aplica.
 
@@ -16348,10 +16371,8 @@ function _horasEntrega_(txt){
   n = Math.round(n * 100) / 100;
   return n > 0 ? n : null;
 }
-function _tareaSoyResp_(t){
-  var yo = (typeof _actorSanc_ === 'function' ? _actorSanc_() : null) || (typeof YO !== 'undefined' && YO && YO.nombre) || '';
-  return _tareasResp_([t], yo).length > 0;
-}
+function _tareaYoNombre_(){ return (typeof _actorSanc_ === 'function' ? _actorSanc_() : null) || (typeof YO !== 'undefined' && YO && YO.nombre) || ''; }
+function _tareaSoyResp_(t){ return _tareasResp_([t], _tareaYoNombre_()).length > 0; }
 /* Quién firma MI parte: mi coordinador, o el PD si el responsable ES el coordinador (nadie firma lo suyo). */
 function _tareaFirmaTxt_(){
   var yo = (typeof _actorSanc_ === 'function' ? _actorSanc_() : null) || (typeof YO !== 'undefined' && YO && YO.nombre) || '';
@@ -16400,7 +16421,14 @@ function _tareaToastParte_(t, h, r){
   if (pt.creados > 0) tost('Parte propuesto ' + _tareaFirmaTxt_() + ': ' + nf2(h) + ' h' +
     (pt.total > 1 ? ' (y lo mismo, marcado como tuyo, para las otras ' + (pt.total - 1) + ')' : '') + '.');
   else if (pt.actualizados > 0) tost('Parte puesto al día: ' + nf2(h) + ' h.');
-  else tost('Ese parte ya estaba propuesto (o firmado): no cambia nada.');
+  else {
+    /* refutar121: la tarea se REABRIÓ tras firmarse (o rechazarse) el parte de la primera entrega: las horas nuevas NO se suman (la clave del parte es la tarea y la persona).
+       Decirlo con las horas que tecleó: «ya estaba propuesto: no cambia nada» parecía que se habían guardado. */
+    var mio = (pt.resultados || []).filter(function(x){ return x && x.parte && x.repetido && x.parte.autor === _tareaYoNombre_(); })[0],
+        et = mio && ({aprobada:'firmado', aplicada:'firmado', rechazada:'rechazado'})[mio.parte.estado];
+    tost(et ? 'El parte de la primera entrega ya está ' + et + ' (' + nf2(mio.parte.horas) + ' h): las horas de ahora (' + nf2(h) + ' h) no se han sumado. Si hay que añadirlas, díselo ' + _tareaFirmaTxt_() + '.'
+            : 'Ese parte ya estaba propuesto: no cambia nada.');
+  }
 }
 /* Lo que se le dice al DESHACER una entrega: los partes sin firmar se retiran en la misma escritura. */
 function _tareaToastRetirados_(r){

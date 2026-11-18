@@ -320,7 +320,7 @@ function vDocs(){
     return h+'<div class="tarj">'+vacio('Nada por aquí',
       /* 21/10 (auditor 11, 🟡 7): `esCoord()` incluye al SUBCOORDINADOR, y el reparto (`coordinadorDe`, y el servidor)
          sólo nombra a quien tiene `cargo:'Coordinador'`: a él no le llega nada, y se le prometía. */
-      'No tienes nada que revisar ni has enviado nada.',
+      'No tienes nada que revisar ni has enviado nada.'+_docsComoEnviar_(),
       '',false)+'</div>';
   }
   h+='<h2 class="sec">Pendiente de tu revisión<span class="ln"></span>'+pend.length+'</h2>';
