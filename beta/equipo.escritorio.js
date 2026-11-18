@@ -326,15 +326,18 @@ function insightsHTML(){
   var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
   if(enAire>0) xs.push(['wa',h1(enAire)+' están sin firmar. Mientras sigan ahí, el umbral del mes y el '+
     'ranking se calculan con datos incompletos.']);
-  var sinCubrir=REUS.reduce(function(a,r){
-    if(_reuFinalizada_(r)) return a;                          // 04/11: lo celebrado ya no pende
+  /* refutar94 (18/11): PERSONAS, no pares persona-reunión: con dos reuniones abiertas a las que no contestó la misma gente, «13 personas» en un equipo de 11. Se cuenta por nombre. */
+  var _sinCub={};
+  REUS.forEach(function(r){
+    if(_reuFinalizada_(r)) return;                            // 04/11: lo celebrado ya no pende
     /* ⛔ Y una reunion OCULTA no suma: `_cobertura_` devuelve `null` y aqui se cuenta 0.
        No es «nadie sin cubrir», es «no lo se» — pero el aviso solo se imprime `if
        (sinCubrir)`, asi que un 0 calla en vez de afirmar. Lo que NO puede pasar es que
        cuente los 29 que el servidor no mando. */
     var sc = r.sinCubrir || _cobertura_(r).sinCubrir;   /* el dato real no lo trae: se deriva */
-    return a+((sc&&sc.length)||0); },0);
-  if(sinCubrir) xs.push(['wa',sinCubrir+' personas no han cubierto alguna disponibilidad abierta. '+
+    (sc||[]).forEach(function(n){ _sinCub[typeof n==='string' ? n : JSON.stringify(n)]=1; }); });
+  var sinCubrir=Object.keys(_sinCub).length;
+  if(sinCubrir) xs.push(['wa',sinCubrir+(sinCubrir===1?' persona no ha cubierto':' personas no han cubierto')+' alguna disponibilidad abierta. '+
     'Mira «Disponibilidad y riesgo» para ver qué sanción implicaría a cada una.']);
   /* ⛔ 21/10 (auditor 20, 🟠): por `horas`, que es lo que trae el servidor (`getFichajesAbiertos`); `min` sólo lo
      tiene la semilla de la maqueta. Contando `min`, los fichajes REALES no encendían el aviso nunca. Y se piden aquí

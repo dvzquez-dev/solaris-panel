@@ -395,7 +395,8 @@ async function _cargarReunionesM_(yaPedidas){
 /* 17/11 (refutar62): lo que dice la pastilla de una reunión. Una que ya está EN MARCHA se llama «en curso»: con «fijada» (lo de antes) un novato que acaba de entrar en su primera
    reunión no veía en ninguna tarjeta que estaba empezada, y la de «Próxima reunión» de Estado seguía diciendo «fijada» con él dentro, contando su tiempo. */
 function _pilReuM_(R){
-  return _reuEstadoFijada_(R) || (R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta')));
+  /* refutar94 (18/11): con el plazo YA CERRADO y sin haber contestado, «te falta» es mentira por lo que invita a hacer: no hay nada que cubrir (la rejilla ya no está). Se dice lo que pasó. */
+  return _reuEstadoFijada_(R) || (R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':(_plazoAbierto_(R.limite)?'te falta':'sin contestar'))));
 }
 function _proxReuHTML_(){
   var R=_proximaReuM_();
@@ -1629,8 +1630,9 @@ function _asisPintarPanelM_(){
   on('[data-asisanadirm]', async function(){
     var i2=document.querySelector('[data-psel-in="asisQuienM"]');
     var n=(elegirPersonasMarcadas('asisQuienM')[0]||(i2?i2.value:'')).trim(); if(!n) return;
-    if(i2) i2.value='';                      // ya está: el campo se vacía ANTES de refrescar (el refresco conserva lo tecleado)
-    await api.marcarPresente(A.id, n, true); await _asisRefrescarM_(); tost(n+': presente.'); });
+    await api.marcarPresente(A.id, n, true);
+    if(i2) i2.value='';                      // ya está: el campo se vacía ANTES de refrescar (el refresco conserva lo tecleado) y DESPUÉS de que el servidor lo acepte: si lo rechaza («no es del equipo»), se queda para corregirlo
+    await _asisRefrescarM_(); tost(n+': presente.'); });
   on('[data-asiscopiarm]', async function(){
     var t=_asisListaTxt_(A.v);
     try{ await navigator.clipboard.writeText(t); tost('Lista copiada.'); }catch(_){ tost('No se pudo copiar.'); } });

@@ -5455,11 +5455,18 @@ function _pselSugerencias_(id, q){
   S.universo.forEach(function(n){
     if(S.marcadas.indexOf(n)>=0 && S.multi) return;
     var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0] || {nombre:n};
-    var t=_sinTildes_(n+' '+(m.pila||'')+' '+(m.unidad||''));
-    if(t.indexOf(q)>=0) hits.push(n);
+    if(_pselTextoDe_(m,n).indexOf(q)>=0) hits.push(n);
   });
   return hits.slice(0,8);
 }
+
+/* ¿Lo escrito es de alguien del equipo (por nombre, pila o unidad, sin tildes)? Con el roster vacío (maqueta sin datos) no se juzga: sí. */
+function _pselEsDelEquipo_(q){
+  q=_sinTildes_((q||'').trim()); var ms=DATA.miembros||[]; if(!q || !ms.length) return true;
+  return ms.some(function(m){ return _pselTextoDe_(m).indexOf(q)>=0; });
+}
+/* El texto en el que se busca a una persona (nombre + pila + unidad, sin tildes): UNA definición para las sugerencias y para «¿es del equipo?». */
+function _pselTextoDe_(m,n){ return _sinTildes_((n||m.nombre||'')+' '+(m.pila||'')+' '+(m.unidad||'')); }
 
 /* Repinta los chips y las opciones del datalist SIN tocar el campo: repintarlo entero es lo que le quita el foco al teclear. */
 function _pselPintar_(id){
@@ -5531,7 +5538,11 @@ function _pselDeleg_(){
     ev.preventDefault();
     var h=_pselSugerencias_(id, t.value), ex=h.indexOf(t.value.trim());
     if(ex>0) h=[h[ex]];
-    if(h.length){ t.value=''; _pselAlternar_(id, h[0], true); }
+    if(h.length){ t.value=''; _pselAlternar_(id, h[0], true); return; }
+    /* 18/11 (refutar95): alguien de FUERA del equipo (el tutor, un patrocinador) se escribía, se daba a Enter y NO PASABA NADA: ni tarjeta ni aviso, con el texto
+       aún en el campo, y al convocar se perdía sin decirlo. Si no es de nadie del equipo, se dice; si es del equipo pero ya está marcado o fuera de esta lista, se calla. */
+    var q=t.value.trim();
+    if(q && !_pselEsDelEquipo_(q)) tost('«'+q+'» no está en el equipo: aquí sólo se puede elegir a quien está en la lista.');
   });
 }
 

@@ -1437,7 +1437,7 @@ function _asisPintarE_(){
           (_reuFinalizada_(A.reu) ? '' : '<button class="btn" id="asisReabrir">Reabrir</button>')+'</div>'
         : '<div class="asisPie"><div style="flex:1;min-width:220px">'+
           elegirPersonas('asisQuien', {universo:_activos_().map(function(m){ return m.nombre; }).filter(function(n){ return conv.indexOf(n)<0; }),
-            multi:false, titulo:'Añadir a alguien en directo', vacio:'Escribe un nombre (vale alguien que aún no está en el equipo) o pulsa «Ver lista».'})+'</div>'+
+            multi:false, titulo:'Añadir a alguien en directo', vacio:'Escribe un nombre o pulsa «Ver lista». Sólo se puede añadir a quien está en el equipo.'})+'</div>'+
           '<button class="btn" id="asisAnadir">Añadir</button>'+
           '<button class="btn" id="asisCerrar">Cerrar asistencia</button>'+
           (_reuPuedeFinalizar_(A.reu, (typeof _actorSanc_==='function' ? _actorSanc_() : null), (typeof esAdmin==='function' && !!esAdmin())) || (_demoLocal_() && !_reuFinalizada_(A.reu))
