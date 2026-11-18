@@ -114,12 +114,12 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=2e74ea1"></script>
+<script src="comun.js?v=84c2646"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=37b0144"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
-<script src="documentos.escritorio.js?v=c9270d5"></script>
+<script src="documentos.escritorio.js?v=41d7aeb"></script>
 <script src="sanciones.escritorio.js?v=5712398"></script>
 <script src="reuniones.escritorio.js?v=aa8fa4d"></script>
 <script src="horas.escritorio.js?v=9034f2d"></script>
@@ -1945,6 +1945,7 @@ V.temporada={g:'Horas',t:'Cierre de temporada',f:function(){
    informacion: eso es firmar a ciegas, justo lo que la pantalla venia a evitar. Ahora
    se pulsa y se abre el expediente entero (`docCard`), que es donde estan los botones. */
 var DOC_SEL=null;                 // expediente desplegado en las listas compactas
+var DOC_ARCH_NUEVO={};            // id → true: su archivo cambió con la tarjeta abierta (`docCard` lo avisa)
 
 
 V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
@@ -3373,7 +3374,13 @@ async function _refrescoVivo_(motivo, que){
     var _ms=_vivoToca_(que,'resto') ? _cargarMisSanciones_() : null;   /* 31/10: TUS sanciones (Lo tuyo) */
     /* 21/10 (🟠 2): mientras no hayan llegado, se piden en CADA vuelta (no sólo cuando cambia su sello). */
     var _d=_pideSi_(DOCS_LLEGO===false ? null : que,'getEntregables','getEntregables').then(function(a){
-      if(Array.isArray(a)){ DOCS.length=0; a.forEach(function(x,i){ DOCS.push(_normDocE_(x,i)); }); DOCS_LLEGO=true; } });
+      if(Array.isArray(a)){
+        /* 18/11 (refutar90): la tarjeta abierta cuyo archivo o ronda cambia (misma `ref`, otro `envio`/enlace) lo DICE: el visor se repinta con el PDF nuevo y el revisor no se entera. */
+        var _antes=DOC_SEL!=null ? DOCS.filter(function(x){ return x.id===DOC_SEL; })[0] : null;
+        DOCS.length=0; a.forEach(function(x,i){ DOCS.push(_normDocE_(x,i)); }); DOCS_LLEGO=true;
+        var _ahora=_antes ? DOCS.filter(function(x){ return x.id===DOC_SEL; })[0] : null;
+        if(_ahora && ((_ahora.envio||'')!==(_antes.envio||'') || (_ahora.drive||'')!==(_antes.drive||''))) DOC_ARCH_NUEVO[DOC_SEL]=true;
+      } });
     /* Las reuniones, con cuidado: la lista NO trae las respuestas (viven en su propia hoja),
        asi que refrescarla a lo bruto deja los mapas de calor a cero. Se conservan las que ya
        estaban hidratadas, emparejando por id. */
@@ -3879,7 +3886,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='f746005';
+var BUILD='d876ea0';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4753,7 +4760,7 @@ function _engDocsAbrir_(){
   /* abrir y cerrar el expediente en las listas compactas */
   $$('[data-docsel]').forEach(function(el){
     el.onclick=function(ev){ ev.stopPropagation();
-      var v=el.dataset.docsel; DOC_SEL = v ? +v : null; pintar();
+      var v=el.dataset.docsel; DOC_SEL = v ? +v : null; DOC_ARCH_NUEVO={}; pintar();
       if(DOC_SEL){ var c=document.getElementById('doc-'+DOC_SEL);
         if(c) c.scrollIntoView({block:'nearest',behavior:redu()?'auto':'smooth'}); }
     };

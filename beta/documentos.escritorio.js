@@ -63,7 +63,7 @@ function _normDocE_(d, i){
     subtitulo:        d.subtitulo || '',
     confidencialidad: d.confidencialidad || '',
     /* 01/11: la versión (la propone el autor, la cambia el revisor) y de qué documento es versión nueva. */
-    version: d.version || '', sustituyeA: d.sustituyeA || '',
+    version: d.version || '', sustituyeA: d.sustituyeA || '', envio: d.envio || '',
     autor:   d.autor || '',
     /* 31/10: el rastro de `cambiarAutorDoc` (PD/José), con los mismos nombres que el servidor y el móvil. */
     autor_original: d.autor_original || null, autor_cambiado_por: d.autor_cambiado_por || null,
@@ -199,7 +199,7 @@ function filaDoc(d){
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
     '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+esc(d.ref)+'</span> · '+
       esc(_m(d.autor).pila)+' · '+ambDoc(d.amb, d.tipo)+(rev ? ' · firma '+esc(rev) : ' · sin revisor')+
-      (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+'</small></span>'+
+      (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+_marcaSuperadaDoc_(d, typeof DOCS!=='undefined' ? DOCS : [])+'</small></span>'+
     '<span class="der">'+
       (mio?'<span class="chip wa">te toca</span>':'')+
       /* El chip sale de `chipSevDoc`, que es LA puerta: aqui habia una copia y en
@@ -249,7 +249,7 @@ function _previaDocE_(d, st){
    sale de `_avisosDoc_`—; aquí sólo cambia la envoltura, que es lo único que difiere de
    verdad entre las dos caras. */
 function _avisosDocE_(d){
-  var xs = (typeof _avisosDoc_==='function') ? _avisosDoc_(d) : [];
+  var xs = (typeof _avisosDoc_==='function') ? _avisosDoc_(d, typeof DOCS!=='undefined' ? DOCS : []) : [];
   return xs.map(function(a){
     return '<div class="just" style="border-left-color:var(--warn)"><span class="sc">'+
            esc(a.t)+'</span>'+esc(a.d)+'</div>';
@@ -436,6 +436,7 @@ function docCard(d){
       (_etiquetasDe_(d).length
         ? '<span class="chip">'+esc(_etiquetasDe_(d).join(' · '))+'</span>' : '')+
     '</div>'+
+    ((typeof DOC_ARCH_NUEVO!=='undefined' && DOC_ARCH_NUEVO[d.id]) ? '<div class="just" style="border-left-color:var(--warn)"><span class="sc">Otra versión de este documento</span>Acaban de mandar un archivo nuevo: lo que ves abajo ya es el nuevo.</div>' : '')+
     _avisosDocE_(d)+
     /* 01/11 (escm1): se LEE antes de decidir — resumen y avisos de calidad ENCIMA del motivo y los botones. */
     '<div class="just"><span class="sc">Resumen ejecutivo</span>'+

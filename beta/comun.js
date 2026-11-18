@@ -13656,15 +13656,77 @@ function _sustituyeDe_(e){ return (e && (e.sustituye || e.sustituyeA)) || ''; }
       Convertir un aviso en un bloqueo sería inventar una política que nadie pidió, y encima
       dejaría un expediente sin salida cuando el bloqueo es justo lo que hay que resolver a
       mano. Se le pone delante y decide él. */
-function _avisosDoc_(e){
+/* 18/11 (refutar90) · LA CADENA DE VERSIONES. Un documento se sustituye (`sustituyeA`: la v2 «sustituye a» la v1, la v3 a la v2), y cada expediente
+   sabía de dónde viene pero NO a dónde va ni qué es su predecesor hoy. `lista` = los expedientes que ESTA persona ve (móvil: `ENTREGABLES`+`ENT_REV`;
+   escritorio: `DOCS`); `estado` en el móvil, `est` en el escritorio: se leen los dos. Devuelve `{antes, despues, n}`:
+     · `antes`   el expediente al que éste sustituye, o `null` (no se ve, o no sustituye a nadie);
+     · `despues` el MÁS NUEVO que lo sustituye y no fue rechazado (uno rechazado no sustituye a nada), o `null`;
+     · `n`       su lugar en la cadena (1 = no sustituye a nadie; 3 = la tercera versión), contando los eslabones aunque alguno no se vea. */
+function _estadoDeDoc_(e){ return String((e && (e.estado || e.est)) || ''); }
+function _cadenaDoc_(e, lista){
+  var out = {antes:null, despues:null, n:1}, L = lista || [], i, x, cur = e, s, p, guard = 0;
+  if(!e) return out;
+  for(i=0;i<L.length;i++){
+    x = L[i];
+    if(!x || x===e || !e.ref || x.ref===e.ref || _sustituyeDe_(x)!==e.ref || _estadoDeDoc_(x)==='rechazado') continue;
+    if(!out.despues || Number(x.id)>Number(out.despues.id)) out.despues = x;
+  }
+  while(cur && guard++<30){
+    s = _sustituyeDe_(cur); if(!s) break;
+    out.n++; p = null;
+    for(i=0;i<L.length;i++){ if(L[i] && L[i].ref===s && L[i]!==cur){ p = L[i]; break; } }
+    if(cur===e) out.antes = p;
+    cur = p;
+  }
+  return out;
+}
+/* Lo que ES hoy un expediente, en una frase que sigue a «…, que»: la v3 decía «sustituye a la v2, que sigue publicado» con la v2 EN REVISIÓN. */
+function _hoyDeDocTxt_(e){
+  var est = _estadoDeDoc_(e);
+  return ({publicado:'sigue publicado', publicando:'se está publicando', aprobado:'está aprobado y aún sin publicar', anot:'está aprobado y aún sin publicar',
+           revision:'aún está en revisión', cambios:'tiene cambios pedidos', rechazado:'fue rechazado', recibido:'aún se está analizando',
+           analizado:'aún se está analizando'})[est] || ('está «'+est+'»');
+}
+/* ¿Ya cuenta la versión nueva (aprobada o publicada)? Si sí, la vieja dejó de ser la vigente. */
+function _docYaCuenta_(e){ return ['aprobado','anot','publicando','publicado'].indexOf(_estadoDeDoc_(e))>=0; }
+/* La marca corta de una FILA de lista: '' salvo si hay una versión más nueva. */
+function _marcaSuperadaDoc_(e, lista){
+  return _cadenaDoc_(e, lista).despues ? ' · hay una versión más nueva' : '';
+}
+/* Las rondas anteriores de la MISMA referencia (`historial`: lo que el servidor aparta al llegar un envío nuevo de algo ya decidido). El escritorio
+   guarda el objeto crudo en `_crudo`. Lo que se decidió antes es lo que hay que saber para juzgar la ronda nueva. */
+function _rondasDocTxt_(e){
+  var h = (e && (e.historial || (e._crudo && e._crudo.historial))) || [];
+  if(!h.length) return '';
+  return h.slice(-3).map(function(x){
+    var d = x && x.decision, acc = d && _accionDocTxt_(d.accion), quien = (x && (x.revisor || (d && d.revisor))) || '';
+    return (acc || (x && x.estado) || 'decidida')+(quien ? ' por '+quien : '')+((d && d.motivo) ? ' («'+String(d.motivo).slice(0,120)+'»)' : '');
+  }).join(' · ');
+}
+function _avisosDoc_(e, lista){
   var xs = [];
   if(e && e.bloqueo)
     xs.push({ k:'bloqueo', t:'Expediente trabado.',
               d:String(e.bloqueo)+' Decidir aquí no lo destraba: hace falta arreglar eso.' });
-  var s = _sustituyeDe_(e);
-  if(s)
-    xs.push({ k:'sustituye', t:'Es una revisión, no un envío nuevo.',
-              d:'Sustituye a '+s+', que sigue publicado y no se borra.' });
+  var s = _sustituyeDe_(e), c = (lista && lista.length) ? _cadenaDoc_(e, lista) : null;
+  if(s){
+    /* Sin lista (o el predecesor no se ve) el texto es el de siempre; con él, dice lo que ES hoy, y cuenta la versión que es. */
+    var ant = c && c.antes;
+    xs.push({ k:'sustituye', t:'Es una revisión, no un envío nuevo.'+((c && c.n>2) ? ' Es la '+c.n+'.ª versión.' : ''),
+              d:'Sustituye a '+s+', que '+(ant ? _hoyDeDocTxt_(ant)+(_estadoDeDoc_(ant)==='publicado' ? ' y no se borra' : '') : 'sigue publicado y no se borra')+'.' });
+  }
+  if(c && c.despues){
+    var d2 = c.despues, ya = _docYaCuenta_(d2), est = _estadoDeDoc_(e),
+        pub = (est==='publicado' || est==='publicando' || est==='aprobado' || est==='anot');
+    xs.push({ k:'superada', t:'Ya hay una versión más nueva.',
+              d:'La sustituye '+(d2.ref||'otra')+' ('+(d2.titulo||d2.tit||'sin título')+'), que '+_hoyDeDocTxt_(d2)+'. '+
+                (ya ? 'Ésta ya no es la vigente.'
+                    : pub ? 'Ésta sigue siendo la vigente hasta que aprueben la nueva.'
+                          : 'Ésta ya no es la que cuenta: aprobarla no la deja como vigente.') });
+  }
+  var ron = _rondasDocTxt_(e);
+  if(ron)
+    xs.push({ k:'rondas', t:'Es la '+(((e.historial || (e._crudo && e._crudo.historial)).length)+1)+'.ª vez que llega.', d:'Antes: '+ron+'.' });
   return xs;
 }
 

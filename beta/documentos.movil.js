@@ -175,7 +175,7 @@ function filaDoc(e,esAutor){
   var _uni = (!esAutor && e.subsistema && (rangoNom(yoNombre())>=2 || _perfilesDe_(miembro(yoNombre())).length>1)) ? ' · '+esc(e.subsistema) : '';
   return '<div class="fila clic '+(esAutor?(e.estado==='cambios'?'borde-no':(_pend?'borde-pe':''))+'':'')+'" data-doc="'+e.id+'" data-p>'+
     '<div class="a"><b>'+esc(e.titulo)+'</b><small><span class="mono">'+e.ref+'</span> · '+
-    esc(e.autor.split(' ')[0])+' · '+ambDocM(e.ambito, e.tipo)+_uni+'</small></div>'+
+    esc(e.autor.split(' ')[0])+' · '+ambDocM(e.ambito, e.tipo)+_uni+_marcaSuperadaDoc_(e, ((typeof ENTREGABLES!=='undefined' && ENTREGABLES)||[]).concat((typeof ENT_REV!=='undefined' && ENT_REV)||[]))+'</small></div>'+
     '<div class="d"><span class="pil '+st[1]+'">'+st[0]+'</span> <span class="chev">›</span></div></div>';
 }
 
@@ -423,7 +423,7 @@ function _docAutorHTML_(e){
       a esta función en esa lista y ponía el banco rojo. Un detector que busca NOMBRES no
       distingue una invocación de una mención: la denuncia crea el hecho. */
 function _avisosDocM_(e){
-  var xs = (typeof _avisosDoc_==='function') ? _avisosDoc_(e) : [];
+  var xs = (typeof _avisosDoc_==='function') ? _avisosDoc_(e, ((typeof ENTREGABLES!=='undefined' && ENTREGABLES)||[]).concat((typeof ENT_REV!=='undefined' && ENT_REV)||[])) : [];
   return xs.map(function(a){
     return '<div class="avisolargo" style="margin-bottom:10px"><b>'+esc(a.t)+'</b> '+
            esc(a.d)+'</div>';
@@ -603,7 +603,7 @@ function verDoc(id){
    lo que una coordinadora acababa de decidir (refutar44). Aquí se relee SÓLO esa ficha y SÓLO si el sello de los documentos cambió (no es un
    `getEntregables` por segundo). Con algo escrito en la ficha no se repinta, que se perdería: se avisa encima. */
 var _DOC_ABIERTO_=null, _DOC_SELLO_=null, _REFDOC_=false;
-function _firmaDocM_(e){ return e ? [e.estado, e.revisor||'', (e.decision&&e.decision.accion)||'', e.nota||'', _peticionRevActiva_(e)?1:0].join('|') : ''; }
+function _firmaDocM_(e){ return e ? [e.estado, e.revisor||'', (e.decision&&e.decision.accion)||'', e.nota||'', _peticionRevActiva_(e)?1:0, e.envio||'', e.enlaceDrive||e.drive||''].join('|') : ''; }
 async function _refrescarDocAbierto_(sellos){
   if(_DOC_ABIERTO_==null) return;
   if(!_modalAbierto_()){ _DOC_ABIERTO_=null; return; }
@@ -619,7 +619,10 @@ async function _refrescarDocAbierto_(sellos){
     _repartirEntregablesM_(L);
     if(!ahora || _firmaDocM_(ahora)===_firmaDocM_(antes) || _DOC_ABIERTO_!==id || !_modalAbierto_()) return;
     var fir=(ahora.decision&&ahora.decision.revisor)||ahora.revisor||'', acc=_accionDocTxt_(ahora.decision&&ahora.decision.accion)||_accionDocTxt_(ahora.estado);
-    var txt=(fir?fir+' acaba de decidirlo':'Acaba de cambiar')+(acc?': '+acc:'')+'.';
+    /* 18/11 (refutar90): la MISMA ref con otro archivo (`envio`/enlace) no cambia estado ni decisión, y el sello no lo veía: el revisor seguía leyendo el PDF viejo. */
+    var nuevoArch=((ahora.envio||'')!==(antes&&antes.envio||'')) || ((ahora.enlaceDrive||ahora.drive||'')!==(antes&&(antes.enlaceDrive||antes.drive)||''));
+    var txt=nuevoArch ? 'Acaban de mandar otra versión de este documento: el archivo es nuevo.'
+      : (fir?fir+' acaba de decidirlo':'Acaba de cambiar')+(acc?': '+acc:'')+'.';
     if(!_MODAL_TOCADO_){ var sc=$('#modal .card').scrollTop; verDoc(id); $('#modal .card').scrollTop=sc; txt+=' Lo que ves ya está al día.'; }
     else txt+=' Lo de abajo aún es de antes (lo que escribiste sigue ahí): revísalo antes de decidir.';
     var b=document.getElementById('docCambio');
