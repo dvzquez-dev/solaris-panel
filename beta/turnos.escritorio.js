@@ -1780,7 +1780,7 @@ function _convocarPoolHTML_(b){
       (no?' title="No ha dicho que pueda: se añade igual" style="opacity:.78"':'')+'>'+esc(_pilaDeM_(m.nombre)||m.pila)+'</button>';
   };
   if(!cv || !b || !b.claves || !b.claves.length) return pool.map(function(m){ return chip(m, false); }).join('');
-  var pueden=_turnoBloqueQuien_(_calorTurnos_(cv, ''), b.dia, b.claves), si=[], no=[];
+  var pueden=_turnoBloqueQuien_(_calorTurnos_(cv, CONV_FIL.sitio), b.dia, b.claves), si=[], no=[];
   pool.forEach(function(m){ (pueden.indexOf(m.nombre)>=0 ? si : no).push(m); });
   var grupo=function(k, tit, l){
     return '<div data-tu-grupo="'+k+'" style="width:100%;margin:0 0 6px"><span class="sc" style="display:block;margin-bottom:4px">'+tit+' ('+l.length+')</span>'+

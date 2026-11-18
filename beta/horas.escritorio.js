@@ -133,12 +133,13 @@ function bloquePanel(){
      coordinadores, que tienen cargo, pero un SUBCOORDINADOR tiene rango 1 y `cargo` nulo
      -- se ofrecia horas a SI MISMO, y el servidor tiene una guarda explicita contra eso. */
   var actor=_m(ACTOR), mandaEnTodo=rangoNom(ACTOR)>=3, unidad=(actor&&actor.unidad)||'';
-  var reg=_activos_().filter(function(m){ return !m.cargo && m.nombre!==ACTOR; }); // de subsistema, sin bajas, sin uno mismo
   /* ⛔ 21/10 (auditor 8, 🟠 3): A QUIEN EL SERVIDOR DEJA, por la misma puerta que decidir un parte (`puedeDecidirParte`
      = `_puede_sobre_parte`: el PD, o quien coordina ESA unidad). Con «misma unidad que el actor», al subcoordinador
      (rango 1, sin ser el coordinador) se le ofrecía su unidad entera —su propio coordinador incluido— y el servidor
      rechazaba cada uno («sin potestad»). 01/11: `puedeOtorgarA` añade al subcoordinador, a SU equipo (Daniel). */
-  var pool=mandaEnTodo?reg:reg.filter(function(m){ return puedeOtorgarA(m, ACTOR); });   /* 01/11: + el subcoordinador, a su equipo */
+  /* 18/11 (refutar85): la lista es LA del móvil y la de «Otorgar horas directamente» (`_otorgablesDe_`: potestad sobre la persona, nunca uno mismo). Con `!m.cargo` el PD no podía
+     darle horas a un coordinador desde aquí (a Cris la feria también le cuenta) y el servidor y el móvil sí le dejan. */
+  var pool=_activos_().filter(function(m){ return _puedeOtorgarA_(m, ACTOR); });
   if(!pool.length) return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
     (coordinadorDe(unidad)===ACTOR ? 'No hay nadie de tu subsistema a quien otorgar horas en bloque.'

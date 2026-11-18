@@ -9972,6 +9972,26 @@ function _dispMudos_(cv){
   return out.sort();
 }
 
+/* refutar86 (18/11): UN TURNO ES EN UN SOLO SITIO (CUVI = Vigo, CITI = Ourense) y el mapa de «Los dos sitios» SUMA a quien pidió uno y a quien pidió el otro. «4 pueden» con Dora
+   sólo en CITI y los otros tres sólo en CUVI dejaba el hueco «válido» (hay alguien del consejo) sin decir que NO hay un sitio donde coincidan. Esto lo dice, por sitio:
+   cuántos aguantan TODO el bloque allí y si alguien del consejo, y avisa de qué sitio se quedaría SIN responsable. `''` si la convocatoria tiene un solo sitio o no hay bloque. Sólo informa: lo que VALE sigue siendo
+   `_turnoBloqueResp_` (si la regla del consejo debe ser por sitio es decisión de Daniel: `INFORME.md` · Dudas). */
+function _turnoPorSitio_(cv, calor, bloque){
+  var sitios=((cv && cv.sitios && cv.sitios.length) ? cv.sitios : ['cuvi','citi']).filter(function(x){ return x!=='no' && x!=='ambos'; });
+  if(!bloque || !bloque.claves.length || sitios.length<2) return '';
+  var sinResp=[], hayResp=_turnoBloqueResp_(cv, calor, bloque).length>0;
+  var lin=sitios.map(function(sit){
+    var cs=_calorTurnos_(cv, sit), quien=_turnoBloqueQuien_(cs, bloque.dia, bloque.claves), resp=_turnoBloqueResp_(cv, cs, bloque);
+    if(quien.length && !resp.length) sinResp.push(_convEtiq_(sit));
+    return '<b>'+esc(_convEtiq_(sit))+'</b> '+(quien.length ? quien.length+(quien.length===1 ? ' puede' : ' pueden') : 'nadie')+
+      (quien.length ? (resp.length ? ', del consejo: '+resp.map(_dispPila_).map(esc).join(', ') : ', nadie del consejo') : '');
+  });
+  /* el hueco «vale» por alguien del consejo de OTRO campus: quien convoque ahí tiene que saber que en este sitio el turno se quedaría sin responsable */
+  var aviso=(hayResp && sinResp.length) ? '<div data-tcal-sitios-aviso style="margin-top:4px;color:var(--rojo,#E41E25);font-size:13px">'+
+    sinResp.map(function(x){ return 'Un turno en '+esc(x)+' no tendría responsable: nadie del consejo puede allí.'; }).join(' ')+'</div>' : '';
+  return _dispGrupo_('Por sitio', lin.join(' · ')+aviso, 'data-tcal-sitios');
+}
+
 /* La caja de debajo del mapa al tocar un hueco: el desglose de `_dispDetalle_` (responsables · coche · resto · los que dijeron que no)
    y, aparte, de QUÉ SITIO puede cada uno (`cv.resp[nom][k].s`, que `_calorTurnos_` no guarda) y quién aguanta el bloque entero.
    ⛔ Los nombres son de quien convoca (rango ≥ 1): lo decide `_dispDetalle_`, no esto. */
@@ -9990,6 +10010,7 @@ function _turnoDetalle_(cv, k, calor, bloque){
     h+=_dispGrupo_('Todo el bloque'+(bloque.hora?' desde las '+esc(bloque.hora):''),
       t.length ? _dispChips_(t, 'bloque') : '<span class="nadie">nadie aguanta las '+bloque.claves.length+' horas</span>', 'data-tcal-todo');
   }
+  h+=_turnoPorSitio_(cv, calor, bloque);
   if(bloque && bloque.claves.length && !_turnoBloqueResp_(cv, calor, bloque).length)
     h+=_dispGrupo_('No vale', '<span style="color:var(--rojo,#E41E25);font-size:13.5px">nadie del consejo puede todo el bloque, y sin \u00e9l no hay responsable</span>', 'data-tcal-novale');
   return h;
@@ -15827,12 +15848,18 @@ function _darHorasFallos_(r){
     return (nb && e.indexOf(nb)<0 ? nb+': ' : '')+e; }).join(' · ');
   return ' '+t+(f.length>2 ? ' · y '+(f.length-2)+' más' : '');
 }
+/* 18/11 (refutar85): el día de lo otorgado cayó en un mes YA CERRADO: el servidor lo dice en el asunto («(mes ya cerrado)», `_con_coletilla_mes_cerrado`) y las horas
+   cuentan en el mes en curso. El aviso lo repite: «ya cuentan en sus horas del mes» a secas sonaba a que sumaban en el mes del día que se eligió. Las dos caras. */
+function _darHorasCerradoTxt_(r){
+  return ((r && r.resultados) || []).some(function(x){ return x && x.id && String(x.tarea||'').indexOf('(mes ya cerrado)')>=0; })
+    ? ' Ese día es de un mes ya cerrado: las horas cuentan en el mes en curso y el asunto lo dice.' : '';
+}
 function _darHorasAviso_(r, n, horas){
   var ok=(r && r.otorgados)||0, fa=_darHorasFallos_(r);
   return !r ? 'El servidor no ha confirmado: mira sus horas antes de repetirlo, que puede estar dado.'
     : !ok ? '0 de '+n+': no se ha dado nada'+(fa ? '.'+fa : ' (sin permiso o con error).')
-    : ok<n ? h1(horas)+' a '+ok+' de '+n+'.'+(fa ? fa : ' A '+(n-ok)+' no se les ha dado (sin permiso o con error).')
-    : h1(horas)+' a '+ok+(ok===1?' persona':' personas')+'. Ya cuentan en sus horas del mes.';
+    : ok<n ? h1(horas)+' a '+ok+' de '+n+'.'+(fa ? fa : ' A '+(n-ok)+' no se les ha dado (sin permiso o con error).')+_darHorasCerradoTxt_(r)
+    : h1(horas)+' a '+ok+(ok===1?' persona':' personas')+'. Ya cuentan en sus horas del mes.'+_darHorasCerradoTxt_(r);
 }
 function _darHorasCablear_(cb){
   var D=DH; if(!D) return;
