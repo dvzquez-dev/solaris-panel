@@ -1239,3 +1239,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 
 /* refutar55 (17/11): texto sólo para el lector de pantalla (el título de nivel 1 de Estado, que no lleva título a la vista). */
 .sr{position:absolute!important;width:1px!important;height:1px!important;margin:-1px!important;padding:0!important;border:0!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important}
+
+/* refutar99 (18/11): lo que ve quien abre la app en un móvil viejo con 3G mientras llegan ~700 KB de JS: el HTML ya está pintado y el JS aún no. Antes era la cabecera con un nombre
+   inventado («Nerea»), el conmutador de la maqueta y un hueco negro de 20 s sin una palabra. Ahora el hueco dice qué pasa; lo borra el primer pintado de Estado. */
+.abriendo{padding:64px 24px;text-align:center;color:var(--ink3,#9a9293);font-size:15px}

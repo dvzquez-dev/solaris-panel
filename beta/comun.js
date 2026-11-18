@@ -8376,13 +8376,18 @@ function _cargarVisor_(cuerpo, id){
      que cargar. Quien revisa la cola entera veia roto todo lo que no cabia en la primera pantalla.
      ✅ Ahora el iframe NO lleva `loading=lazy`: es esta funcion la que decide cuando pedirlo (IntersectionObserver con
      margen de 600 px) y el `fallo` de 6 s cuenta desde ese momento. Sin IntersectionObserver se pide ya, como antes. */
-  var fallo=null;
+  var fallo=null, pedido=false;
   function pedir(){
-    f.src=url;
+    pedido=true; f.src=url;
+    /* ⛔⛔ refutar99 (18/11): ESTO NO BORRA EL VISOR. Antes, a los 6 s sin `onload` se le quitaba el iframe y se decía «No se pudo incrustar»: en un móvil con 3G Drive
+       tarda 8-15 s en servir el PDF, y se le quitaba justo lo que iba a llegar. Un iframe de otro dominio no dice si falló (también dispara `load` con su página de
+       error), así que 6 s sólo dice «va lento»: se avisa, se deja el iframe cargando y se ofrece el enlace. */
     fallo=setTimeout(function(){ if(cuerpo.dataset.ok) return;
-      cuerpo.innerHTML='<div class="dcar">No se pudo incrustar el visor.<br>Ábrelo en Drive con el enlace de abajo.</div>'; }, 6000);
+      if(car) car.textContent='Está tardando en cargar '+que+'… Si no aparece, ábrelo en Drive con el enlace de abajo.'; }, 6000);
   }
-  f.onload=function(){ cuerpo.dataset.ok='1'; if(fallo) clearTimeout(fallo);
+  /* ⛔⛔ refutar99: el `load` de ANTES de pedir nada no cuenta. Un iframe sin `src` dispara `load` (about:blank) en cuanto se añade: eso daba el visor por cargado, quitaba
+     el «Cargando…» al instante y cancelaba el aviso de lentitud, y quien abre un PDF por 3G veía 8 s de gris liso sin una palabra (el mismo hueco que 358.a juró cerrar). */
+  f.onload=function(){ if(!pedido) return; cuerpo.dataset.ok='1'; if(fallo) clearTimeout(fallo);
     /* ✅ AQUI, y no antes: es el unico momento en que se sabe que hay algo que mirar. */
     if(car && car.parentNode) car.parentNode.removeChild(car); };
   cuerpo.appendChild(f);
@@ -9799,6 +9804,16 @@ function _dosDedos_(rej, alAbortar){
   rej.addEventListener('pointerup', suelta);
   rej.addEventListener('pointercancel', suelta);
   return { deslizando: function(){ return desl; }, dedos: function(){ return n; } };
+}
+
+/* ⛔ refutar99 (18/11): los puntos por los que PASÓ el dedo entre dos `pointermove`. Con la CPU al límite (un móvil viejo) el navegador agrupa los movimientos y entre
+   dos eventos el dedo recorre varias casillas: pintar sólo la de abajo del último punto dejaba huecos en medio de un trazo de lunes a viernes (medido: 8 de 20 casillas
+   con un solo salto). Devuelve de `desde` (excluido; si es null, sólo el punto) a `hasta` (incluido) un punto cada `paso` px como mucho; `paso` menor que la casilla más pequeña. */
+function _puntosEntre_(desde, x, y, paso){
+  if(!desde) return [{x:x, y:y}];
+  var dx = x - desde.x, dy = y - desde.y, n = Math.max(1, Math.ceil(Math.sqrt(dx*dx + dy*dy) / (paso || 10))), out = [], i;
+  for(i = 1; i <= n; i++) out.push({x: desde.x + dx * i / n, y: desde.y + dy * i / n});
+  return out;
 }
 
 /* Una copia de las celdas marcadas, para poder DESHACER un trazo abortado. ⚠️ Plana a
@@ -18375,7 +18390,7 @@ function votVerHTML(){
   if(!cerrada && v.soyVotante){
     var todoAnon=v.preguntas.every(function(q){ return q.anonima && q.yaVote; });
     pie+=todoAnon ? '<p class="rnota">Ya has votado.</p>'
-      : '<button type="button" class="btn pri full" data-vact="votar"'+((hay && !VOT.enviando) ? '' : ' disabled')+'>'+(v.yaVote ? 'Cambiar mi voto' : 'Votar')+'</button>';
+      : '<button type="button" class="btn pri full" data-vact="votar"'+((hay && !VOT.enviando) ? '' : ' disabled')+'>'+(VOT.enviando ? 'Enviando tu voto…' : v.yaVote ? 'Cambiar mi voto' : 'Votar')+'</button>';   /* refutar99: por 3G el botón se apagaba 2-4 s SIN decir nada */
   }
   if(!cerrada && v.gestor) pie+='<button type="button" class="btn full" data-vact="cerrar" style="margin-top:8px">Cerrar la votación</button>';
   return '<button type="button" class="vback" data-vact="lista">‹ Votaciones</button>'+cab+estado+nota+faltan+

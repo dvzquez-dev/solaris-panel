@@ -695,7 +695,7 @@ function _engConv_(){
   if(br) br.onclick=function(){ _reusarConv_(cv, repinta); };
   /* Pintar a dedo y de arrastre, como en reuniones. ⚠️ `setPointerCapture` LANZA si el puntero
      no es suyo, y al lanzar aborta el resto del manejador: va envuelto (ya pasó en el pintor). */
-  var pintando=false, antes=null, modoTrazo=null;
+  var pintando=false, antes=null, modoTrazo=null, ultPt=null;
   /* refutar33 (13/11): LOS ESCUCHAS DEL TRAZO SE PONEN UNA VEZ POR NODO. `pintar()` ya no reconstruye si no hay nada nuevo (`_pintarSiCambia_`),
      pero `enganchar()` corre igual y esto hacía `addEventListener` otra vez sobre la MISMA rejilla: tras dos repintados sin cambios un toque
      disparaba tres pintores seguidos —cada uno alternaba la casilla— y la marca no se ponía (o se ponía, según lo impar). Los escuchas leen
@@ -774,17 +774,22 @@ function _engConv_(){
        entrega al elemento capturado igual, pero los `pointermove` del segundo **dejan de
        llegar** en algunos navegadores y el centroide se queda quieto. El pintor ya no la
        necesita: `pointermove` resuelve la celda con `elementFromPoint`. */
-    modoTrazo = _convPintar_(cv, el.dataset.tk) ? 'marca' : 'borra'; repinta();
+    modoTrazo = _convPintar_(cv, el.dataset.tk) ? 'marca' : 'borra'; ultPt = {x:e.clientX, y:e.clientY}; repinta();
   });
   rej.addEventListener('pointermove', function(e){
     var cv=rej._cv, repinta=rej._repinta;
     if(dd.deslizando() || !pintando) return;
-    var el=document.elementFromPoint(e.clientX, e.clientY);
-    el=el&&el.closest?el.closest('[data-tk]'):null;
-    var _huella=JSON.stringify(_convQuiere_());       /* el pincel entero: cambiar sólo el coche de un sitio cuenta */
-    if(!el||el._ult===_huella) return;
-    el._ult=_huella;
-    _convPintar_(cv, el.dataset.tk, modoTrazo); repinta();
+    var _huella=JSON.stringify(_convQuiere_()), pintada=false;       /* el pincel entero: cambiar sólo el coche de un sitio cuenta */
+    /* refutar99: TODOS los puntos desde el último evento, no sólo el de ahora: en un móvil lento el dedo salta varias casillas entre dos `pointermove` */
+    _puntosEntre_(ultPt, e.clientX, e.clientY, 10).forEach(function(q){
+      var el=document.elementFromPoint(q.x, q.y);
+      el=el&&el.closest?el.closest('[data-tk]'):null;
+      if(!el||el._ult===_huella) return;
+      el._ult=_huella; pintada=true;
+      _convPintar_(cv, el.dataset.tk, modoTrazo);
+    });
+    ultPt={x:e.clientX, y:e.clientY};
+    if(pintada) repinta();
   });
   var fin=function(){
     var cv=rej._cv;
@@ -792,7 +797,7 @@ function _engConv_(){
        fila entera son 14 celdas. `pintando` lo vigila para no guardar en un `pointerup`
        que no venía de pintar nada. */
     if(pintando) _convGuardar_(cv);
-    pintando=false; antes=null; modoTrazo=null;
+    pintando=false; antes=null; modoTrazo=null; ultPt=null;
     $$('#convC [data-tk]').forEach(function(x){ x._ult=null; });
   };
   rej.addEventListener('pointerup', fin);
