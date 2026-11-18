@@ -8395,6 +8395,9 @@ function _visorDocHTML_(url, sub, sinEnlace){
                       queEs:'el documento', plegado:false});
 }
 
+/* ⛔ refutar117 (18/11): un enlace sólo es un ENLACE si es http(s). `source_drive_url` sale del Form y llega tal cual: un «javascript:…» pintado en un `href`
+   con `target=_blank` corre en la página de la app, con la sesión de quien revisa dentro. El visor ya lo trata como «no reconocible» (no casa con `/d/<id>/`);
+   lo que faltaba era no ofrecerlo además como enlace pulsable. (Inline y no una función aparte: dos bancos cargan `_visorHTML_` por su nombre.) */
 function _visorHTML_(o){
   var abierto = !o.plegado;
   return '<div class="doc" data-visor>'+
@@ -8409,7 +8412,7 @@ function _visorHTML_(o){
         '<path d="M6 9l6 6 6-6"/></svg></div>'+
     '<div class="vcuerpo"'+(abierto?'':' hidden')+' data-quees="'+esc(o.queEs||'el documento')+'">'+
       (abierto?'<div class="dcar">Cargando '+esc(o.queEs||'el documento')+'…</div>':'')+'</div>'+
-    (o.url?'<a class="da" href="'+esc(o.url)+'" target="_blank" rel="noopener">abrir en Drive</a>':'')+
+    (/^https?:\/\//i.test(String(o.url||''))?'<a class="da" href="'+esc(o.url)+'" target="_blank" rel="noopener">abrir en Drive</a>':'')+
   '</div>';
 }
 
@@ -8419,8 +8422,11 @@ function _visorHTML_(o){
 function _cargarVisor_(cuerpo, id){
   if(cuerpo.dataset.cargado) return; cuerpo.dataset.cargado='1';
   var que=cuerpo.dataset.quees||'el documento';
-  if(!id){ cuerpo.innerHTML='<div class="dcar">El enlace no es un archivo de Drive reconocible.<br>'+
-    'Ábrelo con el enlace de abajo.</div>'; return; }
+  if(!id){
+    /* refutar117: «con el enlace de abajo» sólo si hay enlace abajo (un «javascript:» no se ofrece, `_visorHTML_`) */
+    var sinEnlace = !!(cuerpo.parentNode && cuerpo.parentNode.querySelector && !cuerpo.parentNode.querySelector('a.da'));
+    cuerpo.innerHTML='<div class="dcar">'+(sinEnlace ? 'El enlace del archivo no es una dirección web válida.<br>Pídeselo a quien lo subió.'
+      : 'El enlace no es un archivo de Drive reconocible.<br>Ábrelo con el enlace de abajo.')+'</div>'; return; }
   /* ⛔⛔ EL AVISO SE QUEDA HASTA QUE EL VISOR CARGUE (358.a, 24/08). Aqui se escribia
      «Cargando …» y **cuatro sentencias mas abajo** habia un `cuerpo.innerHTML=''` que lo
      borraba **en el mismo tick**: entre medias no hay nada que ceda el hilo (`setTimeout`

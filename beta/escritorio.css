@@ -366,7 +366,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .parte{border-top:1px solid var(--line);padding:13px}
 .parte:first-child{border-top:0}
 .parte .h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.parte .h b{font-size:13.5px}
+.parte .h b{font-size:13.5px;min-width:0;overflow-wrap:anywhere}   /* refutar117: un título sin espacios (200 letras pegadas) ensanchaba la tarjeta hasta salirse de la pantalla */
 .parte .h .u{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
 .parte .h .q{margin-left:auto;font-family:var(--mono);font-size:18px;font-weight:600;color:var(--warn);letter-spacing:-.02em}
 .parte .just{margin-top:9px;padding:9px 11px;border:1px solid var(--line);border-left:2px solid var(--tel);
