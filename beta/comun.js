@@ -3234,6 +3234,14 @@ function _apiParse(txt, accion){
      y el backend no vio ninguna accion. Nunca llego a ejecutarse nada, asi que se repite. */
   if(accion && /^acci[oó]n desconocida/.test(err) && err.indexOf(accion)<0)
     throw new _ApiTransito("el cuerpo del POST no llegó ("+err+")");
+  /* ⛔ refutar66 (17/11): «acción desconocida: votVotar» CON la acción nombrada = la app y el servidor no son de la misma
+     versión (alguien con la app abierta de ayer mientras el servidor ya es el de hoy, o al revés). Nada se ejecutó. Antes salía
+     tal cual dentro de «No se pudo votar: …», jerga que no dice qué hacer; ahora dice qué hacer Y de paso pregunta si hay
+     versión nueva (se recarga sola si no tienes nada a medias). */
+  if(accion && /^acci[oó]n desconocida/.test(err)){
+    try{ _vigilarVersion_(true); }catch(_){}
+    var ev=new Error(API_MSG_VERSION_DISTINTA); ev.versionDistinta=true; throw ev;
+  }
   /* ⛔ LA SESION CADUCADA SE DICE EN CRISTIANO. Ver `_ApiSesion`: el backend contesta
      `token no válido`, que es exacto y no le sirve de nada a quien está intentando cerrar su
      fichaje. Aquí se traduce a lo único accionable: vuelve a entrar. */
@@ -3314,6 +3322,7 @@ function _revocarAcceso_(){
     'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Entrar con otra cuenta</button>');
   var b=document.getElementById('reGis'); if(b) b.onclick=_pintarLogin_;
 }
+var API_MSG_VERSION_DISTINTA = "Esta versión de la app no es la del servidor: cierra la app y vuelve a abrirla (o recárgala) y repítelo. No se ha guardado nada.";
 var API_MSG_RESP_RARA = "El servidor no ha dado una respuesta válida. Puede que se haya guardado: recarga antes de repetirlo.";
 async function _apiPost_(body){
   /* La fusión vive DENTRO de `_apiPost_` (y su registro en la propia función) para que quien extrae esta función a un banco
@@ -8361,6 +8370,9 @@ function _hayAMedias_(){
   if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || (a && a.isContentEditable)) return true;
   var m = document.getElementById('modal');
   if (m && m.classList && m.classList.contains('on')) return true;
+  /* refutar66: una ESCRITURA en vuelo (un parte, un voto, una disponibilidad que ya salió y aún no contestó): recargar ahora
+     tiraría la respuesta y la persona repetiría lo que ya se guardó. `_apiPost_.vuelo` sólo tiene escrituras sin contestar. */
+  try{ if (_apiPost_.vuelo && Object.keys(_apiPost_.vuelo).length) return true; }catch(_){}
   var ts = document.getElementsByTagName ? document.getElementsByTagName('textarea') : [];
   for (var i = 0; i < ts.length; i++) if (ts[i].value && String(ts[i].value).trim()) return true;
   /* ⛔ Y EL ESCRITORIO (auditoría del 20/10): no tiene `#modal`, pero sí botones de guardar que SÓLO se habilitan con
@@ -8375,6 +8387,47 @@ function _hayAMedias_(){
     else if (ty !== 'hidden' && ty !== 'button' && ty !== 'submit' && x.value !== x.defaultValue) return true;
   }
   return false;
+}
+
+/* ══ ¿HAY VERSIÓN NUEVA MIENTRAS LA APP SIGUE ABIERTA? (refutar66, 17/11) ═══════════════════════════════════════
+   📏 Medido (Chromium, lo que genera `publicar_web.leer()` servido con ETag/`max-age=600`): una app abierta con la v0.32 mientras
+   sale la v0.33 **no se enteraba nunca**. El aviso `version-nueva` lo manda el worker sólo cuando SERVIRÍA lo viejo en una
+   NAVEGACIÓN, y una pestaña abierta no navega: ni a los 15 s, ni con `registration.update()`, ni al volver a ella. Una PWA
+   abierta días en segundo plano seguía con el JS de la semana pasada, hablando con un servidor que ya es otro.
+   ✅ Al volver a la app (y cada 10 min con ella a la vista) se pide la página a la RED y se compara con la que está en pantalla: cada
+   fichero lleva su huella (`comun.js?v=a1b2c3d`), así que «distinta lista de `?v=`» es exactamente «hay otra versión».
+   La recarga la decide `_recargarVersionNueva_` como siempre: nunca encima de algo a medias. */
+var _vigVersion = { ultimo: 0, vuelo: false, timer: null };
+function _huellasDeDoc_(doc){
+  var out = [], ns = doc && doc.querySelectorAll ? doc.querySelectorAll('script[src],link[href]') : [];
+  for (var i = 0; i < ns.length; i++){
+    var u = ns[i].getAttribute('src') || ns[i].getAttribute('href') || '';
+    if (/\?v=[0-9a-f]{7}$/.test(u)) out.push(u);
+  }
+  return out.sort().join('|');
+}
+async function _vigilarVersion_(forzar, volviendo){
+  if (_avisoVersion) return _recargarVersionNueva_(!!volviendo);
+  if (typeof document === 'undefined' || typeof fetch !== 'function' || typeof DOMParser === 'undefined') return false;
+  if (_vigVersion.vuelo) return false;
+  var ahora = Date.now();
+  if (!forzar && ahora - _vigVersion.ultimo < 90000) return false;     // al volver varias veces seguidas, una pregunta
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+  var mia = _huellasDeDoc_(document);
+  if (!mia) return false;                                              // sin publicar (sin `?v=`): no hay con qué comparar
+  _vigVersion.vuelo = true; _vigVersion.ultimo = ahora;
+  try{
+    var u = String(location.href).split('#')[0];
+    /* `sol_v=1` FIJO y `no-cache`: se REVALIDA con el ETag (un 304 vacío si no hay nada nuevo) en vez de bajar el HTML entero (142 KB
+       comprimidos el móvil, 546 KB en claro el escritorio) cada vez que se vuelve a la app. El worker no toca esta URL (`sol_v=`). */
+    var r = await fetch(u + (u.indexOf('?') >= 0 ? '&' : '?') + 'sol_v=1', { cache: 'no-cache' });
+    if (!r || !r.ok) return false;
+    var otra = _huellasDeDoc_(new DOMParser().parseFromString(await r.text(), 'text/html'));
+    if (!otra || otra === mia) return false;                           // sin huellas (una página de error) tampoco es «nueva»
+    _avisoVersion = true;
+    return _recargarVersionNueva_(!!volviendo);
+  }catch(_){ return false; }
+  finally{ _vigVersion.vuelo = false; }
 }
 
 function _recargarVersionNueva_(volviendo){
@@ -8553,8 +8606,13 @@ function _escucharSW_(){
     document.addEventListener('pointerdown', marca, true);
     document.addEventListener('keydown', marca, true);
     document.addEventListener('visibilitychange', function(){
-      if (document.visibilityState === 'visible') _recargarVersionNueva_(true);
+      if (document.visibilityState === 'visible'){ if (!_recargarVersionNueva_(true)) _vigilarVersion_(false, true); }
     });
+    /* refutar66: y con la app a la vista todo el rato (la pantalla de una tablet del taller), cada 10 min. Se pregunta
+       sin `volviendo`: usándola no se recarga en mitad, sólo la primera vez que no haya nada a medias. */
+    if (!_vigVersion.timer) _vigVersion.timer = setInterval(function(){
+      if (document.visibilityState === 'visible') _vigilarVersion_(false);
+    }, 600000);
     navigator.serviceWorker.addEventListener('message', function(ev){
       if (ev && ev.data && ev.data.tipo === 'version-nueva') { _avisoVersion = true; _recargarVersionNueva_(false); }
       else if (ev && ev.data && ev.data.tipo === 'ir') _irDesdeAviso_(ev.data.a);

@@ -50,7 +50,9 @@ self.addEventListener('install', () => self.skipWaiting());
    -`_cacheable_`- y esa funcion **se ejecuta en el banco** con los casos que hacen dano.
    ⚠️ El manejador `fetch` en si NO se ejecuta en ningun banco, y hay que decirlo: usa
    `async`/`await` y `caches`, que el arnes de `cscript` (ES3) no tiene. Se vigila por forma. */
-const CACHE = 'solaris-estaticos-v1';
+/* ⛔ v2 (17/11): la v1 de quien ya la tiene puede llevar `?v=` ENVENENADOS (el JS nuevo bajo el hash viejo; ver `_esVersionado_`)
+   y desde hoy lo versionado se sirve SIN preguntar: esa cache se tira entera al activarse (`_tirarCachesViejas_`). */
+const CACHE = 'solaris-estaticos-v2';
 /* Cuanto se espera a la red antes de abrir con lo guardado (20/10). Corto a proposito: es
    lo que tarda en abrir en el peor caso con red mala; con red buena llega antes. */
 const ESPERA_RED_MS = 3500;
@@ -69,7 +71,34 @@ function _cacheable_(req, scope){
   var u = String(req.url || '');
   if (u.indexOf(scope) !== 0) return false;
   if (u.indexOf('sw.js') >= 0) return false;
+  /* ⛔ `sol_v=` es la pregunta de la PAGINA «¿hay version nueva?» (`_vigilarVersion_`, comun.js): ni se sirve de la cache
+     (contestaria con la copia de ayer: justo lo que pregunta) ni se guarda (guardaria el HTML nuevo SIN sus modulos, que es
+     justo lo que `_guardarPagina_` evita). Ella misma se revalida con el ETag, asi que no baja el HTML entero cada vez. */
+  if (u.indexOf('sol_v=') >= 0) return false;
   return true;
+}
+
+/* ══ refutar66 (17/11): UNA VERSION NUEVA CON LA APP INSTALADA ═════════════════════════════════════════════
+   📏 Medido con Chromium sirviendo lo que genera `publicar_web.leer()` (ETag + `max-age=600`, como Pages):
+   · la cache NUNCA soltaba nada: cada release dejaba SU `comun.js?v=…` (436 KB) y los modulos que cambian, para siempre;
+   · con red lenta, lo guardado se servia y la red lo REFRESCABA por detras... **bajo la URL vieja**: Pages ignora el
+     `?v=`, asi que `comun.js?v=VIEJO` acababa guardando el JS NUEVO (cache envenenada: el hash mentia);
+   · el HTML nuevo se guardaba ANTES que sus modulos: sin red entre medias, la app NO abria (peor que abrir la vieja);
+   · la primera visita no guardaba nada (el worker aun no mandaba): sin red justo despues de instalarla, no abria.
+   ✅ Lo que lleva huella de contenido (`?v=a1b2c3d`) es INMUTABLE: guardado = bueno, no se refresca. El HTML se guarda
+   DESPUES de sus modulos (si falta uno, se queda el par anterior), y al entrar el nuevo se sueltan las generaciones viejas. */
+function _esVersionado_(url){ return /[?&]v=[0-9a-f]{7}$/.test(String(url || '')); }
+
+/* Los `src`/`href` RELATIVOS de un HTML (scripts y hojas de estilo): lo que hay que tener en cache para abrirlo sin red. */
+function _refsDePagina_(html){
+  var s = String(html || ''), out = [], vistos = {}, m, re = /<(?:script|link)\b[^>]*?\s(?:src|href)="([^"#]+)"/gi;
+  while ((m = re.exec(s))) {
+    var u = m[1];
+    if (/^(?:[a-z][a-z0-9+.\-]*:|\/\/)/i.test(u)) continue;
+    if (vistos[u]) continue;
+    vistos[u] = 1; out.push(u);
+  }
+  return out;
 }
 
 /* ══ ¿LO QUE ACABA DE LLEGAR ES DISTINTO DE LO QUE TENIAMOS? (545.ª, 10/09/2026)
@@ -136,6 +165,39 @@ function _modoSubrecurso_(esNavegacion, navVieja, hayGuardado){
 /* Como salio la ultima navegacion: `true` lo guardado, `false` la red, `null` no se sabe. */
 let _navVieja = null;
 
+/* Guarda una pagina Y lo que carga, en ese orden. `req` = la peticion (o su URL) del HTML; `resp` = su respuesta (ya clonada).
+   ⛔ Si falta un modulo con huella, el HTML NO entra: se queda el par anterior, entero y coherente. */
+async function _guardarPagina_(c, req, resp){
+  const urlPag = typeof req === 'string' ? req : req.url;
+  let html = '';
+  try { html = await resp.clone().text(); } catch (_) { return false; }
+  const vigentes = [];
+  const bien = await Promise.all(_refsDePagina_(html).map(async (rel) => {
+    let u = '';
+    try { u = new URL(rel, urlPag).href; } catch (_) { return true; }
+    if (!_cacheable_({ method: 'GET', url: u }, self.registration.scope)) return true;
+    vigentes.push(u);
+    try {
+      if (await c.match(u)) return true;
+      const r = await fetch(u);
+      if (r && r.ok) { await c.put(u, r); return true; }
+    } catch (_) {}
+    return !_esVersionado_(u);        /* lo suelto (manifest, iconos) no tumba la pagina; lo versionado, si */
+  }));
+  if (bien.indexOf(false) >= 0) return false;
+  try { await c.put(req, resp); } catch (_) { return false; }
+  /* La generacion anterior de cada fichero versionado ya no la pide ninguna pagina guardada: se suelta. */
+  try {
+    const base = (x) => String(x).split('?')[0];
+    const nuevos = {}; vigentes.forEach((u) => { if (_esVersionado_(u)) nuevos[u] = base(u); });
+    const hechas = Object.keys(nuevos).map((u) => nuevos[u]);
+    for (const k of await c.keys()) {
+      if (_esVersionado_(k.url) && !nuevos[k.url] && k.url.indexOf(self.registration.scope) === 0 && hechas.indexOf(base(k.url)) >= 0) await c.delete(k);
+    }
+  } catch (_) {}
+  return true;
+}
+
 /* Se lo dice a las pestanas abiertas. ⚠️ NO recarga: alguien puede estar marcando su
    disponibilidad, y recargar por su cuenta le borra lo que llevaba. La pagina decide. */
 async function _avisarVersion_(){
@@ -165,7 +227,10 @@ self.addEventListener('fetch', (e) => {
        ⛔ `cache:'no-cache'` NO ES ADORNO: sin el, `fetch` puede contestar con la copia del
        PROPIO navegador (`max-age=600`, diez minutos) y «la red primero» seguiria siendo la de
        ayer. Con el se revalida contra el servidor (`ETag`: si no cambio, un 304 vacio). */
-    let llego = false, servidoViejo = false;
+    /* ⛔ LO VERSIONADO NO SE REFRESCA: `?v=` es la huella de SU contenido, asi que lo guardado ES lo bueno. Y refrescarlo
+       por detras era lo que lo envenenaba (Pages ignora el `?v=`: guardaba el JS nuevo bajo el hash viejo). */
+    if (guardado && e.request.mode !== 'navigate' && _esVersionado_(e.request.url)) return guardado;
+    let llego = false, servidoViejo = false, guardando = null;
     const red = fetch(e.request, { cache: 'no-cache' }).then((r) => {
       llego = true;
       /* ⛔ Solo se guarda lo que llego BIEN: un 404 o un 500 cacheados se sirven como si
@@ -177,8 +242,15 @@ self.addEventListener('fetch', (e) => {
            nuevo y la comparacion saldria SIEMPRE igual -- verde para siempre.
            ⛔ Y SOLO SI SE SIRVIO LO VIEJO: si la red llego a tiempo, la pagina YA es la nueva,
            y avisar la haria recargar para nada. */
-        if (servidoViejo && _hayVersionNueva_(guardado, r)) { _avisarVersion_(); }
-        try { c.put(e.request, r.clone()); } catch (_) {}
+        let avisar = false;
+        if (servidoViejo && _hayVersionNueva_(guardado, r)) { avisar = true; }
+        /* El HTML entra DESPUES de sus modulos (`_guardarPagina_`); lo demas, como siempre.
+           ⛔ Y EL AVISO SALE CUANDO YA ESTA GUARDADA LA NUEVA, no antes: con la red lenta, avisar al llegar el HTML recargaba la pagina
+           mientras los modulos aun bajaban, la recarga volvia a encontrar el HTML VIEJO en cache y avisaba otra vez — recargas en bucle
+           hasta que terminara la descarga (medido con 5,5 s de retardo). Con la nueva ya dentro, la recarga la abre al instante.
+           ⛔ Y SOLO LA NAVEGACION AVISA: el HTML lleva los `?v=` de todo lo demas, asi que cambia siempre que algo cambia. */
+        if (e.request.mode === 'navigate') guardando = _guardarPagina_(c, e.request, r.clone()).then((bien) => { if (bien && avisar) _avisarVersion_(); return bien; }, () => false);
+        else { try { c.put(e.request, r.clone()); } catch (_) {} }
         return r;
       }
       /* Un 404 o un 500 con copia buena guardada: mejor la copia que una app rota. */
@@ -190,7 +262,7 @@ self.addEventListener('fetch', (e) => {
     }).catch(() => { llego = true; return guardado || Response.error(); });
     /* ⛔ `waitUntil`: si se sirvió lo guardado, la descarga sigue FUERA de la respuesta, y el navegador puede apagar el
        worker a los ~30 s y matarla — sin `put` ni aviso, en cada apertura con red lenta (auditoría del 20/10). */
-    try { e.waitUntil(red.then(() => {}, () => {})); } catch (_) {}
+    try { e.waitUntil(red.then(() => guardando, () => {})); } catch (_) {}
     const nav = e.request.mode === 'navigate';
     if (!guardado) { if (nav) _navVieja = false; return red; }
     const modo = _modoSubrecurso_(nav, _navVieja, true);
@@ -205,7 +277,23 @@ self.addEventListener('fetch', (e) => {
       }, ESPERA_RED_MS))]);
   })());
 });
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+/* ⛔ La PRIMERA visita no pasaba por el worker (aun no mandaba): la cache quedaba VACIA y sin red justo despues de
+   instalar la app no abria. Al activarse, la pagina que lo registro se guarda con lo que carga. */
+async function _tirarCachesViejas_() {
+  for (const k of await caches.keys()) if (k.indexOf('solaris-estaticos-') === 0 && k !== CACHE) await caches.delete(k);
+}
+async function _guardarLasAbiertas_() {
+  await _tirarCachesViejas_();
+  const c = await caches.open(CACHE);
+  const cls = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const cl of cls) {
+    const url = String(cl.url || '').split('#')[0];
+    if (!_cacheable_({ method: 'GET', url: url }, self.registration.scope) || await c.match(url)) continue;
+    const r = await fetch(url, { cache: 'no-cache' });
+    if (r && r.ok) await _guardarPagina_(c, url, r);
+  }
+}
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim().then(() => _guardarLasAbiertas_()).catch(() => {})));
 
 /* ⛔ 21/10 (auditor 7, 🟡 13): un aviso LLEVA A SU PANTALLA. El emisor manda un destino corto (`#horas`) y aquí se
    cuelga de NUESTRO ámbito — el mismo aviso sirve a beta y a producción sin que el emisor sepa en cuál estás. */
