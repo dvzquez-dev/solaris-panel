@@ -4547,6 +4547,7 @@ function _solErrorTxt_(motivo){
     .replace(/\s*\((c[oó]digo|code) \d+\)/i, '').replace(/[.\s]+$/, '') : '';   // `solaria10`: «(código 1)» no es para quien lee
   if(m && _SOL_CUOTA_.test(m)) return 'SolarIA ha llegado a su límite de uso por ahora: prueba más tarde o sigue a mano.';
   if(m && /^SolarIA /.test(m)) return m+'.';   // ya viene dicho en persona («SolarIA está atendiendo otras peticiones…»): sin «no está disponible ahora:» encima
+  if(m && /^(las|tus) notas (son|pasan)|^la descripci[oó]n es demasiado/i.test(m)) return m.charAt(0).toUpperCase()+m.slice(1)+': resume lo importante o cuéntalo en dos veces.';   // refutar107: el exceso es de lo dictado, no un fallo de SolarIA
   if(m && _SOL_NO_SUPO_.test(m)) return 'SolarIA no ha sabido redactarlo: '+m+'.';
   return 'SolarIA no está disponible ahora'+(m ? ': '+m : '')+'.';
 }
@@ -4644,7 +4645,8 @@ async function _solPedir_(k){
   catch(e){ clearTimeout(reloj); suelta(); if(vigente()){ SOLP[k] = {fase: 'error', msg: _solErrorTxt_(e)}; _solPintar_(k); } return; }
   clearTimeout(reloj); suelta();
   if(!vigente()) return;
-  if(c.valor && String(c.valor() == null ? '' : c.valor()) !== base){ delete SOLP[k]; _solPintar_(k); return; }   // la caja cambió mientras pensaba
+  if(c.valor && String(c.valor() == null ? '' : c.valor()) !== base && String(c.valor() == null ? '' : c.valor()).trim()){ SOLP[k] = {fase: 'error', msg: 'Has seguido escribiendo mientras SolarIA contestaba: lo que propuso era del texto de antes. Pulsa el botón otra vez cuando acabes.'}; _solPintar_(k); return; }   // refutar107: quien DICTA sigue hablando y la caja sigue con texto: se dice (sin decirlo, la propuesta desaparecía sin más)
+  if(c.valor && String(c.valor() == null ? '' : c.valor()) !== base){ delete SOLP[k]; _solPintar_(k); return; }   // la caja cambió mientras pensaba (o se vació: la tarea ya se creó)
   if(r && r.vacio && c.calla){ delete SOLP[k]; _solPintar_(k); tost(r.vacio); return; }   // `calla`: sin propuesta clara no se enseña barra, sólo un aviso que se va solo
   if(r && r.vacio) SOLP[k] = {fase: 'error', msg: r.vacio};   // el modelo contestó, pero no hay nada que proponer
   else if(r && r.ok !== false && !r.texto) SOLP[k] = {fase: 'error', msg: 'SolarIA no ha devuelto nada: prueba otra vez o hazlo a mano.'};   // el modelo SÍ contestó: no es «no está disponible»
