@@ -16719,7 +16719,10 @@ function _ftSubir_(t, files, titulo){
   var k = _ftClave_(t), S = FT_.sub[k] = FT_.sub[k] || {cola: [], fallidas: [], rechazos: [], total: 0, hechas: 0, pct: 0, activo: false, msg: ''};
   var r = FT_.est[k] && FT_.est[k].r, max = (r && r.maxBytes) || 26214400;
   files.forEach(function(f){
-    if(!f || !f.size){ return; }
+    if(!f) return;
+    /* refutar116 (18/11): un fichero vacío (una foto que el móvil no llegó a guardar) se callaba: no aparecía ni como error. Un vídeo (la galería los ofrece) ni se manda. */
+    if(!f.size){ S.rechazos.push('«' + f.name + '» está vacía: el móvil no llegó a guardarla. Haz la foto otra vez.'); return; }
+    if(/^video\//.test(f.type || '')){ S.rechazos.push('«' + f.name + '» es un vídeo: aquí sólo van fotos.'); return; }
     if(f.size > max){ S.rechazos.push('«' + f.name + '» pesa ' + _ftBytesTxt_(f.size) + ' (máximo ' + _ftBytesTxt_(max) + ').'); return; }
     S.cola.push({file: f, titulo: String(titulo || '').trim()}); S.total++;
   });
@@ -16737,7 +16740,7 @@ async function _ftVaciar_(t, k){
       S.cola.shift(); S.hechas++;
     }catch(e){
       if(_ftDeRed_(e)){
-        S.msg = 'Sin conexión: quedan ' + S.cola.length + ' fotos por subir. Las ya subidas están a salvo.';
+        S.msg = 'Sin conexión: ' + (S.cola.length === 1 ? 'queda 1 foto por subir' : 'quedan ' + S.cola.length + ' fotos por subir') + '. Las ya subidas están a salvo.';
         S.fallidas = S.fallidas.concat(S.cola.splice(0).map(function(x){ return {file: x.file, titulo: x.titulo}; }));
       }else{
         S.cola.shift(); S.hechas++;
@@ -16748,6 +16751,7 @@ async function _ftVaciar_(t, k){
   }
   S.activo = false; S.pct = 0;
   if(S.hechas >= S.total && !S.fallidas.length){ S.total = S.hechas = 0; S.msg = ''; }
+  _ftPintar_(k);   /* refutar116: ANTES de refrescar la galería (sin red, esa petición tarda): si no, «Subiendo 1 de 2 · 17 %» seguía junto al «Sin conexión» */
   await _ftRefrescar_(t, true);
   _ftPintar_(k);
 }
@@ -17054,6 +17058,8 @@ function _mtEditorHTML_(k){
          '<textarea class="mtf-in" data-mtin="comentarios.' + i + '.texto" placeholder="Qué se hizo, cómo, qué pasó y qué queda pendiente">' + esc(c.texto || '') + '</textarea>';
     fotos.forEach(function(f, j){
       var fp = _mtFotoDe_(ed, f.id);
+      /* refutar116 (18/11): el responsable audiovisual puede quitar una foto del turno DESPUÉS de que se pusiera en la memoria; el envío fallaba sin que el editor la señalara */
+      if(ed.poolListo && !fp) h += '<p class="mtf-nota" data-mtfaltafoto style="color:var(--red)">Esta foto ya no está en el turno (la quitaron). Quítala de la memoria o pon otra.</p>';
       h += '<div class="mtf-foto">' + (fp && fp.mini ? '<img src="' + esc(fp.mini) + '" alt="">' : '') +
            '<div class="mtf-campo" style="flex:1;margin:0"><label class="mtf-lab">Pie de la foto</label>' + _mtInp_('comentarios.' + i + '.fotos.' + j + '.pie', f.pie, 'Qué se ve') + '</div></div>'+
            _mtAcc_('<span class="mtf-c mini" data-mtquitar="foto:' + i + ':' + j + '">Quitar foto</span>');
@@ -17227,7 +17233,7 @@ async function _mtAbrir_(t, k){
   _mtPintar_(k);
   /* las fotos del turno para ponerlas en la memoria (sólo si el servidor deja verlas); sin ellas la memoria se escribe igual */
   _ftDeserv_('listarFotosTurno', t).then(function(f){
-    if(MT_.ed[k] && f && f.puedeVer){ MT_.ed[k].pool = f.fotos || []; _mtPintar_(k); }
+    if(MT_.ed[k] && f && f.puedeVer){ MT_.ed[k].pool = f.fotos || []; MT_.ed[k].poolListo = true; _mtPintar_(k); }
   }, function(){});
 }
 async function _mtReabrir_(t, k){
