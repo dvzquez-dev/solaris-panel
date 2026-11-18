@@ -10791,7 +10791,12 @@ function _tuyoItems_(c){
   if(rc.length) add('rech', 'horas', rc.length === 1 ? 'Te han rechazado un parte' : ('Te han rechazado ' + rc.length + ' partes'),
     (rc[0].tarea ? '«' + esc(rc[0].tarea) + '»' : 'El último') + (rc[0].motivo ? ' — ' + esc(rc[0].motivo) : '') +
       (rc.length > 1 ? (', y ' + (rc.length - 1) + ' más') : '') + '.', true);
-  if(c.conv) add('conv', 'turnos', 'Di tu disponibilidad para los turnos', 'Si no dices nada, se reparte sin contar contigo.', true);
+  /* refutar108 (18/11): quien tiene EXENCIÓN (`exento_hasta`: Erasmus…) ve el mismo aviso pero SIN rojo y diciendo la verdad: no contestar no le sanciona (el servidor ya la salta), aunque sin contestar se reparte sin contar con ella. `c.conv` = la fecha de su exención (texto) o `true`. */
+  if(c.conv){
+    var ex = typeof c.conv === 'string' ? c.conv : '';
+    add('conv', 'turnos', ex ? 'Disponibilidad para los turnos (opcional)' : 'Di tu disponibilidad para los turnos',
+      ex ? 'Tienes exenci\u00f3n hasta el ' + ex + ': si no dices nada no se te sanciona, pero se reparte sin contar contigo.' : 'Si no dices nada, se reparte sin contar contigo.', !ex);
+  }
   return out;
 }
 
@@ -10857,9 +10862,20 @@ function _convFalta_(cv, mias){
 }
 
 /* La frase de lo que falta, corta y sin explicar la regla; `''` si no falta nada. */
+/* refutar108 (18/11): la EXENCIÓN de quien se va (Erasmus…): `exento_hasta` (AAAA-MM-DD, en su ficha del roster) ≥ el día del plazo de la convocatoria, como `sancionar_convocatoria.exento`.
+   Devuelve la fecha «DD/MM/AAAA» hasta la que vale, o `''` si no tiene (o no cubre este plazo). */
+function _exencionConv_(cv){
+  var y = null; try { y = (typeof miembro === 'function' && typeof _fichaYo_ === 'function') ? miembro(_fichaYo_()) : null; } catch(e){}
+  if (!y && typeof YO !== 'undefined') y = YO;
+  var h = String((y && y.exento_hasta) || '').slice(0, 10), l = String((cv && cv.limite) || '').slice(0, 10);
+  return (/^\d{4}-\d\d-\d\d$/.test(h) && /^\d{4}-\d\d-\d\d$/.test(l) && h >= l) ? h.slice(8) + '/' + h.slice(5, 7) + '/' + h.slice(0, 4) : '';
+}
+
 function _convFaltaTxt_(cv, mias){
   var n = _convFalta_(cv, mias).dias.length;
   if (!n) return '';
+  var ex = _exencionConv_(cv);
+  if (ex) return 'Tienes exenci\u00f3n hasta el ' + ex + ': si no la rellenas no se te sanciona.';
   return (n === 1 ? 'Te falta 1 d\u00eda' : 'Te faltan ' + n + ' d\u00edas') + ': sin ' + (n === 1 ? 'él' : 'ellos') + ' cuenta como no contestada.';
 }
 

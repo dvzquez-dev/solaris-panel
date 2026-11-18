@@ -179,7 +179,7 @@ function _tuyoReusE_(){
 function _tuyoConvE_(){
   var cv=_miTurnoCv_(); if(!cv || _convEstado_(cv)!=='abierta') return false;
   var r=cv.resp && cv.resp[_fichaYo_()];
-  return !(r && typeof r==='object' && Object.keys(r).length);
+  return (r && typeof r==='object' && Object.keys(r).length) ? false : (_exencionConv_(cv)||true);   /* refutar108: la fecha de su exención, o `true` */
 }
 
 function _tuyoItemsE_(){

@@ -105,6 +105,7 @@ function _avisosQueTeTocanM_(){
     var ac=(typeof _actorSanc_==='function') ? _actorSanc_() : yo;
     var r=cv.resp && cv.resp[ac];
     conv=!(r && typeof r==='object' && Object.keys(r).length);
+    if(conv && typeof _exencionConv_==='function') conv=_exencionConv_(cv)||true;     /* refutar108: la fecha de su exención, o `true` */
   }
   var apel=(typeof _apelPendientesTuyas_==='function') ? _apelPendientesTuyas_().map(function(a){
     return {autor:pilaClara(a.autor)||String(a.autor||'').split(' ')[0], clase:a.clase}; }) : [];
