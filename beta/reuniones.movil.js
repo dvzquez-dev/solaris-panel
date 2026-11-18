@@ -405,7 +405,7 @@ function _proxReuHTML_(){
   if(_sinReuniones_() || !R)
     return '<h2 class="sec">Próxima reunión<span class="ln"></span></h2>'+
       '<div class="tarj">'+vacio('Ninguna reunión convocada','','',false)+'</div>';
-  var c=_cuandoReuM_(R), pasada=(c.ms<_hoyDateM_().getTime());
+  var c=_cuandoReuM_(R), pasada=(c.ms<_hoyDateM_().getTime()) && !R.en_curso;   /* refutar88: la de las 23:30 que sigue en marcha a las 00:10 no es «la última» */
   /* Si lo único que queda ya ocurrió, se dice: llamar «próxima» a algo de la semana
      pasada es exactamente el tipo de mentira pequeña que hace desconfiar del resto. */
   var rotulo = pasada ? 'Última reunión' : 'Próxima reunión';
@@ -748,7 +748,13 @@ function vReu(){
                 ? '<button class="btn full" data-p id="btnCubrir" style="margin-top:10px">'+
                   (R.cubierta?'Editar mi disponibilidad':'Marcar la mía también (opcional)')+
                   '</button>'
-                : '')
+                /* ⛔ refutar91: CON EL PLAZO CERRADO Y SIN FIJAR, a quien convoca la ficha no le decía NADA (ni que cerró, ni que la fecha es suya): `_reuSinFijarTxt_` sólo llegaba a los convocados.
+                   Y la nota de abajo seguía ofreciendo «puedes marcarla si quieres» sin botón. Mismo aviso que ven los demás, con su «la fijas tú». */
+                : (!R.fijada && !R.finalizada_at
+                    ? '<div class="avisolargo" style="border-color:rgba(230,168,58,.4);background:rgba(230,168,58,.08);color:#e8cfa0">'+
+                      '<b style="color:var(--warn)">El plazo cerró · '+esc(_limM_(R))+'</b>'+
+                      (_reuSinFijarTxt_(R) && '<br>'+esc(_reuSinFijarTxt_(R)))+'</div>'
+                    : ''))
             /* ⛔ CON EL PLAZO CERRADO NO SE OFRECE CUBRIR. El servidor lo RECHAZA
                (`Codigo.gs:4582`) y hasta hoy la pantalla no preguntaba nada: se pintaba la
                rejilla entera, se marcaba, y sólo al pulsar «Guardar» salía un error crudo.
@@ -764,7 +770,9 @@ function vReu(){
               : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
                 (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
     /* si ya está fijada, el aviso de organizador sobra y quedaba colgando debajo del cartel verde */
-    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú, así que no se te <i>pide</i> disponibilidad. Puedes marcarla si quieres.</p>':'')+
+    ((R.exento && !R.fijada)?'<p class="rnota" style="margin:-4px 0 10px">La convocas tú, así que no se te <i>pide</i> disponibilidad.'+(_plazoAbierto_(R.limite)?' Puedes marcarla si quieres.':'')+'</p>':'')+
+    /* refutar91: quien convoca (o el PD) ve cuántos han contestado y QUIÉNES faltan —lo que hace falta para perseguirlos o para decidir si fija ya—. */
+    ((!R.fijada && !R.finalizada_at && _puedeBorrarReuM_(R) && _faltanReuTxt_(R))?'<p class="rnota" data-faltan style="margin:-4px 0 10px">'+esc(_faltanReuTxt_(R))+'</p>':'')+
       /* ⛔ LA REGLA ES LA DEL BACKEND, Y NO ES `esCoord()`. Aqui se ofrecian los tres
          botones a CUALQUIER coordinador, y las tres acciones que llaman las gatea
          `Codigo.gs` por **convocante o admin** -con la misma linea en las tres:
@@ -1236,10 +1244,10 @@ function crearModal(){
   var dias=function(){ return val('ceModo')==='rango' ? _diasEntre_(val('ceD0'),val('ceD1'))
     : _diasDesde_(val('ceFecha')||_dmyAISO_(HOY), Math.max(1,+val('ceND')||1)); };
   var rangos=function(){ var ds=dias();
-    if(!per()) return ds.map(function(){ return [hNum(val('ceH0')), hNum(val('ceH1'))]; });
+    if(!per()) return ds.map(function(){ return _rangoHorasHM_(val('ceH0'), val('ceH1')); });
     var rows=$$('#ceDias .drow');
     return ds.map(function(_,i){ var r=rows[i]; if(!r||r.classList.contains('off')) return [0,0];
-      return [hNum(r.querySelector('.dr0').value), hNum(r.querySelector('.dr1').value)]; }); };
+      return _rangoHorasHM_(r.querySelector('.dr0').value, r.querySelector('.dr1').value); }); };
   var INV=new Set();
   /* El selector es el de `comun.js` (`elegirPersonas`): `INV` es el Set que se manda, y `invRender` le dice al
      selector lo que `tipoUpd` o los subsistemas marcados han puesto (sin avisar a `alCambiar`: no hay bucle). */
@@ -1287,7 +1295,7 @@ function crearModal(){
     var p=$('#cePrev'); if(p) p.innerHTML=((u.F.length&&nb)
       ? '<b>'+u.F.length+' casilla'+(u.F.length===1?'':'s')+'</b> de '+_durTxt_(sl)+' · <b>'+nb+' bloques</b> en '+nd+' día'+(nd===1?'':'s')+
         (per()?' (horario por día)':'')+' · <b>'+INV.size+'</b> convocados.'
-      : 'Revisa fechas u horario: no sale ninguna casilla.')+
+      : (_sinCasillasPor_(rangos()) || 'Revisa fechas u horario: no sale ninguna casilla.'))+
       (_rec>0 ? '<br><b style="color:var(--warn)">Se piden '+_ped+' días y la app reparte '+
         'como mucho '+_topeDias_()+': se han recortado los '+_rec+' últimos.</b> Lo que se '+
         'convoque será lo de arriba, no lo que marca la fecha de fin.' : '')+
@@ -1350,7 +1358,7 @@ function crearModal(){
     var u=_genUnion_(rangos(), _sl), bloques=[], _antes=u.perDia.reduce(function(a,x){ return a+x.length; },0);
     u.perDia=_sinFranjasPasadas_(u.perDia, u.F, ds);      // pulir48 (17/11): de hoy sólo lo que está por venir
     u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
-    if(!u.F.length || !bloques.length){ tost(_antes ? 'Ese horario de hoy ya ha pasado: elige otra hora u otro día.' : 'Con ese horario no sale ninguna casilla.'); return; }
+    if(!u.F.length || !bloques.length){ tost(_antes ? 'Ese horario de hoy ya ha pasado: elige otra hora u otro día.' : (_sinCasillasPor_(rangos()) || 'Con ese horario no sale ninguna casilla.')); return; }
     /* ⛔ 01/11 (Daniel [4e2c13a995]): «si no se pudiese de verdad, obvio no se puede convocar». Antes se avisaba y se
        dejaba convocar con «pulsa otra vez»; ahora, si con este horario nadie puede llegar al mínimo (o nadie puede marcar),
        no se convoca y se dice con números. Los días cortos que NO impiden llegar sólo se avisan en la vista previa. */

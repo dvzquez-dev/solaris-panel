@@ -253,12 +253,12 @@ function _cablearConvocar_(){
      `_genUnion_` ya sabe tratar los tres casos -filtra `r && r[1]>r[0]`-, asi que aqui no hay
      que decidir nada mas: solo dejar de tirar la informacion. */
   var rangos=function(){
-    var h0=_horasHM_(val('cvH0')), h1=_horasHM_(val('cvH1'));
+    var rg=_rangoHorasHM_(val('cvH0'), val('cvH1'));
     return dias().map(function(d){
       var c=CONV_HOR[d];
-      if(!c) return [h0,h1];
+      if(!c) return rg;
       if(c.off) return null;
-      return [_horasHM_(c.h0||val('cvH0')), _horasHM_(c.h1||val('cvH1'))];
+      return _rangoHorasHM_(c.h0||val('cvH0'), c.h1||val('cvH1'));
     });
   };
   elegirPersonasAlCambiar('cvInv', function(l){ CONV_INV=new Set(l); var n=$('#cvN'); if(n) n.textContent=CONV_INV.size; upd(); });
@@ -278,7 +278,7 @@ function _cablearConvocar_(){
     /* La cuenta se dice ANTES de convocar: cuántas casillas salen, cuántas hay que juntar
        y a cuánta gente se le va a reclamar. Es lo que decide si el mapa sirve. */
     p.innerHTML = (!nd) ? 'Revisa las fechas: el rango está vacío o al revés.'
-      : (!u.F.length || !nb) ? 'Con ese horario no sale ninguna casilla.'
+      : (!u.F.length || !nb) ? (_sinCasillasPor_(rangos()) || 'Con ese horario no sale ninguna casilla.')
       : '<b>'+u.F.length+'</b> casilla'+(u.F.length===1?'':'s')+' de <b>'+_durTxt_(sl)+'</b> · '+
         '<b>'+nb+'</b> bloques en <b>'+nd+'</b> día'+(nd===1?'':'s')+' · '+
         'hay que juntar <b>'+nS+'</b> seguida'+(nS===1?'':'s')+' ('+_durTxt_(nS*sl)+') para que cuente · '+
@@ -425,7 +425,7 @@ function _cablearConvocar_(){
     var u=_genUnion_(rangos(), sl), bloques=[], _antes=u.perDia.reduce(function(a,x){ return a+x.length; },0);
     u.perDia=_sinFranjasPasadas_(u.perDia, u.F, ds);      // pulir48 (17/11): de hoy sólo lo que está por venir
     u.perDia.forEach(function(idxs,d){ idxs.forEach(function(fi){ bloques.push([d,fi]); }); });
-    if(!u.F.length || !bloques.length){ tost(_antes ? 'Ese horario de hoy ya ha pasado: elige otra hora u otro día.' : 'Con ese horario no sale ninguna casilla.'); return; }
+    if(!u.F.length || !bloques.length){ tost(_antes ? 'Ese horario de hoy ya ha pasado: elige otra hora u otro día.' : (_sinCasillasPor_(rangos()) || 'Con ese horario no sale ninguna casilla.')); return; }
     if(val('cvTipo')==='mixta'){ var _mb=_mixtaBloqueo_(Array.from(CONV_INV), (_m(ACTOR)||{}).unidad); if(_mb){ tost(_mb); return; } }   // 04/11
     var nS=_slotsMin_(du,sl);
     /* ⛔ 01/11 (Daniel [4e2c13a995]): «si no se pudiese de verdad, obvio no se puede convocar». Ya NO se avisa y se deja
@@ -1004,7 +1004,9 @@ function _fijarPanel_(){
          minimo es 1 y no se dice nada, que es como se comportaba siempre. */
       /* refutar57: ya FIJADA (con `fijarlibre` puede durar más que lo convocado: 4 h 30 sobre 3 h), «Dura 3 h» es la convocatoria y contradice a «fijada · 15:00–19:30» de arriba. */
       (r.duracion>0 && !r.fijada
-        ? (' Dura <b>'+_durTxt_(r.duracion)+'</b>: al elegir dónde empieza se marca eso; puedes cambiar dónde acaba, más largo o más corto.') : '')+'</p>'+
+        ? (' Dura <b>'+_durTxt_(r.duracion)+'</b>: al elegir dónde empieza se marca eso; puedes cambiar dónde acaba, más largo o más corto.') : '')+
+      /* refutar91: cuántos han contestado y quiénes faltan, a la vista de quien va a fijar (la misma frase que el móvil; `_faltanReuTxt_` calla si no se sabe quién). */
+      (!r.fijada && _pf && _faltanReuTxt_(r) ? '<br><span data-faltan>'+esc(_faltanReuTxt_(r))+'</span>' : '')+'</p>'+
     '<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'+
       '<div style="flex-basis:100%">'+lab('Reunión')+nxElige('reSel', _reuOpcionesSelE_(), REUS.indexOf(_sel))+'</div>'+
       '<div style="flex-basis:100%">'+lab('Día')+nxElige('reDia', (r.dias||[]).map(function(d,i){ return [i, d]; }), _fijarSugerido_(r).di)+'</div>'+

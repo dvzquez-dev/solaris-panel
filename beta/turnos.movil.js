@@ -1075,7 +1075,7 @@ function progTurnoAbrir(){
    ⚠️ El turno del móvil trae `roles` como [pila, rol, esYo]; las reglas de `comun.js` leen `{miembro, rol}` → `_ctMVista_`. */
 function _ctMVista_(t){
   if(!t || !YO) return null;
-  var v = {id:t.id, estado:t.estado, fecha:t.iso, f:t.f, hora:t.hora, punto:t.punto, roles:t.rolesM || [], empezado_at:t.empezado_at || null};
+  var v = {id:t.id, estado:t.estado, fecha:t.iso, f:t.f, hora:t.hora, dur:t.dur, punto:t.punto, roles:t.rolesM || [], empezado_at:t.empezado_at || null};
   return _puedeCerrarTurno_(v, YO.nombre) ? v : null;
 }
 /* Lo que la vista cambió (estado, reloj) vuelve al turno de verdad. */
@@ -1102,7 +1102,7 @@ function _ctMHTML_(t){
     return cab+
       (rel
         ? '<p class="rnota" id="ctMReloj" style="margin:0 0 10px"><b>'+esc(rel.charAt(0).toUpperCase()+rel.slice(1))+'</b> · desde las '+esc(_hhmmDe_(t.empezado_at))+'</p>'
-        : (v.fecha === hoy
+        : ((v.fecha === hoy || _ftEnCurso_(v, _ahoraMadridDate_()))   /* refutar88: y el de ayer que cruza la medianoche y sigue en marcha */
             ? '<button class="btn pri full" data-p id="ctMEmp">Empezar turno</button>'+
               '<p class="rnota" style="margin:8px 0 10px">Pone en marcha el reloj. Al acabar, lo cierras desde aquí.</p>'
             : ''))+

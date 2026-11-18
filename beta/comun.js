@@ -2996,13 +2996,27 @@ function _choque_(e){
     return 'Ese fichaje ya está cerrado (¿lo cerraste desde otro aparato?). Lo tienes en «Tus partes».';
   if(/esa sanci[oó]n ya est[aá] apelada: espera a que se responda/.test(m))
     return 'Ya has apelado esa sanción (¿desde otro aparato?): espera a que se responda.';
+  /* refutar89 (18/11): CAMBIÓ TU CARGO (o la unidad de quien lo hizo) con la pantalla abierta: el servidor, que lee el equipo en cada petición, ya no te deja decidir, y la app
+     pegaba «No se pudo: sin potestad sobre este parte» —en la jerga del servidor— sin decir qué pasó ni quitar de la lista lo que ya no es tuyo. */
+  if((x=m.match(/sin potestad (?:sobre este parte|sobre (?:la|esta) sanci[oó]n|para corregir los puntos de la sanci[oó]n|para otorgar a ([^:]+))/)))
+    return (x[1] ? 'Ya no puedes dar horas a '+x[1].split(' ')[0] : /parte/.test(x[0]) ? 'Ya no puedes decidir sobre ese parte' : 'Ya no puedes decidir sobre esa sanción')+
+      ': ha cambiado tu cargo o la unidad de esa persona. Tu lista se ha puesto al día.';
   if(/reuni[oó]n \d+ no encontrada/.test(m))
     return 'Esa reunión ya no existe o ya no estás convocado a ella. Tu lista se ha puesto al día.';
   if(/la reuni[oó]n ya tiene fecha fijada/.test(m))
     return 'Ya se ha fijado la fecha de esta reunión: la disponibilidad está cerrada y lo que marcaste no se ha guardado.';
-  if(/el plazo ya venci[oó]/.test(m))
+  if(/el plazo (?:para cubrir la disponibilidad )?ya venci[oó]/.test(m))   // refutar91: las REUNIONES dicen «el plazo para cubrir la disponibilidad ya venció» (sólo las convocatorias de turnos, «el plazo ya venció»): con la frase corta, esto no casaba y quedaba el crudo + «Vuelve a intentarlo»
     return 'El plazo ya ha terminado: lo último que marcaste no se ha guardado.';
   return '';
+}
+
+/* refutar89 (18/11): «sin permiso para decidir» sobre un documento. Hay DOS motivos y la app los confundía: (1) otra persona de más rango se adelantó y decidió (el documento ya
+   tiene decisión), o (2) NADIE ha decidido, pero a ti ya no te toca: cambió tu cargo (dejaste de coordinar la unidad) o la unidad del autor. Con (2) decir «otra persona ya decidió»
+   es mentira, y en el escritorio salía el texto crudo del servidor. `sinDecidir` = el documento, releído, sigue en revisión sin decisión (o ya ni lo ves); `revisores` = quién lo revisa AHORA. */
+function _textoSinPermisoDoc_(sinDecidir, revisores){
+  if(!sinDecidir) return 'Otra persona de más rango ya ha decidido este documento y tu decisión no lo cambia. La ficha se ha puesto al día.';
+  var q=(revisores||[]).map(function(n){ return String(n).split(' ')[0]; });
+  return 'Ya no te toca revisar este documento: ha cambiado tu cargo o la unidad de su autor.'+(q.length ? ' Ahora lo revisa '+q.join(' y ')+'.' : '')+' Tu lista se ha puesto al día.';
 }
 
 /* refutar80 (18/11): LA MISMA PERSONA EN DOS APARATOS CONTESTANDO LA MISMA REUNIÓN. Ana marca 2 franjas en el móvil y guarda; el portátil, que cargó la reunión antes, marca otra y guarda:
@@ -4881,6 +4895,32 @@ function _reuSinFijarTxt_(R){
   if(leidos && !vivos) return 'Los d\u00edas propuestos ya pasaron sin fijarse: '+(tuya ? 'tendr\u00e1s' : quien+' tendr\u00e1')+' que convocarla de nuevo.';
   return 'Todav\u00eda no tiene fecha: '+(tuya ? 'la fijas t\u00fa.' : 'la fija '+quien+'.');
 }
+/* ⛔ refutar91 (18/11) · QUIÉN FALTA POR CONTESTAR, PARA QUIEN CONVOCA. 📏 Medido en el móvil del PD con una junta de 6 convocados y 3 sin contestar: la ficha sólo decía
+   «6 convocados · mejor hueco … — 3 pueden la reunión entera» —no dice cuántos han contestado ni quiénes faltan—, y para perseguirlos había que abrir el ESCRITORIO («Disponibilidad y
+   riesgo»). La derivación es la de `_cobertura_` (escritorio) con sus mismas guardas: sin agregado (`oculta`) o con las filas anonimizadas o sin leer, NO SE SABE QUIÉN y se calla
+   (§3c-24: una ausencia de datos no es «ha faltado»); la baja no cuenta, ni quien se convocó con el plazo ya vencido (no pudo cumplirlo), ni quien convoca (organiza). Devuelve
+   `{han, de, faltan:[…]}` o `null` si no se sabe. Una puerta para las dos caras. */
+function _faltanDeReu_(R){
+  if(!R || R.agregado===false) return null;
+  var inv=_invitadosVivos_(Array.isArray(R.invitados)?R.invitados.filter(function(n){ return typeof n==='string' && n; }):[]);
+  if(!inv.length) return null;                                                  // sin lista de convocados (reunión de antes del modelo): no hay a quién nombrar
+  var tarde=Array.isArray(R.invitados_tarde)?R.invitados_tarde:[];
+  var uni=inv.filter(function(n){ return n!==R.convocante && tarde.indexOf(n)<0; });
+  var resp=_respDeActivos_(R.resp||{}).resp;
+  var han=Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); });
+  if(!han.length && _nRespReu_(R)>0) return null;                               // han contestado pero las filas aún no se han leído
+  if(han.some(function(n){ return n!==R.convocante && inv.indexOf(n)<0; })) return null;   // filas anonimizadas (`#1`, `#2`…): no son nadie del universo
+  var faltan=uni.filter(function(n){ return han.indexOf(n)<0; });
+  return {han:uni.length-faltan.length, de:uni.length, faltan:faltan};
+}
+function _faltanReuTxt_(R){
+  var f=_faltanDeReu_(R);
+  if(!f || !f.de) return '';
+  if(!f.faltan.length) return f.de===1 ? 'Ha contestado el convocado.' : 'Han contestado los '+f.de+' convocados.';
+  var nom=f.faltan.map(function(n){ return nombreCorto(n); });
+  var lista=nom.length>4 ? nom.slice(0,4).join(', ')+' y '+(nom.length-4)+' más' : _unirY_(nom);
+  return (f.han ? 'Han contestado '+f.han+' de '+f.de+' · ' : 'Nadie ha contestado todavía · ')+(nom.length===1?'falta ':'faltan ')+lista+'.';
+}
 function _plazoTxt_(limite){
   /* ⛔ 20/10 (auditoría): LA FECHA POR `_normLimite_` (la que usa la REGLA): con `_dmyAISO_` a secas, «20/10/2026 10:00»
      salía «sin límite». Y EL MISMO DÍA, POR LA HORA: el texto iba por días y la regla por minutos, así que un plazo
@@ -4917,6 +4957,25 @@ function _hmMin_(m){                       // minutos -> 'HH:MM'
 }
 
 function _horasHM_(v){ return _minHM_(v)/60; }
+
+/* refutar88 (18/11): el «De … A …» de una reunión, en horas `[ini, fin]`. «A 00:00» es el FINAL del día (24), no su principio: de 22:00 a 00:00
+   son DOS horas y la rejilla las ofrece (antes `fin 0 <= ini` no daba «ninguna casilla», y a las 23:30 no se podía convocar nada). `[0,0]` sigue
+   siendo el día apagado (`ini` también 00:00). ES3: lo corre el banco con JScript, igual que `_genUnion_`. */
+function _rangoHorasHM_(ini, fin){
+  var a=_horasHM_(ini), b=_horasHM_(fin);
+  return [a, (b===0 && a>0) ? 24 : b];
+}
+/* Por qué un horario no da NINGUNA casilla, si es porque la hora de fin es anterior a la de inicio (22:00 → 01:00): el mapa de una reunión
+   es de UN día y no cruza la medianoche. '' si no es eso (entonces el que llama dice lo suyo). `rangos` = los `[ini, fin]` de cada día (o null). */
+function _sinCasillasPor_(rangos){
+  var i, r;
+  for(i=0; i<(rangos||[]).length; i++){
+    r=rangos[i];
+    if(r && r[1]<r[0]) return 'La hora de fin ('+_hmMin_(Math.round(r[1]*60))+') es anterior a la de inicio ('+_hmMin_(Math.round(r[0]*60))+'): '+
+      'el mapa de una reunión no cruza la medianoche. Acábalo a las 00:00 y convoca otra para el día siguiente.';
+  }
+  return '';
+}
 
 /* Maximo comun divisor. Vive AQUI, con la familia de `HH:MM`, y no dentro de `vReu`, porque es
    GEMELA byte a byte de la del escritorio y una closure no se puede comparar de un vistazo.
@@ -16223,13 +16282,20 @@ function _ftCuerpo_(t){ return {turno: _ftIdTurno_(t), fecha: _ftFecha_(t), hora
    «3 horas»; sin ella, 4). Sin hora legible, todo el día. Es lo que decide si el INICIO del móvil ofrece las fotos; el servidor
    decide de verdad (sólo el día del turno). */
 function _ftEnCurso_(t, ahora){
-  var f = _ftFecha_(t), a = ahora || new Date();
-  if(f !== a.getFullYear() + '-' + pad(a.getMonth() + 1) + '-' + pad(a.getDate())) return false;
+  var f = _ftFecha_(t), a = ahora || new Date(), hoy = a.getFullYear() + '-' + pad(a.getMonth() + 1) + '-' + pad(a.getDate());
   var h = _ftHora_(t);
+  /* refutar88 (18/11): un turno de las 20:00 que dura 6 h sigue EN MARCHA a las 00:30 del día siguiente: ayer (por su fecha) + la cola que pasa de medianoche.
+     Antes el Inicio le quitaba «Tu turno de hoy» (y con él las fotos) en cuanto cambiaba el día. */
+  if(f !== hoy) return !!h && f === _isoMasDias_(hoy, -1) && _ftHastaMin_(t, h) - 1440 >= a.getHours() * 60 + a.getMinutes();
   if(!h) return true;
   var mm = /^(\d{1,2}):(\d{2})/.exec(h), ini = parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10);
-  var dur = _horasDeDuracion_(t.dur || t.duracion, 4) * 60, ya = a.getHours() * 60 + a.getMinutes();
-  return ya >= ini - 60 && ya <= ini + dur + 120;
+  var ya = a.getHours() * 60 + a.getMinutes();
+  return ya >= ini - 60 && ya <= _ftHastaMin_(t, h);
+}
+/* Hasta qué minuto (desde las 00:00 del día del turno; puede pasar de 1440) se ofrece lo del turno: su hora + la duración + 2 h. */
+function _ftHastaMin_(t, h){
+  var mm = /^(\d{1,2}):(\d{2})/.exec(h);
+  return parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10) + _horasDeDuracion_(t.dur || t.duracion, 4) * 60 + 120;
 }
 function _ftBytesTxt_(n){ return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
 function _ftCss_(){
