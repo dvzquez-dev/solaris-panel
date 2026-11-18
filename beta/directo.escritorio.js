@@ -141,7 +141,7 @@ function _directoSonidoAlterna_(){
 function _directoFilaHTML_(e){
   var p=_directoPieza_(e.pieza), d=new Date(e.at);
   var mal=_directoMalTipo_(e.tipo);
-  var q=e.quien ? ((_m(e.quien)&&_m(e.quien).pila) || e.quien) : '';
+  var q=e.quien ? (pilaClara(e.quien) || e.quien) : '';
   return '<div class="dir-fila'+(mal?' mal':'')+'" style="--c:'+p.c+'">'+
     '<span class="dir-t mono">'+(isNaN(d)?'—':_hhmmDe_(e.at)+':'+pad(d.getSeconds()))+'</span>'+
     '<span class="dir-pz"><i></i>'+esc(p.t)+'</span>'+

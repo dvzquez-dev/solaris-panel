@@ -406,7 +406,7 @@ function _fichaBuzon_(r){
       '<button class="btn sm" style="margin-left:auto" data-bzsel="">Cerrar</button></div>'+
     '<div class="pils">'+
       '<span class="chip">'+(esBug?'fallo':'mejora')+'</span>'+
-      '<span class="chip">'+esc(_m(r.quien).pila)+'</span>'+
+      '<span class="chip">'+esc((pilaClara(r.quien)||_m(r.quien).pila))+'</span>'+
       '<span class="chip">'+esc(r.donde||'—')+(r.pantalla?' · '+esc(r.pantalla):'')+'</span>'+
       /* El eje que decide las horas, A LA VISTA en la tarjeta: antes solo se pintaba en los
          bugs, asi que en una mejora no habia forma de ver por que proponia lo que proponia. */
@@ -579,7 +579,7 @@ function _compPropuesta_(r){
 function _compPuede_(r){
   if((r.estado||'')!=='Publicado') return 'solo cuando esté publicado';
   var yo=_actorSanc_();
-  if(r.quien===yo || _m(r.quien).pila===_m(yo).pila) return 'es tuyo: nadie se compensa a sí mismo';
+  if(r.quien===yo || (_m(r.quien)._fuera && _m(r.quien).pila===_m(yo).pila)) return 'es tuyo: nadie se compensa a sí mismo';
   if(r.horas_otorgadas) return 'ya compensado con '+r.horas_otorgadas+' h';
   return null;
 }
@@ -603,7 +603,7 @@ function _compHTML_(r){
          `<input>` suelto NO valida nada; quien para de verdad es la guarda de
          `escritorio.html`, que pregunta a la MISMA funcion. */
       nxNum('', p.horas, {min:0, max:_maxHorasParte_(), paso:0.25, sufijo:'h', attrs:'data-comph="'+ID+'"'})+'</div>'+
-          '<button class="btn pri" data-comp="'+ID+'">Otorgar a '+esc(_m(r.quien).pila)+'</button>'+
+          '<button class="btn pri" data-comp="'+ID+'">Otorgar a '+esc((pilaClara(r.quien)||_m(r.quien).pila))+'</button>'+
         '</div>')+
   '</div>';
 }
@@ -656,7 +656,7 @@ function _accBuzon_(r, esBug){
      lo único que tiene sentido aquí es echarse atrás, con anotaciones. */
   if(r.estado==='Adelante'){
     return '<div class="ruta"><b>Autorizado</b>'+
-      (r.decidido_por?' por <b>'+esc(_m(r.decidido_por).pila||r.decidido_por)+'</b>':'')+
+      (r.decidido_por?' por <b>'+esc(pilaClara(r.decidido_por)||r.decidido_por)+'</b>':'')+
       (r.decidido_at?' · '+esc(_novCuando_(r.decidido_at)):'')+
       ': se está construyendo y pasará a «listo para revisar» cuando esté en la beta.'+
       '<br>Si ya no debe hacerse, descártalo con tus anotaciones.</div>'+
@@ -665,7 +665,7 @@ function _accBuzon_(r, esBug){
   }
   if(r.estado==='Publicado' || r.estado==='Descartado'){
     return '<div class="ruta">Este reporte ya está <b>'+esc(r.estado.toLowerCase())+'</b>'+
-      (r.decidido_por?', decidido por <b>'+esc(_m(r.decidido_por).pila||r.decidido_por)+'</b>':'')+
+      (r.decidido_por?', decidido por <b>'+esc(pilaClara(r.decidido_por)||r.decidido_por)+'</b>':'')+
       (r.decidido_at?' · '+esc(_novCuando_(r.decidido_at)):'')+
       '. No quedan decisiones que tomar.'+
       ((notas||'').trim()?'<br><span style="color:var(--ink3)">Anotaciones: '+esc(notas.trim())+'</span>':'')+
@@ -687,7 +687,7 @@ function _filaBuzon_(r){
   return '<div class="dec" data-bzsel="'+esc(r.id)+'">'+
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
     '<span class="tx"><b>'+esc(r.titulo)+'</b><small><span class="mono">'+esc(r.id)+'</span> · '+
-      esc(_m(r.quien).pila)+' · '+esc(r.donde||'—')+(r.pantalla?' · '+esc(r.pantalla):'')+'</small></span>'+
+      esc((pilaClara(r.quien)||_m(r.quien).pila))+' · '+esc(r.donde||'—')+(r.pantalla?' · '+esc(r.pantalla):'')+'</small></span>'+
     '<span class="der">'+
       ((!_esMejora_(r)&&r.gravedad==='Bloquea')?'<span class="chip no">bloquea</span>':'')+
       ((_esMejora_(r)&&r.valor==='Alto')?'<span class="chip no">valor alto</span>':'')+

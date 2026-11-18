@@ -822,7 +822,7 @@ function _panelPDmaqueta_(){
       '</div></div>';
 
   var sueltas=SUELTAS.map(function(s){
-    return '<div class="fila"><div class="a"><b>'+esc(s.nombre.split(' ')[0])+'</b>'+
+    return '<div class="fila"><div class="a"><b>'+esc(pilaClara(s.nombre)||s.nombre.split(' ')[0])+'</b>'+
       '<small>'+esc(s.motivo)+' · Art. '+s.articulo+'</small></div>'+
       '<div class="d"><span class="mono" style="color:var(--red2)">'+s.puntos+'</span></div></div>'+
       '<div style="display:flex;gap:7px;margin:2px 0 10px;flex-wrap:wrap">'+

@@ -99,7 +99,7 @@ function parteCard(p){
       /* 26/10 · «Sí, mientras no esté firmado»: las horas que vas a firmar las corrigió su autor — y de cuánto eran */
       (_txtCorreccion_(p.corr)?'<span class="chip wa">'+esc(_txtCorreccion_(p.corr))+'</span>':'')+'</div>'+
     /* 31/10 (textos): si puedes decidir, los botones ya lo dicen; s\u00f3lo se avisa cuando NO es tuyo */
-    (puede?'':'<div class="ruta">Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.</div>')+
+    (puede?'':'<div class="ruta">Lo firma '+esc(rev.map(function(n){return (pilaClara(n)||_m(n).pila);}).join(' o '))+', no t\u00fa.</div>')+
     /* 01/11 · Daniel: «Se queda así y la pantalla lo dice» — el parte del PD lo firma él mismo */
     (_notaFirmaPropia_(p,ACTOR)?'<div class="ruta">'+esc(_notaFirmaPropia_(p,ACTOR))+'</div>':'')+
     /* 01/11 (escm1): el motivo va PLEGADO; lo abre «Pedir detalle» o «Rechazar» (`_engPartes_`) y la elegida se enciende. */
@@ -714,7 +714,7 @@ function _fichaPanel_(){
   var min=_fichaMin_(), largo=min>=600;
   var estado = !abierta ? 'parada' : (pausa?'pausada':'corriendo');
   var perf=_fichaPerfil_(), yo=_fichaYo_();
-  var firma=perf?_firmaDe_(perf,yo):null, firmaP=firma?((miembro(firma)||{}).pila||firma):null;
+  var firma=perf?_firmaDe_(perf,yo):null, firmaP=firma?(pilaClara(firma)||firma):null;
 
   var linea = estado==='corriendo' ? (largo?'M\u00c1S DE 10 H ABIERTA \u00b7 CI\u00c9RRALA':('CONTANDO DESDE LAS '+esc(_hhmmDe_(FICHA.ini))+(_zonaNoMadrid_()?' (HORA DE MADRID)':'')))
             : estado==='pausada'   ? 'EN PAUSA \u00b7 EL RELOJ EST\u00c1 PARADO'
@@ -856,7 +856,7 @@ function _engFicharE_(){
        formulario: el aviso nombraba al coordinador del perfil POR DEFECTO cuando habias
        elegido otro, o sea que la pantalla te decia que lo firma quien no lo firma. */
     var _perfEnvio=_fichaPerfil_()||null;
-    var _firmaP=_perfEnvio?((miembro(_firmaDe_(_perfEnvio,_fichaYo_()))||{}).pila||''):'';
+    var _firmaP=_perfEnvio?(pilaClara(_firmaDe_(_perfEnvio,_fichaYo_()))||''):'';
     try{
       /* ⛔ CON EL FORMULARIO A MEDIAS SE MANDA VACIO, no a medias. El backend decide
          `declarado = !!(tarea || categoria)`: mandar la categoria con la tarea y la
@@ -1114,7 +1114,7 @@ function _bloqFirma_(){
   var perf=_bloqSubsEfectivo_();
   if(!perf) return '';
   var n=_firmaDe_(perf, _fichaYo_());
-  return n ? ((miembro(n)||{}).pila||n) : '';
+  return n ? (pilaClara(n)||n) : '';
 }
 
 /* Entrada/salida: texto HH:MM, no `<select>` de cuartos (no admitía 17:43, la hora de un fichaje, y es un control nativo). */

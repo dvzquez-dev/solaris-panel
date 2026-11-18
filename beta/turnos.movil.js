@@ -390,7 +390,7 @@ function _convCabHTML_(cv){
   var ini=_isoADMY_(cv.dias[0])||cv.dias[0], fin=_isoADMY_(cv.dias[cv.dias.length-1])||'';
   return '<div class="mtit" style="margin:0 0 2px">Disponibilidad para turnos</div>'+
     '<div class="msub">Semana del '+esc(ini)+' al '+esc(fin)+
-      (cv.convocante?' · lo pide '+esc(cv.convocante.split(' ')[0]):'')+'</div>';
+      (cv.convocante?' · lo pide '+esc(pilaClara(cv.convocante)||cv.convocante.split(' ')[0]):'')+'</div>';
 }
 
 /* La unidad del pie: horas (y sus turnos) cuando un turno son varias franjas.

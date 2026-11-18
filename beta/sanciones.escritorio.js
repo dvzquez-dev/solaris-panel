@@ -319,7 +319,7 @@ function _panelSueltas_(){
     tabla([['Persona'],['Motivo'],['Art.',0],['Puntos',1],['']],
       ss.map(function(s){
         var m=_m(s.nombre);
-        return '<tr><td>'+esc((m&&m.pila)||s.nombre)+'</td>'+
+        return '<tr><td>'+esc(pilaClara(s.nombre) || s.nombre)+'</td>'+
           '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
           '<td class="mono" style="color:var(--ink3)">'+esc(s.articulo||'libre')+'</td>'+
           /* ⛔ EL IDIOMA QUE ESTA CARA YA USA (`escritorio.html:2463`): un hueco
@@ -370,7 +370,7 @@ function _nombreLoteEsc_(lote){
 function _revocarSancCard_(s){
   var m = _m(s.nombre), pts = _ptsSanc_(s.puntos);
   return '<div class="parte" data-rvsid="' + esc(s.id) + '">' +
-    '<div class="h"><b>' + esc((m && m.pila) || s.nombre) + '</b>' +
+    '<div class="h"><b>' + esc(pilaClara(s.nombre) || s.nombre) + '</b>' +
       '<span class="u">' + esc(s.articulo ? ('Art. ' + s.articulo) : '\u2014') + '</span>' +
       '<span class="u">' + esc(_nombreLoteEsc_(s.lote)) + '</span>' +
       '<span class="q">' + esc(_etSancFila_(s.puntos, s.origen, s.extra)) + '</span></div>' +
@@ -485,7 +485,7 @@ function _panelDeshacerPremio_(){
   for (i = 0; i < lista.length; i++){
     s = lista[i]; m = _m(s.nombre);
     cuerpo += '<div class="parte" data-dpid="' + esc(s.id) + '">' +
-      '<div class="h"><b>' + esc((m && m.pila) || s.nombre) + '</b>' +
+      '<div class="h"><b>' + esc(pilaClara(s.nombre) || s.nombre) + '</b>' +
         '<span class="u">' + esc(_nombreLoteEsc_(s.lote)) + '</span>' +
         /* 02/11 (Daniel: «pone premio más 0,5»): el premio en PALABRAS, no el rótulo corto de la fila */
         '<span class="q">' + esc(_premioEnPalabras_(s.extra, null)) + '</span></div>' +
@@ -554,7 +554,7 @@ function _panelHistSanc_(){
            ese mapa — con traducciones distintas del original, que es lo que lo hace uno. */
         var et=s.estado;
         var tono=(s.estado==='rechazada'||s.estado==='revocada')?'dn':(s.estado==='aplicada'?'up':'');
-        return '<tr><td>'+esc((m&&m.pila)||s.nombre)+'</td>'+
+        return '<tr><td>'+esc(pilaClara(s.nombre) || s.nombre)+'</td>'+
           '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
           '<td class="mono '+tono+'">'+esc(et)+'</td>'+
           /* ⛔ Igual que su gemela de arriba: el hueco se dice, no se rellena. */
@@ -758,7 +758,7 @@ function _loteReal_(){
 function _apelTarjetaSanc_(a){
   var m = _m(a.autor), puedes = _apelPuedes_(a), l = _enlaceWeb_(a.enlace);
   return '<div class="parte" data-apid="' + esc(a.id) + '" data-apclase="sancion">' +
-    '<div class="h"><b>' + esc((m && m.pila) || a.autor) + '</b>' +
+    '<div class="h"><b>' + esc(pilaClara(a.autor) || a.autor) + '</b>' +
       '<span class="u">' + esc(a.unidad || '—') + '</span><span class="u">sanción</span>' +
       '<span class="q" style="font-size:12px;font-family:var(--sans);font-weight:500">' + esc(_apelEspera_(a.at)) + '</span></div>' +
     '<div class="ruta" style="margin-top:6px"><b>' + esc(a.motivo_sancion || a.titulo) + '</b> · ' + esc(_etSancFila_(a.puntos, null, null)) +
@@ -779,7 +779,7 @@ function _apelTarjeta_(a){
   if (a.clase === 'sancion') return _apelTarjetaSanc_(a);
   var m = _m(a.autor), puedes = _apelPuedes_(a);
   return '<div class="parte" data-apid="' + esc(a.id) + '">' +
-    '<div class="h"><b>' + esc((m && m.pila) || a.autor) + '</b>' +
+    '<div class="h"><b>' + esc(pilaClara(a.autor) || a.autor) + '</b>' +
       '<span class="u">' + esc(a.unidad || '—') + '</span>' +
       '<span class="u">cláusula ' + esc(a.clausula === 'otra' ? 'otra' : a.clausula) + '</span>' +
       '<span class="q" style="font-size:12px;font-family:var(--sans);font-weight:500">' + esc(_apelEspera_(a.at)) + '</span></div>' +
@@ -797,11 +797,11 @@ function _apelTarjeta_(a){
 }
 function _apelResuelta_(a){
   var m = _m(a.autor), q = _m(a.decidido_por);
-  return '<div class="parte"><div class="h"><b>' + esc((m && m.pila) || a.autor) + '</b>' +
+  return '<div class="parte"><div class="h"><b>' + esc(pilaClara(a.autor) || a.autor) + '</b>' +
       '<span class="u">' + esc(a.titulo) + '</span>' +
       '<span class="q" style="font-size:11px;font-family:var(--mono);color:var(--' + (a.estado === 'desestimada' ? 'red2' : 'ok') + ')">' +
         esc(a.estado === 'parcial' ? 'a aviso' : a.estado) + '</span></div>' +
-    '<div class="ruta">' + esc(_apelEstadoTxt_(a)) + ' <span style="color:var(--ink3)">· ' + esc((q && q.pila) || a.decidido_por || '') +
+    '<div class="ruta">' + esc(_apelEstadoTxt_(a)) + ' <span style="color:var(--ink3)">· ' + esc(pilaClara(a.decidido_por) || a.decidido_por || '') +
       ', ' + esc(_isoADMY_(String(a.decidido_at || '').slice(0, 10))) + '</span></div></div>';
 }
 function _vApela_(){
@@ -871,7 +871,7 @@ function _engMisSanc_(){
 /* 04/11 (acciones graves): LA PREGUNTA ANTES DE RESOLVER UNA APELACIÓN — estimar devuelve puntos o quita la tarea, y la respuesta le
    llega a la persona. Dice QUÉ se decide y SOBRE QUIÉN. `datos` es lo que se manda (`decision`, `quitar`, `plazo`). */
 function _avisoApelE_(ap, datos){
-  var quien = ((_m(ap.autor) && _m(ap.autor).pila) || ap.autor || 'esta persona'), NL = String.fromCharCode(10);
+  var quien = (pilaClara(ap.autor) || ap.autor || 'esta persona'), NL = String.fromCharCode(10);
   var que = datos.quitar ? 'Estimar la apelación de ' + quien + ' y quitarle la tarea.' +
       (ap && ap.dejaria_vacia ? NL + NL + 'Es su único responsable: la tarea se queda VACÍA y se avisa a quien coordina para que la reasigne.' : '')
     : datos.decision === 'parcial' ? 'Rebajar a aviso la sanción de ' + quien + ': se le devuelven los puntos.'
@@ -891,7 +891,7 @@ function _engApela_(){
       b.disabled = true;
       _resolverApelacion_(ap, datos).then(function(r){
         pintar(); tost('Apelación ' + (r && r.estado === 'estimada' ? 'estimada' : 'desestimada') + '. Se le avisa a ' +
-          ((_m(ap.autor) && _m(ap.autor).pila) || ap.autor) + '.');
+          (pilaClara(ap.autor) || ap.autor) + '.');
       }).catch(function(e){ b.disabled = false; tost('No se pudo guardar la respuesta: ' + ((e && e.message) || e)); });
     }
     var ta = caja.querySelector('[data-apres]'), pl = caja.querySelector('[data-appl]');

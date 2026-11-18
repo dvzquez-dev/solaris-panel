@@ -2309,7 +2309,7 @@ function _vetoCandidatas_(ss){
   });
 }
 function _vetoDmy_(iso){ var p=String(iso||'').slice(0,10).split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : ''; }
-function _vetoPila_(n){ var m=miembro(n); return (m&&m.pila)||n; }
+function _vetoPila_(n){ return pilaClara(n) || n; }
 /* Las filas (sin envoltorio: cada cara las mete en su panel/tarjeta) y cuántas hay que atender. */
 function _vetoFilas_(ss){
   var out=[], n=0;
@@ -2984,7 +2984,7 @@ function _choque_(e){
     /* refutar80 (18/11): el servidor dice QUIÉN lo decidió. Si fuiste tú (con la pantalla vieja de tu otro aparato), «otra persona» es mentira. */
     var _yo=(typeof _actorSanc_==='function') ? _actorSanc_() : '';
     if(x[2] && _yo && x[2]===_yo) return 'Ya lo habías decidido tú (¿desde otro aparato?): el parte está «'+x[1]+'». Tu lista se ha puesto al día.';
-    return (x[2] ? String(x[2]).split(' ')[0] : 'Otra persona')+' ya lo ha decidido: el parte está «'+x[1]+'». Tu lista se ha puesto al día.';
+    return (x[2] ? (pilaClara(x[2]) || String(x[2]).split(' ')[0]) : 'Otra persona')+' ya lo ha decidido: el parte está «'+x[1]+'». Tu lista se ha puesto al día.';
   }
   /* refutar80: tu propio parte, retirado o declarado desde el OTRO aparato (el servidor lo dice en su jerga: «ya está firmado o cerrado… lo revierte quien lo firmó», cuando nadie lo ha firmado). */
   if((x=m.match(/este parte ya est[aá] firmado o cerrado \((\w+)\): ya no se (retira|corrige)/)))
@@ -5546,7 +5546,7 @@ function personasVerLista(id){
       '<div style="font-size:12px;color:var(--ink3)">'+(S.multi ? S.marcadas.length+' elegidas · pulsa para marcar o quitar' : 'Pulsa para elegir')+'</div>'+
       (gr.length ? gr.map(function(g){
         return '<div class="psel-g">'+esc(g.unidad)+'</div><div class="psel-fila">'+g.gente.map(function(m){
-          return '<span class="psel-c'+(S.marcadas.indexOf(m.nombre)>=0?' on':'')+'" data-psel-l="'+esc(m.nombre)+'" data-p>'+esc(m.pila||m.nombre)+'</span>';
+          return '<span class="psel-c'+(S.marcadas.indexOf(m.nombre)>=0?' on':'')+'" data-psel-l="'+esc(m.nombre)+'" data-p>'+esc(nombreCorto(m.nombre)||m.nombre)+'</span>';
         }).join('')+'</div>'; }).join('')
         : '<p class="psel-vacio">No hay nadie a quien puedas elegir.</p>')+
       '<button type="button" class="btn pri full" data-psel-listo data-p style="margin-top:16px">Listo</button></div>';
@@ -9601,6 +9601,10 @@ function nombreCorto(nom){
   return nom;
 }
 
+/* El rótulo corto de alguien POR SU NOMBRE (refutar87): `nombreCorto` si está en el roster (la pila, o con lo mínimo del apellido si otra persona la comparte); si no, VACÍO: quien llama pone lo suyo (`pilaClara(x)||x`).
+   ⛔ Mostrar `m.pila` a secas es el error: con dos «Ana» el PD aplica una sanción a «Ana» sin saber a cuál. Las dos caras lo llaman (cada una tenía el suyo, y el del escritorio ni existía en los bancos). */
+function pilaClara(n){ return miembro(n) ? nombreCorto(n) : ''; }
+
 /* Una clave de un solo uso para un envío. ⛔ Se genera UNA VEZ por envío y se reutiliza en
    los reintentos: si se generara dentro del reintento, cada intento traería una clave distinta
    y el servidor los vería como envíos distintos — que es justo el fallo que esto evita.
@@ -11160,7 +11164,7 @@ function _etiOrigenParte_(p){
   var o = p && p.origen;
   if(o === 'fichaje') return null;              // el caso normal no necesita rotulo
   if(o === 'otorgada') return { tono:'ok', txt:'otorgada por ' + ((p && p.decidido_por) || 'coordinación') };
-  if(o === 'tarea_acabada') return { tono:'ok', txt:'tarea entregada · horas propuestas' + ((p && p.propuesto_por) ? ' por ' + String(p.propuesto_por).split(' ')[0] : '') };
+  if(o === 'tarea_acabada') return { tono:'ok', txt:'tarea entregada · horas propuestas' + ((p && p.propuesto_por) ? ' por ' + (pilaClara(p.propuesto_por) || String(p.propuesto_por).split(' ')[0]) : '') };
   if(o === 'reversion') return { tono:'ok', txt:'reversión del parte ' + ((p && p.revierte) || '?') };
   if(o === 'manual'){
     /* Con hora de entrada y salida escritas, «sin fichaje» se lee como «no dijo cuando», que es
@@ -16195,7 +16199,7 @@ function _tareaParteColaHTML_(grupos, o){
         (dist ? 'Cada persona trae sus horas (alguien corrigió las suyas). Míralas y firma.'
               : 'Propuesta: ' + nf2(h0) + ' h para ' + (g.lineas.length === 1 ? 'la persona asignada' : 'cada una de las ' + g.lineas.length + ' asignadas') +
                 '. Cámbialas si no cuadran y firma.') +
-        (ajenas.length ? ' Propuestas por otra persona: ' + ajenas.map(function(p){ return o.nombre(p) + ' (por ' + String(p.propuesto_por).split(' ')[0] + ')'; }).join(', ') + '.' : '') +
+        (ajenas.length ? ' Propuestas por otra persona: ' + ajenas.map(function(p){ return o.nombre(p) + ' (por ' + (pilaClara(p.propuesto_por) || String(p.propuesto_por).split(' ')[0]) + ')'; }).join(', ') + '.' : '') +
         '</p>' +
       '<div data-tp-comun style="display:' + (dist ? 'none' : 'flex') + ';gap:8px;align-items:center;margin:0 0 8px"><span style="flex:1;font-size:13px">' +
         (g.lineas.length === 1 ? 'Horas' : 'Horas para cada una') + '</span>' +
@@ -16342,7 +16346,7 @@ function _ftRefrescar_(t, forzar){
   p.then(function(){ if(FT_.est[k]) delete FT_.est[k].pidiendo; });
   return p;
 }
-function _ftAutorPila_(n){ var m = (typeof DATA !== 'undefined' && DATA.miembros || []).filter(function(x){ return x.nombre === n; })[0]; return (m && m.pila) || String(n || '').split(' ')[0]; }
+function _ftAutorPila_(n){ return (typeof DATA !== 'undefined' && pilaClara(n)) || String(n || '').split(' ')[0]; }
 function _ftHoraDe_(at){ return String(at || '').slice(11, 16); }
 function _ftDinHTML_(k){
   var e = FT_.est[k], r = e && e.r, S = FT_.sub[k] || {}, h = '', i;

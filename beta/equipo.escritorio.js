@@ -82,13 +82,13 @@ function _rolDe_(nombre){
 function colaDecision(){
   var out=[];
   porAprobar().forEach(function(p){
-    out.push({ic:'i-reloj',b:h1(p.horas)+' de '+_m(p.autor).pila,
+    out.push({ic:'i-reloj',b:h1(p.horas)+' de '+(pilaClara(p.autor)||_m(p.autor).pila),
       /* Mismo vocabulario que las otras dos pantallas: `bloque` ya no existe. */
       s:esc(p.tarea)+' · '+p.fecha+(_etiOrigenParte_(p)?' · '+_etiOrigenParte_(p).txt:''),
       chip:'<span class="chip wa">parte de horas</span>',ir:'partes',foco:'parte-'+p.id});
   });
   docsMios().forEach(function(d){
-    out.push({ic:'i-doc',b:esc(d.tit),s:d.ref+' · '+_m(d.autor).pila+' · '+esc(ambDoc(d.amb, d.tipo))+   /* 20/10: como la lista, no el crudo */
+    out.push({ic:'i-doc',b:esc(d.tit),s:d.ref+' · '+(pilaClara(d.autor)||_m(d.autor).pila)+' · '+esc(ambDoc(d.amb, d.tipo))+   /* 20/10: como la lista, no el crudo */
       (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):''),
       /* ⛔ POR LA PUERTA UNICA. Aqui habia una copia con el `else` en `'ok'` -verde-, asi
          que `null`, un valor fuera del enum y la cadena vacia salian los TRES con el chip
@@ -114,7 +114,7 @@ function colaDecision(){
      Una fila con quién y de qué, por la MISMA puerta que el globo (`_apelPendientesTuyas_`). */
   var _ap=(typeof _apelPendientesTuyas_==='function')?_apelPendientesTuyas_():[];
   if(_ap.length){
-    var _apN=_ap.slice(0,2).map(function(a){ var m=_m(a.autor); return esc((m&&m.pila)||a.autor)+' ('+(a.clase==='sancion'?'sanción':'tarea')+')'; });
+    var _apN=_ap.slice(0,2).map(function(a){ var m=_m(a.autor); return esc(pilaClara(a.autor)||a.autor)+' ('+(a.clase==='sancion'?'sanción':'tarea')+')'; });
     out.push({ic:'i-gavel',b:_ap.length===1?'Una apelación por resolver':_ap.length+' apelaciones por resolver',
       s:_apN.join(', ')+(_ap.length>2?' y '+(_ap.length-2)+' más':'')+' · la respuesta es obligatoria',
       chip:'<span class="chip no">por decidir</span>',ir:'apela',foco:''});
@@ -427,7 +427,7 @@ function _pintarActua_(){
   var opts=[];
   if(miembro(PD_NOM)) opts.push([PD_NOM,'Project Director']);
   if(miembro(REV2_NOM)) opts.push([REV2_NOM,'Revisor fijo']);
-  _coordsActuar_().forEach(function(x){ opts.push([x.nombre, x.pila||x.nombre.split(' ')[0]]); });
+  _coordsActuar_().forEach(function(x){ opts.push([x.nombre, pilaClara(x.nombre)||x.pila||x.nombre.split(' ')[0]]); });
   if(!opts.length) opts=[[ACTOR,'Yo']];
   $$('#actua button',caja).forEach(function(b){ b.remove(); });
   opts.forEach(function(o){

@@ -20,10 +20,7 @@ function _darHorasTarjetaHTML_(){
     '<p class="rnota" style="margin:0 0 10px">Para una feria, un traslado, un turno sin fichar…: cuentan al momento, sin que nadie las firme.</p>'+
     '<button class="btn pri full" data-p data-darhoras>Dar horas</button></div>';
 }
-function _pilaDeM_(n){
-  var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
-  return m ? nombreCorto(n) : String(n||'').split(' ')[0];       /* refutar39: con dos «Pablo», «Pablo F.» y «Pablo M.» */
-}
+function _pilaDeM_(n){ return pilaClara(n) || String(n||'').split(' ')[0]; }       /* refutar39: con dos «Pablo», «Pablo F.» y «Pablo M.» (refutar87: la regla vive en `pilaClara`, comun.js) */
 
 /* Se rederivaban SOLO el PD, asi que REV2_NOM se quedaba en el nombre de la semilla y el
    rango 2 no existia con datos reales: Jose podia decidir un expediente en el escritorio y
@@ -103,7 +100,7 @@ function _avisosQueTeTocanM_(){
     conv=!(r && typeof r==='object' && Object.keys(r).length);
   }
   var apel=(typeof _apelPendientesTuyas_==='function') ? _apelPendientesTuyas_().map(function(a){
-    return {autor:String(a.autor||'').split(' ')[0], clase:a.clase}; }) : [];
+    return {autor:pilaClara(a.autor)||String(a.autor||'').split(' ')[0], clase:a.clase}; }) : [];
   /* 12/11 (general-1 + gestion-1): sólo el PD (rango 3, como el escritorio y el servidor) y sólo con la cola LEÍDA: `SANC_M===null` es «no lo sé». */
   var sanc=(typeof SANC_M!=='undefined' && Array.isArray(SANC_M) && rangoNom((typeof _actorSanc_==='function') ? _actorSanc_() : yo)>=3) ? SANC_M.length : 0;
   return _tuyoItems_({pdec:pdec, rev:rev, conv:conv, apel:apel, sanc:sanc,
@@ -147,7 +144,7 @@ function vEstado(){
        «Las firma Lois, Project Director» siendo él Lois. */
     cPend={tit:h1(pend)+' esperando aprobación', txt:'Todavía no cuentan. '+(rt
         ? (rt.propio ? 'Las firmas tú: eres el Project Director.'
-           : ('Las firma '+esc(rt.nom.split(' ')[0])+', '+
+           : ('Las firma '+esc(pilaClara(rt.nom)||rt.nom.split(' ')[0])+', '+
               (rt.escalado?'Project Director':'coordinador de tu unidad')+'.'))
         : 'Las firma quien coordine el subsistema de cada parte.')};
   }

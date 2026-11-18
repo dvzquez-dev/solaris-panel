@@ -745,7 +745,7 @@ function durTotalForm(){ return durForm() + _tramosExtraH_(ST.form); }
 function _firmaTxtM_(rt){
   if(!rt) return 'no cuentan hasta que las firma quien coordine el subsistema';
   if(rt.propio) return 'cuentan cuando las firmas tú: eres el Project Director';
-  return 'no cuentan hasta que las firma '+esc(String(rt.nom||'').split(' ')[0])+', '+
+  return 'no cuentan hasta que las firma '+esc(pilaClara(rt.nom||'')||String(rt.nom||'').split(' ')[0])+', '+
     (rt.escalado?'Project Director':'coordinador de tu unidad');
 }
 
@@ -960,7 +960,7 @@ function vFichar(){
     '<button class="btn pri full" data-p id="btnEnviar" disabled style="margin-top:13px">'+
       '<span id="lblEnviar">Faltan datos para enviar</span></button>'+
     '<p class="rnota" style="margin:10px 2px 0">Queda <b style="color:var(--warn)">pendiente</b> y no suma '+
-    'hasta que '+esc(rt.nom.split(' ')[0])+' lo apruebe.</p>';
+    'hasta que '+esc(pilaClara(rt.nom)||rt.nom.split(' ')[0])+' lo apruebe.</p>';
 }
 
 /* ⛔ 20/10 (ficha 🔴 del 20/08): el parte que se iba a DECLARAR, si sigue existiendo. Si el refresco de 90 s se lo

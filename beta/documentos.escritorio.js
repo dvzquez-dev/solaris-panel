@@ -190,7 +190,7 @@ function puedeDecidirDoc(d){
 
 function filaDoc(d){
   if(DOC_SEL===d.id) return docCard(d);
-  var rev=revisoresDe(d).map(function(n){return _m(n).pila;}).join(' o ');
+  var rev=revisoresDe(d).map(function(n){return (pilaClara(n)||_m(n).pila);}).join(' o ');
   /* `mio` sale de `_meTocaDoc_`, LA puerta: aqui preguntaba por `puedeDecidirDoc`, que
      contesta «puedo pisar por rango» y no «me toca» — 2 de 12 combinaciones divergian. */
   var st=estDoc(d.est), mio=_meTocaDoc_(d);
@@ -198,7 +198,7 @@ function filaDoc(d){
   return '<div class="dec" id="doc-'+d.id+'" data-docsel="'+d.id+'">'+
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
     '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+esc(d.ref)+'</span> · '+
-      esc(_m(d.autor).pila)+' · '+ambDoc(d.amb, d.tipo)+(rev ? ' · firma '+esc(rev) : ' · sin revisor')+
+      esc((pilaClara(d.autor)||_m(d.autor).pila))+' · '+ambDoc(d.amb, d.tipo)+(rev ? ' · firma '+esc(rev) : ' · sin revisor')+
       (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+_marcaSuperadaDoc_(d, typeof DOCS!=='undefined' ? DOCS : [])+'</small></span>'+
     '<span class="der">'+
       (mio?'<span class="chip wa">te toca</span>':'')+
@@ -320,7 +320,7 @@ function _decDocLocalE_(d, acc, mot, tit, actor, at, aj){
 }
 
 function docCard(d){
-  var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
+  var revs=revisoresDe(d), rev=revs.map(function(n){return (pilaClara(n)||_m(n).pila);}).join(' o ');
   var sinRev=!revs.length;
   var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';
   if(_peticionRevActiva_(d)) st=['pendiente de confirmaciones','wa'];   /* 05/11 (`pedirrev`) */
@@ -404,7 +404,7 @@ function docCard(d){
       (typeof DOC_SEL!=='undefined' && DOC_SEL===d.id && !(typeof vista!=='undefined' && vista==='docdec')   /* 🟡 2 (refutador) */
         ? '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button>' : '')+'</div>'+
     '<div class="pils">'+
-      '<span class="chip">'+esc(_m(d.autor).pila)+' · '+esc(d.sub||'—')+'</span>'+
+      '<span class="chip">'+esc((pilaClara(d.autor)||_m(d.autor).pila))+' · '+esc(d.sub||'—')+'</span>'+
       '<span class="chip">'+ambDoc(d.amb, d.tipo)+'</span>'+
       '<span class="chip '+st[1]+'">'+st[0]+'</span>'+
       /* ⛔ SIN CLASE = NEUTRO. El `else` era `'ok'` -verde-, asi que «calidad sin
