@@ -114,7 +114,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=3e357fc"></script>
+<script src="comun.js?v=aaa96fe"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=a87b011"></script>
@@ -967,6 +967,7 @@ async function _onCredencial_(resp,_silente){
       var pnl=null; try{ pnl=await api.getPanel(); }catch(_){}
       _aplicarPanel_(pnl); backendOK=true;
     }
+    if(_cambioDePersona_(SESION)) return;     /* refutar115: otra persona en un móvil con la sesión de la anterior abierta → arranca de cero */
     try{ localStorage.setItem('sol_last_email',SESION.email);
          localStorage.setItem('sol_sess',JSON.stringify({token:SESION.token,email:SESION.email,ts:Date.now()})); }catch(_){}
     /* ⛔ SIN TU FICHA NO SE ENTRA — Y DESDE LUEGO NO CON LA DE OTRO.
@@ -1058,6 +1059,7 @@ async function _onCredencial_(resp,_silente){
       var bs=$('#btnSalir'); if(bs) bs.style.display='';   // sí hay salir/cambiar de cuenta
       votCargarLista().then(function(h){ if(h) _repintarSuave_(); }).catch(function(){});   /* 17/11: las votaciones (sin servidor de votaciones, no sale nada) */
       _arrancarRefrescoVivo_();                            // a partir de aqui se alimenta sola
+      _avisarCambioDePersona_();                           // refutar115: si vienes de otra persona, lo dice
     };
     /* El gate de notificaciones ya no esta aqui: corre ANTES del login (ver el arranque,
        al final del fichero). Aqui solo queda guardar la suscripcion, que necesita sesion.
@@ -1883,7 +1885,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='6800bc8';
+var BUILD='ea2d122';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

@@ -3561,10 +3561,11 @@ function _borrLimpiarEnviado_(body){
   (function rec(x,n){ if(n>6||x==null) return; if(typeof x==='string') hojas.push(_borrNorm_(x));
     else if(typeof x==='object') Object.keys(x).forEach(function(k){ if(k!=='token') rec(x[k],n+1); }); })(body,0);
   if(!hojas.length) return;
-  var borrar=[];
+  var borrar=[], mios=_borrClave_('');
   try{
     for(var i=0;i<localStorage.length;i++){
       var k=localStorage.key(i); if(!k || k.indexOf(BORR_PREFIJO)!==0) continue;
+      if(k.indexOf(mios)!==0) continue;      /* refutar115: los borradores de OTRA persona en este móvil no son de este envío (un «ok» de Cris se borraba con el parte de Ana) */
       var o=null; try{ o=JSON.parse(localStorage.getItem(k)); }catch(_){}
       var t=_borrNorm_(o&&o.v); if(!t){ borrar.push(k); continue; }
       if(hojas.some(function(h){ return h.indexOf(t)>=0; })) borrar.push(k);
@@ -5262,20 +5263,59 @@ async function _soltarPushDelServidor_(){
   return 'soltada';
 }
 
+/* ⛔ refutar115 (18/11): UN MÓVIL PRESTADO. Los avisos que ya salieron NO los suelta `borrarPush` (eso sólo corta los que vengan): quedaban en la bandeja del móvil con su texto
+   —«Sanción propuesta a Cris…»— para quien cogiera el aparato después. Se cierran los de ESTE navegador al salir o al entrar otra persona. Devuelve cuántos cerró; nunca lanza. */
+async function _cerrarAvisosDeLaBandeja_(){
+  try{
+    if(typeof navigator==='undefined' || !navigator.serviceWorker) return 0;
+    var reg=await navigator.serviceWorker.getRegistration();
+    if(!reg || !reg.getNotifications) return 0;
+    var l=await reg.getNotifications(); l.forEach(function(n){ try{ n.close(); }catch(_){} });
+    return l.length;
+  }catch(_){ return 0; }
+}
+/* ⛔ refutar115 (18/11): ENTRA OTRA PERSONA SIN SALIR LA ANTERIOR. Con el token de Ana caducado la app ofrece «Entra de nuevo y sigues donde estabas» (`_ofrecerEntrarDeNuevo_`):
+   pensado para Ana, pero lo contesta quien tenga el móvil. Si es Cris, la rejilla de disponibilidad que Ana había pintado (`ST.sel`), el formulario de parte, la memoria de turno
+   a medias… seguían en memoria y el «Guardar» siguiente los mandaba A NOMBRE DE CRIS (medido: respuesta de Cris = la casilla de Ana). Lo escrito y no enviado de Ana ya está a salvo
+   en su borrador (la clave lleva el correo): lo que hay que hacer es NO arrastrar la memoria. Con otra persona, la app arranca de cero (recarga) con la sesión nueva ya guardada y
+   un aviso que lo dice. Misma persona → nada (sigue donde estaba). Devuelve `true` si recarga: quien llama debe PARAR. La `window` recuerda a la última persona aunque `SESION`
+   se haya puesto a `null` (baja, sesión muerta). */
+var CAMBIO_PERSONA_SS = 'sol_cambio_persona';
+function _cambioDePersona_(ses){
+  var em=String((ses && ses.email) || '').toLowerCase(); if(!em) return false;
+  var prev=window.__PERSONA_EN_PANTALLA;
+  if(!prev || prev.email===em){ window.__PERSONA_EN_PANTALLA={email:em, nombre:(ses.nombre||'')}; return false; }
+  try{ localStorage.setItem('sol_last_email', ses.email);
+       localStorage.setItem('sol_sess', JSON.stringify({token:ses.token, email:ses.email, ts:Date.now()})); }catch(_){}
+  try{ sessionStorage.setItem(CAMBIO_PERSONA_SS, JSON.stringify({de:prev.nombre||prev.email, a:ses.nombre||ses.email}));
+       sessionStorage.removeItem('solaris.tareasFiltro'); }catch(_){}      /* el último filtro de Tareas (escritorio) es de quien lo puso */
+  window.__PERSONA_EN_PANTALLA=null;
+  var recargar=function(){ location.reload(); };
+  Promise.race([_cerrarAvisosDeLaBandeja_(), new Promise(function(r){ setTimeout(r, 800); })]).then(recargar, recargar);
+  return true;
+}
+/* Ya con la app arrancada para la persona nueva: lo dice, con el nombre de la anterior. Una sola vez. */
+function _avisarCambioDePersona_(){
+  var o=null; try{ o=JSON.parse(sessionStorage.getItem(CAMBIO_PERSONA_SS)||'null'); sessionStorage.removeItem(CAMBIO_PERSONA_SS); }catch(_){}
+  if(!o || typeof tost!=='function') return false;
+  setTimeout(function(){ tost('Has entrado como '+(o.a||'otra persona')+'. Lo que '+(o.de||'la otra persona')+' tenía escrito sin enviar queda guardado para cuando vuelva a entrar.', {fijo:true}); }, 600);
+  return true;
+}
+
 function cerrarSesion(){
   var hecho=false;
   var fin=function(){
     if(hecho) return;
     hecho=true;
     SESION=null;
-    try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); }catch(_){}
+    try{ localStorage.removeItem('sol_sess'); localStorage.removeItem('sol_last_email'); sessionStorage.removeItem('solaris.tareasFiltro'); }catch(_){}
     try{ if(window.google&&google.accounts&&google.accounts.id) google.accounts.id.disableAutoSelect(); }catch(_){}
     location.reload();
   };
   /* Se sale SIEMPRE: si el servidor no contesta o falla, a los 3 s igual (no se retiene a nadie dentro). Lo que queda
      entonces es su endpoint en el servidor, y el emisor lo poda en cuanto el navegador cambie de cuenta. */
   setTimeout(fin, 3000);
-  try{ _soltarPushDelServidor_().then(fin, fin); }catch(_){ fin(); }
+  try{ Promise.all([_soltarPushDelServidor_(), _cerrarAvisosDeLaBandeja_()]).then(fin, fin); }catch(_){ fin(); }
 }
 
 /* ⛔ 21/10 (auditor 10, 🟡 8): LO QUE ES una persona, en una frase, por UNA puerta para las dos caras. Cada sitio lo
