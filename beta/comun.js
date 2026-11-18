@@ -8635,7 +8635,9 @@ function _recargarVersionNueva_(volviendo){
    `reuniones`, `turnos`, `docs` o `estado`; cada cara lo traduce a la suya. Lo que no conoce → `null` (se queda donde
    esté: abrir la raíz es lo que pasaba antes, no un fallo nuevo). */
 function _vistaDeAviso_(destino, cara){
-  var d=String(destino||'').replace(/^#/,'');
+  /* refutar113 (18/11): `#reuniones/ab12` (un enlace a UN elemento, como los que se pasan por WhatsApp) lleva a la pantalla: lo de
+     después de la barra aún no sabe abrir el elemento (ver «Dudas» de refutar113), pero no puede dejarte en Estado. */
+  var d=String(destino||'').replace(/^#/,'').split('/')[0];
   var M=(cara==='escritorio')
     ? {estado:'panel', horas:'libros', reuniones:'convoc', turnos:'turnos', docs:'docdec', apela:'apela', tareas:'tareas'}
     : {estado:'estado', horas:'horas', reuniones:'reu', turnos:'turnos', docs:'docs', apela:'estado', tareas:'tareas'};
@@ -8784,9 +8786,20 @@ function _irAlAbrir_(){
     var h=(typeof location!=='undefined' && location.hash) ? String(location.hash).slice(1) : '';
     if(!h) return null;
     var r=_irDesdeAviso_(h);
-    if(r && typeof history!=='undefined' && history.replaceState) history.replaceState(null,'',location.pathname+location.search);
+    /* refutar113: un enlace que no lleva a nada (`#cosa`, una pantalla que esta cara no tiene) se retira de la barra igual, y con
+       sesión DICE que no ha servido: antes la app se quedaba en Estado sin explicar nada, y recargar lo repetía. */
+    if(typeof history!=='undefined' && history.replaceState) history.replaceState(null,'',location.pathname+location.search);
+    if(!r && typeof SESION!=='undefined' && SESION && typeof tost==='function') tost('Ese enlace no lleva a ninguna pantalla de la app.');
     return r;
   }catch(_){ return null; }
+}
+/* refutar113: pegar un enlace con la app YA abierta (`…/movil.html#turnos` en la misma pestaña) sólo cambia el hash: no recarga, y
+   `_irAlAbrir_` sólo corría al arrancar, así que no pasaba nada. Se escucha una vez (`_pushInit_` corre dos veces: al abrir y al entrar). */
+function _escucharHash_(){
+  if(typeof window==='undefined' || !window.addEventListener || _escucharHash_.hecho) return false;
+  _escucharHash_.hecho=true;
+  window.addEventListener('hashchange', function(){ _irAlAbrir_(); });
+  return true;
 }
 
 /* Engancha el canal del worker. Devuelve si se pudo enganchar, para que quien llame lo
@@ -8842,6 +8855,7 @@ async function _pushInit_(){
      ⚠️ Y con ellas se iba el aviso de version nueva, que viaja por el mismo canal. */
   var reg=await _registrarSW_();
   _escucharSW_();
+  _escucharHash_();
   _irAlAbrir_();
   if(!_pushSoportado_()) return;
   try{

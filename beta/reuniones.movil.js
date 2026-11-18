@@ -1190,7 +1190,10 @@ function crearModal(){
   var op=tipos.filter(function(t){return _tp.indexOf(t[0])>=0;});
   var hoyISO=_dmyAISO_(HOY), mas=function(iso,n){ var d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n);
     return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
-  var subs=(DATA.subsistemas||[]).map(function(sb){ return '<button type="button" class="cmixb" data-u="'+esc(sb.u||sb)+'" data-p>'+esc(sb.u||sb)+'</button>'; }).join('');
+  /* ⛔ 18/11 (refutar111): las UNIDADES CON GENTE, no `DATA.subsistemas` (las que COMPITEN en el ranking: una lista escrita a mano en `flujos/umbral.SUBSISTEMAS`). Con un
+     subsistema nuevo o renombrado a mitad de temporada esa lista no lo trae, y la mixta de su coordinador ofrecía «GNC» y NO su propia unidad (ni la nueva). El servidor
+     cuenta la mixta por la `unidad` del roster (`_mixta_valida`) y el escritorio ya sacaba los chips de ahí: es la misma pregunta, con la misma puerta. */
+  var subs=_gentePorUnidad_().map(function(g){ return g.u; }).sort(function(a,b){ return a<b?-1:a>b?1:0; }).map(function(u){ return '<button type="button" class="cmixb" data-u="'+esc(u)+'" data-p>'+esc(u)+'</button>'; }).join('');
   var plant=PLANTILLAS_M.length ? '<div class="campo"><span class="sc">Copiar distribución de</span>'+
       nxElige('ceCopiar', [['','— empezar en blanco —']].concat(PLANTILLAS_M.map(function(p,i){ return [String(i), p.titulo]; })), '')+'</div>' : '';
   abrirModal('<div class="mtit">Nueva '+(coord?'reunión':'reunión de trabajo')+'</div>'+
