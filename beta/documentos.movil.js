@@ -151,7 +151,7 @@ function puedeDecidirDoc(e){
 /* ⛔⛔ Y LA TABLA ES LA LEGIBLE, LA DEL ESCRITORIO (649.ª, 14/09). Hasta hoy el móvil leía un mapa que
    devolvía el ámbito tal cual («subsistema») y el escritorio, del mismo expediente, decía «informe de
    subsistema». Decisión [27/07]: el vocabulario de Cowork no se enseña. */
-function ambDocM(a){ return AMB_DOC[a] || String(a || '—'); }
+function ambDocM(a, tipo){ return _ambitoDeActa_(a, tipo) || AMB_DOC[a] || String(a || '—'); }
 /* ⚠️ `esAutor`, no `mio` (20/10): en el escritorio `filaDoc(d, mio)` significa «puedo decidir», o sea lo
    CONTRARIO; con el mismo nombre, portar una línea de una cara a la otra la invertía sin error. */
 function filaDoc(e,esAutor){
@@ -175,7 +175,7 @@ function filaDoc(e,esAutor){
   var _uni = (!esAutor && e.subsistema && (rangoNom(yoNombre())>=2 || _perfilesDe_(miembro(yoNombre())).length>1)) ? ' · '+esc(e.subsistema) : '';
   return '<div class="fila clic '+(esAutor?(e.estado==='cambios'?'borde-no':(_pend?'borde-pe':''))+'':'')+'" data-doc="'+e.id+'" data-p>'+
     '<div class="a"><b>'+esc(e.titulo)+'</b><small><span class="mono">'+e.ref+'</span> · '+
-    esc(e.autor.split(' ')[0])+' · '+ambDocM(e.ambito)+_uni+'</small></div>'+
+    esc(e.autor.split(' ')[0])+' · '+ambDocM(e.ambito, e.tipo)+_uni+'</small></div>'+
     '<div class="d"><span class="pil '+st[1]+'">'+st[0]+'</span> <span class="chev">›</span></div></div>';
 }
 
@@ -487,6 +487,7 @@ function verDoc(id){
     if(_cnt) secs+='<p class="rnota" style="margin:8px 0 0">'+esc(_cnt)+'</p>';
   }
   var _mioDoc = _docAutorHTML_(e);
+  var _mioArriba = puede ? '' : _mioDoc;
   var _autorP = _autorPDoc_(e);
   var acc = puede
     ? '<h4>Tu decisión</h4>'+_revisionPropuestaHTML_(e, yoNombre())+
@@ -509,7 +510,7 @@ function verDoc(id){
        ⚠️ Se llama UNA vez y se guarda: llamarla dos veces en el ternario duplicaría el
        trabajo y, el día que lleve estado dentro, daría dos respuestas distintas. */
     : _mioDoc
-      ? _mioDoc
+      ? ''      /* refutar64 (17/11): lo del autor sube, encima del visor (`_mioArriba`) */
       /* 12/11 (refutar18): a quien le PIDEN confirmar la revisión (es su revisor mientras la petición vive) no se le dice «lo revisa <él>. Tú no
          decides aquí»: lo que le toca lo dice `_peticionRevHTML_` justo debajo (como en el escritorio, que aquí pone ''). */
       : (_peticionRevActiva_(e) && revisoresDe(e).indexOf(yoNombre())>=0 ? ''
@@ -521,7 +522,7 @@ function verDoc(id){
   abrirModal('<div class="mtit">'+esc(e.titulo)+'</div>'+
     '<div class="msub"><span class="mono">'+e.ref+'</span> · '+esc(e.autor)+' · '+esc(e.subsistema)+'</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+
-      '<span class="pil neu">'+ambDocM(e.ambito)+'</span>'+
+      '<span class="pil neu">'+ambDocM(e.ambito, e.tipo)+'</span>'+
       /* ⛔ La clase sale de `EST_DOC`, no de un ternario a mano: el `else` era `conf` y
          pintaba **«rechazado» en VERDE** al autor que abre su propio expediente. */
       '<span class="pil '+_pilEstDoc_(e.estado)+'">'+esc(estDoc(e.estado)[0])+'</span>'+
@@ -552,6 +553,10 @@ function verDoc(id){
     /* ANTES del resumen a propósito: si el expediente está trabado o es una
        revisión de otro, eso cambia lo que hay que mirar en todo lo de abajo. */
     _avisosDocM_(e)+
+    /* ⛔ refutar64 (17/11): AL AUTOR LO QUE FALTA, ANTES DEL PDF. «Te pidieron cambios: falta la figura 3 y cómo corregirlo» estaba al FINAL de la
+       ficha, debajo del visor (52 % de la pantalla) y de los avisos: en un móvil de 360×740 Ana abría su documento y veía su título, la píldora
+       «cambios pedidos» y un cuadro gris de 385 px, y tenía que bajar para saber QUÉ corregir. Es lo único que viene a leer. */
+    _mioArriba+
     '<p style="font-size:12.5px;color:var(--ink2);line-height:1.55;margin:0">'+esc(e.resumen||'Sin descripción.')+'</p>'+
     /* Las etiquetas se VEN aunque no puedas decidir: el campo editable de abajo solo
        sale si te toca firmar, y el AUTOR tiene que poder ver con cuales se publico

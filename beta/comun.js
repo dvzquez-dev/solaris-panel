@@ -3719,6 +3719,15 @@ function _responsableTurno_(t){
   return l.length ? l[0].miembro : null;
 }
 
+/* refutar70 (18/11): un turno que YA PASÓ y nadie ha cerrado sigue «vivo» (cuenta por su estado, no por la fecha) y salía IGUAL que uno de mañana: quien fue no sabía que sus horas
+   esperaban a que alguien lo cerrara, ni quién. Con el PD fuera una semana eran los de los turnos que lleva él. `t` es el turno de la cara móvil (`pasado`, `hecho`, `rolesM`).
+   '' si no hay nada que decir. */
+function _turnoSinCerrarTxt_(t, yo){
+  if(!t || !t.pasado || t.hecho) return '';
+  var r=_responsableTurno_({roles:t.rolesM||[]});
+  return 'Sin cerrar'+(r ? ' \u00b7 '+(r===yo ? 'lo cierras t\u00fa' : 'lo cierra '+nombreCorto(r)) : '');
+}
+
 /* ⛔ QUIEN PUEDE CERRAR UN TURNO. El responsable de ESE turno, y el PD.
    Daniel ya le habia dado a este cargo el papel de «confirma quien fue de verdad al acabar»
    (ver `CARGOS_TURNO`); declarar el extra es la otra mitad del mismo gesto.
@@ -4773,6 +4782,23 @@ var _DIAS_PRISA_ = 3;
 
    ⚠️ Las **palabras** son las de una reunión (*cierra*). Una tarea *vence*, y esa pantalla tiene
    las suyas: lo que comparten es la **cuenta** (`_diasHasta_`), no el verbo. */
+/* refutar70 (18/11): una reunión SIN fijar con el plazo ya cerrado espera a quien la convocó (a veces el PD, que puede estar una semana sin abrir la app). Se dice DE QUIÉN es el
+   siguiente paso y, si todos los días propuestos ya pasaron, que no basta con fijarla: hay que convocarla de nuevo (si no, «mejor hueco lun 23/11» sale con el 23 de hace tres días).
+   Devuelve '' si no hay nada que decir (fijada, finalizada o con el plazo abierto). */
+function _reuSinFijarTxt_(R){
+  if(!R || R.fijada || R.finalizada_at || _plazoAbierto_(R.limite)) return '';
+  var base=_hoyDateM_(), y=base.getFullYear(), leidos=0, vivos=0;
+  (R.dias||[]).forEach(function(d){
+    var m=/^\s*(\d{1,2})\/(\d{1,2})/.exec(String(d||'')); if(!m) return;
+    var t=new Date(y,(+m[2])-1,+m[1]).getTime();
+    if(t < base.getTime()-182*86400000) t=new Date(y+1,(+m[2])-1,+m[1]).getTime();
+    leidos++; if(t>=base.getTime()) vivos++;
+  });
+  var yo=(typeof _fichaYo_==='function') ? _fichaYo_() : '', tuya=!!R.convocante && R.convocante===yo;
+  var quien=R.convocante ? nombreCorto(R.convocante) : 'quien la convoca';
+  if(leidos && !vivos) return 'Los d\u00edas propuestos ya pasaron sin fijarse: '+(tuya ? 'tendr\u00e1s' : quien+' tendr\u00e1')+' que convocarla de nuevo.';
+  return 'Todav\u00eda no tiene fecha: '+(tuya ? 'la fijas t\u00fa.' : 'la fija '+quien+'.');
+}
 function _plazoTxt_(limite){
   /* ⛔ 20/10 (auditoría): LA FECHA POR `_normLimite_` (la que usa la REGLA): con `_dmyAISO_` a secas, «20/10/2026 10:00»
      salía «sin límite». Y EL MISMO DÍA, POR LA HORA: el texto iba por días y la regla por minutos, así que un plazo
@@ -8177,12 +8203,22 @@ function _cablearVisor_(raiz){
   });
   if(!_cablearVisor_._esc){
     _cablearVisor_._esc=true;
+    /* refutar64 (17/11): en CAPTURA y cortando: el oyente de accesibilidad (`Esc` cierra la hoja) cuelga de `document` y corría
+       también, así que Esc cerraba el visor Y la ficha entera, y quien leía el PDF perdía hasta el expediente. */
     document.addEventListener('keydown', function(e){
       if(e.key!=='Escape') return;
-      var f=document.querySelector('.doc.full');
-      if(f){ f.classList.remove('full'); document.body.style.overflow=''; }
-    });
+      if(_soltarVisor_()) e.stopPropagation();
+    }, true);
   }
+}
+/* refutar64 (17/11): el visor maximizado es `position:fixed` y bloquea el scroll de la página (`body.overflow`). Si la ficha se cerraba
+   por OTRO camino que el botón del visor (el «atrás» del móvil, la ✕, otra pantalla), el expediente quedaba oculto pero el bloqueo se
+   quedaba: la lista de Documentos no se podía mover. Una sola puerta para soltarlo; dice si había algo maximizado. */
+function _soltarVisor_(){
+  var f=document.querySelectorAll('.doc.full');
+  Array.prototype.forEach.call(f,function(d){ d.classList.remove('full'); });
+  document.body.style.overflow='';
+  return f.length>0;
 }
 
 /* ⛔⛔ EL `subscribe` SE CAZA, Y ES UN FALLO REPORTADO: `BUG-M-2026-10-07-1` (Óscar,
@@ -15295,7 +15331,7 @@ function _bloqueFormHTML_(){
       alCambiar:function(l){
         var antes={}; BLQ.parts.forEach(function(p){ antes[p.nombre]=p.horas; });
         BLQ.parts=l.map(function(n){ return {nombre:n, horas:antes[n]||''}; });
-        _bloqueHorasPintar_(); }})+
+        _bloqueHorasPintar_(); _bloqueGenteEnElResumen_(); }})+
     '<div id="blqHoras" style="margin:0 0 12px">'+_bloqueHorasHTML_()+'</div>'+
     (B.reunion_id==null && !fin ? '<div id="blqClas" style="margin:0 0 12px">'+_bloqueClasHTML_(B)+'</div>' : '')+
     '<label style="display:block;margin:0 0 12px">'+lab('<span id="blqResLab">'+_bloqueResLabel_(B)+'</span>')+
@@ -15306,6 +15342,31 @@ function _bloqueFormHTML_(){
       '<button class="btn" data-blqcerrar data-p>Cancelar</button></div></div>';
 }
 
+/* refutar67 (17/11): la cabecera del resumen de SolarIA —«Reunión «T» (2 h). 6 participantes: A, B.»— la monta `resumir_reunion.montar` con la lista DE CUANDO se pidió. Si
+   el PD quita después a quien no llegó (o añade a quien faltaba), el texto seguía diciendo los 6 y se enviaba así en los partes de todos (y de ahí va al acta). Sólo toca la
+   PRIMERA línea y sólo si tiene esa forma —lo que escribió la persona no se toca—; la gemela es `resumir_reunion.py:168` (siempre «N participantes», también con 1). */
+function _cabeceraConGente_(txt, nombres){
+  var t=String(txt==null ? '' : txt), i=t.indexOf('\n'), l=i<0 ? t : t.slice(0, i), m=/^(Reunión «.*»(?: \([^)\n]*\))?\.) \d+ participantes: [^\n]*\.$/.exec(l);
+  if(!m) return t;
+  return m[1]+(nombres.length ? ' '+nombres.length+' participantes: '+nombres.join(', ')+'.' : '')+(i<0 ? '' : t.slice(i));
+}
+/* Pone al día esa cabecera en lo que hay escrito (la caja) y en la propuesta de SolarIA que aún no se ha usado. «Volver al original» no se pierde: la caja del resumen no lleva `valor`, así que teclear en ella no suelta la propuesta usada. */
+function _bloqueGenteEnElResumen_(){
+  var ta=$('#blqResumen'), s=SOLP.blq, n=BLQ.parts.map(function(p){ return p.nombre; }), v;
+  if(s && s.fase==='propuesta' && typeof s.prop==='string') s.prop=_cabeceraConGente_(s.prop, n);
+  if(ta){
+    v=_cabeceraConGente_(ta.value, n);
+    if(v!==ta.value) _solPone_(ta, v);
+  }
+  if(!s) return;
+  _solPintar_('blq', true);
+}
+
+/* refutar67 (17/11): un acta es de ámbito «general» (la firma sólo el PD) y salía rotulada «informe general»: un acta no es un informe. Devuelve el rótulo del acta, o '' si no
+   lo es (entonces manda `AMB_DOC`, como siempre: `ambDoc` / `ambDocM` caen a él). El `/acta/i` es el de `ambito_doc` del servidor. */
+function _ambitoDeActa_(amb, tipo){
+  return (amb==='general' && /acta/i.test(String(tipo||''))) ? 'acta de reunión' : '';
+}
 /* Repinta SOLO el bloque de horas (no el formulario: repintarlo entero borraría lo escrito) y engancha sus botones. */
 function _bloqueHorasPintar_(){
   var c=$('#blqHoras'); if(!c || !BLQ) return;

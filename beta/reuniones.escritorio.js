@@ -690,7 +690,7 @@ function _miDispoPanel_(r){
     '<div class="leg" style="margin-top:6px">'+ley+'</div>'+
     (_cerrado
       ? '<p class="rnota" style="margin:9px 0 0;color:var(--warn)">El plazo cerró: lo marcado '+
-        'ya no se puede cambiar.</p>'
+        'ya no se puede cambiar.'+(_reuSinFijarTxt_(r) ? ' '+esc(_reuSinFijarTxt_(r)) : '')+'</p>'
       : '<div style="margin-top:9px;display:flex;gap:9px;align-items:center">'+
       '<button class="btn pri" data-midguardar="'+r.id+'"'+(sucio?'':' disabled')+'>Guardar mi disponibilidad</button>'+
       /* ⛔ EL MINIMO SE DICE ANTES DE PULSAR. El movil lo pone en su contador («cada toque

@@ -114,15 +114,15 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=69c61ee"></script>
+<script src="comun.js?v=7302832"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=4f42fdf"></script>
-<script src="turnos.movil.js?v=aaa3f3c"></script>
+<script src="turnos.movil.js?v=176f5f7"></script>
 <script src="buzon.movil.js?v=3179853"></script>
-<script src="documentos.movil.js?v=9549b24"></script>
+<script src="documentos.movil.js?v=8fc5e01"></script>
 <script src="sanciones.movil.js?v=8831fbd"></script>
-<script src="reuniones.movil.js?v=1b53a53"></script>
+<script src="reuniones.movil.js?v=17e9932"></script>
 <script src="horas.movil.js?v=1f211fb"></script>
 <script src="equipo.movil.js?v=cee4f98"></script>
 <script>
@@ -1424,10 +1424,11 @@ function abrirModal(html){
   $('#modal-body').innerHTML=html;
   $('#modal .x').innerHTML=ico('cerrar');   /* el ✕ es el icono propio, no un carácter */
   $('#modal').classList.add('on');
+  _soltarVisor_();   /* repintar la ficha (la pone al día `_refrescarDocAbierto_`) con el visor maximizado tira ese visor: que no deje el scroll bloqueado (refutar64) */
   $('#modal .card').scrollTop=0;
   _MODAL_TOCADO_=false;
 }
-function cerrarModal(){ $('#modal').classList.remove('on'); }
+function cerrarModal(){ $('#modal').classList.remove('on'); _soltarVisor_(); }
 /* ── TOCAR EL FONDO YA NO TIRA UN FORMULARIO A MEDIAS (830.ª, 15/10) ────────────
    📏 Medido con un dedo de verdad (Chromium, 375×812): en «Nueva reunión» la hoja ocupa
    desde y=65 hasta abajo, y la franja de arriba —donde se ve la cabecera de la app— ES el
@@ -1474,6 +1475,7 @@ window.addEventListener('popstate',function(e){
   if(!_atrasCapa_()){ history.back(); return; }
   history.pushState({sol:'tope'},'');
   var d=document.querySelector('[data-dlg]');
+  if(_soltarVisor_()) return;   /* «atrás» con el visor del PDF maximizado: sale del visor, no cierra la ficha de golpe (refutar64) */
   if(d){ var no=d.querySelector('[data-dlg-no]'); if(no) no.click(); }
   else if(_modalAbierto_()) _fondoDelModal_();
   else irA('estado');
@@ -1875,7 +1877,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='8d15d32';
+var BUILD='19ffff7';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

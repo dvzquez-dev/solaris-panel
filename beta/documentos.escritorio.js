@@ -137,7 +137,7 @@ function chipSevDoc(sev){
          '">'+calDoc(sev)+'</span>';
 }
 
-function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
+function ambDoc(a, tipo){ return _ambitoDeActa_(a, tipo) || AMB_DOC[a] || String(a||'—'); }
 
 /* GEMELA de `puedeDecidirDoc` del movil y de `_puedeDecidir_` del backend: nadie firma
    lo suyo, el primero que decide bloquea a sus iguales, y solo alguien de MAS rango
@@ -198,7 +198,7 @@ function filaDoc(d){
   return '<div class="dec" id="doc-'+d.id+'" data-docsel="'+d.id+'">'+
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
     '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+esc(d.ref)+'</span> · '+
-      esc(_m(d.autor).pila)+' · '+ambDoc(d.amb)+(rev ? ' · firma '+esc(rev) : ' · sin revisor')+
+      esc(_m(d.autor).pila)+' · '+ambDoc(d.amb, d.tipo)+(rev ? ' · firma '+esc(rev) : ' · sin revisor')+
       (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+'</small></span>'+
     '<span class="der">'+
       (mio?'<span class="chip wa">te toca</span>':'')+
@@ -405,7 +405,7 @@ function docCard(d){
         ? '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button>' : '')+'</div>'+
     '<div class="pils">'+
       '<span class="chip">'+esc(_m(d.autor).pila)+' · '+esc(d.sub||'—')+'</span>'+
-      '<span class="chip">'+ambDoc(d.amb)+'</span>'+
+      '<span class="chip">'+ambDoc(d.amb, d.tipo)+'</span>'+
       '<span class="chip '+st[1]+'">'+st[0]+'</span>'+
       /* ⛔ SIN CLASE = NEUTRO. El `else` era `'ok'` -verde-, asi que «calidad sin
          medir» se pintaba con el mismo chip que «calidad alta»: quien mira una lista

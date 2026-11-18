@@ -1061,3 +1061,29 @@ main>.pan:has(.tw),main>div>.pan:has(.tw){max-width:1280px}
 .vsws{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 .vsw{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0}
 .vfal summary{cursor:pointer;color:var(--ink2);font-size:12.5px;margin:6px 0}
+
+/* ═══ 17/11 (refutar68) · TABLETA Y VENTANA ESTRECHA ═══════════════════════════════════════════════════════════════════════════════
+   Medido a 600, 768 y 820 px: con la barra lateral fija (238) el contenido se quedaba en 330-580 px, la cabecera («Actúas como» + nombre + ⋮)
+   se salía por la derecha y las tarjetas se cortaban. ≥ 861 px no cambia NADA (1024, 1280 y el ancho ya estaban bien). Debajo, la barra
+   lateral es un cajón sobre el contenido (☰ en la cabecera) y la cabecera se compacta. */
+.btnlat{display:none;flex:none;width:34px;height:34px;border:1px solid var(--line);border-radius:9px;color:var(--ink2);font-size:16px;line-height:1}
+@media (max-width:860px){
+  .marco{grid-template-columns:minmax(0,1fr)}
+  .top,main{grid-column:1}
+  .btnlat{display:block}
+  aside{position:absolute;left:0;top:0;bottom:0;width:238px;z-index:40;visibility:hidden;transform:translateX(-102%);
+    transition:transform .22s var(--sal),visibility 0s linear .22s;box-shadow:0 0 40px rgba(0,0,0,.6)}
+  .marco.latAbierto aside{visibility:visible;transform:none;transition:transform .22s var(--sal),visibility 0s}
+  .miga{min-width:0;overflow:hidden}
+  .top{gap:9px;padding:0 10px}
+  .actua button{padding:5px 8px}
+  .yo .n{max-width:110px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:bottom}
+  .tarl table{min-width:640px}   /* la columna de la tarea se quedaba en 16-80 px y partía «fabricació-n»: la tabla se desliza en vez de apretarse */
+  main{padding:12px}
+}
+@media (max-width:680px){
+  .yo>span:last-child{display:none}   /* queda la ficha con las iniciales; el nombre completo está en «Ajustes» */
+  .yo{padding:4px}
+  .actua{padding-left:20px}
+  .actua button{padding:5px 6px;font-size:8.5px}
+}

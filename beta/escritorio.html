@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=045495c">
+<link rel="stylesheet" href="escritorio.css?v=49632fe">
 </head>
 <body>
 
@@ -50,6 +50,7 @@
   </aside>
 
   <header class="top">
+    <button id="btnLat" class="btnlat" aria-label="Abrir el menú de pantallas" aria-expanded="false" aria-controls="nav">☰</button>
     <div class="miga"><span>Solaris</span><span style="color:var(--ink3)">/</span>
       <span id="migaA">Operación</span><span style="color:var(--ink3)">/</span><b id="migaB">Panel de mando</b>
       <!-- El distintivo es tambien LA VUELTA a produccion: ver el movil. -->
@@ -113,16 +114,16 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=69c61ee"></script>
+<script src="comun.js?v=7302832"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=3cc0796"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
-<script src="documentos.escritorio.js?v=428fbab"></script>
+<script src="documentos.escritorio.js?v=c9270d5"></script>
 <script src="sanciones.escritorio.js?v=5d4597f"></script>
-<script src="reuniones.escritorio.js?v=b7e594b"></script>
+<script src="reuniones.escritorio.js?v=cec90cb"></script>
 <script src="horas.escritorio.js?v=52fbc5e"></script>
-<script src="equipo.escritorio.js?v=6b38f97"></script>
+<script src="equipo.escritorio.js?v=ee22dba"></script>
 <script src="tareas.escritorio.js?v=d9b0344"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
 <script>
@@ -3475,6 +3476,9 @@ function _aplicarBootstrap_(boot){
   VETOS = boot.vetos || null;
   if(Array.isArray(boot.reuniones)){
     REUS.length=0; boot.reuniones.map(normReu).forEach(function(r){REUS.push(r);});
+    /* refutar70 (18/11): `_hidratarReus_` sale con `!backendOK` y `backendOK=true` se ponía al FINAL de esta función: al abrir la app NO hidrataba nada y el PD veía «SIN LEER»
+       y el mapa a cero hasta el primer refresco de 90 s. Se pone ANTES (lo que se acaba de recibir es del servidor). */
+    backendOK=true;
     _hidratarReus_();          // el bootstrap NO trae `resp`: sin esto el mapa sale a cero
     /* ⛔ AQUI HABIA UN `setTimeout(_refrescoVivo_, 300)`, y es el MISMO fallo que Daniel
        reportó en el móvil («carga el widget una vez extra»), en la otra cara y sin que nadie
@@ -3690,6 +3694,19 @@ function _arrancarGis_(){
     setTimeout(function(){ esperar(n-1); },150);
   })(40);
 }
+/* 17/11 (refutar68): a menos de 860 px la barra lateral (238) dejaba al contenido sin sitio (tableta en vertical: cabecera y tarjetas cortadas por la derecha).
+   Ahí pasa a CAJÓN: el ☰ de la cabecera lo abre, elegir una pantalla, Escape o tocar fuera lo cierran. En ancho no se ve ni cambia nada. */
+function _cablearLateral_(){
+  var m=document.querySelector('.marco'), b=document.getElementById('btnLat'), n=document.getElementById('nav');
+  if(!m||!b||b._ok) return; b._ok=1;
+  function _ponerLateral(a){ m.classList.toggle('latAbierto',!!a); b.setAttribute('aria-expanded',a?'true':'false'); }
+  b.onclick=function(ev){ ev.stopPropagation(); _ponerLateral(!m.classList.contains('latAbierto')); };
+  n.addEventListener('click',function(ev){ if(ev.target.closest('.item')) _ponerLateral(false); });
+  document.addEventListener('click',function(ev){ if(m.classList.contains('latAbierto') && !ev.target.closest('aside')) _ponerLateral(false); });
+  document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && m.classList.contains('latAbierto')){ _ponerLateral(false); b.focus(); } });
+  window.addEventListener('resize',function(){ if(window.innerWidth>860) _ponerLateral(false); });
+}
+_cablearLateral_();
 /* Lo que no es tarea diaria (ajustes, buzon, cerrar sesion) va al menu de los tres
    puntos, no suelto en la cabecera ni en la barra lateral, que ya va cargada. */
 function _cablearSalir_(){
@@ -3830,7 +3847,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='5aeb8d5';
+var BUILD='9344561';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

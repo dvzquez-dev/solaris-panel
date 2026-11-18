@@ -858,7 +858,8 @@ function vTurnos(){
     return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+
       cab(t.f+(t.crucial?' · crucial':'')+(t.estado==='Cancelado'?' · cancelado':''), t.hora)+   /* 20/10: se dice */
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(_sitioConCiudad_(t.punto))+'</b>'+
-      '<small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+(t.lugar?' · '+esc(t.lugar):'')+'</small></div>'+
+      '<small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+(t.lugar?' · '+esc(t.lugar):'')+'</small>'+
+      (_turnoSinCerrarTxt_(t, (YO&&YO.nombre)||'') ? '<small style="color:var(--warn)">'+esc(_turnoSinCerrarTxt_(t, (YO&&YO.nombre)||''))+'</small>' : '')+'</div>'+
       '<div class="d"><span class="chev">›</span></div></div>'+
       _quienVaHTML_(t)+'</div>';
   }

@@ -759,7 +759,8 @@ function vReu(){
                 '<b style="color:var(--warn)">El plazo cerró · '+esc(_limM_(R))+'</b><br>'+
                 (R.cubierta
                   ? 'Lo que dejaste marcado sigue contando; ya no se puede cambiar.'
-                  : 'Ya no se puede cubrir: el servidor no acepta respuestas fuera de plazo.')+'</div>'
+                  : 'Ya no se puede cubrir: el servidor no acepta respuestas fuera de plazo.')+
+                (_reuSinFijarTxt_(R) ? '<br>'+esc(_reuSinFijarTxt_(R)) : '')+'</div>'
               : '<button class="btn pri full" data-p id="btnCubrir" style="margin-top:10px">'+
                 (R.cubierta?'Editar mi disponibilidad':'Cubrir mi disponibilidad')+'</button>'))+
     /* si ya está fijada, el aviso de organizador sobra y quedaba colgando debajo del cartel verde */
