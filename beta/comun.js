@@ -6149,7 +6149,7 @@ function _conCerrojo_(clave, fn){
 function _avisoAprobarDoc_(titulo, acc){
   var NL = String.fromCharCode(10);
   return 'Aprobar «' + titulo + '»' + (acc === 'anot' ? ' con tus anotaciones' : '') + '.' + NL + NL +
-    'Se publica en Notion y en el Libro de Datos en un par de minutos. ¿Seguro?';
+    'Se publica solo en Notion y en el Libro de Datos, normalmente en unos minutos. ¿Seguro?';
 }
 
 /* 04/11 (acciones graves, Daniel: «lo más grave que existe»): LA PREGUNTA ANTES DE DECIDIR UNA SANCIÓN SUELTA, UNA vez para las dos
@@ -13976,6 +13976,23 @@ function _docYaCuenta_(e){ return ['aprobado','anot','publicando','publicado'].i
 function _marcaSuperadaDoc_(e, lista){
   return _cadenaDoc_(e, lista).despues ? ' · hay una versión más nueva' : '';
 }
+/* ⛔ 18/11 (refutar114): CUÁNTO LLEVA APROBADO SIN PUBLICARSE. Aprobar deja `aprobado`; lo publica un timer del mini PC (`documentos_ciclo.py`,
+   cada 10 min) y, si ese timer no corre, falla o aplaza (horas valle), el expediente se queda así SEMANAS con una píldora verde «Aprobado» y
+   nadie —ni su autor, ni el PD en «En curso»— lo veía: no había un solo sitio que dijera desde cuándo. Hasta 1 h es el rato normal de la
+   publicación y no se dice nada; pasada la hora, se dice cuánto lleva («hace 3 días»), por la misma frase que las apelaciones (`_apelEspera_`).
+   `''` si no es `aprobado`/`anot`, si no hay fecha de la decisión (los de antes de `decision`) o si es de hace menos de 1 h: «no lo sé» no se pinta. */
+function _desdeAprobadoTxt_(e){
+  var est = _estadoDeDoc_(e);
+  if(est !== 'aprobado' && est !== 'anot') return '';
+  var at = (e && ((e.decision && e.decision.at) || e.decidedAt)) || '';
+  if(!(Date.now() - Date.parse(at) >= 3600000)) return '';
+  return _apelEspera_(at);
+}
+/* La marca corta de una FILA de «En curso» (las dos caras): '' salvo si lleva más de una hora aprobado sin publicar. */
+function _marcaAprobadoSinPublicar_(e){
+  var t = _desdeAprobadoTxt_(e);
+  return t ? ' · aprobado '+t+' y sin publicar' : '';
+}
 /* Las rondas anteriores de la MISMA referencia (`historial`: lo que el servidor aparta al llegar un envío nuevo de algo ya decidido). El escritorio
    guarda el objeto crudo en `_crudo`. Lo que se decidió antes es lo que hay que saber para juzgar la ronda nueva. */
 function _rondasDocTxt_(e){
@@ -14049,7 +14066,12 @@ function _docAutorModelo_(e){
        es peor que ninguno. */
     var url=String(e.url||'');
     var rv=(typeof _revisadoPorTxt_==='function') ? _revisadoPorTxt_(e) : '';   /* 04/11: quién lo revisó y quién lo validó, si los propuestos */
-    return {tipo:'decidido', html:'<b>'+esc(acc)+'.</b> '+(aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+(rv?'<br><span class="sc">'+esc(rv)+'</span>':'')+
+    /* 18/11 (refutar114): lo aprobado aún NO está publicado, y el autor sólo leía «Aprobado.» con la píldora verde. Dentro de la hora se le
+       dice que se publica solo; pasada la hora, cuánto lleva así (ver `_desdeAprobadoTxt_`). Publicado: nada, ahí está el enlace. */
+    var sp=(e.estado==='aprobado'||e.estado==='anot') ? _desdeAprobadoTxt_(e) : null, sinFecha=!((e.decision&&e.decision.at)||e.decidedAt);
+    var pend=(sp===null) ? '' : '<br>'+(sp ? 'Aprobado '+esc(sp)+' y aún sin publicar.'
+      : sinFecha ? 'Aún no está publicado.' : 'Aún no está publicado: se publica solo, normalmente en unos minutos.');
+    return {tipo:'decidido', html:'<b>'+esc(acc)+'.</b> '+(aj?'Te ajustaron: '+esc(aj)+'. ':'')+pie+(rv?'<br><span class="sc">'+esc(rv)+'</span>':'')+pend+
       (url.indexOf('http')===0
         ? '<br><a href="'+esc(url)+'" target="_blank" rel="noopener">Ver la página publicada</a>' : '')};
   }

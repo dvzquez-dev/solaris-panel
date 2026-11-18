@@ -114,13 +114,13 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=aaa96fe"></script>
+<script src="comun.js?v=19a09e0"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=a87b011"></script>
 <script src="turnos.movil.js?v=cd4b1db"></script>
 <script src="buzon.movil.js?v=3179853"></script>
-<script src="documentos.movil.js?v=eadb320"></script>
+<script src="documentos.movil.js?v=19b24ed"></script>
 <script src="sanciones.movil.js?v=89b61bb"></script>
 <script src="reuniones.movil.js?v=e17510f"></script>
 <script src="horas.movil.js?v=c7e7f49"></script>
@@ -1885,7 +1885,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='ea2d122';
+var BUILD='bd2b2b1';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
@@ -2946,8 +2946,8 @@ document.addEventListener('click',_conCerrojo_(function(ev){
      globo se apagaba, asi que se iba convencido. `Codigo.gs:967` no toca `enlaceDrive`:
      el revisor abriria la version vieja. */
   var _aviso={reenviar:'Devuelto a revisión. Si todavía no has subido el archivo corregido por el formulario, el revisor abrirá la versión anterior.',
-    aprobado:'Aprobado. Se publica en un par de minutos.',   /* 31/10: documentos_ciclo.py pasa cada minuto (el 4201 tardó 73 s) */
-    anot:'Aprobado con anotaciones. Se publica en un par de minutos, con los campos ajustados.',
+    aprobado:'Aprobado. Se publica solo, normalmente en unos minutos.',   /* 18/11 (refutar114): el timer es cada 10 min, no «cada minuto» (el 4201 tardó 73 s de suerte) */
+    anot:'Aprobado con anotaciones. Se publica solo, normalmente en unos minutos, con los campos ajustados.',
     cambios:'Cambios pedidos: le llega al autor.',
     deshacer:'Decisión deshecha: vuelve a revisión.',
     rechazado:'Rechazado.'}[acc]||'Hecho.';

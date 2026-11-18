@@ -114,12 +114,12 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=aaa96fe"></script>
+<script src="comun.js?v=19a09e0"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=37b0144"></script>
 <script src="buzon.escritorio.js?v=ba45925"></script>
-<script src="documentos.escritorio.js?v=038f789"></script>
+<script src="documentos.escritorio.js?v=9bc268c"></script>
 <script src="sanciones.escritorio.js?v=9dd396d"></script>
 <script src="reuniones.escritorio.js?v=e0bf97d"></script>
 <script src="horas.escritorio.js?v=0bf1145"></script>
@@ -1962,9 +1962,10 @@ V.docdec={g:'Documentos',t:'Requiere tu decisión',f:function(){
       'Nada esperando tu firma. El archivo de un miembro lo firma su coordinador; el informe de subsistema, '+
       'el Project Director o '+esc(_m(REV2_NOM).pila)+'; el informe general, solo el Project Director. '+
       'Nadie firma lo suyo.'),'destaca')+
-    /* 31/10: aprobar publica solo — `documentos_ciclo.py` pasa cada minuto (27/10); ya no hay correo de Cowork que sustituir. */
-    '<div class="pan"><div class="nota">Al aprobar, el documento se publica solo en Notion, Drive y el Libro de Datos '+
-    'en un par de minutos.</div></div>'+
+    /* 31/10: aprobar publica solo — `documentos_ciclo.py` (timer cada 10 min, 27/10); ya no hay correo de Cowork que sustituir.
+       18/11 (refutar114): ni «cada minuto» ni «un par de minutos»; y si se atasca, «En curso» dice cuánto lleva aprobado sin publicar. */
+    '<div class="pan"><div class="nota">Al aprobar, el documento se publica solo en Notion, Drive y el Libro de Datos, '+
+    'normalmente en unos minutos. Hasta entonces sale en «En curso» como aprobado; si pasa de una hora, ahí mismo dice cuánto lleva.</div></div>'+
     /* 01/11: sólo el PD (`comun.js`); para cualquier otro es '' y no deja ni el contenedor. */
     _fbpdRaiz_('lista', null, 'btn sm');
 }};
@@ -3895,7 +3896,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='86a0098';
+var BUILD='81c09f8';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4787,8 +4788,8 @@ function _engDocsDecidir_(){
      El motivo y el titulo salen de la propia ficha: un prompt() no deja releer el
      expediente mientras escribes por que lo rechazas. */
   /* 21/10 (auditor 11, 🔴 1): aprobar NO publica (el servidor deja `aprobado`): se dice que queda pendiente. */
-  var ETI_DOC={aprobado:'Aprobado. Se publica en un par de minutos.',   /* 31/10: documentos_ciclo.py pasa cada minuto (el 4201 tardó 73 s) */
-    anot:'Aprobado con anotaciones. Se publica en un par de minutos, con los campos ajustados.',
+  var ETI_DOC={aprobado:'Aprobado. Se publica solo, normalmente en unos minutos.',   /* 18/11 (refutar114): el timer es cada 10 min, no «cada minuto» (el 4201 tardó 73 s de suerte) */
+    anot:'Aprobado con anotaciones. Se publica solo, normalmente en unos minutos, con los campos ajustados.',
     cambios:'Cambios pedidos. Le llega al autor, que podrá reenviarlo corregido.',
     rechazado:'Rechazado. El autor recibe el motivo.',
     deshacer:'Decisión deshecha: vuelve a revisión.',

@@ -199,7 +199,7 @@ function filaDoc(d){
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
     '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+esc(d.ref)+'</span> · '+
       esc((pilaClara(d.autor)||_m(d.autor).pila))+' · '+ambDoc(d.amb, d.tipo)+(rev ? ' · firma '+esc(rev) : ' · sin revisor')+
-      (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+_marcaSuperadaDoc_(d, typeof DOCS!=='undefined' ? DOCS : [])+'</small></span>'+
+      (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+_marcaSuperadaDoc_(d, typeof DOCS!=='undefined' ? DOCS : [])+_marcaAprobadoSinPublicar_(d)+'</small></span>'+
     '<span class="der">'+
       (mio?'<span class="chip wa">te toca</span>':'')+
       /* El chip sale de `chipSevDoc`, que es LA puerta: aqui habia una copia y en

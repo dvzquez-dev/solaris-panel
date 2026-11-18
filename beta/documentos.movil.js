@@ -175,7 +175,7 @@ function filaDoc(e,esAutor){
   var _uni = (!esAutor && e.subsistema && (rangoNom(yoNombre())>=2 || _perfilesDe_(miembro(yoNombre())).length>1)) ? ' · '+esc(e.subsistema) : '';
   return '<div class="fila clic '+(esAutor?(e.estado==='cambios'?'borde-no':(_pend?'borde-pe':''))+'':'')+'" data-doc="'+e.id+'" data-p>'+
     '<div class="a"><b>'+esc(e.titulo)+'</b><small><span class="mono">'+e.ref+'</span> · '+
-    esc(pilaClara(e.autor)||e.autor.split(' ')[0])+' · '+ambDocM(e.ambito, e.tipo)+_uni+_marcaSuperadaDoc_(e, ((typeof ENTREGABLES!=='undefined' && ENTREGABLES)||[]).concat((typeof ENT_REV!=='undefined' && ENT_REV)||[]))+'</small></div>'+
+    esc(pilaClara(e.autor)||e.autor.split(' ')[0])+' · '+ambDocM(e.ambito, e.tipo)+_uni+_marcaSuperadaDoc_(e, ((typeof ENTREGABLES!=='undefined' && ENTREGABLES)||[]).concat((typeof ENT_REV!=='undefined' && ENT_REV)||[]))+_marcaAprobadoSinPublicar_(e)+'</small></div>'+
     '<div class="d"><span class="pil '+st[1]+'">'+st[0]+'</span> <span class="chev">›</span></div></div>';
 }
 
