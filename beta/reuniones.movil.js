@@ -1528,7 +1528,7 @@ function _asisCablearM_(){
     var aviso=function(t){ ASIS_M.msg[id]=t; if(m) m.textContent=t; };
     var enviar=async function(){
       if(b.disabled) return;
-      if(!i.value.trim()){ aviso('Escribe la palabra (la presencial, en el encerado; la telemática, por voz o por chat).'); return; }   /* un botón que no contesta parece roto */
+      if(!i.value.trim()){ aviso('Escribe la palabra: es '+_asisPistaM_((ASIS_M.est[id]||{}).mod)+'.'); return; }   /* un botón que no contesta parece roto */
       b.disabled=true;
       try{
         var r=await api.estoyPresente(isNaN(+id)?id:+id, i.value);

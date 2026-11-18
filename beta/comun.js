@@ -15237,6 +15237,7 @@ function _endirHoras_(ms, durMs){
 }
 /* Los tramos de `n` COMO LOS VA A CONTAR EL SERVIDOR al finalizar (`AS.tramos_ms` + el tope de `e_finalizar_reunion`), en ms [[ini, fin]]: el abierto acaba al finalizar,
    todo se recorta a [inicio de la reunión, inicio + tope de horas] y los de 0 min no cuentan. Una reunión que se quedó abierta toda la noche paga 14 h, no las 19 del reloj (refutar59). */
+var _ENDIR_LARGO_MS_=60000;                  /* gemela de `AS.MIN_TRAMO_LARGO_MS` */
 var _ENDIR_MIN_MS_=1000;                     /* gemela de `AS.MIN_TRAMO_MS`: menos de un segundo no es estar, y un hueco de menos de un segundo no parte el tramo */
 function _endirTramosFin_(ec, n, ahora){
   var now=ahora==null ? Date.now() : ahora, ini=Date.parse(ec && ec.ini);
@@ -15247,7 +15248,10 @@ function _endirTramosFin_(ec, n, ahora){
     a=Math.max(a, ini===ini ? ini : a); b=Math.min(b, fin);
     if(b<=a) return;
     if(out.length && a-out[out.length-1][1]<_ENDIR_MIN_MS_) out[out.length-1][1]=Math.max(b, out[out.length-1][1]); else out.push([a, b]); });
-  return out.filter(function(x){ return x[1]-x[0]>=_ENDIR_MIN_MS_; });
+  out=out.filter(function(x){ return x[1]-x[0]>=_ENDIR_MIN_MS_; });
+  /* 18/11 (refutar83): gemela de `AS.tramos_ms`: un tramo de menos de un minuto (entró al empezar y lo quitaron a los segundos) no sale junto a uno de verdad */
+  var largos=out.filter(function(x){ return x[1]-x[0]>=_ENDIR_LARGO_MS_; });
+  return largos.length ? largos : out;
 }
 /* «15:00–16:30 · 17:30–19:30»: los tramos de `n` en hora de Madrid (el abierto, «desde las 15:00»); al finalizar, los que contará el servidor (`_endirTramosFin_`). */
 function _endirTramosTxt_(ec, n, alFinalizar){

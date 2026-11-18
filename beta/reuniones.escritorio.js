@@ -1349,7 +1349,9 @@ function _asisBoxE_(r){
     (puedeFin ? ' <button class="btn" data-reufin="'+esc(r.id)+'">Finalizar reunión</button>' : '')+
     '<div class="nota" style="border-top:0;padding:8px 0 0">'+(fin
       ? 'Reunión finalizada el <b>'+esc(_isoADMY_(String(r.finalizada_at).slice(0,10)))+'</b>: la asistencia está cerrada.'
-      : 'Una palabra por modalidad: la <b>presencial</b>, en el encerado; la <b>telemática</b>, por voz o por chat. Un cuadrito por convocado '+
+      : (/^tele/i.test(String(r.modalidad||'')) ? 'La palabra de la llamada: se dice por voz o se escribe en el chat. '
+        : /^pres/i.test(String(r.modalidad||'')) ? 'La palabra, en el encerado. '
+        : 'Una palabra por modalidad: la <b>presencial</b>, en el encerado; la <b>telemática</b>, por voz o por chat. ')+'Un cuadrito por convocado '+
         'que se pone verde al escribirla. <b>Finalizar</b> la da por celebrada y bloquea la palabra.')+'</div></div>';
 }
 
