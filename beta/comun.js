@@ -2991,6 +2991,36 @@ function _choque_(e){
   return '';
 }
 
+/* refutar73 (18/11): UNA TAREA QUE CAMBIÓ EN NOTION MIENTRAS SE MIRABA. Ana tiene la lista abierta; alguien en Notion termina una tarea, la quita o se la pasa a otra
+   persona; Ana pulsa «Entregada» sobre lo que se pintó y el servidor contesta con una frase escrita para el programa («no veo esa tarea en el servidor: no se mueve una
+   tarea de la que no se sabe quién es»), pegada detrás de «No se pudo guardar el paso… La tarea sigue como estaba» —y la tarjeta se quedaba ahí—. Esta puerta dice lo que pasó
+   (`''` si el error no es de este tipo) y `_tareaCambioFuera_` además REFRESCA la lista, que es lo que el texto promete. Sólo la usan los dos botones de paso: «no es tuya» en otras
+   pantallas (apelar) no es «cambiaron la tarea». */
+function _choqueTarea_(e){
+  var m=String((e && e.message) || e || '').replace(/^Error:\s*/, ''), x;
+  if(/no veo esa tarea/.test(m))
+    return 'Esa tarea ya no está: la han terminado o quitado en Notion. Te enseño la lista al día.';
+  if(/esa tarea no es tuya/.test(m))
+    return 'Esa tarea ya no es tuya: han cambiado su responsable en Notion. Te enseño la lista al día.';
+  if((x=m.match(/esa tarea ya cambi[oó]: ahora est[aá] en «([^»]*)»/)))
+    return 'Esa tarea ya está en «'+x[1]+'»: la han movido en Notion. Te enseño la lista al día.';
+  return '';
+}
+function _tareaCambioFuera_(e){
+  var t=_choqueTarea_(e);
+  if(t && typeof _refrescoVivo_==='function') _refrescoVivo_('reloj');
+  return t;
+}
+/* refutar73: ¿esta respuesta de `getTareas` SUSTITUYE la lista? Una lista con tareas, siempre. Una VACÍA sólo si quien pregunta es de verdad alguien del equipo (tiene ficha en el
+   panel): para él `[]` es la verdad —su última tarea la terminaron o la quitaron en Notion— y sin esto se quedaba pintada hasta recargar. Para quien aún no tiene ficha (un alta
+   nueva: `_verificarIdentidad_` le da el EMAIL por nombre, que no casa con ningún responsable) `[]` sigue sin ser la verdad y NO le vacía lo que tenía. */
+function _tareasLlegaron_(x){
+  if(!Array.isArray(x)) return false;
+  if(x.length) return true;
+  var n=(typeof SESION!=='undefined' && SESION) ? SESION.nombre : '';
+  return !!(n && typeof miembro==='function' && miembro(n));
+}
+
 /* ⛔ LA CLAVE DE UN ENVIO, PARA QUE UN REINTENTO NO LO DUPLIQUE. `api._post` hace TRES
    intentos en dos segundos contra un fallo de TRANSPORTE —Apps Script pierde el cuerpo
    del POST de vez en cuando—, y si lo que se pierde es la RESPUESTA el servidor ya
@@ -3263,6 +3293,16 @@ var API_MSG_SIN_RED = "Sin conexión con el servidor: lo más probable es que NO
 /* 14/11 (Daniel: «si estás de baja, que ponga algo de que se te ha revocado el acceso a la aplicación Solaris»). El servidor contesta
    «cuenta dada de baja en el equipo» (`_verificarIdentidad_`) y la entrada lo enseñaba con un «Reintentar», que es de un fallo de red. */
 var API_MSG_BAJA = "Se te ha revocado el acceso a la aplicación Solaris porque constas de baja en el equipo. Si es un error, habla con tu coordinador o con el Project Director.";
+/* ⛔ refutar71 (18/11): LO QUE SE LE DICE A QUIEN NO PUEDE ENTRAR, en cristiano y con lo que tiene que HACER. Con una cuenta de otro dominio (la personal de Gmail, que Google
+   ofrece primero) salía «No se pudo entrar: cuenta fuera del dominio uvigo.gal»: exacto y sin decir qué cuenta usar. Los textos del servidor (`verificar_identidad`) se traducen
+   aquí, UNA vez para las dos caras; lo que no se reconoce se deja tal cual (mejor el texto técnico que uno inventado). */
+function _entradaErrTxt_(e){
+  var t=String((e && e.message) || e || '');
+  var m=t.match(/cuenta fuera del dominio\s+(\S+)/);
+  if(m) return 'esa cuenta no es de UVigo Aerotech (el equipo entra con su cuenta @'+m[1]+'). Pulsa \u00abReintentar\u00bb y elige la del equipo.';
+  if(/email no verificado/.test(t)) return 'Google dice que el correo de esa cuenta no est\u00e1 verificado. Entra con la cuenta del equipo.';
+  return t;
+}
 function _esErrBaja_(e){ return /cuenta dada de baja en el equipo/.test(String((e && e.message) || e || "")); }
 /* La puerta de quien consta de baja, en las dos caras: suelta la sesión (no se vuelve a probar sola), para lo vivo y tapa la app.
    Sin «Reintentar» (da lo mismo cada vez); sí «Entrar con otra cuenta». */
@@ -4980,7 +5020,21 @@ function _avisarSesionMuerta_(){
      arregla LAS DOS. \u26d4 Aqu\u00ed escrib\u00ed primero que el m\u00f3vil no la ten\u00eda: **era falso**, y se
      vio ejecutando. La guarda se queda igual, pero por su raz\u00f3n de verdad: cuesta nada, y
      el d\u00eda que una cara la pierda esto no puede reventar **justo al caducar la sesi\u00f3n**. */
-  try{ if (typeof _arrancarGis_ === 'function') _arrancarGis_(); }catch(_){}
+  try{ if (typeof _ofrecerEntrarDeNuevo_ === 'function') _ofrecerEntrarDeNuevo_(); }catch(_){}
+  return true;
+}
+
+/* ⛔ refutar71 (18/11): LA SESIÓN MUERE CON `SESION` PUESTA, Y ENTONCES `_arrancarGis_` NO HACÍA NADA (`if(SESION) return;`). Medido con el móvil: el token de
+   Google dura una hora, la persona pulsa «Guardar disponibilidad» y sale «No se pudo guardar: Tu sesión ha caducado… Vuelve a intentarlo» —y reintentar da lo mismo—
+   sin ningún botón de entrar: la única salida era recargar la página a mano (en la app instalada, cerrarla y abrirla). La comprobación de arriba sólo valía para
+   `SESION` a `null`. Aquí se pinta la entrada ENCIMA de lo que hay (lo escrito sigue debajo, y vuelve a verse al entrar) con el motivo dicho; `SESION` se queda hasta
+   que llegue la credencial nueva (`_onCredencial_` la sustituye), así que nada de lo que ya estaba a medio camino pierde su identidad. Sin la librería de Google
+   (sin red) no se puede pintar nada: se queda el aviso fijo. Devuelve si pintó la entrada. */
+function _ofrecerEntrarDeNuevo_(){
+  if(typeof _pintarLogin_!=='function') return false;
+  if(!SESION){ if(typeof _arrancarGis_==='function') _arrancarGis_(); return false; }
+  if(!(window.google && window.google.accounts && window.google.accounts.id)) return false;
+  _pintarLogin_('Tu sesi\u00f3n con Google ha caducado. Entra de nuevo y sigues donde estabas: lo que ten\u00edas escrito no se ha perdido.');
   return true;
 }
 
@@ -6324,7 +6378,18 @@ async function _enviarSancionForm_(o){
   try{
     /* EL ORDEN IMPORTA: primero Notion, luego la sanción. Al revés quedaría la sanción puesta y la tarea con la fecha
        vieja, la única de las dos combinaciones malas que NO se ve mirando la cola. */
-    if(esDePlazo){ msg('Moviendo el plazo en Notion…'); await api.moverLimiteTarea(urlTarea, plazo); _movido=true; }
+    if(esDePlazo){
+      /* ⛔ refutar73 (18/11): LA LISTA DE TAREAS DEL SANCIONADO PUEDE ESTAR VIEJA (se pidió al elegirle y el formulario lleva abierto el rato que se tarda en rellenarlo). Si mientras tanto
+         en Notion la tarea pasó a otra persona o se terminó, mover el plazo cambiaba el de OTRO y la sanción caía sobre quien ya no la tenía. Se vuelve a leer JUSTO antes de tocar nada. */
+      var _viva=await api.getTareas(quien);
+      var _sigue=(_viva||[]).filter(function(x){ return x.url===urlTarea && !_tareaHecha_(x.e); })[0];
+      if(!_sigue){
+        SANC_TAREAS={quien:'', lista:null, cargando:false}; SANC_FORM.tarea='';
+        var _pq=(_pilaDeM_(quien)||quien), _tx='«'+((t&&(t.n||t.nombre))||'esa tarea')+'» ya no es de '+_pq+' o ya está hecha: la han cambiado en Notion. No se ha puesto la sanción ni se ha movido ningún plazo; mira las tareas de '+_pq+' otra vez.';
+        tost(_tx);
+        return {ok:false, reponer:true};
+      }
+      msg('Moviendo el plazo en Notion…'); await api.moverLimiteTarea(urlTarea, plazo); _movido=true; }
     /* ⛔ UNA CLAVE POR ENVÍO, QUE NACE EN EL FORMULARIO y se ata a la HUELLA de lo que se manda: `api._post` reintenta
        tres veces y si se pierde la RESPUESTA el servidor ya escribió. Fabricarla en la llamada no cubre el reintento a
        mano; no renovarla al cambiar el destinatario deja la sanción a B sin existir (`probar_clave_parte.py`). No

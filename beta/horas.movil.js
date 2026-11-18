@@ -147,6 +147,12 @@ async function _cargarMisPartes_(){
    por el refresco. El admin relee los de `YO` por `_partesDe_` (la misma rama que el arranque), y si mientras tanto
    ha cambiado a quién mira, lo leído no se pinta. */
 async function _recargarPartesVivo_(){
+  /* refutar74 (18/11, la semana de José): y LA COLA QUE TE TOCA FIRMAR. Se leía una sola vez, al abrir: un coordinador con la app abierta no se enteraba
+     NUNCA de que su gente había mandado un parte —ni la tarjeta «Esperan tu decisión» ni el globo de Horas, ni al volver a la pestaña— hasta cerrar y abrir
+     la app, y a quien le toca firmar no le llega ningún aviso al móvil (el escritorio sí lo trae solo). Lo que frenaba esto era que una lectura rancia devolvía a
+     la cola un parte ya firmado: ahora `_cargarPartesDec_` tira lo que llegue si mientras tanto se decidió algo (`_PDEC_VER_`). Sin rango no hay cola (no se pide). */
+  if(typeof _cargarPartesDec_==='function' && typeof rangoNom==='function' && rangoNom((typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '')>=1)
+    await _cargarPartesDec_().catch(function(){});        /* se espera: el repintado de `_refrescoVivo_` va detrás y tiene que verla */
   if(esAdmin()){
     if(!YO) return false;
     var n = YO.nombre;
@@ -1842,7 +1848,9 @@ function _cargarPartesDec_(){
      por el de siempre. Es el mismo fallo que ya se cerró en `_puedeBorrarReuM_`. */
   /* 12/11 (rendimiento-1): el plan del cierre y los partes se piden A LA VEZ; el `then` espera a LAS DOS, así
      que la primera pintada sigue teniendo el plan. `_cargarCierrePlan_` se traga sus errores (devuelve null). */
+  var _v0 = _PDEC_VER_;       /* refutar74: si se decide algo mientras esto vuela, lo que llegue es de ANTES de la decisión y NO se reparte */
   return Promise.all([_cargarCierrePlan_(), api.getPartes({})]).then(function(r){ var arr = r[1];
+    if(_v0 !== _PDEC_VER_) return;
     /* ⛔ LA BANDERA DEL FALLO (19/10). El `catch` de abajo era MUDO: un corte al entrar dejaba
        `PARTES_DEC=[]` y la tarjeta «Esperan tu decisión» DESAPARECÍA — un coordinador leía «no
        tengo nada que firmar» y las horas de su gente se quedaban sin contar. Es el mismo arreglo
@@ -1908,6 +1916,7 @@ function _repartirPartesDec_(arr){
 
 /* Lo que `_cargarPartesDec_` dejó guardado por no saber todavía quién eres, repartido ya con la identidad puesta (la llama el arranque, `_onCredencial_`). */
 var _PDEC_CRUDO_ = null, _PDEC_ESPERA_ = false;
+var _PDEC_VER_ = 0;   /* refutar74: sube con cada decisión local (`_engPartesDec_`); una lectura de la cola que salió antes de ella se tira */
 function _repartirPartesDecSiEspera_(){
   if(!_PDEC_ESPERA_) return;
   _PDEC_ESPERA_ = false;
@@ -2265,6 +2274,7 @@ function _engPartesDec_(){
       /* 12/11 (horas-1, Daniel aceptó): aprobar es UN toque, sin «¿Aprobar estas horas?», como en el escritorio.
          Se deshace en «Ya decidiste»; rechazar y pedir detalle siguen exigiendo su motivo (arriba). */
       $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=true; });
+      _PDEC_VER_++;     /* refutar74: una lectura de la cola que ya iba en vuelo (lo vivo) es de antes de esto y no puede devolver el parte a la lista */
       var prev=b.textContent; b.textContent='…';
       try{
         var upd=await api.decidirParte(id, acc, mot||null);

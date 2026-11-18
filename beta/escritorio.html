@@ -114,17 +114,17 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=7302832"></script>
+<script src="comun.js?v=462e3c7"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=3cc0796"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
 <script src="documentos.escritorio.js?v=c9270d5"></script>
-<script src="sanciones.escritorio.js?v=5d4597f"></script>
+<script src="sanciones.escritorio.js?v=ea7f63d"></script>
 <script src="reuniones.escritorio.js?v=cec90cb"></script>
 <script src="horas.escritorio.js?v=52fbc5e"></script>
 <script src="equipo.escritorio.js?v=ee22dba"></script>
-<script src="tareas.escritorio.js?v=d9b0344"></script>
+<script src="tareas.escritorio.js?v=58a83e0"></script>
 <script src="directo.escritorio.js?v=0455807"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -3348,7 +3348,7 @@ async function _refrescoVivo_(motivo, que){
   _REFRESCANDO_=true; _ULT_REFRESCO_=ahora;
   try{
     var _t=_pideSi_(que,'getTurnos','getTurnos').then(function(t){ if(Array.isArray(t)&&t.length){ TURNOS.length=0; t.forEach(function(x){TURNOS.push(x);}); } });
-    var _q=_pideSi_(que,'getTareas','getTareas').then(function(q){ if(Array.isArray(q)&&q.length){ TAREAS.length=0; q.forEach(function(x){TAREAS.push(x);}); _reponerPasosTarea_(TAREAS, TAREA_PASOS); } });
+    var _q=_pideSi_(que,'getTareas','getTareas').then(function(q){ if(_tareasLlegaron_(q)){ TAREAS.length=0; q.forEach(function(x){TAREAS.push(x);}); _reponerPasosTarea_(TAREAS, TAREA_PASOS); } });
     var _p=_pideSi_(que,'resto','getPanel').then(function(p){ if(!que) _avisoDesfase_(!!p); if(p) _aplicarPanel_(p); });   /* refutar54: como el móvil (refutar37) */
     /* ⛔ LAS MISMAS PUERTAS QUE EL ARRANQUE, y no una segunda copia. Aqui se pedía
        `getSanciones`/`getPartes` a mano y se asignaba `SANC_BACK`/`PART_BACK` **sin llamar a
@@ -3397,6 +3397,9 @@ async function _refrescoVivo_(motivo, que){
   } finally { _REFRESCANDO_=false; }
 }
 function _arrancarRefrescoVivo_(){
+  /* refutar71: ver `movil.html` — una sola vez aunque se vuelva a entrar con la página abierta. */
+  if(window.__REFRESCO_VIVO_ARRANCADO) return;
+  window.__REFRESCO_VIVO_ARRANCADO=true;
   document.addEventListener('visibilitychange', function(){
     if(!document.hidden) _refrescoVivo_('vuelta');
   });
@@ -3511,6 +3514,24 @@ function _aplicarBootstrap_(boot){
 var _EST_PARTE_={pendiente:'pend',aprobada:'aprobado',rechazada:'rechazado',detalle:'detalle',otorgada:'aprobado',aplicada:'aprobado',sin_declarar:'sindecl',caducada:'cad',revertida:'rev',anulada:'rev'};
 
 
+/* ⛔ refutar71 (18/11): EL MURO DE «NO TIENES PERMISO PARA EL ESCRITORIO» NO TENÍA NINGUNA SALIDA, Y A QUIEN AÚN NO ESTÁ EN EL LISTADO LE DECÍA UNA MENTIRA. Medido entrando con
+   una cuenta del dominio sin ficha (alguien recién llegado): «No tienes permiso… Tu sitio es la app del móvil», sin un botón. Dos fallos: (1) no es que no tenga permiso, es que
+   no se encuentra su ficha (el móvil ya lo dice: «no encontramos tus datos… díselo al Project Director»); (2) ni a ése ni a un miembro raso se le ofrecía nada que pulsar: ni ir
+   a la app del móvil, que es su sitio, ni entrar con otra cuenta (quien abrió el escritorio con la personal-del-dominio equivocada se quedaba encerrado: la sesión guardada
+   volvía a traerlo aquí). `mapeado` lo manda el servidor en la identidad (`verificar_identidad`): `false` = el correo no está en el equipo. */
+function _muroSinAcceso_(){
+  var sinFicha=SESION && SESION.mapeado===false;
+  var movil=/beta-escritorio\.html/.test(location.pathname) ? './beta.html' : './index.html';
+  _muro_(_insigniaHTML_()+'<div style="max-width:390px;line-height:1.55;text-align:center">'+
+    (sinFicha
+      ? '<b>Has entrado, pero no encontramos tus datos.</b><br><span style="opacity:.75">Tu cuenta es '+esc(SESION.email||'\u2014')+
+        '. Si acabas de unirte al equipo, puede que a\u00fan no est\u00e9s en el listado: d\u00edselo al Project Director. Si entraste con otra cuenta de la que quer\u00edas, c\u00e1mbiala.</span>'
+      : '<b>No tienes permiso para entrar al escritorio.</b><br><span style="opacity:.75">Este panel es para consejo, junta y direcci\u00f3n. Tu sitio es la app del m\u00f3vil.</span>')+
+    '</div>'+
+    (sinFicha ? '' : '<a id="muroMovil" href="'+movil+'" style="border:1px solid #463E40;background:none;color:#F4F3F3;border-radius:9px;padding:10px 16px;text-decoration:none">Abrir la app del m\u00f3vil</a>')+
+    '<button id="muroOtra" style="border:1px solid #463E40;background:none;color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Entrar con otra cuenta</button>');
+  var b=document.getElementById('muroOtra'); if(b) b.onclick=function(){ cerrarSesion(); };
+}
 async function _onCredencial_(resp,_silente){
   _gate_(_insigniaHTML_()+'<div style="opacity:.8">Verificando…</div>');
   try{
@@ -3527,7 +3548,7 @@ async function _onCredencial_(resp,_silente){
       var yo=await api.quienSoy(resp.credential);
       /* ⛔ 21/10 (auditor 10, 🟠 2): con `rango` — `quienSoy` lo trae justo para el muro de abajo; sin él, por esta
          rama un raso ENTRABA al escritorio. */
-      SESION={token:resp.credential,email:yo.email,nombre:yo.nombre,rango:yo.rango};
+      SESION={token:resp.credential,email:yo.email,nombre:yo.nombre,rango:yo.rango,mapeado:yo.mapeado};
       var pnl=null; try{ pnl=await api.getPanel(); }catch(_){}
       _aplicarPanel_(pnl); backendOK=true;
       /* ⛔ AQUI SÍ HACE FALTA. Por esta rama se entra cuando el bootstrap **no** contestó, y
@@ -3541,7 +3562,7 @@ async function _onCredencial_(resp,_silente){
        acaba de llegar: lo que esperaba por ella se vuelve a pedir en el repintado de abajo. */
     if(SESION && typeof DISP_SRV!=='undefined' && DISP_SRV==='sin sesion') DISP_SRV='sin pedir';
     if(backendOK && SESION.rango!=null && SESION.rango < 0){   // miembro normal: sin acceso al escritorio
-      _muro_(_insigniaHTML_()+'<div style="max-width:380px;line-height:1.55;text-align:center"><b>No tienes permiso para entrar al escritorio.</b><br><span style="opacity:.75">Este panel es para consejo, junta y direcci\u00f3n. Tu sitio es la app del m\u00f3vil.</span></div>');
+      _muroSinAcceso_();
       return;
     }
     /* LA BETA NO ES PARA TODO EL MUNDO — GEMELA de la del móvil. Va aquí, después de que la
@@ -3638,14 +3659,14 @@ async function _onCredencial_(resp,_silente){
     var _red=_silente && _ftDeRed_(e);
     if(_silente && !_red){ try{ localStorage.removeItem('sol_sess'); }catch(_){} SESION=null; _arrancarGis_(); return; }
     _gate_(_insigniaHTML_()+'<div style="color:#ffb3b0;max-width:360px">No se pudo entrar: '+
-      (_red ? 'no hay conexi\u00f3n con el servidor. Revisa tu red y vuelve a intentarlo.' : ((e&&e.message)||e))+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
+      (_red ? 'no hay conexi\u00f3n con el servidor. Revisa tu red y vuelve a intentarlo.' : _entradaErrTxt_(e))+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
       'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>');
     var b=document.getElementById('reGis'); if(b) b.onclick=_red ? function(){ _onCredencial_(resp,true); } : _pintarLogin_;
   }
 }
-function _pintarLogin_(){
-  /* La cabecera es de esta cara; entrar con Google, de `comun.js` (`_iniciarGoogle_`, 19/10). */
-  _iniciarGoogle_(_insigniaHTML_()+
+function _pintarLogin_(motivo){
+  /* La cabecera es de esta cara; entrar con Google, de `comun.js` (`_iniciarGoogle_`, 19/10). `motivo` sólo si es texto: «Reintentar» la usa de `onclick` y le pasa el evento. */
+  _iniciarGoogle_(_insigniaHTML_()+(typeof motivo==='string' && motivo ? '<div style="color:#ffb3b0;max-width:360px">'+esc(motivo)+'</div>' : '')+
     '<div style="font:600 19px/1.3 system-ui">Solaris · Puente de mando</div>'+
     '<div style="opacity:.75;max-width:360px">Entra con tu cuenta de UVigo Aerotech.<br>'+
     'Este panel es para <b>consejo, junta y dirección</b>.</div>');
@@ -3847,7 +3868,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='9344561';
+var BUILD='062f8ff';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

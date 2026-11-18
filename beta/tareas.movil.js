@@ -184,6 +184,8 @@ function _guardarPasoTarea_(t, a, b, hecho, h){
   if(b) b.disabled=true;
   api.moverEstadoTarea(t.url, t.e, a, h).then(function(r){ hecho(r); }).catch(function(e){
     if(b) b.disabled=false;
+    var _ch=_tareaCambioFuera_(e);   /* refutar73: la tarea cambió en Notion → se dice y la lista se pone al día */
+    if(_ch){ tost(_ch); return; }
     /* refutar37: con mala cobertura el aviso ya dice si se guardó o no («NO se haya guardado» / «puede que se haya guardado: recarga»): añadirle «La tarea sigue
        como estaba» lo contradecía cuando el servidor SÍ lo guardó y sólo se perdió la respuesta, y dejaba «)..» con dos puntos. */
     var m=String((e&&e.message)||e).replace(/^Error:\s*/,'').replace(/[.\s]+$/,'');

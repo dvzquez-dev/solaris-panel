@@ -114,16 +114,16 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=7302832"></script>
+<script src="comun.js?v=462e3c7"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
-<script src="tareas.movil.js?v=4f42fdf"></script>
+<script src="tareas.movil.js?v=a87b011"></script>
 <script src="turnos.movil.js?v=176f5f7"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=8fc5e01"></script>
-<script src="sanciones.movil.js?v=8831fbd"></script>
+<script src="sanciones.movil.js?v=67e36af"></script>
 <script src="reuniones.movil.js?v=17e9932"></script>
-<script src="horas.movil.js?v=1f211fb"></script>
+<script src="horas.movil.js?v=1218ed3"></script>
 <script src="equipo.movil.js?v=cee4f98"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -662,10 +662,12 @@ async function _refrescoVivo_(motivo, que){
        guarda a un alta nueva se le VACIA la lista en vez de conservar lo que tenia.
        ⚠️ Lo unico limpio es `getTurnos`: `_notionTurnos_` devuelve `null` a proposito
        cuando no pudo preguntar. Pero la guarda es compartida y se acota por la UNION de
-       sus clientes, no por el mejor de ellos. */
+       sus clientes, no por el mejor de ellos.
+       ✅ refutar73 (18/11): para las TAREAS la guarda es `_tareasLlegaron_` (comun.js): `[]` vale cuando quien pregunta tiene ficha —su última tarea se terminó en Notion y se
+       quedaba pintada—, y sigue sin valer para el alta nueva sin ficha, que es el caso de arriba. */
     var t=_pideSi_(que,'getTurnos','getTurnos').then(function(x){ if(Array.isArray(x)&&x.length){ TURNOS.length=0;
       x.forEach(function(y,i){ TURNOS.push(_normTurnoM_(y,i)); }); } }).catch(function(){});
-    var q=_pideSi_(que,'getTareas','getTareas').then(function(x){ if(Array.isArray(x)&&x.length){ TAREAS.length=0;
+    var q=_pideSi_(que,'getTareas','getTareas').then(function(x){ if(_tareasLlegaron_(x)){ TAREAS.length=0;
       x.forEach(function(y){ TAREAS.push(y); }); _reponerPasosTarea_(TAREAS, TAREA_PASOS); } }).catch(function(){});
     /* ⛔ LOS DOCUMENTOS TAMBIEN, y faltaban desde que existe la pantalla. Cowork empuja un
        expediente y quien tiene el telefono abierto NO LO VEIA NUNCA — y el telefono es la
@@ -738,6 +740,10 @@ var _REFREU_=false;
 
 
 function _arrancarRefrescoVivo_(){
+  /* refutar71: volver a entrar con la página abierta (la sesión caducó) llama otra vez a `_onCredencial_` → aquí; sin esta guarda cada entrada añadía otro reloj de 90 s,
+     otro de 20 s, otro escucha de `visibilitychange` y OTRA pregunta por segundo al servidor (`queHayNuevo`). */
+  if(window.__REFRESCO_VIVO_ARRANCADO) return;
+  window.__REFRESCO_VIVO_ARRANCADO=true;
   document.addEventListener('visibilitychange', function(){
     if(!document.hidden) _refrescoVivo_('vuelta');
   });
@@ -1071,14 +1077,14 @@ async function _onCredencial_(resp,_silente){
     var _red=_silente && _ftDeRed_(e);
     if(_silente && !_red){ try{ localStorage.removeItem('sol_sess'); }catch(_){} SESION=null; _arrancarGis_(); return; }
     _gate_(SPLASH+'<div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+
-      (_red ? 'no hay conexi\u00f3n con el servidor. Revisa tu red y vuelve a intentarlo.' : ((e&&e.message)||e))+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
+      (_red ? 'no hay conexi\u00f3n con el servidor. Revisa tu red y vuelve a intentarlo.' : _entradaErrTxt_(e))+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
       'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>');
     var b=document.getElementById('reGis'); if(b) b.onclick=_red ? function(){ _onCredencial_(resp,true); } : _pintarLogin_;
   }
 }
-function _pintarLogin_(){
-  /* La cabecera es de esta cara; entrar con Google, de `comun.js` (`_iniciarGoogle_`, 19/10). */
-  _iniciarGoogle_(SPLASH+
+function _pintarLogin_(motivo){
+  /* La cabecera es de esta cara; entrar con Google, de `comun.js` (`_iniciarGoogle_`, 19/10). `motivo` sólo si es texto: «Reintentar» la usa de `onclick` y le pasa el evento. */
+  _iniciarGoogle_(SPLASH+(typeof motivo==='string' && motivo ? '<div style="color:#ffb3b0;max-width:340px">'+esc(motivo)+'</div>' : '')+
     '<div style="opacity:.8;max-width:340px">Entra con tu cuenta de UVigo Aerotech<br>para ver tu panel.</div>');
 }
 function _arrancarGis_(){
@@ -1877,7 +1883,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='19ffff7';
+var BUILD='91c9dec';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

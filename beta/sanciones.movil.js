@@ -255,7 +255,7 @@ function _cablearSanciones_(){
   var bt=$('#btnSanc');
   if(bt) bt.onclick=async function(){
     var res=await _enviarSancionForm_({msg:msg, bt:bt});
-    if(!res.ok) return;
+    if(!res.ok){ if(res.reponer) _repintarSancM_(); return; }   /* refutar73: la tarea cambió en Notion → la lista del sancionado se vuelve a pedir */
     SANC_M=null;
     _abrirSanciones_();
   };

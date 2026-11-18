@@ -127,6 +127,8 @@ function _darPasoTareaE_(t, a, b, hecho, h){
   }, function(e){
     delete _PASO_TAREA_EN_CURSO_[k];
     if(b) b.disabled = false;
+    var _ch = _tareaCambioFuera_(e);   /* refutar73: la tarea cambió en Notion → se dice y la lista se pone al día */
+    if(_ch){ tost(_ch); return; }
     tostErr('No se pudo guardar el paso de \u00ab'+t.n+'\u00bb: ', e);
   });
 }
