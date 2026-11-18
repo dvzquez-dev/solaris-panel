@@ -114,7 +114,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=8de72fb"></script>
+<script src="comun.js?v=cf33c5d"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=a87b011"></script>
@@ -122,8 +122,8 @@
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=8fc5e01"></script>
 <script src="sanciones.movil.js?v=67e36af"></script>
-<script src="reuniones.movil.js?v=17e9932"></script>
-<script src="horas.movil.js?v=1218ed3"></script>
+<script src="reuniones.movil.js?v=849e40e"></script>
+<script src="horas.movil.js?v=c1414ea"></script>
 <script src="equipo.movil.js?v=cee4f98"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
@@ -912,7 +912,7 @@ var DEMO = window.__SIN_LOGIN__ === true || _demoLocal_();
 /* La insignia de la puerta que `comun.js` pide sin saber de qué cara es (`_revocarAcceso_`): cada cara declara la suya. */
 function _insigniaCara_(){ return SPLASH; }
 var SPLASH = '<img src="../recursos/insignia.png" alt="Solaris" style="display:block;margin:0 auto 10px;width:104px;height:auto" onerror="this.style.display=\'none\'">'+
-  '<img src="../recursos/banner-solaris.png" alt="UVigo Aerotech Solaris" style="display:block;margin:0 auto 4px;width:min(240px,60vw);height:auto" onerror="this.style.display=\'none\'">';
+  '<img src="../recursos/banner-solaris.png" alt="UVigo Aerotech: Solaris" style="display:block;margin:0 auto 4px;width:min(240px,60vw);height:auto" onerror="this.style.display=\'none\'">';
 function _gate_(html){
   var g=document.getElementById('loginGate');
   if(!g){ g=document.createElement('div'); g.id='loginGate';
@@ -1085,7 +1085,7 @@ async function _onCredencial_(resp,_silente){
 function _pintarLogin_(motivo){
   /* La cabecera es de esta cara; entrar con Google, de `comun.js` (`_iniciarGoogle_`, 19/10). `motivo` sólo si es texto: «Reintentar» la usa de `onclick` y le pasa el evento. */
   _iniciarGoogle_(SPLASH+(typeof motivo==='string' && motivo ? '<div style="color:#ffb3b0;max-width:340px">'+esc(motivo)+'</div>' : '')+
-    '<div style="opacity:.8;max-width:340px">Entra con tu cuenta de UVigo Aerotech<br>para ver tu panel.</div>');
+    '<div style="opacity:.8;max-width:340px">Entra con la cuenta de UVigo Aerotech: Solaris<br>para ver tu panel.</div>');
 }
 function _arrancarGis_(){
   (function esperar(n){
@@ -1883,7 +1883,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='91c9dec';
+var BUILD='85677df';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

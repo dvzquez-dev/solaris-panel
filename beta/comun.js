@@ -3252,7 +3252,7 @@ function _apiParse(txt, accion){
      mismo tres veces--, asi que se dice que fue un rechazo y no un fallo de linea. */
   /* refutar21 (12/11): el servidor antepone «Error: » a cada rechazo (como Apps Script) y los avisos lo enseñaban tal cual
      («No se pudo enviar: Error: Ana Gnc ya tiene el parte…»). Siete sitios ya lo quitaban cada uno por su cuenta; aquí, una vez. */
-  throw new Error(err.replace(/^Error:\s*/,"")||"el backend rechazó la acción sin decir por qué");
+  throw new Error(err.replace(/^Error:\s*/,"")||"no se pudo hacer, y no se sabe más: vuelve a intentarlo");
 }
 
 /* ⛔ `api._post`, UNA VEZ PARA LAS DOS CARAS (01/11, `apitiempo`). Estaba calcado en `movil.html` y
@@ -3307,7 +3307,7 @@ var API_MSG_BAJA = "Se te ha revocado el acceso a la aplicación Solaris porque 
 function _entradaErrTxt_(e){
   var t=String((e && e.message) || e || '');
   var m=t.match(/cuenta fuera del dominio\s+(\S+)/);
-  if(m) return 'esa cuenta no es de UVigo Aerotech (el equipo entra con su cuenta @'+m[1]+'). Pulsa \u00abReintentar\u00bb y elige la del equipo.';
+  if(m) return 'esa cuenta no es la del equipo UVigo Aerotech: Solaris (se entra con la cuenta @'+m[1]+'). Pulsa \u00abReintentar\u00bb y elige la del equipo.';
   if(/email no verificado/.test(t)) return 'Google dice que el correo de esa cuenta no est\u00e1 verificado. Entra con la cuenta del equipo.';
   return t;
 }
@@ -8280,8 +8280,18 @@ function _cablearVisor_(raiz){
     /* refutar64 (17/11): en CAPTURA y cortando: el oyente de accesibilidad (`Esc` cierra la hoja) cuelga de `document` y corría
        también, así que Esc cerraba el visor Y la ficha entera, y quien leía el PDF perdía hasta el expediente. */
     document.addEventListener('keydown', function(e){
+      if(e.key==='Tab'){
+        /* refutar78: con el visor maximizado (`position:fixed`, tapa la página) el Tab se iba a lo que queda DETRÁS (la lista de expedientes, sus botones de decidir). Da la vuelta dentro de él. */
+        var mx=document.querySelector('.doc.full'); if(!mx || document.querySelector('.psel-ov')) return;
+        var fs=Array.prototype.filter.call(mx.querySelectorAll('button,a[href],iframe,input,select,textarea,summary,[tabindex="0"]'), function(x){ return !x.disabled && x.offsetParent!==null; });
+        var k=fs.indexOf(document.activeElement);
+        if(!fs.length){ e.preventDefault(); return; }
+        if(e.shiftKey ? k<=0 : (k<0 || k===fs.length-1)){ e.preventDefault(); fs[e.shiftKey ? fs.length-1 : 0].focus(); }
+        return;
+      }
       if(e.key!=='Escape') return;
-      if(_soltarVisor_()) e.stopPropagation();
+      var bx=document.querySelector('.doc.full [data-vfull]');
+      if(_soltarVisor_()){ e.stopPropagation(); if(bx && bx.isConnected) try{ bx.focus(); }catch(_){} }     // refutar78: el foco vuelve al botón que lo maximizó
     }, true);
   }
 }
@@ -8694,8 +8704,8 @@ async function _pushInit_(){
         if(typeof SESION!=='undefined' && SESION && _asegurar){
           try{ _ya=await _asegurar(null); }catch(_){ _ya=false; }
         }
-        _pushFallo_(_ya ? null : 'el permiso est\u00e1 dado pero no hay suscripci\u00f3n: no te '+
-          'llegar\u00eda ning\u00fan aviso. Vuelve a entrar para reactivarlos.');
+        _pushFallo_(_ya ? null : 'el permiso est\u00e1 dado pero este m\u00f3vil no est\u00e1 registrado para recibir avisos: no te '+
+          'llegar\u00eda ninguno. Vuelve a entrar para reactivarlos.');
       }
     }
   }catch(e){
@@ -14649,7 +14659,7 @@ async function _autorClic_(ev, buscar, alCambiar){
   if (!nuevo.length){ tost('Elige al menos un autor.'); return; }
   if (nuevo.join('|') === _autoresActualesDe_(e).join('|')){ tost('Esos ya son los autores: no hay nada que cambiar.'); return; }
   if (typeof backendOK === 'undefined' || !backendOK || typeof SESION === 'undefined' || !SESION){
-    tost('Sin conexión con el backend: el autor NO se ha cambiado.'); return; }
+    tost('Sin conexión: el autor NO se ha cambiado.'); return; }
   b.disabled = true;
   try {
     var upd = await api.cambiarAutorDoc(e.id, nuevo, e.ref);
@@ -14733,7 +14743,7 @@ async function _pedirRevClic_(ev, buscar, alCambiar){
   var c = b.closest('[data-prdoc]'), e = c ? buscar(c.getAttribute('data-prdoc')) : null, pre = c ? c.getAttribute('data-prpre') : '';
   if (!e) return;
   if (typeof backendOK === 'undefined' || !backendOK || typeof SESION === 'undefined' || !SESION){
-    tost('Sin conexión con el backend: no se ha guardado nada.'); return; }
+    tost('Sin conexión: no se ha guardado nada.'); return; }
   var llamada, ok;
   if (b.hasAttribute('data-prpedir')){
     var revs = elegirPersonasMarcadas(pre + 'RevP'), aut = elegirPersonasMarcadas(pre + 'AutP'), act = _autoresActualesDe_(e);
@@ -17812,14 +17822,31 @@ function _a11yCablear_(){
       e.preventDefault(); t.click(); return;
     }
     if(e.key==='Enter' && t && t.tagName==='TR' && t.hasAttribute('data-a11y')){ e.preventDefault(); t.click(); return; }
+    /* refutar78: una ventana PROPIA (sí/no, texto, elegir, «Ver lista») atrapa el Tab: antes, tras el último botón el foco salía a la página de detrás
+       (menú, botones de la lista: un Enter ahí actuaba SOBRE lo que la ventana tapaba). Da la vuelta dentro de la de encima. */
+    if(e.key==='Tab'){
+      var ovs=document.querySelectorAll('.psel-ov');
+      if(ovs.length){
+        var fs=Array.prototype.filter.call(ovs[ovs.length-1].querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]'), function(x){ return !x.disabled && x.offsetParent!==null; });
+        var k=fs.indexOf(document.activeElement);
+        if(!fs.length){ e.preventDefault(); return; }
+        if(e.shiftKey ? k<=0 : (k<0 || k===fs.length-1)){ e.preventDefault(); fs[e.shiftKey ? fs.length-1 : 0].focus(); }
+        return;
+      }
+    }
     if(e.key==='Escape'){
       var m=document.querySelector('#modal.on');
       if(m && !document.querySelector('.psel-ov')){ var x=m.querySelector('[data-cerrar]'); if(x) x.click(); else m.classList.remove('on'); }
     }
   });
   /* el foco vuelve a quien abrió el modal / la hoja: se recuerda el último foco FUERA de ellos y se devuelve al cerrarse */
-  var antes=null, pend=false;
-  document.addEventListener('focusin', function(e){ if(!e.target.closest || !e.target.closest('#modal,.psel-ov')) antes=e.target; });
+  var antes=null, antesF=null, ovEl=null, ovF=null, pend=false, kbd=false;     // refutar78: `antesF` = la firma de `antes` (sólo si se llegó con el TECLADO); `kbd` = lo último que se tocó fue una tecla
+  document.addEventListener('keydown', function(){ kbd=true; }, true);
+  document.addEventListener('pointerdown', function(){ kbd=false; }, true);
+  document.addEventListener('focusin', function(e){
+    var t=e.target, o=t.closest ? t.closest('.psel-ov') : null;
+    if(o){ ovEl=o; ovF=kbd ? _focoFirma_(o, t) : null; }                                   // refutar78: dónde estaba el foco DENTRO de la ventana (marcar a alguien repinta la hoja entera)
+    else if(!t.closest || !t.closest('#modal')){ antes=t; antesF=kbd ? _focoFirma_(document.body, antes) : null; } });
   var estaba=false;
   new MutationObserver(function(recs){
     /* 17/11 (rapidez): la estrella que viaja por la barra (`#viaje`, `#sombra`, `#chispas`) cambia de CLASE en cuatro momentos de cada cambio de pantalla (0, 300, 460 y 820 ms)
@@ -17833,6 +17860,18 @@ function _a11yCablear_(){
       pend=false; _a11yMarcar_(document);
       var ahora=!!document.querySelector('#modal.on,.psel-ov');
       if(estaba && !ahora && antes && antes.isConnected && antes.focus) antes.focus();
+      /* refutar78: el botón que se pulsó con el TECLADO se repintó (decidir un parte del bloque, fijar, empezar, quitar a alguien: lo normal es `innerHTML`) y el foco cayó a <body>:
+         el siguiente Tab EMPEZABA POR EL MENÚ (24 paradas). Vuelve al que hace LO MISMO (misma firma sin números: el siguiente «Rechaza») y, si ya no hay ninguno, a la vista
+         (como al cambiar de pantalla), no a <body>. Sólo si el foco se perdió y el último gesto fue de teclado: con el ratón no se toca nada. */
+      else if(kbd && !ahora && antesF && antes && (!antes.isConnected || antes.disabled || !antes.offsetParent) && (!document.activeElement || document.activeElement===document.body)){
+        _focoReponer_(document.body, antesF);
+        if(!document.activeElement || document.activeElement===document.body){ var vm=document.getElementById('main'); if(vm && vm.getAttribute('tabindex')==='-1') try{ vm.focus({preventScroll:true}); }catch(_){} }
+      }
+      /* refutar78: y DENTRO de una ventana propia (la lista de personas se repinta entera al marcar a alguien): el foco vuelve a esa misma persona; si no se puede, al primer control. */
+      if(ahora && kbd && ovEl && ovEl.isConnected && (!document.activeElement || document.activeElement===document.body)){
+        if(ovF) _focoReponer_(ovEl, ovF);
+        if(!document.activeElement || document.activeElement===document.body){ var f0=ovEl.querySelector('input,button,[tabindex="0"]'); if(f0) try{ f0.focus({preventScroll:true}); }catch(_){} }
+      }
       if(!estaba && ahora){ var d=document.querySelector('.psel-ov .psel-hoja,#modal.on .card'); var f=d && d.querySelector('input,button,[tabindex="0"]'); if(f && f.focus) try{ f.focus({preventScroll:true}); }catch(_){} }
       estaba=ahora;
     });
@@ -17960,7 +17999,7 @@ function votVerHTML(){
   var cab='<div class="vtit">'+esc(v.titulo)+'</div><p class="rnota" style="margin:2px 0 8px">'+
     (v.reunion ? 'En la reunión «'+esc(v.reunionTitulo||v.reunion)+'» · ' : '')+'Abierta por '+esc(v.creador||'—')+' · '+esc(_votPlazoTxt_(v))+
     ' · mayoría '+(v.mayoria==='absoluta' ? 'absoluta' : 'simple')+(v.verEnDirecto ? ' · recuento en directo' : (v.gestor ? ' · los votantes ven el recuento al cerrar' : ''))+'</p>';
-  var nota=(!v.soyVotante && !cerrada) ? '<p class="rnota">No estás convocado a votar: lo ves como gestor.</p>'
+  var nota=(!v.soyVotante && !cerrada) ? '<p class="rnota">No estás convocado a votar: sólo puedes verla.</p>'
           : (!v.resultadosVisibles && !cerrada) ? '<p class="rnota">El recuento se verá al cerrar.</p>' : '';
   var faltan=(v.gestor && !cerrada && v.faltan && v.faltan.length) ? '<details class="vfal"><summary>Faltan por votar · '+v.faltan.length+'</summary><p class="rnota">'+esc(v.faltan.join(', '))+'</p></details>' : '';
   var pie='';

@@ -114,14 +114,14 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=8de72fb"></script>
+<script src="comun.js?v=cf33c5d"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=3cc0796"></script>
 <script src="buzon.escritorio.js?v=da17cb5"></script>
 <script src="documentos.escritorio.js?v=c9270d5"></script>
 <script src="sanciones.escritorio.js?v=ea7f63d"></script>
-<script src="reuniones.escritorio.js?v=cec90cb"></script>
+<script src="reuniones.escritorio.js?v=4847c2c"></script>
 <script src="horas.escritorio.js?v=52fbc5e"></script>
 <script src="equipo.escritorio.js?v=ee22dba"></script>
 <script src="tareas.escritorio.js?v=58a83e0"></script>
@@ -1699,8 +1699,7 @@ V.cierre={g:'Horas',t:'Cierre mensual',f:function(){
           '<span class="tx"><b>'+esc(p[0])+'</b><small>'+esc(p[2])+'</small></span>'+
           (p[1]?'<span class="chip ok">listo</span>':'<span class="chip no">bloquea</span>')+'</div>';
       }).join('')+
-      '<div class="nota">Estas dos bloquean el cierre: unas horas aprobadas después moverían '+
-      'la cuota de alguien, y una sanción sin confirmar dejaría el comunicado incompleto.</div>')+
+      '')+
     /* 21/10 (auditor 9): la ranura trae un plan de un mes ANTERIOR al que toca cerrar — se dice, no se pinta como vigente */
     (_planViejo ? '<div class="nota">'+_notaPlanViejo_(_planViejo)+'</div>' : '')+   /* 22/10 (auditor 22, 🟡 6) */
     (plan
@@ -2070,7 +2069,7 @@ V.sanciones={g:'Disciplina',t:'Cola de sanciones',f:function(){
         'Notion y sale un único comunicado con sus menciones.')+'</div>'
     : !LOTE.items.length
     ? '<div class="pb">'+vacioSimple('No hay ningún bloque abierto',
-        'Cuando el motor agrupe sanciones pendientes en un bloque, sale aquí para decidirlo entero.')+'</div>'
+        'Cuando haya sanciones pendientes agrupadas en un bloque, saldrá aquí para decidirlo entero.')+'</div>'
     : '<div class="pb"><div class="lote" id="lote">'+
       '<div class="lote-h"><b>'+LOTE.items.length+' personas</b><span class="mono" style="color:var(--red2)">'+rangoLote()+'</span></div>'+
       '<div class="lote-m">'+esc(LOTE.motivo)+' · <b>Art. '+LOTE.art+'</b></div>'+
@@ -2446,8 +2445,7 @@ V.actas={g:'Reuniones',t:'Actas',f:function(){
     var f=new Date(_fActa(d)+'T12:00:00');
     return !isNaN(f.getTime()) && _temporadaDe_(f)===_tv; }).length;
   if(!actas.length) return pan('Actas','ninguna',
-    vacioSimple('Todavía no hay ningún acta','Se sube por el formulario con Tipo de documento = Acta '+
-      'y aparece aquí en cuanto entra. Su referencia empieza por <span class="mono">Acta_S-</span>.'));
+    vacioSimple('Todavía no hay ningún acta','Las actas aparecen aquí en cuanto se suben. Su referencia empieza por <span class="mono">Acta_S-</span>.'));
   return pan('Actas',actas.length+(actas.length===1?' registrada':' registradas')+(_tv?' · '+_nTv+' de la '+_tv:''),
     tabla([['Referencia'],['Título'],['Autor'],['Fecha'],['Estado',1]],
       actas.map(function(d){
@@ -3668,7 +3666,7 @@ function _pintarLogin_(motivo){
   /* La cabecera es de esta cara; entrar con Google, de `comun.js` (`_iniciarGoogle_`, 19/10). `motivo` sólo si es texto: «Reintentar» la usa de `onclick` y le pasa el evento. */
   _iniciarGoogle_(_insigniaHTML_()+(typeof motivo==='string' && motivo ? '<div style="color:#ffb3b0;max-width:360px">'+esc(motivo)+'</div>' : '')+
     '<div style="font:600 19px/1.3 system-ui">Solaris · Puente de mando</div>'+
-    '<div style="opacity:.75;max-width:360px">Entra con tu cuenta de UVigo Aerotech.<br>'+
+    '<div style="opacity:.75;max-width:360px">Entra con la cuenta de UVigo Aerotech: Solaris.<br>'+
     'Este panel es para <b>consejo, junta y dirección</b>.</div>');
 }
 function _arrancarGis_(){
@@ -3721,10 +3719,21 @@ function _cablearLateral_(){
   var m=document.querySelector('.marco'), b=document.getElementById('btnLat'), n=document.getElementById('nav');
   if(!m||!b||b._ok) return; b._ok=1;
   function _ponerLateral(a){ m.classList.toggle('latAbierto',!!a); b.setAttribute('aria-expanded',a?'true':'false'); }
-  b.onclick=function(ev){ ev.stopPropagation(); _ponerLateral(!m.classList.contains('latAbierto')); };
+  b.onclick=function(ev){ ev.stopPropagation(); _ponerLateral(!m.classList.contains('latAbierto'));
+    /* refutar78: abierto con Enter/Espacio (`detail===0`), el foco se queda en ☰ y el menú está DESPUÉS de toda la cabecera y la vista en el orden de Tab:
+       «abrir el cajón» no llevaba a ningún sitio. Pasa a la pantalla en la que estás (↑ ↓ recorren el resto). `visibility` del cajón cerrado no deja enfocar hasta
+       que empieza a abrirse: se intenta ya y otra vez cuando acabe de salir. */
+    if(ev.detail===0 && m.classList.contains('latAbierto')){
+      var _a=function(){ var it=document.querySelector('#nav .item.on')||document.querySelector('#nav .item'); if(it && m.classList.contains('latAbierto')) try{ it.focus(); }catch(_){} };
+      _a(); setTimeout(function(){ if(document.activeElement===b) _a(); },320);
+    }
+  };
   n.addEventListener('click',function(ev){ if(ev.target.closest('.item')) _ponerLateral(false); });
   document.addEventListener('click',function(ev){ if(m.classList.contains('latAbierto') && !ev.target.closest('aside')) _ponerLateral(false); });
   document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && m.classList.contains('latAbierto')){ _ponerLateral(false); b.focus(); } });
+  /* refutar78: con Tab se sale del cajón por su último ítem (primero al ☰, luego a la cabecera) y se quedaba ABIERTO, tapando lo que se está enfocando. Si el foco llega a algo
+     que no es el cajón ni el ☰, se cierra. */
+  document.addEventListener('focusin',function(ev){ var t=ev.target, as=n.closest('aside'); if(m.classList.contains('latAbierto') && as && !as.contains(t) && t!==b) _ponerLateral(false); });
   window.addEventListener('resize',function(){ if(window.innerWidth>860) _ponerLateral(false); });
 }
 _cablearLateral_();
@@ -3868,7 +3877,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='062f8ff';
+var BUILD='e33b371';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4817,7 +4826,7 @@ function _engDocsDecidir_(){
           tost(String(ETI_DOC[accion]||'Hecho.').split('. ')[0].replace(/\.$/,'')+
             ' (maqueta: sólo en este navegador, no se ha publicado nada).');
         } else {
-          tost('Sin conexión con el backend: la decisión NO se ha guardado.');
+          tost('Sin conexión: la decisión NO se ha guardado.');
           b.disabled=false; b.textContent=prev; return;
         }
         if(accion!=='deshacer') DOC_SEL=null;
@@ -4919,7 +4928,7 @@ function _engSancRechazarBloque_(){
     b.onclick=async function(){
       if(b.disabled) return;
       var texto=await _pedirJustificacion_('el bloque entero ('+LOTE.items.length+' personas): no se aplicará ninguna'); if(texto===null) return;
-      if(!LOTE.real || !backendOK || !SESION){ tost('Sin conexión con el backend: el bloque NO se ha rechazado.'); return; }   /* la semilla no afirma nada */
+      if(!LOTE.real || !backendOK || !SESION){ tost('Sin conexión: el bloque NO se ha rechazado.'); return; }   /* la semilla no afirma nada */
       b.disabled=true; var prev=b.textContent; b.textContent='Rechazando…';
       try{
         var r=await api.rechazarBloque(LOTE.lote, texto);

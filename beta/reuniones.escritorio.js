@@ -137,7 +137,7 @@ function _convocPest_(lista){
 /* 17/11 · VOTACIONES en el escritorio (la pieza es de `comun.js`): una pestaña con su propio host; el estado vive en `VOT`, así que un repintado la remonta igual. */
 function _votPanelE_(){
   if(VOT.lista===null) return '';       /* sin servidor de votaciones (Apps Script) o aún sin cargar: sin pestaña */
-  return pan('Votaciones', votPendientes() ? votPendientes()+' por votar' : 'con cuórum', '<div class="pb"><div id="votH"></div></div>');
+  return pan('Votaciones', votPendientes() ? votPendientes()+' por votar' : 'al día', '<div class="pb"><div id="votH"></div></div>');
 }
 /* Las votaciones de ESTA reunión, en su ficha (pestaña «Fijar fecha»), y «Nueva votación» ya colgada de ella. Abrir una lleva a la pestaña «Votaciones». */
 function _votFichaE_(r){

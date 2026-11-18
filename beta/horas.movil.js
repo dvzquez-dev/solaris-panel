@@ -1723,7 +1723,7 @@ function _cuotaHTML_(){
         : '')
       : '<div class="rl"><span>Cuota por tus horas</span><span class="ra">—</span></div>'+
         '<p class="rnota">Llevas el coche en '+YO.coche+' turno'+(YO.coche===1?'':'s')+' entre '+
-        'Ourense y Vigo, pero el servidor aún no ha servido tu cuota <b>sin</b> descuentos: no se puede '+
+        'Ourense y Vigo, pero aún no se ha calculado tu cuota <b>sin</b> descuentos: no se puede '+
         'decir cuánto te resta.</p>')
     : '<p class="rnota">Aún sin descuentos · llevar el coche en un turno entre Ourense y Vigo resta '+nf2(_descuentoCoche_())+' € por turno.</p>';
   /* ⛔⛔ ES UNA ESTIMACIÓN, Y LA CIFRA GRANDE TIENE QUE DECIRLO. Daniel, 15/08, literal:
@@ -1745,6 +1745,11 @@ function _cuotaHTML_(){
       '<p class="rnota" style="margin-top:6px">Es una <b>estimación</b>: la cuota es <b>anual</b>, '+
         'no se paga mes a mes.</p>'+
       '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+recibo+'</div>'+
+      /* ⛔ 17/11 (refutar75) · SIN NINGÚN MES CERRADO la curva usa tus horas SIN dividir (Daniel, 14/08), y a quien lleva unos días eso le pinta una cifra
+         enorme (3 h = 64,74 €) sin una palabra. El escritorio ya lo decía («todavía no has cerrado ningún mes»); aquí faltaba. `meses` ausente es «no lo sé»: no se dice. */
+      ((_q.viva && typeof YO.meses==='number' && YO.meses<=0)
+        ? '<p class="rnota">Todavía <b>no has cerrado ningún mes</b>: se usan tus horas <b>sin dividir</b>, así que la cifra es aún más provisional.</p>'
+        : '')+
       /* ⛔ LA BASE SALE DE LA REGLA, NO SE TECLEA. Aquí ponía **«2 h de base» para todo
          el mundo**, y la base es la del **cargo**: `COMP_CARGO` da **7 h al PD** y **3,5 a
          un coordinador**; 2 es solo el defecto del miembro raso. Y esta nota existe para
