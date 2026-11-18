@@ -1117,7 +1117,7 @@ function _ctMHTML_(t){
   var tope0 = _cierreTope_(st);
   _cierreSembrar_(v, st, new Date(_ahoraInstante_()).toISOString());
   if(!st.ini && !st.fin){   /* sin reloj: se parte de la hora del turno hasta ahora, si cuadra (un turno no dura más de 12 h) */
-    var i0 = String(v.hora || '').slice(0,5), f0 = _hhmmDe_(new Date(_ahoraInstante_()).toISOString()), d0 = _durTurnoDeHoras_(i0, f0);
+    var i0 = String(v.hora || '').slice(0,5), f0 = _hhmmDe_(new Date(_ahoraInstante_()).toISOString()), d0 = _durTurnoDeHoras_(i0, f0, v.fecha);
     if(d0 != null && d0 <= 12){ st.ini = i0; st.fin = f0; st.dur = String(d0); }
   }
   var asis = _asistentesTurno_(v).concat(_dudososTurno_(v)), resp = _responsableTurno_(v);

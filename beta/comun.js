@@ -445,6 +445,23 @@ function _minutosReales_(fecha, ini, fin){
   return Math.abs(r - d) === 60 ? r : d;
 }
 
+/* La hora de pared (HH:MM, Madrid) a la que acaba lo que empieza a las `ini` de `fecha` (AAAA-MM-DD) y dura `min` minutos REALES: la inversa de `_minutosReales_`.
+   `null` si falta la fecha o no se entiende. Cuenta el cambio de hora (refutar109). */
+function _finDePared_(fecha, ini, min){
+  var a = _instanteMadrid_(_dmyAISO_(fecha), ini);
+  return a === null ? null : _hhmmDe_(a + min * 60000);
+}
+
+/* Una frase para quien ve un rango que no suma lo que parece porque cae en la noche del CAMBIO DE HORA, o '' si no cambia nada (refutar109):
+   «Esa noche los relojes pasan de las 02:00 a las 03:00: de 00:00 a 06:00 son 5 h.» */
+function _notaCambioHora_(fecha, ini, fin){
+  if(!_horaHHMM_(ini) || !_horaHHMM_(fin)) return '';
+  var pared = _minHM_(fin) - _minHM_(ini); if(pared < 0) pared += 1440;
+  var real = _minutosReales_(String(fecha || '').slice(0,10), ini, fin);
+  if(real === pared) return '';
+  return ' Esa noche ' + (real < pared ? 'los relojes pasan de las 02:00 a las 03:00' : 'los relojes vuelven de las 03:00 a las 02:00') + ': de ' + ini + ' a ' + fin + ' son ' + nf2(real / 60) + ' h.';
+}
+
 /* LA REJILLA DE FRANJAS de una convocatoria: **UNA sola**, contigua y anclada al tamaño de
    slot, para todos los dias a la vez. `rangos` son horas decimales `[ini,fin]` por dia;
    `[0,0]` = dia apagado. Devuelve `{F, perDia}`: las franjas comunes y, por dia, cuales le
@@ -1187,15 +1204,18 @@ function _diasDelMes_(ahora){
   var _ab=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;
   var _at=(_uc && _uc.at) ? new Date(_uc.at) : null;
   if(_at && !isNaN(_at.getTime()) && /^\d{4}-\d{2}$/.test(String(_ab||''))){
-    var _m0=new Date(_at.getFullYear(), _at.getMonth(), _at.getDate()).getTime();
-    var _h=(ahora||new Date()).getTime();
+    /* 18/11 (refutar109): las cuentas de DÍAS se hacen sobre la PARED (`_pared_`), no sobre instantes: el 28/03/2027 dura 23 h y el 31/10/2027, 25, y con `/86400000` a pelo el
+       «día N» se descolgaba una hora (a las 00:30 del 29/03 salía el 27 en vez del 28). Fuera de esos dos días no cambia nada. Espejo: `servidor._pared_ms`. */
+    var _pared_=function(ms){ return ms - new Date(ms).getTimezoneOffset()*60000; };
+    var _m0=_pared_(new Date(_at.getFullYear(), _at.getMonth(), _at.getDate()).getTime());
+    var _h=_pared_((ahora||new Date()).getTime()), _atP=_pared_(_at.getTime());
     var _c=Math.max(1, (_h-_m0)/86400000);
     /* ⛔ 01/11: `dia` se IMPRIME (entero >= 1, desde la medianoche + 1) y `cont` PESA: el tiempo desde el INSTANTE del cierre
        (sin el +1) entre los dias REALES del mes -- del dia del cierre al ultimo del mes, un dia mas por dia de retraso--,
        como `dias_transcurridos` / `dias_mes_real` del servidor. Daniel: «quedaran 30 dias, son 0,23 horas, ¿por que 0,41?» */
-    var _fin=new Date(+_ab.slice(0,4), +_ab.slice(5,7), 0).getTime();
-    var _tot=Math.max(Math.round((_fin-_m0)/86400000), Math.floor((_h-_m0)/86400000))+1-(_at.getTime()-_m0)/86400000;   /* 01/11 noche, Daniel: «desde […] cuando hice el cierre, hasta […] las 23:59 del 30»: el TRAMO desde el instante */
-    return {dia:Math.floor(_c), total:_tot, cont:Math.max(0, (_h-_at.getTime())/86400000), periodo:_ab};
+    var _fin=_pared_(new Date(+_ab.slice(0,4), +_ab.slice(5,7), 0).getTime());
+    var _tot=Math.max(Math.round((_fin-_m0)/86400000), Math.floor((_h-_m0)/86400000))+1-(_atP-_m0)/86400000;   /* 01/11 noche, Daniel: «desde […] cuando hice el cierre, hasta […] las 23:59 del 30»: el TRAMO desde el instante */
+    return {dia:Math.floor(_c), total:_tot, cont:Math.max(0, (_h-_atP)/86400000), periodo:_ab};
   }
   var d=ahora||new Date();
   /* El respaldo del calendario tambien lleva su hora: mismo criterio que el servidor -- el
@@ -3841,12 +3861,15 @@ function _puedeCerrarTurno_(t, nombre){
 /* 01/11 (Daniel, suplente): las horas de un turno salen de CUANDO EMPEZO y CUANDO ACABO, contando el transporte.
    Devuelve horas (cuartos de hora) o `null` si falta una de las dos o son iguales —«no lo se» no es 0 ni 24—.
    Si el fin es anterior al inicio, cruza la medianoche. */
-function _durTurnoDeHoras_(iniHM, finHM){
+function _durTurnoDeHoras_(iniHM, finHM, fecha){
   var re = /^\d{1,2}:\d{2}$/;
   if(!re.test(String(iniHM == null ? '' : iniHM)) || !re.test(String(finHM == null ? '' : finHM))) return null;
   var m = _minHM_(finHM) - _minHM_(iniHM);
   if(m === 0) return null;
   if(m < 0) m += 1440;
+  /* 18/11 (refutar109): con la FECHA del turno se cuentan los minutos REALES: la noche del 28/03/2027 (02:00 -> 03:00) de 00:00 a 06:00 son 5 h y no 6 (el servidor cuenta 5:
+     con 6 el tope de la compensación salía 1 h de más y el cierre se rechazaba); la del 31/10, 7. Sin fecha, el reloj de pared de siempre. */
+  if(fecha) m = _minutosReales_(String(fecha).slice(0,10), iniHM, finHM);
   return Math.round(m / 15) / 4;
 }
 
@@ -3944,6 +3967,9 @@ function _cierreTramo_(st, t){
   var ini = st.ini || String((t && t.hora) || '').slice(0,5);
   var d = _cierreDurNum_(st);
   if(!/^\d{1,2}:\d{2}$/.test(ini) || !isFinite(d) || d <= 0 || d >= 24) return null;
+  /* 18/11 (refutar109): `d` son horas REALES; en la noche del cambio de hora el fin de pared no es inicio + d (00:00 + 5 h reales = 06:00 el 28/03, y 00:00 + 7 h = 06:00 el 31/10) */
+  var fp = _finDePared_(String((t && t.fecha) || st.fecha || '').slice(0,10), ini, Math.round(d * 60));
+  if(fp) return {ini: ini, fin: fp};
   var m = (_minHM_(ini) + Math.round(d * 60)) % 1440;
   return {ini: ini, fin: pad(Math.floor(m / 60)) + ':' + pad(m % 60)};
 }
@@ -3971,6 +3997,7 @@ function _cierreMapa_(t, st){
    propone. Y con el turno EMPEZADO (`empezado_at`, del servidor) el tramo parte de ese instante hasta `ahoraISO`: se puede corregir
    a mano antes de cerrar. Idempotente: no pisa lo ya tecleado. */
 function _cierreSembrar_(t, st, ahoraISO){
+  st.fecha = String((t && t.fecha) || '').slice(0,10);   /* 18/11 (refutar109): el cambio de hora cuenta según el DÍA del turno */
   var firmes = _asistentesTurno_(t), dud = _dudososTurno_(t);
   if(!Object.keys(st.quien).length){
     firmes.forEach(function(n){ st.quien[n] = true; });
@@ -3979,7 +4006,7 @@ function _cierreSembrar_(t, st, ahoraISO){
   }
   if(t && t.empezado_at && !st.ini && !st.fin){
     st.ini = _hhmmDe_(t.empezado_at); st.fin = _hhmmDe_(ahoraISO);
-    var dr = _durTurnoDeHoras_(st.ini, st.fin);
+    var dr = _durTurnoDeHoras_(st.ini, st.fin, st.fecha);
     if(dr != null && st.dur === '') st.dur = String(dr);
   }
 }
@@ -3994,7 +4021,7 @@ function _cierreRecortar_(st){
 /* Cambia inicio/fin: la duración sale de ahí. Si falta una o son iguales (`null`) no se toca la duración: «no lo sé» no es 0. */
 function _cierrePonHoras_(st, ini, fin){
   st.ini = ini; st.fin = fin;
-  var d = _durTurnoDeHoras_(ini, fin);
+  var d = _durTurnoDeHoras_(ini, fin, st.fecha);
   if(d != null) st.dur = String(d);
   _cierreRecortar_(st);
 }
@@ -16045,7 +16072,7 @@ function _darHorasTramo_(D, horas){
   if(!_horaHHMM_(D.ini) || !_horaHHMM_(D.fin) || D.ini===D.fin) throw new Error('Pon de qué hora a qué hora (HH:MM, distintas).');
   var fut=_finEnFuturoTxt_(D.fecha, [{ini:D.ini, fin:D.fin}]); if(fut) throw new Error(fut);
   var dur=_bloqueDurH_(D.fecha, D.ini, D.fin);
-  if(horas>dur+1e-9) throw new Error('Las horas ('+nf2(horas)+') no pueden pasar de lo que dura el horario ('+nf2(dur)+' h).');
+  if(horas>dur+1e-9) throw new Error('Las horas ('+nf2(horas)+') no pueden pasar de lo que dura el horario ('+nf2(dur)+' h).'+_notaCambioHora_(D.fecha, D.ini, D.fin));
   return {fecha:D.fecha, ini:D.ini, fin:D.fin};
 }
 function _darHorasClasPintar_(){
