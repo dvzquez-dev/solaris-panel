@@ -1370,7 +1370,7 @@ function filaParte(p){
      la nota DETRÁS, como ya hacen `rech` y `rev`. */
   var sub = p.e==='conf' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.nota?' · '+esc(p.nota):''))
           : p.e==='otor' ? (p.nota?esc(p.nota)+(p.ini?' · '+p.ini+'–'+p.fin:''):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
-          : p.e==='pend' ? _cuandoParte_(p)+'esperando aprobación'
+          : p.e==='pend' ? _cuandoParte_(p)+'esperando aprobación'+(_diasEsperando_(p.creado_at) ? ' · lleva '+_diasEsperando_(p.creado_at)+' días' : '')   /* 18/11 (refutar126) */
           /* ⛔ SE ENSEÑA LA PREGUNTA, NO QUE HAY UNA. «Te piden más detalle» no dice QUÉ
              falta, así que el miembro tiene que adivinar o preguntar por Discord — y el
              motivo lo escribió el coordinador precisamente para eso. Es obligatorio en el
@@ -1800,6 +1800,7 @@ function _normPDec_(p){
     aplicado_at:p.aplicado_at||null, motivo:p.motivo||null,   /* 20/10: lo que se pidió, en la ficha de un `detalle` */
     pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya CONTESTADA (el servidor la guarda al responder) */
     estado:p.estado, origen:p.origen||null,
+    creado_at:p.creado_at||null,   /* 18/11 (refutar126): desde cuándo espera la firma (`_diasMasViejo_`); este normalizador enumera campos y sin él el aviso nunca sale */
     corr:p.correcciones||null,   /* 26/10: si su autor corrigió las horas, quien firma lo ve */
     bloque:p.bloque||null, reunion_id:p.reunion_id==null?null:p.reunion_id, resumen:p.resumen||'',   /* 29/10: el parte de bloque */
     tareaparte:p.tareaparte||null, propuesto_por:p.propuesto_por||null };   /* 01/11: tarea entregada → parte propuesto */

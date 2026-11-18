@@ -2177,6 +2177,20 @@ function _apelEspera_(at, ahora){
   if(h < 48) return 'hace ' + h + (h === 1 ? ' hora' : ' horas');
   return 'hace ' + d + ' días';
 }
+/* 18/11 (refutar126): cuántos DÍAS lleva algo esperando desde `at` (ISO o ms). 0 si lleva menos de 3 —«esperando» es normal las primeras horas: se dice lo que se
+   ATASCA, no lo que acaba de llegar—, si no hay fecha o si es futura. Con quien decide una semana fuera, es lo único que distingue «2 h esperando aprobación» de hace 5 minutos
+   de la misma frase a los 9 días. `_apelEspera_` es la otra mitad (la frase «hace 3 h» que lee quien resuelve). */
+function _diasEsperando_(at, ahora){
+  var t = typeof at === 'number' ? at : Date.parse(at == null ? '' : at), ms = (ahora == null ? Date.now() : ahora) - t;
+  var d = Math.floor(ms / 86400000);   /* NaN (sin fecha o basura) y negativos (futuro) no pasan el `>= 3` */
+  return d >= 3 ? d : 0;
+}
+/* Lo más viejo de una lista de fechas (`creado_at`): sus días de espera, o 0. */
+function _diasMasViejo_(lista, ahora){
+  var m = 0;
+  (lista || []).forEach(function(at){ var d = _diasEsperando_(at, ahora); if(d > m) m = d; });
+  return m;
+}
 /* Las abiertas que TÚ puedes resolver (el globo del menú del escritorio). */
 function _apelPendientesTuyas_(){
   return _apelLista_().filter(function(a){ return a && a.estado === 'abierta' && _apelPuedes_(a); });
@@ -2185,7 +2199,7 @@ function _apelPendientesTuyas_(){
 function _apelEstadoTxt_(a){
   if(!a) return '';
   if(a.clase === 'sancion') return _apelSancTxt_(a);
-  if(a.estado === 'abierta') return 'Apelada · esperando respuesta';
+  if(a.estado === 'abierta'){ var d = _diasEsperando_(a.at); return 'Apelada · esperando respuesta' + (d ? ' · lleva ' + d + ' días' : ''); }   /* 18/11 (refutar126) */
   if(a.estado === 'estimada') return 'Apelación estimada' + (a.nuevo_plazo ? ': nuevo plazo, el ' + _plazoDMY_(a.nuevo_plazo) : (a.quitada ? ': se te quita la tarea' : '')) +
     (a.resolucion ? '. ' + a.resolucion : '');
   return 'Apelación desestimada: ' + (a.resolucion || 'sin motivo escrito');
@@ -3317,6 +3331,12 @@ function _apiParse(txt, accion){
   /* ⛔ LA SESION CADUCADA SE DICE EN CRISTIANO. Ver `_ApiSesion`: el backend contesta
      `token no válido`, que es exacto y no le sirve de nada a quien está intentando cerrar su
      fichaje. Aquí se traduce a lo único accionable: vuelve a entrar. */
+  /* ⛔ refutar122 (18/11): GOOGLE QUE NO CONTESTA NO ES UNA SESION CADUCADA. El servidor ya los distingue (`GOOGLE_NO_RESPONDE`): antes los dos llegaban como «token no válido»,
+     la app decía «tu sesión ha caducado», daba la sesión por muerta (se paraba lo vivo) y, al ARRANCAR, borraba la sesión y mandaba a entrar con Google... que estaba caído.
+     No se reintenta aquí (no ejecutó nada, pero repetir en el acto da lo mismo): se dice tal cual y `googleCaido` hace que el arranque CONSERVE la sesión (`_ftDeRed_`). */
+  if(/^Google no responde ahora mismo/i.test(err.replace(/^Error:\s*/,""))){
+    var eg=new Error(err.replace(/^Error:\s*/,"")); eg.googleCaido=true; throw eg;
+  }
   if(_esErrorDeSesion_(err))
     throw new _ApiSesion("Tu sesi\u00f3n con Google ha caducado (dura una hora). Vuelve a entrar "+
                          "con tu cuenta y repite la acci\u00f3n \u2014 no se ha guardado nada.");
@@ -10888,7 +10908,8 @@ function _tuyoItems_(c){
       (resto > 0 ? (', y ' + resto + ' más después') : '') + '.', false, r0.id);
   }
   if(c.pdec) add('pdec', 'horas', c.pdec === 1 ? 'Un parte espera tu firma' : (c.pdec + ' partes esperan tu firma'),
-    c.pdec === 1 ? 'Hasta que lo decidas no le cuenta a quien lo hizo.' : 'Hasta que los decidas no le cuentan a nadie.', false);
+    (c.pdec === 1 ? 'Hasta que lo decidas no le cuenta a quien lo hizo.' : 'Hasta que los decidas no le cuentan a nadie.') +
+      (c.pdecDias ? (c.pdec === 1 ? ' Lleva ' : ' La más antigua lleva ') + c.pdecDias + ' días esperando.' : ''), false);   /* 18/11 (refutar126) */
   if(c.sindecl) add('sindecl', 'horas', c.sindecl === 1 ? 'Un fichaje tuyo sin declarar' : (c.sindecl + ' fichajes tuyos sin declarar'),
     'Se pierden si no los declaras a tiempo (7 días; ' + _caducaAutocierreH_() + ' h si se cerraron solos). Hazlo en Horas.', true);
   if(c.det) add('det', 'horas', c.det === 1 ? 'Te piden detalle de un parte' : ('Te piden detalle de ' + c.det + ' partes'),
@@ -10907,7 +10928,7 @@ function _tuyoItems_(c){
     var ap0 = ap.slice(0, 2).map(function(a){ return esc(a.autor) + ' (' + (a.clase === 'sancion' ? 'sanción' : 'tarea') + ')'; }),
         apTxt = ap.length > 2 ? (ap0.join(', ') + ' y ' + (ap.length - 2) + ' más') : ap0.join(' y ');
     add('apel', 'estado', ap.length === 1 ? 'Una apelación espera tu respuesta' : (ap.length + ' apelaciones esperan tu respuesta'),
-      'De ' + apTxt + '. Se responden desde el escritorio, en Apelaciones.', false);
+      'De ' + apTxt + '.' + (c.apelDias ? (ap.length === 1 ? ' Lleva ' : ' La más antigua lleva ') + c.apelDias + ' días esperando.' : '') + ' Se responden desde el escritorio, en Apelaciones.', false);   /* 18/11 (refutar126) */
   }
   /* 11/11 (🗣️ Daniel): un parte tuyo RECHAZADO sale en Estado con su motivo, como los documentos con cambios pedidos; antes sólo se
      veía plegado en «Horas → Tus partes». `c.rech`: [{tarea, motivo}] (los que aún se ven: `_sigueVisibleSinContar_`). */
@@ -16740,7 +16761,7 @@ function _ftClic_(t, k, ev){
   else if(q('[data-ftdest]')) _ftDestino_(t, k);
 }
 function _ftEsperar_(ms){ return new Promise(function(ok){ setTimeout(ok, ms); }); }
-function _ftDeRed_(e){ return !!(e && (e.sinRed || e.sinRespuesta || e.transito)); }
+function _ftDeRed_(e){ return !!(e && (e.sinRed || e.sinRespuesta || e.transito || e.googleCaido)); }   /* refutar122: «Google no responde» tampoco es una sesión que caduca: se conserva y se reintenta */
 /* La cola de una persona en un turno: UNA a UNA, con progreso, y una que falla NO tira las ya subidas. Un fallo de RED para la cola
    (el resto espera a «Reintentar»); un «no» del servidor (formato, tope, día) sólo descarta esa foto. */
 function _ftSubir_(t, files, titulo){

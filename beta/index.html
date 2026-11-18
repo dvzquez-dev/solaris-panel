@@ -114,7 +114,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=7444689"></script>
+<script src="comun.js?v=a96113f"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=a87b011"></script>
@@ -123,8 +123,8 @@
 <script src="documentos.movil.js?v=c1b59ab"></script>
 <script src="sanciones.movil.js?v=94c4140"></script>
 <script src="reuniones.movil.js?v=51a86d2"></script>
-<script src="horas.movil.js?v=c7e7f49"></script>
-<script src="equipo.movil.js?v=5112265"></script>
+<script src="horas.movil.js?v=87552d2"></script>
+<script src="equipo.movil.js?v=b63c434"></script>
 <script>
 /* Sin IIFE, igual que app.html: sus funciones son globales y eso es lo que
    permite portarlas en los dos sentidos y probarlas desde la consola. */
@@ -1079,7 +1079,7 @@ async function _onCredencial_(resp,_silente){
     var _red=_silente && _ftDeRed_(e);
     if(_silente && !_red){ try{ localStorage.removeItem('sol_sess'); }catch(_){} SESION=null; _arrancarGis_(); return; }
     _gate_(SPLASH+'<div style="color:#ffb3b0;max-width:340px">No se pudo entrar: '+
-      (_red ? 'no hay conexi\u00f3n con el servidor. Revisa tu red y vuelve a intentarlo.' : _entradaErrTxt_(e))+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
+      (_red ? (e && e.googleCaido ? e.message : 'no hay conexi\u00f3n con el servidor. Revisa tu red y vuelve a intentarlo.') : _entradaErrTxt_(e))+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
       'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>');
     var b=document.getElementById('reGis'); if(b) b.onclick=_red ? function(){ _onCredencial_(resp,true); } : _pintarLogin_;
   }
@@ -1885,7 +1885,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='3bbb185';
+var BUILD='f3759f7';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

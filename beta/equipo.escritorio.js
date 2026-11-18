@@ -84,7 +84,8 @@ function colaDecision(){
   porAprobar().forEach(function(p){
     out.push({ic:'i-reloj',b:h1(p.horas)+' de '+(pilaClara(p.autor)||_m(p.autor).pila),
       /* Mismo vocabulario que las otras dos pantallas: `bloque` ya no existe. */
-      s:esc(p.tarea)+' · '+p.fecha+(_etiOrigenParte_(p)?' · '+_etiOrigenParte_(p).txt:''),
+      s:esc(p.tarea)+' · '+p.fecha+(_etiOrigenParte_(p)?' · '+_etiOrigenParte_(p).txt:'')+
+        (_diasEsperando_(p.creado_at)?' · lleva '+_diasEsperando_(p.creado_at)+' días esperando':''),   /* 18/11 (refutar126) */
       chip:'<span class="chip wa">parte de horas</span>',ir:'partes',foco:'parte-'+p.id});
   });
   docsMios().forEach(function(d){
@@ -116,7 +117,8 @@ function colaDecision(){
   if(_ap.length){
     var _apN=_ap.slice(0,2).map(function(a){ var m=_m(a.autor); return esc(pilaClara(a.autor)||a.autor)+' ('+(a.clase==='sancion'?'sanción':'tarea')+')'; });
     out.push({ic:'i-gavel',b:_ap.length===1?'Una apelación por resolver':_ap.length+' apelaciones por resolver',
-      s:_apN.join(', ')+(_ap.length>2?' y '+(_ap.length-2)+' más':'')+' · la respuesta es obligatoria',
+      s:_apN.join(', ')+(_ap.length>2?' y '+(_ap.length-2)+' más':'')+' · la respuesta es obligatoria'+
+        (_diasMasViejo_(_ap.map(function(a){ return a.at; }))?' · lleva '+_diasMasViejo_(_ap.map(function(a){ return a.at; }))+' días esperando':''),   /* 18/11 (refutar126) */
       chip:'<span class="chip no">por decidir</span>',ir:'apela',foco:''});
   }
   /* ⛔ 26/10 — Daniel (25/10): un coordinador puede mover el plazo de una tarea SUYA, *«pero me notifica en algun lugar

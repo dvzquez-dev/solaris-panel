@@ -111,7 +111,10 @@ function _avisosQueTeTocanM_(){
     return {autor:pilaClara(a.autor)||String(a.autor||'').split(' ')[0], clase:a.clase}; }) : [];
   /* 12/11 (general-1 + gestion-1): sólo el PD (rango 3, como el escritorio y el servidor) y sólo con la cola LEÍDA: `SANC_M===null` es «no lo sé». */
   var sanc=(typeof SANC_M!=='undefined' && Array.isArray(SANC_M) && rangoNom((typeof _actorSanc_==='function') ? _actorSanc_() : yo)>=3) ? SANC_M.length : 0;
-  return _tuyoItems_({pdec:pdec, rev:rev, conv:conv, apel:apel, sanc:sanc,
+  /* 18/11 (refutar126): lo que lleva más tiempo esperándote, en días (0 si es reciente): quien vuelve de una semana fuera ve qué se atascó. */
+  var _dPd=(typeof _partesDecTuyos_==='function') ? _diasMasViejo_(_partesDecTuyos_().map(function(p){ return p.creado_at; })) : 0;
+  var _dAp=(typeof _apelPendientesTuyas_==='function') ? _diasMasViejo_(_apelPendientesTuyas_().map(function(a){ return a.at; })) : 0;
+  return _tuyoItems_({pdec:pdec, pdecDias:_dPd, rev:rev, conv:conv, apel:apel, apelDias:_dAp, sanc:sanc,
     sindecl:mios.filter(function(p){ return p.e==='sindecl'; }).length,
     det:mios.filter(function(p){ return p.e==='det'; }).length,
     /* 11/11: el parte RECHAZADO, con su motivo (`nota`), mientras `_sigueVisibleSinContar_` lo deje ver. */
@@ -150,11 +153,14 @@ function vEstado(){
       rt={nom:PD_NOM,escalado:true,propio:(PD_NOM===YO.nombre)};
     /* ⛔ 929.ª: y al PROPIO PD no se le nombra a sí mismo — `rt.propio`, como ya hacía Fichar. Le decía
        «Las firma Lois, Project Director» siendo él Lois. */
+    /* 18/11 (refutar126): y cuánto lleva la más vieja: «2 h esperando» es igual a los 5 minutos que a los 9 días. */
+    var _dMia=_diasMasViejo_(_pendL.map(function(p){ return p.creado_at; }));
     cPend={tit:h1(pend)+' esperando aprobación', txt:'Todavía no cuentan. '+(rt
         ? (rt.propio ? 'Las firmas tú: eres el Project Director.'
            : ('Las firma '+esc(_firmantesTxt_(rt))+', '+
               (rt.escalado?'Project Director':((rt.noms||[]).length>1?'coordinadores de tu unidad':'coordinador de tu unidad'))+'.'))
-        : 'Las firma quien coordine el subsistema de cada parte.')};
+        : 'Las firma quien coordine el subsistema de cada parte.')+
+        (_dMia ? (_pendL.length===1 ? ' Lleva ' : ' La más antigua lleva ')+_dMia+' días esperando.' : '')};
   }
   /* ⛔ Los documentos con cambios pedidos se CUENTAN (el globo del nav, `badges()`, usa el mismo filtro). */
   var cambios=ENTREGABLES.filter(function(e){return e.estado==='cambios';}).map(function(e){ return e.ref; });
