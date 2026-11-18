@@ -746,8 +746,8 @@ function durTotalForm(){ return durForm() + _tramosExtraH_(ST.form); }
 function _firmaTxtM_(rt){
   if(!rt) return 'no cuentan hasta que las firma quien coordine el subsistema';
   if(rt.propio) return 'cuentan cuando las firmas tú: eres el Project Director';
-  return 'no cuentan hasta que las firma '+esc(pilaClara(rt.nom||'')||String(rt.nom||'').split(' ')[0])+', '+
-    (rt.escalado?'Project Director':'coordinador de tu unidad');
+  return 'no cuentan hasta que las firma '+esc(_firmantesTxt_(rt))+', '+
+    (rt.escalado?'Project Director':((rt.noms||[]).length>1?'coordinadores de tu unidad':'coordinador de tu unidad'));
 }
 
 function vFichar(){
@@ -946,7 +946,7 @@ function vFichar(){
          raro cuando Fulano eres tú. */
       '<p>'+(rt.propio
         ?'Este parte <b>no pasa a nadie</b>: el Project Director eres tú.'
-        :'Va a <b>'+esc(rt.nom)+'</b>, '+(rt.escalado?'Project Director':'coordinador de '+esc(_perf))+'.')+
+        :'Va a <b>'+(rt.noms||[rt.nom]).map(esc).join('</b> o <b>')+'</b>, '+(rt.escalado?'Project Director':((rt.noms||[]).length>1?'coordinadores de ':'coordinador de ')+esc(_perf))+'.')+
       /* ⛔ EL ROTULO SE ELIGE POR `propio`, no por `escalado`: al Project Director le decía
          «COMO COORDINAS ‹UNIDAD›» — una coordinación que no tiene, porque `coordinadorDe`
          cae a él cuando la unidad no tiene coordinador. 31/10: para `propio` ya no hay rótulo
@@ -1899,7 +1899,7 @@ function _repartirPartesDec_(arr){
       /* 31/10 · Daniel: «si lo he hecho yo […] le tendría que enrutar a Bruno». El parte del PD de una unidad que coordina
          OTRO no es «tuyo por aprobar» (sigue pudiendo decidirlo; es del coordinador): `coordinadorDe` es la misma regla que
          el servidor, que ya puso en `p.subsistema` la unidad de la TAREA. */
-      if(p.autor===yo && coordinadorDe(p.subsistema)!==yo) return false;
+      if(p.autor===yo && !esElUnicoCoordDe(p.subsistema,yo)) return false;   /* 18/11 (refutar100): con DOS coordinadores el tuyo lo firma el otro */
       return (p.estado==='pendiente' || p.estado==='detalle') && (_mando || p.autor!==yo);
     }).map(_normPDec_);
     /* ⛔ Y DE LA MISMA RESPUESTA, lo ya decidido. Pedirlo en otra llamada seria un segundo
@@ -2134,7 +2134,7 @@ function _engVariosM_(){
    del PD y la lista ofrecía revertir partes de otras unidades a quien no puede. `p` es el parte CRUDO (`subsistema`). */
 function _pdPuedeRevertir_(p, quien){
   var r = (typeof rangoNom==='function') ? rangoNom(quien) : 0;
-  return r >= 3 || (r >= 1 && coordinadorDe(p.subsistema||'—') === quien) || esSubcoordDe(quien, p.autor);   /* 02/11: + el subcoordinador, a su equipo */
+  return r >= 3 || (r >= 1 && esCoordDe(p.subsistema||'—', quien)) || esSubcoordDe(quien, p.autor);   /* 02/11: + el subcoordinador, a su equipo */
 }
 
 function _pdRevertible_(p){

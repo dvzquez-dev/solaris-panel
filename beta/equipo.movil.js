@@ -53,11 +53,18 @@ function _rederivarPD_(){
    mismo, y eso es una decisión de Daniel, no mía. Queda fichado en `docs/pendientes.md`;
    aquí lo único que cambia es **dejar de mentirle sobre su propio cargo**. */
 function aprobadorDe(autor,unidad){
-  var c=coordinadorDe(unidad);
+  /* 18/11 (refutar100): con DOS coordinadores firma el OTRO (`noms` los lista a todos los que pueden; `nom` es el primero); sólo si no hay
+     otro, sube al PD. */
+  var cs=coordinadoresDe(unidad), c=cs[0], otros=cs.filter(function(x){ return x!==autor; });
   /* 11/11 (refutar7): `coordinadorDe` también devuelve al PD cuando la unidad NO tiene coordinador (una unidad nueva). Entonces lo firma
      el Project Director y se dice así: «Pedro, coordinador de tu unidad» era falso para quien entra el primer día. */
-  if(c!==autor) return {nom:c,escalado:(c===PD_NOM),propio:false};
-  return {nom:PD_NOM,escalado:true,propio:(PD_NOM===autor)};
+  if(cs.indexOf(autor)<0) return {nom:c,noms:cs,escalado:(c===PD_NOM),propio:false};
+  if(otros.length) return {nom:otros[0],noms:otros,escalado:false,propio:false};
+  return {nom:PD_NOM,noms:[PD_NOM],escalado:true,propio:(PD_NOM===autor)};
+}
+/* 18/11 (refutar100): «Cris» o «Cris o Ber» — los que pueden firmar, con su pila clara, para las frases «Las firma …». */
+function _firmantesTxt_(rt){
+  return (rt.noms||[rt.nom]).map(function(n){ return pilaClara(n)||String(n).split(' ')[0]; }).join(' o ');
 }
 
 /* Rol efectivo: en login REAL manda YO.cargo (el conmutador ST.rol es solo de la demo). Así el
@@ -144,8 +151,8 @@ function vEstado(){
        «Las firma Lois, Project Director» siendo él Lois. */
     cPend={tit:h1(pend)+' esperando aprobación', txt:'Todavía no cuentan. '+(rt
         ? (rt.propio ? 'Las firmas tú: eres el Project Director.'
-           : ('Las firma '+esc(pilaClara(rt.nom)||rt.nom.split(' ')[0])+', '+
-              (rt.escalado?'Project Director':'coordinador de tu unidad')+'.'))
+           : ('Las firma '+esc(_firmantesTxt_(rt))+', '+
+              (rt.escalado?'Project Director':((rt.noms||[]).length>1?'coordinadores de tu unidad':'coordinador de tu unidad'))+'.'))
         : 'Las firma quien coordine el subsistema de cada parte.')};
   }
   /* ⛔ Los documentos con cambios pedidos se CUENTAN (el globo del nav, `badges()`, usa el mismo filtro). */

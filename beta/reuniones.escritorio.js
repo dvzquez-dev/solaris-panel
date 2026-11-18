@@ -1124,55 +1124,21 @@ function _cobertura_(r){
   if(r && r.agregado === false)
     return {cubren:null, conv:null, sinCubrir:null, bajoMin:null,
             minimo:_minimoExigido_(r), minFijado:(r.minimo!=null), oculto:true, motivo:'oculta'};
-  var cubren=Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); });
-  var universo = (r.invitados&&r.invitados.length) ? r.invitados
-               : (r.tipo==='general' ? _activos_().map(function(m){return m.nombre;}) : cubren);
-  /* el convocante organiza: esta exento de cubrir su propia encuesta */
-  universo = universo.filter(function(n){ return n!==r.convocante; });
-  /* 26/10 (triaje A4d): quien se convocó con el plazo YA VENCIDO no pudo cumplirlo: el motor no le sanciona
-     (`sanciones.universo_convocado`) y aquí no sale en riesgo. */
-  var _tarde = Array.isArray(r.invitados_tarde) ? r.invitados_tarde : [];
-  universo = universo.filter(function(n){ return _tarde.indexOf(n) < 0; });
-  /* ⛔ 22/10 (auditor 23, 🟠 8): EL MOTOR SÓLO SANCIONA A LOS VIVOS QUE ESTÁN INVITADOS (`sanciones.universo_convocado`
-     sobre `vivos`, `sanciones.py:679`). Una baja invitada —la reunión se convocó antes de que se fuera— salía aquí «sin
-     cubrir · sanción que implicaría» con su nombre. Se cruza con los activos que la cara conoce; con menos de dos no hay
-     lista fiable de quién está (§3c-24) y no se filtra. */
-  universo = _invitadosVivos_(universo);
-  /* ⛔⛔ 21/10 (auditor 10, 🟠 3): AÚN SIN LEER. Las filas llegan después (`_hidratarReus_`), y si esa lectura falla
-     se quedan vacías: contarlas decía «0 de 3 han cubierto · 3 en riesgo» con nombres y apellidos, cuando el
-     servidor dice que han contestado (`nResp`). Sin filas y con respuestas, no se sabe quién: el recuento del
-     servidor y `null` en las listas (§3c-24), como la anónima. */
-  if(!cubren.length && _nRespReu_(r) > 0)
+  /* limpieza101: la derivación (universo, bajas, convocados tarde, convocante exento, sin leer, anónima) vive en UN sitio, `_derivaFalta_` (comun.js), la misma que
+     usa el móvil. Lo que se queda aquí es lo de ESTA cara: de dónde sale el universo si no hay lista (todo el equipo, o quien contestó) y los recuentos de cada salida.
+     ⛔ Las explicaciones largas de cada guarda (21/10 sin leer · 18/08 anónima · 22/10 bajas · 26/10 tarde) están en el historial de git de esta función. */
+  var base = (r.invitados&&r.invitados.length) ? r.invitados
+           : (r.tipo==='general' ? _activos_().map(function(m){return m.nombre;}) : Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); }));
+  var d = _derivaFalta_(r, base), universo = d.universo, cubren = d.cubren;
+  if(d.motivo==='sinleer')
     return {cubren:_nRespReu_(r), conv:universo.length, sinCubrir:null, bajoMin:null,
             minimo:(r.minimo!=null ? r.minimo : _minimoExigido_(r)),
             minFijado:(r.minimo!=null), oculto:true, motivo:'sinleer'};
-  /* ⛔⛔ Y LAS FILAS ANONIMIZADAS TAMPOCO SIRVEN PARA NOMBRAR A NADIE (18/08).
-     La guarda de arriba cubre `oculta`. Falta su hermana: con `vision:'anonima'` el
-     servidor conserva TU fila con tu nombre y renombra las ajenas a `#1`, `#2`…
-     (`Codigo.gs:4566-4571`) **pero deja `agregado` en true**, asi que esto seguia
-     derivando. Medido EJECUTANDOLO antes de tocar nada, con Carla cubriendo como `#1`:
-         cubren=2 | conv=3 | sinCubrir=Carla+Dani | bajoMin=-
-     O sea que a Carla, que CUBRIO DE SOBRA, la lista de riesgo la nombra con apellidos y
-     le cuelga su chip de «sancion que implicaria». Y `bajoMin` puede sacar un `#1`, que
-     no es nadie. Acusar a quien hizo lo que tenia que hacer es peor que no avisar.
-     ⛔ NO SE REPLICA AQUI LA REGLA DE VISIBILIDAD -- eso serian dos criterios para la
-     misma pregunta, y el backend lo prohibe por escrito («LA BANDERA VA EXPLICITA, y no
-     se deduce en la cara»). Lo que se mira es si el DATO sirve: una clave de respuesta que
-     no es NADIE del universo significa que las filas no son nominales, y sin filas
-     nominales no se puede decir quien falta. Es una comprobacion de integridad, no una
-     politica.
-     ⚠️ Y SE CONSERVAN LOS RECUENTOS, al reves que en `oculta`, porque aqui SI se saben:
-     con `oculta` llega **solo tu fila** y contar seria inventar; con `anonima` llegan
-     todas y solo faltan los nombres. «2 de 3 han cubierto» es verdad y es util; lo unico
-     que no se puede decir es QUIENES. Callar un dato que se tiene tambien es mentir. */
-  var _sinNombre = cubren.filter(function(n){
-    return n!==r.convocante && universo.indexOf(n)<0;
-  });
-  if(_sinNombre.length)
+  if(d.motivo==='anonima')
     return {cubren:cubren.length, conv:universo.length, sinCubrir:null, bajoMin:null,
             minimo:(r.minimo!=null ? r.minimo : _minimoExigido_(r)),
             minFijado:(r.minimo!=null), oculto:true, motivo:'anonima'};
-  var sin = universo.filter(function(n){ return cubren.indexOf(n)<0; });
+  var sin = d.sin;
   var minimo = r.minimo!=null ? r.minimo : _minimoExigido_(r);
   /* ⛔⛔ EL `c>0` ESCONDIA JUSTO A QUIEN EL MOTOR VA A SANCIONAR. Quien abre la encuesta,
      la deja entera a cero y guarda —«no puedo ningun dia»— tiene fila, asi que sale de

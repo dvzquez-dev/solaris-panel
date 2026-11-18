@@ -25,7 +25,7 @@ function revisoresDe(e){
   /* 05/11 (`pedirrev`): con una PETICIÓN de revisión pendiente del PD, los revisores son los PEDIDOS. Gemela de `revisores_de`. */
   var _pet=_peticionRevActiva_(e); if(_pet) return (_pet.revisores||[]).slice();
   if(_revisoresPropuestosValidos_(e).length) return _destinoConflictoDoc_(e);   /* 05/11 (`conflictojose`): a José, que valida sin firmar */
-  var r = e.ambito==='archivo' ? [coordinadorDe(e.subsistema)]
+  var r = e.ambito==='archivo' ? coordinadoresDe(e.subsistema)
         : e.ambito==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
   /* nadie revisa lo suyo — 02/11: TODOS los autores (el que lo sube, los que nombra el documento y los ajustados), no sólo `autor`. */

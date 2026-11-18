@@ -23,8 +23,10 @@
    yo mismo. O sea, no hay nadie más.») */
 function revisoresDeParte(p){
   if(p.autor===PD_NOM) return [PD_NOM];
-  var c=coordinadorDe(p.unidad);
-  if(c!==p.autor) return [c];
+  var cs=coordinadoresDe(p.unidad);
+  if(cs.indexOf(p.autor)<0) return cs;                                          /* 18/11 (refutar100): los DOS, si hay dos */
+  var otros=cs.filter(function(c){ return c!==p.autor; });
+  if(otros.length) return otros;
   /* ⛔ 20/10 (auditor de partes): el de un coordinador, SÓLO el PD. Aquí escalaba también a José, y el servidor
      (`_puede_sobre_parte`: rango ≥ 3 o coordinar esa unidad) le rechaza: «Lo firma Daniel o José» prometía una firma
      que no existe. */
@@ -68,11 +70,11 @@ function puedeOtorgarA(m,quien){ return _puedeOtorgarA_(m, quien); }   /* 11/11:
    aprobar» (cola y globo) aunque siga pudiendo decidirlo. Misma regla que el móvil (`_cargarPartesDec_`); el servidor ya
    fijó en el parte la unidad de la TAREA. */
 function porAprobar(){return pendientes().filter(function(p){
-  return _firmaMia_(p) && !(p.autor===ACTOR && coordinadorDe(p.unidad)!==ACTOR);});}
+  return _firmaMia_(p) && !(p.autor===ACTOR && !esElUnicoCoordDe(p.unidad,ACTOR));});}
 
 function parteCard(p){
   var m=_m(p.autor), rev=revisoresDeParte(p), puede=puedeDecidirParte(p,ACTOR);
-  var esc2=(coordinadorDe(p.unidad)===p.autor);
+  var esc2=esElUnicoCoordDe(p.unidad,p.autor);
   return '<div class="parte pp" id="parte-'+p.id+'">'+
     '<div class="h"><b>'+esc(_pilaDeM_(p.autor)||m.pila)+'</b>'+
       /* 01/11 (escm1): Aprobar JUNTO AL NOMBRE, no al final de una fila de 1.500 px; el 90 % se aprueba sin motivo. */
@@ -142,7 +144,7 @@ function bloquePanel(){
   var pool=_activos_().filter(function(m){ return _puedeOtorgarA_(m, ACTOR); });
   if(!pool.length) return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-    (coordinadorDe(unidad)===ACTOR ? 'No hay nadie de tu subsistema a quien otorgar horas en bloque.'
+    (esCoordDe(unidad,ACTOR) ? 'No hay nadie de tu subsistema a quien otorgar horas en bloque.'
       : (_subcoordDe_(ACTOR) ? 'No hay nadie en tu equipo a quien otorgar horas en bloque.'
         : 'Otorgar horas es del coordinador de la unidad y del Project Director: el servidor no lo deja a nadie más.'))+
     '</p></div>');

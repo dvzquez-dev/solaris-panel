@@ -4902,18 +4902,28 @@ function _reuSinFijarTxt_(R){
    riesgo»). La derivación es la de `_cobertura_` (escritorio) con sus mismas guardas: sin agregado (`oculta`) o con las filas anonimizadas o sin leer, NO SE SABE QUIÉN y se calla
    (§3c-24: una ausencia de datos no es «ha faltado»); la baja no cuenta, ni quien se convocó con el plazo ya vencido (no pudo cumplirlo), ni quien convoca (organiza). Devuelve
    `{han, de, faltan:[…]}` o `null` si no se sabe. Una puerta para las dos caras. */
-function _faltanDeReu_(R){
-  if(!R || R.agregado===false) return null;
-  var inv=_invitadosVivos_(Array.isArray(R.invitados)?R.invitados.filter(function(n){ return typeof n==='string' && n; }):[]);
-  if(!inv.length) return null;                                                  // sin lista de convocados (reunión de antes del modelo): no hay a quién nombrar
+/* limpieza101 (18/11) · UNA REGLA, UN SITIO: la derivación de «quién falta» que compartían `_cobertura_` (escritorio) y `_faltanDeReu_` (móvil, con las mismas guardas copiadas).
+   `base` = los convocados tal como los pone cada llamador (`_cobertura_` cae a «todo el equipo» o a quien contestó si no hay lista; `_faltanDeReu_` no). Devuelve
+   `{motivo, inv, universo, cubren, sin}`: `motivo` = `'oculta'` (sin agregado: llega sólo tu fila), `'sinleer'` (han contestado pero las filas aún no se leyeron) o `'anonima'`
+   (una fila no es nadie del universo: `#1`, `#2`…) — con motivo, NO SE SABE QUIÉN y `sin` no existe (§3c-24); sin él, `cubren` son los NOMBRES que contestaron y `sin` los del
+   `universo` que no. `inv` = los convocados vivos; `universo` = `inv` sin quien convoca (organiza) ni los convocados con el plazo vencido (no pudieron cumplirlo). */
+function _derivaFalta_(R, base){
+  if(!R || R.agregado===false) return {motivo:'oculta'};
+  var inv=_invitadosVivos_((base||[]).filter(function(n){ return typeof n==='string' && n; }));     // la baja no cuenta (el motor sólo sanciona a vivos)
   var tarde=Array.isArray(R.invitados_tarde)?R.invitados_tarde:[];
-  var uni=inv.filter(function(n){ return n!==R.convocante && tarde.indexOf(n)<0; });
+  var universo=inv.filter(function(n){ return n!==R.convocante && tarde.indexOf(n)<0; });
   var resp=_respDeActivos_(R.resp||{}).resp;
-  var han=Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); });
-  if(!han.length && _nRespReu_(R)>0) return null;                               // han contestado pero las filas aún no se han leído
-  if(han.some(function(n){ return n!==R.convocante && inv.indexOf(n)<0; })) return null;   // filas anonimizadas (`#1`, `#2`…): no son nadie del universo
-  var faltan=uni.filter(function(n){ return han.indexOf(n)<0; });
-  return {han:uni.length-faltan.length, de:uni.length, faltan:faltan};
+  var cubren=Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); });
+  var motivo=null;
+  if(!cubren.length && _nRespReu_(R)>0) motivo='sinleer';
+  else if(cubren.some(function(n){ return n!==R.convocante && inv.indexOf(n)<0; })) motivo='anonima';
+  return {motivo:motivo, inv:inv, universo:universo, cubren:cubren,
+          sin:motivo ? null : universo.filter(function(n){ return cubren.indexOf(n)<0; })};
+}
+function _faltanDeReu_(R){
+  var d=_derivaFalta_(R, R && R.invitados);
+  if(d.motivo || !d.inv.length) return null;                                     // sin lista de convocados (reunión de antes del modelo): no hay a quién nombrar
+  return {han:d.universo.length-d.sin.length, de:d.universo.length, faltan:d.sin};
 }
 function _faltanReuTxt_(R){
   var f=_faltanDeReu_(R);
@@ -10275,8 +10285,9 @@ function _turnoCalorCablear_(raiz, cv, calor, alElegir){
    Se pinta en la pantalla de fichar para que la consecuencia de elegir perfil **se vea antes
    de elegirlo**: es la mitad de la decision, y hasta ahora era invisible. */
 function _firmaDe_(unidad, quien){
-  var c = coordinadorDe(unidad);
-  return c === quien ? PD_NOM : c;
+  /* 18/11 (refutar100): con DOS coordinadores firma el OTRO (el primero que no eres tú); sólo si eres el único sube al PD. */
+  var o = coordinadoresDe(unidad).filter(function(c){ return c !== quien; });
+  return o.length ? o[0] : PD_NOM;
 }
 
 /* Quien coordina esa unidad; si nadie, el PD.
@@ -10297,20 +10308,32 @@ function _puedeMoverPlazo_(t, nombre){
   if (!t || !nombre) return false;
   var r = rangoNom(nombre);
   if (r >= 3) return true;
-  return r >= 1 && !!t.s && coordinadorDe(t.s) === nombre;
+  return r >= 1 && !!t.s && esCoordDe(t.s, nombre);
 }
 
-function coordinadorDe(u){
-  var c = buscaMiembro(function(m){ return m.cargo==='Coordinador' && m.unidad===u; });
-  if (c) return c.nombre;
-  c = buscaMiembro(function(m){
-    /* 26/10: quien la COORDINE, con cargo o sin el (Bruno lleva Logistica; Marta, Patrocinios: «Si, en su unidad») */
-    var v = (typeof _unidadesCoord_==='function') ? _unidadesCoord_(m.coordina) : [], i;
-    for (i=0;i<v.length;i++) if (v[i]===u) return true;
+/* ⛔ 18/11 (refutar100): UNA unidad grande tiene DOS coordinadores (Estructuras). `coordinadorDe` devolvía el PRIMERO y todo lo que comparaba
+   `coordinadorDe(u) === yo` dejaba al segundo sin cola, sin botones y sin poder dar horas, SIN decirlo (el servidor ya los admite a los dos).
+   `coordinadoresDe(u)`: TODOS, sin repetir: los del CARGO en esa unidad y después quien la tenga en `coordina`; si nadie, [PD]. Nunca vacía.
+   Gemela de `coordinadores_doc` del servidor. «¿Manda X en U?» es `esCoordDe(U, X)`; `coordinadorDe` es sólo para un NOMBRE que pintar. */
+function coordinadoresDe(u){
+  var out = [];
+  /* `buscaMiembro` con un `cumple` que siempre dice «no»: es la manera de RECORRER el roster por la misma puerta que el resto (no un `DATA` suelto). */
+  buscaMiembro(function(m){
+    if (m.cargo==='Coordinador' && m.unidad===u && out.indexOf(m.nombre)<0) out.push(m.nombre);
     return false;
   });
-  return c ? c.nombre : PD_NOM;
+  buscaMiembro(function(m){
+    /* 26/10: quien la COORDINE, con cargo o sin el (Bruno lleva Logistica; Marta, Patrocinios: «Si, en su unidad») */
+    var v = (typeof _unidadesCoord_==='function') ? _unidadesCoord_(m.coordina) : [], i;
+    for (i=0;i<v.length;i++) if (v[i]===u && out.indexOf(m.nombre)<0) out.push(m.nombre);
+    return false;
+  });
+  return out.length ? out : [PD_NOM];
 }
+function esCoordDe(u, nombre){ return coordinadoresDe(u).indexOf(nombre) >= 0; }
+/* ¿es `nombre` el ÚNICO que firma lo de esa unidad (sin otro coordinador al lado)? Entonces su propio parte sube al PD. */
+function esElUnicoCoordDe(u, nombre){ var c = coordinadoresDe(u); return c.length===1 && c[0]===nombre; }
+function coordinadorDe(u){ return coordinadoresDe(u)[0]; }
 
 
 /* ⛔ EL MAPA DE CALOR · UNA SOLA VEZ (05/08/2026). Estaba escrito en las DOS caras con la
@@ -15940,7 +15963,7 @@ function _actorHoras_(){ return (typeof _actorSanc_==='function' ? _actorSanc_()
    quien coordina ESA unidad (rango >= 1) o, a su equipo, el subcoordinador. La llaman `puedeDecidirParte` (horas.escritorio.js: decidir un parte),
    `puedeOtorgarA` (otorgar) y `_otorgablesDe_`: antes cada una llevaba su copia. NO incluye «nunca uno mismo»: eso lo pone quien la llama. */
 function _potestadSobre_(quien, autor, unidad){
-  return rangoNom(quien)>=3 || (rangoNom(quien)>=1 && coordinadorDe(unidad)===quien) || esSubcoordDe(quien, autor);
+  return rangoNom(quien)>=3 || (rangoNom(quien)>=1 && esCoordDe(unidad, quien)) || esSubcoordDe(quien, autor);
 }
 /* ¿Puede `quien` OTORGAR horas a la ficha `m` ({nombre, unidad})? Nunca a sí mismo. */
 function _puedeOtorgarA_(m, quien){
