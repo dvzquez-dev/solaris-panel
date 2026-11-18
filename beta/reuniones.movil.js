@@ -1637,8 +1637,8 @@ function _asisPintarPanelM_(){
     if(i2) i2.value='';                      // ya está: el campo se vacía ANTES de refrescar (el refresco conserva lo tecleado) y DESPUÉS de que el servidor lo acepte: si lo rechaza («no es del equipo»), se queda para corregirlo
     await _asisRefrescarM_(); tost(n+': presente.'); });
   on('[data-asiscopiarm]', async function(){
-    var t=_asisListaTxt_(A.v);
-    try{ await navigator.clipboard.writeText(t); tost('Lista copiada.'); }catch(_){ tost('No se pudo copiar.'); } });
+    var t=_asisListaTxt_(A.v, A.reu);
+    tost((await _copiarTexto_(t)) ? 'Lista copiada.' : 'No se pudo copiar.'); });
   Array.prototype.forEach.call(c.querySelectorAll('[data-asisn]'), function(b){
     b.onclick=async function(){                // un toque: marca o quita (llega de improviso, o se equivocó)
       var n=b.getAttribute('data-asisn'); if(b.disabled) return; b.disabled=true;
@@ -1649,7 +1649,7 @@ function _asisPintarPanelM_(){
 
 function _asisAbrirPanelM_(R){
   _asisSalirM_();
-  ASIS_PM={id:R.id, v:null, timer:null, ocupado:false, fin:_reuFinalizada_(R)};
+  ASIS_PM={id:R.id, reu:R, v:null, timer:null, ocupado:false, fin:_reuFinalizada_(R)};
   abrirModal('<div class="mtit">Asistencia en directo</div><div class="msub">'+esc(R.titulo||'')+'</div><div data-asispanelm><p class="rnota">Cargando…</p></div>');
   _asisRefrescarM_();
   ASIS_PM.timer=setInterval(_asisRefrescarM_, 3000);

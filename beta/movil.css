@@ -927,6 +927,9 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 /* decisión cerrada: la etiqueta va al LÍMITE izquierdo de la celda = hora de inicio */
 .rc.rh span{position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}
 .rc.rh span.fin{left:auto;right:0;transform:none}
+/* refutar123 (18/11): la cabecera de DÍA (`.rhd`, «28<span>/11</span>») es `position:static` y su «/mes» heredaba el `position:absolute` de la regla de arriba: salía de la columna,
+   las cabeceras decían «28 29 30 01 02» sin mes (un «01» tras el «30» no dice si es diciembre) y los «/11» se apilaban sueltos en la esquina de la hoja. Va en su sitio, en el flujo. */
+.rc.rh.rhd span{position:static;transform:none;left:auto;top:auto}
 .ecel{height:27px;border-radius:3px;background:var(--sur2);cursor:pointer}
 .ecel.on1{background:var(--tel)}          /* telemático */
 .ecel.on2{background:var(--red)}          /* presencial + telemático */
@@ -1243,3 +1246,12 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 /* refutar99 (18/11): lo que ve quien abre la app en un móvil viejo con 3G mientras llegan ~700 KB de JS: el HTML ya está pintado y el JS aún no. Antes era la cabecera con un nombre
    inventado («Nerea»), el conmutador de la maqueta y un hueco negro de 20 s sin una palabra. Ahora el hueco dice qué pasa; lo borra el primer pintado de Estado. */
 .abriendo{padding:64px 24px;text-align:center;color:var(--ink3,#9a9293);font-size:15px}
+
+/* refutar123 (18/11): el móvil TUMBADO (740×360, o un 667×375). Cabecera (62 px) + barra de abajo (70 px) se comían el 37 % de la altura y el cuerpo se quedaba en ~230 px
+   (la rejilla y las fichas, a trozos). Se compacta: la barra va sólo con iconos (como `#nav.ico`; cada pestaña ya lleva su aria-label) y la cabecera pierde su relleno. */
+@media (orientation:landscape) and (max-height:480px){
+  nav{height:calc(50px + env(safe-area-inset-bottom,0px))}
+  #nav .tab .tl{display:none}
+  #nav .tab{padding:0}
+  header{padding-top:2px;padding-bottom:6px}
+}

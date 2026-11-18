@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=9e9bfc6">
+<link rel="stylesheet" href="escritorio.css?v=265a99d">
 </head>
 <body>
 
@@ -114,14 +114,14 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=078da26"></script>
+<script src="comun.js?v=7444689"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=37b0144"></script>
 <script src="buzon.escritorio.js?v=ba45925"></script>
 <script src="documentos.escritorio.js?v=9bc268c"></script>
 <script src="sanciones.escritorio.js?v=9dd396d"></script>
-<script src="reuniones.escritorio.js?v=e0bf97d"></script>
+<script src="reuniones.escritorio.js?v=2948968"></script>
 <script src="horas.escritorio.js?v=0bf1145"></script>
 <script src="equipo.escritorio.js?v=a7d9483"></script>
 <script src="tareas.escritorio.js?v=32e62fb"></script>
@@ -3896,7 +3896,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='70e1c2f';
+var BUILD='19256b1';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4261,7 +4261,7 @@ function _pinDescargarHistorico_(m){
     b.disabled=true; var prev=b.textContent; b.textContent='Preparando…';
     try{
       var r=await api.historicoCSV();
-      _descargarTexto_('registro-solaris-'+String(r.hoja||'historico').replace(/[^A-Za-z0-9]+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.csv', r.csv||'', 'text/csv');
+      _descargarTexto_('registro-solaris-'+String(r.hoja||'historico').replace(/[^A-Za-z0-9]+/g,'-')+'-'+_ahoraLocalISO_().slice(0,10)+'.csv', r.csv||'', 'text/csv');
       tost('Histórico descargado ('+(r.filas||0)+' filas).');
     }catch(e){ tostErr('No se pudo descargar el histórico: ', e); }
     b.disabled=false; b.textContent=prev;

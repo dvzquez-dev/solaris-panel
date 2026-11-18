@@ -1432,10 +1432,7 @@ function _asisPintarE_(){
       elegirPersonasPoner('asisQuien', [], (PSEL.asisQuien?PSEL.asisQuien.universo:[]).filter(function(x){ return x!==n; }));
       await _asisRefrescarE_(); });
     on('asisCopiar', async function(){
-      var t=_asisListaTxt_(v);
-      try{ await navigator.clipboard.writeText(t); tost('Lista copiada.'); }
-      catch(_){ var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select();
-        try{ document.execCommand('copy'); tost('Lista copiada.'); }catch(e){ tost('No se pudo copiar.'); } ta.remove(); }
+      tost((await _copiarTexto_(_asisListaTxt_(v, A.reu))) ? 'Lista copiada.' : 'No se pudo copiar.');
     });
   }
   document.getElementById('asisCont').innerHTML=cerrada

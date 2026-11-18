@@ -75,7 +75,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .cartel p b{color:var(--ink)}
 
 /* ═══ MARCO ══════════════════════════════════════════════════════════════ */
-.marco{position:relative;display:grid;grid-template-columns:238px minmax(0,1fr);grid-template-rows:56px 1fr;
+.marco{position:relative;display:grid;grid-template-columns:238px minmax(0,1fr);grid-template-rows:minmax(56px,auto) 1fr;   /* refutar123: con la letra al 200 % la ficha del usuario mide 88 px y se salía por arriba tapando el ⋮ */
   height:calc(100vh - 36px);min-height:660px;   /* 838.ª: 36 = el relleno del body; los 150 eran de un cartel que ya no existe */border:1px solid var(--line);border-radius:var(--r);
   overflow:hidden;overflow:clip;   /* 01/11: `clip` y no sólo `hidden`: la marca de agua sobresale del marco y con `hidden` un foco o un clic lo desplazaba (barra lateral y cabecera cortadas) */
   background:var(--bg);box-shadow:0 26px 60px rgba(0,0,0,.45)}
@@ -950,7 +950,7 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .tarl table{table-layout:fixed;min-width:1000px}
 .tarl th,.tarl td{overflow:hidden;text-overflow:ellipsis}
 .tarl th:nth-child(2){width:172px}.tarl th:nth-child(3){width:150px}.tarl th:nth-child(4){width:92px}
-.tarl th:nth-child(5){width:130px}.tarl th:nth-child(6){width:104px}.tarl th:nth-child(7){width:170px}
+.tarl th:nth-child(5){width:max(130px,11em)}.tarl th:nth-child(6){width:max(104px,calc(9.2em + 24px))}   /* refutar123: «Vence» crece con la letra (la fecha, en mono, son 10 caracteres: con el 130 % salía «16/11/2…») */.tarl th:nth-child(7){width:170px}
 .tarl td:first-child{white-space:normal;overflow-wrap:anywhere}
 .chip.tuni{white-space:nowrap}
 /* 02/11 (tareasatras): a menos de 1320 px la tabla (1000 mín.) no cabe y estado y fecha quedaban tras el scroll. Daniel: «ocultar

@@ -17590,11 +17590,26 @@ function _asisDemo_(b, pd){
 function _asisClave_(t){ return _sinTildes_(String(t==null?'':t)).replace(/\s+/g,''); }
 
 /* La lista final, ordenada por hora de llegada: «hh:mm  Nombre», una por línea. Es lo que copia el botón. */
-function _asisListaTxt_(v){
+function _asisListaTxt_(v, r){
   var p=(v&&v.presentes)||{};
   var filas=Object.keys(p).sort(function(a,b){ return p[a]<p[b]?-1:(p[a]>p[b]?1:0); });
   var m=(v&&v.modos)||{};
-  return filas.map(function(n){ return _hhmmDe_(p[n])+'  '+n+(m[n]==='tel'?'  (telemático)':''); }).join('\n');
+  var cuerpo=filas.map(function(n){ return _hhmmDe_(p[n])+'  '+n+(m[n]==='tel'?'  (telemático)':''); }).join('\n');
+  /* 18/11 (refutar125): con la reunión delante, la lista copiada lleva CABECERA («Asistencia · título · DD/MM/AAAA»): pegada en WhatsApp, «10:03  Ana Gnc» a secas no dice de qué
+     reunión es ni de qué día. Sin reunión (la `<pre>` del escritorio, que ya tiene el título encima) sale como siempre. */
+  if(!(r && (r.titulo||r.tit))) return cuerpo;
+  var h=_horarioReuMs_(r), bl=(r.fijada && r.fijadaBl) || [], d0=String((r.dias||[])[bl.length ? bl[0][0] : 0]||'');
+  var dia=h ? _isoADMY_(_ahoraLocalISO_(new Date(h.ini)).slice(0,10)) : (/^\d{4}-\d{2}-\d{2}/.test(d0) ? _isoADMY_(d0) : '');     // `dias` llega en ISO si la reunión no la creó la app
+  return 'Asistencia · '+(r.titulo||r.tit)+(dia ? ' · '+dia : '')+(cuerpo ? '\n'+cuerpo : '');
+}
+/* 18/11 (refutar125) · COPIAR UN TEXTO AL PORTAPAPELES, con respaldo. `navigator.clipboard` sólo existe en https y con permiso: en un WebView viejo o con el permiso denegado el móvil decía
+   «No se pudo copiar» sin más, y el escritorio tenía el respaldo (textarea + `execCommand`) escrito DENTRO de su manejador. Ahora es de las dos caras. `true` si copió. */
+async function _copiarTexto_(t){
+  try{ await navigator.clipboard.writeText(t); return true; }catch(_){ /* sin portapapeles moderno: el camino viejo */ }
+  var ta=document.createElement('textarea'); ta.value=t; ta.setAttribute('readonly',''); ta.style.cssText='position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  var ok=false; try{ ok=!!document.execCommand('copy'); }catch(_){ ok=false; }
+  ta.remove(); return ok;
 }
 
 /* 01/11 · QUIÉN VINO POR TELEMÁTICO sale en OTRO color (🗣️ Daniel: *«la gente q vino telemática (porque marcaron disponibilidad
