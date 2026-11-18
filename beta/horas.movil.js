@@ -1951,7 +1951,7 @@ function _pdRango_(p){
 function _pdFichaHTML_(p){
   return '<div class="pdi" data-pd="'+p.id+'">'+
         '<div class="fila"><div class="a"><b>'+esc(_pilaDeM_(p.autor))+'</b>'+
-          '<small>'+esc(p.unidad)+' · '+esc(p.f)+_pdRango_(p)+'</small></div>'+
+          '<small>'+esc(p.unidad)+' · '+esc(p.f)+_pdRango_(p)+(_esBaja_(p.autor)?' · de baja':'')+'</small></div>'+   /* refutar106: quien se fue sigue con partes en la cola (se firman: lo hizo antes) y se dice */
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
         '<div class="pdt">'+_icoBloque_(p)+esc(p.t)+'</div>'+
         /* ⛔⛔ `p.t`, NO `p.tarea`: `_normPDec_` RENOMBRA el campo al normalizar, y una

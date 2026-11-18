@@ -80,6 +80,7 @@ function parteCard(p){
       /* 01/11 (escm1): Aprobar JUNTO AL NOMBRE, no al final de una fila de 1.500 px; el 90 % se aprueba sin motivo. */
       (puede?'<button class="btn pri sm" data-parte="'+p.id+'" data-acc="si">Aprobar</button>':'')+
       '<span class="u">'+esc(p.unidad)+'</span>'+
+      (_esBaja_(p.autor)?'<span class="u">de baja</span>':'')+   /* refutar106: el parte de quien se fue sigue en la cola y se dice */
       '<span class="u">'+p.fecha+(/^\d/.test(p.ini||'')&&/^\d/.test(p.fin||'')?' · '+p.ini+'–'+p.fin:'')+'</span>'+   /* 18/11 (refutar97): sin horario no sale «—–—» (el móvil ya lo evitaba) */
       /* ⛔ `nf2`, NO `nf(...,1)`. Daniel, 18/08: «ya te dije bien claro que nada de
          redondeos a la decima». El fichaje redondea a CUARTOS (.25/.50/.75), asi que una

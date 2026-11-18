@@ -759,7 +759,7 @@ function _apelTarjetaSanc_(a){
   var m = _m(a.autor), puedes = _apelPuedes_(a), l = _enlaceWeb_(a.enlace);
   return '<div class="parte" data-apid="' + esc(a.id) + '" data-apclase="sancion">' +
     '<div class="h"><b>' + esc(pilaClara(a.autor) || a.autor) + '</b>' +
-      '<span class="u">' + esc(a.unidad || '—') + '</span><span class="u">sanción</span>' +
+      '<span class="u">' + esc(a.unidad || '—') + '</span>' + (_esBaja_(a.autor) ? '<span class="u">de baja</span>' : '') + '<span class="u">sanción</span>' +   /* refutar106: a quien se fue no le llega la respuesta en la app */
       '<span class="q" style="font-size:12px;font-family:var(--sans);font-weight:500">' + esc(_apelEspera_(a.at)) + '</span></div>' +
     '<div class="ruta" style="margin-top:6px"><b>' + esc(a.motivo_sancion || a.titulo) + '</b> · ' + esc(_etSancFila_(a.puntos, null, null)) +
       ' · ' + esc(_isoADMY_(String(a.fecha_sancion || '').slice(0, 10)) || 'sin fecha') +
@@ -780,7 +780,7 @@ function _apelTarjeta_(a){
   var m = _m(a.autor), puedes = _apelPuedes_(a);
   return '<div class="parte" data-apid="' + esc(a.id) + '">' +
     '<div class="h"><b>' + esc(pilaClara(a.autor) || a.autor) + '</b>' +
-      '<span class="u">' + esc(a.unidad || '—') + '</span>' +
+      '<span class="u">' + esc(a.unidad || '—') + '</span>' + (_esBaja_(a.autor) ? '<span class="u">de baja</span>' : '') +
       '<span class="u">cláusula ' + esc(a.clausula === 'otra' ? 'otra' : a.clausula) + '</span>' +
       '<span class="q" style="font-size:12px;font-family:var(--sans);font-weight:500">' + esc(_apelEspera_(a.at)) + '</span></div>' +
     '<div class="ruta" style="margin-top:6px"><b>' + esc(a.titulo) + '</b> · plazo ' + esc(_plazoDMY_(a.plazo) || 'sin fecha') + '</div>' +
