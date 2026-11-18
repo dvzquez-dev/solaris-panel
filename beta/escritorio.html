@@ -114,15 +114,15 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=9fd9b5a"></script>
+<script src="comun.js?v=6e16b34"></script>
 <script src="notis.escritorio.js?v=f8d6e8a"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=37b0144"></script>
 <script src="buzon.escritorio.js?v=ba45925"></script>
-<script src="documentos.escritorio.js?v=8841713"></script>
+<script src="documentos.escritorio.js?v=b5ed075"></script>
 <script src="sanciones.escritorio.js?v=3c5ce83"></script>
 <script src="reuniones.escritorio.js?v=66fbcf2"></script>
-<script src="horas.escritorio.js?v=004493c"></script>
+<script src="horas.escritorio.js?v=20a5e46"></script>
 <script src="equipo.escritorio.js?v=99e1b1d"></script>
 <script src="tareas.escritorio.js?v=e790430"></script>
 <script src="directo.escritorio.js?v=24b1dbb"></script>
@@ -1297,7 +1297,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
        hecho, y lo que todavía se puede deshacer, antes que lo que ya no. */
     _escRevPanel_()+
     pan('Histórico',histVis.length+(histVis.length===1?' decisión':' decisiones'),   /* 🟡 3 (auditor 20) */
-      histVis.length?hist.filter(function(p){ return histVis.indexOf(p)>=0; }).map(function(p){ return _escHistFilaHTML_(p, _perH, _ucH); }).join(''):vacioSimple('Todavía no hay decisiones','Cada parte que apruebes, devuelvas o rechaces queda aquí '+
+      histVis.length?_listaPorTramos_('hist', histVis, function(p){ return _escHistFilaHTML_(p, _perH, _ucH); }):vacioSimple('Todavía no hay decisiones','Cada parte que apruebes, devuelvas o rechaces queda aquí '+
         'con su motivo y con quién lo firmó.'))+
     /* ⛔ 21/10 (auditor 8, 🟡 15): lo que hacen `revisoresDeParte` y el servidor — sin «revisor fijo» (el rango 2 es
        documental: en horas no firma) y con la excepción del PD, que sí firma lo suyo (Daniel, 15/08). */
@@ -1434,7 +1434,11 @@ function _avisoCompE_(lista){
       return '<tr><td><span class="mem"><span class="av">'+ini(m.nombre)+'</span>'+esc(m.pila||m.nombre)+'</span></td>'+
         '<td class="r mono">'+nf2(c.notion)+' h</td><td class="r mono">'+nf2(c.cargo)+'</td><td class="r mono">'+nf2(c.resto)+'</td>'+
         '<td class="r mono dn">'+(d>0?'Notion +':'Notion \u2212')+nf2(Math.abs(d))+' h</td></tr>';
-    }).join('')))+(nota ? '<div class="chips">'+nota+'</div>' : '');
+    }).join('')))+
+    /* 18/11 (refutar93): quien cambió de cargo a mitad de mes sale aquí con ±la diferencia de bases (Notion sigue con lo del cargo viejo) y
+       el PD no tenía forma de saber que es eso. Lo que se le dice es lo que hace el cierre: la base del cargo con el que cierra, entera. */
+    '<div class="nota">Quien cambió de cargo a mitad de mes sale aquí: Notion aún lleva la base del anterior. El cierre le deja la base del cargo con el que cierra el mes, entera, sin repartirla por días.</div>'+
+    (nota ? '<div class="chips">'+nota+'</div>' : '');
 }
 
 /* refutar61 (17/11): ¿esta cuenta VE las horas del resto? Sólo el PD (rango 3): un coordinador recibe del equipo nombre, unidad y cargo, y su cuenta no
@@ -2268,7 +2272,7 @@ V.dispo={g:'Reuniones',t:'Disponibilidad y riesgo',f:function(){
        seguía recomendando la casilla. Misma puerta para los dos. */
     /* 01/11: con orden del día de duración conocida, la ventana es de los bloques que ESE orden pide (`comun.js`). */
     var _huecoE_=function(){ var f=_ventanaFijar_(r, _slotsMin_(r.duracion, r.slot), best), vent=f.vent;
-      return 'Mejor hueco: <b>'+r.dias[vent.d]+' '+
+      return 'Mejor hueco: <b>'+(_isoADMY_(r.dias[vent.d])||r.dias[vent.d])+' '+
         _hFranja_(r,vent.f0)+(vent.f1>vent.f0?('–'+_hFinFranja_(r,vent.f1)):'')+'</b> — '+
         Math.max(0,vent.v)+' de '+r.conv+
         (vent.exacta ? ' pueden la reunión entera.' : (pondOn?' puntos.':' pueden.'))+_notaOrdenHTML_(f); };
@@ -3001,11 +3005,14 @@ V.libros={g:'Horas',t:'Lo tuyo',f:function(){
   var r=_ultimosMov_(mios, function(p){ return p.fecha; }, function(p){ return p.horas; }, 'mes');
   var base=_compBase_(mi), extra=_compExtra_(mi), real=_compEsReal_(mi);
 
+  /* 18/11 (refutar93): la base de ESTA tabla va devengada, como la cifra de arriba, «Tus meses» y el móvil (13/11): enseñaba la entera
+     (2 h) en la misma pantalla donde «Tus meses» decía 1,18. */
+  var baseHoy=_compBaseAHoy_(mi);
   var filas='<tr><td><b>Compensación por tu cargo</b><div class="sc">'+
-      esc(mi.cargo||'miembro')+' · se te asigna cada mes, no se ficha</div></td>'+
-      '<td class="r mono">'+nf2(base)+' h</td></tr>';
+      esc(mi.cargo||'miembro')+' · se te asigna cada mes, no se ficha'+(baseHoy<base-0.005 ? ' · hoy lleva '+nf2(baseHoy)+' de '+nf2(base)+' h' : '')+'</div></td>'+
+      '<td class="r mono">'+nf2(baseHoy)+' h</td></tr>';
   if(extra) filas+='<tr><td><b>Compensación extra</b><div class="sc">'+
-      (extra>0?'asignada por el Project Director por trabajo de más':'ajuste sobre la base')+
+      (extra>0?'asignada por el Project Director, '+_compExtraQue_(extra):_compExtraQue_(extra))+
       ' · solo de este mes</div></td>'+
       '<td class="r mono">'+(extra>0?'+':'')+nf2(extra)+' h</td></tr>';
   filas+=r.todos.map(function(p){
@@ -3886,7 +3893,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='91e4103';
+var BUILD='cc57a1c';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

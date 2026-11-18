@@ -49,10 +49,11 @@ function _origenParte_(p){
   /* El texto sale de `_etiOrigenParte_` (comun.js): aqui solo se decide COMO se pinta en esta
      lista -- corto, en linea y detras del resto. Antes esta funcion tenia su propia tabla de
      casos, que es como el escritorio y ella acabaron diciendo cosas distintas del mismo parte. */
-  var e=_etiOrigenParte_(p);
-  if(!e) return '';
+  var e=_etiOrigenParte_(p), n=(typeof _notaMesCerradoParte_==='function' ? _notaMesCerradoParte_(p) : null);   /* 18/11 (refutar97): sin firmar y de un mes ya cerrado, lo dice */
+  var cola = n ? ' · <span style="color:var(--warn)">'+esc(n)+'</span>' : '';
+  if(!e) return cola;
   var col = e.tono==='ok' ? 'var(--ink3)' : 'var(--warn)';
-  return ' · <span style="color:'+col+'">'+esc(e.txt)+'</span>';
+  return ' · <span style="color:'+col+'">'+esc(e.txt)+'</span>'+cola;
 }
 
 /* ⛔ EL ISO SE CONSERVA. `f` sale ya formateado a `DD/MM/AAAA` para pintarlo, y ordenar por
@@ -1561,7 +1562,7 @@ function _fijasDesglose_(items){
     '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_bh)+' h</b></div></div>';
   var filaExtra =
     '<div class="fila borde-ot"><div class="a"><b>Asignada por el Project Director</b>'+
-      '<small>'+(_cx>0?'por trabajo de más (turnos extra y demás)':'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
+      '<small>'+_compExtraQue_(_cx)+' · <b>solo de este mes</b>: en el cierre '+
       'la compensación vuelve a la base</small></div>'+
     '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
   var fijas=[{catDesglose:'cargo', q:_bh, fila:filaBase}];
@@ -1933,11 +1934,12 @@ function _repartirPartesDecSiEspera_(){
    que hay que mirar. Lo otorgado por la coordinación va en gris — marcarlo en ámbar sería pedirle
    a quien firma que desconfíe de algo que hizo el sistema. */
 function _pdOrigenHTML_(p){
-  var e=_etiOrigenParte_(p);
-  if(!e) return '';
-  return e.tono==='ok'
+  var e=_etiOrigenParte_(p), n=(typeof _notaMesCerradoParte_==='function' ? _notaMesCerradoParte_(p) : null);   /* 18/11 (refutar97): quien firma sabe a qué mes va ANTES de aprobar */
+  var cola = n ? '<span class="pdw">'+esc(n)+'</span>' : '';
+  if(!e) return cola;
+  return cola+(e.tono==='ok'
     ? '<span class="pdw" style="background:none;color:var(--ink3)">'+esc(e.txt)+'</span>'
-    : '<span class="pdw">'+esc(e.txt)+'</span>';
+    : '<span class="pdw">'+esc(e.txt)+'</span>');
 }
 
 /* Una ficha de parte, dentro de la lista de decisión. Se saca aparte porque ahora vive dentro
@@ -2007,6 +2009,7 @@ function _pdFichaHTML_(p){
 var PD_ABIERTO_={};
 document.addEventListener('toggle', function(ev){ var d=ev.target;
   if(d && d.dataset && d.dataset.pdk) PD_ABIERTO_[d.dataset.pdk]=d.open; }, true);
+var TRAMO_PERSONA = 10;   /* 18/11 (refutar96): fichas que se enseñan de cada persona antes de «Mostrar 10 más» */
 function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
   if(!lista.length) return '';
   var horas=0; lista.forEach(function(p){ horas+=p.q; });
@@ -2036,11 +2039,11 @@ function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
         var ps=por[a], h=0; ps.forEach(function(x){ h+=x.q; });
         var k=id+'|'+a;
         /* movil13-3: con UNA persona no hay cabecera (repetía el nombre y las horas de la ficha); el grupo de arriba sigue plegándose. */
-        if(unico) return ps.map(ficha).join('');
+        if(unico) return _listaPorTramos_(k, ps, ficha, TRAMO_PERSONA);   /* 18/11 (refutar96): por tramos — con la temporada entera, 1.900 fichas cerradas dentro de un desplegable bloqueaban 5-7 s */
         return '<details class="pdpers" data-pdk="'+esc(k)+'"'+(PD_ABIERTO_[k]?' open':'')+'>'+
           '<summary><b>'+esc(_pilaDeM_(ps[0].autor))+'</b>'+
             '<span class="pdnum">'+ps.length+' · '+nf2(h)+' h</span></summary>'+
-          ps.map(ficha).join('')+
+          _listaPorTramos_(k, ps, ficha, TRAMO_PERSONA)+
         '</details>';
       }).join('')+
     '</details></div>';
@@ -2184,8 +2187,8 @@ function _pdRevFichaHTML_(p){
      CURSO — horas de otro mes, a alguien que no ha hecho nada, y sin dar error. */
   if (p.cerrado){
     return cab+
-        '<span class="pdw">Mes cerrado ('+esc(p.cerrado)+'): ya no se revierte. '+
-          'Esas horas ya cuentan y de ahí salió la cuota.</span>'+
+        '<span class="pdw">Mes cerrado ('+esc(typeof _nomPeriodo_==='function' ? _nomPeriodo_(p.cerrado) : p.cerrado)+'): ya no se revierte. '+   /* 18/11 (refutar97): «2026-10» era el dato, no el nombre */
+          'Esas horas ya cuentan y de ahí salió la cuota. Si hay que corregirlo, se hace en la ficha.</span>'+
       '</div>';
   }
   return cab+
@@ -2221,6 +2224,7 @@ function _pdRevHTML_(){
 }
 
 function _engPartesRev_(){
+  _engTramos_(pintar);   /* 18/11: «Mostrar N más» de cada persona en las listas de partes */
   var c=$('#prev'); if(!c) return;
   $$('#prev [data-pdrev]').forEach(function(b){
     b.onclick=async function(){

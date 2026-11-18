@@ -1106,7 +1106,9 @@ function _compBaseAHoy_(m){
   if(_hMesReal_(m)==null) return b;
   var f=_fraccionDelMes_();
   if(typeof f!=='number' || !isFinite(f) || f<0) return b;
-  return Math.round(b*Math.min(1,f)*100)/100;
+  /* 18/11 (refutar93): `b − lo que falta por devengar`, que con la base otorgada entera es `b × fracción` de siempre, y con una
+     otorgada menor (cambio de cargo a mitad de mes) sigue cuadrando con la cifra de arriba (`_devengadoAHoy_`). */
+  return Math.round((b-_compPorDevengar_(m,f))*100)/100;
 }
 function _hMesReal_(m){
   m = m || {};
@@ -7218,7 +7220,26 @@ function _devengadoAHoy_(m, h, frac){
      rato: el suelo de `_horasSinBase_` protege una resta, no una rampa.
      ✅ Y asi la rampa GENERALIZA: un mes acabado devenga su valor crudo, sin caso
      especial — que es lo que deja compararlo con el mes anterior sin dos cuentas. */
-  return Math.max(0, Math.round((h - _compBase_(m) * (1 - Math.min(1, frac))) * 100) / 100);
+  return Math.max(0, Math.round((h - _compPorDevengar_(m, frac)) * 100) / 100);
+}
+/* ⛔ 18/11 (refutar93) · LO QUE FALTA POR DEVENGAR SALE DE LO OTORGADO, NO DEL CARGO DE HOY.
+   🗣️ El caso: Noa pasa a coordinar el día 20 y Dora lo deja; la ficha cambia, pero `Compensaciones` de Notion sigue valiendo lo que se
+   les otorgó al empezar el mes (2 h y 3,5 h) hasta que alguien lo toque o se cierre. La rampa restaba la base del cargo NUEVO a unas
+   horas que traen la del VIEJO: Noa perdía 0,61 h de golpe (restaba 3,5 de una cifra que sólo lleva 2) y su desglose enseñaba un «ajuste
+   −1,5» que nadie había puesto. Es lo que `reglas/compensacion_base.liberada_de` ya avisa: «deducir la cantidad del cargo es un fallo que
+   este proyecto ya pagó una vez».
+   ✅ Sólo falta por devengar lo que ESTÁ: `min(base del cargo, Compensaciones de Notion)`. Si Notion trae más (extras del PD, partes en
+   ese cajón) manda la base, como siempre —la extra no se prorratea—; sin el dato de Notion, la base.
+   ⚠️ `_devengado` (`rutinas/servidor.py`, la media del equipo) y `_devengado_` de `Codigo.gs` NO lo llevan: `probar_servidor.py` exige que
+   `getPanel` dé lo mismo que el `.gs` congelado. Con alguien a medio cambio la media del servidor difiere de la de la cara (≲ 0,03 h).
+   ⚠️ Lo contrario (Dora, que deja el cargo: Notion trae MÁS que su base) NO se arregla aquí: esa diferencia es indistinguible de una extra
+   del PD sin el histórico de cargos; se enseña aparte («Asignada…»), diciendo que puede ser de otro cargo. Prorratear el cargo por días
+   es política, no cálculo. */
+function _compPorDevengar_(m, frac){
+  var b=_compBase_(m);
+  var c=m&&m.compensaciones;      /* = `_compEsReal_`, escrito aquí para que sea autónoma (los bancos extraen estas funciones una a una) */
+  if(typeof c==='number' && isFinite(c)) b=Math.min(b, Math.max(0, c));
+  return b * (1 - Math.min(1, frac));
 }
 
 /* ⛔ 11/11 (Daniel: *«¿por qué aparece duplicado?»*): «Compensaciones» de Notion = base + los partes que suman en ese cajón
@@ -7283,6 +7304,16 @@ function _compPartesH_(items){
 function _compExtra_(m, items){
   if(!_compEsReal_(m)) return 0;                 // sin el dato de Notion no se puede saber
   return Math.round((m.compensaciones-_compBase_(m)-(items ? _compPartesH_(items) : 0))*100)/100;
+}
+/* 18/11 (refutar93) · QUÉ ES ESA DIFERENCIA, dicho sin jurar lo que no se sabe. La extra es `Compensaciones` de Notion menos la base de TU
+   CARGO DE HOY, y sale igual de una extra del PD que de un cambio de cargo a mitad de mes (Notion sigue con lo del cargo viejo hasta
+   que se toca o se cierra): la ficha no guarda desde cuándo tienes cada cargo. Antes decía «por trabajo de más» siempre, a quien dejó de
+   coordinar le contaba que alguien le había premiado 1,5 h, y la negativa («ajuste sobre la base») no decía de dónde salía.
+   Las dos frases llevan lo que ya había («por trabajo de más», «solo de este mes») y añaden la otra explicación posible. */
+function _compExtraQue_(cx){
+  if(!(cx>0 || cx<0)) return '';
+  return cx>0 ? 'por trabajo de más (turnos extra y demás), o de otro cargo que tuviste este mes'
+              : 'Notion te tiene '+nf2(-cx)+' h menos que la base de tu cargo (típico de un cambio de cargo a mitad de mes)';
 }
 
 /* Devuelve `{total, ultimos, suma}` de ESTA temporada. `fecha` saca el `DD/MM/AAAA` de cada
@@ -11171,6 +11202,23 @@ function _apuntesMes_(fichajes, horasComp, horasExtra){
   return (fichajes||0) + (((horasComp||0)!==0 || (horasExtra||0)!==0) ? 1 : 0);
 }
 
+/* 18/11 (refutar97): un parte SIN FIRMAR con el día de un mes que YA se cerró cuenta en el mes en curso (Daniel, 15/08: «siempre al actual»), y la
+   coletilla «(mes ya cerrado)» sólo se le pone al firmarlo. Hasta entonces ni quien lo declaró ni quien lo firma sabían que no suma en el mes del
+   día: «28/10 · esperando aprobación» parecía de octubre. Devuelve la frase o `null`. El mes abierto es el del servidor (`_periodoAbierto_`, que
+   lo deriva del último cierre): un mes ANTERIOR a él está cerrado seguro (el de calendario no vale: del 1 al día del cierre el mes pasado sigue abierto).
+   Vale con el parte crudo (`fecha` ISO, `estado` pendiente/detalle) y con el de la vista (`iso` o `f` DD/MM/AAAA, `e` pend/det). Las dos caras. */
+function _notaMesCerradoParte_(p){
+  if(!p || /^\d{4}-\d{2}$/.test(String(p.periodo || ''))) return null;
+  var st = String(p.estado || p.e || '');
+  if(!/^(pend|pendiente|det|detalle)$/.test(st)) return null;
+  var per = (typeof _periodoAbierto_ === 'function') ? _periodoAbierto_() : null;
+  var f = String(p.iso || p.fecha || ''), m = /^(\d{4})-(\d{2})-\d{2}/.exec(f);
+  var d = !m && /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(p.f || p.fecha || ''));
+  var mes = m ? m[1] + '-' + m[2] : (d ? d[3] + '-' + d[2] : null);
+  if(!per || !mes || mes >= per) return null;
+  return _nomPeriodo_(mes).split(' ')[0].toLowerCase()+' ya está cerrado: cuenta en '+_nomPeriodo_(per).split(' ')[0].toLowerCase();
+}
+
 function _etiOrigenParte_(p){
   var o = p && p.origen;
   if(o === 'fichaje') return null;              // el caso normal no necesita rotulo
@@ -13860,7 +13908,7 @@ function _accionDocTxt_(a){
       (`decision.at` y `decidedAt`, `Codigo.gs:997-1001`) y las dos caras reconstruían la
       decisión a mano desde el estado, que no lo lleva. Una firma sin fecha no se contrasta con
       nada, y esta pantalla existe para no firmar a ciegas.
-   ⚠️ `decision.revisor` es el nombre ENTERO y `e.revisor` la pila (`_pilaDe_`): se prefiere el
+   ⚠️ `decision.revisor` es el nombre ENTERO y `e.revisor` es la pila en los expedientes VIEJOS y el nombre entero desde refutar92: se prefiere el
       primero y el segundo es el RESPALDO, porque los expedientes decididos antes de que
       existiera `decision` solo tienen la pila. Sin respaldo, lo más antiguo —justo lo que lleva
       más tiempo esperando— se quedaría mudo.
@@ -15149,14 +15197,26 @@ function _rederivarRev2_(){
   return REV2_NOM;
 }
 
-/* El rango de alguien a quien solo conocemos por el nombre de pila — que es como
-   llegan firmados los turnos del Discord y los expedientes.
-   Estaba escrita DOS VECES, una por cara, palabra por palabra (`documentos.movil.js`
-   y `documentos.escritorio.js`). Si dos personas comparten pila gana la primera del
-   roster: eso ya era así, y aquí queda dicho en vez de escondido en el bucle. */
-function rangoPila(pila){
-  var m = buscaMiembro(function(x){ return x.pila===pila; });
-  return m ? rangoNom(m.nombre) : 0;
+/* Quién es el firmante de un expediente (`e.revisor`) y qué rango tiene.
+   ⛔ refutar92 (18/11): `e.revisor` llegaba firmado por la PILA («Pedro») y se comparaba por pila: con dos «Pedro» ganaba el PRIMERO del roster
+   (un homónimo de rango 0 puesto antes que el PD), y José —rango 2— pisaba lo que el PD había decidido, o la persona equivocada pasaba por
+   «la que decidió». Ahora el expediente guarda el NOMBRE ENTERO (`decision.revisor` ya lo llevaba) y la pila a secas sólo se acepta como
+   DATO VIEJO: si es el nombre de alguien, es esa persona; si es una pila que lleva más de una, se atribuye a la de MÁS rango (quien
+   decidió era revisor, y la duda nunca da más autoridad a un homónimo de rango menor). Las dos caras y la hermana de servidor
+   (`_firmante_de`) usan la misma regla. */
+function firmanteDe(firma){
+  if(!firma) return null;
+  var m = miembro(firma);
+  if(m) return m.nombre;
+  var mejor = null, rm = -1;
+  (DATA.miembros||[]).forEach(function(x){ if(x.pila===firma){ var r=rangoNom(x.nombre); if(r>rm){ rm=r; mejor=x.nombre; } } });
+  return mejor;
+}
+function firmaCorta(firma){ var n=firmanteDe(firma); return (n && pilaClara(n)) || String(firma||'').split(' ')[0]; }      /* el rótulo de quien firmó: «Pedro D.» si hay otro «Pedro» */
+function esFirmaDe(firma, nombre){ return !!nombre && firmanteDe(firma)===nombre; }
+function rangoPila(firma){
+  var n = firmanteDe(firma);
+  return n ? rangoNom(n) : 0;
 }
 
 /* La escalera de autoridad de DOCUMENTOS: PD(3) > revisor fijo(2) >
@@ -18000,6 +18060,30 @@ function _a11yMarcar_(raiz){
     e.setAttribute('aria-hidden','true');
   });
 }
+/* ═══ LISTAS LARGAS POR TRAMOS (18/11, refutar96) ═══════════════════════════════════════════════════════════════════
+   Con la temporada entera (sep→may, 25 personas, ~2.000 partes) «Ya firmaste» e «Histórico» pintaban las 1.949 decisiones de golpe —38.000 nodos, 2.000
+   cajas de motivo, 623.000 px de alto—: la pantalla tardaba 11-19 s en responder y el hilo se quedaba bloqueado. Ahora se ven las primeras `TRAMO_FILAS`
+   y un pie que DICE cuántas hay y deja ver el resto (más, o todas): ni se corta en silencio ni se pinta todo de golpe. El estado vive en `TRAMOS_ABIERTOS`
+   (clave de la lista → cuántas se ven) y sobrevive a repintar; el repintado lo hace cada cara con `_engTramos_(repintar)`. */
+var TRAMO_FILAS = 40, TRAMOS_ABIERTOS = {};
+function _listaPorTramos_(clave, items, fila, paso){
+  paso = paso || TRAMO_FILAS;            // cuántas se enseñan de golpe y cuántas más da cada pulsación (el móvil, con listas por persona, pide menos)
+  var v = TRAMOS_ABIERTOS[clave] || paso, n = items.length, out = '', i;
+  for(i = 0; i < n && i < v; i++) out += fila(items[i], i);
+  if(n > v){
+    out += '<div data-tramo-pie style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;padding:12px 4px 4px;font-size:12.5px;color:var(--ink2)">' +
+      '<span>Se ven ' + v + ' de ' + n + '.</span>' +
+      '<button class="btn" data-tramo="' + esc(clave) + '" data-n="' + Math.min(n, v + paso) + '">Mostrar ' + Math.min(paso, n - v) + ' más</button>' +
+      (n - v > paso ? '<button class="btn" data-tramo="' + esc(clave) + '" data-n="' + n + '">Mostrar las ' + n + '</button>' : '') + '</div>';
+  }
+  return out;
+}
+function _engTramos_(repintar){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-tramo]'), function(b){
+    b.onclick = function(){ TRAMOS_ABIERTOS[b.dataset.tramo] = +b.dataset.n; repintar(); };
+  });
+}
+
 /* ═══ UNA SOLA CAJA DE TEXTO (13/11, `cajastexto`) ═══════════════════════════════════════════════════════════════════════════
    Daniel: «no me chista nada que las cajas de texto sean distintas en la app […] hay algunos recuadros de texto que tienen como un
    fondo raro gris y otros que están bien integrados […] ¿De qué se habla? […] feísimo […] Dile a SolarIA qué quieres […]
@@ -18020,8 +18104,22 @@ function _cajaCrecer_(t){
   t.style.height=Math.min(sh, tope)+'px';
   t.style.overflowY=sh>tope ? 'auto' : 'hidden';
 }
+/* refutar96 (18/11): con la temporada entera la ficha de «Partes» tiene decenas de cajas (el motivo de cada parte pendiente) y esto las medía UNA A UNA:
+   cada `height='auto'` + `scrollHeight` fuerza un layout de TODA la página, y el observador de mutaciones lo repetía en cada cambio de cualquier sitio
+   (53 partes: 12-19 s con el hilo bloqueado, medidos con el perfilador). Ahora, TODAS las escrituras juntas y luego TODAS las lecturas (un solo layout), y
+   sólo las cajas cuyo texto o ancho han cambiado desde la última vez. */
 function _cajaCrecerTodas_(raiz){
-  Array.prototype.forEach.call((raiz||document).querySelectorAll('textarea'), _cajaCrecer_);
+  var ts=(raiz||document).querySelectorAll('textarea'), cand=[], alt=[], i, t, k, tope;
+  for(i=0;i<ts.length;i++){
+    t=ts[i]; if(!t.offsetParent) continue;                           // oculta: no se puede medir
+    k=t.clientWidth+'|'+window.innerHeight+'|'+t.value; if(t._cajaK===k) continue;
+    t._cajaK=k; cand.push(t);
+  }
+  if(!cand.length) return;
+  tope=Math.max(120, Math.round(window.innerHeight*CAJA_TOPE_ALTO));
+  for(i=0;i<cand.length;i++) cand[i].style.height='auto';
+  for(i=0;i<cand.length;i++) alt.push(cand[i].scrollHeight+(cand[i].offsetHeight-cand[i].clientHeight));
+  for(i=0;i<cand.length;i++){ cand[i].style.height=Math.min(alt[i], tope)+'px'; cand[i].style.overflowY=alt[i]>tope ? 'auto' : 'hidden'; }
 }
 function _cajaCablear_(){
   if(_cajaCablear_.hecho || !document.head) return; _cajaCablear_.hecho=true;

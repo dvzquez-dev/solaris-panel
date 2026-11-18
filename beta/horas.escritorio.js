@@ -78,7 +78,7 @@ function parteCard(p){
       /* 01/11 (escm1): Aprobar JUNTO AL NOMBRE, no al final de una fila de 1.500 px; el 90 % se aprueba sin motivo. */
       (puede?'<button class="btn pri sm" data-parte="'+p.id+'" data-acc="si">Aprobar</button>':'')+
       '<span class="u">'+esc(p.unidad)+'</span>'+
-      '<span class="u">'+p.fecha+' · '+p.ini+'–'+p.fin+'</span>'+
+      '<span class="u">'+p.fecha+(/^\d/.test(p.ini||'')&&/^\d/.test(p.fin||'')?' · '+p.ini+'–'+p.fin:'')+'</span>'+   /* 18/11 (refutar97): sin horario no sale «—–—» (el móvil ya lo evitaba) */
       /* ⛔ `nf2`, NO `nf(...,1)`. Daniel, 18/08: «ya te dije bien claro que nada de
          redondeos a la decima». El fichaje redondea a CUARTOS (.25/.50/.75), asi que una
          sola decimal los falsea: 0,75 se enseñaba como «0,8» en la tarjeta donde se FIRMA.
@@ -176,6 +176,7 @@ function normParte(p){
      X» al lado. `_etiOrigenParte_` (comun.js) decide una sola vez, y la misma que el movil. */
   var _eo=_etiOrigenParte_(p);
   if(_eo) fl.push([_eo.tono==='ok'?'ok':'wa', _eo.txt]);
+  var _nm=(typeof _notaMesCerradoParte_==='function' ? _notaMesCerradoParte_(p) : null); if(_nm) fl=fl.concat([['wa', _nm]]);   /* 18/11 (refutar97): sin firmar y de un mes ya cerrado: cuenta en el abierto */
   return { id:p.id, autor:p.autor, unidad:p.subsistema||'—', fecha:_isoADMY_(p.fecha),
     ini:p.ini||'—', fin:p.fin||'—', horas:Number(p.horas)||0, tarea:_tareaVista_(p.tarea),
     turno_h:p.turno_h||0, clave:p.clave||'',   /* 11/11 (turnoextra): `_horasVistaParte_` los lee */
@@ -354,7 +355,7 @@ function _escRevBloqueo_(p){
   var _ce=(typeof CIERRE!=='undefined' && CIERRE) || null;
   var cer=_mesCerradoParte_(p, (_ce && _ce.plan) || null, (_ce && _ce.ultimo_cierre) || null, true);   /* 26/10: para revertir */
   if(cer)
-    return 'Mes cerrado ('+esc(cer)+'): ya no se revierte. Esas horas ya cuentan y de ahí salió '+
+    return 'Mes cerrado ('+esc(typeof _nomPeriodo_==='function' ? _nomPeriodo_(cer) : cer)+'): ya no se revierte. Esas horas ya cuentan y de ahí salió '+
       'la cuota. Si hay que corregirlo, se hace en la ficha.';
   return null;
 }
@@ -457,8 +458,10 @@ function _escRevPanel_(){
   if(!lista.length) return '';
   /* ⛔ 21/10 (auditor 8, 🟡 11): el número dice cuántos AÚN se pueden revertir — la lista trae también los de meses
      cerrados (con su «ya no se revierte») y lo otorgado por el sistema: 53 para el PD con 8 vivos. */
-  for(i=0;i<lista.length;i++){ h+=Number(lista[i].horas)||0; cuerpo+=_escRevCard_(lista[i]);
+  lista=lista.slice().sort(function(a,b){ return String(b.fecha||'')<String(a.fecha||'') ? -1 : String(b.fecha||'')>String(a.fecha||'') ? 1 : 0; });   /* 18/11: lo más reciente primero: es lo que se revierte */
+  for(i=0;i<lista.length;i++){ h+=Number(lista[i].horas)||0;
     if(!_escRevBloqueo_(lista[i])) vivos++; }
+  cuerpo=_listaPorTramos_('rev', lista, _escRevCard_);   /* 18/11 (refutar96): por tramos; el titular de arriba cuenta TODAS */
   /* ⛔ `nf2`, NO `nf(...,1)` (20/08, 130.ª). Era el ULTIMO redondeo a la decima sobre
      horas que quedaba, y estaba en el panel que CONTIENE las tarjetas -- que ya usaban
      `nf2` desde el 18/08. El fichaje redondea a CUARTOS, asi que la mitad de los totales
@@ -473,6 +476,7 @@ function _escRevPanel_(){
 }
 
 function _engPartesRev_(){
+  _engTramos_(pintar);   /* 18/11: «Mostrar N más» de «Ya firmaste» y del «Histórico» */
   $$('[data-rev]').forEach(function(b){
     b.onclick=async function(){
       if(b.disabled) return;

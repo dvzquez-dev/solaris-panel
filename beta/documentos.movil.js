@@ -102,7 +102,7 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq, aj){
   /* 04/11: como el servidor —aprobar con los revisores propuestos—, para que la ficha los enseñe antes del próximo refresco. */
   var _rp=((acc==='aprobado'||acc==='anot') && typeof _revisoresPropuestosValidos_==='function') ? _revisoresPropuestosValidos_(e) : [];
   if(_rp.length){ e.decision=Object.assign({accion:acc, revisor:yoNombre()}, e.decision||{}, {revisadoPor:_rp, validadoPor:yoNombre()}); }
-  e.revisor=pilaDe(yoNombre());           /* constancia de quien decidio */
+  e.revisor=yoNombre();                   /* constancia de quien decidio (refutar92: el nombre ENTERO; la pila no distingue a dos «Pedro») */
   return e;
 }
 
@@ -137,7 +137,7 @@ function puedeDecidirDoc(e){
   if(e.estado==='revision') return true;                  /* sin decidir: cualquiera habilitado */
   /* ya decidido: solo el que decidio, o alguien de MAS rango. El bloqueo mutuo es
      la regla cerrada del pipeline: el primero que decide bloquea a sus iguales. */
-  return e.revisor===pilaDe(yo) || rangoNom(yo)>rangoPila(e.revisor);
+  return esFirmaDe(e.revisor, yo) || rangoNom(yo)>rangoPila(e.revisor);      /* refutar92: por NOMBRE, no por pila */
 }
 
 /* ⛔ EL AMBITO CAE AL TEXTO CRUDO, no a `undefined` (20/08, 125.ª). `AMB_DOC` solo
@@ -622,7 +622,7 @@ async function _refrescarDocAbierto_(sellos){
     /* 18/11 (refutar90): la MISMA ref con otro archivo (`envio`/enlace) no cambia estado ni decisión, y el sello no lo veía: el revisor seguía leyendo el PDF viejo. */
     var nuevoArch=((ahora.envio||'')!==(antes&&antes.envio||'')) || ((ahora.enlaceDrive||ahora.drive||'')!==(antes&&(antes.enlaceDrive||antes.drive)||''));
     var txt=nuevoArch ? 'Acaban de mandar otra versión de este documento: el archivo es nuevo.'
-      : (fir?fir+' acaba de decidirlo':'Acaba de cambiar')+(acc?': '+acc:'')+'.';
+      : (fir?firmaCorta(fir)+' acaba de decidirlo':'Acaba de cambiar')+(acc?': '+acc:'')+'.';
     if(!_MODAL_TOCADO_){ var sc=$('#modal .card').scrollTop; verDoc(id); $('#modal .card').scrollTop=sc; txt+=' Lo que ves ya está al día.'; }
     else txt+=' Lo de abajo aún es de antes (lo que escribiste sigue ahí): revísalo antes de decidir.';
     var b=document.getElementById('docCambio');

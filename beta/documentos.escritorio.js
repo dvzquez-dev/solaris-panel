@@ -185,7 +185,7 @@ function puedeDecidirDoc(d){
      estado (`rangoNom(ACTOR) > rangoPila(null)` = `>0`, cierto para todo revisor),
      que es lo que el caso 38 de `probar_documentos_caras.py` fija. */
   if(d.est==='revision') return true;      /* sin decidir: cualquiera habilitado */
-  return d.revisor===_m(ACTOR).pila || rangoNom(ACTOR)>rangoPila(d.revisor);
+  return esFirmaDe(d.revisor, ACTOR) || rangoNom(ACTOR)>rangoPila(d.revisor);      /* refutar92: por NOMBRE, no por pila */
 }
 
 function filaDoc(d){
@@ -386,8 +386,8 @@ function docCard(d){
     acc=sinRev ? '<div class="ruta">Es tuyo y no hay otro revisor: avisa al Project Director. Nadie decide lo suyo.</div>'
                : '<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>';
   } else if(d.revisor){
-    acc='<div class="ruta">Ya lo decidió <b>'+esc(d.revisor)+'</b>. Puedes consultarlo; para cambiar la '+
-      'decisión hace falta más rango que quién la tomó.</div>';
+    acc='<div class="ruta">Ya lo decidió <b>'+esc(firmaCorta(d.revisor))+'</b>'+(/\.$/.test(firmaCorta(d.revisor))?'':'.')+' Puedes consultarlo; para cambiar la '+
+      'decisión hace falta más rango que quien la tomó.</div>';
   } else if(_peticionRevActiva_(d)){
     acc='';      /* 05/11 (`pedirrev`): lo que toca (confirmar, cancelar) lo dice `_peticionRevHTML_` */
   } else {
