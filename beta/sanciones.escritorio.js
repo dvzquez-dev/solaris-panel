@@ -537,7 +537,7 @@ function _panelHistSanc_(){
     vacioSimple('No se ha podido cargar el historial',
       'Recarga la página.'));
   if(!hs.length) return pan('Historial','vacío',
-    vacioSimple('Todavía no hay sanciones resueltas','Cada una que apruebes, justifiques o rechaces queda aquí con su decisión.'));
+    vacioSimple('Todavía no hay sanciones resueltas','Cada una que apruebes o rechaces queda aquí con su decisión.'));
   return pan('Historial', hs.length+'',
     tabla([['Persona'],['Motivo'],['Estado',0],['Puntos',1],['Cuándo',1]],
       hs.slice(0,40).map(function(s){
