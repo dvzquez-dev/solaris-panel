@@ -558,7 +558,7 @@ function _panelHistSanc_(){
           '<td style="color:var(--ink2)">'+esc(s.motivo||'\u2014')+'</td>'+
           '<td class="mono '+tono+'">'+esc(et)+'</td>'+
           /* ⛔ Igual que su gemela de arriba: el hueco se dice, no se rellena. */
-          '<td class="r mono">'+esc(_etSancFila_(s.puntos, s.origen, s.extra))+'</td>'+   /* 21/10: el rótulo, no el número */
+          '<td class="r mono">'+esc(_etSancFila_(s.puntos, s.origen, s.extra, s.estado))+'</td>'+   /* 21/10: el rótulo, no el número */
           /* ⛔ 21/10 (auditor de sanciones): la fecha de la DECISIÓN (la de propuesta si no consta), en el día de Madrid y
              en DD/MM/AAAA — era `creado_at` recortado: ISO, UTC y otra fecha. */
           '<td class="r mono" style="color:var(--ink3)">'+esc(_diaSancHist_(s))+'</td></tr>';
@@ -860,7 +860,10 @@ function _engMisSanc_(){
         _apelarSancion_(s, mo.value.trim(), (f.querySelector('[data-msenlace]').value || '').trim())
           .then(function(){ return _cargarMisSanciones_(); })
           .then(function(){ pintar(); tost(APEL_SANC_TXT.enviada); })
-          .catch(function(e){ en.disabled = false; er.textContent = (e && e.message) || String(e); });
+          .catch(function(e){
+            var ch = _choque_(e);   /* refutar80: «ya la apelaste» desde tu otro aparato: se dice y la lista se pone al día */
+            en.disabled = false; er.textContent = ch || (e && e.message) || String(e);
+            if (ch) _cargarMisSanciones_().then(function(){ pintar(); }); });
       };
     };
   });

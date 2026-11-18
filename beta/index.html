@@ -114,15 +114,15 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=cf33c5d"></script>
+<script src="comun.js?v=fd37ba2"></script>
 <script src="notis.movil.js?v=bb23894"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=a87b011"></script>
 <script src="turnos.movil.js?v=176f5f7"></script>
 <script src="buzon.movil.js?v=3179853"></script>
 <script src="documentos.movil.js?v=8fc5e01"></script>
-<script src="sanciones.movil.js?v=67e36af"></script>
-<script src="reuniones.movil.js?v=849e40e"></script>
+<script src="sanciones.movil.js?v=9353eb0"></script>
+<script src="reuniones.movil.js?v=02717e1"></script>
 <script src="horas.movil.js?v=c1414ea"></script>
 <script src="equipo.movil.js?v=cee4f98"></script>
 <script>
@@ -454,7 +454,7 @@ var api={
   subirAudio:       function(id,sesion,parte,partes,nombre,datos){ return api._post({action:"subirAudioReunion",id:id,sesion:sesion,parte:parte,partes:partes,nombre:nombre,datos:datos}); },
   /* 31/10: el orden del día (`_ordenDiaReuHTML_`, `comun.js`; backend `rutinas/orden_dia.py`): la tabla y el PDF. */
   getOrdenDia:      function(id){ return api._post({action:"getOrdenDia",id:id}); },
-  guardarOrdenDia:  function(id,filas){ return api._post({action:"guardarOrdenDia",id:id,filas:filas}); },
+  guardarOrdenDia:  function(id,filas,baseAt){ return api._post({action:"guardarOrdenDia",id:id,filas:filas,base_at:typeof baseAt==="string"?baseAt:undefined}); },   // refutar82: `base_at` = la versión que se editaba (si otra persona guardó entre medias, se rechaza)
   getOrdenPdf:      function(id){ return api._post({action:"getOrdenPdf",id:id}); },
   /* 01/11: copiar el orden de otra reunión, pedírselo a SolarIA y dictarlo (`servidor.py`; ninguna guarda nada). */
   listarOrdenesDia: function(id){ return api._post({action:"listarOrdenesDia",id:id}); },
@@ -1883,7 +1883,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='85677df';
+var BUILD='9d8b005';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

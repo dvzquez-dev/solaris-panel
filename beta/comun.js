@@ -2969,7 +2969,7 @@ function tostErr(prefijo, e){
   /* refutar17: Apps Script contesta `String(err)`: sin quitar el «Error: » el aviso era «No se pudo enviar: Error: Ber Gnc ya tiene…». */
   /* refutar44: si el servidor dice que ALGUIEN SE ADELANTÓ, se cuenta eso (y no «No se pudo: este parte no admite decisión (aprobada)»). */
   var ch=_choque_(e);
-  if(ch){ tost(ch, _tostLargo_(ch)); return; }
+  if(ch){ tost(ch, _tostLargo_(ch)); if(typeof _refrescoVivo_==='function') _refrescoVivo_('reloj'); return; }   /* refutar80: «tu lista se ha puesto al día» es verdad en TODAS las pantallas que pasan por aquí, no sólo en las que releen a mano */
   tost(String(prefijo || '') + String((e && e.message) || e).replace(/^Error:\s*/, ''), (e && e.sesion) ? {fijo:true} : null);
 }
 
@@ -2980,8 +2980,22 @@ function tostErr(prefijo, e){
    ⛔ «sin permiso para decidir» NO está aquí: en otras pantallas es «no eres tú» de verdad; sólo la ficha de un documento sabe que es «otro se adelantó». */
 function _choque_(e){
   var m=String((e && e.message) || e || '').replace(/^Error:\s*/, ''), x;
-  if((x=m.match(/este parte no admite decisi[oó]n \((\w+)\)/)))
-    return 'Otra persona ya lo ha decidido: el parte está «'+x[1]+'». Tu lista se ha puesto al día.';
+  if((x=m.match(/este parte no admite decisi[oó]n \((\w+)(?: por ([^)]+))?\)/))){
+    /* refutar80 (18/11): el servidor dice QUIÉN lo decidió. Si fuiste tú (con la pantalla vieja de tu otro aparato), «otra persona» es mentira. */
+    var _yo=(typeof _actorSanc_==='function') ? _actorSanc_() : '';
+    if(x[2] && _yo && x[2]===_yo) return 'Ya lo habías decidido tú (¿desde otro aparato?): el parte está «'+x[1]+'». Tu lista se ha puesto al día.';
+    return (x[2] ? String(x[2]).split(' ')[0] : 'Otra persona')+' ya lo ha decidido: el parte está «'+x[1]+'». Tu lista se ha puesto al día.';
+  }
+  /* refutar80: tu propio parte, retirado o declarado desde el OTRO aparato (el servidor lo dice en su jerga: «ya está firmado o cerrado… lo revierte quien lo firmó», cuando nadie lo ha firmado). */
+  if((x=m.match(/este parte ya est[aá] firmado o cerrado \((\w+)\): ya no se (retira|corrige)/)))
+    return x[1]==='anulada' ? 'Ese parte ya está retirado (¿lo retiraste desde otro aparato?). Tu lista se ha puesto al día.'
+                            : 'Ese parte ya no se puede '+(x[2]==='retira'?'retirar':'corregir')+': está «'+x[1]+'». Tu lista se ha puesto al día.';
+  if((x=m.match(/este parte no admite declaraci[oó]n \((\w+)\)/)))
+    return 'Ese parte ya está declarado (¿lo declaraste desde otro aparato?): ahora está «'+x[1]+'». Tu lista se ha puesto al día.';
+  if(/no tienes ning[uú]n fichaje abierto/.test(m))
+    return 'Ese fichaje ya está cerrado (¿lo cerraste desde otro aparato?). Lo tienes en «Tus partes».';
+  if(/esa sanci[oó]n ya est[aá] apelada: espera a que se responda/.test(m))
+    return 'Ya has apelado esa sanción (¿desde otro aparato?): espera a que se responda.';
   if(/reuni[oó]n \d+ no encontrada/.test(m))
     return 'Esa reunión ya no existe o ya no estás convocado a ella. Tu lista se ha puesto al día.';
   if(/la reuni[oó]n ya tiene fecha fijada/.test(m))
@@ -2989,6 +3003,25 @@ function _choque_(e){
   if(/el plazo ya venci[oó]/.test(m))
     return 'El plazo ya ha terminado: lo último que marcaste no se ha guardado.';
   return '';
+}
+
+/* refutar80 (18/11): LA MISMA PERSONA EN DOS APARATOS CONTESTANDO LA MISMA REUNIÓN. Ana marca 2 franjas en el móvil y guarda; el portátil, que cargó la reunión antes, marca otra y guarda:
+   el servidor guarda una fila por persona, así que la de la última escritura SUSTITUYE a la otra, y las dos pantallas decían «Disponibilidad guardada» sin una palabra de que lo marcado
+   en el otro aparato se había ido. Aquí se pregunta, justo antes de guardar, qué tiene el servidor de `quien`: si no es lo que ESTA pantalla sabía (`base`) ni lo que va a guardar (`nuevo`),
+   devuelve cuántas franjas tenía marcadas (para decirlo en el aviso de después); `0` si no hay nada que decir. Quien guarda gana (como siempre): esto SÓLO lo cuenta.
+   `leer` = la lectura de una reunión de cada cara (`api.getReunion` / `api.get`); sin red o sin la fila, `0`: un aviso de más no justifica bloquear nada. */
+async function _dispCambioFuera_(leer, id, quien, base, nuevo){
+  try{
+    var r=await leer(id), ya=r && (r.respuestas||r.resp||{})[quien];
+    if(!Array.isArray(ya)) return 0;
+    var n=Math.max(ya.length, (base||[]).length, (nuevo||[]).length);
+    var norm=function(v){ var o=[]; for(var i=0;i<n;i++) o.push(+((v||[])[i])||0); return o.join(','); };
+    if(norm(ya)===norm(base) || norm(ya)===norm(nuevo)) return 0;
+    return ya.filter(function(x){ return +x>0; }).length;
+  }catch(_){ return 0; }
+}
+function _dispCambioFueraTxt_(n){
+  return n>0 ? ' Ojo: desde otro aparato tenías marcadas '+n+' franja'+(n===1?'':'s')+' distintas; se han sustituido por estas.' : '';
 }
 
 /* refutar73 (18/11): UNA TAREA QUE CAMBIÓ EN NOTION MIENTRAS SE MIRABA. Ana tiene la lista abierta; alguien en Notion termina una tarea, la quita o se la pasa a otra
@@ -5106,6 +5139,8 @@ function _movDeSancion_(s){
       : (s.origen === 'revocacion') ? 'devuelve<br>una sanción'
       : (s.origen === 'premio') ? 'premio<br>no resta'
       : (s.origen === 'mensual') ? 'punto mensual<br>sin infracción'
+      /* 18/11 (refutar84): un AVISO (0 puntos, aplicado) no «resta hasta el fin de temporada»: no resta nada; queda como registro. */
+      : (s.puntos === 0 || s.puntos === '0') ? 'aviso<br>no resta'
       : 'hasta el fin<br>de temporada'
   };
 }
@@ -5920,8 +5955,11 @@ function _premioEnPalabras_(extra, motivo){
   return (extra && extra.deshace ? 'Premio deshecho' : 'Premio') + (h ? ': ' + h : '') + por;
 }
 
-function _etSancFila_(pts, origen, extra){
+function _etSancFila_(pts, origen, extra, estado){
   var o = String(origen == null ? '' : origen);
+  /* 18/11 (refutar84): una JUSTIFICADA no restó nada, y el móvil de quien la tuvo dice «no restó»: el historial del PD enseñaba el «−1 punto» de la
+     propuesta al lado de «justificada» y se leía que sí costó el punto. */
+  if (estado === 'justificada') return '0 · no restó';
   var comp = _compHoras_(extra && extra.compensacion);
   if (_esPremioSanc_(o, extra))
     /* ⚠️ `nf2`, a 40 líneas de aquí en este mismo fichero: formatea decimales en es-ES
@@ -15113,6 +15151,10 @@ function _puedeBloqueReu_(r, yo, admin){
    sólo no ofrece el botón. Quien puede finalizarla es quien puede empezarla (`_puedeBloqueReu_`: convocante, PD o admin). */
 var REU_ARCHIVO_DIAS = 30;                     // un mes desde que se celebró en la lista; luego, el «Archivo»
 function _reuFinalizada_(r){ return !!(r && r.finalizada_at); }
+/* refutar76 (18/11): EL ESTADO DE UNA REUNIÓN CON FECHA, UNA SOLA VEZ PARA LAS DOS CARAS. El móvil sabía «en curso» pero una FINALIZADA seguía poniendo «fijada» (en su ficha,
+   y ofreciendo «Cambiar fecha/hora»); el escritorio sabía «finalizada» pero una EN CURSO seguía diciendo «📌 21/11 · 15:00–19:30», como si no hubiera empezado. Cada cara,
+   leída sola, parecía bien. Devuelve 'finalizada' | 'en curso' | 'fijada', o '' si no tiene fecha. */
+function _reuEstadoFijada_(r){ return !r ? '' : _reuFinalizada_(r) ? 'finalizada' : r.en_curso ? 'en curso' : r.fijada ? 'fijada' : ''; }
 /* ¿Es PASADA (va al cajón plegable «Pasadas», como «Ver el desglose» de las horas)? 11/11, 🗣️ Daniel: *«las que son así reuniones
    pasadas, que se oculten […] también para las reuniones»*. Pasada = finalizada por su convocante, o con la franja FIJADA ya acabada
    (`_horarioReuMs_`: una que se queda sin finalizar no vuelve a la lista por olvido). Sin fijar y sin finalizar, sigue viva. Sustituye
@@ -17136,6 +17178,14 @@ function _ordHorario_(filas, inicio){
   return (filas||[]).map(function(f){ var d=_ordDur_(f), r={desde:_ordMarca_(t,ini),hasta:_ordMarca_(t+d,ini)}; t+=d; return r; });
 }
 function _ordTotal_(filas){ return (filas||[]).reduce(function(a,f){ return a+_ordDur_(f); },0); }
+/* refutar82: el total de lo que se está EDITANDO no cuenta la fila en blanco (sin tema ni quién: al guardar se descarta): decía «4 h 30» y lo guardado era 4 h 20. */
+function _ordTotalBorrador_(draft){ return _ordTotal_((draft||[]).filter(function(f){ return String(f&&f.tema||'').trim()||String(f&&f.quien||'').trim(); })); }
+/* refutar82: si la reunión está FIJADA y la tabla dura más que lo fijado, se dice cuánto y a qué hora acaba la reunión (el PDF llevaba «19:30–20:15» sin más aviso). '' si cabe o si no hay fijado. */
+function _ordPasaTxt_(st, total){
+  var h=(st&&st.reu&&typeof _horarioReuMs_==='function')?_horarioReuMs_(st.reu):null; if(!h) return '';
+  var dur=Math.round((h.fin-h.ini)/60000); if(!(total>dur)) return '';
+  return 'Se pasa '+_ordTextoDur_(total-dur)+' de lo fijado: la reunión acaba a las '+_hhmmDe_(h.fin)+'.';
+}
 /* refutar15: «Tabla actual: 1 puntos» salía con la fila en blanco de una orden vacía. Se cuentan los puntos con tema, y en singular cuando es uno. */
 function _ordTablaActual_(draft){
   var n=0, i; for(i=0;i<(draft||[]).length;i++) if(String(draft[i]&&draft[i].tema||'').replace(/\s+/g,'')) n++;
@@ -17146,7 +17196,7 @@ function _ordTextoDur_(m){ var h=Math.floor(m/60), r=m%60; return h?(r?h+' h '+p
 function _ordFilaBorrador_(f){ return {dur:(f&&f.dur>0)?f.dur:'',tema:(f&&f.tema)||'',quien:(f&&f.quien)||''}; }
 function _ordFilaEnvio_(f){ var d=_ordDur_(f); return d?{dur:d,tema:f.tema,quien:f.quien}:{tema:f.tema,quien:f.quien}; }
 function _ordAplicarVista_(e, r){
-  ['filas','horas','total','total_txt','pendientes','inicio'].forEach(function(k){ if(r&&r[k]!==undefined) e[k]=r[k]; });
+  ['filas','horas','total','total_txt','pendientes','inicio','at'].forEach(function(k){ if(r&&r[k]!==undefined) e[k]=r[k]; });
 }
 var ORD_VOZ_MAX_S=90;                     // un dictado: 90 s a 24 kbps son ~270 KB, bajo los 600 KB de `servidor.DICTADO_AUDIO_MAX`
 function _ordHoras_(h){ return h ? h.desde+' – '+h.hasta : ''; }
@@ -17155,7 +17205,7 @@ function _ordKB_(n){ return n>=1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max
 function _ordenDiaReuHTML_(r){
   if(!r || !r.id) return '';
   if(!(typeof backendOK!=='undefined' && backendOK && typeof SESION!=='undefined' && SESION)) return '';
-  var st=_ordSt_(r.id);
+  var st=_ordSt_(r.id); st.reu=r;                 // refutar82: la reunión (su fijado) para avisar de que la tabla se pasa
   /* A quién se puede poner de «quién introduce»: los convocados de ESTA reunión (y quien la convoca). */
   st.conv=(Array.isArray(r.invitados)?r.invitados:[]).filter(function(n){ return !!n; }).concat(r.convocante?[r.convocante]:[]);
   /* ordendia-3: lo que se bajó una vez NO vale para siempre (el convocante pudo cambiarlo después del aviso). Se enseña lo que hay al
@@ -17182,6 +17232,7 @@ function _ordTablaHTML_(filas, inicio, horas){
 }
 /* ¿El próximo PDF lleva índice? Lo que se eligió en esta sesión, o si no lo que tiene el PDF generado (así «se recuerda por documento»). */
 function _ordIndice_(st){ return st.indice!==undefined ? !!st.indice : !!(st.e&&st.e.pdf&&st.e.pdf.indice); }
+function _ordPasaHTML_(st, total){ var t=_ordPasaTxt_(st, total); return '<p class="rnota" data-ordpasa style="margin:2px 0 0;color:var(--warn)"'+(t?'':' hidden')+'>'+esc(t)+'</p>'; }
 function _ordenHTML_(id){
   var st=_ordSt_(id), e=st.e; if(!e) return '';
   var cab='<span class="sc" style="display:block;margin-bottom:4px">Orden del día</span>', cuerpo='';
@@ -17191,7 +17242,7 @@ function _ordenHTML_(id){
     /* ordendia-1 (12/11, Daniel: «el convocante construyese el orden del día en la app y con eso le saliese plasmado en un pdf que es lo
        que ve la gente […] No que se vea el orden del dia en la app como tal»): la TABLA es la herramienta de quien edita; el resto ve el PDF. */
     if(!e.puede) cuerpo=e.pdf?'':'<div class="rnota" data-ordsinpdf>'+((e.filas&&e.filas.length)?'El PDF del orden del día aún no está listo.':'Todavía no hay orden del día.')+'</div>';
-    else if(e.filas&&e.filas.length) cuerpo=_ordTablaHTML_(e.filas, e.inicio, e.horas)+(e.pendientes?'<p class="rnota" style="margin:6px 0 0;color:var(--warn)">'+e.pendientes+' punto'+(e.pendientes===1?'':'s')+' sin duración: edita la tabla para ponerla.</p>':'')+(e.por?'<p class="rnota" style="margin:6px 0 0">Editado por '+esc(e.por)+'.</p>':'');
+    else if(e.filas&&e.filas.length) cuerpo=_ordTablaHTML_(e.filas, e.inicio, e.horas)+_ordPasaHTML_(st, _ordTotal_(e.filas))+(e.pendientes?'<p class="rnota" style="margin:6px 0 0;color:var(--warn)">'+e.pendientes+' punto'+(e.pendientes===1?'':'s')+' sin duración: edita la tabla para ponerla.</p>':'')+(e.por?'<p class="rnota" style="margin:6px 0 0">Editado por '+esc(e.por)+'.</p>':'');
     else if(!e.pdf) cuerpo='<div class="rnota">Todavía no hay orden del día.</div>';
     if(e.puede&&e.filas&&e.filas.length&&!e.pdf) cuerpo+='<p class="rnota" data-ordsinpdfaviso style="margin:6px 0 0">Los convocados ven el PDF, no esta tabla: genéralo para que lo vean.</p>';
     if(e.puede) cuerpo+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px"><button class="btn mini" data-ordeditar>'+ico('lapiz')+' '+(e.filas&&e.filas.length?'Editar la tabla':'Escribir el orden del día')+'</button>'+
@@ -17212,7 +17263,8 @@ function _ordenHorasVivas_(el, st){
   Array.prototype.forEach.call(el.querySelectorAll('[data-ordfila]'), function(c,i){
     if(st.draft[i]) c.setAttribute('data-ordpend', _ordDur_(st.draft[i])?'0':'1');
   });
-  var t=el.querySelector('[data-ordtotal]'); if(t) t.textContent='Total: '+_ordTextoDur_(_ordTotal_(st.draft));
+  var t=el.querySelector('[data-ordtotal]'); if(t) t.textContent='Total: '+_ordTextoDur_(_ordTotalBorrador_(st.draft));
+  var pa=el.querySelector('[data-ordpasa]'), tx=_ordPasaTxt_(st, _ordTotalBorrador_(st.draft)); if(pa){ pa.textContent=tx; pa.hidden=!tx; }
 }
 function _ordenEditHTML_(st){
   var inp='width:100%;box-sizing:border-box;min-width:0', hs=_ordHorario_(st.draft, st.e&&st.e.inicio);
@@ -17241,7 +17293,7 @@ function _ordenEditHTML_(st){
   /* Con una propuesta delante la tabla de abajo no se toca (sería de otra tabla): se decide primero. */
   return (prop ? '<div class="rnota">'+_ordTablaActual_(st.draft)+' Abajo, '+(ia.origen==='notion'?'lo traído de Notion':'la propuesta de SolarIA')+'.</div>' :
       (filas||'<div class="rnota">Sin puntos. Añade el primero.</div>'))+
-    '<p class="rnota" style="margin:8px 0 0" data-ordtotal>Total: '+_ordTextoDur_(_ordTotal_(st.draft))+'</p>'+
+    '<p class="rnota" style="margin:8px 0 0" data-ordtotal>Total: '+_ordTextoDur_(_ordTotalBorrador_(st.draft))+'</p>'+_ordPasaHTML_(st, _ordTotalBorrador_(st.draft))+
     (st.e&&st.e.inicio?'':'<p class="rnota" style="margin:2px 0 0">Aún sin fijar: las horas cuentan desde T0 y se ponen solas al fijarla.</p>')+
     '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'+
       '<button type="button" class="btn mini" data-ordanadir'+(prop||st.draft.length>=ORD_TOPE_FILAS?' disabled':'')+'>+ Añadir punto</button>'+
@@ -17432,7 +17484,7 @@ var ORD_REFRESCO_MS=20000;
 /* ¿Toca volver a pedir el orden del día al abrir la ficha? Sí si hace más de ORD_REFRESCO_MS de la última vez y nadie lo está tocando. */
 function _ordenToca_(st){
   if(st.draft||st.mic||st.gen||st.sub||st.cargando||(st.ia&&st.ia.fase)||st.copia||st.plant) return false;
-  return !st.refAt || Date.now()-st.refAt>ORD_REFRESCO_MS;
+  return !st.refAt || !!st.visor || Date.now()-st.refAt>ORD_REFRESCO_MS;      // refutar82: con un PDF abierto en pantalla se pregunta siempre si sigue siendo el mismo
 }
 async function _ordenRefrescar_(id){
   var st=_ordSt_(id), previo=st.e; st.refAt=Date.now();
@@ -17440,7 +17492,12 @@ async function _ordenRefrescar_(id){
   /* ordendia-3: un refresco que falla CONSERVA lo que había (vaciar la tabla ya cargada por un corte de red sería peor que enseñarla vieja). */
   catch(_){ st.e=previo||{filas:[],horas:[],puede:false,pdf:null,por:null,at:null}; }
   if(!st.e.filas) st.e.filas=[];
+  /* refutar82: el PDF que se está VIENDO (un blob bajado antes) es el de entonces: si el PDF cambió (se regeneró, lo subió otra persona, lo quitaron) se suelta y se vuelve a pedir al pulsar «Ver PDF». */
+  if(st.visor && st.visorAt!==((st.e.pdf&&st.e.pdf.at)||null)) _ordenQuitarVisor_(st);
   _ordenPintar_(id);
+  /* refutar82: se guardó la tabla y la app no llegó a rehacer el PDF (cerrada, sin red): los convocados leen el viejo. Quien edita lo SABE (`pdf.desfasado`) y se rehace solo,
+     una vez por PDF (si falla no se reintenta en bucle: queda el aviso de `errGen`). */
+  if(st.e.puede && st.e.pdf && st.e.pdf.desfasado && !st.gen && !st.draft && st.autoAt!==st.e.pdf.at){ st.autoAt=st.e.pdf.at; _ordenGenerar_(id, true); }
 }
 /* Tras FIJAR o CANCELAR el fijado (ordendia-2): las horas de la tabla pasan de «T0+10» a las reales (o al revés), así que se vuelve a
    pedir y, si el PDF vigente es de los GENERADOS, se rehace solo. Uno subido a mano no se toca nunca. */
@@ -17589,7 +17646,7 @@ async function _ordenMicFin_(id, mic, blob){
   st.ia.texto=nuevo ? antes+(antes&&!/\s$/.test(antes)?' ':'')+nuevo : antes;
   _ordenPintar_(id);
 }
-function _ordenQuitarVisor_(st){ if(st.visor){ try{ URL.revokeObjectURL(st.visor); }catch(_){} st.visor=null; } }
+function _ordenQuitarVisor_(st){ if(st.visor){ try{ URL.revokeObjectURL(st.visor); }catch(_){} st.visor=null; st.visorAt=null; } }
 async function _ordenClic_(id, ev){
   var st=_ordSt_(id), t=ev.target&&ev.target.closest?ev.target:null; if(!t||!st.e) return;
   var q=function(a){ return t.closest('['+a+']'); }, n=function(a){ return +q(a).getAttribute(a); };
@@ -17630,11 +17687,19 @@ async function _ordenClic_(id, ev){
     if(filas.some(function(f){ return !_ordDur_(f); })){ tost('Pon la duración de los puntos marcados.'); return _ordenPintar_(id); }
     b.disabled=true;
     try{
-      var r=await api.guardarOrdenDia(id, filas.map(_ordFilaEnvio_));
+      var r=await api.guardarOrdenDia(id, filas.map(_ordFilaEnvio_), st.e.at||'');
       _ordAplicarVista_(st.e, r); if(!r||!r.filas) st.e.filas=filas.map(_ordFilaEnvio_);
       st.e.por=(typeof YO!=='undefined'&&YO&&YO.nombre)||st.e.por; st.draft=null;
       _ordenSoltar_(st); tost('Orden del día guardado.');
-    }catch(e){ b.disabled=false; tostErr('No se pudo guardar: ', e); return; }
+    }catch(e){
+      b.disabled=false;
+      /* refutar82: otra persona guardó mientras tú editabas. NO se pierde lo tuyo (el borrador queda): se toma la versión nueva como base y se avisa; al volver a pulsar «Guardar» se guarda lo tuyo sabiéndolo. */
+      if(/mientras lo editabas/.test((e&&e.message)||'')){
+        try{ var nuevo=await api.getOrdenDia(id); st.e.at=nuevo.at||''; st.e.por=nuevo.por||st.e.por; }catch(_){}
+        var msg=String(e.message).replace(/^Error:\s*/,''); tost(msg, _tostLargo_(msg)); return _ordenPintar_(id);
+      }
+      tostErr('No se pudo guardar: ', e); return;
+    }
     _ordenPintar_(id);
     /* ordendia-2: el PDF generado se rehace con la tabla nueva; un fallo suyo NO deshace el guardado (queda en `errGen`). */
     if(st.e.pdf&&st.e.pdf.generado) _ordenGenerar_(id, true);
@@ -17644,6 +17709,7 @@ async function _ordenClic_(id, ev){
     if(st.visor){ _ordenQuitarVisor_(st); return _ordenPintar_(id); }
     try{ st.visor=await _ordenPdfUrl_(id); }catch(e){ tostErr('No se pudo abrir el PDF: ', e); return; }
     if(!st.visor) return _ordenRefrescar_(id);
+    st.visorAt=(st.e.pdf&&st.e.pdf.at)||null;
     return _ordenPintar_(id);
   }
   if(q('data-orddescargar')){
@@ -17657,6 +17723,7 @@ async function _ordenClic_(id, ev){
   if(q('data-ordimprimir')){
     if(!st.visor){ try{ st.visor=await _ordenPdfUrl_(id); }catch(e){ tostErr('No se pudo abrir el PDF: ', e); return; }
       if(!st.visor) return _ordenRefrescar_(id);
+      st.visorAt=(st.e.pdf&&st.e.pdf.at)||null;
       _ordenPintar_(id); await new Promise(function(r){ setTimeout(r,500); }); }
     var fr=document.querySelector('[data-ordendia="'+String(id).replace(/"/g,'')+'"] iframe');
     try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(_){ window.open(st.visor,'_blank'); }
@@ -17918,7 +17985,14 @@ function votPendientes(){ return (VOT.lista||[]).filter(function(v){ return v.pe
 async function votCargarLista(){
   if(typeof backendOK==='undefined' || !backendOK || !SESION) return false;
   var r=await _pide_('listarVotaciones');
-  if(r && Array.isArray(r.votaciones)){ VOT.lista=r.votaciones; return true; }
+  if(r && Array.isArray(r.votaciones)){
+    VOT.lista=r.votaciones;
+    /* refutar76 (18/11): la FICHA abierta también se pone al día cuando la lista dice que ya no es la misma. El refresco por reloj de las dos caras sólo pedía la lista: el PD que
+       cerraba una votación desde el móvil seguía viendo en el escritorio su ficha «abierta», con «Votar» y «Cerrar la votación» (que el servidor ya no admitía) hasta que la tocaba. */
+    var _l=VOT.det && VOT.vista==='ver' && !VOT.enviando ? VOT.lista.filter(function(x){ return x.id===VOT.det.id; })[0] : null;
+    if(_l && VOT.det.cuorum && _l.cuorum && (_l.estado!==VOT.det.estado || _l.cuorum.n!==VOT.det.cuorum.n)) await votCargarDet(VOT.det.id);
+    return true;
+  }
   return false;
 }
 async function votCargarDet(id){
@@ -18142,7 +18216,22 @@ async function _votClic_(e){
     v.preguntas.forEach(function(q){ if(p[q.id] && p[q.id].length && !(q.anonima && q.yaVote)) resp[q.id]=p[q.id]; });
     VOT.enviando=true; f();
     try{ var r=await api.votVotar(v.id, resp); if(r && r.votacion){ _votAdoptar_(r.votacion); tost('Voto registrado.'); } }
-    catch(er){ tostErr('No se pudo votar: ', er); await votCargarDet(v.id); }
+    catch(er){
+      /* refutar80 (18/11): LA MISMA PERSONA VOTÓ DESDE OTRO APARATO. Esta pantalla aún no sabía que la pregunta anónima estaba votada y la mandó con las demás; el servidor rechaza el
+         voto ENTERO y lo que sí se podía cambiar (la pública) se perdía con él. Se relee la votación y se reenvía sólo lo que admite cambio. */
+      if(/es an[oó]nima y ya la has votado/.test(String((er && er.message) || er))){
+        await votCargarDet(v.id);
+        var v2=VOT.det, resp2={}, p2=(v2 && VOT.pap[v2.id])||{};
+        if(v2) v2.preguntas.forEach(function(q){ if(p2[q.id] && p2[q.id].length && !(q.anonima && q.yaVote)) resp2[q.id]=p2[q.id]; });
+        if(Object.keys(resp2).length){
+          try{ var r4=await api.votVotar(v2.id, resp2);
+            if(r4 && r4.votacion){ _votAdoptar_(r4.votacion); tost('Una pregunta anónima ya la habías votado desde otro aparato: esa no se cambia. Lo demás sí se ha guardado.', {fijo:true}); }
+          }catch(er2){ tostErr('No se pudo votar: ', er2); await votCargarDet(v.id); }
+          VOT.enviando=false; return f();
+        }
+      }
+      tostErr('No se pudo votar: ', er); await votCargarDet(v.id);
+    }
     VOT.enviando=false; return f();
   }
   if(a==='cerrar'){

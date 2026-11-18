@@ -762,6 +762,7 @@ function _cablearMiDispo_(){
         /* ⚠ Lo que VIAJA es la identidad de la SESION, no la que se mira. Defensa en
            profundidad: aunque el bloqueo de arriba fallara, se escribiria en TU fila. */
         var _quien=(typeof _actorSanc_==='function') ? _actorSanc_() : ((typeof ACTOR!=='undefined' && ACTOR) ? String(ACTOR) : '');
+        var _fuera=await _dispCambioFuera_(api.get, r.id, _quien, r.resp && r.resp[_quien], vals);   /* refutar80: ¿lo del otro aparato se va a pisar? */
         await api.responder(r.id, _quien, vals);
         if(!r.resp) r.resp={};
         r.resp[_quien]=vals;
@@ -770,9 +771,9 @@ function _cablearMiDispo_(){
            nadie puede enterarse de la propuesta de puntos al día siguiente. */
         var _gn=0, _gi; for(_gi=0;_gi<vals.length;_gi++) if((+vals[_gi]||0)>0) _gn++;
         var _gav=_avisoMinimo_(_gn, _minimoExigido_(r), r.tipo);
-        tost(_gav.falta
+        tost((_gav.falta
           ? ('Guardado: '+_gn+' franja'+(_gn===1?'':'s')+'. Ojo, '+_gav.txt+' \u2014 por debajo se propone Art. 29i.')
-          : 'Disponibilidad guardada.');
+          : 'Disponibilidad guardada.')+_dispCambioFueraTxt_(_fuera), _fuera>0 ? {fijo:true} : null);
         pintar();
       }catch(e){
         /* ⛔ UNA ESCRITURA QUE SE TRAGA SU ERROR ES TRABAJO PERDIDO EN SILENCIO: se avisa y

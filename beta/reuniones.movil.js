@@ -395,7 +395,7 @@ async function _cargarReunionesM_(yaPedidas){
 /* 17/11 (refutar62): lo que dice la pastilla de una reunión. Una que ya está EN MARCHA se llama «en curso»: con «fijada» (lo de antes) un novato que acaba de entrar en su primera
    reunión no veía en ninguna tarjeta que estaba empezada, y la de «Próxima reunión» de Estado seguía diciendo «fijada» con él dentro, contando su tiempo. */
 function _pilReuM_(R){
-  return R.en_curso ? 'en curso' : (R.fijada?'fijada':(R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta'))));
+  return _reuEstadoFijada_(R) || (R.exento?'organizas':R.tarde?'convocado tarde':(R.bajoMin?'bajo el mínimo':(R.cubierta?'cubierta':'te falta')));
 }
 function _proxReuHTML_(){
   var R=_proximaReuM_();
@@ -731,7 +731,7 @@ function vReu(){
         : '')+
       (R.fijada
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+
-          '<b style="color:var(--ok)">'+(R.en_curso?'Reunión en curso · ':'Reunión fijada · ')+esc(R.fijada)+'</b><br>Disponibilidad cerrada.</div>'
+          '<b style="color:var(--ok)">'+'Reunión '+_reuEstadoFijada_(R)+' · '+esc(R.fijada)+'</b><br>Disponibilidad cerrada.</div>'
         : (R.invitado===false ? ''
           : R.exento
             /* 🗣️ Daniel (14/10): *«que permita, por favor, al que organiza la reunión
@@ -1068,6 +1068,7 @@ function engancharRejilla(){
            sesión), no `YO` -- que «Ver como» reasigna. Defensa en profundidad: aunque
            el bloqueo de arriba fallara, esto escribiría en TU fila y no en la de otro. */
         var _quien=(typeof _actorSanc_==='function') ? _actorSanc_() : ((YO&&YO.nombre)||'');
+        var _fuera=await _dispCambioFuera_(api.getReunion, R2.id, _quien, R2.resp && R2.resp[_quien], vals);   /* refutar80: ¿lo del otro aparato se va a pisar? */
         await api.responder(R2.id, _quien, vals);
         if(!R2.resp) R2.resp={};
         R2.resp[_quien]=vals;
@@ -1084,8 +1085,8 @@ function engancharRejilla(){
         /* ⛔ 21/10 (auditor 19, 🟠 1): O el aviso del Art. 29i O «guardada», nunca los dos: el segundo `tost` pisaba al
            primero en el mismo tick y la persona sólo leía «Disponibilidad guardada.» (el escritorio ya lo hacía así). */
         cerrarModal();
-        tost(_ga.falta ? ('Guardado: '+_gm+' franja'+(_gm===1?'':'s')+'. Ojo, '+_ga.txt+' \u2014 por debajo se propone Art. 29i.')
-                       : 'Disponibilidad guardada.');
+        tost((_ga.falta ? ('Guardado: '+_gm+' franja'+(_gm===1?'':'s')+'. Ojo, '+_ga.txt+' \u2014 por debajo se propone Art. 29i.')
+                       : 'Disponibilidad guardada.')+_dispCambioFueraTxt_(_fuera), _fuera>0 ? {fijo:true} : null);
         pintar();
       }catch(e){
         g.disabled=false; g.textContent=prev;

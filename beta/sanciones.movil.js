@@ -545,7 +545,11 @@ function _formSancion_(s){
     _apelarSancion_(s, mo.value.trim(), ($('#msEnlace').value || '').trim())
       .then(function(){ return _cargarMisSanciones_(); })
       .then(function(){ cerrarModal(); pintar(); tost(APEL_SANC_TXT.enviada); })
-      .catch(function(e){ si.disabled=false; tostErr('No se pudo enviar: ', e); });
+      .catch(function(e){
+        /* refutar80: «ya la apelaste» (desde tu otro aparato): el formulario ya no sirve, se cierra para que `tostErr` pueda poner la lista al día */
+        var _ch=_choque_(e); if(_ch) cerrarModal(); else si.disabled=false;
+        tostErr('No se pudo enviar: ', e);
+        if(_ch) _cargarMisSanciones_().then(function(){ pintar(); }); });
   };
 }
 
