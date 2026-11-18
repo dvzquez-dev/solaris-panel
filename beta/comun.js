@@ -1617,23 +1617,29 @@ function _nxCaja_(tipo, id, val, o, extra, cuerpo){
    las `max` primeras y un chip «Ver todos». Escribir acota sobre TODAS (sin tildes ni mayúsculas, sobre el texto y la clave: `p[0]`
    y, si viene, `p[2]`); lo elegido se ve siempre. UNA función para las dos caras: `_nxFiltra_`. */
 function _nxFiltra_(caja){
-  var bus = caja.querySelector('[data-nxbus]'), q = _sinTildes_(bus ? bus.value : '').trim().replace(/^art(?:iculo|\.)?\s*(?=\d)/, ''), max = +caja.dataset.max, todos = caja.dataset.todos === '1';
+  var bus = caja.querySelector('[data-nxbus]'), bruto = bus ? bus.value.trim() : '', q = bruto.replace(/^art(?:[ií]culo|\.)?\s*(?=\d)/i, ''), max = +caja.dataset.max, todos = caja.dataset.todos === '1', hay = 0;
   [].forEach.call(caja.querySelectorAll('[data-nxv]'), function(x, i){
-    var on = x.classList.contains('on'), dentro = q ? _sinTildes_(x.textContent+' '+(x.getAttribute('data-nxk') || '')).indexOf(q) >= 0 : (todos || i < max);
+    var on = x.classList.contains('on'), casa = q ? _buscaCoincide_(x.textContent+' '+(x.getAttribute('data-nxk') || ''), q) : true;
+    var dentro = q ? casa : (!max || todos || i < max);
+    if(q && casa) hay++;
     x.style.display = (dentro || on) ? '' : 'none'; });
   var v = caja.querySelector('[data-nxall]');
   if(v){ v.style.display = q ? 'none' : ''; v.textContent = todos ? 'Ver menos' : 'Ver todos los motivos'; }
+  /* refutar112: escribir algo que no está daba una lista VACÍA sin una palabra (parecía rota): ahora lo dice */
+  var nada = caja.querySelector('[data-nxnada]');
+  if(nada){ nada.style.display = (q && !hay) ? 'block' : 'none'; nada.textContent = 'Nada con «'+bruto+'».'; }
 }
+var _NX_NADA_ = '<span data-nxnada style="display:none;font-size:13px;color:var(--ink3);margin:2px 0 6px"></span>';   /* el «nada» del buscador (`_nxFiltra_`) */
 function nxElige(id, ops, val, o){
   o = o || {}; val = String(val == null ? '' : val);
   if(o.max && ops.length > o.max){
-    return _nxCaja_('elige', id, val, o, ' data-max="'+o.max+'"', '<input class="nt-bus nx-bus" data-nxbus placeholder="Buscar por palabra o artículo…" aria-label="Buscar">'+
+    return _nxCaja_('elige', id, val, o, ' data-max="'+o.max+'"', '<input class="nt-bus nx-bus" data-nxbus placeholder="Buscar por palabra o artículo…" aria-label="Buscar">'+_NX_NADA_+
       '<span class="nt-fila">'+ops.map(function(p, i){
         return '<button type="button" class="pick'+(String(p[0]) === val ? ' on' : '')+'" data-nxv="'+esc(p[0])+'" data-nxk="'+esc(p[0]+' '+(p[2] || ''))+'"'+
           (o.off ? ' disabled' : '')+(i >= o.max && String(p[0]) !== val ? ' style="display:none"' : '')+'>'+esc(p[1])+'</button>'; }).join('')+
         '<button type="button" class="pick" data-nxall="1"'+(o.off ? ' disabled' : '')+'>Ver todos los motivos</button></span>');
   }
-  return _nxCaja_('elige', id, val, o, '', (o.buscar !== false && ops.length > 8 ? '<input class="nt-bus nx-bus" data-nxbus placeholder="Buscar…" aria-label="Buscar">' : '')+
+  return _nxCaja_('elige', id, val, o, '', (o.buscar !== false && ops.length > 8 ? '<input class="nt-bus nx-bus" data-nxbus placeholder="Buscar…" aria-label="Buscar">'+_NX_NADA_ : '')+
     '<span class="nt-fila">'+ops.map(function(p){
       return '<button type="button" class="pick'+(String(p[0]) === val ? ' on' : '')+'" data-nxv="'+esc(p[0])+'"'+(o.off ? ' disabled' : '')+'>'+esc(p[1])+'</button>'; }).join('')+'</span>');
 }
@@ -1760,10 +1766,7 @@ function _nxPaso_(caja, d){
   });
   document.addEventListener('input', function(e){
     var b = e.target; if(!b.hasAttribute || !b.hasAttribute('data-nxbus')) return;
-    if(b.closest('.nx').dataset.max) return _nxFiltra_(b.closest('.nx'));
-    var q = b.value.toLowerCase();
-    [].forEach.call(b.closest('.nx').querySelectorAll('[data-nxv]'), function(x){
-      x.style.display = (q && x.textContent.toLowerCase().indexOf(q) < 0 && !x.classList.contains('on')) ? 'none' : ''; });
+    _nxFiltra_(b.closest('.nx'));
   });
   document.addEventListener('keydown', function(e){   /* flechas en el valor: ±paso; Re Pág / Av Pág: ±1 h (o ±10 pasos) */
     var v = e.target; if(!v.classList || !v.classList.contains('nx-val')) return;
@@ -5490,24 +5493,24 @@ function _pselMarcadasHTML_(id){
 
 /* Las sugerencias de lo escrito: sin tildes, por nombre, pila o unidad; las ya marcadas no se ofrecen. */
 function _pselSugerencias_(id, q){
-  var S=PSEL[id]; q=_sinTildes_((q||'').trim());
+  var S=PSEL[id]; q=(q||'').trim();
   if(!q) return [];
   var hits=[];
   S.universo.forEach(function(n){
     if(S.marcadas.indexOf(n)>=0 && S.multi) return;
     var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0] || {nombre:n};
-    if(_pselTextoDe_(m,n).indexOf(q)>=0) hits.push(n);
+    if(_buscaCoincide_(_pselTextoDe_(m,n), q)) hits.push(n);
   });
   return hits.slice(0,8);
 }
 
 /* ¿Lo escrito es de alguien del equipo (por nombre, pila o unidad, sin tildes)? Con el roster vacío (maqueta sin datos) no se juzga: sí. */
 function _pselEsDelEquipo_(q){
-  q=_sinTildes_((q||'').trim()); var ms=DATA.miembros||[]; if(!q || !ms.length) return true;
-  return ms.some(function(m){ return _pselTextoDe_(m).indexOf(q)>=0; });
+  q=(q||'').trim(); var ms=DATA.miembros||[]; if(!q || !ms.length) return true;
+  return ms.some(function(m){ return _buscaCoincide_(_pselTextoDe_(m), q); });
 }
 /* El texto en el que se busca a una persona (nombre + pila + unidad, sin tildes): UNA definición para las sugerencias y para «¿es del equipo?». */
-function _pselTextoDe_(m,n){ return _sinTildes_((n||m.nombre||'')+' '+(m.pila||'')+' '+(m.unidad||'')); }
+function _pselTextoDe_(m,n){ return (n||m.nombre||'')+' '+(m.pila||'')+' '+(m.unidad||''); }
 
 /* Repinta los chips y las opciones del datalist SIN tocar el campo: repintarlo entero es lo que le quita el foco al teclear. */
 function _pselPintar_(id){
@@ -5577,13 +5580,18 @@ function _pselDeleg_(){
     var t=ev.target; if(ev.key!=='Enter' || !t || !t.hasAttribute || !t.hasAttribute('data-psel-in')) return;
     var id=idDe(t); if(!id || !PSEL[id]) return;
     ev.preventDefault();
-    var h=_pselSugerencias_(id, t.value), ex=h.indexOf(t.value.trim());
+    var S=PSEL[id], h=_pselSugerencias_(id, t.value), ex=h.indexOf(t.value.trim());
     if(ex>0) h=[h[ex]];
     if(h.length){ t.value=''; _pselAlternar_(id, h[0], true); return; }
     /* 18/11 (refutar95): alguien de FUERA del equipo (el tutor, un patrocinador) se escribía, se daba a Enter y NO PASABA NADA: ni tarjeta ni aviso, con el texto
        aún en el campo, y al convocar se perdía sin decirlo. Si no es de nadie del equipo, se dice; si es del equipo pero ya está marcado o fuera de esta lista, se calla. */
     var q=t.value.trim();
     if(q && !_pselEsDelEquipo_(q)) tost('«'+q+'» no está en el equipo: aquí sólo se puede elegir a quien está en la lista.');
+    /* refutar112: del equipo pero sin sugerencia = ya está elegida, o no es de esta lista: se DICE (antes: Enter y nada, con el texto puesto) */
+    else if(q){
+      var ya=S.universo.filter(function(n){ return S.marcadas.indexOf(n)>=0 && _buscaCoincide_(_pselTextoDe_(miembro(n)||{nombre:n}, n), q); });
+      tost(ya.length ? '«'+(_pilaDeM_(ya[0])||ya[0])+'» ya está elegida.' : '«'+q+'» no está entre las personas que se pueden elegir aquí.');
+    }
   });
 }
 
@@ -9027,6 +9035,22 @@ function _pilEstDoc_(e){
 }
 
 function _sinTildes_(t){ return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+/* ⛔ UNA regla para TODOS los buscadores de texto (refutar112, 18/11): ¿`texto` lleva TODAS las palabras de `consulta`? Sin tildes ni
+   mayúsculas, en cualquier orden («peña ángela» da con «Ángela Núñez Peña»), con los espacios de más (los del medio también: «nunez   pena»)
+   y la «ñ» como letra: si lo escrito lleva «ñ» sólo casa con «ñ» (buscar «ñ» daba a TODA persona con una «n»); sin ella, «nunez» da con
+   «Núñez». Consulta vacía = todo. El texto de cada sitio (nombre+unidad, motivo+artículo…) lo pone quien llama. */
+function _buscaCoincide_(texto, consulta){
+  var q = String(consulta == null ? '' : consulta).normalize('NFC').toLowerCase(), ps = q.split(/\s+/).filter(Boolean);
+  if(!ps.length) return true;
+  var enie = q.indexOf('\u00f1') >= 0;
+  var plano = function(x){
+    if(enie) x = x.replace(/\u00f1/g, '\u0001');
+    x = x.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return enie ? x.replace(/\u0001/g, '\u00f1') : x;
+  };
+  var t = plano(String(texto == null ? '' : texto).normalize('NFC').toLowerCase());
+  return ps.every(function(w){ return t.indexOf(plano(w)) >= 0; });
+}
 
 /* Las etiquetas de dia van en DD/MM, igual que la Reunion General: 'V 24' se lee
    peor y ademas pierde el mes, que importa cuando el rango cruza de mes. */
@@ -16852,7 +16876,7 @@ function _mtNombres_(){ return ((typeof DATA !== 'undefined' && DATA.miembros) |
 function _mtSugHTML_(lista, valor, campo){
   var v = String(valor || '').trim().toLowerCase();
   var vistos = {};
-  var cand = lista.filter(function(x){ var y = x.trim().toLowerCase(); if(!y || vistos[y]) return false; vistos[y] = 1; return y !== v && (!v || y.indexOf(v) >= 0); }).slice(0, 6);   /* sin repetir ninguna */
+  var cand = lista.filter(function(x){ var y = x.trim().toLowerCase(); if(!y || vistos[y]) return false; vistos[y] = 1; return y !== v && _buscaCoincide_(y, v); }).slice(0, 6);   /* sin repetir ninguna */
   return cand.map(function(x){ return '<span class="mtf-c mini" data-mtsug="' + esc(campo) + '" data-v="' + esc(x) + '">' + esc(x) + '</span>'; }).join('');
 }
 function _mtInp_(ruta, valor, ph, extra){
@@ -17690,8 +17714,8 @@ function _ordenArrastrar_(id, el, asa, ev){
 /* «Copiar de otra reunión»: buscador de las reuniones que ya tienen orden del día; su tabla entra como BASE (editable) y no
    se guarda nada hasta «Guardar». `st.copia` = null · {q, lista:null|[…]} ; `st.avisoCopia` = {titulo, antes} para deshacer. */
 function _ordCopiaFiltro_(lista, q){
-  var n=_sinTildes_(String(q||'')).toLowerCase().trim();
-  return (lista||[]).filter(function(x){ return !n || _sinTildes_(String(x.titulo||'')+' '+String(x.fecha||'')).toLowerCase().indexOf(n)>=0; });
+  /* la fecha se busca como se LEE (03/11/2026) y también como viene (2026-11-03) */
+  return (lista||[]).filter(function(x){ return _buscaCoincide_(String(x.titulo||'')+' '+String(x.fecha||'')+' '+_isoADMY_(x.fecha), q); });
 }
 function _ordCopiaListaHTML_(st){
   var c=st.copia; if(!c) return '';
@@ -17701,7 +17725,7 @@ function _ordCopiaListaHTML_(st){
   if(!v.length) return '<div class="rnota">Ninguna reunión coincide.</div>';
   return v.slice(0,30).map(function(x){
     return '<button type="button" class="btn mini" data-ordcopiarde="'+esc(x.id)+'" style="display:block;width:100%;text-align:left;margin-top:5px;white-space:normal">'+
-      esc(x.titulo||('Reunión '+x.id))+' <span style="color:var(--ink3)">· '+esc(x.fecha||'sin fecha')+' · '+x.n+' punto'+(x.n===1?'':'s')+'</span></button>';
+      esc(x.titulo||('Reunión '+x.id))+' <span style="color:var(--ink3)">· '+esc(x.fecha ? _isoADMY_(x.fecha) : 'sin fecha')+' · '+x.n+' punto'+(x.n===1?'':'s')+'</span></button>';
   }).join('');
 }
 function _ordenCopiaHTML_(st){
