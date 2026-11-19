@@ -5063,7 +5063,9 @@ function _derivaFalta_(R, base){
   var cubren=Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); });
   var motivo=null;
   if(!cubren.length && _nRespReu_(R)>0) motivo='sinleer';
-  else if(cubren.some(function(n){ return n!==R.convocante && inv.indexOf(n)<0; })) motivo='anonima';
+  /* refutar153: «no es nadie del universo» = una fila ANONIMIZADA (`#1`…), que no es ningún miembro. Quien contestó y luego salió de la lista de convocados SÍ es alguien (con nombre): no deja
+     sin saber quién falta — su fila ya no cuenta (`universo` sólo tiene a los convocados). */
+  else if(cubren.some(function(n){ return n!==R.convocante && inv.indexOf(n)<0 && !miembro(n); })) motivo='anonima';
   return {motivo:motivo, inv:inv, universo:universo, cubren:cubren,
           sin:motivo ? null : universo.filter(function(n){ return cubren.indexOf(n)<0; })};
 }
@@ -9569,6 +9571,10 @@ function _avisoFijarAntes_(r, ahora){
   if (!lim || !_plazoAbierto_(r.limite, ahora)) return '';
   var conv = (r.invitados || []).filter(function(n){ return n && n !== r.convocante; }).length;
   var han = _nRespReu_(r);
+  /* refutar153: la cuenta es la de la ficha (`_faltanDeReu_`): ni la respuesta de quien convoca, ni la de quien salió de la lista, ni la de una baja cuentan como «han contestado».
+     Si no se sabe quién (visión oculta o anónima) se queda con el recuento a bulto de antes. */
+  var _f = typeof _faltanDeReu_ === 'function' ? _faltanDeReu_(r) : null;     // (el banco de la función suelta no carga el resto de la cara)
+  if (_f && _f.de) { conv = _f.de; han = _f.de - _f.faltan.length; }
   var cuenta = conv
     ? (conv > han ? ('Faltan por contestar ' + (conv - han) + ' de ' + _convocadosTxt_(conv) + '.')
                   : (conv === 1 ? 'Ha contestado el convocado.' : 'Han contestado los ' + conv + ' convocados.'))
