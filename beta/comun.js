@@ -149,6 +149,18 @@ function agruparDesglose(ps){
      (sin cifra de Notion, sin lista de partes o sin periodo): «no lo sé» NUNCA es `ok:true` (§3c-24).
    · Margen: hasta 0,01 h cuadra (los redondeos al céntimo de hora). Sólo la ve el PD (rango ≥ 3), en el Registro del mes. */
 var MARGEN_COMP_H = 0.01;
+/* ⛔ 19/11 (refutar134): el mes en que CUENTA un instante ISO, de cierre a cierre (gemela de `mes_de_cuenta`, reglas/compensacion_base.py): con el
+   último cierre (`CIERRE_UC`) manda sobre el calendario — un premio aplicado el 02/12 con noviembre cerrado el 03/12 ya salió de «Compensaciones»
+   con el cierre de noviembre, y con noviembre aún abierto cuenta en noviembre. Sin cierre legible, el mes escrito en el instante. */
+function _mesDeCuenta_(inst){
+  var cal = String(inst||'').slice(0,7);
+  if(!/^\d{4}-\d{2}$/.test(cal)) return null;
+  var uc = (typeof CIERRE_UC!=='undefined' && CIERRE_UC) ? CIERRE_UC : ((typeof CIERRE!=='undefined' && CIERRE) ? CIERRE.ultimo_cierre : null);
+  var t = Date.parse(String(inst)), tc = uc ? Date.parse(String(uc.at||'')) : NaN;
+  if(!uc || !/^\d{4}-\d{2}$/.test(String(uc.periodo||'')) || isNaN(t) || isNaN(tc)) return cal;
+  if(t < tc) return cal < uc.periodo ? cal : uc.periodo;
+  return _mesSiguiente_(uc.periodo);     /* desde el cierre: el mes ABIERTO (el siguiente al sellado), diga lo que diga el calendario */
+}
 /* ⛔ 01/11 · LOS PREMIOS TAMBIÉN SUMAN. Un premio por disponibilidad (`origen:'premio'`, ya `aplicada`) suma +N h en «Compensaciones»
    de Notion (`aplicar.py`) y no es un parte: sin contarlo, sus 0,5 h salían como «Notion de más» (4 falsos avisos, 28/10). Cuenta el
    del MES de `periodo` (el de `aplicado_at`, o si falta `decidido_at`/`creado_at`). `sanciones` null/ausente-no-array → null. */
@@ -156,7 +168,7 @@ function _premiosCompH_(nombre, sanciones, per){
   var t = 0;
   sanciones.forEach(function(s){
     if(!s || s.nombre!==nombre || s.estado!=='aplicada' || !_esPremioSanc_(s.origen, s.extra)) return;
-    if(String(s.aplicado_at || s.decidido_at || s.creado_at || '').slice(0,7)!==per) return;
+    if(_mesDeCuenta_(s.aplicado_at || s.decidido_at || s.creado_at || '')!==per) return;
     t += Number((s.extra && s.extra.compensacion) || s.compensacion) || 0;
   });
   return t;
@@ -2865,6 +2877,25 @@ function _cuotaDe_(m){
   sb = (m && typeof m.cuota_base === 'number' && isFinite(m.cuota_base)) ? m.cuota_base : null;
   sf = (m && typeof m.cuota === 'number' && isFinite(m.cuota)) ? m.cuota : null;
   return {base: sb, final: sf, viva: false};
+}
+
+/* ⛔⛔ 19/11 (refutar135) · LA CUOTA EXPLICADA A QUIEN LA PAGA — UNA puerta para las dos caras. Las dos decían la cifra, el recibo del coche y «el objetivo va de 8 a 15 h/mes», pero NO
+   cuántas horas al mes llevabas tú, cuál era el objetivo DE AHORA (el del motor: se mueve con el equipo) ni qué te la baja: 64,74 € a quien lleva 3 h/mes salía sin una palabra de por
+   qué, y a quien el coche deja en 0,00 € se le enseñaba «−20,69 €» sin decirle que este año no paga. Devuelve HTML (sólo números nuestros, nada tecleado por nadie) o `''` si falta
+   un ingrediente: un «no lo sé» no se explica con una cifra inventada. `q` es `_cuotaDe_(m)`; `sinMeses` lo pide el escritorio, que ya dice «en N meses» en su nota.
+   ⚠️ NO calcula nada de dinero: usa los MISMOS `_hMesDe_`/`_umbralCuota_`/`_techoCuota_` que la curva, así que lo que dice y lo que cobra no pueden separarse.
+   La curva baja DEPRISA por debajo del umbral y casi nada por encima (sólo toca el mínimo quien es el máximo del equipo): eso es lo que se cuenta, sin nombrar ninguna estadística. */
+function _cuotaPorQue_(m, q, sinMeses){
+  var h=_hMesDe_(m), u=_umbralCuota_(), t=_techoCuota_(), n=m && m.meses, s='';
+  if(!q || h===null || u===null || t===null) return '';
+  if(typeof q.final==='number' && q.final===0 && (Number(m.coche)||0)>0)
+    s+='Con el descuento del coche tu cuota queda en <b>0 €</b>: este año <b>no pagas nada</b>. ';
+  s+='Llevas <b>'+nf2(h)+' h/mes</b>'+((!sinMeses && typeof n==='number' && n>0) ? ' de media en '+n+(n===1?' mes cerrado':' meses cerrados') : '')+
+     ' y el objetivo de ahora es <b>'+nf2(u)+' h/mes</b>. ';
+  if(h<u) s+='Estás por debajo: cuantas más horas al mes, menos cuota. ';
+  else if(h<t) s+='Ya llegas al objetivo: tu cuota está cerca de la mínima y sólo baja un poco más con cada hora extra. ';
+  else s+='Eres de quien más aporta del equipo: pagas la cuota mínima ('+nf2(_paramsCuota_().cuota_min)+' €). ';
+  return s+'Puede cambiar, con tus horas y con las del resto del equipo (el objetivo se mueve con ellas), hasta que se cierre en agosto.';
 }
 
 /* `_ApiTransito` marca los fallos que SI se reintentan: la peticion no llego entera. Se

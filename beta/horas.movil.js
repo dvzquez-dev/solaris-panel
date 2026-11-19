@@ -1760,6 +1760,7 @@ function _cuotaHTML_(){
          ✅ Por la misma puerta que el resto (`_compBase_`), no por una copia: el día que
          cambie la tabla, la frase cambia sola. Es lo mismo que se hizo con la frase del
          expediente en el medidor de conducta. */
+      (_cuotaPorQue_(YO,_q) ? '<p class="rnota">'+_cuotaPorQue_(YO,_q)+'</p>' : '')+
       '<p class="rnota">'+(_q.viva
         ? 'Se recalcula <b>con tus horas de ahora mismo</b>, no en el último cierre. '
         : '<b>Es la última cifra calculada</b>, no la de ahora. ')+
