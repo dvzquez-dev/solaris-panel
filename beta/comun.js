@@ -1834,7 +1834,7 @@ function _unidadesNuevaTarea_(){
 function _genteNuevaTarea_(u){
   return ((DATA && DATA.miembros) || []).filter(function(m){
     return m && !m.baja && _perfilesDe_(m).some(function(p){ return p.unidad === u; });
-  }).map(function(m){ return m.nombre; }).sort(function(a, b){ return a.localeCompare(b); });
+  }).map(function(m){ return m.nombre; }).sort(_cmpEs_);
 }
 /* El contador del título: «37/150». */
 function _ntContador_(t){ return String(t == null ? '' : t).length+'/'+TOPE_TITULO_TAREA; }
@@ -3063,6 +3063,18 @@ function _choque_(e){
   if((x=m.match(/este parte ya est[aá] firmado o cerrado \((\w+)\): ya no se (retira|corrige)/)))
     return x[1]==='anulada' ? 'Ese parte ya está retirado (¿lo retiraste desde otro aparato?). Tu lista se ha puesto al día.'
                             : 'Ese parte ya no se puede '+(x[2]==='retira'?'retirar':'corregir')+': está «'+x[1]+'». Tu lista se ha puesto al día.';
+  /* refutar148 (19/11): DESHACER con la pantalla vieja. Dos personas (o tú en dos aparatos) revierten el MISMO parte: la segunda leía «un parte «anulada» no se revierte» o «ese parte no
+     tiene ninguna decision que revertir» —jerga del servidor—, la ficha seguía ofreciendo «Revertir» y la lista no se enteraba hasta recargar. */
+  if((x=m.match(/un parte [«"](\w+)[»"] no se revierte/)))
+    return x[1]==='anulada' ? 'Ese parte ya está deshecho (¿lo revirtió otra persona, o tú desde otro aparato?). Tu lista se ha puesto al día.'
+                            : 'Ese parte ya no se puede revertir: está «'+x[1]+'». Tu lista se ha puesto al día.';
+  if(/ese parte no tiene ninguna decisi[oó]n que revertir/.test(m))
+    return 'Ese parte ya no tiene decisión que deshacer (¿lo revirtió otra persona, o tú desde otro aparato?). Tu lista se ha puesto al día.';
+  /* refutar148: SANCIÓN decidida con la pantalla vieja. Entre que la abres y pulsas, la rutina de aplicar la cierra («ya aplicada»), otra persona la revoca o la rechazó otra de más rango. */
+  if(/^ya (aplicada|revocada); no se puede cambiar/.test(m))
+    return 'Esa sanción ya está '+(/revocada/.test(m)?'revocada':'aplicada')+': ya no se puede cambiar desde aquí. Tu lista se ha puesto al día.';
+  if((x=m.match(/^lo decidi[oó] (.+?): s[oó]lo lo puede deshacer/)))
+    return 'Lo decidió '+(pilaClara(x[1]) || String(x[1]).split(' ')[0])+': sólo lo deshace el PD o alguien con un cargo igual o superior. Tu lista se ha puesto al día.';
   if((x=m.match(/este parte no admite declaraci[oó]n \((\w+)\)/)))
     return 'Ese parte ya está declarado (¿lo declaraste desde otro aparato?): ahora está «'+x[1]+'». Tu lista se ha puesto al día.';
   if(/no tienes ning[uú]n fichaje abierto/.test(m))
@@ -3086,6 +3098,10 @@ function _choque_(e){
 /* refutar89 (18/11): «sin permiso para decidir» sobre un documento. Hay DOS motivos y la app los confundía: (1) otra persona de más rango se adelantó y decidió (el documento ya
    tiene decisión), o (2) NADIE ha decidido, pero a ti ya no te toca: cambió tu cargo (dejaste de coordinar la unidad) o la unidad del autor. Con (2) decir «otra persona ya decidió»
    es mentira, y en el escritorio salía el texto crudo del servidor. `sinDecidir` = el documento, releído, sigue en revisión sin decisión (o ya ni lo ves); `revisores` = quién lo revisa AHORA. */
+/* refutar148: la otra mitad del choque — «Deshacer» sobre un documento que YA no tiene decisión (lo deshizo otra persona, o tú desde otro aparato): el servidor dice «no hay decisión que
+   deshacer: nadie ha decidido este expediente» y las dos caras lo pegaban tras «No se pudo», con el botón vivo y la ficha vieja. Una sola frase y una sola pregunta para las dos. */
+function _esDeshacerSinDecisionDoc_(err){ return /no hay decisi[oó]n que deshacer/.test(String((err && err.message) || err || '')); }
+function _textoDeshacerDoc_(){ return 'Ese documento ya no tiene decisión que deshacer (¿lo deshizo otra persona, o tú desde otro aparato?). La ficha se ha puesto al día.'; }
 function _textoSinPermisoDoc_(sinDecidir, revisores){
   if(!sinDecidir) return 'Otra persona de más rango ya ha decidido este documento y tu decisión no lo cambia. La ficha se ha puesto al día.';
   var q=(revisores||[]).map(function(n){ return String(n).split(' ')[0]; });
@@ -9181,6 +9197,9 @@ function _pilEstDoc_(e){
   return c === 'ok' ? 'conf' : c === 'wa' ? 'pend' : c === 'no' ? 'no' : 'neu';
 }
 
+/* refutar147 (19/11): UN comparador de NOMBRES en castellano. `.sort()` a secas compara por punto de código (Á = U+00C1 va DESPUÉS de la Z: «Ángela» salía
+   detrás de «Zoe») y `localeCompare(b)` sin locale usa el del TELÉFONO (en gallego, inglés o portugués la «ñ» y las tildes se ordenan de otro modo). */
+function _cmpEs_(a, b){ return String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), 'es'); }
 function _sinTildes_(t){ return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
 /* ⛔ UNA regla para TODOS los buscadores de texto (refutar112, 18/11): ¿`texto` lleva TODAS las palabras de `consulta`? Sin tildes ni
    mayúsculas, en cualquier orden («peña ángela» da con «Ángela Núñez Peña»), con los espacios de más (los del medio también: «nunez   pena»)
@@ -10140,7 +10159,7 @@ function _calorTurnos_(cv, sitio, coche){
          tiene que poder consumirlo sin traducir. Renombrar en la frontera es donde se
          pierde un campo sin que nadie de un error. */
       var c={n:0, hay_coche:false, responsables:[], coches:[], normales:[], no_pueden:[]};
-      Object.keys(cv.resp||{}).sort().forEach(function(nom){
+      Object.keys(cv.resp||{}).sort(_cmpEs_).forEach(function(nom){
         var v=(cv.resp[nom]||{})[k];
         if(v && v.s==='no'){ c.no_pueden.push(nom); return; }
         if(!_dispPuede_(v,sitio)) return;
@@ -10266,7 +10285,7 @@ function _turnoBloqueQuien_(calor, dia, claves){
     n.forEach(function(x){ if(!vistos[x]){ vistos[x]=1; ls.push(x); } });
     comun = comun===null ? ls : comun.filter(function(x){ return ls.indexOf(x)>=0; });
   });
-  return (comun||[]).sort();
+  return (comun||[]).sort(_cmpEs_);
 }
 
 /* ⛔ Un turno SIEMPRE lleva a alguien del consejo (Daniel, 02/11: *«siempre tiene que haber una persona de consejo en un turno. Así que
@@ -10324,7 +10343,7 @@ function _dispMudos_(cv){
     var vacio=true; if(r) for(var k in r){ if(Object.prototype.hasOwnProperty.call(r,k)) vacio=false; }
     if(vacio) out.push(n);
   });
-  return out.sort();
+  return out.sort(_cmpEs_);
 }
 
 /* refutar86 (18/11): UN TURNO ES EN UN SOLO SITIO (CUVI = Vigo, CITI = Ourense) y el mapa de «Los dos sitios» SUMA a quien pidió uno y a quien pidió el otro. «4 pueden» con Dora
@@ -10354,7 +10373,7 @@ function _turnoDetalle_(cv, k, calor, bloque){
   var h=_dispDetalle_(cv, k, calor), c=calor[k];
   if(!c || _rangoMira_()<1) return h;
   var por={};
-  Object.keys(cv.resp||{}).sort().forEach(function(nom){
+  Object.keys(cv.resp||{}).sort(_cmpEs_).forEach(function(nom){
     var v=(cv.resp[nom]||{})[k];
     if(v && v.s && v.s!=='no'){ (por[v.s]=por[v.s]||[]).push(_dispPila_(nom)); }
   });
@@ -16636,6 +16655,14 @@ function _tareaParteGrupos_(lista){
   });
   return {grupos: orden.map(function(k){ return por[k]; }), sueltas: sueltas};
 }
+/* ⛔ refutar149: una tarea que CAMBIÓ DE MANOS deja partes de quien ya no es su responsable (los firma igual: son horas que trabajó). La tarjeta
+   tiene que decir a QUIÉN van, y que esa persona ya no la lleva; si no, «para la persona asignada» parece Ana y es Ber. `[]` si la tarea no está en
+   `TAREAS` (no se sabe de quién es hoy: no se afirma nada). */
+function _tareaParteFuera_(g){
+  var t = (typeof TAREAS !== 'undefined' ? TAREAS : []).filter(function(x){ return _tareaPid_(x) === g.tp; })[0];
+  if (!t) return [];
+  return g.lineas.filter(function(p){ return p.autor && _tareasResp_([t], p.autor).length === 0; });
+}
 /* o = {horas(p), nombre(p), tarea(p)} */
 function _tareaParteColaHTML_(grupos, o){
   return grupos.map(function(g){
@@ -16645,13 +16672,15 @@ function _tareaParteColaHTML_(grupos, o){
        de cada una y el rastro de la corrección: firmar sin tocar nada no puede cambiar las horas de nadie. */
     var dist = g.lineas.some(function(p){ return o.horas(p) !== h0; });
     var ajenas = g.lineas.filter(function(p){ return p.propuesto_por && p.propuesto_por !== p.autor; });
+    var fuera = _tareaParteFuera_(g);
     return '<div data-tp-card="' + esc(g.tp) + '" data-tp-dist="' + (dist ? '1' : '0') + '" data-tp-ini="' + (dist ? '1' : '0') + '" style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 10px">' +
       '<div style="display:flex;justify-content:space-between;gap:8px"><b>' + esc(o.tarea(g.lineas[0])) + '</b>' +
         '<span class="mono">' + g.lineas.length + ' · ' + nf2(tot) + ' h</span></div>' +
       '<p style="margin:6px 0 9px;font-size:12.5px;color:var(--ink2);line-height:1.5">Tarea entregada. ' +
-        (dist ? 'Cada persona trae sus horas (alguien corrigió las suyas). Míralas y firma.'
-              : 'Propuesta: ' + nf2(h0) + ' h para ' + (g.lineas.length === 1 ? 'la persona asignada' : 'cada una de las ' + g.lineas.length + ' asignadas') +
+        (dist ? 'Cada persona trae sus horas (no son las mismas). Míralas y firma.'
+              : 'Propuesta: ' + nf2(h0) + ' h para ' + (g.lineas.length === 1 ? (fuera.length ? o.nombre(g.lineas[0]) : 'la persona asignada') : 'cada una de las ' + g.lineas.length + ' asignadas') +
                 '. Cámbialas si no cuadran y firma.') +
+        (fuera.length ? ' ' + fuera.map(function(p){ return o.nombre(p); }).join(', ') + (fuera.length === 1 ? ' ya no es responsable' : ' ya no son responsables') + ' de la tarea (la reasignaron): sus horas son de cuando la llevaba.' : '') +
         (ajenas.length ? ' Propuestas por otra persona: ' + ajenas.map(function(p){ return o.nombre(p) + ' (por ' + (pilaClara(p.propuesto_por) || String(p.propuesto_por).split(' ')[0]) + ')'; }).join(', ') + '.' : '') +
         '</p>' +
       '<div data-tp-comun style="display:' + (dist ? 'none' : 'flex') + ';gap:8px;align-items:center;margin:0 0 8px"><span style="flex:1;font-size:13px">' +

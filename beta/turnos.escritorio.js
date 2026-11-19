@@ -1752,7 +1752,7 @@ function _convocarPersonaHTML_(cv, nombre){
 }
 /* Los chips para elegir a quién mirar: quien ha contestado algo. Pulsar al elegido lo suelta. */
 function _convocarPersonasHTML_(cv){
-  var quienes = Object.keys((cv && cv.resp) || {}).filter(function(n){ return Object.keys(cv.resp[n]||{}).length; }).sort();
+  var quienes = Object.keys((cv && cv.resp) || {}).filter(function(n){ return Object.keys(cv.resp[n]||{}).length; }).sort(_cmpEs_);
   if(!quienes.length) return '';
   return '<span class="sc" style="display:block;margin:10px 0 5px">Ver a una persona</span><div class="chips" data-conv-personas>'+
     quienes.map(function(n){ return '<button type="button" class="pick'+(n===CONV_PERS?' on':'')+'" data-convpers="'+esc(n)+'">'+esc(_dispPila_(n))+'</button>'; }).join('')+'</div>'+
@@ -1778,7 +1778,7 @@ function _convocarZonaHTML_(){ return _convocarEligeHTML_()+_convocarCalorHTML_(
    «no puede» puede haber dicho que sí después). Sin bloque, una lista. ⛔ La regla del consejo sigue contando sólo con los que pueden
    (`_turnoConsejoAguanta_` lee las respuestas, no a quién se marca aquí). */
 function _convocarPoolHTML_(b){
-  var cv=_convocarCvElegida_(), pool=_activos_().slice().sort(function(a,c){ return String(a.pila).localeCompare(String(c.pila)); });
+  var cv=_convocarCvElegida_(), pool=_activos_().slice().sort(function(a,c){ return _cmpEs_(a.pila, c.pila); });
   var chip=function(m, no){
     return '<button type="button" class="pick'+(TUR_SEL[m.nombre]?' on':'')+'" data-tu="'+esc(m.nombre)+'"'+
       (no?' title="No ha dicho que pueda: se añade igual" style="opacity:.78"':'')+'>'+esc(_pilaDeM_(m.nombre)||m.pila)+'</button>';
