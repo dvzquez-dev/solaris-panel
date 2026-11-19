@@ -38,7 +38,7 @@ function _faltanNotis_(){
      iPhone **sin avisos y en silencio**, en una app que los da por obligatorios.
      ✅ Primero «¿se puede cumplir?» (iPhone sin instalar: si, instalandola) y despues
      «¿puede este aparato?» (no: se pasa). Es el criterio que la cabecera ya describia. */
-  if(_esIOS_() && !_esStandalone_()) return 'ios';
+  if(_esIOS_() && !_esStandalone_()) return _navegadorDeApp_() ? 'app' : 'ios';   // refutar160: dentro de WhatsApp/Instagram no existe «Añadir a pantalla de inicio»: primero hay que salir a Safari
   if(!_pushSoportado_()) return null;                       // no puede: se pasa
   if(Notification.permission==='granted') return null;
   return (Notification.permission==='denied') ? 'denegado' : 'pedir';
@@ -103,7 +103,9 @@ function _gateNotis_(motivo, seguir){
   }
   _gateNotis_._seguir=seguir;
   var cuerpo, boton='';
-  if(motivo==='ios'){
+  if(motivo==='app'){
+    cuerpo='Para usar el panel en iPhone tienes que abrirlo en <b>Safari</b>, no desde aquí.';
+  } else if(motivo==='ios'){
     cuerpo='Para recibir los avisos en iPhone hay que abrir el panel desde la pantalla '+
       'de inicio.<br><br>Pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>, y entra '+
       'desde ese icono.';
@@ -122,6 +124,7 @@ function _gateNotis_(motivo, seguir){
   var g=_gate_(SPLASH+'<div style="max-width:330px;line-height:1.6">'+cuerpo+'</div>'+
     (boton?'<button id="btnGateNotis" style="border:1px solid #463E40;background:none;'+
       'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">'+boton+'</button>':'')+
+    (motivo==='app' ? _avisoNavegadorDeAppHTML_() : '')+
     '<div id="gateNotisMsg" style="opacity:.75;font-size:13px;max-width:330px"></div>');
   var b=g.querySelector('#btnGateNotis');
   if(b) b.onclick=async function(){
@@ -168,6 +171,9 @@ function _notisHTML_(){
   if(_esIOS_() && !_esStandalone_())
     return _avisoFallo+'<div class="tarj"><p class="rnota" style="margin:0;line-height:1.6">Para recibir avisos en <b>iPhone</b>: '+
       'pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> y abre la app desde ese icono.</p></div>';
+  if(!_pushSoportado_() && _navegadorDeApp_())     // refutar160: «ábrelo desde el móvil» a quien YA está en el móvil, dentro de otra app
+    return _avisoFallo+'<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador (el de otra app) '+
+      'no admite notificaciones y aquí te perderías los avisos.</p></div><div class="tarj" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">'+_avisoNavegadorDeAppHTML_(true)+'</div>';
   if(!_pushSoportado_())
     return _avisoFallo+'<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador '+
       'no admite notificaciones y aquí te perderías los avisos. Ábrelo desde el móvil.</p></div>';

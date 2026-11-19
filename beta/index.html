@@ -115,8 +115,8 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=91f2bb7"></script>
-<script src="notis.movil.js?v=4c61d2c"></script>
+<script src="comun.js?v=d23c93b"></script>
+<script src="notis.movil.js?v=e0d00f7"></script>
 <script src="cierre.movil.js?v=8ae9442"></script>
 <script src="tareas.movil.js?v=1d31557"></script>
 <script src="turnos.movil.js?v=a49b9b9"></script>
@@ -1102,7 +1102,7 @@ function _arrancarGis_(){
     if(n<=0){
       if(DEMO){ var g=document.getElementById('loginGate'); if(g) g.remove(); }   // ?demo: cae a la semilla local
       else { _gate_(SPLASH+'<div style="color:#ffb3b0;max-width:320px">No se pudo cargar el inicio de sesión. '+
-        'Revisa tu conexión y recarga.</div><button onclick="location.reload()" style="border:1px solid #463E40;'+
+        'Revisa tu conexión y recarga.</div>'+_avisoNavegadorDeAppHTML_()+'<button onclick="location.reload()" style="border:1px solid #463E40;'+
         'background:none;color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Recargar</button>'); }
       return;
     }
@@ -1891,7 +1891,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='1e0bfdb';
+var BUILD='434a1ab';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía

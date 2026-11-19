@@ -8688,8 +8688,39 @@ function _soltarVisor_(){
    la que diverge el día que Google cambie algo y sólo se arregle en una cara. Cada cara pone SU cabecera (lo que de
    verdad difiere) y esto pone el resto. El error es el del móvil, que dice qué pasa en vez de «Error iniciando Google
    Sign-In». `_gate_` es de cada cara (se resuelve al llamar). */
+/* ⛔ refutar160 (19/11) · EL NAVEGADOR DE OTRA APP. Un enlace pegado en el grupo de WhatsApp se abre, según el móvil, DENTRO de WhatsApp/Instagram/Facebook (un «webview»):
+   sin instalar, sin `Notification` ni `PushManager` y, sobre todo, con Google negándose a iniciar sesión (`disallowed_useragent`). Quien llegaba así veía el botón de Google
+   como si fuera a funcionar, o («No se pudo cargar… revisa tu conexión») un fallo que no era de su conexión, y en el iPhone el aviso de «Compartir → Añadir a pantalla de
+   inicio», que ese navegador no tiene: ningún camino le decía lo único que sirve, que es abrir el enlace en Chrome o Safari.
+   `_navegadorDeApp_(ua, standalone)` devuelve `'app'` o `''`. Android: la marca `; wv)` o el nombre de la app (FB, Instagram, Line, TikTok…). iPhone: el navegador interno de
+   WhatsApp no lleva NINGÚN nombre, sólo le FALTA «Safari/» (Chrome, Firefox y Safari lo llevan) — salvo la app instalada en la pantalla de inicio, que también va sin él y SÍ
+   es nuestra: por eso se mira `standalone` primero. Los dos parámetros son para probarlo; sin ellos lee el navegador. */
+function _navegadorDeApp_(ua, standalone){
+  ua = (ua==null) ? String(navigator.userAgent||'') : String(ua);
+  if(standalone==null) standalone = !!((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true);
+  if(standalone) return '';
+  if(/; wv\)|\b(FBAN|FBAV|FB_IAB|Instagram|MicroMessenger|Snapchat|TikTok|musical_ly|LinkedInApp)\b|\bLine\//.test(ua)) return 'app';
+  if(/iP(hone|ad|od)/.test(ua) && !/Safari\//.test(ua)) return 'app';
+  return '';
+}
+/* El aviso (y «Copiar enlace», que lleva el enlace TAL CUAL se recibió, con su `#reuniones/…`) para las pantallas de entrar. Vacío en un navegador normal: ahí no cambia nada. */
+function _avisoNavegadorDeAppHTML_(yaDentro){
+  if(!_navegadorDeApp_()) return '';
+  return '<div id="avisoOtraApp" style="max-width:340px;line-height:1.55;border:1px solid #463E40;border-radius:12px;padding:12px 14px;text-align:left">'+
+    '<b>Estás dentro de otra app</b> (WhatsApp, Instagram…). '+(yaDentro ? '' : 'Google suele no dejar iniciar sesión en este navegador, y ')+'aquí no te llegarían los avisos.<br>'+
+    'Ábrelo en <b>Chrome</b> o <b>Safari</b>: toca <b>⋮</b> (o el icono de la brújula) y «Abrir en el navegador», o copia el enlace y pégalo allí.</div>'+
+    '<button id="btnCopiarEnlace" onclick="_copiarEnlaceApp_(this)" style="border:1px solid #463E40;background:none;color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Copiar enlace</button>'+
+    '<div id="msgCopiarEnlace" style="opacity:.8;font-size:13px;max-width:330px"></div>';
+}
+/* El enlace con el que se ABRIÓ la página, hash incluido: `_irAlAbrir_` quita `#reuniones/ab12` de la barra al arrancar, y copiar `location.href` después mandaba a Safari a la
+   portada, no a lo que decía el grupo. Se fotografía al cargar este fichero, antes de que nada lo toque. */
+var _URL_ENTRADA_=(function(){ try{ return String(location.href); }catch(_){ return ''; } })();
+async function _copiarEnlaceApp_(b){
+  var ok=await _copiarTexto_(_URL_ENTRADA_ || location.href), m=document.getElementById('msgCopiarEnlace');
+  if(m) m.textContent = ok ? 'Enlace copiado. Pégalo en Chrome o Safari.' : 'No se pudo copiar: usa ⋮ → «Abrir en el navegador».';
+}
 function _iniciarGoogle_(cabeceraHTML){
-  _gate_(cabeceraHTML+'<div id="gbtn"></div>');
+  _gate_(cabeceraHTML+_avisoNavegadorDeAppHTML_()+'<div id="gbtn"></div>');
   try{
     var hint=''; try{ hint=localStorage.getItem('sol_last_email')||''; }catch(_){}
     var cfg={client_id:GOOGLE_CLIENT_ID,callback:_onCredencial_,auto_select:true,
@@ -8787,7 +8818,7 @@ function _hayAMedias_(paraIr){
    otra versión: se TAPA la app con un cartel que no deja tocar (un toque en una pantalla mezclada puede escribir mal), se tira la caché del worker (donde
    está el poso) y se recarga: sin nada guardado, el worker viejo sirve la página nueva ENTERA desde la red. Una vez cada 2 minutos: si la mezcla sigue, no
    se encierra a nadie (`_vigilarVersion_` la cura cuando llegue el HTML). */
-var COMUN_BUILD='91f2bb7';
+var COMUN_BUILD='d23c93b';
 function _mezclaDeVersiones_(build, src){
   var m=/[?&]v=([0-9a-f]{7})$/.exec(String(src||''));
   return !!m && /^[0-9a-f]{7}$/.test(String(build||'')) && m[1]!==String(build);
