@@ -8777,6 +8777,42 @@ function _hayAMedias_(paraIr){
    ✅ Al volver a la app (y cada 10 min con ella a la vista) se pide la página a la RED y se compara con la que está en pantalla: cada
    fichero lleva su huella (`comun.js?v=a1b2c3d`), así que «distinta lista de `?v=`» es exactamente «hay otra versión».
    La recarga la decide `_recargarVersionNueva_` como siempre: nunca encima de algo a medias. */
+
+/* ══ HTML DE UNA VERSIÓN Y `comun.js` DE OTRA (refutar145b, 19/11) ════════════════════════════════════════════════════════
+   📏 Medido en el salto de la v0.32 a la v0.33: el worker de la v0.32 sirve lo guardado cuando la red tarda y lo refresca por detrás BAJO LA URL VIEJA;
+   Pages ignora el `?v=`, así que la caché de la v0.32 acaba con ESTE `comun.js` bajo `comun.js?v=<huella vieja>`, y cada reapertura con el HTML viejo
+   arranca la mezcla (HTML v0.32 + JS v0.33) hasta que llega el HTML nuevo: 6-7 s con la red a 8 s. Eso vive en un worker YA publicado y no se arregla;
+   lo que sí controla esta versión es lo que hace su JS al verse con un HTML que no es el suyo.
+   ✅ `publicar_web.leer()` sella aquí la huella de ESTE fichero (la misma que lleva su `?v=`). Si el `<script>` que lo cargó pide otra huella, el HTML es de
+   otra versión: se TAPA la app con un cartel que no deja tocar (un toque en una pantalla mezclada puede escribir mal), se tira la caché del worker (donde
+   está el poso) y se recarga: sin nada guardado, el worker viejo sirve la página nueva ENTERA desde la red. Una vez cada 2 minutos: si la mezcla sigue, no
+   se encierra a nadie (`_vigilarVersion_` la cura cuando llegue el HTML). */
+var COMUN_BUILD='8e36527';
+function _mezclaDeVersiones_(build, src){
+  var m=/[?&]v=([0-9a-f]{7})$/.exec(String(src||''));
+  return !!m && /^[0-9a-f]{7}$/.test(String(build||'')) && m[1]!==String(build);
+}
+function _curarMezcla_(){
+  var K='sol_mezcla', antes=0, ahora=Date.now();
+  try{ antes=+sessionStorage.getItem(K)||0; sessionStorage.setItem(K,String(ahora)); }catch(_){}
+  if (ahora-antes<120000) return false;
+  try{
+    var d=document.createElement('div'); d.id='solMezcla'; d.setAttribute('role','status');
+    d.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483647;background:#0d0b0a;color:#f3ece6;display:flex;align-items:center;justify-content:center;font:600 16px system-ui,sans-serif;text-align:center;padding:24px';
+    d.textContent='Actualizando Solaris…';
+    (document.body||document.documentElement).appendChild(d);
+  }catch(_){}
+  var ya=false, recargar=function(){ if(ya) return; ya=true; try{ location.reload(); }catch(_){} };
+  try{
+    caches.keys().then(function(ks){
+      return Promise.all(ks.filter(function(k){ return k.indexOf('solaris-estaticos-')===0; }).map(function(k){ return caches.delete(k); }));
+    }).then(recargar, recargar);
+    setTimeout(recargar, 2500);        // la caché del navegador tambien se cuelga: el cartel no puede quedarse para siempre esperando a que conteste
+  }catch(_){ recargar(); }
+  return true;
+}
+try{ if (typeof document!=='undefined' && document.currentScript && _mezclaDeVersiones_(COMUN_BUILD, document.currentScript.getAttribute('src'))) _curarMezcla_(); }catch(_){}
+
 var _vigVersion = { ultimo: 0, vuelo: false, timer: null };
 function _huellasDeDoc_(doc){
   var out = [], ns = doc && doc.querySelectorAll ? doc.querySelectorAll('script[src],link[href]') : [];
