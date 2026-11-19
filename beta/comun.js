@@ -11742,6 +11742,17 @@ function _ahoraInstante_(){ return _demoLocal_() ? new Date(_ahoraApp_()).getTim
 function _zonaNoMadrid_(d){
   try{ d=d||new Date(); return _ahoraLocalISO_(d).slice(11,16)!==(('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)); }catch(_){ return false; }
 }
+/* 19/11 (refutar138): el aviso, UNA vez y visible en TODAS las pantallas. Antes sólo salía «(hora de Madrid)» en el fichaje y en «Tu turno de hoy»: un miembro en
+   Lisboa miraba Turnos, Reuniones o un plazo («cierra HOY» a las 10:00 de Madrid = las 09:00 suyas del día siguiente) y leía las horas como suyas. Se pinta en `#zonaAviso`
+   (cabecera de cada cara) y se vacía cuando el móvil vuelve a Madrid. Se comprueba en cada `pintar`: quien viaja o corrige la zona lo ve al instante. */
+var ZONA_AVISO_TXT = 'Tu móvil está en otra hora: las horas de la app son las de Madrid';
+function _pintarZonaAviso_(){
+  var el=document.getElementById('zonaAviso'); if(!el) return;
+  var no=_zonaNoMadrid_();
+  if(no){ el.textContent=ZONA_AVISO_TXT; el.setAttribute('role','status'); }
+  else el.textContent='';
+  el.hidden=!no;
+}
 
 /* Que es «la imputacion» de un parte: UN solo sitio, para que lo que se VALIDA y lo que se
    ENVIA no puedan desincronizarse en silencio (que es como estuvieron un tiempo en el movil).

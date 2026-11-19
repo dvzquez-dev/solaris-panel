@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=7e79494">
+<link rel="stylesheet" href="escritorio.css?v=1e5b2cc">
 </head>
 <body>
 
@@ -55,7 +55,8 @@
       <span id="migaA">Operación</span><span style="color:var(--ink3)">/</span><b id="migaB">Panel de mando</b>
       <!-- El distintivo es tambien LA VUELTA a produccion: ver el movil. -->
       <a class="beta" id="hBeta" href="../produccion/escritorio.html" style="display:none;margin-left:8px;text-decoration:none"
-         title="Estás en la versión de pruebas · pulsa para volver al panel de verdad">beta</a></div>
+         title="Estás en la versión de pruebas · pulsa para volver al panel de verdad">beta</a>
+      <span id="zonaAviso" class="zonaaviso" hidden></span></div>
     <!-- El buscador se retira hasta que busque de verdad: prometía una función que no existía. -->
     <div class="topd">
       <div class="actua" id="actua">
@@ -114,9 +115,9 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=7a3efea"></script>
+<script src="comun.js?v=b9cc53e"></script>
 <script src="notis.escritorio.js?v=e2a8717"></script>
-<script src="cierre.escritorio.js?v=21604cb"></script>
+<script src="cierre.escritorio.js?v=7a8aac3"></script>
 <script src="turnos.escritorio.js?v=be135e7"></script>
 <script src="buzon.escritorio.js?v=ba45925"></script>
 <script src="documentos.escritorio.js?v=05e04d9"></script>
@@ -3904,7 +3905,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='b6e39ad';
+var BUILD='27ccada';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
@@ -4440,6 +4441,7 @@ function pintar(){
   _pinConvocarCalor_();
   _pinConvDisp_(m);
   _engNov_(pintar);
+  _pintarZonaAviso_();                    /* 19/11 (refutar138): «tu móvil está en otra hora», en la cabecera */
   _scrollRestaurar_(m, _y);
 }
 function _enfocarVista_(){

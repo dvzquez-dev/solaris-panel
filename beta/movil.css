@@ -654,6 +654,8 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .rl .ra{font-family:var(--mono);color:var(--ink);font-weight:600;white-space:nowrap}
 .rl.desc .ra{color:var(--ok)}
 .rnota{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5}
+.zonaaviso{margin:0 0 6px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel2,transparent);font-size:11px;line-height:1.4;color:var(--ink2)}
+.zonaaviso[hidden]{display:none}
 
 /* ═══ BARRA DE 7 · LA ESTRELLA QUE VIAJA ══════════════════════════════════
    Decisión cerrada: el indicador viaja en ARCO con la comba PROPORCIONAL a la

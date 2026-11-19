@@ -241,6 +241,8 @@ main.entrando>*:nth-child(4){animation-delay:.15s}
 /* La nota al pie de una ficha: sin regla salia a tamano y brillo de cuerpo, y con el
    margen de 1em que le pone el navegador. */
 .rnota{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5}
+.zonaaviso{margin-left:12px;padding:2px 9px;border:1px solid var(--line);border-radius:9px;font-size:11px;color:var(--ink2)}
+.zonaaviso[hidden]{display:none}
 /* 19/10: suelta en el panel (tras una tabla, en «Lo tuyo») iba pegada al borde; dentro de `.pb` ya tiene margen. */
 .pan>.rnota{padding:0 13px 10px}
 

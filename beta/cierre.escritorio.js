@@ -40,7 +40,7 @@ async function _cargarCierre_(){
 function _diaUTC_(d){ return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); }
 
 function _finDeMes_(hoy){
-  var h=hoy||new Date(), fin=new Date(h.getFullYear(), h.getMonth()+1, 0);
+  var h=hoy||_ahoraMadridDate_(), fin=new Date(h.getFullYear(), h.getMonth()+1, 0);
   /* ⛔ POR UTC, NO POR HORA LOCAL. Restar dos `Date` locales cuenta las HORAS reales, y
      en Europe/Madrid el intervalo hasta el 31/10 cruza el cambio de hora del **25/10**: son
      N dias **+1 h**, y `Math.ceil` lo sube a **N+1**.
@@ -77,8 +77,9 @@ function _finDeMes_(hoy){
    ⚠️ Y se cuenta por `Date.UTC`, no restando dos `Date` locales, por lo mismo que aprendio
    `_finDeMes_`: en Europe/Madrid un intervalo que cruza el cambio de hora son N dias **+1 h**.
    Aqui el intervalo tipico cruza el 25/10 cada año. */
+/* 19/11 (refutar138): el «hoy» por defecto es el de MADRID (`_ahoraMadridDate_`), no la pared del aparato: un PD en Lisboa veía «quedan 31 días» a las 00:30 del 1/12 de Madrid. */
 function _plazoCierre_(hoy){
-  var h=hoy||new Date();
+  var h=hoy||_ahoraMadridDate_();
   var fin=new Date(h.getFullYear(), h.getMonth(), 0);   /* el ultimo dia del mes anterior */
   /* ⛔ 20/10 (auditoría): con un mes abierto MÁS VIEJO, el plazo es el de ése (como `_mesACerrar_`). */
   var _ab=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null, _am=/^(\d{4})-(\d{2})$/.exec(String(_ab||''));
