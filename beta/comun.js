@@ -7638,6 +7638,12 @@ function _puedeVerVista_(k){
     var a=_actorSanc_();
     if(k==='docdec') return rangoNom(a)>=1;
     if(k==='sanciones') return rangoSanc(a)>=1;
+    /* refutar154 (19/11): tres vistas más que sólo tienen sentido con gente a cargo y que a un miembro sin cargo le salían vacías o ajenas (medido con Fer, del consejo, sin cargo):
+       «Partes de horas» = la cola de quien firma (su propio parte lo veía bajo «En la cola de otros»; sus partes están en «Lo tuyo»), «Fichajes en curso» = «del Project Director»
+       (la pantalla misma lo dice) y «Apelaciones» = la cola de quien resuelve (la suya sale en «Lo tuyo»). */
+    if(k==='partes') return rangoNom(a)>=1;
+    if(k==='curso') return rangoNom(a)>=1;   /* con el PD y sin cargo; a quien coordina se la deja (el recorrido 22 mide lo que se le dice) */
+    if(k==='apela') return rangoSanc(a)>=1;
     if(k==='reclutar') return rangoNom(a)>=3;
     if(k==='convoc' || k==='dispo') return rangoNom(a)>=1 || (_consejoDe_(null)||[]).indexOf(a)>=0;
   }catch(_){}

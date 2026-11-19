@@ -840,7 +840,7 @@ function _misSancPanelE_(mi){
 function _engMisSanc_(){
   $$('[data-msapelar]').forEach(function(b){
     b.onclick = function(){
-      var fila = b.closest('[data-msfila]'), s = _misSancLista_().filter(function(x){ return x.id === b.dataset.msapelar; })[0];
+      var fila = b.closest('[data-msfila]'), s = _misSancLista_().filter(function(x){ return String(x.id) === b.dataset.msapelar; })[0];   /* refutar154: el id de una sanción es un NÚMERO y `dataset` es texto: con `===` «Apelar» no abría nada (el móvil ya comparaba como texto) */
       if (!s || !fila || fila.querySelector('[data-msform]')) return;
       var f = document.createElement('div'); f.setAttribute('data-msform', '1'); f.style.marginTop = '10px';
       f.innerHTML = '<p class="ruta">' + esc(APEL_SANC_TXT.tienes(s.apelable_hasta)) + '</p>' +
@@ -883,7 +883,7 @@ function _avisoApelE_(ap, datos){
 function _engApela_(){
   $$('[data-apid]').forEach(function(caja){
     var ap = null, i, L = _apelLista_();
-    for (i = 0; i < L.length; i++) if (L[i].id === caja.dataset.apid) ap = L[i];
+    for (i = 0; i < L.length; i++) if (String(L[i].id) === caja.dataset.apid) ap = L[i];
     async function resolver(b, datos){
       if (!ap || ap.estado !== 'abierta'){ tost('Esa apelación ya no está abierta: recarga la pantalla.'); pintar(); return; }
       if (b.disabled) return;

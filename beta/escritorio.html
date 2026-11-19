@@ -115,13 +115,13 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=78611ee"></script>
+<script src="comun.js?v=7a82103"></script>
 <script src="notis.escritorio.js?v=e2a8717"></script>
 <script src="cierre.escritorio.js?v=7a8aac3"></script>
 <script src="turnos.escritorio.js?v=136ec47"></script>
 <script src="buzon.escritorio.js?v=ba45925"></script>
 <script src="documentos.escritorio.js?v=586f6bd"></script>
-<script src="sanciones.escritorio.js?v=9dd396d"></script>
+<script src="sanciones.escritorio.js?v=2b1d93f"></script>
 <script src="reuniones.escritorio.js?v=a56ffcb"></script>
 <script src="horas.escritorio.js?v=966bdde"></script>
 <script src="equipo.escritorio.js?v=fb670f2"></script>
@@ -1098,18 +1098,24 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
       }).join('')
     : vacioSimple('Nada pendiente de decidir','');
 
+  /* ⛔ refutar154 (19/11): EL PANEL DE UN MIEMBRO SIN NADA QUE GOBERNAR ERA CINCO CAJAS VACÍAS. Medido con Fer (consejo, sin cargo) a 1280 y a 960 px: «Requiere tu decisión · 0
+     asuntos», «Expedientes esperándote 0», «Bajo el umbral —», «En infracción —» («tu cuenta no ve…») y «Conducta del equipo · sin datos»: la primera pantalla era casi toda para otros
+     y lo suyo (Lo que te toca, Este mes) quedaba debajo. Cuando TODAS esas cajas serían su versión vacía (nada que decidir, ningún expediente, nadie a quien dar horas, sin horas ni
+     puntos del equipo) no se pintan; en cuanto haya algo (un parte que firmar, un coordinador con su gente) vuelven solas. */
+  var _soloLoSuyo=!cola.length && !docsMios().length && !_otorgablesDe_(ACTOR).length && !enAire && !_veHorasDelEquipo_() && conPts.length<2 &&
+    !EQUIPO.some(function(m,i){ return typeof m.infraccion==='boolean' && EQUIPO.some(function(o,j){ return j!==i && typeof o.infraccion==='boolean'; }); });   /* «menos de dos fichas con el dato», como el KPI de abajo */
   /* La capa de NOVEDADES, lo primero del Panel de mando. Si no hay nada, no existe. */
   return ((typeof _novHTML_==='function')?_novHTML_('escritorio'):'')+
     /* 31/10: LO TUYO va arriba de lo de gobierno — ver `_tuyoHTMLE_` (`equipo.escritorio.js`). */
     _tuyoHTMLE_()+
-    pan('Requiere tu decisión',cola.length+(cola.length===1?' asunto':' asuntos'),lista,'destaca')+
+    (_soloLoSuyo?'':pan('Requiere tu decisión',cola.length+(cola.length===1?' asunto':' asuntos'),lista,'destaca'))+
     /* 11/11 (horascoord): darle horas a tu gente era un panel al fondo de «Partes», sin acceso desde ningún sitio (el 01-02/11 un coordinador las
        metió a mano en Notion). Un toque lleva al bloque, con tu unidad ya marcada. Sale sólo a quien tiene a quién dárselas. */
     (_otorgablesDe_(ACTOR).length ? '<div class="dec" data-ir="partes" data-foco="psel-bloInv">'+
       '<span class="ic"><svg><use href="#i-reloj"/></svg></span>'+
       '<span class="tx"><b>Dar horas a tu gente</b><small>una feria, un traslado, un turno sin fichar: cuentan al momento</small></span>'+
       '<span class="der"><span class="chev">›</span></span></div>' : '')+
-    '<div class="kpis">'+
+    (_soloLoSuyo?'':'<div class="kpis">'+
       kpi('Horas en el aire',nf2(enAire)+'<small> h</small>','no cuentan hasta que se firmen','wa',null,'partes')+
       kpi('Expedientes esperándote',docsMios().length,'los firmas tú',docsMios().length?'wa':'up',null,'docdec')+
       /* Se compara la MEDIA de la temporada, no lo que lleve este mes: el umbral tambien
@@ -1127,9 +1133,9 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
       (EQUIPO.filter(function(m){ return typeof m.infraccion==='boolean'; }).length<2
         ? kpi('En infracción este mes','—','tu cuenta no ve las infracciones del resto','','')
         : kpi('En infracción este mes',infra,'marcados en Notion',infra?'dn':'up',(EQUIPO.length?(infra/EQUIPO.length*100).toFixed(0):0)+'%','miembros'))+
-    '</div>'+
-    '<div style="display:grid;grid-template-columns:300px 1fr;gap:13px;align-items:stretch">'+
-      pan('Conducta del equipo', media==null?'sin datos':('media de '+conPts.length),
+    '</div>')+
+    '<div style="display:grid;grid-template-columns:'+(_soloLoSuyo?'1fr':'300px 1fr')+';gap:13px;align-items:stretch">'+
+      (_soloLoSuyo?'':pan('Conducta del equipo', media==null?'sin datos':('media de '+conPts.length),
         '<div class="pb" style="display:flex;flex-direction:column;align-items:center;gap:12px">'+
           (media==null
             ? vacioSimple('Sin puntos del equipo','Solo ves nombre, unidad y cargo del resto del equipo, no sus puntos. '+
@@ -1137,7 +1143,7 @@ V.panel={g:'Operación',t:'Panel de mando',f:function(){
             : anilloHTML(media,'media del equipo'))+
           '<p style="margin:0;font-size:11.5px;color:var(--ink3);line-height:1.6;text-align:center">'+
           'Media de puntos de todo el equipo, sobre 10. Los tres primeros tramos, en '+
-          '<b style="color:var(--ink2)">ámbar</b>, son la zona de riesgo disciplinario.</p></div>')+
+          '<b style="color:var(--ink2)">ámbar</b>, son la zona de riesgo disciplinario.</p></div>'))+
       /* ⛔ DECÍA 'julio 2026' A MANO, y seguía diciéndolo en agosto. El mes se DERIVA de la
          fecha con `_mesLargo_`, que es la misma puerta que usa el resto de la app. */
       /* ⛔ POR LA PUERTA (06/10): el reloj no sabe de que mes son estos numeros —
@@ -1292,7 +1298,7 @@ V.partes={g:'Horas',t:'Partes de horas',f:function(){
         '<button class="btn pri" data-otorgar>Otorgar</button>'+
       '</div></div>'))+
     bloquePanel()+
-    (otras.length?pan('En la cola de otros',otras.length+' partes · los ves, no los decides',
+    (otras.length?pan('En la cola de otros',otras.length+(otras.length===1?' parte':' partes')+' · los ves, no los decides',
       otras.map(parteCard).join('')):'')+
     /* ⛔ DEBAJO de la cola y ENCIMA del histórico: lo que hay que hacer va antes que lo ya
        hecho, y lo que todavía se puede deshacer, antes que lo que ya no. */
@@ -1975,7 +1981,7 @@ V.docurso={g:'Documentos',t:'En curso',f:function(){
   var c=DOCS.filter(function(d){return _docEnCurso_(d.est);});
   return pan('Expedientes en curso',c.length+(c.length===1?' expediente':' expedientes'),
     c.length?c.map(filaDoc).join(''):vacioSimple('Nada en curso','Ningún documento espera revisión ni corrección. '+
-      'Los publicados y los rechazados están en Resueltos.'));   /* 21/10 (🟡 11): la vista se llama así desde el 19/08 */
+      'Los publicados y los rechazados están en Resueltos.'+_docsComoEnviar_()));   /* refutar154: el móvil dice por dónde se envía; aquí no decía nada */   /* 21/10 (🟡 11): la vista se llama así desde el 19/08 */
 }};
 /* ⛔ ERA «Publicados» Y SOLO LISTABA `publicado`, asi que un RECHAZADO no salia en ninguna
    de las tres vistas: al rechazarlo desde aqui (`DOC_SEL=null; pintar()`) desaparecia de la
@@ -1991,7 +1997,7 @@ V.docpub={g:'Documentos',t:'Resueltos',f:function(){
     (p.length-_pub?'<span class="chip">RECHAZADOS <b style="color:var(--ink)">'+(p.length-_pub)+'</b></span>':'')+'</div>'+
     pan('Expedientes resueltos','publicados en Notion o rechazados',
       p.length?p.map(filaDoc).join(''):vacioSimple('Todavía no hay nada resuelto','Un expediente aparece aquí en '+
-        'cuanto se aprueba y se publica en Notion, o en cuanto se rechaza.'));
+        'cuanto se aprueba y se publica en Notion, o en cuanto se rechaza.'+_docsComoEnviar_()));
 }};
 
 /* ── DISCIPLINA ──────────────────────────────────────────────────────────── */
@@ -3851,7 +3857,8 @@ function pintarNav(){
   GRUPOS.forEach(function(g){
     var d=document.createElement('div'); d.className='grupo';
     d.innerHTML='<span class="sc">'+g[0]+'</span><span class="ln"></span>';
-    nav.appendChild(d);
+    /* refutar154: el rótulo del grupo sólo sale con la primera entrada que se pinte: a un miembro sin cargo «Disciplina» le quedaba con nada debajo */
+    var _grupoPuesto=false;
     g[1].forEach(function(k){
       /* 21/10 (auditor 7, 🟡 12): «Sin declarar» es de CADA UNO —el servidor sólo sirve los tuyos—, así que la entrada
          es para todos; antes sólo la veía el admin y quien la necesitaba no tenía ni entrada ni globo. */
@@ -3870,6 +3877,7 @@ function pintarNav(){
       b.innerHTML='<span class="rail"></span><span class="tx">'+V[k].t+'</span>'+
         (V[k].pausa?'<span class="pausa">en pausa</span>':'')+
         (n?'<span class="cnt'+cls+'">'+n+'</span>':'');
+      if(!_grupoPuesto){ nav.appendChild(d); _grupoPuesto=true; }
       nav.appendChild(b);
     });
   });
@@ -3909,7 +3917,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='46d9d3b';
+var BUILD='c8810ed';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
