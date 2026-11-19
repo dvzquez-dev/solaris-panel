@@ -8803,6 +8803,9 @@ function _irDesdeAviso_(destino){
     if(typeof V==='object' && V && irF){
       var e=_vistaDeAviso_(destino,'escritorio');
       if(!e || !V[e]) return null;
+      /* refutar136 (19/11): «Tienes turno el 25/11» llevaba a la pestaña «Disponibilidad» («No hay ninguna disponibilidad convocada») y el
+         turno de quien tocaba el aviso estaba en «Historial de turnos», escondido. Un aviso de turno abre esa lista. */
+      if(e==='turnos' && typeof PEST==='object' && PEST) PEST.tur='turnos';
       irF(e);
       return e;
     }
