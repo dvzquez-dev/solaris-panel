@@ -787,8 +787,9 @@ function vReu(){
          ✅ Se pasa por la puerta que YA existia tres lineas mas abajo para el boton de
          borrar: la misma regla, escrita una vez. */
       (_puedeBorrarReuM_(R)?'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">'+
-        '<button class="btn mini" data-p id="btnFijar" style="flex:1">'+(R.fijada?'Cambiar fecha/hora':'📌 Fijar fecha')+'</button>'+
-        (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':'')+
+        (_reuFechaCerrada_(R)?'':     /* refutar159: en curso o con su parte fichado la fecha no se toca (el servidor lo niega) */
+          '<button class="btn mini" data-p id="btnFijar" style="flex:1">'+(R.fijada?'Cambiar fecha/hora':'📌 Fijar fecha')+'</button>'+
+          (R.fijada?'<button class="btn mini" data-p id="btnDesfijar" style="flex:1;color:var(--warn);border-color:var(--warn)">Cancelar fijado</button>':''))+
         '<button class="btn mini" data-p id="btnInvitados" style="flex:1">Convocados</button>'+
         '<button class="btn mini" data-p id="btnEditarReu" style="flex:1">Título y plazo</button>'+
       '</div>':'')+

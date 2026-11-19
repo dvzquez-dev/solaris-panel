@@ -990,9 +990,9 @@ function _fijarPanel_(){
      los dos desplegables la tarjeta arrancaba en «desde 16:00 · hasta 16:00» — se leía como una
      reunión de cero minutos y era 16:00–17:00. El valor sigue siendo el índice (el manejador de
      «Fijar» no cambia); sólo cambia lo que se lee. El móvil ya lo decía así (`_hFinFranja_`). */
-  var _pf=_puedeFijarReuE_(r);
+  var _pf=_puedeFijarReuE_(r) && !_reuFechaCerrada_(r);          // refutar159: en curso o con su parte fichado, su fecha no se cambia
   /* 31/10 (pasada de usuario, fila 7): los botones apagados dicen por qué, al lado. */
-  var _porFija=_pf ? '' : (!r._srv ? 'Es una reunión de muestra: no se puede fijar.'
+  var _porFija=_pf ? '' : (_puedeFijarReuE_(r) && _reuFechaCerrada_(r) ? 'Ya está en curso o tiene su parte: su fecha no se cambia.' : !r._srv ? 'Es una reunión de muestra: no se puede fijar.'
     : 'La fija quien la convocó'+(r.convocante ? ' ('+(_pilaDeM_(r.convocante)||r.convocante)+')' : '')+'.');
   return pan('Fijar fecha y orden del día', r.fijada?('fijada · '+esc(r.fijada)):'sin fijar',
     '<div class="pb">'+

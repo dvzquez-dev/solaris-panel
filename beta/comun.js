@@ -8818,7 +8818,7 @@ function _hayAMedias_(paraIr){
    otra versión: se TAPA la app con un cartel que no deja tocar (un toque en una pantalla mezclada puede escribir mal), se tira la caché del worker (donde
    está el poso) y se recarga: sin nada guardado, el worker viejo sirve la página nueva ENTERA desde la red. Una vez cada 2 minutos: si la mezcla sigue, no
    se encierra a nadie (`_vigilarVersion_` la cura cuando llegue el HTML). */
-var COMUN_BUILD='d23c93b';
+var COMUN_BUILD='3209cb1';
 function _mezclaDeVersiones_(build, src){
   var m=/[?&]v=([0-9a-f]{7})$/.exec(String(src||''));
   return !!m && /^[0-9a-f]{7}$/.test(String(build||'')) && m[1]!==String(build);
@@ -15906,6 +15906,10 @@ function _reuPuedeFinalizar_(r, yo, admin, ahora){
   var h=_horarioReuMs_(r);
   return !!r.celebrada || !!(h && h.ini <= (ahora==null ? Date.now() : ahora));
 }
+/* refutar159 (19/11): la FECHA de una reunión EN CURSO o con su parte fichado no se mueve ni se quita: el acta y las horas ya cuelgan de ella
+   (`e_fijar_reunion`: «su fecha no se cambia»). Las dos caras ofrecían «Cambiar fecha/hora» y «Cancelar fijado» (y «Fijar») en pleno directo
+   y con la reunión finalizada: un botón que ofrece lo que el servidor va a negar. `r.en_curso` y `r.bloque` son los dos campos que decide el servidor. */
+function _reuFechaCerrada_(r){ return !!(r && (r.en_curso || r.bloque)); }
 /* ¿Se ofrece «Eliminar»? Sólo si nunca se celebró (el servidor lo vuelve a decidir). */
 function _reuSePuedeBorrar_(r){ return !!r && !r.celebrada && !_reuFinalizada_(r); }
 /* Las palabras de asistencia que enseña el gestor: [{modo, rot, pal}] — presencial y/o telemática según la modalidad (`v.palabras`),
