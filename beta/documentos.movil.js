@@ -436,7 +436,7 @@ function _avisosDocM_(e){
    Sacarlo no es estetica: es lo que lo hace medible. */
 /* El panel de «Cambiar autores» (PD y José, sin decidir): '' si no toca. Una sola puerta para la ficha y para `_botonesDecM_`. */
 function _autorPDoc_(e){
-  return (_puedeCambiarAutor_(e.estado, yoNombre()) && !_peticionRevActiva_(e)) ? _autorPanelHTML_('dA', e.id, _autoresActualesDe_(e), '') : '';
+  return (_puedeCambiarAutor_(e.estado, yoNombre(), e) && !_peticionRevActiva_(e)) ? _autorPanelHTML_('dA', e.id, _autoresActualesDe_(e), '') : '';
 }
 function _botonesDecM_(e){
   /* ✅ PARAR SI, PUBLICAR NO. `cambios` y `rechazado` son legitimos sobre algo que aun no

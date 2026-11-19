@@ -359,7 +359,7 @@ function docCard(d){
     /* 21/10 (auditor 19, 🟡 6): la gemela del móvil — a quien lo SUBIÓ, qué hacer él. */
     ((typeof ACTOR!=='undefined' && d.autor===ACTOR) ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
       : 'Pídeselo a quien lo subió antes de decidir.</div></div>'));
-  var acc, _aut, arriba='', _autorP=_puedeCambiarAutor_(d.est, ACTOR) && !_peticionRevActiva_(d) ? _autorPanelHTML_('a'+d.id+'-', d.id, _autoresActualesDe_(d), CAMPO_CSS) : '';
+  var acc, _aut, arriba='', _autorP=_puedeCambiarAutor_(d.est, ACTOR, d) && !_peticionRevActiva_(d) ? _autorPanelHTML_('a'+d.id+'-', d.id, _autoresActualesDe_(d), CAMPO_CSS) : '';
   if(puede){
     /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el móvil (`comun.js` `_anotPanelHTML_`), con
        prefijo `d<id>-`: aquí se pintan varias fichas a la vez. Sólo donde se puede aprobar. */

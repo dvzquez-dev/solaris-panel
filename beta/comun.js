@@ -15056,7 +15056,10 @@ function _anotClic_(ev, buscar){
    campo con desplegable y buscador de nombres (a cualquier persona menos nosotros mismos porque entonces sería revisor y
    autor la misma persona)». Hoy el campo es el selector de personas único (`elegirPersonas`). Lo decide el
    SERVIDOR (`e_cambiar_autor_doc`); esto sólo no ofrece lo que sabe que va a rechazar. */
-function _puedeCambiarAutor_(estado, yo){
+function _puedeCambiarAutor_(estado, yo, e){
+  /* 19/11 (refutar140): `e` (si se pasa) cierra el caso de José AUTOR: quitarse de autor lo haría revisor de lo suyo; lo suyo lo cambia el PD (gemela de
+     `e_cambiar_autor_doc`, que lo rechaza). */
+  if (e && yo !== PD_NOM && _autoresDe_(e).indexOf(yo) >= 0) return false;
   return ['recibido','analizado','revision','cambios'].indexOf(estado) >= 0 && !!yo && (yo === PD_NOM || yo === REV2_NOM);
 }
 /* El roster activo. 04/11: ya SIN quitar al PD ni a José (Daniel, `Manual_S-9001_27`: él es autor y le llega igual; `revisoresDe` sabe a quién
