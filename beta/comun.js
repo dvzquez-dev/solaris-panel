@@ -582,7 +582,7 @@ function _rangoBeta_(){ return (SESION&&SESION.nombre) ? rangoNom(SESION.nombre)
    `_focoFirma_(raiz)` anota quién tiene el foco DENTRO de `raiz` (por `id`, o por etiqueta + atributos `data-*`, y cuál de los que
    comparten esa firma) y `_focoReponer_(raiz, firma)` se lo devuelve al repintado. Si el elemento ya no existe (el parte que
    acabas de aprobar), un BOTÓN pasa al que hace lo MISMO (misma firma sin los números de id): el siguiente «Aprobar». */
-var FOCO_VOLATIL=['data-a11y','data-n','data-borr-hecho','data-tcal-bloque','data-tcal-nobloque'];
+var FOCO_VOLATIL=['data-a11y','data-a11y-p','data-n','data-borr-hecho','data-tcal-bloque','data-tcal-nobloque'];
 function _focoSel_(e, soloLetras){
   if(e.id && !soloLetras) return '#'+(window.CSS && CSS.escape ? CSS.escape(e.id) : e.id.replace(/[^\w-]/g,'\\$&'));
   var h=e.tagName.toLowerCase(), hay=false;
@@ -3096,6 +3096,9 @@ function _textoSinPermisoDoc_(sinDecidir, revisores){
    devuelve cuántas franjas tenía marcadas (para decirlo en el aviso de después); `0` si no hay nada que decir. Quien guarda gana (como siempre): esto SÓLO lo cuenta.
    `leer` = la lectura de una reunión de cada cara (`api.getReunion` / `api.get`); sin red o sin la fila, `0`: un aviso de más no justifica bloquear nada. */
 async function _dispCambioFuera_(leer, id, quien, base, nuevo){
+  /* bateria105: la lectura de antes de guardar es parte de la ESCRITURA: mientras dura cuenta como «en vuelo» (`_apiPost_.vuelo`), o una versión
+     nueva recarga la app justo ahí y la disponibilidad que la persona acaba de dar se pierde (recorrido 102, sección 4). */
+  var _k='_disp_'+id, _v=(_apiPost_.vuelo=_apiPost_.vuelo||{}); _v[_k]=1;
   try{
     var r=await leer(id), ya=r && (r.respuestas||r.resp||{})[quien];
     if(!Array.isArray(ya)) return 0;
@@ -3104,6 +3107,7 @@ async function _dispCambioFuera_(leer, id, quien, base, nuevo){
     if(norm(ya)===norm(base) || norm(ya)===norm(nuevo)) return 0;
     return ya.filter(function(x){ return +x>0; }).length;
   }catch(_){ return 0; }
+  finally{ delete _v[_k]; }
 }
 function _dispCambioFueraTxt_(n){
   return n>0 ? ' Ojo: desde otro aparato tenías marcadas '+n+' franja'+(n===1?'':'s')+' distintas; se han sustituido por estas.' : '';
@@ -5036,7 +5040,7 @@ function _derivaFalta_(R, base){
   if(!R || R.agregado===false) return {motivo:'oculta'};
   var inv=_invitadosVivos_((base||[]).filter(function(n){ return typeof n==='string' && n; }));     // la baja no cuenta (el motor sólo sanciona a vivos)
   var tarde=Array.isArray(R.invitados_tarde)?R.invitados_tarde:[];
-  var universo=inv.filter(function(n){ return n!==R.convocante && tarde.indexOf(n)<0; });
+  var universo=inv.filter(function(n){ return n!==R.convocante && tarde.indexOf(n)<0 && !_exentoHasta_(miembro(n), R.limite); });   // …ni la exenta (Erasmus): el motor no la sanciona
   var resp=_respDeActivos_(R.resp||{}).resp;
   var cubren=Object.keys(resp).filter(function(n){ return Array.isArray(resp[n]); });
   var motivo=null;
@@ -11088,7 +11092,12 @@ function _convFalta_(cv, mias){
 function _exencionConv_(cv){
   var y = null; try { y = (typeof miembro === 'function' && typeof _fichaYo_ === 'function') ? miembro(_fichaYo_()) : null; } catch(e){}
   if (!y && typeof YO !== 'undefined') y = YO;
-  var h = String((y && y.exento_hasta) || '').slice(0, 10), l = String((cv && cv.limite) || '').slice(0, 10);
+  return _exentoHasta_(y, cv && cv.limite);
+}
+/* refutar141 (19/11): la MISMA regla para cualquier persona, no sólo para ti: `exento_hasta` ≥ el día del plazo (`limite`). Antes sólo la leía `_exencionConv_` (tu aviso), y quien convoca veía
+   a la exenta de Erasmus como «sin cubrir · sanción que implicaría» (`_derivaFalta_`) aunque el motor y el aviso la saltan. `m` = la ficha; `''` si no la hay o no cubre este plazo. */
+function _exentoHasta_(m, limite){
+  var h = String((m && m.exento_hasta) || '').slice(0, 10), l = String(limite || '').slice(0, 10);
   return (/^\d{4}-\d\d-\d\d$/.test(h) && /^\d{4}-\d\d-\d\d$/.test(l) && h >= l) ? h.slice(8) + '/' + h.slice(5, 7) + '/' + h.slice(0, 4) : '';
 }
 
@@ -18601,8 +18610,10 @@ function _a11yCablear_(){
       if(estaba && !ahora && antes && antes.isConnected && antes.focus) antes.focus();
       /* refutar78: el botón que se pulsó con el TECLADO se repintó (decidir un parte del bloque, fijar, empezar, quitar a alguien: lo normal es `innerHTML`) y el foco cayó a <body>:
          el siguiente Tab EMPEZABA POR EL MENÚ (24 paradas). Vuelve al que hace LO MISMO (misma firma sin números: el siguiente «Rechaza») y, si ya no hay ninguno, a la vista
-         (como al cambiar de pantalla), no a <body>. Sólo si el foco se perdió y el último gesto fue de teclado: con el ratón no se toca nada. */
-      else if(kbd && !ahora && antesF && antes && (!antes.isConnected || antes.disabled || !antes.offsetParent) && (!document.activeElement || document.activeElement===document.body)){
+         (como al cambiar de pantalla), no a <body>. Sólo si el foco se perdió y el último gesto fue de teclado: con el ratón no se toca nada.
+         bateria105: un botón sólo DESHABILITADO (la acción va en vuelo, p. ej. aprobar un parte) sigue en el documento: su dueño repinta y repone el foco al acabar (refutar42); rescatarlo
+         aquí lo mandaba a la vista y el repintado ya no encontraba nada que reponer (6 Enter seguidos aprobaban UN parte). */
+      else if(kbd && !ahora && antesF && antes && (!antes.isConnected || !antes.offsetParent) && (!document.activeElement || document.activeElement===document.body)){
         _focoReponer_(document.body, antesF);
         if(!document.activeElement || document.activeElement===document.body){ var vm=document.getElementById('main'); if(vm && vm.getAttribute('tabindex')==='-1') try{ vm.focus({preventScroll:true}); }catch(_){} }
       }

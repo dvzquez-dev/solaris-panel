@@ -115,7 +115,7 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=58aba13"></script>
+<script src="comun.js?v=fcb08a8"></script>
 <script src="notis.escritorio.js?v=e2a8717"></script>
 <script src="cierre.escritorio.js?v=7a8aac3"></script>
 <script src="turnos.escritorio.js?v=be135e7"></script>
@@ -3505,8 +3505,12 @@ function _aplicarBootstrap_(boot){
     REUS.length=0; boot.reuniones.map(normReu).forEach(function(r){REUS.push(r);});
     /* refutar70 (18/11): `_hidratarReus_` sale con `!backendOK` y `backendOK=true` se ponía al FINAL de esta función: al abrir la app NO hidrataba nada y el PD veía «SIN LEER»
        y el mapa a cero hasta el primer refresco de 90 s. Se pone ANTES (lo que se acaba de recibir es del servidor). */
-    backendOK=true;
-    _hidratarReus_();          // el bootstrap NO trae `resp`: sin esto el mapa sale a cero
+    /* ⛔ Salvo tras el MURO (rango < 0, un miembro raso): con `backendOK` puesto aquí, `pintar()` pedía por detrás del muro reuniones, fichajes, control y convocatorias
+       (`probar_punta_a_punta_movil` recorrido 27: «sólo pide lo suyo»). Al raso no se le hidrata nada: no ve nada. */
+    if(!(SESION && SESION.rango!=null && SESION.rango < 0)){
+      backendOK=true;
+      _hidratarReus_();          // el bootstrap NO trae `resp`: sin esto el mapa sale a cero
+    }
     /* ⛔ AQUI HABIA UN `setTimeout(_refrescoVivo_, 300)`, y es el MISMO fallo que Daniel
        reportó en el móvil («carga el widget una vez extra»), en la otra cara y sin que nadie
        lo hubiera mirado. Pedía **las siete cosas** -turnos, tareas, panel, sanciones, partes,
@@ -3905,7 +3909,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='27ccada';
+var BUILD='1eef83a';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y
