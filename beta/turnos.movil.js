@@ -870,6 +870,9 @@ function vTurnos(){
   }
   /* los pasados van en CAJÓN plegable, como en app.html: no estorban pero están */
   pas.sort(function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); });
+  /* refutar155 (19/11): un turno CANCELADO de dentro de unos días cae en «pasados» (ya no se va a hacer) y encabezaba el cajón con
+     «el último, 23/11» siendo hoy 19/11: «el último» es el último que YA PASÓ. */
+  var hoyU=_hoyNxISO_(), ult=pas.filter(function(t){ return !t.iso || String(t.iso)<=hoyU; })[0];
   /* los vivos van SUELTOS: sin cabecera de seccion ni etiquetas, para que canten */
   /* La convocatoria va la PRIMERA: lo que caduca manda sobre lo que ya está decidido. */
   return '<div class="h1">Turnos</div><p class="h1s">Fabricación · en cuáles estás y quién más va.</p>'+
@@ -890,7 +893,7 @@ function vTurnos(){
             : 'Cuando te convoquen a uno, saldrá aquí.'+
               (nTodos>nMios?' Hay '+nTodos+' del equipo: míralos con «Todos».':''),'',false)+'</div>')+
     (pas.length? '<div class="cajon" data-caj data-p><span>Turnos pasados <b>· '+pas.length+'</b>'+
-        (pas[0].f?' <span style="color:var(--ink3)">· el último, '+esc(pas[0].f)+'</span>':'')+'</span>'+
+        (ult&&ult.f?' <span style="color:var(--ink3)">· el último, '+esc(ult.f)+'</span>':'')+'</span>'+
         '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
         '<div class="cajsec">'+pas.map(tarjeta).join('')+'</div>' : '');
 }
