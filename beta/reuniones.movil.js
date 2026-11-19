@@ -728,7 +728,9 @@ function vReu(){
       _votTarjM_(R.id)+
       /* 11/11 (reumovil): la ves por tu nivel, no porque te hayan convocado: sin rejilla, sin «te falta» (cubrir y responder son de convocados) */
       (R.invitado===false && !R.fijada
-        ? '<p class="rnota" style="margin:2px 0 10px">No estás convocado a esta reunión: puedes verla, no marcar disponibilidad.</p>'
+        ? '<p class="rnota" style="margin:2px 0 10px">No estás convocado a esta reunión: puedes verla, no marcar disponibilidad.'+
+          /* refutar137: quien entra al equipo con una reunión ya convocada no figura en su lista (se fija al convocar): dice a quién pedir que la corrija */
+          (R.convocante?' Si te toca estar, pídeselo a '+esc((_pilaDeM_(R.convocante)||R.convocante))+', que la convocó.':'')+'</p>'
         : '')+
       (R.fijada
         ? '<div class="avisolargo" style="border-color:rgba(62,180,137,.4);background:rgba(62,180,137,.08);color:#a9dcc6">'+

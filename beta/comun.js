@@ -3982,7 +3982,7 @@ function _cierreTurnoInicial_(t, durH){
    El escritorio (`turnos.escritorio.js`) y el móvil (`turnos.movil.js`) cierran el turno con el MISMO estado `st` (`_cierreVacio_`:
    quién fue, quién llevó coche, el tramo, la duración, el reparto) y las mismas reglas; lo que cada cara pone es sólo el dibujo y
    el cable. Quién puede, cuándo es cerrable, el tope del extra, el tramo que viaja y la llamada al servidor viven AQUÍ. */
-function _cierreVacio_(){ return {k:null, dur:'', quien:{}, extra:{}, hecho:null, coche:{}, listo:null, ini:'', fin:'', pers:false}; }
+function _cierreVacio_(){ return {k:null, dur:'', quien:{}, extra:{}, hecho:null, coche:{}, listo:null, ini:'', fin:'', pers:false, fuera:[]}; }
 
 /* ⛔ 20/10 (ficha del 20/08): ¿se puede CERRAR este turno hoy? No si Notion ya lo da por `Realizado` o `Cancelado`
    —cerrar un cancelado acredita «+1 turno» (×4 h) a gente que no fue— y no si es FUTURO. El estado manda sobre la
@@ -4041,7 +4041,7 @@ function _cierreTramo_(st, t){
 function _cierreMapa_(t, st){
   var out = {}, tope = _cierreTope_(st), esDud = {};
   _dudososTurno_(t).forEach(function(n){ esDud[n] = 1; });
-  _asistentesTurno_(t).concat(_dudososTurno_(t)).forEach(function(n){
+  _cierreGente_(t, st).forEach(function(n){
     if(!st.quien[n]) return;
     var v = st.extra[n];
     /* 01/11 (Daniel): las horas distintas por persona son una opcion APAGADA por defecto; apagada, todos los que fueron llevan el
@@ -4060,6 +4060,7 @@ function _cierreSembrar_(t, st, ahoraISO){
   st.fecha = String((t && t.fecha) || '').slice(0,10);   /* 18/11 (refutar109): el cambio de hora cuenta según el DÍA del turno */
   var firmes = _asistentesTurno_(t), dud = _dudososTurno_(t);
   if(!Object.keys(st.quien).length){
+    st.fuera = [];   /* refutar133: quien se añadió a un turno no pasa al siguiente que se elija (todos los reinicios dejan `quien` vacío) */
     firmes.forEach(function(n){ st.quien[n] = true; });
     dud.forEach(function(n){ st.quien[n] = false; });
     firmes.concat(dud).forEach(function(n){ st.coche[n] = _llevaCocheTurno_(t, n); });
@@ -4069,6 +4070,30 @@ function _cierreSembrar_(t, st, ahoraISO){
     var dr = _durTurnoDeHoras_(st.ini, st.fin, st.fecha);
     if(dr != null && st.dur === '') st.dur = String(dr);
   }
+}
+
+/* ⛔ refutar133 (19/11): QUIEN CUBRE A ÚLTIMA HORA Y NO FIGURA EN EL REPARTO. El formulario de cierre sólo ofrecía a los del reparto, así que el
+   suplente que de verdad fue (y que no estaba ni como «Suplente») no tenía fila: ni su turno, ni su hora extra, ni su coche, y el acta (Asistentes)
+   salía sin él. `st.fuera` = los nombres que quien cierra añade a mano; entran sembrados como «fue» (los has añadido porque fueron) y sin coche.
+   `_cierreGente_` = el reparto + ellos: la ÚNICA lista de filas del formulario (las dos caras) y de lo que viaja (`_cierreMapa_`). */
+function _cierreGente_(t, st){
+  var gente = _asistentesTurno_(t).concat(_dudososTurno_(t)), vistos = {};
+  gente.forEach(function(n){ vistos[n] = 1; });
+  ((st && st.fuera) || []).forEach(function(n){ if(!vistos[n]){ vistos[n] = 1; gente.push(n); } });
+  return gente;
+}
+/* A quién se puede añadir: el equipo que no consta de baja y no está ya en el reparto del turno (ni como «Posible» o «Reserva»: ésos ya tienen fila). */
+function _cierreFueraUniverso_(t){
+  var enReparto = {};
+  ((t && t.roles) || []).forEach(function(r){ if(r && r.miembro) enReparto[r.miembro] = 1; });
+  return _activos_().filter(function(m){ return m && m.nombre && !enReparto[m.nombre]; }).map(function(m){ return m.nombre; });
+}
+/* Pone la lista de añadidos: quien entra va marcado como que fue, sin coche; quien sale pierde sus marcas. */
+function _cierrePonFuera_(st, nombres){
+  var antes = st.fuera || [];
+  antes.forEach(function(n){ if(nombres.indexOf(n) < 0){ delete st.quien[n]; delete st.coche[n]; delete st.extra[n]; } });
+  nombres.forEach(function(n){ if(antes.indexOf(n) < 0){ st.quien[n] = true; st.coche[n] = false; } });
+  st.fuera = nombres.slice();
 }
 
 /* El techo baja (cambia el tramo o la duración): lo que ya estuviera por encima se recorta, o el botón quedaría bloqueado por un

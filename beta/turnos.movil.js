@@ -1120,11 +1120,11 @@ function _ctMHTML_(t){
     var i0 = String(v.hora || '').slice(0,5), f0 = _hhmmDe_(new Date(_ahoraInstante_()).toISOString()), d0 = _durTurnoDeHoras_(i0, f0, v.fecha);
     if(d0 != null && d0 <= 12){ st.ini = i0; st.fin = f0; st.dur = String(d0); }
   }
-  var asis = _asistentesTurno_(v).concat(_dudososTurno_(v)), resp = _responsableTurno_(v);
+  var asis = _cierreGente_(v, st), resp = _responsableTurno_(v);
   var fila = function(n){
     var on = !!st.quien[n];
     return '<div class="fila" style="display:block;padding:9px 0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>'+esc(_pilaDeM_(n) || (miembro(n)||{}).pila || n)+'</b>'+
-      (n === resp ? '<span class="chip">responsable</span>' : '')+(_esSuplenteTurno_(v, n) ? '<span class="chip">suplente</span>' : '')+'</div>'+
+      (n === resp ? '<span class="chip">responsable</span>' : '')+(_esSuplenteTurno_(v, n) ? '<span class="chip">suplente</span>' : '')+((st.fuera || []).indexOf(n) >= 0 ? '<span class="chip">no estaba en el reparto</span>' : '')+'</div>'+
       '<div style="display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin-top:6px">'+
         '<span class="sc">Fue</span>'+nxSiNo('', on, {attrs:'data-ctm-fue="'+esc(n)+'"'})+
         '<span class="sc">Coche</span>'+nxSiNo('', st.coche[n], {attrs:'data-ctm-coche="'+esc(n)+'"', off:!on})+'</div></div>';
@@ -1135,6 +1135,8 @@ function _ctMHTML_(t){
   return cab+'<div class="mtit" style="font-size:16px;margin:0 0 4px">Cerrar el turno</div>'+
     lab('Qui\u00e9n fue')+(asis.length ? '<div class="tarj" style="margin:0;padding:0 12px">'+asis.map(fila).join('')+'</div>'
       : '<p class="rnota">Este turno no tiene a nadie resuelto en el reparto.</p>')+
+    lab('\u00bfFue alguien que no estaba en el reparto?')+elegirPersonas('ctmFuera', {universo:_cierreFueraUniverso_(v), marcadas:st.fuera, titulo:'Qui\u00e9n m\u00e1s fue',
+      vacio:'Nadie m\u00e1s: escribe un nombre o pulsa \u00abVer lista\u00bb.', alCambiar:function(n){ _cierrePonFuera_(st, n); _ctMPintar_(t); }})+
     lab('Cu\u00e1ndo empez\u00f3 (saliendo de casa)')+nxHora('ctMIni', ini0)+
     lab('Cu\u00e1ndo acab\u00f3 (ya de vuelta)')+nxHora('ctMFin', st.fin || ini0)+
     '<p class="rnota" id="ctMRes" style="margin:12px 0 0"><b>'+esc(_cierreResumenHoras_(st))+'</b></p>'+

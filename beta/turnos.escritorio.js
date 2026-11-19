@@ -1495,7 +1495,8 @@ function _cierreTurnoPanel_(){
      render, y eso es lo que hay que conservar. */
   var dud = _dudososTurno_(t), esDud = {};
   dud.forEach(function(n){ esDud[n] = 1; });
-  var asis = firmes.concat(dud);
+  /* refutar133: el reparto + quien se añade a mano (el suplente que no figuraba) */
+  var asis = _cierreGente_(t, CIERRE_TUR);
   /* Primera vez sobre este turno: los firmes se dan por idos; los dudosos NO.
      ⛔ Y la direccion importa: marcarlos por defecto le sumaria **un turno** a quien quiza
      no fue —lo dice el comentario de `_cierreTurMapa_` dos funciones mas arriba—, mientras
@@ -1530,7 +1531,7 @@ function _cierreTurnoPanel_(){
         nxSiNo('', on, {attrs:'data-ct-fue="'+esc(n)+'"'})+
         esc(_pilaDeM_(n)||(miembro(n)||{}).pila || n)+
         (n===resp?' <span class="chip">responsable</span>':'')+
-        (_esSuplenteTurno_(t, n)?' <span class="chip">suplente</span>':'')+'</div>'+
+        (_esSuplenteTurno_(t, n)?' <span class="chip">suplente</span>':'')+((CIERRE_TUR.fuera||[]).indexOf(n)>=0?' <span class="chip">no estaba en el reparto</span>':'')+'</div>'+
         /* 26/10 (C4b): «llevó coche» va al ACTA (Notion `Coche`, almacén `coche_confirmado`). ⚠️ La cuota aún cuenta el
            coche del REPARTO (espejo): que cuente sólo el confirmado es la 2.ª mitad de C4b, ficha abierta. */
         ' <div style="display:flex;align-items:center;gap:6px;font-size:12px;opacity:.85">'+
@@ -1574,6 +1575,9 @@ function _cierreTurnoPanel_(){
     aviso+
     '<div class="campo"><span class="sc">Horas distintas por persona</span>'+
       nxSiNo('ctPers', CIERRE_TUR.pers)+'</div>'+
+    '<div class="campo"><span class="sc">\u00bfFue alguien que no estaba en el reparto?</span>'+
+      elegirPersonas('ctFuera', {universo:_cierreFueraUniverso_(t), marcadas:CIERRE_TUR.fuera, titulo:'Qui\u00e9n m\u00e1s fue',
+        vacio:'Nadie m\u00e1s: escribe un nombre o pulsa \u00abVer lista\u00bb.', alCambiar:function(n){ _cierrePonFuera_(CIERRE_TUR, n); CIERRE_TUR.hecho = null; pintar(); }})+'</div>'+
     (asis.length
       ? '<table class="tb" style="margin-top:9px"><thead><tr><th>Qui\u00e9n fue de verdad</th>'+
         '<th class="r">Extra</th></tr></thead><tbody>'+filas+'</tbody></table>'
