@@ -8725,15 +8725,17 @@ function _recargaVersionYa_(st){
 }
 
 /* ¿Hay algo a medias en pantalla? Un campo con el foco, el modal del móvil abierto, o texto escrito sin enviar. */
-function _hayAMedias_(){
+function _hayAMedias_(paraIr){
   if (typeof document === 'undefined') return false;
   var a = document.activeElement, t = a && a.tagName;
-  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || (a && a.isContentEditable)) return true;
+  /* refutar152: `paraIr` = «¿cambiar de pantalla tiraría algo?» (un aviso tocado con la app abierta). Ahí un campo con el foco pero VACÍO, una ficha abierta sólo
+     para leer y una escritura en vuelo (que se acaba sola) no cuentan: preguntar «¿descartar cambios?» sin cambios es el aviso que se aprende a ignorar. */
+  if (!paraIr && (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || (a && a.isContentEditable))) return true;
   var m = document.getElementById('modal');
-  if (m && m.classList && m.classList.contains('on')) return true;
+  if (m && m.classList && m.classList.contains('on') && (!paraIr || (typeof _MODAL_TOCADO_ !== 'undefined' && _MODAL_TOCADO_))) return true;
   /* refutar66: una ESCRITURA en vuelo (un parte, un voto, una disponibilidad que ya salió y aún no contestó): recargar ahora
      tiraría la respuesta y la persona repetiría lo que ya se guardó. `_apiPost_.vuelo` sólo tiene escrituras sin contestar. */
-  try{ if (_apiPost_.vuelo && Object.keys(_apiPost_.vuelo).length) return true; }catch(_){}
+  if (!paraIr) try{ if (_apiPost_.vuelo && Object.keys(_apiPost_.vuelo).length) return true; }catch(_){}
   var ts = document.getElementsByTagName ? document.getElementsByTagName('textarea') : [];
   for (var i = 0; i < ts.length; i++) if (ts[i].value && String(ts[i].value).trim()) return true;
   /* ⛔ Y EL ESCRITORIO (auditoría del 20/10): no tiene `#modal`, pero sí botones de guardar que SÓLO se habilitan con
@@ -8811,11 +8813,12 @@ function _vistaDeAviso_(destino, cara){
     : {estado:'estado', horas:'horas', reuniones:'reu', turnos:'turnos', docs:'docs', apela:'estado', tareas:'tareas'};
   return Object.prototype.hasOwnProperty.call(M,d) ? M[d] : null;
 }
-function _irDesdeAviso_(destino){
+function _irDesdeAviso_(destino, sinMover){
   try{
     if(typeof VISTAS==='object' && VISTAS && typeof ST==='object' && ST){
       var m=_vistaDeAviso_(destino,'movil');
       if(!m || !VISTAS[m]) return null;
+      if(sinMover) return m;   /* refutar152: sólo «¿lleva a algo?», sin moverse */
       ST.vista=m; if(typeof pintar==='function') pintar();
       return m;
     }
@@ -8825,6 +8828,7 @@ function _irDesdeAviso_(destino){
     if(typeof V==='object' && V && irF){
       var e=_vistaDeAviso_(destino,'escritorio');
       if(!e || !V[e]) return null;
+      if(sinMover) return e;
       /* refutar136 (19/11): «Tienes turno el 25/11» llevaba a la pestaña «Disponibilidad» («No hay ninguna disponibilidad convocada») y el
          turno de quien tocaba el aviso estaba en «Historial de turnos», escondido. Un aviso de turno abre esa lista. */
       if(e==='turnos' && typeof PEST==='object' && PEST) PEST.tur='turnos';
@@ -8833,6 +8837,26 @@ function _irDesdeAviso_(destino){
     }
   }catch(_){}
   return null;
+}
+/* refutar152 (19/11) · UN AVISO TOCADO CON LA APP ABIERTA A MEDIAS DE ALGO. El worker manda `{tipo:'ir'}` y la cara cambiaba de pantalla A SUS ESPALDAS:
+   con una hoja abierta (un parte a medio escribir) la pantalla nueva quedaba DETRÁS de la hoja, a oscuras, sin un solo mensaje: «el aviso no me llevó a nada».
+   Ahora: sin nada que perder, se va (y una ficha abierta sólo para leer se cierra); con algo escrito o marcado se PREGUNTA, igual que al tocar el fondo de
+   una hoja (`_fondoDelModal_`). Una promesa de la vista a la que fue, o `null` (no fue / no sirve el enlace). */
+var _VISTA_AVISO_ROT_ = {estado:'Estado', horas:'Horas', reuniones:'Reuniones', turnos:'Turnos', docs:'Documentos', apela:'Estado', tareas:'Tareas'};
+function _irDesdeAvisoAbierta_(destino){
+  var d=String(destino||'').split('/')[0].replace(/^#/,'');   /* el rótulo de la pantalla para la pregunta */
+  var suelta=function(){
+    /* la ficha de sólo lectura (móvil) se cierra para que se vea la pantalla del aviso */
+    /* `cerrarModal` sólo existe en el móvil: se toma en una variable, no se llama por su nombre desde el módulo común (`probar_bundle_caras.py`) */
+    try{ var mo=document.getElementById('modal'), cm=(typeof cerrarModal==='function') ? cerrarModal : null; if(cm && mo && mo.classList && mo.classList.contains('on')) cm(); }catch(_){}
+    return _irDesdeAviso_(destino);
+  };
+  try{
+    if(!_hayAMedias_(true)) return Promise.resolve(suelta());
+    if(!_irDesdeAviso_(destino, true)) return Promise.resolve(null);
+    return dialogoSiNo('Tienes cambios sin guardar. ¿Ir a '+(_VISTA_AVISO_ROT_[d]||'esa pantalla')+' y descartarlos?',
+      {si:'Ir y descartar', no:'Quedarme aquí'}).then(function(si){ return si ? suelta() : null; });
+  }catch(_){ return Promise.resolve(null); }
 }
 /* ══ 31/10 · SONIDOS CORTOS — fichar, aprobar y avisos, ENCENDIDOS DE SERIE ═════════════════════════════════
    🗣️ Daniel: «sonidos cortos (fichar, aprobar, avisos)» y, esa noche, «los sonidos por default encendidos eh, no
@@ -8992,7 +9016,7 @@ function _escucharSW_(){
     }, 600000);
     navigator.serviceWorker.addEventListener('message', function(ev){
       if (ev && ev.data && ev.data.tipo === 'version-nueva') { _avisoVersion = true; _recargarVersionNueva_(false); }
-      else if (ev && ev.data && ev.data.tipo === 'ir') _irDesdeAviso_(ev.data.a);
+      else if (ev && ev.data && ev.data.tipo === 'ir') _irDesdeAvisoAbierta_(ev.data.a);
       else if (ev && ev.data && ev.data.tipo === 'aviso') _sonar_('aviso');
     });
     return true;

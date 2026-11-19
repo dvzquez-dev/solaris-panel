@@ -115,7 +115,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=56995f9"></script>
+<script src="comun.js?v=a79b146"></script>
 <script src="notis.movil.js?v=4c61d2c"></script>
 <script src="cierre.movil.js?v=817338d"></script>
 <script src="tareas.movil.js?v=1d31557"></script>
@@ -726,7 +726,12 @@ async function _refrescoVivo_(motivo, que){
    queria refrescar. */
 function _refrescarPanelM_(pnl){
   var viendo = (YO && YO.nombre) || null;
+  var _rg0 = (viendo && typeof rangoNom==='function') ? rangoNom(viendo) : 0;
   _aplicarPanel_(pnl);
+  /* 19/11 (refutar150): a mitad de mes pasas a coordinar una unidad. La cola «Esperan tu decisión» sólo se pedía al entrar (siendo raso, `getPartes`
+     te servía SÓLO lo tuyo) y ni el reloj de 90 s ni «tu lista se ha puesto al día» la releen a propósito, así que la nueva coordinadora tenía
+     «Dar horas» pero ningún parte por firmar hasta cerrar y abrir la app. Al SUBIR de rango se pide una vez. */
+  if(viendo && YO && YO.nombre===viendo && _rg0<1 && typeof rangoNom==='function' && rangoNom(viendo)>=1 && typeof _cargarPartesDec_==='function') _cargarPartesDec_().then(function(){ if(!_modalAbierto_()) _repintarSuave_(); }).catch(function(){});
   if(viendo && YO && YO.nombre!==viendo){
     var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===viendo; })[0];
     if(m) YO=m;                     // si ya no esta en el roster, se queda el que toque
@@ -1886,7 +1891,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='fe35484';
+var BUILD='1e0bfdb';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
