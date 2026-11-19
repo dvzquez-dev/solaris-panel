@@ -10475,17 +10475,18 @@ function _puedeMoverPlazo_(t, nombre){
    `coordinadoresDe(u)`: TODOS, sin repetir: los del CARGO en esa unidad y después quien la tenga en `coordina`; si nadie, [PD]. Nunca vacía.
    Gemela de `coordinadores_doc` del servidor. «¿Manda X en U?» es `esCoordDe(U, X)`; `coordinadorDe` es sólo para un NOMBRE que pintar. */
 function coordinadoresDe(u){
-  var out = [];
-  /* `buscaMiembro` con un `cumple` que siempre dice «no»: es la manera de RECORRER el roster por la misma puerta que el resto (no un `DATA` suelto). */
-  buscaMiembro(function(m){
+  var out = [], vivos = [];
+  /* `buscaMiembro` con un `cumple` que siempre dice «no»: es la manera de RECORRER el roster por la misma puerta que el resto (no un `DATA` suelto).
+     19/11 (refutar129): quien esta de BAJA no firma ni revisa (el servidor tampoco lo cuenta, `coordinadores_doc`): sin otro coordinador, el PD. La baja se mira
+     UNA vez y las dos listas (cargo y `coordina`) recorren a los que quedan. */
+  buscaMiembro(function(m){ if (!m.baja) vivos.push(m); return false; });
+  vivos.forEach(function(m){
     if (m.cargo==='Coordinador' && m.unidad===u && out.indexOf(m.nombre)<0) out.push(m.nombre);
-    return false;
   });
-  buscaMiembro(function(m){
+  vivos.forEach(function(m){
     /* 26/10: quien la COORDINE, con cargo o sin el (Bruno lleva Logistica; Marta, Patrocinios: «Si, en su unidad») */
     var v = (typeof _unidadesCoord_==='function') ? _unidadesCoord_(m.coordina) : [], i;
     for (i=0;i<v.length;i++) if (v[i]===u && out.indexOf(m.nombre)<0) out.push(m.nombre);
-    return false;
   });
   return out.length ? out : [PD_NOM];
 }
@@ -15724,6 +15725,9 @@ function _endirHTML_(r, puede){
   var ec=r && r.en_curso; if(!ec) return '';
   _ENDIR_EC_=ec;
   var nom=_endirNombres_(ec), dentro=nom.filter(function(n){ return _endirDentro_(ec, n); });
+  /* 18/11 (refutar128): con 40 en la sala, los que están dentro van PRIMERO (el que salió no se mezcla entre ellos) y la lista se reparte en COLUMNAS: en un proyector
+     de 1080 px caben las 40 a la vez; en el móvil (<2 columnas de 260 px) sigue siendo una sola. */
+  nom=dentro.concat(nom.filter(function(n){ return !_endirDentro_(ec, n); }));
   var filas=nom.map(function(n){
     var d=_endirDentro_(ec, n);
     return '<div data-endir-f="'+esc(n)+'" style="display:flex;gap:8px;align-items:center;min-height:44px;border-bottom:1px solid var(--line)">'+
@@ -15734,8 +15738,8 @@ function _endirHTML_(r, puede){
       (puede?'<button type="button" class="btn mini" data-p data-endir-b="'+esc(n)+'" data-endir-dentro="'+(d?'0':'1')+'" style="min-height:44px">'+(d?'Quitar':'Volver')+'</button>':'')+'</div>';
   }).join('');
   return '<div id="endir" style="margin:0 0 12px"><span class="sc" style="display:block;margin:0 0 5px">En la reunión · '+dentro.length+
-    (dentro.length===1?' persona':' personas')+'</span>'+
-    (filas || '<p class="rnota" style="margin:0 0 8px">Nadie dentro todavía.</p>')+
+    (dentro.length===1?' persona':' personas')+(nom.length>dentro.length?' <span class="rnota">· '+(nom.length-dentro.length)+' fuera</span>':'')+'</span>'+
+    (filas ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));column-gap:18px">'+filas+'</div>' : '<p class="rnota" style="margin:0 0 8px">Nadie dentro todavía.</p>')+
     (puede ? '<div style="margin-top:9px">'+elegirPersonas('endir', {universo:_activos_().map(function(m){ return m.nombre; })
         .filter(function(n){ return !_endirDentro_(ec, n); }), marcadas:[], titulo:'Añadir a la reunión',
         vacio:'Añadir a alguien: escribe un nombre o pulsa «Ver lista».'})+'</div>' : '')+'</div>';
