@@ -3472,6 +3472,27 @@ function _revocarAcceso_(){
     'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Entrar con otra cuenta</button>');
   var b=document.getElementById('reGis'); if(b) b.onclick=_pintarLogin_;
 }
+/* ⛔ refutar161 (19/11): ENTRAR CON LA CUENTA EQUIVOCADA. Muchos tienen DOS cuentas de Google (la personal y la de la universidad) y no saben con cuál los dio de alta el equipo; a otros
+   el PD les cambia el correo. El muro de «no encontramos tus datos» lo decían las dos caras A SU MANERA (el escritorio añadía «si entraste con otra cuenta…», el móvil no) y ninguna
+   decía lo único accionable: que probasen con la OTRA cuenta. UNA sola frase, aquí, para las dos. `email` ya viene sin escapar: se escapa aquí. */
+function _sinFichaHTML_(email){
+  return '<b>Has entrado, pero no encontramos tus datos.</b><br><br><span style="opacity:.75">Tu cuenta es '+esc(email||'—')+
+    '. Si tienes más de una cuenta de Google (la personal, la de la universidad), prueba con la otra: pulsa «Entrar con otra cuenta». '+
+    'Si acabas de unirte al equipo o te han cambiado el correo, puede que aún no conste: díselo al Project Director.</span>';
+}
+/* El servidor contesta «tu cuenta no está en el equipo» (modo directo, `servidor.py`) a quien ya no tiene ficha con la app ABIERTA: al PD le cambiaron el correo, o lo quitaron del
+   listado. Salía en cada gesto como «No se pudo fichar entrada: tu cuenta no está en el equipo: no puede escribir», sin decir qué hacer. */
+function _esErrSinFicha_(e){ return /tu cuenta no está en el equipo/.test(String((e && e.message) || e || "")); }
+/* La puerta de ese caso, UNA para las dos caras: suelta la sesión (no se vuelve a probar sola), para lo vivo y tapa la app con el muro de «no encontramos tus datos» y la salida
+   «Entrar con otra cuenta». Lo escrito y no enviado NO se toca: sigue en su borrador, con el correo en la clave. */
+function _sinFichaAhora_(){
+  var em=(SESION && SESION.email) || '';
+  try{ localStorage.removeItem('sol_sess'); }catch(_){}
+  SESION=null; _sesionMuerta_(true); window.__SESION_MUERTA_DICHA=true; window.__CON_FICHA=false;
+  _gate_(_insigniaCara_()+'<div id="gateSinFicha" style="max-width:340px;line-height:1.6">'+_sinFichaHTML_(em)+'</div><button id="reGis" style="border:1px solid #463E40;background:none;'+
+    'color:#F4F3F3;border-radius:9px;padding:10px 16px;cursor:pointer">Entrar con otra cuenta</button>');
+  var b=document.getElementById('reGis'); if(b) b.onclick=_pintarLogin_;
+}
 var API_MSG_VERSION_DISTINTA = "Esta versión de la app no es la del servidor: cierra la app y vuelve a abrirla (o recárgala) y repítelo. No se ha guardado nada.";
 var API_MSG_RESP_RARA = "El servidor no ha dado una respuesta válida. Puede que se haya guardado: recarga antes de repetirlo.";
 async function _apiPost_(body){
@@ -3521,6 +3542,7 @@ async function _apiPost_(body){
       /* Sólo si HABÍA sesión: «sin token» de quien aún no ha entrado (la demo, el arranque) no es una sesión que caduca. */
       if(e && e.sesion){ if(SESION&&SESION.token){ try{ _sesionMuerta_(true); _avisarSesionMuerta_(); }catch(_){} } throw e; }
       if(e && _esErrBaja_(e)){ if(SESION&&SESION.token){ try{ _revocarAcceso_(); }catch(_){} } throw e; }   /* 14/11: la baja, con la app abierta */
+      if(e && _esErrSinFicha_(e)){ if(SESION&&SESION.token&&window.__CON_FICHA){ try{ _sinFichaAhora_(); }catch(_){} } throw e; }   /* refutar161: ya sin ficha (cambio de correo), con la app abierta; mientras arranca (aún sin `__CON_FICHA`) lo dice el muro de `_onCredencial_` */
       if(e && !e.transito && !(e instanceof TypeError)) throw e;
       ultimo=e;
       if(modelo) break;   // `solaria10`: un solo intento al modelo
@@ -5252,6 +5274,7 @@ function _sesionMuerta_(v){
      falsa —un `e.sesion` de paso— lo vivo se paraba hasta recargar aunque volvieras a entrar, y la próxima muerte de
      verdad ya no se decía. */
   if (v === false) window.__SESION_MUERTA_DICHA = false;
+  if (v === false) window.__CON_FICHA = true;   /* refutar161: con su ficha aquí, la app YA está dentro (`_sinFichaAhora_` sólo actúa entonces) */
   return !!window.__SESION_MUERTA;
 }
 
@@ -5403,7 +5426,7 @@ function _cambioDePersona_(ses){
   if(!prev || prev.email===em){ window.__PERSONA_EN_PANTALLA={email:em, nombre:(ses.nombre||'')}; return false; }
   try{ localStorage.setItem('sol_last_email', ses.email);
        localStorage.setItem('sol_sess', JSON.stringify({token:ses.token, email:ses.email, ts:Date.now()})); }catch(_){}
-  try{ sessionStorage.setItem(CAMBIO_PERSONA_SS, JSON.stringify({de:prev.nombre||prev.email, a:ses.nombre||ses.email}));
+  try{ sessionStorage.setItem(CAMBIO_PERSONA_SS, JSON.stringify({de:prev.nombre||prev.email, deEmail:prev.email, a:ses.nombre||ses.email}));
        sessionStorage.removeItem('solaris.tareasFiltro'); }catch(_){}      /* el último filtro de Tareas (escritorio) es de quien lo puso */
   window.__PERSONA_EN_PANTALLA=null;
   var recargar=function(){ location.reload(); };
@@ -5414,7 +5437,11 @@ function _cambioDePersona_(ses){
 function _avisarCambioDePersona_(){
   var o=null; try{ o=JSON.parse(sessionStorage.getItem(CAMBIO_PERSONA_SS)||'null'); sessionStorage.removeItem(CAMBIO_PERSONA_SS); }catch(_){}
   if(!o || typeof tost!=='function') return false;
-  setTimeout(function(){ tost('Has entrado como '+(o.a||'otra persona')+'. Lo que '+(o.de||'la otra persona')+' tenía escrito sin enviar queda guardado para cuando vuelva a entrar.', {fijo:true}); }, 600);
+  /* refutar161: si «la otra persona» es un CORREO (una cuenta sin ficha: la que el PD ya cambió), no es otra persona sino la misma cuenta vieja: lo escrito con ella sólo se ve entrando con ella. */
+  var deCuenta=/@/.test(String(o.de||'')) || (!!o.a && o.de===o.a);   /* …o la MISMA persona con otro correo (el PD se lo cambió): «la otra persona» sería ella misma */
+  setTimeout(function(){ tost('Has entrado como '+(o.a||'otra persona')+'. '+(deCuenta
+    ? 'Lo que se escribió sin enviar con la cuenta '+(o.deEmail||o.de)+' queda guardado, pero sólo se ve entrando con esa cuenta.'
+    : 'Lo que '+(o.de||'la otra persona')+' tenía escrito sin enviar queda guardado para cuando vuelva a entrar.'), {fijo:true}); }, 600);
   return true;
 }
 
@@ -8818,7 +8845,7 @@ function _hayAMedias_(paraIr){
    otra versión: se TAPA la app con un cartel que no deja tocar (un toque en una pantalla mezclada puede escribir mal), se tira la caché del worker (donde
    está el poso) y se recarga: sin nada guardado, el worker viejo sirve la página nueva ENTERA desde la red. Una vez cada 2 minutos: si la mezcla sigue, no
    se encierra a nadie (`_vigilarVersion_` la cura cuando llegue el HTML). */
-var COMUN_BUILD='3209cb1';
+var COMUN_BUILD='477f12f';
 function _mezclaDeVersiones_(build, src){
   var m=/[?&]v=([0-9a-f]{7})$/.exec(String(src||''));
   return !!m && /^[0-9a-f]{7}$/.test(String(build||'')) && m[1]!==String(build);

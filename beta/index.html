@@ -115,7 +115,7 @@
       <span class="chispas" id="chispas"><b></b><b></b><b></b><b></b></span>
     </nav>
 
-<script src="comun.js?v=3209cb1"></script>
+<script src="comun.js?v=477f12f"></script>
 <script src="notis.movil.js?v=e0d00f7"></script>
 <script src="cierre.movil.js?v=8ae9442"></script>
 <script src="tareas.movil.js?v=1d31557"></script>
@@ -995,10 +995,7 @@ async function _onCredencial_(resp,_silente){
        todo el equipo fuera de la app, que es mucho peor que el fallo que veniamos a arreglar. */
     if(!_YO_REAL_){
       _muro_(SPLASH+'<div style="max-width:330px;line-height:1.6">'+
-        '<b>Has entrado, pero no encontramos tus datos.</b><br><br>'+
-        '<span style="opacity:.75">Tu cuenta es '+esc(SESION.email||'\u2014')+
-        '. Si acabas de unirte al equipo, puede que a\u00fan '+
-        'no est\u00e9s en el listado: d\u00edselo al Project Director.</span></div>'+
+        _sinFichaHTML_(SESION.email)+'</div>'+
         '<button id="reYo" style="border:1px solid #463E40;background:none;color:#F4F3F3;'+
         'border-radius:9px;padding:10px 16px;cursor:pointer">Reintentar</button>'+
         /* 12/11 (refutar29): «Reintentar» repite el MISMO token, así que quien entró con la cuenta equivocada (la personal en vez de la del equipo)
@@ -1891,7 +1888,7 @@ function _abrirAviso_(){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='434a1ab';
+var BUILD='364d615';
 function _ajustesHTML_(){
   var v=(DATA.generado?('datos a '+esc(_isoADMY_(DATA.generado))):'sin datos');
   /* ⛔ 21/10 (auditor 10, 🟡 12): «Sesión» es quien ENTRÓ (`SESION`), no `YO` — `_verComo_` reescribe `YO` y aquí salía
