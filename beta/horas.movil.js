@@ -1972,6 +1972,8 @@ function _pdFichaHTML_(p){
            Daniel tiene delante cuando firma horas de alguien: ahi el rotulo tiene que decir
            de donde salen, no que les falta. */
         _pdOrigenHTML_(p)+
+        /* refutar139: lo que importa ANTES de pulsar «Aprobar» (repetido, horario pisado, muchas horas), con todo lo que tiene la cara delante */
+        (typeof _marcasParteDec_==='function' ? _marcasParteDec_(p, PARTES_DEC.concat(PARTES_REV)) : []).map(function(f){ return '<span class="pdw">'+esc(f)+'</span>'; }).join('')+   /* (`typeof`: los bancos que sacan esta ficha del fichero no cargan `comun.js`) */
         /* 01/11 · Daniel: «Se queda así y la pantalla lo dice» — el parte del PD lo firma él mismo */
         (_notaFirmaPropia_(p,_fichaYo_())?'<span class="pdw" style="background:none;color:var(--ink3)">'+esc(_notaFirmaPropia_(p,_fichaYo_()))+'</span>':'')+
         /* 20/10: un parte DEVUELTO se dice — espera al autor, y se ve qué se le pidió */

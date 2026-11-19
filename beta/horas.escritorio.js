@@ -95,6 +95,8 @@ function parteCard(p){
     '<div class="fl">'+(p.flags||[]).map(function(f){   /* 20/10: un parte sin avisos (la semilla, un `detalle`) no revienta la cola */
       return '<span class="chip '+(f[0]==='ok'?'ok':'wa')+'">'+esc(f[1])+'</span>';}).join('')+
       (p.origen==='fichaje'?'<span class="chip ok">con fichaje</span>':'')+
+      /* refutar139: lo que importa antes de aprobar (repetido, horario pisado, muchas horas), con todos los partes que tiene delante esta cara */
+      ((p.estado==='pend'||p.estado==='detalle') && typeof _marcasParteDec_==='function'?_marcasParteDec_(p, PARTES).map(function(f){ return '<span class="chip wa">'+esc(f)+'</span>'; }).join(''):'')+
       /* 20/10: lo devuelto se DICE — está en la cola esperando al autor, y se ve qué se le pidió. */
       (p.estado==='detalle'?'<span class="chip wa">devuelto · falta detalle'+(p.motivo?' — «'+esc(p.motivo)+'»':'')+'</span>':'')+
       /* 21/10 (auditor 8, 🟡 6): y si ya lo CONTESTÓ, qué se le había preguntado */

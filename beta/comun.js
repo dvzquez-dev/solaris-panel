@@ -11494,6 +11494,36 @@ function _notaMesCerradoParte_(p){
   return _nomPeriodo_(mes).split(' ')[0].toLowerCase()+' ya está cerrado: cuenta en '+_nomPeriodo_(per).split(' ')[0].toLowerCase();
 }
 
+/* refutar139 (19/11): LO QUE IMPORTA PARA FIRMAR 40 PARTES SEGUIDOS. La cola enseñaba cada parte como si fuera el único: dos idénticos (la misma persona, el mismo día, las
+   mismas horas y la misma tarea) salían como dos tarjetas sin marca, y firmar las dos contaba el doble; dos con el horario pisado sólo se avisaban al firmar el SEGUNDO
+   («ya tiene el parte… que se solapa»), cuando la coordinadora ya había perdido el hilo; y uno de 14 h iba igual que uno de 1 h. Devuelve las frases (cortas, ámbar) que
+   hay que mirar ANTES de pulsar «Aprobar»; `[]` si no hay nada. `p` y `todos` valen con el parte crudo (`fecha` ISO, `horas`, `tarea`) y con los de las dos vistas
+   (`f`/`fecha` DD/MM/AAAA, `q`/`horas`, `t`/`tarea`; el estado, el del servidor o `pend`/`det`/`aprobado`…). `todos` es TODO lo que la cara tiene delante, también lo
+   ya firmado: así lo repetido «de lo que firmaste hace un rato» también se ve. Sólo la persona del propio parte: lo de otra no se compara. El servidor no se toca: firmar
+   un solape con algo YA firmado lo para él (`e_decidir_parte`); lo demás es una pista, no una prohibición. */
+function _horasAltasParte_(){ return 8; }
+function _marcasParteDec_(p, todos){
+  if(!p || !p.autor) return [];
+  var vivo = function(x){ return !/^(rech|rechazad|anulad|revertid|rev$|cad|sin_?decl|sindecl)/.test(String(x.estado || x.e || '')); };
+  var decidido = function(x){ return !/^(pend|det)/.test(String(x.estado || x.e || '')); };
+  var iso = function(x){ return _dmyAISO_(String(x.iso || x.f || x.fecha || '')).slice(0, 10); };
+  var hs = function(x){ return Number(x.q != null ? x.q : x.horas) || 0; };
+  var tx = function(x){ return String(x.t != null ? x.t : (x.tarea || '')).replace(/\s*\(mes ya cerrado\)\s*$/i, '').replace(/\s+/g, ' ').trim().toLowerCase(); };
+  var min = function(h){ var m = /^(\d{1,2}):(\d{2})/.exec(String(h || '')); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+  var tramo = function(x){ var a = min(x.ini), b = min(x.fin); if(a == null || b == null) return null; return [a, b <= a ? b + 1440 : b]; };
+  var out = [], ya = {}, mia = tramo(p), dia = iso(p), h = hs(p), t = tx(p);
+  (todos || []).forEach(function(x){
+    if(!x || x.id === p.id || x.autor !== p.autor || !vivo(x) || iso(x) !== dia) return;
+    var rep = Math.abs(hs(x) - h) < 0.001 && tx(x) === t && !(mia && tramo(x));
+    var otra = tramo(x), pisa = !!(mia && otra && mia[0] < otra[1] && otra[0] < mia[1]);
+    var fr = rep ? 'igual que otro parte suyo del mismo día (mismas horas y tarea)' + (decidido(x) ? ', ya firmado' : ', también por firmar')
+           : pisa ? 'se pisa con otro parte suyo (' + x.ini + '–' + x.fin + (decidido(x) ? ', ya firmado' : ', por firmar') + ')' : '';
+    if(fr && !ya[fr]){ ya[fr] = 1; out.push(fr); }
+  });
+  if(h >= _horasAltasParte_()) out.push(nf2(h) + ' h en un solo parte: míralo antes de firmar');
+  return out;
+}
+
 function _etiOrigenParte_(p){
   var o = p && p.origen;
   if(o === 'fichaje') return null;              // el caso normal no necesita rotulo
