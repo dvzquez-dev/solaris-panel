@@ -49,10 +49,11 @@ function _origenParte_(p){
   /* El texto sale de `_etiOrigenParte_` (comun.js): aqui solo se decide COMO se pinta en esta
      lista -- corto, en linea y detras del resto. Antes esta funcion tenia su propia tabla de
      casos, que es como el escritorio y ella acabaron diciendo cosas distintas del mismo parte. */
-  var e=_etiOrigenParte_(p);
-  if(!e) return '';
+  var e=_etiOrigenParte_(p), n=(typeof _notaMesCerradoParte_==='function' ? _notaMesCerradoParte_(p) : null);   /* 18/11 (refutar97): sin firmar y de un mes ya cerrado, lo dice */
+  var cola = n ? ' · <span style="color:var(--warn)">'+esc(n)+'</span>' : '';
+  if(!e) return cola;
   var col = e.tono==='ok' ? 'var(--ink3)' : 'var(--warn)';
-  return ' · <span style="color:'+col+'">'+esc(e.txt)+'</span>';
+  return ' · <span style="color:'+col+'">'+esc(e.txt)+'</span>'+cola;
 }
 
 /* ⛔ EL ISO SE CONSERVA. `f` sale ya formateado a `DD/MM/AAAA` para pintarlo, y ordenar por
@@ -147,6 +148,12 @@ async function _cargarMisPartes_(){
    por el refresco. El admin relee los de `YO` por `_partesDe_` (la misma rama que el arranque), y si mientras tanto
    ha cambiado a quién mira, lo leído no se pinta. */
 async function _recargarPartesVivo_(){
+  /* refutar74 (18/11, la semana de José): y LA COLA QUE TE TOCA FIRMAR. Se leía una sola vez, al abrir: un coordinador con la app abierta no se enteraba
+     NUNCA de que su gente había mandado un parte —ni la tarjeta «Esperan tu decisión» ni el globo de Horas, ni al volver a la pestaña— hasta cerrar y abrir
+     la app, y a quien le toca firmar no le llega ningún aviso al móvil (el escritorio sí lo trae solo). Lo que frenaba esto era que una lectura rancia devolvía a
+     la cola un parte ya firmado: ahora `_cargarPartesDec_` tira lo que llegue si mientras tanto se decidió algo (`_PDEC_VER_`). Sin rango no hay cola (no se pide). */
+  if(typeof _cargarPartesDec_==='function' && typeof rangoNom==='function' && rangoNom((typeof _actorSanc_==='function' ? _actorSanc_() : null) || (YO&&YO.nombre) || '')>=1)
+    await _cargarPartesDec_().catch(function(){});        /* se espera: el repintado de `_refrescoVivo_` va detrás y tiene que verla */
   if(esAdmin()){
     if(!YO) return false;
     var n = YO.nombre;
@@ -533,7 +540,7 @@ function _compHorasHTML_(base, crudo){
      distingue de «+12 %» respecto a un total, y son cosas distintas. */
   return '<div class="comph">'+f+
     '<p class="rnota" style="margin:6px 0 0">Tu ritmo: <b>'+nf2(ritmo)+' h/día</b> ('+nf2(_num)+
-    ' h en '+dia+' días'+(_bt==null?'':', con las horas por gestión de tu cargo repartidas hasta hoy')+   /* 🟡 4 (refutador): también la tiene quien no tiene cargo */   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
+    ' h en '+dia+(dia===1?' día':' días')+(_bt==null?'':', con las horas por gestión de tu cargo repartidas hasta hoy')+   /* 🟡 4 (refutador): también la tiene quien no tiene cargo */   /* 🟡 5 (auditor 21): va en rampa, no fuera */   /* 20/10: sin «de N»: `dias_mes` es una media (30,45) */
     '). Se compara el ritmo y no el total porque el mes en curso va a medias.</p></div>';
 }
 
@@ -650,8 +657,11 @@ function animarBarras(root, silencioso){
   });
   _guardarAnchos_();
   /* Y el rotulo, que lleva `translateX(-50%)`: sin guarda se va medio fuera. */
-  $$('.barhet span',root||document).forEach(function(s){ var l=parseFloat(s.dataset.l);
-    s.style.left=(isFinite(l)?l:0)+'%'; });
+  /* ⛔ 17/11 (refutar49): y el rótulo NO puede salirse de la tarjeta. Con el marcador cerca del final (el objetivo de un mes que empieza, con 0 h hechas:
+     98 %) el rótulo centrado sobresalía 30 px por la derecha y «objetivo 15 h» se cortaba contra el borde del móvil. En los extremos se ALINEA al borde
+     en vez de centrarse (sin medir: un rótulo oculto no mide nada, y esto vale lo mismo pintado que no). */
+  $$('.barhet span',root||document).forEach(function(s){ var l=parseFloat(s.dataset.l); l=isFinite(l)?l:0;
+    s.style.left=l+'%'; s.style.transform = l>85 ? 'translateX(-100%)' : (l<15 ? 'none' : ''); });
 }
 
 /* ⛔ SIN REFERENCIA NO HAY PORCENTAJE, Y SE DICE CALLANDO LA FILA — no pintándola a
@@ -736,8 +746,8 @@ function durTotalForm(){ return durForm() + _tramosExtraH_(ST.form); }
 function _firmaTxtM_(rt){
   if(!rt) return 'no cuentan hasta que las firma quien coordine el subsistema';
   if(rt.propio) return 'cuentan cuando las firmas tú: eres el Project Director';
-  return 'no cuentan hasta que las firma '+esc(String(rt.nom||'').split(' ')[0])+', '+
-    (rt.escalado?'Project Director':'coordinador de tu unidad');
+  return 'no cuentan hasta que las firma '+esc(_firmantesTxt_(rt))+', '+
+    (rt.escalado?'Project Director':((rt.noms||[]).length>1?'coordinadores de tu unidad':'coordinador de tu unidad'));
 }
 
 function vFichar(){
@@ -765,7 +775,7 @@ function vFichar(){
       '<div class="sesion'+(corre?' corre':'')+(s.estado==='pausada'?' pausada':'')+(largo?' larga':'')+'" id="sesion">'+
         '<div class="rel mono" id="relSes">'+fmtHM(min)+'</div>'+
         '<div class="est"><span class="d"></span><span id="estSes">'+
-          (corre?'CONTANDO DESDE LAS '+s.desde:(s.estado==='pausada'?'EN PAUSA · EL RELOJ ESTÁ PARADO':'SIN SESIÓN ABIERTA'))+
+          (corre?'CONTANDO DESDE LAS '+s.desde+(_zonaNoMadrid_()?' (HORA DE MADRID)':''):(s.estado==='pausada'?'EN PAUSA · EL RELOJ ESTÁ PARADO':'SIN SESIÓN ABIERTA'))+
         '</span></div>'+
       '</div>'+
       (s.estado!=='parada' && !nube
@@ -936,7 +946,7 @@ function vFichar(){
          raro cuando Fulano eres tú. */
       '<p>'+(rt.propio
         ?'Este parte <b>no pasa a nadie</b>: el Project Director eres tú.'
-        :'Va a <b>'+esc(rt.nom)+'</b>, '+(rt.escalado?'Project Director':'coordinador de '+esc(_perf))+'.')+
+        :'Va a <b>'+(rt.noms||[rt.nom]).map(esc).join('</b> o <b>')+'</b>, '+(rt.escalado?'Project Director':((rt.noms||[]).length>1?'coordinadores de ':'coordinador de ')+esc(_perf))+'.')+
       /* ⛔ EL ROTULO SE ELIGE POR `propio`, no por `escalado`: al Project Director le decía
          «COMO COORDINAS ‹UNIDAD›» — una coordinación que no tiene, porque `coordinadorDe`
          cae a él cuando la unidad no tiene coordinador. 31/10: para `propio` ya no hay rótulo
@@ -951,7 +961,7 @@ function vFichar(){
     '<button class="btn pri full" data-p id="btnEnviar" disabled style="margin-top:13px">'+
       '<span id="lblEnviar">Faltan datos para enviar</span></button>'+
     '<p class="rnota" style="margin:10px 2px 0">Queda <b style="color:var(--warn)">pendiente</b> y no suma '+
-    'hasta que '+esc(rt.nom.split(' ')[0])+' lo apruebe.</p>';
+    'hasta que '+esc(pilaClara(rt.nom)||rt.nom.split(' ')[0])+' lo apruebe.</p>';
 }
 
 /* ⛔ 20/10 (ficha 🔴 del 20/08): el parte que se iba a DECLARAR, si sigue existiendo. Si el refresco de 90 s se lo
@@ -1360,7 +1370,7 @@ function filaParte(p){
      la nota DETRÁS, como ya hacen `rech` y `rev`. */
   var sub = p.e==='conf' ? (p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')+(p.nota?' · '+esc(p.nota):''))
           : p.e==='otor' ? (p.nota?esc(p.nota)+(p.ini?' · '+p.ini+'–'+p.fin:''):(p.f+(p.ini?' · '+p.ini+'–'+p.fin:'')))
-          : p.e==='pend' ? _cuandoParte_(p)+'esperando aprobación'
+          : p.e==='pend' ? _cuandoParte_(p)+'esperando aprobación'+(_diasEsperando_(p.creado_at) ? ' · lleva '+_diasEsperando_(p.creado_at)+' días' : '')   /* 18/11 (refutar126) */
           /* ⛔ SE ENSEÑA LA PREGUNTA, NO QUE HAY UNA. «Te piden más detalle» no dice QUÉ
              falta, así que el miembro tiene que adivinar o preguntar por Discord — y el
              motivo lo escribió el coordinador precisamente para eso. Es obligatorio en el
@@ -1382,7 +1392,8 @@ function filaParte(p){
      SERVIDOR y el último cierre solo lo tiene el PD: sin ellos la puerta dice lo que no sabe. */
   if(_cuentaYa_(p.e)){
     var _perS=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;   /* ⛔ por la puerta (791.ª) */
-    sub += ' · '+esc(_selloAprobado_(p, _perS, (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null));
+    var _sello=_selloAprobado_(p, _perS, (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null);
+    sub += ' · '+esc(_sello)+esc(_pistaCorregirFirmado_(p, _sello));   /* refutar130: a quién pedirle corregir lo ya firmado */
   }
   /* 12/11 (refutar27): aprobado y aún NO en la ficha (`enFicha===false`: Notion lo aplica después) no «sumó»: SUMARÁ. La píldora de arriba ya lo decía. */
   var catTxt = _cuentaYa_(p.e) ? (p.enFicha===false ? ' · aún no en tu ficha: sumará a ' : ' · sumó a ')+catEti(p.cat)
@@ -1552,7 +1563,7 @@ function _fijasDesglose_(items){
     '<div class="d"><span class="pil otor">automática</span> <b class="mono">'+nf2(_bh)+' h</b></div></div>';
   var filaExtra =
     '<div class="fila borde-ot"><div class="a"><b>Asignada por el Project Director</b>'+
-      '<small>'+(_cx>0?'por trabajo de más (turnos extra y demás)':'ajuste sobre la base de tu cargo')+' · <b>solo de este mes</b>: en el cierre '+
+      '<small>'+_compExtraQue_(_cx)+' · <b>solo de este mes</b>: en el cierre '+
       'la compensación vuelve a la base</small></div>'+
     '<div class="d"><span class="pil otor">asignada</span> <b class="mono">'+(_cx>0?'+':'')+nf2(_cx)+' h</b></div></div>';
   var fijas=[{catDesglose:'cargo', q:_bh, fila:filaBase}];
@@ -1714,7 +1725,7 @@ function _cuotaHTML_(){
         : '')
       : '<div class="rl"><span>Cuota por tus horas</span><span class="ra">—</span></div>'+
         '<p class="rnota">Llevas el coche en '+YO.coche+' turno'+(YO.coche===1?'':'s')+' entre '+
-        'Ourense y Vigo, pero el servidor aún no ha servido tu cuota <b>sin</b> descuentos: no se puede '+
+        'Ourense y Vigo, pero aún no se ha calculado tu cuota <b>sin</b> descuentos: no se puede '+
         'decir cuánto te resta.</p>')
     : '<p class="rnota">Aún sin descuentos · llevar el coche en un turno entre Ourense y Vigo resta '+nf2(_descuentoCoche_())+' € por turno.</p>';
   /* ⛔⛔ ES UNA ESTIMACIÓN, Y LA CIFRA GRANDE TIENE QUE DECIRLO. Daniel, 15/08, literal:
@@ -1736,6 +1747,11 @@ function _cuotaHTML_(){
       '<p class="rnota" style="margin-top:6px">Es una <b>estimación</b>: la cuota es <b>anual</b>, '+
         'no se paga mes a mes.</p>'+
       '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'+recibo+'</div>'+
+      /* ⛔ 17/11 (refutar75) · SIN NINGÚN MES CERRADO la curva usa tus horas SIN dividir (Daniel, 14/08), y a quien lleva unos días eso le pinta una cifra
+         enorme (3 h = 64,74 €) sin una palabra. El escritorio ya lo decía («todavía no has cerrado ningún mes»); aquí faltaba. `meses` ausente es «no lo sé»: no se dice. */
+      ((_q.viva && typeof YO.meses==='number' && YO.meses<=0)
+        ? '<p class="rnota">Todavía <b>no has cerrado ningún mes</b>: se usan tus horas <b>sin dividir</b>, así que la cifra es aún más provisional.</p>'
+        : '')+
       /* ⛔ LA BASE SALE DE LA REGLA, NO SE TECLEA. Aquí ponía **«2 h de base» para todo
          el mundo**, y la base es la del **cargo**: `COMP_CARGO` da **7 h al PD** y **3,5 a
          un coordinador**; 2 es solo el defecto del miembro raso. Y esta nota existe para
@@ -1744,6 +1760,7 @@ function _cuotaHTML_(){
          ✅ Por la misma puerta que el resto (`_compBase_`), no por una copia: el día que
          cambie la tabla, la frase cambia sola. Es lo mismo que se hizo con la frase del
          expediente en el medidor de conducta. */
+      (_cuotaPorQue_(YO,_q) ? '<p class="rnota">'+_cuotaPorQue_(YO,_q)+'</p>' : '')+
       '<p class="rnota">'+(_q.viva
         ? 'Se recalcula <b>con tus horas de ahora mismo</b>, no en el último cierre. '
         : '<b>Es la última cifra calculada</b>, no la de ahora. ')+
@@ -1785,6 +1802,7 @@ function _normPDec_(p){
     aplicado_at:p.aplicado_at||null, motivo:p.motivo||null,   /* 20/10: lo que se pidió, en la ficha de un `detalle` */
     pedido:p.detalle_pedido||null,   /* 21/10 (auditor 8, 🟡 6): la pregunta ya CONTESTADA (el servidor la guarda al responder) */
     estado:p.estado, origen:p.origen||null,
+    creado_at:p.creado_at||null,   /* 18/11 (refutar126): desde cuándo espera la firma (`_diasMasViejo_`); este normalizador enumera campos y sin él el aviso nunca sale */
     corr:p.correcciones||null,   /* 26/10: si su autor corrigió las horas, quien firma lo ve */
     bloque:p.bloque||null, reunion_id:p.reunion_id==null?null:p.reunion_id, resumen:p.resumen||'',   /* 29/10: el parte de bloque */
     tareaparte:p.tareaparte||null, propuesto_por:p.propuesto_por||null };   /* 01/11: tarea entregada → parte propuesto */
@@ -1839,7 +1857,9 @@ function _cargarPartesDec_(){
      por el de siempre. Es el mismo fallo que ya se cerró en `_puedeBorrarReuM_`. */
   /* 12/11 (rendimiento-1): el plan del cierre y los partes se piden A LA VEZ; el `then` espera a LAS DOS, así
      que la primera pintada sigue teniendo el plan. `_cargarCierrePlan_` se traga sus errores (devuelve null). */
+  var _v0 = _PDEC_VER_;       /* refutar74: si se decide algo mientras esto vuela, lo que llegue es de ANTES de la decisión y NO se reparte */
   return Promise.all([_cargarCierrePlan_(), api.getPartes({})]).then(function(r){ var arr = r[1];
+    if(_v0 !== _PDEC_VER_) return;
     /* ⛔ LA BANDERA DEL FALLO (19/10). El `catch` de abajo era MUDO: un corte al entrar dejaba
        `PARTES_DEC=[]` y la tarjeta «Esperan tu decisión» DESAPARECÍA — un coordinador leía «no
        tengo nada que firmar» y las horas de su gente se quedaban sin contar. Es el mismo arreglo
@@ -1882,7 +1902,7 @@ function _repartirPartesDec_(arr){
       /* 31/10 · Daniel: «si lo he hecho yo […] le tendría que enrutar a Bruno». El parte del PD de una unidad que coordina
          OTRO no es «tuyo por aprobar» (sigue pudiendo decidirlo; es del coordinador): `coordinadorDe` es la misma regla que
          el servidor, que ya puso en `p.subsistema` la unidad de la TAREA. */
-      if(p.autor===yo && coordinadorDe(p.subsistema)!==yo) return false;
+      if(p.autor===yo && !esElUnicoCoordDe(p.subsistema,yo)) return false;   /* 18/11 (refutar100): con DOS coordinadores el tuyo lo firma el otro */
       return (p.estado==='pendiente' || p.estado==='detalle') && (_mando || p.autor!==yo);
     }).map(_normPDec_);
     /* ⛔ Y DE LA MISMA RESPUESTA, lo ya decidido. Pedirlo en otra llamada seria un segundo
@@ -1905,6 +1925,7 @@ function _repartirPartesDec_(arr){
 
 /* Lo que `_cargarPartesDec_` dejó guardado por no saber todavía quién eres, repartido ya con la identidad puesta (la llama el arranque, `_onCredencial_`). */
 var _PDEC_CRUDO_ = null, _PDEC_ESPERA_ = false;
+var _PDEC_VER_ = 0;   /* refutar74: sube con cada decisión local (`_engPartesDec_`); una lectura de la cola que salió antes de ella se tira */
 function _repartirPartesDecSiEspera_(){
   if(!_PDEC_ESPERA_) return;
   _PDEC_ESPERA_ = false;
@@ -1916,11 +1937,12 @@ function _repartirPartesDecSiEspera_(){
    que hay que mirar. Lo otorgado por la coordinación va en gris — marcarlo en ámbar sería pedirle
    a quien firma que desconfíe de algo que hizo el sistema. */
 function _pdOrigenHTML_(p){
-  var e=_etiOrigenParte_(p);
-  if(!e) return '';
-  return e.tono==='ok'
+  var e=_etiOrigenParte_(p), n=(typeof _notaMesCerradoParte_==='function' ? _notaMesCerradoParte_(p) : null);   /* 18/11 (refutar97): quien firma sabe a qué mes va ANTES de aprobar */
+  var cola = n ? '<span class="pdw">'+esc(n)+'</span>' : '';
+  if(!e) return cola;
+  return cola+(e.tono==='ok'
     ? '<span class="pdw" style="background:none;color:var(--ink3)">'+esc(e.txt)+'</span>'
-    : '<span class="pdw">'+esc(e.txt)+'</span>';
+    : '<span class="pdw">'+esc(e.txt)+'</span>');
 }
 
 /* Una ficha de parte, dentro de la lista de decisión. Se saca aparte porque ahora vive dentro
@@ -1932,7 +1954,7 @@ function _pdRango_(p){
 function _pdFichaHTML_(p){
   return '<div class="pdi" data-pd="'+p.id+'">'+
         '<div class="fila"><div class="a"><b>'+esc(_pilaDeM_(p.autor))+'</b>'+
-          '<small>'+esc(p.unidad)+' · '+esc(p.f)+_pdRango_(p)+'</small></div>'+
+          '<small>'+esc(p.unidad)+' · '+esc(p.f)+_pdRango_(p)+(_esBaja_(p.autor)?' · de baja':'')+'</small></div>'+   /* refutar106: quien se fue sigue con partes en la cola (se firman: lo hizo antes) y se dice */
           '<div class="d mono" style="font-weight:600">'+nf2(p.q)+' h</div></div>'+
         '<div class="pdt">'+_icoBloque_(p)+esc(p.t)+'</div>'+
         /* ⛔⛔ `p.t`, NO `p.tarea`: `_normPDec_` RENOMBRA el campo al normalizar, y una
@@ -1950,6 +1972,8 @@ function _pdFichaHTML_(p){
            Daniel tiene delante cuando firma horas de alguien: ahi el rotulo tiene que decir
            de donde salen, no que les falta. */
         _pdOrigenHTML_(p)+
+        /* refutar139: lo que importa ANTES de pulsar «Aprobar» (repetido, horario pisado, muchas horas), con todo lo que tiene la cara delante */
+        (typeof _marcasParteDec_==='function' ? _marcasParteDec_(p, PARTES_DEC.concat(PARTES_REV)) : []).map(function(f){ return '<span class="pdw">'+esc(f)+'</span>'; }).join('')+   /* (`typeof`: los bancos que sacan esta ficha del fichero no cargan `comun.js`) */
         /* 01/11 · Daniel: «Se queda así y la pantalla lo dice» — el parte del PD lo firma él mismo */
         (_notaFirmaPropia_(p,_fichaYo_())?'<span class="pdw" style="background:none;color:var(--ink3)">'+esc(_notaFirmaPropia_(p,_fichaYo_()))+'</span>':'')+
         /* 20/10: un parte DEVUELTO se dice — espera al autor, y se ve qué se le pidió */
@@ -1958,7 +1982,7 @@ function _pdFichaHTML_(p){
         (p.estado==='pendiente' && p.pedido?'<span class="pdw">contestó a lo que se le pidió — «'+esc(p.pedido)+'»</span>':'')+
         /* 26/10 · «Sí, mientras no esté firmado»: las horas que tienes delante las corrigió su autor — y de cuánto eran */
         (_txtCorreccion_(p.corr)?'<span class="pdw">'+esc(_txtCorreccion_(p.corr))+'</span>':'')+
-        '<input class="pdm" type="text" placeholder="Motivo — obligatorio para rechazar o pedir detalle">'+
+        '<input class="pdm" type="text" placeholder="Motivo (si rechazas o pides detalle)">'+
         '<div class="pdb">'+
           '<button data-pdacc="aprobar" data-p>Aprobar</button>'+
           '<button data-pdacc="detalle" data-p>Pedir detalle</button>'+
@@ -1990,6 +2014,7 @@ function _pdFichaHTML_(p){
 var PD_ABIERTO_={};
 document.addEventListener('toggle', function(ev){ var d=ev.target;
   if(d && d.dataset && d.dataset.pdk) PD_ABIERTO_[d.dataset.pdk]=d.open; }, true);
+var TRAMO_PERSONA = 10;   /* 18/11 (refutar96): fichas que se enseñan de cada persona antes de «Mostrar 10 más» */
 function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
   if(!lista.length) return '';
   var horas=0; lista.forEach(function(p){ horas+=p.q; });
@@ -2019,11 +2044,11 @@ function _pdGrupoHTML_(id, titulo, nota, lista, ficha){
         var ps=por[a], h=0; ps.forEach(function(x){ h+=x.q; });
         var k=id+'|'+a;
         /* movil13-3: con UNA persona no hay cabecera (repetía el nombre y las horas de la ficha); el grupo de arriba sigue plegándose. */
-        if(unico) return ps.map(ficha).join('');
+        if(unico) return _listaPorTramos_(k, ps, ficha, TRAMO_PERSONA);   /* 18/11 (refutar96): por tramos — con la temporada entera, 1.900 fichas cerradas dentro de un desplegable bloqueaban 5-7 s */
         return '<details class="pdpers" data-pdk="'+esc(k)+'"'+(PD_ABIERTO_[k]?' open':'')+'>'+
           '<summary><b>'+esc(_pilaDeM_(ps[0].autor))+'</b>'+
             '<span class="pdnum">'+ps.length+' · '+nf2(h)+' h</span></summary>'+
-          ps.map(ficha).join('')+
+          _listaPorTramos_(k, ps, ficha, TRAMO_PERSONA)+
         '</details>';
       }).join('')+
     '</details></div>';
@@ -2114,7 +2139,7 @@ function _engVariosM_(){
    del PD y la lista ofrecía revertir partes de otras unidades a quien no puede. `p` es el parte CRUDO (`subsistema`). */
 function _pdPuedeRevertir_(p, quien){
   var r = (typeof rangoNom==='function') ? rangoNom(quien) : 0;
-  return r >= 3 || (r >= 1 && coordinadorDe(p.subsistema||'—') === quien) || esSubcoordDe(quien, p.autor);   /* 02/11: + el subcoordinador, a su equipo */
+  return r >= 3 || (r >= 1 && esCoordDe(p.subsistema||'—', quien)) || esSubcoordDe(quien, p.autor);   /* 02/11: + el subcoordinador, a su equipo */
 }
 
 function _pdRevertible_(p){
@@ -2167,8 +2192,8 @@ function _pdRevFichaHTML_(p){
      CURSO — horas de otro mes, a alguien que no ha hecho nada, y sin dar error. */
   if (p.cerrado){
     return cab+
-        '<span class="pdw">Mes cerrado ('+esc(p.cerrado)+'): ya no se revierte. '+
-          'Esas horas ya cuentan y de ahí salió la cuota.</span>'+
+        '<span class="pdw">Mes cerrado ('+esc(typeof _nomPeriodo_==='function' ? _nomPeriodo_(p.cerrado) : p.cerrado)+'): ya no se revierte. '+   /* 18/11 (refutar97): «2026-10» era el dato, no el nombre */
+          'Esas horas ya cuentan y de ahí salió la cuota. Si hay que corregirlo, se hace en la ficha.</span>'+
       '</div>';
   }
   return cab+
@@ -2204,6 +2229,7 @@ function _pdRevHTML_(){
 }
 
 function _engPartesRev_(){
+  _engTramos_(pintar);   /* 18/11: «Mostrar N más» de cada persona en las listas de partes */
   var c=$('#prev'); if(!c) return;
   $$('#prev [data-pdrev]').forEach(function(b){
     b.onclick=async function(){
@@ -2262,6 +2288,7 @@ function _engPartesDec_(){
       /* 12/11 (horas-1, Daniel aceptó): aprobar es UN toque, sin «¿Aprobar estas horas?», como en el escritorio.
          Se deshace en «Ya decidiste»; rechazar y pedir detalle siguen exigiendo su motivo (arriba). */
       $$('#pdec [data-pdacc]').forEach(function(x){ x.disabled=true; });
+      _PDEC_VER_++;     /* refutar74: una lectura de la cola que ya iba en vuelo (lo vivo) es de antes de esto y no puede devolver el parte a la lista */
       var prev=b.textContent; b.textContent='…';
       try{
         var upd=await api.decidirParte(id, acc, mot||null);
@@ -2464,7 +2491,7 @@ function vHoras(){
         /* ⛔ EL RÓTULO, UNA VEZ (782.ª): el `<h2>` de la línea de arriba ya dice «Tus
            partes» y se ve a la vez que esto. El desplegable se queda con lo que añade — el
            número y las HORAS —, que es lo que el título no tiene. */
-        ? '<details class="pdgrupo"><summary><span class="pdnum">'+
+        ? '<details class="pdgrupo"'+(mias.some(function(x){ return x.e==='det'; })?' open':'')+'><summary><span class="pdnum">'+
             mias.length+' '+(mias.length===1?'parte':'partes')+' · '+
             _rechazadasTxt_(mias)+
             nf2(mias.reduce(function(t,x){ return t+(x.e==='pend' ? _horasVistaParte_(x) : 0); },0))+' h en cola</span></summary>'+
@@ -2596,7 +2623,7 @@ function _rankSubsHTML_(){
     '<div class="tarj">'+(subs.length?subs.map(function(s,i){
       var mio=s.u===YO.unidad;
       return '<div class="fila"><div class="a"><b'+(mio?' style="color:var(--red2)"':'')+'>'+(i+1)+'. '+esc(s.u)+(mio?' (tú)':'')+'</b>'+
-        '<small>'+s.n+' personas</small>'+
+        '<small>'+s.n+(s.n===1?' persona':' personas')+'</small>'+   /* 19/11 (refutar132): «1 personas» */
         '<div style="height:7px;border-radius:4px;background:var(--sur2);margin-top:6px;overflow:hidden">'+
         '<i style="display:block;height:100%;width:'+(s.media/maxS*100).toFixed(0)+'%;border-radius:4px;'+
         'background:'+(mio?'var(--red)':'var(--ink3)')+'"></i></div></div>'+

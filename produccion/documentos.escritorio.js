@@ -24,7 +24,7 @@ function revisoresDe(d){
   /* 05/11 (`pedirrev`): con una PETICIÓN de revisión pendiente del PD, los revisores son los PEDIDOS. Gemela de `revisores_de`. */
   var _pet=_peticionRevActiva_(d); if(_pet) return (_pet.revisores||[]).slice();
   if(_revisoresPropuestosValidos_(d).length) return _destinoConflictoDoc_(d);   /* 05/11 (`conflictojose`): a José, que valida sin firmar */
-  var r = d.amb==='archivo' ? [coordinadorDe(d.sub)]
+  var r = d.amb==='archivo' ? coordinadoresDe(d.sub)
         : d.amb==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
   /* 02/11: TODOS los autores (el que lo sube, los que nombra el documento y los ajustados), no sólo `autor`. */
@@ -63,7 +63,7 @@ function _normDocE_(d, i){
     subtitulo:        d.subtitulo || '',
     confidencialidad: d.confidencialidad || '',
     /* 01/11: la versión (la propone el autor, la cambia el revisor) y de qué documento es versión nueva. */
-    version: d.version || '', sustituyeA: d.sustituyeA || '',
+    version: d.version || '', sustituyeA: d.sustituyeA || '', envio: d.envio || '',
     autor:   d.autor || '',
     /* 31/10: el rastro de `cambiarAutorDoc` (PD/José), con los mismos nombres que el servidor y el móvil. */
     autor_original: d.autor_original || null, autor_cambiado_por: d.autor_cambiado_por || null,
@@ -137,7 +137,7 @@ function chipSevDoc(sev){
          '">'+calDoc(sev)+'</span>';
 }
 
-function ambDoc(a){ return AMB_DOC[a]||String(a||'—'); }
+function ambDoc(a, tipo){ return _ambitoDeActa_(a, tipo) || AMB_DOC[a] || String(a||'—'); }
 
 /* GEMELA de `puedeDecidirDoc` del movil y de `_puedeDecidir_` del backend: nadie firma
    lo suyo, el primero que decide bloquea a sus iguales, y solo alguien de MAS rango
@@ -185,12 +185,12 @@ function puedeDecidirDoc(d){
      estado (`rangoNom(ACTOR) > rangoPila(null)` = `>0`, cierto para todo revisor),
      que es lo que el caso 38 de `probar_documentos_caras.py` fija. */
   if(d.est==='revision') return true;      /* sin decidir: cualquiera habilitado */
-  return d.revisor===_m(ACTOR).pila || rangoNom(ACTOR)>rangoPila(d.revisor);
+  return esFirmaDe(d.revisor, ACTOR) || rangoNom(ACTOR)>rangoPila(d.revisor);      /* refutar92: por NOMBRE, no por pila */
 }
 
 function filaDoc(d){
   if(DOC_SEL===d.id) return docCard(d);
-  var rev=revisoresDe(d).map(function(n){return _m(n).pila;}).join(' o ');
+  var rev=revisoresDe(d).map(function(n){return (pilaClara(n)||_m(n).pila);}).join(' o ');
   /* `mio` sale de `_meTocaDoc_`, LA puerta: aqui preguntaba por `puedeDecidirDoc`, que
      contesta «puedo pisar por rango» y no «me toca» — 2 de 12 combinaciones divergian. */
   var st=estDoc(d.est), mio=_meTocaDoc_(d);
@@ -198,8 +198,8 @@ function filaDoc(d){
   return '<div class="dec" id="doc-'+d.id+'" data-docsel="'+d.id+'">'+
     '<span class="ic"><svg><use href="#i-doc"/></svg></span>'+
     '<span class="tx"><b>'+esc(d.tit)+'</b><small><span class="mono">'+esc(d.ref)+'</span> · '+
-      esc(_m(d.autor).pila)+' · '+ambDoc(d.amb)+(rev ? ' · firma '+esc(rev) : ' · sin revisor')+
-      (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+'</small></span>'+
+      esc((pilaClara(d.autor)||_m(d.autor).pila))+' · '+ambDoc(d.amb, d.tipo)+(rev ? ' · firma '+esc(rev) : ' · sin revisor')+
+      (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):'')+_marcaSuperadaDoc_(d, typeof DOCS!=='undefined' ? DOCS : [])+_marcaAprobadoSinPublicar_(d)+'</small></span>'+
     '<span class="der">'+
       (mio?'<span class="chip wa">te toca</span>':'')+
       /* El chip sale de `chipSevDoc`, que es LA puerta: aqui habia una copia y en
@@ -249,7 +249,7 @@ function _previaDocE_(d, st){
    sale de `_avisosDoc_`—; aquí sólo cambia la envoltura, que es lo único que difiere de
    verdad entre las dos caras. */
 function _avisosDocE_(d){
-  var xs = (typeof _avisosDoc_==='function') ? _avisosDoc_(d) : [];
+  var xs = (typeof _avisosDoc_==='function') ? _avisosDoc_(d, typeof DOCS!=='undefined' ? DOCS : []) : [];
   return xs.map(function(a){
     return '<div class="just" style="border-left-color:var(--warn)"><span class="sc">'+
            esc(a.t)+'</span>'+esc(a.d)+'</div>';
@@ -280,9 +280,16 @@ function _pasosSustituirE_(d){
    proposito: ahi «lo firma X» SI es verdad. */
 function _docAutorE_(d){
   if(!d || typeof ACTOR==='undefined' || d.autor!==ACTOR) return '';
-  var m=_docAutorModelo_({estado:d.est, nota:d.nota, decision:d.decision, decidedAt:d.decidedAt, revisor:d.revisor, url:d.notion});
-  if(!m || m.tipo==='cambios') return '';   /* `cambios` tiene su rama propia en `verDoc` (los pasos para corregir) */
+  var m=_docAutorModelo_({estado:d.est, nota:d.nota, decision:d.decision, decidedAt:d.decidedAt, revisor:d.revisor, url:d.notion, ref:d.ref});
+  if(!m || m.tipo==='cambios' || m.tipo==='revision') return '';   /* `cambios` tiene su rama propia en `verDoc` (los pasos para corregir); `revision` sigue con «lo firma X» (+ el aviso de abajo) */
   return '<div class="ruta">'+m.html+'</div>'+(m.tipo==='decidido' ? _pasosSustituirE_(d) : '');
+}
+
+/* refutar130: «mandé el archivo equivocado» — en revisión el autor tiene el camino (misma referencia por el formulario) y la ficha no lo decía. Misma puerta que el móvil. */
+function _docEquivocadoE_(d){
+  if(!d || typeof ACTOR==='undefined' || d.autor!==ACTOR || d.est!=='revision') return '';
+  var m=_docAutorModelo_({estado:'revision', ref:d.ref});
+  return m ? '<div class="ruta">'+m.html+'</div>' : '';
 }
 
 function _pasosCorregirE_(d){
@@ -320,7 +327,7 @@ function _decDocLocalE_(d, acc, mot, tit, actor, at, aj){
 }
 
 function docCard(d){
-  var revs=revisoresDe(d), rev=revs.map(function(n){return _m(n).pila;}).join(' o ');
+  var revs=revisoresDe(d), rev=revs.map(function(n){return (pilaClara(n)||_m(n).pila);}).join(' o ');
   var sinRev=!revs.length;
   var puede=puedeDecidirDoc(d), st=estDoc(d.est), an=d.analisis||null, secs='';
   if(_peticionRevActiva_(d)) st=['pendiente de confirmaciones','wa'];   /* 05/11 (`pedirrev`) */
@@ -352,7 +359,7 @@ function docCard(d){
     /* 21/10 (auditor 19, 🟡 6): la gemela del móvil — a quien lo SUBIÓ, qué hacer él. */
     ((typeof ACTOR!=='undefined' && d.autor===ACTOR) ? 'Vuelve a mandarlo por el formulario con el enlace al archivo.</div></div>'
       : 'Pídeselo a quien lo subió antes de decidir.</div></div>'));
-  var acc, _aut, arriba='', _autorP=_puedeCambiarAutor_(d.est, ACTOR) && !_peticionRevActiva_(d) ? _autorPanelHTML_('a'+d.id+'-', d.id, _autoresActualesDe_(d), CAMPO_CSS) : '';
+  var acc, _aut, arriba='', _autorP=_puedeCambiarAutor_(d.est, ACTOR, d) && !_peticionRevActiva_(d) ? _autorPanelHTML_('a'+d.id+'-', d.id, _autoresActualesDe_(d), CAMPO_CSS) : '';
   if(puede){
     /* 28/10: los cuatro campos y SolarIA, en el panel COMPARTIDO con el móvil (`comun.js` `_anotPanelHTML_`), con
        prefijo `d<id>-`: aquí se pintan varias fichas a la vez. Sólo donde se puede aprobar. */
@@ -383,11 +390,11 @@ function docCard(d){
        decididos. Lo decide `_docAutorE_`, gemela de `_docAutorHTML_` del movil. */
     acc=_aut;
   } else if(d.autor===ACTOR){
-    acc=sinRev ? '<div class="ruta">Es tuyo y no hay otro revisor: avisa al Project Director. Nadie decide lo suyo.</div>'
-               : '<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>';
+    acc=(sinRev ? '<div class="ruta">Es tuyo y no hay otro revisor: avisa al Project Director. Nadie decide lo suyo.</div>'
+               : '<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>')+_docEquivocadoE_(d);
   } else if(d.revisor){
-    acc='<div class="ruta">Ya lo decidió <b>'+esc(d.revisor)+'</b>. Puedes consultarlo; para cambiar la '+
-      'decisión hace falta más rango que quién la tomó.</div>';
+    acc='<div class="ruta">Ya lo decidió <b>'+esc(firmaCorta(d.revisor))+'</b>'+(/\.$/.test(firmaCorta(d.revisor))?'':'.')+' Puedes consultarlo; para cambiar la '+
+      'decisión hace falta más rango que quien la tomó.</div>';
   } else if(_peticionRevActiva_(d)){
     acc='';      /* 05/11 (`pedirrev`): lo que toca (confirmar, cancelar) lo dice `_peticionRevHTML_` */
   } else {
@@ -404,8 +411,8 @@ function docCard(d){
       (typeof DOC_SEL!=='undefined' && DOC_SEL===d.id && !(typeof vista!=='undefined' && vista==='docdec')   /* 🟡 2 (refutador) */
         ? '<button class="btn sm" style="margin-left:auto" data-docsel="">Cerrar</button>' : '')+'</div>'+
     '<div class="pils">'+
-      '<span class="chip">'+esc(_m(d.autor).pila)+' · '+esc(d.sub||'—')+'</span>'+
-      '<span class="chip">'+ambDoc(d.amb)+'</span>'+
+      '<span class="chip">'+esc((pilaClara(d.autor)||_m(d.autor).pila))+' · '+esc(d.sub||'—')+'</span>'+
+      '<span class="chip">'+ambDoc(d.amb, d.tipo)+'</span>'+
       '<span class="chip '+st[1]+'">'+st[0]+'</span>'+
       /* ⛔ SIN CLASE = NEUTRO. El `else` era `'ok'` -verde-, asi que «calidad sin
          medir» se pintaba con el mismo chip que «calidad alta»: quien mira una lista
@@ -436,6 +443,7 @@ function docCard(d){
       (_etiquetasDe_(d).length
         ? '<span class="chip">'+esc(_etiquetasDe_(d).join(' · '))+'</span>' : '')+
     '</div>'+
+    ((typeof DOC_ARCH_NUEVO!=='undefined' && DOC_ARCH_NUEVO[d.id]) ? '<div class="just" style="border-left-color:var(--warn)"><span class="sc">Otra versión de este documento</span>Acaban de mandar un archivo nuevo: lo que ves abajo ya es el nuevo.</div>' : '')+
     _avisosDocE_(d)+
     /* 01/11 (escm1): se LEE antes de decidir — resumen y avisos de calidad ENCIMA del motivo y los botones. */
     '<div class="just"><span class="sc">Resumen ejecutivo</span>'+

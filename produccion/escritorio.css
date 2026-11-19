@@ -75,7 +75,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .cartel p b{color:var(--ink)}
 
 /* ═══ MARCO ══════════════════════════════════════════════════════════════ */
-.marco{position:relative;display:grid;grid-template-columns:238px minmax(0,1fr);grid-template-rows:56px 1fr;
+.marco{position:relative;display:grid;grid-template-columns:238px minmax(0,1fr);grid-template-rows:minmax(56px,auto) 1fr;   /* refutar123: con la letra al 200 % la ficha del usuario mide 88 px y se salía por arriba tapando el ⋮ */
   height:calc(100vh - 36px);min-height:660px;   /* 838.ª: 36 = el relleno del body; los 150 eran de un cartel que ya no existe */border:1px solid var(--line);border-radius:var(--r);
   overflow:hidden;overflow:clip;   /* 01/11: `clip` y no sólo `hidden`: la marca de agua sobresale del marco y con `hidden` un foco o un clic lo desplazaba (barra lateral y cabecera cortadas) */
   background:var(--bg);box-shadow:0 26px 60px rgba(0,0,0,.45)}
@@ -241,6 +241,8 @@ main.entrando>*:nth-child(4){animation-delay:.15s}
 /* La nota al pie de una ficha: sin regla salia a tamano y brillo de cuerpo, y con el
    margen de 1em que le pone el navegador. */
 .rnota{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5}
+.zonaaviso{margin-left:12px;padding:2px 9px;border:1px solid var(--line);border-radius:9px;font-size:11px;color:var(--ink2)}
+.zonaaviso[hidden]{display:none}
 /* 19/10: suelta en el panel (tras una tabla, en «Lo tuyo») iba pegada al borde; dentro de `.pb` ya tiene margen. */
 .pan>.rnota{padding:0 13px 10px}
 
@@ -249,6 +251,9 @@ main.entrando>*:nth-child(4){animation-delay:.15s}
 .kpi{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px 11px;
   position:relative;overflow:hidden;transition:border-color .2s linear}
 .kpi:hover{border-color:var(--line2)}
+.kpi.ir{cursor:pointer}   /* refutar63: la tarjeta que lleva a su pantalla */
+.kpi.ir:hover{border-color:var(--red3)}
+.kpi.ir:focus-visible{outline:2px solid var(--red2);outline-offset:2px}
 .kpi .val{font-family:var(--mono);font-size:29px;font-weight:600;letter-spacing:-.035em;line-height:1.1;margin:9px 0 3px}
 .kpi .val small{font-size:13px;color:var(--ink3);font-weight:400;letter-spacing:0}
 .kpi .d{font-size:11px;color:var(--ink3)}
@@ -331,6 +336,14 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .dec .tx{flex:1;min-width:0}
 .dec .tx b{display:block;font-size:13px}
 .dec .tx small{display:block;font-size:11px;color:var(--ink3);margin-top:2px}
+.dec .tx small .nb{font-weight:600;color:var(--ink2)}
+/* La fila de móvil (`.fila` con `.a` y `.d`) que comparte `comun.js` (el interruptor de Sonidos): sin esto salía sin estilo, con el botón pegado al texto.
+   `:has(>.a)` porque `.fila` también la usa Horas con otra forma (`.k`). */
+.fila:has(>.a){display:flex;align-items:center;gap:12px;padding:11px 13px}
+.fila>.a{flex:1;min-width:0}
+.fila>.a b{display:block;font-size:13px}
+.fila>.a small{display:block;font-size:11px;color:var(--ink3);margin-top:2px}
+.fila>.d{flex:none}
 .dec .der{display:flex;align-items:center;gap:9px;flex:none}
 .dec .chev{color:var(--ink3);font-family:var(--mono)}
 
@@ -363,7 +376,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .parte{border-top:1px solid var(--line);padding:13px}
 .parte:first-child{border-top:0}
 .parte .h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.parte .h b{font-size:13.5px}
+.parte .h b{font-size:13.5px;min-width:0;overflow-wrap:anywhere}   /* refutar117: un título sin espacios (200 letras pegadas) ensanchaba la tarjeta hasta salirse de la pantalla */
 .parte .h .u{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
 .parte .h .q{margin-left:auto;font-family:var(--mono);font-size:18px;font-weight:600;color:var(--warn);letter-spacing:-.02em}
 .parte .just{margin-top:9px;padding:9px 11px;border:1px solid var(--line);border-left:2px solid var(--tel);
@@ -482,7 +495,7 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 /* la hora al limite SUPERIOR de su fila y pegada a la derecha de su columna estrecha: es la
    misma decision que en horizontal (al limite izquierdo), girada 90 grados. */
 .hg.vert .hc.rh{min-height:0;align-items:flex-start;justify-content:flex-end}
-.hg.vert .hc.rh span{position:static;transform:translateY(calc(-50% - 1px));left:auto;top:auto;padding-right:4px;line-height:1}
+.hg.vert .hc.rh span{position:static;left:auto;top:auto;padding-right:4px;line-height:1}   /* 17/11: el `transform` lo pone `.hlin` (comun.js), UNA regla para todas las rejillas */
 /* ⛔ 19/10: la hora EN LA RAYA entre dos franjas, no arriba DENTRO de la suya (Daniel, 14/10: «justo en el medio
    de dos slots … ni para arriba ni para abajo»): media línea más medio `gap` (2 px). Con `transform`, que no
    cambia la caja que el grid mide. Vale para las DOS copias del mapa (las dos llevan `hg vert`). */
@@ -491,7 +504,8 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .hc.rd{justify-content:flex-end;padding-right:7px;white-space:nowrap;font-size:9.5px;color:var(--ink2)}
 .hc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
 /* etiqueta al LÍMITE izquierdo = hora de inicio (decisión cerrada) */
-.hc.rh span{position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}
+.hc.rh span:not(.hlin){position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}   /* `.hlin` (la hora en la línea, comun.js) lleva su propio transform */
+.hc.rh span.hlin{font-size:8.5px}
 .cel{cursor:default;height:19px;border-radius:2px;display:grid;place-items:center;font-family:var(--mono);
   font-size:8.5px;color:#fff;font-weight:600}
 /* 01/11 (esteticaesc): sobre la celda VERDE (reunión fijada) el blanco no llega a 3:1; ahí va el texto oscuro. */
@@ -946,7 +960,7 @@ tr.tur-sel td:first-child{box-shadow:inset 2px 0 0 var(--red2)}
 .tarl table{table-layout:fixed;min-width:1000px}
 .tarl th,.tarl td{overflow:hidden;text-overflow:ellipsis}
 .tarl th:nth-child(2){width:172px}.tarl th:nth-child(3){width:150px}.tarl th:nth-child(4){width:92px}
-.tarl th:nth-child(5){width:130px}.tarl th:nth-child(6){width:104px}.tarl th:nth-child(7){width:170px}
+.tarl th:nth-child(5){width:max(130px,11em)}.tarl th:nth-child(6){width:max(104px,calc(9.2em + 24px))}   /* refutar123: «Vence» crece con la letra (la fecha, en mono, son 10 caracteres: con el 130 % salía «16/11/2…») */.tarl th:nth-child(7){width:170px}
 .tarl td:first-child{white-space:normal;overflow-wrap:anywhere}
 .chip.tuni{white-space:nowrap}
 /* 02/11 (tareasatras): a menos de 1320 px la tabla (1000 mín.) no cabe y estado y fecha quedaban tras el scroll. Daniel: «ocultar
@@ -1019,3 +1033,67 @@ ol.obj>li::before,.mdoc ol>li::before,.pan ol>li::before{content:counter(paso);p
 /* TOPE DE ANCHO: a 1920 px una tabla de 6 columnas se estiraba a 1.600 px con el dato a 1.500 px del nombre. Las tablas no pasan de 1.280. */
 main>.pan:has(.tw),main>div>.pan:has(.tw){max-width:1280px}
 .tfalta{font-size:12.5px;color:var(--red2);line-height:1.5}
+
+/* 17/11 · VOTACIONES (`comun.js`, bloque «VOTACIONES CON CÓRUM»): tarjetas grandes al dedo, lo elegido en rojo y SIN tick (decisiones-app), la barra del recuento detrás. */
+.votl{margin-bottom:12px}
+.vfila{display:flex;flex-wrap:wrap;align-items:center;gap:6px 11px;padding:11px 0;cursor:pointer;border-top:1px solid var(--line)}
+.vfila:first-child{border-top:0}
+.vfila .a{flex:1;min-width:0}.vfila .a b{display:block}.vfila small{display:block;color:var(--ink3);font-size:11.5px;margin-top:2px}
+.vfila .vres{color:var(--ink2)}
+.vsep{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:12px 0 2px;border-top:1px solid var(--line)}
+.vpil{display:inline-block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+.vpil.pend{color:var(--warn);border-color:rgba(232,145,46,.45);background:rgba(232,145,46,.09)}
+.vpil.ok{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
+.vpil.no{color:var(--red);border-color:rgba(228,30,37,.42);background:rgba(228,30,37,.09)}
+.vback{background:none;border:0;color:var(--ink2);padding:6px 0 10px;cursor:pointer;font:inherit}
+.vtit{font-size:19px;font-weight:600;margin:0 0 4px}
+.vcuo{border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:8px 0 12px;font-size:13px;color:var(--ink2)}
+.vcuo.ok{border-color:rgba(62,180,137,.42);color:var(--ok)}.vcuo.no{border-color:rgba(228,30,37,.42);color:var(--red)}
+.vpreg{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--sur)}
+.vpreg .vh{font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+.vnotas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.vops{display:flex;flex-direction:column;gap:8px}
+.vopc{position:relative;overflow:hidden;text-align:left;min-height:52px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;font:inherit;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px}
+.vopc .vt{flex:1;min-width:40%;position:relative;z-index:1}
+.vopc .vn{position:relative;z-index:1;color:var(--ink2);font-size:12px}
+.vopc .vq{position:relative;z-index:1;flex-basis:100%;color:var(--ink3);font-size:11.5px}
+.vopc .vbar{position:absolute;left:0;top:0;bottom:0;right:0;pointer-events:none}
+.vopc .vbar i{display:block;height:100%;background:rgba(255,255,255,.07)}
+.vopc.on{border-color:var(--red);background:rgba(228,30,37,.18);color:#fff}
+.vopc.on .vbar i{background:rgba(228,30,37,.28)}
+.vopc.gana{border-color:var(--ok)}
+.vopc[disabled]{cursor:default}.vopc[disabled]:not(.on){opacity:.85}
+.vgana{margin:9px 0 0;font-size:13px;color:var(--ink2)}
+.vnew .vin,.votl .vin,.vin{width:100%;box-sizing:border-box;font:inherit;color:var(--ink);background:var(--sur2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-height:44px}
+.vorow{display:flex;gap:6px;margin-top:6px;align-items:center}
+.vx{background:none;border:0;color:var(--ink3);cursor:pointer;font:inherit;padding:8px;min-height:36px}
+.vplan{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.vsws{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.vsw{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0}
+.vfal summary{cursor:pointer;color:var(--ink2);font-size:12.5px;margin:6px 0}
+
+/* ═══ 17/11 (refutar68) · TABLETA Y VENTANA ESTRECHA ═══════════════════════════════════════════════════════════════════════════════
+   Medido a 600, 768 y 820 px: con la barra lateral fija (238) el contenido se quedaba en 330-580 px, la cabecera («Actúas como» + nombre + ⋮)
+   se salía por la derecha y las tarjetas se cortaban. ≥ 861 px no cambia NADA (1024, 1280 y el ancho ya estaban bien). Debajo, la barra
+   lateral es un cajón sobre el contenido (☰ en la cabecera) y la cabecera se compacta. */
+.btnlat{display:none;flex:none;width:34px;height:34px;border:1px solid var(--line);border-radius:9px;color:var(--ink2);font-size:16px;line-height:1}
+@media (max-width:860px){
+  .marco{grid-template-columns:minmax(0,1fr)}
+  .top,main{grid-column:1}
+  .btnlat{display:block}
+  aside{position:absolute;left:0;top:0;bottom:0;width:238px;z-index:40;visibility:hidden;transform:translateX(-102%);
+    transition:transform .22s var(--sal),visibility 0s linear .22s;box-shadow:0 0 40px rgba(0,0,0,.6)}
+  .marco.latAbierto aside{visibility:visible;transform:none;transition:transform .22s var(--sal),visibility 0s}
+  .miga{min-width:0;overflow:hidden}
+  .top{gap:9px;padding:0 10px}
+  .actua button{padding:5px 8px}
+  .yo .n{max-width:110px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:bottom}
+  .tarl table{min-width:640px}   /* la columna de la tarea se quedaba en 16-80 px y partía «fabricació-n»: la tabla se desliza en vez de apretarse */
+  main{padding:12px}
+}
+@media (max-width:680px){
+  .yo>span:last-child{display:none}   /* queda la ficha con las iniciales; el nombre completo está en «Ajustes» */
+  .yo{padding:4px}
+  .actua{padding-left:20px}
+  .actua button{padding:5px 6px;font-size:8.5px}
+}

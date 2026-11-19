@@ -157,7 +157,8 @@ function _convCelHTML_(cv, dia, franja){
   var cch=(v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">'+ico('coche')+'</span>':'';
   var txt=(v&&v.s==='no')?'\u2013':'';
   var fondo=_celdaFondo_(v);        /* 04/11: el color de su pincel (con/sin coche, partido si son dos sitios) */
-  return '<div class="tcel'+cls+'" data-tk="'+_convClave_(dia,franja)+'" data-p'+(fondo?' style="background:'+fondo+'"':'')+'>'+txt+cch+'</div>';
+  return '<div class="tcel'+cls+'" data-tk="'+_convClave_(dia,franja)+'" data-p role="button" tabindex="-1" aria-label="'+esc(_convCelEtiqueta_(dia,(cv.franjas||[]).filter(function(x){ return x.k===franja; })[0]||{k:franja},v))+'"'+
+    (fondo?' style="background:'+fondo+'"':'')+'>'+txt+cch+'</div>';
 }
 
 /* La tarjeta entera. Va la PRIMERA de la pantalla de turnos: lo que caduca manda sobre lo
@@ -279,9 +280,9 @@ function _convHTML_(cv){
      hueco (`_huecoHTML_`); quien CONTESTA veía otra cosa. Una banda de ancho completo, sin casillas: nadie contesta lo que no se ofrece. */
   var filas=F.map(function(fr, i){
     var hu=i ? _huecoEntreFranjas_(F[i-1], fr) : 0;
-    return (hu ? _huecoHTML_(hu) : '')+'<div class="rc rd" data-tfr="'+esc(fr.k)+'" data-p><span>'+esc(fr.txt)+'</span></div>'+
+    return (hu ? _huecoHTML_(hu) : '')+'<div class="rc rd" data-tfr="'+esc(fr.k)+'" data-p>'+_horaLineaHTML_(fr.txt)+'</div>'+
       D.map(function(d){ return _convCelHTML_(cv,d,fr.k); }).join('');
-  }).join('');
+  }).join('')+_horaFinFilaHTML_(F);
   return '<div class="tarj" id="convC">'+
     _convCabHTML_(cv)+
     '<div class="tpin" data-pinceles>'+_pincelChipsHTML_(cv, _pincelSelDe_(CONV_PINCEL, CONV_COCHE, CONV_CC), 'data-pin2')+'</div>'+
@@ -301,7 +302,7 @@ function _convHTML_(cv){
        siendo cierto y por eso la función devuelve 78 cuando la etiqueta es larga: con `nowrap` +
        `flex-end` + `sticky` se sale por la izquierda y se corta, y eso **no lo caza ninguna prueba
        de DOM** —el `textContent` está entero—, sino mirar la pantalla. */
-    '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+
+    '<div class="rejw"><div class="rej" id="convRej" style="grid-template-columns:minmax('+_carrilFranjas_(F)+'px,max-content) repeat('+
       D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
     '<div class="tplazo'+(urge?' urge':'')+'" id="convPie">'+_convPieHTML_(cv)+'</div>'+
     /* 02/11: contestar A MEDIAS no cuenta (`_convFalta_`, comun.js). Aquí se guarda al soltar el dedo, sin botón de enviar: se dice
@@ -370,12 +371,12 @@ function _convPreHTML_(cv){
   /* ⚠️ Y aquí igual, que es la misma rejilla antes de abrir: dos formas de pintar la misma
      etiqueta es como una de las dos se queda vieja. */
   var filas=F.map(function(fr){
-    return '<div class="rc rd"><span>'+esc(fr.txt)+'</span></div>'+
+    return '<div class="rc rd">'+_horaLineaHTML_(fr.txt)+'</div>'+
       D.map(function(){ return '<div class="tcel off"></div>'; }).join('');
-  }).join('');
+  }).join('')+_horaFinFilaHTML_(F);
   return '<div class="tarj" id="convC" data-abre="'+esc(ab)+'">'+
     _convCabHTML_(cv)+
-    '<div class="rejw"><div class="rej" style="grid-template-columns:'+_carrilFranjas_(F)+'px repeat('+
+    '<div class="rejw"><div class="rej" style="grid-template-columns:minmax('+_carrilFranjas_(F)+'px,max-content) repeat('+
       D.length+',minmax(34px,1fr))">'+cab+filas+'</div></div>'+
     '<div class="tplazo">Se abre el <b>'+esc(abD)+'</b> a las '+esc(abH)+
       '. Entonces podr\u00e1s pintar tus ratos.</div>'+
@@ -389,7 +390,7 @@ function _convCabHTML_(cv){
   var ini=_isoADMY_(cv.dias[0])||cv.dias[0], fin=_isoADMY_(cv.dias[cv.dias.length-1])||'';
   return '<div class="mtit" style="margin:0 0 2px">Disponibilidad para turnos</div>'+
     '<div class="msub">Semana del '+esc(ini)+' al '+esc(fin)+
-      (cv.convocante?' · lo pide '+esc(cv.convocante.split(' ')[0]):'')+'</div>';
+      (cv.convocante?' · lo pide '+esc(pilaClara(cv.convocante)||cv.convocante.split(' ')[0]):'')+'</div>';
 }
 
 /* La unidad del pie: horas (y sus turnos) cuando un turno son varias franjas.
@@ -414,8 +415,8 @@ function _convUnid_(n, min){
 function _convPieHTML_(cv){
   var q=_convQuedan_(cv), c=_convCuenta_(cv);
   var t = q<=0 ? 'Plazo cerrado'
-        : q<1  ? 'Quedan <b>'+Math.round(q*60)+' min</b>'
-               : 'Quedan <b>'+Math.round(q)+' h</b>';
+        : q<1  ? 'Quedan <b>'+Math.round(q*60)+' min</b> de plazo'
+               : 'Quedan <b>'+Math.round(q)+' h</b> de plazo';     /* 17/11 (refutar62): «Quedan 71 h · marcadas 0» lo leía un novato como 71 h de trabajo por hacer */
   /* ⛔ CON FRANJAS DE UNA HORA, EL NÚMERO SON HORAS, NO RESPUESTAS. Desde que un toque marca
      el turno entero, «marcadas 4» después de UN gesto se lee como si hubieras contestado cuatro
      veces — cuando has dicho una sola cosa. Se dice en horas, y se añaden los turnos, que es la
@@ -669,6 +670,7 @@ function _engConv_(){
         _convClases_(cv).forEach(function(c){ el.classList.remove(c); });
         if(v&&v.s) el.classList.add(v.s);
         el.style.background = (v&&v.s&&v.s!=='no') ? _celdaFondo_(v) : '';
+        el.setAttribute('aria-label', _convCelEtiqueta_(d, fr, v));
         el.innerHTML=((v&&v.s==='no')?'\u2013':'')+
           ((v&&v.s&&v.s!=='no'&&v.c)?'<span class="cch">'+ico('coche')+'</span>':'');
       });
@@ -693,7 +695,7 @@ function _engConv_(){
   if(br) br.onclick=function(){ _reusarConv_(cv, repinta); };
   /* Pintar a dedo y de arrastre, como en reuniones. ⚠️ `setPointerCapture` LANZA si el puntero
      no es suyo, y al lanzar aborta el resto del manejador: va envuelto (ya pasó en el pintor). */
-  var pintando=false, antes=null, modoTrazo=null;
+  var pintando=false, antes=null, modoTrazo=null, ultPt=null;
   /* refutar33 (13/11): LOS ESCUCHAS DEL TRAZO SE PONEN UNA VEZ POR NODO. `pintar()` ya no reconstruye si no hay nada nuevo (`_pintarSiCambia_`),
      pero `enganchar()` corre igual y esto hacía `addEventListener` otra vez sobre la MISMA rejilla: tras dos repintados sin cambios un toque
      disparaba tres pintores seguidos —cada uno alternaba la casilla— y la marca no se ponía (o se ponía, según lo impar). Los escuchas leen
@@ -722,6 +724,16 @@ function _engConv_(){
   });
   if(rej._engPuesto) return;
   rej._engPuesto=true;
+  /* refutar55: la rejilla se contesta SIN dedo: una parada de Tab, flechas para moverse y Enter/Espacio pinta la casilla con el pincel elegido (lo mismo que tocarla). */
+  _rejillaFlechas_($$('#convRej [data-tk]'), (cv.dias||[]).length);
+  rej.addEventListener('keydown', function(e){
+    if(e.key!=='Enter' && e.key!==' ') return;
+    var el=e.target.closest ? e.target.closest('[data-tk]') : null; if(!el) return;
+    e.preventDefault();
+    var cv=rej._cv;
+    if(_convEstado_(cv)!=='abierta'){ _convVencida_(); return; }
+    _convPintar_(cv, el.getAttribute('data-tk')); rej._repinta(); _convGuardar_(cv);
+  });
   rej.addEventListener('pointerdown', function(e){
     var cv=rej._cv, repinta=rej._repinta;
     if(dd.deslizando()) return;
@@ -762,17 +774,22 @@ function _engConv_(){
        entrega al elemento capturado igual, pero los `pointermove` del segundo **dejan de
        llegar** en algunos navegadores y el centroide se queda quieto. El pintor ya no la
        necesita: `pointermove` resuelve la celda con `elementFromPoint`. */
-    modoTrazo = _convPintar_(cv, el.dataset.tk) ? 'marca' : 'borra'; repinta();
+    modoTrazo = _convPintar_(cv, el.dataset.tk) ? 'marca' : 'borra'; ultPt = {x:e.clientX, y:e.clientY}; repinta();
   });
   rej.addEventListener('pointermove', function(e){
     var cv=rej._cv, repinta=rej._repinta;
     if(dd.deslizando() || !pintando) return;
-    var el=document.elementFromPoint(e.clientX, e.clientY);
-    el=el&&el.closest?el.closest('[data-tk]'):null;
-    var _huella=JSON.stringify(_convQuiere_());       /* el pincel entero: cambiar sólo el coche de un sitio cuenta */
-    if(!el||el._ult===_huella) return;
-    el._ult=_huella;
-    _convPintar_(cv, el.dataset.tk, modoTrazo); repinta();
+    var _huella=JSON.stringify(_convQuiere_()), pintada=false;       /* el pincel entero: cambiar sólo el coche de un sitio cuenta */
+    /* refutar99: TODOS los puntos desde el último evento, no sólo el de ahora: en un móvil lento el dedo salta varias casillas entre dos `pointermove` */
+    _puntosEntre_(ultPt, e.clientX, e.clientY, 10).forEach(function(q){
+      var el=document.elementFromPoint(q.x, q.y);
+      el=el&&el.closest?el.closest('[data-tk]'):null;
+      if(!el||el._ult===_huella) return;
+      el._ult=_huella; pintada=true;
+      _convPintar_(cv, el.dataset.tk, modoTrazo);
+    });
+    ultPt={x:e.clientX, y:e.clientY};
+    if(pintada) repinta();
   });
   var fin=function(){
     var cv=rej._cv;
@@ -780,7 +797,7 @@ function _engConv_(){
        fila entera son 14 celdas. `pintando` lo vigila para no guardar en un `pointerup`
        que no venía de pintar nada. */
     if(pintando) _convGuardar_(cv);
-    pintando=false; antes=null; modoTrazo=null;
+    pintando=false; antes=null; modoTrazo=null; ultPt=null;
     $$('#convC [data-tk]').forEach(function(x){ x._ult=null; });
   };
   rej.addEventListener('pointerup', fin);
@@ -796,7 +813,7 @@ function _ftInicioM_(){
     return _mioTurno_(x) && x.estado !== 'Cancelado' && _ftEnCurso_(x, ahora); })[0];
   if(!t) return '';
   return '<div class="tarj" data-ftwrap style="display:none">'+cab('Tu turno de hoy', t.hora)+
-    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(_sitioConCiudad_(t.punto))+'</b><small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+'</small></div></div>'+
+    '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(_sitioConCiudad_(t.punto))+'</b><small>'+esc(t.hora)+(_zonaNoMadrid_()?' (hora de Madrid)':'')+(t.dur?' · '+esc(t.dur):'')+'</small></div></div>'+
     '<div style="padding:0 14px 12px">'+_ftHTML_(t)+'</div></div>';
 }
 
@@ -846,12 +863,16 @@ function vTurnos(){
     return '<div class="tarj clic" data-turno="'+t.id+'" data-p>'+
       cab(t.f+(t.crucial?' · crucial':'')+(t.estado==='Cancelado'?' · cancelado':''), t.hora)+   /* 20/10: se dice */
       '<div class="fila" style="padding-top:0"><div class="a"><b>'+esc(_sitioConCiudad_(t.punto))+'</b>'+
-      '<small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+(t.lugar?' · '+esc(t.lugar):'')+'</small></div>'+
+      '<small>'+esc(t.hora)+(t.dur?' · '+esc(t.dur):'')+(t.lugar?' · '+esc(t.lugar):'')+'</small>'+
+      (_turnoSinCerrarTxt_(t, (YO&&YO.nombre)||'') ? '<small style="color:var(--warn)">'+esc(_turnoSinCerrarTxt_(t, (YO&&YO.nombre)||''))+'</small>' : '')+'</div>'+
       '<div class="d"><span class="chev">›</span></div></div>'+
       _quienVaHTML_(t)+'</div>';
   }
   /* los pasados van en CAJÓN plegable, como en app.html: no estorban pero están */
   pas.sort(function(a,b){ return String(b.iso||'').localeCompare(String(a.iso||'')); });
+  /* refutar155 (19/11): un turno CANCELADO de dentro de unos días cae en «pasados» (ya no se va a hacer) y encabezaba el cajón con
+     «el último, 23/11» siendo hoy 19/11: «el último» es el último que YA PASÓ. */
+  var hoyU=_hoyNxISO_(), ult=pas.filter(function(t){ return !t.iso || String(t.iso)<=hoyU; })[0];
   /* los vivos van SUELTOS: sin cabecera de seccion ni etiquetas, para que canten */
   /* La convocatoria va la PRIMERA: lo que caduca manda sobre lo que ya está decidido. */
   return '<div class="h1">Turnos</div><p class="h1s">Fabricación · en cuáles estás y quién más va.</p>'+
@@ -872,7 +893,7 @@ function vTurnos(){
             : 'Cuando te convoquen a uno, saldrá aquí.'+
               (nTodos>nMios?' Hay '+nTodos+' del equipo: míralos con «Todos».':''),'',false)+'</div>')+
     (pas.length? '<div class="cajon" data-caj data-p><span>Turnos pasados <b>· '+pas.length+'</b>'+
-        (pas[0].f?' <span style="color:var(--ink3)">· el último, '+esc(pas[0].f)+'</span>':'')+'</span>'+
+        (ult&&ult.f?' <span style="color:var(--ink3)">· el último, '+esc(ult.f)+'</span>':'')+'</span>'+
         '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
         '<div class="cajsec">'+pas.map(tarjeta).join('')+'</div>' : '');
 }
@@ -1041,7 +1062,8 @@ function progTurnoAbrir(){
       var sin = (r && r.sinEtiquetar) || [];
       try{ var tt = await api.getTurnos(); if(Array.isArray(tt) && tt.length){ TURNOS.length = 0; tt.forEach(function(y, i){ TURNOS.push(_normTurnoM_(y, i)); }); } }catch(_){}
       cerrarModal(); PROG_T = null;
-      tost('Turno '+((r && r.id) || '')+' convocado en Notion'+(sin.length ? ' · no se pudo etiquetar a: '+sin.join(', ') : '')+'.');
+      var _msgT = 'Turno '+((r && r.id) || '')+' convocado en Notion'+(sin.length ? ' · no se pudo etiquetar a: '+sin.join(', ') : '')+_choquesTurnoTxt_(r && r.choques)+'.';
+      tost(_msgT, _tostLargo_(_msgT));      /* refutar65: con un choque son >110 caracteres: se queda hasta que se toque (en 2,6 s no se lee) */
       pintar();
     }catch(e){ b.disabled = false; b.textContent = prev; tostErr('No se pudo convocar: ', e); }
   };
@@ -1061,7 +1083,7 @@ function progTurnoAbrir(){
    ⚠️ El turno del móvil trae `roles` como [pila, rol, esYo]; las reglas de `comun.js` leen `{miembro, rol}` → `_ctMVista_`. */
 function _ctMVista_(t){
   if(!t || !YO) return null;
-  var v = {id:t.id, estado:t.estado, fecha:t.iso, f:t.f, hora:t.hora, punto:t.punto, roles:t.rolesM || [], empezado_at:t.empezado_at || null};
+  var v = {id:t.id, estado:t.estado, fecha:t.iso, f:t.f, hora:t.hora, dur:t.dur, punto:t.punto, roles:t.rolesM || [], empezado_at:t.empezado_at || null};
   return _puedeCerrarTurno_(v, YO.nombre) ? v : null;
 }
 /* Lo que la vista cambió (estado, reloj) vuelve al turno de verdad. */
@@ -1088,7 +1110,7 @@ function _ctMHTML_(t){
     return cab+
       (rel
         ? '<p class="rnota" id="ctMReloj" style="margin:0 0 10px"><b>'+esc(rel.charAt(0).toUpperCase()+rel.slice(1))+'</b> · desde las '+esc(_hhmmDe_(t.empezado_at))+'</p>'
-        : (v.fecha === hoy
+        : ((v.fecha === hoy || _ftEnCurso_(v, _ahoraMadridDate_()))   /* refutar88: y el de ayer que cruza la medianoche y sigue en marcha */
             ? '<button class="btn pri full" data-p id="ctMEmp">Empezar turno</button>'+
               '<p class="rnota" style="margin:8px 0 10px">Pone en marcha el reloj. Al acabar, lo cierras desde aquí.</p>'
             : ''))+
@@ -1098,14 +1120,14 @@ function _ctMHTML_(t){
   var tope0 = _cierreTope_(st);
   _cierreSembrar_(v, st, new Date(_ahoraInstante_()).toISOString());
   if(!st.ini && !st.fin){   /* sin reloj: se parte de la hora del turno hasta ahora, si cuadra (un turno no dura más de 12 h) */
-    var i0 = String(v.hora || '').slice(0,5), f0 = _hhmmDe_(new Date(_ahoraInstante_()).toISOString()), d0 = _durTurnoDeHoras_(i0, f0);
+    var i0 = String(v.hora || '').slice(0,5), f0 = _hhmmDe_(new Date(_ahoraInstante_()).toISOString()), d0 = _durTurnoDeHoras_(i0, f0, v.fecha);
     if(d0 != null && d0 <= 12){ st.ini = i0; st.fin = f0; st.dur = String(d0); }
   }
-  var asis = _asistentesTurno_(v).concat(_dudososTurno_(v)), resp = _responsableTurno_(v);
+  var asis = _cierreGente_(v, st), resp = _responsableTurno_(v);
   var fila = function(n){
     var on = !!st.quien[n];
     return '<div class="fila" style="display:block;padding:9px 0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>'+esc(_pilaDeM_(n) || (miembro(n)||{}).pila || n)+'</b>'+
-      (n === resp ? '<span class="chip">responsable</span>' : '')+(_esSuplenteTurno_(v, n) ? '<span class="chip">suplente</span>' : '')+'</div>'+
+      (n === resp ? '<span class="chip">responsable</span>' : '')+(_esSuplenteTurno_(v, n) ? '<span class="chip">suplente</span>' : '')+((st.fuera || []).indexOf(n) >= 0 ? '<span class="chip">no estaba en el reparto</span>' : '')+'</div>'+
       '<div style="display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin-top:6px">'+
         '<span class="sc">Fue</span>'+nxSiNo('', on, {attrs:'data-ctm-fue="'+esc(n)+'"'})+
         '<span class="sc">Coche</span>'+nxSiNo('', st.coche[n], {attrs:'data-ctm-coche="'+esc(n)+'"', off:!on})+'</div></div>';
@@ -1116,6 +1138,8 @@ function _ctMHTML_(t){
   return cab+'<div class="mtit" style="font-size:16px;margin:0 0 4px">Cerrar el turno</div>'+
     lab('Qui\u00e9n fue')+(asis.length ? '<div class="tarj" style="margin:0;padding:0 12px">'+asis.map(fila).join('')+'</div>'
       : '<p class="rnota">Este turno no tiene a nadie resuelto en el reparto.</p>')+
+    lab('\u00bfFue alguien que no estaba en el reparto?')+elegirPersonas('ctmFuera', {universo:_cierreFueraUniverso_(v), marcadas:st.fuera, titulo:'Qui\u00e9n m\u00e1s fue',
+      vacio:'Nadie m\u00e1s: escribe un nombre o pulsa \u00abVer lista\u00bb.', alCambiar:function(n){ _cierrePonFuera_(st, n); _ctMPintar_(t); }})+
     lab('Cu\u00e1ndo empez\u00f3 (saliendo de casa)')+nxHora('ctMIni', ini0)+
     lab('Cu\u00e1ndo acab\u00f3 (ya de vuelta)')+nxHora('ctMFin', st.fin || ini0)+
     '<p class="rnota" id="ctMRes" style="margin:12px 0 0"><b>'+esc(_cierreResumenHoras_(st))+'</b></p>'+

@@ -397,7 +397,7 @@ function _miTurnoPanel_(){
       var k=_dispClave_(d,fr.k), v=mias[k];
       var st = (v && v.s && v.s!=='no') ? ('background:'+_celdaFondo_(v)) : '';
       /* refutar42: la casilla se puede usar con el teclado (`_rejillaFlechas_` en `_cablearMiTurno_`) y dice qué es y qué tiene marcado */
-      var _et=_diaCorto_(d)+' · '+_rotuloTramo_(fr)+' · '+((v&&v.s==='no')?'no puedo':((v&&v.s)?'puedo en '+v.s+(v.c?', con coche':''):'sin marcar'));
+      var _et=_convCelEtiqueta_(d, fr, v);
       return '<div class="dcel'+((v&&v.s&&v.s!=='no')?'':' v0')+'" data-mtk="'+k+'" role="button" tabindex="-1" aria-label="'+esc(_et)+'" '+
         'style="cursor:pointer;'+st+'">'+
         ((v&&v.s==='no')?'\u2013':((v&&v.c)?'\uD83D\uDE97':''))+'</div>';
@@ -1495,7 +1495,8 @@ function _cierreTurnoPanel_(){
      render, y eso es lo que hay que conservar. */
   var dud = _dudososTurno_(t), esDud = {};
   dud.forEach(function(n){ esDud[n] = 1; });
-  var asis = firmes.concat(dud);
+  /* refutar133: el reparto + quien se añade a mano (el suplente que no figuraba) */
+  var asis = _cierreGente_(t, CIERRE_TUR);
   /* Primera vez sobre este turno: los firmes se dan por idos; los dudosos NO.
      ⛔ Y la direccion importa: marcarlos por defecto le sumaria **un turno** a quien quiza
      no fue —lo dice el comentario de `_cierreTurMapa_` dos funciones mas arriba—, mientras
@@ -1530,7 +1531,7 @@ function _cierreTurnoPanel_(){
         nxSiNo('', on, {attrs:'data-ct-fue="'+esc(n)+'"'})+
         esc(_pilaDeM_(n)||(miembro(n)||{}).pila || n)+
         (n===resp?' <span class="chip">responsable</span>':'')+
-        (_esSuplenteTurno_(t, n)?' <span class="chip">suplente</span>':'')+'</div>'+
+        (_esSuplenteTurno_(t, n)?' <span class="chip">suplente</span>':'')+((CIERRE_TUR.fuera||[]).indexOf(n)>=0?' <span class="chip">no estaba en el reparto</span>':'')+'</div>'+
         /* 26/10 (C4b): «llevó coche» va al ACTA (Notion `Coche`, almacén `coche_confirmado`). ⚠️ La cuota aún cuenta el
            coche del REPARTO (espejo): que cuente sólo el confirmado es la 2.ª mitad de C4b, ficha abierta. */
         ' <div style="display:flex;align-items:center;gap:6px;font-size:12px;opacity:.85">'+
@@ -1574,6 +1575,9 @@ function _cierreTurnoPanel_(){
     aviso+
     '<div class="campo"><span class="sc">Horas distintas por persona</span>'+
       nxSiNo('ctPers', CIERRE_TUR.pers)+'</div>'+
+    '<div class="campo"><span class="sc">\u00bfFue alguien que no estaba en el reparto?</span>'+
+      elegirPersonas('ctFuera', {universo:_cierreFueraUniverso_(t), marcadas:CIERRE_TUR.fuera, titulo:'Qui\u00e9n m\u00e1s fue',
+        vacio:'Nadie m\u00e1s: escribe un nombre o pulsa \u00abVer lista\u00bb.', alCambiar:function(n){ _cierrePonFuera_(CIERRE_TUR, n); CIERRE_TUR.hecho = null; pintar(); }})+'</div>'+
     (asis.length
       ? '<table class="tb" style="margin-top:9px"><thead><tr><th>Qui\u00e9n fue de verdad</th>'+
         '<th class="r">Extra</th></tr></thead><tbody>'+filas+'</tbody></table>'
@@ -1748,7 +1752,7 @@ function _convocarPersonaHTML_(cv, nombre){
 }
 /* Los chips para elegir a quién mirar: quien ha contestado algo. Pulsar al elegido lo suelta. */
 function _convocarPersonasHTML_(cv){
-  var quienes = Object.keys((cv && cv.resp) || {}).filter(function(n){ return Object.keys(cv.resp[n]||{}).length; }).sort();
+  var quienes = Object.keys((cv && cv.resp) || {}).filter(function(n){ return Object.keys(cv.resp[n]||{}).length; }).sort(_cmpEs_);
   if(!quienes.length) return '';
   return '<span class="sc" style="display:block;margin:10px 0 5px">Ver a una persona</span><div class="chips" data-conv-personas>'+
     quienes.map(function(n){ return '<button type="button" class="pick'+(n===CONV_PERS?' on':'')+'" data-convpers="'+esc(n)+'">'+esc(_dispPila_(n))+'</button>'; }).join('')+'</div>'+
@@ -1774,13 +1778,13 @@ function _convocarZonaHTML_(){ return _convocarEligeHTML_()+_convocarCalorHTML_(
    «no puede» puede haber dicho que sí después). Sin bloque, una lista. ⛔ La regla del consejo sigue contando sólo con los que pueden
    (`_turnoConsejoAguanta_` lee las respuestas, no a quién se marca aquí). */
 function _convocarPoolHTML_(b){
-  var cv=_convocarCvElegida_(), pool=_activos_().slice().sort(function(a,c){ return String(a.pila).localeCompare(String(c.pila)); });
+  var cv=_convocarCvElegida_(), pool=_activos_().slice().sort(function(a,c){ return _cmpEs_(a.pila, c.pila); });
   var chip=function(m, no){
     return '<button type="button" class="pick'+(TUR_SEL[m.nombre]?' on':'')+'" data-tu="'+esc(m.nombre)+'"'+
       (no?' title="No ha dicho que pueda: se añade igual" style="opacity:.78"':'')+'>'+esc(_pilaDeM_(m.nombre)||m.pila)+'</button>';
   };
   if(!cv || !b || !b.claves || !b.claves.length) return pool.map(function(m){ return chip(m, false); }).join('');
-  var pueden=_turnoBloqueQuien_(_calorTurnos_(cv, ''), b.dia, b.claves), si=[], no=[];
+  var pueden=_turnoBloqueQuien_(_calorTurnos_(cv, CONV_FIL.sitio), b.dia, b.claves), si=[], no=[];
   pool.forEach(function(m){ (pueden.indexOf(m.nombre)>=0 ? si : no).push(m); });
   var grupo=function(k, tit, l){
     return '<div data-tu-grupo="'+k+'" style="width:100%;margin:0 0 6px"><span class="sc" style="display:block;margin-bottom:4px">'+tit+' ('+l.length+')</span>'+

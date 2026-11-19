@@ -20,10 +20,7 @@ function _darHorasTarjetaHTML_(){
     '<p class="rnota" style="margin:0 0 10px">Para una feria, un traslado, un turno sin fichar…: cuentan al momento, sin que nadie las firme.</p>'+
     '<button class="btn pri full" data-p data-darhoras>Dar horas</button></div>';
 }
-function _pilaDeM_(n){
-  var m=(DATA.miembros||[]).filter(function(x){ return x.nombre===n; })[0];
-  return m ? nombreCorto(n) : String(n||'').split(' ')[0];       /* refutar39: con dos «Pablo», «Pablo F.» y «Pablo M.» */
-}
+function _pilaDeM_(n){ return pilaClara(n) || String(n||'').split(' ')[0]; }       /* refutar39: con dos «Pablo», «Pablo F.» y «Pablo M.» (refutar87: la regla vive en `pilaClara`, comun.js) */
 
 /* Se rederivaban SOLO el PD, asi que REV2_NOM se quedaba en el nombre de la semilla y el
    rango 2 no existia con datos reales: Jose podia decidir un expediente en el escritorio y
@@ -56,11 +53,18 @@ function _rederivarPD_(){
    mismo, y eso es una decisión de Daniel, no mía. Queda fichado en `docs/pendientes.md`;
    aquí lo único que cambia es **dejar de mentirle sobre su propio cargo**. */
 function aprobadorDe(autor,unidad){
-  var c=coordinadorDe(unidad);
+  /* 18/11 (refutar100): con DOS coordinadores firma el OTRO (`noms` los lista a todos los que pueden; `nom` es el primero); sólo si no hay
+     otro, sube al PD. */
+  var cs=coordinadoresDe(unidad), c=cs[0], otros=cs.filter(function(x){ return x!==autor; });
   /* 11/11 (refutar7): `coordinadorDe` también devuelve al PD cuando la unidad NO tiene coordinador (una unidad nueva). Entonces lo firma
      el Project Director y se dice así: «Pedro, coordinador de tu unidad» era falso para quien entra el primer día. */
-  if(c!==autor) return {nom:c,escalado:(c===PD_NOM),propio:false};
-  return {nom:PD_NOM,escalado:true,propio:(PD_NOM===autor)};
+  if(cs.indexOf(autor)<0) return {nom:c,noms:cs,escalado:(c===PD_NOM),propio:false};
+  if(otros.length) return {nom:otros[0],noms:otros,escalado:false,propio:false};
+  return {nom:PD_NOM,noms:[PD_NOM],escalado:true,propio:(PD_NOM===autor)};
+}
+/* 18/11 (refutar100): «Cris» o «Cris o Ber» — los que pueden firmar, con su pila clara, para las frases «Las firma …». */
+function _firmantesTxt_(rt){
+  return (rt.noms||[rt.nom]).map(function(n){ return pilaClara(n)||String(n).split(' ')[0]; }).join(' o ');
 }
 
 /* Rol efectivo: en login REAL manda YO.cargo (el conmutador ST.rol es solo de la demo). Así el
@@ -84,6 +88,11 @@ function esPD(){ return ST.rol==='pd' || (typeof YO!=='undefined' && YO && YO.ca
 /* ⛔ 31/10: la REDACCIÓN de estos avisos vive en `_tuyoItems_` (`comun.js`), que pinta también el escritorio. Aquí sólo
    quedan las CUENTAS de este modelo (PARTES con `.e`, `_docsPend_`, `_convAbierta_`) y el HTML de la fila. */
 function _tuyoFilaM_(it){
+  /* refutar146 (19/11): un aviso que «lleva» a Estado, estando ya en Estado (el de la apelación: se responde en el escritorio, y no hay otro sitio),
+     era un botón con su flecha «›» que no llevaba a ninguna parte. Sin destino, sin botón y sin flecha: es sólo un aviso. */
+  if(it.ir==='estado') return '<div class="aviso'+(it.mal?' mal':'')+'">'+
+    '<span class="ic"><svg><use href="#i-warn"/></svg></span>'+
+    '<div style="flex:1"><b>'+it.tit+'</b><p>'+it.txt+'</p></div></div>';
   return '<div class="aviso'+(it.mal?' mal':'')+'" data-ir="'+it.ir+'"'+(it.reuid!==''?(' data-reuid="'+esc(it.reuid)+'"'):'')+' data-p>'+
     '<span class="ic"><svg><use href="#i-warn"/></svg></span>'+
     '<div style="flex:1"><b>'+it.tit+'</b><p>'+it.txt+'</p></div><span class="chev">›</span></div>';
@@ -101,12 +110,16 @@ function _avisosQueTeTocanM_(){
     var ac=(typeof _actorSanc_==='function') ? _actorSanc_() : yo;
     var r=cv.resp && cv.resp[ac];
     conv=!(r && typeof r==='object' && Object.keys(r).length);
+    if(conv && typeof _exencionConv_==='function') conv=_exencionConv_(cv)||true;     /* refutar108: la fecha de su exención, o `true` */
   }
   var apel=(typeof _apelPendientesTuyas_==='function') ? _apelPendientesTuyas_().map(function(a){
-    return {autor:String(a.autor||'').split(' ')[0], clase:a.clase}; }) : [];
+    return {autor:pilaClara(a.autor)||String(a.autor||'').split(' ')[0], clase:a.clase}; }) : [];
   /* 12/11 (general-1 + gestion-1): sólo el PD (rango 3, como el escritorio y el servidor) y sólo con la cola LEÍDA: `SANC_M===null` es «no lo sé». */
   var sanc=(typeof SANC_M!=='undefined' && Array.isArray(SANC_M) && rangoNom((typeof _actorSanc_==='function') ? _actorSanc_() : yo)>=3) ? SANC_M.length : 0;
-  return _tuyoItems_({pdec:pdec, rev:rev, conv:conv, apel:apel, sanc:sanc,
+  /* 18/11 (refutar126): lo que lleva más tiempo esperándote, en días (0 si es reciente): quien vuelve de una semana fuera ve qué se atascó. */
+  var _dPd=(typeof _partesDecTuyos_==='function') ? _diasMasViejo_(_partesDecTuyos_().map(function(p){ return p.creado_at; })) : 0;
+  var _dAp=(typeof _apelPendientesTuyas_==='function') ? _diasMasViejo_(_apelPendientesTuyas_().map(function(a){ return a.at; })) : 0;
+  return _tuyoItems_({pdec:pdec, pdecDias:_dPd, rev:rev, conv:conv, apel:apel, apelDias:_dAp, sanc:sanc,
     sindecl:mios.filter(function(p){ return p.e==='sindecl'; }).length,
     det:mios.filter(function(p){ return p.e==='det'; }).length,
     /* 11/11: el parte RECHAZADO, con su motivo (`nota`), mientras `_sigueVisibleSinContar_` lo deje ver. */
@@ -145,14 +158,18 @@ function vEstado(){
       rt={nom:PD_NOM,escalado:true,propio:(PD_NOM===YO.nombre)};
     /* ⛔ 929.ª: y al PROPIO PD no se le nombra a sí mismo — `rt.propio`, como ya hacía Fichar. Le decía
        «Las firma Lois, Project Director» siendo él Lois. */
+    /* 18/11 (refutar126): y cuánto lleva la más vieja: «2 h esperando» es igual a los 5 minutos que a los 9 días. */
+    var _dMia=_diasMasViejo_(_pendL.map(function(p){ return p.creado_at; }));
     cPend={tit:h1(pend)+' esperando aprobación', txt:'Todavía no cuentan. '+(rt
         ? (rt.propio ? 'Las firmas tú: eres el Project Director.'
-           : ('Las firma '+esc(rt.nom.split(' ')[0])+', '+
-              (rt.escalado?'Project Director':'coordinador de tu unidad')+'.'))
-        : 'Las firma quien coordine el subsistema de cada parte.')};
+           : ('Las firma '+esc(_firmantesTxt_(rt))+', '+
+              (rt.escalado?'Project Director':((rt.noms||[]).length>1?'coordinadores de tu unidad':'coordinador de tu unidad'))+'.'))
+        : 'Las firma quien coordine el subsistema de cada parte.')+
+        (_dMia ? (_pendL.length===1 ? ' Lleva ' : ' La más antigua lleva ')+_dMia+' días esperando.' : '')};
   }
   /* ⛔ Los documentos con cambios pedidos se CUENTAN (el globo del nav, `badges()`, usa el mismo filtro). */
-  var cambios=ENTREGABLES.filter(function(e){return e.estado==='cambios';}).map(function(e){ return e.ref; });
+  var _todosDocs=ENTREGABLES.concat((typeof ENT_REV!=='undefined' && ENT_REV)||[]);
+  var cambios=ENTREGABLES.filter(function(e){return _cambiosSinAtender_(e, _todosDocs);}).map(function(e){ return e.ref; });   /* 19/11: el globo y este aviso, el mismo filtro */
   /* NO uses `REUNION` aqui: es el puntero de la pantalla de Reuniones y cambia al
      navegar, asi que este aviso te mandaba a cubrir la que estabas mirando mientras la
      que cierra manana no salia por ningun lado. Y de no cubrir a tiempo salen sanciones.
@@ -173,7 +190,8 @@ function vEstado(){
      secas, una semilla sin temporada pinta literalmente **«ciclo null»**; y con un
      `||''` quedaría **«ciclo »** colgando. `cab(t,d)` ya omite su `<span>` cuando `d`
      es vacío, así que la cura es la que ya existía ahí dentro. */
-  return _asisTarjetaM_()+_nov+_ftInicioM_()+'<div class="tarj">'+cab('Conducta',_temporadaVigente_()?('ciclo '+_temporadaVigente_()):'')+medidorHTML()+'</div>'+
+  /* refutar55: Estado no lleva título visible (abre con la tarjeta de Conducta) y el lector se quedaba sin encabezado de nivel 1: uno SÓLO para él */
+  return '<div class="h1 sr">Estado</div>'+_asisTarjetaM_()+_nov+_ftInicioM_()+'<div class="tarj">'+cab('Conducta',_temporadaVigente_()?('ciclo '+_temporadaVigente_()):'')+medidorHTML()+'</div>'+
     av+
     /* LAS HORAS SALIERON DE AQUI (Daniel, 28/07: «quitaria las horas de estado y las
        dejaria solo en horas»). Estaban en dos pantallas con la misma cifra y la misma barra.

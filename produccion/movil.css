@@ -654,6 +654,8 @@ h2.sec .ln{flex:1;height:1px;background:var(--line)}
 .rl .ra{font-family:var(--mono);color:var(--ink);font-weight:600;white-space:nowrap}
 .rl.desc .ra{color:var(--ok)}
 .rnota{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.5}
+.zonaaviso{margin:0 0 6px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel2,transparent);font-size:11px;line-height:1.4;color:var(--ink2)}
+.zonaaviso[hidden]{display:none}
 
 /* ═══ BARRA DE 7 · LA ESTRELLA QUE VIAJA ══════════════════════════════════
    Decisión cerrada: el indicador viaja en ARCO con la comba PROPORCIONAL a la
@@ -698,10 +700,14 @@ nav{flex:none;position:relative;height:calc(70px + env(safe-area-inset-bottom,0p
 /* `--tabN` lo pone `pintarNav` con cuantas pestañas hay. Con siete el ancho da para 7,5 px
    de rotulo; con menos sobra sitio y crecen. Daniel: «que se autoajuste el espacio de
    abajo»; Adrian, en el reporte: «poder ver las letras de las demas a mayor tamaño». */
-.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+.tab{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   padding:12px 0 9px;font-family:var(--mono);letter-spacing:.05em;text-transform:uppercase;
   font-size:clamp(7.5px, calc(7.5px + (7 - var(--tabN,7)) * .5px), 9.5px);
   color:var(--ink3);position:relative;transition:color .18s linear,font-size .18s linear}
+/* refutar55: el rótulo mide lo que mide (una línea) para saber si cabe; sin sitio, la barra se queda en iconos (`_ajustarNav_`). */
+.tab .tl{white-space:nowrap}
+#nav.ico .tab .tl{display:none}
+#nav.ico .tab{padding:15px 0 14px}
 .tab svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;
   stroke-linecap:round;stroke-linejoin:round}
 .tab.on{color:var(--ink)} .tab.on svg{stroke:var(--red2)}
@@ -913,7 +919,7 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
    ⚠️ Y tampoco con márgenes negativos: arrastran el fondo `sticky` y el borde de la celda.
    ⛔ Las dos rejillas comparten `.rc.rd`, así que **una regla escrita mirando una sola cara
    toca las dos** — que es como se rompe la pantalla de al lado sin enterarse. */
-.rc.rd span{display:block;transform:translateY(-50%)}
+.rc.rd span{display:block}   /* 17/11: el `transform` ya no va aquí: lo pone `.hlin` (`_horaLineaCablear_`, comun.js), la misma regla para toda rejilla */
 .rc.rh{position:relative;overflow:visible;align-items:flex-start;min-height:15px}
 /* ⛔ LA CABECERA YA NO ES UNA HORA, ES UN DÍA: un rótulo de columna, y los rótulos de
    columna SÍ van centrados — lo que la decisión del 05/08 manda poner «al límite» es la
@@ -923,6 +929,9 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 /* decisión cerrada: la etiqueta va al LÍMITE izquierdo de la celda = hora de inicio */
 .rc.rh span{position:absolute;left:0;top:2px;transform:translateX(-50%);white-space:nowrap;font-size:8.5px}
 .rc.rh span.fin{left:auto;right:0;transform:none}
+/* refutar123 (18/11): la cabecera de DÍA (`.rhd`, «28<span>/11</span>») es `position:static` y su «/mes» heredaba el `position:absolute` de la regla de arriba: salía de la columna,
+   las cabeceras decían «28 29 30 01 02» sin mes (un «01» tras el «30» no dice si es diciembre) y los «/11» se apilaban sueltos en la esquina de la hoja. Va en su sitio, en el flujo. */
+.rc.rh.rhd span{position:static;transform:none;left:auto;top:auto}
 .ecel{height:27px;border-radius:3px;background:var(--sur2);cursor:pointer}
 .ecel.on1{background:var(--tel)}          /* telemático */
 .ecel.on2{background:var(--red)}          /* presencial + telemático */
@@ -1193,3 +1202,58 @@ ul.obj li{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-bottom:5px}
 
 /* documentos-1 (12/11): «Editar antes de decidir» plegado en la ficha del expediente (como .doc-edit del escritorio) */
 .doc-edit{margin-top:11px}.doc-edit-c{display:none;margin-top:6px}.doc-edit.ab .doc-edit-c{display:block}
+
+/* 17/11 · VOTACIONES (`comun.js`, bloque «VOTACIONES CON CÓRUM»): tarjetas grandes al dedo, lo elegido en rojo y SIN tick (decisiones-app), la barra del recuento detrás. */
+.votl{margin-bottom:12px}
+.vfila{display:flex;flex-wrap:wrap;align-items:center;gap:6px 11px;padding:11px 0;cursor:pointer;border-top:1px solid var(--line)}
+.vfila:first-child{border-top:0}
+/* refutar55: con la letra al 200 % el titular de una votación (30 px) no cabía en lo que le dejaba el estado a su derecha: ahora pide el 60 % de la fila (si no cabe junto, el estado baja) y una palabra larga parte en vez de salirse */
+.vfila .a{flex:1 1 60%;min-width:0;overflow-wrap:anywhere}.vfila .a b{display:block}.vfila small{display:block;color:var(--ink3);font-size:11.5px;margin-top:2px}
+.vfila .vres{color:var(--ink2)}
+.vsep{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:12px 0 2px;border-top:1px solid var(--line)}
+.vpil{display:inline-block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+.vpil.pend{color:var(--warn);border-color:rgba(232,145,46,.45);background:rgba(232,145,46,.09)}
+.vpil.ok{color:var(--ok);border-color:rgba(62,180,137,.42);background:rgba(62,180,137,.08)}
+.vpil.no{color:var(--red);border-color:rgba(228,30,37,.42);background:rgba(228,30,37,.09)}
+.vback{background:none;border:0;color:var(--ink2);padding:6px 0 10px;cursor:pointer;font:inherit}
+.vtit{font-size:19px;font-weight:600;margin:0 0 4px}
+.vcuo{border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:8px 0 12px;font-size:13px;color:var(--ink2)}
+.vcuo.ok{border-color:rgba(62,180,137,.42);color:var(--ok)}.vcuo.no{border-color:rgba(228,30,37,.42);color:var(--red)}
+.vpreg{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--sur)}
+.vpreg .vh{font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+.vnotas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.vops{display:flex;flex-direction:column;gap:8px}
+.vopc{position:relative;overflow:hidden;text-align:left;min-height:52px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;font:inherit;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px}
+.vopc .vt{flex:1;min-width:40%;position:relative;z-index:1}
+.vopc .vn{position:relative;z-index:1;color:var(--ink2);font-size:12px}
+.vopc .vq{position:relative;z-index:1;flex-basis:100%;color:var(--ink3);font-size:11.5px}
+.vopc .vbar{position:absolute;left:0;top:0;bottom:0;right:0;pointer-events:none}
+.vopc .vbar i{display:block;height:100%;background:rgba(255,255,255,.07)}
+.vopc.on{border-color:var(--red);background:rgba(228,30,37,.18);color:#fff}
+.vopc.on .vbar i{background:rgba(228,30,37,.28)}
+.vopc.gana{border-color:var(--ok)}
+.vopc[disabled]{cursor:default}.vopc[disabled]:not(.on){opacity:.85}
+.vgana{margin:9px 0 0;font-size:13px;color:var(--ink2)}
+.vnew .vin,.votl .vin,.vin{width:100%;box-sizing:border-box;font:inherit;color:var(--ink);background:var(--sur2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-height:44px}
+.vorow{display:flex;gap:6px;margin-top:6px;align-items:center}
+.vx{background:none;border:0;color:var(--ink3);cursor:pointer;font:inherit;padding:8px;min-height:36px}
+.vplan{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.vsws{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.vsw{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0}
+.vfal summary{cursor:pointer;color:var(--ink2);font-size:12.5px;margin:6px 0}
+
+/* refutar55 (17/11): texto sólo para el lector de pantalla (el título de nivel 1 de Estado, que no lleva título a la vista). */
+.sr{position:absolute!important;width:1px!important;height:1px!important;margin:-1px!important;padding:0!important;border:0!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important}
+
+/* refutar99 (18/11): lo que ve quien abre la app en un móvil viejo con 3G mientras llegan ~700 KB de JS: el HTML ya está pintado y el JS aún no. Antes era la cabecera con un nombre
+   inventado («Nerea»), el conmutador de la maqueta y un hueco negro de 20 s sin una palabra. Ahora el hueco dice qué pasa; lo borra el primer pintado de Estado. */
+.abriendo{padding:64px 24px;text-align:center;color:var(--ink3,#9a9293);font-size:15px}
+
+/* refutar123 (18/11): el móvil TUMBADO (740×360, o un 667×375). Cabecera (62 px) + barra de abajo (70 px) se comían el 37 % de la altura y el cuerpo se quedaba en ~230 px
+   (la rejilla y las fichas, a trozos). Se compacta: la barra va sólo con iconos (como `#nav.ico`; cada pestaña ya lleva su aria-label) y la cabecera pierde su relleno. */
+@media (orientation:landscape) and (max-height:480px){
+  nav{height:calc(50px + env(safe-area-inset-bottom,0px))}
+  #nav .tab .tl{display:none}
+  #nav .tab{padding:0}
+  header{padding-top:2px;padding-bottom:6px}
+}

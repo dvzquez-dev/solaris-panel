@@ -25,7 +25,7 @@ function revisoresDe(e){
   /* 05/11 (`pedirrev`): con una PETICIÓN de revisión pendiente del PD, los revisores son los PEDIDOS. Gemela de `revisores_de`. */
   var _pet=_peticionRevActiva_(e); if(_pet) return (_pet.revisores||[]).slice();
   if(_revisoresPropuestosValidos_(e).length) return _destinoConflictoDoc_(e);   /* 05/11 (`conflictojose`): a José, que valida sin firmar */
-  var r = e.ambito==='archivo' ? [coordinadorDe(e.subsistema)]
+  var r = e.ambito==='archivo' ? coordinadoresDe(e.subsistema)
         : e.ambito==='subsistema' ? [PD_NOM,REV2_NOM]
         : [PD_NOM];
   /* nadie revisa lo suyo — 02/11: TODOS los autores (el que lo sube, los que nombra el documento y los ajustados), no sólo `autor`. */
@@ -102,7 +102,7 @@ function _aplicarDecDoc_(e, acc, mot, tit, etq, aj){
   /* 04/11: como el servidor —aprobar con los revisores propuestos—, para que la ficha los enseñe antes del próximo refresco. */
   var _rp=((acc==='aprobado'||acc==='anot') && typeof _revisoresPropuestosValidos_==='function') ? _revisoresPropuestosValidos_(e) : [];
   if(_rp.length){ e.decision=Object.assign({accion:acc, revisor:yoNombre()}, e.decision||{}, {revisadoPor:_rp, validadoPor:yoNombre()}); }
-  e.revisor=pilaDe(yoNombre());           /* constancia de quien decidio */
+  e.revisor=yoNombre();                   /* constancia de quien decidio (refutar92: el nombre ENTERO; la pila no distingue a dos «Pedro») */
   return e;
 }
 
@@ -137,7 +137,7 @@ function puedeDecidirDoc(e){
   if(e.estado==='revision') return true;                  /* sin decidir: cualquiera habilitado */
   /* ya decidido: solo el que decidio, o alguien de MAS rango. El bloqueo mutuo es
      la regla cerrada del pipeline: el primero que decide bloquea a sus iguales. */
-  return e.revisor===pilaDe(yo) || rangoNom(yo)>rangoPila(e.revisor);
+  return esFirmaDe(e.revisor, yo) || rangoNom(yo)>rangoPila(e.revisor);      /* refutar92: por NOMBRE, no por pila */
 }
 
 /* ⛔ EL AMBITO CAE AL TEXTO CRUDO, no a `undefined` (20/08, 125.ª). `AMB_DOC` solo
@@ -151,7 +151,7 @@ function puedeDecidirDoc(e){
 /* ⛔⛔ Y LA TABLA ES LA LEGIBLE, LA DEL ESCRITORIO (649.ª, 14/09). Hasta hoy el móvil leía un mapa que
    devolvía el ámbito tal cual («subsistema») y el escritorio, del mismo expediente, decía «informe de
    subsistema». Decisión [27/07]: el vocabulario de Cowork no se enseña. */
-function ambDocM(a){ return AMB_DOC[a] || String(a || '—'); }
+function ambDocM(a, tipo){ return _ambitoDeActa_(a, tipo) || AMB_DOC[a] || String(a || '—'); }
 /* ⚠️ `esAutor`, no `mio` (20/10): en el escritorio `filaDoc(d, mio)` significa «puedo decidir», o sea lo
    CONTRARIO; con el mismo nombre, portar una línea de una cara a la otra la invertía sin error. */
 function filaDoc(e,esAutor){
@@ -171,9 +171,11 @@ function filaDoc(e,esAutor){
      nueva: el día que se añada un estado, esto lo hereda en vez de quedarse viejo — que
      es exactamente cómo nació este fallo. */
   var _pend = _docEnCurso_(e.estado) && e.estado!=='cambios';
+  /* 17/11 (refutar52): quien revisa de varias unidades (José coordina Propulsión y la UCT; el PD y José revisan los informes de todas) ve de QUÉ unidad es cada uno */
+  var _uni = (!esAutor && e.subsistema && (rangoNom(yoNombre())>=2 || _perfilesDe_(miembro(yoNombre())).length>1)) ? ' · '+esc(e.subsistema) : '';
   return '<div class="fila clic '+(esAutor?(e.estado==='cambios'?'borde-no':(_pend?'borde-pe':''))+'':'')+'" data-doc="'+e.id+'" data-p>'+
     '<div class="a"><b>'+esc(e.titulo)+'</b><small><span class="mono">'+e.ref+'</span> · '+
-    esc(e.autor.split(' ')[0])+' · '+ambDocM(e.ambito)+'</small></div>'+
+    esc(pilaClara(e.autor)||e.autor.split(' ')[0])+' · '+ambDocM(e.ambito, e.tipo)+_uni+_marcaSuperadaDoc_(e, ((typeof ENTREGABLES!=='undefined' && ENTREGABLES)||[]).concat((typeof ENT_REV!=='undefined' && ENT_REV)||[]))+_marcaAprobadoSinPublicar_(e)+'</small></div>'+
     '<div class="d"><span class="pil '+st[1]+'">'+st[0]+'</span> <span class="chev">›</span></div></div>';
 }
 
@@ -223,8 +225,9 @@ function _repartirEntregablesM_(lista){
    `vDocs`, y un tercer criterio para «¿tengo algo en Documentos?» es como divergen. */
 function _docsAvisoM_(){
   var pend = (typeof _docsPend_==='function') ? (_docsPend_()||[]).length : 0;
+  var todos = ((typeof ENTREGABLES!=='undefined' && ENTREGABLES)||[]).concat((typeof ENT_REV!=='undefined' && ENT_REV)||[]);
   var mios = (typeof ENTREGABLES!=='undefined' && ENTREGABLES)
-    ? ENTREGABLES.filter(function(e){ return e && e.estado==='cambios'; }).length : 0;
+    ? ENTREGABLES.filter(function(e){ return e && _cambiosSinAtender_(e, todos); }).length : 0;      /* 19/11: sin el ya sustituido por un envío nuevo */
   return pend + mios;
 }
 
@@ -318,7 +321,7 @@ function vDocs(){
     return h+'<div class="tarj">'+vacio('Nada por aquí',
       /* 21/10 (auditor 11, 🟡 7): `esCoord()` incluye al SUBCOORDINADOR, y el reparto (`coordinadorDe`, y el servidor)
          sólo nombra a quien tiene `cargo:'Coordinador'`: a él no le llega nada, y se le prometía. */
-      'No tienes nada que revisar ni has enviado nada.',
+      'No tienes nada que revisar ni has enviado nada.'+_docsComoEnviar_(),
       '',false)+'</div>';
   }
   h+='<h2 class="sec">Pendiente de tu revisión<span class="ln"></span>'+pend.length+'</h2>';
@@ -394,7 +397,7 @@ function _pasosCorregirM_(e){
 function _docAutorHTML_(e){
   if(!e || _autoresDe_(e).indexOf(yoNombre())<0) return '';   /* 12/11 (refutar18): también quien lo firma con otro */
   var est=e.estado;
-  var m=_docAutorModelo_({estado:est, nota:e.nota, decision:e.decision, decidedAt:e.decidedAt, revisor:e.revisor, url:e.paginaNotion});
+  var m=_docAutorModelo_({estado:est, nota:e.nota, decision:e.decision, decidedAt:e.decidedAt, revisor:e.revisor, url:e.paginaNotion, ref:e.ref});
   if(!m) return '';
   var marco='<div class="avisolargo" style="margin-top:14px">';
   /* ⛔ EL ROTULO DECIA «Reenviar corregido» Y NO REENVIA NADA: `Codigo.gs:965-967`
@@ -421,7 +424,7 @@ function _docAutorHTML_(e){
       a esta función en esa lista y ponía el banco rojo. Un detector que busca NOMBRES no
       distingue una invocación de una mención: la denuncia crea el hecho. */
 function _avisosDocM_(e){
-  var xs = (typeof _avisosDoc_==='function') ? _avisosDoc_(e) : [];
+  var xs = (typeof _avisosDoc_==='function') ? _avisosDoc_(e, ((typeof ENTREGABLES!=='undefined' && ENTREGABLES)||[]).concat((typeof ENT_REV!=='undefined' && ENT_REV)||[])) : [];
   return xs.map(function(a){
     return '<div class="avisolargo" style="margin-bottom:10px"><b>'+esc(a.t)+'</b> '+
            esc(a.d)+'</div>';
@@ -434,7 +437,7 @@ function _avisosDocM_(e){
    Sacarlo no es estetica: es lo que lo hace medible. */
 /* El panel de «Cambiar autores» (PD y José, sin decidir): '' si no toca. Una sola puerta para la ficha y para `_botonesDecM_`. */
 function _autorPDoc_(e){
-  return (_puedeCambiarAutor_(e.estado, yoNombre()) && !_peticionRevActiva_(e)) ? _autorPanelHTML_('dA', e.id, _autoresActualesDe_(e), '') : '';
+  return (_puedeCambiarAutor_(e.estado, yoNombre(), e) && !_peticionRevActiva_(e)) ? _autorPanelHTML_('dA', e.id, _autoresActualesDe_(e), '') : '';
 }
 function _botonesDecM_(e){
   /* ✅ PARAR SI, PUBLICAR NO. `cambios` y `rechazado` son legitimos sobre algo que aun no
@@ -468,8 +471,9 @@ function _previaDocM_(e){
 function verDoc(id){
   var e=ENTREGABLES.concat(ENT_REV).filter(function(x){return x.id===id;})[0];
   if(!e) return;
+  _DOC_ABIERTO_=id;   /* 14/11: la que relee `_refrescarDocAbierto_` */
   var puede=puedeDecidirDoc(e);
-  var revs=revisoresDe(e).map(function(n){return n.split(' ')[0];}).join(' o ');
+  var revs=revisoresDe(e).map(function(n){return pilaClara(n)||n.split(' ')[0];}).join(' o ');
   var sinRev=!revs;
   var sevTxt={baja:'alta',media:'media',alta:'baja'};
   var an=e.analisis, secs='';
@@ -484,6 +488,7 @@ function verDoc(id){
     if(_cnt) secs+='<p class="rnota" style="margin:8px 0 0">'+esc(_cnt)+'</p>';
   }
   var _mioDoc = _docAutorHTML_(e);
+  var _mioArriba = puede ? '' : _mioDoc;
   var _autorP = _autorPDoc_(e);
   var acc = puede
     ? '<h4>Tu decisión</h4>'+_revisionPropuestaHTML_(e, yoNombre())+
@@ -506,7 +511,7 @@ function verDoc(id){
        ⚠️ Se llama UNA vez y se guarda: llamarla dos veces en el ternario duplicaría el
        trabajo y, el día que lleve estado dentro, daría dos respuestas distintas. */
     : _mioDoc
-      ? _mioDoc
+      ? ''      /* refutar64 (17/11): lo del autor sube, encima del visor (`_mioArriba`) */
       /* 12/11 (refutar18): a quien le PIDEN confirmar la revisión (es su revisor mientras la petición vive) no se le dice «lo revisa <él>. Tú no
          decides aquí»: lo que le toca lo dice `_peticionRevHTML_` justo debajo (como en el escritorio, que aquí pone ''). */
       : (_peticionRevActiva_(e) && revisoresDe(e).indexOf(yoNombre())>=0 ? ''
@@ -518,7 +523,7 @@ function verDoc(id){
   abrirModal('<div class="mtit">'+esc(e.titulo)+'</div>'+
     '<div class="msub"><span class="mono">'+e.ref+'</span> · '+esc(e.autor)+' · '+esc(e.subsistema)+'</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+
-      '<span class="pil neu">'+ambDocM(e.ambito)+'</span>'+
+      '<span class="pil neu">'+ambDocM(e.ambito, e.tipo)+'</span>'+
       /* ⛔ La clase sale de `EST_DOC`, no de un ternario a mano: el `else` era `conf` y
          pintaba **«rechazado» en VERDE** al autor que abre su propio expediente. */
       '<span class="pil '+_pilEstDoc_(e.estado)+'">'+esc(estDoc(e.estado)[0])+'</span>'+
@@ -549,6 +554,10 @@ function verDoc(id){
     /* ANTES del resumen a propósito: si el expediente está trabado o es una
        revisión de otro, eso cambia lo que hay que mirar en todo lo de abajo. */
     _avisosDocM_(e)+
+    /* ⛔ refutar64 (17/11): AL AUTOR LO QUE FALTA, ANTES DEL PDF. «Te pidieron cambios: falta la figura 3 y cómo corregirlo» estaba al FINAL de la
+       ficha, debajo del visor (52 % de la pantalla) y de los avisos: en un móvil de 360×740 Ana abría su documento y veía su título, la píldora
+       «cambios pedidos» y un cuadro gris de 385 px, y tenía que bajar para saber QUÉ corregir. Es lo único que viene a leer. */
+    _mioArriba+
     '<p style="font-size:12.5px;color:var(--ink2);line-height:1.55;margin:0">'+esc(e.resumen||'Sin descripción.')+'</p>'+
     /* Las etiquetas se VEN aunque no puedas decidir: el campo editable de abajo solo
        sale si te toca firmar, y el AUTOR tiene que poder ver con cuales se publico
@@ -589,3 +598,36 @@ function verDoc(id){
   _cablearVisor_();
 }
 
+/* 14/11 — LA FICHA ABIERTA TAMBIÉN SE PONE AL DÍA. Daniel: «que en documentos el PD no tenga la pantalla desactualizada. Por diseño eso no debería ser
+   así. Se supone que se actualiza cada segundo». Lo de cada segundo ya existía (`_arrancarVivo_`), pero con un modal abierto `_refrescoVivo_` no toca
+   nada, y la ficha de un documento ES un modal: quien la leía cinco minutos decidía sobre el estado de cuando la abrió, y el PD podía pisar sin saberlo
+   lo que una coordinadora acababa de decidir (refutar44). Aquí se relee SÓLO esa ficha y SÓLO si el sello de los documentos cambió (no es un
+   `getEntregables` por segundo). Con algo escrito en la ficha no se repinta, que se perdería: se avisa encima. */
+var _DOC_ABIERTO_=null, _DOC_SELLO_=null, _REFDOC_=false;
+function _firmaDocM_(e){ return e ? [e.estado, e.revisor||'', (e.decision&&e.decision.accion)||'', e.nota||'', _peticionRevActiva_(e)?1:0, e.envio||'', e.enlaceDrive||e.drive||''].join('|') : ''; }
+async function _refrescarDocAbierto_(sellos){
+  if(_DOC_ABIERTO_==null) return;
+  if(!_modalAbierto_()){ _DOC_ABIERTO_=null; return; }
+  var se=sellos ? [sellos['entregables'], sellos['kv/entregables']].join('|') : null;
+  if(se!==null && se===_DOC_SELLO_) return;
+  if(_REFDOC_ || typeof api==='undefined' || typeof api.getEntregables!=='function') return;
+  _REFDOC_=true;
+  try{
+    var id=_DOC_ABIERTO_, antes=ENTREGABLES.concat(ENT_REV).filter(function(x){return x.id===id;})[0];
+    var L=await api.getEntregables(); if(!Array.isArray(L)) return;
+    _DOC_SELLO_=se;
+    var ahora=L.filter(function(x){return x && x.id===id;})[0];
+    _repartirEntregablesM_(L);
+    if(!ahora || _firmaDocM_(ahora)===_firmaDocM_(antes) || _DOC_ABIERTO_!==id || !_modalAbierto_()) return;
+    var fir=(ahora.decision&&ahora.decision.revisor)||ahora.revisor||'', acc=_accionDocTxt_(ahora.decision&&ahora.decision.accion)||_accionDocTxt_(ahora.estado);
+    /* 18/11 (refutar90): la MISMA ref con otro archivo (`envio`/enlace) no cambia estado ni decisión, y el sello no lo veía: el revisor seguía leyendo el PDF viejo. */
+    var nuevoArch=((ahora.envio||'')!==(antes&&antes.envio||'')) || ((ahora.enlaceDrive||ahora.drive||'')!==(antes&&(antes.enlaceDrive||antes.drive)||''));
+    var txt=nuevoArch ? 'Acaban de mandar otra versión de este documento: el archivo es nuevo.'
+      : (fir?firmaCorta(fir)+' acaba de decidirlo':'Acaba de cambiar')+(acc?': '+acc:'')+'.';
+    if(!_MODAL_TOCADO_){ var sc=$('#modal .card').scrollTop; verDoc(id); $('#modal .card').scrollTop=sc; txt+=' Lo que ves ya está al día.'; }
+    else txt+=' Lo de abajo aún es de antes (lo que escribiste sigue ahí): revísalo antes de decidir.';
+    var b=document.getElementById('docCambio');
+    if(!b){ b=document.createElement('div'); b.id='docCambio'; b.className='avisolargo'; b.style.margin='0 0 10px'; var mb=$('#modal-body'); mb.insertBefore(b, mb.firstChild); }
+    b.textContent=txt;
+  }catch(_){ } finally { _REFDOC_=false; }
+}

@@ -98,7 +98,7 @@ function _sancionesHTML_(){
   var K={ campo:function(t,h){ return '<div class="campo"><span class="sc">'+t+'</span>'+h+'</div>'; },
           nota:function(h,aviso){ return '<p class="rnota" style="margin:0 0 10px'+(aviso?';color:var(--warn)':'')+'">'+h+'</p>'; } };
   return '<div class="mtit">Sanciones</div>'+
-    '<div class="msub">Ponerlas y decidirlas. El comunicado sigue saliendo del escritorio.</div>'+
+    '<div class="msub">Ponerlas y decidirlas. El comunicado sale después de decidirlas.</div>'+
     /* A cuánta gente puedes sancionar, como el `pan(...)` del escritorio (ficha del 20/08: `nTotal` se
        calculaba aquí y no se pintaba nunca). */
     /* sanciones-1 (12/11): con sanciones esperando, lo PENDIENTE va primero y «Poner una sanción» queda en UNA barra pegada al título (siempre a la vista,
@@ -255,7 +255,7 @@ function _cablearSanciones_(){
   var bt=$('#btnSanc');
   if(bt) bt.onclick=async function(){
     var res=await _enviarSancionForm_({msg:msg, bt:bt});
-    if(!res.ok) return;
+    if(!res.ok){ if(res.reponer) _repintarSancM_(); return; }   /* refutar73: la tarea cambió en Notion → la lista del sancionado se vuelve a pedir */
     SANC_M=null;
     _abrirSanciones_();
   };
@@ -545,7 +545,11 @@ function _formSancion_(s){
     _apelarSancion_(s, mo.value.trim(), ($('#msEnlace').value || '').trim())
       .then(function(){ return _cargarMisSanciones_(); })
       .then(function(){ cerrarModal(); pintar(); tost(APEL_SANC_TXT.enviada); })
-      .catch(function(e){ si.disabled=false; tostErr('No se pudo enviar: ', e); });
+      .catch(function(e){
+        /* refutar80: «ya la apelaste» (desde tu otro aparato): el formulario ya no sirve, se cierra para que `tostErr` pueda poner la lista al día */
+        var _ch=_choque_(e); if(_ch) cerrarModal(); else si.disabled=false;
+        tostErr('No se pudo enviar: ', e);
+        if(_ch) _cargarMisSanciones_().then(function(){ pintar(); }); });
   };
 }
 
@@ -571,7 +575,8 @@ function _libroPuntosHTML_(){
       /* ⛔ VACIO Y «TODAVIA NO SE SABE» NO SE PINTAN IGUAL. Es la mitad que faltaba:
          arreglar el dato sin arreglar lo que se PINTA deja el bug intacto. */
       ? '<div class="retf" style="opacity:.7"><span class="mo"><b>Cargando tus movimientos…</b></span></div>'
-      : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b></span></div>'))+
+      /* refutar120: el desglose de quien aún no tiene nada era un botón que se abre a una línea; dice qué saldrá aquí */
+      : '<div class="retf" style="opacity:.7"><span class="mo"><b>Sin movimientos esta temporada</b><small>Aquí saldrá cada sanción o compensación que suba o baje tus puntos.</small></span></div>'))+
     (r.todos.length ? '<p class="rnota" style="margin:8px 0 0">'+_notaRegistro_(r.total,'temporada',r.total)+'</p>' : '')+
   '</div></div>';
 }
@@ -818,7 +823,7 @@ function _panelPDmaqueta_(){
       '</div></div>';
 
   var sueltas=SUELTAS.map(function(s){
-    return '<div class="fila"><div class="a"><b>'+esc(s.nombre.split(' ')[0])+'</b>'+
+    return '<div class="fila"><div class="a"><b>'+esc(pilaClara(s.nombre)||s.nombre.split(' ')[0])+'</b>'+
       '<small>'+esc(s.motivo)+' · Art. '+s.articulo+'</small></div>'+
       '<div class="d"><span class="mono" style="color:var(--red2)">'+s.puntos+'</span></div></div>'+
       '<div style="display:flex;gap:7px;margin:2px 0 10px;flex-wrap:wrap">'+

@@ -23,8 +23,10 @@
    yo mismo. O sea, no hay nadie más.») */
 function revisoresDeParte(p){
   if(p.autor===PD_NOM) return [PD_NOM];
-  var c=coordinadorDe(p.unidad);
-  if(c!==p.autor) return [c];
+  var cs=coordinadoresDe(p.unidad);
+  if(cs.indexOf(p.autor)<0) return cs;                                          /* 18/11 (refutar100): los DOS, si hay dos */
+  var otros=cs.filter(function(c){ return c!==p.autor; });
+  if(otros.length) return otros;
   /* ⛔ 20/10 (auditor de partes): el de un coordinador, SÓLO el PD. Aquí escalaba también a José, y el servidor
      (`_puede_sobre_parte`: rango ≥ 3 o coordinar esa unidad) le rechaza: «Lo firma Daniel o José» prometía una firma
      que no existe. */
@@ -68,17 +70,18 @@ function puedeOtorgarA(m,quien){ return _puedeOtorgarA_(m, quien); }   /* 11/11:
    aprobar» (cola y globo) aunque siga pudiendo decidirlo. Misma regla que el móvil (`_cargarPartesDec_`); el servidor ya
    fijó en el parte la unidad de la TAREA. */
 function porAprobar(){return pendientes().filter(function(p){
-  return _firmaMia_(p) && !(p.autor===ACTOR && coordinadorDe(p.unidad)!==ACTOR);});}
+  return _firmaMia_(p) && !(p.autor===ACTOR && !esElUnicoCoordDe(p.unidad,ACTOR));});}
 
 function parteCard(p){
   var m=_m(p.autor), rev=revisoresDeParte(p), puede=puedeDecidirParte(p,ACTOR);
-  var esc2=(coordinadorDe(p.unidad)===p.autor);
+  var esc2=esElUnicoCoordDe(p.unidad,p.autor);
   return '<div class="parte pp" id="parte-'+p.id+'">'+
     '<div class="h"><b>'+esc(_pilaDeM_(p.autor)||m.pila)+'</b>'+
       /* 01/11 (escm1): Aprobar JUNTO AL NOMBRE, no al final de una fila de 1.500 px; el 90 % se aprueba sin motivo. */
       (puede?'<button class="btn pri sm" data-parte="'+p.id+'" data-acc="si">Aprobar</button>':'')+
       '<span class="u">'+esc(p.unidad)+'</span>'+
-      '<span class="u">'+p.fecha+' · '+p.ini+'–'+p.fin+'</span>'+
+      (_esBaja_(p.autor)?'<span class="u">de baja</span>':'')+   /* refutar106: el parte de quien se fue sigue en la cola y se dice */
+      '<span class="u">'+p.fecha+(/^\d/.test(p.ini||'')&&/^\d/.test(p.fin||'')?' · '+p.ini+'–'+p.fin:'')+'</span>'+   /* 18/11 (refutar97): sin horario no sale «—–—» (el móvil ya lo evitaba) */
       /* ⛔ `nf2`, NO `nf(...,1)`. Daniel, 18/08: «ya te dije bien claro que nada de
          redondeos a la decima». El fichaje redondea a CUARTOS (.25/.50/.75), asi que una
          sola decimal los falsea: 0,75 se enseñaba como «0,8» en la tarjeta donde se FIRMA.
@@ -92,6 +95,8 @@ function parteCard(p){
     '<div class="fl">'+(p.flags||[]).map(function(f){   /* 20/10: un parte sin avisos (la semilla, un `detalle`) no revienta la cola */
       return '<span class="chip '+(f[0]==='ok'?'ok':'wa')+'">'+esc(f[1])+'</span>';}).join('')+
       (p.origen==='fichaje'?'<span class="chip ok">con fichaje</span>':'')+
+      /* refutar139: lo que importa antes de aprobar (repetido, horario pisado, muchas horas), con todos los partes que tiene delante esta cara */
+      ((p.estado==='pend'||p.estado==='detalle') && typeof _marcasParteDec_==='function'?_marcasParteDec_(p, PARTES).map(function(f){ return '<span class="chip wa">'+esc(f)+'</span>'; }).join(''):'')+
       /* 20/10: lo devuelto se DICE — está en la cola esperando al autor, y se ve qué se le pidió. */
       (p.estado==='detalle'?'<span class="chip wa">devuelto · falta detalle'+(p.motivo?' — «'+esc(p.motivo)+'»':'')+'</span>':'')+
       /* 21/10 (auditor 8, 🟡 6): y si ya lo CONTESTÓ, qué se le había preguntado */
@@ -99,7 +104,7 @@ function parteCard(p){
       /* 26/10 · «Sí, mientras no esté firmado»: las horas que vas a firmar las corrigió su autor — y de cuánto eran */
       (_txtCorreccion_(p.corr)?'<span class="chip wa">'+esc(_txtCorreccion_(p.corr))+'</span>':'')+'</div>'+
     /* 31/10 (textos): si puedes decidir, los botones ya lo dicen; s\u00f3lo se avisa cuando NO es tuyo */
-    (puede?'':'<div class="ruta">Lo firma '+esc(rev.map(function(n){return _m(n).pila;}).join(' o '))+', no t\u00fa.</div>')+
+    (puede?'':'<div class="ruta">Lo firma '+esc(rev.map(function(n){return (pilaClara(n)||_m(n).pila);}).join(' o '))+', no t\u00fa.</div>')+
     /* 01/11 · Daniel: «Se queda así y la pantalla lo dice» — el parte del PD lo firma él mismo */
     (_notaFirmaPropia_(p,ACTOR)?'<div class="ruta">'+esc(_notaFirmaPropia_(p,ACTOR))+'</div>':'')+
     /* 01/11 (escm1): el motivo va PLEGADO; lo abre «Pedir detalle» o «Rechazar» (`_engPartes_`) y la elegida se enciende. */
@@ -133,15 +138,16 @@ function bloquePanel(){
      coordinadores, que tienen cargo, pero un SUBCOORDINADOR tiene rango 1 y `cargo` nulo
      -- se ofrecia horas a SI MISMO, y el servidor tiene una guarda explicita contra eso. */
   var actor=_m(ACTOR), mandaEnTodo=rangoNom(ACTOR)>=3, unidad=(actor&&actor.unidad)||'';
-  var reg=_activos_().filter(function(m){ return !m.cargo && m.nombre!==ACTOR; }); // de subsistema, sin bajas, sin uno mismo
   /* ⛔ 21/10 (auditor 8, 🟠 3): A QUIEN EL SERVIDOR DEJA, por la misma puerta que decidir un parte (`puedeDecidirParte`
      = `_puede_sobre_parte`: el PD, o quien coordina ESA unidad). Con «misma unidad que el actor», al subcoordinador
      (rango 1, sin ser el coordinador) se le ofrecía su unidad entera —su propio coordinador incluido— y el servidor
      rechazaba cada uno («sin potestad»). 01/11: `puedeOtorgarA` añade al subcoordinador, a SU equipo (Daniel). */
-  var pool=mandaEnTodo?reg:reg.filter(function(m){ return puedeOtorgarA(m, ACTOR); });   /* 01/11: + el subcoordinador, a su equipo */
+  /* 18/11 (refutar85): la lista es LA del móvil y la de «Otorgar horas directamente» (`_otorgablesDe_`: potestad sobre la persona, nunca uno mismo). Con `!m.cargo` el PD no podía
+     darle horas a un coordinador desde aquí (a Cris la feria también le cuenta) y el servidor y el móvil sí le dejan. */
+  var pool=_activos_().filter(function(m){ return _puedeOtorgarA_(m, ACTOR); });
   if(!pool.length) return pan('Bloque de horas','a varios de tu subsistema de golpe',
     '<div class="pb"><p style="margin:0;font-size:12.5px;color:var(--ink2);line-height:1.6">'+
-    (coordinadorDe(unidad)===ACTOR ? 'No hay nadie de tu subsistema a quien otorgar horas en bloque.'
+    (esCoordDe(unidad,ACTOR) ? 'No hay nadie de tu subsistema a quien otorgar horas en bloque.'
       : (_subcoordDe_(ACTOR) ? 'No hay nadie en tu equipo a quien otorgar horas en bloque.'
         : 'Otorgar horas es del coordinador de la unidad y del Project Director: el servidor no lo deja a nadie más.'))+
     '</p></div>');
@@ -175,6 +181,7 @@ function normParte(p){
      X» al lado. `_etiOrigenParte_` (comun.js) decide una sola vez, y la misma que el movil. */
   var _eo=_etiOrigenParte_(p);
   if(_eo) fl.push([_eo.tono==='ok'?'ok':'wa', _eo.txt]);
+  var _nm=(typeof _notaMesCerradoParte_==='function' ? _notaMesCerradoParte_(p) : null); if(_nm) fl=fl.concat([['wa', _nm]]);   /* 18/11 (refutar97): sin firmar y de un mes ya cerrado: cuenta en el abierto */
   return { id:p.id, autor:p.autor, unidad:p.subsistema||'—', fecha:_isoADMY_(p.fecha),
     ini:p.ini||'—', fin:p.fin||'—', horas:Number(p.horas)||0, tarea:_tareaVista_(p.tarea),
     turno_h:p.turno_h||0, clave:p.clave||'',   /* 11/11 (turnoextra): `_horasVistaParte_` los lee */
@@ -353,7 +360,7 @@ function _escRevBloqueo_(p){
   var _ce=(typeof CIERRE!=='undefined' && CIERRE) || null;
   var cer=_mesCerradoParte_(p, (_ce && _ce.plan) || null, (_ce && _ce.ultimo_cierre) || null, true);   /* 26/10: para revertir */
   if(cer)
-    return 'Mes cerrado ('+esc(cer)+'): ya no se revierte. Esas horas ya cuentan y de ahí salió '+
+    return 'Mes cerrado ('+esc(typeof _nomPeriodo_==='function' ? _nomPeriodo_(cer) : cer)+'): ya no se revierte. Esas horas ya cuentan y de ahí salió '+
       'la cuota. Si hay que corregirlo, se hace en la ficha.';
   return null;
 }
@@ -456,8 +463,10 @@ function _escRevPanel_(){
   if(!lista.length) return '';
   /* ⛔ 21/10 (auditor 8, 🟡 11): el número dice cuántos AÚN se pueden revertir — la lista trae también los de meses
      cerrados (con su «ya no se revierte») y lo otorgado por el sistema: 53 para el PD con 8 vivos. */
-  for(i=0;i<lista.length;i++){ h+=Number(lista[i].horas)||0; cuerpo+=_escRevCard_(lista[i]);
+  lista=lista.slice().sort(function(a,b){ return String(b.fecha||'')<String(a.fecha||'') ? -1 : String(b.fecha||'')>String(a.fecha||'') ? 1 : 0; });   /* 18/11: lo más reciente primero: es lo que se revierte */
+  for(i=0;i<lista.length;i++){ h+=Number(lista[i].horas)||0;
     if(!_escRevBloqueo_(lista[i])) vivos++; }
+  cuerpo=_listaPorTramos_('rev', lista, _escRevCard_);   /* 18/11 (refutar96): por tramos; el titular de arriba cuenta TODAS */
   /* ⛔ `nf2`, NO `nf(...,1)` (20/08, 130.ª). Era el ULTIMO redondeo a la decima sobre
      horas que quedaba, y estaba en el panel que CONTIENE las tarjetas -- que ya usaban
      `nf2` desde el 18/08. El fichaje redondea a CUARTOS, asi que la mitad de los totales
@@ -472,6 +481,7 @@ function _escRevPanel_(){
 }
 
 function _engPartesRev_(){
+  _engTramos_(pintar);   /* 18/11: «Mostrar N más» de «Ya firmaste» y del «Histórico» */
   $$('[data-rev]').forEach(function(b){
     b.onclick=async function(){
       if(b.disabled) return;
@@ -713,9 +723,9 @@ function _fichaPanel_(){
   var min=_fichaMin_(), largo=min>=600;
   var estado = !abierta ? 'parada' : (pausa?'pausada':'corriendo');
   var perf=_fichaPerfil_(), yo=_fichaYo_();
-  var firma=perf?_firmaDe_(perf,yo):null, firmaP=firma?((miembro(firma)||{}).pila||firma):null;
+  var firma=perf?_firmaDe_(perf,yo):null, firmaP=firma?(pilaClara(firma)||firma):null;
 
-  var linea = estado==='corriendo' ? (largo?'M\u00c1S DE 10 H ABIERTA \u00b7 CI\u00c9RRALA':('CONTANDO DESDE LAS '+esc(_hhmmDe_(FICHA.ini))))
+  var linea = estado==='corriendo' ? (largo?'M\u00c1S DE 10 H ABIERTA \u00b7 CI\u00c9RRALA':('CONTANDO DESDE LAS '+esc(_hhmmDe_(FICHA.ini))+(_zonaNoMadrid_()?' (HORA DE MADRID)':'')))
             : estado==='pausada'   ? 'EN PAUSA \u00b7 EL RELOJ EST\u00c1 PARADO'
             : sabido               ? 'SIN SESI\u00d3N ABIERTA'
             : 'COMPROBANDO SI YA TIENES UN FICHAJE ABIERTO\u2026';
@@ -855,7 +865,7 @@ function _engFicharE_(){
        formulario: el aviso nombraba al coordinador del perfil POR DEFECTO cuando habias
        elegido otro, o sea que la pantalla te decia que lo firma quien no lo firma. */
     var _perfEnvio=_fichaPerfil_()||null;
-    var _firmaP=_perfEnvio?((miembro(_firmaDe_(_perfEnvio,_fichaYo_()))||{}).pila||''):'';
+    var _firmaP=_perfEnvio?(pilaClara(_firmaDe_(_perfEnvio,_fichaYo_()))||''):'';
     try{
       /* ⛔ CON EL FORMULARIO A MEDIAS SE MANDA VACIO, no a medias. El backend decide
          `declarado = !!(tarea || categoria)`: mandar la categoria con la tarea y la
@@ -1113,7 +1123,7 @@ function _bloqFirma_(){
   var perf=_bloqSubsEfectivo_();
   if(!perf) return '';
   var n=_firmaDe_(perf, _fichaYo_());
-  return n ? ((miembro(n)||{}).pila||n) : '';
+  return n ? (pilaClara(n)||n) : '';
 }
 
 /* Entrada/salida: texto HH:MM, no `<select>` de cuartos (no admitía 17:43, la hora de un fichaje, y es un control nativo). */
@@ -1548,7 +1558,7 @@ function _ritmoHorasHTMLE_(mi){
         '<span class="tr"><i class="z"></i><b style="left:'+izq.toFixed(2)+'%;width:'+w.toFixed(2)+'%"></b></span>'+
         '<span class="vv"><b>'+pc(dl)+'</b><small>'+esc(f.txt)+'</small></span></div>';
     }).join('')+'</div>'+
-    '<div class="nota">Tu ritmo: <b>'+nf2(r.ritmo)+' h/día</b> ('+nf2(r.num)+' h en '+r.dia+' días'+
+    '<div class="nota">Tu ritmo: <b>'+nf2(r.ritmo)+' h/día</b> ('+nf2(r.num)+' h en '+r.dia+(r.dia===1?' día':' días')+
     (r.conBase?', con las horas por gestión de tu cargo repartidas hasta hoy':'')+'). Se compara el ritmo, no el total: '+
     'el mes en curso va a medias y el anterior está entero.</div>');
 }
@@ -1807,7 +1817,7 @@ function _bloqueReuPanelE_(){
   var r=_reuSelE_();
   var puede=_puedeBloqueReu_(r, _actorSanc_(), (typeof esAdmin==='function' && esAdmin()));
   var abierto=!!(BLQ && BLQ.donde===vista);
-  if(!puede && !abierto) return '';
+  if(!puede && !abierto && !(r && r.en_curso)) return '';     /* 17/11: quien no la lleva ve quién está dentro */
   /* 31/10 (feosesc #23): sin nada que enseñar, el panel NO sale (salía un marco con un hueco vacío). */
   var cuerpo=abierto?_bloqueFormHTML_():_bloqueReuHTML_(r, puede);
   if(!String(cuerpo||'').replace(/<[^>]*>/g,'').trim()) return '';

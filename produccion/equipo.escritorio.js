@@ -82,13 +82,14 @@ function _rolDe_(nombre){
 function colaDecision(){
   var out=[];
   porAprobar().forEach(function(p){
-    out.push({ic:'i-reloj',b:h1(p.horas)+' de '+_m(p.autor).pila,
+    out.push({ic:'i-reloj',b:h1(p.horas)+' de '+(pilaClara(p.autor)||_m(p.autor).pila),
       /* Mismo vocabulario que las otras dos pantallas: `bloque` ya no existe. */
-      s:esc(p.tarea)+' · '+p.fecha+(_etiOrigenParte_(p)?' · '+_etiOrigenParte_(p).txt:''),
+      s:esc(p.tarea)+' · '+p.fecha+(_etiOrigenParte_(p)?' · '+_etiOrigenParte_(p).txt:'')+
+        (_diasEsperando_(p.creado_at)?' · lleva '+_diasEsperando_(p.creado_at)+' días esperando':''),   /* 18/11 (refutar126) */
       chip:'<span class="chip wa">parte de horas</span>',ir:'partes',foco:'parte-'+p.id});
   });
   docsMios().forEach(function(d){
-    out.push({ic:'i-doc',b:esc(d.tit),s:d.ref+' · '+_m(d.autor).pila+' · '+esc(ambDoc(d.amb))+   /* 20/10: como la lista, no el crudo */
+    out.push({ic:'i-doc',b:esc(d.tit),s:d.ref+' · '+(pilaClara(d.autor)||_m(d.autor).pila)+' · '+esc(ambDoc(d.amb, d.tipo))+   /* 20/10: como la lista, no el crudo */
       (d.iss?' · '+d.iss+' aviso'+(d.iss===1?'':'s'):''),
       /* ⛔ POR LA PUERTA UNICA. Aqui habia una copia con el `else` en `'ok'` -verde-, asi
          que `null`, un valor fuera del enum y la cadena vacia salian los TRES con el chip
@@ -114,9 +115,10 @@ function colaDecision(){
      Una fila con quién y de qué, por la MISMA puerta que el globo (`_apelPendientesTuyas_`). */
   var _ap=(typeof _apelPendientesTuyas_==='function')?_apelPendientesTuyas_():[];
   if(_ap.length){
-    var _apN=_ap.slice(0,2).map(function(a){ var m=_m(a.autor); return esc((m&&m.pila)||a.autor)+' ('+(a.clase==='sancion'?'sanción':'tarea')+')'; });
+    var _apN=_ap.slice(0,2).map(function(a){ var m=_m(a.autor); return esc(pilaClara(a.autor)||a.autor)+' ('+(a.clase==='sancion'?'sanción':'tarea')+')'; });
     out.push({ic:'i-gavel',b:_ap.length===1?'Una apelación por resolver':_ap.length+' apelaciones por resolver',
-      s:_apN.join(', ')+(_ap.length>2?' y '+(_ap.length-2)+' más':'')+' · la respuesta es obligatoria',
+      s:_apN.join(', ')+(_ap.length>2?' y '+(_ap.length-2)+' más':'')+' · la respuesta es obligatoria'+
+        (_diasMasViejo_(_ap.map(function(a){ return a.at; }))?' · lleva '+_diasMasViejo_(_ap.map(function(a){ return a.at; }))+' días esperando':''),   /* 18/11 (refutar126) */
       chip:'<span class="chip no">por decidir</span>',ir:'apela',foco:''});
   }
   /* ⛔ 26/10 — Daniel (25/10): un coordinador puede mover el plazo de una tarea SUYA, *«pero me notifica en algun lugar
@@ -179,7 +181,7 @@ function _tuyoReusE_(){
 function _tuyoConvE_(){
   var cv=_miTurnoCv_(); if(!cv || _convEstado_(cv)!=='abierta') return false;
   var r=cv.resp && cv.resp[_fichaYo_()];
-  return !(r && typeof r==='object' && Object.keys(r).length);
+  return (r && typeof r==='object' && Object.keys(r).length) ? false : (_exencionConv_(cv)||true);   /* refutar108: la fecha de su exención, o `true` */
 }
 
 function _tuyoItemsE_(){
@@ -192,7 +194,7 @@ function _tuyoItemsE_(){
       return p && p.autor===yo && p.estado==='rechazada' && _sigueVisibleSinContar_(p, Date.parse(_ahoraApp_())); })
       .sort(function(a,b){ var fa=String(a.decidido_at||a.fecha||''), fb=String(b.decidido_at||b.fecha||''); return (fb>fa)-(fb<fa) || (Number(b.id)||0)-(Number(a.id)||0); })
       .map(function(p){ return {tarea:p.tarea, motivo:p.motivo}; }),
-    cambios:DOCS.filter(function(d){ return d.est==='cambios' && _autoresDe_(d).indexOf(yo)>=0; })   /* 12/11 (refutar18): también el que firmas con otro */.map(function(d){ return d.ref; }),
+    cambios:DOCS.filter(function(d){ return _cambiosSinAtender_(d, DOCS) && _autoresDe_(d).indexOf(yo)>=0; })   /* 12/11 (refutar18): también el que firmas con otro */.map(function(d){ return d.ref; }),
     reus:{lista:reus.map(function(r){ return {id:r.id, titulo:r.tit||r.titulo, bajoMin:Array.isArray(r.resp&&r.resp[yo])}; }),
           plazo:reus.length ? _plazoTxt_(reus[0].limite) : ''},
     conv:_tuyoConvE_()});
@@ -326,15 +328,18 @@ function insightsHTML(){
   var enAire=pendientes().reduce(function(a,p){return a+p.horas;},0);
   if(enAire>0) xs.push(['wa',h1(enAire)+' están sin firmar. Mientras sigan ahí, el umbral del mes y el '+
     'ranking se calculan con datos incompletos.']);
-  var sinCubrir=REUS.reduce(function(a,r){
-    if(_reuFinalizada_(r)) return a;                          // 04/11: lo celebrado ya no pende
+  /* refutar94 (18/11): PERSONAS, no pares persona-reunión: con dos reuniones abiertas a las que no contestó la misma gente, «13 personas» en un equipo de 11. Se cuenta por nombre. */
+  var _sinCub={};
+  REUS.forEach(function(r){
+    if(_reuFinalizada_(r)) return;                            // 04/11: lo celebrado ya no pende
     /* ⛔ Y una reunion OCULTA no suma: `_cobertura_` devuelve `null` y aqui se cuenta 0.
        No es «nadie sin cubrir», es «no lo se» — pero el aviso solo se imprime `if
        (sinCubrir)`, asi que un 0 calla en vez de afirmar. Lo que NO puede pasar es que
        cuente los 29 que el servidor no mando. */
     var sc = r.sinCubrir || _cobertura_(r).sinCubrir;   /* el dato real no lo trae: se deriva */
-    return a+((sc&&sc.length)||0); },0);
-  if(sinCubrir) xs.push(['wa',sinCubrir+' personas no han cubierto alguna disponibilidad abierta. '+
+    (sc||[]).forEach(function(n){ _sinCub[typeof n==='string' ? n : JSON.stringify(n)]=1; }); });
+  var sinCubrir=Object.keys(_sinCub).length;
+  if(sinCubrir) xs.push(['wa',sinCubrir+(sinCubrir===1?' persona no ha cubierto':' personas no han cubierto')+' alguna disponibilidad abierta. '+
     'Mira «Disponibilidad y riesgo» para ver qué sanción implicaría a cada una.']);
   /* ⛔ 21/10 (auditor 20, 🟠): por `horas`, que es lo que trae el servidor (`getFichajesAbiertos`); `min` sólo lo
      tiene la semilla de la maqueta. Contando `min`, los fichajes REALES no encendían el aviso nunca. Y se piden aquí
@@ -427,7 +432,7 @@ function _pintarActua_(){
   var opts=[];
   if(miembro(PD_NOM)) opts.push([PD_NOM,'Project Director']);
   if(miembro(REV2_NOM)) opts.push([REV2_NOM,'Revisor fijo']);
-  _coordsActuar_().forEach(function(x){ opts.push([x.nombre, x.pila||x.nombre.split(' ')[0]]); });
+  _coordsActuar_().forEach(function(x){ opts.push([x.nombre, pilaClara(x.nombre)||x.pila||x.nombre.split(' ')[0]]); });
   if(!opts.length) opts=[[ACTOR,'Yo']];
   $$('#actua button',caja).forEach(function(b){ b.remove(); });
   opts.forEach(function(o){

@@ -184,6 +184,8 @@ function _guardarPasoTarea_(t, a, b, hecho, h){
   if(b) b.disabled=true;
   api.moverEstadoTarea(t.url, t.e, a, h).then(function(r){ hecho(r); }).catch(function(e){
     if(b) b.disabled=false;
+    var _ch=_tareaCambioFuera_(e);   /* refutar73: la tarea cambió en Notion → se dice y la lista se pone al día */
+    if(_ch){ tost(_ch); return; }
     /* refutar37: con mala cobertura el aviso ya dice si se guardó o no («NO se haya guardado» / «puede que se haya guardado: recarga»): añadirle «La tarea sigue
        como estaba» lo contradecía cuando el servidor SÍ lo guardó y sólo se perdió la respuesta, y dejaba «)..» con dos puntos. */
     var m=String((e&&e.message)||e).replace(/^Error:\s*/,'').replace(/[.\s]+$/,'');
@@ -215,7 +217,7 @@ function _apelReciente_(ap){
 function _formApelar_(t){
   var cl='', op=nxElige('apelCl', APEL_CLAUSULAS.map(function(c){ return [c.k, c.t]; }), '');
   abrirModal('<div class="h1" style="font-size:18px">Apelar «'+esc(t.n)+'»</div>'+
-    '<p class="h1s">Es tu derecho (Art. 34 del RRI). Lo ve tu coordinador y el Project Director. Si no apelas y no la haces, resta 1 punto.</p>'+
+    '<p class="h1s">Es tu derecho (Art. 34 del RRI). Lo ve tu coordinador y el Project Director. Si no apelas y no la haces, resta 1 punto. Una vez enviada no se puede cambiar: repásala antes.</p>'+
     '<div class="tarj" style="padding:4px 12px">'+op+'</div>'+
     '<label class="campo" style="margin-top:12px"><span class="sc">Cuéntanos qué pasa <span class="req">*</span></span>'+
       '<textarea id="apelMotivo" data-borr="apel-tarea-'+esc(t.url||t.titulo||'')+'" placeholder="Qué te lo impide o por qué no te corresponde."></textarea></label>'+
