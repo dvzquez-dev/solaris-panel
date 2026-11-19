@@ -280,9 +280,16 @@ function _pasosSustituirE_(d){
    proposito: ahi «lo firma X» SI es verdad. */
 function _docAutorE_(d){
   if(!d || typeof ACTOR==='undefined' || d.autor!==ACTOR) return '';
-  var m=_docAutorModelo_({estado:d.est, nota:d.nota, decision:d.decision, decidedAt:d.decidedAt, revisor:d.revisor, url:d.notion});
-  if(!m || m.tipo==='cambios') return '';   /* `cambios` tiene su rama propia en `verDoc` (los pasos para corregir) */
+  var m=_docAutorModelo_({estado:d.est, nota:d.nota, decision:d.decision, decidedAt:d.decidedAt, revisor:d.revisor, url:d.notion, ref:d.ref});
+  if(!m || m.tipo==='cambios' || m.tipo==='revision') return '';   /* `cambios` tiene su rama propia en `verDoc` (los pasos para corregir); `revision` sigue con «lo firma X» (+ el aviso de abajo) */
   return '<div class="ruta">'+m.html+'</div>'+(m.tipo==='decidido' ? _pasosSustituirE_(d) : '');
+}
+
+/* refutar130: «mandé el archivo equivocado» — en revisión el autor tiene el camino (misma referencia por el formulario) y la ficha no lo decía. Misma puerta que el móvil. */
+function _docEquivocadoE_(d){
+  if(!d || typeof ACTOR==='undefined' || d.autor!==ACTOR || d.est!=='revision') return '';
+  var m=_docAutorModelo_({estado:'revision', ref:d.ref});
+  return m ? '<div class="ruta">'+m.html+'</div>' : '';
 }
 
 function _pasosCorregirE_(d){
@@ -383,8 +390,8 @@ function docCard(d){
        decididos. Lo decide `_docAutorE_`, gemela de `_docAutorHTML_` del movil. */
     acc=_aut;
   } else if(d.autor===ACTOR){
-    acc=sinRev ? '<div class="ruta">Es tuyo y no hay otro revisor: avisa al Project Director. Nadie decide lo suyo.</div>'
-               : '<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>';
+    acc=(sinRev ? '<div class="ruta">Es tuyo y no hay otro revisor: avisa al Project Director. Nadie decide lo suyo.</div>'
+               : '<div class="ruta">Es tuyo: lo firma <b>'+esc(rev)+'</b>. Nadie decide lo suyo, tampoco tú.</div>')+_docEquivocadoE_(d);
   } else if(d.revisor){
     acc='<div class="ruta">Ya lo decidió <b>'+esc(firmaCorta(d.revisor))+'</b>'+(/\.$/.test(firmaCorta(d.revisor))?'':'.')+' Puedes consultarlo; para cambiar la '+
       'decisión hace falta más rango que quien la tomó.</div>';

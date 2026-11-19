@@ -2309,7 +2309,8 @@ async function _cargarMisSanciones_(){
 }
 /* Los textos del formulario de apelar: UNO para las dos caras (el móvil lo abre en un modal; el escritorio, bajo la fila). */
 var APEL_SANC_TXT={
-  tienes:function(hasta){ return 'Tienes hasta el ' + (_isoADMY_(hasta) || '') + '. Mientras se resuelve, la sanción sigue aplicada.'; },
+  /* refutar130: una apelación enviada NO se edita ni se retira (el servidor admite UNA por sanción): se avisa ANTES de enviar, que es cuando se puede remediar. */
+  tienes:function(hasta){ return 'Tienes hasta el ' + (_isoADMY_(hasta) || '') + '. Mientras se resuelve, la sanción sigue aplicada. Una vez enviada no se puede cambiar: repásala antes.'; },
   campo:'Qué pasó', ayuda:'Lo que quieres que se tenga en cuenta.', enlace:'Enlace o foto (si lo hay)',
   vacio:'Cuenta qué pasó.', enviada:'Apelación enviada. Te avisamos cuando respondan.'
 };
@@ -3188,6 +3189,10 @@ function _copiarPanelEnDATA_(pnl){
   /* ⛔ 22/10 (auditor 30, 🟡 3): la curva de la cuota del MOTOR (umbral y techo, con las bajas). Sin esta línea se
      caería al suelo como `banda_min` (§3c-28) y la cara volvería a su curva SIN las bajas. */
   /* (refutador 33, 🟡 3) y un `null` que LLEGA la borra: es el motor diciendo «no la uses» (otra temporada) */
+  /* ⛔⛔ 19/11 (refutar131): LAS UNIDADES SIN COORDINADOR. El servidor las manda en `vacantes` y `_vacantesTxt_` las lee de `DATA.vacantes`, pero **nadie las
+     copiaba**: «El equipo» (móvil) y el aviso del escritorio no podían decir NUNCA «Estructuras — Sin coordinador desde el 03/11 · lo dejó Dora»; los dos extremos
+     tenían banco y el cable del medio no existía. Sin la lista, la unidad desaparecía de la pantalla que existe para contestar «¿a quién le llega esto?». */
+  if(Array.isArray(pnl.vacantes)) DATA.vacantes = pnl.vacantes;
   if('cuota_curva' in pnl) DATA.cuota_curva = (pnl.cuota_curva && typeof pnl.cuota_curva === 'object') ? pnl.cuota_curva : null;
   /* ⛔⛔ Y EL CONSEJO, IGUAL: lo manda `Codigo.gs:862` y no lo copiaba nadie, así que
      `DATA.consejo` era `undefined` **siempre**. En pantalla eso es convocar un «Consejo»
@@ -4908,6 +4913,17 @@ function _selloAprobado_(p, perAbierto, uc){
   }
   return verbo + ' ' + _firmaParte_(p) + ' · ' + (mes ? 'cuenta en ' + _nomPeriodo_(mes)
     : (cerrado ? 'de un mes ya cerrado' : 'sin mes confirmado'));
+}
+
+/* refutar130 (19/11): «me equivoqué en las horas y ya lo firmaron». El autor no puede corregir ni retirar un parte firmado (el servidor lo dice, pero en la pantalla no
+   había nada que dijera a quién pedirlo) y sólo lo revierte quien lo firmó, con motivo, y sólo mientras su mes siga abierto (después, el PD). Va tras el sello, SÓLO en
+   los partes propios que se aprobaron (un otorgado o un revertido no son un error del autor) y sólo si consta quién los firmó. */
+function _pistaCorregirFirmado_(p, sello){
+  if (!p || p.origen === 'otorgada' || p.origen === 'reversion') return '';
+  var por = String(p.decidido_por || '');
+  if (!por || /^el sistema\b/i.test(por)) return '';
+  if (/de un mes ya cerrado/.test(String(sello || ''))) return ' · si hay un error, el mes ya está cerrado: díselo al PD';
+  return ' · si hay un error, pídele a ' + ((typeof _pilaDeM_ === 'function' && _pilaDeM_(por)) || por) + ' que lo revierta y lo mandas bien';
 }
 
 function _diasHasta_(ms){
@@ -13718,10 +13734,13 @@ function _novHTML_(cara){
   if(typeof _puedeVerNovedades_!=='function' || !_puedeVerNovedades_()) return '';
   var d=_novDe_(cara);
   if(!d.pendientes.length && !d.hechas.length) return '';
-  var item=function(i){ return '<li>'+icoTexto(esc(i.txt))+'</li>'; };   /* los textos de las tandas llevan emojis de hace meses: se pintan como iconos */
+  /* ⛔ 19/11 (refutar131): los textos de las tandas llevan **negritas** y `código` de markdown, y aquí salían con los asteriscos y los acentos graves
+     a la vista («si es **telemática**…»). Se pintan como negrita y código, igual que el changelog (`_mdHTML_`). */
+  var md=function(t){ return esc(t).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>'); };
+  var item=function(i){ return '<li>'+icoTexto(md(i.txt))+'</li>'; };   /* los textos de las tandas llevan emojis de hace meses: se pintan como iconos */
   var tanda=function(t, hecha){
     return '<div class="novt'+(hecha?' ok':'')+'" data-nov="'+esc(t.id)+'">'+
-      '<div class="novh"><b>'+esc(t.titulo)+'</b><span class="novf">'+esc(t.fecha)+'</span></div>'+
+      '<div class="novh"><b>'+md(t.titulo)+'</b><span class="novf">'+esc(t.fecha)+'</span></div>'+
       '<ul class="novl">'+t.items.map(item).join('')+'</ul>'+
       (hecha
         ? '<div class="novb"><span class="novv">visto el '+esc(_novCuando_(t.visto_at))+'</span>'+
@@ -14101,6 +14120,11 @@ function _docAutorModelo_(e){
   var pie=firma ? '<br><span class="sc">'+esc(firma)+'</span>' : '';
   if(e.estado==='cambios')
     return {tipo:'cambios', html:'<b>Te pidieron cambios.</b> '+esc(e.nota||'')+pie};
+  /* refutar130 (19/11): «mandé el archivo equivocado». Mientras nadie decide, el servidor admite una ronda nueva con la MISMA referencia (`envio` distinto: avisa al revisor
+     y el archivo anterior queda en el historial), pero la ficha del autor no decía nada y no hay botón de retirar. Se dice el camino y que el revisor ya puede estar leyendo el viejo. */
+  if(e.estado==='revision')
+    return {tipo:'revision', html:'<b>En revisión.</b> ¿Mandaste el archivo equivocado? Vuelve a enviarlo por el formulario: en «¿Qué estás enviando?» elige «Corrección tras cambios pedidos» y pon la MISMA referencia'+
+      (e.ref ? ' ('+esc(e.ref)+')' : '')+'. Se avisa a quien lo revisa y el anterior queda en el historial; no se puede retirar.'};   /* sin `pie`: en revisión no hay ninguna decisión que firmar */
   /* Desde un rechazo no hay «reenviar» (`Codigo.gs` exige `cambios`): lo suyo es un envío NUEVO, enlazado al original,
      que no se borra. Lo dicen las dos caras (hasta el 01/11 sólo el móvil). */
   if(e.estado==='rechazado')
@@ -16457,8 +16481,10 @@ function _tareaToastParte_(t, h, r){
 }
 /* Lo que se le dice al DESHACER una entrega: los partes sin firmar se retiran en la misma escritura. */
 function _tareaToastRetirados_(r){
-  var n = r && r.partes_tarea && r.partes_tarea.retirados;
-  return n ? ' ' + (n === 1 ? 'Se retiró el parte propuesto.' : 'Se retiraron los ' + n + ' partes propuestos.') : '';
+  var pt = r && r.partes_tarea, n = pt && pt.retirados, f = pt && pt.firmados;
+  /* refutar130 (19/11): lo YA FIRMADO no se retira con el «Deshacer»: son horas trabajadas. Se dice, o «Deshecho» se lee como que las horas se fueron con el paso. */
+  var firm = f ? ' ' + (f === 1 ? 'El parte ya firmado (' : 'Los ' + f + ' partes ya firmados (') + nf2(pt.horas_firmadas || 0) + ' h) sigue contando: si no debía, díselo ' + _tareaFirmaTxt_() + '.' : '';
+  return (n ? ' ' + (n === 1 ? 'Se retiró el parte propuesto.' : 'Se retiraron los ' + n + ' partes propuestos.') : '') + firm;
 }
 /* REINTENTO (`proponerPartesTarea`): la tarea ya está entregada y no hay parte mío (falló, o la entregué sin horas). El camino
    normal viaja con el paso (`moverEstadoTarea` con `horas`). El servidor sólo lo admite en la ventana de la entrega. */
@@ -16848,6 +16874,13 @@ async function _ftBajar_(accion, t, extra){
   }
   return {trozos: trozos, nombre: ult.nombre, ext: ult.ext};
 }
+/* refutar130 (19/11): la foto subida al turno equivocado. Quien la subió la quita MIENTRAS NO SE ENTREGUE (la entrega la hace el responsable o el reloj tras el turno); pasada
+   la entrega, el botón desaparecía sin explicación. Se dice hasta cuándo, y a quién pedirlo después. Pura: la prueba la corre sin pintar el visor. */
+function _ftAvisoQuitarTxt_(f, gestiona){
+  if(!f || !f.mia || gestiona) return '';
+  return f.entregada ? 'Ya está entregada a la carpeta del turno: para quitarla pídeselo al responsable audiovisual o al PD.'
+                     : 'Es tuya: la puedes quitar hasta que se entregue a la carpeta del turno. Si es de otro turno, quítala y súbela en el que toca.';
+}
 function _ftVisor_(t, k, id){
   var r = FT_.est[k] && FT_.est[k].r, f = r && r.fotos.filter(function(x){ return x.id === id; })[0]; if(!f) return;
   _pselCss_(); _ftCss_();
@@ -16858,6 +16891,7 @@ function _ftVisor_(t, k, id){
   ov.innerHTML = '<div class="psel-hoja ftf-vis" role="dialog" style="width:min(420px,94%);height:auto;max-height:92%;border-radius:16px;border-width:1px">'+
     (f.mini ? '<img data-ftimg src="' + esc(f.mini) + '" alt="">' : '<p class="ftf-nota">Sin vista previa (' + esc(String(f.ext).toUpperCase()) + '). Descarga el original.</p>')+
     '<p class="ftf-nota">' + esc(f.autor) + ' · ' + esc(_ftHoraDe_(f.at)) + ' · ' + esc(_ftBytesTxt_(f.tam)) + (f.titulo ? ' · ' + esc(f.titulo) : '') + (f.entregada ? ' · entregada' : '') + '</p>'+
+    (_ftAvisoQuitarTxt_(f, r.puedeGestionar) ? '<p class="ftf-nota" data-ftaviso>' + esc(_ftAvisoQuitarTxt_(f, r.puedeGestionar)) + '</p>' : '')+
     '<div class="ftf-fila">' + (f.ext !== 'heic' ? '<span class="ftf-c" data-ftorig data-p>Ver original</span>' : '') +
     '<span class="ftf-c pri" data-ftdesc1 data-p>Descargar original</span>' +
     (puedeQuitar ? '<span class="ftf-c" data-ftquitar data-p>Quitar</span>' : '') + '<span class="ftf-c" data-ftcerrar data-p>Cerrar</span></div></div>';
@@ -18544,7 +18578,7 @@ function _votAdoptar_(v){
 }
 
 function _votCuorumTxt_(c){
-  return c.n+' de '+c.de+(c.minimo ? ' · cuórum '+c.minimo+(c.hay ? ' ✓' : '') : ' · sin cuórum');
+  return c.n+' de '+c.de+(c.minimo ? ' · cuórum '+c.minimo+(c.hay ? ' alcanzado' : '')   /* 19/11: era « ✓» (un emoji: probar_sin_emojis_caras) */ : ' · sin cuórum');
 }
 function _votPlazoTxt_(v){
   if(v.estado==='cerrada') return 'cerrada'+(v.cerrada && v.cerrada.como==='plazo' ? ' por plazo' : '');
@@ -18641,7 +18675,7 @@ function votNuevaHTML(){
         return '<button type="button" class="pick" data-vact="plantilla" data-vqi="'+qi+'" data-vp="'+pi+'">'+esc(p[0])+'</button>'; }).join('')+'</div>'+
       q.opciones.map(function(o,oi){
         return '<div class="vorow"><input class="vin" data-vf="op" data-vqi="'+qi+'" data-voi="'+oi+'" placeholder="Opción '+(oi+1)+'" value="'+esc(o)+'" maxlength="120">'+
-          (q.opciones.length>2 ? '<button type="button" class="vx" data-vact="quitaro" data-vqi="'+qi+'" data-voi="'+oi+'" aria-label="Quitar la opción">✕</button>' : '')+'</div>'; }).join('')+
+          (q.opciones.length>2 ? '<button type="button" class="vx" data-vact="quitaro" data-vqi="'+qi+'" data-voi="'+oi+'" aria-label="Quitar la opción">'+ico('cerrar')+'</button>' : '')+'</div>'; }).join('')+
       (q.opciones.length<12 ? '<button type="button" class="btn sm" data-vact="masop" data-vqi="'+qi+'">+ Opción</button>' : '')+
       '<div class="vsws">'+_votSiNoHTML_('votMul'+qi, q.multiple, 'Se pueden elegir varias')+_votSiNoHTML_('votAno'+qi, q.anonima, 'Anónima')+'</div></div>';
   }).join('');

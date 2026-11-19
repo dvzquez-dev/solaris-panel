@@ -334,6 +334,14 @@ td .av{width:21px;height:21px;border-radius:5px;background:var(--sur2);border:1p
 .dec .tx{flex:1;min-width:0}
 .dec .tx b{display:block;font-size:13px}
 .dec .tx small{display:block;font-size:11px;color:var(--ink3);margin-top:2px}
+.dec .tx small .nb{font-weight:600;color:var(--ink2)}
+/* La fila de móvil (`.fila` con `.a` y `.d`) que comparte `comun.js` (el interruptor de Sonidos): sin esto salía sin estilo, con el botón pegado al texto.
+   `:has(>.a)` porque `.fila` también la usa Horas con otra forma (`.k`). */
+.fila:has(>.a){display:flex;align-items:center;gap:12px;padding:11px 13px}
+.fila>.a{flex:1;min-width:0}
+.fila>.a b{display:block;font-size:13px}
+.fila>.a small{display:block;font-size:11px;color:var(--ink3);margin-top:2px}
+.fila>.d{flex:none}
 .dec .der{display:flex;align-items:center;gap:9px;flex:none}
 .dec .chev{color:var(--ink3);font-family:var(--mono)}
 

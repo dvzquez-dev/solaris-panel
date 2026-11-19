@@ -171,9 +171,15 @@ function _notisHTML_(){
   if(!_pushSoportado_())
     return _avisoFallo+'<div class="tarj"><p class="rnota" style="margin:0;color:var(--warn)">Este navegador '+
       'no admite notificaciones y aquí te perderías los avisos. Ábrelo desde el móvil.</p></div>';
+  /* ⛔ 19/11 (refutar131): el gate del arranque sólo comprueba el permiso AL ENTRAR. Si el teléfono se lo quita con la app abierta (o la persona lo
+     deniega desde sus ajustes), esta pantalla seguía enseñando los interruptores como si fueran a servir: se dice que no llegará nada y dónde se arregla. */
+  var _avisoPermiso = (Notification.permission!=='granted')
+    ? '<div class="tarj" id="ajNotisAviso"><p class="rnota" style="margin:0;color:var(--warn)">El teléfono tiene las notificaciones de esta app '+
+      (Notification.permission==='denied'?'bloqueadas':'sin activar')+', así que <b>no te llega ningún aviso</b>, elijas lo que elijas aquí. '+
+      'Actívalas en los ajustes del teléfono (Notificaciones → Solaris o tu navegador) y vuelve a abrir la app.</p></div>' : '';
   /* El botón de «activar» se fue: para llegar hasta aquí ya has pasado el gate del arranque.
      Lo que queda es elegir QUÉ te llega. */
-  return _avisoFallo+'<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
+  return _avisoPermiso+_avisoFallo+'<div class="tarj"><div class="plg"><div class="plgh" data-plg data-p>'+
       '<b>Qué avisos quieres recibir</b>'+
       '<svg viewBox="0 0 24 24" style="margin-left:auto;width:15px;height:15px;fill:none;'+
         'stroke:currentColor;stroke-width:2.4;transition:transform .3s"><path d="M6 9l6 6 6-6"/></svg></div>'+

@@ -330,7 +330,9 @@ function buzonModal(tipo, prev){
       '<button data-g="Cosmético"'+_marcaG_('Cosmético')+
         ' data-p>Es cosmético</button></div>':'')+
     _fotoBuzonHTML_()+
-    '<p class="rnota">Lo revisa el Project Director y, si sale adelante, te avisamos.</p>'+
+    /* ⛔ 19/11 (refutar131): decía «si sale adelante, te avisamos» y NADA avisa a quien reporta (ni push ni lista de sus reportes): se promete sólo lo que hay.
+       Lo que falta —que se le avise de la decisión— está a «Dudas» del INFORME de refutar131. */
+    '<p class="rnota">Lo revisa el Project Director.</p>'+
     '<button class="btn pri full" data-p id="bzEnviar" style="margin-top:10px">Enviar</button>');
   /* (`grav` ya se declaró arriba, con lo que venía en `prev`: aquí se clavaba
      'Molesta' y eso borraba la elección en cada reconstrucción del modal.) */

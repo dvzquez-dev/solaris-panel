@@ -396,7 +396,7 @@ function _pasosCorregirM_(e){
 function _docAutorHTML_(e){
   if(!e || _autoresDe_(e).indexOf(yoNombre())<0) return '';   /* 12/11 (refutar18): también quien lo firma con otro */
   var est=e.estado;
-  var m=_docAutorModelo_({estado:est, nota:e.nota, decision:e.decision, decidedAt:e.decidedAt, revisor:e.revisor, url:e.paginaNotion});
+  var m=_docAutorModelo_({estado:est, nota:e.nota, decision:e.decision, decidedAt:e.decidedAt, revisor:e.revisor, url:e.paginaNotion, ref:e.ref});
   if(!m) return '';
   var marco='<div class="avisolargo" style="margin-top:14px">';
   /* ⛔ EL ROTULO DECIA «Reenviar corregido» Y NO REENVIA NADA: `Codigo.gs:965-967`

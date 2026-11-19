@@ -138,8 +138,10 @@ function _notisPrefsHTML_(){
        qué éste no tiene botón?», y al pie no la lee nadie. */
     filas+='<div class="dec" style="cursor:default"><span class="tx"><b>'+esc(e[0])+'</b>'+
       '<small>'+esc(e[1])+
-      (fijo?' · <b>no se puede desactivar</b>: lleva plazo y consecuencias':'')+
-      (vivo?'':' · <b>hoy no se manda ninguno de este tipo</b>: se guarda tu elección y '+
+      /* ⛔ 19/11 (refutar131): `<span class="nb">`, NO `<b>`: `.dec .tx b` es el TITULAR de la fila (bloque a 13 px) y el «no se puede desactivar»
+         salía como un segundo título con «: lleva plazo…» huérfano debajo. */
+      (fijo?' · <span class="nb">no se puede desactivar</span>: lleva plazo y consecuencias':'')+
+      (vivo?'':' · <span class="nb">hoy no se manda ninguno de este tipo</span>: se guarda tu elección y '+
         'valdrá en cuanto exista')+
       '</small></span><span class="der">'+(fijo
         ? '<span class="chip ok">siempre</span>'

@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0C0B0B">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <title>Solaris · Puente de mando</title>
-<link rel="stylesheet" href="escritorio.css?v=265a99d">
+<link rel="stylesheet" href="escritorio.css?v=7e79494">
 </head>
 <body>
 
@@ -50,7 +50,7 @@
   </aside>
 
   <header class="top">
-    <button id="btnLat" class="btnlat" aria-label="Abrir el menú de pantallas" aria-expanded="false" aria-controls="nav">☰</button>
+    <button id="btnLat" class="btnlat" aria-label="Abrir el menú de pantallas" aria-expanded="false" aria-controls="nav"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></button>
     <div class="miga"><span>Solaris</span><span style="color:var(--ink3)">/</span>
       <span id="migaA">Operación</span><span style="color:var(--ink3)">/</span><b id="migaB">Panel de mando</b>
       <!-- El distintivo es tambien LA VUELTA a produccion: ver el movil. -->
@@ -114,12 +114,12 @@
          bajo el marco (medido en Chromium, scrollHeight 2290 en una ventana de 900). Nadie la usaba:
          la barra del escritorio es `#viajev`, dentro del lateral, y era además un id DUPLICADO. -->
 
-<script src="comun.js?v=1c97157"></script>
-<script src="notis.escritorio.js?v=f8d6e8a"></script>
+<script src="comun.js?v=e55c17d"></script>
+<script src="notis.escritorio.js?v=e2a8717"></script>
 <script src="cierre.escritorio.js?v=21604cb"></script>
 <script src="turnos.escritorio.js?v=37b0144"></script>
 <script src="buzon.escritorio.js?v=ba45925"></script>
-<script src="documentos.escritorio.js?v=9bc268c"></script>
+<script src="documentos.escritorio.js?v=05e04d9"></script>
 <script src="sanciones.escritorio.js?v=9dd396d"></script>
 <script src="reuniones.escritorio.js?v=2948968"></script>
 <script src="horas.escritorio.js?v=0bf1145"></script>
@@ -2603,8 +2603,14 @@ function _filasRanking_(vis){
   var hay=vis.some(function(m){ return typeof m.puesto==='number'; });
   var con=vis.filter(function(m){ return !_sinCierres_(m); });
   return {
+    /* ⛔ 19/11 (refutar132): EL PUESTO LO MANDA EL SERVIDOR, también en los empates. Aquí se ordenaba sólo por ritmo, y con dos personas a la
+       par (10,0 y 10,0) el orden era el del roster mientras el servidor desempata por el nombre (`temporada.ranking_personas`, `orden_es`): Cris
+       veía «vas 3.º» en el móvil y el PD la tenía 2.ª en esta tabla. Con `puesto` manda `puesto`; sin él (maqueta) se desempata por nombre. */
     rk: con.filter(function(m){ return !hay || typeof m.puesto==='number'; })
-           .sort(function(a,b){return _hMesDe_(b)-_hMesDe_(a);}),
+           .sort(function(a,b){
+             if(typeof a.puesto==='number' && typeof b.puesto==='number') return a.puesto-b.puesto;
+             return (_hMesDe_(b)-_hMesDe_(a)) || String(a.nombre||'').localeCompare(String(b.nombre||''),'es');
+           }),
     fuera: hay ? con.filter(function(m){ return typeof m.puesto!=='number'; }) : []
   };
 }
@@ -3255,7 +3261,7 @@ V.ajustes={g:'Ajustes',t:'Ajustes',f:function(){
      cargarla siempre serían 32 llamadas de más a Apps Script al día. El cerrojo está dentro
      (`NOTIS_SRV`), así que repintar no vuelve a preguntar. */
   _notisCargar_(pintar);
-  return pan('Notificaciones', (typeof Notification==='undefined')?'no disponibles':Notification.permission,
+  return pan('Notificaciones', (typeof Notification==='undefined')?'no disponibles':({granted:'permiso dado',denied:'bloqueadas','default':'sin permiso'}[Notification.permission]||Notification.permission),
       _notisHTML_())+
     pan('Sonidos','', _sonidosHTML_())+
     pan('Sesión','', tabla([['Dato'],['Valor']],
@@ -3896,7 +3902,7 @@ function colocarEstrella(animar){
    Existe porque el 27/07 se perdieron dos rondas depurando builds distintos: Pages manda
    `max-age=600`, asi que una recarga normal no pregunta en 10 minutos y no habia forma
    de saber si dos personas miraban el mismo codigo. */
-var BUILD='05bb60f';
+var BUILD='9b018d2';
 function _pintarPie_(){
   var t=document.getElementById('pieTemp'), c=document.getElementById('pieCon');
   /* La temporada Y la version del fichero. Lo segundo porque Pages cachea el HTML 10 min y

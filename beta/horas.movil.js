@@ -1392,7 +1392,8 @@ function filaParte(p){
      SERVIDOR y el último cierre solo lo tiene el PD: sin ellos la puerta dice lo que no sabe. */
   if(_cuentaYa_(p.e)){
     var _perS=(typeof _periodoAbierto_==='function') ? _periodoAbierto_() : null;   /* ⛔ por la puerta (791.ª) */
-    sub += ' · '+esc(_selloAprobado_(p, _perS, (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null));
+    var _sello=_selloAprobado_(p, _perS, (typeof CIERRE_UC!=='undefined') ? CIERRE_UC : null);
+    sub += ' · '+esc(_sello)+esc(_pistaCorregirFirmado_(p, _sello));   /* refutar130: a quién pedirle corregir lo ya firmado */
   }
   /* 12/11 (refutar27): aprobado y aún NO en la ficha (`enFicha===false`: Notion lo aplica después) no «sumó»: SUMARÁ. La píldora de arriba ya lo decía. */
   var catTxt = _cuentaYa_(p.e) ? (p.enFicha===false ? ' · aún no en tu ficha: sumará a ' : ' · sumó a ')+catEti(p.cat)
@@ -2619,7 +2620,7 @@ function _rankSubsHTML_(){
     '<div class="tarj">'+(subs.length?subs.map(function(s,i){
       var mio=s.u===YO.unidad;
       return '<div class="fila"><div class="a"><b'+(mio?' style="color:var(--red2)"':'')+'>'+(i+1)+'. '+esc(s.u)+(mio?' (tú)':'')+'</b>'+
-        '<small>'+s.n+' personas</small>'+
+        '<small>'+s.n+(s.n===1?' persona':' personas')+'</small>'+   /* 19/11 (refutar132): «1 personas» */
         '<div style="height:7px;border-radius:4px;background:var(--sur2);margin-top:6px;overflow:hidden">'+
         '<i style="display:block;height:100%;width:'+(s.media/maxS*100).toFixed(0)+'%;border-radius:4px;'+
         'background:'+(mio?'var(--red)':'var(--ink3)')+'"></i></div></div>'+
