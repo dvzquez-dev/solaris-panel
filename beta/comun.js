@@ -8421,6 +8421,15 @@ function _avisoRevertirCierre_(est, hoy){
   return n.charAt(0).toUpperCase() + n.slice(1) + (dia ? ' (' + dia + ')' : '') + '.';
 }
 
+/* 19/11 (refutar156) · LO QUE «REVERTIR» NO DESHACE, dicho con lo que hay que HACER. Antes: «El bloque del mes en el Registro no se deshace: revísalo.»
+   — sin decir qué mirar ni qué pasa si no se mira. Lo que pasa (`revertir_cierre.py`, doc de cabecera): el Registro identifica el bloque por su
+   ETIQUETA, así que volver a aplicar el cierre devuelve «ya estaba» y NO lo reescribe; la cuota y el ranking salen del Registro, y siguen con las
+   horas del cierre deshecho. UNA frase para las dos caras (el escritorio y el móvil la repetían, cada una a su manera). */
+function _notaRegistroRevertir_(){
+  return 'El bloque del mes en el Registro no se deshace, y el cierre nuevo no lo reescribe: bórralo a mano en «Registro mensual Solaris» antes de volver a aplicar. '+
+    'Si no, la cuota y el ranking siguen con las horas del cierre deshecho.';
+}
+
 /* 02/11 (cierremovil): EL GESTO de «Revertir el cierre», UNA vez para las dos caras (antes vivía inline en `escritorio.html` y el
    móvil aplicaba sin poder deshacer). Esto SÍ acaba escribiendo en Notion (devuelve las fichas a su «antes»): aquí sólo se levanta
    el flag; lo hace `revertir_cierre.py` desde el gate, por persona y parándose si alguien tocó la ficha. Pregunta con el diálogo

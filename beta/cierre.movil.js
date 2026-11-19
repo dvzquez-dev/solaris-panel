@@ -139,7 +139,21 @@ function _revertirCierreHTML_(est){
     (rv?'<button class="btn" '+((vr||_aplicandoVivo_(est))?'disabled ':'')+'data-revertircierre style="width:100%;margin-top:'+(av?'10':'18')+'px">'+
         (vr?'Revirtiendo… (en cola o devolviendo las fichas)':'Revertir el cierre de '+esc(_nomPeriodo_(rv.periodo)))+'</button>'+
       '<p class="rnota">Devuelve las fichas de Notion a como estaban antes de este cierre. Si alguien ha tocado una ficha después, '+
-      'se para ahí y lo dice. El bloque del mes en el Registro no se deshace: revísalo.</p>':'');
+      'se para ahí y lo dice. '+esc(_notaRegistroRevertir_())+'</p>':'');
+}
+
+/* 19/11 (refutar156) · «CALCULAR OTRA VEZ» CON EL PLAN YA DELANTE. Sólo salía sin plan: tras REVERTIR un cierre, el plan sigue ahí (sin aplicar, con
+   las cifras de antes de cerrar) y el móvil sólo ofrecía «Aplicar» ese plan viejo — justo cuando hay que recalcular —, y el gate, si Notion cambió desde
+   que se calculó, dice «pulsa Calcular otra vez» (`aplicar_cierre.py`) a quien en el móvil no tiene botón. El escritorio ya lo tenía. Un cierre APLICADO
+   no lo ofrece: recalcular borraría el rastro de que se aplicó (el escritorio lo avisa; aquí se evita). Mismo `data-cerrarmes` y mismo gesto. */
+function _recalcularCierreHTML_(plan, nBloq, vuela){
+  if(!plan || plan.aplicado || plan.resultado) return '';
+  var cer=_mesACerrar_();
+  if(cer.curso) return '';
+  return '<button class="btn" '+((nBloq||vuela)?'disabled ':'')+'data-cerrarmes style="width:100%;margin-top:10px">'+
+      (nBloq?'Bloqueado · '+nBloq+' sin resolver':'Calcular otra vez el cierre de '+esc(cer.mes))+'</button>'+
+    '<p class="rnota">El plan de arriba sale de las fichas de cuando se calculó. Si has revertido el cierre, o ha cambiado algo desde entonces, '+
+    'calcúlalo otra vez antes de aplicarlo.</p>';
 }
 
 function _cierreHTML_(est, err, cargando){
@@ -181,7 +195,7 @@ function _cierreHTML_(est, err, cargando){
   if(plan) return cab+(filas ? '<div class="rec">'+filas+'</div>'+
       '<p class="rnota" style="color:var(--warn)">Esto entra en la cuenta y sigue sin '+
       'resolver. El servidor no deja aplicar el cierre hasta que se decida: lo que se decidiera después dejaría '+
-      'mal la cuota de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan, bloq.length, _aplicandoVivo_(est))+_revertirCierreHTML_(est);
+      'mal la cuota de alguien.</p>' : '')+_planHTML_(plan)+_decidirCierreHTML_(plan, bloq.length, _aplicandoVivo_(est))+_recalcularCierreHTML_(plan, bloq.length, _aplicandoVivo_(est))+_revertirCierreHTML_(est);
   if(enc) return cab+'<p class="rnota">Encolado. La rutina lo recoge en la siguiente pasada '+
     '(va cada 2 minutos) y deja el plan.</p>'+_revertirCierreHTML_(est);
   return cab+(filas ? '<div class="rec">'+filas+'</div>'+
