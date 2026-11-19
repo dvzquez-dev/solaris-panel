@@ -98,7 +98,7 @@ function _sancionesHTML_(){
   var K={ campo:function(t,h){ return '<div class="campo"><span class="sc">'+t+'</span>'+h+'</div>'; },
           nota:function(h,aviso){ return '<p class="rnota" style="margin:0 0 10px'+(aviso?';color:var(--warn)':'')+'">'+h+'</p>'; } };
   return '<div class="mtit">Sanciones</div>'+
-    '<div class="msub">Ponerlas y decidirlas. El comunicado sigue saliendo del escritorio.</div>'+
+    '<div class="msub">Ponerlas y decidirlas. El comunicado sale después de decidirlas.</div>'+
     /* A cuánta gente puedes sancionar, como el `pan(...)` del escritorio (ficha del 20/08: `nTotal` se
        calculaba aquí y no se pintaba nunca). */
     /* sanciones-1 (12/11): con sanciones esperando, lo PENDIENTE va primero y «Poner una sanción» queda en UNA barra pegada al título (siempre a la vista,

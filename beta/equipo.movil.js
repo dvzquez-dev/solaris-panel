@@ -88,6 +88,11 @@ function esPD(){ return ST.rol==='pd' || (typeof YO!=='undefined' && YO && YO.ca
 /* ⛔ 31/10: la REDACCIÓN de estos avisos vive en `_tuyoItems_` (`comun.js`), que pinta también el escritorio. Aquí sólo
    quedan las CUENTAS de este modelo (PARTES con `.e`, `_docsPend_`, `_convAbierta_`) y el HTML de la fila. */
 function _tuyoFilaM_(it){
+  /* refutar146 (19/11): un aviso que «lleva» a Estado, estando ya en Estado (el de la apelación: se responde en el escritorio, y no hay otro sitio),
+     era un botón con su flecha «›» que no llevaba a ninguna parte. Sin destino, sin botón y sin flecha: es sólo un aviso. */
+  if(it.ir==='estado') return '<div class="aviso'+(it.mal?' mal':'')+'">'+
+    '<span class="ic"><svg><use href="#i-warn"/></svg></span>'+
+    '<div style="flex:1"><b>'+it.tit+'</b><p>'+it.txt+'</p></div></div>';
   return '<div class="aviso'+(it.mal?' mal':'')+'" data-ir="'+it.ir+'"'+(it.reuid!==''?(' data-reuid="'+esc(it.reuid)+'"'):'')+' data-p>'+
     '<span class="ic"><svg><use href="#i-warn"/></svg></span>'+
     '<div style="flex:1"><b>'+it.tit+'</b><p>'+it.txt+'</p></div><span class="chev">›</span></div>';
