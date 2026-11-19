@@ -3015,7 +3015,9 @@ function tost(m, o){
     return;
   }
   t.classList.remove('fijo'); t.onclick=null;
-  t._h=setTimeout(cerrar, 2600);
+  /* refutar142 (19/11): 2,6 s fijos NO bastan para «Sin conexión con el servidor: lo más probable es que NO se haya guardado…» (190 letras: sin datos en el móvil se iba sin leerse).
+     Sigue siendo efímero (decisión del 28/07: «no hay red» no se queda fijo), pero dura lo que tarda en leerse: ~55 ms por letra, entre 2,6 y 9 s. */
+  t._h=setTimeout(cerrar, Math.max(2600, Math.min(9000, String(m==null?'':m).length*55)));
 }
 
 
