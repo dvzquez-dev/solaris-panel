@@ -225,8 +225,9 @@ function _repartirEntregablesM_(lista){
    `vDocs`, y un tercer criterio para «¿tengo algo en Documentos?» es como divergen. */
 function _docsAvisoM_(){
   var pend = (typeof _docsPend_==='function') ? (_docsPend_()||[]).length : 0;
+  var todos = ((typeof ENTREGABLES!=='undefined' && ENTREGABLES)||[]).concat((typeof ENT_REV!=='undefined' && ENT_REV)||[]);
   var mios = (typeof ENTREGABLES!=='undefined' && ENTREGABLES)
-    ? ENTREGABLES.filter(function(e){ return e && e.estado==='cambios'; }).length : 0;
+    ? ENTREGABLES.filter(function(e){ return e && _cambiosSinAtender_(e, todos); }).length : 0;      /* 19/11: sin el ya sustituido por un envío nuevo */
   return pend + mios;
 }
 

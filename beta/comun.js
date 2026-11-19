@@ -8787,7 +8787,7 @@ function _hayAMedias_(paraIr){
    otra versión: se TAPA la app con un cartel que no deja tocar (un toque en una pantalla mezclada puede escribir mal), se tira la caché del worker (donde
    está el poso) y se recarga: sin nada guardado, el worker viejo sirve la página nueva ENTERA desde la red. Una vez cada 2 minutos: si la mezcla sigue, no
    se encierra a nadie (`_vigilarVersion_` la cura cuando llegue el HTML). */
-var COMUN_BUILD='8e36527';
+var COMUN_BUILD='91f2bb7';
 function _mezclaDeVersiones_(build, src){
   var m=/[?&]v=([0-9a-f]{7})$/.exec(String(src||''));
   return !!m && /^[0-9a-f]{7}$/.test(String(build||'')) && m[1]!==String(build);
@@ -14256,6 +14256,13 @@ function _docYaCuenta_(e){ return ['aprobado','anot','publicando','publicado'].i
 /* La marca corta de una FILA de lista: '' salvo si hay una versión más nueva. */
 function _marcaSuperadaDoc_(e, lista){
   return _cadenaDoc_(e, lista).despues ? ' · hay una versión más nueva' : '';
+}
+/* 19/11 (refutar158) · ¿LE TOCA AL AUTOR CORREGIR ESTE EXPEDIENTE? `cambios` y SIN versión más nueva viva. Quien en vez de la «corrección tras
+   cambios pedidos» sube un envío NUEVO que sustituye al viejo (`sustituyeA`) ya ha hecho lo que se le pedía, pero el viejo seguía en `cambios`
+   para siempre: el globo de Docs, el aviso del inicio («corrígelo y reenvíalo») y la ficha seguían pidiéndole algo que no hay que hacer.
+   Una puerta para el globo y el aviso de las dos caras (`lista` = los expedientes que ve esta persona, como en `_cadenaDoc_`). */
+function _cambiosSinAtender_(e, lista){
+  return _estadoDeDoc_(e)==='cambios' && !_cadenaDoc_(e, lista).despues;
 }
 /* ⛔ 18/11 (refutar114): CUÁNTO LLEVA APROBADO SIN PUBLICARSE. Aprobar deja `aprobado`; lo publica un timer del mini PC (`documentos_ciclo.py`,
    cada 10 min) y, si ese timer no corre, falla o aplaza (horas valle), el expediente se queda así SEMANAS con una píldora verde «Aprobado» y

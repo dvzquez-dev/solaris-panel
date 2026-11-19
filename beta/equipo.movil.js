@@ -168,7 +168,8 @@ function vEstado(){
         (_dMia ? (_pendL.length===1 ? ' Lleva ' : ' La más antigua lleva ')+_dMia+' días esperando.' : '')};
   }
   /* ⛔ Los documentos con cambios pedidos se CUENTAN (el globo del nav, `badges()`, usa el mismo filtro). */
-  var cambios=ENTREGABLES.filter(function(e){return e.estado==='cambios';}).map(function(e){ return e.ref; });
+  var _todosDocs=ENTREGABLES.concat((typeof ENT_REV!=='undefined' && ENT_REV)||[]);
+  var cambios=ENTREGABLES.filter(function(e){return _cambiosSinAtender_(e, _todosDocs);}).map(function(e){ return e.ref; });   /* 19/11: el globo y este aviso, el mismo filtro */
   /* NO uses `REUNION` aqui: es el puntero de la pantalla de Reuniones y cambia al
      navegar, asi que este aviso te mandaba a cubrir la que estabas mirando mientras la
      que cierra manana no salia por ningun lado. Y de no cubrir a tiempo salen sanciones.
